@@ -13,6 +13,7 @@ struct Symbol {
   const char *end;
 
   Symbol(SymbolType type_, const char *start_, const char *end_) : type(type_), start(start_), end(end_) { }
+  Symbol() : type(ERROR), start(0), end(0) { }
 };
 
 struct input_t;

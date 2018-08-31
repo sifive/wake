@@ -124,6 +124,7 @@ static bool lex_str(input_t &in, unsigned char q, std::string& result)
 #define mkSym(x) Symbol(x, in.tok, in.cur)
 
 static Symbol lex_top(input_t &in) {
+  start:
   in.tok = in.cur;
 
   /*!re2c
@@ -140,9 +141,10 @@ static Symbol lex_top(input_t &in) {
       end { return mkSym((in.lim - in.tok == YYMAXFILL) ? END : ERROR); }
 
       // whitespace
-      [ ]+       { }
-      "#" [^\n]* { }
-      "\n" [ ]*  { return mkSym(EOL); }
+      [ ]+              { goto start; }
+      "#" [^\n]*        { goto start; }
+      "\n" [ ]* / [#\n] { goto start; }
+      "\n" [ ]*         { return mkSym(EOL); }
 
       // character and string literals
       ['"] { std::string out; return mkSym(lex_str(in, in.cur[-1], out) ? STRING : ERROR); }
@@ -177,7 +179,7 @@ Lexer::Lexer(const char *file) : engine(new input_t(fopen(file, "r"))), state(ne
 Lexer::~Lexer() { fclose(engine->file); }
 
 Symbol Lexer::get() {
-  if (state->indent == state->tabs.back()) {
+  if (state->indent != state->tabs.back()) {
     if (state->indent > state->tabs.back()) {
       state->tabs.push_back(state->indent);
       return Symbol(INDENT, engine->tok, engine->cur);

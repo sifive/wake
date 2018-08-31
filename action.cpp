@@ -71,13 +71,3 @@ void Thunk::execute(ActionQueue& queue) {
     assert(0);
   }
 }
-
-int main() {
-  ActionQueue queue;
-  while (!queue.empty()) {
-    Action *doit = queue.front();
-    queue.pop_front();
-    doit->execute(queue);
-  }
-}
-
