@@ -19,7 +19,7 @@ std::ostream& operator<<(std::ostream& os, const Expr *expr) {
     return os << "Lambda(" << lambda->name << "," << lambda->body.get() << ")";
   } else if (expr->type == DefMap::type) {
     const DefMap *def = reinterpret_cast<const DefMap*>(expr);
-    os << "DefMap(";
+    os << "DefMap(" << std::endl;
     for (auto i = def->map.begin(); i != def->map.end(); ++i)
       os << "  " << i->first << " = " << i->second.get() << std::endl;
     return os << "  " << def->body.get() << ")" << std::endl;

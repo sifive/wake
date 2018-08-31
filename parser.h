@@ -3,6 +3,7 @@
 
 #include "expr.h"
 #include "symbol.h"
-DefMap::defs parse_defs(Lexer &lex);
+
+DefMap::defs parse_top(Lexer &lex);
 
 #endif

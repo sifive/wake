@@ -5,7 +5,7 @@ int main(int argc, const char **argv) {
   DefMap::defs defs;
   for (int i = 1; i < argc; ++i) {
     Lexer lex(argv[i]);
-    DefMap::defs file = parse_defs(lex);
+    DefMap::defs file = parse_top(lex);
 
     for (auto i = file.begin(); i != file.end(); ++i) {
       assert (defs.find(i->first) == defs.end());

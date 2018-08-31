@@ -2,6 +2,9 @@
 #include "symbol.h"
 #include "parser.h"
 
+//#define TRACE(x) do { fprintf(stderr, "%s\n", x); } while (0)
+#define TRACE(x) do { } while (0)
+
 struct op_type {
   int p;
   int l;
@@ -40,16 +43,28 @@ static op_type precedence(Symbol x) {
   }
 }
 
+void expect(SymbolType type, Lexer &lex) {
+  if (lex.next.type != type) {
+    fprintf(stderr, "Was expecting a %s, but got a %s at %s\n", symbolTable[type], symbolTable[lex.next.type], lex.location());
+    exit(1);
+  }
+}
+
 static std::string get_id(Lexer &lex) {
-  assert (lex.next.type == ID);
+  expect(ID, lex);
   std::string name(lex.next.start, lex.next.end);
   lex.consume();
   return name;
 }
 
+static Expr* parse_term(Lexer &lex);
+static Expr* parse_product(Lexer &lex);
 static Expr* parse_sum(int precedence, Lexer &lex);
+static DefMap::defs parse_defs(Lexer &lex);
+static Expr* parse_block(Lexer &lex);
 
 static Expr* parse_term(Lexer &lex) {
+  TRACE("TERM");
   switch (lex.next.type) {
     case ID: {
       auto name = get_id(lex);
@@ -65,36 +80,40 @@ static Expr* parse_term(Lexer &lex) {
     case POPEN: {
       lex.consume();
       auto x = parse_sum(0, lex);
-      assert (lex.next.type == PCLOSE);
+      expect(PCLOSE, lex);
       lex.consume();
       return x;
     }
     default: {
-      printf("Expected a term, found a %s\n", symbolTable[lex.next.type]);
-      assert (0);
+      expect(POPEN, lex);
       return 0;
     }
   }
 }
 
 static Expr* parse_product(Lexer &lex) {
+  TRACE("PRODUCT");
   auto product = parse_term(lex);
 
-  switch (lex.next.type) {
-    case ID:
-    case STRING:
-    case LAMBDA:
-    case POPEN: {
-      auto arg = parse_term(lex);
-      product = new App(product, arg);
-    }
-    default: {
-      return product;
+  for (;;) {
+    switch (lex.next.type) {
+      case ID:
+      case STRING:
+      case LAMBDA:
+      case POPEN: {
+        auto arg = parse_term(lex);
+        product = new App(product, arg);
+        break;
+      }
+      default: {
+        return product;
+      }
     }
   }
 }
 
 static Expr* parse_sum(int p, Lexer &lex) {
+  TRACE("SUM");
   auto lhs = parse_product(lex);
   op_type op;
   while (lex.next.type == OPERATOR && (op = precedence(lex.next)).p >= p) {
@@ -102,47 +121,60 @@ static Expr* parse_sum(int p, Lexer &lex) {
     lex.consume();
     auto var = new VarRef(name);
     auto rhs = parse_sum(op.p + op.l, lex);
-    return new App(new App(var, lhs), rhs);
+    lhs = new App(new App(var, lhs), rhs);
   }
   return lhs;
 }
 
-static Expr* parse_block(Lexer &lex) {
-  DefMap::defs map = parse_defs(lex);
-  auto body = parse_sum(0, lex);
-  return new DefMap(map, body);
-}
-
-DefMap::defs parse_defs(Lexer &lex) {
+static DefMap::defs parse_defs(Lexer &lex) {
+  TRACE("DEFS");
   std::map<std::string, std::unique_ptr<Expr> > map;
 
   while (lex.next.type == DEF) {
     lex.consume();
 
     std::string name = get_id(lex);
-    assert (map.find(name) == map.end());
+    if (map.find(name) != map.end()) {
+      fprintf(stderr, "Duplicate def %s at %s\n", name.c_str(), lex.location());
+      exit(1);
+    }
 
     std::list<std::string> args;
     while (lex.next.type == ID) args.push_back(get_id(lex));
 
-    assert (lex.next.type == EQUALS);
+    expect(EQUALS, lex);
     lex.consume();
 
     Expr *body;
     if (lex.next.type == EOL) {
       lex.consume();
-      assert (lex.next.type == INDENT);
+      expect(INDENT, lex);
       lex.consume();
       body = parse_block(lex);
-      assert (lex.next.type == DEDENT);
+      expect(DEDENT, lex);
       lex.consume();
     } else {
       body = parse_sum(0, lex);
-      assert (lex.next.type == EOL);
+      expect(EOL, lex);
       lex.consume();
     }
 
     map[name] = std::unique_ptr<Expr>(body);
   }
   return map;
+}
+
+static Expr* parse_block(Lexer &lex) {
+  TRACE("BLOCK");
+  DefMap::defs map = parse_defs(lex);
+  auto body = parse_sum(0, lex);
+  expect(EOL, lex);
+  lex.consume();
+  return new DefMap(map, body);
+}
+
+DefMap::defs parse_top(Lexer &lex) {
+  DefMap::defs out = parse_defs(lex);
+  expect(END, lex);
+  return out;
 }

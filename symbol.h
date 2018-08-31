@@ -28,6 +28,7 @@ struct Lexer {
   ~Lexer();
 
   void consume();
+  const char *location();
 };
 
 #endif
