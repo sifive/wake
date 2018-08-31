@@ -1,5 +1,5 @@
-#include "expr.h"
 #include "bind.h"
+#include "expr.h"
 
 struct NameRef {
   int depth;
@@ -66,8 +66,10 @@ static bool explore(Expr *expr, NameBinding *binding) {
       ok = explore(i->second.get(), &bind) && ok;
     ok = explore(def->body.get(), &bind) && ok;
     return ok;
+  } else if (expr->type == Literal::type) {
+    return true;
   } else {
-    assert(0);
+    assert(0 /* unreachable */);
     return false;
   }
 }

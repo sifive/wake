@@ -14,6 +14,8 @@ struct Value {
   virtual ~Value();
 };
 
+std::ostream& operator << (std::ostream& os, const Value *value);
+
 struct String : public Value {
   static const char *type;
   std::string value;

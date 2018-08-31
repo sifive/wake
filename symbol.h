@@ -5,7 +5,7 @@
 #include <list>
 #include <memory>
 
-enum SymbolType { ERROR, ID, OPERATOR, STRING, DEF, LAMBDA, EQUALS, POPEN, PCLOSE, END, EOL, INDENT, DEDENT };
+enum SymbolType { ERROR, ID, OPERATOR, LITERAL, DEF, LAMBDA, EQUALS, POPEN, PCLOSE, END, EOL, INDENT, DEDENT };
 extern const char *symbolTable[];
 struct Symbol {
   SymbolType type;
@@ -18,17 +18,20 @@ struct Symbol {
 
 struct input_t;
 struct state_t;
+struct Value;
 
 struct Lexer {
   std::unique_ptr<input_t> engine;
   std::unique_ptr<state_t> state;
   Symbol next;
+  bool fail;
 
   Lexer(const char *file);
   ~Lexer();
 
   void consume();
   const char *location();
+  std::unique_ptr<Value> value();
 };
 
 #endif

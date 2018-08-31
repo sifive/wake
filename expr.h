@@ -13,7 +13,7 @@ struct Expr {
   virtual ~Expr();
 };
 
-std::ostream& operator<<(std::ostream& os, const Expr *expr);
+std::ostream& operator << (std::ostream& os, const Expr *expr);
 
 struct App : public Expr {
   std::unique_ptr<Expr> fn;
@@ -48,6 +48,14 @@ struct DefMap : public Expr {
 
   static const char *type;
   DefMap(defs& map_, Expr* body_) : Expr(type), map(), body(body_) { map.swap(map_); }
+};
+
+struct Value;
+struct Literal : public Expr {
+  std::unique_ptr<Value> value;
+  static const char *type;
+
+  Literal(std::unique_ptr<Value> value_);
 };
 
 #endif

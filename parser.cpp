@@ -1,6 +1,7 @@
+#include "parser.h"
 #include "expr.h"
 #include "symbol.h"
-#include "parser.h"
+#include "value.h"
 
 //#define TRACE(x) do { fprintf(stderr, "%s\n", x); } while (0)
 #define TRACE(x) do { } while (0)
@@ -43,11 +44,13 @@ static op_type precedence(Symbol x) {
   }
 }
 
-void expect(SymbolType type, Lexer &lex) {
+bool expect(SymbolType type, Lexer &lex) {
   if (lex.next.type != type) {
     fprintf(stderr, "Was expecting a %s, but got a %s at %s\n", symbolTable[type], symbolTable[lex.next.type], lex.location());
-    exit(1);
+    lex.fail = true;
+    return false;
   }
+  return true;
 }
 
 static std::string get_id(Lexer &lex) {
@@ -71,7 +74,11 @@ static Expr* parse_term(Lexer &lex) {
       auto name = get_id(lex);
       return new VarRef(name, location);
     }
-    // case STRING:
+    case LITERAL: {
+      Expr *out = new Literal(lex.value());
+      lex.consume();
+      return out;
+    }
     case LAMBDA: {
       lex.consume();
       auto name = get_id(lex);
@@ -81,13 +88,14 @@ static Expr* parse_term(Lexer &lex) {
     case POPEN: {
       lex.consume();
       auto x = parse_sum(0, lex);
-      expect(PCLOSE, lex);
-      lex.consume();
+      if (expect(PCLOSE, lex)) lex.consume();
       return x;
     }
     default: {
-      expect(POPEN, lex);
-      return 0;
+      fprintf(stderr, "Was expecting an ID/LAMBDA/POPEN/OPERATOR/LITERAL, got a %s at %s\n",
+        symbolTable[lex.next.type], lex.location());
+      lex.fail = true;
+      return new Literal(std::unique_ptr<Value>(new String("bad")));
     }
   }
 }
@@ -99,7 +107,7 @@ static Expr* parse_product(Lexer &lex) {
   for (;;) {
     switch (lex.next.type) {
       case ID:
-      case STRING:
+      case LITERAL:
       case LAMBDA:
       case POPEN: {
         auto arg = parse_term(lex);
@@ -148,7 +156,7 @@ static DefMap::defs parse_defs(Lexer &lex) {
 
     if (map.find(name) != map.end()) {
       fprintf(stderr, "Duplicate def %s at %s\n", name.c_str(), lex.location());
-      exit(1);
+      lex.fail = true;
     }
 
     expect(EQUALS, lex);

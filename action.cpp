@@ -1,6 +1,6 @@
+#include "action.h"
 #include "expr.h"
 #include "value.h"
-#include "action.h"
 
 Action::~Action() { }
 
@@ -82,7 +82,10 @@ void Thunk::execute(ActionQueue& queue) {
     Thunk *body = new Thunk(this, def->body.get(), defs);
     queue.push_back(body);
     body->depend(queue, new MapRet(this));
+  } else if (expr->type == Literal::type) {
+    Literal *lit = reinterpret_cast<Literal*>(expr);
+    broadcast(queue, this, lit->value.get());
   } else {
-    assert(0);
+    assert(0 /* unreachable */);
   }
 }

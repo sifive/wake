@@ -1,11 +1,12 @@
 #include "symbol.h"
+#include "value.h"
 #include <string.h>
 #include <limits.h>
 #include <string>
 #include <sstream>
 
 const char *symbolTable[] = {
-  "ERROR", "ID", "OPERATOR", "STRING", "DEF", "LAMBDA", "EQUALS", "POPEN", "PCLOSE", "END", "EOL", "INDENT", "DEDENT"
+  "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "LAMBDA", "EQUALS", "POPEN", "PCLOSE", "END", "EOL", "INDENT", "DEDENT"
 };
 
 /*!max:re2c*/
@@ -20,6 +21,7 @@ struct input_t {
   char *sol;
   int  line;
   bool eof;
+  std::unique_ptr<Value> value;
 
   FILE *const file;
 
@@ -155,7 +157,13 @@ static Symbol lex_top(input_t &in) {
       "\n" [ ]*         { ++in.line; in.sol = in.tok+1; return mkSym(EOL); }
 
       // character and string literals
-      ['"] { std::string out; return mkSym(lex_str(in, in.cur[-1], out) ? STRING : ERROR); }
+      // !!! broken -- location is wrong.
+      ['"] {
+        std::string out;
+        bool ok = lex_str(in, in.cur[-1], out);
+        in.value = std::unique_ptr<Value>(new String(out));
+        return mkSym(ok ? LITERAL : ERROR);
+      }
 
       // keywords
       "def" { return mkSym(DEF);    }
@@ -184,7 +192,7 @@ struct state_t {
   }
 };
 
-Lexer::Lexer(const char *file) : engine(new input_t(fopen(file, "r"))), state(new state_t(file)), next(Symbol(ERROR, 0, 0))  {
+Lexer::Lexer(const char *file) : engine(new input_t(fopen(file, "r"))), state(new state_t(file)), next(Symbol(ERROR, 0, 0)), fail(false)  {
   if (engine->file) consume();
 }
 
@@ -217,4 +225,8 @@ const char *Lexer::location() {
   str << state->filename << ":" << engine->line << ":" << (engine->tok - engine->sol + 1);
   state->location = str.str();
   return state->location.c_str();
+}
+
+std::unique_ptr<Value> Lexer::value() {
+  return std::move(engine->value);
 }

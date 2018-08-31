@@ -1,13 +1,17 @@
-#include <iostream>
 #include "expr.h"
+#include "value.h"
+#include <iostream>
 
 Expr::~Expr() { }
 const char *App::type = "App";
 const char *Lambda::type = "Lambda";
 const char *VarRef::type = "VarRef";
 const char *DefMap::type = "DefMap";
+const char *Literal::type = "Literal";
 
-std::ostream& operator<<(std::ostream& os, const Expr *expr) {
+Literal::Literal(std::unique_ptr<Value> value_) : Expr(type), value(std::move(value_)) { }
+
+std::ostream& operator << (std::ostream& os, const Expr *expr) {
   if (expr->type == VarRef::type) {
     const VarRef *ref = reinterpret_cast<const VarRef*>(expr);
     return os << "VarRef(" << ref->name << ")";
@@ -23,7 +27,11 @@ std::ostream& operator<<(std::ostream& os, const Expr *expr) {
     for (auto i = def->map.begin(); i != def->map.end(); ++i)
       os << "  " << i->first << " = " << i->second.get() << std::endl;
     return os << "  " << def->body.get() << ")" << std::endl;
+  } else if (expr->type == Literal::type) {
+    const Literal *lit = reinterpret_cast<const Literal*>(expr);
+    return os << "Literal(" << lit->value.get() << ")" << std::endl;
   } else {
-    assert(0);
+    assert(0 /* unreachable */);
+    return os;
   }
 }

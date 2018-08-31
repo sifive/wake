@@ -1,22 +1,34 @@
 #include <iostream>
 #include "parser.h"
 #include "bind.h"
+#include "symbol.h"
 
 int main(int argc, const char **argv) {
+  bool ok = true;
+
   DefMap::defs defs;
   for (int i = 1; i < argc; ++i) {
     Lexer lex(argv[i]);
     DefMap::defs file = parse_top(lex);
+    if (lex.fail) ok = false;
 
     for (auto i = file.begin(); i != file.end(); ++i) {
-      assert (defs.find(i->first) == defs.end());
-      defs[i->first] = std::move(i->second);
+      if (defs.find(i->first) != defs.end()) {
+        fprintf(stderr, "Duplicate def %s at %s and %s\n", i->first.c_str(), "x", "y"); // !!!
+        ok = false;
+      } else {
+        defs[i->first] = std::move(i->second);
+      }
     }
   }
 
   auto root = new DefMap(defs, new VarRef("main", "<start>"));
-  if (!bind_refs(root)) {
-    fprintf(stderr, "Variable resolution failure\n");
+  if (!bind_refs(root)) ok = false;
+
+  std::cout << root;
+
+  if (!ok) {
+    fprintf(stderr, ">>> Aborting without execution <<<\n");
     return 1;
   }
 
@@ -28,5 +40,6 @@ int main(int argc, const char **argv) {
     doit->execute(queue);
   }
 */
+
   return 0;
 }
