@@ -1,24 +1,26 @@
 #ifndef SYMBOL_H
 #define SYMBOL_H
 
+#include "location.h"
 #include <stdio.h>
 #include <list>
 #include <memory>
 
 enum SymbolType { ERROR, ID, OPERATOR, LITERAL, DEF, LAMBDA, EQUALS, POPEN, PCLOSE, END, EOL, INDENT, DEDENT };
 extern const char *symbolTable[];
+
+struct Value;
 struct Symbol {
   SymbolType type;
-  const char *start;
-  const char *end;
+  Location location;
+  std::unique_ptr<Value> value;
 
-  Symbol(SymbolType type_, const char *start_, const char *end_) : type(type_), start(start_), end(end_) { }
-  Symbol() : type(ERROR), start(0), end(0) { }
+  Symbol(SymbolType type_, const Location& location_, Value* value_) : type(type_), location(location_), value(value_) { }
+  Symbol() : type(ERROR), location() { }
 };
 
 struct input_t;
 struct state_t;
-struct Value;
 
 struct Lexer {
   std::unique_ptr<input_t> engine;
@@ -29,9 +31,8 @@ struct Lexer {
   Lexer(const char *file);
   ~Lexer();
 
+  std::string text();
   void consume();
-  const char *location();
-  std::unique_ptr<Value> value();
 };
 
 #endif

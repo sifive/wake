@@ -3,7 +3,6 @@
 #include <string.h>
 #include <limits.h>
 #include <string>
-#include <sstream>
 
 const char *symbolTable[] = {
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "LAMBDA", "EQUALS", "POPEN", "PCLOSE", "END", "EOL", "INDENT", "DEDENT"
@@ -19,13 +18,13 @@ struct input_t {
   char *mar;
   char *tok;
   char *sol;
-  int  line;
+  int  row;
   bool eof;
-  std::unique_ptr<Value> value;
 
+  const char *filename;
   FILE *const file;
 
-  input_t(FILE *f) : buf(), lim(buf + SIZE), cur(lim), mar(lim), tok(lim), sol(lim), line(1), eof(false), file(f) { }
+  input_t(const char *fn, FILE *f) : buf(), lim(buf + SIZE), cur(lim), mar(lim), tok(lim), sol(lim), row(1), eof(false), filename(fn), file(f) { }
   bool fill(size_t need);
 };
 
@@ -131,10 +130,14 @@ static bool lex_str(input_t &in, unsigned char q, std::string& result)
   return true;
 }
 
-#define mkSym(x) Symbol(x, in.tok, in.cur)
+#define mkSym2(x, v) Symbol(x, Location(in.filename, start, Coordinates(in.row, in.cur - in.sol)), v)
+#define mkSym(x) mkSym2(x, 0)
 
 static Symbol lex_top(input_t &in) {
-  start:
+  Coordinates start;
+top:
+  start.row = in.row;
+  start.column = in.cur - in.sol + 1;
   in.tok = in.cur;
 
   /*!re2c
@@ -151,18 +154,16 @@ static Symbol lex_top(input_t &in) {
       end { return mkSym((in.lim - in.tok == YYMAXFILL) ? END : ERROR); }
 
       // whitespace
-      [ ]+              { goto start; }
-      "#" [^\n]*        { goto start; }
-      "\n" [ ]* / [#\n] { ++in.line; in.sol = in.tok+1; goto start; }
-      "\n" [ ]*         { ++in.line; in.sol = in.tok+1; return mkSym(EOL); }
+      [ ]+              { goto top; }
+      "#" [^\n]*        { goto top; }
+      "\n" [ ]* / [#\n] { ++in.row; in.sol = in.tok+1; goto top; }
+      "\n" [ ]*         { ++in.row; in.sol = in.tok+1; return mkSym(EOL); }
 
       // character and string literals
-      // !!! broken -- location is wrong.
       ['"] {
         std::string out;
         bool ok = lex_str(in, in.cur[-1], out);
-        in.value = std::unique_ptr<Value>(new String(out));
-        return mkSym(ok ? LITERAL : ERROR);
+        return mkSym2(ok ? LITERAL : ERROR, new String(out));
       }
 
       // keywords
@@ -192,7 +193,7 @@ struct state_t {
   }
 };
 
-Lexer::Lexer(const char *file) : engine(new input_t(fopen(file, "r"))), state(new state_t(file)), next(Symbol(ERROR, 0, 0)), fail(false)  {
+Lexer::Lexer(const char *file) : engine(new input_t(file, fopen(file, "r"))), state(new state_t(file)), next(), fail(false)  {
   if (engine->file) consume();
 }
 
@@ -200,33 +201,21 @@ Lexer::~Lexer() {
   if (engine->file) fclose(engine->file);
 }
 
+std::string Lexer::text() {
+  return std::string(engine->tok, engine->cur);
+}
+
 void Lexer::consume() {
   if (state->indent != state->tabs.back()) {
     if (state->indent > state->tabs.back()) {
       state->tabs.push_back(state->indent);
-      next = Symbol(INDENT, engine->tok, engine->cur);
+      next.type = INDENT;
     } else {
       state->tabs.pop_back();
-      next = Symbol(DEDENT, engine->tok, engine->cur);
+      next.type = DEDENT;
     }
   } else {
     next = lex_top(*engine.get());
-#if 0
-    printf("%s: ", symbolTable[next.type]);
-    fwrite(next.start, 1, next.end - next.start, stdout);
-    printf("\n");
-#endif
-    if (next.type == EOL) state->indent = (next.end - next.start) - 1;
+    if (next.type == EOL) state->indent = (engine->cur - engine->tok) - 1;
   }
-}
-
-const char *Lexer::location() {
-  std::stringstream str;
-  str << state->filename << ":" << engine->line << ":" << (engine->tok - engine->sol + 1);
-  state->location = str.str();
-  return state->location.c_str();
-}
-
-std::unique_ptr<Value> Lexer::value() {
-  return std::move(engine->value);
 }

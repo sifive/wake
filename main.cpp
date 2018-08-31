@@ -2,6 +2,7 @@
 #include "parser.h"
 #include "bind.h"
 #include "symbol.h"
+#include "value.h"
 
 int main(int argc, const char **argv) {
   bool ok = true;
@@ -14,7 +15,10 @@ int main(int argc, const char **argv) {
 
     for (auto i = file.begin(); i != file.end(); ++i) {
       if (defs.find(i->first) != defs.end()) {
-        fprintf(stderr, "Duplicate def %s at %s and %s\n", i->first.c_str(), "x", "y"); // !!!
+        fprintf(stderr, "Duplicate def %s at %s and %s\n",
+          i->first.c_str(),
+          defs[i->first]->location.str().c_str(),
+          i->second->location.str().c_str());
         ok = false;
       } else {
         defs[i->first] = std::move(i->second);
@@ -22,7 +26,7 @@ int main(int argc, const char **argv) {
     }
   }
 
-  auto root = new DefMap(defs, new VarRef("main", "<start>"));
+  auto root = new DefMap(Location(), defs, new VarRef("main", "<start>"));
   if (!bind_refs(root)) ok = false;
 
   std::cout << root;

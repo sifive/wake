@@ -1,6 +1,7 @@
 #ifndef EXPR_H
 #define EXPR_H
 
+#include "location.h"
 #include <memory>
 #include <string>
 #include <map>
@@ -8,8 +9,9 @@
 /* Expression AST */
 struct Expr {
   const char *type;
+  Location location;
 
-  Expr(const char *type_) : type(type_) { }
+  Expr(const char *type_, const Location& location_) : type(type_), location(location_) { }
   virtual ~Expr();
 };
 
@@ -20,7 +22,8 @@ struct App : public Expr {
   std::unique_ptr<Expr> val;
 
   static const char *type;
-  App(Expr* fn_, Expr* val_) : Expr(type), fn(fn_), val(val_) { }
+  App(const Location& location_, Expr* fn_, Expr* val_)
+   : Expr(type, location_), fn(fn_), val(val_) { }
 };
 
 struct Lambda : public Expr {
@@ -28,17 +31,18 @@ struct Lambda : public Expr {
   std::unique_ptr<Expr> body;
 
   static const char *type;
-  Lambda(const std::string& name_, Expr* body_) : Expr(type), name(name_), body(body_) { }
+  Lambda(const Location& location_, const std::string& name_, Expr* body_)
+   : Expr(type, location_), name(name_), body(body_) { }
 };
 
 struct VarRef : public Expr {
   std::string name;
-  std::string location;
   int depth;
   int offset;
 
   static const char *type;
-  VarRef(const std::string& name_, const std::string &location_) : Expr(type), name(name_), location(location_) { }
+  VarRef(const Location& location_, const std::string& name_)
+   : Expr(type, location_), name(name_) { }
 };
 
 struct DefMap : public Expr {
@@ -47,7 +51,8 @@ struct DefMap : public Expr {
   std::unique_ptr<Expr> body;
 
   static const char *type;
-  DefMap(defs& map_, Expr* body_) : Expr(type), map(), body(body_) { map.swap(map_); }
+  DefMap(const Location& location_, defs& map_, Expr* body_)
+   : Expr(type, location_), map(), body(body_) { map.swap(map_); }
 };
 
 struct Value;
@@ -55,7 +60,7 @@ struct Literal : public Expr {
   std::unique_ptr<Value> value;
   static const char *type;
 
-  Literal(std::unique_ptr<Value> value_);
+  Literal(const Location& location_, std::unique_ptr<Value> value_);
 };
 
 #endif

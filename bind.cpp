@@ -37,7 +37,7 @@ static bool explore(Expr *expr, NameBinding *binding) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     NameRef pos = binding->find(ref->name);
     if (pos.offset == -1) {
-      fprintf(stderr, "Variable reference %s is unbound at %s\n", ref->name.c_str(), ref->location.c_str());
+      fprintf(stderr, "Variable reference %s is unbound at %s\n", ref->name.c_str(), ref->location.str().c_str());
       return false;
     }
     ref->depth = pos.depth;

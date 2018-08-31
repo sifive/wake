@@ -13,8 +13,8 @@ struct op_type {
   op_type() : p(-1), l(-1) { }
 };
 
-static op_type precedence(Symbol x) {
-  switch (x.start[0]) {
+static op_type precedence(char c) {
+  switch (c) {
   case '.':
     return op_type(8, 1);
   case '^':
@@ -46,7 +46,10 @@ static op_type precedence(Symbol x) {
 
 bool expect(SymbolType type, Lexer &lex) {
   if (lex.next.type != type) {
-    fprintf(stderr, "Was expecting a %s, but got a %s at %s\n", symbolTable[type], symbolTable[lex.next.type], lex.location());
+    fprintf(stderr, "Was expecting a %s, but got a %s at %s\n",
+      symbolTable[type],
+      symbolTable[lex.next.type],
+      lex.next.location.str().c_str());
     lex.fail = true;
     return false;
   }
@@ -55,9 +58,14 @@ bool expect(SymbolType type, Lexer &lex) {
 
 static std::string get_id(Lexer &lex) {
   expect(ID, lex);
-  std::string name(lex.next.start, lex.next.end);
+  std::string name = lex.text();
   lex.consume();
   return name;
+}
+
+static std::pair<std::string, Location> get_id_loc(Lexer &lex) {
+  Location location = lex.next.location;
+  return std::make_pair(get_id(lex), location);
 }
 
 static Expr* parse_term(Lexer &lex);
@@ -70,32 +78,38 @@ static Expr* parse_term(Lexer &lex) {
   TRACE("TERM");
   switch (lex.next.type) {
     case ID: {
-      std::string location = lex.location();
-      auto name = get_id(lex);
-      return new VarRef(name, location);
+      Expr* out = new VarRef(lex.next.location, lex.text());
+      lex.consume();
+      return out;
     }
     case LITERAL: {
-      Expr *out = new Literal(lex.value());
+      Expr *out = new Literal(lex.next.location, std::move(lex.next.value));
       lex.consume();
       return out;
     }
     case LAMBDA: {
+      Location location = lex.next.location;
       lex.consume();
       auto name = get_id(lex);
       auto term = parse_term(lex);
-      return new Lambda(name, term);
+      location.end = term->location.end;
+      return new Lambda(location, name, term);
     }
     case POPEN: {
+      Location location = lex.next.location;
       lex.consume();
       auto x = parse_sum(0, lex);
+      location.end = lex.next.location.end;
       if (expect(PCLOSE, lex)) lex.consume();
+      x->location = location;
       return x;
     }
     default: {
       fprintf(stderr, "Was expecting an ID/LAMBDA/POPEN/OPERATOR/LITERAL, got a %s at %s\n",
-        symbolTable[lex.next.type], lex.location());
+        symbolTable[lex.next.type],
+        lex.next.location.str().c_str());
       lex.fail = true;
-      return new Literal(std::unique_ptr<Value>(new String("bad")));
+      return new Literal(Location(), std::unique_ptr<Value>(new String("bad")));
     }
   }
 }
@@ -111,7 +125,9 @@ static Expr* parse_product(Lexer &lex) {
       case LAMBDA:
       case POPEN: {
         auto arg = parse_term(lex);
-        product = new App(product, arg);
+        Location location = product->location;
+        location.end = arg->location.end;
+        product = new App(location, product, arg);
         break;
       }
       default: {
@@ -124,14 +140,17 @@ static Expr* parse_product(Lexer &lex) {
 static Expr* parse_sum(int p, Lexer &lex) {
   TRACE("SUM");
   auto lhs = parse_product(lex);
+  std::string name;
   op_type op;
-  while (lex.next.type == OPERATOR && (op = precedence(lex.next)).p >= p) {
-    std::string name(lex.next.start, lex.next.end);
-    std::string location = lex.location();
+  while (lex.next.type == OPERATOR && (op = precedence((name = lex.text())[0])).p >= p) {
+    auto opp = new VarRef(lex.next.location, name);
     lex.consume();
-    auto var = new VarRef(name, location);
     auto rhs = parse_sum(op.p + op.l, lex);
-    lhs = new App(new App(var, lhs), rhs);
+    Location app1_loc = lhs->location;
+    Location app2_loc = lhs->location;
+    app1_loc.end = opp->location.end;
+    app2_loc.end = rhs->location.end;
+    lhs = new App(app2_loc, new App(app1_loc, opp, lhs), rhs);
   }
   return lhs;
 }
@@ -143,19 +162,24 @@ static DefMap::defs parse_defs(Lexer &lex) {
   while (lex.next.type == DEF) {
     lex.consume();
 
-    std::string name = get_id(lex);
-    std::list<std::string> args;
-    while (lex.next.type == ID) args.push_back(get_id(lex));
+    std::list<std::pair<std::string, Location> > args;
+    while (lex.next.type == ID) args.push_back(get_id_loc(lex));
 
-    if (lex.next.type == OPERATOR && args.empty()) {
-      args.push_back(name);
-      name = std::string(lex.next.start, lex.next.end);
+    std::string name;
+    if (lex.next.type == OPERATOR && args.size() == 1) {
+      name = lex.text();
       lex.consume();
-      args.push_back(get_id(lex));
+      args.push_back(get_id_loc(lex));
+    } else {
+      name = args.front().first;
+      args.pop_front();
     }
 
     if (map.find(name) != map.end()) {
-      fprintf(stderr, "Duplicate def %s at %s\n", name.c_str(), lex.location());
+      fprintf(stderr, "Duplicate def %s at %s and %s\n",
+        name.c_str(),
+        map[name]->location.str().c_str(),
+        lex.next.location.str().c_str());
       lex.fail = true;
     }
 
@@ -177,8 +201,11 @@ static DefMap::defs parse_defs(Lexer &lex) {
     }
 
     // add the arguments
-    for (auto i = args.rbegin(); i != args.rend(); ++i)
-      body = new Lambda(*i, body);
+    for (auto i = args.rbegin(); i != args.rend(); ++i) {
+      Location location = body->location;
+      location.start = i->second.start;
+      body = new Lambda(location, i->first, body);
+    }
 
     map[name] = std::unique_ptr<Expr>(body);
   }
@@ -187,11 +214,13 @@ static DefMap::defs parse_defs(Lexer &lex) {
 
 static Expr* parse_block(Lexer &lex) {
   TRACE("BLOCK");
+  Location location = lex.next.location;
   DefMap::defs map = parse_defs(lex);
   auto body = parse_sum(0, lex);
+  location.end = body->location.end;
   expect(EOL, lex);
   lex.consume();
-  return new DefMap(map, body);
+  return new DefMap(location, map, body);
 }
 
 DefMap::defs parse_top(Lexer &lex) {
