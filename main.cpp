@@ -1,5 +1,6 @@
 #include <iostream>
 #include "parser.h"
+#include "bind.h"
 
 int main(int argc, const char **argv) {
   DefMap::defs defs;
@@ -13,10 +14,12 @@ int main(int argc, const char **argv) {
     }
   }
 
-  auto root = new DefMap(defs, new VarRef("asd"));
-  std::cout << root;
+  auto root = new DefMap(defs, new VarRef("main", "<start>"));
+  if (!bind_refs(root)) {
+    fprintf(stderr, "Variable resolution failure\n");
+    return 1;
+  }
 
-  return 0;
 /*
   ActionQueue queue;
   while (!queue.empty()) {
@@ -25,4 +28,5 @@ int main(int argc, const char **argv) {
     doit->execute(queue);
   }
 */
+  return 0;
 }

@@ -67,8 +67,9 @@ static Expr* parse_term(Lexer &lex) {
   TRACE("TERM");
   switch (lex.next.type) {
     case ID: {
+      std::string location = lex.location();
       auto name = get_id(lex);
-      return new VarRef(name);
+      return new VarRef(name, location);
     }
     // case STRING:
     case LAMBDA: {
@@ -118,8 +119,9 @@ static Expr* parse_sum(int p, Lexer &lex) {
   op_type op;
   while (lex.next.type == OPERATOR && (op = precedence(lex.next)).p >= p) {
     std::string name(lex.next.start, lex.next.end);
+    std::string location = lex.location();
     lex.consume();
-    auto var = new VarRef(name);
+    auto var = new VarRef(name, location);
     auto rhs = parse_sum(op.p + op.l, lex);
     lhs = new App(new App(var, lhs), rhs);
   }
@@ -158,6 +160,10 @@ static DefMap::defs parse_defs(Lexer &lex) {
       expect(EOL, lex);
       lex.consume();
     }
+
+    // add the arguments
+    for (auto i = args.rbegin(); i != args.rend(); ++i)
+      body = new Lambda(*i, body);
 
     map[name] = std::unique_ptr<Expr>(body);
   }

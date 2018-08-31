@@ -33,11 +33,12 @@ struct Lambda : public Expr {
 
 struct VarRef : public Expr {
   std::string name;
+  std::string location;
   int depth;
   int offset;
 
   static const char *type;
-  VarRef(const std::string& name_) : Expr(type), name(name_) { }
+  VarRef(const std::string& name_, const std::string &location_) : Expr(type), name(name_), location(location_) { }
 };
 
 struct DefMap : public Expr {
