@@ -6,7 +6,7 @@
 #include <list>
 #include <memory>
 
-enum SymbolType { ERROR, ID, OPERATOR, LITERAL, DEF, LAMBDA, EQUALS, POPEN, PCLOSE, END, EOL, INDENT, DEDENT };
+enum SymbolType { ERROR, ID, OPERATOR, DROP, LITERAL, DEF, LAMBDA, EQUALS, POPEN, PCLOSE, END, EOL, INDENT, DEDENT };
 extern const char *symbolTable[];
 
 struct Value;

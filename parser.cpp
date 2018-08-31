@@ -63,9 +63,17 @@ static std::string get_id(Lexer &lex) {
   return name;
 }
 
-static std::pair<std::string, Location> get_id_loc(Lexer &lex) {
-  Location location = lex.next.location;
-  return std::make_pair(get_id(lex), location);
+static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
+  if (lex.next.type != ID && lex.next.type != DROP) {
+    fprintf(stderr, "Was expecting an ID/DROP argument, but got a %s at %s\n",
+      symbolTable[lex.next.type],
+      lex.next.location.str().c_str());
+    lex.fail = true;
+  }
+
+  auto out = std::make_pair(lex.text(), lex.next.location);
+  lex.consume();
+  return out;
 }
 
 static Expr* parse_term(Lexer &lex);
@@ -90,10 +98,10 @@ static Expr* parse_term(Lexer &lex) {
     case LAMBDA: {
       Location location = lex.next.location;
       lex.consume();
-      auto name = get_id(lex);
+      auto name = get_arg_loc(lex);
       auto term = parse_term(lex);
       location.end = term->location.end;
-      return new Lambda(location, name, term);
+      return new Lambda(location, name.first, term);
     }
     case POPEN: {
       Location location = lex.next.location;
@@ -163,13 +171,13 @@ static DefMap::defs parse_defs(Lexer &lex) {
     lex.consume();
 
     std::list<std::pair<std::string, Location> > args;
-    while (lex.next.type == ID) args.push_back(get_id_loc(lex));
+    while (lex.next.type == ID || lex.next.type == DROP) args.push_back(get_arg_loc(lex));
 
     std::string name;
     if (lex.next.type == OPERATOR && args.size() == 1) {
       name = lex.text();
       lex.consume();
-      args.push_back(get_id_loc(lex));
+      args.push_back(get_arg_loc(lex));
     } else {
       name = args.front().first;
       args.pop_front();

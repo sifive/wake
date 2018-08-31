@@ -172,6 +172,7 @@ top:
       "="   { return mkSym(EQUALS); }
       "("   { return mkSym(POPEN);  }
       ")"   { return mkSym(PCLOSE); }
+      "_"   { return mkSym(DROP);   }
 
       [a-z][a-zA-Z0-9_]* { return mkSym(ID); }
       [$~]               { return mkSym(ID); }
