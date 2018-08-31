@@ -1,16 +1,20 @@
-#include "symbol.h"
+#include <iostream>
+#include "parser.h"
 
 int main(int argc, const char **argv) {
+  DefMap::defs defs;
   for (int i = 1; i < argc; ++i) {
     Lexer lex(argv[i]);
-    while (lex.next.type != ERROR && lex.next.type != END) {
-      switch (lex.next.type) {
-        case ID:  printf("ID "); fwrite(lex.next.start, 1, (lex.next.end - lex.next.start), stdout); printf("\n"); break;
-        default: printf("%s\n", symbolTable[lex.next.type]); break;
-      }
-      lex.consume();
-    } 
+    DefMap::defs file = parse_defs(lex);
+
+    for (auto i = file.begin(); i != file.end(); ++i) {
+      assert (defs.find(i->first) == defs.end());
+      defs[i->first] = std::move(i->second);
+    }
   }
+
+  auto root = new DefMap(defs, new VarRef("asd"));
+  std::cout << root;
 
   return 0;
 /*

@@ -13,12 +13,14 @@ struct Expr {
   virtual ~Expr();
 };
 
+std::ostream& operator<<(std::ostream& os, const Expr *expr);
+
 struct App : public Expr {
   std::unique_ptr<Expr> fn;
   std::unique_ptr<Expr> val;
 
   static const char *type;
-  App(std::unique_ptr<Expr> fn_, std::unique_ptr<Expr> val_) : Expr(type), fn(std::move(fn_)), val(std::move(val_)) { }
+  App(Expr* fn_, Expr* val_) : Expr(type), fn(fn_), val(val_) { }
 };
 
 struct Lambda : public Expr {
@@ -26,7 +28,7 @@ struct Lambda : public Expr {
   std::unique_ptr<Expr> body;
 
   static const char *type;
-  Lambda(const std::string& name_, std::unique_ptr<Expr> body_) : Expr(type), name(name_), body(std::move(body_)) { }
+  Lambda(const std::string& name_, Expr* body_) : Expr(type), name(name_), body(body_) { }
 };
 
 struct VarRef : public Expr {
@@ -39,11 +41,12 @@ struct VarRef : public Expr {
 };
 
 struct DefMap : public Expr {
+  typedef std::map<std::string, std::unique_ptr<Expr> > defs;
+  defs map;
   std::unique_ptr<Expr> body;
-  std::map<std::string, std::unique_ptr<Expr> > map;
 
   static const char *type;
-  DefMap(std::unique_ptr<Expr> body_) : Expr(type), body(std::move(body_)), map() { }
+  DefMap(defs& map_, Expr* body_) : Expr(type), map(), body(body_) { map.swap(map_); }
 };
 
 #endif
