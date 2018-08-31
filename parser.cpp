@@ -136,13 +136,20 @@ static DefMap::defs parse_defs(Lexer &lex) {
     lex.consume();
 
     std::string name = get_id(lex);
+    std::list<std::string> args;
+    while (lex.next.type == ID) args.push_back(get_id(lex));
+
+    if (lex.next.type == OPERATOR && args.empty()) {
+      args.push_back(name);
+      name = std::string(lex.next.start, lex.next.end);
+      lex.consume();
+      args.push_back(get_id(lex));
+    }
+
     if (map.find(name) != map.end()) {
       fprintf(stderr, "Duplicate def %s at %s\n", name.c_str(), lex.location());
       exit(1);
     }
-
-    std::list<std::string> args;
-    while (lex.next.type == ID) args.push_back(get_id(lex));
 
     expect(EQUALS, lex);
     lex.consume();
