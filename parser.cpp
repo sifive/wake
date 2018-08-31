@@ -180,6 +180,7 @@ static Expr* parse_block(Lexer &lex) {
 }
 
 DefMap::defs parse_top(Lexer &lex) {
+  if (lex.next.type == EOL) lex.consume();
   DefMap::defs out = parse_defs(lex);
   expect(END, lex);
   return out;

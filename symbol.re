@@ -214,7 +214,7 @@ void Lexer::consume() {
 
 const char *Lexer::location() {
   std::stringstream str;
-  str << state->filename << ":" << engine->line << ":" << (engine->cur - engine->sol);
+  str << state->filename << ":" << engine->line << ":" << (engine->tok - engine->sol + 1);
   state->location = str.str();
   return state->location.c_str();
 }
