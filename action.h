@@ -31,6 +31,8 @@ struct Thunk : public Action {
   Binding *bindings;
 
   Thunk(Action *invoker_, Expr *expr_, Binding *bindings_) : Action(invoker_), expr(expr_), bindings(bindings_), result(0), value(0) { }
+  Thunk() : Action(0), expr(0), bindings(0) { }
+
   void execute(ActionQueue &queue);
   void depend(ActionQueue& queue, Callback *callback);
   void broadcast(ActionQueue& queue, Action *result_, Value *value_);
@@ -55,6 +57,11 @@ struct AppFn : public Callback {
   Thunk *arg;
   void execute(ActionQueue &queue);
   AppFn(Action *invoker_, Thunk *arg_) : Callback(invoker_), arg(arg_) { }
+};
+
+struct MapRet : public Callback {
+  void execute(ActionQueue &queue);
+  MapRet(Action *invoker_) : Callback(invoker_) { }
 };
 
 #endif

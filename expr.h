@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <map>
 
 /* Expression AST */
 struct Expr {
@@ -30,10 +31,19 @@ struct Lambda : public Expr {
 
 struct VarRef : public Expr {
   std::string name;
-  int index; // >= 0: global, < 0: arg
+  int depth;
+  int offset;
 
   static const char *type;
   VarRef(const std::string& name_) : Expr(type), name(name_) { }
+};
+
+struct DefMap : public Expr {
+  std::unique_ptr<Expr> body;
+  std::map<std::string, std::unique_ptr<Expr> > map;
+
+  static const char *type;
+  DefMap(std::unique_ptr<Expr> body_) : Expr(type), body(std::move(body_)), map() { }
 };
 
 #endif

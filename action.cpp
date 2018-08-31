@@ -45,17 +45,18 @@ void AppFn::execute(ActionQueue &queue) {
   thunk->depend(queue, new AppRet(this));
 }
 
+void MapRet::execute(ActionQueue &queue) {
+  Thunk *thunk = reinterpret_cast<Thunk*>(invoker);
+  thunk->broadcast(queue, this, value);
+}
+
 void Thunk::execute(ActionQueue& queue) {
-  if (expr->type == VarRef::type) { // this is a 'var' thunk node
+  if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
-    if (ref->index >= 0) {
-      // !!! return glob[ref->index];
-    } else {
-      Binding *iter = bindings;
-      for (int index = ++ref->index; index; ++index)
-        iter = iter->next;
-      iter->thunk->depend(queue, new VarRet(this));
-    }
+    Binding *iter = bindings;
+    for (int depth = ref->depth; depth; --depth)
+      iter = iter->next;
+    iter->thunk[ref->offset].depend(queue, new VarRet(this));
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
     Thunk *fn  = new Thunk(this, app->fn.get(), bindings);
@@ -67,6 +68,20 @@ void Thunk::execute(ActionQueue& queue) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     Closure *closure = new Closure(lambda->body.get(), bindings);
     broadcast(queue, this, closure);
+  } else if (expr->type == DefMap::type) {
+    DefMap *def = reinterpret_cast<DefMap*>(expr);
+    Thunk *thunk = new Thunk[def->map.size()]();
+    Binding *defs = new Binding(thunk, bindings);
+    int j = 0;
+    for (auto i = def->map.begin(); i != def->map.end(); ++i, ++j) {
+      thunk[j].invoker = this;
+      thunk[j].expr = i->second.get();
+      thunk[j].bindings = defs;
+      queue.push_back(thunk + j);
+    }
+    Thunk *body = new Thunk(this, def->body.get(), defs);
+    queue.push_back(body);
+    body->depend(queue, new MapRet(this));
   } else {
     assert(0);
   }

@@ -6,7 +6,7 @@
 #include <memory>
 
 enum SymbolType { ERROR, ID, OPERATOR, STRING, DEF, LAMBDA, EQUALS, POPEN, PCLOSE, END, EOL, INDENT, DEDENT };
-
+extern const char *symbolTable[];
 struct Symbol {
   SymbolType type;
   const char *start;
@@ -22,11 +22,12 @@ struct state_t;
 struct Lexer {
   std::unique_ptr<input_t> engine;
   std::unique_ptr<state_t> state;
+  Symbol next;
 
   Lexer(const char *file);
   ~Lexer();
 
-  Symbol get();
+  void consume();
 };
 
 #endif

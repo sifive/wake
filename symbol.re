@@ -3,6 +3,10 @@
 #include <limits.h>
 #include <string>
 
+const char *symbolTable[] = {
+  "ERROR", "ID", "OPERATOR", "STRING", "DEF", "LAMBDA", "EQUALS", "POPEN", "PCLOSE", "END", "EOL", "INDENT", "DEDENT"
+};
+
 /*!max:re2c*/
 static const size_t SIZE = 64 * 1024;
 
@@ -157,11 +161,11 @@ static Symbol lex_top(input_t &in) {
       ")"   { return mkSym(PCLOSE); }
 
       [a-z][a-zA-Z0-9_]* { return mkSym(ID); }
-      [-+/%*^<=>&|]+     { return mkSym(OPERATOR); }
-      [!]+               { return mkSym(ID); }
+      [$~]               { return mkSym(ID); }
+      [.^*/%-+<>=!&|,]+  { return mkSym(OPERATOR); }
    */
 
-   // reserved punctuation: ~`@${}[]:;,.
+   // reserved punctuation: `@{}[]:;
    // reserved id space: capitalized
 }
 
@@ -174,22 +178,25 @@ struct state_t {
   }
 };
 
-Lexer::Lexer(const char *file) : engine(new input_t(fopen(file, "r"))), state(new state_t) { }
+Lexer::Lexer(const char *file) : engine(new input_t(fopen(file, "r"))), state(new state_t), next(Symbol(ERROR, 0, 0))  {
+  if (engine->file) consume();
+}
 
-Lexer::~Lexer() { fclose(engine->file); }
+Lexer::~Lexer() {
+  if (engine->file) fclose(engine->file);
+}
 
-Symbol Lexer::get() {
+void Lexer::consume() {
   if (state->indent != state->tabs.back()) {
     if (state->indent > state->tabs.back()) {
       state->tabs.push_back(state->indent);
-      return Symbol(INDENT, engine->tok, engine->cur);
+      next = Symbol(INDENT, engine->tok, engine->cur);
     } else {
       state->tabs.pop_back();
-      return Symbol(DEDENT, engine->tok, engine->cur);
+      next = Symbol(DEDENT, engine->tok, engine->cur);
     }
   } else {
-    Symbol x = lex_top(*engine.get());
-    if (x.type == EOL) state->indent = (x.end - x.start) - 1;
-    return x;
+    next = lex_top(*engine.get());
+    if (next.type == EOL) state->indent = (next.end - next.start) - 1;
   }
 }
