@@ -34,7 +34,7 @@ struct Thunk : public Action {
 
   static const char *type;
   Thunk(Action *invoker_, Expr *expr_, Binding *bindings_) : Action(type, invoker_), expr(expr_), bindings(bindings_), result(0), value(0) { }
-  Thunk() : Action(type, 0), expr(0), bindings(0) { }
+  Thunk() : Action(type, 0), expr(0), bindings(0), result(0), value(0) { }
 
   void execute(ActionQueue &queue);
   void depend(ActionQueue& queue, Callback *callback);
