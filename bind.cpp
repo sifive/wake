@@ -1,6 +1,7 @@
 #include "bind.h"
 #include "expr.h"
 #include <iostream>
+#include <cassert>
 
 struct NameRef {
   int depth;

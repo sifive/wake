@@ -1,5 +1,6 @@
 #include "value.h"
 #include <iostream>
+#include <cassert>
 
 Value::~Value() { }
 const char *String::type = "String";

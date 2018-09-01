@@ -1,6 +1,7 @@
 #include "expr.h"
 #include "value.h"
 #include <iostream>
+#include <cassert>
 
 Expr::~Expr() { }
 const char *App::type = "App";

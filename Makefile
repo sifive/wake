@@ -1,5 +1,5 @@
 wideml:	$(patsubst %.cpp,%.o,$(wildcard *.cpp)) symbol.o
-	g++ -o $@ $^ -L/opt/local/lib -lgmp -losxfuse
+	g++ -std=c++11 -Wall -O2 -o $@ $^
 
 %.o:	%.cpp	$(wildcard *.h)
 	g++ -std=c++11 -Wall -O2 -o $@ -c $<

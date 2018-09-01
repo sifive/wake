@@ -2,6 +2,7 @@
 #include "expr.h"
 #include "value.h"
 #include <iostream>
+#include <cassert>
 
 Action::~Action() { }
 

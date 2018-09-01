@@ -1,5 +1,6 @@
 #include <string.h>
 #include <iostream>
+#include <cassert>
 #include "parser.h"
 #include "bind.h"
 #include "symbol.h"
@@ -50,7 +51,7 @@ int main(int argc, const char **argv) {
   Thunk *top = new Thunk(0, root, 0);
   ActionQueue queue;
   queue.push_back(top);
-  long steps = 0, widest = 0;
+  unsigned long steps = 0, widest = 0;
   while (!queue.empty()) {
     Action *doit = queue.front();
     queue.pop_front();
