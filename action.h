@@ -22,8 +22,8 @@ struct Action {
 };
 
 struct Callback : public Action {
-  Action *input;
-  Value *value;
+  Action *input_action;
+  Value  *input_value;
 
   Callback(const char *type_, Action *invoker_) : Action(type_, invoker_) { }
 };
@@ -33,19 +33,19 @@ struct Thunk : public Action {
   Binding *bindings;
 
   static const char *type;
-  Thunk(Action *invoker_, Expr *expr_, Binding *bindings_) : Action(type, invoker_), expr(expr_), bindings(bindings_), result(0), value(0) { }
-  Thunk() : Action(type, 0), expr(0), bindings(0), result(0), value(0) { }
+  Thunk(Action *invoker_ = 0, Expr *expr_ = 0, Binding *bindings_ = 0)
+   : Action(type, invoker_), expr(expr_), bindings(bindings_), return_action(0), return_value(0) { }
 
   void execute(ActionQueue &queue);
   void depend(ActionQueue& queue, Callback *callback);
-  void broadcast(ActionQueue& queue, Action *result_, Value *value_);
+  void broadcast(ActionQueue& queue, Action *return_action_, Value *return_value_);
 
   // To be used only after execution complete
-  Value *output() { return value; }
+  Value *output() { return return_value; }
 
 private:
-  Action *result;
-  Value *value;
+  Action *return_action;
+  Value  *return_value;
   std::list<Callback*> wait;
 };
 

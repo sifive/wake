@@ -13,41 +13,41 @@ const char *AppFn ::type = "AppFn";
 const char *MapRet::type = "MapRet";
 
 void Thunk::depend(ActionQueue& queue, Callback *callback) {
-  if (result) {
-    callback->input = result;
-    callback->value = value;
+  if (return_action) {
+    callback->input_action = return_action;
+    callback->input_value  = return_value;
     queue.push_back(callback);
   } else {
     wait.push_back(callback);
   }
 }
 
-void Thunk::broadcast(ActionQueue& queue, Action *result_, Value *value_) {
-  result = result_;
-  value = value_;
+void Thunk::broadcast(ActionQueue& queue, Action *return_action_, Value *return_value_) {
+  return_action = return_action_;
+  return_value  = return_value_;
   while (!wait.empty()) {
     Callback *callback = wait.front();
     wait.pop_front();
-    callback->input = result;
-    callback->value = value;
+    callback->input_action = return_action;
+    callback->input_value  = return_value;
     queue.push_back(callback);
   }
 }
 
 void VarRet::execute(ActionQueue &queue) {
   Thunk *thunk = reinterpret_cast<Thunk*>(invoker);
-  thunk->broadcast(queue, this, value);
+  thunk->broadcast(queue, this, input_value);
 }
 
 void AppRet::execute(ActionQueue &queue) {
   AppFn *appFn = reinterpret_cast<AppFn*>(invoker);
   Thunk *thunk = reinterpret_cast<Thunk*>(appFn->invoker);
-  thunk->broadcast(queue, this, value);
+  thunk->broadcast(queue, this, input_value);
 }
 
 void AppFn::execute(ActionQueue &queue) {
-  if (value->type != Closure::type) {
-    std::cerr << "Attempt to apply " << value << " which is not a Closure" << std::endl;
+  if (input_value->type != Closure::type) {
+    std::cerr << "Attempt to apply " << input_value << " which is not a Closure" << std::endl;
     for (Action *action = this; action; action = action->invoker) {
       if (action->type == Thunk::type) {
         Thunk *thunk = reinterpret_cast<Thunk*>(action);
@@ -56,7 +56,7 @@ void AppFn::execute(ActionQueue &queue) {
     }
     exit(1);
   }
-  Closure *clo = reinterpret_cast<Closure*>(value);
+  Closure *clo = reinterpret_cast<Closure*>(input_value);
   Thunk *thunk = new Thunk(this, clo->body, new Binding(arg, clo->bindings));
   queue.push_back(thunk);
   thunk->depend(queue, new AppRet(this));
@@ -64,7 +64,7 @@ void AppFn::execute(ActionQueue &queue) {
 
 void MapRet::execute(ActionQueue &queue) {
   Thunk *thunk = reinterpret_cast<Thunk*>(invoker);
-  thunk->broadcast(queue, this, value);
+  thunk->broadcast(queue, this, input_value);
 }
 
 void Thunk::execute(ActionQueue& queue) {
