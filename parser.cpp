@@ -71,6 +71,23 @@ static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
   return out;
 }
 
+bool expectValue(const char *type, Lexer& lex) {
+  if (expect(LITERAL, lex)) {
+    if (lex.next.value->type == type) {
+      return true;
+    } else {
+      std::cerr << "Was expecting a "
+        << type << ", but got a "
+        << lex.next.value->type << " at "
+        << lex.next.location.str() << std::endl;
+      lex.fail = true;
+      return false;
+    }
+  } else {
+    return false;
+  }
+}
+
 static Expr* parse_term(Lexer &lex);
 static Expr* parse_product(Lexer &lex);
 static Expr* parse_sum(int precedence, Lexer &lex);
@@ -97,6 +114,19 @@ static Expr* parse_term(Lexer &lex) {
       auto term = parse_term(lex);
       location.end = term->location.end;
       return new Lambda(location, name.first, term);
+    }
+    case PRIM: {
+      std::string name;
+      Location location = lex.next.location;
+      lex.consume();
+      if (expectValue(String::type, lex)) {
+        name = reinterpret_cast<String*>(lex.next.value.get())->value;
+        location.end = lex.next.location.end;
+        lex.consume();
+      } else {
+        name = "bad_prim";
+      }
+      return new Prim(location, name);
     }
     case POPEN: {
       Location location = lex.next.location;

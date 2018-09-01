@@ -17,6 +17,14 @@ struct Expr {
 
 std::ostream& operator << (std::ostream& os, const Expr *expr);
 
+struct Prim : public Expr {
+  std::string name;
+  int args;
+
+  static const char *type;
+  Prim(const Location& location_, const std::string &name_) : Expr(type, location_), name(name_), args(0) { }
+};
+
 struct App : public Expr {
   std::unique_ptr<Expr> fn;
   std::unique_ptr<Expr> val;

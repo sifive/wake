@@ -12,8 +12,9 @@ struct NameBinding {
   NameBinding *next;
   std::map<std::string, int> *map;
   std::string *name;
+  bool open;
 
-  NameBinding(NameBinding *next_) : next(next_), map(0), name(0) { }
+  NameBinding(NameBinding *next_) : next(next_), map(0), name(0), open(true) { }
   NameRef find(const std::string& x) {
     NameRef out;
     std::map<std::string, int>::iterator i;
@@ -49,6 +50,7 @@ static bool explore(Expr *expr, NameBinding *binding) {
     return true;
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
+    binding->open = false;
     bool f = explore(app->fn.get(), binding);
     bool a = explore(app->val.get(), binding);
     return f && a;
@@ -71,6 +73,12 @@ static bool explore(Expr *expr, NameBinding *binding) {
     ok = explore(def->body.get(), &bind) && ok;
     return ok;
   } else if (expr->type == Literal::type) {
+    return true;
+  } else if (expr->type == Prim::type) {
+    Prim *prim = reinterpret_cast<Prim*>(expr);
+    int args = 0;
+    for (NameBinding *iter = binding; iter && iter->open && iter->name; iter = iter->next) ++args;
+    prim->args = args;
     return true;
   } else {
     assert(0 /* unreachable */);

@@ -102,6 +102,8 @@ void Thunk::execute(ActionQueue& queue) {
   } else if (expr->type == Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
     broadcast(queue, this, lit->value.get());
+  } else if (expr->type == Prim::type) {
+    assert(0 /* prim */);
   } else {
     assert(0 /* unreachable */);
   }
