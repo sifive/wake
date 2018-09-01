@@ -1,8 +1,10 @@
 #include "symbol.h"
 #include "value.h"
+#include <stdio.h>
 #include <string.h>
 #include <limits.h>
 #include <string>
+#include <list>
 
 const char *symbolTable[] = {
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "LAMBDA", "EQUALS", "POPEN", "PCLOSE", "END", "EOL", "INDENT", "DEDENT"

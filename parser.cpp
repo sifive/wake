@@ -2,6 +2,8 @@
 #include "expr.h"
 #include "symbol.h"
 #include "value.h"
+#include <iostream>
+#include <list>
 
 //#define TRACE(x) do { fprintf(stderr, "%s\n", x); } while (0)
 #define TRACE(x) do { } while (0)
@@ -46,28 +48,21 @@ static op_type precedence(char c) {
 
 bool expect(SymbolType type, Lexer &lex) {
   if (lex.next.type != type) {
-    fprintf(stderr, "Was expecting a %s, but got a %s at %s\n",
-      symbolTable[type],
-      symbolTable[lex.next.type],
-      lex.next.location.str().c_str());
+    std::cerr << "Was expecting a "
+      << symbolTable[type] << ", but got a "
+      << symbolTable[lex.next.type] << " at "
+      << lex.next.location.str() << std::endl;
     lex.fail = true;
     return false;
   }
   return true;
 }
 
-static std::string get_id(Lexer &lex) {
-  expect(ID, lex);
-  std::string name = lex.text();
-  lex.consume();
-  return name;
-}
-
 static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
   if (lex.next.type != ID && lex.next.type != DROP) {
-    fprintf(stderr, "Was expecting an ID/DROP argument, but got a %s at %s\n",
-      symbolTable[lex.next.type],
-      lex.next.location.str().c_str());
+    std::cerr << "Was expecting an ID/DROP argument, but got a "
+      << symbolTable[lex.next.type] << " at "
+      << lex.next.location.str() << std::endl;
     lex.fail = true;
   }
 
@@ -113,9 +108,9 @@ static Expr* parse_term(Lexer &lex) {
       return x;
     }
     default: {
-      fprintf(stderr, "Was expecting an ID/LAMBDA/POPEN/OPERATOR/LITERAL, got a %s at %s\n",
-        symbolTable[lex.next.type],
-        lex.next.location.str().c_str());
+      std::cerr << "Was expecting an ID/LAMBDA/POPEN/OPERATOR/LITERAL, got a "
+        << symbolTable[lex.next.type] << " at "
+        << lex.next.location.str() << std::endl;
       lex.fail = true;
       return new Literal(Location(), std::unique_ptr<Value>(new String("bad")));
     }
@@ -184,10 +179,10 @@ static DefMap::defs parse_defs(Lexer &lex) {
     }
 
     if (map.find(name) != map.end()) {
-      fprintf(stderr, "Duplicate def %s at %s and %s\n",
-        name.c_str(),
-        map[name]->location.str().c_str(),
-        lex.next.location.str().c_str());
+      std::cerr << "Duplicate def "
+        << name << " at "
+        << map[name]->location.str() << " and "
+        << lex.next.location.str() << std::endl;
       lex.fail = true;
     }
 

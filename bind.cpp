@@ -1,5 +1,6 @@
 #include "bind.h"
 #include "expr.h"
+#include <iostream>
 
 struct NameRef {
   int depth;
@@ -37,7 +38,9 @@ static bool explore(Expr *expr, NameBinding *binding) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     NameRef pos = binding->find(ref->name);
     if (pos.offset == -1) {
-      fprintf(stderr, "Variable reference %s is unbound at %s\n", ref->name.c_str(), ref->location.str().c_str());
+      std::cerr << "Variable reference "
+        << ref->name << " is unbound at "
+        << ref->location.str() << std::endl;
       return false;
     }
     ref->depth = pos.depth;

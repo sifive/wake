@@ -17,9 +17,9 @@ struct Value {
 std::ostream& operator << (std::ostream& os, const Value *value);
 
 struct String : public Value {
-  static const char *type;
   std::string value;
 
+  static const char *type;
   String(const std::string& value_) : Value(type), value(value_) { }
 };
 

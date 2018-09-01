@@ -2,8 +2,6 @@
 #define SYMBOL_H
 
 #include "location.h"
-#include <stdio.h>
-#include <list>
 #include <memory>
 
 enum SymbolType { ERROR, ID, OPERATOR, DROP, LITERAL, DEF, LAMBDA, EQUALS, POPEN, PCLOSE, END, EOL, INDENT, DEDENT };

@@ -1,8 +1,15 @@
 #include "action.h"
 #include "expr.h"
 #include "value.h"
+#include <iostream>
 
 Action::~Action() { }
+
+const char *Thunk ::type = "Thunk";
+const char *VarRet::type = "VarRet";
+const char *AppRet::type = "AppRet";
+const char *AppFn ::type = "AppFn";
+const char *MapRet::type = "MapRet";
 
 void Thunk::depend(ActionQueue& queue, Callback *callback) {
   if (result) {
@@ -38,7 +45,16 @@ void AppRet::execute(ActionQueue &queue) {
 }
 
 void AppFn::execute(ActionQueue &queue) {
-  assert (value->type == Closure::type); // bad program
+  if (value->type != Closure::type) {
+    std::cerr << "Attempt to apply " << value << " which is not a Closure" << std::endl;
+    for (Action *action = this; action; action = action->invoker) {
+      if (action->type == Thunk::type) {
+        Thunk *thunk = reinterpret_cast<Thunk*>(action);
+        std::cerr << "  from " << thunk->expr->location.str() << std::endl;
+      }
+    }
+    exit(1);
+  }
   Closure *clo = reinterpret_cast<Closure*>(input);
   Thunk *thunk = new Thunk(this, clo->body, new Binding(arg, clo->bindings));
   queue.push_back(thunk);
