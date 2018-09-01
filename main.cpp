@@ -1,6 +1,6 @@
-#include <string.h>
 #include <iostream>
 #include <cassert>
+#include <cstring>
 #include "parser.h"
 #include "bind.h"
 #include "symbol.h"

@@ -1,8 +1,7 @@
 #include "symbol.h"
 #include "value.h"
-#include <stdio.h>
-#include <string.h>
-#include <limits.h>
+#include <cstdio>
+#include <cstring>
 #include <algorithm>
 #include <string>
 #include <list>
@@ -56,53 +55,31 @@ bool input_t::fill(size_t need) {
 
 /*!re2c re2c:define:YYCTYPE = "char"; */
 
-template<int base>
-static bool adddgt(unsigned long &u, unsigned long d)
+static wchar_t lex_oct(const char *s, const char *e)
 {
-  if (u > (ULONG_MAX - d) / base) {
-      return false;
-  }
-  u = u * base + d;
-  return true;
+  wchar_t u = 0;
+  for (++s; s < e; ++s) u = u*8 + *s - '0';
+  return u;
 }
 
-static bool lex_oct(const char *s, const char *e, unsigned long &u)
+static wchar_t lex_hex(const char *s, const char *e)
 {
-  for (u = 0, ++s; s < e; ++s) {
-    if (!adddgt<8>(u, (unsigned)*s - 0x30u)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-static bool lex_dec(const char *s, const char *e, unsigned long &u)
-{
-  for (u = 0; s < e; ++s) {
-    if (!adddgt<10>(u, (unsigned)*s - 0x30u)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-static bool lex_hex(const char *s, const char *e, unsigned long &u)
-{
-  for (u = 0, s += 2; s < e;) {
+  wchar_t u = 0;
+  for (s += 2; s < e;) {
   /*!re2c
       re2c:yyfill:enable = 0;
       re2c:define:YYCURSOR = s;
-      *     { if (!adddgt<16>(u, (unsigned)s[-1] - 0x30u))      return false; continue; }
-      [a-f] { if (!adddgt<16>(u, (unsigned)s[-1] - 0x61u + 10)) return false; continue; }
-      [A-F] { if (!adddgt<16>(u, (unsigned)s[-1] - 0x41u + 10)) return false; continue; }
+      *     { u = u*16 + s[-1] - '0' +  0; continue; }
+      [a-f] { u = u*16 + s[-1] - 'a' + 10; continue; }
+      [A-F] { u = u*16 + s[-1] - 'A' + 10; continue; }
   */
   }
-  return true;
+  return u;
 }
 
 static bool lex_str(input_t &in, unsigned char q, std::string& result)
 {
-  for (unsigned long u = q;; result.push_back((char)u)) {
+  for (wchar_t u = q;; result.push_back(u)) {
     in.tok = in.cur;
     /*!re2c
         re2c:define:YYCURSOR = in.cur;
@@ -124,10 +101,10 @@ static bool lex_str(input_t &in, unsigned char q, std::string& result)
         "\\'"                { u = '\''; continue; }
         "\\\""               { u = '"';  continue; }
         "\\?"                { u = '?';  continue; }
-        "\\" [0-7]{1,3}      { if (!lex_oct(in.tok, in.cur, u)) return false; continue; }
-        "\\u" [0-9a-fA-F]{4} { if (!lex_hex(in.tok, in.cur, u)) return false; continue; }
-        "\\U" [0-9a-fA-F]{8} { if (!lex_hex(in.tok, in.cur, u)) return false; continue; }
-        "\\x" [0-9a-fA-F]+   { if (!lex_hex(in.tok, in.cur, u)) return false; continue; }
+        "\\" [0-7]{1,3}      { u = lex_oct(in.tok, in.cur); continue; }
+        "\\x" [0-9a-fA-F]{2} { u = lex_hex(in.tok, in.cur); continue; }
+        "\\u" [0-9a-fA-F]{4} { u = lex_hex(in.tok, in.cur); continue; }
+        "\\U" [0-9a-fA-F]{8} { u = lex_hex(in.tok, in.cur); continue; }
     */
   }
   return true;
