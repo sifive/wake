@@ -55,7 +55,7 @@ void AppFn::execute(ActionQueue &queue) {
     }
     exit(1);
   }
-  Closure *clo = reinterpret_cast<Closure*>(input);
+  Closure *clo = reinterpret_cast<Closure*>(value);
   Thunk *thunk = new Thunk(this, clo->body, new Binding(arg, clo->bindings));
   queue.push_back(thunk);
   thunk->depend(queue, new AppRet(this));
@@ -79,7 +79,7 @@ void Thunk::execute(ActionQueue& queue) {
     Thunk *arg = new Thunk(this, app->val.get(), bindings);
     queue.push_back(fn);
     queue.push_back(arg);
-    fn->depend(queue, new AppRet(this));
+    fn->depend(queue, new AppFn(this, arg));
   } else if (expr->type == Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     Closure *closure = new Closure(lambda->body.get(), bindings);
