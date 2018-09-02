@@ -7,7 +7,7 @@
 #include <list>
 
 const char *symbolTable[] = {
-  "ERROR", "ID", "OPERATOR", "DROP", "LITERAL", "DEF", "PRIM", "LAMBDA", "EQUALS", "POPEN", "PCLOSE",
+  "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "PRIM", "LAMBDA", "EQUALS", "POPEN", "PCLOSE",
   "IF", "THEN", "ELSE", "END", "EOL", "INDENT", "DEDENT"
 };
 
@@ -167,11 +167,17 @@ top:
       "="    { return mkSym(EQUALS); }
       "("    { return mkSym(POPEN);  }
       ")"    { return mkSym(PCLOSE); }
-      "_"    { return mkSym(DROP);   }
 
-      [a-z][a-zA-Z0-9_]* { return mkSym(ID); }
-      [$~]               { return mkSym(ID); }
-      [.^*/%\-+<>=!&|,]+ { return mkSym(OPERATOR); }
+      // identifiers
+      binary = [.^*/%\-+<>=!&|,];
+      unary  = [$~];
+      ary    = binary | unary;
+      bin_op = binary ary*;
+      una_op = (unary ary*) | "!";
+      id     = [a-z][a-zA-Z0-9_]* | "_";
+
+      id | una_op { return mkSym(ID); }
+      bin_op      { return mkSym(OPERATOR); }
    */
 
    // reserved punctuation: `@{}[]:;

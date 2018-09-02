@@ -59,8 +59,8 @@ bool expect(SymbolType type, Lexer &lex) {
 }
 
 static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
-  if (lex.next.type != ID && lex.next.type != DROP) {
-    std::cerr << "Was expecting an ID/DROP argument, but got a "
+  if (lex.next.type != ID) {
+    std::cerr << "Was expecting an ID argument, but got a "
       << symbolTable[lex.next.type] << " at "
       << lex.next.location.str() << std::endl;
     lex.fail = true;
@@ -213,19 +213,24 @@ static DefMap::defs parse_defs(Lexer &lex) {
   std::map<std::string, std::unique_ptr<Expr> > map;
 
   while (lex.next.type == DEF) {
+    Location def = lex.next.location;
     lex.consume();
 
     std::list<std::pair<std::string, Location> > args;
-    while (lex.next.type == ID || lex.next.type == DROP) args.push_back(get_arg_loc(lex));
+    while (lex.next.type == ID) args.push_back(get_arg_loc(lex));
 
     std::string name;
     if (lex.next.type == OPERATOR && args.size() == 1) {
       name = lex.text();
       lex.consume();
       args.push_back(get_arg_loc(lex));
-    } else {
+    } else if (!args.empty()) {
       name = args.front().first;
       args.pop_front();
+    } else {
+      name = "broken";
+      std::cerr << "def has no name at " << def.str() << std::endl;
+      lex.fail = true;
     }
 
     if (map.find(name) != map.end()) {

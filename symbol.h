@@ -4,7 +4,7 @@
 #include "location.h"
 #include <memory>
 
-enum SymbolType { ERROR, ID, OPERATOR, DROP, LITERAL, DEF, PRIM, LAMBDA, EQUALS, POPEN, PCLOSE, IF, THEN, ELSE, END, EOL, INDENT, DEDENT };
+enum SymbolType { ERROR, ID, OPERATOR, LITERAL, DEF, PRIM, LAMBDA, EQUALS, POPEN, PCLOSE, IF, THEN, ELSE, END, EOL, INDENT, DEDENT };
 extern const char *symbolTable[];
 
 struct Value;
