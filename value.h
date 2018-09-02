@@ -29,6 +29,7 @@ struct Integer : public Value {
 
   static const char *type;
   Integer(const char *value_) : Value(type), value(value_, 0) { }
+  Integer(const mpz_class &value_): Value(type), value(value_) { }
 };
 
 struct Thunk;

@@ -49,3 +49,21 @@ def map f l =
 
 # string operations
 def x ++ y = prim "strcat"
+
+# integer operations
+def x + y = prim "add"
+def x - y = prim "sub"
+def x * y = prim "mul"
+def x / y = prim "div"
+def x % y = prim "mod"
+def x << y = prim "shl"
+def x >> y = prim "shr"
+#def x ^ y = prim "exp"
+def xor x y = prim "xor"
+def and x y = prim "and"
+def or  x y = prim "or"
+def gcd x y = prim "gcd"
+def lcm x y = prim "lcm"
+#def powm x y m = prim "powm"
+
+# comparisons ... < > <= >= == != ... what to return? need to build True/False in C++

@@ -150,7 +150,7 @@ top:
       dec = [1-9][0-9_]*;
       hex = '0x' [0-9a-fA-F_]+;
       bin = '0b' [01_]+;
-      (dec | hex | bin) {
+      ("0" | dec | hex | bin) {
         std::string integer(in.tok, in.cur);
         std::replace(integer.begin(), integer.end(), '_', ' ');
         return mkSym2(LITERAL, new Integer(integer.c_str()));
