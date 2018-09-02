@@ -24,17 +24,20 @@ void string_concat(void *data, const std::vector<Value*> &args, Action *completi
     resume(completion, new String(arg0->value + arg1->value));
     return;
   }
-  resume(completion, new String("bad-value"));
-  return;
+  exit(1);
 }
 
 void stack_trace(Action *failure) {
+  Location *trace = 0;
   for (Action *action = failure; action; action = action->invoker) {
     if (action->type == Thunk::type) {
       Thunk *thunk = reinterpret_cast<Thunk*>(action);
-      std::cerr << "  from " << thunk->expr->location.str() << std::endl;
+      if (trace && !thunk->expr->location.contains(*trace))
+        std::cerr << "  from " << trace->str() << std::endl;
+      trace = &thunk->expr->location;
     }
   }
+  // last trace is always <init>:1:1; don't print it
 }
 
 static ActionQueue queue;
