@@ -2,7 +2,7 @@
 #define VALUE_H
 
 #include <string>
-#include <gmpxx.h>
+#include <gmp.h>
 
 /* Values */
 
@@ -25,11 +25,14 @@ struct String : public Value {
 };
 
 struct Integer : public Value {
-  mpz_class value;
+  mpz_t value;
 
   static const char *type;
-  Integer(const char *value_) : Value(type), value(value_, 0) { }
-  Integer(const mpz_class &value_): Value(type), value(value_) { }
+  Integer(const char *value_) : Value(type) { mpz_init_set_str(value, value_, 0); }
+  Integer() : Value(type) { mpz_init(value); }
+  ~Integer();
+
+  std::string str(int base = 10) const;
 };
 
 struct Thunk;
