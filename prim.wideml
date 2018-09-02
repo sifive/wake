@@ -1,0 +1,51 @@
+# bools
+def true  x y = x
+def false x y = y
+def ~x = x false true
+def x && y = x y x
+def x || y = x x y
+
+# tuples
+def pair x y f = f x y
+def first  p = p true
+def second p = p false
+
+# lists
+def x, y = pair x y
+def nil x = true
+def empty l = l (\x \y false)
+
+# list operations
+
+def last default l =
+  def then _ = default
+  def else _ = last (first l) (second l)
+  empty l then else ""
+
+def foldl f a l =
+  def then _ = a
+  def else _ = foldl f (f a (first l)) (second l)
+  empty l then else ""
+
+def scanl f a l =
+  def then _ = nil
+  def else _ = scanl f (f a (first l)) (second l)
+  a, empty l then else ""
+
+def foldr f a l =
+  def then _ = a
+  def else _ = f (first l) (foldr f a (second l))
+  empty l then else ""
+
+def scanr f a l =
+  def then = a, nil
+  def else = \r (f (first l) (first r), r) (scanr f a (second l))
+  empty l then else ""
+
+def map f l =
+  def then _ = nil
+  def else _ = f (first l), map f (second l)
+  empty l then else ""
+
+# string operations
+def x ++ y = prim "strcat"

@@ -7,26 +7,6 @@
 #include "value.h"
 #include "action.h"
 
-// resume should have an error report method with stack trace !!!
-void string_concat(void *data, const std::vector<Value*> &args, Action *completion) {
-  if (args.size() != 2) {
-    std::cerr << "strcat called on " << args.size() << std::endl;
-    stack_trace(completion);
-  } else if (args[0]->type != String::type) {
-    std::cerr << "strcat called with arg1=" << args[0] << " which is not a string." << std::endl;
-    stack_trace(completion);
-  } else if (args[1]->type != String::type) {
-    std::cerr << "strcat called with arg2=" << args[1] << " which is not a string." << std::endl;
-    stack_trace(completion);
-  } else {
-    String *arg0 = reinterpret_cast<String*>(args[0]);
-    String *arg1 = reinterpret_cast<String*>(args[1]);
-    resume(completion, new String(arg0->value + arg1->value));
-    return;
-  }
-  exit(1);
-}
-
 void stack_trace(Action *failure) {
   Location *trace = 0;
   for (Action *action = failure; action; action = action->invoker) {
@@ -71,7 +51,8 @@ int main(int argc, const char **argv) {
 
   /* Primitives */
   PrimMap pmap;
-  pmap["strcat"].first = string_concat;
+  prim_register_string(pmap);
+  prim_register_integer(pmap);
 
   Location location("<init>");
   auto root = new DefMap(location, defs, new VarRef(location, "main"));
