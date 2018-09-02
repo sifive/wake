@@ -43,6 +43,8 @@ def gcd x y = prim "gcd"
 def lcm x y = prim "lcm"
 def str x y = prim "str"
 def powm x y m = prim "powm"
+
+# Comparison operators for integers and strings
 def x <  y = prim "lt"
 def x >  y = y < x
 def x >= y = ~(x < y)

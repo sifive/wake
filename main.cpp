@@ -61,6 +61,7 @@ int main(int argc, const char **argv) {
   PrimMap pmap;
   prim_register_string(pmap);
   prim_register_integer(pmap);
+  prim_register_polymorphic(pmap);
 
   auto root = new DefMap(location, defs, new VarRef(location, "main"));
   if (!bind_refs(root, pmap)) ok = false;

@@ -85,22 +85,6 @@ static void prim_powm(void *data, const std::vector<Value*> &args, Action *compl
 // mpz_popcount, com, abs, neg
 // scan0/1 ?
 
-static void prim_lt(void *data, const std::vector<Value*> &args, Action *completion) {
-  EXPECT_ARGS(2);
-  Integer *arg0 = GET_INTEGER(0);
-  Integer *arg1 = GET_INTEGER(1);
-  int cmp = mpz_cmp(arg0->value, arg1->value);
-  resume(completion, cmp < 0 ? prim_true : prim_false);
-}
-
-static void prim_eq(void *data, const std::vector<Value*> &args, Action *completion) {
-  EXPECT_ARGS(2);
-  Integer *arg0 = GET_INTEGER(0);
-  Integer *arg1 = GET_INTEGER(1);
-  int cmp = mpz_cmp(arg0->value, arg1->value);
-  resume(completion, cmp == 0 ? prim_true : prim_false);
-}
-
 void prim_register_integer(PrimMap& pmap) {
   pmap["add"].first = prim_add;
   pmap["sub"].first = prim_sub;
@@ -118,6 +102,4 @@ void prim_register_integer(PrimMap& pmap) {
   pmap["root"].first= prim_root;
   pmap["str"].first = prim_str;
   pmap["powm"].first= prim_powm;
-  pmap["lt" ].first = prim_lt;
-  pmap["eq" ].first = prim_eq;
 }

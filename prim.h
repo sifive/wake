@@ -31,5 +31,6 @@ extern Value *prim_false;
 
 void prim_register_string(PrimMap& pmap);
 void prim_register_integer(PrimMap& pmap);
+void prim_register_polymorphic(PrimMap& pmap);
 
 #endif
