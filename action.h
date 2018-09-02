@@ -68,6 +68,24 @@ struct AppFn : public Callback {
   AppFn(Action *invoker_, Thunk *arg_) : Callback(type, invoker_), arg(arg_) { }
 };
 
+struct Prim;
+struct PrimArg : public Callback {
+  static void chain(ActionQueue &queue, Action *invoker, Prim *prim, Binding *binding, int arg);
+  Prim *prim;
+  Binding *binding;
+  int arg;
+  void execute(ActionQueue &queue);
+  static const char *type;
+  PrimArg(Action *invoker_, Prim *prim_, Binding *binding_, int arg_)
+   : Callback(type, invoker_), prim(prim_), binding(binding_), arg(arg_) { }
+};
+
+struct PrimRet : public Callback {
+  void execute(ActionQueue &queue);
+  static const char *type;
+  PrimRet(Action *invoker_) : Callback(type, invoker_) { }
+};
+
 struct MapRet : public Callback {
   void execute(ActionQueue &queue);
   static const char *type;

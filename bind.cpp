@@ -35,7 +35,7 @@ struct NameBinding {
   }
 };
 
-static bool explore(Expr *expr, NameBinding *binding) {
+static bool explore(Expr *expr, const PrimMap& pmap, NameBinding *binding) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     NameRef pos = binding->find(ref->name);
@@ -51,14 +51,14 @@ static bool explore(Expr *expr, NameBinding *binding) {
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
     binding->open = false;
-    bool f = explore(app->fn.get(), binding);
-    bool a = explore(app->val.get(), binding);
+    bool f = explore(app->fn .get(), pmap, binding);
+    bool a = explore(app->val.get(), pmap, binding);
     return f && a;
   } else if (expr->type == Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     NameBinding bind(binding);
     bind.name = &lambda->name;
-    return explore(lambda->body.get(), &bind);
+    return explore(lambda->body.get(), pmap, &bind);
   } else if (expr->type == DefMap::type) {
     DefMap *def = reinterpret_cast<DefMap*>(expr);
     NameBinding bind(binding);
@@ -69,8 +69,8 @@ static bool explore(Expr *expr, NameBinding *binding) {
     bind.map = &offsets;
     bool ok = true;
     for (auto i = def->map.begin(); i != def->map.end(); ++i)
-      ok = explore(i->second.get(), &bind) && ok;
-    ok = explore(def->body.get(), &bind) && ok;
+      ok = explore(i->second.get(), pmap, &bind) && ok;
+    ok = explore(def->body.get(), pmap, &bind) && ok;
     return ok;
   } else if (expr->type == Literal::type) {
     return true;
@@ -79,13 +79,23 @@ static bool explore(Expr *expr, NameBinding *binding) {
     int args = 0;
     for (NameBinding *iter = binding; iter && iter->open && iter->name; iter = iter->next) ++args;
     prim->args = args;
-    return true;
+    PrimMap::const_iterator i = pmap.find(prim->name);
+    if (i == pmap.end()) {
+      std::cerr << "Primitive reference "
+        << prim->name << " is unbound at "
+        << prim->location.str() << std::endl;
+      return false;
+    } else {
+      prim->fn   = i->second.first;
+      prim->data = i->second.second;
+      return true;
+    }
   } else {
     assert(0 /* unreachable */);
     return false;
   }
 }
 
-bool bind_refs(Expr *expr) {
-  return explore(expr, 0);
+bool bind_refs(Expr *expr, const PrimMap& pmap) {
+  return explore(expr, pmap, 0);
 }

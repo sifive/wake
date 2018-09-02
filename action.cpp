@@ -6,11 +6,13 @@
 
 Action::~Action() { }
 
-const char *Thunk ::type = "Thunk";
-const char *VarRet::type = "VarRet";
-const char *AppRet::type = "AppRet";
-const char *AppFn ::type = "AppFn";
-const char *MapRet::type = "MapRet";
+const char *Thunk  ::type = "Thunk";
+const char *PrimArg::type = "PrimArg";
+const char *PrimRet::type = "PrimFn";
+const char *VarRet ::type = "VarRet";
+const char *AppRet ::type = "AppRet";
+const char *AppFn  ::type = "AppFn";
+const char *MapRet ::type = "MapRet";
 
 void Thunk::depend(ActionQueue& queue, Callback *callback) {
   if (return_action) {
@@ -67,6 +69,34 @@ void MapRet::execute(ActionQueue &queue) {
   thunk->broadcast(queue, this, input_value);
 }
 
+void PrimArg::chain(ActionQueue &queue, Action *invoker, Prim *prim, Binding *binding, int arg) {
+  if (prim->args == arg) {
+    std::vector<Value*> args;
+    Action *iter = invoker;
+    for (int index = 0; index < prim->args; ++index) {
+      PrimArg *prim = reinterpret_cast<PrimArg*>(iter);
+      args.push_back(prim->input_value);
+      iter = iter->invoker;
+    }
+    PrimRet *completion = new PrimRet(invoker);
+    completion->input_action = invoker;
+    prim->fn(prim->data, args, completion);
+  } else {
+    binding->thunk->depend(queue, new PrimArg(invoker, prim, binding, arg));
+  }
+}
+
+void PrimArg::execute(ActionQueue &queue) {
+  chain(queue, this, prim, binding->next, arg+1);
+}
+
+void PrimRet::execute(ActionQueue &queue) {
+  Action *iter;
+  for (iter = invoker; iter->type != Thunk::type; iter = iter->invoker) { }
+  Thunk *thunk = reinterpret_cast<Thunk*>(iter);
+  thunk->broadcast(queue, this, input_value);
+}
+
 void Thunk::execute(ActionQueue& queue) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
@@ -103,7 +133,8 @@ void Thunk::execute(ActionQueue& queue) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
     broadcast(queue, this, lit->value.get());
   } else if (expr->type == Prim::type) {
-    assert(0 /* prim */);
+    Prim *prim = reinterpret_cast<Prim*>(expr);
+    PrimArg::chain(queue, this, prim, bindings, 0);
   } else {
     assert(0 /* unreachable */);
   }

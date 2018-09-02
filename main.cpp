@@ -7,6 +7,43 @@
 #include "value.h"
 #include "action.h"
 
+// resume should have an error report method with stack trace !!!
+void string_concat(void *data, const std::vector<Value*> &args, Action *completion) {
+  if (args.size() != 2) {
+    std::cerr << "strcat called on " << args.size() << std::endl;
+    stack_trace(completion);
+  } else if (args[0]->type != String::type) {
+    std::cerr << "strcat called with arg1=" << args[0] << " which is not a string." << std::endl;
+    stack_trace(completion);
+  } else if (args[1]->type != String::type) {
+    std::cerr << "strcat called with arg2=" << args[1] << " which is not a string." << std::endl;
+    stack_trace(completion);
+  } else {
+    String *arg0 = reinterpret_cast<String*>(args[0]);
+    String *arg1 = reinterpret_cast<String*>(args[1]);
+    resume(completion, new String(arg0->value + arg1->value));
+    return;
+  }
+  resume(completion, new String("bad-value"));
+  return;
+}
+
+void stack_trace(Action *failure) {
+  for (Action *action = failure; action; action = action->invoker) {
+    if (action->type == Thunk::type) {
+      Thunk *thunk = reinterpret_cast<Thunk*>(action);
+      std::cerr << "  from " << thunk->expr->location.str() << std::endl;
+    }
+  }
+}
+
+static ActionQueue queue;
+void resume(Action *completion, Value *return_value) {
+  PrimRet *ret = reinterpret_cast<PrimRet*>(completion);
+  ret->input_value = return_value;
+  queue.push_back(ret);
+}
+
 int main(int argc, const char **argv) {
   bool ok = true;
 
@@ -29,9 +66,13 @@ int main(int argc, const char **argv) {
     }
   }
 
+  /* Primitives */
+  PrimMap pmap;
+  pmap["strcat"].first = string_concat;
+
   Location location("<init>");
   auto root = new DefMap(location, defs, new VarRef(location, "main"));
-  if (!bind_refs(root)) ok = false;
+  if (!bind_refs(root, pmap)) ok = false;
 
   const char *slash = strrchr(argv[0], '/');
   const char *exec = slash ? slash + 1 : argv[0];
@@ -47,9 +88,7 @@ int main(int argc, const char **argv) {
     return 1;
   }
 
-
   Thunk *top = new Thunk(0, root, 0);
-  ActionQueue queue;
   queue.push_back(top);
   unsigned long steps = 0, widest = 0;
   while (!queue.empty()) {

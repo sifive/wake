@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <map>
+#include <vector>
 
 /* Expression AST */
 struct Expr {
@@ -17,9 +18,15 @@ struct Expr {
 
 std::ostream& operator << (std::ostream& os, const Expr *expr);
 
+struct Action;
+struct Value;
 struct Prim : public Expr {
   std::string name;
   int args;
+
+  // The function must call 'resume(completion, value);' when done
+  void (*fn)(void *data, const std::vector<Value*> &args, Action *completion);
+  void *data;
 
   static const char *type;
   Prim(const Location& location_, const std::string &name_) : Expr(type, location_), name(name_), args(0) { }
@@ -63,7 +70,6 @@ struct DefMap : public Expr {
    : Expr(type, location_), map(), body(body_) { map.swap(map_); }
 };
 
-struct Value;
 struct Literal : public Expr {
   std::unique_ptr<Value> value;
   static const char *type;
