@@ -25,6 +25,8 @@ def map   f   l = if empty l then nil else f (first l), map f (second l)
 
 # string operations
 def x ++ y = prim "cat"
+def len s  = prim "len"
+def cut s begin end = prim "cut"
 
 # integer operations
 def x + y = prim "add"
