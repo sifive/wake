@@ -1,7 +1,7 @@
 #include "prim.h"
 #include "value.h"
 
-static void prim_strcat(void *data, const std::vector<Value*> &args, Action *completion) {
+static void prim_cat(void *data, const std::vector<Value*> &args, Action *completion) {
   EXPECT_ARGS(2);
   String *arg0 = GET_STRING(0);
   String *arg1 = GET_STRING(1);
@@ -9,5 +9,5 @@ static void prim_strcat(void *data, const std::vector<Value*> &args, Action *com
 }
 
 void prim_register_string(PrimMap& pmap) {
-  pmap["strcat"].first = prim_strcat;
+  pmap["cat"].first = prim_cat;
 }

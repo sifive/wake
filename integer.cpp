@@ -51,21 +51,6 @@ BINOP_SI(shr, mpz_tdiv_q_2exp)
 BINOP_SI(exp, mpz_pow_ui)
 BINOP_SI(root,mpz_root)
 
-static void prim_str(void *data, const std::vector<Value*> &args, Action *completion) {
-  EXPECT_ARGS(2);
-  Integer *arg0 = GET_INTEGER(0);
-  Integer *arg1 = GET_INTEGER(1);
-  long base;
-  if (!mpz_fits_slong_p(arg1->value) || (base = mpz_get_si(arg1->value)) > 62 ||
-      base < -36 || base == 0 || base == 1 || base == -1) {
-    std::cerr << "prim_str called with argument 2 = "
-      << arg1 << ", which is not a valid base [-36,62] \\ [-1,1]." << std::endl;
-    stack_trace(completion);
-    exit(1);
-  }
-  resume(completion, new String(arg0->str(base)));
-}
-
 static void prim_powm(void *data, const std::vector<Value*> &args, Action *completion) {
   EXPECT_ARGS(3);
   Integer *arg0 = GET_INTEGER(0);
@@ -79,6 +64,37 @@ static void prim_powm(void *data, const std::vector<Value*> &args, Action *compl
     exit(1);
   }
   mpz_powm(out->value, arg0->value, arg1->value, arg2->value);
+  resume(completion, out);
+}
+
+static void prim_str(void *data, const std::vector<Value*> &args, Action *completion) {
+  EXPECT_ARGS(2);
+  Integer *arg0 = GET_INTEGER(0);
+  Integer *arg1 = GET_INTEGER(1);
+  long base;
+  if (!mpz_fits_slong_p(arg0->value) || (base = mpz_get_si(arg0->value)) > 62 ||
+      base < -36 || base == 0 || base == 1 || base == -1) {
+    std::cerr << "prim_str called with argument 1 = "
+      << arg0 << ", which is not a valid base; [-36,62] \\ [-1,1]." << std::endl;
+    stack_trace(completion);
+    exit(1);
+  }
+  resume(completion, new String(arg1->str(base)));
+}
+
+static void prim_int(void *data, const std::vector<Value*> &args, Action *completion) {
+  EXPECT_ARGS(2);
+  Integer *arg0 = GET_INTEGER(0);
+  String  *arg1 = GET_STRING(1);
+  Integer *out  = new Integer;
+  long base;
+  if (!mpz_fits_slong_p(arg0->value) || (base = mpz_get_si(arg0->value)) > 62 || base < 0 || base == 1) {
+    std::cerr << "prim_int called with argument 1 = "
+      << arg0 << ", which is not a valid base; 0 or [2,62]." << std::endl;
+    stack_trace(completion);
+    exit(1);
+  }
+  mpz_set_str(out->value, arg1->value.c_str(), base);
   resume(completion, out);
 }
 
@@ -100,6 +116,7 @@ void prim_register_integer(PrimMap& pmap) {
   pmap["shr"].first = prim_shr;
   pmap["exp"].first = prim_exp;
   pmap["root"].first= prim_root;
-  pmap["str"].first = prim_str;
   pmap["powm"].first= prim_powm;
+  pmap["str"].first = prim_str;
+  pmap["int"].first = prim_int;
 }

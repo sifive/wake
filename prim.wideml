@@ -24,7 +24,7 @@ def scanr f a l = if empty l then a, nil else \r (f (first l) (first r), r) (sca
 def map   f   l = if empty l then nil else f (first l), map f (second l)
 
 # string operations
-def x ++ y = prim "strcat"
+def x ++ y = prim "cat"
 
 # integer operations
 def x + y = prim "add"
@@ -35,14 +35,18 @@ def x % y = prim "mod"
 def x << y = prim "shl"
 def x >> y = prim "shr"
 def x ^ y = prim "exp"
-def root x n = prim "root"
+def root x n = \_\_ prim "root" n x
+def sqrt = root 2
 def xor x y = prim "xor"
 def and x y = prim "and"
 def or  x y = prim "or"
 def gcd x y = prim "gcd"
 def lcm x y = prim "lcm"
-def str x y = prim "str"
-def powm x y m = prim "powm"
+def powm x y m = prim "powm" # fast version of: (x^y) % m
+
+# Type conversion
+def str base n = prim "str" # int -> string
+def int base s = prim "int" # string -> int
 
 # Comparison operators for integers and strings
 def x <  y = prim "lt"
