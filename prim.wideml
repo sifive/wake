@@ -67,5 +67,9 @@ def gcd x y = prim "gcd"
 def lcm x y = prim "lcm"
 def str x y = prim "str"
 def powm x y m = prim "powm"
-
-# comparisons ... < > <= >= == != ... what to return? need to build True/False in C++
+def x <  y = prim "lt"
+def x >  y = y < x
+def x >= y = ~(x < y)
+def x <= y = ~(y < x)
+def x == y = prim "eq"
+def x != y = ~(x == y)

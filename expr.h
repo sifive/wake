@@ -56,8 +56,8 @@ struct VarRef : public Expr {
   int offset;
 
   static const char *type;
-  VarRef(const Location& location_, const std::string& name_)
-   : Expr(type, location_), name(name_) { }
+  VarRef(const Location& location_, const std::string& name_, int depth_ = 0, int offset_ = 0)
+   : Expr(type, location_), name(name_), depth(depth_), offset(offset_) { }
 };
 
 struct DefMap : public Expr {

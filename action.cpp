@@ -1,6 +1,7 @@
 #include "action.h"
 #include "expr.h"
 #include "value.h"
+#include "prim.h"
 #include <iostream>
 #include <cassert>
 
@@ -50,12 +51,7 @@ void AppRet::execute(ActionQueue &queue) {
 void AppFn::execute(ActionQueue &queue) {
   if (input_value->type != Closure::type) {
     std::cerr << "Attempt to apply " << input_value << " which is not a Closure" << std::endl;
-    for (Action *action = this; action; action = action->invoker) {
-      if (action->type == Thunk::type) {
-        Thunk *thunk = reinterpret_cast<Thunk*>(action);
-        std::cerr << "  from " << thunk->expr->location.str() << std::endl;
-      }
-    }
+    stack_trace(this);
     exit(1);
   }
   Closure *clo = reinterpret_cast<Closure*>(input_value);
