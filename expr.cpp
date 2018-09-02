@@ -14,6 +14,9 @@ const char *Literal::type = "Literal";
 Literal::Literal(const Location& location_, std::unique_ptr<Value> value_)
  : Expr(type, location_), value(std::move(value_)) { }
 
+Literal::Literal(const Location& location_, const char *value_)
+ : Expr(type, location_), value(new String(value_)) { }
+
 static std::string pad(int depth) {
   return std::string(depth, ' ');
 }

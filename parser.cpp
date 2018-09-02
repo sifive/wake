@@ -91,6 +91,7 @@ bool expectValue(const char *type, Lexer& lex) {
 static Expr* parse_term(Lexer &lex);
 static Expr* parse_product(Lexer &lex);
 static Expr* parse_sum(int precedence, Lexer &lex);
+static Expr* parse_if(Lexer &lex);
 static DefMap::defs parse_defs(Lexer &lex);
 static Expr* parse_block(Lexer &lex);
 
@@ -131,7 +132,7 @@ static Expr* parse_term(Lexer &lex) {
     case POPEN: {
       Location location = lex.next.location;
       lex.consume();
-      auto x = parse_sum(0, lex);
+      auto x = parse_if(lex);
       location.end = lex.next.location.end;
       if (expect(PCLOSE, lex)) lex.consume();
       x->location = location;
@@ -142,7 +143,7 @@ static Expr* parse_term(Lexer &lex) {
         << symbolTable[lex.next.type] << " at "
         << lex.next.location.str() << std::endl;
       lex.fail = true;
-      return new Literal(Location(), std::unique_ptr<Value>(new String("bad")));
+      return new Literal();
     }
   }
 }
@@ -188,6 +189,25 @@ static Expr* parse_sum(int p, Lexer &lex) {
   return lhs;
 }
 
+static Expr* parse_if(Lexer &lex) {
+  if (lex.next.type == IF) {
+    Location l = lex.next.location;
+    lex.consume();
+    auto condE = parse_sum(0, lex);
+    if (expect(THEN, lex)) lex.consume();
+    auto thenE = parse_sum(0, lex);
+    if (expect(ELSE, lex)) lex.consume();
+    auto elseE = parse_sum(0, lex);
+    l.end = elseE->location.end;
+    return new App(l, new App(l, new App(l, condE,
+      new Lambda(l, "_", thenE)),
+      new Lambda(l, "_", elseE)),
+      new Literal());
+  } else {
+    return parse_sum(0, lex);
+  }
+}
+
 static DefMap::defs parse_defs(Lexer &lex) {
   TRACE("DEFS");
   std::map<std::string, std::unique_ptr<Expr> > map;
@@ -228,7 +248,7 @@ static DefMap::defs parse_defs(Lexer &lex) {
       expect(DEDENT, lex);
       lex.consume();
     } else {
-      body = parse_sum(0, lex);
+      body = parse_if(lex);
       expect(EOL, lex);
       lex.consume();
     }
@@ -249,7 +269,7 @@ static Expr* parse_block(Lexer &lex) {
   TRACE("BLOCK");
   Location location = lex.next.location;
   DefMap::defs map = parse_defs(lex);
-  auto body = parse_sum(0, lex);
+  auto body = parse_if(lex);
   location.end = body->location.end;
   expect(EOL, lex);
   lex.consume();

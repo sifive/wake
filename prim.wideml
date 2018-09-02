@@ -16,36 +16,12 @@ def nil x = true
 def empty l = l (\x \y false)
 
 # list operations
-
-def last default l =
-  def then _ = default
-  def else _ = last (first l) (second l)
-  empty l then else ""
-
-def foldl f a l =
-  def then _ = a
-  def else _ = foldl f (f a (first l)) (second l)
-  empty l then else ""
-
-def scanl f a l =
-  def then _ = nil
-  def else _ = scanl f (f a (first l)) (second l)
-  a, empty l then else ""
-
-def foldr f a l =
-  def then _ = a
-  def else _ = f (first l) (foldr f a (second l))
-  empty l then else ""
-
-def scanr f a l =
-  def then = a, nil
-  def else = \r (f (first l) (first r), r) (scanr f a (second l))
-  empty l then else ""
-
-def map f l =
-  def then _ = nil
-  def else _ = f (first l), map f (second l)
-  empty l then else ""
+def last    x l = if empty l then x else last (first l) (second l)
+def foldl f a l =     if empty l then a   else foldl f (f a (first l)) (second l)
+def scanl f a l = a, (if empty l then nil else scanl f (f a (first l)) (second l))
+def foldr f a l =     if empty l then a   else f (first l) (foldr f a (second l))
+def scanr f a l = if empty l then a, nil else \r (f (first l) (first r), r) (scanr f a (second l))
+def map   f   l = if empty l then nil else f (first l), map f (second l)
 
 # string operations
 def x ++ y = prim "strcat"

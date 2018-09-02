@@ -75,6 +75,7 @@ struct Literal : public Expr {
   static const char *type;
 
   Literal(const Location& location_, std::unique_ptr<Value> value_);
+  Literal(const Location& location_ = Location(), const char *value_ = "bad");
 };
 
 #endif
