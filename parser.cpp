@@ -21,7 +21,7 @@ static op_type precedence(const std::string& str) {
   case '.':
     return op_type(13, 1);
   case 'a': // Application rules run between \\ and $
-    return op_type(12, 0);
+    return op_type(12, 1);
   case '$':
     return op_type(11, 0);
   case '^':
@@ -99,17 +99,47 @@ bool expectValue(const char *type, Lexer& lex) {
   }
 }
 
-static Expr* parse_term(Lexer &lex);
-static Expr* parse_app(Lexer &lex);
 static Expr* parse_unary(int p, Lexer &lex);
 static Expr* parse_binary(int p, Lexer &lex);
 static Expr* parse_if(Lexer &lex);
 static DefMap::defs parse_defs(Lexer &lex);
 static Expr* parse_block(Lexer &lex);
 
-static Expr* parse_term(Lexer &lex) {
-  TRACE("TERM");
+static Expr* parse_unary(int p, Lexer &lex) {
+  TRACE("UNARY");
   switch (lex.next.type) {
+    // Unary operators
+    case OPERATOR: {
+      Location location = lex.next.location;
+      op_type op = precedence(lex.text());
+      if (op.p < p) {
+        std::cerr << "Lower precedence unary operator "
+          << lex.text() << " must use ()s at "
+          << lex.next.location.str() << std::endl;
+        lex.fail = true;
+      }
+      auto opp = new VarRef(lex.next.location, "unary " + lex.text());
+      lex.consume();
+      auto rhs = parse_binary(op.p + op.l, lex);
+      location.end = rhs->location.end;
+      return new App(location, opp, rhs);
+    }
+    case LAMBDA: {
+      Location location = lex.next.location;
+      op_type op = precedence(lex.text());
+      if (op.p < p) {
+        std::cerr << "Lower precedence unary operator "
+          << lex.text() << " must use ()s at "
+          << lex.next.location.str() << std::endl;
+        lex.fail = true;
+      }
+      lex.consume();
+      auto name = get_arg_loc(lex);
+      auto rhs = parse_binary(op.p + op.l, lex);
+      location.end = rhs->location.end;
+      return new Lambda(location, name.first, rhs);
+    }
+    // Terminals
     case ID: {
       Expr *out = new VarRef(lex.next.location, lex.text());
       lex.consume();
@@ -143,7 +173,7 @@ static Expr* parse_term(Lexer &lex) {
       return out;
     }
     default: {
-      std::cerr << "Was expecting a TERMINAL (ID/LITERAL/PRIM/POPEN), got a "
+      std::cerr << "Was expecting an (OPERATOR/LAMBDA/ID/LITERAL/PRIM/POPEN), got a "
         << symbolTable[lex.next.type] << " at "
         << lex.next.location.str() << std::endl;
       lex.fail = true;
@@ -152,95 +182,43 @@ static Expr* parse_term(Lexer &lex) {
   }
 }
 
-static Expr* parse_app(Lexer &lex) {
-  TRACE("APP");
-  op_type op = precedence("a");
-  Expr *product = parse_binary(op.p, lex);
-
+static Expr* parse_binary(int p, Lexer &lex) {
+  TRACE("BINARY");
+  auto lhs = parse_unary(p, lex);
   for (;;) {
     switch (lex.next.type) {
-      // Handled by parse_unary
-      case OPERATOR:
-        if (precedence(lex.text()).p < op.p)
-          return product;
+      case OPERATOR: {
+        std::string name = lex.text();
+        op_type op = precedence(name);
+        if (op.p < p) return lhs;
+        auto opp = new VarRef(lex.next.location, "binary " + name);
+        lex.consume();
+        auto rhs = parse_binary(op.p + op.l, lex);
+        Location app1_loc = lhs->location;
+        Location app2_loc = lhs->location;
+        app1_loc.end = opp->location.end;
+        app2_loc.end = rhs->location.end;
+        lhs = new App(app2_loc, new App(app1_loc, opp, lhs), rhs);
+        break;
+      }
       case LAMBDA:
-      // Handled by parse_term
       case ID:
       case LITERAL:
       case PRIM:
       case POPEN: {
-        auto arg = parse_binary(op.p, lex);
-        Location location = product->location;
-        location.end = arg->location.end;
-        product = new App(location, product, arg);
+        op_type op = precedence("a"); // application
+        if (op.p < p) return lhs;
+        auto rhs = parse_binary(op.p + op.l, lex);
+        Location location = lhs->location;
+        location.end = rhs->location.end;
+        lhs = new App(location, lhs, rhs);
         break;
       }
       default: {
-        return product;
+        return lhs;
       }
     }
   }
-}
-
-static Expr* parse_unary(int p, Lexer &lex) {
-  TRACE("UNARY");
-  switch (lex.next.type) {
-    case OPERATOR: {
-      Location location = lex.next.location;
-      op_type op = precedence(lex.text());
-      if (op.p < p) {
-        std::cerr << "Lower precedence unary operator "
-          << lex.text() << " must use ()s at "
-          << lex.next.location.str() << std::endl;
-        lex.fail = true;
-      }
-      auto opp = new VarRef(lex.next.location, "unary " + lex.text());
-      lex.consume();
-      auto rhs = parse_binary(op.p + op.l, lex);
-      location.end = rhs->location.end;
-      return new App(location, opp, rhs);
-    }
-    case LAMBDA: {
-      Location location = lex.next.location;
-      op_type op = precedence(lex.text());
-      if (op.p < p) {
-        std::cerr << "Lower precedence unary operator "
-          << lex.text() << " must use ()s at "
-          << lex.next.location.str() << std::endl;
-        lex.fail = true;
-      }
-      lex.consume();
-      auto name = get_arg_loc(lex);
-      auto rhs = parse_binary(op.p + op.l, lex);
-      location.end = rhs->location.end;
-      return new Lambda(location, name.first, rhs);
-    }
-    default: {
-      if (p >= precedence("a").p) {
-        return parse_term(lex);
-      } else {
-        return parse_app(lex);
-      }
-    }
-  }
-}
-
-static Expr* parse_binary(int p, Lexer &lex) {
-  TRACE("BINARY");
-  auto lhs = parse_unary(p, lex);
-  std::string name;
-  op_type op;
-  while (lex.next.type == OPERATOR && (op = precedence(name = lex.text())).p >= p) {
-    auto opp = new VarRef(lex.next.location, "binary " + name);
-    lex.consume();
-    auto rhs = parse_binary(op.p + op.l, lex);
-    Location app1_loc = lhs->location;
-    Location app2_loc = lhs->location;
-    app1_loc.end = opp->location.end;
-    app2_loc.end = rhs->location.end;
-    lhs = new App(app2_loc, new App(app1_loc, opp, lhs), rhs);
-  }
-  return lhs;
 }
 
 static Expr* parse_if(Lexer &lex) {
