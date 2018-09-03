@@ -105,6 +105,24 @@ static Expr* parse_if(Lexer &lex);
 static DefMap::defs parse_defs(Lexer &lex);
 static Expr* parse_block(Lexer &lex);
 
+static int relabel_anon(Expr* expr, int index) {
+  if (expr->type == VarRef::type) {
+    VarRef *ref = reinterpret_cast<VarRef*>(expr);
+    if (ref->name != "_") return index;
+    ++index;
+    ref->name += std::to_string(index);
+    return index;
+  } else if (expr->type == App::type) {
+    App *app = reinterpret_cast<App*>(expr);
+    return relabel_anon(app->val.get(), relabel_anon(app->fn.get(), index));
+  } else if (expr->type == Lambda::type) {
+    Lambda *lambda = reinterpret_cast<Lambda*>(expr);
+    return relabel_anon(lambda->body.get(), index);
+  }
+  // noop for DefMap, Literal, Prim
+  return index;
+}
+
 static Expr* parse_unary(int p, Lexer &lex) {
   TRACE("UNARY");
   switch (lex.next.type) {
@@ -170,6 +188,9 @@ static Expr* parse_unary(int p, Lexer &lex) {
       location.end = lex.next.location.end;
       if (expect(PCLOSE, lex)) lex.consume();
       out->location = location;
+      int args = relabel_anon(out, 0);
+      for (int index = args; index >= 1; --index)
+        out = new Lambda(location, "_" + std::to_string(index), out);
       return out;
     }
     default: {
