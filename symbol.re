@@ -169,15 +169,11 @@ top:
       ")"    { return mkSym(PCLOSE); }
 
       // identifiers
-      binary = [.^*/%\-+<>=!&|,];
-      unary  = [$~];
-      ary    = binary | unary;
-      bin_op = binary ary*;
-      una_op = (unary ary*) | "!";
-      id     = [a-z][a-zA-Z0-9_]* | "_";
+      op = [.$^*/%\-+~<>=!&|,]+;
+      id = [a-z][a-zA-Z0-9_]* | "_";
 
-      id | una_op { return mkSym(ID); }
-      bin_op      { return mkSym(OPERATOR); }
+      id { return mkSym(ID); }
+      op { return mkSym(OPERATOR); }
    */
 
    // reserved punctuation: `@{}[]:;

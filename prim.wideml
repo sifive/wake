@@ -1,7 +1,10 @@
+# sugar
+def x . f = f x
+
 # bools
 def true  x y = x
 def false x y = y
-def ~x = x false true
+def !x = x false true
 def x && y = x y x
 def x || y = x x y
 
@@ -13,15 +16,18 @@ def second p = p false
 # lists
 def x, y = pair x y
 def nil x = true
-def empty l = l (\x \y false)
+def empty l = l (\_\_ false)
+def tail = second
+def last l =
+  def help x l = if l.empty then x else help l.first l.tail
+  help "" l
 
 # list operations
-def last    x l = if empty l then x else last (first l) (second l)
-def foldl f a l =     if empty l then a   else foldl f (f a (first l)) (second l)
-def scanl f a l = a, (if empty l then nil else scanl f (f a (first l)) (second l))
-def foldr f a l =     if empty l then a   else f (first l) (foldr f a (second l))
-def scanr f a l = if empty l then a, nil else \r (f (first l) (first r), r) (scanr f a (second l))
-def map   f   l = if empty l then nil else f (first l), map f (second l)
+def foldl f a l =     if l.empty then a   else foldl f (f a l.first) l.tail
+def scanl f a l = a, (if l.empty then nil else scanl f (f a l.first) l.tail)
+def foldr f a l =     if l.empty then a   else f l.first (foldr f a l.tail)
+def scanr f a l = if l.empty then a, nil else \r (f l.first r.first, r) (scanr f a l.tail)
+def map   f   l = if l.empty then nil else f l.first, map f l.tail
 
 # string operations
 def x ++ y = prim "cat"
@@ -29,6 +35,9 @@ def len s  = prim "len"
 def cut s begin end = prim "cut"
 
 # integer operations
+def +x = x
+def -x = prim "neg"
+def ~x = prim "com"
 def x + y = prim "add"
 def x - y = prim "sub"
 def x * y = prim "mul"
@@ -37,8 +46,9 @@ def x % y = prim "mod"
 def x << y = prim "shl"
 def x >> y = prim "shr"
 def x ^ y = prim "exp"
-def root x n = \_\_ prim "root" n x
+def root x n = (\_\_ prim "root") n x
 def sqrt = root 2
+def abs x = prim "abs"
 def xor x y = prim "xor"
 def and x y = prim "and"
 def or  x y = prim "or"
@@ -53,7 +63,7 @@ def int base s = prim "int" # string -> int
 # Comparison operators for integers and strings
 def x <  y = prim "lt"
 def x >  y = y < x
-def x >= y = ~(x < y)
-def x <= y = ~(y < x)
+def x >= y = !(x < y)
+def x <= y = !(y < x)
 def x == y = prim "eq"
-def x != y = ~(x == y)
+def x != y = !(x == y)

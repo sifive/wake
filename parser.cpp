@@ -15,31 +15,42 @@ struct op_type {
   op_type() : p(-1), l(-1) { }
 };
 
-static op_type precedence(char c) {
+static op_type precedence(const std::string& str) {
+  char c = str[0];
   switch (c) {
   case '.':
-    return op_type(8, 1);
+    return op_type(13, 1);
+  case 'a': // Application rules run between \\ and $
+    return op_type(12, 0);
+  case '$':
+    return op_type(11, 0);
   case '^':
-    return op_type(7, 0);
+    return op_type(10, 0);
   case '*':
+    return op_type(9, 1);
   case '/':
   case '%':
-    return op_type(6, 1);
+    return op_type(8, 1);
   case '-':
+  case '~':
+  // case '!': // single-character '!'
+    return op_type(7, 1);
   case '+':
-    return op_type(5, 1);
-  // case ':':
+    return op_type(6, 1);
   case '<':
   case '>':
-    return op_type(4, 1);
+    return op_type(5, 1);
+  case '!': // multi-character '!' (like != )
+    if (str.size() == 1) return op_type(7, 1);
   case '=':
-  case '!':
-    return op_type(3, 1);
+    return op_type(4, 1);
   case '&':
-    return op_type(2, 1);
+    return op_type(3, 1);
   case '|':
-    return op_type(1, 1);
+    return op_type(2, 1);
   case ',':
+    return op_type(1, 0);
+  case '\\': // LAMBDA
     return op_type(0, 0);
   default:
     return op_type(-1, -1);
@@ -89,8 +100,9 @@ bool expectValue(const char *type, Lexer& lex) {
 }
 
 static Expr* parse_term(Lexer &lex);
-static Expr* parse_product(Lexer &lex);
-static Expr* parse_sum(int precedence, Lexer &lex);
+static Expr* parse_app(Lexer &lex);
+static Expr* parse_unary(int p, Lexer &lex);
+static Expr* parse_binary(int p, Lexer &lex);
 static Expr* parse_if(Lexer &lex);
 static DefMap::defs parse_defs(Lexer &lex);
 static Expr* parse_block(Lexer &lex);
@@ -99,7 +111,7 @@ static Expr* parse_term(Lexer &lex) {
   TRACE("TERM");
   switch (lex.next.type) {
     case ID: {
-      Expr* out = new VarRef(lex.next.location, lex.text());
+      Expr *out = new VarRef(lex.next.location, lex.text());
       lex.consume();
       return out;
     }
@@ -107,14 +119,6 @@ static Expr* parse_term(Lexer &lex) {
       Expr *out = new Literal(lex.next.location, std::move(lex.next.value));
       lex.consume();
       return out;
-    }
-    case LAMBDA: {
-      Location location = lex.next.location;
-      lex.consume();
-      auto name = get_arg_loc(lex);
-      auto term = parse_term(lex);
-      location.end = term->location.end;
-      return new Lambda(location, name.first, term);
     }
     case PRIM: {
       std::string name;
@@ -132,14 +136,14 @@ static Expr* parse_term(Lexer &lex) {
     case POPEN: {
       Location location = lex.next.location;
       lex.consume();
-      auto x = parse_if(lex);
+      Expr *out = parse_if(lex);
       location.end = lex.next.location.end;
       if (expect(PCLOSE, lex)) lex.consume();
-      x->location = location;
-      return x;
+      out->location = location;
+      return out;
     }
     default: {
-      std::cerr << "Was expecting an ID/LAMBDA/POPEN/OPERATOR/LITERAL, got a "
+      std::cerr << "Was expecting a TERMINAL (ID/LITERAL/PRIM/POPEN), got a "
         << symbolTable[lex.next.type] << " at "
         << lex.next.location.str() << std::endl;
       lex.fail = true;
@@ -148,17 +152,24 @@ static Expr* parse_term(Lexer &lex) {
   }
 }
 
-static Expr* parse_product(Lexer &lex) {
-  TRACE("PRODUCT");
-  auto product = parse_term(lex);
+static Expr* parse_app(Lexer &lex) {
+  TRACE("APP");
+  op_type op = precedence("a");
+  Expr *product = parse_binary(op.p, lex);
 
   for (;;) {
     switch (lex.next.type) {
+      // Handled by parse_unary
+      case OPERATOR:
+        if (precedence(lex.text()).p < op.p)
+          return product;
+      case LAMBDA:
+      // Handled by parse_term
       case ID:
       case LITERAL:
-      case LAMBDA:
+      case PRIM:
       case POPEN: {
-        auto arg = parse_term(lex);
+        auto arg = parse_binary(op.p, lex);
         Location location = product->location;
         location.end = arg->location.end;
         product = new App(location, product, arg);
@@ -171,15 +182,58 @@ static Expr* parse_product(Lexer &lex) {
   }
 }
 
-static Expr* parse_sum(int p, Lexer &lex) {
-  TRACE("SUM");
-  auto lhs = parse_product(lex);
+static Expr* parse_unary(int p, Lexer &lex) {
+  TRACE("UNARY");
+  switch (lex.next.type) {
+    case OPERATOR: {
+      Location location = lex.next.location;
+      op_type op = precedence(lex.text());
+      if (op.p < p) {
+        std::cerr << "Lower precedence unary operator "
+          << lex.text() << " must use ()s at "
+          << lex.next.location.str() << std::endl;
+        lex.fail = true;
+      }
+      auto opp = new VarRef(lex.next.location, "unary " + lex.text());
+      lex.consume();
+      auto rhs = parse_binary(op.p + op.l, lex);
+      location.end = rhs->location.end;
+      return new App(location, opp, rhs);
+    }
+    case LAMBDA: {
+      Location location = lex.next.location;
+      op_type op = precedence(lex.text());
+      if (op.p < p) {
+        std::cerr << "Lower precedence unary operator "
+          << lex.text() << " must use ()s at "
+          << lex.next.location.str() << std::endl;
+        lex.fail = true;
+      }
+      lex.consume();
+      auto name = get_arg_loc(lex);
+      auto rhs = parse_binary(op.p + op.l, lex);
+      location.end = rhs->location.end;
+      return new Lambda(location, name.first, rhs);
+    }
+    default: {
+      if (p >= precedence("a").p) {
+        return parse_term(lex);
+      } else {
+        return parse_app(lex);
+      }
+    }
+  }
+}
+
+static Expr* parse_binary(int p, Lexer &lex) {
+  TRACE("BINARY");
+  auto lhs = parse_unary(p, lex);
   std::string name;
   op_type op;
-  while (lex.next.type == OPERATOR && (op = precedence((name = lex.text())[0])).p >= p) {
-    auto opp = new VarRef(lex.next.location, name);
+  while (lex.next.type == OPERATOR && (op = precedence(name = lex.text())).p >= p) {
+    auto opp = new VarRef(lex.next.location, "binary " + name);
     lex.consume();
-    auto rhs = parse_sum(op.p + op.l, lex);
+    auto rhs = parse_binary(op.p + op.l, lex);
     Location app1_loc = lhs->location;
     Location app2_loc = lhs->location;
     app1_loc.end = opp->location.end;
@@ -190,21 +244,22 @@ static Expr* parse_sum(int p, Lexer &lex) {
 }
 
 static Expr* parse_if(Lexer &lex) {
+  TRACE("IF");
   if (lex.next.type == IF) {
     Location l = lex.next.location;
     lex.consume();
-    auto condE = parse_sum(0, lex);
+    auto condE = parse_binary(0, lex);
     if (expect(THEN, lex)) lex.consume();
-    auto thenE = parse_sum(0, lex);
+    auto thenE = parse_binary(0, lex);
     if (expect(ELSE, lex)) lex.consume();
-    auto elseE = parse_sum(0, lex);
+    auto elseE = parse_binary(0, lex);
     l.end = elseE->location.end;
     return new App(l, new App(l, new App(l, condE,
       new Lambda(l, "_", thenE)),
       new Lambda(l, "_", elseE)),
       new Literal());
   } else {
-    return parse_sum(0, lex);
+    return parse_binary(0, lex);
   }
 }
 
@@ -220,17 +275,29 @@ static DefMap::defs parse_defs(Lexer &lex) {
     while (lex.next.type == ID) args.push_back(get_arg_loc(lex));
 
     std::string name;
-    if (lex.next.type == OPERATOR && args.size() == 1) {
-      name = lex.text();
-      lex.consume();
-      args.push_back(get_arg_loc(lex));
-    } else if (!args.empty()) {
-      name = args.front().first;
-      args.pop_front();
+    if (lex.next.type == OPERATOR) {
+      if (args.empty()) {
+        name = "unary " + lex.text();
+        lex.consume();
+        args.push_back(get_arg_loc(lex));
+      } else if (args.size() == 1) {
+        name = "binary " + lex.text();
+        lex.consume();
+        args.push_back(get_arg_loc(lex));
+      } else {
+        name = "broken";
+        std::cerr << "Operator def is neither unary nor binary at " << def.str() << std::endl;
+        lex.fail = true;
+      }
     } else {
-      name = "broken";
-      std::cerr << "def has no name at " << def.str() << std::endl;
-      lex.fail = true;
+      if (args.empty()) {
+        name = "broken";
+        std::cerr << "def has no name at " << def.str() << std::endl;
+        lex.fail = true;
+      } else {
+        name = args.front().first;
+        args.pop_front();
+      }
     }
 
     if (map.find(name) != map.end()) {
@@ -282,6 +349,7 @@ static Expr* parse_block(Lexer &lex) {
 }
 
 DefMap::defs parse_top(Lexer &lex) {
+  TRACE("TOP");
   if (lex.next.type == EOL) lex.consume();
   DefMap::defs out = parse_defs(lex);
   expect(END, lex);

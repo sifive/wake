@@ -3,6 +3,19 @@
 #include <iostream>
 #include <gmp.h>
 
+#define UNOP(name, fn)										\
+static void prim_##name(void *data, const std::vector<Value*> &args, Action *completion) {	\
+  EXPECT_ARGS(1);										\
+  Integer *arg0 = GET_INTEGER(0);								\
+  Integer *out = new Integer;									\
+  fn(out->value, arg0->value);									\
+  resume(completion, out);									\
+}
+
+UNOP(com, mpz_com)
+UNOP(abs, mpz_abs)
+UNOP(neg, mpz_neg)
+
 #define BINOP(name, fn)										\
 static void prim_##name(void *data, const std::vector<Value*> &args, Action *completion) {	\
   EXPECT_ARGS(2);										\
@@ -98,10 +111,12 @@ static void prim_int(void *data, const std::vector<Value*> &args, Action *comple
   resume(completion, out);
 }
 
-// mpz_popcount, com, abs, neg
-// scan0/1 ?
+// popcount, scan0, scan1 ?
 
 void prim_register_integer(PrimMap& pmap) {
+  pmap["com"].first = prim_com;
+  pmap["abs"].first = prim_abs;
+  pmap["neg"].first = prim_neg;
   pmap["add"].first = prim_add;
   pmap["sub"].first = prim_sub;
   pmap["mul"].first = prim_mul;
