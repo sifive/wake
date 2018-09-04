@@ -6,6 +6,7 @@
 #include "symbol.h"
 #include "value.h"
 #include "action.h"
+#include "expr.h"
 
 void stack_trace(Action *failure) {
   Location *trace = 0;
@@ -33,23 +34,11 @@ Value *prim_false;
 int main(int argc, const char **argv) {
   bool ok = true;
 
-  DefMap::defs defs;
+  Top top;
   for (int i = 1; i < argc; ++i) {
     Lexer lex(argv[i]);
-    DefMap::defs file = parse_top(lex);
+    parse_top(top, lex);
     if (lex.fail) ok = false;
-
-    for (auto i = file.begin(); i != file.end(); ++i) {
-      if (defs.find(i->first) != defs.end()) {
-        std::cerr << "Duplicate def "
-          << i->first << " at "
-          << defs[i->first]->location.str() << " and "
-          << i->second->location.str();
-        ok = false;
-      } else {
-        defs[i->first] = std::move(i->second);
-      }
-    }
   }
 
   /* Initialize primitive bools */
@@ -63,15 +52,14 @@ int main(int argc, const char **argv) {
   prim_register_integer(pmap);
   prim_register_polymorphic(pmap);
 
-  auto root = new DefMap(location, defs, new VarRef(location, "main"));
-  if (!bind_refs(root, pmap)) ok = false;
+  if (!bind_refs(&top, pmap)) ok = false;
 
   const char *slash = strrchr(argv[0], '/');
   const char *exec = slash ? slash + 1 : argv[0];
   int debug = !strcmp(exec, "wideml-debug");
 
   if (!strcmp(exec, "wideml-parse")) {
-    std::cout << root;
+    std::cout << &top;
     return 0;
   }
 
@@ -80,8 +68,8 @@ int main(int argc, const char **argv) {
     return 1;
   }
 
-  Thunk *top = new Thunk(0, root, 0);
-  queue.push_back(top);
+  Thunk *result = new Thunk(0, &top, 0);
+  queue.push_back(result);
   unsigned long steps = 0, widest = 0;
   while (!queue.empty()) {
     Action *doit = queue.front();
@@ -104,8 +92,8 @@ int main(int argc, const char **argv) {
   if (debug) {
     std::cerr << "Computed in " << steps << " steps with " << widest << " in parallel." << std::endl;
   }
-  assert (top->output());
-  std::cout << top->output() << std::endl;
+  assert (result->output());
+  std::cout << result->output() << std::endl;
 
   return 0;
 }

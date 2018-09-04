@@ -1,69 +1,70 @@
 # sugar
-def x . f = f x
+global x . f = f x
 
 # bools
-def true  x y = x
-def false x y = y
-def !x = x false true
-def x && y = x y x
-def x || y = x x y
+global true  x y = x
+global false x y = y
+global !x = x false true
+global x && y = x y x
+global x || y = x x y
 
 # tuples
-def pair x y f = f x y
-def first  p = p true
-def second p = p false
+global pair x y f = f x y
+global first  p = p true
+global second p = p false
 
 # lists
-def x, y = pair x y
-def nil x = true
-def empty l = l (\_\_ false)
-def tail = second
-def last l =
+global x, y = pair x y
+global nil x = true
+global empty l = l (\_\_ false)
+global tail = second
+global last l =
   def help x l = if l.empty then x else help l.first l.tail
   help "" l
 
 # list operations
-def foldl f a l =     if l.empty then a   else foldl f (f a l.first) l.tail
-def scanl f a l = a, (if l.empty then nil else scanl f (f a l.first) l.tail)
-def foldr f a l =     if l.empty then a   else f l.first (foldr f a l.tail)
-def scanr f a l = if l.empty then a, nil else \r (f l.first r.first, r) (scanr f a l.tail)
-def map   f   l = if l.empty then nil else f l.first, map f l.tail
+global foldl f a l =     if l.empty then a   else foldl f (f a l.first) l.tail
+global scanl f a l = a, (if l.empty then nil else scanl f (f a l.first) l.tail)
+global foldr f a l =     if l.empty then a   else f l.first (foldr f a l.tail)
+global scanr f a l = if l.empty then a, nil else \r (f l.first r.first, r) (scanr f a l.tail)
+global map   f   l = if l.empty then nil else f l.first, map f l.tail
 
 # string operations
-def x ++ y = prim "cat"
-def len s  = prim "len"
-def cut s begin end = prim "cut"
+global x ++ y = prim "cat"
+global len s  = prim "len"
+global cat l = foldl (_++_) "" l
+global cut s begin end = prim "cut"
 
 # integer operations
-def +x = x
-def -x = prim "neg"
-def ~x = prim "com"
-def x + y = prim "add"
-def x - y = prim "sub"
-def x * y = prim "mul"
-def x / y = prim "div"
-def x % y = prim "mod"
-def x << y = prim "shl"
-def x >> y = prim "shr"
-def x ^ y = prim "exp"
-def root x n = (\_\_ prim "root") n x
-def sqrt = root 2
-def abs x = prim "abs"
-def xor x y = prim "xor"
-def and x y = prim "and"
-def or  x y = prim "or"
-def gcd x y = prim "gcd"
-def lcm x y = prim "lcm"
-def powm x y m = prim "powm" # fast version of: (x^y) % m
+global +x = x
+global -x = prim "neg"
+global ~x = prim "com"
+global x + y = prim "add"
+global x - y = prim "sub"
+global x * y = prim "mul"
+global x / y = prim "div"
+global x % y = prim "mod"
+global x << y = prim "shl"
+global x >> y = prim "shr"
+global x ^ y = prim "exp"
+global root x n = (\_\_ prim "root") n x
+global sqrt = root 2
+global abs x = prim "abs"
+global xor x y = prim "xor"
+global and x y = prim "and"
+global or  x y = prim "or"
+global gcd x y = prim "gcd"
+global lcm x y = prim "lcm"
+global powm x y m = prim "powm" # fast version of: (x^y) % m
 
 # Type conversion
-def str base n = prim "str" # int -> string
-def int base s = prim "int" # string -> int
+global str base n = prim "str" # int -> string
+global int base s = prim "int" # string -> int
 
 # Comparison operators for integers and strings
-def x <  y = prim "lt"
-def x >  y = y < x
-def x >= y = !(x < y)
-def x <= y = !(y < x)
-def x == y = prim "eq"
-def x != y = !(x == y)
+global x <  y = prim "lt"
+global x >  y = y < x
+global x >= y = !(x < y)
+global x <= y = !(y < x)
+global x == y = prim "eq"
+global x != y = !(x == y)

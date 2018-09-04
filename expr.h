@@ -60,22 +60,33 @@ struct VarRef : public Expr {
    : Expr(type, location_), name(name_), depth(depth_), offset(offset_) { }
 };
 
-struct DefMap : public Expr {
-  typedef std::map<std::string, std::unique_ptr<Expr> > defs;
-  defs map;
-  std::unique_ptr<Expr> body;
-
-  static const char *type;
-  DefMap(const Location& location_, defs& map_, Expr* body_)
-   : Expr(type, location_), map(), body(body_) { map.swap(map_); }
-};
-
 struct Literal : public Expr {
   std::unique_ptr<Value> value;
   static const char *type;
 
   Literal(const Location& location_, std::unique_ptr<Value> value_);
   Literal(const Location& location_ = Location(), const char *value_ = "bad");
+};
+
+struct DefMap : public Expr {
+  typedef std::map<std::string, std::unique_ptr<Expr> > defs;
+  defs map;
+  std::unique_ptr<Expr> body;
+
+  static const char *type;
+  DefMap(const Location &location_, defs& map_, Expr* body_)
+   : Expr(type, location_), map(), body(body_) { map.swap(map_); }
+  DefMap(const Location &location_) : Expr(type, location_), map(), body(new Literal()) { }
+};
+
+struct Top : public Expr {
+  typedef std::vector<DefMap> DefMaps;
+  typedef std::map<std::string, int> Globals;
+  DefMaps defmaps;
+  Globals globals;
+
+  static const char *type;
+  Top() : Expr(type, Location()) { }
 };
 
 #endif

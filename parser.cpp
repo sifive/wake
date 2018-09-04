@@ -15,12 +15,12 @@ struct op_type {
   op_type() : p(-1), l(-1) { }
 };
 
-static op_type precedence(const std::string& str) {
+static op_type precedence(const std::string &str) {
   char c = str[0];
   switch (c) {
   case '.':
     return op_type(13, 1);
-  case 'a': // Application rules run between \\ and $
+  case 'a': // Application rules run between . and $
     return op_type(12, 1);
   case '$':
     return op_type(11, 0);
@@ -82,7 +82,7 @@ static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
   return out;
 }
 
-bool expectValue(const char *type, Lexer& lex) {
+bool expectValue(const char *type, Lexer &lex) {
   if (expect(LITERAL, lex)) {
     if (lex.next.value->type == type) {
       return true;
@@ -102,7 +102,7 @@ bool expectValue(const char *type, Lexer& lex) {
 static Expr* parse_unary(int p, Lexer &lex);
 static Expr* parse_binary(int p, Lexer &lex);
 static Expr* parse_if(Lexer &lex);
-static DefMap::defs parse_defs(Lexer &lex);
+static Expr* parse_def(Lexer &lex, std::string &name);
 static Expr* parse_block(Lexer &lex);
 
 static int relabel_anon(Expr* expr, int index) {
@@ -262,84 +262,86 @@ static Expr* parse_if(Lexer &lex) {
   }
 }
 
-static DefMap::defs parse_defs(Lexer &lex) {
-  TRACE("DEFS");
-  std::map<std::string, std::unique_ptr<Expr> > map;
+static void detect_duplicates(Lexer &lex, const DefMap::defs &map, const std::string &name, Location l) {
+  auto i = map.find(name);
+  if (i != map.end()) {
+    std::cerr << "Duplicate def "
+      << name << " at "
+      << i->second->location.str() << " and "
+      << l.str() << std::endl;
+    lex.fail = true;
+  }
+}
 
-  while (lex.next.type == DEF) {
-    Location def = lex.next.location;
-    lex.consume();
+static Expr *parse_def(Lexer &lex, std::string &name) {
+  Location def = lex.next.location;
+  lex.consume();
 
-    std::list<std::pair<std::string, Location> > args;
-    while (lex.next.type == ID) args.push_back(get_arg_loc(lex));
+  std::list<std::pair<std::string, Location> > args;
+  while (lex.next.type == ID) args.push_back(get_arg_loc(lex));
 
-    std::string name;
-    if (lex.next.type == OPERATOR) {
-      if (args.empty()) {
-        name = "unary " + lex.text();
-        lex.consume();
-        args.push_back(get_arg_loc(lex));
-      } else if (args.size() == 1) {
-        name = "binary " + lex.text();
-        lex.consume();
-        args.push_back(get_arg_loc(lex));
-      } else {
-        name = "broken";
-        std::cerr << "Operator def is neither unary nor binary at " << def.str() << std::endl;
-        lex.fail = true;
-      }
+  if (lex.next.type == OPERATOR) {
+    if (args.empty()) {
+      name = "unary " + lex.text();
+      lex.consume();
+      args.push_back(get_arg_loc(lex));
+    } else if (args.size() == 1) {
+      name = "binary " + lex.text();
+      lex.consume();
+      args.push_back(get_arg_loc(lex));
     } else {
-      if (args.empty()) {
-        name = "broken";
-        std::cerr << "def has no name at " << def.str() << std::endl;
-        lex.fail = true;
-      } else {
-        name = args.front().first;
-        args.pop_front();
-      }
-    }
-
-    if (map.find(name) != map.end()) {
-      std::cerr << "Duplicate def "
-        << name << " at "
-        << map[name]->location.str() << " and "
-        << lex.next.location.str() << std::endl;
+      name = "broken";
+      std::cerr << "Operator def is neither unary nor binary at " << def.str() << std::endl;
       lex.fail = true;
     }
-
-    expect(EQUALS, lex);
-    lex.consume();
-
-    Expr *body;
-    if (lex.next.type == EOL) {
-      lex.consume();
-      expect(INDENT, lex);
-      lex.consume();
-      body = parse_block(lex);
-      expect(DEDENT, lex);
-      lex.consume();
+  } else {
+    if (args.empty()) {
+      name = "broken";
+      std::cerr << "def has no name at " << def.str() << std::endl;
+      lex.fail = true;
     } else {
-      body = parse_if(lex);
-      expect(EOL, lex);
-      lex.consume();
+      name = args.front().first;
+      args.pop_front();
     }
-
-    // add the arguments
-    for (auto i = args.rbegin(); i != args.rend(); ++i) {
-      Location location = body->location;
-      location.start = i->second.start;
-      body = new Lambda(location, i->first, body);
-    }
-
-    map[name] = std::unique_ptr<Expr>(body);
   }
-  return map;
+
+  expect(EQUALS, lex);
+  lex.consume();
+
+  Expr *body;
+  if (lex.next.type == EOL) {
+    lex.consume();
+    expect(INDENT, lex);
+    lex.consume();
+    body = parse_block(lex);
+    expect(DEDENT, lex);
+    lex.consume();
+  } else {
+    body = parse_if(lex);
+    expect(EOL, lex);
+    lex.consume();
+  }
+
+  // add the arguments
+  for (auto i = args.rbegin(); i != args.rend(); ++i) {
+    Location location = body->location;
+    location.start = i->second.start;
+    body = new Lambda(location, i->first, body);
+  }
+
+  return body;
 }
 
 static Expr* parse_block(Lexer &lex) {
   TRACE("BLOCK");
   Location location = lex.next.location;
-  DefMap::defs map = parse_defs(lex);
+  DefMap::defs map;
+  while (lex.next.type == DEF) {
+    std::string name;
+    auto def = parse_def(lex, name);
+    detect_duplicates(lex, map, name, def->location);
+    map[name] = std::unique_ptr<Expr>(def);
+  }
   auto body = parse_if(lex);
   location.end = body->location.end;
   expect(EOL, lex);
@@ -347,10 +349,30 @@ static Expr* parse_block(Lexer &lex) {
   return new DefMap(location, map, body);
 }
 
-DefMap::defs parse_top(Lexer &lex) {
+void parse_top(Top &top, Lexer &lex) {
   TRACE("TOP");
   if (lex.next.type == EOL) lex.consume();
-  DefMap::defs out = parse_defs(lex);
+  top.defmaps.push_back(DefMap(lex.next.location));
+  DefMap &defmap = top.defmaps.back();
+
+  while (lex.next.type == DEF || lex.next.type == GLOBAL) {
+    SymbolType sym = lex.next.type;
+    std::string name;
+    Expr *def = parse_def(lex, name);
+    detect_duplicates(lex, defmap.map, name, def->location);
+    defmap.map[name] = std::unique_ptr<Expr>(def);
+    if (sym == GLOBAL) {
+      if (top.globals.find(name) != top.globals.end()) {
+        std::cerr << "Duplicate global "
+          << name << " at "
+          << def->location.str() << " and "
+          << top.defmaps[top.globals[name]].map[name]->location.str() << std::endl;
+        lex.fail = true;
+      } else {
+        top.globals[name] = top.defmaps.size()-1;
+      }
+    }
+  }
+  defmap.location.end = lex.next.location.start;
   expect(END, lex);
-  return out;
 }

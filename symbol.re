@@ -7,8 +7,8 @@
 #include <list>
 
 const char *symbolTable[] = {
-  "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "PRIM", "LAMBDA", "EQUALS", "POPEN", "PCLOSE",
-  "IF", "THEN", "ELSE", "END", "EOL", "INDENT", "DEDENT"
+  "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "GLOBAL", "MERGE", "PRIM", "LAMBDA",
+  "EQUALS", "POPEN", "PCLOSE", "IF", "THEN", "ELSE", "END", "EOL", "INDENT", "DEDENT"
 };
 
 /*!max:re2c*/
@@ -158,15 +158,17 @@ top:
       }
 
       // keywords
-      "def"  { return mkSym(DEF);    }
-      "prim" { return mkSym(PRIM);   }
-      "if"   { return mkSym(IF);     }
-      "then" { return mkSym(THEN);   }
-      "else" { return mkSym(ELSE);   }
-      "\\"   { return mkSym(LAMBDA); }
-      "="    { return mkSym(EQUALS); }
-      "("    { return mkSym(POPEN);  }
-      ")"    { return mkSym(PCLOSE); }
+      "def"    { return mkSym(DEF);    }
+      "global" { return mkSym(GLOBAL); }
+      "merge"  { return mkSym(MERGE);  }
+      "prim"   { return mkSym(PRIM);   }
+      "if"     { return mkSym(IF);     }
+      "then"   { return mkSym(THEN);   }
+      "else"   { return mkSym(ELSE);   }
+      "\\"     { return mkSym(LAMBDA); }
+      "="      { return mkSym(EQUALS); }
+      "("      { return mkSym(POPEN);  }
+      ")"      { return mkSym(PCLOSE); }
 
       // identifiers
       op = [.$^*/%\-+~<>=!&|,]+;

@@ -1,9 +1,9 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "expr.h"
 struct Lexer;
+struct Top;
 
-DefMap::defs parse_top(Lexer &lex);
+void parse_top(Top &top, Lexer &lex);
 
 #endif

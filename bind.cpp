@@ -14,7 +14,9 @@ struct NameBinding {
   std::string *name;
   bool open;
 
-  NameBinding(NameBinding *next_) : next(next_), map(0), name(0), open(true) { }
+  NameBinding(NameBinding *next_, std::string *name_) : next(next_), map(0), name(name_), open(true) { }
+  NameBinding(NameBinding *next_, std::map<std::string, int> *map_) : next(next_), map(map_), name(0), open(true) { }
+
   NameRef find(const std::string& x) {
     NameRef out;
     std::map<std::string, int>::iterator i;
@@ -56,20 +58,17 @@ static bool explore(Expr *expr, const PrimMap& pmap, NameBinding *binding) {
     return f && a;
   } else if (expr->type == Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
-    NameBinding bind(binding);
-    bind.name = &lambda->name;
+    NameBinding bind(binding, &lambda->name);
     return explore(lambda->body.get(), pmap, &bind);
   } else if (expr->type == DefMap::type) {
     DefMap *def = reinterpret_cast<DefMap*>(expr);
-    NameBinding bind(binding);
     std::map<std::string, int> offsets;
+    NameBinding bind(binding, &offsets);
     int j = 0;
-    for (auto i = def->map.begin(); i != def->map.end(); ++i, ++j)
-      offsets[i->first] = j;
-    bind.map = &offsets;
+    for (auto &i : def->map) offsets[i.first] = j++;
     bool ok = true;
-    for (auto i = def->map.begin(); i != def->map.end(); ++i)
-      ok = explore(i->second.get(), pmap, &bind) && ok;
+    for (auto &i : def->map)
+      ok = explore(i.second.get(), pmap, &bind) && ok;
     ok = explore(def->body.get(), pmap, &bind) && ok;
     return ok;
   } else if (expr->type == Literal::type) {
@@ -90,6 +89,16 @@ static bool explore(Expr *expr, const PrimMap& pmap, NameBinding *binding) {
       prim->data = i->second.second;
       return true;
     }
+  } else if (expr->type == Top::type) {
+    Top *top = reinterpret_cast<Top*>(expr);
+    std::map<std::string, int> offsets;
+    NameBinding bind(binding, &offsets);
+    int j = 0;
+    for (auto &i : top->globals) offsets[i.first] = j++;
+    bool ok = true;
+    for (auto &i : top->defmaps)
+      ok = explore(&i, pmap, &bind) && ok;
+    return ok;
   } else {
     assert(0 /* unreachable */);
     return false;

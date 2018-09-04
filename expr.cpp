@@ -10,6 +10,7 @@ const char *Lambda::type = "Lambda";
 const char *VarRef::type = "VarRef";
 const char *DefMap::type = "DefMap";
 const char *Literal::type = "Literal";
+const char *Top::type = "Top";
 
 Literal::Literal(const Location& location_, std::unique_ptr<Value> value_)
  : Expr(type, location_), value(std::move(value_)) { }
@@ -37,9 +38,9 @@ static void format(std::ostream& os, int depth, const Expr *expr) {
   } else if (expr->type == DefMap::type) {
     const DefMap *def = reinterpret_cast<const DefMap*>(expr);
     os << pad(depth) << "DefMap @ " << def->location.str() << std::endl;
-    for (auto i = def->map.begin(); i != def->map.end(); ++i) {
-      os << pad(depth+2) << i->first << " =" << std::endl;
-      format(os, depth+4, i->second.get());
+    for (auto &i : def->map) {
+      os << pad(depth+2) << i.first << " =" << std::endl;
+      format(os, depth+4, i.second.get());
     }
     format(os, depth+2, def->body.get());
   } else if (expr->type == Literal::type) {
@@ -48,6 +49,12 @@ static void format(std::ostream& os, int depth, const Expr *expr) {
   } else if (expr->type == Prim::type) {
     const Prim *prim = reinterpret_cast<const Prim*>(expr);
     os << pad(depth) << "Prim(" << prim->args << "," << prim->name << ") @ " << prim->location.str() << std::endl;
+  } else if (expr->type == Top::type) {
+    const Top *top = reinterpret_cast<const Top*>(expr);
+    os << pad(depth) << "Top; globals =";
+    for (auto &i : top->globals) os << " " << i.first;
+    os << std::endl;
+    for (auto &i : top->defmaps) format(os, depth+2, &i);
   } else {
     assert(0 /* unreachable */);
   }
