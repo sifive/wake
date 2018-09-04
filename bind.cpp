@@ -96,8 +96,19 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     int j = 0;
     for (auto &i : top->globals) offsets[i.first] = j++;
     bool ok = true;
-    for (auto &i : top->defmaps)
+    std::vector<std::map<std::string, int> > defmaps(top->defmaps.size());
+    j = 0;
+    for (auto &i : top->defmaps) {
+      std::map<std::string, int> &offsets = defmaps[j++];
+      int l = 0;
+      for (auto &k : i.map) offsets[k.first] = l++;
       ok = explore(&i, pmap, &bind) && ok;
+    }
+    ok = explore(top->main.get(), pmap, &bind) && ok;
+    for (auto &i : top->globals) {
+      i.second.var->depth = 0;
+      i.second.var->offset = defmaps[i.second.defmap][i.first];
+    }
     return ok;
   } else {
     assert(0 /* unreachable */);

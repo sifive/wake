@@ -14,6 +14,7 @@ const char *VarRet ::type = "VarRet";
 const char *AppRet ::type = "AppRet";
 const char *AppFn  ::type = "AppFn";
 const char *MapRet ::type = "MapRet";
+const char *TopRet ::type = "TopRet";
 
 void Thunk::depend(ActionQueue &queue, Callback *callback) {
   if (return_action) {
@@ -65,6 +66,11 @@ void MapRet::execute(ActionQueue &queue) {
   thunk->broadcast(queue, this, input_value);
 }
 
+void TopRet::execute(ActionQueue &queue) {
+  Thunk *thunk = reinterpret_cast<Thunk*>(invoker);
+  thunk->broadcast(queue, this, input_value);
+}
+
 void PrimArg::chain(ActionQueue &queue, Action *invoker, Prim *prim, Binding *binding, int arg) {
   if (prim->args == arg) {
     std::vector<Value*> args;
@@ -93,6 +99,19 @@ void PrimRet::execute(ActionQueue &queue) {
   thunk->broadcast(queue, this, input_value);
 }
 
+static Binding *bind_defmap(ActionQueue &queue, Action *invoker, DefMap *def, Binding *bindings) {
+  Thunk *thunk = new Thunk[def->map.size()]();
+  Binding *defs = new Binding(thunk, bindings);
+  int j = 0;
+  for (auto &i : def->map) {
+    thunk[j].invoker = invoker;
+    thunk[j].expr = i.second.get();
+    thunk[j].bindings = defs;
+    queue.push_back(thunk + j++);
+  }
+  return defs;
+}
+
 void Thunk::execute(ActionQueue &queue) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
@@ -112,17 +131,9 @@ void Thunk::execute(ActionQueue &queue) {
     Closure *closure = new Closure(lambda->body.get(), bindings);
     broadcast(queue, this, closure);
   } else if (expr->type == DefMap::type) {
-    DefMap *def = reinterpret_cast<DefMap*>(expr);
-    Thunk *thunk = new Thunk[def->map.size()]();
-    Binding *defs = new Binding(thunk, bindings);
-    int j = 0;
-    for (auto &i : def->map) {
-      thunk[j].invoker = this;
-      thunk[j].expr = i.second.get();
-      thunk[j].bindings = defs;
-      queue.push_back(thunk + j++);
-    }
-    Thunk *body = new Thunk(this, def->body.get(), defs);
+    DefMap *defmap = reinterpret_cast<DefMap*>(expr);
+    Binding *defs = bind_defmap(queue, this, defmap, bindings);
+    Thunk *body = new Thunk(this, defmap->body.get(), defs);
     queue.push_back(body);
     body->depend(queue, new MapRet(this));
   } else if (expr->type == Literal::type) {
@@ -131,6 +142,23 @@ void Thunk::execute(ActionQueue &queue) {
   } else if (expr->type == Prim::type) {
     Prim *prim = reinterpret_cast<Prim*>(expr);
     PrimArg::chain(queue, this, prim, bindings, 0);
+  } else if (expr->type == Top::type) {
+    Top *top = reinterpret_cast<Top*>(expr);
+    Thunk *globals = new Thunk[top->globals.size()]();
+    Binding *global = new Binding(globals, bindings);
+    std::vector<Binding*> defmaps;
+    for (auto &i : top->defmaps)
+      defmaps.push_back(bind_defmap(queue, this, &i, global));
+    int j = 0;
+    for (auto &i : top->globals) {
+      globals[j].invoker  = this;
+      globals[j].expr     = i.second.var.get();
+      globals[j].bindings = defmaps[i.second.defmap];
+      queue.push_back(globals + j++);
+    }
+    Thunk *main = new Thunk(this, top->main.get(), global);
+    queue.push_back(main);
+    main->depend(queue, new TopRet(this));
   } else {
     assert(0 /* unreachable */);
   }

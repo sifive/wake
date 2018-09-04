@@ -80,13 +80,18 @@ struct DefMap : public Expr {
 };
 
 struct Top : public Expr {
+  struct Global {
+    int defmap;
+    std::unique_ptr<VarRef> var; // evaluated inside defmap
+  };
   typedef std::vector<DefMap> DefMaps;
-  typedef std::map<std::string, int> Globals;
-  DefMaps defmaps;
+  typedef std::map<std::string, Global> Globals;
   Globals globals;
+  DefMaps defmaps; // evaluated inside globals
+  std::unique_ptr<VarRef> main; // evaluated inside globals
 
   static const char *type;
-  Top() : Expr(type, Location()) { }
+  Top() : Expr(type, Location("<top>")), globals(), defmaps(), main(new VarRef(Location("<init>"), "main")) { }
 };
 
 #endif

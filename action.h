@@ -92,4 +92,10 @@ struct MapRet : public Callback {
   MapRet(Action *invoker_) : Callback(type, invoker_) { }
 };
 
+struct TopRet : public Callback {
+  void execute(ActionQueue &queue);
+  static const char *type;
+  TopRet(Action *invoker_) : Callback(type, invoker_) { }
+};
+
 #endif
