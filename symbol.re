@@ -78,7 +78,7 @@ static wchar_t lex_hex(const char *s, const char *e)
   return u;
 }
 
-static bool lex_str(input_t &in, unsigned char q, std::string& result)
+static bool lex_str(input_t &in, unsigned char q, std::string &result)
 {
   for (wchar_t u = q;; result.push_back(u)) {
     in.tok = in.cur;

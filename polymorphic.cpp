@@ -34,7 +34,7 @@ static void prim_eq(void *data, const std::vector<Value*> &args, Action *complet
   resume(completion, cmp == 0 ? prim_true : prim_false);
 }
 
-void prim_register_polymorphic(PrimMap& pmap) {
+void prim_register_polymorphic(PrimMap &pmap) {
   pmap["lt"].first = prim_lt;
   pmap["eq"].first = prim_eq;
 }

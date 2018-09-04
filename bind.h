@@ -3,6 +3,6 @@
 
 #include "prim.h"
 
-bool bind_refs(Expr *expr, const PrimMap& pmap);
+bool bind_refs(Expr *expr, const PrimMap &pmap);
 
 #endif

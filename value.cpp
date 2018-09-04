@@ -11,7 +11,7 @@ Integer::~Integer() {
   mpz_clear(value);
 }
 
-std::ostream& operator << (std::ostream& os, const Value *value) {
+std::ostream & operator << (std::ostream &os, const Value *value) {
   if (value->type == String::type) {
     const String *str = reinterpret_cast<const String*>(value);
     return os << "String(" << str->value << ")";

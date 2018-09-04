@@ -113,7 +113,7 @@ static void prim_int(void *data, const std::vector<Value*> &args, Action *comple
 
 // popcount, scan0, scan1 ?
 
-void prim_register_integer(PrimMap& pmap) {
+void prim_register_integer(PrimMap &pmap) {
   pmap["com"].first = prim_com;
   pmap["abs"].first = prim_abs;
   pmap["neg"].first = prim_neg;

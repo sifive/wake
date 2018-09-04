@@ -15,7 +15,7 @@ const char *AppRet ::type = "AppRet";
 const char *AppFn  ::type = "AppFn";
 const char *MapRet ::type = "MapRet";
 
-void Thunk::depend(ActionQueue& queue, Callback *callback) {
+void Thunk::depend(ActionQueue &queue, Callback *callback) {
   if (return_action) {
     callback->input_action = return_action;
     callback->input_value  = return_value;
@@ -25,7 +25,7 @@ void Thunk::depend(ActionQueue& queue, Callback *callback) {
   }
 }
 
-void Thunk::broadcast(ActionQueue& queue, Action *return_action_, Value *return_value_) {
+void Thunk::broadcast(ActionQueue &queue, Action *return_action_, Value *return_value_) {
   return_action = return_action_;
   return_value  = return_value_;
   while (!wait.empty()) {
@@ -93,7 +93,7 @@ void PrimRet::execute(ActionQueue &queue) {
   thunk->broadcast(queue, this, input_value);
 }
 
-void Thunk::execute(ActionQueue& queue) {
+void Thunk::execute(ActionQueue &queue) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     Binding *iter = bindings;
@@ -116,11 +116,11 @@ void Thunk::execute(ActionQueue& queue) {
     Thunk *thunk = new Thunk[def->map.size()]();
     Binding *defs = new Binding(thunk, bindings);
     int j = 0;
-    for (auto i = def->map.begin(); i != def->map.end(); ++i, ++j) {
+    for (auto &i : def->map) {
       thunk[j].invoker = this;
-      thunk[j].expr = i->second.get();
+      thunk[j].expr = i.second.get();
       thunk[j].bindings = defs;
-      queue.push_back(thunk + j);
+      queue.push_back(thunk + j++);
     }
     Thunk *body = new Thunk(this, def->body.get(), defs);
     queue.push_back(body);

@@ -15,13 +15,13 @@ struct Value {
   virtual ~Value();
 };
 
-std::ostream& operator << (std::ostream& os, const Value *value);
+std::ostream & operator << (std::ostream &os, const Value *value);
 
 struct String : public Value {
   std::string value;
 
   static const char *type;
-  String(const std::string& value_) : Value(type), value(value_) { }
+  String(const std::string &value_) : Value(type), value(value_) { }
 };
 
 struct Integer : public Value {

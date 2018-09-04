@@ -16,7 +16,7 @@ void resume(Action *completion, Value *return_value);
 void stack_trace(Action *completion);
 
 typedef void (*PrimFn)(void *data, const std::vector<Value*> &args, Action *completion);
-typedef std::map<std::string, std::pair<PrimFn, void* > > PrimMap;
+typedef std::map<std::string, std::pair<PrimFn, void *> > PrimMap;
 
 void expect_args(const char *fn, Action *completion, const std::vector<Value*> &args, int expect);
 String *expect_string(const char *fn, Action *completion, Value *value, int index);
@@ -29,8 +29,8 @@ Integer *expect_integer(const char *fn, Action *completion, Value *value, int in
 extern Value *prim_true;
 extern Value *prim_false;
 
-void prim_register_string(PrimMap& pmap);
-void prim_register_integer(PrimMap& pmap);
-void prim_register_polymorphic(PrimMap& pmap);
+void prim_register_string(PrimMap &pmap);
+void prim_register_integer(PrimMap &pmap);
+void prim_register_polymorphic(PrimMap &pmap);
 
 #endif

@@ -99,13 +99,13 @@ bool expectValue(const char *type, Lexer &lex) {
   }
 }
 
-static Expr* parse_unary(int p, Lexer &lex);
-static Expr* parse_binary(int p, Lexer &lex);
-static Expr* parse_if(Lexer &lex);
-static Expr* parse_def(Lexer &lex, std::string &name);
-static Expr* parse_block(Lexer &lex);
+static Expr *parse_unary(int p, Lexer &lex);
+static Expr *parse_binary(int p, Lexer &lex);
+static Expr *parse_if(Lexer &lex);
+static Expr *parse_def(Lexer &lex, std::string &name);
+static Expr *parse_block(Lexer &lex);
 
-static int relabel_anon(Expr* expr, int index) {
+static int relabel_anon(Expr *expr, int index) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     if (ref->name != "_") return index;
@@ -123,7 +123,7 @@ static int relabel_anon(Expr* expr, int index) {
   return index;
 }
 
-static Expr* parse_unary(int p, Lexer &lex) {
+static Expr *parse_unary(int p, Lexer &lex) {
   TRACE("UNARY");
   switch (lex.next.type) {
     // Unary operators
@@ -203,7 +203,7 @@ static Expr* parse_unary(int p, Lexer &lex) {
   }
 }
 
-static Expr* parse_binary(int p, Lexer &lex) {
+static Expr *parse_binary(int p, Lexer &lex) {
   TRACE("BINARY");
   auto lhs = parse_unary(p, lex);
   for (;;) {
@@ -242,7 +242,7 @@ static Expr* parse_binary(int p, Lexer &lex) {
   }
 }
 
-static Expr* parse_if(Lexer &lex) {
+static Expr *parse_if(Lexer &lex) {
   TRACE("IF");
   if (lex.next.type == IF) {
     Location l = lex.next.location;
@@ -332,7 +332,7 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
   return body;
 }
 
-static Expr* parse_block(Lexer &lex) {
+static Expr *parse_block(Lexer &lex) {
   TRACE("BLOCK");
   Location location = lex.next.location;
   DefMap::defs map;

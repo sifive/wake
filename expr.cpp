@@ -12,17 +12,17 @@ const char *DefMap::type = "DefMap";
 const char *Literal::type = "Literal";
 const char *Top::type = "Top";
 
-Literal::Literal(const Location& location_, std::unique_ptr<Value> value_)
+Literal::Literal(const Location &location_, std::unique_ptr<Value> value_)
  : Expr(type, location_), value(std::move(value_)) { }
 
-Literal::Literal(const Location& location_, const char *value_)
+Literal::Literal(const Location &location_, const char *value_)
  : Expr(type, location_), value(new String(value_)) { }
 
 static std::string pad(int depth) {
   return std::string(depth, ' ');
 }
 
-static void format(std::ostream& os, int depth, const Expr *expr) {
+static void format(std::ostream &os, int depth, const Expr *expr) {
   if (expr->type == VarRef::type) {
     const VarRef *ref = reinterpret_cast<const VarRef*>(expr);
     os << pad(depth) << "VarRef(" << ref->name << ") @ " << ref->location.str() << std::endl;
@@ -60,7 +60,7 @@ static void format(std::ostream& os, int depth, const Expr *expr) {
   }
 }
 
-std::ostream& operator << (std::ostream& os, const Expr *expr) {
+std::ostream & operator << (std::ostream &os, const Expr *expr) {
   format(os, 0, expr);
   return os;
 }

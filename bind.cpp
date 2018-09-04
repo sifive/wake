@@ -17,7 +17,7 @@ struct NameBinding {
   NameBinding(NameBinding *next_, std::string *name_) : next(next_), map(0), name(name_), open(true) { }
   NameBinding(NameBinding *next_, std::map<std::string, int> *map_) : next(next_), map(map_), name(0), open(true) { }
 
-  NameRef find(const std::string& x) {
+  NameRef find(const std::string &x) {
     NameRef out;
     std::map<std::string, int>::iterator i;
     if (name && *name == x) {
@@ -37,7 +37,7 @@ struct NameBinding {
   }
 };
 
-static bool explore(Expr *expr, const PrimMap& pmap, NameBinding *binding) {
+static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     NameRef pos = binding->find(ref->name);
@@ -105,6 +105,6 @@ static bool explore(Expr *expr, const PrimMap& pmap, NameBinding *binding) {
   }
 }
 
-bool bind_refs(Expr *expr, const PrimMap& pmap) {
+bool bind_refs(Expr *expr, const PrimMap &pmap) {
   return explore(expr, pmap, 0);
 }

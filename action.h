@@ -37,8 +37,8 @@ struct Thunk : public Action {
    : Action(type, invoker_), expr(expr_), bindings(bindings_), return_action(0), return_value(0) { }
 
   void execute(ActionQueue &queue);
-  void depend(ActionQueue& queue, Callback *callback);
-  void broadcast(ActionQueue& queue, Action *return_action_, Value *return_value_);
+  void depend(ActionQueue &queue, Callback *callback);
+  void broadcast(ActionQueue &queue, Action *return_action_, Value *return_value_);
 
   // To be used only after execution complete
   Value *output() { return return_value; }

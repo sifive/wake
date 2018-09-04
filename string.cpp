@@ -44,7 +44,7 @@ static void prim_cut(void *data, const std::vector<Value*> &args, Action *comple
   resume(completion, new String(arg0->value.substr(begin, end-begin)));
 }
 
-void prim_register_string(PrimMap& pmap) {
+void prim_register_string(PrimMap &pmap) {
   pmap["cat"].first = prim_cat;
   pmap["len"].first = prim_len;
   pmap["cut"].first = prim_cut;
