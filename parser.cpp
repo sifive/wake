@@ -184,8 +184,9 @@ static Expr *parse_unary(int p, Lexer &lex) {
     case POPEN: {
       Location location = lex.next.location;
       lex.consume();
-      Expr *out = parse_if(lex);
+      Expr *out = parse_block(lex);
       location.end = lex.next.location.end;
+      if (lex.next.type == EOL) lex.consume();
       if (expect(PCLOSE, lex)) lex.consume();
       out->location = location;
       int args = relabel_anon(out, 0);
@@ -247,11 +248,13 @@ static Expr *parse_if(Lexer &lex) {
   if (lex.next.type == IF) {
     Location l = lex.next.location;
     lex.consume();
-    auto condE = parse_binary(0, lex);
+    auto condE = parse_block(lex);
+    if (lex.next.type == EOL) lex.consume();
     if (expect(THEN, lex)) lex.consume();
-    auto thenE = parse_binary(0, lex);
+    auto thenE = parse_block(lex);
+    if (lex.next.type == EOL) lex.consume();
     if (expect(ELSE, lex)) lex.consume();
-    auto elseE = parse_binary(0, lex);
+    auto elseE = parse_block(lex);
     l.end = elseE->location.end;
     return new App(l, new App(l, new App(l, condE,
       new Lambda(l, "_", thenE)),
@@ -308,19 +311,8 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
   expect(EQUALS, lex);
   lex.consume();
 
-  Expr *body;
-  if (lex.next.type == EOL) {
-    lex.consume();
-    expect(INDENT, lex);
-    lex.consume();
-    body = parse_block(lex);
-    expect(DEDENT, lex);
-    lex.consume();
-  } else {
-    body = parse_if(lex);
-    expect(EOL, lex);
-    lex.consume();
-  }
+  Expr *body = parse_block(lex);
+  if (expect(EOL, lex)) lex.consume();
 
   // add the arguments
   for (auto i = args.rbegin(); i != args.rend(); ++i) {
@@ -334,19 +326,31 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
 
 static Expr *parse_block(Lexer &lex) {
   TRACE("BLOCK");
-  Location location = lex.next.location;
-  DefMap::defs map;
-  while (lex.next.type == DEF) {
-    std::string name;
-    auto def = parse_def(lex, name);
-    detect_duplicates(lex, map, name, def->location);
-    map[name] = std::unique_ptr<Expr>(def);
+  Expr *out;
+
+  if (lex.next.type == EOL) {
+    lex.consume();
+    if (expect(INDENT, lex)) lex.consume();
+
+    Location location = lex.next.location;
+    DefMap::defs map;
+    while (lex.next.type == DEF) {
+      std::string name;
+      auto def = parse_def(lex, name);
+      detect_duplicates(lex, map, name, def->location);
+      map[name] = std::unique_ptr<Expr>(def);
+    }
+    auto body = parse_if(lex);
+    location.end = body->location.end;
+    out = map.empty() ? body : new DefMap(location, map, body);
+
+    if (expect(DEDENT, lex)) lex.consume();
+    return out;
+  } else {
+    out = parse_if(lex);
   }
-  auto body = parse_if(lex);
-  location.end = body->location.end;
-  expect(EOL, lex);
-  lex.consume();
-  return new DefMap(location, map, body);
+
+  return out;
 }
 
 void parse_top(Top &top, Lexer &lex) {

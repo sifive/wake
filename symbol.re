@@ -187,8 +187,9 @@ struct state_t {
   std::string location;
   std::list<int> tabs;
   int indent;
+  bool eol;
 
-  state_t(const char *file) : filename(file), location(), tabs(), indent(0) {
+  state_t(const char *file) : filename(file), location(), tabs(), indent(0), eol(false) {
     tabs.push_back(0);
   }
 };
@@ -206,16 +207,23 @@ std::string Lexer::text() {
 }
 
 void Lexer::consume() {
-  if (state->indent != state->tabs.back()) {
-    if (state->indent > state->tabs.back()) {
-      state->tabs.push_back(state->indent);
-      next.type = INDENT;
-    } else {
+  if (state->eol) {
+    if (state->indent < state->tabs.back()) {
       state->tabs.pop_back();
       next.type = DEDENT;
+    } else {
+      next.type = EOL;
+      state->eol = false;
     }
+  } else if (state->indent > state->tabs.back()) {
+    state->tabs.push_back(state->indent);
+    next.type = INDENT;
   } else {
     next = lex_top(*engine.get());
-    if (next.type == EOL) state->indent = (engine->cur - engine->tok) - 1;
+    if (next.type == EOL) {
+      state->indent = (engine->cur - engine->tok) - 1;
+      state->eol = true;
+      consume();
+    }
   }
 }
