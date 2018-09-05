@@ -7,7 +7,7 @@
 #include <list>
 
 const char *symbolTable[] = {
-  "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "GLOBAL", "MERGE", "PRIM", "LAMBDA",
+  "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "GLOBAL", "PUBLISH", "PRIM", "LAMBDA",
   "EQUALS", "POPEN", "PCLOSE", "IF", "THEN", "ELSE", "END", "EOL", "INDENT", "DEDENT"
 };
 
@@ -160,7 +160,7 @@ top:
       // keywords
       "def"    { return mkSym(DEF);    }
       "global" { return mkSym(GLOBAL); }
-      "merge"  { return mkSym(MERGE);  }
+      "publish"{ return mkSym(PUBLISH);}
       "prim"   { return mkSym(PRIM);   }
       "if"     { return mkSym(IF);     }
       "then"   { return mkSym(THEN);   }

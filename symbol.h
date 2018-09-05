@@ -5,7 +5,7 @@
 #include <memory>
 
 enum SymbolType {
-  ERROR, ID, OPERATOR, LITERAL, DEF, GLOBAL, MERGE, PRIM, LAMBDA,
+  ERROR, ID, OPERATOR, LITERAL, DEF, GLOBAL, PUBLISH, PRIM, LAMBDA,
   EQUALS, POPEN, PCLOSE, IF, THEN, ELSE, END, EOL, INDENT, DEDENT
 };
 extern const char *symbolTable[];
