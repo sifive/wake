@@ -65,7 +65,7 @@ struct Literal : public Expr {
   static const char *type;
 
   Literal(const Location &location_, std::unique_ptr<Value> value_);
-  Literal(const Location &location_ = Location(), const char *value_ = "bad");
+  Literal(const Location &location_, const char *value_);
 };
 
 struct DefMap : public Expr {
@@ -76,7 +76,7 @@ struct DefMap : public Expr {
   static const char *type;
   DefMap(const Location &location_, defs &map_, Expr *body_)
    : Expr(type, location_), map(), body(body_) { map.swap(map_); }
-  DefMap(const Location &location_) : Expr(type, location_), map(), body(new Literal()) { }
+  DefMap(const Location &location_) : Expr(type, location_), map(), body(new Literal(location, "top")) { }
 };
 
 struct Top : public Expr {
@@ -91,7 +91,7 @@ struct Top : public Expr {
   std::unique_ptr<VarRef> main; // evaluated inside globals
 
   static const char *type;
-  Top() : Expr(type, Location("<top>")), globals(), defmaps(), main(new VarRef(Location("<init>"), "main")) { }
+  Top() : Expr(type, LOCATION), globals(), defmaps(), main(new VarRef(LOCATION, "main")) { }
 };
 
 #endif

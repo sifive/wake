@@ -42,7 +42,7 @@ int main(int argc, const char **argv) {
   }
 
   /* Initialize primitive bools */
-  Location location("<init>");
+  Location location = LOCATION;
   prim_true  = new Closure(new Lambda(location, "_", new VarRef(location, "_", 1, 0)), 0);
   prim_false = new Closure(new Lambda(location, "_", new VarRef(location, "_", 0, 0)), 0);
 

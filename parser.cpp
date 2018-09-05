@@ -199,7 +199,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
         << symbolTable[lex.next.type] << " at "
         << lex.next.location.str() << std::endl;
       lex.fail = true;
-      return new Literal();
+      return new Literal(LOCATION, "bad unary");
     }
   }
 }
@@ -259,7 +259,7 @@ static Expr *parse_if(Lexer &lex) {
     return new App(l, new App(l, new App(l, condE,
       new Lambda(l, "_", thenE)),
       new Lambda(l, "_", elseE)),
-      new Literal());
+      new Literal(LOCATION, "if"));
   } else {
     return parse_binary(0, lex);
   }
@@ -375,7 +375,7 @@ void parse_top(Top &top, Lexer &lex) {
       } else {
         Top::Global &glob = top.globals[name];
         glob.defmap = top.defmaps.size()-1;
-        glob.var    = std::unique_ptr<VarRef>(new VarRef(Location(), name));
+        glob.var    = std::unique_ptr<VarRef>(new VarRef(LOCATION, name));
       }
     }
   }

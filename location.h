@@ -21,12 +21,14 @@ struct Location {
   Coordinates start, end;
 
   std::string str() const;
-  Location(const char *file_ = "<null>", Coordinates start_ = Coordinates(), Coordinates end_ = Coordinates())
+  Location(const char *file_, Coordinates start_, Coordinates end_)
     : file(file_), start(start_), end(end_) { }
 
   bool contains(const Location &loc) const {
     return file == loc.file && start <= loc.start && loc.end <= end;
   }
 };
+
+#define LOCATION Location(__FILE__, Coordinates(__LINE__, 1), Coordinates(__LINE__, 1))
 
 #endif

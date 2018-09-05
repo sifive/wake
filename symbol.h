@@ -17,7 +17,6 @@ struct Symbol {
   std::unique_ptr<Value> value;
 
   Symbol(SymbolType type_, const Location &location_, Value *value_) : type(type_), location(location_), value(value_) { }
-  Symbol() : type(ERROR), location() { }
 };
 
 struct input_t;
