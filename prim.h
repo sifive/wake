@@ -29,8 +29,11 @@ Integer *expect_integer(const char *fn, Action *completion, Value *value, int in
 extern Value *prim_true;
 extern Value *prim_false;
 
+struct JobTable;
+
 void prim_register_string(PrimMap &pmap);
 void prim_register_integer(PrimMap &pmap);
 void prim_register_polymorphic(PrimMap &pmap);
+void prim_register_job(JobTable *jobtable, PrimMap &pmap);
 
 #endif

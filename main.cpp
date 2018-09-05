@@ -7,6 +7,7 @@
 #include "value.h"
 #include "action.h"
 #include "expr.h"
+#include "job.h"
 
 void stack_trace(Action *failure) {
   Location *trace = 0;
@@ -22,6 +23,7 @@ void stack_trace(Action *failure) {
 }
 
 static ActionQueue queue;
+
 void resume(Action *completion, Value *return_value) {
   PrimRet *ret = reinterpret_cast<PrimRet*>(completion);
   ret->input_value = return_value;
@@ -33,6 +35,8 @@ Value *prim_false;
 
 int main(int argc, const char **argv) {
   bool ok = true;
+
+  JobTable jobtable(4);
 
   Top top;
   for (int i = 1; i < argc; ++i) {
@@ -51,6 +55,7 @@ int main(int argc, const char **argv) {
   prim_register_string(pmap);
   prim_register_integer(pmap);
   prim_register_polymorphic(pmap);
+  prim_register_job(&jobtable, pmap);
 
   if (!bind_refs(&top, pmap)) ok = false;
 
@@ -71,7 +76,7 @@ int main(int argc, const char **argv) {
   Thunk *result = new Thunk(0, &top, 0);
   queue.push_back(result);
   unsigned long steps = 0, widest = 0;
-  while (!queue.empty()) {
+  do while (!queue.empty()) {
     Action *doit = queue.front();
     queue.pop_front();
 
@@ -87,7 +92,7 @@ int main(int argc, const char **argv) {
     }
 
     doit->execute(queue);
-  }
+  } while (jobtable.wait());
 
   if (debug) {
     std::cerr << "Computed in " << steps << " steps with " << widest << " in parallel." << std::endl;
