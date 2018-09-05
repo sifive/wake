@@ -56,9 +56,9 @@ int main(int argc, const char **argv) {
 
   const char *slash = strrchr(argv[0], '/');
   const char *exec = slash ? slash + 1 : argv[0];
-  int debug = !strcmp(exec, "wideml-debug");
+  int debug = !strcmp(exec, "wake-debug");
 
-  if (!strcmp(exec, "wideml-parse")) {
+  if (!strcmp(exec, "wake-parse")) {
     std::cout << &top;
     return 0;
   }

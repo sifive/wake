@@ -1,6 +1,7 @@
 #include "prim.h"
 #include "value.h"
 #include <gmp.h>
+#include <cassert>
 
 static void prim_lt(void *data, const std::vector<Value*> &args, Action *completion) {
   EXPECT_ARGS(2);

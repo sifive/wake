@@ -4,7 +4,7 @@
 #include <cstdlib>
 
 void expect_args(const char *fn, Action *completion, const std::vector<Value*> &args, int expect) {
-  if (args.size() != expect) {
+  if (args.size() != (size_t)expect) {
     std::cerr << fn << " called on " << args.size() << "; was expecting " << expect << std::endl;
     stack_trace(completion);
     exit(1);
