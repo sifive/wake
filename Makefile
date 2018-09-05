@@ -2,7 +2,7 @@ GMP     ?= /opt/local
 GMP_INC ?= $(GMP)/include
 GMP_LIB ?= $(GMP)/lib
 
-wideml:	$(patsubst %.cpp,%.o,$(wildcard *.cpp)) symbol.o
+wake:	$(patsubst %.cpp,%.o,$(wildcard *.cpp)) symbol.o
 	g++ -std=c++11 -Wall -O2 -L $(GMP_LIB) -o $@ $^ -lgmp
 
 %.o:	%.cpp	$(wildcard *.h)
