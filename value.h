@@ -29,6 +29,7 @@ struct Integer : public Value {
 
   static const char *type;
   Integer(const char *value_) : Value(type) { mpz_init_set_str(value, value_, 0); }
+  Integer(long value_) : Value(type) { mpz_init_set_si(value, value_); }
   Integer() : Value(type) { mpz_init(value); }
   ~Integer();
 

@@ -17,7 +17,7 @@ static void prim_lt(void *data, const std::vector<Value*> &args, Action *complet
   } else {
     assert(0 /* unreachable */);
   }
-  resume(completion, cmp < 0 ? prim_true : prim_false);
+  resume(completion, cmp < 0 ? make_true() : make_false());
 }
 
 static void prim_eq(void *data, const std::vector<Value*> &args, Action *completion) {
@@ -32,7 +32,7 @@ static void prim_eq(void *data, const std::vector<Value*> &args, Action *complet
     String *arg1 = GET_STRING(1);
     cmp = arg0->value != arg1->value;
   }
-  resume(completion, cmp == 0 ? prim_true : prim_false);
+  resume(completion, cmp == 0 ? make_true() : make_false());
 }
 
 static void prim_cmp(void *data, const std::vector<Value*> &args, Action *completion) {

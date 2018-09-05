@@ -15,6 +15,9 @@ const char *Top::type = "Top";
 Literal::Literal(const Location &location_, std::unique_ptr<Value> value_)
  : Expr(type, location_), value(std::move(value_)) { }
 
+Literal::Literal(const Location &location_, Value *value_)
+ : Expr(type, location_), value(value_) { }
+
 Literal::Literal(const Location &location_, const char *value_)
  : Expr(type, location_), value(new String(value_)) { }
 

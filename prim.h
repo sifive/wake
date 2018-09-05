@@ -26,8 +26,9 @@ Integer *expect_integer(const char *fn, Action *completion, Value *value, int in
 #define GET_STRING(index) expect_string(__FUNCTION__, completion, args[index], index+1)
 #define GET_INTEGER(index) expect_integer(__FUNCTION__, completion, args[index], index+1)
 
-extern Value *prim_true;
-extern Value *prim_false;
+Value *make_true();
+Value *make_false();
+Value *make_list(const std::vector<Value*>& values);
 
 struct JobTable;
 

@@ -30,9 +30,6 @@ void resume(Action *completion, Value *return_value) {
   queue.push_back(ret);
 }
 
-Value *prim_true;
-Value *prim_false;
-
 int main(int argc, const char **argv) {
   bool ok = true;
 
@@ -44,11 +41,6 @@ int main(int argc, const char **argv) {
     parse_top(top, lex);
     if (lex.fail) ok = false;
   }
-
-  /* Initialize primitive bools */
-  Location location = LOCATION;
-  prim_true  = new Closure(new Lambda(location, "_", new VarRef(location, "_", 1, 0)), 0);
-  prim_false = new Closure(new Lambda(location, "_", new VarRef(location, "_", 0, 0)), 0);
 
   /* Primitives */
   PrimMap pmap;

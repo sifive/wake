@@ -10,8 +10,6 @@
 #include <list>
 #include <vector>
 
-extern char **environ; // !!!
-
 struct Task {
   std::string path;
   std::string cmdline;
@@ -101,7 +99,7 @@ static void launch(JobTable *jobtable) {
         close(pipefd[1]);
         execve(task.path.c_str(),
           split_null(task.cmdline),
-          environ); // !!!
+          split_null(task.environ));
         perror("execv");
         exit(1);
       }
@@ -165,14 +163,22 @@ bool JobTable::wait() {
 
       for (auto &i : imp->table) {
         if (i.pid == pid) {
-          // !!! race on output?
-          Value *value = new String(i.output.str());
+          if (i.pipe != 0) {
+            int got;
+            while ((got = read(i.pipe, buffer, sizeof(buffer))) > 0)
+              i.output.write(buffer, got);
+          }
+
+          std::vector<Value*> out;
+          out.push_back(new Integer(code));
+          out.push_back(new String(i.output.str()));
+
           if (i.pipe != -1) close(i.pipe);
           i.pid = 0;
           i.pipe = -1;
           i.output.clear();
-          // !!! pass 'code' also
-          resume(i.completion, value);
+
+          resume(i.completion, make_list(out));
         }
       }
     }
@@ -192,6 +198,7 @@ static void prim_job(void *data, const std::vector<Value*> &args, Action *comple
   String *arg2 = GET_STRING(2); // null terminated environment variables
   jobtable->imp->tasks.emplace_back(arg0->value, arg1->value, arg2->value, completion);
   launch(jobtable);
+  // !!! arg4 = stdin?
 }
 
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
