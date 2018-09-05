@@ -25,9 +25,7 @@ global foldl f a l =     if l.empty then a   else foldl f (f a l.head) l.tail
 global scanl f a l = a, (if l.empty then nil else scanl f (f a l.head) l.tail)
 global foldr f a l =     if l.empty then a   else f l.head (foldr f a l.tail)
 global scanr f a l =
-  if l.empty
-  then a, nil
-  else
+  if l.empty then a, nil else
     def finish r = f l.head r.head, r
     finish (scanr f a l.tail)
 
@@ -39,9 +37,7 @@ global len l     = foldl (\a\_ a+1) 0 l
 
 # list choppers
 global splitAt i l =
-  if   i <= 0 || l.empty
-  then pair nil l
-  else
+  if i <= 0 || l.empty then pair nil l else
     def finish r = pair (l.head, r.first) r.second
     finish (splitAt (i-1) l.tail)
 
@@ -50,12 +46,8 @@ global drop i l = (splitAt i l).second
 global at   i l = if i < 0 then nil else take 1 (drop i l)
 
 global splitUntil f l =
-  if l.empty
-  then pair nil l
-  else
-    if f l.head
-    then pair nil l
-    else
+  if l.empty then pair nil l else
+    if f l.head then pair nil l else
       def finish r = pair (l.head, r.first) r.second
       finish (splitUntil f l.tail)
 
@@ -66,9 +58,7 @@ global exists f l = !empty (dropUntil f l)
 global forall f l = empty (dropUntil (\x !f x) l)
 
 global splitBy f l =
-  if l.empty
-  then pair nil nil
-  else
+  if l.empty then pair nil nil else
     def finish r =
       if f l.head
       then pair (l.head, r.first) r.second
@@ -77,16 +67,19 @@ global splitBy f l =
 
 global filter f l = (splitBy f l).first
 
+# f should be a less-than comparison
+global sort f l =
+  if l.empty then nil else
+    def key = l.head
+    def split = splitBy (f key) l.tail
+    sort f split.second ++ (key, sort f split.first)
+
 global collate f l r =
   if l.empty
   then
-    if r.empty
-    then 0
-    else -1 # less-than
+    if r.empty then 0 else -1
   else
-    if r.empty
-    then 1 # greater-than
-    else
+    if r.empty then 1 else
       def cmp = f l.head r.head
       if cmp == 0
       then collate f l.tail r.tail
