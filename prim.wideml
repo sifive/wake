@@ -1,4 +1,3 @@
-# sugar
 global x . f = f x
 
 # bools
@@ -17,23 +16,88 @@ global second p = p false
 global x, y = pair x y
 global nil x = true
 global empty l = l (\_\_ false)
+global head = first
 global tail = second
-global last l =
-  def help x l = if l.empty then x else help l.first l.tail
-  help "" l
 
-# list operations
-global foldl f a l =     if l.empty then a   else foldl f (f a l.first) l.tail
-global scanl f a l = a, (if l.empty then nil else scanl f (f a l.first) l.tail)
-global foldr f a l =     if l.empty then a   else f l.first (foldr f a l.tail)
-global scanr f a l = if l.empty then a, nil else \r (f l.first r.first, r) (scanr f a l.tail)
-global map   f   l = if l.empty then nil else f l.first, map f l.tail
+# list transforms
+global map   f   l = if l.empty then nil else f l.head, map f l.tail
+global foldl f a l =     if l.empty then a   else foldl f (f a l.head) l.tail
+global scanl f a l = a, (if l.empty then nil else scanl f (f a l.head) l.tail)
+global foldr f a l =     if l.empty then a   else f l.head (foldr f a l.tail)
+global scanr f a l =
+  if l.empty
+  then a, nil
+  else
+    def finish r = f l.head r.head, r
+    finish (scanr f a l.tail)
+
+# list helpers
+global l ++ r    = foldr (_,_) r l
+global reverse l = foldl (\a\b b,a) nil l
+global flatten l = foldr (_++_) nil l
+global len l     = foldl (\a\_ a+1) 0 l
+
+# list choppers
+global splitAt i l =
+  if   i <= 0 || l.empty
+  then pair nil l
+  else
+    def finish r = pair (l.head, r.first) r.second
+    finish (splitAt (i-1) l.tail)
+
+global take i l = (splitAt i l).first
+global drop i l = (splitAt i l).second
+global at   i l = if i < 0 then nil else take 1 (drop i l)
+
+global splitUntil f l =
+  if l.empty
+  then pair nil l
+  else
+    if f l.head
+    then pair nil l
+    else
+      def finish r = pair (l.head, r.first) r.second
+      finish (splitUntil f l.tail)
+
+global takeUntil f l = (splitUntil f l).first
+global dropUntil f l = (splitUntil f l).second
+global find f l = at 0 (dropUntil f l)
+global exists f l = !empty (dropUntil f l)
+global forall f l = empty (dropUntil (\x !f x) l)
+
+global splitBy f l =
+  if l.empty
+  then pair nil nil
+  else
+    def finish r =
+      if f l.head
+      then pair (l.head, r.first) r.second
+      else pair r.first (l.head, r.second)
+    finish (splitBy f l.tail)
+
+global filter f l = (splitBy f l).first
+
+global collate f l r =
+  if l.empty
+  then
+    if r.empty
+    then 0
+    else -1 # less-than
+  else
+    if r.empty
+    then 1 # greater-than
+    else
+      def cmp = f l.head r.head
+      if cmp == 0
+      then collate f l.tail r.tail
+      else cmp
 
 # string operations
-global x ++ y = prim "cat"
-global len s  = prim "len"
-global cat l = foldl (_++_) "" l
-global cut s begin end = prim "cut"
+global cat l = foldl (\_\_ prim "cat") "" l
+
+# these suck; we probably just want 'explode' that splits into grapheme clusters
+#global len s  = prim "len"
+#global cut s begin end = prim "cut"
 
 # integer operations
 global +x = x
@@ -57,9 +121,15 @@ global gcd x y = prim "gcd"
 global lcm x y = prim "lcm"
 global powm x y m = prim "powm" # fast version of: (x^y) % m
 
+global seq n =
+  def helper n l = if n == 0 then l else helper (n-1) (n-1,l)
+  helper (abs n) nil
+
 # Type conversion
-global str base n = prim "str" # int -> string
-global int base s = prim "int" # string -> int
+global strbase base n = prim "str" # int -> string
+global intbase base s = prim "int" # string -> int
+global str = strbase 10
+global int = intbase 0
 
 # Comparison operators for integers and strings
 global x <  y = prim "lt"
@@ -68,3 +138,4 @@ global x >= y = !(x < y)
 global x <= y = !(y < x)
 global x == y = prim "eq"
 global x != y = !(x == y)
+global cmp x y = prim "cmp" # lt=-1, eq=0, gt=1
