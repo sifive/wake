@@ -132,3 +132,5 @@ global x <= y = !(y < x)
 global x == y = prim "eq"
 global x != y = !(x == y)
 global cmp x y = prim "cmp" # lt=-1, eq=0, gt=1
+
+global job path cmd env = prim "job"
