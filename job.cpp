@@ -1,6 +1,7 @@
 #include "job.h"
 #include "prim.h"
 #include "value.h"
+#include "action.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -9,21 +10,22 @@
 #include <sstream>
 #include <list>
 #include <vector>
+#include <cstring>
 
 struct Task {
   std::string path;
   std::string cmdline;
   std::string environ;
-  Action *completion;
-  Task(const std::string &path_, const std::string &cmdline_, const std::string &environ_, Action *completion_) :
-    path(path_), cmdline(cmdline_), environ(environ_), completion(completion_) { }
+  std::unique_ptr<Action> completion;
+  Task(const std::string &path_, const std::string &cmdline_, const std::string &environ_, std::unique_ptr<Action> &&completion_) :
+    path(path_), cmdline(cmdline_), environ(environ_), completion(std::move(completion_)) { }
 };
 
 struct Job {
   pid_t pid;
   int pipe;
   std::stringstream output;
-  Action *completion;
+  std::unique_ptr<Action> completion;
   Job() : pid(0) { }
 };
 
@@ -105,7 +107,7 @@ static void launch(JobTable *jobtable) {
       }
       close(pipefd[1]);
       i.pipe = pipefd[0];
-      i.completion = task.completion;
+      i.completion = std::move(task.completion);
       jobtable->imp->tasks.pop_front();
     }
   }
@@ -169,16 +171,16 @@ bool JobTable::wait() {
               i.output.write(buffer, got);
           }
 
-          std::vector<Value*> out;
-          out.push_back(new Integer(code));
-          out.push_back(new String(i.output.str()));
+          std::vector<std::shared_ptr<Value> > out;
+          out.emplace_back(new Integer(code));
+          out.emplace_back(new String(i.output.str()));
 
           if (i.pipe != -1) close(i.pipe);
           i.pid = 0;
           i.pipe = -1;
           i.output.clear();
 
-          resume(i.completion, make_list(out));
+          resume(std::move(i.completion), make_list(out));
         }
       }
     }
@@ -190,13 +192,13 @@ bool JobTable::wait() {
   }
 }
 
-static void prim_job(void *data, const std::vector<Value*> &args, Action *completion) {
+static void prim_job(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT_ARGS(3);
   String *arg0 = GET_STRING(0); // path to executable
   String *arg1 = GET_STRING(1); // null terminated command-line options
   String *arg2 = GET_STRING(2); // null terminated environment variables
-  jobtable->imp->tasks.emplace_back(arg0->value, arg1->value, arg2->value, completion);
+  jobtable->imp->tasks.emplace_back(arg0->value, arg1->value, arg2->value, std::move(completion));
   launch(jobtable);
   // !!! arg4 = stdin?
 }

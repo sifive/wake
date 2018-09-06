@@ -144,7 +144,7 @@ top:
       ['"] {
         std::string out;
         bool ok = lex_str(in, in.cur[-1], out);
-        return mkSym2(ok ? LITERAL : ERROR, new String(out));
+        return mkSym2(ok ? LITERAL : ERROR, new String(std::move(out)));
       }
 
       // integer literals

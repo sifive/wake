@@ -4,6 +4,7 @@
 #include "value.h"
 #include "prim.h"
 #include <iostream>
+#include <algorithm>
 #include <cassert>
 
 Action::~Action() { }
@@ -17,14 +18,14 @@ const char *AppFn  ::type = "AppFn";
 const char *MapRet ::type = "MapRet";
 const char *TopRet ::type = "TopRet";
 
-static uint64_t serial_gen = 0;
+uint64_t Action::next_serial = 0;
 
-void Future::depend(ActionQueue &queue, Callback *callback) {
+void Future::depend(ActionQueue &queue, std::unique_ptr<Callback> &&callback) {
   if (value) {
-    queue.push(std::unique_ptr<Callback>(callback));
+    queue.push(std::move(callback));
   } else {
     callback->next = std::move(waiting);
-    waiting = std::unique_ptr<Callback>(callback);
+    waiting = std::move(callback);
   }
 }
 
@@ -32,32 +33,36 @@ void Future::complete(ActionQueue &queue, std::shared_ptr<Value> &&value_, uint6
   value = std::move(value_);
   action_serial = action_serial_;
 
-  std::unique_ptr<Callback> cb, next;
+  assert (value);
+
+  std::unique_ptr<Action> cb, next;
   for (cb = std::move(waiting); cb; cb = std::move(next)) {
-    next = std::unique_ptr<Callback>(reinterpret_cast<Callback*>(cb->next.release()));
+    next = std::move(cb->next);
     queue.push(std::move(cb));
   }
 }
 
-void Future::complete(ActionQueue &queue, Value *value_, uint64_t action_serial_) {
-  return complete(queue, std::shared_ptr<Value>(value), action_serial_);
-}
-
 void Future::complete(ActionQueue &queue, const std::shared_ptr<Value> &value_, uint64_t action_serial_) {
-  return complete(queue, std::shared_ptr<Value>(value), action_serial_);
+  return complete(queue, std::shared_ptr<Value>(value_), action_serial_);
 }
 
 Action::Action(const char *type_, Action *invoker, std::shared_ptr<Future> &&future_result_)
- : serial(++serial_gen), invoker_serial(invoker->serial), stack(invoker->stack), future_result(std::move(future_result_)) { }
+ : type(type_), serial(++next_serial), invoker_serial(invoker->serial), stack(invoker->stack), future_result(std::move(future_result_)) { }
 
-Action::Action(const char *type_, Action *invoker, Future *future_result_, const Location &location)
- : serial(++serial_gen), invoker_serial(invoker->serial), stack(Stack::grow(invoker->stack, location)), future_result(future_result_) { }
+Action::Action(const char *type_, Action *invoker, std::shared_ptr<Future> &&future_result_, const Location &location)
+ : type(type_), serial(++next_serial), invoker_serial(invoker->serial), stack(Stack::grow(invoker->stack, location)), future_result(future_result_) { }
+
+Action::Action(const char *type_, std::shared_ptr<Future> &&future_result_, const Location &location)
+ : type(type_), serial(++next_serial), invoker_serial(0), stack(new Stack(location)), future_result(future_result_) { }
 
 Eval::Eval(Action *invoker, Expr *expr_, const std::shared_ptr<Binding> &bindings_)
- : Action(type, invoker, new Future, expr_->location), expr(expr_), bindings(bindings_) { }
+ : Action(type, invoker, std::shared_ptr<Future>(new Future), expr_->location), expr(expr_), bindings(bindings_) { }
 
-Eval::Eval(Action *invoker, Expr *expr_, Binding *bindings_)
- : Action(type, invoker, new Future, expr_->location), expr(expr_), bindings(bindings_) { }
+Eval::Eval(Action *invoker, Expr *expr_, std::shared_ptr<Binding> &&bindings_)
+ : Action(type, invoker, std::shared_ptr<Future>(new Future), expr_->location), expr(expr_), bindings(bindings_) { }
+
+Eval::Eval(Expr *expr_)
+ : Action(type, std::shared_ptr<Future>(new Future), expr_->location), expr(expr_), bindings() { }
 
 Callback::Callback(const char *type_, Action *invoker, const std::shared_ptr<Future> &future_input_)
  : Action(type_, invoker, std::move(invoker->future_result)), future_input(future_input_) { }
@@ -73,7 +78,7 @@ void Return::execute(ActionQueue &queue) {
 }
 
 static void hook(ActionQueue &queue, Callback *cb) {
-  cb->future_input->depend(queue, cb);
+  cb->future_input->depend(queue, std::unique_ptr<Callback>(cb));
 }
 
 void AppFn::execute(ActionQueue &queue) {
@@ -83,9 +88,9 @@ void AppFn::execute(ActionQueue &queue) {
     exit(1);
   }
   Closure *clo = reinterpret_cast<Closure*>(value);
-  Eval *eval = new Eval(this, clo->body, new Binding(clo->bindings, std::move(arg)));
-  eval->future_result->depend(queue, new AppRet(this, eval->future_result));
-  queue.push(std::unique_ptr<Action>(eval));
+  std::unique_ptr<Eval> eval(new Eval(this, clo->body, std::shared_ptr<Binding>(new Binding(clo->bindings, std::move(arg)))));
+  hook(queue, new AppRet(this, eval->future_result));
+  queue.push(std::move(eval));
 }
 
 void PrimArg::chain(
@@ -94,10 +99,9 @@ void PrimArg::chain(
     Prim *prim,
     const std::shared_ptr<Binding> &binding,
     std::vector<std::shared_ptr<Value> > &&values) {
-  if (prim->args == values.size()) {
-    std::vector<Value*> args;
-    for (auto &i : values) args.push_back(i.get());
-    prim->fn(prim->data, args, new PrimRet(invoker));
+  if ((size_t)prim->args == values.size()) {
+    std::reverse(values.begin(), values.end());
+    prim->fn(prim->data, std::move(values), std::unique_ptr<Action>(new PrimRet(invoker)));
   } else {
     hook(queue, new PrimArg(invoker, prim, binding, std::move(values), binding->future[0]));
   }
@@ -108,12 +112,12 @@ void PrimArg::execute(ActionQueue &queue) {
   chain(queue, this, prim, binding->next, std::move(values));
 }
 
-static Binding *bind_defmap(ActionQueue &queue, Action *invoker, DefMap *def, const std::shared_ptr<Binding> &bindings) {
-  Binding *defs = new Binding(bindings);
+static std::shared_ptr<Binding> bind_defmap(ActionQueue &queue, Action *invoker, DefMap *def, const std::shared_ptr<Binding> &bindings) {
+  std::shared_ptr<Binding> defs(new Binding(bindings));
   for (auto &i : def->map) {
-    Eval *eval = new Eval(invoker, i.second.get(), defs);
-    queue.push(eval);
+    std::unique_ptr<Eval> eval(new Eval(invoker, i.second.get(), defs));
     defs->future.push_back(eval->future_result);
+    queue.push(std::move(eval));
   }
   return defs;
 }
@@ -127,21 +131,21 @@ void Eval::execute(ActionQueue &queue) {
     hook(queue, new VarRet(this, iter->future[ref->offset]));
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
-    Eval *fn  = new Eval(this, app->fn.get(), bindings);
-    Eval *arg = new Eval(this, app->val.get(), bindings);
-    queue.push(fn);
-    queue.push(arg);
+    std::unique_ptr<Eval> fn (new Eval(this, app->fn.get(), bindings));
+    std::unique_ptr<Eval> arg(new Eval(this, app->val.get(), bindings));
     hook(queue, new AppFn(this, fn->future_result, arg->future_result));
+    queue.push(std::move(fn));
+    queue.push(std::move(arg));
   } else if (expr->type == Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
-    Closure *closure = new Closure(lambda->body.get(), bindings);
-    future_result->complete(queue, closure, serial);
+    std::shared_ptr<Value> closure(new Closure(lambda->body.get(), bindings));
+    future_result->complete(queue, std::move(closure), serial);
   } else if (expr->type == DefMap::type) {
     DefMap *defmap = reinterpret_cast<DefMap*>(expr);
-    Binding *defs = bind_defmap(queue, this, defmap, bindings);
-    Eval *body = new Eval(this, defmap->body.get(), defs);
-    queue.push(body);
+    std::shared_ptr<Binding> defs = bind_defmap(queue, this, defmap, bindings);
+    std::unique_ptr<Eval> body(new Eval(this, defmap->body.get(), std::move(defs)));
     hook(queue, new MapRet(this, body->future_result));
+    queue.push(std::move(body));
   } else if (expr->type == Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
     future_result->complete(queue, lit->value, serial);
@@ -152,17 +156,17 @@ void Eval::execute(ActionQueue &queue) {
   } else if (expr->type == Top::type) {
     Top *top = reinterpret_cast<Top*>(expr);
     std::shared_ptr<Binding> global(new Binding(bindings));
-    std::vector<Binding*> defmaps;
+    std::vector<std::shared_ptr<Binding> > defmaps;
     for (auto &i : top->defmaps)
       defmaps.push_back(bind_defmap(queue, this, &i, global));
     for (auto &i : top->globals) {
-      Eval *eval = new Eval(this, i.second.var.get(), defmaps[i.second.defmap]);
-      queue.push(eval);
+      std::unique_ptr<Eval> eval(new Eval(this, i.second.var.get(), defmaps[i.second.defmap]));
       global->future.push_back(eval->future_result);
+      queue.push(std::move(eval));
     }
-    Eval *main = new Eval(this, top->main.get(), global);
-    queue.push(main);
+    std::unique_ptr<Eval> main(new Eval(this, top->main.get(), std::move(global)));
     hook(queue, new TopRet(this, main->future_result));
+    queue.push(std::move(main));
   } else {
     assert(0 /* unreachable */);
   }
@@ -177,8 +181,4 @@ void ActionQueue::push(std::unique_ptr<Action> &&action) {
     bottom = top.get();
   }
   bottom->next.reset();
-}
-
-void ActionQueue::push(Action *action) {
-  return push(std::unique_ptr<Action>(action));
 }

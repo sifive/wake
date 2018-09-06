@@ -25,6 +25,7 @@ struct String : public Value {
 
   static const char *type;
   String(const std::string &value_) : Value(type), value(value_) { }
+  String(std::string &&value_) : Value(type), value(std::move(value_)) { }
 };
 
 struct Integer : public Value {

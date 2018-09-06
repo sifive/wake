@@ -11,6 +11,8 @@ struct Stack {
   static std::shared_ptr<Stack> grow(const std::shared_ptr<Stack> &next, const Location &location);
   std::string str() const;
 
+  Stack(const Location &location_) : next(), location(location_) { }
+
 private:
   Stack(const std::shared_ptr<Stack> &next_, const Location &location_);
 };

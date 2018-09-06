@@ -12,14 +12,14 @@
 
 static ActionQueue queue;
 
-void stack_trace(Action *completion) {
+void stack_trace(const std::unique_ptr<Action> &completion) {
   std::cerr << completion->stack.get();
 }
 
-void resume(Action *completion, Value *return_value) {
-  PrimRet *ret = reinterpret_cast<PrimRet*>(completion);
+void resume(std::unique_ptr<Action> &&completion, std::shared_ptr<Value> &&return_value) {
+  std::unique_ptr<PrimRet> ret(reinterpret_cast<PrimRet*>(completion.release()));
   ret->future_input->complete(queue, return_value, ret->invoker_serial);
-  queue.push(ret);
+  queue.push(std::move(ret));
 }
 
 int main(int argc, const char **argv) {
@@ -55,18 +55,15 @@ int main(int argc, const char **argv) {
     return 1;
   }
 
-  Eval *main = new Eval(0, &top, 0);
-  queue.push(main);
-  std::shared_ptr<Future> result = main->future_result;
+  std::unique_ptr<Action> main(new Eval(&top));
+  std::shared_ptr<Future> result(main->future_result);
+  queue.push(std::move(main));
 
-  unsigned long steps = 0;
   do while (!queue.empty()) {
-    std::unique_ptr<Action> doit = queue.pop();
-    doit->execute(queue);
-    ++steps;
+    queue.pop()->execute(queue);
   } while (jobtable.wait());
 
-  std::cerr << "Computed in " << steps << " steps." << std::endl;
+  std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;
   std::shared_ptr<Value> out = result->get_value();
   assert (out);
   std::cout << out.get() << std::endl;

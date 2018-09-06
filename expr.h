@@ -25,7 +25,7 @@ struct Prim : public Expr {
   int args;
 
   // The function must call 'resume(completion, value);' when done
-  void (*fn)(void *data, const std::vector<Value*> &args, Action *completion);
+  void (*fn)(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion);
   void *data;
 
   static const char *type;
@@ -65,7 +65,6 @@ struct Literal : public Expr {
   static const char *type;
 
   Literal(const Location &location_, const std::shared_ptr<Value> &value_);
-  Literal(const Location &location_, Value *value_);
   Literal(const Location &location_, const char *value_);
 };
 

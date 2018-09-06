@@ -3,27 +3,27 @@
 #include <iostream>
 #include <gmp.h>
 
-#define UNOP(name, fn)										\
-static void prim_##name(void *data, const std::vector<Value*> &args, Action *completion) {	\
-  EXPECT_ARGS(1);										\
-  Integer *arg0 = GET_INTEGER(0);								\
-  Integer *out = new Integer;									\
-  fn(out->value, arg0->value);									\
-  resume(completion, out);									\
+#define UNOP(name, fn)														\
+static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {	\
+  EXPECT_ARGS(1);														\
+  Integer *arg0 = GET_INTEGER(0);												\
+  Integer *out = new Integer;													\
+  fn(out->value, arg0->value);													\
+  resume(std::move(completion), std::shared_ptr<Value>(out));									\
 }
 
 UNOP(com, mpz_com)
 UNOP(abs, mpz_abs)
 UNOP(neg, mpz_neg)
 
-#define BINOP(name, fn)										\
-static void prim_##name(void *data, const std::vector<Value*> &args, Action *completion) {	\
-  EXPECT_ARGS(2);										\
-  Integer *arg0 = GET_INTEGER(0);								\
-  Integer *arg1 = GET_INTEGER(1);								\
-  Integer *out = new Integer;									\
-  fn(out->value, arg0->value, arg1->value);							\
-  resume(completion, out);									\
+#define BINOP(name, fn)														\
+static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {	\
+  EXPECT_ARGS(2);														\
+  Integer *arg0 = GET_INTEGER(0);												\
+  Integer *arg1 = GET_INTEGER(1);												\
+  Integer *out = new Integer;													\
+  fn(out->value, arg0->value, arg1->value);											\
+  resume(std::move(completion), std::shared_ptr<Value>(out));									\
 }
 
 BINOP(add, mpz_add)
@@ -37,26 +37,26 @@ BINOP(or,  mpz_ior)
 BINOP(gcd, mpz_gcd)
 BINOP(lcm, mpz_lcm)
 
-#define BINOP_SI(name, fn)									\
-static void prim_##name(void *data, const std::vector<Value*> &args, Action *completion) {	\
-  EXPECT_ARGS(2);										\
-  Integer *arg0 = GET_INTEGER(0);								\
-  Integer *arg1 = GET_INTEGER(1);								\
-  Integer *out = new Integer;									\
-  if (mpz_sgn(arg1->value) < 0) {								\
-    std::cerr << "prim_" #name " called with argument 2 = "					\
-      << arg1 << ", which is not a positive integer." << std::endl;				\
-    stack_trace(completion);									\
-    exit(1);											\
-  }												\
-  if (!mpz_fits_slong_p(arg1->value) || (mpz_get_si(arg1->value) >> 20) != 0) {			\
-    std::cerr << "prim_" #name " called with argument 2 = "					\
-      << arg1 << ", which is unreasonably large." << std::endl;					\
-    stack_trace(completion);									\
-    exit(1);											\
-  }												\
-  fn(out->value, arg0->value, mpz_get_si(arg1->value));						\
-  resume(completion, out);									\
+#define BINOP_SI(name, fn)													\
+static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {	\
+  EXPECT_ARGS(2);														\
+  Integer *arg0 = GET_INTEGER(0);												\
+  Integer *arg1 = GET_INTEGER(1);												\
+  Integer *out = new Integer;													\
+  if (mpz_sgn(arg1->value) < 0) {												\
+    std::cerr << "prim_" #name " called with argument 2 = "									\
+      << arg1 << ", which is not a positive integer." << std::endl;								\
+    stack_trace(completion);													\
+    exit(1);															\
+  }																\
+  if (!mpz_fits_slong_p(arg1->value) || (mpz_get_si(arg1->value) >> 20) != 0) {							\
+    std::cerr << "prim_" #name " called with argument 2 = "									\
+      << arg1 << ", which is unreasonably large." << std::endl;									\
+    stack_trace(completion);													\
+    exit(1);															\
+  }																\
+  fn(out->value, arg0->value, mpz_get_si(arg1->value));										\
+  resume(std::move(completion), std::shared_ptr<Value>(out));									\
 }
 
 BINOP_SI(shl, mpz_mul_2exp)
@@ -64,7 +64,7 @@ BINOP_SI(shr, mpz_tdiv_q_2exp)
 BINOP_SI(exp, mpz_pow_ui)
 BINOP_SI(root,mpz_root)
 
-static void prim_powm(void *data, const std::vector<Value*> &args, Action *completion) {
+static void prim_powm(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
   EXPECT_ARGS(3);
   Integer *arg0 = GET_INTEGER(0);
   Integer *arg1 = GET_INTEGER(1);
@@ -77,10 +77,10 @@ static void prim_powm(void *data, const std::vector<Value*> &args, Action *compl
     exit(1);
   }
   mpz_powm(out->value, arg0->value, arg1->value, arg2->value);
-  resume(completion, out);
+  resume(std::move(completion), std::shared_ptr<Value>(out));
 }
 
-static void prim_str(void *data, const std::vector<Value*> &args, Action *completion) {
+static void prim_str(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
   EXPECT_ARGS(2);
   Integer *arg0 = GET_INTEGER(0);
   Integer *arg1 = GET_INTEGER(1);
@@ -92,10 +92,10 @@ static void prim_str(void *data, const std::vector<Value*> &args, Action *comple
     stack_trace(completion);
     exit(1);
   }
-  resume(completion, new String(arg1->str(base)));
+  resume(std::move(completion), std::shared_ptr<Value>(new String(arg1->str(base))));
 }
 
-static void prim_int(void *data, const std::vector<Value*> &args, Action *completion) {
+static void prim_int(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
   EXPECT_ARGS(2);
   Integer *arg0 = GET_INTEGER(0);
   String  *arg1 = GET_STRING(1);
@@ -108,7 +108,7 @@ static void prim_int(void *data, const std::vector<Value*> &args, Action *comple
     exit(1);
   }
   mpz_set_str(out->value, arg1->value.c_str(), base);
-  resume(completion, out);
+  resume(std::move(completion), std::shared_ptr<Value>(out));
 }
 
 // popcount, scan0, scan1 ?

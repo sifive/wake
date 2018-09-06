@@ -4,7 +4,7 @@
 #include <iostream>
 #include <cstdlib>
 
-void expect_args(const char *fn, Action *completion, const std::vector<Value*> &args, int expect) {
+void expect_args(const char *fn, const std::unique_ptr<Action> &completion, const std::vector<std::shared_ptr<Value> > &args, int expect) {
   if (args.size() != (size_t)expect) {
     std::cerr << fn << " called on " << args.size() << "; was expecting " << expect << std::endl;
     stack_trace(completion);
@@ -12,7 +12,7 @@ void expect_args(const char *fn, Action *completion, const std::vector<Value*> &
   }
 }
 
-String *expect_string (const char *fn, Action *completion, Value *value, int index) {
+String *expect_string(const char *fn, const std::unique_ptr<Action> &completion, const std::shared_ptr<Value> &value, int index) {
   if (value->type != String::type) {
     std::cerr << fn << " called with argument "
       << index << " = "
@@ -20,10 +20,10 @@ String *expect_string (const char *fn, Action *completion, Value *value, int ind
     stack_trace(completion);
     exit(1);
   }
-  return reinterpret_cast<String*>(value);
+  return reinterpret_cast<String*>(value.get());
 }
 
-Integer *expect_integer(const char *fn, Action *completion, Value *value, int index) {
+Integer *expect_integer(const char *fn, const std::unique_ptr<Action> &completion, const std::shared_ptr<Value> &value, int index) {
   if (value->type != Integer::type) {
     std::cerr << fn << " called with argument "
       << index << " = "
@@ -31,21 +31,21 @@ Integer *expect_integer(const char *fn, Action *completion, Value *value, int in
     stack_trace(completion);
     exit(1);
   }
-  return reinterpret_cast<Integer*>(value);
+  return reinterpret_cast<Integer*>(value.get());
 }
 
-Value *make_true() {
+std::shared_ptr<Value> make_true() {
   Location location = LOCATION;
-  return new Closure(new Lambda(location, "_", new VarRef(location, "_", 1, 0)), 0);
+  return std::shared_ptr<Value>(new Closure(new Lambda(location, "_", new VarRef(location, "_", 1, 0)), 0));
 }
 
-Value *make_false() {
+std::shared_ptr<Value> make_false() {
   Location location = LOCATION;
-  return new Closure(new Lambda(location, "_", new VarRef(location, "_", 0, 0)), 0);
+  return std::shared_ptr<Value>(new Closure(new Lambda(location, "_", new VarRef(location, "_", 0, 0)), 0));
 }
 
-Value *make_list(const std::vector<Value*> &values) {
-  Value *out = make_true();
+std::shared_ptr<Value> make_list(const std::vector<std::shared_ptr<Value> > &values) {
+  std::shared_ptr<Value> out = make_true();
   for (auto i = values.rbegin(); i != values.rend(); ++i) {
     // \f f (*i) out
     Expr *tail = new Literal(LOCATION, out);
@@ -53,7 +53,7 @@ Value *make_list(const std::vector<Value*> &values) {
     Expr *f    = new VarRef(LOCATION, "_");
     Expr *app1 = new App(LOCATION, f, head);
     Expr *app2 = new App(LOCATION, app1, tail);
-    out = new Closure(app2, 0);
+    out = std::shared_ptr<Value>(new Closure(app2, 0));
   }
   return out;
 }

@@ -15,9 +15,6 @@ const char *Top::type = "Top";
 Literal::Literal(const Location &location_, const std::shared_ptr<Value> &value_)
  : Expr(type, location_), value(value_) { }
 
-Literal::Literal(const Location &location_, Value *value_)
- : Expr(type, location_), value(value_) { }
-
 Literal::Literal(const Location &location_, const char *value_)
  : Expr(type, location_), value(new String(value_)) { }
 

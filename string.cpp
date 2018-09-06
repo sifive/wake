@@ -2,22 +2,20 @@
 #include "value.h"
 #include <gmp.h>
 
-static void prim_cat(void *data, const std::vector<Value*> &args, Action *completion) {
+static void prim_cat(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
   EXPECT_ARGS(2);
   String *arg0 = GET_STRING(0);
   String *arg1 = GET_STRING(1);
-  resume(completion, new String(arg0->value + arg1->value));
+  resume(std::move(completion), std::shared_ptr<Value>(new String(arg0->value + arg1->value)));
 }
 
-static void prim_len(void *data, const std::vector<Value*> &args, Action *completion) {
+static void prim_len(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
   EXPECT_ARGS(1);
   String *arg0 = GET_STRING(0);
-  Integer *out = new Integer;
-  mpz_set_ui(out->value, arg0->value.size());
-  resume(completion, out);
+  resume(std::move(completion), std::shared_ptr<Value>(new Integer(arg0->value.size())));
 }
 
-static void prim_cut(void *data, const std::vector<Value*> &args, Action *completion) {
+static void prim_cut(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
   EXPECT_ARGS(3);
   String  *arg0 = GET_STRING(0);
   Integer *arg1 = GET_INTEGER(1);
@@ -41,7 +39,7 @@ static void prim_cut(void *data, const std::vector<Value*> &args, Action *comple
   }
 
   if (begin > end) begin = end;
-  resume(completion, new String(arg0->value.substr(begin, end-begin)));
+  resume(std::move(completion), std::shared_ptr<Value>(new String(arg0->value.substr(begin, end-begin))));
 }
 
 void prim_register_string(PrimMap &pmap) {

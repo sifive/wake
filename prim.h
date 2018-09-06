@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <memory>
 
 struct Expr;
 struct Action;
@@ -12,23 +13,23 @@ struct String;
 struct Integer;
 
 /* Primitive functions must call resume once they are done their work */
-void resume(Action *completion, Value *return_value);
-void stack_trace(Action *completion);
+void resume(std::unique_ptr<Action> &&completion, std::shared_ptr<Value> &&return_value);
+void stack_trace(const std::unique_ptr<Action> &completion);
 
-typedef void (*PrimFn)(void *data, const std::vector<Value*> &args, Action *completion);
+typedef void (*PrimFn)(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion);
 typedef std::map<std::string, std::pair<PrimFn, void *> > PrimMap;
 
-void expect_args(const char *fn, Action *completion, const std::vector<Value*> &args, int expect);
-String *expect_string(const char *fn, Action *completion, Value *value, int index);
-Integer *expect_integer(const char *fn, Action *completion, Value *value, int index);
+void expect_args(const char *fn, const std::unique_ptr<Action> &completion, const std::vector<std::shared_ptr<Value> > &args, int expect);
+String *expect_string(const char *fn, const std::unique_ptr<Action> &completion, const std::shared_ptr<Value> &value, int index);
+Integer *expect_integer(const char *fn, const std::unique_ptr<Action> &completion, const std::shared_ptr<Value> &value, int index);
 
 #define EXPECT_ARGS(num) expect_args(__FUNCTION__, completion, args, num)
 #define GET_STRING(index) expect_string(__FUNCTION__, completion, args[index], index+1)
 #define GET_INTEGER(index) expect_integer(__FUNCTION__, completion, args[index], index+1)
 
-Value *make_true();
-Value *make_false();
-Value *make_list(const std::vector<Value*>& values);
+std::shared_ptr<Value> make_true();
+std::shared_ptr<Value> make_false();
+std::shared_ptr<Value> make_list(const std::vector<std::shared_ptr<Value> >& values);
 
 struct JobTable;
 

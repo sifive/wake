@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <memory>
 
 /* Evaluation */
 
@@ -17,10 +18,9 @@ struct Future;
 struct Prim;
 
 struct Future {
-  void depend(ActionQueue &queue, Callback *callback);
+  void depend(ActionQueue &queue, std::unique_ptr<Callback> &&callback);
   void complete(ActionQueue &queue, std::shared_ptr<Value> &&value_, uint64_t action_serial_);
   void complete(ActionQueue &queue, const std::shared_ptr<Value> &value_, uint64_t action_serial_);
-  void complete(ActionQueue &queue, Value *value_, uint64_t action_serial_);
 
   // You may only invoke this after you were 'wake'd
   std::shared_ptr<Value> get_value() const { return value; }
@@ -34,6 +34,7 @@ private:
 };
 
 struct Action {
+  static uint64_t next_serial;
   const char *type;
   uint64_t serial; // database key
   uint64_t invoker_serial;
@@ -43,7 +44,8 @@ struct Action {
 
   virtual ~Action();
   Action(const char *type_, Action *invoker, std::shared_ptr<Future> &&future_result_);
-  Action(const char *type_, Action *invoker, Future *future_result_, const Location &location);
+  Action(const char *type_, Action *invoker, std::shared_ptr<Future> &&future_result_, const Location &location);
+  Action(const char *type_, std::shared_ptr<Future> &&future_result_, const Location &location);
 
   virtual void execute(ActionQueue &queue) = 0;
 };
@@ -54,7 +56,8 @@ struct Eval : public Action {
 
   static const char *type;
   Eval(Action *invoker, Expr *expr_, const std::shared_ptr<Binding> &bindings_);
-  Eval(Action *invoker, Expr *expr_, Binding *bindings_);
+  Eval(Action *invoker, Expr *expr_, std::shared_ptr<Binding> &&bindings_);
+  Eval(Expr *expr_);
 
   void execute(ActionQueue &queue);
 };
@@ -121,16 +124,17 @@ struct ActionQueue {
 
   bool empty() const { return !top; }
   void push(std::unique_ptr<Action> &&action);
-  void push(Action *action);
   std::unique_ptr<Action> pop() {
     std::unique_ptr<Action> out = std::move(top);
-    if (top->next) {
-      top = std::move(top->next);
+    if (out->next) {
+      top = std::move(out->next);
     } else {
       bottom = 0;
     }
     return out;
   }
+
+  ActionQueue() : top(), bottom(0) { }
 };
 
 #endif
