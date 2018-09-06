@@ -29,6 +29,8 @@ struct Location {
   }
 };
 
+std::ostream & operator << (std::ostream &os, const Location &location);
+
 #define LOCATION Location(__FILE__, Coordinates(__LINE__, 1), Coordinates(__LINE__, 1))
 
 #endif

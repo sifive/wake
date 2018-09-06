@@ -1,4 +1,5 @@
 #include "action.h"
+#include "stack.h"
 #include "expr.h"
 #include "value.h"
 #include "prim.h"
@@ -7,7 +8,7 @@
 
 Action::~Action() { }
 
-const char *Thunk  ::type = "Thunk";
+const char *Eval   ::type = "Eval";
 const char *PrimArg::type = "PrimArg";
 const char *PrimRet::type = "PrimFn";
 const char *VarRet ::type = "VarRet";
@@ -16,150 +17,168 @@ const char *AppFn  ::type = "AppFn";
 const char *MapRet ::type = "MapRet";
 const char *TopRet ::type = "TopRet";
 
-void Thunk::depend(ActionQueue &queue, Callback *callback) {
-  if (return_action) {
-    callback->input_action = return_action;
-    callback->input_value  = return_value;
-    queue.push_back(callback);
+static uint64_t serial_gen = 0;
+
+void Future::depend(ActionQueue &queue, Callback *callback) {
+  if (value) {
+    queue.push(std::unique_ptr<Callback>(callback));
   } else {
-    wait.push_back(callback);
+    callback->next = std::move(waiting);
+    waiting = std::unique_ptr<Callback>(callback);
   }
 }
 
-void Thunk::broadcast(ActionQueue &queue, Action *return_action_, Value *return_value_) {
-  return_action = return_action_;
-  return_value  = return_value_;
-  while (!wait.empty()) {
-    Callback *callback = wait.front();
-    wait.pop_front();
-    callback->input_action = return_action;
-    callback->input_value  = return_value;
-    queue.push_back(callback);
+void Future::complete(ActionQueue &queue, std::shared_ptr<Value> &&value_, uint64_t action_serial_) {
+  value = std::move(value_);
+  action_serial = action_serial_;
+
+  std::unique_ptr<Callback> cb, next;
+  for (cb = std::move(waiting); cb; cb = std::move(next)) {
+    next = std::unique_ptr<Callback>(reinterpret_cast<Callback*>(cb->next.release()));
+    queue.push(std::move(cb));
   }
 }
 
-void VarRet::execute(ActionQueue &queue) {
-  Thunk *thunk = reinterpret_cast<Thunk*>(invoker);
-  thunk->broadcast(queue, this, input_value);
+void Future::complete(ActionQueue &queue, Value *value_, uint64_t action_serial_) {
+  return complete(queue, std::shared_ptr<Value>(value), action_serial_);
 }
 
-void AppRet::execute(ActionQueue &queue) {
-  AppFn *appFn = reinterpret_cast<AppFn*>(invoker);
-  Thunk *thunk = reinterpret_cast<Thunk*>(appFn->invoker);
-  thunk->broadcast(queue, this, input_value);
+void Future::complete(ActionQueue &queue, const std::shared_ptr<Value> &value_, uint64_t action_serial_) {
+  return complete(queue, std::shared_ptr<Value>(value), action_serial_);
+}
+
+Action::Action(const char *type_, Action *invoker, std::shared_ptr<Future> &&future_result_)
+ : serial(++serial_gen), invoker_serial(invoker->serial), stack(invoker->stack), future_result(std::move(future_result_)) { }
+
+Action::Action(const char *type_, Action *invoker, Future *future_result_, const Location &location)
+ : serial(++serial_gen), invoker_serial(invoker->serial), stack(Stack::grow(invoker->stack, location)), future_result(future_result_) { }
+
+Eval::Eval(Action *invoker, Expr *expr_, const std::shared_ptr<Binding> &bindings_)
+ : Action(type, invoker, new Future, expr_->location), expr(expr_), bindings(bindings_) { }
+
+Eval::Eval(Action *invoker, Expr *expr_, Binding *bindings_)
+ : Action(type, invoker, new Future, expr_->location), expr(expr_), bindings(bindings_) { }
+
+Callback::Callback(const char *type_, Action *invoker, const std::shared_ptr<Future> &future_input_)
+ : Action(type_, invoker, std::move(invoker->future_result)), future_input(future_input_) { }
+
+AppFn::AppFn(Action *invoker, const std::shared_ptr<Future> &future_input_, const std::shared_ptr<Future> &arg_)
+ : Callback(type, invoker, future_input_), arg(arg_) { }
+
+Return::Return(const char *type_, Action *invoker, const std::shared_ptr<Future> &future_input_)
+ : Callback(type_, invoker, future_input_) { }
+
+void Return::execute(ActionQueue &queue) {
+  future_result->complete(queue, future_input->get_value(), serial);
+}
+
+static void hook(ActionQueue &queue, Callback *cb) {
+  cb->future_input->depend(queue, cb);
 }
 
 void AppFn::execute(ActionQueue &queue) {
-  if (input_value->type != Closure::type) {
-    std::cerr << "Attempt to apply " << input_value << " which is not a Closure" << std::endl;
-    stack_trace(this);
+  Value *value = future_input->get_raw_value();
+  if (value->type != Closure::type) {
+    std::cerr << "Attempt to apply " << value << " which is not a Closure" << std::endl;
     exit(1);
   }
-  Closure *clo = reinterpret_cast<Closure*>(input_value);
-  Thunk *thunk = new Thunk(this, clo->body, new Binding(arg, clo->bindings));
-  queue.push_back(thunk);
-  thunk->depend(queue, new AppRet(this));
+  Closure *clo = reinterpret_cast<Closure*>(value);
+  Eval *eval = new Eval(this, clo->body, new Binding(clo->bindings, std::move(arg)));
+  eval->future_result->depend(queue, new AppRet(this, eval->future_result));
+  queue.push(std::unique_ptr<Action>(eval));
 }
 
-void MapRet::execute(ActionQueue &queue) {
-  Thunk *thunk = reinterpret_cast<Thunk*>(invoker);
-  thunk->broadcast(queue, this, input_value);
-}
-
-void TopRet::execute(ActionQueue &queue) {
-  Thunk *thunk = reinterpret_cast<Thunk*>(invoker);
-  thunk->broadcast(queue, this, input_value);
-}
-
-void PrimArg::chain(ActionQueue &queue, Action *invoker, Prim *prim, Binding *binding, int arg) {
-  if (prim->args == arg) {
+void PrimArg::chain(
+    ActionQueue &queue,
+    Action *invoker,
+    Prim *prim,
+    const std::shared_ptr<Binding> &binding,
+    std::vector<std::shared_ptr<Value> > &&values) {
+  if (prim->args == values.size()) {
     std::vector<Value*> args;
-    Action *iter = invoker;
-    for (int index = 0; index < prim->args; ++index) {
-      PrimArg *prim = reinterpret_cast<PrimArg*>(iter);
-      args.push_back(prim->input_value);
-      iter = iter->invoker;
-    }
-    PrimRet *completion = new PrimRet(invoker);
-    completion->input_action = invoker;
-    prim->fn(prim->data, args, completion);
+    for (auto &i : values) args.push_back(i.get());
+    prim->fn(prim->data, args, new PrimRet(invoker));
   } else {
-    binding->thunk->depend(queue, new PrimArg(invoker, prim, binding, arg));
+    hook(queue, new PrimArg(invoker, prim, binding, std::move(values), binding->future[0]));
   }
 }
 
 void PrimArg::execute(ActionQueue &queue) {
-  chain(queue, this, prim, binding->next, arg+1);
+  values.push_back(future_input->get_value());
+  chain(queue, this, prim, binding->next, std::move(values));
 }
 
-void PrimRet::execute(ActionQueue &queue) {
-  Action *iter;
-  for (iter = invoker; iter->type != Thunk::type; iter = iter->invoker) { }
-  Thunk *thunk = reinterpret_cast<Thunk*>(iter);
-  thunk->broadcast(queue, this, input_value);
-}
-
-static Binding *bind_defmap(ActionQueue &queue, Action *invoker, DefMap *def, Binding *bindings) {
-  Thunk *thunk = new Thunk[def->map.size()]();
-  Binding *defs = new Binding(thunk, bindings);
-  int j = 0;
+static Binding *bind_defmap(ActionQueue &queue, Action *invoker, DefMap *def, const std::shared_ptr<Binding> &bindings) {
+  Binding *defs = new Binding(bindings);
   for (auto &i : def->map) {
-    thunk[j].invoker = invoker;
-    thunk[j].expr = i.second.get();
-    thunk[j].bindings = defs;
-    queue.push_back(thunk + j++);
+    Eval *eval = new Eval(invoker, i.second.get(), defs);
+    queue.push(eval);
+    defs->future.push_back(eval->future_result);
   }
   return defs;
 }
 
-void Thunk::execute(ActionQueue &queue) {
+void Eval::execute(ActionQueue &queue) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
-    Binding *iter = bindings;
+    Binding *iter = bindings.get();
     for (int depth = ref->depth; depth; --depth)
-      iter = iter->next;
-    iter->thunk[ref->offset].depend(queue, new VarRet(this));
+      iter = iter->next.get();
+    hook(queue, new VarRet(this, iter->future[ref->offset]));
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
-    Thunk *fn  = new Thunk(this, app->fn.get(), bindings);
-    Thunk *arg = new Thunk(this, app->val.get(), bindings);
-    queue.push_back(fn);
-    queue.push_back(arg);
-    fn->depend(queue, new AppFn(this, arg));
+    Eval *fn  = new Eval(this, app->fn.get(), bindings);
+    Eval *arg = new Eval(this, app->val.get(), bindings);
+    queue.push(fn);
+    queue.push(arg);
+    hook(queue, new AppFn(this, fn->future_result, arg->future_result));
   } else if (expr->type == Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     Closure *closure = new Closure(lambda->body.get(), bindings);
-    broadcast(queue, this, closure);
+    future_result->complete(queue, closure, serial);
   } else if (expr->type == DefMap::type) {
     DefMap *defmap = reinterpret_cast<DefMap*>(expr);
     Binding *defs = bind_defmap(queue, this, defmap, bindings);
-    Thunk *body = new Thunk(this, defmap->body.get(), defs);
-    queue.push_back(body);
-    body->depend(queue, new MapRet(this));
+    Eval *body = new Eval(this, defmap->body.get(), defs);
+    queue.push(body);
+    hook(queue, new MapRet(this, body->future_result));
   } else if (expr->type == Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
-    broadcast(queue, this, lit->value.get());
+    future_result->complete(queue, lit->value, serial);
   } else if (expr->type == Prim::type) {
     Prim *prim = reinterpret_cast<Prim*>(expr);
-    PrimArg::chain(queue, this, prim, bindings, 0);
+    std::vector<std::shared_ptr<Value> > values;
+    PrimArg::chain(queue, this, prim, bindings, std::move(values));
   } else if (expr->type == Top::type) {
     Top *top = reinterpret_cast<Top*>(expr);
-    Thunk *globals = new Thunk[top->globals.size()]();
-    Binding *global = new Binding(globals, bindings);
+    std::shared_ptr<Binding> global(new Binding(bindings));
     std::vector<Binding*> defmaps;
     for (auto &i : top->defmaps)
       defmaps.push_back(bind_defmap(queue, this, &i, global));
-    int j = 0;
     for (auto &i : top->globals) {
-      globals[j].invoker  = this;
-      globals[j].expr     = i.second.var.get();
-      globals[j].bindings = defmaps[i.second.defmap];
-      queue.push_back(globals + j++);
+      Eval *eval = new Eval(this, i.second.var.get(), defmaps[i.second.defmap]);
+      queue.push(eval);
+      global->future.push_back(eval->future_result);
     }
-    Thunk *main = new Thunk(this, top->main.get(), global);
-    queue.push_back(main);
-    main->depend(queue, new TopRet(this));
+    Eval *main = new Eval(this, top->main.get(), global);
+    queue.push(main);
+    hook(queue, new TopRet(this, main->future_result));
   } else {
     assert(0 /* unreachable */);
   }
+}
+
+void ActionQueue::push(std::unique_ptr<Action> &&action) {
+  if (bottom) {
+    bottom->next = std::move(action);
+    bottom = bottom->next.get();
+  } else {
+    top = std::move(action);
+    bottom = top.get();
+  }
+  bottom->next.reset();
+}
+
+void ActionQueue::push(Action *action) {
+  return push(std::unique_ptr<Action>(action));
 }

@@ -8,26 +8,18 @@
 #include "action.h"
 #include "expr.h"
 #include "job.h"
-
-void stack_trace(Action *failure) {
-  Location *trace = 0;
-  for (Action *action = failure; action; action = action->invoker) {
-    if (action->type == Thunk::type) {
-      Thunk *thunk = reinterpret_cast<Thunk*>(action);
-      if (trace && !thunk->expr->location.contains(*trace))
-        std::cerr << "  from " << trace->str() << std::endl;
-      trace = &thunk->expr->location;
-    }
-  }
-  // last trace is always <init>:1:1; don't print it
-}
+#include "stack.h"
 
 static ActionQueue queue;
 
+void stack_trace(Action *completion) {
+  std::cerr << completion->stack.get();
+}
+
 void resume(Action *completion, Value *return_value) {
   PrimRet *ret = reinterpret_cast<PrimRet*>(completion);
-  ret->input_value = return_value;
-  queue.push_back(ret);
+  ret->future_input->complete(queue, return_value, ret->invoker_serial);
+  queue.push(ret);
 }
 
 int main(int argc, const char **argv) {
@@ -53,8 +45,6 @@ int main(int argc, const char **argv) {
 
   const char *slash = strrchr(argv[0], '/');
   const char *exec = slash ? slash + 1 : argv[0];
-  int debug = !strcmp(exec, "wake-debug");
-
   if (!strcmp(exec, "wake-parse")) {
     std::cout << &top;
     return 0;
@@ -65,32 +55,21 @@ int main(int argc, const char **argv) {
     return 1;
   }
 
-  Thunk *result = new Thunk(0, &top, 0);
-  queue.push_back(result);
-  unsigned long steps = 0, widest = 0;
+  Eval *main = new Eval(0, &top, 0);
+  queue.push(main);
+  std::shared_ptr<Future> result = main->future_result;
+
+  unsigned long steps = 0;
   do while (!queue.empty()) {
-    Action *doit = queue.front();
-    queue.pop_front();
-
-    if (debug) {
-      if (doit->type == Thunk::type) {
-        Thunk *thunk = reinterpret_cast<Thunk*>(doit);
-        std::cerr << "Executing " << thunk->expr->type << " @ " << thunk->expr->location.str() << std::endl;
-      } else {
-        std::cerr << "Executing " << doit->type << std::endl;
-      }
-      ++steps;
-      if (queue.size() > widest) widest = queue.size();
-    }
-
+    std::unique_ptr<Action> doit = queue.pop();
     doit->execute(queue);
+    ++steps;
   } while (jobtable.wait());
 
-  if (debug) {
-    std::cerr << "Computed in " << steps << " steps with " << widest << " in parallel." << std::endl;
-  }
-  assert (result->output());
-  std::cout << result->output() << std::endl;
+  std::cerr << "Computed in " << steps << " steps." << std::endl;
+  std::shared_ptr<Value> out = result->get_value();
+  assert (out);
+  std::cout << out.get() << std::endl;
 
   return 0;
 }

@@ -2,11 +2,14 @@
 #define VALUE_H
 
 #include <string>
+#include <vector>
+#include <memory>
 #include <gmp.h>
 
 /* Values */
 
 struct Expr;
+struct Future;
 
 struct Value {
   const char *type;
@@ -36,20 +39,20 @@ struct Integer : public Value {
   std::string str(int base = 10) const;
 };
 
-struct Thunk;
 struct Binding {
-  Thunk *thunk;
-  Binding *next;
+  std::shared_ptr<Binding> next;
+  std::vector<std::shared_ptr<Future> > future;
 
-  Binding(Thunk *thunk_, Binding *next_) : thunk(thunk_), next(next_) { }
+  Binding(const std::shared_ptr<Binding> &next_) : next(next_), future() { }
+  Binding(const std::shared_ptr<Binding> &next_, std::shared_ptr<Future> &&arg) : next(next_), future(1, arg) { }
 };
 
 struct Closure : public Value {
   Expr *body;
-  Binding *bindings;
+  std::shared_ptr<Binding> bindings;
 
   static const char *type;
-  Closure(Expr *body_, Binding *bindings_) : Value(type), body(body_), bindings(bindings_) { }
+  Closure(Expr *body_, const std::shared_ptr<Binding> &bindings_) : Value(type), body(body_), bindings(bindings_) { }
 };
 
 #endif

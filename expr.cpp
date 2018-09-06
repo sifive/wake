@@ -12,8 +12,8 @@ const char *DefMap::type = "DefMap";
 const char *Literal::type = "Literal";
 const char *Top::type = "Top";
 
-Literal::Literal(const Location &location_, std::unique_ptr<Value> value_)
- : Expr(type, location_), value(std::move(value_)) { }
+Literal::Literal(const Location &location_, const std::shared_ptr<Value> &value_)
+ : Expr(type, location_), value(value_) { }
 
 Literal::Literal(const Location &location_, Value *value_)
  : Expr(type, location_), value(value_) { }

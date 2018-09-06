@@ -61,10 +61,10 @@ struct VarRef : public Expr {
 };
 
 struct Literal : public Expr {
-  std::unique_ptr<Value> value;
+  std::shared_ptr<Value> value;
   static const char *type;
 
-  Literal(const Location &location_, std::unique_ptr<Value> value_);
+  Literal(const Location &location_, const std::shared_ptr<Value> &value_);
   Literal(const Location &location_, Value *value_);
   Literal(const Location &location_, const char *value_);
 };

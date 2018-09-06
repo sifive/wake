@@ -1,13 +1,18 @@
 #include "location.h"
 #include <sstream>
 
+std::ostream & operator << (std::ostream &os, const Location &location) {
+  os << location.file << ":";
+  if (location.start.row == location.end.row) os << location.start.row;
+  else os << "[" << location.start.row << "-" << location.end.row << "]";
+  os << ":";
+  if (location.start.column == location.end.column) os << location.start.column;
+  else os << "[" << location.start.column << "-" << location.end.column << "]";
+  return os;
+}
+
 std::string Location::str() const {
   std::stringstream str;
-  str << file << ":";
-  if (start.row == end.row) str << start.row;
-  else str << "[" << start.row << "-" << end.row << "]";
-  str << ":";
-  if (start.column == end.column) str << start.column;
-  else str << "[" << start.column << "-" << end.column << "]";
+  str << *this;
   return str.str();
 }
