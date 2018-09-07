@@ -119,7 +119,7 @@ void Eval::execute(ActionQueue &queue) {
       iter = &(*iter)->next;
     int vals = (*iter)->future.size();
     if (ref->offset >= vals) {
-      std::shared_ptr<Value> closure(new Closure((*iter)->binding->fun[ref->offset-vals].get(), *iter));
+      std::shared_ptr<Value> closure(new Closure((*iter)->binding->fun[ref->offset-vals]->body.get(), *iter));
       future_result->complete(queue, std::move(closure), serial);
     } else {
       hook(queue, new VarRet(this, (*iter)->future[ref->offset]));

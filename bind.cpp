@@ -220,8 +220,8 @@ struct NameBinding {
 static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
-    NameRef pos = binding->find(ref->name);
-    if (pos.offset == -1) {
+    NameRef pos;
+    if (!binding || (pos = binding->find(ref->name)).offset == -1) {
       std::cerr << "Variable reference "
         << ref->name << " is unbound at "
         << ref->location.str() << std::endl;

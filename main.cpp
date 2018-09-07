@@ -55,7 +55,6 @@ int main(int argc, const char **argv) {
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }
-  std::cout << root.get();
 
   std::unique_ptr<Action> main(new Eval(root.get()));
   std::shared_ptr<Future> result(main->future_result);
