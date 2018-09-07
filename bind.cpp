@@ -1,7 +1,187 @@
 #include "bind.h"
 #include "expr.h"
+#include "prim.h"
 #include <iostream>
+#include <vector>
+#include <map>
+#include <set>
+#include <queue>
+#include <list>
 #include <cassert>
+
+typedef std::map<std::string, int> NameIndex;
+
+struct ResolveDef {
+  std::string name;
+  std::unique_ptr<Expr> expr;
+  std::set<int> edges; // edges: things this name uses
+};
+
+struct ResolveBinding {
+  ResolveBinding *parent;
+  int current_index;
+  int prefix;
+  NameIndex index;
+  std::vector<ResolveDef> defs;
+};
+
+struct RelaxedVertex {
+  int v;
+  int d;
+  RelaxedVertex(int v_, int d_) : v(v_), d(d_) { }
+};
+
+static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vector<ResolveDef> &defs, std::unique_ptr<Expr> &&body) {
+  // Bellman-Ford algorithm, run for longest path
+  // if f uses [yg], then d[f] must be <= d[yg]
+  // if x uses [yg], then d[x] must be <= d[yg]+1
+  // if we ever find a d[_] > n, there is an illegal loop
+
+  std::vector<int> d(defs.size(), 0);
+  std::queue<RelaxedVertex> q;
+
+  for (int i = 0; i < (int)defs.size(); ++i)
+    q.push(RelaxedVertex(i, 0));
+
+  while (!q.empty()) {
+    RelaxedVertex rv = q.front();
+    int drv = d[rv.v];
+    q.pop();
+    if (rv.d < drv) continue;
+    ResolveDef &def = defs[rv.v];
+    if (drv > defs.size()) {
+      std::cerr << "Value definition cycle detected including "
+        << def.name << " at "
+        << def.expr->location << std::endl;
+      break;
+    }
+    int w = def.expr->type == Lambda::type ? 0 : 1;
+    for (auto i : def.edges) {
+      if (drv + w > d[i]) {
+        d[i] = drv + w;
+        q.push(RelaxedVertex(i, drv + w));
+      }
+    }
+  }
+
+  std::vector<std::list<int> > levels(defs.size());
+  for (int i = 0; i < (int)defs.size(); ++i)
+    levels[d[i]].push_back(i);
+
+  std::unique_ptr<Expr> out(std::move(body));
+  for (int i = 0; i < (int)defs.size(); ++i) {
+    if (levels[i].empty()) continue;
+    std::unique_ptr<DefBinding> bind(new DefBinding(location, std::move(out)));
+    int vals = 0;
+    for (auto j : levels[i]) {
+      if (defs[j].expr->type != Lambda::type) ++vals;
+    }
+    for (auto j : levels[i]) {
+      if (defs[j].expr->type == Lambda::type) {
+        bind->order[defs[j].name] = bind->fun.size() + vals;
+        bind->fun.emplace_back(reinterpret_cast<Lambda*>(defs[j].expr.release()));
+      } else {
+        bind->order[defs[j].name] = bind->val.size();
+        bind->val.emplace_back(std::move(defs[j].expr));
+      }
+    }
+    out = std::move(bind);
+  }
+
+  return out;
+}
+
+static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding *binding) {
+  if (expr->type == VarRef::type) {
+    VarRef *ref = reinterpret_cast<VarRef*>(expr.get());
+    ResolveBinding *iter;
+    for (iter = binding; iter; iter = iter->parent) {
+      NameIndex::iterator i;
+      if ((i = iter->index.find(ref->name)) != iter->index.end()) {
+        if (iter->current_index != -1)
+          iter->defs[iter->current_index].edges.insert(i->second);
+        break;
+      }
+      if (iter->prefix >= 0) {
+        std::string file_local = std::to_string(iter->prefix) + "_" + ref->name;
+        if ((i = iter->index.find(file_local)) != iter->index.end()) {
+          ref->name = file_local;
+          if (iter->current_index != -1)
+            iter->defs[iter->current_index].edges.insert(i->second);
+          break;
+        }
+      }
+    }
+    // don't fail if unbound; leave that for the second pass
+    return expr;
+  } else if (expr->type == App::type) {
+    App *app = reinterpret_cast<App*>(expr.get());
+    app->fn  = fracture(std::move(app->fn),  binding);
+    app->val = fracture(std::move(app->val), binding);
+    return expr;
+  } else if (expr->type == Lambda::type) {
+    Lambda *lambda = reinterpret_cast<Lambda*>(expr.get());
+    ResolveBinding lbinding;
+    lbinding.parent = binding;
+    lbinding.current_index = 0;
+    lbinding.prefix = -1;
+    lbinding.index[lambda->name] = 0;
+    lbinding.defs.resize(lbinding.defs.size()+1); // don't care
+    lambda->body = fracture(std::move(lambda->body), &lbinding);
+    return expr;
+  } else if (expr->type == DefMap::type) {
+    DefMap *def = reinterpret_cast<DefMap*>(expr.get());
+    ResolveBinding dbinding;
+    dbinding.parent = binding;
+    for (auto &i : def->map) {
+      dbinding.index[i.first] = dbinding.defs.size();
+      dbinding.defs.resize(dbinding.defs.size()+1);
+      ResolveDef &def = dbinding.defs.back();
+      def.name = i.first;
+      def.expr = std::move(i.second);
+    }
+    dbinding.current_index = 0;
+    dbinding.prefix = -1;
+    for (auto &i : dbinding.defs) {
+      i.expr = fracture(std::move(i.expr), &dbinding);
+      ++dbinding.current_index;
+    }
+    dbinding.current_index = -1;
+    std::unique_ptr<Expr> body = fracture(std::move(def->body), &dbinding);
+    return fracture_binding(def->location, dbinding.defs, std::move(body));
+  } else if (expr->type == Top::type) {
+    Top *top = reinterpret_cast<Top*>(expr.get());
+    ResolveBinding tbinding;
+    tbinding.parent = binding;
+    tbinding.prefix = 0;
+    for (auto &b : top->defmaps) {
+      for (auto &i : b.map) {
+        std::string file_local = std::to_string(tbinding.prefix) + "_" + i.first;
+        std::string name = (top->globals.find(i.first) != top->globals.end()) ? i.first : file_local;
+        tbinding.index[name] = tbinding.defs.size();
+        tbinding.defs.resize(tbinding.defs.size()+1);
+        ResolveDef &def = tbinding.defs.back();
+        def.name = name;
+        def.expr = std::move(i.second);
+      }
+      ++tbinding.prefix;
+    }
+    tbinding.current_index = 0;
+    tbinding.prefix = 0;
+    for (auto &b : top->defmaps) {
+      for (int i = 0; i < (int)b.map.size(); ++i) {
+        tbinding.defs[tbinding.current_index].expr =
+          fracture(std::move(tbinding.defs[tbinding.current_index].expr), &tbinding);
+        ++tbinding.current_index;
+      }
+      ++tbinding.prefix;
+    }
+    return fracture_binding(top->location, tbinding.defs, std::unique_ptr<Expr>(new VarRef(LOCATION, "main")));
+  } else {
+    // Literal/Prim
+    return expr;
+  }
+}
 
 struct NameRef {
   int depth;
@@ -10,7 +190,7 @@ struct NameRef {
 
 struct NameBinding {
   NameBinding *next;
-  std::map<std::string, int> *map;
+  DefOrder *map;
   std::string *name;
   bool open;
 
@@ -60,15 +240,14 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     NameBinding bind(binding, &lambda->name);
     return explore(lambda->body.get(), pmap, &bind);
-  } else if (expr->type == DefMap::type) {
-    DefMap *def = reinterpret_cast<DefMap*>(expr);
-    std::map<std::string, int> offsets;
-    NameBinding bind(binding, &offsets);
-    int j = 0;
-    for (auto &i : def->map) offsets[i.first] = j++;
+  } else if (expr->type == DefBinding::type) {
+    DefBinding *def = reinterpret_cast<DefBinding*>(expr);
+    NameBinding bind(binding, &def->order);
     bool ok = true;
-    for (auto &i : def->map)
-      ok = explore(i.second.get(), pmap, &bind) && ok;
+    for (auto &i : def->val)
+      ok = explore(i.get(), pmap, &bind) && ok;
+    for (auto &i : def->fun)
+      ok = explore(i.get(), pmap, &bind) && ok;
     ok = explore(def->body.get(), pmap, &bind) && ok;
     return ok;
   } else if (expr->type == Literal::type) {
@@ -89,33 +268,14 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       prim->data = i->second.second;
       return true;
     }
-  } else if (expr->type == Top::type) {
-    Top *top = reinterpret_cast<Top*>(expr);
-    std::map<std::string, int> offsets;
-    NameBinding bind(binding, &offsets);
-    int j = 0;
-    for (auto &i : top->globals) offsets[i.first] = j++;
-    bool ok = true;
-    std::vector<std::map<std::string, int> > defmaps(top->defmaps.size());
-    j = 0;
-    for (auto &i : top->defmaps) {
-      std::map<std::string, int> &offsets = defmaps[j++];
-      int l = 0;
-      for (auto &k : i.map) offsets[k.first] = l++;
-      ok = explore(&i, pmap, &bind) && ok;
-    }
-    ok = explore(top->main.get(), pmap, &bind) && ok;
-    for (auto &i : top->globals) {
-      i.second.var->depth = 0;
-      i.second.var->offset = defmaps[i.second.defmap][i.first];
-    }
-    return ok;
   } else {
     assert(0 /* unreachable */);
     return false;
   }
 }
 
-bool bind_refs(Expr *expr, const PrimMap &pmap) {
-  return explore(expr, pmap, 0);
+std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap) {
+  std::unique_ptr<Expr> out = fracture(std::move(top), 0);
+  if (out && !explore(out.get(), pmap, 0)) out.reset();
+  return out;
 }

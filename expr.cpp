@@ -9,6 +9,7 @@ const char *App::type = "App";
 const char *Lambda::type = "Lambda";
 const char *VarRef::type = "VarRef";
 const char *DefMap::type = "DefMap";
+const char *DefBinding::type = "DefBinding";
 const char *Literal::type = "Literal";
 const char *Top::type = "Top";
 
@@ -55,6 +56,15 @@ static void format(std::ostream &os, int depth, const Expr *expr) {
     for (auto &i : top->globals) os << " " << i.first;
     os << std::endl;
     for (auto &i : top->defmaps) format(os, depth+2, &i);
+  } else if (expr->type == DefBinding::type) {
+    const DefBinding *def = reinterpret_cast<const DefBinding*>(expr);
+    os << pad(depth) << "DefBinding @ " << def->location.str() << std::endl;
+    size_t vals = def->val.size();
+    for (auto &i : def->order) {
+      os << pad(depth+2) << (i.second < vals ? "val " : "fun ") << i.first << " =" << std::endl;
+      format(os, depth+4, (i.second < vals) ? def->val[i.second].get() : def->fun[i.second - vals].get());
+    }
+    format(os, depth+2, def->body.get());
   } else {
     assert(0 /* unreachable */);
   }

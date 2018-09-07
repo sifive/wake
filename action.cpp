@@ -15,8 +15,7 @@ const char *PrimRet::type = "PrimFn";
 const char *VarRet ::type = "VarRet";
 const char *AppRet ::type = "AppRet";
 const char *AppFn  ::type = "AppFn";
-const char *MapRet ::type = "MapRet";
-const char *TopRet ::type = "TopRet";
+const char *DefRet ::type = "DefRet";
 
 uint64_t Action::next_serial = 0;
 
@@ -112,23 +111,19 @@ void PrimArg::execute(ActionQueue &queue) {
   chain(queue, this, prim, binding->next, std::move(values));
 }
 
-static std::shared_ptr<Binding> bind_defmap(ActionQueue &queue, Action *invoker, DefMap *def, const std::shared_ptr<Binding> &bindings) {
-  std::shared_ptr<Binding> defs(new Binding(bindings));
-  for (auto &i : def->map) {
-    std::unique_ptr<Eval> eval(new Eval(invoker, i.second.get(), defs));
-    defs->future.push_back(eval->future_result);
-    queue.push(std::move(eval));
-  }
-  return defs;
-}
-
 void Eval::execute(ActionQueue &queue) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
-    Binding *iter = bindings.get();
+    std::shared_ptr<Binding> *iter = &bindings;
     for (int depth = ref->depth; depth; --depth)
-      iter = iter->next.get();
-    hook(queue, new VarRet(this, iter->future[ref->offset]));
+      iter = &(*iter)->next;
+    int vals = (*iter)->future.size();
+    if (ref->offset >= vals) {
+      std::shared_ptr<Value> closure(new Closure((*iter)->binding->fun[ref->offset-vals].get(), *iter));
+      future_result->complete(queue, std::move(closure), serial);
+    } else {
+      hook(queue, new VarRet(this, (*iter)->future[ref->offset]));
+    }
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
     std::unique_ptr<Eval> fn (new Eval(this, app->fn.get(), bindings));
@@ -140,11 +135,16 @@ void Eval::execute(ActionQueue &queue) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     std::shared_ptr<Value> closure(new Closure(lambda->body.get(), bindings));
     future_result->complete(queue, std::move(closure), serial);
-  } else if (expr->type == DefMap::type) {
-    DefMap *defmap = reinterpret_cast<DefMap*>(expr);
-    std::shared_ptr<Binding> defs = bind_defmap(queue, this, defmap, bindings);
-    std::unique_ptr<Eval> body(new Eval(this, defmap->body.get(), std::move(defs)));
-    hook(queue, new MapRet(this, body->future_result));
+  } else if (expr->type == DefBinding::type) {
+    DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
+    std::shared_ptr<Binding> defs(new Binding(bindings, defbinding));
+    for (auto &i : defbinding->val) {
+      std::unique_ptr<Eval> eval(new Eval(this, i.get(), bindings));
+      defs->future.push_back(eval->future_result);
+      queue.push(std::move(eval));
+    }
+    std::unique_ptr<Eval> body(new Eval(this, defbinding->body.get(), std::move(defs)));
+    hook(queue, new DefRet(this, body->future_result));
     queue.push(std::move(body));
   } else if (expr->type == Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
@@ -153,20 +153,6 @@ void Eval::execute(ActionQueue &queue) {
     Prim *prim = reinterpret_cast<Prim*>(expr);
     std::vector<std::shared_ptr<Value> > values;
     PrimArg::chain(queue, this, prim, bindings, std::move(values));
-  } else if (expr->type == Top::type) {
-    Top *top = reinterpret_cast<Top*>(expr);
-    std::shared_ptr<Binding> global(new Binding(bindings));
-    std::vector<std::shared_ptr<Binding> > defmaps;
-    for (auto &i : top->defmaps)
-      defmaps.push_back(bind_defmap(queue, this, &i, global));
-    for (auto &i : top->globals) {
-      std::unique_ptr<Eval> eval(new Eval(this, i.second.var.get(), defmaps[i.second.defmap]));
-      global->future.push_back(eval->future_result);
-      queue.push(std::move(eval));
-    }
-    std::unique_ptr<Eval> main(new Eval(this, top->main.get(), std::move(global)));
-    hook(queue, new TopRet(this, main->future_result));
-    queue.push(std::move(main));
   } else {
     assert(0 /* unreachable */);
   }

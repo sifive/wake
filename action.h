@@ -108,14 +108,9 @@ struct PrimRet : public Return {
   PrimRet(Action *invoker) : Return(type, invoker, std::shared_ptr<Future>(new Future)) { }
 };
 
-struct MapRet : public Return {
+struct DefRet : public Return {
   static const char *type;
-  MapRet(Action *invoker, const std::shared_ptr<Future> &future_input_) : Return(type, invoker, future_input_) { }
-};
-
-struct TopRet : public Return {
-  static const char *type;
-  TopRet(Action *invoker, const std::shared_ptr<Future> &future_input_) : Return(type, invoker, future_input_) { }
+  DefRet(Action *invoker, const std::shared_ptr<Future> &future_input_) : Return(type, invoker, future_input_) { }
 };
 
 struct ActionQueue {

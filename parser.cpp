@@ -370,12 +370,10 @@ void parse_top(Top &top, Lexer &lex) {
         std::cerr << "Duplicate global "
           << name << " at "
           << def->location.str() << " and "
-          << top.defmaps[top.globals[name].defmap].map[name]->location.str() << std::endl;
+          << top.defmaps[top.globals[name]].map[name]->location.str() << std::endl;
         lex.fail = true;
       } else {
-        Top::Global &glob = top.globals[name];
-        glob.defmap = top.defmaps.size()-1;
-        glob.var    = std::unique_ptr<VarRef>(new VarRef(LOCATION, name));
+        top.globals[name] = top.defmaps.size()-1;
       }
     }
   }

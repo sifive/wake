@@ -40,12 +40,14 @@ struct Integer : public Value {
   std::string str(int base = 10) const;
 };
 
+struct DefBinding;
 struct Binding {
   std::shared_ptr<Binding> next;
   std::vector<std::shared_ptr<Future> > future;
+  DefBinding *binding;
 
-  Binding(const std::shared_ptr<Binding> &next_) : next(next_), future() { }
-  Binding(const std::shared_ptr<Binding> &next_, std::shared_ptr<Future> &&arg) : next(next_), future(1, arg) { }
+  Binding(const std::shared_ptr<Binding> &next_, DefBinding *binding_) : next(next_), future(), binding(binding_) { }
+  Binding(const std::shared_ptr<Binding> &next_, std::shared_ptr<Future> &&arg) : next(next_), future(1, arg), binding(0) { }
 };
 
 struct Closure : public Value {

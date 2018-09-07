@@ -68,6 +68,8 @@ struct Literal : public Expr {
   Literal(const Location &location_, const char *value_);
 };
 
+typedef std::map<std::string, int> DefOrder;
+
 struct DefMap : public Expr {
   typedef std::map<std::string, std::unique_ptr<Expr> > defs;
   defs map;
@@ -80,18 +82,26 @@ struct DefMap : public Expr {
 };
 
 struct Top : public Expr {
-  struct Global {
-    int defmap;
-    std::unique_ptr<VarRef> var; // evaluated inside defmap
-  };
   typedef std::vector<DefMap> DefMaps;
-  typedef std::map<std::string, Global> Globals;
-  Globals globals;
-  DefMaps defmaps; // evaluated inside globals
-  std::unique_ptr<VarRef> main; // evaluated inside globals
+  DefMaps defmaps;
+  DefOrder globals;
 
   static const char *type;
-  Top() : Expr(type, LOCATION), globals(), defmaps(), main(new VarRef(LOCATION, "main")) { }
+  Top() : Expr(type, LOCATION), defmaps(), globals() { }
+};
+
+// Created by transforming DefMap+Top
+struct DefBinding : public Expr {
+  typedef std::vector<std::unique_ptr<Expr> > values;
+  typedef std::vector<std::unique_ptr<Lambda> > functions;
+
+  std::unique_ptr<Expr> body;
+  values val;     // access prior binding
+  functions fun;  // access current binding
+  DefOrder order; // values, then functions
+
+  static const char *type;
+  DefBinding(const Location &location_, std::unique_ptr<Expr> &&body_) : Expr(type, location_), body(std::move(body_)) { }
 };
 
 #endif

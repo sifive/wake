@@ -27,10 +27,10 @@ int main(int argc, const char **argv) {
 
   JobTable jobtable(4);
 
-  Top top;
+  std::unique_ptr<Top> top(new Top);
   for (int i = 1; i < argc; ++i) {
     Lexer lex(argv[i]);
-    parse_top(top, lex);
+    parse_top(*top.get(), lex);
     if (lex.fail) ok = false;
   }
 
@@ -41,21 +41,22 @@ int main(int argc, const char **argv) {
   prim_register_polymorphic(pmap);
   prim_register_job(&jobtable, pmap);
 
-  if (!bind_refs(&top, pmap)) ok = false;
-
   const char *slash = strrchr(argv[0], '/');
   const char *exec = slash ? slash + 1 : argv[0];
   if (!strcmp(exec, "wake-parse")) {
-    std::cout << &top;
+    std::cout << top.get();
     return 0;
   }
+
+  std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
+  if (!root) ok = false;
 
   if (!ok) {
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }
 
-  std::unique_ptr<Action> main(new Eval(&top));
+  std::unique_ptr<Action> main(new Eval(root.get()));
   std::shared_ptr<Future> result(main->future_result);
   queue.push(std::move(main));
 
