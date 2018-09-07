@@ -148,7 +148,7 @@ top:
       }
 
       // integer literals
-      dec = [1-9][0-9_]*;
+      dec = [0-9][0-9_]*;
       hex = '0x' [0-9a-fA-F_]+;
       bin = '0b' [01_]+;
       ("0" | dec | hex | bin) {
