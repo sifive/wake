@@ -27,6 +27,10 @@ struct Future {
   Value *get_raw_value() const { return value.get(); }
   uint64_t get_serial() const { return action_serial; }
 
+  Future() { }
+  Future(std::shared_ptr<Value>&& value_) : value(value_) { }
+  Future(const std::shared_ptr<Value>& value_) : value(value_) { }
+
 private:
   std::shared_ptr<Value> value;
   std::unique_ptr<Callback> waiting;
