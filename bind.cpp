@@ -53,6 +53,7 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
       std::cerr << "Value definition cycle detected including "
         << def.name << " at "
         << def.expr->location << std::endl;
+      for (int i = 0; i < (int)defs.size(); ++i) d[i] = 0;
       break;
     }
     int w = def.expr->type == Lambda::type ? 0 : 1;
@@ -194,6 +195,7 @@ struct NameBinding {
   std::string *name;
   bool open;
 
+  NameBinding() : next(0), map(0), name(0), open(true) { }
   NameBinding(NameBinding *next_, std::string *name_) : next(next_), map(0), name(name_), open(true) { }
   NameBinding(NameBinding *next_, std::map<std::string, int> *map_) : next(next_), map(map_), name(0), open(true) { }
 
@@ -221,7 +223,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     NameRef pos;
-    if (!binding || (pos = binding->find(ref->name)).offset == -1) {
+    if ((pos = binding->find(ref->name)).offset == -1) {
       std::cerr << "Variable reference "
         << ref->name << " is unbound at "
         << ref->location.str() << std::endl;
@@ -275,7 +277,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
 }
 
 std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap) {
+  NameBinding bottom;
   std::unique_ptr<Expr> out = fracture(std::move(top), 0);
-  if (out && !explore(out.get(), pmap, 0)) out.reset();
+  if (out && !explore(out.get(), pmap, &bottom)) out.reset();
   return out;
 }
