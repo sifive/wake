@@ -49,7 +49,7 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
     q.pop();
     if (rv.d < drv) continue;
     ResolveDef &def = defs[rv.v];
-    if (drv > defs.size()) {
+    if (drv > (int)defs.size()) {
       std::cerr << "Value definition cycle detected including "
         << def.name << " at "
         << def.expr->location << std::endl;
@@ -245,7 +245,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     NameBinding bind(binding, &def->order);
     bool ok = true;
     for (auto &i : def->val)
-      ok = explore(i.get(), pmap, &bind) && ok;
+      ok = explore(i.get(), pmap, binding) && ok;
     for (auto &i : def->fun)
       ok = explore(i.get(), pmap, &bind) && ok;
     ok = explore(def->body.get(), pmap, &bind) && ok;

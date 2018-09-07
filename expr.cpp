@@ -26,7 +26,9 @@ static std::string pad(int depth) {
 static void format(std::ostream &os, int depth, const Expr *expr) {
   if (expr->type == VarRef::type) {
     const VarRef *ref = reinterpret_cast<const VarRef*>(expr);
-    os << pad(depth) << "VarRef(" << ref->name << ") @ " << ref->location.str() << std::endl;
+    os << pad(depth) << "VarRef(" << ref->name;
+    if (ref->offset != -1) os << "," << ref->depth << "," << ref->offset;
+    os << ") @ " << ref->location.str() << std::endl;
   } else if (expr->type == App::type) {
     const App *app = reinterpret_cast<const App*>(expr);
     os << pad(depth) << "App @ " << app->location.str() << std::endl;
@@ -59,7 +61,7 @@ static void format(std::ostream &os, int depth, const Expr *expr) {
   } else if (expr->type == DefBinding::type) {
     const DefBinding *def = reinterpret_cast<const DefBinding*>(expr);
     os << pad(depth) << "DefBinding @ " << def->location.str() << std::endl;
-    size_t vals = def->val.size();
+    size_t vals = (int)def->val.size();
     for (auto &i : def->order) {
       os << pad(depth+2) << (i.second < vals ? "val " : "fun ") << i.first << " =" << std::endl;
       format(os, depth+4, (i.second < vals) ? def->val[i.second].get() : def->fun[i.second - vals].get());
