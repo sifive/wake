@@ -1,5 +1,10 @@
 global x . f = f x
-#global raise x = prim "raise"
+
+# exceptions
+def test     x = prim "test"
+def catch    x = prim "catch"
+global try f x = if test x then f (catch x) else x
+global raise x = prim "raise"
 
 # bools
 global true  x y = x

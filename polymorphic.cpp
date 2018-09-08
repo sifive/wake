@@ -61,8 +61,37 @@ static void prim_cmp(void *data, std::vector<std::shared_ptr<Value> > &&args, st
   RETURN(new Integer(out));
 }
 
+static void prim_test(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
+  if (args.size() != 1) {
+    resume(std::move(completion), std::shared_ptr<Value>(new Exception("prim_test called on " + std::to_string(args.size()) + "; was exepecting 1")));
+  } else {
+    resume(std::move(completion), args[0]->type == Exception::type ? make_true() : make_false());
+  }
+}
+
+static void prim_catch(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
+  if (args.size() != 1 || args[0]->type != Exception::type) {
+    resume(std::move(completion), std::shared_ptr<Value>(new Exception("prim_catch not called on an exception")));
+  } else {
+    Exception *exception = reinterpret_cast<Exception*>(args[0].get());
+    std::vector<std::shared_ptr<Value> > out;
+    for (auto &i : exception->causes)
+      out.emplace_back(new String(i.reason));
+    resume(std::move(completion), make_list(out));
+  }
+}
+
+static void prim_raise(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
+  EXPECT(1);
+  STRING(arg0, 0);
+  resume(std::move(completion), std::shared_ptr<Value>(new Exception(arg0->value)));
+}
+
 void prim_register_polymorphic(PrimMap &pmap) {
   pmap["lt"].first = prim_lt;
   pmap["eq"].first = prim_eq;
   pmap["cmp"].first = prim_cmp;
+  pmap["test"].first = prim_test;
+  pmap["catch"].first = prim_catch;
+  pmap["raise"].first = prim_raise;
 }
