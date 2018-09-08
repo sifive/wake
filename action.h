@@ -18,7 +18,7 @@ struct Future;
 struct Prim;
 
 struct Future {
-  void depend(ActionQueue &queue, std::unique_ptr<Callback> &&callback);
+  void depend(ActionQueue &queue, std::unique_ptr<Callback> callback);
   void complete(ActionQueue &queue, std::shared_ptr<Value> &&value_, uint64_t action_serial_);
   void complete(ActionQueue &queue, const std::shared_ptr<Value> &value_, uint64_t action_serial_);
 
@@ -29,7 +29,7 @@ struct Future {
 
   Future() { }
   Future(std::shared_ptr<Value>&& value_) : value(value_) { }
-  Future(const std::shared_ptr<Value>& value_) : value(value_) { }
+  Future(const std::shared_ptr<Value> &value_) : value(value_) { }
 
 private:
   std::shared_ptr<Value> value;
@@ -122,7 +122,7 @@ struct ActionQueue {
   Action *bottom;
 
   bool empty() const { return !top; }
-  void push(std::unique_ptr<Action> &&action);
+  void push(std::unique_ptr<Action> action);
   std::unique_ptr<Action> pop() {
     std::unique_ptr<Action> out = std::move(top);
     if (out->next) {

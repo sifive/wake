@@ -31,7 +31,7 @@ struct RelaxedVertex {
   RelaxedVertex(int v_, int d_) : v(v_), d(d_) { }
 };
 
-static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vector<ResolveDef> &defs, std::unique_ptr<Expr> &&body) {
+static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vector<ResolveDef> &defs, std::unique_ptr<Expr> body) {
   // Bellman-Ford algorithm, run for longest path
   // if f uses [yg], then d[f] must be <= d[yg]
   // if x uses [yg], then d[x] must be <= d[yg]+1

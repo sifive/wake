@@ -25,7 +25,7 @@ struct Prim : public Expr {
   int args;
 
   // The function must call 'resume(completion, value);' when done
-  void (*fn)(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion);
+  void (*fn)(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion);
   void *data;
 
   static const char *type;
@@ -101,7 +101,7 @@ struct DefBinding : public Expr {
   DefOrder order; // values, then functions
 
   static const char *type;
-  DefBinding(const Location &location_, std::unique_ptr<Expr> &&body_) : Expr(type, location_), body(std::move(body_)) { }
+  DefBinding(const Location &location_, std::unique_ptr<Expr> body_) : Expr(type, location_), body(std::move(body_)) { }
 };
 
 #endif

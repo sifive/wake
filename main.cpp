@@ -16,7 +16,7 @@ void stack_trace(const std::unique_ptr<Action> &completion) {
   std::cerr << completion->stack.get();
 }
 
-void resume(std::unique_ptr<Action> &&completion, std::shared_ptr<Value> &&return_value) {
+void resume(std::unique_ptr<Action> completion, std::shared_ptr<Value> &&return_value) {
   std::unique_ptr<PrimRet> ret(reinterpret_cast<PrimRet*>(completion.release()));
   ret->future_input->complete(queue, return_value, ret->invoker_serial);
   queue.push(std::move(ret));

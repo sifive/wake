@@ -17,7 +17,7 @@ struct Task {
   std::string cmdline;
   std::string environ;
   std::unique_ptr<Action> completion;
-  Task(const std::string &path_, const std::string &cmdline_, const std::string &environ_, std::unique_ptr<Action> &&completion_) :
+  Task(const std::string &path_, const std::string &cmdline_, const std::string &environ_, std::unique_ptr<Action> completion_) :
     path(path_), cmdline(cmdline_), environ(environ_), completion(std::move(completion_)) { }
 };
 
@@ -195,7 +195,7 @@ bool JobTable::wait() {
   }
 }
 
-static void prim_job(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
+static void prim_job(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT(3);
   STRING(arg0, 0); // path to executable

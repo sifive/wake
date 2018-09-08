@@ -65,7 +65,7 @@ struct Cause {
   std::string reason;
   std::shared_ptr<Stack> trace;
   Cause(const std::string &reason_) : reason(reason_) { }
-  Cause(const std::string &reason_, const std::shared_ptr<Stack>& trace_) : reason(reason_), trace(trace_) { }
+  Cause(const std::string &reason_, const std::shared_ptr<Stack> &trace_) : reason(reason_), trace(trace_) { }
 };
 
 struct Exception : public Value {

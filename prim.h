@@ -13,7 +13,7 @@ struct String;
 struct Integer;
 
 /* Primitive functions must call resume once they are done their work */
-void resume(std::unique_ptr<Action> &&completion, std::shared_ptr<Value> &&return_value);
+void resume(std::unique_ptr<Action> completion, std::shared_ptr<Value> &&return_value);
 
 /* Macros for handling inputs from wake */
 #define RETURN(val) do {							\
@@ -52,11 +52,11 @@ std::unique_ptr<Action> cast_integer(std::unique_ptr<Action> completion, const s
 /* Useful expressions for primitives */
 std::shared_ptr<Value> make_true();
 std::shared_ptr<Value> make_false();
-std::shared_ptr<Value> make_list(const std::vector<std::shared_ptr<Value> >& values);
+std::shared_ptr<Value> make_list(const std::vector<std::shared_ptr<Value> > &values);
 
 
 /* Register primitive functions */
-typedef void (*PrimFn)(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion);
+typedef void (*PrimFn)(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion);
 typedef std::map<std::string, std::pair<PrimFn, void *> > PrimMap;
 struct JobTable;
 

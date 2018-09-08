@@ -18,7 +18,7 @@ const char *DefRet ::type = "DefRet";
 
 uint64_t Action::next_serial = 0;
 
-void Future::depend(ActionQueue &queue, std::unique_ptr<Callback> &&callback) {
+void Future::depend(ActionQueue &queue, std::unique_ptr<Callback> callback) {
   if (value) {
     queue.push(std::move(callback));
   } else {
@@ -160,7 +160,7 @@ void Eval::execute(ActionQueue &queue) {
   }
 }
 
-void ActionQueue::push(std::unique_ptr<Action> &&action) {
+void ActionQueue::push(std::unique_ptr<Action> action) {
   if (bottom) {
     bottom->next = std::move(action);
     bottom = bottom->next.get();

@@ -3,20 +3,20 @@
 #include "action.h"
 #include <gmp.h>
 
-static void prim_cat(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
+static void prim_cat(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
   EXPECT(2);
   STRING(arg0, 0);
   STRING(arg1, 1);
   RETURN(new String(arg0->value + arg1->value));
 }
 
-static void prim_len(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
+static void prim_len(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
   EXPECT(1);
   STRING(arg0, 0);
   RETURN(new Integer(arg0->value.size()));
 }
 
-static void prim_cut(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
+static void prim_cut(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
   EXPECT(3);
   STRING(arg0, 0);
   INTEGER(arg1, 1);
