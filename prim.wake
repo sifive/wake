@@ -10,8 +10,8 @@ global raise x = prim "raise"
 global true  x y = x
 global false x y = y
 global !x = x false true
-global x && y = x y x
-global x || y = x x y
+global x & y = x y x # both sides are evaluated
+global x | y = x x y
 
 # tuples
 global pair x y f = f x y
@@ -22,8 +22,8 @@ global second p = p false
 global x, y = pair x y
 global nil x = true
 global empty l = l (\_\_ false)
-global head = first
-global tail = second
+global head l = if l.empty then raise "empty list" else l.first
+global tail l = if l.empty then raise "empty list" else l.second
 
 # list transforms
 global map   f   l = if l.empty then nil else f l.head, map f l.tail
@@ -43,13 +43,13 @@ global len l     = foldl (\a\_ a+1) 0 l
 
 # list choppers
 global splitAt i l =
-  if i <= 0 || l.empty then pair nil l else
+  if i <= 0 | l.empty then pair nil l else
     def finish r = pair (l.head, r.first) r.second
     finish (splitAt (i-1) l.tail)
 
 global take i l = (splitAt i l).first
 global drop i l = (splitAt i l).second
-global at   i l = if i < 0 then nil else take 1 (drop i l)
+global at   i l = if i < 0 then nil else (drop i l).head
 
 global splitUntil f l =
   if l.empty then pair nil l else
@@ -74,11 +74,12 @@ global splitBy f l =
 global filter f l = (splitBy f l).first
 
 # f should be a less-than comparison
-global sort f l =
+global sortBy f l =
   if l.empty then nil else
     def key = l.head
     def split = splitBy (f key) l.tail
     sort f split.second ++ (key, sort f split.first)
+global sort l = sortBy (_<_) l
 
 global collate f l r =
   if l.empty
@@ -111,7 +112,7 @@ global x << y = prim "shl"
 global x >> y = prim "shr"
 global x ^ y = prim "exp"
 global root x n = (\_\_ prim "root") n x
-global sqrt = root 2
+global sqrt x = root 2 x
 global abs x = prim "abs"
 global xor x y = prim "xor"
 global and x y = prim "and"
@@ -127,8 +128,8 @@ global seq n =
 # Type conversion
 global strbase base n = prim "str" # int -> string
 global intbase base s = prim "int" # string -> int
-global str = strbase 10
-global int = intbase 0
+global str n = strbase 10 n
+global int s = intbase 0 s
 
 # Comparison operators for integers and strings
 global x <  y = prim "lt"
