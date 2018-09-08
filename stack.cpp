@@ -7,7 +7,7 @@ std::shared_ptr<Stack> Stack::grow(const std::shared_ptr<Stack> &parent, const L
   if (parent->location.contains(location)) {
     return parent;
   } else {
-    return std::shared_ptr<Stack>(new Stack(parent, location));
+    return std::make_shared<Stack>(parent, location);
   }
 }
 

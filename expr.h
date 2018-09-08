@@ -64,7 +64,7 @@ struct Literal : public Expr {
   std::shared_ptr<Value> value;
   static const char *type;
 
-  Literal(const Location &location_, const std::shared_ptr<Value> &value_);
+  Literal(const Location &location_, std::shared_ptr<Value> &&value_);
   Literal(const Location &location_, const char *value_);
 };
 

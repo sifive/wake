@@ -172,7 +172,7 @@ bool JobTable::wait() {
           }
 
           std::vector<std::shared_ptr<Value> > out;
-          out.emplace_back(new String(i.output.str()));
+          out.emplace_back(std::make_shared<String>(i.output.str()));
 
           if (i.pipe != -1) close(i.pipe);
           i.pid = 0;
@@ -182,7 +182,7 @@ bool JobTable::wait() {
           if (code == 0) {
             resume(std::move(i.completion), make_list(out));
           } else {
-            resume(std::move(i.completion), std::shared_ptr<Value>(new Exception("Non-zero exit status (" + std::to_string(code) + ")")));
+            resume(std::move(i.completion), std::make_shared<Exception>("Non-zero exit status (" + std::to_string(code) + ")"));
           }
         }
       }

@@ -16,15 +16,15 @@ struct Integer;
 void resume(std::unique_ptr<Action> completion, std::shared_ptr<Value> &&return_value);
 
 /* Macros for handling inputs from wake */
-#define RETURN(val) do {							\
-  resume(std::move(completion), std::shared_ptr<Value>(val));			\
-  return;									\
+#define RETURN(val) do {						\
+  resume(std::move(completion), std::move(val));			\
+  return;								\
 } while (0)
 
-#define REQUIRE(b, str) do {							\
-  if (!(b)) {									\
-    resume(std::move(completion), std::shared_ptr<Value>(new Exception(str)));	\
-    return;									\
+#define REQUIRE(b, str) do {						\
+  if (!(b)) {								\
+    resume(std::move(completion), std::make_shared<Exception>(str));	\
+    return;								\
 } } while (0)
 
 std::unique_ptr<Action> expect_args(const char *fn, std::unique_ptr<Action> completion, const std::vector<std::shared_ptr<Value> > &args, int expect);

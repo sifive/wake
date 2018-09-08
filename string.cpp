@@ -7,13 +7,15 @@ static void prim_cat(void *data, std::vector<std::shared_ptr<Value> > &&args, st
   EXPECT(2);
   STRING(arg0, 0);
   STRING(arg1, 1);
-  RETURN(new String(arg0->value + arg1->value));
+  auto out = std::make_shared<String>(arg0->value + arg1->value);
+  RETURN(out);
 }
 
 static void prim_len(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
   EXPECT(1);
   STRING(arg0, 0);
-  RETURN(new Integer(arg0->value.size()));
+  auto out = std::make_shared<Integer>(arg0->value.size());
+  RETURN(out);
 }
 
 static void prim_cut(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
@@ -40,7 +42,8 @@ static void prim_cut(void *data, std::vector<std::shared_ptr<Value> > &&args, st
   }
 
   if (begin > end) begin = end;
-  RETURN(new String(arg0->value.substr(begin, end-begin)));
+  auto out = std::make_shared<String>(arg0->value.substr(begin, end-begin));
+  RETURN(out);
 }
 
 void prim_register_string(PrimMap &pmap) {

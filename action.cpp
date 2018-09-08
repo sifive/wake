@@ -1,5 +1,4 @@
 #include "action.h"
-#include "stack.h"
 #include "expr.h"
 #include "value.h"
 #include "prim.h"
@@ -45,22 +44,22 @@ void Future::complete(ActionQueue &queue, const std::shared_ptr<Value> &value_, 
 }
 
 Action::Action(const char *type_, Action *invoker, std::shared_ptr<Future> &&future_result_)
- : type(type_), serial(++next_serial), invoker_serial(invoker->serial), stack(invoker->stack), future_result(std::move(future_result_)) { }
+ : type(type_), serial(++next_serial), invoker_serial(invoker->serial), future_result(std::move(future_result_)) { }
 
 Action::Action(const char *type_, Action *invoker, std::shared_ptr<Future> &&future_result_, const Location &location)
- : type(type_), serial(++next_serial), invoker_serial(invoker->serial), stack(Stack::grow(invoker->stack, location)), future_result(future_result_) { }
+ : type(type_), serial(++next_serial), invoker_serial(invoker->serial), future_result(future_result_) { }
 
 Action::Action(const char *type_, std::shared_ptr<Future> &&future_result_, const Location &location)
- : type(type_), serial(++next_serial), invoker_serial(0), stack(new Stack(location)), future_result(future_result_) { }
+ : type(type_), serial(++next_serial), invoker_serial(0), future_result(future_result_) { }
 
 Eval::Eval(Action *invoker, Expr *expr_, const std::shared_ptr<Binding> &bindings_)
- : Action(type, invoker, std::shared_ptr<Future>(new Future), expr_->location), expr(expr_), bindings(bindings_) { }
+ : Action(type, invoker, std::make_shared<Future>(), expr_->location), expr(expr_), bindings(bindings_) { }
 
 Eval::Eval(Action *invoker, Expr *expr_, std::shared_ptr<Binding> &&bindings_)
- : Action(type, invoker, std::shared_ptr<Future>(new Future), expr_->location), expr(expr_), bindings(bindings_) { }
+ : Action(type, invoker, std::make_shared<Future>(), expr_->location), expr(expr_), bindings(bindings_) { }
 
 Eval::Eval(Expr *expr_)
- : Action(type, std::shared_ptr<Future>(new Future), expr_->location), expr(expr_), bindings() { }
+ : Action(type, std::make_shared<Future>(), expr_->location), expr(expr_), bindings() { }
 
 Callback::Callback(const char *type_, Action *invoker, const std::shared_ptr<Future> &future_input_)
  : Action(type_, invoker, std::move(invoker->future_result)), future_input(future_input_) { }
@@ -84,11 +83,11 @@ void AppFn::execute(ActionQueue &queue) {
   if (value->type == Exception::type) {
     future_result->complete(queue, future_input->get_value(), serial);
   } else if (value->type != Closure::type) {
-    std::shared_ptr<Value> exception(new Exception("Attempt to apply " + value->to_str() + " which is not a Closure"));
+    auto exception = std::make_shared<Exception>("Attempt to apply " + value->to_str() + " which is not a Closure");
     future_result->complete(queue, std::move(exception), serial);
   } else {
     Closure *clo = reinterpret_cast<Closure*>(value);
-    std::unique_ptr<Eval> eval(new Eval(this, clo->body, std::shared_ptr<Binding>(new Binding(clo->bindings, std::move(arg)))));
+    std::unique_ptr<Eval> eval(new Eval(this, clo->body, std::make_shared<Binding>(clo->bindings, std::move(arg))));
     hook(queue, new AppRet(this, eval->future_result));
     queue.push(std::move(eval));
   }
@@ -121,7 +120,7 @@ void Eval::execute(ActionQueue &queue) {
       iter = &(*iter)->next;
     int vals = (*iter)->future.size();
     if (ref->offset >= vals) {
-      std::shared_ptr<Value> closure(new Closure((*iter)->binding->fun[ref->offset-vals]->body.get(), *iter));
+      auto closure = std::make_shared<Closure>((*iter)->binding->fun[ref->offset-vals]->body.get(), *iter);
       future_result->complete(queue, std::move(closure), serial);
     } else {
       hook(queue, new VarRet(this, (*iter)->future[ref->offset]));
@@ -135,11 +134,11 @@ void Eval::execute(ActionQueue &queue) {
     queue.push(std::move(arg));
   } else if (expr->type == Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
-    std::shared_ptr<Value> closure(new Closure(lambda->body.get(), bindings));
+    auto closure = std::make_shared<Closure>(lambda->body.get(), bindings);
     future_result->complete(queue, std::move(closure), serial);
   } else if (expr->type == DefBinding::type) {
     DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
-    std::shared_ptr<Binding> defs(new Binding(bindings, defbinding));
+    auto defs = std::make_shared<Binding>(bindings, defbinding);
     for (auto &i : defbinding->val) {
       std::unique_ptr<Eval> eval(new Eval(this, i.get(), bindings));
       defs->future.push_back(eval->future_result);

@@ -13,11 +13,11 @@ const char *DefBinding::type = "DefBinding";
 const char *Literal::type = "Literal";
 const char *Top::type = "Top";
 
-Literal::Literal(const Location &location_, const std::shared_ptr<Value> &value_)
- : Expr(type, location_), value(value_) { }
+Literal::Literal(const Location &location_, std::shared_ptr<Value> &&value_)
+ : Expr(type, location_), value(std::move(value_)) { }
 
 Literal::Literal(const Location &location_, const char *value_)
- : Expr(type, location_), value(new String(value_)) { }
+ : Expr(type, location_), value(std::make_shared<String>(value_)) { }
 
 static std::string pad(int depth) {
   return std::string(depth, ' ');

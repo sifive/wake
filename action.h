@@ -42,7 +42,6 @@ struct Action {
   const char *type;
   uint64_t serial; // database key
   uint64_t invoker_serial;
-  std::shared_ptr<Stack>  stack;
   std::shared_ptr<Future> future_result;
   std::unique_ptr<Action> next; // for building lists of Actions
 
@@ -109,7 +108,7 @@ struct PrimArg : public Callback {
 
 struct PrimRet : public Return {
   static const char *type;
-  PrimRet(Action *invoker) : Return(type, invoker, std::shared_ptr<Future>(new Future)) { }
+  PrimRet(Action *invoker) : Return(type, invoker, std::make_shared<Future>()) { }
 };
 
 struct DefRet : public Return {

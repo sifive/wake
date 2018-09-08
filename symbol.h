@@ -14,9 +14,10 @@ struct Value;
 struct Symbol {
   SymbolType type;
   Location location;
-  std::unique_ptr<Value> value;
+  std::shared_ptr<Value> value;
 
-  Symbol(SymbolType type_, const Location &location_, Value *value_) : type(type_), location(location_), value(value_) { }
+  Symbol(SymbolType type_, const Location &location_) : type(type_), location(location_) { }
+  Symbol(SymbolType type_, const Location &location_, std::shared_ptr<Value> &&value_) : type(type_), location(location_), value(value_) { }
 };
 
 struct input_t;

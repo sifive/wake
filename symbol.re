@@ -112,7 +112,7 @@ static bool lex_str(input_t &in, unsigned char q, std::string &result)
 }
 
 #define mkSym2(x, v) Symbol(x, Location(in.filename, start, Coordinates(in.row, in.cur - in.sol)), v)
-#define mkSym(x) mkSym2(x, 0)
+#define mkSym(x) Symbol(x, Location(in.filename, start, Coordinates(in.row, in.cur - in.sol)))
 
 static Symbol lex_top(input_t &in) {
   Coordinates start;
@@ -144,7 +144,7 @@ top:
       ['"] {
         std::string out;
         bool ok = lex_str(in, in.cur[-1], out);
-        return mkSym2(ok ? LITERAL : ERROR, new String(std::move(out)));
+        return mkSym2(ok ? LITERAL : ERROR, std::make_shared<String>(std::move(out)));
       }
 
       // integer literals
@@ -154,7 +154,7 @@ top:
       ("0" | dec | hex | bin) {
         std::string integer(in.tok, in.cur);
         std::replace(integer.begin(), integer.end(), '_', ' ');
-        return mkSym2(LITERAL, new Integer(integer.c_str()));
+        return mkSym2(LITERAL, std::make_shared<Integer>(integer.c_str()));
       }
 
       // keywords

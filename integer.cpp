@@ -7,7 +7,7 @@
 static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {	\
   EXPECT(1);														\
   INTEGER(arg0, 0);													\
-  Integer *out = new Integer;												\
+  auto out = std::make_shared<Integer>();										\
   fn(out->value, arg0->value);												\
   RETURN(out);														\
 }
@@ -21,7 +21,7 @@ static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args,
   EXPECT(2);														\
   INTEGER(arg0, 0);													\
   INTEGER(arg1, 1);													\
-  Integer *out = new Integer;												\
+  auto out = std::make_shared<Integer>();										\
   fn(out->value, arg0->value, arg1->value);										\
   RETURN(out);														\
 }
@@ -41,7 +41,7 @@ static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args,
   INTEGER(arg0, 0);													\
   INTEGER(arg1, 1);													\
   REQUIRE(mpz_cmp_si(arg1->value, 0) != 0, "division by 0");								\
-  Integer *out = new Integer;												\
+  auto out = std::make_shared<Integer>();										\
   fn(out->value, arg0->value, arg1->value);										\
   RETURN(out);														\
 }
@@ -56,7 +56,7 @@ static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args,
   INTEGER(arg1, 1);													\
   REQUIRE(mpz_sgn(arg1->value) >= 0, arg1->to_str() + " is negative");		 					\
   REQUIRE(mpz_cmp_si(arg1->value, 1<<20) < 0, arg1->to_str() + " is too large");					\
-  Integer *out = new Integer;												\
+  auto out = std::make_shared<Integer>();										\
   fn(out->value, arg0->value, mpz_get_si(arg1->value));									\
   RETURN(out);														\
 }
@@ -72,7 +72,7 @@ static void prim_powm(void *data, std::vector<std::shared_ptr<Value> > &&args, s
   INTEGER(arg1, 1);
   INTEGER(arg2, 2);
   REQUIRE(mpz_sgn(arg1->value) >= 0, arg1->to_str() + " is negative");
-  Integer *out = new Integer;
+  auto out = std::make_shared<Integer>();
   mpz_powm(out->value, arg0->value, arg1->value, arg2->value);
   RETURN(out);
 }
@@ -88,7 +88,8 @@ static void prim_str(void *data, std::vector<std::shared_ptr<Value> > &&args, st
     ok &= base <= 62 && base >= -36 && base != 0 && base != 1 && base != -1;
   }
   REQUIRE(ok, arg0->to_str() + " is not a valid base; [-36,62] \\ [-1,1]");
-  RETURN(new String(arg1->str(base)));
+  auto out = std::make_shared<String>(arg1->str(base));
+  RETURN(out);
 }
 
 static void prim_int(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
@@ -102,7 +103,7 @@ static void prim_int(void *data, std::vector<std::shared_ptr<Value> > &&args, st
     ok &= base <= 62 && base > 0 && base != 1;
   }
   REQUIRE(ok, arg0->to_str() + " is not a valid base; 0 or [2,62]");
-  Integer *out  = new Integer;
+  auto out = std::make_shared<Integer>();
   mpz_set_str(out->value, arg1->value.c_str(), base);
   RETURN(out);
 }
