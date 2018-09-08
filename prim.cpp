@@ -2,37 +2,55 @@
 #include "value.h"
 #include "expr.h"
 #include "action.h"
-#include <iostream>
 #include <cstdlib>
+#include <sstream>
 
-void expect_args(const char *fn, const std::unique_ptr<Action> &completion, const std::vector<std::shared_ptr<Value> > &args, int expect) {
+std::unique_ptr<Action> expect_args(const char *fn, std::unique_ptr<Action> completion, const std::vector<std::shared_ptr<Value> > &args, int expect) {
   if (args.size() != (size_t)expect) {
-    std::cerr << fn << " called on " << args.size() << "; was expecting " << expect << std::endl;
-    stack_trace(completion);
-    exit(1);
+    std::stringstream str;
+    str << fn << " called on " << args.size() << "; was expecting " << expect << std::endl;
+    resume(std::move(completion), std::shared_ptr<Value>(new Exception(str.str())));
+    return std::unique_ptr<Action>();
+  }
+
+  // merge exceptions
+  std::shared_ptr<Exception> exception(new Exception);
+  for (auto &i : args) {
+    if (i->type == Exception::type) {
+      (*exception) += *reinterpret_cast<Exception*>(i.get());
+    }
+  }
+
+  if (exception->causes.empty()) {
+    return completion;
+  } else {
+    resume(std::move(completion), std::move(exception));
+    return std::unique_ptr<Action>();
   }
 }
 
-String *expect_string(const char *fn, const std::unique_ptr<Action> &completion, const std::shared_ptr<Value> &value, int index) {
+std::unique_ptr<Action> cast_string(std::unique_ptr<Action> completion, const std::shared_ptr<Value> &value, String **str) {
   if (value->type != String::type) {
-    std::cerr << fn << " called with argument "
-      << index << " = "
-      << value << ", which is not a String." << std::endl;
-    stack_trace(completion);
-    exit(1);
+    std::stringstream str;
+    str << value << " is not a String";
+    resume(std::move(completion), std::shared_ptr<Value>(new Exception(str.str())));
+    return std::unique_ptr<Action>();
+  } else {
+    *str = reinterpret_cast<String*>(value.get());
+    return completion;
   }
-  return reinterpret_cast<String*>(value.get());
 }
 
-Integer *expect_integer(const char *fn, const std::unique_ptr<Action> &completion, const std::shared_ptr<Value> &value, int index) {
+std::unique_ptr<Action> cast_integer(std::unique_ptr<Action> completion, const std::shared_ptr<Value> &value, Integer **in) {
   if (value->type != Integer::type) {
-    std::cerr << fn << " called with argument "
-      << index << " = "
-      << value << ", which is not an Integer." << std::endl;
-    stack_trace(completion);
-    exit(1);
+    std::stringstream str;
+    str << value << " is not an Integer";
+    resume(std::move(completion), std::shared_ptr<Value>(new Exception(str.str())));
+    return std::unique_ptr<Action>();
+  } else {
+    *in = reinterpret_cast<Integer*>(value.get());
+    return completion;
   }
-  return reinterpret_cast<Integer*>(value.get());
 }
 
 // true  x y = x

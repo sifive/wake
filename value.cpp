@@ -1,15 +1,23 @@
 #include "value.h"
 #include "action.h"
 #include <iostream>
+#include <sstream>
 #include <cassert>
 
 Value::~Value() { }
 const char *String::type = "String";
 const char *Integer::type = "Integer";
 const char *Closure::type = "Closure";
+const char *Exception::type = "Exception";
 
 Integer::~Integer() {
   mpz_clear(value);
+}
+
+std::string Value::to_str() const {
+  std::stringstream str;
+  str << this;
+  return str.str();
 }
 
 std::ostream & operator << (std::ostream &os, const Value *value) {
@@ -21,6 +29,12 @@ std::ostream & operator << (std::ostream &os, const Value *value) {
     return os << "Integer(" << integer->str() << ")";
   } else if (value->type == Closure::type) {
     return os << "Closure";
+  } else if (value->type == Exception::type) {
+    const Exception *exception = reinterpret_cast<const Exception*>(value);
+    os << "Exception(";
+    for (auto &i : exception->causes)
+      os << i.reason; // !!!
+    return os << ")";
   } else {
     assert(0 /* unreachable */);
     return os;

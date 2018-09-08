@@ -172,7 +172,6 @@ bool JobTable::wait() {
           }
 
           std::vector<std::shared_ptr<Value> > out;
-          out.emplace_back(new Integer(code));
           out.emplace_back(new String(i.output.str()));
 
           if (i.pipe != -1) close(i.pipe);
@@ -180,7 +179,11 @@ bool JobTable::wait() {
           i.pipe = -1;
           i.output.clear();
 
-          resume(std::move(i.completion), make_list(out));
+          if (code == 0) {
+            resume(std::move(i.completion), make_list(out));
+          } else {
+            resume(std::move(i.completion), std::shared_ptr<Value>(new Exception("Non-zero exit status (" + std::to_string(code) + ")")));
+          }
         }
       }
     }
@@ -194,10 +197,10 @@ bool JobTable::wait() {
 
 static void prim_job(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> &&completion) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
-  EXPECT_ARGS(3);
-  String *arg0 = GET_STRING(0); // path to executable
-  String *arg1 = GET_STRING(1); // null terminated command-line options
-  String *arg2 = GET_STRING(2); // null terminated environment variables
+  EXPECT(3);
+  STRING(arg0, 0); // path to executable
+  STRING(arg1, 1); // null terminated command-line options
+  STRING(arg2, 2); // null terminated environment variables
   jobtable->imp->tasks.emplace_back(arg0->value, arg1->value, arg2->value, std::move(completion));
   launch(jobtable);
   // !!! arg4 = stdin?

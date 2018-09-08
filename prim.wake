@@ -1,4 +1,5 @@
 global x . f = f x
+#global raise x = prim "raise"
 
 # bools
 global true  x y = x

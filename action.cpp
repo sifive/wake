@@ -3,7 +3,6 @@
 #include "expr.h"
 #include "value.h"
 #include "prim.h"
-#include <iostream>
 #include <algorithm>
 #include <cassert>
 
@@ -82,14 +81,17 @@ static void hook(ActionQueue &queue, Callback *cb) {
 
 void AppFn::execute(ActionQueue &queue) {
   Value *value = future_input->get_raw_value();
-  if (value->type != Closure::type) {
-    std::cerr << "Attempt to apply " << value << " which is not a Closure" << std::endl;
-    exit(1);
+  if (value->type == Exception::type) {
+    future_result->complete(queue, future_input->get_value(), serial);
+  } else if (value->type != Closure::type) {
+    std::shared_ptr<Value> exception(new Exception("Attempt to apply " + value->to_str() + " which is not a Closure"));
+    future_result->complete(queue, std::move(exception), serial);
+  } else {
+    Closure *clo = reinterpret_cast<Closure*>(value);
+    std::unique_ptr<Eval> eval(new Eval(this, clo->body, std::shared_ptr<Binding>(new Binding(clo->bindings, std::move(arg)))));
+    hook(queue, new AppRet(this, eval->future_result));
+    queue.push(std::move(eval));
   }
-  Closure *clo = reinterpret_cast<Closure*>(value);
-  std::unique_ptr<Eval> eval(new Eval(this, clo->body, std::shared_ptr<Binding>(new Binding(clo->bindings, std::move(arg)))));
-  hook(queue, new AppRet(this, eval->future_result));
-  queue.push(std::move(eval));
 }
 
 void PrimArg::chain(

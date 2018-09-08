@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <list>
 #include <memory>
 #include <gmp.h>
 
@@ -10,11 +11,13 @@
 
 struct Expr;
 struct Future;
+struct Stack;
 
 struct Value {
   const char *type;
 
   Value(const char *type_) : type(type_) { }
+  std::string to_str() const;
   virtual ~Value();
 };
 
@@ -56,6 +59,28 @@ struct Closure : public Value {
 
   static const char *type;
   Closure(Expr *body_, const std::shared_ptr<Binding> &bindings_) : Value(type), body(body_), bindings(bindings_) { }
+};
+
+struct Cause {
+  std::string reason;
+  std::shared_ptr<Stack> trace;
+  Cause(const std::string &reason_) : reason(reason_) { }
+  Cause(const std::string &reason_, const std::shared_ptr<Stack>& trace_) : reason(reason_), trace(trace_) { }
+};
+
+struct Exception : public Value {
+  std::list<Cause> causes;
+
+  static const char *type;
+  Exception() : Value(type) { }
+  Exception(const std::string &reason_) : Value(type) {
+    causes.emplace_back(reason_);
+  }
+
+  Exception &operator += (const Exception &other) {
+    causes.insert(causes.end(), other.causes.begin(), other.causes.end());
+    return *this;
+  }
 };
 
 #endif
