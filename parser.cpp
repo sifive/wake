@@ -62,7 +62,7 @@ bool expect(SymbolType type, Lexer &lex) {
     std::cerr << "Was expecting a "
       << symbolTable[type] << ", but got a "
       << symbolTable[lex.next.type] << " at "
-      << lex.next.location.str() << std::endl;
+      << lex.next.location << std::endl;
     lex.fail = true;
     return false;
   }
@@ -73,7 +73,7 @@ static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
   if (lex.next.type != ID) {
     std::cerr << "Was expecting an ID argument, but got a "
       << symbolTable[lex.next.type] << " at "
-      << lex.next.location.str() << std::endl;
+      << lex.next.location << std::endl;
     lex.fail = true;
   }
 
@@ -90,7 +90,7 @@ bool expectValue(const char *type, Lexer &lex) {
       std::cerr << "Was expecting a "
         << type << ", but got a "
         << lex.next.value->type << " at "
-        << lex.next.location.str() << std::endl;
+        << lex.next.location << std::endl;
       lex.fail = true;
       return false;
     }
@@ -143,7 +143,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
       if (op.p < p) {
         std::cerr << "Lower precedence unary operator "
           << lex.text() << " must use ()s at "
-          << lex.next.location.str() << std::endl;
+          << lex.next.location << std::endl;
         lex.fail = true;
       }
       auto opp = new VarRef(lex.next.location, "unary " + lex.text());
@@ -158,7 +158,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
       if (op.p < p) {
         std::cerr << "Lower precedence unary operator "
           << lex.text() << " must use ()s at "
-          << lex.next.location.str() << std::endl;
+          << lex.next.location << std::endl;
         lex.fail = true;
       }
       lex.consume();
@@ -212,7 +212,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
     default: {
       std::cerr << "Was expecting an (OPERATOR/LAMBDA/ID/LITERAL/PRIM/POPEN), got a "
         << symbolTable[lex.next.type] << " at "
-        << lex.next.location.str() << std::endl;
+        << lex.next.location << std::endl;
       lex.fail = true;
       return new Literal(LOCATION, "bad unary");
     }
@@ -298,13 +298,13 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
       args.push_back(get_arg_loc(lex));
     } else {
       name = "broken";
-      std::cerr << "Operator def is neither unary nor binary at " << def.str() << std::endl;
+      std::cerr << "Operator def is neither unary nor binary at " << def << std::endl;
       lex.fail = true;
     }
   } else {
     if (args.empty()) {
       name = "broken";
-      std::cerr << "def has no name at " << def.str() << std::endl;
+      std::cerr << "def has no name at " << def << std::endl;
       lex.fail = true;
     } else {
       name = args.front().first;
@@ -333,8 +333,8 @@ static void bind_def(Lexer &lex, DefMap::defs &map, const std::string &name, Exp
   if (i != map.end()) {
     std::cerr << "Duplicate def "
       << name << " at "
-      << i->second->location.str() << " and "
-      << def->location.str() << std::endl;
+      << i->second->location << " and "
+      << def->location << std::endl;
     lex.fail = true;
   }
   map[name] = std::unique_ptr<Expr>(def);
@@ -418,8 +418,8 @@ void parse_top(Top &top, Lexer &lex) {
         if (top.globals.find(name) != top.globals.end()) {
           std::cerr << "Duplicate global "
             << name << " at "
-            << def->location.str() << " and "
-            << top.defmaps[top.globals[name]].map[name]->location.str() << std::endl;
+            << def->location << " and "
+            << top.defmaps[top.globals[name]].map[name]->location << std::endl;
           lex.fail = true;
         } else {
           top.globals[name] = top.defmaps.size()-1;

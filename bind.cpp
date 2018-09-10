@@ -226,7 +226,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     if ((pos = binding->find(ref->name)).offset == -1) {
       std::cerr << "Variable reference "
         << ref->name << " is unbound at "
-        << ref->location.str() << std::endl;
+        << ref->location << std::endl;
       return false;
     }
     ref->depth = pos.depth;
@@ -263,7 +263,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     if (i == pmap.end()) {
       std::cerr << "Primitive reference "
         << prim->name << " is unbound at "
-        << prim->location.str() << std::endl;
+        << prim->location << std::endl;
       return false;
     } else {
       prim->fn   = i->second.first;
