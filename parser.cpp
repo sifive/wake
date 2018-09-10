@@ -105,22 +105,32 @@ static Expr *parse_if(Lexer &lex);
 static Expr *parse_def(Lexer &lex, std::string &name);
 static Expr *parse_block(Lexer &lex);
 
-static int relabel_anon(Expr *expr, int index) {
-  if (expr->type == VarRef::type) {
-    VarRef *ref = reinterpret_cast<VarRef*>(expr);
-    if (ref->name != "_") return index;
-    ++index;
-    ref->name += std::to_string(index);
-    return index;
-  } else if (expr->type == App::type) {
-    App *app = reinterpret_cast<App*>(expr);
-    return relabel_anon(app->val.get(), relabel_anon(app->fn.get(), index));
-  } else if (expr->type == Lambda::type) {
-    Lambda *lambda = reinterpret_cast<Lambda*>(expr);
-    return relabel_anon(lambda->body.get(), index);
+static int relabel_descend(Expr *expr, int index) {
+  if (!(expr->flags & FLAG_TOUCHED)) {
+    expr->flags |= FLAG_TOUCHED;
+    if (expr->type == VarRef::type) {
+      VarRef *ref = reinterpret_cast<VarRef*>(expr);
+      if (ref->name != "_") return index;
+      ++index;
+      ref->name += std::to_string(index);
+      return index;
+    } else if (expr->type == App::type) {
+      App *app = reinterpret_cast<App*>(expr);
+      return relabel_descend(app->val.get(), relabel_descend(app->fn.get(), index));
+    } else if (expr->type == Lambda::type) {
+      Lambda *lambda = reinterpret_cast<Lambda*>(expr);
+      return relabel_descend(lambda->body.get(), index);
+    }
   }
   // noop for DefMap, Literal, Prim
   return index;
+}
+
+static Expr *relabel_anon(Expr *out) {
+  int args = relabel_descend(out, 0);
+  for (int index = args; index >= 1; --index)
+    out = new Lambda(out->location, "_" + std::to_string(index), out);
+  return out;
 }
 
 static Expr *parse_unary(int p, Lexer &lex) {
@@ -189,9 +199,6 @@ static Expr *parse_unary(int p, Lexer &lex) {
       if (lex.next.type == EOL) lex.consume();
       if (expect(PCLOSE, lex)) lex.consume();
       out->location = location;
-      int args = relabel_anon(out, 0);
-      for (int index = args; index >= 1; --index)
-        out = new Lambda(location, "_" + std::to_string(index), out);
       return out;
     }
     default: {
@@ -261,7 +268,7 @@ static Expr *parse_if(Lexer &lex) {
       new Lambda(l, "_", elseE)),
       new Literal(LOCATION, "if"));
   } else {
-    return parse_binary(0, lex);
+    return relabel_anon(parse_binary(0, lex));
   }
 }
 

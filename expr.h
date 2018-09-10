@@ -7,12 +7,15 @@
 #include <map>
 #include <vector>
 
+#define FLAG_TOUCHED 1
+
 /* Expression AST */
 struct Expr {
   const char *type;
   Location location;
+  long flags;
 
-  Expr(const char *type_, const Location &location_) : type(type_), location(location_) { }
+  Expr(const char *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), flags(flags_) { }
   virtual ~Expr();
 };
 

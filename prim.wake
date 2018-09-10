@@ -14,7 +14,7 @@ global x & y = x y x # both sides are evaluated
 global x | y = x x y
 
 # tuples
-global pair x y f = f x y
+global pair x y = _ x y
 global first  p = p true
 global second p = p false
 
