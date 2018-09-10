@@ -355,6 +355,12 @@ static void publish_def(Lexer &lex, DefMap::defs &publish, const std::string &na
       i->second.release())));
 }
 
+static void publish_seal(DefMap::defs &publish) {
+  for (auto &i : publish) {
+    i.second = std::unique_ptr<Expr>(new Lambda(i.second->location, "_tail", i.second.release()));
+  }
+}
+
 static Expr *parse_block(Lexer &lex) {
   TRACE("BLOCK");
   Expr *out;
@@ -389,6 +395,7 @@ static Expr *parse_block(Lexer &lex) {
       }
     }
 
+    publish_seal(publish);
     auto body = parse_if(lex);
     location.end = body->location.end;
     out = (publish.empty() && map.empty()) ? body : new DefMap(location, std::move(map), std::move(publish), body);
@@ -445,6 +452,7 @@ void parse_top(Top &top, Lexer &lex) {
     }
   }
 
+  publish_seal(defmap.publish);
   defmap.location.end = lex.next.location.start;
   expect(END, lex);
 }

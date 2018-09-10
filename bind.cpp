@@ -21,6 +21,7 @@ struct ResolveBinding {
   ResolveBinding *parent;
   int current_index;
   int prefix;
+  int depth;
   NameIndex index;
   std::vector<ResolveDef> defs;
 };
@@ -92,29 +93,51 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
   return out;
 }
 
+static bool reference_map(ResolveBinding *binding, const std::string &name) {
+  NameIndex::iterator i;
+  if ((i = binding->index.find(name)) != binding->index.end()) {
+    if (binding->current_index != -1)
+      binding->defs[binding->current_index].edges.insert(i->second);
+    return true;
+  } else {
+    return false;
+  }
+}
+
+static bool rebind_ref(ResolveBinding *binding, std::string &name) {
+  ResolveBinding *iter;
+  for (iter = binding; iter; iter = iter->parent) {
+    if (iter->prefix >= 0) {
+      std::string file_local = std::to_string(iter->prefix) + " " + name;
+      if (reference_map(iter, file_local)) {
+        name = file_local;
+        return true;
+      }
+    }
+    if (reference_map(iter, name)) return true;
+  }
+  return false;
+}
+
+Expr *rebind_subscribe(ResolveBinding *binding, const Location &location, const std::string &name) {
+  ResolveBinding *iter;
+  for (iter = binding; iter; iter = iter->parent) {
+    std::string pub = "publish " + std::to_string(iter->depth) + " " + name;
+    if (reference_map(iter, pub)) return new VarRef(location, pub);
+  }
+  // nil
+  return new Lambda(location, "_", new Lambda(location, "_t", new Lambda(location, "_f", new VarRef(location, "_t"))));
+}
+
 static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding *binding) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr.get());
-    ResolveBinding *iter;
-    for (iter = binding; iter; iter = iter->parent) {
-      NameIndex::iterator i;
-      if ((i = iter->index.find(ref->name)) != iter->index.end()) {
-        if (iter->current_index != -1)
-          iter->defs[iter->current_index].edges.insert(i->second);
-        break;
-      }
-      if (iter->prefix >= 0) {
-        std::string file_local = std::to_string(iter->prefix) + "_" + ref->name;
-        if ((i = iter->index.find(file_local)) != iter->index.end()) {
-          ref->name = file_local;
-          if (iter->current_index != -1)
-            iter->defs[iter->current_index].edges.insert(i->second);
-          break;
-        }
-      }
-    }
     // don't fail if unbound; leave that for the second pass
+    rebind_ref(binding, ref->name);
     return expr;
+  } else if (expr->type == Subscribe::type) {
+    Subscribe *sub = reinterpret_cast<Subscribe*>(expr.get());
+    return std::unique_ptr<Expr>(rebind_subscribe(binding, sub->location, sub->name));
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr.get());
     app->fn  = fracture(std::move(app->fn),  binding);
@@ -126,6 +149,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     lbinding.parent = binding;
     lbinding.current_index = 0;
     lbinding.prefix = -1;
+    lbinding.depth = binding->depth + 1;
     lbinding.index[lambda->name] = 0;
     lbinding.defs.resize(lbinding.defs.size()+1); // don't care
     lambda->body = fracture(std::move(lambda->body), &lbinding);
@@ -134,6 +158,8 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     DefMap *def = reinterpret_cast<DefMap*>(expr.get());
     ResolveBinding dbinding;
     dbinding.parent = binding;
+    dbinding.prefix = -1;
+    dbinding.depth = binding->depth + 1;
     for (auto &i : def->map) {
       dbinding.index[i.first] = dbinding.defs.size();
       dbinding.defs.resize(dbinding.defs.size()+1);
@@ -141,9 +167,18 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
       def.name = i.first;
       def.expr = std::move(i.second);
     }
+    for (auto &i : def->publish) {
+      std::string name = "publish " + std::to_string(dbinding.depth) + " " + i.first;
+      dbinding.index[name] = dbinding.defs.size();
+      dbinding.defs.resize(dbinding.defs.size()+1);
+      ResolveDef &def = dbinding.defs.back();
+      Location l = i.second->location;
+      def.name = std::move(name);
+      def.expr = std::unique_ptr<Expr>(new App(l, i.second.release(), rebind_subscribe(binding, l, i.first)));
+    }
     dbinding.current_index = 0;
-    dbinding.prefix = -1;
     for (auto &i : dbinding.defs) {
+      // problem: publishes resolves to themselves !!!
       i.expr = fracture(std::move(i.expr), &dbinding);
       ++dbinding.current_index;
     }
@@ -155,22 +190,50 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     ResolveBinding tbinding;
     tbinding.parent = binding;
     tbinding.prefix = 0;
+    tbinding.depth = binding ? binding->depth+1 : 0;
+    int chain = 0;
     for (auto &b : top->defmaps) {
       for (auto &i : b.map) {
-        std::string file_local = std::to_string(tbinding.prefix) + "_" + i.first;
-        std::string name = (top->globals.find(i.first) != top->globals.end()) ? i.first : file_local;
+        std::string name;
+        DefOrder::iterator glob;
+        // If this file defines the global, put it at the global name; otherwise, localize the name
+        if ((glob = top->globals.find(i.first)) != top->globals.end() && glob->second == tbinding.prefix) {
+          name = i.first;
+        } else {
+          name = std::to_string(tbinding.prefix) + " " + i.first;
+        }
         tbinding.index[name] = tbinding.defs.size();
         tbinding.defs.resize(tbinding.defs.size()+1);
         ResolveDef &def = tbinding.defs.back();
         def.name = name;
         def.expr = std::move(i.second);
       }
+      for (auto &i : b.publish) {
+        std::string name = "publish " + std::to_string(tbinding.depth) + " " + i.first;
+        Location l = i.second->location;
+        Expr *tail;
+        NameIndex::iterator pub;
+        if ((pub = tbinding.index.find(name)) == tbinding.index.end()) {
+          tail = rebind_subscribe(binding, l, i.first);
+        } else {
+          std::string name = "chain " + std::to_string(++chain);
+          tail = new VarRef(l, name);
+          tbinding.index[name] = pub->second;
+          tbinding.defs[pub->second].name = std::move(name);
+        }
+        tbinding.index[name] = tbinding.defs.size();
+        tbinding.defs.resize(tbinding.defs.size()+1);
+        ResolveDef &def = tbinding.defs.back();
+        def.name = std::move(name);
+        def.expr = std::unique_ptr<Expr>(new App(l, i.second.release(), tail));
+      }
       ++tbinding.prefix;
     }
+
     tbinding.current_index = 0;
     tbinding.prefix = 0;
     for (auto &b : top->defmaps) {
-      for (int i = 0; i < (int)b.map.size(); ++i) {
+      for (int i = 0; i < (int)b.map.size() + (int)b.publish.size(); ++i) {
         tbinding.defs[tbinding.current_index].expr =
           fracture(std::move(tbinding.defs[tbinding.current_index].expr), &tbinding);
         ++tbinding.current_index;
