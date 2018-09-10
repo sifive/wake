@@ -71,17 +71,25 @@ struct Literal : public Expr {
   Literal(const Location &location_, const char *value_);
 };
 
+struct Subscribe : public Expr {
+  std::string name;
+  static const char *type;
+  Subscribe(const Location &location_, const std::string &name_)
+   : Expr(type, location_), name(name_) { }
+};
+
 typedef std::map<std::string, int> DefOrder;
 
 struct DefMap : public Expr {
   typedef std::map<std::string, std::unique_ptr<Expr> > defs;
   defs map;
+  defs publish;
   std::unique_ptr<Expr> body;
 
   static const char *type;
-  DefMap(const Location &location_, defs &map_, Expr *body_)
-   : Expr(type, location_), map(), body(body_) { map.swap(map_); }
-  DefMap(const Location &location_) : Expr(type, location_), map(), body(new Literal(location, "top")) { }
+  DefMap(const Location &location_, defs &&map_, defs &&publish_, Expr *body_)
+   : Expr(type, location_), map(std::move(map_)), publish(std::move(publish_)), body(body_) { }
+  DefMap(const Location &location_) : Expr(type, location_), map(), publish(), body(new Literal(location, "top")) { }
 };
 
 struct Top : public Expr {

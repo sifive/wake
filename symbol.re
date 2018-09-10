@@ -7,7 +7,7 @@
 #include <list>
 
 const char *symbolTable[] = {
-  "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "GLOBAL", "PUBLISH", "PRIM", "LAMBDA",
+  "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
   "EQUALS", "POPEN", "PCLOSE", "IF", "THEN", "ELSE", "END", "EOL", "INDENT", "DEDENT"
 };
 
@@ -158,17 +158,18 @@ top:
       }
 
       // keywords
-      "def"    { return mkSym(DEF);    }
-      "global" { return mkSym(GLOBAL); }
-      "publish"{ return mkSym(PUBLISH);}
-      "prim"   { return mkSym(PRIM);   }
-      "if"     { return mkSym(IF);     }
-      "then"   { return mkSym(THEN);   }
-      "else"   { return mkSym(ELSE);   }
-      "\\"     { return mkSym(LAMBDA); }
-      "="      { return mkSym(EQUALS); }
-      "("      { return mkSym(POPEN);  }
-      ")"      { return mkSym(PCLOSE); }
+      "def"       { return mkSym(DEF);       }
+      "global"    { return mkSym(GLOBAL);    }
+      "publish"   { return mkSym(PUBLISH);   }
+      "subscribe" { return mkSym(SUBSCRIBE); }
+      "prim"      { return mkSym(PRIM);      }
+      "if"        { return mkSym(IF);        }
+      "then"      { return mkSym(THEN);      }
+      "else"      { return mkSym(ELSE);      }
+      "\\"        { return mkSym(LAMBDA);    }
+      "="         { return mkSym(EQUALS);    }
+      "("         { return mkSym(POPEN);     }
+      ")"         { return mkSym(PCLOSE);    }
 
       // identifiers
       op = [.$^*/%\-+~<>=!&|,]+;

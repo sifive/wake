@@ -191,6 +191,14 @@ static Expr *parse_unary(int p, Lexer &lex) {
       }
       return new Prim(location, name);
     }
+    case SUBSCRIBE: {
+      std::string name;
+      Location location = lex.next.location;
+      lex.consume();
+      auto id = get_arg_loc(lex);
+      location.end = id.second.end;
+      return new Subscribe(location, id.first);
+    }
     case POPEN: {
       Location location = lex.next.location;
       lex.consume();
@@ -272,17 +280,6 @@ static Expr *parse_if(Lexer &lex) {
   }
 }
 
-static void detect_duplicates(Lexer &lex, const DefMap::defs &map, const std::string &name, Location l) {
-  auto i = map.find(name);
-  if (i != map.end()) {
-    std::cerr << "Duplicate def "
-      << name << " at "
-      << i->second->location.str() << " and "
-      << l.str() << std::endl;
-    lex.fail = true;
-  }
-}
-
 static Expr *parse_def(Lexer &lex, std::string &name) {
   Location def = lex.next.location;
   lex.consume();
@@ -331,6 +328,33 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
   return body;
 }
 
+static void bind_def(Lexer &lex, DefMap::defs &map, const std::string &name, Expr *def) {
+  auto i = map.find(name);
+  if (i != map.end()) {
+    std::cerr << "Duplicate def "
+      << name << " at "
+      << i->second->location.str() << " and "
+      << def->location.str() << std::endl;
+    lex.fail = true;
+  }
+  map[name] = std::unique_ptr<Expr>(def);
+}
+
+static void publish_def(Lexer &lex, DefMap::defs &publish, const std::string &name, Expr *def) {
+  DefMap::defs::iterator i;
+  if ((i = publish.find(name)) == publish.end()) {
+    // A reference to _tail which we close with a lambda at the top of the chain
+    i = publish.insert(std::make_pair(name, new VarRef(def->location, "_tail"))).first;
+  }
+  // Make a tuple
+  i->second = std::unique_ptr<Expr>(new Lambda(def->location, "_pub",
+    new App(def->location,
+      new App(def->location,
+        new VarRef(def->location, "_pub"),
+        def),
+      i->second.release())));
+}
+
 static Expr *parse_block(Lexer &lex) {
   TRACE("BLOCK");
   Expr *out;
@@ -341,15 +365,33 @@ static Expr *parse_block(Lexer &lex) {
 
     Location location = lex.next.location;
     DefMap::defs map;
-    while (lex.next.type == DEF) {
-      std::string name;
-      auto def = parse_def(lex, name);
-      detect_duplicates(lex, map, name, def->location);
-      map[name] = std::unique_ptr<Expr>(def);
+    DefMap::defs publish;
+
+    bool repeat = true;
+    while (repeat) {
+      switch (lex.next.type) {
+        case DEF: {
+          std::string name;
+          auto def = parse_def(lex, name);
+          bind_def(lex, map, name, def);
+          break;
+        }
+        case PUBLISH: {
+          std::string name;
+          auto def = parse_def(lex, name);
+          publish_def(lex, publish, name, def);
+          break;
+        }
+        default: {
+          repeat = false;
+          break;
+        }
+      }
     }
+
     auto body = parse_if(lex);
     location.end = body->location.end;
-    out = map.empty() ? body : new DefMap(location, map, body);
+    out = (publish.empty() && map.empty()) ? body : new DefMap(location, std::move(map), std::move(publish), body);
 
     if (expect(DEDENT, lex)) lex.consume();
     return out;
@@ -366,24 +408,43 @@ void parse_top(Top &top, Lexer &lex) {
   top.defmaps.push_back(DefMap(lex.next.location));
   DefMap &defmap = top.defmaps.back();
 
-  while (lex.next.type == DEF || lex.next.type == GLOBAL) {
-    SymbolType sym = lex.next.type;
-    std::string name;
-    Expr *def = parse_def(lex, name);
-    detect_duplicates(lex, defmap.map, name, def->location);
-    defmap.map[name] = std::unique_ptr<Expr>(def);
-    if (sym == GLOBAL) {
-      if (top.globals.find(name) != top.globals.end()) {
-        std::cerr << "Duplicate global "
-          << name << " at "
-          << def->location.str() << " and "
-          << top.defmaps[top.globals[name]].map[name]->location.str() << std::endl;
-        lex.fail = true;
-      } else {
-        top.globals[name] = top.defmaps.size()-1;
+  bool repeat = true;
+  while (repeat) {
+    switch (lex.next.type) {
+      case GLOBAL: {
+        std::string name;
+        auto def = parse_def(lex, name);
+        bind_def(lex, defmap.map, name, def);
+        if (top.globals.find(name) != top.globals.end()) {
+          std::cerr << "Duplicate global "
+            << name << " at "
+            << def->location.str() << " and "
+            << top.defmaps[top.globals[name]].map[name]->location.str() << std::endl;
+          lex.fail = true;
+        } else {
+          top.globals[name] = top.defmaps.size()-1;
+        }
+        break;
+      }
+      case DEF: {
+        std::string name;
+        auto def = parse_def(lex, name);
+        bind_def(lex, defmap.map, name, def);
+        break;
+      }
+      case PUBLISH: {
+        std::string name;
+        auto def = parse_def(lex, name);
+        publish_def(lex, defmap.publish, name, def);
+        break;
+      }
+      default: {
+        repeat = false;
+        break;
       }
     }
   }
+
   defmap.location.end = lex.next.location.start;
   expect(END, lex);
 }

@@ -8,9 +8,11 @@ const char *Prim::type = "Prim";
 const char *App::type = "App";
 const char *Lambda::type = "Lambda";
 const char *VarRef::type = "VarRef";
-const char *DefMap::type = "DefMap";
-const char *DefBinding::type = "DefBinding";
 const char *Literal::type = "Literal";
+const char *DefBinding::type = "DefBinding";
+// these are removed by bind
+const char *Subscribe::type = "Subscribe";
+const char *DefMap::type = "DefMap";
 const char *Top::type = "Top";
 
 Literal::Literal(const Location &location_, std::shared_ptr<Value> &&value_)
@@ -28,30 +30,37 @@ static void format(std::ostream &os, int depth, const Expr *expr) {
     const VarRef *ref = reinterpret_cast<const VarRef*>(expr);
     os << pad(depth) << "VarRef(" << ref->name;
     if (ref->offset != -1) os << "," << ref->depth << "," << ref->offset;
-    os << ") @ " << ref->location.str() << std::endl;
+    os << ") @ " << ref->location << std::endl;
+  } else if (expr->type == Subscribe::type) {
+    const Subscribe *sub = reinterpret_cast<const Subscribe*>(expr);
+    os << pad(depth) << "Subscribe(" << sub->name << ") @ " << sub->location << std::endl;
   } else if (expr->type == App::type) {
     const App *app = reinterpret_cast<const App*>(expr);
-    os << pad(depth) << "App @ " << app->location.str() << std::endl;
+    os << pad(depth) << "App @ " << app->location << std::endl;
     format(os, depth+2, app->fn.get());
     format(os, depth+2, app->val.get());
   } else if (expr->type == Lambda::type) {
     const Lambda *lambda = reinterpret_cast<const Lambda*>(expr);
-    os << pad(depth) << "Lambda(" << lambda->name << ") @ " << lambda->location.str() << std::endl;
+    os << pad(depth) << "Lambda(" << lambda->name << ") @ " << lambda->location << std::endl;
     format(os, depth+2, lambda->body.get());
   } else if (expr->type == DefMap::type) {
     const DefMap *def = reinterpret_cast<const DefMap*>(expr);
-    os << pad(depth) << "DefMap @ " << def->location.str() << std::endl;
+    os << pad(depth) << "DefMap @ " << def->location << std::endl;
     for (auto &i : def->map) {
       os << pad(depth+2) << i.first << " =" << std::endl;
+      format(os, depth+4, i.second.get());
+    }
+    for (auto &i : def->publish) {
+      os << pad(depth+2) << "publish " << i.first << " =" << std::endl;
       format(os, depth+4, i.second.get());
     }
     format(os, depth+2, def->body.get());
   } else if (expr->type == Literal::type) {
     const Literal *lit = reinterpret_cast<const Literal*>(expr);
-    os << pad(depth) << "Literal(" << lit->value.get() << ") @ " << lit->location.str() << std::endl;
+    os << pad(depth) << "Literal(" << lit->value.get() << ") @ " << lit->location << std::endl;
   } else if (expr->type == Prim::type) {
     const Prim *prim = reinterpret_cast<const Prim*>(expr);
-    os << pad(depth) << "Prim(" << prim->args << "," << prim->name << ") @ " << prim->location.str() << std::endl;
+    os << pad(depth) << "Prim(" << prim->args << "," << prim->name << ") @ " << prim->location << std::endl;
   } else if (expr->type == Top::type) {
     const Top *top = reinterpret_cast<const Top*>(expr);
     os << pad(depth) << "Top; globals =";
@@ -60,7 +69,7 @@ static void format(std::ostream &os, int depth, const Expr *expr) {
     for (auto &i : top->defmaps) format(os, depth+2, &i);
   } else if (expr->type == DefBinding::type) {
     const DefBinding *def = reinterpret_cast<const DefBinding*>(expr);
-    os << pad(depth) << "DefBinding @ " << def->location.str() << std::endl;
+    os << pad(depth) << "DefBinding @ " << def->location << std::endl;
     int vals = def->val.size();
     for (auto &i : def->order) {
       os << pad(depth+2) << (i.second < vals ? "val " : "fun ") << i.first << " =" << std::endl;
