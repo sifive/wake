@@ -43,10 +43,10 @@ struct Integer : public Value {
 
 struct Closure : public Value {
   Expr *body;
-  std::shared_ptr<Binding> bindings;
+  std::shared_ptr<Binding> binding;
 
   static const char *type;
-  Closure(Expr *body_, const std::shared_ptr<Binding> &bindings_) : Value(type), body(body_), bindings(bindings_) { }
+  Closure(Expr *body_, const std::shared_ptr<Binding> &binding_) : Value(type), body(body_), binding(binding_) { }
 };
 
 struct Cause {

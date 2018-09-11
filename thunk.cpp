@@ -1,6 +1,9 @@
 #include "thunk.h"
 #include "expr.h"
 #include "value.h"
+#include <algorithm>
+#include <cassert>
+#include <iostream>
 
 struct Application : public Receiver {
   std::shared_ptr<Binding> args;
@@ -18,6 +21,7 @@ void Application::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
     Receiver::receiveM(queue, std::move(receiver), std::move(exception));
   } else {
     Closure *clo = reinterpret_cast<Closure*>(value.get());
+    args->next = clo->binding;
     queue.queue.emplace(clo->body, std::move(args), std::move(receiver));
   }
 }
@@ -63,7 +67,7 @@ void Thunk::eval(ThunkQueue &queue)
     }
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
-    auto args = std::make_shared<Binding>(binding, nullptr, 1);
+    auto args = std::make_shared<Binding>(nullptr, nullptr, 1);
     queue.queue.emplace(app->val.get(), binding, Binding::make_completer(args, 0));
     queue.queue.emplace(app->fn .get(), std::move(binding), std::unique_ptr<Receiver>(
       new Application(std::move(args), std::move(receiver))));
