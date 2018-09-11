@@ -2,7 +2,6 @@
 #define VALUE_H
 
 #include <string>
-#include <vector>
 #include <list>
 #include <memory>
 #include <gmp.h>
@@ -10,8 +9,7 @@
 /* Values */
 
 struct Expr;
-struct Future;
-struct Stack;
+struct Binding;
 
 struct Value {
   const char *type;
@@ -43,16 +41,6 @@ struct Integer : public Value {
   std::string str(int base = 10) const;
 };
 
-struct DefBinding;
-struct Binding {
-  std::shared_ptr<Binding> next;
-  std::vector<std::shared_ptr<Future> > future;
-  DefBinding *binding;
-
-  Binding(const std::shared_ptr<Binding> &next_, DefBinding *binding_) : next(next_), future(), binding(binding_) { }
-  Binding(const std::shared_ptr<Binding> &next_, std::shared_ptr<Future> &&arg) : next(next_), future(1, arg), binding(0) { }
-};
-
 struct Closure : public Value {
   Expr *body;
   std::shared_ptr<Binding> bindings;
@@ -63,9 +51,7 @@ struct Closure : public Value {
 
 struct Cause {
   std::string reason;
-  std::shared_ptr<Stack> trace;
   Cause(const std::string &reason_) : reason(reason_) { }
-  Cause(const std::string &reason_, const std::shared_ptr<Stack> &trace_) : reason(reason_), trace(trace_) { }
 };
 
 struct Exception : public Value {

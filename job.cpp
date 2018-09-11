@@ -1,7 +1,7 @@
 #include "job.h"
 #include "prim.h"
 #include "value.h"
-#include "action.h"
+#include "heap.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -16,8 +16,8 @@ struct Task {
   std::string path;
   std::string cmdline;
   std::string environ;
-  std::unique_ptr<Action> completion;
-  Task(const std::string &path_, const std::string &cmdline_, const std::string &environ_, std::unique_ptr<Action> completion_) :
+  std::unique_ptr<Receiver> completion;
+  Task(const std::string &path_, const std::string &cmdline_, const std::string &environ_, std::unique_ptr<Receiver> completion_) :
     path(path_), cmdline(cmdline_), environ(environ_), completion(std::move(completion_)) { }
 };
 
@@ -25,7 +25,7 @@ struct Job {
   pid_t pid;
   int pipe;
   std::stringstream output;
-  std::unique_ptr<Action> completion;
+  std::unique_ptr<Receiver> completion;
   Job() : pid(0) { }
 };
 
@@ -180,7 +180,7 @@ bool JobTable::wait() {
           i.output.clear();
 
           if (code == 0) {
-            resume(std::move(i.completion), make_list(out));
+            resume(std::move(i.completion), make_list(std::move(out)));
           } else {
             resume(std::move(i.completion), std::make_shared<Exception>("Non-zero exit status (" + std::to_string(code) + ")"));
           }
@@ -195,7 +195,7 @@ bool JobTable::wait() {
   }
 }
 
-static void prim_job(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_job(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT(3);
   STRING(arg0, 0); // path to executable

@@ -6,14 +6,13 @@
 #include <vector>
 #include <memory>
 
-struct Expr;
-struct Action;
+struct Receiver;
 struct Value;
 struct String;
 struct Integer;
 
 /* Primitive functions must call resume once they are done their work */
-void resume(std::unique_ptr<Action> completion, std::shared_ptr<Value> &&return_value);
+void resume(std::unique_ptr<Receiver> completion, std::shared_ptr<Value> &&return_value);
 
 /* Macros for handling inputs from wake */
 #define RETURN(val) do {						\
@@ -27,13 +26,13 @@ void resume(std::unique_ptr<Action> completion, std::shared_ptr<Value> &&return_
     return;								\
 } } while (0)
 
-std::unique_ptr<Action> expect_args(const char *fn, std::unique_ptr<Action> completion, const std::vector<std::shared_ptr<Value> > &args, int expect);
+std::unique_ptr<Receiver> expect_args(const char *fn, std::unique_ptr<Receiver> completion, const std::vector<std::shared_ptr<Value> > &args, int expect);
 #define EXPECT(num) do { 							\
   completion = expect_args(__FUNCTION__, std::move(completion), args, num);	\
   if (!completion) return;							\
 } while (0)
 
-std::unique_ptr<Action> cast_string(std::unique_ptr<Action> completion, const std::shared_ptr<Value> &value, String **str);
+std::unique_ptr<Receiver> cast_string(std::unique_ptr<Receiver> completion, const std::shared_ptr<Value> &value, String **str);
 #define STRING(arg, i) 								\
   String *arg;									\
   do {										\
@@ -41,7 +40,7 @@ std::unique_ptr<Action> cast_string(std::unique_ptr<Action> completion, const st
     if (!completion) return;							\
   } while(0)
 
-std::unique_ptr<Action> cast_integer(std::unique_ptr<Action> completion, const std::shared_ptr<Value> &value, Integer **str);
+std::unique_ptr<Receiver> cast_integer(std::unique_ptr<Receiver> completion, const std::shared_ptr<Value> &value, Integer **str);
 #define INTEGER(arg, i) 							\
   Integer *arg;									\
   do {										\
@@ -52,11 +51,10 @@ std::unique_ptr<Action> cast_integer(std::unique_ptr<Action> completion, const s
 /* Useful expressions for primitives */
 std::shared_ptr<Value> make_true();
 std::shared_ptr<Value> make_false();
-std::shared_ptr<Value> make_list(const std::vector<std::shared_ptr<Value> > &values);
-
+std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values);
 
 /* Register primitive functions */
-typedef void (*PrimFn)(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion);
+typedef void (*PrimFn)(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion);
 typedef std::map<std::string, std::pair<PrimFn, void *> > PrimMap;
 struct JobTable;
 

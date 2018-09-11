@@ -7,6 +7,9 @@
 #include <map>
 #include <vector>
 
+struct Receiver;
+struct Value;
+
 #define FLAG_TOUCHED 1
 
 /* Expression AST */
@@ -21,14 +24,12 @@ struct Expr {
 
 std::ostream & operator << (std::ostream &os, const Expr *expr);
 
-struct Action;
-struct Value;
 struct Prim : public Expr {
   std::string name;
   int args;
 
   // The function must call 'resume(completion, value);' when done
-  void (*fn)(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion);
+  void (*fn)(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion);
   void *data;
 
   static const char *type;

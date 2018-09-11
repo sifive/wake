@@ -5,17 +5,24 @@
 #include "bind.h"
 #include "symbol.h"
 #include "value.h"
-#include "action.h"
+#include "thunk.h"
+#include "heap.h"
 #include "expr.h"
 #include "job.h"
 #include "stack.h"
 
-static ActionQueue queue;
+static ThunkQueue queue;
 
-void resume(std::unique_ptr<Action> completion, std::shared_ptr<Value> &&return_value) {
-  std::unique_ptr<PrimRet> ret(reinterpret_cast<PrimRet*>(completion.release()));
-  ret->future_input->complete(queue, return_value, ret->invoker_serial);
-  queue.push(std::move(ret));
+void resume(std::unique_ptr<Receiver> completion, std::shared_ptr<Value> &&return_value) {
+  Receiver::receiveM(queue, std::move(completion), std::move(return_value));
+}
+
+struct Output : public Receiver {
+  void receive(ThunkQueue &queue, std::shared_ptr<Value> &&value);
+};
+
+void Output::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
+  std::cout << value.get() << std::endl;
 }
 
 int main(int argc, const char **argv) {
@@ -52,18 +59,9 @@ int main(int argc, const char **argv) {
     return 1;
   }
 
-  std::unique_ptr<Action> main(new Eval(root.get()));
-  std::shared_ptr<Future> result(main->future_result);
-  queue.push(std::move(main));
+  queue.queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output));
+  do { queue.run(); } while (jobtable.wait());
 
-  do while (!queue.empty()) {
-    queue.pop()->execute(queue);
-  } while (jobtable.wait());
-
-  std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;
-  std::shared_ptr<Value> out = result->get_value();
-  assert (out);
-  std::cout << out.get() << std::endl;
-
+  //std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;
   return 0;
 }

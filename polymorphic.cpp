@@ -1,10 +1,10 @@
 #include "prim.h"
 #include "value.h"
-#include "action.h"
+#include "heap.h"
 #include <gmp.h>
 #include <sstream>
 
-static void prim_lt(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_lt(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   EXPECT(2);
   int cmp;
   if (args[0]->type == Integer::type) {
@@ -24,7 +24,7 @@ static void prim_lt(void *data, std::vector<std::shared_ptr<Value> > &&args, std
   RETURN(out);
 }
 
-static void prim_eq(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_eq(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   EXPECT(2);
   bool eq;
   if (args[0]->type == Integer::type) {
@@ -42,7 +42,7 @@ static void prim_eq(void *data, std::vector<std::shared_ptr<Value> > &&args, std
   RETURN(out);
 }
 
-static void prim_cmp(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_cmp(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   EXPECT(2);
   int cmp;
   if (args[0]->type == Integer::type) {
@@ -63,7 +63,7 @@ static void prim_cmp(void *data, std::vector<std::shared_ptr<Value> > &&args, st
   RETURN(out);
 }
 
-static void prim_test(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_test(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   if (args.size() != 1) {
     resume(std::move(completion), std::make_shared<Exception>("prim_test called on " + std::to_string(args.size()) + "; was exepecting 1"));
   } else {
@@ -71,7 +71,7 @@ static void prim_test(void *data, std::vector<std::shared_ptr<Value> > &&args, s
   }
 }
 
-static void prim_catch(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_catch(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   if (args.size() != 1 || args[0]->type != Exception::type) {
     resume(std::move(completion), std::make_shared<Exception>("prim_catch not called on an exception"));
   } else {
@@ -79,11 +79,11 @@ static void prim_catch(void *data, std::vector<std::shared_ptr<Value> > &&args, 
     std::vector<std::shared_ptr<Value> > out;
     for (auto &i : exception->causes)
       out.emplace_back(std::make_shared<String>(i.reason));
-    resume(std::move(completion), make_list(out));
+    resume(std::move(completion), make_list(std::move(out)));
   }
 }
 
-static void prim_raise(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_raise(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   EXPECT(1);
   STRING(arg0, 0);
   resume(std::move(completion), std::make_shared<Exception>(arg0->value));

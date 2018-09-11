@@ -1,9 +1,9 @@
 #include "prim.h"
 #include "value.h"
-#include "action.h"
+#include "heap.h"
 #include <gmp.h>
 
-static void prim_cat(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_cat(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   EXPECT(2);
   STRING(arg0, 0);
   STRING(arg1, 1);
@@ -11,14 +11,14 @@ static void prim_cat(void *data, std::vector<std::shared_ptr<Value> > &&args, st
   RETURN(out);
 }
 
-static void prim_len(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_len(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   EXPECT(1);
   STRING(arg0, 0);
   auto out = std::make_shared<Integer>(arg0->value.size());
   RETURN(out);
 }
 
-static void prim_cut(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_cut(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   EXPECT(3);
   STRING(arg0, 0);
   INTEGER(arg1, 1);

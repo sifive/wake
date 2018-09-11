@@ -1,10 +1,10 @@
 #include "prim.h"
 #include "value.h"
-#include "action.h"
+#include "heap.h"
 #include <gmp.h>
 
 #define UNOP(name, fn)													\
-static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {	\
+static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {	\
   EXPECT(1);														\
   INTEGER(arg0, 0);													\
   auto out = std::make_shared<Integer>();										\
@@ -17,7 +17,7 @@ UNOP(abs, mpz_abs)
 UNOP(neg, mpz_neg)
 
 #define BINOP(name, fn)													\
-static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {	\
+static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {	\
   EXPECT(2);														\
   INTEGER(arg0, 0);													\
   INTEGER(arg1, 1);													\
@@ -36,7 +36,7 @@ BINOP(gcd, mpz_gcd)
 BINOP(lcm, mpz_lcm)
 
 #define BINOP_ZERO(name, fn)												\
-static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {	\
+static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {	\
   EXPECT(2);														\
   INTEGER(arg0, 0);													\
   INTEGER(arg1, 1);													\
@@ -50,7 +50,7 @@ BINOP_ZERO(div, mpz_tdiv_q)
 BINOP_ZERO(mod, mpz_tdiv_r)
 
 #define BINOP_SI(name, fn)												\
-static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {	\
+static void prim_##name(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {	\
   EXPECT(2);														\
   INTEGER(arg0, 0);													\
   INTEGER(arg1, 1);													\
@@ -66,7 +66,7 @@ BINOP_SI(shr, mpz_tdiv_q_2exp)
 BINOP_SI(exp, mpz_pow_ui)
 BINOP_SI(root,mpz_root)
 
-static void prim_powm(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_powm(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   EXPECT(3);
   INTEGER(arg0, 0);
   INTEGER(arg1, 1);
@@ -77,7 +77,7 @@ static void prim_powm(void *data, std::vector<std::shared_ptr<Value> > &&args, s
   RETURN(out);
 }
 
-static void prim_str(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_str(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   EXPECT(2);
   INTEGER(arg0, 0);
   INTEGER(arg1, 1);
@@ -92,7 +92,7 @@ static void prim_str(void *data, std::vector<std::shared_ptr<Value> > &&args, st
   RETURN(out);
 }
 
-static void prim_int(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Action> completion) {
+static void prim_int(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   EXPECT(2);
   INTEGER(arg0, 0);
   STRING(arg1, 1);
