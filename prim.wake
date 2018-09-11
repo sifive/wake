@@ -122,8 +122,8 @@ global lcm x y = prim "lcm"
 global powm x y m = prim "powm" # fast version of: (x^y) % m
 
 global seq n =
-  def helper n l = if n == 0 then l else helper (n-1) (n-1,l)
-  helper (abs n) nil
+  def helper i = if i >= n then nil else i, helper (i+1)
+  helper 0
 
 # Type conversion
 global strbase base n = prim "str" # int -> string
@@ -140,4 +140,6 @@ global x == y = prim "eq"
 global x != y = !(x == y)
 global cmp x y = prim "cmp" # lt=-1, eq=0, gt=1
 
+# file paths are all relative to workspace root
+# env execdir visible_files cmdline -> (input_files, output_files)
 global job path cmd env = prim "job"

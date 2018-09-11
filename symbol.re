@@ -151,7 +151,7 @@ top:
       dec = [0-9][0-9_]*;
       hex = '0x' [0-9a-fA-F_]+;
       bin = '0b' [01_]+;
-      ("0" | dec | hex | bin) {
+      (dec | hex | bin) {
         std::string integer(in.tok, in.cur);
         std::replace(integer.begin(), integer.end(), '_', ' ');
         return mkSym2(LITERAL, std::make_shared<Integer>(integer.c_str()));
