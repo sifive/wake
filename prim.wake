@@ -78,7 +78,7 @@ global sortBy f l =
   if l.empty then nil else
     def key = l.head
     def split = splitBy (f key) l.tail
-    sort f split.second ++ (key, sort f split.first)
+    sortBy f split.second ++ (key, sortBy f split.first)
 global sort l = sortBy (_<_) l
 
 global collate f l r =
