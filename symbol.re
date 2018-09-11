@@ -8,7 +8,7 @@
 
 const char *symbolTable[] = {
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
-  "EQUALS", "POPEN", "PCLOSE", "IF", "THEN", "ELSE", "END", "EOL", "INDENT", "DEDENT"
+  "EQUALS", "POPEN", "PCLOSE", "IF", "THEN", "ELSE", "HERE", "END", "EOL", "INDENT", "DEDENT"
 };
 
 /*!max:re2c*/
@@ -166,6 +166,7 @@ top:
       "if"        { return mkSym(IF);        }
       "then"      { return mkSym(THEN);      }
       "else"      { return mkSym(ELSE);      }
+      "here"      { return mkSym(HERE);      }
       "\\"        { return mkSym(LAMBDA);    }
       "="         { return mkSym(EQUALS);    }
       "("         { return mkSym(POPEN);     }

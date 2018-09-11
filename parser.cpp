@@ -191,6 +191,14 @@ static Expr *parse_unary(int p, Lexer &lex) {
       }
       return new Prim(location, name);
     }
+    case HERE: {
+      std::string name(lex.next.location.file);
+      std::string::size_type cut = name.find_last_of('/');
+      if (cut == std::string::npos) name = "."; else name.resize(cut);
+      Expr *out = new Literal(lex.next.location, std::make_shared<String>(std::move(name)));
+      lex.consume();
+      return out;
+    }
     case SUBSCRIBE: {
       std::string name;
       Location location = lex.next.location;
