@@ -240,7 +240,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
       }
       ++tbinding.prefix;
     }
-    return fracture_binding(top->location, tbinding.defs, std::unique_ptr<Expr>(new VarRef(LOCATION, "main")));
+    return fracture_binding(top->location, tbinding.defs, std::move(top->body));
   } else {
     // Literal/Prim
     return expr;

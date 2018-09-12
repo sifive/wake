@@ -97,6 +97,7 @@ struct Top : public Expr {
   typedef std::vector<DefMap> DefMaps;
   DefMaps defmaps;
   DefOrder globals;
+  std::unique_ptr<Expr> body;
 
   static const char *type;
   Top() : Expr(type, LOCATION), defmaps(), globals() { }

@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cstring>
 #include <thread>
+#include <sstream>
 #include "parser.h"
 #include "bind.h"
 #include "symbol.h"
@@ -28,6 +29,7 @@ void Output::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
 }
 
 int main(int argc, const char **argv) {
+  const char *usage = "Usage: wake [options] [--] EXPRESSION";
   argagg::parser argparser {{
     { "help", {"-h", "--help"},
       "shows this help message", 0},
@@ -44,7 +46,7 @@ int main(int argc, const char **argv) {
   catch (const std::exception& e) { std::cerr << e.what() << std::endl; return 1; }
 
   if (args["help"]) {
-    std::cerr << "Usage: wake [options] EXPRESSION" << std::endl << argparser;
+    std::cerr << usage << std::endl << argparser;
     return 0;
   }
 
@@ -74,10 +76,21 @@ int main(int argc, const char **argv) {
   }
   wakefiles.clear();
 
-  if (verbose) std::cerr << "Running " << jobs << " jobs at a time." << std::endl;
-  JobTable jobtable(jobs, verbose);
+  if (args.pos.empty()) {
+    // read from stdin
+    std::cerr << "Interactive mode not yet supported; supply batch commands on command-line" << std::endl;
+    std::cerr << std::endl << usage << std::endl << argparser;
+    return 1;
+  } else {
+    std::stringstream expr;
+    for (auto i : args.pos) expr << i << " ";
+    Lexer lex(expr.str());
+    top->body = std::unique_ptr<Expr>(parse_command(lex));
+    if (lex.fail) ok = false;
+  }
 
   /* Primitives */
+  JobTable jobtable(jobs, verbose);
   PrimMap pmap;
   prim_register_string(pmap);
   prim_register_integer(pmap);
@@ -102,6 +115,7 @@ int main(int argc, const char **argv) {
     return 1;
   }
 
+  if (verbose) std::cerr << "Running " << jobs << " jobs at a time." << std::endl;
   queue.queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output));
   do { queue.run(); } while (jobtable.wait());
 

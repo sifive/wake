@@ -30,6 +30,7 @@ struct Lexer {
   bool fail;
 
   Lexer(const char *file);
+  Lexer(const std::string &cmdline);
   ~Lexer();
 
   std::string text();

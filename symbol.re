@@ -28,7 +28,9 @@ struct input_t {
   const char *filename;
   FILE *const file;
 
-  input_t(const char *fn, FILE *f) : buf(), lim(buf + SIZE), cur(lim), mar(lim), tok(lim), sol(lim), row(1), eof(false), filename(fn), file(f) { }
+  input_t(const char *fn, FILE *f, int start = SIZE, int end = SIZE)
+   : buf(), lim(buf + end), cur(buf + start), mar(buf + start), tok(buf + start), sol(buf + start),
+     row(1), eof(false), filename(fn), file(f) { }
   bool fill(size_t need);
 };
 
@@ -252,21 +254,34 @@ top:
 }
 
 struct state_t {
-  std::string filename;
   std::string location;
   std::list<int> tabs;
   int indent;
   bool eol;
 
-  state_t(const char *file) : filename(file), location(), tabs(), indent(0), eol(false) {
+  state_t() : location(), tabs(), indent(0), eol(false) {
     tabs.push_back(0);
   }
 };
 
 Lexer::Lexer(const char *file)
- : engine(new input_t(file, fopen(file, "r"))), state(new state_t(file)), next(ERROR, LOCATION, 0), fail(false)
+ : engine(new input_t(file, fopen(file, "r"))), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
 {
   if (engine->file) consume();
+}
+
+Lexer::Lexer(const std::string &cmdline)
+  : engine(new input_t("<command-line>", 0, 0, cmdline.size())), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
+{
+  if (cmdline.size() >= SIZE) {
+    fail = true;
+  } else {
+    memcpy(&engine->buf[0], cmdline.c_str(), cmdline.size());
+    memset(&engine->buf[cmdline.size()], 0, YYMAXFILL);
+    engine->eof = true;
+    engine->lim += YYMAXFILL;
+    consume();
+  }
 }
 
 Lexer::~Lexer() {

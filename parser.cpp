@@ -466,3 +466,11 @@ void parse_top(Top &top, Lexer &lex) {
   defmap.location.end = lex.next.location.start;
   expect(END, lex);
 }
+
+Expr *parse_command(Lexer &lex) {
+  TRACE("COMMAND");
+  if (lex.next.type == EOL) lex.consume();
+  auto out = parse_block(lex);
+  expect(END, lex);
+  return out;
+}
