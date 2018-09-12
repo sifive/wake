@@ -1,53 +1,54 @@
 #include "prim.h"
 #include "value.h"
 #include "heap.h"
-#include <gmp.h>
+#include <sstream>
 
-static void prim_cat(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+struct CatStream : public Value {
+  std::stringstream str;
+  static const char *type;
+  CatStream() : Value(type) { }
+};
+const char *CatStream::type = "CatStream";
+
+static std::unique_ptr<Receiver> cast_catstream(std::unique_ptr<Receiver> completion, const std::shared_ptr<Value> &value, CatStream **cat) {
+  if (value->type != CatStream::type) {
+    resume(std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a CatStream"));
+    return std::unique_ptr<Receiver>();
+  } else {
+    *cat = reinterpret_cast<CatStream*>(value.get());
+    return completion;
+  }
+}
+#define CATSTREAM(arg, i) 							\
+  CatStream *arg;								\
+  do {										\
+    completion = cast_catstream(std::move(completion), args[i], &arg);		\
+    if (!completion) return;							\
+  } while(0)
+
+static void prim_catopen(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+  EXPECT(0);
+  auto out = std::make_shared<CatStream>();
+  RETURN(out);
+}
+
+static void prim_catadd(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   EXPECT(2);
-  STRING(arg0, 0);
+  CATSTREAM(arg0, 0);
   STRING(arg1, 1);
-  auto out = std::make_shared<String>(arg0->value + arg1->value);
-  RETURN(out);
+  arg0->str << arg1->value;
+  RETURN(args[0]);
 }
 
-static void prim_len(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static void prim_catclose(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   EXPECT(1);
-  STRING(arg0, 0);
-  auto out = std::make_shared<Integer>(arg0->value.size());
-  RETURN(out);
-}
-
-static void prim_cut(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
-  EXPECT(3);
-  STRING(arg0, 0);
-  INTEGER(arg1, 1);
-  INTEGER(arg2, 2);
-  size_t begin, end, len = arg0->value.size();
-
-  if (mpz_sgn(arg1->value) < 0) {
-    begin = 0;
-  } else if (mpz_cmp_ui(arg1->value, len) >= 0) {
-    begin = len;
-  } else {
-    begin = mpz_get_ui(arg1->value);
-  }
-
-  if (mpz_sgn(arg2->value) < 0) {
-    end = 0;
-  } else if (mpz_cmp_ui(arg2->value, len) >= 0) {
-    end = len;
-  } else {
-    end = mpz_get_ui(arg2->value);
-  }
-
-  if (begin > end) begin = end;
-  auto out = std::make_shared<String>(arg0->value.substr(begin, end-begin));
+  CATSTREAM(arg0, 0);
+  auto out = std::make_shared<String>(arg0->str.str());
   RETURN(out);
 }
 
 void prim_register_string(PrimMap &pmap) {
-  pmap["cat"].first = prim_cat;
-  pmap["len"].first = prim_len;
-  pmap["cut"].first = prim_cut;
+  pmap["catopen" ].first = prim_catopen;
+  pmap["catadd"  ].first = prim_catadd;
+  pmap["catclose"].first = prim_catclose;
 }

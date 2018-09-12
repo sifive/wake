@@ -93,11 +93,11 @@ global collate f l r =
       else cmp
 
 # string operations
-global cat l = foldl (\_\_ prim "cat") "" l
-
-# these suck; we probably just want 'explode' that splits into grapheme clusters
-#global len s  = prim "len"
-#global cut s begin end = prim "cut"
+global cat l =
+  def catopen    = prim "catopen"
+  def catclose c = prim "catclose"
+  def catadd c s = prim "catadd"
+  catclose (foldl catadd catopen l)
 
 # integer operations
 global +x = x
