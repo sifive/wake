@@ -140,6 +140,26 @@ global x == y = prim "eq"
 global x != y = !(x == y)
 global cmp x y = prim "cmp" # lt=-1, eq=0, gt=1
 
+# Regular expressions
+global quote s = prim "quote" # str -> str  (quoted for use in a regexp)
+global match r =              # regexp str -> bool
+  def compile r = prim "re2"
+  def match r s = prim "match"
+  match (compile r)
+global extract r =            # regexp-with-(exp)s str -> str list
+  def compile r = prim "re2"
+  def extract r s = prim "extract"
+  extract (compile r)
+global replace r =            # regexp replacement str -> str
+  def compile r = prim "re2"
+  def replace r s t = prim "replace"
+  replace (compile r)
+global tokenize r =            # regexp seperator str -> str list
+  def compile r = prim "re2"
+  def tokenize r s = prim "tokenize"
+  tokenize (compile r)
+
 # file paths are all relative to workspace root
 # env execdir visible_files cmdline -> (input_files, output_files)
 global job path cmd env = prim "job"
+# cacheable / uncacheable jobs -> different methods

@@ -61,6 +61,7 @@ struct JobTable;
 void prim_register_string(PrimMap &pmap);
 void prim_register_integer(PrimMap &pmap);
 void prim_register_polymorphic(PrimMap &pmap);
+void prim_register_regexp(PrimMap &pmap);
 void prim_register_job(JobTable *jobtable, PrimMap &pmap);
 
 #endif

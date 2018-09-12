@@ -42,6 +42,7 @@ int main(int argc, const char **argv) {
   prim_register_string(pmap);
   prim_register_integer(pmap);
   prim_register_polymorphic(pmap);
+  prim_register_regexp(pmap);
   prim_register_job(&jobtable, pmap);
 
   const char *slash = strrchr(argv[0], '/');

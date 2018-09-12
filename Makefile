@@ -3,7 +3,7 @@ GMP_INC ?= $(GMP)/include
 GMP_LIB ?= $(GMP)/lib
 
 wake:	$(patsubst %.cpp,%.o,$(wildcard *.cpp)) symbol.o
-	g++ -std=c++11 -Wall -O2 -L $(GMP_LIB) -o $@ $^ -lgmp
+	g++ -std=c++11 -Wall -O2 -L $(GMP_LIB) -o $@ $^ -lgmp -lre2
 
 %.o:	%.cpp	$(wildcard *.h)
 	g++ -std=c++11 -Wall -O2 -I $(GMP_INC) -o $@ -c $<
