@@ -1,4 +1,5 @@
 #include "value.h"
+#include "expr.h"
 #include <iostream>
 #include <sstream>
 #include <cassert>
@@ -27,7 +28,8 @@ std::ostream & operator << (std::ostream &os, const Value *value) {
     const Integer *integer = reinterpret_cast<const Integer*>(value);
     return os << "Integer(" << integer->str() << ")";
   } else if (value->type == Closure::type) {
-    return os << "Closure";
+    const Closure *closure = reinterpret_cast<const Closure*>(value);
+    return os << "Closure(" << closure->body->location << ")";
   } else if (value->type == Exception::type) {
     const Exception *exception = reinterpret_cast<const Exception*>(value);
     os << "Exception(";
