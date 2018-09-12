@@ -2,6 +2,7 @@
 #include "value.h"
 #include <cstdio>
 #include <cstring>
+#include <cstdint>
 #include <algorithm>
 #include <string>
 #include <list>
@@ -56,16 +57,16 @@ bool input_t::fill(size_t need) {
 
 /*!re2c re2c:define:YYCTYPE = "char"; */
 
-static wchar_t lex_oct(const char *s, const char *e)
+static uint32_t lex_oct(const char *s, const char *e)
 {
-  wchar_t u = 0;
+  uint32_t u = 0;
   for (++s; s < e; ++s) u = u*8 + *s - '0';
   return u;
 }
 
-static wchar_t lex_hex(const char *s, const char *e)
+static uint32_t lex_hex(const char *s, const char *e)
 {
-  wchar_t u = 0;
+  uint32_t u = 0;
   for (s += 2; s < e;) {
   /*!re2c
       re2c:yyfill:enable = 0;
@@ -78,9 +79,70 @@ static wchar_t lex_hex(const char *s, const char *e)
   return u;
 }
 
-static bool lex_str(input_t &in, unsigned char q, std::string &result)
+enum
 {
-  for (wchar_t u = q;; result.push_back(u)) {
+        Bit1    = 7,
+        Bitx    = 6,
+        Bit2    = 5,
+        Bit3    = 4,
+        Bit4    = 3,
+        Bit5    = 2,
+
+        T1      = ((1<<(Bit1+1))-1) ^ 0xFF,     /* 0000 0000 */
+        Tx      = ((1<<(Bitx+1))-1) ^ 0xFF,     /* 1000 0000 */
+        T2      = ((1<<(Bit2+1))-1) ^ 0xFF,     /* 1100 0000 */
+        T3      = ((1<<(Bit3+1))-1) ^ 0xFF,     /* 1110 0000 */
+        T4      = ((1<<(Bit4+1))-1) ^ 0xFF,     /* 1111 0000 */
+        T5      = ((1<<(Bit5+1))-1) ^ 0xFF,     /* 1111 1000 */
+
+        Rune1   = (1<<(Bit1+0*Bitx))-1,         /*                     0111 1111 */
+        Rune2   = (1<<(Bit2+1*Bitx))-1,         /*                0111 1111 1111 */
+        Rune3   = (1<<(Bit3+2*Bitx))-1,         /*           1111 1111 1111 1111 */
+        Rune4   = (1<<(Bit4+3*Bitx))-1,         /* 0001 1111 1111 1111 1111 1111 */
+
+        Maskx   = (1<<Bitx)-1,                  /* 0011 1111 */
+        Testx   = Maskx ^ 0xFF                  /* 1100 0000 */
+};
+
+static char push_utf8(std::string &result, uint32_t c)
+{
+  if (c <= Rune1) {
+    return static_cast<char>(c);
+  } else if (c <= Rune2) {
+    result.push_back(T2 | static_cast<char>(c >> 1*Bitx));
+    return Tx | (c & Maskx);
+  } else if (c <= Rune3) {
+    result.push_back(T3 | static_cast<char>(c >> 2*Bitx));
+    result.push_back(Tx | ((c >> 1*Bitx) & Maskx));
+    return Tx | (c & Maskx);
+  } else if (c <= Rune4) {
+    result.push_back(T4 | static_cast<char>(c >> 3*Bitx));
+    result.push_back(Tx | ((c >> 2*Bitx) & Maskx));
+    result.push_back(Tx | ((c >> 1*Bitx) & Maskx));
+    return  Tx | (c & Maskx);
+  } else {
+    return static_cast<char>(0xff);
+  }
+}
+
+static int utf8_size(const char *str)
+{
+  uint8_t c = str[0];
+  if (c < Tx) return 1;
+  if (c < T2) return -1;
+  if ((static_cast<uint8_t>(str[1]) & Testx) != Tx) return -1;
+  if (c < T3) return 2;
+  if ((static_cast<uint8_t>(str[2]) & Testx) != Tx) return -1;
+  if (c < T4) return 3;
+  if ((static_cast<uint8_t>(str[3]) & Testx) != Tx) return -1;
+  if (c < T5) return 4;
+  return -1;
+}
+
+static bool lex_str(input_t &in, char q, std::string &result)
+{
+  for (char u = q;; result.push_back(u)) {
+    if (u == static_cast<char>(0xff)) return false;
     in.tok = in.cur;
     /*!re2c
         re2c:define:YYCURSOR = in.cur;
@@ -90,7 +152,7 @@ static bool lex_str(input_t &in, unsigned char q, std::string &result)
         re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
         re2c:define:YYFILL:naked = 1;
         *                    { return false; }
-        [^\n\\]              { u = in.tok[0]; if (u == q) break; continue; }
+        [^\n\\]              { u = in.tok[0]; if (u == q) break; else continue; }
         "\\a"                { u = '\a'; continue; }
         "\\b"                { u = '\b'; continue; }
         "\\f"                { u = '\f'; continue; }
@@ -102,12 +164,17 @@ static bool lex_str(input_t &in, unsigned char q, std::string &result)
         "\\'"                { u = '\''; continue; }
         "\\\""               { u = '"';  continue; }
         "\\?"                { u = '?';  continue; }
-        "\\" [0-7]{1,3}      { u = lex_oct(in.tok, in.cur); continue; }
-        "\\x" [0-9a-fA-F]{2} { u = lex_hex(in.tok, in.cur); continue; }
-        "\\u" [0-9a-fA-F]{4} { u = lex_hex(in.tok, in.cur); continue; }
-        "\\U" [0-9a-fA-F]{8} { u = lex_hex(in.tok, in.cur); continue; }
+        "\\"  [0-7]{1,3}     { u = push_utf8(result, lex_oct(in.tok, in.cur)); continue; }
+        "\\x" [0-9a-fA-F]{2} { u = push_utf8(result, lex_hex(in.tok, in.cur)); continue; }
+        "\\u" [0-9a-fA-F]{4} { u = push_utf8(result, lex_hex(in.tok, in.cur)); continue; }
+        "\\U" [0-9a-fA-F]{8} { u = push_utf8(result, lex_hex(in.tok, in.cur)); continue; }
     */
   }
+  // Confirm this is UTF-8
+  int code;
+  for (const char *c = result.c_str(); *c; c += code)
+    if ((code = utf8_size(c)) == -1)
+      return false;
   return true;
 }
 
