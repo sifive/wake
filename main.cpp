@@ -9,7 +9,7 @@
 #include "heap.h"
 #include "expr.h"
 #include "job.h"
-#include "stack.h"
+#include "sources.h"
 
 static ThunkQueue queue;
 
@@ -26,16 +26,24 @@ void Output::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
 }
 
 int main(int argc, const char **argv) {
+  if (!chdir_workspace()) {
+    std::cerr << "Unable to locate wake.db in any parent directory." << std::endl;
+    return 1;
+  }
+
+  auto all_sources(find_all_sources());
+  auto wakefiles(sources(all_sources, ".*/[^/]+\\.wake"));
+
   bool ok = true;
-
-  JobTable jobtable(4);
-
   std::unique_ptr<Top> top(new Top);
-  for (int i = 1; i < argc; ++i) {
-    Lexer lex(argv[i]);
+  for (auto i : wakefiles) {
+    Lexer lex(i->value.c_str());
     parse_top(*top.get(), lex);
     if (lex.fail) ok = false;
   }
+  wakefiles.clear();
+
+  JobTable jobtable(4);
 
   /* Primitives */
   PrimMap pmap;
@@ -44,6 +52,8 @@ int main(int argc, const char **argv) {
   prim_register_polymorphic(pmap);
   prim_register_regexp(pmap);
   prim_register_job(&jobtable, pmap);
+  pmap["sources"].first = prim_sources;
+  pmap["sources"].second = &all_sources;
 
   const char *slash = strrchr(argv[0], '/');
   const char *exec = slash ? slash + 1 : argv[0];
