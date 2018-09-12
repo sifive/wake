@@ -51,6 +51,7 @@ std::unique_ptr<Receiver> cast_integer(std::unique_ptr<Receiver> completion, con
 /* Useful expressions for primitives */
 std::shared_ptr<Value> make_true();
 std::shared_ptr<Value> make_false();
+std::shared_ptr<Value> make_tuple(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second);
 std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values);
 
 /* Register primitive functions */

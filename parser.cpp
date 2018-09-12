@@ -250,6 +250,8 @@ static Expr *parse_binary(int p, Lexer &lex) {
       case ID:
       case LITERAL:
       case PRIM:
+      case HERE:
+      case SUBSCRIBE:
       case POPEN: {
         op_type op = precedence("a"); // application
         if (op.p < p) return lhs;

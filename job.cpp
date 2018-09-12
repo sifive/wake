@@ -8,17 +8,20 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sstream>
+#include <iostream>
 #include <list>
 #include <vector>
 #include <cstring>
 
 struct Task {
-  std::string path;
-  std::string cmdline;
+  bool cache;
   std::string environ;
+  std::string dir;
+  std::string files;
+  std::string cmdline;
   std::unique_ptr<Receiver> completion;
-  Task(const std::string &path_, const std::string &cmdline_, const std::string &environ_, std::unique_ptr<Receiver> completion_) :
-    path(path_), cmdline(cmdline_), environ(environ_), completion(std::move(completion_)) { }
+  Task(int cache_, const std::string &environ_, const std::string &dir_, const std::string &files_, const std::string &cmdline_, std::unique_ptr<Receiver> completion_) :
+    cache(cache_), environ(environ_), dir(dir_), files(files_), cmdline(cmdline_), completion(std::move(completion_)) { }
 };
 
 struct Job {
@@ -61,7 +64,9 @@ JobTable::~JobTable() {
   }
   pid_t pid;
   int status;
-  while ((pid = waitpid(-1, &status, 0)) > 0) { }
+  while ((pid = waitpid(-1, &status, 0)) > 0) {
+    std::cout << "<<< " << pid << std::endl;
+  }
 }
 
 static char **split_null(std::string &str) {
@@ -99,12 +104,19 @@ static void launch(JobTable *jobtable) {
         dup2(pipefd[1], 2);
         close(pipefd[0]);
         close(pipefd[1]);
-        execve(task.path.c_str(),
-          split_null(task.cmdline),
-          split_null(task.environ));
-        perror("execv");
+        if (chdir(task.dir.c_str())) {
+          perror("chdir");
+          exit(1);
+        }
+        // !!! use 'files' and 'cache'
+        auto cmdline = split_null(task.cmdline);
+        auto environ = split_null(task.environ);
+        execve(cmdline[0], cmdline, environ);
+        perror("execve");
         exit(1);
       }
+      for (char &c : task.cmdline) if (c == 0) c = ' ';
+      std::cout << ">>> " << i.pid << ": " << task.cmdline << std::endl;
       close(pipefd[1]);
       i.pipe = pipefd[0];
       i.completion = std::move(task.completion);
@@ -154,6 +166,7 @@ bool JobTable::wait() {
     pid_t pid;
     while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
       if (WIFSTOPPED(status)) continue;
+      std::cout << "<<< " << pid << std::endl;
 
       ++done;
       int code = 0;
@@ -177,6 +190,7 @@ bool JobTable::wait() {
           if (i.pipe != -1) close(i.pipe);
           i.pid = 0;
           i.pipe = -1;
+          std::cerr << i.output.str();
           i.output.clear();
 
           if (code == 0) {
@@ -197,13 +211,14 @@ bool JobTable::wait() {
 
 static void prim_job(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
-  EXPECT(3);
-  STRING(arg0, 0); // path to executable
-  STRING(arg1, 1); // null terminated command-line options
-  STRING(arg2, 2); // null terminated environment variables
-  jobtable->imp->tasks.emplace_back(arg0->value, arg1->value, arg2->value, std::move(completion));
+  EXPECT(5);
+  INTEGER(cache, 0);
+  STRING(env, 1);
+  STRING(dir, 2);
+  STRING(files, 3);
+  STRING(cmd, 4);
+  jobtable->imp->tasks.emplace_back(cache->str() == "1", env->value, dir->value, files->value, cmd->value, std::move(completion));
   launch(jobtable);
-  // !!! arg4 = stdin?
 }
 
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {

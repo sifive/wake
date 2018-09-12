@@ -98,6 +98,10 @@ global cat l =
   def catclose c = prim "catclose"
   def catadd c s = prim "catadd"
   catclose (foldl catadd catopen l)
+global catWith s l =
+  if l.empty then "" else
+    def inserted = foldr (s, _, _) nil l
+    cat (inserted.tail)
 
 # integer operations
 global +x = x
@@ -160,9 +164,9 @@ global tokenize r =            # regexp seperator str -> str list
   tokenize (compile r)
 
 # Find sources files
-global sources r = prim "sources"
+global sources dir regexp = prim "sources"
 
 # file paths are all relative to workspace root
-# env execdir visible_files cmdline -> (input_files, output_files)
-global job path cmd env = prim "job"
-# cacheable / uncacheable jobs -> different methods
+def runjob cache env dir files cmd = prim "job"
+def implode l = cat (foldr (_, "\0", _) nil l)
+global job env dir files cmd = runjob 1 env.implode dir files.implode cmd.implode

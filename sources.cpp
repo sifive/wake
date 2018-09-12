@@ -49,11 +49,12 @@ std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<
 }
 
 void prim_sources(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
-  EXPECT(1);
+  EXPECT(2);
   STRING(arg0, 0);
+  STRING(arg1, 1);
 
   std::vector<std::shared_ptr<String> > *all = reinterpret_cast<std::vector<std::shared_ptr<String> >*>(data);
-  auto match = sources(*all, arg0->value);
+  auto match = sources(*all, arg1->value);
 
   std::vector<std::shared_ptr<Value> > downcast;
   downcast.reserve(match.size());
