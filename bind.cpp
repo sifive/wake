@@ -307,6 +307,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     return explore(lambda->body.get(), pmap, &bind);
   } else if (expr->type == DefBinding::type) {
     DefBinding *def = reinterpret_cast<DefBinding*>(expr);
+    binding->open = false;
     NameBinding bind(binding, &def->order);
     bool ok = true;
     for (auto &i : def->val)
