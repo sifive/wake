@@ -73,6 +73,13 @@ global splitBy f l =
 
 global filter f l = (splitBy f l).first
 
+# Tranposition is only it's own inverse when the lists have non-increasing size
+global transpose l =
+  def todo = filter (!_.empty) l
+  def heads = map first todo
+  def tails = map second todo
+  if todo.empty then nil else heads, transpose tails
+
 # f should be a less-than comparison
 global sortBy f l =
   if l.empty then nil else

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cassert>
 #include <cstring>
+#include <thread>
 #include "parser.h"
 #include "bind.h"
 #include "symbol.h"
@@ -10,6 +11,7 @@
 #include "expr.h"
 #include "job.h"
 #include "sources.h"
+#include "argagg.hpp"
 
 static ThunkQueue queue;
 
@@ -26,7 +28,36 @@ void Output::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
 }
 
 int main(int argc, const char **argv) {
-  if (!chdir_workspace()) {
+  argagg::parser argparser {{
+    { "help", {"-h", "--help"},
+      "shows this help message", 0},
+    { "jobs", {"-n", "--jobs"},
+      "number of concurrent jobs to run", 1},
+    { "verbose", {"-v", "--verbose"},
+      "output progress information", 0},
+    { "init", {"--init"},
+      "directory to configure as workspace top", 1},
+  }};
+
+  argagg::parser_results args;
+  try { args = argparser.parse(argc, argv); }
+  catch (const std::exception& e) { std::cerr << e.what() << std::endl; return 1; }
+
+  if (args["help"]) {
+    std::cerr << "Usage: wake [options] EXPRESSION" << std::endl << argparser;
+    return 0;
+  }
+
+  int jobs = args["jobs"].as<int>(std::thread::hardware_concurrency());
+  bool verbose = args["verbose"];
+
+  if (args["init"]) {
+    std::string dir = args["init"];
+    if (!make_workspace(dir)) {
+      std::cerr << "Unable to initialize a workspace in " << dir << std::endl;
+      return 1;
+    }
+  } else if (!chdir_workspace()) {
     std::cerr << "Unable to locate wake.db in any parent directory." << std::endl;
     return 1;
   }
@@ -43,7 +74,8 @@ int main(int argc, const char **argv) {
   }
   wakefiles.clear();
 
-  JobTable jobtable(4);
+  if (verbose) std::cerr << "Running " << jobs << " jobs at a time." << std::endl;
+  JobTable jobtable(jobs, verbose);
 
   /* Primitives */
   PrimMap pmap;

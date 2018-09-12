@@ -36,14 +36,16 @@ struct JobTable::detail {
   std::vector<Job> table;
   std::list<Task> tasks;
   sigset_t sigset;
+  bool verbose;
 };
 
 static void handle_SIGCHLD(int sig) {
   /* noop -- we just want to interrupt select */
 }
 
-JobTable::JobTable(int max_jobs) : imp(new JobTable::detail) {
+JobTable::JobTable(int max_jobs, bool verbose) : imp(new JobTable::detail) {
   imp->table.resize(max_jobs);
+  imp->verbose = verbose;
 
   sigset_t block;
   sigemptyset(&block);
@@ -65,7 +67,7 @@ JobTable::~JobTable() {
   pid_t pid;
   int status;
   while ((pid = waitpid(-1, &status, 0)) > 0) {
-    std::cout << "<<< " << pid << std::endl;
+    if (imp->verbose) std::cerr << "<<< " << pid << std::endl;
   }
 }
 
@@ -116,7 +118,8 @@ static void launch(JobTable *jobtable) {
         exit(1);
       }
       for (char &c : task.cmdline) if (c == 0) c = ' ';
-      std::cout << ">>> " << i.pid << ": " << task.cmdline << std::endl;
+      if (jobtable->imp->verbose)
+        std::cerr << ">>> " << i.pid << ": " << task.cmdline << std::endl;
       close(pipefd[1]);
       i.pipe = pipefd[0];
       i.completion = std::move(task.completion);
@@ -190,7 +193,7 @@ bool JobTable::wait() {
           if (i.pipe != -1) close(i.pipe);
           i.pid = 0;
           i.pipe = -1;
-          std::cerr << i.output.str();
+          if (imp->verbose) std::cerr << i.output.str();
           i.output.clear();
 
           if (code == 0) {

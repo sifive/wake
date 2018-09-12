@@ -5,6 +5,16 @@
 #include <re2/re2.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <fcntl.h>
+
+bool make_workspace(const std::string &dir) {
+  if (chdir(dir.c_str()) != 0) return false;
+  int perm = S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH;
+  int fd = open("wake.db", O_RDWR|O_CREAT|O_TRUNC, perm);
+  if (fd == -1) return false;
+  close(fd);
+  return true;
+}
 
 bool chdir_workspace() {
   int attempts;
