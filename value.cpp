@@ -32,10 +32,10 @@ std::ostream & operator << (std::ostream &os, const Value *value) {
     return os << "Closure(" << closure->body->location << ")";
   } else if (value->type == Exception::type) {
     const Exception *exception = reinterpret_cast<const Exception*>(value);
-    os << "Exception(";
+    os << "Exception(" << std::endl;
     for (auto &i : exception->causes)
-      os << i.reason; // !!!
-    return os << ")";
+      os << "  " << i.reason << std::endl; // !!!
+    return os << ")" << std::endl;
   } else {
     assert(0 /* unreachable */);
     return os;

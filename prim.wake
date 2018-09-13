@@ -173,7 +173,31 @@ global tokenize r =            # regexp seperator str -> str list
 # Find sources files
 global sources dir regexp = prim "sources"
 
-# file paths are all relative to workspace root
-def runjob cache env dir files cmd = prim "job"
+# Internal job execution implementation
 def implode l = cat (foldr (_, "\0", _) nil l)
-global job env dir files cmd = runjob 1 env.implode dir files.implode cmd.implode
+def runjob cache env stdin dir files cmd =
+  def run cache env stdin dir files cmd = prim "job"
+  def result = run cache env stdin dir files cmd
+  # Defer the execution of these, as they call to the database
+  def stdout  r = prim "job_stdout"
+  def stderr  r = prim "job_stderr"
+  def inputs  r = prim "job_inputs"
+  def outputs r = prim "job_outputs"
+  def get i = # We use this getter hide the bare JobResult type
+    if      i == 0 then stdout  result
+    else if i == 1 then stderr  result
+    else if i == 2 then inputs  result
+    else if i == 3 then outputs result
+    else nil
+  get
+
+# Access the output of a job
+global stdout  job = job 0
+global stderr  job = job 1
+global inputs  job = job 2
+global outputs job = job 3
+
+global null = "/dev/null"
+
+# file paths are all relative to workspace root
+global job env dir files cmd = runjob 1 env.implode null dir files.implode cmd.implode
