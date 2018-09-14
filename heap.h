@@ -2,10 +2,12 @@
 #define HEAP_H
 
 #include <memory>
+#include <vector>
 
 struct Value;
 struct ThunkQueue;
 struct DefBinding;
+struct Location;
 
 struct Receiver {
   virtual ~Receiver();
@@ -51,12 +53,17 @@ friend struct Completer;
 
 struct Binding {
   std::shared_ptr<Binding> next;
+  std::shared_ptr<Binding> invoker; // !!! want weak, but contracting
+  std::unique_ptr<Future[]> future;
+  Location *location;
   DefBinding *binding;
   int nargs;
-  std::unique_ptr<Future[]> future;
 
-  Binding(const std::shared_ptr<Binding> &next_, DefBinding *binding_, int nargs_) : next(next_), binding(binding_), nargs(nargs_), future(new Future[nargs]) { }
+  Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Location *location_, DefBinding *binding_, int nargs_)
+    : next(next_), invoker(invoker_), future(new Future[nargs_]), location(location_), binding(binding_), nargs(nargs_) { }
+
   static std::unique_ptr<Receiver> make_completer(const std::shared_ptr<Binding> &binding, int arg);
+  static std::vector<Location> stack_trace(const std::shared_ptr<Binding> &binding);
 };
 
 #endif

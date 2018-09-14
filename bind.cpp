@@ -178,7 +178,6 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     }
     dbinding.current_index = 0;
     for (auto &i : dbinding.defs) {
-      // problem: publishes resolves to themselves !!!
       i.expr = fracture(std::move(i.expr), &dbinding);
       ++dbinding.current_index;
     }

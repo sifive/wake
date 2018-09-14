@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <algorithm>
 #include <string>
-#include <list>
+#include <vector>
 
 const char *symbolTable[] = {
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
@@ -255,7 +255,7 @@ top:
 
 struct state_t {
   std::string location;
-  std::list<int> tabs;
+  std::vector<int> tabs;
   int indent;
   bool eol;
 

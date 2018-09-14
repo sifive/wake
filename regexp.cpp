@@ -10,24 +10,24 @@ struct RegExp : public Value {
 };
 const char *RegExp::type = "RegExp";
 
-static std::unique_ptr<Receiver> cast_regexp(std::unique_ptr<Receiver> completion, const std::shared_ptr<Value> &value, RegExp **reg) {
+static std::unique_ptr<Receiver> cast_regexp(std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, RegExp **reg) {
   if (value->type != RegExp::type) {
-    resume(std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a RegExp"));
+    resume(std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a RegExp", binding));
     return std::unique_ptr<Receiver>();
   } else {
     *reg = reinterpret_cast<RegExp*>(value.get());
     return completion;
   }
 }
-#define REGEXP(arg, i)	 							\
-  RegExp *arg;									\
-  do {										\
-    completion = cast_regexp(std::move(completion), args[i], &arg);		\
-    if (!completion) return;							\
+#define REGEXP(arg, i)	 								\
+  RegExp *arg;										\
+  do {											\
+    completion = cast_regexp(std::move(completion), binding, args[i], &arg);		\
+    if (!completion) return;								\
   } while(0)
 
 
-static void prim_re2(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_re2) {
   EXPECT(1);
   STRING(arg0, 0);
   RE2::Options options;
@@ -36,19 +36,19 @@ static void prim_re2(void *data, std::vector<std::shared_ptr<Value> > &&args, st
   if (out->exp.ok()) {
     RETURN(out);
   } else {
-    auto exp = std::make_shared<Exception>(out->exp.error());
+    auto exp = std::make_shared<Exception>(out->exp.error(), binding);
     RETURN(exp);
   }
 }
 
-static void prim_quote(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_quote) {
   EXPECT(1);
   STRING(arg0, 0);
   auto out = std::make_shared<String>(RE2::QuoteMeta(arg0->value));
   RETURN(out);
 }
 
-static void prim_match(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_match) {
   EXPECT(2);
   REGEXP(arg0, 0);
   STRING(arg1, 1);
@@ -56,7 +56,7 @@ static void prim_match(void *data, std::vector<std::shared_ptr<Value> > &&args, 
   RETURN(out);
 }
 
-static void prim_extract(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_extract) {
   EXPECT(2);
   REGEXP(arg0, 0);
   STRING(arg1, 1);
@@ -65,7 +65,7 @@ static void prim_extract(void *data, std::vector<std::shared_ptr<Value> > &&args
   std::vector<re2::StringPiece> submatch(matches, nullptr);
   re2::StringPiece input(arg1->value);
   if (!arg0->exp.Match(input, 0, arg1->value.size(), RE2::ANCHOR_BOTH, submatch.data(), matches)) {
-    auto exp = std::make_shared<Exception>("No match");
+    auto exp = std::make_shared<Exception>("No match", binding);
     RETURN(exp);
   }
 
@@ -76,7 +76,7 @@ static void prim_extract(void *data, std::vector<std::shared_ptr<Value> > &&args
   RETURN(out);
 }
 
-static void prim_replace(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_replace) {
   EXPECT(3);
   REGEXP(arg0, 0);
   STRING(arg1, 1);
@@ -87,7 +87,7 @@ static void prim_replace(void *data, std::vector<std::shared_ptr<Value> > &&args
   RETURN(out);
 }
 
-static void prim_tokenize(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_tokenize) {
   EXPECT(2);
   REGEXP(arg0, 0);
   STRING(arg1, 1);

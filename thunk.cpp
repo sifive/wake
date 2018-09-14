@@ -1,7 +1,6 @@
 #include "thunk.h"
 #include "expr.h"
 #include "value.h"
-#include <algorithm>
 #include <cassert>
 #include <iostream>
 
@@ -17,11 +16,12 @@ void Application::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
   if (value->type == Exception::type) {
     Receiver::receiveM(queue, std::move(receiver), std::move(value));
   } else if (value->type != Closure::type) {
-    auto exception = std::make_shared<Exception>("Attempt to apply " + value->to_str() + " which is not a Closure");
+    auto exception = std::make_shared<Exception>("Attempt to apply " + value->to_str() + " which is not a Closure", args->invoker);
     Receiver::receiveM(queue, std::move(receiver), std::move(exception));
   } else {
     Closure *clo = reinterpret_cast<Closure*>(value.get());
     args->next = clo->binding;
+    args->location = &clo->body->location;
     queue.queue.emplace(clo->body, std::move(args), std::move(receiver));
   }
 }
@@ -32,17 +32,19 @@ struct Primitive : public Receiver {
   std::shared_ptr<Binding> binding;
   Prim *prim;
   void receive(ThunkQueue &queue, std::shared_ptr<Value> &&value);
-  Primitive(std::vector<std::shared_ptr<Value> > &&args_, std::unique_ptr<Receiver> receiver_, const std::shared_ptr<Binding> &binding_, Prim *prim_)
+  Primitive(std::vector<std::shared_ptr<Value> > &&args_, std::unique_ptr<Receiver> receiver_, std::shared_ptr<Binding> &&binding_, Prim *prim_)
    : args(std::move(args_)), receiver(std::move(receiver_)), binding(std::move(binding_)), prim(prim_) { }
 };
 
 static void chain_app(ThunkQueue &queue, std::unique_ptr<Receiver> receiver, Prim *prim, std::shared_ptr<Binding> &&binding, std::vector<std::shared_ptr<Value> > &&args) {
-  if ((int)args.size() == prim->args) {
-    std::reverse(args.begin(), args.end());
-    prim->fn(prim->data, std::move(args), std::move(receiver));
+  int idx = args.size();
+  if (idx == prim->args) {
+    prim->fn(prim->data, std::move(receiver), std::move(binding), std::move(args));
   } else {
-    binding->future[0].depend(queue, std::unique_ptr<Receiver>(
-      new Primitive(std::move(args), std::move(receiver), binding->next, prim)));
+    Binding *arg = binding.get();
+    for (int i = idx+1; i < prim->args; ++i) arg = arg->next.get();
+    arg->future[0].depend(queue, std::unique_ptr<Receiver>(
+      new Primitive(std::move(args), std::move(receiver), std::move(binding), prim)));
   }
 }
 
@@ -67,7 +69,7 @@ void Thunk::eval(ThunkQueue &queue)
     }
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
-    auto args = std::make_shared<Binding>(nullptr, nullptr, 1);
+    auto args = std::make_shared<Binding>(nullptr, binding, nullptr, nullptr, 1);
     queue.queue.emplace(app->val.get(), binding, Binding::make_completer(args, 0));
     queue.queue.emplace(app->fn .get(), std::move(binding), std::unique_ptr<Receiver>(
       new Application(std::move(args), std::move(receiver))));
@@ -77,10 +79,10 @@ void Thunk::eval(ThunkQueue &queue)
     Receiver::receiveM(queue, std::move(receiver), std::move(closure));
   } else if (expr->type == DefBinding::type) {
     DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
-    auto defs = std::make_shared<Binding>(std::move(binding), defbinding, defbinding->val.size());
+    auto defs = std::make_shared<Binding>(binding, binding, &defbinding->location, defbinding, defbinding->val.size());
     int j = 0;
     for (auto &i : defbinding->val)
-      queue.queue.emplace(i.get(), defs->next, Binding::make_completer(defs, j++));
+      queue.queue.emplace(i.get(), binding, Binding::make_completer(defs, j++));
     queue.queue.emplace(defbinding->body.get(), std::move(defs), std::move(receiver));
   } else if (expr->type == Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);

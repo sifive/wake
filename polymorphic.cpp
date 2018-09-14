@@ -4,7 +4,7 @@
 #include <gmp.h>
 #include <sstream>
 
-static void prim_lt(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_lt) {
   EXPECT(2);
   int cmp;
   if (args[0]->type == Integer::type) {
@@ -18,13 +18,13 @@ static void prim_lt(void *data, std::vector<std::shared_ptr<Value> > &&args, std
   } else {
     std::stringstream str;
     str << args[0] << " and " << args[0] << "can not be compared";
-    REQUIRE(false, str.str());
+    RAISE(str.str());
   }
   auto out = cmp < 0 ? make_true() : make_false();
   RETURN(out);
 }
 
-static void prim_eq(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_eq) {
   EXPECT(2);
   bool eq;
   if (args[0]->type == Integer::type) {
@@ -42,7 +42,7 @@ static void prim_eq(void *data, std::vector<std::shared_ptr<Value> > &&args, std
   RETURN(out);
 }
 
-static void prim_cmp(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_cmp) {
   EXPECT(2);
   int cmp;
   if (args[0]->type == Integer::type) {
@@ -56,37 +56,37 @@ static void prim_cmp(void *data, std::vector<std::shared_ptr<Value> > &&args, st
   } else {
     std::stringstream str;
     str << args[0] << " and " << args[0] << "can not be compared";
-    REQUIRE(false, str.str());
+    RAISE(str.str());
   }
   // Normalize it
   auto out = std::make_shared<Integer>((cmp < 0) ? -1 : (cmp > 0) ? 1 : 0);
   RETURN(out);
 }
 
-static void prim_test(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_test) {
   if (args.size() != 1) {
-    resume(std::move(completion), std::make_shared<Exception>("prim_test called on " + std::to_string(args.size()) + "; was exepecting 1"));
+    resume(std::move(completion), std::make_shared<Exception>("prim_test called on " + std::to_string(args.size()) + "; was exepecting 1", binding));
   } else {
     resume(std::move(completion), args[0]->type == Exception::type ? make_true() : make_false());
   }
 }
 
-static void prim_catch(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_catch) {
   if (args.size() != 1 || args[0]->type != Exception::type) {
-    resume(std::move(completion), std::make_shared<Exception>("prim_catch not called on an exception"));
+    resume(std::move(completion), std::make_shared<Exception>("prim_catch not called on an exception", binding));
   } else {
     Exception *exception = reinterpret_cast<Exception*>(args[0].get());
     std::vector<std::shared_ptr<Value> > out;
     for (auto &i : exception->causes)
-      out.emplace_back(std::make_shared<String>(i.reason));
+      out.emplace_back(std::make_shared<String>(i->reason));
     resume(std::move(completion), make_list(std::move(out)));
   }
 }
 
-static void prim_raise(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_raise) {
   EXPECT(1);
   STRING(arg0, 0);
-  resume(std::move(completion), std::make_shared<Exception>(arg0->value));
+  resume(std::move(completion), std::make_shared<Exception>(arg0->value, binding));
 }
 
 void prim_register_polymorphic(PrimMap &pmap) {

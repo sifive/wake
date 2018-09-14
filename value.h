@@ -2,14 +2,15 @@
 #define VALUE_H
 
 #include <string>
-#include <list>
 #include <memory>
+#include <vector>
 #include <gmp.h>
 
 /* Values */
 
 struct Expr;
 struct Binding;
+struct Location;
 
 struct Value {
   const char *type;
@@ -51,17 +52,16 @@ struct Closure : public Value {
 
 struct Cause {
   std::string reason;
-  Cause(const std::string &reason_) : reason(reason_) { }
+  std::vector<Location> stack;
+  Cause(const std::string &reason_, std::vector<Location> &&stack_);
 };
 
 struct Exception : public Value {
-  std::list<Cause> causes;
+  std::vector<std::shared_ptr<Cause> > causes;
 
   static const char *type;
   Exception() : Value(type) { }
-  Exception(const std::string &reason_) : Value(type) {
-    causes.emplace_back(reason_);
-  }
+  Exception(const std::string &reason, const std::shared_ptr<Binding> &binding);
 
   Exception &operator += (const Exception &other) {
     causes.insert(causes.end(), other.causes.begin(), other.causes.end());

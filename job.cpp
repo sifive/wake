@@ -22,8 +22,9 @@ struct Task {
   std::string files;
   std::string cmdline;
   std::unique_ptr<Receiver> completion;
-  Task(int cache_, const std::string &environ_, const std::string &stdin_, const std::string &dir_, const std::string &files_, const std::string &cmdline_, std::unique_ptr<Receiver> completion_) :
-    cache(cache_), environ(environ_), stdin(stdin_), dir(dir_), files(files_), cmdline(cmdline_), completion(std::move(completion_)) { }
+  std::shared_ptr<Binding> binding;
+  Task(int cache_, const std::string &environ_, const std::string &stdin_, const std::string &dir_, const std::string &files_, const std::string &cmdline_, std::unique_ptr<Receiver> completion_, const std::shared_ptr<Binding> &binding_) :
+    cache(cache_), environ(environ_), stdin(stdin_), dir(dir_), files(files_), cmdline(cmdline_), completion(std::move(completion_)), binding(binding_) { }
 };
 
 struct Job {
@@ -33,6 +34,7 @@ struct Job {
   std::stringstream stdout;
   std::stringstream stderr;
   std::unique_ptr<Receiver> completion;
+  std::shared_ptr<Binding> binding;
   Job() : pid(0) { }
 };
 
@@ -55,20 +57,20 @@ struct JobResult : public Value {
 
 const char *JobResult::type = "JobResult";
 
-static std::unique_ptr<Receiver> cast_jobresult(std::unique_ptr<Receiver> completion, const std::shared_ptr<Value> &value, JobResult **job) {
+static std::unique_ptr<Receiver> cast_jobresult(std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, JobResult **job) {
   if (value->type != JobResult::type) {
-    resume(std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a JobResult"));
+    resume(std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a JobResult", binding));
     return std::unique_ptr<Receiver>();
   } else {
     *job = reinterpret_cast<JobResult*>(value.get());
     return completion;
   }
 }
-#define JOBRESULT(arg, i) 							\
-  JobResult *arg;								\
-  do {										\
-    completion = cast_jobresult(std::move(completion), args[i], &arg);		\
-    if (!completion) return;							\
+#define JOBRESULT(arg, i) 								\
+  JobResult *arg;									\
+  do {											\
+    completion = cast_jobresult(std::move(completion), binding, args[i], &arg);		\
+    if (!completion) return;								\
   } while(0)
 
 static void handle_SIGCHLD(int sig) {
@@ -167,6 +169,7 @@ static void launch(JobTable *jobtable) {
       i.pipe_stdout = pipe_stdout[0];
       i.pipe_stderr = pipe_stderr[0];
       i.completion = std::move(task.completion);
+      i.binding = std::move(task.binding);
       jobtable->imp->tasks.pop_front();
     }
   }
@@ -270,8 +273,10 @@ bool JobTable::wait() {
             out->outputs = make_list(std::move(nil));
             resume(std::move(i.completion), std::move(out));
           } else {
-            resume(std::move(i.completion), std::make_shared<Exception>("Non-zero exit status (" + std::to_string(code) + ")\n" + stderr->value));
+            resume(std::move(i.completion), std::make_shared<Exception>("Non-zero exit status (" + std::to_string(code) + ")\n" + stderr->value, i.binding));
           }
+
+          i.binding.reset();
         }
       }
     }
@@ -283,7 +288,7 @@ bool JobTable::wait() {
   }
 }
 
-static void prim_job(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_job) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT(6);
   INTEGER(cache, 0);
@@ -292,32 +297,32 @@ static void prim_job(void *data, std::vector<std::shared_ptr<Value> > &&args, st
   STRING(dir, 3);
   STRING(files, 4);
   STRING(cmd, 5);
-  jobtable->imp->tasks.emplace_back(cache->str() == "1", env->value, stdin->value, dir->value, files->value, cmd->value, std::move(completion));
+  jobtable->imp->tasks.emplace_back(cache->str() == "1", env->value, stdin->value, dir->value, files->value, cmd->value, std::move(completion), binding);
   launch(jobtable);
 }
 
-static void prim_stdout(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_stdout) {
   EXPECT(1);
   JOBRESULT(arg0, 0);
   auto out = arg0->stdout;
   RETURN(out);
 }
 
-static void prim_stderr(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_stderr) {
   EXPECT(1);
   JOBRESULT(arg0, 0);
   auto out = arg0->stderr;
   RETURN(out);
 }
 
-static void prim_inputs(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_inputs) {
   EXPECT(1);
   JOBRESULT(arg0, 0);
   auto out = arg0->inputs;
   RETURN(out);
 }
 
-static void prim_outputs(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion) {
+static PRIMFN(prim_outputs) {
   EXPECT(1);
   JOBRESULT(arg0, 0);
   auto out = arg0->outputs;

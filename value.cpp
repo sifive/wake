@@ -1,5 +1,6 @@
 #include "value.h"
 #include "expr.h"
+#include "heap.h"
 #include <iostream>
 #include <sstream>
 #include <cassert>
@@ -33,13 +34,24 @@ std::ostream & operator << (std::ostream &os, const Value *value) {
   } else if (value->type == Exception::type) {
     const Exception *exception = reinterpret_cast<const Exception*>(value);
     os << "Exception(" << std::endl;
-    for (auto &i : exception->causes)
-      os << "  " << i.reason << std::endl; // !!!
+    for (auto &i : exception->causes) {
+      os << "  " << i->reason << std::endl;
+      for (auto &j : i->stack) {
+        os << "    from " << j << std::endl;
+      }
+    }
     return os << ")" << std::endl;
   } else {
     assert(0 /* unreachable */);
     return os;
   }
+}
+
+Cause::Cause(const std::string &reason_, std::vector<Location> &&stack_)
+ : reason(reason_), stack(std::move(stack_)) { }
+
+Exception::Exception(const std::string &reason, const std::shared_ptr<Binding> &binding) : Value(type) {
+  causes.emplace_back(std::make_shared<Cause>(reason, Binding::stack_trace(binding)));
 }
 
 std::string Integer::str(int base) const {

@@ -2,6 +2,7 @@
 #define EXPR_H
 
 #include "location.h"
+#include "primfn.h"
 #include <memory>
 #include <string>
 #include <map>
@@ -28,8 +29,7 @@ struct Prim : public Expr {
   std::string name;
   int args;
 
-  // The function must call 'resume(completion, value);' when done
-  void (*fn)(void *data, std::vector<std::shared_ptr<Value> > &&args, std::unique_ptr<Receiver> completion);
+  PrimFn fn;
   void *data;
 
   static const char *type;
