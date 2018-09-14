@@ -33,8 +33,10 @@ int main(int argc, const char **argv) {
   argagg::parser argparser {{
     { "help", {"-h", "--help"},
       "shows this help message", 0},
-    { "jobs", {"-n", "--jobs"},
+    { "jobs", {"-j", "--jobs"},
       "number of concurrent jobs to run", 1},
+    { "debug", {"-d", "--debug"},
+      "simulate a stack for exceptions", 0},
     { "verbose", {"-v", "--verbose"},
       "output progress information", 0},
     { "init", {"--init"},
@@ -52,6 +54,7 @@ int main(int argc, const char **argv) {
 
   int jobs = args["jobs"].as<int>(std::thread::hardware_concurrency());
   bool verbose = args["verbose"];
+  queue.stack_trace = args["debug"];
 
   if (args["init"]) {
     std::string dir = args["init"];

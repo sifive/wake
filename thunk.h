@@ -22,6 +22,7 @@ struct Thunk {
 };
 
 struct ThunkQueue {
+  bool stack_trace;
   std::queue<Thunk> queue;
   void run();
 };

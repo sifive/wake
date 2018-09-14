@@ -69,7 +69,7 @@ void Thunk::eval(ThunkQueue &queue)
     }
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
-    auto args = std::make_shared<Binding>(nullptr, binding, nullptr, nullptr, 1);
+    auto args = std::make_shared<Binding>(nullptr, queue.stack_trace?binding:nullptr, nullptr, nullptr, 1);
     queue.queue.emplace(app->val.get(), binding, Binding::make_completer(args, 0));
     queue.queue.emplace(app->fn .get(), std::move(binding), std::unique_ptr<Receiver>(
       new Application(std::move(args), std::move(receiver))));
@@ -79,7 +79,7 @@ void Thunk::eval(ThunkQueue &queue)
     Receiver::receiveM(queue, std::move(receiver), std::move(closure));
   } else if (expr->type == DefBinding::type) {
     DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
-    auto defs = std::make_shared<Binding>(binding, binding, &defbinding->location, defbinding, defbinding->val.size());
+    auto defs = std::make_shared<Binding>(binding, queue.stack_trace?binding:nullptr, &defbinding->location, defbinding, defbinding->val.size());
     int j = 0;
     for (auto &i : defbinding->val)
       queue.queue.emplace(i.get(), binding, Binding::make_completer(defs, j++));

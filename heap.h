@@ -53,7 +53,7 @@ friend struct Completer;
 
 struct Binding {
   std::shared_ptr<Binding> next;
-  std::shared_ptr<Binding> invoker; // !!! want weak, but contracting
+  std::shared_ptr<Binding> invoker;
   std::unique_ptr<Future[]> future;
   Location *location;
   DefBinding *binding;
