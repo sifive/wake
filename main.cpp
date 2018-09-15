@@ -20,11 +20,13 @@ void resume(std::unique_ptr<Receiver> completion, std::shared_ptr<Value> &&retur
 }
 
 struct Output : public Receiver {
+  std::shared_ptr<Value> *save;
+  Output(std::shared_ptr<Value> *save_) : save(save_) { }
   void receive(ThunkQueue &queue, std::shared_ptr<Value> &&value);
 };
 
 void Output::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
-  std::cout << value.get() << std::endl;
+  *save = std::move(value);
 }
 
 int main(int argc, const char **argv) {
@@ -108,7 +110,12 @@ int main(int argc, const char **argv) {
       return 1;
     } else {
       std::stringstream expr;
-      for (auto i : args.pos) expr << i << " ";
+      bool first = true;
+      for (auto i : args.pos) {
+        if (!first) expr << " ";
+        first = false;
+        expr << i;
+      }
       targets.push_back(expr.str());
     }
   } else if (!args.pos.empty()) {
@@ -130,15 +137,18 @@ int main(int argc, const char **argv) {
   }
 
   // Read all wake targets
-  // !!! buggy for more than one body
-  for (auto i : targets) {
-    Lexer lex(i);
-    top->body = std::unique_ptr<Expr>(parse_command(lex));
+  std::vector<std::string> target_names;
+  Expr *body = new Lambda(LOCATION, "_", new Literal(LOCATION, "top"));
+  for (size_t i = 0; i < targets.size(); ++i) {
+    body = new Lambda(LOCATION, "_", body);
+    target_names.emplace_back("<target-" + std::to_string(i) + "-expression>");
+  }
+  for (size_t i = 0; i < targets.size(); ++i) {
+    Lexer lex(targets[i], target_names[i].c_str());
+    body = new App(LOCATION, body, parse_command(lex));
     if (lex.fail) ok = false;
   }
-  if (targets.empty()) {
-    top->body = std::unique_ptr<Expr>(new Literal(LOCATION, "no active wake targets (see -h and use -a)"));
-  }
+  top->body = std::unique_ptr<Expr>(body);
 
   /* Primitives */
   JobTable jobtable(&db, jobs, verbose);
@@ -170,8 +180,13 @@ int main(int argc, const char **argv) {
   if (args["list"]) return 0;
 
   if (verbose) std::cerr << "Running " << jobs << " jobs at a time." << std::endl;
-  queue.queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output));
+  std::shared_ptr<Value> output;
+  queue.queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output(&output)));
   do { queue.run(); } while (jobtable.wait());
+
+  Binding *iter = reinterpret_cast<Closure*>(output.get())->binding.get();
+  for (size_t i = 0; i < targets.size(); ++i)
+    std::cout << targets[i] << " = " << iter->future[0].output() << std::endl;
 
   //std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;
   db.clean(args["verbose"]);

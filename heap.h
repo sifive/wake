@@ -45,6 +45,9 @@ struct Future {
     value = std::move(value_);
   }
 
+  // use only after evaluation has completed
+  std::shared_ptr<Value> output() { return value; }
+
 private:
   std::shared_ptr<Value> value;
   std::unique_ptr<Receiver> waiting;

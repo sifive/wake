@@ -270,8 +270,8 @@ Lexer::Lexer(const char *file)
   if (engine->file) consume();
 }
 
-Lexer::Lexer(const std::string &cmdline)
-  : engine(new input_t("<command-line>", 0, 0, cmdline.size())), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
+Lexer::Lexer(const std::string &cmdline, const char *target)
+  : engine(new input_t(target, 0, 0, cmdline.size())), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
 {
   if (cmdline.size() >= SIZE) {
     fail = true;
