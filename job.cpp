@@ -2,6 +2,8 @@
 #include "prim.h"
 #include "value.h"
 #include "heap.h"
+#include "database.h"
+#include "location.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -15,7 +17,7 @@
 #include <cstring>
 
 struct Task {
-  bool cache;
+  int job;
   std::string environ;
   std::string stdin;
   std::string dir;
@@ -23,16 +25,15 @@ struct Task {
   std::string cmdline;
   std::unique_ptr<Receiver> completion;
   std::shared_ptr<Binding> binding;
-  Task(int cache_, const std::string &environ_, const std::string &stdin_, const std::string &dir_, const std::string &files_, const std::string &cmdline_, std::unique_ptr<Receiver> completion_, const std::shared_ptr<Binding> &binding_) :
-    cache(cache_), environ(environ_), stdin(stdin_), dir(dir_), files(files_), cmdline(cmdline_), completion(std::move(completion_)), binding(binding_) { }
+  Task(int job_, const std::string &environ_, const std::string &stdin_, const std::string &dir_, const std::string &files_, const std::string &cmdline_, std::unique_ptr<Receiver> completion_, const std::shared_ptr<Binding> &binding_) :
+    job(job_), environ(environ_), stdin(stdin_), dir(dir_), files(files_), cmdline(cmdline_), completion(std::move(completion_)), binding(binding_) { }
 };
 
 struct Job {
   pid_t pid;
+  int job;
   int pipe_stdout;
   int pipe_stderr;
-  std::stringstream stdout;
-  std::stringstream stderr;
   std::unique_ptr<Receiver> completion;
   std::shared_ptr<Binding> binding;
   Job() : pid(0) { }
@@ -42,17 +43,16 @@ struct JobTable::detail {
   std::vector<Job> table;
   std::list<Task> tasks;
   sigset_t sigset;
+  Database *db;
   bool verbose;
 };
 
 /* We return this fancy type, instead of a tuple, because we want to load the results from the database */
 struct JobResult : public Value {
-  std::shared_ptr<Value> stdout;
-  std::shared_ptr<Value> stderr;
-  std::shared_ptr<Value> inputs;
-  std::shared_ptr<Value> outputs;
+  Database *db;
+  int job;
   static const char *type;
-  JobResult() : Value(type) { }
+  JobResult(Database *db_, int job_) : Value(type), db(db_), job(job_) { }
 };
 
 const char *JobResult::type = "JobResult";
@@ -77,9 +77,10 @@ static void handle_SIGCHLD(int sig) {
   /* noop -- we just want to interrupt select */
 }
 
-JobTable::JobTable(int max_jobs, bool verbose) : imp(new JobTable::detail) {
+JobTable::JobTable(Database *db, int max_jobs, bool verbose) : imp(new JobTable::detail) {
   imp->table.resize(max_jobs);
   imp->verbose = verbose;
+  imp->db = db;
 
   sigset_t block;
   sigemptyset(&block);
@@ -154,7 +155,7 @@ static void launch(JobTable *jobtable) {
           perror("chdir");
           exit(1);
         }
-        // !!! use 'files' and 'cache'
+        // !!! use 'files'
         auto cmdline = split_null(task.cmdline);
         auto environ = split_null(task.environ);
         execve(cmdline[0], cmdline, environ);
@@ -166,6 +167,7 @@ static void launch(JobTable *jobtable) {
         std::cerr << ">>> " << i.pid << ": " << task.cmdline << std::endl;
       close(pipe_stdout[1]);
       close(pipe_stderr[1]);
+      i.job = task.job;
       i.pipe_stdout = pipe_stdout[0];
       i.pipe_stderr = pipe_stderr[0];
       i.completion = std::move(task.completion);
@@ -210,7 +212,7 @@ bool JobTable::wait() {
           close(i.pipe_stdout);
           i.pipe_stdout = -1;
         } else {
-          i.stdout.write(buffer, got);
+          imp->db->save_output(i.job, 1, buffer, got);
         }
       }
       if (i.pid != 0 && i.pipe_stderr != -1 && FD_ISSET(i.pipe_stderr, &set)) {
@@ -219,7 +221,7 @@ bool JobTable::wait() {
           close(i.pipe_stderr);
           i.pipe_stderr = -1;
         } else {
-          i.stderr.write(buffer, got);
+          imp->db->save_output(i.job, 2, buffer, got);
         }
       }
     }
@@ -244,36 +246,27 @@ bool JobTable::wait() {
           if (i.pipe_stdout != -1) {
             int got;
             while ((got = read(i.pipe_stdout, buffer, sizeof(buffer))) > 0)
-              i.stdout.write(buffer, got);
+              imp->db->save_output(i.job, 1, buffer, got);
+            close(i.pipe_stdout);
           }
           if (i.pipe_stderr != -1) {
             int got;
             while ((got = read(i.pipe_stderr, buffer, sizeof(buffer))) > 0)
-              i.stderr.write(buffer, got);
+              imp->db->save_output(i.job, 2, buffer, got);
+            close(i.pipe_stderr);
           }
-
-          if (i.pipe_stdout != -1) close(i.pipe_stdout);
-          if (i.pipe_stderr != -1) close(i.pipe_stderr);
           i.pid = 0;
           i.pipe_stdout = -1;
           i.pipe_stderr = -1;
-          auto stdout = std::make_shared<String>(i.stdout.str());
-          auto stderr = std::make_shared<String>(i.stderr.str());
-          i.stdout.clear();
-          i.stderr.clear();
-          if (imp->verbose) std::cout << stdout->value;
-          std::cerr << stderr->value;
+          if (imp->verbose) std::cout << imp->db->get_output(i.job, 1);
+          std::cerr << imp->db->get_output(i.job, 2);
 
           if (code == 0) {
             std::vector<std::shared_ptr<Value> > nil;
-            auto out = std::make_shared<JobResult>();
-            out->stdout  = std::move(stdout);
-            out->stderr  = std::move(stderr);
-            out->inputs  = make_list(std::move(nil));
-            out->outputs = make_list(std::move(nil));
+            auto out = std::make_shared<JobResult>(imp->db, i.job);
             resume(std::move(i.completion), std::move(out));
           } else {
-            resume(std::move(i.completion), std::make_shared<Exception>("Non-zero exit status (" + std::to_string(code) + ")\n" + stderr->value, i.binding));
+            resume(std::move(i.completion), std::make_shared<Exception>("Non-zero exit status (" + std::to_string(code) + ")", i.binding));
           }
 
           i.binding.reset();
@@ -297,35 +290,66 @@ static PRIMFN(prim_job) {
   STRING(dir, 3);
   STRING(files, 4);
   STRING(cmd, 5);
-  jobtable->imp->tasks.emplace_back(cache->str() == "1", env->value, stdin->value, dir->value, files->value, cmd->value, std::move(completion), binding);
-  launch(jobtable);
+  int cached = cache->str() == "1";
+  int job;
+  std::stringstream stack;
+  for (auto &i : Binding::stack_trace(binding)) stack << i << std::endl;
+  if (jobtable->imp->db->needs_build(
+      cached,
+      dir->value,
+      cmd->value,
+      env->value,
+      stdin->value,
+      files->value,
+      stack.str(),
+      &job))
+  {
+    jobtable->imp->tasks.emplace_back(
+      job,
+      env->value,
+      stdin->value,
+      dir->value,
+      files->value,
+      cmd->value,
+      std::move(completion),
+      binding);
+    launch(jobtable);
+  }
 }
 
 static PRIMFN(prim_stdout) {
   EXPECT(1);
   JOBRESULT(arg0, 0);
-  auto out = arg0->stdout;
+  auto out = std::make_shared<String>(arg0->db->get_output(arg0->job, 1));
   RETURN(out);
 }
 
 static PRIMFN(prim_stderr) {
   EXPECT(1);
   JOBRESULT(arg0, 0);
-  auto out = arg0->stderr;
+  auto out = std::make_shared<String>(arg0->db->get_output(arg0->job, 2));
   RETURN(out);
 }
 
 static PRIMFN(prim_inputs) {
   EXPECT(1);
   JOBRESULT(arg0, 0);
-  auto out = arg0->inputs;
+  auto files = arg0->db->get_inputs(arg0->job);
+  std::vector<std::shared_ptr<Value> > vals;
+  vals.reserve(files.size());
+  for (auto &i : files) vals.emplace_back(std::make_shared<String>(std::move(i)));
+  auto out = make_list(std::move(vals));
   RETURN(out);
 }
 
 static PRIMFN(prim_outputs) {
   EXPECT(1);
   JOBRESULT(arg0, 0);
-  auto out = arg0->outputs;
+  auto files = arg0->db->get_outputs(arg0->job);
+  std::vector<std::shared_ptr<Value> > vals;
+  vals.reserve(files.size());
+  for (auto &i : files) vals.emplace_back(std::make_shared<String>(std::move(i)));
+  auto out = make_list(std::move(vals));
   RETURN(out);
 }
 

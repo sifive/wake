@@ -3,11 +3,13 @@
 
 #include <memory>
 
+struct Database;
+
 struct JobTable {
   struct detail;
   std::unique_ptr<detail> imp;
 
-  JobTable(int max_jobs, bool verbose);
+  JobTable(Database *db, int max_jobs, bool verbose);
   ~JobTable();
 
   // Wait for a job to complete; false -> no more active jobs

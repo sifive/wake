@@ -1,6 +1,4 @@
 #include <iostream>
-#include <cassert>
-#include <cstring>
 #include <thread>
 #include <sstream>
 #include "parser.h"
@@ -12,6 +10,7 @@
 #include "expr.h"
 #include "job.h"
 #include "sources.h"
+#include "database.h"
 #include "argagg.hpp"
 
 static ThunkQueue queue;
@@ -29,17 +28,27 @@ void Output::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
 }
 
 int main(int argc, const char **argv) {
-  const char *usage = "Usage: wake [options] [--] EXPRESSION";
+  const char *usage = "Usage: wake [OPTION] [--] [ADDED EXPRESSION]";
   argagg::parser argparser {{
     { "help", {"-h", "--help"},
       "shows this help message", 0},
+    { "add", {"-a", "--add"},
+      "add a build target to wake", 0},
+    { "remove", {"-r", "--remove"},
+      "remove a build target from wake", 1},
+    { "list", {"-l", "--list"},
+      "list builds targets registed with wake", 0},
+    { "once", {"-o", "--once"},
+      "add a one-shot build target", 0},
     { "jobs", {"-j", "--jobs"},
       "number of concurrent jobs to run", 1},
-    { "debug", {"-d", "--debug"},
-      "simulate a stack for exceptions", 0},
     { "verbose", {"-v", "--verbose"},
       "output progress information", 0},
-    { "init", {"--init"},
+    { "debug", {"-d", "--debug"},
+      "simulate a stack for exceptions", 0},
+    { "parse", {"-p", "--parse"},
+      "parse wake files and print the AST", 0},
+    { "init", {"-i", "--init"},
       "directory to configure as workspace top", 1},
   }};
 
@@ -67,33 +76,72 @@ int main(int argc, const char **argv) {
     return 1;
   }
 
-  auto all_sources(find_all_sources());
-  auto wakefiles(sources(all_sources, ".*/[^/]+\\.wake"));
+  Database db;
+  std::string fail = db.open();
+  if (!fail.empty()) {
+    std::cerr << "Failed to open wake.db: " << fail << std::endl;
+    return 1;
+  }
+
+  std::vector<std::string> targets = db.get_targets();
+  if (args["list"]) {
+    std::cout << "Active wake targets:" << std::endl;
+    int j = 0;
+    for (auto &i : targets)
+      std::cout << "  " << j++ << " = " << i << std::endl;
+  }
+
+  if (args["remove"]) {
+    int victim = args["remove"];
+    if (victim < 0 || victim >= targets.size()) {
+      std::cerr << "Could not remove target " << victim << "; there are only " << targets.size() << std::endl;
+      return 1;
+    }
+    if (args["verbose"]) std::cout << "Removed target " << victim << " = " << targets[victim] << std::endl;
+    db.del_target(targets[victim]);
+    targets.erase(targets.begin() + victim);
+  }
+
+  if (args["once"] || args["add"]) {
+    if (args.pos.empty()) {
+      std::cerr << "You must specify positional arguments to use for the wake bulid target" << std::endl;
+      return 1;
+    } else {
+      std::stringstream expr;
+      for (auto i : args.pos) expr << i << " ";
+      targets.push_back(expr.str());
+    }
+  } else if (!args.pos.empty()) {
+    std::cerr << "Unexpected positional arguments (did you forget -a ?):";
+    for (auto i : args.pos) std::cerr << " " << i;
+    std::cerr << std::endl;
+    return 1;
+  }
 
   bool ok = true;
+  auto all_sources(find_all_sources());
+
+  // Read all wake build files
   std::unique_ptr<Top> top(new Top);
-  for (auto i : wakefiles) {
+  for (auto i : sources(all_sources, ".*/[^/]+\\.wake")) {
     Lexer lex(i->value.c_str());
     parse_top(*top.get(), lex);
     if (lex.fail) ok = false;
   }
-  wakefiles.clear();
 
-  if (args.pos.empty()) {
-    // read from stdin
-    std::cerr << "Interactive mode not yet supported; supply batch commands on command-line" << std::endl;
-    std::cerr << std::endl << usage << std::endl << argparser;
-    return 1;
-  } else {
-    std::stringstream expr;
-    for (auto i : args.pos) expr << i << " ";
-    Lexer lex(expr.str());
+  // Read all wake targets
+  // !!! buggy for more than one body
+  for (auto i : targets) {
+    Lexer lex(i);
     top->body = std::unique_ptr<Expr>(parse_command(lex));
     if (lex.fail) ok = false;
   }
+  if (targets.empty()) {
+    top->body = std::unique_ptr<Expr>(new Literal(LOCATION, "no active wake targets (see -h and use -a)"));
+  }
 
   /* Primitives */
-  JobTable jobtable(jobs, verbose);
+  JobTable jobtable(&db, jobs, verbose);
   PrimMap pmap;
   prim_register_string(pmap);
   prim_register_integer(pmap);
@@ -103,25 +151,29 @@ int main(int argc, const char **argv) {
   pmap["sources"].first = prim_sources;
   pmap["sources"].second = &all_sources;
 
-  const char *slash = strrchr(argv[0], '/');
-  const char *exec = slash ? slash + 1 : argv[0];
-  if (!strcmp(exec, "wake-parse")) {
-    std::cout << top.get();
-    return 0;
-  }
+  if (args["parse"]) std::cout << top.get();
 
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
   if (!root) ok = false;
 
   if (!ok) {
+    if (args["add"]) std::cerr << ">>> Expression not added to the active target list <<<" << std::endl;
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }
+
+  if (args["add"]) {
+    db.add_target(targets.back());
+    if (args["verbose"]) std::cout << "Added target " << (targets.size()-1) << " = " << targets.back() << std::endl;
+  }
+  if (args["parse"]) return 0;
+  if (args["list"]) return 0;
 
   if (verbose) std::cerr << "Running " << jobs << " jobs at a time." << std::endl;
   queue.queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output));
   do { queue.run(); } while (jobtable.wait());
 
   //std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;
+  db.clean(args["verbose"]);
   return 0;
 }
