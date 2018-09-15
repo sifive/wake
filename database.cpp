@@ -69,6 +69,7 @@ bool Database::needs_build(
   const std::string &stack,
   int   *job)
 {
+  *job = 0;
   return true;
 }
 

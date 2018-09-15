@@ -95,7 +95,7 @@ int main(int argc, const char **argv) {
 
   if (args["remove"]) {
     int victim = args["remove"];
-    if (victim < 0 || victim >= targets.size()) {
+    if (victim < 0 || victim >= (int)targets.size()) {
       std::cerr << "Could not remove target " << victim << "; there are only " << targets.size() << std::endl;
       return 1;
     }

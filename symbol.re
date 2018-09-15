@@ -189,6 +189,8 @@ top:
   start.row = in.row;
   start.column = in.cur - in.sol + 1;
   in.tok = in.cur;
+  char *YYCTXMARKER;
+  (void)YYCTXMARKER;
 
   /*!re2c
       re2c:define:YYCURSOR = in.cur;

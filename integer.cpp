@@ -81,7 +81,7 @@ static PRIMFN(prim_str) {
   EXPECT(2);
   INTEGER(arg0, 0);
   INTEGER(arg1, 1);
-  long base;
+  long base = 0;
   bool ok = mpz_fits_slong_p(arg0->value);
   if (ok) {
     base = mpz_get_si(arg0->value);
@@ -96,7 +96,7 @@ static PRIMFN(prim_int) {
   EXPECT(2);
   INTEGER(arg0, 0);
   STRING(arg1, 1);
-  long base;
+  long base = 0;
   bool ok = mpz_fits_slong_p(arg0->value);
   if (ok) {
     base = mpz_get_si(arg0->value);
