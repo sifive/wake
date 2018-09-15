@@ -5,10 +5,9 @@
 #include <string>
 #include <vector>
 
-
 struct Database {
   struct detail;
-  std::unique_ptr<detail> impl;
+  std::unique_ptr<detail> imp;
 
   Database();
   ~Database();

@@ -1,3 +1,4 @@
 *.o
 symbol.cpp
 wake
+wake.db
