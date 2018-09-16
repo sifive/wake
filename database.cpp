@@ -20,10 +20,12 @@ struct Database::detail {
   sqlite3_stmt *insert_file;
   sqlite3_stmt *insert_hash;
   sqlite3_stmt *get_log;
+  sqlite3_stmt *get_tree;
   //sqlite3_stmt *needs_build;
   long run_id;
   detail() : db(0), add_target(0), del_target(0), begin_txn(0), commit_txn(0), insert_job(0),
-             insert_tree(0), insert_log(0), insert_file(0), insert_hash(0), get_log(0) { }
+             insert_tree(0), insert_log(0), insert_file(0), insert_hash(0), get_log(0),
+             get_tree(0) { }
 };
 
 Database::Database() : imp(new detail) { }
@@ -178,6 +180,16 @@ std::string Database::open() {
     return out;
   }
 
+  const char *sql_get_tree =
+    "select f.path from t filetree, p files"
+    " where t.access=?, t.job_id=?, p.file_id=t.file_id;";
+  ret = sqlite3_prepare_v2(imp->db, sql_get_tree, -1, &imp->get_tree, 0);
+  if (ret != SQLITE_OK) {
+    std::string out = std::string("sqlite3_prepare_v2 get_tree: ") + sqlite3_errmsg(imp->db);
+    close();
+    return out;
+  }
+
   return "";
 }
 
@@ -273,6 +285,15 @@ void Database::close() {
     }
   }
   imp->get_log = 0;
+
+  if (imp->get_tree) {
+    ret = sqlite3_finalize(imp->get_tree);
+    if (ret != SQLITE_OK) {
+      std::cerr << "Could not sqlite3_finalize get_tree: " << sqlite3_errmsg(imp->db) << std::endl;
+      return;
+    }
+  }
+  imp->get_tree = 0;
 
   if (imp->db) {
     int ret = sqlite3_close(imp->db);
@@ -417,6 +438,20 @@ bool Database::needs_build(
       single_step (why, imp->insert_tree);
     }
   }
+/*
+  const char *sql_candidates =
+    "select job_id, run_id from jobs where directory=?, commandline=?, environment=?;";
+  // !!! fail if >1 candidate
+  const char *sql =
+    "(select h.file_id, h.hash from f filetree, h hashes"
+    " where f.access=1, f.job_id=?CANDIDATE?, h.file_id=f.file_id, h.run_id=?CANDIDATE?)"
+    "except"
+    "(select h.file_id, h.hash from f filetree, h hashes"
+    " where f.access=0, f.job_id=?THIS?, h.file_id=f.file_id, h.run_id=?NOW?)";
+  // !!! any results -> must rerun
+  // if want to reuse, confirm the outputs exist with same hash?
+  //   -> suggests we should hash all outputs on completion of a command
+*/
   end_txn();
   *job = out;
   return true;
@@ -448,12 +483,32 @@ void Database::save_job(long job, const std::string &inputs, const std::string &
   end_txn();
 }
 
-std::vector<std::string> Database::get_inputs(int job)  {
-  // !!!
+std::vector<std::string> Database::get_inputs(long job)  {
+  std::vector<std::string> out;
+  const char *why = "Could not read job inputs";
+  bind_integer(why, imp->get_tree, 1, INPUT);
+  bind_integer(why, imp->get_tree, 2, job);
+  while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
+    out.emplace_back(
+      reinterpret_cast<const char*>(sqlite3_column_text(imp->get_tree, 0)),
+      sqlite3_column_bytes(imp->get_tree, 0));
+  }
+  finish_stmt(why, imp->get_tree);
+  return out;
 }
 
-std::vector<std::string> Database::get_outputs(int job) {
-  // !!!
+std::vector<std::string> Database::get_outputs(long job) {
+  std::vector<std::string> out;
+  const char *why = "Could not read job outputs";
+  bind_integer(why, imp->get_tree, 1, OUTPUT);
+  bind_integer(why, imp->get_tree, 2, job);
+  while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
+    out.emplace_back(
+      reinterpret_cast<const char*>(sqlite3_column_text(imp->get_tree, 0)),
+      sqlite3_column_bytes(imp->get_tree, 0));
+  }
+  finish_stmt(why, imp->get_tree);
+  return out;
 }
 
 void Database::save_output(long job, int descriptor, const char *buffer, int size) {
@@ -475,7 +530,7 @@ std::string Database::get_output(long job, int descriptor) {
       reinterpret_cast<const char*>(sqlite3_column_text(imp->get_log, 0)),
       sqlite3_column_bytes(imp->get_log, 0));
   }
-  finish_stmt (why, imp->get_log);
+  finish_stmt(why, imp->get_log);
   return out.str();
 }
 
