@@ -32,6 +32,8 @@ static PRIMFN(prim_re2) {
   STRING(arg0, 0);
   RE2::Options options;
   options.set_log_errors(false);
+  options.set_one_line(true);
+  options.set_dot_nl(true);
   auto out = std::make_shared<RegExp>(arg0->value, options);
   if (out->exp.ok()) {
     RETURN(out);

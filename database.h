@@ -22,31 +22,39 @@ struct Database {
   void prepare(); // prepare for job execution
   void clean(bool verbose); // finished execution; sweep stale files
 
+  void begin_txn();
+  void end_txn();
+
   bool needs_build(
     int   cache, // 0 -> always need rebuild
     const std::string &directory,
     const std::string &commandline,
     const std::string &environment,
-    // ^^^ only these matter to identify the job
     const std::string &stdin, // "" -> /dev/null
+    // ^^^ only these matter to identify the job
     const std::string &visible_files, // null separated
-    // ^^^ a rebuild will be necessary if the hashes of inputs disagree
+    // ^^^ a rebuild will be necessary if the hashes of inputs or stdin disagree
     const std::string &stack,
-    int   *job); // key used for accesses below
+    long   *job); // key used for accesses below
+  void save_job(
+    long job,
+    const std::string &inputs,   // null separated
+    const std::string &outputs); // null separated
+  std::vector<std::string> get_inputs(int job);
+  std::vector<std::string> get_outputs(int job);
+
   void save_output( // call only if needs_build -> true
-    int job,
+    long job,
     int descriptor,
     const char *buffer,
     int size);
-  void save_job(
-    int job,
-    const std::string &inputs,   // null separated
-    const std::string &outputs); // null separated
   std::string get_output(
-    int job,
+    long job,
     int descriptor);
-  std::vector<std::string> get_inputs(int job);
-  std::vector<std::string> get_outputs(int job);
+
+  void add_hash(
+    const std::string &file,
+    const std::string &hash);
 };
 
 #endif

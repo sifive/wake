@@ -180,6 +180,7 @@ int main(int argc, const char **argv) {
   if (args["list"]) return 0;
 
   if (verbose) std::cerr << "Running " << jobs << " jobs at a time." << std::endl;
+  db.prepare();
   std::shared_ptr<Value> output;
   queue.queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output(&output)));
   do { queue.run(); } while (jobtable.wait());

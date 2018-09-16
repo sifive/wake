@@ -17,7 +17,7 @@
 #include <cstring>
 
 struct Task {
-  int job;
+  long job;
   std::string environ;
   std::string stdin;
   std::string dir;
@@ -25,13 +25,13 @@ struct Task {
   std::string cmdline;
   std::unique_ptr<Receiver> completion;
   std::shared_ptr<Binding> binding;
-  Task(int job_, const std::string &environ_, const std::string &stdin_, const std::string &dir_, const std::string &files_, const std::string &cmdline_, std::unique_ptr<Receiver> completion_, const std::shared_ptr<Binding> &binding_) :
+  Task(long job_, const std::string &environ_, const std::string &stdin_, const std::string &dir_, const std::string &files_, const std::string &cmdline_, std::unique_ptr<Receiver> completion_, const std::shared_ptr<Binding> &binding_) :
     job(job_), environ(environ_), stdin(stdin_), dir(dir_), files(files_), cmdline(cmdline_), completion(std::move(completion_)), binding(binding_) { }
 };
 
 struct Job {
   pid_t pid;
-  int job;
+  long job;
   int pipe_stdout;
   int pipe_stderr;
   std::unique_ptr<Receiver> completion;
@@ -50,9 +50,9 @@ struct JobTable::detail {
 /* We return this fancy type, instead of a tuple, because we want to load the results from the database */
 struct JobResult : public Value {
   Database *db;
-  int job;
+  long job;
   static const char *type;
-  JobResult(Database *db_, int job_) : Value(type), db(db_), job(job_) { }
+  JobResult(Database *db_, long job_) : Value(type), db(db_), job(job_) { }
 };
 
 const char *JobResult::type = "JobResult";
@@ -136,16 +136,16 @@ static void launch(JobTable *jobtable) {
         perror("pipe");
         exit(1);
       }
+      fcntl(pipe_stdout[0], F_SETFL, fcntl(pipe_stdout[0], F_GETFL, 0) | FD_CLOEXEC);
+      fcntl(pipe_stderr[0], F_SETFL, fcntl(pipe_stderr[0], F_GETFL, 0) | FD_CLOEXEC);
       i.pid = fork();
       if (i.pid == 0) {
         dup2(pipe_stdout[1], 1);
         dup2(pipe_stderr[1], 2);
-        close(pipe_stdout[0]);
         close(pipe_stdout[1]);
-        close(pipe_stderr[0]);
         close(pipe_stderr[1]);
         int stdin = open(task.stdin.c_str(), O_RDONLY);
-        if (!stdin) {
+        if (stdin == -1) {
           perror(("open " + task.stdin).c_str());
           exit(1);
         }
@@ -291,7 +291,7 @@ static PRIMFN(prim_job) {
   STRING(files, 4);
   STRING(cmd, 5);
   int cached = cache->str() == "1";
-  int job;
+  long job;
   std::stringstream stack;
   for (auto &i : Binding::stack_trace(binding)) stack << i << std::endl;
   if (jobtable->imp->db->needs_build(
@@ -353,6 +353,15 @@ static PRIMFN(prim_outputs) {
   RETURN(out);
 }
 
+static PRIMFN(prim_add_hash) {
+  EXPECT(3);
+  JOBRESULT(job, 0);
+  STRING(file, 1);
+  STRING(hash, 2);
+  job->db->add_hash(file->value, hash->value);
+  RETURN(args[1]);
+}
+
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   pmap["job"].first = prim_job;
   pmap["job"].second = jobtable;
@@ -360,4 +369,5 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   pmap["job_stderr" ].first = prim_stderr;
   pmap["job_inputs" ].first = prim_inputs;
   pmap["job_outputs"].first = prim_outputs;
+  pmap["add_hash"   ].first = prim_add_hash;
 }

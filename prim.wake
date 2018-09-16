@@ -177,27 +177,28 @@ global sources dir regexp = prim "sources"
 def implode l = cat (foldr (_, "\0", _) nil l)
 def runjob cache env stdin dir files cmd =
   def run cache env stdin dir files cmd = prim "job"
-  def result = run cache env stdin dir files cmd
+  def hfiles = map hash files
+  def result = run cache env.implode stdin dir hfiles.implode cmd.implode
   # Defer the execution of these, as they call to the database
-  def stdout  r = prim "job_stdout"
   def stderr  r = prim "job_stderr"
   def inputs  r = prim "job_inputs"
   def outputs r = prim "job_outputs"
-  def get i = # We use this getter hide the bare JobResult type
-    if      i == 0 then stdout  result
-    else if i == 1 then stderr  result
-    else if i == 2 then inputs  result
-    else if i == 3 then outputs result
-    else nil
-  get
+  \f (f stdout stderr inputs outputs) result
+
+global hash f =
+  def run cache env stdin dir files cmd = prim "job"
+  def result = run 0 "" f "." "\0" "/opt/local/bin/md5sum\0"
+  def stdout r = prim "job_stdout"
+  def add r f h = prim "add_hash"
+  add result f (head (extract "(.{32}).*" result.stdout))
 
 # Access the output of a job
-global stdout  job = job 0
-global stderr  job = job 1
-global inputs  job = job 2
-global outputs job = job 3
+global stdout  job = job (\x\_\_\_ x)
+global stderr  job = job (\_\x\_\_ x)
+global inputs  job = job (\_\_\x\_ x)
+global outputs job = job (\_\_\_\x x)
 
 global null = "/dev/null"
 
 # file paths are all relative to workspace root
-global job env dir files cmd = runjob 1 env.implode null dir files.implode cmd.implode
+global job env dir files cmd = runjob 1 env null dir files cmd
