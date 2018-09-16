@@ -184,9 +184,16 @@ int main(int argc, const char **argv) {
   queue.queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output(&output)));
   do { queue.run(); } while (jobtable.wait());
 
+  std::vector<std::shared_ptr<Value> > outputs;
+  outputs.reserve(targets.size());
   Binding *iter = reinterpret_cast<Closure*>(output.get())->binding.get();
+  for (size_t i = 0; i < targets.size(); ++i) {
+    outputs.emplace_back(iter->future[0].output());
+    iter = iter->next.get();
+  }
+
   for (size_t i = 0; i < targets.size(); ++i)
-    std::cout << targets[i] << " = " << iter->future[0].output() << std::endl;
+    std::cout << targets[i] << " = " << outputs[targets.size()-1-i] << std::endl;
 
   //std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;
   db.clean(args["verbose"]);
