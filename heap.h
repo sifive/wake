@@ -49,6 +49,8 @@ struct Future {
   // use only after evaluation has completed
   std::shared_ptr<Value> output() { return value; }
 
+  void hash(std::unique_ptr<Hasher> hasher);
+
 private:
   std::shared_ptr<Value> value;
   std::unique_ptr<Receiver> waiting;
@@ -59,17 +61,19 @@ struct Binding {
   std::shared_ptr<Binding> next;
   std::shared_ptr<Binding> invoker;
   std::unique_ptr<Future[]> future;
+  std::unique_ptr<Hasher> hasher;
   Location *location;
   DefBinding *binding;
+  uint64_t hashcode[2];
   int nargs;
 
   Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Location *location_, DefBinding *binding_, int nargs_)
-    : next(next_), invoker(invoker_), future(new Future[nargs_]), location(location_), binding(binding_), nargs(nargs_) { }
+    : next(next_), invoker(invoker_), future(new Future[nargs_]), hasher(),
+      location(location_), binding(binding_), hashcode{0, 0}, nargs(nargs_) { }
 
   static std::unique_ptr<Receiver> make_completer(const std::shared_ptr<Binding> &binding, int arg);
   static std::vector<Location> stack_trace(const std::shared_ptr<Binding> &binding);
-
-  void hash(std::unique_ptr<Hasher> hasher);
+  static void hash(const std::shared_ptr<Binding> &binding, std::unique_ptr<Hasher> hasher_);
 };
 
 #endif

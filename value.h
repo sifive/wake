@@ -14,6 +14,7 @@ struct Binding;
 struct Location;
 
 struct Hasher {
+  std::unique_ptr<Hasher> next;
   virtual void receive(uint64_t hash[2]) = 0;
   virtual ~Hasher();
 };

@@ -79,7 +79,7 @@ struct ClosureHasher : public Hasher {
 };
 
 void Closure::hash(std::unique_ptr<Hasher> hasher) {
-  binding->hash(std::unique_ptr<Hasher>(new ClosureHasher(std::move(hasher), body)));
+  Binding::hash(binding, std::unique_ptr<Hasher>(new ClosureHasher(std::move(hasher), body)));
 }
 
 Cause::Cause(const std::string &reason_, std::vector<Location> &&stack_)

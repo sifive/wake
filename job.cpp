@@ -155,7 +155,7 @@ static void launch(JobTable *jobtable) {
         dup2(pipe_stderr[1], 2);
         close(pipe_stdout[1]);
         close(pipe_stderr[1]);
-        int stdin = open(task.stdin.c_str(), O_RDONLY);
+        int stdin = open(task.stdin.empty() ? "/dev/null" : task.stdin.c_str(), O_RDONLY);
         if (stdin == -1) {
           perror(("open " + task.stdin).c_str());
           exit(1);
