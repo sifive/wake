@@ -114,7 +114,10 @@ void Binding::hash(const std::shared_ptr<Binding> &binding, std::unique_ptr<Hash
   if (binding->hashcode) {
     hasher->receive(binding->hashcode);
   } else {
-    if (!binding->hasher) {
+    bool first = !binding->hasher;
+    hasher->next = std::move(binding->hasher);
+    binding->hasher = std::move(hasher);
+    if (first) {
       if (binding->next) {
         Binding::hash(binding->next, std::unique_ptr<Hasher>(new ParentHasher(binding)));
       } else {
@@ -122,7 +125,5 @@ void Binding::hash(const std::shared_ptr<Binding> &binding, std::unique_ptr<Hash
         FutureHasher::chain(std::shared_ptr<Binding>(binding), std::move(codes), 0);
       }
     }
-    hasher->next = std::move(binding->hasher);
-    binding->hasher = std::move(hasher);
   }
 }

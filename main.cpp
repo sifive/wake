@@ -196,8 +196,12 @@ int main(int argc, const char **argv) {
     iter = iter->next.get();
   }
 
-  for (size_t i = 0; i < targets.size(); ++i)
-    std::cout << targets[i] << " = " << outputs[targets.size()-1-i] << std::endl;
+  for (size_t i = 0; i < targets.size(); ++i) {
+    Value *v = outputs[targets.size()-1-i].get();
+    std::cout << targets[i] << " = ";
+    if (v) std::cout << v; else std::cout << "MISSING FUTURE";
+    std::cout << std::endl;
+  }
 
   //std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;
   db.clean(args["verbose"]);
