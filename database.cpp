@@ -22,11 +22,12 @@ struct Database::detail {
   sqlite3_stmt *get_log;
   sqlite3_stmt *get_tree;
   sqlite3_stmt *set_runtime;
-  //sqlite3_stmt *needs_build;
+  sqlite3_stmt *find_prior;
+  sqlite3_stmt *needs_build;
   long run_id;
   detail() : db(0), add_target(0), del_target(0), begin_txn(0), commit_txn(0), insert_job(0),
              insert_tree(0), insert_log(0), insert_file(0), insert_hash(0), get_log(0),
-             get_tree(0), set_runtime(0) { }
+             get_tree(0), set_runtime(0), find_prior(0), needs_build(0) { }
 };
 
 Database::Database() : imp(new detail) { }
@@ -68,6 +69,7 @@ std::string Database::open() {
     "  stack       text    not null,"
     "  stdin       integer," // null means /dev/null
     "  time        text    not null default current_timestamp,"
+    "  status      integer,"
     "  runtime     real,"
     "  foreign key(run_id, stdin) references hashes(run_id, file_id));"
     "create index if not exists job on jobs(directory, commandline, environment);"
@@ -192,10 +194,34 @@ std::string Database::open() {
     return out;
   }
 
-  const char *sql_set_runtime = "update jobs set runtime=? where job_id=?;";
+  const char *sql_set_runtime = "update jobs set status=?, runtime=? where job_id=?;";
   ret = sqlite3_prepare_v2(imp->db, sql_set_runtime, -1, &imp->set_runtime, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 set_runtime: ") + sqlite3_errmsg(imp->db);
+    close();
+    return out;
+  }
+
+  const char *sql_find_prior =
+    "select job_id from jobs where "
+    "directory=? and commandline=? and environment=? and runtime is not null";
+  ret = sqlite3_prepare_v2(imp->db, sql_find_prior, -1, &imp->find_prior, 0);
+  if (ret != SQLITE_OK) {
+    std::string out = std::string("sqlite3_prepare_v2 find_prior: ") + sqlite3_errmsg(imp->db);
+    close();
+    return out;
+  }
+
+  const char *sql_needs_build =
+    "select h.file_id, h.hash from jobs j, filetree f, hashes h"
+    " where j.directory=? and j.commandline=? and j.environment=? and j.runtime is not null"
+    "  and f.access=1 and f.job_id=j.job_id and h.file_id=f.file_id and h.run_id=j.run_id "
+    "except "
+    "select h.file_id, h.hash from filetree f, hashes h"
+    " where f.access=0 and f.job_id=? and h.file_id=f.file_id and h.run_id=?";
+  ret = sqlite3_prepare_v2(imp->db, sql_needs_build, -1, &imp->needs_build, 0);
+  if (ret != SQLITE_OK) {
+    std::string out = std::string("sqlite3_prepare_v2 needs_build: ") + sqlite3_errmsg(imp->db);
     close();
     return out;
   }
@@ -313,6 +339,24 @@ void Database::close() {
     }
   }
   imp->set_runtime = 0;
+
+  if (imp->find_prior) {
+    ret = sqlite3_finalize(imp->find_prior);
+    if (ret != SQLITE_OK) {
+      std::cerr << "Could not sqlite3_finalize find_prior: " << sqlite3_errmsg(imp->db) << std::endl;
+      return;
+    }
+  }
+  imp->find_prior = 0;
+
+  if (imp->needs_build) {
+    ret = sqlite3_finalize(imp->needs_build);
+    if (ret != SQLITE_OK) {
+      std::cerr << "Could not sqlite3_finalize needs_build: " << sqlite3_errmsg(imp->db) << std::endl;
+      return;
+    }
+  }
+  imp->needs_build = 0;
 
   if (imp->db) {
     int ret = sqlite3_close(imp->db);
@@ -467,30 +511,29 @@ bool Database::needs_build(
       tok = scan+1;
     }
   }
-/*
-  const char *sql_candidates =
-    "select job_id, run_id from jobs where directory=?, commandline=?, environment=?;";
-  // !!! fail if >1 candidate
-  const char *sql =
-    "(select h.file_id, h.hash from f filetree, h hashes"
-    " where f.access=1, f.job_id=?CANDIDATE?, h.file_id=f.file_id, h.run_id=?CANDIDATE?)"
-    "except"
-    "(select h.file_id, h.hash from f filetree, h hashes"
-    " where f.access=0, f.job_id=?THIS?, h.file_id=f.file_id, h.run_id=?NOW?)";
-  // !!! any results -> must rerun
-  // if want to reuse, confirm the outputs exist with same hash?
-  //   -> suggests we should hash all outputs on completion of a command
-*/
+  bind_string (why, imp->find_prior, 1, directory);
+  bind_string (why, imp->find_prior, 2, commandline);
+  bind_string (why, imp->find_prior, 3, environment);
+  bool prior = sqlite3_step(imp->find_prior) == SQLITE_ROW;
+  finish_stmt (why, imp->find_prior);
+  bind_string (why, imp->needs_build, 1, directory);
+  bind_string (why, imp->needs_build, 2, commandline);
+  bind_string (why, imp->needs_build, 3, environment);
+  bind_integer(why, imp->needs_build, 4, out);
+  bind_integer(why, imp->needs_build, 5, imp->run_id);
+  bool rerun = sqlite3_step(imp->needs_build) == SQLITE_ROW;
+  finish_stmt (why, imp->needs_build);
   end_txn();
   *job = out;
-  return true;
+  return !prior || rerun || !cache;
 }
 
-void Database::save_job(long job, const std::string &inputs, const std::string &outputs, double runtime) {
+void Database::save_job(long job, const std::string &inputs, const std::string &outputs, int status, double runtime) {
   const char *why = "Could not save job inputs and outputs";
   begin_txn();
-  bind_double (why, imp->set_runtime, 1, runtime);
-  bind_integer(why, imp->set_runtime, 2, job);
+  bind_integer(why, imp->set_runtime, 1, status);
+  bind_double (why, imp->set_runtime, 2, runtime);
+  bind_integer(why, imp->set_runtime, 3, job);
   single_step (why, imp->set_runtime);
   const char *tok = inputs.c_str();
   const char *end = tok + inputs.size();

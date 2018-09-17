@@ -40,6 +40,7 @@ struct Database {
     long job,
     const std::string &inputs,  // null separated
     const std::string &outputs, // null separated
+    int status,
     double runtime);
   std::vector<std::string> get_inputs(long job);
   std::vector<std::string> get_outputs(long job);

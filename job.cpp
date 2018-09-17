@@ -56,10 +56,10 @@ struct JobTable::detail {
 struct JobResult : public Value {
   Database *db;
   long job;
-  int code;
+  int status;
   double runtime;
   static const char *type;
-  JobResult(Database *db_, long job_, int code_, double runtime_) : Value(type), db(db_), job(job_), code(code_), runtime(runtime_) { }
+  JobResult(Database *db_, long job_, int status_, double runtime_) : Value(type), db(db_), job(job_), status(status_), runtime(runtime_) { }
 
   void stream(std::ostream &os) const;
   void hash(std::unique_ptr<Hasher> hasher);
@@ -330,6 +330,9 @@ static PRIMFN(prim_job) {
       cmd->value,
       std::move(completion));
     launch(jobtable);
+  } else {
+    auto out = std::make_shared<JobResult>(jobtable->imp->db, job, 0, 0);
+    RETURN(out);
   }
 }
 
@@ -343,7 +346,7 @@ static PRIMFN(prim_stdout) {
 static PRIMFN(prim_status) {
   EXPECT(1);
   JOBRESULT(arg0, 0);
-  auto out = std::make_shared<Integer>(arg0->code);
+  auto out = std::make_shared<Integer>(arg0->status);
   RETURN(out);
 }
 
@@ -381,7 +384,7 @@ static PRIMFN(prim_finish) {
   JOBRESULT(job, 0);
   STRING(inputs, 1);
   STRING(outputs, 2);
-  job->db->save_job(job->job, inputs->value, outputs->value, job->runtime);
+  job->db->save_job(job->job, inputs->value, outputs->value, job->runtime, job->status);
   RETURN(args[0]);
 }
 
