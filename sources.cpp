@@ -19,7 +19,7 @@ bool make_workspace(const std::string &dir) {
 bool chdir_workspace() {
   int attempts;
   for (attempts = 100; attempts && access("wake.db", W_OK|R_OK) == -1; --attempts) {
-    chdir("..");
+    if (chdir("..") == -1) return false;
   }
   return attempts != 0;
 }

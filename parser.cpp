@@ -370,7 +370,7 @@ static void publish_def(Lexer &lex, DefMap::defs &publish, const std::string &na
   DefMap::defs::iterator i;
   if ((i = publish.find(name)) == publish.end()) {
     // A reference to _tail which we close with a lambda at the top of the chain
-    i = publish.insert(std::make_pair(name, new VarRef(def->location, "_tail"))).first;
+    i = publish.insert(std::make_pair(name, std::unique_ptr<Expr>(new VarRef(def->location, "_tail")))).first;
   }
   // Make a tuple
   i->second = std::unique_ptr<Expr>(new Lambda(def->location, "_pub",
