@@ -65,7 +65,9 @@ void JobResult::hash(std::unique_ptr<Hasher> hasher) {
   uint64_t payload[2];
   payload[0] = (long)type;
   payload[1] = job;
-  hasher->receive(payload);
+  Hash out;
+  HASH(payload, sizeof(payload), (long)type, out);
+  hasher->receive(out);
 }
 
 static std::unique_ptr<Receiver> cast_jobresult(std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, JobResult **job) {

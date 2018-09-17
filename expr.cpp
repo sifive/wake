@@ -1,6 +1,6 @@
 #include "expr.h"
 #include "value.h"
-#include "MurmurHash3.h"
+#include "hash.h"
 #include <iostream>
 #include <cassert>
 #include <sstream>
@@ -43,7 +43,7 @@ void VarRef::hash() {
   uint64_t payload[2];
   payload[0] = depth;
   payload[1] = offset;
-  MurmurHash3_x64_128(payload, 16, (long)type, hashcode);
+  HASH(payload, 16, (long)type, hashcode);
 }
 
 void Subscribe::format(std::ostream &os, int depth) const {
@@ -61,14 +61,12 @@ void App::format(std::ostream &os, int depth) const {
 }
 
 void App::hash() {
-  uint64_t codes[4];
+  std::vector<uint64_t> codes;
   fn->hash();
   val->hash();
-  codes[0] = fn->hashcode[0];
-  codes[1] = fn->hashcode[1];
-  codes[2] = val->hashcode[0];
-  codes[3] = val->hashcode[1];
-  MurmurHash3_x64_128(codes, 32, (long)type, hashcode);
+  fn->hashcode.push(codes);
+  val->hashcode.push(codes);
+  HASH(codes.data(), codes.size()*8, (long)type, hashcode);
 }
 
 void Lambda::format(std::ostream &os, int depth) const {
@@ -78,7 +76,7 @@ void Lambda::format(std::ostream &os, int depth) const {
 
 void Lambda::hash() {
   body->hash();
-  MurmurHash3_x64_128(body->hashcode, 16, (long)type, hashcode);
+  HASH(&body->hashcode, sizeof(body->hashcode), (long)type, hashcode);
 }
 
 void DefMap::format(std::ostream &os, int depth) const {
@@ -105,15 +103,14 @@ void Literal::format(std::ostream &os, int depth) const {
 struct LiteralHasher : public Hasher {
   Literal *lit;
   LiteralHasher(Literal *lit_) : lit(lit_) { }
-  void receive(uint64_t hash[2]) {
-    lit->hashcode[0] = hash[0];
-    lit->hashcode[1] = hash[1];
+  void receive(Hash hash) {
+    lit->hashcode = hash;
   }
 };
 
 void Literal::hash() {
   value->hash(std::unique_ptr<Hasher>(new LiteralHasher(this)));
-  MurmurHash3_x64_128(hashcode, 16, (long)type, hashcode);
+  HASH(&hashcode, sizeof(hashcode), (long)type, hashcode);
 }
 
 void Prim::format(std::ostream &os, int depth) const {
@@ -121,7 +118,7 @@ void Prim::format(std::ostream &os, int depth) const {
 }
 
 void Prim::hash() {
-  MurmurHash3_x64_128(name.data(), name.size(), (long)type, hashcode);
+  HASH(name.data(), name.size(), (long)type, hashcode);
 }
 
 void Top::format(std::ostream &os, int depth) const {
@@ -154,18 +151,15 @@ void DefBinding::hash() {
   std::vector<uint64_t> codes;
   for (auto &i : val) {
     i->hash();
-    codes.push_back(i->hashcode[0]);
-    codes.push_back(i->hashcode[1]);
+    i->hashcode.push(codes);
   }
   for (auto &i : fun) {
     i->hash();
-    codes.push_back(i->hashcode[0]);
-    codes.push_back(i->hashcode[1]);
+    i->hashcode.push(codes);
   }
   body->hash();
-  codes.push_back(body->hashcode[0]);
-  codes.push_back(body->hashcode[1]);
-  MurmurHash3_x64_128(codes.data(), codes.size()*sizeof(uint64_t), (long)type, hashcode);
+  body->hashcode.push(codes);
+  HASH(codes.data(), codes.size()*8, (long)type, hashcode);
 }
 
 std::ostream & operator << (std::ostream &os, const Expr *expr) {

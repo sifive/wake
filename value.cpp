@@ -1,7 +1,7 @@
 #include "value.h"
 #include "expr.h"
 #include "heap.h"
-#include "MurmurHash3.h"
+#include "hash.h"
 #include <iostream>
 #include <sstream>
 #include <cassert>
@@ -44,21 +44,21 @@ void Exception::stream(std::ostream &os) const {
 }
 
 void String::hash(std::unique_ptr<Hasher> hasher) {
-  uint64_t payload[2];
-  MurmurHash3_x64_128(value.data(), value.size(), (long)type, payload);
+  Hash payload;
+  HASH(value.data(), value.size(), (long)type, payload);
   hasher->receive(payload);
 }
 
 void Integer::hash(std::unique_ptr<Hasher> hasher) {
-  uint64_t payload[2];
-  MurmurHash3_x64_128(value[0]._mp_d, abs(value[0]._mp_size)*sizeof(mp_limb_t), (long)type, payload);
+  Hash payload;
+  HASH(value[0]._mp_d, abs(value[0]._mp_size)*sizeof(mp_limb_t), (long)type, payload);
   hasher->receive(payload);
 }
 
 void Exception::hash(std::unique_ptr<Hasher> hasher) {
-  uint64_t payload[2];
+  Hash payload;
   std::string str = to_str();
-  MurmurHash3_x64_128(str.data(), str.size(), (long)type, payload);
+  HASH(str.data(), str.size(), (long)type, payload);
   hasher->receive(payload);
 }
 
@@ -66,14 +66,12 @@ struct ClosureHasher : public Hasher {
   std::unique_ptr<Hasher> chain;
   Expr *body;
   ClosureHasher(std::unique_ptr<Hasher> chain_, Expr *body_) : chain(std::move(chain_)), body(body_) { }
-  void receive(uint64_t hash[2]) {
-    uint64_t codes[4];
-    uint64_t out[2];
-    codes[0] = body->hashcode[0];
-    codes[1] = body->hashcode[1];
-    codes[2] = hash[0];
-    codes[3] = hash[1];
-    MurmurHash3_x64_128(codes, 32, (long)Closure::type, out);
+  void receive(Hash hash) {
+    std::vector<uint64_t> codes;
+    Hash out;
+    hash.push(codes);
+    body->hashcode.push(codes);
+    HASH(codes.data(), 8*codes.size(), (long)Closure::type, out);
     chain->receive(out);
   }
 };

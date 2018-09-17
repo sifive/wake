@@ -1,6 +1,7 @@
 #ifndef HEAP_H
 #define HEAP_H
 
+#include "hash.h"
 #include <memory>
 #include <vector>
 
@@ -64,12 +65,12 @@ struct Binding {
   std::unique_ptr<Hasher> hasher;
   Location *location;
   DefBinding *binding;
-  uint64_t hashcode[2];
+  Hash hashcode;
   int nargs;
 
   Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Location *location_, DefBinding *binding_, int nargs_)
     : next(next_), invoker(invoker_), future(new Future[nargs_]), hasher(),
-      location(location_), binding(binding_), hashcode{0, 0}, nargs(nargs_) { }
+      location(location_), binding(binding_), hashcode(), nargs(nargs_) { }
 
   static std::unique_ptr<Receiver> make_completer(const std::shared_ptr<Binding> &binding, int arg);
   static std::vector<Location> stack_trace(const std::shared_ptr<Binding> &binding);

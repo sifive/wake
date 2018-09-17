@@ -1,6 +1,7 @@
 #ifndef VALUE_H
 #define VALUE_H
 
+#include "hash.h"
 #include <string>
 #include <memory>
 #include <vector>
@@ -15,7 +16,7 @@ struct Location;
 
 struct Hasher {
   std::unique_ptr<Hasher> next;
-  virtual void receive(uint64_t hash[2]) = 0;
+  virtual void receive(Hash hash) = 0;
   virtual ~Hasher();
 };
 

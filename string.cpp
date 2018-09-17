@@ -1,7 +1,7 @@
 #include "prim.h"
 #include "value.h"
 #include "heap.h"
-#include "MurmurHash3.h"
+#include "hash.h"
 #include <sstream>
 
 struct CatStream : public Value {
@@ -16,9 +16,9 @@ const char *CatStream::type = "CatStream";
 
 void CatStream::stream(std::ostream &os) const { os << "CatStream(" << str.str() << ")"; }
 void CatStream::hash(std::unique_ptr<Hasher> hasher) {
-  uint64_t payload[2];
+  Hash payload;
   std::string data = str.str();
-  MurmurHash3_x64_128(data.data(), data.size(), (long)type, payload);
+  HASH(data.data(), data.size(), (long)type, payload);
   hasher->receive(payload);
 }
 

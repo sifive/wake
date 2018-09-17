@@ -3,6 +3,7 @@
 
 #include "location.h"
 #include "primfn.h"
+#include "hash.h"
 #include <memory>
 #include <string>
 #include <map>
@@ -17,7 +18,7 @@ struct Value;
 struct Expr {
   const char *type;
   Location location;
-  uint64_t hashcode[2];
+  Hash hashcode;
   long flags;
 
   Expr(const char *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), flags(flags_) { }
@@ -87,6 +88,18 @@ struct Literal : public Expr {
 
   Literal(const Location &location_, std::shared_ptr<Value> &&value_);
   Literal(const Location &location_, const char *value_);
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
+};
+
+struct Memoize : public Expr {
+  std::unique_ptr<Expr> body;
+  std::map<Hash, std::shared_ptr<Value> > values;
+
+  static const char *type;
+  Memoize(const Location &location_, Expr *body_)
+   : Expr(type, location_), body(body_) { }
 
   void format(std::ostream &os, int depth) const;
   void hash();

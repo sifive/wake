@@ -1,7 +1,7 @@
 #include "prim.h"
 #include "value.h"
 #include "heap.h"
-#include "MurmurHash3.h"
+#include "hash.h"
 #include <re2/re2.h>
 #include <iostream>
 
@@ -17,9 +17,9 @@ const char *RegExp::type = "RegExp";
 
 void RegExp::stream(std::ostream &os) const { os << "RegExp(" << exp.pattern() << ")"; }
 void RegExp::hash(std::unique_ptr<Hasher> hasher) {
-  uint64_t payload[2];
+  Hash payload;
   std::string pattern = exp.pattern();
-  MurmurHash3_x64_128(pattern.data(), pattern.size(), (long)type, payload);
+  HASH(pattern.data(), pattern.size(), (long)type, payload);
   hasher->receive(payload);
 }
 

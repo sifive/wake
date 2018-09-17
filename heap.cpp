@@ -1,7 +1,7 @@
 #include "heap.h"
 #include "location.h"
 #include "value.h"
-#include "MurmurHash3.h"
+#include "heap.h"
 
 Receiver::~Receiver() { }
 
@@ -56,14 +56,13 @@ struct FutureHasher : public Hasher {
   int arg;
   FutureHasher(std::shared_ptr<Binding> &&binding_, std::vector<uint64_t> &&codes_, int arg_)
    : binding(std::move(binding_)), codes(std::move(codes_)), arg(arg_) { }
-  void receive(uint64_t hash[2]) {
-    codes.push_back(hash[0]);
-    codes.push_back(hash[1]);
+  void receive(Hash hash) {
+    hash.push(codes);
     chain(std::move(binding), std::move(codes), arg+1);
   }
   static void chain(std::shared_ptr<Binding> &&binding, std::vector<uint64_t> &&codes, int arg) {
     if (arg == binding->nargs) {
-      MurmurHash3_x64_128(codes.data(), codes.size()*8, 42, binding->hashcode);
+      HASH(codes.data(), codes.size()*8, 42, binding->hashcode);
       std::unique_ptr<Hasher> iter, next;
       for (iter = std::move(binding->hasher); iter; iter = std::move(next)) {
         next = std::move(iter->next);
@@ -80,16 +79,15 @@ struct FutureHasher : public Hasher {
 struct ParentHasher : public Hasher {
   std::shared_ptr<Binding> binding;
   ParentHasher(const std::shared_ptr<Binding> &binding_) : binding(binding_) { }
-  void receive(uint64_t hash[2]) {
+  void receive(Hash hash) {
     std::vector<uint64_t> codes;
-    codes.push_back(hash[0]);
-    codes.push_back(hash[1]);
+    hash.push(codes);
     FutureHasher::chain(std::move(binding), std::move(codes), 0);
   }
 };
 
 void Binding::hash(const std::shared_ptr<Binding> &binding, std::unique_ptr<Hasher> hasher) {
-  if (binding->hashcode[0] || binding->hashcode[1]) {
+  if (binding->hashcode) {
     hasher->receive(binding->hashcode);
   } else {
     if (!binding->hasher) {
