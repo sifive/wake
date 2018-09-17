@@ -187,7 +187,7 @@ def runjob cache env stdin dir files cmd =
 
 global hash f =
   def run cache env stdin dir files cmd = prim "job"
-  def result = run 0 "" f "." "\0" "/opt/local/bin/md5sum\0"
+  def result = run 0 "" "" "." "" ("/opt/local/bin/md5sum\0", f, "\0", nil).cat
   def stdout r = prim "job_stdout"
   def add r f h = prim "add_hash"
   add result f (head (extract "(.{32}).*" result.stdout))
@@ -198,7 +198,5 @@ global stderr  job = job (\_\x\_\_ x)
 global inputs  job = job (\_\_\x\_ x)
 global outputs job = job (\_\_\_\x x)
 
-global null = "/dev/null"
-
 # file paths are all relative to workspace root
-global job env dir files cmd = runjob 1 env null dir files cmd
+global job env dir files cmd = runjob 1 env "" dir files cmd

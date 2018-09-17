@@ -65,9 +65,10 @@ std::string Database::open() {
     "  commandline text    not null,"
     "  environment text    not null,"
     "  stack       text    not null,"
-    "  stdin       integer references files(file_id),"
+    "  stdin       integer," // null means /dev/null
     "  time        text    not null default current_timestamp,"
-    "  runtime     real);"
+    "  runtime     real,"
+    "  foreign key(run_id, stdin) references hashes(run_id, file_id));"
     "create index if not exists job on jobs(directory, commandline, environment);"
     "create table if not exists filetree("
     "  access  integer not null," // 0=visible, 1=input, 2=output
@@ -424,7 +425,7 @@ bool Database::needs_build(
   bind_string (why, imp->insert_job, 3, commandline);
   bind_string (why, imp->insert_job, 4, environment);
   bind_string (why, imp->insert_job, 5, stack);
-  bind_string (why, imp->insert_job, 6, stdin); // !!! should do something about this dangling (impacts hash)
+  bind_string (why, imp->insert_job, 6, stdin);
   single_step (why, imp->insert_job);
   out = sqlite3_last_insert_rowid(imp->db);
   const char *tok = visible_files.c_str();
