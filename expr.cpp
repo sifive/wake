@@ -14,6 +14,7 @@ const char *Literal::type = "Literal";
 const char *DefBinding::type = "DefBinding";
 // these are removed by bind
 const char *Subscribe::type = "Subscribe";
+const char *Memoize::type = "Memoize";
 const char *DefMap::type = "DefMap";
 const char *Top::type = "Top";
 
@@ -52,6 +53,16 @@ void Subscribe::format(std::ostream &os, int depth) const {
 
 void Subscribe::hash() {
   assert(0 /* unreachable */);
+}
+
+void Memoize::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Memoize @ " << location << std::endl;
+  body->format(os, depth+2);
+}
+
+void Memoize::hash() {
+  body->hash();
+  HASH(&body->hashcode, sizeof(body->hashcode), (long)type, hashcode);
 }
 
 void App::format(std::ostream &os, int depth) const {

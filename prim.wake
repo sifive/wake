@@ -185,12 +185,13 @@ def runjob cache env stdin dir files cmd =
   def outputs r = prim "job_outputs"
   \f (f stdout stderr inputs outputs) result
 
-global hash f =
+global hash f = memoize (
   def run cache env stdin dir files cmd = prim "job"
   def result = run 0 "" "" "." "" ("/opt/local/bin/md5sum\0", f, "\0", nil).cat
   def stdout r = prim "job_stdout"
   def add r f h = prim "add_hash"
   add result f (head (extract "(.{32}).*" result.stdout))
+)
 
 # Access the output of a job
 global stdout  job = job (\x\_\_\_ x)

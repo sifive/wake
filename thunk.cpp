@@ -53,6 +53,28 @@ void Primitive::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
   chain_app(queue, std::move(receiver), prim, std::move(binding), std::move(args));
 }
 
+struct MemoizeHasher : public Hasher {
+  std::unique_ptr<Receiver> receiver;
+  std::shared_ptr<Binding> binding;
+  Memoize *memoize;
+  ThunkQueue *queue;
+  MemoizeHasher(std::unique_ptr<Receiver> receiver_, const std::shared_ptr<Binding> &binding_, Memoize *memoize_, ThunkQueue *queue_)
+   : receiver(std::move(receiver_)), binding(binding_), memoize(memoize_), queue(queue_) { }
+  void receive(Hash hash);
+};
+
+void MemoizeHasher::receive(Hash hash)
+{
+  auto i = memoize->values.find(hash);
+  if (i == memoize->values.end()) {
+    Future &future = memoize->values[hash];
+    future.depend(*queue, std::move(receiver));
+    queue->queue.emplace(memoize->body.get(), std::move(binding), future.make_completer());
+  } else {
+    i->second.depend(*queue, std::move(receiver));
+  }
+}
+
 void Thunk::eval(ThunkQueue &queue)
 {
   if (expr->type == VarRef::type) {
@@ -77,6 +99,9 @@ void Thunk::eval(ThunkQueue &queue)
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     auto closure = std::make_shared<Closure>(lambda->body.get(), binding);
     Receiver::receiveM(queue, std::move(receiver), std::move(closure));
+  } else if (expr->type == Memoize::type) {
+    Memoize *memoize = reinterpret_cast<Memoize*>(expr);
+    Binding::hash(binding, std::unique_ptr<Hasher>(new MemoizeHasher(std::move(receiver), binding, memoize, &queue)));
   } else if (expr->type == DefBinding::type) {
     DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
     auto defs = std::make_shared<Binding>(binding, queue.stack_trace?binding:nullptr, &defbinding->location, defbinding, defbinding->val.size());

@@ -154,6 +154,10 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     lbinding.defs.resize(lbinding.defs.size()+1); // don't care
     lambda->body = fracture(std::move(lambda->body), &lbinding);
     return expr;
+  } else if (expr->type == Memoize::type) {
+    Memoize *memoize = reinterpret_cast<Memoize*>(expr.get());
+    memoize->body = fracture(std::move(memoize->body), binding);
+    return expr;
   } else if (expr->type == DefMap::type) {
     DefMap *def = reinterpret_cast<DefMap*>(expr.get());
     ResolveBinding dbinding;
@@ -304,6 +308,9 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     NameBinding bind(binding, &lambda->name);
     return explore(lambda->body.get(), pmap, &bind);
+  } else if (expr->type == Memoize::type) {
+    Memoize *memoize = reinterpret_cast<Memoize*>(expr);
+    return explore(memoize->body.get(), pmap, binding);
   } else if (expr->type == DefBinding::type) {
     DefBinding *def = reinterpret_cast<DefBinding*>(expr);
     binding->open = false;

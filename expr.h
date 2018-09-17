@@ -4,6 +4,7 @@
 #include "location.h"
 #include "primfn.h"
 #include "hash.h"
+#include "heap.h"
 #include <memory>
 #include <string>
 #include <map>
@@ -95,7 +96,7 @@ struct Literal : public Expr {
 
 struct Memoize : public Expr {
   std::unique_ptr<Expr> body;
-  std::map<Hash, std::shared_ptr<Value> > values;
+  std::map<Hash, Future> values;
 
   static const char *type;
   Memoize(const Location &location_, Expr *body_)

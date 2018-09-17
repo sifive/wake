@@ -5,6 +5,26 @@
 
 Receiver::~Receiver() { }
 
+struct Memoizer : public Receiver {
+  Future *future;
+  Memoizer(Future *future_) : future(future_) { }
+  void receive(ThunkQueue &queue, std::shared_ptr<Value> &&value);
+};
+
+void Memoizer::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value)
+{
+  future->value = std::move(value);
+  std::unique_ptr<Receiver> iter, next;
+  for (iter = std::move(future->waiting); iter; iter = std::move(next)) {
+    next = std::move(iter->next);
+    Receiver::receiveC(queue, std::move(iter), future->value);
+  }
+}
+
+std::unique_ptr<Receiver> Future::make_completer() {
+  return std::unique_ptr<Receiver>(new Memoizer(this));
+}
+
 struct Completer : public Receiver {
   std::shared_ptr<Future> future;
   void receive(ThunkQueue &queue, std::shared_ptr<Value> &&value);
@@ -85,6 +105,10 @@ struct ParentHasher : public Hasher {
     FutureHasher::chain(std::move(binding), std::move(codes), 0);
   }
 };
+
+Binding::Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Location *location_, DefBinding *binding_, int nargs_)
+  : next(next_), invoker(invoker_), future(new Future[nargs_]), hasher(),
+    location(location_), binding(binding_), hashcode(), nargs(nargs_) { }
 
 void Binding::hash(const std::shared_ptr<Binding> &binding, std::unique_ptr<Hasher> hasher) {
   if (binding->hashcode) {

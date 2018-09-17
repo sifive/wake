@@ -50,6 +50,7 @@ static op_type precedence(const std::string &str) {
     return op_type(2, 1);
   case ',':
     return op_type(1, 0);
+  case 'm': // MEMOIZE
   case '\\': // LAMBDA
     return op_type(0, 0);
   default:
@@ -152,6 +153,20 @@ static Expr *parse_unary(int p, Lexer &lex) {
       location.end = rhs->location.end;
       return new App(location, opp, rhs);
     }
+    case MEMOIZE: {
+      Location location = lex.next.location;
+      op_type op = precedence(lex.text());
+      if (op.p < p) {
+        std::cerr << "Lower precedence unary operator "
+          << lex.text() << " must use ()s at "
+          << lex.next.location << std::endl;
+        lex.fail = true;
+      }
+      lex.consume();
+      auto rhs = parse_binary(op.p + op.l, lex);
+      location.end = rhs->location.end;
+      return new Memoize(location, rhs);
+    }
     case LAMBDA: {
       Location location = lex.next.location;
       op_type op = precedence(lex.text());
@@ -246,6 +261,7 @@ static Expr *parse_binary(int p, Lexer &lex) {
         lhs = new App(app2_loc, new App(app1_loc, opp, lhs), rhs);
         break;
       }
+      case MEMOIZE:
       case LAMBDA:
       case ID:
       case LITERAL:
