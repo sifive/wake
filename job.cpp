@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
+#include <sys/time.h>
 #include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -24,20 +25,24 @@ struct Task {
   std::string files;
   std::string cmdline;
   std::unique_ptr<Receiver> completion;
-  std::shared_ptr<Binding> binding;
-  Task(long job_, const std::string &environ_, const std::string &stdin_, const std::string &dir_, const std::string &files_, const std::string &cmdline_, std::unique_ptr<Receiver> completion_, const std::shared_ptr<Binding> &binding_) :
-    job(job_), environ(environ_), stdin(stdin_), dir(dir_), files(files_), cmdline(cmdline_), completion(std::move(completion_)), binding(binding_) { }
+  Task(long job_, const std::string &environ_, const std::string &stdin_, const std::string &dir_, const std::string &files_, const std::string &cmdline_, std::unique_ptr<Receiver> completion_) :
+    job(job_), environ(environ_), stdin(stdin_), dir(dir_), files(files_), cmdline(cmdline_), completion(std::move(completion_)) { }
 };
 
 struct Job {
   pid_t pid;
+  struct timeval start;
   long job;
   int pipe_stdout;
   int pipe_stderr;
   std::unique_ptr<Receiver> completion;
-  std::shared_ptr<Binding> binding;
   Job() : pid(0) { }
+  double runtime(struct timeval now);
 };
+
+double Job::runtime(struct timeval now) {
+  return now.tv_sec - start.tv_sec + (now.tv_usec - start.tv_usec)/1000000.0;
+}
 
 struct JobTable::detail {
   std::vector<Job> table;
@@ -51,8 +56,10 @@ struct JobTable::detail {
 struct JobResult : public Value {
   Database *db;
   long job;
+  int code;
+  double runtime;
   static const char *type;
-  JobResult(Database *db_, long job_) : Value(type), db(db_), job(job_) { }
+  JobResult(Database *db_, long job_, int code_, double runtime_) : Value(type), db(db_), job(job_), code(code_), runtime(runtime_) { }
 
   void stream(std::ostream &os) const;
   void hash(std::unique_ptr<Hasher> hasher);
@@ -115,7 +122,7 @@ JobTable::~JobTable() {
   pid_t pid;
   int status;
   while ((pid = waitpid(-1, &status, 0)) > 0) {
-    if (imp->verbose) std::cerr << "<<< " << pid << std::endl;
+    // if (imp->verbose) std::cerr << "<<< " << pid << std::endl;
   }
 }
 
@@ -151,6 +158,7 @@ static void launch(JobTable *jobtable) {
       }
       fcntl(pipe_stdout[0], F_SETFL, fcntl(pipe_stdout[0], F_GETFL, 0) | FD_CLOEXEC);
       fcntl(pipe_stderr[0], F_SETFL, fcntl(pipe_stderr[0], F_GETFL, 0) | FD_CLOEXEC);
+      gettimeofday(&i.start, 0);
       i.pid = fork();
       if (i.pid == 0) {
         dup2(pipe_stdout[1], 1);
@@ -177,14 +185,13 @@ static void launch(JobTable *jobtable) {
       }
       for (char &c : task.cmdline) if (c == 0) c = ' ';
       if (jobtable->imp->verbose)
-        std::cerr << ">>> " << i.pid << ": " << task.cmdline << std::endl;
+        std::cerr << task.cmdline << std::endl;
       close(pipe_stdout[1]);
       close(pipe_stderr[1]);
       i.job = task.job;
       i.pipe_stdout = pipe_stdout[0];
       i.pipe_stderr = pipe_stderr[0];
       i.completion = std::move(task.completion);
-      i.binding = std::move(task.binding);
       jobtable->imp->tasks.pop_front();
     }
   }
@@ -218,6 +225,9 @@ bool JobTable::wait() {
       exit(1);
     }
 
+    struct timeval now;
+    gettimeofday(&now, 0);
+
     if (retval > 0) for (auto &i : imp->table) {
       if (i.pid != 0 && i.pipe_stdout != -1 && FD_ISSET(i.pipe_stdout, &set)) {
         int got = read(i.pipe_stdout, buffer, sizeof(buffer));
@@ -225,7 +235,7 @@ bool JobTable::wait() {
           close(i.pipe_stdout);
           i.pipe_stdout = -1;
         } else {
-          imp->db->save_output(i.job, 1, buffer, got);
+          imp->db->save_output(i.job, 1, buffer, got, i.runtime(now));
         }
       }
       if (i.pid != 0 && i.pipe_stderr != -1 && FD_ISSET(i.pipe_stderr, &set)) {
@@ -234,7 +244,7 @@ bool JobTable::wait() {
           close(i.pipe_stderr);
           i.pipe_stderr = -1;
         } else {
-          imp->db->save_output(i.job, 2, buffer, got);
+          imp->db->save_output(i.job, 2, buffer, got, i.runtime(now));
         }
       }
     }
@@ -244,7 +254,7 @@ bool JobTable::wait() {
     pid_t pid;
     while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
       if (WIFSTOPPED(status)) continue;
-      if (imp->verbose) std::cerr << "<<< " << pid << std::endl;
+      // if (imp->verbose) std::cerr << "<<< " << pid << std::endl;
 
       ++done;
       int code = 0;
@@ -259,30 +269,24 @@ bool JobTable::wait() {
           if (i.pipe_stdout != -1) {
             int got;
             while ((got = read(i.pipe_stdout, buffer, sizeof(buffer))) > 0)
-              imp->db->save_output(i.job, 1, buffer, got);
+              imp->db->save_output(i.job, 1, buffer, got, i.runtime(now));
             close(i.pipe_stdout);
           }
           if (i.pipe_stderr != -1) {
             int got;
             while ((got = read(i.pipe_stderr, buffer, sizeof(buffer))) > 0)
-              imp->db->save_output(i.job, 2, buffer, got);
+              imp->db->save_output(i.job, 2, buffer, got, i.runtime(now));
             close(i.pipe_stderr);
           }
           i.pid = 0;
           i.pipe_stdout = -1;
           i.pipe_stderr = -1;
-          if (imp->verbose) std::cout << imp->db->get_output(i.job, 1);
-          std::cerr << imp->db->get_output(i.job, 2);
+          // if (imp->verbose) std::cout << imp->db->get_output(i.job, 1);
+          if (imp->verbose) std::cerr << imp->db->get_output(i.job, 2);
 
-          if (code == 0) {
-            std::vector<std::shared_ptr<Value> > nil;
-            auto out = std::make_shared<JobResult>(imp->db, i.job);
-            resume(std::move(i.completion), std::move(out));
-          } else {
-            resume(std::move(i.completion), std::make_shared<Exception>("Non-zero exit status (" + std::to_string(code) + ")", i.binding));
-          }
-
-          i.binding.reset();
+          std::vector<std::shared_ptr<Value> > nil;
+          auto out = std::make_shared<JobResult>(imp->db, i.job, code, i.runtime(now));
+          resume(std::move(i.completion), std::move(out));
         }
       }
     }
@@ -324,8 +328,7 @@ static PRIMFN(prim_job) {
       dir->value,
       files->value,
       cmd->value,
-      std::move(completion),
-      binding);
+      std::move(completion));
     launch(jobtable);
   }
 }
@@ -334,6 +337,13 @@ static PRIMFN(prim_stdout) {
   EXPECT(1);
   JOBRESULT(arg0, 0);
   auto out = std::make_shared<String>(arg0->db->get_output(arg0->job, 1));
+  RETURN(out);
+}
+
+static PRIMFN(prim_status) {
+  EXPECT(1);
+  JOBRESULT(arg0, 0);
+  auto out = std::make_shared<Integer>(arg0->code);
   RETURN(out);
 }
 
@@ -366,6 +376,15 @@ static PRIMFN(prim_outputs) {
   RETURN(out);
 }
 
+static PRIMFN(prim_finish) {
+  EXPECT(3);
+  JOBRESULT(job, 0);
+  STRING(inputs, 1);
+  STRING(outputs, 2);
+  job->db->save_job(job->job, inputs->value, outputs->value, job->runtime);
+  RETURN(args[0]);
+}
+
 static PRIMFN(prim_add_hash) {
   EXPECT(3);
   JOBRESULT(job, 0);
@@ -378,9 +397,11 @@ static PRIMFN(prim_add_hash) {
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   pmap["job"].first = prim_job;
   pmap["job"].second = jobtable;
+  pmap["job_status" ].first = prim_status;
   pmap["job_stdout" ].first = prim_stdout;
   pmap["job_stderr" ].first = prim_stderr;
   pmap["job_inputs" ].first = prim_inputs;
   pmap["job_outputs"].first = prim_outputs;
+  pmap["job_finish" ].first = prim_finish;
   pmap["add_hash"   ].first = prim_add_hash;
 }

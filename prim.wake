@@ -175,29 +175,36 @@ global sources dir regexp = prim "sources"
 
 # Internal job execution implementation
 def implode l = cat (foldr (_, "\0", _) nil l)
-def runjob cache env stdin dir files cmd =
+def runjob cache env stdin dir ifiles ofiles cmd =
   def run cache env stdin dir files cmd = prim "job"
-  def hfiles = map hash files
-  def result = run cache env.implode stdin dir hfiles.implode cmd.implode
+  def finish r i o = prim "job_finish"
+  def hifiles = map hash ifiles
+  def rawjob = run cache env.implode stdin dir hifiles.implode cmd.implode
+  def hofiles = if rawjob.status == 0 then map hash ofiles else nil
+  def job = finish rawjob hifiles.implode hofiles.implode
   # Defer the execution of these, as they call to the database
+  def status  r = prim "job_status"
   def stderr  r = prim "job_stderr"
   def inputs  r = prim "job_inputs"
   def outputs r = prim "job_outputs"
-  \f (f stdout stderr inputs outputs) result
+  \f (f status stdout stderr inputs outputs) job
 
 global hash f = memoize (
   def run cache env stdin dir files cmd = prim "job"
-  def result = run 0 "" "" "." "" ("/opt/local/bin/md5sum\0", f, "\0", nil).cat
+  def finish r i o = prim "job_finish"
+  def rawresult = run 0 "" "" "." "" ("/opt/local/bin/md5sum\0", f, "\0", nil).cat
+  def result = finish rawresult "" ""
   def stdout r = prim "job_stdout"
   def add r f h = prim "add_hash"
   add result f (head (extract "(.{32}).*" result.stdout))
 )
 
 # Access the output of a job
-global stdout  job = job (\x\_\_\_ x)
-global stderr  job = job (\_\x\_\_ x)
-global inputs  job = job (\_\_\x\_ x)
-global outputs job = job (\_\_\_\x x)
+global status  job = job (\x\_\_\_\_ x)
+global stdout  job = job (\_\x\_\_\_ x)
+global stderr  job = job (\_\_\x\_\_ x)
+global inputs  job = job (\_\_\_\x\_ x)
+global outputs job = job (\_\_\_\_\x x)
 
 # file paths are all relative to workspace root
-global job env dir files cmd = runjob 1 env "" dir files cmd
+global job env dir ifiles ofiles cmd = runjob 1 env "" dir ifiles ofiles cmd

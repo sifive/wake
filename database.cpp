@@ -21,11 +21,12 @@ struct Database::detail {
   sqlite3_stmt *insert_hash;
   sqlite3_stmt *get_log;
   sqlite3_stmt *get_tree;
+  sqlite3_stmt *set_runtime;
   //sqlite3_stmt *needs_build;
   long run_id;
   detail() : db(0), add_target(0), del_target(0), begin_txn(0), commit_txn(0), insert_job(0),
              insert_tree(0), insert_log(0), insert_file(0), insert_hash(0), get_log(0),
-             get_tree(0) { }
+             get_tree(0), set_runtime(0) { }
 };
 
 Database::Database() : imp(new detail) { }
@@ -191,6 +192,14 @@ std::string Database::open() {
     return out;
   }
 
+  const char *sql_set_runtime = "update jobs set runtime=? where job_id=?;";
+  ret = sqlite3_prepare_v2(imp->db, sql_set_runtime, -1, &imp->set_runtime, 0);
+  if (ret != SQLITE_OK) {
+    std::string out = std::string("sqlite3_prepare_v2 set_runtime: ") + sqlite3_errmsg(imp->db);
+    close();
+    return out;
+  }
+
   return "";
 }
 
@@ -296,6 +305,15 @@ void Database::close() {
   }
   imp->get_tree = 0;
 
+  if (imp->set_runtime) {
+    ret = sqlite3_finalize(imp->set_runtime);
+    if (ret != SQLITE_OK) {
+      std::cerr << "Could not sqlite3_finalize set_runtime: " << sqlite3_errmsg(imp->db) << std::endl;
+      return;
+    }
+  }
+  imp->set_runtime = 0;
+
   if (imp->db) {
     int ret = sqlite3_close(imp->db);
     if (ret != SQLITE_OK) {
@@ -360,6 +378,15 @@ static void bind_integer(const char *why, sqlite3_stmt *stmt, int index, long x)
   ret = sqlite3_bind_int64(stmt, index, x);
   if (ret != SQLITE_OK) {
     std::cerr << why << "; sqlite3_bind_int64(" << index << "): " << sqlite3_errmsg(sqlite3_db_handle(stmt)) << std::endl;
+    exit(1);
+  }
+}
+
+static void bind_double(const char *why, sqlite3_stmt *stmt, int index, double x) {
+  int ret;
+  ret = sqlite3_bind_double(stmt, index, x);
+  if (ret != SQLITE_OK) {
+    std::cerr << why << "; sqlite3_bind_double(" << index << "): " << sqlite3_errmsg(sqlite3_db_handle(stmt)) << std::endl;
     exit(1);
   }
 }
@@ -437,6 +464,7 @@ bool Database::needs_build(
       bind_string (why, imp->insert_tree, 3, tok, scan-tok);
       bind_integer(why, imp->insert_tree, 4, imp->run_id);
       single_step (why, imp->insert_tree);
+      tok = scan+1;
     }
   }
 /*
@@ -458,9 +486,12 @@ bool Database::needs_build(
   return true;
 }
 
-void Database::save_job(long job, const std::string &inputs, const std::string &outputs) {
+void Database::save_job(long job, const std::string &inputs, const std::string &outputs, double runtime) {
   const char *why = "Could not save job inputs and outputs";
   begin_txn();
+  bind_double (why, imp->set_runtime, 1, runtime);
+  bind_integer(why, imp->set_runtime, 2, job);
+  single_step (why, imp->set_runtime);
   const char *tok = inputs.c_str();
   const char *end = tok + inputs.size();
   for (const char *scan = tok; scan != end; ++scan) {
@@ -468,7 +499,9 @@ void Database::save_job(long job, const std::string &inputs, const std::string &
       bind_integer(why, imp->insert_tree, 1, INPUT);
       bind_integer(why, imp->insert_tree, 2, job);
       bind_string (why, imp->insert_tree, 3, tok, scan-tok);
+      bind_integer(why, imp->insert_tree, 4, imp->run_id);
       single_step (why, imp->insert_tree);
+      tok = scan+1;
     }
   }
   tok = outputs.c_str();
@@ -478,7 +511,9 @@ void Database::save_job(long job, const std::string &inputs, const std::string &
       bind_integer(why, imp->insert_tree, 1, OUTPUT);
       bind_integer(why, imp->insert_tree, 2, job);
       bind_string (why, imp->insert_tree, 3, tok, scan-tok);
+      bind_integer(why, imp->insert_tree, 4, imp->run_id);
       single_step (why, imp->insert_tree);
+      tok = scan+1;
     }
   }
   end_txn();
@@ -512,11 +547,11 @@ std::vector<std::string> Database::get_outputs(long job) {
   return out;
 }
 
-void Database::save_output(long job, int descriptor, const char *buffer, int size) {
+void Database::save_output(long job, int descriptor, const char *buffer, int size, double runtime) {
   const char *why = "Could not save job output";
   bind_integer(why, imp->insert_log, 1, job);
   bind_integer(why, imp->insert_log, 2, descriptor);
-  bind_integer(why, imp->insert_log, 3, 0); // !!! fix me
+  bind_double (why, imp->insert_log, 3, runtime);
   bind_string (why, imp->insert_log, 4, buffer, size);
   single_step (why, imp->insert_log);
 }

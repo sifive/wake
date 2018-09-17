@@ -38,8 +38,9 @@ struct Database {
     long   *job); // key used for accesses below
   void save_job(
     long job,
-    const std::string &inputs,   // null separated
-    const std::string &outputs); // null separated
+    const std::string &inputs,  // null separated
+    const std::string &outputs, // null separated
+    double runtime);
   std::vector<std::string> get_inputs(long job);
   std::vector<std::string> get_outputs(long job);
 
@@ -47,7 +48,8 @@ struct Database {
     long job,
     int descriptor,
     const char *buffer,
-    int size);
+    int size,
+    double runtime);
   std::string get_output(
     long job,
     int descriptor);
