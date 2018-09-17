@@ -1,14 +1,27 @@
 #include "prim.h"
 #include "value.h"
 #include "heap.h"
+#include "MurmurHash3.h"
 #include <re2/re2.h>
+#include <iostream>
 
 struct RegExp : public Value {
   RE2 exp;
   static const char *type;
   RegExp(const std::string &regexp, const RE2::Options &opts) : Value(type), exp(re2::StringPiece(regexp), opts) { }
+
+  void stream(std::ostream &os) const;
+  void hash(std::unique_ptr<Hasher> hasher);
 };
 const char *RegExp::type = "RegExp";
+
+void RegExp::stream(std::ostream &os) const { os << "RegExp(" << exp.pattern() << ")"; }
+void RegExp::hash(std::unique_ptr<Hasher> hasher) {
+  uint64_t payload[2];
+  std::string pattern = exp.pattern();
+  MurmurHash3_x64_128(pattern.data(), pattern.size(), (long)type, payload);
+  hasher->receive(payload);
+}
 
 static std::unique_ptr<Receiver> cast_regexp(std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, RegExp **reg) {
   if (value->type != RegExp::type) {

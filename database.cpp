@@ -181,8 +181,8 @@ std::string Database::open() {
   }
 
   const char *sql_get_tree =
-    "select f.path from t filetree, p files"
-    " where t.access=?, t.job_id=?, p.file_id=t.file_id;";
+    "select p.path from filetree t, files p"
+    " where t.access=? and t.job_id=? and p.file_id=t.file_id;";
   ret = sqlite3_prepare_v2(imp->db, sql_get_tree, -1, &imp->get_tree, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 get_tree: ") + sqlite3_errmsg(imp->db);

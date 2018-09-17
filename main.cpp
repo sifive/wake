@@ -179,6 +179,9 @@ int main(int argc, const char **argv) {
   if (args["parse"]) return 0;
   if (args["list"]) return 0;
 
+  // Initialize expression hashes for memoize of closures
+  root->hash();
+
   if (verbose) std::cerr << "Running " << jobs << " jobs at a time." << std::endl;
   db.prepare();
   std::shared_ptr<Value> output;

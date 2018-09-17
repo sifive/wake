@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <cstdint>
 #include <gmp.h>
 
 /* Values */
@@ -12,12 +13,20 @@ struct Expr;
 struct Binding;
 struct Location;
 
+struct Hasher {
+  virtual void receive(uint64_t hash[2]) = 0;
+  virtual ~Hasher();
+};
+
 struct Value {
   const char *type;
 
   Value(const char *type_) : type(type_) { }
-  std::string to_str() const;
   virtual ~Value();
+
+  std::string to_str() const;
+  virtual void stream(std::ostream &os) const = 0;
+  virtual void hash(std::unique_ptr<Hasher> hasher) = 0;
 };
 
 std::ostream & operator << (std::ostream &os, const Value *value);
@@ -28,6 +37,9 @@ struct String : public Value {
   static const char *type;
   String(const std::string &value_) : Value(type), value(value_) { }
   String(std::string &&value_) : Value(type), value(std::move(value_)) { }
+
+  void stream(std::ostream &os) const;
+  void hash(std::unique_ptr<Hasher> hasher);
 };
 
 struct Integer : public Value {
@@ -40,6 +52,8 @@ struct Integer : public Value {
   ~Integer();
 
   std::string str(int base = 10) const;
+  void stream(std::ostream &os) const;
+  void hash(std::unique_ptr<Hasher> hasher);
 };
 
 struct Closure : public Value {
@@ -48,6 +62,8 @@ struct Closure : public Value {
 
   static const char *type;
   Closure(Expr *body_, const std::shared_ptr<Binding> &binding_) : Value(type), body(body_), binding(binding_) { }
+  void stream(std::ostream &os) const;
+  void hash(std::unique_ptr<Hasher> hasher);
 };
 
 struct Cause {
@@ -67,6 +83,9 @@ struct Exception : public Value {
     causes.insert(causes.end(), other.causes.begin(), other.causes.end());
     return *this;
   }
+
+  void stream(std::ostream &os) const;
+  void hash(std::unique_ptr<Hasher> hasher);
 };
 
 #endif

@@ -1,14 +1,26 @@
 #include "prim.h"
 #include "value.h"
 #include "heap.h"
+#include "MurmurHash3.h"
 #include <sstream>
 
 struct CatStream : public Value {
   std::stringstream str;
   static const char *type;
   CatStream() : Value(type) { }
+
+  void stream(std::ostream &os) const;
+  void hash(std::unique_ptr<Hasher> hasher);
 };
 const char *CatStream::type = "CatStream";
+
+void CatStream::stream(std::ostream &os) const { os << "CatStream(" << str.str() << ")"; }
+void CatStream::hash(std::unique_ptr<Hasher> hasher) {
+  uint64_t payload[2];
+  std::string data = str.str();
+  MurmurHash3_x64_128(data.data(), data.size(), (long)type, payload);
+  hasher->receive(payload);
+}
 
 static std::unique_ptr<Receiver> cast_catstream(std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, CatStream **cat) {
   if (value->type != CatStream::type) {

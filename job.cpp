@@ -53,9 +53,20 @@ struct JobResult : public Value {
   long job;
   static const char *type;
   JobResult(Database *db_, long job_) : Value(type), db(db_), job(job_) { }
+
+  void stream(std::ostream &os) const;
+  void hash(std::unique_ptr<Hasher> hasher);
 };
 
 const char *JobResult::type = "JobResult";
+
+void JobResult::stream(std::ostream &os) const { os << "JobResult(" << job << ")"; }
+void JobResult::hash(std::unique_ptr<Hasher> hasher) {
+  uint64_t payload[2];
+  payload[0] = (long)type;
+  payload[1] = job;
+  hasher->receive(payload);
+}
 
 static std::unique_ptr<Receiver> cast_jobresult(std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, JobResult **job) {
   if (value->type != JobResult::type) {

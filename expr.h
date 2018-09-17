@@ -17,10 +17,15 @@ struct Value;
 struct Expr {
   const char *type;
   Location location;
+  uint64_t hashcode[2];
   long flags;
 
   Expr(const char *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), flags(flags_) { }
   virtual ~Expr();
+
+  std::string to_str() const;
+  virtual void format(std::ostream &os, int depth) const = 0;
+  virtual void hash() = 0;
 };
 
 std::ostream & operator << (std::ostream &os, const Expr *expr);
@@ -34,6 +39,9 @@ struct Prim : public Expr {
 
   static const char *type;
   Prim(const Location &location_, const std::string &name_) : Expr(type, location_), name(name_), args(0) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
 };
 
 struct App : public Expr {
@@ -43,6 +51,9 @@ struct App : public Expr {
   static const char *type;
   App(const Location &location_, Expr *fn_, Expr *val_)
    : Expr(type, location_), fn(fn_), val(val_) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
 };
 
 struct Lambda : public Expr {
@@ -52,6 +63,9 @@ struct Lambda : public Expr {
   static const char *type;
   Lambda(const Location &location_, const std::string &name_, Expr *body_)
    : Expr(type, location_), name(name_), body(body_) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
 };
 
 struct VarRef : public Expr {
@@ -62,6 +76,9 @@ struct VarRef : public Expr {
   static const char *type;
   VarRef(const Location &location_, const std::string &name_, int depth_ = 0, int offset_ = -1)
    : Expr(type, location_), name(name_), depth(depth_), offset(offset_) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
 };
 
 struct Literal : public Expr {
@@ -70,6 +87,9 @@ struct Literal : public Expr {
 
   Literal(const Location &location_, std::shared_ptr<Value> &&value_);
   Literal(const Location &location_, const char *value_);
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
 };
 
 struct Subscribe : public Expr {
@@ -77,6 +97,9 @@ struct Subscribe : public Expr {
   static const char *type;
   Subscribe(const Location &location_, const std::string &name_)
    : Expr(type, location_), name(name_) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
 };
 
 typedef std::map<std::string, int> DefOrder;
@@ -91,6 +114,9 @@ struct DefMap : public Expr {
   DefMap(const Location &location_, defs &&map_, defs &&publish_, Expr *body_)
    : Expr(type, location_), map(std::move(map_)), publish(std::move(publish_)), body(body_) { }
   DefMap(const Location &location_) : Expr(type, location_), map(), publish(), body(new Literal(location, "top")) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
 };
 
 struct Top : public Expr {
@@ -101,6 +127,9 @@ struct Top : public Expr {
 
   static const char *type;
   Top() : Expr(type, LOCATION), defmaps(), globals() { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
 };
 
 // Created by transforming DefMap+Top
@@ -115,6 +144,9 @@ struct DefBinding : public Expr {
 
   static const char *type;
   DefBinding(const Location &location_, std::unique_ptr<Expr> body_) : Expr(type, location_), body(std::move(body_)) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
 };
 
 #endif

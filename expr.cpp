@@ -1,7 +1,9 @@
 #include "expr.h"
 #include "value.h"
+#include "MurmurHash3.h"
 #include <iostream>
 #include <cassert>
+#include <sstream>
 
 Expr::~Expr() { }
 const char *Prim::type = "Prim";
@@ -25,63 +27,148 @@ static std::string pad(int depth) {
   return std::string(depth, ' ');
 }
 
-static void format(std::ostream &os, int depth, const Expr *expr) {
-  if (expr->type == VarRef::type) {
-    const VarRef *ref = reinterpret_cast<const VarRef*>(expr);
-    os << pad(depth) << "VarRef(" << ref->name;
-    if (ref->offset != -1) os << "," << ref->depth << "," << ref->offset;
-    os << ") @ " << ref->location << std::endl;
-  } else if (expr->type == Subscribe::type) {
-    const Subscribe *sub = reinterpret_cast<const Subscribe*>(expr);
-    os << pad(depth) << "Subscribe(" << sub->name << ") @ " << sub->location << std::endl;
-  } else if (expr->type == App::type) {
-    const App *app = reinterpret_cast<const App*>(expr);
-    os << pad(depth) << "App @ " << app->location << std::endl;
-    format(os, depth+2, app->fn.get());
-    format(os, depth+2, app->val.get());
-  } else if (expr->type == Lambda::type) {
-    const Lambda *lambda = reinterpret_cast<const Lambda*>(expr);
-    os << pad(depth) << "Lambda(" << lambda->name << ") @ " << lambda->location << std::endl;
-    format(os, depth+2, lambda->body.get());
-  } else if (expr->type == DefMap::type) {
-    const DefMap *def = reinterpret_cast<const DefMap*>(expr);
-    os << pad(depth) << "DefMap @ " << def->location << std::endl;
-    for (auto &i : def->map) {
-      os << pad(depth+2) << i.first << " =" << std::endl;
-      format(os, depth+4, i.second.get());
-    }
-    for (auto &i : def->publish) {
-      os << pad(depth+2) << "publish " << i.first << " =" << std::endl;
-      format(os, depth+4, i.second.get());
-    }
-    format(os, depth+2, def->body.get());
-  } else if (expr->type == Literal::type) {
-    const Literal *lit = reinterpret_cast<const Literal*>(expr);
-    os << pad(depth) << "Literal(" << lit->value.get() << ") @ " << lit->location << std::endl;
-  } else if (expr->type == Prim::type) {
-    const Prim *prim = reinterpret_cast<const Prim*>(expr);
-    os << pad(depth) << "Prim(" << prim->args << "," << prim->name << ") @ " << prim->location << std::endl;
-  } else if (expr->type == Top::type) {
-    const Top *top = reinterpret_cast<const Top*>(expr);
-    os << pad(depth) << "Top; globals =";
-    for (auto &i : top->globals) os << " " << i.first;
-    os << std::endl;
-    for (auto &i : top->defmaps) format(os, depth+2, &i);
-  } else if (expr->type == DefBinding::type) {
-    const DefBinding *def = reinterpret_cast<const DefBinding*>(expr);
-    os << pad(depth) << "DefBinding @ " << def->location << std::endl;
-    int vals = def->val.size();
-    for (auto &i : def->order) {
-      os << pad(depth+2) << (i.second < vals ? "val " : "fun ") << i.first << " =" << std::endl;
-      format(os, depth+4, (i.second < vals) ? def->val[i.second].get() : def->fun[i.second - vals].get());
-    }
-    format(os, depth+2, def->body.get());
-  } else {
-    assert(0 /* unreachable */);
+std::string Expr::to_str() const {
+  std::stringstream str;
+  str << this;
+  return str.str();
+}
+
+void VarRef::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "VarRef(" << name;
+  if (offset != -1) os << "," << depth << "," << offset;
+  os << ") @ " << location << std::endl;
+}
+
+void VarRef::hash() {
+  uint64_t payload[2];
+  payload[0] = depth;
+  payload[1] = offset;
+  MurmurHash3_x64_128(payload, 16, (long)type, hashcode);
+}
+
+void Subscribe::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Subscribe(" << name << ") @ " << location << std::endl;
+}
+
+void Subscribe::hash() {
+  assert(0 /* unreachable */);
+}
+
+void App::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "App @ " << location << std::endl;
+  fn->format(os, depth+2);
+  val->format(os, depth+2);
+}
+
+void App::hash() {
+  uint64_t codes[4];
+  fn->hash();
+  val->hash();
+  codes[0] = fn->hashcode[0];
+  codes[1] = fn->hashcode[1];
+  codes[2] = val->hashcode[0];
+  codes[3] = val->hashcode[1];
+  MurmurHash3_x64_128(codes, 32, (long)type, hashcode);
+}
+
+void Lambda::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Lambda(" << name << ") @ " << location << std::endl;
+  body->format(os, depth+2);
+}
+
+void Lambda::hash() {
+  body->hash();
+  MurmurHash3_x64_128(body->hashcode, 16, (long)type, hashcode);
+}
+
+void DefMap::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "DefMap @ " << location << std::endl;
+  for (auto &i : map) {
+    os << pad(depth+2) << i.first << " =" << std::endl;
+    i.second->format(os, depth+4);
   }
+  for (auto &i : publish) {
+    os << pad(depth+2) << "publish " << i.first << " =" << std::endl;
+    i.second->format(os, depth+4);
+  }
+  body->format(os, depth+2);
+}
+
+void DefMap::hash() {
+  assert(0 /* unreachable */);
+}
+
+void Literal::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Literal(" << value.get() << ") @ " << location << std::endl;
+}
+
+struct LiteralHasher : public Hasher {
+  Literal *lit;
+  LiteralHasher(Literal *lit_) : lit(lit_) { }
+  void receive(uint64_t hash[2]) {
+    lit->hashcode[0] = hash[0];
+    lit->hashcode[1] = hash[1];
+  }
+};
+
+void Literal::hash() {
+  value->hash(std::unique_ptr<Hasher>(new LiteralHasher(this)));
+  MurmurHash3_x64_128(hashcode, 16, (long)type, hashcode);
+}
+
+void Prim::format(std::ostream &os, int depth) const {
+ os << pad(depth) << "Prim(" << args << "," << name << ") @ " << location << std::endl;
+}
+
+void Prim::hash() {
+  MurmurHash3_x64_128(name.data(), name.size(), (long)type, hashcode);
+}
+
+void Top::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Top; globals =";
+  for (auto &i : globals) os << " " << i.first;
+  os << std::endl;
+  for (auto &i : defmaps) i.format(os, depth+2);
+  body->format(os, depth+2);
+}
+
+void Top::hash() {
+  assert(0 /* unreachable */);
+}
+
+void DefBinding::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "DefBinding @ " << location << std::endl;
+  int vals = val.size();
+  for (auto &i : order) {
+    os << pad(depth+2) << (i.second < vals ? "val " : "fun ") << i.first << " =" << std::endl;
+    if (i.second < vals) {
+      val[i.second]->format(os, depth+4);
+    } else {
+      fun[i.second - vals]->format(os, depth+4);
+    }
+  }
+  body->format(os, depth+2);
+}
+
+void DefBinding::hash() {
+  std::vector<uint64_t> codes;
+  for (auto &i : val) {
+    i->hash();
+    codes.push_back(i->hashcode[0]);
+    codes.push_back(i->hashcode[1]);
+  }
+  for (auto &i : fun) {
+    i->hash();
+    codes.push_back(i->hashcode[0]);
+    codes.push_back(i->hashcode[1]);
+  }
+  body->hash();
+  codes.push_back(body->hashcode[0]);
+  codes.push_back(body->hashcode[1]);
+  MurmurHash3_x64_128(codes.data(), codes.size()*sizeof(uint64_t), (long)type, hashcode);
 }
 
 std::ostream & operator << (std::ostream &os, const Expr *expr) {
-  format(os, 0, expr);
+  expr->format(os, 0);
   return os;
 }

@@ -8,6 +8,7 @@ struct Value;
 struct ThunkQueue;
 struct DefBinding;
 struct Location;
+struct Hasher;
 
 struct Receiver {
   virtual ~Receiver();
@@ -67,6 +68,8 @@ struct Binding {
 
   static std::unique_ptr<Receiver> make_completer(const std::shared_ptr<Binding> &binding, int arg);
   static std::vector<Location> stack_trace(const std::shared_ptr<Binding> &binding);
+
+  void hash(std::unique_ptr<Hasher> hasher);
 };
 
 #endif
