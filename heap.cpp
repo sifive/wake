@@ -90,7 +90,8 @@ struct FutureHasher : public Hasher {
       }
       binding->hasher.reset();
     } else {
-      binding->future[arg].hash(std::unique_ptr<Hasher>(new FutureHasher(
+      Binding *bind = binding.get();
+      bind->future[arg].hash(std::unique_ptr<Hasher>(new FutureHasher(
         std::move(binding), std::move(codes), arg)));
     }
   }
@@ -111,7 +112,9 @@ Binding::Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Bi
     location(location_), binding(binding_), hashcode(), nargs(nargs_) { }
 
 void Binding::hash(const std::shared_ptr<Binding> &binding, std::unique_ptr<Hasher> hasher) {
-  if (binding->hashcode) {
+  if (!binding) {
+    hasher->receive(Hash());
+  } else if (binding->hashcode) {
     hasher->receive(binding->hashcode);
   } else {
     bool first = !binding->hasher;
