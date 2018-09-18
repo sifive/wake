@@ -1,0 +1,16 @@
+def compileC = (subscribe compileC).head
+def linkO = (subscribe linkO).head
+
+def re2c file =
+  def cpp = replace "\\.re$" ".cpp" file
+  def cmdline = "/usr/local/bin/re2c", file, "-o", cpp, nil
+  def result = job nil here (file, nil) (cpp, nil) cmdline
+  result.outputs.head
+
+global buildWake _ =
+  def reFiles = sources here ".*\\.re"
+  def headerFiles = sources here ".*\\.h"
+  def cppFiles = sources here ".*\\.cpp" ++ map re2c reFiles
+  def compile = compileC ("-std=c++11", "-I/opt/local/include", "-Wall", "-O2", nil) headerFiles
+  def objFiles = map compile cppFiles
+  linkO ("-L/opt/local/", "-lgmp", "-lre2", "-lsqlite3", nil) objFiles "wake"

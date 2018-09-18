@@ -130,7 +130,7 @@ int main(int argc, const char **argv) {
 
   // Read all wake build files
   std::unique_ptr<Top> top(new Top);
-  for (auto i : sources(all_sources, ".*/[^/]+\\.wake")) {
+  for (auto i : sources(all_sources, ".", "(.*/)?[^/]+\\.wake")) {
     Lexer lex(i->value.c_str());
     parse_top(*top.get(), lex);
     if (lex.fail) ok = false;
@@ -158,8 +158,7 @@ int main(int argc, const char **argv) {
   prim_register_polymorphic(pmap);
   prim_register_regexp(pmap);
   prim_register_job(&jobtable, pmap);
-  pmap["sources"].first = prim_sources;
-  pmap["sources"].second = &all_sources;
+  prim_register_sources(&all_sources, pmap);
 
   if (args["parse"]) std::cout << top.get();
 

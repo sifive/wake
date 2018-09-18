@@ -170,12 +170,20 @@ global tokenize r =            # regexp seperator str -> str list
   def tokenize r s = prim "tokenize"
   tokenize (compile r)
 
+def add_sources str = prim "add_sources"
+def implode l = cat (foldr (_, "\0", _) nil l)
+def got_sources = add_sources (subscribe source).implode # returns true
+
 # Find sources files
-global sources dir regexp = prim "sources"
+global sources dir regexp =
+  def scan dir regexp = prim "sources"
+  if got_sources then scan dir regexp else nil # force dependency on add_sources
+
+global simplify path = prim "simplify"
+global relative dir path = prim "relative"
 
 # Internal job execution implementation
-def implode l = cat (foldr (_, "\0", _) nil l)
-def runjob cache env stdin dir ifiles ofiles cmd =
+def runjob cache env stdin dir ifiles ofiles cmd = memoize(
   def run cache env stdin dir files cmd = prim "job"
   def finish r i o = prim "job_finish"
   def hifiles = map hash ifiles
@@ -188,6 +196,7 @@ def runjob cache env stdin dir ifiles ofiles cmd =
   def inputs  r = prim "job_inputs"
   def outputs r = prim "job_outputs"
   \f (f status stdout stderr inputs outputs) job
+)
 
 global hash f = memoize (
   def run cache env stdin dir files cmd = prim "job"

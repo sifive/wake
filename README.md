@@ -1,7 +1,11 @@
-Dependencies:
+External dependencies:
+ - c++ 11
  - libgmp-dev
- - libre2-dev
  - libfuse-dev
+ - libre2-dev
  - re2c
+ - md5sum
+
+Internal dependencies:
  - argagg
- - sha3
+ - MurmurHash3

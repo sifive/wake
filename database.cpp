@@ -84,8 +84,8 @@ std::string Database::open() {
     "  job_id     integer not null references jobs(job_id),"
     "  descriptor integer not null," // 1=stdout, 2=stderr"
     "  seconds    real    not null," // seconds after job start
-    "  output     text    not null,"
-    "  primary key(job_id, descriptor, seconds));";
+    "  output     text    not null);"
+    "create index if not exists logorder on log(job_id, descriptor, seconds);";
   char *fail;
   ret = sqlite3_exec(imp->db, schema_sql, 0, 0, &fail);
   if (ret != SQLITE_OK) {
