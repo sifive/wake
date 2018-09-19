@@ -72,7 +72,7 @@ std::string Database::open() {
     "  status      integer,"
     "  runtime     real,"
     "  foreign key(run_id, stdin) references hashes(run_id, file_id));"
-    "create index if not exists job on jobs(directory, commandline, environment);"
+    "create index if not exists job on jobs(directory, commandline, environment, stdin);"
     "create table if not exists filetree("
     "  access  integer not null," // 0=visible, 1=input, 2=output
     "  job_id  integer not null references jobs(job_id),"
@@ -478,27 +478,15 @@ void Database::end_txn() {
   single_step("Could not commit a transaction", imp->commit_txn);
 }
 
-bool Database::needs_build(
-  int   cache,
+bool Database::reuse_job(
   const std::string &directory,
-  const std::string &commandline,
-  const std::string &environment,
   const std::string &stdin,
-  const std::string &visible_files,
-  const std::string &stack,
-  long  *job)
+  const std::string &environment,
+  const std::string &commandline,
+  const std::string &visible,
+  long *job)
 {
-  long out;
-  const char *why = "Could not insert a job";
-  begin_txn();
-  bind_integer(why, imp->insert_job, 1, imp->run_id);
-  bind_string (why, imp->insert_job, 2, directory);
-  bind_string (why, imp->insert_job, 3, commandline);
-  bind_string (why, imp->insert_job, 4, environment);
-  bind_string (why, imp->insert_job, 5, stack);
-  bind_string (why, imp->insert_job, 6, stdin);
-  single_step (why, imp->insert_job);
-  out = sqlite3_last_insert_rowid(imp->db);
+/*
   const char *tok = visible_files.c_str();
   const char *end = tok + visible_files.size();
   for (const char *scan = tok; scan != end; ++scan) {
@@ -523,12 +511,36 @@ bool Database::needs_build(
   bind_integer(why, imp->needs_build, 5, imp->run_id);
   bool rerun = sqlite3_step(imp->needs_build) == SQLITE_ROW;
   finish_stmt (why, imp->needs_build);
-  end_txn();
-  *job = out;
-  return !prior || rerun || !cache;
+*/
+  return false;
 }
 
-void Database::save_job(long job, const std::string &inputs, const std::string &outputs, int status, double runtime) {
+void Database::insert_job(
+  const std::string &directory,
+  const std::string &stdin,
+  const std::string &environment,
+  const std::string &commandline,
+  const std::string &stack,
+  long  *job)
+{
+  long out;
+  const char *why = "Could not insert a job";
+  begin_txn();
+  // !!! wipe out prior tree
+  // !!! wipe out prior jobs
+  bind_integer(why, imp->insert_job, 1, imp->run_id);
+  bind_string (why, imp->insert_job, 2, directory);
+  bind_string (why, imp->insert_job, 3, commandline);
+  bind_string (why, imp->insert_job, 4, environment);
+  bind_string (why, imp->insert_job, 5, stack);
+  bind_string (why, imp->insert_job, 6, stdin);
+  single_step (why, imp->insert_job);
+  out = sqlite3_last_insert_rowid(imp->db);
+  end_txn();
+  *job = out;
+}
+
+void Database::finish_job(long job, const std::string &inputs, const std::string &outputs, int status, double runtime) {
   const char *why = "Could not save job inputs and outputs";
   begin_txn();
   bind_integer(why, imp->set_runtime, 1, status);
@@ -562,24 +574,10 @@ void Database::save_job(long job, const std::string &inputs, const std::string &
   end_txn();
 }
 
-std::vector<std::string> Database::get_inputs(long job)  {
+std::vector<std::string> Database::get_tree(int kind, long job)  {
   std::vector<std::string> out;
-  const char *why = "Could not read job inputs";
-  bind_integer(why, imp->get_tree, 1, INPUT);
-  bind_integer(why, imp->get_tree, 2, job);
-  while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
-    out.emplace_back(
-      reinterpret_cast<const char*>(sqlite3_column_text(imp->get_tree, 0)),
-      sqlite3_column_bytes(imp->get_tree, 0));
-  }
-  finish_stmt(why, imp->get_tree);
-  return out;
-}
-
-std::vector<std::string> Database::get_outputs(long job) {
-  std::vector<std::string> out;
-  const char *why = "Could not read job outputs";
-  bind_integer(why, imp->get_tree, 1, OUTPUT);
+  const char *why = "Could not read job tree";
+  bind_integer(why, imp->get_tree, 1, kind);
   bind_integer(why, imp->get_tree, 2, job);
   while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
     out.emplace_back(

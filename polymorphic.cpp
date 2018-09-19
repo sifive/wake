@@ -65,28 +65,30 @@ static PRIMFN(prim_cmp) {
 
 static PRIMFN(prim_test) {
   if (args.size() != 1) {
-    resume(std::move(completion), std::make_shared<Exception>("prim_test called on " + std::to_string(args.size()) + "; was exepecting 1", binding));
+    Receiver::receiveM(queue, std::move(completion),
+      std::make_shared<Exception>("prim_test called on " + std::to_string(args.size()) + "; was exepecting 1", binding));
   } else {
-    resume(std::move(completion), args[0]->type == Exception::type ? make_true() : make_false());
+    Receiver::receiveM(queue, std::move(completion), args[0]->type == Exception::type ? make_true() : make_false());
   }
 }
 
 static PRIMFN(prim_catch) {
   if (args.size() != 1 || args[0]->type != Exception::type) {
-    resume(std::move(completion), std::make_shared<Exception>("prim_catch not called on an exception", binding));
+    Receiver::receiveM(queue, std::move(completion),
+      std::make_shared<Exception>("prim_catch not called on an exception", binding));
   } else {
     Exception *exception = reinterpret_cast<Exception*>(args[0].get());
     std::vector<std::shared_ptr<Value> > out;
     for (auto &i : exception->causes)
       out.emplace_back(std::make_shared<String>(i->reason));
-    resume(std::move(completion), make_list(std::move(out)));
+    Receiver::receiveM(queue, std::move(completion), make_list(std::move(out)));
   }
 }
 
 static PRIMFN(prim_raise) {
   EXPECT(1);
   STRING(arg0, 0);
-  resume(std::move(completion), std::make_shared<Exception>(arg0->value, binding));
+  Receiver::receiveM(queue, std::move(completion), std::make_shared<Exception>(arg0->value, binding));
 }
 
 void prim_register_polymorphic(PrimMap &pmap) {

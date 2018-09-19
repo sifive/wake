@@ -22,20 +22,21 @@ void CatStream::hash(std::unique_ptr<Hasher> hasher) {
   hasher->receive(payload);
 }
 
-static std::unique_ptr<Receiver> cast_catstream(std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, CatStream **cat) {
+static std::unique_ptr<Receiver> cast_catstream(ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, CatStream **cat) {
   if (value->type != CatStream::type) {
-    resume(std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a CatStream", binding));
+    Receiver::receiveM(queue, std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a CatStream", binding));
     return std::unique_ptr<Receiver>();
   } else {
     *cat = reinterpret_cast<CatStream*>(value.get());
     return completion;
   }
 }
-#define CATSTREAM(arg, i) 								\
-  CatStream *arg;									\
-  do {											\
-    completion = cast_catstream(std::move(completion), binding, args[i], &arg);		\
-    if (!completion) return;								\
+
+#define CATSTREAM(arg, i) 									\
+  CatStream *arg;										\
+  do {												\
+    completion = cast_catstream(queue, std::move(completion), binding, args[i], &arg);		\
+    if (!completion) return;									\
   } while(0)
 
 static PRIMFN(prim_catopen) {

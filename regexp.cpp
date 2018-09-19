@@ -23,22 +23,22 @@ void RegExp::hash(std::unique_ptr<Hasher> hasher) {
   hasher->receive(payload);
 }
 
-static std::unique_ptr<Receiver> cast_regexp(std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, RegExp **reg) {
+static std::unique_ptr<Receiver> cast_regexp(ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, RegExp **reg) {
   if (value->type != RegExp::type) {
-    resume(std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a RegExp", binding));
+    Receiver::receiveM(queue, std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a RegExp", binding));
     return std::unique_ptr<Receiver>();
   } else {
     *reg = reinterpret_cast<RegExp*>(value.get());
     return completion;
   }
 }
-#define REGEXP(arg, i)	 								\
-  RegExp *arg;										\
-  do {											\
-    completion = cast_regexp(std::move(completion), binding, args[i], &arg);		\
-    if (!completion) return;								\
-  } while(0)
 
+#define REGEXP(arg, i)	 									\
+  RegExp *arg;											\
+  do {												\
+    completion = cast_regexp(queue, std::move(completion), binding, args[i], &arg);		\
+    if (!completion) return;									\
+  } while(0)
 
 static PRIMFN(prim_re2) {
   EXPECT(1);

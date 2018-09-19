@@ -15,10 +15,6 @@
 
 static ThunkQueue queue;
 
-void resume(std::unique_ptr<Receiver> completion, std::shared_ptr<Value> &&return_value) {
-  Receiver::receiveM(queue, std::move(completion), std::move(return_value));
-}
-
 struct Output : public Receiver {
   std::shared_ptr<Value> *save;
   Output(std::shared_ptr<Value> *save_) : save(save_) { }
@@ -185,7 +181,7 @@ int main(int argc, const char **argv) {
   db.prepare();
   std::shared_ptr<Value> output;
   queue.queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output(&output)));
-  do { queue.run(); } while (jobtable.wait());
+  do { queue.run(); } while (jobtable.wait(queue));
 
   std::vector<std::shared_ptr<Value> > outputs;
   outputs.reserve(targets.size());

@@ -39,7 +39,7 @@ struct Primitive : public Receiver {
 static void chain_app(ThunkQueue &queue, std::unique_ptr<Receiver> receiver, Prim *prim, std::shared_ptr<Binding> &&binding, std::vector<std::shared_ptr<Value> > &&args) {
   int idx = args.size();
   if (idx == prim->args) {
-    prim->fn(prim->data, std::move(receiver), std::move(binding), std::move(args));
+    prim->fn(prim->data, queue, std::move(receiver), std::move(binding), std::move(args));
   } else {
     Binding *arg = binding.get();
     for (int i = idx+1; i < prim->args; ++i) arg = arg->next.get();

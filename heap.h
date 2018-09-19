@@ -12,6 +12,7 @@ struct Location;
 struct Hasher;
 
 struct Receiver {
+  std::unique_ptr<Receiver> next; // for wait Q
   virtual ~Receiver();
 
   static void receiveM(ThunkQueue &queue, std::unique_ptr<Receiver> receiver, std::shared_ptr<Value> &&value) {
@@ -23,12 +24,6 @@ struct Receiver {
 
 protected:
   virtual void receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) = 0;
-
-private:
-  std::unique_ptr<Receiver> next; // for wait Q
-friend struct Future;
-friend struct Completer;
-friend struct Memoizer;
 };
 
 struct Future {

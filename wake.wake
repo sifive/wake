@@ -4,7 +4,7 @@ def linkO = (subscribe linkO).head
 def re2c file =
   def cpp = replace "\\.re$" ".cpp" file
   def cmdline = "/usr/local/bin/re2c", file, "-o", cpp, nil
-  def result = job nil here (file, nil) (cpp, nil) cmdline
+  def result = job "." cmdline (file, nil)
   result.outputs.head
 
 global buildWake _ =
@@ -13,4 +13,8 @@ global buildWake _ =
   def cppFiles = sources here ".*\\.cpp" ++ map re2c reFiles
   def compile = compileC ("-std=c++11", "-I/opt/local/include", "-Wall", "-O2", nil) headerFiles
   def objFiles = map compile cppFiles
-  linkO ("-L/opt/local/", "-lgmp", "-lre2", "-lsqlite3", nil) objFiles "wake"
+  linkO ("-L/opt/local/lib", "-lgmp", "-lre2", "-lsqlite3", nil) objFiles "wake"
+
+# fix syntax:
+#   list syntax
+#   regexp instead of glob
