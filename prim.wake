@@ -100,6 +100,8 @@ global collate f l r =
       else cmp
 
 # string operations
+global read path = prim "read"
+global write path content = prim "write"
 global cat l =
   def catopen    = prim "catopen"
   def catclose c = prim "catclose"

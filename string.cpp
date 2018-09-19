@@ -3,6 +3,7 @@
 #include "heap.h"
 #include "hash.h"
 #include <sstream>
+#include <fstream>
 
 struct CatStream : public Value {
   std::stringstream str;
@@ -60,8 +61,31 @@ static PRIMFN(prim_catclose) {
   RETURN(out);
 }
 
+static PRIMFN(prim_read) {
+  EXPECT(1);
+  STRING(arg0, 0);
+  std::ifstream t(arg0->value);
+  REQUIRE(!t.fail(), "Could not read " + arg0->value);
+  std::stringstream buffer;
+  buffer << t.rdbuf();
+  auto out = std::make_shared<String>(buffer.str());
+  RETURN(out);
+}
+
+static PRIMFN(prim_write) {
+  EXPECT(2);
+  STRING(arg0, 0);
+  STRING(arg1, 1);
+  std::ofstream t(arg0->value, std::ios_base::trunc);
+  REQUIRE(!t.fail(), "Could not write " + arg0->value);
+  t << arg1->value;
+  RETURN(args[0]);
+}
+
 void prim_register_string(PrimMap &pmap) {
   pmap["catopen" ].first = prim_catopen;
   pmap["catadd"  ].first = prim_catadd;
   pmap["catclose"].first = prim_catclose;
+  pmap["write"   ].first = prim_write;
+  pmap["read"    ].first = prim_read;
 }
