@@ -32,6 +32,7 @@ struct JobResult : public Value {
   long job;
   double runtime;
   int status; // -signal, +code
+  std::shared_ptr<Value> bad_finish;
 
   // There are 4 distinct wait queues for jobs
   std::unique_ptr<Receiver> q_stdout;  // waken once stdout closed
@@ -423,6 +424,7 @@ void JobResult::process(ThunkQueue &queue) {
     for (auto &i : files) vals.emplace_back(std::make_shared<String>(std::move(i)));
     auto out = make_list(std::move(vals));
     std::unique_ptr<Receiver> iter, next;
+    if (bad_finish) out = bad_finish;
     for (iter = std::move(q_inputs); iter; iter = std::move(next)) {
       next = std::move(iter->next);
       Receiver::receiveC(queue, std::move(iter), out);
@@ -436,6 +438,7 @@ void JobResult::process(ThunkQueue &queue) {
     vals.reserve(files.size());
     for (auto &i : files) vals.emplace_back(std::make_shared<String>(std::move(i)));
     auto out = make_list(std::move(vals));
+    if (bad_finish) out = bad_finish;
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_outputs); iter; iter = std::move(next)) {
       next = std::move(iter->next);
@@ -494,18 +497,43 @@ static PRIMFN(prim_job_tree) {
 }
 
 static PRIMFN(prim_job_finish) {
-  EXPECT(3);
+  REQUIRE (args.size() == 3, "prim_job_finish not called on 3 arguments");
   JOBRESULT(job, 0);
-  STRING(inputs, 1);
-  STRING(outputs, 2);
   if (!(job->state & STATE_MERGED)) {
     // fatal because it means the queue will not converge
     std::cerr << "ERROR: attempted to finish an unmerged job" << std::endl;
     exit(1);
   }
-  job->db->finish_job(job->job, inputs->value, outputs->value, job->runtime, job->status);
+
+  // On an exception, we need to still FINISH, but with an exception from the inputs/outputs
+  std::string empty;
+  std::string *inputs;
+  std::string *outputs;
+
+  if (args[1]->type == String::type) {
+    inputs = &reinterpret_cast<String*>(args[1].get())->value;
+  } else if (args[1]->type == Exception::type) {
+    job->bad_finish = args[1];
+    inputs = &empty;
+  } else {
+    job->bad_finish = std::make_shared<Exception>("prim_job_finish arg1 not a string", binding);
+    inputs = &empty;
+  }
+
+  if (args[2]->type == String::type) {
+    outputs = &reinterpret_cast<String*>(args[2].get())->value;
+  } else if (args[2]->type == Exception::type) {
+    job->bad_finish = args[2];
+    outputs = &empty;
+  } else {
+    job->bad_finish = std::make_shared<Exception>("prim_job_finish arg2 not a string", binding);
+    outputs = &empty;
+  }
+
+  job->db->finish_job(job->job, *inputs, *outputs, job->runtime, job->status);
   job->state |= STATE_FINISHED;
   job->process(queue);
+
   auto out = make_true();
   RETURN(out);
 }

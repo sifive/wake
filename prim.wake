@@ -225,9 +225,8 @@ global hash f = memoize (
 
 # A job where all inputs and outputs are known a-priori
 global uncached_simple_job dir stdin env cmd inputs outputs =
-  def hashed = map hash inputs
   def job = launch dir stdin env cmd
-  def final _ = finish job hashed (map hash outputs)
+  def final _ = finish job (map hash inputs) (map hash outputs)
   def wait = (job.status == 0) final final ""
   job
 
