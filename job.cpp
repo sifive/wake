@@ -265,6 +265,7 @@ bool JobTable::wait(ThunkQueue &queue) {
       for (auto &i : imp->table) {
         if (i.pid == pid) {
           i.job->state |= STATE_MERGED;
+          i.job->status = code;
           if (i.pipe_stdout != -1) {
             int got;
             while ((got = read(i.pipe_stdout, buffer, sizeof(buffer))) > 0)
@@ -285,6 +286,7 @@ bool JobTable::wait(ThunkQueue &queue) {
           // if (imp->verbose) std::cout << i.job->db->get_output(i.job->job, 1);
           if (imp->verbose) std::cerr << i.job->db->get_output(i.job->job, 2);
           i.job->process(queue);
+          i.job.reset();
         }
       }
     }
@@ -335,10 +337,10 @@ static std::unique_ptr<Receiver> cast_jobresult(ThunkQueue &queue, std::unique_p
 static PRIMFN(prim_job_launch) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT(4);
-  STRING(dir, 1);
-  STRING(stdin, 2);
-  STRING(env, 3);
-  STRING(cmd, 4);
+  STRING(dir, 0);
+  STRING(stdin, 1);
+  STRING(env, 2);
+  STRING(cmd, 3);
   std::stringstream stack;
   for (auto &i : Binding::stack_trace(binding)) stack << i << std::endl;
 
@@ -359,11 +361,11 @@ static PRIMFN(prim_job_launch) {
 static PRIMFN(prim_job_cache) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT(5);
-  STRING(dir, 1);
-  STRING(stdin, 2);
-  STRING(env, 3);
-  STRING(cmd, 4);
-  STRING(visible, 5);
+  STRING(dir, 0);
+  STRING(stdin, 1);
+  STRING(env, 2);
+  STRING(cmd, 3);
+  STRING(visible, 4);
 
   long job;
   bool cached = jobtable->imp->db->reuse_job(
