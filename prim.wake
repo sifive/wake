@@ -187,6 +187,11 @@ global relative dir path = prim "relative"
 # The internal function operates on imploded strings, not lists
 def primjob dir stdin env cmd = prim "job_launch"
 def oncejob dir stdin env cmd = memoize primjob dir stdin env cmd
+def primcache dir stdin env cmd visible = prim "job_cache"
+def oncecache dir stdin env cmd visible = memoize primcache dir stdin env cmd visible
+global jobcache dir stdin env cmd visible =
+  def cache = oncecache dir stdin env.implode cmd.implode visible.implode
+  if test cache then cache else wrap cache
 
 # Launch a job, raw interface
 # If you use this API, you MUST also run 'finish' on the result AFTER status is available
@@ -194,23 +199,27 @@ def oncejob dir stdin env cmd = memoize primjob dir stdin env cmd
 #   stdin: file to attach to standard input ("" = nothing)
 #   env:   string list of all environement variables in the form key=value
 #   cmd:   string list of command arguments (head is the full path to the command)
-global launch dir stdin env cmd =
-  def result = oncejob dir stdin env.implode cmd.implode
+global launch dir stdin env cmd = wrap (oncejob dir stdin env.implode cmd.implode)
+
+def fail job ok =
+  if job.status == 0 then ok else
+    raise ("Non-zero exit status (", str job.status, ")", nil).cat
+
+# Access the output of a job
+def wrap result =
   def output  r f   = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
   def kill    r s   = prim "job_kill"   # s != 0 => kills; blocks till exit; return status
   def finish  r i o = prim "job_finish" # ignored except on first call; blocks till exit; returns true
   def tree    r i   = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
   \f (f output kill finish tree) result
-
-# Access the output of a job
 def    output  job = job (\x\_\_\_ x)
 def    tree    job = job (\_\_\_\x x)
 global kill    job = job (\_\x\_\_ x)
 global status  job = kill job 0
 global stdout  job = output job 1
 global stderr  job = output job 2
-global inputs  job = tree job 1
-global outputs job = tree job 2
+global inputs  job = fail job (tree job 1)
+global outputs job = fail job (tree job 2)
 
 # Complete a job, marking done and recording used inputs/outputs
 global finish job inputs outputs = job (\_\_\x\_ x) inputs.implode outputs.implode
@@ -231,10 +240,8 @@ global uncached_simple_job dir stdin env cmd inputs outputs =
   job
 
 global simple_job dir stdin env cmd inputs outputs =
-  # job_cache may steal the old build; prim_launch wipes out old jobs on fork
-  def cache dir stdin env cmd visible = prim "job_cache"
   def handle _ = uncached_simple_job dir stdin env cmd inputs outputs
-  try handle (cache dir stdin env.implode cmd.implode (map hash inputs).implode)
+  try handle (jobcache dir stdin env cmd (map hash inputs))
 
 # Still not caching, just hermetic
 global uncached_fuse_job dir stdin env cmd visible =
@@ -254,10 +261,8 @@ global uncached_fuse_job dir stdin env cmd visible =
   job
 
 global fuse_job dir stdin env cmd visible =
-  # job_cache may steal the old build; prim_launch wipes out old jobs on fork
-  def cache dir stdin env cmd visible = prim "job_cache"
   def handle _ = uncached_fuse_job dir stdin env cmd visible
-  try handle (cache dir stdin env.implode cmd.implode (map hash visible).implode)
+  try handle (jobcache dir stdin env cmd (map hash visible))
 
 # Most jobs don't need explicit stdin/env control
 def environment = subscribe environment

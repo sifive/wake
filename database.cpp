@@ -22,12 +22,17 @@ struct Database::detail {
   sqlite3_stmt *get_log;
   sqlite3_stmt *get_tree;
   sqlite3_stmt *set_runtime;
+  sqlite3_stmt *delete_tree;
+  sqlite3_stmt *delete_prior;
+  sqlite3_stmt *insert_temp;
   sqlite3_stmt *find_prior;
   sqlite3_stmt *needs_build;
+  sqlite3_stmt *wipe_temp;
   long run_id;
   detail() : db(0), add_target(0), del_target(0), begin_txn(0), commit_txn(0), insert_job(0),
-             insert_tree(0), insert_log(0), insert_file(0), insert_hash(0), get_log(0),
-             get_tree(0), set_runtime(0), find_prior(0), needs_build(0) { }
+             insert_tree(0), insert_log(0), insert_file(0), insert_hash(0), get_log(0), get_tree(0),
+             set_runtime(0), delete_tree(0), delete_prior(0), insert_temp(0), find_prior(0),
+             needs_build(0), wipe_temp(0) { }
 };
 
 Database::Database() : imp(new detail) { }
@@ -80,6 +85,10 @@ std::string Database::open() {
     "  run_id  integer not null," // implied by hashes constraint: references runs(run_id)
     "  primary key(access, job_id, file_id),"
     "  foreign key(run_id, file_id) references hashes(run_id, file_id));"
+    "create temp table temptree("
+    "  run_id  integer not null," // implied by hashes constraint: references runs(run_id)
+    "  file_id integer not null," // implied by hashes constraint: references files(file_id)
+    "  foreign key(run_id, file_id) references hashes(run_id, file_id));"
     "create table if not exists log("
     "  job_id     integer not null references jobs(job_id),"
     "  descriptor integer not null," // 1=stdout, 2=stderr"
@@ -96,7 +105,7 @@ std::string Database::open() {
   }
 
   // prepare statements
-  const char *sql_add_target = "insert into targets(expression) values(?);";
+  const char *sql_add_target = "insert into targets(expression) values(?)";
   ret = sqlite3_prepare_v2(imp->db, sql_add_target, -1, &imp->add_target, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 add_target: ") + sqlite3_errmsg(imp->db);
@@ -104,7 +113,7 @@ std::string Database::open() {
     return out;
   }
 
-  const char *sql_del_target = "delete from targets where expression=?;";
+  const char *sql_del_target = "delete from targets where expression=?";
   ret = sqlite3_prepare_v2(imp->db, sql_del_target, -1, &imp->del_target, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 del_target: ") + sqlite3_errmsg(imp->db);
@@ -112,7 +121,7 @@ std::string Database::open() {
     return out;
   }
 
-  const char *sql_begin_txn = "begin transaction;";
+  const char *sql_begin_txn = "begin transaction";
   ret = sqlite3_prepare_v2(imp->db, sql_begin_txn, -1, &imp->begin_txn, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 begin_txn: ") + sqlite3_errmsg(imp->db);
@@ -120,7 +129,7 @@ std::string Database::open() {
     return out;
   }
 
-  const char *sql_commit_txn = "commit transaction;";
+  const char *sql_commit_txn = "commit transaction";
   ret = sqlite3_prepare_v2(imp->db, sql_commit_txn, -1, &imp->commit_txn, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 commit_txn: ") + sqlite3_errmsg(imp->db);
@@ -130,7 +139,7 @@ std::string Database::open() {
 
   const char *sql_insert_job =
     "insert into jobs(run_id, directory, commandline, environment, stack, stdin) "
-    "values(?, ?, ?, ?, ?, (select file_id from files where path=?));";
+    "values(?, ?, ?, ?, ?, (select file_id from files where path=?))";
   ret = sqlite3_prepare_v2(imp->db, sql_insert_job, -1, &imp->insert_job, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 insert_job: ") + sqlite3_errmsg(imp->db);
@@ -140,7 +149,7 @@ std::string Database::open() {
 
   const char *sql_insert_tree =
     "insert into filetree(access, job_id, file_id, run_id) "
-    "values(?, ?, (select file_id from files where path=?), ?);";
+    "values(?, ?, (select file_id from files where path=?), ?)";
   ret = sqlite3_prepare_v2(imp->db, sql_insert_tree, -1, &imp->insert_tree, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 insert_tree: ") + sqlite3_errmsg(imp->db);
@@ -150,7 +159,7 @@ std::string Database::open() {
 
   const char *sql_insert_log =
     "insert into log(job_id, descriptor, seconds, output) "
-    "values(?, ?, ?, ?);";
+    "values(?, ?, ?, ?)";
   ret = sqlite3_prepare_v2(imp->db, sql_insert_log, -1, &imp->insert_log, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 insert_log: ") + sqlite3_errmsg(imp->db);
@@ -158,7 +167,7 @@ std::string Database::open() {
     return out;
   }
 
-  const char *sql_insert_file = "insert or ignore into files(path) values (?);";
+  const char *sql_insert_file = "insert or ignore into files(path) values (?)";
   ret = sqlite3_prepare_v2(imp->db, sql_insert_file, -1, &imp->insert_file, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 insert_file: ") + sqlite3_errmsg(imp->db);
@@ -168,7 +177,7 @@ std::string Database::open() {
 
   const char *sql_insert_hash =
     "insert into hashes(run_id, file_id, hash) "
-    "values(?, (select file_id from files where path=?), ?);";
+    "values(?, (select file_id from files where path=?), ?)";
   ret = sqlite3_prepare_v2(imp->db, sql_insert_hash, -1, &imp->insert_hash, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 insert_hash: ") + sqlite3_errmsg(imp->db);
@@ -176,7 +185,7 @@ std::string Database::open() {
     return out;
   }
 
-  const char *sql_get_log = "select output from log where job_id=? and descriptor=? order by seconds;";
+  const char *sql_get_log = "select output from log where job_id=? and descriptor=? order by seconds";
   ret = sqlite3_prepare_v2(imp->db, sql_get_log, -1, &imp->get_log, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 get_log: ") + sqlite3_errmsg(imp->db);
@@ -186,7 +195,7 @@ std::string Database::open() {
 
   const char *sql_get_tree =
     "select p.path from filetree t, files p"
-    " where t.access=? and t.job_id=? and p.file_id=t.file_id;";
+    " where t.access=? and t.job_id=? and p.file_id=t.file_id";
   ret = sqlite3_prepare_v2(imp->db, sql_get_tree, -1, &imp->get_tree, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 get_tree: ") + sqlite3_errmsg(imp->db);
@@ -194,7 +203,7 @@ std::string Database::open() {
     return out;
   }
 
-  const char *sql_set_runtime = "update jobs set status=?, runtime=? where job_id=?;";
+  const char *sql_set_runtime = "update jobs set status=?, runtime=? where job_id=?";
   ret = sqlite3_prepare_v2(imp->db, sql_set_runtime, -1, &imp->set_runtime, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 set_runtime: ") + sqlite3_errmsg(imp->db);
@@ -202,9 +211,38 @@ std::string Database::open() {
     return out;
   }
 
+  const char *sql_delete_tree =
+    "delete from filetree where job_id in (select job_id from jobs where "
+    "directory=? and commandline=? and environment=?)";
+  ret = sqlite3_prepare_v2(imp->db, sql_delete_tree, -1, &imp->delete_tree, 0);
+  if (ret != SQLITE_OK) {
+    std::string out = std::string("sqlite3_prepare_v2 delete_tree: ") + sqlite3_errmsg(imp->db);
+    close();
+    return out;
+  }
+
+  const char *sql_delete_prior =
+    "delete from jobs where "
+    "directory=? and commandline=? and environment=?";
+  ret = sqlite3_prepare_v2(imp->db, sql_delete_prior, -1, &imp->delete_prior, 0);
+  if (ret != SQLITE_OK) {
+    std::string out = std::string("sqlite3_prepare_v2 delete_prior: ") + sqlite3_errmsg(imp->db);
+    close();
+    return out;
+  }
+
+  const char *sql_insert_temp =
+    "insert into temptree(run_id, file_id) values(?, (select file_id from files where path=?))";
+  ret = sqlite3_prepare_v2(imp->db, sql_insert_temp, -1, &imp->insert_temp, 0);
+  if (ret != SQLITE_OK) {
+    std::string out = std::string("sqlite3_prepare_v2 insert_temp: ") + sqlite3_errmsg(imp->db);
+    close();
+    return out;
+  }
+
   const char *sql_find_prior =
     "select job_id from jobs where "
-    "directory=? and commandline=? and environment=? and runtime is not null";
+    "directory=? and commandline=? and environment=? and status=0";
   ret = sqlite3_prepare_v2(imp->db, sql_find_prior, -1, &imp->find_prior, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 find_prior: ") + sqlite3_errmsg(imp->db);
@@ -214,14 +252,23 @@ std::string Database::open() {
 
   const char *sql_needs_build =
     "select h.file_id, h.hash from jobs j, filetree f, hashes h"
-    " where j.directory=? and j.commandline=? and j.environment=? and j.runtime is not null"
-    "  and f.access=1 and f.job_id=j.job_id and h.file_id=f.file_id and h.run_id=j.run_id "
+    " where j.directory=? and j.commandline=? and j.environment=? and j.status=0"
+    "  and f.access=1 and f.job_id=j.job_id"
+    "  and h.run_id=f.run_id and h.file_id=f.file_id "
     "except "
-    "select h.file_id, h.hash from filetree f, hashes h"
-    " where f.access=0 and f.job_id=? and h.file_id=f.file_id and h.run_id=?";
+    "select h.file_id, h.hash from temptree f, hashes h"
+    " where h.run_id=f.run_id and h.file_id=f.file_id";
   ret = sqlite3_prepare_v2(imp->db, sql_needs_build, -1, &imp->needs_build, 0);
   if (ret != SQLITE_OK) {
     std::string out = std::string("sqlite3_prepare_v2 needs_build: ") + sqlite3_errmsg(imp->db);
+    close();
+    return out;
+  }
+
+  const char *sql_wipe_temp = "delete from temptree";
+  ret = sqlite3_prepare_v2(imp->db, sql_wipe_temp, -1, &imp->wipe_temp, 0);
+  if (ret != SQLITE_OK) {
+    std::string out = std::string("sqlite3_prepare_v2 wipe_temp: ") + sqlite3_errmsg(imp->db);
     close();
     return out;
   }
@@ -340,6 +387,33 @@ void Database::close() {
   }
   imp->set_runtime = 0;
 
+  if (imp->delete_tree) {
+    ret = sqlite3_finalize(imp->delete_tree);
+    if (ret != SQLITE_OK) {
+      std::cerr << "Could not sqlite3_finalize delete_tree: " << sqlite3_errmsg(imp->db) << std::endl;
+      return;
+    }
+  }
+  imp->delete_tree = 0;
+
+  if (imp->delete_prior) {
+    ret = sqlite3_finalize(imp->delete_prior);
+    if (ret != SQLITE_OK) {
+      std::cerr << "Could not sqlite3_finalize delete_prior: " << sqlite3_errmsg(imp->db) << std::endl;
+      return;
+    }
+  }
+  imp->delete_prior = 0;
+
+  if (imp->insert_temp) {
+    ret = sqlite3_finalize(imp->insert_temp);
+    if (ret != SQLITE_OK) {
+      std::cerr << "Could not sqlite3_finalize insert_temp: " << sqlite3_errmsg(imp->db) << std::endl;
+      return;
+    }
+  }
+  imp->insert_temp = 0;
+
   if (imp->find_prior) {
     ret = sqlite3_finalize(imp->find_prior);
     if (ret != SQLITE_OK) {
@@ -357,6 +431,15 @@ void Database::close() {
     }
   }
   imp->needs_build = 0;
+
+  if (imp->wipe_temp) {
+    ret = sqlite3_finalize(imp->wipe_temp);
+    if (ret != SQLITE_OK) {
+      std::cerr << "Could not sqlite3_finalize wipe_temp: " << sqlite3_errmsg(imp->db) << std::endl;
+      return;
+    }
+  }
+  imp->wipe_temp = 0;
 
   if (imp->db) {
     int ret = sqlite3_close(imp->db);
@@ -486,16 +569,15 @@ bool Database::reuse_job(
   const std::string &visible,
   long *job)
 {
-/*
-  const char *tok = visible_files.c_str();
-  const char *end = tok + visible_files.size();
+  const char *why = "Could not check for a cached job";
+  begin_txn();
+  const char *tok = visible.c_str();
+  const char *end = tok + visible.size();
   for (const char *scan = tok; scan != end; ++scan) {
     if (*scan == 0 && scan != tok) {
-      bind_integer(why, imp->insert_tree, 1, VISIBLE);
-      bind_integer(why, imp->insert_tree, 2, out);
-      bind_string (why, imp->insert_tree, 3, tok, scan-tok);
-      bind_integer(why, imp->insert_tree, 4, imp->run_id);
-      single_step (why, imp->insert_tree);
+      bind_integer(why, imp->insert_temp, 1, imp->run_id);
+      bind_string (why, imp->insert_temp, 2, tok, scan-tok);
+      single_step (why, imp->insert_temp);
       tok = scan+1;
     }
   }
@@ -503,16 +585,16 @@ bool Database::reuse_job(
   bind_string (why, imp->find_prior, 2, commandline);
   bind_string (why, imp->find_prior, 3, environment);
   bool prior = sqlite3_step(imp->find_prior) == SQLITE_ROW;
+  if (prior) *job = sqlite3_column_int(imp->find_prior, 0);
   finish_stmt (why, imp->find_prior);
   bind_string (why, imp->needs_build, 1, directory);
   bind_string (why, imp->needs_build, 2, commandline);
   bind_string (why, imp->needs_build, 3, environment);
-  bind_integer(why, imp->needs_build, 4, out);
-  bind_integer(why, imp->needs_build, 5, imp->run_id);
   bool rerun = sqlite3_step(imp->needs_build) == SQLITE_ROW;
   finish_stmt (why, imp->needs_build);
-*/
-  return false;
+  single_step (why, imp->wipe_temp);
+  end_txn();
+  return prior && !rerun;
 }
 
 void Database::insert_job(
@@ -526,8 +608,14 @@ void Database::insert_job(
   long out;
   const char *why = "Could not insert a job";
   begin_txn();
-  // !!! wipe out prior tree
-  // !!! wipe out prior jobs
+  bind_string (why, imp->delete_tree, 1, directory);
+  bind_string (why, imp->delete_tree, 2, commandline);
+  bind_string (why, imp->delete_tree, 3, environment);
+  single_step (why, imp->delete_tree);
+  bind_string (why, imp->delete_prior, 1, directory);
+  bind_string (why, imp->delete_prior, 2, commandline);
+  bind_string (why, imp->delete_prior, 3, environment);
+  single_step (why, imp->delete_prior);
   bind_integer(why, imp->insert_job, 1, imp->run_id);
   bind_string (why, imp->insert_job, 2, directory);
   bind_string (why, imp->insert_job, 3, commandline);

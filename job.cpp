@@ -530,7 +530,7 @@ static PRIMFN(prim_job_finish) {
     outputs = &empty;
   }
 
-  job->db->finish_job(job->job, *inputs, *outputs, job->runtime, job->status);
+  job->db->finish_job(job->job, *inputs, *outputs, job->status, job->runtime);
   job->state |= STATE_FINISHED;
   job->process(queue);
 
