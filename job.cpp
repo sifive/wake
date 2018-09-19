@@ -311,7 +311,7 @@ JobResult::JobResult(Database *db_, const std::string &dir, const std::string &s
 }
 
 Task::Task(Database *db_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_, const std::string &stack_)
-  : job(std::make_shared<JobResult>(db_, dir, stdin, environ, cmdline)),
+  : job(std::make_shared<JobResult>(db_, dir_, stdin_, environ_, cmdline_)),
     dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_), stack(stack_)
 {
 }
@@ -511,17 +511,18 @@ static PRIMFN(prim_job_finish) {
 }
 
 static PRIMFN(prim_add_hash) {
-  EXPECT(3);
-  JOBRESULT(job, 0);
-  STRING(file, 1);
-  STRING(hash, 2);
-  job->db->add_hash(file->value, hash->value);
-  RETURN(args[1]);
+  JobTable *jobtable = reinterpret_cast<JobTable*>(data);
+  EXPECT(2);
+  STRING(file, 0);
+  STRING(hash, 1);
+  jobtable->imp->db->add_hash(file->value, hash->value);
+  RETURN(args[0]);
 }
 
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   pmap["job_launch" ].second = jobtable;
   pmap["job_cache"  ].second = jobtable;
+  pmap["add_hash"   ].second = jobtable;
   pmap["job_launch" ].first = prim_job_launch;
   pmap["job_cache"  ].first = prim_job_cache;
   pmap["job_output" ].first = prim_job_output;

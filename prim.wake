@@ -195,7 +195,7 @@ def oncejob dir stdin env cmd = memoize primjob dir stdin env cmd
 #   env:   string list of all environement variables in the form key=value
 #   cmd:   string list of command arguments (head is the full path to the command)
 global launch dir stdin env cmd =
-  def result = oncejob env.implode stdin dir cmd.implode
+  def result = oncejob dir stdin env.implode cmd.implode
   def output  r f   = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
   def kill    r s   = prim "job_kill"   # s != 0 => kills; blocks till exit; return status
   def finish  r i o = prim "job_finish" # ignored except on first call; blocks till exit; returns true
@@ -216,10 +216,10 @@ global outputs job = tree job 2
 global finish job inputs outputs = job (\_\_\x\_ x) inputs.implode outputs.implode
 
 global hash f = memoize (
-  def job = launch "." "" nil ("/opt/local/bin/md5sum", f, nil)
+  def job = launch "." "" nil ("/usr/bin/md5sum", f, nil)
   def final _ = finish job nil nil
   def wait = (job.status == 0) final final ""
-  def add r f h = prim "add_hash"
+  def add f h = prim "add_hash"
   if job.status == 0 then add f (head (extract "(.{32}).*" job.stdout)) else job.stderr
 )
 
