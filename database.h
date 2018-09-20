@@ -5,6 +5,25 @@
 #include <string>
 #include <vector>
 
+struct FileReflection {
+  std::string path;
+  std::string hash;
+};
+
+struct JobReflection {
+  long job;
+  std::string directory;
+  std::vector<std::string> commandline;
+  std::vector<std::string> environment;
+  std::string stack;
+  std::string stdin; // !!! wrong
+  std::string time;
+  int status;
+  double runtime;
+  std::vector<FileReflection> inputs;
+  std::vector<FileReflection> outputs;
+};
+
 struct Database {
   struct detail;
   std::unique_ptr<detail> imp;
@@ -61,6 +80,10 @@ struct Database {
   void add_hash(
     const std::string &file,
     const std::string &hash);
+
+  std::vector<JobReflection> explain(
+    const std::string &file,
+    int use);
 };
 
 #endif

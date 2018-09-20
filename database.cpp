@@ -28,11 +28,12 @@ struct Database::detail {
   sqlite3_stmt *find_prior;
   sqlite3_stmt *needs_build;
   sqlite3_stmt *wipe_temp;
+  sqlite3_stmt *find_owner;
   long run_id;
   detail() : db(0), add_target(0), del_target(0), begin_txn(0), commit_txn(0), insert_job(0),
              insert_tree(0), insert_log(0), insert_file(0), insert_hash(0), get_log(0), get_tree(0),
              set_runtime(0), delete_tree(0), delete_prior(0), insert_temp(0), find_prior(0),
-             needs_build(0), wipe_temp(0) { }
+             needs_build(0), wipe_temp(0), find_owner(0) { }
 };
 
 Database::Database() : imp(new detail) { }
@@ -85,6 +86,7 @@ std::string Database::open() {
     "  run_id  integer not null," // implied by hashes constraint: references runs(run_id)
     "  primary key(access, job_id, file_id),"
     "  foreign key(run_id, file_id) references hashes(run_id, file_id));"
+    "create index if not exists filesearch on filetree(access, file_id);"
     "create temp table temptree("
     "  run_id  integer not null," // implied by hashes constraint: references runs(run_id)
     "  file_id integer not null," // implied by hashes constraint: references files(file_id)
@@ -124,8 +126,8 @@ std::string Database::open() {
     "values(?, (select file_id from files where path=?), ?)";
   const char *sql_get_log = "select output from log where job_id=? and descriptor=? order by seconds";
   const char *sql_get_tree =
-    "select p.path from filetree t, files p"
-    " where t.access=? and t.job_id=? and p.file_id=t.file_id";
+    "select p.path, h.hash from filetree t, hashes h, files p"
+    " where t.access=? and t.job_id=? and h.run_id=t.run_id and h.file_id=t.file_id and p.file_id=t.file_id";
   const char *sql_set_runtime = "update jobs set status=?, runtime=? where job_id=?";
   const char *sql_delete_tree =
     "delete from filetree where job_id in (select job_id from jobs where "
@@ -147,6 +149,10 @@ std::string Database::open() {
     "select h.file_id, h.hash from temptree f, hashes h"
     " where h.run_id=f.run_id and h.file_id=f.file_id";
   const char *sql_wipe_temp = "delete from temptree";
+  const char *sql_find_owner =
+    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.time, j.status, j.runtime"
+    " from jobs j, filetree t, files f"
+    " where f.path=? and t.access=? and t.file_id=f.file_id and j.job_id=t.job_id";
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
@@ -174,6 +180,7 @@ std::string Database::open() {
   PREPARE(sql_find_prior,   find_prior);
   PREPARE(sql_needs_build,  needs_build);
   PREPARE(sql_wipe_temp,    wipe_temp);
+  PREPARE(sql_find_owner,   find_owner);
 
   return "";
 }
@@ -210,6 +217,7 @@ void Database::close() {
   FINALIZE(find_prior);
   FINALIZE(needs_build);
   FINALIZE(wipe_temp);
+  FINALIZE(find_owner);
 
   if (imp->db) {
     int ret = sqlite3_close(imp->db);
@@ -479,4 +487,69 @@ void Database::add_hash(const std::string &file, const std::string &hash) {
   bind_string (why, imp->insert_hash, 3, hash);
   single_step (why, imp->insert_hash);
   end_txn();
+}
+
+static std::string rip_column(sqlite3_stmt *stmt, int col) {
+  return std::string(
+    reinterpret_cast<const char*>(sqlite3_column_text(stmt, col)),
+    sqlite3_column_bytes(stmt, col));
+}
+
+static std::vector<std::string> chop_null(const std::string &str) {
+  std::vector<std::string> out;
+  const char *tok = str.c_str();
+  const char *end = tok + str.size();
+  for (const char *scan = tok; scan != end; ++scan) {
+    if (*scan == 0 && scan != tok) {
+      out.emplace_back(tok, scan-tok);
+      tok = scan+1;
+    }
+  }
+  return out;
+}
+
+std::vector<JobReflection> Database::explain(const std::string &file, int use) {
+  const char *why = "Could not explain file";
+  std::vector<JobReflection> out;
+
+  begin_txn();
+  bind_string (why, imp->find_owner, 1, file);
+  bind_integer(why, imp->find_owner, 2, use);
+  while (sqlite3_step(imp->find_owner) == SQLITE_ROW) {
+    out.resize(out.size()+1);
+    JobReflection &desc = out.back();
+    desc.job = sqlite3_column_int64(imp->find_owner, 0);
+    desc.directory = rip_column(imp->find_owner, 1);
+    desc.commandline = chop_null(rip_column(imp->find_owner, 2));
+    desc.environment = chop_null(rip_column(imp->find_owner, 3));
+    desc.stack = rip_column(imp->find_owner, 4);
+    desc.stdin = rip_column(imp->find_owner, 5);
+    desc.time = rip_column(imp->find_owner, 6);
+    desc.status = sqlite3_column_int64(imp->find_owner, 7);
+    desc.runtime = sqlite3_column_double(imp->find_owner, 8);
+    // inputs
+    bind_integer(why, imp->get_tree, 1, INPUT);
+    bind_integer(why, imp->get_tree, 2, desc.job);
+    while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
+      desc.inputs.resize(desc.inputs.size()+1);
+      FileReflection &file = desc.inputs.back();
+      file.path = rip_column(imp->get_tree, 0);
+      file.hash = rip_column(imp->get_tree, 1);
+    }
+    finish_stmt(why, imp->get_tree);
+    // inputs
+    bind_integer(why, imp->get_tree, 1, OUTPUT);
+    bind_integer(why, imp->get_tree, 2, desc.job);
+    while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
+      desc.outputs.resize(desc.outputs.size()+1);
+      FileReflection &file = desc.outputs.back();
+      file.path = rip_column(imp->get_tree, 0);
+      file.hash = rip_column(imp->get_tree, 1);
+    }
+    finish_stmt(why, imp->get_tree);
+  }
+  finish_stmt(why, imp->find_owner);
+  end_txn();
+
+  return out;
 }

@@ -38,6 +38,8 @@ int main(int argc, const char **argv) {
       "list builds targets registed with wake", 0},
     { "once", {"-o", "--once"},
       "add a one-shot build target", 0},
+    { "query", {"-q", "--query"},
+      "query what created the named file", 1},
     { "jobs", {"-j", "--jobs"},
       "number of concurrent jobs to run", 1},
     { "verbose", {"-v", "--verbose"},
@@ -173,6 +175,35 @@ int main(int argc, const char **argv) {
   }
   if (args["parse"]) return 0;
   if (args["list"]) return 0;
+
+  if (args["query"]) {
+    std::string file = args["query"];
+    auto out = db.explain(file, 2);
+    for (auto &job : out) {
+      std::cout
+        << "Job " << job.job << ":" << std::endl
+        << "  Command-line:";
+      for (auto &arg : job.commandline) std::cout << " " << arg;
+      std::cout
+        << std::endl
+        << "  Environment:" << std::endl;
+      for (auto &env : job.environment)
+        std::cout << "    " << env << std::endl;
+      std::cout
+        << "  Stdin:" << job.stdin << std::endl
+        << "  Built:   " << job.time << std::endl
+        << "  Runtime: " << job.runtime << std::endl
+        << "  Status:  " << job.status << std::endl
+        << "Inputs:" << std::endl;
+      for (auto &in : job.inputs)
+        std::cout << "  " << in.hash << " " << in.path << std::endl;
+      std::cout
+        << "Outputs:" << std::endl;
+      for (auto &out : job.outputs)
+        std::cout << "  " << out.hash << " " << out.path << std::endl;
+    }
+    return 0;
+  }
 
   // Initialize expression hashes for memoize of closures
   root->hash();

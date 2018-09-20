@@ -287,6 +287,7 @@ bool JobTable::wait(ThunkQueue &queue) {
           // if (imp->verbose) std::cout << i.job->db->get_output(i.job->job, 1);
           if (imp->verbose) std::cerr << i.job->db->get_output(i.job->job, 2);
           i.job->process(queue);
+          i.job->runtime = i.runtime(now);
           i.job.reset();
         }
       }
