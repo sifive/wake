@@ -227,7 +227,7 @@ global outputs job = fail job (tree job 2)
 global finish job inputs outputs = job (\_\_\x\_ x) inputs.implode outputs.implode
 
 global hash f = memoize (
-  def job = launch "." "" nil ("/usr/bin/md5sum", f, nil)
+  def job = launch "." "" nil ("/opt/local/bin/md5sum", f, nil)
   def final _ = finish job nil nil
   def wait = (job.status == 0) final final ""
   def add f h = prim "add_hash"
