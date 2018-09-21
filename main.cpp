@@ -25,6 +25,32 @@ void Output::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
   *save = std::move(value);
 }
 
+void describe(const std::vector<JobReflection> &jobs) {
+  for (auto &job : jobs) {
+    std::cout
+      << "Job " << job.job << ":" << std::endl
+      << "  Command-line:";
+    for (auto &arg : job.commandline) std::cout << " " << arg;
+    std::cout
+      << std::endl
+      << "  Environment:" << std::endl;
+    for (auto &env : job.environment)
+      std::cout << "    " << env << std::endl;
+    std::cout
+      << "  Stdin:" << job.stdin << std::endl
+      << "  Built:   " << job.time << std::endl
+      << "  Runtime: " << job.runtime << std::endl
+      << "  Status:  " << job.status << std::endl
+      << "Inputs:" << std::endl;
+    for (auto &in : job.inputs)
+      std::cout << "  " << in.hash << " " << in.path << std::endl;
+    std::cout
+      << "Outputs:" << std::endl;
+    for (auto &out : job.outputs)
+      std::cout << "  " << out.hash << " " << out.path << std::endl;
+  }
+}
+
 int main(int argc, const char **argv) {
   const char *usage = "Usage: wake [OPTION] [--] [ADDED EXPRESSION]";
   argagg::parser argparser {{
@@ -36,10 +62,10 @@ int main(int argc, const char **argv) {
       "remove a build target from wake", 1},
     { "list", {"-l", "--list"},
       "list builds targets registed with wake", 0},
-    { "once", {"-o", "--once"},
-      "add a one-shot build target", 0},
-    { "query", {"-q", "--query"},
-      "query what created the named file", 1},
+    { "output", {"-o", "--output"},
+      "query which jobs have this output", 1},
+    { "input", {"-i", "--input"},
+      "query which jobs have this input", 1},
     { "jobs", {"-j", "--jobs"},
       "number of concurrent jobs to run", 1},
     { "verbose", {"-v", "--verbose"},
@@ -48,7 +74,7 @@ int main(int argc, const char **argv) {
       "simulate a stack for exceptions", 0},
     { "parse", {"-p", "--parse"},
       "parse wake files and print the AST", 0},
-    { "init", {"-i", "--init"},
+    { "init", {"--init"},
       "directory to configure as workspace top", 1},
   }};
 
@@ -102,11 +128,11 @@ int main(int argc, const char **argv) {
     targets.erase(targets.begin() + victim);
   }
 
-  if (args["once"] || args["add"]) {
-    if (args.pos.empty()) {
-      std::cerr << "You must specify positional arguments to use for the wake bulid target" << std::endl;
-      return 1;
-    } else {
+  if (args["add"] && args.pos.empty()) {
+    std::cerr << "You must specify positional arguments to use for the wake bulid target" << std::endl;
+    return 1;
+  } else {
+    if (!args.pos.empty()) {
       std::stringstream expr;
       bool first = true;
       for (auto i : args.pos) {
@@ -116,11 +142,6 @@ int main(int argc, const char **argv) {
       }
       targets.push_back(expr.str());
     }
-  } else if (!args.pos.empty()) {
-    std::cerr << "Unexpected positional arguments (did you forget -a ?):";
-    for (auto i : args.pos) std::cerr << " " << i;
-    std::cerr << std::endl;
-    return 1;
   }
 
   bool ok = true;
@@ -173,37 +194,12 @@ int main(int argc, const char **argv) {
     db.add_target(targets.back());
     if (args["verbose"]) std::cout << "Added target " << (targets.size()-1) << " = " << targets.back() << std::endl;
   }
+  if (args["input"]) describe(db.explain(args["input"], 1));
+  if (args["output"]) describe(db.explain(args["output"], 2));
   if (args["parse"]) return 0;
   if (args["list"]) return 0;
-
-  if (args["query"]) {
-    std::string file = args["query"];
-    auto out = db.explain(file, 2);
-    for (auto &job : out) {
-      std::cout
-        << "Job " << job.job << ":" << std::endl
-        << "  Command-line:";
-      for (auto &arg : job.commandline) std::cout << " " << arg;
-      std::cout
-        << std::endl
-        << "  Environment:" << std::endl;
-      for (auto &env : job.environment)
-        std::cout << "    " << env << std::endl;
-      std::cout
-        << "  Stdin:" << job.stdin << std::endl
-        << "  Built:   " << job.time << std::endl
-        << "  Runtime: " << job.runtime << std::endl
-        << "  Status:  " << job.status << std::endl
-        << "Inputs:" << std::endl;
-      for (auto &in : job.inputs)
-        std::cout << "  " << in.hash << " " << in.path << std::endl;
-      std::cout
-        << "Outputs:" << std::endl;
-      for (auto &out : job.outputs)
-        std::cout << "  " << out.hash << " " << out.path << std::endl;
-    }
-    return 0;
-  }
+  if (args["input"]) return 0;
+  if (args["output"]) return 0;
 
   // Initialize expression hashes for memoize of closures
   root->hash();

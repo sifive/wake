@@ -552,7 +552,7 @@ std::vector<JobReflection> Database::explain(const std::string &file, int use) {
     bind_integer(why, imp->get_tree, 1, INPUT);
     bind_integer(why, imp->get_tree, 2, desc.job);
     while (sqlite3_step(imp->get_tree) == SQLITE_ROW)
-      desc.outputs.emplace_back(
+      desc.inputs.emplace_back(
         rip_column(imp->get_tree, 0),
         rip_column(imp->get_tree, 1));
     finish_stmt(why, imp->get_tree);
