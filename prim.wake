@@ -59,7 +59,7 @@ global splitUntil f l =
 
 global takeUntil f l = (splitUntil f l).first
 global dropUntil f l = (splitUntil f l).second
-global find f l = at 0 (dropUntil f l)
+global find f l = take 1 (dropUntil f l)
 global exists f l = !empty (dropUntil f l)
 global forall f l = empty (dropUntil (\x !f x) l)
 
@@ -191,9 +191,17 @@ def primjob dir stdin env cmd = prim "job_launch"
 def oncejob dir stdin env cmd = memoize primjob dir stdin env cmd
 def primcache dir stdin env cmd visible = prim "job_cache"
 def oncecache dir stdin env cmd visible = memoize primcache dir stdin env cmd visible
-global jobcache dir stdin env cmd visible =
+global jobcache build dir stdin env cmd visible =
   def cache = oncecache dir stdin env.implode cmd.implode visible.implode
-  if test cache then cache else wrap cache
+  if test cache then build 0 else
+    def out = wrap cache
+    def notOk pair = hashcode pair.first != pair.second
+    def bad = find notOk out.outputs
+    if bad.empty then out else
+      def file = bad.head.first
+      def expect = hashcode file
+      def saw = bad.head.second
+      raise ("Hash mismatch for ", file, " (", saw, " != ", expect, "); remove it or run with -f", nil).cat
 
 # Launch a job, raw interface
 # If you use this API, you MUST also run 'finish' on the result AFTER status is available
@@ -232,28 +240,30 @@ global output  job =
 # Complete a job, marking done and recording used inputs/outputs
 global finish job inputs outputs = job (\_\_\x\_ x) inputs.implode outputs.implode
 
-global hash f = memoize (
+global hashpair f = memoize ( # pair file hash
   def job = launch "." "" nil ("/opt/local/bin/md5sum", f, nil)
   def final _ = finish job nil nil
   def wait = (job.status == 0) final final ""
   def add f h = prim "add_hash"
   if job.status == 0 then add f (head (extract "(.{32}).*" job.stdout)) else job.stderr
 )
+global hashname f = (hashpair f).first  # just the filename
+global hashcode f = (hashpair f).second # just the hashcode
 
 # A job where all inputs and outputs are known a-priori
 global uncached_simple_job dir stdin env cmd inputs outputs =
   def job = launch dir stdin env cmd
-  def final _ = finish job (map hash inputs) (map hash outputs)
+  def final _ = finish job (map hashname inputs) (map hashname outputs)
   def wait = (job.status == 0) final final ""
   job
 
 global simple_job dir stdin env cmd inputs outputs =
-  def handle _ = uncached_simple_job dir stdin env cmd inputs outputs
-  try handle (jobcache dir stdin env cmd (map hash inputs))
+  def build _ = uncached_simple_job dir stdin env cmd inputs outputs
+  jobcache build dir stdin env cmd (map hashname inputs)
 
 # Still not caching, just hermetic
 global uncached_fuse_job dir stdin env cmd visible =
-  def fuse = uncached_simple_job "." "" nil ("/secret/fuse-wake", map hash visible) nil nil
+  def fuse = uncached_simple_job "." "" nil ("/secret/fuse-wake", map hashname visible) nil nil
   def err = fuse.stderr
   def handle _ = raise ("Could not start fuse-wake: ", err, nil).cat
   def list = try handle (extract "OK: (.*)" err)
@@ -264,13 +274,13 @@ global uncached_fuse_job dir stdin env cmd visible =
     def result = extract "(.*\0)\0(.*)" fuse.output
     def inputs = tokenize "\0" (at 0 result)
     def outputs = tokenize "\0" (at 1 result)
-    finish job inputs (map hash outputs)
+    finish job inputs (map hashname outputs)
   def wait = (job.status == 0) final final ""
   job
 
 global fuse_job dir stdin env cmd visible =
-  def handle _ = uncached_fuse_job dir stdin env cmd visible
-  try handle (jobcache dir stdin env cmd (map hash visible))
+  def build _ = uncached_fuse_job dir stdin env cmd visible
+  jobcache build dir stdin env cmd (map hashname visible)
 
 # Most jobs don't need explicit stdin/env control
 def environment = subscribe environment

@@ -547,7 +547,10 @@ static PRIMFN(prim_add_hash) {
   STRING(file, 0);
   STRING(hash, 1);
   jobtable->imp->db->add_hash(file->value, hash->value);
-  RETURN(args[0]);
+  auto out = make_tuple(
+    std::shared_ptr<Value>(args[0]),
+    std::shared_ptr<Value>(args[1]));
+  RETURN(out);
 }
 
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
