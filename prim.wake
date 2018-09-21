@@ -292,5 +292,5 @@ global path = catWith ":" (subscribe path)
 publish environment = cat ("PATH=", path, nil)
 
 # Most jobs don't need explicit stdin/env control
-def environment = subscribe environment
+global environment = subscribe environment
 global job dir cmd visible = fuse_job dir "" environment cmd visible

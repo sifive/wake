@@ -1,10 +1,10 @@
 publish compileC flags headers file =
   def obj = replace "\\.c(pp)?$" ".o" file
   def cmdline = which "g++", flags ++ ("-c", file, "-o", obj, nil)
-  def result = simple_job "." "" nil cmdline (file, headers) (obj, nil)
+  def result = simple_job "." "" environment cmdline (file, headers) (obj, nil)
   result.output
 
 publish linkO flags objs file =
-  def cmdline = which "g++", flags ++ ("-o", file, objs)
-  def result = simple_job "." "" nil cmdline objs (file, nil)
+  def cmdline = (which "g++", "-o", file, objs) ++ flags
+  def result = simple_job "." "" environment cmdline objs (file, nil)
   result.output

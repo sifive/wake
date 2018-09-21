@@ -4,7 +4,7 @@ def linkO = (subscribe linkO).head
 def re2c file =
   def cpp = replace "\\.re$" ".cpp" file
   def cmdline = which "re2c", file, "-o", cpp, nil
-  def result = simple_job "." "" nil cmdline (file, nil) (cpp, nil)
+  def result = simple_job "." "" environment cmdline (file, nil) (cpp, nil)
   result.output
 
 global buildWake _ =
