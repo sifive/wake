@@ -102,6 +102,7 @@ global collate f l r =
 # string operations
 global read path = prim "read"
 global write path content = prim "write"
+global getenv key = prim "getenv"
 global cat l =
   def catopen    = prim "catopen"
   def catclose c = prim "catclose"
@@ -185,6 +186,8 @@ global sources dir regexp =
 # Operate on paths
 global simplify path = prim "simplify"
 global relative dir path = prim "relative"
+global whichIn path exec = prim "search_path"
+global which exec = whichIn path exec
 
 # The internal function operates on imploded strings, not lists
 def primjob dir stdin env cmd = prim "job_launch"
@@ -241,7 +244,7 @@ global output  job =
 global finish job inputs outputs = job (\_\_\x\_ x) inputs.implode outputs.implode
 
 global hashpair f = memoize ( # pair file hash
-  def job = launch "." "" nil ("/opt/local/bin/md5sum", f, nil)
+  def job = launch "." "" nil (which "md5sum", f, nil)
   def final _ = finish job nil nil
   def wait = (job.status == 0) final final ""
   def add f h = prim "add_hash"
@@ -281,6 +284,12 @@ global uncached_fuse_job dir stdin env cmd visible =
 global fuse_job dir stdin env cmd visible =
   def build _ = uncached_fuse_job dir stdin env cmd visible
   jobcache build dir stdin env cmd (map hashname visible)
+
+# Setup a default path
+publish path = "/usr/bin"
+publish path = "/bin"
+global path = catWith ":" (subscribe path)
+publish environment = cat ("PATH=", path, nil)
 
 # Most jobs don't need explicit stdin/env control
 def environment = subscribe environment

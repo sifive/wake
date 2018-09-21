@@ -553,6 +553,35 @@ static PRIMFN(prim_add_hash) {
   RETURN(out);
 }
 
+static bool check_exec(const char *tok, size_t len, const std::string &exec, std::string &out) {
+  out.assign(tok, len);
+  out += "/";
+  out += exec;
+  return access(out.c_str(), X_OK) == 0;
+}
+
+static PRIMFN(prim_search_path) {
+  EXPECT(2);
+  STRING(path, 0);
+  STRING(exec, 1);
+
+  auto out = std::make_shared<String>("");
+  const char *tok = path->value.c_str();
+  const char *end = tok + path->value.size();
+  for (const char *scan = tok; scan != end; ++scan) {
+    if (*scan == ':' && scan != tok) {
+      if (check_exec(tok, scan-tok, exec->value, out->value)) RETURN(out);
+      std::string path(tok, scan-tok);
+      path += "/";
+      path += exec->value;
+      tok = scan+1;
+    }
+  }
+
+  if (check_exec(tok, end-tok, exec->value, out->value)) RETURN(out);
+  RAISE(exec->value + " not found in " + path->value);
+}
+
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   pmap["job_launch" ].second = jobtable;
   pmap["job_cache"  ].second = jobtable;
@@ -564,4 +593,5 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   pmap["job_tree"   ].first = prim_job_tree;
   pmap["job_finish" ].first = prim_job_finish;
   pmap["add_hash"   ].first = prim_add_hash;
+  pmap["search_path"].first = prim_search_path;
 }

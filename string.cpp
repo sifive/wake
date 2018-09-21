@@ -4,6 +4,7 @@
 #include "hash.h"
 #include <sstream>
 #include <fstream>
+#include <stdlib.h>
 
 struct CatStream : public Value {
   std::stringstream str;
@@ -82,10 +83,20 @@ static PRIMFN(prim_write) {
   RETURN(args[0]);
 }
 
+static PRIMFN(prim_getenv) {
+  EXPECT(1);
+  STRING(arg0, 0);
+  const char *env = getenv(arg0->value.c_str());
+  REQUIRE(env, arg0->value + " is unset in the environment");
+  auto out = std::make_shared<String>(env);
+  RETURN(out);
+}
+
 void prim_register_string(PrimMap &pmap) {
   pmap["catopen" ].first = prim_catopen;
   pmap["catadd"  ].first = prim_catadd;
   pmap["catclose"].first = prim_catclose;
   pmap["write"   ].first = prim_write;
   pmap["read"    ].first = prim_read;
+  pmap["getenv"  ].first = prim_getenv;
 }

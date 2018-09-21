@@ -1,0 +1,2 @@
+publish path = "/opt/local/bin"
+publish path = "/usr/local/bin"
