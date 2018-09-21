@@ -115,7 +115,7 @@ static PRIMFN(prim_tokenize) {
     tokens.emplace_back(std::make_shared<String>(token.as_string()));
     input.remove_prefix(token.size() + hit.size());
   }
-  if (!input.empty()) tokens.emplace_back(std::make_shared<String>(input.as_string()));
+  tokens.emplace_back(std::make_shared<String>(input.as_string()));
   auto out = make_list(std::move(tokens));
   RETURN(out);
 }

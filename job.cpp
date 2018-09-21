@@ -161,6 +161,7 @@ static void launch(JobTable *jobtable) {
       gettimeofday(&i.start, 0);
       i.job->db->insert_job(task.dir, task.stdin, task.environ, task.cmdline, task.stack, &i.job->job);
       i.job->pid = i.pid = fork();
+      i.job->state |= STATE_FORKED;
       if (i.pid == 0) {
         dup2(pipe_stdout[1], 1);
         dup2(pipe_stderr[1], 2);
@@ -223,6 +224,8 @@ bool JobTable::wait(ThunkQueue &queue) {
     struct timeval now;
     gettimeofday(&now, 0);
 
+    int done = 0;
+
     if (retval > 0) for (auto &i : imp->table) {
       if (i.pid != 0 && i.pipe_stdout != -1 && FD_ISSET(i.pipe_stdout, &set)) {
         int got = read(i.pipe_stdout, buffer, sizeof(buffer));
@@ -231,6 +234,7 @@ bool JobTable::wait(ThunkQueue &queue) {
           i.pipe_stdout = -1;
           i.job->state |= STATE_STDOUT;
           i.job->process(queue);
+          ++done;
         } else {
           i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
         }
@@ -242,13 +246,13 @@ bool JobTable::wait(ThunkQueue &queue) {
           i.pipe_stderr = -1;
           i.job->state |= STATE_STDERR;
           i.job->process(queue);
+          ++done;
         } else {
           i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
         }
       }
     }
 
-    int done = 0;
     int status;
     pid_t pid;
     while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
@@ -475,7 +479,7 @@ static PRIMFN(prim_job_kill) {
   REQUIRE(mpz_cmp_si(arg1->value, 256) < 0, "signal too large (> 256)");
   REQUIRE(mpz_cmp_si(arg1->value, 0) >= 0, "signal too small (< 0)");
   int sig = mpz_get_si(arg1->value);
-  if ((arg0->state & STATE_FORKED) && !(arg0->state & STATE_MERGED))
+  if (sig && (arg0->state & STATE_FORKED) && !(arg0->state & STATE_MERGED))
     kill(arg0->pid, sig);
   completion->next = std::move(arg0->q_merge);
   arg0->q_merge = std::move(completion);
