@@ -11,7 +11,7 @@
 #include "job.h"
 #include "sources.h"
 #include "database.h"
-#include "argagg.hpp"
+#include "argagg.h"
 
 static ThunkQueue queue;
 
