@@ -5,7 +5,7 @@ def re2c file =
   def cpp = replace "\\.re$" ".cpp" file
   def cmdline = "/usr/local/bin/re2c", file, "-o", cpp, nil
   def result = simple_job "." "" nil cmdline (file, nil) (cpp, nil)
-  result.outputs.head
+  result.output
 
 global buildWake _ =
   def reFiles = sources here ".*\\.re"

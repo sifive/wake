@@ -468,13 +468,13 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   end_txn();
 }
 
-std::vector<std::string> Database::get_tree(int kind, long job)  {
-  std::vector<std::string> out;
+std::vector<FileReflection> Database::get_tree(int kind, long job)  {
+  std::vector<FileReflection> out;
   const char *why = "Could not read job tree";
   bind_integer(why, imp->get_tree, 1, kind);
   bind_integer(why, imp->get_tree, 2, job);
   while (sqlite3_step(imp->get_tree) == SQLITE_ROW)
-    out.emplace_back(rip_column(imp->get_tree, 0));
+    out.emplace_back(rip_column(imp->get_tree, 0), rip_column(imp->get_tree, 1));
   finish_stmt(why, imp->get_tree);
   return out;
 }
@@ -549,22 +549,18 @@ std::vector<JobReflection> Database::explain(const std::string &file, int use) {
     // inputs
     bind_integer(why, imp->get_tree, 1, INPUT);
     bind_integer(why, imp->get_tree, 2, desc.job);
-    while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
-      desc.inputs.resize(desc.inputs.size()+1);
-      FileReflection &file = desc.inputs.back();
-      file.path = rip_column(imp->get_tree, 0);
-      file.hash = rip_column(imp->get_tree, 1);
-    }
+    while (sqlite3_step(imp->get_tree) == SQLITE_ROW)
+      desc.outputs.emplace_back(
+        rip_column(imp->get_tree, 0),
+        rip_column(imp->get_tree, 1));
     finish_stmt(why, imp->get_tree);
     // inputs
     bind_integer(why, imp->get_tree, 1, OUTPUT);
     bind_integer(why, imp->get_tree, 2, desc.job);
-    while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
-      desc.outputs.resize(desc.outputs.size()+1);
-      FileReflection &file = desc.outputs.back();
-      file.path = rip_column(imp->get_tree, 0);
-      file.hash = rip_column(imp->get_tree, 1);
-    }
+    while (sqlite3_step(imp->get_tree) == SQLITE_ROW)
+      desc.outputs.emplace_back(
+        rip_column(imp->get_tree, 0),
+        rip_column(imp->get_tree, 1));
     finish_stmt(why, imp->get_tree);
   }
   finish_stmt(why, imp->find_owner);

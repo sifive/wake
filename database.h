@@ -8,6 +8,7 @@
 struct FileReflection {
   std::string path;
   std::string hash;
+  FileReflection(std::string &&path_, std::string &&hash_) : path(std::move(path_)), hash(std::move(hash_)) { }
 };
 
 struct JobReflection {
@@ -65,7 +66,7 @@ struct Database {
     const std::string &outputs, // null separated
     int status,
     double runtime);
-  std::vector<std::string> get_tree(int kind, long job);
+  std::vector<FileReflection> get_tree(int kind, long job);
 
   void save_output( // call only if needs_build -> true
     long job,

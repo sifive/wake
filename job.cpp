@@ -387,6 +387,16 @@ static PRIMFN(prim_job_cache) {
   RETURN(out);
 }
 
+static std::shared_ptr<Value> convert_tree(std::vector<FileReflection> &&files) {
+  std::vector<std::shared_ptr<Value> > vals;
+  vals.reserve(files.size());
+  for (auto &i : files)
+    vals.emplace_back(make_tuple(
+      std::static_pointer_cast<Value>(std::make_shared<String>(std::move(i.path))),
+      std::static_pointer_cast<Value>(std::make_shared<String>(std::move(i.hash)))));
+  return make_list(std::move(vals));
+}
+
 void JobResult::process(ThunkQueue &queue) {
   if ((state & STATE_STDOUT) && q_stdout) {
     auto out = std::make_shared<String>(db->get_output(job, 1));
@@ -420,12 +430,8 @@ void JobResult::process(ThunkQueue &queue) {
 
   if ((state & STATE_FINISHED) && q_inputs) {
     auto files = db->get_tree(1, job);
-    std::vector<std::shared_ptr<Value> > vals;
-    vals.reserve(files.size());
-    for (auto &i : files) vals.emplace_back(std::make_shared<String>(std::move(i)));
-    auto out = make_list(std::move(vals));
+    auto out = bad_finish ? bad_finish : convert_tree(std::move(files));
     std::unique_ptr<Receiver> iter, next;
-    if (bad_finish) out = bad_finish;
     for (iter = std::move(q_inputs); iter; iter = std::move(next)) {
       next = std::move(iter->next);
       Receiver::receiveC(queue, std::move(iter), out);
@@ -435,11 +441,7 @@ void JobResult::process(ThunkQueue &queue) {
 
   if ((state & STATE_FINISHED) && q_outputs) {
     auto files = db->get_tree(2, job);
-    std::vector<std::shared_ptr<Value> > vals;
-    vals.reserve(files.size());
-    for (auto &i : files) vals.emplace_back(std::make_shared<String>(std::move(i)));
-    auto out = make_list(std::move(vals));
-    if (bad_finish) out = bad_finish;
+    auto out = bad_finish ? bad_finish : convert_tree(std::move(files));
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_outputs); iter; iter = std::move(next)) {
       next = std::move(iter->next);
