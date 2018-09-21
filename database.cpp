@@ -53,6 +53,8 @@ std::string Database::open() {
   }
 
   const char *schema_sql =
+    "pragma journal_mode=wal;"
+    "pragma synchronous=0;"
     "create table if not exists targets("
     "  expression text primary key);"
     "create table if not exists runs("
