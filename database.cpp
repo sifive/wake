@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include <sqlite3.h>
+#include <unistd.h>
 #include <cstdlib>
 
 #define VISIBLE 0
@@ -296,6 +297,12 @@ static void bind_double(const char *why, sqlite3_stmt *stmt, int index, double x
   }
 }
 
+static std::string rip_column(sqlite3_stmt *stmt, int col) {
+  return std::string(
+    reinterpret_cast<const char*>(sqlite3_column_text(stmt, col)),
+    sqlite3_column_bytes(stmt, col));
+}
+
 std::vector<std::string> Database::get_targets() {
   std::vector<std::string> out;
   int ret = sqlite3_exec(imp->db, "select expression from targets;", &fill_vector, &out, 0);
@@ -349,6 +356,18 @@ bool Database::reuse_job(
 {
   const char *why = "Could not check for a cached job";
   begin_txn();
+  bind_string (why, imp->find_prior, 1, directory);
+  bind_string (why, imp->find_prior, 2, commandline);
+  bind_string (why, imp->find_prior, 3, environment);
+  bool prior = sqlite3_step(imp->find_prior) == SQLITE_ROW;
+  if (prior) *job = sqlite3_column_int(imp->find_prior, 0);
+  finish_stmt (why, imp->find_prior);
+
+  if (!prior) {
+    end_txn();
+    return false;
+  }
+
   const char *tok = visible.c_str();
   const char *end = tok + visible.size();
   for (const char *scan = tok; scan != end; ++scan) {
@@ -359,20 +378,29 @@ bool Database::reuse_job(
       tok = scan+1;
     }
   }
-  bind_string (why, imp->find_prior, 1, directory);
-  bind_string (why, imp->find_prior, 2, commandline);
-  bind_string (why, imp->find_prior, 3, environment);
-  bool prior = sqlite3_step(imp->find_prior) == SQLITE_ROW;
-  if (prior) *job = sqlite3_column_int(imp->find_prior, 0);
-  finish_stmt (why, imp->find_prior);
   bind_string (why, imp->needs_build, 1, directory);
   bind_string (why, imp->needs_build, 2, commandline);
   bind_string (why, imp->needs_build, 3, environment);
   bool rerun = sqlite3_step(imp->needs_build) == SQLITE_ROW;
   finish_stmt (why, imp->needs_build);
   single_step (why, imp->wipe_temp);
+
+  if (rerun) {
+    end_txn();
+    return false;
+  }
+
+  bool exist = true;
+  bind_integer(why, imp->get_tree, 1, OUTPUT);
+  bind_integer(why, imp->get_tree, 2, *job);
+  while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
+    std::string path = rip_column(imp->get_tree, 0);
+    if (access(path.c_str(), R_OK) != 0) exist = false;
+  }
+  finish_stmt(why, imp->get_tree);
   end_txn();
-  return prior && !rerun;
+
+  return exist;
 }
 
 void Database::insert_job(
@@ -445,11 +473,8 @@ std::vector<std::string> Database::get_tree(int kind, long job)  {
   const char *why = "Could not read job tree";
   bind_integer(why, imp->get_tree, 1, kind);
   bind_integer(why, imp->get_tree, 2, job);
-  while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
-    out.emplace_back(
-      reinterpret_cast<const char*>(sqlite3_column_text(imp->get_tree, 0)),
-      sqlite3_column_bytes(imp->get_tree, 0));
-  }
+  while (sqlite3_step(imp->get_tree) == SQLITE_ROW)
+    out.emplace_back(rip_column(imp->get_tree, 0));
   finish_stmt(why, imp->get_tree);
   return out;
 }
@@ -487,12 +512,6 @@ void Database::add_hash(const std::string &file, const std::string &hash) {
   bind_string (why, imp->insert_hash, 3, hash);
   single_step (why, imp->insert_hash);
   end_txn();
-}
-
-static std::string rip_column(sqlite3_stmt *stmt, int col) {
-  return std::string(
-    reinterpret_cast<const char*>(sqlite3_column_text(stmt, col)),
-    sqlite3_column_bytes(stmt, col));
 }
 
 static std::vector<std::string> chop_null(const std::string &str) {
