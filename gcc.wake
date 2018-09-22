@@ -6,5 +6,5 @@ publish compileC flags headers file =
 
 publish linkO flags objs file =
   def cmdline = (which "g++", "-o", file, objs) ++ flags
-  def result = simple_job cmdline objs (file, nil)
+  def result = job cmdline objs
   result.output
