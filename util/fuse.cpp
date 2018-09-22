@@ -700,7 +700,7 @@ std::string path;
 static void *(wakefuse_init)(struct fuse_conn_info *conn)
 {
 	std::cerr << "OK: " << path << std::flush;
-	int fd = open("build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0777);
+	int fd = open("build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0666);
 	dup2(fd, 2); // close stderr for wake to capture
 	close(fd);
 	return 0;
