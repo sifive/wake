@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <errno.h>
+#include <signal.h>
 #include <sys/time.h>
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
@@ -696,17 +697,42 @@ static int wakefuse_removexattr(const char *path, const char *name)
 #endif /* HAVE_SETXATTR */
 
 std::string path;
-static void *(wakefuse_init)(struct fuse_conn_info *conn) {
+static void *(wakefuse_init)(struct fuse_conn_info *conn)
+{
 	std::cerr << "OK: " << path << std::flush;
-	dup2(1, 2); // close stderr for wake to capture
+	int fd = open("build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0777);
+	dup2(fd, 2); // close stderr for wake to capture
+	close(fd);
 	return 0;
 }
 
 static struct fuse_operations wakefuse_ops;
 
+static void handle_alarm(int sig)
+{
+	// Start a retry timer
+	struct itimerval retry;
+	memset(&retry, 0, sizeof(retry));
+	retry.it_value.tv_usec = 50000; // 50ms
+	setitimer(ITIMER_REAL, &retry, 0);
+	// Try to quit right away
+	struct sigaction sa;
+	sigaction(SIGTERM, 0, &sa);
+	if (sa.sa_handler != SIG_DFL)
+		kill(getpid(), SIGTERM);
+}
+
 int main(int argc, char *argv[])
 {
 	umask(0);
+
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = handle_alarm;
+	sa.sa_flags = 0;
+	sigemptyset(&sa.sa_mask);
+	sigaddset(&sa.sa_mask, SIGTERM);
+	sigaction(SIGALRM, &sa, NULL);
 
 	pid_t pid = getpid();
 	path = "build/" + std::to_string(pid);
@@ -721,12 +747,6 @@ int main(int argc, char *argv[])
 
 	for (int i = 1; i < argc; ++i)
 		files_visible.insert(argv[i]);
-
-	const char *args[4];
-	args[0] = argv[0];
-	args[1] = path.c_str();
-	args[2] = "-f";
-	args[3] = 0;
 
 	wakefuse_ops.init		= wakefuse_init;
 	wakefuse_ops.getattr		= wakefuse_getattr;
@@ -759,6 +779,12 @@ int main(int argc, char *argv[])
 	wakefuse_ops.listxattr		= wakefuse_listxattr;
 	wakefuse_ops.removexattr	= wakefuse_removexattr;
 #endif
+
+	const char *args[4];
+	args[0] = argv[0];
+	args[1] = path.c_str();
+	args[2] = "-f";
+	args[3] = 0;
 
 	int out = fuse_main(3, const_cast<char**>(args), &wakefuse_ops, NULL);
 
