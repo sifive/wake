@@ -77,8 +77,12 @@ static int map_open(const char *path, int oflag, int mode)
 	if (is_root(path)) {
 		return dup(rootfd);
 	} else {
-		if ((oflag & O_CREAT) && !is_creatable(map(path)))
-			return -EACCES;
+		if ((oflag & O_CREAT)) {
+			if (!is_creatable(map(path)))
+				return -EACCES;
+			if ((oflag & O_EXCL))
+				oflag = O_TRUNC | (oflag & ~O_EXCL);
+		}
 
 		if (!(oflag & O_CREAT) && !is_readable(map(path)))
 			return -ENOENT;
@@ -758,6 +762,7 @@ int main(int argc, char *argv[])
 
 	int out = fuse_main(3, const_cast<char**>(args), &wakefuse_ops, NULL);
 
+	for (auto &i : files_wrote) files_read.erase(i);
 	for (auto &i : files_read) std::cout << i << '\0';
 	std::cout << '\0';
 	for (auto &i : files_wrote) std::cout << i << '\0';
