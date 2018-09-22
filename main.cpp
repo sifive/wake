@@ -37,10 +37,11 @@ void describe(const std::vector<JobReflection> &jobs) {
     for (auto &env : job.environment)
       std::cout << "    " << env << std::endl;
     std::cout
+      << "  Directory: " << job.directory << std::endl
+      << "  Built:     " << job.time << std::endl
+      << "  Runtime:   " << job.runtime << std::endl
+      << "  Status:    " << job.status << std::endl
       << "  Stdin:" << job.stdin << std::endl
-      << "  Built:   " << job.time << std::endl
-      << "  Runtime: " << job.runtime << std::endl
-      << "  Status:  " << job.status << std::endl
       << "Inputs:" << std::endl;
     for (auto &in : job.inputs)
       std::cout << "  " << in.hash << " " << in.path << std::endl;

@@ -190,8 +190,8 @@ global whichIn path exec = prim "search_path"
 global which exec = whichIn path exec
 
 # The internal function operates on imploded strings, not lists
-def primjob pool dir stdin env cmd = prim "job_launch"
-def oncejob dir stdin env cmd = memoize primjob 1 dir stdin env cmd
+def primjob pool root dir stdin env cmd = prim "job_launch"
+def oncejob root dir stdin env cmd = memoize primjob 1 root dir stdin env cmd
 def primcache dir stdin env cmd visible = prim "job_cache"
 def oncecache dir stdin env cmd visible = memoize primcache dir stdin env cmd visible
 
@@ -209,11 +209,12 @@ global jobcache build dir stdin env cmd visible =
 
 # Launch a job, raw interface
 # If you use this API, you MUST also run 'finish' on the result AFTER status is available
+#   root:  fake root directory
 #   dir:   directory where the command should be run
 #   stdin: file to attach to standard input ("" = nothing)
 #   env:   string list of all environement variables in the form key=value
 #   cmd:   string list of command arguments (head is the full path to the command)
-global launch dir stdin env cmd = wrap (oncejob dir stdin env.implode cmd.implode)
+global launch root dir stdin env cmd = wrap (oncejob root dir stdin env.implode cmd.implode)
 
 def fail job ok =
   if job.status == 0 then ok else
@@ -245,7 +246,7 @@ global output  job =
 global finish job inputs outputs = job (\_\_\x\_ x) inputs.implode outputs.implode
 
 global hashpair f = memoize ( # pair file hash
-  def job = launch "." "" nil (which "md5sum", f, nil)
+  def job = launch "." "." "" nil (which "md5sum", f, nil)
   def final _ = finish job nil nil
   def wait = (job.status == 0) final final ""
   def add f h = prim "add_hash"
@@ -256,7 +257,7 @@ global hashcode f = (hashpair f).second # just the hashcode
 
 # A job where all inputs and outputs are known a-priori
 global uncached_simple_job dir stdin env cmd inputs outputs =
-  def job = launch dir stdin env cmd
+  def job = launch "." dir stdin env cmd
   def final _ = finish job (map hashname inputs) (map hashname outputs)
   def wait = (job.status == 0) final final ""
   job
@@ -267,14 +268,13 @@ global cached_simple_job dir stdin env cmd inputs outputs =
 
 # Still not caching, just hermetic
 global uncached_fuse_job dir stdin env cmd visible =
-  def fuse = wrap (primjob 0 "." "" "" (which "fuse-wake", map hashname visible).implode)
+  def fuse = wrap (primjob 0 "." "." "" "" (which "fuse-wake", map hashname visible).implode)
   def endfuse _ = finish fuse nil nil
   def waitfuse = (fuse.status == 0) endfuse endfuse ""
   def err = fuse.stderr
   def handle _ = raise ("Could not start fuse-wake: ", err, nil).cat
   def list = try handle (extract "OK: (.*)" err)
-  def tree = simplify (list.head, "/", dir, nil).cat
-  def job = launch tree stdin env cmd
+  def job = launch list.head dir stdin env cmd
   def final _ = # run once job exits
     def status = kill fuse 15 # SIGTERM
     def result = extract "(.*\0)\0(.*)" fuse.stdout

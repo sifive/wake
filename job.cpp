@@ -61,13 +61,14 @@ void JobResult::hash(std::unique_ptr<Hasher> hasher) { hasher->receive(code); }
 // A Task is a job that is not yet forked
 struct Task {
   std::shared_ptr<JobResult> job;
+  std::string root;
   std::string dir;
   std::string stdin;
   std::string environ;
   std::string cmdline;
   std::string stack;
-  Task(const std::shared_ptr<JobResult> &job_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_, const std::string &stack_)
-  : job(job_), dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_), stack(stack_) { }
+  Task(const std::shared_ptr<JobResult> &job_, const std::string &root_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_, const std::string &stack_)
+  : job(job_), root(root_), dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_), stack(stack_) { }
 };
 
 // A Job is a forked job not yet merged
@@ -184,7 +185,11 @@ static void launch(JobTable *jobtable) {
         }
         dup2(stdin, 0);
         close(stdin);
-        if (chdir(task.dir.c_str())) {
+        if (task.root != "." && chdir(task.root.c_str())) {
+          perror("chdir");
+          exit(1);
+        }
+        if (task.dir != "." && chdir(task.dir.c_str())) {
           perror("chdir");
           exit(1);
         }
@@ -346,12 +351,13 @@ static std::unique_ptr<Receiver> cast_jobresult(ThunkQueue &queue, std::unique_p
 
 static PRIMFN(prim_job_launch) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
-  EXPECT(5);
+  EXPECT(6);
   INTEGER(pool, 0);
-  STRING(dir, 1);
-  STRING(stdin, 2);
-  STRING(env, 3);
-  STRING(cmd, 4);
+  STRING(root, 1);
+  STRING(dir, 2);
+  STRING(stdin, 3);
+  STRING(env, 4);
+  STRING(cmd, 5);
 
   REQUIRE(mpz_cmp_si(pool->value, 0) >= 0, "Pool must be >= 0");
   REQUIRE(mpz_cmp_si(pool->value, POOLS) < 0, "Pool must be < POOLS");
@@ -367,6 +373,7 @@ static PRIMFN(prim_job_launch) {
 
   jobtable->imp->tasks[mpz_get_si(pool->value)].emplace_back(
     out,
+    root->value,
     dir->value,
     stdin->value,
     env->value,
