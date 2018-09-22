@@ -69,7 +69,7 @@ static bool is_readable(const std::string &path) {
 }
 
 static bool is_creatable(const std::string &path) {
-	return is_writeable(path) || faccessat(rootfd, path.c_str(), R_OK, 0) != 0;
+	return true; // is_writeable(path) || faccessat(rootfd, path.c_str(), R_OK, 0) != 0;
 }
 
 static int map_open(const char *path, int oflag, int mode)

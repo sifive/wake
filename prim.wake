@@ -261,7 +261,7 @@ global uncached_simple_job dir stdin env cmd inputs outputs =
   def wait = (job.status == 0) final final ""
   job
 
-global simple_job dir stdin env cmd inputs outputs =
+global cached_simple_job dir stdin env cmd inputs outputs =
   def build _ = uncached_simple_job dir stdin env cmd inputs outputs
   jobcache build dir stdin env cmd (map hashname inputs)
 
@@ -284,7 +284,7 @@ global uncached_fuse_job dir stdin env cmd visible =
   def wait = (job.status == 0) final final ""
   job
 
-global fuse_job dir stdin env cmd visible =
+global cached_fuse_job dir stdin env cmd visible =
   def build _ = uncached_fuse_job dir stdin env cmd visible
   jobcache build dir stdin env cmd (map hashname visible)
 
@@ -297,4 +297,5 @@ publish environment = cat ("PATH=", path, nil)
 
 # Most jobs don't need explicit stdin/env control
 global environment = subscribe environment
-global job cmd visible = fuse_job "." "" environment cmd visible
+global job cmd visible = cached_fuse_job "." "" environment cmd visible
+global simple_job cmd inputs outputs = cached_simple_job "." "" environment cmd inputs outputs
