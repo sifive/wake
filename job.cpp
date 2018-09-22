@@ -17,6 +17,9 @@
 #include <vector>
 #include <cstring>
 
+// How many job categories to support
+#define POOLS 2
+
 #define STATE_FORKED	1  // in database and running
 #define STATE_STDOUT	2  // stdout fully in database
 #define STATE_STDERR	4  // stderr fully in database
@@ -63,11 +66,13 @@ struct Task {
   std::string environ;
   std::string cmdline;
   std::string stack;
-  Task(Database *db_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_, const std::string &stack_);
+  Task(const std::shared_ptr<JobResult> &job_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_, const std::string &stack_)
+  : job(job_), dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_), stack(stack_) { }
 };
 
 // A Job is a forked job not yet merged
 struct Job {
+  int pool;
   std::shared_ptr<JobResult> job;
   int pipe_stdout;
   int pipe_stderr;
@@ -84,7 +89,7 @@ double Job::runtime(struct timeval now) {
 // Implementation details for a JobTable
 struct JobTable::detail {
   std::vector<Job> table;
-  std::list<Task> tasks;
+  std::vector<std::list<Task> > tasks;
   sigset_t sigset;
   Database *db;
   bool verbose;
@@ -95,9 +100,13 @@ static void handle_SIGCHLD(int sig) {
 }
 
 JobTable::JobTable(Database *db, int max_jobs, bool verbose) : imp(new JobTable::detail) {
-  imp->table.resize(max_jobs);
+  imp->table.resize(max_jobs*POOLS);
+  imp->tasks.resize(POOLS);
   imp->verbose = verbose;
   imp->db = db;
+
+  for (unsigned i = 0; i < imp->table.size(); ++i)
+    imp->table[i].pool = i / max_jobs;
 
   sigset_t block;
   sigemptyset(&block);
@@ -144,9 +153,10 @@ static char **split_null(std::string &str) {
 
 static void launch(JobTable *jobtable) {
   for (auto &i : jobtable->imp->table) {
-    if (jobtable->imp->tasks.empty()) break;
+    if (jobtable->imp->tasks[i.pool].empty()) continue;
+
     if (i.pid == 0) {
-      Task &task = jobtable->imp->tasks.front();
+      Task &task = jobtable->imp->tasks[i.pool].front();
       int pipe_stdout[2];
       int pipe_stderr[2];
       if (pipe(pipe_stdout) == -1 || pipe(pipe_stderr) == -1) {
@@ -187,8 +197,8 @@ static void launch(JobTable *jobtable) {
       close(pipe_stdout[1]);
       close(pipe_stderr[1]);
       for (char &c : task.cmdline) if (c == 0) c = ' ';
-      if (jobtable->imp->verbose) std::cerr << task.cmdline << std::endl;
-      jobtable->imp->tasks.pop_front();
+      if (jobtable->imp->verbose && i.pool) std::cerr << task.cmdline << std::endl;
+      jobtable->imp->tasks[i.pool].pop_front();
     }
   }
 }
@@ -289,7 +299,7 @@ bool JobTable::wait(ThunkQueue &queue) {
           i.pipe_stdout = -1;
           i.pipe_stderr = -1;
           // if (imp->verbose) std::cout << i.job->db->get_output(i.job->job, 1);
-          if (imp->verbose) std::cerr << i.job->db->get_output(i.job->job, 2);
+          if (imp->verbose && i.pool) std::cerr << i.job->db->get_output(i.job->job, 2);
           i.job->process(queue);
           i.job->runtime = i.runtime(now);
           i.job.reset();
@@ -316,12 +326,6 @@ JobResult::JobResult(Database *db_, const std::string &dir, const std::string &s
   HASH(codes.data(), 8*codes.size(), (long)type, code);
 }
 
-Task::Task(Database *db_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_, const std::string &stack_)
-  : job(std::make_shared<JobResult>(db_, dir_, stdin_, environ_, cmdline_)),
-    dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_), stack(stack_)
-{
-}
-
 static std::unique_ptr<Receiver> cast_jobresult(ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, JobResult **job) {
   if (value->type != JobResult::type) {
     Receiver::receiveM(queue, std::move(completion),
@@ -342,23 +346,33 @@ static std::unique_ptr<Receiver> cast_jobresult(ThunkQueue &queue, std::unique_p
 
 static PRIMFN(prim_job_launch) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
-  EXPECT(4);
-  STRING(dir, 0);
-  STRING(stdin, 1);
-  STRING(env, 2);
-  STRING(cmd, 3);
+  EXPECT(5);
+  INTEGER(pool, 0);
+  STRING(dir, 1);
+  STRING(stdin, 2);
+  STRING(env, 3);
+  STRING(cmd, 4);
+
+  REQUIRE(mpz_cmp_si(pool->value, 0) >= 0, "Pool must be >= 0");
+  REQUIRE(mpz_cmp_si(pool->value, POOLS) < 0, "Pool must be < POOLS");
+
   std::stringstream stack;
   for (auto &i : Binding::stack_trace(binding)) stack << i << std::endl;
-
-  jobtable->imp->tasks.emplace_back(
+  auto out = std::make_shared<JobResult>(
     jobtable->imp->db,
+    dir->value,
+    stdin->value,
+    env->value,
+    cmd->value);
+
+  jobtable->imp->tasks[mpz_get_si(pool->value)].emplace_back(
+    out,
     dir->value,
     stdin->value,
     env->value,
     cmd->value,
     stack.str());
 
-  std::shared_ptr<Value> out = jobtable->imp->tasks.back().job;
   launch(jobtable);
 
   RETURN(out);

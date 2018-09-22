@@ -190,10 +190,11 @@ global whichIn path exec = prim "search_path"
 global which exec = whichIn path exec
 
 # The internal function operates on imploded strings, not lists
-def primjob dir stdin env cmd = prim "job_launch"
-def oncejob dir stdin env cmd = memoize primjob dir stdin env cmd
+def primjob pool dir stdin env cmd = prim "job_launch"
+def oncejob dir stdin env cmd = memoize primjob 1 dir stdin env cmd
 def primcache dir stdin env cmd visible = prim "job_cache"
 def oncecache dir stdin env cmd visible = memoize primcache dir stdin env cmd visible
+
 global jobcache build dir stdin env cmd visible =
   def cache = oncecache dir stdin env.implode cmd.implode visible.implode
   if test cache then build 0 else
@@ -266,7 +267,9 @@ global simple_job dir stdin env cmd inputs outputs =
 
 # Still not caching, just hermetic
 global uncached_fuse_job dir stdin env cmd visible =
-  def fuse = uncached_simple_job "." "" nil (which "fuse-wake", map hashname visible) nil nil
+  def fuse = wrap (primjob 0 "." "" "" (which "fuse-wake", map hashname visible).implode)
+  def endfuse _ = finish fuse nil nil
+  def waitfuse = (fuse.status == 0) endfuse endfuse ""
   def err = fuse.stderr
   def handle _ = raise ("Could not start fuse-wake: ", err, nil).cat
   def list = try handle (extract "OK: (.*)" err)
