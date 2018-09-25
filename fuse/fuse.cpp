@@ -735,8 +735,8 @@ int main(int argc, char *argv[])
 	sigaction(SIGALRM, &sa, NULL);
 
 	pid_t pid = getpid();
-	path = "build/" + std::to_string(pid);
-	mkdir("build", 0775);
+	path = ".build/" + std::to_string(pid);
+	mkdir(".build", 0775);
 	mkdir(path.c_str(), 0775);
 
 	rootfd = open(".", O_RDONLY);

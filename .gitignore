@@ -1,4 +1,6 @@
+.build
 *.o
 symbol.cpp
 wake
+fuse-wake
 wake.db
