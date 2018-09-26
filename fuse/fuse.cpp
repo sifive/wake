@@ -699,10 +699,15 @@ static int wakefuse_removexattr(const char *path, const char *name)
 std::string path;
 static void *(wakefuse_init)(struct fuse_conn_info *conn)
 {
-	std::cerr << "OK: " << path << std::flush;
-	int fd = open("build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0666);
-	dup2(fd, 2); // close stderr for wake to capture
-	close(fd);
+	int fd = open(".build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0666);
+	if (fd == -1) {
+		std::cerr << "Could not open fuse.log" << std::endl;
+		close(2);
+	} else {
+		std::cerr << "OK: " << path << std::flush;
+		dup2(fd, 2); // close stderr for wake to capture
+		close(fd);
+	}
 	return 0;
 }
 

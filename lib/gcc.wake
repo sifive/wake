@@ -1,0 +1,44 @@
+def c11Flags      = ("-std=c++11", nil)
+def debugCFlags   = ("-Wall", "-Wextra", "-O0", "-g", "-pg", nil)
+def debugLFlags   = ("-g", "-pg", nil)
+def releaseCFlags = ("-Wall", "-O2", "-flto", nil)
+def releaseLFlags = ("-flto", nil)
+
+def doCompileC variant gcc flags headers file =
+  def obj = replace "\\.c(pp)?$" (".", variant, ".o", nil).cat file
+  def cmdline = gcc, flags ++ ("-c", file, "-o", obj, nil)
+  def result = job cmdline (file, headers)
+  result.output
+
+def doLinkO variant linker flags objs file =
+  def cmdline = (linker, "-o", (file, ".", variant, nil).cat, objs) ++ flags
+  def result = job cmdline objs
+  result.output
+
+def makeCompileC variant gcc flags =
+  pair variant (\extra doCompileC variant gcc (flags ++ extra))
+
+def makeLinkO variant linker flags =
+  pair variant (\extra doLinkO variant linker (flags ++ extra))
+
+publish compileC = makeCompileC "native-c99-debug"     (which "gcc") (debugCFlags)
+publish compileC = makeCompileC "native-c99-release"   (which "gcc") (releaseCFlags)
+publish compileC = makeCompileC "native-cpp11-debug"   (which "g++") (c11Flags ++ debugCFlags)
+publish compileC = makeCompileC "native-cpp11-release" (which "g++") (c11Flags ++ releaseCFlags)
+
+publish linkO = makeLinkO "native-c99-debug"     (which "gcc") (debugLFlags)
+publish linkO = makeLinkO "native-c99-release"   (which "gcc") (releaseLFlags)
+publish linkO = makeLinkO "native-cpp11-debug"   (which "g++") (debugLFlags)
+publish linkO = makeLinkO "native-cpp11-release" (which "g++") (releaseLFlags)
+
+def pickVariant variant variants =
+  def selected = find (match variant _.first) variants
+  if selected.empty
+  then
+    def ok = catWith " " (map first variants)
+    raise ("No variant matches ", variant, "; options: ", ok, nil).cat
+  else
+    selected.head.second
+
+global compileC variant = pickVariant variant (subscribe compileC)
+global linkO    variant = pickVariant variant (subscribe linkO)

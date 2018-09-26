@@ -1,0 +1,8 @@
+global pkgConfig args = memoize (
+  def cmdline = which "pkg-config", args
+  def result = simple_job cmdline nil nil
+  tokenize " " (tokenize "\n" result.stdout).head
+)
+
+global cflags pkg = pkgConfig ("--cflags", pkg, nil)
+global libs   pkg = pkgConfig ("--libs",   pkg, nil)

@@ -1,0 +1,11 @@
+# useful build variants
+global default = "native-cpp11-release"
+global debug = "native-cpp11-debug"
+
+global all variant =
+  def wake = buildWake variant
+  def fuse = buildFuse variant
+  def cp x y = if variant == default then job (which "cp", x, y, nil) (x, nil) else nil
+  def wakeCp = cp wake "wake"
+  def fuseCp = cp fuse "fuse-wake"
+  cat ("Built: ", wake, " ", fuse, nil)

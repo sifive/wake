@@ -2,5 +2,7 @@
 *.o
 symbol.cpp
 wake
+wake.*
 fuse-wake
+fuse-wake.*
 wake.db

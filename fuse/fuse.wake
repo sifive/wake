@@ -1,0 +1,5 @@
+global buildFuse variant =
+  def compile = compileC variant (cflags "fuse") nil
+  def cppFiles = sources here ".*\\.cpp"
+  def objFiles = map compile cppFiles
+  linkO variant (libs "fuse") objFiles "fuse-wake"

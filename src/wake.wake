@@ -1,0 +1,13 @@
+def re2c file =
+  def cpp = replace "\\.re$" ".cpp" file
+  def cmdline = which "re2c", file, "-o", cpp, nil
+  def result = job cmdline (file, nil)
+  result.output
+
+global buildWake variant =
+  def reFiles = sources here ".*\\.re"
+  def headerFiles = sources here ".*\\.h"
+  def cppFiles = sources here ".*\\.cpp" ++ map re2c reFiles
+  def compile = compileC variant ("-I/opt/local/include", nil) headerFiles
+  def objFiles = map compile cppFiles
+  linkO variant ("-L/opt/local/lib", "-lgmp", "-lre2", "-lsqlite3", nil) objFiles "wake"
