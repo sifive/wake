@@ -6,10 +6,10 @@ GMP_LIB ?= $(GMP)/lib
 CFLAGS	?= -Wall -O2 -flto
 
 all:		wake.db
+	./bin/wake -v all default
 
 wake.db:	bin/wake lib/wake/fuse-wake
 	./bin/wake --init .
-	./bin/wake -v all default
 
 install:	all
 	./bin/wake -v install '"install"'
