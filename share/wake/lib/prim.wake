@@ -49,7 +49,7 @@ global splitAt i l =
 
 global take i l = (splitAt i l).first
 global drop i l = (splitAt i l).second
-global at   i l = if i < 0 then nil else (drop i l).head
+global at   i l = if i < 0 then raise "at called with negative index" else (drop i l).head
 
 global splitUntil f l =
   if l.empty then pair nil l else
