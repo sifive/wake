@@ -13,4 +13,4 @@ global install dest =
   def libinstall = map (installIn dest) libfiles
   def bininstall = map (\exe installAs (releaseAs exe) exe) binfiles
   def pass = flatten (libinstall ++ bininstall)
-  if pass.empty then "ok" else "fail"
+  catWith " " pass
