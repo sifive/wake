@@ -7,5 +7,6 @@ External dependencies:
  - md5sum
 
 Internal dependencies:
- - argagg
- - MurmurHash3
+ - argagg		BSD 0 clause
+ - MurmurHash3		public domain
+ - whereami		WTFPLV2

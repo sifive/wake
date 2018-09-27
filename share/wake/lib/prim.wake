@@ -188,6 +188,8 @@ global simplify path = prim "simplify"
 global relative dir path = prim "relative"
 global whichIn path exec = prim "search_path"
 global which exec = whichIn path exec
+global workspace = prim "getcwd"
+def wakepath = prim "execpath"
 
 # The internal function operates on imploded strings, not lists
 def primjob pool root dir stdin env cmd = prim "job_launch"
@@ -267,9 +269,10 @@ global cached_simple_job dir stdin env cmd inputs outputs =
   jobcache build dir stdin env cmd (map hashname inputs)
 
 # Still not caching, just hermetic
+def fusepath = relative workspace (simplify (wakepath, "/../lib/wake/fuse-wake", nil).cat)
 global uncached_fuse_job dir stdin env cmd files dirs =
   def visible = map hashname files ++ (dir, dirs)
-  def fuse = wrap (primjob 0 "." "." "" "" (which "fuse-wake", visible).implode)
+  def fuse = wrap (primjob 0 "." "." "" "" (fusepath, visible).implode)
   def endfuse _ = finish fuse nil nil
   def waitfuse = (fuse.status == 0) endfuse endfuse ""
   def err = fuse.stderr

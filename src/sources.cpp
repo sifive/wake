@@ -2,6 +2,7 @@
 #include "prim.h"
 #include "value.h"
 #include "heap.h"
+#include "whereami.h"
 #include <re2/re2.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -61,6 +62,16 @@ static void scan(std::vector<std::shared_ptr<String> > &out, const std::string &
   }
 }
 
+static void push_files(std::vector<std::shared_ptr<String> > &out, const std::string &path) {
+  if (auto dir = opendir(path.c_str())) {
+    while (auto f = readdir(dir)) {
+      std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
+      if (f->d_type == DT_REG) out.emplace_back(std::make_shared<String>(name));
+    }
+    closedir(dir);
+  }
+}
+
 static bool str_lexical(const std::shared_ptr<String> &a, const std::shared_ptr<String> &b) {
   return a->value < b->value;
 }
@@ -75,16 +86,18 @@ static void distinct(std::vector<std::shared_ptr<String> > &sources) {
   sources.resize(std::distance(sources.begin(), it));
 }
 
-std::vector<std::shared_ptr<String> > find_all_sources() {
-  std::vector<std::shared_ptr<String> > out;
-  scan(out, ".");
-  distinct(out);
-  return out;
+static std::string find_execpath() {
+  int dirlen = wai_getExecutablePath(0, 0, 0) + 1;
+  std::unique_ptr<char[]> execbuf(new char[dirlen]);
+  wai_getExecutablePath(execbuf.get(), dirlen, &dirlen);
+  std::string exepath(execbuf.get(), dirlen);
+  execbuf.reset();
+  return exepath;
 }
 
 // true if possible, false if illegal (ie: . => ., hax/ => hax, foo/.././bar.z => bar.z, foo/../../bar.z => illegal, /foo => illegal)
 static bool make_canonical(std::string &x) {
-  if (x[0] == '/') return false; // absolute paths forbidden
+  bool abs = x[0] == '/';
 
   std::vector<std::string> tokens;
 
@@ -119,7 +132,62 @@ static bool make_canonical(std::string &x) {
     x = str.str();
   }
 
+  if (abs) x.insert(x.begin(), '/');
+
   return true;
+}
+
+// dir + path must be canonical
+std::string make_relative(std::string &dir, std::string &path) {
+  if (dir == ".") dir = ""; else dir += '/';
+  path += '/';
+
+  size_t skip = 0, end = std::min(path.size(), dir.size());
+  for (size_t i = 0; i < end; ++i) {
+    if (dir[i] != path[i])
+      break;
+    if (dir[i] == '/') skip = i+1;
+  }
+
+  std::stringstream str;
+  for (size_t i = skip; i < dir.size(); ++i)
+    if (dir[i] == '/')
+      str << "../";
+
+  std::string x;
+  std::string last(path, skip, path.size()-skip-1);
+  if (last.empty() || last == ".") {
+    // remove trailing '/'
+    x = str.str();
+    if (x.empty()) x = ".";
+    else x.resize(x.size()-1);
+  } else {
+    str << last;
+    x = str.str();
+  }
+
+  if (x.empty()) return ".";
+  return x;
+}
+
+static std::string get_cwd() {
+  std::vector<char> buf;
+  buf.resize(1024, '\0');
+  while (getcwd(buf.data(), buf.size()) == 0 && errno == ERANGE)
+    buf.resize(buf.size() * 2);
+  return std::string(buf.data());
+}
+
+std::vector<std::shared_ptr<String> > find_all_sources() {
+  std::vector<std::shared_ptr<String> > out;
+  scan(out, ".");
+  std::string cwd = get_cwd();
+  std::string abs_libdir = find_execpath() + "/../share/wake/lib";
+  make_canonical(abs_libdir);
+  std::string rel_libdir = make_relative(cwd, abs_libdir);
+  push_files(out, rel_libdir);
+  distinct(out);
+  return out;
 }
 
 static std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<String> > &all, const std::string &base, const RE2 &exp) {
@@ -194,7 +262,7 @@ static PRIMFN(prim_add_sources) {
       if (make_canonical(name)) {
         all->emplace_back(std::make_shared<String>(std::move(name)));
       } else {
-        std::cerr << "Warning: Published source '" << name << "' escapes wake workspace; skipped" << std::endl;
+        std::cerr << "Warning: Published source '" << name << "' has too many ..s; skipped" << std::endl;
       }
       tok = scan+1;
     }
@@ -211,7 +279,7 @@ static PRIMFN(prim_simplify) {
 
   auto out = std::make_shared<String>(arg0->value);
   bool ok = make_canonical(out->value);
-  REQUIRE(ok, "path escapes wake workspace");
+  REQUIRE(ok, "path has too many ..s");
   RETURN(out);
 }
 
@@ -230,34 +298,19 @@ static PRIMFN(prim_relative) {
   ok = make_canonical(path);
   REQUIRE(ok, "path escapes wake workspace");
 
-  if (dir == ".") dir = ""; else dir += '/';
-  path += '/';
+  auto out = std::make_shared<String>(make_relative(dir, path));
+  RETURN(out);
+}
 
-  size_t skip = 0, end = std::min(path.size(), dir.size());
-  for (size_t i = 0; i < end; ++i) {
-    if (dir[i] != path[i])
-      break;
-    if (dir[i] == '/') skip = i+1;
-  }
+static PRIMFN(prim_execpath) {
+  EXPECT(0);
+  auto out = std::make_shared<String>(find_execpath());
+  RETURN(out);
+}
 
-  std::stringstream str;
-  for (size_t i = skip; i < dir.size(); ++i)
-    if (dir[i] == '/')
-      str << "../";
-
-  std::string x;
-  std::string last(path, skip, path.size()-skip-1);
-  if (last.empty() || last == ".") {
-    // remove trailing '/'
-    x = str.str();
-    if (x.empty()) x = ".";
-    else x.resize(x.size()-1);
-  } else {
-    str << last;
-    x = str.str();
-  }
-
-  auto out = std::make_shared<String>(x.empty() ? "." : std::move(x));
+static PRIMFN(prim_getcwd) {
+  EXPECT(0);
+  auto out = std::make_shared<String>(get_cwd());
   RETURN(out);
 }
 
@@ -268,4 +321,6 @@ void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimM
   pmap["add_sources"].second = sources;
   pmap["simplify"].first = prim_simplify;
   pmap["relative"].first = prim_relative;
+  pmap["execpath"].first = prim_execpath;
+  pmap["getcwd"].first = prim_getcwd;
 }
