@@ -5,6 +5,9 @@
 #include <sstream>
 #include <fstream>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <cstring>
 
 struct CatStream : public Value {
   std::stringstream str;
@@ -92,6 +95,34 @@ static PRIMFN(prim_getenv) {
   RETURN(out);
 }
 
+static PRIMFN(prim_mkdir) {
+  EXPECT(2);
+  STRING(path, 0);
+  INTEGER(mode, 1);
+
+  REQUIRE(mpz_cmp_si(mode->value, 0) >= 0, "mode must be >= 0");
+  REQUIRE(mpz_cmp_si(mode->value, 0xffff) <= 0, "mode must be <= 0xffff");
+  long mask = mpz_get_si(mode->value);
+
+  std::vector<char> scan(path->value.begin(), path->value.end());
+  scan.push_back('/');
+
+  for (size_t i = 1; i < scan.size(); ++i) {
+    if (scan[i] == '/') {
+      scan[i] = 0;
+      if (mkdir(scan.data(), mask) != 0 && errno != EEXIST) {
+        std::stringstream str;
+        str << scan.data() << ": " << strerror(errno);
+        RAISE(str.str());
+      }
+      scan[i] = '/';
+    }
+  }
+
+  auto out = make_true();
+  RETURN(out);
+}
+
 void prim_register_string(PrimMap &pmap) {
   pmap["catopen" ].first = prim_catopen;
   pmap["catadd"  ].first = prim_catadd;
@@ -99,4 +130,5 @@ void prim_register_string(PrimMap &pmap) {
   pmap["write"   ].first = prim_write;
   pmap["read"    ].first = prim_read;
   pmap["getenv"  ].first = prim_getenv;
+  pmap["mkdir"   ].first = prim_mkdir;
 }

@@ -3,8 +3,13 @@ global default = "native-cpp11-release"
 global debug = "native-cpp11-debug"
 
 global all variant =
-  def cp x y = job (which "cp", x, y, nil) (x, nil) ("bin", "lib/wake", nil)
   def maybeCp x y = if variant == default then output (cp x y) else x
   def wake = maybeCp (buildWake variant) "bin/wake"
   def fuse = maybeCp (buildFuse variant) "lib/wake/fuse-wake"
-  cat ("Built: ", wake, " ", fuse, nil)
+  (wake, fuse, nil)
+
+global install dest =
+  def libdir = simplify (here, "/share/wake/lib", nil).cat
+  def libfiles = sources libdir ".*"
+  def binfiles = all default
+  map (installIn dest) (binfiles ++ libfiles)

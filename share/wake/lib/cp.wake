@@ -1,0 +1,10 @@
+global cp x y =
+  def outdir = simplify (y, "/..", nil).cat
+  job (which "cp", x, y, nil) (x, nil) (outdir, nil)
+
+global installIn dir file =
+  def dest = simplify (dir, "/", file, nil).cat
+  def path = simplify (dest, "/..", nil).cat
+  def cp x y = uncached_simple_job "." "" nil (which "cp", file, dest, nil) (file, nil) nil
+  def doit _ = map first (cp file dest).outputs # nil if dest outside workspace
+  if mkdir path 0x1fd then doit "" else raise "unreachable"
