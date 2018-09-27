@@ -9,7 +9,7 @@ all:		wake.db
 	./bin/wake -v all default
 
 wake.db:	bin/wake lib/wake/fuse-wake
-	./bin/wake --init .
+	test -f $@ || ./bin/wake --init .
 
 install:	all
 	./bin/wake -v install '"install"'
@@ -26,3 +26,5 @@ lib/wake/fuse-wake:	fuse/fuse.cpp
 %.cpp:	%.re
 	re2c $< > $@.tmp
 	mv $@.tmp $@
+
+.PRECIOUS:	src/symbol.cpp
