@@ -208,6 +208,7 @@ static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 static int wakefuse_mknod(const char *path, mode_t mode, dev_t rdev)
 {
 	int res;
+	(void)rdev;
 
 	TRACE(path);
 
@@ -699,7 +700,11 @@ static int wakefuse_removexattr(const char *path, const char *name)
 std::string path;
 static void *(wakefuse_init)(struct fuse_conn_info *conn)
 {
-	int fd = open(".build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0666);
+	int fd;
+
+	(void)conn;
+
+	fd = open(".build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0666);
 	if (fd == -1) {
 		std::cerr << "Could not open fuse.log" << std::endl;
 		close(2);
@@ -715,11 +720,14 @@ static struct fuse_operations wakefuse_ops;
 
 static void handle_alarm(int sig)
 {
+	(void)sig;
+
 	// Start a retry timer
 	struct itimerval retry;
 	memset(&retry, 0, sizeof(retry));
 	retry.it_value.tv_usec = 50000; // 50ms
 	setitimer(ITIMER_REAL, &retry, 0);
+
 	// Try to quit right away
 	struct sigaction sa;
 	sigaction(SIGTERM, 0, &sa);

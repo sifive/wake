@@ -43,41 +43,41 @@ void Exception::stream(std::ostream &os) const {
   os << ")" << std::endl;
 }
 
-void String::hash(std::unique_ptr<Hasher> hasher) {
+void String::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) {
   Hash payload;
   HASH(value.data(), value.size(), (long)type, payload);
-  hasher->receive(payload);
+  Hasher::receive(queue, std::move(hasher), payload);
 }
 
-void Integer::hash(std::unique_ptr<Hasher> hasher) {
+void Integer::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) {
   Hash payload;
   HASH(value[0]._mp_d, abs(value[0]._mp_size)*sizeof(mp_limb_t), (long)type, payload);
-  hasher->receive(payload);
+  Hasher::receive(queue, std::move(hasher), payload);
 }
 
-void Exception::hash(std::unique_ptr<Hasher> hasher) {
+void Exception::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) {
   Hash payload;
   std::string str = to_str();
   HASH(str.data(), str.size(), (long)type, payload);
-  hasher->receive(payload);
+  Hasher::receive(queue, std::move(hasher), payload);
 }
 
 struct ClosureHasher : public Hasher {
   std::unique_ptr<Hasher> chain;
   Expr *body;
   ClosureHasher(std::unique_ptr<Hasher> chain_, Expr *body_) : chain(std::move(chain_)), body(body_) { }
-  void receive(Hash hash) {
+  void receive(ThunkQueue &queue, Hash hash) {
     std::vector<uint64_t> codes;
     Hash out;
     hash.push(codes);
     body->hashcode.push(codes);
     HASH(codes.data(), 8*codes.size(), (long)Closure::type, out);
-    chain->receive(out);
+    Hasher::receive(queue, std::move(chain), out);
   }
 };
 
-void Closure::hash(std::unique_ptr<Hasher> hasher) {
-  Binding::hash(binding, std::unique_ptr<Hasher>(new ClosureHasher(std::move(hasher), body)));
+void Closure::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) {
+  Binding::hash(queue, binding, std::unique_ptr<Hasher>(new ClosureHasher(std::move(hasher), body)));
 }
 
 Cause::Cause(const std::string &reason_, std::vector<Location> &&stack_)

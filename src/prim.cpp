@@ -6,9 +6,11 @@
 #include <cstdlib>
 #include <sstream>
 
-std::unique_ptr<Receiver> require(const char *fn, ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, bool ok, const std::string &str) {
+std::unique_ptr<Receiver> require(const char *fn, ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, bool ok, const std::string &str_) {
   if (!ok) {
-    Receiver::receiveM(queue, std::move(completion), std::make_shared<Exception>(str, binding));
+    std::stringstream str;
+    str << fn << ": " << str_ << std::endl;
+    Receiver::receiveM(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
     return std::unique_ptr<Receiver>();
   }
   return completion;

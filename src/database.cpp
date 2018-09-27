@@ -233,6 +233,7 @@ void Database::close() {
 }
 
 static int fill_vector(void *data, int cols, char **text, char **colname) {
+  (void)colname;
   if (cols >= 1) {
     std::vector<std::string> *vec = reinterpret_cast<std::vector<std::string>*>(data);
     vec->emplace_back(text[0]);

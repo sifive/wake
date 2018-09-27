@@ -64,6 +64,7 @@ static PRIMFN(prim_cmp) {
 }
 
 static PRIMFN(prim_test) {
+  (void)data; // silence unused variable warning (EXPECT not called)
   if (args.size() != 1) {
     Receiver::receiveM(queue, std::move(completion),
       std::make_shared<Exception>("prim_test called on " + std::to_string(args.size()) + "; was exepecting 1", binding));
@@ -73,6 +74,7 @@ static PRIMFN(prim_test) {
 }
 
 static PRIMFN(prim_catch) {
+  (void)data; // silence unused variable warning (EXPECT not called)
   if (args.size() != 1 || args[0]->type != Exception::type) {
     Receiver::receiveM(queue, std::move(completion),
       std::make_shared<Exception>("prim_catch not called on an exception", binding));

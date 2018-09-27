@@ -47,7 +47,7 @@ struct Future {
   std::shared_ptr<Value> output() { return value; }
 
   // Only for use by memoization:
-  void hash(std::unique_ptr<Hasher> hasher);
+  void hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher);
   std::unique_ptr<Receiver> make_completer();
 
 private:
@@ -71,7 +71,7 @@ struct Binding {
 
   static std::unique_ptr<Receiver> make_completer(const std::shared_ptr<Binding> &binding, int arg);
   static std::vector<Location> stack_trace(const std::shared_ptr<Binding> &binding);
-  static void hash(const std::shared_ptr<Binding> &binding, std::unique_ptr<Hasher> hasher_);
+  static void hash(ThunkQueue &queue, const std::shared_ptr<Binding> &binding, std::unique_ptr<Hasher> hasher_);
 };
 
 #endif

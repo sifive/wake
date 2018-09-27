@@ -48,7 +48,7 @@ struct JobResult : public Value {
   JobResult(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline);
 
   void stream(std::ostream &os) const;
-  void hash(std::unique_ptr<Hasher> hasher);
+  void hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher);
 
   void process(ThunkQueue &queue); // Run commands based on state
 };
@@ -56,7 +56,7 @@ struct JobResult : public Value {
 const char *JobResult::type = "JobResult";
 
 void JobResult::stream(std::ostream &os) const { os << "JobResult(" << job << ")"; }
-void JobResult::hash(std::unique_ptr<Hasher> hasher) { hasher->receive(code); }
+void JobResult::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) { Hasher::receive(queue, std::move(hasher), code); }
 
 // A Task is a job that is not yet forked
 struct Task {
@@ -98,6 +98,7 @@ struct JobTable::detail {
 
 static void handle_SIGCHLD(int sig) {
   /* noop -- we just want to interrupt select */
+  (void)sig;
 }
 
 JobTable::JobTable(Database *db, int max_jobs, bool verbose) : imp(new JobTable::detail) {
@@ -525,6 +526,7 @@ static PRIMFN(prim_job_tree) {
 }
 
 static PRIMFN(prim_job_finish) {
+  (void)data; // silence unused variable warning (EXPECT not called)
   REQUIRE (args.size() == 3, "prim_job_finish not called on 3 arguments");
   JOBRESULT(job, 0);
   if (!(job->state & STATE_MERGED)) {

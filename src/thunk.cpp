@@ -57,21 +57,20 @@ struct MemoizeHasher : public Hasher {
   std::unique_ptr<Receiver> receiver;
   std::shared_ptr<Binding> binding;
   Memoize *memoize;
-  ThunkQueue *queue;
-  MemoizeHasher(std::unique_ptr<Receiver> receiver_, const std::shared_ptr<Binding> &binding_, Memoize *memoize_, ThunkQueue *queue_)
-   : receiver(std::move(receiver_)), binding(binding_), memoize(memoize_), queue(queue_) { }
-  void receive(Hash hash);
+  MemoizeHasher(std::unique_ptr<Receiver> receiver_, const std::shared_ptr<Binding> &binding_, Memoize *memoize_)
+   : receiver(std::move(receiver_)), binding(binding_), memoize(memoize_) { }
+  void receive(ThunkQueue &queue, Hash hash);
 };
 
-void MemoizeHasher::receive(Hash hash)
+void MemoizeHasher::receive(ThunkQueue &queue, Hash hash)
 {
   auto i = memoize->values.find(hash);
   if (i == memoize->values.end()) {
     Future &future = memoize->values[hash];
-    future.depend(*queue, std::move(receiver));
-    queue->queue.emplace(memoize->body.get(), std::move(binding), future.make_completer());
+    future.depend(queue, std::move(receiver));
+    queue.queue.emplace(memoize->body.get(), std::move(binding), future.make_completer());
   } else {
-    i->second.depend(*queue, std::move(receiver));
+    i->second.depend(queue, std::move(receiver));
   }
 }
 
@@ -101,7 +100,7 @@ void Thunk::eval(ThunkQueue &queue)
     Receiver::receiveM(queue, std::move(receiver), std::move(closure));
   } else if (expr->type == Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
-    Binding::hash(binding, std::unique_ptr<Hasher>(new MemoizeHasher(std::move(receiver), binding, memoize, &queue)));
+    Binding::hash(queue, binding, std::unique_ptr<Hasher>(new MemoizeHasher(std::move(receiver), binding, memoize)));
   } else if (expr->type == DefBinding::type) {
     DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
     auto defs = std::make_shared<Binding>(binding, queue.stack_trace?binding:nullptr, &defbinding->location, defbinding, defbinding->val.size());

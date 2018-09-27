@@ -3,7 +3,7 @@
 GMP     ?= /opt/local
 GMP_INC ?= $(GMP)/include
 GMP_LIB ?= $(GMP)/lib
-CFLAGS	?= -Wall -Wextra -Wno-unused-parameter -O2 -flto
+CFLAGS	?= -Wall -O2 -flto
 
 all:		bin/wake lib/wake/fuse-wake
 	./bin/wake --init .

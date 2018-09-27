@@ -366,7 +366,7 @@ static void bind_def(Lexer &lex, DefMap::defs &map, const std::string &name, Exp
   map[name] = std::unique_ptr<Expr>(def);
 }
 
-static void publish_def(Lexer &lex, DefMap::defs &publish, const std::string &name, Expr *def) {
+static void publish_def(DefMap::defs &publish, const std::string &name, Expr *def) {
   DefMap::defs::iterator i;
   if ((i = publish.find(name)) == publish.end()) {
     // A reference to _tail which we close with a lambda at the top of the chain
@@ -411,7 +411,7 @@ static Expr *parse_block(Lexer &lex) {
         case PUBLISH: {
           std::string name;
           auto def = parse_def(lex, name);
-          publish_def(lex, publish, name, def);
+          publish_def(publish, name, def);
           break;
         }
         default: {
@@ -468,7 +468,7 @@ void parse_top(Top &top, Lexer &lex) {
       case PUBLISH: {
         std::string name;
         auto def = parse_def(lex, name);
-        publish_def(lex, defmap.publish, name, def);
+        publish_def(defmap.publish, name, def);
         break;
       }
       default: {

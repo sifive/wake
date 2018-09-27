@@ -31,6 +31,7 @@ std::unique_ptr<Receiver> require(const char *fn, ThunkQueue &queue, std::unique
 
 std::unique_ptr<Receiver> expect_args(const char *fn, ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::vector<std::shared_ptr<Value> > &args, int expect);
 #define EXPECT(num) do { 									\
+  (void)data;											\
   completion = expect_args(__FUNCTION__, queue, std::move(completion), binding, args, num);	\
   if (!completion) return;									\
 } while (0)

@@ -1,6 +1,7 @@
 #include "expr.h"
 #include "value.h"
 #include "hash.h"
+#include "thunk.h"
 #include <iostream>
 #include <cassert>
 #include <sstream>
@@ -114,13 +115,15 @@ void Literal::format(std::ostream &os, int depth) const {
 struct LiteralHasher : public Hasher {
   Literal *lit;
   LiteralHasher(Literal *lit_) : lit(lit_) { }
-  void receive(Hash hash) {
+  void receive(ThunkQueue &queue, Hash hash) {
+    (void)queue; // not invoked from main loop
     lit->hashcode = hash;
   }
 };
 
 void Literal::hash() {
-  value->hash(std::unique_ptr<Hasher>(new LiteralHasher(this)));
+  ThunkQueue queue;
+  value->hash(queue, std::unique_ptr<Hasher>(new LiteralHasher(this)));
   HASH(&hashcode, sizeof(hashcode), (long)type, hashcode);
 }
 

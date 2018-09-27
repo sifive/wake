@@ -55,14 +55,16 @@ std::vector<Location> Binding::stack_trace(const std::shared_ptr<Binding> &bindi
 struct FutureReceiver : public Receiver {
   std::unique_ptr<Hasher> hasher;
   FutureReceiver(std::unique_ptr<Hasher> hasher_) : hasher(std::move(hasher_)) { }
-  void receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
-    value->hash(std::move(hasher));
-  }
+  void receive(ThunkQueue &queue, std::shared_ptr<Value> &&value);
 };
 
-void Future::hash(std::unique_ptr<Hasher> hasher) {
+void FutureReceiver::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
+  value->hash(queue, std::move(hasher));
+}
+
+void Future::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) {
   if (value) {
-    value->hash(std::move(hasher));
+    value->hash(queue, std::move(hasher));
   } else {
     std::unique_ptr<Receiver> wait(new FutureReceiver(std::move(hasher)));
     wait->next = std::move(waiting);
@@ -76,56 +78,62 @@ struct FutureHasher : public Hasher {
   int arg;
   FutureHasher(std::shared_ptr<Binding> &&binding_, std::vector<uint64_t> &&codes_, int arg_)
    : binding(std::move(binding_)), codes(std::move(codes_)), arg(arg_) { }
-  void receive(Hash hash) {
-    hash.push(codes);
-    chain(std::move(binding), std::move(codes), arg+1);
-  }
-  static void chain(std::shared_ptr<Binding> &&binding, std::vector<uint64_t> &&codes, int arg) {
-    if (arg == binding->nargs) {
-      HASH(codes.data(), codes.size()*8, 42, binding->hashcode);
-      std::unique_ptr<Hasher> iter, next;
-      for (iter = std::move(binding->hasher); iter; iter = std::move(next)) {
-        next = std::move(iter->next);
-        iter->receive(binding->hashcode);
-      }
-      binding->hasher.reset();
-    } else {
-      Binding *bind = binding.get();
-      bind->future[arg].hash(std::unique_ptr<Hasher>(new FutureHasher(
-        std::move(binding), std::move(codes), arg)));
-    }
-  }
+  void receive(ThunkQueue &queue, Hash hash);
+  static void chain(ThunkQueue &queue, std::shared_ptr<Binding> &&binding, std::vector<uint64_t> &&codes, int arg);
 };
+
+void FutureHasher::receive(ThunkQueue &queue, Hash hash) {
+  hash.push(codes);
+  chain(queue, std::move(binding), std::move(codes), arg+1);
+}
+
+void FutureHasher::chain(ThunkQueue &queue, std::shared_ptr<Binding> &&binding, std::vector<uint64_t> &&codes, int arg) {
+  if (arg == binding->nargs) {
+    HASH(codes.data(), codes.size()*8, 42, binding->hashcode);
+    std::unique_ptr<Hasher> iter, next;
+    for (iter = std::move(binding->hasher); iter; iter = std::move(next)) {
+      next = std::move(iter->next);
+      Hasher::receive(queue, std::move(iter), binding->hashcode);
+    }
+    binding->hasher.reset();
+  } else {
+    Binding *bind = binding.get();
+    bind->future[arg].hash(queue, std::unique_ptr<Hasher>(new FutureHasher(
+      std::move(binding), std::move(codes), arg)));
+  }
+}
 
 struct ParentHasher : public Hasher {
   std::shared_ptr<Binding> binding;
   ParentHasher(const std::shared_ptr<Binding> &binding_) : binding(binding_) { }
-  void receive(Hash hash) {
-    std::vector<uint64_t> codes;
-    hash.push(codes);
-    FutureHasher::chain(std::move(binding), std::move(codes), 0);
-  }
+  void receive(ThunkQueue &queue, Hash hash);
 };
+
+void ParentHasher::receive(ThunkQueue &queue, Hash hash) {
+  std::vector<uint64_t> codes;
+  hash.push(codes);
+  FutureHasher::chain(queue, std::move(binding), std::move(codes), 0);
+}
 
 Binding::Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Location *location_, DefBinding *binding_, int nargs_)
   : next(next_), invoker(invoker_), future(new Future[nargs_]), hasher(),
     location(location_), binding(binding_), hashcode(), nargs(nargs_) { }
 
-void Binding::hash(const std::shared_ptr<Binding> &binding, std::unique_ptr<Hasher> hasher) {
+void Binding::hash(ThunkQueue &queue, const std::shared_ptr<Binding> &binding, std::unique_ptr<Hasher> hasher) {
   if (!binding) {
-    hasher->receive(Hash());
+    Hasher::receive(queue, std::move(hasher), Hash());
   } else if (binding->hashcode) {
-    hasher->receive(binding->hashcode);
+    Hasher::receive(queue, std::move(hasher), binding->hashcode);
   } else {
     bool first = !binding->hasher;
     hasher->next = std::move(binding->hasher);
     binding->hasher = std::move(hasher);
     if (first) {
       if (binding->next) {
-        Binding::hash(binding->next, std::unique_ptr<Hasher>(new ParentHasher(binding)));
+        Binding::hash(queue, binding->next, std::unique_ptr<Hasher>(new ParentHasher(binding)));
       } else {
         std::vector<uint64_t> codes;
-        FutureHasher::chain(std::shared_ptr<Binding>(binding), std::move(codes), 0);
+        FutureHasher::chain(queue, std::shared_ptr<Binding>(binding), std::move(codes), 0);
       }
     }
   }

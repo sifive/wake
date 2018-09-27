@@ -11,16 +11,16 @@ struct RegExp : public Value {
   RegExp(const std::string &regexp, const RE2::Options &opts) : Value(type), exp(re2::StringPiece(regexp), opts) { }
 
   void stream(std::ostream &os) const;
-  void hash(std::unique_ptr<Hasher> hasher);
+  void hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher);
 };
 const char *RegExp::type = "RegExp";
 
 void RegExp::stream(std::ostream &os) const { os << "RegExp(" << exp.pattern() << ")"; }
-void RegExp::hash(std::unique_ptr<Hasher> hasher) {
+void RegExp::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) {
   Hash payload;
   std::string pattern = exp.pattern();
   HASH(pattern.data(), pattern.size(), (long)type, payload);
-  hasher->receive(payload);
+  Hasher::receive(queue, std::move(hasher), payload);
 }
 
 static std::unique_ptr<Receiver> cast_regexp(ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, RegExp **reg) {
