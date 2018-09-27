@@ -267,8 +267,9 @@ global cached_simple_job dir stdin env cmd inputs outputs =
   jobcache build dir stdin env cmd (map hashname inputs)
 
 # Still not caching, just hermetic
-global uncached_fuse_job dir stdin env cmd visible =
-  def fuse = wrap (primjob 0 "." "." "" "" (which "fuse-wake", map hashname visible).implode)
+global uncached_fuse_job dir stdin env cmd files dirs =
+  def visible = map hashname files ++ (dir, dirs)
+  def fuse = wrap (primjob 0 "." "." "" "" (which "fuse-wake", visible).implode)
   def endfuse _ = finish fuse nil nil
   def waitfuse = (fuse.status == 0) endfuse endfuse ""
   def err = fuse.stderr
@@ -284,9 +285,9 @@ global uncached_fuse_job dir stdin env cmd visible =
   def wait = (job.status == 0) final final ""
   job
 
-global cached_fuse_job dir stdin env cmd visible =
-  def build _ = uncached_fuse_job dir stdin env cmd visible
-  jobcache build dir stdin env cmd (map hashname visible)
+global cached_fuse_job dir stdin env cmd files dirs =
+  def build _ = uncached_fuse_job dir stdin env cmd files dirs
+  jobcache build dir stdin env cmd (map hashname files)
 
 # Setup a default path
 publish path = "/usr/bin"
@@ -297,5 +298,5 @@ publish environment = cat ("PATH=", path, nil)
 
 # Most jobs don't need explicit stdin/env control
 global environment = subscribe environment
-global job cmd visible = cached_fuse_job "." "" environment cmd visible
+global job cmd files dirs = cached_fuse_job "." "" environment cmd files dirs
 global simple_job cmd inputs outputs = cached_simple_job "." "" environment cmd inputs outputs

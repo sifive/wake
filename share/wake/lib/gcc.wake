@@ -7,12 +7,13 @@ def releaseLFlags = ("-flto", nil)
 def doCompileC variant gcc flags headers file =
   def obj = replace "\\.c(pp)?$" (".", variant, ".o", nil).cat file
   def cmdline = gcc, flags ++ ("-c", file, "-o", obj, nil)
-  def result = job cmdline (file, headers)
+  def result = job cmdline (file, headers) nil
   result.output
 
 def doLinkO variant linker flags objs file =
   def cmdline = (linker, "-o", (file, ".", variant, nil).cat, objs) ++ flags
-  def result = job cmdline objs
+  def outdir = simplify (file, "/..", nil).cat
+  def result = job cmdline objs (outdir, nil)
   result.output
 
 def makeCompileC variant gcc flags =
