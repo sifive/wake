@@ -1,7 +1,7 @@
 #include "heap.h"
 #include "location.h"
 #include "value.h"
-#include "heap.h"
+#include "expr.h"
 
 Receiver::~Receiver() { }
 
@@ -47,8 +47,8 @@ std::unique_ptr<Receiver> Binding::make_completer(const std::shared_ptr<Binding>
 std::vector<Location> Binding::stack_trace(const std::shared_ptr<Binding> &binding) {
   std::vector<Location> out;
   for (Binding *i = binding.get(); i; i = i->invoker.get())
-    if (!i->binding)
-      out.emplace_back(*i->location);
+    if (i->expr->type != DefBinding::type)
+      out.emplace_back(i->expr->location);
   return out;
 }
 
@@ -115,9 +115,9 @@ void ParentHasher::receive(ThunkQueue &queue, Hash hash) {
   FutureHasher::chain(queue, std::move(binding), std::move(codes), 0);
 }
 
-Binding::Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Location *location_, DefBinding *binding_, int nargs_)
+Binding::Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Expr *expr_, int nargs_)
   : next(next_), invoker(invoker_), future(new Future[nargs_]), hasher(),
-    location(location_), binding(binding_), hashcode(), nargs(nargs_) { }
+    expr(expr_), hashcode(), nargs(nargs_) { }
 
 void Binding::hash(ThunkQueue &queue, const std::shared_ptr<Binding> &binding, std::unique_ptr<Hasher> hasher) {
   if (!binding) {

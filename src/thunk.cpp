@@ -21,7 +21,7 @@ void Application::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
   } else {
     Closure *clo = reinterpret_cast<Closure*>(value.get());
     args->next = clo->binding;
-    args->location = &clo->body->location;
+    args->expr = clo->body;
     queue.queue.emplace(clo->body, std::move(args), std::move(receiver));
   }
 }
@@ -83,14 +83,15 @@ void Thunk::eval(ThunkQueue &queue)
       iter = &(*iter)->next;
     int vals = (*iter)->nargs;
     if (ref->offset >= vals) {
-      auto closure = std::make_shared<Closure>((*iter)->binding->fun[ref->offset-vals]->body.get(), *iter);
+      auto defs = reinterpret_cast<DefBinding*>((*iter)->expr);
+      auto closure = std::make_shared<Closure>(defs->fun[ref->offset-vals]->body.get(), *iter);
       Receiver::receiveM(queue, std::move(receiver), std::move(closure));
     } else {
       (*iter)->future[ref->offset].depend(queue, std::move(receiver));
     }
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
-    auto args = std::make_shared<Binding>(nullptr, queue.stack_trace?binding:nullptr, nullptr, nullptr, 1);
+    auto args = std::make_shared<Binding>(nullptr, queue.stack_trace?binding:nullptr, nullptr, 1);
     queue.queue.emplace(app->val.get(), binding, Binding::make_completer(args, 0));
     queue.queue.emplace(app->fn .get(), std::move(binding), std::unique_ptr<Receiver>(
       new Application(std::move(args), std::move(receiver))));
@@ -103,7 +104,7 @@ void Thunk::eval(ThunkQueue &queue)
     Binding::hash(queue, binding, std::unique_ptr<Hasher>(new MemoizeHasher(std::move(receiver), binding, memoize)));
   } else if (expr->type == DefBinding::type) {
     DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
-    auto defs = std::make_shared<Binding>(binding, queue.stack_trace?binding:nullptr, &defbinding->location, defbinding, defbinding->val.size());
+    auto defs = std::make_shared<Binding>(binding, queue.stack_trace?binding:nullptr, defbinding, defbinding->val.size());
     int j = 0;
     for (auto &i : defbinding->val)
       queue.queue.emplace(i.get(), binding, Binding::make_completer(defs, j++));

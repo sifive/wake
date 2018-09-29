@@ -7,7 +7,7 @@
 
 struct Value;
 struct ThunkQueue;
-struct DefBinding;
+struct Expr;
 struct Location;
 struct Hasher;
 
@@ -62,12 +62,11 @@ struct Binding {
   std::shared_ptr<Binding> invoker;
   std::unique_ptr<Future[]> future;
   std::unique_ptr<Hasher> hasher;
-  Location *location;
-  DefBinding *binding;
+  Expr *expr;
   Hash hashcode;
   int nargs;
 
-  Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Location *location_, DefBinding *binding_, int nargs_);
+  Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Expr *expr_, int nargs_);
 
   static std::unique_ptr<Receiver> make_completer(const std::shared_ptr<Binding> &binding, int arg);
   static std::vector<Location> stack_trace(const std::shared_ptr<Binding> &binding);
