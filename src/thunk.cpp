@@ -113,6 +113,14 @@ void Thunk::eval(ThunkQueue &queue)
     Receiver::receiveC(queue, std::move(receiver), lit->value);
   } else if (expr->type == Prim::type) {
     Prim *prim = reinterpret_cast<Prim*>(expr);
+    // Cut the scope of primitive to only it's own arguments
+    if (prim->args == 0) {
+      binding.reset();
+    } else {
+      Binding *iter = binding.get();
+      for (int i = 1; i < prim->args; ++i) iter = iter->next.get();
+      iter->next.reset();
+    }
     std::vector<std::shared_ptr<Value> > args;
     args.reserve(prim->args);
     chain_app(queue, std::move(receiver), prim, std::move(binding), std::move(args));
