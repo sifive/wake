@@ -18,10 +18,10 @@ struct Thunk {
   Thunk(Expr *expr_, std::shared_ptr<Binding>      &&binding_, std::unique_ptr<Receiver> receiver_) : expr(expr_), binding(binding_), receiver(std::move(receiver_)) { }
   Thunk(Expr *expr_, const std::shared_ptr<Binding> &binding_, std::unique_ptr<Receiver> receiver_) : expr(expr_), binding(binding_), receiver(std::move(receiver_)) { }
 
-  void eval(ThunkQueue &queue);
+  void eval(WorkQueue &queue);
 };
 
-struct ThunkQueue {
+struct WorkQueue {
   bool stack_trace;
   std::queue<Thunk> queue;
   void run();

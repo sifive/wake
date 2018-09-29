@@ -6,7 +6,7 @@
 #include <vector>
 
 struct Value;
-struct ThunkQueue;
+struct WorkQueue;
 struct Expr;
 struct Location;
 struct Hasher;
@@ -15,21 +15,21 @@ struct Receiver {
   std::unique_ptr<Receiver> next; // for wait Q
   virtual ~Receiver();
 
-  static void receiveM(ThunkQueue &queue, std::unique_ptr<Receiver> receiver, std::shared_ptr<Value> &&value) {
+  static void receiveM(WorkQueue &queue, std::unique_ptr<Receiver> receiver, std::shared_ptr<Value> &&value) {
     receiver->receive(queue, std::move(value));
   }
-  static void receiveC(ThunkQueue &queue, std::unique_ptr<Receiver> receiver, std::shared_ptr<Value> value) {
+  static void receiveC(WorkQueue &queue, std::unique_ptr<Receiver> receiver, std::shared_ptr<Value> value) {
     receiver->receive(queue, std::move(value));
   }
 
 protected:
-  virtual void receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) = 0;
+  virtual void receive(WorkQueue &queue, std::shared_ptr<Value> &&value) = 0;
 };
 
 struct Future {
   Future() { }
 
-  void depend(ThunkQueue &queue, std::unique_ptr<Receiver> receiver) {
+  void depend(WorkQueue &queue, std::unique_ptr<Receiver> receiver) {
     if (value) {
       Receiver::receiveC(queue, std::move(receiver), value);
     } else {
@@ -47,7 +47,7 @@ struct Future {
   std::shared_ptr<Value> output() { return value; }
 
   // Only for use by memoization:
-  void hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher);
+  void hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher);
   std::unique_ptr<Receiver> make_completer();
 
 private:
@@ -70,7 +70,7 @@ struct Binding {
 
   static std::unique_ptr<Receiver> make_completer(const std::shared_ptr<Binding> &binding, int arg);
   static std::vector<Location> stack_trace(const std::shared_ptr<Binding> &binding);
-  static void hash(ThunkQueue &queue, const std::shared_ptr<Binding> &binding, std::unique_ptr<Hasher> hasher_);
+  static void hash(WorkQueue &queue, const std::shared_ptr<Binding> &binding, std::unique_ptr<Hasher> hasher_);
 };
 
 #endif

@@ -115,14 +115,14 @@ void Literal::format(std::ostream &os, int depth) const {
 struct LiteralHasher : public Hasher {
   Literal *lit;
   LiteralHasher(Literal *lit_) : lit(lit_) { }
-  void receive(ThunkQueue &queue, Hash hash) {
+  void receive(WorkQueue &queue, Hash hash) {
     (void)queue; // not invoked from main loop
     lit->hashcode = hash;
   }
 };
 
 void Literal::hash() {
-  ThunkQueue queue;
+  WorkQueue queue;
   value->hash(queue, std::unique_ptr<Hasher>(new LiteralHasher(this)));
   HASH(&hashcode, sizeof(hashcode), (long)type, hashcode);
 }

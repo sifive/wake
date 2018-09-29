@@ -4,7 +4,7 @@
 #include <memory>
 
 struct Database;
-struct ThunkQueue;
+struct WorkQueue;
 
 struct JobTable {
   struct detail;
@@ -14,7 +14,7 @@ struct JobTable {
   ~JobTable();
 
   // Wait for a job to complete; false -> no more active jobs
-  bool wait(ThunkQueue &queue);
+  bool wait(WorkQueue &queue);
 };
 
 #endif

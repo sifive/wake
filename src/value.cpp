@@ -43,19 +43,19 @@ void Exception::stream(std::ostream &os) const {
   os << ")" << std::endl;
 }
 
-void String::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) {
+void String::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) {
   Hash payload;
   HASH(value.data(), value.size(), (long)type, payload);
   Hasher::receive(queue, std::move(hasher), payload);
 }
 
-void Integer::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) {
+void Integer::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) {
   Hash payload;
   HASH(value[0]._mp_d, abs(value[0]._mp_size)*sizeof(mp_limb_t), (long)type, payload);
   Hasher::receive(queue, std::move(hasher), payload);
 }
 
-void Exception::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) {
+void Exception::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) {
   Hash payload;
   std::string str = to_str();
   HASH(str.data(), str.size(), (long)type, payload);
@@ -66,7 +66,7 @@ struct ClosureHasher : public Hasher {
   std::unique_ptr<Hasher> chain;
   Expr *body;
   ClosureHasher(std::unique_ptr<Hasher> chain_, Expr *body_) : chain(std::move(chain_)), body(body_) { }
-  void receive(ThunkQueue &queue, Hash hash) {
+  void receive(WorkQueue &queue, Hash hash) {
     std::vector<uint64_t> codes;
     Hash out;
     hash.push(codes);
@@ -76,7 +76,7 @@ struct ClosureHasher : public Hasher {
   }
 };
 
-void Closure::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) {
+void Closure::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) {
   Binding::hash(queue, binding, std::unique_ptr<Hasher>(new ClosureHasher(std::move(hasher), body)));
 }
 

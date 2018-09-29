@@ -15,19 +15,19 @@ struct CatStream : public Value {
   CatStream() : Value(type) { }
 
   void stream(std::ostream &os) const;
-  void hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher);
+  void hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher);
 };
 const char *CatStream::type = "CatStream";
 
 void CatStream::stream(std::ostream &os) const { os << "CatStream(" << str.str() << ")"; }
-void CatStream::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) {
+void CatStream::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) {
   Hash payload;
   std::string data = str.str();
   HASH(data.data(), data.size(), (long)type, payload);
   Hasher::receive(queue, std::move(hasher), payload);
 }
 
-static std::unique_ptr<Receiver> cast_catstream(ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, CatStream **cat) {
+static std::unique_ptr<Receiver> cast_catstream(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, CatStream **cat) {
   if (value->type != CatStream::type) {
     Receiver::receiveM(queue, std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a CatStream", binding));
     return std::unique_ptr<Receiver>();

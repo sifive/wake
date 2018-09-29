@@ -13,15 +13,15 @@
 #include "database.h"
 #include "argagg.h"
 
-static ThunkQueue queue;
+static WorkQueue queue;
 
 struct Output : public Receiver {
   std::shared_ptr<Value> *save;
   Output(std::shared_ptr<Value> *save_) : save(save_) { }
-  void receive(ThunkQueue &queue, std::shared_ptr<Value> &&value);
+  void receive(WorkQueue &queue, std::shared_ptr<Value> &&value);
 };
 
-void Output::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
+void Output::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
   (void)queue; // we're done; no following actions to take!
   *save = std::move(value);
 }

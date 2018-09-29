@@ -7,12 +7,12 @@
 struct Application : public Receiver {
   std::shared_ptr<Binding> args;
   std::unique_ptr<Receiver> receiver;
-  void receive(ThunkQueue &queue, std::shared_ptr<Value> &&value);
+  void receive(WorkQueue &queue, std::shared_ptr<Value> &&value);
   Application(std::shared_ptr<Binding> &&args_, std::unique_ptr<Receiver> receiver_)
    : args(std::move(args_)), receiver(std::move(receiver_)) { }
 };
 
-void Application::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
+void Application::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
   if (value->type == Exception::type) {
     Receiver::receiveM(queue, std::move(receiver), std::move(value));
   } else if (value->type != Closure::type) {
@@ -31,12 +31,12 @@ struct Primitive : public Receiver {
   std::unique_ptr<Receiver> receiver;
   std::shared_ptr<Binding> binding;
   Prim *prim;
-  void receive(ThunkQueue &queue, std::shared_ptr<Value> &&value);
+  void receive(WorkQueue &queue, std::shared_ptr<Value> &&value);
   Primitive(std::vector<std::shared_ptr<Value> > &&args_, std::unique_ptr<Receiver> receiver_, std::shared_ptr<Binding> &&binding_, Prim *prim_)
    : args(std::move(args_)), receiver(std::move(receiver_)), binding(std::move(binding_)), prim(prim_) { }
 };
 
-static void chain_app(ThunkQueue &queue, std::unique_ptr<Receiver> receiver, Prim *prim, std::shared_ptr<Binding> &&binding, std::vector<std::shared_ptr<Value> > &&args) {
+static void chain_app(WorkQueue &queue, std::unique_ptr<Receiver> receiver, Prim *prim, std::shared_ptr<Binding> &&binding, std::vector<std::shared_ptr<Value> > &&args) {
   int idx = args.size();
   if (idx == prim->args) {
     prim->fn(prim->data, queue, std::move(receiver), std::move(binding), std::move(args));
@@ -48,7 +48,7 @@ static void chain_app(ThunkQueue &queue, std::unique_ptr<Receiver> receiver, Pri
   }
 }
 
-void Primitive::receive(ThunkQueue &queue, std::shared_ptr<Value> &&value) {
+void Primitive::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
   args.emplace_back(std::move(value));
   chain_app(queue, std::move(receiver), prim, std::move(binding), std::move(args));
 }
@@ -59,10 +59,10 @@ struct MemoizeHasher : public Hasher {
   Memoize *memoize;
   MemoizeHasher(std::unique_ptr<Receiver> receiver_, const std::shared_ptr<Binding> &binding_, Memoize *memoize_)
    : receiver(std::move(receiver_)), binding(binding_), memoize(memoize_) { }
-  void receive(ThunkQueue &queue, Hash hash);
+  void receive(WorkQueue &queue, Hash hash);
 };
 
-void MemoizeHasher::receive(ThunkQueue &queue, Hash hash)
+void MemoizeHasher::receive(WorkQueue &queue, Hash hash)
 {
   auto i = memoize->values.find(hash);
   if (i == memoize->values.end()) {
@@ -74,7 +74,7 @@ void MemoizeHasher::receive(ThunkQueue &queue, Hash hash)
   }
 }
 
-void Thunk::eval(ThunkQueue &queue)
+void Thunk::eval(WorkQueue &queue)
 {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
@@ -130,7 +130,7 @@ void Thunk::eval(ThunkQueue &queue)
   }
 }
 
-void ThunkQueue::run() {
+void WorkQueue::run() {
   while (!queue.empty()) {
     queue.front().eval(*this);
     queue.pop();

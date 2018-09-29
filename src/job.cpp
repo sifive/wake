@@ -48,15 +48,15 @@ struct JobResult : public Value {
   JobResult(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline);
 
   void stream(std::ostream &os) const;
-  void hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher);
+  void hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher);
 
-  void process(ThunkQueue &queue); // Run commands based on state
+  void process(WorkQueue &queue); // Run commands based on state
 };
 
 const char *JobResult::type = "JobResult";
 
 void JobResult::stream(std::ostream &os) const { os << "JobResult(" << job << ")"; }
-void JobResult::hash(ThunkQueue &queue, std::unique_ptr<Hasher> hasher) { Hasher::receive(queue, std::move(hasher), code); }
+void JobResult::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) { Hasher::receive(queue, std::move(hasher), code); }
 
 // A Task is a job that is not yet forked
 struct Task {
@@ -209,7 +209,7 @@ static void launch(JobTable *jobtable) {
   }
 }
 
-bool JobTable::wait(ThunkQueue &queue) {
+bool JobTable::wait(WorkQueue &queue) {
   char buffer[4096];
 
   while (1) {
@@ -332,7 +332,7 @@ JobResult::JobResult(Database *db_, const std::string &dir, const std::string &s
   HASH(codes.data(), 8*codes.size(), (long)type, code);
 }
 
-static std::unique_ptr<Receiver> cast_jobresult(ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, JobResult **job) {
+static std::unique_ptr<Receiver> cast_jobresult(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, JobResult **job) {
   if (value->type != JobResult::type) {
     Receiver::receiveM(queue, std::move(completion),
       std::make_shared<Exception>(value->to_str() + " is not a JobResult", binding));
@@ -423,7 +423,7 @@ static std::shared_ptr<Value> convert_tree(std::vector<FileReflection> &&files) 
   return make_list(std::move(vals));
 }
 
-void JobResult::process(ThunkQueue &queue) {
+void JobResult::process(WorkQueue &queue) {
   if ((state & STATE_STDOUT) && q_stdout) {
     auto out = std::make_shared<String>(db->get_output(job, 1));
     std::unique_ptr<Receiver> iter, next;

@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <sstream>
 
-std::unique_ptr<Receiver> require(const char *fn, ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, bool ok, const std::string &str_) {
+std::unique_ptr<Receiver> require(const char *fn, WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, bool ok, const std::string &str_) {
   if (!ok) {
     std::stringstream str;
     str << fn << ": " << str_ << std::endl;
@@ -16,7 +16,7 @@ std::unique_ptr<Receiver> require(const char *fn, ThunkQueue &queue, std::unique
   return completion;
 }
 
-std::unique_ptr<Receiver> expect_args(const char *fn, ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::vector<std::shared_ptr<Value> > &args, int expect) {
+std::unique_ptr<Receiver> expect_args(const char *fn, WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::vector<std::shared_ptr<Value> > &args, int expect) {
   if (args.size() != (size_t)expect) {
     std::stringstream str;
     str << fn << " called on " << args.size() << "; was expecting " << expect << std::endl;
@@ -40,7 +40,7 @@ std::unique_ptr<Receiver> expect_args(const char *fn, ThunkQueue &queue, std::un
   }
 }
 
-std::unique_ptr<Receiver> cast_string(ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, String **str) {
+std::unique_ptr<Receiver> cast_string(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, String **str) {
   if (value->type != String::type) {
     std::stringstream str;
     str << value << " is not a String";
@@ -52,7 +52,7 @@ std::unique_ptr<Receiver> cast_string(ThunkQueue &queue, std::unique_ptr<Receive
   }
 }
 
-std::unique_ptr<Receiver> cast_integer(ThunkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Integer **in) {
+std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Integer **in) {
   if (value->type != Integer::type) {
     std::stringstream str;
     str << value << " is not an Integer";
