@@ -25,7 +25,7 @@ void RegExp::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) {
 
 static std::unique_ptr<Receiver> cast_regexp(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, RegExp **reg) {
   if (value->type != RegExp::type) {
-    Receiver::receiveM(queue, std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a RegExp", binding));
+    Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a RegExp", binding));
     return std::unique_ptr<Receiver>();
   } else {
     *reg = reinterpret_cast<RegExp*>(value.get());

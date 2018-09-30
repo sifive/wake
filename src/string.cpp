@@ -29,7 +29,7 @@ void CatStream::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) {
 
 static std::unique_ptr<Receiver> cast_catstream(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, CatStream **cat) {
   if (value->type != CatStream::type) {
-    Receiver::receiveM(queue, std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a CatStream", binding));
+    Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a CatStream", binding));
     return std::unique_ptr<Receiver>();
   } else {
     *cat = reinterpret_cast<CatStream*>(value.get());

@@ -334,7 +334,7 @@ JobResult::JobResult(Database *db_, const std::string &dir, const std::string &s
 
 static std::unique_ptr<Receiver> cast_jobresult(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, JobResult **job) {
   if (value->type != JobResult::type) {
-    Receiver::receiveM(queue, std::move(completion),
+    Receiver::receive(queue, std::move(completion),
       std::make_shared<Exception>(value->to_str() + " is not a JobResult", binding));
     return std::unique_ptr<Receiver>();
   } else {
@@ -429,7 +429,7 @@ void JobResult::process(WorkQueue &queue) {
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_stdout); iter; iter = std::move(next)) {
       next = std::move(iter->next);
-      Receiver::receiveC(queue, std::move(iter), out);
+      Receiver::receive(queue, std::move(iter), out);
     }
     q_stdout.reset();
   }
@@ -439,7 +439,7 @@ void JobResult::process(WorkQueue &queue) {
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_stderr); iter; iter = std::move(next)) {
       next = std::move(iter->next);
-      Receiver::receiveC(queue, std::move(iter), out);
+      Receiver::receive(queue, std::move(iter), out);
     }
     q_stderr.reset();
   }
@@ -449,7 +449,7 @@ void JobResult::process(WorkQueue &queue) {
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_merge); iter; iter = std::move(next)) {
       next = std::move(iter->next);
-      Receiver::receiveC(queue, std::move(iter), out);
+      Receiver::receive(queue, std::move(iter), out);
     }
     q_merge.reset();
   }
@@ -460,7 +460,7 @@ void JobResult::process(WorkQueue &queue) {
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_inputs); iter; iter = std::move(next)) {
       next = std::move(iter->next);
-      Receiver::receiveC(queue, std::move(iter), out);
+      Receiver::receive(queue, std::move(iter), out);
     }
     q_inputs.reset();
   }
@@ -471,7 +471,7 @@ void JobResult::process(WorkQueue &queue) {
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_outputs); iter; iter = std::move(next)) {
       next = std::move(iter->next);
-      Receiver::receiveC(queue, std::move(iter), out);
+      Receiver::receive(queue, std::move(iter), out);
     }
     q_outputs.reset();
   }

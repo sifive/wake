@@ -10,7 +10,7 @@ std::unique_ptr<Receiver> require(const char *fn, WorkQueue &queue, std::unique_
   if (!ok) {
     std::stringstream str;
     str << fn << ": " << str_ << std::endl;
-    Receiver::receiveM(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
+    Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
     return std::unique_ptr<Receiver>();
   }
   return completion;
@@ -20,7 +20,7 @@ std::unique_ptr<Receiver> expect_args(const char *fn, WorkQueue &queue, std::uni
   if (args.size() != (size_t)expect) {
     std::stringstream str;
     str << fn << " called on " << args.size() << "; was expecting " << expect << std::endl;
-    Receiver::receiveM(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
+    Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
     return std::unique_ptr<Receiver>();
   }
 
@@ -35,7 +35,7 @@ std::unique_ptr<Receiver> expect_args(const char *fn, WorkQueue &queue, std::uni
   if (exception->causes.empty()) {
     return completion;
   } else {
-    Receiver::receiveM(queue, std::move(completion), std::move(exception));
+    Receiver::receive(queue, std::move(completion), std::move(exception));
     return std::unique_ptr<Receiver>();
   }
 }
@@ -44,7 +44,7 @@ std::unique_ptr<Receiver> cast_string(WorkQueue &queue, std::unique_ptr<Receiver
   if (value->type != String::type) {
     std::stringstream str;
     str << value << " is not a String";
-    Receiver::receiveM(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
+    Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
     return std::unique_ptr<Receiver>();
   } else {
     *str = reinterpret_cast<String*>(value.get());
@@ -56,7 +56,7 @@ std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receive
   if (value->type != Integer::type) {
     std::stringstream str;
     str << value << " is not an Integer";
-    Receiver::receiveM(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
+    Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
     return std::unique_ptr<Receiver>();
   } else {
     *in = reinterpret_cast<Integer*>(value.get());

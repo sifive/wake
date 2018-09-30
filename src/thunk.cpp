@@ -14,15 +14,15 @@ struct Application : public Receiver {
 
 void Application::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
   if (value->type == Exception::type) {
-    Receiver::receiveM(queue, std::move(receiver), std::move(value));
+    Receiver::receive(queue, std::move(receiver), std::move(value));
   } else if (value->type != Closure::type) {
     auto exception = std::make_shared<Exception>("Attempt to apply " + value->to_str() + " which is not a Closure", args->invoker);
-    Receiver::receiveM(queue, std::move(receiver), std::move(exception));
+    Receiver::receive(queue, std::move(receiver), std::move(exception));
   } else {
     Closure *clo = reinterpret_cast<Closure*>(value.get());
     args->next = clo->binding;
     args->expr = clo->body;
-    queue.queue.emplace(clo->body, std::move(args), std::move(receiver));
+    queue.emplace(clo->body, std::move(args), std::move(receiver));
   }
 }
 
@@ -68,14 +68,13 @@ void MemoizeHasher::receive(WorkQueue &queue, Hash hash)
   if (i == memoize->values.end()) {
     Future &future = memoize->values[hash];
     future.depend(queue, std::move(receiver));
-    queue.queue.emplace(memoize->body.get(), std::move(binding), future.make_completer());
+    queue.emplace(memoize->body.get(), std::move(binding), future.make_completer());
   } else {
     i->second.depend(queue, std::move(receiver));
   }
 }
 
-void Thunk::eval(WorkQueue &queue)
-{
+void Thunk::eval(WorkQueue &queue) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     std::shared_ptr<Binding> *iter = &binding;
@@ -85,20 +84,20 @@ void Thunk::eval(WorkQueue &queue)
     if (ref->offset >= vals) {
       auto defs = reinterpret_cast<DefBinding*>((*iter)->expr);
       auto closure = std::make_shared<Closure>(defs->fun[ref->offset-vals]->body.get(), *iter);
-      Receiver::receiveM(queue, std::move(receiver), std::move(closure));
+      Receiver::receive(queue, std::move(receiver), std::move(closure));
     } else {
       (*iter)->future[ref->offset].depend(queue, std::move(receiver));
     }
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
     auto args = std::make_shared<Binding>(nullptr, queue.stack_trace?binding:nullptr, nullptr, 1);
-    queue.queue.emplace(app->val.get(), binding, Binding::make_completer(args, 0));
-    queue.queue.emplace(app->fn .get(), std::move(binding), std::unique_ptr<Receiver>(
+    queue.emplace(app->val.get(), binding, Binding::make_completer(args, 0));
+    queue.emplace(app->fn .get(), std::move(binding), std::unique_ptr<Receiver>(
       new Application(std::move(args), std::move(receiver))));
   } else if (expr->type == Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     auto closure = std::make_shared<Closure>(lambda->body.get(), binding);
-    Receiver::receiveM(queue, std::move(receiver), std::move(closure));
+    Receiver::receive(queue, std::move(receiver), std::move(closure));
   } else if (expr->type == Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
     Binding::hash(queue, binding, std::unique_ptr<Hasher>(new MemoizeHasher(std::move(receiver), binding, memoize)));
@@ -107,11 +106,11 @@ void Thunk::eval(WorkQueue &queue)
     auto defs = std::make_shared<Binding>(binding, queue.stack_trace?binding:nullptr, defbinding, defbinding->val.size());
     int j = 0;
     for (auto &i : defbinding->val)
-      queue.queue.emplace(i.get(), binding, Binding::make_completer(defs, j++));
-    queue.queue.emplace(defbinding->body.get(), std::move(defs), std::move(receiver));
+      queue.emplace(i.get(), binding, Binding::make_completer(defs, j++));
+    queue.emplace(defbinding->body.get(), std::move(defs), std::move(receiver));
   } else if (expr->type == Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
-    Receiver::receiveC(queue, std::move(receiver), lit->value);
+    Receiver::receive(queue, std::move(receiver), lit->value);
   } else if (expr->type == Prim::type) {
     Prim *prim = reinterpret_cast<Prim*>(expr);
     // Cut the scope of primitive to only it's own arguments
@@ -130,9 +129,37 @@ void Thunk::eval(WorkQueue &queue)
   }
 }
 
+void Receive::eval(WorkQueue &queue) {
+  receiver->receive(queue, std::move(value));
+}
+
 void WorkQueue::run() {
-  while (!queue.empty()) {
-    queue.front().eval(*this);
-    queue.pop();
+  while (!receives.empty()) {
+    receives.front().eval(*this);
+    receives.pop();
   }
+  while (!thunks.empty()) {
+    thunks.front().eval(*this);
+    thunks.pop();
+    while (!receives.empty()) {
+      receives.front().eval(*this);
+      receives.pop();
+    }
+  }
+}
+
+void WorkQueue::emplace(Expr *expr, std::shared_ptr<Binding> &&binding, std::unique_ptr<Receiver> receiver) {
+  thunks.emplace(expr, std::move(binding), std::move(receiver));
+}
+
+void WorkQueue::emplace(Expr *expr, const std::shared_ptr<Binding> &binding, std::unique_ptr<Receiver> receiver) {
+  thunks.emplace(expr, std::shared_ptr<Binding>(binding), std::move(receiver));
+}
+
+void Receiver::receive(WorkQueue &queue, std::unique_ptr<Receiver> receiver, std::shared_ptr<Value> &&value) {
+  queue.receives.emplace(std::move(receiver), std::move(value));
+}
+
+void Receiver::receive(WorkQueue &queue, std::unique_ptr<Receiver> receiver, const std::shared_ptr<Value> &value) {
+  queue.receives.emplace(std::move(receiver), std::shared_ptr<Value>(value));
 }

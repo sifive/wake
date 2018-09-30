@@ -17,7 +17,7 @@ void Memoizer::receive(WorkQueue &queue, std::shared_ptr<Value> &&value)
   std::unique_ptr<Receiver> iter, next;
   for (iter = std::move(future->waiting); iter; iter = std::move(next)) {
     next = std::move(iter->next);
-    Receiver::receiveC(queue, std::move(iter), future->value);
+    Receiver::receive(queue, std::move(iter), future->value);
   }
 }
 
@@ -36,7 +36,7 @@ void Completer::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
   std::unique_ptr<Receiver> iter, next;
   for (iter = std::move(future->waiting); iter; iter = std::move(next)) {
     next = std::move(iter->next);
-    Receiver::receiveC(queue, std::move(iter), future->value);
+    Receiver::receive(queue, std::move(iter), future->value);
   }
 }
 

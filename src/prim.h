@@ -14,7 +14,7 @@ struct Integer;
 
 /* Macros for handling inputs from wake */
 #define RETURN(val) do {						\
-  Receiver::receiveM(queue, std::move(completion), std::move(val));	\
+  Receiver::receive(queue, std::move(completion), std::move(val));	\
   return;								\
 } while (0)
 

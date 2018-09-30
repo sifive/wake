@@ -15,15 +15,12 @@ struct Receiver {
   std::unique_ptr<Receiver> next; // for wait Q
   virtual ~Receiver();
 
-  static void receiveM(WorkQueue &queue, std::unique_ptr<Receiver> receiver, std::shared_ptr<Value> &&value) {
-    receiver->receive(queue, std::move(value));
-  }
-  static void receiveC(WorkQueue &queue, std::unique_ptr<Receiver> receiver, std::shared_ptr<Value> value) {
-    receiver->receive(queue, std::move(value));
-  }
+  static void receive(WorkQueue &queue, std::unique_ptr<Receiver> receiver, std::shared_ptr<Value> &&value);
+  static void receive(WorkQueue &queue, std::unique_ptr<Receiver> receiver, const std::shared_ptr<Value> &value);
 
 protected:
   virtual void receive(WorkQueue &queue, std::shared_ptr<Value> &&value) = 0;
+friend struct Receive;
 };
 
 struct Future {
@@ -31,7 +28,7 @@ struct Future {
 
   void depend(WorkQueue &queue, std::unique_ptr<Receiver> receiver) {
     if (value) {
-      Receiver::receiveC(queue, std::move(receiver), value);
+      Receiver::receive(queue, std::move(receiver), value);
     } else {
       receiver->next = std::move(waiting);
       waiting = std::move(receiver);
