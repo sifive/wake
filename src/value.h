@@ -15,18 +15,6 @@ struct Binding;
 struct Location;
 struct WorkQueue;
 
-struct Hasher {
-  std::unique_ptr<Hasher> next;
-  virtual ~Hasher();
-
-  static void receive(WorkQueue &queue, std::unique_ptr<Hasher> hasher, Hash hash) {
-    hasher->receive(queue, hash);
-  }
-
-protected:
-  virtual void receive(WorkQueue &queue, Hash hash) = 0;
-};
-
 struct Value {
   const char *type;
 
@@ -35,7 +23,7 @@ struct Value {
 
   std::string to_str() const;
   virtual void stream(std::ostream &os) const = 0;
-  virtual void hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) = 0;
+  virtual Hash hash() const = 0;
 };
 
 std::ostream & operator << (std::ostream &os, const Value *value);
@@ -48,7 +36,7 @@ struct String : public Value {
   String(std::string &&value_) : Value(type), value(std::move(value_)) { }
 
   void stream(std::ostream &os) const;
-  void hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher);
+  Hash hash() const;
 };
 
 struct Integer : public Value {
@@ -62,7 +50,7 @@ struct Integer : public Value {
 
   std::string str(int base = 10) const;
   void stream(std::ostream &os) const;
-  void hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher);
+  Hash hash() const;
 };
 
 struct Closure : public Value {
@@ -72,7 +60,7 @@ struct Closure : public Value {
   static const char *type;
   Closure(Expr *body_, const std::shared_ptr<Binding> &binding_) : Value(type), body(body_), binding(binding_) { }
   void stream(std::ostream &os) const;
-  void hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher);
+  Hash hash() const;
 };
 
 struct Cause {
@@ -94,7 +82,7 @@ struct Exception : public Value {
   }
 
   void stream(std::ostream &os) const;
-  void hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher);
+  Hash hash() const;
 };
 
 #endif

@@ -15,16 +15,16 @@ struct CatStream : public Value {
   CatStream() : Value(type) { }
 
   void stream(std::ostream &os) const;
-  void hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher);
+  Hash hash() const;
 };
 const char *CatStream::type = "CatStream";
 
 void CatStream::stream(std::ostream &os) const { os << "CatStream(" << str.str() << ")"; }
-void CatStream::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) {
+Hash CatStream::hash() const {
   Hash payload;
   std::string data = str.str();
   HASH(data.data(), data.size(), (long)type, payload);
-  Hasher::receive(queue, std::move(hasher), payload);
+  return payload;
 }
 
 static std::unique_ptr<Receiver> cast_catstream(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, CatStream **cat) {

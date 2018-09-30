@@ -6,7 +6,6 @@
 #include <sstream>
 #include <cassert>
 
-Hasher::~Hasher() { }
 Value::~Value() { }
 const char *String::type = "String";
 const char *Integer::type = "Integer";
@@ -43,48 +42,39 @@ void Exception::stream(std::ostream &os) const {
   os << ")" << std::endl;
 }
 
-void String::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) {
+Hash String::hash() const {
   Hash payload;
   HASH(value.data(), value.size(), (long)type, payload);
-  Hasher::receive(queue, std::move(hasher), payload);
+  return payload;
 }
 
-void Integer::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) {
+Hash Integer::hash() const {
   Hash payload;
   HASH(value[0]._mp_d, abs(value[0]._mp_size)*sizeof(mp_limb_t), (long)type, payload);
-  Hasher::receive(queue, std::move(hasher), payload);
+  return payload;
 }
 
-void Exception::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) {
+Hash Exception::hash() const {
   Hash payload;
   std::string str = to_str();
   HASH(str.data(), str.size(), (long)type, payload);
-  Hasher::receive(queue, std::move(hasher), payload);
+  return payload;
 }
 
-struct ClosureHasher : public Hasher {
-  std::unique_ptr<Hasher> chain;
-  Expr *body;
-  ClosureHasher(std::unique_ptr<Hasher> chain_, Expr *body_) : chain(std::move(chain_)), body(body_) { }
-  void receive(WorkQueue &queue, Hash hash) {
-    std::vector<uint64_t> codes;
-    Hash out;
-    hash.push(codes);
-    body->hashcode.push(codes);
-    HASH(codes.data(), 8*codes.size(), (long)Closure::type, out);
-    Hasher::receive(queue, std::move(chain), out);
-  }
-};
-
-void Closure::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) {
-  Binding::hash(queue, binding, std::unique_ptr<Hasher>(new ClosureHasher(std::move(hasher), body)));
+Hash Closure::hash() const {
+  Hash out;
+  std::vector<uint64_t> codes;
+  body->hashcode.push(codes);
+  binding->hash().push(codes);
+  HASH(codes.data(), 8*codes.size(), (long)Closure::type, out);
+  return out;
 }
 
 Cause::Cause(const std::string &reason_, std::vector<Location> &&stack_)
  : reason(reason_), stack(std::move(stack_)) { }
 
 Exception::Exception(const std::string &reason, const std::shared_ptr<Binding> &binding) : Value(type) {
-  causes.emplace_back(std::make_shared<Cause>(reason, Binding::stack_trace(binding)));
+  causes.emplace_back(std::make_shared<Cause>(reason, binding->stack_trace()));
 }
 
 std::string Integer::str(int base) const {

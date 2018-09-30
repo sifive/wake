@@ -11,7 +11,7 @@ struct Hash {
     out.push_back(data[0]);
     out.push_back(data[1]);
   }
-  operator bool () { return data[0] || data[1]; }
+  operator bool () const { return data[0] || data[1]; }
 };
 
 static inline bool operator < (const Hash &x, const Hash &y) {

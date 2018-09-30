@@ -48,7 +48,7 @@ struct JobResult : public Value {
   JobResult(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline);
 
   void stream(std::ostream &os) const;
-  void hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher);
+  Hash hash() const;
 
   void process(WorkQueue &queue); // Run commands based on state
 };
@@ -56,7 +56,7 @@ struct JobResult : public Value {
 const char *JobResult::type = "JobResult";
 
 void JobResult::stream(std::ostream &os) const { os << "JobResult(" << job << ")"; }
-void JobResult::hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher) { Hasher::receive(queue, std::move(hasher), code); }
+Hash JobResult::hash() const { return code; }
 
 // A Task is a job that is not yet forked
 struct Task {
@@ -364,7 +364,7 @@ static PRIMFN(prim_job_launch) {
   REQUIRE(mpz_cmp_si(pool->value, POOLS) < 0, "Pool must be < POOLS");
 
   std::stringstream stack;
-  for (auto &i : Binding::stack_trace(binding)) stack << i << std::endl;
+  for (auto &i : binding->stack_trace()) stack << i << std::endl;
   auto out = std::make_shared<JobResult>(
     jobtable->imp->db,
     dir->value,

@@ -216,7 +216,7 @@ int main(int argc, const char **argv) {
   outputs.reserve(targets.size());
   Binding *iter = reinterpret_cast<Closure*>(output.get())->binding.get();
   for (size_t i = 0; i < targets.size(); ++i) {
-    outputs.emplace_back(iter->future[0].output());
+    outputs.emplace_back(iter->future[0].value);
     iter = iter->next.get();
   }
 

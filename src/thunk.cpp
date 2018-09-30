@@ -26,44 +26,37 @@ void Application::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
   }
 }
 
-struct Primitive : public Receiver {
-  std::vector<std::shared_ptr<Value> > args;
+struct Primitive : public Finisher {
   std::unique_ptr<Receiver> receiver;
   std::shared_ptr<Binding> binding;
   Prim *prim;
-  void receive(WorkQueue &queue, std::shared_ptr<Value> &&value);
-  Primitive(std::vector<std::shared_ptr<Value> > &&args_, std::unique_ptr<Receiver> receiver_, std::shared_ptr<Binding> &&binding_, Prim *prim_)
-   : args(std::move(args_)), receiver(std::move(receiver_)), binding(std::move(binding_)), prim(prim_) { }
+  void finish(WorkQueue &queue);
+  Primitive(std::unique_ptr<Receiver> receiver_, std::shared_ptr<Binding> &&binding_, Prim *prim_)
+   : receiver(std::move(receiver_)), binding(std::move(binding_)), prim(prim_) { }
 };
 
-static void chain_app(WorkQueue &queue, std::unique_ptr<Receiver> receiver, Prim *prim, std::shared_ptr<Binding> &&binding, std::vector<std::shared_ptr<Value> > &&args) {
-  int idx = args.size();
-  if (idx == prim->args) {
-    prim->fn(prim->data, queue, std::move(receiver), std::move(binding), std::move(args));
-  } else {
-    Binding *arg = binding.get();
-    for (int i = idx+1; i < prim->args; ++i) arg = arg->next.get();
-    arg->future[0].depend(queue, std::unique_ptr<Receiver>(
-      new Primitive(std::move(args), std::move(receiver), std::move(binding), prim)));
+void Primitive::finish(WorkQueue &queue) {
+  std::vector<std::shared_ptr<Value> > args(prim->args);
+  Binding *iter = binding.get();
+  for (int i = prim->args-1; i >= 0; --i) {
+    args[i] = iter->future[0].value;
+    iter = iter->next.get();
   }
+  prim->fn(prim->data, queue, std::move(receiver), std::move(binding), std::move(args));
 }
 
-void Primitive::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
-  args.emplace_back(std::move(value));
-  chain_app(queue, std::move(receiver), prim, std::move(binding), std::move(args));
-}
-
-struct MemoizeHasher : public Hasher {
+struct Hasher : public Finisher {
   std::unique_ptr<Receiver> receiver;
   std::shared_ptr<Binding> binding;
   Memoize *memoize;
-  MemoizeHasher(std::unique_ptr<Receiver> receiver_, const std::shared_ptr<Binding> &binding_, Memoize *memoize_)
-   : receiver(std::move(receiver_)), binding(binding_), memoize(memoize_) { }
-  void receive(WorkQueue &queue, Hash hash);
+  Hasher(std::unique_ptr<Receiver> receiver_, std::shared_ptr<Binding> &&binding_, Memoize *memoize_)
+   : receiver(std::move(receiver_)), binding(std::move(binding_)), memoize(memoize_) { }
+  void finish(WorkQueue &queue);
 };
 
-void MemoizeHasher::receive(WorkQueue &queue, Hash hash)
+void Hasher::finish(WorkQueue &queue)
 {
+  Hash hash = binding->hash();
   auto i = memoize->values.find(hash);
   if (i == memoize->values.end()) {
     Future &future = memoize->values[hash];
@@ -100,7 +93,8 @@ void Thunk::eval(WorkQueue &queue) {
     Receiver::receive(queue, std::move(receiver), std::move(closure));
   } else if (expr->type == Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
-    Binding::hash(queue, binding, std::unique_ptr<Hasher>(new MemoizeHasher(std::move(receiver), binding, memoize)));
+    binding->wait(queue, std::unique_ptr<Finisher>(
+      new Hasher(std::move(receiver), std::move(binding), memoize)));
   } else if (expr->type == DefBinding::type) {
     DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
     auto defs = std::make_shared<Binding>(binding, queue.stack_trace?binding:nullptr, defbinding, defbinding->val.size());
@@ -121,9 +115,8 @@ void Thunk::eval(WorkQueue &queue) {
       for (int i = 1; i < prim->args; ++i) iter = iter->next.get();
       iter->next.reset();
     }
-    std::vector<std::shared_ptr<Value> > args;
-    args.reserve(prim->args);
-    chain_app(queue, std::move(receiver), prim, std::move(binding), std::move(args));
+    binding->wait(queue, std::unique_ptr<Finisher>(
+      new Primitive(std::move(receiver), std::move(binding), prim)));
   } else {
     assert(0 /* unreachable */);
   }

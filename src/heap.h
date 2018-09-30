@@ -9,23 +9,42 @@ struct Value;
 struct WorkQueue;
 struct Expr;
 struct Location;
-struct Hasher;
 
+// Wait for a value
 struct Receiver {
-  std::unique_ptr<Receiver> next; // for wait Q
   virtual ~Receiver();
+  std::unique_ptr<Receiver> next; // for wait Q
 
   static void receive(WorkQueue &queue, std::unique_ptr<Receiver> receiver, std::shared_ptr<Value> &&value);
   static void receive(WorkQueue &queue, std::unique_ptr<Receiver> receiver, const std::shared_ptr<Value> &value);
 
 protected:
   virtual void receive(WorkQueue &queue, std::shared_ptr<Value> &&value) = 0;
+
+private:
 friend struct Receive;
+};
+
+// Wait for a binding to be recursively finished
+struct Finisher {
+  virtual ~Finisher();
+
+  static void finish(WorkQueue &queue, std::unique_ptr<Finisher> finisher) {
+    finisher->finish(queue);
+  }
+
+protected:
+  virtual void finish(WorkQueue &queue) = 0;
+
+private:
+  std::unique_ptr<Finisher> next;
+friend struct Binding;
 };
 
 struct Future {
   Future() { }
 
+  std::shared_ptr<Value> value;
   void depend(WorkQueue &queue, std::unique_ptr<Receiver> receiver) {
     if (value) {
       Receiver::receive(queue, std::move(receiver), value);
@@ -35,39 +54,39 @@ struct Future {
     }
   }
 
-  // use only if nothing has depended on this yet
-  void assign(const std::shared_ptr<Value> &value_) {
-    value = std::move(value_);
-  }
-
-  // use only after evaluation has completed
-  std::shared_ptr<Value> output() { return value; }
-
-  // Only for use by memoization:
-  void hash(WorkQueue &queue, std::unique_ptr<Hasher> hasher);
+  // for use with Memoize::values
   std::unique_ptr<Receiver> make_completer();
 
 private:
-  std::shared_ptr<Value> value;
+  void broadcast(WorkQueue &queue, std::shared_ptr<Value> &&value_);
   std::unique_ptr<Receiver> waiting;
 friend struct Completer;
-friend struct Memoizer;
 };
 
 struct Binding {
-  std::shared_ptr<Binding> next;
-  std::shared_ptr<Binding> invoker;
-  std::unique_ptr<Future[]> future;
-  std::unique_ptr<Hasher> hasher;
+  std::shared_ptr<Binding> next;      // lexically enclosing scope
+  std::shared_ptr<Binding> invoker;   // for stack tracing
+  std::unique_ptr<Finisher> finisher; // list of callbacks awaiting finished values
+  std::unique_ptr<Future[]> future;   // variable values
+  mutable Hash hashcode;
   Expr *expr;
-  Hash hashcode;
   int nargs;
+  int state; // count first completions, then finishes
 
   Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Expr *expr_, int nargs_);
 
   static std::unique_ptr<Receiver> make_completer(const std::shared_ptr<Binding> &binding, int arg);
-  static std::vector<Location> stack_trace(const std::shared_ptr<Binding> &binding);
-  static void hash(WorkQueue &queue, const std::shared_ptr<Binding> &binding, std::unique_ptr<Hasher> hasher_);
+
+  std::vector<Location> stack_trace() const;
+  void format(std::ostream &os, int depth) const;
+
+  void wait(WorkQueue &queue, std::unique_ptr<Finisher> finisher);
+  Hash hash() const; // call only after 'wait'
+
+  void future_completed(WorkQueue &queue);
+  void future_finished(WorkQueue &queue);
 };
+
+std::ostream & operator << (std::ostream &os, const Binding *binding);
 
 #endif

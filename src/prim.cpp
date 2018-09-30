@@ -80,8 +80,8 @@ std::shared_ptr<Value> make_false() {
 static std::unique_ptr<Expr> ePair(new App(LOCATION, new App(LOCATION, new VarRef(LOCATION, "_", 0, 0), new VarRef(LOCATION, "_", 1, 0)), new VarRef(LOCATION, "_", 1, 1)));
 std::shared_ptr<Value> make_tuple(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second) {
   auto binding = std::make_shared<Binding>(nullptr, nullptr, ePair.get(), 2);
-  binding->future[0].assign(std::move(first));
-  binding->future[1].assign(std::move(second));
+  binding->future[0].value = std::move(first);
+  binding->future[1].value = std::move(second);
   return std::make_shared<Closure>(ePair.get(), binding);
 }
 
@@ -91,8 +91,8 @@ std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values) 
   auto out = std::make_shared<Closure>(eNill.get(), nullptr);
   for (auto i = values.rbegin(); i != values.rend(); ++i) {
     auto binding = std::make_shared<Binding>(nullptr, nullptr, eNill.get(), 2);
-    binding->future[0].assign(std::move(*i));
-    binding->future[1].assign(std::move(out));
+    binding->future[0].value = std::move(*i);
+    binding->future[1].value = std::move(out);
     out = std::make_shared<Closure>(ePair.get(), binding);
   }
   return out;
