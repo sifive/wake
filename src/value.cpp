@@ -109,7 +109,10 @@ Hash Closure::hash() const {
   Hash out;
   std::vector<uint64_t> codes;
   lambda->hashcode.push(codes);
-  if (binding) binding->hash().push(codes);
+  if (binding) {
+    assert (binding->flags & FLAG_HASH_POST);
+    binding->hashcode.push(codes);
+  }
   HASH(codes.data(), 8*codes.size(), (long)Closure::type, out);
   return out;
 }

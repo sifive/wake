@@ -64,6 +64,8 @@ friend struct Completer;
 };
 
 #define FLAG_PRINTED	1
+#define FLAG_HASH_PRE	2
+#define FLAG_HASH_POST	4
 
 struct Binding {
   std::shared_ptr<Binding> next;      // lexically enclosing scope

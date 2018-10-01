@@ -2,6 +2,7 @@
 #include "location.h"
 #include "value.h"
 #include "expr.h"
+#include <cassert>
 
 Callback::~Callback() { }
 
@@ -75,12 +76,38 @@ void Binding::wait(WorkQueue &queue, std::unique_ptr<Finisher> finisher) {
 }
 
 Hash Binding::hash() const {
-  if (hashcode) return hashcode;
-  std::vector<uint64_t> codes;
-  if (next) next->hash().push(codes);
-  for (int arg = 0; arg < nargs; ++arg)
-    future[arg].value->hash().push(codes);
-  HASH(codes.data(), 8*codes.size(), 42, hashcode);
+  std::vector<const Binding*> stack;
+
+  // Post-order iterative DAG traversal
+  stack.push_back(this);
+  while (!stack.empty()) {
+    const Binding *top = stack.back();
+    if ((top->flags & FLAG_HASH_POST) != 0) {
+      // already finished
+      stack.pop_back();
+    } else if ((top->flags & FLAG_HASH_PRE) != 0) {
+      // children visited; compute hashcode
+      top->flags |= FLAG_HASH_POST;
+      std::vector<uint64_t> codes;
+      if (top->next) top->next->hashcode.push(codes);
+      for (int arg = 0; arg < top->nargs; ++arg)
+        top->future[arg].value->hash().push(codes);
+      HASH(codes.data(), 8*codes.size(), 42, top->hashcode);
+      stack.pop_back();
+    } else {
+      // explore children, NO POP
+      top->flags |= FLAG_HASH_PRE;
+      if (top->next) stack.push_back(top->next.get());
+      for (int arg = 0; arg < top->nargs; ++arg) {
+        Value *value = top->future[arg].value.get();
+        if (value->type != Closure::type) continue;
+        Binding *child = reinterpret_cast<Closure*>(value)->binding.get();
+        if (child) stack.push_back(child);
+        assert (!child || (child->flags & FLAG_HASH_POST) || !(child->flags & FLAG_HASH_PRE)); // cycle
+      }
+    }
+  }
+
   return hashcode;
 }
 
