@@ -87,7 +87,7 @@ std::string Database::open() {
     "  job_id  integer not null references jobs(job_id),"
     "  file_id integer not null," // implied by hashes constraint: references files(file_id)
     "  run_id  integer not null," // implied by hashes constraint: references runs(run_id)
-    "  primary key(access, job_id, file_id),"
+    "  primary key(job_id, access, file_id),"
     "  foreign key(run_id, file_id) references hashes(run_id, file_id));"
     "create index if not exists filesearch on filetree(access, file_id);"
     "create temp table temptree("
@@ -154,7 +154,7 @@ std::string Database::open() {
   const char *sql_wipe_temp = "delete from temptree";
   const char *sql_find_owner =
     "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.time, j.status, j.runtime"
-    " from jobs j, filetree t, files f"
+    " from files f, filetree t, jobs j"
     " where f.path=? and t.access=? and t.file_id=f.file_id and j.job_id=t.job_id";
 
 #define PREPARE(sql, member)										\
