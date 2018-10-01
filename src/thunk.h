@@ -4,7 +4,7 @@
 #include <queue>
 #include <memory>
 
-// We need ~Receiver
+// We need ~Callback
 #include "heap.h"
 
 struct Binding;
@@ -22,11 +22,11 @@ struct Thunk {
 };
 
 struct Receive {
-  std::unique_ptr<Receiver> receiver;
+  std::unique_ptr<Callback> callback;
   std::shared_ptr<Value> value;
 
-  Receive(std::unique_ptr<Receiver> receiver_, std::shared_ptr<Value> &&value_)
-   : receiver(std::move(receiver_)), value(std::move(value_)) { }
+  Receive(std::unique_ptr<Callback> callback_, std::shared_ptr<Value> &&value_)
+   : callback(std::move(callback_)), value(std::move(value_)) { }
 
   void eval(WorkQueue &queue);
 };

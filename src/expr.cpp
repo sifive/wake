@@ -2,7 +2,6 @@
 #include "value.h"
 #include "hash.h"
 #include "thunk.h"
-#include <iostream>
 #include <cassert>
 #include <sstream>
 

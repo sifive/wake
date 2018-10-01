@@ -3,9 +3,7 @@
 #include "value.h"
 #include "expr.h"
 
-Receiver::~Receiver() { }
-
-Finisher::~Finisher() { }
+Callback::~Callback() { }
 
 struct Completer : public Receiver {
   std::shared_ptr<Binding> binding;
@@ -68,11 +66,10 @@ void Binding::wait(WorkQueue &queue, std::unique_ptr<Finisher> finisher) {
   if (iter) {
     finisher->next = std::move(iter->finisher);
     iter->finisher = std::move(finisher);
-    // ... urp. recursion here too?
+    // This can only cause recursion as deep as the deepest lexical scope
     if (iter->state == -iter->nargs)
       iter->future_finished(queue);
   } else {
-    // Push to queue here to break recursion ?
     Finisher::finish(queue, std::move(finisher));
   }
 }

@@ -62,7 +62,7 @@ global takeUntil f l = (splitUntil f l).first
 global dropUntil f l = (splitUntil f l).second
 global find f l = take 1 (dropUntil f l)
 global exists f l = !empty (dropUntil f l)
-global forall f l = empty (dropUntil (\x !f x) l)
+global forall f l = empty (dropUntil (!f _) l)
 
 global splitBy f l =
   if l.empty then pair nil nil else
@@ -233,7 +233,7 @@ def wrap result =
   def kill    r s   = prim "job_kill"   # s != 0 => kills; blocks till exit; return status
   def finish  r i o = prim "job_finish" # ignored except on first call; blocks till exit; returns true
   def tree    r i   = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
-  \f (f output kill finish tree) result
+  _ output kill finish tree $ result
 def    stdio   job = job (\x\_\_\_ x)
 def    tree    job = job (\_\_\_\x x)
 global kill    job = job (\_\x\_\_ x)

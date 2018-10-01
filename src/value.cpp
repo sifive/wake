@@ -2,7 +2,6 @@
 #include "expr.h"
 #include "heap.h"
 #include "hash.h"
-#include <iostream>
 #include <sstream>
 #include <cassert>
 

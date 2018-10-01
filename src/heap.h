@@ -10,9 +10,12 @@ struct WorkQueue;
 struct Expr;
 struct Location;
 
+struct Callback {
+  virtual ~Callback();
+};
+
 // Wait for a value
-struct Receiver {
-  virtual ~Receiver();
+struct Receiver : public Callback {
   std::unique_ptr<Receiver> next; // for wait Q
 
   static void receive(WorkQueue &queue, std::unique_ptr<Receiver> receiver, std::shared_ptr<Value> &&value);
@@ -26,12 +29,8 @@ friend struct Receive;
 };
 
 // Wait for a binding to be recursively finished
-struct Finisher {
-  virtual ~Finisher();
-
-  static void finish(WorkQueue &queue, std::unique_ptr<Finisher> finisher) {
-    finisher->finish(queue);
-  }
+struct Finisher : public Callback {
+  static void finish(WorkQueue &queue, std::unique_ptr<Finisher> finisher);
 
 protected:
   virtual void finish(WorkQueue &queue) = 0;
@@ -39,6 +38,7 @@ protected:
 private:
   std::unique_ptr<Finisher> next;
 friend struct Binding;
+friend struct Receive;
 };
 
 struct Future {

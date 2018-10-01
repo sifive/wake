@@ -125,7 +125,11 @@ void Thunk::eval(WorkQueue &queue) {
 }
 
 void Receive::eval(WorkQueue &queue) {
-  receiver->receive(queue, std::move(value));
+  if (value) {
+    reinterpret_cast<Receiver*>(callback.get())->receive(queue, std::move(value));
+  } else {
+    reinterpret_cast<Finisher*>(callback.get())->finish(queue);
+  }
 }
 
 void WorkQueue::run() {
@@ -157,4 +161,8 @@ void Receiver::receive(WorkQueue &queue, std::unique_ptr<Receiver> receiver, std
 
 void Receiver::receive(WorkQueue &queue, std::unique_ptr<Receiver> receiver, const std::shared_ptr<Value> &value) {
   queue.receives.emplace(std::move(receiver), std::shared_ptr<Value>(value));
+}
+
+void Finisher::finish(WorkQueue &queue, std::unique_ptr<Finisher> finisher) {
+  queue.receives.emplace(std::move(finisher), nullptr);
 }
