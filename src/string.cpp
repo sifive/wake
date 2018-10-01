@@ -21,8 +21,8 @@ struct CatStream : public Value {
 const char *CatStream::type = "CatStream";
 
 void CatStream::format(std::ostream &os, int depth) const {
-  (void)depth;
-  os << "CatStream(" << str.str() << ")" << std::endl;
+  os << "CatStream(" << str.str() << ")";
+  if (depth >= 0) os << std::endl;
 }
 
 Hash CatStream::hash() const {

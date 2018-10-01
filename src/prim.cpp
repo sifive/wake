@@ -43,7 +43,7 @@ std::unique_ptr<Receiver> expect_args(const char *fn, WorkQueue &queue, std::uni
 std::unique_ptr<Receiver> cast_string(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, String **str) {
   if (value->type != String::type) {
     std::stringstream str;
-    str << value << " is not a String";
+    str << value->to_str() << " is not a String";
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
     return std::unique_ptr<Receiver>();
   } else {
@@ -55,7 +55,7 @@ std::unique_ptr<Receiver> cast_string(WorkQueue &queue, std::unique_ptr<Receiver
 std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Integer **in) {
   if (value->type != Integer::type) {
     std::stringstream str;
-    str << value << " is not an Integer";
+    str << value->to_str() << " is not an Integer";
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
     return std::unique_ptr<Receiver>();
   } else {

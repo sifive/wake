@@ -17,7 +17,7 @@ Integer::~Integer() {
 
 std::string Value::to_str() const {
   std::stringstream str;
-  str << this;
+  format(str, -1);
   return str.str();
 }
 
@@ -31,18 +31,21 @@ static std::string pad(int depth) {
 }
 
 void String::format(std::ostream &os, int depth) const {
-  (void)depth;
-  os << "String(" << value << ")" << std::endl;
+  os << "String(" << value << ")";
+  if (depth >= 0) os << std::endl;
 }
 
 void Integer::format(std::ostream &os, int depth) const {
-  (void)depth;
-  os << "Integer(" << str() << ")" << std::endl;
+  os << "Integer(" << str() << ")";
+  if (depth >= 0) os << std::endl;
 }
 
 void Closure::format(std::ostream &os, int depth) const {
-  os << "Closure @ " << lambda->location << ":" << std::endl;
-  if (binding) binding->format(os, depth+2);
+  os << "Closure @ " << lambda->location;
+  if (depth >= 0) {
+    os << ":" << std::endl;
+    if (binding) binding->format(os, depth+2);
+  }
 }
 
 void Binding::format(std::ostream &os, int depth) const {
@@ -77,12 +80,17 @@ void Binding::format(std::ostream &os, int depth) const {
 }
 
 void Exception::format(std::ostream &os, int depth) const {
-  os << "Exception" << std::endl;
-  for (auto &i : causes) {
-    os << pad(depth+2) << i->reason << std::endl;
-    for (auto &j : i->stack) {
-      os << pad(depth+4) << "from " << j << std::endl;
+  os << "Exception";
+  if (depth >= 0) {
+    os << std::endl;
+    for (auto &i : causes) {
+      os << pad(depth+2) << i->reason << std::endl;
+      for (auto &j : i->stack) {
+        os << pad(depth+4) << "from " << j << std::endl;
+      }
     }
+  } else if (!causes.empty()) {
+    os << "(" << causes[0]->reason << ")";
   }
 }
 

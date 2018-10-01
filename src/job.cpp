@@ -56,8 +56,8 @@ struct JobResult : public Value {
 const char *JobResult::type = "JobResult";
 
 void JobResult::format(std::ostream &os, int depth) const {
-  (void)depth;
-  os << "JobResult(" << job << ")" << std::endl;
+  os << "JobResult(" << job << ")";
+  if (depth >= 0) os << std::endl;
 }
 
 Hash JobResult::hash() const { return code; }

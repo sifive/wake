@@ -21,8 +21,8 @@ struct Value {
   Value(const char *type_) : type(type_) { }
   virtual ~Value();
 
-  std::string to_str() const;
-  virtual void format(std::ostream &os, int depth) const = 0;
+  std::string to_str() const; // one-line version
+  virtual void format(std::ostream &os, int depth) const = 0; // depth=-1 means use one-line
   virtual Hash hash() const = 0;
 };
 

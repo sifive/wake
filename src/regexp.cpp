@@ -16,8 +16,8 @@ struct RegExp : public Value {
 const char *RegExp::type = "RegExp";
 
 void RegExp::format(std::ostream &os, int depth) const {
-  (void)depth;
-  os << "RegExp(" << exp.pattern() << ")" << std::endl;
+  os << "RegExp(" << exp.pattern() << ")";
+  if (depth >= 0) os << std::endl;
 }
 
 Hash RegExp::hash() const {
