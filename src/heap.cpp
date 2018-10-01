@@ -111,6 +111,37 @@ Hash Binding::hash() const {
   return hashcode;
 }
 
+static void flatten_orphan(Binding *top, std::shared_ptr<Binding> &&orphan) {
+  while (orphan.use_count() == 1) {
+    // this sort of pointer manipulation is safe because we hold the only reference
+    std::shared_ptr<Binding> deref = std::move(orphan->next);
+    orphan->next = std::move(top->next);
+    top->next = std::move(orphan);
+    orphan = std::move(deref);
+  }
+}
+
+static void flatten_orphans(Binding *top) {
+  top->flags |= FLAG_FLATTENED;
+  if (top->invoker == top->next) top->invoker.reset();
+  for (int arg = 0; arg < top->nargs; ++arg) {
+    std::shared_ptr<Value> &value = top->future[arg].value;
+    if (value.use_count() == 1 && value->type == Closure::type)
+      flatten_orphan(top, std::move(reinterpret_cast<Closure*>(value.get())->binding));
+    value.reset();
+  }
+  flatten_orphan(top, std::move(top->invoker));
+}
+
+Binding::~Binding() {
+  if ((flags & FLAG_FLATTENED) != 0) return;
+  flatten_orphans(this);
+  while (next.use_count() == 1) {
+    flatten_orphans(next.get());
+    next = std::move(next->next); // does not cause recursive ~Binding
+  }
+}
+
 void Binding::future_completed(WorkQueue &queue) {
   --state;
   if (state == -nargs && finisher)

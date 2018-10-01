@@ -66,6 +66,7 @@ friend struct Completer;
 #define FLAG_PRINTED	1
 #define FLAG_HASH_PRE	2
 #define FLAG_HASH_POST	4
+#define FLAG_FLATTENED	8
 
 struct Binding {
   std::shared_ptr<Binding> next;      // lexically enclosing scope
@@ -79,6 +80,7 @@ struct Binding {
   mutable int flags;
 
   Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Expr *expr_, int nargs_);
+  ~Binding();
 
   static std::unique_ptr<Receiver> make_completer(const std::shared_ptr<Binding> &binding, int arg);
 
