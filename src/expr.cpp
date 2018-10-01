@@ -109,7 +109,8 @@ void DefMap::hash() {
 }
 
 void Literal::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Literal(" << value.get() << ") @ " << location << std::endl;
+  os << pad(depth) << "Literal @ " << location << " = ";
+  value->format(os, depth);
 }
 
 void Literal::hash() {
