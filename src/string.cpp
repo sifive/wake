@@ -4,6 +4,7 @@
 #include "hash.h"
 #include <sstream>
 #include <fstream>
+#include <iostream>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -127,6 +128,22 @@ static PRIMFN(prim_mkdir) {
   RETURN(out);
 }
 
+static PRIMFN(prim_format) {
+  REQUIRE(args.size() == 1, "prim_format expects 1 argument");
+  std::stringstream buffer;
+  args[0]->format(buffer, 0);
+  auto out = std::make_shared<String>(buffer.str());
+  RETURN(out);
+}
+
+static PRIMFN(prim_print) {
+  EXPECT(1);
+  STRING(arg0, 0);
+  std::cerr << arg0->value;
+  auto out = make_true();
+  RETURN(out);
+}
+
 void prim_register_string(PrimMap &pmap) {
   pmap["catopen" ].first = prim_catopen;
   pmap["catadd"  ].first = prim_catadd;
@@ -135,4 +152,6 @@ void prim_register_string(PrimMap &pmap) {
   pmap["read"    ].first = prim_read;
   pmap["getenv"  ].first = prim_getenv;
   pmap["mkdir"   ].first = prim_mkdir;
+  pmap["format"  ].first = prim_format;
+  pmap["print"   ].first = prim_print;
 }
