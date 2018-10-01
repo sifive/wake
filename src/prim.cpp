@@ -82,6 +82,7 @@ std::shared_ptr<Value> make_tuple(std::shared_ptr<Value> &&first, std::shared_pt
   auto binding = std::make_shared<Binding>(nullptr, nullptr, ePair.get(), 2);
   binding->future[0].value = std::move(first);
   binding->future[1].value = std::move(second);
+  binding->state = 2;
   return std::make_shared<Closure>(ePair.get(), binding);
 }
 
@@ -93,6 +94,7 @@ std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values) 
     auto binding = std::make_shared<Binding>(nullptr, nullptr, eNill.get(), 2);
     binding->future[0].value = std::move(*i);
     binding->future[1].value = std::move(out);
+    binding->state = 2;
     out = std::make_shared<Closure>(ePair.get(), binding);
   }
   return out;

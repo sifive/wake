@@ -77,9 +77,11 @@ void Binding::wait(WorkQueue &queue, std::unique_ptr<Finisher> finisher) {
   if (iter) {
     finisher->next = std::move(iter->finisher);
     iter->finisher = std::move(finisher);
+    // ... urp. recursion here too?
     if (iter->state == -iter->nargs)
       iter->future_finished(queue);
   } else {
+    // Push to queue here to break recursion ?
     Finisher::finish(queue, std::move(finisher));
   }
 }
@@ -102,6 +104,7 @@ void Binding::future_completed(WorkQueue &queue) {
 
 void Binding::future_finished(WorkQueue &queue) {
   if (state < 0) state = 0;
+
   while (state < nargs &&
     (future[state].value->type != Closure::type ||
      !reinterpret_cast<Closure*>(future[state].value.get())->binding)) {
@@ -109,22 +112,11 @@ void Binding::future_finished(WorkQueue &queue) {
   }
 
   if (state == nargs) {
-    Binding *wait;
-    for (wait = next.get(); wait; wait = wait->next.get())
-      if (wait->state != wait->nargs) break;
-    std::unique_ptr<Finisher> iter, next;
-    for (iter = std::move(finisher); iter; iter = std::move(next)) {
-      next = std::move(iter->next);
-      if (wait) {
-        iter->next = std::move(wait->finisher);
-        wait->finisher = std::move(iter);
-      } else {
-        Finisher::finish(queue, std::move(iter));
-      }
+    std::unique_ptr<Finisher> iter, iter_next;
+    for (iter = std::move(finisher); iter; iter = std::move(iter_next)) {
+      iter_next = std::move(iter->next);
+      next->wait(queue, std::move(iter));
     }
-    // !!! recursion is bad
-    if (wait && wait->finisher && wait->state == -wait->nargs)
-      wait->future_finished(queue);
   } else {
     Closure *closure = reinterpret_cast<Closure*>(future[state].value.get());
     closure->binding->wait(queue, std::unique_ptr<Finisher>(new ChildFinisher(this)));

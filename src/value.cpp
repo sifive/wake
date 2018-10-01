@@ -65,7 +65,7 @@ Hash Closure::hash() const {
   Hash out;
   std::vector<uint64_t> codes;
   body->hashcode.push(codes);
-  binding->hash().push(codes);
+  if (binding) binding->hash().push(codes);
   HASH(codes.data(), 8*codes.size(), (long)Closure::type, out);
   return out;
 }

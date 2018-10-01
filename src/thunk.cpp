@@ -2,7 +2,6 @@
 #include "expr.h"
 #include "value.h"
 #include <cassert>
-#include <iostream>
 
 struct Application : public Receiver {
   std::shared_ptr<Binding> args;
@@ -93,7 +92,8 @@ void Thunk::eval(WorkQueue &queue) {
     Receiver::receive(queue, std::move(receiver), std::move(closure));
   } else if (expr->type == Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
-    binding->wait(queue, std::unique_ptr<Finisher>(
+    Binding *held = binding.get();
+    held->wait(queue, std::unique_ptr<Finisher>(
       new Hasher(std::move(receiver), std::move(binding), memoize)));
   } else if (expr->type == DefBinding::type) {
     DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
@@ -109,14 +109,16 @@ void Thunk::eval(WorkQueue &queue) {
     Prim *prim = reinterpret_cast<Prim*>(expr);
     // Cut the scope of primitive to only it's own arguments
     if (prim->args == 0) {
-      binding.reset();
+      std::vector<std::shared_ptr<Value> > args;
+      prim->fn(prim->data, queue, std::move(receiver), nullptr, std::move(args));
     } else {
       Binding *iter = binding.get();
       for (int i = 1; i < prim->args; ++i) iter = iter->next.get();
       iter->next.reset();
+      Binding *held = binding.get();
+      held->wait(queue, std::unique_ptr<Finisher>(
+        new Primitive(std::move(receiver), std::move(binding), prim)));
     }
-    binding->wait(queue, std::unique_ptr<Finisher>(
-      new Primitive(std::move(receiver), std::move(binding), prim)));
   } else {
     assert(0 /* unreachable */);
   }
