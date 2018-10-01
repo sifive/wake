@@ -10,7 +10,7 @@
 
 /* Values */
 
-struct Expr;
+struct Lambda;
 struct Binding;
 struct Location;
 struct WorkQueue;
@@ -22,7 +22,7 @@ struct Value {
   virtual ~Value();
 
   std::string to_str() const;
-  virtual void stream(std::ostream &os) const = 0;
+  virtual void format(std::ostream &os, int depth) const = 0;
   virtual Hash hash() const = 0;
 };
 
@@ -35,7 +35,7 @@ struct String : public Value {
   String(const std::string &value_) : Value(type), value(value_) { }
   String(std::string &&value_) : Value(type), value(std::move(value_)) { }
 
-  void stream(std::ostream &os) const;
+  void format(std::ostream &os, int depth) const;
   Hash hash() const;
 };
 
@@ -49,17 +49,17 @@ struct Integer : public Value {
   ~Integer();
 
   std::string str(int base = 10) const;
-  void stream(std::ostream &os) const;
+  void format(std::ostream &os, int depth) const;
   Hash hash() const;
 };
 
 struct Closure : public Value {
-  Expr *body;
+  Lambda *lambda;
   std::shared_ptr<Binding> binding;
 
   static const char *type;
-  Closure(Expr *body_, const std::shared_ptr<Binding> &binding_) : Value(type), body(body_), binding(binding_) { }
-  void stream(std::ostream &os) const;
+  Closure(Lambda *lambda_, const std::shared_ptr<Binding> &binding_) : Value(type), lambda(lambda_), binding(binding_) { }
+  void format(std::ostream &os, int depth) const;
   Hash hash() const;
 };
 
@@ -81,7 +81,7 @@ struct Exception : public Value {
     return *this;
   }
 
-  void stream(std::ostream &os) const;
+  void format(std::ostream &os, int depth) const;
   Hash hash() const;
 };
 

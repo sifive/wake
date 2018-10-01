@@ -20,8 +20,8 @@ void Application::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
   } else {
     Closure *clo = reinterpret_cast<Closure*>(value.get());
     args->next = clo->binding;
-    args->expr = clo->body;
-    queue.emplace(clo->body, std::move(args), std::move(receiver));
+    args->expr = clo->lambda;
+    queue.emplace(clo->lambda->body.get(), std::move(args), std::move(receiver));
   }
 }
 
@@ -75,7 +75,7 @@ void Thunk::eval(WorkQueue &queue) {
     int vals = (*iter)->nargs;
     if (ref->offset >= vals) {
       auto defs = reinterpret_cast<DefBinding*>((*iter)->expr);
-      auto closure = std::make_shared<Closure>(defs->fun[ref->offset-vals]->body.get(), *iter);
+      auto closure = std::make_shared<Closure>(defs->fun[ref->offset-vals].get(), *iter);
       Receiver::receive(queue, std::move(receiver), std::move(closure));
     } else {
       (*iter)->future[ref->offset].depend(queue, std::move(receiver));
@@ -88,7 +88,7 @@ void Thunk::eval(WorkQueue &queue) {
       new Application(std::move(args), std::move(receiver))));
   } else if (expr->type == Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
-    auto closure = std::make_shared<Closure>(lambda->body.get(), binding);
+    auto closure = std::make_shared<Closure>(lambda, binding);
     Receiver::receive(queue, std::move(receiver), std::move(closure));
   } else if (expr->type == Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);

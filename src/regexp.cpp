@@ -10,12 +10,16 @@ struct RegExp : public Value {
   static const char *type;
   RegExp(const std::string &regexp, const RE2::Options &opts) : Value(type), exp(re2::StringPiece(regexp), opts) { }
 
-  void stream(std::ostream &os) const;
+  void format(std::ostream &os, int depth) const;
   Hash hash() const;
 };
 const char *RegExp::type = "RegExp";
 
-void RegExp::stream(std::ostream &os) const { os << "RegExp(" << exp.pattern() << ")"; }
+void RegExp::format(std::ostream &os, int depth) const {
+  (void)depth;
+  os << "RegExp(" << exp.pattern() << ")" << std::endl;
+}
+
 Hash RegExp::hash() const {
   Hash payload;
   std::string pattern = exp.pattern();

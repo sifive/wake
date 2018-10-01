@@ -46,7 +46,7 @@ void ChildFinisher::finish(WorkQueue &queue) {
 
 Binding::Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Expr *expr_, int nargs_)
   : next(next_), invoker(invoker_), finisher(), future(new Future[nargs_]),
-    hashcode(), expr(expr_), nargs(nargs_), state(0) { }
+    hashcode(), expr(expr_), nargs(nargs_), state(0), flags(0) { }
 
 std::unique_ptr<Receiver> Binding::make_completer(const std::shared_ptr<Binding> &binding, int arg) {
   return std::unique_ptr<Receiver>(new Completer(binding, &binding->future[arg]));
@@ -58,15 +58,6 @@ std::vector<Location> Binding::stack_trace() const {
     if (i->expr->type != DefBinding::type)
       out.emplace_back(i->expr->location);
   return out;
-}
-
-void Binding::format(std::ostream &os, int depth) const {
-  // !!!
-}
-
-std::ostream & operator << (std::ostream &os, const Binding *binding) {
-  binding->format(os, 0);
-  return os;
 }
 
 void Binding::wait(WorkQueue &queue, std::unique_ptr<Finisher> finisher) {

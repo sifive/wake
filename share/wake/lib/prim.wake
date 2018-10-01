@@ -14,12 +14,12 @@ global x & y = x y x # both sides are evaluated
 global x | y = x x y
 
 # tuples
-global pair x y = _ x y
+global pair first second = _ first second
 global first  p = p true
 global second p = p false
 
 # lists
-global x, y = pair x y
+global head, tail = _ head tail
 global nil _ = true
 global empty l = l (\_\_ false)
 global head l = if l.empty then raise "empty list" else l.first
@@ -301,6 +301,6 @@ global path = catWith ":" (subscribe path)
 publish environment = cat ("PATH=", path, nil)
 
 # Most jobs don't need explicit stdin/env control
-global environment = subscribe environment
+global environment = map (_) (subscribe environment)
 global job cmd files dirs = cached_fuse_job "." "" environment cmd files dirs
 global simple_job cmd inputs outputs = cached_simple_job "." "" environment cmd inputs outputs

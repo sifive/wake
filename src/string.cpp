@@ -14,12 +14,16 @@ struct CatStream : public Value {
   static const char *type;
   CatStream() : Value(type) { }
 
-  void stream(std::ostream &os) const;
+  void format(std::ostream &os, int depth) const;
   Hash hash() const;
 };
 const char *CatStream::type = "CatStream";
 
-void CatStream::stream(std::ostream &os) const { os << "CatStream(" << str.str() << ")"; }
+void CatStream::format(std::ostream &os, int depth) const {
+  (void)depth;
+  os << "CatStream(" << str.str() << ")" << std::endl;
+}
+
 Hash CatStream::hash() const {
   Hash payload;
   std::string data = str.str();

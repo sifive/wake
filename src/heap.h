@@ -63,6 +63,8 @@ private:
 friend struct Completer;
 };
 
+#define FLAG_PRINTED	1
+
 struct Binding {
   std::shared_ptr<Binding> next;      // lexically enclosing scope
   std::shared_ptr<Binding> invoker;   // for stack tracing
@@ -72,6 +74,7 @@ struct Binding {
   Expr *expr;
   int nargs;
   int state; // count first completions, then finishes
+  mutable int flags;
 
   Binding(const std::shared_ptr<Binding> &next_, const std::shared_ptr<Binding> &invoker_, Expr *expr_, int nargs_);
 
@@ -86,7 +89,5 @@ struct Binding {
   void future_completed(WorkQueue &queue);
   void future_finished(WorkQueue &queue);
 };
-
-std::ostream & operator << (std::ostream &os, const Binding *binding);
 
 #endif

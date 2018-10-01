@@ -47,7 +47,7 @@ struct JobResult : public Value {
   static const char *type;
   JobResult(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline);
 
-  void stream(std::ostream &os) const;
+  void format(std::ostream &os, int depth) const;
   Hash hash() const;
 
   void process(WorkQueue &queue); // Run commands based on state
@@ -55,7 +55,11 @@ struct JobResult : public Value {
 
 const char *JobResult::type = "JobResult";
 
-void JobResult::stream(std::ostream &os) const { os << "JobResult(" << job << ")"; }
+void JobResult::format(std::ostream &os, int depth) const {
+  (void)depth;
+  os << "JobResult(" << job << ")" << std::endl;
+}
+
 Hash JobResult::hash() const { return code; }
 
 // A Task is a job that is not yet forked

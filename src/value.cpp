@@ -23,23 +23,68 @@ std::string Value::to_str() const {
 }
 
 std::ostream & operator << (std::ostream &os, const Value *value) {
-  value->stream(os);
+  value->format(os, 0);
   return os;
 }
 
-void String ::stream(std::ostream &os) const { os << "String(" << value << ")"; }
-void Integer::stream(std::ostream &os) const { os << "Integer(" << str() << ")"; }
-void Closure::stream(std::ostream &os) const { os << "Closure(" << body->location << ")"; }
+static std::string pad(int depth) {
+  return std::string(depth, ' ');
+}
 
-void Exception::stream(std::ostream &os) const {
-  os << "Exception(" << std::endl;
-  for (auto &i : causes) {
-    os << "  " << i->reason << std::endl;
-    for (auto &j : i->stack) {
-      os << "    from " << j << std::endl;
+void String::format(std::ostream &os, int depth) const {
+  (void)depth;
+  os << "String(" << value << ")" << std::endl;
+}
+
+void Integer::format(std::ostream &os, int depth) const {
+  (void)depth;
+  os << "Integer(" << str() << ")" << std::endl;
+}
+
+void Closure::format(std::ostream &os, int depth) const {
+  os << "Closure @ " << lambda->location << ":" << std::endl;
+  if (binding) binding->format(os, depth+2);
+}
+
+void Binding::format(std::ostream &os, int depth) const {
+  std::vector<const Binding*> todo;
+  const Binding *iter;
+  for (iter = this; iter; iter = iter->next.get()) {
+    if ((iter->flags & FLAG_PRINTED) != 0) break;
+    iter->flags |= FLAG_PRINTED;
+    todo.push_back(iter);
+  }
+  for (size_t i = todo.size(); i > 0; --i) {
+    iter = todo[i-1];
+    for (int i = 0; i < iter->nargs; ++i) {
+      if (iter->expr->type == Lambda::type) {
+        Lambda *lambda = reinterpret_cast<Lambda*>(iter->expr);
+        os << pad(depth) << lambda->name << " = "; // " @ " << lambda->location << " = ";
+      }
+      if (iter->expr->type == DefBinding::type) {
+        DefBinding *defbinding = reinterpret_cast<DefBinding*>(iter->expr);
+        std::string name;
+        for (auto &x : defbinding->order) if (x.second == i) name = x.first;
+        if (name.find(' ') != std::string::npos) continue; // internal pub/sub detail
+        os << pad(depth) << name << " = "; // " @ " << defbinding->val[i]->location << " = ";
+      }
+      if (iter->future[i].value) {
+        iter->future[i].value->format(os, depth);
+      } else {
+        os << "UNRESOLVED FUTURE" << std::endl;
+      }
     }
   }
-  os << ")" << std::endl;
+}
+
+void Exception::format(std::ostream &os, int depth) const {
+  os << "Exception" << std::endl;
+  for (auto &i : causes) {
+    os << pad(depth+2) << i->reason << std::endl;
+    for (auto &j : i->stack) {
+      os << pad(depth+4) << "from " << j << std::endl;
+    }
+  }
 }
 
 Hash String::hash() const {
@@ -64,7 +109,7 @@ Hash Exception::hash() const {
 Hash Closure::hash() const {
   Hash out;
   std::vector<uint64_t> codes;
-  body->hashcode.push(codes);
+  lambda->hashcode.push(codes);
   if (binding) binding->hash().push(codes);
   HASH(codes.data(), 8*codes.size(), (long)Closure::type, out);
   return out;

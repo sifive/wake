@@ -223,8 +223,7 @@ int main(int argc, const char **argv) {
   for (size_t i = 0; i < targets.size(); ++i) {
     Value *v = outputs[targets.size()-1-i].get();
     std::cout << targets[i] << " = ";
-    if (v) std::cout << v; else std::cout << "MISSING FUTURE";
-    std::cout << std::endl;
+    if (v) std::cout << v; else std::cout << "MISSING FUTURE" << std::endl;
   }
 
   //std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;

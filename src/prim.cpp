@@ -65,19 +65,19 @@ std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receive
 }
 
 // true  x y = x
-static std::unique_ptr<Expr> eTrue(new Lambda(LOCATION, "_", new VarRef(LOCATION, "_", 1, 0)));
+static std::unique_ptr<Lambda> eTrue(new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new VarRef(LOCATION, "_", 1, 0))));
 std::shared_ptr<Value> make_true() {
   return std::make_shared<Closure>(eTrue.get(), nullptr);
 }
 
 // false x y = y
-static std::unique_ptr<Expr> eFalse(new Lambda(LOCATION, "_", new VarRef(LOCATION, "_", 0, 0)));
+static std::unique_ptr<Lambda> eFalse(new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new VarRef(LOCATION, "_", 0, 0))));
 std::shared_ptr<Value> make_false() {
   return std::make_shared<Closure>(eFalse.get(), nullptr);
 }
 
 // pair x y f = f x y # with x+y already bound
-static std::unique_ptr<Expr> ePair(new App(LOCATION, new App(LOCATION, new VarRef(LOCATION, "_", 0, 0), new VarRef(LOCATION, "_", 1, 0)), new VarRef(LOCATION, "_", 1, 1)));
+static std::unique_ptr<Lambda> ePair(new Lambda(LOCATION, "_", new App(LOCATION, new App(LOCATION, new VarRef(LOCATION, "_", 0, 0), new VarRef(LOCATION, "_", 1, 0)), new VarRef(LOCATION, "_", 1, 1))));
 std::shared_ptr<Value> make_tuple(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second) {
   auto binding = std::make_shared<Binding>(nullptr, nullptr, ePair.get(), 2);
   binding->future[0].value = std::move(first);
@@ -87,7 +87,7 @@ std::shared_ptr<Value> make_tuple(std::shared_ptr<Value> &&first, std::shared_pt
 }
 
 // nill x y z = y
-static std::unique_ptr<Expr> eNill(new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new VarRef(LOCATION, "_", 1, 0))));
+static std::unique_ptr<Lambda> eNill(new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new VarRef(LOCATION, "_", 1, 0)))));
 std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values) {
   auto out = std::make_shared<Closure>(eNill.get(), nullptr);
   for (auto i = values.rbegin(); i != values.rend(); ++i) {
