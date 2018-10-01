@@ -22,32 +22,32 @@ static op_type precedence(const std::string &str) {
     return op_type(13, 1);
   case 'a': // Application rules run between . and $
     return op_type(12, 1);
-  case '$':
-    return op_type(11, 0);
   case '^':
-    return op_type(10, 0);
+    return op_type(11, 0);
   case '*':
-    return op_type(9, 1);
+    return op_type(10, 1);
   case '/':
   case '%':
-    return op_type(8, 1);
+    return op_type(9, 1);
   case '-':
   case '~':
   // case '!': // single-character '!'
-    return op_type(7, 1);
+    return op_type(8, 1);
   case '+':
-    return op_type(6, 1);
+    return op_type(7, 1);
   case '<':
   case '>':
-    return op_type(5, 1);
+    return op_type(6, 1);
   case '!': // multi-character '!' (like != )
-    if (str.size() == 1) return op_type(7, 1);
+    if (str.size() == 1) return op_type(8, 1);
   case '=':
-    return op_type(4, 1);
+    return op_type(5, 1);
   case '&':
-    return op_type(3, 1);
+    return op_type(4, 1);
   case '|':
-    return op_type(2, 1);
+    return op_type(3, 1);
+  case '$':
+    return op_type(2, 0);
   case ',':
     return op_type(1, 0);
   case 'm': // MEMOIZE

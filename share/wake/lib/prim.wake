@@ -1,4 +1,5 @@
 global x . f = f x
+global f $ x = f x
 
 # exceptions
 def test     x = prim "test"
