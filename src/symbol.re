@@ -268,7 +268,7 @@ struct state_t {
 };
 
 Lexer::Lexer(const char *file)
- : engine(new input_t(file, fopen(file, "r"))), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
+ : engine(new input_t(file, fopen(file, "r"))), state(new state_t), next(ERROR, Location(file, Coordinates(), Coordinates())), fail(false)
 {
   if (engine->file) consume();
 }

@@ -29,11 +29,11 @@ bool chdir_workspace() {
   return attempts != 0;
 }
 
-static std::string slurp(const char *command) {
+static std::string slurp(const std::string &command) {
   std::stringstream str;
   char buf[4096];
   int got;
-  FILE *cmd = popen(command, "r");
+  FILE *cmd = popen(command.c_str(), "r");
   while ((got = fread(buf, 1, sizeof(buf), cmd)) > 0) str.write(buf, got);
   pclose(cmd);
   return str.str();
@@ -44,7 +44,7 @@ static void scan(std::vector<std::shared_ptr<String> > &out, const std::string &
     while (auto f = readdir(dir)) {
       if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
       if (!strcmp(f->d_name, ".git")) {
-        std::string files(slurp("git ls-files -z"));
+        std::string files(slurp("git -C " + path + " ls-files -z"));
         std::string prefix(path == "." ? "" : (path + "/"));
         const char *tok = files.data();
         const char *end = tok + files.size();
