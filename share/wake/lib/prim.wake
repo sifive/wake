@@ -107,6 +107,7 @@ global getenv key = prim "getenv"
 global mkdir path mode = prim "mkdir"
 global format any = prim "format"
 global print str = prim "print"
+global println str = print (str, "\n", nil).cat
 global dbg any = print (format any)
 global cat l =
   def catopen    = prim "catopen"
