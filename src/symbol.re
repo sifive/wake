@@ -141,9 +141,9 @@ static int utf8_size(const char *str)
   return -1;
 }
 
-static bool lex_str(input_t &in, char q, std::string &result)
+static bool lex_sstr(input_t &in, std::string &result)
 {
-  for (char u = q;; result.push_back(u)) {
+  for (char u = 0;; result.push_back(u)) {
     if (u == static_cast<char>(0xff)) return false;
     in.tok = in.cur;
     /*!re2c
@@ -154,7 +154,33 @@ static bool lex_str(input_t &in, char q, std::string &result)
         re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
         re2c:define:YYFILL:naked = 1;
         *                    { return false; }
-        [^\n\\]              { u = in.tok[0]; if (u == q) break; else continue; }
+        "'"                  { break; }
+        [^]                  { u = in.tok[0]; continue; }
+    */
+  }
+  // Confirm this is UTF-8
+  int code;
+  for (const char *c = result.c_str(); *c; c += code)
+    if ((code = utf8_size(c)) == -1)
+      return false;
+  return true;
+}
+
+static bool lex_dstr(input_t &in, std::string &result)
+{
+  for (char u = 0;; result.push_back(u)) {
+    if (u == static_cast<char>(0xff)) return false;
+    in.tok = in.cur;
+    /*!re2c
+        re2c:define:YYCURSOR = in.cur;
+        re2c:define:YYMARKER = in.mar;
+        re2c:define:YYLIMIT = in.lim;
+        re2c:yyfill:enable = 1;
+        re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
+        re2c:define:YYFILL:naked = 1;
+        *                    { return false; }
+        "\""                 { break; }
+        [^\n\\]              { u = in.tok[0]; continue; }
         "\\a"                { u = '\a'; continue; }
         "\\b"                { u = '\b'; continue; }
         "\\f"                { u = '\f'; continue; }
@@ -214,7 +240,7 @@ top:
       // character and string literals
       ['"] {
         std::string out;
-        bool ok = lex_str(in, in.cur[-1], out);
+        bool ok = in.cur[-1] == '"' ? lex_dstr(in, out) : lex_sstr(in, out);
         return mkSym2(ok ? LITERAL : ERROR, std::make_shared<String>(std::move(out)));
       }
 

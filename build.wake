@@ -7,9 +7,9 @@ global all variant = map (_ variant) targets
 
 global install dest =
   def libdir = simplify (here, "/share/wake/lib", nil).cat
-  def libfiles = sources libdir ".*"
+  def libfiles = sources libdir '.*'
   def binfiles = all default
-  def releaseAs exe = cat (dest, "/", take 1 (extract "(.*)\\.(.*)" exe))
+  def releaseAs exe = cat (dest, "/", take 1 (extract '(.*)\.(.*)' exe))
   def libinstall = map (installIn dest) libfiles
   def bininstall = map (\exe installAs (releaseAs exe) exe) binfiles
   def pass = flatten (libinstall ++ bininstall)

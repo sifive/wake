@@ -258,7 +258,7 @@ global hashpair f = memoize ( # pair file hash
   def final _ = finish job nil nil
   def wait = (job.status == 0) final final ""
   def add f h = prim "add_hash"
-  if job.status == 0 then add f (head (extract "(.{32}).*" job.stdout)) else job.stderr
+  if job.status == 0 then add f (head (extract '(.{32}).*' job.stdout)) else job.stderr
 )
 global hashname f = (hashpair f).first  # just the filename
 global hashcode f = (hashpair f).second # just the hashcode
@@ -283,7 +283,7 @@ global uncached_fuse_job dir stdin env cmd files dirs =
   def waitfuse = (fuse.status == 0) endfuse endfuse ""
   def err = fuse.stderr
   def handle _ = raise ("Could not start fuse-wake: ", err, nil).cat
-  def list = try handle (extract "OK: (.*)" err)
+  def list = try handle (extract 'OK: (.*)' err)
   def job = launch list.head dir stdin env cmd
   def final _ = # run once job exits
     def status = kill fuse 14 # SIGALRM
