@@ -10,14 +10,14 @@ enum SymbolType {
 };
 extern const char *symbolTable[];
 
-struct Value;
+struct Expr;
 struct Symbol {
   SymbolType type;
   Location location;
-  std::shared_ptr<Value> value;
+  std::unique_ptr<Expr> expr;
 
   Symbol(SymbolType type_, const Location &location_) : type(type_), location(location_) { }
-  Symbol(SymbolType type_, const Location &location_, std::shared_ptr<Value> &&value_) : type(type_), location(location_), value(value_) { }
+  Symbol(SymbolType type_, const Location &location_, std::unique_ptr<Expr> &&expr_) : type(type_), location(location_), expr(std::move(expr_)) { }
 };
 
 struct input_t;

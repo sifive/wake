@@ -85,12 +85,21 @@ static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
 
 bool expectValue(const char *type, Lexer &lex) {
   if (expect(LITERAL, lex)) {
-    if (lex.next.value->type == type) {
-      return true;
+    if (lex.next.expr->type == Literal::type) {
+      Literal *lit = reinterpret_cast<Literal*>(lex.next.expr.get());
+      if (lit->value->type == type) {
+        return true;
+      } else {
+        std::cerr << "Was expecting a "
+          << type << ", but got a "
+          << lit->type << " at "
+          << lex.next.location << std::endl;
+        lex.fail = true;
+        return false;
+      }
     } else {
       std::cerr << "Was expecting a "
-        << type << ", but got a "
-        << lex.next.value->type << " at "
+        << type << ", but got an interpolated string at "
         << lex.next.location << std::endl;
       lex.fail = true;
       return false;
@@ -189,7 +198,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
       return out;
     }
     case LITERAL: {
-      Expr *out = new Literal(lex.next.location, std::move(lex.next.value));
+      Expr *out = lex.next.expr.release();
       lex.consume();
       return out;
     }
@@ -198,7 +207,8 @@ static Expr *parse_unary(int p, Lexer &lex) {
       Location location = lex.next.location;
       lex.consume();
       if (expectValue(String::type, lex)) {
-        name = reinterpret_cast<String*>(lex.next.value.get())->value;
+        Literal *lit = reinterpret_cast<Literal*>(lex.next.expr.get());
+        name = reinterpret_cast<String*>(lit->value.get())->value;
         location.end = lex.next.location.end;
         lex.consume();
       } else {

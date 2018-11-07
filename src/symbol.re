@@ -1,5 +1,6 @@
 #include "symbol.h"
 #include "value.h"
+#include "expr.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -206,8 +207,9 @@ static bool lex_dstr(input_t &in, std::string &result)
   return true;
 }
 
-#define mkSym2(x, v) Symbol(x, Location(in.filename, start, Coordinates(in.row, in.cur - in.sol)), v)
-#define mkSym(x) Symbol(x, Location(in.filename, start, Coordinates(in.row, in.cur - in.sol)))
+#define SYM_LOCATION Location(in.filename, start, Coordinates(in.row, in.cur - in.sol))
+#define mkSym2(x, v) Symbol(x, SYM_LOCATION, v)
+#define mkSym(x) Symbol(x, SYM_LOCATION)
 
 static Symbol lex_top(input_t &in) {
   Coordinates start;
@@ -241,7 +243,9 @@ top:
       ['"] {
         std::string out;
         bool ok = in.cur[-1] == '"' ? lex_dstr(in, out) : lex_sstr(in, out);
-        return mkSym2(ok ? LITERAL : ERROR, std::make_shared<String>(std::move(out)));
+        std::shared_ptr<String> str = std::make_shared<String>(std::move(out));
+        std::unique_ptr<Expr> expr(new Literal(SYM_LOCATION, std::move(str)));
+        return mkSym2(ok ? LITERAL : ERROR, std::move(expr));
       }
 
       // integer literals
@@ -251,7 +255,9 @@ top:
       (dec | hex | bin) {
         std::string integer(in.tok, in.cur);
         std::replace(integer.begin(), integer.end(), '_', ' ');
-        return mkSym2(LITERAL, std::make_shared<Integer>(integer.c_str()));
+        std::shared_ptr<Integer> str = std::make_shared<Integer>(integer.c_str());
+        std::unique_ptr<Expr> expr(new Literal(SYM_LOCATION, std::move(str)));
+        return mkSym2(LITERAL, std::move(expr));
       }
 
       // keywords
