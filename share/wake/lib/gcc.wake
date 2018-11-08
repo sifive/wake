@@ -5,14 +5,14 @@ def releaseCFlags = ("-Wall", "-O2", "-flto", nil)
 def releaseLFlags = ("-flto", nil)
 
 def doCompileC variant gcc flags headers file =
-  def obj = replace '\.c(pp)?$' (".", variant, ".o", nil).cat file
+  def obj = replace '\.c(pp)?$' ".{variant}.o" file
   def cmdline = gcc, flags ++ ("-c", file, "-o", obj, nil)
   def result = job cmdline (file, headers) nil
   result.output
 
 def doLinkO variant linker flags objs file =
-  def cmdline = (linker, "-o", (file, ".", variant, nil).cat, objs) ++ flags
-  def outdir = simplify (file, "/..", nil).cat
+  def cmdline = (linker, "-o", "{file}.{variant}", objs) ++ flags
+  def outdir = simplify "{file}/.."
   def result = job cmdline objs (outdir, nil)
   result.output
 
@@ -37,7 +37,7 @@ def pickVariant variant variants =
   if selected.empty
   then
     def ok = catWith " " (map first variants)
-    raise ("No variant matches ", variant, "; options: ", ok, nil).cat
+    raise "No variant matches {variant}; options: {ok}"
   else
     selected.head.second
 

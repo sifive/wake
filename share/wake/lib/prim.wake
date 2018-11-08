@@ -107,7 +107,7 @@ global getenv key = prim "getenv"
 global mkdir path mode = prim "mkdir"
 global format any = prim "format"
 global print str = prim "print"
-global println str = print (str, "\n", nil).cat
+global println str = print "{str}\n"
 global dbg any = print (format any)
 global cat l =
   def catopen    = prim "catopen"
@@ -213,7 +213,7 @@ global jobcache build dir stdin env cmd visible =
       def file = bad.head.first
       def expect = hashcode file
       def saw = bad.head.second
-      raise ("Hash mismatch for ", file, " (", saw, " != ", expect, "); remove it or run with -f", nil).cat
+      raise "Hash mismatch for {file} ({saw} != {expect}); remove it or run with -f"
 
 # Launch a job, raw interface
 # If you use this API, you MUST also run 'finish' on the result AFTER status is available
@@ -226,7 +226,7 @@ global launch root dir stdin env cmd = wrap (oncejob root dir stdin env.implode 
 
 def fail job ok =
   if job.status == 0 then ok else
-    raise ("Non-zero exit status (", str job.status, ")", nil).cat
+    raise "Non-zero exit status {str job.status})"
 
 # Access the output of a job
 def wrap result =
@@ -275,14 +275,14 @@ global cached_simple_job dir stdin env cmd inputs outputs =
   jobcache build dir stdin env cmd (map hashname inputs)
 
 # Still not caching, just hermetic
-def fusepath = relative workspace (simplify (wakepath, "/../lib/wake/fuse-wake", nil).cat)
+def fusepath = relative workspace (simplify "{wakepath}/../lib/wake/fuse-wake")
 global uncached_fuse_job dir stdin env cmd files dirs =
   def visible = map hashname files ++ (dir, dirs)
   def fuse = wrap (primjob 0 "." "." "" "" (fusepath, visible).implode)
   def endfuse _ = finish fuse nil nil
   def waitfuse = (fuse.status == 0) endfuse endfuse ""
   def err = fuse.stderr
-  def handle _ = raise ("Could not start fuse-wake: ", err, nil).cat
+  def handle _ = raise "Could not start fuse-wake: {err}"
   def list = try handle (extract 'OK: (.*)' err)
   def job = launch list.head dir stdin env cmd
   def final _ = # run once job exits
@@ -303,7 +303,7 @@ publish path = "/usr/bin"
 publish path = "/bin"
 
 global path = catWith ":" (subscribe path)
-publish environment = cat ("PATH=", path, nil)
+publish environment = "PATH={path}"
 
 # Most jobs don't need explicit stdin/env control
 global environment = map (_) (subscribe environment)
