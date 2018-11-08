@@ -210,6 +210,7 @@ top:
           exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
           lex.consume();
           exprs.push_back(parse_block(lex));
+          if (lex.next.type == EOL) lex.consume();
           ok &= expect(BCLOSE, lex);
           start.row = in.row;
           start.column = in.cur - in.sol;
