@@ -294,7 +294,7 @@ top:
 
       // character and string literals
       ['"] {
-        Expr *out;
+        Expr *out = 0;
         bool ok = in.cur[-1] == '"' ? lex_dstr(lex, out) : lex_sstr(lex, out);
         return mkSym2(ok ? LITERAL : ERROR, out);
       }
