@@ -10,7 +10,8 @@
 
 const char *symbolTable[] = {
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
-  "EQUALS", "POPEN", "PCLOSE", "IF", "THEN", "ELSE", "HERE", "MEMOIZE", "END", "EOL", "INDENT", "DEDENT"
+  "EQUALS", "POPEN", "PCLOSE", "BOPEN", "BCLOSE", "IF", "THEN", "ELSE", "HERE", "MEMOIZE", "END",
+  "EOL", "INDENT", "DEDENT"
 };
 
 /*!max:re2c*/
@@ -275,6 +276,8 @@ top:
       "="         { return mkSym(EQUALS);    }
       "("         { return mkSym(POPEN);     }
       ")"         { return mkSym(PCLOSE);    }
+      "{"         { return mkSym(BOPEN);     }
+      "}"         { return mkSym(BCLOSE);    }
 
       // identifiers
       op = [.$^*/%\-+~<>=!&|,]+;
@@ -284,7 +287,7 @@ top:
       op { return mkSym(OPERATOR); }
    */
 
-   // reserved punctuation: `@{}[]:;
+   // reserved punctuation: `@[]:;
    // reserved id space: capitalized
 }
 
