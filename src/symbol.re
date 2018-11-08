@@ -1,6 +1,7 @@
 #include "symbol.h"
 #include "value.h"
 #include "expr.h"
+#include "parser.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -35,6 +36,8 @@ struct input_t {
      row(1), eof(false), filename(fn), file(f) { }
   bool fill(size_t need);
 };
+
+#define SYM_LOCATION Location(in.filename, start, Coordinates(in.row, in.cur - in.sol))
 
 bool input_t::fill(size_t need) {
   if (eof) {
@@ -143,9 +146,22 @@ static int utf8_size(const char *str)
   return -1;
 }
 
-static bool lex_sstr(input_t &in, std::string &result)
+static bool is_unicode(const std::string &str)
 {
-  for (char u = 0;; result.push_back(u)) {
+  int code;
+  for (const char *c = str.c_str(); *c; c += code)
+    if ((code = utf8_size(c)) == -1)
+      return false;
+  return true;
+}
+
+static bool lex_sstr(Lexer &lex, Expr *&out)
+{
+  input_t &in = *lex.engine.get();
+  Coordinates start(in.row, in.cur - in.sol);
+  std::string slice;
+
+  for (char u = 0;; slice.push_back(u)) {
     if (u == static_cast<char>(0xff)) return false;
     in.tok = in.cur;
     /*!re2c
@@ -160,18 +176,24 @@ static bool lex_sstr(input_t &in, std::string &result)
         [^]                  { u = in.tok[0]; continue; }
     */
   }
-  // Confirm this is UTF-8
-  int code;
-  for (const char *c = result.c_str(); *c; c += code)
-    if ((code = utf8_size(c)) == -1)
-      return false;
-  return true;
+
+  bool ok = is_unicode(slice);
+  std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
+  out = new Literal(SYM_LOCATION, std::move(str));
+  return ok;
 }
 
-static bool lex_dstr(input_t &in, std::string &result)
+static bool lex_dstr(Lexer &lex, Expr *&out)
 {
-  for (char u = 0;; result.push_back(u)) {
+  input_t &in = *lex.engine.get();
+  Coordinates start(in.row, in.cur - in.sol);
+  std::vector<Expr*> exprs;
+  std::string slice;
+  bool ok = true;
+
+  for (char u = 0;; slice.push_back(u)) {
     if (u == static_cast<char>(0xff)) return false;
+top:
     in.tok = in.cur;
     /*!re2c
         re2c:define:YYCURSOR = in.cur;
@@ -180,9 +202,24 @@ static bool lex_dstr(input_t &in, std::string &result)
         re2c:yyfill:enable = 1;
         re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
         re2c:define:YYFILL:naked = 1;
-        *                    { return false; }
-        "\""                 { break; }
+
+        * { return false; }
+        [{] {
+          ok &= is_unicode(slice);
+          std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
+          exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
+          lex.consume();
+          exprs.push_back(parse_block(lex));
+          ok &= expect(BCLOSE, lex);
+          start.row = in.row;
+          start.column = in.cur - in.sol;
+          goto top;
+        }
+
+        ["]                  { break; }
         [^\n\\]              { u = in.tok[0]; continue; }
+        "\\{"                { u = '{';  continue; }
+        "\\}"                { u = '}';  continue; }
         "\\a"                { u = '\a'; continue; }
         "\\b"                { u = '\b'; continue; }
         "\\f"                { u = '\f'; continue; }
@@ -194,25 +231,39 @@ static bool lex_dstr(input_t &in, std::string &result)
         "\\'"                { u = '\''; continue; }
         "\\\""               { u = '"';  continue; }
         "\\?"                { u = '?';  continue; }
-        "\\"  [0-7]{1,3}     { u = push_utf8(result, lex_oct(in.tok, in.cur)); continue; }
-        "\\x" [0-9a-fA-F]{2} { u = push_utf8(result, lex_hex(in.tok, in.cur)); continue; }
-        "\\u" [0-9a-fA-F]{4} { u = push_utf8(result, lex_hex(in.tok, in.cur)); continue; }
-        "\\U" [0-9a-fA-F]{8} { u = push_utf8(result, lex_hex(in.tok, in.cur)); continue; }
+        "\\"  [0-7]{1,3}     { u = push_utf8(slice, lex_oct(in.tok, in.cur)); continue; }
+        "\\x" [0-9a-fA-F]{2} { u = push_utf8(slice, lex_hex(in.tok, in.cur)); continue; }
+        "\\u" [0-9a-fA-F]{4} { u = push_utf8(slice, lex_hex(in.tok, in.cur)); continue; }
+        "\\U" [0-9a-fA-F]{8} { u = push_utf8(slice, lex_hex(in.tok, in.cur)); continue; }
     */
   }
-  // Confirm this is UTF-8
-  int code;
-  for (const char *c = result.c_str(); *c; c += code)
-    if ((code = utf8_size(c)) == -1)
-      return false;
-  return true;
+
+  ok &= is_unicode(slice);
+  std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
+  exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
+
+  if (exprs.size() == 1) {
+    out = exprs.front();
+  } else {
+    DefMap *map = new DefMap(LOCATION);
+    map->map["_catopen"]  = std::unique_ptr<Expr>(new Prim(LOCATION, "catopen"));
+    map->map["_catadd"]   = std::unique_ptr<Expr>(new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new Prim(LOCATION, "catadd"))));
+    map->map["_catclose"] = std::unique_ptr<Expr>(new Lambda(LOCATION, "_", new Prim(LOCATION, "catclose")));
+    Expr *body = new VarRef(LOCATION, "_catopen");
+    for (auto expr : exprs)
+      body = new App(LOCATION, new App(LOCATION, new VarRef(LOCATION, "_catadd"), body), expr);
+    map->body = std::unique_ptr<Expr>(new App(LOCATION, new VarRef(LOCATION, "_catclose"), body));
+    out = map;
+  }
+
+  return ok;
 }
 
-#define SYM_LOCATION Location(in.filename, start, Coordinates(in.row, in.cur - in.sol))
 #define mkSym2(x, v) Symbol(x, SYM_LOCATION, v)
 #define mkSym(x) Symbol(x, SYM_LOCATION)
 
-static Symbol lex_top(input_t &in) {
+static Symbol lex_top(Lexer &lex) {
+  input_t &in = *lex.engine.get();
   Coordinates start;
 top:
   start.row = in.row;
@@ -242,11 +293,9 @@ top:
 
       // character and string literals
       ['"] {
-        std::string out;
-        bool ok = in.cur[-1] == '"' ? lex_dstr(in, out) : lex_sstr(in, out);
-        std::shared_ptr<String> str = std::make_shared<String>(std::move(out));
-        std::unique_ptr<Expr> expr(new Literal(SYM_LOCATION, std::move(str)));
-        return mkSym2(ok ? LITERAL : ERROR, std::move(expr));
+        Expr *out;
+        bool ok = in.cur[-1] == '"' ? lex_dstr(lex, out) : lex_sstr(lex, out);
+        return mkSym2(ok ? LITERAL : ERROR, out);
       }
 
       // integer literals
@@ -256,9 +305,8 @@ top:
       (dec | hex | bin) {
         std::string integer(in.tok, in.cur);
         std::replace(integer.begin(), integer.end(), '_', ' ');
-        std::shared_ptr<Integer> str = std::make_shared<Integer>(integer.c_str());
-        std::unique_ptr<Expr> expr(new Literal(SYM_LOCATION, std::move(str)));
-        return mkSym2(LITERAL, std::move(expr));
+        std::shared_ptr<Integer> value = std::make_shared<Integer>(integer.c_str());
+        return mkSym2(LITERAL, new Literal(SYM_LOCATION, std::move(value)));
       }
 
       // keywords
@@ -343,7 +391,7 @@ void Lexer::consume() {
     state->tabs.push_back(state->indent);
     next.type = INDENT;
   } else {
-    next = lex_top(*engine.get());
+    next = lex_top(*this);
     if (next.type == EOL) {
       state->indent = (engine->cur - engine->tok) - 1;
       state->eol = true;

@@ -18,7 +18,7 @@ struct Symbol {
   std::unique_ptr<Expr> expr;
 
   Symbol(SymbolType type_, const Location &location_) : type(type_), location(location_) { }
-  Symbol(SymbolType type_, const Location &location_, std::unique_ptr<Expr> &&expr_) : type(type_), location(location_), expr(std::move(expr_)) { }
+  Symbol(SymbolType type_, const Location &location_, Expr *expr_) : type(type_), location(location_), expr(expr_) { }
 };
 
 struct input_t;

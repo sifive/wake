@@ -83,7 +83,7 @@ static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
   return out;
 }
 
-bool expectValue(const char *type, Lexer &lex) {
+static bool expectValue(const char *type, Lexer &lex) {
   if (expect(LITERAL, lex)) {
     if (lex.next.expr->type == Literal::type) {
       Literal *lit = reinterpret_cast<Literal*>(lex.next.expr.get());
@@ -113,7 +113,6 @@ static Expr *parse_unary(int p, Lexer &lex);
 static Expr *parse_binary(int p, Lexer &lex);
 static Expr *parse_if(Lexer &lex);
 static Expr *parse_def(Lexer &lex, std::string &name);
-static Expr *parse_block(Lexer &lex);
 
 static int relabel_descend(Expr *expr, int index) {
   if (!(expr->flags & FLAG_TOUCHED)) {
@@ -397,7 +396,7 @@ static void publish_seal(DefMap::defs &publish) {
   }
 }
 
-static Expr *parse_block(Lexer &lex) {
+Expr *parse_block(Lexer &lex) {
   TRACE("BLOCK");
   Expr *out;
 

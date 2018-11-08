@@ -1,11 +1,14 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-struct Lexer;
+#include "symbol.h"
+
 struct Top;
 struct Expr;
 
+bool expect(SymbolType type, Lexer &lex);
 void parse_top(Top &top, Lexer &lex);
 Expr *parse_command(Lexer &lex);
+Expr *parse_block(Lexer &lex);
 
 #endif
