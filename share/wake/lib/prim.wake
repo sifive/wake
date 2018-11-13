@@ -102,7 +102,7 @@ global collate f l r =
 
 # string operations
 global read path = prim "read"
-global write path content = prim "write"
+global write path content mode = prim "write"
 global getenv key = prim "getenv"
 global mkdir path mode = prim "mkdir"
 global format any = prim "format"

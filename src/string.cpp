@@ -82,12 +82,19 @@ static PRIMFN(prim_read) {
 }
 
 static PRIMFN(prim_write) {
-  EXPECT(2);
+  EXPECT(3);
   STRING(arg0, 0);
   STRING(arg1, 1);
+  INTEGER(mode, 2);
+
+  REQUIRE(mpz_cmp_si(mode->value, 0) >= 0, "mode must be >= 0");
+  REQUIRE(mpz_cmp_si(mode->value, 0xffff) <= 0, "mode must be <= 0xffff");
+  long mask = mpz_get_si(mode->value);
+
   std::ofstream t(arg0->value, std::ios_base::trunc);
   REQUIRE(!t.fail(), "Could not write " + arg0->value);
   t << arg1->value;
+  chmod(arg0->value.c_str(), mask);
   RETURN(args[0]);
 }
 
