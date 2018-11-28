@@ -36,7 +36,7 @@
 #include <string>
 #include <iostream>
 
-//#define TRACE(x) do { printf("%s: %s\n", __FUNCTION__, x); fflush(stdout); } while (0)
+//#define TRACE(x) do { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } while (0)
 #define TRACE(x) (void)x
 
 static int rootfd;
@@ -268,6 +268,7 @@ static int wakefuse_unlink(const char *path)
 		return -errno;
 
 	files_wrote.erase(map(path));
+	files_read.erase(map(path));
 	return 0;
 }
 
@@ -293,6 +294,7 @@ static int wakefuse_rmdir(const char *path)
 		return -errno;
 
 	files_wrote.erase(map(path));
+	files_read.erase(map(path));
 	return 0;
 }
 
@@ -339,6 +341,7 @@ static int wakefuse_rename(const char *from, const char *to)
 		return -errno;
 
 	files_wrote.erase(map(from));
+	files_read.erase(map(from));
 	files_wrote.insert(map(to));
 
 	return 0;
