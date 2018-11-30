@@ -93,7 +93,7 @@ void Thunk::eval(WorkQueue &queue) {
   } else if (expr->type == Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
     Binding *held = binding.get();
-    held->wait(queue, std::unique_ptr<Finisher>(
+    Binding::wait(held, queue, std::unique_ptr<Finisher>(
       new Hasher(std::move(receiver), std::move(binding), memoize)));
   } else if (expr->type == DefBinding::type) {
     DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
@@ -116,7 +116,7 @@ void Thunk::eval(WorkQueue &queue) {
       for (int i = 1; i < prim->args; ++i) iter = iter->next.get();
       iter->next.reset();
       Binding *held = binding.get();
-      held->wait(queue, std::unique_ptr<Finisher>(
+      Binding::wait(held, queue, std::unique_ptr<Finisher>(
         new Primitive(std::move(receiver), std::move(binding), prim)));
     }
   } else {

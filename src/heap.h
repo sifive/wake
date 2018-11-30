@@ -87,7 +87,7 @@ struct Binding {
   std::vector<Location> stack_trace() const;
   void format(std::ostream &os, int depth) const;
 
-  void wait(WorkQueue &queue, std::unique_ptr<Finisher> finisher);
+  static void wait(Binding *iter, WorkQueue &queue, std::unique_ptr<Finisher> finisher);
   Hash hash() const; // call only after 'wait'
 
   void future_completed(WorkQueue &queue);

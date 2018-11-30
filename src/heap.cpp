@@ -59,10 +59,9 @@ std::vector<Location> Binding::stack_trace() const {
   return out;
 }
 
-void Binding::wait(WorkQueue &queue, std::unique_ptr<Finisher> finisher) {
-  Binding *iter;
-  for (iter = this; iter; iter = iter->next.get())
-    if (iter->state != iter->nargs) break;
+void Binding::wait(Binding *iter, WorkQueue &queue, std::unique_ptr<Finisher> finisher) {
+  while (iter && iter->state == iter->nargs)
+    iter = iter->next.get();
 
   if (iter) {
     finisher->next = std::move(iter->finisher);
@@ -161,10 +160,10 @@ void Binding::future_finished(WorkQueue &queue) {
     std::unique_ptr<Finisher> iter, iter_next;
     for (iter = std::move(finisher); iter; iter = std::move(iter_next)) {
       iter_next = std::move(iter->next);
-      next->wait(queue, std::move(iter));
+      Binding::wait(next.get(), queue, std::move(iter));
     }
   } else {
     Closure *closure = reinterpret_cast<Closure*>(future[state].value.get());
-    closure->binding->wait(queue, std::unique_ptr<Finisher>(new ChildFinisher(this)));
+    Binding::wait(closure->binding.get(), queue, std::unique_ptr<Finisher>(new ChildFinisher(this)));
   }
 }
