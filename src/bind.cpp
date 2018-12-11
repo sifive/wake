@@ -38,7 +38,7 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
   // if x uses [yg], then d[x] must be <= d[yg]+1
   // if we ever find a d[_] > n, there is an illegal loop
 
-  std::vector<int> d(defs.size(), 0);
+  std::vector<int> d(defs.size(), 0), p(defs.size(), -1);
   std::queue<RelaxedVertex> q;
 
   for (int i = 0; i < (int)defs.size(); ++i)
@@ -50,17 +50,26 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
     q.pop();
     if (rv.d < drv) continue;
     ResolveDef &def = defs[rv.v];
-    if (drv > (int)defs.size()) {
-      std::cerr << "Value definition cycle detected including "
-        << def.name << " at "
-        << def.expr->location << std::endl;
-      for (int i = 0; i < (int)defs.size(); ++i) d[i] = 0;
-      break;
+    if (drv >= (int)defs.size()) {
+      int j = rv.v;
+      for (int i = 0; i < (int)defs.size(); ++i) {
+        d[i] = 0;
+        j = p[j];
+      }
+      // j is now inside the cycle
+      std::cerr << "Value definition cycle detected including:" << std::endl;
+      int i = j;
+      do {
+        std::cerr << "  " << defs[i].name << " at " << defs[i].expr->location << std::endl;
+        i = p[i];
+      } while (i != j);
+      return 0;
     }
     int w = def.expr->type == Lambda::type ? 0 : 1;
     for (auto i : def.edges) {
       if (drv + w > d[i]) {
         d[i] = drv + w;
+        p[i] = rv.v;
         q.push(RelaxedVertex(i, drv + w));
       }
     }
@@ -286,6 +295,7 @@ struct NameBinding {
 };
 
 static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
+  if (!expr) return false; // failed fracture
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     NameRef pos;
