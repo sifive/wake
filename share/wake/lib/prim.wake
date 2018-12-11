@@ -276,7 +276,7 @@ global cached_simple_job dir stdin env cmd inputs outputs =
 
 # Still not caching, just hermetic
 def fusepath = relative workspace (simplify "{wakepath}/../lib/wake/fuse-wake")
-global uncached_fuse_job dir stdin env cmd files dirs =
+global uncached_fuse_job dir stdin env cmd files dirs = memoize (
   def visible = map hashname files ++ (dir, dirs)
   def fuse = wrap (primjob 0 "." "." "" "" (fusepath, visible).implode)
   def endfuse _ = finish fuse nil nil
@@ -293,6 +293,7 @@ global uncached_fuse_job dir stdin env cmd files dirs =
     finish job inputs (map hashname outputs)
   def wait = (job.status == 0) final final ""
   job
+)
 
 global cached_fuse_job dir stdin env cmd files dirs =
   def build _ = uncached_fuse_job dir stdin env cmd files dirs
