@@ -37,7 +37,7 @@ std::string Expr::to_str() const {
 void VarRef::format(std::ostream &os, int depth) const {
   os << pad(depth) << "VarRef(" << name;
   if (offset != -1) os << "," << depth << "," << offset;
-  os << ") @ " << location << std::endl;
+  os << "): " << typeVar << " @ " << location << std::endl;
 }
 
 void VarRef::hash() {
@@ -56,7 +56,7 @@ void Subscribe::hash() {
 }
 
 void Memoize::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Memoize @ " << location << std::endl;
+  os << pad(depth) << "Memoize: " << typeVar << " @ " << location << std::endl;
   body->format(os, depth+2);
 }
 
@@ -66,7 +66,7 @@ void Memoize::hash() {
 }
 
 void App::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "App @ " << location << std::endl;
+  os << pad(depth) << "App: " << typeVar << " @ " << location << std::endl;
   fn->format(os, depth+2);
   val->format(os, depth+2);
 }
@@ -81,7 +81,7 @@ void App::hash() {
 }
 
 void Lambda::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Lambda(" << name << ") @ " << location << std::endl;
+  os << pad(depth) << "Lambda(" << name << "): " << typeVar << " @ " << location << std::endl;
   body->format(os, depth+2);
 }
 
@@ -108,7 +108,7 @@ void DefMap::hash() {
 }
 
 void Literal::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Literal @ " << location << " = ";
+  os << pad(depth) << "Literal: " << typeVar << " @ " << location << " = ";
   value->format(os, depth);
 }
 
@@ -118,7 +118,7 @@ void Literal::hash() {
 }
 
 void Prim::format(std::ostream &os, int depth) const {
- os << pad(depth) << "Prim(" << args << "," << name << ") @ " << location << std::endl;
+ os << pad(depth) << "Prim(" << args << "," << name << "): " << typeVar << " @ " << location << std::endl;
 }
 
 void Prim::hash() {
@@ -138,7 +138,7 @@ void Top::hash() {
 }
 
 void DefBinding::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "DefBinding @ " << location << std::endl;
+  os << pad(depth) << "DefBinding: " << typeVar << " @ " << location << std::endl;
   int vals = val.size();
   for (auto &i : order) {
     os << pad(depth+2) << (i.second < vals ? "val " : "fun ") << i.first << " =" << std::endl;

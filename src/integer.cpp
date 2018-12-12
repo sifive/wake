@@ -66,6 +66,14 @@ BINOP_SI(shr, mpz_tdiv_q_2exp)
 BINOP_SI(exp, mpz_pow_ui)
 BINOP_SI(root,mpz_root)
 
+static PRIMTYPE(type_powm) {
+  return args.size() == 3 &&
+    args[0]->unifyVal(Integer::typeVar) &&
+    args[1]->unifyVal(Integer::typeVar) &&
+    args[2]->unifyVal(Integer::typeVar) &&
+    out->unifyVal(Integer::typeVar);
+}
+
 static PRIMFN(prim_powm) {
   EXPECT(3);
   INTEGER(arg0, 0);
@@ -75,6 +83,13 @@ static PRIMFN(prim_powm) {
   auto out = std::make_shared<Integer>();
   mpz_powm(out->value, arg0->value, arg1->value, arg2->value);
   RETURN(out);
+}
+
+static PRIMTYPE(type_str) {
+  return args.size() == 2 &&
+    args[0]->unifyVal(Integer::typeVar) &&
+    args[1]->unifyVal(Integer::typeVar) &&
+    out->unifyVal(String::typeVar);
 }
 
 static PRIMFN(prim_str) {
@@ -90,6 +105,13 @@ static PRIMFN(prim_str) {
   REQUIRE(ok, arg0->to_str() + " is not a valid base; [-36,62] \\ [-1,1]");
   auto out = std::make_shared<String>(arg1->str(base));
   RETURN(out);
+}
+
+static PRIMTYPE(type_int) {
+  return args.size() == 2 &&
+    args[0]->unifyVal(Integer::typeVar) &&
+    args[1]->unifyVal(String::typeVar) &&
+    out->unifyVal(Integer::typeVar);
 }
 
 static PRIMFN(prim_int) {
@@ -110,25 +132,38 @@ static PRIMFN(prim_int) {
 
 // popcount, scan0, scan1 ?
 
+static PRIMTYPE(type_unop) {
+  return args.size() == 1 &&
+    args[0]->unifyVal(Integer::typeVar) &&
+    out->unifyVal(Integer::typeVar);
+}
+
+static PRIMTYPE(type_binop) {
+  return args.size() == 2 &&
+    args[0]->unifyVal(Integer::typeVar) &&
+    args[1]->unifyVal(Integer::typeVar) &&
+    out->unifyVal(Integer::typeVar);
+}
+
 void prim_register_integer(PrimMap &pmap) {
-  pmap["com"].first = prim_com;
-  pmap["abs"].first = prim_abs;
-  pmap["neg"].first = prim_neg;
-  pmap["add"].first = prim_add;
-  pmap["sub"].first = prim_sub;
-  pmap["mul"].first = prim_mul;
-  pmap["div"].first = prim_div;
-  pmap["mod"].first = prim_mod;
-  pmap["xor"].first = prim_xor;
-  pmap["and"].first = prim_and;
-  pmap["or" ].first = prim_or;
-  pmap["gcd"].first = prim_gcd;
-  pmap["lcm"].first = prim_lcm;
-  pmap["shl"].first = prim_shl;
-  pmap["shr"].first = prim_shr;
-  pmap["exp"].first = prim_exp;
-  pmap["root"].first= prim_root;
-  pmap["powm"].first= prim_powm;
-  pmap["str"].first = prim_str;
-  pmap["int"].first = prim_int;
+  pmap.emplace("com", PrimDesc(prim_com, type_unop));
+  pmap.emplace("abs", PrimDesc(prim_abs, type_unop));
+  pmap.emplace("neg", PrimDesc(prim_neg, type_unop));
+  pmap.emplace("add", PrimDesc(prim_add, type_binop));
+  pmap.emplace("sub", PrimDesc(prim_sub, type_binop));
+  pmap.emplace("mul", PrimDesc(prim_mul, type_binop));
+  pmap.emplace("div", PrimDesc(prim_div, type_binop));
+  pmap.emplace("mod", PrimDesc(prim_mod, type_binop));
+  pmap.emplace("xor", PrimDesc(prim_xor, type_binop));
+  pmap.emplace("and", PrimDesc(prim_and, type_binop));
+  pmap.emplace("or",  PrimDesc(prim_or,  type_binop));
+  pmap.emplace("gcd", PrimDesc(prim_gcd, type_binop));
+  pmap.emplace("lcm", PrimDesc(prim_lcm, type_binop));
+  pmap.emplace("shl", PrimDesc(prim_shl, type_binop));
+  pmap.emplace("shr", PrimDesc(prim_shr, type_binop));
+  pmap.emplace("exp", PrimDesc(prim_exp, type_binop));
+  pmap.emplace("root",PrimDesc(prim_root,type_binop));
+  pmap.emplace("powm",PrimDesc(prim_powm,type_powm));
+  pmap.emplace("str", PrimDesc(prim_str, type_str));
+  pmap.emplace("int", PrimDesc(prim_int, type_int));
 }

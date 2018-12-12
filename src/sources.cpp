@@ -219,6 +219,13 @@ std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<
   return sources(all, base, exp);
 }
 
+static PRIMTYPE(type_sources) {
+  return args.size() == 2 &&
+    args[0]->unifyVal(String::typeVar) &&
+    args[1]->unifyVal(String::typeVar) &&
+    out->unifyVal(Integer::typeVar); // !!! wrong; string list
+}
+
 static PRIMFN(prim_sources) {
   EXPECT(2);
   STRING(arg0, 0);
@@ -248,6 +255,12 @@ static PRIMFN(prim_sources) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_add_sources) {
+  return args.size() == 1 &&
+    args[0]->unifyVal(String::typeVar) &&
+    out->unifyVal(Integer::typeVar); // !!! wrong; bool
+}
+
 static PRIMFN(prim_add_sources) {
   EXPECT(1);
   STRING(arg0, 0);
@@ -273,6 +286,12 @@ static PRIMFN(prim_add_sources) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_simplify) {
+  return args.size() == 1 &&
+    args[0]->unifyVal(String::typeVar) &&
+    out->unifyVal(String::typeVar);
+}
+
 static PRIMFN(prim_simplify) {
   EXPECT(1);
   STRING(arg0, 0);
@@ -281,6 +300,13 @@ static PRIMFN(prim_simplify) {
   bool ok = make_canonical(out->value);
   REQUIRE(ok, "path has too many ..s");
   RETURN(out);
+}
+
+static PRIMTYPE(type_relative) {
+  return args.size() == 2 &&
+    args[0]->unifyVal(String::typeVar) &&
+    args[1]->unifyVal(String::typeVar) &&
+    out->unifyVal(String::typeVar);
 }
 
 static PRIMFN(prim_relative) {
@@ -302,10 +328,20 @@ static PRIMFN(prim_relative) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_execpath) {
+  return args.size() == 0 &&
+    out->unifyVal(String::typeVar);
+}
+
 static PRIMFN(prim_execpath) {
   EXPECT(0);
   auto out = std::make_shared<String>(find_execpath());
   RETURN(out);
+}
+
+static PRIMTYPE(type_getcwd) {
+  return args.size() == 0 &&
+    out->unifyVal(String::typeVar);
 }
 
 static PRIMFN(prim_getcwd) {
@@ -315,12 +351,10 @@ static PRIMFN(prim_getcwd) {
 }
 
 void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimMap &pmap) {
-  pmap["sources"].first = prim_sources;
-  pmap["sources"].second = sources;
-  pmap["add_sources"].first = prim_add_sources;
-  pmap["add_sources"].second = sources;
-  pmap["simplify"].first = prim_simplify;
-  pmap["relative"].first = prim_relative;
-  pmap["execpath"].first = prim_execpath;
-  pmap["getcwd"].first = prim_getcwd;
+  pmap.emplace("sources",     PrimDesc(prim_sources,     type_sources,     sources));
+  pmap.emplace("add_sources", PrimDesc(prim_add_sources, type_add_sources, sources));
+  pmap.emplace("simplify",    PrimDesc(prim_simplify,    type_simplify));
+  pmap.emplace("relative",    PrimDesc(prim_relative,    type_relative));
+  pmap.emplace("execpath",    PrimDesc(prim_execpath,    type_execpath));
+  pmap.emplace("getcwd",      PrimDesc(prim_getcwd,      type_getcwd));
 }

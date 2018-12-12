@@ -2,6 +2,7 @@
 #include "value.h"
 #include "heap.h"
 #include "hash.h"
+#include "expr.h"
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -13,9 +14,11 @@
 struct CatStream : public Value {
   std::stringstream str;
   static const char *type;
+  static TypeVar typeVar;
   CatStream() : Value(type) { }
 
   void format(std::ostream &os, int depth) const;
+  TypeVar &getType();
   Hash hash() const;
 };
 const char *CatStream::type = "CatStream";
@@ -23,6 +26,11 @@ const char *CatStream::type = "CatStream";
 void CatStream::format(std::ostream &os, int depth) const {
   os << "CatStream(" << str.str() << ")";
   if (depth >= 0) os << std::endl;
+}
+
+TypeVar CatStream::typeVar("catstream", 0);
+TypeVar &CatStream::getType() {
+  return typeVar;
 }
 
 Hash CatStream::hash() const {
@@ -49,10 +57,22 @@ static std::unique_ptr<Receiver> cast_catstream(WorkQueue &queue, std::unique_pt
     if (!completion) return;									\
   } while(0)
 
+static PRIMTYPE(type_catopen) {
+  return args.size() == 0 &&
+    out->unifyVal(CatStream::typeVar);
+}
+
 static PRIMFN(prim_catopen) {
   EXPECT(0);
   auto out = std::make_shared<CatStream>();
   RETURN(out);
+}
+
+static PRIMTYPE(type_catadd) {
+  return args.size() == 2 &&
+    args[0]->unifyVal(CatStream::typeVar) &&
+    args[1]->unifyVal(String::typeVar) &&
+    out->unifyVal(CatStream::typeVar);
 }
 
 static PRIMFN(prim_catadd) {
@@ -63,11 +83,23 @@ static PRIMFN(prim_catadd) {
   RETURN(args[0]);
 }
 
+static PRIMTYPE(type_catclose) {
+  return args.size() == 1 &&
+    args[0]->unifyVal(CatStream::typeVar) &&
+    out->unifyVal(String::typeVar);
+}
+
 static PRIMFN(prim_catclose) {
   EXPECT(1);
   CATSTREAM(arg0, 0);
   auto out = std::make_shared<String>(arg0->str.str());
   RETURN(out);
+}
+
+static PRIMTYPE(type_read) {
+  return args.size() == 1 &&
+    args[0]->unifyVal(String::typeVar) &&
+    out->unifyVal(String::typeVar);
 }
 
 static PRIMFN(prim_read) {
@@ -79,6 +111,14 @@ static PRIMFN(prim_read) {
   buffer << t.rdbuf();
   auto out = std::make_shared<String>(buffer.str());
   RETURN(out);
+}
+
+static PRIMTYPE(type_write) {
+  return args.size() == 3 &&
+    args[0]->unifyVal(String::typeVar) &&
+    args[1]->unifyVal(String::typeVar) &&
+    args[2]->unifyVal(Integer::typeVar) &&
+    out->unifyVal(String::typeVar);
 }
 
 static PRIMFN(prim_write) {
@@ -98,6 +138,12 @@ static PRIMFN(prim_write) {
   RETURN(args[0]);
 }
 
+static PRIMTYPE(type_getenv) {
+  return args.size() == 1 &&
+    args[0]->unifyVal(String::typeVar) &&
+    out->unifyVal(String::typeVar);
+}
+
 static PRIMFN(prim_getenv) {
   EXPECT(1);
   STRING(arg0, 0);
@@ -105,6 +151,13 @@ static PRIMFN(prim_getenv) {
   REQUIRE(env, arg0->value + " is unset in the environment");
   auto out = std::make_shared<String>(env);
   RETURN(out);
+}
+
+static PRIMTYPE(type_mkdir) {
+  return args.size() == 2 &&
+    args[0]->unifyVal(String::typeVar) &&
+    args[1]->unifyVal(Integer::typeVar) &&
+    out->unifyVal(String::typeVar); // !!! wrong; bool 
 }
 
 static PRIMFN(prim_mkdir) {
@@ -135,12 +188,24 @@ static PRIMFN(prim_mkdir) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_format) {
+  return args.size() == 1 &&
+    // don't unify args[0] => allow any
+    out->unifyVal(String::typeVar);
+}
+
 static PRIMFN(prim_format) {
   REQUIRE(args.size() == 1, "prim_format expects 1 argument");
   std::stringstream buffer;
-  args[0]->format(buffer, 0);
+    args[0]->format(buffer, 0);
   auto out = std::make_shared<String>(buffer.str());
   RETURN(out);
+}
+
+static PRIMTYPE(type_print) {
+  return args.size() == 1 &&
+    args[0]->unifyVal(String::typeVar) &&
+    out->unifyVal(String::typeVar); // !!! wrong; bool 
 }
 
 static PRIMFN(prim_print) {
@@ -152,13 +217,13 @@ static PRIMFN(prim_print) {
 }
 
 void prim_register_string(PrimMap &pmap) {
-  pmap["catopen" ].first = prim_catopen;
-  pmap["catadd"  ].first = prim_catadd;
-  pmap["catclose"].first = prim_catclose;
-  pmap["write"   ].first = prim_write;
-  pmap["read"    ].first = prim_read;
-  pmap["getenv"  ].first = prim_getenv;
-  pmap["mkdir"   ].first = prim_mkdir;
-  pmap["format"  ].first = prim_format;
-  pmap["print"   ].first = prim_print;
+  pmap.emplace("catopen", PrimDesc(prim_catopen, type_catopen));
+  pmap.emplace("catadd",  PrimDesc(prim_catadd,  type_catadd));
+  pmap.emplace("catclose",PrimDesc(prim_catclose,type_catclose));
+  pmap.emplace("write",   PrimDesc(prim_write,   type_write));
+  pmap.emplace("read",    PrimDesc(prim_read,    type_read));
+  pmap.emplace("getenv",  PrimDesc(prim_getenv,  type_getenv));
+  pmap.emplace("mkdir",   PrimDesc(prim_mkdir,   type_mkdir));
+  pmap.emplace("format",  PrimDesc(prim_format,  type_format));
+  pmap.emplace("print",   PrimDesc(prim_print,   type_print));
 }

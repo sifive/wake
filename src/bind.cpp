@@ -1,6 +1,7 @@
 #include "bind.h"
 #include "expr.h"
 #include "prim.h"
+#include "value.h"
 #include <iostream>
 #include <vector>
 #include <map>
@@ -266,21 +267,21 @@ struct NameRef {
 
 struct NameBinding {
   NameBinding *next;
-  DefOrder *map;
-  std::string *name;
+  DefBinding *binding;
+  Lambda *lambda;
   bool open;
 
-  NameBinding() : next(0), map(0), name(0), open(true) { }
-  NameBinding(NameBinding *next_, std::string *name_) : next(next_), map(0), name(name_), open(true) { }
-  NameBinding(NameBinding *next_, std::map<std::string, int> *map_) : next(next_), map(map_), name(0), open(true) { }
+  NameBinding() : next(0), binding(0), lambda(0), open(true) { }
+  NameBinding(NameBinding *next_, Lambda *lambda_) : next(next_), binding(0), lambda(lambda_), open(true) { }
+  NameBinding(NameBinding *next_, DefBinding *binding_) : next(next_), binding(binding_), lambda(0), open(true) { }
 
   NameRef find(const std::string &x) {
     NameRef out;
     std::map<std::string, int>::iterator i;
-    if (name && *name == x) {
+    if (lambda && lambda->name == x) {
       out.depth = 0;
       out.offset = 0;
-    } else if (map && (i = map->find(x)) != map->end()) {
+    } else if (binding && (i = binding->order.find(x)) != binding->order.end()) {
       out.depth = 0;
       out.offset = i->second;
     } else if (next) {
@@ -296,6 +297,7 @@ struct NameBinding {
 
 static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   if (!expr) return false; // failed fracture
+  expr->typeVar.setDOB();
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     NameRef pos;
@@ -307,24 +309,33 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     }
     ref->depth = pos.depth;
     ref->offset = pos.offset;
+    // !!! unify varref
     return true;
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
     binding->open = false;
     bool f = explore(app->fn .get(), pmap, binding);
     bool a = explore(app->val.get(), pmap, binding);
-    return f && a;
+    bool t = app->fn->typeVar.unifyDef(TypeVar("=>", 2), 0);
+    bool ta = t && app->fn->typeVar.getArgs()[0].unifyVal(app->val->typeVar);
+    bool tr = t && app->fn->typeVar.getArgs()[1].unifyVal(app->typeVar);
+    return f && a && t && ta && tr;
   } else if (expr->type == Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
-    NameBinding bind(binding, &lambda->name);
-    return explore(lambda->body.get(), pmap, &bind);
+    bool t = lambda->typeVar.unifyDef(TypeVar("=>", 2), 0);
+    NameBinding bind(binding, lambda);
+    bool out = explore(lambda->body.get(), pmap, &bind);
+    bool tr = t && lambda->typeVar.getArgs()[1].unifyVal(lambda->body->typeVar);
+    return out && t && tr;
   } else if (expr->type == Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
-    return explore(memoize->body.get(), pmap, binding);
+    bool out = explore(memoize->body.get(), pmap, binding);
+    bool t = memoize->typeVar.unifyVal(memoize->body->typeVar);
+    return out && t;
   } else if (expr->type == DefBinding::type) {
     DefBinding *def = reinterpret_cast<DefBinding*>(expr);
     binding->open = false;
-    NameBinding bind(binding, &def->order);
+    NameBinding bind(binding, def);
     bool ok = true;
     for (auto &i : def->val)
       ok = explore(i.get(), pmap, binding) && ok;
@@ -333,12 +344,17 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     ok = explore(def->body.get(), pmap, &bind) && ok;
     return ok;
   } else if (expr->type == Literal::type) {
-    return true;
+    Literal *lit = reinterpret_cast<Literal*>(expr);
+    return lit->typeVar.unifyVal(lit->value->getType());
   } else if (expr->type == Prim::type) {
     Prim *prim = reinterpret_cast<Prim*>(expr);
-    int args = 0;
-    for (NameBinding *iter = binding; iter && iter->open && iter->name; iter = iter->next) ++args;
-    prim->args = args;
+    std::vector<TypeVar*> args;
+    for (NameBinding *iter = binding; iter && iter->open && iter->lambda; iter = iter->next) {
+      assert (iter->lambda->typeVar.getName() == "=>");
+      args.push_back(&iter->lambda->typeVar.getArgs()[0]);
+    }
+    std::reverse(args.begin(), args.end());
+    prim->args = args.size();
     PrimMap::const_iterator i = pmap.find(prim->name);
     if (i == pmap.end()) {
       std::cerr << "Primitive reference "
@@ -346,9 +362,9 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
         << prim->location << std::endl;
       return false;
     } else {
-      prim->fn   = i->second.first;
-      prim->data = i->second.second;
-      return true;
+      prim->fn   = i->second.fn;
+      prim->data = i->second.data;
+      return i->second.type(i->second.data, args, &prim->typeVar);
     }
   } else {
     assert(0 /* unreachable */);
