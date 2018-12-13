@@ -205,13 +205,13 @@ int main(int argc, const char **argv) {
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
   if (!root) ok = false;
 
-  if (args["typecheck"]) std::cout << root.get();
-
   if (!ok) {
     if (args["add"]) std::cerr << ">>> Expression not added to the active target list <<<" << std::endl;
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }
+
+  if (args["typecheck"]) std::cout << root.get();
 
   if (args["add"]) {
     db.add_target(targets.back());

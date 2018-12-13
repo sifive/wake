@@ -273,10 +273,11 @@ struct NameBinding {
   DefBinding *binding;
   Lambda *lambda;
   bool open;
+  bool clone;
 
-  NameBinding() : next(0), binding(0), lambda(0), open(true) { }
-  NameBinding(NameBinding *next_, Lambda *lambda_) : next(next_), binding(0), lambda(lambda_), open(true) { }
-  NameBinding(NameBinding *next_, DefBinding *binding_) : next(next_), binding(binding_), lambda(0), open(true) { }
+  NameBinding() : next(0), binding(0), lambda(0), open(true), clone(false) { }
+  NameBinding(NameBinding *next_, Lambda *lambda_) : next(next_), binding(0), lambda(lambda_), open(true), clone(false) { }
+  NameBinding(NameBinding *next_, DefBinding *binding_) : next(next_), binding(binding_), lambda(0), open(true), clone(false) { }
 
   NameRef find(const std::string &x) {
     NameRef out;
@@ -289,7 +290,7 @@ struct NameBinding {
     } else if (binding && (i = binding->order.find(x)) != binding->order.end()) {
       out.depth = 0;
       out.offset = i->second;
-      out.def = 1;
+      out.def = clone ? 1 : 0;
       if (i->second < (int)binding->val.size()) {
         out.var = &binding->val[i->second]->typeVar;
       } else {
@@ -322,7 +323,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     ref->offset = pos.offset;
     if (pos.def) {
       TypeVar temp;
-      pos.var->clone(temp, pos.var->getDOB());
+      pos.var->clone(temp);
       return ref->typeVar.unify(temp);
     } else {
       return ref->typeVar.unify(*pos.var);
@@ -332,8 +333,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     binding->open = false;
     bool f = explore(app->fn .get(), pmap, binding);
     bool a = explore(app->val.get(), pmap, binding);
-    bool t = app->fn->typeVar.unify(TypeVar("=>", 2));
-    bool ta = t && app->fn->typeVar[0].unify(app->val->typeVar);
+    bool t = app->fn->typeVar.unify(TypeVar("=>", 2), &app->location);
+    bool ta = t && app->fn->typeVar[0].unify(app->val->typeVar, &app->location);
     bool tr = t && app->fn->typeVar[1].unify(app->typeVar);
     return f && a && t && ta && tr;
   } else if (expr->type == Lambda::type) {
@@ -355,9 +356,13 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     bool ok = true;
     for (auto &i : def->val)
       ok = explore(i.get(), pmap, binding) && ok;
+    for (auto &i : def->fun) // !!! same-component only...
+      i->typeVar.setDOB();
     for (auto &i : def->fun)
       ok = explore(i.get(), pmap, &bind) && ok;
+    bind.clone = true;
     ok = explore(def->body.get(), pmap, &bind) && ok;
+    ok = def->typeVar.unify(def->body->typeVar) && ok;
     return ok;
   } else if (expr->type == Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
