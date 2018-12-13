@@ -129,7 +129,7 @@ void Top::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Top; globals =";
   for (auto &i : globals) os << " " << i.first;
   os << std::endl;
-  for (auto &i : defmaps) i.format(os, depth+2);
+  for (auto &i : defmaps) i->format(os, depth+2);
   body->format(os, depth+2);
 }
 

@@ -136,7 +136,7 @@ struct DefMap : public Expr {
 };
 
 struct Top : public Expr {
-  typedef std::vector<DefMap> DefMaps;
+  typedef std::vector<std::unique_ptr<DefMap> > DefMaps;
   DefMaps defmaps;
   DefOrder globals;
   std::unique_ptr<Expr> body;

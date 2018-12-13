@@ -68,10 +68,10 @@ BINOP_SI(root,mpz_root)
 
 static PRIMTYPE(type_powm) {
   return args.size() == 3 &&
-    args[0]->unifyVal(Integer::typeVar) &&
-    args[1]->unifyVal(Integer::typeVar) &&
-    args[2]->unifyVal(Integer::typeVar) &&
-    out->unifyVal(Integer::typeVar);
+    args[0]->unify(Integer::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    args[2]->unify(Integer::typeVar) &&
+    out->unify(Integer::typeVar);
 }
 
 static PRIMFN(prim_powm) {
@@ -87,9 +87,9 @@ static PRIMFN(prim_powm) {
 
 static PRIMTYPE(type_str) {
   return args.size() == 2 &&
-    args[0]->unifyVal(Integer::typeVar) &&
-    args[1]->unifyVal(Integer::typeVar) &&
-    out->unifyVal(String::typeVar);
+    args[0]->unify(Integer::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_str) {
@@ -109,9 +109,9 @@ static PRIMFN(prim_str) {
 
 static PRIMTYPE(type_int) {
   return args.size() == 2 &&
-    args[0]->unifyVal(Integer::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    out->unifyVal(Integer::typeVar);
+    args[0]->unify(Integer::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(Integer::typeVar);
 }
 
 static PRIMFN(prim_int) {
@@ -134,15 +134,15 @@ static PRIMFN(prim_int) {
 
 static PRIMTYPE(type_unop) {
   return args.size() == 1 &&
-    args[0]->unifyVal(Integer::typeVar) &&
-    out->unifyVal(Integer::typeVar);
+    args[0]->unify(Integer::typeVar) &&
+    out->unify(Integer::typeVar);
 }
 
 static PRIMTYPE(type_binop) {
   return args.size() == 2 &&
-    args[0]->unifyVal(Integer::typeVar) &&
-    args[1]->unifyVal(Integer::typeVar) &&
-    out->unifyVal(Integer::typeVar);
+    args[0]->unify(Integer::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(Integer::typeVar);
 }
 
 void prim_register_integer(PrimMap &pmap) {

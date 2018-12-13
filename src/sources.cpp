@@ -221,9 +221,9 @@ std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<
 
 static PRIMTYPE(type_sources) {
   return args.size() == 2 &&
-    args[0]->unifyVal(String::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    out->unifyVal(Integer::typeVar); // !!! wrong; string list
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(Integer::typeVar); // !!! wrong; string list
 }
 
 static PRIMFN(prim_sources) {
@@ -257,8 +257,8 @@ static PRIMFN(prim_sources) {
 
 static PRIMTYPE(type_add_sources) {
   return args.size() == 1 &&
-    args[0]->unifyVal(String::typeVar) &&
-    out->unifyVal(Integer::typeVar); // !!! wrong; bool
+    args[0]->unify(String::typeVar) &&
+    out->unify(Integer::typeVar); // !!! wrong; bool
 }
 
 static PRIMFN(prim_add_sources) {
@@ -288,8 +288,8 @@ static PRIMFN(prim_add_sources) {
 
 static PRIMTYPE(type_simplify) {
   return args.size() == 1 &&
-    args[0]->unifyVal(String::typeVar) &&
-    out->unifyVal(String::typeVar);
+    args[0]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_simplify) {
@@ -304,9 +304,9 @@ static PRIMFN(prim_simplify) {
 
 static PRIMTYPE(type_relative) {
   return args.size() == 2 &&
-    args[0]->unifyVal(String::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    out->unifyVal(String::typeVar);
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_relative) {
@@ -330,7 +330,7 @@ static PRIMFN(prim_relative) {
 
 static PRIMTYPE(type_execpath) {
   return args.size() == 0 &&
-    out->unifyVal(String::typeVar);
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_execpath) {
@@ -341,7 +341,7 @@ static PRIMFN(prim_execpath) {
 
 static PRIMTYPE(type_getcwd) {
   return args.size() == 0 &&
-    out->unifyVal(String::typeVar);
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_getcwd) {
