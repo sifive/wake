@@ -22,7 +22,7 @@ void RegExp::format(std::ostream &os, int depth) const {
   if (depth >= 0) os << std::endl;
 }
 
-TypeVar RegExp::typeVar("regexp", 0);
+TypeVar RegExp::typeVar("Regexp", 0);
 TypeVar &RegExp::getType() {
   return typeVar;
 }
@@ -53,8 +53,8 @@ static std::unique_ptr<Receiver> cast_regexp(WorkQueue &queue, std::unique_ptr<R
 
 static PRIMTYPE(type_re2) {
   return args.size() == 1 &&
-    args[0]->unifyVal(String::typeVar) &&
-    out->unifyVal(RegExp::typeVar);
+    args[0]->unify(String::typeVar) &&
+    out->unify(RegExp::typeVar);
 }
 
 static PRIMFN(prim_re2) {
@@ -75,8 +75,8 @@ static PRIMFN(prim_re2) {
 
 static PRIMTYPE(type_quote) {
   return args.size() == 1 &&
-    args[0]->unifyVal(String::typeVar) &&
-    out->unifyVal(String::typeVar);
+    args[0]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_quote) {
@@ -88,9 +88,9 @@ static PRIMFN(prim_quote) {
 
 static PRIMTYPE(type_match) {
   return args.size() == 2 &&
-    args[0]->unifyVal(RegExp::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    out->unifyVal(String::typeVar); // !!! wrong; bool
+    args[0]->unify(RegExp::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(String::typeVar); // !!! wrong; bool
 }
 
 static PRIMFN(prim_match) {
@@ -103,9 +103,9 @@ static PRIMFN(prim_match) {
 
 static PRIMTYPE(type_extract) {
   return args.size() == 2 &&
-    args[0]->unifyVal(RegExp::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    out->unifyVal(String::typeVar); // !!! wrong; string list
+    args[0]->unify(RegExp::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(String::typeVar); // !!! wrong; string list
 }
 
 static PRIMFN(prim_extract) {
@@ -130,10 +130,10 @@ static PRIMFN(prim_extract) {
 
 static PRIMTYPE(type_replace) {
   return args.size() == 3 &&
-    args[0]->unifyVal(RegExp::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    args[2]->unifyVal(String::typeVar) &&
-    out->unifyVal(String::typeVar);
+    args[0]->unify(RegExp::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    args[2]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_replace) {
@@ -149,9 +149,9 @@ static PRIMFN(prim_replace) {
 
 static PRIMTYPE(type_tokenize) {
   return args.size() == 2 &&
-    args[0]->unifyVal(RegExp::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    out->unifyVal(String::typeVar); // !!! wrong; string list
+    args[0]->unify(RegExp::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(String::typeVar); // !!! wrong; string list
 }
 
 static PRIMFN(prim_tokenize) {

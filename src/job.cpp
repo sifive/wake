@@ -62,7 +62,7 @@ void JobResult::format(std::ostream &os, int depth) const {
   if (depth >= 0) os << std::endl;
 }
 
-TypeVar JobResult::typeVar("job", 0);
+TypeVar JobResult::typeVar("Job", 0);
 TypeVar &JobResult::getType() {
   return typeVar;
 }
@@ -371,13 +371,13 @@ static std::unique_ptr<Receiver> cast_jobresult(WorkQueue &queue, std::unique_pt
 
 static PRIMTYPE(type_job_launch) {
   return args.size() == 6 &&
-    args[0]->unifyVal(Integer::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    args[2]->unifyVal(String::typeVar) &&
-    args[3]->unifyVal(String::typeVar) &&
-    args[4]->unifyVal(String::typeVar) &&
-    args[5]->unifyVal(String::typeVar) &&
-    out->unifyVal(JobResult::typeVar);
+    args[0]->unify(Integer::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    args[2]->unify(String::typeVar) &&
+    args[3]->unify(String::typeVar) &&
+    args[4]->unify(String::typeVar) &&
+    args[5]->unify(String::typeVar) &&
+    out->unify(JobResult::typeVar);
 }
 
 static PRIMFN(prim_job_launch) {
@@ -418,12 +418,12 @@ static PRIMFN(prim_job_launch) {
 
 static PRIMTYPE(type_job_cache) {
   return args.size() == 5 &&
-    args[0]->unifyVal(String::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    args[2]->unifyVal(String::typeVar) &&
-    args[3]->unifyVal(String::typeVar) &&
-    args[4]->unifyVal(String::typeVar) &&
-    out->unifyVal(JobResult::typeVar);
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    args[2]->unify(String::typeVar) &&
+    args[3]->unify(String::typeVar) &&
+    args[4]->unify(String::typeVar) &&
+    out->unify(JobResult::typeVar);
 }
 
 static PRIMFN(prim_job_cache) {
@@ -519,9 +519,9 @@ void JobResult::process(WorkQueue &queue) {
 
 static PRIMTYPE(type_job_output) {
   return args.size() == 2 &&
-    args[0]->unifyVal(JobResult::typeVar) &&
-    args[1]->unifyVal(Integer::typeVar) &&
-    out->unifyVal(String::typeVar);
+    args[0]->unify(JobResult::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_job_output) {
@@ -543,9 +543,9 @@ static PRIMFN(prim_job_output) {
 
 static PRIMTYPE(type_job_kill) {
   return args.size() == 2 &&
-    args[0]->unifyVal(JobResult::typeVar) &&
-    args[1]->unifyVal(Integer::typeVar) &&
-    out->unifyVal(Integer::typeVar);
+    args[0]->unify(JobResult::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(Integer::typeVar);
 }
 
 static PRIMFN(prim_job_kill) {
@@ -564,9 +564,9 @@ static PRIMFN(prim_job_kill) {
 
 static PRIMTYPE(type_job_tree) {
   return args.size() == 2 &&
-    args[0]->unifyVal(JobResult::typeVar) &&
-    args[1]->unifyVal(Integer::typeVar) &&
-    out->unifyVal(Integer::typeVar); // !!! wrong; (string, string) list
+    args[0]->unify(JobResult::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(Integer::typeVar); // !!! wrong; (string, string) list
 }
 
 static PRIMFN(prim_job_tree) {
@@ -588,10 +588,10 @@ static PRIMFN(prim_job_tree) {
 
 static PRIMTYPE(type_job_finish) {
   return args.size() == 3 &&
-    args[0]->unifyVal(JobResult::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    args[2]->unifyVal(String::typeVar) &&
-    out->unifyVal(Integer::typeVar); // !!! wrong; bool
+    args[0]->unify(JobResult::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    args[2]->unify(String::typeVar) &&
+    out->unify(Integer::typeVar); // !!! wrong; bool
 }
 
 static PRIMFN(prim_job_finish) {
@@ -639,9 +639,9 @@ static PRIMFN(prim_job_finish) {
 
 static PRIMTYPE(type_add_hash) {
   return args.size() == 2 &&
-    args[0]->unifyVal(String::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    out->unifyVal(Integer::typeVar); // !!! wrong; (string, string)
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(Integer::typeVar); // !!! wrong; (string, string)
 }
 
 static PRIMFN(prim_add_hash) {
@@ -665,9 +665,9 @@ static bool check_exec(const char *tok, size_t len, const std::string &exec, std
 
 static PRIMTYPE(type_search_path) {
   return args.size() == 2 &&
-    args[0]->unifyVal(String::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    out->unifyVal(String::typeVar);
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_search_path) {

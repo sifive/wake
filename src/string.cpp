@@ -28,7 +28,7 @@ void CatStream::format(std::ostream &os, int depth) const {
   if (depth >= 0) os << std::endl;
 }
 
-TypeVar CatStream::typeVar("catstream", 0);
+TypeVar CatStream::typeVar("Catstream", 0);
 TypeVar &CatStream::getType() {
   return typeVar;
 }
@@ -59,7 +59,7 @@ static std::unique_ptr<Receiver> cast_catstream(WorkQueue &queue, std::unique_pt
 
 static PRIMTYPE(type_catopen) {
   return args.size() == 0 &&
-    out->unifyVal(CatStream::typeVar);
+    out->unify(CatStream::typeVar);
 }
 
 static PRIMFN(prim_catopen) {
@@ -70,9 +70,9 @@ static PRIMFN(prim_catopen) {
 
 static PRIMTYPE(type_catadd) {
   return args.size() == 2 &&
-    args[0]->unifyVal(CatStream::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    out->unifyVal(CatStream::typeVar);
+    args[0]->unify(CatStream::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(CatStream::typeVar);
 }
 
 static PRIMFN(prim_catadd) {
@@ -85,8 +85,8 @@ static PRIMFN(prim_catadd) {
 
 static PRIMTYPE(type_catclose) {
   return args.size() == 1 &&
-    args[0]->unifyVal(CatStream::typeVar) &&
-    out->unifyVal(String::typeVar);
+    args[0]->unify(CatStream::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_catclose) {
@@ -98,8 +98,8 @@ static PRIMFN(prim_catclose) {
 
 static PRIMTYPE(type_read) {
   return args.size() == 1 &&
-    args[0]->unifyVal(String::typeVar) &&
-    out->unifyVal(String::typeVar);
+    args[0]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_read) {
@@ -115,10 +115,10 @@ static PRIMFN(prim_read) {
 
 static PRIMTYPE(type_write) {
   return args.size() == 3 &&
-    args[0]->unifyVal(String::typeVar) &&
-    args[1]->unifyVal(String::typeVar) &&
-    args[2]->unifyVal(Integer::typeVar) &&
-    out->unifyVal(String::typeVar);
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    args[2]->unify(Integer::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_write) {
@@ -140,8 +140,8 @@ static PRIMFN(prim_write) {
 
 static PRIMTYPE(type_getenv) {
   return args.size() == 1 &&
-    args[0]->unifyVal(String::typeVar) &&
-    out->unifyVal(String::typeVar);
+    args[0]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_getenv) {
@@ -155,9 +155,9 @@ static PRIMFN(prim_getenv) {
 
 static PRIMTYPE(type_mkdir) {
   return args.size() == 2 &&
-    args[0]->unifyVal(String::typeVar) &&
-    args[1]->unifyVal(Integer::typeVar) &&
-    out->unifyVal(String::typeVar); // !!! wrong; bool 
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(String::typeVar); // !!! wrong; bool 
 }
 
 static PRIMFN(prim_mkdir) {
@@ -191,7 +191,7 @@ static PRIMFN(prim_mkdir) {
 static PRIMTYPE(type_format) {
   return args.size() == 1 &&
     // don't unify args[0] => allow any
-    out->unifyVal(String::typeVar);
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_format) {
@@ -204,8 +204,8 @@ static PRIMFN(prim_format) {
 
 static PRIMTYPE(type_print) {
   return args.size() == 1 &&
-    args[0]->unifyVal(String::typeVar) &&
-    out->unifyVal(String::typeVar); // !!! wrong; bool 
+    args[0]->unify(String::typeVar) &&
+    out->unify(String::typeVar); // !!! wrong; bool 
 }
 
 static PRIMFN(prim_print) {

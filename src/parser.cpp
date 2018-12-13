@@ -447,8 +447,8 @@ Expr *parse_block(Lexer &lex) {
 void parse_top(Top &top, Lexer &lex) {
   TRACE("TOP");
   if (lex.next.type == EOL) lex.consume();
-  top.defmaps.push_back(DefMap(lex.next.location));
-  DefMap &defmap = top.defmaps.back();
+  top.defmaps.emplace_back(new DefMap(lex.next.location));
+  DefMap &defmap = *top.defmaps.back();
 
   bool repeat = true;
   while (repeat) {
@@ -461,7 +461,7 @@ void parse_top(Top &top, Lexer &lex) {
           std::cerr << "Duplicate global "
             << name << " at "
             << def->location << " and "
-            << top.defmaps[top.globals[name]].map[name]->location << std::endl;
+            << top.defmaps[top.globals[name]]->map[name]->location << std::endl;
           lex.fail = true;
         } else {
           top.globals[name] = top.defmaps.size()-1;

@@ -6,8 +6,8 @@
 
 static PRIMTYPE(type_lt) {
   return args.size() == 2 &&
-    args[0]->unifyVal(*args[1]) &&
-    out->unifyVal(Integer::typeVar); // !!! wrong; bool
+    args[0]->unify(*args[1]) &&
+    out->unify(Integer::typeVar); // !!! wrong; bool
 }
 
 static PRIMFN(prim_lt) {
@@ -32,8 +32,8 @@ static PRIMFN(prim_lt) {
 
 static PRIMTYPE(type_eq) {
   return args.size() == 2 &&
-    args[0]->unifyVal(*args[1]) &&
-    out->unifyVal(Integer::typeVar); // !!! wrong; bool
+    args[0]->unify(*args[1]) &&
+    out->unify(Integer::typeVar); // !!! wrong; bool
 }
 
 static PRIMFN(prim_eq) {
@@ -56,8 +56,8 @@ static PRIMFN(prim_eq) {
 
 static PRIMTYPE(type_cmp) {
   return args.size() == 2 &&
-    args[0]->unifyVal(*args[1]) &&
-    out->unifyVal(Integer::typeVar);
+    args[0]->unify(*args[1]) &&
+    out->unify(Integer::typeVar);
 }
 
 static PRIMFN(prim_cmp) {
@@ -84,7 +84,7 @@ static PRIMFN(prim_cmp) {
 static PRIMTYPE(type_test) {
   return args.size() == 1 &&
     // leave arg0 free
-    out->unifyVal(Integer::typeVar); // !!! wrong; bool
+    out->unify(Integer::typeVar); // !!! wrong; bool
 }
 
 static PRIMFN(prim_test) {
@@ -100,7 +100,7 @@ static PRIMFN(prim_test) {
 static PRIMTYPE(type_catch) {
   return args.size() == 1 &&
     // leave arg0 free
-    out->unifyVal(String::typeVar);
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_catch) {
@@ -119,7 +119,7 @@ static PRIMFN(prim_catch) {
 
 static PRIMTYPE(type_raise) {
   return args.size() == 1 &&
-    args[0]->unifyVal(String::typeVar);
+    args[0]->unify(String::typeVar);
     // leave prim free
 }
 
