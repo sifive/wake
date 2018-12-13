@@ -6,6 +6,8 @@
 
 struct CloneMap;
 struct LabelMap;
+struct UnifyMap;
+struct Location;
 
 struct TypeVar {
 private:
@@ -19,7 +21,9 @@ private:
   std::string name;
 
   static void do_clone(TypeVar &out, const TypeVar &x, int dob, CloneMap &clones);
-  static void do_format(std::ostream &os, const TypeVar &value, LabelMap &labels, bool parens);
+  static void do_format(std::ostream &os, int dob, const TypeVar &value, LabelMap &labels, bool parens);
+  bool do_unify(TypeVar &other, UnifyMap &map);
+  void do_debug(std::ostream &os, TypeVar &other, UnifyMap &map, int who, bool parens);
 
   bool isFree() const { return name.empty(); }
 
@@ -41,10 +45,10 @@ public:
   int getDOB() const { return find()->dob; }
 
   void setDOB();
-  bool unify(TypeVar &other);
-  bool unify(TypeVar &&other) { return unify(other); }
+  bool unify(TypeVar &other, Location *location = 0);
+  bool unify(TypeVar &&other, Location *location = 0) { return unify(other, location); }
 
-  void clone(TypeVar &into, int dob) const;
+  void clone(TypeVar &into) const;
 
 friend std::ostream & operator << (std::ostream &os, const TypeVar &value);
 };
