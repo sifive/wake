@@ -90,7 +90,7 @@ static PRIMTYPE(type_match) {
   return args.size() == 2 &&
     args[0]->unify(RegExp::typeVar) &&
     args[1]->unify(String::typeVar) &&
-    out->unify(String::typeVar); // !!! wrong; bool
+    out->unify(Data::typeBool);
 }
 
 static PRIMFN(prim_match) {
@@ -102,10 +102,13 @@ static PRIMFN(prim_match) {
 }
 
 static PRIMTYPE(type_extract) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
   return args.size() == 2 &&
     args[0]->unify(RegExp::typeVar) &&
     args[1]->unify(String::typeVar) &&
-    out->unify(String::typeVar); // !!! wrong; string list
+    out->unify(list);
 }
 
 static PRIMFN(prim_extract) {
@@ -148,10 +151,13 @@ static PRIMFN(prim_replace) {
 }
 
 static PRIMTYPE(type_tokenize) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
   return args.size() == 2 &&
     args[0]->unify(RegExp::typeVar) &&
     args[1]->unify(String::typeVar) &&
-    out->unify(String::typeVar); // !!! wrong; string list
+    out->unify(list);
 }
 
 static PRIMFN(prim_tokenize) {

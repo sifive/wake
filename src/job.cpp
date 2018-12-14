@@ -563,10 +563,17 @@ static PRIMFN(prim_job_kill) {
 }
 
 static PRIMTYPE(type_job_tree) {
+  TypeVar list;
+  TypeVar pair;
+  Data::typeList.clone(list);
+  Data::typePair.clone(pair);
+  list[0].unify(pair);
+  pair[0].unify(String::typeVar);
+  pair[1].unify(String::typeVar);
   return args.size() == 2 &&
     args[0]->unify(JobResult::typeVar) &&
     args[1]->unify(Integer::typeVar) &&
-    out->unify(Integer::typeVar); // !!! wrong; (string, string) list
+    out->unify(list);
 }
 
 static PRIMFN(prim_job_tree) {
@@ -591,7 +598,7 @@ static PRIMTYPE(type_job_finish) {
     args[0]->unify(JobResult::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
-    out->unify(Integer::typeVar); // !!! wrong; bool
+    out->unify(Data::typeBool);
 }
 
 static PRIMFN(prim_job_finish) {
@@ -638,10 +645,14 @@ static PRIMFN(prim_job_finish) {
 }
 
 static PRIMTYPE(type_add_hash) {
+  TypeVar pair;
+  Data::typePair.clone(pair);
+  pair[0].unify(String::typeVar);
+  pair[1].unify(String::typeVar);
   return args.size() == 2 &&
     args[0]->unify(String::typeVar) &&
     args[1]->unify(String::typeVar) &&
-    out->unify(Integer::typeVar); // !!! wrong; (string, string)
+    out->unify(pair);
 }
 
 static PRIMFN(prim_add_hash) {

@@ -147,6 +147,14 @@ Hash Closure::hash() const {
   return out;
 }
 
+TypeVar Data::typeBool("Bool", 0);
+const TypeVar Data::typeList("List", 1);
+const TypeVar Data::typePair("Pair", 2);
+TypeVar &Data::getType() {
+  assert (0); // unreachable
+  return typeBool;
+}
+
 Cause::Cause(const std::string &reason_, std::vector<Location> &&stack_)
  : reason(reason_), stack(std::move(stack_)) { }
 
