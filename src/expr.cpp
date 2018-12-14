@@ -139,14 +139,18 @@ void Top::hash() {
 
 void DefBinding::format(std::ostream &os, int depth) const {
   os << pad(depth) << "DefBinding: " << typeVar << " @ " << location << std::endl;
-  int vals = val.size();
-  for (auto &i : order) {
-    os << pad(depth+2) << (i.second < vals ? "val " : "fun ") << i.first << " =" << std::endl;
-    if (i.second < vals) {
-      val[i.second]->format(os, depth+4);
-    } else {
-      fun[i.second - vals]->format(os, depth+4);
-    }
+
+  // invert name=>index map
+  std::vector<const char*> names(order.size());
+  for (auto &i : order) names[i.second] = i.first.c_str();
+
+  for (int i = 0; i < (int)val.size(); ++i) {
+    os << pad(depth+2) << "val " << names[i] << " = " << std::endl;
+    val[i]->format(os, depth+4);
+  }
+  for (int i = 0; i < (int)fun.size(); ++i) {
+    os << pad(depth+2) << "fun " << names[i+val.size()] << " (" << scc[i] << ") = " << std::endl;
+    fun[i]->format(os, depth+4);
   }
   body->format(os, depth+2);
 }

@@ -157,6 +157,7 @@ struct DefBinding : public Expr {
   values val;     // access prior binding
   functions fun;  // access current binding
   DefOrder order; // values, then functions
+  std::vector<int> scc; // SCC id per function
 
   static const char *type;
   DefBinding(const Location &location_, std::unique_ptr<Expr> body_) : Expr(type, location_), body(std::move(body_)) { }

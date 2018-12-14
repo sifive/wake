@@ -17,7 +17,53 @@ struct ResolveDef {
   std::string name;
   std::unique_ptr<Expr> expr;
   std::set<int> edges; // edges: things this name uses
+  int index, lowlink, onstack; // Tarjan SCC variables
 };
+
+struct SCCState {
+  std::vector<ResolveDef> *defs;
+  std::vector<int> *levelmap;
+  std::vector<int> S;
+  DefBinding *binding;
+  int index;
+  int level;
+};
+
+static void SCC(SCCState &state, int vi) {
+  ResolveDef &v = (*state.defs)[vi];
+
+  v.index = state.index;
+  v.lowlink = state.index;
+  ++state.index;
+
+  state.S.push_back(vi);
+  v.onstack = 1;
+
+  for (auto wi : v.edges) {
+    ResolveDef &w = (*state.defs)[wi];
+    if ((*state.levelmap)[wi] != state.level) continue;
+
+    if (w.index == -1 && w.expr->type == Lambda::type) {
+      SCC(state, wi);
+      v.lowlink = std::min(v.lowlink, w.lowlink);
+    } else if (w.onstack) {
+      v.lowlink = std::min(v.lowlink, w.index);
+    }
+  }
+
+  if (v.lowlink == v.index) {
+    int wi, scc_id = state.binding->fun.size();
+    do {
+      wi = state.S.back();
+      ResolveDef &w = (*state.defs)[wi];
+      state.S.pop_back();
+      w.onstack = 0;
+      state.binding->order[w.name] = state.binding->fun.size() + state.binding->val.size();
+      state.binding->fun.emplace_back(reinterpret_cast<Lambda*>(w.expr.release()));
+      state.binding->scc.push_back(scc_id);
+    } while (wi != vi);
+  }
+}
 
 struct ResolveBinding {
   ResolveBinding *parent;
@@ -85,19 +131,26 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
   for (int i = 0; i < (int)defs.size(); ++i) {
     if (levels[i].empty()) continue;
     std::unique_ptr<DefBinding> bind(new DefBinding(location, std::move(out)));
-    int vals = 0;
     for (auto j : levels[i]) {
-      if (defs[j].expr->type != Lambda::type) ++vals;
-    }
-    for (auto j : levels[i]) {
-      if (defs[j].expr->type == Lambda::type) {
-        bind->order[defs[j].name] = bind->fun.size() + vals;
-        bind->fun.emplace_back(reinterpret_cast<Lambda*>(defs[j].expr.release()));
-      } else {
+      if (defs[j].expr->type != Lambda::type) {
         bind->order[defs[j].name] = bind->val.size();
         bind->val.emplace_back(std::move(defs[j].expr));
+        defs[j].index = 0;
+      } else {
+        defs[j].index = -1;
+        defs[j].lowlink = -1;
+        defs[j].onstack = 0;
       }
     }
+    SCCState state;
+    state.defs = &defs;
+    state.levelmap = &d;
+    state.binding = bind.get();
+    state.level = i;
+    state.index = 0;
+    for (auto j : levels[i])
+      if (defs[j].index == -1 && defs[j].expr->type == Lambda::type)
+        SCC(state, j);
     out = std::move(bind);
   }
 
@@ -273,11 +326,11 @@ struct NameBinding {
   DefBinding *binding;
   Lambda *lambda;
   bool open;
-  bool clone;
+  int generalized;
 
-  NameBinding() : next(0), binding(0), lambda(0), open(true), clone(false) { }
-  NameBinding(NameBinding *next_, Lambda *lambda_) : next(next_), binding(0), lambda(lambda_), open(true), clone(false) { }
-  NameBinding(NameBinding *next_, DefBinding *binding_) : next(next_), binding(binding_), lambda(0), open(true), clone(false) { }
+  NameBinding() : next(0), binding(0), lambda(0), open(true), generalized(0) { }
+  NameBinding(NameBinding *next_, Lambda *lambda_) : next(next_), binding(0), lambda(lambda_), open(true), generalized(0) { }
+  NameBinding(NameBinding *next_, DefBinding *binding_) : next(next_), binding(binding_), lambda(0), open(true), generalized(0) { }
 
   NameRef find(const std::string &x) {
     NameRef out;
@@ -290,7 +343,7 @@ struct NameBinding {
     } else if (binding && (i = binding->order.find(x)) != binding->order.end()) {
       out.depth = 0;
       out.offset = i->second;
-      out.def = clone ? 1 : 0;
+      out.def = i->second < generalized;
       if (i->second < (int)binding->val.size()) {
         out.var = &binding->val[i->second]->typeVar;
       } else {
@@ -356,11 +409,12 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     bool ok = true;
     for (auto &i : def->val)
       ok = explore(i.get(), pmap, binding) && ok;
-    for (auto &i : def->fun) // !!! same-component only...
-      i->typeVar.setDOB();
-    for (auto &i : def->fun)
-      ok = explore(i.get(), pmap, &bind) && ok;
-    bind.clone = true;
+    for (auto &i : def->fun) i->typeVar.setDOB();
+    for (int i = 0; i < (int)def->fun.size(); ++i) {
+      bind.generalized = def->val.size() + def->scc[i];
+      ok = explore(def->fun[i].get(), pmap, &bind) && ok;
+    }
+    bind.generalized = def->val.size() + def->fun.size();
     ok = explore(def->body.get(), pmap, &bind) && ok;
     ok = def->typeVar.unify(def->body->typeVar, &def->location) && ok;
     return ok;
