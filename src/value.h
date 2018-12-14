@@ -71,6 +71,20 @@ struct Closure : public Value {
   Hash hash() const;
 };
 
+struct Data : public Value {
+  int id; // constructor id; look-up type in table
+//  std::unique_ptr<Future[]> future;
+
+  static TypeVar typeBool;
+  // these two are const to prevent unify() on them; use clone
+  static const TypeVar typeList;
+  static const TypeVar typePair;
+  Data(int id_, int nvals);
+  void format(std::ostream &os, int depth) const;
+  TypeVar &getType();
+  Hash hash() const;
+};
+
 struct Cause {
   std::string reason;
   std::vector<Location> stack;

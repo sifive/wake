@@ -220,10 +220,13 @@ std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<
 }
 
 static PRIMTYPE(type_sources) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
   return args.size() == 2 &&
     args[0]->unify(String::typeVar) &&
     args[1]->unify(String::typeVar) &&
-    out->unify(Integer::typeVar); // !!! wrong; string list
+    out->unify(list);
 }
 
 static PRIMFN(prim_sources) {
@@ -258,7 +261,7 @@ static PRIMFN(prim_sources) {
 static PRIMTYPE(type_add_sources) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
-    out->unify(Integer::typeVar); // !!! wrong; bool
+    out->unify(Data::typeBool);
 }
 
 static PRIMFN(prim_add_sources) {

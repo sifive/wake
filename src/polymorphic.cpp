@@ -7,7 +7,7 @@
 static PRIMTYPE(type_lt) {
   return args.size() == 2 &&
     args[0]->unify(*args[1]) &&
-    out->unify(Integer::typeVar); // !!! wrong; bool
+    out->unify(Data::typeBool);
 }
 
 static PRIMFN(prim_lt) {
@@ -33,7 +33,7 @@ static PRIMFN(prim_lt) {
 static PRIMTYPE(type_eq) {
   return args.size() == 2 &&
     args[0]->unify(*args[1]) &&
-    out->unify(Integer::typeVar); // !!! wrong; bool
+    out->unify(Data::typeBool);
 }
 
 static PRIMFN(prim_eq) {
@@ -84,7 +84,7 @@ static PRIMFN(prim_cmp) {
 static PRIMTYPE(type_test) {
   return args.size() == 1 &&
     // leave arg0 free
-    out->unify(Integer::typeVar); // !!! wrong; bool
+    out->unify(Data::typeBool);
 }
 
 static PRIMFN(prim_test) {
