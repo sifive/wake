@@ -21,6 +21,8 @@ private:
   TypeVar *pargs;
   std::string name;
 
+  bool contains(const TypeVar *other) const;
+  void do_sweep() const;
   static void do_clone(TypeVar &out, const TypeVar &x, int dob);
   static int do_format(std::ostream &os, int dob, const TypeVar &value, int tags, bool parens);
   bool do_unify(TypeVar &other);
