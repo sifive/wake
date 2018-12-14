@@ -1,14 +1,15 @@
 #include "type.h"
 #include "location.h"
+#include <cstring>
 #include <iostream>
 #include <cassert>
 
 static int globalClock = 0;
 static int globalEpoch = 1; // before a tagging pass, globalEpoch > TypeVar.epoch for all TypeVars
 
-TypeVar::TypeVar() : parent(0), epoch(0), dob(0), nargs(0), pargs(0) { }
+TypeVar::TypeVar() : parent(0), epoch(0), dob(0), nargs(0), pargs(0), name("") { }
 
-TypeVar::TypeVar(const std::string &name_, int nargs_)
+TypeVar::TypeVar(const char *name_, int nargs_)
  : parent(0), epoch(0), dob(++globalClock), nargs(nargs_), name(name_) {
   pargs = nargs ? new TypeVar[nargs] : 0;
   for (int i = 0; i < nargs; ++i) pargs[i].dob = ++globalClock;
@@ -85,7 +86,7 @@ bool TypeVar::do_unify(TypeVar &other) {
       if (b->dob < a->dob) a->dob = b->dob;
     }
     return !infinite;
-  } else if (a->name != b->name || a->nargs != b->nargs) {
+  } else if (strcmp(a->name, b->name) || a->nargs != b->nargs) {
     return false;
   } else {
     bool ok = true;
@@ -95,7 +96,6 @@ bool TypeVar::do_unify(TypeVar &other) {
     if (ok) {
       b->parent = a;
       if (b->dob < a->dob) a->dob = b->dob;
-      b->name.clear();
       // we cannot clear pargs, because other TypeVars might point through our children
     } else {
       if (a->epoch < globalEpoch) a->epoch = globalEpoch;
@@ -110,13 +110,13 @@ void TypeVar::do_debug(std::ostream &os, TypeVar &other, int who, bool parens) {
   TypeVar *b = other.find();
   TypeVar *w = who ? b : a;
 
-  if (a->nargs != b->nargs || a->name != b->name) {
+  if (a->nargs != b->nargs || strcmp(a->name, b->name)) {
     if (parens && w->nargs > 0) os << "(";
     // os << "[[[ ";
-    if (w->name[0] == '=') {
-      os << "_ => _";
-    } else if (w->isFree()) {
+    if (w->isFree()) {
       os << "infinite-type";
+    } else if (w->name[0] == '=') {
+      os << "_ => _";
     } else {
       os << w->name;
       for (int i = 0; i < w->nargs; ++i)
@@ -163,7 +163,7 @@ bool TypeVar::unify(TypeVar &other, Location *location) {
 void TypeVar::do_clone(TypeVar &out, const TypeVar &x, int dob) {
   out.dob = ++globalClock;
   const TypeVar *in = x.find();
-  if (in->name.size() == 0 && in->dob < dob) { // no need to clone
+  if (in->name[0] == 0 && in->dob < dob) { // no need to clone
     out.parent = const_cast<TypeVar*>(in);
   } else {
     if (in->epoch < globalEpoch) { // not previously cloned

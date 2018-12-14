@@ -1,9 +1,7 @@
 #ifndef TYPE_H
 #define TYPE_H
 
-#include <vector>
-#include <string>
-
+#include <ostream>
 struct Location;
 
 struct TypeVar {
@@ -19,7 +17,7 @@ private:
   int dob; // date of birth
   int nargs;
   TypeVar *pargs;
-  std::string name;
+  const char *name;
 
   bool contains(const TypeVar *other) const;
   void do_sweep() const;
@@ -28,7 +26,7 @@ private:
   bool do_unify(TypeVar &other);
   void do_debug(std::ostream &os, TypeVar &other, int who, bool parens);
 
-  bool isFree() const { return name.empty(); }
+  bool isFree() const { return name[0] == 0; }
 
 public:
   TypeVar(const TypeVar& other) = delete;
@@ -38,7 +36,7 @@ public:
 
   ~TypeVar();
   TypeVar(); // free type-var
-  TypeVar(const std::string &name_, int nargs_);
+  TypeVar(const char *name_, int nargs_);
 
   const TypeVar *find() const;
   TypeVar *find();
