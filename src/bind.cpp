@@ -324,9 +324,9 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     if (pos.def) {
       TypeVar temp;
       pos.var->clone(temp);
-      return ref->typeVar.unify(temp);
+      return ref->typeVar.unify(temp, &ref->location);
     } else {
-      return ref->typeVar.unify(*pos.var);
+      return ref->typeVar.unify(*pos.var, &ref->location);
     }
   } else if (expr->type == App::type) {
     App *app = reinterpret_cast<App*>(expr);
@@ -335,19 +335,19 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     bool a = explore(app->val.get(), pmap, binding);
     bool t = app->fn->typeVar.unify(TypeVar("=>", 2), &app->location);
     bool ta = t && app->fn->typeVar[0].unify(app->val->typeVar, &app->location);
-    bool tr = t && app->fn->typeVar[1].unify(app->typeVar);
+    bool tr = t && app->fn->typeVar[1].unify(app->typeVar, &app->location);
     return f && a && t && ta && tr;
   } else if (expr->type == Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
-    bool t = lambda->typeVar.unify(TypeVar("=>", 2));
+    bool t = lambda->typeVar.unify(TypeVar("=>", 2), &lambda->location);
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), pmap, &bind);
-    bool tr = t && lambda->typeVar[1].unify(lambda->body->typeVar);
+    bool tr = t && lambda->typeVar[1].unify(lambda->body->typeVar, &lambda->location);
     return out && t && tr;
   } else if (expr->type == Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
     bool out = explore(memoize->body.get(), pmap, binding);
-    bool t = memoize->typeVar.unify(memoize->body->typeVar);
+    bool t = memoize->typeVar.unify(memoize->body->typeVar, &memoize->location);
     return out && t;
   } else if (expr->type == DefBinding::type) {
     DefBinding *def = reinterpret_cast<DefBinding*>(expr);
@@ -362,11 +362,11 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       ok = explore(i.get(), pmap, &bind) && ok;
     bind.clone = true;
     ok = explore(def->body.get(), pmap, &bind) && ok;
-    ok = def->typeVar.unify(def->body->typeVar) && ok;
+    ok = def->typeVar.unify(def->body->typeVar, &def->location) && ok;
     return ok;
   } else if (expr->type == Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
-    return lit->typeVar.unify(lit->value->getType());
+    return lit->typeVar.unify(lit->value->getType(), &lit->location);
   } else if (expr->type == Prim::type) {
     Prim *prim = reinterpret_cast<Prim*>(expr);
     std::vector<TypeVar*> args;

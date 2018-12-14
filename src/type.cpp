@@ -35,6 +35,28 @@ void TypeVar::setDOB() {
   dob = ++globalClock;
 }
 
+bool TypeVar::contains(const TypeVar *other) const {
+  const TypeVar *a = find();
+  if (a->epoch < globalEpoch) a->epoch = globalEpoch;
+  if (!(a->epoch & 2)) {
+    a->epoch |= 2;
+    if (a == other) return true;
+    for (int i = 0; i < a->nargs; ++i)
+      if (a->pargs[i].contains(other))
+        return true;
+  }
+  return false;
+}
+
+void TypeVar::do_sweep() const {
+  const TypeVar *a = find();
+  if ((a->epoch & 2)) {
+    epoch &= ~2;
+    for (int i = 0; i < a->nargs; ++i)
+      a->pargs[i].do_sweep();
+  }
+}
+
 // Always point RHS at LHS (so RHS can be a temporary)
 bool TypeVar::do_unify(TypeVar &other) {
   TypeVar *a = find();
@@ -45,16 +67,24 @@ bool TypeVar::do_unify(TypeVar &other) {
   if (a == b) {
     return true;
   } else if (b->isFree()) {
-    b->parent = a;
-    if (b->dob < a->dob) a->dob = b->dob;
-    return true;
+    bool infinite = a->contains(b);
+    a->do_sweep();
+    if (!infinite) {
+      b->parent = a;
+      if (b->dob < a->dob) a->dob = b->dob;
+    }
+    return !infinite;
   } else if (a->isFree()) {
-    std::swap(a->name,  b->name);
-    std::swap(a->nargs, b->nargs);
-    std::swap(a->pargs, b->pargs);
-    b->parent = a;
-    if (b->dob < a->dob) a->dob = b->dob;
-    return true;
+    bool infinite = b->contains(a);
+    b->do_sweep();
+    if (!infinite) {
+      std::swap(a->name,  b->name);
+      std::swap(a->nargs, b->nargs);
+      std::swap(a->pargs, b->pargs);
+      b->parent = a;
+      if (b->dob < a->dob) a->dob = b->dob;
+    }
+    return !infinite;
   } else if (a->name != b->name || a->nargs != b->nargs) {
     return false;
   } else {
@@ -68,7 +98,8 @@ bool TypeVar::do_unify(TypeVar &other) {
       b->name.clear();
       // we cannot clear pargs, because other TypeVars might point through our children
     } else {
-      a->epoch = globalEpoch + 1;
+      if (a->epoch < globalEpoch) a->epoch = globalEpoch;
+      a->epoch |= 1;
     }
     return ok;
   }
@@ -84,6 +115,8 @@ void TypeVar::do_debug(std::ostream &os, TypeVar &other, int who, bool parens) {
     // os << "[[[ ";
     if (w->name[0] == '=') {
       os << "_ => _";
+    } else if (w->isFree()) {
+      os << "infinite-type";
     } else {
       os << w->name;
       for (int i = 0; i < w->nargs; ++i)
@@ -91,7 +124,7 @@ void TypeVar::do_debug(std::ostream &os, TypeVar &other, int who, bool parens) {
     }
     // os << " ]]]";
     if (parens && w->nargs > 0) os << ")";
-  } else if (a->epoch - globalEpoch == 1) {
+  } else if (a->epoch - globalEpoch != 1) {
     os << "_";
   } else {
     if (parens) os << "(";
@@ -111,6 +144,7 @@ void TypeVar::do_debug(std::ostream &os, TypeVar &other, int who, bool parens) {
 }
 
 bool TypeVar::unify(TypeVar &other, Location *location) {
+  globalEpoch += (-globalEpoch) & 3; // round up to a multiple of 4
   bool ok = do_unify(other);
   if (!ok) {
     std::ostream &os = std::cerr;
@@ -122,7 +156,7 @@ bool TypeVar::unify(TypeVar &other, Location *location) {
     do_debug(os, other, 1, false);
     os << std::endl;
   }
-  globalEpoch += 2;
+  globalEpoch += 4;
   return ok;
 }
 
