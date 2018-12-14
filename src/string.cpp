@@ -28,7 +28,7 @@ void CatStream::format(std::ostream &os, int depth) const {
   if (depth >= 0) os << std::endl;
 }
 
-TypeVar CatStream::typeVar("Catstream", 0);
+TypeVar CatStream::typeVar("CatStream", 0);
 TypeVar &CatStream::getType() {
   return typeVar;
 }

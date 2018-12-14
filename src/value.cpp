@@ -94,7 +94,7 @@ void Exception::format(std::ostream &os, int depth) const {
   }
 }
 
-TypeVar String::typeVar("Str", 0);
+TypeVar String::typeVar("String", 0);
 TypeVar &String::getType() {
   return typeVar;
 }
@@ -105,7 +105,7 @@ Hash String::hash() const {
   return payload;
 }
 
-TypeVar Integer::typeVar("Int", 0);
+TypeVar Integer::typeVar("Integer", 0);
 TypeVar &Integer::getType() {
   return typeVar;
 }
