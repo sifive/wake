@@ -4,14 +4,15 @@
 #include <vector>
 #include <string>
 
-struct CloneMap;
-struct LabelMap;
-struct UnifyMap;
 struct Location;
 
 struct TypeVar {
 private:
   mutable TypeVar *parent;
+
+  // Scratch variables useful for tree traversals
+  mutable TypeVar *link;
+  mutable int epoch;
 
   // before unification, expr children are YOUNGER than their parent
   // before unification, args are YOUNGER than the constructor
@@ -20,10 +21,10 @@ private:
   TypeVar *pargs;
   std::string name;
 
-  static void do_clone(TypeVar &out, const TypeVar &x, int dob, CloneMap &clones);
-  static void do_format(std::ostream &os, int dob, const TypeVar &value, LabelMap &labels, bool parens);
-  bool do_unify(TypeVar &other, UnifyMap &map);
-  void do_debug(std::ostream &os, TypeVar &other, UnifyMap &map, int who, bool parens);
+  static void do_clone(TypeVar &out, const TypeVar &x, int dob);
+  static int do_format(std::ostream &os, int dob, const TypeVar &value, int tags, bool parens);
+  bool do_unify(TypeVar &other);
+  void do_debug(std::ostream &os, TypeVar &other, int who, bool parens);
 
   bool isFree() const { return name.empty(); }
 

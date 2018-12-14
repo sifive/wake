@@ -2,15 +2,14 @@
 #include "location.h"
 #include <iostream>
 #include <cassert>
-#include <map>
-#include <set>
 
 static int globalClock = 0;
+static int globalEpoch = 1; // before a tagging pass, globalEpoch > TypeVar.epoch for all TypeVars
 
-TypeVar::TypeVar() : parent(0), dob(0), nargs(0), pargs(0) { }
+TypeVar::TypeVar() : parent(0), epoch(0), dob(0), nargs(0), pargs(0) { }
 
 TypeVar::TypeVar(const std::string &name_, int nargs_)
- : parent(0), dob(++globalClock), nargs(nargs_), name(name_) {
+ : parent(0), epoch(0), dob(++globalClock), nargs(nargs_), name(name_) {
   pargs = nargs ? new TypeVar[nargs] : 0;
   for (int i = 0; i < nargs; ++i) pargs[i].dob = ++globalClock;
 }
@@ -36,12 +35,8 @@ void TypeVar::setDOB() {
   dob = ++globalClock;
 }
 
-struct UnifyMap {
-  std::set<TypeVar*> problems;
-};
-
 // Always point RHS at LHS (so RHS can be a temporary)
-bool TypeVar::do_unify(TypeVar &other, UnifyMap &map) {
+bool TypeVar::do_unify(TypeVar &other) {
   TypeVar *a = find();
   TypeVar *b = other.find();
   assert (a->dob);
@@ -61,12 +56,11 @@ bool TypeVar::do_unify(TypeVar &other, UnifyMap &map) {
     if (b->dob < a->dob) a->dob = b->dob;
     return true;
   } else if (a->name != b->name || a->nargs != b->nargs) {
-    map.problems.insert(a);
     return false;
   } else {
     bool ok = true;
     for (int i = 0; i < a->nargs; ++i)
-      if (!a->pargs[i].do_unify(b->pargs[i], map))
+      if (!a->pargs[i].do_unify(b->pargs[i]))
         ok = false;
     if (ok) {
       b->parent = a;
@@ -74,13 +68,13 @@ bool TypeVar::do_unify(TypeVar &other, UnifyMap &map) {
       b->name.clear();
       // we cannot clear pargs, because other TypeVars might point through our children
     } else {
-      map.problems.insert(a);
+      a->epoch = globalEpoch + 1;
     }
     return ok;
   }
 }
 
-void TypeVar::do_debug(std::ostream &os, TypeVar &other, UnifyMap &map, int who, bool parens) {
+void TypeVar::do_debug(std::ostream &os, TypeVar &other, int who, bool parens) {
   TypeVar *a = find();
   TypeVar *b = other.find();
   TypeVar *w = who ? b : a;
@@ -97,19 +91,19 @@ void TypeVar::do_debug(std::ostream &os, TypeVar &other, UnifyMap &map, int who,
     }
     // os << " ]]]";
     if (parens && w->nargs > 0) os << ")";
-  } else if (map.problems.find(a) == map.problems.end()) {
+  } else if (a->epoch - globalEpoch == 1) {
     os << "_";
   } else {
     if (parens) os << "(";
     if (a->name[0] == '=') {
-      a->pargs[0].do_debug(os, b->pargs[0], map, who, true);
+      a->pargs[0].do_debug(os, b->pargs[0], who, true);
       os << " => ";
-      a->pargs[1].do_debug(os, b->pargs[1], map, who, false);
+      a->pargs[1].do_debug(os, b->pargs[1], who, false);
     } else {
       os << a->name;
       for (int i = 0; i < a->nargs; ++i) {
         os << " ";
-        a->pargs[i].do_debug(os, b->pargs[i], map, who, true);
+        a->pargs[i].do_debug(os, b->pargs[i], who, true);
       }
     }
     if (parens) os << ")";
@@ -117,48 +111,45 @@ void TypeVar::do_debug(std::ostream &os, TypeVar &other, UnifyMap &map, int who,
 }
 
 bool TypeVar::unify(TypeVar &other, Location *location) {
-  UnifyMap map;
-  bool ok = do_unify(other, map);
+  bool ok = do_unify(other);
   if (!ok) {
     std::ostream &os = std::cerr;
     os << "Type inference error";
     if (location) os << " at " << *location;
     os << ":" << std::endl << "    ";
-    do_debug(os, other, map, 0, false);
+    do_debug(os, other, 0, false);
     os << std::endl << "  does not match:" << std::endl << "    ";
-    do_debug(os, other, map, 1, false);
+    do_debug(os, other, 1, false);
     os << std::endl;
   }
+  globalEpoch += 2;
   return ok;
 }
 
-struct CloneMap {
-  std::map<const TypeVar*, TypeVar*> map;
-};
-
-void TypeVar::do_clone(TypeVar &out, const TypeVar &x, int dob, CloneMap &clones) {
+void TypeVar::do_clone(TypeVar &out, const TypeVar &x, int dob) {
   out.dob = ++globalClock;
   const TypeVar *in = x.find();
   if (in->name.size() == 0 && in->dob < dob) { // no need to clone
     out.parent = const_cast<TypeVar*>(in);
   } else {
-    auto dup = clones.map.insert(std::make_pair(in, &out));
-    if (dup.second) { // not previously cloned
+    if (in->epoch < globalEpoch) { // not previously cloned
+      in->epoch = globalEpoch;
+      in->link = &out;
       out.name = in->name;
       out.nargs = in->nargs;
       out.pargs = out.nargs ? new TypeVar[out.nargs] : 0;
       for (int i = 0; i < out.nargs; ++i)
-        do_clone(out.pargs[i], in->pargs[i], dob, clones);
+        do_clone(out.pargs[i], in->pargs[i], dob);
     } else { // this TypeVar was already cloned; replicate sharing
-      out.parent = dup.first->second;
+      out.parent = in->link;
     }
   }
 }
 
 void TypeVar::clone(TypeVar &into) const {
   assert (!into.parent && into.isFree());
-  CloneMap clones;
-  do_clone(into, *this, dob, clones);
+  do_clone(into, *this, dob);
+  ++globalEpoch;
 }
 
 static void tag2str(std::ostream &os, int tag) {
@@ -167,37 +158,37 @@ static void tag2str(std::ostream &os, int tag) {
   os << (char)('a' + (tag % radix));
 }
 
-struct LabelMap {
-  std::map<const TypeVar*, int> map;
-};
-
-void TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, LabelMap &labels, bool parens) {
+int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, int tags, bool parens) {
   const TypeVar *a = value.find();
   if (a->isFree()) {
-    auto label = labels.map.insert(std::make_pair(a, (int)labels.map.size()));
+    int tag = a->epoch - globalEpoch;
+    if (tag < 0) {
+      tag = tags++;
+      a->epoch = globalEpoch + tag;
+    }
     if (a->dob <= dob) os << "_";
-    tag2str(os, label.first->second);
+    tag2str(os, tag);
   } else if (a->nargs == 0) {
     os << a->name;
   } else if (a->name[0] == '=') {
     if (parens) os << "(";
-    do_format(os, dob, a->pargs[0], labels, true);
+    tags = do_format(os, dob, a->pargs[0], tags, true);
     os << " => ";
-    do_format(os, dob, a->pargs[1], labels, false);
+    tags = do_format(os, dob, a->pargs[1], tags, false);
     if (parens) os << ")";
   } else {
     if (parens) os << "(";
     os << a->name;
     for (int i = 0; i < a->nargs; ++i) {
       os << " ";
-      do_format(os, dob, a->pargs[i], labels, true);
+      tags = do_format(os, dob, a->pargs[i], tags, true);
     }
     if (parens) os << ")";
   }
+  return tags;
 }
 
 std::ostream & operator << (std::ostream &os, const TypeVar &value) {
-  LabelMap labels;
-  TypeVar::do_format(os, value.find()->dob, value, labels, false);
+  globalEpoch += TypeVar::do_format(os, value.find()->dob, value, 0, false);
   return os;
 }
