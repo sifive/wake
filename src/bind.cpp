@@ -437,7 +437,11 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     } else {
       prim->fn   = i->second.fn;
       prim->data = i->second.data;
-      return i->second.type(i->second.data, args, &prim->typeVar);
+      bool ok = i->second.type(i->second.data, args, &prim->typeVar);
+      if (!ok) std::cerr << "Primitive reference "
+        << prim->name << " has wrong type signature at "
+        << prim->location << std::endl;
+      return ok;
     }
   } else {
     assert(0 /* unreachable */);

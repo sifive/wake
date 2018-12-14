@@ -22,7 +22,7 @@ void RegExp::format(std::ostream &os, int depth) const {
   if (depth >= 0) os << std::endl;
 }
 
-TypeVar RegExp::typeVar("Regexp", 0);
+TypeVar RegExp::typeVar("RegExp", 0);
 TypeVar &RegExp::getType() {
   return typeVar;
 }
