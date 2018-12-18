@@ -72,6 +72,8 @@ int main(int argc, const char **argv) {
       "number of concurrent jobs to run", 1},
     { "verbose", {"-v", "--verbose"},
       "output progress information", 0},
+    { "quiet", {"-q", "--quiet"},
+      "quiet operation", 0},
     { "debug", {"-d", "--debug"},
       "simulate a stack for exceptions", 0},
     { "parse", {"-p", "--parse"},
@@ -91,7 +93,13 @@ int main(int argc, const char **argv) {
 
   int jobs = args["jobs"].as<int>(std::thread::hardware_concurrency());
   bool verbose = args["verbose"];
+  bool quiet = args["quiet"];
   queue.stack_trace = args["debug"];
+
+  if (quiet && verbose) {
+    std::cerr << "Cannot be both quiet and verbose!" << std::endl;
+    return 1;
+  }
 
   if (args["init"]) {
     std::string dir = args["init"];
@@ -172,7 +180,7 @@ int main(int argc, const char **argv) {
   top->body = std::unique_ptr<Expr>(body);
 
   /* Primitives */
-  JobTable jobtable(&db, jobs, verbose);
+  JobTable jobtable(&db, jobs, verbose, quiet);
   PrimMap pmap;
   prim_register_string(pmap);
   prim_register_integer(pmap);

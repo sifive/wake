@@ -98,6 +98,7 @@ struct JobTable::detail {
   sigset_t sigset;
   Database *db;
   bool verbose;
+  bool quiet;
 };
 
 static void handle_SIGCHLD(int sig) {
@@ -105,10 +106,11 @@ static void handle_SIGCHLD(int sig) {
   (void)sig;
 }
 
-JobTable::JobTable(Database *db, int max_jobs, bool verbose) : imp(new JobTable::detail) {
+JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet) : imp(new JobTable::detail) {
   imp->table.resize(max_jobs*POOLS);
   imp->tasks.resize(POOLS);
   imp->verbose = verbose;
+  imp->quiet = quiet;
   imp->db = db;
 
   for (unsigned i = 0; i < imp->table.size(); ++i)
@@ -207,7 +209,7 @@ static void launch(JobTable *jobtable) {
       close(pipe_stdout[1]);
       close(pipe_stderr[1]);
       for (char &c : task.cmdline) if (c == 0) c = ' ';
-      if (jobtable->imp->verbose && i.pool) std::cerr << task.cmdline << std::endl;
+      if (!jobtable->imp->quiet && i.pool) std::cerr << task.cmdline << std::endl;
       jobtable->imp->tasks[i.pool].pop_front();
     }
   }
@@ -256,6 +258,9 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->process(queue);
           ++done;
         } else {
+          if (imp->verbose) {
+            std::cout << buffer;
+          }
           i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
         }
       }
@@ -268,6 +273,9 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->process(queue);
           ++done;
         } else {
+          if (imp->verbose) {
+            std::cerr << buffer;
+          }
           i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
         }
       }
