@@ -10,8 +10,8 @@
 #include <vector>
 
 const char *symbolTable[] = {
-  "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
-  "EQUALS", "POPEN", "PCLOSE", "BOPEN", "BCLOSE", "IF", "THEN", "ELSE", "HERE", "MEMOIZE", "END",
+  "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "VAL", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
+  "DATA", "EQUALS", "POPEN", "PCLOSE", "BOPEN", "BCLOSE", "IF", "THEN", "ELSE", "HERE", "MEMOIZE", "END",
   "EOL", "INDENT", "DEDENT"
 };
 
@@ -310,6 +310,8 @@ top:
 
       // keywords
       "def"       { return mkSym(DEF);       }
+      "val"       { return mkSym(VAL);       }
+      "data"      { return mkSym(DATA);      }
       "global"    { return mkSym(GLOBAL);    }
       "publish"   { return mkSym(PUBLISH);   }
       "subscribe" { return mkSym(SUBSCRIBE); }
@@ -328,7 +330,7 @@ top:
 
       // identifiers
       op = [.$^*/%\-+~<>=!&|,]+;
-      id = [a-z][a-zA-Z0-9_]* | "_";
+      id = [a-zA-Z][a-zA-Z0-9_]* | "_";
 
       id { return mkSym(ID); }
       op { return mkSym(OPERATOR); }
