@@ -396,6 +396,71 @@ static void publish_seal(DefMap::defs &publish) {
   }
 }
 
+static void parse_data(Lexer &lex) {
+  lex.consume();
+
+  if (expect(ID, lex)) lex.consume();
+  // confirm caps
+  while (lex.next.type == ID) lex.consume();
+  // confirm no caps
+
+  if (expect(EQUALS, lex)) lex.consume();
+  if (expect(EOL, lex)) lex.consume();
+  if (expect(INDENT, lex)) lex.consume();
+
+  bool repeat = true;
+  while (repeat) {
+    switch (lex.next.type) {
+      case ID: {
+        lex.consume();
+        break;
+      }
+      case DEDENT:
+        repeat = false;
+        lex.consume();
+        expect(EOL, lex);
+      case EOL: {
+        lex.consume();
+        break;
+      }
+      default: {
+        repeat = false;
+        break;
+      }
+    }
+  }
+}
+
+static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top) {
+  switch (lex.next.type) {
+    default:
+       std::cerr << "Missing DEF after GLOBAL at " << lex.next.location << std::endl;
+       lex.fail = true;
+    case DEF:
+    case VAL: {
+      std::string name;
+      auto def = parse_def(lex, name);
+      bind_def(lex, map, name, def);
+      if (top) {
+        if (top->globals.find(name) != top->globals.end()) {
+          std::cerr << "Duplicate global "
+            << name << " at "
+            << def->location << " and "
+            << top->defmaps[top->globals[name]]->map[name]->location << std::endl;
+          lex.fail = true;
+        } else {
+          top->globals[name] = top->defmaps.size()-1;
+        }
+      }
+      break;
+    }
+    case DATA: {
+      parse_data(lex);
+      break;
+    }
+  }
+}
+
 Expr *parse_block(Lexer &lex) {
   TRACE("BLOCK");
   Expr *out;
@@ -411,10 +476,9 @@ Expr *parse_block(Lexer &lex) {
     bool repeat = true;
     while (repeat) {
       switch (lex.next.type) {
+        case VAL:
         case DEF: {
-          std::string name;
-          auto def = parse_def(lex, name);
-          bind_def(lex, map, name, def);
+          parse_decl(map, lex, 0);
           break;
         }
         case PUBLISH: {
@@ -454,24 +518,14 @@ void parse_top(Top &top, Lexer &lex) {
   while (repeat) {
     switch (lex.next.type) {
       case GLOBAL: {
-        std::string name;
-        auto def = parse_def(lex, name);
-        bind_def(lex, defmap.map, name, def);
-        if (top.globals.find(name) != top.globals.end()) {
-          std::cerr << "Duplicate global "
-            << name << " at "
-            << def->location << " and "
-            << top.defmaps[top.globals[name]]->map[name]->location << std::endl;
-          lex.fail = true;
-        } else {
-          top.globals[name] = top.defmaps.size()-1;
-        }
+        lex.consume();
+        parse_decl(defmap.map, lex, &top);
         break;
       }
+      case DATA:
+      case VAL:
       case DEF: {
-        std::string name;
-        auto def = parse_def(lex, name);
-        bind_def(lex, defmap.map, name, def);
+        parse_decl(defmap.map, lex, 0);
         break;
       }
       case PUBLISH: {
