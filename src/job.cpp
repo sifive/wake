@@ -259,7 +259,7 @@ bool JobTable::wait(WorkQueue &queue) {
           ++done;
         } else {
           if (imp->verbose) {
-            std::cout << buffer;
+            std::cout.write(buffer, got);
           }
           i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
         }
@@ -274,7 +274,7 @@ bool JobTable::wait(WorkQueue &queue) {
           ++done;
         } else {
           if (imp->verbose) {
-            std::cerr << buffer;
+            std::cerr.write(buffer, got);
           }
           i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
         }
