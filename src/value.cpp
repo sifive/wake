@@ -51,7 +51,7 @@ void Closure::format(std::ostream &os, int depth) const {
 }
 
 void Data::format(std::ostream &os, int depth) const {
-  os << cons->name;
+  os << cons->ast.name;
   if (depth >= 0) {
     os << ":" << std::endl;
     const Binding *iter;

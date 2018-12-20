@@ -36,6 +36,9 @@ struct Lexer {
 
   std::string text();
   void consume();
+
+  static bool isUpper(const char *str); // unicode-upper
+  static bool isLower(const char *str); // unicode-letter \ unicode-upper
 };
 
 #endif

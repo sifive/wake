@@ -2,6 +2,7 @@
 #include "expr.h"
 #include "symbol.h"
 #include "value.h"
+#include "datatype.h"
 #include <iostream>
 #include <list>
 
@@ -396,13 +397,128 @@ static void publish_seal(DefMap::defs &publish) {
   }
 }
 
-static void parse_data(Lexer &lex) {
+static AST parse_ast(int p, Lexer &lex);
+
+static AST parse_unary_ast(int p, Lexer &lex) {
+  TRACE("UNARY_AST");
+  switch (lex.next.type) {
+    // Unary operators
+    case OPERATOR: {
+      Location location = lex.next.location;
+      op_type op = precedence(lex.text());
+      if (op.p < p) {
+        std::cerr << "Lower precedence unary operator "
+          << lex.text() << " must use ()s at "
+          << lex.next.location << std::endl;
+        lex.fail = true;
+      }
+      std::string name = lex.text();
+      lex.consume();
+      AST rhs = parse_ast(op.p + op.l, lex);
+      location.end = rhs.location.end;
+      std::vector<AST> args;
+      args.emplace_back(std::move(rhs));
+      return AST(location, std::move(name), std::move(args));
+    }
+    // Terminals
+    case ID: {
+      AST out(lex.next.location, lex.text());
+      lex.consume();
+      return out;
+    }
+    case POPEN: {
+      Location location = lex.next.location;
+      lex.consume();
+      AST out = parse_ast(0, lex);
+      location.end = lex.next.location.end;
+      if (expect(PCLOSE, lex)) lex.consume();
+      out.location = location;
+      return out;
+    }
+    default: {
+      std::cerr << "Was expecting an (OPERATOR/ID/POPEN), got a "
+        << symbolTable[lex.next.type] << " at "
+        << lex.next.location << std::endl;
+      lex.fail = true;
+      return AST(lex.next.location);
+    }
+  }
+}
+
+static AST parse_ast(int p, Lexer &lex) {
+  TRACE("AST");
+  AST lhs = parse_unary_ast(p, lex);
+  for (;;) {
+    switch (lex.next.type) {
+      case OPERATOR: {
+        std::string name = lex.text();
+        op_type op = precedence(name);
+        if (op.p < p) return lhs;
+        lex.consume();
+        auto rhs = parse_ast(op.p + op.l, lex);
+        Location loc = lhs.location;
+        loc.end = rhs.location.end;
+        std::vector<AST> args;
+        args.emplace_back(std::move(lhs));
+        args.emplace_back(std::move(rhs));
+        lhs = AST(loc, std::move(name), std::move(args));
+        break;
+      }
+      case ID:
+      case POPEN: {
+        op_type op = precedence("a"); // application
+        if (op.p < p) return lhs;
+        AST rhs = parse_ast(op.p + op.l, lex);
+        Location location = lhs.location;
+        location.end = rhs.location.end;
+        if (lhs.args.empty() && Lexer::isLower(lhs.name.c_str())) {
+          std::cerr << "Lower-case identifier " << lhs.name
+            << " cannot be used as a constructor at " << location
+            << std::endl;
+          lex.fail = true;
+        }
+        lhs.args.emplace_back(std::move(rhs));
+        break;
+      }
+      default: {
+        return lhs;
+      }
+    }
+  }
+}
+
+static void parse_data(Lexer &lex, DefMap::sums &data) {
+  Location dataloc = lex.next.location;
   lex.consume();
 
-  if (expect(ID, lex)) lex.consume();
-  // confirm caps
-  while (lex.next.type == ID) lex.consume();
-  // confirm no caps
+  AST def = parse_ast(0, lex);
+  if (!def) return;
+
+  if (Lexer::isLower(def.name.c_str())) {
+    std::cerr << "Type name must be upper-case or operator, not "
+      << def.name << " at "
+      << def.location << std::endl;
+    lex.fail = true;
+  }
+  for (auto &x : def.args) {
+    if (!Lexer::isLower(x.name.c_str())) {
+      std::cerr << "Type argument must be lower-case, not "
+        << x.name << " at "
+        << x.location << std::endl;
+      lex.fail = true;
+    }
+  }
+
+  std::string typ = def.name;
+  auto insert = data.emplace(typ, std::move(def));
+  Sum &sum = insert.first->second;
+  if (!insert.second) {
+    std::cerr << "Type " << typ
+      << " redefined at " << dataloc
+      << " previously defined at " << sum.location
+      << std::endl;
+    lex.fail = true;
+  }
 
   if (expect(EQUALS, lex)) lex.consume();
   if (expect(EOL, lex)) lex.consume();
@@ -410,11 +526,17 @@ static void parse_data(Lexer &lex) {
 
   bool repeat = true;
   while (repeat) {
-    switch (lex.next.type) {
-      case ID: {
-        lex.consume();
-        break;
+    AST cons = parse_ast(0, lex);
+    if (cons) {
+      if (Lexer::isLower(cons.name.c_str())) {
+        std::cerr << "Constructor name must be upper-case or operator, not "
+          << cons.name << " at "
+          << cons.location << std::endl;
+        lex.fail = true;
       }
+      sum.addConstructor(std::move(cons));
+    }
+    switch (lex.next.type) {
       case DEDENT:
         repeat = false;
         lex.consume();
@@ -424,6 +546,8 @@ static void parse_data(Lexer &lex) {
         break;
       }
       default: {
+        std::cerr << "Unexpected end of data definition at " << lex.next.location << std::endl;
+        lex.fail = true;
         repeat = false;
         break;
       }
@@ -431,7 +555,7 @@ static void parse_data(Lexer &lex) {
   }
 }
 
-static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top) {
+static void parse_decl(DefMap::defs &map, DefMap::sums &data, Lexer &lex, Top *top) {
   switch (lex.next.type) {
     default:
        std::cerr << "Missing DEF after GLOBAL at " << lex.next.location << std::endl;
@@ -455,7 +579,7 @@ static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top) {
       break;
     }
     case DATA: {
-      parse_data(lex);
+      parse_data(lex, data);
       break;
     }
   }
@@ -472,13 +596,14 @@ Expr *parse_block(Lexer &lex) {
     Location location = lex.next.location;
     DefMap::defs map;
     DefMap::defs publish;
+    DefMap::sums data;
 
     bool repeat = true;
     while (repeat) {
       switch (lex.next.type) {
         case VAL:
         case DEF: {
-          parse_decl(map, lex, 0);
+          parse_decl(map, data, lex, 0);
           break;
         }
         case PUBLISH: {
@@ -497,7 +622,7 @@ Expr *parse_block(Lexer &lex) {
     publish_seal(publish);
     auto body = parse_if(lex);
     location.end = body->location.end;
-    out = (publish.empty() && map.empty()) ? body : new DefMap(location, std::move(map), std::move(publish), body);
+    out = (publish.empty() && map.empty()) ? body : new DefMap(location, std::move(map), std::move(publish), std::move(data), body);
 
     if (expect(DEDENT, lex)) lex.consume();
     return out;
@@ -519,13 +644,13 @@ void parse_top(Top &top, Lexer &lex) {
     switch (lex.next.type) {
       case GLOBAL: {
         lex.consume();
-        parse_decl(defmap.map, lex, &top);
+        parse_decl(defmap.map, defmap.data, lex, &top);
         break;
       }
       case DATA:
       case VAL:
       case DEF: {
-        parse_decl(defmap.map, lex, 0);
+        parse_decl(defmap.map, defmap.data, lex, 0);
         break;
       }
       case PUBLISH: {

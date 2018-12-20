@@ -400,3 +400,11 @@ void Lexer::consume() {
     }
   }
 }
+
+bool Lexer::isLower(const char *str) {
+  return str[0] >= 'a' && str[0] <= 'z';
+}
+
+bool Lexer::isUpper(const char *str) {
+  return str[0] >= 'A' && str[0] <= 'Z';
+}
