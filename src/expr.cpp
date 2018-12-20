@@ -174,11 +174,11 @@ void DefBinding::hash() {
 }
 
 void Construct::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Construct(" << cons->name << "): " << typeVar << " @ " << location << std::endl;
+  os << pad(depth) << "Construct(" << cons->ast.name << "): " << typeVar << " @ " << location << std::endl;
 }
 
 void Construct::hash() {
-  HASH(cons->name.data(), cons->name.size(), (long)type, hashcode);
+  HASH(cons->ast.name.data(), cons->ast.name.size(), (long)type, hashcode);
 }
 
 void Destruct::format(std::ostream &os, int depth) const {

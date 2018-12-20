@@ -139,12 +139,12 @@ void Thunk::eval(WorkQueue &queue) {
     queue.emplace(defbinding->body.get(), std::move(defs), std::move(receiver));
   } else if (expr->type == Construct::type) {
     Construct *cons = reinterpret_cast<Construct*>(expr);
-    if (cons->cons->nargs == 0) {
+    if (cons->cons->ast.args.size() == 0) {
       Receiver::receive(queue, std::move(receiver),
         std::make_shared<Data>(cons->cons, nullptr));
     } else {
       Binding *iter = binding.get();
-      for (int i = 1; i < cons->cons->nargs; ++i) iter = iter->next.get();
+      for (size_t i = 1; i < cons->cons->ast.args.size(); ++i) iter = iter->next.get();
       iter->next.reset();
       Receiver::receive(queue, std::move(receiver),
         std::make_shared<Data>(cons->cons, std::move(binding)));

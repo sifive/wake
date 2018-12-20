@@ -6,6 +6,7 @@
 #include "hash.h"
 #include "heap.h"
 #include "type.h"
+#include "datatype.h"
 #include <memory>
 #include <string>
 #include <map>
@@ -122,13 +123,15 @@ typedef std::map<std::string, int> DefOrder;
 
 struct DefMap : public Expr {
   typedef std::map<std::string, std::unique_ptr<Expr> > defs;
+  typedef std::map<std::string, Sum> sums;
   defs map;
   defs publish;
+  sums data;
   std::unique_ptr<Expr> body;
 
   static const char *type;
-  DefMap(const Location &location_, defs &&map_, defs &&publish_, Expr *body_)
-   : Expr(type, location_), map(std::move(map_)), publish(std::move(publish_)), body(body_) { }
+  DefMap(const Location &location_, defs &&map_, defs &&publish_, sums &&data_, Expr *body_)
+   : Expr(type, location_), map(std::move(map_)), publish(std::move(publish_)), data(std::move(data_)), body(body_) { }
   DefMap(const Location &location_) : Expr(type, location_), map(), publish(), body(new Literal(location, "top")) { }
 
   void format(std::ostream &os, int depth) const;
