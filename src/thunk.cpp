@@ -1,6 +1,7 @@
 #include "thunk.h"
 #include "expr.h"
 #include "value.h"
+#include "datatype.h"
 #include <cassert>
 
 struct Application : public Receiver {
@@ -22,6 +23,40 @@ void Application::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
     args->next = clo->binding;
     args->expr = clo->lambda;
     queue.emplace(clo->lambda->body.get(), std::move(args), std::move(receiver));
+  }
+}
+
+struct Destructure : public Receiver {
+  std::shared_ptr<Binding> args;
+  std::unique_ptr<Receiver> receiver;
+  Destruct *des;
+  void receive(WorkQueue &queue, std::shared_ptr<Value> &&value);
+  Destructure(std::shared_ptr<Binding> &&args_, std::unique_ptr<Receiver> receiver_, Destruct *des_)
+   : args(std::move(args_)), receiver(std::move(receiver_)), des(des_) { }
+};
+
+void Destructure::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
+  if (value->type == Exception::type) {
+    Receiver::receive(queue, std::move(receiver), std::move(value));
+  } else if (value->type != Data::type) {
+    auto exception = std::make_shared<Exception>("Attempt to destructure " + value->to_str() + " which is not a Data", args->invoker);
+    Receiver::receive(queue, std::move(receiver), std::move(exception));
+  } else {
+    Data *data = reinterpret_cast<Data*>(value.get());
+    if (data->cons->sum != des->sum){
+      auto exception = std::make_shared<Exception>("Attempt to destructure " + value->to_str() + " which is not a " + des->sum->name, args->invoker);
+      Receiver::receive(queue, std::move(receiver), std::move(exception));
+    } else {
+      // Create a binding to hold 'data' and 'fn'
+      auto flip = std::make_shared<Binding>(data->binding, queue.stack_trace?args:nullptr, des, 2);
+      flip->future[1].value = std::move(value);
+      // Find the correct handler function
+      Binding *fn = args.get();
+      for (int i = 0; i <= data->cons->index; ++i) fn = fn->next.get();
+      fn->future[0].depend(queue, Binding::make_completer(flip, 0));
+      // Invoke the chain expr to setup user function
+      queue.emplace(data->cons->expr.get(), std::move(flip), std::move(receiver));
+    }
   }
 }
 
@@ -102,6 +137,22 @@ void Thunk::eval(WorkQueue &queue) {
     for (auto &i : defbinding->val)
       queue.emplace(i.get(), binding, Binding::make_completer(defs, j++));
     queue.emplace(defbinding->body.get(), std::move(defs), std::move(receiver));
+  } else if (expr->type == Construct::type) {
+    Construct *cons = reinterpret_cast<Construct*>(expr);
+    if (cons->cons->nargs == 0) {
+      Receiver::receive(queue, std::move(receiver),
+        std::make_shared<Data>(cons->cons, nullptr));
+    } else {
+      Binding *iter = binding.get();
+      for (int i = 1; i < cons->cons->nargs; ++i) iter = iter->next.get();
+      iter->next.reset();
+      Receiver::receive(queue, std::move(receiver),
+        std::make_shared<Data>(cons->cons, std::move(binding)));
+    }
+  } else if (expr->type == Destruct::type) {
+    Destruct *des = reinterpret_cast<Destruct*>(expr);
+    binding->future[0].depend(queue, std::unique_ptr<Receiver>(
+      new Destructure(std::move(binding), std::move(receiver), des)));
   } else if (expr->type == Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
     Receiver::receive(queue, std::move(receiver), lit->value);

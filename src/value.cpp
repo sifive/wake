@@ -2,6 +2,7 @@
 #include "expr.h"
 #include "heap.h"
 #include "hash.h"
+#include "datatype.h"
 #include <sstream>
 #include <cassert>
 
@@ -9,6 +10,7 @@ Value::~Value() { }
 const char *String::type = "String";
 const char *Integer::type = "Integer";
 const char *Closure::type = "Closure";
+const char *Data::type = "Data";
 const char *Exception::type = "Exception";
 
 Integer::~Integer() {
@@ -45,6 +47,27 @@ void Closure::format(std::ostream &os, int depth) const {
   if (depth >= 0) {
     os << ":" << std::endl;
     if (binding) binding->format(os, depth+2);
+  }
+}
+
+void Data::format(std::ostream &os, int depth) const {
+  os << cons->name;
+  if (depth >= 0) {
+    os << ":" << std::endl;
+    const Binding *iter;
+    std::vector<const Binding*> todo;
+    for (iter = binding.get(); iter; iter = iter->next.get())
+      todo.push_back(iter);
+    for (size_t i = todo.size(); i > 0; --i) {
+      iter = todo[i-1];
+      assert (iter->expr->type == Lambda::type);
+      os << pad(depth);
+      if (iter->future[0].value) {
+        iter->future[0].value->format(os, depth);
+      } else {
+        os << "UNRESOLVED FUTURE" << std::endl;
+      }
+    }
   }
 }
 
@@ -153,6 +176,17 @@ const TypeVar Data::typePair("Pair", 2);
 TypeVar &Data::getType() {
   assert (0); // unreachable
   return typeBool;
+}
+
+Hash Data::hash() const {
+  Hash out;
+  std::vector<uint64_t> codes;
+  if (binding) {
+    assert (binding->flags & FLAG_HASH_POST);
+    binding->hashcode.push(codes);
+  }
+  HASH(codes.data(), 8*codes.size(), (long)cons, out);
+  return out;
 }
 
 Cause::Cause(const std::string &reason_, std::vector<Location> &&stack_)

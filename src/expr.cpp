@@ -2,6 +2,7 @@
 #include "value.h"
 #include "hash.h"
 #include "thunk.h"
+#include "datatype.h"
 #include <cassert>
 #include <sstream>
 
@@ -12,6 +13,8 @@ const char *Lambda::type = "Lambda";
 const char *VarRef::type = "VarRef";
 const char *Literal::type = "Literal";
 const char *DefBinding::type = "DefBinding";
+const char *Construct::type = "Construct";
+const char *Destruct::type = "Destruct";
 // these are removed by bind
 const char *Subscribe::type = "Subscribe";
 const char *Memoize::type = "Memoize";
@@ -168,6 +171,22 @@ void DefBinding::hash() {
   body->hash();
   body->hashcode.push(codes);
   HASH(codes.data(), codes.size()*8, (long)type, hashcode);
+}
+
+void Construct::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Construct(" << cons->name << "): " << typeVar << " @ " << location << std::endl;
+}
+
+void Construct::hash() {
+  HASH(cons->name.data(), cons->name.size(), (long)type, hashcode);
+}
+
+void Destruct::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Destruct(" << sum->name << "): " << typeVar << " @ " << location << std::endl;
+}
+
+void Destruct::hash() {
+  HASH(sum->name.data(), sum->name.size(), (long)type, hashcode);
 }
 
 std::ostream & operator << (std::ostream &os, const Expr *expr) {
