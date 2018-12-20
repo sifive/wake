@@ -71,15 +71,17 @@ struct Closure : public Value {
   Hash hash() const;
 };
 
+struct Constructor;
 struct Data : public Value {
-  int id; // constructor id; look-up type in table
-//  std::unique_ptr<Future[]> future;
+  Constructor *cons;
+  std::shared_ptr<Binding> binding;
 
+  static const char *type;
   static TypeVar typeBool;
   // these two are const to prevent unify() on them; use clone
   static const TypeVar typeList;
   static const TypeVar typePair;
-  Data(int id_, int nvals);
+  Data(Constructor *cons_, std::shared_ptr<Binding> &&binding_) : Value(type), cons(cons_), binding(std::move(binding_)) { }
   void format(std::ostream &os, int depth) const;
   TypeVar &getType();
   Hash hash() const;

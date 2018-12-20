@@ -166,4 +166,29 @@ struct DefBinding : public Expr {
   void hash();
 };
 
+// Created by transforming Data
+struct Constructor;
+struct Construct : public Expr {
+  Constructor *cons;
+
+  static const char *type;
+  Construct(const Location &location_, Constructor *cons_)
+   : Expr(type, location_), cons(cons_) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
+};
+
+struct Sum;
+struct Destruct : public Expr {
+  Sum *sum;
+
+  static const char *type;
+  Destruct(const Location &location_, Sum *sum_)
+   : Expr(type, location_), sum(sum_) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
+};
+
 #endif
