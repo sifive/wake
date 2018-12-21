@@ -12,7 +12,6 @@ void Sum::addConstructor(AST &&ast) {
   size_t nargs = ast.args.size();
   members.emplace_back(std::move(ast));
   Constructor &cons = members.back();
-  cons.sum = this;
   cons.index = members.size()-1;
 
   cons.expr = std::unique_ptr<Expr>(new App(LOCATION,

@@ -421,6 +421,47 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   } else if (expr->type == Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
     return lit->typeVar.unify(lit->value->getType(), &lit->location);
+  } else if (expr->type == Construct::type) {
+    Construct *cons = reinterpret_cast<Construct*>(expr);
+    bool ok = cons->typeVar.unify(
+      TypeVar(cons->sum->name.c_str(), cons->sum->args.size()));
+    std::map<std::string, TypeVar> ids;
+    for (size_t i = 0; i < cons->sum->args.size(); ++i)
+      ok = cons->typeVar[i].unify(ids[cons->sum->args[i]]) && ok;
+    NameBinding *iter = binding;
+    for (size_t i = cons->cons->ast.args.size(); i; --i) {
+      ok = cons->cons->ast.args[i-1].unify(iter->lambda->typeVar[0], ids) && ok;
+      iter = iter->next;
+    }
+    return ok;
+  } else if (expr->type == Destruct::type) {
+    Destruct *des = reinterpret_cast<Destruct*>(expr);
+    // (typ => cons0 => b) => (typ => cons1 => b) => typ => b
+    TypeVar &typ = binding->lambda->typeVar[0];
+    bool ok = typ.unify(
+      TypeVar(des->sum.name.c_str(), des->sum.args.size()));
+    std::map<std::string, TypeVar> ids;
+    for (size_t i = 0; i < des->sum.args.size(); ++i)
+      ok = typ[i].unify(ids[des->sum.args[i]]) && ok;
+    NameBinding *iter = binding;
+    for (size_t i = des->sum.members.size(); i; --i) {
+      iter = iter->next;
+      TypeVar *tail = &iter->lambda->typeVar[0];
+      Constructor &cons = des->sum.members[i-1];
+      if (!tail->unify(TypeVar("=>", 2))) { ok = false; break; }
+      ok = (*tail)[0].unify(typ) && ok;
+      tail = &(*tail)[1];
+      size_t j;
+      for (j = 0; j < cons.ast.args.size(); ++j) {
+        if (!tail->unify(TypeVar("=>", 2))) { ok = false; break; }
+        ok = cons.ast.args[j].unify((*tail)[0], ids) && ok;
+        tail = &(*tail)[1];
+      }
+      if (j == cons.ast.args.size()) {
+        ok = des->typeVar.unify(*tail) && ok;
+      }
+    }
+    return ok;
   } else if (expr->type == Prim::type) {
     Prim *prim = reinterpret_cast<Prim*>(expr);
     std::vector<TypeVar*> args;

@@ -182,11 +182,11 @@ void Construct::hash() {
 }
 
 void Destruct::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Destruct(" << sum->name << "): " << typeVar << " @ " << location << std::endl;
+  os << pad(depth) << "Destruct(" << sum.name << "): " << typeVar << " @ " << location << std::endl;
 }
 
 void Destruct::hash() {
-  HASH(sum->name.data(), sum->name.size(), (long)type, hashcode);
+  HASH(sum.name.data(), sum.name.size(), (long)type, hashcode);
 }
 
 std::ostream & operator << (std::ostream &os, const Expr *expr) {

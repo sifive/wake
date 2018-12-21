@@ -43,8 +43,8 @@ void Destructure::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
     Receiver::receive(queue, std::move(receiver), std::move(exception));
   } else {
     Data *data = reinterpret_cast<Data*>(value.get());
-    if (data->cons->sum != des->sum){
-      auto exception = std::make_shared<Exception>("Attempt to destructure " + value->to_str() + " which is not a " + des->sum->name, args->invoker);
+    if (&des->sum.members[data->cons->index] != data->cons) {
+      auto exception = std::make_shared<Exception>("Attempt to destructure " + value->to_str() + " which is not a " + des->sum.name, args->invoker);
       Receiver::receive(queue, std::move(receiver), std::move(exception));
     } else {
       // Create a binding to hold 'data' and 'fn'
