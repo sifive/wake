@@ -52,7 +52,8 @@ void Destructure::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
       flip->future[1].value = std::move(value);
       // Find the correct handler function
       Binding *fn = args.get();
-      for (int i = 0; i <= data->cons->index; ++i) fn = fn->next.get();
+      int limit = des->sum.members.size() - data->cons->index;
+      for (int i = 0; i < limit; ++i) fn = fn->next.get();
       fn->future[0].depend(queue, Binding::make_completer(flip, 0));
       // Invoke the chain expr to setup user function
       queue.emplace(data->cons->expr.get(), std::move(flip), std::move(receiver));

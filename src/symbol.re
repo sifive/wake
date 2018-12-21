@@ -408,3 +408,7 @@ bool Lexer::isLower(const char *str) {
 bool Lexer::isUpper(const char *str) {
   return str[0] >= 'A' && str[0] <= 'Z';
 }
+
+bool Lexer::isOperator(const char *str) {
+  return !isUpper(str) && !isLower(str);
+}
