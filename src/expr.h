@@ -172,11 +172,12 @@ struct DefBinding : public Expr {
 // Created by transforming Data
 struct Constructor;
 struct Construct : public Expr {
+  Sum *sum;
   Constructor *cons;
 
   static const char *type;
-  Construct(const Location &location_, Constructor *cons_)
-   : Expr(type, location_), cons(cons_) { }
+  Construct(const Location &location_, Sum *sum_, Constructor *cons_)
+   : Expr(type, location_), sum(sum_), cons(cons_) { }
 
   void format(std::ostream &os, int depth) const;
   void hash();
@@ -184,11 +185,11 @@ struct Construct : public Expr {
 
 struct Sum;
 struct Destruct : public Expr {
-  Sum *sum;
+  Sum sum;
 
   static const char *type;
-  Destruct(const Location &location_, Sum *sum_)
-   : Expr(type, location_), sum(sum_) { }
+  Destruct(const Location &location_, Sum &&sum_)
+   : Expr(type, location_), sum(std::move(sum_)) { }
 
   void format(std::ostream &os, int depth) const;
   void hash();

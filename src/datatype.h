@@ -30,7 +30,6 @@ struct Sum;
 struct Expr;
 struct Constructor {
   AST ast;
-  Sum *sum;
   int index; // sum->members[index] = this
   std::unique_ptr<Expr> expr; // body of chain in: def chain a b c data fn = fn data a b c
   
@@ -42,11 +41,6 @@ struct Sum {
   Location location;
   std::vector<std::string> args;
   std::vector<Constructor> members;
-
-  Sum(const Sum& other) = delete;
-  Sum(Sum &&other) = delete;
-  Sum& operator = (const Sum &other) = delete;
-  Sum& operator = (Sum &&other) = delete;
 
   Sum(AST &&ast);
   void addConstructor(AST &&ast);
