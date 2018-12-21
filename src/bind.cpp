@@ -191,7 +191,7 @@ Expr *rebind_subscribe(ResolveBinding *binding, const Location &location, const 
     if (reference_map(iter, pub)) return new VarRef(location, pub);
   }
   // nil
-  return new Lambda(location, "_", new Lambda(location, "_t", new Lambda(location, "_f", new VarRef(location, "_t"))));
+  return new VarRef(location, "Nil");
 }
 
 static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding *binding) {
