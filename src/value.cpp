@@ -61,9 +61,9 @@ void Data::format(std::ostream &os, int depth) const {
     for (size_t i = todo.size(); i > 0; --i) {
       iter = todo[i-1];
       assert (iter->expr->type == Lambda::type);
-      os << pad(depth);
+      os << pad(depth+2);
       if (iter->future[0].value) {
-        iter->future[0].value->format(os, depth);
+        iter->future[0].value->format(os, depth+2);
       } else {
         os << "UNRESOLVED FUTURE" << std::endl;
       }

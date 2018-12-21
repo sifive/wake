@@ -39,6 +39,7 @@ struct Lexer {
 
   static bool isUpper(const char *str); // unicode-upper
   static bool isLower(const char *str); // unicode-letter \ unicode-upper
+  static bool isOperator(const char *str);
 };
 
 #endif
