@@ -32,8 +32,10 @@ TypeVar *TypeVar::find() {
 }
 
 void TypeVar::setDOB() {
-  assert (isFree());
-  dob = ++globalClock;
+  if (!dob) {
+    assert (!parent && isFree());
+    dob = ++globalClock;
+  }
 }
 
 bool TypeVar::contains(const TypeVar *other) const {
