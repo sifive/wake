@@ -307,10 +307,11 @@ static Expr *parse_if(Lexer &lex) {
     if (expect(ELSE, lex)) lex.consume();
     auto elseE = parse_block(lex);
     l.end = elseE->location.end;
-    return new App(l, new App(l, new App(l, condE,
+    return new App(l, new App(l, new App(l,
+      new VarRef(l, "Bool"),
       new Lambda(l, "_", thenE)),
       new Lambda(l, "_", elseE)),
-      new Literal(LOCATION, "if"));
+      condE);
   } else {
     return relabel_anon(parse_binary(0, lex));
   }
@@ -389,6 +390,21 @@ static void publish_def(DefMap::defs &publish, const std::string &name, Expr *de
         new VarRef(def->location, "_pub"),
         def),
       i->second.release())));
+}
+
+static void bind_global(const std::string &name, Top *top, Lexer &lex) {
+  if (!top) return;
+
+  auto it = top->globals.find(name);
+  if (it != top->globals.end()) {
+    std::cerr << "Duplicate global "
+      << name << " at "
+      << top->defmaps.back()->map[name]->location << " and "
+      << top->defmaps[it->second]->map[name]->location << std::endl;
+    lex.fail = true;
+  } else {
+    top->globals[name] = top->defmaps.size()-1;
+  }
 }
 
 static void publish_seal(DefMap::defs &publish) {
@@ -487,8 +503,23 @@ static AST parse_ast(int p, Lexer &lex) {
   }
 }
 
-static void parse_data(Lexer &lex, DefMap::sums &data) {
-  Location dataloc = lex.next.location;
+static std::string fixup_data_name(const std::string &name, size_t args) {
+  if (Lexer::isOperator(name.c_str())) {
+    if (args == 1) {
+      return "unary " + name;
+    } else if (args == 2) {
+      return "binary " + name;
+    } else {
+      assert(0);
+      return name;
+    }
+  } else {
+    return name;
+  }
+}
+
+
+static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
   lex.consume();
 
   AST def = parse_ast(0, lex);
@@ -509,16 +540,7 @@ static void parse_data(Lexer &lex, DefMap::sums &data) {
     }
   }
 
-  std::string typ = def.name;
-  auto insert = data.emplace(typ, std::move(def));
-  Sum &sum = insert.first->second;
-  if (!insert.second) {
-    std::cerr << "Type " << typ
-      << " redefined at " << dataloc
-      << " previously defined at " << sum.location
-      << std::endl;
-    lex.fail = true;
-  }
+  Sum sum(std::move(def));
 
   if (expect(EQUALS, lex)) lex.consume();
   if (expect(EOL, lex)) lex.consume();
@@ -553,9 +575,29 @@ static void parse_data(Lexer &lex, DefMap::sums &data) {
       }
     }
   }
+
+  std::string name = fixup_data_name(sum.name, sum.args.size());
+  Location location = sum.location;
+  Destruct *destruct = new Destruct(location, std::move(sum));
+  Sum *sump = &destruct->sum;
+  Expr *destructfn = new Lambda(sump->location, "_", destruct);
+
+  for (auto &c : sump->members) {
+    destructfn = new Lambda(sump->location, "_", destructfn);
+    std::string name = fixup_data_name(c.ast.name, c.ast.args.size());
+    Expr *construct = new Construct(c.ast.location, sump, &c);
+    for (size_t i = 0; i < c.ast.args.size(); ++i)
+      construct = new Lambda(c.ast.location, "_", construct);
+
+    bind_def(lex, map, name, construct);
+    bind_global(name, top, lex);
+  }
+
+  bind_def(lex, map, name, destructfn);
+  bind_global(name, top, lex);
 }
 
-static void parse_decl(DefMap::defs &map, DefMap::sums &data, Lexer &lex, Top *top) {
+static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top) {
   switch (lex.next.type) {
     default:
        std::cerr << "Missing DEF after GLOBAL at " << lex.next.location << std::endl;
@@ -565,21 +607,11 @@ static void parse_decl(DefMap::defs &map, DefMap::sums &data, Lexer &lex, Top *t
       std::string name;
       auto def = parse_def(lex, name);
       bind_def(lex, map, name, def);
-      if (top) {
-        if (top->globals.find(name) != top->globals.end()) {
-          std::cerr << "Duplicate global "
-            << name << " at "
-            << def->location << " and "
-            << top->defmaps[top->globals[name]]->map[name]->location << std::endl;
-          lex.fail = true;
-        } else {
-          top->globals[name] = top->defmaps.size()-1;
-        }
-      }
+      bind_global(name, top, lex);
       break;
     }
     case DATA: {
-      parse_data(lex, data);
+      parse_data(lex, map, top);
       break;
     }
   }
@@ -596,14 +628,13 @@ Expr *parse_block(Lexer &lex) {
     Location location = lex.next.location;
     DefMap::defs map;
     DefMap::defs publish;
-    DefMap::sums data;
 
     bool repeat = true;
     while (repeat) {
       switch (lex.next.type) {
         case VAL:
         case DEF: {
-          parse_decl(map, data, lex, 0);
+          parse_decl(map, lex, 0);
           break;
         }
         case PUBLISH: {
@@ -622,7 +653,7 @@ Expr *parse_block(Lexer &lex) {
     publish_seal(publish);
     auto body = parse_if(lex);
     location.end = body->location.end;
-    out = (publish.empty() && map.empty()) ? body : new DefMap(location, std::move(map), std::move(publish), std::move(data), body);
+    out = (publish.empty() && map.empty()) ? body : new DefMap(location, std::move(map), std::move(publish), body);
 
     if (expect(DEDENT, lex)) lex.consume();
     return out;
@@ -644,13 +675,13 @@ void parse_top(Top &top, Lexer &lex) {
     switch (lex.next.type) {
       case GLOBAL: {
         lex.consume();
-        parse_decl(defmap.map, defmap.data, lex, &top);
+        parse_decl(defmap.map, lex, &top);
         break;
       }
       case DATA:
       case VAL:
       case DEF: {
-        parse_decl(defmap.map, defmap.data, lex, 0);
+        parse_decl(defmap.map, lex, 0);
         break;
       }
       case PUBLISH: {

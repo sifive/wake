@@ -194,59 +194,6 @@ Expr *rebind_subscribe(ResolveBinding *binding, const Location &location, const 
   return new Lambda(location, "_", new Lambda(location, "_t", new Lambda(location, "_f", new VarRef(location, "_t"))));
 }
 
-static std::string fixup_data_name(const std::string &name, size_t args) {
-  if (Lexer::isOperator(name.c_str())) {
-    if (args == 1) {
-      return "unary " + name;
-    } else if (args == 2) {
-      return "binary " + name;
-    } else {
-      assert(0);
-      return name;
-    }
-  } else {
-    return name;
-  }
-}
-
-static bool implement_data(DefMap &map) {
-  bool ok = true;
-  for (auto &s : map.data) {
-    std::string name = fixup_data_name(s.first, s.second.args.size());
-    auto it = map.map.find(name);
-    if (it != map.map.end()) {
-      std::cerr << "Data type " << s.first
-        << " at " << s.second.location
-        << " conflicts with definition at " << it->second->location
-        << std::endl;
-      ok = false;
-      continue;
-    }
-    Destruct *destruct = new Destruct(s.second.location, std::move(s.second));
-    Sum *sum = &destruct->sum;
-    Expr *destructfn = new Lambda(sum->location, "_", destruct);
-    for (auto &c : sum->members) {
-      destructfn = new Lambda(sum->location, "_", destructfn);
-      std::string name = fixup_data_name(c.ast.name, c.ast.args.size());
-      auto it = map.map.find(name);
-      if (it != map.map.end()) {
-        std::cerr << "Data constructor " << c.ast.name
-          << " at " << c.ast.location
-          << " conflicts with definition at " << it->second->location
-          << std::endl;
-        ok = false;
-        continue;
-      }
-      Expr *construct = new Construct(c.ast.location, sum, &c);
-      for (size_t i = 0; i < c.ast.args.size(); ++i)
-        construct = new Lambda(c.ast.location, "_", construct);
-      map.map[name] = std::unique_ptr<Expr>(construct);
-    }
-    map.map[name] = std::unique_ptr<Expr>(destructfn);
-  }
-  return ok;
-}
-
 static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding *binding) {
   if (expr->type == VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr.get());
@@ -314,7 +261,6 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     tbinding.depth = binding ? binding->depth+1 : 0;
     int chain = 0;
     for (auto &b : top->defmaps) {
-      if (!implement_data(*b)) return nullptr;
       for (auto &i : b->map) {
         std::string name;
         DefOrder::iterator glob;
@@ -364,7 +310,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     }
     return fracture_binding(top->location, tbinding.defs, std::move(top->body));
   } else {
-    // Literal/Prim
+    // Literal/Prim/Construct/Destruct
     return expr;
   }
 }
