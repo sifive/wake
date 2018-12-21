@@ -58,6 +58,13 @@ void TypeVar::do_sweep() const {
   }
 }
 
+void TypeVar::do_cap(int dob) {
+  TypeVar *a = find();
+  if (dob < a->dob) a->dob = dob;
+  for (int i = 0; i < a->nargs; ++i)
+    a->pargs[i].do_cap(dob);
+}
+
 // Always point RHS at LHS (so RHS can be a temporary)
 bool TypeVar::do_unify(TypeVar &other) {
   TypeVar *a = find();
@@ -71,8 +78,8 @@ bool TypeVar::do_unify(TypeVar &other) {
     bool infinite = a->contains(b);
     a->do_sweep();
     if (!infinite) {
+      a->do_cap(b->dob);
       b->parent = a;
-      if (b->dob < a->dob) a->dob = b->dob;
     }
     return !infinite;
   } else if (a->isFree()) {
@@ -82,8 +89,9 @@ bool TypeVar::do_unify(TypeVar &other) {
       std::swap(a->name,  b->name);
       std::swap(a->nargs, b->nargs);
       std::swap(a->pargs, b->pargs);
+      std::swap(a->dob,   b->dob);
+      a->do_cap(b->dob);
       b->parent = a;
-      if (b->dob < a->dob) a->dob = b->dob;
     }
     return !infinite;
   } else if (strcmp(a->name, b->name) || a->nargs != b->nargs) {
@@ -95,7 +103,6 @@ bool TypeVar::do_unify(TypeVar &other) {
         ok = false;
     if (ok) {
       b->parent = a;
-      if (b->dob < a->dob) a->dob = b->dob;
       // we cannot clear pargs, because other TypeVars might point through our children
     } else {
       if (a->epoch < globalEpoch) a->epoch = globalEpoch;
@@ -182,7 +189,7 @@ void TypeVar::do_clone(TypeVar &out, const TypeVar &x, int dob) {
 
 void TypeVar::clone(TypeVar &into) const {
   assert (!into.parent && into.isFree());
-  do_clone(into, *this, dob);
+  do_clone(into, *this, find()->dob);
   ++globalEpoch;
 }
 
@@ -200,7 +207,7 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, int tags
       tag = tags++;
       a->epoch = globalEpoch + tag;
     }
-    if (a->dob <= dob) os << "_";
+    if (a->dob < dob) os << "_";
     tag2str(os, tag);
   } else if (a->nargs == 0) {
     os << a->name;
