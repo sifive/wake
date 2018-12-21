@@ -518,6 +518,9 @@ static std::string fixup_data_name(const std::string &name, size_t args) {
   }
 }
 
+Sum *Bool;
+Sum *List;
+Sum *Pair;
 
 static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
   lex.consume();
@@ -595,6 +598,9 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
 
   bind_def(lex, map, name, destructfn);
   bind_global(name, top, lex);
+  if (top && name == "Bool") Bool = sump;
+  if (top && name == "List") List = sump;
+  if (top && name == "Pair") Pair = sump;
 }
 
 static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top) {
