@@ -384,12 +384,12 @@ static void publish_def(DefMap::defs &publish, const std::string &name, Expr *de
     i = publish.insert(std::make_pair(name, std::unique_ptr<Expr>(new VarRef(def->location, "_tail")))).first;
   }
   // Make a tuple
-  i->second = std::unique_ptr<Expr>(new Lambda(def->location, "_pub",
+  i->second = std::unique_ptr<Expr>(
     new App(def->location,
       new App(def->location,
-        new VarRef(def->location, "_pub"),
+        new VarRef(def->location, "binary ,"),
         def),
-      i->second.release())));
+      i->second.release()));
 }
 
 static void bind_global(const std::string &name, Top *top, Lexer &lex) {
