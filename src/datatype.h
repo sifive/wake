@@ -6,6 +6,7 @@
 #include <string>
 #include <map>
 #include <ostream>
+#include <memory>
 
 struct TypeVar;
 struct AST {

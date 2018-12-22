@@ -507,11 +507,8 @@ static std::string fixup_data_name(const std::string &name, size_t args) {
   if (Lexer::isOperator(name.c_str())) {
     if (args == 1) {
       return "unary " + name;
-    } else if (args == 2) {
-      return "binary " + name;
     } else {
-      assert(0);
-      return name;
+      return "binary " + name;
     }
   } else {
     return name;
