@@ -152,7 +152,8 @@ void Thunk::eval(WorkQueue &queue) {
     }
   } else if (expr->type == Destruct::type) {
     Destruct *des = reinterpret_cast<Destruct*>(expr);
-    binding->future[0].depend(queue, std::unique_ptr<Receiver>(
+    Binding *data = binding.get();
+    data->future[0].depend(queue, std::unique_ptr<Receiver>(
       new Destructure(std::move(binding), std::move(receiver), des)));
   } else if (expr->type == Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
