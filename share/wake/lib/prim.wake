@@ -306,11 +306,12 @@ global def hashname f = (hashpair f).first  # just the filename
 global def hashcode f = (hashpair f).second # just the hashcode
 
 # A job where all inputs and outputs are known a-priori
-global def uncached_simple_job dir stdin env cmd inputs outputs =
+global def uncached_simple_job dir stdin env cmd inputs outputs = memoize (
   def job = launch "." dir stdin env cmd
   def final _ = finish job (map hashname inputs) (map hashname outputs)
   def wait = if job.status == 0 then final 0 else final 0
   job
+)
 
 global def cached_simple_job dir stdin env cmd inputs outputs =
   def build _ = uncached_simple_job dir stdin env cmd inputs outputs
