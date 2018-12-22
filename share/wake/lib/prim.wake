@@ -298,7 +298,7 @@ global def finish job inputs outputs =
 global def hashpair f = memoize ( # pair file hash
   def job = launch "." "." "" Nil (which "md5sum", f, Nil)
   def final _ = finish job Nil Nil
-  def wait = if job.status == 0 then final else final
+  def wait = if job.status == 0 then final 0 else final 0
   def add f h = prim "add_hash"
   if job.status == 0 then add f (head (extract '(.{32}).*' job.stdout)) else raise "Hashing failed"
 )
@@ -309,7 +309,7 @@ global def hashcode f = (hashpair f).second # just the hashcode
 global def uncached_simple_job dir stdin env cmd inputs outputs =
   def job = launch "." dir stdin env cmd
   def final _ = finish job (map hashname inputs) (map hashname outputs)
-  def wait = if job.status == 0 then final else final
+  def wait = if job.status == 0 then final 0 else final 0
   job
 
 global def cached_simple_job dir stdin env cmd inputs outputs =
@@ -322,7 +322,7 @@ global def uncached_fuse_job dir stdin env cmd files dirs = memoize (
   def visible = map hashname files ++ (dir, dirs)
   def fuse = primjob 0 "." "." "" "" (fusepath, visible).implode
   def endfuse _ = finish fuse Nil Nil
-  def waitfuse = if fuse.status == 0 then endfuse else endfuse
+  def waitfuse = if fuse.status == 0 then endfuse 0 else endfuse 0
   def err = fuse.stderr
   def handle _ = raise "Could not start fuse-wake: {err}"
   def list = try handle (extract 'OK: (.*)' err)
@@ -333,7 +333,7 @@ global def uncached_fuse_job dir stdin env cmd files dirs = memoize (
     def inputs = (tokenize "\0" (at 0 result)).reverse.tail
     def outputs = (tokenize "\0" (at 1 result)).reverse.tail
     finish job inputs (map hashname outputs)
-  def wait = if job.status == 0 then final else final
+  def wait = if job.status == 0 then final 0 else final 0
   job
 )
 
