@@ -6,6 +6,7 @@
 #include "symbol.h"
 #include <sstream>
 #include <cassert>
+#include <algorithm>
 
 Value::~Value() { }
 const char *String::type = "String";
