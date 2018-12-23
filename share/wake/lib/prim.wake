@@ -207,10 +207,10 @@ global def cmp x y = prim "cmp" # lt=-1, eq=0, gt=1
 
 # Regular expressions
 global def quote s = prim "quote" # str -> str  (quoted for use in a regexp)
-global def match r =              # regexp str -> bool
+global def matches r =              # regexp str -> bool
   def compile r = prim "re2"
-  def match r s = prim "match"
-  match (compile r)
+  def matches r s = prim "match"
+  matches (compile r)
 global def extract r =            # regexp-with-(exp)s str -> str list
   def compile r = prim "re2"
   def extract r s = prim "extract"
