@@ -96,6 +96,7 @@ void Data::format(std::ostream &os, int p) const {
     } else if (name.substr(0, 6) == "unary ") {
       op_type q = op_precedence(name.c_str() + 6);
       if (q.p < p) os << "(";
+      os << name.c_str() + 6;
       future_format(os, todo[0]->future[0], q.p);
       if (q.p < p) os << ")";
     } else {

@@ -24,9 +24,9 @@ private:
   bool contains(const TypeVar *other) const;
   void do_sweep() const;
   static void do_clone(TypeVar &out, const TypeVar &x, int dob);
-  static int do_format(std::ostream &os, int dob, const TypeVar &value, int tags, bool parens);
+  static int do_format(std::ostream &os, int dob, const TypeVar &value, int tags, int p);
   bool do_unify(TypeVar &other);
-  void do_debug(std::ostream &os, TypeVar &other, int who, bool parens);
+  void do_debug(std::ostream &os, TypeVar &other, int who, int p);
   void do_cap(int dob);
 
   bool isFree() const { return name[0] == 0; }

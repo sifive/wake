@@ -24,7 +24,8 @@ void Sum::addConstructor(AST &&ast) {
 }
 
 bool AST::unify(TypeVar &out, std::map<std::string, TypeVar> &ids) {
-  if (Lexer::isLower(name.c_str())) {
+  bool isOp = name.find(' ') != std::string::npos;
+  if (!isOp && Lexer::isLower(name.c_str())) {
     auto it = ids.find(name);
     if (it == ids.end()) {
       std::cerr << "Unbound type variable " << name << " at " << location << std::endl;
