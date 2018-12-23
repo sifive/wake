@@ -224,12 +224,12 @@ Hash Closure::hash() const {
   return out;
 }
 
-TypeVar Data::typeBool("Bool", 0);
+TypeVar Data::typeBoolean("Boolean", 0);
 const TypeVar Data::typeList("List", 1);
 const TypeVar Data::typePair("Pair", 2);
 TypeVar &Data::getType() {
   assert (0); // unreachable
-  return typeBool;
+  return typeBoolean;
 }
 
 Hash Data::hash() const {

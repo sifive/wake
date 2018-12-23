@@ -600,7 +600,7 @@ static PRIMTYPE(type_job_finish) {
     args[0]->unify(JobResult::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
-    out->unify(Data::typeBool);
+    out->unify(Data::typeBoolean);
 }
 
 static PRIMFN(prim_job_finish) {

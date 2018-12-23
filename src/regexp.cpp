@@ -92,7 +92,7 @@ static PRIMTYPE(type_match) {
   return args.size() == 2 &&
     args[0]->unify(RegExp::typeVar) &&
     args[1]->unify(String::typeVar) &&
-    out->unify(Data::typeBool);
+    out->unify(Data::typeBoolean);
 }
 
 static PRIMFN(prim_match) {
