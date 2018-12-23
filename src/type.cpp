@@ -1,5 +1,7 @@
 #include "type.h"
 #include "location.h"
+#include "symbol.h"
+#include "expr.h"
 #include <cstring>
 #include <iostream>
 #include <cassert>
@@ -114,41 +116,59 @@ bool TypeVar::do_unify(TypeVar &other) {
   }
 }
 
-void TypeVar::do_debug(std::ostream &os, TypeVar &other, int who, bool parens) {
+void TypeVar::do_debug(std::ostream &os, TypeVar &other, int who, int p) {
   TypeVar *a = find();
   TypeVar *b = other.find();
   TypeVar *w = who ? b : a;
 
   if (a->nargs != b->nargs || strcmp(a->name, b->name)) {
-    if (parens && w->nargs > 0) os << "(";
     // os << "[[[ ";
     if (w->isFree()) {
-      os << "infinite-type";
-    } else if (w->name[0] == '=') {
-      os << "_ => _";
+      os << "<infinite-type>";
+    } else if (!strncmp(w->name, "binary ", 7)) {
+      op_type q = op_precedence(w->name + 7);
+      if (q.p < p) os << "(";
+      os << "_ " << w->name+7  << " _";
+      if (q.p < p) os << ")";
+    } else if (!strncmp(w->name, "unary ", 6)) {
+      op_type q = op_precedence(w->name + 6);
+      if (q.p < p) os << "(";
+      os << w->name + 6 << " _";
+      if (q.p < p) os << ")";
     } else {
+      op_type q = op_precedence("a");
+      if (q.p < p) os << "(";
       os << w->name;
       for (int i = 0; i < w->nargs; ++i)
         os << " _";
+      if (q.p < p) os << ")";
     }
     // os << " ]]]";
-    if (parens && w->nargs > 0) os << ")";
   } else if (a->epoch - globalEpoch != 1) {
     os << "_";
+  } else if (!strncmp(a->name, "binary ", 7)) {
+    op_type q = op_precedence(a->name + 7);
+    if (q.p < p) os << "(";
+    a->pargs[0].do_debug(os, b->pargs[0], who, q.p + !q.l);
+    if (a->name[7] != ',') os << " ";
+    os << a->name + 7 << " ";
+    a->pargs[1].do_debug(os, b->pargs[1], who, q.p + q.l);
+    if (q.p < p) os << ")";
+  } else if (!strncmp(a->name, "unary ", 6)) {
+    op_type q = op_precedence(a->name + 6);
+    if (q.p < p) os << "(";
+    os << a->name + 6;
+    a->pargs[0].do_debug(os, b->pargs[0], who, q.p);
+    if (q.p < p) os << ")";
   } else {
-    if (parens) os << "(";
-    if (a->name[0] == '=') {
-      a->pargs[0].do_debug(os, b->pargs[0], who, true);
-      os << " => ";
-      a->pargs[1].do_debug(os, b->pargs[1], who, false);
-    } else {
-      os << a->name;
-      for (int i = 0; i < a->nargs; ++i) {
-        os << " ";
-        a->pargs[i].do_debug(os, b->pargs[i], who, true);
-      }
+    op_type q = op_precedence("a");
+    if (q.p < p) os << "(";
+    os << a->name;
+    for (int i = 0; i < a->nargs; ++i) {
+      os << " ";
+      a->pargs[i].do_debug(os, b->pargs[i], who, q.p+q.l);
     }
-    if (parens) os << ")";
+    if (q.p < p) os << ")";
   }
 }
 
@@ -160,7 +180,7 @@ bool TypeVar::unify(TypeVar &other, Location *location) {
     os << "Type inference error";
     if (location) os << " at " << *location;
     os << ":" << std::endl << "    ";
-    do_debug(os, other, 0, false);
+    do_debug(os, other, 0, 0);
     os << std::endl << "  does not match:" << std::endl << "    ";
     do_debug(os, other, 1, false);
     os << std::endl;
@@ -201,7 +221,7 @@ static void tag2str(std::ostream &os, int tag) {
   os << (char)('a' + (tag % radix));
 }
 
-int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, int tags, bool parens) {
+int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, int tags, int p) {
   const TypeVar *a = value.find();
   if (a->isFree()) {
     int tag = a->epoch - globalEpoch;
@@ -213,20 +233,29 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, int tags
     tag2str(os, tag);
   } else if (a->nargs == 0) {
     os << a->name;
-  } else if (a->name[0] == '=') {
-    if (parens) os << "(";
-    tags = do_format(os, dob, a->pargs[0], tags, true);
-    os << " => ";
-    tags = do_format(os, dob, a->pargs[1], tags, false);
-    if (parens) os << ")";
+  } else if (!strncmp(a->name, "binary ", 7)) {
+    op_type q = op_precedence(a->name + 7);
+    if (q.p < p) os << "(";
+    tags = do_format(os, dob, a->pargs[0], tags, q.p + !q.l);
+    if (a->name[7] != ',') os << " ";
+    os << a->name + 7 << " ";
+    tags = do_format(os, dob, a->pargs[1], tags, q.p + q.l);
+    if (q.p < p) os << ")";
+  } else if (!strncmp(a->name, "unary ", 6)) {
+    op_type q = op_precedence(a->name + 6);
+    if (q.p < p) os << "(";
+    os << a->name + 6;
+    tags = do_format(os, dob, a->pargs[0], tags, q.p);
+    if (q.p < p) os << ")";
   } else {
-    if (parens) os << "(";
+    op_type q = op_precedence("a");
+    if (q.p < p) os << "(";
     os << a->name;
     for (int i = 0; i < a->nargs; ++i) {
       os << " ";
-      tags = do_format(os, dob, a->pargs[i], tags, true);
+      tags = do_format(os, dob, a->pargs[i], tags, q.p+q.l);
     }
-    if (parens) os << ")";
+    if (q.p < p) os << ")";
   }
   return tags;
 }

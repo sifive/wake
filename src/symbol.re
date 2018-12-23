@@ -440,7 +440,7 @@ op_type op_precedence(const char *str) {
   case '!': // multi-character '!' (like != )
     if (str[1] == 0) return op_type(8, 1);
   case '=':
-    return op_type(5, 1);
+    return op_type(5, 0);
   case '&':
     return op_type(4, 1);
   case '|':

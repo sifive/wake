@@ -112,7 +112,7 @@ void DefMap::hash() {
 
 void Literal::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Literal: " << typeVar << " @ " << location << " = ";
-  value->format(os, depth);
+  value->format(os, -1-depth);
 }
 
 void Literal::hash() {

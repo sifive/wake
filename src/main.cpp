@@ -183,6 +183,7 @@ int main(int argc, const char **argv) {
     body = new Lambda(LOCATION, "_", body);
     target_names.emplace_back("<target-" + std::to_string(i) + "-expression>");
   }
+  TypeVar *types = &body->typeVar;
   for (size_t i = 0; i < targets.size(); ++i) {
     Lexer lex(targets[i], target_names[i].c_str());
     body = new App(LOCATION, body, parse_command(lex));
@@ -258,7 +259,8 @@ int main(int argc, const char **argv) {
 
   for (size_t i = 0; i < targets.size(); ++i) {
     Value *v = outputs[targets.size()-1-i].get();
-    std::cout << targets[i] << " = ";
+    std::cout << targets[i] << ": " << (*types)[0] << " = ";
+    types = &(*types)[1];
     if (v) {
       if (verbose) {
         v->format(std::cout, -1);
