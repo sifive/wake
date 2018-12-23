@@ -93,6 +93,13 @@ static Expr *relabel_anon(Expr *out) {
   return out;
 }
 
+static void precedence_error(Lexer &lex) {
+  std::cerr << "Lower precedence unary operator "
+    << lex.text() << " must use ()s at "
+    << lex.next.location << std::endl;
+  lex.fail = true;
+}
+
 static Expr *parse_unary(int p, Lexer &lex) {
   TRACE("UNARY");
   switch (lex.next.type) {
@@ -100,12 +107,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
     case OPERATOR: {
       Location location = lex.next.location;
       op_type op = op_precedence(lex.text().c_str());
-      if (op.p < p) {
-        std::cerr << "Lower precedence unary operator "
-          << lex.text() << " must use ()s at "
-          << lex.next.location << std::endl;
-        lex.fail = true;
-      }
+      if (op.p < p) precedence_error(lex);
       auto opp = new VarRef(lex.next.location, "unary " + lex.text());
       lex.consume();
       auto rhs = parse_binary(op.p + op.l, lex);
@@ -115,12 +117,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
     case MEMOIZE: {
       Location location = lex.next.location;
       op_type op = op_precedence("m");
-      if (op.p < p) {
-        std::cerr << "Lower precedence unary operator "
-          << lex.text() << " must use ()s at "
-          << lex.next.location << std::endl;
-        lex.fail = true;
-      }
+      if (op.p < p) precedence_error(lex);
       lex.consume();
       auto rhs = parse_binary(op.p + op.l, lex);
       location.end = rhs->location.end;
@@ -129,12 +126,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
     case LAMBDA: {
       Location location = lex.next.location;
       op_type op = op_precedence("\\");
-      if (op.p < p) {
-        std::cerr << "Lower precedence unary operator "
-          << lex.text() << " must use ()s at "
-          << lex.next.location << std::endl;
-        lex.fail = true;
-      }
+      if (op.p < p) precedence_error(lex);
       lex.consume();
       auto name = get_arg_loc(lex);
       auto rhs = parse_binary(op.p + op.l, lex);
@@ -155,6 +147,8 @@ static Expr *parse_unary(int p, Lexer &lex) {
     case PRIM: {
       std::string name;
       Location location = lex.next.location;
+      op_type op = op_precedence("p");
+      if (op.p < p) precedence_error(lex);
       lex.consume();
       if (expectValue(String::type, lex)) {
         Literal *lit = reinterpret_cast<Literal*>(lex.next.expr.get());
@@ -177,6 +171,8 @@ static Expr *parse_unary(int p, Lexer &lex) {
     case SUBSCRIBE: {
       std::string name;
       Location location = lex.next.location;
+      op_type op = op_precedence("s");
+      if (op.p < p) precedence_error(lex);
       lex.consume();
       auto id = get_arg_loc(lex);
       location.end = id.second.end;
@@ -371,12 +367,7 @@ static AST parse_unary_ast(int p, Lexer &lex) {
     case OPERATOR: {
       Location location = lex.next.location;
       op_type op = op_precedence(lex.text().c_str());
-      if (op.p < p) {
-        std::cerr << "Lower precedence unary operator "
-          << lex.text() << " must use ()s at "
-          << lex.next.location << std::endl;
-        lex.fail = true;
-      }
+      if (op.p < p) precedence_error(lex);
       std::string name = "unary " + lex.text();
       lex.consume();
       AST rhs = parse_ast(op.p + op.l, lex);

@@ -420,6 +420,9 @@ op_type op_precedence(const char *str) {
   switch (c) {
   case '.':
     return op_type(13, 1);
+  case 's': // SUBSCRIBE
+  case 'm': // MEMOIZE
+  case 'p': // PRIM
   case 'a': // Application rules run between . and $
     return op_type(APP_PRECEDENCE, 1);
   case '^':
@@ -450,7 +453,6 @@ op_type op_precedence(const char *str) {
     return op_type(2, 0);
   case ',':
     return op_type(1, 0);
-  case 'm': // MEMOIZE
   case '\\': // LAMBDA
     return op_type(0, 0);
   default:
