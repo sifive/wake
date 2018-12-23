@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <gmp.h>
 
+#define APP_PRECEDENCE 12
+
 /* Values */
 
 struct Lambda;
@@ -23,7 +25,7 @@ struct Value {
   virtual ~Value();
 
   std::string to_str() const; // one-line version
-  virtual void format(std::ostream &os, int depth) const = 0; // depth=-1 means use one-line
+  virtual void format(std::ostream &os, int p) const = 0; // < 0 means indent
   virtual TypeVar &getType() = 0;
   virtual Hash hash() const = 0;
 };

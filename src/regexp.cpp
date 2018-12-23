@@ -17,9 +17,11 @@ struct RegExp : public Value {
 };
 const char *RegExp::type = "RegExp";
 
-void RegExp::format(std::ostream &os, int depth) const {
-  os << "RegExp(" << exp.pattern() << ")";
-  if (depth >= 0) os << std::endl;
+void RegExp::format(std::ostream &os, int p) const {
+  if (APP_PRECEDENCE < p) os << "(";
+  os << "RegExp ";
+  String(exp.pattern()).format(os, p);
+  if (APP_PRECEDENCE < p) os << ")";
 }
 
 TypeVar RegExp::typeVar("RegExp", 0);

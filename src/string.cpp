@@ -23,9 +23,11 @@ struct CatStream : public Value {
 };
 const char *CatStream::type = "CatStream";
 
-void CatStream::format(std::ostream &os, int depth) const {
-  os << "CatStream(" << str.str() << ")";
-  if (depth >= 0) os << std::endl;
+void CatStream::format(std::ostream &os, int p) const {
+  if (APP_PRECEDENCE < p) os << "(";
+  os << "CatStream ";
+  String(str.str()).format(os, p);
+  if (APP_PRECEDENCE < p) os << ")";
 }
 
 TypeVar CatStream::typeVar("CatStream", 0);
@@ -197,7 +199,7 @@ static PRIMTYPE(type_format) {
 static PRIMFN(prim_format) {
   REQUIRE(args.size() == 1, "prim_format expects 1 argument");
   std::stringstream buffer;
-    args[0]->format(buffer, 0);
+  args[0]->format(buffer, 0);
   auto out = std::make_shared<String>(buffer.str());
   RETURN(out);
 }

@@ -413,3 +413,46 @@ bool Lexer::isUpper(const char *str) {
 bool Lexer::isOperator(const char *str) {
   return !isUpper(str) && !isLower(str);
 }
+
+op_type op_precedence(const char *str) {
+  char c = str[0];
+  switch (c) {
+  case '.':
+    return op_type(13, 1);
+  case 'a': // Application rules run between . and $
+    return op_type(APP_PRECEDENCE, 1);
+  case '^':
+    return op_type(11, 0);
+  case '*':
+    return op_type(10, 1);
+  case '/':
+  case '%':
+    return op_type(9, 1);
+  case '-':
+  case '~':
+  // case '!': // single-character '!'
+    return op_type(8, 1);
+  case '+':
+    return op_type(7, 1);
+  case '<':
+  case '>':
+    return op_type(6, 1);
+  case '!': // multi-character '!' (like != )
+    if (str[1] == 0) return op_type(8, 1);
+  case '=':
+    return op_type(5, 1);
+  case '&':
+    return op_type(4, 1);
+  case '|':
+    return op_type(3, 1);
+  case '$':
+    return op_type(2, 0);
+  case ',':
+    return op_type(1, 0);
+  case 'm': // MEMOIZE
+  case '\\': // LAMBDA
+    return op_type(0, 0);
+  default:
+    return op_type(-1, -1);
+  }
+}

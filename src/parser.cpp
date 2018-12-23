@@ -9,56 +9,6 @@
 //#define TRACE(x) do { fprintf(stderr, "%s\n", x); } while (0)
 #define TRACE(x) do { } while (0)
 
-struct op_type {
-  int p;
-  int l;
-  op_type(int p_, int l_) : p(p_), l(l_) { }
-  op_type() : p(-1), l(-1) { }
-};
-
-static op_type precedence(const std::string &str) {
-  char c = str[0];
-  switch (c) {
-  case '.':
-    return op_type(13, 1);
-  case 'a': // Application rules run between . and $
-    return op_type(12, 1);
-  case '^':
-    return op_type(11, 0);
-  case '*':
-    return op_type(10, 1);
-  case '/':
-  case '%':
-    return op_type(9, 1);
-  case '-':
-  case '~':
-  // case '!': // single-character '!'
-    return op_type(8, 1);
-  case '+':
-    return op_type(7, 1);
-  case '<':
-  case '>':
-    return op_type(6, 1);
-  case '!': // multi-character '!' (like != )
-    if (str.size() == 1) return op_type(8, 1);
-  case '=':
-    return op_type(5, 1);
-  case '&':
-    return op_type(4, 1);
-  case '|':
-    return op_type(3, 1);
-  case '$':
-    return op_type(2, 0);
-  case ',':
-    return op_type(1, 0);
-  case 'm': // MEMOIZE
-  case '\\': // LAMBDA
-    return op_type(0, 0);
-  default:
-    return op_type(-1, -1);
-  }
-}
-
 bool expect(SymbolType type, Lexer &lex) {
   if (lex.next.type != type) {
     std::cerr << "Was expecting a "
@@ -149,7 +99,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
     // Unary operators
     case OPERATOR: {
       Location location = lex.next.location;
-      op_type op = precedence(lex.text());
+      op_type op = op_precedence(lex.text().c_str());
       if (op.p < p) {
         std::cerr << "Lower precedence unary operator "
           << lex.text() << " must use ()s at "
@@ -164,7 +114,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
     }
     case MEMOIZE: {
       Location location = lex.next.location;
-      op_type op = precedence(lex.text());
+      op_type op = op_precedence("m");
       if (op.p < p) {
         std::cerr << "Lower precedence unary operator "
           << lex.text() << " must use ()s at "
@@ -178,7 +128,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
     }
     case LAMBDA: {
       Location location = lex.next.location;
-      op_type op = precedence(lex.text());
+      op_type op = op_precedence("\\");
       if (op.p < p) {
         std::cerr << "Lower precedence unary operator "
           << lex.text() << " must use ()s at "
@@ -258,10 +208,9 @@ static Expr *parse_binary(int p, Lexer &lex) {
   for (;;) {
     switch (lex.next.type) {
       case OPERATOR: {
-        std::string name = lex.text();
-        op_type op = precedence(name);
+        op_type op = op_precedence(lex.text().c_str());
         if (op.p < p) return lhs;
-        auto opp = new VarRef(lex.next.location, "binary " + name);
+        auto opp = new VarRef(lex.next.location, "binary " + lex.text());
         lex.consume();
         auto rhs = parse_binary(op.p + op.l, lex);
         Location app1_loc = lhs->location;
@@ -279,7 +228,7 @@ static Expr *parse_binary(int p, Lexer &lex) {
       case HERE:
       case SUBSCRIBE:
       case POPEN: {
-        op_type op = precedence("a"); // application
+        op_type op = op_precedence("a"); // application
         if (op.p < p) return lhs;
         auto rhs = parse_binary(op.p + op.l, lex);
         Location location = lhs->location;
@@ -421,14 +370,14 @@ static AST parse_unary_ast(int p, Lexer &lex) {
     // Unary operators
     case OPERATOR: {
       Location location = lex.next.location;
-      op_type op = precedence(lex.text());
+      op_type op = op_precedence(lex.text().c_str());
       if (op.p < p) {
         std::cerr << "Lower precedence unary operator "
           << lex.text() << " must use ()s at "
           << lex.next.location << std::endl;
         lex.fail = true;
       }
-      std::string name = lex.text();
+      std::string name = "unary " + lex.text();
       lex.consume();
       AST rhs = parse_ast(op.p + op.l, lex);
       location.end = rhs.location.end;
@@ -467,9 +416,9 @@ static AST parse_ast(int p, Lexer &lex) {
   for (;;) {
     switch (lex.next.type) {
       case OPERATOR: {
-        std::string name = lex.text();
-        op_type op = precedence(name);
+        op_type op = op_precedence(lex.text().c_str());
         if (op.p < p) return lhs;
+        std::string name = "binary " + lex.text();
         lex.consume();
         auto rhs = parse_ast(op.p + op.l, lex);
         Location loc = lhs.location;
@@ -482,12 +431,16 @@ static AST parse_ast(int p, Lexer &lex) {
       }
       case ID:
       case POPEN: {
-        op_type op = precedence("a"); // application
+        op_type op = op_precedence("a"); // application
         if (op.p < p) return lhs;
         AST rhs = parse_ast(op.p + op.l, lex);
         Location location = lhs.location;
         location.end = rhs.location.end;
-        if (lhs.args.empty() && Lexer::isLower(lhs.name.c_str())) {
+        if (lhs.name.find(' ') != std::string::npos) {
+          std::cerr << "Cannot supply additional constructor arguments to " << lhs.name
+            << " at " << location << std::endl;
+          lex.fail = true;
+        } else if (lhs.args.empty() && Lexer::isLower(lhs.name.c_str())) {
           std::cerr << "Lower-case identifier " << lhs.name
             << " cannot be used as a constructor at " << location
             << std::endl;
@@ -503,18 +456,6 @@ static AST parse_ast(int p, Lexer &lex) {
   }
 }
 
-static std::string fixup_data_name(const std::string &name, size_t args) {
-  if (Lexer::isOperator(name.c_str())) {
-    if (args == 1) {
-      return "unary " + name;
-    } else {
-      return "binary " + name;
-    }
-  } else {
-    return name;
-  }
-}
-
 Sum *Bool;
 Sum *List;
 Sum *Pair;
@@ -525,14 +466,16 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
   AST def = parse_ast(0, lex);
   if (!def) return;
 
-  if (Lexer::isLower(def.name.c_str())) {
+  bool isOp = def.name.find(' ') != std::string::npos;
+  if (!isOp && Lexer::isLower(def.name.c_str())) {
     std::cerr << "Type name must be upper-case or operator, not "
       << def.name << " at "
       << def.location << std::endl;
     lex.fail = true;
   }
   for (auto &x : def.args) {
-    if (!Lexer::isLower(x.name.c_str())) {
+    bool isOp = x.name.find(' ') != std::string::npos;
+    if (isOp || !Lexer::isLower(x.name.c_str())) {
       std::cerr << "Type argument must be lower-case, not "
         << x.name << " at "
         << x.location << std::endl;
@@ -550,7 +493,8 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
   while (repeat) {
     AST cons = parse_ast(0, lex);
     if (cons) {
-      if (Lexer::isLower(cons.name.c_str())) {
+      bool isOp = cons.name.find(' ') != std::string::npos;
+      if (!isOp && Lexer::isLower(cons.name.c_str())) {
         std::cerr << "Constructor name must be upper-case or operator, not "
           << cons.name << " at "
           << cons.location << std::endl;
@@ -576,7 +520,7 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
     }
   }
 
-  std::string name = fixup_data_name(sum.name, sum.args.size());
+  std::string name = sum.name;
   Location location = sum.location;
   Destruct *destruct = new Destruct(location, std::move(sum));
   Sum *sump = &destruct->sum;
@@ -584,20 +528,56 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
 
   for (auto &c : sump->members) {
     destructfn = new Lambda(sump->location, "_", destructfn);
-    std::string name = fixup_data_name(c.ast.name, c.ast.args.size());
     Expr *construct = new Construct(c.ast.location, sump, &c);
     for (size_t i = 0; i < c.ast.args.size(); ++i)
       construct = new Lambda(c.ast.location, "_", construct);
 
-    bind_def(lex, map, name, construct);
-    bind_global(name, top, lex);
+    bind_def(lex, map, c.ast.name, construct);
+    bind_global(c.ast.name, top, lex);
   }
 
   bind_def(lex, map, name, destructfn);
   bind_global(name, top, lex);
-  if (top && name == "Bool") Bool = sump;
-  if (top && name == "List") List = sump;
-  if (top && name == "Pair") Pair = sump;
+
+  if (name == "Integer" || name == "String" || name == "RegExp" ||
+      name == "CatStream" || name == "Exception" || name == FN ||
+      name == "JobResult") {
+    std::cerr << "Constuctor " << name
+      << " is reserved at " << sump->location << "." << std::endl;
+    lex.fail = true;
+  }
+
+  if (top && name == "Bool") {
+    if (sump->members.size() != 2 ||
+        sump->members[0].ast.args.size() != 0 ||
+        sump->members[1].ast.args.size() != 0) {
+      std::cerr << "Special constructor Bool not defined correctly at "
+        << sump->location << "." << std::endl;
+      lex.fail = true;
+    }
+    Bool = sump;
+  }
+
+  if (top && name == "List") {
+    if (sump->members.size() != 2 ||
+        sump->members[0].ast.args.size() != 0 ||
+        sump->members[1].ast.args.size() != 2) {
+      std::cerr << "Special constructor List not defined correctly at "
+        << sump->location << "." << std::endl;
+      lex.fail = true;
+    }
+    List = sump;
+  }
+
+  if (top && name == "Pair") {
+    if (sump->members.size() != 1 ||
+        sump->members[0].ast.args.size() != 2) {
+      std::cerr << "Special constructor Pair not defined correctly at "
+        << sump->location << "." << std::endl;
+      lex.fail = true;
+    }
+    Pair = sump;
+  }
 }
 
 static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top) {

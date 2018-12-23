@@ -4,6 +4,8 @@
 #include <ostream>
 struct Location;
 
+#define FN "binary =>"
+
 struct TypeVar {
 private:
   mutable TypeVar *parent;

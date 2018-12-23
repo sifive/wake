@@ -387,13 +387,13 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     binding->open = false;
     bool f = explore(app->fn .get(), pmap, binding);
     bool a = explore(app->val.get(), pmap, binding);
-    bool t = app->fn->typeVar.unify(TypeVar("=>", 2), &app->location);
+    bool t = app->fn->typeVar.unify(TypeVar(FN, 2), &app->location);
     bool ta = t && app->fn->typeVar[0].unify(app->val->typeVar, &app->location);
     bool tr = t && app->fn->typeVar[1].unify(app->typeVar, &app->location);
     return f && a && t && ta && tr;
   } else if (expr->type == Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
-    bool t = lambda->typeVar.unify(TypeVar("=>", 2), &lambda->location);
+    bool t = lambda->typeVar.unify(TypeVar(FN, 2), &lambda->location);
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), pmap, &bind);
     bool tr = t && lambda->typeVar[1].unify(lambda->body->typeVar, &lambda->location);
@@ -456,12 +456,12 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       iter = iter->next;
       TypeVar *tail = &iter->lambda->typeVar[0];
       Constructor &cons = des->sum.members[i-1];
-      if (!tail->unify(TypeVar("=>", 2))) { ok = false; break; }
+      if (!tail->unify(TypeVar(FN, 2))) { ok = false; break; }
       ok = (*tail)[0].unify(typ) && ok;
       tail = &(*tail)[1];
       size_t j;
       for (j = 0; j < cons.ast.args.size(); ++j) {
-        if (!tail->unify(TypeVar("=>", 2))) { ok = false; break; }
+        if (!tail->unify(TypeVar(FN, 2))) { ok = false; break; }
         ok = cons.ast.args[j].unify((*tail)[0], ids) && ok;
         tail = &(*tail)[1];
       }

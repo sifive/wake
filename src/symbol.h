@@ -42,4 +42,13 @@ struct Lexer {
   static bool isOperator(const char *str);
 };
 
+struct op_type {
+  int p;
+  int l;
+  op_type(int p_, int l_) : p(p_), l(l_) { }
+  op_type() : p(-1), l(-1) { }
+};
+
+op_type op_precedence(const char *str);
+
 #endif
