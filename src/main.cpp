@@ -197,8 +197,8 @@ int main(int argc, const char **argv) {
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
   if (!root) ok = false;
 
-  if (!Bool) {
-    std::cerr << "Primitive data type Bool not defined." << std::endl;
+  if (!Boolean) {
+    std::cerr << "Primitive data type Boolean not defined." << std::endl;
     ok = false;
   }
 

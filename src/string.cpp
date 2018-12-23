@@ -159,7 +159,7 @@ static PRIMTYPE(type_mkdir) {
   return args.size() == 2 &&
     args[0]->unify(String::typeVar) &&
     args[1]->unify(Integer::typeVar) &&
-    out->unify(Data::typeBool);
+    out->unify(Data::typeBoolean);
 }
 
 static PRIMFN(prim_mkdir) {
@@ -207,7 +207,7 @@ static PRIMFN(prim_format) {
 static PRIMTYPE(type_print) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
-    out->unify(Data::typeBool);
+    out->unify(Data::typeBoolean);
 }
 
 static PRIMFN(prim_print) {

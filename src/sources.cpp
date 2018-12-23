@@ -261,7 +261,7 @@ static PRIMFN(prim_sources) {
 static PRIMTYPE(type_add_sources) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
-    out->unify(Data::typeBool);
+    out->unify(Data::typeBoolean);
 }
 
 static PRIMFN(prim_add_sources) {

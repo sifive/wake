@@ -79,7 +79,7 @@ struct Data : public Value {
   std::shared_ptr<Binding> binding;
 
   static const char *type;
-  static TypeVar typeBool;
+  static TypeVar typeBoolean;
   // these two are const to prevent unify() on them; use clone
   static const TypeVar typeList;
   static const TypeVar typePair;

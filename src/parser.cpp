@@ -257,7 +257,7 @@ static Expr *parse_if(Lexer &lex) {
     auto elseE = parse_block(lex);
     l.end = elseE->location.end;
     return new App(l, new App(l, new App(l,
-      new VarRef(l, "Bool"),
+      new VarRef(l, "Boolean"),
       new Lambda(l, "_", thenE)),
       new Lambda(l, "_", elseE)),
       condE);
@@ -456,7 +456,7 @@ static AST parse_ast(int p, Lexer &lex) {
   }
 }
 
-Sum *Bool;
+Sum *Boolean;
 Sum *List;
 Sum *Pair;
 
@@ -547,15 +547,15 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
     lex.fail = true;
   }
 
-  if (top && name == "Bool") {
+  if (top && name == "Boolean") {
     if (sump->members.size() != 2 ||
         sump->members[0].ast.args.size() != 0 ||
         sump->members[1].ast.args.size() != 0) {
-      std::cerr << "Special constructor Bool not defined correctly at "
+      std::cerr << "Special constructor Boolean not defined correctly at "
         << sump->location << "." << std::endl;
       lex.fail = true;
     }
-    Bool = sump;
+    Boolean = sump;
   }
 
   if (top && name == "List") {

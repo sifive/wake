@@ -8,13 +8,13 @@ global def try f x = if test x then f (catch x) else x
 global def raise x = prim "raise"
 
 # bools
-global data Bool =
+global data Boolean =
   True
   False
 
-global def !x    = Bool (\_ False) (\_ True) x
-global def x & y = Bool (\_ y) (\_ False) x
-global def x | y = Bool (\_ True) (\_ y) x
+global def !x    = Boolean (\_ False) (\_ True) x
+global def x & y = Boolean (\_ y) (\_ False) x
+global def x | y = Boolean (\_ True) (\_ y) x
 
 # tuples
 global data Pair a b =
