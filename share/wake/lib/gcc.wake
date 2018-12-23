@@ -33,7 +33,7 @@ publish linkO = makeLinkO "native-cpp11-debug"   (which "g++") (debugLFlags)
 publish linkO = makeLinkO "native-cpp11-release" (which "g++") (releaseLFlags)
 
 def pickVariant variant variants =
-  def selected = find (match variant _.first) variants
+  def selected = find (matches variant _.first) variants
   if selected.empty
   then
     def ok = catWith " " (map first variants)
