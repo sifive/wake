@@ -17,8 +17,7 @@ global def x & y = Boolean (\_ y) (\_ False) x
 global def x | y = Boolean (\_ True) (\_ y) x
 
 # tuples
-global data Pair a b =
-  PPair a b
+global data Pair a b = PPair a b
 
 global def pair x y = PPair x y
 global def first  = Pair (\_\x\_ x) _
