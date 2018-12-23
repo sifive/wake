@@ -196,6 +196,21 @@ int main(int argc, const char **argv) {
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
   if (!root) ok = false;
 
+  if (!Bool) {
+    std::cerr << "Primitive data type Bool not defined." << std::endl;
+    ok = false;
+  }
+
+  if (!List) {
+    std::cerr << "Primitive data type List not defined." << std::endl;
+    ok = false;
+  }
+
+  if (!Pair) {
+    std::cerr << "Primitive data type Pair not defined." << std::endl;
+    ok = false;
+  }
+
   if (!ok) {
     if (args["add"]) std::cerr << ">>> Expression not added to the active target list <<<" << std::endl;
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
@@ -235,7 +250,15 @@ int main(int argc, const char **argv) {
   for (size_t i = 0; i < targets.size(); ++i) {
     Value *v = outputs[targets.size()-1-i].get();
     std::cout << targets[i] << " = ";
-    if (v) std::cout << v; else std::cout << "MISSING FUTURE" << std::endl;
+    if (v) {
+      if (verbose) {
+        v->format(std::cout, -1);
+      } else {
+        std::cout << v << std::endl;
+      }
+    } else {
+      std::cout << "MISSING FUTURE" << std::endl;
+    }
   }
 
   //std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;

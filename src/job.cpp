@@ -57,9 +57,11 @@ struct JobResult : public Value {
 
 const char *JobResult::type = "JobResult";
 
-void JobResult::format(std::ostream &os, int depth) const {
-  os << "JobResult(" << job << ")";
-  if (depth >= 0) os << std::endl;
+void JobResult::format(std::ostream &os, int p) const {
+  if (APP_PRECEDENCE < p) os << "(";
+  os << "JobResult " << job;
+  if (APP_PRECEDENCE < p) os << ")";
+  if (p < 0) os << std::endl;
 }
 
 TypeVar JobResult::typeVar("Job", 0);
