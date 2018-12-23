@@ -434,9 +434,8 @@ op_type op_precedence(const char *str) {
     return op_type(9, 1);
   case '-':
   case '~':
-  // case '!': // single-character '!'
-    return op_type(8, 1);
   case '+':
+  // case '!': // single-character '!'
     return op_type(7, 1);
   case '<':
   case '>':
