@@ -308,7 +308,9 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
       }
       ++tbinding.prefix;
     }
-    return fracture_binding(top->location, tbinding.defs, std::move(top->body));
+    tbinding.current_index = -1;
+    std::unique_ptr<Expr> body = fracture(std::move(top->body), &tbinding);
+    return fracture_binding(top->location, tbinding.defs, std::move(body));
   } else {
     // Literal/Prim/Construct/Destruct
     return expr;
