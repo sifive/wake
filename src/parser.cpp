@@ -460,6 +460,16 @@ Sum *Boolean;
 Sum *List;
 Sum *Pair;
 
+static void check_cons_name(const AST &ast, Lexer &lex) {
+  bool isOp = ast.name.find(' ') != std::string::npos;
+  if (!isOp && Lexer::isLower(ast.name.c_str())) {
+    std::cerr << "Constructor name must be upper-case or operator, not "
+      << ast.name << " at "
+      << ast.location << std::endl;
+    lex.fail = true;
+  }
+}
+
 static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
   lex.consume();
 
@@ -486,38 +496,43 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
   Sum sum(std::move(def));
 
   if (expect(EQUALS, lex)) lex.consume();
-  if (expect(EOL, lex)) lex.consume();
-  if (expect(INDENT, lex)) lex.consume();
 
-  bool repeat = true;
-  while (repeat) {
+  if (lex.next.type == EOL) {
+    lex.consume();
+    if (expect(INDENT, lex)) lex.consume();
+
+    bool repeat = true;
+    while (repeat) {
+      AST cons = parse_ast(0, lex);
+      if (cons) {
+        check_cons_name(cons, lex);
+        sum.addConstructor(std::move(cons));
+      }
+      switch (lex.next.type) {
+        case DEDENT:
+          repeat = false;
+          lex.consume();
+          expect(EOL, lex);
+        case EOL: {
+          lex.consume();
+          break;
+        }
+        default: {
+          std::cerr << "Unexpected end of data definition at " << lex.next.location << std::endl;
+          lex.fail = true;
+          repeat = false;
+          break;
+        }
+      }
+    }
+  } else {
     AST cons = parse_ast(0, lex);
     if (cons) {
-      bool isOp = cons.name.find(' ') != std::string::npos;
-      if (!isOp && Lexer::isLower(cons.name.c_str())) {
-        std::cerr << "Constructor name must be upper-case or operator, not "
-          << cons.name << " at "
-          << cons.location << std::endl;
-        lex.fail = true;
-      }
+      check_cons_name(cons, lex);
       sum.addConstructor(std::move(cons));
     }
-    switch (lex.next.type) {
-      case DEDENT:
-        repeat = false;
-        lex.consume();
-        expect(EOL, lex);
-      case EOL: {
-        lex.consume();
-        break;
-      }
-      default: {
-        std::cerr << "Unexpected end of data definition at " << lex.next.location << std::endl;
-        lex.fail = true;
-        repeat = false;
-        break;
-      }
-    }
+    expect(EOL, lex);
+    lex.consume();
   }
 
   std::string name = sum.name;
