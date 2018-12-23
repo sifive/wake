@@ -1,8 +1,21 @@
 #include "prim.h"
 #include "value.h"
 #include "heap.h"
+#include "type.h"
 #include <gmp.h>
 #include <sstream>
+
+static PRIMTYPE(type_typeof) {
+  if (args.size() == 1) { *data = args[0]; }
+  return args.size() == 1 && out->unify(String::typeVar);
+}
+
+static PRIMFN(prim_typeof) {
+  std::stringstream ss;
+  ss << *(TypeVar*)data;
+  auto out = std::make_shared<String>(ss.str());
+  RETURN(out);
+}
 
 static PRIMTYPE(type_lt) {
   return args.size() == 2 &&
@@ -136,4 +149,5 @@ void prim_register_polymorphic(PrimMap &pmap) {
   pmap.emplace("test",  PrimDesc(prim_test,  type_test));
   pmap.emplace("catch", PrimDesc(prim_catch, type_catch));
   pmap.emplace("raise", PrimDesc(prim_raise, type_raise));
+  pmap.emplace("typeof",PrimDesc(prim_typeof,type_typeof));
 }
