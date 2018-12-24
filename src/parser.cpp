@@ -60,6 +60,7 @@ static bool expectValue(const char *type, Lexer &lex) {
   }
 }
 
+static AST parse_ast(int p, Lexer &lex, bool magic = false);
 static Expr *parse_unary(int p, Lexer &lex);
 static Expr *parse_binary(int p, Lexer &lex);
 static Expr *parse_if(Lexer &lex);
@@ -80,6 +81,11 @@ static int relabel_descend(Expr *expr, int index) {
     } else if (expr->type == Lambda::type) {
       Lambda *lambda = reinterpret_cast<Lambda*>(expr);
       return relabel_descend(lambda->body.get(), index);
+    } else if (expr->type == Match::type) {
+      Match *match = reinterpret_cast<Match*>(expr);
+      for (auto &v : match->args)
+        index = relabel_descend(v.get(), index);
+      return index;
     }
   }
   // noop for DefMap, Literal, Prim
@@ -100,6 +106,75 @@ static void precedence_error(Lexer &lex) {
   lex.fail = true;
 }
 
+static Expr *parse_match(int p, Lexer &lex) {
+  Location location = lex.next.location;
+  op_type op = op_precedence("m");
+  if (op.p < p) precedence_error(lex);
+  lex.consume();
+
+  Match *out = new Match(location);
+  bool repeat;
+
+  repeat = true;
+  while (repeat) {
+    auto rhs = parse_binary(op.p + op.l, lex);
+    out->args.emplace_back(rhs);
+
+    switch (lex.next.type) {
+      case OPERATOR:
+      case MATCH:
+      case MEMOIZE:
+      case LAMBDA:
+      case ID:
+      case LITERAL:
+      case PRIM:
+      case HERE:
+      case SUBSCRIBE:
+      case POPEN:
+        break;
+      case EOL:
+        lex.consume();
+        repeat = false;
+        break;
+      default:
+        std::cerr << "Unexpected end of match definition at " << lex.next.location << std::endl;
+        lex.fail = true;
+        repeat = false;
+        break;
+    }
+  }
+
+  if (expect(INDENT, lex)) lex.consume();
+
+  // Process the patterns
+  bool multiarg = out->args.size() > 1;
+  repeat = true;
+  while (repeat) {
+    AST ast = parse_ast(multiarg?APP_PRECEDENCE:0, lex, multiarg);
+    if (expect(EQUALS, lex)) lex.consume();
+    Expr *expr = parse_block(lex);
+    out->patterns.emplace_back(std::move(ast), expr);
+
+    switch (lex.next.type) {
+      case DEDENT:
+        repeat = false;
+        lex.consume();
+        break;
+      case EOL:
+        lex.consume();
+        break;
+      default:
+        std::cerr << "Unexpected end of match definition at " << lex.next.location << std::endl;
+        lex.fail = true;
+        repeat = false;
+        break;
+    }
+  }
+
+  out->location.end = out->patterns.back().expr->location.end;
+  return out;
+}
+
 static Expr *parse_unary(int p, Lexer &lex) {
   TRACE("UNARY");
   switch (lex.next.type) {
@@ -113,6 +188,9 @@ static Expr *parse_unary(int p, Lexer &lex) {
       auto rhs = parse_binary(op.p + op.l, lex);
       location.end = rhs->location.end;
       return new App(location, opp, rhs);
+    }
+    case MATCH: {
+      return parse_match(p, lex);
     }
     case MEMOIZE: {
       Location location = lex.next.location;
@@ -216,6 +294,7 @@ static Expr *parse_binary(int p, Lexer &lex) {
         lhs = new App(app2_loc, new App(app1_loc, opp, lhs), rhs);
         break;
       }
+      case MATCH:
       case MEMOIZE:
       case LAMBDA:
       case ID:
@@ -358,8 +437,6 @@ static void publish_seal(DefMap::defs &publish) {
   }
 }
 
-static AST parse_ast(int p, Lexer &lex);
-
 static AST parse_unary_ast(int p, Lexer &lex) {
   TRACE("UNARY_AST");
   switch (lex.next.type) {
@@ -401,9 +478,9 @@ static AST parse_unary_ast(int p, Lexer &lex) {
   }
 }
 
-static AST parse_ast(int p, Lexer &lex) {
+static AST parse_ast(int p, Lexer &lex, bool magic) {
   TRACE("AST");
-  AST lhs = parse_unary_ast(p, lex);
+  AST lhs = magic ? AST(lex.next.location) : parse_unary_ast(p, lex);
   for (;;) {
     switch (lex.next.type) {
       case OPERATOR: {

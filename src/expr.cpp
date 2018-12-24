@@ -17,6 +17,7 @@ const char *Construct::type = "Construct";
 const char *Destruct::type = "Destruct";
 // these are removed by bind
 const char *Subscribe::type = "Subscribe";
+const char *Match::type = "Match";
 const char *Memoize::type = "Memoize";
 const char *DefMap::type = "DefMap";
 const char *Top::type = "Top";
@@ -66,6 +67,30 @@ void Memoize::format(std::ostream &os, int depth) const {
 void Memoize::hash() {
   body->hash();
   HASH(&body->hashcode, sizeof(body->hashcode), (long)type, hashcode);
+}
+
+void Match::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Match: " << typeVar << " @ " << location << std::endl;
+  for (auto &a: args)
+    a->format(os, depth+2);
+  for (auto &p: patterns) {
+    os << pad(depth+2) << p.pattern << " = " << std::endl;
+    p.expr->format(os, depth+4);
+  }
+}
+
+void Match::hash() {
+  std::vector<uint64_t> codes;
+  for (auto &a : args) {
+    a->hash();
+    a->hashcode.push(codes);
+  }
+  for (auto &p : patterns) {
+    // !!! hash pattern
+    p.expr->hash();
+    p.expr->hashcode.push(codes);
+  }
+  HASH(codes.data(), codes.size()*8, (long)type, hashcode);
 }
 
 void App::format(std::ostream &os, int depth) const {

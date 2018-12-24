@@ -109,6 +109,25 @@ struct Memoize : public Expr {
   void hash();
 };
 
+struct Pattern {
+  AST pattern;
+  std::unique_ptr<Expr> expr;
+
+  Pattern(AST &&pattern_, Expr *expr_) : pattern(std::move(pattern_)), expr(expr_) { }
+};
+
+struct Match : public Expr {
+  std::vector<std::unique_ptr<Expr> > args;
+  std::vector<Pattern> patterns;
+
+  static const char *type;
+  Match(const Location &location_)
+   : Expr(type, location_) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
+};
+
 struct Subscribe : public Expr {
   std::string name;
   static const char *type;
