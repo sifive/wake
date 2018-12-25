@@ -520,7 +520,7 @@ static AST parse_ast(int p, Lexer &lex, bool magic, bool def) {
         AST rhs = parse_ast(op.p + op.l, lex);
         Location location = lhs.location;
         location.end = rhs.location.end;
-        if (lhs.name.find(' ') != std::string::npos) {
+        if (Lexer::isOperator(lhs.name.c_str())) {
           std::cerr << "Cannot supply additional constructor arguments to " << lhs.name
             << " at " << location << std::endl;
           lex.fail = true;
@@ -546,8 +546,7 @@ Sum *List;
 Sum *Pair;
 
 static void check_cons_name(const AST &ast, Lexer &lex) {
-  bool isOp = ast.name.find(' ') != std::string::npos;
-  if (!isOp && Lexer::isLower(ast.name.c_str())) {
+  if (Lexer::isLower(ast.name.c_str())) {
     std::cerr << "Constructor name must be upper-case or operator, not "
       << ast.name << " at "
       << ast.location << std::endl;
@@ -561,16 +560,14 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
   AST def = parse_ast(0, lex);
   if (!def) return;
 
-  bool isOp = def.name.find(' ') != std::string::npos;
-  if (!isOp && Lexer::isLower(def.name.c_str())) {
+  if (Lexer::isLower(def.name.c_str())) {
     std::cerr << "Type name must be upper-case or operator, not "
       << def.name << " at "
       << def.location << std::endl;
     lex.fail = true;
   }
   for (auto &x : def.args) {
-    bool isOp = x.name.find(' ') != std::string::npos;
-    if (isOp || !Lexer::isLower(x.name.c_str())) {
+    if (!Lexer::isLower(x.name.c_str())) {
       std::cerr << "Type argument must be lower-case, not "
         << x.name << " at "
         << x.location << std::endl;
