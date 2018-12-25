@@ -354,16 +354,18 @@ top:
       "{"         { return mkSym(BOPEN);     }
       "}"         { return mkSym(BCLOSE);    }
 
+      // operators
+      reserved = [:;?@];
+      special = [#"'\\];
+      // future: op = (Sc|Sk|Sm|(Po\reserved\special)|Pd)+;
+      op = [.$^*/%\-+~`<>=!&|,]+;
+
       // identifiers
-      op = [.$^*/%\-+~<>=!&|,]+;
-      id = [a-zA-Z][a-zA-Z0-9_]* | "_";
+      id = (Lm|M)*(L|So)(L|So|N|Pc)* | "_";
 
       id { return mkSym(ID); }
       op { return mkSym(OPERATOR); }
    */
-
-   // reserved punctuation: `@[]:;
-   // reserved id space: capitalized
 }
 
 struct state_t {
@@ -428,57 +430,68 @@ void Lexer::consume() {
 }
 
 bool Lexer::isLower(const char *str) {
-  return str[0] >= 'a' && str[0] <= 'z';
+  const char *ignore;
+top:
+  /*!re2c
+      re2c:yyfill:enable = 0;
+      re2c:define:YYMARKER = ignore;
+      re2c:define:YYCURSOR = str;
+      *           { return true; }
+      "unary "    { return false; }
+      "binary "   { return false; }
+      Lm | M      { goto top; }
+      Lt | Lu     { return false; }
+  */
 }
 
 bool Lexer::isUpper(const char *str) {
-  return str[0] >= 'A' && str[0] <= 'Z';
+  const char *ignore;
+top:
+  /*!re2c
+      re2c:yyfill:enable = 0;
+      re2c:define:YYMARKER = ignore;
+      re2c:define:YYCURSOR = str;
+      *           { return false; }
+      Lm | M      { goto top; }
+      Lt | Lu     { return true; }
+  */
 }
 
 bool Lexer::isOperator(const char *str) {
-  return !isUpper(str) && !isLower(str);
+  const char *ignore;
+  /*!re2c
+      re2c:yyfill:enable = 0;
+      re2c:define:YYMARKER = ignore;
+      re2c:define:YYCURSOR = str;
+      *           { return false; }
+      "unary "    { return true; }
+      "binary "   { return true; }
+  */
 }
 
 op_type op_precedence(const char *str) {
-  char c = str[0];
-  switch (c) {
-  case '.':
-    return op_type(13, 1);
-  case 's': // SUBSCRIBE
-  case 'm': // MEMOIZE
-  case 'p': // PRIM
-  case 'a': // Application rules run between . and $
-    return op_type(APP_PRECEDENCE, 1);
-  case '^':
-    return op_type(11, 0);
-  case '*':
-    return op_type(10, 1);
-  case '/':
-  case '%':
-    return op_type(9, 1);
-  case '-':
-  case '~':
-  case '+':
-  // case '!': // single-character '!'
-    return op_type(7, 1);
-  case '<':
-  case '>':
-    return op_type(6, 1);
-  case '!': // multi-character '!' (like != )
-    if (str[1] == 0) return op_type(8, 1);
-  case '=':
-    return op_type(5, 0);
-  case '&':
-    return op_type(4, 1);
-  case '|':
-    return op_type(3, 1);
-  case '$':
-    return op_type(2, 0);
-  case ',':
-    return op_type(1, 0);
-  case '\\': // LAMBDA
-    return op_type(0, 0);
-  default:
-    return op_type(-1, -1);
-  }
+  const char *ignore;
+  const char *YYCTXMARKER;
+  (void)YYCTXMARKER;
+  /*!re2c
+      re2c:yyfill:enable = 0;
+      re2c:define:YYMARKER = ignore;
+      re2c:define:YYCURSOR = str;
+
+      *            { return op_type(-1, -1); }
+      [.]          { return op_type(13, 1);  }
+      [smpa]       { return op_type(APP_PRECEDENCE, 1); } // SUBSCRIBE/MEMOIZE/PRIM/APP
+      "^"          { return op_type(11, 0);  }
+      [*]          { return op_type(10, 1);  }
+      [/%]         { return op_type(9, 1);   }
+      [!] / [^=]   { return op_type(7, 1);   }
+      [-+~`]       { return op_type(7, 1);   }
+      [<>]         { return op_type(6, 1);   }
+      [!=]         { return op_type(5, 0);   }
+      [&]          { return op_type(4, 1);   }
+      [|]          { return op_type(3, 1);   }
+      [$]          { return op_type(2, 0);   }
+      [,]          { return op_type(1, 0);   }
+      [\\]         { return op_type(0, 0);   }
+  */
 }
