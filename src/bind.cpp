@@ -200,10 +200,46 @@ struct PatternTree {
   int var; // -1 if unbound/_
   std::vector<PatternTree> children;
   PatternTree() : sum(0), cons(0), var(-1) { }
+  void format(std::ostream &os, int p) const;
 };
 
-std::ostream & operator << (std::ostream &os, const PatternTree& p) {
-  return os << "TODO"; // !!!
+std::ostream & operator << (std::ostream &os, const PatternTree &pt) {
+  pt.format(os, 0);
+  return os;
+}
+
+void PatternTree::format(std::ostream &os, int p) const
+{
+  if (!sum) {
+    os << "_";
+    return;
+  }
+
+  const std::string &name = sum->members[cons].ast.name;
+  if (name.substr(0, 7) == "binary ") {
+    op_type q = op_precedence(name.c_str() + 7);
+    if (q.p < p) os << "(";
+    children[0].format(os, q.p + !q.l);
+    if (name[7] != ',') os << " ";
+    os << name.c_str() + 7 << " ";
+    children[1].format(os, q.p + q.l);
+    if (q.p < p) os << ")";
+  } else if (name.substr(0, 6) == "unary ") {
+    op_type q = op_precedence(name.c_str() + 6);
+    if (q.p < p) os << "(";
+    os << name.c_str() + 6;
+    children[0].format(os, q.p);
+    if (q.p < p) os << ")";
+  } else {
+    op_type q = op_precedence("a");
+    if (q.p < p && !children.empty()) os << "(";
+    os << name;
+    for (auto &v : children) {
+      os << " ";
+      v.format(os, q.p + q.l);
+    }
+    if (q.p < p && !children.empty()) os << ")";
+  }
 }
 
 struct PatternRef {
@@ -219,8 +255,8 @@ struct PatternRef {
 
 // assumes a detail <= b
 static Sum *find_mismatch(std::vector<int> &path, const PatternTree &a, const PatternTree &b) {
-  if (!a.sum && b.sum) return b.sum;
-  for (size_t i = 0; i < b.sum->members.size(); ++i) {
+  if (!a.sum) return b.sum;
+  for (size_t i = 0; i < a.children.size(); ++i) {
     path.push_back(i);
     Sum *out = find_mismatch(path, a.children[i], b.children[i]);
     if (out) return out;
@@ -287,26 +323,26 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
             << " but is used in pattern at " << p->location
             << "." << std::endl;
           return nullptr;
-        } else if (t->sum && t->cons == c) {
+        } else if (t->sum && t->cons == (int)c) {
           bucket.emplace_back(std::move(*p));
           p->index = -2;
         }
       }
       std::unique_ptr<Expr> &exp = map->map[cname];
       exp = expand_patterns(bucket);
-      var -= args;
+      if (!exp) return nullptr;
       for (int i = 0; i < args; ++i)
         exp = std::unique_ptr<Expr>(new Lambda(prototype.location,
-          "_a" + std::to_string(var+i), exp.release()));
+          "_a" + std::to_string(--var), exp.release()));
       exp = std::unique_ptr<Expr>(new Lambda(prototype.location, "_", exp.release()));
       for (auto p = patterns.rbegin(); p != patterns.rend(); ++p) {
-        if (p->index == -2) {
+        if (p->index == -1) {
           *p = std::move(bucket.back());
           bucket.pop_back();
           PatternTree *t = get_expansion(&p->tree, expand);
           t->sum = nullptr;
           t->children.clear();
-        } else if (p->index == -1) {
+        } else if (p->index == -2) {
           *p = std::move(bucket.back());
           bucket.pop_back();
         }
@@ -330,18 +366,21 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
 
 static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, const AST &ast) {
   PatternTree out;
+  bool isOp = ast.name.find(' ') != std::string::npos;
   if (ast.name == "_") {
     // no-op; unbound
-  } else if (Lexer::isLower(ast.name.c_str())) {
+  } else if (!isOp && Lexer::isLower(ast.name.c_str())) {
     expr = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, expr.release()));
     out.var = 0; // bound
   } else {
     for (ResolveBinding *iter = binding; iter; iter = iter->parent) {
-//      if (iter->prefix >= 0)
-//        std::string file_local = std::to_string(iter->prefix) + " " + name;
-      auto it = iter->index.find(ast.name);
+      NameIndex::iterator it = iter->index.end();
+      if (iter->prefix >= 0)
+        it = iter->index.find(std::to_string(iter->prefix) + " " + ast.name);
+      if (it == iter->index.end())
+        it = iter->index.find(ast.name);
       if (it != iter->index.end()) {
-        Expr *cons = binding->defs[it->second].expr.get();
+        Expr *cons = iter->defs[it->second].expr.get();
         while (cons->type == Lambda::type)
           cons = reinterpret_cast<Lambda*>(cons)->body.get();
         if (cons->type == Construct::type) {
@@ -362,6 +401,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
         << " parameters, but must have " << out.sum->members[out.cons].ast.args.size()
         << " at " << ast.location
         << "." << std::endl;
+      out.sum = 0;
       out.var = 0;
     } else {
       for (auto a = ast.args.rbegin(); a != ast.args.rend(); ++a)
@@ -391,6 +431,7 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
     ++f;
   }
   map->body = expand_patterns(patterns);
+  if (!map->body) return nullptr;
   for (auto &p : patterns) {
     if (!p.uses) {
       std::cerr << "Pattern unreachable in match at " << p.location << std::endl;
@@ -559,9 +600,11 @@ struct NameBinding {
       out.offset = i->second;
       out.def = i->second < generalized;
       if (i->second < (int)binding->val.size()) {
-        out.var = &binding->val[i->second]->typeVar;
+        auto x = binding->val[i->second].get();
+        out.var = x?&x->typeVar:0;
       } else {
-        out.var = &binding->fun[i->second-binding->val.size()]->typeVar;
+        auto x = binding->fun[i->second-binding->val.size()].get();
+        out.var = x?&x->typeVar:0;
       }
     } else if (next) {
       out = next->find(x);
@@ -588,6 +631,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     }
     ref->depth = pos.depth;
     ref->offset = pos.offset;
+    if (!pos.var) return true;
     if (pos.def) {
       TypeVar temp;
       pos.var->clone(temp);
@@ -600,8 +644,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     binding->open = false;
     bool f = explore(app->fn .get(), pmap, binding);
     bool a = explore(app->val.get(), pmap, binding);
-    bool t = app->fn->typeVar.unify(TypeVar(FN, 2), &app->location);
-    bool ta = t && app->fn->typeVar[0].unify(app->val->typeVar, &app->location);
+    bool t = f && app->fn->typeVar.unify(TypeVar(FN, 2), &app->location);
+    bool ta = t && a && app->fn->typeVar[0].unify(app->val->typeVar, &app->location);
     bool tr = t && app->fn->typeVar[1].unify(app->typeVar, &app->location);
     return f && a && t && ta && tr;
   } else if (expr->type == Lambda::type) {
@@ -609,12 +653,12 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     bool t = lambda->typeVar.unify(TypeVar(FN, 2), &lambda->location);
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), pmap, &bind);
-    bool tr = t && lambda->typeVar[1].unify(lambda->body->typeVar, &lambda->location);
+    bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &lambda->location);
     return out && t && tr;
   } else if (expr->type == Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
     bool out = explore(memoize->body.get(), pmap, binding);
-    bool t = memoize->typeVar.unify(memoize->body->typeVar, &memoize->location);
+    bool t = out && memoize->typeVar.unify(memoize->body->typeVar, &memoize->location);
     return out && t;
   } else if (expr->type == DefBinding::type) {
     DefBinding *def = reinterpret_cast<DefBinding*>(expr);
@@ -625,13 +669,13 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       ok = explore(i.get(), pmap, binding) && ok;
     for (int i = 0; i < (int)def->fun.size(); ++i) {
       for (int j = i; j < (int)def->fun.size() && i == def->scc[j]; ++j)
-        def->fun[j]->typeVar.setDOB();
+        if (def->fun[j]) def->fun[j]->typeVar.setDOB();
       bind.generalized = def->val.size() + def->scc[i];
       ok = explore(def->fun[i].get(), pmap, &bind) && ok;
     }
     bind.generalized = def->val.size() + def->fun.size();
     ok = explore(def->body.get(), pmap, &bind) && ok;
-    ok = def->typeVar.unify(def->body->typeVar, &def->location) && ok;
+    ok = ok && def->typeVar.unify(def->body->typeVar, &def->location) && ok;
     return ok;
   } else if (expr->type == Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
