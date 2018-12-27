@@ -17,13 +17,12 @@ global def x & y = if x then y else False
 global def x | y = if x then True else y
 
 # tuples
-global data Pair a b = PPair a b
+global data Pair a b = Pair a b
 
-global def pair x y = PPair x y
 global def first  = match _
-  PPair x _ = x
+  Pair x _ = x
 global def second = match _
-  PPair _ x = x
+  Pair _ x = x
 
 # lists
 global data List a =
@@ -72,19 +71,19 @@ global def len l     = foldl (\a\_ a+1) 0 l
 
 # list choppers
 global def splitAt i l =
-  if i <= 0 then pair Nil l else match l
-    Nil  = pair Nil l
+  if i <= 0 then Pair Nil l else match l
+    Nil  = Pair Nil l
     h, t = match (splitAt (i-1) t)
-      PPair f s = pair (h, f) s
+      Pair f s = Pair (h, f) s
 
 global def take i l = (splitAt i l).first
 global def drop i l = (splitAt i l).second
 global def at   i l = if i < 0 then raise "at called with negative index" else (drop i l).head
 
 global def splitUntil f l = match l
-  Nil  = pair Nil Nil
-  h, t = if f h then pair Nil l else match (splitUntil f t)
-    PPair f s = pair (h, f) s
+  Nil  = Pair Nil Nil
+  h, t = if f h then Pair Nil l else match (splitUntil f t)
+    Pair f s = Pair (h, f) s
 
 global def takeUntil f l = (splitUntil f l).first
 global def dropUntil f l = (splitUntil f l).second
@@ -93,12 +92,12 @@ global def exists f l = !empty (dropUntil f l)
 global def forall f l = empty (dropUntil (!f _) l)
 
 global def splitBy f = match _
-  Nil  = pair Nil Nil
+  Nil  = Pair Nil Nil
   h, t = match (splitBy f t)
-    PPair x y =
+    Pair x y =
       if f h
-      then pair (h, x) y
-      else pair x (h, y)
+      then Pair (h, x) y
+      else Pair x (h, y)
 
 global def filter f l = (splitBy f l).first
 
@@ -113,15 +112,15 @@ global def transpose l =
 global def sortBy f = match _
   Nil  = Nil
   h, t = match (splitBy (f h) t)
-    PPair x y = sortBy f y ++ (h, sortBy f x)
+    Pair x y = sortBy f y ++ (h, sortBy f x)
 
 global def sort l = sortBy (_<_) l
 
-global def collate f l r = match (PPair l r)
-  PPair Nil     Nil     = 0
-  PPair Nil     _       = -1
-  PPair _       Nil     = 1
-  PPair (lh,lt) (rh,rt) =
+global def collate f l r = match (Pair l r)
+  Pair Nil     Nil     = 0
+  Pair Nil     _       = -1
+  Pair _       Nil     = 1
+  Pair (lh,lt) (rh,rt) =
     def cmp = f lh rh
     if cmp == 0 then collate f lt rt else cmp
 
@@ -275,7 +274,7 @@ global def finish job inputs outputs =
   def imp job inputs outputs = prim "job_finish" # ignored except on first call; blocks till exit; returns true
   imp job inputs.implode outputs.implode
 
-global def hashpair f = memoize ( # pair file hash
+global def hashpair f = memoize ( # Pair file hash
   def job = launch "." "." "" Nil (which "md5sum", f, Nil)
   def final _ = finish job Nil Nil
   def wait = if job.status == 0 then final 0 else final 0

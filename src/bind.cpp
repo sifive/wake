@@ -295,7 +295,7 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
   Sum *sum = find_mismatch(expand, prototype.tree, patterns[1].tree);
   if (sum) {
     std::unique_ptr<DefMap> map(new DefMap(prototype.location));
-    map->body = std::unique_ptr<Expr>(new VarRef(prototype.location, sum->name));
+    map->body = std::unique_ptr<Expr>(new VarRef(prototype.location, "destruct " + sum->name));
     for (size_t c = 0; c < sum->members.size(); ++c) {
       std::string cname = "_c" + std::to_string(c);
       map->body = std::unique_ptr<Expr>(new App(prototype.location,

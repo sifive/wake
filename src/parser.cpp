@@ -332,7 +332,7 @@ static Expr *parse_if(Lexer &lex) {
     auto elseE = parse_block(lex);
     l.end = elseE->location.end;
     return new App(l, new App(l, new App(l,
-      new VarRef(l, "Boolean"),
+      new VarRef(l, "destruct Boolean"),
       new Lambda(l, "_", thenE)),
       new Lambda(l, "_", elseE)),
       condE);
@@ -619,8 +619,9 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
     bind_global(c.ast.name, top, lex);
   }
 
-  bind_def(lex, map, name, destructfn);
-  bind_global(name, top, lex);
+  std::string tname = "destruct " + name;
+  bind_def(lex, map, tname, destructfn);
+  bind_global(tname, top, lex);
 
   if (name == "Integer" || name == "String" || name == "RegExp" ||
       name == "CatStream" || name == "Exception" || name == FN ||
