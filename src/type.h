@@ -14,9 +14,9 @@ private:
   mutable TypeVar *link;
   mutable int epoch;
 
-  // before unification, expr children are YOUNGER than their parent
-  // before unification, args are YOUNGER than the constructor
-  int dob; // date of birth
+  // var_dob is unchanging after setDOB
+  // free_dob is the DOB of a free variable, unified to the oldest
+  int var_dob, free_dob;
   int nargs;
   TypeVar *pargs;
   const char *name;
@@ -46,13 +46,13 @@ public:
 
   const TypeVar & operator[](int i) const { return find()->pargs[i]; }
   TypeVar & operator[](int i) { return find()->pargs[i]; }
-  int getDOB() const { return find()->dob; }
 
   void setDOB();
   bool unify(TypeVar &other, Location *location = 0);
   bool unify(TypeVar &&other, Location *location = 0) { return unify(other, location); }
 
   void clone(TypeVar &into) const;
+  void format(std::ostream &os, const TypeVar &top) const; // use top's dob
 
 friend std::ostream & operator << (std::ostream &os, const TypeVar &value);
 };

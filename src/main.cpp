@@ -259,8 +259,10 @@ int main(int argc, const char **argv) {
 
   for (size_t i = 0; i < targets.size(); ++i) {
     Value *v = outputs[targets.size()-1-i].get();
-    std::cout << targets[i] << ": " << (*types)[0] << " = ";
+    std::cout << targets[i] << ": ";
+    (*types)[0].format(std::cout, body->typeVar);
     types = &(*types)[1];
+    std::cout << " = ";
     if (v) {
       if (verbose) {
         v->format(std::cout, -1);

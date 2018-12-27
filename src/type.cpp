@@ -9,12 +9,14 @@
 static int globalClock = 0;
 static int globalEpoch = 1; // before a tagging pass, globalEpoch > TypeVar.epoch for all TypeVars
 
-TypeVar::TypeVar() : parent(0), epoch(0), dob(0), nargs(0), pargs(0), name("") { }
+TypeVar::TypeVar() : parent(0), epoch(0), var_dob(0), free_dob(0), nargs(0), pargs(0), name("") { }
 
 TypeVar::TypeVar(const char *name_, int nargs_)
- : parent(0), epoch(0), dob(++globalClock), nargs(nargs_), name(name_) {
+ : parent(0), epoch(0), var_dob(++globalClock), free_dob(var_dob), nargs(nargs_), name(name_) {
   pargs = nargs ? new TypeVar[nargs] : 0;
-  for (int i = 0; i < nargs; ++i) pargs[i].dob = ++globalClock;
+  for (int i = 0; i < nargs; ++i) {
+    pargs[i].free_dob = pargs[i].var_dob = ++globalClock;
+  }
 }
 
 TypeVar::~TypeVar() {
@@ -34,9 +36,9 @@ TypeVar *TypeVar::find() {
 }
 
 void TypeVar::setDOB() {
-  if (!dob) {
+  if (!var_dob) {
     assert (!parent && isFree());
-    dob = ++globalClock;
+    free_dob = var_dob = ++globalClock;
   }
 }
 
@@ -64,7 +66,7 @@ void TypeVar::do_sweep() const {
 
 void TypeVar::do_cap(int dob) {
   TypeVar *a = find();
-  if (dob < a->dob) a->dob = dob;
+  if (dob < a->free_dob) a->free_dob = dob;
   for (int i = 0; i < a->nargs; ++i)
     a->pargs[i].do_cap(dob);
 }
@@ -73,8 +75,8 @@ void TypeVar::do_cap(int dob) {
 bool TypeVar::do_unify(TypeVar &other) {
   TypeVar *a = find();
   TypeVar *b = other.find();
-  assert (a->dob);
-  assert (b->dob);
+  assert (a->var_dob);
+  assert (b->var_dob);
 
   if (a == b) {
     return true;
@@ -82,7 +84,7 @@ bool TypeVar::do_unify(TypeVar &other) {
     bool infinite = a->contains(b);
     a->do_sweep();
     if (!infinite) {
-      a->do_cap(b->dob);
+      a->do_cap(b->free_dob);
       b->parent = a;
     }
     return !infinite;
@@ -90,11 +92,11 @@ bool TypeVar::do_unify(TypeVar &other) {
     bool infinite = b->contains(a);
     b->do_sweep();
     if (!infinite) {
-      std::swap(a->name,  b->name);
-      std::swap(a->nargs, b->nargs);
-      std::swap(a->pargs, b->pargs);
-      std::swap(a->dob,   b->dob);
-      a->do_cap(b->dob);
+      std::swap(a->name,     b->name);
+      std::swap(a->nargs,    b->nargs);
+      std::swap(a->pargs,    b->pargs);
+      std::swap(a->free_dob, b->free_dob);
+      a->do_cap(b->free_dob);
       b->parent = a;
     }
     return !infinite;
@@ -190,9 +192,9 @@ bool TypeVar::unify(TypeVar &other, Location *location) {
 }
 
 void TypeVar::do_clone(TypeVar &out, const TypeVar &x, int dob) {
-  out.dob = ++globalClock;
+  out.free_dob = out.var_dob = ++globalClock;
   const TypeVar *in = x.find();
-  if (in->name[0] == 0 && in->dob < dob) { // no need to clone
+  if (in->isFree() && in->free_dob < dob) { // no need to clone
     out.parent = const_cast<TypeVar*>(in);
   } else {
     if (in->epoch < globalEpoch) { // not previously cloned
@@ -211,7 +213,7 @@ void TypeVar::do_clone(TypeVar &out, const TypeVar &x, int dob) {
 
 void TypeVar::clone(TypeVar &into) const {
   assert (!into.parent && into.isFree());
-  do_clone(into, *this, find()->dob);
+  do_clone(into, *this, var_dob);
   ++globalEpoch;
 }
 
@@ -229,7 +231,7 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, int tags
       tag = tags++;
       a->epoch = globalEpoch + tag;
     }
-    if (a->dob < dob) os << "_";
+    if (a->free_dob < dob) os << "_";
     tag2str(os, tag);
   } else if (a->nargs == 0) {
     os << a->name;
@@ -260,7 +262,11 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, int tags
   return tags;
 }
 
+void TypeVar::format(std::ostream &os, const TypeVar &top) const {
+  globalEpoch += TypeVar::do_format(os, top.var_dob, *this, 0, 0);
+}
+
 std::ostream & operator << (std::ostream &os, const TypeVar &value) {
-  globalEpoch += TypeVar::do_format(os, value.find()->dob, value, 0, false);
+  globalEpoch += TypeVar::do_format(os, value.var_dob, value, 0, 0);
   return os;
 }
