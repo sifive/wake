@@ -12,60 +12,57 @@ global data Boolean =
   True
   False
 
-global def !x    = Boolean (\_ False) (\_ True) x
-global def x & y = Boolean (\_ y) (\_ False) x
-global def x | y = Boolean (\_ True) (\_ y) x
+global def !x    = if x then False else True
+global def x & y = if x then y else False
+global def x | y = if x then True else y
 
 # tuples
 global data Pair a b = PPair a b
 
 global def pair x y = PPair x y
-global def first  = Pair (\_\x\_ x) _
-global def second = Pair (\_\_\x x) _
+global def first  = match _
+  PPair x _ = x
+global def second = match _
+  PPair _ x = x
 
 # lists
 global data List a =
   Nil
   a, (List a)
 
-global def empty = List (\_ True) (\_\_\_ False) _
+global def empty = match _
+  Nil = True
+  _   = False
 
-global def head l =
-  def nil  _     = raise "empty list"
-  def cons _ h t = h
-  List nil cons l
+global def head = match _
+  Nil  = raise "empty list"
+  h, _ = h
 
-global def tail l =
-  def nil  _     = raise "empty list"
-  def cons _ h t = t
-  List nil cons l
+global def tail = match _
+  Nil  = raise "empty list"
+  _, t = t
 
-global def map f l =
-  def nil  _     = Nil
-  def cons _ a t = f a, map f t
-  List nil cons l
+global def map f = match _
+  Nil  = Nil
+  h, t = f h, map f t
 
-global def foldl f a l =
-  def nil  _     = a
-  def cons _ h t = foldl f (f a h) t
-  List nil cons l
+global def foldl f a = match _
+  Nil  = a
+  h, t = foldl f (f a h) t
 
-global def scanl f a l =
-  def nil  _     = Nil
-  def cons _ h t = scanl f (f a h) t
-  a, List nil cons l
+global def scanl f a = match _
+  Nil  = a, Nil
+  h, t = a, scanl f (f a h) t
 
-global def foldr f a l =
-  def nil  _     = a
-  def cons _ h t = f h (foldr f a t)
-  List nil cons l
+global def foldr f a = match _
+  Nil  = a
+  h, t = f h (foldr f a t)
 
-global def scanr f a l =
-  def nil  _     = a, Nil
-  def cons _ h t =
+global def scanr f a = match _
+  Nil  = a, Nil
+  h, t =
     def finish r = f h r.head, r
     finish (scanr f a t)
-  List nil cons l
 
 # list helpers
 global def l ++ r    = foldr (_,_) r l
@@ -75,19 +72,19 @@ global def len l     = foldl (\a\_ a+1) 0 l
 
 # list choppers
 global def splitAt i l =
-  if i <= 0 then pair Nil l else
-    def nil  _     = pair Nil l
-    def cons _ h t = Pair (\_\f\s pair (h, f) s) (splitAt (i-1) t)
-    List nil cons l
+  if i <= 0 then pair Nil l else match l
+    Nil  = pair Nil l
+    h, t = match (splitAt (i-1) t)
+      PPair f s = pair (h, f) s
 
 global def take i l = (splitAt i l).first
 global def drop i l = (splitAt i l).second
 global def at   i l = if i < 0 then raise "at called with negative index" else (drop i l).head
 
-global def splitUntil f l =
-  def nil  _     = pair Nil l
-  def cons _ h t = if f h then pair Nil l else Pair (\_\f\s pair (h, f) s) (splitUntil f t)
-  List nil cons l
+global def splitUntil f l = match l
+  Nil  = pair Nil Nil
+  h, t = if f h then pair Nil l else match (splitUntil f t)
+    PPair f s = pair (h, f) s
 
 global def takeUntil f l = (splitUntil f l).first
 global def dropUntil f l = (splitUntil f l).second
@@ -95,15 +92,13 @@ global def find f l = take 1 (dropUntil f l)
 global def exists f l = !empty (dropUntil f l)
 global def forall f l = empty (dropUntil (!f _) l)
 
-global def splitBy f l =
-  def nil  _     = pair Nil Nil
-  def cons _ h t =
-    def finish _ x y =
+global def splitBy f = match _
+  Nil  = pair Nil Nil
+  h, t = match (splitBy f t)
+    PPair x y =
       if f h
       then pair (h, x) y
       else pair x (h, y)
-    Pair finish (splitBy f t)
-  List nil cons l
 
 global def filter f l = (splitBy f l).first
 
@@ -115,34 +110,20 @@ global def transpose l =
   if todo.empty then Nil else heads, transpose tails
 
 # f should be a less-than comparison
-global def sortBy f l =
-  def nil  _     = Nil
-  def cons _ h t =
-    Pair (\_\x\y sortBy f y ++ (h, sortBy f x)) (splitBy (f h) t)
-  List nil cons l
+global def sortBy f = match _
+  Nil  = Nil
+  h, t = match (splitBy (f h) t)
+    PPair x y = sortBy f y ++ (h, sortBy f x)
 
 global def sort l = sortBy (_<_) l
 
-global def collate f l r =
-  def nil  _     =
-    def nil  _       = 0
-    def cons _ rh rt = -1
-    List nil cons r
-  def cons _ lh lt =
-    def nil  _       = 1
-    def cons _ rh rt =
-      def cmp = f lh rh
-      if cmp == 0 then collate f lt rt else cmp
-    List nil cons r
-  List nil cons l
-
-# global def collate f = match _ _
-#   Nil     Nil     =  0
-#   Nil     _       = -1
-#   _       Nil     =  1
-#   (lh,lt) (rh,rt) =
-#     def cmp = f lh rh
-#     if cmp == 0 then collate f lr rt else cmp
+global def collate f l r = match (PPair l r)
+  PPair Nil     Nil     = 0
+  PPair Nil     _       = -1
+  PPair _       Nil     = 1
+  PPair (lh,lt) (rh,rt) =
+    def cmp = f lh rh
+    if cmp == 0 then collate f lt rt else cmp
 
 # string operations
 global def read path = prim "read"
