@@ -444,6 +444,7 @@ bool Lexer::isLower(const char *str) {
       "unary "    { return false; }
       "binary "   { return false; }
       modifier    { goto top; }
+      "_"         { return false; }
       upper       { return false; }
   */
 }

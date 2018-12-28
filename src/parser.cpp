@@ -5,6 +5,7 @@
 #include "datatype.h"
 #include <iostream>
 #include <list>
+#include <set>
 
 //#define TRACE(x) do { fprintf(stderr, "%s\n", x); } while (0)
 #define TRACE(x) do { } while (0)
@@ -60,7 +61,7 @@ static bool expectValue(const char *type, Lexer &lex) {
   }
 }
 
-static AST parse_ast(int p, Lexer &lex, bool magic = false, bool def = false);
+static AST parse_ast(int p, Lexer &lex, bool makefirst = false, bool firstok = false);
 static Expr *parse_unary(int p, Lexer &lex);
 static Expr *parse_binary(int p, Lexer &lex);
 static Expr *parse_if(Lexer &lex);
@@ -150,7 +151,7 @@ static Expr *parse_match(int p, Lexer &lex) {
   bool multiarg = out->args.size() > 1;
   repeat = true;
   while (repeat) {
-    AST ast = parse_ast(multiarg?APP_PRECEDENCE:0, lex, multiarg);
+    AST ast = parse_ast(multiarg?APP_PRECEDENCE:0, lex, multiarg, multiarg);
     if (expect(EQUALS, lex)) lex.consume();
     Expr *expr = parse_block(lex);
     out->patterns.emplace_back(std::move(ast), expr);
@@ -348,18 +349,26 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
   name = std::move(ast.name);
   ast.name.clear();
 
-  bool isOp = name.find(' ') != std::string::npos;
-  if (isOp && !ast.args.empty()) {
+  if (Lexer::isOperator(name.c_str()) && !ast.args.empty()) {
     // Unfortunately, parse_ast will allow: (a b) * (C d); reject it
     AST &arg1 = ast.args.front();
-    bool isOp = arg1.name.find(' ') != std::string::npos;
-    if (!arg1.args.empty() && !isOp && Lexer::isLower(arg1.name.c_str())) {
-      std::cerr << "Lower-case identifier " << arg1.name
-        << " cannot be used as a constructor at " << arg1.location
-        << std::endl;
-      lex.fail = true;
+    if (!arg1.args.empty()) {
+      if (arg1.name == "_") {
+        std::cerr << "Wildcard _"
+          << " cannot be used as a constructor at " << arg1.location
+          << std::endl;
+        lex.fail = true;
+      }
+      if (Lexer::isLower(arg1.name.c_str())) {
+        std::cerr << "Lower-case identifier " << arg1.name
+          << " cannot be used as a constructor at " << arg1.location
+          << std::endl;
+        lex.fail = true;
+      }
     }
-  } else if (!Lexer::isLower(name.c_str())) {
+  }
+
+  if (Lexer::isUpper(name.c_str())) {
     std::cerr << "Upper-case identifier " << name
       << " cannot be used as a function name at " << ast.location
       << std::endl;
@@ -372,11 +381,10 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
   Expr *body = parse_block(lex);
   if (expect(EOL, lex)) lex.consume();
 
-  // do we need a pattern match?
+  // do we need a pattern match? lower / wildcard are ok
   bool pattern = false;
   for (auto &x : ast.args) {
-    bool isOp = x.name.find(' ') != std::string::npos;
-    pattern |= isOp || Lexer::isUpper(x.name.c_str());
+    pattern |= Lexer::isOperator(x.name.c_str()) || Lexer::isUpper(x.name.c_str());
   }
 
   if (!pattern) {
@@ -494,9 +502,9 @@ static AST parse_unary_ast(int p, Lexer &lex) {
   }
 }
 
-static AST parse_ast(int p, Lexer &lex, bool magic, bool def) {
+static AST parse_ast(int p, Lexer &lex, bool makefirst, bool firstok) {
   TRACE("AST");
-  AST lhs = magic ? AST(lex.next.location) : parse_unary_ast(p, lex);
+  AST lhs = makefirst ? AST(lex.next.location) : parse_unary_ast(p, lex);
   for (;;) {
     switch (lex.next.type) {
       case OPERATOR: {
@@ -524,13 +532,18 @@ static AST parse_ast(int p, Lexer &lex, bool magic, bool def) {
           std::cerr << "Cannot supply additional constructor arguments to " << lhs.name
             << " at " << location << std::endl;
           lex.fail = true;
-        } else if (!def && lhs.args.empty() && Lexer::isLower(lhs.name.c_str())) {
+        } else if (!firstok && lhs.args.empty() && lhs.name == "_") {
+          std::cerr << "Wildcard _"
+            << " cannot be used as a constructor at " << location
+            << std::endl;
+          lex.fail = true;
+        } else if (!firstok && lhs.args.empty() && Lexer::isLower(lhs.name.c_str())) {
           std::cerr << "Lower-case identifier " << lhs.name
             << " cannot be used as a constructor at " << location
             << std::endl;
           lex.fail = true;
         }
-        def = false;
+        firstok = false;
         lhs.args.emplace_back(std::move(rhs));
         break;
       }
@@ -546,7 +559,7 @@ Sum *List;
 Sum *Pair;
 
 static void check_cons_name(const AST &ast, Lexer &lex) {
-  if (Lexer::isLower(ast.name.c_str())) {
+  if (ast.name == "_" || Lexer::isLower(ast.name.c_str())) {
     std::cerr << "Constructor name must be upper-case or operator, not "
       << ast.name << " at "
       << ast.location << std::endl;
@@ -560,16 +573,24 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
   AST def = parse_ast(0, lex);
   if (!def) return;
 
-  if (Lexer::isLower(def.name.c_str())) {
+  if (def.name == "_" || Lexer::isLower(def.name.c_str())) {
     std::cerr << "Type name must be upper-case or operator, not "
       << def.name << " at "
       << def.location << std::endl;
     lex.fail = true;
   }
+
+  std::set<std::string> args;
   for (auto &x : def.args) {
     if (!Lexer::isLower(x.name.c_str())) {
       std::cerr << "Type argument must be lower-case, not "
         << x.name << " at "
+        << x.location << std::endl;
+      lex.fail = true;
+    }
+    if (!args.insert(x.name).second) {
+      std::cerr << "Type argument "
+        << x.name << " occurs more than once at "
         << x.location << std::endl;
       lex.fail = true;
     }

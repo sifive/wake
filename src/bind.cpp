@@ -366,10 +366,9 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
 
 static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, const AST &ast, Sum *multiarg) {
   PatternTree out;
-  bool isOp = ast.name.find(' ') != std::string::npos;
   if (ast.name == "_") {
     // no-op; unbound
-  } else if (!isOp && !ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
+  } else if (!ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
     expr = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, expr.release()));
     out.var = 0; // bound
   } else {
