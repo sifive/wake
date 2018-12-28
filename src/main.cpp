@@ -1,3 +1,5 @@
+#define VERSION "0.3"
+
 #include <iostream>
 #include <thread>
 #include <sstream>
@@ -72,6 +74,8 @@ int main(int argc, const char **argv) {
       "number of concurrent jobs to run", 1},
     { "verbose", {"-v", "--verbose"},
       "output progress information", 0},
+    { "version", {"--version"},
+      "report the version of wake", 0},
     { "quiet", {"-q", "--quiet"},
       "quiet operation", 0},
     { "debug", {"-d", "--debug"},
@@ -88,6 +92,11 @@ int main(int argc, const char **argv) {
 
   if (args["help"]) {
     std::cerr << usage << std::endl << argparser;
+    return 0;
+  }
+
+  if (args["version"]) {
+    std::cerr << "wake v" << VERSION << std::endl;
     return 0;
   }
 
@@ -182,7 +191,7 @@ int main(int argc, const char **argv) {
   /* Primitives */
   JobTable jobtable(&db, jobs, verbose, quiet);
   PrimMap pmap;
-  prim_register_string(pmap);
+  prim_register_string(pmap, VERSION);
   prim_register_integer(pmap);
   prim_register_polymorphic(pmap);
   prim_register_regexp(pmap);

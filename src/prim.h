@@ -62,7 +62,7 @@ std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values);
 typedef std::map<std::string, std::pair<PrimFn, void *> > PrimMap;
 struct JobTable;
 
-void prim_register_string(PrimMap &pmap);
+void prim_register_string(PrimMap &pmap, const char *version);
 void prim_register_integer(PrimMap &pmap);
 void prim_register_polymorphic(PrimMap &pmap);
 void prim_register_regexp(PrimMap &pmap);
