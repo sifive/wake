@@ -86,7 +86,12 @@ void Match::hash() {
     a->hashcode.push(codes);
   }
   for (auto &p : patterns) {
-    // !!! hash pattern
+    std::stringstream ss;
+    ss << p.pattern;
+    std::string str = ss.str();
+    Hash code;
+    HASH(str.data(), str.size(), (long)type, code);
+    code.push(codes);
     p.expr->hash();
     p.expr->hashcode.push(codes);
   }
