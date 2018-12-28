@@ -101,3 +101,13 @@ global def collate f l r = match l r
 global def seq n =
   def helper i = if i >= n then Nil else i, helper (i+1)
   helper 0
+
+global def zip = match _ _
+  Nil     _       = Nil
+  _       Nil     = Nil
+  (lh,lt) (rh,rt) = Pair lh rh, zip lt rt
+
+global def unzip = match _
+  Nil           = Pair Nil Nil
+  (Pair a b), t = match (unzip t)
+    Pair c d = Pair (a, c) (b, d)
