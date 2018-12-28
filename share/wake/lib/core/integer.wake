@@ -1,0 +1,21 @@
+# integer operations
+global def +x = x
+global def -x = prim "neg"
+global def ~x = prim "com"
+global def x + y = prim "add"
+global def x - y = prim "sub"
+global def x * y = prim "mul"
+global def x / y = prim "div"
+global def x % y = prim "mod"
+global def x << y = prim "shl"
+global def x >> y = prim "shr"
+global def x ^ y = prim "exp"
+global def root x n = (\_\_ prim "root") n x
+global def sqrt x = root 2 x
+global def abs x = prim "abs"
+global def xor x y = prim "xor"
+global def and x y = prim "and"
+global def or  x y = prim "or"
+global def gcd x y = prim "gcd"
+global def lcm x y = prim "lcm"
+global def powm x y m = prim "powm" # fast version of: (x^y) % m

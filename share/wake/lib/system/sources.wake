@@ -1,0 +1,9 @@
+# Private implementation of global sources
+def add_sources str = prim "add_sources"
+def implode l = cat (foldr (_, "\0", _) Nil l)
+def got_sources = add_sources (subscribe source).implode # returns true
+
+# Find sources files
+global def sources dir regexp =
+  def scan dir regexp = prim "sources"
+  if got_sources then scan dir regexp else Nil # force dependency on add_sources

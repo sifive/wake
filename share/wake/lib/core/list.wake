@@ -1,0 +1,113 @@
+# lists
+global data List a =
+  Nil
+  a, (List a)
+
+global def empty = match _
+  Nil = True
+  _   = False
+
+global def head = match _
+  Nil  = raise "empty list"
+  h, _ = h
+
+global def tail = match _
+  Nil  = raise "empty list"
+  _, t = t
+
+global def map f = match _
+  Nil  = Nil
+  h, t = f h, map f t
+
+global def foldl f a = match _
+  Nil  = a
+  h, t = foldl f (f a h) t
+
+global def scanl f a = match _
+  Nil  = a, Nil
+  h, t = a, scanl f (f a h) t
+
+global def foldr f a = match _
+  Nil  = a
+  h, t = f h (foldr f a t)
+
+global def scanr f a = match _
+  Nil  = a, Nil
+  h, t =
+    def finish r = f h r.head, r
+    finish (scanr f a t)
+
+# list helpers
+global def l ++ r    = foldr (_,_) r l
+global def reverse l = foldl (\a\b b,a) Nil l
+global def flatten l = foldr (_++_) Nil l
+global def len l     = foldl (\a\_ a+1) 0 l
+
+# list choppers
+global def splitAt i l =
+  if i <= 0 then Pair Nil l else match l
+    Nil  = Pair Nil l
+    h, t = match (splitAt (i-1) t)
+      Pair f s = Pair (h, f) s
+
+global def take i l = (splitAt i l).first
+global def drop i l = (splitAt i l).second
+global def at   i l = if i < 0 then raise "at called with negative index" else (drop i l).head
+
+global def splitUntil f l = match l
+  Nil  = Pair Nil Nil
+  h, t = if f h then Pair Nil l else match (splitUntil f t)
+    Pair f s = Pair (h, f) s
+
+global def takeUntil f l = (splitUntil f l).first
+global def dropUntil f l = (splitUntil f l).second
+global def find f l = take 1 (dropUntil f l)
+global def exists f l = !empty (dropUntil f l)
+global def forall f l = empty (dropUntil (!f _) l)
+
+global def splitBy f = match _
+  Nil  = Pair Nil Nil
+  h, t = match (splitBy f t)
+    Pair x y =
+      if f h
+      then Pair (h, x) y
+      else Pair x (h, y)
+
+global def filter f l = (splitBy f l).first
+
+# Tranposition is only it's own inverse when the lists have non-increasing size
+global def transpose l =
+  def todo = filter (!_.empty) l
+  def heads = map head todo
+  def tails = map tail todo
+  if todo.empty then Nil else heads, transpose tails
+
+# f should be a less-than comparison
+global def sortBy f = match _
+  Nil  = Nil
+  h, t = match (splitBy (f h) t)
+    Pair x y = sortBy f y ++ (h, sortBy f x)
+
+global def sort l = sortBy (_<_) l
+
+global def collate f l r = match l r
+  Nil     Nil     = 0
+  Nil     _       = -1
+  _       Nil     = 1
+  (lh,lt) (rh,rt) =
+    def cmp = f lh rh
+    if cmp == 0 then collate f lt rt else cmp
+
+global def seq n =
+  def helper i = if i >= n then Nil else i, helper (i+1)
+  helper 0
+
+global def zip = match _ _
+  Nil     _       = Nil
+  _       Nil     = Nil
+  (lh,lt) (rh,rt) = Pair lh rh, zip lt rt
+
+global def unzip = match _
+  Nil           = Pair Nil Nil
+  (Pair a b), t = match (unzip t)
+    Pair c d = Pair (a, c) (b, d)

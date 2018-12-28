@@ -1,0 +1,21 @@
+# String methods
+
+global def cat l =
+  def catopen    = prim "catopen"
+  def catclose c = prim "catclose"
+  def catadd c s = prim "catadd"
+  catclose (foldl catadd catopen l)
+
+global def catWith s l =
+  if l.empty then "" else
+    def inserted = foldr (s, _, _) Nil l
+    cat (inserted.tail)
+
+# String <=> Integer type conversion
+global def strbase base n = prim "str" # int -> string
+global def intbase base s = prim "int" # string -> int
+global def str n = strbase 10 n
+global def int s = intbase 0 s
+
+# Version of wake
+global def version = prim "version"

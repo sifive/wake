@@ -5,9 +5,9 @@
 #include <memory>
 
 enum SymbolType {
-  ERROR, ID, OPERATOR, LITERAL, DEF, GLOBAL, PUBLISH, SUBSCRIBE, PRIM, LAMBDA,
-  EQUALS, POPEN, PCLOSE, BOPEN, BCLOSE, IF, THEN, ELSE, HERE, MEMOIZE, END,
-  EOL, INDENT, DEDENT
+  ERROR, ID, OPERATOR, LITERAL, DEF, VAL, GLOBAL, PUBLISH, SUBSCRIBE, PRIM, LAMBDA,
+  DATA, EQUALS, POPEN, PCLOSE, BOPEN, BCLOSE, IF, THEN, ELSE, HERE, MEMOIZE, END,
+  MATCH, EOL, INDENT, DEDENT
 };
 extern const char *symbolTable[];
 
@@ -36,6 +36,19 @@ struct Lexer {
 
   std::string text();
   void consume();
+
+  static bool isUpper(const char *str); // unicode-upper
+  static bool isLower(const char *str); // unicode-letter \ unicode-upper
+  static bool isOperator(const char *str);
 };
+
+struct op_type {
+  int p;
+  int l;
+  op_type(int p_, int l_) : p(p_), l(l_) { }
+  op_type() : p(-1), l(-1) { }
+};
+
+op_type op_precedence(const char *str);
 
 #endif

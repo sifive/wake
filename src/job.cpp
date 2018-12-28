@@ -45,9 +45,11 @@ struct JobResult : public Value {
   std::unique_ptr<Receiver> q_outputs; // waken once job is merged+finished (inputs+outputs available)
 
   static const char *type;
+  static TypeVar typeVar;
   JobResult(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline);
 
   void format(std::ostream &os, int depth) const;
+  TypeVar &getType();
   Hash hash() const;
 
   void process(WorkQueue &queue); // Run commands based on state
@@ -55,9 +57,16 @@ struct JobResult : public Value {
 
 const char *JobResult::type = "JobResult";
 
-void JobResult::format(std::ostream &os, int depth) const {
-  os << "JobResult(" << job << ")";
-  if (depth >= 0) os << std::endl;
+void JobResult::format(std::ostream &os, int p) const {
+  if (APP_PRECEDENCE < p) os << "(";
+  os << "JobResult " << job;
+  if (APP_PRECEDENCE < p) os << ")";
+  if (p < 0) os << std::endl;
+}
+
+TypeVar JobResult::typeVar("Job", 0);
+TypeVar &JobResult::getType() {
+  return typeVar;
 }
 
 Hash JobResult::hash() const { return code; }
@@ -362,6 +371,17 @@ static std::unique_ptr<Receiver> cast_jobresult(WorkQueue &queue, std::unique_pt
     if (!completion) return;									\
   } while(0)
 
+static PRIMTYPE(type_job_launch) {
+  return args.size() == 6 &&
+    args[0]->unify(Integer::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    args[2]->unify(String::typeVar) &&
+    args[3]->unify(String::typeVar) &&
+    args[4]->unify(String::typeVar) &&
+    args[5]->unify(String::typeVar) &&
+    out->unify(JobResult::typeVar);
+}
+
 static PRIMFN(prim_job_launch) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT(6);
@@ -396,6 +416,16 @@ static PRIMFN(prim_job_launch) {
   launch(jobtable);
 
   RETURN(out);
+}
+
+static PRIMTYPE(type_job_cache) {
+  return args.size() == 5 &&
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    args[2]->unify(String::typeVar) &&
+    args[3]->unify(String::typeVar) &&
+    args[4]->unify(String::typeVar) &&
+    out->unify(JobResult::typeVar);
 }
 
 static PRIMFN(prim_job_cache) {
@@ -489,6 +519,13 @@ void JobResult::process(WorkQueue &queue) {
   }
 }
 
+static PRIMTYPE(type_job_output) {
+  return args.size() == 2 &&
+    args[0]->unify(JobResult::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(String::typeVar);
+}
+
 static PRIMFN(prim_job_output) {
   EXPECT(2);
   JOBRESULT(arg0, 0);
@@ -506,6 +543,13 @@ static PRIMFN(prim_job_output) {
   }
 }
 
+static PRIMTYPE(type_job_kill) {
+  return args.size() == 2 &&
+    args[0]->unify(JobResult::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(Integer::typeVar);
+}
+
 static PRIMFN(prim_job_kill) {
   EXPECT(2);
   JOBRESULT(arg0, 0);
@@ -518,6 +562,20 @@ static PRIMFN(prim_job_kill) {
   completion->next = std::move(arg0->q_merge);
   arg0->q_merge = std::move(completion);
   arg0->process(queue);
+}
+
+static PRIMTYPE(type_job_tree) {
+  TypeVar list;
+  TypeVar pair;
+  Data::typeList.clone(list);
+  Data::typePair.clone(pair);
+  list[0].unify(pair);
+  pair[0].unify(String::typeVar);
+  pair[1].unify(String::typeVar);
+  return args.size() == 2 &&
+    args[0]->unify(JobResult::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(list);
 }
 
 static PRIMFN(prim_job_tree) {
@@ -535,6 +593,14 @@ static PRIMFN(prim_job_tree) {
   } else {
     RAISE("argument neither inputs(1) nor outputs(2)");
   }
+}
+
+static PRIMTYPE(type_job_finish) {
+  return args.size() == 3 &&
+    args[0]->unify(JobResult::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    args[2]->unify(String::typeVar) &&
+    out->unify(Data::typeBoolean);
 }
 
 static PRIMFN(prim_job_finish) {
@@ -580,6 +646,17 @@ static PRIMFN(prim_job_finish) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_add_hash) {
+  TypeVar pair;
+  Data::typePair.clone(pair);
+  pair[0].unify(String::typeVar);
+  pair[1].unify(String::typeVar);
+  return args.size() == 2 &&
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(pair);
+}
+
 static PRIMFN(prim_add_hash) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT(2);
@@ -597,6 +674,13 @@ static bool check_exec(const char *tok, size_t len, const std::string &exec, std
   out += "/";
   out += exec;
   return access(out.c_str(), X_OK) == 0;
+}
+
+static PRIMTYPE(type_search_path) {
+  return args.size() == 2 &&
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_search_path) {
@@ -622,15 +706,12 @@ static PRIMFN(prim_search_path) {
 }
 
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
-  pmap["job_launch" ].second = jobtable;
-  pmap["job_cache"  ].second = jobtable;
-  pmap["add_hash"   ].second = jobtable;
-  pmap["job_launch" ].first = prim_job_launch;
-  pmap["job_cache"  ].first = prim_job_cache;
-  pmap["job_output" ].first = prim_job_output;
-  pmap["job_kill"   ].first = prim_job_kill;
-  pmap["job_tree"   ].first = prim_job_tree;
-  pmap["job_finish" ].first = prim_job_finish;
-  pmap["add_hash"   ].first = prim_add_hash;
-  pmap["search_path"].first = prim_search_path;
+  pmap.emplace("job_launch", PrimDesc(prim_job_launch, type_job_launch, jobtable));
+  pmap.emplace("job_cache",  PrimDesc(prim_job_cache,  type_job_cache,  jobtable));
+  pmap.emplace("job_output", PrimDesc(prim_job_output, type_job_output));
+  pmap.emplace("job_kill",   PrimDesc(prim_job_kill,   type_job_kill));
+  pmap.emplace("job_tree",   PrimDesc(prim_job_tree,   type_job_tree));
+  pmap.emplace("job_finish", PrimDesc(prim_job_finish, type_job_finish));
+  pmap.emplace("add_hash",   PrimDesc(prim_add_hash,   type_add_hash,   jobtable));
+  pmap.emplace("search_path",PrimDesc(prim_search_path,type_search_path));
 }

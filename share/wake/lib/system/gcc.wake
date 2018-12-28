@@ -1,26 +1,26 @@
-def c11Flags      = ("-std=c++11", nil)
-def debugCFlags   = ("-Wall", "-Wextra", "-O0", "-g", "-pg", nil)
-def debugLFlags   = ("-g", "-pg", nil)
-def releaseCFlags = ("-Wall", "-O2", "-flto", nil)
-def releaseLFlags = ("-flto", nil)
+def c11Flags      = ("-std=c++11", Nil)
+def debugCFlags   = ("-Wall", "-Wextra", "-O0", "-g", "-pg", Nil)
+def debugLFlags   = ("-g", "-pg", Nil)
+def releaseCFlags = ("-Wall", "-O2", "-flto", Nil)
+def releaseLFlags = ("-flto", Nil)
 
 def doCompileC variant gcc flags headers file =
   def obj = replace '\.c(pp)?$' ".{variant}.o" file
-  def cmdline = gcc, flags ++ ("-c", file, "-o", obj, nil)
-  def result = job cmdline (file, headers) nil
+  def cmdline = gcc, flags ++ ("-c", file, "-o", obj, Nil)
+  def result = job cmdline (file, headers) Nil
   result.output
 
 def doLinkO variant linker flags objs file =
   def cmdline = (linker, "-o", "{file}.{variant}", objs) ++ flags
   def outdir = simplify "{file}/.."
-  def result = job cmdline objs (outdir, nil)
+  def result = job cmdline objs (outdir, Nil)
   result.output
 
 def makeCompileC variant gcc flags =
-  pair variant (\extra doCompileC variant gcc (flags ++ extra))
+  Pair variant (\extra doCompileC variant gcc (flags ++ extra))
 
 def makeLinkO variant linker flags =
-  pair variant (\extra doLinkO variant linker (flags ++ extra))
+  Pair variant (\extra doLinkO variant linker (flags ++ extra))
 
 publish compileC = makeCompileC "native-c99-debug"     (which "gcc") (debugCFlags)
 publish compileC = makeCompileC "native-c99-release"   (which "gcc") (releaseCFlags)
@@ -33,7 +33,7 @@ publish linkO = makeLinkO "native-cpp11-debug"   (which "g++") (debugLFlags)
 publish linkO = makeLinkO "native-cpp11-release" (which "g++") (releaseLFlags)
 
 def pickVariant variant variants =
-  def selected = find (match variant _.first) variants
+  def selected = find (matches variant _.first) variants
   if selected.empty
   then
     def ok = catWith " " (map first variants)
@@ -41,5 +41,5 @@ def pickVariant variant variants =
   else
     selected.head.second
 
-global compileC variant = pickVariant variant (subscribe compileC)
-global linkO    variant = pickVariant variant (subscribe linkO)
+global def compileC variant = pickVariant variant (subscribe compileC)
+global def linkO    variant = pickVariant variant (subscribe linkO)

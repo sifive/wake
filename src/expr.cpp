@@ -2,6 +2,7 @@
 #include "value.h"
 #include "hash.h"
 #include "thunk.h"
+#include "datatype.h"
 #include <cassert>
 #include <sstream>
 
@@ -12,8 +13,11 @@ const char *Lambda::type = "Lambda";
 const char *VarRef::type = "VarRef";
 const char *Literal::type = "Literal";
 const char *DefBinding::type = "DefBinding";
+const char *Construct::type = "Construct";
+const char *Destruct::type = "Destruct";
 // these are removed by bind
 const char *Subscribe::type = "Subscribe";
+const char *Match::type = "Match";
 const char *Memoize::type = "Memoize";
 const char *DefMap::type = "DefMap";
 const char *Top::type = "Top";
@@ -37,7 +41,7 @@ std::string Expr::to_str() const {
 void VarRef::format(std::ostream &os, int depth) const {
   os << pad(depth) << "VarRef(" << name;
   if (offset != -1) os << "," << depth << "," << offset;
-  os << ") @ " << location << std::endl;
+  os << "): " << typeVar << " @ " << location << std::endl;
 }
 
 void VarRef::hash() {
@@ -56,7 +60,7 @@ void Subscribe::hash() {
 }
 
 void Memoize::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Memoize @ " << location << std::endl;
+  os << pad(depth) << "Memoize: " << typeVar << " @ " << location << std::endl;
   body->format(os, depth+2);
 }
 
@@ -65,8 +69,37 @@ void Memoize::hash() {
   HASH(&body->hashcode, sizeof(body->hashcode), (long)type, hashcode);
 }
 
+void Match::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Match: " << typeVar << " @ " << location << std::endl;
+  for (auto &a: args)
+    a->format(os, depth+2);
+  for (auto &p: patterns) {
+    os << pad(depth+2) << p.pattern << " = " << std::endl;
+    p.expr->format(os, depth+4);
+  }
+}
+
+void Match::hash() {
+  std::vector<uint64_t> codes;
+  for (auto &a : args) {
+    a->hash();
+    a->hashcode.push(codes);
+  }
+  for (auto &p : patterns) {
+    std::stringstream ss;
+    ss << p.pattern;
+    std::string str = ss.str();
+    Hash code;
+    HASH(str.data(), str.size(), (long)type, code);
+    code.push(codes);
+    p.expr->hash();
+    p.expr->hashcode.push(codes);
+  }
+  HASH(codes.data(), codes.size()*8, (long)type, hashcode);
+}
+
 void App::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "App @ " << location << std::endl;
+  os << pad(depth) << "App: " << typeVar << " @ " << location << std::endl;
   fn->format(os, depth+2);
   val->format(os, depth+2);
 }
@@ -81,7 +114,7 @@ void App::hash() {
 }
 
 void Lambda::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Lambda(" << name << ") @ " << location << std::endl;
+  os << pad(depth) << "Lambda(" << name << "): " << typeVar << " @ " << location << std::endl;
   body->format(os, depth+2);
 }
 
@@ -108,8 +141,8 @@ void DefMap::hash() {
 }
 
 void Literal::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Literal @ " << location << " = ";
-  value->format(os, depth);
+  os << pad(depth) << "Literal: " << typeVar << " @ " << location << " = ";
+  value->format(os, -1-depth);
 }
 
 void Literal::hash() {
@@ -118,7 +151,7 @@ void Literal::hash() {
 }
 
 void Prim::format(std::ostream &os, int depth) const {
- os << pad(depth) << "Prim(" << args << "," << name << ") @ " << location << std::endl;
+ os << pad(depth) << "Prim(" << args << "," << name << "): " << typeVar << " @ " << location << std::endl;
 }
 
 void Prim::hash() {
@@ -129,7 +162,7 @@ void Top::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Top; globals =";
   for (auto &i : globals) os << " " << i.first;
   os << std::endl;
-  for (auto &i : defmaps) i.format(os, depth+2);
+  for (auto &i : defmaps) i->format(os, depth+2);
   body->format(os, depth+2);
 }
 
@@ -138,15 +171,19 @@ void Top::hash() {
 }
 
 void DefBinding::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "DefBinding @ " << location << std::endl;
-  int vals = val.size();
-  for (auto &i : order) {
-    os << pad(depth+2) << (i.second < vals ? "val " : "fun ") << i.first << " =" << std::endl;
-    if (i.second < vals) {
-      val[i.second]->format(os, depth+4);
-    } else {
-      fun[i.second - vals]->format(os, depth+4);
-    }
+  os << pad(depth) << "DefBinding: " << typeVar << " @ " << location << std::endl;
+
+  // invert name=>index map
+  std::vector<const char*> names(order.size());
+  for (auto &i : order) names[i.second] = i.first.c_str();
+
+  for (int i = 0; i < (int)val.size(); ++i) {
+    os << pad(depth+2) << "val " << names[i] << " = " << std::endl;
+    val[i]->format(os, depth+4);
+  }
+  for (int i = 0; i < (int)fun.size(); ++i) {
+    os << pad(depth+2) << "fun " << names[i+val.size()] << " (" << scc[i] << ") = " << std::endl;
+    fun[i]->format(os, depth+4);
   }
   body->format(os, depth+2);
 }
@@ -164,6 +201,22 @@ void DefBinding::hash() {
   body->hash();
   body->hashcode.push(codes);
   HASH(codes.data(), codes.size()*8, (long)type, hashcode);
+}
+
+void Construct::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Construct(" << cons->ast.name << "): " << typeVar << " @ " << location << std::endl;
+}
+
+void Construct::hash() {
+  HASH(cons->ast.name.data(), cons->ast.name.size(), (long)type, hashcode);
+}
+
+void Destruct::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Destruct(" << sum.name << "): " << typeVar << " @ " << location << std::endl;
+}
+
+void Destruct::hash() {
+  HASH(sum.name.data(), sum.name.size(), (long)type, hashcode);
 }
 
 std::ostream & operator << (std::ostream &os, const Expr *expr) {

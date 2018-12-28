@@ -1,8 +1,15 @@
 #include "prim.h"
 #include "value.h"
 #include "heap.h"
+#include "type.h"
 #include <gmp.h>
 #include <sstream>
+
+static PRIMTYPE(type_lt) {
+  return args.size() == 2 &&
+    args[0]->unify(*args[1]) &&
+    out->unify(Data::typeBoolean);
+}
 
 static PRIMFN(prim_lt) {
   EXPECT(2);
@@ -24,6 +31,12 @@ static PRIMFN(prim_lt) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_eq) {
+  return args.size() == 2 &&
+    args[0]->unify(*args[1]) &&
+    out->unify(Data::typeBoolean);
+}
+
 static PRIMFN(prim_eq) {
   EXPECT(2);
   bool eq;
@@ -40,6 +53,12 @@ static PRIMFN(prim_eq) {
   }
   auto out = eq ? make_true() : make_false();
   RETURN(out);
+}
+
+static PRIMTYPE(type_cmp) {
+  return args.size() == 2 &&
+    args[0]->unify(*args[1]) &&
+    out->unify(Integer::typeVar);
 }
 
 static PRIMFN(prim_cmp) {
@@ -63,6 +82,12 @@ static PRIMFN(prim_cmp) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_test) {
+  return args.size() == 1 &&
+    // leave arg0 free
+    out->unify(Data::typeBoolean);
+}
+
 static PRIMFN(prim_test) {
   (void)data; // silence unused variable warning (EXPECT not called)
   if (args.size() != 1) {
@@ -71,6 +96,15 @@ static PRIMFN(prim_test) {
   } else {
     Receiver::receive(queue, std::move(completion), args[0]->type == Exception::type ? make_true() : make_false());
   }
+}
+
+static PRIMTYPE(type_catch) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
+  return args.size() == 1 &&
+    // leave arg0 free
+    out->unify(list);
 }
 
 static PRIMFN(prim_catch) {
@@ -87,6 +121,12 @@ static PRIMFN(prim_catch) {
   }
 }
 
+static PRIMTYPE(type_raise) {
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar);
+    // leave prim free
+}
+
 static PRIMFN(prim_raise) {
   EXPECT(1);
   STRING(arg0, 0);
@@ -94,10 +134,10 @@ static PRIMFN(prim_raise) {
 }
 
 void prim_register_polymorphic(PrimMap &pmap) {
-  pmap["lt"].first = prim_lt;
-  pmap["eq"].first = prim_eq;
-  pmap["cmp"].first = prim_cmp;
-  pmap["test"].first = prim_test;
-  pmap["catch"].first = prim_catch;
-  pmap["raise"].first = prim_raise;
+  pmap.emplace("lt",    PrimDesc(prim_lt,    type_lt));
+  pmap.emplace("eq",    PrimDesc(prim_eq,    type_eq));
+  pmap.emplace("cmp",   PrimDesc(prim_cmp,   type_cmp));
+  pmap.emplace("test",  PrimDesc(prim_test,  type_test));
+  pmap.emplace("catch", PrimDesc(prim_catch, type_catch));
+  pmap.emplace("raise", PrimDesc(prim_raise, type_raise));
 }

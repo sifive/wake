@@ -1,0 +1,9 @@
+# Boolean type
+global data Boolean =
+  True
+  False
+
+# if is compiler sugar for match
+global def !x    = if x then False else True
+global def x & y = if x then y else False
+global def x | y = if x then True else y

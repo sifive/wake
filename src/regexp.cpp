@@ -8,16 +8,25 @@
 struct RegExp : public Value {
   RE2 exp;
   static const char *type;
+  static TypeVar typeVar;
   RegExp(const std::string &regexp, const RE2::Options &opts) : Value(type), exp(re2::StringPiece(regexp), opts) { }
 
   void format(std::ostream &os, int depth) const;
+  TypeVar &getType();
   Hash hash() const;
 };
 const char *RegExp::type = "RegExp";
 
-void RegExp::format(std::ostream &os, int depth) const {
-  os << "RegExp(" << exp.pattern() << ")";
-  if (depth >= 0) os << std::endl;
+void RegExp::format(std::ostream &os, int p) const {
+  if (APP_PRECEDENCE < p) os << "(";
+  os << "RegExp ";
+  String(exp.pattern()).format(os, p);
+  if (APP_PRECEDENCE < p) os << ")";
+}
+
+TypeVar RegExp::typeVar("RegExp", 0);
+TypeVar &RegExp::getType() {
+  return typeVar;
 }
 
 Hash RegExp::hash() const {
@@ -44,6 +53,12 @@ static std::unique_ptr<Receiver> cast_regexp(WorkQueue &queue, std::unique_ptr<R
     if (!completion) return;									\
   } while(0)
 
+static PRIMTYPE(type_re2) {
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
+    out->unify(RegExp::typeVar);
+}
+
 static PRIMFN(prim_re2) {
   EXPECT(1);
   STRING(arg0, 0);
@@ -60,11 +75,24 @@ static PRIMFN(prim_re2) {
   }
 }
 
+static PRIMTYPE(type_quote) {
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
+}
+
 static PRIMFN(prim_quote) {
   EXPECT(1);
   STRING(arg0, 0);
   auto out = std::make_shared<String>(RE2::QuoteMeta(arg0->value));
   RETURN(out);
+}
+
+static PRIMTYPE(type_match) {
+  return args.size() == 2 &&
+    args[0]->unify(RegExp::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(Data::typeBoolean);
 }
 
 static PRIMFN(prim_match) {
@@ -73,6 +101,16 @@ static PRIMFN(prim_match) {
   STRING(arg1, 1);
   auto out = RE2::FullMatch(arg1->value, arg0->exp) ? make_true() : make_false();
   RETURN(out);
+}
+
+static PRIMTYPE(type_extract) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
+  return args.size() == 2 &&
+    args[0]->unify(RegExp::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(list);
 }
 
 static PRIMFN(prim_extract) {
@@ -95,6 +133,14 @@ static PRIMFN(prim_extract) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_replace) {
+  return args.size() == 3 &&
+    args[0]->unify(RegExp::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    args[2]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
+}
+
 static PRIMFN(prim_replace) {
   EXPECT(3);
   REGEXP(arg0, 0);
@@ -104,6 +150,16 @@ static PRIMFN(prim_replace) {
   auto out = std::make_shared<String>(arg2->value);
   RE2::GlobalReplace(&out->value, arg0->exp, arg1->value);
   RETURN(out);
+}
+
+static PRIMTYPE(type_tokenize) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
+  return args.size() == 2 &&
+    args[0]->unify(RegExp::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(list);
 }
 
 static PRIMFN(prim_tokenize) {
@@ -125,10 +181,10 @@ static PRIMFN(prim_tokenize) {
 }
 
 void prim_register_regexp(PrimMap &pmap) {
-  pmap["re2"     ].first = prim_re2;
-  pmap["quote"   ].first = prim_quote;
-  pmap["match"   ].first = prim_match;
-  pmap["extract" ].first = prim_extract;
-  pmap["replace" ].first = prim_replace;
-  pmap["tokenize"].first = prim_tokenize;
+  pmap.emplace("re2",      PrimDesc(prim_re2,      type_re2));
+  pmap.emplace("quote",    PrimDesc(prim_quote,    type_quote));
+  pmap.emplace("match",    PrimDesc(prim_match,    type_match));
+  pmap.emplace("extract",  PrimDesc(prim_extract,  type_extract));
+  pmap.emplace("replace",  PrimDesc(prim_replace,  type_replace));
+  pmap.emplace("tokenize", PrimDesc(prim_tokenize, type_tokenize));
 }

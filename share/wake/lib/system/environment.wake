@@ -1,0 +1,6 @@
+# Setup a default path
+publish path = "/usr/bin"
+publish path = "/bin"
+
+global def path = catWith ":" (subscribe path)
+publish environment = "PATH={path}"

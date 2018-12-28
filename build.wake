@@ -1,11 +1,11 @@
 # useful build variants
-global default = "native-cpp11-release"
-global debug = "native-cpp11-debug"
+global def default = "native-cpp11-release"
+global def debug = "native-cpp11-debug"
 
-def targets = (buildWake, buildFuse, nil)
-global all variant = map (_ variant) targets
+def targets = buildWake, buildFuse, Nil
+global def all variant = map (_ variant) targets
 
-global install dest =
+global def install dest =
   def libdir = simplify "{here}/share/wake/lib"
   def libfiles = sources libdir '.*'
   def binfiles = all default

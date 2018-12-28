@@ -1,4 +1,4 @@
-#define VERSION "0.3"
+#define VERSION "0.4"
 
 #include <iostream>
 #include <thread>
@@ -82,6 +82,8 @@ int main(int argc, const char **argv) {
       "simulate a stack for exceptions", 0},
     { "parse", {"-p", "--parse"},
       "parse wake files and print the AST", 0},
+    { "typecheck", {"-t", "--typecheck"},
+      "type-check wake files and print the typed AST", 0},
     { "init", {"--init"},
       "directory to configure as workspace top", 1},
   }};
@@ -181,6 +183,7 @@ int main(int argc, const char **argv) {
     body = new Lambda(LOCATION, "_", body);
     target_names.emplace_back("<target-" + std::to_string(i) + "-expression>");
   }
+  TypeVar *types = &body->typeVar;
   for (size_t i = 0; i < targets.size(); ++i) {
     Lexer lex(targets[i], target_names[i].c_str());
     body = new App(LOCATION, body, parse_command(lex));
@@ -203,11 +206,28 @@ int main(int argc, const char **argv) {
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
   if (!root) ok = false;
 
+  if (!Boolean) {
+    std::cerr << "Primitive data type Boolean not defined." << std::endl;
+    ok = false;
+  }
+
+  if (!List) {
+    std::cerr << "Primitive data type List not defined." << std::endl;
+    ok = false;
+  }
+
+  if (!Pair) {
+    std::cerr << "Primitive data type Pair not defined." << std::endl;
+    ok = false;
+  }
+
   if (!ok) {
     if (args["add"]) std::cerr << ">>> Expression not added to the active target list <<<" << std::endl;
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }
+
+  if (args["typecheck"]) std::cout << root.get();
 
   if (args["add"]) {
     db.add_target(targets.back());
@@ -239,8 +259,19 @@ int main(int argc, const char **argv) {
 
   for (size_t i = 0; i < targets.size(); ++i) {
     Value *v = outputs[targets.size()-1-i].get();
-    std::cout << targets[i] << " = ";
-    if (v) std::cout << v; else std::cout << "MISSING FUTURE" << std::endl;
+    std::cout << targets[i] << ": ";
+    (*types)[0].format(std::cout, body->typeVar);
+    types = &(*types)[1];
+    std::cout << " = ";
+    if (v) {
+      if (verbose) {
+        v->format(std::cout, -1);
+      } else {
+        std::cout << v << std::endl;
+      }
+    } else {
+      std::cout << "MISSING FUTURE" << std::endl;
+    }
   }
 
   //std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;

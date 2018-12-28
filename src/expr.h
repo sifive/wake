@@ -5,6 +5,8 @@
 #include "primfn.h"
 #include "hash.h"
 #include "heap.h"
+#include "type.h"
+#include "datatype.h"
 #include <memory>
 #include <string>
 #include <map>
@@ -19,6 +21,7 @@ struct Value;
 struct Expr {
   const char *type;
   Location location;
+  TypeVar typeVar;
   Hash hashcode;
   long flags;
 
@@ -34,8 +37,8 @@ std::ostream & operator << (std::ostream &os, const Expr *expr);
 
 struct Prim : public Expr {
   std::string name;
-  int args;
 
+  int args;
   PrimFn fn;
   void *data;
 
@@ -106,6 +109,25 @@ struct Memoize : public Expr {
   void hash();
 };
 
+struct Pattern {
+  AST pattern;
+  std::unique_ptr<Expr> expr;
+
+  Pattern(AST &&pattern_, Expr *expr_) : pattern(std::move(pattern_)), expr(expr_) { }
+};
+
+struct Match : public Expr {
+  std::vector<std::unique_ptr<Expr> > args;
+  std::vector<Pattern> patterns;
+
+  static const char *type;
+  Match(const Location &location_)
+   : Expr(type, location_) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
+};
+
 struct Subscribe : public Expr {
   std::string name;
   static const char *type;
@@ -134,7 +156,7 @@ struct DefMap : public Expr {
 };
 
 struct Top : public Expr {
-  typedef std::vector<DefMap> DefMaps;
+  typedef std::vector<std::unique_ptr<DefMap> > DefMaps;
   DefMaps defmaps;
   DefOrder globals;
   std::unique_ptr<Expr> body;
@@ -155,9 +177,36 @@ struct DefBinding : public Expr {
   values val;     // access prior binding
   functions fun;  // access current binding
   DefOrder order; // values, then functions
+  std::vector<int> scc; // SCC id per function
 
   static const char *type;
   DefBinding(const Location &location_, std::unique_ptr<Expr> body_) : Expr(type, location_), body(std::move(body_)) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
+};
+
+// Created by transforming Data
+struct Constructor;
+struct Construct : public Expr {
+  Sum *sum;
+  Constructor *cons;
+
+  static const char *type;
+  Construct(const Location &location_, Sum *sum_, Constructor *cons_)
+   : Expr(type, location_), sum(sum_), cons(cons_) { }
+
+  void format(std::ostream &os, int depth) const;
+  void hash();
+};
+
+struct Sum;
+struct Destruct : public Expr {
+  Sum sum;
+
+  static const char *type;
+  Destruct(const Location &location_, Sum &&sum_)
+   : Expr(type, location_), sum(std::move(sum_)) { }
 
   void format(std::ostream &os, int depth) const;
   void hash();

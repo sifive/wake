@@ -1,0 +1,7 @@
+
+
+
+# tuples
+global data Pair a b = Pair a b
+global def first  (Pair x _) = x
+global def second (Pair _ x) = x

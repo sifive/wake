@@ -1,0 +1,7 @@
+# Debug helper method
+global def print str = prim "print"
+global def println str = print "{str}\n"
+global def dbg any = print (format any)
+
+# Any => String conversion
+global def format any = prim "format"

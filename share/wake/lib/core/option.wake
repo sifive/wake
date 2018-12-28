@@ -1,0 +1,4 @@
+# option
+global data Option a =
+  Some a
+  None
