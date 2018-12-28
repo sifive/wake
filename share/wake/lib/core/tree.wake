@@ -1,0 +1,219 @@
+# balanced order-statistic trees
+data Tree a = Tree (a => a => Order) (TreeNode a) # cmp root
+data TreeNode a =
+  Tip
+  Bin Integer (TreeNode a) a (TreeNode a) # size left key right
+
+# delta = 2.5, gamma = 1.5 for a reasonably tight balance
+def deltaQ = 5
+def deltaD = 2
+def ratioQ = 3
+def ratioD = 2
+
+# Create a new tree, sorted by cmp: a => a => Boolean
+global def tnew cmp = Tree cmp Tip
+
+# Insert y into the tree as the lowest rank of the equal keys = y
+global def tinsert (Tree cmp root) y =
+  def helper = match _
+    Tip         = Bin 1 Tip y Tip
+    Bin _ l x r = match (cmp x y)
+      GT = balanceL (helper l) x r
+      _  = balanceR l x (helper r)
+  Tree cmp (helper root)
+
+# Insert y into the tree only if no other keys = y
+global def tinsertOnce (Tree cmp root) y =
+  def helper t = match t
+    Tip         = Bin 1 Tip y Tip
+    Bin s l x r = match (cmp x y)
+      GT = balanceL (helper l) x r
+      EQ = t
+      LT = balanceR l x (helper r)
+  Tree cmp (helper root)
+
+# Insert y into the tree and if any exist, replace an arbitrary key = y
+global def tinsertReplace (Tree cmp root) y =
+  def helper t = match t
+    Tip         = Bin 1 Tip y Tip
+    Bin s l x r = match (cmp x y)
+      GT = balanceL (helper l) x r
+      EQ = Bin s l y r
+      LT = balanceR l x (helper r)
+  Tree cmp (helper root)
+
+# Remove ALL keys = y
+#global def tdelete (Tree cmp root) y =
+
+global def tlen (Tree _ root) = size root
+def size = match _
+  Tip         = 0
+  Bin s _ _ _ = s
+
+global def tempty (Tree _ root) = match root
+  Tip = True
+  _   = False
+
+global def tfoldl f a (Tree _ root) =
+  def helper a = match _
+    Tip         = a
+    Bin _ l x r = helper (f (helper a l) x) r
+  helper a root
+
+global def tfoldr f a (Tree _ root) =
+  def helper a = match _
+    Tip         = a
+    Bin _ l x r = helper (f (helper a r) x) l
+  helper a root
+
+# !!! segfault: global def tlist_buggy = tfoldr (_,_) Nil
+global def tlist = tfoldr (\a\b b,a) Nil
+
+# Extract the i-th ranked element => Option x
+global def tat i (Tree _ root) =
+  def helper i = match _
+    Tip         = None
+    Bin _ l x r =
+      def sizeL = size l
+      match (cmp i sizeL)
+        LT = helper i l
+        EQ = Some x
+        GT = helper (i-sizeL-1) r
+  helper i root
+
+# Lowest rank element where f x = True  => Option (Pair x rank)
+global def tfind f (Tree _ root) =
+  def helper = match _
+    Tip         = None
+    Bin s l x r = match (helper l) (f x) (helper r)
+      (Some p) _    _       = Some p
+      _        True _       = Some (Pair x (s-size r-1))
+      _ _ (Some (Pair x i)) = Some (Pair x (i+size l+1))
+      _        _    _       = None
+  helper root
+
+# Returns True if there exists an x where f x = True
+global def texists f t = match (tfind f t)
+  Some (Pair _ _) = True
+  None            = False
+
+global def tforall f t = !texists (!f _) t
+
+# ttake, tdrop
+# tsplitBy, tfilter
+
+# Lowest rank element f x = True   => Option (Pair x rank)
+global def tlowerT f (Tree _ root) = lower f root
+
+# Lowest rank element with x >= y
+global def tlowerGE y (Tree cmp root) =
+  def f x = match (cmp x y)
+    LT = False
+    _  = True
+  lower f root
+
+# Lowest rank element with x > y
+global def tlowerGT y (Tree cmp root) =
+  def f x = match (cmp x y)
+    GT = True
+    _  = False
+  lower f root
+
+# f must be monotone wrt. the Tree's compare function
+def lower f root =
+  def none = match _
+    Tip         = None
+    Bin s l x r = if f x then someL x (size root - s) l else none r
+  def someR z i = match _ # i = size including self
+    Tip         = Some (Pair z i)
+    Bin s l x r = if f x then someL x (i-s) l else someR z i r
+  def someL z i = match _ # i = size left of self
+    Tip         = Some (Pair z i)
+    Bin s l x r = if f x then someL x i l else someR z (i+s) r
+  none root
+
+# Highest rank element with f x = False  => Option (Pair x rank)
+# f must be monotone wrt. the Tree's compare function
+global def tupperF f (Tree _ root)= upper f root
+
+# Highest rank element with x < y
+global def tupperLT y (Tree cmp root) =
+  def f x = match (cmp x y)
+    LT = False
+    _  = True
+  upper f root
+
+# Highest rank element with x <= y
+global def tupperLE y (Tree cmp root) =
+  def f x = match (cmp x y)
+    GT = True
+    _  = False
+  upper f root
+
+def upper f root =
+  def none = match _
+    Tip         = None
+    Bin s l x r = if f x then none l else someR x s r
+  def someR z i = match _ # i = size including self
+    Tip         = Some (Pair z (i-1))
+    Bin s l x r = if f x then someL z (i-s) l else someR x i r
+  def someL z i = match _ # i = size left of self
+    Tip         = Some (Pair z (i-1))
+    Bin s l x r = if f x then someL z i l else someR x (i+s) r
+  none root
+
+global def tcontains y t =
+  match t (tupperLE y t)
+    (Tree cmp _) None              = False
+    (Tree cmp _) (Some (Pair x _)) = match (cmp x y)
+      EQ = True
+      _  = False
+
+# tunion, tintersect, tsubtract
+
+global def tshape (Tree _ root) =
+  def row x =
+    def helper i = match _
+      Tip = Nil
+      Bin _ l _ r =
+        def me = if i == x then "." else " "
+        helper (i+1) l ++ (me, helper (i+1) r)
+    cat (helper 0 root)
+  catWith "\n" $ map row (seq 8)
+
+# Written while reading the Haskell Set implementation 
+def balanceL l x r = match l r
+  Tip Tip = Bin 1 Tip x Tip
+  (Bin ls ll lx lr) Tip = match ll lr
+    Tip Tip = Bin 2 l x Tip
+    ll  Tip = Bin 3 ll lx (Bin 1 Tip x Tip)
+    Tip (Bin _ _ lrx _) = Bin 3 (Bin 1 Tip lx Tip) lrx (Bin 1 Tip x Tip)
+    (Bin lls _ _ _) (Bin lrs lrl lrx lrr) = match (ratioD*lrs < ratioQ*lls)
+      True  = Bin (1+ls) ll lx (Bin (1+lrs) lr x Tip)
+      False = Bin (1+ls) (Bin (1+lls+size lrl) ll lx lrl) lrx (Bin (1+size lrr) lrr x Tip)
+  Tip (Bin rs _ _ _) = Bin (1+rs) Tip x r
+  (Bin ls ll lx lr) (Bin rs _ _ _) = match (ls*deltaD > deltaQ*rs)
+    True = match ll lr
+      (Bin lls _ _ _) (Bin lrs lrl lrx lrr) = match (ratioD*lrs < ratioQ*lls)
+        True  = Bin (1+ls+rs) ll lx (Bin (1+rs+lrs) lr x r)
+        False = Bin (1+ls+rs) (Bin (1+lls+size lrl) ll lx lrl) lrx (Bin (1+rs+size lrr) lrr x r)
+      _ _ = raise "Failure in Tree.balanceL"
+    False = Bin (1+ls+rs) l x r
+
+def balanceR l x r = match l r
+  Tip Tip = Bin 1 Tip x Tip
+  Tip (Bin rs rl rx rr) = match rl rr
+    Tip Tip = Bin 2 Tip x r
+    Tip _   = Bin 3 (Bin 1 Tip x Tip) rx rr
+    (Bin _ _ rlx _) Tip = Bin 3 (Bin 1 Tip x Tip) rlx (Bin 1 Tip rx Tip)
+    (Bin rls rll rlx rlr) (Bin rrs _ _ _) = match (ratioD*rls < ratioQ*rrs)
+      True  = Bin (1+rs) (Bin (1+rls) Tip x rl) rx rr
+      False = Bin (1+rs) (Bin (1+size rll) Tip x rll) rlx (Bin (1+rrs+size rlr) rlr rx rr)
+  (Bin ls _ _ _) Tip = Bin (1+ls) l x Tip
+  (Bin ls _ _ _) (Bin rs rl rx rr) = match (deltaD*rs > deltaQ*ls)
+    True = match rl rr
+      (Bin rls rll rlx rlr) (Bin rrs _ _ _) = match (ratioD*rls < ratioQ*rrs)
+        True  = Bin (1+ls+rs) (Bin (1+ls+rls) l x rl) rx rr
+        False = Bin (1+ls+rs) (Bin (1+ls+size rll) l x rll) rlx (Bin (1+rrs+size rlr) rlr rx rr)
+      _ _ = raise "Failure in Tree.balanceR"
+    False = Bin (1+ls+rs) l x r
