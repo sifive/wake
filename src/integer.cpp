@@ -122,7 +122,7 @@ static PRIMFN(prim_int) {
   bool ok = mpz_fits_slong_p(arg0->value);
   if (ok) {
     base = mpz_get_si(arg0->value);
-    ok &= base <= 62 && base > 0 && base != 1;
+    ok &= base <= 62 && base >= 0 && base != 1;
   }
   REQUIRE(ok, arg0->to_str() + " is not a valid base; 0 or [2,62]");
   auto out = std::make_shared<Integer>();
