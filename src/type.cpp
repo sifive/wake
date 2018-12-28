@@ -58,7 +58,7 @@ bool TypeVar::contains(const TypeVar *other) const {
 void TypeVar::do_sweep() const {
   const TypeVar *a = find();
   if ((a->epoch & 2)) {
-    epoch &= ~2;
+    a->epoch &= ~2;
     for (int i = 0; i < a->nargs; ++i)
       a->pargs[i].do_sweep();
   }
