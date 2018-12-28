@@ -65,8 +65,10 @@ static void scan(std::vector<std::shared_ptr<String> > &out, const std::string &
 static void push_files(std::vector<std::shared_ptr<String> > &out, const std::string &path) {
   if (auto dir = opendir(path.c_str())) {
     while (auto f = readdir(dir)) {
+      if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
       std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
       if (f->d_type == DT_REG) out.emplace_back(std::make_shared<String>(name));
+      if (f->d_type == DT_DIR) push_files(out, name);
     }
     closedir(dir);
   }
