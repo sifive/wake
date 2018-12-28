@@ -99,9 +99,12 @@ static PRIMFN(prim_test) {
 }
 
 static PRIMTYPE(type_catch) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
   return args.size() == 1 &&
     // leave arg0 free
-    out->unify(String::typeVar);
+    out->unify(list);
 }
 
 static PRIMFN(prim_catch) {
