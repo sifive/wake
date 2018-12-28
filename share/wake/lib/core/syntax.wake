@@ -1,0 +1,3 @@
+# Syntax helpers
+global def x . f = f x
+global def f $ x = f x

@@ -1,0 +1,23 @@
+# Regular expressions
+
+global def quote s = prim "quote" # str -> str  (quoted for use in a regexp)
+
+global def matches r =              # regexp str -> bool
+  def compile r = prim "re2"
+  def matches r s = prim "match"
+  matches (compile r)
+
+global def extract r =            # regexp-with-(exp)s str -> str list
+  def compile r = prim "re2"
+  def extract r s = prim "extract"
+  extract (compile r)
+
+global def replace r =            # regexp replacement str -> str
+  def compile r = prim "re2"
+  def replace r s t = prim "replace"
+  replace (compile r)
+
+global def tokenize r =            # regexp seperator str -> str list
+  def compile r = prim "re2"
+  def tokenize r s = prim "tokenize"
+  tokenize (compile r)

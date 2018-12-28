@@ -1,0 +1,9 @@
+# file/path operations
+global def read path = prim "read"
+global def write path content mode = prim "write"
+global def mkdir path mode = prim "mkdir"
+global def simplify path = prim "simplify"
+global def relative dir path = prim "relative"
+global def whichIn path exec = prim "search_path"
+global def which exec = whichIn path exec
+global def workspace = prim "getcwd"
