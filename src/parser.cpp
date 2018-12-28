@@ -686,8 +686,7 @@ static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top) {
     default:
        std::cerr << "Missing DEF after GLOBAL at " << lex.next.location << std::endl;
        lex.fail = true;
-    case DEF:
-    case VAL: {
+    case DEF: {
       std::string name;
       auto def = parse_def(lex, name);
       bind_def(lex, map, name, def);
@@ -716,7 +715,6 @@ Expr *parse_block(Lexer &lex) {
     bool repeat = true;
     while (repeat) {
       switch (lex.next.type) {
-        case VAL:
         case DEF: {
           parse_decl(map, lex, 0);
           break;
@@ -763,7 +761,6 @@ void parse_top(Top &top, Lexer &lex) {
         break;
       }
       case DATA:
-      case VAL:
       case DEF: {
         parse_decl(defmap.map, lex, 0);
         break;
