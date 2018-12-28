@@ -94,10 +94,20 @@ void Exception::format(std::ostream &os, int depth) const {
   }
 }
 
+TypeVar String::typeVar("str", 0);
+TypeVar &String::getType() {
+  return typeVar;
+}
+
 Hash String::hash() const {
   Hash payload;
   HASH(value.data(), value.size(), (long)type, payload);
   return payload;
+}
+
+TypeVar Integer::typeVar("int", 0);
+TypeVar &Integer::getType() {
+  return typeVar;
 }
 
 Hash Integer::hash() const {
@@ -106,11 +116,23 @@ Hash Integer::hash() const {
   return payload;
 }
 
+TypeVar Exception::typeVar("exception", 0);
+TypeVar &Exception::getType() {
+  assert (0); // unreachable
+  return typeVar;
+}
+
 Hash Exception::hash() const {
   Hash payload;
   std::string str = to_str();
   HASH(str.data(), str.size(), (long)type, payload);
   return payload;
+}
+
+TypeVar Closure::typeVar("closure", 0);
+TypeVar &Closure::getType() {
+  assert (0); // unreachable
+  return typeVar;
 }
 
 Hash Closure::hash() const {

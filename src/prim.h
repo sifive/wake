@@ -1,6 +1,7 @@
 #ifndef PRIM_H
 #define PRIM_H
 
+#include "type.h"
 #include "primfn.h"
 #include <map>
 #include <string>
@@ -59,7 +60,15 @@ std::shared_ptr<Value> make_tuple(std::shared_ptr<Value> &&first, std::shared_pt
 std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values);
 
 /* Register primitive functions */
-typedef std::map<std::string, std::pair<PrimFn, void *> > PrimMap;
+struct PrimDesc {
+  PrimFn   fn;
+  PrimType type;
+  void    *data;
+
+  PrimDesc(PrimFn fn_, PrimType type_, void *data_ = 0) : fn(fn_), type(type_), data(data_) { }
+};
+
+typedef std::map<std::string, PrimDesc> PrimMap;
 struct JobTable;
 
 void prim_register_string(PrimMap &pmap, const char *version);

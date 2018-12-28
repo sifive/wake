@@ -82,6 +82,8 @@ int main(int argc, const char **argv) {
       "simulate a stack for exceptions", 0},
     { "parse", {"-p", "--parse"},
       "parse wake files and print the AST", 0},
+    { "typecheck", {"-t", "--typecheck"},
+      "type-check wake files and print the typed AST", 0},
     { "init", {"--init"},
       "directory to configure as workspace top", 1},
   }};
@@ -202,6 +204,8 @@ int main(int argc, const char **argv) {
 
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
   if (!root) ok = false;
+
+  if (args["typecheck"]) std::cout << root.get();
 
   if (!ok) {
     if (args["add"]) std::cerr << ">>> Expression not added to the active target list <<<" << std::endl;

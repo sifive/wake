@@ -5,6 +5,7 @@
 #include "primfn.h"
 #include "hash.h"
 #include "heap.h"
+#include "type.h"
 #include <memory>
 #include <string>
 #include <map>
@@ -19,6 +20,7 @@ struct Value;
 struct Expr {
   const char *type;
   Location location;
+  TypeVar typeVar;
   Hash hashcode;
   long flags;
 
@@ -34,8 +36,8 @@ std::ostream & operator << (std::ostream &os, const Expr *expr);
 
 struct Prim : public Expr {
   std::string name;
-  int args;
 
+  int args;
   PrimFn fn;
   void *data;
 
