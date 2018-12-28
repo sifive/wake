@@ -18,11 +18,8 @@ global def x | y = if x then True else y
 
 # tuples
 global data Pair a b = Pair a b
-
-global def first  = match _
-  Pair x _ = x
-global def second = match _
-  Pair _ x = x
+global def first  (Pair x _) = x
+global def second (Pair _ x) = x
 
 # lists
 global data List a =

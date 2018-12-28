@@ -60,7 +60,7 @@ static bool expectValue(const char *type, Lexer &lex) {
   }
 }
 
-static AST parse_ast(int p, Lexer &lex, bool magic = false);
+static AST parse_ast(int p, Lexer &lex, bool magic = false, bool def = false);
 static Expr *parse_unary(int p, Lexer &lex);
 static Expr *parse_binary(int p, Lexer &lex);
 static Expr *parse_if(Lexer &lex);
@@ -342,35 +342,28 @@ static Expr *parse_if(Lexer &lex) {
 }
 
 static Expr *parse_def(Lexer &lex, std::string &name) {
-  Location def = lex.next.location;
   lex.consume();
 
-  std::list<std::pair<std::string, Location> > args;
-  while (lex.next.type == ID) args.push_back(get_arg_loc(lex));
+  AST ast = parse_ast(0, lex, false, true);
+  name = std::move(ast.name);
+  ast.name.clear();
 
-  if (lex.next.type == OPERATOR) {
-    if (args.empty()) {
-      name = "unary " + lex.text();
-      lex.consume();
-      args.push_back(get_arg_loc(lex));
-    } else if (args.size() == 1) {
-      name = "binary " + lex.text();
-      lex.consume();
-      args.push_back(get_arg_loc(lex));
-    } else {
-      name = "broken";
-      std::cerr << "Operator def is neither unary nor binary at " << def << std::endl;
+  bool isOp = name.find(' ') != std::string::npos;
+  if (isOp && !ast.args.empty()) {
+    // Unfortunately, parse_ast will allow: (a b) * (C d); reject it
+    AST &arg1 = ast.args.front();
+    bool isOp = arg1.name.find(' ') != std::string::npos;
+    if (!arg1.args.empty() && !isOp && Lexer::isLower(arg1.name.c_str())) {
+      std::cerr << "Lower-case identifier " << arg1.name
+        << " cannot be used as a constructor at " << arg1.location
+        << std::endl;
       lex.fail = true;
     }
-  } else {
-    if (args.empty()) {
-      name = "broken";
-      std::cerr << "def has no name at " << def << std::endl;
-      lex.fail = true;
-    } else {
-      name = args.front().first;
-      args.pop_front();
-    }
+  } else if (!Lexer::isLower(name.c_str())) {
+    std::cerr << "Upper-case identifier " << name
+      << " cannot be used as a function name at " << ast.location
+      << std::endl;
+    lex.fail = true;
   }
 
   expect(EQUALS, lex);
@@ -379,11 +372,34 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
   Expr *body = parse_block(lex);
   if (expect(EOL, lex)) lex.consume();
 
-  // add the arguments
-  for (auto i = args.rbegin(); i != args.rend(); ++i) {
-    Location location = body->location;
-    location.start = i->second.start;
-    body = new Lambda(location, i->first, body);
+  // do we need a pattern match?
+  bool pattern = false;
+  for (auto &x : ast.args) {
+    bool isOp = x.name.find(' ') != std::string::npos;
+    pattern |= isOp || Lexer::isUpper(x.name.c_str());
+  }
+
+  if (!pattern) {
+    // no pattern; simple lambdas for the arguments
+    for (auto i = ast.args.rbegin(); i != ast.args.rend(); ++i) {
+      Location location = body->location;
+      location.start = i->location.start;
+      body = new Lambda(location, i->name, body);
+    }
+  } else {
+    // bind the arguments to anonymous lambdas and push the whole thing into a pattern
+    int args = ast.args.size();
+    Match *match = new Match(body->location);
+    if (args > 1) {
+      match->patterns.emplace_back(std::move(ast), body);
+    } else {
+      match->patterns.emplace_back(std::move(ast.args.front()), body);
+    }
+    body = match;
+    for (int i = 0; i < args; ++i) {
+      body = new Lambda(body->location, "_" + std::to_string(args-1-i), body);
+      match->args.emplace_back(new VarRef(LOCATION, "_" + std::to_string(i)));
+    }
   }
 
   return body;
@@ -478,7 +494,7 @@ static AST parse_unary_ast(int p, Lexer &lex) {
   }
 }
 
-static AST parse_ast(int p, Lexer &lex, bool magic) {
+static AST parse_ast(int p, Lexer &lex, bool magic, bool def) {
   TRACE("AST");
   AST lhs = magic ? AST(lex.next.location) : parse_unary_ast(p, lex);
   for (;;) {
@@ -508,12 +524,13 @@ static AST parse_ast(int p, Lexer &lex, bool magic) {
           std::cerr << "Cannot supply additional constructor arguments to " << lhs.name
             << " at " << location << std::endl;
           lex.fail = true;
-        } else if (lhs.args.empty() && Lexer::isLower(lhs.name.c_str())) {
+        } else if (!def && lhs.args.empty() && Lexer::isLower(lhs.name.c_str())) {
           std::cerr << "Lower-case identifier " << lhs.name
             << " cannot be used as a constructor at " << location
             << std::endl;
           lex.fail = true;
         }
+        def = false;
         lhs.args.emplace_back(std::move(rhs));
         break;
       }
