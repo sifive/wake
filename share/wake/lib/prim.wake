@@ -116,11 +116,11 @@ global def sortBy f = match _
 
 global def sort l = sortBy (_<_) l
 
-global def collate f l r = match (Pair l r)
-  Pair Nil     Nil     = 0
-  Pair Nil     _       = -1
-  Pair _       Nil     = 1
-  Pair (lh,lt) (rh,rt) =
+global def collate f l r = match l r
+  Nil     Nil     = 0
+  Nil     _       = -1
+  _       Nil     = 1
+  (lh,lt) (rh,rt) =
     def cmp = f lh rh
     if cmp == 0 then collate f lt rt else cmp
 

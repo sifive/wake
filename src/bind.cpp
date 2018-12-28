@@ -199,7 +199,7 @@ struct PatternTree {
   int cons;
   int var; // -1 if unbound/_
   std::vector<PatternTree> children;
-  PatternTree() : sum(0), cons(0), var(-1) { }
+  PatternTree(int var_ = -1) : sum(0), cons(0), var(var_) { }
   void format(std::ostream &os, int p) const;
 };
 
@@ -364,12 +364,12 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
   }
 }
 
-static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, const AST &ast) {
+static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, const AST &ast, Sum *multiarg) {
   PatternTree out;
   bool isOp = ast.name.find(' ') != std::string::npos;
   if (ast.name == "_") {
     // no-op; unbound
-  } else if (!isOp && Lexer::isLower(ast.name.c_str())) {
+  } else if (!isOp && !ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
     expr = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, expr.release()));
     out.var = 0; // bound
   } else {
@@ -390,14 +390,19 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
         }
       }
     }
+    if (ast.name.empty()) out.sum = multiarg;
     if (!out.sum) {
       std::cerr << "Constructor " << ast.name
         << " in pattern match not found at " << ast.location
         << "." << std::endl;
       out.var = 0;
     } else if (out.sum->members[out.cons].ast.args.size() != ast.args.size()) {
-      std::cerr << "Constructor " << ast.name
-        << " in pattern match has " << ast.args.size()
+      if (ast.name.empty()) {
+        std::cerr << "Case";
+      } else {
+        std::cerr << "Constructor " << ast.name;
+      }
+      std::cerr  << " in pattern match has " << ast.args.size()
         << " parameters, but must have " << out.sum->members[out.cons].ast.args.size()
         << " at " << ast.location
         << "." << std::endl;
@@ -405,7 +410,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       out.var = 0;
     } else {
       for (auto a = ast.args.rbegin(); a != ast.args.rend(); ++a)
-        out.children.push_back(cons_lookup(binding, expr, *a));
+        out.children.push_back(cons_lookup(binding, expr, *a, 0));
       std::reverse(out.children.begin(), out.children.end());
     }
   }
@@ -415,21 +420,43 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
 static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_ptr<Match> match) {
   std::unique_ptr<DefMap> map(new DefMap(match->location));
   std::vector<PatternRef> patterns;
-  map->map["_a0"] = std::move(match->args.front());
+  Sum multiarg(AST(LOCATION));
+  multiarg.members.emplace_back(AST(LOCATION));
+
+  int index = 0;
+  std::vector<PatternTree> children;
+  for (auto &a : match->args) {
+    map->map["_a" + std::to_string(index)] = std::move(a);
+    children.emplace_back(index);
+    multiarg.members.front().ast.args.emplace_back(AST(LOCATION));
+    ++index;
+  }
+
   patterns.emplace_back(match->location);
-  patterns.back().tree.var = 0;
-  patterns.back().index = 1;
-  patterns.back().uses = 1;
+  PatternRef &prototype = patterns.front();
+  prototype.uses = 1;
+  prototype.index = index;
+
+  if (index == 1) {
+    prototype.tree = std::move(children.front());
+  } else {
+    prototype.tree.children = std::move(children);
+    prototype.tree.sum = &multiarg;
+  }
+
   int f = 0;
+  bool ok = true;
   for (auto &p : match->patterns) {
     std::unique_ptr<Expr> &expr = map->map["_f" + std::to_string(f)];
     expr = std::move(p.expr);
     patterns.emplace_back(expr->location);
     patterns.back().index = f;
-    patterns.back().tree = cons_lookup(binding, expr, p.pattern);
+    patterns.back().tree = cons_lookup(binding, expr, p.pattern, &multiarg);
+    ok &= !patterns.front().tree.sum || patterns.back().tree.sum;
     expr = std::unique_ptr<Expr>(new Lambda(expr->location, "_", expr.release()));
     ++f;
   }
+  if (!ok) return nullptr;
   map->body = expand_patterns(patterns);
   if (!map->body) return nullptr;
   for (auto &p : patterns) {
