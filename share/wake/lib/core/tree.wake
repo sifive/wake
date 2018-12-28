@@ -54,19 +54,29 @@ global def tempty (Tree _ root) = match root
   Tip = True
   _   = False
 
+# Folds from left to right
 global def tfoldl f a (Tree _ root) =
   def helper a = match _
     Tip         = a
     Bin _ l x r = helper (f (helper a l) x) r
   helper a root
 
+# Folds from right to left
 global def tfoldr f a (Tree _ root) =
   def helper a = match _
     Tip         = a
     Bin _ l x r = helper (f (helper a r) x) l
   helper a root
 
-# !!! segfault: global def tlist_buggy = tfoldr (_,_) Nil
+# Folds in parallel
+# Assumes: f is an associative operator and has type: a => a => a
+global def tfold f a (Tree _ root) =
+  def helper a = match _
+    Tip = a
+    Bin _ l x r = f (helper a l) (helper x r)
+  helper a root
+
+# Convert a Tree to a List
 global def tlist = tfoldr (\a\b b,a) Nil
 
 # Extract the i-th ranked element => Option x
