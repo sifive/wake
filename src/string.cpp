@@ -151,7 +151,13 @@ static PRIMFN(prim_print) {
   RETURN(out);
 }
 
-void prim_register_string(PrimMap &pmap) {
+static PRIMFN(prim_version) {
+  EXPECT(0);
+  auto out = std::make_shared<String>((const char *)data);
+  RETURN(out);
+}
+
+void prim_register_string(PrimMap &pmap, const char *version) {
   pmap["catopen" ].first = prim_catopen;
   pmap["catadd"  ].first = prim_catadd;
   pmap["catclose"].first = prim_catclose;
@@ -161,4 +167,6 @@ void prim_register_string(PrimMap &pmap) {
   pmap["mkdir"   ].first = prim_mkdir;
   pmap["format"  ].first = prim_format;
   pmap["print"   ].first = prim_print;
+  pmap["version" ].first = prim_version;
+  pmap["version" ].second = (void *)version;
 }

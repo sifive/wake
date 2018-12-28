@@ -196,6 +196,7 @@ global whichIn path exec = prim "search_path"
 global which exec = whichIn path exec
 global workspace = prim "getcwd"
 def wakepath = prim "execpath"
+global version = prim "version"
 
 # The internal function operates on imploded strings, not lists
 def primjob pool root dir stdin env cmd = prim "job_launch"
