@@ -207,10 +207,17 @@ static Expr *parse_unary(int p, Lexer &lex) {
       op_type op = op_precedence("\\");
       if (op.p < p) precedence_error(lex);
       lex.consume();
-      auto name = get_arg_loc(lex);
+      AST ast = parse_ast(APP_PRECEDENCE+1, lex);
       auto rhs = parse_binary(op.p + op.l, lex);
       location.end = rhs->location.end;
-      return new Lambda(location, name.first, rhs);
+      if (Lexer::isUpper(ast.name.c_str()) || Lexer::isOperator(ast.name.c_str())) {
+        Match *match = new Match(location);
+        match->patterns.emplace_back(std::move(ast), rhs);
+        match->args.emplace_back(new VarRef(LOCATION, "_xx"));
+        return new Lambda(location, "_xx", match);
+      } else {
+        return new Lambda(location, ast.name, rhs);
+      }
     }
     // Terminals
     case ID: {
