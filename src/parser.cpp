@@ -413,7 +413,10 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
   return body;
 }
 
-static void bind_def(Lexer &lex, DefMap::defs &map, const std::string &name, Expr *def) {
+static void bind_def(Lexer &lex, DefMap::defs &map, std::string name, Expr *def) {
+  if (name == "_")
+    name += std::to_string(map.size());
+
   auto i = map.find(name);
   if (i != map.end()) {
     std::cerr << "Duplicate def "
@@ -441,7 +444,7 @@ static void publish_def(DefMap::defs &publish, const std::string &name, Expr *de
 }
 
 static void bind_global(const std::string &name, Top *top, Lexer &lex) {
-  if (!top) return;
+  if (!top || name == "_") return;
 
   auto it = top->globals.find(name);
   if (it != top->globals.end()) {
