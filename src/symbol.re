@@ -361,7 +361,11 @@ top:
       op = [.$^*/%\-+~`<>=!&|,]+;
 
       // identifiers
-      id = (Lm|M)*(L|So)(L|So|N|Pc)* | "_";
+      modifier = []; // Lm|M
+      upper = [A-Z]; // Lt|Lu
+      start = [a-zA-Z]; // L|So
+      body = [a-zA-Z0-9_]; // L|So|N|Pc
+      id = modifier* start body* | "_";
 
       id { return mkSym(ID); }
       op { return mkSym(OPERATOR); }
@@ -431,7 +435,7 @@ void Lexer::consume() {
 
 bool Lexer::isLower(const char *str) {
   const char *ignore;
-top:
+//top:
   /*!re2c
       re2c:yyfill:enable = 0;
       re2c:define:YYMARKER = ignore;
@@ -439,21 +443,21 @@ top:
       *           { return true; }
       "unary "    { return false; }
       "binary "   { return false; }
-      Lm | M      { goto top; }
-      Lt | Lu     { return false; }
+      modifier    { goto top; }
+      upper       { return false; }
   */
 }
 
 bool Lexer::isUpper(const char *str) {
-  const char *ignore;
-top:
+//  const char *ignore;
+//top:
   /*!re2c
       re2c:yyfill:enable = 0;
       re2c:define:YYMARKER = ignore;
       re2c:define:YYCURSOR = str;
       *           { return false; }
-      Lm | M      { goto top; }
-      Lt | Lu     { return true; }
+      modifier    { goto top; }
+      upper       { return true; }
   */
 }
 
