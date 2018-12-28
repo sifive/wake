@@ -220,7 +220,7 @@ static PRIMFN(prim_print) {
 
 static PRIMTYPE(type_version) {
   return args.size() == 0 &&
-    out->unifyVal(String::typeVar);
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_version) {
@@ -229,7 +229,7 @@ static PRIMFN(prim_version) {
   RETURN(out);
 }
 
-void prim_register_string(PrimMap &pmap) {
+void prim_register_string(PrimMap &pmap, const char *version) {
   pmap.emplace("catopen", PrimDesc(prim_catopen, type_catopen));
   pmap.emplace("catadd",  PrimDesc(prim_catadd,  type_catadd));
   pmap.emplace("catclose",PrimDesc(prim_catclose,type_catclose));
@@ -239,5 +239,5 @@ void prim_register_string(PrimMap &pmap) {
   pmap.emplace("mkdir",   PrimDesc(prim_mkdir,   type_mkdir));
   pmap.emplace("format",  PrimDesc(prim_format,  type_format));
   pmap.emplace("print",   PrimDesc(prim_print,   type_print));
-  pmap.emplace("version", PrimDesc(prim_version, type_version));
+  pmap.emplace("version", PrimDesc(prim_version, type_version, (void*)version));
 }

@@ -18,4 +18,4 @@ global def str n = strbase 10 n
 global def int s = intbase 0 s
 
 # Version of wake
-global version = prim "version"
+global def version = prim "version"
