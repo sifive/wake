@@ -65,7 +65,7 @@ global def tfoldl f a (Tree _ root) =
 global def tfoldr f a (Tree _ root) =
   def helper a = match _
     Tip         = a
-    Bin _ l x r = helper (f (helper a r) x) l
+    Bin _ l x r = helper (f x (helper a r)) l
   helper a root
 
 # Folds in parallel
@@ -77,7 +77,7 @@ global def tfold f a (Tree _ root) =
   helper a root
 
 # Convert a Tree to a List
-global def tlist = tfoldr (\a\b b,a) Nil
+global def tlist = tfoldr (_,_) Nil
 
 # Extract the i-th ranked element => Option x
 global def tat i (Tree _ root) =
