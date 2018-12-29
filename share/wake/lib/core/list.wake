@@ -91,12 +91,12 @@ global def sortBy f = match _
 global def sort l = sortBy (_<_) l
 
 global def collate f l r = match l r
-  Nil     Nil     = 0
-  Nil     _       = -1
-  _       Nil     = 1
-  (lh,lt) (rh,rt) =
-    def cmp = f lh rh
-    if cmp == 0 then collate f lt rt else cmp
+  Nil     Nil     = EQ
+  Nil     _       = LT
+  _       Nil     = GT
+  (lh,lt) (rh,rt) = match (f lh rh)
+    EQ = collate f lt rt
+    x  = x
 
 global def seq n =
   def helper i = if i >= n then Nil else i, helper (i+1)
