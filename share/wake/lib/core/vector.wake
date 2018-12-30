@@ -1,0 +1,26 @@
+data Slice a = Slice (Vector a) Integer Integer
+
+# Vector type
+global def vnewFromList l =
+  def llen = len l
+  def vnew n = prim "vnew"
+  # take out as an arg so vnew does not generalize
+  def bind out =
+    def vset o i v = prim "vset"
+    def doit i v =
+      def _ = vset out i v
+      i+1
+    def _ = foldl doit 0 l
+    out
+  Slice (bind (vnew llen)) 0 llen
+
+global def vlen (Slice _ s e) = e - s
+
+global def vat i (Slice v s e) =
+  def get v i = prim "vget"
+  def j = i+s
+  if j < e then get v j else raise "index out of bounds"
+
+global def vsplitAt i (Slice v s e) =
+  def x = min e (s + max 0 i)
+  Pair (Slice v s x) (Slice v x e)

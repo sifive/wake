@@ -38,12 +38,12 @@ std::ostream & operator << (std::ostream &os, const Expr *expr);
 struct Prim : public Expr {
   std::string name;
 
-  int args;
+  int args, flags;
   PrimFn fn;
   void *data;
 
   static const char *type;
-  Prim(const Location &location_, const std::string &name_) : Expr(type, location_), name(name_), args(0) { }
+  Prim(const Location &location_, const std::string &name_) : Expr(type, location_), name(name_), args(0), flags(0) { }
 
   void format(std::ostream &os, int depth) const;
   void hash();

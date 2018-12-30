@@ -195,6 +195,7 @@ int main(int argc, const char **argv) {
   JobTable jobtable(&db, jobs, verbose, quiet);
   PrimMap pmap;
   prim_register_string(pmap, VERSION);
+  prim_register_vector(pmap);
   prim_register_integer(pmap);
   prim_register_polymorphic(pmap);
   prim_register_regexp(pmap);
