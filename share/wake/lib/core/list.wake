@@ -52,7 +52,11 @@ global def splitAt i l =
 
 global def take i l = (splitAt i l).first
 global def drop i l = (splitAt i l).second
-global def at   i l = if i < 0 then raise "at called with negative index" else (drop i l).head
+global def at   i l =
+  def fail _ = raise "at index out of bounds"
+  if i < 0 then fail Unit else match (drop i l)
+    Nil  = fail Unit
+    x, _ = x
 
 global def splitUntil f l = match l
   Nil  = Pair Nil Nil
@@ -61,7 +65,9 @@ global def splitUntil f l = match l
 
 global def takeUntil f l = (splitUntil f l).first
 global def dropUntil f l = (splitUntil f l).second
-global def find f l = take 1 (dropUntil f l)
+global def find f l = match (dropUntil f l)
+  Nil  = None
+  x, _ = Some x
 global def exists f l = !empty (dropUntil f l)
 global def forall f l = empty (dropUntil (!f _) l)
 

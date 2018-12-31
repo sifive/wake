@@ -10,12 +10,11 @@ global def jobcache build dir stdin env cmd visible =
     None     = build 0
     Some out =
       def notOk pair = hashcode pair.first != pair.second
-      def bad = find notOk out.outputs
-      if bad.empty then out else
-        def file = bad.head.first
-        def expect = hashcode file
-        def saw = bad.head.second
-        raise "Hash mismatch for {file} ({saw} != {expect}); remove it or run with -f"
+      match (find notOk out.outputs)
+        None = out
+        Some (Pair file saw) =
+          def expect = hashcode file
+          raise "Hash mismatch for {file} ({saw} != {expect}); remove it or run with -f"
 
 # Launch a job, raw interface
 # If you use this API, you MUST also run 'finish' on the result AFTER status is available
