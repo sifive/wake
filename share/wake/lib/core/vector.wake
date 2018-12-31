@@ -14,13 +14,161 @@ global def vnewFromList l =
     out
   Slice (bind (vnew llen)) 0 llen
 
+global def vempty (Slice _ s e) = s == e
 global def vlen (Slice _ s e) = e - s
-
-global def vat i (Slice v s e) =
-  def get v i = prim "vget"
-  def j = i+s
-  if j < e then get v j else raise "index out of bounds"
+global def vlist = vfoldr (_,_) Nil
 
 global def vsplitAt i (Slice v s e) =
   def x = min e (s + max 0 i)
   Pair (Slice v s x) (Slice v x e)
+
+global def vtake i v = (vsplitAt i v).first
+global def vdrop i v = (vsplitAt i v).second
+
+global def vat i (Slice v s e) =
+  def get v i = prim "vget"
+  def j = i+s
+  if j < e then get v j else raise "vat index out of bounds"
+
+def vat_ i (Slice v s _) =
+  def get v i = prim "vget"
+  get v (s+i)
+
+global def vmap f v = vtab (\i f (vat_ i v)) (vlen v)
+global def vseq n = vtab (_) n
+global def vzip a b = vtab (\i Pair (vat_ i a) (vat_ i b)) (min (vlen a) (vlen b))
+global def vunzip v =
+  Pair (vtab (\i (vat_ i v).first) (vlen v)) (vtab (\i (vat_ i v).second) (vlen v))
+global def vreverse v =
+  def n = vlen v
+  def n1 = n-1
+  vtab (\i vat_ (n1-i) v) n
+
+def vtab f n =
+  def vnew n = prim "vnew"
+  def bind out =
+    def vset o i v = prim "vset"
+    def helper s e =
+      def mid = (e + s) >> 1
+      def mid1 = mid + 1
+      def _ = vset out mid (f mid)
+      def _ = if mid  == s then Unit else helper s mid
+      def _ = if mid1 == e then Unit else helper mid1 e
+      Unit
+    def _ = if n != 0 then helper 0 n else Unit
+    Slice out 0 n
+  bind (vnew n)
+
+global def vfoldl f a v =
+  def len = vlen v
+  def helper a i =
+    if i == len
+    then a
+    else helper (f a (vat_ i v)) (i+1)
+  helper a 0
+
+global def vfoldr f a v =
+  def helper a i =
+    if i == -1
+    then a
+    else helper (f (vat_ i v) a) (i-1)
+  helper a (vlen v - 1)
+
+global def vfold f a v =
+  def len = vlen v
+  def helper a s e =
+    def mid = (e + s) >> 1
+    def mid1 = mid + 1
+    def b = vat_ mid v
+    def l = if mid  == s then a else helper a s mid
+    def r = if mid1 == e then b else helper b mid1 e
+    f l r
+  if len == 0 then a else helper a 0 len
+
+global def vfind f v =
+  def len = vlen v
+  def helper i =
+    if i == len then None else
+      def x = vat_ i v
+      if f x then Some (Pair x i) else helper (i+1)
+  helper 0
+
+global def vsplitUntil f v =
+  match (vfind f v)
+    None = match v
+      (Slice z _ _) = Pair v (Slice z 0 0)
+    Some (Pair _ i) = vsplitAt i v
+
+global def vtakeUntil f t = (vsplitUntil f t).first
+global def vdropUntil f t = (vsplitUntil f t).second
+
+# Returns True if there exists an x where f x = True
+global def vexists f t = match (vfind f t)
+  Some (Pair _ _) = True
+  None            = False
+
+global def vforall f t = !vexists (!f _) t
+
+global def vsplitBy f v =
+  def len = vlen v
+  def len1 = len-1
+  def vnew n = prim "vnew"
+  def select = vmap (\x (if f x then 1 else 0)) v
+  def index = vscanl (_+_) 0 select # !!!
+  def take = vat_ len index
+  def bind out =
+    def vset o i v = prim "vset"
+    def helper s e =
+      def mid = (e + s) >> 1
+      def mid1 = mid + 1
+      def t = vat_ mid select
+      def i = vat_ mid index
+      def x = vat_ mid v
+      def j = if t == 1 then i else take + (mid-i)
+      def _ = vset out j x
+      def l = if mid  == s then Unit else helper s mid
+      def r = if mid1 == e then Unit else helper mid1 e
+      Unit
+    def _ = helper 0 len
+    Pair (Slice out 0 take) (Slice out take len)
+  bind (vnew len)
+
+global def vfilter f v = (vsplitBy f v).first
+
+global def vscanl f a v =
+  def len = vlen v
+  def vnew n = prim "vnew"
+  def bind out =
+    def vset o i v = prim "vset"
+    def helper a i =
+      def _ = vset out i a
+      if i == len
+      then Unit
+      else helper (f a (vat_ i v)) (i+1)
+    def _ = helper a 0
+    Slice out 0 (len+1)
+  bind (vnew (len+1))
+
+global def vscanr f a v =
+  def len = vlen v
+  def vnew n = prim "vnew"
+  def bind out =
+    def vset o i v = prim "vset"
+    def helper a i =
+      def _ = vset out i a
+      def i1 = i - 1
+      if i == 0
+      then Unit
+      else helper (f (vat_ i1 v) a) i1
+    def _ = helper a len
+    Slice out 0 (len+1)
+  bind (vnew (len+1))
+
+# !!! vscan = O(n), log n deep prefix-sum
+
+# !!! sortBy: quick-sort using mid-point as pivot => O(n) sorted
+# ... prefix-sum to determine final positions
+
+# !!! collate
+# !!! flatten => use scanl of lengths
+# !!! transpose
