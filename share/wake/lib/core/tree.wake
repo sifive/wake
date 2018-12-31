@@ -13,37 +13,18 @@ def ratioD = 2
 # Create a new tree, sorted by cmp: a => a => Boolean
 global def tnew cmp = Tree cmp Tip
 
-# Insert y into the tree as the lowest rank of the equal keys = y
-global def tinsert (Tree cmp root) y =
-  def helper = match _
-    Tip         = Bin 1 Tip y Tip
-    Bin _ l x r = match (cmp x y)
-      GT = balanceL (helper l) x r
-      _  = balanceR l x (helper r)
-  Tree cmp (helper root)
-
-# Insert y into the tree only if no other keys = y
-global def tinsertOnce (Tree cmp root) y =
-  def helper t = match t
-    Tip         = Bin 1 Tip y Tip
-    Bin s l x r = match (cmp x y)
-      GT = balanceL (helper l) x r
-      EQ = t
-      LT = balanceR l x (helper r)
-  Tree cmp (helper root)
-
-# Insert y into the tree and if any exist, replace an arbitrary key = y
-global def tinsertReplace (Tree cmp root) y =
-  def helper t = match t
-    Tip         = Bin 1 Tip y Tip
-    Bin s l x r = match (cmp x y)
-      GT = balanceL (helper l) x r
-      EQ = Bin s l y r
-      LT = balanceR l x (helper r)
-  Tree cmp (helper root)
-
-# Remove ALL keys = y
-#global def tdelete (Tree cmp root) y =
+global def tnewFromList cmp list = tnewFromVector cmp (vnewFromList list)
+global def tnewFromVector cmp vraw = # !!! Multi
+  def helper v =
+    def len = vlen v
+    if      len == 0 then Tip
+    else if len == 1 then Bin 1 Tip (vat 0 v) Tip
+    else
+      def mid = len / 2
+      def l = (vsplitAt mid v).first
+      def r = (vsplitAt (mid+1) v).second
+      Bin len (helper l) (vat mid v) (helper r)
+  Tree cmp (helper vraw) #!!! vsort; O(n) if pre-sorted
 
 global def tlen (Tree _ root) = size root
 def size = match _
@@ -53,6 +34,56 @@ def size = match _
 global def tempty (Tree _ root) = match root
   Tip = True
   _   = False
+
+# Insert y into the tree only if no other keys = y
+global def tinsert y (Tree cmp root) =
+  def helper t = match t
+    Tip         = Bin 1 Tip y Tip
+    Bin s l x r = match (cmp x y)
+      GT = balanceL (helper l) x r
+      EQ = t
+      LT = balanceR l x (helper r)
+  Tree cmp (helper root)
+
+# Insert y into the tree, removing any existing keys = y
+global def tinsertReplace y (Tree cmp root) =
+  def helper t = match t
+    Tip         = Bin 1 Tip y Tip
+    Bin s l x r = match (cmp x y)
+      GT = join3 (helper l) x r
+      EQ = join3 (delete cmp y l) y (delete cmp y r)
+      LT = join3 l x (helper r)
+  Tree cmp (helper root)
+
+# Insert y into the tree at the lowest rank of keys = y
+global def tinsertMulti y (Tree cmp root) =
+  def helper = match _
+    Tip         = Bin 1 Tip y Tip
+    Bin _ l x r = match (cmp x y)
+      GT = balanceL (helper l) x r
+      _  = balanceR l x (helper r)
+  Tree cmp (helper root)
+
+# True if every element of a appears in b
+global def tsubset (Tree _ aroot) (Tree cmp broot) =
+  def helper a b = match a b
+    Tip _ = True
+    _ Tip = False
+    _ (Bin _ bl bx br) = match (split bx cmp a)
+      Triple al _ ag = helper al bl & helper ag br
+  helper aroot broot
+
+# Remove ALL keys = y
+global def tdelete y (Tree cmp root) =
+  Tree cmp (delete cmp y root)
+def delete cmp y t =
+  def helper = match _
+    Tip = Tip
+    Bin _ l x r = match (cmp x y)
+      GT = join3 (helper l) x r
+      EQ = join2 (helper l) (helper r)
+      LT = join3 l x (helper r)
+  helper t
 
 # Folds from left to right
 global def tfoldl f a (Tree _ root) =
@@ -68,8 +99,7 @@ global def tfoldr f a (Tree _ root) =
     Bin _ l x r = helper (f x (helper a r)) l
   helper a root
 
-# Folds in parallel
-# Assumes: f is an associative operator and has type: a => a => a
+# Fold in parallel; assumes f is an associative operator and has type: a => a => a
 global def tfold f a (Tree _ root) =
   def helper a = match _
     Tip = a
@@ -78,6 +108,9 @@ global def tfold f a (Tree _ root) =
 
 # Convert a Tree to a List
 global def tlist = tfoldr (_,_) Nil
+
+#!!! toVector
+#global def tmap cmp f t = tnewFromVector cmp (vmap f (tvector t))
 
 # Extract the i-th ranked element => Option x
 global def tat i (Tree _ root) =
@@ -90,6 +123,23 @@ global def tat i (Tree _ root) =
         EQ = Some x
         GT = helper (i-sizeL-1) r
   helper i root
+
+# Split elements ranked [0,i) and [i,inf) into two trees
+global def tsplitAt i (Tree cmp root) =
+  def helper i = match _
+    Tip = Pair Tip Tip
+    Bin _ l x r =
+      def sizeL = size l
+      if i > sizeL
+      then match (helper (i-sizeL-1) r)
+        Pair rl rr = Pair (join3 l x rl) rr
+      else match (helper i l)
+        Pair ll lr = Pair ll (join3 lr x r)
+  match (helper i root)
+    Pair l r = Pair (Tree cmp l) (Tree cmp r)
+
+global def ttake i t = (tsplitAt i t).first
+global def tdrop i t = (tsplitAt i t).second
 
 # Lowest rank element where f x = True  => Option (Pair x rank)
 global def tfind f (Tree _ root) =
@@ -109,11 +159,66 @@ global def texists f t = match (tfind f t)
 
 global def tforall f t = !texists (!f _) t
 
-# ttake, tdrop
-# tsplitBy, tfilter
+# Split tree into those elements <, =, and > y
+global def tsplit y (Tree cmp root) =
+  match (split cmp y root)
+    Triple l e g = Triple (Tree cmp l) (Tree cmp e) (Tree cmp g)
 
-# Lowest rank element f x = True   => Option (Pair x rank)
-global def tlowerT f (Tree _ root) = lower f root
+def split y cmp root =
+  def helper = match _
+    Tip = Triple Tip Tip Tip
+    Bin _ l x r = match (cmp x y)
+      LT = match (helper r)
+        Triple rl re rg = Triple (join3 l x rl) re rg
+      GT = match (helper l)
+        Triple ll le lg = Triple ll le (join3 lg x r)
+      EQ = match (helper l) (helper r)
+        (Triple ll le _) (Triple _ re rg) = Triple ll (join3 le x re) rg
+  helper root
+
+# Split tree into those elements where f x = True and those where f x = False
+global def tsplitBy f (Tree cmp root) =
+  def helper t = match t
+    Tip = Pair Tip Tip
+    Bin _ l x r = match (helper l) (helper r)
+      (Pair tl fl) (Pair tr fr) =
+        if f x
+        then Pair (join3 tl x tr) (join2 fl fr)
+        else Pair (join2 tl tr) (join3 fl x fr)
+  match (helper root)
+    Pair t f = Pair (Tree cmp t) (Tree cmp f)
+
+# Drop all elements except those where f x = True
+global def tfilter f (Tree cmp root) =
+  def helper t = match t
+    Tip = Tip
+    Bin _ l x r =
+      def l_ = helper l
+      def r_ = helper r
+      if f x then join3 l_ x r_ else join2 l_ r_
+  Tree cmp (helper root)
+
+# Return the smallest element in the tree
+global def tmin (Tree _ root) = min root
+def min root =
+  def none = match _
+    Tip         = None
+    Bin _ l x _ = some x l
+  def some x = match _
+    Tip         = Some x
+    Bin _ l y _ = some y l
+  none root
+
+# Return the largest element in the tree
+global def tmax (Tree _ root) = max root
+def max root =
+  def none = match _
+    Tip         = None
+    Bin _ _ x r = some x r
+  def some x = match _
+    Tip         = Some x
+    Bin _ _ y r = some y r
+  none root
 
 # Lowest rank element with x >= y
 global def tlowerGE y (Tree cmp root) =
@@ -129,7 +234,7 @@ global def tlowerGT y (Tree cmp root) =
     _  = False
   lower f root
 
-# f must be monotone wrt. the Tree's compare function
+# Lowest rank element f x = True   => Option (Pair x rank)
 def lower f root =
   def none = match _
     Tip         = None
@@ -141,10 +246,6 @@ def lower f root =
     Tip         = Some (Pair z i)
     Bin s l x r = if f x then someL x i l else someR z (i+s) r
   none root
-
-# Highest rank element with f x = False  => Option (Pair x rank)
-# f must be monotone wrt. the Tree's compare function
-global def tupperF f (Tree _ root)= upper f root
 
 # Highest rank element with x < y
 global def tupperLT y (Tree cmp root) =
@@ -160,6 +261,7 @@ global def tupperLE y (Tree cmp root) =
     _  = False
   upper f root
 
+# Highest rank element with f x = False  => Option (Pair x rank)
 def upper f root =
   def none = match _
     Tip         = None
@@ -172,6 +274,7 @@ def upper f root =
     Bin s l x r = if f x then someL z i l else someR x (i+s) r
   none root
 
+# Returns True if there is a key in t = y
 global def tcontains y t =
   match t (tupperLE y t)
     (Tree cmp _) None              = False
@@ -179,8 +282,60 @@ global def tcontains y t =
       EQ = True
       _  = False
 
-# tunion, tintersect, tsubtract
+# Union of two trees, keeping only values from a on equality
+global def tunion (Tree _ aroot) (Tree cmp broot) =
+  Tree cmp (union cmp aroot broot)
+def union cmp aroot broot =
+  def helper a b = match a b
+    Tip _ = b
+    _ Tip = a
+    (Bin _ al ax ar) _ = match (split ax cmp b)
+      Triple bl _ bg = join3 (helper al bl) ax (helper ar bg)
+  helper aroot broot
 
+# Union of two trees, keeping equal values of a before equal values of b
+global def tunionMulti (Tree _ aroot) (Tree cmp broot) =
+  Tree cmp (unionMulti cmp aroot broot)
+
+def unionMulti cmp aroot broot =
+  def helper a b = match a b
+    Tip _ = b
+    _ Tip = a
+    (Bin _ _ ax _) _ = match (split ax cmp a) (split ax cmp b)
+      (Triple al ae ag) (Triple bl be bg) =
+        def l = helper al bl
+        def r = helper ag bg
+        def r_ = join2 be r # fast if be=Tip
+        if size ae == 1
+        then join3 l ax r_
+        else join2 (join2 l ae) r_
+  helper aroot broot
+
+# Remove all occurrences of keys from a which appear in b
+global def tsubtract (Tree _ aroot) (Tree cmp broot) =
+  def helper a b = match a b
+    Tip _ = Tip
+    _ Tip = a
+    _ (Bin _ bl bx br) = match (split bx cmp a)
+      Triple al _ ag = join2 (helper al bl) (helper ag br)
+  Tree cmp (helper aroot broot)
+
+# Keep all occurrences of keys from a which appear in b
+global def tintersect (Tree _ aroot) (Tree cmp broot) =
+  def helper a b = match a b
+    Tip _ = Tip
+    _ Tip = Tip
+    _ (Bin _ bl bx br) = match (split bx cmp a)
+      Triple al ae ag =
+        def l = helper al bl
+        def r = helper ag br
+        match ae
+          Tip = join2 l r
+          Bin aes _ aex _ =
+            if aes == 1 then join3 l aex r else join2 (join2 l ae) r
+  helper aroot broot
+
+# Pretty print the tree shape for debug
 global def tshape (Tree _ root) =
   def row x =
     def helper i = match _
@@ -190,6 +345,34 @@ global def tshape (Tree _ root) =
         helper (i+1) l ++ (me, helper (i+1) r)
     cat (helper 0 root)
   catWith "\n" $ map row (seq 8)
+
+# Create a balanced tree with with order: l:Tree x:Element r:Tree
+def join3 l x r = match l r
+  Tip _ = insertMin x r
+  _ Tip = insertMax x l
+  (Bin ls ll lx lr) (Bin rs rl rx rr) =
+    if      deltaQ*ls < deltaD*rs then balanceL (join3 l x rl) rx rr
+    else if deltaQ*rs < deltaD*ls then balanceR ll lx (join3 lr x r)
+    else Bin (ls+rs+1) l x r
+
+# Create a balanced tree with with order: l:Tree r:Tree
+def join2 l r = match l
+  Tip = r
+  Bin _ ll lx lr = match (splitLast ll lx lr)
+    Pair l_ x_ = join3 l_ x_ r
+
+def splitLast l x r = match r
+  Tip = Pair l x
+  Bin _ rl rx rr = match (splitLast rl rx rr)
+    Pair l_ x_ = Pair (join3 l x l_) x_
+
+def insertMax x = match _
+  Tip = Bin 1 Tip x Tip
+  Bin _ l y r = balanceR l y (insertMax x r)
+
+def insertMin x = match _
+  Tip = Bin 1 Tip x Tip
+  Bin _ l y r = balanceL (insertMin x l) y r
 
 # Written while reading the Haskell Set implementation 
 def balanceL l x r = match l r
