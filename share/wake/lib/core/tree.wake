@@ -115,12 +115,12 @@ global def tlist = tfoldr (_,_) Nil
 # Extract the i-th ranked element => Option x
 global def tat i (Tree _ root) =
   def helper i = match _
-    Tip         = None
+    Tip = raise "tat index out of bounds"
     Bin _ l x r =
       def sizeL = size l
       match (cmp i sizeL)
         LT = helper i l
-        EQ = Some x
+        EQ = x
         GT = helper (i-sizeL-1) r
   helper i root
 
@@ -151,6 +151,15 @@ global def tfind f (Tree _ root) =
       _ _ (Some (Pair x i)) = Some (Pair x (i+size l+1))
       _        _    _       = None
   helper root
+
+global def tsplitUntil f t =
+  match (tfind f t)
+    None = match t
+      (Tree cmp _) = Pair t (Tree cmp Tip)
+    Some (Pair _ i) = tsplitAt i t
+
+global def ttakeUntil f t = (tsplitUntil f t).first
+global def tdropUntil f t = (tsplitUntil f t).second
 
 # Returns True if there exists an x where f x = True
 global def texists f t = match (tfind f t)
