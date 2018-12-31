@@ -163,8 +163,8 @@ global def tdropUntil f t = (tsplitUntil f t).second
 
 # Returns True if there exists an x where f x = True
 global def texists f t = match (tfind f t)
-  Some (Pair _ _) = True
-  None            = False
+  Some _ = True
+  None   = False
 
 global def tforall f t = !texists (!f _) t
 

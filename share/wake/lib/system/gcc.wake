@@ -34,7 +34,7 @@ publish linkO = makeLinkO "native-cpp11-release" (which "g++") (releaseLFlags)
 
 def pickVariant variant variants =
   match (find (matches variant _.first) variants)
-    Some x = x.second
+    Some (Pair x _) = x.second
     None =
       def ok = catWith " " (map first variants)
       raise "No variant matches {variant}; options: {ok}"

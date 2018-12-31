@@ -65,11 +65,15 @@ global def splitUntil f l = match l
 
 global def takeUntil f l = (splitUntil f l).first
 global def dropUntil f l = (splitUntil f l).second
-global def find f l = match (dropUntil f l)
-  Nil  = None
-  x, _ = Some x
-global def exists f l = !empty (dropUntil f l)
-global def forall f l = empty (dropUntil (!f _) l)
+global def find f =
+  def helper i = match _
+    Nil  = None
+    h, t = if f h then Some (Pair h i) else helper (i+1) t
+  helper 0
+global def exists f l = match (find f l)
+  Some _ = True
+  None   = False
+global def forall f l = !exists (!f _) l
 
 global def splitBy f = match _
   Nil  = Pair Nil Nil

@@ -12,7 +12,7 @@ global def jobcache build dir stdin env cmd visible =
       def notOk pair = hashcode pair.first != pair.second
       match (find notOk out.outputs)
         None = out
-        Some (Pair file saw) =
+        Some (Pair (Pair file saw) _) =
           def expect = hashcode file
           raise "Hash mismatch for {file} ({saw} != {expect}); remove it or run with -f"
 

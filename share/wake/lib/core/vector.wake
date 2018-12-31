@@ -104,8 +104,8 @@ global def vdropUntil f t = (vsplitUntil f t).second
 
 # Returns True if there exists an x where f x = True
 global def vexists f t = match (vfind f t)
-  Some (Pair _ _) = True
-  None            = False
+  Some _ = True
+  None   = False
 
 global def vforall f t = !vexists (!f _) t
 
