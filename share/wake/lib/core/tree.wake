@@ -106,11 +106,13 @@ global def tfoldr f a (Tree _ root) =
   helper a root
 
 # Fold in parallel; assumes f is an associative operator and has type: a => a => a
-global def tfold f a (Tree _ root) =
+global def tfoldmap f a g (Tree _ root) =
   def helper a = match _
-    Tip = a
+    Tip = g a
     Bin _ l x r = f (helper a l) (helper x r)
   helper a root
+
+global def tfold f a t = tfoldmap f a (_) t
 
 # Convert a Tree to a List
 global def tlist = tfoldr (_,_) Nil

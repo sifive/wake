@@ -174,9 +174,48 @@ global def vscanr f a v =
     Slice out 0 (len+1)
   bind (vnew (len+1))
 
-# !!! vscan = O(n), log n deep prefix-sum
-# f called exactly once
-global def vscanmap f a g v = vscanl f a (vmap g v)
+# vscan = O(n), log n deep prefix-sum
+# f called exactly once per input
+global def vscanmap f a g v =
+  def len = vlen v + 1
+  def vnew n = prim "vnew"
+  def vset o i v = prim "vset"
+  def gather out =
+    def helper s e =
+      if e - s == 1
+      then if s == -1 then a else g (vat_ s v)
+      else
+        def mid = (e+s) >> 1
+        def lo = helper s mid
+        def hi = helper mid e
+        def _ = vset out mid lo
+        f lo hi
+    def bitrev x =
+      if x == 0 then Unit else
+        def lowbit = and x (-x)
+        def bottom = xor x lowbit
+        def _ = vset out (x-1) (helper (bottom-1) (x-1))
+        bitrev bottom
+    def _ = bitrev len
+    Slice out 0 len
+  def temp = gather (vnew len)
+  def scatter out =
+    def helper a s e =
+      def _ = vset out s a
+      if e - s == 1 then Unit else
+        def mid = (e+s) >> 1
+        def _ = helper a s mid
+        if mid >= len then Unit else
+          def v = vat_ mid temp
+          helper (a+v) mid e
+    def double x =
+      if x >= len then Unit else
+        def e = (x<<1) + 1
+        def _ = helper (vat_ x temp) x e
+        double e
+    def _ = double 0
+    Slice out 0 len
+  scatter (vnew len)
 global def vscan f a v = vscanmap f a (_) v
 
 # Merge-sort, if sorted then O(n) else O(nlogn)
