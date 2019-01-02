@@ -52,11 +52,15 @@ global def splitAt i l =
 
 global def take i l = (splitAt i l).first
 global def drop i l = (splitAt i l).second
-global def at   i l =
-  def fail _ = raise "at index out of bounds"
-  if i < 0 then fail Unit else match (drop i l)
-    Nil  = fail Unit
-    x, _ = x
+
+global def atOpt i l =
+  if i < 0 then None else match (drop i l)
+    Nil  = None
+    x, _ = Some x
+
+global def at i l = match (atOpt i l)
+  None   = raise "at index out of bounds"
+  Some x = x
 
 global def splitUntil f l = match l
   Nil  = Pair Nil Nil
@@ -98,7 +102,14 @@ global def sortBy f = match _
   h, t = match (splitBy (f h) t)
     Pair x y = sortBy f y ++ (h, sortBy f x)
 
-global def sort l = sortBy (_<_) l
+# f should be an equality comparison
+# keep only the first occurrence in a run of equal values
+global def distinctBy f l = match l
+  x, y, t =
+    if f x y
+    then distinctBy f (x, t)
+    else x, distinctBy f (y, t)
+  _ = l
 
 global def collate f l r = match l r
   Nil     Nil     = EQ
@@ -108,9 +119,11 @@ global def collate f l r = match l r
     EQ = collate f lt rt
     x  = x
 
-global def seq n =
-  def helper i = if i >= n then Nil else i, helper (i+1)
+global def tab f n =
+  def helper i = if i >= n then Nil else f i, helper (i+1)
   helper 0
+
+global def seq = tab (_)
 
 global def zip = match _ _
   Nil     _       = Nil

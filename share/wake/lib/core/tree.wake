@@ -13,18 +13,24 @@ def ratioD = 2
 # Create a new tree, sorted by cmp: a => a => Boolean
 global def tnew cmp = Tree cmp Tip
 
-global def tnewFromList cmp list = tnewFromVector cmp (vnewFromList list)
-global def tnewFromVector cmp vraw = # !!! Multi
-  def helper v =
-    def len = vlen v
-    if      len == 0 then Tip
-    else if len == 1 then Bin 1 Tip (vat 0 v) Tip
-    else
-      def mid = len / 2
-      def l = (vsplitAt mid v).first
-      def r = (vsplitAt (mid+1) v).second
-      Bin len (helper l) (vat mid v) (helper r)
-  Tree cmp (helper vraw) #!!! vsort; O(n) if pre-sorted
+global def ltree cmp list = vtree cmp (lvector list)
+global def ltreeMulti cmp list = vtreeMulti cmp (lvector list)
+
+global def vtreeMulti cmp v =
+  Tree cmp (build (vsortBy (lt cmp) v))
+
+global def vtree cmp v =
+  Tree cmp (build (vdistinctBy (eq cmp) (vsortBy (lt cmp) v)))
+
+def build v =
+  def len = vlen v
+  if      len == 0 then Tip
+  else if len == 1 then Bin 1 Tip (vat 0 v) Tip
+  else
+    def mid = len / 2
+    def l = vtake mid v
+    def r = vdrop (mid+1) v
+    Bin len (build l) (vat mid v) (build r)
 
 global def tlen (Tree _ root) = size root
 def size = match _
@@ -39,7 +45,7 @@ global def tempty (Tree _ root) = match root
 global def tinsert y (Tree cmp root) =
   def helper t = match t
     Tip         = Bin 1 Tip y Tip
-    Bin s l x r = match (cmp x y)
+    Bin _ l x r = match (cmp x y)
       GT = balanceL (helper l) x r
       EQ = t
       LT = balanceR l x (helper r)
@@ -109,20 +115,32 @@ global def tfold f a (Tree _ root) =
 # Convert a Tree to a List
 global def tlist = tfoldr (_,_) Nil
 
-#!!! toVector
-#global def tmap cmp f t = tnewFromVector cmp (vmap f (tvector t))
-
-# Extract the i-th ranked element => Option x
-global def tat i (Tree _ root) =
+global def tappi f (Tree _ root) =
   def helper i = match _
-    Tip = raise "tat index out of bounds"
+    Tip = Unit
+    Bin _ l x r =
+      def ix = i + size l
+      def _ = helper i l
+      def _ = helper (ix+1) r
+      def _ = f ix x
+      Unit
+  helper 0 root
+
+# Extract the i-th ranked element
+global def tatOpt i (Tree _ root) =
+  def helper i = match _
+    Tip = None
     Bin _ l x r =
       def sizeL = size l
       match (cmp i sizeL)
         LT = helper i l
-        EQ = x
+        EQ = Some x
         GT = helper (i-sizeL-1) r
   helper i root
+
+global def tat i l = match (tatOpt i l)
+  None   = raise "tat index out of bounds"
+  Some x = x
 
 # Split elements ranked [0,i) and [i,inf) into two trees
 global def tsplitAt i (Tree cmp root) =
@@ -170,7 +188,7 @@ global def tforall f t = !texists (!f _) t
 
 # Split tree into those elements <, =, and > y
 global def tsplit y (Tree cmp root) =
-  match (split cmp y root)
+  match (split y cmp root)
     Triple l e g = Triple (Tree cmp l) (Tree cmp e) (Tree cmp g)
 
 def split y cmp root =
@@ -181,8 +199,22 @@ def split y cmp root =
         Triple rl re rg = Triple (join3 l x rl) re rg
       GT = match (helper l)
         Triple ll le lg = Triple ll le (join3 lg x r)
-      EQ = match (helper l) (helper r)
-        (Triple ll le _) (Triple _ re rg) = Triple ll (join3 le x re) rg
+      EQ = match (splitlt l) (splitgt r)
+        (Pair ll le) (Pair re rg) = Triple ll (join3 le x re) rg
+  def splitlt = match _
+    Tip = Pair Tip Tip
+    Bin _ l x r = match (cmp x y)
+      LT = match (splitlt r)
+        Pair rl re = Pair (join3 l x rl) re
+      _  = match (splitlt l)
+        Pair ll le = Pair ll (join3 le x r)
+  def splitgt = match _
+    Tip = Pair Tip Tip
+    Bin _ l x r = match (cmp x y)
+      GT = match (splitgt l)
+        Pair le lg = Pair le (join3 lg x r)
+      _  = match (splitgt r)
+        Pair re rg = Pair (join3 l x re) rg
   helper root
 
 # Split tree into those elements where f x = True and those where f x = False
@@ -290,6 +322,10 @@ global def tcontains y t =
     (Tree cmp _) (Some (Pair x _)) = match (cmp x y)
       EQ = True
       _  = False
+
+# Eliminate duplicates, as identified by f
+global def tdistinctBy f t = match t
+  Tree cmp _ = Tree cmp (build (vdistinctBy f (tvector t)))
 
 # Union of two trees, keeping only values from a on equality
 global def tunion (Tree _ aroot) (Tree cmp broot) =
