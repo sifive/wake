@@ -19,3 +19,6 @@ global def or  x y = prim "or"
 global def gcd x y = prim "gcd"
 global def lcm x y = prim "lcm"
 global def powm x y m = prim "powm" # fast version of: (x^y) % m
+
+global def min x y = if x < y then x else y
+global def max x y = if x < y then y else x

@@ -2,6 +2,7 @@
 #include "expr.h"
 #include "value.h"
 #include "datatype.h"
+#include "prim.h"
 #include <cassert>
 
 struct Application : public Receiver {
@@ -50,6 +51,7 @@ void Destructure::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
       // Create a binding to hold 'data' and 'fn'
       auto flip = std::make_shared<Binding>(data->binding, queue.stack_trace?args:nullptr, des, 2);
       flip->future[1].value = std::move(value);
+      flip->state = -1;
       // Find the correct handler function
       Binding *fn = args.get();
       int limit = des->sum.members.size() - data->cons->index;
@@ -78,6 +80,25 @@ void Primitive::finish(WorkQueue &queue) {
     iter = iter->next.get();
   }
   prim->fn(prim->data, queue, std::move(receiver), std::move(binding), std::move(args));
+}
+
+struct MultiReceiverShared {
+  std::unique_ptr<Finisher> finisher;
+  int todo;
+  MultiReceiverShared(std::unique_ptr<Finisher> finisher_, int todo_)
+   : finisher(std::move(finisher_)), todo(todo_) { }
+};
+
+struct MultiReceiver : public Receiver {
+  std::shared_ptr<MultiReceiverShared> shared;
+  MultiReceiver(std::shared_ptr<MultiReceiverShared> shared_)
+   : shared(std::move(shared_)) { }
+  void receive(WorkQueue &queue, std::shared_ptr<Value> &&value);
+};
+
+void MultiReceiver::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
+  if (--shared->todo == 0)
+    Finisher::finish(queue, std::move(shared->finisher));
 }
 
 struct Hasher : public Finisher {
@@ -169,8 +190,18 @@ void Thunk::eval(WorkQueue &queue) {
       for (int i = 1; i < prim->args; ++i) iter = iter->next.get();
       iter->next.reset();
       Binding *held = binding.get();
-      Binding::wait(held, queue, std::unique_ptr<Finisher>(
-        new Primitive(std::move(receiver), std::move(binding), prim)));
+      std::unique_ptr<Finisher> finisher(
+        new Primitive(std::move(receiver), std::move(binding), prim));
+      if ((prim->flags & PRIM_SHALLOW)) {
+        auto shared = std::make_shared<MultiReceiverShared>(
+          std::move(finisher), prim->args);
+        for (iter = held; iter; iter = iter->next.get())
+          for (int i = 0; i < iter->nargs; ++i)
+            iter->future[i].depend(queue,
+              std::unique_ptr<Receiver>(new MultiReceiver(shared)));
+      } else {
+        Binding::wait(held, queue, std::move(finisher));
+      }
     }
   } else {
     assert(0 /* unreachable */);

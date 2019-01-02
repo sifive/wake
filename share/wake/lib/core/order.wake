@@ -18,3 +18,18 @@ global def cmp x y =
   def raw x y = prim "cmp" # lt=-1, eq=0, gt=1
   def int = raw x y
   if int == 0 then EQ else if int < 0 then LT else GT
+
+global def lt cmp x y =
+  match (cmp x y)
+    LT = True
+    _  = False
+
+global def gt cmp x y =
+  match (cmp x y)
+    GT = True
+    _  = False
+
+global def eq cmp x y =
+  match (cmp x y)
+    EQ = True
+    _  = False

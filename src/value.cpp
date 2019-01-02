@@ -80,25 +80,26 @@ static void future_format(std::ostream &os, const Future &f, int p) {
 
 void Data::format(std::ostream &os, int p) const {
   const std::string &name = cons->ast.name;
-  std::vector<const Binding*> todo;
+  std::vector<const Future*> todo;
   for (const Binding *iter = binding.get(); iter; iter = iter->next.get())
-    todo.push_back(iter);
+    for (int i = iter->nargs-1; i >= 0; --i)
+      todo.push_back(&iter->future[i]);
   std::reverse(todo.begin(), todo.end());
 
   if (p >= 0) {
     if (name.substr(0, 7) == "binary ") {
       op_type q = op_precedence(name.c_str() + 7);
       if (q.p < p) os << "(";
-      future_format(os, todo[0]->future[0], q.p + !q.l);
+      future_format(os, *todo[0], q.p + !q.l);
       if (name[7] != ',') os << " ";
       os << name.c_str() + 7 << " ";
-      future_format(os, todo[1]->future[0], q.p + q.l);
+      future_format(os, *todo[1], q.p + q.l);
       if (q.p < p) os << ")";
     } else if (name.substr(0, 6) == "unary ") {
       op_type q = op_precedence(name.c_str() + 6);
       if (q.p < p) os << "(";
       os << name.c_str() + 6;
-      future_format(os, todo[0]->future[0], q.p);
+      future_format(os, *todo[0], q.p);
       if (q.p < p) os << ")";
     } else {
       op_type q = op_precedence("a");
@@ -106,7 +107,7 @@ void Data::format(std::ostream &os, int p) const {
       os << name;
       for (auto v : todo) {
         os << " ";
-        future_format(os, v->future[0], q.p + q.l);
+        future_format(os, *v, q.p + q.l);
       }
       if (q.p < p && !todo.empty()) os << ")";
     }
@@ -116,7 +117,7 @@ void Data::format(std::ostream &os, int p) const {
     os << std::endl;
     for (auto v : todo) {
       os << pad(p-2);
-      future_format(os, v->future[0], p-2);
+      future_format(os, *v, p-2);
     }
   }
 }

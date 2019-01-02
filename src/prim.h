@@ -59,19 +59,25 @@ std::shared_ptr<Value> make_false();
 std::shared_ptr<Value> make_tuple(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second);
 std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values);
 
+#define PRIM_PURE	1	// has no side-effects (can be duplicated / removed)
+#define PRIM_SHALLOW	2	// only wait for direct arguments (not children)
+
 /* Register primitive functions */
 struct PrimDesc {
   PrimFn   fn;
   PrimType type;
   void    *data;
+  int      flags;
 
-  PrimDesc(PrimFn fn_, PrimType type_, void *data_ = 0) : fn(fn_), type(type_), data(data_) { }
+  PrimDesc(PrimFn fn_, PrimType type_, void *data_ = 0, int flags_ = 0)
+   : fn(fn_), type(type_), data(data_), flags(flags_) { }
 };
 
 typedef std::map<std::string, PrimDesc> PrimMap;
 struct JobTable;
 
 void prim_register_string(PrimMap &pmap, const char *version);
+void prim_register_vector(PrimMap &pmap);
 void prim_register_integer(PrimMap &pmap);
 void prim_register_polymorphic(PrimMap &pmap);
 void prim_register_regexp(PrimMap &pmap);

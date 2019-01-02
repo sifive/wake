@@ -1,0 +1,48 @@
+		list		vector		tree		note
+---------------------------------------------------------------------------------
+prepend		1		-		-		lists only
+empty		1		1		1
+len		n		1		1
+splitAt		m		1		log n
+take		m		1		log n
+drop		m		1		log n
+at		m		1		log n
+atOpt		m		1		log n
+foldl		n		n		n
+foldr		n		n		n
+foldmap		-		n		n		don't pretend lists are parallel
+fold		-		n		n		"
+find		n		n		n
+exists		n		n		n
+forall		n		n		n
+splitUntil	n		n		n
+takeUntil	n		n		n
+dropUntil	n		n		n
+splitBy		n		n		n
+filter		n		n		n
+distinctBy	n		n		n
+collate		n		n		?
+sortBy		n log n		n log n		-		changes order
+reverse		n		n		-		"
+tab		n		n		-		API takes no cmp
+seq		n		n		-		"
+map		n		n		-		changes type (no cmp)
+flatten		n		n		-		"
+transpose	n		n		-		"
+zip		n		n		-		"
+unzip		n		n		-		"
+scanl		n		n		-		"
+scanr		n		n		-		"
+scan		-		n		-		lists not parallel, duplicate outputs
+split		-		-		log n		requires order
+contains	-		-		log n		"
+min		-		-		log n		"
+max		-		-		log n		"
+lowerG[TE]	-		-		log n		"
+upperL[TE]	-		-		log n		"
+subset		-		-		m log(n/m)	"
+union{Multi}	-		-		m log(n/m)	"
+subtract	-		-		m log(n/m)	"
+intersect	-		-		m log(n/m)	"
+insert*		-		-		log n		"
+delete		-		-		log n		"

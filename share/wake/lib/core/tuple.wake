@@ -1,7 +1,9 @@
+# unit / void
+global data Unit = Unit
 
-
-
-# tuples
+# pairs
 global data Pair a b = Pair a b
 global def first  (Pair x _) = x
 global def second (Pair _ x) = x
+
+global data Triple a b c = Triple a b c

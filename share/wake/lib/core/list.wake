@@ -52,7 +52,15 @@ global def splitAt i l =
 
 global def take i l = (splitAt i l).first
 global def drop i l = (splitAt i l).second
-global def at   i l = if i < 0 then raise "at called with negative index" else (drop i l).head
+
+global def atOpt i l =
+  if i < 0 then None else match (drop i l)
+    Nil  = None
+    x, _ = Some x
+
+global def at i l = match (atOpt i l)
+  None   = raise "at index out of bounds"
+  Some x = x
 
 global def splitUntil f l = match l
   Nil  = Pair Nil Nil
@@ -61,9 +69,15 @@ global def splitUntil f l = match l
 
 global def takeUntil f l = (splitUntil f l).first
 global def dropUntil f l = (splitUntil f l).second
-global def find f l = take 1 (dropUntil f l)
-global def exists f l = !empty (dropUntil f l)
-global def forall f l = empty (dropUntil (!f _) l)
+global def find f =
+  def helper i = match _
+    Nil  = None
+    h, t = if f h then Some (Pair h i) else helper (i+1) t
+  helper 0
+global def exists f l = match (find f l)
+  Some _ = True
+  None   = False
+global def forall f l = !exists (!f _) l
 
 global def splitBy f = match _
   Nil  = Pair Nil Nil
@@ -83,24 +97,30 @@ global def transpose l =
   if todo.empty then Nil else heads, transpose tails
 
 # f should be a less-than comparison
-global def sortBy f = match _
-  Nil  = Nil
-  h, t = match (splitBy (f h) t)
-    Pair x y = sortBy f y ++ (h, sortBy f x)
+global def sortBy f l = vlist (vsortBy f (lvector l))
 
-global def sort l = sortBy (_<_) l
+# f should be an equality comparison
+# keep only the first occurrence in a run of equal values
+global def distinctBy f l = match l
+  x, y, t =
+    if f x y
+    then distinctBy f (x, t)
+    else x, distinctBy f (y, t)
+  _ = l
 
 global def collate f l r = match l r
-  Nil     Nil     = 0
-  Nil     _       = -1
-  _       Nil     = 1
-  (lh,lt) (rh,rt) =
-    def cmp = f lh rh
-    if cmp == 0 then collate f lt rt else cmp
+  Nil     Nil     = EQ
+  Nil     _       = LT
+  _       Nil     = GT
+  (lh,lt) (rh,rt) = match (f lh rh)
+    EQ = collate f lt rt
+    x  = x
 
-global def seq n =
-  def helper i = if i >= n then Nil else i, helper (i+1)
+global def tab f n =
+  def helper i = if i >= n then Nil else f i, helper (i+1)
   helper 0
+
+global def seq = tab (_)
 
 global def zip = match _ _
   Nil     _       = Nil

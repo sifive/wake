@@ -33,13 +33,11 @@ publish linkO = makeLinkO "native-cpp11-debug"   (which "g++") (debugLFlags)
 publish linkO = makeLinkO "native-cpp11-release" (which "g++") (releaseLFlags)
 
 def pickVariant variant variants =
-  def selected = find (matches variant _.first) variants
-  if selected.empty
-  then
-    def ok = catWith " " (map first variants)
-    raise "No variant matches {variant}; options: {ok}"
-  else
-    selected.head.second
+  match (find (matches variant _.first) variants)
+    Some (Pair x _) = x.second
+    None =
+      def ok = catWith " " (map first variants)
+      raise "No variant matches {variant}; options: {ok}"
 
 global def compileC variant = pickVariant variant (subscribe compileC)
 global def linkO    variant = pickVariant variant (subscribe linkO)
