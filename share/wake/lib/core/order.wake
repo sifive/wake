@@ -24,6 +24,11 @@ global def lt cmp x y =
     LT = True
     _  = False
 
+global def gt cmp x y =
+  match (cmp x y)
+    GT = True
+    _  = False
+
 global def eq cmp x y =
   match (cmp x y)
     EQ = True

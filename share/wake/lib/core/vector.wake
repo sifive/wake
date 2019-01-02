@@ -132,6 +132,19 @@ global def vsplitBy f v =
 
 global def vfilter f v = (vsplitBy f v).first
 
+global def vunfoldl f a n =
+  def vnew n = prim "vnew"
+  def bind out =
+    def vset o i v = prim "vset"
+    def helper a i =
+      if i == n then Unit else match (f a)
+        Pair a x =
+          def _ = vset out i x
+          helper a (i+1)
+    def _ = helper a 0
+    Slice out 0 n
+  bind (vnew n)
+
 global def vscanl f a v =
   def len = vlen v
   def vnew n = prim "vnew"
@@ -166,8 +179,39 @@ global def vscanr f a v =
 global def vscanmap f a g v = vscanl f a (vmap g v)
 global def vscan f a v = vscanmap f a (_) v
 
-# !!! sortBy O(n) if sorted
-global def vsortBy lt v = lvector (sortBy lt (vlist v))
+# Merge-sort, if sorted then O(n) else O(nlogn)
+global def vsortBy lt v =
+  def nondesc i = # 1 if v(i) > v(i+1)
+    def vi = vat_ i v
+    def vi1 = vat_ (i+1) v
+    if lt vi1 vi then 1 else 0
+  def runs = vscan (_+_) 0 (vtab nondesc (vlen v - 1))
+  # 0000111112345
+  #         ^^^^^ strictly descending run
+  #     ^^^^^ non-descending runs
+  def merge a b =
+    def helper (Pair ai bi) =
+      def doit x a b = Pair (Pair (ai+a) (bi+b)) x
+      match (vatOpt ai a) (vatOpt bi b)
+        None     None     = raise "impossible"
+        (Some x) None     = doit x 1 0
+        None     (Some y) = doit y 0 1
+        (Some x) (Some y) = match (lt y x)
+          True  = doit y 0 1
+          False = doit x 1 0 # x <= y prefers x for stable sort
+    vunfoldl helper (Pair 0 0) (vlen a + vlen b)
+  def helper v r =
+    def len = vlen v
+    def mid = len >> 1
+    if mid == 0 then v else
+      def len1 = len-1
+      def lo = vat_ 0 r
+      def hi = vat_ len1 r
+      if lo == hi then v
+      else if lo + len1 == hi then vreverse v
+      else match (vsplitAt mid v) (vsplitAt mid r)
+        (Pair l r) (Pair rl rr) = merge (helper l rl) (helper r rr)
+  helper v runs
 
 global def vdistinctBy eq v =
   def keep i =

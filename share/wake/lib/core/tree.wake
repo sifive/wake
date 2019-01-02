@@ -27,7 +27,7 @@ def build v =
   if      len == 0 then Tip
   else if len == 1 then Bin 1 Tip (vat 0 v) Tip
   else
-    def mid = len / 2
+    def mid = len >> 1
     def l = vtake mid v
     def r = vdrop (mid+1) v
     Bin len (build l) (vat mid v) (build r)
