@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <cstring>
+#include <utf8proc.h>
 
 struct CatStream : public Value {
   std::stringstream str;
@@ -244,6 +245,78 @@ static PRIMFN(prim_scmp) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_normalize) {
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
+}
+
+static PRIMFN(prim_sNFC) {
+  EXPECT(1);
+  STRING(arg0, 0);
+  utf8proc_uint8_t *dst;
+  ssize_t len = utf8proc_map(
+    reinterpret_cast<const utf8proc_uint8_t*>(arg0->value.c_str()),
+    arg0->value.size(),
+    &dst,
+    static_cast<utf8proc_option_t>(
+      UTF8PROC_COMPOSE |
+      UTF8PROC_REJECTNA));
+  REQUIRE(len > 0, std::string("Could not normalize string ") + utf8proc_errmsg(len));
+  auto out = std::make_shared<String>(std::string(
+    reinterpret_cast<const char*>(dst),
+    static_cast<size_t>(len)));
+  free(dst);
+  RETURN(out);
+}
+
+static PRIMFN(prim_sNFKC) {
+  EXPECT(1);
+  STRING(arg0, 0);
+  utf8proc_uint8_t *dst;
+  ssize_t len = utf8proc_map(
+    reinterpret_cast<const utf8proc_uint8_t*>(arg0->value.c_str()),
+    arg0->value.size(),
+    &dst,
+    static_cast<utf8proc_option_t>(
+      UTF8PROC_COMPOSE   |
+      UTF8PROC_COMPAT    |
+      UTF8PROC_IGNORE    |
+      UTF8PROC_STRIPCC   |
+      UTF8PROC_LUMP      |
+      UTF8PROC_REJECTNA));
+  REQUIRE(len > 0, std::string("Could not normalize string ") + utf8proc_errmsg(len));
+  auto out = std::make_shared<String>(std::string(
+    reinterpret_cast<const char*>(dst),
+    static_cast<size_t>(len)));
+  free(dst);
+  RETURN(out);
+}
+
+static PRIMFN(prim_scaseNFKC) {
+  EXPECT(1);
+  STRING(arg0, 0);
+  utf8proc_uint8_t *dst;
+  ssize_t len = utf8proc_map(
+    reinterpret_cast<const utf8proc_uint8_t*>(arg0->value.c_str()),
+    arg0->value.size(),
+    &dst,
+    static_cast<utf8proc_option_t>(
+      UTF8PROC_COMPOSE   |
+      UTF8PROC_COMPAT    |
+      UTF8PROC_IGNORE    |
+      UTF8PROC_STRIPCC   |
+      UTF8PROC_LUMP      |
+      UTF8PROC_CASEFOLD  |
+      UTF8PROC_REJECTNA));
+  REQUIRE(len > 0, std::string("Could not normalize string ") + utf8proc_errmsg(len));
+  auto out = std::make_shared<String>(std::string(
+    reinterpret_cast<const char*>(dst),
+    static_cast<size_t>(len)));
+  free(dst);
+  RETURN(out);
+}
+
 void prim_register_string(PrimMap &pmap, const char *version) {
   pmap.emplace("catopen", PrimDesc(prim_catopen, type_catopen));
   pmap.emplace("catadd",  PrimDesc(prim_catadd,  type_catadd));
@@ -255,9 +328,8 @@ void prim_register_string(PrimMap &pmap, const char *version) {
   pmap.emplace("format",  PrimDesc(prim_format,  type_format));
   pmap.emplace("print",   PrimDesc(prim_print,   type_print));
   pmap.emplace("version", PrimDesc(prim_version, type_version, (void*)version));
-
-  pmap.emplace("scmpNFC",      PrimDesc(prim_scmp, type_scmp));
-  pmap.emplace("scmpNFKC",     PrimDesc(prim_scmp, type_scmp));
-  pmap.emplace("scmpRaw",      PrimDesc(prim_scmp, type_scmp));
-  pmap.emplace("scasecmpNFKC", PrimDesc(prim_scmp, type_scmp));
+  pmap.emplace("scmp",    PrimDesc(prim_scmp,    type_scmp));
+  pmap.emplace("sNFC",    PrimDesc(prim_sNFC,    type_normalize));
+  pmap.emplace("sNFKC",   PrimDesc(prim_sNFKC,   type_normalize));
+  pmap.emplace("scaseNFKC", PrimDesc(prim_scaseNFKC, type_normalize));
 }

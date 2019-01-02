@@ -15,7 +15,7 @@ install:	all
 	./bin/wake -v install '"install"'
 
 bin/wake:	$(patsubst %.cpp,%.o,$(wildcard src/*.cpp)) src/symbol.o
-	g++ -std=c++11 $(CFLAGS) -L $(GMP_LIB) -o $@ $^ -lgmp -lre2 -lsqlite3
+	g++ -std=c++11 $(CFLAGS) -L $(GMP_LIB) -o $@ $^ -lgmp -lre2 -lsqlite3 -lutf8proc
 
 lib/wake/fuse-wake:	fuse/fuse.cpp
 	g++ -std=c++11 $(CFLAGS) `pkg-config --cflags fuse` $< -o $@ `pkg-config --libs fuse`

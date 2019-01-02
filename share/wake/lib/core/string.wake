@@ -20,14 +20,19 @@ global def int s = intbase 0 s
 # Version of wake
 global def version = prim "version"
 
+# Unicode normalization methods
+global def sNFC x = prim "sNFC"
+global def sNFKC x = prim "sNFKC"
+global def scaseNFKC x = prim "scaseNFKC"
+
 # Unicode NFC string comparison Ç == C+◌̧
-global def scmpNFC x y = prim "scmpNFC"
+global def scmpNFC x y = scmpRaw (sNFC x) (sNFC y)
 # Unicode NFKC string comparison (¼i⁹ = 1/4i9)
-global def scmpNFKC x y = prim "scmpNFKC"
+global def scmpNFKC x y = scmpRaw (sNFKC x) (sNFKC y)
 # Unicode case insensitive NFKC comparison
-global def scasecmpNFKC x y = prim "scasecmpNFKC"
+global def scasecmpNFKC x y = scmpRaw (scaseNFKC x) (scaseNFKC y)
 # Raw binary string comparison; no normalization performed
-global def scmpRaw x y = prim "scmpRaw"
+global def scmpRaw x y = prim "scmp"
 
 # NFKC order (fancy format removed) -- secure default
 # This is the string order you should probably be using
