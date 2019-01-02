@@ -272,9 +272,11 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
     map->map["_catopen"]  = std::unique_ptr<Expr>(new Prim(LOCATION, "catopen"));
     map->map["_catadd"]   = std::unique_ptr<Expr>(new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new Prim(LOCATION, "catadd"))));
     map->map["_catclose"] = std::unique_ptr<Expr>(new Lambda(LOCATION, "_", new Prim(LOCATION, "catclose")));
+    map->map["_iformat"] = std::unique_ptr<Expr>(new Lambda(LOCATION, "_", new Prim(LOCATION, "iformat")));
     Expr *body = new VarRef(LOCATION, "_catopen");
     for (auto expr : exprs)
-      body = new App(LOCATION, new App(LOCATION, new VarRef(LOCATION, "_catadd"), body), expr);
+      body = new App(LOCATION, new App(LOCATION, new VarRef(LOCATION, "_catadd"), body),
+        new App(LOCATION, new VarRef(LOCATION, "_iformat"), expr));
     map->body = std::unique_ptr<Expr>(new App(LOCATION, new VarRef(LOCATION, "_catclose"), body));
     out = map;
   }

@@ -205,6 +205,20 @@ static PRIMFN(prim_format) {
   RETURN(out);
 }
 
+static PRIMFN(prim_iformat) {
+  REQUIRE(args.size() == 1, "prim_iformat expects 1 argument");
+  std::shared_ptr<Value> out;
+  if (args[0]->type == String::type) {
+    out = std::make_shared<String>(
+      reinterpret_cast<String*>(args[0].get())->value);
+  } else {
+    std::stringstream buffer;
+    args[0]->format(buffer, 0);
+    out = std::make_shared<String>(buffer.str());
+  }
+  RETURN(out);
+}
+
 static PRIMTYPE(type_print) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
@@ -326,6 +340,7 @@ void prim_register_string(PrimMap &pmap, const char *version) {
   pmap.emplace("getenv",  PrimDesc(prim_getenv,  type_getenv));
   pmap.emplace("mkdir",   PrimDesc(prim_mkdir,   type_mkdir));
   pmap.emplace("format",  PrimDesc(prim_format,  type_format));
+  pmap.emplace("iformat", PrimDesc(prim_iformat, type_format));
   pmap.emplace("print",   PrimDesc(prim_print,   type_print));
   pmap.emplace("version", PrimDesc(prim_version, type_version, (void*)version));
   pmap.emplace("scmp",    PrimDesc(prim_scmp,    type_scmp));
