@@ -260,11 +260,11 @@ global def vdistinctBy eq v =
       if eq vi1 vi then None else Some vi
   vmapPartial (_) (vtab keep (vlen v))
 
-global def vcollate f l r =
+global def vcmp f l r =
   def len = min (vlen l) (vlen r)
   def helper i =
     if i == len then
-      cmp (vlen l) (vlen r)
+      icmp (vlen l) (vlen r)
     else match (f (vat_ i l) (vat_ i r))
       EQ = helper (i+1)
       x  = x

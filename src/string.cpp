@@ -229,6 +229,21 @@ static PRIMFN(prim_version) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_scmp) {
+  return args.size() == 2 &&
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(Data::typeOrder);
+}
+
+static PRIMFN(prim_scmp) {
+  EXPECT(2);
+  STRING(arg0, 0);
+  STRING(arg1, 1);
+  auto out = make_order(arg0->value.compare(arg1->value));
+  RETURN(out);
+}
+
 void prim_register_string(PrimMap &pmap, const char *version) {
   pmap.emplace("catopen", PrimDesc(prim_catopen, type_catopen));
   pmap.emplace("catadd",  PrimDesc(prim_catadd,  type_catadd));
@@ -240,4 +255,9 @@ void prim_register_string(PrimMap &pmap, const char *version) {
   pmap.emplace("format",  PrimDesc(prim_format,  type_format));
   pmap.emplace("print",   PrimDesc(prim_print,   type_print));
   pmap.emplace("version", PrimDesc(prim_version, type_version, (void*)version));
+
+  pmap.emplace("scmpNFC",      PrimDesc(prim_scmp, type_scmp));
+  pmap.emplace("scmpNFKC",     PrimDesc(prim_scmp, type_scmp));
+  pmap.emplace("scmpRaw",      PrimDesc(prim_scmp, type_scmp));
+  pmap.emplace("scasecmpNFKC", PrimDesc(prim_scmp, type_scmp));
 }

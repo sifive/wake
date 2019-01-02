@@ -134,7 +134,7 @@ global def tatOpt i (Tree _ root) =
     Tip = None
     Bin _ l x r =
       def sizeL = size l
-      match (cmp i sizeL)
+      match (icmp i sizeL)
         LT = helper i l
         EQ = Some x
         GT = helper (i-sizeL-1) r

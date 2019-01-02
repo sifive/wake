@@ -565,6 +565,7 @@ static AST parse_ast(int p, Lexer &lex, bool makefirst, bool firstok) {
 }
 
 Sum *Boolean;
+Sum *Order;
 Sum *List;
 Sum *Pair;
 
@@ -685,6 +686,18 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
       lex.fail = true;
     }
     Boolean = sump;
+  }
+
+  if (top && name == "Order") {
+    if (sump->members.size() != 3 ||
+        sump->members[0].ast.args.size() != 0 ||
+        sump->members[1].ast.args.size() != 0 ||
+        sump->members[2].ast.args.size() != 0) {
+      std::cerr << "Special constructor Order not defined correctly at "
+        << sump->location << "." << std::endl;
+      lex.fail = true;
+    }
+    Order = sump;
   }
 
   if (top && name == "List") {

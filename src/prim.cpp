@@ -65,14 +65,16 @@ std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receive
   }
 }
 
-// true  x y = x
-std::shared_ptr<Value> make_true() {
-  return std::make_shared<Data>(&Boolean->members[0], nullptr);
+std::shared_ptr<Value> make_bool(bool x) {
+  return std::make_shared<Data>(&Boolean->members[x?0:1], nullptr);
 }
 
-// false x y = y
-std::shared_ptr<Value> make_false() {
-  return std::make_shared<Data>(&Boolean->members[1], nullptr);
+std::shared_ptr<Value> make_order(int x) {
+  int m;
+  if (x < 0) m = 0;
+  else if (x > 0) m = 2;
+  else m = 1;
+  return std::make_shared<Data>(&Order->members[m], nullptr);
 }
 
 // pair x y f = f x y # with x+y already bound

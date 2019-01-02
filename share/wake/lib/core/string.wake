@@ -19,3 +19,41 @@ global def int s = intbase 0 s
 
 # Version of wake
 global def version = prim "version"
+
+# Unicode NFC string comparison Ç == C+◌̧
+global def scmpNFC x y = prim "scmpNFC"
+# Unicode NFKC string comparison (¼i⁹ = 1/4i9)
+global def scmpNFKC x y = prim "scmpNFKC"
+# Unicode case insensitive NFKC comparison
+global def scasecmpNFKC x y = prim "scasecmpNFKC"
+# Raw binary string comparison; no normalization performed
+global def scmpRaw x y = prim "scmpRaw"
+
+# NFKC order (fancy format removed) -- secure default
+# This is the string order you should probably be using
+global def x <~  y = lt scmpNFKC x y
+global def x >~  y = y <~ x
+global def x >=~ y = !(x <~ y)
+global def x <=~ y = !(y <~ x)
+
+global def x ==~ y = eq scmpNFKC x y
+global def x !=~ y = !(x ==~ y)
+
+# Case insensitive order (^ = upper-case)
+global def x <^  y = lt scasecmpNFKC x y
+global def x >^  y = y <^ x
+global def x >=^ y = !(x <^ y)
+global def x <=^ y = !(y <^ x)
+
+global def x ==^ y = eq scasecmpNFKC x y
+global def x !=^ y = !(x ==^ y)
+
+# Raw binary string order
+# Only use this for non-textual data
+global def x <*  y = lt scmpRaw x y
+global def x >*  y = y <* x
+global def x >=* y = !(x <* y)
+global def x <=* y = !(y <* x)
+
+global def x ==* y = eq scmpRaw x y
+global def x !=* y = !(x ==* y)
