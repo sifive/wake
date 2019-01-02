@@ -10,7 +10,7 @@
 std::unique_ptr<Receiver> require(const char *fn, WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, bool ok, const std::string &str_) {
   if (!ok) {
     std::stringstream str;
-    str << fn << ": " << str_ << std::endl;
+    str << fn << ": " << str_;
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
     return std::unique_ptr<Receiver>();
   }
@@ -20,7 +20,7 @@ std::unique_ptr<Receiver> require(const char *fn, WorkQueue &queue, std::unique_
 std::unique_ptr<Receiver> expect_args(const char *fn, WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::vector<std::shared_ptr<Value> > &args, int expect) {
   if (args.size() != (size_t)expect) {
     std::stringstream str;
-    str << fn << " called on " << args.size() << "; was expecting " << expect << std::endl;
+    str << fn << " called on " << args.size() << "; was expecting " << expect;
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
     return std::unique_ptr<Receiver>();
   }
