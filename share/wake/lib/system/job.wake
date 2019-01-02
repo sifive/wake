@@ -9,7 +9,7 @@ global def jobcache build dir stdin env cmd visible =
   match (tryelse (\_ None) (Some _) (oncecache dir stdin env.implode cmd.implode visible.implode))
     None     = build 0
     Some out =
-      def notOk pair = hashcode pair.first != pair.second
+      def notOk pair = hashcode pair.first !=* pair.second
       match (find notOk out.outputs)
         None = out
         Some (Pair (Pair file saw) _) =

@@ -197,7 +197,7 @@ int main(int argc, const char **argv) {
   prim_register_string(pmap, VERSION);
   prim_register_vector(pmap);
   prim_register_integer(pmap);
-  prim_register_polymorphic(pmap);
+  prim_register_exception(pmap);
   prim_register_regexp(pmap);
   prim_register_job(&jobtable, pmap);
   prim_register_sources(&all_sources, pmap);
@@ -209,6 +209,11 @@ int main(int argc, const char **argv) {
 
   if (!Boolean) {
     std::cerr << "Primitive data type Boolean not defined." << std::endl;
+    ok = false;
+  }
+
+  if (!Order) {
+    std::cerr << "Primitive data type Order not defined." << std::endl;
     ok = false;
   }
 

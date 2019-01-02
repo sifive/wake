@@ -10,7 +10,7 @@
 std::unique_ptr<Receiver> require(const char *fn, WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, bool ok, const std::string &str_) {
   if (!ok) {
     std::stringstream str;
-    str << fn << ": " << str_ << std::endl;
+    str << fn << ": " << str_;
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
     return std::unique_ptr<Receiver>();
   }
@@ -20,7 +20,7 @@ std::unique_ptr<Receiver> require(const char *fn, WorkQueue &queue, std::unique_
 std::unique_ptr<Receiver> expect_args(const char *fn, WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::vector<std::shared_ptr<Value> > &args, int expect) {
   if (args.size() != (size_t)expect) {
     std::stringstream str;
-    str << fn << " called on " << args.size() << "; was expecting " << expect << std::endl;
+    str << fn << " called on " << args.size() << "; was expecting " << expect;
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
     return std::unique_ptr<Receiver>();
   }
@@ -65,14 +65,16 @@ std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receive
   }
 }
 
-// true  x y = x
-std::shared_ptr<Value> make_true() {
-  return std::make_shared<Data>(&Boolean->members[0], nullptr);
+std::shared_ptr<Value> make_bool(bool x) {
+  return std::make_shared<Data>(&Boolean->members[x?0:1], nullptr);
 }
 
-// false x y = y
-std::shared_ptr<Value> make_false() {
-  return std::make_shared<Data>(&Boolean->members[1], nullptr);
+std::shared_ptr<Value> make_order(int x) {
+  int m;
+  if (x < 0) m = 0;
+  else if (x > 0) m = 2;
+  else m = 1;
+  return std::make_shared<Data>(&Order->members[m], nullptr);
 }
 
 // pair x y f = f x y # with x+y already bound

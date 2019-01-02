@@ -99,7 +99,7 @@ static PRIMFN(prim_match) {
   EXPECT(2);
   REGEXP(arg0, 0);
   STRING(arg1, 1);
-  auto out = RE2::FullMatch(arg1->value, arg0->exp) ? make_true() : make_false();
+  auto out = make_bool(RE2::FullMatch(arg1->value, arg0->exp));
   RETURN(out);
 }
 

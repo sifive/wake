@@ -145,6 +145,21 @@ static PRIMTYPE(type_binop) {
     out->unify(Integer::typeVar);
 }
 
+static PRIMTYPE(type_icmp) {
+  return args.size() == 2 &&
+    args[0]->unify(Integer::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(Data::typeOrder);
+}
+
+static PRIMFN(prim_icmp) {
+  EXPECT(2);
+  INTEGER(arg0, 0);
+  INTEGER(arg1, 1);
+  auto out = make_order(mpz_cmp(arg0->value, arg1->value));
+  RETURN(out);
+}
+
 void prim_register_integer(PrimMap &pmap) {
   pmap.emplace("com", PrimDesc(prim_com, type_unop));
   pmap.emplace("abs", PrimDesc(prim_abs, type_unop));
@@ -166,4 +181,5 @@ void prim_register_integer(PrimMap &pmap) {
   pmap.emplace("powm",PrimDesc(prim_powm,type_powm));
   pmap.emplace("str", PrimDesc(prim_str, type_str));
   pmap.emplace("int", PrimDesc(prim_int, type_int));
+  pmap.emplace("icmp",PrimDesc(prim_icmp,type_icmp));
 }

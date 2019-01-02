@@ -108,12 +108,12 @@ global def distinctBy f l = match l
     else x, distinctBy f (y, t)
   _ = l
 
-global def collate f l r = match l r
+global def cmp f l r = match l r
   Nil     Nil     = EQ
   Nil     _       = LT
   _       Nil     = GT
   (lh,lt) (rh,rt) = match (f lh rh)
-    EQ = collate f lt rt
+    EQ = cmp f lt rt
     x  = x
 
 global def tab f n =

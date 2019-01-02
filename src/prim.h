@@ -54,10 +54,15 @@ std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receive
   } while(0)
 
 /* Useful expressions for primitives */
-std::shared_ptr<Value> make_true();
-std::shared_ptr<Value> make_false();
+std::shared_ptr<Value> make_bool(bool x);
+std::shared_ptr<Value> make_order(int x);
 std::shared_ptr<Value> make_tuple(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second);
 std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values);
+#define make_true() make_bool(true)
+#define make_false() make_bool(false)
+#define make_LT() make_order(-1)
+#define make_EQ() make_order(0)
+#define make_GT() make_order(1)
 
 #define PRIM_PURE	1	// has no side-effects (can be duplicated / removed)
 #define PRIM_SHALLOW	2	// only wait for direct arguments (not children)
@@ -79,7 +84,7 @@ struct JobTable;
 void prim_register_string(PrimMap &pmap, const char *version);
 void prim_register_vector(PrimMap &pmap);
 void prim_register_integer(PrimMap &pmap);
-void prim_register_polymorphic(PrimMap &pmap);
+void prim_register_exception(PrimMap &pmap);
 void prim_register_regexp(PrimMap &pmap);
 void prim_register_job(JobTable *jobtable, PrimMap &pmap);
 void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimMap &pmap);
