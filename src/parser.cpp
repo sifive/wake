@@ -670,7 +670,7 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
 
   if (name == "Integer" || name == "String" || name == "RegExp" ||
       name == "CatStream" || name == "Exception" || name == FN ||
-      name == "JobResult" || name == "Vector") {
+      name == "JobResult" || name == "Array") {
     std::cerr << "Constuctor " << name
       << " is reserved at " << sump->location << "." << std::endl;
     lex.fail = true;

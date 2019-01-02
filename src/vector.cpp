@@ -5,8 +5,8 @@
 #include "heap.h"
 #include "expr.h"
 
-static Constructor vectorC(AST(LOCATION, "Vector"));
-static const TypeVar vectorT("Vector", 1);
+static Constructor vectorC(AST(LOCATION, "Array"));
+static const TypeVar vectorT("Array", 1);
 
 static PRIMTYPE(type_vnew) {
   TypeVar vec;

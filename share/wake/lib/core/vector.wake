@@ -1,5 +1,5 @@
 # Vector type
-data Slice a = Slice (Vector a) Integer Integer
+data Vector a = Vector (Array a) Integer Integer
 
 # Convert List a => Vector a
 global def lvector l =
@@ -13,7 +13,7 @@ global def lvector l =
       i+1
     def _ = foldl doit 0 l
     out
-  Slice (bind (vnew llen)) 0 llen
+  Vector (bind (vnew llen)) 0 llen
 
 global def tvector t =
   def len = tlen t
@@ -24,20 +24,20 @@ global def tvector t =
     def f i x = vset out i x
     def _ = tappi f t
     out
-  Slice (bind (vnew len)) 0 len
+  Vector (bind (vnew len)) 0 len
 
-global def vempty (Slice _ s e) = s == e
-global def vlen (Slice _ s e) = e - s
+global def vempty (Vector _ s e) = s == e
+global def vlen (Vector _ s e) = e - s
 global def vlist = vfoldr (_,_) Nil
 
-global def vsplitAt i (Slice v s e) =
+global def vsplitAt i (Vector v s e) =
   def x = min e (s + max 0 i)
-  Pair (Slice v s x) (Slice v x e)
+  Pair (Vector v s x) (Vector v x e)
 
 global def vtake i v = (vsplitAt i v).first
 global def vdrop i v = (vsplitAt i v).second
 
-global def vatOpt i (Slice v s e) =
+global def vatOpt i (Vector v s e) =
   def get v i = prim "vget"
   def j = i+s
   if i >= 0 & j < e then Some (get v j) else None
@@ -46,7 +46,7 @@ global def vat i v = match (vatOpt i v)
   None   = raise "vat index out of bounds"
   Some x = x
 
-def vat_ i (Slice v s _) =
+def vat_ i (Vector v s _) =
   def get v i = prim "vget"
   get v (s+i)
 
@@ -99,7 +99,7 @@ global def vfind f v =
 global def vsplitUntil f v =
   match (vfind f v)
     None = match v
-      (Slice z _ _) = Pair v (Slice z 0 0)
+      (Vector z _ _) = Pair v (Vector z 0 0)
     Some (Pair _ i) = vsplitAt i v
 
 global def vtakeUntil f t = (vsplitUntil f t).first
@@ -127,7 +127,7 @@ global def vsplitBy f v =
       def x = vat_ i v
       if t then vset take o x else vset drop (i-o) x
     def _ = vappi exec len
-    Pair (Slice take 0 ntake) (Slice drop 0 ndrop)
+    Pair (Vector take 0 ntake) (Vector drop 0 ndrop)
   bind (vnew ntake) (vnew ndrop)
 
 global def vfilter f v = (vsplitBy f v).first
@@ -142,7 +142,7 @@ global def vunfoldl f a n =
           def _ = vset out i x
           helper a (i+1)
     def _ = helper a 0
-    Slice out 0 n
+    Vector out 0 n
   bind (vnew n)
 
 global def vscanl f a v =
@@ -156,7 +156,7 @@ global def vscanl f a v =
       then Unit
       else helper (f a (vat_ i v)) (i+1)
     def _ = helper a 0
-    Slice out 0 (len+1)
+    Vector out 0 (len+1)
   bind (vnew (len+1))
 
 global def vscanr f a v =
@@ -171,7 +171,7 @@ global def vscanr f a v =
       then Unit
       else helper (f (vat_ i1 v) a) i1
     def _ = helper a len
-    Slice out 0 (len+1)
+    Vector out 0 (len+1)
   bind (vnew (len+1))
 
 # vscan = O(n), log n deep prefix-sum
@@ -197,7 +197,7 @@ global def vscanmap f a g v =
         def _ = vset out (x-1) (helper (bottom-1) (x-1))
         bitrev bottom
     def _ = bitrev len
-    Slice out 0 len
+    Vector out 0 len
   def temp = gather (vnew len)
   def scatter out =
     def helper a s e =
@@ -207,14 +207,14 @@ global def vscanmap f a g v =
         def _ = helper a s mid
         if mid >= len then Unit else
           def v = vat_ mid temp
-          helper (a+v) mid e
+          helper (f a v) mid e
     def double x =
       if x >= len then Unit else
         def e = (x<<1) + 1
         def _ = helper (vat_ x temp) x e
         double e
     def _ = double 0
-    Slice out 0 len
+    Vector out 0 len
   scatter (vnew len)
 global def vscan f a v = vscanmap f a (_) v
 
@@ -288,7 +288,7 @@ global def vflatten vo =
       def inner i = vset out (base+i) (vat_ i vi)
       vappi inner leni
     def _ = vappi outer leno
-    Slice out 0 flat
+    Vector out 0 flat
   bind (vnew flat)
 
 # Simple parallel construction
@@ -297,7 +297,7 @@ global def vtab f n =
   def bind out =
     def vset o i v = prim "vset"
     def _ = vappi (\i vset out i (f i)) n
-    Slice out 0 n
+    Vector out 0 n
   bind (vnew n)
 
 # f will be called more than once per element
@@ -315,7 +315,7 @@ def vmapPartial f v =
       Some x = vset out (vat_ i dest) x
       None   = True
     def _ = vappi exec leni
-    Slice out 0 leno
+    Vector out 0 leno
   bind (vnew leno)
 
 def vappi f n =
