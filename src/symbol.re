@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <utf8proc.h>
 
 const char *symbolTable[] = {
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "VAL", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
@@ -415,7 +416,32 @@ Lexer::~Lexer() {
 }
 
 std::string Lexer::text() {
-  return std::string(engine->tok, engine->cur);
+  std::string out;
+  utf8proc_uint8_t *dst;
+  ssize_t len;
+
+  len = utf8proc_map(
+    reinterpret_cast<const utf8proc_uint8_t*>(engine->tok),
+    engine->cur - engine->tok,
+    &dst,
+    static_cast<utf8proc_option_t>(
+      UTF8PROC_COMPOSE   |
+      UTF8PROC_COMPAT    |
+      UTF8PROC_IGNORE    |
+      UTF8PROC_STRIPCC   |
+      UTF8PROC_LUMP      |
+      UTF8PROC_REJECTNA));
+
+  if (len >= 0) {
+    out.assign(
+      reinterpret_cast<const char*>(dst),
+      static_cast<size_t>(len));
+  } else {
+    out.assign(engine->tok, engine->cur);
+  }
+
+  free(dst);
+  return out;
 }
 
 void Lexer::consume() {
