@@ -34,7 +34,7 @@ struct Lexer {
   Lexer(const std::string &cmdline, const char *target);
   ~Lexer();
 
-  std::string text();
+  std::string text() const;
   void consume();
 
   static bool isUpper(const char *str); // unicode-upper

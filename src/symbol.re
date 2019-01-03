@@ -59,6 +59,18 @@ Cf = [\xad-\xad\u0600-\u0605\u061c-\u061c\u06dd-\u06dd\u070f-\u070f\u180e-\u180e
 Co = [\ue000-\uf8ff\U000f0000-\U000ffffd\U00100000-\U0010fffd];
 Cs = [\ud800-\udfff];
 Cn = [\u0378-\u0379\u0380-\u0383\u038b-\u038b\u038d-\u038d\u03a2-\u03a2\u0530-\u0530\u0557-\u0558\u0560-\u0560\u0588-\u0588\u058b-\u058c\u0590-\u0590\u05c8-\u05cf\u05eb-\u05ef\u05f5-\u05ff\u061d-\u061d\u070e-\u070e\u074b-\u074c\u07b2-\u07bf\u07fb-\u07ff\u082e-\u082f\u083f-\u083f\u085c-\u085d\u085f-\u089f\u08b3-\u08e3\u0984-\u0984\u098d-\u098e\u0991-\u0992\u09a9-\u09a9\u09b1-\u09b1\u09b3-\u09b5\u09ba-\u09bb\u09c5-\u09c6\u09c9-\u09ca\u09cf-\u09d6\u09d8-\u09db\u09de-\u09de\u09e4-\u09e5\u09fc-\u0a00\u0a04-\u0a04\u0a0b-\u0a0e\u0a11-\u0a12\u0a29-\u0a29\u0a31-\u0a31\u0a34-\u0a34\u0a37-\u0a37\u0a3a-\u0a3b\u0a3d-\u0a3d\u0a43-\u0a46\u0a49-\u0a4a\u0a4e-\u0a50\u0a52-\u0a58\u0a5d-\u0a5d\u0a5f-\u0a65\u0a76-\u0a80\u0a84-\u0a84\u0a8e-\u0a8e\u0a92-\u0a92\u0aa9-\u0aa9\u0ab1-\u0ab1\u0ab4-\u0ab4\u0aba-\u0abb\u0ac6-\u0ac6\u0aca-\u0aca\u0ace-\u0acf\u0ad1-\u0adf\u0ae4-\u0ae5\u0af2-\u0b00\u0b04-\u0b04\u0b0d-\u0b0e\u0b11-\u0b12\u0b29-\u0b29\u0b31-\u0b31\u0b34-\u0b34\u0b3a-\u0b3b\u0b45-\u0b46\u0b49-\u0b4a\u0b4e-\u0b55\u0b58-\u0b5b\u0b5e-\u0b5e\u0b64-\u0b65\u0b78-\u0b81\u0b84-\u0b84\u0b8b-\u0b8d\u0b91-\u0b91\u0b96-\u0b98\u0b9b-\u0b9b\u0b9d-\u0b9d\u0ba0-\u0ba2\u0ba5-\u0ba7\u0bab-\u0bad\u0bba-\u0bbd\u0bc3-\u0bc5\u0bc9-\u0bc9\u0bce-\u0bcf\u0bd1-\u0bd6\u0bd8-\u0be5\u0bfb-\u0bff\u0c04-\u0c04\u0c0d-\u0c0d\u0c11-\u0c11\u0c29-\u0c29\u0c3a-\u0c3c\u0c45-\u0c45\u0c49-\u0c49\u0c4e-\u0c54\u0c57-\u0c57\u0c5a-\u0c5f\u0c64-\u0c65\u0c70-\u0c77\u0c80-\u0c80\u0c84-\u0c84\u0c8d-\u0c8d\u0c91-\u0c91\u0ca9-\u0ca9\u0cb4-\u0cb4\u0cba-\u0cbb\u0cc5-\u0cc5\u0cc9-\u0cc9\u0cce-\u0cd4\u0cd7-\u0cdd\u0cdf-\u0cdf\u0ce4-\u0ce5\u0cf0-\u0cf0\u0cf3-\u0d00\u0d04-\u0d04\u0d0d-\u0d0d\u0d11-\u0d11\u0d3b-\u0d3c\u0d45-\u0d45\u0d49-\u0d49\u0d4f-\u0d56\u0d58-\u0d5f\u0d64-\u0d65\u0d76-\u0d78\u0d80-\u0d81\u0d84-\u0d84\u0d97-\u0d99\u0db2-\u0db2\u0dbc-\u0dbc\u0dbe-\u0dbf\u0dc7-\u0dc9\u0dcb-\u0dce\u0dd5-\u0dd5\u0dd7-\u0dd7\u0de0-\u0de5\u0df0-\u0df1\u0df5-\u0e00\u0e3b-\u0e3e\u0e5c-\u0e80\u0e83-\u0e83\u0e85-\u0e86\u0e89-\u0e89\u0e8b-\u0e8c\u0e8e-\u0e93\u0e98-\u0e98\u0ea0-\u0ea0\u0ea4-\u0ea4\u0ea6-\u0ea6\u0ea8-\u0ea9\u0eac-\u0eac\u0eba-\u0eba\u0ebe-\u0ebf\u0ec5-\u0ec5\u0ec7-\u0ec7\u0ece-\u0ecf\u0eda-\u0edb\u0ee0-\u0eff\u0f48-\u0f48\u0f6d-\u0f70\u0f98-\u0f98\u0fbd-\u0fbd\u0fcd-\u0fcd\u0fdb-\u0fff\u10c6-\u10c6\u10c8-\u10cc\u10ce-\u10cf\u1249-\u1249\u124e-\u124f\u1257-\u1257\u1259-\u1259\u125e-\u125f\u1289-\u1289\u128e-\u128f\u12b1-\u12b1\u12b6-\u12b7\u12bf-\u12bf\u12c1-\u12c1\u12c6-\u12c7\u12d7-\u12d7\u1311-\u1311\u1316-\u1317\u135b-\u135c\u137d-\u137f\u139a-\u139f\u13f5-\u13ff\u169d-\u169f\u16f9-\u16ff\u170d-\u170d\u1715-\u171f\u1737-\u173f\u1754-\u175f\u176d-\u176d\u1771-\u1771\u1774-\u177f\u17de-\u17df\u17ea-\u17ef\u17fa-\u17ff\u180f-\u180f\u181a-\u181f\u1878-\u187f\u18ab-\u18af\u18f6-\u18ff\u191f-\u191f\u192c-\u192f\u193c-\u193f\u1941-\u1943\u196e-\u196f\u1975-\u197f\u19ac-\u19af\u19ca-\u19cf\u19db-\u19dd\u1a1c-\u1a1d\u1a5f-\u1a5f\u1a7d-\u1a7e\u1a8a-\u1a8f\u1a9a-\u1a9f\u1aae-\u1aaf\u1abf-\u1aff\u1b4c-\u1b4f\u1b7d-\u1b7f\u1bf4-\u1bfb\u1c38-\u1c3a\u1c4a-\u1c4c\u1c80-\u1cbf\u1cc8-\u1ccf\u1cf7-\u1cf7\u1cfa-\u1cff\u1df6-\u1dfb\u1f16-\u1f17\u1f1e-\u1f1f\u1f46-\u1f47\u1f4e-\u1f4f\u1f58-\u1f58\u1f5a-\u1f5a\u1f5c-\u1f5c\u1f5e-\u1f5e\u1f7e-\u1f7f\u1fb5-\u1fb5\u1fc5-\u1fc5\u1fd4-\u1fd5\u1fdc-\u1fdc\u1ff0-\u1ff1\u1ff5-\u1ff5\u1fff-\u1fff\u2065-\u2065\u2072-\u2073\u208f-\u208f\u209d-\u209f\u20be-\u20cf\u20f1-\u20ff\u218a-\u218f\u23fb-\u23ff\u2427-\u243f\u244b-\u245f\u2b74-\u2b75\u2b96-\u2b97\u2bba-\u2bbc\u2bc9-\u2bc9\u2bd2-\u2bff\u2c2f-\u2c2f\u2c5f-\u2c5f\u2cf4-\u2cf8\u2d26-\u2d26\u2d28-\u2d2c\u2d2e-\u2d2f\u2d68-\u2d6e\u2d71-\u2d7e\u2d97-\u2d9f\u2da7-\u2da7\u2daf-\u2daf\u2db7-\u2db7\u2dbf-\u2dbf\u2dc7-\u2dc7\u2dcf-\u2dcf\u2dd7-\u2dd7\u2ddf-\u2ddf\u2e43-\u2e7f\u2e9a-\u2e9a\u2ef4-\u2eff\u2fd6-\u2fef\u2ffc-\u2fff\u3040-\u3040\u3097-\u3098\u3100-\u3104\u312e-\u3130\u318f-\u318f\u31bb-\u31bf\u31e4-\u31ef\u321f-\u321f\u32ff-\u32ff\u4db6-\u4dbf\u9fcd-\u9fff\ua48d-\ua48f\ua4c7-\ua4cf\ua62c-\ua63f\ua69e-\ua69e\ua6f8-\ua6ff\ua78f-\ua78f\ua7ae-\ua7af\ua7b2-\ua7f6\ua82c-\ua82f\ua83a-\ua83f\ua878-\ua87f\ua8c5-\ua8cd\ua8da-\ua8df\ua8fc-\ua8ff\ua954-\ua95e\ua97d-\ua97f\ua9ce-\ua9ce\ua9da-\ua9dd\ua9ff-\ua9ff\uaa37-\uaa3f\uaa4e-\uaa4f\uaa5a-\uaa5b\uaac3-\uaada\uaaf7-\uab00\uab07-\uab08\uab0f-\uab10\uab17-\uab1f\uab27-\uab27\uab2f-\uab2f\uab60-\uab63\uab66-\uabbf\uabee-\uabef\uabfa-\uabff\ud7a4-\ud7af\ud7c7-\ud7ca\ud7fc-\ud7ff\ufa6e-\ufa6f\ufada-\ufaff\ufb07-\ufb12\ufb18-\ufb1c\ufb37-\ufb37\ufb3d-\ufb3d\ufb3f-\ufb3f\ufb42-\ufb42\ufb45-\ufb45\ufbc2-\ufbd2\ufd40-\ufd4f\ufd90-\ufd91\ufdc8-\ufdef\ufdfe-\ufdff\ufe1a-\ufe1f\ufe2e-\ufe2f\ufe53-\ufe53\ufe67-\ufe67\ufe6c-\ufe6f\ufe75-\ufe75\ufefd-\ufefe\uff00-\uff00\uffbf-\uffc1\uffc8-\uffc9\uffd0-\uffd1\uffd8-\uffd9\uffdd-\uffdf\uffe7-\uffe7\uffef-\ufff8\ufffe-\U0000ffff\U0001000c-\U0001000c\U00010027-\U00010027\U0001003b-\U0001003b\U0001003e-\U0001003e\U0001004e-\U0001004f\U0001005e-\U0001007f\U000100fb-\U000100ff\U00010103-\U00010106\U00010134-\U00010136\U0001018d-\U0001018f\U0001019c-\U0001019f\U000101a1-\U000101cf\U000101fe-\U0001027f\U0001029d-\U0001029f\U000102d1-\U000102df\U000102fc-\U000102ff\U00010324-\U0001032f\U0001034b-\U0001034f\U0001037b-\U0001037f\U0001039e-\U0001039e\U000103c4-\U000103c7\U000103d6-\U000103ff\U0001049e-\U0001049f\U000104aa-\U000104ff\U00010528-\U0001052f\U00010564-\U0001056e\U00010570-\U000105ff\U00010737-\U0001073f\U00010756-\U0001075f\U00010768-\U000107ff\U00010806-\U00010807\U00010809-\U00010809\U00010836-\U00010836\U00010839-\U0001083b\U0001083d-\U0001083e\U00010856-\U00010856\U0001089f-\U000108a6\U000108b0-\U000108ff\U0001091c-\U0001091e\U0001093a-\U0001093e\U00010940-\U0001097f\U000109b8-\U000109bd\U000109c0-\U000109ff\U00010a04-\U00010a04\U00010a07-\U00010a0b\U00010a14-\U00010a14\U00010a18-\U00010a18\U00010a34-\U00010a37\U00010a3b-\U00010a3e\U00010a48-\U00010a4f\U00010a59-\U00010a5f\U00010aa0-\U00010abf\U00010ae7-\U00010aea\U00010af7-\U00010aff\U00010b36-\U00010b38\U00010b56-\U00010b57\U00010b73-\U00010b77\U00010b92-\U00010b98\U00010b9d-\U00010ba8\U00010bb0-\U00010bff\U00010c49-\U00010e5f\U00010e7f-\U00010fff\U0001104e-\U00011051\U00011070-\U0001107e\U000110c2-\U000110cf\U000110e9-\U000110ef\U000110fa-\U000110ff\U00011135-\U00011135\U00011144-\U0001114f\U00011177-\U0001117f\U000111c9-\U000111cc\U000111ce-\U000111cf\U000111db-\U000111e0\U000111f5-\U000111ff\U00011212-\U00011212\U0001123e-\U000112af\U000112eb-\U000112ef\U000112fa-\U00011300\U00011304-\U00011304\U0001130d-\U0001130e\U00011311-\U00011312\U00011329-\U00011329\U00011331-\U00011331\U00011334-\U00011334\U0001133a-\U0001133b\U00011345-\U00011346\U00011349-\U0001134a\U0001134e-\U00011356\U00011358-\U0001135c\U00011364-\U00011365\U0001136d-\U0001136f\U00011375-\U0001147f\U000114c8-\U000114cf\U000114da-\U0001157f\U000115b6-\U000115b7\U000115ca-\U000115ff\U00011645-\U0001164f\U0001165a-\U0001167f\U000116b8-\U000116bf\U000116ca-\U0001189f\U000118f3-\U000118fe\U00011900-\U00011abf\U00011af9-\U00011fff\U00012399-\U000123ff\U0001246f-\U0001246f\U00012475-\U00012fff\U0001342f-\U000167ff\U00016a39-\U00016a3f\U00016a5f-\U00016a5f\U00016a6a-\U00016a6d\U00016a70-\U00016acf\U00016aee-\U00016aef\U00016af6-\U00016aff\U00016b46-\U00016b4f\U00016b5a-\U00016b5a\U00016b62-\U00016b62\U00016b78-\U00016b7c\U00016b90-\U00016eff\U00016f45-\U00016f4f\U00016f7f-\U00016f8e\U00016fa0-\U0001afff\U0001b002-\U0001bbff\U0001bc6b-\U0001bc6f\U0001bc7d-\U0001bc7f\U0001bc89-\U0001bc8f\U0001bc9a-\U0001bc9b\U0001bca4-\U0001cfff\U0001d0f6-\U0001d0ff\U0001d127-\U0001d128\U0001d1de-\U0001d1ff\U0001d246-\U0001d2ff\U0001d357-\U0001d35f\U0001d372-\U0001d3ff\U0001d455-\U0001d455\U0001d49d-\U0001d49d\U0001d4a0-\U0001d4a1\U0001d4a3-\U0001d4a4\U0001d4a7-\U0001d4a8\U0001d4ad-\U0001d4ad\U0001d4ba-\U0001d4ba\U0001d4bc-\U0001d4bc\U0001d4c4-\U0001d4c4\U0001d506-\U0001d506\U0001d50b-\U0001d50c\U0001d515-\U0001d515\U0001d51d-\U0001d51d\U0001d53a-\U0001d53a\U0001d53f-\U0001d53f\U0001d545-\U0001d545\U0001d547-\U0001d549\U0001d551-\U0001d551\U0001d6a6-\U0001d6a7\U0001d7cc-\U0001d7cd\U0001d800-\U0001e7ff\U0001e8c5-\U0001e8c6\U0001e8d7-\U0001edff\U0001ee04-\U0001ee04\U0001ee20-\U0001ee20\U0001ee23-\U0001ee23\U0001ee25-\U0001ee26\U0001ee28-\U0001ee28\U0001ee33-\U0001ee33\U0001ee38-\U0001ee38\U0001ee3a-\U0001ee3a\U0001ee3c-\U0001ee41\U0001ee43-\U0001ee46\U0001ee48-\U0001ee48\U0001ee4a-\U0001ee4a\U0001ee4c-\U0001ee4c\U0001ee50-\U0001ee50\U0001ee53-\U0001ee53\U0001ee55-\U0001ee56\U0001ee58-\U0001ee58\U0001ee5a-\U0001ee5a\U0001ee5c-\U0001ee5c\U0001ee5e-\U0001ee5e\U0001ee60-\U0001ee60\U0001ee63-\U0001ee63\U0001ee65-\U0001ee66\U0001ee6b-\U0001ee6b\U0001ee73-\U0001ee73\U0001ee78-\U0001ee78\U0001ee7d-\U0001ee7d\U0001ee7f-\U0001ee7f\U0001ee8a-\U0001ee8a\U0001ee9c-\U0001eea0\U0001eea4-\U0001eea4\U0001eeaa-\U0001eeaa\U0001eebc-\U0001eeef\U0001eef2-\U0001efff\U0001f02c-\U0001f02f\U0001f094-\U0001f09f\U0001f0af-\U0001f0b0\U0001f0c0-\U0001f0c0\U0001f0d0-\U0001f0d0\U0001f0f6-\U0001f0ff\U0001f10d-\U0001f10f\U0001f12f-\U0001f12f\U0001f16c-\U0001f16f\U0001f19b-\U0001f1e5\U0001f203-\U0001f20f\U0001f23b-\U0001f23f\U0001f249-\U0001f24f\U0001f252-\U0001f2ff\U0001f32d-\U0001f32f\U0001f37e-\U0001f37f\U0001f3cf-\U0001f3d3\U0001f3f8-\U0001f3ff\U0001f4ff-\U0001f4ff\U0001f54b-\U0001f54f\U0001f57a-\U0001f57a\U0001f5a4-\U0001f5a4\U0001f643-\U0001f644\U0001f6d0-\U0001f6df\U0001f6ed-\U0001f6ef\U0001f6f4-\U0001f6ff\U0001f774-\U0001f77f\U0001f7d5-\U0001f7ff\U0001f80c-\U0001f80f\U0001f848-\U0001f84f\U0001f85a-\U0001f85f\U0001f888-\U0001f88f\U0001f8ae-\U0001ffff\U0002a6d7-\U0002a6ff\U0002b735-\U0002b73f\U0002b81e-\U0002f7ff\U0002fa1e-\U000e0000\U000e0002-\U000e001f\U000e0080-\U000e00ff\U000e01f0-\U000effff\U000ffffe-\U000fffff\U0010fffe-\U0010ffff];
+
+Sma = [\u2190\u2191\u2192\u2193\u2194\u219a\u219b\u21a0\u21a3\u21a6] | // ←↑→↓↔↚↛↠↣↦
+      [\u21ae\u21ce\u21cf\u21d2\u21d4\u21f4\u21f5\u21f6\u21f7\u21f8] | // ↮⇎⇏⇒⇔⇴⇵⇶⇷⇸
+      [\u21f9\u21fa\u21fb\u21fc\u21fd\u21fe\u21ff]; // ⇹⇺⇻⇼⇽⇾⇿
+Smo = [\xac\xb1\xd7\xf7\u0606\u0607\u2044\u2052\u207a\u207b\u207c\u208a\u208b\u208c] | // ¬±×÷؆؇⁄⁒⁺⁻⁼₊₋₌
+      [\u2140\u214b\u2200\u2201\u2203\u2204\u2208\u2209\u220a\u220b\u220c\u220d] | // ⅀⅋∀∁∃∄∈∉∊∋∌∍
+      [\u220e\u220f\u2210\u2211\u2212\u2213\u2214\u2215\u2217\u2218\u2219]       | // ∎∏∐∑−∓∔∕∗∘∙
+      [\u221a\u221b\u221c\u221d\u221f\u2220\u2221\u2222\u2225\u2226\u2227\u2228] | // √∛∜∝∟∠∡∢∥∦∧∨
+      [\u2229\u222a\u222b-\u2233\u2234\u2235] | // ∩∪ ∫ ∬ ∭ ∮ ∯ ∰ ∱ ∲ ∳ ∴∵
+      Sma;
+Smc = [\u03f6\u2118\u2141\u2142\u2143\u2144\u2202\u2205\u2206\u2207\u221e]; // ϶℘⅁⅂⅃⅄∂∅∆∇∞
+Smx = [\u0608\u2216\u2223\u2224]; // ??? ؈∖∣∤
 */
 
 struct input_t {
@@ -366,13 +378,13 @@ top:
       reserved = [:;?@];
       special = [#"'\\];
       // future: op = (Sc|Sk|Sm|(Po\reserved\special)|Pd)+;
-      op = [.$^*/%\-+~`<>=!&|,]+;
+      op = (Sc|Smo|[.^*/%\-+~`<>=!&|,])+;
 
       // identifiers
       modifier = Lm|M;
       upper = Lt|Lu;
-      start = L|So;
-      body = L|So|N|Pc|M;
+      start = L|So|Smc;
+      body = L|So|Smc|N|Pc|Lm|M;
       id = modifier* start body* | "_";
 
       id { return mkSym(ID); }
@@ -415,14 +427,50 @@ Lexer::~Lexer() {
   if (engine->file) fclose(engine->file);
 }
 
-std::string Lexer::text() {
+static std::string op_escape(const char *str) {
   std::string out;
+  const char *ignore;
+  const char *YYCTXMARKER;
+  (void)ignore;
+  (void)YYCTXMARKER;
+
+  while (true) {
+    const char *start = str;
+    /*!re2c
+      re2c:yyfill:enable = 0;
+      re2c:define:YYMARKER = ignore;
+      re2c:define:YYCURSOR = str;
+
+      *            { break; }
+      [\x00]       { break; }
+      [\xac]       { out.push_back('!'); continue; } // ¬
+      [\xf7]       { out.push_back('/'); continue; } // ÷
+      [\u2044]     { out.push_back('/'); continue; } // ⁄
+      [\u2052]     { out.push_back('%'); continue; } // ⁒
+      [\u2118]     { out.push_back('P'); continue; } // ℘
+      [\u2141]     { out.push_back('G'); continue; } // ⅁
+      [\u2142]     { out.push_back('L'); continue; } // ⅂
+      [\u2143]     { out.push_back('L'); continue; } // ⅃
+      [\u2144]     { out.push_back('Y'); continue; } // ⅄
+      [\u214b]     { out.push_back('&'); continue; } // ⅋
+      [\u220a]     { out.append("∈");    continue; } // ∊
+      [\u220d]     { out.append("∋");    continue; } // ∍
+      [\u2217]     { out.push_back('*'); continue; } // ∗
+      [\u0606]     { out.append("∛");    continue; } // ؆
+      [\u0607]     { out.append("∜");    continue; } // ؇
+      [^]          { out.append(start, str); continue; }
+  */}
+
+  return out;
+}
+
+static ssize_t id_escape(const unsigned char *s, const unsigned char *e, char **out) {
   utf8proc_uint8_t *dst;
   ssize_t len;
 
   len = utf8proc_map(
-    reinterpret_cast<const utf8proc_uint8_t*>(engine->tok),
-    engine->cur - engine->tok,
+    reinterpret_cast<const utf8proc_uint8_t*>(s),
+    e - s,
     &dst,
     static_cast<utf8proc_option_t>(
       UTF8PROC_COMPOSE   |
@@ -432,15 +480,23 @@ std::string Lexer::text() {
       UTF8PROC_LUMP      |
       UTF8PROC_REJECTNA));
 
+  *out = reinterpret_cast<char*>(dst);
+  return len;
+}
+
+std::string Lexer::text() const {
+  std::string out;
+  char *dst;
+  ssize_t len;
+
+  len = id_escape(engine->tok, engine->cur, &dst);
   if (len >= 0) {
-    out.assign(
-      reinterpret_cast<const char*>(dst),
-      static_cast<size_t>(len));
+    out = op_escape(dst);
+    free(dst);
   } else {
     out.assign(engine->tok, engine->cur);
   }
 
-  free(dst);
   return out;
 }
 
@@ -520,20 +576,33 @@ op_type op_precedence(const char *str) {
       re2c:define:YYMARKER = ignore;
       re2c:define:YYCURSOR = str;
 
-      *            { return op_type(-1, -1); }
-      [.]          { return op_type(13, 1);  }
-      [smpa]       { return op_type(APP_PRECEDENCE, 1); } // SUBSCRIBE/MEMOIZE/PRIM/APP
-      "^"          { return op_type(11, 0);  }
-      [*]          { return op_type(10, 1);  }
-      [/%]         { return op_type(9, 1);   }
-      [!] / [^=]   { return op_type(7, 1);   }
-      [-+~`]       { return op_type(7, 1);   }
-      [<>]         { return op_type(6, 1);   }
-      [!=]         { return op_type(5, 0);   }
-      [&]          { return op_type(4, 1);   }
-      [|]          { return op_type(3, 1);   }
-      [$]          { return op_type(2, 0);   }
-      [,]          { return op_type(1, 0);   }
-      [\\]         { return op_type(0, 0);   }
+      *                          { return op_type(-1, -1);}
+      [.]                        { return op_type(18, 1); }
+      [smpa]                     { return op_type(APP_PRECEDENCE, 1); } // SUBSCRIBE/MEMOIZE/PRIM/APP
+      [\u2218\u2219]             { return op_type(16, 0); } // ∘∙
+      "^"                        { return op_type(15, 0); }
+      [\u220f]                   { return op_type(14, 0); } // ∏
+      [*\xd7]                    { return op_type(13, 1); } // ×
+      [\u2210]                   { return op_type(12, 0); } // ∐
+      [/%]                       { return op_type(11, 1); }
+      [\u2211]                   { return op_type(10, 0); } // ∑
+      [!] / [^=]                 { return op_type(9, 1);  }
+      [-+~`]                     |
+      [\xb1\u2213\u2214]         { return op_type(9, 1);  } // ±∓∔
+      [\u221a\u221b\u221c]       { return op_type(8, 1);  } // √∛∜
+      [<>\u221d]                 |                          // ∝
+      [\u2208\u2209\u220b\u220c] |                          // ∈∉∋∌
+      [\u221f\u2220\u2221\u2222] |                          // ∟∠∡∢
+      [\u2225\u2226]             { return op_type(7, 1);  } // ∥∦
+      [!=]                       { return op_type(6, 0);  }
+      [&\u2227\u2229]            { return op_type(5, 1);  } // ∧∩
+      [|\u2228\u222a]            { return op_type(4, 1);  } // ∨∪
+      Sc                         { return op_type(3, 0);  }
+      Sma                        { return op_type(2, 0);  }
+      [,]                        { return op_type(1, 0);  }
+      [\\]                       |
+      [\u2200\u2201\u2203\u2204] |                          // ∀∁∃∄
+      [\u222b-\u2233]            |                          // ∫ ∬ ∭ ∮ ∯ ∰ ∱ ∲ ∳
+      [\u220e\u2234\u2235]       { return op_type(0, 0);  } // ∎∴∵
   */
 }
