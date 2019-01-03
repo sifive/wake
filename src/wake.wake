@@ -1,6 +1,6 @@
 def re2c file =
   def cpp = replace '\.re$' ".cpp" file
-  def cmdline = which "re2c", file, "-o", cpp, Nil
+  def cmdline = which "re2c", "-8", file, "-o", cpp, Nil
   def result = job cmdline (file, Nil) Nil
   result.output
 
