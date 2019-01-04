@@ -4,6 +4,7 @@
 #include "hash.h"
 #include <memory>
 #include <vector>
+#include <iosfwd>
 
 struct Value;
 struct WorkQueue;

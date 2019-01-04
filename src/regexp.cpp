@@ -2,8 +2,11 @@
 #include "value.h"
 #include "heap.h"
 #include "hash.h"
+#include "type.h"
 #include <re2/re2.h>
 #include <iostream>
+#include <string>
+#include <iosfwd>
 
 struct RegExp : public Value {
   RE2 exp;

@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 #include <cstdint>
+#include <iosfwd>
 #include <gmp.h>
 
 #define APP_PRECEDENCE 12

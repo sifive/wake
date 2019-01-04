@@ -4,6 +4,7 @@
 #include "value.h"
 #include "heap.h"
 #include "expr.h"
+#include "type.h"
 
 static Constructor vectorC(AST(LOCATION, "Array"));
 static const TypeVar vectorT("Array", 1);

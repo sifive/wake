@@ -6,6 +6,7 @@
 #include "parser.h"
 #include <cstdlib>
 #include <sstream>
+#include <iosfwd>
 
 std::unique_ptr<Receiver> require(const char *fn, WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, bool ok, const std::string &str_) {
   if (!ok) {
