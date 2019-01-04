@@ -318,6 +318,10 @@ def upper f root =
   none root
 
 # Returns True if there is a key in t = y
+global def x ∈ y = tcontains x y
+global def x ∉ y = !(x ∈ y)
+global def x ∋ y = y ∈ x
+global def x ∌ y = y ∉ x
 global def tcontains y t =
   match t (tupperLE y t)
     (Tree cmp _) None              = False
@@ -330,6 +334,7 @@ global def tdistinctBy f t = match t
   Tree cmp _ = Tree cmp (build (vdistinctBy f (tvector t)))
 
 # Union of two trees, keeping only values from a on equality
+global def a ∪ b = tunion a b
 global def tunion (Tree _ aroot) (Tree cmp broot) =
   Tree cmp (union cmp aroot broot)
 def union cmp aroot broot =
@@ -368,6 +373,7 @@ global def tsubtract (Tree _ aroot) (Tree cmp broot) =
   Tree cmp (helper aroot broot)
 
 # Keep all occurrences of keys from a which appear in b
+global def a ∩ b = tintersect a b
 global def tintersect (Tree _ aroot) (Tree cmp broot) =
   def helper a b = match a b
     Tip _ = Tip

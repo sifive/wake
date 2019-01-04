@@ -1,3 +1,4 @@
 # Syntax helpers
 global def x . f = f x
 global def f $ x = f x
+global def f ∘ g = \x f (g x)
