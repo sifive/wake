@@ -25,7 +25,7 @@ lib/wake/fuse-wake:	fuse/fuse.cpp
 	$(CXX) -std=c++11 $(CFLAGS) -I $(GMP_INC) -o $@ -c $<
 
 %.cpp:	%.re
-	re2c -8 $< > $@.tmp
+	re2c -8 --no-generation-date $< > $@.tmp
 	mv $@.tmp $@
 
 .PRECIOUS:	src/symbol.cpp
