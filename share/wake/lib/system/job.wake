@@ -36,8 +36,10 @@ global def kill    job signal = prim "job_kill" # s != 0 => kills; blocks till e
 global def status  job = kill  job 0
 global def stdout  job = stdio job 1
 global def stderr  job = stdio job 2
-global def inputs  job = tree job 1
-global def outputs job = tree job 2
+global def inputs  job = fail job (tree job 1)
+global def outputs job = fail job (tree job 2)
+global def rawinputs  job = tree job 1
+global def rawoutputs job = tree job 2
 global def output  job =
   def got = outputs job
   def num = got.len
