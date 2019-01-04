@@ -1,5 +1,6 @@
 # Bootstrap build file
 
+CXX     ?= g++
 GMP     ?= /opt/local
 GMP_INC ?= $(GMP)/include
 GMP_LIB ?= $(GMP)/lib
@@ -15,13 +16,13 @@ install:	all
 	./bin/wake -v install '"install"'
 
 bin/wake:	$(patsubst %.cpp,%.o,$(wildcard src/*.cpp)) src/symbol.o
-	g++ -std=c++11 $(CFLAGS) -L $(GMP_LIB) -o $@ $^ -lgmp -lre2 -lsqlite3 -lutf8proc
+	$(CXX) -std=c++11 $(CFLAGS) -L $(GMP_LIB) -o $@ $^ -lgmp -lre2 -lsqlite3 -lutf8proc
 
 lib/wake/fuse-wake:	fuse/fuse.cpp
-	g++ -std=c++11 $(CFLAGS) `pkg-config --cflags fuse` $< -o $@ `pkg-config --libs fuse`
+	$(CXX) -std=c++11 $(CFLAGS) `pkg-config --cflags fuse` $< -o $@ `pkg-config --libs fuse`
 
 %.o:	%.cpp	$(wildcard src/*.h)
-	g++ -std=c++11 $(CFLAGS) -I $(GMP_INC) -o $@ -c $<
+	$(CXX) -std=c++11 $(CFLAGS) -I $(GMP_INC) -o $@ -c $<
 
 %.cpp:	%.re
 	re2c $< > $@.tmp
