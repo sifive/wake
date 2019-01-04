@@ -1,5 +1,6 @@
 #include "sources.h"
 #include "prim.h"
+#include "primfn.h"
 #include "value.h"
 #include "heap.h"
 #include "whereami.h"

@@ -3,6 +3,7 @@
 #include "symbol.h"
 #include "value.h"
 #include "datatype.h"
+#include "location.h"
 #include <iostream>
 #include <list>
 #include <set>

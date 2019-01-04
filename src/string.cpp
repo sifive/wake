@@ -3,9 +3,11 @@
 #include "heap.h"
 #include "hash.h"
 #include "expr.h"
+#include "type.h"
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <iosfwd>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <errno.h>
