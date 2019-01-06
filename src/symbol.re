@@ -60,17 +60,34 @@ Co = [\ue000-\uf8ff\U000f0000-\U000ffffd\U00100000-\U0010fffd];
 Cs = [\ud800-\udfff];
 Cn = [\u0378-\u0379\u0380-\u0383\u038b-\u038b\u038d-\u038d\u03a2-\u03a2\u0530-\u0530\u0557-\u0558\u0560-\u0560\u0588-\u0588\u058b-\u058c\u0590-\u0590\u05c8-\u05cf\u05eb-\u05ef\u05f5-\u05ff\u061d-\u061d\u070e-\u070e\u074b-\u074c\u07b2-\u07bf\u07fb-\u07ff\u082e-\u082f\u083f-\u083f\u085c-\u085d\u085f-\u089f\u08b3-\u08e3\u0984-\u0984\u098d-\u098e\u0991-\u0992\u09a9-\u09a9\u09b1-\u09b1\u09b3-\u09b5\u09ba-\u09bb\u09c5-\u09c6\u09c9-\u09ca\u09cf-\u09d6\u09d8-\u09db\u09de-\u09de\u09e4-\u09e5\u09fc-\u0a00\u0a04-\u0a04\u0a0b-\u0a0e\u0a11-\u0a12\u0a29-\u0a29\u0a31-\u0a31\u0a34-\u0a34\u0a37-\u0a37\u0a3a-\u0a3b\u0a3d-\u0a3d\u0a43-\u0a46\u0a49-\u0a4a\u0a4e-\u0a50\u0a52-\u0a58\u0a5d-\u0a5d\u0a5f-\u0a65\u0a76-\u0a80\u0a84-\u0a84\u0a8e-\u0a8e\u0a92-\u0a92\u0aa9-\u0aa9\u0ab1-\u0ab1\u0ab4-\u0ab4\u0aba-\u0abb\u0ac6-\u0ac6\u0aca-\u0aca\u0ace-\u0acf\u0ad1-\u0adf\u0ae4-\u0ae5\u0af2-\u0b00\u0b04-\u0b04\u0b0d-\u0b0e\u0b11-\u0b12\u0b29-\u0b29\u0b31-\u0b31\u0b34-\u0b34\u0b3a-\u0b3b\u0b45-\u0b46\u0b49-\u0b4a\u0b4e-\u0b55\u0b58-\u0b5b\u0b5e-\u0b5e\u0b64-\u0b65\u0b78-\u0b81\u0b84-\u0b84\u0b8b-\u0b8d\u0b91-\u0b91\u0b96-\u0b98\u0b9b-\u0b9b\u0b9d-\u0b9d\u0ba0-\u0ba2\u0ba5-\u0ba7\u0bab-\u0bad\u0bba-\u0bbd\u0bc3-\u0bc5\u0bc9-\u0bc9\u0bce-\u0bcf\u0bd1-\u0bd6\u0bd8-\u0be5\u0bfb-\u0bff\u0c04-\u0c04\u0c0d-\u0c0d\u0c11-\u0c11\u0c29-\u0c29\u0c3a-\u0c3c\u0c45-\u0c45\u0c49-\u0c49\u0c4e-\u0c54\u0c57-\u0c57\u0c5a-\u0c5f\u0c64-\u0c65\u0c70-\u0c77\u0c80-\u0c80\u0c84-\u0c84\u0c8d-\u0c8d\u0c91-\u0c91\u0ca9-\u0ca9\u0cb4-\u0cb4\u0cba-\u0cbb\u0cc5-\u0cc5\u0cc9-\u0cc9\u0cce-\u0cd4\u0cd7-\u0cdd\u0cdf-\u0cdf\u0ce4-\u0ce5\u0cf0-\u0cf0\u0cf3-\u0d00\u0d04-\u0d04\u0d0d-\u0d0d\u0d11-\u0d11\u0d3b-\u0d3c\u0d45-\u0d45\u0d49-\u0d49\u0d4f-\u0d56\u0d58-\u0d5f\u0d64-\u0d65\u0d76-\u0d78\u0d80-\u0d81\u0d84-\u0d84\u0d97-\u0d99\u0db2-\u0db2\u0dbc-\u0dbc\u0dbe-\u0dbf\u0dc7-\u0dc9\u0dcb-\u0dce\u0dd5-\u0dd5\u0dd7-\u0dd7\u0de0-\u0de5\u0df0-\u0df1\u0df5-\u0e00\u0e3b-\u0e3e\u0e5c-\u0e80\u0e83-\u0e83\u0e85-\u0e86\u0e89-\u0e89\u0e8b-\u0e8c\u0e8e-\u0e93\u0e98-\u0e98\u0ea0-\u0ea0\u0ea4-\u0ea4\u0ea6-\u0ea6\u0ea8-\u0ea9\u0eac-\u0eac\u0eba-\u0eba\u0ebe-\u0ebf\u0ec5-\u0ec5\u0ec7-\u0ec7\u0ece-\u0ecf\u0eda-\u0edb\u0ee0-\u0eff\u0f48-\u0f48\u0f6d-\u0f70\u0f98-\u0f98\u0fbd-\u0fbd\u0fcd-\u0fcd\u0fdb-\u0fff\u10c6-\u10c6\u10c8-\u10cc\u10ce-\u10cf\u1249-\u1249\u124e-\u124f\u1257-\u1257\u1259-\u1259\u125e-\u125f\u1289-\u1289\u128e-\u128f\u12b1-\u12b1\u12b6-\u12b7\u12bf-\u12bf\u12c1-\u12c1\u12c6-\u12c7\u12d7-\u12d7\u1311-\u1311\u1316-\u1317\u135b-\u135c\u137d-\u137f\u139a-\u139f\u13f5-\u13ff\u169d-\u169f\u16f9-\u16ff\u170d-\u170d\u1715-\u171f\u1737-\u173f\u1754-\u175f\u176d-\u176d\u1771-\u1771\u1774-\u177f\u17de-\u17df\u17ea-\u17ef\u17fa-\u17ff\u180f-\u180f\u181a-\u181f\u1878-\u187f\u18ab-\u18af\u18f6-\u18ff\u191f-\u191f\u192c-\u192f\u193c-\u193f\u1941-\u1943\u196e-\u196f\u1975-\u197f\u19ac-\u19af\u19ca-\u19cf\u19db-\u19dd\u1a1c-\u1a1d\u1a5f-\u1a5f\u1a7d-\u1a7e\u1a8a-\u1a8f\u1a9a-\u1a9f\u1aae-\u1aaf\u1abf-\u1aff\u1b4c-\u1b4f\u1b7d-\u1b7f\u1bf4-\u1bfb\u1c38-\u1c3a\u1c4a-\u1c4c\u1c80-\u1cbf\u1cc8-\u1ccf\u1cf7-\u1cf7\u1cfa-\u1cff\u1df6-\u1dfb\u1f16-\u1f17\u1f1e-\u1f1f\u1f46-\u1f47\u1f4e-\u1f4f\u1f58-\u1f58\u1f5a-\u1f5a\u1f5c-\u1f5c\u1f5e-\u1f5e\u1f7e-\u1f7f\u1fb5-\u1fb5\u1fc5-\u1fc5\u1fd4-\u1fd5\u1fdc-\u1fdc\u1ff0-\u1ff1\u1ff5-\u1ff5\u1fff-\u1fff\u2065-\u2065\u2072-\u2073\u208f-\u208f\u209d-\u209f\u20be-\u20cf\u20f1-\u20ff\u218a-\u218f\u23fb-\u23ff\u2427-\u243f\u244b-\u245f\u2b74-\u2b75\u2b96-\u2b97\u2bba-\u2bbc\u2bc9-\u2bc9\u2bd2-\u2bff\u2c2f-\u2c2f\u2c5f-\u2c5f\u2cf4-\u2cf8\u2d26-\u2d26\u2d28-\u2d2c\u2d2e-\u2d2f\u2d68-\u2d6e\u2d71-\u2d7e\u2d97-\u2d9f\u2da7-\u2da7\u2daf-\u2daf\u2db7-\u2db7\u2dbf-\u2dbf\u2dc7-\u2dc7\u2dcf-\u2dcf\u2dd7-\u2dd7\u2ddf-\u2ddf\u2e43-\u2e7f\u2e9a-\u2e9a\u2ef4-\u2eff\u2fd6-\u2fef\u2ffc-\u2fff\u3040-\u3040\u3097-\u3098\u3100-\u3104\u312e-\u3130\u318f-\u318f\u31bb-\u31bf\u31e4-\u31ef\u321f-\u321f\u32ff-\u32ff\u4db6-\u4dbf\u9fcd-\u9fff\ua48d-\ua48f\ua4c7-\ua4cf\ua62c-\ua63f\ua69e-\ua69e\ua6f8-\ua6ff\ua78f-\ua78f\ua7ae-\ua7af\ua7b2-\ua7f6\ua82c-\ua82f\ua83a-\ua83f\ua878-\ua87f\ua8c5-\ua8cd\ua8da-\ua8df\ua8fc-\ua8ff\ua954-\ua95e\ua97d-\ua97f\ua9ce-\ua9ce\ua9da-\ua9dd\ua9ff-\ua9ff\uaa37-\uaa3f\uaa4e-\uaa4f\uaa5a-\uaa5b\uaac3-\uaada\uaaf7-\uab00\uab07-\uab08\uab0f-\uab10\uab17-\uab1f\uab27-\uab27\uab2f-\uab2f\uab60-\uab63\uab66-\uabbf\uabee-\uabef\uabfa-\uabff\ud7a4-\ud7af\ud7c7-\ud7ca\ud7fc-\ud7ff\ufa6e-\ufa6f\ufada-\ufaff\ufb07-\ufb12\ufb18-\ufb1c\ufb37-\ufb37\ufb3d-\ufb3d\ufb3f-\ufb3f\ufb42-\ufb42\ufb45-\ufb45\ufbc2-\ufbd2\ufd40-\ufd4f\ufd90-\ufd91\ufdc8-\ufdef\ufdfe-\ufdff\ufe1a-\ufe1f\ufe2e-\ufe2f\ufe53-\ufe53\ufe67-\ufe67\ufe6c-\ufe6f\ufe75-\ufe75\ufefd-\ufefe\uff00-\uff00\uffbf-\uffc1\uffc8-\uffc9\uffd0-\uffd1\uffd8-\uffd9\uffdd-\uffdf\uffe7-\uffe7\uffef-\ufff8\ufffe-\U0000ffff\U0001000c-\U0001000c\U00010027-\U00010027\U0001003b-\U0001003b\U0001003e-\U0001003e\U0001004e-\U0001004f\U0001005e-\U0001007f\U000100fb-\U000100ff\U00010103-\U00010106\U00010134-\U00010136\U0001018d-\U0001018f\U0001019c-\U0001019f\U000101a1-\U000101cf\U000101fe-\U0001027f\U0001029d-\U0001029f\U000102d1-\U000102df\U000102fc-\U000102ff\U00010324-\U0001032f\U0001034b-\U0001034f\U0001037b-\U0001037f\U0001039e-\U0001039e\U000103c4-\U000103c7\U000103d6-\U000103ff\U0001049e-\U0001049f\U000104aa-\U000104ff\U00010528-\U0001052f\U00010564-\U0001056e\U00010570-\U000105ff\U00010737-\U0001073f\U00010756-\U0001075f\U00010768-\U000107ff\U00010806-\U00010807\U00010809-\U00010809\U00010836-\U00010836\U00010839-\U0001083b\U0001083d-\U0001083e\U00010856-\U00010856\U0001089f-\U000108a6\U000108b0-\U000108ff\U0001091c-\U0001091e\U0001093a-\U0001093e\U00010940-\U0001097f\U000109b8-\U000109bd\U000109c0-\U000109ff\U00010a04-\U00010a04\U00010a07-\U00010a0b\U00010a14-\U00010a14\U00010a18-\U00010a18\U00010a34-\U00010a37\U00010a3b-\U00010a3e\U00010a48-\U00010a4f\U00010a59-\U00010a5f\U00010aa0-\U00010abf\U00010ae7-\U00010aea\U00010af7-\U00010aff\U00010b36-\U00010b38\U00010b56-\U00010b57\U00010b73-\U00010b77\U00010b92-\U00010b98\U00010b9d-\U00010ba8\U00010bb0-\U00010bff\U00010c49-\U00010e5f\U00010e7f-\U00010fff\U0001104e-\U00011051\U00011070-\U0001107e\U000110c2-\U000110cf\U000110e9-\U000110ef\U000110fa-\U000110ff\U00011135-\U00011135\U00011144-\U0001114f\U00011177-\U0001117f\U000111c9-\U000111cc\U000111ce-\U000111cf\U000111db-\U000111e0\U000111f5-\U000111ff\U00011212-\U00011212\U0001123e-\U000112af\U000112eb-\U000112ef\U000112fa-\U00011300\U00011304-\U00011304\U0001130d-\U0001130e\U00011311-\U00011312\U00011329-\U00011329\U00011331-\U00011331\U00011334-\U00011334\U0001133a-\U0001133b\U00011345-\U00011346\U00011349-\U0001134a\U0001134e-\U00011356\U00011358-\U0001135c\U00011364-\U00011365\U0001136d-\U0001136f\U00011375-\U0001147f\U000114c8-\U000114cf\U000114da-\U0001157f\U000115b6-\U000115b7\U000115ca-\U000115ff\U00011645-\U0001164f\U0001165a-\U0001167f\U000116b8-\U000116bf\U000116ca-\U0001189f\U000118f3-\U000118fe\U00011900-\U00011abf\U00011af9-\U00011fff\U00012399-\U000123ff\U0001246f-\U0001246f\U00012475-\U00012fff\U0001342f-\U000167ff\U00016a39-\U00016a3f\U00016a5f-\U00016a5f\U00016a6a-\U00016a6d\U00016a70-\U00016acf\U00016aee-\U00016aef\U00016af6-\U00016aff\U00016b46-\U00016b4f\U00016b5a-\U00016b5a\U00016b62-\U00016b62\U00016b78-\U00016b7c\U00016b90-\U00016eff\U00016f45-\U00016f4f\U00016f7f-\U00016f8e\U00016fa0-\U0001afff\U0001b002-\U0001bbff\U0001bc6b-\U0001bc6f\U0001bc7d-\U0001bc7f\U0001bc89-\U0001bc8f\U0001bc9a-\U0001bc9b\U0001bca4-\U0001cfff\U0001d0f6-\U0001d0ff\U0001d127-\U0001d128\U0001d1de-\U0001d1ff\U0001d246-\U0001d2ff\U0001d357-\U0001d35f\U0001d372-\U0001d3ff\U0001d455-\U0001d455\U0001d49d-\U0001d49d\U0001d4a0-\U0001d4a1\U0001d4a3-\U0001d4a4\U0001d4a7-\U0001d4a8\U0001d4ad-\U0001d4ad\U0001d4ba-\U0001d4ba\U0001d4bc-\U0001d4bc\U0001d4c4-\U0001d4c4\U0001d506-\U0001d506\U0001d50b-\U0001d50c\U0001d515-\U0001d515\U0001d51d-\U0001d51d\U0001d53a-\U0001d53a\U0001d53f-\U0001d53f\U0001d545-\U0001d545\U0001d547-\U0001d549\U0001d551-\U0001d551\U0001d6a6-\U0001d6a7\U0001d7cc-\U0001d7cd\U0001d800-\U0001e7ff\U0001e8c5-\U0001e8c6\U0001e8d7-\U0001edff\U0001ee04-\U0001ee04\U0001ee20-\U0001ee20\U0001ee23-\U0001ee23\U0001ee25-\U0001ee26\U0001ee28-\U0001ee28\U0001ee33-\U0001ee33\U0001ee38-\U0001ee38\U0001ee3a-\U0001ee3a\U0001ee3c-\U0001ee41\U0001ee43-\U0001ee46\U0001ee48-\U0001ee48\U0001ee4a-\U0001ee4a\U0001ee4c-\U0001ee4c\U0001ee50-\U0001ee50\U0001ee53-\U0001ee53\U0001ee55-\U0001ee56\U0001ee58-\U0001ee58\U0001ee5a-\U0001ee5a\U0001ee5c-\U0001ee5c\U0001ee5e-\U0001ee5e\U0001ee60-\U0001ee60\U0001ee63-\U0001ee63\U0001ee65-\U0001ee66\U0001ee6b-\U0001ee6b\U0001ee73-\U0001ee73\U0001ee78-\U0001ee78\U0001ee7d-\U0001ee7d\U0001ee7f-\U0001ee7f\U0001ee8a-\U0001ee8a\U0001ee9c-\U0001eea0\U0001eea4-\U0001eea4\U0001eeaa-\U0001eeaa\U0001eebc-\U0001eeef\U0001eef2-\U0001efff\U0001f02c-\U0001f02f\U0001f094-\U0001f09f\U0001f0af-\U0001f0b0\U0001f0c0-\U0001f0c0\U0001f0d0-\U0001f0d0\U0001f0f6-\U0001f0ff\U0001f10d-\U0001f10f\U0001f12f-\U0001f12f\U0001f16c-\U0001f16f\U0001f19b-\U0001f1e5\U0001f203-\U0001f20f\U0001f23b-\U0001f23f\U0001f249-\U0001f24f\U0001f252-\U0001f2ff\U0001f32d-\U0001f32f\U0001f37e-\U0001f37f\U0001f3cf-\U0001f3d3\U0001f3f8-\U0001f3ff\U0001f4ff-\U0001f4ff\U0001f54b-\U0001f54f\U0001f57a-\U0001f57a\U0001f5a4-\U0001f5a4\U0001f643-\U0001f644\U0001f6d0-\U0001f6df\U0001f6ed-\U0001f6ef\U0001f6f4-\U0001f6ff\U0001f774-\U0001f77f\U0001f7d5-\U0001f7ff\U0001f80c-\U0001f80f\U0001f848-\U0001f84f\U0001f85a-\U0001f85f\U0001f888-\U0001f88f\U0001f8ae-\U0001ffff\U0002a6d7-\U0002a6ff\U0002b735-\U0002b73f\U0002b81e-\U0002f7ff\U0002fa1e-\U000e0000\U000e0002-\U000e001f\U000e0080-\U000e00ff\U000e01f0-\U000effff\U000ffffe-\U000fffff\U0010fffe-\U0010ffff];
 
-Sma = [\u2190\u2191\u2192\u2193\u2194\u219a\u219b\u21a0\u21a3\u21a6] | // ←↑→↓↔↚↛↠↣↦
-      [\u21ae\u21ce\u21cf\u21d2\u21d4\u21f4\u21f5\u21f6\u21f7\u21f8] | // ↮⇎⇏⇒⇔⇴⇵⇶⇷⇸
-      [\u21f9\u21fa\u21fb\u21fc\u21fd\u21fe\u21ff]; // ⇹⇺⇻⇼⇽⇾⇿
-Smo = [\xac\xb1\xd7\xf7\u0606\u0607\u2044\u2052\u207a\u207b\u207c\u208a\u208b\u208c] | // ¬±×÷؆؇⁄⁒⁺⁻⁼₊₋₌
-      [\u2140\u214b\u2200\u2201\u2203\u2204\u2208\u2209\u220a\u220b\u220c\u220d] | // ⅀⅋∀∁∃∄∈∉∊∋∌∍
-      [\u220e\u220f\u2210\u2211\u2212\u2213\u2214\u2215\u2217\u2218\u2219]       | // ∎∏∐∑−∓∔∕∗∘∙
-      [\u221a\u221b\u221c\u221d\u221f\u2220\u2221\u2222\u2225\u2226\u2227\u2228] | // √∛∜∝∟∠∡∢∥∦∧∨
-      [\u2229\u222a\u222b-\u2233\u2234\u2235] | // ∩∪ ∫ ∬ ∭ ∮ ∯ ∰ ∱ ∲ ∳ ∴∵
-      Sma;
-Smc = [\u03f6\u2118\u2141\u2142\u2143\u2144\u2202\u2205\u2206\u2207\u221e]; // ϶℘⅁⅂⅃⅄∂∅∆∇∞
-Smx = [\u0608\u2216\u2223\u2224]; // ??? ؈∖∣∤
+// Sm categorized by operator precedence
+Sm_id     = [\u03f6\u2202\u2205-\u2207\u221e\u223f\u22ee-\u22f1\u25b7\u25c1\u25f8-\u25ff\u27c0\u27c1\u29b0-\u29b5\u29bd\u29c4\u29c5\u29c8-\u29cd\u29d6\u29d7\u29dd\u29de\u29e0\u29e8-\u29f3]; // ϶ ∂ ∅ ∆ ∇ ∞ ∿ ⋮ ⋯ ⋰ ⋱ ▷ ◁ ◸ ◹ ◺ ◻ ◼ ◽ ◾ ◿ ⟀ ⟁ ⦰ ⦱ ⦲ ⦳ ⦴ ⦵ ⦽ ⧄ ⧅ ⧈ ⧉ ⧊ ⧋ ⧌ ⧍ ⧖ ⧗ ⧝ ⧞ ⧠ ⧨ ⧩ ⧪ ⧫ ⧬ ⧭ ⧮ ⧯ ⧰ ⧱ ⧲ ⧳
+Sm_nfkc   = [\u2044\u207a-\u207c\u208a-\u208c\u2140\u2212\u2215\u2216\u2223\u2224\u222c\u222d\u222f\u2230\u2236\u223c\u2241\u2a0c\u2a74-\u2a76\ufb29\ufe62\ufe64-\ufe66\uff0b\uff1c-\uff1e\uff5c\uff5e\uffe2\uffe9-\uffec]; // ⁄ ⁺ ⁻ ⁼ ₊ ₋ ₌ ⅀ − ∕ ∖ ∣ ∤ ∬ ∭ ∯ ∰ ∶ ∼ ≁ ⨌ ⩴ ⩵ ⩶ ﬩ ﹢ ﹤ ﹥ ﹦ ＋ ＜ ＝ ＞ ｜ ～ ￢ ￩ ￪ ￫ ￬
+Sm_norm   = [\u0606\u0607\u2052\u2118\u2141-\u2144\u214b\u220a\u220d\u2217\u223d\u223e\u229d\u22f4\u22f7\u22fc\u22fe\u27c2\u27cb\u27cd\u27d8\u27d9\u27dd\u27de\u2980\u2982\u29f5\u29f8\u29f9\u2a1f\u2a3e\u2ade-\u2ae0]; // ؆ ؇ ⁒ ℘ ⅁ ⅂ ⅃ ⅄ ⅋ ∊ ∍ ∗ ∽ ∾ ⊝ ⋴ ⋷ ⋼ ⋾ ⟂ ⟋ ⟍ ⟘ ⟙ ⟝ ⟞ ⦀ ⦂ ⧵ ⧸ ⧹ ⨟ ⨾ ⫞ ⫟ ⫠
+Sm_unop   = [\u221a-\u221c]; // √ ∛ ∜
+Sm_comp   = [\u2218\u229a\u22c6\u29be\u29c7]; // ∘ ⊚ ⋆ ⦾ ⧇
+Sm_produ  = [\u220f\u22c2\u2a00\u2a02\u2a05\u2a09]; // ∏ ⋂ ⨀ ⨂ ⨅ ⨉
+Sm_prodb  = [\xd7\u2219\u2229\u2240\u2293\u2297\u2299\u229b\u22a0\u22a1\u22c4\u22c5\u22c7-\u22cc\u22d2\u27d0\u27d5-\u27d7\u27e1\u2981\u29bb\u29bf\u29c6\u29d1-\u29d5\u29e2\u2a1d\u2a2f-\u2a37\u2a3b-\u2a3d\u2a40\u2a43\u2a44\u2a4b\u2a4d\u2a4e]; // × ∙ ∩ ≀ ⊓ ⊗ ⊙ ⊛ ⊠ ⊡ ⋄ ⋅ ⋇ ⋈ ⋉ ⋊ ⋋ ⋌ ⋒ ⟐ ⟕ ⟖ ⟗ ⟡ ⦁ ⦻ ⦿ ⧆ ⧑ ⧒ ⧓ ⧔ ⧕ ⧢ ⨝ ⨯ ⨰ ⨱ ⨲ ⨳ ⨴ ⨵ ⨶ ⨷ ⨻ ⨼ ⨽ ⩀ ⩃ ⩄ ⩋ ⩍ ⩎
+Sm_divu   = [\u2210]; // ∐
+Sm_divb   = [\xf7\u2298\u27cc\u29b8\u29bc\u29f6\u29f7\u2a38\u2afb\u2afd]; // ÷ ⊘ ⟌ ⦸ ⦼ ⧶ ⧷ ⨸ ⫻ ⫽
+Sm_sumu   = [\u2211\u222b\u222e\u2231-\u2233\u22c3\u2a01\u2a03\u2a04\u2a06\u2a0a\u2a0b\u2a0d-\u2a1c\u2aff]; // ∑ ∫ ∮ ∱ ∲ ∳ ⋃ ⨁ ⨃ ⨄ ⨆ ⨊ ⨋ ⨍ ⨎ ⨏ ⨐ ⨑ ⨒ ⨓ ⨔ ⨕ ⨖ ⨗ ⨘ ⨙ ⨚ ⨛ ⨜ ⫿
+Sm_sumb   = [\x2b\x7e\xac\xb1\u0338\u2213\u2214\u222a\u2238-\u223b\u2242\u228c-\u228e\u2294-\u2296\u229e\u229f\u22b9\u22bb\u22d3\u29fa\u29fb\u29fe\u29ff\u2a22-\u2a2e\u2a39\u2a3a\u2a3f\u2a41\u2a42\u2a45\u2a4a\u2a4c\u2a4f\u2a50\u2a6a\u2a6b\u2aec\u2aed\u2afe]; // + ~ ¬ ± ̸ ∓ ∔ ∪ ∸ ∸ ∹ ∺ ∻ ≂ ⊌ ⊍ ⊎ ⊔ ⊕ ⊖ ⊞ ⊟ ⊹ ⊻ ⋓ ⧺ ⧻ ⧾ ⧿ ⨢ ⨣ ⨤ ⨥ ⨦ ⨧ ⨨ ⨩ ⨪ ⨫ ⨬ ⨭ ⨮ ⨹ ⨺ ⨿ ⩁ ⩂ ⩅ ⩊ ⩌ ⩏ ⩐ ⩪ ⩫ ⫬ ⫭ ⫾
+Sm_lt     = [\x3c\u2264\u2266\u2268\u226a\u226e\u2270\u2272\u2274\u2276\u2278\u227a\u227c\u227e\u2280\u2282\u2284\u2286\u2288\u228a\u228f\u2291\u22b0\u22b2\u22b4\u22b7\u22d0\u22d6\u22d8\u22da\u22dc\u22de\u22e0\u22e2\u22e4\u22e6\u22e8\u22ea\u22ec\u27c3\u27c8\u29c0\u29cf\u29e1\u2a79\u2a7b\u2a7d\u2a7f\u2a81\u2a83\u2a85\u2a87\u2a89\u2a8b\u2a8d\u2a8f\u2a91\u2a93\u2a95\u2a97\u2a99\u2a9b\u2a9d\u2a9f\u2aa1\u2aa3\u2aa6\u2aa8\u2aaa\u2aac\u2aaf\u2ab1\u2ab3\u2ab5\u2ab7\u2ab9\u2abb\u2abd\u2abf\u2ac1\u2ac3\u2ac5\u2ac7\u2ac9\u2acb\u2acd\u2acf\u2ad1\u2ad3\u2ad5\u2af7\u2af9]; // < ≤ ≦ ≨ ≪ ≮ ≰ ≲ ≴ ≶ ≸ ≺ ≼ ≾ ⊀ ⊂ ⊄ ⊆ ⊈ ⊊ ⊏ ⊑ ⊰ ⊲ ⊴ ⊷ ⋐ ⋖ ⋘ ⋚ ⋜ ⋞ ⋠ ⋢ ⋤ ⋦ ⋨ ⋪ ⋬ ⟃ ⟈ ⧀ ⧏ ⧡ ⩹ ⩻ ⩽ ⩿ ⪁ ⪃ ⪅ ⪇ ⪉ ⪋ ⪍ ⪏ ⪑ ⪓ ⪕ ⪗ ⪙ ⪛ ⪝ ⪟ ⪡ ⪣ ⪦ ⪨ ⪪ ⪬ ⪯ ⪱ ⪳ ⪵ ⪷ ⪹ ⪻ ⪽ ⪿ ⫁ ⫃ ⫅ ⫇ ⫉ ⫋ ⫍ ⫏ ⫑ ⫓ ⫕ ⫷ ⫹
+Sm_gt     = [\x3e\u2265\u2267\u2269\u226b\u226f\u2271\u2273\u2275\u2277\u2279\u227b\u227d\u227f\u2281\u2283\u2285\u2287\u2289\u228b\u2290\u2292\u22b1\u22b3\u22b5\u22b6\u22d1\u22d7\u22d9\u22db\u22dd\u22df\u22e1\u22e3\u22e5\u22e7\u22e9\u22eb\u22ed\u27c4\u27c9\u29c1\u29d0\u2a7a\u2a7c\u2a7e\u2a80\u2a82\u2a84\u2a86\u2a88\u2a8a\u2a8c\u2a8e\u2a90\u2a92\u2a94\u2a96\u2a98\u2a9a\u2a9c\u2a9e\u2aa0\u2aa2\u2aa7\u2aa9\u2aab\u2aad\u2ab0\u2ab2\u2ab4\u2ab6\u2ab8\u2aba\u2abc\u2abe\u2ac0\u2ac2\u2ac4\u2ac6\u2ac8\u2aca\u2acc\u2ace\u2ad0\u2ad2\u2ad4\u2ad6\u2af8\u2afa]; // > ≥ ≧ ≩ ≫ ≯ ≱ ≳ ≵ ≷ ≹ ≻ ≽ ≿ ⊁ ⊃ ⊅ ⊇ ⊉ ⊋ ⊐ ⊒ ⊱ ⊳ ⊵ ⊶ ⋑ ⋗ ⋙ ⋛ ⋝ ⋟ ⋡ ⋣ ⋥ ⋧ ⋩ ⋫ ⋭ ⟄ ⟉ ⧁ ⧐ ⩺ ⩼ ⩾ ⪀ ⪂ ⪄ ⪆ ⪈ ⪊ ⪌ ⪎ ⪐ ⪒ ⪔ ⪖ ⪘ ⪚ ⪜ ⪞ ⪠ ⪢ ⪧ ⪩ ⪫ ⪭ ⪰ ⪲ ⪴ ⪶ ⪸ ⪺ ⪼ ⪾ ⫀ ⫂ ⫄ ⫆ ⫈ ⫊ ⫌ ⫎ ⫐ ⫒ ⫔ ⫖ ⫸ ⫺
+Sm_eq     = [\x3d\u2243-\u2263\u226d\u229c\u22cd\u22d5\u29c2\u29c3\u29ce\u29e3-\u29e7\u2a46-\u2a49\u2a59\u2a66-\u2a69\u2a6c-\u2a73\u2a77\u2a78\u2aa4\u2aa5\u2aae\u2ad7\u2ad8]; // = ≃ ≄ ≅ ≆ ≇ ≈ ≉ ≊ ≋ ≌ ≍ ≎ ≏ ≐ ≑ ≒ ≓ ≔ ≕ ≖ ≗ ≘ ≙ ≚ ≛ ≜ ≝ ≞ ≟ ≠ ≡ ≢ ≣ ≭ ⊜ ⋍ ⋕ ⧂ ⧃ ⧎ ⧣ ⧤ ⧥ ⧦ ⧧ ⩆ ⩇ ⩈ ⩉ ⩙ ⩦ ⩧ ⩨ ⩩ ⩬ ⩭ ⩮ ⩯ ⩰ ⩱ ⩲ ⩳ ⩷ ⩸ ⪤ ⪥ ⪮ ⫗ ⫘
+Sm_test   = [\x7c\u0338\u2208\u2209\u220b\u220c\u221d\u221f-\u2222\u2225\u2226\u226c\u22be\u22bf\u22d4\u22f2\u22f3\u22f5\u22f6\u22f8-\u22fb\u22fd\u22ff\u237c\u27ca\u27d2\u299b-\u29af\u29b6\u29b7\u29b9\u29ba\u2a64\u2a65\u2ad9-\u2add\u2ae1\u2aee\u2af2-\u2af6\u2afc]; // | ̸ ∈ ∉ ∋ ∌ ∝ ∟ ∠ ∡ ∢ ∥ ∦ ≬ ⊾ ⊿ ⋔ ⋲ ⋳ ⋵ ⋶ ⋸ ⋹ ⋺ ⋻ ⋽ ⋿ ⍼ ⟊ ⟒ ⦛ ⦜ ⦝ ⦞ ⦟ ⦠ ⦡ ⦢ ⦣ ⦤ ⦥ ⦦ ⦧ ⦨ ⦩ ⦪ ⦫ ⦬ ⦭ ⦮ ⦯ ⦶ ⦷ ⦹ ⦺ ⩤ ⩥ ⫙ ⫚ ⫛ ⫝̸ ⫝ ⫡ ⫮ ⫲ ⫳ ⫴ ⫵ ⫶ ⫼
+Sm_andu   = [\u22c0]; // ⋀
+Sm_andb   = [\u2227\u22bc\u22cf\u27ce\u27d1\u2a07\u2a51\u2a53\u2a55\u2a58\u2a5a\u2a5c\u2a5e-\u2a60]; // ∧ ⊼ ⋏ ⟎ ⟑ ⨇ ⩑ ⩓ ⩕ ⩘ ⩚ ⩜ ⩞ ⩞ ⩟ ⩟ ⩠ ⩠
+Sm_oru    = [\u22c1]; // ⋁
+Sm_orb    = [\u2228\u22bd\u22ce\u27c7\u27cf\u2a08\u2a52\u2a54\u2a56\u2a57\u2a5b\u2a5d\u2a61-\u2a63]; // ∨ ⊽ ⋎ ⟇ ⟏ ⨈ ⩒ ⩔ ⩖ ⩗ ⩛ ⩝ ⩡ ⩢ ⩣
+Sm_Sc     = [\u266f]; // ♯
+Sm_larrow = [\u2190\u2191\u219a\u21f7\u21fa\u21fd\u22a3\u22a5\u27e3\u27e5\u27f0\u27f2\u27f5\u27f8\u27fb\u27fd\u2902\u2906\u2909\u290a\u290c\u290e\u2912\u2919\u291b\u291d\u291f\u2923\u2926\u2927\u292a\u2931\u2932\u2934\u2936\u293a\u293d\u293e\u2940\u2943\u2944\u2946\u2949\u2952\u2954\u2956\u2958\u295a\u295c\u295e\u2960\u2962\u2963\u296a\u296b\u2973\u2976\u2977\u297a-\u297c\u297e\u2ae3-\u2ae5\u2ae8\u2aeb\u2b30-\u2b42\u2b49-\u2b4b]; // ← ↑ ↚ ⇷ ⇺ ⇽ ⊣ ⊥ ⟣ ⟥ ⟰ ⟲ ⟵ ⟸ ⟻ ⟽ ⤂ ⤆ ⤉ ⤊ ⤌ ⤎ ⤒ ⤙ ⤛ ⤝ ⤟ ⤣ ⤦ ⤧ ⤪ ⤱ ⤲ ⤴ ⤶ ⤺ ⤽ ⤾ ⥀ ⥃ ⥄ ⥆ ⥉ ⥒ ⥔ ⥖ ⥘ ⥚ ⥜ ⥞ ⥠ ⥢ ⥣ ⥪ ⥫ ⥳ ⥶ ⥷ ⥺ ⥻ ⥼ ⥾ ⫣ ⫤ ⫥ ⫨ ⫫ ⬰ ⬱ ⬲ ⬳ ⬴ ⬵ ⬶ ⬷ ⬸ ⬹ ⬺ ⬻ ⬼ ⬽ ⬾ ⬿ ⭀ ⭁ ⭂ ⭉ ⭊ ⭋
+Sm_rarrow = [\u2192\u2193\u219b\u21a0\u21a3\u21a6\u21cf\u21d2\u21f4\u21f6\u21f8\u21fb\u21fe\u22a2\u22a4\u22a6-\u22af\u22ba\u27e2\u27e4\u27f1\u27f3\u27f4\u27f6\u27f9\u27fc\u27fe\u27ff\u2900\u2901\u2903\u2905\u2907\u2908\u290b\u290d\u290f-\u2911\u2913-\u2918\u291a\u291c\u291e\u2920\u2924\u2925\u2928\u2929\u292d-\u2930\u2933\u2935\u2937-\u2939\u293b\u293c\u293f\u2941\u2942\u2945\u2947\u2953\u2955\u2957\u2959\u295b\u295d\u295f\u2961\u2964\u2965\u296c\u296d\u2970-\u2972\u2974\u2975\u2978\u2979\u297d\u297f\u29f4\u2ae2\u2ae6\u2ae7\u2aea\u2b43\u2b44\u2b47\u2b48\u2b4c]; // → ↓ ↛ ↠ ↣ ↦ ⇏ ⇒ ⇴ ⇶ ⇸ ⇻ ⇾ ⊢ ⊤ ⊦ ⊧ ⊨ ⊩ ⊪ ⊫ ⊬ ⊭ ⊮ ⊯ ⊺ ⟢ ⟤ ⟱ ⟳ ⟴ ⟶ ⟹ ⟼ ⟾ ⟿ ⤀ ⤁ ⤃ ⤅ ⤇ ⤈ ⤋ ⤍ ⤏ ⤐ ⤑ ⤓ ⤔ ⤕ ⤖ ⤗ ⤘ ⤚ ⤜ ⤞ ⤠ ⤤ ⤥ ⤨ ⤩ ⤭ ⤮ ⤯ ⤰ ⤳ ⤵ ⤷ ⤸ ⤹ ⤻ ⤼ ⤿ ⥁ ⥂ ⥅ ⥇ ⥓ ⥕ ⥗ ⥙ ⥛ ⥝ ⥟ ⥡ ⥤ ⥥ ⥬ ⥭ ⥰ ⥱ ⥲ ⥴ ⥵ ⥸ ⥹ ⥽ ⥿ ⧴ ⫢ ⫦ ⫧ ⫪ ⭃ ⭄ ⭇ ⭈ ⭌
+Sm_earrow = [\x09\u2194\u21ae\u21ce\u21d4\u21f5\u21f9\u21fc\u21ff\u27da\u27db\u27e0\u27f7\u27fa\u2904\u2921\u2922\u292b\u292c\u2948\u294a-\u2951\u2966-\u2969\u296e\u296f\u2ae9]; // 	 	 ↔ ↮ ⇎ ⇔ ⇵ ⇹ ⇼ ⇿ ⟚ ⟛ ⟠ ⟷ ⟺ ⤄ ⤡ ⤢ ⤫ ⤬ ⥈ ⥊ ⥋ ⥌ ⥍ ⥎ ⥏ ⥐ ⥑ ⥦ ⥧ ⥨ ⥩ ⥮ ⥯ ⫩
+Sm_quant  = [\u2200\u2201\u2203\u2204\u220e\u2234\u2235\u2237]; // ∀ ∁ ∃ ∄ ∎ ∴ ∵ ∷
+Sm_wtf    = [\u0608\u22b8\u27d3\u27d4\u27dc\u27df\u2999\u299a\u29dc\u29df\u2a1e\u2a20\u2a21\u2aef-\u2af1]; // ؈ ⊸ ⟓ ⟔ ⟜ ⟟ ⦙ ⦚ ⧜ ⧟ ⨞ ⨠ ⨡ ⫯ ⫰ ⫱
+Sm_multi  = [\u2320\u2321\u237c\u239b-\u23b3\u23dc-\u23e1]; // ⌠ ⌡ ⍼ ⎛ ⎜ ⎝ ⎞ ⎟ ⎠ ⎡ ⎢ ⎣ ⎤ ⎥ ⎦ ⎧ ⎨ ⎩ ⎪ ⎫ ⎬ ⎭ ⎮ ⎯ ⎰ ⎱ ⎲ ⎳ ⏜ ⏝ ⏞ ⏟ ⏠ ⏡
+Sm_op = Sm_nfkc | Sm_norm | Sm_unop | Sm_comp | Sm_produ | Sm_prodb | Sm_divu | Sm_divb | Sm_sumu | Sm_sumb | Sm_lt | Sm_gt | Sm_eq | Sm_test | Sm_andu | Sm_andb | Sm_oru | Sm_orb | Sm_Sc | Sm_larrow | Sm_rarrow | Sm_earrow | Sm_quant;
 */
 
 struct input_t {
@@ -375,16 +392,17 @@ top:
       "}"         { return mkSym(BCLOSE);    }
 
       // operators
-      reserved = [:;?@];
-      special = [#"'\\];
-      // future: op = (Sc|Sk|Sm|(Po\reserved\special)|Pd)+;
-      op = (Sc|Smo|[.^*/%\-+~`<>=!&|,])+;
+      Po_reserved = [:;?@];
+      Po_special  = ["#'\\];
+      Po_op       = [!%&*,./];
+      // !!! TODO: Po, Pd(without -)
+      op = (Sk|Sc|Sm_op|Po_op|"-")+; // [`^] are Sk
 
       // identifiers
       modifier = Lm|M;
       upper = Lt|Lu;
-      start = L|So|Smc;
-      body = L|So|Smc|N|Pc|Lm|M;
+      start = L|So|Sm_id;
+      body = L|So|Sm_id|N|Pc|Lm|M;
       id = modifier* start body* | "_";
 
       id { return mkSym(ID); }
@@ -441,24 +459,45 @@ static std::string op_escape(const char *str) {
       re2c:define:YYMARKER = ignore;
       re2c:define:YYCURSOR = str;
 
-      *            { break; }
-      [\x00]       { break; }
-      [\xac]       { out.push_back('!'); continue; } // ¬
-      [\xf7]       { out.push_back('/'); continue; } // ÷
-      [\u2044]     { out.push_back('/'); continue; } // ⁄
-      [\u2052]     { out.push_back('%'); continue; } // ⁒
-      [\u2118]     { out.push_back('P'); continue; } // ℘
-      [\u2141]     { out.push_back('G'); continue; } // ⅁
-      [\u2142]     { out.push_back('L'); continue; } // ⅂
-      [\u2143]     { out.push_back('L'); continue; } // ⅃
-      [\u2144]     { out.push_back('Y'); continue; } // ⅄
-      [\u214b]     { out.push_back('&'); continue; } // ⅋
-      [\u220a]     { out.append("∈");    continue; } // ∊
-      [\u220d]     { out.append("∋");    continue; } // ∍
-      [\u2217]     { out.push_back('*'); continue; } // ∗
-      [\u0606]     { out.append("∛");    continue; } // ؆
-      [\u0607]     { out.append("∜");    continue; } // ؇
-      [^]          { out.append(start, str); continue; }
+      *                { break; }
+      [\x00]           { break; }
+      [\u0606] /* ؆ */ { out.append("∛"); continue; }
+      [\u0607] /* ؇ */ { out.append("∜"); continue; }
+      [\u2052] /* ⁒ */ { out.append("%"); continue; }
+      [\u2118] /* ℘ */ { out.append("P"); continue; }
+      [\u2141] /* ⅁ */ { out.append("G"); continue; }
+      [\u2142] /* ⅂ */ { out.append("L"); continue; }
+      [\u2143] /* ⅃ */ { out.append("L"); continue; }
+      [\u2144] /* ⅄ */ { out.append("Y"); continue; }
+      [\u214b] /* ⅋ */ { out.append("&"); continue; }
+      [\u220a] /* ∊ */ { out.append("∈"); continue; }
+      [\u220d] /* ∍ */ { out.append("∋"); continue; }
+      [\u2217] /* ∗ */ { out.append("*"); continue; }
+      [\u223d] /* ∽ */ { out.append("~"); continue; }
+      [\u223e] /* ∾ */ { out.append("~"); continue; }
+      [\u229d] /* ⊝ */ { out.append("⊖"); continue; }
+      [\u22f4] /* ⋴ */ { out.append("⋳"); continue; }
+      [\u22f7] /* ⋷ */ { out.append("⋶"); continue; }
+      [\u22fc] /* ⋼ */ { out.append("⋻"); continue; }
+      [\u22fe] /* ⋾ */ { out.append("⋽"); continue; }
+      [\u27c2] /* ⟂ */ { out.append("⊥"); continue; }
+      [\u27cb] /* ⟋ */ { out.append("/"); continue; }
+      [\u27cd] /* ⟍ */ { out.append("\\");continue; }
+      [\u27d8] /* ⟘ */ { out.append("⊥"); continue; }
+      [\u27d9] /* ⟙ */ { out.append("⊤"); continue; }
+      [\u27dd] /* ⟝ */ { out.append("⊢"); continue; }
+      [\u27de] /* ⟞ */ { out.append("⊣"); continue; }
+      [\u2980] /* ⦀ */ { out.append("⫴"); continue; }
+      [\u2982] /* ⦂ */ { out.append(":"); continue; }
+      [\u29f5] /* ⧵ */ { out.append("\\");continue; }
+      [\u29f8] /* ⧸ */ { out.append("/"); continue; }
+      [\u29f9] /* ⧹ */ { out.append("\\");continue; }
+      [\u2a1f] /* ⨟ */ { out.append(";"); continue; }
+      [\u2a3e] /* ⨾ */ { out.append("l"); continue; }
+      [\u2ade] /* ⫞ */ { out.append("⋽"); continue; }
+      [\u2adf] /* ⫟ */ { out.append("⊤"); continue; }
+      [\u2ae0] /* ⫠ */ { out.append("⊥"); continue; }
+      [^]              { out.append(start, str); continue; }
   */}
 
   return out;
@@ -571,38 +610,37 @@ op_type op_precedence(const char *str) {
   const char *YYCTXMARKER;
   (void)ignore;
   (void)YYCTXMARKER;
+top:
   /*!re2c
       re2c:yyfill:enable = 0;
       re2c:define:YYMARKER = ignore;
       re2c:define:YYCURSOR = str;
 
       *                          { return op_type(-1, -1);}
-      [.]                        { return op_type(18, 1); }
+      "."                        { return op_type(22, 1); }
       [smpa]                     { return op_type(APP_PRECEDENCE, 1); } // SUBSCRIBE/MEMOIZE/PRIM/APP
-      [\u2218\u2219]             { return op_type(16, 0); } // ∘∙
-      "^"                        { return op_type(15, 0); }
-      [\u220f]                   { return op_type(14, 0); } // ∏
-      [*\xd7]                    { return op_type(13, 1); } // ×
-      [\u2210]                   { return op_type(12, 0); } // ∐
-      [/%]                       { return op_type(11, 1); }
-      [\u2211]                   { return op_type(10, 0); } // ∑
-      [!] / [^=]                 { return op_type(9, 1);  }
-      [-+~`]                     |
-      [\xb1\u2213\u2214]         { return op_type(9, 1);  } // ±∓∔
-      [\u221a\u221b\u221c]       { return op_type(8, 1);  } // √∛∜
-      [<>\u221d]                 |                          // ∝
-      [\u2208\u2209\u220b\u220c] |                          // ∈∉∋∌
-      [\u221f\u2220\u2221\u2222] |                          // ∟∠∡∢
-      [\u2225\u2226]             { return op_type(7, 1);  } // ∥∦
-      [!=]                       { return op_type(6, 0);  }
-      [&\u2227\u2229]            { return op_type(5, 1);  } // ∧∩
-      [|\u2228\u222a]            { return op_type(4, 1);  } // ∨∪
-      Sc                         { return op_type(3, 0);  }
-      Sma                        { return op_type(2, 0);  }
-      [,]                        { return op_type(1, 0);  }
-      [\\]                       |
-      [\u2200\u2201\u2203\u2204] |                          // ∀∁∃∄
-      [\u222b-\u2233]            |                          // ∫ ∬ ∭ ∮ ∯ ∰ ∱ ∲ ∳
-      [\u220e\u2234\u2235]       { return op_type(0, 0);  } // ∎∴∵
+      Sm_comp                    { return op_type(20, 0); }
+      Sm_unop                    { return op_type(19, 0); }
+      "^"                        { return op_type(18, 0); }
+      Sm_produ                   { return op_type(17, 0); }
+      "*" | Sm_prodb             { return op_type(16, 1); }
+      Sm_divu                    { return op_type(15, 0); }
+      [/%] | Sm_divb             { return op_type(14, 1); }
+      Sm_sumu                    { return op_type(13, 0); }
+      [!] / [^=]                 { return op_type(12, 1); }
+      [`\-] | Sm_sumb            { return op_type(12, 1); }
+      Sm_test | Sm_lt | Sm_gt    { return op_type(11, 1); }
+      "!" | Sm_eq                { return op_type(10, 0); }
+      Sm_andu                    { return op_type(9, 0);  }
+      "&" | Sm_andb              { return op_type(8, 1);  }
+      Sm_oru                     { return op_type(7, 0);  }
+      "|" | Sm_orb               { return op_type(6, 1);  }
+      Sm_Sc | Sc                 { return op_type(5, 0);  }
+      Sm_larrow | Sm_rarrow      { return op_type(4, 1);  }
+      Sm_earrow                  { return op_type(3, 0);  }
+      ","                        { return op_type(2, 0);  }
+      Sm_quant                   { return op_type(1, 0);  }
+      [\\]                       { return op_type(0, 0);  }
+      Sk                         { goto top; }
   */
 }

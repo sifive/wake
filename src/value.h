@@ -10,7 +10,7 @@
 #include <iosfwd>
 #include <gmp.h>
 
-#define APP_PRECEDENCE 17
+#define APP_PRECEDENCE 21
 
 /* Values */
 
