@@ -70,6 +70,14 @@ global def tinsertMulti y (Tree cmp root) =
       _  = balanceR l x (helper r)
   Tree cmp (helper root)
 
+global def a ⊆ b = tsubset a b
+global def a ⊇ b = tsubset b a
+global def a ⊉ b = !(a ⊇ b)
+global def a ⊈ b = !(a ⊆ b)
+
+global def a ⊊ b = a ⊆ b & b ⊈ a # strict
+global def a ⊋ b = a ⊇ b & b ⊉ a # strict
+
 # True if every element of a appears in b
 global def tsubset (Tree _ aroot) (Tree cmp broot) =
   def helper a b = match a b
@@ -346,6 +354,7 @@ def union cmp aroot broot =
   helper aroot broot
 
 # Union of two trees, keeping equal values of a before equal values of b
+global def a ⊎ b = tunionMulti a b
 global def tunionMulti (Tree _ aroot) (Tree cmp broot) =
   Tree cmp (unionMulti cmp aroot broot)
 
@@ -364,6 +373,7 @@ def unionMulti cmp aroot broot =
   helper aroot broot
 
 # Remove all occurrences of keys from a which appear in b
+global def a ∖ b = tsubtract a b
 global def tsubtract (Tree _ aroot) (Tree cmp broot) =
   def helper a b = match a b
     Tip _ = Tip
