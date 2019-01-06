@@ -20,6 +20,10 @@ global def gcd x y = prim "gcd"
 global def lcm x y = prim "lcm"
 global def powm x y m = prim "powm" # fast version of: (x^y) % m
 
+global def √ x = root 2 x
+global def ∛ x = root 3 x
+global def ∜ x = root 4 x
+
 global def icmp x y = prim "icmp"
 
 global def x <  y = lt icmp x y
@@ -32,3 +36,6 @@ global def x != y = !(x == y)
 
 global def min x y = if x < y then x else y
 global def max x y = if x < y then y else x
+
+global def ∏ l = foldl (_*_) 1 l
+global def ∑ l = foldl (_+_) 0 l
