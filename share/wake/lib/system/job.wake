@@ -81,21 +81,23 @@ def wakepath = prim "execpath"
 def fusepath = relative workspace (simplify "{wakepath}/../lib/wake/fuse-wake")
 global def uncached_fuse_job dir stdin env cmd files = memoize (
   def visible = dir, map hashname files
-  def fuse = primjob 0 "." "." "" "" (fusepath, visible).implode
-  def endfuse _ = finish fuse Nil Nil
-  def waitfuse = if fuse.status == 0 then endfuse 0 else endfuse 0
-  def err = fuse.stderr
-  def handle _ = raise "Could not start fuse-wake: {err}"
-  def list = try handle (extract 'OK: (.*)' err)
-  def job = launch list.head dir stdin env cmd
-  def final _ = # run once job exits
-    def status = kill fuse 14 # SIGALRM
-    def result = extract "(.*\0)?\0(.*)" fuse.stdout
-    def inputs = (tokenize "\0" (at 0 result)).reverse.tail
-    def outputs = (tokenize "\0" (at 1 result)).reverse.tail
-    finish job inputs (map hashname outputs)
-  def wait = if job.status == 0 then final 0 else final 0
-  job
+  def doit args =
+    def fuse = primjob 0 "." "." "" "" args
+    def endfuse _ = finish fuse Nil Nil
+    def waitfuse = if fuse.status == 0 then endfuse 0 else endfuse 0
+    def err = fuse.stderr
+    def handle _ = raise "Could not start fuse-wake: {err}"
+    def list = try handle (extract 'OK: (.*)' err)
+    def job = launch list.head dir stdin env cmd
+    def final _ = # run once job exits
+      def status = kill fuse 14 # SIGALRM
+      def result = extract "(.*\0)?\0(.*)" fuse.stdout
+      def inputs = (tokenize "\0" (at 0 result)).reverse.tail
+      def outputs = (tokenize "\0" (at 1 result)).reverse.tail
+      finish job inputs (map hashname outputs)
+    def wait = if job.status == 0 then final 0 else final 0
+    job
+  tryelse (raise _.cat) doit (fusepath, visible).implode
 )
 
 global def cached_fuse_job dir stdin env cmd files =
