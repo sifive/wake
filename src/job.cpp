@@ -8,6 +8,8 @@
 #include <sys/wait.h>
 #include <sys/select.h>
 #include <sys/time.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 #include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -168,6 +170,48 @@ static char **split_null(std::string &str) {
   return out;
 }
 
+static int do_hash_dir() {
+  printf("00000000000000000000000000000000\n");
+  return 0;
+}
+
+static int do_hash(const char *file) {
+  struct stat stat;
+  int fd;
+  uint8_t hash[16];
+  void *map;
+
+  fd = open(file, O_RDONLY);
+  if (fd == -1) {
+    if (errno == EISDIR) return do_hash_dir();
+    perror("open");
+    return 1;
+  }
+
+  if (fstat(fd, &stat) != 0) {
+    if (errno == EISDIR) return do_hash_dir();
+    perror("fstat");
+    return 1;
+  }
+
+  if (S_ISDIR(stat.st_mode)) return do_hash_dir();
+
+  map = mmap(0, stat.st_size, PROT_READ, MAP_SHARED, fd, 0);
+  if (map == MAP_FAILED) {
+    perror("mmap");
+    return 1;
+  }
+
+  MurmurHash3_x64_128(map, stat.st_size, 42, &hash[0]);
+  printf("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",
+    hash[ 0], hash[ 1], hash[ 2], hash[ 3],
+    hash[ 4], hash[ 5], hash[ 6], hash[ 7],
+    hash[ 8], hash[ 9], hash[10], hash[11],
+    hash[12], hash[13], hash[14], hash[15]);
+
+  return 0;
+}
+
 static void launch(JobTable *jobtable) {
   for (auto &i : jobtable->imp->table) {
     if (jobtable->imp->tasks[i.pool].empty()) continue;
@@ -211,8 +255,12 @@ static void launch(JobTable *jobtable) {
         }
         auto cmdline = split_null(task.cmdline);
         auto environ = split_null(task.environ);
-        execve(cmdline[0], cmdline, environ);
-        perror("execve");
+        if (!strcmp(cmdline[0], "<hash>")) {
+          exit(do_hash(cmdline[1]));
+        } else {
+          execve(cmdline[0], cmdline, environ);
+          perror("execve");
+        }
         exit(1);
       }
       close(pipe_stdout[1]);

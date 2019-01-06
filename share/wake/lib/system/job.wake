@@ -53,7 +53,7 @@ global def finish job inputs outputs =
   imp job inputs.implode outputs.implode
 
 global def hashpair f = memoize ( # Pair file hash
-  def job = launch "." "." "" Nil (which "md5sum", f, Nil)
+  def job = launch "." "." "" Nil ("<hash>", f, Nil)
   def final _ = finish job Nil Nil
   def wait = if job.status == 0 then final 0 else final 0
   def add f h = prim "add_hash"
@@ -79,8 +79,8 @@ def wakepath = prim "execpath"
 
 # Still not caching, just hermetic
 def fusepath = relative workspace (simplify "{wakepath}/../lib/wake/fuse-wake")
-global def uncached_fuse_job dir stdin env cmd files dirs = memoize (
-  def visible = map hashname files ++ (dir, dirs)
+global def uncached_fuse_job dir stdin env cmd files = memoize (
+  def visible = dir, map hashname files
   def fuse = primjob 0 "." "." "" "" (fusepath, visible).implode
   def endfuse _ = finish fuse Nil Nil
   def waitfuse = if fuse.status == 0 then endfuse 0 else endfuse 0
@@ -98,11 +98,11 @@ global def uncached_fuse_job dir stdin env cmd files dirs = memoize (
   job
 )
 
-global def cached_fuse_job dir stdin env cmd files dirs =
-  def build _ = uncached_fuse_job dir stdin env cmd files dirs
+global def cached_fuse_job dir stdin env cmd files =
+  def build _ = uncached_fuse_job dir stdin env cmd files
   jobcache build dir stdin env cmd (map hashname files)
 
 # Most jobs don't need explicit stdin/env control
 global def environment = subscribe environment
-global def job cmd files dirs = cached_fuse_job "." "" environment cmd files dirs
+global def job cmd files = cached_fuse_job "." "" environment cmd files
 global def simple_job cmd inputs outputs = cached_simple_job "." "" environment cmd inputs outputs

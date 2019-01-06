@@ -5,7 +5,6 @@ External dependencies:
  - libre2-dev
  - re2c
  - utf8proc
- - md5sum
 
 Internal dependencies:
  - argagg		BSD 0 clause

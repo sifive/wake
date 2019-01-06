@@ -1,7 +1,7 @@
 def re2c file =
   def cpp = replace '\.re$' ".cpp" file
   def cmdline = which "re2c", "-8", "--no-generation-date", file, "-o", cpp, Nil
-  def result = job cmdline (file, Nil) Nil
+  def result = job cmdline (file, Nil)
   result.output
 
 global def buildWake variant =

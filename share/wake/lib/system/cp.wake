@@ -1,6 +1,6 @@
 global def cp x y =
   def outdir = simplify "{y}/.."
-  job (which "cp", x, y, Nil) (x, Nil) (outdir, Nil)
+  job (which "cp", x, y, Nil) (outdir, x, Nil)
 
 global def installAs dest file =
   def path = simplify "{dest}/.."
