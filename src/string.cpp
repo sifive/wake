@@ -4,6 +4,7 @@
 #include "hash.h"
 #include "expr.h"
 #include "type.h"
+#include "symbol.h"
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -333,6 +334,60 @@ static PRIMFN(prim_scaseNFKC) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_code2str) {
+  return args.size() == 1 &&
+    args[0]->unify(Integer::typeVar) &&
+    out->unify(String::typeVar);
+}
+
+static PRIMFN(prim_code2str) {
+  EXPECT(1);
+  INTEGER(arg0, 0);
+  std::string str;
+  bool ok = mpz_fits_slong_p(arg0->value);
+  long x = ok ? mpz_get_si(arg0->value) : 0;
+  ok = ok && x >= 0;
+  ok = ok && push_utf8(str, x);
+  REQUIRE(ok, "Not a valid Unicode codepoint");
+  auto out = std::make_shared<String>(std::move(str));
+  RETURN(out);
+}
+
+static PRIMFN(prim_bin2str) {
+  EXPECT(1);
+  INTEGER(arg0, 0);
+  bool ok = mpz_fits_slong_p(arg0->value);
+  long x = ok ? mpz_get_si(arg0->value) : 0;
+  ok = ok && x >= 0 && x < 256;
+  REQUIRE(ok, "Not a valid byte");
+  char c[2] = { static_cast<char>(x), 0 };
+  auto out = std::make_shared<String>(std::string(c));
+  RETURN(out);
+}
+
+static PRIMTYPE(type_str2code) {
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
+    out->unify(Integer::typeVar);
+}
+
+static PRIMFN(prim_str2code) {
+  EXPECT(1);
+  STRING(arg0, 0);
+  uint32_t rune;
+  int x = pop_utf8(&rune, arg0->value.c_str());
+  REQUIRE (x >= 1, "Invalid UTF-8");
+  auto out = std::make_shared<Integer>(rune);
+  RETURN(out);
+}
+
+static PRIMFN(prim_str2bin) {
+  EXPECT(1);
+  STRING(arg0, 0);
+  auto out = std::make_shared<Integer>(static_cast<unsigned char>(arg0->value[0]));
+  RETURN(out);
+}
+
 void prim_register_string(PrimMap &pmap, const char *version) {
   pmap.emplace("catopen", PrimDesc(prim_catopen, type_catopen));
   pmap.emplace("catadd",  PrimDesc(prim_catadd,  type_catadd));
@@ -349,4 +404,8 @@ void prim_register_string(PrimMap &pmap, const char *version) {
   pmap.emplace("sNFC",    PrimDesc(prim_sNFC,    type_normalize));
   pmap.emplace("sNFKC",   PrimDesc(prim_sNFKC,   type_normalize));
   pmap.emplace("scaseNFKC", PrimDesc(prim_scaseNFKC, type_normalize));
+  pmap.emplace("code2str", PrimDesc(prim_code2str, type_code2str));
+  pmap.emplace("bin2str",  PrimDesc(prim_bin2str,  type_code2str));
+  pmap.emplace("str2code", PrimDesc(prim_str2code, type_str2code));
+  pmap.emplace("str2bin",  PrimDesc(prim_str2bin,  type_str2code));
 }

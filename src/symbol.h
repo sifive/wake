@@ -3,6 +3,7 @@
 
 #include "location.h"
 #include <memory>
+#include <cstdint>
 
 enum SymbolType {
   ERROR, ID, OPERATOR, LITERAL, DEF, VAL, GLOBAL, PUBLISH, SUBSCRIBE, PRIM, LAMBDA,
@@ -48,6 +49,9 @@ struct op_type {
   op_type(int p_, int l_) : p(p_), l(l_) { }
   op_type() : p(-1), l(-1) { }
 };
+
+bool push_utf8(std::string &result, uint32_t c);
+int pop_utf8(uint32_t *rune, const char *str);
 
 op_type op_precedence(const char *str);
 

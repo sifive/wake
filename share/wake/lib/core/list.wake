@@ -19,6 +19,12 @@ global def map f = match _
   Nil  = Nil
   h, t = f h, map f t
 
+global def mapPartial f = match _
+  Nil  = Nil
+  h, t = match (f h)
+    Some x = x, mapPartial f t
+    None   = mapPartial f t
+
 global def foldl f a = match _
   Nil  = a
   h, t = foldl f (f a h) t

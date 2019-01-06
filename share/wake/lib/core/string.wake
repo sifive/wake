@@ -17,6 +17,14 @@ global def intbase base s = prim "int" # string -> int
 global def str n = strbase 10 n
 global def int s = intbase 0 s
 
+# String <=> Integer Unicode conversion
+global def code2str i = prim "code2str"
+global def str2code s = prim "str2code"
+
+# String <=> Integer Binary conversion (Warning: may create invalid Unicode)
+global def bin2str i = prim "bin2str"
+global def str2bin s = prim "str2bin"
+
 # Version of wake
 global def version = prim "version"
 

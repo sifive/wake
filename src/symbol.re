@@ -190,7 +190,7 @@ enum
 #define HIGH_SURROGATE 0xDC00
 #define END_SURROGATE  0xE000
 
-static bool push_utf8(std::string &result, uint32_t c)
+bool push_utf8(std::string &result, uint32_t c)
 {
   if (c <= Rune1) {
     result.push_back(static_cast<unsigned char>(c));
@@ -212,6 +212,64 @@ static bool push_utf8(std::string &result, uint32_t c)
     return false;
   }
   return true;
+}
+
+int pop_utf8(uint32_t *rune, const char *str)
+{
+  int c, c1, c2, c3;
+  long l;
+
+  /*
+   * one character sequence
+   *  00000-0007F => T1
+   */
+  c = *(unsigned char*)str;
+  if (c < Tx) {
+    *rune = c;
+    return 1;
+  }
+
+  /*
+   * two character sequence
+   *  0080-07FF => T2 Tx
+   */
+  c1 = *(unsigned char*)(str+1) ^ Tx;
+  if (c1 & Testx) return -1;
+  if (c < T3) {
+    if (c < T2) return -1;
+    l = ((c << Bitx) | c1) & Rune2;
+    if (l <= Rune1) return -1;
+    *rune = l;
+    return 2;
+  }
+
+  /*
+   * three character sequence
+   *  0800-FFFF => T3 Tx Tx
+   */
+  c2 = *(unsigned char*)(str+2) ^ Tx;
+  if (c2 & Testx) return -1;
+  if (c < T4) {
+    l = ((((c << Bitx) | c1) << Bitx) | c2) & Rune3;
+    if (l <= Rune2) return -1;
+    *rune = l;
+    return 3;
+  }
+
+  /*
+   * four character sequence (21-bit value)
+   *  10000-1FFFFF => T4 Tx Tx Tx
+   */
+  c3 = *(unsigned char*)(str+3) ^ Tx;
+  if (c3 & Testx) return -1;
+  if (c < T5) {
+    l = ((((((c << Bitx) | c1) << Bitx) | c2) << Bitx) | c3) & Rune4;
+    if (l <= Rune3) return -1;
+    *rune = l;
+    return 4;
+  }
+
+  return -1;
 }
 
 static bool lex_sstr(Lexer &lex, Expr *&out)
