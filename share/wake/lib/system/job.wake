@@ -90,7 +90,7 @@ global def uncached_fuse_job dir stdin env cmd files = memoize (
   def job = launch list.head dir stdin env cmd
   def final _ = # run once job exits
     def status = kill fuse 14 # SIGALRM
-    def result = extract "(.*\0)\0(.*)" fuse.stdout
+    def result = extract "(.*\0)?\0(.*)" fuse.stdout
     def inputs = (tokenize "\0" (at 0 result)).reverse.tail
     def outputs = (tokenize "\0" (at 1 result)).reverse.tail
     finish job inputs (map hashname outputs)
