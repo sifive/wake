@@ -240,7 +240,7 @@ static int wakefuse_mkdir(const char *path, mode_t mode)
 		return -EACCES;
 
 	res = mkdirat(rootfd, map(path), mode);
-	if (res == -1)
+	if (res == -1 && errno != EEXIST)
 		return -errno;
 
 	files_wrote.insert(map(path));
