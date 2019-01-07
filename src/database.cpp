@@ -263,6 +263,15 @@ static void single_step(const char *why, sqlite3_stmt *stmt) {
   ret = sqlite3_step(stmt);
   if (ret != SQLITE_DONE) {
     std::cerr << why << "; sqlite3_step: " << sqlite3_errmsg(sqlite3_db_handle(stmt)) << std::endl;
+    std::cerr << "The failing statement was: ";
+#if SQLITE_VERSION_NUMBER >= 3014000
+    char *tmp = sqlite3_expanded_sql(stmt);
+    std::cerr << tmp;
+    sqlite3_free(tmp);
+#else
+    std::cerr << sqlite3_sql(stmt);
+#endif
+    std::cerr << std::endl;
     exit(1);
   }
 
