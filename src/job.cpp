@@ -233,6 +233,10 @@ static void launch(JobTable *jobtable) {
       i.pipe_stderr = pipe_stderr[0];
       gettimeofday(&i.start, 0);
       i.job->db->insert_job(task.dir, task.stdin, task.environ, task.cmdline, task.stack, &i.job->job);
+      std::cout << std::flush;
+      std::cerr << std::flush;
+      fflush(stdout);
+      fflush(stderr);
       i.job->pid = i.pid = fork();
       i.job->state |= STATE_FORKED;
       if (i.pid == 0) {
