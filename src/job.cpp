@@ -196,10 +196,12 @@ static int do_hash(const char *file) {
 
   if (S_ISDIR(stat.st_mode)) return do_hash_dir();
 
-  map = mmap(0, stat.st_size, PROT_READ, MAP_SHARED, fd, 0);
-  if (map == MAP_FAILED) {
-    perror("mmap");
-    return 1;
+  if (stat.st_size != 0) {
+    map = mmap(0, stat.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    if (map == MAP_FAILED) {
+      perror("mmap");
+      return 1;
+    }
   }
 
   MurmurHash3_x64_128(map, stat.st_size, 42, &hash[0]);
