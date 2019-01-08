@@ -11,11 +11,13 @@ global def format any = prim "format"
 global def waitOne f x =
   def wait x = prim "wait_one"
   match (wait x)
-    _ = f x
+    True  = f x
+    False = f x
 
 # Wait for all of a value to be made available, then run (f x)
 # Eg: x = 1, 2, 3, Nil; waitAll f x waits for all the values 1-3 to be known
 global def waitAll f x =
   def wait x = prim "wait_all"
   match (wait x)
-    _ = f x
+    True  = f x
+    False = f x

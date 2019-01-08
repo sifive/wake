@@ -55,14 +55,15 @@ static PRIMFN(prim_raise) {
   Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(arg0->value, binding));
 }
 
-static PRIMTYPE(type_id) {
+static PRIMTYPE(type_true) {
   return args.size() == 1 &&
-    out->unify(*args[0]);
+    out->unify(Data::typeBoolean);
 }
 
-static PRIMFN(prim_id) {
+static PRIMFN(prim_true) {
   EXPECT(1);
-  RETURN(args[0]);
+  auto out = make_true();
+  RETURN(out);
 }
 
 void prim_register_exception(PrimMap &pmap) {
@@ -70,6 +71,6 @@ void prim_register_exception(PrimMap &pmap) {
   pmap.emplace("catch", PrimDesc(prim_catch, type_catch, 0, PRIM_PURE));
   pmap.emplace("raise", PrimDesc(prim_raise, type_raise, 0, PRIM_PURE));
 
-  pmap.emplace("wait_one", PrimDesc(prim_id, type_id, 0, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("wait_all", PrimDesc(prim_id, type_id, 0, PRIM_PURE));
+  pmap.emplace("wait_one", PrimDesc(prim_true, type_true, 0, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("wait_all", PrimDesc(prim_true, type_true, 0, PRIM_PURE));
 }
