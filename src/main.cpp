@@ -1,4 +1,9 @@
-#define VERSION "0.4"
+#ifndef VERSION
+#include "version.h"
+#endif
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define VERSION_STR TOSTRING(VERSION)
 
 #include <iostream>
 #include <thread>
@@ -98,7 +103,7 @@ int main(int argc, const char **argv) {
   }
 
   if (args["version"]) {
-    std::cerr << "wake v" << VERSION << std::endl;
+    std::cerr << "wake " << VERSION_STR << std::endl;
     return 0;
   }
 
@@ -194,7 +199,7 @@ int main(int argc, const char **argv) {
   /* Primitives */
   JobTable jobtable(&db, jobs, verbose, quiet);
   PrimMap pmap;
-  prim_register_string(pmap, VERSION);
+  prim_register_string(pmap, VERSION_STR);
   prim_register_vector(pmap);
   prim_register_integer(pmap);
   prim_register_exception(pmap);

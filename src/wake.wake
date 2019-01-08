@@ -4,9 +4,16 @@ def re2c file =
   def result = job cmdline (file, Nil)
   result.output
 
+def version_h _ =
+  def out = "{here}/version.h"
+  def cmdline = which "git", "describe", "--tags", "--dirty", Nil
+  def git = volatile_job cmdline Nil (\_ Nil)
+  def body = "#define VERSION {git.stdout}"
+  waitOne (\_ out) (write out body 0664)
+
 global def buildWake variant =
   def reFiles = sources here '.*\.re'
-  def headerFiles = sources here '.*\.h'
+  def headerFiles = version_h 0, sources here '.*\.h'
   def cppFiles = sources here '.*\.cpp' ++ map re2c reFiles
   def compile = compileC variant ("-I/opt/local/include", Nil) headerFiles
   def objFiles = map compile cppFiles
