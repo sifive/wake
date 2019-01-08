@@ -261,6 +261,36 @@ static PRIMFN(prim_sources) {
   RETURN(out);
 }
 
+static PRIMFN(prim_files) {
+  EXPECT(2);
+  STRING(arg0, 0);
+  STRING(arg1, 1);
+
+  std::string root(arg0->value);
+  REQUIRE(make_canonical(root), "base directory cannot be made canonical (too many ..s?)");
+
+  RE2::Options options;
+  options.set_log_errors(false);
+  options.set_one_line(true);
+  options.set_dot_nl(true);
+  RE2 exp(arg1->value, options);
+  if (!exp.ok()) {
+    auto fail = std::make_shared<Exception>(exp.error(), binding);
+    RETURN(fail);
+  }
+
+  std::vector<std::shared_ptr<String> > files;
+  push_files(files, root);
+  auto match = sources(files, root, exp);
+
+  std::vector<std::shared_ptr<Value> > downcast;
+  downcast.reserve(match.size());
+  for (auto &i : match) downcast.emplace_back(std::move(i));
+
+  auto out = make_list(std::move(downcast));
+  RETURN(out);
+}
+
 static PRIMTYPE(type_add_sources) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
@@ -359,6 +389,7 @@ static PRIMFN(prim_getcwd) {
 void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimMap &pmap) {
   pmap.emplace("sources",     PrimDesc(prim_sources,     type_sources,     sources));
   pmap.emplace("add_sources", PrimDesc(prim_add_sources, type_add_sources, sources));
+  pmap.emplace("files",       PrimDesc(prim_files,       type_sources));
   pmap.emplace("simplify",    PrimDesc(prim_simplify,    type_simplify));
   pmap.emplace("relative",    PrimDesc(prim_relative,    type_relative));
   pmap.emplace("execpath",    PrimDesc(prim_execpath,    type_execpath));

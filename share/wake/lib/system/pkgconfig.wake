@@ -1,6 +1,6 @@
 global def pkgConfig args = memoize (
   def cmdline = which "pkg-config", args
-  def result = simple_job cmdline Nil Nil
+  def result = manual_job cmdline Nil (\_ Nil) # caching ok
   tokenize " " (tokenize "\n" result.stdout).head
 )
 
