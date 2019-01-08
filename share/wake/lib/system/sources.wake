@@ -6,4 +6,9 @@ def got_sources = add_sources (subscribe source).implode # returns true
 # Find sources files
 global def sources dir regexp =
   def scan dir regexp = prim "sources"
-  if got_sources then scan dir regexp else Nil # force dependency on add_sources
+  waitOne (\_ scan dir regexp) got_sources
+
+# Find files
+# WARNING! Use of this method can make a build unreproducible
+# Depending on when the method is invoked, the results may vary
+global def files dir regexp = prim "files"
