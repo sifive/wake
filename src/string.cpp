@@ -237,9 +237,8 @@ static PRIMFN(prim_format) {
 static PRIMFN(prim_iformat) {
   REQUIRE(args.size() == 1, "prim_iformat expects 1 argument");
   std::shared_ptr<Value> out;
-  if (args[0]->type == String::type) {
-    out = std::make_shared<String>(
-      reinterpret_cast<String*>(args[0].get())->value);
+  if (args[0]->type == Exception::type || args[0]->type == String::type) {
+    out = args[0];
   } else {
     std::stringstream buffer;
     args[0]->format(buffer, 0);
