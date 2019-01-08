@@ -13,7 +13,7 @@ wake.db:	bin/wake lib/wake/fuse-wake
 	test -f $@ || ./bin/wake --init .
 
 install:	all
-	./bin/wake -v install '"install"'
+	./bin/wake install '"install"'
 
 bin/wake:	$(patsubst %.cpp,%.o,$(wildcard src/*.cpp)) src/symbol.o
 	$(CXX) -std=c++11 $(CFLAGS) -L $(GMP_LIB) -o $@ $^ -lgmp -lre2 -lsqlite3 -lutf8proc

@@ -13,4 +13,4 @@ global def install dest =
   def libinstall = map (installIn dest) libfiles
   def bininstall = map (\exe installAs (releaseAs exe) exe) binfiles
   def pass = flatten (libinstall ++ bininstall)
-  catWith " " pass
+  pass
