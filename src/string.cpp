@@ -102,6 +102,32 @@ static PRIMFN(prim_catclose) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_explode) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
+    out->unify(list);
+}
+
+static PRIMFN(prim_explode) {
+  EXPECT(1);
+  STRING(arg0, 0);
+  std::vector<std::shared_ptr<Value> > vals;
+  uint32_t rune;
+
+  int got;
+  for (const char *ptr = arg0->value.c_str(); *ptr; ptr += got) {
+    got = pop_utf8(&rune, ptr);
+    REQUIRE(got > 0, "Invalid Unicode");
+    vals.emplace_back(std::make_shared<String>(std::string(ptr, got)));
+  }
+
+  auto out = make_list(std::move(vals));
+  RETURN(out);
+}
+
 static PRIMTYPE(type_read) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
@@ -392,6 +418,7 @@ void prim_register_string(PrimMap &pmap, const char *version) {
   pmap.emplace("catopen", PrimDesc(prim_catopen, type_catopen));
   pmap.emplace("catadd",  PrimDesc(prim_catadd,  type_catadd));
   pmap.emplace("catclose",PrimDesc(prim_catclose,type_catclose));
+  pmap.emplace("explode", PrimDesc(prim_explode, type_explode));
   pmap.emplace("write",   PrimDesc(prim_write,   type_write));
   pmap.emplace("read",    PrimDesc(prim_read,    type_read));
   pmap.emplace("getenv",  PrimDesc(prim_getenv,  type_getenv));

@@ -11,6 +11,9 @@ global def catWith s l =
     def inserted = foldr (s, _, _) Nil l
     cat (inserted.tail)
 
+# String => List String of codepoints
+global def explode s = prim "explode"
+
 # String <=> Integer type conversion
 global def strbase base n = prim "str" # int -> string
 global def intbase base s = prim "int" # string -> int
