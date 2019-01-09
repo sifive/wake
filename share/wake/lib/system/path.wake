@@ -1,6 +1,6 @@
 # file/path operations
 global def read path = prim "read"
-global def write path content mode = prim "write"
+global def write mode path content = prim "write"
 global def mkdir path mode = prim "mkdir"
 global def simplify path = prim "simplify"
 global def relative dir path = prim "relative"
