@@ -274,7 +274,7 @@ static void launch(JobTable *jobtable) {
       close(pipe_stdout[1]);
       close(pipe_stderr[1]);
       for (char &c : task.cmdline) if (c == 0) c = ' ';
-      if (!jobtable->imp->quiet && i.pool && !i.internal) {
+      if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
         std::cerr << task.cmdline << std::endl;
       }
       jobtable->imp->tasks[i.pool].pop_front();
@@ -340,7 +340,7 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->process(queue);
           ++done;
         } else {
-          if (!imp->quiet && i.pool) {
+          if (!imp->quiet && i.pool) { // print stderr also internal
             std::cerr.write(buffer, got);
           }
           i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
