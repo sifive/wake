@@ -90,6 +90,7 @@ struct Task {
 struct Job {
   int pool;
   std::shared_ptr<JobResult> job;
+  int internal;
   int pipe_stdout;
   int pipe_stderr;
   struct timeval start;
@@ -229,6 +230,7 @@ static void launch(JobTable *jobtable) {
       fcntl(pipe_stdout[0], F_SETFL, fcntl(pipe_stdout[0], F_GETFL, 0) | FD_CLOEXEC);
       fcntl(pipe_stderr[0], F_SETFL, fcntl(pipe_stderr[0], F_GETFL, 0) | FD_CLOEXEC);
       i.job = std::move(task.job);
+      i.internal = !strncmp(task.cmdline.c_str(), "<hash>", 6);
       i.pipe_stdout = pipe_stdout[0];
       i.pipe_stderr = pipe_stderr[0];
       gettimeofday(&i.start, 0);
@@ -261,7 +263,7 @@ static void launch(JobTable *jobtable) {
         }
         auto cmdline = split_null(task.cmdline);
         auto environ = split_null(task.environ);
-        if (!strcmp(cmdline[0], "<hash>")) {
+        if (i.internal) {
           exit(do_hash(cmdline[1]));
         } else {
           execve(cmdline[0], cmdline, environ);
@@ -272,7 +274,9 @@ static void launch(JobTable *jobtable) {
       close(pipe_stdout[1]);
       close(pipe_stderr[1]);
       for (char &c : task.cmdline) if (c == 0) c = ' ';
-      if (!jobtable->imp->quiet && i.pool) std::cerr << task.cmdline << std::endl;
+      if (!jobtable->imp->quiet && i.pool && !i.internal) {
+        std::cerr << task.cmdline << std::endl;
+      }
       jobtable->imp->tasks[i.pool].pop_front();
     }
   }
@@ -321,7 +325,7 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->process(queue);
           ++done;
         } else {
-          if (imp->verbose) {
+          if (imp->verbose && i.pool && !i.internal) {
             std::cout.write(buffer, got);
           }
           i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
@@ -336,7 +340,7 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->process(queue);
           ++done;
         } else {
-          if (imp->verbose) {
+          if (!imp->quiet && i.pool) {
             std::cerr.write(buffer, got);
           }
           i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
@@ -379,8 +383,6 @@ bool JobTable::wait(WorkQueue &queue) {
           i.pid = 0;
           i.pipe_stdout = -1;
           i.pipe_stderr = -1;
-          // if (imp->verbose) std::cout << i.job->db->get_output(i.job->job, 1);
-          if (imp->verbose && i.pool) std::cerr << i.job->db->get_output(i.job->job, 2);
           i.job->process(queue);
           i.job->runtime = i.runtime(now);
           i.job.reset();

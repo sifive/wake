@@ -27,7 +27,7 @@ global def launch root dir stdin env cmd = oncejob root dir stdin env.implode cm
 
 def fail job ok =
   if job.status == 0 then ok else
-    raise "Non-zero exit status {str job.status})"
+    raise "Non-zero exit status ({str job.status})"
 
 # Access the output of a job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
