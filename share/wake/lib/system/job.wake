@@ -1,12 +1,10 @@
 # The internal function operates on imploded strings, not lists
 def primjob pool root dir stdin env cmd = prim "job_launch"
-def oncejob root dir stdin env cmd = memoize primjob 1 root dir stdin env cmd
 def primcache dir stdin env cmd visible = prim "job_cache"
-def oncecache dir stdin env cmd visible = memoize primcache dir stdin env cmd visible
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
-global def jobcache build dir stdin env cmd visible =
-  match (tryelse (\_ None) (Some _) (oncecache dir stdin env.implode cmd.implode visible.implode))
+global def jobcache build dir stdin env cmd visible = memoize (
+  match (tryelse (\_ None) (Some _) (primcache dir stdin env.implode cmd.implode visible.implode))
     None     = build 0
     Some out =
       def notOk pair = hashcode pair.first !=* pair.second
@@ -15,6 +13,7 @@ global def jobcache build dir stdin env cmd visible =
         Some (Pair (Pair file saw) _) =
           def expect = hashcode file
           raise "Hash mismatch for {file} ({saw} != {expect}); remove it or run with -f"
+)
 
 # Launch a job, raw interface
 # If you use this API, you MUST also run 'finish' on the result AFTER status is available
@@ -23,7 +22,7 @@ global def jobcache build dir stdin env cmd visible =
 #   stdin: file to attach to standard input ("" = nothing)
 #   env:   string list of all environement variables in the form key=value
 #   cmd:   string list of command arguments (head is the full path to the command)
-global def launch root dir stdin env cmd = oncejob root dir stdin env.implode cmd.implode
+global def launch root dir stdin env cmd = primjob 1 root dir stdin env.implode cmd.implode
 
 def fail job ok =
   if job.status == 0 then ok else
