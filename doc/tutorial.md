@@ -1,247 +1,250 @@
-  This tutorial assumes you have wake and git installed in your path.
-  Code sections are intended to be copy-pasted into a terminal.
+# Wake Tutorial
 
-0. Invoking wake
+This tutorial assumes you have wake and git installed in your path.
+Code sections are intended to be copy-pasted into a terminal.
 
-mkdir tutorial
-cd tutorial
-wake --init .
-wake '5 + 6'
+## Invoking wake
 
-  This sequence of commands creates a new workspace managed by wake.
-  The init option is used to create an initial wake.db to record the state
-  of the build in this workspace.
-  Whenever you run wake, it searches for a wake.db in parent directories.
-  The first wake.db found defines what wake considers to be the workspace.
-  You can thus safely run wake in any sub-directory of tutorial and wake
-  will be aware of all the relevant dependencies and rules.
 
-  The final output of wake run on an expression is always of the form
-  "expression: type = value". In this case, 5 + 6 results in value 11,
-  which is an Integer.
-  
-git init .
-echo 'global def hello = "Hello World"' > tutorial.wake
-git add tutorial.wake
-wake hello
+    mkdir tutorial
+    cd tutorial
+    wake --init .
+    wake '5 + 6'
 
-  Wake processes all versioned wake files (*.wake) which are in the workspace.
-  A very common mistake is to create a new wake file and run wake without first
-  adding that file to verison control. In that case, the file will not be read,
-  and you will likely get an error like "Variable reference xyz is unbound".
+This sequence of commands creates a new workspace managed by wake.
+The `init` option is used to create an initial `wake.db` to record the state
+of the build in this workspace.
+Whenever you run wake, it searches for a `wake.db` in parent directories.
+The first `wake.db` found defines what wake considers to be the workspace.
+You can thus safely run wake in any sub-directory of tutorial and wake
+will be aware of all the relevant dependencies and rules.
 
-  The syntax "def x = y" introduces a new variable "x" whose value is equal
-  to "y". In this case, "y" is just a String. The "global" is necessary to
-  make "hello" available to other wake files, including what we type on the
-  command-line.
+The final output of wake run on an expression is always of the form
+`expression: type = value`. In this case, 5 + 6 results in value 11,
+which is an `Integer`.
 
-1. Compile a C file
+    git init .
+    echo 'global def hello = "Hello World"' > tutorial.wake
+    git add tutorial.wake
+    wake hello
 
-echo 'int main() { return 0; }' > main.cpp
-echo 'global def build x = compileC "native-cpp11-release" ("-I.", Nil) Nil "main.cpp"' > tutorial.wake
-git add main.cpp
-wake 'build 0'
+Wake processes all versioned wake files (`*.wake`) which are in the workspace.
+A very common mistake is to create a new wake file and run wake without first
+adding that file to version control. In that case, the file will not be read,
+and you will likely get an error like `Variable reference xyz is unbound`.
 
-  Let's just ignore the wake file for the moment and focus on how wake behaves.
-  First, by default wake prints out the jobs it has executed.
-  In this case, that means we see that it ran g++ to produce an object file.
+The syntax `def x = y` introduces a new variable `x` whose value is equal
+to `y`. In this case, `y` is just a `String`. The `global` is necessary to
+make `"hello"` available to other wake files, including what we type on the
+command-line.
 
-wake -o main.native-cpp11-release.o
+## Compiling a CPP file
 
-  We can ask wake to tell us about which job used a file as an output.
-  Notice that the command-line and environment was captured.
-  If either of these change, wake will rebuild the file.
+    echo 'int main() { return 0; }' > main.cpp
+    echo 'global def build x = compileC "native-cpp11-release" ("-I.", Nil) Nil "main.cpp"' > tutorial.wake
+    git add main.cpp
+    wake 'build 0'
 
-wake -i main.cpp
+Let's just ignore the wake file for the moment and focus on how wake behaves.
+First, by default wake prints out the jobs it has executed.
+In this case, that means we see that it ran g++ to produce an object file.
 
-  We can also ask wake to tell us about which job used a file as an input.
-  For header files, this can be a large number of files, so you might want
-  to pipe the output to less.
+    wake -o main.native-cpp11-release.o
 
-touch main.cpp
-wake 'build 0'
+We can ask wake to tell us about which job used a file as an output.
+Notice that the command-line and environment was captured.
+If either of these change, wake will rebuild the file.
 
-  Notice that wake does not rebuild the object file in this case.  It
-  checked that the hash of the input has not changed and concluded that
-  the existing output would have been reproduced by gcc. You can see
-  what files wake is inspecting using 'wake -v'.
+    wake -i main.cpp
 
-rm *.o
-wake 'build 0'
+We can also ask wake to tell us about which job used a file as an input.
+For header files, this can be a large number of files, so you might want
+to pipe the output to less.
 
-  If the object file is removed, or main.cpp modified, then wake will,
-  of course, rebuild the object file.
+    touch main.cpp
+    wake 'build 0'
 
-wake 'compileC'
-cat tutorial.wake
+Notice that wake does not rebuild the object file in this case.  It
+checked that the hash of the input has not changed and concluded that
+the existing output would have been reproduced by gcc. You can see
+what files wake is inspecting using `wake -v`.
 
-  Now let's turn our attention back to the wake file.
-  As before, def introduces a new variable, "build" this time.
+    rm *.o
+    wake 'build 0'
 
-  In this case, however, build is a function with a single argument "x",
-  which it ignores. Build steps should typically be functions because we
-  don't want them to run unless specifically invoked.
+If the object file is removed, or main.cpp modified, then wake will,
+of course, rebuild the object file.
 
-  build invokes the compileC function. In wake "f x y" is read as
-  function "f" run on "x" and "y". In C this would be "f(x, y)". So
-  compileC is being run on four arguments. 
+    wake 'compileC'
+    cat tutorial.wake
 
-  Notice that the type of compileC is "String => List String => List String
-  => String => String".  This should be read as "a function that takes a
-  String, then a List of Strings, then another List of Strings, another
-  String, and finally returns a String."
+Now let's turn our attention back to the wake file.
+As before, `def` introduces a new variable, `build` this time.
+In this case, however, `build` is a function with a single argument `x`,
+which it ignores. Build steps should typically be functions because we
+don't want them to run unless specifically invoked.
 
-  Indeed, we can see in our use of compileC, we passed a String for the
-  first and last arguments. The second and third arguments are Lists.
-  Nil is the empty List and "(x, y, Nil)" is a List with x and y.
+build invokes the compileC function. In wake `f x y` is read as
+function `f` run on `x` and `y`. In C this would be `f(x, y)`. So
+compileC is being run on four arguments. 
 
-  The arguments to compileC are:
-    1- the build variant as a String
-    2- a list of additional compiler options
-    3- a list of legal input files (more on this later)
-    4- the name of the file to compile
+Notice that the type of compileC is `String => List String => List String => String => String`.
+This should be read as "a function that takes a String, then a List of
+Strings, then another List of Strings, another String, and finally returns a
+String."
 
-  The output of compileC is the name of the object file produced.
+Indeed, we can see in our use of compileC, we passed a String for the
+first and last arguments. The second and third arguments are Lists.
+`Nil` is the empty List and `(x, y, Nil)` is a List with x and y.
 
-2. Compile two C files and link them
+The arguments to compileC are:
+  1. the build variant as a String
+  2. a list of additional compiler options
+  3. a list of legal input files (more on this later)
+  4. the name of the file to compile
 
-echo 'int helper() { return 42; }' > help.cpp
-git add help.cpp
-cat > tutorial.wake <<EOF
-def variant = "native-cpp11-release"
-global def build _ =
-  def main = compileC variant ("-I.", Nil) Nil "main.cpp"
-  def help = compileC variant ("-I.", Nil) Nil "help.cpp"
-  linkO variant ("-lm", Nil) (main, help, Nil) "tutorial"
-EOF
-wake 'build 0'
+The output of compileC is the name of the object file produced.
 
-  We've changed a few things.  Trivial stuff first: We put the build variant
-  into a shared variable so we can change it more easily.  We replaced the
-  argument to build with "_", which means we don't care about it, so don't
-  give the argument a name.
+## Compiling and linking two CPP files
 
-  build now uses multiple lines.  In wake, the last line always defines the
-  value of the define.  As build is a function, you could say the last line
-  is the return value.  All lines except the last line must themselves
-  define new variables.  Also, wake is whitespace sensitive.  It knows that
-  main and help are variables defined inside build, while variant is not.
+    echo 'int helper() { return 42; }' > help.cpp
+    git add help.cpp
+    cat > tutorial.wake <<EOF
+    def variant = "native-cpp11-release"
+    global def build _ =
+      def main = compileC variant ("-I.", Nil) Nil "main.cpp"
+      def help = compileC variant ("-I.", Nil) Nil "help.cpp"
+      linkO variant ("-lm", Nil) (main, help, Nil) "tutorial"
+    EOF
+    wake 'build 0'
 
-rm *.o
-wake 'build 0'
+We've changed a few things.  Trivial stuff first: We put the build variant
+into a shared variable so we can change it more easily.  We replaced the
+argument to build with `_`, which means we don't care about it, so don't
+give the argument a name.
 
-  Blink and you'll miss it.  Wake ran both the compile for main.cpp and
-  help.cpp at the same time.  Even though our wake file said to compile
-  main.cpp first and then to compile help.cpp, wake understands that these
-  steps can be run in parallel.  Conversely, because main and help are
-  needed by the linking step, that step will wait for both object files to
-  compile.
+build now uses multiple lines.  In wake, the last line is always the value
+of the define.  As `build` is a function, you could say the last line is the
+return value.  All lines except the last line must themselves define new
+variables.  Also, wake is whitespace sensitive.  It knows that `main` and
+`help` are variables defined inside `build`, while `variant` is not.
 
-  However, wake probably did NOT relink the objects of the program this
-  time.  That's because wake remembers the hashes of the objects it gave to
-  the linker last time.  The rebuilt object files have the same hashes, so
-  there was no need to relink the program.  Similarly, whitespace only
-  changes to the files will not cause a relink.
+    rm *.o
+    wake 'build 0'
 
-echo 'int main() { return 2; }' > main.cpp
-wake 'build 0'
+Blink and you'll miss it.  Wake ran both the compile for `main.cpp` and
+`help.cpp` at the same time.  Even though our wake file said to compile
+`main.cpp` first and then compile `help.cpp`, wake understands that these
+steps can be run in parallel.  Conversely, because `main` and `help` are
+needed by the linking step, that step will wait for both object files to
+compile.
 
-  Of course, if you change main.cpp meaningfully, both it will be recompiled
-  and the program relinked.
+However, wake probably did NOT relink the objects of the program this
+time.  That's because wake remembers the hashes of the objects it gave to
+the linker last time.  The rebuilt object files have the same hashes, so
+there was no need to relink the program.  Similarly, whitespace only
+changes to the files will not cause a relink.
 
-3. Example using header files
+    echo 'int main() { return 2; }' > main.cpp
+    wake 'build 0'
 
-echo 'int helper();' > helper.h
-echo -e '#include "helper.h"\nint main() { return helper(); }' > main.cpp
-git add helper.h
-cat > tutorial.wake <<EOF
-def variant = "native-cpp11-release"
-global def build _ =
-  def headers = sources here '.*\.h'
-  def main = compileC variant ("-I.", Nil) headers "main.cpp"
-  def help = compileC variant ("-I.", Nil) headers "help.cpp"
-  linkO variant ("-lm", Nil) (main, help, Nil) "tutorial"
-EOF
-wake 'build 0'
+Of course, if you change `main.cpp` meaningfully, both it will be recompiled
+and the program relinked.
 
-  Recall that the third argument to compileC is a list of legal input files.
-  Wake forbids jobs from reading files in the workspace that are not declared
-  inputs.  This means that if you include header files, they must be
-  declared in the list of legal inputs passed to compileC or the compile
-  will fail.
+## Example using header files
 
-  In this example, we've used the 'sources' command to find all the header
-  files in the same directory and pass them as legal inputs to gcc.  The
-  keyword "here" expands to the directory of the wake file.  The second
-  argument to "sources" is a regular expression to select which files to
-  return. We've used ''s here which define strings with escapes disabled.
-  If we had used ""s we would have had to write ".*\\.h", instead.
+    echo 'int helper();' > helper.h
+    echo -e '#include "helper.h"\nint main() { return helper(); }' > main.cpp
+    git add helper.h
+    cat > tutorial.wake <<EOF
+    def variant = "native-cpp11-release"
+    global def build _ =
+      def headers = sources here '.*\.h'
+      def main = compileC variant ("-I.", Nil) headers "main.cpp"
+      def help = compileC variant ("-I.", Nil) headers "help.cpp"
+      linkO variant ("-lm", Nil) (main, help, Nil) "tutorial"
+    EOF
+    wake 'build 0'
 
-  In a classic Makefile it would be considered bad form to list all header
-  files as dependencies for all cpp files.  That's because make would
-  recompile every cpp file whenever any header file changes.  In wake, we
-  don't have this problem.  Wake monitors jobs to see which files they
-  actually used and remembers this for later builds.  Therefore, it's best
-  in wake to err on the side of caution (and convenience) by just listing
-  all the headers in directories that are interesting to the cpp files.
+Recall that the third argument to `compileC` is a list of legal input files.
+Wake forbids jobs from reading files in the workspace that are not declared
+inputs.  This means that if you include header files, they must be
+declared in the list of legal inputs passed to compileC or the compile
+will fail.
 
-wake -o main.native-cpp11-release.o 
+In this example, we've used the `sources` command to find all the header
+files in the same directory and pass them as legal inputs to gcc.  The
+keyword `here` expands to the directory of the wake file.  The second
+argument to `sources` is a regular expression to select which files to
+return. We've used `''`s here which define strings with escapes disabled.
+If we had used `""`s we would have had to write `".*\\.h"`, instead.
 
-  For this file, wake recorded that it needed both main.cpp and helper.h
+In a classic Makefile it would be considered bad form to list all header
+files as dependencies for all cpp files.  That's because make would
+recompile every cpp file whenever any header file changes.  In wake, we
+don't have this problem.  Wake monitors jobs to see which files they
+actually used and remembers this for later builds.  Therefore, it's best in
+wake to err on the side of caution (and convenience) by just listing all the
+headers in directories that are interesting to the cpp files.
 
-wake -o help.native-cpp11-release.o 
+    wake -o main.native-cpp11-release.o 
 
-  For this file, wake recorded that it only needed help.cpp, despite
-  helper.h being a legal input.
+For this file, wake recorded that it needed both `main.cpp` and `helper.h`.
 
-4. Example of map and partial function evaluation
+    wake -o help.native-cpp11-release.o 
 
-cat > tutorial.wake <<EOF
-def variant = "native-cpp11-release"
-global def build _ =
-  def headers = sources here '.*\.h'
-  def compile = compileC variant ("-I.", Nil) headers
-  def objects = map compile (sources here '.*\.cpp')
-  linkO variant ("-lm", Nil) objects "tutorial"
-EOF
-wake 'build 0'
+For this file, wake recorded that it only needed `help.cpp`, despite
+`helper.h` being a legal input.
 
-  Having to list all cpp files is cumbersome.  Probably you've organized
-  your codebase so that all the files in the current directory should be
-  linked together.  This example demonstrates how to support that.
+## Example of map and partial function evaluation
 
-  Notice that we've defined "compile" to be compileC with every argument
-  supplied EXCEPT the name of the file to compile.  We could now write
-  'compile "main.cpp"' to compile a single cpp file, saving some typing.
+    cat > tutorial.wake <<EOF
+    def variant = "native-cpp11-release"
+    global def build _ =
+      def headers = sources here '.*\.h'
+      def compile = compileC variant ("-I.", Nil) headers
+      def objects = map compile (sources here '.*\.cpp')
+      linkO variant ("-lm", Nil) objects "tutorial"
+    EOF
+    wake 'build 0'
 
-  However, we can also use the "map" function to save even more!  We use the
-  sources function to find all the cpp files.  That gives us a list of
-  strings.  compile is a function which needs to take only one more String.
-  What map does is apply the function supplied as its first argument to
-  every element in the list supplied as its second argument.  Thus, objects
-  is now a list of all the object files created by compiling all the cpp
-  files.  Our wake file is now both smaller and will automatically work when
-  new cpp files are added.
+Having to list all cpp files is cumbersome.  Probably you've organized
+your codebase so that all the files in the current directory should be
+linked together.  This example demonstrates how to support that.
 
-5. Example of pkg-config
+Notice that we've defined `compile` to be `compileC` with every argument
+supplied EXCEPT the name of the file to compile.  We could now write
+`compile "main.cpp"` to compile a single cpp file, saving some typing.
 
-cat > tutorial.wake <<EOF
-def variant = "native-cpp11-release"
-global def build _ =
-  def headers = sources here '.*\.h'
-  def compile = compileC variant (cflags "zlib") headers
-  def objects = map compile (sources here '.*\.cpp')
-  linkO variant (libs "zlib") objects "tutorial"
-EOF
+However, we can also use the `map` function to save even more!  We use the
+`sources` function to find all the cpp files.  That gives us a list of
+strings.  `compile` is a function which needs to take only one more
+`String`.  What `map` does is apply the function supplied as its first
+argument to every element in the list supplied as its second argument. 
+Thus, `objects` is now a list of all the object files created by compiling
+all the cpp files.  Our wake file is now both smaller and will automatically
+work when new cpp files are added.
 
-  It's pretty common for programs to depend on system libraries.  These
-  days, most well maintained libraries supply a pkg-config file that helps
-  authors get the command-line arguments right without worrying where the
-  library was installed.
+## Example of pkg-config
 
-  Wake has a pair of helper methods that make this easy, as shown.
+    cat > tutorial.wake <<EOF
+    def variant = "native-cpp11-release"
+    global def build _ =
+      def headers = sources here '.*\.h'
+      def compile = compileC variant (cflags "zlib") headers
+      def objects = map compile (sources here '.*\.cpp')
+      linkO variant (libs "zlib") objects "tutorial"
+    EOF
+    wake 'build 0'
 
-6. Example of a dynamic header
+It's pretty common for programs to depend on system libraries.  These days,
+most well maintained libraries supply a pkg-config file (`*.pc`) that helps
+authors get the command-line arguments right without worrying where the
+library was installed.
+
+Wake has a pair of helper methods that make this easy, as shown.
+
+## Example of a dynamic header
 
 cat >> tutorial.wake <<EOF
 global def date_h _ =
@@ -258,12 +261,11 @@ wake 'version_h 0'
 ... explain 'job' is the raw way commands are run (compileC and linkO use it)
   ... but in this case, we want 'volatile_job' because the output can change each run and we don't want fuse
 
-7. Example of targets depending on prior target (ie: impossible in Make)
+## Example of targets depending on prior target (ie: impossible in Make)
 
+## Data types
 
-8. Data types
-
-9. Example of parsing
+## Example of parsing
 
 curl -o UnicodeData.txt ftp://ftp.unicode.org/Public/UNIDATA/UnicodeData.txt
 cat >>tutorial.wake <<EOF
@@ -288,7 +290,7 @@ EOF
 ... if the class is "Sm" (ignoring case) then convert the hexadecimal into a unicode code point
 .. FYI, you can use Unicode operators and identifiers in wake
 
-10. Publish/Subscribe
+## Publish/Subscribe
 
-11. Data dependency / Build order
+## Data dependency / Build order
 
