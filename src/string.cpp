@@ -187,15 +187,15 @@ static PRIMFN(prim_getenv) {
 
 static PRIMTYPE(type_mkdir) {
   return args.size() == 2 &&
-    args[0]->unify(String::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
-    out->unify(Data::typeBoolean);
+    args[0]->unify(Integer::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_mkdir) {
   EXPECT(2);
-  STRING(path, 0);
-  INTEGER(mode, 1);
+  INTEGER(mode, 0);
+  STRING(path, 1);
 
   REQUIRE(mpz_cmp_si(mode->value, 0) >= 0, "mode must be >= 0");
   REQUIRE(mpz_cmp_si(mode->value, 0xffff) <= 0, "mode must be <= 0xffff");
@@ -216,8 +216,7 @@ static PRIMFN(prim_mkdir) {
     }
   }
 
-  auto out = make_true();
-  RETURN(out);
+  RETURN(args[1]);
 }
 
 static PRIMTYPE(type_format) {
