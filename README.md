@@ -54,22 +54,22 @@ Installing wake:
   On Mac OS with Mac Ports installed:
     sudo port install osxfuse sqlite3 gmp re2 re2c libutf8proc
   On Debian/Ubuntu:
-    sudo apt-get install ...
+    sudo apt-get install libfuse-dev libsqlite3-dev libgmp-dev libre2-dev re2c libutf8proc-dev
 
   git clone https://github.com/sifive/wake.git
   cd wake; make
   ./bin/wake 'install "/usr/local"' # or wherever
 
 External dependencies:
- - c++ 11		GPLv3		http://gcc.gnu.org/...
- - sqlite3-dev		...
- - libgmp-dev
- - libfuse-dev
- - libre2-dev
- - re2c
- - utf8proc
+ - c++ 11		GPLv3		https://www.gnu.org/software/gcc/
+ - sqlite3-dev		public domain	https://www.sqlite.org/
+ - libgmp-dev		LGPL v3		https://gmplib.org
+ - libfuse-dev		LGPL v2.1	https://github.com/libfuse/libfuse
+ - libre2-dev		BSD 3-clause	https://github.com/google/re2
+ - re2c			public domain	http://re2c.org
+ - utf8proc		MIT 		https://juliastrings.github.io/utf8proc/
 
 Internal dependencies:
- - argagg		BSD 0 clause	http://
- - MurmurHash3		public domain
- - whereami		WTFPLV2
+ - argagg		MIT		https://github.com/vietjtnguyen/argagg
+ - MurmurHash3		public domain	https://github.com/aappleby/smhasher
+ - whereami		WTFPLV2		https://github.com/gpakosz/whereami

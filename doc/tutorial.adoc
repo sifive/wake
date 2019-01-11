@@ -265,7 +265,7 @@ wake 'version_h 0'
 
 9. Example of parsing
 
-curl -O UnicodeData.txt ...
+curl -o UnicodeData.txt ftp://ftp.unicode.org/Public/UNIDATA/UnicodeData.txt
 cat >>tutorial.wake <<EOF
 global def mathSymbols _ =
   def helper = match _
