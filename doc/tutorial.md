@@ -151,7 +151,7 @@ changes to the files will not cause a relink.
 Of course, if you change `main.cpp` meaningfully, both it will be recompiled
 and the program relinked.
 
-## Example using header files
+## Using header files
 
     echo 'int helper();' > helper.h
     echo -e '#include "helper.h"\nint main() { return helper(); }' > main.cpp
@@ -196,7 +196,7 @@ For this file, wake recorded that it needed both `main.cpp` and `helper.h`.
 For this file, wake recorded that it only needed `help.cpp`, despite
 `helper.h` being a legal input.
 
-## Example of map and partial function evaluation
+## Map and partial function evaluation
 
     cat > tutorial.wake <<EOF
     def variant = "native-cpp11-release"
@@ -225,7 +225,7 @@ Thus, `objects` is now a list of all the object files created by compiling
 all the cpp files.  Our wake file is now both smaller and will automatically
 work when new cpp files are added.
 
-## Example of pkg-config
+## Using libraries with pkg-config
 
     cat > tutorial.wake <<EOF
     def variant = "native-cpp11-release"
@@ -244,53 +244,126 @@ library was installed.
 
 Wake has a pair of helper methods that make this easy, as shown.
 
-## Example of a dynamic header
+## Target execution depending on prior targets
 
-cat >> tutorial.wake <<EOF
-global def date_h _ =
-  def cmdline = which "git", "describe", "--tags", "--dirty", Nil
-  def git = volatile_job cmdline Nil (\_ Nil)
-  def body = "#define VERSION {git.stdout}"
-  write 0644 "{here}/version.h" body
-EOF
-wake 'version_h 0'
+... find an easy to understand example impossible in make
 
-... explain {}s = string escape
-... explain which = "/usr/bin/git"
-... explain \x introduces a function of 'x'
-... explain 'job' is the raw way commands are run (compileC and linkO use it)
-  ... but in this case, we want 'volatile_job' because the output can change each run and we don't want fuse
+## Dynamically creating a header file
 
-## Example of targets depending on prior target (ie: impossible in Make)
+    cat >> tutorial.wake <<EOF
+    global def info_h _ =
+      def cmdline = which "uname", "-sr", Nil
+      def os = job cmdline Nil
+      def body = "#define OS {os.stdout}#define WAKE {version}\n"
+      write 0644 "{here}/info.h" body
+    EOF
+    wake 'info_h 0'
 
-## Data types
+This example creates a header file suitable for inclusion in our build. 
+The produced header includes the operating system the build ran on and the
+version of wake used in the build.  We can make this non-source header file
+available by changing `tutorial.wake` to include:
 
-## Example of parsing
+      def headers = info_h 0, sources here '.*\.h'
 
-curl -o UnicodeData.txt ftp://ftp.unicode.org/Public/UNIDATA/UnicodeData.txt
-cat >>tutorial.wake <<EOF
-global def mathSymbols _ =
-  def helper = match _
-    code, _, class, _ =
-      if class ==^ "Sm" then Some (code2str (intbase 16 code)) else None
-    _ = None
-  def lines = tokenize "\n" (read "UnicodeData.txt")
-  def codes = mapPartial (helper $ tokenize ";" _) lines
-  catWith " " codes
-EOF
+To understand what's happening in this example, let's break down all the new
+methods being leveraged. 
+
+`which` is a function which searches wake's path for the named program.  On
+most systems, `which "uname" = "/bin/uname"`.  Using `which` buys us a bit
+of indirection and is usually good form to use with jobs.
+
+`job` is the main method wake uses to invoke a job.  It takes two arguments,
+a list of strings for the command-line and a list of strings of legal
+inputs.  As with `compileC` and `linkO`, every file in the workspace which
+the job needs must be listed in this second argument, or the job will not
+have access to them.  Indeed, both `compileC` and `linkO` are implemented by
+using `job` internally. The value returned by `job` can be accessed in many
+ways. `job.stdout` provides the standard output from the command.
+`job.status` is an `Integer` equal to the job's exit status. `job.outputs`
+returns a list of string pairs, with the output filename and it's hash.
+
+The `body` variable is created using string interpolation.  Inside a `""`
+string, you can include wake expressions within `{}`s and they will be
+inserted into the string.  In this example, we fill in the desired variables
+into the string body.  `version` is just a `String` with the current wake
+version.
+
+Finally, we create the output file `info.h` with the desired contents.
+`write` returns the file name created once the file has been written.
+This way, anything that depends on the return of our `info_h` method will
+have to wait until `info.h` has been saved to disk.
+
+## Publish/Subscribe
+
+    cat >>tutorial.wake <<EOF
+    publish animal = "Cat"
+    publish animal = "Dog"
+    publish animal = replace "u" "o" "Mouse"
+    global def animals = subscribe animal
+    EOF
+    wake 'animals'
+
+Wake includes a publish/subscribe interface to support accumulating
+information between multiple files. `publish x = y` adds `y` to the list of
+things which will be returned by a `subscribe x` expression. Note that
+`animal` is not a variable; it is a topic, which is in a different
+namespace than normal variables.
+
+This API can be used to accumulate all the unit tests in the workspace into
+a single location that runs them all at once.  Keep in mind that the
+published list can be of any type (including functions and data types), so
+the types of workspace-wide information that can be accumulated this way is
+wide open.  However, all publishes to a particular topic must agree to use
+the same type in the list, or the files will not type check.
+
+## Data types and pattern matching
+
+So far, we've gotten a lot done with primitive types (`Integer`, `String`,
+...) and Lists. However, wake does allow you to define your own data types.
+These can then be analyzed using pattern matching.
+
+Consider the follow program:
+
+    global data Animal =
+      Cat String
+      Dog Integer
+
+    global def strAnimal = match _
+      Cat x = "a cat called {x}"
+      Dog y = "a {y}-year-old dog"
+
+... explain sum-product
+... try 'map (_+5) (seq 5)'
+  _ introduces a function; this is the same as map (\x x+5) (seq 5)
+... explain pattern extraction
+
+## Downloading and parsing files
+
+    cat >>tutorial.wake <<EOF
+    def curl url =
+      def file = "{here}/{head $ extract '.*/(.*)' url}"
+      def cmdline = which "curl", "-o", file, url, Nil
+      def curl = job cmdline (here, Nil)
+      waitAll (\_ file) curl.status
+
+    global def mathSymbols _ =
+      def helper = match _
+        code, _, class, _ =
+          if class ==^ "Sm" then Some (code2str (intbase 16 code)) else None
+        _ = None
+      def url = "ftp://ftp.unicode.org/Public/UNIDATA/UnicodeData.txt"
+      def lines = tokenize "\n" (read (curl url))
+      def codes = mapPartial (helper $ tokenize ";" _) lines
+      catWith " " codes
+    EOF
+    wake `mathSymbols 0`
 
 ... explain: read takes a file and makes a String
 ... tokenize splits a string on the token into a list of strings
-... try 'map (_+5) (seq 5)'
-  _ introduces a function; this is the same as map (\x x+5) (seq 5)
 ... mapPartial (_) (None, Some "x", Some "y", None, Nil)
   keeps only the Some elements, and discards the Nones
 ... for each line in the file, split it by the ';'s and pass the list to helper
 ... helper uses a pattern match on it's argument to match the 1st and 3rd list argument
 ... if the class is "Sm" (ignoring case) then convert the hexadecimal into a unicode code point
 .. FYI, you can use Unicode operators and identifiers in wake
-
-## Publish/Subscribe
-
-## Data dependency / Build order
-
