@@ -5,11 +5,10 @@ def re2c file =
   result.output
 
 def version_h _ =
-  def out = "{here}/version.h"
   def cmdline = which "git", "describe", "--tags", "--dirty", Nil
   def git = volatile_job cmdline Nil (\_ Nil)
   def body = "#define VERSION {git.stdout}"
-  waitOne (\_ out) (write out body 0664)
+  write 0644 "{here}/version.h" body
 
 global def buildWake variant =
   def reFiles = sources here '.*\.re'

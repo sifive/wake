@@ -6,7 +6,7 @@ global def installAs dest file =
   def path = simplify "{dest}/.."
   def alwaysCp x y = uncached_manual_job "." "" Nil (which "cp", file, dest, Nil) (file, Nil) (\_ dest, Nil)
   def doit _ = map first (alwaysCp file dest).outputs # Nil if dest outside workspace
-  if mkdir path 0x1fd then doit "" else raise "unreachable"
+  waitAll (doit _) (mkdir 0775 path)
 
 global def installIn dir file =
   def dest = simplify "{dir}/{file}"

@@ -1,8 +1,9 @@
-global def pkgConfig args = memoize (
+global def pkgConfig args = memoize 0 (
   def cmdline = which "pkg-config", args
   def result = manual_job cmdline Nil (\_ Nil) # caching ok
-  tokenize " " (tokenize "\n" result.stdout).head
+  def output = tokenize " " (tokenize "\n" result.stdout).head
+  if result.status != 0 then raise "pkg-config failed" else output
 )
 
-global def cflags pkg = pkgConfig ("--cflags", pkg, Nil)
-global def libs   pkg = pkgConfig ("--libs",   pkg, Nil)
+global def cflags pkg = try (\_ raise "pkg-config for {pkg} not found") (pkgConfig ("--cflags", pkg, Nil))
+global def libs   pkg = try (\_ raise "pkg-config for {pkg} not found") (pkgConfig ("--libs",   pkg, Nil))

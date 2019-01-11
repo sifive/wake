@@ -2,7 +2,7 @@
 global def default = "native-cpp11-release"
 global def debug = "native-cpp11-debug"
 
-def targets = buildWake, buildFuse, Nil
+def targets = buildWake, buildFuse, buildShim, Nil
 global def all variant = map (_ variant) targets
 
 global def install dest =

@@ -147,27 +147,27 @@ static PRIMFN(prim_read) {
 
 static PRIMTYPE(type_write) {
   return args.size() == 3 &&
-    args[0]->unify(String::typeVar) &&
+    args[0]->unify(Integer::typeVar) &&
     args[1]->unify(String::typeVar) &&
-    args[2]->unify(Integer::typeVar) &&
+    args[2]->unify(String::typeVar) &&
     out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_write) {
   EXPECT(3);
-  STRING(arg0, 0);
-  STRING(arg1, 1);
-  INTEGER(mode, 2);
+  INTEGER(mode, 0);
+  STRING(path, 1);
+  STRING(body, 2);
 
   REQUIRE(mpz_cmp_si(mode->value, 0) >= 0, "mode must be >= 0");
   REQUIRE(mpz_cmp_si(mode->value, 0xffff) <= 0, "mode must be <= 0xffff");
   long mask = mpz_get_si(mode->value);
 
-  std::ofstream t(arg0->value, std::ios_base::trunc);
-  REQUIRE(!t.fail(), "Could not write " + arg0->value);
-  t << arg1->value;
-  chmod(arg0->value.c_str(), mask);
-  RETURN(args[0]);
+  std::ofstream t(path->value, std::ios_base::trunc);
+  REQUIRE(!t.fail(), "Could not write " + path->value);
+  t << body->value;
+  chmod(path->value.c_str(), mask);
+  RETURN(args[1]);
 }
 
 static PRIMTYPE(type_getenv) {
@@ -187,15 +187,15 @@ static PRIMFN(prim_getenv) {
 
 static PRIMTYPE(type_mkdir) {
   return args.size() == 2 &&
-    args[0]->unify(String::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
-    out->unify(Data::typeBoolean);
+    args[0]->unify(Integer::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
 }
 
 static PRIMFN(prim_mkdir) {
   EXPECT(2);
-  STRING(path, 0);
-  INTEGER(mode, 1);
+  INTEGER(mode, 0);
+  STRING(path, 1);
 
   REQUIRE(mpz_cmp_si(mode->value, 0) >= 0, "mode must be >= 0");
   REQUIRE(mpz_cmp_si(mode->value, 0xffff) <= 0, "mode must be <= 0xffff");
@@ -216,8 +216,7 @@ static PRIMFN(prim_mkdir) {
     }
   }
 
-  auto out = make_true();
-  RETURN(out);
+  RETURN(args[1]);
 }
 
 static PRIMTYPE(type_format) {

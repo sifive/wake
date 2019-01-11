@@ -199,9 +199,23 @@ static Expr *parse_unary(int p, Lexer &lex) {
       op_type op = op_precedence("m");
       if (op.p < p) precedence_error(lex);
       lex.consume();
+      long skip = 0;
+      if (expectValue(Integer::type, lex)) {
+        Literal *lit = reinterpret_cast<Literal*>(lex.next.expr.get());
+        mpz_t &x = reinterpret_cast<Integer*>(lit->value.get())->value;
+        if (mpz_fits_slong_p(x)) {
+          skip = mpz_get_si(x);
+        } else {
+          std::cerr << "Integer argument to memoize too large at "
+             << location << std::endl;
+          lex.fail = true;
+        }
+        location.end = lex.next.location.end;
+        lex.consume();
+      }
       auto rhs = parse_binary(op.p + op.l, lex);
       location.end = rhs->location.end;
-      return new Memoize(location, rhs);
+      return new Memoize(location, skip, rhs);
     }
     case LAMBDA: {
       Location location = lex.next.location;

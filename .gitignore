@@ -7,4 +7,6 @@
 /src/version.h
 /lib/wake/fuse-wake
 /lib/wake/fuse-wake.*
+/lib/wake/shim-wake
+/lib/wake/shim-wake.*
 /install

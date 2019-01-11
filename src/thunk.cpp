@@ -112,7 +112,12 @@ struct Hasher : public Finisher {
 
 void Hasher::finish(WorkQueue &queue)
 {
-  Hash hash = binding->hash();
+  Binding *root = binding.get();
+  for (long j = 0; root && j < memoize->skip; ++j) root = root->next.get();
+
+  Hash hash;
+  if (root) hash = root->hash();
+
   auto i = memoize->values.find(hash);
   if (i == memoize->values.end()) {
     Future &future = memoize->values[hash];
@@ -150,6 +155,7 @@ void Thunk::eval(WorkQueue &queue) {
   } else if (expr->type == Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
     Binding *held = binding.get();
+    for (long i = 0; held && i < memoize->skip; ++i) held = held->next.get();
     Binding::wait(held, queue, std::unique_ptr<Finisher>(
       new Hasher(std::move(receiver), std::move(binding), memoize)));
   } else if (expr->type == DefBinding::type) {

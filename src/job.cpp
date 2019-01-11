@@ -4,6 +4,7 @@
 #include "heap.h"
 #include "database.h"
 #include "location.h"
+#include "whereami.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -90,6 +91,7 @@ struct Task {
 struct Job {
   int pool;
   std::shared_ptr<JobResult> job;
+  int internal;
   int pipe_stdout;
   int pipe_stderr;
   struct timeval start;
@@ -170,6 +172,8 @@ static char **split_null(std::string &str) {
   return out;
 }
 
+#ifdef NO_VFORK
+
 static int do_hash_dir() {
   printf("00000000000000000000000000000000\n");
   return 0;
@@ -214,6 +218,8 @@ static int do_hash(const char *file) {
   return 0;
 }
 
+#endif
+
 static void launch(JobTable *jobtable) {
   for (auto &i : jobtable->imp->table) {
     if (jobtable->imp->tasks[i.pool].empty()) continue;
@@ -226,9 +232,10 @@ static void launch(JobTable *jobtable) {
         perror("pipe");
         exit(1);
       }
-      fcntl(pipe_stdout[0], F_SETFL, fcntl(pipe_stdout[0], F_GETFL, 0) | FD_CLOEXEC);
-      fcntl(pipe_stderr[0], F_SETFL, fcntl(pipe_stderr[0], F_GETFL, 0) | FD_CLOEXEC);
+      fcntl(pipe_stdout[0], F_SETFD, fcntl(pipe_stdout[0], F_GETFD, 0) | FD_CLOEXEC);
+      fcntl(pipe_stderr[0], F_SETFD, fcntl(pipe_stderr[0], F_GETFD, 0) | FD_CLOEXEC);
       i.job = std::move(task.job);
+      i.internal = !strncmp(task.cmdline.c_str(), "<hash>", 6);
       i.pipe_stdout = pipe_stdout[0];
       i.pipe_stderr = pipe_stderr[0];
       gettimeofday(&i.start, 0);
@@ -237,9 +244,32 @@ static void launch(JobTable *jobtable) {
       std::cerr << std::flush;
       fflush(stdout);
       fflush(stderr);
-      i.job->pid = i.pid = fork();
-      i.job->state |= STATE_FORKED;
-      if (i.pid == 0) {
+#ifndef NO_VFORK
+      int dirlen = wai_getExecutablePath(0, 0, 0) + 1;
+      std::unique_ptr<char[]> execbuf(new char[dirlen]);
+      wai_getExecutablePath(execbuf.get(), dirlen, &dirlen);
+      std::string exepath(execbuf.get(), dirlen);
+
+      std::stringstream prelude;
+      prelude << exepath << "/../lib/wake/shim-wake" << '\0'
+        << (task.stdin.empty() ? "/dev/null" : task.stdin.c_str()) << '\0'
+        << std::to_string(pipe_stdout[1]) << '\0'
+        << std::to_string(pipe_stderr[1]) << '\0'
+        << task.root << '\0'
+        << task.dir << '\0';
+      std::string shim = prelude.str() + task.cmdline;
+      auto cmdline = split_null(shim);
+      auto environ = split_null(task.environ);
+      pid_t pid = vfork();
+      if (pid == 0) {
+        execve(cmdline[0], cmdline, environ);
+        _exit(127);
+      }
+#else
+      auto cmdline = split_null(task.cmdline);
+      auto environ = split_null(task.environ);
+      pid_t pid = fork();
+      if (pid == 0) {
         dup2(pipe_stdout[1], 1);
         dup2(pipe_stderr[1], 2);
         close(pipe_stdout[1]);
@@ -259,20 +289,25 @@ static void launch(JobTable *jobtable) {
           perror("chdir");
           exit(1);
         }
-        auto cmdline = split_null(task.cmdline);
-        auto environ = split_null(task.environ);
-        if (!strcmp(cmdline[0], "<hash>")) {
+        if (i.internal) {
           exit(do_hash(cmdline[1]));
         } else {
           execve(cmdline[0], cmdline, environ);
           perror("execve");
         }
-        exit(1);
+        exit(127);
       }
+#endif
+      delete [] cmdline;
+      delete [] environ;
+      i.job->pid = i.pid = pid;
+      i.job->state |= STATE_FORKED;
       close(pipe_stdout[1]);
       close(pipe_stderr[1]);
       for (char &c : task.cmdline) if (c == 0) c = ' ';
-      if (!jobtable->imp->quiet && i.pool) std::cerr << task.cmdline << std::endl;
+      if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
+        std::cerr << task.cmdline << std::endl;
+      }
       jobtable->imp->tasks[i.pool].pop_front();
     }
   }
@@ -321,7 +356,7 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->process(queue);
           ++done;
         } else {
-          if (imp->verbose) {
+          if (imp->verbose && i.pool && !i.internal) {
             std::cout.write(buffer, got);
           }
           i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
@@ -336,7 +371,7 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->process(queue);
           ++done;
         } else {
-          if (imp->verbose) {
+          if (!imp->quiet && i.pool) { // print stderr also internal
             std::cerr.write(buffer, got);
           }
           i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
@@ -379,8 +414,6 @@ bool JobTable::wait(WorkQueue &queue) {
           i.pid = 0;
           i.pipe_stdout = -1;
           i.pipe_stderr = -1;
-          // if (imp->verbose) std::cout << i.job->db->get_output(i.job->job, 1);
-          if (imp->verbose && i.pool) std::cerr << i.job->db->get_output(i.job->job, 2);
           i.job->process(queue);
           i.job->runtime = i.runtime(now);
           i.job.reset();
