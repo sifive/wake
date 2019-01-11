@@ -137,6 +137,8 @@ void TypeVar::do_debug(std::ostream &os, TypeVar &other, int who, int p) {
       if (q.p < p) os << "(";
       os << w->name + 6 << " _";
       if (q.p < p) os << ")";
+    } else if (w->nargs == 0) {
+      os << w->name;
     } else {
       op_type q = op_precedence("a");
       if (q.p < p) os << "(";
