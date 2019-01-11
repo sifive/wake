@@ -227,8 +227,8 @@ static void launch(JobTable *jobtable) {
         perror("pipe");
         exit(1);
       }
-      fcntl(pipe_stdout[0], F_SETFL, fcntl(pipe_stdout[0], F_GETFL, 0) | FD_CLOEXEC);
-      fcntl(pipe_stderr[0], F_SETFL, fcntl(pipe_stderr[0], F_GETFL, 0) | FD_CLOEXEC);
+      fcntl(pipe_stdout[0], F_SETFD, fcntl(pipe_stdout[0], F_GETFD, 0) | FD_CLOEXEC);
+      fcntl(pipe_stderr[0], F_SETFD, fcntl(pipe_stderr[0], F_GETFD, 0) | FD_CLOEXEC);
       i.job = std::move(task.job);
       i.internal = !strncmp(task.cmdline.c_str(), "<hash>", 6);
       i.pipe_stdout = pipe_stdout[0];
