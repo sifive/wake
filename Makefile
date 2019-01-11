@@ -11,7 +11,7 @@ VERSION := $(shell git describe --tags --dirty)
 all:		wake.db
 	./bin/wake all default
 
-wake.db:	bin/wake lib/wake/fuse-wake
+wake.db:	bin/wake lib/wake/fuse-wake lib/wake/shim-wake
 	test -f $@ || ./bin/wake --init .
 
 install:	all
@@ -22,6 +22,9 @@ bin/wake:	$(patsubst %.cpp,%.o,$(wildcard src/*.cpp)) src/symbol.o
 
 lib/wake/fuse-wake:	fuse/fuse.cpp
 	$(CXX) -std=c++11 $(CFLAGS) `pkg-config --cflags fuse` $< -o $@ `pkg-config --libs fuse`
+
+lib/wake/shim-wake:	shim/shim.cpp
+	$(CXX) -std=c++11 $(CFLAGS) $< -o $@
 
 %.o:	%.cpp	$(filter versin.h,$(wildcard src/*.h))
 	$(CXX) -std=c++11 $(CFLAGS) -I $(GMP_INC) -o $@ -c $<
