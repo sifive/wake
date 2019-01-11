@@ -12,7 +12,7 @@ or that your colleagues already built, you might appreciate wake.
     Which jobs to run next can depend on the results of previous jobs.  For
     example, when you run configure in a traditional automake system, this
     typically affects what will be built by make.  Similarly cmake.  These
-    two-stage build systems are necessary because Make job selection cannot
+    two-stage build systems are necessary because make job selection cannot
     depend on the result of a prior build step.  In complicated builds,
     two-stages are sometimes not enough. In wake, all jobs may be dependent.
 
@@ -21,7 +21,7 @@ or that your colleagues already built, you might appreciate wake.
     In classic build systems, you must specify all the inputs and outputs of
     a job you want to run.  If you under-specify the inputs, the build is
     not reproducible; it might fail to compile files that need recompilation
-    and the job might fail non-deterministicly on systems which run more
+    and the job might fail non-deterministically on systems which run more
     jobs simultaneously.  If you over-specify the inputs, the build performs
     unnecessary recompilation when those inputs change.  In wake, if you
     under-specify the inputs, the build fails every time.  If you
