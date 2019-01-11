@@ -1,10 +1,12 @@
+# What is this?
+
 Wake is a build orchestration tool and language.
 If you have a build whose steps cannot be adequately expressed in
 make/tup/basel/etc, you probably need wake.
 If you don't want to waste time rebuilding things that don't need it,
 or that your colleagues already built, you might appreciate wake.
 
-Wake features:
+# Wake features:
   - dependent job execution
 
     Which jobs to run next can depend on the results of previous jobs.  For
@@ -49,16 +51,22 @@ Wake features:
     files and save you time.  This can also translate into pull requests
     whose regression tests pass immediately, increasing productivity.
 
-Installing wake:
+# Installing dependencies
 
-  On Mac OS with Mac Ports installed:
+On Mac OS with Mac Ports installed:
+
     sudo port install osxfuse sqlite3 gmp re2 re2c libutf8proc
-  On Debian/Ubuntu:
+
+On Debian/Ubuntu:
+
     sudo apt-get install libfuse-dev libsqlite3-dev libgmp-dev libre2-dev re2c libutf8proc-dev
 
-  git clone https://github.com/sifive/wake.git
-  cd wake; make
-  ./bin/wake 'install "/usr/local"' # or wherever
+# Building wake
+
+    git clone https://github.com/sifive/wake.git
+    cd wake
+    make
+    ./bin/wake 'install "/usr/local"' # or wherever
 
 External dependencies:
  - c++ 11		GPLv3		https://www.gnu.org/software/gcc/
