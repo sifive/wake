@@ -3,7 +3,7 @@ def primjob pool root dir stdin env cmd = prim "job_launch"
 def primcache dir stdin env cmd visible = prim "job_cache"
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
-global def jobcache build dir stdin env cmd visible = memoize (
+global def jobcache build dir stdin env cmd visible = memoize 0 (
   match (tryelse (\_ None) (Some _) (primcache dir stdin env.implode cmd.implode visible.implode))
     None     = build 0
     Some out =
@@ -51,7 +51,7 @@ global def finish job inputs outputs =
   def imp job inputs outputs = prim "job_finish" # ignored except on first call; blocks till exit; returns true
   imp job inputs.implode outputs.implode
 
-global def hashpair f = memoize ( # Pair file hash
+global def hashpair f = memoize 0 ( # Pair file hash
   def job = launch "." "." "" Nil ("<hash>", f, Nil)
   def final _ = finish job Nil Nil
   def _ = waitOne final job.status
@@ -62,7 +62,7 @@ global def hashname f = (hashpair f).first  # just the filename
 global def hashcode f = (hashpair f).second # just the hashcode
 
 # A job where all inputs and outputs are known a-priori
-global def uncached_manual_job dir stdin env cmd inputs foutputs = memoize (
+global def uncached_manual_job dir stdin env cmd inputs foutputs = memoize 1 (
   def job = launch "." dir stdin env cmd
   def final _ = finish job (map hashname inputs) (map hashname (foutputs Unit))
   def _ = waitOne final job.status
@@ -78,7 +78,7 @@ def wakepath = prim "execpath"
 
 # Still not caching, just hermetic
 def fusepath = relative workspace (simplify "{wakepath}/../lib/wake/fuse-wake")
-global def uncached_fuse_job dir stdin env cmd files = memoize (
+global def uncached_fuse_job dir stdin env cmd files = memoize 0 (
   def visible = dir, map hashname files
   def doit args =
     def fuse = primjob 0 "." "." "" "" args

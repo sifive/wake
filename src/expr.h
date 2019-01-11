@@ -98,12 +98,13 @@ struct Literal : public Expr {
 };
 
 struct Memoize : public Expr {
+  long skip;
   std::unique_ptr<Expr> body;
   std::map<Hash, Future> values;
 
   static const char *type;
-  Memoize(const Location &location_, Expr *body_)
-   : Expr(type, location_), body(body_) { }
+  Memoize(const Location &location_, long skip_, Expr *body_)
+   : Expr(type, location_), skip(skip_), body(body_) { }
 
   void format(std::ostream &os, int depth) const;
   void hash();
