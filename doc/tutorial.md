@@ -139,17 +139,17 @@ steps can be run in parallel.  Conversely, because `main` and `help` are
 needed by the linking step, that step will wait for both object files to
 compile.
 
-However, wake probably did NOT relink the objects of the program this
+However, wake probably did NOT re-link the objects of the program this
 time.  That's because wake remembers the hashes of the objects it gave to
 the linker last time.  The rebuilt object files have the same hashes, so
-there was no need to relink the program.  Similarly, whitespace only
-changes to the files will not cause a relink.
+there was no need to re-link the program.  Similarly, whitespace only
+changes to the files will not cause a re-link.
 
     echo 'int main() { return 2; }' > main.cpp
     wake 'build 0'
 
 Of course, if you change `main.cpp` meaningfully, both it will be recompiled
-and the program relinked.
+and the program re-linked.
 
 ## Using header files
 
@@ -244,10 +244,6 @@ library was installed.
 
 Wake has a pair of helper methods that make this easy, as shown.
 
-## Target execution depending on prior targets
-
-... find an easy to understand example impossible in make
-
 ## Dynamically creating a header file
 
     cat >> tutorial.wake <<EOF
@@ -255,7 +251,7 @@ Wake has a pair of helper methods that make this easy, as shown.
       def cmdline = which "uname", "-sr", Nil
       def os = job cmdline Nil
       def body = "#define OS {os.stdout}#define WAKE {version}\n"
-      write 0644 "{here}/info.h" body
+      write 0644 "{here}/info.h" body # create with mode: rw-r--r--
     EOF
     wake 'info_h 0'
 
@@ -292,7 +288,33 @@ version.
 Finally, we create the output file `info.h` with the desired contents.
 `write` returns the file name created once the file has been written.
 This way, anything that depends on the return of our `info_h` method will
-have to wait until `info.h` has been saved to disk.
+have to wait until `info.h` has been saved to disk. We also have an example
+of a comment, `# ...`, which translates the magic octal value `0644` to
+something more human-readable.
+
+## Target execution depending on prior targets
+
+Consider a build system where there is a program `feature-detect` that needs
+to be compiled. Once that has been compiled, it gets run to determine which
+features the system supports. Then, based on the output of `feature-detect`,
+the build proceeds to build the `main-program`. This is the sort of example
+that is impossible in a system like make, but fairly straight-forward in
+wake:
+
+    def build_feature_detect _ =
+      def object = compileC variant Nil Nil "feature-detect.cpp"
+      linkO variant Nil (object, Nil) "feature-detect"
+
+    def run_feature_detect _ =
+      def cmdline = (build_feature_detect 0), "--detect-stuff-to-build", Nil
+      def detect = job cmdline ("some-config-file", Nil)
+      tokenize " " detect.stdout
+
+    global def complex_build _ =
+      def headers = sources here '.*\.h'
+      def compile = compileC variant (cflags "zlib") headers
+      def objects = map compile (run_feature_detect 0)
+      linkO variant (libs "zlib") objects "tutorial"
 
 ## Publish/Subscribe
 
@@ -325,27 +347,73 @@ These can then be analyzed using pattern matching.
 
 Consider the follow program:
 
+    cat >>tutorial.wake <<EOF
     global data Animal =
       Cat String
       Dog Integer
 
-    global def strAnimal = match _
+    global def strAnimal a = match a
       Cat x = "a cat called {x}"
       Dog y = "a {y}-year-old dog"
+    EOF
+    wake 'Cat'
+    wake 'strAnimal (Dog 12)'
+    wake 'strAnimal (Cat "Fluffy")'
 
-... explain sum-product
-... try 'map (_+5) (seq 5)'
-  _ introduces a function; this is the same as map (\x x+5) (seq 5)
-... explain pattern extraction
+The `data` keyword introduces a new type, `Animal`.
+Types are always capitalized, and use a different namespace from variables.
+As defined, `Animal` can either be a `Cat` or a `Dog`,
+where `Cat`s have names and `Dog`s have ages.
+The general syntax is `data TYPE = (CONS TYPE*)+`.
+If we want the new type available to other files, we put a `global` in
+front of the `data`, just like with variables.
+
+As wake informs us, `Cat` is a variable that takes a `String` and returns an
+`Animal`. However, unlike normal variables, `Cat` is also a type constructor.
+Type constructors differ from normal variables in that they are capitalized
+and can be used in pattern matches.
+
+## Anonymous functions
+
+Generally, one should define functions with a name.
+This makes code more readable for other people.
+However, sometimes the function is really just an after-thought.
+For these cases wake makes it possible to define functions inline.
+
+    wake '\x x^2'
+    wake 'map (\x x^2) (seq 10)'
+
+The backslash syntax is an easy-to-type stand-in for the lambda symbol, λ.
+While we've not talked about it, the wake language implements a "typed lambda
+calculus". That's just a fancy way of saying you can pass functions to
+functions. This syntax for inline functions is wake's homage to its roots.
+
+The general syntax is `\ PATTERN BODY`. Yes, you can pattern match directly
+inside a lambda expression. For that matter, you can do it with `def NAME
+PATTERN = BODY` as well. For example:
+
+    wake '(\ (Pair x y) x + y) (Pair 1 2)'
+
+To make inline functions even easier to define, wake also supports a syntax
+where one specifies the holes `_` in an expression and a function is created
+which fills the holes from left to right.
+
+    wake '_ + 4'
+    wake 'map (_ + 4) (seq 8)'
+
+This hole-oriented syntax is not as powerful as lambda expressions, because
+each argument can only be used once.  Furthermore, the functions are created
+at block boundaries, which include `()`s, which can limit their usefulness.
+Nevertheless, sometimes this syntax can be convenient, too.
 
 ## Downloading and parsing files
 
     cat >>tutorial.wake <<EOF
     def curl url =
-      def file = "{here}/{head $ extract '.*/(.*)' url}"
+      def file = simplify "{here}/{head (extract '.*/(.*)' url)}"
       def cmdline = which "curl", "-o", file, url, Nil
       def curl = job cmdline (here, Nil)
-      waitAll (\_ file) curl.status
+      curl.output
 
     global def mathSymbols _ =
       def helper = match _
@@ -357,13 +425,42 @@ Consider the follow program:
       def codes = mapPartial (helper $ tokenize ";" _) lines
       catWith " " codes
     EOF
-    wake `mathSymbols 0`
+    wake 'mathSymbols 0'
 
-... explain: read takes a file and makes a String
-... tokenize splits a string on the token into a list of strings
-... mapPartial (_) (None, Some "x", Some "y", None, Nil)
-  keeps only the Some elements, and discards the Nones
-... for each line in the file, split it by the ';'s and pass the list to helper
-... helper uses a pattern match on it's argument to match the 1st and 3rd list argument
-... if the class is "Sm" (ignoring case) then convert the hexadecimal into a unicode code point
-.. FYI, you can use Unicode operators and identifiers in wake
+Above is a fun example using wake as a hybrid build/programming language.
+This wake code downloads the Unicode symbol tables from the Internet using
+curl and then grabs all the mathematical symbols from the table, formats
+them, and returns the output.
+
+As we've covered before, `job` is used to launch curl to download the table.
+The `curl` function also makes use of `extract` with a regular expression
+to split the filename out of the URL. `extract` returns a `List String`
+containing each occurrence of `()` in the regular expression. We also use
+the `simplify` function which transforms paths into canonical form. In this,
+case `simplify` removes the leading `"./"`.
+
+If you look in `UnicodeData.txt`, you will see that it uses lines with comma
+separated values, one for each Unicode code point.  Thus `lines` simply
+splits the `String` returned by `read` into each code point description.
+For each line, we then split it into the fields and pass the result to
+`helper`.
+
+`helper` uses a pattern match to extract the first and third arguments from
+the list. If the third argument is of class `"Sm"`, ie: symbols/math, then
+wake converts the hexadecimal from the first column into the Unicode code
+point for that value and returns a `String` containing the value.
+
+`mapPartial` uses `Option String`s.  Options can either be `None`, which
+means no value is available or `Some x` which is a value `x`.  `Option` is
+a data type like any other in wake.  It is particularly useful in those
+situations where one would use a null pointer in a language like C.  In this
+case, we use `Option` to only return values from `helper` where the code
+point is a math symbol. `mapPartial` then creates a list out of only those
+values helper returned. Try this, for an example:
+
+    wake 'mapPartial (_) (None, Some "xx", Some "yy", None, Nil)'
+
+As a final note, wake files must be UTF-8 encoded.
+This means that you can use Unicode symbols in strings, comments,
+identifiers, and even operators.
+In fact, all the operators we just printed are legal in wake.
