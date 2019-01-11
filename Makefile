@@ -26,7 +26,7 @@ lib/wake/fuse-wake:	fuse/fuse.cpp
 lib/wake/shim-wake:	shim/shim.cpp
 	$(CXX) -std=c++11 $(CFLAGS) $< -o $@
 
-%.o:	%.cpp	$(filter-out version.h,$(wildcard src/*.h))
+%.o:	%.cpp	$(filter-out src/version.h,$(wildcard src/*.h))
 	$(CXX) -std=c++11 $(CFLAGS) -I $(GMP_INC) -o $@ -c $<
 
 %.cpp:	%.re
