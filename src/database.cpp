@@ -87,7 +87,7 @@ std::string Database::open() {
     "  job_id  integer not null references jobs(job_id),"
     "  file_id integer not null," // implied by hashes constraint: references files(file_id)
     "  run_id  integer not null," // implied by hashes constraint: references runs(run_id)
-    "  primary key(job_id, access, file_id),"
+    "  primary key(job_id, access, file_id) on conflict ignore,"
     "  foreign key(run_id, file_id) references hashes(run_id, file_id));"
     "create index if not exists filesearch on filetree(access, file_id);"
     "create temp table temptree("
