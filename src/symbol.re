@@ -602,13 +602,13 @@ void Lexer::consume() {
     if (state->indent < state->tabs.back()) {
       state->tabs.pop_back();
       next.type = DEDENT;
+    } else if (state->indent > state->tabs.back()) {
+      state->tabs.push_back(state->indent);
+      next.type = INDENT;
     } else {
       next.type = EOL;
       state->eol = false;
     }
-  } else if (state->indent > state->tabs.back()) {
-    state->tabs.push_back(state->indent);
-    next.type = INDENT;
   } else {
     next = lex_top(*this);
     if (next.type == EOL) {

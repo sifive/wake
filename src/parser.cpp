@@ -134,7 +134,7 @@ static Expr *parse_match(int p, Lexer &lex) {
       case SUBSCRIBE:
       case POPEN:
         break;
-      case EOL:
+      case INDENT:
         lex.consume();
         repeat = false;
         break;
@@ -146,7 +146,7 @@ static Expr *parse_match(int p, Lexer &lex) {
     }
   }
 
-  if (expect(INDENT, lex)) lex.consume();
+  if (expect(EOL, lex)) lex.consume();
 
   // Process the patterns
   bool multiarg = out->args.size() > 1;
@@ -626,9 +626,9 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
 
   if (expect(EQUALS, lex)) lex.consume();
 
-  if (lex.next.type == EOL) {
+  if (lex.next.type == INDENT) {
     lex.consume();
-    if (expect(INDENT, lex)) lex.consume();
+    if (expect(EOL, lex)) lex.consume();
 
     bool repeat = true;
     while (repeat) {
@@ -760,9 +760,9 @@ Expr *parse_block(Lexer &lex) {
   TRACE("BLOCK");
   Expr *out;
 
-  if (lex.next.type == EOL) {
+  if (lex.next.type == INDENT) {
     lex.consume();
-    if (expect(INDENT, lex)) lex.consume();
+    if (expect(EOL, lex)) lex.consume();
 
     Location location = lex.next.location;
     DefMap::defs map;
