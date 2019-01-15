@@ -1,4 +1,10 @@
 # Syntax helpers
+
+# Flip function and object order
 global def x . f = f x
+global def x |-> f = f x
+global def x ↦ f = f x
+
+# Avoid ()s without changing order
 global def f $ x = f x
 global def f ∘ g = \x f (g x)

@@ -321,7 +321,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
           std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
           exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
           lex.consume();
-          exprs.push_back(parse_block(lex));
+          exprs.push_back(parse_block(lex, false));
           if (lex.next.type == EOL) lex.consume();
           ok &= expect(BCLOSE, lex);
           start.row = in.row;
@@ -602,13 +602,13 @@ void Lexer::consume() {
     if (state->indent < state->tabs.back()) {
       state->tabs.pop_back();
       next.type = DEDENT;
+    } else if (state->indent > state->tabs.back()) {
+      state->tabs.push_back(state->indent);
+      next.type = INDENT;
     } else {
       next.type = EOL;
       state->eol = false;
     }
-  } else if (state->indent > state->tabs.back()) {
-    state->tabs.push_back(state->indent);
-    next.type = INDENT;
   } else {
     next = lex_top(*this);
     if (next.type == EOL) {
@@ -698,7 +698,7 @@ top:
       Sm_earrow                  { return op_type(3, 0);  }
       ","                        { return op_type(2, 0);  }
       Sm_quant                   { return op_type(1, 0);  }
-      [\\]                       { return op_type(0, 0);  }
+      [i\\]                      { return op_type(0, 0);  } // IF and LAMBDA
       Sk                         { goto top; }
   */
 }
