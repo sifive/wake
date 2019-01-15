@@ -380,12 +380,14 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
         it = iter->index.find(ast.name);
       if (it != iter->index.end()) {
         Expr *cons = iter->defs[it->second].expr.get();
-        while (cons->type == Lambda::type)
-          cons = reinterpret_cast<Lambda*>(cons)->body.get();
-        if (cons->type == Construct::type) {
-          Construct *c = reinterpret_cast<Construct*>(cons);
-          out.sum = c->sum;
-          out.cons = c->cons->index;
+        if (cons) {
+          while (cons->type == Lambda::type)
+            cons = reinterpret_cast<Lambda*>(cons)->body.get();
+          if (cons->type == Construct::type) {
+            Construct *c = reinterpret_cast<Construct*>(cons);
+            out.sum = c->sum;
+            out.cons = c->cons->index;
+          }
         }
       }
     }
