@@ -698,7 +698,7 @@ top:
       Sm_earrow                  { return op_type(3, 0);  }
       ","                        { return op_type(2, 0);  }
       Sm_quant                   { return op_type(1, 0);  }
-      [\\]                       { return op_type(0, 0);  }
+      [i\\]                      { return op_type(0, 0);  } // IF and LAMBDA
       Sk                         { goto top; }
   */
 }

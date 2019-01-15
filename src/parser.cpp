@@ -64,7 +64,6 @@ static bool expectValue(const char *type, Lexer &lex) {
 
 static AST parse_ast(int p, Lexer &lex, bool makefirst = false, bool firstok = false);
 static Expr *parse_binary(int p, Lexer &lex, bool multiline);
-static Expr *parse_if(Lexer &lex, bool multiline);
 static Expr *parse_def(Lexer &lex, std::string &name);
 
 static int relabel_descend(Expr *expr, int index) {
@@ -288,6 +287,25 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       out->location = location;
       return out;
     }
+    case IF: {
+      Location l = lex.next.location;
+      op_type op = op_precedence("i");
+      if (op.p < p) precedence_error(lex);
+      lex.consume();
+      auto condE = parse_block(lex, multiline);
+      if (expect(THEN, lex)) lex.consume();
+      if (lex.next.type == EOL && multiline) lex.consume();
+      auto thenE = parse_block(lex, multiline);
+      if (lex.next.type == EOL && multiline) lex.consume();
+      if (expect(ELSE, lex)) lex.consume();
+      auto elseE = parse_block(lex, multiline);
+      l.end = elseE->location.end;
+      return new App(l, new App(l, new App(l,
+        new VarRef(l, "destruct Boolean"),
+        new Lambda(l, "_", thenE)),
+        new Lambda(l, "_", elseE)),
+        condE);
+    }
     default: {
       std::cerr << "Was expecting an (OPERATOR/LAMBDA/ID/LITERAL/PRIM/POPEN), got a "
         << symbolTable[lex.next.type] << " at "
@@ -325,6 +343,7 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
       case PRIM:
       case HERE:
       case SUBSCRIBE:
+      case IF:
       case POPEN: {
         op_type op = op_precedence("a"); // application
         if (op.p < p) return lhs;
@@ -344,29 +363,6 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
         return lhs;
       }
     }
-  }
-}
-
-static Expr *parse_if(Lexer &lex, bool multiline) {
-  TRACE("IF");
-  if (lex.next.type == IF) {
-    Location l = lex.next.location;
-    lex.consume();
-    auto condE = parse_block(lex, multiline);
-    if (expect(THEN, lex)) lex.consume();
-    if (lex.next.type == EOL && multiline) lex.consume();
-    auto thenE = parse_block(lex, multiline);
-    if (lex.next.type == EOL && multiline) lex.consume();
-    if (expect(ELSE, lex)) lex.consume();
-    auto elseE = parse_block(lex, multiline);
-    l.end = elseE->location.end;
-    return new App(l, new App(l, new App(l,
-      new VarRef(l, "destruct Boolean"),
-      new Lambda(l, "_", thenE)),
-      new Lambda(l, "_", elseE)),
-      condE);
-  } else {
-    return relabel_anon(parse_binary(0, lex, multiline));
   }
 }
 
@@ -795,14 +791,14 @@ Expr *parse_block(Lexer &lex, bool multiline) {
     }
 
     publish_seal(publish);
-    auto body = parse_if(lex, true);
+    auto body = relabel_anon(parse_binary(0, lex, true));
     location.end = body->location.end;
     out = (publish.empty() && map.empty()) ? body : new DefMap(location, std::move(map), std::move(publish), body);
 
     if (expect(DEDENT, lex)) lex.consume();
     return out;
   } else {
-    out = parse_if(lex, multiline);
+    out = relabel_anon(parse_binary(0, lex, multiline));
   }
 
   return out;
