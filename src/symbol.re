@@ -321,7 +321,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
           std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
           exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
           lex.consume();
-          exprs.push_back(parse_block(lex));
+          exprs.push_back(parse_block(lex, false));
           if (lex.next.type == EOL) lex.consume();
           ok &= expect(BCLOSE, lex);
           start.row = in.row;

@@ -63,9 +63,8 @@ static bool expectValue(const char *type, Lexer &lex) {
 }
 
 static AST parse_ast(int p, Lexer &lex, bool makefirst = false, bool firstok = false);
-static Expr *parse_unary(int p, Lexer &lex);
-static Expr *parse_binary(int p, Lexer &lex);
-static Expr *parse_if(Lexer &lex);
+static Expr *parse_binary(int p, Lexer &lex, bool multiline);
+static Expr *parse_if(Lexer &lex, bool multiline);
 static Expr *parse_def(Lexer &lex, std::string &name);
 
 static int relabel_descend(Expr *expr, int index) {
@@ -119,7 +118,7 @@ static Expr *parse_match(int p, Lexer &lex) {
 
   repeat = true;
   while (repeat) {
-    auto rhs = parse_binary(op.p + op.l, lex);
+    auto rhs = parse_binary(op.p + op.l, lex, false);
     out->args.emplace_back(rhs);
 
     switch (lex.next.type) {
@@ -154,7 +153,7 @@ static Expr *parse_match(int p, Lexer &lex) {
   while (repeat) {
     AST ast = parse_ast(multiarg?APP_PRECEDENCE:0, lex, multiarg, multiarg);
     if (expect(EQUALS, lex)) lex.consume();
-    Expr *expr = parse_block(lex);
+    Expr *expr = parse_block(lex, false);
     out->patterns.emplace_back(std::move(ast), expr);
 
     switch (lex.next.type) {
@@ -177,7 +176,7 @@ static Expr *parse_match(int p, Lexer &lex) {
   return out;
 }
 
-static Expr *parse_unary(int p, Lexer &lex) {
+static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
   TRACE("UNARY");
   switch (lex.next.type) {
     // Unary operators
@@ -187,7 +186,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
       if (op.p < p) precedence_error(lex);
       auto opp = new VarRef(lex.next.location, "unary " + lex.text());
       lex.consume();
-      auto rhs = parse_binary(op.p + op.l, lex);
+      auto rhs = parse_binary(op.p + op.l, lex, multiline);
       location.end = rhs->location.end;
       return new App(location, opp, rhs);
     }
@@ -213,7 +212,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
         location.end = lex.next.location.end;
         lex.consume();
       }
-      auto rhs = parse_binary(op.p + op.l, lex);
+      auto rhs = parse_binary(op.p + op.l, lex, multiline);
       location.end = rhs->location.end;
       return new Memoize(location, skip, rhs);
     }
@@ -223,7 +222,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
       if (op.p < p) precedence_error(lex);
       lex.consume();
       AST ast = parse_ast(APP_PRECEDENCE+1, lex);
-      auto rhs = parse_binary(op.p + op.l, lex);
+      auto rhs = parse_binary(op.p + op.l, lex, multiline);
       location.end = rhs->location.end;
       if (Lexer::isUpper(ast.name.c_str()) || Lexer::isOperator(ast.name.c_str())) {
         Match *match = new Match(location);
@@ -282,7 +281,7 @@ static Expr *parse_unary(int p, Lexer &lex) {
     case POPEN: {
       Location location = lex.next.location;
       lex.consume();
-      Expr *out = parse_block(lex);
+      Expr *out = parse_block(lex, multiline);
       location.end = lex.next.location.end;
       if (lex.next.type == EOL) lex.consume();
       if (expect(PCLOSE, lex)) lex.consume();
@@ -299,9 +298,10 @@ static Expr *parse_unary(int p, Lexer &lex) {
   }
 }
 
-static Expr *parse_binary(int p, Lexer &lex) {
+static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
   TRACE("BINARY");
-  auto lhs = parse_unary(p, lex);
+  if (lex.next.type == EOL && multiline) lex.consume();
+  auto lhs = parse_unary(p, lex, multiline);
   for (;;) {
     switch (lex.next.type) {
       case OPERATOR: {
@@ -309,7 +309,7 @@ static Expr *parse_binary(int p, Lexer &lex) {
         if (op.p < p) return lhs;
         auto opp = new VarRef(lex.next.location, "binary " + lex.text());
         lex.consume();
-        auto rhs = parse_binary(op.p + op.l, lex);
+        auto rhs = parse_binary(op.p + op.l, lex, multiline);
         Location app1_loc = lhs->location;
         Location app2_loc = lhs->location;
         app1_loc.end = opp->location.end;
@@ -328,11 +328,17 @@ static Expr *parse_binary(int p, Lexer &lex) {
       case POPEN: {
         op_type op = op_precedence("a"); // application
         if (op.p < p) return lhs;
-        auto rhs = parse_binary(op.p + op.l, lex);
+        auto rhs = parse_binary(op.p + op.l, lex, multiline);
         Location location = lhs->location;
         location.end = rhs->location.end;
         lhs = new App(location, lhs, rhs);
         break;
+      }
+      case EOL: {
+        if (multiline) {
+          lex.consume();
+          break;
+        }
       }
       default: {
         return lhs;
@@ -341,18 +347,18 @@ static Expr *parse_binary(int p, Lexer &lex) {
   }
 }
 
-static Expr *parse_if(Lexer &lex) {
+static Expr *parse_if(Lexer &lex, bool multiline) {
   TRACE("IF");
   if (lex.next.type == IF) {
     Location l = lex.next.location;
     lex.consume();
-    auto condE = parse_block(lex);
-    if (lex.next.type == EOL) lex.consume();
+    auto condE = parse_block(lex, multiline);
     if (expect(THEN, lex)) lex.consume();
-    auto thenE = parse_block(lex);
-    if (lex.next.type == EOL) lex.consume();
+    if (lex.next.type == EOL && multiline) lex.consume();
+    auto thenE = parse_block(lex, multiline);
+    if (lex.next.type == EOL && multiline) lex.consume();
     if (expect(ELSE, lex)) lex.consume();
-    auto elseE = parse_block(lex);
+    auto elseE = parse_block(lex, multiline);
     l.end = elseE->location.end;
     return new App(l, new App(l, new App(l,
       new VarRef(l, "destruct Boolean"),
@@ -360,7 +366,7 @@ static Expr *parse_if(Lexer &lex) {
       new Lambda(l, "_", elseE)),
       condE);
   } else {
-    return relabel_anon(parse_binary(0, lex));
+    return relabel_anon(parse_binary(0, lex, multiline));
   }
 }
 
@@ -400,7 +406,7 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
   expect(EQUALS, lex);
   lex.consume();
 
-  Expr *body = parse_block(lex);
+  Expr *body = parse_block(lex, false);
   if (expect(EOL, lex)) lex.consume();
 
   // do we need a pattern match? lower / wildcard are ok
@@ -756,7 +762,7 @@ static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top) {
   }
 }
 
-Expr *parse_block(Lexer &lex) {
+Expr *parse_block(Lexer &lex, bool multiline) {
   TRACE("BLOCK");
   Expr *out;
 
@@ -789,14 +795,14 @@ Expr *parse_block(Lexer &lex) {
     }
 
     publish_seal(publish);
-    auto body = parse_if(lex);
+    auto body = parse_if(lex, true);
     location.end = body->location.end;
     out = (publish.empty() && map.empty()) ? body : new DefMap(location, std::move(map), std::move(publish), body);
 
     if (expect(DEDENT, lex)) lex.consume();
     return out;
   } else {
-    out = parse_if(lex);
+    out = parse_if(lex, multiline);
   }
 
   return out;
@@ -842,7 +848,7 @@ void parse_top(Top &top, Lexer &lex) {
 Expr *parse_command(Lexer &lex) {
   TRACE("COMMAND");
   if (lex.next.type == EOL) lex.consume();
-  auto out = parse_block(lex);
+  auto out = parse_block(lex, false);
   expect(END, lex);
   return out;
 }

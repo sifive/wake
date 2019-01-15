@@ -9,7 +9,7 @@ struct Expr;
 bool expect(SymbolType type, Lexer &lex);
 void parse_top(Top &top, Lexer &lex);
 Expr *parse_command(Lexer &lex);
-Expr *parse_block(Lexer &lex);
+Expr *parse_block(Lexer &lex, bool multiline);
 
 // These types must be defined by prim.wake
 struct Sum;
