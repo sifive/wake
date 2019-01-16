@@ -739,17 +739,25 @@ static PRIMTYPE(type_add_hash) {
     out->unify(pair);
 }
 
+#ifdef __APPLE__
+#define st_mtim st_mtimespec
+#endif
+
+static long stat_mod_ns(const std::string &file) {
+  struct stat sbuf;
+  stat(file.c_str(), &sbuf);
+  long modified = sbuf.st_mtim.tv_sec;
+  modified *= 1000000000L;
+  modified += sbuf.st_mtim.tv_nsec;
+  return modified;
+}
+
 static PRIMFN(prim_add_hash) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT(2);
   STRING(file, 0);
   STRING(hash, 1);
-  struct stat sbuf;
-  stat(file->value.c_str(), &sbuf);
-  long modified = sbuf.st_mtimespec.tv_sec;
-  modified *= 1000000000L;
-  modified += sbuf.st_mtimespec.tv_nsec;
-  jobtable->imp->db->add_hash(file->value, hash->value, modified);
+  jobtable->imp->db->add_hash(file->value, hash->value, stat_mod_ns(file->value));
   auto out = make_tuple(
     std::shared_ptr<Value>(args[0]),
     std::shared_ptr<Value>(args[1]));
@@ -766,12 +774,7 @@ static PRIMFN(prim_get_hash) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT(1);
   STRING(file, 0);
-  struct stat sbuf;
-  stat(file->value.c_str(), &sbuf);
-  long modified = sbuf.st_mtimespec.tv_sec;
-  modified *= 1000000000L;
-  modified += sbuf.st_mtimespec.tv_nsec;
-  std::string hash = jobtable->imp->db->get_hash(file->value, modified);
+  std::string hash = jobtable->imp->db->get_hash(file->value, stat_mod_ns(file->value));
   auto out = std::make_shared<String>(std::move(hash));
   RETURN(out);
 }
