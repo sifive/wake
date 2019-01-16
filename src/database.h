@@ -17,7 +17,7 @@ struct JobReflection {
   std::vector<std::string> commandline;
   std::vector<std::string> environment;
   std::string stack;
-  std::string stdin; // !!! wrong
+  std::string stdin;
   std::string time;
   int status;
   double runtime;

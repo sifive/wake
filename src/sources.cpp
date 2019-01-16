@@ -89,12 +89,14 @@ static void distinct(std::vector<std::shared_ptr<String> > &sources) {
   sources.resize(std::distance(sources.begin(), it));
 }
 
-static std::string find_execpath() {
-  int dirlen = wai_getExecutablePath(0, 0, 0) + 1;
-  std::unique_ptr<char[]> execbuf(new char[dirlen]);
-  wai_getExecutablePath(execbuf.get(), dirlen, &dirlen);
-  std::string exepath(execbuf.get(), dirlen);
-  execbuf.reset();
+std::string find_execpath() {
+  static std::string exepath;
+  if (exepath.empty()) {
+    int dirlen = wai_getExecutablePath(0, 0, 0) + 1;
+    std::unique_ptr<char[]> execbuf(new char[dirlen]);
+    wai_getExecutablePath(execbuf.get(), dirlen, &dirlen);
+    exepath.assign(execbuf.get(), dirlen);
+  }
   return exepath;
 }
 
@@ -126,7 +128,7 @@ static bool make_canonical(std::string &x) {
   }
 
   if (tokens.empty()) {
-    x = ".";
+    if (abs) x = ""; else x = ".";
   } else {
     std::stringstream str;
     str << tokens.front();
@@ -141,7 +143,12 @@ static bool make_canonical(std::string &x) {
 }
 
 // dir + path must be canonical
-std::string make_relative(std::string &dir, std::string &path) {
+static std::string make_relative(std::string &dir, std::string &path) {
+  if ((!path.empty() && path[0] == '/') !=
+      (!dir .empty() && dir [0] == '/')) {
+    return path;
+  }
+
   if (dir == ".") dir = ""; else dir += '/';
   path += '/';
 
@@ -173,12 +180,16 @@ std::string make_relative(std::string &dir, std::string &path) {
   return x;
 }
 
-static std::string get_cwd() {
-  std::vector<char> buf;
-  buf.resize(1024, '\0');
-  while (getcwd(buf.data(), buf.size()) == 0 && errno == ERANGE)
-    buf.resize(buf.size() * 2);
-  return std::string(buf.data());
+std::string get_cwd() {
+  static std::string cwd;
+  if (cwd.empty()) {
+    std::vector<char> buf;
+    buf.resize(1024, '\0');
+    while (getcwd(buf.data(), buf.size()) == 0 && errno == ERANGE)
+      buf.resize(buf.size() * 2);
+    cwd.assign(buf.data());
+  }
+  return cwd;
 }
 
 std::vector<std::shared_ptr<String> > find_all_sources() {

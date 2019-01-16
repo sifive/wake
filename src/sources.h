@@ -13,6 +13,9 @@ struct String;
 bool chdir_workspace();
 bool make_workspace(const std::string &dir);
 
+std::string find_execpath();
+std::string get_cwd();
+
 std::vector<std::shared_ptr<String> > find_all_sources();
 std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<String> > &all, const std::string &base, const std::string &regexp);
 

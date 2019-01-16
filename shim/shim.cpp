@@ -58,7 +58,19 @@ int main(int argc, char **argv) {
   int stdin_fd, stdout_fd, stderr_fd;
   const char *root, *dir;
 
-  if (argc < 4) return 1;
+  if (argc < 7) return 1;
+
+  root = argv[4];
+  if ((root[0] != '.' || root[1] != 0) && chdir(root)) {
+    fprintf(stderr, "chdir: %s: %s\n", root, strerror(errno));
+    return 127;
+  }
+
+  dir = argv[5];
+  if ((dir[0] != '.' || dir[1] != 0) && chdir(dir)) {
+    fprintf(stderr, "chdir: %s: %s\n", dir, strerror(errno));
+    return 127;
+  }
 
   stdin_fd = open(argv[1], O_RDONLY);
   if (stdin_fd == -1) {
@@ -74,18 +86,6 @@ int main(int argc, char **argv) {
   dup2(stderr_fd, 2);
   close(stdout_fd);
   close(stderr_fd);
-
-  root = argv[4];
-  if ((root[0] != '.' || root[1] != 0) && chdir(root)) {
-    fprintf(stderr, "chdir: %s: %s\n", root, strerror(errno));
-    return 127;
-  }
-
-  dir = argv[5];
-  if ((dir[0] != '.' || dir[1] != 0) && chdir(dir)) {
-    fprintf(stderr, "chdir: %s: %s\n", dir, strerror(errno));
-    return 127;
-  }
 
   if (strcmp(argv[6], "<hash>")) {
     execv(argv[6], argv+6);
