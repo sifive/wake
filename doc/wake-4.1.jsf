@@ -1,0 +1,163 @@
+# JOE syntax highlight file for Haskell
+
+=Idle
+=Comment green
+=Keyword bold
+=Statement bold
+=Conditional
+=Structure
+=Bad red
+=Constant
+=Number
+=FloatNumber
+=DecNumber
+=HexNumber
+=OctNumber
+=BinNumber
+=String blue
+=StringEscape bold blue
+
+=Special yellow
+=VarId
+=ConId bold
+=VarSym green
+
+:reset Idle
+	*		reset		
+	"a-z_"		varid		buffer recolor=-1
+	"A-Z"		conid		mark recolor=-1
+	"!$%&*+.-/<>?^|~," varsym	buffer recolor=-1
+	"="		equal		recolor=-1
+	"()\\"		special		recolor=-1
+	"#"		linecomment	recolor=-1
+	"0-9"		integerstart	mark noeat
+	"\'"		rawlit		recolor=-1
+	"\""		strlit		recolor=-1
+	"`@{}[]:;"	errorstate	noeat
+
+:equal Special
+	*		reset		noeat
+	"!$%&*+.-/<>?^|~,="	varsym	recolor=-2
+
+:special Special
+	*		reset		noeat
+	
+:errorstate Bad
+	*		reset
+
+:conid ConId
+	*		reset		noeat
+	"a-zA-Z0-9_"	conid
+	
+:varid VarId
+	*		reset		noeat strings
+	"data"		struct
+	"def"		stmt
+	"else"		cond
+	"here"		kw
+	"if"		cond
+	"global"	kw
+	"match"		stmt
+	"memoize"	kw
+	"prim"		kw
+	"publish"	kw
+	"subscribe"	kw
+	"then"		cond
+	"val"		stmt
+	"_"		kw
+done
+	"a-zA-Z0-9_'"	varid
+
+:kw Keyword
+	*		reset		noeat
+
+:cond Conditional
+	*		reset		noeat
+
+:struct Structure
+	*		reset		noeat
+
+:stmt Statement
+	*		reset		noeat
+
+:varsym VarSym
+	*		reset		noeat
+	"!$%&*+.-/<>?^|~,=" varsym
+
+:linecomment Comment comment
+	*		linecomment
+	"\n"		reset
+
+:integerstart DecNumber
+	*		decnum
+	"0"		intdispatch
+
+:decnum DecNumber
+	*		reset		noeat
+	"0-9_"		decnum
+	
+:intdispatch DecNumber
+	*		reset		noeat
+	"0-7_"		octint		recolor=-2
+	"b"		binstart
+	"x"		hexstart
+
+:octint OctNumber
+	*		reset		noeat
+	"0-7_"		octint
+
+:binstart BinNumber
+	*		varid		noeat recolor=-2
+	"0-1_"		binint		recolor=-3
+
+:binint BinNumber
+	*		reset		noeat
+	"0-1_"		binint
+
+:hexstart HexNumber
+	*		varid		noeat recolor=-2
+	"0-9a-fA-F_"	hexint		recolor=-3
+
+:hexint HexNumber
+	*		reset		noeat
+	"0-9a-fA-F_"	hexint
+
+:rawlit String string
+	*		rawlit
+	"\'"		reset
+
+:strlit String string
+	*		strlit
+	"\""		reset
+	"\n"		errorstate	noeat recolor=-2
+	"\\"		escape_strlit	mark recolor=-1
+	"{"		subexp_strlit	mark recolor=-1
+
+:subexp_strlit StringEscape string
+	*		subexp_strlit
+	"}"		strlit
+
+:escape_strlit StringEscape string
+	*		strliterror	recolor=-2
+	"0-9"		escdecstr
+	"xuU"		eschexstrstart
+	"{}abfnrtv\\\"\'?"	strlit
+
+:escoctstr StringEscape string
+	*		strlit	noeat
+	"0-7"		escoctstr
+
+:escdecstr StringEscape string
+	*		strlit	noeat
+	"0-9"		escdecstr
+
+:eschexstrstart StringEscape string
+	*		strliterror	recolor=-3 noeat
+	"0-9a-fA-F"	eschexstr
+
+:eschexstr StringEscape string
+	*		strlit		noeat
+	"0-9a-fA-F"	eschexstr
+
+:strliterror Bad
+	*		strlit		noeat
