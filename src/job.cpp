@@ -756,6 +756,26 @@ static PRIMFN(prim_add_hash) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_get_hash) {
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
+}
+
+static PRIMFN(prim_get_hash) {
+  JobTable *jobtable = reinterpret_cast<JobTable*>(data);
+  EXPECT(1);
+  STRING(file, 0);
+  struct stat sbuf;
+  stat(file->value.c_str(), &sbuf);
+  long modified = sbuf.st_mtimespec.tv_sec;
+  modified *= 1000000000L;
+  modified += sbuf.st_mtimespec.tv_nsec;
+  std::string hash = jobtable->imp->db->get_hash(file->value, modified);
+  auto out = std::make_shared<String>(std::move(hash));
+  RETURN(out);
+}
+
 static bool check_exec(const char *tok, size_t len, const std::string &exec, std::string &out) {
   out.assign(tok, len);
   out += "/";
@@ -800,5 +820,6 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   pmap.emplace("job_tree",   PrimDesc(prim_job_tree,   type_job_tree));
   pmap.emplace("job_finish", PrimDesc(prim_job_finish, type_job_finish));
   pmap.emplace("add_hash",   PrimDesc(prim_add_hash,   type_add_hash,   jobtable));
+  pmap.emplace("get_hash",   PrimDesc(prim_get_hash,   type_get_hash,   jobtable));
   pmap.emplace("search_path",PrimDesc(prim_search_path,type_search_path));
 }

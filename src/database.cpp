@@ -30,11 +30,12 @@ struct Database::detail {
   sqlite3_stmt *needs_build;
   sqlite3_stmt *wipe_temp;
   sqlite3_stmt *find_owner;
+  sqlite3_stmt *fetch_hash;
   long run_id;
   detail() : db(0), add_target(0), del_target(0), begin_txn(0), commit_txn(0), insert_job(0),
              insert_tree(0), insert_log(0), insert_file(0), insert_hash(0), get_log(0), get_tree(0),
              set_runtime(0), delete_tree(0), delete_prior(0), insert_temp(0), find_prior(0),
-             needs_build(0), wipe_temp(0), find_owner(0) { }
+             needs_build(0), wipe_temp(0), find_owner(0), fetch_hash(0) { }
 };
 
 Database::Database() : imp(new detail) { }
@@ -70,7 +71,7 @@ std::string Database::open() {
     "  hash     text    not null,"
     "  modified integer not null,"
     "  primary key(run_id, file_id));"
-    "create unique index if not exists statmap on hashes(file_id, modified);"
+    "create index if not exists statmap on hashes(file_id, modified);"
     "create table if not exists jobs("
     "  job_id      integer primary key,"
     "  run_id      integer not null references runs(run_id),"
@@ -157,6 +158,9 @@ std::string Database::open() {
     "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.time, j.status, j.runtime"
     " from files f, filetree t, jobs j"
     " where f.path=? and t.access=? and t.file_id=f.file_id and j.job_id=t.job_id";
+  const char *sql_fetch_hash =
+    "select h.hash, h.run_id from files f, hashes h"
+    " where f.path=? and f.file_id=h.file_id and h.modified=?;";
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
@@ -185,6 +189,7 @@ std::string Database::open() {
   PREPARE(sql_needs_build,  needs_build);
   PREPARE(sql_wipe_temp,    wipe_temp);
   PREPARE(sql_find_owner,   find_owner);
+  PREPARE(sql_fetch_hash,   fetch_hash);
 
   return "";
 }
@@ -222,6 +227,7 @@ void Database::close() {
   FINALIZE(needs_build);
   FINALIZE(wipe_temp);
   FINALIZE(find_owner);
+  FINALIZE(fetch_hash);
 
   if (imp->db) {
     int ret = sqlite3_close(imp->db);
@@ -530,6 +536,17 @@ void Database::add_hash(const std::string &file, const std::string &hash, long m
   bind_integer(why, imp->insert_hash, 4, modified);
   single_step (why, imp->insert_hash);
   end_txn();
+}
+
+std::string Database::get_hash(const std::string &file, long modified) {
+  std::string out;
+  const char *why = "Could not fetch a hash";
+  bind_string (why, imp->fetch_hash, 1, file);
+  bind_integer(why, imp->fetch_hash, 2, modified);
+  if (sqlite3_step(imp->fetch_hash) == SQLITE_ROW)
+    out = rip_column(imp->fetch_hash, 0);
+  finish_stmt(why, imp->fetch_hash);
+  return out;
 }
 
 static std::vector<std::string> chop_null(const std::string &str) {
