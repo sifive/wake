@@ -141,7 +141,7 @@ int main(int argc, const char **argv) {
     { "input", {"-i", "--input"},
       "query which jobs have this input", 1},
     { "rerun", {"-r", "--rerun"},
-      "output job descriptions as a runable shell script"},
+      "output job descriptions as a runable shell script", 0},
     { "jobs", {"-j", "--jobs"},
       "number of concurrent jobs to run", 1},
     { "verbose", {"-v", "--verbose"},
