@@ -80,7 +80,8 @@ struct Database {
 
   void add_hash(
     const std::string &file,
-    const std::string &hash);
+    const std::string &hash,
+    long modified);
 
   std::vector<JobReflection> explain(
     const std::string &file,

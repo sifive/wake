@@ -65,10 +65,12 @@ std::string Database::open() {
     "  path    text    not null);"
     "create unique index if not exists filenames on files(path);"
     "create table if not exists hashes("
-    "  run_id  integer not null references runs(run_id),"
-    "  file_id integer not null references files(file_id),"
-    "  hash    text    not null,"
+    "  run_id   integer not null references runs(run_id),"
+    "  file_id  integer not null references files(file_id),"
+    "  hash     text    not null,"
+    "  modified integer not null,"
     "  primary key(run_id, file_id));"
+    "create unique index if not exists statmap on hashes(file_id, modified);"
     "create table if not exists jobs("
     "  job_id      integer primary key,"
     "  run_id      integer not null references runs(run_id),"
@@ -124,8 +126,8 @@ std::string Database::open() {
     "values(?, ?, ?, ?)";
   const char *sql_insert_file = "insert or ignore into files(path) values (?)";
   const char *sql_insert_hash =
-    "insert into hashes(run_id, file_id, hash) "
-    "values(?, (select file_id from files where path=?), ?)";
+    "insert into hashes(run_id, file_id, hash, modified) "
+    "values(?, (select file_id from files where path=?), ?, ?)";
   const char *sql_get_log = "select output from log where job_id=? and descriptor=? order by seconds";
   const char *sql_get_tree =
     "select p.path, h.hash from filetree t, hashes h, files p"
@@ -517,7 +519,7 @@ std::string Database::get_output(long job, int descriptor) {
   return out.str();
 }
 
-void Database::add_hash(const std::string &file, const std::string &hash) {
+void Database::add_hash(const std::string &file, const std::string &hash, long modified) {
   const char *why = "Could not insert a hash";
   begin_txn();
   bind_string (why, imp->insert_file, 1, file);
@@ -525,6 +527,7 @@ void Database::add_hash(const std::string &file, const std::string &hash) {
   bind_integer(why, imp->insert_hash, 1, imp->run_id);
   bind_string (why, imp->insert_hash, 2, file);
   bind_string (why, imp->insert_hash, 3, hash);
+  bind_integer(why, imp->insert_hash, 4, modified);
   single_step (why, imp->insert_hash);
   end_txn();
 }

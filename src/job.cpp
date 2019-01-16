@@ -744,7 +744,12 @@ static PRIMFN(prim_add_hash) {
   EXPECT(2);
   STRING(file, 0);
   STRING(hash, 1);
-  jobtable->imp->db->add_hash(file->value, hash->value);
+  struct stat sbuf;
+  stat(file->value.c_str(), &sbuf);
+  long modified = sbuf.st_mtimespec.tv_sec;
+  modified *= 1000000000L;
+  modified += sbuf.st_mtimespec.tv_nsec;
+  jobtable->imp->db->add_hash(file->value, hash->value, modified);
   auto out = make_tuple(
     std::shared_ptr<Value>(args[0]),
     std::shared_ptr<Value>(args[1]));
