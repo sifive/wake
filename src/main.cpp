@@ -33,7 +33,7 @@ void Output::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
   *save = std::move(value);
 }
 
-void describe(const std::vector<JobReflection> &jobs) {
+static void describe_human(const std::vector<JobReflection> &jobs) {
   for (auto &job : jobs) {
     std::cout
       << "Job " << job.job << ":" << std::endl
@@ -60,6 +60,71 @@ void describe(const std::vector<JobReflection> &jobs) {
   }
 }
 
+static void escape(const std::string &x) {
+  std::cout << "'";
+  size_t j;
+  for (size_t i = 0; i != std::string::npos; i = j) {
+    j = x.find('\'', i);
+    if (j != std::string::npos) {
+      std::cout.write(x.data()+i, j-i);
+      std::cout << "'\\''";
+      ++j;
+    } else {
+      std::cout.write(x.data()+i, x.size()-i);
+    }
+  }
+  std::cout << "'";
+}
+
+static void describe_shell(const std::vector<JobReflection> &jobs) {
+  std::cout << "#! /bin/sh -ex" << std::endl;
+
+  for (auto &job : jobs) {
+    std::cout << std::endl << "# Wake job " << job.job << ":" << std::endl;
+    std::cout << "cd ";
+    escape(get_cwd());
+    std::cout << std::endl;
+    if (job.directory != ".") {
+      std::cout << "cd ";
+      escape(job.directory);
+      std::cout << std::endl;
+    }
+    std::cout << "env -i \\" << std::endl;
+    for (auto &env : job.environment) {
+      std::cout << "\t";
+      escape(env);
+      std::cout << " \\" << std::endl;
+    }
+    for (auto &arg : job.commandline) {
+      escape(arg);
+      std::cout << " \\" << std::endl << '\t';
+    }
+    std::cout << "< ";
+    escape(job.stdin);
+    std::cout
+      << std::endl << std::endl
+      << "# When wake ran this command:" << std::endl
+      << "#   Built:     " << job.time << std::endl
+      << "#   Runtime:   " << job.runtime << std::endl
+      << "#   Status:    " << job.status << std::endl
+      << "# Inputs:" << std::endl;
+    for (auto &in : job.inputs)
+      std::cout << "#   " << in.hash << " " << in.path << std::endl;
+    std::cout
+      << "# Outputs:" << std::endl;
+    for (auto &out : job.outputs)
+      std::cout << "#   " << out.hash << " " << out.path << std::endl;
+  }
+}
+
+void describe(const std::vector<JobReflection> &jobs, bool rerun) {
+  if (rerun) {
+    describe_shell(jobs);
+  } else {
+    describe_human(jobs);
+  }
+}
+
 int main(int argc, const char **argv) {
   const char *usage = "Usage: wake [OPTION] [--] [ADDED EXPRESSION]";
   argagg::parser argparser {{
@@ -67,7 +132,7 @@ int main(int argc, const char **argv) {
       "shows this help message", 0},
     { "add", {"-a", "--add"},
       "add a build target to wake", 0},
-    { "remove", {"-r", "--remove"},
+    { "subtract", {"-s", "--subtract"},
       "remove a build target from wake", 1},
     { "list", {"-l", "--list"},
       "list builds targets registed with wake", 0},
@@ -75,6 +140,8 @@ int main(int argc, const char **argv) {
       "query which jobs have this output", 1},
     { "input", {"-i", "--input"},
       "query which jobs have this input", 1},
+    { "rerun", {"-r", "--rerun"},
+      "output job descriptions as a runable shell script"},
     { "jobs", {"-j", "--jobs"},
       "number of concurrent jobs to run", 1},
     { "verbose", {"-v", "--verbose"},
@@ -110,6 +177,7 @@ int main(int argc, const char **argv) {
   int jobs = args["jobs"].as<int>(std::thread::hardware_concurrency());
   bool verbose = args["verbose"];
   bool quiet = args["quiet"];
+  bool rerun = args["rerun"];
   queue.stack_trace = args["debug"];
 
   if (quiet && verbose) {
@@ -143,8 +211,8 @@ int main(int argc, const char **argv) {
       std::cout << "  " << j++ << " = " << i << std::endl;
   }
 
-  if (args["remove"]) {
-    int victim = args["remove"];
+  if (args["subtract"]) {
+    int victim = args["subtract"];
     if (victim < 0 || victim >= (int)targets.size()) {
       std::cerr << "Could not remove target " << victim << "; there are only " << targets.size() << std::endl;
       return 1;
@@ -246,8 +314,8 @@ int main(int argc, const char **argv) {
     db.add_target(targets.back());
     if (args["verbose"]) std::cout << "Added target " << (targets.size()-1) << " = " << targets.back() << std::endl;
   }
-  if (args["input"]) describe(db.explain(args["input"], 1));
-  if (args["output"]) describe(db.explain(args["output"], 2));
+  if (args["input"]) describe(db.explain(args["input"], 1), rerun);
+  if (args["output"]) describe(db.explain(args["output"], 2), rerun);
   if (args["parse"]) return 0;
   if (args["list"]) return 0;
   if (args["input"]) return 0;
