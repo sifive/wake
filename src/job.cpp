@@ -4,7 +4,7 @@
 #include "heap.h"
 #include "database.h"
 #include "location.h"
-#include "whereami.h"
+#include "sources.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -245,13 +245,8 @@ static void launch(JobTable *jobtable) {
       fflush(stdout);
       fflush(stderr);
 #ifndef NO_VFORK
-      int dirlen = wai_getExecutablePath(0, 0, 0) + 1;
-      std::unique_ptr<char[]> execbuf(new char[dirlen]);
-      wai_getExecutablePath(execbuf.get(), dirlen, &dirlen);
-      std::string exepath(execbuf.get(), dirlen);
-
       std::stringstream prelude;
-      prelude << exepath << "/../lib/wake/shim-wake" << '\0'
+      prelude << find_execpath() << "/../lib/wake/shim-wake" << '\0'
         << (task.stdin.empty() ? "/dev/null" : task.stdin.c_str()) << '\0'
         << std::to_string(pipe_stdout[1]) << '\0'
         << std::to_string(pipe_stderr[1]) << '\0'
