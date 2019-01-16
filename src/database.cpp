@@ -24,17 +24,19 @@ struct Database::detail {
   sqlite3_stmt *get_tree;
   sqlite3_stmt *set_runtime;
   sqlite3_stmt *delete_tree;
+  sqlite3_stmt *delete_log;
   sqlite3_stmt *delete_prior;
   sqlite3_stmt *insert_temp;
   sqlite3_stmt *find_prior;
   sqlite3_stmt *needs_build;
   sqlite3_stmt *wipe_temp;
   sqlite3_stmt *find_owner;
+  sqlite3_stmt *fetch_hash;
   long run_id;
   detail() : db(0), add_target(0), del_target(0), begin_txn(0), commit_txn(0), insert_job(0),
              insert_tree(0), insert_log(0), insert_file(0), insert_hash(0), get_log(0), get_tree(0),
-             set_runtime(0), delete_tree(0), delete_prior(0), insert_temp(0), find_prior(0),
-             needs_build(0), wipe_temp(0), find_owner(0) { }
+             set_runtime(0), delete_tree(0), delete_log(0), delete_prior(0), insert_temp(0),
+             find_prior(0), needs_build(0), wipe_temp(0), find_owner(0), fetch_hash(0) { }
 };
 
 Database::Database() : imp(new detail) { }
@@ -55,6 +57,7 @@ std::string Database::open() {
   const char *schema_sql =
     "pragma journal_mode=wal;"
     "pragma synchronous=0;"
+    "pragma foreign_keys=on;"
     "create table if not exists targets("
     "  expression text primary key);"
     "create table if not exists runs("
@@ -65,10 +68,12 @@ std::string Database::open() {
     "  path    text    not null);"
     "create unique index if not exists filenames on files(path);"
     "create table if not exists hashes("
-    "  run_id  integer not null references runs(run_id),"
-    "  file_id integer not null references files(file_id),"
-    "  hash    text    not null,"
+    "  run_id   integer not null references runs(run_id),"
+    "  file_id  integer not null references files(file_id),"
+    "  hash     text    not null,"
+    "  modified integer not null,"
     "  primary key(run_id, file_id));"
+    "create index if not exists statmap on hashes(file_id, modified);"
     "create table if not exists jobs("
     "  job_id      integer primary key,"
     "  run_id      integer not null references runs(run_id),"
@@ -90,9 +95,8 @@ std::string Database::open() {
     "  foreign key(run_id, file_id) references hashes(run_id, file_id));"
     "create index if not exists filesearch on filetree(access, file_id);"
     "create temp table temptree("
-    "  run_id  integer not null," // implied by hashes constraint: references runs(run_id)
-    "  file_id integer not null," // implied by hashes constraint: references files(file_id)
-    "  foreign key(run_id, file_id) references hashes(run_id, file_id));"
+    "  run_id  integer not null,"
+    "  file_id integer not null);"
     "create table if not exists log("
     "  job_id     integer not null references jobs(job_id),"
     "  descriptor integer not null," // 1=stdout, 2=stderr"
@@ -124,8 +128,8 @@ std::string Database::open() {
     "values(?, ?, ?, ?)";
   const char *sql_insert_file = "insert or ignore into files(path) values (?)";
   const char *sql_insert_hash =
-    "insert into hashes(run_id, file_id, hash) "
-    "values(?, (select file_id from files where path=?), ?)";
+    "insert into hashes(run_id, file_id, hash, modified) "
+    "values(?, (select file_id from files where path=?), ?, ?)";
   const char *sql_get_log = "select output from log where job_id=? and descriptor=? order by seconds";
   const char *sql_get_tree =
     "select p.path, h.hash from filetree t, hashes h, files p"
@@ -133,6 +137,9 @@ std::string Database::open() {
   const char *sql_set_runtime = "update jobs set status=?, runtime=? where job_id=?";
   const char *sql_delete_tree =
     "delete from filetree where job_id in (select job_id from jobs where "
+    "directory=? and commandline=? and environment=? and stdin=?)";
+  const char *sql_delete_log =
+    "delete from log where job_id in (select job_id from jobs where "
     "directory=? and commandline=? and environment=? and stdin=?)";
   const char *sql_delete_prior =
     "delete from jobs where "
@@ -155,6 +162,9 @@ std::string Database::open() {
     "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.time, j.status, j.runtime"
     " from files f, filetree t, jobs j"
     " where f.path=? and t.access=? and t.file_id=f.file_id and j.job_id=t.job_id";
+  const char *sql_fetch_hash =
+    "select h.hash, h.run_id from files f, hashes h"
+    " where f.path=? and f.file_id=h.file_id and h.modified=?;";
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
@@ -177,12 +187,14 @@ std::string Database::open() {
   PREPARE(sql_get_tree,     get_tree);
   PREPARE(sql_set_runtime,  set_runtime);
   PREPARE(sql_delete_tree,  delete_tree);
+  PREPARE(sql_delete_log,   delete_log);
   PREPARE(sql_delete_prior, delete_prior);
   PREPARE(sql_insert_temp,  insert_temp);
   PREPARE(sql_find_prior,   find_prior);
   PREPARE(sql_needs_build,  needs_build);
   PREPARE(sql_wipe_temp,    wipe_temp);
   PREPARE(sql_find_owner,   find_owner);
+  PREPARE(sql_fetch_hash,   fetch_hash);
 
   return "";
 }
@@ -214,12 +226,14 @@ void Database::close() {
   FINALIZE(get_tree);
   FINALIZE(set_runtime);
   FINALIZE(delete_tree);
+  FINALIZE(delete_log);
   FINALIZE(delete_prior);
   FINALIZE(insert_temp);
   FINALIZE(find_prior);
   FINALIZE(needs_build);
   FINALIZE(wipe_temp);
   FINALIZE(find_owner);
+  FINALIZE(fetch_hash);
 
   if (imp->db) {
     int ret = sqlite3_close(imp->db);
@@ -432,6 +446,11 @@ void Database::insert_job(
   bind_string (why, imp->delete_tree, 3, environment);
   bind_string (why, imp->delete_tree, 4, stdin);
   single_step (why, imp->delete_tree);
+  bind_string (why, imp->delete_log, 1, directory);
+  bind_string (why, imp->delete_log, 2, commandline);
+  bind_string (why, imp->delete_log, 3, environment);
+  bind_string (why, imp->delete_log, 4, stdin);
+  single_step (why, imp->delete_log);
   bind_string (why, imp->delete_prior, 1, directory);
   bind_string (why, imp->delete_prior, 2, commandline);
   bind_string (why, imp->delete_prior, 3, environment);
@@ -517,7 +536,7 @@ std::string Database::get_output(long job, int descriptor) {
   return out.str();
 }
 
-void Database::add_hash(const std::string &file, const std::string &hash) {
+void Database::add_hash(const std::string &file, const std::string &hash, long modified) {
   const char *why = "Could not insert a hash";
   begin_txn();
   bind_string (why, imp->insert_file, 1, file);
@@ -525,8 +544,20 @@ void Database::add_hash(const std::string &file, const std::string &hash) {
   bind_integer(why, imp->insert_hash, 1, imp->run_id);
   bind_string (why, imp->insert_hash, 2, file);
   bind_string (why, imp->insert_hash, 3, hash);
+  bind_integer(why, imp->insert_hash, 4, modified);
   single_step (why, imp->insert_hash);
   end_txn();
+}
+
+std::string Database::get_hash(const std::string &file, long modified) {
+  std::string out;
+  const char *why = "Could not fetch a hash";
+  bind_string (why, imp->fetch_hash, 1, file);
+  bind_integer(why, imp->fetch_hash, 2, modified);
+  if (sqlite3_step(imp->fetch_hash) == SQLITE_ROW)
+    out = rip_column(imp->fetch_hash, 0);
+  finish_stmt(why, imp->fetch_hash);
+  return out;
 }
 
 static std::vector<std::string> chop_null(const std::string &str) {
