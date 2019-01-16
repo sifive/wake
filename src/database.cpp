@@ -76,11 +76,10 @@ std::string Database::open() {
     "  commandline text    not null,"
     "  environment text    not null,"
     "  stack       text    not null,"
-    "  stdin       integer," // null means /dev/null
+    "  stdin       text,"  // might point outside the workspace
     "  time        text    not null default current_timestamp,"
     "  status      integer,"
-    "  runtime     real,"
-    "  foreign key(run_id, stdin) references hashes(run_id, file_id));"
+    "  runtime     real);"
     "create index if not exists job on jobs(directory, commandline, environment, stdin);"
     "create table if not exists filetree("
     "  access  integer not null," // 0=visible, 1=input, 2=output
@@ -116,7 +115,7 @@ std::string Database::open() {
   const char *sql_commit_txn = "commit transaction";
   const char *sql_insert_job =
     "insert into jobs(run_id, directory, commandline, environment, stack, stdin) "
-    "values(?, ?, ?, ?, ?, (select file_id from files where path=?))";
+    "values(?, ?, ?, ?, ?, ?)";
   const char *sql_insert_tree =
     "insert into filetree(access, job_id, file_id, run_id) "
     "values(?, ?, (select file_id from files where path=?), ?)";
@@ -134,18 +133,18 @@ std::string Database::open() {
   const char *sql_set_runtime = "update jobs set status=?, runtime=? where job_id=?";
   const char *sql_delete_tree =
     "delete from filetree where job_id in (select job_id from jobs where "
-    "directory=? and commandline=? and environment=?)";
+    "directory=? and commandline=? and environment=? and stdin=?)";
   const char *sql_delete_prior =
     "delete from jobs where "
-    "directory=? and commandline=? and environment=?";
+    "directory=? and commandline=? and environment=? and stdin=?";
   const char *sql_insert_temp =
     "insert into temptree(run_id, file_id) values(?, (select file_id from files where path=?))";
   const char *sql_find_prior =
     "select job_id from jobs where "
-    "directory=? and commandline=? and environment=? and status=0";
+    "directory=? and commandline=? and environment=? and stdin=? and status=0";
   const char *sql_needs_build =
     "select h.file_id, h.hash from jobs j, filetree f, hashes h"
-    " where j.directory=? and j.commandline=? and j.environment=? and j.status=0"
+    " where j.directory=? and j.commandline=? and j.environment=? and j.stdin=? and j.status=0"
     "  and f.access=1 and f.job_id=j.job_id"
     "  and h.run_id=f.run_id and h.file_id=f.file_id "
     "except "
@@ -371,6 +370,7 @@ bool Database::reuse_job(
   bind_string (why, imp->find_prior, 1, directory);
   bind_string (why, imp->find_prior, 2, commandline);
   bind_string (why, imp->find_prior, 3, environment);
+  bind_string (why, imp->find_prior, 4, stdin);
   bool prior = sqlite3_step(imp->find_prior) == SQLITE_ROW;
   if (prior) *job = sqlite3_column_int(imp->find_prior, 0);
   finish_stmt (why, imp->find_prior);
@@ -393,6 +393,7 @@ bool Database::reuse_job(
   bind_string (why, imp->needs_build, 1, directory);
   bind_string (why, imp->needs_build, 2, commandline);
   bind_string (why, imp->needs_build, 3, environment);
+  bind_string (why, imp->needs_build, 4, stdin);
   bool rerun = sqlite3_step(imp->needs_build) == SQLITE_ROW;
   finish_stmt (why, imp->needs_build);
   single_step (why, imp->wipe_temp);
@@ -429,10 +430,12 @@ void Database::insert_job(
   bind_string (why, imp->delete_tree, 1, directory);
   bind_string (why, imp->delete_tree, 2, commandline);
   bind_string (why, imp->delete_tree, 3, environment);
+  bind_string (why, imp->delete_tree, 4, stdin);
   single_step (why, imp->delete_tree);
   bind_string (why, imp->delete_prior, 1, directory);
   bind_string (why, imp->delete_prior, 2, commandline);
   bind_string (why, imp->delete_prior, 3, environment);
+  bind_string (why, imp->delete_prior, 4, stdin);
   single_step (why, imp->delete_prior);
   bind_integer(why, imp->insert_job, 1, imp->run_id);
   bind_string (why, imp->insert_job, 2, directory);
@@ -558,6 +561,7 @@ std::vector<JobReflection> Database::explain(const std::string &file, int use) {
     desc.time = rip_column(imp->find_owner, 6);
     desc.status = sqlite3_column_int64(imp->find_owner, 7);
     desc.runtime = sqlite3_column_double(imp->find_owner, 8);
+    if (desc.stdin.empty()) desc.stdin = "/dev/null";
     // inputs
     bind_integer(why, imp->get_tree, 1, INPUT);
     bind_integer(why, imp->get_tree, 2, desc.job);
