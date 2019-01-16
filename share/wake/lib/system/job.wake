@@ -52,11 +52,14 @@ global def finish job inputs outputs =
   imp job inputs.implode outputs.implode
 
 global def hashpair f = memoize 0 ( # Pair file hash
-  def job = launch "." "." "" Nil ("<hash>", f, Nil)
-  def final _ = finish job Nil Nil
-  def _ = waitOne final job.status
+  def get f = prim "get_hash"
   def add f h = prim "add_hash"
-  if job.status == 0 then add f (head (extract '(.{32}).*' job.stdout)) else raise "Hashing failed"
+  def reuse = get f
+  if reuse !=* "" then add f reuse else
+    def job = launch "." "." "" Nil ("<hash>", f, Nil)
+    def final _ = finish job Nil Nil
+    def _ = waitOne final job.status
+    if job.status == 0 then add f (head (extract '(.{32}).*' job.stdout)) else raise "Hashing failed"
 )
 global def hashname f = (hashpair f).first  # just the filename
 global def hashcode f = (hashpair f).second # just the hashcode
