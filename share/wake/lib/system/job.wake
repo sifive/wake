@@ -59,7 +59,7 @@ global def hashpair f = memoize 0 ( # Pair file hash
     def job = launch "." "." "" Nil ("<hash>", f, Nil)
     def final _ = finish job Nil Nil
     def _ = waitOne final job.status
-    if job.status == 0 then add f (head (extract '(.{32}).*' job.stdout)) else raise "Hashing failed"
+    if job.status == 0 then add f (head (extract '(.{32}).*' job.stdout)) else raise "Failed to hash file {f}"
 )
 global def hashname f = (hashpair f).first  # just the filename
 global def hashcode f = (hashpair f).second # just the hashcode
