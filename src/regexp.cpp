@@ -35,7 +35,7 @@ TypeVar &RegExp::getType() {
 Hash RegExp::hash() const {
   Hash payload;
   std::string pattern = exp.pattern();
-  HASH(pattern.data(), pattern.size(), (long)type, payload);
+  hash4(pattern.data(), pattern.size(), type, payload);
   return payload;
 }
 

@@ -427,12 +427,13 @@ JobResult::JobResult(Database *db_, const std::string &dir, const std::string &s
   : Value(type), db(db_), state(0), code(), pid(0), job(-1), runtime(0), status(0)
 {
   std::vector<uint64_t> codes;
+  codes.push_back((long)type);
   Hash acc;
-  HASH(dir    .data(), dir    .size(), (long)type, acc); acc.push(codes);
-  HASH(stdin  .data(), stdin  .size(), (long)type, acc); acc.push(codes);
-  HASH(environ.data(), environ.size(), (long)type, acc); acc.push(codes);
-  HASH(cmdline.data(), cmdline.size(), (long)type, acc); acc.push(codes);
-  HASH(codes.data(), 8*codes.size(), (long)type, code);
+  hash3(dir    .data(), dir    .size(), acc); acc.push(codes);
+  hash3(stdin  .data(), stdin  .size(), acc); acc.push(codes);
+  hash3(environ.data(), environ.size(), acc); acc.push(codes);
+  hash3(cmdline.data(), cmdline.size(), acc); acc.push(codes);
+  hash3(codes.data(), 8*codes.size(), code);
 }
 
 static std::unique_ptr<Receiver> cast_jobresult(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, JobResult **job) {

@@ -45,10 +45,11 @@ void VarRef::format(std::ostream &os, int depth) const {
 }
 
 void VarRef::hash() {
-  uint64_t payload[2];
-  payload[0] = depth;
-  payload[1] = offset;
-  HASH(payload, 16, (long)type, hashcode);
+  uint64_t payload[3];
+  payload[0] = (long)type;
+  payload[1] = depth;
+  payload[2] = offset;
+  hash3(&payload[0], 24, hashcode);
 }
 
 void Subscribe::format(std::ostream &os, int depth) const {
@@ -66,7 +67,7 @@ void Memoize::format(std::ostream &os, int depth) const {
 
 void Memoize::hash() {
   body->hash();
-  HASH(&body->hashcode, sizeof(body->hashcode), (long)type, hashcode);
+  rehash(body->hashcode, type, hashcode);
 }
 
 void Match::format(std::ostream &os, int depth) const {
@@ -81,6 +82,7 @@ void Match::format(std::ostream &os, int depth) const {
 
 void Match::hash() {
   std::vector<uint64_t> codes;
+  codes.push_back((long)type);
   for (auto &a : args) {
     a->hash();
     a->hashcode.push(codes);
@@ -90,12 +92,12 @@ void Match::hash() {
     ss << p.pattern;
     std::string str = ss.str();
     Hash code;
-    HASH(str.data(), str.size(), (long)type, code);
+    hash3(str.c_str(), str.size()+1, code);
     code.push(codes);
     p.expr->hash();
     p.expr->hashcode.push(codes);
   }
-  HASH(codes.data(), codes.size()*8, (long)type, hashcode);
+  hash3(codes.data(), codes.size()*8, hashcode);
 }
 
 void App::format(std::ostream &os, int depth) const {
@@ -106,11 +108,12 @@ void App::format(std::ostream &os, int depth) const {
 
 void App::hash() {
   std::vector<uint64_t> codes;
+  codes.push_back((long)type);
   fn->hash();
   val->hash();
   fn->hashcode.push(codes);
   val->hashcode.push(codes);
-  HASH(codes.data(), codes.size()*8, (long)type, hashcode);
+  hash3(codes.data(), codes.size()*8, hashcode);
 }
 
 void Lambda::format(std::ostream &os, int depth) const {
@@ -120,7 +123,7 @@ void Lambda::format(std::ostream &os, int depth) const {
 
 void Lambda::hash() {
   body->hash();
-  HASH(&body->hashcode, sizeof(body->hashcode), (long)type, hashcode);
+  rehash(body->hashcode, type, hashcode);
 }
 
 void DefMap::format(std::ostream &os, int depth) const {
@@ -146,8 +149,8 @@ void Literal::format(std::ostream &os, int depth) const {
 }
 
 void Literal::hash() {
-  hashcode = value->hash();
-  HASH(&hashcode, sizeof(hashcode), (long)type, hashcode);
+  Hash h = value->hash();
+  rehash(h, type, hashcode);
 }
 
 void Prim::format(std::ostream &os, int depth) const {
@@ -155,7 +158,7 @@ void Prim::format(std::ostream &os, int depth) const {
 }
 
 void Prim::hash() {
-  HASH(name.data(), name.size(), (long)type, hashcode);
+  hash4(name.data(), name.size(), type, hashcode);
 }
 
 void Top::format(std::ostream &os, int depth) const {
@@ -190,6 +193,7 @@ void DefBinding::format(std::ostream &os, int depth) const {
 
 void DefBinding::hash() {
   std::vector<uint64_t> codes;
+  codes.push_back((long)type);
   for (auto &i : val) {
     i->hash();
     i->hashcode.push(codes);
@@ -200,7 +204,7 @@ void DefBinding::hash() {
   }
   body->hash();
   body->hashcode.push(codes);
-  HASH(codes.data(), codes.size()*8, (long)type, hashcode);
+  hash3(codes.data(), codes.size()*8, hashcode);
 }
 
 void Construct::format(std::ostream &os, int depth) const {
@@ -208,7 +212,7 @@ void Construct::format(std::ostream &os, int depth) const {
 }
 
 void Construct::hash() {
-  HASH(cons->ast.name.data(), cons->ast.name.size(), (long)type, hashcode);
+  hash4(cons->ast.name.data(), cons->ast.name.size(), type, hashcode);
 }
 
 void Destruct::format(std::ostream &os, int depth) const {
@@ -216,7 +220,7 @@ void Destruct::format(std::ostream &os, int depth) const {
 }
 
 void Destruct::hash() {
-  HASH(sum.name.data(), sum.name.size(), (long)type, hashcode);
+  hash4(sum.name.data(), sum.name.size(), type, hashcode);
 }
 
 std::ostream & operator << (std::ostream &os, const Expr *expr) {

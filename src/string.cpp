@@ -42,7 +42,7 @@ TypeVar &CatStream::getType() {
 Hash CatStream::hash() const {
   Hash payload;
   std::string data = str.str();
-  HASH(data.data(), data.size(), (long)type, payload);
+  hash4(data.data(), data.size(), type, payload);
   return payload;
 }
 

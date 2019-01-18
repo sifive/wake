@@ -91,7 +91,7 @@ Hash Binding::hash() const {
       if (top->next) top->next->hashcode.push(codes);
       for (int arg = 0; arg < top->nargs; ++arg)
         top->future[arg].value->hash().push(codes);
-      HASH(codes.data(), 8*codes.size(), 42, top->hashcode);
+      hash3(codes.data(), 8*codes.size(), top->hashcode);
       stack.pop_back();
     } else {
       // explore children, NO POP
