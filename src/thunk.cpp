@@ -97,6 +97,7 @@ struct MultiReceiver : public Receiver {
 };
 
 void MultiReceiver::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
+  (void)value; // we're just waiting for the value to be ready
   if (--shared->todo == 0)
     Finisher::finish(queue, std::move(shared->finisher));
 }

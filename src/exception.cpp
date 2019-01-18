@@ -46,7 +46,7 @@ static PRIMFN(prim_catch) {
 static PRIMTYPE(type_raise) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar);
-    // leave prim free
+  (void)out; // leave prim free
 }
 
 static PRIMFN(prim_raise) {

@@ -57,6 +57,7 @@ static PRIMTYPE(type_vset) {
 
 static PRIMFN(prim_vset) {
 //  EXPECT(3); allow Exceptions to be written into vectors
+  (void)data;
   INTEGER(arg1, 1);
   Data *vec = reinterpret_cast<Data*>(args[0].get());
   REQUIRE(mpz_cmp_si(arg1->value, 0) >= 0, "vset too small (< 0)");

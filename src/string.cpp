@@ -227,6 +227,7 @@ static PRIMTYPE(type_format) {
 
 static PRIMFN(prim_format) {
   REQUIRE(args.size() == 1, "prim_format expects 1 argument");
+  (void)data;
   std::stringstream buffer;
   args[0]->format(buffer, 0);
   auto out = std::make_shared<String>(buffer.str());
@@ -235,6 +236,7 @@ static PRIMFN(prim_format) {
 
 static PRIMFN(prim_iformat) {
   REQUIRE(args.size() == 1, "prim_iformat expects 1 argument");
+  (void)data;
   std::shared_ptr<Value> out;
   if (args[0]->type == Exception::type || args[0]->type == String::type) {
     out = args[0];
