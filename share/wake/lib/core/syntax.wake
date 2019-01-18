@@ -1,9 +1,8 @@
 # Syntax helpers
 
 # Flip function and object order
-global def x . f = f x
-global def x |-> f = f x
-global def x ↦ f = f x
+global def x . f = f x # obj.method-style syntax (. precedence > application)
+global def x | f = f x # bash-style pipe operator
 
 # Avoid ()s without changing order
 global def f $ x = f x

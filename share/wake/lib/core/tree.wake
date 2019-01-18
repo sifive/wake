@@ -75,8 +75,8 @@ global def a ⊇ b = tsubset b a
 global def a ⊉ b = !(a ⊇ b)
 global def a ⊈ b = !(a ⊆ b)
 
-global def a ⊊ b = a ⊆ b & b ⊈ a # strict
-global def a ⊋ b = a ⊇ b & b ⊉ a # strict
+global def a ⊊ b = a ⊆ b && b ⊈ a # strict
+global def a ⊋ b = a ⊇ b && b ⊉ a # strict
 
 # True if every element of a appears in b
 global def tsubset (Tree _ aroot) (Tree cmp broot) =
@@ -84,7 +84,7 @@ global def tsubset (Tree _ aroot) (Tree cmp broot) =
     Tip _ = True
     _ Tip = False
     _ (Bin _ bl bx br) = match (split bx cmp a)
-      Triple al _ ag = helper al bl & helper ag br
+      Triple al _ ag = helper al bl && helper ag br
   helper aroot broot
 
 # Remove ALL keys = y

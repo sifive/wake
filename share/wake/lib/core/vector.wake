@@ -40,7 +40,7 @@ global def vdrop i v = (vsplitAt i v).second
 global def vatOpt i (Vector v s e) =
   def get v i = prim "vget"
   def j = i+s
-  if i >= 0 & j < e then Some (get v j) else None
+  if i >= 0 && j < e then Some (get v j) else None
 
 global def vat i v = match (vatOpt i v)
   None   = raise "vat index out of bounds"
