@@ -8,6 +8,7 @@
 #include <iostream>
 #include <thread>
 #include <sstream>
+#include <random>
 #include "parser.h"
 #include "bind.h"
 #include "symbol.h"
@@ -19,6 +20,7 @@
 #include "sources.h"
 #include "database.h"
 #include "argagg.h"
+#include "hash.h"
 
 static WorkQueue queue;
 
@@ -179,6 +181,14 @@ int main(int argc, const char **argv) {
   bool quiet = args["quiet"];
   bool rerun = args["rerun"];
   queue.stack_trace = args["debug"];
+
+  // seed the keyed hash function
+  {
+    std::random_device rd;
+    std::uniform_int_distribution<uint64_t> dist;
+    sip_key[0] = dist(rd);
+    sip_key[1] = dist(rd);
+  }
 
   if (quiet && verbose) {
     std::cerr << "Cannot be both quiet and verbose!" << std::endl;

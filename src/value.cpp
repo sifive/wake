@@ -180,7 +180,7 @@ TypeVar &String::getType() {
 
 Hash String::hash() const {
   Hash payload;
-  HASH(value.data(), value.size(), (long)type, payload);
+  hash4(value.data(), value.size(), type, payload);
   return payload;
 }
 
@@ -191,7 +191,7 @@ TypeVar &Integer::getType() {
 
 Hash Integer::hash() const {
   Hash payload;
-  HASH(value[0]._mp_d, abs(value[0]._mp_size)*sizeof(mp_limb_t), (long)type, payload);
+  hash4(value[0]._mp_d, abs(value[0]._mp_size)*sizeof(mp_limb_t), type, payload);
   return payload;
 }
 
@@ -204,7 +204,7 @@ TypeVar &Exception::getType() {
 Hash Exception::hash() const {
   Hash payload;
   std::string str = to_str();
-  HASH(str.data(), str.size(), (long)type, payload);
+  hash4(str.data(), str.size(), type, payload);
   return payload;
 }
 
@@ -217,12 +217,13 @@ TypeVar &Closure::getType() {
 Hash Closure::hash() const {
   Hash out;
   std::vector<uint64_t> codes;
+  codes.push_back((long)Closure::type);
   lambda->hashcode.push(codes);
   if (binding) {
     assert (binding->flags & FLAG_HASH_POST);
     binding->hashcode.push(codes);
   }
-  HASH(codes.data(), 8*codes.size(), (long)Closure::type, out);
+  hash3(codes.data(), 8*codes.size(), out);
   return out;
 }
 
@@ -238,11 +239,12 @@ TypeVar &Data::getType() {
 Hash Data::hash() const {
   Hash out;
   std::vector<uint64_t> codes;
+  codes.push_back((long)cons);
   if (binding) {
     assert (binding->flags & FLAG_HASH_POST);
     binding->hashcode.push(codes);
   }
-  HASH(codes.data(), 8*codes.size(), (long)cons, out);
+  hash3(codes.data(), 8*codes.size(), out);
   return out;
 }
 

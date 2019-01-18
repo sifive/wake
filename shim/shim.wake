@@ -1,5 +1,5 @@
 global def buildShim variant =
-  def compile = compileC variant Nil (sources "src" 'MurmurHash3\..*')
+  def compile = compileC variant Nil (sources here '.*\.h')
   def cppFiles = sources here '.*\.cpp'
   def objFiles = map compile cppFiles
   linkO variant Nil objFiles "lib/wake/shim-wake"
