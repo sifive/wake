@@ -25,16 +25,6 @@
 
 #define ROTL(x, b) (uint64_t)(((x) << (b)) | ((x) >> (64 - (b))))
 
-#define U32TO8_LE(p, v)                                                        \
-    (p)[0] = (uint8_t)((v));                                                   \
-    (p)[1] = (uint8_t)((v) >> 8);                                              \
-    (p)[2] = (uint8_t)((v) >> 16);                                             \
-    (p)[3] = (uint8_t)((v) >> 24);
-
-#define U64TO8_LE(p, v)                                                        \
-    U32TO8_LE((p), (uint32_t)((v)));                                           \
-    U32TO8_LE((p) + 4, (uint32_t)((v) >> 32));
-
 #define U8TO64_LE(p)                                                           \
     (((uint64_t)((p)[0])) | ((uint64_t)((p)[1]) << 8) |                        \
      ((uint64_t)((p)[2]) << 16) | ((uint64_t)((p)[3]) << 24) |                 \
@@ -75,16 +65,16 @@
 #define TRACE
 #endif
 
-int siphash(const uint8_t *in, const size_t inlen, const uint8_t *k,
-            uint8_t *out, const size_t outlen) {
+uint64_t sip_key[2];
+int siphash(const void *inv, unsigned long inlen, uint64_t *out) {
+    const uint8_t *in = reinterpret_cast<const uint8_t*>(inv);
 
-    assert((outlen == 8) || (outlen == 16));
     uint64_t v0 = 0x736f6d6570736575ULL;
     uint64_t v1 = 0x646f72616e646f6dULL;
     uint64_t v2 = 0x6c7967656e657261ULL;
     uint64_t v3 = 0x7465646279746573ULL;
-    uint64_t k0 = U8TO64_LE(k);
-    uint64_t k1 = U8TO64_LE(k + 8);
+    uint64_t k0 = sip_key[0];
+    uint64_t k1 = sip_key[1];
     uint64_t m;
     int i;
     const uint8_t *end = in + inlen - (inlen % sizeof(uint64_t));
@@ -94,9 +84,7 @@ int siphash(const uint8_t *in, const size_t inlen, const uint8_t *k,
     v2 ^= k0;
     v1 ^= k1;
     v0 ^= k0;
-
-    if (outlen == 16)
-        v1 ^= 0xee;
+    v1 ^= 0xee;
 
     for (; in != end; in += 8) {
         m = U8TO64_LE(in);
@@ -137,20 +125,14 @@ int siphash(const uint8_t *in, const size_t inlen, const uint8_t *k,
 
     v0 ^= b;
 
-    if (outlen == 16)
-        v2 ^= 0xee;
-    else
-        v2 ^= 0xff;
+    v2 ^= 0xee;
 
     TRACE;
     for (i = 0; i < dROUNDS; ++i)
         SIPROUND;
 
     b = v0 ^ v1 ^ v2 ^ v3;
-    U64TO8_LE(out, b);
-
-    if (outlen == 8)
-        return 0;
+    out[0] = b;
 
     v1 ^= 0xdd;
 
@@ -159,7 +141,7 @@ int siphash(const uint8_t *in, const size_t inlen, const uint8_t *k,
         SIPROUND;
 
     b = v0 ^ v1 ^ v2 ^ v3;
-    U64TO8_LE(out + 8, b);
+    out[1] = b;
 
     return 0;
 }
