@@ -23,10 +23,10 @@ bin/wake:	$(patsubst %.cpp,%.o,$(wildcard src/*.cpp)) src/symbol.o
 lib/wake/fuse-wake:	fuse/fuse.cpp
 	$(CXX) -std=c++11 $(CFLAGS) `pkg-config --cflags fuse` $< -o $@ `pkg-config --libs fuse`
 
-lib/wake/shim-wake:	shim/shim.cpp
-	$(CXX) -std=c++11 $(CFLAGS) $< -o $@
+lib/wake/shim-wake:	$(patsubst %.cpp,%.o,$(wildcard shim/*.cpp))
+	$(CXX) -std=c++11 $(CFLAGS) -o $@ $^
 
-%.o:	%.cpp	$(filter-out src/version.h,$(wildcard src/*.h))
+%.o:	%.cpp	$(filter-out src/version.h,$(wildcard src/*.h) $(wildcard shim/*.h))
 	$(CXX) -std=c++11 $(CFLAGS) -I $(GMP_INC) -o $@ -c $<
 
 %.cpp:	%.re

@@ -1,25 +1,29 @@
 /* Wake vfork exec shim */
 #include <sys/errno.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
-#include "../src/MurmurHash3.cpp"
+#include "blake2.h"
+
+// Can increase to 64 if needed
+#define HASH_BYTES 32
 
 static int do_hash_dir() {
-  printf("00000000000000000000000000000000\n");
+  for (int i = 0; i < HASH_BYTES; ++i)
+    printf("00");
+  printf("\n");
   return 0;
 }
 
 static int do_hash(const char *file) {
   struct stat stat;
-  int fd;
-  uint8_t hash[16];
-  void *map;
+  int fd, got;
+  uint8_t hash[HASH_BYTES], buffer[8192];
+  blake2b_state S;
 
   fd = open(file, O_RDONLY);
   if (fd == -1) {
@@ -36,20 +40,19 @@ static int do_hash(const char *file) {
 
   if (S_ISDIR(stat.st_mode)) return do_hash_dir();
 
-  if (stat.st_size != 0) {
-    map = mmap(0, stat.st_size, PROT_READ, MAP_SHARED, fd, 0);
-    if (map == MAP_FAILED) {
-      perror("mmap");
-      return 1;
-    }
+  blake2b_init(&S, sizeof(hash));
+  while ((got = read(fd, &buffer[0], sizeof(buffer))) > 0)
+    blake2b_update(&S, &buffer[0], got);
+  blake2b_final(&S, &hash[0], sizeof(hash));
+
+  if (got < 0) {
+    perror("read");
+    return 1;
   }
 
-  MurmurHash3_x64_128(map, stat.st_size, 42, &hash[0]);
-  printf("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",
-    hash[ 0], hash[ 1], hash[ 2], hash[ 3],
-    hash[ 4], hash[ 5], hash[ 6], hash[ 7],
-    hash[ 8], hash[ 9], hash[10], hash[11],
-    hash[12], hash[13], hash[14], hash[15]);
+  for (int i = 0; i < (int)sizeof(hash); ++i)
+    printf("%02x", hash[i]);
+  printf("\n");
 
   return 0;
 }

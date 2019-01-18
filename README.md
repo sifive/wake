@@ -80,4 +80,5 @@ External dependencies:
 Internal dependencies:
  - argagg		MIT		https://github.com/vietjtnguyen/argagg
  - MurmurHash3		public domain	https://github.com/aappleby/smhasher
+ - BLAKE2		public domain	https://github.com/BLAKE2/libb2
  - whereami		WTFPLV2		https://github.com/gpakosz/whereami
