@@ -1,8 +1,8 @@
 #ifndef HASH_H
 #define HASH_H
 
-#include "MurmurHash3.h"
 #include <vector>
+#include <cstdint>
 
 struct Hash {
   uint64_t data[2];
@@ -18,6 +18,9 @@ static inline bool operator < (const Hash &x, const Hash &y) {
   return x.data[0] < y.data[0];
 }
 
-#define HASH(key, len, seed, hash) MurmurHash3_x64_128(key, len, seed, &hash.data);
+extern uint64_t sip_key[2];
+int siphash(const void *in, unsigned long inlen, uint64_t *out);
+
+#define HASH(key, len, ignore, hash) siphash(key, len, &hash.data[0]);
 
 #endif
