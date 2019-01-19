@@ -65,14 +65,14 @@ def hashname f = hashpair f | first  # just the filename
 def hashcode f = hashpair f | second # just the hashcode
 
 # A job where all inputs and outputs are known a-priori
-global def uncached_manual_job dir stdin env cmd inputs foutputs = memoize 1 (
+def uncached_manual_job dir stdin env cmd inputs foutputs = memoize 1 (
   def job = launch "." dir stdin env cmd
   def final _ = finish job (map hashname inputs) (map hashname (foutputs Unit))
   def _ = waitOne final job.status
   job
 )
 
-global def cached_manual_job dir stdin env cmd inputs foutputs =
+def cached_manual_job dir stdin env cmd inputs foutputs =
   def build _ = uncached_manual_job dir stdin env cmd inputs foutputs
   jobcache build dir stdin env cmd (map hashname inputs)
 
@@ -81,7 +81,7 @@ def wakepath = prim "execpath"
 
 # Still not caching, just hermetic
 def fusepath = relative workspace (simplify "{wakepath}/../lib/wake/fuse-wake")
-global def uncached_fuse_job dir stdin env cmd files = memoize 0 (
+def uncached_fuse_job dir stdin env cmd files = memoize 0 (
   def visible = dir, map hashname files
   def doit args =
     def fuse = primjob 0 "." "." "" "" args
@@ -102,12 +102,38 @@ global def uncached_fuse_job dir stdin env cmd files = memoize 0 (
   tryelse (raise _.cat) doit (fusepath, visible).implode
 )
 
-global def cached_fuse_job dir stdin env cmd files =
+def cached_fuse_job dir stdin env cmd files =
   def build _ = uncached_fuse_job dir stdin env cmd files
   jobcache build dir stdin env cmd (map hashname files)
 
 # Most jobs don't need explicit stdin/env control
 global def environment = subscribe environment
+
+data JobOutput =
+  FUSE
+  Manual (Unit => List String)
+
+# The Job API to get/set/edit jobs
+tuple Job =
+  global Command       List String
+  global Inputs        List String
+  Output JobOutput
+  global Environment   List String
+  global Directory     String
+  global StandardInput String
+  global Cache         Boolean
+
+global def makeJob cmd inputs =
+   Job cmd inputs FUSE environment "." "" True
+global def makeManualJob cmd inputs foutput =
+  Job cmd inputs (Manual foutput) environment "." "" True
+
+# Run the job!
+global def runJob (Job cmd inputs output env dir stdin cache) = match output cache
+  FUSE       True  = cached_fuse_job dir stdin env cmd inputs
+  FUSE       False = uncached_fuse_job dir stdin env cmd inputs
+  (Manual f) True  = cached_manual_job dir stdin env cmd inputs f
+  (Manual f) False = uncached_manual_job dir stdin env cmd inputs f
 
 # Whenever possible, use 'job' if:
 #   cmd can run under FUSE
@@ -117,7 +143,9 @@ global def environment = subscribe environment
 # job only allows cmd access to 'inputs', to prevent undeclared dependencies.
 # If you miss declared inputs, your build will fail so you can fix it.
 # If you declare too many inputs, cmd execution/replay will wait for unnecessary files.
-global def job cmd inputs = cached_fuse_job "." "" environment cmd inputs
+global def job cmd inputs =
+  makeJob cmd inputs
+  | runJob
 
 # Use always_job when:
 #   cmd can run under FUSE
@@ -127,7 +155,10 @@ global def job cmd inputs = cached_fuse_job "." "" environment cmd inputs
 # always_job only allows cmd access to 'inputs', to prevent undeclared dependencies.
 # If you miss declared inputs, your build will fail so you can fix it.
 # If you declare too many inputs, cmd execution/replay will wait for unnecessary files.
-global def always_job cmd inputs = uncached_fuse_job "." "" environment cmd inputs
+global def always_job cmd inputs =
+  makeJob cmd inputs
+  | setJobCache False
+  | runJob
 
 # Use manual_job when:
 #   cmd cannot run under FUSE, but you know which inputs and outputs cmd uses
@@ -140,7 +171,9 @@ global def always_job cmd inputs = uncached_fuse_job "." "" environment cmd inpu
 # If you declare too many inputs, cmd may be rerun and wait unnecessarily.
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
-global def manual_job cmd inputs foutputs = cached_manual_job "." "" environment cmd inputs foutputs
+global def manual_job cmd inputs foutputs =
+  makeManualJob cmd inputs foutputs
+  | runJob
 
 # Use volatile_job when:
 #   cmd cannot run under FUSE, but you know which inputs and outputs cmd uses
@@ -152,4 +185,7 @@ global def manual_job cmd inputs foutputs = cached_manual_job "." "" environment
 # If you declare too many inputs, cmd may wait unnecessarily.
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
-global def volatile_job cmd inputs foutputs = uncached_manual_job ".l" "" environment cmd inputs foutputs
+global def volatile_job cmd inputs foutputs =
+  makeManualJob cmd inputs foutputs
+  | setJobCache False
+  | runJob

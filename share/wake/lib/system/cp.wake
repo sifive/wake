@@ -4,8 +4,15 @@ global def cp x y =
 
 global def installAs dest file =
   def path = simplify "{dest}/.."
-  def alwaysCp x y = uncached_manual_job "." "" Nil (which "cp", file, dest, Nil) (file, Nil) (\_ dest, Nil)
-  def doit _ = alwaysCp file dest | outputs | map first # Nil if dest outside workspace
+  def cmd = which "cp", file, dest, Nil
+  def inputs = file, Nil
+  def foutputs _ = dest, Nil
+  def doit _ =
+    makeManualJob cmd inputs foutputs
+    | setJobEnvironment Nil
+    | runJob
+    | outputs
+    | map first # Nil if dest outside workspace
   waitAll (doit _) (mkdir 0775 path)
 
 global def installIn dir file =
