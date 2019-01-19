@@ -106,9 +106,6 @@ def cached_fuse_job dir stdin env cmd files =
   def build _ = uncached_fuse_job dir stdin env cmd files
   jobcache build dir stdin env cmd (map hashname files)
 
-# Most jobs don't need explicit stdin/env control
-global def environment = subscribe environment
-
 data JobOutput =
   FUSE
   Manual (Unit => List String)
@@ -123,8 +120,10 @@ tuple Job =
   global StandardInput String
   global Cache         Boolean
 
+# Most jobs don't need explicit stdin/env control
+
 global def makeJob cmd inputs =
-   Job cmd inputs FUSE environment "." "" True
+  Job cmd inputs FUSE environment "." "" True
 global def makeManualJob cmd inputs foutput =
   Job cmd inputs (Manual foutput) environment "." "" True
 

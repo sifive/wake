@@ -4,3 +4,5 @@ publish path = "/bin"
 
 global def path = catWith ":" (subscribe path)
 publish environment = "PATH={path}"
+
+global def environment = subscribe environment
