@@ -67,7 +67,7 @@ void JobResult::format(std::ostream &os, int p) const {
   if (p < 0) os << std::endl;
 }
 
-TypeVar JobResult::typeVar("Job", 0);
+TypeVar JobResult::typeVar("JobResult", 0);
 TypeVar &JobResult::getType() {
   return typeVar;
 }
