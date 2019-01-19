@@ -36,7 +36,7 @@ or that your colleagues already built, you might appreciate wake.
     did.  You can query that database at any time to find out exactly how a
     file in your workspace got there.
 
-  - intrinsicly-parallel language
+  - intrinsically-parallel language
 
     While your build orchestration files describe a sequence of compilation
     steps, the wake language automatically extracts parallelism.  Everything
