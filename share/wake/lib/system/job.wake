@@ -3,7 +3,7 @@ def primjob pool root dir stdin env cmd = prim "job_launch"
 def primcache dir stdin env cmd visible = prim "job_cache"
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
-global def jobcache build dir stdin env cmd visible = memoize 0 (
+def jobcache build dir stdin env cmd visible = memoize 0 (
   match (tryelse (\_ None) (Some _) (primcache dir stdin env.implode cmd.implode visible.implode))
     None     = build 0
     Some out =
@@ -22,7 +22,7 @@ global def jobcache build dir stdin env cmd visible = memoize 0 (
 #   stdin: file to attach to standard input ("" = nothing)
 #   env:   string list of all environement variables in the form key=value
 #   cmd:   string list of command arguments (head is the full path to the command)
-global def launch root dir stdin env cmd = primjob 1 root dir stdin env.implode cmd.implode
+def launch root dir stdin env cmd = primjob 1 root dir stdin env.implode cmd.implode
 
 def fail job ok =
   if job.status == 0 then ok else
@@ -47,11 +47,11 @@ global def output  job =
   else                  raise "more than one output found"
 
 # Complete a job, marking done and recording used inputs/outputs
-global def finish job inputs outputs =
+def finish job inputs outputs =
   def imp job inputs outputs = prim "job_finish" # ignored except on first call; blocks till exit; returns true
   imp job inputs.implode outputs.implode
 
-global def hashpair f = memoize 0 ( # Pair file hash
+def hashpair f = memoize 0 ( # Pair file hash
   def get f = prim "get_hash"
   def add f h = prim "add_hash"
   def reuse = get f
@@ -61,8 +61,8 @@ global def hashpair f = memoize 0 ( # Pair file hash
     def _ = waitOne final job.status
     if job.status == 0 then add f (head (extract '(.{64}).*' job.stdout)) else raise "Failed to hash file {f}"
 )
-global def hashname f = (hashpair f).first  # just the filename
-global def hashcode f = (hashpair f).second # just the hashcode
+def hashname f = hashpair f | first  # just the filename
+def hashcode f = hashpair f | second # just the hashcode
 
 # A job where all inputs and outputs are known a-priori
 global def uncached_manual_job dir stdin env cmd inputs foutputs = memoize 1 (
@@ -94,8 +94,8 @@ global def uncached_fuse_job dir stdin env cmd files = memoize 0 (
     def final _ = # run once job exits
       def status = kill fuse 14 # SIGALRM
       def result = extract "(.*\0)?\0(.*)" fuse.stdout
-      def inputs = (tokenize "\0" (at 0 result)).reverse.tail
-      def outputs = (tokenize "\0" (at 1 result)).reverse.tail
+      def inputs  = result | at 0 | tokenize "\0" | reverse | tail
+      def outputs = result | at 1 | tokenize "\0" | reverse | tail
       finish job inputs (map hashname outputs)
     def _ = waitOne final job.status
     job
@@ -152,4 +152,4 @@ global def manual_job cmd inputs foutputs = cached_manual_job "." "" environment
 # If you declare too many inputs, cmd may wait unnecessarily.
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
-global def volatile_job cmd inputs foutputs = uncached_manual_job "." "" environment cmd inputs foutputs
+global def volatile_job cmd inputs foutputs = uncached_manual_job ".l" "" environment cmd inputs foutputs

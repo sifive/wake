@@ -9,7 +9,7 @@ global def cat l =
 global def catWith s l =
   if l.empty then "" else
     def inserted = foldr (s, _, _) Nil l
-    cat (inserted.tail)
+    cat inserted.tail
 
 # String => List String of codepoints
 global def explode s = prim "explode"
