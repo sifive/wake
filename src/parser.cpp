@@ -595,11 +595,11 @@ static void check_cons_name(const AST &ast, Lexer &lex) {
   }
 }
 
-static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
+static AST parse_type_def(Lexer &lex) {
   lex.consume();
 
   AST def = parse_ast(0, lex);
-  if (!def) return;
+  if (!def) return def;
 
   if (def.name == "_" || Lexer::isLower(def.name.c_str())) {
     std::cerr << "Type name must be upper-case or operator, not "
@@ -624,9 +624,214 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
     }
   }
 
-  Sum sum(std::move(def));
-
   if (expect(EQUALS, lex)) lex.consume();
+
+  return def;
+}
+
+static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
+  if (name == "Integer" || name == "String" || name == "RegExp" ||
+      name == "CatStream" || name == "Exception" || name == FN ||
+      name == "JobResult" || name == "Array") {
+    std::cerr << "Constuctor " << name
+      << " is reserved at " << sump->location << "." << std::endl;
+    lex.fail = true;
+  }
+
+  if (name == "Boolean") {
+    if (sump->members.size() != 2 ||
+        sump->members[0].ast.args.size() != 0 ||
+        sump->members[1].ast.args.size() != 0) {
+      std::cerr << "Special constructor Boolean not defined correctly at "
+        << sump->location << "." << std::endl;
+      lex.fail = true;
+    }
+    Boolean = sump;
+  }
+
+  if (name == "Order") {
+    if (sump->members.size() != 3 ||
+        sump->members[0].ast.args.size() != 0 ||
+        sump->members[1].ast.args.size() != 0 ||
+        sump->members[2].ast.args.size() != 0) {
+      std::cerr << "Special constructor Order not defined correctly at "
+        << sump->location << "." << std::endl;
+      lex.fail = true;
+    }
+    Order = sump;
+  }
+
+  if (name == "List") {
+    if (sump->members.size() != 2 ||
+        sump->members[0].ast.args.size() != 0 ||
+        sump->members[1].ast.args.size() != 2) {
+      std::cerr << "Special constructor List not defined correctly at "
+        << sump->location << "." << std::endl;
+      lex.fail = true;
+    }
+    List = sump;
+  }
+
+  if (name == "Pair") {
+    if (sump->members.size() != 1 ||
+        sump->members[0].ast.args.size() != 2) {
+      std::cerr << "Special constructor Pair not defined correctly at "
+        << sump->location << "." << std::endl;
+      lex.fail = true;
+    }
+    Pair = sump;
+  }
+}
+
+static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top) {
+  AST def = parse_type_def(lex);
+  if (!def) return;
+
+  std::string name = def.name;
+  std::string tname = "destruct " + name;
+  Sum sum(std::move(def));
+  AST tuple(sum.location, std::string(sum.name));
+  std::vector<std::pair<std::string, bool> > members;
+
+  if (!expect(INDENT, lex)) return;
+  lex.consume();
+  expect(EOL, lex);
+  lex.consume();
+
+  bool repeat = true;
+  while (repeat) {
+    bool global = lex.next.type == GLOBAL;
+    if (global) lex.consume();
+
+    std::string mname = get_arg_loc(lex).first;
+
+    AST member = parse_ast(0, lex);
+    if (member) {
+      tuple.args.push_back(member);
+      members.emplace_back(mname, global);
+    }
+
+    switch (lex.next.type) {
+      case DEDENT:
+        repeat = false;
+        lex.consume();
+        expect(EOL, lex);
+      case EOL: {
+        lex.consume();
+        break;
+      }
+      default: {
+        std::cerr << "Unexpected end of tuple definition at " << lex.next.location << std::endl;
+        lex.fail = true;
+        repeat = false;
+        break;
+      }
+    }
+  }
+
+  sum.addConstructor(std::move(tuple));
+
+  Location location = sum.location;
+  Destruct *destruct = new Destruct(location, std::move(sum));
+  Sum *sump = &destruct->sum;
+  Expr *destructfn =
+    new Lambda(sump->location, "_",
+    new Lambda(sump->location, "_",
+    destruct));
+
+  Constructor &c = sump->members.back();
+  Expr *construct = new Construct(c.ast.location, sump, &c);
+  for (size_t i = 0; i < c.ast.args.size(); ++i)
+    construct = new Lambda(c.ast.location, "_", construct);
+
+  bind_def(lex, map, c.ast.name, construct);
+  bind_global(c.ast.name, top, lex);
+
+  bind_def(lex, map, tname, destructfn);
+  bind_global(tname, top, lex);
+
+  check_special(lex, name, sump);
+
+  // Create get/set/edit helper methods
+  int outer = 0;
+  for (auto &m : members) {
+    std::string &mname = m.first;
+    bool global = m.second;
+
+    // Implement get methods
+    Expr *getifn = new VarRef(sump->location, "_" + std::to_string(outer+1));
+    for (int inner = (int)members.size(); inner >= 0; --inner)
+      getifn = new Lambda(sump->location, "_" + std::to_string(inner), getifn);
+
+    std::string get = "get" + name + mname;
+    Expr *getfn =
+      new Lambda(sump->location, "_x",
+        new App(sump->location,
+          new App(sump->location,
+            new VarRef(sump->location, tname),
+            getifn),
+          new VarRef(sump->location, "_x")));
+
+    bind_def(lex, map, get, getfn);
+    bind_global(get, top, lex);
+
+    // Implement edit methods
+    Expr *editifn = new VarRef(sump->location, name);
+    for (int inner = 0; inner < (int)members.size(); ++inner)
+      editifn = new App(sump->location, editifn,
+        (inner == outer)
+        ? reinterpret_cast<Expr*>(new App(sump->location,
+           new VarRef(sump->location, "_f"),
+           new VarRef(sump->location, "_" + std::to_string(inner+1))))
+        : reinterpret_cast<Expr*>(new VarRef(sump->location, "_" + std::to_string(inner+1))));
+    for (int inner = (int)members.size(); inner >= 0; --inner)
+      editifn = new Lambda(sump->location, "_" + std::to_string(inner), editifn);
+
+    std::string edit = "edit" + name + mname;
+    Expr *editfn =
+      new Lambda(sump->location, "_f",
+        new Lambda(sump->location, "_x",
+          new App(sump->location,
+            new App(sump->location,
+              new VarRef(sump->location, tname),
+              editifn),
+            new VarRef(sump->location, "_x"))));
+
+    bind_def(lex, map, edit, editfn);
+    bind_global(edit, top, lex);
+
+    // Implement set methods
+    Expr *setifn = new VarRef(sump->location, name);
+    for (int inner = 0; inner < (int)members.size(); ++inner)
+      setifn = new App(sump->location, setifn,
+        (inner == outer)
+        ? reinterpret_cast<Expr*>(new VarRef(sump->location,"_v"))
+        : reinterpret_cast<Expr*>(new VarRef(sump->location, "_" + std::to_string(inner+1))));
+    for (int inner = (int)members.size(); inner >= 0; --inner)
+      setifn = new Lambda(sump->location, "_" + std::to_string(inner), setifn);
+
+    std::string set = "set" + name + mname;
+    Expr *setfn =
+      new Lambda(sump->location, "_v",
+        new Lambda(sump->location, "_x",
+          new App(sump->location,
+            new App(sump->location,
+              new VarRef(sump->location, tname),
+              setifn),
+            new VarRef(sump->location, "_x"))));
+
+    bind_def(lex, map, set, setfn);
+    bind_global(set, top, lex);
+
+    ++outer;
+  }
+}
+
+static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
+  AST def = parse_type_def(lex);
+  if (!def) return;
+
+  Sum sum(std::move(def));
 
   if (lex.next.type == INDENT) {
     lex.consume();
@@ -685,58 +890,7 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
   std::string tname = "destruct " + name;
   bind_def(lex, map, tname, destructfn);
   bind_global(tname, top, lex);
-
-  if (name == "Integer" || name == "String" || name == "RegExp" ||
-      name == "CatStream" || name == "Exception" || name == FN ||
-      name == "JobResult" || name == "Array") {
-    std::cerr << "Constuctor " << name
-      << " is reserved at " << sump->location << "." << std::endl;
-    lex.fail = true;
-  }
-
-  if (top && name == "Boolean") {
-    if (sump->members.size() != 2 ||
-        sump->members[0].ast.args.size() != 0 ||
-        sump->members[1].ast.args.size() != 0) {
-      std::cerr << "Special constructor Boolean not defined correctly at "
-        << sump->location << "." << std::endl;
-      lex.fail = true;
-    }
-    Boolean = sump;
-  }
-
-  if (top && name == "Order") {
-    if (sump->members.size() != 3 ||
-        sump->members[0].ast.args.size() != 0 ||
-        sump->members[1].ast.args.size() != 0 ||
-        sump->members[2].ast.args.size() != 0) {
-      std::cerr << "Special constructor Order not defined correctly at "
-        << sump->location << "." << std::endl;
-      lex.fail = true;
-    }
-    Order = sump;
-  }
-
-  if (top && name == "List") {
-    if (sump->members.size() != 2 ||
-        sump->members[0].ast.args.size() != 0 ||
-        sump->members[1].ast.args.size() != 2) {
-      std::cerr << "Special constructor List not defined correctly at "
-        << sump->location << "." << std::endl;
-      lex.fail = true;
-    }
-    List = sump;
-  }
-
-  if (top && name == "Pair") {
-    if (sump->members.size() != 1 ||
-        sump->members[0].ast.args.size() != 2) {
-      std::cerr << "Special constructor Pair not defined correctly at "
-        << sump->location << "." << std::endl;
-      lex.fail = true;
-    }
-    Pair = sump;
-  }
+  check_special(lex, name, sump);
 }
 
 static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top) {
@@ -749,6 +903,10 @@ static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top) {
       auto def = parse_def(lex, name);
       bind_def(lex, map, name, def);
       bind_global(name, top, lex);
+      break;
+    }
+    case TUPLE: {
+      parse_tuple(lex, map, top);
       break;
     }
     case DATA: {
@@ -818,6 +976,7 @@ void parse_top(Top &top, Lexer &lex) {
         parse_decl(defmap.map, lex, &top);
         break;
       }
+      case TUPLE:
       case DATA:
       case DEF: {
         parse_decl(defmap.map, lex, 0);

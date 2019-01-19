@@ -430,7 +430,7 @@ top:
 
       // keywords
       "def"       { return mkSym(DEF);       }
-      "val"       { return mkSym(VAL);       }
+      "tuple"     { return mkSym(TUPLE);     }
       "data"      { return mkSym(DATA);      }
       "global"    { return mkSym(GLOBAL);    }
       "publish"   { return mkSym(PUBLISH);   }
