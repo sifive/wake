@@ -321,7 +321,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
           std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
           exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
           lex.consume();
-          exprs.push_back(parse_block(lex, false));
+          exprs.push_back(parse_expr(lex));
           if (lex.next.type == EOL) lex.consume();
           ok &= expect(BCLOSE, lex);
           start.row = in.row;
@@ -357,17 +357,15 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
   if (exprs.size() == 1) {
     out = exprs.front();
   } else {
-    DefMap *map = new DefMap(LOCATION);
-    map->map["_catopen"]  = std::unique_ptr<Expr>(new Prim(LOCATION, "catopen"));
-    map->map["_catadd"]   = std::unique_ptr<Expr>(new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new Prim(LOCATION, "catadd"))));
-    map->map["_catclose"] = std::unique_ptr<Expr>(new Lambda(LOCATION, "_", new Prim(LOCATION, "catclose")));
-    map->map["_iformat"] = std::unique_ptr<Expr>(new Lambda(LOCATION, "_", new Prim(LOCATION, "iformat")));
-    Expr *body = new VarRef(LOCATION, "_catopen");
+    Expr *cat = new Prim(LOCATION, "catopen");
     for (auto expr : exprs)
-      body = new App(LOCATION, new App(LOCATION, new VarRef(LOCATION, "_catadd"), body),
-        new App(LOCATION, new VarRef(LOCATION, "_iformat"), expr));
-    map->body = std::unique_ptr<Expr>(new App(LOCATION, new VarRef(LOCATION, "_catclose"), body));
-    out = map;
+      cat = new App(LOCATION,
+        new App(LOCATION, new VarRef(LOCATION, "_catadd"), cat),
+        new App(LOCATION, new Lambda(LOCATION, "_", new Prim(LOCATION, "iformat")), expr));
+    cat = new App(LOCATION, new Lambda(LOCATION, "_", new Prim(LOCATION, "catclose")), cat);
+    cat = new App(LOCATION, new Lambda(LOCATION, "_catadd", cat),
+            new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new Prim(LOCATION, "catadd"))));
+    out = cat;
   }
 
   return ok;

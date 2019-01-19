@@ -65,6 +65,7 @@ static bool expectValue(const char *type, Lexer &lex) {
 static AST parse_ast(int p, Lexer &lex, bool makefirst = false, bool firstok = false);
 static Expr *parse_binary(int p, Lexer &lex, bool multiline);
 static Expr *parse_def(Lexer &lex, std::string &name);
+static Expr *parse_block(Lexer &lex, bool multiline);
 
 static int relabel_descend(Expr *expr, int index) {
   if (!(expr->flags & FLAG_TOUCHED)) {
@@ -916,7 +917,7 @@ static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top, bool global) {
   }
 }
 
-Expr *parse_block(Lexer &lex, bool multiline) {
+static Expr *parse_block(Lexer &lex, bool multiline) {
   TRACE("BLOCK");
   Expr *out;
 
@@ -960,6 +961,10 @@ Expr *parse_block(Lexer &lex, bool multiline) {
   }
 
   return out;
+}
+
+Expr *parse_expr(Lexer &lex) {
+  return parse_binary(0, lex, false);
 }
 
 void parse_top(Top &top, Lexer &lex) {
