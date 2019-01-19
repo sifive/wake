@@ -683,7 +683,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
   }
 }
 
-static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top) {
+static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
   AST def = parse_type_def(lex);
   if (!def) return;
 
@@ -745,10 +745,10 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top) {
     construct = new Lambda(c.ast.location, "_", construct);
 
   bind_def(lex, map, c.ast.name, construct);
-  bind_global(c.ast.name, top, lex);
+  if (global) bind_global(c.ast.name, top, lex);
 
   bind_def(lex, map, tname, destructfn);
-  bind_global(tname, top, lex);
+  if (global) bind_global(tname, top, lex);
 
   check_special(lex, name, sump);
 
@@ -773,7 +773,7 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top) {
           new VarRef(sump->location, "_x")));
 
     bind_def(lex, map, get, getfn);
-    bind_global(get, top, lex);
+    if (global) bind_global(get, top, lex);
 
     // Implement edit methods
     Expr *editifn = new VarRef(sump->location, name);
@@ -798,7 +798,7 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top) {
             new VarRef(sump->location, "_x"))));
 
     bind_def(lex, map, edit, editfn);
-    bind_global(edit, top, lex);
+    if (global) bind_global(edit, top, lex);
 
     // Implement set methods
     Expr *setifn = new VarRef(sump->location, name);
@@ -821,13 +821,13 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top) {
             new VarRef(sump->location, "_x"))));
 
     bind_def(lex, map, set, setfn);
-    bind_global(set, top, lex);
+    if (global) bind_global(set, top, lex);
 
     ++outer;
   }
 }
 
-static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
+static void parse_data(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
   AST def = parse_type_def(lex);
   if (!def) return;
 
@@ -884,16 +884,16 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top) {
       construct = new Lambda(c.ast.location, "_", construct);
 
     bind_def(lex, map, c.ast.name, construct);
-    bind_global(c.ast.name, top, lex);
+    if (global) bind_global(c.ast.name, top, lex);
   }
 
   std::string tname = "destruct " + name;
   bind_def(lex, map, tname, destructfn);
-  bind_global(tname, top, lex);
+  if (global) bind_global(tname, top, lex);
   check_special(lex, name, sump);
 }
 
-static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top) {
+static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top, bool global) {
   switch (lex.next.type) {
     default:
        std::cerr << "Missing DEF after GLOBAL at " << lex.next.location << std::endl;
@@ -902,15 +902,15 @@ static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top) {
       std::string name;
       auto def = parse_def(lex, name);
       bind_def(lex, map, name, def);
-      bind_global(name, top, lex);
+      if (global) bind_global(name, top, lex);
       break;
     }
     case TUPLE: {
-      parse_tuple(lex, map, top);
+      parse_tuple(lex, map, top, global);
       break;
     }
     case DATA: {
-      parse_data(lex, map, top);
+      parse_data(lex, map, top, global);
       break;
     }
   }
@@ -932,7 +932,7 @@ Expr *parse_block(Lexer &lex, bool multiline) {
     while (repeat) {
       switch (lex.next.type) {
         case DEF: {
-          parse_decl(map, lex, 0);
+          parse_decl(map, lex, 0, false);
           break;
         }
         case PUBLISH: {
@@ -973,13 +973,13 @@ void parse_top(Top &top, Lexer &lex) {
     switch (lex.next.type) {
       case GLOBAL: {
         lex.consume();
-        parse_decl(defmap.map, lex, &top);
+        parse_decl(defmap.map, lex, &top, true);
         break;
       }
       case TUPLE:
       case DATA:
       case DEF: {
-        parse_decl(defmap.map, lex, 0);
+        parse_decl(defmap.map, lex, &top,false);
         break;
       }
       case PUBLISH: {
