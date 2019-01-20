@@ -7,12 +7,11 @@ def jobcache build dir stdin env cmd visible = memoize 0 (
   match (tryelse (\_ None) (Some _) (primcache dir stdin env.implode cmd.implode visible.implode))
     None     = build 0
     Some out =
-      def notOk pair = hashcode pair.first !=* pair.second
-      match (find notOk out.outputs)
+      def notOk (Pair name hash) = hashcode name !=* hash
+      match (find notOk (tree out 2))
         None = out
         Some (Pair (Pair file saw) _) =
-          def expect = hashcode file
-          raise "Hash mismatch for {file} ({saw} != {expect}); remove it or run with -f"
+          raise "Hash mismatch for {file} ({saw} != {hashcode file}); remove it or run with -f"
 )
 
 # Launch a job, raw interface
@@ -25,8 +24,7 @@ def jobcache build dir stdin env cmd visible = memoize 0 (
 def launch root dir stdin env cmd = primjob 1 root dir stdin env.implode cmd.implode
 
 def fail job ok =
-  if job.status == 0 then ok else
-    raise "Non-zero exit status ({str job.status})"
+  if job.status == 0 then ok else raise "Non-zero exit status ({job.status})"
 
 # Access the output of a job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
@@ -35,16 +33,14 @@ global def kill    job signal = prim "job_kill" # s != 0 => kills; blocks till e
 global def status  job = kill  job 0
 global def stdout  job = stdio job 1
 global def stderr  job = stdio job 2
-global def inputs  job = fail job (tree job 1)
-global def outputs job = fail job (tree job 2)
-global def rawinputs  job = tree job 1
-global def rawoutputs job = tree job 2
-global def output  job =
-  def got = outputs job
-  def num = got.len
-  if      num == 1 then got.head.first
-  else if num == 0 then raise "no outputs available"
-  else                  raise "more than one output found"
+global def inputs  job = fail job job.rawinputs
+global def outputs job = fail job job.rawoutputs
+global def rawinputs  job = tree job 1 | map first
+global def rawoutputs job = tree job 2 | map first
+global def output = match _.outputs
+  x, Nil = x
+  Nil    = raise "no outputs available"
+  _      = raise "more than one output found"
 
 # Complete a job, marking done and recording used inputs/outputs
 def finish job inputs outputs =
@@ -59,7 +55,9 @@ def hashpair f = memoize 0 ( # Pair file hash
     def job = launch "." "." "" Nil ("<hash>", f, Nil)
     def final _ = finish job Nil Nil
     def _ = waitOne final job.status
-    if job.status == 0 then add f (head (extract '(.{64}).*' job.stdout)) else raise "Failed to hash file {f}"
+    if job.status == 0
+    then extract '(.{64}).*' job.stdout | head | add f
+    else raise "Failed to hash file {f}"
 )
 def hashname f = hashpair f | first  # just the filename
 def hashcode f = hashpair f | second # just the hashcode
