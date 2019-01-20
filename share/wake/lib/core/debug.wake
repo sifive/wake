@@ -1,10 +1,10 @@
-# Debug helper method
-global def print str = prim "print"
-global def println str = print "{str}\n"
-global def dbg any = print (format any)
-
 # Any => String conversion
 global def format any = prim "format"
+
+# Print any type to stdout; even exceptions
+def print_ str = prim "print"
+global def print   any = print_ (format any)
+global def println any = print_ "{format any}\n"
 
 # Wait for the top of a value to be made available, then run (f x)
 # Eg: x = 1, 2, 3, Nil; waitOne f x waits for ',' to be known vs. Nil
