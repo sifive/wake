@@ -2,8 +2,15 @@
 global data Unit = Unit
 
 # pairs
-global data Pair a b = Pair a b
+global tuple Pair a b =
+  global First  a
+  global Second b
+
+# Backwards compatibility
 global def first  (Pair x _) = x
 global def second (Pair _ x) = x
 
-global data Triple a b c = Triple a b c
+global tuple Triple a b c =
+  global First  a
+  global Second b
+  global Third  c
