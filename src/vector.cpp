@@ -52,7 +52,7 @@ static PRIMTYPE(type_vset) {
     args[0]->unify(vec) &&
     args[1]->unify(Integer::typeVar) &&
     args[2]->unify(vec[0]) &&
-    out->unify(Data::typeBoolean);
+    out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_vset) {
@@ -66,7 +66,7 @@ static PRIMFN(prim_vset) {
     queue,
     Binding::make_completer(vec->binding, mpz_get_si(arg1->value)),
     std::move(args[2]));
-  auto out = make_true();
+  auto out = make_unit();
   RETURN(out);
 }
 

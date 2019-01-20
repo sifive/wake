@@ -683,7 +683,7 @@ static PRIMTYPE(type_job_finish) {
     args[0]->unify(JobResult::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
-    out->unify(Data::typeBoolean);
+    out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_job_finish) {
@@ -725,7 +725,7 @@ static PRIMFN(prim_job_finish) {
   job->state |= STATE_FINISHED;
   job->process(queue);
 
-  auto out = make_true();
+  auto out = make_unit();
   RETURN(out);
 }
 

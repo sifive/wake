@@ -66,6 +66,10 @@ std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receive
   }
 }
 
+std::shared_ptr<Value> make_unit() {
+  return std::make_shared<Data>(&Unit->members[0], nullptr);
+}
+
 std::shared_ptr<Value> make_bool(bool x) {
   return std::make_shared<Data>(&Boolean->members[x?0:1], nullptr);
 }

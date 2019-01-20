@@ -251,14 +251,14 @@ static PRIMFN(prim_iformat) {
 static PRIMTYPE(type_print) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
-    out->unify(Data::typeBoolean);
+    out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_print) {
   EXPECT(1);
   STRING(arg0, 0);
   std::cerr << arg0->value;
-  auto out = make_true();
+  auto out = make_unit();
   RETURN(out);
 }
 

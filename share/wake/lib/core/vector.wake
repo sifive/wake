@@ -315,7 +315,7 @@ def vmapPartial f v =
     def vset o i v = prim "vset"
     def exec i = match (f (vat_ i v))
       Some x = vset out (vat_ i dest) x
-      None   = True
+      None   = Unit
     def _ = vappi exec leni
     Vector out 0 leno
   bind (vnew leno)

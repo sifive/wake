@@ -305,7 +305,7 @@ static PRIMFN(prim_files) {
 static PRIMTYPE(type_add_sources) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
-    out->unify(Data::typeBoolean);
+    out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_add_sources) {
@@ -329,7 +329,7 @@ static PRIMFN(prim_add_sources) {
   }
 
   distinct(*all);
-  auto out = make_true();
+  auto out = make_unit();
   RETURN(out);
 }
 

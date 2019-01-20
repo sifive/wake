@@ -54,15 +54,11 @@ std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receive
   } while(0)
 
 /* Useful expressions for primitives */
+std::shared_ptr<Value> make_unit();
 std::shared_ptr<Value> make_bool(bool x);
 std::shared_ptr<Value> make_order(int x);
 std::shared_ptr<Value> make_tuple(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second);
 std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values);
-#define make_true() make_bool(true)
-#define make_false() make_bool(false)
-#define make_LT() make_order(-1)
-#define make_EQ() make_order(0)
-#define make_GT() make_order(1)
 
 #define PRIM_PURE	1	// has no side-effects (can be duplicated / removed)
 #define PRIM_SHALLOW	2	// only wait for direct arguments (not children)
