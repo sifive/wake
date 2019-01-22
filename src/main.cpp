@@ -348,6 +348,7 @@ int main(int argc, const char **argv) {
     iter = iter->next.get();
   }
 
+  bool pass = true;
   for (size_t i = 0; i < targets.size(); ++i) {
     Value *v = outputs[targets.size()-1-i].get();
     std::cout << targets[i] << ": ";
@@ -355,17 +356,19 @@ int main(int argc, const char **argv) {
     types = &(*types)[1];
     std::cout << " = ";
     if (v) {
+      if (v->type == Exception::type) pass = false;
       if (verbose) {
         v->format(std::cout, -1);
       } else {
         std::cout << v << std::endl;
       }
     } else {
+      pass = false;
       std::cout << "MISSING FUTURE" << std::endl;
     }
   }
 
   //std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;
   db.clean(args["verbose"]);
-  return 0;
+  return pass?0:1;
 }
