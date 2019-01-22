@@ -8,6 +8,7 @@ struct Expr;
 
 bool expect(SymbolType type, Lexer &lex);
 void parse_top(Top &top, Lexer &lex);
+void parse_json(Top &top, JLexer &lex);
 Expr *parse_command(Lexer &lex);
 Expr *parse_expr(Lexer &lex);
 

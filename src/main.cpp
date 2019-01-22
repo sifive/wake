@@ -263,6 +263,14 @@ int main(int argc, const char **argv) {
     if (lex.fail) ok = false;
   }
 
+  for (auto i : sources(all_sources, ".", "(.*/)?[^/]+\\.wake\\.json")) {
+    if (verbose && queue.stack_trace)
+      std::cerr << "Parsing " << i << std::endl;
+    JLexer jlex(i->value.c_str());
+    parse_json(*top.get(), jlex);
+    if (jlex.fail) ok = false;
+  }
+
   std::vector<std::string> globals;
   if (args["globals"])
     for (auto &g : top->globals)

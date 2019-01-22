@@ -11,16 +11,27 @@
 //#define TRACE(x) do { fprintf(stderr, "%s\n", x); } while (0)
 #define TRACE(x) do { } while (0)
 
-bool expect(SymbolType type, Lexer &lex) {
-  if (lex.next.type != type) {
+bool expect(SymbolType type, Symbol &sym) {
+  if (sym.type != type) {
     std::cerr << "Was expecting a "
       << symbolTable[type] << ", but got a "
-      << symbolTable[lex.next.type] << " at "
-      << lex.next.location << std::endl;
-    lex.fail = true;
+      << symbolTable[sym.type] << " at "
+      << sym.location << std::endl;
     return false;
   }
   return true;
+}
+
+bool expect(SymbolType type, Lexer &lex) {
+  bool ok = expect(type, lex.next);
+  lex.fail |= !ok;
+  return ok;
+}
+
+bool expect(SymbolType type, JLexer &lex) {
+  bool ok = expect(type, lex.next);
+  lex.fail |= !ok;
+  return ok;
 }
 
 static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
@@ -438,7 +449,7 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
   return body;
 }
 
-static void bind_def(Lexer &lex, DefMap::defs &map, std::string name, Expr *def) {
+static void bind_def(bool &fail, DefMap::defs &map, std::string name, Expr *def) {
   if (name == "_")
     name += std::to_string(map.size());
 
@@ -448,9 +459,17 @@ static void bind_def(Lexer &lex, DefMap::defs &map, std::string name, Expr *def)
       << name << " at "
       << i->second->location << " and "
       << def->location << std::endl;
-    lex.fail = true;
+    fail = true;
   }
   map[name] = std::unique_ptr<Expr>(def);
+}
+
+static void bind_def(Lexer &lex, DefMap::defs &map, std::string name, Expr *def) {
+  return bind_def(lex.fail, map, name, def);
+}
+
+static void bind_def(JLexer &lex, DefMap::defs &map, std::string name, Expr *def) {
+  return bind_def(lex.fail, map, name, def);
 }
 
 static void publish_def(DefMap::defs &publish, const std::string &name, Expr *def) {
@@ -468,7 +487,7 @@ static void publish_def(DefMap::defs &publish, const std::string &name, Expr *de
       i->second.release()));
 }
 
-static void bind_global(const std::string &name, Top *top, Lexer &lex) {
+static void bind_global(const std::string &name, Top *top, bool &fail) {
   if (!top || name == "_") return;
 
   auto it = top->globals.find(name);
@@ -477,10 +496,18 @@ static void bind_global(const std::string &name, Top *top, Lexer &lex) {
       << name << " at "
       << top->defmaps.back()->map[name]->location << " and "
       << top->defmaps[it->second]->map[name]->location << std::endl;
-    lex.fail = true;
+    fail = true;
   } else {
     top->globals[name] = top->defmaps.size()-1;
   }
+}
+
+static void bind_global(const std::string &name, Top *top, Lexer &lex) {
+  return bind_global(name, top, lex.fail);
+}
+
+static void bind_global(const std::string &name, Top *top, JLexer &lex) {
+  return bind_global(name, top, lex.fail);
 }
 
 static void publish_seal(DefMap::defs &publish) {
@@ -1022,4 +1049,285 @@ Expr *parse_command(Lexer &lex) {
   auto out = parse_block(lex, false);
   expect(END, lex);
   return out;
+}
+
+static Expr *parse_jelement(JLexer &jlex, Top* top);
+
+static Expr *invalid_json(JLexer &jlex) {
+  jlex.fail = true;
+  jlex.consume();
+  return new Literal(jlex.next.location, std::make_shared<Integer>(0));
+}
+
+Expr *parse_jlist(JLexer &jlex) {
+  Expr *out = new VarRef(jlex.next.location, "Nil");
+  if (jlex.next.type == SCLOSE) return out;
+
+  std::vector<Expr*> exps;
+  bool repeat = true;
+  while (repeat) {
+    exps.push_back(parse_jelement(jlex, 0));
+    switch (jlex.next.type) {
+      case COMMA: {
+        jlex.consume();
+        break;
+      }
+      case SCLOSE: {
+        jlex.consume();
+        repeat = false;
+        break;
+      }
+      default: {
+        jlex.consume();
+        std::cerr << "Was expecting COMMA/SCLOSE, got a "
+          << symbolTable[jlex.next.type]
+          << " at " << jlex.next.location << std::endl;
+      }
+    }
+  }
+
+  for (auto i = exps.rbegin(); i != exps.rend(); ++i) {
+    out =
+      new App(jlex.next.location,
+        new App(jlex.next.location,
+          new VarRef(jlex.next.location, "binary ,"), *i), out);
+  }
+
+  return out;
+}
+
+Expr *parse_jargs(JLexer &jlex, Expr *inner) {
+  jlex.consume();
+  if (jlex.next.type == SCLOSE) return inner;
+
+  std::vector<std::string> args;
+  bool repeat = true;
+  while (repeat) {
+    std::string arg = "_";
+    if (expect(STR, jlex)) {
+      Literal *lit = reinterpret_cast<Literal*>(jlex.next.expr.get());
+      String *str = reinterpret_cast<String*>(lit->value.get());
+      arg = str->value;
+    }
+    jlex.consume();
+    args.push_back(std::move(arg));
+
+    switch (jlex.next.type) {
+      case COMMA: {
+        jlex.consume();
+        break;
+      }
+      case SCLOSE: {
+        jlex.consume();
+        repeat = false;
+        break;
+      }
+      default: {
+        jlex.consume();
+        std::cerr << "Was expecting COMMA/SCLOSE, got a "
+          << symbolTable[jlex.next.type]
+          << " at " << jlex.next.location << std::endl;
+      }
+    }
+  }
+
+  for (auto i = args.rbegin(); i != args.rend(); ++i)
+    inner = new Lambda(jlex.next.location, *i, inner);
+
+  return inner;
+}
+
+Expr *parse_jbody(JLexer &jlex) {
+  Location app = jlex.next.location;
+
+  expect(SOPEN, jlex);
+  jlex.consume();
+
+  if (jlex.next.type == SCLOSE) {
+    jlex.consume();
+    app.end = jlex.next.location.end;
+    return new VarRef(app, "Unit");
+  }
+
+  Expr *out = 0;
+  bool repeat = true;
+  while (repeat) {
+    Expr *next;
+    switch (jlex.next.type) {
+      case STR: {
+        Literal *lit = reinterpret_cast<Literal*>(jlex.next.expr.get());
+        String *str = reinterpret_cast<String*>(lit->value.get());
+        next = new VarRef(jlex.next.location, str->value);
+        jlex.consume();
+        break;
+      }
+      case SOPEN: {
+        next = parse_jbody(jlex);
+        break;
+      }
+      default: {
+        std::cerr << "Was expecting STR/SOPEN, got a "
+          << symbolTable[jlex.next.type]
+          << " at " << jlex.next.location << std::endl;
+        next = invalid_json(jlex);
+      }
+    }
+
+    app.end = next->location.end;
+    if (!out) {
+      out = next;
+    } else {
+      out = new App(app, out, next);
+    }
+
+    switch (jlex.next.type) {
+      case COMMA: {
+        jlex.consume();
+        break;
+      }
+      case SCLOSE: {
+        jlex.consume();
+        repeat = false;
+        break;
+      }
+      default: {
+        std::cerr << "Was expecting COMMA/SCLOSE, got a "
+          << symbolTable[jlex.next.type]
+          << " at " << jlex.next.location << std::endl;
+        jlex.consume();
+        jlex.fail = true;
+      }
+    }
+  }
+
+  return out;
+}
+
+Expr *parse_jobject(JLexer &jlex, Top *top) {
+  DefMap *defmap = new DefMap(jlex.next.location);
+  if (top) top->defmaps.emplace_back(defmap);
+  Expr *out = defmap;
+
+  jlex.consume();
+  if (jlex.next.type == BCLOSE && !top) {
+    std::cerr << "Empty objects not suppported by wake (must at least have a body) at "
+      << jlex.next.location << "." << std::endl;
+    return invalid_json(jlex);
+  }
+
+  bool repeat = true;
+  bool body = false;
+  while (repeat) {
+    // Extract the JSON key
+    std::string key = "bad";
+    if (expect(STR, jlex)) {
+      Literal *lit = reinterpret_cast<Literal*>(jlex.next.expr.get());
+      String *str = reinterpret_cast<String*>(lit->value.get());
+      key = str->value;
+    }
+    jlex.consume();
+
+    expect(COLON, jlex);
+    jlex.consume();
+
+    if (key == "body") {
+      if (top) {
+        std::cerr << "body cannot be defined for top-level at " <<
+          jlex.next.location << "." << std::endl;
+        return invalid_json(jlex);
+      } else {
+        body = true;
+        defmap->body = std::unique_ptr<Expr>(parse_jbody(jlex));
+      }
+    } else if (key == "args") {
+      if (top) {
+        std::cerr << "args cannot be defined for top-level at " <<
+          jlex.next.location << "." << std::endl;
+        return invalid_json(jlex);
+      } else {
+        out = parse_jargs(jlex, out);
+      }
+    } else {
+      Expr *value = parse_jelement(jlex, 0);
+      bind_def(jlex, defmap->map, key, value);
+      bind_global(key, top, jlex);
+    }
+
+    switch (jlex.next.type) {
+      case COMMA: {
+        jlex.consume();
+        break;
+      }
+      case BCLOSE: {
+        defmap->location.end = jlex.next.location.end;
+        jlex.consume();
+        repeat = false;
+        break;
+      }
+      default: {
+        std::cerr << "Was expecting COMMA/BCLOSE, got a "
+          << symbolTable[jlex.next.type]
+          << " at " << jlex.next.location << std::endl;
+      }
+    }
+  }
+
+  if (!body && !top) {
+    std::cerr << "Object without body at " << defmap->location << std::endl;
+    jlex.fail = true;
+  }
+
+  return out;
+}
+
+static Expr *parse_jelement(JLexer &jlex, Top* top) {
+  switch (jlex.next.type) {
+    case FLOAT: {
+      std::cerr << "Non-integer numbers not suppported by wake at "
+        << jlex.next.location << "." << std::endl;
+      return invalid_json(jlex);
+    }
+    case NULLVAL: {
+      std::cerr << "Null values numbers not suppported by wake at "
+        << jlex.next.location << "." << std::endl;
+      return invalid_json(jlex);
+    }
+    case STR: {
+      Expr *out = jlex.next.expr.release();
+      jlex.consume();
+      return out;
+    }
+    case NUM: {
+      Expr *out = jlex.next.expr.release();
+      jlex.consume();
+      return out;
+    }
+    case TRUE: {
+      Expr *out = new VarRef(jlex.next.location, "True");
+      jlex.consume();
+      return out;
+    }
+    case FALSE: {
+      Expr *out = new VarRef(jlex.next.location, "False");
+      jlex.consume();
+      return out;
+    }
+    case SOPEN: {
+      return parse_jlist(jlex);
+    }
+    case BOPEN: {
+      return parse_jobject(jlex, top);
+    }
+    default: {
+      std::cerr << "Unexpected symbol "
+        << symbolTable[jlex.next.type]
+          << " at " << jlex.next.location << std::endl;
+      return invalid_json(jlex);
+    }
+  }
+}
+
+void parse_json(Top &top, JLexer &jlex) {
+  parse_jelement(jlex, &top);
+  expect(END, jlex);
 }
