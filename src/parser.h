@@ -17,5 +17,6 @@ extern Sum *Boolean; // True | False
 extern Sum *Order; // LT | EQ | GT
 extern Sum *List; // Nil | a, b
 extern Sum *Pair; // Pair a b
+extern Sum *Unit; // Unit
 
 #endif

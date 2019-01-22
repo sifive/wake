@@ -12,7 +12,6 @@ global def installAs dest file =
     | setJobEnvironment Nil
     | runJob
     | outputs
-    | map first # Nil if dest outside workspace
   waitAll (doit _) (mkdir 0775 path)
 
 global def installIn dir file =
