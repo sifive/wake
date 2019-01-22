@@ -1051,7 +1051,7 @@ Expr *parse_command(Lexer &lex) {
   return out;
 }
 
-static Expr *parse_jelement(JLexer &jlex, Top* top);
+static Expr *parse_jelement(JLexer &jlex, Top* top, bool &publish);
 
 static Expr *invalid_json(JLexer &jlex) {
   jlex.fail = true;
@@ -1060,13 +1060,19 @@ static Expr *invalid_json(JLexer &jlex) {
 }
 
 Expr *parse_jlist(JLexer &jlex) {
+  jlex.consume();
+
   Expr *out = new VarRef(jlex.next.location, "Nil");
-  if (jlex.next.type == SCLOSE) return out;
+  if (jlex.next.type == SCLOSE) {
+    jlex.consume();
+    return out;
+  }
 
   std::vector<Expr*> exps;
   bool repeat = true;
+  bool publish;
   while (repeat) {
-    exps.push_back(parse_jelement(jlex, 0));
+    exps.push_back(parse_jelement(jlex, 0, publish));
     switch (jlex.next.type) {
       case COMMA: {
         jlex.consume();
@@ -1078,10 +1084,12 @@ Expr *parse_jlist(JLexer &jlex) {
         break;
       }
       default: {
-        jlex.consume();
         std::cerr << "Was expecting COMMA/SCLOSE, got a "
           << symbolTable[jlex.next.type]
           << " at " << jlex.next.location << std::endl;
+        jlex.fail = true;
+        repeat = false;
+        break;
       }
     }
   }
@@ -1098,7 +1106,10 @@ Expr *parse_jlist(JLexer &jlex) {
 
 Expr *parse_jargs(JLexer &jlex, Expr *inner) {
   jlex.consume();
-  if (jlex.next.type == SCLOSE) return inner;
+  if (jlex.next.type == SCLOSE) {
+    jlex.consume();
+    return inner;
+  }
 
   std::vector<std::string> args;
   bool repeat = true;
@@ -1123,10 +1134,12 @@ Expr *parse_jargs(JLexer &jlex, Expr *inner) {
         break;
       }
       default: {
-        jlex.consume();
         std::cerr << "Was expecting COMMA/SCLOSE, got a "
           << symbolTable[jlex.next.type]
           << " at " << jlex.next.location << std::endl;
+        jlex.fail = true;
+        repeat = false;
+        break;
       }
     }
   }
@@ -1157,7 +1170,14 @@ Expr *parse_jbody(JLexer &jlex) {
       case STR: {
         Literal *lit = reinterpret_cast<Literal*>(jlex.next.expr.get());
         String *str = reinterpret_cast<String*>(lit->value.get());
-        next = new VarRef(jlex.next.location, str->value);
+        if (str->value == "here") {
+          std::string name(jlex.next.location.file);
+          std::string::size_type cut = name.find_last_of('/');
+          if (cut == std::string::npos) name = "."; else name.resize(cut);
+          next = new Literal(jlex.next.location, std::make_shared<String>(std::move(name)));
+        } else {
+          next = new VarRef(jlex.next.location, str->value);
+        }
         jlex.consume();
         break;
       }
@@ -1170,6 +1190,7 @@ Expr *parse_jbody(JLexer &jlex) {
           << symbolTable[jlex.next.type]
           << " at " << jlex.next.location << std::endl;
         next = invalid_json(jlex);
+        break;
       }
     }
 
@@ -1194,8 +1215,9 @@ Expr *parse_jbody(JLexer &jlex) {
         std::cerr << "Was expecting COMMA/SCLOSE, got a "
           << symbolTable[jlex.next.type]
           << " at " << jlex.next.location << std::endl;
-        jlex.consume();
         jlex.fail = true;
+        repeat = false;
+        break;
       }
     }
   }
@@ -1203,7 +1225,7 @@ Expr *parse_jbody(JLexer &jlex) {
   return out;
 }
 
-Expr *parse_jobject(JLexer &jlex, Top *top) {
+Expr *parse_jobject(JLexer &jlex, Top *top, bool &publish) {
   DefMap *defmap = new DefMap(jlex.next.location);
   if (top) top->defmaps.emplace_back(defmap);
   Expr *out = defmap;
@@ -1217,6 +1239,7 @@ Expr *parse_jobject(JLexer &jlex, Top *top) {
 
   bool repeat = true;
   bool body = false;
+  bool child_publish;
   while (repeat) {
     // Extract the JSON key
     std::string key = "bad";
@@ -1247,10 +1270,19 @@ Expr *parse_jobject(JLexer &jlex, Top *top) {
       } else {
         out = parse_jargs(jlex, out);
       }
+    } else if (key == "publish") {
+      expect(TRUE, jlex);
+      jlex.consume();
+      publish = true;
     } else {
-      Expr *value = parse_jelement(jlex, 0);
-      bind_def(jlex, defmap->map, key, value);
-      bind_global(key, top, jlex);
+      child_publish = false;
+      Expr *value = parse_jelement(jlex, 0, child_publish);
+      if (child_publish) {
+        publish_def(defmap->publish, key, value);
+      } else {
+        bind_def(jlex, defmap->map, key, value);
+        bind_global(key, top, jlex);
+      }
     }
 
     switch (jlex.next.type) {
@@ -1268,6 +1300,9 @@ Expr *parse_jobject(JLexer &jlex, Top *top) {
         std::cerr << "Was expecting COMMA/BCLOSE, got a "
           << symbolTable[jlex.next.type]
           << " at " << jlex.next.location << std::endl;
+        jlex.fail = true;
+        repeat = false;
+        break;
       }
     }
   }
@@ -1277,10 +1312,11 @@ Expr *parse_jobject(JLexer &jlex, Top *top) {
     jlex.fail = true;
   }
 
+  publish_seal(defmap->publish);
   return out;
 }
 
-static Expr *parse_jelement(JLexer &jlex, Top* top) {
+static Expr *parse_jelement(JLexer &jlex, Top* top, bool &publish) {
   switch (jlex.next.type) {
     case FLOAT: {
       std::cerr << "Non-integer numbers not suppported by wake at "
@@ -1316,7 +1352,7 @@ static Expr *parse_jelement(JLexer &jlex, Top* top) {
       return parse_jlist(jlex);
     }
     case BOPEN: {
-      return parse_jobject(jlex, top);
+      return parse_jobject(jlex, top, publish);
     }
     default: {
       std::cerr << "Unexpected symbol "
@@ -1328,6 +1364,7 @@ static Expr *parse_jelement(JLexer &jlex, Top* top) {
 }
 
 void parse_json(Top &top, JLexer &jlex) {
-  parse_jelement(jlex, &top);
+  bool publish;
+  parse_jelement(jlex, &top, publish);
   expect(END, jlex);
 }
