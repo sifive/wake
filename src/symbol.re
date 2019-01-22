@@ -650,9 +650,36 @@ static bool lex_jstr(JLexer &lex, Expr *&out)
         re2c:yyfill:enable = 1;
         re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
         re2c:define:YYFILL:naked = 1;
+
+        hexd = [0-9a-fA-F] ;
+
         *                    { return false; }
         ["]                  { break; }
+        [\x00-\x1F]          { return false; }
         [^]                  { slice.append(in.tok, in.cur); continue; }
+
+	// Two surrogates => one character
+        "\\u" [dD] [89abAB] hexd{2} "\\u" [dD] [c-fC-F] hexd{2} {
+          uint32_t lo = lex_hex(in.tok,   in.tok+6);
+          uint32_t hi = lex_hex(in.tok+6, in.tok+12);
+          uint32_t x = ((lo & 0x3ff) << 10) + (hi & 0x3ff) + 0x10000;
+          if (!push_utf8(slice, x)) return false;
+          continue;
+        }
+	"\\u" hexd{4} {
+          uint32_t x = lex_hex(in.tok, in.cur);
+          if (!push_utf8(slice, x)) return false;
+          continue;
+        }
+        "\\b"                { slice.push_back('\b'); continue; }
+        "\\f"                { slice.push_back('\f'); continue; }
+        "\\n"                { slice.push_back('\n'); continue; }
+        "\\r"                { slice.push_back('\r'); continue; }
+        "\\t"                { slice.push_back('\t'); continue; }
+        "\\\\"               { slice.push_back('\\'); continue; }
+        "\\\""               { slice.push_back('"');  continue; }
+        "\\/"                { slice.push_back('/');  continue; }
+	"\\"                 { return false; }
     */
   }
 
