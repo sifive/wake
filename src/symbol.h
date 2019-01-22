@@ -6,9 +6,13 @@
 #include <cstdint>
 
 enum SymbolType {
+  // WAKE:
   ERROR, ID, OPERATOR, LITERAL, DEF, TUPLE, GLOBAL, PUBLISH, SUBSCRIBE, PRIM, LAMBDA,
   DATA, EQUALS, POPEN, PCLOSE, BOPEN, BCLOSE, IF, THEN, ELSE, HERE, MEMOIZE, END,
-  MATCH, EOL, INDENT, DEDENT
+  MATCH, EOL, INDENT, DEDENT,
+  // JSON:
+  // BOPEN, BCLOSE,
+  SOPEN, SCLOSE, COLON, COMMA, NULLVAL, TRUE, FALSE, NUM, FLOAT, STR
 };
 extern const char *symbolTable[];
 
@@ -41,6 +45,18 @@ struct Lexer {
   static bool isUpper(const char *str); // unicode-upper
   static bool isLower(const char *str); // unicode-letter \ unicode-upper
   static bool isOperator(const char *str);
+};
+
+struct JLexer {
+  std::unique_ptr<input_t> engine;
+  Symbol next;
+  bool fail;
+
+  JLexer(const char *file);
+  ~JLexer();
+
+  std::string text() const;
+  void consume();
 };
 
 struct op_type {
