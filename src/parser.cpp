@@ -1181,6 +1181,14 @@ Expr *parse_jbody(JLexer &jlex) {
         jlex.consume();
         break;
       }
+      case NUM:
+      case TRUE:
+      case FALSE:
+      case BOPEN: {
+        bool child_publish;
+        next = parse_jelement(jlex, 0, child_publish);
+        break;
+      }
       case SOPEN: {
         next = parse_jbody(jlex);
         break;
