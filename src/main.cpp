@@ -137,7 +137,7 @@ int main(int argc, const char **argv) {
     { "subtract", {"-s", "--subtract"},
       "remove a build target from wake", 1},
     { "list", {"-l", "--list"},
-      "list builds targets registed with wake", 0},
+      "list builds targets registered with wake", 0},
     { "output", {"-o", "--output"},
       "query which jobs have this output", 1},
     { "input", {"-i", "--input"},
