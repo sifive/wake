@@ -137,7 +137,7 @@ int main(int argc, const char **argv) {
     { "subtract", {"-s", "--subtract"},
       "remove a build target from wake", 1},
     { "list", {"-l", "--list"},
-      "list builds targets registed with wake", 0},
+      "list builds targets registered with wake", 0},
     { "output", {"-o", "--output"},
       "query which jobs have this output", 1},
     { "input", {"-i", "--input"},
@@ -158,6 +158,8 @@ int main(int argc, const char **argv) {
       "parse wake files and print the AST", 0},
     { "typecheck", {"-t", "--typecheck"},
       "type-check wake files and print the typed AST", 0},
+    { "globals", {"-g", "--globals"},
+      "print out all global variables", 0},
     { "init", {"--init"},
       "directory to configure as workspace top", 1},
   }};
@@ -261,10 +263,15 @@ int main(int argc, const char **argv) {
     if (lex.fail) ok = false;
   }
 
+  std::vector<std::string> globals;
+  if (args["globals"])
+    for (auto &g : top->globals)
+      globals.push_back(g.first);
+
   // Read all wake targets
   std::vector<std::string> target_names;
   Expr *body = new Lambda(LOCATION, "_", new Literal(LOCATION, "top"));
-  for (size_t i = 0; i < targets.size(); ++i) {
+  for (size_t i = 0; i < targets.size() + globals.size(); ++i) {
     body = new Lambda(LOCATION, "_", body);
     target_names.emplace_back("<target-" + std::to_string(i) + "-expression>");
   }
@@ -274,6 +281,9 @@ int main(int argc, const char **argv) {
     body = new App(LOCATION, body, parse_command(lex));
     if (lex.fail) ok = false;
   }
+  for (auto &g : globals)
+    body = new App(LOCATION, body, new VarRef(LOCATION, g));
+
   top->body = std::unique_ptr<Expr>(body);
 
   /* Primitives */
@@ -341,17 +351,21 @@ int main(int argc, const char **argv) {
   do { queue.run(); } while (jobtable.wait(queue));
 
   std::vector<std::shared_ptr<Value> > outputs;
-  outputs.reserve(targets.size());
+  outputs.reserve(targets.size()+globals.size());
   Binding *iter = reinterpret_cast<Closure*>(output.get())->binding.get();
-  for (size_t i = 0; i < targets.size(); ++i) {
+  for (size_t i = 0; i < targets.size()+globals.size(); ++i) {
     outputs.emplace_back(iter->future[0].value);
     iter = iter->next.get();
   }
 
   bool pass = true;
-  for (size_t i = 0; i < targets.size(); ++i) {
-    Value *v = outputs[targets.size()-1-i].get();
-    std::cout << targets[i] << ": ";
+  for (size_t i = 0; i < targets.size()+globals.size(); ++i) {
+    Value *v = outputs[targets.size()+globals.size()-1-i].get();
+    if (i < targets.size()) {
+      std::cout << targets[i] << ": ";
+    } else {
+      std::cout << globals[i-targets.size()] << ": ";
+    }
     (*types)[0].format(std::cout, body->typeVar);
     types = &(*types)[1];
     std::cout << " = ";
