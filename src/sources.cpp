@@ -104,40 +104,43 @@ std::string find_execpath() {
 static bool make_canonical(std::string &x) {
   bool abs = x[0] == '/';
 
+  std::stringstream str;
+  if (abs) str << "/";
+
   std::vector<std::string> tokens;
 
   size_t tok = 0;
   size_t scan = 0;
-  while ((scan = x.find_first_of('/', tok)) != std::string::npos) {
-    std::string token(x, tok, scan-tok);
+  bool repeat;
+  do {
+    scan = x.find_first_of('/', tok);
+    repeat = scan != std::string::npos;
+    std::string token(x, tok, repeat?(scan-tok):scan);
     tok = scan+1;
     if (token == "..") {
-      if (tokens.empty()) return false;
-      tokens.pop_back();
+      if (tokens.empty()) {
+        if (!abs) str << "../";
+      } else {
+        tokens.pop_back();
+      }
     } else if (!token.empty() && token != ".") {
       tokens.emplace_back(std::move(token));
     }
-  }
-
-  std::string token(x, tok);
-  if (token == "..") {
-    if (tokens.empty()) return false;
-    tokens.pop_back();
-  } else if (!token.empty() && token != ".") {
-    tokens.emplace_back(std::move(token));
-  }
+  } while (repeat);
 
   if (tokens.empty()) {
-    if (abs) x = ""; else x = ".";
+    if (abs) {
+      x = "/";
+    } else {
+      x = str.str();
+      if (x.empty()) x = "."; else x.resize(x.size()-1);
+    }
   } else {
-    std::stringstream str;
     str << tokens.front();
     for (auto i = tokens.begin() + 1; i != tokens.end(); ++i)
       str << "/" << *i;
     x = str.str();
   }
-
-  if (abs) x.insert(x.begin(), '/');
 
   return true;
 }
