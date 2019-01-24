@@ -6,7 +6,7 @@ def releaseLFlags = ("-flto", Nil)
 
 def doCompileC variant gcc flags headers file =
   def obj = replace '\.c(pp)?$' ".{variant}.o" file
-  def cmdline = gcc, flags ++ ("-c", file, "-o", obj, Nil)
+  def cmdline = gcc, flags ++ ("-c", file, "-frandom-seed={obj}", "-o", obj, Nil)
   def result = job cmdline (file, headers)
   result.output
 
