@@ -100,50 +100,58 @@ std::string find_execpath() {
   return exepath;
 }
 
-// true if possible, false if illegal (ie: . => ., hax/ => hax, foo/.././bar.z => bar.z, foo/../../bar.z => illegal, /foo => illegal)
-static bool make_canonical(std::string &x) {
+// . => ., hax/ => hax, foo/.././bar.z => bar.z, foo/../../bar.z => ../bar.z
+static std::string make_canonical(const std::string &x) {
   bool abs = x[0] == '/';
+
+  std::stringstream str;
+  if (abs) str << "/";
 
   std::vector<std::string> tokens;
 
   size_t tok = 0;
   size_t scan = 0;
-  while ((scan = x.find_first_of('/', tok)) != std::string::npos) {
-    std::string token(x, tok, scan-tok);
+  bool repeat;
+  bool pop = false;
+  do {
+    scan = x.find_first_of('/', tok);
+    repeat = scan != std::string::npos;
+    std::string token(x, tok, repeat?(scan-tok):scan);
     tok = scan+1;
     if (token == "..") {
-      if (tokens.empty()) return false;
-      tokens.pop_back();
+      if (!tokens.empty()) {
+        tokens.pop_back();
+      } else if (!abs) {
+        str << "../";
+        pop = true;
+      }
     } else if (!token.empty() && token != ".") {
       tokens.emplace_back(std::move(token));
     }
-  }
-
-  std::string token(x, tok);
-  if (token == "..") {
-    if (tokens.empty()) return false;
-    tokens.pop_back();
-  } else if (!token.empty() && token != ".") {
-    tokens.emplace_back(std::move(token));
-  }
+  } while (repeat);
 
   if (tokens.empty()) {
-    if (abs) x = ""; else x = ".";
+    if (abs) {
+      return "/";
+    } else {
+      if (pop) {
+        std::string out = str.str();
+        out.resize(out.size()-1);
+        return out;
+      } else {
+        return ".";
+      }
+    }
   } else {
-    std::stringstream str;
     str << tokens.front();
     for (auto i = tokens.begin() + 1; i != tokens.end(); ++i)
       str << "/" << *i;
-    x = str.str();
+    return str.str();
   }
-
-  if (abs) x.insert(x.begin(), '/');
-
-  return true;
 }
 
 // dir + path must be canonical
-static std::string make_relative(std::string &dir, std::string &path) {
+static std::string make_relative(std::string &&dir, std::string &&path) {
   if ((!path.empty() && path[0] == '/') !=
       (!dir .empty() && dir [0] == '/')) {
     return path;
@@ -195,10 +203,8 @@ std::string get_cwd() {
 std::vector<std::shared_ptr<String> > find_all_sources() {
   std::vector<std::shared_ptr<String> > out;
   scan(out, ".");
-  std::string cwd = get_cwd();
   std::string abs_libdir = find_execpath() + "/../share/wake/lib";
-  make_canonical(abs_libdir);
-  std::string rel_libdir = make_relative(cwd, abs_libdir);
+  std::string rel_libdir = make_relative(get_cwd(), make_canonical(abs_libdir));
   push_files(out, rel_libdir);
   distinct(out);
   return out;
@@ -248,8 +254,7 @@ static PRIMFN(prim_sources) {
   STRING(arg0, 0);
   STRING(arg1, 1);
 
-  std::string root(arg0->value);
-  REQUIRE(make_canonical(root), "base directory cannot be made canonical (too many ..s?)");
+  std::string root = make_canonical(arg0->value);
 
   RE2::Options options;
   options.set_log_errors(false);
@@ -277,8 +282,7 @@ static PRIMFN(prim_files) {
   STRING(arg0, 0);
   STRING(arg1, 1);
 
-  std::string root(arg0->value);
-  REQUIRE(make_canonical(root), "base directory cannot be made canonical (too many ..s?)");
+  std::string root = make_canonical(arg0->value);
 
   RE2::Options options;
   options.set_log_errors(false);
@@ -319,11 +323,7 @@ static PRIMFN(prim_add_sources) {
   for (const char *scan = tok; scan != end; ++scan) {
     if (*scan == 0 && scan != tok) {
       std::string name(tok);
-      if (make_canonical(name)) {
-        all->emplace_back(std::make_shared<String>(std::move(name)));
-      } else {
-        std::cerr << "Warning: Published source '" << name << "' has too many ..s; skipped" << std::endl;
-      }
+      all->emplace_back(std::make_shared<String>(make_canonical(name)));
       tok = scan+1;
     }
   }
@@ -343,9 +343,7 @@ static PRIMFN(prim_simplify) {
   EXPECT(1);
   STRING(arg0, 0);
 
-  auto out = std::make_shared<String>(arg0->value);
-  bool ok = make_canonical(out->value);
-  REQUIRE(ok, "path has too many ..s");
+  auto out = std::make_shared<String>(make_canonical(arg0->value));
   RETURN(out);
 }
 
@@ -358,20 +356,12 @@ static PRIMTYPE(type_relative) {
 
 static PRIMFN(prim_relative) {
   EXPECT(2);
-  STRING(arg0, 0);
-  STRING(arg1, 1);
+  STRING(dir, 0);
+  STRING(path, 1);
 
-  bool ok;
-
-  std::string dir(arg0->value);
-  ok = make_canonical(dir);
-  REQUIRE(ok, "dir escapes wake workspace");
-
-  std::string path(arg1->value);
-  ok = make_canonical(path);
-  REQUIRE(ok, "path escapes wake workspace");
-
-  auto out = std::make_shared<String>(make_relative(dir, path));
+  auto out = std::make_shared<String>(make_relative(
+    make_canonical(dir->value),
+    make_canonical(path->value)));
   RETURN(out);
 }
 
