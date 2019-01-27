@@ -352,7 +352,7 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
       map->body.release(),
       new VarRef(prototype.location, "_a" + std::to_string(
         get_expansion(&prototype.tree, expand)->var))));
-    return map;
+    return std::unique_ptr<Expr>(map.release());
   } else {
     PatternRef &p = patterns[1];
     ++p.uses;
@@ -466,7 +466,7 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
       return nullptr;
     }
   }
-  return map;
+  return std::unique_ptr<Expr>(map.release());
 }
 
 static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding *binding) {
