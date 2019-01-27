@@ -55,11 +55,11 @@ or that your colleagues already built, you might appreciate wake.
 
 On Mac OS with Mac Ports installed:
 
-    sudo port install osxfuse sqlite3 gmp re2 re2c libutf8proc
+    sudo port install osxfuse sqlite3 gmp re2 re2c libutf8proc pkgconfig
 
 On Debian/Ubuntu:
 
-    sudo apt-get install libfuse-dev libsqlite3-dev libgmp-dev libre2-dev re2c libutf8proc-dev
+    sudo apt-get install libfuse-dev libsqlite3-dev libgmp-dev libre2-dev re2c libutf8proc-dev pkg-config
 
 # Building wake
 
