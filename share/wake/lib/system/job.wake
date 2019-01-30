@@ -24,20 +24,20 @@ def jobcache build dir stdin env cmd visible = memoize 0 (
 def launch root dir stdin env cmd = primjob 1 root dir stdin env.implode cmd.implode
 
 def fail job ok =
-  if job.status == 0 then ok else raise "Non-zero exit status ({job.status})"
+  if job.getJobStatus == 0 then ok else raise "Non-zero exit status ({job.getJobStatus})"
 
 # Access the output of a job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
 def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
-global def kill    job signal = prim "job_kill" # s != 0 => kills; blocks till exit; return status
-global def status  job = kill  job 0
-global def stdout  job = stdio job 1
-global def stderr  job = stdio job 2
-global def inputs  job = fail job job.rawinputs
-global def outputs job = fail job job.rawoutputs
-global def rawinputs  job = tree job 1 | map first
-global def rawoutputs job = tree job 2 | map first
-global def output = match _.outputs
+global def killJob job signal = prim "job_kill" # s != 0 => kills; blocks till exit; return status
+global def getJobStatus  job = killJob  job 0
+global def getJobStdout  job = stdio job 1
+global def getJobStderr  job = stdio job 2
+global def getJobInputs  job = fail job job.getJobRawInputs
+global def getJobOutputs job = fail job job.getJobRawOutputs
+global def getJobRawInputs  job = tree job 1 | map first
+global def getJobRawOutputs job = tree job 2 | map first
+global def getJobOutput = match _.getJobOutputs
   x, Nil = x
   Nil    = raise "no outputs available"
   _      = raise "more than one output found"
@@ -54,9 +54,9 @@ def hashpair f = memoize 0 ( # Pair file hash
   if reuse !=* "" then add f reuse else
     def job = launch "." "." "" Nil ("<hash>", f, Nil)
     def final _ = finish job Nil Nil
-    def _ = waitOne final job.status
-    if job.status == 0
-    then extract '(.{64}).*' job.stdout | head | add f
+    def _ = waitOne final job.getJobStatus
+    if job.getJobStatus == 0
+    then extract '(.{64}).*' job.getJobStdout | head | add f
     else raise "Failed to hash file {f}"
 )
 def hashname f = hashpair f | first  # just the filename
@@ -66,7 +66,7 @@ def hashcode f = hashpair f | second # just the hashcode
 def uncached_manual_job dir stdin env cmd inputs foutputs = memoize 1 (
   def job = launch "." dir stdin env cmd
   def final _ = finish job (map hashname inputs) (map hashname (foutputs Unit))
-  def _ = waitOne final job.status
+  def _ = waitOne final job.getJobStatus
   job
 )
 
@@ -84,18 +84,18 @@ def uncached_fuse_job dir stdin env cmd files = memoize 0 (
   def doit args =
     def fuse = primjob 0 "." "." "" "" args
     def endfuse _ = finish fuse Nil Nil
-    def _ = waitOne endfuse fuse.status
-    def err = fuse.stderr
+    def _ = waitOne endfuse fuse.getJobStatus
+    def err = fuse.getJobStderr
     def handle _ = raise "Could not start fuse-wake: {err}"
     def list = try handle (extract 'OK: (.*)' err)
     def job = launch list.head dir stdin env cmd
     def final _ = # run once job exits
-      def status = kill fuse 14 # SIGALRM
-      def result = extract "(.*\0)?\0(.*)" fuse.stdout
+      def status = killJob fuse 14 # SIGALRM
+      def result = extract "(.*\0)?\0(.*)" fuse.getJobStdout
       def inputs  = result | at 0 | tokenize "\0" | reverse | tail
       def outputs = result | at 1 | tokenize "\0" | reverse | tail
       finish job inputs (map hashname outputs)
-    def _ = waitOne final job.status
+    def _ = waitOne final job.getJobStatus
     job
   tryelse (raise _.cat) doit (fusepath, visible).implode
 )

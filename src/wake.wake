@@ -2,12 +2,12 @@ def re2c file =
   def cpp = replace '\.re$' ".cpp" file
   def cmdline = which "re2c", "-8", "--no-generation-date", file, "-o", cpp, Nil
   def result = job cmdline (file, Nil)
-  result.output
+  result.getJobOutput
 
 def version_h _ =
   def cmdline = which "git", "describe", "--tags", "--dirty", Nil
   def git = volatile_job cmdline Nil (\_ Nil)
-  def body = "#define VERSION {git.stdout}"
+  def body = "#define VERSION {git.getJobStdout}"
   write 0644 "{here}/version.h" body
 
 global def buildWake variant =

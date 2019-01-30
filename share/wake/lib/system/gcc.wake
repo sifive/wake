@@ -8,13 +8,13 @@ def doCompileC variant gcc flags headers file =
   def obj = replace '\.c(pp)?$' ".{variant}.o" file
   def cmdline = gcc, flags ++ ("-c", file, "-frandom-seed={obj}", "-o", obj, Nil)
   def result = job cmdline (file, headers)
-  result.output
+  result.getJobOutput
 
 def doLinkO variant linker flags objs file =
   def cmdline = (linker, "-o", "{file}.{variant}", objs) ++ flags
   def outdir = simplify "{file}/.."
   def result = job cmdline (outdir, objs)
-  result.output
+  result.getJobOutput
 
 def makeCompileC variant gcc flags =
   Pair variant (\extra doCompileC variant gcc (flags ++ extra))

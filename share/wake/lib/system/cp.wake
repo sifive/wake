@@ -11,7 +11,7 @@ global def installAs dest file =
     makeManualPlan cmd inputs foutputs
     | setPlanEnvironment Nil
     | makeJob
-    | outputs
+    | getJobOutputs
   waitAll (doit _) (mkdir 0775 path)
 
 global def installIn dir file =
