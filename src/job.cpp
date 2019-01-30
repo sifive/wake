@@ -87,8 +87,8 @@ struct Task {
   : job(job_), root(root_), dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_), stack(stack_) { }
 };
 
-// A Job is a forked job not yet merged
-struct Job {
+// A JobEntry is a forked job not yet merged
+struct JobEntry {
   int pool;
   std::shared_ptr<JobResult> job;
   int internal;
@@ -96,17 +96,17 @@ struct Job {
   int pipe_stderr;
   struct timeval start;
   pid_t pid;
-  Job() : pid(0) { }
+  JobEntry() : pid(0) { }
   double runtime(struct timeval now);
 };
 
-double Job::runtime(struct timeval now) {
+double JobEntry::runtime(struct timeval now) {
   return now.tv_sec - start.tv_sec + (now.tv_usec - start.tv_usec)/1000000.0;
 }
 
 // Implementation details for a JobTable
 struct JobTable::detail {
-  std::vector<Job> table;
+  std::vector<JobEntry> table;
   std::vector<std::list<Task> > tasks;
   sigset_t sigset;
   Database *db;
