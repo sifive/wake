@@ -5,15 +5,14 @@ def releaseCFlags = ("-Wall", "-O2", "-flto", Nil)
 def releaseLFlags = ("-flto", Nil)
 
 def doCompileC variant gcc flags headers file =
-  def obj = replace '\.c(pp)?$' ".{variant}.o" file
-  def cmdline = gcc, flags ++ ("-c", file, "-frandom-seed={obj}", "-o", obj, Nil)
+  def obj = replace '\.c(pp)?$' ".{variant}.o" file.getPathName
+  def cmdline = gcc, flags ++ ("-c", file.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
   def result = job cmdline (file, headers)
   result.getJobOutput
 
 def doLinkO variant linker flags objs file =
-  def cmdline = (linker, "-o", "{file}.{variant}", objs) ++ flags
-  def outdir = simplify "{file}/.."
-  def result = job cmdline (outdir, objs)
+  def cmdline = (linker, "-o", "{file}.{variant}", map getPathName objs) ++ flags
+  def result = job cmdline (makePath "{file}/..", objs)
   result.getJobOutput
 
 def makeCompileC variant gcc flags =

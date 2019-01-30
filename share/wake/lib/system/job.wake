@@ -1,3 +1,34 @@
+# Paths differ from Strings in that they have been hashed; their content is frozen
+data Path = Path String
+global def getPathName (Path name) = name
+
+# Convert a file name into a path.
+# If you use this method, name must never be an output of a Job.
+global def makePath name = Path (hashname (simplify name))
+
+def hashname f = hashpair f | first  # just the filename
+def hashcode f = hashpair f | second # just the hashcode
+def hashpair f = memoize 0 ( # Pair file hash
+  def get f = prim "get_hash"
+  def add f h = prim "add_hash"
+  def reuse = get f
+  if reuse !=* "" then add f reuse else
+    def job = launch "." "." "" Nil ("<hash>", f, Nil)
+    def final _ = finish job Nil Nil
+    def _ = waitOne final job.getJobStatus
+    if job.getJobStatus == 0
+    then extract '(.{64}).*' job.getJobStdout | head | add f
+    else raise "Failed to hash file {f}"
+)
+
+global def write mode path content =
+  def imp m p c = prim "write"
+  makePath (imp mode path content)
+
+global def mkdir mode path =
+  def imp m p = prim "mkdir"
+  Path (imp mode path)
+
 # The internal function operates on imploded strings, not lists
 def primjob pool root dir stdin env cmd = prim "job_launch"
 def primcache dir stdin env cmd visible = prim "job_cache"
@@ -11,7 +42,7 @@ def jobcache build dir stdin env cmd visible = memoize 0 (
       match (find notOk (tree out 2))
         None = out
         Some (Pair (Pair file saw) _) =
-          raise "Hash mismatch for {file} ({saw} != {hashcode file}); remove it or run with -f"
+          raise "Hash mismatch for {file} ({saw} != {hashcode file}); remove it"
 )
 
 # Launch a job, raw interface
@@ -35,8 +66,8 @@ global def getJobStdout  job = stdio job 1
 global def getJobStderr  job = stdio job 2
 global def getJobInputs  job = fail job job.getJobRawInputs
 global def getJobOutputs job = fail job job.getJobRawOutputs
-global def getJobRawInputs  job = tree job 1 | map first
-global def getJobRawOutputs job = tree job 2 | map first
+global def getJobRawInputs  job = tree job 1 | map first | map makePath
+global def getJobRawOutputs job = tree job 2 | map first | map makePath
 global def getJobOutput = match _.getJobOutputs
   x, Nil = x
   Nil    = raise "no outputs available"
@@ -47,32 +78,18 @@ def finish job inputs outputs =
   def imp job inputs outputs = prim "job_finish" # ignored except on first call; blocks till exit; returns true
   imp job inputs.implode outputs.implode
 
-def hashpair f = memoize 0 ( # Pair file hash
-  def get f = prim "get_hash"
-  def add f h = prim "add_hash"
-  def reuse = get f
-  if reuse !=* "" then add f reuse else
-    def job = launch "." "." "" Nil ("<hash>", f, Nil)
-    def final _ = finish job Nil Nil
-    def _ = waitOne final job.getJobStatus
-    if job.getJobStatus == 0
-    then extract '(.{64}).*' job.getJobStdout | head | add f
-    else raise "Failed to hash file {f}"
-)
-def hashname f = hashpair f | first  # just the filename
-def hashcode f = hashpair f | second # just the hashcode
 
 # A job where all inputs and outputs are known a-priori
 def uncached_manual_job dir stdin env cmd inputs foutputs = memoize 1 (
   def job = launch "." dir stdin env cmd
-  def final _ = finish job (map hashname inputs) (map hashname (foutputs Unit))
+  def final _ = finish job (map hashname (map getPathName inputs)) (map hashname (foutputs Unit))
   def _ = waitOne final job.getJobStatus
   job
 )
 
 def cached_manual_job dir stdin env cmd inputs foutputs =
   def build _ = uncached_manual_job dir stdin env cmd inputs foutputs
-  jobcache build dir stdin env cmd (map hashname inputs)
+  jobcache build dir stdin env cmd (map hashname (map getPathName inputs))
 
 # Location of wake itself
 def wakepath = prim "execpath"
@@ -80,7 +97,7 @@ def wakepath = prim "execpath"
 # Still not caching, just hermetic
 def fusepath = relative workspace (simplify "{wakepath}/../lib/wake/fuse-wake")
 def uncached_fuse_job dir stdin env cmd files = memoize 0 (
-  def visible = dir, map hashname files
+  def visible = dir, map hashname (map getPathName files)
   def doit args =
     def fuse = primjob 0 "." "." "" "" args
     def endfuse _ = finish fuse Nil Nil
@@ -102,7 +119,7 @@ def uncached_fuse_job dir stdin env cmd files = memoize 0 (
 
 def cached_fuse_job dir stdin env cmd files =
   def build _ = uncached_fuse_job dir stdin env cmd files
-  jobcache build dir stdin env cmd (map hashname files)
+  jobcache build dir stdin env cmd (map hashname (map getPathName files))
 
 data JobOutput =
   FUSE
@@ -111,7 +128,7 @@ data JobOutput =
 # The Job API to get/set/edit jobs
 tuple Plan =
   global Command       List String
-  global Inputs        List String
+  global Visible       List Path
   Output JobOutput
   global Environment   List String
   global Directory     String
