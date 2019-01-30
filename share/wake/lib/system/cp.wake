@@ -8,9 +8,9 @@ global def installAs dest file =
   def inputs = file, Nil
   def foutputs _ = dest, Nil
   def doit _ =
-    makeManualJob cmd inputs foutputs
-    | setJobEnvironment Nil
-    | runJob
+    makeManualPlan cmd inputs foutputs
+    | setPlanEnvironment Nil
+    | makeJob
     | outputs
   waitAll (doit _) (mkdir 0775 path)
 

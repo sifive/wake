@@ -109,7 +109,7 @@ data JobOutput =
   Manual (Unit => List String)
 
 # The Job API to get/set/edit jobs
-tuple Job =
+tuple Plan =
   global Command       List String
   global Inputs        List String
   Output JobOutput
@@ -120,13 +120,13 @@ tuple Job =
 
 # Most jobs don't need explicit stdin/env control
 
-global def makeJob cmd inputs =
-  Job cmd inputs FUSE environment "." "" True
-global def makeManualJob cmd inputs foutput =
-  Job cmd inputs (Manual foutput) environment "." "" True
+global def makePlan cmd inputs =
+  Plan cmd inputs FUSE environment "." "" True
+global def makeManualPlan cmd inputs foutput =
+  Plan cmd inputs (Manual foutput) environment "." "" True
 
 # Run the job!
-global def runJob (Job cmd inputs output env dir stdin cache) = match output cache
+global def makeJob (Plan cmd inputs output env dir stdin cache) = match output cache
   FUSE       True  = cached_fuse_job dir stdin env cmd inputs
   FUSE       False = uncached_fuse_job dir stdin env cmd inputs
   (Manual f) True  = cached_manual_job dir stdin env cmd inputs f
@@ -141,8 +141,8 @@ global def runJob (Job cmd inputs output env dir stdin cache) = match output cac
 # If you miss declared inputs, your build will fail so you can fix it.
 # If you declare too many inputs, cmd execution/replay will wait for unnecessary files.
 global def job cmd inputs =
-  makeJob cmd inputs
-  | runJob
+  makePlan cmd inputs
+  | makeJob
 
 # Use always_job when:
 #   cmd can run under FUSE
@@ -153,9 +153,9 @@ global def job cmd inputs =
 # If you miss declared inputs, your build will fail so you can fix it.
 # If you declare too many inputs, cmd execution/replay will wait for unnecessary files.
 global def always_job cmd inputs =
-  makeJob cmd inputs
-  | setJobCache False
-  | runJob
+  makePlan cmd inputs
+  | setPlanCache False
+  | makeJob
 
 # Use manual_job when:
 #   cmd cannot run under FUSE, but you know which inputs and outputs cmd uses
@@ -169,8 +169,8 @@ global def always_job cmd inputs =
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
 global def manual_job cmd inputs foutputs =
-  makeManualJob cmd inputs foutputs
-  | runJob
+  makeManualPlan cmd inputs foutputs
+  | makeJob
 
 # Use volatile_job when:
 #   cmd cannot run under FUSE, but you know which inputs and outputs cmd uses
@@ -183,6 +183,6 @@ global def manual_job cmd inputs foutputs =
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
 global def volatile_job cmd inputs foutputs =
-  makeManualJob cmd inputs foutputs
-  | setJobCache False
-  | runJob
+  makeManualPlan cmd inputs foutputs
+  | setPlanCache False
+  | makeJob
