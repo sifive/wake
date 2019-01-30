@@ -6,7 +6,7 @@ def re2c file =
 
 def version_h _ =
   def cmdline = which "git", "describe", "--tags", "--dirty", Nil
-  def git = volatile_job cmdline Nil (\_ Nil)
+  def git = volatileJob cmdline Nil (\_ Nil)
   def body = "#define VERSION {git.getJobStdout}"
   write 0644 "{here}/version.h" body
 

@@ -144,45 +144,45 @@ global def job cmd inputs =
   makePlan cmd inputs
   | makeJob
 
-# Use always_job when:
+# Use alwaysJob when:
 #   cmd can run under FUSE
 #   cmd output can differ between invocations
 # Examples:
 #   date
-# always_job only allows cmd access to 'inputs', to prevent undeclared dependencies.
+# alwaysJob only allows cmd access to 'inputs', to prevent undeclared dependencies.
 # If you miss declared inputs, your build will fail so you can fix it.
 # If you declare too many inputs, cmd execution/replay will wait for unnecessary files.
-global def always_job cmd inputs =
+global def alwaysJob cmd inputs =
   makePlan cmd inputs
   | setPlanCache False
   | makeJob
 
-# Use manual_job when:
+# Use manualJob when:
 #   cmd cannot run under FUSE, but you know which inputs and outputs cmd uses
 #   cmd guarantees to produce the same outputs given the same inputs
 # Examples:
 #   vcs
 # cmd will have access to the entire workspace.
-# manual_job behaves like normal target rule in a Makefile.
+# manualJob behaves like normal target rule in a Makefile.
 # If you miss declared inputs, your build is not reproducible and may run in the wrong order.
 # If you declare too many inputs, cmd may be rerun and wait unnecessarily.
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
-global def manual_job cmd inputs foutputs =
+global def manualJob cmd inputs foutputs =
   makeManualPlan cmd inputs foutputs
   | makeJob
 
-# Use volatile_job when:
+# Use volatileJob when:
 #   cmd cannot run under FUSE, but you know which inputs and outputs cmd uses
 #   cmd output can differ between invocations
 # Examples:
 #   ???
-# volatile_job behaves like a PHONY target in a Makefile.
+# volatileJob behaves like a PHONY target in a Makefile.
 # If you miss declared inputs, your build is not reproducible and may run in the wrong order.
 # If you declare too many inputs, cmd may wait unnecessarily.
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
-global def volatile_job cmd inputs foutputs =
+global def volatileJob cmd inputs foutputs =
   makeManualPlan cmd inputs foutputs
   | setPlanCache False
   | makeJob
