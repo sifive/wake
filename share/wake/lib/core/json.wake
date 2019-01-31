@@ -10,9 +10,25 @@ global data JValue =
 
 global def parseJSON file = prim "json"
 
-def escape str = "\"{str}\"" # !!!
+global def escape =
+  def fmt t x =
+    if      x == 0xa then '\n', t
+    else if x == 0x9 then '\t', t
+    else if x == 0xd then '\r', t
+    else if x <  16  then '\u000', strbase 16 x, t
+    else                  '\u00',  strbase 16 x, t
+  def helper = match _
+    s, c, t = s, str2bin c | fmt (helper t)
+    x = x
+  _
+  | replace '[\\"]' '\\\0'
+  | replace "\0" '\\u0000'
+  | replace '[\x01-\x1f]' "\0\\0\0"
+  | tokenize "\0"
+  | helper
+
 def format rhs = match _
-  JString  s    = escape s, rhs
+  JString  s    = '"', escape s ++ ('"', rhs)
   JInteger i    = str i,    rhs
   JReal    r    = r,        rhs
   JBoolean True = "true",   rhs
@@ -23,7 +39,7 @@ def format rhs = match _
     if list.empty then '[]', rhs
     else '[', foldr helper (']', rhs) list | tail
   JObject  list =
-    def helper (Pair key value) acc = ',', escape key, ':', format acc value
+    def helper (Pair key value) acc = ',', '"', escape key ++ ('":', format acc value)
     if list.empty then '{}', rhs
     else '{', foldr helper ('}', rhs) list | tail
 
