@@ -49,7 +49,21 @@ void String::format(std::ostream &os, int p) const {
     case '\r': os << "\\r"; break;
     case '\t': os << "\\t"; break;
     case '\v': os << "\\v"; break;
-    default: os << ch; break;
+    default: {
+      unsigned char c = ch;
+      if (c < 10) {
+        os << "\\x0" << (char)('0' + c);
+      } else if (c < 0x10) {
+        os << "\\x0" << (char)('a' + c - 10);
+      } else if (c < 0x10 + 10) {
+        os << "\\x1" << (char)('0' + c - 16);
+      } else if (c < 0x20) {
+        os << "\\x1" << (char)('a' + c - 16 - 10);
+      } else {
+        os << ch;
+      }
+      break;
+    }
   }
   os << "\"";
   if (p < 0) os << std::endl;
