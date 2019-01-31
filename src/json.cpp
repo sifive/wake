@@ -3,14 +3,15 @@
 #include "symbol.h"
 #include "expr.h"
 #include "parser.h"
-#include <iostream>
+#include <sstream>
 
-static bool expect(SymbolType type, JLexer &jlex) {
+static bool expect(SymbolType type, JLexer &jlex, std::ostream& errs) {
   if (jlex.next.type != type) {
-    std::cerr << "Was expecting a "
-      << symbolTable[type] << ", but got a "
-      << symbolTable[jlex.next.type] << " at "
-      << jlex.next.location << std::endl;
+    if (!jlex.fail)
+      errs << "Was expecting a "
+        << symbolTable[type] << ", but got a "
+        << symbolTable[jlex.next.type] << " at "
+        << jlex.next.location;
     jlex.fail = true;
     return false;
   }
@@ -31,9 +32,9 @@ static std::shared_ptr<Value> getJValue(JLexer &jlex, int member) {
   return getJValue(std::move(lit->value), member);
 }
 
-static std::shared_ptr<Value> parse_jelement(JLexer &jlex);
+static std::shared_ptr<Value> parse_jelement(JLexer &jlex, std::ostream& errs);
 
-static std::shared_ptr<Value> parse_jlist(JLexer &jlex) {
+static std::shared_ptr<Value> parse_jlist(JLexer &jlex, std::ostream& errs) {
   jlex.consume();
 
   bool repeat = true;
@@ -45,7 +46,7 @@ static std::shared_ptr<Value> parse_jlist(JLexer &jlex) {
   }
 
   while (repeat) {
-    values.emplace_back(parse_jelement(jlex));
+    values.emplace_back(parse_jelement(jlex, errs));
     switch (jlex.next.type) {
       case COMMA: {
         jlex.consume();
@@ -57,9 +58,10 @@ static std::shared_ptr<Value> parse_jlist(JLexer &jlex) {
         break;
       }
       default: {
-        std::cerr << "Was expecting COMMA/SCLOSE, got a "
-          << symbolTable[jlex.next.type]
-          << " at " << jlex.next.location << std::endl;
+        if (!jlex.fail)
+          errs << "Was expecting COMMA/SCLOSE, got a "
+            << symbolTable[jlex.next.type]
+            << " at " << jlex.next.location;
         jlex.fail = true;
         repeat = false;
         break;
@@ -71,7 +73,7 @@ done:
   return getJValue(make_list(std::move(values)), 6);
 }
 
-static std::shared_ptr<Value> parse_jobject(JLexer &jlex) {
+static std::shared_ptr<Value> parse_jobject(JLexer &jlex, std::ostream& errs) {
   jlex.consume();
 
   bool repeat = true;
@@ -85,16 +87,16 @@ static std::shared_ptr<Value> parse_jobject(JLexer &jlex) {
   while (repeat) {
     // Extract the JSON key
     std::shared_ptr<Value> key;
-    if (expect(STR, jlex)) {
+    if (expect(STR, jlex, errs)) {
       Literal *lit = reinterpret_cast<Literal*>(jlex.next.expr.get());
       key = std::move(lit->value);
     }
     jlex.consume();
 
-    expect(COLON, jlex);
+    expect(COLON, jlex, errs);
     jlex.consume();
 
-    values.emplace_back(make_tuple(std::move(key), parse_jelement(jlex)));
+    values.emplace_back(make_tuple(std::move(key), parse_jelement(jlex, errs)));
 
     switch (jlex.next.type) {
       case COMMA: {
@@ -107,9 +109,10 @@ static std::shared_ptr<Value> parse_jobject(JLexer &jlex) {
         break;
       }
       default: {
-        std::cerr << "Was expecting COMMA/BCLOSE, got a "
-          << symbolTable[jlex.next.type]
-          << " at " << jlex.next.location << std::endl;
+        if (!jlex.fail)
+          errs << "Was expecting COMMA/BCLOSE, got a "
+            << symbolTable[jlex.next.type]
+            << " at " << jlex.next.location;
         jlex.fail = true;
         repeat = false;
         break;
@@ -121,7 +124,7 @@ done:
   return getJValue(make_list(std::move(values)), 5);
 }
 
-static std::shared_ptr<Value> parse_jelement(JLexer &jlex) {
+static std::shared_ptr<Value> parse_jelement(JLexer &jlex, std::ostream& errs) {
   switch (jlex.next.type) {
     case FLOAT: {
       auto out = getJValue(jlex, 2);
@@ -151,16 +154,17 @@ static std::shared_ptr<Value> parse_jelement(JLexer &jlex) {
       return getJValue(make_bool(false), 3);
     }
     case SOPEN: {
-      return parse_jlist(jlex);
+      return parse_jlist(jlex, errs);
     }
     case BOPEN: {
-      return parse_jobject(jlex);
+      return parse_jobject(jlex, errs);
     }
     default: {
+      if (!jlex.fail)
+        errs << "Unexpected symbol "
+          << symbolTable[jlex.next.type]
+          << " at " << jlex.next.location;
       jlex.fail = true;
-      std::cerr << "Unexpected symbol "
-        << symbolTable[jlex.next.type]
-          << " at " << jlex.next.location << std::endl;
       return nullptr;
     }
   }
@@ -176,8 +180,10 @@ static PRIMFN(prim_json) {
   EXPECT(1);
   STRING(file, 0);
   JLexer jlex(file->value.c_str());
-  auto out = parse_jelement(jlex);
-  expect(END, jlex);
+  std::stringstream errs;
+  auto out = parse_jelement(jlex, errs);
+  expect(END, jlex, errs);
+  if (jlex.fail) RAISE(errs.str());
   RETURN(out);
 }
 
