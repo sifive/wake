@@ -294,6 +294,7 @@ int main(int argc, const char **argv) {
   prim_register_integer(pmap);
   prim_register_exception(pmap);
   prim_register_regexp(pmap);
+  prim_register_json(pmap);
   prim_register_job(&jobtable, pmap);
   prim_register_sources(&all_sources, pmap);
 
