@@ -2,9 +2,9 @@
 global def format any = prim "format"
 
 # Print any type to stdout; even exceptions
-def print_ str = prim "print"
-global def print   any = print_ (format any)
-global def println any = print_ "{format any}\n"
+global def puts str = prim "print"
+global def print   any = puts (format any)
+global def println any = puts "{format any}\n"
 
 # Wait for the top of a value to be made available, then run (f x)
 # Eg: x = 1, 2, 3, Nil; waitOne f x waits for ',' to be known vs. Nil
