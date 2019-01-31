@@ -1,0 +1,30 @@
+# The JSON data type
+global data JValue =
+  JString  String
+  JInteger Integer
+  JReal    String
+  JBoolean Boolean
+  JNull
+  JObject  (List (Pair String JValue))
+  JArray   (List JValue)
+
+global def parseJSON file = prim "json"
+
+def escape str = "\"{str}\"" # !!!
+def format rhs = match _
+  JString  s    = escape s, rhs
+  JInteger i    = str i,    rhs
+  JReal    r    = r,        rhs
+  JBoolean True = "true",   rhs
+  JBoolean False= "false",  rhs
+  JNull         = "null",   rhs
+  JArray   list =
+    def helper value acc = ',', format acc value
+    if list.empty then '[]', rhs
+    else '[', foldr helper (']', rhs) list | tail
+  JObject  list =
+    def helper (Pair key value) acc = ',', escape key, ':', format acc value
+    if list.empty then '{}', rhs
+    else '{', foldr helper ('}', rhs) list | tail
+
+global def formatJSON x = format Nil x | cat

@@ -18,5 +18,6 @@ extern Sum *Order; // LT | EQ | GT
 extern Sum *List; // Nil | a, b
 extern Sum *Pair; // Pair a b
 extern Sum *Unit; // Unit
+extern Sum *JValue; // JString String | JInteger Integer | JReal String | JBoolean Boolean | JNull | JObject  List (Pair String JValue) | JArray List JValue
 
 #endif

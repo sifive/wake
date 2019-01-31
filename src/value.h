@@ -83,6 +83,7 @@ struct Data : public Value {
   static TypeVar typeBoolean;
   static TypeVar typeOrder;
   static TypeVar typeUnit;
+  static TypeVar typeJValue;
   // these two are const to prevent unify() on them; use clone
   static const TypeVar typeList;
   static const TypeVar typePair;

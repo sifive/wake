@@ -587,6 +587,7 @@ Sum *Order;
 Sum *List;
 Sum *Pair;
 Sum *Unit;
+Sum *JValue;
 
 static void check_cons_name(const AST &ast, Lexer &lex) {
   if (ast.name == "_" || Lexer::isLower(ast.name.c_str())) {
@@ -692,6 +693,15 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
       lex.fail = true;
     }
     Unit = sump;
+  }
+
+  if (name == "JValue") {
+    if (sump->members.size() != 7) {
+      std::cerr << "Special constructor JValue not defined correctly at "
+        << sump->location << "." << std::endl;
+      lex.fail = true;
+    }
+    JValue = sump;
   }
 }
 

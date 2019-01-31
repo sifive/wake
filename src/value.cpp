@@ -230,6 +230,7 @@ Hash Closure::hash() const {
 TypeVar Data::typeBoolean("Boolean", 0);
 TypeVar Data::typeOrder("Order", 0);
 TypeVar Data::typeUnit("Unit", 0);
+TypeVar Data::typeJValue("JValue", 0);
 const TypeVar Data::typeList("List", 1);
 const TypeVar Data::typePair("Pair", 2);
 TypeVar &Data::getType() {
