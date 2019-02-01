@@ -44,3 +44,41 @@ def format rhs = match _
     else '{', foldr helper ('}', rhs) list | tail
 
 global def formatJSON x = format Nil x | cat
+
+# JSON query language: json./"baz"./"foo".|(_./"hax" ==/ JInteger 6)./"zz"
+
+global def x .| f = match x
+  JArray  l = JArray  (filter f l)
+  JObject l = JObject (filter (f $ getPairSecond _) l)
+  x = if f x then x else JArray Nil
+
+global def x ./ y = match x
+  JString  _ = JArray Nil
+  JInteger _ = JArray Nil
+  JReal    _ = JArray Nil
+  JBoolean _ = JArray Nil
+  JNull      = JArray Nil
+  JObject  l = match (find (getPairFirst _ ==~ y) l)
+    None = JArray Nil
+    Some (Pair (Pair _ x) _) = x
+  JArray   l =
+    def flatten z tail = match (z ./ y)
+      JArray m = m ++ tail
+      r = r, tail
+    JArray (foldr flatten Nil l)
+
+global def x ==/ y = match x y
+  (JString  a) (JString  b) = a ==~ b
+  (JInteger a) (JInteger b) = a ==  b
+  (JReal    a) (JReal    b) = a ==* b
+  (JBoolean a) (JBoolean b) = if a then b else !b
+  JNull        JNull        = True
+  (JObject  a) (JObject  b) =
+    def helper (Pair (Pair k c) (Pair l d)) = k ==~ l && c ==/ d
+    if a.len != b.len then False else zip a b | forall helper
+  (JArray   a) (JArray   b) =
+    def helper (Pair c d) = c ==/ d
+    if a.len != b.len then False else zip a b | forall helper
+  (JArray a) _ = exists (_ ==/ y) a
+  _ (JArray b) = exists (_ ==/ x) b
+  _ _ = False
