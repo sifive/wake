@@ -65,6 +65,9 @@ On Debian/Ubuntu:
 
     git clone https://github.com/sifive/wake.git
     cd wake
+    git tag                 # See what versions exist
+    #git checkout master    # Use development branch (e.g. recent bug fix)
+    #git checkout v0.9      # Check out a specific version, like v0.9
     make
     ./bin/wake 'install "/usr/local"' # or wherever
 
