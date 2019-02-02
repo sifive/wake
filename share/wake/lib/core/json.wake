@@ -45,27 +45,30 @@ def format rhs = match _
 
 global def formatJSON x = format Nil x | cat
 
-# JSON query language: json./"baz"./"foo".|(_./"hax" ==/ JInteger 6)./"zz"
+global def x /| f = match x
+  JArray l = JArray (filter f l)
+  _ = if f x then JArray (x, Nil) else JArray Nil
 
-global def x .| f = match x
-  JArray  l = JArray  (filter f l)
-  JObject l = JObject (filter (f $ getPairSecond _) l)
-  x = if f x then x else JArray Nil
+global def x /. i = match x
+  JArray l = at i l
+  _ = if i == 0 then x else raise "index out of bounds"
 
-global def x ./ y = match x
-  JString  _ = JArray Nil
-  JInteger _ = JArray Nil
-  JReal    _ = JArray Nil
-  JBoolean _ = JArray Nil
-  JNull      = JArray Nil
-  JObject  l = match (find (getPairFirst _ ==~ y) l)
-    None = JArray Nil
-    Some (Pair (Pair _ x) _) = x
-  JArray   l =
-    def flatten z tail = match (z ./ y)
-      JArray m = m ++ tail
-      r = r, tail
-    JArray (foldr flatten Nil l)
+global def x // y =
+  def helper tail = match _
+    JString  _ = tail
+    JInteger _ = tail
+    JReal    _ = tail
+    JBoolean _ = tail
+    JNull      = tail
+    JObject  l =
+      def flatten v tail = match v.getPairSecond
+        JArray l = l ++ tail
+        w = w, tail
+      foldr flatten tail (filter (matches y _.getPairFirst) l)
+    JArray   l =
+      def flatten v tail = helper tail v
+      foldr flatten tail l
+  JArray (helper Nil x)
 
 global def x ==/ y = match x y
   (JString  a) (JString  b) = a ==~ b
