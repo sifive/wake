@@ -176,7 +176,7 @@ static PRIMTYPE(type_json) {
     out->unify(Data::typeJValue);
 }
 
-static PRIMFN(prim_json) {
+static PRIMFN(prim_json_file) {
   EXPECT(1);
   STRING(file, 0);
   JLexer jlex(file->value.c_str());
@@ -187,6 +187,18 @@ static PRIMFN(prim_json) {
   RETURN(out);
 }
 
+static PRIMFN(prim_json_body) {
+  EXPECT(1);
+  STRING(body, 0);
+  JLexer jlex(body->value.c_str(), "<input-string>");
+  std::stringstream errs;
+  auto out = parse_jelement(jlex, errs);
+  expect(END, jlex, errs);
+  if (jlex.fail) RAISE(errs.str());
+  RETURN(out);
+}
+
 void prim_register_json(PrimMap &pmap) {
-  pmap.emplace("json", PrimDesc(prim_json, type_json));
+  pmap.emplace("json_file", PrimDesc(prim_json_file, type_json));
+  pmap.emplace("json_body", PrimDesc(prim_json_body, type_json));
 }

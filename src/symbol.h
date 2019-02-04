@@ -53,6 +53,7 @@ struct JLexer {
   bool fail;
 
   JLexer(const char *file);
+  JLexer(const std::string &body, const char *target);
   ~JLexer();
 
   std::string text() const;

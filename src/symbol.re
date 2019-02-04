@@ -508,6 +508,20 @@ Lexer::Lexer(const std::string &cmdline, const char *target)
   }
 }
 
+JLexer::JLexer(const std::string &body, const char *target)
+  : engine(new input_t(target, 0, 0, body.size())), next(ERROR, LOCATION, 0), fail(false)
+{
+  if (body.size() >= SIZE) {
+    fail = true;
+  } else {
+    memcpy(&engine->buf[0], body.c_str(), body.size());
+    memset(&engine->buf[body.size()], 0, YYMAXFILL);
+    engine->eof = true;
+    engine->lim += YYMAXFILL;
+    consume();
+  }
+}
+
 Lexer::~Lexer() {
   if (engine->file) fclose(engine->file);
 }
