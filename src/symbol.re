@@ -12,9 +12,13 @@
 #include <utf8proc.h>
 
 const char *symbolTable[] = {
+  // WAKE:
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "VAL", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
   "DATA", "EQUALS", "POPEN", "PCLOSE", "BOPEN", "BCLOSE", "IF", "THEN", "ELSE", "HERE", "MEMOIZE", "END",
-  "MATCH", "EOL", "INDENT", "DEDENT"
+  "MATCH", "EOL", "INDENT", "DEDENT",
+  // JSON:
+  // "BOPEN", "BCLOSE",
+  "SOPEN", "SCLOSE", "COLON", "COMMA", "NULLVAL", "TRUE", "FALSE", "NUM", "FLOAT", "STR"
 };
 
 /*!max:re2c*/
@@ -107,6 +111,8 @@ struct input_t {
    : buf(), lim(buf + end), cur(buf + start), mar(buf + start), tok(buf + start), sol(buf + start),
      row(1), eof(false), filename(fn), file(f) { }
   bool fill(size_t need);
+
+  std::string text() const;
 };
 
 #define SYM_LOCATION Location(in.filename, start, Coordinates(in.row, in.cur - in.sol))
@@ -467,18 +473,23 @@ top:
 }
 
 struct state_t {
-  std::string location;
   std::vector<int> tabs;
   int indent;
   bool eol;
 
-  state_t() : location(), tabs(), indent(0), eol(false) {
+  state_t() : tabs(), indent(0), eol(false) {
     tabs.push_back(0);
   }
 };
 
 Lexer::Lexer(const char *file)
  : engine(new input_t(file, fopen(file, "r"))), state(new state_t), next(ERROR, Location(file, Coordinates(), Coordinates())), fail(false)
+{
+  if (engine->file) consume();
+}
+
+JLexer::JLexer(const char *file)
+ : engine(new input_t(file, fopen(file, "r"))), next(ERROR, Location(file, Coordinates(), Coordinates())), fail(false)
 {
   if (engine->file) consume();
 }
@@ -497,7 +508,25 @@ Lexer::Lexer(const std::string &cmdline, const char *target)
   }
 }
 
+JLexer::JLexer(const std::string &body, const char *target)
+  : engine(new input_t(target, 0, 0, body.size())), next(ERROR, LOCATION, 0), fail(false)
+{
+  if (body.size() >= SIZE) {
+    fail = true;
+  } else {
+    memcpy(&engine->buf[0], body.c_str(), body.size());
+    memset(&engine->buf[body.size()], 0, YYMAXFILL);
+    engine->eof = true;
+    engine->lim += YYMAXFILL;
+    consume();
+  }
+}
+
 Lexer::~Lexer() {
+  if (engine->file) fclose(engine->file);
+}
+
+JLexer::~JLexer() {
   if (engine->file) fclose(engine->file);
 }
 
@@ -579,21 +608,24 @@ static ssize_t id_escape(const unsigned char *s, const unsigned char *e, char **
   return len;
 }
 
-std::string Lexer::text() const {
+std::string input_t::text() const {
   std::string out;
   char *dst;
   ssize_t len;
 
-  len = id_escape(engine->tok, engine->cur, &dst);
+  len = id_escape(tok, cur, &dst);
   if (len >= 0) {
     out = op_escape(dst);
     free(dst);
   } else {
-    out.assign(engine->tok, engine->cur);
+    out.assign(tok, cur);
   }
 
   return out;
 }
+
+std::string Lexer::text() const { return engine->text(); }
+std::string JLexer::text() const { return engine->text(); }
 
 void Lexer::consume() {
   if (state->eol) {
@@ -615,6 +647,131 @@ void Lexer::consume() {
       consume();
     }
   }
+}
+
+static bool lex_jstr(JLexer &lex, Expr *&out)
+{
+  input_t &in = *lex.engine.get();
+  Coordinates start(in.row, in.cur - in.sol);
+  std::string slice;
+
+  while (true) {
+    in.tok = in.cur;
+    /*!re2c
+        re2c:define:YYCURSOR = in.cur;
+        re2c:define:YYMARKER = in.mar;
+        re2c:define:YYLIMIT = in.lim;
+        re2c:yyfill:enable = 1;
+        re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
+        re2c:define:YYFILL:naked = 1;
+
+        hexd = [0-9a-fA-F] ;
+
+        *                    { return false; }
+        ["]                  { break; }
+        [\x00-\x1F]          { return false; }
+        [^]                  { slice.append(in.tok, in.cur); continue; }
+
+	// Two surrogates => one character
+        "\\u" [dD] [89abAB] hexd{2} "\\u" [dD] [c-fC-F] hexd{2} {
+          uint32_t lo = lex_hex(in.tok,   in.tok+6);
+          uint32_t hi = lex_hex(in.tok+6, in.tok+12);
+          uint32_t x = ((lo & 0x3ff) << 10) + (hi & 0x3ff) + 0x10000;
+          if (!push_utf8(slice, x)) return false;
+          continue;
+        }
+	"\\u" hexd{4} {
+          uint32_t x = lex_hex(in.tok, in.cur);
+          if (!push_utf8(slice, x)) return false;
+          continue;
+        }
+        "\\b"                { slice.push_back('\b'); continue; }
+        "\\f"                { slice.push_back('\f'); continue; }
+        "\\n"                { slice.push_back('\n'); continue; }
+        "\\r"                { slice.push_back('\r'); continue; }
+        "\\t"                { slice.push_back('\t'); continue; }
+        "\\\\"               { slice.push_back('\\'); continue; }
+        "\\\""               { slice.push_back('"');  continue; }
+        "\\/"                { slice.push_back('/');  continue; }
+	"\\"                 { return false; }
+    */
+  }
+
+  std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
+  out = new Literal(SYM_LOCATION, std::move(str));
+  return true;
+}
+
+static Symbol lex_json(JLexer &lex) {
+  input_t &in = *lex.engine.get();
+  Coordinates start;
+top:
+  start.row = in.row;
+  start.column = in.cur - in.sol + 1;
+  in.tok = in.cur;
+  unsigned char *YYCTXMARKER;
+  (void)YYCTXMARKER;
+
+  /*!re2c
+      re2c:define:YYCURSOR = in.cur;
+      re2c:define:YYMARKER = in.mar;
+      re2c:define:YYLIMIT = in.lim;
+      re2c:yyfill:enable = 1;
+      re2c:define:YYFILL = "if (!in.fill(@@)) return mkSym(ERROR);";
+      re2c:define:YYFILL:naked = 1;
+
+      DIGIT   = [0-9] ;
+      DIGITNZ = [1-9] ;
+      UINT    = "0" | ( DIGITNZ DIGIT* ) ;
+      INT     = "-"? UINT ;
+      HEX     = DIGIT | [a-fA-F] ;
+      HEXNZ   = DIGITNZ | [a-fA-F] ;
+      HEX7    = [0-7] ;
+      HEXC    = DIGIT | [a-cA-C] ;
+      FLOAT   = INT "." DIGIT+ ;
+      EXP     = ( INT | FLOAT ) [eE] [+-]? DIGIT+ ;
+      NL      = "\r"? "\n" ;
+      WS      = [ \t\r]+ ;
+
+      *         { return mkSym(ERROR); }
+      end       { return mkSym((in.lim - in.tok == YYMAXFILL) ? END : ERROR); }
+      NL        { ++in.row; in.sol = in.tok+1; goto top; }
+      WS        { goto top; }
+
+      // syntax
+      "{"       { return mkSym(BOPEN);   }
+      "}"       { return mkSym(BCLOSE);  }
+      "["       { return mkSym(SOPEN);   }
+      "]"       { return mkSym(SCLOSE);  }
+      ":"       { return mkSym(COLON);   }
+      ","       { return mkSym(COMMA);   }
+
+      // keywords
+      "null"    { return mkSym(NULLVAL); }
+      "false"   { return mkSym(FALSE);   }
+      "true"    { return mkSym(TRUE);    }
+
+      // literals
+      INT       {
+        std::string integer(in.tok, in.cur);
+        std::shared_ptr<Integer> value = std::make_shared<Integer>(integer.c_str());
+        return mkSym2(NUM, new Literal(SYM_LOCATION, std::move(value)));
+      }
+      FLOAT|EXP {
+        std::string real(in.tok, in.cur);
+        std::shared_ptr<String> value = std::make_shared<String>(std::move(real));
+        return mkSym2(FLOAT, new Literal(SYM_LOCATION, std::move(value)));
+      }
+      ["]       {
+        Expr *out = 0;
+        bool ok = lex_jstr(lex, out);
+        return mkSym2(ok ? STR : ERROR, out);
+      }
+  */
+}
+
+void JLexer::consume() {
+  next = lex_json(*this);
 }
 
 bool Lexer::isLower(const char *str) {

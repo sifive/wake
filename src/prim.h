@@ -82,6 +82,7 @@ void prim_register_vector(PrimMap &pmap);
 void prim_register_integer(PrimMap &pmap);
 void prim_register_exception(PrimMap &pmap);
 void prim_register_regexp(PrimMap &pmap);
+void prim_register_json(PrimMap &pmap);
 void prim_register_job(JobTable *jobtable, PrimMap &pmap);
 void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimMap &pmap);
 
