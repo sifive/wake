@@ -28,13 +28,13 @@ static int do_hash(const char *file) {
   fd = open(file, O_RDONLY);
   if (fd == -1) {
     if (errno == EISDIR) return do_hash_dir();
-    perror("open");
+    fprintf(stderr, "hash_open: %s: %s\n", file, strerror(errno));
     return 1;
   }
 
   if (fstat(fd, &stat) != 0) {
     if (errno == EISDIR) return do_hash_dir();
-    perror("fstat");
+    fprintf(stderr, "hash_fstat: %s: %s\n", file, strerror(errno));
     return 1;
   }
 
@@ -46,7 +46,7 @@ static int do_hash(const char *file) {
   blake2b_final(&S, &hash[0], sizeof(hash));
 
   if (got < 0) {
-    perror("read");
+    fprintf(stderr, "hash_read: %s: %s\n", file, strerror(errno));
     return 1;
   }
 
