@@ -172,54 +172,6 @@ static char **split_null(std::string &str) {
   return out;
 }
 
-#ifdef NO_VFORK
-
-static int do_hash_dir() {
-  printf("00000000000000000000000000000000\n");
-  return 0;
-}
-
-static int do_hash(const char *file) {
-  struct stat stat;
-  int fd;
-  uint8_t hash[16];
-  void *map;
-
-  fd = open(file, O_RDONLY);
-  if (fd == -1) {
-    if (errno == EISDIR) return do_hash_dir();
-    perror("open");
-    return 1;
-  }
-
-  if (fstat(fd, &stat) != 0) {
-    if (errno == EISDIR) return do_hash_dir();
-    perror("fstat");
-    return 1;
-  }
-
-  if (S_ISDIR(stat.st_mode)) return do_hash_dir();
-
-  if (stat.st_size != 0) {
-    map = mmap(0, stat.st_size, PROT_READ, MAP_SHARED, fd, 0);
-    if (map == MAP_FAILED) {
-      perror("mmap");
-      return 1;
-    }
-  }
-
-  MurmurHash3_x64_128(map, stat.st_size, 42, &hash[0]);
-  printf("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",
-    hash[ 0], hash[ 1], hash[ 2], hash[ 3],
-    hash[ 4], hash[ 5], hash[ 6], hash[ 7],
-    hash[ 8], hash[ 9], hash[10], hash[11],
-    hash[12], hash[13], hash[14], hash[15]);
-
-  return 0;
-}
-
-#endif
-
 static void launch(JobTable *jobtable) {
   for (auto &i : jobtable->imp->table) {
     if (jobtable->imp->tasks[i.pool].empty()) continue;
@@ -244,7 +196,6 @@ static void launch(JobTable *jobtable) {
       std::cerr << std::flush;
       fflush(stdout);
       fflush(stderr);
-#ifndef NO_VFORK
       std::stringstream prelude;
       prelude << find_execpath() << "/../lib/wake/shim-wake" << '\0'
         << (task.stdin.empty() ? "/dev/null" : task.stdin.c_str()) << '\0'
@@ -260,39 +211,6 @@ static void launch(JobTable *jobtable) {
         execve(cmdline[0], cmdline, environ);
         _exit(127);
       }
-#else
-      auto cmdline = split_null(task.cmdline);
-      auto environ = split_null(task.environ);
-      pid_t pid = fork();
-      if (pid == 0) {
-        dup2(pipe_stdout[1], 1);
-        dup2(pipe_stderr[1], 2);
-        close(pipe_stdout[1]);
-        close(pipe_stderr[1]);
-        int stdin = open(task.stdin.empty() ? "/dev/null" : task.stdin.c_str(), O_RDONLY);
-        if (stdin == -1) {
-          perror(("open " + task.stdin).c_str());
-          exit(1);
-        }
-        dup2(stdin, 0);
-        close(stdin);
-        if (task.root != "." && chdir(task.root.c_str())) {
-          perror("chdir");
-          exit(1);
-        }
-        if (task.dir != "." && chdir(task.dir.c_str())) {
-          perror("chdir");
-          exit(1);
-        }
-        if (i.internal) {
-          exit(do_hash(cmdline[1]));
-        } else {
-          execve(cmdline[0], cmdline, environ);
-          perror("execve");
-        }
-        exit(127);
-      }
-#endif
       delete [] cmdline;
       delete [] environ;
       i.job->pid = i.pid = pid;
