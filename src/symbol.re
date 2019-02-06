@@ -96,11 +96,11 @@ Sm_op = Sm_nfkc | Sm_norm | Sm_unop | Sm_comp | Sm_produ | Sm_prodb | Sm_divu | 
 
 struct input_t {
   unsigned char buf[SIZE + YYMAXFILL];
-  unsigned char *lim;
-  unsigned char *cur;
-  unsigned char *mar;
-  unsigned char *tok;
-  unsigned char *sol;
+  const unsigned char *lim;
+  const unsigned char *cur;
+  const unsigned char *mar;
+  const unsigned char *tok;
+  const unsigned char *sol;
   int  row;
   bool eof;
 
@@ -131,10 +131,10 @@ bool input_t::fill(size_t need) {
   mar -= free;
   tok -= free;
   sol -= free;
-  lim += fread(lim, 1, free, file);
+  lim += fread(buf + (lim - buf), 1, free, file);
   if (lim < buf + SIZE) {
     eof = true;
-    memset(lim, 0, YYMAXFILL);
+    memset(buf + (lim - buf), 0, YYMAXFILL);
     lim += YYMAXFILL;
   }
   return true;
@@ -222,6 +222,7 @@ bool push_utf8(std::string &result, uint32_t c)
 
 int pop_utf8(uint32_t *rune, const char *str)
 {
+  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
   int c, c1, c2, c3;
   long l;
 
@@ -229,7 +230,7 @@ int pop_utf8(uint32_t *rune, const char *str)
    * one character sequence
    *  00000-0007F => T1
    */
-  c = *(unsigned char*)str;
+  c = s[0];
   if (c < Tx) {
     *rune = c;
     return 1;
@@ -239,7 +240,7 @@ int pop_utf8(uint32_t *rune, const char *str)
    * two character sequence
    *  0080-07FF => T2 Tx
    */
-  c1 = *(unsigned char*)(str+1) ^ Tx;
+  c1 = s[1] ^ Tx;
   if (c1 & Testx) return -1;
   if (c < T3) {
     if (c < T2) return -1;
@@ -253,7 +254,7 @@ int pop_utf8(uint32_t *rune, const char *str)
    * three character sequence
    *  0800-FFFF => T3 Tx Tx
    */
-  c2 = *(unsigned char*)(str+2) ^ Tx;
+  c2 = s[2] ^ Tx;
   if (c2 & Testx) return -1;
   if (c < T4) {
     l = ((((c << Bitx) | c1) << Bitx) | c2) & Rune3;
@@ -266,7 +267,7 @@ int pop_utf8(uint32_t *rune, const char *str)
    * four character sequence (21-bit value)
    *  10000-1FFFFF => T4 Tx Tx Tx
    */
-  c3 = *(unsigned char*)(str+3) ^ Tx;
+  c3 = s[3] ^ Tx;
   if (c3 & Testx) return -1;
   if (c < T5) {
     l = ((((((c << Bitx) | c1) << Bitx) | c2) << Bitx) | c3) & Rune4;
@@ -387,7 +388,7 @@ top:
   start.row = in.row;
   start.column = in.cur - in.sol + 1;
   in.tok = in.cur;
-  unsigned char *YYCTXMARKER;
+  const unsigned char *YYCTXMARKER;
   (void)YYCTXMARKER;
 
   /*!re2c
@@ -532,17 +533,18 @@ JLexer::~JLexer() {
 
 static std::string op_escape(const char *str) {
   std::string out;
-  const char *ignore;
-  const char *YYCTXMARKER;
+  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
+  const unsigned char *ignore;
+  const unsigned char *YYCTXMARKER;
   (void)ignore;
   (void)YYCTXMARKER;
 
   while (true) {
-    const char *start = str;
+    const unsigned char *start = s;
     /*!re2c
       re2c:yyfill:enable = 0;
       re2c:define:YYMARKER = ignore;
-      re2c:define:YYCURSOR = str;
+      re2c:define:YYCURSOR = s;
 
       *                { break; }
       [\x00]           { break; }
@@ -582,7 +584,10 @@ static std::string op_escape(const char *str) {
       [\u2ade] /* ⫞ */ { out.append("⋽"); continue; }
       [\u2adf] /* ⫟ */ { out.append("⊤"); continue; }
       [\u2ae0] /* ⫠ */ { out.append("⊥"); continue; }
-      [^]              { out.append(start, str); continue; }
+      [^]              { out.append(
+                           reinterpret_cast<const char*>(start),
+                           reinterpret_cast<const char*>(s));
+                         continue; }
   */}
 
   return out;
@@ -709,7 +714,7 @@ top:
   start.row = in.row;
   start.column = in.cur - in.sol + 1;
   in.tok = in.cur;
-  unsigned char *YYCTXMARKER;
+  const unsigned char *YYCTXMARKER;
   (void)YYCTXMARKER;
 
   /*!re2c
@@ -775,13 +780,14 @@ void JLexer::consume() {
 }
 
 bool Lexer::isLower(const char *str) {
-  const char *ignore;
+  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
+  const unsigned char *ignore;
   (void)ignore;
 top:
   /*!re2c
       re2c:yyfill:enable = 0;
       re2c:define:YYMARKER = ignore;
-      re2c:define:YYCURSOR = str;
+      re2c:define:YYCURSOR = s;
       *           { return true; }
       "unary "    { return false; }
       "binary "   { return false; }
@@ -792,13 +798,14 @@ top:
 }
 
 bool Lexer::isUpper(const char *str) {
-  const char *ignore;
+  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
+  const unsigned char *ignore;
   (void)ignore;
 top:
   /*!re2c
       re2c:yyfill:enable = 0;
       re2c:define:YYMARKER = ignore;
-      re2c:define:YYCURSOR = str;
+      re2c:define:YYCURSOR = s;
       *           { return false; }
       modifier    { goto top; }
       upper       { return true; }
@@ -806,12 +813,13 @@ top:
 }
 
 bool Lexer::isOperator(const char *str) {
-  const char *ignore;
+  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
+  const unsigned char *ignore;
   (void)ignore;
   /*!re2c
       re2c:yyfill:enable = 0;
       re2c:define:YYMARKER = ignore;
-      re2c:define:YYCURSOR = str;
+      re2c:define:YYCURSOR = s;
       *           { return false; }
       "unary "    { return true; }
       "binary "   { return true; }
@@ -819,15 +827,16 @@ bool Lexer::isOperator(const char *str) {
 }
 
 op_type op_precedence(const char *str) {
-  const char *ignore;
-  const char *YYCTXMARKER;
+  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
+  const unsigned char *ignore;
+  const unsigned char *YYCTXMARKER;
   (void)ignore;
   (void)YYCTXMARKER;
 top:
   /*!re2c
       re2c:yyfill:enable = 0;
       re2c:define:YYMARKER = ignore;
-      re2c:define:YYCURSOR = str;
+      re2c:define:YYCURSOR = s;
 
       *                          { return op_type(-1, -1);}
       "."                        { return op_type(22, 1); }
