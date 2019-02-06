@@ -110,7 +110,7 @@ struct input_t {
   input_t(const char *fn, FILE *f, int start = SIZE, int end = SIZE)
    : buf(), lim(buf + end), cur(buf + start), mar(buf + start), tok(buf + start), sol(buf + start),
      row(1), eof(false), filename(fn), file(f) { }
-  bool fill(size_t need);
+  bool __attribute__ ((noinline)) fill(size_t need);
 
   std::string text() const;
 };
