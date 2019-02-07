@@ -12,6 +12,7 @@ struct Receiver;
 struct Value;
 struct String;
 struct Integer;
+struct Double;
 
 /* Macros for handling inputs from wake */
 #define RETURN(val) do {						\
@@ -53,11 +54,19 @@ std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receive
     if (!completion) return;								\
   } while(0)
 
+std::unique_ptr<Receiver> cast_double(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Double **str);
+#define DOUBLE(arg, i) 									\
+  Double *arg;										\
+  do {											\
+    completion = cast_double(queue, std::move(completion), binding, args[i], &arg);	\
+    if (!completion) return;								\
+  } while(0)
+
 /* Useful expressions for primitives */
 std::shared_ptr<Value> make_unit();
 std::shared_ptr<Value> make_bool(bool x);
 std::shared_ptr<Value> make_order(int x);
-std::shared_ptr<Value> make_tuple(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second);
+std::shared_ptr<Value> make_tuple2(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second);
 std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values);
 
 #define PRIM_PURE	1	// has no side-effects (can be duplicated / removed)
@@ -80,6 +89,7 @@ struct JobTable;
 void prim_register_string(PrimMap &pmap, const char *version);
 void prim_register_vector(PrimMap &pmap);
 void prim_register_integer(PrimMap &pmap);
+void prim_register_double(PrimMap &pmap);
 void prim_register_exception(PrimMap &pmap);
 void prim_register_regexp(PrimMap &pmap);
 void prim_register_json(PrimMap &pmap);

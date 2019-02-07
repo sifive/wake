@@ -11,6 +11,7 @@
 Value::~Value() { }
 const char *String::type = "String";
 const char *Integer::type = "Integer";
+const char *Double::type = "Double";
 const char *Closure::type = "Closure";
 const char *Data::type = "Data";
 const char *Exception::type = "Exception";
@@ -70,6 +71,11 @@ void String::format(std::ostream &os, int p) const {
 }
 
 void Integer::format(std::ostream &os, int p) const {
+  os << str();
+  if (p < 0) os << std::endl;
+}
+
+void Double::format(std::ostream &os, int p) const {
   os << str();
   if (p < 0) os << std::endl;
 }
@@ -206,6 +212,41 @@ TypeVar &Integer::getType() {
 Hash Integer::hash() const {
   Hash payload;
   hash4(value[0]._mp_d, abs(value[0]._mp_size)*sizeof(mp_limb_t), type, payload);
+  return payload;
+}
+
+TypeVar Double::typeVar("Double", 0);
+TypeVar &Double::getType() {
+  return typeVar;
+}
+
+std::string Double::str(int format, int precision) const {
+  std::stringstream s;
+  s.precision(precision);
+  switch (format) {
+    case FIXED:      s << std::fixed;      break;
+    case SCIENTIFIC: s << std::scientific; break;
+    case HEXFLOAT:   s << std::hexfloat;   break;
+    default: if (value < 0.1 && value > -0.1) s << std::scientific; break;
+  }
+  s << value;
+  if (format == DEFAULTFLOAT) {
+    std::string out = s.str();
+    if (out.find('.') == std::string::npos &&
+        (out[0] == '-' ? out[1] >= '0' && out[1] <= '9'
+                       : out[0] >= '0' && out[0] <= '9')) {
+      s << "e0";
+    } else {
+      return out;
+    }
+  }
+  return s.str();
+}
+
+Hash Double::hash() const {
+  Hash payload;
+  std::string x = str(HEXFLOAT);
+  hash4(x.data(), x.size(), type, payload);
   return payload;
 }
 

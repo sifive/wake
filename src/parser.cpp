@@ -74,6 +74,7 @@ static int relabel_descend(Expr *expr, int index) {
       VarRef *ref = reinterpret_cast<VarRef*>(expr);
       if (ref->name != "_") return index;
       ++index;
+      ref->name += " ";
       ref->name += std::to_string(index);
       return index;
     } else if (expr->type == App::type) {
@@ -96,7 +97,7 @@ static int relabel_descend(Expr *expr, int index) {
 static Expr *relabel_anon(Expr *out) {
   int args = relabel_descend(out, 0);
   for (int index = args; index >= 1; --index)
-    out = new Lambda(out->location, "_" + std::to_string(index), out);
+    out = new Lambda(out->location, "_ " + std::to_string(index), out);
   return out;
 }
 
@@ -227,8 +228,8 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (Lexer::isUpper(ast.name.c_str()) || Lexer::isOperator(ast.name.c_str())) {
         Match *match = new Match(location);
         match->patterns.emplace_back(std::move(ast), rhs);
-        match->args.emplace_back(new VarRef(LOCATION, "_xx"));
-        return new Lambda(location, "_xx", match);
+        match->args.emplace_back(new VarRef(LOCATION, "_ xx"));
+        return new Lambda(location, "_ xx", match);
       } else {
         return new Lambda(location, ast.name, rhs);
       }
@@ -430,8 +431,8 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
     }
     body = match;
     for (int i = 0; i < args; ++i) {
-      body = new Lambda(body->location, "_" + std::to_string(args-1-i), body);
-      match->args.emplace_back(new VarRef(LOCATION, "_" + std::to_string(i)));
+      body = new Lambda(body->location, "_ " + std::to_string(args-1-i), body);
+      match->args.emplace_back(new VarRef(LOCATION, "_ " + std::to_string(i)));
     }
   }
 
@@ -457,7 +458,7 @@ static void publish_def(DefMap::defs &publish, const std::string &name, Expr *de
   DefMap::defs::iterator i;
   if ((i = publish.find(name)) == publish.end()) {
     // A reference to _tail which we close with a lambda at the top of the chain
-    i = publish.insert(std::make_pair(name, std::unique_ptr<Expr>(new VarRef(def->location, "_tail")))).first;
+    i = publish.insert(std::make_pair(name, std::unique_ptr<Expr>(new VarRef(def->location, "_ tail")))).first;
   }
   // Make a tuple
   i->second = std::unique_ptr<Expr>(
@@ -485,7 +486,7 @@ static void bind_global(const std::string &name, Top *top, Lexer &lex) {
 
 static void publish_seal(DefMap::defs &publish) {
   for (auto &i : publish) {
-    i.second = std::unique_ptr<Expr>(new Lambda(i.second->location, "_tail", i.second.release()));
+    i.second = std::unique_ptr<Expr>(new Lambda(i.second->location, "_ tail", i.second.release()));
   }
 }
 
@@ -635,7 +636,7 @@ static AST parse_type_def(Lexer &lex) {
 static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
   if (name == "Integer" || name == "String" || name == "RegExp" ||
       name == "CatStream" || name == "Exception" || name == FN ||
-      name == "JobResult" || name == "Array") {
+      name == "JobResult" || name == "Array" || name == "Double") {
     std::cerr << "Constuctor " << name
       << " is reserved at " << sump->location << "." << std::endl;
     lex.fail = true;
@@ -781,18 +782,18 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
     bool global = m.second;
 
     // Implement get methods
-    Expr *getifn = new VarRef(sump->location, "_" + std::to_string(outer+1));
+    Expr *getifn = new VarRef(sump->location, "_ " + std::to_string(outer+1));
     for (int inner = (int)members.size(); inner >= 0; --inner)
-      getifn = new Lambda(sump->location, "_" + std::to_string(inner), getifn);
+      getifn = new Lambda(sump->location, "_ " + std::to_string(inner), getifn);
 
     std::string get = "get" + name + mname;
     Expr *getfn =
-      new Lambda(sump->location, "_x",
+      new Lambda(sump->location, "_ x",
         new App(sump->location,
           new App(sump->location,
             new VarRef(sump->location, tname),
             getifn),
-          new VarRef(sump->location, "_x")));
+          new VarRef(sump->location, "_ x")));
 
     bind_def(lex, map, get, getfn);
     if (global) bind_global(get, top, lex);
@@ -803,21 +804,21 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
       editifn = new App(sump->location, editifn,
         (inner == outer)
         ? reinterpret_cast<Expr*>(new App(sump->location,
-           new VarRef(sump->location, "_f"),
-           new VarRef(sump->location, "_" + std::to_string(inner+1))))
-        : reinterpret_cast<Expr*>(new VarRef(sump->location, "_" + std::to_string(inner+1))));
+           new VarRef(sump->location, "_ f"),
+           new VarRef(sump->location, "_ " + std::to_string(inner+1))))
+        : reinterpret_cast<Expr*>(new VarRef(sump->location, "_ " + std::to_string(inner+1))));
     for (int inner = (int)members.size(); inner >= 0; --inner)
-      editifn = new Lambda(sump->location, "_" + std::to_string(inner), editifn);
+      editifn = new Lambda(sump->location, "_ " + std::to_string(inner), editifn);
 
     std::string edit = "edit" + name + mname;
     Expr *editfn =
-      new Lambda(sump->location, "_f",
-        new Lambda(sump->location, "_x",
+      new Lambda(sump->location, "_ f",
+        new Lambda(sump->location, "_ x",
           new App(sump->location,
             new App(sump->location,
               new VarRef(sump->location, tname),
               editifn),
-            new VarRef(sump->location, "_x"))));
+            new VarRef(sump->location, "_ x"))));
 
     bind_def(lex, map, edit, editfn);
     if (global) bind_global(edit, top, lex);
@@ -827,20 +828,20 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
     for (int inner = 0; inner < (int)members.size(); ++inner)
       setifn = new App(sump->location, setifn,
         (inner == outer)
-        ? reinterpret_cast<Expr*>(new VarRef(sump->location,"_v"))
-        : reinterpret_cast<Expr*>(new VarRef(sump->location, "_" + std::to_string(inner+1))));
+        ? reinterpret_cast<Expr*>(new VarRef(sump->location,"_ v"))
+        : reinterpret_cast<Expr*>(new VarRef(sump->location, "_ " + std::to_string(inner+1))));
     for (int inner = (int)members.size(); inner >= 0; --inner)
-      setifn = new Lambda(sump->location, "_" + std::to_string(inner), setifn);
+      setifn = new Lambda(sump->location, "_ " + std::to_string(inner), setifn);
 
     std::string set = "set" + name + mname;
     Expr *setfn =
-      new Lambda(sump->location, "_v",
-        new Lambda(sump->location, "_x",
+      new Lambda(sump->location, "_ v",
+        new Lambda(sump->location, "_ x",
           new App(sump->location,
             new App(sump->location,
               new VarRef(sump->location, tname),
               setifn),
-            new VarRef(sump->location, "_x"))));
+            new VarRef(sump->location, "_ x"))));
 
     bind_def(lex, map, set, setfn);
     if (global) bind_global(set, top, lex);

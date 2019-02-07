@@ -1,0 +1,85 @@
+# double operations
+global def dabs x = prim "dabs"
+global def   -. x = prim "dneg"
+global def   +. x = x
+global def x +. y = prim "dadd"
+global def x -. y = prim "dsub"
+global def x *. y = prim "dmul"
+global def x /. y = prim "ddiv"
+global def x ^. y = prim "dpow"
+global def dfma x y z = prim "dfma" # x*y + z
+
+global def dcmp x y = prim "dcmp"
+
+global def x <.  y = lt dcmp x y
+global def x >.  y = y <. x
+global def x >=. y = !(x <. y)
+global def x <=. y = !(y <. x)
+
+global def x ==. y = eq dcmp x y
+global def x !=. y = !(x ==. y)
+
+global def dmin x y = if x <. y then x else y
+global def dmax x y = if x <. y then y else x
+
+global def ∏. l = foldl (_*._) 1.0 l
+global def ∑. l = foldl (_+._) 0.0 l
+
+global data DoubleFormat =
+  Fixed
+  Scientific
+  HexFloat
+  DefaultFloat
+
+global def dformat x =
+  def imp f p x = prim "dstr"
+  def f = match x
+    Fixed        = 0
+    Scientific   = 1
+    HexFloat     = 2
+    DefaultFloat = 3
+  imp f
+
+global def double s = prim "ddbl"
+global def dhex = dformat HexFloat 20
+global def dstr = dformat DefaultFloat 17
+
+# Conversion methods
+global data Class =
+  Infinite
+  NaN
+  SubNormal
+  Normal
+
+global def dclass x =
+  def imp x = prim "dclass"
+  def c = imp x
+  if      c == 1 then Infinite
+  else if c == 2 then NaN
+  else if c == 4 then SubNormal
+  else                Normal
+
+global def dfrexp x   = prim "dfrexp"
+global def dldexp f e = prim "dldexp"
+global def dmodf  x   = prim "dmodf"
+
+# Handy numerical functions
+global def dcos    x = prim "dcos"
+global def dsin    x = prim "dsin"
+global def dtan    x = prim "dtan"
+global def dacos   x = prim "dacos"
+global def dasin   x = prim "dasin"
+global def dexp    x = prim "dexp"
+global def dlog    x = prim "dlog"
+global def dexpm1  x = prim "dexpm1"
+global def dlog1p  x = prim "dlog1p"
+global def derf    x = prim "derf"
+global def derfc   x = prim "derfc"
+global def dtgamma x = prim "dtgamma"
+global def dlgamma x = prim "dlgamma"
+global def datan x y = prim "datan"
+
+# Useful constants
+global def nan = 0.0 /. 0.0
+global def inf = 1.0 /. 0.0
+global def pi  = dacos 0.0 *. 2.0

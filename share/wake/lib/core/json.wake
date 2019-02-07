@@ -2,7 +2,7 @@
 global data JValue =
   JString  String
   JInteger Integer
-  JReal    String
+  JDouble  Double
   JBoolean Boolean
   JNull
   JObject  (List (Pair String JValue))
@@ -31,7 +31,10 @@ global def escape =
 def format rhs = match _
   JString  s    = '"', escape s ++ ('"', rhs)
   JInteger i    = str i,    rhs
-  JReal    r    = r,        rhs
+  JDouble  d    = match (dclass d)
+    Infinite = (if d <. 0e0 then "-1e9999" else "1e9999"), rhs
+    NaN      = "NaN",   rhs
+    _        = dstr d,  rhs
   JBoolean True = "true",   rhs
   JBoolean False= "false",  rhs
   JNull         = "null",   rhs
@@ -50,15 +53,15 @@ global def x /| f = match x
   JArray l = JArray (filter f l)
   _ = if f x then JArray (x, Nil) else JArray Nil
 
-global def x /. i = match x
-  JArray l = at i l
-  _ = if i == 0 then x else raise "index out of bounds"
+#global def x /. i = match x
+#  JArray l = at i l
+#  _ = if i == 0 then x else raise "index out of bounds"
 
 global def x // y =
   def helper tail = match _
     JString  _ = tail
     JInteger _ = tail
-    JReal    _ = tail
+    JDouble  _ = tail
     JBoolean _ = tail
     JNull      = tail
     JObject  l =
@@ -74,7 +77,7 @@ global def x // y =
 global def x ==/ y = match x y
   (JString  a) (JString  b) = a ==~ b
   (JInteger a) (JInteger b) = a ==  b
-  (JReal    a) (JReal    b) = a ==* b
+  (JDouble  a) (JDouble  b) = a ==. b
   (JBoolean a) (JBoolean b) = if a then b else !b
   JNull        JNull        = True
   (JObject  a) (JObject  b) =

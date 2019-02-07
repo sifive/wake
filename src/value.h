@@ -8,6 +8,7 @@
 #include <vector>
 #include <cstdint>
 #include <iosfwd>
+#include <limits>
 #include <gmp.h>
 
 #define APP_PRECEDENCE 21
@@ -57,6 +58,26 @@ struct Integer : public Value {
   ~Integer();
 
   std::string str(int base = 10) const;
+  void format(std::ostream &os, int depth) const;
+  TypeVar &getType();
+  Hash hash() const;
+};
+
+#define FIXED 0
+#define SCIENTIFIC 1
+#define HEXFLOAT 2
+#define DEFAULTFLOAT 3
+struct Double : public Value {
+  typedef std::numeric_limits< double > limits;
+  double value;
+
+  static const char *type;
+  static TypeVar typeVar;
+
+  Double(double value_ = 0) : Value(type), value(value_) { }
+  Double(const char *str);
+
+  std::string str(int format = DEFAULTFLOAT, int precision = limits::max_digits10) const;
   void format(std::ostream &os, int depth) const;
   TypeVar &getType();
   Hash hash() const;

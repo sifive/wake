@@ -126,8 +126,11 @@ static PRIMFN(prim_int) {
   }
   REQUIRE(ok, arg0->to_str() + " is not a valid base; 0 or [2,62]");
   auto out = std::make_shared<Integer>();
-  mpz_set_str(out->value, arg1->value.c_str(), base);
-  RETURN(out);
+  if (mpz_set_str(out->value, arg1->value.c_str(), base)) {
+    RAISE("String " + arg1->value + " is not in Integer format");
+  } else {
+    RETURN(out);
+  }
 }
 
 // popcount, scan0, scan1 ?

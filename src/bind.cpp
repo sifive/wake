@@ -269,7 +269,7 @@ static Expr *fill_pattern(Expr *expr, const PatternTree &a, const PatternTree &b
   if (b.var >= 0) {
     expr = new App(expr->location,
       expr,
-      new VarRef(expr->location, "_a" + std::to_string(a.var)));
+      new VarRef(expr->location, "_ a" + std::to_string(a.var)));
   } else {
     for (size_t i = 0; i < a.children.size(); ++i)
       expr = fill_pattern(expr, a.children[i], b.children[i]);
@@ -297,7 +297,7 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
     std::unique_ptr<DefMap> map(new DefMap(prototype.location));
     map->body = std::unique_ptr<Expr>(new VarRef(prototype.location, "destruct " + sum->name));
     for (size_t c = 0; c < sum->members.size(); ++c) {
-      std::string cname = "_c" + std::to_string(c);
+      std::string cname = "_ c" + std::to_string(c);
       map->body = std::unique_ptr<Expr>(new App(prototype.location,
         map->body.release(),
         new VarRef(prototype.location, cname)));
@@ -333,7 +333,7 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
       if (!exp) return nullptr;
       for (int i = 0; i < args; ++i)
         exp = std::unique_ptr<Expr>(new Lambda(prototype.location,
-          "_a" + std::to_string(--var), exp.release()));
+          "_ a" + std::to_string(--var), exp.release()));
       exp = std::unique_ptr<Expr>(new Lambda(prototype.location, "_", exp.release()));
       for (auto p = patterns.rbegin(); p != patterns.rend(); ++p) {
         if (p->index == -1) {
@@ -350,7 +350,7 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
     }
     map->body = std::unique_ptr<Expr>(new App(prototype.location,
       map->body.release(),
-      new VarRef(prototype.location, "_a" + std::to_string(
+      new VarRef(prototype.location, "_ a" + std::to_string(
         get_expansion(&prototype.tree, expand)->var))));
     return std::unique_ptr<Expr>(map.release());
   } else {
@@ -358,8 +358,8 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
     ++p.uses;
     return std::unique_ptr<Expr>(fill_pattern(
       new App(p.location,
-        new VarRef(p.location, "_f" + std::to_string(p.index)),
-        new VarRef(p.location, "_a0")),
+        new VarRef(p.location, "_ f" + std::to_string(p.index)),
+        new VarRef(p.location, "_ a0")),
       prototype.tree, p.tree));
   }
 }
@@ -427,7 +427,7 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
   int index = 0;
   std::vector<PatternTree> children;
   for (auto &a : match->args) {
-    map->map["_a" + std::to_string(index)] = std::move(a);
+    map->map["_ a" + std::to_string(index)] = std::move(a);
     children.emplace_back(index);
     multiarg.members.front().ast.args.emplace_back(AST(LOCATION));
     ++index;
@@ -448,7 +448,7 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
   int f = 0;
   bool ok = true;
   for (auto &p : match->patterns) {
-    std::unique_ptr<Expr> &expr = map->map["_f" + std::to_string(f)];
+    std::unique_ptr<Expr> &expr = map->map["_ f" + std::to_string(f)];
     expr = std::move(p.expr);
     patterns.emplace_back(expr->location);
     patterns.back().index = f;

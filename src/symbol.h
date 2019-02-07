@@ -12,7 +12,7 @@ enum SymbolType {
   MATCH, EOL, INDENT, DEDENT,
   // JSON:
   // BOPEN, BCLOSE,
-  SOPEN, SCLOSE, COLON, COMMA, NULLVAL, TRUE, FALSE, NUM, FLOAT, STR
+  SOPEN, SCLOSE, COLON, COMMA, NULLVAL, TRUE, FALSE, NUM, DOUBLE, STR
 };
 extern const char *symbolTable[];
 

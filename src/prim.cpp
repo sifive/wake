@@ -66,6 +66,18 @@ std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receive
   }
 }
 
+std::unique_ptr<Receiver> cast_double(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Double **in) {
+  if (value->type != Double::type) {
+    std::stringstream str;
+    str << value->to_str() << " is not an Double";
+    Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
+    return std::unique_ptr<Receiver>();
+  } else {
+    *in = reinterpret_cast<Double*>(value.get());
+    return completion;
+  }
+}
+
 std::shared_ptr<Value> make_unit() {
   return std::make_shared<Data>(&Unit->members[0], nullptr);
 }
@@ -84,7 +96,7 @@ std::shared_ptr<Value> make_order(int x) {
 
 // pair x y f = f x y # with x+y already bound
 static std::unique_ptr<Lambda> ePair(new Lambda(LOCATION, "_", nullptr));
-std::shared_ptr<Value> make_tuple(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second) {
+std::shared_ptr<Value> make_tuple2(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second) {
   auto bind0 = std::make_shared<Binding>(nullptr, nullptr, ePair.get(), 1);
   bind0->future[0].value = std::move(first);
   bind0->state = 1;
