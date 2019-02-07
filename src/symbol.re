@@ -707,7 +707,7 @@ static bool lex_jstr(JLexer &lex, Expr *&out, unsigned char eos)
         //   u
         // NonEscapeCharacter ::
         //   SourceCharacter but not one of EscapeCharacter or LineTerminator
-        NonEscapeCharacter = [^'"\\bfnrtv0-9xu\n\r\u2028\u2029];
+        NonEscapeCharacter = [^'"\\bfnrtv0-9xu\n\r\u2028\u2029\x00];
 
         // CharacterEscapeSequence ::
         //   SingleEscapeCharacter
@@ -773,9 +773,12 @@ static bool lex_jstr(JLexer &lex, Expr *&out, unsigned char eos)
         "\\v"                   { slice.push_back('\v'); continue; }
         "\\f"                   { slice.push_back('\f'); continue; }
         "\\r"                   { slice.push_back('\r'); continue; }
+        "\\'"                   { slice.push_back('\''); continue; }
+        "\\\""                  { slice.push_back('"');  continue; }
+        "\\\\"                  { slice.push_back('\\'); continue; }
         "\\" NonEscapeCharacter { slice.append(in.tok+1, in.cur);  continue; }
 	"\\"                    { return false; }
-        [^\r\n]                 { slice.append(in.tok, in.cur); continue; }
+        [^\x00\r\n]             { slice.append(in.tok, in.cur); continue; }
     */
   }
 
@@ -845,7 +848,7 @@ top:
       //   => a = c* (x d* y c*)* (x d*)?
       //     where c = [^*], x = "*", d = "*", y = [^/*]
       //   => MultiLineCommentCharsopt = [^*]* ("*" "*"* [^/*] [^*]*)* ("*" "*"*)?
-      MultiLineCommentCharsopt = [^*]* ("*"+ [^/*] [^*]*)* "*"*;
+      MultiLineCommentCharsopt = [^\x00*]* ("*"+ [^\x00/*] [^\x00*]*)* "*"*;
 
       // MultiLineComment ::
       //   /* MultiLineCommentCharsopt */
@@ -857,7 +860,7 @@ top:
       //   SingleLineCommentChar SingleLineCommentCharsopt
       // SingleLineComment ::
       //   // SingleLineCommentCharsopt
-      SingleLineComment = "//" [^\n\r\u2028\u2029]*;
+      SingleLineComment = "//" [^\n\r\u2028\u2029\x00]*;
 
       // Comment ::
       //   MultiLineComment
@@ -988,7 +991,7 @@ top:
 
       // Special case the integers
       [+-]? (DecimalIntegerLiteral|HexIntegerLiteral) {
-        std::string integer(in.tok, in.cur);
+        std::string integer(in.tok[0] == '+' ? in.tok+1 : in.tok, in.cur);
         std::shared_ptr<Integer> value = std::make_shared<Integer>(integer.c_str());
         return mkSym2(NUM, new Literal(SYM_LOCATION, std::move(value)));
       }
