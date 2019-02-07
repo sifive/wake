@@ -73,7 +73,9 @@ struct Double : public Value {
 
   static const char *type;
   static TypeVar typeVar;
+
   Double(double value_ = 0) : Value(type), value(value_) { }
+  Double(const char *str);
 
   std::string str(int format = DEFAULTFLOAT, int precision = limits::max_digits10) const;
   void format(std::ostream &os, int depth) const;

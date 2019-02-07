@@ -18,7 +18,7 @@ const char *symbolTable[] = {
   "MATCH", "EOL", "INDENT", "DEDENT",
   // JSON:
   // "BOPEN", "BCLOSE",
-  "SOPEN", "SCLOSE", "COLON", "COMMA", "NULLVAL", "TRUE", "FALSE", "NUM", "FLOAT", "STR"
+  "SOPEN", "SCLOSE", "COLON", "COMMA", "NULLVAL", "TRUE", "FALSE", "NUM", "DOUBLE", "STR"
 };
 
 /*!max:re2c*/
@@ -434,8 +434,7 @@ top:
       (double10 | double10e | double16 | double16e) {
         std::string x(in.tok, in.cur);
         std::remove(x.begin(), x.end(), '_');
-        char *ignore;
-        std::shared_ptr<Double> value = std::make_shared<Double>(std::strtod(x.c_str(), &ignore));
+        std::shared_ptr<Double> value = std::make_shared<Double>(x.c_str());
         return mkSym2(LITERAL, new Literal(SYM_LOCATION, std::move(value)));
       }
 
@@ -990,7 +989,7 @@ top:
       //   Comment
       //   JSON5Token
       WhiteSpace      { goto top; }
-      LineTerminator  { ++in.row; in.sol = in.cur+1; goto top; }
+      LineTerminator  { ++in.row; in.sol = in.cur; goto top; }
       Comment         {
         lex_jcomment(in);
         goto top;
@@ -1008,10 +1007,19 @@ top:
         std::shared_ptr<Integer> value = std::make_shared<Integer>(integer.c_str());
         return mkSym2(NUM, new Literal(SYM_LOCATION, std::move(value)));
       }
-      JSON5Number {
-        std::string real(in.tok, in.cur);
-        std::shared_ptr<String> value = std::make_shared<String>(std::move(real));
-        return mkSym2(FLOAT, new Literal(SYM_LOCATION, std::move(value)));
+      [+-]? NumericLiteral {
+        const char *s1 = reinterpret_cast<const char*>(in.tok);
+        std::shared_ptr<Double> value = std::make_shared<Double>(s1);
+        return mkSym2(DOUBLE, new Literal(SYM_LOCATION, std::move(value)));
+      }
+      [+-]? "Infinity" {
+        double infy = (in.tok[0]=='-'?-1.0:1.0) / 0.0;
+        std::shared_ptr<Double> value = std::make_shared<Double>(infy);
+        return mkSym2(DOUBLE, new Literal(SYM_LOCATION, std::move(value)));
+      }
+      [+-]? "NaN" {
+        std::shared_ptr<Double> value = std::make_shared<Double>(0.0/0.0);
+        return mkSym2(DOUBLE, new Literal(SYM_LOCATION, std::move(value)));
       }
 
       // JSON5Punctuator::

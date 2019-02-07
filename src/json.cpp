@@ -182,7 +182,7 @@ static std::shared_ptr<Value> parse_jvalue(JLexer &jlex, std::ostream& errs) {
       jlex.consume();
       return out;
     }
-    case FLOAT: {
+    case DOUBLE: {
       auto out = getJValue(jlex, 2);
       jlex.consume();
       return out;
@@ -231,7 +231,7 @@ static PRIMFN(prim_json_file) {
 static PRIMFN(prim_json_body) {
   EXPECT(1);
   STRING(body, 0);
-  JLexer jlex(body->value.c_str(), "<input-string>");
+  JLexer jlex(body->value, "<input-string>");
   std::stringstream errs;
   auto out = parse_jvalue(jlex, errs);
   expect(END, jlex, errs);
