@@ -468,7 +468,7 @@ top:
       // identifiers
       modifier = Lm|M;
       upper = Lt|Lu;
-      start = L|So|Sm_id;
+      start = L|So|Sm_id; // Nl? allow _ here too?
       body = L|So|Sm_id|N|Pc|Lm|M;
       id = modifier* start body* | "_";
 
@@ -540,6 +540,17 @@ static std::string op_escape(const char *str) {
 
       *                { break; }
       [\x00]           { break; }
+
+      // Two surrogates => one character in json identifiers
+      "\\u" [dD] [89abAB] [0-9a-fA-F]{2} "\\u" [dD] [c-fC-F] [0-9a-fA-F]{2} {
+        uint32_t lo = lex_hex(start,   start+6);
+        uint32_t hi = lex_hex(start+6, start+12);
+        uint32_t x = ((lo & 0x3ff) << 10) + (hi & 0x3ff) + 0x10000;
+        push_utf8(out, x);
+        continue;
+      }
+      "\\u" [0-9a-fA-F]{4} { push_utf8(out, lex_hex(start, s)); continue; }
+
       [\u0606] /* ؆ */ { out.append("∛"); continue; }
       [\u0607] /* ؇ */ { out.append("∜"); continue; }
       [\u2052] /* ⁒ */ { out.append("%"); continue; }
@@ -646,11 +657,13 @@ void Lexer::consume() {
   }
 }
 
-static bool lex_jstr(JLexer &lex, Expr *&out)
+static bool lex_jstr(JLexer &lex, Expr *&out, unsigned char eos)
 {
   input_t &in = *lex.engine.get();
   Coordinates start(in.row, in.cur - in.sol);
   std::string slice;
+  const unsigned char *YYCTXMARKER;
+  (void)YYCTXMARKER;
 
   while (true) {
     in.tok = in.cur;
@@ -662,41 +675,126 @@ static bool lex_jstr(JLexer &lex, Expr *&out)
         re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
         re2c:define:YYFILL:naked = 1;
 
-        hexd = [0-9a-fA-F] ;
+        // LineTerminator ::
+        //   <LF>
+        //   <CR>
+        //   <LS>
+        //   <PS>
+        LineTerminator = [\n\r\u2028\u2029];
 
-        *                    { return false; }
-        ["]                  { break; }
-        [\x00-\x1F]          { return false; }
-        [^]                  { slice.append(in.tok, in.cur); continue; }
+        // LineTerminatorSequence ::
+        //   <LF>
+        //   <CR> [lookahead ∉ <LF> ]
+        //   <LS>
+        //   <PS>
+        //   <CR> <LF>
+        LineTerminatorSequence = [\n\r\u2028\u2029] | "\r\n";
+
+        // LineContinuation ::
+        //   \ LineTerminatorSequence
+        LineContinuation = "\\" LineTerminatorSequence;
+
+        // HexDigit ::
+        //   one of 0 1 2 3 4 5 6 7 8 9 a b c d e f A B C D E F
+        HexDigit = [0-9a-fA-F];
+
+        // SingleEscapeCharacter ::
+        //   one of ' " \ b f n r t v
+        // EscapeCharacter ::
+        //   SingleEscapeCharacter
+        //   DecimalDigit
+        //   x
+        //   u
+        // NonEscapeCharacter ::
+        //   SourceCharacter but not one of EscapeCharacter or LineTerminator
+        NonEscapeCharacter = [^'"\\bfnrtv0-9xu\n\r\u2028\u2029];
+
+        // CharacterEscapeSequence ::
+        //   SingleEscapeCharacter
+        //   NonEscapeCharacter
+
+        // HexEscapeSequence ::
+        //   x HexDigit HexDigit
+        HexEscapeSequence = "x" HexDigit{2};
+
+        // UnicodeEscapeSequence ::
+        //   u HexDigit HexDigit HexDigit HexDigit
+        UnicodeEscapeSequence = "u" HexDigit{4};
+
+        // EscapeSequence ::
+        //   CharacterEscapeSequence
+        //   0 [lookahead ∉ DecimalDigit]
+        //   HexEscapeSequence
+        //   UnicodeEscapeSequence
+
+        // JSON5DoubleStringCharacter::
+        //   SourceCharacter but not one of " or \ or LineTerminator
+        //   \ EscapeSequence
+        //   LineContinuation
+        //   U+2028
+        //   U+2029
+        // JSON5SingleStringCharacter::
+        //   SourceCharacter but not one of ' or \ or LineTerminator
+        //   \ EscapeSequence
+        //   LineContinuation
+        //   U+2028
+        //   U+2029
+
+        // JSON5DoubleStringCharacters::
+        //   JSON5DoubleStringCharacter JSON5DoubleStringCharactersopt
+        // JSON5SingleStringCharacters::
+        //   JSON5SingleStringCharacter JSON5SingleStringCharactersopt
+
+        *                { return false; }
+        LineContinuation { continue; }
+        ["'] {
+          if (in.cur[-1] == eos) {
+             break;
+          } else {
+             slice.push_back(in.cur[-1]);
+             continue;
+          }
+        }
 
 	// Two surrogates => one character
-        "\\u" [dD] [89abAB] hexd{2} "\\u" [dD] [c-fC-F] hexd{2} {
+        "\\u" [dD] [89abAB] HexDigit{2} "\\u" [dD] [c-fC-F] HexDigit{2} {
           uint32_t lo = lex_hex(in.tok,   in.tok+6);
           uint32_t hi = lex_hex(in.tok+6, in.tok+12);
           uint32_t x = ((lo & 0x3ff) << 10) + (hi & 0x3ff) + 0x10000;
           if (!push_utf8(slice, x)) return false;
           continue;
         }
-	"\\u" hexd{4} {
-          uint32_t x = lex_hex(in.tok, in.cur);
-          if (!push_utf8(slice, x)) return false;
-          continue;
-        }
-        "\\b"                { slice.push_back('\b'); continue; }
-        "\\f"                { slice.push_back('\f'); continue; }
-        "\\n"                { slice.push_back('\n'); continue; }
-        "\\r"                { slice.push_back('\r'); continue; }
-        "\\t"                { slice.push_back('\t'); continue; }
-        "\\\\"               { slice.push_back('\\'); continue; }
-        "\\\""               { slice.push_back('"');  continue; }
-        "\\/"                { slice.push_back('/');  continue; }
-	"\\"                 { return false; }
+	"\\u" HexDigit{4}       { if (!push_utf8(slice, lex_hex(in.tok, in.cur))) return false; continue; }
+	"\\x" HexDigit{2}       { if (!push_utf8(slice, lex_hex(in.tok, in.cur))) return false; continue; }
+        "\\0" / [^0-9]          { slice.push_back('\0'); continue; }
+        "\\b"                   { slice.push_back('\b'); continue; }
+        "\\t"                   { slice.push_back('\t'); continue; }
+        "\\n"                   { slice.push_back('\n'); continue; }
+        "\\v"                   { slice.push_back('\v'); continue; }
+        "\\f"                   { slice.push_back('\f'); continue; }
+        "\\r"                   { slice.push_back('\r'); continue; }
+        "\\" NonEscapeCharacter { slice.append(in.tok+1, in.cur);  continue; }
+	"\\"                    { return false; }
+        [^\r\n]                 { slice.append(in.tok, in.cur); continue; }
     */
   }
 
   std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
   out = new Literal(SYM_LOCATION, std::move(str));
   return true;
+}
+
+static void lex_jcomment(input_t &in) {
+  unsigned const char *s = in.tok;
+  unsigned const char *e = in.cur;
+  while (s != e) {
+    /*!re2c
+        re2c:yyfill:enable = 0;
+        re2c:define:YYCURSOR = s;
+        *               { continue; }
+        LineTerminator  { ++in.row; in.sol = s; continue; }
+    */
+  }
 }
 
 static Symbol lex_json(JLexer &lex) {
@@ -717,52 +815,6 @@ top:
       re2c:define:YYFILL = "if (!in.fill(@@)) return mkSym(ERROR);";
       re2c:define:YYFILL:naked = 1;
 
-      // JSON5InputElement::
-      //   WhiteSpace
-      //   LineTerminator
-      //   Comment
-      //   JSON5Token
-      // JSON5Token::
-      //   JSON5Identifier
-      //   JSON5Punctuator
-      //   JSON5String
-      //   JSON5Number
-      // JSON5Identifier::
-      //   IdentifierName
-      // JSON5Punctuator::
-      //   one of {}[]:,
-      // JSON5Null::
-      //   NullLiteral
-      // JSON5Boolean::
-      //   BooleanLiteral
-      // JSON5String::
-      //  " JSON5DoubleStringCharactersopt "
-      //  ' JSON5SingleStringCharactersopt '
-      // JSON5DoubleStringCharacters::
-      //   JSON5DoubleStringCharacter JSON5DoubleStringCharactersopt
-      // JSON5SingleStringCharacters::
-      //   JSON5SingleStringCharacter JSON5SingleStringCharactersopt
-      // JSON5DoubleStringCharacter::
-      //   SourceCharacter but not one of " or \ or LineTerminator
-      //   \ EscapeSequence
-      //   LineContinuation
-      //   U+2028
-      //   U+2029
-      // JSON5SingleStringCharacter::
-      //   SourceCharacter but not one of ' or \ or LineTerminator
-      //   \ EscapeSequence
-      //   LineContinuation
-      //   U+2028
-      //   U+2029
-      // JSON5Number::
-      //   JSON5NumericLiteral
-      //   + JSON5NumericLiteral
-      //   - JSON5NumericLiteral
-      // JSON5NumericLiteral::
-      //   NumericLiteral
-      //   Infinity
-      //   NaN
-
       // WhiteSpace ::
       //   <TAB>
       //   <VT>
@@ -771,107 +823,126 @@ top:
       //   <NBSP>
       //   <BOM>
       //   <USP>
-      // LineTerminator ::
-      //   <LF>
-      //   <CR>
-      //   <LS>
-      //   <PS>
-      // LineTerminatorSequence ::
-      //   <LF>
-      //   <CR> [lookahead ∉ <LF> ]
-      //   <LS>
-      //   <PS>
-      //   <CR> <LF>
-      // Comment ::
-      //   MultiLineComment
-      //   SingleLineComment
-      // MultiLineComment ::
-      //   /* MultiLineCommentCharsopt */
-      // MultiLineCommentChars ::
-      //   MultiLineNotAsteriskChar MultiLineCommentCharsopt
-      //   * PostAsteriskCommentCharsopt
+      WhiteSpace = [\t\v\f \u00a0\ufeff] | Z;
+
+      // MultiLineNotForwardSlashOrAsteriskChar ::
+      //   SourceCharacter but not one of / or *
       // PostAsteriskCommentChars ::
       //   MultiLineNotForwardSlashOrAsteriskChar MultiLineCommentCharsopt
       //   * PostAsteriskCommentCharsopt
+      // => PostAsteriskCommentCharsopt = "*"* ([^/*] MultiLineCommentCharsopt)?
       // MultiLineNotAsteriskChar ::
       //   SourceCharacter but not *
-      // MultiLineNotForwardSlashOrAsteriskChar ::
-      //   SourceCharacter but not one of / or *
-      // SingleLineComment ::
-      //   // SingleLineCommentCharsopt
-      // SingleLineCommentChars ::
-      //   SingleLineCommentChar SingleLineCommentCharsopt
+      // MultiLineCommentChars ::
+      //   MultiLineNotAsteriskChar MultiLineCommentCharsopt
+      //   * PostAsteriskCommentCharsopt
+      // => MultiLineCommentCharsopt = [^*]* ("*" PostAsteriskCommentCharsopt)?
+
+      // To cut the cyclic definition above, note:
+      //   a = c* (x b)?
+      //   b = d* (y a)?
+      //   => a = c* (x d* (y c* (x d* (y c* (x d* ...)?)?)?)?)?
+      //   => a = c* (x d* y c*)* (x d*)?
+      //     where c = [^*], x = "*", d = "*", y = [^/*]
+      //   => MultiLineCommentCharsopt = [^*]* ("*" "*"* [^/*] [^*]*)* ("*" "*"*)?
+      MultiLineCommentCharsopt = [^*]* ("*"+ [^/*] [^*]*)* "*"*;
+
+      // MultiLineComment ::
+      //   /* MultiLineCommentCharsopt */
+      MultiLineComment = "/*" MultiLineCommentCharsopt "*/";
+
       // SingleLineCommentChar ::
       //   SourceCharacter but not LineTerminator
-      // LineContinuation ::
-      //   \ LineTerminatorSequence
-      // NullLiteral ::
-      //   null
-      // BooleanLiteral ::
-      //   true
-      //   false
-      // NumericLiteral ::
-      //   DecimalLiteral
-      //   HexIntegerLiteral
-      // DecimalLiteral ::
-      //   DecimalIntegerLiteral . DecimalDigitsopt ExponentPartopt
-      //   . DecimalDigits ExponentPartopt
-      //   DecimalIntegerLiteral ExponentPartopt
-      // DecimalIntegerLiteral ::
-      //   0
-      //   NonZeroDigit DecimalDigitsopt
-      // DecimalDigits ::
-      //   DecimalDigit
-      //   DecimalDigits DecimalDigit
-      // DecimalDigit ::
-      //   one of 0 1 2 3 4 5 6 7 8 9
-      // NonZeroDigit ::
-      //   one of 1 2 3 4 5 6 7 8 9
-      // ExponentPart ::
-      //   ExponentIndicator SignedInteger
-      // ExponentIndicator ::
-      //   one of e E
-      // SignedInteger ::
-      //   DecimalDigits
-      //   + DecimalDigits
-      //   - DecimalDigits
+      // SingleLineCommentChars ::
+      //   SingleLineCommentChar SingleLineCommentCharsopt
+      // SingleLineComment ::
+      //   // SingleLineCommentCharsopt
+      SingleLineComment = "//" [^\n\r\u2028\u2029]*;
+
+      // Comment ::
+      //   MultiLineComment
+      //   SingleLineComment
+      Comment = MultiLineComment | SingleLineComment;
+
       // HexIntegerLiteral ::
       //   0x HexDigit
       //   0X HexDigit
       //   HexIntegerLiteral HexDigit
-      // HexDigit ::
-      //   one of 0 1 2 3 4 5 6 7 8 9 a b c d e f A B C D E F
-      // EscapeSequence ::
-      //   CharacterEscapeSequence
-      //   0 [lookahead ∉ DecimalDigit]
-      //   HexEscapeSequence
-      //   UnicodeEscapeSequence
-      // CharacterEscapeSequence ::
-      //   SingleEscapeCharacter
-      //   NonEscapeCharacter
-      // SingleEscapeCharacter ::
-      //   one of ' " \ b f n r t v
-      // NonEscapeCharacter ::
-      //   SourceCharacter but not one of EscapeCharacter or LineTerminator
-      // EscapeCharacter ::
-      //   SingleEscapeCharacter
+      HexIntegerLiteral = "0" [xX] HexDigit+;
+
+      // DecimalDigit ::
+      //   one of 0 1 2 3 4 5 6 7 8 9
+      DecimalDigit = [0-9];
+
+      // NonZeroDigit ::
+      //   one of 1 2 3 4 5 6 7 8 9
+      NonZeroDigit = [1-9];
+
+      // DecimalDigits ::
       //   DecimalDigit
-      //   x
-      //   u
-      // HexEscapeSequence ::
-      //   x HexDigit HexDigit
-      // UnicodeEscapeSequence ::
-      //   u HexDigit HexDigit HexDigit HexDigit
-      // Identifier ::
-      //   IdentifierName but not ReservedWord
-      // IdentifierName ::
-      //   IdentifierStart
-      //   IdentifierName IdentifierPart
+      //   DecimalDigits DecimalDigit
+      DecimalDigits = DecimalDigit+;
+
+      // DecimalIntegerLiteral ::
+      //   0
+      //   NonZeroDigit DecimalDigitsopt
+      DecimalIntegerLiteral = "0" | NonZeroDigit DecimalDigits?;
+
+      // SignedInteger ::
+      //   DecimalDigits
+      //   + DecimalDigits
+      //   - DecimalDigits
+      // ExponentIndicator ::
+      //   one of e E
+      // ExponentPart ::
+      //   ExponentIndicator SignedInteger
+      ExponentPart = [eE] [+-]? DecimalDigits;
+
+      // DecimalLiteral ::
+      //   DecimalIntegerLiteral . DecimalDigitsopt ExponentPartopt
+      //   . DecimalDigits ExponentPartopt
+      //   DecimalIntegerLiteral ExponentPartopt
+      DecimalLiteral = (DecimalIntegerLiteral "." DecimalDigits? ExponentPart?)
+                     | ("." DecimalDigits ExponentPart?)
+                     | DecimalIntegerLiteral ExponentPart?;
+
+      // NumericLiteral ::
+      //   DecimalLiteral
+      //   HexIntegerLiteral
+      NumericLiteral = DecimalLiteral | HexIntegerLiteral;
+
+      // JSON5NumericLiteral::
+      //   NumericLiteral
+      //   Infinity
+      //   NaN
+      JSON5NumericLiteral = NumericLiteral | "Infinity" | "NaN";
+
+      // JSON5Number::
+      //   JSON5NumericLiteral
+      //   + JSON5NumericLiteral
+      //   - JSON5NumericLiteral
+      JSON5Number = [+-]? JSON5NumericLiteral;
+
+      // UnicodeLetter ::
+      //   any character in the Unicode categories “Uppercase letter (Lu)”, “Lowercase letter (Ll)”, “Titlecase letter (Lt)”, “Modifier letter (Lm)”, “Other letter (Lo)”, or “Letter number (Nl)”.
+      UnicodeLetter = Lu | Ll | Lt | Lm | Lo | Nl;
+      // UnicodeCombiningMark ::
+      //   any character in the Unicode categories “Non-spacing mark (Mn)” or “Combining spacing mark (Mc)”
+      UnicodeCombiningMark = Mn | Mc;
+      // UnicodeDigit ::
+      //   any character in the Unicode category “Decimal number (Nd)”
+      UnicodeDigit = Nd;
+      // UnicodeConnectorPunctuation ::
+      //   any character in the Unicode category “Connector punctuation (Pc)”
+      UnicodeConnectorPunctuation = Pc;
+
       // IdentifierStart ::
       //   UnicodeLetter
       //   $
       //   _
       //   \ UnicodeEscapeSequence
+      IdentifierStart = UnicodeLetter | [$_] | ("\\" UnicodeEscapeSequence);
+
       // IdentifierPart ::
       //   IdentifierStart
       //   UnicodeCombiningMark
@@ -879,60 +950,86 @@ top:
       //   UnicodeConnectorPunctuation
       //   <ZWNJ>
       //   <ZWJ>
-      // UnicodeLetter ::
-      //   any character in the Unicode categories “Uppercase letter (Lu)”, “Lowercase letter (Ll)”, “Titlecase letter (Lt)”, “Modifier letter (Lm)”, “Other letter (Lo)”, or “Letter number (Nl)”.
-      // UnicodeCombiningMark ::
-      //   any character in the Unicode categories “Non-spacing mark (Mn)” or “Combining spacing mark (Mc)”
-      // UnicodeDigit ::
-      //   any character in the Unicode category “Decimal number (Nd)”
-      // UnicodeConnectorPunctuation ::
-      //   any character in the Unicode category “Connector punctuation (Pc)”
+      IdentifierPart = IdentifierStart | UnicodeCombiningMark | UnicodeDigit | UnicodeConnectorPunctuation | [\u200C\u200D];
 
-      DIGIT   = [0-9] ;
-      DIGITNZ = [1-9] ;
-      UINT    = "0" | ( DIGITNZ DIGIT* ) ;
-      INT     = "-"? UINT ;
-      HEX     = DIGIT | [a-fA-F] ;
-      HEXNZ   = DIGITNZ | [a-fA-F] ;
-      HEX7    = [0-7] ;
-      HEXC    = DIGIT | [a-cA-C] ;
-      FLOAT   = INT "." DIGIT+ ;
-      EXP     = ( INT | FLOAT ) [eE] [+-]? DIGIT+ ;
-      NL      = "\r"? "\n" ;
-      WS      = [ \t\r]+ ;
+      // IdentifierName ::
+      //   IdentifierStart
+      //   IdentifierName IdentifierPart
+      // JSON5Identifier::
+      //   IdentifierName
+      JSON5Identifier = IdentifierStart IdentifierPart*;
 
-      *         { return mkSym(ERROR); }
-      end       { return mkSym((in.lim - in.tok == YYMAXFILL) ? END : ERROR); }
-      NL        { ++in.row; in.sol = in.tok+1; goto top; }
-      WS        { goto top; }
+      // JSON5SourceCharacter::
+      //   SourceCharacter
+      // SourceCharacter ::
+      //   any Unicode code unit
+      * { return mkSym(ERROR); }
 
-      // syntax
-      "{"       { return mkSym(BOPEN);   }
-      "}"       { return mkSym(BCLOSE);  }
-      "["       { return mkSym(SOPEN);   }
-      "]"       { return mkSym(SCLOSE);  }
-      ":"       { return mkSym(COLON);   }
-      ","       { return mkSym(COMMA);   }
+      // Minor extension to json5; interpret NULL as EOF
+      end { return mkSym((in.lim - in.tok == YYMAXFILL) ? END : ERROR); }
 
-      // keywords
-      "null"    { return mkSym(NULLVAL); }
-      "false"   { return mkSym(FALSE);   }
-      "true"    { return mkSym(TRUE);    }
+      // JSON5InputElement::
+      //   WhiteSpace
+      //   LineTerminator
+      //   Comment
+      //   JSON5Token
+      WhiteSpace      { goto top; }
+      LineTerminator  { ++in.row; in.sol = in.cur+1; goto top; }
+      Comment         {
+        lex_jcomment(in);
+        goto top;
+      }
 
-      // literals
-      INT       {
+      // JSON5Token::
+      //   JSON5Identifier
+      //   JSON5Punctuator
+      //   JSON5String
+      //   JSON5Number
+
+      // Special case the integers
+      [+-]? (DecimalIntegerLiteral|HexIntegerLiteral) {
         std::string integer(in.tok, in.cur);
         std::shared_ptr<Integer> value = std::make_shared<Integer>(integer.c_str());
         return mkSym2(NUM, new Literal(SYM_LOCATION, std::move(value)));
       }
-      FLOAT|EXP {
+      JSON5Number {
         std::string real(in.tok, in.cur);
         std::shared_ptr<String> value = std::make_shared<String>(std::move(real));
         return mkSym2(FLOAT, new Literal(SYM_LOCATION, std::move(value)));
       }
-      ["]       {
+
+      // JSON5Punctuator::
+      //   one of {}[]:,
+      "{"             { return mkSym(BOPEN);   }
+      "}"             { return mkSym(BCLOSE);  }
+      "["             { return mkSym(SOPEN);   }
+      "]"             { return mkSym(SCLOSE);  }
+      ":"             { return mkSym(COLON);   }
+      ","             { return mkSym(COMMA);   }
+
+      // JSON5Null::
+      //   NullLiteral
+      // NullLiteral ::
+      //   null
+      "null"          { return mkSym(NULLVAL); }
+
+      // JSON5Boolean::
+      //   BooleanLiteral
+      // BooleanLiteral ::
+      //   true
+      //   false
+      "false"         { return mkSym(FALSE);   }
+      "true"          { return mkSym(TRUE);    }
+
+      JSON5Identifier { return mkSym(ID); }
+
+      // JSON5String::
+      //  " JSON5DoubleStringCharactersopt "
+      //  ' JSON5SingleStringCharactersopt '
+
+      ['"] {
         Expr *out = 0;
-        bool ok = lex_jstr(lex, out);
+        bool ok = lex_jstr(lex, out, in.cur[-1]);
         return mkSym2(ok ? STR : ERROR, out);
       }
   */
