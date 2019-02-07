@@ -300,7 +300,7 @@ static bool lex_sstr(Lexer &lex, Expr *&out)
         re2c:define:YYFILL:naked = 1;
         *                    { return false; }
         "'"                  { break; }
-        [^]                  { slice.append(in.tok, in.cur); continue; }
+        [^\x00]              { slice.append(in.tok, in.cur); continue; }
     */
   }
 
@@ -341,7 +341,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
         }
 
         ["]                  { break; }
-        [^\n\\]              { slice.append(in.tok, in.cur); continue; }
+        [^\n\\\x00]          { slice.append(in.tok, in.cur); continue; }
         "\\{"                { slice.push_back('{');  continue; }
         "\\}"                { slice.push_back('}');  continue; }
         "\\a"                { slice.push_back('\a'); continue; }
@@ -409,7 +409,7 @@ top:
       end { return mkSym((in.lim - in.tok == YYMAXFILL) ? END : ERROR); }
 
       nl = [\n\v\f\r\x85\u2028\u2029];
-      notnl = [^\n\v\f\r\x85\u2028\u2029];
+      notnl = [^\n\v\f\r\x85\u2028\u2029\x00];
       lws = [\t \xa0\u1680\u2000-\u200A\u202F\u205F\u3000];
 
       // whitespace
