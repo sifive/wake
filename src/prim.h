@@ -12,6 +12,7 @@ struct Receiver;
 struct Value;
 struct String;
 struct Integer;
+struct Double;
 
 /* Macros for handling inputs from wake */
 #define RETURN(val) do {						\
@@ -50,6 +51,14 @@ std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receive
   Integer *arg;										\
   do {											\
     completion = cast_integer(queue, std::move(completion), binding, args[i], &arg);	\
+    if (!completion) return;								\
+  } while(0)
+
+std::unique_ptr<Receiver> cast_double(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Double **str);
+#define DOUBLE(arg, i) 									\
+  Double *arg;										\
+  do {											\
+    completion = cast_double(queue, std::move(completion), binding, args[i], &arg);	\
     if (!completion) return;								\
   } while(0)
 
