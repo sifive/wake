@@ -1,7 +1,7 @@
 global def pkgConfig args = memoize 0 (
   def cmdline = which "pkg-config", args
   def result = manual_job cmdline Nil (\_ Nil) # caching ok
-  def output = tokenize "\n" result.stdout | head | tokenize " "
+  def output = tokenize "\n" result.stdout | head | tokenize " " | filter (_ !=* "")
   if result.status != 0 then raise "pkg-config failed" else output
 )
 
