@@ -717,6 +717,177 @@ top:
       re2c:define:YYFILL = "if (!in.fill(@@)) return mkSym(ERROR);";
       re2c:define:YYFILL:naked = 1;
 
+      // JSON5InputElement::
+      //   WhiteSpace
+      //   LineTerminator
+      //   Comment
+      //   JSON5Token
+      // JSON5Token::
+      //   JSON5Identifier
+      //   JSON5Punctuator
+      //   JSON5String
+      //   JSON5Number
+      // JSON5Identifier::
+      //   IdentifierName
+      // JSON5Punctuator::
+      //   one of {}[]:,
+      // JSON5Null::
+      //   NullLiteral
+      // JSON5Boolean::
+      //   BooleanLiteral
+      // JSON5String::
+      //  " JSON5DoubleStringCharactersopt "
+      //  ' JSON5SingleStringCharactersopt '
+      // JSON5DoubleStringCharacters::
+      //   JSON5DoubleStringCharacter JSON5DoubleStringCharactersopt
+      // JSON5SingleStringCharacters::
+      //   JSON5SingleStringCharacter JSON5SingleStringCharactersopt
+      // JSON5DoubleStringCharacter::
+      //   SourceCharacter but not one of " or \ or LineTerminator
+      //   \ EscapeSequence
+      //   LineContinuation
+      //   U+2028
+      //   U+2029
+      // JSON5SingleStringCharacter::
+      //   SourceCharacter but not one of ' or \ or LineTerminator
+      //   \ EscapeSequence
+      //   LineContinuation
+      //   U+2028
+      //   U+2029
+      // JSON5Number::
+      //   JSON5NumericLiteral
+      //   + JSON5NumericLiteral
+      //   - JSON5NumericLiteral
+      // JSON5NumericLiteral::
+      //   NumericLiteral
+      //   Infinity
+      //   NaN
+
+      // WhiteSpace ::
+      //   <TAB>
+      //   <VT>
+      //   <FF>
+      //   <SP>
+      //   <NBSP>
+      //   <BOM>
+      //   <USP>
+      // LineTerminator ::
+      //   <LF>
+      //   <CR>
+      //   <LS>
+      //   <PS>
+      // LineTerminatorSequence ::
+      //   <LF>
+      //   <CR> [lookahead ∉ <LF> ]
+      //   <LS>
+      //   <PS>
+      //   <CR> <LF>
+      // Comment ::
+      //   MultiLineComment
+      //   SingleLineComment
+      // MultiLineComment ::
+      //   /* MultiLineCommentCharsopt */
+      // MultiLineCommentChars ::
+      //   MultiLineNotAsteriskChar MultiLineCommentCharsopt
+      //   * PostAsteriskCommentCharsopt
+      // PostAsteriskCommentChars ::
+      //   MultiLineNotForwardSlashOrAsteriskChar MultiLineCommentCharsopt
+      //   * PostAsteriskCommentCharsopt
+      // MultiLineNotAsteriskChar ::
+      //   SourceCharacter but not *
+      // MultiLineNotForwardSlashOrAsteriskChar ::
+      //   SourceCharacter but not one of / or *
+      // SingleLineComment ::
+      //   // SingleLineCommentCharsopt
+      // SingleLineCommentChars ::
+      //   SingleLineCommentChar SingleLineCommentCharsopt
+      // SingleLineCommentChar ::
+      //   SourceCharacter but not LineTerminator
+      // LineContinuation ::
+      //   \ LineTerminatorSequence
+      // NullLiteral ::
+      //   null
+      // BooleanLiteral ::
+      //   true
+      //   false
+      // NumericLiteral ::
+      //   DecimalLiteral
+      //   HexIntegerLiteral
+      // DecimalLiteral ::
+      //   DecimalIntegerLiteral . DecimalDigitsopt ExponentPartopt
+      //   . DecimalDigits ExponentPartopt
+      //   DecimalIntegerLiteral ExponentPartopt
+      // DecimalIntegerLiteral ::
+      //   0
+      //   NonZeroDigit DecimalDigitsopt
+      // DecimalDigits ::
+      //   DecimalDigit
+      //   DecimalDigits DecimalDigit
+      // DecimalDigit ::
+      //   one of 0 1 2 3 4 5 6 7 8 9
+      // NonZeroDigit ::
+      //   one of 1 2 3 4 5 6 7 8 9
+      // ExponentPart ::
+      //   ExponentIndicator SignedInteger
+      // ExponentIndicator ::
+      //   one of e E
+      // SignedInteger ::
+      //   DecimalDigits
+      //   + DecimalDigits
+      //   - DecimalDigits
+      // HexIntegerLiteral ::
+      //   0x HexDigit
+      //   0X HexDigit
+      //   HexIntegerLiteral HexDigit
+      // HexDigit ::
+      //   one of 0 1 2 3 4 5 6 7 8 9 a b c d e f A B C D E F
+      // EscapeSequence ::
+      //   CharacterEscapeSequence
+      //   0 [lookahead ∉ DecimalDigit]
+      //   HexEscapeSequence
+      //   UnicodeEscapeSequence
+      // CharacterEscapeSequence ::
+      //   SingleEscapeCharacter
+      //   NonEscapeCharacter
+      // SingleEscapeCharacter ::
+      //   one of ' " \ b f n r t v
+      // NonEscapeCharacter ::
+      //   SourceCharacter but not one of EscapeCharacter or LineTerminator
+      // EscapeCharacter ::
+      //   SingleEscapeCharacter
+      //   DecimalDigit
+      //   x
+      //   u
+      // HexEscapeSequence ::
+      //   x HexDigit HexDigit
+      // UnicodeEscapeSequence ::
+      //   u HexDigit HexDigit HexDigit HexDigit
+      // Identifier ::
+      //   IdentifierName but not ReservedWord
+      // IdentifierName ::
+      //   IdentifierStart
+      //   IdentifierName IdentifierPart
+      // IdentifierStart ::
+      //   UnicodeLetter
+      //   $
+      //   _
+      //   \ UnicodeEscapeSequence
+      // IdentifierPart ::
+      //   IdentifierStart
+      //   UnicodeCombiningMark
+      //   UnicodeDigit
+      //   UnicodeConnectorPunctuation
+      //   <ZWNJ>
+      //   <ZWJ>
+      // UnicodeLetter ::
+      //   any character in the Unicode categories “Uppercase letter (Lu)”, “Lowercase letter (Ll)”, “Titlecase letter (Lt)”, “Modifier letter (Lm)”, “Other letter (Lo)”, or “Letter number (Nl)”.
+      // UnicodeCombiningMark ::
+      //   any character in the Unicode categories “Non-spacing mark (Mn)” or “Combining spacing mark (Mc)”
+      // UnicodeDigit ::
+      //   any character in the Unicode category “Decimal number (Nd)”
+      // UnicodeConnectorPunctuation ::
+      //   any character in the Unicode category “Connector punctuation (Pc)”
+
       DIGIT   = [0-9] ;
       DIGITNZ = [1-9] ;
       UINT    = "0" | ( DIGITNZ DIGIT* ) ;
