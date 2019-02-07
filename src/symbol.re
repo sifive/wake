@@ -425,14 +425,26 @@ top:
         return mkSym2(ok ? LITERAL : ERROR, out);
       }
 
-      // integer literals
+      // double literals
       dec = [1-9][0-9_]*;
+      double10  = (dec|"0") "." [0-9_]+ ([eE] [+-]? [0-9_]+)?;
+      double10e = (dec|"0") [eE] [+-]? [0-9_]+;
+      double16  = "0x" [0-9a-fA-F_]+ "." [0-9a-fA-F_]+ ([pP] [+-]? [0-9a-fA-F_]+)?;
+      double16e = "0x" [0-9a-fA-F_]+ [pP] [+-]? [0-9a-fA-F_]+;
+      (double10 | double10e | double16 | double16e) {
+        std::string x(in.tok, in.cur);
+        std::remove(x.begin(), x.end(), '_');
+        std::shared_ptr<Double> value = std::make_shared<Double>(std::stod(x));
+        return mkSym2(LITERAL, new Literal(SYM_LOCATION, std::move(value)));
+      }
+
+      // integer literals
       oct = '0'[0-7_]*;
       hex = '0x' [0-9a-fA-F_]+;
       bin = '0b' [01_]+;
       (dec | oct | hex | bin) {
         std::string integer(in.tok, in.cur);
-        std::replace(integer.begin(), integer.end(), '_', ' ');
+        std::remove(integer.begin(), integer.end(), '_');
         std::shared_ptr<Integer> value = std::make_shared<Integer>(integer.c_str());
         return mkSym2(LITERAL, new Literal(SYM_LOCATION, std::move(value)));
       }
