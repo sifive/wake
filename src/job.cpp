@@ -460,7 +460,7 @@ static std::shared_ptr<Value> convert_tree(std::vector<FileReflection> &&files) 
   std::vector<std::shared_ptr<Value> > vals;
   vals.reserve(files.size());
   for (auto &i : files)
-    vals.emplace_back(make_tuple(
+    vals.emplace_back(make_tuple2(
       std::static_pointer_cast<Value>(std::make_shared<String>(std::move(i.path))),
       std::static_pointer_cast<Value>(std::make_shared<String>(std::move(i.hash)))));
   return make_list(std::move(vals));
@@ -677,7 +677,7 @@ static PRIMFN(prim_add_hash) {
   STRING(file, 0);
   STRING(hash, 1);
   jobtable->imp->db->add_hash(file->value, hash->value, stat_mod_ns(file->value));
-  auto out = make_tuple(
+  auto out = make_tuple2(
     std::shared_ptr<Value>(args[0]),
     std::shared_ptr<Value>(args[1]));
   RETURN(out);

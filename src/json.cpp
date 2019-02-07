@@ -129,7 +129,7 @@ static std::shared_ptr<Value> parse_jobject(JLexer &jlex, std::ostream& errs) {
     expect(COLON, jlex, errs);
     jlex.consume();
 
-    values.emplace_back(make_tuple(std::move(key), parse_jvalue(jlex, errs)));
+    values.emplace_back(make_tuple2(std::move(key), parse_jvalue(jlex, errs)));
 
     switch (jlex.next.type) {
       case COMMA: {

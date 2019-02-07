@@ -96,7 +96,7 @@ std::shared_ptr<Value> make_order(int x) {
 
 // pair x y f = f x y # with x+y already bound
 static std::unique_ptr<Lambda> ePair(new Lambda(LOCATION, "_", nullptr));
-std::shared_ptr<Value> make_tuple(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second) {
+std::shared_ptr<Value> make_tuple2(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second) {
   auto bind0 = std::make_shared<Binding>(nullptr, nullptr, ePair.get(), 1);
   bind0->future[0].value = std::move(first);
   bind0->state = 1;

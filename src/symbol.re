@@ -434,7 +434,8 @@ top:
       (double10 | double10e | double16 | double16e) {
         std::string x(in.tok, in.cur);
         std::remove(x.begin(), x.end(), '_');
-        std::shared_ptr<Double> value = std::make_shared<Double>(std::stod(x));
+        char *ignore;
+        std::shared_ptr<Double> value = std::make_shared<Double>(std::strtod(x.c_str(), &ignore));
         return mkSym2(LITERAL, new Literal(SYM_LOCATION, std::move(value)));
       }
 
