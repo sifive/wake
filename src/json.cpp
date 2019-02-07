@@ -32,21 +32,27 @@ static std::shared_ptr<Value> getJValue(JLexer &jlex, int member) {
   return getJValue(std::move(lit->value), member);
 }
 
-static std::shared_ptr<Value> parse_jelement(JLexer &jlex, std::ostream& errs);
+static std::shared_ptr<Value> parse_jvalue(JLexer &jlex, std::ostream& errs);
 
-static std::shared_ptr<Value> parse_jlist(JLexer &jlex, std::ostream& errs) {
+// JSON5Array:
+//   []
+//   [JSON5ElementList ,opt]
+// JSON5ElementList:
+//   JSON5Value
+//   JSON5ElementList , JSON5Value
+static std::shared_ptr<Value> parse_jarray(JLexer &jlex, std::ostream& errs) {
   jlex.consume();
 
   bool repeat = true;
   std::vector<std::shared_ptr<Value> > values;
 
-  if (jlex.next.type == SCLOSE) {
-    jlex.consume();
-    goto done;
-  }
-
   while (repeat) {
-    values.emplace_back(parse_jelement(jlex, errs));
+    if (jlex.next.type == SCLOSE) {
+      jlex.consume();
+      break;
+    }
+
+    values.emplace_back(parse_jvalue(jlex, errs));
     switch (jlex.next.type) {
       case COMMA: {
         jlex.consume();
@@ -69,34 +75,61 @@ static std::shared_ptr<Value> parse_jlist(JLexer &jlex, std::ostream& errs) {
     }
   }
 
-done:
   return getJValue(make_list(std::move(values)), 6);
 }
 
+// JSON5Object:
+//   {}
+//   {JSON5MemberList ,opt}
+// JSON5MemberList:
+//   JSON5Member
+//   JSON5MemberList , JSON5Member
+// JSON5Member:
+//   JSON5MemberName : JSON5Value
+// JSON5MemberName:
+//   JSON5Identifier
+//   JSON5String
 static std::shared_ptr<Value> parse_jobject(JLexer &jlex, std::ostream& errs) {
   jlex.consume();
 
   bool repeat = true;
   std::vector<std::shared_ptr<Value> > values;
 
-  if (jlex.next.type == BCLOSE) {
-    jlex.consume();
-    goto done;
-  }
-
   while (repeat) {
+    if (jlex.next.type == BCLOSE) {
+      jlex.consume();
+      break;
+    }
+
     // Extract the JSON key
     std::shared_ptr<Value> key;
-    if (expect(STR, jlex, errs)) {
-      Literal *lit = reinterpret_cast<Literal*>(jlex.next.expr.get());
-      key = std::move(lit->value);
+    switch (jlex.next.type) {
+      case STR: {
+        Literal *lit = reinterpret_cast<Literal*>(jlex.next.expr.get());
+        key = std::move(lit->value);
+        jlex.consume();
+        break;
+      }
+      case ID: {
+        key = std::make_shared<String>(jlex.text());
+        jlex.consume();
+        break;
+      }
+      default: {
+        if (!jlex.fail)
+          errs << "Was expecting ID/STR, got a "
+            << symbolTable[jlex.next.type]
+            << " at " << jlex.next.location;
+        jlex.fail = true;
+        repeat = false;
+        break;
+      }
     }
-    jlex.consume();
 
     expect(COLON, jlex, errs);
     jlex.consume();
 
-    values.emplace_back(make_tuple(std::move(key), parse_jelement(jlex, errs)));
+    values.emplace_back(make_tuple(std::move(key), parse_jvalue(jlex, errs)));
 
     switch (jlex.next.type) {
       case COMMA: {
@@ -120,30 +153,21 @@ static std::shared_ptr<Value> parse_jobject(JLexer &jlex, std::ostream& errs) {
     }
   }
 
-done:
   return getJValue(make_list(std::move(values)), 5);
 }
 
-static std::shared_ptr<Value> parse_jelement(JLexer &jlex, std::ostream& errs) {
+// JSON5Value:
+//   JSON5Null
+//   JSON5Boolean
+//   JSON5String
+//   JSON5Number
+//   JSON5Object
+//   JSON5Array
+static std::shared_ptr<Value> parse_jvalue(JLexer &jlex, std::ostream& errs) {
   switch (jlex.next.type) {
-    case FLOAT: {
-      auto out = getJValue(jlex, 2);
-      jlex.consume();
-      return out;
-    }
     case NULLVAL: {
       jlex.consume();
       return std::make_shared<Data>(&JValue->members[4], nullptr);
-    }
-    case STR: {
-      auto out = getJValue(jlex, 0);
-      jlex.consume();
-      return out;
-    }
-    case NUM: {
-      auto out = getJValue(jlex, 1);
-      jlex.consume();
-      return out;
     }
     case TRUE: {
       jlex.consume();
@@ -153,11 +177,26 @@ static std::shared_ptr<Value> parse_jelement(JLexer &jlex, std::ostream& errs) {
       jlex.consume();
       return getJValue(make_bool(false), 3);
     }
-    case SOPEN: {
-      return parse_jlist(jlex, errs);
+    case STR: {
+      auto out = getJValue(jlex, 0);
+      jlex.consume();
+      return out;
+    }
+    case FLOAT: {
+      auto out = getJValue(jlex, 2);
+      jlex.consume();
+      return out;
+    }
+    case NUM: {
+      auto out = getJValue(jlex, 1);
+      jlex.consume();
+      return out;
     }
     case BOPEN: {
       return parse_jobject(jlex, errs);
+    }
+    case SOPEN: {
+      return parse_jarray(jlex, errs);
     }
     default: {
       if (!jlex.fail)
@@ -176,12 +215,14 @@ static PRIMTYPE(type_json) {
     out->unify(Data::typeJValue);
 }
 
+// JSON5Text:
+//   JSON5Value
 static PRIMFN(prim_json_file) {
   EXPECT(1);
   STRING(file, 0);
   JLexer jlex(file->value.c_str());
   std::stringstream errs;
-  auto out = parse_jelement(jlex, errs);
+  auto out = parse_jvalue(jlex, errs);
   expect(END, jlex, errs);
   if (jlex.fail) RAISE(errs.str());
   RETURN(out);
@@ -192,7 +233,7 @@ static PRIMFN(prim_json_body) {
   STRING(body, 0);
   JLexer jlex(body->value.c_str(), "<input-string>");
   std::stringstream errs;
-  auto out = parse_jelement(jlex, errs);
+  auto out = parse_jvalue(jlex, errs);
   expect(END, jlex, errs);
   if (jlex.fail) RAISE(errs.str());
   RETURN(out);
