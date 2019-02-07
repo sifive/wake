@@ -110,6 +110,10 @@ struct input_t {
   input_t(const char *fn, FILE *f, int start = SIZE, int end = SIZE)
    : buf(), lim(buf + end), cur(buf + start), mar(buf + start), tok(buf + start), sol(buf + start),
      row(1), eof(false), filename(fn), file(f) { }
+  input_t(const char *fn, const unsigned char *buf_, int end)
+   : buf(), lim(buf_ + end), cur(buf_), mar(buf_), tok(buf_), sol(buf_),
+     row(1), eof(true), filename(fn), file(0) { }
+
   bool __attribute__ ((noinline)) fill(size_t need);
 
   std::string text() const;
@@ -495,32 +499,20 @@ JLexer::JLexer(const char *file)
   if (engine->file) consume();
 }
 
+static const unsigned char *ucast(const char *c) {
+  return reinterpret_cast<const unsigned char *>(c);
+}
+
 Lexer::Lexer(const std::string &cmdline, const char *target)
-  : engine(new input_t(target, 0, 0, cmdline.size())), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
+  : engine(new input_t(target, ucast(cmdline.c_str()), YYMAXFILL+cmdline.size())), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
 {
-  if (cmdline.size() >= SIZE) {
-    fail = true;
-  } else {
-    memcpy(&engine->buf[0], cmdline.c_str(), cmdline.size());
-    memset(&engine->buf[cmdline.size()], 0, YYMAXFILL);
-    engine->eof = true;
-    engine->lim += YYMAXFILL;
-    consume();
-  }
+  consume();
 }
 
 JLexer::JLexer(const std::string &body, const char *target)
-  : engine(new input_t(target, 0, 0, body.size())), next(ERROR, LOCATION, 0), fail(false)
+  : engine(new input_t(target, ucast(body.c_str()), YYMAXFILL+body.size())), next(ERROR, LOCATION, 0), fail(false)
 {
-  if (body.size() >= SIZE) {
-    fail = true;
-  } else {
-    memcpy(&engine->buf[0], body.c_str(), body.size());
-    memset(&engine->buf[body.size()], 0, YYMAXFILL);
-    engine->eof = true;
-    engine->lim += YYMAXFILL;
-    consume();
-  }
+  consume();
 }
 
 Lexer::~Lexer() {
