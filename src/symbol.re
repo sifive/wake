@@ -371,10 +371,10 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
     Expr *cat = new Prim(LOCATION, "catopen");
     for (auto expr : exprs)
       cat = new App(LOCATION,
-        new App(LOCATION, new VarRef(LOCATION, "_catadd"), cat),
+        new App(LOCATION, new VarRef(LOCATION, "_ catadd"), cat),
         new App(LOCATION, new Lambda(LOCATION, "_", new Prim(LOCATION, "iformat")), expr));
     cat = new App(LOCATION, new Lambda(LOCATION, "_", new Prim(LOCATION, "catclose")), cat);
-    cat = new App(LOCATION, new Lambda(LOCATION, "_catadd", cat),
+    cat = new App(LOCATION, new Lambda(LOCATION, "_ catadd", cat),
             new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new Prim(LOCATION, "catadd"))));
     out = cat;
   }
@@ -480,9 +480,9 @@ top:
       // identifiers
       modifier = Lm|M;
       upper = Lt|Lu;
-      start = L|So|Sm_id; // Nl? allow _ here too?
+      start = L|So|Sm_id|Nl|"_";
       body = L|So|Sm_id|N|Pc|Lm|M;
-      id = modifier* start body* | "_";
+      id = modifier* start body*;
 
       id { return mkSym(ID); }
       op { return mkSym(OPERATOR); }
@@ -1076,7 +1076,7 @@ top:
       "unary "    { return false; }
       "binary "   { return false; }
       modifier    { goto top; }
-      "_"         { return false; }
+      "_\x00"     { return false; }
       upper       { return false; }
   */
 }
