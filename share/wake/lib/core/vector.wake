@@ -34,8 +34,8 @@ global def vsplitAt i (Vector v s e) =
   def x = min e (s + max 0 i)
   Pair (Vector v s x) (Vector v x e)
 
-global def vtake i v = vsplitAt i v | first
-global def vdrop i v = vsplitAt i v | second
+global def vtake i v = vsplitAt i v | getPairFirst
+global def vdrop i v = vsplitAt i v | getPairSecond
 
 global def vatOpt i (Vector v s e) =
   def get v i = prim "vget"
@@ -55,8 +55,8 @@ global def vseq n = vtab (_) n
 global def vzip a b = vtab (\i Pair (vat_ i a) (vat_ i b)) (min (vlen a) (vlen b))
 global def vunzip v =
   Pair
-  (vtab (vat_ _ v | first)  (vlen v))
-  (vtab (vat_ _ v | second) (vlen v))
+  (vtab (vat_ _ v | getPairFirst)  (vlen v))
+  (vtab (vat_ _ v | getPairSecond) (vlen v))
 global def vreverse v =
   def n = vlen v
   def n1 = n-1
@@ -104,8 +104,8 @@ global def vsplitUntil f v =
       (Vector z _ _) = Pair v (Vector z 0 0)
     Some (Pair _ i) = vsplitAt i v
 
-global def vtakeUntil f t = vsplitUntil f t | first
-global def vdropUntil f t = vsplitUntil f t | second
+global def vtakeUntil f t = vsplitUntil f t | getPairFirst
+global def vdropUntil f t = vsplitUntil f t | getPairSecond
 
 # Returns True if there exists an x where f x = True
 global def vexists f t = match (vfind f t)
@@ -132,7 +132,7 @@ global def vsplitBy f v =
     Pair (Vector take 0 ntake) (Vector drop 0 ndrop)
   bind (vnew ntake) (vnew ndrop)
 
-global def vfilter f v = vsplitBy f v | first
+global def vfilter f v = vsplitBy f v | getPairFirst
 
 global def vunfoldl f a n =
   def vnew n = prim "vnew"
