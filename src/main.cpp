@@ -84,7 +84,7 @@ static void describe_shell(const std::vector<JobReflection> &jobs) {
   for (auto &job : jobs) {
     std::cout << std::endl << "# Wake job " << job.job << ":" << std::endl;
     std::cout << "cd ";
-    escape(get_cwd());
+    escape(get_workspace());
     std::cout << std::endl;
     if (job.directory != ".") {
       std::cout << "cd ";

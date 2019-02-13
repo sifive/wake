@@ -189,14 +189,16 @@ static std::string make_relative(std::string &&dir, std::string &&path) {
 }
 
 std::string get_cwd() {
+  std::vector<char> buf;
+  buf.resize(1024, '\0');
+  while (getcwd(buf.data(), buf.size()) == 0 && errno == ERANGE)
+    buf.resize(buf.size() * 2);
+  return buf.data();
+}
+
+std::string get_workspace() {
   static std::string cwd;
-  if (cwd.empty()) {
-    std::vector<char> buf;
-    buf.resize(1024, '\0');
-    while (getcwd(buf.data(), buf.size()) == 0 && errno == ERANGE)
-      buf.resize(buf.size() * 2);
-    cwd.assign(buf.data());
-  }
+  if (cwd.empty()) cwd = get_cwd();
   return cwd;
 }
 
@@ -204,7 +206,7 @@ std::vector<std::shared_ptr<String> > find_all_sources() {
   std::vector<std::shared_ptr<String> > out;
   scan(out, ".");
   std::string abs_libdir = find_execpath() + "/../share/wake/lib";
-  std::string rel_libdir = make_relative(get_cwd(), make_canonical(abs_libdir));
+  std::string rel_libdir = make_relative(get_workspace(), make_canonical(abs_libdir));
   push_files(out, rel_libdir);
   distinct(out);
   return out;
@@ -376,14 +378,14 @@ static PRIMFN(prim_execpath) {
   RETURN(out);
 }
 
-static PRIMTYPE(type_getcwd) {
+static PRIMTYPE(type_workspace) {
   return args.size() == 0 &&
     out->unify(String::typeVar);
 }
 
-static PRIMFN(prim_getcwd) {
+static PRIMFN(prim_workspace) {
   EXPECT(0);
-  auto out = std::make_shared<String>(get_cwd());
+  auto out = std::make_shared<String>(get_workspace());
   RETURN(out);
 }
 
@@ -394,5 +396,5 @@ void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimM
   pmap.emplace("simplify",    PrimDesc(prim_simplify,    type_simplify));
   pmap.emplace("relative",    PrimDesc(prim_relative,    type_relative));
   pmap.emplace("execpath",    PrimDesc(prim_execpath,    type_execpath));
-  pmap.emplace("getcwd",      PrimDesc(prim_getcwd,      type_getcwd));
+  pmap.emplace("workspace",   PrimDesc(prim_workspace,   type_workspace));
 }
