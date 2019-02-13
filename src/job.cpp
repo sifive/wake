@@ -608,9 +608,14 @@ static PRIMFN(prim_job_finish) {
   (void)data; // silence unused variable warning (EXPECT not called)
   REQUIRE (args.size() == 3, "prim_job_finish not called on 3 arguments");
   JOBRESULT(job, 0);
+
   if (!(job->state & STATE_MERGED)) {
     // fatal because it means the queue will not converge
     std::cerr << "ERROR: attempted to finish an unmerged job" << std::endl;
+    exit(1);
+  }
+  if ((job->state & STATE_FINISHED)) {
+    std::cerr << "ERROR: attempted to finish a finished job" << std::endl;
     exit(1);
   }
 
