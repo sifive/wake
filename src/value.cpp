@@ -233,6 +233,7 @@ std::string Double::str(int format, int precision) const {
   if (format == DEFAULTFLOAT) {
     std::string out = s.str();
     if (out.find('.') == std::string::npos &&
+        out.find('e') == std::string::npos &&
         (out[0] == '-' ? out[1] >= '0' && out[1] <= '9'
                        : out[0] >= '0' && out[0] <= '9')) {
       s << "e0";
