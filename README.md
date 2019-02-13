@@ -6,6 +6,8 @@ make/tup/basel/etc, you probably need wake.
 If you don't want to waste time rebuilding things that don't need it,
 or that your colleagues already built, you might appreciate wake.
 
+Put another way, Wake puts the _fun_ in _function_!
+
 # Wake features:
   - dependent job execution
 
