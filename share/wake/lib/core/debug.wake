@@ -2,7 +2,8 @@
 global def format any = prim "format"
 
 # Print any type to stdout; even exceptions
-global def puts str = prim "print"
+global def puts    str = prim "print"
+global def putsln  str = puts (str, "\n", Nil).cat
 global def print   any = puts (format any)
 global def println any = puts "{format any}\n"
 

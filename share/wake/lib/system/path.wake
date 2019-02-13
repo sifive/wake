@@ -6,4 +6,4 @@ global def simplify path = prim "simplify"
 global def relative dir path = prim "relative"
 global def whichIn path exec = prim "search_path"
 global def which exec = whichIn path exec
-global def workspace = prim "getcwd"
+global def workspace = prim "workspace"
