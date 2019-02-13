@@ -22,11 +22,16 @@ bool make_workspace(const std::string &dir) {
   return true;
 }
 
-bool chdir_workspace() {
+bool chdir_workspace(std::string &prefix) {
   int attempts;
+  std::string cwd = get_cwd();
   for (attempts = 100; attempts && access("wake.db", W_OK|R_OK) == -1; --attempts) {
     if (chdir("..") == -1) return false;
   }
+  std::string workspace = get_workspace();
+  prefix.assign(cwd.begin() + workspace.size(), cwd.end());
+  if (!prefix.empty())
+    std::rotate(prefix.begin(), prefix.begin()+1, prefix.end());
   return attempts != 0;
 }
 

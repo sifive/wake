@@ -10,7 +10,7 @@ struct Value;
 struct Receiver;
 struct String;
 
-bool chdir_workspace();
+bool chdir_workspace(std::string &prefix);
 bool make_workspace(const std::string &dir);
 
 std::string find_execpath();

@@ -215,13 +215,14 @@ int main(int argc, const char **argv) {
     return 1;
   }
 
+  std::string prefix;
   if (args["init"]) {
     std::string dir = args["init"];
     if (!make_workspace(dir)) {
       std::cerr << "Unable to initialize a workspace in " << dir << std::endl;
       return 1;
     }
-  } else if (!chdir_workspace()) {
+  } else if (!chdir_workspace(prefix)) {
     std::cerr << "Unable to locate wake.db in any parent directory." << std::endl;
     return 1;
   }
@@ -270,8 +271,15 @@ int main(int argc, const char **argv) {
     }
   }
 
-  if (args["input"]) describe(db.explain(args["input"], 1), rerun);
-  if (args["output"]) describe(db.explain(args["output"], 2), rerun);
+  if (args["input"]) {
+    std::string input = args["input"];
+    describe(db.explain(prefix + input, 1), rerun);
+  }
+
+  if (args["output"]) {
+    std::string output = args["output"];
+    describe(db.explain(prefix + output, 2), rerun);
+  }
 
   if (noparse) return 0;
 
