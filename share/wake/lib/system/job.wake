@@ -96,7 +96,7 @@ def runOnce cmd env dir stdin finputs foutputs findexes vis keep share run pool 
   memoize 9 (runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool root)
 
 # Run the job!
-global def makeJob (Plan cmd vis env dir stdin keep share (Runner run) finputs foutputs findexes pool root) =
+global def runJob (Plan cmd vis env dir stdin keep share (Runner run) finputs foutputs findexes pool root) =
   if pool == 0
   then runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool root
   else runOnce   cmd env dir stdin finputs foutputs findexes vis keep share run pool root
@@ -127,7 +127,7 @@ global def fuseRunner =
     def fuse =
       makeManualPlan cmd Nil (\_ Nil)
       | setPlanPool 0
-      | makeJob
+      | runJob
     def handle = raise "Could not start fuse-wake: {_}"
     def root = try handle (extract 'OK: (.*)' fuse.getJobStderr)
     def result = extract "(.*\0)?\0(.*)" fuse.getJobStdout
@@ -159,7 +159,7 @@ def hashpair f = memoize 0 ( # Pair file hash
   def add f h = prim "add_hash"
   def reuse = get f
   if reuse !=* "" then add f reuse else
-    def job = makeManualPlan ("<hash>", f, Nil) Nil (\_ Nil) | makeJob
+    def job = makeManualPlan ("<hash>", f, Nil) Nil (\_ Nil) | runJob
     if job.getJobStatus == 0
     then extract '(.{64}).*' job.getJobStdout | head | add f
     else raise "Failed to hash file {f}"
@@ -183,7 +183,7 @@ global def mkdir mode path =
 # If you declare too many visible inputs, cmd execution/replay will wait for unnecessary files.
 global def job cmd visible =
   makePlan cmd visible
-  | makeJob
+  | runJob
 
 # Use alwaysJob when:
 #   cmd can run under FUSE
@@ -197,7 +197,7 @@ global def alwaysJob cmd visible =
   makePlan cmd visible
   | setPlanKeep False
   | setPlanShare False
-  | makeJob
+  | runJob
 
 # Use manualJob when:
 #   cmd cannot run under FUSE, but you know which inputs and outputs cmd uses
@@ -214,7 +214,7 @@ global def manualJob cmd visible foutputs =
   makePlan cmd visible
   | setPlanRunner manualRunner
   | setPlanFnOutputs (\_ foutputs Unit)
-  | makeJob
+  | runJob
 
 # Use volatileJob when:
 #   cmd cannot run under FUSE, but you know which inputs and outputs cmd uses
@@ -232,4 +232,4 @@ global def volatileJob cmd visible foutputs =
   | setPlanFnOutputs (\_ foutputs Unit)
   | setPlanKeep False
   | setPlanShare False
-  | makeJob
+  | runJob

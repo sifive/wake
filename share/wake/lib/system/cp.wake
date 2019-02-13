@@ -8,7 +8,7 @@ global def installAs dest file =
   def doit _ =
     makeManualPlan cmd inputs foutputs
     | setPlanEnvironment Nil
-    | makeJob
+    | runJob
     | getJobOutputs
   waitAll (doit _) (mkdir 0775 "{dest}/..")
 
