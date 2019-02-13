@@ -5,7 +5,7 @@ global def format any = prim "format"
 global def puts    str = prim "print"
 global def putsln  str = puts (str, "\n", Nil).cat
 global def print   any = puts (format any)
-global def println any = puts "{format any}\n"
+global def println any = putsln (format any)
 
 # Wait for the top of a value to be made available, then run (f x)
 # Eg: x = 1, 2, 3, Nil; waitOne f x waits for ',' to be known vs. Nil
