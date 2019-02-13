@@ -133,19 +133,19 @@ int main(int argc, const char **argv) {
     { "help", {"-h", "--help"},
       "shows this help message", 0},
     { "add", {"-a", "--add"},
-      "add a build target to wake", 0},
+      "add command-line as a persistent build target", 0},
     { "subtract", {"-s", "--subtract"},
-      "remove a build target from wake", 1},
+      "remove the index-specified persistent build target", 1},
     { "list", {"-l", "--list"},
-      "list builds targets registered with wake", 0},
+      "list the registered persistent builds targets", 0},
     { "output", {"-o", "--output"},
-      "query which jobs have this output", 1},
+      "query which jobs have the specified output file", 1},
     { "input", {"-i", "--input"},
-      "query which jobs have this input", 1},
+      "query which jobs have the specified input file", 1},
     { "rerun", {"-r", "--rerun"},
       "output job descriptions as a runable shell script", 0},
     { "jobs", {"-j", "--jobs"},
-      "number of concurrent jobs to run", 1},
+      "set the number of concurrent jobs to run", 1},
     { "verbose", {"-v", "--verbose"},
       "output stdout of jobs", 0},
     { "version", {"--version"},
@@ -153,7 +153,7 @@ int main(int argc, const char **argv) {
     { "quiet", {"-q", "--quiet"},
       "surpress output of job commands and stderr", 0},
     { "debug", {"-d", "--debug"},
-      "simulate a stack for exceptions", 0},
+      "simulate a stack for exceptions and print closures", 0},
     { "parse", {"-p", "--parse"},
       "parse wake files and print the AST", 0},
     { "typecheck", {"-t", "--typecheck"},
@@ -198,6 +198,11 @@ int main(int argc, const char **argv) {
     std::uniform_int_distribution<uint64_t> dist;
     sip_key[0] = dist(rd);
     sip_key[1] = dist(rd);
+  }
+
+  if (jobs < 1) {
+    std::cerr << "Cannot run with less than 1 jobs!" << std::endl;
+    return 1;
   }
 
   if (quiet && verbose) {
