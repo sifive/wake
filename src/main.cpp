@@ -419,7 +419,7 @@ int main(int argc, const char **argv) {
     std::cout << " = ";
     if (v) {
       if (v->type == Exception::type) pass = false;
-      if (verbose) {
+      if (args["debug"]) {
         v->format(std::cout, -1);
       } else {
         std::cout << v << std::endl;
