@@ -184,6 +184,14 @@ int main(int argc, const char **argv) {
   bool rerun = args["rerun"];
   queue.stack_trace = args["debug"];
 
+  bool nodb = args["init"];
+  bool noparse = nodb ||
+    args["subtract"] || args["list"] ||
+    args["output"] || args["input"];
+  bool notype = noparse || args["parse"];
+  bool noexecute = notype ||
+    args["add"] || args["typecheck"] || args["globals"];
+
   // seed the keyed hash function
   {
     std::random_device rd;
@@ -197,6 +205,11 @@ int main(int argc, const char **argv) {
     return 1;
   }
 
+  if (noparse && !args.pos.empty()) {
+    std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
+    return 1;
+  }
+
   if (args["init"]) {
     std::string dir = args["init"];
     if (!make_workspace(dir)) {
@@ -207,6 +220,8 @@ int main(int argc, const char **argv) {
     std::cerr << "Unable to locate wake.db in any parent directory." << std::endl;
     return 1;
   }
+
+  if (nodb) return 0;
 
   Database db;
   std::string fail = db.open();
@@ -249,6 +264,11 @@ int main(int argc, const char **argv) {
       targets.push_back(expr.str());
     }
   }
+
+  if (args["input"]) describe(db.explain(args["input"], 1), rerun);
+  if (args["output"]) describe(db.explain(args["output"], 2), rerun);
+
+  if (noparse) return 0;
 
   bool ok = true;
   auto all_sources(find_all_sources());
@@ -301,6 +321,7 @@ int main(int argc, const char **argv) {
 
   if (args["parse"]) std::cout << top.get();
 
+  if (notype) return ok?0:1;
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
   if (!root) ok = false;
 
@@ -324,6 +345,16 @@ int main(int argc, const char **argv) {
     ok = false;
   }
 
+  if (!Unit) {
+    std::cerr << "Primitive data type Unit not defined." << std::endl;
+    ok = false;
+  }
+
+  if (!JValue) {
+    std::cerr << "Primitive data type JValue not defined." << std::endl;
+    ok = false;
+  }
+
   if (!ok) {
     if (args["add"]) std::cerr << ">>> Expression not added to the active target list <<<" << std::endl;
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
@@ -331,17 +362,31 @@ int main(int argc, const char **argv) {
   }
 
   if (args["typecheck"]) std::cout << root.get();
+  if (args["globals"]) {
+    for (auto &g : globals) {
+      Expr *e = root.get();
+      while (e && e->type == DefBinding::type) {
+        DefBinding *d = reinterpret_cast<DefBinding*>(e);
+        e = d->body.get();
+        auto i = d->order.find(g);
+        if (i != d->order.end()) {
+          int idx = i->second;
+          Expr *v = idx < d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
+          std::cout << g << ": ";
+          v->typeVar.format(std::cout, v->typeVar);
+          std::cout << " = <" << v->location << ">" << std::endl;
+        }
+      }
+    }
+  }
 
   if (args["add"]) {
     db.add_target(targets.back());
     if (args["verbose"]) std::cout << "Added target " << (targets.size()-1) << " = " << targets.back() << std::endl;
   }
-  if (args["input"]) describe(db.explain(args["input"], 1), rerun);
-  if (args["output"]) describe(db.explain(args["output"], 2), rerun);
-  if (args["parse"]) return 0;
-  if (args["list"]) return 0;
-  if (args["input"]) return 0;
-  if (args["output"]) return 0;
+
+  // Exit without execution for these arguments
+  if (noexecute) return 0;
 
   // Initialize expression hashes for memoize of closures
   root->hash();
@@ -353,21 +398,17 @@ int main(int argc, const char **argv) {
   do { queue.run(); } while (jobtable.wait(queue));
 
   std::vector<std::shared_ptr<Value> > outputs;
-  outputs.reserve(targets.size()+globals.size());
+  outputs.reserve(targets.size());
   Binding *iter = reinterpret_cast<Closure*>(output.get())->binding.get();
-  for (size_t i = 0; i < targets.size()+globals.size(); ++i) {
+  for (size_t i = 0; i < targets.size(); ++i) {
     outputs.emplace_back(iter->future[0].value);
     iter = iter->next.get();
   }
 
   bool pass = true;
-  for (size_t i = 0; i < targets.size()+globals.size(); ++i) {
-    Value *v = outputs[targets.size()+globals.size()-1-i].get();
-    if (i < targets.size()) {
-      std::cout << targets[i] << ": ";
-    } else {
-      std::cout << globals[i-targets.size()] << ": ";
-    }
+  for (size_t i = 0; i < targets.size(); ++i) {
+    Value *v = outputs[targets.size()-1-i].get();
+    std::cout << targets[i] << ": ";
     (*types)[0].format(std::cout, body->typeVar);
     types = &(*types)[1];
     std::cout << " = ";
