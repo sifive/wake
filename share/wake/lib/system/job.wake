@@ -56,7 +56,10 @@ global def makePlan cmd visible =
   Plan cmd visible environment "." "" True True fuseRunner id id id 1 "."
 
 global def makeManualPlan cmd visible foutputs =
-  Plan cmd visible Nil "." "" False False manualRunner id (\_ foutputs Unit) id 1 "."
+  Plan cmd visible Nil "." "" True True manualRunner id (\_ foutputs Unit) id 1 "."
+
+def makeRawPlan cmd  =
+  Plan cmd Nil Nil "." "" False False manualRunner id id id 1 "."
 
 # This runner does not detect inputs/outputs/indexes on it's own
 # You must use Fn{Inputs,Outputs,Indexes} to fill in this information
@@ -124,10 +127,7 @@ def fusePath = relative workspace (simplify "{wakePath}/../lib/wake/fuse-wake")
 global def fuseRunner =
   def doit in =
     def cmd = fusePath, in.getRunnerInputDirectory, in.getRunnerInputVisible | map getPathName
-    def fuse =
-      makeManualPlan cmd Nil (\_ Nil)
-      | setPlanPool 0
-      | runJob
+    def fuse = makeRawPlan cmd | setPlanPool 0 | runJob
     def handle = raise "Could not start fuse-wake: {_}"
     def root = try handle (extract 'OK: (.*)' fuse.getJobStderr)
     def result = extract "(.*\0)?\0(.*)" fuse.getJobStdout
@@ -159,7 +159,7 @@ def hashpair f = memoize 0 ( # Pair file hash
   def add f h = prim "add_hash"
   def reuse = get f
   if reuse !=* "" then add f reuse else
-    def job = makeManualPlan ("<hash>", f, Nil) Nil (\_ Nil) | runJob
+    def job = makeRawPlan ("<hash>", f, Nil) | runJob
     if job.getJobStatus == 0
     then extract '(.{64}).*' job.getJobStdout | head | add f
     else raise "Failed to hash file {f}"
@@ -211,9 +211,7 @@ global def alwaysJob cmd visible =
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
 global def manualJob cmd visible foutputs =
-  makePlan cmd visible
-  | setPlanRunner manualRunner
-  | setPlanFnOutputs (\_ foutputs Unit)
+  makeManualPlan cmd visible foutputs
   | runJob
 
 # Use volatileJob when:
@@ -227,9 +225,7 @@ global def manualJob cmd visible foutputs =
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
 global def volatileJob cmd visible foutputs =
-  makePlan cmd visible
-  | setPlanRunner manualRunner
-  | setPlanFnOutputs (\_ foutputs Unit)
+  makeManualPlan cmd visible foutputs
   | setPlanKeep False
   | setPlanShare False
   | runJob
