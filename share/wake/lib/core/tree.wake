@@ -396,7 +396,7 @@ global def tintersect (Tree _ aroot) (Tree cmp broot) =
           Tip = join2 l r
           Bin aes _ aex _ =
             if aes == 1 then join3 l aex r else join2 (join2 l ae) r
-  helper aroot broot
+  Tree cmp (helper aroot broot)
 
 # Pretty print the tree shape for debug
 global def tshape (Tree _ root) =
