@@ -11,6 +11,6 @@ global def install dest =
   def binfiles = all default
   def releaseAs exe = cat (dest, "/", take 1 (extract '(.*)\.(.*)' exe))
   def libinstall = map (installIn dest) libfiles
-  def bininstall = map (\exe installAs (releaseAs exe) exe) binfiles
+  def bininstall = map (\exe installAs (releaseAs exe.getPathName) exe) binfiles
   def pass = flatten (libinstall ++ bininstall)
   pass

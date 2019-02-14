@@ -30,7 +30,7 @@
 #define STATE_FINISHED	16 // inputs+outputs+status+runtime in database
 
 // Can be queried at multiple stages of the job's lifetime
-struct JobResult : public Value {
+struct Job : public Value {
   Database *db;
   int state;
   Hash code; // hash(dir, stdin, environ, cmdline)
@@ -49,7 +49,7 @@ struct JobResult : public Value {
 
   static const char *type;
   static TypeVar typeVar;
-  JobResult(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline);
+  Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline);
 
   void format(std::ostream &os, int depth) const;
   TypeVar &getType();
@@ -58,55 +58,55 @@ struct JobResult : public Value {
   void process(WorkQueue &queue); // Run commands based on state
 };
 
-const char *JobResult::type = "JobResult";
+const char *Job::type = "Job";
 
-void JobResult::format(std::ostream &os, int p) const {
+void Job::format(std::ostream &os, int p) const {
   if (APP_PRECEDENCE < p) os << "(";
-  os << "JobResult " << job;
+  os << "Job " << job;
   if (APP_PRECEDENCE < p) os << ")";
   if (p < 0) os << std::endl;
 }
 
-TypeVar JobResult::typeVar("JobResult", 0);
-TypeVar &JobResult::getType() {
+TypeVar Job::typeVar("Job", 0);
+TypeVar &Job::getType() {
   return typeVar;
 }
 
-Hash JobResult::hash() const { return code; }
+Hash Job::hash() const { return code; }
 
 // A Task is a job that is not yet forked
 struct Task {
-  std::shared_ptr<JobResult> job;
+  std::shared_ptr<Job> job;
   std::string root;
   std::string dir;
   std::string stdin;
   std::string environ;
   std::string cmdline;
   std::string stack;
-  Task(const std::shared_ptr<JobResult> &job_, const std::string &root_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_, const std::string &stack_)
+  Task(const std::shared_ptr<Job> &job_, const std::string &root_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_, const std::string &stack_)
   : job(job_), root(root_), dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_), stack(stack_) { }
 };
 
-// A Job is a forked job not yet merged
-struct Job {
+// A JobEntry is a forked job not yet merged
+struct JobEntry {
   int pool;
-  std::shared_ptr<JobResult> job;
+  std::shared_ptr<Job> job;
   int internal;
   int pipe_stdout;
   int pipe_stderr;
   struct timeval start;
   pid_t pid;
-  Job() : pid(0) { }
+  JobEntry() : pid(0) { }
   double runtime(struct timeval now);
 };
 
-double Job::runtime(struct timeval now) {
+double JobEntry::runtime(struct timeval now) {
   return now.tv_sec - start.tv_sec + (now.tv_usec - start.tv_usec)/1000000.0;
 }
 
 // Implementation details for a JobTable
 struct JobTable::detail {
-  std::vector<Job> table;
+  std::vector<JobEntry> table;
   std::vector<std::list<Task> > tasks;
   sigset_t sigset;
   Database *db;
@@ -341,7 +341,7 @@ bool JobTable::wait(WorkQueue &queue) {
   }
 }
 
-JobResult::JobResult(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline)
+Job::Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline)
   : Value(type), db(db_), state(0), code(), pid(0), job(-1), runtime(0), status(0)
 {
   std::vector<uint64_t> codes;
@@ -354,19 +354,19 @@ JobResult::JobResult(Database *db_, const std::string &dir, const std::string &s
   hash3(codes.data(), 8*codes.size(), code);
 }
 
-static std::unique_ptr<Receiver> cast_jobresult(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, JobResult **job) {
-  if (value->type != JobResult::type) {
+static std::unique_ptr<Receiver> cast_jobresult(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Job **job) {
+  if (value->type != Job::type) {
     Receiver::receive(queue, std::move(completion),
-      std::make_shared<Exception>(value->to_str() + " is not a JobResult", binding));
+      std::make_shared<Exception>(value->to_str() + " is not a Job", binding));
     return std::unique_ptr<Receiver>();
   } else {
-    *job = reinterpret_cast<JobResult*>(value.get());
+    *job = reinterpret_cast<Job*>(value.get());
     return completion;
   }
 }
 
 #define JOBRESULT(arg, i) 									\
-  JobResult *arg;										\
+  Job *arg;										\
   do {												\
     completion = cast_jobresult(queue, std::move(completion), binding, args[i], &arg);		\
     if (!completion) return;									\
@@ -380,7 +380,7 @@ static PRIMTYPE(type_job_launch) {
     args[3]->unify(String::typeVar) &&
     args[4]->unify(String::typeVar) &&
     args[5]->unify(String::typeVar) &&
-    out->unify(JobResult::typeVar);
+    out->unify(Job::typeVar);
 }
 
 static PRIMFN(prim_job_launch) {
@@ -398,7 +398,7 @@ static PRIMFN(prim_job_launch) {
 
   std::stringstream stack;
   for (auto &i : binding->stack_trace()) stack << i << std::endl;
-  auto out = std::make_shared<JobResult>(
+  auto out = std::make_shared<Job>(
     jobtable->imp->db,
     dir->value,
     stdin->value,
@@ -426,7 +426,7 @@ static PRIMTYPE(type_job_cache) {
     args[2]->unify(String::typeVar) &&
     args[3]->unify(String::typeVar) &&
     args[4]->unify(String::typeVar) &&
-    out->unify(JobResult::typeVar);
+    out->unify(Job::typeVar);
 }
 
 static PRIMFN(prim_job_cache) {
@@ -449,7 +449,7 @@ static PRIMFN(prim_job_cache) {
 
   if (!cached) RAISE("not cached");
 
-  auto out = std::make_shared<JobResult>(jobtable->imp->db, dir->value, stdin->value, env->value, cmd->value);
+  auto out = std::make_shared<Job>(jobtable->imp->db, dir->value, stdin->value, env->value, cmd->value);
   out->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED|STATE_FINISHED;
   out->job = job;
 
@@ -466,7 +466,7 @@ static std::shared_ptr<Value> convert_tree(std::vector<FileReflection> &&files) 
   return make_list(std::move(vals));
 }
 
-void JobResult::process(WorkQueue &queue) {
+void Job::process(WorkQueue &queue) {
   if ((state & STATE_STDOUT) && q_stdout) {
     auto out = std::make_shared<String>(db->get_output(job, 1));
     std::unique_ptr<Receiver> iter, next;
@@ -522,7 +522,7 @@ void JobResult::process(WorkQueue &queue) {
 
 static PRIMTYPE(type_job_output) {
   return args.size() == 2 &&
-    args[0]->unify(JobResult::typeVar) &&
+    args[0]->unify(Job::typeVar) &&
     args[1]->unify(Integer::typeVar) &&
     out->unify(String::typeVar);
 }
@@ -546,7 +546,7 @@ static PRIMFN(prim_job_output) {
 
 static PRIMTYPE(type_job_kill) {
   return args.size() == 2 &&
-    args[0]->unify(JobResult::typeVar) &&
+    args[0]->unify(Job::typeVar) &&
     args[1]->unify(Integer::typeVar) &&
     out->unify(Integer::typeVar);
 }
@@ -574,7 +574,7 @@ static PRIMTYPE(type_job_tree) {
   pair[0].unify(String::typeVar);
   pair[1].unify(String::typeVar);
   return args.size() == 2 &&
-    args[0]->unify(JobResult::typeVar) &&
+    args[0]->unify(Job::typeVar) &&
     args[1]->unify(Integer::typeVar) &&
     out->unify(list);
 }
@@ -598,7 +598,7 @@ static PRIMFN(prim_job_tree) {
 
 static PRIMTYPE(type_job_finish) {
   return args.size() == 3 &&
-    args[0]->unify(JobResult::typeVar) &&
+    args[0]->unify(Job::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
     out->unify(Data::typeUnit);
@@ -608,9 +608,14 @@ static PRIMFN(prim_job_finish) {
   (void)data; // silence unused variable warning (EXPECT not called)
   REQUIRE (args.size() == 3, "prim_job_finish not called on 3 arguments");
   JOBRESULT(job, 0);
+
   if (!(job->state & STATE_MERGED)) {
     // fatal because it means the queue will not converge
     std::cerr << "ERROR: attempted to finish an unmerged job" << std::endl;
+    exit(1);
+  }
+  if ((job->state & STATE_FINISHED)) {
+    std::cerr << "ERROR: attempted to finish a finished job" << std::endl;
     exit(1);
   }
 

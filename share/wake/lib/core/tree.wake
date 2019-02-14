@@ -166,8 +166,8 @@ global def tsplitAt i (Tree cmp root) =
   match (helper i root)
     Pair l r = Pair (Tree cmp l) (Tree cmp r)
 
-global def ttake i t = tsplitAt i t | first
-global def tdrop i t = tsplitAt i t | second
+global def ttake i t = tsplitAt i t | getPairFirst
+global def tdrop i t = tsplitAt i t | getPairSecond
 
 # Lowest rank element where f x = True  => Option (Pair x rank)
 global def tfind f (Tree _ root) =
@@ -186,8 +186,8 @@ global def tsplitUntil f t =
       (Tree cmp _) = Pair t (Tree cmp Tip)
     Some (Pair _ i) = tsplitAt i t
 
-global def ttakeUntil f t = tsplitUntil f t | first
-global def tdropUntil f t = tsplitUntil f t | second
+global def ttakeUntil f t = tsplitUntil f t | getPairFirst
+global def tdropUntil f t = tsplitUntil f t | getPairSecond
 
 # Returns True if there exists an x where f x = True
 global def texists f t = match (tfind f t)

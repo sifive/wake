@@ -1,9 +1,19 @@
-# file/path operations
-global def read path = prim "read"
-global def write mode path content = prim "write"
-global def mkdir mode path = prim "mkdir"
+# Read the file contents of a Path
+global def read path =
+  def imp p = prim "read"
+  imp path.getPathName
+
+# Simplify away the ..s and .s in a String
 global def simplify path = prim "simplify"
+
+# Reframe path into a form accesible relative to dir
 global def relative dir path = prim "relative"
-global def whichIn path exec = prim "search_path"
+
+# Locate an executable in the search path
+global def whichIn path exec = memoize 0 (
+  def imp path exec = prim "search_path"
+  imp path exec
+)
+
 global def which exec = whichIn path exec
 global def workspace = prim "workspace"

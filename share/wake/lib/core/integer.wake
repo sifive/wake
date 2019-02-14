@@ -20,10 +20,6 @@ global def gcd x y = prim "gcd"
 global def lcm x y = prim "lcm"
 global def powm x y m = prim "powm" # fast version of: (x^y) % m
 
-global def √ x = root 2 x
-global def ∛ x = root 3 x
-global def ∜ x = root 4 x
-
 global def icmp x y = prim "icmp"
 
 global def x <  y = lt icmp x y

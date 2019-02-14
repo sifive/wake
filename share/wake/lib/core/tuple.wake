@@ -6,10 +6,6 @@ global tuple Pair a b =
   global First  a
   global Second b
 
-# Backwards compatibility
-global def first  (Pair x _) = x
-global def second (Pair _ x) = x
-
 global tuple Triple a b c =
   global First  a
   global Second b

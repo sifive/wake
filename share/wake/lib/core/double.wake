@@ -9,6 +9,16 @@ global def x /. y = prim "ddiv"
 global def x ^. y = prim "dpow"
 global def dfma x y z = prim "dfma" # x*y + z
 
+global def droot n =
+  def n1 = 1.0 /. n
+  _ ^. n1
+global def dsqrt = droot 2.0
+def root3 = droot 3.0
+def root4 = droot 4.0
+global def √ x = dsqrt x
+global def ∛ x = root3 x
+global def ∜ x = root4 x
+
 global def dcmp x y = prim "dcmp"
 
 global def x <.  y = lt dcmp x y
@@ -26,26 +36,26 @@ global def ∏. l = foldl (_*._) 1.0 l
 global def ∑. l = foldl (_+._) 0.0 l
 
 global data DoubleFormat =
-  Fixed
-  Scientific
-  HexFloat
-  DefaultFloat
+  DoubleFixed
+  DoubleScientific
+  DoubleHex
+  DoubleDefault
 
 global def dformat x =
   def imp f p x = prim "dstr"
   def f = match x
-    Fixed        = 0
-    Scientific   = 1
-    HexFloat     = 2
-    DefaultFloat = 3
+    DoubleFixed      = 0
+    DoubleScientific = 1
+    DoubleHex        = 2
+    DoubleDefault    = 3
   imp f
 
 global def double s = prim "ddbl"
-global def dhex = dformat HexFloat 20
-global def dstr = dformat DefaultFloat 17
+global def dhex = dformat DoubleHex 20
+global def dstr = dformat DoubleDefault 17
 
 # Conversion methods
-global data Class =
+global data DoubleClass =
   Infinite
   NaN
   SubNormal

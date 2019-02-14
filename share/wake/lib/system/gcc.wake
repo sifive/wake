@@ -5,16 +5,15 @@ def releaseCFlags = ("-Wall", "-O2", "-flto", Nil)
 def releaseLFlags = ("-flto", Nil)
 
 def doCompileC variant gcc flags headers file =
-  def obj = replace '\.c(pp)?$' ".{variant}.o" file
-  def cmdline = gcc, flags ++ ("-c", file, "-frandom-seed={obj}", "-o", obj, Nil)
+  def obj = replace '\.c(pp)?$' ".{variant}.o" file.getPathName
+  def cmdline = gcc, flags ++ ("-c", file.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
   def result = job cmdline (file, headers)
-  result.output
+  result.getJobOutput
 
 def doLinkO variant linker flags objs file =
-  def cmdline = (linker, "-o", "{file}.{variant}", objs) ++ flags
-  def outdir = simplify "{file}/.."
-  def result = job cmdline (outdir, objs)
-  result.output
+  def cmdline = (linker, "-o", "{file}.{variant}", map getPathName objs) ++ flags
+  def result = job cmdline (makePath "{file}/..", objs)
+  result.getJobOutput
 
 def makeCompileC variant gcc flags =
   Pair variant (\extra doCompileC variant gcc (flags ++ extra))
@@ -33,10 +32,10 @@ publish linkO = makeLinkO "native-cpp11-debug"   (which "g++") (debugLFlags)
 publish linkO = makeLinkO "native-cpp11-release" (which "g++") (releaseLFlags)
 
 def pickVariant variant variants =
-  match (find (matches variant _.first) variants)
-    Some (Pair x _) = x.second
+  match (find (matches variant _.getPairFirst) variants)
+    Some (Pair x _) = x.getPairSecond
     None =
-      def ok = catWith " " (map first variants)
+      def ok = catWith " " (map getPairFirst variants)
       raise "No variant matches {variant}; options: {ok}"
 
 global def compileC variant = pickVariant variant (subscribe compileC)

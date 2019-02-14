@@ -1,8 +1,8 @@
 global def pkgConfig args = memoize 0 (
   def cmdline = which "pkg-config", args
-  def result = manual_job cmdline Nil (\_ Nil) # caching ok
-  def output = tokenize "\n" result.stdout | head | tokenize " " | filter (_ !=* "")
-  if result.status != 0 then raise "pkg-config failed" else output
+  def result = manualJob cmdline Nil (\_ Nil) # caching ok
+  def output = tokenize "\n" result.getJobStdout | head | tokenize " " | filter (_ !=* "")
+  if result.getJobStatus != 0 then raise "pkg-config failed" else output
 )
 
 global def cflags pkg = try (\_ raise "pkg-config for {pkg} not found") (pkgConfig ("--cflags", pkg, Nil))
