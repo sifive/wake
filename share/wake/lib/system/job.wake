@@ -29,6 +29,7 @@ tuple Plan =
   global Environment   List String  # KEY=VALUE environment variables fed to the command
   global Directory     String       # The directory in which the command should be run
   global StandardInput String       # The file to which standard input should be connected
+  global Once          Boolean      # Should Job only be run once in a given wake execution
   global Keep          Boolean      # Should Job output be reusable between wake invocations
   global Share         Boolean      # Should Job output be shared between workspaces
   global Runner        Runner       # The runner to use when executing this job
@@ -39,7 +40,7 @@ tuple Plan =
   Root                 String       # Workspace root directory used by the Job
 
 # The criteria which determine if Job execution can be skipped:
-#   A matching job was run by this wake invocation
+#   Once  is True and a matching job was run by this wake invocation
 #   Keep  is True and there is matching output in the workspace
 #   Share is True and there is matching output in a shared cache
 # A Job is considered matching if:
@@ -49,17 +50,18 @@ tuple Plan =
 #   The prior Outputs exist as the output of a matching Job
 #   The prior Inputs have the same hashes as files in the workspace
 #   The prior Indexes observe the same set of Visible files
+# Note: Once=False => Keep=False => Share=False
 
 # Set reasonable defaults for all Plan arguments
 def id x = x
 global def makePlan cmd visible =
-  Plan cmd visible environment "." "" True True fuseRunner id id id 1 "."
+  Plan cmd visible environment "." "" True True True fuseRunner id id id 1 "."
 
 global def makeManualPlan cmd visible foutputs =
-  Plan cmd visible Nil "." "" True True manualRunner id (\_ foutputs Unit) id 1 "."
+  Plan cmd visible environment "." "" True True True manualRunner id (\_ foutputs Unit) id 1 "."
 
 def makeRawPlan cmd  =
-  Plan cmd Nil Nil "." "" False False manualRunner id id id 1 "."
+  Plan cmd Nil Nil "." "" False False False manualRunner id id id 1 "."
 
 # This runner does not detect inputs/outputs/indexes on it's own
 # You must use Fn{Inputs,Outputs,Indexes} to fill in this information
@@ -99,10 +101,12 @@ def runOnce cmd env dir stdin finputs foutputs findexes vis keep share run pool 
   memoize 9 (runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool root)
 
 # Run the job!
-global def runJob (Plan cmd vis env dir stdin keep share (Runner run) finputs foutputs findexes pool root) =
-  if pool == 0
-  then runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool root
-  else runOnce   cmd env dir stdin finputs foutputs findexes vis keep share run pool root
+global def runJob (Plan cmd vis env dir stdin once keep share (Runner run) finputs foutputs findexes pool root) =
+  def keep_  = once && keep
+  def share_ = keep_ && share
+  if once
+  then runOnce   cmd env dir stdin finputs foutputs findexes vis keep_ share_ run pool root
+  else runAlways cmd env dir stdin finputs foutputs findexes vis keep_ share_ run pool root
 
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
@@ -196,7 +200,6 @@ global def job cmd visible =
 global def alwaysJob cmd visible =
   makePlan cmd visible
   | setPlanKeep False
-  | setPlanShare False
   | runJob
 
 # Use manualJob when:
@@ -227,5 +230,4 @@ global def manualJob cmd visible foutputs =
 global def volatileJob cmd visible foutputs =
   makeManualPlan cmd visible foutputs
   | setPlanKeep False
-  | setPlanShare False
   | runJob
