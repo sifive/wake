@@ -29,15 +29,36 @@ tuple Plan =
   global Environment   List String  # KEY=VALUE environment variables fed to the command
   global Directory     String       # The directory in which the command should be run
   global StandardInput String       # The file to which standard input should be connected
-  global Once          Boolean      # Should Job only be run once in a given wake execution
-  global Keep          Boolean      # Should Job output be reusable between wake invocations
-  global Share         Boolean      # Should Job output be shared between workspaces
+  Once_                Boolean      # Should Job only be run once in a given wake execution
+  Keep_                Boolean      # Should Job output be reusable between wake invocations
+  Share_               Boolean      # Should Job output be shared between workspaces
   global Runner        Runner       # The runner to use when executing this job
   global FnInputs      (List String => List String) # Modify the Runner's reported inputs  (files read)
   global FnOutputs     (List String => List String) # Modify the Runner's reported outputs (files created)
   global FnIndexes     (List String => List String) # Modify the Runner's reported indexes (directories listed)
   Pool                 Integer      # Resource pool used to pay for the Job
   Root                 String       # Workspace root directory used by the Job
+
+global def getPlanOnce  = getPlanOnce_
+global def getPlanKeep  = getPlanKeep_
+global def getPlanShare = getPlanShare_
+global def editPlanOnce  f p = setPlanOnce  (f p.getPlanOnce_)
+global def editPlanKeep  f p = setPlanKeep  (f p.getPlanKeep_)
+global def editPlanShare f p = setPlanShare (f p.getPlanShare_)
+
+# Maintain the invariant that: Share => Keep => Once
+global def setPlanOnce v p =
+  if v
+  then p | setPlanOnce_ True
+  else p | setPlanOnce_ False | setPlanKeep_ False | setPlanShare_ False
+global def setPlanKeep v p =
+  if v
+  then p | setPlanOnce_ True  | setPlanKeep_  True
+  else p | setPlanKeep_ False | setPlanShare_ False
+global def setPlanShare v p =
+  if v
+  then p | setPlanOnce_ True | setPlanKeep_ True | setPlanShare_ True
+  else p | setPlanShare_ False
 
 # The criteria which determine if Job execution can be skipped:
 #   Once  is True and a matching job was run by this wake invocation
@@ -50,7 +71,6 @@ tuple Plan =
 #   The prior Outputs exist as the output of a matching Job
 #   The prior Inputs have the same hashes as files in the workspace
 #   The prior Indexes observe the same set of Visible files
-# Note: Once=False => Keep=False => Share=False
 
 # Set reasonable defaults for all Plan arguments
 def id x = x
@@ -102,11 +122,9 @@ def runOnce cmd env dir stdin finputs foutputs findexes vis keep share run pool 
 
 # Run the job!
 global def runJob (Plan cmd vis env dir stdin once keep share (Runner run) finputs foutputs findexes pool root) =
-  def keep_  = once && keep
-  def share_ = keep_ && share
   if once
-  then runOnce   cmd env dir stdin finputs foutputs findexes vis keep_ share_ run pool root
-  else runAlways cmd env dir stdin finputs foutputs findexes vis keep_ share_ run pool root
+  then runOnce   cmd env dir stdin finputs foutputs findexes vis keep share run pool root
+  else runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool root
 
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
