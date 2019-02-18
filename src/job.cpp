@@ -77,14 +77,12 @@ Hash Job::hash() const { return code; }
 // A Task is a job that is not yet forked
 struct Task {
   std::shared_ptr<Job> job;
-  std::string root;
   std::string dir;
   std::string stdin;
   std::string environ;
   std::string cmdline;
-  std::string stack;
-  Task(const std::shared_ptr<Job> &job_, const std::string &root_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_, const std::string &stack_)
-  : job(job_), root(root_), dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_), stack(stack_) { }
+  Task(const std::shared_ptr<Job> &job_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_)
+  : job(job_), dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_) { }
 };
 
 // A JobEntry is a forked job not yet merged
@@ -191,7 +189,6 @@ static void launch(JobTable *jobtable) {
       i.pipe_stdout = pipe_stdout[0];
       i.pipe_stderr = pipe_stderr[0];
       gettimeofday(&i.start, 0);
-      i.job->db->insert_job(task.dir, task.stdin, task.environ, task.cmdline, task.stack, &i.job->job);
       std::cout << std::flush;
       std::cerr << std::flush;
       fflush(stdout);
@@ -201,7 +198,6 @@ static void launch(JobTable *jobtable) {
         << (task.stdin.empty() ? "/dev/null" : task.stdin.c_str()) << '\0'
         << std::to_string(pipe_stdout[1]) << '\0'
         << std::to_string(pipe_stderr[1]) << '\0'
-        << task.root << '\0'
         << task.dir << '\0';
       std::string shim = prelude.str() + task.cmdline;
       auto cmdline = split_null(shim);
@@ -374,27 +370,62 @@ static std::unique_ptr<Receiver> cast_jobresult(WorkQueue &queue, std::unique_pt
 
 static PRIMTYPE(type_job_launch) {
   return args.size() == 6 &&
-    args[0]->unify(Integer::typeVar) &&
-    args[1]->unify(String::typeVar) &&
+    args[0]->unify(Job::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
     args[2]->unify(String::typeVar) &&
     args[3]->unify(String::typeVar) &&
     args[4]->unify(String::typeVar) &&
     args[5]->unify(String::typeVar) &&
-    out->unify(Job::typeVar);
+    out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_job_launch) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT(6);
-  INTEGER(pool, 0);
-  STRING(root, 1);
+  JOBRESULT(job, 0);
+  INTEGER(pool, 1);
   STRING(dir, 2);
   STRING(stdin, 3);
   STRING(env, 4);
   STRING(cmd, 5);
 
+  if (job->state != 0) {
+    std::cerr << "ERROR: attempted to launch a FORKED job" << std::endl;
+    exit(1);
+  }
+
   REQUIRE(mpz_cmp_si(pool->value, 0) >= 0, "Pool must be >= 0");
   REQUIRE(mpz_cmp_si(pool->value, POOLS) < 0, "Pool must be < POOLS");
+
+  jobtable->imp->tasks[mpz_get_si(pool->value)].emplace_back(
+    std::dynamic_pointer_cast<Job>(args[0]),
+    dir->value,
+    stdin->value,
+    env->value,
+    cmd->value);
+
+  launch(jobtable);
+
+  auto out = make_unit();
+  RETURN(out);
+}
+
+static PRIMTYPE(type_job_create) {
+  return args.size() == 4 &&
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    args[2]->unify(String::typeVar) &&
+    args[3]->unify(String::typeVar) &&
+    out->unify(Job::typeVar);
+}
+
+static PRIMFN(prim_job_create) {
+  JobTable *jobtable = reinterpret_cast<JobTable*>(data);
+  EXPECT(4);
+  STRING(dir, 0);
+  STRING(stdin, 1);
+  STRING(env, 2);
+  STRING(cmd, 3);
 
   std::stringstream stack;
   for (auto &i : binding->stack_trace()) stack << i << std::endl;
@@ -405,16 +436,13 @@ static PRIMFN(prim_job_launch) {
     env->value,
     cmd->value);
 
-  jobtable->imp->tasks[mpz_get_si(pool->value)].emplace_back(
-    out,
-    root->value,
+  out->db->insert_job(
     dir->value,
     stdin->value,
     env->value,
     cmd->value,
-    stack.str());
-
-  launch(jobtable);
+    stack.str(),
+    &out->job);
 
   RETURN(out);
 }
@@ -740,6 +768,7 @@ static PRIMFN(prim_search_path) {
 }
 
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
+  pmap.emplace("job_create", PrimDesc(prim_job_create, type_job_create, jobtable));
   pmap.emplace("job_launch", PrimDesc(prim_job_launch, type_job_launch, jobtable));
   pmap.emplace("job_cache",  PrimDesc(prim_job_cache,  type_job_cache,  jobtable));
   pmap.emplace("job_output", PrimDesc(prim_job_output, type_job_output));

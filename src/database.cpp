@@ -135,7 +135,7 @@ std::string Database::open() {
   const char *sql_get_tree =
     "select p.path, h.hash from filetree t, hashes h, files p"
     " where t.access=? and t.job_id=? and h.run_id=t.run_id and h.file_id=t.file_id and p.file_id=t.file_id";
-  const char *sql_set_runtime = "update jobs set status=?, runtime=? where job_id=?";
+  const char *sql_set_runtime = "update jobs set time=current_timestamp, status=?, runtime=? where job_id=?";
   const char *sql_delete_tree =
     "delete from filetree where job_id in (select job_id from jobs where "
     "directory=? and commandline=? and environment=? and stdin=?)";
@@ -439,7 +439,6 @@ void Database::insert_job(
   const std::string &stack,
   long  *job)
 {
-  long out;
   const char *why = "Could not insert a job";
   begin_txn();
   bind_string (why, imp->delete_tree, 1, directory);
@@ -464,9 +463,8 @@ void Database::insert_job(
   bind_string (why, imp->insert_job, 5, stack);
   bind_string (why, imp->insert_job, 6, stdin);
   single_step (why, imp->insert_job);
-  out = sqlite3_last_insert_rowid(imp->db);
   end_txn();
-  *job = out;
+  *job = sqlite3_last_insert_rowid(imp->db);
 }
 
 void Database::finish_job(long job, const std::string &inputs, const std::string &outputs, int status, double runtime) {

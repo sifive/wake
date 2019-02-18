@@ -4,23 +4,21 @@ global tuple Runner =
 
 # RunnerInput is a subset of the fields supplied in the execution Plan
 tuple RunnerInput =
+  global Job           Job
   global CommandLine   List String
   global Visible       List Path
   global Environment   List String
   global Directory     String
   global StandardInput String
   Pool                 Integer
-  Root                 String
 
 tuple RunnerOutput =
-  global Job     Job
-  # these might be futures:
   global Inputs  List String
   global Outputs List String
   global Indexes List String
 
-global def makeRunnerOutput job =
-  RunnerOutput job Nil Nil Nil
+global def makeRunnerOutput Unit =
+  RunnerOutput Nil Nil Nil
 
 # A Plan describes a not-yet-executed Job
 tuple Plan =
@@ -37,7 +35,6 @@ tuple Plan =
   global FnOutputs     (List String => List String) # Modify the Runner's reported outputs (files created)
   global FnIndexes     (List String => List String) # Modify the Runner's reported indexes (directories listed)
   Pool                 Integer      # Resource pool used to pay for the Job
-  Root                 String       # Workspace root directory used by the Job
 
 global def getPlanOnce  = getPlanOnce_
 global def getPlanKeep  = getPlanKeep_
@@ -75,36 +72,39 @@ global def setPlanShare v p =
 # Set reasonable defaults for all Plan arguments
 def id x = x
 global def makePlan cmd visible =
-  Plan cmd visible environment "." "" True True True fuseRunner id id id 1 "."
+  Plan cmd visible environment "." "" True True True fuseRunner id id id 1
 
 global def makeManualPlan cmd visible foutputs =
-  Plan cmd visible environment "." "" True True True manualRunner id (\_ foutputs Unit) id 1 "."
+  Plan cmd visible environment "." "" True True True manualRunner id (\_ foutputs Unit) id 1
 
 def makeRawPlan cmd  =
-  Plan cmd Nil Nil "." "" False False False manualRunner id id id 1 "."
+  Plan cmd Nil Nil "." "" False False False manualRunner id id id 1
 
 # This runner does not detect inputs/outputs/indexes on it's own
 # You must use Fn{Inputs,Outputs,Indexes} to fill in this information
 global def manualRunner =
-  def launch pool root dir stdin env cmd = prim "job_launch"
-  def doit (RunnerInput cmd vis env dir stdin pool root) =
-    def job = launch pool root dir stdin env.implode cmd.implode
-    RunnerOutput job (map getPathName vis) Nil Nil
+  def launch job pool dir stdin env cmd = prim "job_launch"
+  def doit (RunnerInput job cmd vis env dir stdin pool) =
+    def _ = launch job pool dir stdin env.implode cmd.implode
+    RunnerOutput (map getPathName vis) Nil Nil
   Runner doit
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
-def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool root =
+def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool =
+  def create dir stdin env cmd = prim "job_create"
   def finish job inputs outputs = prim "job_finish"
   def cache dir stdin env cmd visible = prim "job_cache"
-  def input = RunnerInput cmd vis env dir stdin pool root
-  def build _ = match (run input)
-    RunnerOutput job inputs outputs indexes =
-      def final _ =
-        def input  = finputs  inputs  | map hashname | implode
-        def output = foutputs outputs | map hashname | implode
-        finish job input output
-      def _ = waitOne final job.getJobStatus
-      job
+  def build _ =
+    def job = create dir stdin env.implode cmd.implode
+    def input = RunnerInput job cmd vis env dir stdin pool
+    match (run input)
+      RunnerOutput inputs outputs indexes =
+        def final _ =
+          def input  = finputs  inputs  | map hashname | implode
+          def output = foutputs outputs | map hashname | implode
+          finish job input output
+        def _ = waitOne final job.getJobStatus
+        job
   match keep
     False = build 0
     True  = match (tryelse (\_ None) (Some _) (cache dir stdin env.implode cmd.implode (map getPathName vis).implode))
@@ -117,14 +117,14 @@ def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run poo
             raise "Hash mismatch for {file} ({saw} != {hashcode file}); remove it"
 
 # Only run if the first four arguments differ
-def runOnce cmd env dir stdin finputs foutputs findexes vis keep share run pool root =
-  memoize 9 (runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool root)
+def runOnce cmd env dir stdin finputs foutputs findexes vis keep share run pool =
+  memoize 9 (runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool)
 
 # Run the job!
-global def runJob (Plan cmd vis env dir stdin once keep share (Runner run) finputs foutputs findexes pool root) =
+global def runJob (Plan cmd vis env dir stdin once keep share (Runner run) finputs foutputs findexes pool) =
   if once
-  then runOnce   cmd env dir stdin finputs foutputs findexes vis keep share run pool root
-  else runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool root
+  then runOnce   cmd env dir stdin finputs foutputs findexes vis keep share run pool
+  else runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool
 
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
@@ -157,12 +157,12 @@ global def fuseRunner =
     def outputs = result | at 1 | tokenize "\0" | reverse | tail
     def out =
       in
-      | setRunnerInputRoot root.head
+      | editRunnerInputDirectory ("{root.head}/{_}")
       | manualRunner.getRunnerFn
       | setRunnerOutputInputs  inputs
       | setRunnerOutputOutputs outputs
     def final _ = killJob fuse 14 # SIGALRM
-    def _ = waitOne final out.getRunnerOutputJob.getJobStatus
+    def _ = waitOne final in.getRunnerInputJob.getJobStatus
     out
   Runner doit
 
