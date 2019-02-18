@@ -13,5 +13,5 @@ global def installAs dest file =
   waitAll (doit _) (mkdir 0775 "{dest}/..")
 
 global def installIn dir file =
-  def dest = simplify "{dir}/{file}"
+  def dest = simplify "{dir}/{file.getPathName}"
   installAs dest file

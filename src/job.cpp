@@ -410,6 +410,43 @@ static PRIMFN(prim_job_launch) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_job_virtual) {
+  return args.size() == 5 &&
+    args[0]->unify(Job::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    args[2]->unify(String::typeVar) &&
+    args[3]->unify(Integer::typeVar) &&
+    args[4]->unify(Double::typeVar) &&
+    out->unify(Data::typeUnit);
+}
+
+static PRIMFN(prim_job_virtual) {
+  EXPECT(5);
+  JOBRESULT(job, 0);
+  STRING(stdout, 1);
+  STRING(stderr, 2);
+  INTEGER(status, 3);
+  DOUBLE(runtime, 4);
+
+  if (job->state != 0) {
+    std::cerr << "ERROR: attempted to virtualize a FORKED job" << std::endl;
+    exit(1);
+  }
+
+  if (!stdout->value.empty())
+    job->db->save_output(job->job, 1, stdout->value.data(), stdout->value.size(), 0);
+  if (!stderr->value.empty())
+    job->db->save_output(job->job, 2, stderr->value.data(), stderr->value.size(), 0);
+  job->status = mpz_get_si(status->value);
+  job->runtime = runtime->value;
+
+  job->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED;
+  job->process(queue);
+
+  auto out = make_unit();
+  RETURN(out);
+}
+
 static PRIMTYPE(type_job_create) {
   return args.size() == 4 &&
     args[0]->unify(String::typeVar) &&
@@ -770,6 +807,7 @@ static PRIMFN(prim_search_path) {
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   pmap.emplace("job_create", PrimDesc(prim_job_create, type_job_create, jobtable));
   pmap.emplace("job_launch", PrimDesc(prim_job_launch, type_job_launch, jobtable));
+  pmap.emplace("job_virtual",PrimDesc(prim_job_virtual,type_job_virtual,jobtable));
   pmap.emplace("job_cache",  PrimDesc(prim_job_cache,  type_job_cache,  jobtable));
   pmap.emplace("job_output", PrimDesc(prim_job_output, type_job_output));
   pmap.emplace("job_kill",   PrimDesc(prim_job_kill,   type_job_kill));

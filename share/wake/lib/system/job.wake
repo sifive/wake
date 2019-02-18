@@ -84,9 +84,29 @@ def makeRawPlan cmd  =
 # You must use Fn{Inputs,Outputs,Indexes} to fill in this information
 global def manualRunner =
   def launch job pool dir stdin env cmd = prim "job_launch"
-  def doit (RunnerInput job cmd vis env dir stdin pool) =
-    def _ = launch job pool dir stdin env.implode cmd.implode
-    RunnerOutput (map getPathName vis) Nil Nil
+  def doit in = match in
+    RunnerInput job cmd vis env dir stdin pool =
+      def ok = launch job pool dir stdin env.implode cmd.implode
+      def out = RunnerOutput (map getPathName vis) Nil Nil
+      def handle _ = match (virtualRunner (\_ out))
+        Runner run = run in
+      tryelse handle (\_ out) ok
+  Runner doit
+
+global def virtualRunner fn =
+  def virtual job stdout stderr status runtime = prim "job_virtual"
+  def doit in =
+    def out = fn in
+    match (try (\x RunnerOutput x Nil Nil) out)
+      RunnerOutput inputs outputs indexes =
+        def fails = tryelse (_) (\_ Nil)
+        def exceptions = inputs ++ outputs ++ indexes | map fails | flatten
+        def stderr = catWith "\n" exceptions
+        def status = if exceptions.empty then 0 else 1
+        def _ = virtual in.getRunnerInputJob "" stderr status 0.0
+        if exceptions.empty
+        then out
+        else RunnerOutput (map getPathName in.getRunnerInputVisible) Nil Nil
   Runner doit
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
@@ -191,9 +211,17 @@ global def write mode path content =
   def imp m p c = prim "write"
   makePath (imp mode path content)
 
-global def mkdir mode path =
+# Create a directory (if it does not already exist)
+global def mkdir mode rawpath =
+  def path = simplify rawpath
   def imp m p = prim "mkdir"
-  Path (imp mode path)
+  def doit _ = RunnerOutput Nil (imp mode path, Nil) Nil
+  makePlan ("<mkdir>", path, Nil) Nil
+  | setPlanRunner      (virtualRunner doit)
+  | setPlanKeep        False
+  | setPlanEnvironment Nil
+  | runJob
+  | getJobOutput
 
 # Whenever possible, use 'job' if:
 #   cmd can run under FUSE
