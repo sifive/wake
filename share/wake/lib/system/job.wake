@@ -116,11 +116,11 @@ global def virtualRunner =
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
 def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool =
-  def create dir stdin env cmd = prim "job_create"
+  def create dir stdin env cmd visible = prim "job_create"
   def finish job inputs outputs = prim "job_finish"
   def cache dir stdin env cmd visible = prim "job_cache"
   def build _ =
-    def job = create dir stdin env.implode cmd.implode # !!! vis.implode
+    def job = create dir stdin env.implode cmd.implode (map getPathName vis).implode
     def input = tryelse (\_ RunnerInput (cast job) Nil Nil "" "" 0) (\_ RunnerInput cmd vis env dir stdin pool) job
     def output = run job input
     match (try (\_ RunnerOutput (cast output) (cast output) (cast output)) output)
