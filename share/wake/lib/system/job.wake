@@ -212,6 +212,27 @@ def hashcode f = memoize 0 (
     else raise "Failed to hash file {f}"
 )
 
+def stateRunner =
+  def add f h = prim "add_hash"
+  def hash = "0000000000000000000000000000000000000000000000000000000000000000"
+  def pre input =
+    match input.getRunnerInputCommand
+      _, file, Nil = Pair input file
+      _ = raise "stateRunner: invalid command-line"
+  def post (Pair output file) =
+    editRunnerOutputOutputs (add file hash, _) output
+  makeRunner pre post virtualRunner
+
+# Mark a file whose contents must not be tracked
+global def makeStatePath file =
+  makePlan ("<state>", file, Nil) Nil
+  | setPlanRunner      stateRunner
+  | setPlanKeep        False
+  | setPlanEnvironment Nil
+  | setPlanFnOutputs   (file, _)
+  | runJob
+  | getJobOutput
+
 # Whenever possible, use 'job' if:
 #   cmd can run under FUSE
 #   cmd guarantees to produce the same outputs given the same inputs
