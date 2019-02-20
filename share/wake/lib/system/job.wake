@@ -116,7 +116,7 @@ global def virtualRunner =
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
 def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool =
-  def create dir stdin env cmd visible = prim "job_create"
+  def create dir stdin env cmd visible keep = prim "job_create"
   def finish job inputs outputs = prim "job_finish"
   def cache dir stdin env cmd visible = prim "job_cache"
   def build _ =
@@ -133,7 +133,7 @@ def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run poo
           def _ = waitOne final job.getJobStatus
           job
     # Do not invoke the runner/finish if job create fails
-    def rawjob = create dir stdin env.implode cmd.implode (map getPathName vis).implode
+    def rawjob = create dir stdin env.implode cmd.implode (map getPathName vis).implode (if keep then 1 else 0)
     tryelse (\_ cast rawjob) doit rawjob
   match keep
     False = build 0

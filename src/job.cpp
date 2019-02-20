@@ -36,6 +36,7 @@ struct Job : public Value {
   Hash code; // hash(dir, stdin, environ, cmdline)
   pid_t pid;
   long job;
+  bool keep;
   double runtime;
   int status; // -signal, +code
   std::shared_ptr<Value> bad_launch;
@@ -50,7 +51,7 @@ struct Job : public Value {
 
   static const char *type;
   static TypeVar typeVar;
-  Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline);
+  Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline, bool keep);
 
   void format(std::ostream &os, int depth) const;
   TypeVar &getType();
@@ -338,8 +339,8 @@ bool JobTable::wait(WorkQueue &queue) {
   }
 }
 
-Job::Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline)
-  : Value(type), db(db_), state(0), code(), pid(0), job(-1), runtime(0), status(0)
+Job::Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline, bool keep_)
+  : Value(type), db(db_), state(0), code(), pid(0), job(-1), keep(keep_), runtime(0), status(0)
 {
   std::vector<uint64_t> codes;
   codes.push_back((long)type);
@@ -532,23 +533,25 @@ static PRIMFN(prim_job_virtual) {
 }
 
 static PRIMTYPE(type_job_create) {
-  return args.size() == 5 &&
+  return args.size() == 6 &&
     args[0]->unify(String::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
     args[3]->unify(String::typeVar) &&
     args[4]->unify(String::typeVar) &&
+    args[5]->unify(Integer::typeVar) &&
     out->unify(Job::typeVar);
 }
 
 static PRIMFN(prim_job_create) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
-  EXPECT(5);
+  EXPECT(6);
   STRING(dir, 0);
   STRING(stdin, 1);
   STRING(env, 2);
   STRING(cmd, 3);
   STRING(visible, 4);
+  INTEGER(keep, 5);
 
   std::stringstream stack;
   for (auto &i : binding->stack_trace()) stack << i << std::endl;
@@ -557,7 +560,8 @@ static PRIMFN(prim_job_create) {
     dir->value,
     stdin->value,
     env->value,
-    cmd->value);
+    cmd->value,
+    mpz_cmp_si(keep->value,0));
 
   out->db->insert_job(
     dir->value,
@@ -600,7 +604,7 @@ static PRIMFN(prim_job_cache) {
 
   if (!cached) RAISE("not cached");
 
-  auto out = std::make_shared<Job>(jobtable->imp->db, dir->value, stdin->value, env->value, cmd->value);
+  auto out = std::make_shared<Job>(jobtable->imp->db, dir->value, stdin->value, env->value, cmd->value, true);
   out->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED|STATE_FINISHED;
   out->job = job;
 
@@ -795,7 +799,7 @@ static PRIMFN(prim_job_finish) {
     outputs = &empty;
   }
 
-  bool keep = !job->bad_launch && !job->bad_finish; // !!! && job->keep
+  bool keep = !job->bad_launch && !job->bad_finish && job->keep;
   job->db->finish_job(job->job, *inputs, *outputs, keep, job->status, job->runtime);
   job->state |= STATE_FINISHED;
   job->process(queue);
