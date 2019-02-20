@@ -795,8 +795,8 @@ static PRIMFN(prim_job_finish) {
     outputs = &empty;
   }
 
-  // !!! record if the job was exception-free (bad_launch/bad_finish)
-  job->db->finish_job(job->job, *inputs, *outputs, job->status, job->runtime);
+  bool keep = !job->bad_launch && !job->bad_finish; // !!! && job->keep
+  job->db->finish_job(job->job, *inputs, *outputs, keep, job->status, job->runtime);
   job->state |= STATE_FINISHED;
   job->process(queue);
 
@@ -805,14 +805,10 @@ static PRIMFN(prim_job_finish) {
 }
 
 static PRIMTYPE(type_add_hash) {
-  TypeVar pair;
-  Data::typePair.clone(pair);
-  pair[0].unify(String::typeVar);
-  pair[1].unify(String::typeVar);
   return args.size() == 2 &&
     args[0]->unify(String::typeVar) &&
     args[1]->unify(String::typeVar) &&
-    out->unify(pair);
+    out->unify(String::typeVar);
 }
 
 #ifdef __APPLE__
@@ -834,10 +830,7 @@ static PRIMFN(prim_add_hash) {
   STRING(file, 0);
   STRING(hash, 1);
   jobtable->imp->db->add_hash(file->value, hash->value, stat_mod_ns(file->value));
-  auto out = make_tuple2(
-    std::shared_ptr<Value>(args[0]),
-    std::shared_ptr<Value>(args[1]));
-  RETURN(out);
+  RETURN(args[0]);
 }
 
 static PRIMTYPE(type_get_hash) {

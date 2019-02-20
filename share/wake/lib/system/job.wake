@@ -126,8 +126,8 @@ def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run poo
       match (try (\_ RunnerOutput (cast output) (cast output) (cast output)) output)
         RunnerOutput inputs outputs indexes =
           def final _ =
-            def input  = finputs  inputs  | map hashname | implode
-            def output = foutputs outputs | map hashname | implode
+            def input  = finputs  inputs  | map simplify | implode
+            def output = foutputs outputs | map addhash | implode
             finish job input output
           # Input + output names might be known before the job terminates
           def _ = waitOne final job.getJobStatus
@@ -197,16 +197,18 @@ global def fuseRunner =
 data Path = Path String
 global def getPathName (Path name) = name
 
-def hashname f = hashpair f | getPairFirst  # just the filename
-def hashcode f = hashpair f | getPairSecond # just the hashcode
-def hashpair f = memoize 0 ( # Pair file hash
-  def get f = prim "get_hash"
+def addhash f =
+  def p = simplify f
   def add f h = prim "add_hash"
+  add p (hashcode p)
+
+def hashcode f = memoize 0 (
+  def get f = prim "get_hash"
   def reuse = get f
-  if reuse !=* "" then add f reuse else
+  if reuse !=* "" then reuse else
     def job = makeRawPlan ("<hash>", f, Nil) | runJob
     if job.getJobStatus == 0
-    then extract '(.{64}).*' job.getJobStdout | head | add f
+    then extract '(.{64}).*' job.getJobStdout | head
     else raise "Failed to hash file {f}"
 )
 
