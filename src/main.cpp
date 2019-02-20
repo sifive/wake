@@ -387,7 +387,7 @@ int main(int argc, const char **argv) {
         auto i = d->order.find(g);
         if (i != d->order.end()) {
           int idx = i->second;
-          Expr *v = idx < d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
+          Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
           std::cout << g << ": ";
           v->typeVar.format(std::cout, v->typeVar);
           std::cout << " = <" << v->location << ">" << std::endl;
