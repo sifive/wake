@@ -73,6 +73,8 @@ static PRIMTYPE(type_unit) {
 
 static PRIMFN(prim_unit) {
   (void)data; // silence unused variable warning (EXPECT not called)
+  (void)binding;
+  (void)args;
   auto out = make_unit();
   RETURN(out);
 }
