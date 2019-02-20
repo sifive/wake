@@ -201,19 +201,10 @@ static PRIMFN(prim_mkdir) {
   REQUIRE(mpz_cmp_si(mode->value, 0xffff) <= 0, "mode must be <= 0xffff");
   long mask = mpz_get_si(mode->value);
 
-  std::vector<char> scan(path->value.begin(), path->value.end());
-  scan.push_back('/');
-
-  for (size_t i = 1; i < scan.size(); ++i) {
-    if (scan[i] == '/') {
-      scan[i] = 0;
-      if (mkdir(scan.data(), mask) != 0 && errno != EEXIST) {
-        std::stringstream str;
-        str << scan.data() << ": " << strerror(errno);
-        RAISE(str.str());
-      }
-      scan[i] = '/';
-    }
+  if (mkdir(path->value.c_str(), mask) != 0 && errno != EEXIST && errno != EISDIR) {
+    std::stringstream str;
+    str << path->value << ": " << strerror(errno);
+    RAISE(str.str());
   }
 
   RETURN(args[1]);

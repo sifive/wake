@@ -214,15 +214,6 @@ def hashpair f = memoize 0 ( # Pair file hash
     else raise "Failed to hash file {f}"
 )
 
-global def write mode path content =
-  def imp m p c = prim "write"
-  makePath (imp mode path content)
-
-# Create a directory (if it does not already exist)
-global def mkdir mode rawpath =
-  def imp m p = prim "mkdir"
-  Path (imp mode rawpath.simplify)
-
 # Whenever possible, use 'job' if:
 #   cmd can run under FUSE
 #   cmd guarantees to produce the same outputs given the same inputs
