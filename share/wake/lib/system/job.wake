@@ -134,17 +134,18 @@ def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run poo
           job
     # Do not invoke the runner/finish if job create fails
     def rawjob = create dir stdin env.implode cmd.implode (map getPathName vis).implode (if keep then 1 else 0)
-    tryelse (\_ cast rawjob) doit rawjob
+    tryelse (\_ rawjob) doit rawjob
+  def confirm last job =
+    def notOk (Pair name hash) = hashcode name !=* hash
+    match (waitOne (\_ find notOk last) job.getJobStatus)
+      None = job
+      Some (Pair (Pair file saw) _) =
+        raise "Hash mismatch for {file} ({saw} != {hashcode file}); remove it"
   match keep
     False = build 0
-    True  = match (tryelse (\_ None) (Some _) (cache dir stdin env.implode cmd.implode (map getPathName vis).implode))
-      None     = build 0
-      Some out =
-        def notOk (Pair name hash) = hashcode name !=* hash
-        match (find notOk (tree out 2))
-          None = out
-          Some (Pair (Pair file saw) _) =
-            raise "Hash mismatch for {file} ({saw} != {hashcode file}); remove it"
+    True  = match (cache dir stdin env.implode cmd.implode (map getPathName vis).implode)
+      Pair (job, _) last = confirm last job
+      Pair Nil      last = confirm last (build 0)
 
 # Only run if the first four arguments differ
 def runOnce cmd env dir stdin finputs foutputs findexes vis keep share run pool =

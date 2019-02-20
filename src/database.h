@@ -51,7 +51,9 @@ struct Database {
     const std::string &environment,
     const std::string &commandline,
     const std::string &visible,
-    long *job);
+    bool check,
+    long &job,
+    std::vector<FileReflection> &out);
   void insert_job( // also wipes out any old runs
     const std::string &directory,
     const std::string &stdin, // "" -> /dev/null

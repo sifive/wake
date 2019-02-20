@@ -366,7 +366,9 @@ bool Database::reuse_job(
   const std::string &environment,
   const std::string &commandline,
   const std::string &visible,
-  long *job)
+  bool check,
+  long &job,
+  std::vector<FileReflection> &out)
 {
   const char *why = "Could not check for a cached job";
   begin_txn();
@@ -375,7 +377,7 @@ bool Database::reuse_job(
   bind_string (why, imp->find_prior, 3, environment);
   bind_string (why, imp->find_prior, 4, stdin);
   bool prior = sqlite3_step(imp->find_prior) == SQLITE_ROW;
-  if (prior) *job = sqlite3_column_int(imp->find_prior, 0);
+  if (prior) job = sqlite3_column_int(imp->find_prior, 0);
   finish_stmt (why, imp->find_prior);
 
   if (!prior) {
@@ -384,17 +386,18 @@ bool Database::reuse_job(
   }
 
   bool exist = true;
-  bind_integer(why, imp->get_tree, 1, *job);
+  bind_integer(why, imp->get_tree, 1, job);
   bind_integer(why, imp->get_tree, 2, OUTPUT);
   while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
     std::string path = rip_column(imp->get_tree, 0);
     if (access(path.c_str(), R_OK) != 0) exist = false;
+    out.emplace_back(std::move(path), rip_column(imp->get_tree, 1));
   }
   finish_stmt(why, imp->get_tree);
 
-  if (exist) {
+  if (exist && !check) {
     bind_integer(why, imp->update_prior, 1, imp->run_id);
-    bind_integer(why, imp->update_prior, 2, *job);
+    bind_integer(why, imp->update_prior, 2, job);
     single_step (why, imp->update_prior);
   }
 

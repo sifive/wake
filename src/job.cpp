@@ -112,6 +112,7 @@ struct JobTable::detail {
   Database *db;
   bool verbose;
   bool quiet;
+  bool check;
 };
 
 static void handle_SIGCHLD(int sig) {
@@ -119,11 +120,12 @@ static void handle_SIGCHLD(int sig) {
   (void)sig;
 }
 
-JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet) : imp(new JobTable::detail) {
+JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool check) : imp(new JobTable::detail) {
   imp->table.resize(max_jobs*POOLS);
   imp->tasks.resize(POOLS);
   imp->verbose = verbose;
   imp->quiet = quiet;
+  imp->check = check;
   imp->db = db;
 
   for (unsigned i = 0; i < imp->table.size(); ++i)
@@ -574,14 +576,38 @@ static PRIMFN(prim_job_create) {
   RETURN(out);
 }
 
+static std::shared_ptr<Value> convert_tree(std::vector<FileReflection> &&files) {
+  std::vector<std::shared_ptr<Value> > vals;
+  vals.reserve(files.size());
+  for (auto &i : files)
+    vals.emplace_back(make_tuple2(
+      std::static_pointer_cast<Value>(std::make_shared<String>(std::move(i.path))),
+      std::static_pointer_cast<Value>(std::make_shared<String>(std::move(i.hash)))));
+  return make_list(std::move(vals));
+}
+
 static PRIMTYPE(type_job_cache) {
+  TypeVar spair;
+  TypeVar plist;
+  TypeVar jlist;
+  TypeVar pair;
+  Data::typePair.clone(spair);
+  Data::typeList.clone(plist);
+  Data::typeList.clone(jlist);
+  Data::typePair.clone(pair);
+  spair[0].unify(String::typeVar);
+  spair[1].unify(String::typeVar);
+  plist[0].unify(spair);
+  jlist[0].unify(Job::typeVar);
+  pair[0].unify(jlist);
+  pair[1].unify(plist);
   return args.size() == 5 &&
     args[0]->unify(String::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
     args[3]->unify(String::typeVar) &&
     args[4]->unify(String::typeVar) &&
-    out->unify(Job::typeVar);
+    out->unify(pair);
 }
 
 static PRIMFN(prim_job_cache) {
@@ -594,31 +620,27 @@ static PRIMFN(prim_job_cache) {
   STRING(visible, 4);
 
   long job;
+  std::vector<FileReflection> files;
   bool cached = jobtable->imp->db->reuse_job(
     dir->value,
     stdin->value,
     env->value,
     cmd->value,
     visible->value,
-    &job);
+    jobtable->imp->check,
+    job,
+    files);
 
-  if (!cached) RAISE("not cached");
+  std::vector<std::shared_ptr<Value> > jobs;
+  if (cached && !jobtable->imp->check) {
+    auto out = std::make_shared<Job>(jobtable->imp->db, dir->value, stdin->value, env->value, cmd->value, true);
+    out->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED|STATE_FINISHED;
+    out->job = job;
+    jobs.emplace_back(std::move(out));
+  }
 
-  auto out = std::make_shared<Job>(jobtable->imp->db, dir->value, stdin->value, env->value, cmd->value, true);
-  out->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED|STATE_FINISHED;
-  out->job = job;
-
+  auto out = make_tuple2(make_list(std::move(jobs)), convert_tree(std::move(files)));
   RETURN(out);
-}
-
-static std::shared_ptr<Value> convert_tree(std::vector<FileReflection> &&files) {
-  std::vector<std::shared_ptr<Value> > vals;
-  vals.reserve(files.size());
-  for (auto &i : files)
-    vals.emplace_back(make_tuple2(
-      std::static_pointer_cast<Value>(std::make_shared<String>(std::move(i.path))),
-      std::static_pointer_cast<Value>(std::make_shared<String>(std::move(i.hash)))));
-  return make_list(std::move(vals));
 }
 
 void Job::process(WorkQueue &queue) {

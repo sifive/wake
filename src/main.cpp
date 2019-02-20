@@ -158,6 +158,8 @@ int main(int argc, const char **argv) {
       "parse wake files and print the AST", 0},
     { "typecheck", {"-t", "--typecheck"},
       "type-check wake files and print the typed AST", 0},
+    { "check", {"-c", "--check"},
+      "rebuild all outputs tod check for build repeatability", 0},
     { "globals", {"-g", "--globals"},
       "print out all global variables", 0},
     { "init", {"--init"},
@@ -182,6 +184,7 @@ int main(int argc, const char **argv) {
   bool verbose = args["verbose"];
   bool quiet = args["quiet"];
   bool rerun = args["rerun"];
+  bool check = args["check"];
   queue.stack_trace = args["debug"];
 
   bool nodb = args["init"];
@@ -320,7 +323,7 @@ int main(int argc, const char **argv) {
   top->body = std::unique_ptr<Expr>(body);
 
   /* Primitives */
-  JobTable jobtable(&db, jobs, verbose, quiet);
+  JobTable jobtable(&db, jobs, verbose, quiet, check);
   PrimMap pmap;
   prim_register_string(pmap, VERSION_STR);
   prim_register_vector(pmap);
