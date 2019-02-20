@@ -370,9 +370,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
   } else {
     Expr *cat = new Prim(LOCATION, "catopen");
     for (auto expr : exprs)
-      cat = new App(LOCATION,
-        new App(LOCATION, new VarRef(LOCATION, "_ catadd"), cat),
-        new App(LOCATION, new Lambda(LOCATION, "_", new Prim(LOCATION, "iformat")), expr));
+      cat = new App(expr->location, new App(LOCATION, new VarRef(LOCATION, "_ catadd"), cat), expr);
     cat = new App(LOCATION, new Lambda(LOCATION, "_", new Prim(LOCATION, "catclose")), cat);
     cat = new App(LOCATION, new Lambda(LOCATION, "_ catadd", cat),
             new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new Prim(LOCATION, "catadd"))));

@@ -160,7 +160,7 @@ global def runJob (Plan cmd vis env dir stdin once keep share (Runner run) finpu
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
 def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
-def fail job ok = if job.getJobStatus == 0 then ok else raise "Non-zero exit status ({job.getJobStatus})"
+def fail job ok = if job.getJobStatus == 0 then ok else raise "Non-zero exit status ({str job.getJobStatus})"
 global def killJob job signal = prim "job_kill" # s != 0 => kills; blocks till exit; return status
 global def getJobStatus  job = killJob  job 0
 global def getJobStdout  job = stdio job 1
@@ -181,7 +181,7 @@ global def fuseRunner =
   def pre input =
     def cmd = fusePath, input.getRunnerInputDirectory, input.getRunnerInputVisible | map getPathName
     def fuse = makeRawPlan cmd | setPlanPool 0 | runJob
-    def handle = raise "Could not start fuse-wake: {_}"
+    def handle = raise "Could not start fuse-wake: {format _}"
     def root = try handle (extract 'OK: (.*)' fuse.getJobStderr)
     Pair (editRunnerInputDirectory ("{root.head}/{_}") input) fuse
   def post (Pair output fuse) =
