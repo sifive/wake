@@ -1,17 +1,12 @@
-global def cp x y =
-  job (which "cp", x.getPathName, y, Nil) (makePath "{y}/..", x, Nil)
-
 global def installAs dest file =
-  def cmd = which "cp", file.getPathName, dest, Nil
-  def inputs = file, Nil
-  def foutputs _ = dest, Nil
-  def doit _ =
-    makeManualPlan cmd inputs foutputs
-    | setPlanEnvironment Nil
-    | runJob
-    | getJobOutputs
-  waitAll (doit _) (mkdir 0775 "{dest}/..")
+  def sdest = simplify dest
+  def cmd = which "cp", file.getPathName, sdest, Nil
+  def inputs = mkdir 0775 "{dest}/..", file, Nil
+  def foutputs _ = sdest, Nil
+  makeManualPlan cmd inputs foutputs
+  | setPlanEnvironment Nil
+  | runJob
+  | getJobOutput
 
 global def installIn dir file =
-  def dest = simplify "{dir}/{file.getPathName}"
-  installAs dest file
+  installAs "{dir}/{file.getPathName}" file

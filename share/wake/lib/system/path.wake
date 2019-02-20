@@ -42,16 +42,17 @@ global def mkdir mode path =
     | (Pair _ acc)
   foldl helper (Pair Nil "") (path | simplify | tokenize "/") | getPairFirst | head
 
-global def write mode path content =
+global def write mode rawpath content =
+  def path = simplify rawpath
   def writeRunner =
     def imp m p c = prim "write"
     def pre input = Pair input Unit
     def post (Pair output Unit) =
       output
-      | editRunnerOutputOutputs (imp mode path.simplify content, _)
+      | editRunnerOutputOutputs (imp mode path content, _)
     makeRunner pre post virtualRunner
   def exec = or mode ((and mode 0444) >> 2) # copy read permissions to execute permissions
-  makePlan ("<write>", str mode, path, Nil) (mkdir exec "{path}/..".simplify, Nil)
+  makePlan ("<write>", str mode, path, Nil) (mkdir exec "{path}/..", Nil)
   | setPlanRunner      writeRunner
   | setPlanOnce        False
   | setPlanEnvironment Nil

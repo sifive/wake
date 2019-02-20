@@ -12,7 +12,7 @@ def doCompileC variant gcc flags headers file =
 
 def doLinkO variant linker flags objs file =
   def cmdline = (linker, "-o", "{file}.{variant}", map getPathName objs) ++ flags
-  def result = job cmdline (makePath "{file}/..", objs)
+  def result = job cmdline (mkdir 0775 "{file}/..", objs)
   result.getJobOutput
 
 def makeCompileC variant gcc flags =
