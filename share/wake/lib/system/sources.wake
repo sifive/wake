@@ -3,12 +3,21 @@ def add_sources str = prim "add_sources"
 def implode l = cat (foldr (_, "\0", _) Nil l)
 def got_sources = add_sources (subscribe source).implode # returns true
 
-# Find sources files
-global def sources dir regexp =
-  def scan dir regexp = prim "sources"
-  waitOne (\_ scan dir regexp | map makePath) got_sources
-
 # Find files
 # WARNING! Use of this method can make a build unreproducible
 # Depending on when the method is invoked, the results may vary
 global def files dir regexp = prim "files"
+
+def makeSource file =
+  makePlan ("<source>", file, Nil) Nil
+  | setPlanRunner      virtualRunner
+  | setPlanKeep        False
+  | setPlanEnvironment Nil
+  | setPlanFnOutputs   (file, _)
+  | runJob
+  | getJobOutput
+
+# Find sources files
+global def sources dir regexp =
+  def scan dir regexp = prim "sources"
+  waitOne (\_ scan dir regexp | map makeSource) got_sources

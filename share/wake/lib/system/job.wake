@@ -197,10 +197,6 @@ global def fuseRunner =
 data Path = Path String
 global def getPathName (Path name) = name
 
-# Convert a file name into a path.
-# If you use this method, name must never be an output of a Job.
-global def makePath name = Path (hashname (simplify name))
-
 def hashname f = hashpair f | getPairFirst  # just the filename
 def hashcode f = hashpair f | getPairSecond # just the hashcode
 def hashpair f = memoize 0 ( # Pair file hash
