@@ -1,11 +1,6 @@
-# A Runner describes a way to invoke a Plan to get a Job
-global tuple Runner =
-  global Fn RunnerInput => RunnerOutput
-
 # RunnerInput is a subset of the fields supplied in the execution Plan
 tuple RunnerInput =
-  global Job           Job
-  global CommandLine   List String
+  global Command       List String
   global Visible       List Path
   global Environment   List String
   global Directory     String
@@ -17,8 +12,22 @@ tuple RunnerOutput =
   global Outputs List String
   global Indexes List String
 
-global def makeRunnerOutput Unit =
-  RunnerOutput Nil Nil Nil
+# A Runner describes a way to invoke a Plan to get a Job
+tuple Runner =
+  Fn Job => RunnerInput => RunnerOutput
+
+# Create new Runner given pre- and post-hooks around an existing Runner
+global def makeRunner pre post (Runner run) =
+  def doit job preInput =
+    def preOutput = pre preInput
+    # Ensure that match does not re-raise the exception; must invoke run!
+    match (try (\_ Pair (cast preOutput) (cast preOutput)) preOutput)
+      Pair runInput state =
+        def runOutput = run job runInput
+        def final _ = post (Pair runOutput state)
+        # Don't run any 'post' steps until the outputs is all there
+        waitOne final job.getJobStatus
+  Runner doit
 
 # A Plan describes a not-yet-executed Job
 tuple Plan =
@@ -84,29 +93,25 @@ def makeRawPlan cmd  =
 # You must use Fn{Inputs,Outputs,Indexes} to fill in this information
 global def manualRunner =
   def launch job pool dir stdin env cmd = prim "job_launch"
-  def doit in = match in
-    RunnerInput job cmd vis env dir stdin pool =
-      def ok = launch job pool dir stdin env.implode cmd.implode
-      def out = RunnerOutput (map getPathName vis) Nil Nil
-      def handle _ = match (virtualRunner (\_ out))
-        Runner run = run in
-      tryelse handle (\_ out) ok
+  def doit job input =
+   # Ensure that match does not re-raise the exception (launch must run)
+   match (try (\_ RunnerInput (cast input) Nil Nil "" "" 0) input)
+     RunnerInput cmd vis env dir stdin pool =
+       def _ = launch job pool dir stdin env.implode cmd.implode
+       RunnerOutput (map getPathName vis) Nil Nil
   Runner doit
 
-global def virtualRunner fn =
+global def virtualRunner =
   def virtual job stdout stderr status runtime = prim "job_virtual"
-  def doit in =
-    def out = fn in
-    match (try (\x RunnerOutput x Nil Nil) out)
-      RunnerOutput inputs outputs indexes =
-        def fails = tryelse (_) (\_ Nil)
-        def exceptions = inputs ++ outputs ++ indexes | map fails | flatten
-        def stderr = catWith "\n" exceptions
-        def status = if exceptions.empty then 0 else 1
-        def _ = virtual in.getRunnerInputJob "" stderr status 0.0
-        if exceptions.empty
-        then out
-        else RunnerOutput (map getPathName in.getRunnerInputVisible) Nil Nil
+  def doit job input =
+   # Ensure that match does not re-raise the exception (virtual must run)
+   match (try (\_ RunnerInput (cast input) Nil Nil "" "" 0) input)
+     RunnerInput cmd vis env dir stdin pool =
+       # Make sure any exceptions get fed into virtual
+       def stuff = implode (dir, stdin, str pool, cmd ++ env)
+       def status = if stuff ==* "" then 0 else 0
+       def _ = virtual job "" "" status 0.0
+       RunnerOutput (map getPathName vis) Nil Nil
   Runner doit
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
@@ -115,14 +120,16 @@ def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run poo
   def finish job inputs outputs = prim "job_finish"
   def cache dir stdin env cmd visible = prim "job_cache"
   def build _ =
-    def job = create dir stdin env.implode cmd.implode
-    def input = RunnerInput job cmd vis env dir stdin pool
-    match (run input)
+    def job = create dir stdin env.implode cmd.implode # !!! vis.implode
+    def input = tryelse (\_ RunnerInput (cast job) Nil Nil "" "" 0) (\_ RunnerInput cmd vis env dir stdin pool) job
+    def output = run job input
+    match (try (\_ RunnerOutput (cast output) (cast output) (cast output)) output)
       RunnerOutput inputs outputs indexes =
         def final _ =
           def input  = finputs  inputs  | map hashname | implode
           def output = foutputs outputs | map hashname | implode
           finish job input output
+        # Input + output names might be known before the job terminates
         def _ = waitOne final job.getJobStatus
         job
   match keep
@@ -154,10 +161,10 @@ global def killJob job signal = prim "job_kill" # s != 0 => kills; blocks till e
 global def getJobStatus  job = killJob  job 0
 global def getJobStdout  job = stdio job 1
 global def getJobStderr  job = stdio job 2
-global def getJobInputs  job = fail job job.getJobRawInputs
-global def getJobOutputs job = fail job job.getJobRawOutputs
-global def getJobRawInputs  job = tree job 1 | map getPairFirst | map makePath
-global def getJobRawOutputs job = tree job 2 | map getPairFirst | map makePath
+global def getJobInputs  job = fail job job.getJobFailedInputs
+global def getJobOutputs job = fail job job.getJobFailedOutputs
+global def getJobFailedInputs  job = tree job 1 | map getPairFirst | map makePath
+global def getJobFailedOutputs job = tree job 2 | map getPairFirst | map makePath
 global def getJobOutput = match _.getJobOutputs
   x, Nil = x
   Nil    = raise "no outputs available"
@@ -167,24 +174,21 @@ global def getJobOutput = match _.getJobOutputs
 def wakePath = prim "execpath" # location of the wake executable
 def fusePath = relative workspace (simplify "{wakePath}/../lib/wake/fuse-wake")
 global def fuseRunner =
-  def doit in =
-    def cmd = fusePath, in.getRunnerInputDirectory, in.getRunnerInputVisible | map getPathName
+  def pre input =
+    def cmd = fusePath, input.getRunnerInputDirectory, input.getRunnerInputVisible | map getPathName
     def fuse = makeRawPlan cmd | setPlanPool 0 | runJob
     def handle = raise "Could not start fuse-wake: {_}"
     def root = try handle (extract 'OK: (.*)' fuse.getJobStderr)
+    Pair (editRunnerInputDirectory ("{root.head}/{_}") input) fuse
+  def post (Pair output fuse) =
+    def _ = killJob fuse 14 # SIGALRM
     def result = extract "(.*\0)?\0(.*)" fuse.getJobStdout
     def inputs  = result | at 0 | tokenize "\0" | reverse | tail
     def outputs = result | at 1 | tokenize "\0" | reverse | tail
-    def out =
-      in
-      | editRunnerInputDirectory ("{root.head}/{_}")
-      | manualRunner.getRunnerFn
-      | setRunnerOutputInputs  inputs
-      | setRunnerOutputOutputs outputs
-    def final _ = killJob fuse 14 # SIGALRM
-    def _ = waitOne final in.getRunnerInputJob.getJobStatus
-    out
-  Runner doit
+    output
+    | setRunnerOutputInputs  inputs
+    | setRunnerOutputOutputs outputs
+  makeRunner pre post manualRunner
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
 data Path = Path String
@@ -213,15 +217,8 @@ global def write mode path content =
 
 # Create a directory (if it does not already exist)
 global def mkdir mode rawpath =
-  def path = simplify rawpath
   def imp m p = prim "mkdir"
-  def doit _ = RunnerOutput Nil (imp mode path, Nil) Nil
-  makePlan ("<mkdir>", path, Nil) Nil
-  | setPlanRunner      (virtualRunner doit)
-  | setPlanKeep        False
-  | setPlanEnvironment Nil
-  | runJob
-  | getJobOutput
+  Path (imp mode rawpath.simplify)
 
 # Whenever possible, use 'job' if:
 #   cmd can run under FUSE
