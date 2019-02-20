@@ -439,6 +439,6 @@ int main(int argc, const char **argv) {
   }
 
   //std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;
-  db.clean(args["verbose"]);
+  db.clean();
   return pass?0:1;
 }

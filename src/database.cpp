@@ -31,11 +31,12 @@ struct Database::detail {
   sqlite3_stmt *update_prior;
   sqlite3_stmt *find_owner;
   sqlite3_stmt *fetch_hash;
+  sqlite3_stmt *delete_useless;
   long run_id;
   detail() : db(0), add_target(0), del_target(0), begin_txn(0), commit_txn(0), insert_job(0),
              insert_tree(0), insert_log(0), wipe_file(0), insert_file(0), update_file(0),
              get_log(0), get_tree(0), set_runtime(0), detect_overlap(0), delete_overlap(0),
-             find_prior(0), update_prior(0), find_owner(0), fetch_hash(0) { }
+             find_prior(0), update_prior(0), find_owner(0), fetch_hash(0), delete_useless(0) { }
 };
 
 Database::Database() : imp(new detail) { }
@@ -151,7 +152,10 @@ std::string Database::open() {
     " from files f, filetree t, jobs j"
     " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id";
   const char *sql_fetch_hash =
-    "select hash from files where path=? and modified=?;";
+    "select hash from files where path=? and modified=?";
+  const char *sql_delete_useless =
+    "delete from jobs where job_id in"
+    " (select job_id from jobs where keep=0 except select job_id from filetree where access=2)";
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
@@ -180,6 +184,7 @@ std::string Database::open() {
   PREPARE(sql_update_prior,   update_prior);
   PREPARE(sql_find_owner,     find_owner);
   PREPARE(sql_fetch_hash,     fetch_hash);
+  PREPARE(sql_delete_useless, delete_useless);
 
   return "";
 }
@@ -217,6 +222,7 @@ void Database::close() {
   FINALIZE(update_prior);
   FINALIZE(find_owner);
   FINALIZE(fetch_hash);
+  FINALIZE(delete_useless);
 
   if (imp->db) {
     int ret = sqlite3_close(imp->db);
@@ -342,8 +348,8 @@ void Database::prepare() {
   imp->run_id = sqlite3_last_insert_rowid(imp->db);
 }
 
-void Database::clean(bool verbose) {
-  // !!!
+void Database::clean() {
+  single_step("Could not clean database", imp->delete_useless);
 }
 
 void Database::begin_txn() {

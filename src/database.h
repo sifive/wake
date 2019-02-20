@@ -40,7 +40,7 @@ struct Database {
   void del_target(const std::string &target);
 
   void prepare(); // prepare for job execution
-  void clean(bool verbose); // finished execution; sweep stale files
+  void clean(); // finished execution; sweep stale jobs
 
   void begin_txn();
   void end_txn();
