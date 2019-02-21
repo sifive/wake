@@ -40,7 +40,7 @@ struct Database {
   void del_target(const std::string &target);
 
   void prepare(); // prepare for job execution
-  void clean(bool verbose); // finished execution; sweep stale files
+  void clean(); // finished execution; sweep stale jobs
 
   void begin_txn();
   void end_txn();
@@ -51,7 +51,9 @@ struct Database {
     const std::string &environment,
     const std::string &commandline,
     const std::string &visible,
-    long *job);
+    bool check,
+    long &job,
+    std::vector<FileReflection> &out);
   void insert_job( // also wipes out any old runs
     const std::string &directory,
     const std::string &stdin, // "" -> /dev/null
@@ -64,6 +66,7 @@ struct Database {
     long job,
     const std::string &inputs,  // null separated
     const std::string &outputs, // null separated
+    bool keep,
     int status,
     double runtime);
   std::vector<FileReflection> get_tree(int kind, long job);

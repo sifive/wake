@@ -1,26 +1,33 @@
-# A Runner describes a way to invoke a Plan to get a Job
-global tuple Runner =
-  global Fn RunnerInput => RunnerOutput
-
 # RunnerInput is a subset of the fields supplied in the execution Plan
 tuple RunnerInput =
-  global CommandLine   List String
+  global Command       List String
   global Visible       List Path
   global Environment   List String
   global Directory     String
   global StandardInput String
   Pool                 Integer
-  Root                 String
 
 tuple RunnerOutput =
-  global Job     Job
-  # these might be futures:
   global Inputs  List String
   global Outputs List String
   global Indexes List String
 
-global def makeRunnerOutput job =
-  RunnerOutput job Nil Nil Nil
+# A Runner describes a way to invoke a Plan to get a Job
+tuple Runner =
+  Fn Job => RunnerInput => RunnerOutput
+
+# Create new Runner given pre- and post-hooks around an existing Runner
+global def makeRunner pre post (Runner run) =
+  def doit job preInput =
+    def preOutput = pre preInput
+    # Ensure that match does not re-raise the exception; must invoke run!
+    match (try (\_ Pair (cast preOutput) (cast preOutput)) preOutput)
+      Pair runInput state =
+        def runOutput = run job runInput
+        def final _ = post (Pair runOutput state)
+        # Don't run any 'post' steps until the outputs is all there
+        waitOne final job.getJobStatus
+  Runner doit
 
 # A Plan describes a not-yet-executed Job
 tuple Plan =
@@ -29,15 +36,35 @@ tuple Plan =
   global Environment   List String  # KEY=VALUE environment variables fed to the command
   global Directory     String       # The directory in which the command should be run
   global StandardInput String       # The file to which standard input should be connected
-  global Once          Boolean      # Should Job only be run once in a given wake execution
-  global Keep          Boolean      # Should Job output be reusable between wake invocations
-  global Share         Boolean      # Should Job output be shared between workspaces
+  Once_                Boolean      # Should Job only be run once in a given wake execution
+  Keep_                Boolean      # Should Job output be reusable between wake invocations
+  Share_               Boolean      # Should Job output be shared between workspaces
   global Runner        Runner       # The runner to use when executing this job
   global FnInputs      (List String => List String) # Modify the Runner's reported inputs  (files read)
   global FnOutputs     (List String => List String) # Modify the Runner's reported outputs (files created)
   global FnIndexes     (List String => List String) # Modify the Runner's reported indexes (directories listed)
   Pool                 Integer      # Resource pool used to pay for the Job
-  Root                 String       # Workspace root directory used by the Job
+
+global def getPlanOnce  = getPlanOnce_
+global def getPlanKeep  = getPlanKeep_
+global def getPlanShare = getPlanShare_
+global def editPlanOnce  f p = setPlanOnce  (f p.getPlanOnce_)
+global def editPlanKeep  f p = setPlanKeep  (f p.getPlanKeep_)
+global def editPlanShare f p = setPlanShare (f p.getPlanShare_)
+
+# Maintain the invariant that: Share => Keep => Once
+global def setPlanOnce v p =
+  if v
+  then p | setPlanOnce_ True
+  else p | setPlanOnce_ False | setPlanKeep_ False | setPlanShare_ False
+global def setPlanKeep v p =
+  if v
+  then p | setPlanOnce_ True  | setPlanKeep_  True
+  else p | setPlanKeep_ False | setPlanShare_ False
+global def setPlanShare v p =
+  if v
+  then p | setPlanOnce_ True | setPlanKeep_ True | setPlanShare_ True
+  else p | setPlanShare_ False
 
 # The criteria which determine if Job execution can be skipped:
 #   Once  is True and a matching job was run by this wake invocation
@@ -50,76 +77,98 @@ tuple Plan =
 #   The prior Outputs exist as the output of a matching Job
 #   The prior Inputs have the same hashes as files in the workspace
 #   The prior Indexes observe the same set of Visible files
-# Note: Once=False => Keep=False => Share=False
 
 # Set reasonable defaults for all Plan arguments
 def id x = x
 global def makePlan cmd visible =
-  Plan cmd visible environment "." "" True True True fuseRunner id id id 1 "."
+  Plan cmd visible environment "." "" True True True fuseRunner id id id 1
 
 global def makeManualPlan cmd visible foutputs =
-  Plan cmd visible environment "." "" True True True manualRunner id (\_ foutputs Unit) id 1 "."
+  Plan cmd visible environment "." "" True True True manualRunner id (\_ foutputs Unit) id 1
 
 def makeRawPlan cmd  =
-  Plan cmd Nil Nil "." "" False False False manualRunner id id id 1 "."
+  Plan cmd Nil Nil "." "" False False False manualRunner id id id 1
 
 # This runner does not detect inputs/outputs/indexes on it's own
 # You must use Fn{Inputs,Outputs,Indexes} to fill in this information
 global def manualRunner =
-  def launch pool root dir stdin env cmd = prim "job_launch"
-  def doit (RunnerInput cmd vis env dir stdin pool root) =
-    def job = launch pool root dir stdin env.implode cmd.implode
-    RunnerOutput job (map getPathName vis) Nil Nil
+  def launch job pool dir stdin env cmd = prim "job_launch"
+  def doit job input =
+   # Ensure that match does not re-raise the exception (launch must run)
+   match (try (\_ RunnerInput (cast input) Nil Nil "" "" 0) input)
+     RunnerInput cmd vis env dir stdin pool =
+       def _ = launch job pool dir stdin env.implode cmd.implode
+       RunnerOutput (map getPathName vis) Nil Nil
+  Runner doit
+
+global def virtualRunner =
+  def virtual job stdout stderr status runtime = prim "job_virtual"
+  def doit job input =
+   # Ensure that match does not re-raise the exception (virtual must run)
+   match (try (\_ RunnerInput (cast input) Nil Nil "" "" 0) input)
+     RunnerInput cmd vis env dir stdin pool =
+       # Make sure any exceptions get fed into virtual
+       def stuff = implode (dir, stdin, str pool, cmd ++ env)
+       def status = if stuff ==* "" then 0 else 0
+       def _ = virtual job "" "" status 0.0
+       RunnerOutput (map getPathName vis) Nil Nil
   Runner doit
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
-def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool root =
+def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool =
+  def create dir stdin env cmd visible keep = prim "job_create"
   def finish job inputs outputs = prim "job_finish"
   def cache dir stdin env cmd visible = prim "job_cache"
-  def input = RunnerInput cmd vis env dir stdin pool root
-  def build _ = match (run input)
-    RunnerOutput job inputs outputs indexes =
-      def final _ =
-        def input  = finputs  inputs  | map hashname | implode
-        def output = foutputs outputs | map hashname | implode
-        finish job input output
-      def _ = waitOne final job.getJobStatus
-      job
+  def build _ =
+    def doit job =
+      def output = run job (RunnerInput cmd vis env dir stdin pool)
+      # Make sure we run finish even if the runner raises an exception
+      match (try (\_ RunnerOutput (cast output) (cast output) (cast output)) output)
+        RunnerOutput inputs outputs indexes =
+          def final _ =
+            def input  = finputs  inputs  | map simplify | implode
+            def output = foutputs outputs | map addhash | implode
+            finish job input output
+          # Input + output names might be known before the job terminates
+          def _ = waitOne final job.getJobStatus
+          job
+    # Do not invoke the runner/finish if job create fails
+    def rawjob = create dir stdin env.implode cmd.implode (map getPathName vis).implode (if keep then 1 else 0)
+    tryelse (\_ rawjob) doit rawjob
+  def confirm last job =
+    def notOk (Pair name hash) = hashcode name !=* hash
+    match (waitOne (\_ find notOk last) job.getJobStatus)
+      None = job
+      Some (Pair (Pair file saw) _) =
+        raise "Hash mismatch for {file} ({saw} != {hashcode file}); remove it"
   match keep
     False = build 0
-    True  = match (tryelse (\_ None) (Some _) (cache dir stdin env.implode cmd.implode (map getPathName vis).implode))
-      None     = build 0
-      Some out =
-        def notOk (Pair name hash) = hashcode name !=* hash
-        match (find notOk (tree out 2))
-          None = out
-          Some (Pair (Pair file saw) _) =
-            raise "Hash mismatch for {file} ({saw} != {hashcode file}); remove it"
+    True  = match (cache dir stdin env.implode cmd.implode (map getPathName vis).implode)
+      Pair (job, _) last = confirm last job
+      Pair Nil      last = confirm last (build 0)
 
 # Only run if the first four arguments differ
-def runOnce cmd env dir stdin finputs foutputs findexes vis keep share run pool root =
-  memoize 9 (runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool root)
+def runOnce cmd env dir stdin finputs foutputs findexes vis keep share run pool =
+  memoize 9 (runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool)
 
 # Run the job!
-global def runJob (Plan cmd vis env dir stdin once keep share (Runner run) finputs foutputs findexes pool root) =
-  def keep_  = once && keep
-  def share_ = keep_ && share
+global def runJob (Plan cmd vis env dir stdin once keep share (Runner run) finputs foutputs findexes pool) =
   if once
-  then runOnce   cmd env dir stdin finputs foutputs findexes vis keep_ share_ run pool root
-  else runAlways cmd env dir stdin finputs foutputs findexes vis keep_ share_ run pool root
+  then runOnce   cmd env dir stdin finputs foutputs findexes vis keep share run pool
+  else runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool
 
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
 def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
-def fail job ok = if job.getJobStatus == 0 then ok else raise "Non-zero exit status ({job.getJobStatus})"
+def fail job ok = if job.getJobStatus == 0 then ok else raise "Non-zero exit status ({str job.getJobStatus})"
 global def killJob job signal = prim "job_kill" # s != 0 => kills; blocks till exit; return status
 global def getJobStatus  job = killJob  job 0
 global def getJobStdout  job = stdio job 1
 global def getJobStderr  job = stdio job 2
-global def getJobInputs  job = fail job job.getJobRawInputs
-global def getJobOutputs job = fail job job.getJobRawOutputs
-global def getJobRawInputs  job = tree job 1 | map getPairFirst | map makePath
-global def getJobRawOutputs job = tree job 2 | map getPairFirst | map makePath
+global def getJobInputs  job = fail job job.getJobFailedInputs
+global def getJobOutputs job = fail job job.getJobFailedOutputs
+global def getJobFailedInputs  job = tree job 1 | map getPairFirst | map Path
+global def getJobFailedOutputs job = tree job 2 | map getPairFirst | map Path
 global def getJobOutput = match _.getJobOutputs
   x, Nil = x
   Nil    = raise "no outputs available"
@@ -129,53 +178,61 @@ global def getJobOutput = match _.getJobOutputs
 def wakePath = prim "execpath" # location of the wake executable
 def fusePath = relative workspace (simplify "{wakePath}/../lib/wake/fuse-wake")
 global def fuseRunner =
-  def doit in =
-    def cmd = fusePath, in.getRunnerInputDirectory, in.getRunnerInputVisible | map getPathName
+  def pre input =
+    def cmd = fusePath, input.getRunnerInputDirectory, input.getRunnerInputVisible | map getPathName
     def fuse = makeRawPlan cmd | setPlanPool 0 | runJob
-    def handle = raise "Could not start fuse-wake: {_}"
+    def handle = raise "Could not start fuse-wake: {format _}"
     def root = try handle (extract 'OK: (.*)' fuse.getJobStderr)
+    Pair (editRunnerInputDirectory ("{root.head}/{_}") input) fuse
+  def post (Pair output fuse) =
+    def _ = killJob fuse 14 # SIGALRM
     def result = extract "(.*\0)?\0(.*)" fuse.getJobStdout
     def inputs  = result | at 0 | tokenize "\0" | reverse | tail
     def outputs = result | at 1 | tokenize "\0" | reverse | tail
-    def out =
-      in
-      | setRunnerInputRoot root.head
-      | manualRunner.getRunnerFn
-      | setRunnerOutputInputs  inputs
-      | setRunnerOutputOutputs outputs
-    def final _ = killJob fuse 14 # SIGALRM
-    def _ = waitOne final out.getRunnerOutputJob.getJobStatus
-    out
-  Runner doit
+    output
+    | setRunnerOutputInputs  inputs
+    | setRunnerOutputOutputs outputs
+  makeRunner pre post manualRunner
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
 data Path = Path String
 global def getPathName (Path name) = name
 
-# Convert a file name into a path.
-# If you use this method, name must never be an output of a Job.
-global def makePath name = Path (hashname (simplify name))
-
-def hashname f = hashpair f | getPairFirst  # just the filename
-def hashcode f = hashpair f | getPairSecond # just the hashcode
-def hashpair f = memoize 0 ( # Pair file hash
-  def get f = prim "get_hash"
+def addhash f =
+  def p = simplify f
   def add f h = prim "add_hash"
+  add p (hashcode p)
+
+def hashcode f = memoize 0 (
+  def get f = prim "get_hash"
   def reuse = get f
-  if reuse !=* "" then add f reuse else
+  if reuse !=* "" then reuse else
     def job = makeRawPlan ("<hash>", f, Nil) | runJob
     if job.getJobStatus == 0
-    then extract '(.{64}).*' job.getJobStdout | head | add f
+    then extract '(.{64}).*' job.getJobStdout | head
     else raise "Failed to hash file {f}"
 )
 
-global def write mode path content =
-  def imp m p c = prim "write"
-  makePath (imp mode path content)
+def stateRunner =
+  def add f h = prim "add_hash"
+  def hash = "0000000000000000000000000000000000000000000000000000000000000000"
+  def pre input =
+    match input.getRunnerInputCommand
+      _, file, Nil = Pair input file
+      _ = raise "stateRunner: invalid command-line"
+  def post (Pair output file) =
+    editRunnerOutputOutputs (add file hash, _) output
+  makeRunner pre post virtualRunner
 
-global def mkdir mode path =
-  def imp m p = prim "mkdir"
-  Path (imp mode path)
+# Mark a file whose contents must not be tracked
+global def makeStatePath file =
+  makePlan ("<state>", file, Nil) Nil
+  | setPlanRunner      stateRunner
+  | setPlanKeep        False
+  | setPlanEnvironment Nil
+  | setPlanFnOutputs   (file, _)
+  | runJob
+  | getJobOutput
 
 # Whenever possible, use 'job' if:
 #   cmd can run under FUSE

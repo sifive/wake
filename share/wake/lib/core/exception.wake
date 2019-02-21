@@ -4,3 +4,4 @@ def catch x = prim "catch"
 global def try f x = if test x then f (catch x) else x
 global def tryelse f g x = if test x then f (catch x) else g x
 global def raise x = prim "raise"
+global def cast x = prim "cast"

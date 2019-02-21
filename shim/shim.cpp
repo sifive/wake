@@ -59,17 +59,11 @@ static int do_hash(const char *file) {
 
 int main(int argc, char **argv) {
   int stdin_fd, stdout_fd, stderr_fd;
-  const char *root, *dir;
+  const char *dir;
 
-  if (argc < 7) return 1;
+  if (argc < 6) return 1;
 
-  root = argv[4];
-  if ((root[0] != '.' || root[1] != 0) && chdir(root)) {
-    fprintf(stderr, "chdir: %s: %s\n", root, strerror(errno));
-    return 127;
-  }
-
-  dir = argv[5];
+  dir = argv[4];
   if ((dir[0] != '.' || dir[1] != 0) && chdir(dir)) {
     fprintf(stderr, "chdir: %s: %s\n", dir, strerror(errno));
     return 127;
@@ -90,11 +84,11 @@ int main(int argc, char **argv) {
   close(stdout_fd);
   close(stderr_fd);
 
-  if (strcmp(argv[6], "<hash>")) {
-    execv(argv[6], argv+6);
-    fprintf(stderr, "execv: %s: %s\n", argv[6], strerror(errno));
+  if (strcmp(argv[5], "<hash>")) {
+    execv(argv[5], argv+5);
+    fprintf(stderr, "execv: %s: %s\n", argv[5], strerror(errno));
     return 127;
   } else {
-    return do_hash(argv[7]);
+    return do_hash(argv[6]);
   }
 }

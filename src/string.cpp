@@ -201,19 +201,10 @@ static PRIMFN(prim_mkdir) {
   REQUIRE(mpz_cmp_si(mode->value, 0xffff) <= 0, "mode must be <= 0xffff");
   long mask = mpz_get_si(mode->value);
 
-  std::vector<char> scan(path->value.begin(), path->value.end());
-  scan.push_back('/');
-
-  for (size_t i = 1; i < scan.size(); ++i) {
-    if (scan[i] == '/') {
-      scan[i] = 0;
-      if (mkdir(scan.data(), mask) != 0 && errno != EEXIST) {
-        std::stringstream str;
-        str << scan.data() << ": " << strerror(errno);
-        RAISE(str.str());
-      }
-      scan[i] = '/';
-    }
+  if (mkdir(path->value.c_str(), mask) != 0 && errno != EEXIST && errno != EISDIR) {
+    std::stringstream str;
+    str << path->value << ": " << strerror(errno);
+    RAISE(str.str());
   }
 
   RETURN(args[1]);
@@ -231,20 +222,6 @@ static PRIMFN(prim_format) {
   std::stringstream buffer;
   args[0]->format(buffer, 0);
   auto out = std::make_shared<String>(buffer.str());
-  RETURN(out);
-}
-
-static PRIMFN(prim_iformat) {
-  REQUIRE(args.size() == 1, "prim_iformat expects 1 argument");
-  (void)data;
-  std::shared_ptr<Value> out;
-  if (args[0]->type == Exception::type || args[0]->type == String::type) {
-    out = args[0];
-  } else {
-    std::stringstream buffer;
-    args[0]->format(buffer, 0);
-    out = std::make_shared<String>(buffer.str());
-  }
   RETURN(out);
 }
 
@@ -424,7 +401,6 @@ void prim_register_string(PrimMap &pmap, const char *version) {
   pmap.emplace("getenv",  PrimDesc(prim_getenv,  type_getenv));
   pmap.emplace("mkdir",   PrimDesc(prim_mkdir,   type_mkdir));
   pmap.emplace("format",  PrimDesc(prim_format,  type_format));
-  pmap.emplace("iformat", PrimDesc(prim_iformat, type_format));
   pmap.emplace("print",   PrimDesc(prim_print,   type_print));
   pmap.emplace("version", PrimDesc(prim_version, type_version, (void*)version));
   pmap.emplace("scmp",    PrimDesc(prim_scmp,    type_scmp));

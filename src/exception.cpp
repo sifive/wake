@@ -55,13 +55,26 @@ static PRIMFN(prim_raise) {
   Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(arg0->value, binding));
 }
 
+static PRIMTYPE(type_cast) {
+  return args.size() == 1;
+  // leave arg0 free
+  (void)out; // leave prim free
+}
+
+static PRIMFN(prim_cast) {
+  EXPECT(1); // re-raise the exception argument
+  RAISE("Attempt to cast a non-exception");
+}
+
 static PRIMTYPE(type_unit) {
   return args.size() == 1 &&
     out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_unit) {
-  EXPECT(1);
+  (void)data; // silence unused variable warning (EXPECT not called)
+  (void)binding;
+  (void)args;
   auto out = make_unit();
   RETURN(out);
 }
@@ -70,6 +83,7 @@ void prim_register_exception(PrimMap &pmap) {
   pmap.emplace("test",  PrimDesc(prim_test,  type_test,  0, PRIM_PURE));
   pmap.emplace("catch", PrimDesc(prim_catch, type_catch, 0, PRIM_PURE));
   pmap.emplace("raise", PrimDesc(prim_raise, type_raise, 0, PRIM_PURE));
+  pmap.emplace("cast",  PrimDesc(prim_cast,  type_cast,  0, PRIM_PURE));
 
   pmap.emplace("wait_one", PrimDesc(prim_unit, type_unit, 0, PRIM_PURE|PRIM_SHALLOW));
   pmap.emplace("wait_all", PrimDesc(prim_unit, type_unit, 0, PRIM_PURE));
