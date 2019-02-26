@@ -29,7 +29,7 @@ struct Database {
   struct detail;
   std::unique_ptr<detail> imp;
 
-  Database();
+  Database(bool debugdb);
   ~Database();
 
   std::string open();

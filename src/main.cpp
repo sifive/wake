@@ -154,6 +154,8 @@ int main(int argc, const char **argv) {
       "surpress output of job commands and stderr", 0},
     { "debug", {"-d", "--debug"},
       "simulate a stack for exceptions and print closures", 0},
+    { "debug-db", {"--debug-db"},
+      "print all database query execution to stderr", 0},
     { "parse", {"-p", "--parse"},
       "parse wake files and print the AST", 0},
     { "typecheck", {"-t", "--typecheck"},
@@ -185,6 +187,7 @@ int main(int argc, const char **argv) {
   bool quiet = args["quiet"];
   bool rerun = args["rerun"];
   bool check = args["check"];
+  bool debugdb = args["debug-db"];
   queue.stack_trace = args["debug"];
 
   bool nodb = args["init"];
@@ -232,7 +235,7 @@ int main(int argc, const char **argv) {
 
   if (nodb) return 0;
 
-  Database db;
+  Database db(debugdb);
   std::string fail = db.open();
   if (!fail.empty()) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;

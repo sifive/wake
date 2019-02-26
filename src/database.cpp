@@ -11,6 +11,7 @@
 #define INDEXES 3
 
 struct Database::detail {
+  bool debugdb;
   sqlite3 *db;
   sqlite3_stmt *add_target;
   sqlite3_stmt *del_target;
@@ -33,13 +34,14 @@ struct Database::detail {
   sqlite3_stmt *fetch_hash;
   sqlite3_stmt *delete_useless;
   long run_id;
-  detail() : db(0), add_target(0), del_target(0), begin_txn(0), commit_txn(0), insert_job(0),
-             insert_tree(0), insert_log(0), wipe_file(0), insert_file(0), update_file(0),
-             get_log(0), get_tree(0), set_runtime(0), detect_overlap(0), delete_overlap(0),
-             find_prior(0), update_prior(0), find_owner(0), fetch_hash(0), delete_useless(0) { }
+  detail(bool debugdb_)
+   : debugdb(debugdb_), db(0), add_target(0), del_target(0), begin_txn(0), commit_txn(0),
+     insert_job(0), insert_tree(0), insert_log(0), wipe_file(0), insert_file(0), update_file(0),
+     get_log(0), get_tree(0), set_runtime(0), detect_overlap(0), delete_overlap(0),
+     find_prior(0), update_prior(0), find_owner(0), fetch_hash(0), delete_useless(0) { }
 };
 
-Database::Database() : imp(new detail) { }
+Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
 Database::~Database() { close(); }
 
 std::string Database::open() {
@@ -243,8 +245,20 @@ static int fill_vector(void *data, int cols, char **text, char **colname) {
   return 0;
 }
 
-static void finish_stmt(const char *why, sqlite3_stmt *stmt) {
+static void finish_stmt(const char *why, sqlite3_stmt *stmt, bool debug) {
   int ret;
+
+  if (debug) {
+    std::cerr << "DB:: ";
+#if SQLITE_VERSION_NUMBER >= 3014000
+    char *tmp = sqlite3_expanded_sql(stmt);
+    std::cerr << tmp;
+    sqlite3_free(tmp);
+#else
+    std::cerr << sqlite3_sql(stmt);
+#endif
+    std::cerr << std::endl;
+  }
 
   ret = sqlite3_reset(stmt);
   if (ret != SQLITE_OK) {
@@ -259,7 +273,7 @@ static void finish_stmt(const char *why, sqlite3_stmt *stmt) {
   }
 }
 
-static void single_step(const char *why, sqlite3_stmt *stmt) {
+static void single_step(const char *why, sqlite3_stmt *stmt, bool debug) {
   int ret;
 
   ret = sqlite3_step(stmt);
@@ -277,7 +291,7 @@ static void single_step(const char *why, sqlite3_stmt *stmt) {
     exit(1);
   }
 
-  finish_stmt(why, stmt);
+  finish_stmt(why, stmt, debug);
 }
 
 static void bind_string(const char *why, sqlite3_stmt *stmt, int index, const char *str, size_t len) {
@@ -328,13 +342,13 @@ std::vector<std::string> Database::get_targets() {
 void Database::add_target(const std::string &target) {
   const char *why = "Could not add a wake target";
   bind_string(why, imp->add_target, 1, target);
-  single_step(why, imp->add_target);
+  single_step(why, imp->add_target, imp->debugdb);
 }
 
 void Database::del_target(const std::string &target) {
   const char *why = "Could not remove a wake target";
   bind_string(why, imp->del_target, 1, target);
-  single_step(why, imp->del_target);
+  single_step(why, imp->del_target, imp->debugdb);
 }
 
 void Database::prepare() {
@@ -349,15 +363,15 @@ void Database::prepare() {
 }
 
 void Database::clean() {
-  single_step("Could not clean database", imp->delete_useless);
+  single_step("Could not clean database", imp->delete_useless, imp->debugdb);
 }
 
 void Database::begin_txn() {
-  single_step("Could not begin a transaction", imp->begin_txn);
+  single_step("Could not begin a transaction", imp->begin_txn, imp->debugdb);
 }
 
 void Database::end_txn() {
-  single_step("Could not commit a transaction", imp->commit_txn);
+  single_step("Could not commit a transaction", imp->commit_txn, imp->debugdb);
 }
 
 bool Database::reuse_job(
@@ -378,7 +392,7 @@ bool Database::reuse_job(
   bind_string (why, imp->find_prior, 4, stdin);
   bool prior = sqlite3_step(imp->find_prior) == SQLITE_ROW;
   if (prior) job = sqlite3_column_int(imp->find_prior, 0);
-  finish_stmt (why, imp->find_prior);
+  finish_stmt (why, imp->find_prior, imp->debugdb);
 
   if (!prior) {
     end_txn();
@@ -393,12 +407,12 @@ bool Database::reuse_job(
     if (access(path.c_str(), R_OK) != 0) exist = false;
     out.emplace_back(std::move(path), rip_column(imp->get_tree, 1));
   }
-  finish_stmt(why, imp->get_tree);
+  finish_stmt(why, imp->get_tree, imp->debugdb);
 
   if (exist && !check) {
     bind_integer(why, imp->update_prior, 1, imp->run_id);
     bind_integer(why, imp->update_prior, 2, job);
-    single_step (why, imp->update_prior);
+    single_step (why, imp->update_prior, imp->debugdb);
   }
 
   end_txn();
@@ -422,7 +436,7 @@ void Database::insert_job(
   bind_string (why, imp->insert_job, 4, environment);
   bind_string (why, imp->insert_job, 5, stack);
   bind_string (why, imp->insert_job, 6, stdin);
-  single_step (why, imp->insert_job);
+  single_step (why, imp->insert_job, imp->debugdb);
   end_txn();
   *job = sqlite3_last_insert_rowid(imp->db);
 }
@@ -434,7 +448,7 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   bind_integer(why, imp->set_runtime, 2, status);
   bind_double (why, imp->set_runtime, 3, runtime);
   bind_integer(why, imp->set_runtime, 4, job);
-  single_step (why, imp->set_runtime);
+  single_step (why, imp->set_runtime, imp->debugdb);
   const char *tok = inputs.c_str();
   const char *end = tok + inputs.size();
   for (const char *scan = tok; scan != end; ++scan) {
@@ -442,7 +456,7 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
       bind_integer(why, imp->insert_tree, 1, INPUT);
       bind_integer(why, imp->insert_tree, 2, job);
       bind_string (why, imp->insert_tree, 3, tok, scan-tok);
-      single_step (why, imp->insert_tree);
+      single_step (why, imp->insert_tree, imp->debugdb);
       tok = scan+1;
     }
   }
@@ -453,14 +467,14 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
       bind_integer(why, imp->insert_tree, 1, OUTPUT);
       bind_integer(why, imp->insert_tree, 2, job);
       bind_string (why, imp->insert_tree, 3, tok, scan-tok);
-      single_step (why, imp->insert_tree);
+      single_step (why, imp->insert_tree, imp->debugdb);
       tok = scan+1;
     }
   }
 
   bind_integer(why, imp->delete_overlap, 1, imp->run_id);
   bind_integer(why, imp->delete_overlap, 2, job);
-  single_step (why, imp->delete_overlap);
+  single_step (why, imp->delete_overlap, imp->debugdb);
 
   bool fail = false;
   bind_integer(why, imp->detect_overlap, 1, job);
@@ -468,7 +482,7 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
     std::cerr << "File output by multiple Jobs: " << rip_column(imp->detect_overlap, 0) << std::endl;
     fail = true;
   }
-  finish_stmt(why, imp->detect_overlap);
+  finish_stmt(why, imp->detect_overlap, imp->debugdb);
 
   end_txn();
 
@@ -482,7 +496,7 @@ std::vector<FileReflection> Database::get_tree(int kind, long job)  {
   bind_integer(why, imp->get_tree, 2, kind);
   while (sqlite3_step(imp->get_tree) == SQLITE_ROW)
     out.emplace_back(rip_column(imp->get_tree, 0), rip_column(imp->get_tree, 1));
-  finish_stmt(why, imp->get_tree);
+  finish_stmt(why, imp->get_tree, imp->debugdb);
   return out;
 }
 
@@ -492,7 +506,7 @@ void Database::save_output(long job, int descriptor, const char *buffer, int siz
   bind_integer(why, imp->insert_log, 2, descriptor);
   bind_double (why, imp->insert_log, 3, runtime);
   bind_string (why, imp->insert_log, 4, buffer, size);
-  single_step (why, imp->insert_log);
+  single_step (why, imp->insert_log, imp->debugdb);
 }
 
 std::string Database::get_output(long job, int descriptor) {
@@ -505,7 +519,7 @@ std::string Database::get_output(long job, int descriptor) {
       reinterpret_cast<const char*>(sqlite3_column_text(imp->get_log, 0)),
       sqlite3_column_bytes(imp->get_log, 0));
   }
-  finish_stmt(why, imp->get_log);
+  finish_stmt(why, imp->get_log, imp->debugdb);
   return out.str();
 }
 
@@ -514,15 +528,15 @@ void Database::add_hash(const std::string &file, const std::string &hash, long m
   begin_txn();
   bind_string (why, imp->wipe_file, 1, file);
   bind_string (why, imp->wipe_file, 2, hash);
-  single_step (why, imp->wipe_file);
+  single_step (why, imp->wipe_file, imp->debugdb);
   bind_string (why, imp->update_file, 1, hash);
   bind_integer(why, imp->update_file, 2, modified);
   bind_string (why, imp->update_file, 3, file);
-  single_step (why, imp->update_file);
+  single_step (why, imp->update_file, imp->debugdb);
   bind_string (why, imp->insert_file, 1, hash);
   bind_integer(why, imp->insert_file, 2, modified);
   bind_string (why, imp->insert_file, 3, file);
-  single_step (why, imp->insert_file);
+  single_step (why, imp->insert_file, imp->debugdb);
   end_txn();
 }
 
@@ -533,7 +547,7 @@ std::string Database::get_hash(const std::string &file, long modified) {
   bind_integer(why, imp->fetch_hash, 2, modified);
   if (sqlite3_step(imp->fetch_hash) == SQLITE_ROW)
     out = rip_column(imp->fetch_hash, 0);
-  finish_stmt(why, imp->fetch_hash);
+  finish_stmt(why, imp->fetch_hash, imp->debugdb);
   return out;
 }
 
@@ -577,7 +591,7 @@ std::vector<JobReflection> Database::explain(const std::string &file, int use) {
       desc.inputs.emplace_back(
         rip_column(imp->get_tree, 0),
         rip_column(imp->get_tree, 1));
-    finish_stmt(why, imp->get_tree);
+    finish_stmt(why, imp->get_tree, imp->debugdb);
     // outputs
     bind_integer(why, imp->get_tree, 1, desc.job);
     bind_integer(why, imp->get_tree, 2, OUTPUT);
@@ -585,9 +599,9 @@ std::vector<JobReflection> Database::explain(const std::string &file, int use) {
       desc.outputs.emplace_back(
         rip_column(imp->get_tree, 0),
         rip_column(imp->get_tree, 1));
-    finish_stmt(why, imp->get_tree);
+    finish_stmt(why, imp->get_tree, imp->debugdb);
   }
-  finish_stmt(why, imp->find_owner);
+  finish_stmt(why, imp->find_owner, imp->debugdb);
   end_txn();
 
   return out;
