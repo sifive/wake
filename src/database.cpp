@@ -429,7 +429,6 @@ void Database::insert_job(
   long  *job)
 {
   const char *why = "Could not insert a job";
-  begin_txn();
   bind_integer(why, imp->insert_job, 1, imp->run_id);
   bind_string (why, imp->insert_job, 2, directory);
   bind_string (why, imp->insert_job, 3, commandline);
@@ -437,7 +436,6 @@ void Database::insert_job(
   bind_string (why, imp->insert_job, 5, stack);
   bind_string (why, imp->insert_job, 6, stdin);
   single_step (why, imp->insert_job, imp->debugdb);
-  end_txn();
   *job = sqlite3_last_insert_rowid(imp->db);
 }
 
