@@ -874,6 +874,19 @@ static PRIMFN(prim_get_hash) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_get_modtime) {
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
+    out->unify(Integer::typeVar);
+}
+
+static PRIMFN(prim_get_modtime) {
+  EXPECT(1);
+  STRING(file, 0);
+  auto out = std::make_shared<Integer>(stat_mod_ns(file->value));
+  RETURN(out);
+}
+
 static bool check_exec(const char *tok, size_t len, const std::string &exec, std::string &out) {
   out.assign(tok, len);
   out += "/";
@@ -921,5 +934,6 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   pmap.emplace("job_finish", PrimDesc(prim_job_finish, type_job_finish));
   pmap.emplace("add_hash",   PrimDesc(prim_add_hash,   type_add_hash,   jobtable));
   pmap.emplace("get_hash",   PrimDesc(prim_get_hash,   type_get_hash,   jobtable));
+  pmap.emplace("get_modtime",PrimDesc(prim_get_modtime,type_get_modtime));
   pmap.emplace("search_path",PrimDesc(prim_search_path,type_search_path));
 }

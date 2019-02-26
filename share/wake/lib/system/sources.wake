@@ -9,9 +9,10 @@ def got_sources = add_sources (subscribe source).implode # returns true
 global def files dir regexp = prim "files"
 
 def makeSource file =
-  makePlan ("<source>", file, Nil) Nil
+  def get_modtime file = prim "get_modtime"
+  makePlan ("<source>", str (get_modtime file), file, Nil) Nil
   | setPlanRunner      virtualRunner
-  | setPlanKeep        False
+  | setPlanShare       False
   | setPlanEnvironment Nil
   | setPlanFnOutputs   (file, _)
   | runJob
