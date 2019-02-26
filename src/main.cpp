@@ -35,7 +35,7 @@ void Output::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
   *save = std::move(value);
 }
 
-static void describe_human(const std::vector<JobReflection> &jobs) {
+static void describe_human(const std::vector<JobReflection> &jobs, bool debug) {
   for (auto &job : jobs) {
     std::cout
       << "Job " << job.job << ":" << std::endl
@@ -59,6 +59,10 @@ static void describe_human(const std::vector<JobReflection> &jobs) {
       << "Outputs:" << std::endl;
     for (auto &out : job.outputs)
       std::cout << "  " << out.hash << " " << out.path << std::endl;
+    if (debug) {
+      // std::replace(job.stack.begin(), job.stack.end(), '\n', "\n  ");
+      std::cout << "Stack:" << std::endl << "  " << job.stack;
+    }
   }
 }
 
@@ -78,7 +82,7 @@ static void escape(const std::string &x) {
   std::cout << "'";
 }
 
-static void describe_shell(const std::vector<JobReflection> &jobs) {
+static void describe_shell(const std::vector<JobReflection> &jobs, bool debug) {
   std::cout << "#! /bin/sh -ex" << std::endl;
 
   for (auto &job : jobs) {
@@ -119,11 +123,11 @@ static void describe_shell(const std::vector<JobReflection> &jobs) {
   }
 }
 
-void describe(const std::vector<JobReflection> &jobs, bool rerun) {
+void describe(const std::vector<JobReflection> &jobs, bool rerun, bool debug) {
   if (rerun) {
-    describe_shell(jobs);
+    describe_shell(jobs, debug);
   } else {
-    describe_human(jobs);
+    describe_human(jobs, debug);
   }
 }
 
@@ -188,7 +192,8 @@ int main(int argc, const char **argv) {
   bool rerun = args["rerun"];
   bool check = args["check"];
   bool debugdb = args["debug-db"];
-  queue.stack_trace = args["debug"];
+  bool debug = args["debug"];
+  queue.stack_trace = debug;
 
   bool nodb = args["init"];
   bool noparse = nodb ||
@@ -279,12 +284,12 @@ int main(int argc, const char **argv) {
 
   if (args["input"]) {
     std::string input = args["input"];
-    describe(db.explain(prefix + input, 1), rerun);
+    describe(db.explain(prefix + input, 1), rerun, debug);
   }
 
   if (args["output"]) {
     std::string output = args["output"];
-    describe(db.explain(prefix + output, 2), rerun);
+    describe(db.explain(prefix + output, 2), rerun, debug);
   }
 
   if (noparse) return 0;
