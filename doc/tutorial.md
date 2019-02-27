@@ -41,7 +41,7 @@ command-line.
 ## Compiling a CPP file
 
     echo 'int main() { return 0; }' > main.cpp
-    echo 'global def build x = compileC "native-cpp11-release" ("-I.", Nil) Nil "main.cpp"' > tutorial.wake
+    echo 'global def build x = compileC "native-cpp11-release" ("-I.", Nil) Nil (source "main.cpp")' > tutorial.wake
     git add main.cpp
     wake 'build 0'
 
@@ -112,8 +112,8 @@ The output of compileC is the name of the object file produced.
     cat > tutorial.wake <<EOF
     def variant = "native-cpp11-release"
     global def build _ =
-      def main = compileC variant ("-I.", Nil) Nil "main.cpp"
-      def help = compileC variant ("-I.", Nil) Nil "help.cpp"
+      def main = compileC variant ("-I.", Nil) Nil (source "main.cpp")
+      def help = compileC variant ("-I.", Nil) Nil (source "help.cpp")
       linkO variant ("-lm", Nil) (main, help, Nil) "tutorial"
     EOF
     wake 'build 0'
@@ -160,8 +160,8 @@ and the program re-linked.
     def variant = "native-cpp11-release"
     global def build _ =
       def headers = sources here '.*\.h'
-      def main = compileC variant ("-I.", Nil) headers "main.cpp"
-      def help = compileC variant ("-I.", Nil) headers "help.cpp"
+      def main = compileC variant ("-I.", Nil) headers (source "main.cpp")
+      def help = compileC variant ("-I.", Nil) headers (source "help.cpp")
       linkO variant ("-lm", Nil) (main, help, Nil) "tutorial"
     EOF
     wake 'build 0'
@@ -250,7 +250,7 @@ Wake has a pair of helper methods that make this easy, as shown.
     global def info_h _ =
       def cmdline = which "uname", "-sr", Nil
       def os = job cmdline Nil
-      def body = "#define OS {os.stdout}#define WAKE {version}\n"
+      def body = "#define OS {os.getJobStdout}#define WAKE {version}\n"
       write 0644 "{here}/info.h" body # create with mode: rw-r--r--
     EOF
     wake 'info_h 0'
@@ -302,13 +302,13 @@ that is impossible in a system like make, but fairly straight-forward in
 wake:
 
     def build_feature_detect _ =
-      def object = compileC variant Nil Nil "feature-detect.cpp"
+      def object = compileC variant Nil Nil (source "feature-detect.cpp")
       linkO variant Nil (object, Nil) "feature-detect"
 
     def run_feature_detect _ =
-      def cmdline = (build_feature_detect 0), "--detect-stuff-to-build", Nil
+      def cmdline = build_feature_detect 0, "--detect-stuff-to-build", Nil
       def detect = job cmdline ("some-config-file", Nil)
-      tokenize " " detect.stdout
+      tokenize " " detect.getJobStdout
 
     global def complex_build _ =
       def headers = sources here '.*\.h'
@@ -354,7 +354,7 @@ Consider the follow program:
 
     global def strAnimal a = match a
       Cat x = "a cat called {x}"
-      Dog y = "a {y}-year-old dog"
+      Dog y = "a {str y}-year-old dog"
     EOF
     wake 'Cat'
     wake 'strAnimal (Dog 12)'
@@ -412,8 +412,8 @@ Nevertheless, sometimes this syntax can be convenient, too.
     def curl url =
       def file = simplify "{here}/{head (extract '.*/(.*)' url)}"
       def cmdline = which "curl", "-o", file, url, Nil
-      def curl = job cmdline (here, Nil)
-      curl.output
+      def curl = job cmdline Nil
+      curl.getJobOutput
 
     global def mathSymbols _ =
       def helper = match _

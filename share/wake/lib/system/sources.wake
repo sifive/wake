@@ -8,7 +8,7 @@ def got_sources = add_sources (subscribe source).implode # returns true
 # Depending on when the method is invoked, the results may vary
 global def files dir regexp = prim "files"
 
-def makeSource file =
+global def source file =
   def get_modtime file = prim "get_modtime"
   makePlan ("<source>", str (get_modtime file), file, Nil) Nil
   | setPlanRunner      virtualRunner
@@ -21,4 +21,4 @@ def makeSource file =
 # Find sources files
 global def sources dir regexp =
   def scan dir regexp = prim "sources"
-  waitOne (\_ scan dir regexp | map makeSource) got_sources
+  waitOne (\_ scan dir regexp | map source) got_sources
