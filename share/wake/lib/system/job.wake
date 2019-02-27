@@ -127,7 +127,7 @@ def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run poo
         RunnerOutput inputs outputs indexes =
           def final _ =
             def input  = finputs  inputs  | map simplify | implode
-            def output = foutputs outputs | map addhash | implode
+            def output = foutputs outputs | map addhash  | implode
             finish job input output
           # Input + output names might be known before the job terminates
           def _ = waitOne final job.getJobStatus
@@ -197,6 +197,7 @@ global def fuseRunner =
 # Paths differ from Strings in that they have been hashed; their content is frozen
 data Path = Path String
 global def getPathName (Path name) = name
+global def getPathParent (Path name) = Path (simplify "{name}/..")
 
 def addhash f =
   def p = simplify f
