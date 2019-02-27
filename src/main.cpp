@@ -35,7 +35,7 @@ void Output::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
   *save = std::move(value);
 }
 
-static void describe_human(const std::vector<JobReflection> &jobs) {
+static void describe_human(const std::vector<JobReflection> &jobs, bool debug) {
   for (auto &job : jobs) {
     std::cout
       << "Job " << job.job << ":" << std::endl
@@ -59,6 +59,16 @@ static void describe_human(const std::vector<JobReflection> &jobs) {
       << "Outputs:" << std::endl;
     for (auto &out : job.outputs)
       std::cout << "  " << out.hash << " " << out.path << std::endl;
+    if (debug) {
+      std::cout << "Stack:";
+      size_t i, j;
+      for (i = 0; (j = job.stack.find('\n', i)) != std::string::npos; i = j+1) {
+        std::cout << "\n  ";
+        std::cout.write(job.stack.data()+i, j-i);
+      }
+      std::cout.write(job.stack.data()+i, job.stack.size()-i);
+      std::cout << std::endl;
+    }
   }
 }
 
@@ -78,7 +88,7 @@ static void escape(const std::string &x) {
   std::cout << "'";
 }
 
-static void describe_shell(const std::vector<JobReflection> &jobs) {
+static void describe_shell(const std::vector<JobReflection> &jobs, bool debug) {
   std::cout << "#! /bin/sh -ex" << std::endl;
 
   for (auto &job : jobs) {
@@ -116,14 +126,24 @@ static void describe_shell(const std::vector<JobReflection> &jobs) {
       << "# Outputs:" << std::endl;
     for (auto &out : job.outputs)
       std::cout << "#   " << out.hash << " " << out.path << std::endl;
+    if (debug) {
+      std::cout << "# Stack:";
+      size_t i, j;
+      for (i = 0; (j = job.stack.find('\n', i)) != std::string::npos; i = j+1) {
+        std::cout << "\n#   ";
+        std::cout.write(job.stack.data()+i, j-i);
+      }
+      std::cout.write(job.stack.data()+i, job.stack.size()-i);
+      std::cout << std::endl;
+    }
   }
 }
 
-void describe(const std::vector<JobReflection> &jobs, bool rerun) {
+void describe(const std::vector<JobReflection> &jobs, bool rerun, bool debug) {
   if (rerun) {
-    describe_shell(jobs);
+    describe_shell(jobs, debug);
   } else {
-    describe_human(jobs);
+    describe_human(jobs, debug);
   }
 }
 
@@ -154,12 +174,14 @@ int main(int argc, const char **argv) {
       "surpress output of job commands and stderr", 0},
     { "debug", {"-d", "--debug"},
       "simulate a stack for exceptions and print closures", 0},
+    { "debug-db", {"--debug-db"},
+      "print all database query execution to stderr", 0},
     { "parse", {"-p", "--parse"},
       "parse wake files and print the AST", 0},
     { "typecheck", {"-t", "--typecheck"},
       "type-check wake files and print the typed AST", 0},
     { "check", {"-c", "--check"},
-      "rebuild all outputs tod check for build repeatability", 0},
+      "rebuild all outputs to check for build repeatability", 0},
     { "globals", {"-g", "--globals"},
       "print out all global variables", 0},
     { "init", {"--init"},
@@ -185,7 +207,9 @@ int main(int argc, const char **argv) {
   bool quiet = args["quiet"];
   bool rerun = args["rerun"];
   bool check = args["check"];
-  queue.stack_trace = args["debug"];
+  bool debugdb = args["debug-db"];
+  bool debug = args["debug"];
+  queue.stack_trace = debug;
 
   bool nodb = args["init"];
   bool noparse = nodb ||
@@ -232,7 +256,7 @@ int main(int argc, const char **argv) {
 
   if (nodb) return 0;
 
-  Database db;
+  Database db(debugdb);
   std::string fail = db.open();
   if (!fail.empty()) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;
@@ -276,12 +300,12 @@ int main(int argc, const char **argv) {
 
   if (args["input"]) {
     std::string input = args["input"];
-    describe(db.explain(prefix + input, 1), rerun);
+    describe(db.explain(prefix + input, 1), rerun, debug);
   }
 
   if (args["output"]) {
     std::string output = args["output"];
-    describe(db.explain(prefix + output, 2), rerun);
+    describe(db.explain(prefix + output, 2), rerun, debug);
   }
 
   if (noparse) return 0;

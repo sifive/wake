@@ -33,7 +33,7 @@ def mkdirRunner =
 global def mkdir mode path =
   def helper (Pair inputs acc_) e =
     def acc = if acc_ ==* "" then if e ==* "" then "/" else e else simplify "{acc_}/{e}"
-    makePlan ("<mkdir>", "-m", str mode, acc, Nil) inputs
+    makePlan ("<mkdir>", "-m", "0{strbase 8 mode}", acc, Nil) inputs
     | setPlanRunner      mkdirRunner
     | setPlanKeep        False
     | setPlanEnvironment Nil
