@@ -60,8 +60,14 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug) {
     for (auto &out : job.outputs)
       std::cout << "  " << out.hash << " " << out.path << std::endl;
     if (debug) {
-      // std::replace(job.stack.begin(), job.stack.end(), '\n', "\n  ");
-      std::cout << "Stack:" << std::endl << "  " << job.stack;
+      std::cout << "Stack:";
+      size_t i, j;
+      for (i = 0; (j = job.stack.find('\n', i)) != std::string::npos; i = j+1) {
+        std::cout << "\n  ";
+        std::cout.write(job.stack.data()+i, j-i);
+      }
+      std::cout.write(job.stack.data()+i, job.stack.size()-i);
+      std::cout << std::endl;
     }
   }
 }
@@ -120,6 +126,16 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug) {
       << "# Outputs:" << std::endl;
     for (auto &out : job.outputs)
       std::cout << "#   " << out.hash << " " << out.path << std::endl;
+    if (debug) {
+      std::cout << "# Stack:";
+      size_t i, j;
+      for (i = 0; (j = job.stack.find('\n', i)) != std::string::npos; i = j+1) {
+        std::cout << "\n#   ";
+        std::cout.write(job.stack.data()+i, j-i);
+      }
+      std::cout.write(job.stack.data()+i, job.stack.size()-i);
+      std::cout << std::endl;
+    }
   }
 }
 
