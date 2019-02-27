@@ -282,7 +282,7 @@ static PRIMFN(prim_sNFC) {
     static_cast<utf8proc_option_t>(
       UTF8PROC_COMPOSE |
       UTF8PROC_REJECTNA));
-  REQUIRE(len > 0, std::string("Could not normalize string ") + utf8proc_errmsg(len));
+  REQUIRE(len >= 0, std::string("Could not normalize string ") + utf8proc_errmsg(len));
   auto out = std::make_shared<String>(std::string(
     reinterpret_cast<const char*>(dst),
     static_cast<size_t>(len)));
@@ -305,7 +305,7 @@ static PRIMFN(prim_sNFKC) {
       UTF8PROC_STRIPCC   |
       UTF8PROC_LUMP      |
       UTF8PROC_REJECTNA));
-  REQUIRE(len > 0, std::string("Could not normalize string ") + utf8proc_errmsg(len));
+  REQUIRE(len >= 0, std::string("Could not normalize string ") + utf8proc_errmsg(len));
   auto out = std::make_shared<String>(std::string(
     reinterpret_cast<const char*>(dst),
     static_cast<size_t>(len)));
@@ -329,7 +329,7 @@ static PRIMFN(prim_scaseNFKC) {
       UTF8PROC_LUMP      |
       UTF8PROC_CASEFOLD  |
       UTF8PROC_REJECTNA));
-  REQUIRE(len > 0, std::string("Could not normalize string ") + utf8proc_errmsg(len));
+  REQUIRE(len >= 0, std::string("Could not normalize string ") + utf8proc_errmsg(len));
   auto out = std::make_shared<String>(std::string(
     reinterpret_cast<const char*>(dst),
     static_cast<size_t>(len)));
