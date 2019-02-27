@@ -165,7 +165,7 @@ int main(int argc, const char **argv) {
     { "typecheck", {"-t", "--typecheck"},
       "type-check wake files and print the typed AST", 0},
     { "check", {"-c", "--check"},
-      "rebuild all outputs tod check for build repeatability", 0},
+      "rebuild all outputs to check for build repeatability", 0},
     { "globals", {"-g", "--globals"},
       "print out all global variables", 0},
     { "init", {"--init"},
