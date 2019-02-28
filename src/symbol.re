@@ -283,6 +283,35 @@ int pop_utf8(uint32_t *rune, const char *str)
   return -1;
 }
 
+static ssize_t unicode_escape(const unsigned char *s, const unsigned char *e, char **out) {
+  utf8proc_uint8_t *dst;
+  ssize_t len;
+
+  len = utf8proc_map(
+    reinterpret_cast<const utf8proc_uint8_t*>(s),
+    e - s,
+    &dst,
+    static_cast<utf8proc_option_t>(
+      UTF8PROC_COMPOSE   |
+      UTF8PROC_COMPAT    |
+      UTF8PROC_IGNORE    |
+      UTF8PROC_LUMP      |
+      UTF8PROC_REJECTNA));
+
+  *out = reinterpret_cast<char*>(dst);
+  return len;
+}
+
+static std::string unicode_escape(std::string &&str) {
+  char *cleaned;
+  const unsigned char *data = reinterpret_cast<const unsigned char *>(str.data());
+  ssize_t len = unicode_escape(data, data + str.size(), &cleaned);
+  if (len < 0) return str;
+  std::string out(cleaned, len);
+  free(cleaned);
+  return out;
+}
+
 static bool lex_sstr(Lexer &lex, Expr *&out)
 {
   input_t &in = *lex.engine.get();
@@ -304,6 +333,7 @@ static bool lex_sstr(Lexer &lex, Expr *&out)
     */
   }
 
+  // NOTE: unicode_escape NOT invoked; '' is raw "" is cleaned
   std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
   out = new Literal(SYM_LOCATION, std::move(str));
   return true;
@@ -362,7 +392,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
     */
   }
 
-  std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
+  std::shared_ptr<String> str = std::make_shared<String>(unicode_escape(std::move(slice)));
   exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
 
   if (exprs.size() == 1) {
@@ -606,32 +636,12 @@ static std::string op_escape(const char *str) {
   return out;
 }
 
-static ssize_t id_escape(const unsigned char *s, const unsigned char *e, char **out) {
-  utf8proc_uint8_t *dst;
-  ssize_t len;
-
-  len = utf8proc_map(
-    reinterpret_cast<const utf8proc_uint8_t*>(s),
-    e - s,
-    &dst,
-    static_cast<utf8proc_option_t>(
-      UTF8PROC_COMPOSE   |
-      UTF8PROC_COMPAT    |
-      UTF8PROC_IGNORE    |
-      UTF8PROC_STRIPCC   |
-      UTF8PROC_LUMP      |
-      UTF8PROC_REJECTNA));
-
-  *out = reinterpret_cast<char*>(dst);
-  return len;
-}
-
 std::string input_t::text() const {
   std::string out;
   char *dst;
   ssize_t len;
 
-  len = id_escape(tok, cur, &dst);
+  len = unicode_escape(tok, cur, &dst);
   if (len >= 0) {
     out = op_escape(dst);
     free(dst);
