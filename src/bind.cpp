@@ -247,6 +247,7 @@ struct PatternRef {
   PatternTree tree;
   int index; // for prototype: next var name, for patterns: function index
   int uses;
+  bool guard;
 
   PatternRef(const Location &location_) : location(location_), uses(0) { }
   PatternRef(PatternRef &&other) = default;
@@ -302,7 +303,6 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
         map->body.release(),
         new VarRef(prototype.location, cname)));
       std::vector<PatternRef> bucket;
-      std::vector<int> undo;
       int args = sum->members[c].ast.args.size();
       int var = prototype.index;
       prototype.index += args;
@@ -356,20 +356,42 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
   } else {
     PatternRef &p = patterns[1];
     ++p.uses;
-    return std::unique_ptr<Expr>(fill_pattern(
+    std::unique_ptr<Expr> guard_true(fill_pattern(
       new App(p.location,
         new VarRef(p.location, "_ f" + std::to_string(p.index)),
         new VarRef(p.location, "_ a0")),
       prototype.tree, p.tree));
+    if (!p.guard) {
+      return guard_true;
+    } else {
+      PatternRef save(std::move(patterns[1]));
+      patterns.erase(patterns.begin()+1);
+      std::unique_ptr<Expr> guard_false(expand_patterns(patterns));
+      patterns.emplace(patterns.begin()+1, std::move(save));
+      if (!guard_false) return nullptr;
+      std::unique_ptr<Expr> guard(fill_pattern(
+        new App(p.location,
+          new VarRef(p.location, "_ g" + std::to_string(p.index)),
+          new VarRef(p.location, "_ a0")),
+        prototype.tree, p.tree));
+      std::unique_ptr<Expr> out(
+        new App(p.location, new App(p.location, new App(p.location,
+          new VarRef(p.location, "destruct Boolean"),
+          new Lambda(p.location, "_", guard_true.release())),
+          new Lambda(p.location, "_", guard_false.release())),
+          guard.release()));
+      return out;
+    }
   }
 }
 
-static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, const AST &ast, Sum *multiarg) {
+static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, std::unique_ptr<Expr> &guard, const AST &ast, Sum *multiarg) {
   PatternTree out;
   if (ast.name == "_") {
     // no-op; unbound
   } else if (!ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
     expr = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, expr.release()));
+    guard = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, guard.release()));
     out.var = 0; // bound
   } else {
     for (ResolveBinding *iter = binding; iter; iter = iter->parent) {
@@ -411,7 +433,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       out.var = 0;
     } else {
       for (auto a = ast.args.rbegin(); a != ast.args.rend(); ++a)
-        out.children.push_back(cons_lookup(binding, expr, *a, 0));
+        out.children.push_back(cons_lookup(binding, expr, guard, *a, 0));
       std::reverse(out.children.begin(), out.children.end());
     }
   }
@@ -437,6 +459,7 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
   PatternRef &prototype = patterns.front();
   prototype.uses = 1;
   prototype.index = index;
+  prototype.guard = false;
 
   if (index == 1) {
     prototype.tree = std::move(children.front());
@@ -448,13 +471,18 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
   int f = 0;
   bool ok = true;
   for (auto &p : match->patterns) {
+    std::unique_ptr<Expr> nill;
     std::unique_ptr<Expr> &expr = map->map["_ f" + std::to_string(f)];
+    std::unique_ptr<Expr> &guard = p.guard ? map->map["_ g" + std::to_string(f)] : nill;
     expr = std::move(p.expr);
+    guard = std::move(p.guard);
     patterns.emplace_back(expr->location);
     patterns.back().index = f;
-    patterns.back().tree = cons_lookup(binding, expr, p.pattern, &multiarg);
+    patterns.back().guard = static_cast<bool>(guard);
+    patterns.back().tree = cons_lookup(binding, expr, guard, p.pattern, &multiarg);
     ok &= !patterns.front().tree.sum || patterns.back().tree.sum;
     expr = std::unique_ptr<Expr>(new Lambda(expr->location, "_", expr.release()));
+    guard = std::unique_ptr<Expr>(new Lambda(expr->location, "_", guard.release()));
     ++f;
   }
   if (!ok) return nullptr;

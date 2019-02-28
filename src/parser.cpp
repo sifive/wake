@@ -153,9 +153,14 @@ static Expr *parse_match(int p, Lexer &lex) {
   repeat = true;
   while (repeat) {
     AST ast = parse_ast(multiarg?APP_PRECEDENCE:0, lex, multiarg, multiarg);
+    Expr *guard = 0;
+    if (lex.next.type == IF) {
+      lex.consume();
+      guard = parse_block(lex, false);
+    }
     if (expect(EQUALS, lex)) lex.consume();
     Expr *expr = parse_block(lex, false);
-    out->patterns.emplace_back(std::move(ast), expr);
+    out->patterns.emplace_back(std::move(ast), expr, guard);
 
     switch (lex.next.type) {
       case DEDENT:
@@ -227,7 +232,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       location.end = rhs->location.end;
       if (Lexer::isUpper(ast.name.c_str()) || Lexer::isOperator(ast.name.c_str())) {
         Match *match = new Match(location);
-        match->patterns.emplace_back(std::move(ast), rhs);
+        match->patterns.emplace_back(std::move(ast), rhs, nullptr);
         match->args.emplace_back(new VarRef(LOCATION, "_ xx"));
         return new Lambda(location, "_ xx", match);
       } else {
@@ -425,9 +430,9 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
     int args = ast.args.size();
     Match *match = new Match(body->location);
     if (args > 1) {
-      match->patterns.emplace_back(std::move(ast), body);
+      match->patterns.emplace_back(std::move(ast), body, nullptr);
     } else {
-      match->patterns.emplace_back(std::move(ast.args.front()), body);
+      match->patterns.emplace_back(std::move(ast.args.front()), body, nullptr);
     }
     body = match;
     for (int i = 0; i < args; ++i) {
