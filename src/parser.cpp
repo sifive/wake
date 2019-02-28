@@ -62,7 +62,7 @@ static bool expectValue(const char *type, Lexer &lex) {
   }
 }
 
-static AST parse_ast(int p, Lexer &lex, bool makefirst = false, bool firstok = false);
+static AST parse_ast(int p, Lexer &lex, bool makefirst = false, bool firstok = false, std::vector<Expr*>* guard = 0);
 static Expr *parse_binary(int p, Lexer &lex, bool multiline);
 static Expr *parse_def(Lexer &lex, std::string &name);
 static Expr *parse_block(Lexer &lex, bool multiline);
@@ -152,10 +152,37 @@ static Expr *parse_match(int p, Lexer &lex) {
   bool multiarg = out->args.size() > 1;
   repeat = true;
   while (repeat) {
-    AST ast = parse_ast(multiarg?APP_PRECEDENCE:0, lex, multiarg, multiarg);
+    std::vector<Expr*> literals;
+    AST ast = parse_ast(multiarg?APP_PRECEDENCE:0, lex, multiarg, multiarg, &literals);
+
+    Expr *guard = 0;
+    if (lex.next.type == IF) {
+      lex.consume();
+      guard = parse_block(lex, false);
+    }
+
+    for (size_t i = 0; i < literals.size(); ++i) {
+      Expr* e = literals[i];
+      std::string comparison("scmp");
+      if (e->type == Literal::type) {
+        Literal *lit = reinterpret_cast<Literal*>(e);
+        if (lit->value->type == Integer::type) comparison = "icmp";
+        if (lit->value->type == Double::type) comparison = "dcmp";
+      }
+      if (!guard) guard = new VarRef(e->location, "True");
+      guard = new App(e->location, new App(e->location, new App(e->location, new App(e->location,
+        new VarRef(e->location, "destruct Order"),
+        new Lambda(e->location, "_", new VarRef(e->location, "False"))),
+        new Lambda(e->location, "_", guard)),
+        new Lambda(e->location, "_", new VarRef(e->location, "False"))),
+        new App(e->location, new App(e->location,
+          new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison))),
+          e), new VarRef(e->location, "_ k" + std::to_string(i))));
+    }
+
     if (expect(EQUALS, lex)) lex.consume();
     Expr *expr = parse_block(lex, false);
-    out->patterns.emplace_back(std::move(ast), expr);
+    out->patterns.emplace_back(std::move(ast), expr, guard);
 
     switch (lex.next.type) {
       case DEDENT:
@@ -227,7 +254,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       location.end = rhs->location.end;
       if (Lexer::isUpper(ast.name.c_str()) || Lexer::isOperator(ast.name.c_str())) {
         Match *match = new Match(location);
-        match->patterns.emplace_back(std::move(ast), rhs);
+        match->patterns.emplace_back(std::move(ast), rhs, nullptr);
         match->args.emplace_back(new VarRef(LOCATION, "_ xx"));
         return new Lambda(location, "_ xx", match);
       } else {
@@ -425,9 +452,9 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
     int args = ast.args.size();
     Match *match = new Match(body->location);
     if (args > 1) {
-      match->patterns.emplace_back(std::move(ast), body);
+      match->patterns.emplace_back(std::move(ast), body, nullptr);
     } else {
-      match->patterns.emplace_back(std::move(ast.args.front()), body);
+      match->patterns.emplace_back(std::move(ast.args.front()), body, nullptr);
     }
     body = match;
     for (int i = 0; i < args; ++i) {
@@ -490,7 +517,7 @@ static void publish_seal(DefMap::defs &publish) {
   }
 }
 
-static AST parse_unary_ast(int p, Lexer &lex) {
+static AST parse_unary_ast(int p, Lexer &lex, std::vector<Expr*>* guard) {
   TRACE("UNARY_AST");
   switch (lex.next.type) {
     // Unary operators
@@ -500,7 +527,7 @@ static AST parse_unary_ast(int p, Lexer &lex) {
       if (op.p < p) precedence_error(lex);
       std::string name = "unary " + lex.text();
       lex.consume();
-      AST rhs = parse_ast(op.p + op.l, lex);
+      AST rhs = parse_ast(op.p + op.l, lex, false, false, guard);
       location.end = rhs.location.end;
       std::vector<AST> args;
       args.emplace_back(std::move(rhs));
@@ -515,11 +542,20 @@ static AST parse_unary_ast(int p, Lexer &lex) {
     case POPEN: {
       Location location = lex.next.location;
       lex.consume();
-      AST out = parse_ast(0, lex);
+      AST out = parse_ast(0, lex, false, false, guard);
       location.end = lex.next.location.end;
       if (expect(PCLOSE, lex)) lex.consume();
       out.location = location;
       return out;
+    }
+    case LITERAL: {
+      if (guard) {
+        AST out(lex.next.location, "_ k" + std::to_string(guard->size()));
+        guard->push_back(lex.next.expr.release());
+        lex.consume();
+        return out;
+      }
+      // fall through to default
     }
     default: {
       std::cerr << "Was expecting an (OPERATOR/ID/POPEN), got a "
@@ -531,9 +567,9 @@ static AST parse_unary_ast(int p, Lexer &lex) {
   }
 }
 
-static AST parse_ast(int p, Lexer &lex, bool makefirst, bool firstok) {
+static AST parse_ast(int p, Lexer &lex, bool makefirst, bool firstok, std::vector<Expr*>* guard) {
   TRACE("AST");
-  AST lhs = makefirst ? AST(lex.next.location) : parse_unary_ast(p, lex);
+  AST lhs = makefirst ? AST(lex.next.location) : parse_unary_ast(p, lex, guard);
   for (;;) {
     switch (lex.next.type) {
       case OPERATOR: {
@@ -541,7 +577,7 @@ static AST parse_ast(int p, Lexer &lex, bool makefirst, bool firstok) {
         if (op.p < p) return lhs;
         std::string name = "binary " + lex.text();
         lex.consume();
-        auto rhs = parse_ast(op.p + op.l, lex);
+        auto rhs = parse_ast(op.p + op.l, lex, false, false, guard);
         Location loc = lhs.location;
         loc.end = rhs.location.end;
         std::vector<AST> args;
@@ -550,11 +586,12 @@ static AST parse_ast(int p, Lexer &lex, bool makefirst, bool firstok) {
         lhs = AST(loc, std::move(name), std::move(args));
         break;
       }
+      case LITERAL:
       case ID:
       case POPEN: {
         op_type op = op_precedence("a"); // application
         if (op.p < p) return lhs;
-        AST rhs = parse_ast(op.p + op.l, lex);
+        AST rhs = parse_ast(op.p + op.l, lex, false, false, guard);
         Location location = lhs.location;
         location.end = rhs.location.end;
         if (Lexer::isOperator(lhs.name.c_str())) {

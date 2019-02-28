@@ -113,8 +113,9 @@ struct Memoize : public Expr {
 struct Pattern {
   AST pattern;
   std::unique_ptr<Expr> expr;
+  std::unique_ptr<Expr> guard;
 
-  Pattern(AST &&pattern_, Expr *expr_) : pattern(std::move(pattern_)), expr(expr_) { }
+  Pattern(AST &&pattern_, Expr *expr_, Expr *guard_) : pattern(std::move(pattern_)), expr(expr_), guard(guard_) { }
 };
 
 struct Match : public Expr {

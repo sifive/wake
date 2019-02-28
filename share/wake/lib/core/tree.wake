@@ -22,11 +22,10 @@ global def vtreeMulti cmp v =
 global def vtree cmp v =
   Tree cmp (build (vdistinctBy (eq cmp) (vsortBy (lt cmp) v)))
 
-def build v =
-  def len = vlen v
-  if      len == 0 then Tip
-  else if len == 1 then Bin 1 Tip (vat 0 v) Tip
-  else
+def build v = match (vlen v)
+  0 = Tip
+  1 = Bin 1 Tip (vat 0 v) Tip
+  len =
     def mid = len >> 1
     def l = vtake mid v
     def r = vdrop (mid+1) v

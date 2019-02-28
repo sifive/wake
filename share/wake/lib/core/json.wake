@@ -12,12 +12,12 @@ global def parseJSONBody body = prim "json_body"
 global def parseJSONFile file = prim "json_file"
 
 global def escape =
-  def fmt t x =
-    if      x == 0xa then '\n', t
-    else if x == 0x9 then '\t', t
-    else if x == 0xd then '\r', t
-    else if x <  16  then '\u000', strbase 16 x, t
-    else                  '\u00',  strbase 16 x, t
+  def fmt t = match _
+    0xa = '\n', t
+    0x9 = '\t', t
+    0xd = '\r', t
+    x if x < 16 = '\u000', strbase 16 x, t
+    x           = '\u00',  strbase 16 x, t
   def helper = match _
     s, c, t = s, str2bin c | fmt (helper t)
     x = x
@@ -32,9 +32,10 @@ def format rhs = match _
   JString  s    = '"', escape s ++ ('"', rhs)
   JInteger i    = str i,    rhs
   JDouble  d    = match (dclass d)
-    Infinite = (if d <. 0e0 then "-1e9999" else "1e9999"), rhs
-    NaN      = "NaN",   rhs
-    _        = dstr d,  rhs
+    Infinite if d <. 0e0 = "-1e9999", rhs
+    Infinite = "1e9999", rhs
+    NaN      = "NaN",    rhs
+    _        = dstr d,   rhs
   JBoolean True = "true",   rhs
   JBoolean False= "false",  rhs
   JNull         = "null",   rhs
