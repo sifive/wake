@@ -63,11 +63,11 @@ global data DoubleClass =
 
 global def dclass x =
   def imp x = prim "dclass"
-  def c = imp x
-  if      c == 1 then Infinite
-  else if c == 2 then NaN
-  else if c == 4 then SubNormal
-  else                Normal
+  match (imp x)
+    1 = Infinite
+    2 = NaN
+    4 = SubNormal
+    _ = Normal
 
 global def dfrexp x   = prim "dfrexp"
 global def dldexp f e = prim "dldexp"
