@@ -562,7 +562,7 @@ static std::vector<std::string> chop_null(const std::string &str) {
   return out;
 }
 
-std::vector<JobReflection> Database::explain(const std::string &file, int use) {
+std::vector<JobReflection> Database::explain(const std::string &file, int use, bool verbose) {
   const char *why = "Could not explain file";
   std::vector<JobReflection> out;
 
@@ -582,6 +582,10 @@ std::vector<JobReflection> Database::explain(const std::string &file, int use) {
     desc.status = sqlite3_column_int64(imp->find_owner, 7);
     desc.runtime = sqlite3_column_double(imp->find_owner, 8);
     if (desc.stdin.empty()) desc.stdin = "/dev/null";
+    if (verbose) {
+      desc.stdout = get_output(desc.job, 1);
+      desc.stderr = get_output(desc.job, 2);
+    }
     // inputs
     bind_integer(why, imp->get_tree, 1, desc.job);
     bind_integer(why, imp->get_tree, 2, INPUT);

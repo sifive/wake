@@ -35,6 +35,16 @@ void Output::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
   *save = std::move(value);
 }
 
+static void indent(const std::string& tab, const std::string& body) {
+  size_t i, j;
+  for (i = 0; (j = body.find('\n', i)) != std::string::npos; i = j+1) {
+    std::cout << "\n" << tab;
+    std::cout.write(body.data()+i, j-i);
+  }
+  std::cout.write(body.data()+i, body.size()-i);
+  std::cout << std::endl;
+}
+
 static void describe_human(const std::vector<JobReflection> &jobs, bool debug) {
   for (auto &job : jobs) {
     std::cout
@@ -61,13 +71,15 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug) {
       std::cout << "  " << out.hash << " " << out.path << std::endl;
     if (debug) {
       std::cout << "Stack:";
-      size_t i, j;
-      for (i = 0; (j = job.stack.find('\n', i)) != std::string::npos; i = j+1) {
-        std::cout << "\n  ";
-        std::cout.write(job.stack.data()+i, j-i);
-      }
-      std::cout.write(job.stack.data()+i, job.stack.size()-i);
-      std::cout << std::endl;
+      indent("  ", job.stack);
+    }
+    if (!job.stdout.empty()) {
+      std::cerr << "Stdout:";
+      indent("  ", job.stdout);
+    }
+    if (!job.stderr.empty()) {
+      std::cerr << "Stderr:";
+      indent("  ", job.stderr);
     }
   }
 }
@@ -128,13 +140,15 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug) {
       std::cout << "#   " << out.hash << " " << out.path << std::endl;
     if (debug) {
       std::cout << "# Stack:";
-      size_t i, j;
-      for (i = 0; (j = job.stack.find('\n', i)) != std::string::npos; i = j+1) {
-        std::cout << "\n#   ";
-        std::cout.write(job.stack.data()+i, j-i);
-      }
-      std::cout.write(job.stack.data()+i, job.stack.size()-i);
-      std::cout << std::endl;
+      indent("#   ", job.stack);
+    }
+    if (!job.stdout.empty()) {
+      std::cerr << "Stdout:";
+      indent("#   ", job.stdout);
+    }
+    if (!job.stderr.empty()) {
+      std::cerr << "Stderr:";
+      indent("#   ", job.stderr);
     }
   }
 }
@@ -300,12 +314,12 @@ int main(int argc, const char **argv) {
 
   if (args["input"]) {
     std::string input = args["input"];
-    describe(db.explain(prefix + input, 1), rerun, debug);
+    describe(db.explain(prefix + input, 1, verbose), rerun, debug);
   }
 
   if (args["output"]) {
     std::string output = args["output"];
-    describe(db.explain(prefix + output, 2), rerun, debug);
+    describe(db.explain(prefix + output, 2, verbose), rerun, debug);
   }
 
   if (noparse) return 0;

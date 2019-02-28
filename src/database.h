@@ -19,6 +19,8 @@ struct JobReflection {
   std::string stack;
   std::string stdin;
   std::string time;
+  std::string stdout;
+  std::string stderr;
   int status;
   double runtime;
   std::vector<FileReflection> inputs;
@@ -92,7 +94,8 @@ struct Database {
 
   std::vector<JobReflection> explain(
     const std::string &file,
-    int use);
+    int use,
+    bool verbose);
 };
 
 #endif
