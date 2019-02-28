@@ -417,12 +417,11 @@ Nevertheless, sometimes this syntax can be convenient, too.
 
     global def mathSymbols _ =
       def helper = match _
-        code, _, class, _ =
-          if class ==^ "Sm" then Some (code2str (intbase 16 code)) else None
-        _ = None
+        code, _, "Sm", _ = Some (code2str (intbase 16 code))
+        _                = None
       def url = "ftp://ftp.unicode.org/Public/UNIDATA/UnicodeData.txt"
       def lines = tokenize "\n" (read (curl url))
-      def codes = mapPartial (helper $ tokenize ";" _) lines
+      def codes = mapPartial (tokenize ";" _ | helper) lines
       catWith " " codes
     EOF
     wake 'mathSymbols 0'
