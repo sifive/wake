@@ -77,6 +77,10 @@ void Match::format(std::ostream &os, int depth) const {
   for (auto &p: patterns) {
     os << pad(depth+2) << p.pattern << " = " << std::endl;
     p.expr->format(os, depth+4);
+    if (p.guard) {
+      os << pad(depth+2) << "if" << std::endl;
+      p.guard->format(os, depth+4);
+    }
   }
 }
 
@@ -96,6 +100,12 @@ void Match::hash() {
     code.push(codes);
     p.expr->hash();
     p.expr->hashcode.push(codes);
+    if (p.guard) {
+      p.guard->hash();
+      p.guard->hashcode.push(codes);
+    } else {
+      codes.push_back(0);
+    }
   }
   hash3(codes.data(), codes.size()*8, hashcode);
 }
