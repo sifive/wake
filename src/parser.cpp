@@ -152,36 +152,32 @@ static Expr *parse_match(int p, Lexer &lex) {
   bool multiarg = out->args.size() > 1;
   repeat = true;
   while (repeat) {
-    std::vector<Expr*> tests;
-    AST ast = parse_ast(multiarg?APP_PRECEDENCE:0, lex, multiarg, multiarg, &tests);
-
-    for (size_t i = 0; i < tests.size(); ++i) {
-      Expr*& e = tests[i];
-      std::string comparison("binary ==~");
-      if (e->type == Literal::type) {
-        Literal *lit = reinterpret_cast<Literal*>(e);
-        if (lit->value->type == Integer::type) comparison = "binary ==";
-        if (lit->value->type == Double::type) comparison = "binary ==.";
-      }
-      e = new App(e->location, new App(e->location,
-        new VarRef(e->location, comparison),
-        e),
-        new VarRef(e->location, "_ k" + std::to_string(i)));
-    }
-
-    if (lex.next.type == IF) {
-      lex.consume();
-      tests.push_back(parse_block(lex, false));
-    }
+    std::vector<Expr*> literals;
+    AST ast = parse_ast(multiarg?APP_PRECEDENCE:0, lex, multiarg, multiarg, &literals);
 
     Expr *guard = 0;
-    for (auto e : tests) {
-      if (!guard) {
-        guard = e;
-      } else {
-        guard = new App(e->location, new App(e->location,
-          new VarRef(e->location, "binary &&"), e), guard);
+    if (lex.next.type == IF) {
+      lex.consume();
+      guard = parse_block(lex, false);
+    }
+
+    for (size_t i = 0; i < literals.size(); ++i) {
+      Expr* e = literals[i];
+      std::string comparison("scmp");
+      if (e->type == Literal::type) {
+        Literal *lit = reinterpret_cast<Literal*>(e);
+        if (lit->value->type == Integer::type) comparison = "icmp";
+        if (lit->value->type == Double::type) comparison = "dcmp";
       }
+      if (!guard) guard = new VarRef(e->location, "True");
+      guard = new App(e->location, new App(e->location, new App(e->location, new App(e->location,
+        new VarRef(e->location, "destruct Order"),
+        new Lambda(e->location, "_", new VarRef(e->location, "False"))),
+        new Lambda(e->location, "_", guard)),
+        new Lambda(e->location, "_", new VarRef(e->location, "False"))),
+        new App(e->location, new App(e->location,
+          new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison))),
+          e), new VarRef(e->location, "_ k" + std::to_string(i))));
     }
 
     if (expect(EQUALS, lex)) lex.consume();
