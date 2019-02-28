@@ -1,7 +1,7 @@
 # lists
 global data List a =
   Nil
-  a, (List a)
+  a, List a
 
 global def empty = match _
   Nil = True
@@ -56,8 +56,8 @@ global def splitAt i l =
     h, t = match (splitAt (i-1) t)
       Pair f s = Pair (h, f) s
 
-global def take i l = splitAt i l | getPairFirst
-global def drop i l = splitAt i l | getPairSecond
+global def take = splitAt _ _ | getPairFirst
+global def drop = splitAt _ _ | getPairSecond
 
 global def atOpt i l =
   if i < 0 then None else match (drop i l)
@@ -73,16 +73,19 @@ global def splitUntil f l = match l
   h, t = if f h then Pair Nil l else match (splitUntil f t)
     Pair f s = Pair (h, f) s
 
-global def takeUntil f l = splitUntil f l | getPairFirst
-global def dropUntil f l = splitUntil f l | getPairSecond
+global def takeUntil = splitUntil _ _ | getPairFirst
+global def dropUntil = splitUntil _ _ | getPairSecond
+
 global def find f =
   def helper i = match _
     Nil  = None
     h, t = if f h then Some (Pair h i) else helper (i+1) t
   helper 0
+
 global def exists f l = match (find f l)
   Some _ = True
   None   = False
+
 global def forall f l = !exists (!f _) l
 
 global def splitBy f = match _
@@ -93,7 +96,7 @@ global def splitBy f = match _
       then Pair (h, x) y
       else Pair x (h, y)
 
-global def filter f l = splitBy f l | getPairFirst
+global def filter = splitBy _ _ | getPairFirst
 
 # Tranposition is only it's own inverse when the lists have non-increasing size
 global def transpose l =
@@ -114,7 +117,7 @@ global def distinctBy f l = match l
     else x, distinctBy f (y, t)
   _ = l
 
-global def cmp f l r = match l r
+global def cmp f = match _ _
   Nil     Nil     = EQ
   Nil     _       = LT
   _       Nil     = GT
