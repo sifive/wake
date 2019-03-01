@@ -328,4 +328,4 @@ def vappi f n =
     def _ = if mid  == s then Unit else helper s mid
     def _ = if mid1 == e then Unit else helper mid1 e
     Unit
-  if n == 0 then Unit else helper 0 n
+  if n <= 0 then Unit else helper 0 n
