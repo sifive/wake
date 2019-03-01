@@ -69,11 +69,23 @@ std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receive
 std::unique_ptr<Receiver> cast_double(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Double **in) {
   if (value->type != Double::type) {
     std::stringstream str;
-    str << value->to_str() << " is not an Double";
+    str << value->to_str() << " is not a Double";
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
     return std::unique_ptr<Receiver>();
   } else {
     *in = reinterpret_cast<Double*>(value.get());
+    return completion;
+  }
+}
+
+std::unique_ptr<Receiver> cast_data(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Data **in) {
+  if (value->type != Data::type) {
+    std::stringstream str;
+    str << value->to_str() << " is not a Data";
+    Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
+    return std::unique_ptr<Receiver>();
+  } else {
+    *in = reinterpret_cast<Data*>(value.get());
     return completion;
   }
 }
