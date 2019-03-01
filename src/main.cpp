@@ -198,6 +198,8 @@ int main(int argc, const char **argv) {
       "rebuild all outputs to check for build repeatability", 0},
     { "globals", {"-g", "--globals"},
       "print out all global variables", 0},
+    { "nowait", {"-n", "--nowait"},
+      "don't wait to acquire the database lock", 0},
     { "init", {"--init"},
       "directory to configure as workspace top", 1},
   }};
@@ -223,6 +225,7 @@ int main(int argc, const char **argv) {
   bool check = args["check"];
   bool debugdb = args["debug-db"];
   bool debug = args["debug"];
+  bool wait = !args["nowait"];
   queue.stack_trace = debug;
 
   bool nodb = args["init"];
@@ -271,7 +274,7 @@ int main(int argc, const char **argv) {
   if (nodb) return 0;
 
   Database db(debugdb);
-  std::string fail = db.open();
+  std::string fail = db.open(wait);
   if (!fail.empty()) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;
     return 1;

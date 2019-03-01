@@ -44,7 +44,7 @@ struct Database::detail {
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
 Database::~Database() { close(); }
 
-std::string Database::open() {
+std::string Database::open(bool wait) {
   if (imp->db) return "";
   int ret;
 
@@ -98,13 +98,22 @@ std::string Database::open() {
     "  seconds    real    not null," // seconds after job start
     "  output     text    not null);"
     "create index if not exists logorder on log(job_id, descriptor, seconds);";
-  char *fail;
-  ret = sqlite3_exec(imp->db, schema_sql, 0, 0, &fail);
-  if (ret != SQLITE_OK) {
+
+  while (true) {
+    char *fail;
+    ret = sqlite3_exec(imp->db, schema_sql, 0, 0, &fail);
+    if (ret == SQLITE_OK) break;
+
     std::string out = fail;
     sqlite3_free(fail);
-    close();
-    return out;
+
+    if (!wait || ret != SQLITE_BUSY) {
+      close();
+      return out;
+    } else {
+      std::cerr << "Database wake.db is busy; waiting 1 second ..." << std::endl;
+      sleep(1);
+    }
   }
 
   // prepare statements

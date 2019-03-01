@@ -34,7 +34,7 @@ struct Database {
   Database(bool debugdb);
   ~Database();
 
-  std::string open();
+  std::string open(bool wait);
   void close();
 
   std::vector<std::string> get_targets();
