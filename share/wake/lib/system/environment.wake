@@ -1,3 +1,8 @@
+# System information
+def uname = prim "uname"
+global def sysname = uname.getPairFirst
+global def machine = uname.getPairSecond
+
 # Setup a default path
 publish path = "/usr/bin"
 publish path = "/bin"
