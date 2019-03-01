@@ -1,12 +1,13 @@
 # Bootstrap build file
 
 CXX     ?= g++
-GMP     ?= /opt/local
-GMP_INC ?= $(GMP)/include
-GMP_LIB ?= $(GMP)/lib
 CFLAGS	?= -Wall -O2 -flto -DVERSION=$(VERSION)
 
-VERSION := $(shell git describe --tags --dirty)
+CORE_CFLAGS  := $(shell pkg-config --cflags re2 sqlite3)
+CORE_LDFLAGS := $(shell pkg-config --libs   re2 sqlite3)
+FUSE_CFLAGS  := $(shell pkg-config --cflags fuse)
+FUSE_LDFLAGS := $(shell pkg-config --libs   fuse)
+VERSION      := $(shell git describe --tags --dirty)
 
 all:		wake.db
 	./bin/wake all default
@@ -18,16 +19,16 @@ install:	all
 	./bin/wake install '"install"'
 
 bin/wake:	$(patsubst %.cpp,%.o,$(wildcard src/*.cpp)) src/symbol.o
-	$(CXX) -std=c++11 $(CFLAGS) -L $(GMP_LIB) -o $@ $^ -lgmp -lre2 -lsqlite3 -lutf8proc
+	$(CXX) -std=c++11 $(CFLAGS) -o $@ $^ $(CORE_LDFLAGS) -lgmp -lutf8proc
 
 lib/wake/fuse-wake:	fuse/fuse.cpp
-	$(CXX) -std=c++11 $(CFLAGS) `pkg-config --cflags fuse` $< -o $@ `pkg-config --libs fuse`
+	$(CXX) -std=c++11 $(CFLAGS) $(FUSE_CFLAGS) $< -o $@ $(FUSE_LDFLAGS)
 
 lib/wake/shim-wake:	$(patsubst %.cpp,%.o,$(wildcard shim/*.cpp))
 	$(CXX) -std=c++11 $(CFLAGS) -o $@ $^
 
 %.o:	%.cpp	$(filter-out src/version.h,$(wildcard src/*.h) $(wildcard shim/*.h))
-	$(CXX) -std=c++11 $(CFLAGS) -I $(GMP_INC) -o $@ -c $<
+	$(CXX) -std=c++11 $(CFLAGS) $(CORE_CFLAGS) -o $@ -c $<
 
 %.cpp:	%.re
 	re2c -8 --no-generation-date $< > $@.tmp
