@@ -491,7 +491,7 @@ static void publish_def(DefMap::defs &publish, const std::string &name, Expr *de
   i->second = std::unique_ptr<Expr>(
     new App(def->location,
       new App(def->location,
-        new VarRef(def->location, "binary ,"),
+        new VarRef(def->location, "binary ++"),
         def),
       i->second.release()));
 }

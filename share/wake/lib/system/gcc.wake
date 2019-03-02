@@ -16,10 +16,10 @@ def doLinkO variant linker flags objs file =
   result.getJobOutput
 
 def makeCompileC variant gcc flags =
-  Pair variant (\extra doCompileC variant gcc (flags ++ extra))
+  Pair variant (\extra doCompileC variant gcc (flags ++ extra)), Nil
 
 def makeLinkO variant linker flags =
-  Pair variant (\extra doLinkO variant linker (flags ++ extra))
+  Pair variant (\extra doLinkO variant linker (flags ++ extra)), Nil
 
 publish compileC = makeCompileC "native-c99-debug"     (which "gcc") (debugCFlags)
 publish compileC = makeCompileC "native-c99-release"   (which "gcc") (releaseCFlags)

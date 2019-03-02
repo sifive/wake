@@ -44,7 +44,7 @@ global def scanr f a = match _
     finish (scanr f a t)
 
 # list helpers
-global def l ++ r    = foldr (_,_) r l
+global def l ++ r    = foldr (_,_) r l # ++ is required by the implementation of publish
 global def reverse l = foldl (\a\b b,a) Nil l
 global def flatten l = foldr (_++_) Nil l
 global def len l     = foldl (\a\_ a+1) 0 l

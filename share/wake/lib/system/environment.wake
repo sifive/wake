@@ -4,10 +4,10 @@ global def sysname = uname.getPairFirst
 global def machine = uname.getPairSecond
 
 # Setup a default path
-publish path = "/usr/bin"
-publish path = "/bin"
+publish path = "/usr/bin", Nil
+publish path = "/bin", Nil
 
 global def path = catWith ":" (subscribe path)
-publish environment = "PATH={path}"
+publish environment = "PATH={path}", Nil
 
 global def environment = subscribe environment
