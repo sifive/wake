@@ -203,8 +203,7 @@ global def vscanmap f a g v =
   def temp = gather (vnew len)
   def scatter out =
     def helper a s e =
-      def _ = vset out s a
-      if e - s == 1 then Unit else
+      if e - s == 1 then vset out s a else
         def mid = (e+s) >> 1
         def _ = helper a s mid
         if mid >= len then Unit else
