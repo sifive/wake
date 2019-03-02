@@ -5,6 +5,7 @@
 #include "heap.h"
 #include "expr.h"
 #include "type.h"
+#include <cassert>
 
 static Constructor vectorC(AST(LOCATION, "Array"));
 static const TypeVar vectorT("Array", 1);
@@ -38,8 +39,8 @@ static PRIMTYPE(type_vget) {
 
 static PRIMFN(prim_vget) {
   EXPECT(2);
+  DATA(vec, 0);
   INTEGER(arg1, 1);
-  Data *vec = reinterpret_cast<Data*>(args[0].get());
   REQUIRE(mpz_cmp_si(arg1->value, 0) >= 0, "vget too small (< 0)");
   REQUIRE(mpz_cmp_si(arg1->value, vec->binding->nargs) < 0, "vget too large");
   vec->binding->future[mpz_get_si(arg1->value)].depend(queue, std::move(completion));
@@ -56,16 +57,21 @@ static PRIMTYPE(type_vset) {
 }
 
 static PRIMFN(prim_vset) {
-//  EXPECT(3); allow Exceptions to be written into vectors
-  (void)data;
+  (void)data; // allow Exceptions to be written into vectors
+  REQUIRE(args.size() == 3, "prim_vset not called on 3 arguments");
+  DATA(vec, 0);
   INTEGER(arg1, 1);
-  Data *vec = reinterpret_cast<Data*>(args[0].get());
-  REQUIRE(mpz_cmp_si(arg1->value, 0) >= 0, "vset too small (< 0)");
-  REQUIRE(mpz_cmp_si(arg1->value, vec->binding->nargs) < 0, "vset too large");
+
+  // Getting this wrong means vector.wake is buggy and the heap will crash
+  assert(mpz_cmp_si(arg1->value, 0) >= 0);
+  assert(mpz_cmp_si(arg1->value, vec->binding->nargs) < 0);
+  assert(!vec->binding->future[mpz_get_si(arg1->value)].value);
+
   Receiver::receive(
     queue,
     Binding::make_completer(vec->binding, mpz_get_si(arg1->value)),
     std::move(args[2]));
+
   auto out = make_unit();
   RETURN(out);
 }

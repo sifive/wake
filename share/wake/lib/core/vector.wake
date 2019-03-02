@@ -13,7 +13,7 @@ global def lvector l =
       i+1
     def _ = foldl doit 0 l
     out
-  Vector (bind (vnew llen)) 0 llen
+  reraise (\l Vector (bind (vnew l)) 0 l) llen
 
 global def tvector t =
   def len = tlen t
@@ -24,7 +24,7 @@ global def tvector t =
     def f i x = vset out i x
     def _ = tappi f t
     out
-  Vector (bind (vnew len)) 0 len
+  reraise (\l Vector (bind (vnew l)) 0 l) len
 
 global def vempty (Vector _ s e) = s == e
 global def vlen (Vector _ s e) = e - s
@@ -130,7 +130,7 @@ global def vsplitBy f v =
       if t then vset take o x else vset drop (i-o) x
     def _ = vappi exec len
     Pair (Vector take 0 ntake) (Vector drop 0 ndrop)
-  bind (vnew ntake) (vnew ndrop)
+  reraise (\_ bind (vnew ntake) (vnew ndrop)) v
 
 global def vfilter f v = vsplitBy f v | getPairFirst
 
@@ -145,7 +145,7 @@ global def vunfoldl f a n =
           helper a (i+1)
     def _ = helper a 0
     Vector out 0 n
-  bind (vnew n)
+  if n < 0 then raise "vunfoldl: negative length ({str n})" else bind (vnew n)
 
 global def vscanl f a v =
   def len = vlen v
@@ -158,7 +158,7 @@ global def vscanl f a v =
       then Unit
       else helper (f a (vat_ i v)) (i+1)
     def _ = helper a 0
-    Vector out 0 (len+1)
+    reraise (Vector _ 0 (len+1)) out
   bind (vnew (len+1))
 
 global def vscanr f a v =
@@ -173,7 +173,7 @@ global def vscanr f a v =
       then Unit
       else helper (f (vat_ i1 v) a) i1
     def _ = helper a len
-    Vector out 0 (len+1)
+    reraise (Vector _ 0 (len+1)) out
   bind (vnew (len+1))
 
 # vscan = O(n), log n deep prefix-sum
@@ -203,8 +203,7 @@ global def vscanmap f a g v =
   def temp = gather (vnew len)
   def scatter out =
     def helper a s e =
-      def _ = vset out s a
-      if e - s == 1 then Unit else
+      if e - s == 1 then vset out s a else
         def mid = (e+s) >> 1
         def _ = helper a s mid
         if mid >= len then Unit else
@@ -216,7 +215,7 @@ global def vscanmap f a g v =
         def _ = helper (vat_ x temp) x e
         double e
     def _ = double 0
-    Vector out 0 len
+    reraise (Vector _ 0 len) out
   scatter (vnew len)
 global def vscan f a v = vscanmap f a (_) v
 
@@ -300,7 +299,7 @@ global def vtab f n =
     def vset o i v = prim "vset"
     def _ = vappi (\i vset out i (f i)) n
     Vector out 0 n
-  bind (vnew n)
+  if n < 0 then raise "vtab: negative length ({str n})" else bind (vnew n)
 
 # f will be called more than once per element
 def vmapPartial f v =
@@ -317,7 +316,7 @@ def vmapPartial f v =
       Some x = vset out (vat_ i dest) x
       None   = Unit
     def _ = vappi exec leni
-    Vector out 0 leno
+    reraise (Vector _ 0 leno) out
   bind (vnew leno)
 
 def vappi f n =
@@ -328,4 +327,4 @@ def vappi f n =
     def _ = if mid  == s then Unit else helper s mid
     def _ = if mid1 == e then Unit else helper mid1 e
     Unit
-  if n == 0 then Unit else helper 0 n
+  if n <= 0 then Unit else helper 0 n
