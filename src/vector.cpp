@@ -5,6 +5,7 @@
 #include "heap.h"
 #include "expr.h"
 #include "type.h"
+#include <cassert>
 
 static Constructor vectorC(AST(LOCATION, "Array"));
 static const TypeVar vectorT("Array", 1);
@@ -61,8 +62,11 @@ static PRIMFN(prim_vset) {
   DATA(vec, 0);
   INTEGER(arg1, 1);
 
-  REQUIRE(mpz_cmp_si(arg1->value, 0) >= 0, "vset too small (< 0)");
-  REQUIRE(mpz_cmp_si(arg1->value, vec->binding->nargs) < 0, "vset too large");
+  // Getting this wrong means vector.wake is buggy and the heap will crash
+  assert(mpz_cmp_si(arg1->value, 0) >= 0);
+  assert(mpz_cmp_si(arg1->value, vec->binding->nargs) < 0);
+  assert(!vec->binding->future[mpz_get_si(arg1->value)].value);
+
   Receiver::receive(
     queue,
     Binding::make_completer(vec->binding, mpz_get_si(arg1->value)),
