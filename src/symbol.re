@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <iostream>
 #include <utf8proc.h>
 
 const char *symbolTable[] = {
@@ -519,10 +520,10 @@ top:
 
 struct state_t {
   std::vector<int> tabs;
-  int indent;
+  std::string indent;
   bool eol;
 
-  state_t() : tabs(), indent(0), eol(false) {
+  state_t() : tabs(), indent(), eol(false) {
     tabs.push_back(0);
   }
 };
@@ -657,11 +658,11 @@ std::string JLexer::text() const { return engine->text(); }
 
 void Lexer::consume() {
   if (state->eol) {
-    if (state->indent < state->tabs.back()) {
+    if (state->indent.size() < state->tabs.back()) {
       state->tabs.pop_back();
       next.type = DEDENT;
-    } else if (state->indent > state->tabs.back()) {
-      state->tabs.push_back(state->indent);
+    } else if (state->indent.size() > state->tabs.back()) {
+      state->tabs.push_back(state->indent.size());
       next.type = INDENT;
     } else {
       next.type = EOL;
@@ -670,7 +671,13 @@ void Lexer::consume() {
   } else {
     next = lex_top(*this);
     if (next.type == EOL) {
-      state->indent = (engine->cur - engine->tok) - 1;
+      std::string newindent(engine->tok+1, engine->cur);
+      size_t check = std::min(newindent.size(), state->indent.size());
+      if (!std::equal(newindent.begin(), newindent.begin()+check, state->indent.begin())) {
+        std::cerr << "Whitespace is neither a prefix nor a suffix of the previous line at " << next.location << std::endl;
+        fail = true;
+      }
+      std::swap(state->indent, newindent);
       state->eol = true;
       consume();
     }
