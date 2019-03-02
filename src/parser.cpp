@@ -482,18 +482,21 @@ static void bind_def(Lexer &lex, DefMap::defs &map, std::string name, Expr *def)
 }
 
 static void publish_def(DefMap::defs &publish, const std::string &name, Expr *def) {
+  // Build a prepender
+  std::unique_ptr<Expr> tail(
+    new App(def->location, new App(def->location,
+      new VarRef(def->location, "binary ++"),
+      def), new VarRef(def->location, "_ tail")));
+
   DefMap::defs::iterator i;
   if ((i = publish.find(name)) == publish.end()) {
-    // A reference to _tail which we close with a lambda at the top of the chain
-    i = publish.insert(std::make_pair(name, std::unique_ptr<Expr>(new VarRef(def->location, "_ tail")))).first;
+    i = publish.insert(std::make_pair(name, std::move(tail))).first;
+  } else {
+    // Apply the existing prepender to us (we come after it)
+    i->second = std::unique_ptr<Expr>(new App(def->location, i->second.release(), tail.release()));
   }
-  // Make a tuple
-  i->second = std::unique_ptr<Expr>(
-    new App(def->location,
-      new App(def->location,
-        new VarRef(def->location, "binary ++"),
-        def),
-      i->second.release()));
+
+  i->second = std::unique_ptr<Expr>(new Lambda(def->location, "_ tail", i->second.release()));
 }
 
 static void bind_global(const std::string &name, Top *top, Lexer &lex) {
@@ -508,12 +511,6 @@ static void bind_global(const std::string &name, Top *top, Lexer &lex) {
     lex.fail = true;
   } else {
     top->globals[name] = top->defmaps.size()-1;
-  }
-}
-
-static void publish_seal(DefMap::defs &publish) {
-  for (auto &i : publish) {
-    i.second = std::unique_ptr<Expr>(new Lambda(i.second->location, "_ tail", i.second.release()));
   }
 }
 
@@ -1008,7 +1005,6 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
       }
     }
 
-    publish_seal(publish);
     auto body = relabel_anon(parse_binary(0, lex, true));
     location.end = body->location.end;
     out = (publish.empty() && map.empty()) ? body : new DefMap(location, std::move(map), std::move(publish), body);
@@ -1059,7 +1055,6 @@ void parse_top(Top &top, Lexer &lex) {
     }
   }
 
-  publish_seal(defmap.publish);
   defmap.location.end = lex.next.location.start;
   expect(END, lex);
 }
