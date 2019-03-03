@@ -11,6 +11,7 @@
 #include <iosfwd>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include <errno.h>
 #include <cstring>
 #include <utf8proc.h>
@@ -389,24 +390,45 @@ static PRIMFN(prim_str2bin) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_uname) {
+  TypeVar pair;
+  Data::typePair.clone(pair);
+  pair[0].unify(String::typeVar);
+  pair[1].unify(String::typeVar);
+  return args.size() == 0 &&
+    out->unify(pair);
+}
+
+static PRIMFN(prim_uname) {
+  EXPECT(0);
+  struct utsname uts;
+  int ret = uname(&uts);
+  REQUIRE (ret == 0, "uname failed");
+  auto out = make_tuple2(
+    std::make_shared<String>(uts.sysname),
+    std::make_shared<String>(uts.machine));
+  RETURN(out);
+}
+
 void prim_register_string(PrimMap &pmap, const char *version) {
-  pmap.emplace("catopen", PrimDesc(prim_catopen, type_catopen));
-  pmap.emplace("catadd",  PrimDesc(prim_catadd,  type_catadd));
-  pmap.emplace("catclose",PrimDesc(prim_catclose,type_catclose));
-  pmap.emplace("explode", PrimDesc(prim_explode, type_explode));
-  pmap.emplace("write",   PrimDesc(prim_write,   type_write));
-  pmap.emplace("read",    PrimDesc(prim_read,    type_read));
-  pmap.emplace("getenv",  PrimDesc(prim_getenv,  type_getenv));
-  pmap.emplace("mkdir",   PrimDesc(prim_mkdir,   type_mkdir));
-  pmap.emplace("format",  PrimDesc(prim_format,  type_format));
-  pmap.emplace("print",   PrimDesc(prim_print,   type_print));
-  pmap.emplace("version", PrimDesc(prim_version, type_version, (void*)version));
-  pmap.emplace("scmp",    PrimDesc(prim_scmp,    type_scmp));
-  pmap.emplace("sNFC",    PrimDesc(prim_sNFC,    type_normalize));
-  pmap.emplace("sNFKC",   PrimDesc(prim_sNFKC,   type_normalize));
-  pmap.emplace("scaseNFKC", PrimDesc(prim_scaseNFKC, type_normalize));
+  pmap.emplace("catopen",  PrimDesc(prim_catopen,  type_catopen));
+  pmap.emplace("catadd",   PrimDesc(prim_catadd,   type_catadd));
+  pmap.emplace("catclose", PrimDesc(prim_catclose, type_catclose));
+  pmap.emplace("explode",  PrimDesc(prim_explode,  type_explode));
+  pmap.emplace("write",    PrimDesc(prim_write,    type_write));
+  pmap.emplace("read",     PrimDesc(prim_read,     type_read));
+  pmap.emplace("getenv",   PrimDesc(prim_getenv,   type_getenv));
+  pmap.emplace("mkdir",    PrimDesc(prim_mkdir,    type_mkdir));
+  pmap.emplace("format",   PrimDesc(prim_format,   type_format));
+  pmap.emplace("print",    PrimDesc(prim_print,    type_print));
+  pmap.emplace("version",  PrimDesc(prim_version,  type_version, (void*)version));
+  pmap.emplace("scmp",     PrimDesc(prim_scmp,     type_scmp));
+  pmap.emplace("sNFC",     PrimDesc(prim_sNFC,     type_normalize));
+  pmap.emplace("sNFKC",    PrimDesc(prim_sNFKC,    type_normalize));
+  pmap.emplace("scaseNFKC",PrimDesc(prim_scaseNFKC,type_normalize));
   pmap.emplace("code2str", PrimDesc(prim_code2str, type_code2str));
   pmap.emplace("bin2str",  PrimDesc(prim_bin2str,  type_code2str));
   pmap.emplace("str2code", PrimDesc(prim_str2code, type_str2code));
   pmap.emplace("str2bin",  PrimDesc(prim_str2bin,  type_str2code));
+  pmap.emplace("uname",    PrimDesc(prim_uname,    type_uname));
 }

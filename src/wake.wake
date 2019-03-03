@@ -14,6 +14,6 @@ global def buildWake variant =
   def reFiles = sources here '.*\.re'
   def headerFiles = version_h 0, sources here '.*\.h'
   def cppFiles = sources here '.*\.cpp' ++ map re2c reFiles
-  def compile = compileC variant ("-I/opt/local/include", Nil) headerFiles
+  def compile = compileC variant (cflags "re2 sqlite3") headerFiles
   def objFiles = map compile cppFiles
-  linkO variant ("-L/opt/local/lib", "-lgmp", "-lre2", "-lsqlite3", "-lutf8proc", Nil) objFiles "bin/wake"
+  linkO variant (libs "re2 sqlite3" ++ ("-lgmp", "-lutf8proc", Nil)) objFiles "bin/wake"
