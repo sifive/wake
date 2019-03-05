@@ -2,3 +2,15 @@
 global data Option a =
   Some a
   None
+
+global def mapOpt f = match _
+  Some a = Some (f a)
+  None   = None
+
+global def isSome = match _
+  Some _ = True
+  None   = False
+
+global def getOrElse b = match _
+  Some a = a
+  None   = b
