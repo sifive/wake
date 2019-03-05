@@ -87,16 +87,16 @@ struct Task {
   : job(job_), dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_) { }
 };
 
-// A JobEntry is a forked job not yet merged
+// A JobEntry is a forked job with pid|stdout|stderr incomplete
 struct JobEntry {
   int pool;
-  std::shared_ptr<Job> job;
+  std::shared_ptr<Job> job; // if unset, available for reuse
   int internal;
-  int pipe_stdout;
-  int pipe_stderr;
+  pid_t pid;       //  0 if merged
+  int pipe_stdout; // -1 if closed
+  int pipe_stderr; // -1 if closed
   struct timeval start;
-  pid_t pid;
-  JobEntry() : pid(0) { }
+  JobEntry() : pid(0), pipe_stdout(-1), pipe_stderr(-1) { }
   double runtime(struct timeval now);
 };
 
@@ -176,53 +176,55 @@ static char **split_null(std::string &str) {
 
 static void launch(JobTable *jobtable) {
   for (auto &i : jobtable->imp->table) {
+    if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1)
+      i.job.reset();
+
+    if (i.job) continue;
     if (jobtable->imp->tasks[i.pool].empty()) continue;
 
-    if (i.pid == 0) {
-      Task &task = jobtable->imp->tasks[i.pool].front();
-      int pipe_stdout[2];
-      int pipe_stderr[2];
-      if (pipe(pipe_stdout) == -1 || pipe(pipe_stderr) == -1) {
-        perror("pipe");
-        exit(1);
-      }
-      fcntl(pipe_stdout[0], F_SETFD, fcntl(pipe_stdout[0], F_GETFD, 0) | FD_CLOEXEC);
-      fcntl(pipe_stderr[0], F_SETFD, fcntl(pipe_stderr[0], F_GETFD, 0) | FD_CLOEXEC);
-      i.job = std::move(task.job);
-      i.internal = !strncmp(task.cmdline.c_str(), "<hash>", 6);
-      i.pipe_stdout = pipe_stdout[0];
-      i.pipe_stderr = pipe_stderr[0];
-      gettimeofday(&i.start, 0);
-      std::cout << std::flush;
-      std::cerr << std::flush;
-      fflush(stdout);
-      fflush(stderr);
-      std::stringstream prelude;
-      prelude << find_execpath() << "/../lib/wake/shim-wake" << '\0'
-        << (task.stdin.empty() ? "/dev/null" : task.stdin.c_str()) << '\0'
-        << std::to_string(pipe_stdout[1]) << '\0'
-        << std::to_string(pipe_stderr[1]) << '\0'
-        << task.dir << '\0';
-      std::string shim = prelude.str() + task.cmdline;
-      auto cmdline = split_null(shim);
-      auto environ = split_null(task.environ);
-      pid_t pid = vfork();
-      if (pid == 0) {
-        execve(cmdline[0], cmdline, environ);
-        _exit(127);
-      }
-      delete [] cmdline;
-      delete [] environ;
-      i.job->pid = i.pid = pid;
-      i.job->state |= STATE_FORKED;
-      close(pipe_stdout[1]);
-      close(pipe_stderr[1]);
-      for (char &c : task.cmdline) if (c == 0) c = ' ';
-      if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
-        std::cerr << task.cmdline << std::endl;
-      }
-      jobtable->imp->tasks[i.pool].pop_front();
+    Task &task = jobtable->imp->tasks[i.pool].front();
+    int pipe_stdout[2];
+    int pipe_stderr[2];
+    if (pipe(pipe_stdout) == -1 || pipe(pipe_stderr) == -1) {
+      perror("pipe");
+      exit(1);
     }
+    fcntl(pipe_stdout[0], F_SETFD, fcntl(pipe_stdout[0], F_GETFD, 0) | FD_CLOEXEC);
+    fcntl(pipe_stderr[0], F_SETFD, fcntl(pipe_stderr[0], F_GETFD, 0) | FD_CLOEXEC);
+    i.job = std::move(task.job);
+    i.internal = !strncmp(task.cmdline.c_str(), "<hash>", 6);
+    i.pipe_stdout = pipe_stdout[0];
+    i.pipe_stderr = pipe_stderr[0];
+    gettimeofday(&i.start, 0);
+    std::cout << std::flush;
+    std::cerr << std::flush;
+    fflush(stdout);
+    fflush(stderr);
+    std::stringstream prelude;
+    prelude << find_execpath() << "/../lib/wake/shim-wake" << '\0'
+      << (task.stdin.empty() ? "/dev/null" : task.stdin.c_str()) << '\0'
+      << std::to_string(pipe_stdout[1]) << '\0'
+      << std::to_string(pipe_stderr[1]) << '\0'
+      << task.dir << '\0';
+    std::string shim = prelude.str() + task.cmdline;
+    auto cmdline = split_null(shim);
+    auto environ = split_null(task.environ);
+    pid_t pid = vfork();
+    if (pid == 0) {
+      execve(cmdline[0], cmdline, environ);
+      _exit(127);
+    }
+    delete [] cmdline;
+    delete [] environ;
+    i.job->pid = i.pid = pid;
+    i.job->state |= STATE_FORKED;
+    close(pipe_stdout[1]);
+    close(pipe_stderr[1]);
+    for (char &c : task.cmdline) if (c == 0) c = ' ';
+    if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
+      std::cerr << task.cmdline << std::endl;
+    }
+    jobtable->imp->tasks[i.pool].pop_front();
   }
 }
 
@@ -232,21 +234,21 @@ bool JobTable::wait(WorkQueue &queue) {
   while (1) {
     fd_set set;
     int nfds = 0;
-    int npids = 0;
+    int njobs = 0;
 
     FD_ZERO(&set);
     for (auto &i : imp->table) {
-      npids += (i.pid != 0);
-      if (i.pid != 0 && i.pipe_stdout != -1) {
+      if (i.job) ++njobs;
+      if (i.pipe_stdout != -1) {
         if (i.pipe_stdout >= nfds) nfds = i.pipe_stdout + 1;
         FD_SET(i.pipe_stdout, &set);
       }
-      if (i.pid != 0 && i.pipe_stderr != -1) {
+      if (i.pipe_stderr != -1) {
         if (i.pipe_stderr >= nfds) nfds = i.pipe_stderr + 1;
         FD_SET(i.pipe_stderr, &set);
       }
     }
-    if (npids == 0) return false;
+    if (njobs == 0) return false;
 
     int retval = pselect(nfds, &set, 0, 0, 0, &imp->sigset);
     if (retval == -1 && errno != EINTR) {
@@ -260,7 +262,7 @@ bool JobTable::wait(WorkQueue &queue) {
     int done = 0;
 
     if (retval > 0) for (auto &i : imp->table) {
-      if (i.pid != 0 && i.pipe_stdout != -1 && FD_ISSET(i.pipe_stdout, &set)) {
+      if (i.pipe_stdout != -1 && FD_ISSET(i.pipe_stdout, &set)) {
         int got = read(i.pipe_stdout, buffer, sizeof(buffer));
         if (got <= 0) {
           close(i.pipe_stdout);
@@ -275,7 +277,7 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
         }
       }
-      if (i.pid != 0 && i.pipe_stderr != -1 && FD_ISSET(i.pipe_stderr, &set)) {
+      if (i.pipe_stderr != -1 && FD_ISSET(i.pipe_stderr, &set)) {
         int got = read(i.pipe_stderr, buffer, sizeof(buffer));
         if (got <= 0) {
           close(i.pipe_stderr);
@@ -308,28 +310,11 @@ bool JobTable::wait(WorkQueue &queue) {
 
       for (auto &i : imp->table) {
         if (i.pid == pid) {
+          i.pid = 0;
           i.job->state |= STATE_MERGED;
           i.job->status = code;
-          if (i.pipe_stdout != -1) {
-            int got;
-            while ((got = read(i.pipe_stdout, buffer, sizeof(buffer))) > 0)
-              i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
-            close(i.pipe_stdout);
-            i.job->state |= STATE_STDOUT;
-          }
-          if (i.pipe_stderr != -1) {
-            int got;
-            while ((got = read(i.pipe_stderr, buffer, sizeof(buffer))) > 0)
-              i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
-            close(i.pipe_stderr);
-            i.job->state |= STATE_STDERR;
-          }
-          i.pid = 0;
-          i.pipe_stdout = -1;
-          i.pipe_stderr = -1;
-          i.job->process(queue);
           i.job->runtime = i.runtime(now);
-          i.job.reset();
+          i.job->process(queue);
         }
       }
     }
