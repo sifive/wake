@@ -28,27 +28,34 @@ global def escape =
   | tokenize "\0"
   | helper
 
-def format rhs = match _
-  JString  s    = '"', escape s ++ ('"', rhs)
-  JInteger i    = str i,    rhs
-  JDouble  d    = match (dclass d)
-    Infinite if d <. 0e0 = "-1e9999", rhs
-    Infinite = "1e9999", rhs
-    NaN      = "NaN",    rhs
-    _        = dstr d,   rhs
-  JBoolean True = "true",   rhs
-  JBoolean False= "false",  rhs
-  JNull         = "null",   rhs
-  JArray   list =
-    def helper value acc = ',', format acc value
-    if list.empty then '[]', rhs
-    else '[', foldr helper (']', rhs) list | tail
-  JObject  list =
-    def helper (Pair key value) acc = ',', '"', escape key ++ ('":', format acc value)
-    if list.empty then '{}', rhs
-    else '{', foldr helper ('}', rhs) list | tail
+def format rhs depth lhs =
+  def deeper = mapOpt ("  {_}") depth
+  def tabbed = mapOpt ("\n{_}") depth | getOrElse ""
+  def tabbeder = mapOpt ("\n{_}") deeper | getOrElse ""
+  def space = if depth.isSome then " " else ""
+  match lhs
+    JString  s    = '"', escape s ++ ('"', rhs)
+    JInteger i    = str i,    rhs
+    JDouble  d    = match (dclass d)
+      Infinite if d <. 0e0 = "-1e9999", rhs
+      Infinite = "1e9999", rhs
+      NaN      = "NaN",    rhs
+      _        = dstr d,   rhs
+    JBoolean True = "true",   rhs
+    JBoolean False= "false",  rhs
+    JNull         = "null",   rhs
+    JArray   list =
+      def helper value acc = ",{tabbeder}", format acc deeper value
+      if list.empty then '[]', rhs
+      else "[{tabbeder}", foldr helper ("{tabbed}]", rhs) list | tail
+    JObject  list =
+      def helper (Pair key value) acc =
+        ",{tabbeder}", '"', escape key ++ ("\":{space}", format acc deeper value)
+      if list.empty then '{}', rhs
+      else "\{{tabbeder}", foldr helper ("{tabbed}\}", rhs) list | tail
 
-global def formatJSON x = format Nil x | cat
+global def formatJSON x = format Nil None x | cat
+global def prettyJSON x = format Nil (Some "") x | cat
 
 global def x /| f = match x
   JArray l = JArray (filter f l)
