@@ -21,6 +21,7 @@
 #include "database.h"
 #include "argagg.h"
 #include "hash.h"
+#include "status.h"
 
 static WorkQueue queue;
 
@@ -452,6 +453,8 @@ int main(int argc, const char **argv) {
   db.prepare();
   std::shared_ptr<Value> output;
   queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output(&output)));
+
+  setup_status();
   do { queue.run(); } while (jobtable.wait(queue));
 
   std::vector<std::shared_ptr<Value> > outputs;

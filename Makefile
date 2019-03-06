@@ -3,8 +3,8 @@
 CXX     ?= g++
 CFLAGS	?= -Wall -O2 -flto -DVERSION=$(VERSION)
 
-CORE_CFLAGS  := $(shell pkg-config --cflags re2 sqlite3)
-CORE_LDFLAGS := $(shell pkg-config --libs   re2 sqlite3)
+CORE_CFLAGS  := $(shell pkg-config --cflags re2 sqlite3 ncurses)
+CORE_LDFLAGS := $(shell pkg-config --libs   re2 sqlite3 ncurses)
 FUSE_CFLAGS  := $(shell pkg-config --cflags fuse)
 FUSE_LDFLAGS := $(shell pkg-config --libs   fuse)
 VERSION      := $(shell git describe --tags --dirty)
