@@ -97,6 +97,7 @@ struct JobEntry {
   int pipe_stdout; // -1 if closed
   int pipe_stderr; // -1 if closed
   struct timeval start;
+  std::list<Status>::iterator status;
   JobEntry() : pid(0), pipe_stdout(-1), pipe_stderr(-1) { }
   double runtime(struct timeval now);
 };
@@ -193,8 +194,10 @@ static char **split_null(std::string &str) {
 
 static void launch(JobTable *jobtable) {
   for (auto &i : jobtable->imp->table) {
-    if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1)
+    if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
+      if (i.job && i.pool) status_state.erase(i.status);
       i.job.reset();
+    }
 
     if (i.job) continue;
     if (jobtable->imp->tasks[i.pool].empty()) continue;
@@ -238,6 +241,9 @@ static void launch(JobTable *jobtable) {
     close(pipe_stdout[1]);
     close(pipe_stderr[1]);
     for (char &c : task.cmdline) if (c == 0) c = ' ';
+    if (i.pool)
+      i.status = status_state.emplace(status_state.end(),
+        task.cmdline, 0, i.start); // !!! task; budget
     if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
       std::stringstream s;
       s << task.cmdline << std::endl;
@@ -289,6 +295,7 @@ bool JobTable::wait(WorkQueue &queue) {
         if (got <= 0) {
           close(i.pipe_stdout);
           i.pipe_stdout = -1;
+          if (i.pool) i.status->stdout = false;
           i.job->state |= STATE_STDOUT;
           i.job->process(queue);
           ++done;
@@ -304,6 +311,7 @@ bool JobTable::wait(WorkQueue &queue) {
         if (got <= 0) {
           close(i.pipe_stderr);
           i.pipe_stderr = -1;
+          if (i.pool) i.status->stderr = false;
           i.job->state |= STATE_STDERR;
           i.job->process(queue);
           ++done;
