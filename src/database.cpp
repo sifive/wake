@@ -1,4 +1,5 @@
 #include "database.h"
+#include "status.h"
 #include <iostream>
 #include <sstream>
 #include <sqlite3.h>
@@ -258,15 +259,18 @@ static void finish_stmt(const char *why, sqlite3_stmt *stmt, bool debug) {
   int ret;
 
   if (debug) {
-    std::cerr << "DB:: ";
+    std::stringstream s;
+    s << "DB:: ";
 #if SQLITE_VERSION_NUMBER >= 3014000
     char *tmp = sqlite3_expanded_sql(stmt);
-    std::cerr << tmp;
+    s << tmp;
     sqlite3_free(tmp);
 #else
-    std::cerr << sqlite3_sql(stmt);
+    s << sqlite3_sql(stmt);
 #endif
-    std::cerr << std::endl;
+    s << std::endl;
+    std::string out = s.str();
+    status_write(2, out.data(), out.size());
   }
 
   ret = sqlite3_reset(stmt);
@@ -343,8 +347,10 @@ static std::string rip_column(sqlite3_stmt *stmt, int col) {
 std::vector<std::string> Database::get_targets() {
   std::vector<std::string> out;
   int ret = sqlite3_exec(imp->db, "select expression from targets;", &fill_vector, &out, 0);
-  if (ret != SQLITE_OK)
+  if (ret != SQLITE_OK) {
     std::cerr << "Could not enumerate wake targets: " << sqlite3_errmsg(imp->db) << std::endl;
+    exit(1);
+  }
   return out;
 }
 
@@ -365,7 +371,7 @@ void Database::prepare() {
   const char *sql = "insert into runs(run_id) values(null);";
   int ret = sqlite3_exec(imp->db, sql, 0, 0, 0);
   if (ret != SQLITE_OK) {
-    std::cerr << "Could not enumerate wake targets: " << sqlite3_errmsg(imp->db) << std::endl;
+    std::cerr << "Could not insert run: " << sqlite3_errmsg(imp->db) << std::endl;
     exit(1);
   }
   imp->run_id = sqlite3_last_insert_rowid(imp->db);
@@ -486,7 +492,10 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   bool fail = false;
   bind_integer(why, imp->detect_overlap, 1, job);
   while (sqlite3_step(imp->detect_overlap) == SQLITE_ROW) {
-    std::cerr << "File output by multiple Jobs: " << rip_column(imp->detect_overlap, 0) << std::endl;
+    std::stringstream s;
+    s << "File output by multiple Jobs: " << rip_column(imp->detect_overlap, 0) << std::endl;
+    std::string out = s.str();
+    status_write(2, out.data(), out.size());
     fail = true;
   }
   finish_stmt(why, imp->detect_overlap, imp->debugdb);

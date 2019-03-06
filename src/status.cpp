@@ -28,7 +28,7 @@ static void update_rows(int)
   }
 }
 
-void setup_status()
+void status_init()
 {
   tty = isatty(2) == 1;
   if (tty) {
@@ -52,12 +52,23 @@ void setup_status()
   }
 }
 
-void draw_status()
+void status_write(int fd, const char *data, int len)
+{
+  if (fd == 1) {
+    std::cout.write(data, len);
+    std::cout << std::flush;
+  } else {
+    std::cerr.write(data, len);
+    std::cerr << std::flush;
+  }
+}
+
+void status_refresh()
 {
   tputs(cuu1, 1, eputc);
 }
 
-void finish_status()
+void status_finish()
 {
   reset_shell_mode();
 }

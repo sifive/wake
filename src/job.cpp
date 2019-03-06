@@ -5,6 +5,7 @@
 #include "database.h"
 #include "location.h"
 #include "sources.h"
+#include "status.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -222,7 +223,10 @@ static void launch(JobTable *jobtable) {
     close(pipe_stderr[1]);
     for (char &c : task.cmdline) if (c == 0) c = ' ';
     if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
-      std::cerr << task.cmdline << std::endl;
+      std::stringstream s;
+      s << task.cmdline << std::endl;
+      std::string out = s.str();
+      status_write(2, out.data(), out.size());
     }
     jobtable->imp->tasks[i.pool].pop_front();
   }
@@ -272,7 +276,7 @@ bool JobTable::wait(WorkQueue &queue) {
           ++done;
         } else {
           if (imp->verbose && i.pool && !i.internal) {
-            std::cout.write(buffer, got);
+            status_write(1, buffer, got);
           }
           i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
         }
@@ -287,7 +291,7 @@ bool JobTable::wait(WorkQueue &queue) {
           ++done;
         } else {
           if (!imp->quiet && i.pool) { // print stderr also internal
-            std::cerr.write(buffer, got);
+            status_write(2, buffer, got);
           }
           i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
         }

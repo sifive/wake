@@ -1,6 +1,16 @@
 #ifndef STATUS_H
 #define STATUS_H
 
-void setup_status();
+struct Status {
+  double budget;
+  bool stdout, stderr;
+//  std::string cmdline;
+};
+
+void status_init();
+//void status_set(std::vector<Status> &state);
+void status_write(int fd, const char *data, int len);
+void status_refresh();
+void status_finish();
 
 #endif

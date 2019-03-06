@@ -454,8 +454,9 @@ int main(int argc, const char **argv) {
   std::shared_ptr<Value> output;
   queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output(&output)));
 
-  setup_status();
+  status_init();
   do { queue.run(); } while (jobtable.wait(queue));
+  status_finish();
 
   std::vector<std::shared_ptr<Value> > outputs;
   outputs.reserve(targets.size());
