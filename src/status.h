@@ -7,6 +7,8 @@ struct Status {
 //  std::string cmdline;
 };
 
+extern bool refresh_needed;
+
 void status_init();
 //void status_set(std::vector<Status> &state);
 void status_write(int fd, const char *data, int len);

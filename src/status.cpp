@@ -8,6 +8,8 @@
 #include <curses.h>
 #include <term.h>
 
+bool refresh_needed = false;
+
 static bool tty = false;
 static int rows = 0, cols = 0;
 static const char *cuu1;
@@ -65,7 +67,8 @@ void status_write(int fd, const char *data, int len)
 
 void status_refresh()
 {
-  tputs(cuu1, 1, eputc);
+  refresh_needed = false;
+  // tputs(cuu1, 1, eputc);
 }
 
 void status_finish()
