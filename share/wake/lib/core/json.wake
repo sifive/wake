@@ -39,9 +39,9 @@ def format format lhs =
   def space = if indent > 0 then " " else ""
   def indention = tab (\_ ' ') indent | cat
   def rec rhs depth lhs =
-    def deeper = mapOpt ("{indention}{_}") depth
-    def tabbed = mapOpt ("\n{_}") depth | getOrElse ""
-    def tabbeder = mapOpt ("\n{_}") deeper | getOrElse ""
+    def deeper = omap ("{indention}{_}") depth
+    def tabbed = omap ("\n{_}") depth | getOrElse ""
+    def tabbeder = omap ("\n{_}") deeper | getOrElse ""
     match lhs
       JString  s    = '"', format.getJSONFormatString s, '"', rhs
       JInteger i    = format.getJSONFormatInteger i,    rhs
