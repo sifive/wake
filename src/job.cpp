@@ -96,6 +96,8 @@ struct JobEntry {
   pid_t pid;       //  0 if merged
   int pipe_stdout; // -1 if closed
   int pipe_stderr; // -1 if closed
+  std::string stdout_buf;
+  std::string stderr_buf;
   struct timeval start;
   std::list<Status>::iterator status;
   JobEntry() : pid(0), pipe_stdout(-1), pipe_stderr(-1) { }
@@ -299,11 +301,22 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->state |= STATE_STDOUT;
           i.job->process(queue);
           ++done;
-        } else {
           if (imp->verbose && i.pool && !i.internal) {
-            status_write(1, buffer, got);
+            if (!i.stdout_buf.empty() && i.stdout_buf.back() != '\n')
+              i.stdout_buf.push_back('\n');
+            status_write(1, i.stdout_buf.data(), i.stdout_buf.size());
+            i.stdout_buf.clear();
           }
+        } else {
           i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
+          if (imp->verbose && i.pool && !i.internal) {
+            i.stdout_buf.append(buffer, got);
+            size_t dump = i.stdout_buf.rfind('\n');
+            if (dump != std::string::npos) {
+              status_write(1, i.stdout_buf.data(), dump+1);
+              i.stdout_buf.erase(0, dump+1);
+            }
+          }
         }
       }
       if (i.pipe_stderr != -1 && FD_ISSET(i.pipe_stderr, &set)) {
@@ -315,11 +328,22 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->state |= STATE_STDERR;
           i.job->process(queue);
           ++done;
-        } else {
-          if (!imp->quiet && i.pool) { // print stderr also internal
-            status_write(2, buffer, got);
+          if (!imp->quiet && i.pool) { // print stderr also for internal
+            if (!i.stderr_buf.empty() && i.stderr_buf.back() != '\n')
+              i.stderr_buf.push_back('\n');
+            status_write(2, i.stderr_buf.data(), i.stderr_buf.size());
+            i.stderr_buf.clear();
           }
+        } else {
           i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
+          if (!imp->quiet && i.pool) { // print stderr also for internal
+            i.stderr_buf.append(buffer, got);
+            size_t dump = i.stderr_buf.rfind('\n');
+            if (dump != std::string::npos) {
+              status_write(2, i.stderr_buf.data(), dump+1);
+              i.stderr_buf.erase(0, dump+1);
+            }
+          }
         }
       }
     }
