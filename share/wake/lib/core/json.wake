@@ -34,8 +34,8 @@ tuple JSONFormat =
   global Double (Double => String)
   global Indent Integer
 
-def format format lhs =
-  def indent = format.getJSONFormatIndent
+def format fmt lhs =
+  def indent = fmt.getJSONFormatIndent
   def space = if indent > 0 then " " else ""
   def indention = tab (\_ ' ') indent | cat
   def rec rhs depth lhs =
@@ -43,9 +43,9 @@ def format format lhs =
     def tabbed = omap ("\n{_}") depth | getOrElse ""
     def tabbeder = omap ("\n{_}") deeper | getOrElse ""
     match lhs
-      JString  s    = '"', format.getJSONFormatString s, '"', rhs
-      JInteger i    = format.getJSONFormatInteger i,    rhs
-      JDouble  d    = format.getJSONFormatDouble d, rhs
+      JString  s    = '"', fmt.getJSONFormatString s, '"', rhs
+      JInteger i    = fmt.getJSONFormatInteger i,          rhs
+      JDouble  d    = fmt.getJSONFormatDouble d,           rhs
       JBoolean True = "true",   rhs
       JBoolean False= "false",  rhs
       JNull         = "null",   rhs
