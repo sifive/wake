@@ -36,7 +36,8 @@ static void status_redraw()
   struct timeval now;
   gettimeofday(&now, 0);
 
-  if (rows > status_state.size() && cols > 16) for (auto &x : status_state) {
+  int total = status_state.size();
+  if (rows > 4 && cols > 16) for (auto &x : status_state) {
     double runtime =
       (now.tv_sec  - x.launch.tv_sec) +
       (now.tv_usec - x.launch.tv_usec) / 1000000.0;
@@ -64,6 +65,11 @@ static void status_redraw()
 
     std::cerr << progress << cut << std::endl;
     ++used;
+    if (used != total && used == rows - 3) {
+      std::cerr << "... +" << (total-used) << " more" << std::endl;
+      ++used;
+      break;
+    }
   }
 
   refresh_needed = false;
