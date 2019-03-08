@@ -158,7 +158,7 @@ JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool ch
 
   struct itimerval timer;
   timer.it_value.tv_sec = 0;
-  timer.it_value.tv_usec = 1000000/5; // refresh at 5Hz
+  timer.it_value.tv_usec = 1000000/6; // refresh at 6Hz
   timer.it_interval = timer.it_value;
 
   setitimer(ITIMER_REAL, &timer, 0);
