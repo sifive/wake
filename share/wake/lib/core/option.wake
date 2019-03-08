@@ -22,5 +22,5 @@ global def omapPartial f = match _
   None   = None
 
 global def ofilter f = match _
-  Some a = if (f a) then Some a else None
-  None   = None
+  Some a if f a = Some a
+  _ = None
