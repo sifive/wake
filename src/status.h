@@ -7,11 +7,11 @@
 struct Status {
   std::string cmdline;
   double budget;
-  bool stdout, stderr;
+  bool merged, stdout, stderr;
   struct timeval launch;
   Status(const std::string &cmdline_, double budget_, const struct timeval &launch_)
    : cmdline(cmdline_), budget(budget_),
-     stdout(true), stderr(true),
+     merged(false), stdout(true), stderr(true),
      launch(launch_) { }
 };
 

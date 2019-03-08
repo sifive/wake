@@ -245,7 +245,7 @@ static void launch(JobTable *jobtable) {
     for (char &c : task.cmdline) if (c == 0) c = ' ';
     if (i.pool)
       i.status = status_state.emplace(status_state.end(),
-        task.cmdline, 0, i.start); // !!! task; budget
+        task.cmdline, 0.0, i.start); // !!! task; budget
     if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
       std::stringstream s;
       s << task.cmdline << std::endl;
@@ -365,6 +365,7 @@ bool JobTable::wait(WorkQueue &queue) {
       for (auto &i : imp->table) {
         if (i.pid == pid) {
           i.pid = 0;
+          if (i.pool) i.status->merged = true;
           i.job->state |= STATE_MERGED;
           i.job->status = code;
           i.job->runtime = i.runtime(now);

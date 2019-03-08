@@ -9,6 +9,8 @@
 #include <math.h>
 #include <curses.h>
 #include <term.h>
+#include <string.h>
+#include <stdio.h>
 
 bool refresh_needed = false;
 std::list<Status> status_state;
@@ -29,6 +31,13 @@ static void status_clear()
 {
   for (; used; --used) tputs(cuu1, 1, eputc);
   tputs(ed, 1, eputc);
+}
+
+static int ilog10(int x)
+{
+  int out = 1;
+  for (; x >= 10; x /= 10) ++out;
+  return out;
 }
 
 static void status_redraw()
@@ -52,15 +61,26 @@ static void status_redraw()
     }
 
     char progress[] = "[      ] ";
-    if (x.budget == 0) {
+    if (x.merged) {
+      if (!x.stdout) {
+        strcpy(progress, "[stdout] ");
+      } else if (!x.stderr) {
+        strcpy(progress, "[stderr] ");
+      } else {
+        strcpy(progress, "[merged] ");
+      }
+    } else if (x.budget == 0) {
       long offset = lround(floor(fmod(2*runtime, 6.0)));
       progress[offset+1] = '#';
     } else if (runtime < x.budget) {
-      for (long offset = lround(floor(6*runtime/x.budget)); offset; --offset)
-        progress[offset+1] = '#';
+      for (long offset = lround(floor(7*runtime/x.budget)); offset; --offset)
+        progress[offset] = '#';
     } else {
-      double ratio = 100.0 * runtime/x.budget;
-      // !!!
+      long over = lround(100.0 * runtime/x.budget);
+      if (over > 99999) over = 99999;
+      int len = ilog10(over);
+      int wide = 5;
+      snprintf(progress, sizeof(progress), "[%*d%%%*s] ", (wide+len)/2, (int)over, (wide-len+1)/2, "");
     }
 
     std::cerr << progress << cut << std::endl;
