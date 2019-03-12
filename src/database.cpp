@@ -167,7 +167,7 @@ std::string Database::open(bool wait) {
     "select hash from files where path=? and modified=?";
   const char *sql_delete_useless =
     "delete from jobs where job_id in"
-    " (select job_id from jobs where keep=0 except select job_id from filetree where access=2)";
+    " (select job_id from jobs where keep is null or keep==0 except select job_id from filetree where access=2)";
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
