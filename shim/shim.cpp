@@ -74,15 +74,28 @@ int main(int argc, char **argv) {
     fprintf(stderr, "open: %s: %s\n", argv[1], strerror(errno));
     return 127;
   }
-  dup2(stdin_fd, 0);
-  close(stdin_fd);
 
   stdout_fd = atoi(argv[2]);
   stderr_fd = atoi(argv[3]);
-  dup2(stdout_fd, 1);
-  dup2(stderr_fd, 2);
-  close(stdout_fd);
-  close(stderr_fd);
+
+  while (stdin_fd  <= 2 && stdin_fd  != 0) stdin_fd  = dup(stdin_fd);
+  while (stdout_fd <= 2 && stderr_fd != 1) stdout_fd = dup(stdout_fd);
+  while (stderr_fd <= 2 && stdout_fd != 2) stderr_fd = dup(stderr_fd);
+
+  if (stdin_fd != 0) {
+    dup2(stdin_fd, 0);
+    close(stdin_fd);
+  }
+
+  if (stdout_fd != 1) {
+    dup2(stdout_fd, 1);
+    close(stdout_fd);
+  }
+
+  if (stderr_fd != 2) {
+    dup2(stderr_fd, 2);
+    close(stderr_fd);
+  }
 
   if (strcmp(argv[5], "<hash>")) {
     execv(argv[5], argv+5);
