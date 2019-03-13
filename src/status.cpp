@@ -53,7 +53,7 @@ static void status_redraw()
 
     int rest = cols - 10;
     std::string cut;
-    if (x.cmdline.size() < rest) {
+    if ((int)x.cmdline.size() < rest) {
       cut = x.cmdline;
     } else {
       cut = x.cmdline.substr(0, (rest-5)/2) + " ... " +
