@@ -477,7 +477,6 @@ bool JobTable::wait(WorkQueue &queue) {
     child_ready = false;
     while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
       if (WIFSTOPPED(status)) continue;
-      // if (imp->verbose) std::cerr << "<<< " << pid << std::endl;
 
       ++done;
       int code = 0;
