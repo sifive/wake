@@ -24,7 +24,9 @@
 // How many job categories to support
 #define POOLS 2
 // How many times to SIGTERM a process before SIGKILL
-#define TERM_ATTEMPTS 5
+#define TERM_ATTEMPTS 6
+// How long between first and second SIGTERM attempt (exponentially increasing)
+#define TERM_BASE_GAP_MS 100
 
 #define STATE_FORKED	1  // in database and running
 #define STATE_STDOUT	2  // stdout fully in database
@@ -206,15 +208,30 @@ static struct timeval mytimersub(struct timeval a, struct timeval b) {
   return out;
 }
 
+static struct timeval mytimerdouble(struct timeval a) {
+  a.tv_sec <<= 1;
+  a.tv_usec <<= 1;
+  if (a.tv_usec > 1000000) {
+    ++a.tv_sec;
+    a.tv_usec -= 1000000;
+  }
+  return a;
+}
+
 JobTable::~JobTable() {
   // Disable the status refresh signal
   struct itimerval timer;
   memset(&timer, 0, sizeof(timer));
   setitimer(ITIMER_REAL, &timer, 0);
 
+  // SIGTERM strategy is to double the gap between termination attempts every retry
+  struct timeval limit;
+  limit.tv_sec  = TERM_BASE_GAP_MS / 1000;
+  limit.tv_usec = (TERM_BASE_GAP_MS % 1000) * 1000;
+
   // Try to kill children gently first, once every second
   bool children = true;
-  for (int retry = 0; children && retry < TERM_ATTEMPTS; ++retry) {
+  for (int retry = 0; children && retry < TERM_ATTEMPTS; ++retry, limit = mytimerdouble(limit)) {
     children = false;
 
     // Send every child SIGTERM
@@ -225,17 +242,17 @@ JobTable::~JobTable() {
     }
 
     // Reap children for one second; exit early if none remain
-    struct timeval start, now, delta;
+    struct timeval start, now, remain;
     struct timespec timeout;
     gettimeofday(&start, 0);
-    for (now = start; children && (delta = mytimersub(now, start)).tv_sec < 1; gettimeofday(&now, 0)) {
+    for (now = start; children && (remain = mytimersub(limit, mytimersub(now, start))).tv_sec >= 0; gettimeofday(&now, 0)) {
       // Block signals SIGCHLD between here and pselect()
       sigset_t saved;
       sigprocmask(SIG_BLOCK, &imp->block, &saved);
 
       // Continue waiting for the full second
       timeout.tv_sec = 0;
-      timeout.tv_nsec = (1000000 - delta.tv_usec) * 1000;
+      timeout.tv_nsec = remain.tv_usec * 1000;
 
       // Sleep until timeout or a signal arrives
       if (!child_ready) pselect(0, 0, 0, 0, &timeout, &saved);
