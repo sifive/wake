@@ -23,6 +23,16 @@ static const char *cr;
 static const char *ed;
 static int used = 0;
 
+static void write_all(int fd, const char *data, size_t len)
+{
+  ssize_t got;
+  size_t done;
+  for (done = 0; done < len; done += got) {
+    got = write(fd, data+done, len-done);
+    if (done < 0 && errno != EINTR) break;
+  }
+}
+
 static void status_clear()
 {
   if (tty) {
@@ -31,7 +41,7 @@ static void status_clear()
     os << cr;
     os << ed;
     std::string s = os.str();
-    write(2, s.data(), s.size());
+    write_all(2, s.data(), s.size());
   }
 }
 
@@ -96,7 +106,7 @@ static void status_redraw()
   }
 
   std::string s = os.str();
-  write(2, s.data(), s.size());
+  write_all(2, s.data(), s.size());
   refresh_needed = false;
 }
 
@@ -144,9 +154,9 @@ void status_write(int fd, const char *data, int len)
 {
   status_clear();
   if (fd == 1) {
-    write(1, data, len);
+    write_all(1, data, len);
   } else {
-    write(2, data, len);
+    write_all(2, data, len);
   }
   refresh_needed = true;
 }
