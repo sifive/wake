@@ -3,6 +3,7 @@
 #include "value.h"
 #include "datatype.h"
 #include "prim.h"
+#include "status.h"
 #include <cassert>
 
 struct Application : public Receiver {
@@ -225,6 +226,7 @@ void Receive::eval(WorkQueue &queue) {
 
 void WorkQueue::run() {
   while (!receives.empty()) {
+    if (refresh_needed) status_refresh();
     receives.front().eval(*this);
     receives.pop();
   }
@@ -232,6 +234,7 @@ void WorkQueue::run() {
     thunks.front().eval(*this);
     thunks.pop();
     while (!receives.empty()) {
+      if (refresh_needed) status_refresh();
       receives.front().eval(*this);
       receives.pop();
     }

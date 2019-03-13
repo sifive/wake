@@ -3,8 +3,8 @@
 CXX     ?= g++
 CFLAGS	?= -Wall -O2 -flto -DVERSION=$(VERSION)
 
-CORE_CFLAGS  := $(shell pkg-config --cflags re2 sqlite3)
-CORE_LDFLAGS := $(shell pkg-config --libs   re2 sqlite3)
+CORE_CFLAGS  := $(shell pkg-config --cflags sqlite3 ncurses)
+CORE_LDFLAGS := $(shell pkg-config --libs   sqlite3 ncurses)
 FUSE_CFLAGS  := $(shell pkg-config --cflags fuse)
 FUSE_LDFLAGS := $(shell pkg-config --libs   fuse)
 VERSION      := $(shell git describe --tags --dirty)
@@ -19,7 +19,7 @@ install:	all
 	./bin/wake install '"install"'
 
 bin/wake:	$(patsubst %.cpp,%.o,$(wildcard src/*.cpp)) src/symbol.o
-	$(CXX) -std=c++11 $(CFLAGS) -o $@ $^ $(CORE_LDFLAGS) -lgmp -lutf8proc
+	$(CXX) -std=c++11 $(CFLAGS) -o $@ $^ $(CORE_LDFLAGS) -lgmp -lutf8proc -lre2
 
 lib/wake/fuse-wake:	fuse/fuse.cpp
 	$(CXX) -std=c++11 $(CFLAGS) $(FUSE_CFLAGS) $< -o $@ $(FUSE_LDFLAGS)

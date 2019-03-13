@@ -5,6 +5,7 @@
 #include "expr.h"
 #include "type.h"
 #include "symbol.h"
+#include "status.h"
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -235,7 +236,7 @@ static PRIMTYPE(type_print) {
 static PRIMFN(prim_print) {
   EXPECT(1);
   STRING(arg0, 0);
-  std::cerr << arg0->value;
+  status_write(2, arg0->value.data(), arg0->value.size());
   auto out = make_unit();
   RETURN(out);
 }

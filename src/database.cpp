@@ -1,4 +1,5 @@
 #include "database.h"
+#include "status.h"
 #include <iostream>
 #include <sstream>
 #include <sqlite3.h>
@@ -77,9 +78,9 @@ std::string Database::open(bool wait) {
     "  run_id      integer not null references runs(run_id),"
     "  use_id      integer not null references runs(run_id),"
     "  directory   text    not null,"
-    "  commandline text    not null,"
-    "  environment text    not null,"
-    "  stack       text    not null,"
+    "  commandline blob    not null,"
+    "  environment blob    not null,"
+    "  stack       blob    not null,"
     "  stdin       text,"    // might point outside the workspace
     "  keep        integer," // 0=false, 1=true
     "  time        text,"
@@ -166,7 +167,7 @@ std::string Database::open(bool wait) {
     "select hash from files where path=? and modified=?";
   const char *sql_delete_useless =
     "delete from jobs where job_id in"
-    " (select job_id from jobs where keep=0 except select job_id from filetree where access=2)";
+    " (select job_id from jobs where keep is null or keep==0 except select job_id from filetree where access=2)";
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
@@ -258,15 +259,18 @@ static void finish_stmt(const char *why, sqlite3_stmt *stmt, bool debug) {
   int ret;
 
   if (debug) {
-    std::cerr << "DB:: ";
+    std::stringstream s;
+    s << "DB:: ";
 #if SQLITE_VERSION_NUMBER >= 3014000
     char *tmp = sqlite3_expanded_sql(stmt);
-    std::cerr << tmp;
+    s << tmp;
     sqlite3_free(tmp);
 #else
-    std::cerr << sqlite3_sql(stmt);
+    s << sqlite3_sql(stmt);
 #endif
-    std::cerr << std::endl;
+    s << std::endl;
+    std::string out = s.str();
+    status_write(2, out.data(), out.size());
   }
 
   ret = sqlite3_reset(stmt);
@@ -303,6 +307,19 @@ static void single_step(const char *why, sqlite3_stmt *stmt, bool debug) {
   finish_stmt(why, stmt, debug);
 }
 
+static void bind_blob(const char *why, sqlite3_stmt *stmt, int index, const char *str, size_t len) {
+  int ret;
+  ret = sqlite3_bind_blob(stmt, index, str, len, SQLITE_STATIC);
+  if (ret != SQLITE_OK) {
+    std::cerr << why << "; sqlite3_bind_blob(" << index << "): " << sqlite3_errmsg(sqlite3_db_handle(stmt)) << std::endl;
+    exit(1);
+  }
+}
+
+static void bind_blob(const char *why, sqlite3_stmt *stmt, int index, const std::string &x) {
+  bind_blob(why, stmt, index, x.data(), x.size());
+}
+
 static void bind_string(const char *why, sqlite3_stmt *stmt, int index, const char *str, size_t len) {
   int ret;
   ret = sqlite3_bind_text(stmt, index, str, len, SQLITE_STATIC);
@@ -336,15 +353,17 @@ static void bind_double(const char *why, sqlite3_stmt *stmt, int index, double x
 
 static std::string rip_column(sqlite3_stmt *stmt, int col) {
   return std::string(
-    reinterpret_cast<const char*>(sqlite3_column_text(stmt, col)),
+    reinterpret_cast<const char*>(sqlite3_column_blob(stmt, col)),
     sqlite3_column_bytes(stmt, col));
 }
 
 std::vector<std::string> Database::get_targets() {
   std::vector<std::string> out;
   int ret = sqlite3_exec(imp->db, "select expression from targets;", &fill_vector, &out, 0);
-  if (ret != SQLITE_OK)
+  if (ret != SQLITE_OK) {
     std::cerr << "Could not enumerate wake targets: " << sqlite3_errmsg(imp->db) << std::endl;
+    exit(1);
+  }
   return out;
 }
 
@@ -365,7 +384,7 @@ void Database::prepare() {
   const char *sql = "insert into runs(run_id) values(null);";
   int ret = sqlite3_exec(imp->db, sql, 0, 0, 0);
   if (ret != SQLITE_OK) {
-    std::cerr << "Could not enumerate wake targets: " << sqlite3_errmsg(imp->db) << std::endl;
+    std::cerr << "Could not insert run: " << sqlite3_errmsg(imp->db) << std::endl;
     exit(1);
   }
   imp->run_id = sqlite3_last_insert_rowid(imp->db);
@@ -396,8 +415,8 @@ bool Database::reuse_job(
   const char *why = "Could not check for a cached job";
   begin_txn();
   bind_string (why, imp->find_prior, 1, directory);
-  bind_string (why, imp->find_prior, 2, commandline);
-  bind_string (why, imp->find_prior, 3, environment);
+  bind_blob   (why, imp->find_prior, 2, commandline);
+  bind_blob   (why, imp->find_prior, 3, environment);
   bind_string (why, imp->find_prior, 4, stdin);
   bool prior = sqlite3_step(imp->find_prior) == SQLITE_ROW;
   if (prior) job = sqlite3_column_int(imp->find_prior, 0);
@@ -440,9 +459,9 @@ void Database::insert_job(
   const char *why = "Could not insert a job";
   bind_integer(why, imp->insert_job, 1, imp->run_id);
   bind_string (why, imp->insert_job, 2, directory);
-  bind_string (why, imp->insert_job, 3, commandline);
-  bind_string (why, imp->insert_job, 4, environment);
-  bind_string (why, imp->insert_job, 5, stack);
+  bind_blob   (why, imp->insert_job, 3, commandline);
+  bind_blob   (why, imp->insert_job, 4, environment);
+  bind_blob   (why, imp->insert_job, 5, stack);
   bind_string (why, imp->insert_job, 6, stdin);
   single_step (why, imp->insert_job, imp->debugdb);
   *job = sqlite3_last_insert_rowid(imp->db);
@@ -486,7 +505,10 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   bool fail = false;
   bind_integer(why, imp->detect_overlap, 1, job);
   while (sqlite3_step(imp->detect_overlap) == SQLITE_ROW) {
-    std::cerr << "File output by multiple Jobs: " << rip_column(imp->detect_overlap, 0) << std::endl;
+    std::stringstream s;
+    s << "File output by multiple Jobs: " << rip_column(imp->detect_overlap, 0) << std::endl;
+    std::string out = s.str();
+    status_write(2, out.data(), out.size());
     fail = true;
   }
   finish_stmt(why, imp->detect_overlap, imp->debugdb);
@@ -523,7 +545,7 @@ std::string Database::get_output(long job, int descriptor) {
   bind_integer(why, imp->get_log, 2, descriptor);
   while (sqlite3_step(imp->get_log) == SQLITE_ROW) {
     out.write(
-      reinterpret_cast<const char*>(sqlite3_column_text(imp->get_log, 0)),
+      reinterpret_cast<const char*>(sqlite3_column_blob(imp->get_log, 0)),
       sqlite3_column_bytes(imp->get_log, 0));
   }
   finish_stmt(why, imp->get_log, imp->debugdb);

@@ -21,6 +21,7 @@
 #include "database.h"
 #include "argagg.h"
 #include "hash.h"
+#include "status.h"
 
 static WorkQueue queue;
 
@@ -198,8 +199,10 @@ int main(int argc, const char **argv) {
       "rebuild all outputs to check for build repeatability", 0},
     { "globals", {"-g", "--globals"},
       "print out all global variables", 0},
-    { "nowait", {"-n", "--nowait"},
+    { "no-wait", {"-n", "--no-wait"},
       "don't wait to acquire the database lock", 0},
+    { "no-tty", {"--no-tty"},
+      "disable progress bar rendering", 0},
     { "init", {"--init"},
       "directory to configure as workspace top", 1},
   }};
@@ -225,7 +228,8 @@ int main(int argc, const char **argv) {
   bool check = args["check"];
   bool debugdb = args["debug-db"];
   bool debug = args["debug"];
-  bool wait = !args["nowait"];
+  bool wait = !args["no-wait"];
+  bool tty = !args["no-tty"];
   queue.stack_trace = debug;
 
   bool nodb = args["init"];
@@ -452,7 +456,10 @@ int main(int argc, const char **argv) {
   db.prepare();
   std::shared_ptr<Value> output;
   queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output(&output)));
+
+  status_init(tty);
   do { queue.run(); } while (jobtable.wait(queue));
+  status_finish();
 
   std::vector<std::shared_ptr<Value> > outputs;
   outputs.reserve(targets.size());

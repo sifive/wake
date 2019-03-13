@@ -658,10 +658,10 @@ std::string JLexer::text() const { return engine->text(); }
 
 void Lexer::consume() {
   if (state->eol) {
-    if (state->indent.size() < state->tabs.back()) {
+    if ((int)state->indent.size() < state->tabs.back()) {
       state->tabs.pop_back();
       next.type = DEDENT;
-    } else if (state->indent.size() > state->tabs.back()) {
+    } else if ((int)state->indent.size() > state->tabs.back()) {
       state->tabs.push_back(state->indent.size());
       next.type = INDENT;
     } else {
