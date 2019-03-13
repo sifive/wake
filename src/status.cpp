@@ -1,5 +1,5 @@
 #include "status.h"
-#include <iostream>
+#include <sstream>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <signal.h>
@@ -23,18 +23,25 @@ static const char *cr;
 static const char *ed;
 static int used = 0;
 
-static int eputc(int c)
+static void write_all(int fd, const char *data, size_t len)
 {
-  std::cerr << (char)c;
-  return 0;
+  ssize_t got;
+  size_t done;
+  for (done = 0; done < len; done += got) {
+    got = write(fd, data+done, len-done);
+    if (done < 0 && errno != EINTR) break;
+  }
 }
 
 static void status_clear()
 {
   if (tty) {
-    for (; used; --used) tputs(cuu1, 1, eputc);
-    tputs(cr, 1, eputc);
-    tputs(ed, 1, eputc);
+    std::stringstream os;
+    for (; used; --used) os << cuu1;
+    os << cr;
+    os << ed;
+    std::string s = os.str();
+    write_all(2, s.data(), s.size());
   }
 }
 
@@ -47,6 +54,7 @@ static int ilog10(int x)
 
 static void status_redraw()
 {
+  std::stringstream os;
   struct timeval now;
   gettimeofday(&now, 0);
 
@@ -88,15 +96,17 @@ static void status_redraw()
       snprintf(progress, sizeof(progress), "[%*d%%%*s] ", (wide+len)/2, (int)over, (wide-len+1)/2, "");
     }
 
-    std::cerr << progress << cut << std::endl;
+    os << progress << cut << std::endl;
     ++used;
     if (used != total && used == rows - 3) {
-      std::cerr << "... +" << (total-used) << " more" << std::endl;
+      os << "... +" << (total-used) << " more" << std::endl;
       ++used;
       break;
     }
   }
 
+  std::string s = os.str();
+  write_all(2, s.data(), s.size());
   refresh_needed = false;
 }
 
@@ -143,14 +153,8 @@ void status_init(bool tty_)
 void status_write(int fd, const char *data, int len)
 {
   status_clear();
-  if (fd == 1) {
-    std::cout.write(data, len);
-    std::cout << std::flush;
-  } else {
-    std::cerr.write(data, len);
-    std::cerr << std::flush;
-  }
-  status_redraw();
+  write_all(fd, data, len);
+  refresh_needed = true;
 }
 
 void status_refresh()

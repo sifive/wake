@@ -75,11 +75,11 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug) {
       indent("  ", job.stack);
     }
     if (!job.stdout.empty()) {
-      std::cerr << "Stdout:";
+      std::cout << "Stdout:";
       indent("  ", job.stdout);
     }
     if (!job.stderr.empty()) {
-      std::cerr << "Stderr:";
+      std::cout << "Stderr:";
       indent("  ", job.stderr);
     }
   }
@@ -144,11 +144,11 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug) {
       indent("#   ", job.stack);
     }
     if (!job.stdout.empty()) {
-      std::cerr << "Stdout:";
+      std::cout << "Stdout:";
       indent("#   ", job.stdout);
     }
     if (!job.stderr.empty()) {
-      std::cerr << "Stderr:";
+      std::cout << "Stderr:";
       indent("#   ", job.stderr);
     }
   }
