@@ -153,11 +153,7 @@ void status_init(bool tty_)
 void status_write(int fd, const char *data, int len)
 {
   status_clear();
-  if (fd == 1) {
-    write_all(1, data, len);
-  } else {
-    write_all(2, data, len);
-  }
+  write_all(fd, data, len);
   refresh_needed = true;
 }
 
