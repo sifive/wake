@@ -106,9 +106,12 @@ static void update_rows(int)
   status_redraw();
 }
 
-void status_init()
+void status_init(bool tty_)
 {
-  tty = isatty(2) == 1;
+  tty = tty_;
+  if (tty) {
+    if (isatty(2) != 1) tty = false;
+  }
   if (tty) {
     int eret;
     int ret = setupterm(0, 2, &eret);

@@ -18,7 +18,7 @@ struct Status {
 extern bool refresh_needed;
 extern std::list<Status> status_state;
 
-void status_init();
+void status_init(bool tty);
 void status_write(int fd, const char *data, int len);
 void status_refresh();
 void status_finish();
