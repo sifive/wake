@@ -23,6 +23,8 @@
 
 // How many job categories to support
 #define POOLS 2
+// How many times to SIGTERM a process before SIGKILL
+#define TERM_ATTEMPTS 5
 
 #define STATE_FORKED	1  // in database and running
 #define STATE_STDOUT	2  // stdout fully in database
@@ -112,21 +114,28 @@ double JobEntry::runtime(struct timeval now) {
 struct JobTable::detail {
   std::vector<JobEntry> table;
   std::vector<std::list<Task> > tasks;
-  sigset_t sigset;
+  sigset_t block; // signals that interrupt pselect()
   Database *db;
   bool verbose;
   bool quiet;
   bool check;
 };
 
+static bool child_ready = false;
+
 static void handle_SIGCHLD(int sig) {
-  /* noop -- we just want to interrupt select */
   (void)sig;
+  child_ready = true;
 }
 
 static void handle_SIGALRM(int sig) {
   (void)sig;
   refresh_needed = true;
+}
+
+static void handle_exit(int sig) {
+  (void)sig;
+  exit_now = true;
 }
 
 JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool check) : imp(new JobTable::detail) {
@@ -136,42 +145,124 @@ JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool ch
   imp->quiet = quiet;
   imp->check = check;
   imp->db = db;
+  sigemptyset(&imp->block);
 
   for (unsigned i = 0; i < imp->table.size(); ++i)
     imp->table[i].pool = i / max_jobs;
 
-  sigset_t block;
-  sigemptyset(&block);
-  sigaddset(&block, SIGCHLD);
-  sigprocmask(SIG_BLOCK, &block, &imp->sigset);
-
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
-  sa.sa_handler = handle_SIGCHLD;
-  sa.sa_flags = SA_NOCLDSTOP | SA_RESTART;
-  sigemptyset(&sa.sa_mask);
-  sigaction(SIGCHLD, &sa, 0);
 
-  sa.sa_handler = handle_SIGALRM;
-  sa.sa_flags = SA_RESTART;
-  sigaction(SIGALRM, &sa, 0);
+  // Ignore these signals
+  sa.sa_handler = SIG_IGN;
+  sigaction(SIGPIPE, &sa, 0);
+  sigaction(SIGUSR1, &sa, 0);
+  sigaction(SIGUSR2, &sa, 0);
 
+  // These signals cause wake to exit cleanly
+  sa.sa_handler = handle_exit;
+  sigaction(SIGHUP,  &sa, 0);
+  sigaction(SIGINT,  &sa, 0);
+  sigaction(SIGQUIT, &sa, 0);
+  sigaction(SIGTERM, &sa, 0);
+  sigaction(SIGXCPU, &sa, 0);
+  sigaction(SIGXFSZ, &sa, 0);
+
+  // Add to the set of signals we need to interrupt pselect()
+  sigaddset(&imp->block, SIGHUP);
+  sigaddset(&imp->block, SIGINT);
+  sigaddset(&imp->block, SIGQUIT);
+  sigaddset(&imp->block, SIGTERM);
+  sigaddset(&imp->block, SIGXCPU);
+  sigaddset(&imp->block, SIGXFSZ);
+
+  // Setup a SIGALRM timer to trigger status redraw
   struct itimerval timer;
   timer.it_value.tv_sec = 0;
   timer.it_value.tv_usec = 1000000/6; // refresh at 6Hz
   timer.it_interval = timer.it_value;
 
+  sa.sa_handler = handle_SIGALRM;
+  sigaction(SIGALRM, &sa, 0);
+  sigaddset(&imp->block, SIGALRM);
   setitimer(ITIMER_REAL, &timer, 0);
+
+  // SIGCHLD interrupts pselect()
+  sa.sa_handler = handle_SIGCHLD;
+  sa.sa_flags = SA_NOCLDSTOP;
+  sigemptyset(&sa.sa_mask);
+  sigaction(SIGCHLD, &sa, 0);
+  sigaddset(&imp->block, SIGCHLD);
+}
+
+static struct timeval mytimersub(struct timeval a, struct timeval b) {
+  struct timeval out;
+  out.tv_sec = a.tv_sec - b.tv_sec;
+  out.tv_usec = a.tv_usec - b.tv_usec;
+  if (out.tv_usec < 0) {
+    --out.tv_sec;
+    out.tv_usec += 1000000;
+  }
+  return out;
 }
 
 JobTable::~JobTable() {
-  for (auto &i : imp->table) {
-    if (i.pid != 0) kill(i.pid, SIGKILL);
+  // Disable the status refresh signal
+  struct itimerval timer;
+  memset(&timer, 0, sizeof(timer));
+  setitimer(ITIMER_REAL, &timer, 0);
+
+  // Try to kill children gently first, once every second
+  bool children = true;
+  for (int retry = 0; children && retry < TERM_ATTEMPTS; ++retry) {
+    children = false;
+
+    // Send every child SIGTERM
+    for (auto &i : imp->table) {
+      if (i.pid == 0) continue;
+      children = true;
+      kill(i.pid, SIGTERM);
+    }
+
+    // Reap children for one second; exit early if none remain
+    struct timeval start, now, delta;
+    struct timespec timeout;
+    gettimeofday(&start, 0);
+    for (now = start; children && (delta = mytimersub(now, start)).tv_sec < 1; gettimeofday(&now, 0)) {
+      // Block signals SIGCHLD between here and pselect()
+      sigset_t saved;
+      sigprocmask(SIG_BLOCK, &imp->block, &saved);
+
+      // Continue waiting for the full second
+      timeout.tv_sec = 0;
+      timeout.tv_nsec = (1000000 - delta.tv_usec) * 1000;
+
+      // Sleep until timeout or a signal arrives
+      if (!child_ready) pselect(0, 0, 0, 0, &timeout, &saved);
+
+      // Restore signals
+      child_ready = false;
+      sigprocmask(SIG_SETMASK, &saved, 0);
+
+      pid_t pid;
+      int status;
+      while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        if (WIFSTOPPED(status)) continue;
+
+        children = false;
+        for (auto &i : imp->table) {
+          if (i.pid == pid) i.pid = 0;
+          if (i.pid != 0) children = true;
+        }
+      }
+    }
   }
-  pid_t pid;
-  int status;
-  while ((pid = waitpid(-1, &status, 0)) > 0) {
-    // if (imp->verbose) std::cerr << "<<< " << pid << std::endl;
+
+  // Force children to die
+  for (auto &i : imp->table) {
+    if (i.pid == 0) continue;
+    std::cerr << "Force killing " << i.pid << " after " << TERM_ATTEMPTS << " attempts with SIGTERM" << std::endl;
+    kill(i.pid, SIGKILL);
   }
 }
 
@@ -258,10 +349,11 @@ static void launch(JobTable *jobtable) {
 
 bool JobTable::wait(WorkQueue &queue) {
   char buffer[4096];
+  struct timespec nowait;
+  memset(&nowait, 0, sizeof(nowait));
 
-  while (1) {
-    if (refresh_needed) status_refresh();
-
+  bool compute = false;
+  while (!exit_now) {
     fd_set set;
     int nfds = 0;
     int njobs = 0;
@@ -278,9 +370,24 @@ bool JobTable::wait(WorkQueue &queue) {
         FD_SET(i.pipe_stderr, &set);
       }
     }
-    if (njobs == 0) return false;
+    if (njobs == 0) break;
 
-    int retval = pselect(nfds, &set, 0, 0, 0, &imp->sigset);
+    // Block all signals we expect to interrupt pselect
+    sigset_t saved;
+    sigprocmask(SIG_BLOCK, &imp->block, &saved);
+
+    // Check for all signals that are now blocked
+    struct timespec *timeout = 0;
+    if (child_ready) timeout = &nowait;
+    if (exit_now) timeout = &nowait;
+    if (refresh_needed) status_refresh();
+
+    // Wait for a status change, with signals atomically unblocked in pselect
+    int retval = pselect(nfds, &set, 0, 0, timeout, &saved);
+
+    // Restore signal mask
+    sigprocmask(SIG_SETMASK, &saved, 0);
+
     if (retval == -1 && errno != EINTR) {
       perror("pselect");
       exit(1);
@@ -350,6 +457,7 @@ bool JobTable::wait(WorkQueue &queue) {
 
     int status;
     pid_t pid;
+    child_ready = false;
     while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
       if (WIFSTOPPED(status)) continue;
       // if (imp->verbose) std::cerr << "<<< " << pid << std::endl;
@@ -376,9 +484,12 @@ bool JobTable::wait(WorkQueue &queue) {
 
     if (done > 0) {
       launch(this);
-      return true;
+      compute = true;
+      break;
     }
   }
+
+  return compute;
 }
 
 Job::Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline, bool keep_)
