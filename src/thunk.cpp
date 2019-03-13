@@ -226,15 +226,14 @@ void Receive::eval(WorkQueue &queue) {
 
 void WorkQueue::run() {
   while (!receives.empty()) {
-    if (refresh_needed) status_refresh();
     receives.front().eval(*this);
     receives.pop();
   }
-  while (!thunks.empty()) {
+  while (!thunks.empty() && !exit_now) {
+    if (refresh_needed) status_refresh();
     thunks.front().eval(*this);
     thunks.pop();
     while (!receives.empty()) {
-      if (refresh_needed) status_refresh();
       receives.front().eval(*this);
       receives.pop();
     }
