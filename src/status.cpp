@@ -12,12 +12,14 @@
 #include <string.h>
 #include <stdio.h>
 
+bool exit_now = false;
 bool refresh_needed = false;
 std::list<Status> status_state;
 
 static bool tty = false;
 static int rows = 0, cols = 0;
 static const char *cuu1;
+static const char *cr;
 static const char *ed;
 static int used = 0;
 
@@ -30,6 +32,7 @@ static int eputc(int c)
 static void status_clear()
 {
   for (; used; --used) tputs(cuu1, 1, eputc);
+  tputs(cr, 1, eputc);
   tputs(ed, 1, eputc);
 }
 
@@ -103,7 +106,7 @@ static void update_rows(int)
     cols = size.ws_col;
   }
   status_clear();
-  status_redraw();
+  refresh_needed = true;
 }
 
 void status_init(bool tty_)
@@ -119,10 +122,12 @@ void status_init(bool tty_)
   }
   if (tty) {
     cuu1 = tigetstr("cuu1"); // cursor up one row
+    cr = tigetstr("cr");     // return to first column
     ed = tigetstr("ed");     // erase to bottom of display
     rows = tigetnum("lines");
     cols = tigetnum("cols");
     if (!cuu1 || cuu1 == (char*)-1) tty = false;
+    if (!cr || cr == (char*)-1) tty = false;
     if (!ed || ed == (char*)-1) tty = false;
     if (cols < 0 || rows < 0) tty = false;
   }
