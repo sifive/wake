@@ -12,12 +12,14 @@
 #include <string.h>
 #include <stdio.h>
 
+bool exit_now = false;
 bool refresh_needed = false;
 std::list<Status> status_state;
 
 static bool tty = false;
 static int rows = 0, cols = 0;
 static const char *cuu1;
+static const char *cr;
 static const char *ed;
 static int used = 0;
 
@@ -29,8 +31,11 @@ static int eputc(int c)
 
 static void status_clear()
 {
-  for (; used; --used) tputs(cuu1, 1, eputc);
-  tputs(ed, 1, eputc);
+  if (tty) {
+    for (; used; --used) tputs(cuu1, 1, eputc);
+    tputs(cr, 1, eputc);
+    tputs(ed, 1, eputc);
+  }
 }
 
 static int ilog10(int x)
@@ -46,7 +51,7 @@ static void status_redraw()
   gettimeofday(&now, 0);
 
   int total = status_state.size();
-  if (rows > 4 && cols > 16) for (auto &x : status_state) {
+  if (tty && rows > 4 && cols > 16) for (auto &x : status_state) {
     double runtime =
       (now.tv_sec  - x.launch.tv_sec) +
       (now.tv_usec - x.launch.tv_usec) / 1000000.0;
@@ -103,7 +108,7 @@ static void update_rows(int)
     cols = size.ws_col;
   }
   status_clear();
-  status_redraw();
+  refresh_needed = true;
 }
 
 void status_init(bool tty_)
@@ -119,10 +124,12 @@ void status_init(bool tty_)
   }
   if (tty) {
     cuu1 = tigetstr("cuu1"); // cursor up one row
+    cr = tigetstr("cr");     // return to first column
     ed = tigetstr("ed");     // erase to bottom of display
     rows = tigetnum("lines");
     cols = tigetnum("cols");
     if (!cuu1 || cuu1 == (char*)-1) tty = false;
+    if (!cr || cr == (char*)-1) tty = false;
     if (!ed || ed == (char*)-1) tty = false;
     if (cols < 0 || rows < 0) tty = false;
   }
@@ -155,5 +162,5 @@ void status_refresh()
 void status_finish()
 {
   status_clear();
-  reset_shell_mode();
+  if (tty) reset_shell_mode();
 }

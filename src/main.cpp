@@ -461,35 +461,40 @@ int main(int argc, const char **argv) {
   do { queue.run(); } while (jobtable.wait(queue));
   status_finish();
 
-  std::vector<std::shared_ptr<Value> > outputs;
-  outputs.reserve(targets.size());
-  Binding *iter = reinterpret_cast<Closure*>(output.get())->binding.get();
-  for (size_t i = 0; i < targets.size(); ++i) {
-    outputs.emplace_back(iter->future[0].value);
-    iter = iter->next.get();
-  }
-
   bool pass = true;
-  for (size_t i = 0; i < targets.size(); ++i) {
-    Value *v = outputs[targets.size()-1-i].get();
-    std::cout << targets[i] << ": ";
-    (*types)[0].format(std::cout, body->typeVar);
-    types = &(*types)[1];
-    std::cout << " = ";
-    if (v) {
-      if (v->type == Exception::type) pass = false;
-      if (args["debug"]) {
-        v->format(std::cout, -1);
+  if (exit_now) {
+    std::cerr << "Early termination requested" << std::endl;
+    pass = false;
+  } else {
+    std::vector<std::shared_ptr<Value> > outputs;
+    outputs.reserve(targets.size());
+    Binding *iter = reinterpret_cast<Closure*>(output.get())->binding.get();
+    for (size_t i = 0; i < targets.size(); ++i) {
+      outputs.emplace_back(iter->future[0].value);
+      iter = iter->next.get();
+    }
+
+    pass = true;
+    for (size_t i = 0; i < targets.size(); ++i) {
+      Value *v = outputs[targets.size()-1-i].get();
+      std::cout << targets[i] << ": ";
+      (*types)[0].format(std::cout, body->typeVar);
+      types = &(*types)[1];
+      std::cout << " = ";
+      if (v) {
+        if (v->type == Exception::type) pass = false;
+        if (args["debug"]) {
+          v->format(std::cout, -1);
+        } else {
+          std::cout << v << std::endl;
+        }
       } else {
-        std::cout << v << std::endl;
+        pass = false;
+        std::cout << "MISSING FUTURE" << std::endl;
       }
-    } else {
-      pass = false;
-      std::cout << "MISSING FUTURE" << std::endl;
     }
   }
 
-  //std::cerr << "Computed in " << Action::next_serial << " steps." << std::endl;
   db.clean();
   return pass?0:1;
 }

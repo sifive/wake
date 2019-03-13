@@ -15,6 +15,7 @@ struct Status {
      launch(launch_) { }
 };
 
+extern bool exit_now;
 extern bool refresh_needed;
 extern std::list<Status> status_state;
 
