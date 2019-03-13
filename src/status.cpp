@@ -31,9 +31,11 @@ static int eputc(int c)
 
 static void status_clear()
 {
-  for (; used; --used) tputs(cuu1, 1, eputc);
-  tputs(cr, 1, eputc);
-  tputs(ed, 1, eputc);
+  if (tty) {
+    for (; used; --used) tputs(cuu1, 1, eputc);
+    tputs(cr, 1, eputc);
+    tputs(ed, 1, eputc);
+  }
 }
 
 static int ilog10(int x)
@@ -49,7 +51,7 @@ static void status_redraw()
   gettimeofday(&now, 0);
 
   int total = status_state.size();
-  if (rows > 4 && cols > 16) for (auto &x : status_state) {
+  if (tty && rows > 4 && cols > 16) for (auto &x : status_state) {
     double runtime =
       (now.tv_sec  - x.launch.tv_sec) +
       (now.tv_usec - x.launch.tv_usec) / 1000000.0;
@@ -160,5 +162,5 @@ void status_refresh()
 void status_finish()
 {
   status_clear();
-  reset_shell_mode();
+  if (tty) reset_shell_mode();
 }
