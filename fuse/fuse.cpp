@@ -700,11 +700,24 @@ static int wakefuse_removexattr(const char *path, const char *name)
 }
 #endif /* HAVE_SETXATTR */
 
-std::string path;
-struct fuse* fh;
-struct fuse_chan* fc;
+static std::string path;
+static struct fuse* fh;
+static struct fuse_chan* fc;
+static sigset_t saved;
+static int logfd;
 
 static struct fuse_operations wakefuse_ops;
+
+static void *wakefuse_init(struct fuse_conn_info *conn)
+{
+	std::cerr << "OK: " << path << std::flush;
+	dup2(logfd, 2); // close stderr for wake to capture
+	close(logfd);
+
+	// unblock signals
+	sigprocmask(SIG_SETMASK, &saved, 0);
+	return 0;
+}
 
 static void handle_exit(int sig)
 {
@@ -721,6 +734,7 @@ static void handle_exit(int sig)
 
 int main(int argc, char *argv[])
 {
+	wakefuse_ops.init		= wakefuse_init;
 	wakefuse_ops.getattr		= wakefuse_getattr;
 	wakefuse_ops.access		= wakefuse_access;
 	wakefuse_ops.readlink		= wakefuse_readlink;
@@ -752,8 +766,8 @@ int main(int argc, char *argv[])
 	wakefuse_ops.removexattr	= wakefuse_removexattr;
 #endif
 
-	int status = 1, logfd, attempts;
-	sigset_t block, saved;
+	int status = 1, attempts;
+	sigset_t block;
 	struct sigaction sa;
 	struct fuse_args args;
 
@@ -822,13 +836,6 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "fuse_new failed");
 		goto unmount;
 	}
-
-	// unblock signals
-	sigprocmask(SIG_SETMASK, &saved, 0);
-
-	std::cerr << "OK: " << path << std::flush;
-	dup2(logfd, 2); // close stderr for wake to capture
-	close(logfd);
 
 	if (fuse_loop(fh) != 0) {
 		fprintf(stderr, "fuse_loop failed");
