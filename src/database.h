@@ -37,6 +37,8 @@ struct Database {
   std::string open(bool wait);
   void close();
 
+  void entropy(uint64_t *key, int words);
+
   std::vector<std::string> get_targets();
   void add_target(const std::string &target);
   void del_target(const std::string &target);

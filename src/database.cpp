@@ -14,6 +14,8 @@
 struct Database::detail {
   bool debugdb;
   sqlite3 *db;
+  sqlite3_stmt *get_entropy;
+  sqlite3_stmt *set_entropy;
   sqlite3_stmt *add_target;
   sqlite3_stmt *del_target;
   sqlite3_stmt *begin_txn;
@@ -36,10 +38,10 @@ struct Database::detail {
   sqlite3_stmt *delete_useless;
   long run_id;
   detail(bool debugdb_)
-   : debugdb(debugdb_), db(0), add_target(0), del_target(0), begin_txn(0), commit_txn(0),
-     insert_job(0), insert_tree(0), insert_log(0), wipe_file(0), insert_file(0), update_file(0),
-     get_log(0), get_tree(0), set_runtime(0), detect_overlap(0), delete_overlap(0),
-     find_prior(0), update_prior(0), find_owner(0), fetch_hash(0), delete_useless(0) { }
+   : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), add_target(0), del_target(0), begin_txn(0),
+     commit_txn(0), insert_job(0), insert_tree(0), insert_log(0), wipe_file(0), insert_file(0), update_file(0),
+     get_log(0), get_tree(0), set_runtime(0), detect_overlap(0), delete_overlap(0), find_prior(0),
+     update_prior(0), find_owner(0), fetch_hash(0), delete_useless(0) { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -64,6 +66,9 @@ std::string Database::open(bool wait) {
     "pragma foreign_keys=on;"
     "create table if not exists targets("
     "  expression text primary key);"
+    "create table if not exists entropy("
+    "  row_id integer primary key,"
+    "  seed   integer not null);"
     "create table if not exists runs("
     "  run_id integer primary key,"
     "  time   text    not null default current_timestamp);"
@@ -118,6 +123,8 @@ std::string Database::open(bool wait) {
   }
 
   // prepare statements
+  const char *sql_get_entropy = "select seed from entropy order by row_id";
+  const char *sql_set_entropy = "insert into entropy(seed) values(?)";
   const char *sql_add_target = "insert into targets(expression) values(?)";
   const char *sql_del_target = "delete from targets where expression=?";
   const char *sql_begin_txn = "begin transaction";
@@ -176,6 +183,8 @@ std::string Database::open(bool wait) {
     return out;												\
   }
 
+  PREPARE(sql_get_entropy,    get_entropy);
+  PREPARE(sql_set_entropy,    set_entropy);
   PREPARE(sql_add_target,     add_target);
   PREPARE(sql_del_target,     del_target);
   PREPARE(sql_begin_txn,      begin_txn);
@@ -214,6 +223,8 @@ void Database::close() {
   }									\
   imp->member = 0;
 
+  FINALIZE(get_entropy);
+  FINALIZE(set_entropy);
   FINALIZE(add_target);
   FINALIZE(del_target);
   FINALIZE(begin_txn);
@@ -354,6 +365,28 @@ static std::string rip_column(sqlite3_stmt *stmt, int col) {
   return std::string(
     reinterpret_cast<const char*>(sqlite3_column_blob(stmt, col)),
     sqlite3_column_bytes(stmt, col));
+}
+
+void Database::entropy(uint64_t *key, int words) {
+  const char *why = "Could not restore entropy";
+  int word;
+
+  begin_txn();
+
+  // Use entropy from DB
+  for (word = 0; word < words; ++word) {
+    if (sqlite3_step(imp->get_entropy) != SQLITE_ROW) break;
+    key[word] = sqlite3_column_int64(imp->get_entropy, 0);
+  }
+  finish_stmt(why, imp->get_entropy, imp->debugdb);
+
+  // Save any additional entropy needed
+  for (; word < words; ++word) {
+    bind_integer(why, imp->set_entropy, 1, key[word]);
+    single_step (why, imp->set_entropy, imp->debugdb);
+  }
+
+  end_txn();
 }
 
 std::vector<std::string> Database::get_targets() {

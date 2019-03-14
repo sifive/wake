@@ -240,14 +240,6 @@ int main(int argc, const char **argv) {
   bool noexecute = notype ||
     args["add"] || args["typecheck"] || args["globals"];
 
-  // seed the keyed hash function
-  {
-    std::random_device rd;
-    std::uniform_int_distribution<uint64_t> dist;
-    sip_key[0] = dist(rd);
-    sip_key[1] = dist(rd);
-  }
-
   if (jobs < 1) {
     std::cerr << "Cannot run with less than 1 jobs!" << std::endl;
     return 1;
@@ -282,6 +274,15 @@ int main(int argc, const char **argv) {
   if (!fail.empty()) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;
     return 1;
+  }
+
+  // seed the keyed hash function
+  {
+    std::random_device rd;
+    std::uniform_int_distribution<uint64_t> dist;
+    sip_key[0] = dist(rd);
+    sip_key[1] = dist(rd);
+    db.entropy(&sip_key[0], 2);
   }
 
   std::vector<std::string> targets = db.get_targets();
