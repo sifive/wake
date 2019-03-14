@@ -704,24 +704,6 @@ std::string path;
 struct fuse* fh;
 struct fuse_chan* fc;
 
-static void *wakefuse_init(struct fuse_conn_info *conn)
-{
-	int fd;
-
-	(void)conn;
-
-	fd = open(".build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0666);
-	if (fd == -1) {
-		std::cerr << "Could not open fuse.log" << std::endl;
-		close(2);
-	} else {
-		std::cerr << "OK: " << path << std::flush;
-		dup2(fd, 2); // close stderr for wake to capture
-		close(fd);
-	}
-	return 0;
-}
-
 static struct fuse_operations wakefuse_ops;
 
 static void handle_exit(int sig)
@@ -739,7 +721,6 @@ static void handle_exit(int sig)
 
 int main(int argc, char *argv[])
 {
-	wakefuse_ops.init		= wakefuse_init;
 	wakefuse_ops.getattr		= wakefuse_getattr;
 	wakefuse_ops.access		= wakefuse_access;
 	wakefuse_ops.readlink		= wakefuse_readlink;
@@ -771,8 +752,7 @@ int main(int argc, char *argv[])
 	wakefuse_ops.removexattr	= wakefuse_removexattr;
 #endif
 
-	int status = 1;
-	pid_t pid;
+	int status = 1, logfd;
 	sigset_t block, saved;
 	struct sigaction sa;
 	struct fuse_args args;
@@ -789,9 +769,14 @@ int main(int argc, char *argv[])
 		goto term;
 	}
 
-	pid = getpid();
-	path = ".build/" + std::to_string(pid);
 	mkdir(".build", 0775);
+	logfd = open(".build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0666);
+	if (logfd == -1) {
+		perror("failed to open .build/fuse.log");
+		goto term;
+	}
+
+	path = ".build/" + std::to_string(getpid());
 	if (mkdir(path.c_str(), 0775) != 0 && errno != EEXIST) {
 		perror("mkdir");
 		goto term;
@@ -840,6 +825,10 @@ int main(int argc, char *argv[])
 
 	// unblock signals
 	sigprocmask(SIG_SETMASK, &saved, 0);
+
+	std::cerr << "OK: " << path << std::flush;
+	dup2(logfd, 2); // close stderr for wake to capture
+	close(logfd);
 
 	if (fuse_loop(fh) != 0) {
 		fprintf(stderr, "fuse_loop failed");
