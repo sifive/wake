@@ -861,12 +861,10 @@ int main(int argc, char *argv[])
 
 	// Success! Already unmounted.
 	status = 0;
-	goto destroy;
 
 unmount:
 	// out-of-order completion: unmount THEN destroy
 	fuse_unmount(path.c_str(), fc);
-destroy:
 	if (fh) fuse_destroy(fh);
 freeargs:
 	fuse_opt_free_args(&args);
