@@ -700,70 +700,52 @@ static int wakefuse_removexattr(const char *path, const char *name)
 }
 #endif /* HAVE_SETXATTR */
 
-std::string path;
-static void *(wakefuse_init)(struct fuse_conn_info *conn)
-{
-	int fd;
-
-	(void)conn;
-
-	fd = open(".build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0666);
-	if (fd == -1) {
-		std::cerr << "Could not open fuse.log" << std::endl;
-		close(2);
-	} else {
-		std::cerr << "OK: " << path << std::flush;
-		dup2(fd, 2); // close stderr for wake to capture
-		close(fd);
-	}
-	return 0;
-}
+static std::string path;
+static struct fuse* fh;
+static struct fuse_chan* fc;
+static sigset_t saved;
+static int logfd;
 
 static struct fuse_operations wakefuse_ops;
 
-static void handle_alarm(int sig)
+static void *wakefuse_init(struct fuse_conn_info *conn)
+{
+	std::cerr << "OK: " << path << std::flush;
+	dup2(logfd, 2); // close stderr for wake to capture
+	close(logfd);
+
+	// unblock signals
+	sigprocmask(SIG_SETMASK, &saved, 0);
+	return 0;
+}
+
+static void handle_exit(int sig)
 {
 	(void)sig;
 
-	// Start a retry timer
-	struct itimerval retry;
-	memset(&retry, 0, sizeof(retry));
-	retry.it_value.tv_usec = 50000; // 50ms
-	setitimer(ITIMER_REAL, &retry, 0);
+	// Unfortunately, fuse_unmount can fail if the filesystem is still in use.
+	// Yes, this can even happen on linux with MNT_DETACH / lazy umount.
+	// Worse, fuse_unmount closes descriptors and frees memory, so can only be called once.
+	// Thus, calling fuse_exit here would terminate fuse_loop and then maybe fail to unmount.
 
-	// Try to quit right away
-	struct sigaction sa;
-	sigaction(SIGTERM, 0, &sa);
-	if (sa.sa_handler != SIG_DFL)
-		kill(getpid(), SIGTERM);
+	// Instead of terminating the loop directly via fuse_exit, try to unmount.
+	// If this succeeds, fuse_loop will terminate anyway.
+	// In case it fails, we setup an itimer to keep trying to unmount.
+
+	// We need to fork before fuse_unmount, in order to be able to try more than once.
+	if (fork() == 0) {
+		fuse_unmount(path.c_str(), fc);
+		exit(0);
+	} else {
+		struct itimerval retry;
+		memset(&retry, 0, sizeof(retry));
+		retry.it_value.tv_usec = 100000; // 100ms
+		setitimer(ITIMER_REAL, &retry, 0);
+	}
 }
 
 int main(int argc, char *argv[])
 {
-	umask(0);
-
-	struct sigaction sa;
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = handle_alarm;
-	sa.sa_flags = 0;
-	sigemptyset(&sa.sa_mask);
-	sigaddset(&sa.sa_mask, SIGTERM);
-	sigaction(SIGALRM, &sa, NULL);
-
-	pid_t pid = getpid();
-	path = ".build/" + std::to_string(pid);
-	mkdir(".build", 0775);
-	mkdir(path.c_str(), 0775);
-
-	rootfd = open(".", O_RDONLY);
-	if (rootfd == -1) {
-		perror("failed to open .");
-		return 1;
-	}
-
-	for (int i = 1; i < argc; ++i)
-		files_visible.insert(argv[i]);
-
 	wakefuse_ops.init		= wakefuse_init;
 	wakefuse_ops.getattr		= wakefuse_getattr;
 	wakefuse_ops.access		= wakefuse_access;
@@ -796,20 +778,100 @@ int main(int argc, char *argv[])
 	wakefuse_ops.removexattr	= wakefuse_removexattr;
 #endif
 
-	const char *args[4];
-	args[0] = argv[0];
-	args[1] = path.c_str();
-	args[2] = "-f";
-	args[3] = 0;
+	int status = 1;
+	sigset_t block;
+	struct sigaction sa;
+	struct fuse_args args;
 
-	int out = fuse_main(3, const_cast<char**>(args), &wakefuse_ops, NULL);
+	// no fail operations
+	memset(&sa, 0, sizeof(sa));
+	umask(0);
+	for (int i = 1; i < argc; ++i)
+		files_visible.insert(argv[i]);
+
+	rootfd = open(".", O_RDONLY);
+	if (rootfd == -1) {
+		perror("failed to open .");
+		goto term;
+	}
+
+	mkdir(".build", 0775);
+	logfd = open(".build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0666);
+	if (logfd == -1) {
+		perror("failed to open .build/fuse.log");
+		goto term;
+	}
+
+	path = ".build/" + std::to_string(getpid());
+	if (mkdir(path.c_str(), 0775) != 0 && errno != EEXIST) {
+		perror("mkdir");
+		goto term;
+	}
+
+	args = FUSE_ARGS_INIT(0, NULL);
+	if (fuse_opt_add_arg(&args, "wake") != 0) {
+		fprintf(stderr, "fuse_opt_add_arg failed");
+		goto rmroot;
+	}
+
+	// block those signals where we wish to terminate cleanly
+	sigemptyset(&block);
+	sigaddset(&block, SIGHUP);
+	sigaddset(&block, SIGALRM);
+	sigaddset(&block, SIGINT);
+	sigaddset(&block, SIGQUIT);
+	sigaddset(&block, SIGTERM);
+	sigprocmask(SIG_BLOCK, &block, &saved);
+
+	// ignore these signals
+	sa.sa_handler = SIG_IGN;
+	sigaction(SIGPIPE, &sa, 0);
+	sigaction(SIGUSR1, &sa, 0);
+	sigaction(SIGUSR2, &sa, 0);
+
+	// hook these signals
+	sa.sa_handler = handle_exit;
+	sigaction(SIGHUP,  &sa, 0);
+	sigaction(SIGALRM, &sa, 0);
+	sigaction(SIGINT,  &sa, 0);
+	sigaction(SIGQUIT, &sa, 0);
+	sigaction(SIGTERM, &sa, 0);
+
+	fc = fuse_mount(path.c_str(), &args);
+	if (!fc) {
+		fprintf(stderr, "fuse_mount failed");
+		goto freeargs;
+	}
+
+	fh = fuse_new(fc, &args, &wakefuse_ops, sizeof(wakefuse_ops), 0);
+	if (!fh) {
+		fprintf(stderr, "fuse_new failed");
+		goto unmount;
+	}
+
+	if (fuse_loop(fh) != 0) {
+		fprintf(stderr, "fuse_loop failed");
+		goto unmount;
+	}
 
 	for (auto &i : files_wrote) files_read.erase(i);
 	for (auto &i : files_read) std::cout << i << '\0';
 	std::cout << '\0';
 	for (auto &i : files_wrote) std::cout << i << '\0';
 
-	rmdir(path.c_str());
+	// Success! Already unmounted.
+	status = 0;
 
-	return out;
+unmount:
+	// out-of-order completion: unmount THEN destroy
+	fuse_unmount(path.c_str(), fc);
+	if (fh) fuse_destroy(fh);
+freeargs:
+	fuse_opt_free_args(&args);
+rmroot:
+	if (rmdir(path.c_str()) != 0) {
+		fprintf(stderr, "rmdir %s: %s\n", path.c_str(), strerror(errno));
+	}
+term:
+	return status;
 }
