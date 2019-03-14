@@ -133,8 +133,8 @@ std::string Database::open(bool wait) {
     "values(?, ?, ?, ?)";
   const char *sql_wipe_file =
     "delete from jobs where job_id in"
-    " (select distinct job_id from filetree"
-    "  where file_id in (select file_id from files where path=? and hash<>?) and access=1)";
+    " (select t.job_id from files f, filetree t"
+    "  where f.path=? and f.hash<>? and t.file_id=f.file_id and t.access=1)";
   const char *sql_insert_file =
     "insert or ignore into files(hash, modified, path) values (?, ?, ?)";
   const char *sql_update_file =
@@ -147,13 +147,12 @@ std::string Database::open(bool wait) {
   const char *sql_set_runtime =
     "update jobs set time=current_timestamp, keep=?, status=?, runtime=? where job_id=?";
   const char *sql_detect_overlap =
-    "select distinct f.path from filetree t, files f"
-    " where t.access=2 and t.job_id<>?1 and t.file_id in "
-    " (select file_id from filetree where job_id=?1 and access=2) and f.file_id=t.file_id";
+    "select f.path from filetree t1, filetree t2, files f"
+    " where t1.job_id=?1 and t1.access=2 and t2.file_id=t1.file_id and t2.access=2 and t2.job_id<>?1 and f.file_id=t1.file_id";
   const char *sql_delete_overlap =
     "delete from jobs where use_id<>? and job_id in "
-    "(select distinct job_id from filetree"
-    "  where file_id in (select file_id from filetree where job_id=? and access=2) and access=2)";
+    "(select t2.job_id from filetree t1, filetree t2"
+    "  where t1.job_id=?2 and t1.access=2 and t2.file_id=t1.file_id and t2.access=2 and t2.job_id<>?2)";
   const char *sql_find_prior =
     "select job_id from jobs where "
     "directory=? and commandline=? and environment=? and stdin=? and status=0 and keep=1";
