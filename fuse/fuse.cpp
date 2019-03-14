@@ -752,7 +752,7 @@ int main(int argc, char *argv[])
 	wakefuse_ops.removexattr	= wakefuse_removexattr;
 #endif
 
-	int status = 1, logfd;
+	int status = 1, logfd, attempts;
 	sigset_t block, saved;
 	struct sigaction sa;
 	struct fuse_args args;
@@ -851,7 +851,15 @@ unmount:
 freeargs:
 	fuse_opt_free_args(&args);
 rmroot:
-	rmdir(path.c_str());
+	attempts = 0;
+	while (true) {
+		if (rmdir(path.c_str()) == 0) break;
+		if (++attempts == 5) break;
+		sleep(1);
+	}
+	if (attempts == 5) {
+		fprintf(stderr, "rmdir %s: %s\n", path.c_str(), strerror(errno));
+	}
 term:
 	return status;
 }
