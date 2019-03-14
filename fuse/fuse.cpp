@@ -701,7 +701,10 @@ static int wakefuse_removexattr(const char *path, const char *name)
 #endif /* HAVE_SETXATTR */
 
 std::string path;
-static void *(wakefuse_init)(struct fuse_conn_info *conn)
+struct fuse* fh;
+struct fuse_chan* fc;
+
+static void *wakefuse_init(struct fuse_conn_info *conn)
 {
 	int fd;
 
@@ -721,49 +724,21 @@ static void *(wakefuse_init)(struct fuse_conn_info *conn)
 
 static struct fuse_operations wakefuse_ops;
 
-static void handle_alarm(int sig)
+static void handle_exit(int sig)
 {
 	(void)sig;
-
-	// Start a retry timer
-	struct itimerval retry;
-	memset(&retry, 0, sizeof(retry));
-	retry.it_value.tv_usec = 50000; // 50ms
-	setitimer(ITIMER_REAL, &retry, 0);
-
-	// Try to quit right away
-	struct sigaction sa;
-	sigaction(SIGTERM, 0, &sa);
-	if (sa.sa_handler != SIG_DFL)
-		kill(getpid(), SIGTERM);
+#ifdef __APPLE__
+	if (fork() == 0) {
+		fuse_unmount(path.c_str(), fc);
+		exit(0);
+	}
+#else
+	fuse_exit(fh);
+#endif
 }
 
 int main(int argc, char *argv[])
 {
-	umask(0);
-
-	struct sigaction sa;
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = handle_alarm;
-	sa.sa_flags = 0;
-	sigemptyset(&sa.sa_mask);
-	sigaddset(&sa.sa_mask, SIGTERM);
-	sigaction(SIGALRM, &sa, NULL);
-
-	pid_t pid = getpid();
-	path = ".build/" + std::to_string(pid);
-	mkdir(".build", 0775);
-	mkdir(path.c_str(), 0775);
-
-	rootfd = open(".", O_RDONLY);
-	if (rootfd == -1) {
-		perror("failed to open .");
-		return 1;
-	}
-
-	for (int i = 1; i < argc; ++i)
-		files_visible.insert(argv[i]);
-
 	wakefuse_ops.init		= wakefuse_init;
 	wakefuse_ops.getattr		= wakefuse_getattr;
 	wakefuse_ops.access		= wakefuse_access;
@@ -796,20 +771,98 @@ int main(int argc, char *argv[])
 	wakefuse_ops.removexattr	= wakefuse_removexattr;
 #endif
 
-	const char *args[4];
-	args[0] = argv[0];
-	args[1] = path.c_str();
-	args[2] = "-f";
-	args[3] = 0;
+	int status = 1;
+	pid_t pid;
+	sigset_t block, saved;
+	struct sigaction sa;
+	struct fuse_args args;
 
-	int out = fuse_main(3, const_cast<char**>(args), &wakefuse_ops, NULL);
+	// no fail operations
+	memset(&sa, 0, sizeof(sa));
+	umask(0);
+	for (int i = 1; i < argc; ++i)
+		files_visible.insert(argv[i]);
+
+	rootfd = open(".", O_RDONLY);
+	if (rootfd == -1) {
+		perror("failed to open .");
+		goto term;
+	}
+
+	pid = getpid();
+	path = ".build/" + std::to_string(pid);
+	mkdir(".build", 0775);
+	if (mkdir(path.c_str(), 0775) != 0 && errno != EEXIST) {
+		perror("mkdir");
+		goto term;
+	}
+
+	args = FUSE_ARGS_INIT(0, NULL);
+	if (fuse_opt_add_arg(&args, "wake") != 0) {
+		fprintf(stderr, "fuse_opt_add_arg failed");
+		goto rmroot;
+	}
+
+	// block those signals where we wish to terminate cleanly
+	sigemptyset(&block);
+	sigaddset(&block, SIGHUP);
+	sigaddset(&block, SIGALRM);
+	sigaddset(&block, SIGINT);
+	sigaddset(&block, SIGQUIT);
+	sigaddset(&block, SIGTERM);
+	sigprocmask(SIG_BLOCK, &block, &saved);
+
+	// ignore these signals
+	sa.sa_handler = SIG_IGN;
+	sigaction(SIGPIPE, &sa, 0);
+	sigaction(SIGUSR1, &sa, 0);
+	sigaction(SIGUSR2, &sa, 0);
+
+	// hook these signals
+	sa.sa_handler = handle_exit;
+	sigaction(SIGHUP,  &sa, 0);
+	sigaction(SIGALRM, &sa, 0);
+	sigaction(SIGINT,  &sa, 0);
+	sigaction(SIGQUIT, &sa, 0);
+	sigaction(SIGTERM, &sa, 0);
+
+	fc = fuse_mount(path.c_str(), &args);
+	if (!fc) {
+		fprintf(stderr, "fuse_mount failed");
+		goto freeargs;
+	}
+
+	fh = fuse_new(fc, &args, &wakefuse_ops, sizeof(wakefuse_ops), 0);
+	if (!fh) {
+		fprintf(stderr, "fuse_new failed");
+		goto unmount;
+	}
+
+	// unblock signals
+	sigprocmask(SIG_SETMASK, &saved, 0);
+
+	if (fuse_loop(fh) != 0) {
+		fprintf(stderr, "fuse_loop failed");
+		goto destroy;
+	}
 
 	for (auto &i : files_wrote) files_read.erase(i);
 	for (auto &i : files_read) std::cout << i << '\0';
 	std::cout << '\0';
 	for (auto &i : files_wrote) std::cout << i << '\0';
 
-	rmdir(path.c_str());
+	// Success!
+	status = 0;
 
-	return out;
+destroy:
+unmount:
+	// out-of-order completion: unmount THEN destroy
+	fuse_unmount(path.c_str(), fc);
+	if (fh) fuse_destroy(fh);
+freeargs:
+	fuse_opt_free_args(&args);
+rmroot:
+	rmdir(path.c_str());
+term:
+	return status;
 }
