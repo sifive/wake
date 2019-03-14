@@ -722,14 +722,26 @@ static void *wakefuse_init(struct fuse_conn_info *conn)
 static void handle_exit(int sig)
 {
 	(void)sig;
-#ifdef __APPLE__
+
+	// Unfortunately, fuse_unmount can fail if the filesystem is still in use.
+	// Yes, this can even happen on linux with MNT_DETACH / lazy umount.
+	// Worse, fuse_unmount closes descriptors and frees memory, so can only be called once.
+	// Thus, calling fuse_exit here would terminate fuse_loop and then maybe fail to unmount.
+
+	// Instead of terminating the loop directly via fuse_exit, try to unmount.
+	// If this succeeds, fuse_loop will terminate anyway.
+	// In case it fails, we setup an itimer to keep trying to unmount.
+
+	// We need to fork before fuse_unmount, in order to be able to try more than once.
 	if (fork() == 0) {
 		fuse_unmount(path.c_str(), fc);
 		exit(0);
+	} else {
+		struct itimerval retry;
+		memset(&retry, 0, sizeof(retry));
+		retry.it_value.tv_usec = 100000; // 100ms
+		setitimer(ITIMER_REAL, &retry, 0);
 	}
-#else
-	fuse_exit(fh);
-#endif
 }
 
 int main(int argc, char *argv[])
@@ -839,7 +851,7 @@ int main(int argc, char *argv[])
 
 	if (fuse_loop(fh) != 0) {
 		fprintf(stderr, "fuse_loop failed");
-		goto destroy;
+		goto unmount;
 	}
 
 	for (auto &i : files_wrote) files_read.erase(i);
@@ -847,13 +859,14 @@ int main(int argc, char *argv[])
 	std::cout << '\0';
 	for (auto &i : files_wrote) std::cout << i << '\0';
 
-	// Success!
+	// Success! Already unmounted.
 	status = 0;
+	goto destroy;
 
-destroy:
 unmount:
 	// out-of-order completion: unmount THEN destroy
 	fuse_unmount(path.c_str(), fc);
+destroy:
 	if (fh) fuse_destroy(fh);
 freeargs:
 	fuse_opt_free_args(&args);
