@@ -190,7 +190,7 @@ std::string Database::open(bool wait) {
   const char *sql_update_prior =
     "update jobs set use_id=? where job_id=?";
   const char *sql_find_owner =
-    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime"
+    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.iobytes"
     " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id"
     " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id";
   const char *sql_fetch_hash =
@@ -734,8 +734,11 @@ std::vector<JobReflection> Database::explain(const std::string &file, int use, b
     desc.stack = rip_column(imp->find_owner, 4);
     desc.stdin = rip_column(imp->find_owner, 5);
     desc.time = rip_column(imp->find_owner, 6);
-    desc.status = sqlite3_column_int64(imp->find_owner, 7);
-    desc.runtime = sqlite3_column_double(imp->find_owner, 8);
+    desc.usage.status = sqlite3_column_int64(imp->find_owner, 7);
+    desc.usage.runtime = sqlite3_column_double(imp->find_owner, 8);
+    desc.usage.cputime = sqlite3_column_double(imp->find_owner, 9);
+    desc.usage.membytes = sqlite3_column_int64(imp->find_owner, 10);
+    desc.usage.iobytes = sqlite3_column_int64(imp->find_owner, 11);
     if (desc.stdin.empty()) desc.stdin = "/dev/null";
     if (verbose) {
       desc.stdout = get_output(desc.job, 1);

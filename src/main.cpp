@@ -60,8 +60,11 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug) {
     std::cout
       << "  Directory: " << job.directory << std::endl
       << "  Built:     " << job.time << std::endl
-      << "  Runtime:   " << job.runtime << std::endl
-      << "  Status:    " << job.status << std::endl
+      << "  Runtime:   " << job.usage.runtime << std::endl
+      << "  CPUtime:   " << job.usage.cputime << std::endl
+      << "  Mem bytes: " << job.usage.membytes << std::endl
+      << "  IO bytes:  " << job.usage.iobytes << std::endl
+      << "  Status:    " << job.usage.status << std::endl
       << "  Stdin:     " << job.stdin << std::endl
       << "Inputs:" << std::endl;
     for (auto &in : job.inputs)
@@ -130,8 +133,11 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug) {
       << std::endl << std::endl
       << "# When wake ran this command:" << std::endl
       << "#   Built:     " << job.time << std::endl
-      << "#   Runtime:   " << job.runtime << std::endl
-      << "#   Status:    " << job.status << std::endl
+      << "#   Runtime:   " << job.usage.runtime << std::endl
+      << "#   CPUtime:   " << job.usage.cputime << std::endl
+      << "#   Mem bytes: " << job.usage.membytes << std::endl
+      << "#   IO bytes:  " << job.usage.iobytes << std::endl
+      << "#   Status:    " << job.usage.status << std::endl
       << "# Inputs:" << std::endl;
     for (auto &in : job.inputs)
       std::cout << "#   " << in.hash << " " << in.path << std::endl;

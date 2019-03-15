@@ -11,6 +11,15 @@ struct FileReflection {
   FileReflection(std::string &&path_, std::string &&hash_) : path(std::move(path_)), hash(std::move(hash_)) { }
 };
 
+struct Usage {
+  bool found;
+  int status; // -signal, +code
+  double runtime;
+  double cputime;
+  uint64_t membytes;
+  uint64_t iobytes;
+};
+
 struct JobReflection {
   long job;
   std::string directory;
@@ -21,19 +30,9 @@ struct JobReflection {
   std::string time;
   std::string stdout;
   std::string stderr;
-  int status;
-  double runtime;
+  Usage usage;
   std::vector<FileReflection> inputs;
   std::vector<FileReflection> outputs;
-};
-
-struct Usage {
-  bool found;
-  int status; // -signal, +code
-  double runtime;
-  double cputime;
-  uint64_t membytes;
-  uint64_t iobytes;
 };
 
 struct Database {
