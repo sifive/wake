@@ -500,7 +500,7 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->reality.cputime  = (rusage.ru_utime.tv_sec  + rusage.ru_stime.tv_sec) +
                                     (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0;
           i.job->reality.membytes = rusage.ru_maxrss;
-          i.job->reality.iobytes  = (rusage.ru_inblock + rusage.ru_oublock) * UINT64_C(4096);
+          i.job->reality.iobytes  = (rusage.ru_inblock + rusage.ru_oublock) * UINT64_C(512);
           i.job->process(queue);
         }
       }
