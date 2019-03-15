@@ -29,7 +29,7 @@ struct JobReflection {
 
 struct Prediction {
   bool found;
-  int status;
+  int status; // -signal, +code
   double runtime;
   double cputime;
   uint64_t membytes;
@@ -58,7 +58,7 @@ struct Database {
   void begin_txn();
   void end_txn();
 
-  bool reuse_job(
+  Prediction reuse_job(
     const std::string &directory,
     const std::string &stdin, // "" -> /dev/null
     const std::string &environment,
@@ -83,8 +83,7 @@ struct Database {
     const std::string &outputs, // null separated
     uint64_t hashcode,
     bool keep,
-    int status,
-    double runtime);
+    Prediction reality);
   std::vector<FileReflection> get_tree(int kind, long job);
 
   void save_output( // call only if needs_build -> true

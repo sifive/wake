@@ -21,6 +21,7 @@ struct Database::detail {
   sqlite3_stmt *begin_txn;
   sqlite3_stmt *commit_txn;
   sqlite3_stmt *predict_job;
+  sqlite3_stmt *stats_job;
   sqlite3_stmt *insert_job;
   sqlite3_stmt *insert_tree;
   sqlite3_stmt *insert_log;
@@ -43,10 +44,10 @@ struct Database::detail {
   long run_id;
   detail(bool debugdb_)
    : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), add_target(0), del_target(0), begin_txn(0),
-     commit_txn(0), predict_job(0), insert_job(0), insert_tree(0), insert_log(0), wipe_file(0), insert_file(0),
-     update_file(0), get_log(0), get_tree(0), add_stats(0), link_stats(0), detect_overlap(0), delete_overlap(0),
-     find_prior(0), update_prior(0), find_owner(0), fetch_hash(0), delete_jobs(0), delete_dups(0), delete_stats(0)
-  { }
+     commit_txn(0), predict_job(0), stats_job(0), insert_job(0), insert_tree(0), insert_log(0), wipe_file(0),
+     insert_file(0), update_file(0), get_log(0), get_tree(0), add_stats(0), link_stats(0), detect_overlap(0),
+     delete_overlap(0), find_prior(0), update_prior(0), find_owner(0), fetch_hash(0), delete_jobs(0),
+     delete_dups(0), delete_stats(0) { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -145,7 +146,10 @@ std::string Database::open(bool wait) {
   const char *sql_commit_txn = "commit transaction";
   const char *sql_predict_job =
     "select status, runtime, cputime, membytes, iobytes"
-    " from stats where hashcode=? order by stat_id desc";
+    " from stats where hashcode=? order by stat_id desc limit 1";
+  const char *sql_stats_job =
+    "select status, runtime, cputime, membytes, iobytes"
+    " from stats where stat_id=?";
   const char *sql_insert_job =
     "insert into jobs(run_id, use_id, directory, commandline, environment, stack, stdin)"
     " values(?, ?1, ?, ?, ?, ?, ?)";
@@ -181,7 +185,7 @@ std::string Database::open(bool wait) {
     "(select t2.job_id from filetree t1, filetree t2"
     "  where t1.job_id=?2 and t1.access=2 and t2.file_id=t1.file_id and t2.access=2 and t2.job_id<>?2)";
   const char *sql_find_prior =
-    "select job_id from jobs where "
+    "select job_id, stat_id from jobs where "
     "directory=? and commandline=? and environment=? and stdin=? and keep=1";
   const char *sql_update_prior =
     "update jobs set use_id=? where job_id=?";
@@ -219,6 +223,7 @@ std::string Database::open(bool wait) {
   PREPARE(sql_begin_txn,      begin_txn);
   PREPARE(sql_commit_txn,     commit_txn);
   PREPARE(sql_predict_job,    predict_job);
+  PREPARE(sql_stats_job,      stats_job);
   PREPARE(sql_insert_job,     insert_job);
   PREPARE(sql_insert_tree,    insert_tree);
   PREPARE(sql_insert_log,     insert_log);
@@ -263,6 +268,7 @@ void Database::close() {
   FINALIZE(begin_txn);
   FINALIZE(commit_txn);
   FINALIZE(predict_job);
+  FINALIZE(stats_job);
   FINALIZE(insert_job);
   FINALIZE(insert_tree);
   FINALIZE(insert_log);
@@ -473,7 +479,7 @@ void Database::end_txn() {
   single_step("Could not commit a transaction", imp->commit_txn, imp->debugdb);
 }
 
-bool Database::reuse_job(
+Prediction Database::reuse_job(
   const std::string &directory,
   const std::string &stdin,
   const std::string &environment,
@@ -481,34 +487,51 @@ bool Database::reuse_job(
   const std::string &visible,
   bool check,
   long &job,
-  std::vector<FileReflection> &out)
+  std::vector<FileReflection> &files)
 {
+  Prediction out;
+  long stat_id;
+
   const char *why = "Could not check for a cached job";
   begin_txn();
   bind_string (why, imp->find_prior, 1, directory);
   bind_blob   (why, imp->find_prior, 2, commandline);
   bind_blob   (why, imp->find_prior, 3, environment);
   bind_string (why, imp->find_prior, 4, stdin);
-  bool prior = sqlite3_step(imp->find_prior) == SQLITE_ROW;
-  if (prior) job = sqlite3_column_int(imp->find_prior, 0);
+  out.found = sqlite3_step(imp->find_prior) == SQLITE_ROW;
+  if (out.found) {
+    job     = sqlite3_column_int64(imp->find_prior, 0);
+    stat_id = sqlite3_column_int64(imp->find_prior, 1);
+  }
   finish_stmt (why, imp->find_prior, imp->debugdb);
 
-  if (!prior) {
+  if (!out.found) {
     end_txn();
-    return false;
+    return out;
   }
 
-  bool exist = true;
+  bind_integer(why, imp->stats_job, 1, stat_id);
+  if (sqlite3_step(imp->stats_job) == SQLITE_ROW) {
+    out.status   = sqlite3_column_int64 (imp->stats_job, 0);
+    out.runtime  = sqlite3_column_double(imp->stats_job, 1);
+    out.cputime  = sqlite3_column_double(imp->stats_job, 2);
+    out.membytes = sqlite3_column_int64 (imp->stats_job, 3);
+    out.iobytes  = sqlite3_column_int64 (imp->stats_job, 4);
+  } else {
+    out.found = false;
+  }
+  finish_stmt(why, imp->stats_job, imp->debugdb);
+
   bind_integer(why, imp->get_tree, 1, job);
   bind_integer(why, imp->get_tree, 2, OUTPUT);
   while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
     std::string path = rip_column(imp->get_tree, 0);
-    if (access(path.c_str(), R_OK) != 0) exist = false;
-    out.emplace_back(std::move(path), rip_column(imp->get_tree, 1));
+    if (access(path.c_str(), R_OK) != 0) out.found = false;
+    files.emplace_back(std::move(path), rip_column(imp->get_tree, 1));
   }
   finish_stmt(why, imp->get_tree, imp->debugdb);
 
-  if (exist && !check) {
+  if (out.found && !check) {
     bind_integer(why, imp->update_prior, 1, imp->run_id);
     bind_integer(why, imp->update_prior, 2, job);
     single_step (why, imp->update_prior, imp->debugdb);
@@ -516,7 +539,7 @@ bool Database::reuse_job(
 
   end_txn();
 
-  return exist;
+  return out;
 }
 
 Prediction Database::predict_job(uint64_t hashcode)
@@ -562,15 +585,15 @@ void Database::insert_job(
   *job = sqlite3_last_insert_rowid(imp->db);
 }
 
-void Database::finish_job(long job, const std::string &inputs, const std::string &outputs, uint64_t hashcode, bool keep, int status, double runtime) {
+void Database::finish_job(long job, const std::string &inputs, const std::string &outputs, uint64_t hashcode, bool keep, Prediction reality) {
   const char *why = "Could not save job inputs and outputs";
   begin_txn();
   bind_integer(why, imp->add_stats, 1, hashcode);
-  bind_integer(why, imp->add_stats, 2, status);
-  bind_double (why, imp->add_stats, 3, runtime);
-  bind_double (why, imp->add_stats, 4, 0.0); // cputime
-  bind_integer(why, imp->add_stats, 5, 0);   // membytes
-  bind_integer(why, imp->add_stats, 6, 0);   // iobytes
+  bind_integer(why, imp->add_stats, 2, reality.status);
+  bind_double (why, imp->add_stats, 3, reality.runtime);
+  bind_double (why, imp->add_stats, 4, reality.cputime);
+  bind_integer(why, imp->add_stats, 5, reality.membytes);
+  bind_integer(why, imp->add_stats, 6, reality.iobytes);
   single_step (why, imp->add_stats, imp->debugdb);
   bind_integer(why, imp->link_stats, 1, sqlite3_last_insert_rowid(imp->db));
   bind_integer(why, imp->link_stats, 2, keep?1:0);
