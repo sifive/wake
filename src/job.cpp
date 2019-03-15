@@ -988,8 +988,8 @@ static PRIMFN(prim_job_finish) {
     outputs = &empty;
   }
 
-  bool keep = !job->bad_launch && !job->bad_finish && job->keep;
-  job->db->finish_job(job->job, *inputs, *outputs, keep, job->status, job->runtime);
+  bool keep = !job->bad_launch && !job->bad_finish && job->keep && job->status == 0;
+  job->db->finish_job(job->job, *inputs, *outputs, job->code.data[0], keep, job->status, job->runtime);
   job->state |= STATE_FINISHED;
   job->process(queue);
 

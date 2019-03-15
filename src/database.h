@@ -70,6 +70,7 @@ struct Database {
     long job,
     const std::string &inputs,  // null separated
     const std::string &outputs, // null separated
+    uint64_t hashcode,
     bool keep,
     int status,
     double runtime);
