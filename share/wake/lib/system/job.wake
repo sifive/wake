@@ -102,7 +102,7 @@ global def manualRunner =
   Runner doit
 
 global def virtualRunner =
-  def virtual job stdout stderr status runtime cputime membytes iobytes = prim "job_virtual"
+  def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
   def doit job input =
    # Ensure that match does not re-raise the exception (virtual must run)
    match (try (\_ RunnerInput (cast input) Nil Nil "" "" 0) input)
@@ -110,7 +110,7 @@ global def virtualRunner =
        # Make sure any exceptions get fed into virtual
        def stuff = implode (dir, stdin, str pool, cmd ++ env)
        def status = if stuff ==* "" then 0 else 0
-       def _ = virtual job "" "" status 0.0 0.0 0 0
+       def _ = virtual job "" "" status 0.0 0.0 0 0 0
        RunnerOutput (map getPathName vis) Nil Nil
   Runner doit
 

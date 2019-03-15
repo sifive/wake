@@ -17,7 +17,8 @@ struct Usage {
   double runtime;
   double cputime;
   uint64_t membytes;
-  uint64_t iobytes;
+  uint64_t ibytes;
+  uint64_t obytes;
 };
 
 struct JobReflection {

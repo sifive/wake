@@ -500,7 +500,8 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->reality.cputime  = (rusage.ru_utime.tv_sec  + rusage.ru_stime.tv_sec) +
                                     (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0;
           i.job->reality.membytes = rusage.ru_maxrss;
-          i.job->reality.iobytes  = (rusage.ru_inblock + rusage.ru_oublock) * UINT64_C(512);
+          i.job->reality.ibytes   = rusage.ru_inblock * UINT64_C(512);
+          i.job->reality.obytes   = rusage.ru_oublock * UINT64_C(512);
           i.job->process(queue);
         }
       }
@@ -631,7 +632,8 @@ static PRIMFN(prim_job_launch) {
     job->reality.runtime  = 0;
     job->reality.cputime  = 0;
     job->reality.membytes = 0;
-    job->reality.iobytes  = 0;
+    job->reality.ibytes   = 0;
+    job->reality.obytes   = 0;
     job->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED;
     job->process(queue);
   } else {
@@ -645,7 +647,7 @@ static PRIMFN(prim_job_launch) {
 }
 
 static PRIMTYPE(type_job_virtual) {
-  return args.size() == 8 &&
+  return args.size() == 9 &&
     args[0]->unify(Job::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
@@ -654,12 +656,13 @@ static PRIMTYPE(type_job_virtual) {
     args[5]->unify(Double::typeVar) &&
     args[6]->unify(Integer::typeVar) &&
     args[7]->unify(Integer::typeVar) &&
+    args[8]->unify(Integer::typeVar) &&
     out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_job_virtual) {
   (void)data; // silence unused variable warning (EXPECT not called)
-  REQUIRE (args.size() == 8, "prim_job_virtual not called on 8 arguments");
+  REQUIRE (args.size() == 9, "prim_job_virtual not called on 8 arguments");
   JOBRESULT(job, 0);
 
   if (job->state != 0) {
@@ -732,14 +735,25 @@ static PRIMFN(prim_job_virtual) {
   }
 
   if (args[7]->type == &Integer::type) {
-    Integer *iobytes = reinterpret_cast<Integer*>(args[7].get());
-    job->reality.iobytes = mpz_get_si(iobytes->value);
+    Integer *ibytes = reinterpret_cast<Integer*>(args[7].get());
+    job->reality.ibytes = mpz_get_si(ibytes->value);
   } else if (args[7]->type == &Exception::type) {
     job->bad_launch = args[7];
-    job->reality.iobytes = 0;
+    job->reality.ibytes = 0;
   } else {
     job->bad_launch = std::make_shared<Exception>("prim_job_virtual arg7 not an Integer", binding);
-    job->reality.iobytes = 0;
+    job->reality.ibytes = 0;
+  }
+
+  if (args[8]->type == &Integer::type) {
+    Integer *obytes = reinterpret_cast<Integer*>(args[7].get());
+    job->reality.obytes = mpz_get_si(obytes->value);
+  } else if (args[8]->type == &Exception::type) {
+    job->bad_launch = args[8];
+    job->reality.obytes = 0;
+  } else {
+    job->bad_launch = std::make_shared<Exception>("prim_job_virtual arg8 not an Integer", binding);
+    job->reality.obytes = 0;
   }
 
   job->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED;

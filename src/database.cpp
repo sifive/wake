@@ -91,7 +91,8 @@ std::string Database::open(bool wait) {
     "  runtime    real    not null,"
     "  cputime    real    not null,"
     "  membytes   integer not null,"
-    "  iobytes    integer not null);"
+    "  ibytes     integer not null,"
+    "  obytes     integer not null);"
     "create index if not exists stathash on stats(hashcode);"
     "create table if not exists jobs("
     "  job_id      integer primary key,"
@@ -145,10 +146,10 @@ std::string Database::open(bool wait) {
   const char *sql_begin_txn = "begin transaction";
   const char *sql_commit_txn = "commit transaction";
   const char *sql_predict_job =
-    "select status, runtime, cputime, membytes, iobytes"
+    "select status, runtime, cputime, membytes, ibytes, obytes"
     " from stats where hashcode=? order by stat_id desc limit 1";
   const char *sql_stats_job =
-    "select status, runtime, cputime, membytes, iobytes"
+    "select status, runtime, cputime, membytes, ibytes, obytes"
     " from stats where stat_id=?";
   const char *sql_insert_job =
     "insert into jobs(run_id, use_id, directory, commandline, environment, stack, stdin)"
@@ -173,8 +174,8 @@ std::string Database::open(bool wait) {
     "select f.path, f.hash from filetree t, files f"
     " where t.job_id=? and t.access=? and f.file_id=t.file_id";
   const char *sql_add_stats =
-    "insert into stats(hashcode, status, runtime, cputime, membytes, iobytes)"
-    " values(?, ?, ?, ?, ?, ?)";
+    "insert into stats(hashcode, status, runtime, cputime, membytes, ibytes, obytes)"
+    " values(?, ?, ?, ?, ?, ?, ?)";
   const char *sql_link_stats =
     "update jobs set stat_id=?, endtime=current_timestamp, keep=? where job_id=?";
   const char *sql_detect_overlap =
@@ -190,7 +191,7 @@ std::string Database::open(bool wait) {
   const char *sql_update_prior =
     "update jobs set use_id=? where job_id=?";
   const char *sql_find_owner =
-    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.iobytes"
+    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id"
     " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id";
   const char *sql_fetch_hash =
@@ -516,7 +517,8 @@ Usage Database::reuse_job(
     out.runtime  = sqlite3_column_double(imp->stats_job, 1);
     out.cputime  = sqlite3_column_double(imp->stats_job, 2);
     out.membytes = sqlite3_column_int64 (imp->stats_job, 3);
-    out.iobytes  = sqlite3_column_int64 (imp->stats_job, 4);
+    out.ibytes   = sqlite3_column_int64 (imp->stats_job, 4);
+    out.obytes   = sqlite3_column_int64 (imp->stats_job, 5);
   } else {
     out.found = false;
   }
@@ -553,14 +555,16 @@ Usage Database::predict_job(uint64_t hashcode)
     out.runtime  = sqlite3_column_double(imp->predict_job, 1);
     out.cputime  = sqlite3_column_double(imp->predict_job, 2);
     out.membytes = sqlite3_column_int64 (imp->predict_job, 3);
-    out.iobytes  = sqlite3_column_int64 (imp->predict_job, 4);
+    out.ibytes   = sqlite3_column_int64 (imp->predict_job, 4);
+    out.obytes   = sqlite3_column_int64 (imp->predict_job, 5);
   } else {
     out.found    = false;
     out.status   = 0;
     out.runtime  = 0;
     out.cputime  = 0;
     out.membytes = 0;
-    out.iobytes  = 0;
+    out.ibytes   = 0;
+    out.obytes   = 0;
   }
   finish_stmt(why, imp->predict_job, imp->debugdb);
   return out;
@@ -593,7 +597,8 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   bind_double (why, imp->add_stats, 3, reality.runtime);
   bind_double (why, imp->add_stats, 4, reality.cputime);
   bind_integer(why, imp->add_stats, 5, reality.membytes);
-  bind_integer(why, imp->add_stats, 6, reality.iobytes);
+  bind_integer(why, imp->add_stats, 6, reality.ibytes);
+  bind_integer(why, imp->add_stats, 7, reality.obytes);
   single_step (why, imp->add_stats, imp->debugdb);
   bind_integer(why, imp->link_stats, 1, sqlite3_last_insert_rowid(imp->db));
   bind_integer(why, imp->link_stats, 2, keep?1:0);
@@ -727,18 +732,19 @@ std::vector<JobReflection> Database::explain(const std::string &file, int use, b
   while (sqlite3_step(imp->find_owner) == SQLITE_ROW) {
     out.resize(out.size()+1);
     JobReflection &desc = out.back();
-    desc.job = sqlite3_column_int64(imp->find_owner, 0);
-    desc.directory = rip_column(imp->find_owner, 1);
-    desc.commandline = chop_null(rip_column(imp->find_owner, 2));
-    desc.environment = chop_null(rip_column(imp->find_owner, 3));
-    desc.stack = rip_column(imp->find_owner, 4);
-    desc.stdin = rip_column(imp->find_owner, 5);
-    desc.time = rip_column(imp->find_owner, 6);
-    desc.usage.status = sqlite3_column_int64(imp->find_owner, 7);
-    desc.usage.runtime = sqlite3_column_double(imp->find_owner, 8);
-    desc.usage.cputime = sqlite3_column_double(imp->find_owner, 9);
-    desc.usage.membytes = sqlite3_column_int64(imp->find_owner, 10);
-    desc.usage.iobytes = sqlite3_column_int64(imp->find_owner, 11);
+    desc.job            = sqlite3_column_int64(imp->find_owner, 0);
+    desc.directory      = rip_column(imp->find_owner, 1);
+    desc.commandline    = chop_null(rip_column(imp->find_owner, 2));
+    desc.environment    = chop_null(rip_column(imp->find_owner, 3));
+    desc.stack          = rip_column(imp->find_owner, 4);
+    desc.stdin          = rip_column(imp->find_owner, 5);
+    desc.time           = rip_column(imp->find_owner, 6);
+    desc.usage.status   = sqlite3_column_int64 (imp->find_owner, 7);
+    desc.usage.runtime  = sqlite3_column_double(imp->find_owner, 8);
+    desc.usage.cputime  = sqlite3_column_double(imp->find_owner, 9);
+    desc.usage.membytes = sqlite3_column_int64 (imp->find_owner, 10);
+    desc.usage.ibytes   = sqlite3_column_int64 (imp->find_owner, 11);
+    desc.usage.obytes   = sqlite3_column_int64 (imp->find_owner, 12);
     if (desc.stdin.empty()) desc.stdin = "/dev/null";
     if (verbose) {
       desc.stdout = get_output(desc.job, 1);

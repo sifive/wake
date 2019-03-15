@@ -63,7 +63,8 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug) {
       << "  Runtime:   " << job.usage.runtime << std::endl
       << "  CPUtime:   " << job.usage.cputime << std::endl
       << "  Mem bytes: " << job.usage.membytes << std::endl
-      << "  IO bytes:  " << job.usage.iobytes << std::endl
+      << "  In  bytes: " << job.usage.ibytes << std::endl
+      << "  Out bytes: " << job.usage.obytes << std::endl
       << "  Status:    " << job.usage.status << std::endl
       << "  Stdin:     " << job.stdin << std::endl
       << "Inputs:" << std::endl;
@@ -136,7 +137,8 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug) {
       << "#   Runtime:   " << job.usage.runtime << std::endl
       << "#   CPUtime:   " << job.usage.cputime << std::endl
       << "#   Mem bytes: " << job.usage.membytes << std::endl
-      << "#   IO bytes:  " << job.usage.iobytes << std::endl
+      << "#   In  bytes: " << job.usage.ibytes << std::endl
+      << "#   Out bytes: " << job.usage.obytes << std::endl
       << "#   Status:    " << job.usage.status << std::endl
       << "# Inputs:" << std::endl;
     for (auto &in : job.inputs)
