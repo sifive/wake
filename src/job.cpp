@@ -55,7 +55,7 @@ struct Job : public Value {
   std::unique_ptr<Receiver> q_inputs;  // waken once job is merged+finished (inputs+outputs available)
   std::unique_ptr<Receiver> q_outputs; // waken once job is merged+finished (inputs+outputs available)
 
-  static const char *type;
+  static const TypeDescriptor type;
   static TypeVar typeVar;
   Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline, bool keep);
 
@@ -66,7 +66,7 @@ struct Job : public Value {
   void process(WorkQueue &queue); // Run commands based on state
 };
 
-const char *Job::type = "Job";
+const TypeDescriptor Job::type("Job");
 
 void Job::format(std::ostream &os, int p) const {
   if (APP_PRECEDENCE < p) os << "(";
@@ -511,21 +511,20 @@ bool JobTable::wait(WorkQueue &queue) {
 }
 
 Job::Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline, bool keep_)
-  : Value(type), db(db_), state(0), code(), pid(0), job(-1), keep(keep_), runtime(0), status(0)
+  : Value(&type), db(db_), state(0), code(), pid(0), job(-1), keep(keep_), runtime(0), status(0)
 {
   std::vector<uint64_t> codes;
-  codes.push_back((long)type);
-  Hash acc;
-  hash3(dir    .data(), dir    .size(), acc); acc.push(codes);
-  hash3(stdin  .data(), stdin  .size(), acc); acc.push(codes);
-  hash3(environ.data(), environ.size(), acc); acc.push(codes);
-  hash3(cmdline.data(), cmdline.size(), acc); acc.push(codes);
-  hash3(codes.data(), 8*codes.size(), code);
+  type.hashcode.push(codes);
+  Hash(dir).push(codes);
+  Hash(stdin).push(codes);
+  Hash(environ).push(codes);
+  Hash(cmdline).push(codes);
+  code = Hash(codes);
   predict = db->predict_job(code.data[0]);
 }
 
 static std::unique_ptr<Receiver> cast_jobresult(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Job **job) {
-  if (value->type != Job::type) {
+  if (value->type != &Job::type) {
     Receiver::receive(queue, std::move(completion),
       std::make_shared<Exception>(value->to_str() + " is not a Job", binding));
     return std::unique_ptr<Receiver>();
@@ -560,7 +559,7 @@ static PRIMFN(prim_job_launch) {
   JOBRESULT(job, 0);
 
   int poolv = 0;
-  if (args[1]->type == Integer::type) {
+  if (args[1]->type == &Integer::type) {
     Integer *pool = reinterpret_cast<Integer*>(args[1].get());
     if (mpz_cmp_si(pool->value, 0) < 0) {
       job->bad_launch = std::make_shared<Exception>("prim_job_launch: pool must be >= 0", binding);
@@ -569,47 +568,47 @@ static PRIMFN(prim_job_launch) {
     } else {
       poolv = mpz_get_si(pool->value);
     }
-  } else if (args[1]->type == Exception::type) {
+  } else if (args[1]->type == &Exception::type) {
     job->bad_launch = args[1];
   } else {
     job->bad_launch = std::make_shared<Exception>("prim_job_launch arg1 not an Integer", binding);
   }
 
   std::string *dirv = 0;
-  if (args[2]->type == String::type) {
+  if (args[2]->type == &String::type) {
     String *dir = reinterpret_cast<String*>(args[2].get());
     dirv = &dir->value;
-  } else if (args[2]->type == Exception::type) {
+  } else if (args[2]->type == &Exception::type) {
     job->bad_launch = args[2];
   } else {
     job->bad_launch = std::make_shared<Exception>("prim_job_launch arg2 not a String", binding);
   }
 
   std::string *stdinv = 0;
-  if (args[3]->type == String::type) {
+  if (args[3]->type == &String::type) {
     String *stdin = reinterpret_cast<String*>(args[3].get());
     stdinv = &stdin->value;
-  } else if (args[3]->type == Exception::type) {
+  } else if (args[3]->type == &Exception::type) {
     job->bad_launch = args[3];
   } else {
     job->bad_launch = std::make_shared<Exception>("prim_job_launch arg3 not a String", binding);
   }
 
   std::string *envv = 0;
-  if (args[4]->type == String::type) {
+  if (args[4]->type == &String::type) {
     String *env = reinterpret_cast<String*>(args[4].get());
     envv = &env->value;
-  } else if (args[4]->type == Exception::type) {
+  } else if (args[4]->type == &Exception::type) {
     job->bad_launch = args[4];
   } else {
     job->bad_launch = std::make_shared<Exception>("prim_job_launch arg4 not a String", binding);
   }
 
   std::string *cmdv = 0;
-  if (args[5]->type == String::type) {
+  if (args[5]->type == &String::type) {
     String *cmd = reinterpret_cast<String*>(args[5].get());
     cmdv = &cmd->value;
-  } else if (args[5]->type == Exception::type) {
+  } else if (args[5]->type == &Exception::type) {
     job->bad_launch = args[5];
   } else {
     job->bad_launch = std::make_shared<Exception>("prim_job_launch arg5 not a String", binding);
@@ -655,30 +654,30 @@ static PRIMFN(prim_job_virtual) {
     exit(1);
   }
 
-  if (args[1]->type == String::type) {
+  if (args[1]->type == &String::type) {
     String *stdout = reinterpret_cast<String*>(args[1].get());
     if (!stdout->value.empty())
       job->db->save_output(job->job, 1, stdout->value.data(), stdout->value.size(), 0);
-  } else if (args[1]->type == Exception::type) {
+  } else if (args[1]->type == &Exception::type) {
     job->bad_launch = args[1];
   } else {
     job->bad_launch = std::make_shared<Exception>("prim_job_virtual arg1 not a String", binding);
   }
 
-  if (args[2]->type == String::type) {
+  if (args[2]->type == &String::type) {
     String *stderr = reinterpret_cast<String*>(args[2].get());
     if (!stderr->value.empty())
       job->db->save_output(job->job, 2, stderr->value.data(), stderr->value.size(), 0);
-  } else if (args[2]->type == Exception::type) {
+  } else if (args[2]->type == &Exception::type) {
     job->bad_launch = args[2];
   } else {
     job->bad_launch = std::make_shared<Exception>("prim_job_virtual arg2 not a String", binding);
   }
 
-  if (args[3]->type == Integer::type) {
+  if (args[3]->type == &Integer::type) {
     Integer *status = reinterpret_cast<Integer*>(args[3].get());
     job->status = mpz_get_si(status->value);
-  } else if (args[3]->type == Exception::type) {
+  } else if (args[3]->type == &Exception::type) {
     job->bad_launch = args[3];
     job->status = 128;
   } else {
@@ -686,10 +685,10 @@ static PRIMFN(prim_job_virtual) {
     job->status = 128;
   }
 
-  if (args[4]->type == Double::type) {
+  if (args[4]->type == &Double::type) {
     Double *runtime = reinterpret_cast<Double*>(args[4].get());
     job->runtime = runtime->value;
-  } else if (args[4]->type == Exception::type) {
+  } else if (args[4]->type == &Exception::type) {
     job->bad_launch = args[4];
     job->runtime = 0;
   } else {
@@ -971,9 +970,9 @@ static PRIMFN(prim_job_finish) {
   std::string *inputs;
   std::string *outputs;
 
-  if (args[1]->type == String::type) {
+  if (args[1]->type == &String::type) {
     inputs = &reinterpret_cast<String*>(args[1].get())->value;
-  } else if (args[1]->type == Exception::type) {
+  } else if (args[1]->type == &Exception::type) {
     job->bad_finish = args[1];
     inputs = &empty;
   } else {
@@ -981,9 +980,9 @@ static PRIMFN(prim_job_finish) {
     inputs = &empty;
   }
 
-  if (args[2]->type == String::type) {
+  if (args[2]->type == &String::type) {
     outputs = &reinterpret_cast<String*>(args[2].get())->value;
-  } else if (args[2]->type == Exception::type) {
+  } else if (args[2]->type == &Exception::type) {
     job->bad_finish = args[2];
     outputs = &empty;
   } else {

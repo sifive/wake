@@ -7,26 +7,26 @@
 #include <sstream>
 
 Expr::~Expr() { }
-const char *Prim::type = "Prim";
-const char *App::type = "App";
-const char *Lambda::type = "Lambda";
-const char *VarRef::type = "VarRef";
-const char *Literal::type = "Literal";
-const char *DefBinding::type = "DefBinding";
-const char *Construct::type = "Construct";
-const char *Destruct::type = "Destruct";
+const TypeDescriptor Prim      ::type("Prim");
+const TypeDescriptor App       ::type("App");
+const TypeDescriptor Lambda    ::type("Lambda");
+const TypeDescriptor VarRef    ::type("VarRef");
+const TypeDescriptor Literal   ::type("Literal");
+const TypeDescriptor DefBinding::type("DefBinding");
+const TypeDescriptor Construct ::type("Construct");
+const TypeDescriptor Destruct  ::type("Destruct");
 // these are removed by bind
-const char *Subscribe::type = "Subscribe";
-const char *Match::type = "Match";
-const char *Memoize::type = "Memoize";
-const char *DefMap::type = "DefMap";
-const char *Top::type = "Top";
+const TypeDescriptor Subscribe ::type("Subscribe");
+const TypeDescriptor Match     ::type("Match");
+const TypeDescriptor Memoize   ::type("Memoize");
+const TypeDescriptor DefMap    ::type("DefMap");
+const TypeDescriptor Top       ::type("Top");
 
 Literal::Literal(const Location &location_, std::shared_ptr<Value> &&value_)
- : Expr(type, location_), value(std::move(value_)) { }
+ : Expr(&type, location_), value(std::move(value_)) { }
 
 Literal::Literal(const Location &location_, const char *value_)
- : Expr(type, location_), value(std::make_shared<String>(value_)) { }
+ : Expr(&type, location_), value(std::make_shared<String>(value_)) { }
 
 static std::string pad(int depth) {
   return std::string(depth, ' ');
@@ -44,19 +44,20 @@ void VarRef::format(std::ostream &os, int depth) const {
   os << "): " << typeVar << " @ " << location << std::endl;
 }
 
-void VarRef::hash() {
-  uint64_t payload[3];
-  payload[0] = (long)type;
-  payload[1] = depth;
-  payload[2] = offset;
-  hash3(&payload[0], 24, hashcode);
+Hash VarRef::hash() {
+  uint64_t payload[4];
+  payload[0] = type.hashcode.data[0];
+  payload[0] = type.hashcode.data[1];
+  payload[2] = depth;
+  payload[3] = offset;
+  return hashcode = Hash(&payload[0], 32);
 }
 
 void Subscribe::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Subscribe(" << name << ") @ " << location << std::endl;
 }
 
-void Subscribe::hash() {
+Hash Subscribe::hash() {
   assert(0 /* unreachable */);
 }
 
@@ -65,9 +66,8 @@ void Memoize::format(std::ostream &os, int depth) const {
   body->format(os, depth+2);
 }
 
-void Memoize::hash() {
-  body->hash();
-  rehash(body->hashcode, type, hashcode);
+Hash Memoize::hash() {
+  return hashcode = body->hash() + type.hashcode;
 }
 
 void Match::format(std::ostream &os, int depth) const {
@@ -84,30 +84,23 @@ void Match::format(std::ostream &os, int depth) const {
   }
 }
 
-void Match::hash() {
+Hash Match::hash() {
   std::vector<uint64_t> codes;
-  codes.push_back((long)type);
-  for (auto &a : args) {
-    a->hash();
-    a->hashcode.push(codes);
-  }
+  type.hashcode.push(codes);
+  for (auto &a : args)
+    a->hash().push(codes);
   for (auto &p : patterns) {
     std::stringstream ss;
     ss << p.pattern;
-    std::string str = ss.str();
-    Hash code;
-    hash3(str.c_str(), str.size()+1, code);
-    code.push(codes);
-    p.expr->hash();
-    p.expr->hashcode.push(codes);
+    Hash(ss.str()).push(codes);
+    p.expr->hash().push(codes);
     if (p.guard) {
-      p.guard->hash();
-      p.guard->hashcode.push(codes);
+      p.guard->hash().push(codes);
     } else {
       codes.push_back(0);
     }
   }
-  hash3(codes.data(), codes.size()*8, hashcode);
+  return hashcode = Hash(codes);
 }
 
 void App::format(std::ostream &os, int depth) const {
@@ -116,14 +109,12 @@ void App::format(std::ostream &os, int depth) const {
   val->format(os, depth+2);
 }
 
-void App::hash() {
+Hash App::hash() {
   std::vector<uint64_t> codes;
-  codes.push_back((long)type);
-  fn->hash();
-  val->hash();
-  fn->hashcode.push(codes);
-  val->hashcode.push(codes);
-  hash3(codes.data(), codes.size()*8, hashcode);
+  type.hashcode.push(codes);
+  fn->hash().push(codes);
+  val->hash().push(codes);
+  return hashcode = Hash(codes);
 }
 
 void Lambda::format(std::ostream &os, int depth) const {
@@ -131,9 +122,8 @@ void Lambda::format(std::ostream &os, int depth) const {
   body->format(os, depth+2);
 }
 
-void Lambda::hash() {
-  body->hash();
-  rehash(body->hashcode, type, hashcode);
+Hash Lambda::hash() {
+  return hashcode = body->hash() + type.hashcode;
 }
 
 void DefMap::format(std::ostream &os, int depth) const {
@@ -149,7 +139,7 @@ void DefMap::format(std::ostream &os, int depth) const {
   body->format(os, depth+2);
 }
 
-void DefMap::hash() {
+Hash DefMap::hash() {
   assert(0 /* unreachable */);
 }
 
@@ -158,17 +148,16 @@ void Literal::format(std::ostream &os, int depth) const {
   value->format(os, -1-depth);
 }
 
-void Literal::hash() {
-  Hash h = value->hash();
-  rehash(h, type, hashcode);
+Hash Literal::hash() {
+  return hashcode = value->hash() + type.hashcode;
 }
 
 void Prim::format(std::ostream &os, int depth) const {
  os << pad(depth) << "Prim(" << args << "," << name << "): " << typeVar << " @ " << location << std::endl;
 }
 
-void Prim::hash() {
-  hash4(name.data(), name.size(), type, hashcode);
+Hash Prim::hash() {
+  return hashcode = Hash(name) + type.hashcode;
 }
 
 void Top::format(std::ostream &os, int depth) const {
@@ -179,7 +168,7 @@ void Top::format(std::ostream &os, int depth) const {
   body->format(os, depth+2);
 }
 
-void Top::hash() {
+Hash Top::hash() {
   assert(0 /* unreachable */);
 }
 
@@ -201,36 +190,31 @@ void DefBinding::format(std::ostream &os, int depth) const {
   body->format(os, depth+2);
 }
 
-void DefBinding::hash() {
+Hash DefBinding::hash() {
   std::vector<uint64_t> codes;
-  codes.push_back((long)type);
-  for (auto &i : val) {
-    i->hash();
-    i->hashcode.push(codes);
-  }
-  for (auto &i : fun) {
-    i->hash();
-    i->hashcode.push(codes);
-  }
-  body->hash();
-  body->hashcode.push(codes);
-  hash3(codes.data(), codes.size()*8, hashcode);
+  type.hashcode.push(codes);
+  for (auto &i : val)
+    i->hash().push(codes);
+  for (auto &i : fun)
+    i->hash().push(codes);
+  body->hash().push(codes);
+  return hashcode = Hash(codes);
 }
 
 void Construct::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Construct(" << cons->ast.name << "): " << typeVar << " @ " << location << std::endl;
 }
 
-void Construct::hash() {
-  hash4(cons->ast.name.data(), cons->ast.name.size(), type, hashcode);
+Hash Construct::hash() {
+  return hashcode = Hash(cons->ast.name) + type.hashcode;
 }
 
 void Destruct::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Destruct(" << sum.name << "): " << typeVar << " @ " << location << std::endl;
 }
 
-void Destruct::hash() {
-  hash4(sum.name.data(), sum.name.size(), type, hashcode);
+Hash Destruct::hash() {
+  return hashcode = Hash(sum.name) + type.hashcode;
 }
 
 std::ostream & operator << (std::ostream &os, const Expr *expr) {

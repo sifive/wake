@@ -427,7 +427,7 @@ int main(int argc, const char **argv) {
   if (args["globals"]) {
     for (auto &g : globals) {
       Expr *e = root.get();
-      while (e && e->type == DefBinding::type) {
+      while (e && e->type == &DefBinding::type) {
         DefBinding *d = reinterpret_cast<DefBinding*>(e);
         e = d->body.get();
         auto i = d->order.find(g);
@@ -483,7 +483,7 @@ int main(int argc, const char **argv) {
       types = &(*types)[1];
       std::cout << " = ";
       if (v) {
-        if (v->type == Exception::type) pass = false;
+        if (v->type == &Exception::type) pass = false;
         if (args["debug"]) {
           v->format(std::cout, -1);
         } else {

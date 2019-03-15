@@ -65,7 +65,8 @@
 #define TRACE
 #endif
 
-uint64_t sip_key[2];
+uint64_t sip_key[2]; // 0 initially
+
 int siphash(const void *inv, unsigned long inlen, uint64_t *out) {
     const uint8_t *in = reinterpret_cast<const uint8_t*>(inv);
 

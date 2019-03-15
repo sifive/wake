@@ -13,7 +13,7 @@ static PRIMTYPE(type_test) {
 static PRIMFN(prim_test) {
   (void)data; // silence unused variable warning (EXPECT not called)
   REQUIRE(args.size() == 1, "prim_test not called on 1 argument");
-  auto out = make_bool(args[0]->type == Exception::type);
+  auto out = make_bool(args[0]->type == &Exception::type);
   RETURN(out);
 }
 
@@ -29,7 +29,7 @@ static PRIMTYPE(type_catch) {
 static PRIMFN(prim_catch) {
   (void)data; // silence unused variable warning (EXPECT not called)
   REQUIRE(args.size() == 1, "prim_catch not called on 1 argument");
-  REQUIRE(args[0]->type == Exception::type, "prim_catch not called on an Exception");
+  REQUIRE(args[0]->type == &Exception::type, "prim_catch not called on an Exception");
 
   Exception *exception = reinterpret_cast<Exception*>(args[0].get());
 

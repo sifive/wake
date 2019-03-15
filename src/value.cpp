@@ -9,12 +9,12 @@
 #include <algorithm>
 
 Value::~Value() { }
-const char *String::type = "String";
-const char *Integer::type = "Integer";
-const char *Double::type = "Double";
-const char *Closure::type = "Closure";
-const char *Data::type = "Data";
-const char *Exception::type = "Exception";
+const TypeDescriptor String   ::type("String");
+const TypeDescriptor Integer  ::type("Integer");
+const TypeDescriptor Double   ::type("Double");
+const TypeDescriptor Closure  ::type("Closure");
+const TypeDescriptor Data     ::type("Data");
+const TypeDescriptor Exception::type("Exception");
 
 Integer::~Integer() {
   mpz_clear(value);
@@ -153,11 +153,11 @@ void Binding::format(std::ostream &os, int p) const {
   for (size_t i = todo.size(); i > 0; --i) {
     iter = todo[i-1];
     for (int i = 0; i < iter->nargs; ++i) {
-      if (iter->expr->type == Lambda::type) {
+      if (iter->expr->type == &Lambda::type) {
         Lambda *lambda = reinterpret_cast<Lambda*>(iter->expr);
         os << pad(p) << lambda->name << " = "; // " @ " << lambda->location << " = ";
       }
-      if (iter->expr->type == DefBinding::type) {
+      if (iter->expr->type == &DefBinding::type) {
         DefBinding *defbinding = reinterpret_cast<DefBinding*>(iter->expr);
         std::string name;
         for (auto &x : defbinding->order) if (x.second == i) name = x.first;
@@ -199,9 +199,7 @@ TypeVar &String::getType() {
 }
 
 Hash String::hash() const {
-  Hash payload;
-  hash4(value.data(), value.size(), type, payload);
-  return payload;
+  return Hash(value) + type.hashcode;
 }
 
 TypeVar Integer::typeVar("Integer", 0);
@@ -210,9 +208,7 @@ TypeVar &Integer::getType() {
 }
 
 Hash Integer::hash() const {
-  Hash payload;
-  hash4(value[0]._mp_d, abs(value[0]._mp_size)*sizeof(mp_limb_t), type, payload);
-  return payload;
+  return Hash(value[0]._mp_d, abs(value[0]._mp_size)*sizeof(mp_limb_t)) + type.hashcode;
 }
 
 TypeVar Double::typeVar("Double", 0);
@@ -245,10 +241,7 @@ std::string Double::str(int format, int precision) const {
 }
 
 Hash Double::hash() const {
-  Hash payload;
-  std::string x = str(HEXFLOAT);
-  hash4(x.data(), x.size(), type, payload);
-  return payload;
+  return Hash(str(HEXFLOAT)) + type.hashcode;
 }
 
 TypeVar Exception::typeVar("Exception", 0);
@@ -258,10 +251,7 @@ TypeVar &Exception::getType() {
 }
 
 Hash Exception::hash() const {
-  Hash payload;
-  std::string str = to_str();
-  hash4(str.data(), str.size(), type, payload);
-  return payload;
+  return Hash(to_str()) + type.hashcode;
 }
 
 TypeVar Closure::typeVar("Closure", 0);
@@ -271,16 +261,14 @@ TypeVar &Closure::getType() {
 }
 
 Hash Closure::hash() const {
-  Hash out;
   std::vector<uint64_t> codes;
-  codes.push_back((long)Closure::type);
+  type.hashcode.push(codes);
   lambda->hashcode.push(codes);
   if (binding) {
     assert (binding->flags & FLAG_HASH_POST);
     binding->hashcode.push(codes);
   }
-  hash3(codes.data(), 8*codes.size(), out);
-  return out;
+  return Hash(codes);
 }
 
 TypeVar Data::typeBoolean("Boolean", 0);
@@ -295,21 +283,19 @@ TypeVar &Data::getType() {
 }
 
 Hash Data::hash() const {
-  Hash out;
   std::vector<uint64_t> codes;
-  codes.push_back((long)cons);
+  Hash(cons->ast.name).push(codes);
   if (binding) {
     assert (binding->flags & FLAG_HASH_POST);
     binding->hashcode.push(codes);
   }
-  hash3(codes.data(), 8*codes.size(), out);
-  return out;
+  return Hash(codes);
 }
 
 Cause::Cause(const std::string &reason_, std::vector<Location> &&stack_)
  : reason(reason_), stack(std::move(stack_)) { }
 
-Exception::Exception(const std::string &reason, const std::shared_ptr<Binding> &binding) : Value(type) {
+Exception::Exception(const std::string &reason, const std::shared_ptr<Binding> &binding) : Value(&type) {
   causes.emplace_back(std::make_shared<Cause>(reason, binding->stack_trace()));
 }
 

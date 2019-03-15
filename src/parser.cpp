@@ -36,23 +36,23 @@ static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
   return out;
 }
 
-static bool expectValue(const char *type, Lexer &lex) {
+static bool expectValue(const TypeDescriptor *type, Lexer &lex) {
   if (expect(LITERAL, lex)) {
-    if (lex.next.expr->type == Literal::type) {
+    if (lex.next.expr->type == &Literal::type) {
       Literal *lit = reinterpret_cast<Literal*>(lex.next.expr.get());
       if (lit->value->type == type) {
         return true;
       } else {
         std::cerr << "Was expecting a "
-          << type << ", but got a "
-          << lit->type << " at "
+          << type->name << ", but got a "
+          << lit->value->type->name << " at "
           << lex.next.location << std::endl;
         lex.fail = true;
         return false;
       }
     } else {
       std::cerr << "Was expecting a "
-        << type << ", but got an interpolated string at "
+        << type->name << ", but got an interpolated string at "
         << lex.next.location << std::endl;
       lex.fail = true;
       return false;
@@ -70,20 +70,20 @@ static Expr *parse_block(Lexer &lex, bool multiline);
 static int relabel_descend(Expr *expr, int index) {
   if (!(expr->flags & FLAG_TOUCHED)) {
     expr->flags |= FLAG_TOUCHED;
-    if (expr->type == VarRef::type) {
+    if (expr->type == &VarRef::type) {
       VarRef *ref = reinterpret_cast<VarRef*>(expr);
       if (ref->name != "_") return index;
       ++index;
       ref->name += " ";
       ref->name += std::to_string(index);
       return index;
-    } else if (expr->type == App::type) {
+    } else if (expr->type == &App::type) {
       App *app = reinterpret_cast<App*>(expr);
       return relabel_descend(app->val.get(), relabel_descend(app->fn.get(), index));
-    } else if (expr->type == Lambda::type) {
+    } else if (expr->type == &Lambda::type) {
       Lambda *lambda = reinterpret_cast<Lambda*>(expr);
       return relabel_descend(lambda->body.get(), index);
-    } else if (expr->type == Match::type) {
+    } else if (expr->type == &Match::type) {
       Match *match = reinterpret_cast<Match*>(expr);
       for (auto &v : match->args)
         index = relabel_descend(v.get(), index);
@@ -164,10 +164,10 @@ static Expr *parse_match(int p, Lexer &lex) {
     for (size_t i = 0; i < literals.size(); ++i) {
       Expr* e = literals[i];
       std::string comparison("scmp");
-      if (e->type == Literal::type) {
+      if (e->type == &Literal::type) {
         Literal *lit = reinterpret_cast<Literal*>(e);
-        if (lit->value->type == Integer::type) comparison = "icmp";
-        if (lit->value->type == Double::type) comparison = "dcmp";
+        if (lit->value->type == &Integer::type) comparison = "icmp";
+        if (lit->value->type == &Double::type) comparison = "dcmp";
       }
       if (!guard) guard = new VarRef(e->location, "True");
       guard = new App(e->location, new App(e->location, new App(e->location, new App(e->location,
@@ -227,7 +227,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (op.p < p) precedence_error(lex);
       lex.consume();
       long skip = 0;
-      if (expectValue(Integer::type, lex)) {
+      if (expectValue(&Integer::type, lex)) {
         Literal *lit = reinterpret_cast<Literal*>(lex.next.expr.get());
         mpz_t &x = reinterpret_cast<Integer*>(lit->value.get())->value;
         if (mpz_fits_slong_p(x)) {
@@ -278,7 +278,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       op_type op = op_precedence("p");
       if (op.p < p) precedence_error(lex);
       lex.consume();
-      if (expectValue(String::type, lex)) {
+      if (expectValue(&String::type, lex)) {
         Literal *lit = reinterpret_cast<Literal*>(lex.next.expr.get());
         name = reinterpret_cast<String*>(lit->value.get())->value;
         location.end = lex.next.location.end;

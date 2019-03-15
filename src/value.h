@@ -21,9 +21,9 @@ struct Location;
 struct WorkQueue;
 
 struct Value {
-  const char *type;
+  const TypeDescriptor *type;
 
-  Value(const char *type_) : type(type_) { }
+  Value(const TypeDescriptor *type_) : type(type_) { }
   virtual ~Value();
 
   std::string to_str() const; // one-line version
@@ -37,10 +37,10 @@ std::ostream & operator << (std::ostream &os, const Value *value);
 struct String : public Value {
   std::string value;
 
-  static const char *type;
+  static const TypeDescriptor type;
   static TypeVar typeVar;
-  String(const std::string &value_) : Value(type), value(value_) { }
-  String(std::string &&value_) : Value(type), value(std::move(value_)) { }
+  String(const std::string &value_) : Value(&type), value(value_) { }
+  String(std::string &&value_) : Value(&type), value(std::move(value_)) { }
 
   void format(std::ostream &os, int depth) const;
   TypeVar &getType();
@@ -50,11 +50,11 @@ struct String : public Value {
 struct Integer : public Value {
   mpz_t value;
 
-  static const char *type;
+  static const TypeDescriptor type;
   static TypeVar typeVar;
-  Integer(const char *value_) : Value(type) { mpz_init_set_str(value, value_, 0); }
-  Integer(long value_) : Value(type) { mpz_init_set_si(value, value_); }
-  Integer() : Value(type) { mpz_init(value); }
+  Integer(const char *value_) : Value(&type) { mpz_init_set_str(value, value_, 0); }
+  Integer(long value_) : Value(&type) { mpz_init_set_si(value, value_); }
+  Integer() : Value(&type) { mpz_init(value); }
   ~Integer();
 
   std::string str(int base = 10) const;
@@ -71,10 +71,10 @@ struct Double : public Value {
   typedef std::numeric_limits< double > limits;
   double value;
 
-  static const char *type;
+  static const TypeDescriptor type;
   static TypeVar typeVar;
 
-  Double(double value_ = 0) : Value(type), value(value_) { }
+  Double(double value_ = 0) : Value(&type), value(value_) { }
   Double(const char *str);
 
   std::string str(int format = DEFAULTFLOAT, int precision = limits::max_digits10) const;
@@ -87,9 +87,9 @@ struct Closure : public Value {
   Lambda *lambda;
   std::shared_ptr<Binding> binding;
 
-  static const char *type;
+  static const TypeDescriptor type;
   static TypeVar typeVar;
-  Closure(Lambda *lambda_, const std::shared_ptr<Binding> &binding_) : Value(type), lambda(lambda_), binding(binding_) { }
+  Closure(Lambda *lambda_, const std::shared_ptr<Binding> &binding_) : Value(&type), lambda(lambda_), binding(binding_) { }
   void format(std::ostream &os, int depth) const;
   TypeVar &getType();
   Hash hash() const;
@@ -100,7 +100,7 @@ struct Data : public Value {
   Constructor *cons;
   std::shared_ptr<Binding> binding;
 
-  static const char *type;
+  static const TypeDescriptor type;
   static TypeVar typeBoolean;
   static TypeVar typeOrder;
   static TypeVar typeUnit;
@@ -108,7 +108,7 @@ struct Data : public Value {
   // these two are const to prevent unify() on them; use clone
   static const TypeVar typeList;
   static const TypeVar typePair;
-  Data(Constructor *cons_, std::shared_ptr<Binding> &&binding_) : Value(type), cons(cons_), binding(std::move(binding_)) { }
+  Data(Constructor *cons_, std::shared_ptr<Binding> &&binding_) : Value(&type), cons(cons_), binding(std::move(binding_)) { }
   void format(std::ostream &os, int depth) const;
   TypeVar &getType();
   Hash hash() const;
@@ -123,9 +123,9 @@ struct Cause {
 struct Exception : public Value {
   std::vector<std::shared_ptr<Cause> > causes;
 
-  static const char *type;
+  static const TypeDescriptor type;
   static TypeVar typeVar;
-  Exception() : Value(type) { }
+  Exception() : Value(&type) { }
   Exception(const std::string &reason, const std::shared_ptr<Binding> &binding);
 
   Exception &operator += (const Exception &other) {
