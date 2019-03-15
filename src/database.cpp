@@ -38,13 +38,15 @@ struct Database::detail {
   sqlite3_stmt *find_owner;
   sqlite3_stmt *fetch_hash;
   sqlite3_stmt *delete_jobs;
+  sqlite3_stmt *delete_dups;
   sqlite3_stmt *delete_stats;
   long run_id;
   detail(bool debugdb_)
    : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), add_target(0), del_target(0), begin_txn(0),
      commit_txn(0), predict_job(0), insert_job(0), insert_tree(0), insert_log(0), wipe_file(0), insert_file(0),
      update_file(0), get_log(0), get_tree(0), add_stats(0), link_stats(0), detect_overlap(0), delete_overlap(0),
-     find_prior(0), update_prior(0), find_owner(0), fetch_hash(0), delete_jobs(0), delete_stats(0) { }
+     find_prior(0), update_prior(0), find_owner(0), fetch_hash(0), delete_jobs(0), delete_dups(0), delete_stats(0)
+  { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -192,7 +194,10 @@ std::string Database::open(bool wait) {
   const char *sql_delete_jobs =
     "delete from jobs where job_id in"
     " (select job_id from jobs where keep=0 except select job_id from filetree where access=2)";
-  // !!! delete duplicate hashcode stats
+  const char *sql_delete_dups =
+    "delete from stats where stat_id in"
+    " (select stat_id from (select hashcode, count(*) as num, max(stat_id) as keep from stats group by hashcode) d, stats s"
+    "  where d.num>1 and s.hashcode=d.hashcode and s.stat_id<>d.keep except select stat_id from jobs)";
   const char *sql_delete_stats =
     "delete from stats where stat_id in"
     " (select stat_id from stats"
@@ -231,6 +236,7 @@ std::string Database::open(bool wait) {
   PREPARE(sql_find_owner,     find_owner);
   PREPARE(sql_fetch_hash,     fetch_hash);
   PREPARE(sql_delete_jobs,    delete_jobs);
+  PREPARE(sql_delete_dups,    delete_dups);
   PREPARE(sql_delete_stats,   delete_stats);
 
   return "";
@@ -274,6 +280,7 @@ void Database::close() {
   FINALIZE(find_owner);
   FINALIZE(fetch_hash);
   FINALIZE(delete_jobs);
+  FINALIZE(delete_dups);
   FINALIZE(delete_stats);
 
   if (imp->db) {
@@ -454,6 +461,7 @@ void Database::prepare() {
 
 void Database::clean() {
   single_step("Could not clean database jobs",  imp->delete_jobs,  imp->debugdb);
+  single_step("Could not clean database dups",  imp->delete_dups,  imp->debugdb);
   single_step("Could not clean database stats", imp->delete_stats, imp->debugdb);
 }
 
