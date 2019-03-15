@@ -44,8 +44,8 @@ struct Job : public Value {
   bool keep;
   std::shared_ptr<Value> bad_launch;
   std::shared_ptr<Value> bad_finish;
-  Prediction predict;
-  Prediction reality;
+  Usage predict;
+  Usage reality;
 
   // There are 4 distinct wait queues for jobs
   std::unique_ptr<Receiver> q_stdout;  // waken once stdout closed
@@ -837,7 +837,7 @@ static PRIMFN(prim_job_cache) {
 
   long job;
   std::vector<FileReflection> files;
-  Prediction reuse = jobtable->imp->db->reuse_job(
+  Usage reuse = jobtable->imp->db->reuse_job(
     dir->value,
     stdin->value,
     env->value,

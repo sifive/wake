@@ -479,7 +479,7 @@ void Database::end_txn() {
   single_step("Could not commit a transaction", imp->commit_txn, imp->debugdb);
 }
 
-Prediction Database::reuse_job(
+Usage Database::reuse_job(
   const std::string &directory,
   const std::string &stdin,
   const std::string &environment,
@@ -489,7 +489,7 @@ Prediction Database::reuse_job(
   long &job,
   std::vector<FileReflection> &files)
 {
-  Prediction out;
+  Usage out;
   long stat_id;
 
   const char *why = "Could not check for a cached job";
@@ -542,9 +542,9 @@ Prediction Database::reuse_job(
   return out;
 }
 
-Prediction Database::predict_job(uint64_t hashcode)
+Usage Database::predict_job(uint64_t hashcode)
 {
-  Prediction out;
+  Usage out;
   const char *why = "Could not predict a job";
   bind_integer(why, imp->predict_job, 1, hashcode);
   if (sqlite3_step(imp->predict_job) == SQLITE_ROW) {
@@ -585,7 +585,7 @@ void Database::insert_job(
   *job = sqlite3_last_insert_rowid(imp->db);
 }
 
-void Database::finish_job(long job, const std::string &inputs, const std::string &outputs, uint64_t hashcode, bool keep, Prediction reality) {
+void Database::finish_job(long job, const std::string &inputs, const std::string &outputs, uint64_t hashcode, bool keep, Usage reality) {
   const char *why = "Could not save job inputs and outputs";
   begin_txn();
   bind_integer(why, imp->add_stats, 1, hashcode);
