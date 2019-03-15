@@ -13,7 +13,7 @@ TypeVar::TypeVar() : parent(0), epoch(0), var_dob(0), free_dob(0), nargs(0), par
 
 TypeVar::TypeVar(const char *name_, int nargs_)
  : parent(0), epoch(0), var_dob(++globalClock), free_dob(var_dob), nargs(nargs_), name(name_) {
-  pargs = nargs ? new TypeVar[nargs] : 0;
+  pargs = nargs > 0 ? new TypeVar[nargs] : 0;
   for (int i = 0; i < nargs; ++i) {
     pargs[i].free_dob = pargs[i].var_dob = ++globalClock;
   }
@@ -204,7 +204,7 @@ void TypeVar::do_clone(TypeVar &out, const TypeVar &x, int dob) {
       in->link = &out;
       out.name = in->name;
       out.nargs = in->nargs;
-      out.pargs = out.nargs ? new TypeVar[out.nargs] : 0;
+      out.pargs = out.nargs > 0 ? new TypeVar[out.nargs] : 0;
       for (int i = 0; i < out.nargs; ++i)
         do_clone(out.pargs[i], in->pargs[i], dob);
     } else { // this TypeVar was already cloned; replicate sharing
