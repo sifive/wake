@@ -195,8 +195,9 @@ std::string Database::open(bool wait) {
   // !!! delete duplicate hashcode stats
   const char *sql_delete_stats =
     "delete from stats where stat_id in"
-    " (select stat_id from stats except select stat_id from jobs)"
-    " order by stat_id desc limit 9999999 offset 4*(select count(*) from jobs)";
+    " (select stat_id from stats"
+    "  where stat_id not in (select stat_id from jobs)"
+    "  order by stat_id desc limit 9999999 offset 4*(select count(*) from jobs))";
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
