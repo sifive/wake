@@ -27,6 +27,15 @@ struct JobReflection {
   std::vector<FileReflection> outputs;
 };
 
+struct Prediction {
+  bool found;
+  int status;
+  double runtime;
+  double cputime;
+  uint64_t membytes;
+  uint64_t iobytes;
+};
+
 struct Database {
   struct detail;
   std::unique_ptr<detail> imp;
@@ -58,6 +67,8 @@ struct Database {
     bool check,
     long &job,
     std::vector<FileReflection> &out);
+  Prediction predict_job(
+    uint64_t hashcode);
   void insert_job( // also wipes out any old runs
     const std::string &directory,
     const std::string &stdin, // "" -> /dev/null

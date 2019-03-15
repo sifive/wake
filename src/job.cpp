@@ -46,6 +46,7 @@ struct Job : public Value {
   int status; // -signal, +code
   std::shared_ptr<Value> bad_launch;
   std::shared_ptr<Value> bad_finish;
+  Prediction predict;
 
   // There are 4 distinct wait queues for jobs
   std::unique_ptr<Receiver> q_stdout;  // waken once stdout closed
@@ -351,9 +352,10 @@ static void launch(JobTable *jobtable) {
     close(pipe_stdout[1]);
     close(pipe_stderr[1]);
     for (char &c : task.cmdline) if (c == 0) c = ' ';
-    if (i.pool)
-      i.status = status_state.emplace(status_state.end(),
-        task.cmdline, 0.0, i.start); // !!! task; budget
+    if (i.pool) {
+      double predict = (i.job->predict.found && i.job->predict.status == 0) ? i.job->predict.runtime : 0;
+      i.status = status_state.emplace(status_state.end(), task.cmdline, predict, i.start);
+    }
     if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
       std::stringstream s;
       s << task.cmdline << std::endl;
@@ -519,6 +521,7 @@ Job::Job(Database *db_, const std::string &dir, const std::string &stdin, const 
   hash3(environ.data(), environ.size(), acc); acc.push(codes);
   hash3(cmdline.data(), cmdline.size(), acc); acc.push(codes);
   hash3(codes.data(), 8*codes.size(), code);
+  predict = db->predict_job(code.data[0]);
 }
 
 static std::unique_ptr<Receiver> cast_jobresult(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Job **job) {

@@ -20,6 +20,7 @@ struct Database::detail {
   sqlite3_stmt *del_target;
   sqlite3_stmt *begin_txn;
   sqlite3_stmt *commit_txn;
+  sqlite3_stmt *predict_job;
   sqlite3_stmt *insert_job;
   sqlite3_stmt *insert_tree;
   sqlite3_stmt *insert_log;
@@ -41,9 +42,9 @@ struct Database::detail {
   long run_id;
   detail(bool debugdb_)
    : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), add_target(0), del_target(0), begin_txn(0),
-     commit_txn(0), insert_job(0), insert_tree(0), insert_log(0), wipe_file(0), insert_file(0), update_file(0),
-     get_log(0), get_tree(0), add_stats(0), link_stats(0), detect_overlap(0), delete_overlap(0), find_prior(0),
-     update_prior(0), find_owner(0), fetch_hash(0), delete_jobs(0), delete_stats(0) { }
+     commit_txn(0), predict_job(0), insert_job(0), insert_tree(0), insert_log(0), wipe_file(0), insert_file(0),
+     update_file(0), get_log(0), get_tree(0), add_stats(0), link_stats(0), detect_overlap(0), delete_overlap(0),
+     find_prior(0), update_prior(0), find_owner(0), fetch_hash(0), delete_jobs(0), delete_stats(0) { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -80,7 +81,7 @@ std::string Database::open(bool wait) {
     "  hash     text    not null,"
     "  modified integer not null);"
     "create unique index if not exists filenames on files(path);"
-    "create table if not exists stats(" // how to clean this? (stats \ linked stats) limit 9999999 offset 4*#jobs
+    "create table if not exists stats("
     "  stat_id    integer primary key autoincrement,"
     "  hashcode   integer not null," // on collision, prefer largest stat_id (ie: newest)
     "  status     integer not null,"
@@ -140,6 +141,9 @@ std::string Database::open(bool wait) {
   const char *sql_del_target = "delete from targets where expression=?";
   const char *sql_begin_txn = "begin transaction";
   const char *sql_commit_txn = "commit transaction";
+  const char *sql_predict_job =
+    "select status, runtime, cputime, membytes, iobytes"
+    " from stats where hashcode=? order by stat_id desc";
   const char *sql_insert_job =
     "insert into jobs(run_id, use_id, directory, commandline, environment, stack, stdin)"
     " values(?, ?1, ?, ?, ?, ?, ?)";
@@ -208,6 +212,7 @@ std::string Database::open(bool wait) {
   PREPARE(sql_del_target,     del_target);
   PREPARE(sql_begin_txn,      begin_txn);
   PREPARE(sql_commit_txn,     commit_txn);
+  PREPARE(sql_predict_job,    predict_job);
   PREPARE(sql_insert_job,     insert_job);
   PREPARE(sql_insert_tree,    insert_tree);
   PREPARE(sql_insert_log,     insert_log);
@@ -250,6 +255,7 @@ void Database::close() {
   FINALIZE(del_target);
   FINALIZE(begin_txn);
   FINALIZE(commit_txn);
+  FINALIZE(predict_job);
   FINALIZE(insert_job);
   FINALIZE(insert_tree);
   FINALIZE(insert_log);
@@ -502,6 +508,30 @@ bool Database::reuse_job(
   end_txn();
 
   return exist;
+}
+
+Prediction Database::predict_job(uint64_t hashcode)
+{
+  Prediction out;
+  const char *why = "Could not predict a job";
+  bind_integer(why, imp->predict_job, 1, hashcode);
+  if (sqlite3_step(imp->predict_job) == SQLITE_ROW) {
+    out.found    = true;
+    out.status   = sqlite3_column_int   (imp->predict_job, 0);
+    out.runtime  = sqlite3_column_double(imp->predict_job, 1);
+    out.cputime  = sqlite3_column_double(imp->predict_job, 2);
+    out.membytes = sqlite3_column_int64 (imp->predict_job, 3);
+    out.iobytes  = sqlite3_column_int64 (imp->predict_job, 4);
+  } else {
+    out.found    = false;
+    out.status   = 0;
+    out.runtime  = 0;
+    out.cputime  = 0;
+    out.membytes = 0;
+    out.iobytes  = 0;
+  }
+  finish_stmt(why, imp->predict_job, imp->debugdb);
+  return out;
 }
 
 void Database::insert_job(
