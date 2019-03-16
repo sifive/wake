@@ -19,15 +19,16 @@
 
 struct CatStream : public Value {
   std::stringstream str;
-  static const char *type;
+  static const TypeDescriptor type;
   static TypeVar typeVar;
-  CatStream() : Value(type) { }
+  CatStream() : Value(&type) { }
 
   void format(std::ostream &os, int depth) const;
   TypeVar &getType();
   Hash hash() const;
 };
-const char *CatStream::type = "CatStream";
+
+const TypeDescriptor CatStream::type("CatStream");
 
 void CatStream::format(std::ostream &os, int p) const {
   if (APP_PRECEDENCE < p) os << "(";
@@ -42,14 +43,11 @@ TypeVar &CatStream::getType() {
 }
 
 Hash CatStream::hash() const {
-  Hash payload;
-  std::string data = str.str();
-  hash4(data.data(), data.size(), type, payload);
-  return payload;
+  return Hash(str.str()) + type.hashcode;
 }
 
 static std::unique_ptr<Receiver> cast_catstream(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, CatStream **cat) {
-  if (value->type != CatStream::type) {
+  if (value->type != &CatStream::type) {
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a CatStream", binding));
     return std::unique_ptr<Receiver>();
   } else {

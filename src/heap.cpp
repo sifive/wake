@@ -54,7 +54,7 @@ std::unique_ptr<Receiver> Binding::make_completer(const std::shared_ptr<Binding>
 std::vector<Location> Binding::stack_trace() const {
   std::vector<Location> out;
   for (const Binding *i = this; i; i = i->invoker.get())
-    if (i->expr->type != DefBinding::type)
+    if (i->expr->type != &DefBinding::type)
       out.emplace_back(i->expr->location);
   return out;
 }
@@ -91,7 +91,7 @@ Hash Binding::hash() const {
       if (top->next) top->next->hashcode.push(codes);
       for (int arg = 0; arg < top->nargs; ++arg)
         top->future[arg].value->hash().push(codes);
-      hash3(codes.data(), 8*codes.size(), top->hashcode);
+      top->hashcode = Hash(codes);
       stack.pop_back();
     } else {
       // explore children, NO POP
@@ -99,12 +99,12 @@ Hash Binding::hash() const {
       if (top->next) stack.push_back(top->next.get());
       for (int arg = 0; arg < top->nargs; ++arg) {
         Value *value = top->future[arg].value.get();
-        if (value->type == Closure::type) {
+        if (value->type == &Closure::type) {
           Binding *child = reinterpret_cast<Closure*>(value)->binding.get();
           if (child) stack.push_back(child);
           assert (!child || (child->flags & FLAG_HASH_POST) || !(child->flags & FLAG_HASH_PRE)); // cycle
         }
-        if (value->type == Data::type) {
+        if (value->type == &Data::type) {
           Binding *child = reinterpret_cast<Data*>(value)->binding.get();
           if (child) stack.push_back(child);
           assert (!child || (child->flags & FLAG_HASH_POST) || !(child->flags & FLAG_HASH_PRE)); // cycle
@@ -132,9 +132,9 @@ static void flatten_orphans(Binding *top) {
   for (int arg = 0; arg < top->nargs; ++arg) {
     std::shared_ptr<Value> &value = top->future[arg].value;
     if (value.use_count() == 1) {
-      if (value->type == Closure::type)
+      if (value->type == &Closure::type)
         flatten_orphan(top, std::move(reinterpret_cast<Closure*>(value.get())->binding));
-      if (value->type == Data::type)
+      if (value->type == &Data::type)
         flatten_orphan(top, std::move(reinterpret_cast<Data*>(value.get())->binding));
     }
     value.reset();
@@ -161,9 +161,9 @@ void Binding::future_finished(WorkQueue &queue) {
   if (state < 0) state = 0;
 
   while (state < nargs &&
-    (future[state].value->type != Closure::type ||
+    (future[state].value->type != &Closure::type ||
      !reinterpret_cast<Closure*>(future[state].value.get())->binding) &&
-    (future[state].value->type != Data::type ||
+    (future[state].value->type != &Data::type ||
      !reinterpret_cast<Data*>(future[state].value.get())->binding)) {
     ++state;
   }
@@ -175,11 +175,11 @@ void Binding::future_finished(WorkQueue &queue) {
       Binding::wait(next.get(), queue, std::move(iter));
     }
   } else {
-    if (future[state].value->type == Closure::type) {
+    if (future[state].value->type == &Closure::type) {
       Closure *closure = reinterpret_cast<Closure*>(future[state].value.get());
       Binding::wait(closure->binding.get(), queue, std::unique_ptr<Finisher>(new ChildFinisher(this)));
     }
-    if (future[state].value->type == Data::type) {
+    if (future[state].value->type == &Data::type) {
       Data *data = reinterpret_cast<Data*>(future[state].value.get());
       Binding::wait(data->binding.get(), queue, std::unique_ptr<Finisher>(new ChildFinisher(this)));
     }

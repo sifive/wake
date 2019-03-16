@@ -10,15 +10,16 @@
 
 struct RegExp : public Value {
   RE2 exp;
-  static const char *type;
+  static const TypeDescriptor type;
   static TypeVar typeVar;
-  RegExp(const std::string &regexp, const RE2::Options &opts) : Value(type), exp(re2::StringPiece(regexp), opts) { }
+  RegExp(const std::string &regexp, const RE2::Options &opts) : Value(&type), exp(re2::StringPiece(regexp), opts) { }
 
   void format(std::ostream &os, int depth) const;
   TypeVar &getType();
   Hash hash() const;
 };
-const char *RegExp::type = "RegExp";
+
+const TypeDescriptor RegExp::type("RegExp");
 
 void RegExp::format(std::ostream &os, int p) const {
   if (APP_PRECEDENCE < p) os << "(";
@@ -33,14 +34,11 @@ TypeVar &RegExp::getType() {
 }
 
 Hash RegExp::hash() const {
-  Hash payload;
-  std::string pattern = exp.pattern();
-  hash4(pattern.data(), pattern.size(), type, payload);
-  return payload;
+  return Hash(exp.pattern()) + type.hashcode;
 }
 
 static std::unique_ptr<Receiver> cast_regexp(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, RegExp **reg) {
-  if (value->type != RegExp::type) {
+  if (value->type != &RegExp::type) {
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a RegExp", binding));
     return std::unique_ptr<Receiver>();
   } else {

@@ -44,7 +44,7 @@ static void SCC(SCCState &state, int vi) {
     ResolveDef &w = (*state.defs)[wi];
     if ((*state.levelmap)[wi] != state.level) continue;
 
-    if (w.index == -1 && w.expr->type == Lambda::type) {
+    if (w.index == -1 && w.expr->type == &Lambda::type) {
       SCC(state, wi);
       v.lowlink = std::min(v.lowlink, w.lowlink);
     } else if (w.onstack) {
@@ -114,7 +114,7 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
       } while (i != j);
       return 0;
     }
-    int w = def.expr->type == Lambda::type ? 0 : 1;
+    int w = def.expr->type == &Lambda::type ? 0 : 1;
     for (auto i : def.edges) {
       if (drv + w > d[i]) {
         d[i] = drv + w;
@@ -133,7 +133,7 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
     if (levels[i].empty()) continue;
     std::unique_ptr<DefBinding> bind(new DefBinding(location, std::move(out)));
     for (auto j : levels[i]) {
-      if (defs[j].expr->type != Lambda::type) {
+      if (defs[j].expr->type != &Lambda::type) {
         bind->order[defs[j].name] = bind->val.size();
         bind->val.emplace_back(std::move(defs[j].expr));
         defs[j].index = 0;
@@ -150,7 +150,7 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
     state.level = i;
     state.index = 0;
     for (auto j : levels[i])
-      if (defs[j].index == -1 && defs[j].expr->type == Lambda::type)
+      if (defs[j].index == -1 && defs[j].expr->type == &Lambda::type)
         SCC(state, j);
     out = std::move(bind);
   }
@@ -403,9 +403,9 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       if (it != iter->index.end()) {
         Expr *cons = iter->defs[it->second].expr.get();
         if (cons) {
-          while (cons->type == Lambda::type)
+          while (cons->type == &Lambda::type)
             cons = reinterpret_cast<Lambda*>(cons)->body.get();
-          if (cons->type == Construct::type) {
+          if (cons->type == &Construct::type) {
             Construct *c = reinterpret_cast<Construct*>(cons);
             out.sum = c->sum;
             out.cons = c->cons->index;
@@ -498,20 +498,20 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
 }
 
 static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding *binding) {
-  if (expr->type == VarRef::type) {
+  if (expr->type == &VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr.get());
     // don't fail if unbound; leave that for the second pass
     rebind_ref(binding, ref->name);
     return expr;
-  } else if (expr->type == Subscribe::type) {
+  } else if (expr->type == &Subscribe::type) {
     Subscribe *sub = reinterpret_cast<Subscribe*>(expr.get());
     return std::unique_ptr<Expr>(rebind_subscribe(binding, sub->location, sub->name));
-  } else if (expr->type == App::type) {
+  } else if (expr->type == &App::type) {
     App *app = reinterpret_cast<App*>(expr.get());
     app->fn  = fracture(std::move(app->fn),  binding);
     app->val = fracture(std::move(app->val), binding);
     return expr;
-  } else if (expr->type == Lambda::type) {
+  } else if (expr->type == &Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr.get());
     ResolveBinding lbinding;
     lbinding.parent = binding;
@@ -522,16 +522,16 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     lbinding.defs.resize(lbinding.defs.size()+1); // don't care
     lambda->body = fracture(std::move(lambda->body), &lbinding);
     return expr;
-  } else if (expr->type == Match::type) {
+  } else if (expr->type == &Match::type) {
     std::unique_ptr<Match> m(reinterpret_cast<Match*>(expr.release()));
     auto out = rebind_match(binding, std::move(m));
     if (!out) return out;
     return fracture(std::move(out), binding);
-  } else if (expr->type == Memoize::type) {
+  } else if (expr->type == &Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr.get());
     memoize->body = fracture(std::move(memoize->body), binding);
     return expr;
-  } else if (expr->type == DefMap::type) {
+  } else if (expr->type == &DefMap::type) {
     DefMap *def = reinterpret_cast<DefMap*>(expr.get());
     ResolveBinding dbinding;
     dbinding.parent = binding;
@@ -561,7 +561,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     dbinding.current_index = -1;
     std::unique_ptr<Expr> body = fracture(std::move(def->body), &dbinding);
     return fracture_binding(def->location, dbinding.defs, std::move(body));
-  } else if (expr->type == Top::type) {
+  } else if (expr->type == &Top::type) {
     Top *top = reinterpret_cast<Top*>(expr.get());
     ResolveBinding tbinding;
     tbinding.parent = binding;
@@ -676,7 +676,7 @@ struct NameBinding {
 static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   if (!expr) return false; // failed fracture
   expr->typeVar.setDOB();
-  if (expr->type == VarRef::type) {
+  if (expr->type == &VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     NameRef pos;
     if ((pos = binding->find(ref->name)).offset == -1) {
@@ -695,7 +695,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     } else {
       return ref->typeVar.unify(*pos.var, &ref->location);
     }
-  } else if (expr->type == App::type) {
+  } else if (expr->type == &App::type) {
     App *app = reinterpret_cast<App*>(expr);
     binding->open = false;
     bool f = explore(app->fn .get(), pmap, binding);
@@ -704,19 +704,19 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     bool ta = t && a && app->fn->typeVar[0].unify(app->val->typeVar, &app->location);
     bool tr = t && app->fn->typeVar[1].unify(app->typeVar, &app->location);
     return f && a && t && ta && tr;
-  } else if (expr->type == Lambda::type) {
+  } else if (expr->type == &Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     bool t = lambda->typeVar.unify(TypeVar(FN, 2), &lambda->location);
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), pmap, &bind);
     bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &lambda->location);
     return out && t && tr;
-  } else if (expr->type == Memoize::type) {
+  } else if (expr->type == &Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
     bool out = explore(memoize->body.get(), pmap, binding);
     bool t = out && memoize->typeVar.unify(memoize->body->typeVar, &memoize->location);
     return out && t;
-  } else if (expr->type == DefBinding::type) {
+  } else if (expr->type == &DefBinding::type) {
     DefBinding *def = reinterpret_cast<DefBinding*>(expr);
     binding->open = false;
     NameBinding bind(binding, def);
@@ -733,10 +733,10 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     ok = explore(def->body.get(), pmap, &bind) && ok;
     ok = ok && def->typeVar.unify(def->body->typeVar, &def->location) && ok;
     return ok;
-  } else if (expr->type == Literal::type) {
+  } else if (expr->type == &Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
     return lit->typeVar.unify(lit->value->getType(), &lit->location);
-  } else if (expr->type == Construct::type) {
+  } else if (expr->type == &Construct::type) {
     Construct *cons = reinterpret_cast<Construct*>(expr);
     bool ok = cons->typeVar.unify(
       TypeVar(cons->sum->name.c_str(), cons->sum->args.size()));
@@ -752,7 +752,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       iter = iter->next;
     }
     return ok;
-  } else if (expr->type == Destruct::type) {
+  } else if (expr->type == &Destruct::type) {
     Destruct *des = reinterpret_cast<Destruct*>(expr);
     // (typ => cons0 => b) => (typ => cons1 => b) => typ => b
     TypeVar &typ = binding->lambda->typeVar[0];
@@ -783,7 +783,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       }
     }
     return ok;
-  } else if (expr->type == Prim::type) {
+  } else if (expr->type == &Prim::type) {
     Prim *prim = reinterpret_cast<Prim*>(expr);
     std::vector<TypeVar*> args;
     for (NameBinding *iter = binding; iter && iter->open && iter->lambda; iter = iter->next)

@@ -60,8 +60,12 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug) {
     std::cout
       << "  Directory: " << job.directory << std::endl
       << "  Built:     " << job.time << std::endl
-      << "  Runtime:   " << job.runtime << std::endl
-      << "  Status:    " << job.status << std::endl
+      << "  Runtime:   " << job.usage.runtime << std::endl
+      << "  CPUtime:   " << job.usage.cputime << std::endl
+      << "  Mem bytes: " << job.usage.membytes << std::endl
+      << "  In  bytes: " << job.usage.ibytes << std::endl
+      << "  Out bytes: " << job.usage.obytes << std::endl
+      << "  Status:    " << job.usage.status << std::endl
       << "  Stdin:     " << job.stdin << std::endl
       << "Inputs:" << std::endl;
     for (auto &in : job.inputs)
@@ -130,8 +134,12 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug) {
       << std::endl << std::endl
       << "# When wake ran this command:" << std::endl
       << "#   Built:     " << job.time << std::endl
-      << "#   Runtime:   " << job.runtime << std::endl
-      << "#   Status:    " << job.status << std::endl
+      << "#   Runtime:   " << job.usage.runtime << std::endl
+      << "#   CPUtime:   " << job.usage.cputime << std::endl
+      << "#   Mem bytes: " << job.usage.membytes << std::endl
+      << "#   In  bytes: " << job.usage.ibytes << std::endl
+      << "#   Out bytes: " << job.usage.obytes << std::endl
+      << "#   Status:    " << job.usage.status << std::endl
       << "# Inputs:" << std::endl;
     for (auto &in : job.inputs)
       std::cout << "#   " << in.hash << " " << in.path << std::endl;
@@ -240,14 +248,6 @@ int main(int argc, const char **argv) {
   bool noexecute = notype ||
     args["add"] || args["typecheck"] || args["globals"];
 
-  // seed the keyed hash function
-  {
-    std::random_device rd;
-    std::uniform_int_distribution<uint64_t> dist;
-    sip_key[0] = dist(rd);
-    sip_key[1] = dist(rd);
-  }
-
   if (jobs < 1) {
     std::cerr << "Cannot run with less than 1 jobs!" << std::endl;
     return 1;
@@ -282,6 +282,15 @@ int main(int argc, const char **argv) {
   if (!fail.empty()) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;
     return 1;
+  }
+
+  // seed the keyed hash function
+  {
+    std::random_device rd;
+    std::uniform_int_distribution<uint64_t> dist;
+    sip_key[0] = dist(rd);
+    sip_key[1] = dist(rd);
+    db.entropy(&sip_key[0], 2);
   }
 
   std::vector<std::string> targets = db.get_targets();
@@ -426,7 +435,7 @@ int main(int argc, const char **argv) {
   if (args["globals"]) {
     for (auto &g : globals) {
       Expr *e = root.get();
-      while (e && e->type == DefBinding::type) {
+      while (e && e->type == &DefBinding::type) {
         DefBinding *d = reinterpret_cast<DefBinding*>(e);
         e = d->body.get();
         auto i = d->order.find(g);
@@ -482,7 +491,7 @@ int main(int argc, const char **argv) {
       types = &(*types)[1];
       std::cout << " = ";
       if (v) {
-        if (v->type == Exception::type) pass = false;
+        if (v->type == &Exception::type) pass = false;
         if (args["debug"]) {
           v->format(std::cout, -1);
         } else {

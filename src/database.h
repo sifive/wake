@@ -11,6 +11,16 @@ struct FileReflection {
   FileReflection(std::string &&path_, std::string &&hash_) : path(std::move(path_)), hash(std::move(hash_)) { }
 };
 
+struct Usage {
+  bool found;
+  int status; // -signal, +code
+  double runtime;
+  double cputime;
+  uint64_t membytes;
+  uint64_t ibytes;
+  uint64_t obytes;
+};
+
 struct JobReflection {
   long job;
   std::string directory;
@@ -21,8 +31,7 @@ struct JobReflection {
   std::string time;
   std::string stdout;
   std::string stderr;
-  int status;
-  double runtime;
+  Usage usage;
   std::vector<FileReflection> inputs;
   std::vector<FileReflection> outputs;
 };
@@ -37,6 +46,8 @@ struct Database {
   std::string open(bool wait);
   void close();
 
+  void entropy(uint64_t *key, int words);
+
   std::vector<std::string> get_targets();
   void add_target(const std::string &target);
   void del_target(const std::string &target);
@@ -47,7 +58,7 @@ struct Database {
   void begin_txn();
   void end_txn();
 
-  bool reuse_job(
+  Usage reuse_job(
     const std::string &directory,
     const std::string &stdin, // "" -> /dev/null
     const std::string &environment,
@@ -56,6 +67,8 @@ struct Database {
     bool check,
     long &job,
     std::vector<FileReflection> &out);
+  Usage predict_job(
+    uint64_t hashcode);
   void insert_job( // also wipes out any old runs
     const std::string &directory,
     const std::string &stdin, // "" -> /dev/null
@@ -68,9 +81,9 @@ struct Database {
     long job,
     const std::string &inputs,  // null separated
     const std::string &outputs, // null separated
+    uint64_t hashcode,
     bool keep,
-    int status,
-    double runtime);
+    Usage reality);
   std::vector<FileReflection> get_tree(int kind, long job);
 
   void save_output( // call only if needs_build -> true

@@ -29,7 +29,7 @@ std::unique_ptr<Receiver> expect_args(const char *fn, WorkQueue &queue, std::uni
   // merge exceptions
   auto exception = std::make_shared<Exception>();
   for (auto &i : args) {
-    if (i->type == Exception::type) {
+    if (i->type == &Exception::type) {
       (*exception) += *reinterpret_cast<Exception*>(i.get());
     }
   }
@@ -43,7 +43,7 @@ std::unique_ptr<Receiver> expect_args(const char *fn, WorkQueue &queue, std::uni
 }
 
 std::unique_ptr<Receiver> cast_string(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, String **str) {
-  if (value->type != String::type) {
+  if (value->type != &String::type) {
     std::stringstream str;
     str << value->to_str() << " is not a String";
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
@@ -55,7 +55,7 @@ std::unique_ptr<Receiver> cast_string(WorkQueue &queue, std::unique_ptr<Receiver
 }
 
 std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Integer **in) {
-  if (value->type != Integer::type) {
+  if (value->type != &Integer::type) {
     std::stringstream str;
     str << value->to_str() << " is not an Integer";
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
@@ -67,7 +67,7 @@ std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receive
 }
 
 std::unique_ptr<Receiver> cast_double(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Double **in) {
-  if (value->type != Double::type) {
+  if (value->type != &Double::type) {
     std::stringstream str;
     str << value->to_str() << " is not a Double";
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));
@@ -79,7 +79,7 @@ std::unique_ptr<Receiver> cast_double(WorkQueue &queue, std::unique_ptr<Receiver
 }
 
 std::unique_ptr<Receiver> cast_data(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Data **in) {
-  if (value->type != Data::type) {
+  if (value->type != &Data::type) {
     std::stringstream str;
     str << value->to_str() << " is not a Data";
     Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(str.str(), binding));

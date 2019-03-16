@@ -19,18 +19,18 @@ struct Value;
 
 /* Expression AST */
 struct Expr {
-  const char *type;
+  const TypeDescriptor *type;
   Location location;
   TypeVar typeVar;
   Hash hashcode;
   long flags;
 
-  Expr(const char *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), flags(flags_) { }
+  Expr(const TypeDescriptor *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), flags(flags_) { }
   virtual ~Expr();
 
   std::string to_str() const;
   virtual void format(std::ostream &os, int depth) const = 0;
-  virtual void hash() = 0;
+  virtual Hash hash() = 0;
 };
 
 std::ostream & operator << (std::ostream &os, const Expr *expr);
@@ -42,35 +42,35 @@ struct Prim : public Expr {
   PrimFn fn;
   void *data;
 
-  static const char *type;
-  Prim(const Location &location_, const std::string &name_) : Expr(type, location_), name(name_), args(0), flags(0) { }
+  static const TypeDescriptor type;
+  Prim(const Location &location_, const std::string &name_) : Expr(&type, location_), name(name_), args(0), flags(0) { }
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 struct App : public Expr {
   std::unique_ptr<Expr> fn;
   std::unique_ptr<Expr> val;
 
-  static const char *type;
+  static const TypeDescriptor type;
   App(const Location &location_, Expr *fn_, Expr *val_)
-   : Expr(type, location_), fn(fn_), val(val_) { }
+   : Expr(&type, location_), fn(fn_), val(val_) { }
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 struct Lambda : public Expr {
   std::string name;
   std::unique_ptr<Expr> body;
 
-  static const char *type;
+  static const TypeDescriptor type;
   Lambda(const Location &location_, const std::string &name_, Expr *body_)
-   : Expr(type, location_), name(name_), body(body_) { }
+   : Expr(&type, location_), name(name_), body(body_) { }
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 struct VarRef : public Expr {
@@ -78,23 +78,23 @@ struct VarRef : public Expr {
   int depth;
   int offset;
 
-  static const char *type;
+  static const TypeDescriptor type;
   VarRef(const Location &location_, const std::string &name_, int depth_ = 0, int offset_ = -1)
-   : Expr(type, location_), name(name_), depth(depth_), offset(offset_) { }
+   : Expr(&type, location_), name(name_), depth(depth_), offset(offset_) { }
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 struct Literal : public Expr {
   std::shared_ptr<Value> value;
-  static const char *type;
 
+  static const TypeDescriptor type;
   Literal(const Location &location_, std::shared_ptr<Value> &&value_);
   Literal(const Location &location_, const char *value_);
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 struct Memoize : public Expr {
@@ -102,12 +102,12 @@ struct Memoize : public Expr {
   std::unique_ptr<Expr> body;
   std::map<Hash, Future> values;
 
-  static const char *type;
+  static const TypeDescriptor type;
   Memoize(const Location &location_, long skip_, Expr *body_)
-   : Expr(type, location_), skip(skip_), body(body_) { }
+   : Expr(&type, location_), skip(skip_), body(body_) { }
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 struct Pattern {
@@ -122,22 +122,23 @@ struct Match : public Expr {
   std::vector<std::unique_ptr<Expr> > args;
   std::vector<Pattern> patterns;
 
-  static const char *type;
+  static const TypeDescriptor type;
   Match(const Location &location_)
-   : Expr(type, location_) { }
+   : Expr(&type, location_) { }
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 struct Subscribe : public Expr {
   std::string name;
-  static const char *type;
+
+  static const TypeDescriptor type;
   Subscribe(const Location &location_, const std::string &name_)
-   : Expr(type, location_), name(name_) { }
+   : Expr(&type, location_), name(name_) { }
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 typedef std::map<std::string, int> DefOrder;
@@ -148,13 +149,14 @@ struct DefMap : public Expr {
   defs publish;
   std::unique_ptr<Expr> body;
 
-  static const char *type;
+  static const TypeDescriptor type;
   DefMap(const Location &location_, defs &&map_, defs &&publish_, Expr *body_)
-   : Expr(type, location_), map(std::move(map_)), publish(std::move(publish_)), body(body_) { }
-  DefMap(const Location &location_) : Expr(type, location_), map(), publish(), body(new Literal(location, "top")) { }
+   : Expr(&type, location_), map(std::move(map_)), publish(std::move(publish_)), body(body_) { }
+  DefMap(const Location &location_)
+   : Expr(&type, location_), map(), publish(), body(new Literal(location, "top")) { }
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 struct Top : public Expr {
@@ -163,11 +165,11 @@ struct Top : public Expr {
   DefOrder globals;
   std::unique_ptr<Expr> body;
 
-  static const char *type;
-  Top() : Expr(type, LOCATION), defmaps(), globals() { }
+  static const TypeDescriptor type;
+  Top() : Expr(&type, LOCATION), defmaps(), globals() { }
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 // Created by transforming DefMap+Top
@@ -181,11 +183,12 @@ struct DefBinding : public Expr {
   DefOrder order; // values, then functions
   std::vector<int> scc; // SCC id per function
 
-  static const char *type;
-  DefBinding(const Location &location_, std::unique_ptr<Expr> body_) : Expr(type, location_), body(std::move(body_)) { }
+  static const TypeDescriptor type;
+  DefBinding(const Location &location_, std::unique_ptr<Expr> body_)
+   : Expr(&type, location_), body(std::move(body_)) { }
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 // Created by transforming Data
@@ -194,24 +197,24 @@ struct Construct : public Expr {
   Sum *sum;
   Constructor *cons;
 
-  static const char *type;
+  static const TypeDescriptor type;
   Construct(const Location &location_, Sum *sum_, Constructor *cons_)
-   : Expr(type, location_), sum(sum_), cons(cons_) { }
+   : Expr(&type, location_), sum(sum_), cons(cons_) { }
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 struct Sum;
 struct Destruct : public Expr {
   Sum sum;
 
-  static const char *type;
+  static const TypeDescriptor type;
   Destruct(const Location &location_, Sum &&sum_)
-   : Expr(type, location_), sum(std::move(sum_)) { }
+   : Expr(&type, location_), sum(std::move(sum_)) { }
 
   void format(std::ostream &os, int depth) const;
-  void hash();
+  Hash hash();
 };
 
 #endif

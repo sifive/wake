@@ -15,9 +15,9 @@ struct Application : public Receiver {
 };
 
 void Application::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
-  if (value->type == Exception::type) {
+  if (value->type == &Exception::type) {
     Receiver::receive(queue, std::move(receiver), std::move(value));
-  } else if (value->type != Closure::type) {
+  } else if (value->type != &Closure::type) {
     auto exception = std::make_shared<Exception>("Attempt to apply " + value->to_str() + " which is not a Closure", args->invoker);
     Receiver::receive(queue, std::move(receiver), std::move(exception));
   } else {
@@ -38,9 +38,9 @@ struct Destructure : public Receiver {
 };
 
 void Destructure::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
-  if (value->type == Exception::type) {
+  if (value->type == &Exception::type) {
     Receiver::receive(queue, std::move(receiver), std::move(value));
-  } else if (value->type != Data::type) {
+  } else if (value->type != &Data::type) {
     auto exception = std::make_shared<Exception>("Attempt to destructure " + value->to_str() + " which is not a Data", args->invoker);
     Receiver::receive(queue, std::move(receiver), std::move(exception));
   } else {
@@ -131,7 +131,7 @@ void Hasher::finish(WorkQueue &queue)
 }
 
 void Thunk::eval(WorkQueue &queue) {
-  if (expr->type == VarRef::type) {
+  if (expr->type == &VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     std::shared_ptr<Binding> *iter = &binding;
     for (int depth = ref->depth; depth; --depth)
@@ -144,30 +144,30 @@ void Thunk::eval(WorkQueue &queue) {
     } else {
       (*iter)->future[ref->offset].depend(queue, std::move(receiver));
     }
-  } else if (expr->type == App::type) {
+  } else if (expr->type == &App::type) {
     App *app = reinterpret_cast<App*>(expr);
     auto args = std::make_shared<Binding>(nullptr, queue.stack_trace?binding:nullptr, nullptr, 1);
     queue.emplace(app->val.get(), binding, Binding::make_completer(args, 0));
     queue.emplace(app->fn .get(), std::move(binding), std::unique_ptr<Receiver>(
       new Application(std::move(args), std::move(receiver))));
-  } else if (expr->type == Lambda::type) {
+  } else if (expr->type == &Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     auto closure = std::make_shared<Closure>(lambda, binding);
     Receiver::receive(queue, std::move(receiver), std::move(closure));
-  } else if (expr->type == Memoize::type) {
+  } else if (expr->type == &Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
     Binding *held = binding.get();
     for (long i = 0; held && i < memoize->skip; ++i) held = held->next.get();
     Binding::wait(held, queue, std::unique_ptr<Finisher>(
       new Hasher(std::move(receiver), std::move(binding), memoize)));
-  } else if (expr->type == DefBinding::type) {
+  } else if (expr->type == &DefBinding::type) {
     DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
     auto defs = std::make_shared<Binding>(binding, queue.stack_trace?binding:nullptr, defbinding, defbinding->val.size());
     int j = 0;
     for (auto &i : defbinding->val)
       queue.emplace(i.get(), binding, Binding::make_completer(defs, j++));
     queue.emplace(defbinding->body.get(), std::move(defs), std::move(receiver));
-  } else if (expr->type == Construct::type) {
+  } else if (expr->type == &Construct::type) {
     Construct *cons = reinterpret_cast<Construct*>(expr);
     if (cons->cons->ast.args.size() == 0) {
       Receiver::receive(queue, std::move(receiver),
@@ -179,15 +179,15 @@ void Thunk::eval(WorkQueue &queue) {
       Receiver::receive(queue, std::move(receiver),
         std::make_shared<Data>(cons->cons, std::move(binding)));
     }
-  } else if (expr->type == Destruct::type) {
+  } else if (expr->type == &Destruct::type) {
     Destruct *des = reinterpret_cast<Destruct*>(expr);
     Binding *data = binding.get();
     data->future[0].depend(queue, std::unique_ptr<Receiver>(
       new Destructure(std::move(binding), std::move(receiver), des)));
-  } else if (expr->type == Literal::type) {
+  } else if (expr->type == &Literal::type) {
     Literal *lit = reinterpret_cast<Literal*>(expr);
     Receiver::receive(queue, std::move(receiver), lit->value);
-  } else if (expr->type == Prim::type) {
+  } else if (expr->type == &Prim::type) {
     Prim *prim = reinterpret_cast<Prim*>(expr);
     // Cut the scope of primitive to only it's own arguments
     if (prim->args == 0) {

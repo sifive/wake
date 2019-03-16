@@ -14,10 +14,14 @@
 struct Database::detail {
   bool debugdb;
   sqlite3 *db;
+  sqlite3_stmt *get_entropy;
+  sqlite3_stmt *set_entropy;
   sqlite3_stmt *add_target;
   sqlite3_stmt *del_target;
   sqlite3_stmt *begin_txn;
   sqlite3_stmt *commit_txn;
+  sqlite3_stmt *predict_job;
+  sqlite3_stmt *stats_job;
   sqlite3_stmt *insert_job;
   sqlite3_stmt *insert_tree;
   sqlite3_stmt *insert_log;
@@ -26,20 +30,24 @@ struct Database::detail {
   sqlite3_stmt *update_file;
   sqlite3_stmt *get_log;
   sqlite3_stmt *get_tree;
-  sqlite3_stmt *set_runtime;
+  sqlite3_stmt *add_stats;
+  sqlite3_stmt *link_stats;
   sqlite3_stmt *detect_overlap;
   sqlite3_stmt *delete_overlap;
   sqlite3_stmt *find_prior;
   sqlite3_stmt *update_prior;
   sqlite3_stmt *find_owner;
   sqlite3_stmt *fetch_hash;
-  sqlite3_stmt *delete_useless;
+  sqlite3_stmt *delete_jobs;
+  sqlite3_stmt *delete_dups;
+  sqlite3_stmt *delete_stats;
   long run_id;
   detail(bool debugdb_)
-   : debugdb(debugdb_), db(0), add_target(0), del_target(0), begin_txn(0), commit_txn(0),
-     insert_job(0), insert_tree(0), insert_log(0), wipe_file(0), insert_file(0), update_file(0),
-     get_log(0), get_tree(0), set_runtime(0), detect_overlap(0), delete_overlap(0),
-     find_prior(0), update_prior(0), find_owner(0), fetch_hash(0), delete_useless(0) { }
+   : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), add_target(0), del_target(0), begin_txn(0),
+     commit_txn(0), predict_job(0), stats_job(0), insert_job(0), insert_tree(0), insert_log(0), wipe_file(0),
+     insert_file(0), update_file(0), get_log(0), get_tree(0), add_stats(0), link_stats(0), detect_overlap(0),
+     delete_overlap(0), find_prior(0), update_prior(0), find_owner(0), fetch_hash(0), delete_jobs(0),
+     delete_dups(0), delete_stats(0) { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -64,8 +72,11 @@ std::string Database::open(bool wait) {
     "pragma foreign_keys=on;"
     "create table if not exists targets("
     "  expression text primary key);"
+    "create table if not exists entropy("
+    "  row_id integer primary key autoincrement,"
+    "  seed   integer not null);"
     "create table if not exists runs("
-    "  run_id integer primary key,"
+    "  run_id integer primary key autoincrement,"
     "  time   text    not null default current_timestamp);"
     "create table if not exists files("
     "  file_id  integer primary key,"
@@ -73,6 +84,16 @@ std::string Database::open(bool wait) {
     "  hash     text    not null,"
     "  modified integer not null);"
     "create unique index if not exists filenames on files(path);"
+    "create table if not exists stats("
+    "  stat_id    integer primary key autoincrement,"
+    "  hashcode   integer not null," // on collision, prefer largest stat_id (ie: newest)
+    "  status     integer not null,"
+    "  runtime    real    not null,"
+    "  cputime    real    not null,"
+    "  membytes   integer not null,"
+    "  ibytes     integer not null,"
+    "  obytes     integer not null);"
+    "create index if not exists stathash on stats(hashcode);"
     "create table if not exists jobs("
     "  job_id      integer primary key,"
     "  run_id      integer not null references runs(run_id),"
@@ -81,11 +102,10 @@ std::string Database::open(bool wait) {
     "  commandline blob    not null,"
     "  environment blob    not null,"
     "  stack       blob    not null,"
-    "  stdin       text,"    // might point outside the workspace
-    "  keep        integer," // 0=false, 1=true
-    "  time        text,"
-    "  status      integer,"
-    "  runtime     real);"
+    "  stdin       text    not null," // might point outside the workspace
+    "  stat_id     integer references stats(stat_id)," // null if unmerged
+    "  endtime     text    not null default '',"
+    "  keep        integer not null default 0);"       // 0=false, 1=true
     "create index if not exists job on jobs(directory, commandline, environment, stdin);"
     "create table if not exists filetree("
     "  access  integer not null," // 0=visible, 1=input, 2=output, 3=indexes
@@ -94,11 +114,12 @@ std::string Database::open(bool wait) {
     "  primary key(job_id, access, file_id) on conflict ignore);"
     "create index if not exists filesearch on filetree(file_id, access);"
     "create table if not exists log("
+    "  log_id     integer primary key autoincrement,"
     "  job_id     integer not null references jobs(job_id) on delete cascade,"
     "  descriptor integer not null," // 1=stdout, 2=stderr"
     "  seconds    real    not null," // seconds after job start
     "  output     text    not null);"
-    "create index if not exists logorder on log(job_id, descriptor, seconds);";
+    "create index if not exists logorder on log(job_id, descriptor, log_id);";
 
   while (true) {
     char *fail;
@@ -118,56 +139,75 @@ std::string Database::open(bool wait) {
   }
 
   // prepare statements
+  const char *sql_get_entropy = "select seed from entropy order by row_id";
+  const char *sql_set_entropy = "insert into entropy(seed) values(?)";
   const char *sql_add_target = "insert into targets(expression) values(?)";
   const char *sql_del_target = "delete from targets where expression=?";
   const char *sql_begin_txn = "begin transaction";
   const char *sql_commit_txn = "commit transaction";
+  const char *sql_predict_job =
+    "select status, runtime, cputime, membytes, ibytes, obytes"
+    " from stats where hashcode=? order by stat_id desc limit 1";
+  const char *sql_stats_job =
+    "select status, runtime, cputime, membytes, ibytes, obytes"
+    " from stats where stat_id=?";
   const char *sql_insert_job =
-    "insert into jobs(run_id, use_id, directory, commandline, environment, stack, stdin) "
-    "values(?, ?1, ?, ?, ?, ?, ?)";
+    "insert into jobs(run_id, use_id, directory, commandline, environment, stack, stdin)"
+    " values(?, ?1, ?, ?, ?, ?, ?)";
   const char *sql_insert_tree =
-    "insert into filetree(access, job_id, file_id) "
-    "values(?, ?, (select file_id from files where path=?))";
+    "insert into filetree(access, job_id, file_id)"
+    " values(?, ?, (select file_id from files where path=?))";
   const char *sql_insert_log =
-    "insert into log(job_id, descriptor, seconds, output) "
-    "values(?, ?, ?, ?)";
+    "insert into log(job_id, descriptor, seconds, output)"
+    " values(?, ?, ?, ?)";
   const char *sql_wipe_file =
     "delete from jobs where job_id in"
-    " (select distinct job_id from filetree"
-    "  where file_id in (select file_id from files where path=? and hash<>?) and access=1)";
+    " (select t.job_id from files f, filetree t"
+    "  where f.path=? and f.hash<>? and t.file_id=f.file_id and t.access=1)";
   const char *sql_insert_file =
     "insert or ignore into files(hash, modified, path) values (?, ?, ?)";
   const char *sql_update_file =
     "update files set hash=?, modified=? where path=?";
   const char *sql_get_log =
-    "select output from log where job_id=? and descriptor=? order by seconds";
+    "select output from log where job_id=? and descriptor=? order by log_id";
   const char *sql_get_tree =
     "select f.path, f.hash from filetree t, files f"
     " where t.job_id=? and t.access=? and f.file_id=t.file_id";
-  const char *sql_set_runtime =
-    "update jobs set time=current_timestamp, keep=?, status=?, runtime=? where job_id=?";
+  const char *sql_add_stats =
+    "insert into stats(hashcode, status, runtime, cputime, membytes, ibytes, obytes)"
+    " values(?, ?, ?, ?, ?, ?, ?)";
+  const char *sql_link_stats =
+    "update jobs set stat_id=?, endtime=current_timestamp, keep=? where job_id=?";
   const char *sql_detect_overlap =
-    "select distinct f.path from filetree t, files f"
-    " where t.access=2 and t.job_id<>?1 and t.file_id in "
-    " (select file_id from filetree where job_id=?1 and access=2) and f.file_id=t.file_id";
+    "select f.path from filetree t1, filetree t2, files f"
+    " where t1.job_id=?1 and t1.access=2 and t2.file_id=t1.file_id and t2.access=2 and t2.job_id<>?1 and f.file_id=t1.file_id";
   const char *sql_delete_overlap =
     "delete from jobs where use_id<>? and job_id in "
-    "(select distinct job_id from filetree"
-    "  where file_id in (select file_id from filetree where job_id=? and access=2) and access=2)";
+    "(select t2.job_id from filetree t1, filetree t2"
+    "  where t1.job_id=?2 and t1.access=2 and t2.file_id=t1.file_id and t2.access=2 and t2.job_id<>?2)";
   const char *sql_find_prior =
-    "select job_id from jobs where "
-    "directory=? and commandline=? and environment=? and stdin=? and status=0 and keep=1";
+    "select job_id, stat_id from jobs where "
+    "directory=? and commandline=? and environment=? and stdin=? and keep=1";
   const char *sql_update_prior =
     "update jobs set use_id=? where job_id=?";
   const char *sql_find_owner =
-    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.time, j.status, j.runtime"
-    " from files f, filetree t, jobs j"
+    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id"
     " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id";
   const char *sql_fetch_hash =
     "select hash from files where path=? and modified=?";
-  const char *sql_delete_useless =
+  const char *sql_delete_jobs =
     "delete from jobs where job_id in"
-    " (select job_id from jobs where keep is null or keep==0 except select job_id from filetree where access=2)";
+    " (select job_id from jobs where keep=0 except select job_id from filetree where access=2)";
+  const char *sql_delete_dups =
+    "delete from stats where stat_id in"
+    " (select stat_id from (select hashcode, count(*) as num, max(stat_id) as keep from stats group by hashcode) d, stats s"
+    "  where d.num>1 and s.hashcode=d.hashcode and s.stat_id<>d.keep except select stat_id from jobs)";
+  const char *sql_delete_stats =
+    "delete from stats where stat_id in"
+    " (select stat_id from stats"
+    "  where stat_id not in (select stat_id from jobs)"
+    "  order by stat_id desc limit 9999999 offset 4*(select count(*) from jobs))";
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
@@ -177,10 +217,14 @@ std::string Database::open(bool wait) {
     return out;												\
   }
 
+  PREPARE(sql_get_entropy,    get_entropy);
+  PREPARE(sql_set_entropy,    set_entropy);
   PREPARE(sql_add_target,     add_target);
   PREPARE(sql_del_target,     del_target);
   PREPARE(sql_begin_txn,      begin_txn);
   PREPARE(sql_commit_txn,     commit_txn);
+  PREPARE(sql_predict_job,    predict_job);
+  PREPARE(sql_stats_job,      stats_job);
   PREPARE(sql_insert_job,     insert_job);
   PREPARE(sql_insert_tree,    insert_tree);
   PREPARE(sql_insert_log,     insert_log);
@@ -189,14 +233,17 @@ std::string Database::open(bool wait) {
   PREPARE(sql_update_file,    update_file);
   PREPARE(sql_get_log,        get_log);
   PREPARE(sql_get_tree,       get_tree);
-  PREPARE(sql_set_runtime,    set_runtime);
+  PREPARE(sql_add_stats,      add_stats);
+  PREPARE(sql_link_stats,     link_stats);
   PREPARE(sql_detect_overlap, detect_overlap);
   PREPARE(sql_delete_overlap, delete_overlap);
   PREPARE(sql_find_prior,     find_prior);
   PREPARE(sql_update_prior,   update_prior);
   PREPARE(sql_find_owner,     find_owner);
   PREPARE(sql_fetch_hash,     fetch_hash);
-  PREPARE(sql_delete_useless, delete_useless);
+  PREPARE(sql_delete_jobs,    delete_jobs);
+  PREPARE(sql_delete_dups,    delete_dups);
+  PREPARE(sql_delete_stats,   delete_stats);
 
   return "";
 }
@@ -215,10 +262,14 @@ void Database::close() {
   }									\
   imp->member = 0;
 
+  FINALIZE(get_entropy);
+  FINALIZE(set_entropy);
   FINALIZE(add_target);
   FINALIZE(del_target);
   FINALIZE(begin_txn);
   FINALIZE(commit_txn);
+  FINALIZE(predict_job);
+  FINALIZE(stats_job);
   FINALIZE(insert_job);
   FINALIZE(insert_tree);
   FINALIZE(insert_log);
@@ -227,14 +278,17 @@ void Database::close() {
   FINALIZE(update_file);
   FINALIZE(get_log);
   FINALIZE(get_tree);
-  FINALIZE(set_runtime);
+  FINALIZE(add_stats);
+  FINALIZE(link_stats);
   FINALIZE(detect_overlap);
   FINALIZE(delete_overlap);
   FINALIZE(find_prior);
   FINALIZE(update_prior);
   FINALIZE(find_owner);
   FINALIZE(fetch_hash);
-  FINALIZE(delete_useless);
+  FINALIZE(delete_jobs);
+  FINALIZE(delete_dups);
+  FINALIZE(delete_stats);
 
   if (imp->db) {
     int ret = sqlite3_close(imp->db);
@@ -357,6 +411,28 @@ static std::string rip_column(sqlite3_stmt *stmt, int col) {
     sqlite3_column_bytes(stmt, col));
 }
 
+void Database::entropy(uint64_t *key, int words) {
+  const char *why = "Could not restore entropy";
+  int word;
+
+  begin_txn();
+
+  // Use entropy from DB
+  for (word = 0; word < words; ++word) {
+    if (sqlite3_step(imp->get_entropy) != SQLITE_ROW) break;
+    key[word] = sqlite3_column_int64(imp->get_entropy, 0);
+  }
+  finish_stmt(why, imp->get_entropy, imp->debugdb);
+
+  // Save any additional entropy needed
+  for (; word < words; ++word) {
+    bind_integer(why, imp->set_entropy, 1, key[word]);
+    single_step (why, imp->set_entropy, imp->debugdb);
+  }
+
+  end_txn();
+}
+
 std::vector<std::string> Database::get_targets() {
   std::vector<std::string> out;
   int ret = sqlite3_exec(imp->db, "select expression from targets;", &fill_vector, &out, 0);
@@ -391,7 +467,9 @@ void Database::prepare() {
 }
 
 void Database::clean() {
-  single_step("Could not clean database", imp->delete_useless, imp->debugdb);
+  single_step("Could not clean database jobs",  imp->delete_jobs,  imp->debugdb);
+  single_step("Could not clean database dups",  imp->delete_dups,  imp->debugdb);
+  single_step("Could not clean database stats", imp->delete_stats, imp->debugdb);
 }
 
 void Database::begin_txn() {
@@ -402,7 +480,7 @@ void Database::end_txn() {
   single_step("Could not commit a transaction", imp->commit_txn, imp->debugdb);
 }
 
-bool Database::reuse_job(
+Usage Database::reuse_job(
   const std::string &directory,
   const std::string &stdin,
   const std::string &environment,
@@ -410,34 +488,52 @@ bool Database::reuse_job(
   const std::string &visible,
   bool check,
   long &job,
-  std::vector<FileReflection> &out)
+  std::vector<FileReflection> &files)
 {
+  Usage out;
+  long stat_id;
+
   const char *why = "Could not check for a cached job";
   begin_txn();
   bind_string (why, imp->find_prior, 1, directory);
   bind_blob   (why, imp->find_prior, 2, commandline);
   bind_blob   (why, imp->find_prior, 3, environment);
   bind_string (why, imp->find_prior, 4, stdin);
-  bool prior = sqlite3_step(imp->find_prior) == SQLITE_ROW;
-  if (prior) job = sqlite3_column_int(imp->find_prior, 0);
+  out.found = sqlite3_step(imp->find_prior) == SQLITE_ROW;
+  if (out.found) {
+    job     = sqlite3_column_int64(imp->find_prior, 0);
+    stat_id = sqlite3_column_int64(imp->find_prior, 1);
+  }
   finish_stmt (why, imp->find_prior, imp->debugdb);
 
-  if (!prior) {
+  if (!out.found) {
     end_txn();
-    return false;
+    return out;
   }
 
-  bool exist = true;
+  bind_integer(why, imp->stats_job, 1, stat_id);
+  if (sqlite3_step(imp->stats_job) == SQLITE_ROW) {
+    out.status   = sqlite3_column_int64 (imp->stats_job, 0);
+    out.runtime  = sqlite3_column_double(imp->stats_job, 1);
+    out.cputime  = sqlite3_column_double(imp->stats_job, 2);
+    out.membytes = sqlite3_column_int64 (imp->stats_job, 3);
+    out.ibytes   = sqlite3_column_int64 (imp->stats_job, 4);
+    out.obytes   = sqlite3_column_int64 (imp->stats_job, 5);
+  } else {
+    out.found = false;
+  }
+  finish_stmt(why, imp->stats_job, imp->debugdb);
+
   bind_integer(why, imp->get_tree, 1, job);
   bind_integer(why, imp->get_tree, 2, OUTPUT);
   while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
     std::string path = rip_column(imp->get_tree, 0);
-    if (access(path.c_str(), R_OK) != 0) exist = false;
-    out.emplace_back(std::move(path), rip_column(imp->get_tree, 1));
+    if (access(path.c_str(), R_OK) != 0) out.found = false;
+    files.emplace_back(std::move(path), rip_column(imp->get_tree, 1));
   }
   finish_stmt(why, imp->get_tree, imp->debugdb);
 
-  if (exist && !check) {
+  if (out.found && !check) {
     bind_integer(why, imp->update_prior, 1, imp->run_id);
     bind_integer(why, imp->update_prior, 2, job);
     single_step (why, imp->update_prior, imp->debugdb);
@@ -445,7 +541,33 @@ bool Database::reuse_job(
 
   end_txn();
 
-  return exist;
+  return out;
+}
+
+Usage Database::predict_job(uint64_t hashcode)
+{
+  Usage out;
+  const char *why = "Could not predict a job";
+  bind_integer(why, imp->predict_job, 1, hashcode);
+  if (sqlite3_step(imp->predict_job) == SQLITE_ROW) {
+    out.found    = true;
+    out.status   = sqlite3_column_int   (imp->predict_job, 0);
+    out.runtime  = sqlite3_column_double(imp->predict_job, 1);
+    out.cputime  = sqlite3_column_double(imp->predict_job, 2);
+    out.membytes = sqlite3_column_int64 (imp->predict_job, 3);
+    out.ibytes   = sqlite3_column_int64 (imp->predict_job, 4);
+    out.obytes   = sqlite3_column_int64 (imp->predict_job, 5);
+  } else {
+    out.found    = false;
+    out.status   = 0;
+    out.runtime  = 0;
+    out.cputime  = 0;
+    out.membytes = 0;
+    out.ibytes   = 0;
+    out.obytes   = 0;
+  }
+  finish_stmt(why, imp->predict_job, imp->debugdb);
+  return out;
 }
 
 void Database::insert_job(
@@ -467,14 +589,21 @@ void Database::insert_job(
   *job = sqlite3_last_insert_rowid(imp->db);
 }
 
-void Database::finish_job(long job, const std::string &inputs, const std::string &outputs, bool keep, int status, double runtime) {
+void Database::finish_job(long job, const std::string &inputs, const std::string &outputs, uint64_t hashcode, bool keep, Usage reality) {
   const char *why = "Could not save job inputs and outputs";
   begin_txn();
-  bind_integer(why, imp->set_runtime, 1, keep?1:0);
-  bind_integer(why, imp->set_runtime, 2, status);
-  bind_double (why, imp->set_runtime, 3, runtime);
-  bind_integer(why, imp->set_runtime, 4, job);
-  single_step (why, imp->set_runtime, imp->debugdb);
+  bind_integer(why, imp->add_stats, 1, hashcode);
+  bind_integer(why, imp->add_stats, 2, reality.status);
+  bind_double (why, imp->add_stats, 3, reality.runtime);
+  bind_double (why, imp->add_stats, 4, reality.cputime);
+  bind_integer(why, imp->add_stats, 5, reality.membytes);
+  bind_integer(why, imp->add_stats, 6, reality.ibytes);
+  bind_integer(why, imp->add_stats, 7, reality.obytes);
+  single_step (why, imp->add_stats, imp->debugdb);
+  bind_integer(why, imp->link_stats, 1, sqlite3_last_insert_rowid(imp->db));
+  bind_integer(why, imp->link_stats, 2, keep?1:0);
+  bind_integer(why, imp->link_stats, 3, job);
+  single_step (why, imp->link_stats, imp->debugdb);
   const char *tok = inputs.c_str();
   const char *end = tok + inputs.size();
   for (const char *scan = tok; scan != end; ++scan) {
@@ -603,15 +732,19 @@ std::vector<JobReflection> Database::explain(const std::string &file, int use, b
   while (sqlite3_step(imp->find_owner) == SQLITE_ROW) {
     out.resize(out.size()+1);
     JobReflection &desc = out.back();
-    desc.job = sqlite3_column_int64(imp->find_owner, 0);
-    desc.directory = rip_column(imp->find_owner, 1);
-    desc.commandline = chop_null(rip_column(imp->find_owner, 2));
-    desc.environment = chop_null(rip_column(imp->find_owner, 3));
-    desc.stack = rip_column(imp->find_owner, 4);
-    desc.stdin = rip_column(imp->find_owner, 5);
-    desc.time = rip_column(imp->find_owner, 6);
-    desc.status = sqlite3_column_int64(imp->find_owner, 7);
-    desc.runtime = sqlite3_column_double(imp->find_owner, 8);
+    desc.job            = sqlite3_column_int64(imp->find_owner, 0);
+    desc.directory      = rip_column(imp->find_owner, 1);
+    desc.commandline    = chop_null(rip_column(imp->find_owner, 2));
+    desc.environment    = chop_null(rip_column(imp->find_owner, 3));
+    desc.stack          = rip_column(imp->find_owner, 4);
+    desc.stdin          = rip_column(imp->find_owner, 5);
+    desc.time           = rip_column(imp->find_owner, 6);
+    desc.usage.status   = sqlite3_column_int64 (imp->find_owner, 7);
+    desc.usage.runtime  = sqlite3_column_double(imp->find_owner, 8);
+    desc.usage.cputime  = sqlite3_column_double(imp->find_owner, 9);
+    desc.usage.membytes = sqlite3_column_int64 (imp->find_owner, 10);
+    desc.usage.ibytes   = sqlite3_column_int64 (imp->find_owner, 11);
+    desc.usage.obytes   = sqlite3_column_int64 (imp->find_owner, 12);
     if (desc.stdin.empty()) desc.stdin = "/dev/null";
     if (verbose) {
       desc.stdout = get_output(desc.job, 1);

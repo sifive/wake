@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <gmp.h>
 
-Double::Double(const char *str) : Value(type) {
+Double::Double(const char *str) : Value(&type) {
   char *end;
   value = strtod(str, &end);
 }
