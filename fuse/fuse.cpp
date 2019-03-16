@@ -705,6 +705,7 @@ static struct fuse* fh;
 static struct fuse_chan* fc;
 static sigset_t saved;
 static int logfd;
+static bool fail;
 
 static struct fuse_operations wakefuse_ops;
 
@@ -721,7 +722,7 @@ static void *wakefuse_init(struct fuse_conn_info *conn)
 
 static void handle_exit(int sig)
 {
-	(void)sig;
+	if (sig != SIGALRM) fail = true;
 
 	// Unfortunately, fuse_unmount can fail if the filesystem is still in use.
 	// Yes, this can even happen on linux with MNT_DETACH / lazy umount.
@@ -739,7 +740,7 @@ static void handle_exit(int sig)
 	} else {
 		struct itimerval retry;
 		memset(&retry, 0, sizeof(retry));
-		retry.it_value.tv_usec = 100000; // 100ms
+		retry.it_value.tv_usec = 200000; // 200ms
 		setitimer(ITIMER_REAL, &retry, 0);
 	}
 }
@@ -857,13 +858,13 @@ int main(int argc, char *argv[])
 	// Block signals again
 	sigprocmask(SIG_BLOCK, &block, 0);
 
-	for (auto &i : files_wrote) files_read.erase(i);
-	for (auto &i : files_read) std::cout << i << '\0';
-	std::cout << '\0';
-	for (auto &i : files_wrote) std::cout << i << '\0';
-
-	// Success! Already unmounted.
-	status = 0;
+	if (!fail) {
+		for (auto &i : files_wrote) files_read.erase(i);
+		for (auto &i : files_read) std::cout << i << '\0';
+		std::cout << '\0';
+		for (auto &i : files_wrote) std::cout << i << '\0';
+		status = 0;
+	}
 
 unmount:
 	// out-of-order completion: unmount THEN destroy
