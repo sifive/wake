@@ -854,6 +854,9 @@ int main(int argc, char *argv[])
 		goto unmount;
 	}
 
+	// Block signals again
+	sigprocmask(SIG_BLOCK, &block, 0);
+
 	for (auto &i : files_wrote) files_read.erase(i);
 	for (auto &i : files_read) std::cout << i << '\0';
 	std::cout << '\0';
