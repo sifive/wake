@@ -395,11 +395,12 @@ static PRIMFN(prim_workspace) {
 }
 
 void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimMap &pmap) {
-  pmap.emplace("sources",     PrimDesc(prim_sources,     type_sources,     sources));
-  pmap.emplace("add_sources", PrimDesc(prim_add_sources, type_add_sources, sources));
-  pmap.emplace("files",       PrimDesc(prim_files,       type_sources));
-  pmap.emplace("simplify",    PrimDesc(prim_simplify,    type_simplify));
-  pmap.emplace("relative",    PrimDesc(prim_relative,    type_relative));
-  pmap.emplace("execpath",    PrimDesc(prim_execpath,    type_execpath));
-  pmap.emplace("workspace",   PrimDesc(prim_workspace,   type_workspace));
+  // Re-ordering of sources/files would break their behaviour, so they are not pure.
+  pmap.emplace("sources",     PrimDesc(prim_sources,     type_sources,     PRIM_SHALLOW, sources));
+  pmap.emplace("add_sources", PrimDesc(prim_add_sources, type_add_sources, PRIM_SHALLOW, sources));
+  pmap.emplace("files",       PrimDesc(prim_files,       type_sources,     PRIM_SHALLOW));
+  pmap.emplace("simplify",    PrimDesc(prim_simplify,    type_simplify,    PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("relative",    PrimDesc(prim_relative,    type_relative,    PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("execpath",    PrimDesc(prim_execpath,    type_execpath,    PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("workspace",   PrimDesc(prim_workspace,   type_workspace,   PRIM_PURE|PRIM_SHALLOW));
 }
