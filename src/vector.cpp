@@ -77,7 +77,8 @@ static PRIMFN(prim_vset) {
 }
 
 void prim_register_vector(PrimMap &pmap) {
-  pmap.emplace("vnew", PrimDesc(prim_vnew, type_vnew));
-  pmap.emplace("vget", PrimDesc(prim_vget, type_vget, 0, PRIM_SHALLOW|PRIM_PURE));
-  pmap.emplace("vset", PrimDesc(prim_vset, type_vset, 0, PRIM_SHALLOW));
+  // We cannot safely reorder vget, so it is not PURE
+  pmap.emplace("vnew", PrimDesc(prim_vnew, type_vnew, PRIM_SHALLOW));
+  pmap.emplace("vget", PrimDesc(prim_vget, type_vget, PRIM_SHALLOW));
+  pmap.emplace("vset", PrimDesc(prim_vset, type_vset, PRIM_SHALLOW));
 }
