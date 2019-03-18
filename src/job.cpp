@@ -53,7 +53,6 @@ struct Job : public Value {
   // There are 4 distinct wait queues for jobs
   std::unique_ptr<Receiver> q_stdout;  // waken once stdout closed
   std::unique_ptr<Receiver> q_stderr;  // waken once stderr closed
-  std::unique_ptr<Receiver> q_merge;   // waken once job merged (reality available)
   std::unique_ptr<Receiver> q_reality; // waken once job merged (reality available)
   std::unique_ptr<Receiver> q_inputs;  // waken once job finished (inputs+outputs+report available)
   std::unique_ptr<Receiver> q_outputs; // waken once job finished (inputs+outputs+report available)
@@ -357,7 +356,7 @@ static void launch(JobTable *jobtable) {
     close(pipe_stderr[1]);
     for (char &c : task.cmdline) if (c == 0) c = ' ';
     if (i.pool) {
-      double predict = (i.job->predict.found && i.job->predict.status == 0) ? i.job->predict.runtime : 0;
+      double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
       i.status = status_state.emplace(status_state.end(), task.cmdline, predict, i.start);
     }
     if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
@@ -931,16 +930,6 @@ void Job::process(WorkQueue &queue) {
     q_stderr.reset();
   }
 
-  if ((state & STATE_MERGED) && q_merge) {
-    auto out = bad_launch ? bad_launch : std::make_shared<Integer>(reality.status);
-    std::unique_ptr<Receiver> iter, next;
-    for (iter = std::move(q_merge); iter; iter = std::move(next)) {
-      next = std::move(iter->next);
-      Receiver::receive(queue, std::move(iter), out);
-    }
-    q_merge.reset();
-  }
-
   if ((state & STATE_MERGED) && q_reality) {
     auto out = bad_launch ? bad_launch : make_usage(reality);
     std::unique_ptr<Receiver> iter, next;
@@ -1012,7 +1001,7 @@ static PRIMTYPE(type_job_kill) {
   return args.size() == 2 &&
     args[0]->unify(Job::typeVar) &&
     args[1]->unify(Integer::typeVar) &&
-    out->unify(Integer::typeVar);
+    out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_job_kill) {
@@ -1020,13 +1009,13 @@ static PRIMFN(prim_job_kill) {
   JOBRESULT(arg0, 0);
   INTEGER(arg1, 1);
   REQUIRE(mpz_cmp_si(arg1->value, 256) < 0, "signal too large (> 256)");
-  REQUIRE(mpz_cmp_si(arg1->value, 0) >= 0, "signal too small (< 0)");
+  REQUIRE(mpz_cmp_si(arg1->value, 0) > 0, "signal too small (<= 0)");
   int sig = mpz_get_si(arg1->value);
-  if (sig && (arg0->state & STATE_FORKED) && !(arg0->state & STATE_MERGED))
+  if ((arg0->state & STATE_FORKED) && !(arg0->state & STATE_MERGED))
     kill(arg0->pid, sig);
-  completion->next = std::move(arg0->q_merge);
-  arg0->q_merge = std::move(completion);
-  arg0->process(queue);
+
+  auto out = make_unit();
+  RETURN(out);
 }
 
 static PRIMTYPE(type_job_tree) {
