@@ -228,9 +228,13 @@ global def fuseRunner =
     def result = extract "(.*\0)?\0(.*)" fuse.getJobStdout
     def inputs  = result | at 0 | tokenize "\0" | reverse | tail
     def outputs = result | at 1 | tokenize "\0" | reverse | tail
+    def usage (Usage ps pr pc pm pi po) = match fuse.getJobReport
+      Usage fs _ fc fm fi fo =
+        Usage (if fs == 0 then ps else fs) pr (fc +. pc) (fm + pm) (fi + pi) (fo + po)
     output
     | setRunnerOutputInputs  inputs
     | setRunnerOutputOutputs outputs
+    | editRunnerOutputUsage usage
   makeRunner pre post manualRunner
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
