@@ -826,12 +826,14 @@ int main(int argc, char *argv[])
 
 	// ignore these signals
 	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = SA_RESTART;
 	sigaction(SIGPIPE, &sa, 0);
 	sigaction(SIGUSR1, &sa, 0);
 	sigaction(SIGUSR2, &sa, 0);
 
 	// hook these signals
 	sa.sa_handler = handle_exit;
+	sa.sa_flags = SA_RESTART;
 	sigaction(SIGHUP,  &sa, 0);
 	sigaction(SIGALRM, &sa, 0);
 	sigaction(SIGINT,  &sa, 0);
