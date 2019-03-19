@@ -6,6 +6,7 @@
 #include "location.h"
 #include "sources.h"
 #include "status.h"
+#include "thunk.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -127,7 +128,8 @@ struct JobTable::detail {
   bool check;
 };
 
-static bool child_ready = false;
+static volatile bool child_ready = false;
+static volatile bool exit_asap = false;
 
 static void handle_SIGCHLD(int sig) {
   (void)sig;
@@ -136,7 +138,11 @@ static void handle_SIGCHLD(int sig) {
 
 static void handle_exit(int sig) {
   (void)sig;
-  exit_now = true;
+  exit_asap = true;
+}
+
+bool JobTable::exit_now() {
+  return exit_asap;
 }
 
 JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool check) : imp(new JobTable::detail) {
@@ -363,7 +369,7 @@ bool JobTable::wait(WorkQueue &queue) {
   memset(&nowait, 0, sizeof(nowait));
 
   bool compute = false;
-  while (!exit_now) {
+  while (!exit_now()) {
     fd_set set;
     int nfds = 0;
     int njobs = 0;
@@ -389,7 +395,7 @@ bool JobTable::wait(WorkQueue &queue) {
     // Check for all signals that are now blocked
     struct timespec *timeout = 0;
     if (child_ready) timeout = &nowait;
-    if (exit_now) timeout = &nowait;
+    if (exit_now()) timeout = &nowait;
     status_refresh();
 
     // Wait for a status change, with signals atomically unblocked in pselect

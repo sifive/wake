@@ -12,7 +12,6 @@
 #include <string.h>
 #include <stdio.h>
 
-bool exit_now = false;
 std::list<Status> status_state;
 
 static volatile bool refresh_needed = false;

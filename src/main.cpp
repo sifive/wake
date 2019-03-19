@@ -471,7 +471,7 @@ int main(int argc, const char **argv) {
   status_finish();
 
   bool pass = true;
-  if (exit_now) {
+  if (JobTable::exit_now()) {
     std::cerr << "Early termination requested" << std::endl;
     pass = false;
   } else {

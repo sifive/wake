@@ -4,6 +4,7 @@
 #include "datatype.h"
 #include "prim.h"
 #include "status.h"
+#include "job.h"
 #include <cassert>
 
 struct Application : public Receiver {
@@ -232,7 +233,7 @@ void WorkQueue::run() {
   }
   while (!thunks.empty()) {
     if (++count >= 10000) {
-      if (exit_now) break;
+      if (JobTable::exit_now()) break;
       status_refresh();
       count = 0;
     }
