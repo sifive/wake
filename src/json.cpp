@@ -240,6 +240,6 @@ static PRIMFN(prim_json_body) {
 }
 
 void prim_register_json(PrimMap &pmap) {
-  pmap.emplace("json_file", PrimDesc(prim_json_file, type_json));
-  pmap.emplace("json_body", PrimDesc(prim_json_body, type_json));
+  pmap.emplace("json_file", PrimDesc(prim_json_file, type_json, PRIM_SHALLOW));
+  pmap.emplace("json_body", PrimDesc(prim_json_body, type_json, PRIM_SHALLOW|PRIM_PURE));
 }

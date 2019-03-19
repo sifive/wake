@@ -19,6 +19,8 @@ struct Usage {
   uint64_t membytes;
   uint64_t ibytes;
   uint64_t obytes;
+
+  Usage() : found(false) { }
 };
 
 struct JobReflection {

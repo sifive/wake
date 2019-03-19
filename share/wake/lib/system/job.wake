@@ -1,3 +1,11 @@
+tuple Usage =
+  global Status   Integer
+  global Runtime  Double
+  global CPUtime  Double
+  global MemBytes Integer
+  global InBytes  Integer
+  global OutBytes Integer
+
 # RunnerInput is a subset of the fields supplied in the execution Plan
 tuple RunnerInput =
   global Command       List String
@@ -5,12 +13,14 @@ tuple RunnerInput =
   global Environment   List String
   global Directory     String
   global StandardInput String
+  global Record        Option Usage
   Pool                 Integer
 
 tuple RunnerOutput =
   global Inputs  List String
   global Outputs List String
   global Indexes List String
+  global Usage   Usage
 
 # A Runner describes a way to invoke a Plan to get a Job
 tuple Runner =
@@ -25,8 +35,8 @@ global def makeRunner pre post (Runner run) =
       Pair runInput state =
         def runOutput = run job runInput
         def final _ = post (Pair runOutput state)
-        # Don't run any 'post' steps until the outputs is all there
-        waitOne final job.getJobStatus
+        # Don't run any 'post' steps until the Job has stopped running
+        waitJobMerged final job
   Runner doit
 
 # A Plan describes a not-yet-executed Job
@@ -89,55 +99,63 @@ global def makeManualPlan cmd visible foutputs =
 def makeRawPlan cmd  =
   Plan cmd Nil Nil "." "" False False False manualRunner id id id 1
 
+def defaultUsage = Usage 0 0.0 0.0 0 0 0
+
 # This runner does not detect inputs/outputs/indexes on it's own
 # You must use Fn{Inputs,Outputs,Indexes} to fill in this information
 global def manualRunner =
-  def launch job pool dir stdin env cmd = prim "job_launch"
+  def launch job pool dir stdin env cmd status runtime cputime membytes ibytes obytes = prim "job_launch"
   def doit job input =
    # Ensure that match does not re-raise the exception (launch must run)
-   match (try (\_ RunnerInput (cast input) Nil Nil "" "" 0) input)
-     RunnerInput cmd vis env dir stdin pool =
-       def _ = launch job pool dir stdin env.implode cmd.implode
-       RunnerOutput (map getPathName vis) Nil Nil
+   match (try (\_ RunnerInput (cast input) Nil Nil "" "" None 0) input)
+     RunnerInput cmd vis env dir stdin predict pool =
+       match (getOrElse defaultUsage (try (\_ None) predict))
+         Usage status runtime cputime mem in out =
+           def _ = launch job pool dir stdin env.implode cmd.implode status runtime cputime mem in out
+           RunnerOutput (map getPathName vis) Nil Nil (getJobReality job)
   Runner doit
 
 global def virtualRunner =
   def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
   def doit job input =
    # Ensure that match does not re-raise the exception (virtual must run)
-   match (try (\_ RunnerInput (cast input) Nil Nil "" "" 0) input)
-     RunnerInput cmd vis env dir stdin pool =
-       # Make sure any exceptions get fed into virtual
-       def stuff = implode (dir, stdin, str pool, cmd ++ env)
-       def status = if stuff ==* "" then 0 else 0
-       def _ = virtual job "" "" status 0.0 0.0 0 0 0
-       RunnerOutput (map getPathName vis) Nil Nil
+   match (try (\_ RunnerInput (cast input) Nil Nil "" "" None 0) input)
+     RunnerInput cmd vis env dir stdin predict pool =
+       match (getOrElse defaultUsage (try (\_ None) predict))
+         Usage status runtime cputime mem in out =
+           # Make sure any exceptions get fed into virtual
+           def stuff = implode (dir, stdin, str pool, cmd ++ env)
+           def s = if stuff ==* "" then status else status
+           def _ = virtual job "" "" s runtime cputime mem in out # sets predict+reality
+           RunnerOutput (map getPathName vis) Nil Nil (getJobReality job)
   Runner doit
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
 def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool =
   def create dir stdin env cmd visible keep = prim "job_create"
-  def finish job inputs outputs = prim "job_finish"
+  def finish job inputs outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
   def cache dir stdin env cmd visible = prim "job_cache"
   def build _ =
     def doit job =
-      def output = run job (RunnerInput cmd vis env dir stdin pool)
-      # Make sure we run finish even if the runner raises an exception
-      match (try (\_ RunnerOutput (cast output) (cast output) (cast output)) output)
-        RunnerOutput inputs outputs indexes =
-          def final _ =
-            def input  = finputs  inputs  | map simplify | implode
-            def output = foutputs outputs | map addhash  | implode
-            finish job input output
-          # Input + output names might be known before the job terminates
-          def _ = waitOne final job.getJobStatus
-          job
+      def output = run job (RunnerInput cmd vis env dir stdin (getJobRecord job) pool)
+      def final _ =
+        # Make sure we run finish even if the runner raises an exception
+        match (try (\_ RunnerOutput (cast output) (cast output) (cast output) (cast output)) output)
+          RunnerOutput inputs outputs indexes usage =
+            match (try (\_ defaultUsage) usage)
+              Usage status runtime cputime mem in out =
+                def input  = finputs  inputs  | map simplify | implode
+                def output = foutputs outputs | map addhash  | implode
+                finish job input output status runtime cputime mem in out
+      # Make sure we don't hash files before the job has stopped running
+      def _ = waitJobMerged final job
+      job
     # Do not invoke the runner/finish if job create fails
     def rawjob = create dir stdin env.implode cmd.implode (map getPathName vis).implode (if keep then 1 else 0)
     tryelse (\_ rawjob) doit rawjob
   def confirm last job =
     def notOk (Pair name hash) = hashcode name !=* hash
-    match (waitOne (\_ find notOk last) job.getJobStatus)
+    match (waitJobMerged (\_ find notOk last) job)
       None = job
       Some (Pair (Pair file saw) _) =
         raise "Hash mismatch for {file} ({saw} != {hashcode file}); remove it"
@@ -157,12 +175,33 @@ global def runJob (Plan cmd vis env dir stdin once keep share (Runner run) finpu
   then runOnce   cmd env dir stdin finputs foutputs findexes vis keep share run pool
   else runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool
 
+def toUsage (Pair (Pair status runtime) (Pair (Pair cputime membytes) (Pair ibytes obytes))) =
+  Usage status runtime cputime membytes ibytes obytes
+
+def getJobReality =
+  def raw job = prim "job_reality"
+  raw _ | toUsage
+
+def waitJobMerged f j =
+  def raw job = prim "job_reality"
+  raw j | waitOne f
+
+# Actual usage of a finished job
+global def getJobReport =
+  def raw job = prim "job_report"
+  raw _ | toUsage
+
+# From database, available the moment a Job exists
+global def getJobRecord =
+  def raw job = prim "job_record"
+  raw _ | atOpt 0 | omap toUsage
+
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
 def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
 def fail job ok = if job.getJobStatus == 0 then ok else raise "Non-zero exit status ({str job.getJobStatus})"
 global def killJob job signal = prim "job_kill" # s != 0 => kills; blocks till exit; return status
-global def getJobStatus  job = killJob  job 0
+global def getJobStatus  job = getJobReport job | getUsageStatus
 global def getJobStdout  job = stdio job 1
 global def getJobStderr  job = stdio job 2
 global def getJobInputs  job = fail job job.getJobFailedInputs
@@ -189,9 +228,13 @@ global def fuseRunner =
     def result = extract "(.*\0)?\0(.*)" fuse.getJobStdout
     def inputs  = result | at 0 | tokenize "\0" | reverse | tail
     def outputs = result | at 1 | tokenize "\0" | reverse | tail
+    def usage (Usage ps pr pc pm pi po) = match fuse.getJobReport
+      Usage fs _ fc fm fi fo =
+        Usage (if fs == 0 then ps else fs) pr (fc +. pc) (fm + pm) (fi + pi) (fo + po)
     output
     | setRunnerOutputInputs  inputs
     | setRunnerOutputOutputs outputs
+    | editRunnerOutputUsage usage
   makeRunner pre post manualRunner
 
 # Paths differ from Strings in that they have been hashed; their content is frozen

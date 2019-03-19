@@ -705,7 +705,7 @@ static struct fuse* fh;
 static struct fuse_chan* fc;
 static sigset_t saved;
 static int logfd;
-static bool fail;
+static bool pass;
 
 static struct fuse_operations wakefuse_ops;
 
@@ -722,7 +722,7 @@ static void *wakefuse_init(struct fuse_conn_info *conn)
 
 static void handle_exit(int sig)
 {
-	if (sig != SIGALRM) fail = true;
+	if (sig != SIGALRM) pass = false;
 
 	// Unfortunately, fuse_unmount can fail if the filesystem is still in use.
 	// Yes, this can even happen on linux with MNT_DETACH / lazy umount.
@@ -826,12 +826,14 @@ int main(int argc, char *argv[])
 
 	// ignore these signals
 	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = SA_RESTART;
 	sigaction(SIGPIPE, &sa, 0);
 	sigaction(SIGUSR1, &sa, 0);
 	sigaction(SIGUSR2, &sa, 0);
 
 	// hook these signals
 	sa.sa_handler = handle_exit;
+	sa.sa_flags = SA_RESTART;
 	sigaction(SIGHUP,  &sa, 0);
 	sigaction(SIGALRM, &sa, 0);
 	sigaction(SIGINT,  &sa, 0);
@@ -857,14 +859,7 @@ int main(int argc, char *argv[])
 
 	// Block signals again
 	sigprocmask(SIG_BLOCK, &block, 0);
-
-	if (!fail) {
-		for (auto &i : files_wrote) files_read.erase(i);
-		for (auto &i : files_read) std::cout << i << '\0';
-		std::cout << '\0';
-		for (auto &i : files_wrote) std::cout << i << '\0';
-		status = 0;
-	}
+	pass = true;
 
 unmount:
 	// out-of-order completion: unmount THEN destroy
@@ -877,5 +872,26 @@ rmroot:
 		fprintf(stderr, "rmdir %s: %s\n", path.c_str(), strerror(errno));
 	}
 term:
+	if (pass) {
+		// re-enable signals to make it possible to interrupt output
+		sa.sa_handler = SIG_DFL;
+		sa.sa_flags = 0;
+		sigaction(SIGPIPE, &sa, 0);
+		sigaction(SIGUSR1, &sa, 0);
+		sigaction(SIGUSR2, &sa, 0);
+		sigaction(SIGHUP,  &sa, 0);
+		sigaction(SIGALRM, &sa, 0);
+		sigaction(SIGINT,  &sa, 0);
+		sigaction(SIGQUIT, &sa, 0);
+		sigaction(SIGTERM, &sa, 0);
+		sigprocmask(SIG_SETMASK, &saved, 0);
+
+		for (auto &i : files_wrote) files_read.erase(i);
+		for (auto &i : files_read) std::cout << i << '\0';
+		std::cout << '\0';
+		for (auto &i : files_wrote) std::cout << i << '\0';
+		status = 0;
+	}
+
 	return status;
 }

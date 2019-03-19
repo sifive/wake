@@ -164,25 +164,25 @@ static PRIMFN(prim_icmp) {
 }
 
 void prim_register_integer(PrimMap &pmap) {
-  pmap.emplace("com", PrimDesc(prim_com, type_unop));
-  pmap.emplace("abs", PrimDesc(prim_abs, type_unop));
-  pmap.emplace("neg", PrimDesc(prim_neg, type_unop));
-  pmap.emplace("add", PrimDesc(prim_add, type_binop));
-  pmap.emplace("sub", PrimDesc(prim_sub, type_binop));
-  pmap.emplace("mul", PrimDesc(prim_mul, type_binop));
-  pmap.emplace("div", PrimDesc(prim_div, type_binop));
-  pmap.emplace("mod", PrimDesc(prim_mod, type_binop));
-  pmap.emplace("xor", PrimDesc(prim_xor, type_binop));
-  pmap.emplace("and", PrimDesc(prim_and, type_binop));
-  pmap.emplace("or",  PrimDesc(prim_or,  type_binop));
-  pmap.emplace("gcd", PrimDesc(prim_gcd, type_binop));
-  pmap.emplace("lcm", PrimDesc(prim_lcm, type_binop));
-  pmap.emplace("shl", PrimDesc(prim_shl, type_binop));
-  pmap.emplace("shr", PrimDesc(prim_shr, type_binop));
-  pmap.emplace("exp", PrimDesc(prim_exp, type_binop));
-  pmap.emplace("root",PrimDesc(prim_root,type_binop));
-  pmap.emplace("powm",PrimDesc(prim_powm,type_powm));
-  pmap.emplace("str", PrimDesc(prim_str, type_str));
-  pmap.emplace("int", PrimDesc(prim_int, type_int));
-  pmap.emplace("icmp",PrimDesc(prim_icmp,type_icmp));
+  pmap.emplace("com", PrimDesc(prim_com, type_unop,  PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("abs", PrimDesc(prim_abs, type_unop,  PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("neg", PrimDesc(prim_neg, type_unop,  PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("add", PrimDesc(prim_add, type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("sub", PrimDesc(prim_sub, type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("mul", PrimDesc(prim_mul, type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("div", PrimDesc(prim_div, type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("mod", PrimDesc(prim_mod, type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("xor", PrimDesc(prim_xor, type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("and", PrimDesc(prim_and, type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("or",  PrimDesc(prim_or,  type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("gcd", PrimDesc(prim_gcd, type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("lcm", PrimDesc(prim_lcm, type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("shl", PrimDesc(prim_shl, type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("shr", PrimDesc(prim_shr, type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("exp", PrimDesc(prim_exp, type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("root",PrimDesc(prim_root,type_binop, PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("powm",PrimDesc(prim_powm,type_powm,  PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("str", PrimDesc(prim_str, type_str,   PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("int", PrimDesc(prim_int, type_int,   PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("icmp",PrimDesc(prim_icmp,type_icmp,  PRIM_PURE|PRIM_SHALLOW));
 }

@@ -35,49 +35,63 @@ bool chdir_workspace(std::string &prefix) {
   return attempts != 0;
 }
 
-static std::string slurp(const std::string &command) {
+static std::string slurp(const std::string &command, bool &fail) {
   std::stringstream str;
   char buf[4096];
   int got;
   FILE *cmd = popen(command.c_str(), "r");
   while ((got = fread(buf, 1, sizeof(buf), cmd)) > 0) str.write(buf, got);
-  pclose(cmd);
+  if (ferror(cmd)) fail = true;
+  if (pclose(cmd) != 0) fail = true;
   return str.str();
 }
 
-static void scan(std::vector<std::shared_ptr<String> > &out, const std::string &path) {
-  if (auto dir = opendir(path.c_str())) {
-    while (auto f = readdir(dir)) {
-      if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
-      if (!strcmp(f->d_name, ".git")) {
-        std::string files(slurp("git -C " + path + " ls-files -z"));
-        std::string prefix(path == "." ? "" : (path + "/"));
-        const char *tok = files.data();
-        const char *end = tok + files.size();
-        for (const char *scan = tok; scan != end; ++scan) {
-          if (*scan == 0 && scan != tok) {
-            out.emplace_back(std::make_shared<String>(prefix + tok));
-            tok = scan+1;
-          }
+static bool scan(std::vector<std::shared_ptr<String> > &out, const std::string &path) {
+  auto dir = opendir(path.c_str());
+  if (!dir) return true;
+
+  struct dirent *f;
+  bool failed = false;
+  for (errno = 0; !failed && (f = readdir(dir)); errno = 0) {
+    if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
+    if (!strcmp(f->d_name, ".git")) {
+      std::string files(slurp("git -C " + path + " ls-files -z", failed));
+      std::string prefix(path == "." ? "" : (path + "/"));
+      const char *tok = files.data();
+      const char *end = tok + files.size();
+      for (const char *scan = tok; scan != end; ++scan) {
+        if (*scan == 0 && scan != tok) {
+          out.emplace_back(std::make_shared<String>(prefix + tok));
+          tok = scan+1;
         }
       }
+    } else {
       std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
-      if (f->d_type == DT_DIR) scan(out, name);
+      if (f->d_type == DT_DIR) failed = scan(out, name);
     }
-    closedir(dir);
   }
+
+  failed = errno         != 0 || failed;
+  failed = closedir(dir) != 0 || failed;
+  return failed;
 }
 
-static void push_files(std::vector<std::shared_ptr<String> > &out, const std::string &path) {
-  if (auto dir = opendir(path.c_str())) {
-    while (auto f = readdir(dir)) {
-      if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
-      std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
-      if (f->d_type == DT_REG) out.emplace_back(std::make_shared<String>(name));
-      if (f->d_type == DT_DIR) push_files(out, name);
-    }
-    closedir(dir);
+static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::string &path) {
+  auto dir = opendir(path.c_str());
+  if (!dir) return true;
+
+  struct dirent *f;
+  bool failed = false;
+  for (errno = 0; !failed && (f = readdir(dir)); errno = 0) {
+    if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
+    std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
+    if (f->d_type == DT_REG) out.emplace_back(std::make_shared<String>(name));
+    if (f->d_type == DT_DIR) failed = push_files(out, name);
   }
+
+  failed = errno         != 0 || failed;
+  failed = closedir(dir) != 0 || failed;
+  return failed;
 }
 
 static bool str_lexical(const std::shared_ptr<String> &a, const std::shared_ptr<String> &b) {
@@ -207,12 +221,12 @@ std::string get_workspace() {
   return cwd;
 }
 
-std::vector<std::shared_ptr<String> > find_all_sources() {
+std::vector<std::shared_ptr<String> > find_all_sources(bool &ok) {
   std::vector<std::shared_ptr<String> > out;
-  scan(out, ".");
+  ok = ok && !scan(out, ".");
   std::string abs_libdir = find_execpath() + "/../share/wake/lib";
   std::string rel_libdir = make_relative(get_workspace(), make_canonical(abs_libdir));
-  push_files(out, rel_libdir);
+  ok = ok && !push_files(out, rel_libdir);
   distinct(out);
   return out;
 }
@@ -302,7 +316,8 @@ static PRIMFN(prim_files) {
   }
 
   std::vector<std::shared_ptr<String> > files;
-  push_files(files, root);
+  bool fail = push_files(files, root);
+  REQUIRE(!fail, "Directory listing failure");
   auto match = sources(files, root, exp);
 
   std::vector<std::shared_ptr<Value> > downcast;
@@ -395,11 +410,12 @@ static PRIMFN(prim_workspace) {
 }
 
 void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimMap &pmap) {
-  pmap.emplace("sources",     PrimDesc(prim_sources,     type_sources,     sources));
-  pmap.emplace("add_sources", PrimDesc(prim_add_sources, type_add_sources, sources));
-  pmap.emplace("files",       PrimDesc(prim_files,       type_sources));
-  pmap.emplace("simplify",    PrimDesc(prim_simplify,    type_simplify));
-  pmap.emplace("relative",    PrimDesc(prim_relative,    type_relative));
-  pmap.emplace("execpath",    PrimDesc(prim_execpath,    type_execpath));
-  pmap.emplace("workspace",   PrimDesc(prim_workspace,   type_workspace));
+  // Re-ordering of sources/files would break their behaviour, so they are not pure.
+  pmap.emplace("sources",     PrimDesc(prim_sources,     type_sources,     PRIM_SHALLOW, sources));
+  pmap.emplace("add_sources", PrimDesc(prim_add_sources, type_add_sources, PRIM_SHALLOW, sources));
+  pmap.emplace("files",       PrimDesc(prim_files,       type_sources,     PRIM_SHALLOW));
+  pmap.emplace("simplify",    PrimDesc(prim_simplify,    type_simplify,    PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("relative",    PrimDesc(prim_relative,    type_relative,    PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("execpath",    PrimDesc(prim_execpath,    type_execpath,    PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("workspace",   PrimDesc(prim_workspace,   type_workspace,   PRIM_PURE|PRIM_SHALLOW));
 }

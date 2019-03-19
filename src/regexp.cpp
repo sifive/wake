@@ -182,10 +182,10 @@ static PRIMFN(prim_tokenize) {
 }
 
 void prim_register_regexp(PrimMap &pmap) {
-  pmap.emplace("re2",      PrimDesc(prim_re2,      type_re2));
-  pmap.emplace("quote",    PrimDesc(prim_quote,    type_quote));
-  pmap.emplace("match",    PrimDesc(prim_match,    type_match));
-  pmap.emplace("extract",  PrimDesc(prim_extract,  type_extract));
-  pmap.emplace("replace",  PrimDesc(prim_replace,  type_replace));
-  pmap.emplace("tokenize", PrimDesc(prim_tokenize, type_tokenize));
+  pmap.emplace("re2",      PrimDesc(prim_re2,      type_re2,      PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("quote",    PrimDesc(prim_quote,    type_quote,    PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("match",    PrimDesc(prim_match,    type_match,    PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("extract",  PrimDesc(prim_extract,  type_extract,  PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("replace",  PrimDesc(prim_replace,  type_replace,  PRIM_PURE|PRIM_SHALLOW));
+  pmap.emplace("tokenize", PrimDesc(prim_tokenize, type_tokenize, PRIM_PURE|PRIM_SHALLOW));
 }

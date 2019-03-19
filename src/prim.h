@@ -85,11 +85,11 @@ std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values);
 struct PrimDesc {
   PrimFn   fn;
   PrimType type;
-  void    *data;
   int      flags;
+  void    *data;
 
-  PrimDesc(PrimFn fn_, PrimType type_, void *data_ = 0, int flags_ = 0)
-   : fn(fn_), type(type_), data(data_), flags(flags_) { }
+  PrimDesc(PrimFn fn_, PrimType type_, int flags_, void *data_ = 0)
+   : fn(fn_), type(type_), flags(flags_), data(data_) { }
 };
 
 typedef std::map<std::string, PrimDesc> PrimMap;
