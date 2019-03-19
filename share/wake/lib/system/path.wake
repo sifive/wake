@@ -29,21 +29,27 @@ def mkdirRunner =
     | editRunnerOutputOutputs (imp (int mode) dir, _)
   makeRunner pre post virtualRunner
 
-# Create a directory (if it does not already exist)
-global def mkdir mode path =
-  def helper (Pair inputs acc_) e =
-    def acc = if acc_ ==* "" then if e ==* "" then "/" else e else simplify "{acc_}/{e}"
-    makePlan ("<mkdir>", "-m", "0{strbase 8 mode}", acc, Nil) inputs
-    | setPlanRunner      mkdirRunner
-    | setPlanKeep        False
-    | setPlanEnvironment Nil
-    | runJob
-    | getJobOutputs
-    | (Pair _ acc)
-  foldl helper (Pair Nil "") (path | simplify | tokenize "/") | getPairFirst | head
+def mkdirImp inputs mode path =
+  makePlan ("<mkdir>", "-m", "0{strbase 8 mode}", path, Nil) inputs
+  | setPlanRunner      mkdirRunner
+  | setPlanKeep        False
+  | setPlanEnvironment Nil
+  | runJob
+  | getJobOutput
 
-global def write mode rawpath content =
-  def path = simplify rawpath
+# Create a directory in the parent
+global def mkdirIn parent mode name =
+  mkdirImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify
+
+# Make all every element in the directory path with mode 0775
+global def mkdir path =
+  def root = match _
+    "", x, t = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 "/{x}") t
+    x, t     = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 x) t
+    Nil      = raise "impossible"
+  path | simplify | tokenize "/" | root
+
+def writeImp inputs mode path content =
   def writeRunner =
     def imp m p c = prim "write"
     def pre input = Pair input Unit
@@ -51,10 +57,19 @@ global def write mode rawpath content =
       output
       | editRunnerOutputOutputs (imp mode path content, _)
     makeRunner pre post virtualRunner
-  def exec = or mode ((and mode 0444) >> 2) # copy read permissions to execute permissions
-  makePlan ("<write>", str mode, path, Nil) (mkdir exec "{path}/..", Nil)
+  makePlan ("<write>", str mode, path, Nil) inputs
   | setPlanRunner      writeRunner
   | setPlanOnce        False
   | setPlanEnvironment Nil
   | runJob
   | getJobOutput
+
+# Create a file with the given mode in the specified directory
+global def writeIn parent mode name content =
+  writeImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify content
+
+# Create all directories and the named file
+global def write rawpath content =
+  def path = simplify rawpath
+  def parent = simplify "{path}/.."
+  writeImp (mkdir parent, Nil) 0664 path content

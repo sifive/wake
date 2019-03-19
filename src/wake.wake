@@ -8,7 +8,7 @@ def version_h _ =
   def cmdline = which "git", "describe", "--tags", "--dirty", Nil
   def git = volatileJob cmdline Nil (\_ Nil)
   def body = "#define VERSION {git.getJobStdout}"
-  write 0644 "{here}/version.h" body
+  write "{here}/version.h" body
 
 global def buildWake variant =
   def reFiles = sources here '.*\.re'
