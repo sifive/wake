@@ -12,6 +12,7 @@ struct String;
 
 bool chdir_workspace(std::string &prefix);
 bool make_workspace(const std::string &dir);
+std::string make_canonical(const std::string &x);
 
 std::string find_execpath();
 std::string get_cwd();

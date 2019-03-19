@@ -330,12 +330,12 @@ int main(int argc, const char **argv) {
 
   if (args["input"]) {
     std::string input = args["input"];
-    describe(db.explain(prefix + input, 1, verbose), rerun, debug);
+    describe(db.explain(make_canonical(prefix + input), 1, verbose), rerun, debug);
   }
 
   if (args["output"]) {
     std::string output = args["output"];
-    describe(db.explain(prefix + output, 2, verbose), rerun, debug);
+    describe(db.explain(make_canonical(prefix + output), 2, verbose), rerun, debug);
   }
 
   if (noparse) return 0;

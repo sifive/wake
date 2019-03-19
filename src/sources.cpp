@@ -120,7 +120,7 @@ std::string find_execpath() {
 }
 
 // . => ., hax/ => hax, foo/.././bar.z => bar.z, foo/../../bar.z => ../bar.z
-static std::string make_canonical(const std::string &x) {
+std::string make_canonical(const std::string &x) {
   bool abs = x[0] == '/';
 
   std::stringstream str;
