@@ -16,7 +16,6 @@ struct Status {
 };
 
 extern bool exit_now;
-extern bool refresh_needed;
 extern std::list<Status> status_state;
 
 void status_init(bool tty);

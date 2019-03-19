@@ -13,8 +13,10 @@
 #include <stdio.h>
 
 bool exit_now = false;
-bool refresh_needed = false;
 std::list<Status> status_state;
+
+static volatile bool refresh_needed = false;
+static volatile bool resize_detected = false;
 
 static bool tty = false;
 static int rows = 0, cols = 0;
@@ -57,6 +59,16 @@ static void status_redraw()
   std::stringstream os;
   struct timeval now;
   gettimeofday(&now, 0);
+
+  refresh_needed = false;
+  if (resize_detected) {
+    resize_detected = false;
+    struct winsize size;
+    if (ioctl(2, TIOCGWINSZ, &size) == 0) {
+      rows = size.ws_row;
+      cols = size.ws_col;
+    }
+  }
 
   int total = status_state.size();
   if (tty && rows > 4 && cols > 16) for (auto &x : status_state) {
@@ -107,31 +119,35 @@ static void status_redraw()
 
   std::string s = os.str();
   write_all(2, s.data(), s.size());
-  refresh_needed = false;
 }
 
-static void update_rows(int)
+static void handle_SIGALRM(int sig)
 {
-  struct winsize size;
-  if (ioctl(2, TIOCGWINSZ, &size) == 0) {
-    rows = size.ws_row;
-    cols = size.ws_col;
-  }
-  status_clear();
+  (void)sig;
   refresh_needed = true;
+}
+
+static void handle_SIGWINCH(int sig)
+{
+  (void)sig;
+  refresh_needed = true;
+  resize_detected = true;
 }
 
 void status_init(bool tty_)
 {
   tty = tty_;
+
   if (tty) {
     if (isatty(2) != 1) tty = false;
   }
+
   if (tty) {
     int eret;
     int ret = setupterm(0, 2, &eret);
     if (ret != OK) tty = false;
   }
+
   if (tty) {
     cuu1 = tigetstr("cuu1"); // cursor up one row
     cr = tigetstr("cr");     // return to first column
@@ -143,10 +159,25 @@ void status_init(bool tty_)
     if (!ed || ed == (char*)-1) tty = false;
     if (cols < 0 || rows < 0) tty = false;
   }
+
   if (tty) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+
     // watch for resize events
-    signal(SIGWINCH, update_rows);
-    update_rows(SIGWINCH);
+    sa.sa_handler = handle_SIGWINCH;
+    sigaction(SIGWINCH, &sa, 0);
+    handle_SIGWINCH(SIGWINCH);
+
+    // Setup a SIGALRM timer to trigger status redraw
+    struct itimerval timer;
+    timer.it_value.tv_sec = 0;
+    timer.it_value.tv_usec = 1000000/6; // refresh at 6Hz
+    timer.it_interval = timer.it_value;
+
+    sa.sa_handler = handle_SIGALRM;
+    sigaction(SIGALRM, &sa, 0);
+    setitimer(ITIMER_REAL, &timer, 0);
   }
 }
 
@@ -159,8 +190,10 @@ void status_write(int fd, const char *data, int len)
 
 void status_refresh()
 {
-  status_clear();
-  status_redraw();
+  if (refresh_needed) {
+    status_clear();
+    status_redraw();
+  }
 }
 
 void status_finish()

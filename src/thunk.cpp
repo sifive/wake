@@ -225,12 +225,17 @@ void Receive::eval(WorkQueue &queue) {
 }
 
 void WorkQueue::run() {
+  int count = 0;
   while (!receives.empty()) {
     receives.front().eval(*this);
     receives.pop();
   }
-  while (!thunks.empty() && !exit_now) {
-    if (refresh_needed) status_refresh();
+  while (!thunks.empty()) {
+    if (++count >= 10000) {
+      if (exit_now) break;
+      status_refresh();
+      count = 0;
+    }
     thunks.front().eval(*this);
     thunks.pop();
     while (!receives.empty()) {

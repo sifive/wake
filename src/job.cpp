@@ -134,11 +134,6 @@ static void handle_SIGCHLD(int sig) {
   child_ready = true;
 }
 
-static void handle_SIGALRM(int sig) {
-  (void)sig;
-  refresh_needed = true;
-}
-
 static void handle_exit(int sig) {
   (void)sig;
   exit_now = true;
@@ -182,16 +177,9 @@ JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool ch
   sigaddset(&imp->block, SIGXCPU);
   sigaddset(&imp->block, SIGXFSZ);
 
-  // Setup a SIGALRM timer to trigger status redraw
-  struct itimerval timer;
-  timer.it_value.tv_sec = 0;
-  timer.it_value.tv_usec = 1000000/6; // refresh at 6Hz
-  timer.it_interval = timer.it_value;
-
-  sa.sa_handler = handle_SIGALRM;
-  sigaction(SIGALRM, &sa, 0);
+  // These are handled in status.cpp
   sigaddset(&imp->block, SIGALRM);
-  setitimer(ITIMER_REAL, &timer, 0);
+  sigaddset(&imp->block, SIGWINCH);
 
   // SIGCHLD interrupts pselect()
   sa.sa_handler = handle_SIGCHLD;
@@ -402,7 +390,7 @@ bool JobTable::wait(WorkQueue &queue) {
     struct timespec *timeout = 0;
     if (child_ready) timeout = &nowait;
     if (exit_now) timeout = &nowait;
-    if (refresh_needed) status_refresh();
+    status_refresh();
 
     // Wait for a status change, with signals atomically unblocked in pselect
     int retval = pselect(nfds, &set, 0, 0, timeout, &saved);
