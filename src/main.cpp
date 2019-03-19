@@ -341,7 +341,8 @@ int main(int argc, const char **argv) {
   if (noparse) return 0;
 
   bool ok = true;
-  auto all_sources(find_all_sources());
+  auto all_sources(find_all_sources(ok));
+  if (!ok) std::cerr << "Source file enumeration failed" << std::endl;
 
   // Read all wake build files
   std::unique_ptr<Top> top(new Top);

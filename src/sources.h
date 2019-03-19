@@ -17,7 +17,7 @@ std::string find_execpath();
 std::string get_cwd();
 std::string get_workspace();
 
-std::vector<std::shared_ptr<String> > find_all_sources();
+std::vector<std::shared_ptr<String> > find_all_sources(bool &ok);
 std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<String> > &all, const std::string &base, const std::string &regexp);
 
 #endif
