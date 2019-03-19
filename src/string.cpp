@@ -141,6 +141,7 @@ static PRIMFN(prim_read) {
   REQUIRE(!t.fail(), "Could not read " + arg0->value);
   std::stringstream buffer;
   buffer << t.rdbuf();
+  REQUIRE(!t.bad(), "Could not read " + arg0->value);
   auto out = std::make_shared<String>(buffer.str());
   RETURN(out);
 }
@@ -167,6 +168,7 @@ static PRIMFN(prim_write) {
   REQUIRE(!t.fail(), "Could not write " + path->value);
   t << body->value;
   chmod(path->value.c_str(), mask);
+  REQUIRE(!t.bad(), "Could not write " + path->value);
   RETURN(args[1]);
 }
 
