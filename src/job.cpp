@@ -407,6 +407,7 @@ bool JobTable::wait(WorkQueue &queue) {
     if (child_ready) timeout = &nowait;
     if (exit_now()) timeout = &nowait;
 
+#if !defined(__linux__)
     // In case SIGALRM with SA_RESTART doesn't stop pselect
     if (!timeout) {
       struct itimerval timer;
@@ -418,8 +419,8 @@ bool JobTable::wait(WorkQueue &queue) {
         timeout = &alarm;
       }
     }
+#endif
     status_refresh();
-
 
     // Wait for a status change, with signals atomically unblocked in pselect
     int retval = pselect(nfds, &set, 0, 0, timeout, &saved);
