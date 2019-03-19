@@ -1,4 +1,5 @@
 #include "status.h"
+#include "job.h"
 #include <sstream>
 #include <sys/ioctl.h>
 #include <sys/time.h>
@@ -28,7 +29,7 @@ static void write_all(int fd, const char *data, size_t len)
 {
   ssize_t got;
   size_t done;
-  for (done = 0; done < len; done += got) {
+  for (done = 0; !JobTable::exit_now() && done < len; done += got) {
     got = write(fd, data+done, len-done);
     if (done < 0 && errno != EINTR) break;
   }
@@ -165,6 +166,7 @@ void status_init(bool tty_)
 
     // watch for resize events
     sa.sa_handler = handle_SIGWINCH;
+    sa.sa_flags = SA_RESTART; // interrupting pselect() is not critical for this
     sigaction(SIGWINCH, &sa, 0);
     handle_SIGWINCH(SIGWINCH);
 
@@ -175,6 +177,7 @@ void status_init(bool tty_)
     timer.it_interval = timer.it_value;
 
     sa.sa_handler = handle_SIGALRM;
+    sa.sa_flags = SA_RESTART; // we will truncate the pselect timeout to compensate
     sigaction(SIGALRM, &sa, 0);
     setitimer(ITIMER_REAL, &timer, 0);
   }
@@ -198,5 +201,11 @@ void status_refresh()
 void status_finish()
 {
   status_clear();
-  if (tty) reset_shell_mode();
+  if (tty) {
+    struct itimerval timer;
+    memset(&timer, 0, sizeof(timer));
+    setitimer(ITIMER_REAL, &timer, 0);
+
+    reset_shell_mode();
+  }
 }

@@ -467,6 +467,12 @@ int main(int argc, const char **argv) {
   std::shared_ptr<Value> output;
   queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output(&output)));
 
+  // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
+  std::cout << std::flush;
+  std::cerr << std::flush;
+  fflush(stdout);
+  fflush(stderr);
+
   status_init(tty);
   do { queue.run(); } while (jobtable.wait(queue));
   status_finish();

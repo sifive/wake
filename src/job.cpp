@@ -121,7 +121,7 @@ double JobEntry::runtime(struct timeval now) {
 struct JobTable::detail {
   std::vector<JobEntry> table;
   std::vector<std::list<Task> > tasks;
-  sigset_t block; // signals that interrupt pselect()
+  sigset_t block; // signals that can race with pselect()
   Database *db;
   bool verbose;
   bool quiet;
@@ -162,12 +162,23 @@ JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool ch
 
   // Ignore these signals
   sa.sa_handler = SIG_IGN;
+  sa.sa_flags = SA_RESTART;
   sigaction(SIGPIPE, &sa, 0);
   sigaction(SIGUSR1, &sa, 0);
   sigaction(SIGUSR2, &sa, 0);
 
+  // SIGCHLD interrupts pselect()
+  sa.sa_handler = handle_SIGCHLD;
+  sa.sa_flags = SA_NOCLDSTOP;
+  // no SA_RESTART, because we need to interrupt pselect() portably
+  // to protect other syscalls, we keep SIGCHLD blocked except in pselect()
+  sigaddset(&imp->block, SIGCHLD);
+  sigprocmask(SIG_BLOCK, &imp->block, 0);
+  sigaction(SIGCHLD, &sa, 0);
+
   // These signals cause wake to exit cleanly
   sa.sa_handler = handle_exit;
+  sa.sa_flags = 0; // no SA_RESTART, because we want to terminate blocking calls
   sigaction(SIGHUP,  &sa, 0);
   sigaction(SIGINT,  &sa, 0);
   sigaction(SIGQUIT, &sa, 0);
@@ -186,13 +197,6 @@ JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool ch
   // These are handled in status.cpp
   sigaddset(&imp->block, SIGALRM);
   sigaddset(&imp->block, SIGWINCH);
-
-  // SIGCHLD interrupts pselect()
-  sa.sa_handler = handle_SIGCHLD;
-  sa.sa_flags = SA_NOCLDSTOP;
-  sigemptyset(&sa.sa_mask);
-  sigaction(SIGCHLD, &sa, 0);
-  sigaddset(&imp->block, SIGCHLD);
 }
 
 static struct timeval mytimersub(struct timeval a, struct timeval b) {
@@ -244,9 +248,10 @@ JobTable::~JobTable() {
     struct timespec timeout;
     gettimeofday(&start, 0);
     for (now = start; children && (remain = mytimersub(limit, mytimersub(now, start))).tv_sec >= 0; gettimeofday(&now, 0)) {
-      // Block signals SIGCHLD between here and pselect()
+      // Block racey signals between here and pselect()
       sigset_t saved;
       sigprocmask(SIG_BLOCK, &imp->block, &saved);
+      sigdelset(&saved, SIGCHLD);
 
       // Continue waiting for the full second
       timeout.tv_sec = 0;
@@ -257,6 +262,7 @@ JobTable::~JobTable() {
 
       // Restore signals
       child_ready = false;
+      sigaddset(&saved, SIGCHLD);
       sigprocmask(SIG_SETMASK, &saved, 0);
 
       pid_t pid;
@@ -324,10 +330,6 @@ static void launch(JobTable *jobtable) {
     i.pipe_stdout = pipe_stdout[0];
     i.pipe_stderr = pipe_stderr[0];
     gettimeofday(&i.start, 0);
-    std::cout << std::flush;
-    std::cerr << std::flush;
-    fflush(stdout);
-    fflush(stderr);
     std::stringstream prelude;
     prelude << find_execpath() << "/../lib/wake/shim-wake" << '\0'
       << (task.stdin.empty() ? "/dev/null" : task.stdin.c_str()) << '\0'
@@ -337,11 +339,18 @@ static void launch(JobTable *jobtable) {
     std::string shim = prelude.str() + task.cmdline;
     auto cmdline = split_null(shim);
     auto environ = split_null(task.environ);
+
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGCHLD);
+    sigprocmask(SIG_UNBLOCK, &set, 0);
     pid_t pid = vfork();
     if (pid == 0) {
       execve(cmdline[0], cmdline, environ);
       _exit(127);
     }
+    sigprocmask(SIG_BLOCK, &set, 0);
+
     delete [] cmdline;
     delete [] environ;
     i.job->pid = i.pid = pid;
@@ -391,17 +400,32 @@ bool JobTable::wait(WorkQueue &queue) {
     // Block all signals we expect to interrupt pselect
     sigset_t saved;
     sigprocmask(SIG_BLOCK, &imp->block, &saved);
+    sigdelset(&saved, SIGCHLD);
 
     // Check for all signals that are now blocked
     struct timespec *timeout = 0;
     if (child_ready) timeout = &nowait;
     if (exit_now()) timeout = &nowait;
+
+    // In case SIGALRM with SA_RESTART doesn't stop pselect
+    if (!timeout) {
+      struct itimerval timer;
+      struct timespec alarm;
+      getitimer(ITIMER_REAL, &timer);
+      if (timer.it_value.tv_sec || timer.it_value.tv_usec) {
+        alarm.tv_sec = timer.it_value.tv_sec;
+        alarm.tv_nsec = (10000 + timer.it_value.tv_usec) * 1000;
+        timeout = &alarm;
+      }
+    }
     status_refresh();
+
 
     // Wait for a status change, with signals atomically unblocked in pselect
     int retval = pselect(nfds, &set, 0, 0, timeout, &saved);
 
     // Restore signal mask
+    sigaddset(&saved, SIGCHLD);
     sigprocmask(SIG_SETMASK, &saved, 0);
 
     if (retval == -1 && errno != EINTR) {
@@ -417,7 +441,7 @@ bool JobTable::wait(WorkQueue &queue) {
     if (retval > 0) for (auto &i : imp->table) {
       if (i.pipe_stdout != -1 && FD_ISSET(i.pipe_stdout, &set)) {
         int got = read(i.pipe_stdout, buffer, sizeof(buffer));
-        if (got <= 0) {
+        if (got == 0 || (got < 0 && errno != EINTR)) {
           close(i.pipe_stdout);
           i.pipe_stdout = -1;
           if (i.pool) i.status->stdout = false;
@@ -444,7 +468,7 @@ bool JobTable::wait(WorkQueue &queue) {
       }
       if (i.pipe_stderr != -1 && FD_ISSET(i.pipe_stderr, &set)) {
         int got = read(i.pipe_stderr, buffer, sizeof(buffer));
-        if (got <= 0) {
+        if (got == 0 || (got < 0 && errno != EINTR)) {
           close(i.pipe_stderr);
           i.pipe_stderr = -1;
           if (i.pool) i.status->stderr = false;
