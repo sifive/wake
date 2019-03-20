@@ -497,17 +497,9 @@ int main(int argc, const char **argv) {
       (*types)[0].format(std::cout, body->typeVar);
       types = &(*types)[1];
       std::cout << " = ";
-      if (v) {
-        if (v->type == &Exception::type) pass = false;
-        if (args["debug"]) {
-          v->format(std::cout, -1);
-        } else {
-          std::cout << v << std::endl;
-        }
-      } else {
-        pass = false;
-        std::cout << "MISSING FUTURE" << std::endl;
-      }
+      Value::format(std::cout, v, debug, verbose?0:-1);
+      std::cout << std::endl;
+      if (!v || v->type == &Exception::type) pass = false;
     }
   }
 

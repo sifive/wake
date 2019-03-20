@@ -16,27 +16,41 @@ const TypeDescriptor Closure  ::type("Closure");
 const TypeDescriptor Data     ::type("Data");
 const TypeDescriptor Exception::type("Exception");
 
+void FormatState::resume() {
+  stack.emplace_back(current.value, current.precedence, current.state+1);
+}
+
+void FormatState::child(const Value *value, int precedence) {
+  stack.emplace_back(value, precedence, 0);
+}
+
 Integer::~Integer() {
   mpz_clear(value);
 }
 
+void Value::format(std::ostream &os, const Value *value, bool detailed, int indent) {
+  FormatState state;
+  state.detailed = detailed;
+  state.indent = indent;
+  state.stack.emplace_back(value, 0, 0);
+  while (!state.stack.empty()) {
+    state.current = state.stack.back();
+    state.stack.pop_back();
+    if (state.current.value) {
+      state.current.value->format(os, state);
+    } else {
+      os << "<future>";
+    }
+  }
+}
+
 std::string Value::to_str() const {
   std::stringstream str;
-  format(str, 0);
+  str << this;
   return str.str();
 }
 
-std::ostream & operator << (std::ostream &os, const Value *value) {
-  value->format(os, 0);
-  return os;
-}
-
-static std::string pad(int depth) {
-  if (depth < 0) depth = -depth-1;
-  return std::string(depth, ' ');
-}
-
-void String::format(std::ostream &os, int p) const {
+void String::format(std::ostream &os, FormatState &state) const {
   os << "\"";
   for (char ch : value) switch (ch) {
     case '"': os << "\\\""; break;
@@ -67,130 +81,106 @@ void String::format(std::ostream &os, int p) const {
     }
   }
   os << "\"";
-  if (p < 0) os << std::endl;
 }
 
-void Integer::format(std::ostream &os, int p) const {
+void Integer::format(std::ostream &os, FormatState &state) const {
   os << str();
-  if (p < 0) os << std::endl;
 }
 
-void Double::format(std::ostream &os, int p) const {
+void Double::format(std::ostream &os, FormatState &state) const {
   os << str();
-  if (p < 0) os << std::endl;
 }
 
-void Closure::format(std::ostream &os, int p) const {
-  if (p >= 0) {
-    os << "<" << lambda->location << ">";
-  } else {
-    os << "Closure @ " << lambda->location;
-    os << ":" << std::endl;
-    if (binding) binding->format(os, p-2);
-  }
+void Closure::format(std::ostream &os, FormatState &state) const {
+  os << "<" << lambda->location << ">";
+  // !!! if (state.detailed) print referenced variables only
 }
 
-static void future_format(std::ostream &os, const Future &f, int p) {
-  if (!f.value) {
-    os << "<future>";
-  } else {
-    f.value->format(os, p);
-  }
-}
-
-void Data::format(std::ostream &os, int p) const {
+void Data::format(std::ostream &os, FormatState &state) const {
   const std::string &name = cons->ast.name;
-  std::vector<const Future*> todo;
-  for (const Binding *iter = binding.get(); iter; iter = iter->next.get())
-    for (int i = iter->nargs-1; i >= 0; --i)
-      todo.push_back(&iter->future[i]);
-  std::reverse(todo.begin(), todo.end());
 
-  if (p >= 0) {
-    if (name.substr(0, 7) == "binary ") {
-      op_type q = op_precedence(name.c_str() + 7);
-      if (q.p < p) os << "(";
-      future_format(os, *todo[0], q.p + !q.l);
+  const Value* child = 0;
+  if (!cons->ast.args.empty()) {
+    int index = cons->ast.args.size() - 1 - state.get();
+    for (const Binding *iter = binding.get(); iter; iter = iter->next.get()) {
+      if (index >= iter->nargs) {
+        index -= iter->nargs;
+      } else {
+        child = iter->future[iter->nargs-1-index].value.get();
+        break;
+      }
+    }
+  }
+
+  if (name.substr(0, 7) == "binary ") {
+    op_type q = op_precedence(name.c_str() + 7);
+    switch (state.get()) {
+    case 0:
+      if (q.p < state.p()) os << "(";
+      state.resume();
+      state.child(child, q.p + !q.l);
+      break;
+    case 1:
       if (name[7] != ',') os << " ";
       os << name.c_str() + 7 << " ";
-      future_format(os, *todo[1], q.p + q.l);
-      if (q.p < p) os << ")";
-    } else if (name.substr(0, 6) == "unary ") {
-      op_type q = op_precedence(name.c_str() + 6);
-      if (q.p < p) os << "(";
+      state.resume();
+      state.child(child, q.p + q.l);
+      break;
+    case 2:
+      if (q.p < state.p()) os << ")";
+      break;
+    }
+  } else if (name.substr(0, 6) == "unary ") {
+    op_type q = op_precedence(name.c_str() + 6);
+    switch (state.get()) {
+    case 0:
+      if (q.p < state.p()) os << "(";
       os << name.c_str() + 6;
-      future_format(os, *todo[0], q.p);
-      if (q.p < p) os << ")";
-    } else {
-      op_type q = op_precedence("a");
-      if (q.p < p && !todo.empty()) os << "(";
-      os << name;
-      for (auto v : todo) {
-        os << " ";
-        future_format(os, *v, q.p + q.l);
-      }
-      if (q.p < p && !todo.empty()) os << ")";
+      state.resume();
+      state.child(child, q.p);
+      break;
+    case 1:
+      if (q.p < state.p()) os << ")";
+      break;
     }
   } else {
-    os << name;
-    if (!todo.empty()) os << ":";
-    os << std::endl;
-    for (auto v : todo) {
-      os << pad(p-2);
-      future_format(os, *v, p-2);
+    if (state.get() == 0) {
+      if (APP_PRECEDENCE < state.p() && !cons->ast.args.empty()) os << "(";
+      os << name;
+    }
+    if (state.get() < (int)cons->ast.args.size()) {
+      os << " ";
+      state.resume();
+      state.child(child, APP_PRECEDENCE+1);
+    } else {
+      if (APP_PRECEDENCE < state.p() && !cons->ast.args.empty()) os << ")";
     }
   }
 }
 
-void Binding::format(std::ostream &os, int p) const {
-  std::vector<const Binding*> todo;
-  const Binding *iter;
-  for (iter = this; iter; iter = iter->next.get()) {
-    if ((iter->flags & FLAG_PRINTED) != 0) break;
-    iter->flags |= FLAG_PRINTED;
-    todo.push_back(iter);
-  }
-  for (size_t i = todo.size(); i > 0; --i) {
-    iter = todo[i-1];
-    for (int i = 0; i < iter->nargs; ++i) {
-      if (iter->expr->type == &Lambda::type) {
-        Lambda *lambda = reinterpret_cast<Lambda*>(iter->expr);
-        os << pad(p) << lambda->name << " = "; // " @ " << lambda->location << " = ";
-      }
-      if (iter->expr->type == &DefBinding::type) {
-        DefBinding *defbinding = reinterpret_cast<DefBinding*>(iter->expr);
-        std::string name;
-        for (auto &x : defbinding->order) if (x.second == i) name = x.first;
-        if (name.find(' ') != std::string::npos) continue; // internal pub/sub detail
-        os << pad(p) << name << " = "; // " @ " << defbinding->val[i]->location << " = ";
-      }
-      if (iter->future[i].value) {
-        iter->future[i].value->format(os, p);
-      } else {
-        os << "UNRESOLVED FUTURE" << std::endl;
-      }
-    }
-  }
+static std::string pad(int depth) {
+  return std::string(depth, ' ');
 }
 
-void Exception::format(std::ostream &os, int p) const {
-  op_type q = op_precedence("a");
-  if (q.p < p) os << "(";
-
+void Exception::format(std::ostream &os, FormatState &state) const {
+  if (APP_PRECEDENCE < state.p()) os << "(";
   os << "Exception";
-  if (p < 0) {
-    os << std::endl;
+
+  if (state.detailed) {
     for (auto &i : causes) {
-      os << pad(p-2) << "\"" << i->reason << "\"" << std::endl;
+      if (state.indent < 0) os << " "; else os << std::endl << pad(state.indent+2);
+      os << "(\"" << i->reason << "\"";
       for (auto &j : i->stack) {
-        os << pad(p-4) << "from " << j << std::endl;
+        if (state.indent < 0) os << " "; else os << std::endl << pad(state.indent+4);
+        os << "from " << j;
       }
+      os << ")";
     }
-  } else if (!causes.empty()) {
+  } else {
     os << " \"" << causes[0]->reason << "\"";
   }
 
-  if (q.p < p) os << ")";
+  if (APP_PRECEDENCE < state.p()) os << ")";
 }
 
 TypeVar String::typeVar("String", 0);

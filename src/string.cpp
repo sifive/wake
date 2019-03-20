@@ -23,18 +23,18 @@ struct CatStream : public Value {
   static TypeVar typeVar;
   CatStream() : Value(&type) { }
 
-  void format(std::ostream &os, int depth) const;
+  void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 };
 
 const TypeDescriptor CatStream::type("CatStream");
 
-void CatStream::format(std::ostream &os, int p) const {
-  if (APP_PRECEDENCE < p) os << "(";
+void CatStream::format(std::ostream &os, FormatState &state) const {
+  if (APP_PRECEDENCE < state.p()) os << "(";
   os << "CatStream ";
-  String(str.str()).format(os, p);
-  if (APP_PRECEDENCE < p) os << ")";
+  String(str.str()).format(os, state);
+  if (APP_PRECEDENCE < state.p()) os << ")";
 }
 
 TypeVar CatStream::typeVar("CatStream", 0);
@@ -222,7 +222,7 @@ static PRIMFN(prim_format) {
   REQUIRE(args.size() == 1, "prim_format expects 1 argument");
   (void)data;
   std::stringstream buffer;
-  args[0]->format(buffer, 0);
+  buffer << args[0].get();
   auto out = std::make_shared<String>(buffer.str());
   RETURN(out);
 }

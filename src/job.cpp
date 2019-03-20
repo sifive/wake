@@ -63,7 +63,7 @@ struct Job : public Value {
   static TypeVar typeVar;
   Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline, bool keep);
 
-  void format(std::ostream &os, int depth) const;
+  void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 
@@ -72,11 +72,10 @@ struct Job : public Value {
 
 const TypeDescriptor Job::type("Job");
 
-void Job::format(std::ostream &os, int p) const {
-  if (APP_PRECEDENCE < p) os << "(";
+void Job::format(std::ostream &os, FormatState &state) const {
+  if (APP_PRECEDENCE < state.p()) os << "(";
   os << "Job " << job;
-  if (APP_PRECEDENCE < p) os << ")";
-  if (p < 0) os << std::endl;
+  if (APP_PRECEDENCE < state.p()) os << ")";
 }
 
 TypeVar Job::typeVar("Job", 0);

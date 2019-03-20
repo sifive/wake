@@ -19,6 +19,26 @@ struct Lambda;
 struct Binding;
 struct Location;
 struct WorkQueue;
+struct Value;
+
+struct FormatEntry {
+  const Value *value;
+  int precedence;
+  int state;
+  FormatEntry(const Value *value_ = nullptr, int precedence_ = 0, int state_ = 0)
+   : value(value_), precedence(precedence_), state(state_) { }
+};
+
+struct FormatState {
+  std::vector<FormatEntry> stack;
+  FormatEntry current;
+  bool detailed;
+  int indent; // -1 -> single-line
+  void resume();
+  void child(const Value *value, int precedence);
+  int get() const { return current.state; }
+  int p() const { return current.precedence; }
+};
 
 struct Value {
   const TypeDescriptor *type;
@@ -27,12 +47,17 @@ struct Value {
   virtual ~Value();
 
   std::string to_str() const; // one-line version
-  virtual void format(std::ostream &os, int p) const = 0; // < 0 means indent
+  static void format(std::ostream &os, const Value *value, bool detailed = false, int indent = -1);
+
+  virtual void format(std::ostream &os, FormatState &state) const = 0;
   virtual TypeVar &getType() = 0;
   virtual Hash hash() const = 0;
 };
 
-std::ostream & operator << (std::ostream &os, const Value *value);
+inline std::ostream & operator << (std::ostream &os, const Value *value) {
+  Value::format(os, value);
+  return os;
+}
 
 struct String : public Value {
   std::string value;
@@ -42,7 +67,7 @@ struct String : public Value {
   String(const std::string &value_) : Value(&type), value(value_) { }
   String(std::string &&value_) : Value(&type), value(std::move(value_)) { }
 
-  void format(std::ostream &os, int depth) const;
+  void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 };
@@ -58,7 +83,7 @@ struct Integer : public Value {
   ~Integer();
 
   std::string str(int base = 10) const;
-  void format(std::ostream &os, int depth) const;
+  void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 };
@@ -78,7 +103,7 @@ struct Double : public Value {
   Double(const char *str);
 
   std::string str(int format = DEFAULTFLOAT, int precision = limits::max_digits10) const;
-  void format(std::ostream &os, int depth) const;
+  void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 };
@@ -90,7 +115,7 @@ struct Closure : public Value {
   static const TypeDescriptor type;
   static TypeVar typeVar;
   Closure(Lambda *lambda_, const std::shared_ptr<Binding> &binding_) : Value(&type), lambda(lambda_), binding(binding_) { }
-  void format(std::ostream &os, int depth) const;
+  void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 };
@@ -109,7 +134,7 @@ struct Data : public Value {
   static const TypeVar typeList;
   static const TypeVar typePair;
   Data(Constructor *cons_, std::shared_ptr<Binding> &&binding_) : Value(&type), cons(cons_), binding(std::move(binding_)) { }
-  void format(std::ostream &os, int depth) const;
+  void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 };
@@ -133,7 +158,7 @@ struct Exception : public Value {
     return *this;
   }
 
-  void format(std::ostream &os, int depth) const;
+  void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 };
