@@ -1,7 +1,7 @@
 global def installAs dest file =
   def sdest = simplify dest
   def cmd = which "cp", file.getPathName, sdest, Nil
-  def inputs = mkdir 0775 "{dest}/..", file, Nil
+  def inputs = mkdir "{dest}/..", file, Nil
   def foutputs _ = sdest, Nil
   makeManualPlan cmd inputs foutputs
   | setPlanEnvironment Nil
