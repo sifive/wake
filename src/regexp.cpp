@@ -14,18 +14,18 @@ struct RegExp : public Value {
   static TypeVar typeVar;
   RegExp(const std::string &regexp, const RE2::Options &opts) : Value(&type), exp(re2::StringPiece(regexp), opts) { }
 
-  void format(std::ostream &os, int depth) const;
+  void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 };
 
 const TypeDescriptor RegExp::type("RegExp");
 
-void RegExp::format(std::ostream &os, int p) const {
-  if (APP_PRECEDENCE < p) os << "(";
+void RegExp::format(std::ostream &os, FormatState &state) const {
+  if (APP_PRECEDENCE < state.p()) os << "(";
   os << "RegExp ";
-  String(exp.pattern()).format(os, p);
-  if (APP_PRECEDENCE < p) os << ")";
+  String(exp.pattern()).format(os, state);
+  if (APP_PRECEDENCE < state.p()) os << ")";
 }
 
 TypeVar RegExp::typeVar("RegExp", 0);
