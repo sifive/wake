@@ -36,6 +36,7 @@ struct Database::detail {
   sqlite3_stmt *delete_overlap;
   sqlite3_stmt *find_prior;
   sqlite3_stmt *update_prior;
+  sqlite3_stmt *delete_prior;
   sqlite3_stmt *find_owner;
   sqlite3_stmt *fetch_hash;
   sqlite3_stmt *delete_jobs;
@@ -46,8 +47,8 @@ struct Database::detail {
    : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), add_target(0), del_target(0), begin_txn(0),
      commit_txn(0), predict_job(0), stats_job(0), insert_job(0), insert_tree(0), insert_log(0), wipe_file(0),
      insert_file(0), update_file(0), get_log(0), get_tree(0), add_stats(0), link_stats(0), detect_overlap(0),
-     delete_overlap(0), find_prior(0), update_prior(0), find_owner(0), fetch_hash(0), delete_jobs(0),
-     delete_dups(0), delete_stats(0) { }
+     delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0), find_owner(0), fetch_hash(0),
+     delete_jobs(0), delete_dups(0), delete_stats(0) { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -190,6 +191,11 @@ std::string Database::open(bool wait) {
     "directory=? and commandline=? and environment=? and stdin=? and keep=1";
   const char *sql_update_prior =
     "update jobs set use_id=? where job_id=?";
+  const char *sql_delete_prior =
+    "delete from jobs where job_id in"
+    " (select j2.job_id from jobs j1, jobs j2"
+    "  where j1.job_id=?1 and j1.directory=j2.directory and j1.commandline=j2.commandline"
+    "  and j1.environment=j2.environment and j1.stdin=j2.stdin and j2.job_id<>?1)";
   const char *sql_find_owner =
     "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id"
@@ -239,6 +245,7 @@ std::string Database::open(bool wait) {
   PREPARE(sql_delete_overlap, delete_overlap);
   PREPARE(sql_find_prior,     find_prior);
   PREPARE(sql_update_prior,   update_prior);
+  PREPARE(sql_delete_prior,   delete_prior);
   PREPARE(sql_find_owner,     find_owner);
   PREPARE(sql_fetch_hash,     fetch_hash);
   PREPARE(sql_delete_jobs,    delete_jobs);
@@ -284,6 +291,7 @@ void Database::close() {
   FINALIZE(delete_overlap);
   FINALIZE(find_prior);
   FINALIZE(update_prior);
+  FINALIZE(delete_prior);
   FINALIZE(find_owner);
   FINALIZE(fetch_hash);
   FINALIZE(delete_jobs);
@@ -626,6 +634,9 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
       tok = scan+1;
     }
   }
+
+  bind_integer(why, imp->delete_prior, 1, job);
+  single_step (why, imp->delete_prior, imp->debugdb);
 
   bind_integer(why, imp->delete_overlap, 1, imp->run_id);
   bind_integer(why, imp->delete_overlap, 2, job);
