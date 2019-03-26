@@ -87,18 +87,19 @@ static bool scan(std::vector<std::shared_ptr<String> > &out, const std::string &
         }
       }
     } else {
-      bool recurse = false;
-#ifndef NO_DTYPE
+      bool recurse;
+#ifdef DT_DIR
       if (f->d_type == DT_UNKNOWN) {
 #endif
         struct stat sbuf;
         if (fstatat(dirfd, f->d_name, &sbuf, AT_SYMLINK_NOFOLLOW) != 0) {
           fprintf(stderr, "Failed to fstatat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
           failed = true;
+          recurse = false;
         } else {
           recurse = S_ISDIR(sbuf.st_mode);
         }
-#ifndef NO_DTYPE
+#ifdef DT_DIR
       } else {
         recurse = f->d_type == DT_DIR;
       }
@@ -126,22 +127,55 @@ static bool scan(std::vector<std::shared_ptr<String> > &out) {
   return dirfd == -1 || scan(out, ".", dirfd);
 }
 
-static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::string &path) {
-  auto dir = opendir(path.c_str());
-  if (!dir) return true;
+static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::string &path, int dirfd) {
+  auto dir = fdopendir(dirfd);
+  if (!dir) {
+    close(dirfd);
+    return true;
+  }
 
   struct dirent *f;
   bool failed = false;
   for (errno = 0; !failed && (f = readdir(dir)); errno = 0) {
     if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
     std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
-    if (f->d_type == DT_REG) out.emplace_back(std::make_shared<String>(name));
-    if (f->d_type == DT_DIR) failed = push_files(out, name);
+    bool recurse;
+    struct stat sbuf;
+#ifdef DT_DIR
+    if (f->d_type != DT_UNKNOWN) {
+      recurse = f->d_type == DT_DIR;
+    } else {
+#endif
+      if (fstatat(dirfd, f->d_name, &sbuf, AT_SYMLINK_NOFOLLOW) != 0) {
+        failed = true;
+        recurse = false;
+      } else {
+        recurse = S_ISDIR(sbuf.st_mode);
+      }
+#ifdef DT_DIR
+    }
+#endif
+    if (recurse) {
+      int fd = openat(dirfd, f->d_name, O_RDONLY);
+      if (fd == -1) {
+        failed = true;
+      } else {
+        std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
+        failed = push_files(out, name, fd);
+      }
+    } else {
+      out.emplace_back(std::make_shared<String>(name));
+    }
   }
 
   failed = errno         != 0 || failed;
   failed = closedir(dir) != 0 || failed;
   return failed;
+}
+
+static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::string &path) {
+  int dirfd = open(path.c_str(), O_RDONLY);
+  return dirfd == -1 || push_files(out, path, dirfd);
 }
 
 static bool str_lexical(const std::shared_ptr<String> &a, const std::shared_ptr<String> &b) {
