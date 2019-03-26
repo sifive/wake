@@ -5,6 +5,11 @@
 #include "heap.h"
 #include "whereami.h"
 #include <re2/re2.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
@@ -40,15 +45,31 @@ static std::string slurp(const std::string &command, bool &fail) {
   char buf[4096];
   int got;
   FILE *cmd = popen(command.c_str(), "r");
-  while ((got = fread(buf, 1, sizeof(buf), cmd)) > 0) str.write(buf, got);
-  if (ferror(cmd)) fail = true;
-  if (pclose(cmd) != 0) fail = true;
+  if (!cmd) {
+    fail = true;
+    fprintf(stderr, "Failed to popen %s: %s\n", command.c_str(), strerror(errno));
+  } else {
+    while ((got = fread(buf, 1, sizeof(buf), cmd)) > 0) str.write(buf, got);
+    if (ferror(cmd)) {
+      fprintf(stderr, "Failed to read %s: %s\n", command.c_str(), strerror(errno));
+      fail = true;
+    }
+    errno = EINVAL;
+    if (pclose(cmd) != 0) {
+      fprintf(stderr, "Failed to pclose %s: %s\n", command.c_str(), strerror(errno));
+      fail = true;
+    }
+  }
   return str.str();
 }
 
-static bool scan(std::vector<std::shared_ptr<String> > &out, const std::string &path) {
-  auto dir = opendir(path.c_str());
-  if (!dir) return true;
+static bool scan(std::vector<std::shared_ptr<String> > &out, const std::string &path, int dirfd) {
+  auto dir = fdopendir(dirfd);
+  if (!dir) {
+    fprintf(stderr, "Failed to fdopendir %s: %s\n", path.c_str(), strerror(errno));
+    close(dirfd);
+    return true;
+  }
 
   struct dirent *f;
   bool failed = false;
@@ -66,14 +87,43 @@ static bool scan(std::vector<std::shared_ptr<String> > &out, const std::string &
         }
       }
     } else {
-      std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
-      if (f->d_type == DT_DIR) failed = scan(out, name);
+      bool recurse = false;
+#ifndef NO_DTYPE
+      if (f->d_type == DT_UNKNOWN) {
+#endif
+        struct stat sbuf;
+        if (fstatat(dirfd, f->d_name, &sbuf, AT_SYMLINK_NOFOLLOW) != 0) {
+          fprintf(stderr, "Failed to fstatat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
+          failed = true;
+        } else {
+          recurse = S_ISDIR(sbuf.st_mode);
+        }
+#ifndef NO_DTYPE
+      } else {
+        recurse = f->d_type == DT_DIR;
+      }
+#endif
+      if (recurse) {
+        int fd = openat(dirfd, f->d_name, O_RDONLY);
+        if (fd == -1) {
+          fprintf(stderr, "Failed to openat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
+          failed = true;
+        } else {
+          std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
+          failed = scan(out, name, fd);
+        }
+      }
     }
   }
 
   failed = errno         != 0 || failed;
   failed = closedir(dir) != 0 || failed;
   return failed;
+}
+
+static bool scan(std::vector<std::shared_ptr<String> > &out) {
+  int dirfd = open(".", O_RDONLY);
+  return dirfd == -1 || scan(out, ".", dirfd);
 }
 
 static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::string &path) {
@@ -223,7 +273,7 @@ std::string get_workspace() {
 
 std::vector<std::shared_ptr<String> > find_all_sources(bool &ok) {
   std::vector<std::shared_ptr<String> > out;
-  ok = ok && !scan(out, ".");
+  ok = ok && !scan(out);
   std::string abs_libdir = find_execpath() + "/../share/wake/lib";
   std::string rel_libdir = make_relative(get_workspace(), make_canonical(abs_libdir));
   ok = ok && !push_files(out, rel_libdir);
