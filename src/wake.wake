@@ -4,10 +4,13 @@ def version_h _ =
   def body = "#define VERSION {git.getJobStdout}"
   write "{here}/version.h" body
 
-global def buildWake (Pair variant _) =
+global def buildWake (Pair variant clib) =
+  def deps = map (_ clib) (utf8proc, gopt, Nil)
   def reFiles = sources here '.*\.re'
-  def headerFiles = version_h 0, sources here '.*\.h'
-  def cppFiles = sources here '.*\.cpp' ++ map re2c reFiles
-  def compile = compileC variant (cflags "sqlite3 ncurses") headerFiles
-  def objFiles = map compile cppFiles
-  linkO variant (libs "sqlite3 ncurses" ++ ("-lgmp", "-lutf8proc", "-lre2", Nil)) objFiles "bin/wake"
+  def headerFiles = version_h 0, (sources here '.*\.h', map getCPackageHeaders deps).flatten
+  def cppFiles = map re2c reFiles ++ sources here '.*\.cpp'
+  def copts = cflags "sqlite3 ncurses", map getCPackageCFlags deps
+  def compile = compileC variant copts.flatten headerFiles
+  def objFiles = flatten (map compile cppFiles, map getCPackageObjects deps)
+  def lflags = flatten (libs "sqlite3 ncurses", map getCPackageLFlags deps) ++ ("-lgmp", "-lre2", Nil)
+  linkO variant lflags objFiles "bin/wake"
