@@ -13,7 +13,7 @@ global def lvector l =
       i+1
     def _ = foldl doit 0 l
     out
-  reraise (\l Vector (bind (vnew l)) 0 l) llen
+  reraise llen (\l Vector (bind (vnew l)) 0 l)
 
 global def tvector t =
   def len = tlen t
@@ -24,7 +24,7 @@ global def tvector t =
     def f i x = vset out i x
     def _ = tappi f t
     out
-  reraise (\l Vector (bind (vnew l)) 0 l) len
+  reraise len (\l Vector (bind (vnew l)) 0 l)
 
 global def vempty (Vector _ s e) = s == e
 global def vlen (Vector _ s e) = e - s
@@ -130,7 +130,7 @@ global def vsplitBy f v =
       if t then vset take o x else vset drop (i-o) x
     def _ = vappi exec len
     Pair (Vector take 0 ntake) (Vector drop 0 ndrop)
-  reraise (\_ bind (vnew ntake) (vnew ndrop)) v
+  reraise v (\_ bind (vnew ntake) (vnew ndrop))
 
 global def vfilter f v = vsplitBy f v | getPairFirst
 
@@ -158,7 +158,7 @@ global def vscanl f a v =
       then Unit
       else helper (f a (vat_ i v)) (i+1)
     def _ = helper a 0
-    reraise (Vector _ 0 (len+1)) out
+    reraise out (Vector _ 0 (len+1))
   bind (vnew (len+1))
 
 global def vscanr f a v =
@@ -173,7 +173,7 @@ global def vscanr f a v =
       then Unit
       else helper (f (vat_ i1 v) a) i1
     def _ = helper a len
-    reraise (Vector _ 0 (len+1)) out
+    reraise out (Vector _ 0 (len+1))
   bind (vnew (len+1))
 
 # vscan = O(n), log n deep prefix-sum
@@ -215,7 +215,7 @@ global def vscanmap f a g v =
         def _ = helper (vat_ x temp) x e
         double e
     def _ = double 0
-    reraise (Vector _ 0 len) out
+    reraise out (Vector _ 0 len)
   scatter (vnew len)
 global def vscan f a v = vscanmap f a (_) v
 
@@ -316,7 +316,7 @@ def vmapPartial f v =
       Some x = vset out (vat_ i dest) x
       None   = Unit
     def _ = vappi exec leni
-    reraise (Vector _ 0 leno) out
+    reraise out (Vector _ 0 leno)
   bind (vnew leno)
 
 def vappi f n =
