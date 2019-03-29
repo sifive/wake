@@ -35,8 +35,9 @@ lib/wake/shim-wake:	$(patsubst %.c,%.o,$(wildcard shim/*.c))
 %.o:	%.c	$(filter-out src/version.h,$(wildcard */*.h))
 	$(CC) $(CFLAGS) $(CORE_CFLAGS) -o $@ -c $<
 
-%.cpp:	%.re
-	re2c -8 --no-generation-date $< > $@.tmp
+# Rely on wake to recreate this file if re2c is available
+%.cpp:	%.cpp.gz
+	gzip -dc $^ > $@.tmp
 	mv $@.tmp $@
 
 .PRECIOUS:	src/symbol.cpp

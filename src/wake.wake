@@ -1,9 +1,3 @@
-def re2c file =
-  def cpp = replace '\.re$' ".cpp" file.getPathName
-  def cmdline = which "re2c", "-8", "--no-generation-date", file.getPathName, "-o", cpp, Nil
-  def result = job cmdline (file, Nil)
-  result.getJobOutput
-
 def version_h _ =
   def cmdline = which "git", "describe", "--tags", "--dirty", Nil
   def git = volatileJob cmdline Nil (\_ Nil)

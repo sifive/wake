@@ -78,8 +78,10 @@ External dependencies:
  - libfuse-dev		LGPL v2.1	https://github.com/libfuse/libfuse
  - libre2-dev		BSD 3-clause	https://github.com/google/re2
  - libncurses5-dev	MIT		https://www.gnu.org/software/ncurses/
- - re2c			public domain	http://re2c.org
  - utf8proc		MIT 		https://juliastrings.github.io/utf8proc/
+
+Optional dependencies:
+ - re2c			public domain	http://re2c.org
 
 Internal dependencies:
  - argagg		MIT		https://github.com/vietjtnguyen/argagg

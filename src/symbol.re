@@ -307,7 +307,7 @@ static std::string unicode_escape(std::string &&str) {
   char *cleaned;
   const unsigned char *data = reinterpret_cast<const unsigned char *>(str.data());
   ssize_t len = unicode_escape(data, data + str.size(), &cleaned);
-  if (len < 0) return str;
+  if (len < 0) return std::move(str);
   std::string out(cleaned, len);
   free(cleaned);
   return out;
