@@ -740,12 +740,9 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     Construct *cons = reinterpret_cast<Construct*>(expr);
     bool ok = cons->typeVar.unify(
       TypeVar(cons->sum->name.c_str(), cons->sum->args.size()));
-    std::map<std::string, TypeVar> ids;
-    for (size_t i = 0; i < cons->sum->args.size(); ++i) {
-      TypeVar &var = ids[cons->sum->args[i]];
-      var.setDOB();
-      ok = cons->typeVar[i].unify(var) && ok;
-    }
+    std::map<std::string, TypeVar*> ids;
+    for (size_t i = 0; i < cons->sum->args.size(); ++i)
+      ids[cons->sum->args[i]] = &cons->typeVar[i];
     NameBinding *iter = binding;
     for (size_t i = cons->cons->ast.args.size(); i; --i) {
       ok = cons->cons->ast.args[i-1].unify(iter->lambda->typeVar[0], ids) && ok;
@@ -758,12 +755,9 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     TypeVar &typ = binding->lambda->typeVar[0];
     bool ok = typ.unify(
       TypeVar(des->sum.name.c_str(), des->sum.args.size()));
-    std::map<std::string, TypeVar> ids;
-    for (size_t i = 0; i < des->sum.args.size(); ++i) {
-      TypeVar &var = ids[des->sum.args[i]];
-      var.setDOB();
-      ok = typ[i].unify(var) && ok;
-    }
+    std::map<std::string, TypeVar*> ids;
+    for (size_t i = 0; i < des->sum.args.size(); ++i)
+      ids[des->sum.args[i]] = &typ[i];
     NameBinding *iter = binding;
     for (size_t i = des->sum.members.size(); i; --i) {
       iter = iter->next;

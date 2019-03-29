@@ -21,7 +21,7 @@ struct AST {
   AST(const Location &location_) :
     location(location_) { }
 
-  bool unify(TypeVar &out, std::map<std::string, TypeVar> &ids);
+  bool unify(TypeVar &out, const std::map<std::string, TypeVar*> &ids);
   operator bool() const { return !name.empty(); }
 };
 
