@@ -18,11 +18,12 @@ def fail pkg = match _
   "pkg-config failed", Nil = raise "pkg-config for {pkg} not found"
   x = raise x.head
 
-global def cflags pkg = try (fail pkg) (pkgConfigImp ("--cflags", pkg, Nil))
-global def libs   pkg = try (fail pkg) (pkgConfigImp ("--libs",   pkg, Nil))
+global def cflags pkg = try (fail pkg) (pkgConfigImp ("--short-errors", "--cflags", tokenize " " pkg))
+global def libs   pkg = try (fail pkg) (pkgConfigImp ("--short-errors", "--libs",   tokenize " " pkg))
 
 global def pkgConfig pkg =
-  def version = pkgConfigImp ("--modversion", pkg, Nil) | head
-  def cflags  = pkgConfigImp ("--cflags", pkg, Nil)
-  def lflags  = pkgConfigImp ("--libs", pkg, Nil)
+  def pkgs = tokenize " " pkg
+  def version = pkgConfigImp ("--short-errors", "--modversion", pkgs) | head
+  def cflags  = pkgConfigImp ("--silence-errors", "--cflags", pkgs)
+  def lflags  = pkgConfigImp ("--silence-errors", "--libs", pkgs)
   (CPackage _ Nil Nil _ _) | reraise version | reraise cflags | reraise lflags | try (fail pkg)
