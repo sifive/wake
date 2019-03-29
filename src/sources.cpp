@@ -257,7 +257,7 @@ std::string make_canonical(const std::string &x) {
 static std::string make_relative(std::string &&dir, std::string &&path) {
   if ((!path.empty() && path[0] == '/') !=
       (!dir .empty() && dir [0] == '/')) {
-    return path;
+    return std::move(path);
   }
 
   if (dir == ".") dir = ""; else dir += '/';
