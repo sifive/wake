@@ -9,6 +9,8 @@
 #include <thread>
 #include <sstream>
 #include <random>
+#include <inttypes.h>
+#include <stdlib.h>
 #include "parser.h"
 #include "bind.h"
 #include "symbol.h"
@@ -19,9 +21,9 @@
 #include "job.h"
 #include "sources.h"
 #include "database.h"
-#include "argagg.h"
 #include "hash.h"
 #include "status.h"
+#include "gopt.h"
 
 static WorkQueue queue;
 
@@ -162,112 +164,144 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug) {
   }
 }
 
-void describe(const std::vector<JobReflection> &jobs, bool rerun, bool debug) {
-  if (rerun) {
+void describe(const std::vector<JobReflection> &jobs, bool script, bool debug) {
+  if (script) {
     describe_shell(jobs, debug);
   } else {
     describe_human(jobs, debug);
   }
 }
 
-int main(int argc, const char **argv) {
-  const char *usage = "Usage: wake [OPTION] [--] [ADDED EXPRESSION]";
-  argagg::parser argparser {{
-    { "help", {"-h", "--help"},
-      "shows this help message", 0},
-    { "add", {"-a", "--add"},
-      "add command-line as a persistent build target", 0},
-    { "subtract", {"-s", "--subtract"},
-      "remove the index-specified persistent build target", 1},
-    { "list", {"-l", "--list"},
-      "list the registered persistent builds targets", 0},
-    { "output", {"-o", "--output"},
-      "query which jobs have the specified output file", 1},
-    { "input", {"-i", "--input"},
-      "query which jobs have the specified input file", 1},
-    { "rerun", {"-r", "--rerun"},
-      "output job descriptions as a runable shell script", 0},
-    { "jobs", {"-j", "--jobs"},
-      "set the number of concurrent jobs to run", 1},
-    { "verbose", {"-v", "--verbose"},
-      "output stdout of jobs", 0},
-    { "version", {"--version"},
-      "report the version of wake", 0},
-    { "quiet", {"-q", "--quiet"},
-      "surpress output of job commands and stderr", 0},
-    { "debug", {"-d", "--debug"},
-      "simulate a stack for exceptions and print closures", 0},
-    { "debug-db", {"--debug-db"},
-      "print all database query execution to stderr", 0},
-    { "parse", {"-p", "--parse"},
-      "parse wake files and print the AST", 0},
-    { "typecheck", {"-t", "--typecheck"},
-      "type-check wake files and print the typed AST", 0},
-    { "check", {"-c", "--check"},
-      "rebuild all outputs to check for build repeatability", 0},
-    { "globals", {"-g", "--globals"},
-      "print out all global variables", 0},
-    { "no-wait", {"-n", "--no-wait"},
-      "don't wait to acquire the database lock", 0},
-    { "no-tty", {"--no-tty"},
-      "disable progress bar rendering", 0},
-    { "init", {"--init"},
-      "directory to configure as workspace top", 1},
-  }};
+void print_help(const char *argv0) {
+  std::cout << std::endl
+    << "Usage: " << argv0 << " [-dghioqsv] [-j NUM] [--] [arg0 ...]" << std::endl
+    << std::endl
+    << "  Flags affecting build execution:" << std::endl
+    << "    --jobs=NUM -jNUM Schedule local job execution to use <= NUM CPU-bound tasks" << std::endl
+    << "    --verbose  -v    Report job standard output and hash progres"                << std::endl
+    << "    --debug    -d    Report stack frame information for exceptions and closures" << std::endl
+    << "    --quiet    -q    Surpress report of launched job command line arguments"     << std::endl
+    << "    --no-tty         Surpress interactive build progress interface"              << std::endl
+    << "    --no-wait        Do not wait to obtain database lock; fail immediately"      << std::endl
+    << std::endl
+    << "  Database introspection:" << std::endl
+    << "    --input  FILES   Report recorded meta-data for jobs which read FILES"        << std::endl
+    << "    --output FILES   Report recorded meta-data for jobs which wrote FILES"       << std::endl
+    << "    --verbose  -v    Report recorded standard output and error of matching jobs" << std::endl
+    << "    --debug    -d    Report recorded stack frame of matching jobs"               << std::endl
+    << "    --script   -s    Format reported jobs as an executable shell script"         << std::endl
+    << std::endl
+    << "  Persistent tasks:" << std::endl
+    << "    --init=DIR       Create or replace a wake.db in the specified directory"     << std::endl
+    << "    --list-tasks     List all database-saved tasks which run on every build"     << std::endl
+    << "    --add-task EXPR+ Add a persistent task to the database for future builds"    << std::endl
+    << "    --remove-task=N  Remove persistent task #N from the database"                << std::endl
+    << std::endl
+    << "  Help functions:" << std::endl
+    << "    --version        Print the version of wake on standard output"               << std::endl
+    << "    --globals  -g    Print all global variables available to the command-line"   << std::endl
+    << "    --help     -h    Print this help message and exit"                           << std::endl
+    << std::endl;
+    // debug-db, stop-after-* are secret undocumented options
+}
 
-  argagg::parser_results args;
-  try { args = argparser.parse(argc, argv); }
-  catch (const std::exception& e) { std::cerr << e.what() << std::endl; return 1; }
+static struct option *arg(struct option opts[], const char *name) {
+  for (int i = 0; !(opts[i].flags & GOPT_LAST); ++i)
+    if (!strcmp(opts[i].long_name, name))
+      return opts + i;
 
-  if (args["help"]) {
-    std::cerr << usage << std::endl << argparser;
-    return 0;
-  }
+  std::cerr << "Wake option parser bug: " << name << std::endl;
+  exit(1);
+}
 
-  if (args["version"]) {
-    std::cerr << "wake " << VERSION_STR << std::endl;
-    return 0;
-  }
+int main(int argc, char **argv) {
+  struct option options[] {
+    { 'j', "jobs",                  GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
+    { 'v', "verbose",               GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
+    { 'd', "debug",                 GOPT_ARGUMENT_FORBIDDEN },
+    { 'q', "quiet",                 GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "no-wait",               GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "no-tty",                GOPT_ARGUMENT_FORBIDDEN },
+    { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
+    { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
+    { 's', "script",                GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "init",                  GOPT_ARGUMENT_REQUIRED  },
+    { 0,   "list-tasks",            GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "add-task",              GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "remove-task",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
+    { 0,   "version",               GOPT_ARGUMENT_FORBIDDEN },
+    { 'g', "globals",               GOPT_ARGUMENT_FORBIDDEN },
+    { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "stop-after-parse",      GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   0,                       GOPT_LAST}};
 
-  int jobs = args["jobs"].as<int>(std::thread::hardware_concurrency());
-  bool verbose = args["verbose"];
-  bool quiet = args["quiet"];
-  bool rerun = args["rerun"];
-  bool check = args["check"];
-  bool debugdb = args["debug-db"];
-  bool debug = args["debug"];
-  bool wait = !args["no-wait"];
-  bool tty = !args["no-tty"];
+  argc = gopt(argv, options);
+  gopt_errors(argv[0], options);
+
+  bool verbose = arg(options, "verbose" )->count;
+  bool debug   = arg(options, "debug"   )->count;
+  bool quiet   = arg(options, "quiet"   )->count;
+  bool wait    =!arg(options, "no-wait" )->count;
+  bool tty     =!arg(options, "no-tty"  )->count;
+  bool input   = arg(options, "input"   )->count;
+  bool output  = arg(options, "output"  )->count;
+  bool script  = arg(options, "script"  )->count;
+  bool list    = arg(options, "list-tasks")->count;
+  bool add     = arg(options, "add-task")->count;
+  bool version = arg(options, "version" )->count;
+  bool global  = arg(options, "globals" )->count;
+  bool help    = arg(options, "help"    )->count;
+  bool debugdb = arg(options, "debug-db")->count;
+  bool parse   = arg(options, "stop-after-parse")->count;
+  bool check   = arg(options, "stop-after-type-check")->count;
+
+  const char *jobs   = arg(options, "jobs"  )->argument;
+  const char *init   = arg(options, "init"  )->argument;
+  const char *remove = arg(options, "remove-task")->argument;
+
   queue.stack_trace = debug;
 
-  bool nodb = args["init"];
-  bool noparse = nodb ||
-    args["subtract"] || args["list"] ||
-    args["output"] || args["input"];
-  bool notype = noparse || args["parse"];
-  bool noexecute = notype ||
-    args["add"] || args["typecheck"] || args["globals"];
-
-  if (jobs < 1) {
-    std::cerr << "Cannot run with less than 1 jobs!" << std::endl;
-    return 1;
+  if (help) {
+    print_help(argv[0]);
+    return 0;
   }
+
+  if (version) {
+    std::cout << "wake " << VERSION_STR << std::endl;
+    return 0;
+  }
+
+  int njobs = std::thread::hardware_concurrency();
+  if (jobs) {
+    char *tail;
+    njobs = strtol(jobs, &tail, 0);
+    if (*tail || njobs < 1) {
+      std::cerr << "Cannot run with " << jobs << " jobs!" << std::endl;
+      return 1;
+    }
+  }
+
+  bool nodb = init;
+  bool noparse = nodb || remove || list || output || input;
+  bool notype = noparse || parse;
+  bool noexecute = notype || add || check || global;
 
   if (quiet && verbose) {
     std::cerr << "Cannot be both quiet and verbose!" << std::endl;
     return 1;
   }
 
-  if (noparse && !args.pos.empty()) {
+  if (noparse && argc < 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
     return 1;
   }
 
   std::string prefix;
-  if (args["init"]) {
-    std::string dir = args["init"];
-    if (!make_workspace(dir)) {
-      std::cerr << "Unable to initialize a workspace in " << dir << std::endl;
+  if (init) {
+    if (!make_workspace(init)) {
+      std::cerr << "Unable to initialize a workspace in " << init << std::endl;
       return 1;
     }
   } else if (!chdir_workspace(prefix)) {
@@ -294,48 +328,49 @@ int main(int argc, const char **argv) {
   }
 
   std::vector<std::string> targets = db.get_targets();
-  if (args["list"]) {
+  if (list) {
     std::cout << "Active wake targets:" << std::endl;
     int j = 0;
     for (auto &i : targets)
       std::cout << "  " << j++ << " = " << i << std::endl;
   }
 
-  if (args["subtract"]) {
-    int victim = args["subtract"];
-    if (victim < 0 || victim >= (int)targets.size()) {
-      std::cerr << "Could not remove target " << victim << "; there are only " << targets.size() << std::endl;
+  if (remove) {
+    char *tail;
+    int victim = strtol(remove, &tail, 0);
+    if (*tail || victim < 0 || victim >= (int)targets.size()) {
+      std::cerr << "Could not remove target " << remove << "; there are only " << targets.size() << std::endl;
       return 1;
     }
-    if (args["verbose"]) std::cout << "Removed target " << victim << " = " << targets[victim] << std::endl;
+    if (verbose) std::cout << "Removed target " << victim << " = " << targets[victim] << std::endl;
     db.del_target(targets[victim]);
     targets.erase(targets.begin() + victim);
   }
 
-  if (args["add"] && args.pos.empty()) {
+  if (add && argc < 1) {
     std::cerr << "You must specify positional arguments to use for the wake bulid target" << std::endl;
     return 1;
   } else {
-    if (!args.pos.empty()) {
+    if (argc > 1) {
       std::stringstream expr;
-      bool first = true;
-      for (auto i : args.pos) {
-        if (!first) expr << " ";
-        first = false;
-        expr << i;
+      for (int i = 1; i < argc; ++i) {
+        if (i != 1) expr << " ";
+        expr << argv[i];
       }
       targets.push_back(expr.str());
     }
   }
 
-  if (args["input"]) {
-    std::string input = args["input"];
-    describe(db.explain(make_canonical(prefix + input), 1, verbose), rerun, debug);
+  if (input) {
+    for (int i = 1; i < argc; ++i) {
+      describe(db.explain(make_canonical(prefix + argv[i]), 1, verbose), script, debug);
+    }
   }
 
-  if (args["output"]) {
-    std::string output = args["output"];
-    describe(db.explain(make_canonical(prefix + output), 2, verbose), rerun, debug);
+  if (output) {
+    for (int i = 1; i < argc; ++i) {
+      describe(db.explain(make_canonical(prefix + argv[i]), 2, verbose), script, debug);
+    }
   }
 
   if (noparse) return 0;
@@ -355,7 +390,7 @@ int main(int argc, const char **argv) {
   }
 
   std::vector<std::string> globals;
-  if (args["globals"])
+  if (global)
     for (auto &g : top->globals)
       globals.push_back(g.first);
 
@@ -378,7 +413,7 @@ int main(int argc, const char **argv) {
   top->body = std::unique_ptr<Expr>(body);
 
   /* Primitives */
-  JobTable jobtable(&db, jobs, verbose, quiet, check);
+  JobTable jobtable(&db, njobs, verbose, quiet, check);
   PrimMap pmap;
   prim_register_string(pmap, VERSION_STR);
   prim_register_vector(pmap);
@@ -390,7 +425,7 @@ int main(int argc, const char **argv) {
   prim_register_job(&jobtable, pmap);
   prim_register_sources(&all_sources, pmap);
 
-  if (args["parse"]) std::cout << top.get();
+  if (parse) std::cout << top.get();
 
   if (notype) return ok?0:1;
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
@@ -427,33 +462,31 @@ int main(int argc, const char **argv) {
   }
 
   if (!ok) {
-    if (args["add"]) std::cerr << ">>> Expression not added to the active target list <<<" << std::endl;
+    if (add) std::cerr << ">>> Expression not added to the active target list <<<" << std::endl;
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }
 
-  if (args["typecheck"]) std::cout << root.get();
-  if (args["globals"]) {
-    for (auto &g : globals) {
-      Expr *e = root.get();
-      while (e && e->type == &DefBinding::type) {
-        DefBinding *d = reinterpret_cast<DefBinding*>(e);
-        e = d->body.get();
-        auto i = d->order.find(g);
-        if (i != d->order.end()) {
-          int idx = i->second;
-          Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
-          std::cout << g << ": ";
-          v->typeVar.format(std::cout, v->typeVar);
-          std::cout << " = <" << v->location << ">" << std::endl;
-        }
+  if (check) std::cout << root.get();
+  for (auto &g : globals) {
+    Expr *e = root.get();
+    while (e && e->type == &DefBinding::type) {
+      DefBinding *d = reinterpret_cast<DefBinding*>(e);
+      e = d->body.get();
+      auto i = d->order.find(g);
+      if (i != d->order.end()) {
+        int idx = i->second;
+        Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
+        std::cout << g << ": ";
+        v->typeVar.format(std::cout, v->typeVar);
+        std::cout << " = <" << v->location << ">" << std::endl;
       }
     }
   }
 
-  if (args["add"]) {
+  if (add) {
     db.add_target(targets.back());
-    if (args["verbose"]) std::cout << "Added target " << (targets.size()-1) << " = " << targets.back() << std::endl;
+    if (verbose) std::cout << "Added target " << (targets.size()-1) << " = " << targets.back() << std::endl;
   }
 
   // Exit without execution for these arguments
@@ -462,10 +495,9 @@ int main(int argc, const char **argv) {
   // Initialize expression hashes for memoize of closures
   root->hash();
 
-  if (verbose) std::cerr << "Running " << jobs << " jobs at a time." << std::endl;
   db.prepare();
-  std::shared_ptr<Value> output;
-  queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output(&output)));
+  std::shared_ptr<Value> value;
+  queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output(&value)));
 
   // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
   std::cout << std::flush;
@@ -484,7 +516,7 @@ int main(int argc, const char **argv) {
   } else {
     std::vector<std::shared_ptr<Value> > outputs;
     outputs.reserve(targets.size());
-    Binding *iter = reinterpret_cast<Closure*>(output.get())->binding.get();
+    Binding *iter = reinterpret_cast<Closure*>(value.get())->binding.get();
     for (size_t i = 0; i < targets.size(); ++i) {
       outputs.emplace_back(iter->future[0].value);
       iter = iter->next.get();
