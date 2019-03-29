@@ -10,7 +10,7 @@ def version_h _ =
   def body = "#define VERSION {git.getJobStdout}"
   write "{here}/version.h" body
 
-global def buildWake variant =
+global def buildWake (Pair variant _) =
   def reFiles = sources here '.*\.re'
   def headerFiles = version_h 0, sources here '.*\.h'
   def cppFiles = sources here '.*\.cpp' ++ map re2c reFiles
