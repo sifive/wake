@@ -84,7 +84,7 @@ Optional dependencies:
  - re2c			public domain	http://re2c.org
 
 Internal dependencies:
- - argagg		MIT		https://github.com/vietjtnguyen/argagg
+ - gopt			TFL		http://www.purposeful.co.uk/software/gopt/
  - SipHash		public domain	https://github.com/veorq/SipHash
  - BLAKE2		public domain	https://github.com/BLAKE2/libb2
  - whereami		WTFPLV2		https://github.com/gpakosz/whereami
