@@ -14,11 +14,15 @@ def pkgConfigImp args = memoize 0 (
   if result.getJobStatus != 0 then raise "pkg-config failed" else output
 )
 
-global def cflags pkg = try (\_ raise "pkg-config for {pkg} not found") (pkgConfigImp ("--cflags", pkg, Nil))
-global def libs   pkg = try (\_ raise "pkg-config for {pkg} not found") (pkgConfigImp ("--libs",   pkg, Nil))
+def fail pkg = match _
+  "pkg-config failed", Nil = raise "pkg-config for {pkg} not found"
+  x = raise x.head
+
+global def cflags pkg = try (fail pkg) (pkgConfigImp ("--cflags", pkg, Nil))
+global def libs   pkg = try (fail pkg) (pkgConfigImp ("--libs",   pkg, Nil))
 
 global def pkgConfig pkg =
   def version = pkgConfigImp ("--modversion", pkg, Nil) | head
   def cflags  = pkgConfigImp ("--cflags", pkg, Nil)
   def lflags  = pkgConfigImp ("--libs", pkg, Nil)
-  CPackage version Nil Nil cflags lflags
+  (CPackage _ Nil Nil _ _) | reraise version | reraise cflags | reraise lflags | try (fail pkg)
