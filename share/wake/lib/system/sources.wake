@@ -14,7 +14,7 @@ global def source file =
   | setPlanRunner      virtualRunner
   | setPlanShare       False
   | setPlanEnvironment Nil
-  | setPlanFnOutputs   (file, _)
+  | setPlanFnOutputs   (file.simplify, _)
   | runJob
   | getJobOutput
 

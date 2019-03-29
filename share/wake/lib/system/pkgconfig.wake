@@ -1,9 +1,24 @@
-global def pkgConfig args = memoize 0 (
+global tuple CPackage =
+  global Verison String
+  global Headers List Path
+  global Objects List Path
+  global CFlags  List String
+  global LFlags  List String
+
+global def makeCPackage version = CPackage version Nil Nil Nil Nil
+
+def pkgConfigImp args = memoize 0 (
   def cmdline = which "pkg-config", args
   def result = manualJob cmdline Nil (\_ Nil) # caching ok
-  def output = tokenize "\n" result.getJobStdout | head | tokenize " " | filter (_ !=* "")
+  def output = result.getJobStdout | tokenize "\n" | head | tokenize " " | filter (_ !=* "")
   if result.getJobStatus != 0 then raise "pkg-config failed" else output
 )
 
-global def cflags pkg = try (\_ raise "pkg-config for {pkg} not found") (pkgConfig ("--cflags", pkg, Nil))
-global def libs   pkg = try (\_ raise "pkg-config for {pkg} not found") (pkgConfig ("--libs",   pkg, Nil))
+global def cflags pkg = try (\_ raise "pkg-config for {pkg} not found") (pkgConfigImp ("--cflags", pkg, Nil))
+global def libs   pkg = try (\_ raise "pkg-config for {pkg} not found") (pkgConfigImp ("--libs",   pkg, Nil))
+
+global def pkgConfig pkg =
+  def version = pkgConfigImp ("--modversion", pkg, Nil) | head
+  def cflags  = pkgConfigImp ("--cflags", pkg, Nil)
+  def lflags  = pkgConfigImp ("--libs", pkg, Nil)
+  CPackage version Nil Nil cflags lflags
