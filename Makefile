@@ -6,7 +6,7 @@ CC	:= gcc -std=c99
 CXX	:= g++ -std=c++11
 CFLAGS	:= -Wall -O2 -flto -DVERSION=$(VERSION)
 
-CORE_CFLAGS  := $(shell pkg-config --cflags sqlite3 ncurses)
+CORE_CFLAGS  := $(shell pkg-config --cflags sqlite3 ncurses) -Iutf8proc -Igopt
 CORE_LDFLAGS := $(shell pkg-config --libs   sqlite3 ncurses)
 FUSE_CFLAGS  := $(shell pkg-config --cflags fuse)
 FUSE_LDFLAGS := $(shell pkg-config --libs   fuse)
@@ -20,8 +20,10 @@ wake.db:	bin/wake lib/wake/fuse-wake lib/wake/shim-wake
 install:	all
 	./bin/wake install '"install"'
 
-bin/wake:	$(patsubst %.cpp,%.o,$(wildcard src/*.cpp)) src/symbol.o
-	$(CXX) $(CFLAGS) -o $@ $^ $(CORE_LDFLAGS) -lgmp -lutf8proc -lre2
+bin/wake:	src/symbol.o					\
+		$(patsubst %.cpp,%.o,$(wildcard src/*.cpp))	\
+		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c)
+	$(CXX) $(CFLAGS) -o $@ $^ $(CORE_LDFLAGS) -lgmp -lre2
 
 lib/wake/fuse-wake:	fuse/fuse.cpp
 	$(CXX) $(CFLAGS) $(FUSE_CFLAGS) $< -o $@ $(FUSE_LDFLAGS)
