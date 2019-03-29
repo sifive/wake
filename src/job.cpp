@@ -1303,19 +1303,19 @@ static PRIMFN(prim_job_record) {
 }
 
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
-  pmap.emplace("job_cache",  PrimDesc(prim_job_cache,  type_job_cache,   PRIM_SHALLOW, jobtable));
-  pmap.emplace("job_create", PrimDesc(prim_job_create, type_job_create,  PRIM_SHALLOW, jobtable));
-  pmap.emplace("job_launch", PrimDesc(prim_job_launch, type_job_launch,  PRIM_SHALLOW, jobtable));
-  pmap.emplace("job_virtual",PrimDesc(prim_job_virtual,type_job_virtual, PRIM_SHALLOW, jobtable));
-  pmap.emplace("job_finish", PrimDesc(prim_job_finish, type_job_finish,  PRIM_SHALLOW));
-  pmap.emplace("job_kill",   PrimDesc(prim_job_kill,   type_job_kill,    PRIM_SHALLOW));
-  pmap.emplace("job_output", PrimDesc(prim_job_output, type_job_output,  PRIM_SHALLOW|PRIM_PURE));
-  pmap.emplace("job_tree",   PrimDesc(prim_job_tree,   type_job_tree,    PRIM_SHALLOW|PRIM_PURE));
-  pmap.emplace("job_reality",PrimDesc(prim_job_reality,type_job_reality, PRIM_SHALLOW|PRIM_PURE));
-  pmap.emplace("job_report", PrimDesc(prim_job_report, type_job_report,  PRIM_SHALLOW|PRIM_PURE));
-  pmap.emplace("job_record", PrimDesc(prim_job_record, type_job_record,  PRIM_SHALLOW|PRIM_PURE));
-  pmap.emplace("add_hash",   PrimDesc(prim_add_hash,   type_add_hash,    PRIM_SHALLOW, jobtable));
-  pmap.emplace("get_hash",   PrimDesc(prim_get_hash,   type_get_hash,    PRIM_SHALLOW, jobtable));
-  pmap.emplace("get_modtime",PrimDesc(prim_get_modtime,type_get_modtime, PRIM_SHALLOW));
-  pmap.emplace("search_path",PrimDesc(prim_search_path,type_search_path, PRIM_SHALLOW));
+  prim_register(pmap, "job_cache",  prim_job_cache,  type_job_cache,   PRIM_SHALLOW, jobtable);
+  prim_register(pmap, "job_create", prim_job_create, type_job_create,  PRIM_SHALLOW, jobtable);
+  prim_register(pmap, "job_launch", prim_job_launch, type_job_launch,  PRIM_SHALLOW, jobtable);
+  prim_register(pmap, "job_virtual",prim_job_virtual,type_job_virtual, PRIM_SHALLOW, jobtable);
+  prim_register(pmap, "job_finish", prim_job_finish, type_job_finish,  PRIM_SHALLOW);
+  prim_register(pmap, "job_kill",   prim_job_kill,   type_job_kill,    PRIM_SHALLOW);
+  prim_register(pmap, "job_output", prim_job_output, type_job_output,  PRIM_SHALLOW|PRIM_PURE);
+  prim_register(pmap, "job_tree",   prim_job_tree,   type_job_tree,    PRIM_SHALLOW|PRIM_PURE);
+  prim_register(pmap, "job_reality",prim_job_reality,type_job_reality, PRIM_SHALLOW|PRIM_PURE);
+  prim_register(pmap, "job_report", prim_job_report, type_job_report,  PRIM_SHALLOW|PRIM_PURE);
+  prim_register(pmap, "job_record", prim_job_record, type_job_record,  PRIM_SHALLOW|PRIM_PURE);
+  prim_register(pmap, "add_hash",   prim_add_hash,   type_add_hash,    PRIM_SHALLOW, jobtable);
+  prim_register(pmap, "get_hash",   prim_get_hash,   type_get_hash,    PRIM_SHALLOW, jobtable);
+  prim_register(pmap, "get_modtime",prim_get_modtime,type_get_modtime, PRIM_SHALLOW);
+  prim_register(pmap, "search_path",prim_search_path,type_search_path, PRIM_SHALLOW);
 }
