@@ -79,11 +79,11 @@ static PRIMFN(prim_unit) {
 }
 
 void prim_register_exception(PrimMap &pmap) {
-  pmap.emplace("test",  PrimDesc(prim_test,  type_test,  PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("catch", PrimDesc(prim_catch, type_catch, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("raise", PrimDesc(prim_raise, type_raise, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("cast",  PrimDesc(prim_cast,  type_cast,  PRIM_PURE|PRIM_SHALLOW));
+  prim_register(pmap, "test",  prim_test,  type_test,  PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "catch", prim_catch, type_catch, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "raise", prim_raise, type_raise, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "cast",  prim_cast,  type_cast,  PRIM_PURE|PRIM_SHALLOW);
 
-  pmap.emplace("wait_one", PrimDesc(prim_unit, type_unit, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("wait_all", PrimDesc(prim_unit, type_unit, PRIM_PURE));
+  prim_register(pmap, "wait_one", prim_unit, type_unit, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "wait_all", prim_unit, type_unit, PRIM_PURE);
 }

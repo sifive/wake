@@ -1,0 +1,24 @@
+# Require re2c >= 1.0 for flag support
+def re2cOk Unit =
+  def out = job (which "re2c", "--version", Nil) Nil | getJobStdout
+  def ver = try (\_ Nil) (out | extract "re2c ([0-9.]+)\n" | head | tokenize '\.' | map int)
+  match ver
+    x, y, _ = x >= 1
+    _       = False
+
+def re2cReal file =
+  def cpp = replace '\.re$' ".cpp" file.getPathName
+  def cmdline = which "re2c", "-8", "--no-generation-date", file.getPathName, "-o", cpp, Nil
+  def result = job cmdline (file, Nil) | getJobOutput
+  def compress = which "gzip", "-nk9", result.getPathName, Nil
+  def _ = job compress (result, Nil)
+  result
+
+def re2cFake file =
+  def cpp = replace '\.re$' ".cpp" file.getPathName
+  def zip = source "{cpp}.gz"
+  def cmd = which "gzip", "-dc", "{cpp}.gz", Nil
+  job cmd (zip, Nil) | getJobStdout | write cpp
+
+global def re2c file =
+  if re2cOk Unit then re2cReal file else re2cFake file

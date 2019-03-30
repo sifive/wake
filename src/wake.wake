@@ -1,19 +1,16 @@
-def re2c file =
-  def cpp = replace '\.re$' ".cpp" file.getPathName
-  def cmdline = which "re2c", "-8", "--no-generation-date", file.getPathName, "-o", cpp, Nil
-  def result = job cmdline (file, Nil)
-  result.getJobOutput
-
 def version_h _ =
   def cmdline = which "git", "describe", "--tags", "--dirty", Nil
   def git = volatileJob cmdline Nil (\_ Nil)
   def body = "#define VERSION {git.getJobStdout}"
   write "{here}/version.h" body
 
-global def buildWake variant =
+global def buildWake (Pair variant clib) =
+  def deps = map (_ clib) (utf8proc, gopt, Nil) ++ map pkgConfig ("sqlite3", "ncurses", Nil)
   def reFiles = sources here '.*\.re'
-  def headerFiles = version_h 0, sources here '.*\.h'
-  def cppFiles = sources here '.*\.cpp' ++ map re2c reFiles
-  def compile = compileC variant (cflags "sqlite3 ncurses") headerFiles
-  def objFiles = map compile cppFiles
-  linkO variant (libs "sqlite3 ncurses" ++ ("-lgmp", "-lutf8proc", "-lre2", Nil)) objFiles "bin/wake"
+  def headerFiles = version_h 0, (sources here '.*\.h', map getCPackageHeaders deps).flatten
+  def cppFiles = map re2c reFiles ++ sources here '.*\.cpp'
+  def copts = map getCPackageCFlags deps
+  def compile = compileC variant copts.flatten headerFiles
+  def objFiles = flatten (map compile cppFiles, map getCPackageObjects deps)
+  def lflags = flatten (map getCPackageLFlags deps) ++ ("-lgmp", "-lre2", Nil)
+  linkO variant lflags objFiles "bin/wake"

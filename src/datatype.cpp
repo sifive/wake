@@ -23,14 +23,14 @@ void Sum::addConstructor(AST &&ast) {
       new VarRef(LOCATION, "_", nargs-i, 0)));
 }
 
-bool AST::unify(TypeVar &out, std::map<std::string, TypeVar> &ids) {
+bool AST::unify(TypeVar &out, const std::map<std::string, TypeVar*> &ids) {
   if (Lexer::isLower(name.c_str())) {
     auto it = ids.find(name);
     if (it == ids.end()) {
       std::cerr << "Unbound type variable " << name << " at " << location << std::endl;
       return false;
     } else {
-      return out.unify(it->second, &location);
+      return out.unify(*it->second, &location);
     }
   } else { // upper or operator
     TypeVar cons(name.c_str(), args.size());

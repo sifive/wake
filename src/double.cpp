@@ -102,7 +102,7 @@ static PRIMFN(prim_str) {
   INTEGER(arg0, 0);
   INTEGER(arg1, 1);
   DOUBLE(arg2, 2);
-  long format, precision;
+  long format = 0, precision = 0;
 
   bool ok = mpz_fits_slong_p(arg0->value);
   if (ok) {
@@ -252,37 +252,37 @@ static PRIMFN(prim_modf) {
 
 void prim_register_double(PrimMap &pmap) {
   // basic functions
-  pmap.emplace("dabs", PrimDesc(prim_abs, type_unop,  PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dneg", PrimDesc(prim_neg, type_unop,  PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dadd", PrimDesc(prim_add, type_binop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dsub", PrimDesc(prim_sub, type_binop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dmul", PrimDesc(prim_mul, type_binop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("ddiv", PrimDesc(prim_div, type_binop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dpow", PrimDesc(prim_pow, type_binop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dfma", PrimDesc(prim_fma, type_fma,   PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dcmp", PrimDesc(prim_cmp, type_cmp,   PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dstr", PrimDesc(prim_str, type_str,   PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("ddbl", PrimDesc(prim_dbl, type_dbl,   PRIM_PURE|PRIM_SHALLOW));
+  prim_register(pmap, "dabs", prim_abs, type_unop,  PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dneg", prim_neg, type_unop,  PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dadd", prim_add, type_binop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dsub", prim_sub, type_binop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dmul", prim_mul, type_binop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "ddiv", prim_div, type_binop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dpow", prim_pow, type_binop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dfma", prim_fma, type_fma,   PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dcmp", prim_cmp, type_cmp,   PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dstr", prim_str, type_str,   PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "ddbl", prim_dbl, type_dbl,   PRIM_PURE|PRIM_SHALLOW);
 
   // integer/double interop
-  pmap.emplace("dclass", PrimDesc(prim_class, type_class, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dfrexp", PrimDesc(prim_frexp, type_frexp, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dldexp", PrimDesc(prim_ldexp, type_ldexp, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dmodf",  PrimDesc(prim_modf,  type_modf,  PRIM_PURE|PRIM_SHALLOW));
+  prim_register(pmap, "dclass", prim_class, type_class, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dfrexp", prim_frexp, type_frexp, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dldexp", prim_ldexp, type_ldexp, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dmodf",  prim_modf,  type_modf,  PRIM_PURE|PRIM_SHALLOW);
 
   // handy numeric functions
-  pmap.emplace("dcos",   PrimDesc(prim_cos,   type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dsin",   PrimDesc(prim_sin,   type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dtan",   PrimDesc(prim_tan,   type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dacos",  PrimDesc(prim_acos,  type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dasin",  PrimDesc(prim_asin,  type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dexp",   PrimDesc(prim_exp,   type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dlog",   PrimDesc(prim_log,   type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dexpm1", PrimDesc(prim_expm1, type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dlog1p", PrimDesc(prim_log1p, type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("derf",   PrimDesc(prim_erf,   type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("derfc",  PrimDesc(prim_erfc,  type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dtgamma",PrimDesc(prim_tgamma,type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("dlgamma",PrimDesc(prim_lgamma,type_unop, PRIM_PURE|PRIM_SHALLOW));
-  pmap.emplace("datan",  PrimDesc(prim_atan,  type_binop, PRIM_PURE|PRIM_SHALLOW));
+  prim_register(pmap, "dcos",   prim_cos,   type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dsin",   prim_sin,   type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dtan",   prim_tan,   type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dacos",  prim_acos,  type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dasin",  prim_asin,  type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dexp",   prim_exp,   type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dlog",   prim_log,   type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dexpm1", prim_expm1, type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dlog1p", prim_log1p, type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "derf",   prim_erf,   type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "derfc",  prim_erfc,  type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dtgamma",prim_tgamma,type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dlgamma",prim_lgamma,type_unop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "datan",  prim_atan,  type_binop, PRIM_PURE|PRIM_SHALLOW);
 }

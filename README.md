@@ -55,11 +55,11 @@ or that your colleagues already built, you might appreciate wake.
 
 On Mac OS with Mac Ports installed:
 
-    sudo port install osxfuse sqlite3 gmp re2 re2c libutf8proc ncurses pkgconfig
+    sudo port install osxfuse sqlite3 gmp re2 ncurses pkgconfig
 
 On Debian/Ubuntu:
 
-    sudo apt-get install libfuse-dev libsqlite3-dev libgmp-dev libre2-dev re2c libutf8proc-dev libncurses5-dev pkg-config
+    sudo apt-get install libfuse-dev libsqlite3-dev libgmp-dev libre2-dev libncurses5-dev pkg-config
 
 # Building wake
 
@@ -78,11 +78,13 @@ External dependencies:
  - libfuse-dev		LGPL v2.1	https://github.com/libfuse/libfuse
  - libre2-dev		BSD 3-clause	https://github.com/google/re2
  - libncurses5-dev	MIT		https://www.gnu.org/software/ncurses/
+
+Optional dependencies:
  - re2c			public domain	http://re2c.org
  - utf8proc		MIT 		https://juliastrings.github.io/utf8proc/
 
 Internal dependencies:
- - argagg		MIT		https://github.com/vietjtnguyen/argagg
+ - gopt			TFL		http://www.purposeful.co.uk/software/gopt/
  - SipHash		public domain	https://github.com/veorq/SipHash
  - BLAKE2		public domain	https://github.com/BLAKE2/libb2
  - whereami		WTFPLV2		https://github.com/gpakosz/whereami

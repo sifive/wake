@@ -133,3 +133,8 @@ std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values) 
   }
   return out;
 }
+
+void prim_register(PrimMap &pmap, const char *key, PrimFn fn, PrimType type, int flags, void *data) {
+  pmap.insert(std::make_pair(key, PrimDesc(fn, type, flags, data)));
+  // pmap.emplace(key, PrimDesc(fn, type, flags, data));
+}
