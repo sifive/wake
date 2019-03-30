@@ -1,4 +1,5 @@
 def c11Flags      = ("-std=c++11", Nil)
+def c99Flags      = ("-std=c99", Nil)
 def debugCFlags   = ("-Wall", "-Wextra", "-O0", "-g", "-pg", Nil)
 def debugLFlags   = ("-g", "-pg", Nil)
 def releaseCFlags = ("-Wall", "-O2", "-flto", Nil)
@@ -21,8 +22,8 @@ def makeCompileC variant gcc flags =
 def makeLinkO variant linker flags =
   Pair variant (\extra doLinkO variant linker (flags ++ extra)), Nil
 
-publish compileC = makeCompileC "native-c99-debug"     (which "gcc") (debugCFlags)
-publish compileC = makeCompileC "native-c99-release"   (which "gcc") (releaseCFlags)
+publish compileC = makeCompileC "native-c99-debug"     (which "gcc") (c99Flags ++ debugCFlags)
+publish compileC = makeCompileC "native-c99-release"   (which "gcc") (c99Flags ++ releaseCFlags)
 publish compileC = makeCompileC "native-cpp11-debug"   (which "g++") (c11Flags ++ debugCFlags)
 publish compileC = makeCompileC "native-cpp11-release" (which "g++") (c11Flags ++ releaseCFlags)
 
