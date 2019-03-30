@@ -7,6 +7,7 @@
 #include <re2/re2.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -40,23 +41,39 @@ bool chdir_workspace(std::string &prefix) {
   return attempts != 0;
 }
 
-static std::string slurp(const std::string &command, bool &fail) {
+static std::string slurp(int dirfd, bool &fail) {
   std::stringstream str;
   char buf[4096];
-  int got;
-  FILE *cmd = popen(command.c_str(), "r");
-  if (!cmd) {
+  int got, status, pipefd[2];
+  pid_t pid;
+
+  if (pipe(pipefd) == -1) {
     fail = true;
-    fprintf(stderr, "Failed to popen %s: %s\n", command.c_str(), strerror(errno));
+    fprintf(stderr, "Failed to open pipe %s\n", strerror(errno));
+  } else if ((pid = fork()) == 0) {
+    fchdir(dirfd);
+    close(pipefd[0]);
+    if (pipefd[1] != 1) {
+      dup2(pipefd[1], 1);
+      close(pipefd[1]);
+    }
+    execlp("git", "git", "ls-files", "-z", 0);
+    fprintf(stderr, "Failed to execlp(git): %s\n", strerror(errno));
+    exit(1);
   } else {
-    while ((got = fread(buf, 1, sizeof(buf), cmd)) > 0) str.write(buf, got);
-    if (ferror(cmd)) {
-      fprintf(stderr, "Failed to read %s: %s\n", command.c_str(), strerror(errno));
+    close(pipefd[1]);
+    while ((got = read(pipefd[0], buf, sizeof(buf))) > 0) str.write(buf, got);
+    if (got == -1) {
+      fprintf(stderr, "Failed to read from git: %s\n", strerror(errno));
       fail = true;
     }
-    errno = EINVAL;
-    if (pclose(cmd) != 0) {
-      fprintf(stderr, "Failed to pclose %s: %s\n", command.c_str(), strerror(errno));
+    close(pipefd[0]);
+    while (waitpid(pid, &status, 0) != pid) { }
+    if (WIFSIGNALED(status)) {
+      fprintf(stderr, "Failed to reap git: killed by %d\n", WTERMSIG(status));
+      fail = true;
+    } else if (WEXITSTATUS(status)) {
+      fprintf(stderr, "Failed to reap git: exited with %d\n", WEXITSTATUS(status));
       fail = true;
     }
   }
@@ -76,7 +93,7 @@ static bool scan(std::vector<std::shared_ptr<String> > &out, const std::string &
   for (errno = 0; !failed && (f = readdir(dir)); errno = 0) {
     if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
     if (!strcmp(f->d_name, ".git")) {
-      std::string files(slurp("git -C " + path + " ls-files -z", failed));
+      std::string files(slurp(dirfd, failed));
       std::string prefix(path == "." ? "" : (path + "/"));
       const char *tok = files.data();
       const char *end = tok + files.size();
@@ -123,7 +140,9 @@ static bool scan(std::vector<std::shared_ptr<String> > &out, const std::string &
 }
 
 static bool scan(std::vector<std::shared_ptr<String> > &out) {
-  int dirfd = open(".", O_RDONLY);
+  int flags, dirfd = open(".", O_RDONLY);
+  if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1)
+    fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
   return dirfd == -1 || scan(out, ".", dirfd);
 }
 
@@ -174,7 +193,9 @@ static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::st
 }
 
 static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::string &path) {
-  int dirfd = open(path.c_str(), O_RDONLY);
+  int flags, dirfd = open(path.c_str(), O_RDONLY);
+  if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1)
+    fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
   return dirfd == -1 || push_files(out, path, dirfd);
 }
 
