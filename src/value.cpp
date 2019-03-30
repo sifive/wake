@@ -208,14 +208,15 @@ TypeVar &Double::getType() {
 
 std::string Double::str(int format, int precision) const {
   std::stringstream s;
+  char buf[80];
   s.precision(precision);
   switch (format) {
-    case FIXED:      s << std::fixed;      break;
-    case SCIENTIFIC: s << std::scientific; break;
-    case HEXFLOAT:   s << std::hexfloat;   break;
-    default: if (value < 0.1 && value > -0.1) s << std::scientific; break;
+    case FIXED:      s << std::fixed      << value; break;
+    case SCIENTIFIC: s << std::scientific << value; break;
+    // std::hexfloat is not available pre g++ 5.1
+    case HEXFLOAT:   snprintf(buf, sizeof(buf), "%.*a", precision, value); s << buf; break;
+    default: if (value < 0.1 && value > -0.1) s << std::scientific; s << value; break;
   }
-  s << value;
   if (format == DEFAULTFLOAT) {
     std::string out = s.str();
     if (out.find('.') == std::string::npos &&
