@@ -8,6 +8,25 @@ global data JValue =
   JObject  (List (Pair String JValue))
   JArray   (List JValue)
 
+global def getJString = match _
+  JString x = x
+  x         = raise "{format x} is not a JString"
+global def getJInteger = match _
+  JInteger x = x
+  x          = raise "{format x} is not a JInteger"
+global def getJDouble = match _
+  JDouble x = x
+  x         = raise "{format x} is not a JDouble"
+global def getJBoolean = match _
+  JBoolean x = x
+  x          = raise "{format x} is not a JBoolean"
+global def getJObject = match _
+  JObject x = x
+  x         = raise "{format x} is not a JObject"
+global def getJArray = match _
+  JArray x = x
+  x        = raise "{format x} is not a JArray"
+
 global def parseJSONBody body = prim "json_body"
 global def parseJSONFile file = prim "json_file"
 
@@ -34,7 +53,7 @@ tuple JSONFormat =
   global Double (Double => String)
   global Indent Integer
 
-def format fmt lhs =
+def doFormat fmt lhs =
   def indent = fmt.getJSONFormatIndent
   def space = if indent > 0 then " " else ""
   def indention = tab (\_ ' ') indent | cat
@@ -71,7 +90,7 @@ global def defaultJSONFormat =
 
 global def prettyJSONFormat = defaultJSONFormat | setJSONFormatIndent 2
 
-global def customFormatJSON fmt x = format fmt x | cat
+global def customFormatJSON fmt x = doFormat fmt x | cat
 global def formatJSON = customFormatJSON defaultJSONFormat
 global def prettyJSON = customFormatJSON prettyJSONFormat
 
