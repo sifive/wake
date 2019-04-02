@@ -251,7 +251,7 @@ Wake has a pair of helper methods that make this easy, as shown.
       def cmdline = which "uname", "-sr", Nil
       def os = job cmdline Nil
       def body = "#define OS {os.getJobStdout}#define WAKE {version}\n"
-      write 0644 "{here}/info.h" body # create with mode: rw-r--r--
+      write "{here}/info.h" body # create with mode: rw-r--r--
     EOF
     wake 'info_h 0'
 
@@ -319,9 +319,9 @@ wake:
 ## Publish/Subscribe
 
     cat >>tutorial.wake <<EOF
-    publish animal = "Cat"
-    publish animal = "Dog"
-    publish animal = replace "u" "o" "Mouse"
+    publish animal = "Cat", Nil
+    publish animal = "Dog", Nil
+    publish animal = replace "u" "o" "Mouse", Nil
     global def animals = subscribe animal
     EOF
     wake 'animals'
@@ -330,7 +330,7 @@ Wake includes a publish/subscribe interface to support accumulating
 information between multiple files. `publish x = y` adds `y` to the list of
 things which will be returned by a `subscribe x` expression. Note that
 `animal` is not a variable; it is a topic, which is in a different
-namespace than normal variables.
+namespace than normal variables. Note that `y` must be a List type.
 
 This API can be used to accumulate all the unit tests in the workspace into
 a single location that runs them all at once.  Keep in mind that the
