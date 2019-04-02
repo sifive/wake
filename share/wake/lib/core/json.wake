@@ -20,16 +20,12 @@ global def getJDouble = match _
 global def getJBoolean = match _
   JBoolean x = x
   x          = raise "{format x} is not a JBoolean"
-global def getJNull = match _
-  JNull = JNull
-  x     = raise "{format x} is not a JNull"
 global def getJObject = match _
   JObject x = x
   x         = raise "{format x} is not a JObject"
 global def getJArray = match _
   JArray x = x
   x        = raise "{format x} is not a JArray"
-
 
 global def parseJSONBody body = prim "json_body"
 global def parseJSONFile file = prim "json_file"
