@@ -57,6 +57,16 @@ On Mac OS with Mac Ports installed:
 
     sudo port install osxfuse sqlite3 gmp re2 ncurses pkgconfig
 
+On Mac OS with Home Brew installed:
+
+    brew tap homebrew/cask
+    brew cask install osxfuse
+    brew install sqlite3 gmp re2 ncurses pkgconfig
+
+    export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+
+    You must reboot for the installation of osxfuse to take effect.
+
 On Debian/Ubuntu:
 
     sudo apt-get install libfuse-dev libsqlite3-dev libgmp-dev libre2-dev libncurses5-dev pkg-config
