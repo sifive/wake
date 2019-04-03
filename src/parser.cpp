@@ -798,8 +798,8 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
 
   Constructor &c = sump->members.back();
   Expr *construct = new Construct(c.ast.location, sump, &c);
-  for (size_t i = 0; i < c.ast.args.size(); ++i)
-    construct = new Lambda(c.ast.location, "_", construct);
+  for (size_t i = c.ast.args.size(); i > 0; --i)
+    construct = new Lambda(c.ast.location, "val" + members[i-1].first, construct);
 
   bind_def(lex, map, c.ast.name, construct);
   if (global) bind_global(c.ast.name, top, lex);
@@ -838,7 +838,7 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
       editifn = new App(sump->location, editifn,
         (inner == outer)
         ? reinterpret_cast<Expr*>(new App(sump->location,
-           new VarRef(sump->location, "_ f"),
+           new VarRef(sump->location, "fn" + mname),
            new VarRef(sump->location, "_ " + std::to_string(inner+1))))
         : reinterpret_cast<Expr*>(new VarRef(sump->location, "_ " + std::to_string(inner+1))));
     for (int inner = (int)members.size(); inner >= 0; --inner)
@@ -846,7 +846,7 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
 
     std::string edit = "edit" + name + mname;
     Expr *editfn =
-      new Lambda(sump->location, "_ f",
+      new Lambda(sump->location, "fn" + mname,
         new Lambda(sump->location, "_ x",
           new App(sump->location,
             new App(sump->location,
@@ -862,14 +862,14 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
     for (int inner = 0; inner < (int)members.size(); ++inner)
       setifn = new App(sump->location, setifn,
         (inner == outer)
-        ? reinterpret_cast<Expr*>(new VarRef(sump->location,"_ v"))
+        ? reinterpret_cast<Expr*>(new VarRef(sump->location, "val" + mname))
         : reinterpret_cast<Expr*>(new VarRef(sump->location, "_ " + std::to_string(inner+1))));
     for (int inner = (int)members.size(); inner >= 0; --inner)
       setifn = new Lambda(sump->location, "_ " + std::to_string(inner), setifn);
 
     std::string set = "set" + name + mname;
     Expr *setfn =
-      new Lambda(sump->location, "_ v",
+      new Lambda(sump->location, "val" + mname,
         new Lambda(sump->location, "_ x",
           new App(sump->location,
             new App(sump->location,
