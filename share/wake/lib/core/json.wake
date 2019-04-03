@@ -23,6 +23,10 @@ global def getJBoolean = match _
 global def getJObject = match _
   JObject x = x
   x         = raise "{format x} is not a JObject"
+global def getJObjectKey key obj =
+  match (find (\(Pair k v) k ==~ key) obj.getJObject)
+    Some (Pair (Pair _ value) _) = value
+    None = raise "{key} not found in {format obj}!"
 global def getJArray = match _
   JArray x = x
   x        = raise "{format x} is not a JArray"
