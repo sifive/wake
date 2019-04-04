@@ -9,8 +9,9 @@ global data JValue =
   JArray   (List JValue)
 
 global def getJString = match _
-  JString x = x
-  x         = raise "{format x} is not a JString"
+  JString x               = x
+  JArray (JString x, Nil) = x
+  x                       = raise "{format x} is not a JString"
 global def getJInteger = match _
   JInteger x = x
   x          = raise "{format x} is not a JInteger"
