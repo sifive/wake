@@ -27,7 +27,7 @@ global def libs   pkg = try (fail pkg) (pkgConfigImp ("--short-errors", "--libs"
 
 global def pkgConfig pkg =
   def pkgs = tokenize " " pkg
-  def version = pkgConfigImp ("--short-errors", "--modversion", pkgs) | head
-  def cflags  = pkgConfigImp ("--silence-errors", "--cflags", pkgs)
-  def lflags  = pkgConfigImp ("--silence-errors", "--libs", pkgs)
+  def version = pkgConfigImp ("--silence-errors", "--modversion", pkgs) | head
+  def cflags  = pkgConfigImp ("--silence-errors", "--cflags", reraise version (\_ pkgs))
+  def lflags  = pkgConfigImp ("--silence-errors", "--libs",   reraise version (\_ pkgs))
   (CPackage _ Nil Nil _ _) | reraise version | reraise cflags | reraise lflags | try (fail pkg)
