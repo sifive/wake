@@ -9,7 +9,9 @@ global def makeCPackage version = CPackage version Nil Nil Nil Nil
 
 def pkgConfigImp args = memoize 0 (
   def cmdline = which "pkg-config", args
-  def addenv list = reraise (getenv "PKG_CONFIG_PATH") ("PKG_CONFIG_PATH={_}", list) | try (\_ list)
+  def addenv list = match (getenv "PKG_CONFIG_PATH")
+    Some p = "PKG_CONFIG_PATH={p}", list
+    None   = list
   def result =
     makeManualPlan cmdline Nil (\_ Nil) # caching ok
     | editPlanEnvironment addenv
