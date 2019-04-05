@@ -4,13 +4,17 @@ def version_h _ =
   def body = "#define VERSION {git.getJobStdout}"
   write "{here}/version.h" body
 
+def pkg name = match (pkgConfig name)
+  Some x = x
+  None   = makeCPackage "" | editCPackageLFlags ("-l{name}", _)
+
 global def buildWake (Pair variant clib) =
-  def deps = map (_ clib) (utf8proc, gopt, Nil) ++ map pkgConfig ("sqlite3", "ncurses", Nil)
+  def internalDeps = map (_ clib) (utf8proc, gopt, Nil)
+  def externalDeps = map pkg ("sqlite3", "ncurses", "gmp", "re2", Nil)
+  def deps = internalDeps ++ externalDeps | flattenCPackages
   def reFiles = sources here '.*\.re'
-  def headerFiles = version_h 0, (sources here '.*\.h', map getCPackageHeaders deps).flatten
+  def headerFiles = version_h 0, deps.getCPackageHeaders ++ sources here '.*\.h'
   def cppFiles = map re2c reFiles ++ sources here '.*\.cpp'
-  def copts = map getCPackageCFlags deps
-  def compile = compileC variant copts.flatten headerFiles
-  def objFiles = flatten (map compile cppFiles, map getCPackageObjects deps)
-  def lflags = flatten (map getCPackageLFlags deps) ++ ("-lgmp", "-lre2", Nil)
-  linkO variant lflags objFiles "bin/wake"
+  def compile = compileC variant deps.getCPackageCFlags headerFiles
+  def objFiles = map compile cppFiles ++ deps.getCPackageObjects
+  linkO variant deps.getCPackageLFlags objFiles "bin/wake"

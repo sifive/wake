@@ -6,6 +6,12 @@ global tuple CPackage =
   global LFlags  List String
 
 global def makeCPackage version = CPackage version Nil Nil Nil Nil
+global def flattenCPackages packages =
+  def headers = map getCPackageHeaders packages | flatten
+  def objects = map getCPackageObjects packages | flatten
+  def cflags  = map getCPackageCFlags  packages | flatten
+  def lflags  = map getCPackageLFlags  packages | flatten
+  CPackage "" headers objects cflags lflags
 
 def pkgConfigImp args = memoize 0 (
   def cmdline = which "pkg-config", args
@@ -17,19 +23,24 @@ def pkgConfigImp args = memoize 0 (
     | editPlanEnvironment addenv
     | runJob
   def output = result.getJobStdout | tokenize "\n" | head | tokenize " " | filter (_ !=* "")
-  if result.getJobStatus != 0 then raise "pkg-config failed" else output
+  if result.getJobStatus != 0 then None else Some output
 )
 
 def fail pkg = match _
-  "pkg-config failed", Nil = raise "pkg-config for {pkg} not found"
-  x = raise x.head
+  Some x = x
+  None   = raise "pkg-config for {pkg} not found"
 
-global def cflags pkg = try (fail pkg) (pkgConfigImp ("--short-errors", "--cflags", tokenize " " pkg))
-global def libs   pkg = try (fail pkg) (pkgConfigImp ("--short-errors", "--libs",   tokenize " " pkg))
+global def cflags pkg = pkgConfigImp ("--short-errors", "--cflags", tokenize " " pkg) | fail pkg
+global def libs   pkg = pkgConfigImp ("--short-errors", "--libs",   tokenize " " pkg) | fail pkg
 
 global def pkgConfig pkg =
   def pkgs = tokenize " " pkg
-  def version = pkgConfigImp ("--silence-errors", "--modversion", pkgs) | head
-  def cflags  = pkgConfigImp ("--silence-errors", "--cflags", reraise version (\_ pkgs))
-  def lflags  = pkgConfigImp ("--silence-errors", "--libs",   reraise version (\_ pkgs))
-  (CPackage _ Nil Nil _ _) | reraise version | reraise cflags | reraise lflags | try (fail pkg)
+  def version = pkgConfigImp ("--short-errors", "--modversion", pkgs)
+  match version
+    Some (version, _) =
+      def cflags  = pkgConfigImp ("--silence-errors", "--cflags", pkgs)
+      def lflags  = pkgConfigImp ("--silence-errors", "--libs",   pkgs)
+      match cflags lflags
+        (Some cflags) (Some lflags) = Some (CPackage version Nil Nil cflags lflags)
+        _ _ = None
+    _ = None
