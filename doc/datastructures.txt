@@ -20,8 +20,9 @@ takeUntil	n		n		n
 dropUntil	n		n		n
 splitBy		n		n		n
 filter		n		n		n
-distinctBy	n		n		n
 cmp		n		n		n
+distinctRunBy	n		n		n
+distinctBy	n log n		n log n		n log n
 sortBy		n log n		n log n		-		changes order
 reverse		n		n		-		"
 tab		n		n		-		API takes no cmp

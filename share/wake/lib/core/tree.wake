@@ -20,7 +20,7 @@ global def vtreeMulti cmp v =
   Tree cmp (build (vsortBy (lt cmp) v))
 
 global def vtree cmp v =
-  Tree cmp (build (vdistinctBy (eq cmp) (vsortBy (lt cmp) v)))
+  Tree cmp (build (vdistinctRunBy (eq cmp) (vsortBy (lt cmp) v)))
 
 def build v = match (vlen v)
   0 = Tip
@@ -336,9 +336,13 @@ global def tcontains y t =
       EQ = True
       _  = False
 
+# Eliminate duplicates, as identified by cmp
+global def tdistinctBy cmp t = match t
+  Tree tcmp _ = ltree tcmp (distinctBy cmp (tlist t))
+
 # Eliminate duplicates, as identified by f
-global def tdistinctBy f t = match t
-  Tree cmp _ = Tree cmp (build (vdistinctBy f (tvector t)))
+global def tdistinctRunBy f t = match t
+  Tree cmp _ = Tree cmp (build (vdistinctRunBy f (tvector t)))
 
 # Union of two trees, keeping only values from a on equality
 global def a ∪ b = tunion a b

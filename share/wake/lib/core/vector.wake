@@ -253,7 +253,16 @@ global def vsortBy lt v =
         (Pair l r) (Pair rl rr) = merge (helper l rl) (helper r rr)
   helper v runs
 
-global def vdistinctBy eq v =
+global def vdistinctBy cmp v =
+  def gen (Pair tree i) =
+    def x = vat_ i v
+    def i1 = i + 1
+    if x ∈ tree
+    then Pair (Pair tree i1) None
+    else Pair (Pair (tinsert x tree) i1) (Some x)
+  vmapPartial (_) (vunfoldl gen (Pair (tnew cmp) 0) (vlen v))
+
+global def vdistinctRunBy eq v =
   def keep i =
     def vi = vat_ i v
     if i == 0 then Some vi else

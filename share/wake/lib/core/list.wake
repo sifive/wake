@@ -108,13 +108,22 @@ global def transpose l =
 # f should be a less-than comparison
 global def sortBy f l = vlist (vsortBy f (lvector l))
 
+# keep only the first occurrence of a value
+global def distinctBy cmp =
+  def helper tree = match _
+    Nil = Nil
+    x, tail = match (x ∈ tree)
+      True  = helper tree tail
+      False = x, helper (tinsert x tree) tail
+  helper (tnew cmp) _
+
 # f should be an equality comparison
 # keep only the first occurrence in a run of equal values
-global def distinctBy f l = match l
+global def distinctRunBy f l = match l
   x, y, t =
     if f x y
-    then distinctBy f (x, t)
-    else x, distinctBy f (y, t)
+    then distinctRunBy f (x, t)
+    else x, distinctRunBy f (y, t)
   _ = l
 
 global def cmp f = match _ _
