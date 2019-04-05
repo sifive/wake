@@ -239,8 +239,18 @@ static void tag2str(std::ostream &os, int tag) {
   os << (char)('a' + (tag % radix));
 }
 
-int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, int tags, int p) {
+int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag, int tags, int o) {
   const TypeVar *a = value.find();
+  int p;
+
+  if (tag) {
+    op_type q = op_precedence(":");
+    p = q.p + q.l;
+    os << "(" << tag << ": ";
+  } else {
+    p = o;
+  }
+
   if (a->isFree()) {
     int tag = a->epoch - globalEpoch;
     if (tag < 0) {
@@ -254,16 +264,16 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, int tags
   } else if (!strncmp(a->name, "binary ", 7)) {
     op_type q = op_precedence(a->name + 7);
     if (q.p < p) os << "(";
-    tags = do_format(os, dob, a->cargs[0].var, tags, q.p + !q.l);
+    tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag, tags, q.p + !q.l);
     if (a->name[7] != ',') os << " ";
     os << a->name + 7 << " ";
-    tags = do_format(os, dob, a->cargs[1].var, tags, q.p + q.l);
+    tags = do_format(os, dob, a->cargs[1].var, a->cargs[1].tag, tags, q.p + q.l);
     if (q.p < p) os << ")";
   } else if (!strncmp(a->name, "unary ", 6)) {
     op_type q = op_precedence(a->name + 6);
     if (q.p < p) os << "(";
     os << a->name + 6;
-    tags = do_format(os, dob, a->cargs[0].var, tags, q.p);
+    tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag, tags, q.p);
     if (q.p < p) os << ")";
   } else {
     op_type q = op_precedence("a");
@@ -271,18 +281,19 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, int tags
     os << a->name;
     for (int i = 0; i < a->nargs; ++i) {
       os << " ";
-      tags = do_format(os, dob, a->cargs[i].var, tags, q.p+q.l);
+      tags = do_format(os, dob, a->cargs[i].var, a->cargs[i].tag, tags, q.p+q.l);
     }
     if (q.p < p) os << ")";
   }
+  if (tag) os << ")";
   return tags;
 }
 
 void TypeVar::format(std::ostream &os, const TypeVar &top) const {
-  globalEpoch += TypeVar::do_format(os, top.var_dob, *this, 0, 0);
+  globalEpoch += TypeVar::do_format(os, top.var_dob, *this, 0, 0, 0);
 }
 
 std::ostream & operator << (std::ostream &os, const TypeVar &value) {
-  globalEpoch += TypeVar::do_format(os, value.var_dob, value, 0, 0);
+  globalEpoch += TypeVar::do_format(os, value.var_dob, value, 0, 0, 0);
   return os;
 }
