@@ -6,6 +6,7 @@ struct Location;
 
 #define FN "binary =>"
 
+struct TypeChild;
 struct TypeVar {
 private:
   mutable TypeVar *parent;
@@ -18,7 +19,7 @@ private:
   // free_dob is the DOB of a free variable, unified to the oldest
   int var_dob, free_dob;
   int nargs;
-  TypeVar *pargs;
+  TypeChild *cargs;
   const char *name;
 
   bool contains(const TypeVar *other) const;
@@ -44,10 +45,14 @@ public:
   const TypeVar *find() const;
   TypeVar *find();
 
-  const TypeVar & operator[](int i) const { return find()->pargs[i]; }
-  TypeVar & operator[](int i) { return find()->pargs[i]; }
+  const TypeVar & operator[](int i) const;
+  TypeVar & operator[](int i);
+
+  const char *getName() const;
+  const char *getTag(int i) const;
 
   void setDOB();
+  void setTag(int i, const char *tag);
   bool unify(TypeVar &other, Location *location = 0);
   bool unify(TypeVar &&other, Location *location = 0) { return unify(other, location); }
 
@@ -56,5 +61,17 @@ public:
 
 friend std::ostream & operator << (std::ostream &os, const TypeVar &value);
 };
+
+struct TypeChild {
+  struct TypeVar var;
+  const char *tag;
+  TypeChild();
+};
+
+inline const TypeVar & TypeVar::operator[](int i) const { return find()->cargs[i].var; }
+inline       TypeVar & TypeVar::operator[](int i) { return find()->cargs[i].var; }
+
+inline const char *TypeVar::getName() const { return find()->name; }
+inline const char *TypeVar::getTag(int i) const { return find()->cargs[i].tag; }
 
 #endif

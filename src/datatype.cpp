@@ -37,8 +37,10 @@ bool AST::unify(TypeVar &out, const std::map<std::string, TypeVar*> &ids) {
     bool ok = out.unify(cons);
     bool childok = true;
     if (ok) {
-      for (size_t i = 0; i < args.size(); ++i)
+      for (size_t i = 0; i < args.size(); ++i) {
         childok = args[i].unify(out[i], ids) && childok;
+        if (!args[i].tag.empty()) out.setTag(i, args[i].tag.c_str());
+      }
     }
     return ok && childok;
   }

@@ -707,6 +707,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     bool t = lambda->typeVar.unify(TypeVar(FN, 2), &lambda->location);
+    if (t && lambda->name != "_" && lambda->name.find(' ') == std::string::npos)
+      lambda->typeVar.setTag(0, lambda->name.c_str());
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), pmap, &bind);
     bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &lambda->location);
