@@ -11,7 +11,7 @@
 #include <limits>
 #include <gmp.h>
 
-#define APP_PRECEDENCE 21
+#define APP_PRECEDENCE 22
 
 /* Values */
 

@@ -569,6 +569,20 @@ static AST parse_ast(int p, Lexer &lex, bool makefirst, bool firstok, std::vecto
   AST lhs = makefirst ? AST(lex.next.location) : parse_unary_ast(p, lex, guard);
   for (;;) {
     switch (lex.next.type) {
+      case COLON: {
+        op_type op = op_precedence(lex.text().c_str());
+        if (op.p < p) return lhs;
+        lex.consume();
+        if (!lhs.args.empty() || !Lexer::isLower(lhs.name.c_str())) {
+          std::cerr << "Left-hand-side of COLON must be a simple lower-case identifier, not "
+            << lhs.name << " at " << lhs.location << std::endl;
+          lex.fail = true;
+        }
+        std::string tag = std::move(lhs.name);
+        lhs = parse_ast(op.p + op.l, lex, false, false, guard);
+        lhs.tag = std::move(tag);
+        break;
+      }
       case OPERATOR: {
         op_type op = op_precedence(lex.text().c_str());
         if (op.p < p) return lhs;
