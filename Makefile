@@ -5,11 +5,19 @@ VERSION	:= $(shell git describe --tags --dirty)
 CC	:= gcc -std=c99
 CXX	:= g++ -std=c++11
 CFLAGS	:= -Wall -O2 -flto -DVERSION=$(VERSION)
+LDFLAGS	:=
 
-CORE_CFLAGS  := $(shell pkg-config --cflags sqlite3 ncurses) -Iutf8proc -Igopt
-CORE_LDFLAGS := $(shell pkg-config --libs   sqlite3 ncurses)
-FUSE_CFLAGS  := $(shell pkg-config --cflags fuse)
-FUSE_LDFLAGS := $(shell pkg-config --libs   fuse)
+LOCAL_CFLAGS :=	-Iutf8proc -Igopt
+FUSE_CFLAGS  :=	$(shell pkg-config --silence-errors --cflags fuse)
+CORE_CFLAGS  := $(shell pkg-config --silence-errors --cflags sqlite3)	\
+		$(shell pkg-config --silence-errors --cflags gmp-6)	\
+		$(shell pkg-config --silence-errors --cflags re2)	\
+		$(shell pkg-config --silence-errors --cflags ncurses)
+FUSE_LDFLAGS := $(shell pkg-config --silence-errors --libs fuse    || echo -lfuse)
+CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsqlite3)	\
+		$(shell pkg-config --silence-errors --libs gmp-6   || echo -lgmp)	\
+		$(shell pkg-config --silence-errors --libs re2     || echo -lre2)	\
+		$(shell pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
 all:		wake.db
 	./bin/wake all default
@@ -23,19 +31,19 @@ install:	all
 bin/wake:	src/symbol.o					\
 		$(patsubst %.cpp,%.o,$(wildcard src/*.cpp))	\
 		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c)
-	$(CXX) $(CFLAGS) -o $@ $^ $(CORE_LDFLAGS) -lgmp -lre2
+	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
 lib/wake/fuse-wake:	fuse/fuse.cpp
-	$(CXX) $(CFLAGS) $(FUSE_CFLAGS) $< -o $@ $(FUSE_LDFLAGS)
+	$(CXX) $(CFLAGS) $(FUSE_CFLAGS) $< -o $@ $(LDFLAGS) $(FUSE_LDFLAGS)
 
 lib/wake/shim-wake:	$(patsubst %.c,%.o,$(wildcard shim/*.c))
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 %.o:	%.cpp	$(filter-out src/version.h,$(wildcard */*.h))
-	$(CXX) $(CFLAGS) $(CORE_CFLAGS) -o $@ -c $<
+	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(CORE_CFLAGS) -o $@ -c $<
 
 %.o:	%.c	$(filter-out src/version.h,$(wildcard */*.h))
-	$(CC) $(CFLAGS) $(CORE_CFLAGS) -o $@ -c $<
+	$(CC) $(CFLAGS) $(LOCAL_CFLAGS) -o $@ -c $<
 
 # Rely on wake to recreate this file if re2c is available
 %.cpp:	%.cpp.gz

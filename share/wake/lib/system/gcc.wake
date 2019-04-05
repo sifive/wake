@@ -7,12 +7,12 @@ def releaseLFlags = ("-flto", Nil)
 
 def doCompileC variant gcc flags headers file =
   def obj = replace '\.c(pp)?$' ".{variant}.o" file.getPathName
-  def cmdline = gcc, flags ++ ("-c", file.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
+  def cmdline = gcc, distinctBy scmpRaw flags ++ ("-c", file.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
   def result = job cmdline (file, headers)
   result.getJobOutput
 
 def doLinkO variant linker flags objs file =
-  def cmdline = (linker, "-o", "{file}.{variant}", map getPathName objs) ++ flags
+  def cmdline = (linker, "-o", "{file}.{variant}", map getPathName objs) ++ distinctBy scmpRaw flags
   def result = job cmdline (mkdir "{file}/..", objs)
   result.getJobOutput
 

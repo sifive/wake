@@ -174,10 +174,11 @@ void describe(const std::vector<JobReflection> &jobs, bool script, bool debug) {
 
 void print_help(const char *argv0) {
   std::cout << std::endl
-    << "Usage: " << argv0 << " [-dghioqsv] [-j NUM] [--] [arg0 ...]" << std::endl
+    << "Usage: " << argv0 << " [-cdghioqsv] [-j NUM] [--] [arg0 ...]" << std::endl
     << std::endl
     << "  Flags affecting build execution:" << std::endl
     << "    --jobs=NUM -jNUM Schedule local job execution to use <= NUM CPU-bound tasks" << std::endl
+    << "    --check    -c    Rerun all jobs and confirm their output is reproducible"    << std::endl
     << "    --verbose  -v    Report job standard output and hash progres"                << std::endl
     << "    --debug    -d    Report stack frame information for exceptions and closures" << std::endl
     << "    --quiet    -q    Surpress report of launched job command line arguments"     << std::endl
@@ -217,6 +218,7 @@ static struct option *arg(struct option opts[], const char *name) {
 int main(int argc, char **argv) {
   struct option options[] {
     { 'j', "jobs",                  GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
+    { 'c', "check",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'v', "verbose",               GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 'd', "debug",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'q', "quiet",                 GOPT_ARGUMENT_FORBIDDEN },
@@ -240,6 +242,7 @@ int main(int argc, char **argv) {
   argc = gopt(argv, options);
   gopt_errors(argv[0], options);
 
+  bool check   = arg(options, "check"   )->count;
   bool verbose = arg(options, "verbose" )->count;
   bool debug   = arg(options, "debug"   )->count;
   bool quiet   = arg(options, "quiet"   )->count;
@@ -255,7 +258,7 @@ int main(int argc, char **argv) {
   bool help    = arg(options, "help"    )->count;
   bool debugdb = arg(options, "debug-db")->count;
   bool parse   = arg(options, "stop-after-parse")->count;
-  bool check   = arg(options, "stop-after-type-check")->count;
+  bool tcheck  = arg(options, "stop-after-type-check")->count;
 
   const char *jobs   = arg(options, "jobs"  )->argument;
   const char *init   = arg(options, "init"  )->argument;
@@ -286,7 +289,7 @@ int main(int argc, char **argv) {
   bool nodb = init;
   bool noparse = nodb || remove || list || output || input;
   bool notype = noparse || parse;
-  bool noexecute = notype || add || check || global;
+  bool noexecute = notype || add || tcheck || global;
 
   if (quiet && verbose) {
     std::cerr << "Cannot be both quiet and verbose!" << std::endl;
@@ -467,7 +470,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (check) std::cout << root.get();
+  if (tcheck) std::cout << root.get();
   for (auto &g : globals) {
     Expr *e = root.get();
     while (e && e->type == &DefBinding::type) {
