@@ -748,6 +748,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     NameBinding *iter = binding;
     for (size_t i = cons->cons->ast.args.size(); i; --i) {
       ok = cons->cons->ast.args[i-1].unify(iter->lambda->typeVar[0], ids) && ok;
+      if (!cons->cons->ast.args[i-1].tag.empty())
+        iter->lambda->typeVar.setTag(0, cons->cons->ast.args[i-1].tag.c_str());
       iter = iter->next;
     }
     return ok;
