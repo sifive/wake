@@ -66,10 +66,17 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline);
 static Expr *parse_def(Lexer &lex, std::string &name);
 static Expr *parse_block(Lexer &lex, bool multiline);
 
-static AST parse_unary_ast(int p, Lexer &lex, std::vector<Expr*>* guard);
-static AST parse_ast(int p, Lexer &lex, std::vector<Expr*>* guard, AST &&lhs);
-static AST parse_ast(int p, Lexer &lex, std::vector<Expr*>* guard = 0) {
-  return parse_ast(p, lex, guard, parse_unary_ast(p, lex, guard));
+struct ASTState {
+  bool type;  // control ':' reduction
+  bool match; // allow literals
+  std::vector<Expr*> guard;
+  ASTState(bool type_, bool match_) : type(type_), match(match_) { }
+};
+
+static AST parse_unary_ast(int p, Lexer &lex, ASTState &state);
+static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs);
+static AST parse_ast(int p, Lexer &lex, ASTState &state) {
+  return parse_ast(p, lex, state, parse_unary_ast(p, lex, state));
 }
 
 static bool check_constructors(const AST &ast) {
@@ -177,10 +184,10 @@ static Expr *parse_match(int p, Lexer &lex) {
   bool multiarg = out->args.size() > 1;
   repeat = true;
   while (repeat) {
-    std::vector<Expr*> literals;
+    ASTState state(false, true);
     AST ast = multiarg
-      ? parse_ast(APP_PRECEDENCE, lex, &literals, AST(lex.next.location))
-      : parse_ast(0, lex, &literals);
+      ? parse_ast(APP_PRECEDENCE, lex, state, AST(lex.next.location))
+      : parse_ast(0, lex, state);
     if (check_constructors(ast)) lex.fail = true;
 
     Expr *guard = 0;
@@ -189,8 +196,8 @@ static Expr *parse_match(int p, Lexer &lex) {
       guard = parse_block(lex, false);
     }
 
-    for (size_t i = 0; i < literals.size(); ++i) {
-      Expr* e = literals[i];
+    for (size_t i = 0; i < state.guard.size(); ++i) {
+      Expr* e = state.guard[i];
       std::string comparison("scmp");
       if (e->type == &Literal::type) {
         Literal *lit = reinterpret_cast<Literal*>(e);
@@ -277,7 +284,8 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       op_type op = op_precedence("\\");
       if (op.p < p) precedence_error(lex);
       lex.consume();
-      AST ast = parse_ast(APP_PRECEDENCE+1, lex);
+      ASTState state(false, false);
+      AST ast = parse_ast(APP_PRECEDENCE+1, lex, state);
       if (check_constructors(ast)) lex.fail = true;
       auto rhs = parse_binary(op.p + op.l, lex, multiline);
       location.end = rhs->location.end;
@@ -427,7 +435,8 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
 static Expr *parse_def(Lexer &lex, std::string &name) {
   lex.consume();
 
-  AST ast = parse_ast(0, lex);
+  ASTState state(false, false);
+  AST ast = parse_ast(0, lex, state);
   name = std::move(ast.name);
   ast.name.clear();
   if (check_constructors(ast)) lex.fail = true;
@@ -525,7 +534,7 @@ static void bind_global(const std::string &name, Top *top, Lexer &lex) {
   }
 }
 
-static AST parse_unary_ast(int p, Lexer &lex, std::vector<Expr*>* guard) {
+static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
   TRACE("UNARY_AST");
   switch (lex.next.type) {
     // Unary operators
@@ -535,7 +544,7 @@ static AST parse_unary_ast(int p, Lexer &lex, std::vector<Expr*>* guard) {
       if (op.p < p) precedence_error(lex);
       std::string name = "unary " + lex.text();
       lex.consume();
-      AST rhs = parse_ast(op.p + op.l, lex, guard);
+      AST rhs = parse_ast(op.p + op.l, lex, state);
       location.end = rhs.location.end;
       std::vector<AST> args;
       args.emplace_back(std::move(rhs));
@@ -550,16 +559,16 @@ static AST parse_unary_ast(int p, Lexer &lex, std::vector<Expr*>* guard) {
     case POPEN: {
       Location location = lex.next.location;
       lex.consume();
-      AST out = parse_ast(0, lex, guard);
+      AST out = parse_ast(0, lex, state);
       location.end = lex.next.location.end;
       if (expect(PCLOSE, lex)) lex.consume();
       out.location = location;
       return out;
     }
     case LITERAL: {
-      if (guard) {
-        AST out(lex.next.location, "_ k" + std::to_string(guard->size()));
-        guard->push_back(lex.next.expr.release());
+      if (state.match) {
+        AST out(lex.next.location, "_ k" + std::to_string(state.guard.size()));
+        state.guard.push_back(lex.next.expr.release());
         lex.consume();
         return out;
       }
@@ -575,7 +584,7 @@ static AST parse_unary_ast(int p, Lexer &lex, std::vector<Expr*>* guard) {
   }
 }
 
-static AST parse_ast(int p, Lexer &lex, std::vector<Expr*>* guard, AST &&lhs_) {
+static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
   AST lhs(std::move(lhs_));
   TRACE("AST");
   for (;;) {
@@ -590,7 +599,7 @@ static AST parse_ast(int p, Lexer &lex, std::vector<Expr*>* guard, AST &&lhs_) {
           lex.fail = true;
         }
         std::string tag = std::move(lhs.name);
-        lhs = parse_ast(op.p + op.l, lex, guard);
+        lhs = parse_ast(op.p + op.l, lex, state);
         lhs.tag = std::move(tag);
         break;
       }
@@ -599,7 +608,7 @@ static AST parse_ast(int p, Lexer &lex, std::vector<Expr*>* guard, AST &&lhs_) {
         if (op.p < p) return lhs;
         std::string name = "binary " + lex.text();
         lex.consume();
-        auto rhs = parse_ast(op.p + op.l, lex, guard);
+        auto rhs = parse_ast(op.p + op.l, lex, state);
         Location loc = lhs.location;
         loc.end = rhs.location.end;
         std::vector<AST> args;
@@ -613,7 +622,7 @@ static AST parse_ast(int p, Lexer &lex, std::vector<Expr*>* guard, AST &&lhs_) {
       case POPEN: {
         op_type op = op_precedence("a"); // application
         if (op.p < p) return lhs;
-        AST rhs = parse_ast(op.p + op.l, lex, guard);
+        AST rhs = parse_ast(op.p + op.l, lex, state);
         Location location = lhs.location;
         location.end = rhs.location.end;
         if (Lexer::isOperator(lhs.name.c_str())) {
@@ -650,7 +659,8 @@ static void check_cons_name(const AST &ast, Lexer &lex) {
 static AST parse_type_def(Lexer &lex) {
   lex.consume();
 
-  AST def = parse_ast(0, lex);
+  ASTState state(true, false);
+  AST def = parse_ast(0, lex, state);
   if (check_constructors(def)) lex.fail = true;
   if (!def) return def;
 
@@ -777,7 +787,8 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
 
     std::string mname = get_arg_loc(lex).first;
 
-    AST member = parse_ast(0, lex);
+    ASTState state(true, false);
+    AST member = parse_ast(0, lex, state);
     if (check_constructors(member)) lex.fail = true;
     if (member) {
       tuple.args.push_back(member);
@@ -912,7 +923,8 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
 
     bool repeat = true;
     while (repeat) {
-      AST cons = parse_ast(0, lex);
+      ASTState state(true, false);
+      AST cons = parse_ast(0, lex, state);
       if (check_constructors(cons)) lex.fail = true;
       if (cons) {
         check_cons_name(cons, lex);
@@ -936,7 +948,8 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
       }
     }
   } else {
-    AST cons = parse_ast(0, lex);
+    ASTState state(true, false);
+    AST cons = parse_ast(0, lex, state);
     if (check_constructors(cons)) lex.fail = true;
     if (cons) {
       check_cons_name(cons, lex);
