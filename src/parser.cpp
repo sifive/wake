@@ -67,9 +67,29 @@ static Expr *parse_def(Lexer &lex, std::string &name);
 static Expr *parse_block(Lexer &lex, bool multiline);
 
 static AST parse_unary_ast(int p, Lexer &lex, std::vector<Expr*>* guard);
-static AST parse_ast(int p, Lexer &lex, bool firstok, std::vector<Expr*>* guard, AST &&lhs);
-static AST parse_ast(int p, Lexer &lex, bool firstok = false, std::vector<Expr*>* guard = 0) {
-  return parse_ast(p, lex, firstok, guard, parse_unary_ast(p, lex, guard));
+static AST parse_ast(int p, Lexer &lex, std::vector<Expr*>* guard, AST &&lhs);
+static AST parse_ast(int p, Lexer &lex, std::vector<Expr*>* guard = 0) {
+  return parse_ast(p, lex, guard, parse_unary_ast(p, lex, guard));
+}
+
+static bool check_constructors(const AST &ast) {
+  if (!ast.args.empty() && ast.name == "_") {
+    std::cerr << "Wildcard _"
+      << " cannot be used as a constructor at " << ast.location
+      << std::endl;
+    return true;
+  }
+
+  if (!ast.args.empty() && !ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
+    std::cerr << "Lower-case identifier " << ast.name
+      << " cannot be used as a constructor at " << ast.location
+      << std::endl;
+    return true;
+  }
+
+  bool fail = false;
+  for (auto &a : ast.args) fail = check_constructors(a) || fail;
+  return fail;
 }
 
 static int relabel_descend(Expr *expr, int index) {
@@ -159,8 +179,9 @@ static Expr *parse_match(int p, Lexer &lex) {
   while (repeat) {
     std::vector<Expr*> literals;
     AST ast = multiarg
-      ? parse_ast(APP_PRECEDENCE, lex, true, &literals, AST(lex.next.location))
-      : parse_ast(0, lex, false, &literals);
+      ? parse_ast(APP_PRECEDENCE, lex, &literals, AST(lex.next.location))
+      : parse_ast(0, lex, &literals);
+    if (check_constructors(ast)) lex.fail = true;
 
     Expr *guard = 0;
     if (lex.next.type == IF) {
@@ -257,6 +278,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (op.p < p) precedence_error(lex);
       lex.consume();
       AST ast = parse_ast(APP_PRECEDENCE+1, lex);
+      if (check_constructors(ast)) lex.fail = true;
       auto rhs = parse_binary(op.p + op.l, lex, multiline);
       location.end = rhs->location.end;
       if (Lexer::isUpper(ast.name.c_str()) || Lexer::isOperator(ast.name.c_str())) {
@@ -405,28 +427,10 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
 static Expr *parse_def(Lexer &lex, std::string &name) {
   lex.consume();
 
-  AST ast = parse_ast(0, lex, true);
+  AST ast = parse_ast(0, lex);
   name = std::move(ast.name);
   ast.name.clear();
-
-  if (Lexer::isOperator(name.c_str()) && !ast.args.empty()) {
-    // Unfortunately, parse_ast will allow: (a b) * (C d); reject it
-    AST &arg1 = ast.args.front();
-    if (!arg1.args.empty()) {
-      if (arg1.name == "_") {
-        std::cerr << "Wildcard _"
-          << " cannot be used as a constructor at " << arg1.location
-          << std::endl;
-        lex.fail = true;
-      }
-      if (Lexer::isLower(arg1.name.c_str())) {
-        std::cerr << "Lower-case identifier " << arg1.name
-          << " cannot be used as a constructor at " << arg1.location
-          << std::endl;
-        lex.fail = true;
-      }
-    }
-  }
+  if (check_constructors(ast)) lex.fail = true;
 
   if (Lexer::isUpper(name.c_str())) {
     std::cerr << "Upper-case identifier " << name
@@ -531,7 +535,7 @@ static AST parse_unary_ast(int p, Lexer &lex, std::vector<Expr*>* guard) {
       if (op.p < p) precedence_error(lex);
       std::string name = "unary " + lex.text();
       lex.consume();
-      AST rhs = parse_ast(op.p + op.l, lex, false, guard);
+      AST rhs = parse_ast(op.p + op.l, lex, guard);
       location.end = rhs.location.end;
       std::vector<AST> args;
       args.emplace_back(std::move(rhs));
@@ -546,7 +550,7 @@ static AST parse_unary_ast(int p, Lexer &lex, std::vector<Expr*>* guard) {
     case POPEN: {
       Location location = lex.next.location;
       lex.consume();
-      AST out = parse_ast(0, lex, false, guard);
+      AST out = parse_ast(0, lex, guard);
       location.end = lex.next.location.end;
       if (expect(PCLOSE, lex)) lex.consume();
       out.location = location;
@@ -571,7 +575,7 @@ static AST parse_unary_ast(int p, Lexer &lex, std::vector<Expr*>* guard) {
   }
 }
 
-static AST parse_ast(int p, Lexer &lex, bool firstok, std::vector<Expr*>* guard, AST &&lhs_) {
+static AST parse_ast(int p, Lexer &lex, std::vector<Expr*>* guard, AST &&lhs_) {
   AST lhs(std::move(lhs_));
   TRACE("AST");
   for (;;) {
@@ -586,7 +590,7 @@ static AST parse_ast(int p, Lexer &lex, bool firstok, std::vector<Expr*>* guard,
           lex.fail = true;
         }
         std::string tag = std::move(lhs.name);
-        lhs = parse_ast(op.p + op.l, lex, false, guard);
+        lhs = parse_ast(op.p + op.l, lex, guard);
         lhs.tag = std::move(tag);
         break;
       }
@@ -595,7 +599,7 @@ static AST parse_ast(int p, Lexer &lex, bool firstok, std::vector<Expr*>* guard,
         if (op.p < p) return lhs;
         std::string name = "binary " + lex.text();
         lex.consume();
-        auto rhs = parse_ast(op.p + op.l, lex, false, guard);
+        auto rhs = parse_ast(op.p + op.l, lex, guard);
         Location loc = lhs.location;
         loc.end = rhs.location.end;
         std::vector<AST> args;
@@ -609,25 +613,14 @@ static AST parse_ast(int p, Lexer &lex, bool firstok, std::vector<Expr*>* guard,
       case POPEN: {
         op_type op = op_precedence("a"); // application
         if (op.p < p) return lhs;
-        AST rhs = parse_ast(op.p + op.l, lex, false, guard);
+        AST rhs = parse_ast(op.p + op.l, lex, guard);
         Location location = lhs.location;
         location.end = rhs.location.end;
         if (Lexer::isOperator(lhs.name.c_str())) {
           std::cerr << "Cannot supply additional constructor arguments to " << lhs.name
             << " at " << location << std::endl;
           lex.fail = true;
-        } else if (!firstok && lhs.args.empty() && lhs.name == "_") {
-          std::cerr << "Wildcard _"
-            << " cannot be used as a constructor at " << location
-            << std::endl;
-          lex.fail = true;
-        } else if (!firstok && lhs.args.empty() && Lexer::isLower(lhs.name.c_str())) {
-          std::cerr << "Lower-case identifier " << lhs.name
-            << " cannot be used as a constructor at " << location
-            << std::endl;
-          lex.fail = true;
         }
-        firstok = false;
         lhs.args.emplace_back(std::move(rhs));
         break;
       }
@@ -658,6 +651,7 @@ static AST parse_type_def(Lexer &lex) {
   lex.consume();
 
   AST def = parse_ast(0, lex);
+  if (check_constructors(def)) lex.fail = true;
   if (!def) return def;
 
   if (def.name == "_" || Lexer::isLower(def.name.c_str())) {
@@ -784,6 +778,7 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
     std::string mname = get_arg_loc(lex).first;
 
     AST member = parse_ast(0, lex);
+    if (check_constructors(member)) lex.fail = true;
     if (member) {
       tuple.args.push_back(member);
       members.emplace_back(mname, global);
@@ -918,6 +913,7 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
     bool repeat = true;
     while (repeat) {
       AST cons = parse_ast(0, lex);
+      if (check_constructors(cons)) lex.fail = true;
       if (cons) {
         check_cons_name(cons, lex);
         sum.addConstructor(std::move(cons));
@@ -941,6 +937,7 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
     }
   } else {
     AST cons = parse_ast(0, lex);
+    if (check_constructors(cons)) lex.fail = true;
     if (cons) {
       check_cons_name(cons, lex);
       sum.addConstructor(std::move(cons));
