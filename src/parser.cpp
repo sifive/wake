@@ -818,7 +818,7 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
   Constructor &c = sump->members.back();
   Expr *construct = new Construct(c.ast.location, sump, &c);
   for (size_t i = c.ast.args.size(); i > 0; --i)
-    construct = new Lambda(c.ast.location, "val" + c.ast.args[i-1].tag, construct);
+    construct = new Lambda(c.ast.location, c.ast.args[i-1].tag, construct);
 
   bind_def(lex, map, c.ast.name, construct);
   if (global) bind_global(c.ast.name, top, lex);
@@ -882,14 +882,14 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
     for (int inner = 0; inner < (int)members.size(); ++inner)
       setifn = new App(sump->location, setifn,
         (inner == outer)
-        ? reinterpret_cast<Expr*>(new VarRef(sump->location, "val" + mname))
+        ? reinterpret_cast<Expr*>(new VarRef(sump->location, mname))
         : reinterpret_cast<Expr*>(new VarRef(sump->location, "_ " + std::to_string(inner+1))));
     for (int inner = (int)members.size(); inner >= 0; --inner)
       setifn = new Lambda(sump->location, "_ " + std::to_string(inner), setifn);
 
     std::string set = "set" + name + mname;
     Expr *setfn =
-      new Lambda(sump->location, "val" + mname,
+      new Lambda(sump->location, mname,
         new Lambda(sump->location, "_ x",
           new App(sump->location,
             new App(sump->location,
