@@ -53,10 +53,10 @@ global def escape =
   | helper
 
 tuple JSONFormat =
-  global String (String => String)
-  global Integer (Integer => String)
-  global Double (Double => String)
-  global Indent Integer
+  global String:  String  => String
+  global Integer: Integer => String
+  global Double:  Double  => String
+  global Indent:  Integer
 
 def doFormat fmt lhs =
   def indent = fmt.getJSONFormatIndent

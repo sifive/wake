@@ -12,6 +12,7 @@ struct TypeVar;
 struct AST {
   Location location;
   std::string name;
+  std::string tag;
   std::vector<AST> args;
 
   AST(const Location &location_, std::string &&name_, std::vector<AST> &&args_) :

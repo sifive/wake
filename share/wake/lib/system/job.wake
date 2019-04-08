@@ -1,30 +1,30 @@
 tuple Usage =
-  global Status   Integer
-  global Runtime  Double
-  global CPUtime  Double
-  global MemBytes Integer
-  global InBytes  Integer
-  global OutBytes Integer
+  global Status:   Integer
+  global Runtime:  Double
+  global CPUtime:  Double
+  global MemBytes: Integer
+  global InBytes:  Integer
+  global OutBytes: Integer
 
 # RunnerInput is a subset of the fields supplied in the execution Plan
 tuple RunnerInput =
-  global Command       List String
-  global Visible       List Path
-  global Environment   List String
-  global Directory     String
-  global StandardInput String
-  global Record        Option Usage
-  Pool                 Integer
+  global Command:       List String
+  global Visible:       List Path
+  global Environment:   List String
+  global Directory:     String
+  global StandardInput: String
+  global Record:        Option Usage
+  Pool:                 Integer
 
 tuple RunnerOutput =
-  global Inputs  List String
-  global Outputs List String
-  global Indexes List String
-  global Usage   Usage
+  global Inputs:  List String
+  global Outputs: List String
+  global Indexes: List String
+  global Usage:   Usage
 
 # A Runner describes a way to invoke a Plan to get a Job
 tuple Runner =
-  Fn Job => RunnerInput => RunnerOutput
+  Fn: Job => RunnerInput => RunnerOutput
 
 # Create new Runner given pre- and post-hooks around an existing Runner
 global def makeRunner pre post (Runner run) =
@@ -41,19 +41,19 @@ global def makeRunner pre post (Runner run) =
 
 # A Plan describes a not-yet-executed Job
 tuple Plan =
-  global Command       List String  # The command-line arguments (the first is the command to run)
-  global Visible       List Path    # Only these files should be available to the command
-  global Environment   List String  # KEY=VALUE environment variables fed to the command
-  global Directory     String       # The directory in which the command should be run
-  global StandardInput String       # The file to which standard input should be connected
-  Once_                Boolean      # Should Job only be run once in a given wake execution
-  Keep_                Boolean      # Should Job output be reusable between wake invocations
-  Share_               Boolean      # Should Job output be shared between workspaces
-  global Runner        Runner       # The runner to use when executing this job
-  global FnInputs      (List String => List String) # Modify the Runner's reported inputs  (files read)
-  global FnOutputs     (List String => List String) # Modify the Runner's reported outputs (files created)
-  global FnIndexes     (List String => List String) # Modify the Runner's reported indexes (directories listed)
-  Pool                 Integer      # Resource pool used to pay for the Job
+  global Command:       List String  # The command-line arguments (the first is the command to run)
+  global Visible:       List Path    # Only these files should be available to the command
+  global Environment:   List String  # KEY=VALUE environment variables fed to the command
+  global Directory:     String       # The directory in which the command should be run
+  global StandardInput: String       # The file to which standard input should be connected
+  Once_:                Boolean      # Should Job only be run once in a given wake execution
+  Keep_:                Boolean      # Should Job output be reusable between wake invocations
+  Share_:               Boolean      # Should Job output be shared between workspaces
+  global Runner:        Runner       # The runner to use when executing this job
+  global FnInputs:      (List String => List String) # Modify the Runner's reported inputs  (files read)
+  global FnOutputs:     (List String => List String) # Modify the Runner's reported outputs (files created)
+  global FnIndexes:     (List String => List String) # Modify the Runner's reported indexes (directories listed)
+  Pool:                 Integer      # Resource pool used to pay for the Job
 
 global def getPlanOnce  = getPlanOnce_
 global def getPlanKeep  = getPlanKeep_

@@ -707,6 +707,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     bool t = lambda->typeVar.unify(TypeVar(FN, 2), &lambda->location);
+    if (t && lambda->name != "_" && lambda->name.find(' ') == std::string::npos)
+      lambda->typeVar.setTag(0, lambda->name.c_str());
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), pmap, &bind);
     bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &lambda->location);
@@ -746,6 +748,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     NameBinding *iter = binding;
     for (size_t i = cons->cons->ast.args.size(); i; --i) {
       ok = cons->cons->ast.args[i-1].unify(iter->lambda->typeVar[0], ids) && ok;
+      if (!cons->cons->ast.args[i-1].tag.empty())
+        iter->lambda->typeVar.setTag(0, cons->cons->ast.args[i-1].tag.c_str());
       iter = iter->next;
     }
     return ok;
