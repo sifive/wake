@@ -767,7 +767,7 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
   std::string tname = "destruct " + name;
   Sum sum(std::move(def));
   AST tuple(sum.location, std::string(sum.name));
-  std::vector<std::pair<std::string, bool> > members;
+  std::vector<bool> members;
 
   if (!expect(INDENT, lex)) return;
   lex.consume();
@@ -779,14 +779,12 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
     bool global = lex.next.type == GLOBAL;
     if (global) lex.consume();
 
-    std::string mname = get_arg_loc(lex).first;
-
     ASTState state(true, false);
     AST member = parse_ast(0, lex, state);
     if (check_constructors(member)) lex.fail = true;
     if (member) {
       tuple.args.push_back(member);
-      members.emplace_back(mname, global);
+      members.push_back(global);
     }
 
     switch (lex.next.type) {
@@ -820,7 +818,7 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
   Constructor &c = sump->members.back();
   Expr *construct = new Construct(c.ast.location, sump, &c);
   for (size_t i = c.ast.args.size(); i > 0; --i)
-    construct = new Lambda(c.ast.location, "val" + members[i-1].first, construct);
+    construct = new Lambda(c.ast.location, "val" + c.ast.args[i-1].tag, construct);
 
   bind_def(lex, map, c.ast.name, construct);
   if (global) bind_global(c.ast.name, top, lex);
@@ -832,9 +830,10 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
 
   // Create get/set/edit helper methods
   int outer = 0;
-  for (auto &m : members) {
-    std::string &mname = m.first;
-    bool global = m.second;
+  for (unsigned i = 0; i < members.size(); ++i) {
+    std::string &mname = c.ast.args[i].tag;
+    bool global = members[i];
+    if (mname.empty()) continue;
 
     // Implement get methods
     Expr *getifn = new VarRef(sump->location, "_ " + std::to_string(outer+1));

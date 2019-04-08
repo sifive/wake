@@ -1,9 +1,9 @@
 global tuple CPackage =
-  global Verison String
-  global Headers List Path
-  global Objects List Path
-  global CFlags  List String
-  global LFlags  List String
+  global Verison: String
+  global Headers: List Path
+  global Objects: List Path
+  global CFlags:  List String
+  global LFlags:  List String
 
 global def makeCPackage version = CPackage version Nil Nil Nil Nil
 global def flattenCPackages packages =

@@ -3,10 +3,10 @@ global data Unit = Unit
 
 # pairs
 global tuple Pair a b =
-  global First  a
-  global Second b
+  global First:  a
+  global Second: b
 
 global tuple Triple a b c =
-  global First  a
-  global Second b
-  global Third  c
+  global First:  a
+  global Second: b
+  global Third:  c
