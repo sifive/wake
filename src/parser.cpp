@@ -589,20 +589,6 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
   TRACE("AST");
   for (;;) {
     switch (lex.next.type) {
-      case COLON: {
-        op_type op = op_precedence(lex.text().c_str());
-        if (op.p < p) return lhs;
-        lex.consume();
-        if (!lhs.args.empty() || !Lexer::isLower(lhs.name.c_str())) {
-          std::cerr << "Left-hand-side of COLON must be a simple lower-case identifier, not "
-            << lhs.name << " at " << lhs.location << std::endl;
-          lex.fail = true;
-        }
-        std::string tag = std::move(lhs.name);
-        lhs = parse_ast(op.p + op.l, lex, state);
-        lhs.tag = std::move(tag);
-        break;
-      }
       case OPERATOR: {
         op_type op = op_precedence(lex.text().c_str());
         if (op.p < p) return lhs;
@@ -633,6 +619,23 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
         lhs.args.emplace_back(std::move(rhs));
         break;
       }
+      case COLON: {
+        if (state.type) {
+          op_type op = op_precedence(lex.text().c_str());
+          if (op.p < p) return lhs;
+          lex.consume();
+          if (!lhs.args.empty() || Lexer::isOperator(lhs.name.c_str())) {
+            std::cerr << "Left-hand-side of COLON must be a simple lower-case identifier, not "
+              << lhs.name << " at " << lhs.location << std::endl;
+            lex.fail = true;
+          }
+          std::string tag = std::move(lhs.name);
+          lhs = parse_ast(op.p + op.l, lex, state);
+          lhs.tag = std::move(tag);
+          break;
+        }
+        // fall-through to default
+      }
       default: {
         return lhs;
       }
@@ -647,19 +650,10 @@ Sum *Pair;
 Sum *Unit;
 Sum *JValue;
 
-static void check_cons_name(const AST &ast, Lexer &lex) {
-  if (ast.name == "_" || Lexer::isLower(ast.name.c_str())) {
-    std::cerr << "Constructor name must be upper-case or operator, not "
-      << ast.name << " at "
-      << ast.location << std::endl;
-    lex.fail = true;
-  }
-}
-
 static AST parse_type_def(Lexer &lex) {
   lex.consume();
 
-  ASTState state(true, false);
+  ASTState state(false, false);
   AST def = parse_ast(0, lex, state);
   if (check_constructors(def)) lex.fail = true;
   if (!def) return def;
@@ -911,6 +905,29 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
   }
 }
 
+static void parse_data_elt(Lexer &lex, Sum &sum) {
+  ASTState state(true, false);
+  AST cons = parse_ast(0, lex, state);
+
+  if (cons) {
+    if (check_constructors(cons)) lex.fail = true;
+    if (!cons.tag.empty()) {
+      std::cerr << "Constructor "
+        << cons.name << " should not be tagged with "
+        << cons.tag << " at "
+        << cons.location << std::endl;
+      lex.fail = true;
+    }
+    if (cons.name == "_" || Lexer::isLower(cons.name.c_str())) {
+      std::cerr << "Constructor name must be upper-case or operator, not "
+        << cons.name << " at "
+        << cons.location << std::endl;
+      lex.fail = true;
+    }
+    sum.addConstructor(std::move(cons));
+  }
+}
+
 static void parse_data(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
   AST def = parse_type_def(lex);
   if (!def) return;
@@ -923,13 +940,7 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
 
     bool repeat = true;
     while (repeat) {
-      ASTState state(true, false);
-      AST cons = parse_ast(0, lex, state);
-      if (check_constructors(cons)) lex.fail = true;
-      if (cons) {
-        check_cons_name(cons, lex);
-        sum.addConstructor(std::move(cons));
-      }
+      parse_data_elt(lex, sum);
       switch (lex.next.type) {
         case DEDENT:
           repeat = false;
@@ -948,14 +959,7 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
       }
     }
   } else {
-    ASTState state(true, false);
-    AST cons = parse_ast(0, lex, state);
-    if (check_constructors(cons)) lex.fail = true;
-    if (cons) {
-      check_cons_name(cons, lex);
-      sum.addConstructor(std::move(cons));
-    }
-    expect(EOL, lex);
+    parse_data_elt(lex, sum);
     lex.consume();
   }
 
