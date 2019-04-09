@@ -728,7 +728,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     bool a = explore(app->val.get(), pmap, binding);
     FnErrorMessage fnm(&app->fn->location);
     bool t = f && app->fn->typeVar.unify(TypeVar(FN, 2), &fnm);
-    ArgErrorMessage argm(&app->fn->location, &app->val->location, app->fn->typeVar.getTag(0));
+    ArgErrorMessage argm(&app->fn->location, &app->val->location, t?app->fn->typeVar.getTag(0):0);
     bool ta = t && a && app->fn->typeVar[0].unify(app->val->typeVar, &argm);
     bool tr = t && app->fn->typeVar[1].unify(app->typeVar, &app->location);
     return f && a && t && ta && tr;
