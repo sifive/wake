@@ -23,7 +23,24 @@ static int rows = 0, cols = 0;
 static const char *cuu1;
 static const char *cr;
 static const char *ed;
+static const char *sgr0;
 static int used = 0;
+
+const char *term_red()
+{
+  char *out;
+  if (!sgr0) return "";
+  out = tigetstr("setaf");
+  if (!out || out == (char*)-1) return "";
+  out = tparm(out, 1); // red
+  if (!out || out == (char*)-1) return "";
+  return out;
+}
+
+const char *term_normal()
+{
+  return sgr0?sgr0:"";
+}
 
 static void write_all(int fd, const char *data, size_t len)
 {
@@ -134,7 +151,7 @@ static void handle_SIGWINCH(int sig)
   resize_detected = true;
 }
 
-void status_init(bool tty_)
+void term_init(bool tty_)
 {
   tty = tty_;
 
@@ -158,8 +175,13 @@ void status_init(bool tty_)
     if (!cr || cr == (char*)-1) tty = false;
     if (!ed || ed == (char*)-1) tty = false;
     if (cols < 0 || rows < 0) tty = false;
+    sgr0 = tigetstr("sgr0"); // optional
+    if (sgr0 == (char*)-1) sgr0 = 0;
   }
+}
 
+void status_init()
+{
   if (tty) {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));

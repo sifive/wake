@@ -2,6 +2,7 @@
 #include "location.h"
 #include "symbol.h"
 #include "expr.h"
+#include "status.h"
 #include <cstring>
 #include <iostream>
 #include <cassert>
@@ -205,13 +206,13 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const ch
   }
 
   if (b && (a->nargs != b->nargs || strcmp(a->name, b->name))) {
-    // red
+    os << term_red();
     if (a->isFree()) {
       os << "<infinite-type>";
     } else {
       do_format(os, dob, value, 0, 0, tags, p);
     }
-    // normal
+    os << term_normal();
   } else if (a->isFree()) {
     int tag = a->epoch - globalEpoch;
     if (tag < 0) {

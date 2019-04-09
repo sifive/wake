@@ -282,6 +282,8 @@ int main(int argc, char **argv) {
     return 0;
   }
 
+  term_init(tty);
+
   int njobs = std::thread::hardware_concurrency();
   if (jobs) {
     char *tail;
@@ -408,8 +410,9 @@ int main(int argc, char **argv) {
   Expr *body = new Lambda(LOCATION, "_", new Literal(LOCATION, "top"));
   for (size_t i = 0; i < targets.size() + globals.size(); ++i) {
     body = new Lambda(LOCATION, "_", body);
-    target_names.emplace_back("<target-" + std::to_string(i) + "-expression>");
+    target_names.emplace_back("<target-" + std::to_string(i) + ">");
   }
+  if (argc > 1) target_names.back() = "<command-line>";
   TypeVar *types = &body->typeVar;
   for (size_t i = 0; i < targets.size(); ++i) {
     Lexer lex(targets[i], target_names[i].c_str());
@@ -514,7 +517,7 @@ int main(int argc, char **argv) {
   fflush(stdout);
   fflush(stderr);
 
-  status_init(tty);
+  status_init();
   do { queue.run(); } while (jobtable.wait(queue));
   status_finish();
 
