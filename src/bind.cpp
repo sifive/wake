@@ -682,8 +682,13 @@ struct FnErrorMessage : public TypeErrorMessage  {
 
 struct ArgErrorMessage : public TypeErrorMessage {
   const Location *lf, *la;
-  ArgErrorMessage(const Location *lf_, const Location *la_) : lf(lf_), la(la_) { }
-  void formatA(std::ostream &os) const { os << "Type error; function " << *lf << " expected argument of type"; }
+  const char *arg;
+  ArgErrorMessage(const Location *lf_, const Location *la_, const char *arg_) : lf(lf_), la(la_), arg(arg_) { }
+  void formatA(std::ostream &os) const {
+    os << "Type error; function " << *lf << " expected argument";
+    if (arg && !strchr(arg, ' ') && strcmp(arg, "_")) os << " '" << arg << "'";
+    os << " of type";
+  }
   void formatB(std::ostream &os) const { os << "but was supplied argument " << *la << " of type"; }
 };
 
@@ -716,7 +721,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     bool a = explore(app->val.get(), pmap, binding);
     FnErrorMessage fnm(&app->fn->location);
     bool t = f && app->fn->typeVar.unify(TypeVar(FN, 2), &fnm);
-    ArgErrorMessage argm(&app->fn->location, &app->val->location);
+    ArgErrorMessage argm(&app->fn->location, &app->val->location, app->fn->typeVar.getTag(0));
     bool ta = t && a && app->fn->typeVar[0].unify(app->val->typeVar, &argm);
     bool tr = t && app->fn->typeVar[1].unify(app->typeVar, &app->location);
     return f && a && t && ta && tr;
