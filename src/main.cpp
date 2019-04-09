@@ -25,6 +25,8 @@
 #include "status.h"
 #include "gopt.h"
 
+#define SHORT_HASH 8
+
 static WorkQueue queue;
 
 struct Output : public Receiver {
@@ -48,7 +50,7 @@ static void indent(const std::string& tab, const std::string& body) {
   std::cout << std::endl;
 }
 
-static void describe_human(const std::vector<JobReflection> &jobs, bool debug) {
+static void describe_human(const std::vector<JobReflection> &jobs, bool debug, bool verbose) {
   for (auto &job : jobs) {
     std::cout
       << "Job " << job.job << ":" << std::endl
@@ -71,11 +73,13 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug) {
       << "  Stdin:     " << job.stdin << std::endl
       << "Inputs:" << std::endl;
     for (auto &in : job.inputs)
-      std::cout << "  " << in.hash << " " << in.path << std::endl;
+      std::cout << "  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
+                << " " << in.path << std::endl;
     std::cout
       << "Outputs:" << std::endl;
     for (auto &out : job.outputs)
-      std::cout << "  " << out.hash << " " << out.path << std::endl;
+      std::cout << "  " << out.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
+                << " " << out.path << std::endl;
     if (debug) {
       std::cout << "Stack:";
       indent("  ", job.stack);
@@ -107,7 +111,7 @@ static void escape(const std::string &x) {
   std::cout << "'";
 }
 
-static void describe_shell(const std::vector<JobReflection> &jobs, bool debug) {
+static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, bool verbose) {
   std::cout << "#! /bin/sh -ex" << std::endl;
 
   for (auto &job : jobs) {
@@ -144,11 +148,13 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug) {
       << "#   Status:    " << job.usage.status << std::endl
       << "# Inputs:" << std::endl;
     for (auto &in : job.inputs)
-      std::cout << "#   " << in.hash << " " << in.path << std::endl;
+      std::cout << "#  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
+                << " " << in.path << std::endl;
     std::cout
       << "# Outputs:" << std::endl;
     for (auto &out : job.outputs)
-      std::cout << "#   " << out.hash << " " << out.path << std::endl;
+      std::cout << "#  " << out.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
+                << " " << out.path << std::endl;
     if (debug) {
       std::cout << "# Stack:";
       indent("#   ", job.stack);
@@ -164,11 +170,11 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug) {
   }
 }
 
-void describe(const std::vector<JobReflection> &jobs, bool script, bool debug) {
+void describe(const std::vector<JobReflection> &jobs, bool script, bool debug, bool verbose) {
   if (script) {
-    describe_shell(jobs, debug);
+    describe_shell(jobs, debug, verbose);
   } else {
-    describe_human(jobs, debug);
+    describe_human(jobs, debug, verbose);
   }
 }
 
@@ -366,13 +372,13 @@ int main(int argc, char **argv) {
 
   if (input) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(prefix + argv[i]), 1, verbose), script, debug);
+      describe(db.explain(make_canonical(prefix + argv[i]), 1, verbose), script, debug, verbose);
     }
   }
 
   if (output) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(prefix + argv[i]), 2, verbose), script, debug);
+      describe(db.explain(make_canonical(prefix + argv[i]), 2, verbose), script, debug, verbose);
     }
   }
 
