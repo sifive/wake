@@ -6,6 +6,18 @@ struct Location;
 
 #define FN "binary =>"
 
+struct TypeErrorMessage {
+  virtual void formatA(std::ostream &os) const = 0;
+  virtual void formatB(std::ostream &os) const = 0;
+};
+
+struct LegacyErrorMessage : public TypeErrorMessage {
+  const Location *l;
+  LegacyErrorMessage(const Location *l_) : l(l_) { }
+  void formatA(std::ostream &os) const;
+  void formatB(std::ostream &os) const;
+};
+
 struct TypeChild;
 struct TypeVar {
 private:
@@ -53,8 +65,11 @@ public:
 
   void setDOB();
   void setTag(int i, const char *tag);
-  bool unify(TypeVar &other, Location *location = 0);
-  bool unify(TypeVar &&other, Location *location = 0) { return unify(other, location); }
+  bool unify(TypeVar &other,  const TypeErrorMessage *message);
+  bool unify(TypeVar &&other, const TypeErrorMessage *message) { return unify(other, message); }
+  //  Deprecated:
+  bool unify(TypeVar &other,  const Location *l = 0) { LegacyErrorMessage m(l); return unify(other, &m); }
+  bool unify(TypeVar &&other, const Location *l = 0) { LegacyErrorMessage m(l); return unify(other, &m); }
 
   void clone(TypeVar &into) const;
   void format(std::ostream &os, const TypeVar &top) const; // use top's dob

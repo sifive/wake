@@ -188,16 +188,26 @@ void TypeVar::do_debug(std::ostream &os, TypeVar &other, int who, int p) {
   }
 }
 
-bool TypeVar::unify(TypeVar &other, Location *location) {
+void LegacyErrorMessage::formatA(std::ostream &os) const {
+  os << "Type inference error";
+  if (l) os << " at " << *l;
+}
+
+void LegacyErrorMessage::formatB(std::ostream &os) const {
+  os << "  does not match:";
+}
+
+bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {
   globalEpoch += (-globalEpoch) & 3; // round up to a multiple of 4
   bool ok = do_unify(other);
   if (!ok) {
     std::ostream &os = std::cerr;
-    os << "Type inference error";
-    if (location) os << " at " << *location;
+    message->formatA(os);
     os << ":" << std::endl << "    ";
     do_debug(os, other, 0, 0);
-    os << std::endl << "  does not match:" << std::endl << "    ";
+    os << std::endl;
+    message->formatB(os);
+    os << ":" << std::endl << "    ";
     do_debug(os, other, 1, false);
     os << std::endl;
   }
