@@ -673,6 +673,20 @@ struct NameBinding {
   }
 };
 
+struct FnErrorMessage : public TypeErrorMessage  {
+  const Location *lf;
+  FnErrorMessage(const Location *lf_) : lf(lf_) { }
+  void formatA(std::ostream &os) const { os << "Type error; expression " << *lf << " has type"; }
+  void formatB(std::ostream &os) const { os << "but is used as a function and must have function type"; }
+};
+
+struct ArgErrorMessage : public TypeErrorMessage {
+  const Location *lf, *la;
+  ArgErrorMessage(const Location *lf_, const Location *la_) : lf(lf_), la(la_) { }
+  void formatA(std::ostream &os) const { os << "Type error; function " << *lf << " expected argument of type"; }
+  void formatB(std::ostream &os) const { os << "but was supplied argument " << *la << " of type"; }
+};
+
 static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   if (!expr) return false; // failed fracture
   expr->typeVar.setDOB();
@@ -700,8 +714,10 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     binding->open = false;
     bool f = explore(app->fn .get(), pmap, binding);
     bool a = explore(app->val.get(), pmap, binding);
-    bool t = f && app->fn->typeVar.unify(TypeVar(FN, 2), &app->location);
-    bool ta = t && a && app->fn->typeVar[0].unify(app->val->typeVar, &app->location);
+    FnErrorMessage fnm(&app->fn->location);
+    bool t = f && app->fn->typeVar.unify(TypeVar(FN, 2), &fnm);
+    ArgErrorMessage argm(&app->fn->location, &app->val->location);
+    bool ta = t && a && app->fn->typeVar[0].unify(app->val->typeVar, &argm);
     bool tr = t && app->fn->typeVar[1].unify(app->typeVar, &app->location);
     return f && a && t && ta && tr;
   } else if (expr->type == &Lambda::type) {
@@ -711,7 +727,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       lambda->typeVar.setTag(0, lambda->name.c_str());
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), pmap, &bind);
-    bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &lambda->location);
+    bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &lambda->location); // might fail due to recursive use
     return out && t && tr;
   } else if (expr->type == &Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
