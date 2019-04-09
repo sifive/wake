@@ -205,7 +205,5 @@ void status_finish()
     struct itimerval timer;
     memset(&timer, 0, sizeof(timer));
     setitimer(ITIMER_REAL, &timer, 0);
-
-    reset_shell_mode();
   }
 }
