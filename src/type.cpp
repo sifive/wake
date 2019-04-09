@@ -132,12 +132,13 @@ bool TypeVar::do_unify(TypeVar &other) {
 }
 
 void LegacyErrorMessage::formatA(std::ostream &os) const {
-  os << "Type inference error";
-  if (l) os << " at " << *l;
+  os << "Type error; unable to unify";
+  if (l) os << " " << *l << " of";
+  os << " type";
 }
 
 void LegacyErrorMessage::formatB(std::ostream &os) const {
-  os << "  does not match:";
+  os << "with incompatible type";
 }
 
 bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {

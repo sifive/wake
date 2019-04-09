@@ -692,6 +692,13 @@ struct ArgErrorMessage : public TypeErrorMessage {
   void formatB(std::ostream &os) const { os << "but was supplied argument " << *la << " of type"; }
 };
 
+struct RecErrorMessage : public TypeErrorMessage  {
+  const Location *lf;
+  RecErrorMessage(const Location *lf_) : lf(lf_) { }
+  void formatA(std::ostream &os) const { os << "Type error; recursive use of " << *lf << " requires return type"; }
+  void formatB(std::ostream &os) const { os << "but the function body actually returns type"; }
+};
+
 static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   if (!expr) return false; // failed fracture
   expr->typeVar.setDOB();
@@ -732,7 +739,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       lambda->typeVar.setTag(0, lambda->name.c_str());
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), pmap, &bind);
-    bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &lambda->location); // might fail due to recursive use
+    RecErrorMessage recm(&lambda->body->location);
+    bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &recm);
     return out && t && tr;
   } else if (expr->type == &Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
