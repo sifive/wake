@@ -53,12 +53,12 @@ static inline int is_root(const char *path) {
 }
 
 static bool is_visible(const std::string &path) {
-	auto i = files_visible.lower_bound(path);
-	return i != files_visible.end() && (
-		*i == path || (
-			i->size() > path.size() &&
-			i->substr(0, path.size()) == path &&
-			(*i)[path.size()] == '/'));
+	if (files_visible.find(path) != files_visible.end()) return true;
+	auto i = files_visible.lower_bound(path + "/");
+	return i != files_visible.end()
+		&& i->size() > path.size()
+		&& (*i)[path.size()] == '/'
+		&& 0 == i->compare(0, path.size(), path);
 }
 
 static bool is_writeable(const std::string &path) {
