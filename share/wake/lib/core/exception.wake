@@ -1,8 +1,8 @@
 # exceptions
 def test  x = prim "test"
 def catch x = prim "catch"
-global def try f x = if test x then f (catch x) else x
-global def raise x = prim "raise"
-global def cast x = prim "cast"
+global def try handleCausesFn expr = if test expr then handleCausesFn (catch expr) else expr
+global def raise cause = prim "raise"
+global def cast exception = prim "cast"
 
-global def reraise x f = if test x then cast x else f x
+global def reraise expr mapFn = if test expr then cast expr else mapFn expr

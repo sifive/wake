@@ -1,9 +1,9 @@
 # Syntax helpers
 
 # Flip function and object order
-global def x . f = f x # obj.method-style syntax (. precedence > application)
-global def x | f = f x # bash-style pipe operator
+global def argument . memberFn = memberFn argument # obj.method-style syntax (. precedence > application)
+global def argument | pipeFn = pipeFn argument # bash-style pipe operator
 
 # Avoid ()s without changing order
-global def f $ x = f x
+global def dollarFn $ argument = dollarFn argument
 global def f ∘ g = \x f (g x)
