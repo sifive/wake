@@ -51,7 +51,10 @@ static std::string slurp(int dirfd, bool &fail) {
     fail = true;
     fprintf(stderr, "Failed to open pipe %s\n", strerror(errno));
   } else if ((pid = fork()) == 0) {
-    fchdir(dirfd);
+    if (fchdir(dirfd) == -1) {
+      fprintf(stderr, "Failed to chdir: %s\n", strerror(errno));
+      exit(1);
+    }
     close(pipefd[0]);
     if (pipefd[1] != 1) {
       dup2(pipefd[1], 1);

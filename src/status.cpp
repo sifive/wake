@@ -28,9 +28,10 @@ static int used = 0;
 
 const char *term_red()
 {
+  static char setaf_lit[] = "setaf";
   char *out;
   if (!sgr0) return "";
-  out = tigetstr("setaf");
+  out = tigetstr(setaf_lit);
   if (!out || out == (char*)-1) return "";
   out = tparm(out, 1); // red
   if (!out || out == (char*)-1) return "";
@@ -166,16 +167,23 @@ void term_init(bool tty_)
   }
 
   if (tty) {
-    cuu1 = tigetstr("cuu1"); // cursor up one row
-    cr = tigetstr("cr");     // return to first column
-    ed = tigetstr("ed");     // erase to bottom of display
-    rows = tigetnum("lines");
-    cols = tigetnum("cols");
+    // tigetstr function argument is (char*) on some platforms, so we need this hack:
+    static char cuu1_lit[] = "cuu1";
+    static char cr_lit[] = "cr";
+    static char ed_lit[] = "ed";
+    static char lines_lit[] = "lines";
+    static char cols_lit[] = "cols";
+    static char sgr0_lit[] = "sgr0";
+    cuu1 = tigetstr(cuu1_lit);   // cursor up one row
+    cr   = tigetstr(cr_lit);     // return to first column
+    ed   = tigetstr(ed_lit);     // erase to bottom of display
+    rows = tigetnum(lines_lit);
+    cols = tigetnum(cols_lit);
     if (!cuu1 || cuu1 == (char*)-1) tty = false;
     if (!cr || cr == (char*)-1) tty = false;
     if (!ed || ed == (char*)-1) tty = false;
     if (cols < 0 || rows < 0) tty = false;
-    sgr0 = tigetstr("sgr0"); // optional
+    sgr0 = tigetstr(sgr0_lit); // optional
     if (sgr0 == (char*)-1) sgr0 = 0;
   }
 }
