@@ -5,7 +5,8 @@
 
 struct Coordinates {
   int row, column;
-  Coordinates(int r = 1, int c = 1) : row(r), column(c) { }
+  long bytes;
+  Coordinates(int r = 1, int c = 1, long b = -1) : row(r), column(c), bytes(b) { }
 
   bool operator < (const Coordinates &c) const {
     if (row == c.row) { return column < c.column; }
@@ -14,23 +15,47 @@ struct Coordinates {
   bool operator >  (const Coordinates &c) const { return   c < *this;  }
   bool operator <= (const Coordinates &c) const { return !(c < *this); }
   bool operator >= (const Coordinates &c) const { return !(*this < c); }
+
+  Coordinates operator + (int x) const { return Coordinates(row, column+x, bytes+x); }
+  Coordinates operator - (int x) const { return Coordinates(row, column-x, bytes-x); }
 };
+
+struct Location;
+
+struct TextLocation {
+  const Location *l;
+  TextLocation(const Location *l_) : l(l_) { }
+};
+
+std::ostream & operator << (std::ostream &os, TextLocation location);
+
+struct FileLocation {
+  const Location *l;
+  FileLocation(const Location *l_) : l(l_) { }
+};
+
+std::ostream & operator << (std::ostream &os, FileLocation location);
 
 struct Location {
-  const char *file;
+  const char *filename;
   Coordinates start, end;
 
-  std::string str() const;
-  Location(const char *file_, Coordinates start_, Coordinates end_)
-    : file(file_), start(start_), end(end_) { }
+  [[deprecated]] std::string str() const;
+  Location(const char *filename_, Coordinates start_, Coordinates end_)
+    : filename(filename_), start(start_), end(end_) { }
 
   bool contains(const Location &loc) const {
-    return file == loc.file && start <= loc.start && loc.end <= end;
+    return filename == loc.filename && start <= loc.start && loc.end <= end;
   }
+
+  FileLocation file() const { return FileLocation(this); }
+  TextLocation text() const { return TextLocation(this); }
 };
 
-std::ostream & operator << (std::ostream &os, const Location &location);
+[[deprecated]] inline std::ostream & operator << (std::ostream &os, const Location &location) {
+  return os << location.file();
+}
 
-#define LOCATION Location(__FILE__, Coordinates(__LINE__, 1), Coordinates(__LINE__, 1))
+#define LOCATION Location(__FILE__, Coordinates(__LINE__), Coordinates(__LINE__))
 
 #endif

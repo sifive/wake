@@ -102,6 +102,7 @@ struct input_t {
   const unsigned char *mar;
   const unsigned char *tok;
   const unsigned char *sol;
+  long offset;
   int  row;
   bool eof;
 
@@ -110,17 +111,18 @@ struct input_t {
 
   input_t(const char *fn, FILE *f, int start = SIZE, int end = SIZE)
    : buf(), lim(buf + end), cur(buf + start), mar(buf + start), tok(buf + start), sol(buf + start),
-     row(1), eof(false), filename(fn), file(f) { }
+     offset(-start), row(1), eof(false), filename(fn), file(f) { }
   input_t(const char *fn, const unsigned char *buf_, int end)
    : buf(), lim(buf_ + end), cur(buf_), mar(buf_), tok(buf_), sol(buf_),
-     row(1), eof(true), filename(fn), file(0) { }
+     offset(0), row(1), eof(true), filename(fn), file(0) { }
 
   bool __attribute__ ((noinline)) fill(size_t need);
 
   std::string text() const;
+  Coordinates coord() const { return Coordinates(row, 1 + cur - sol, offset + cur - &buf[0]); }
 };
 
-#define SYM_LOCATION Location(in.filename, start, Coordinates(in.row, in.cur - in.sol))
+#define SYM_LOCATION Location(in.filename, start, in.coord()-1)
 
 bool input_t::fill(size_t need) {
   if (eof) {
@@ -136,6 +138,7 @@ bool input_t::fill(size_t need) {
   mar -= free;
   tok -= free;
   sol -= free;
+  offset += free;
   lim += fread(buf + (lim - buf), 1, free, file);
   if (lim < buf + SIZE) {
     eof = true;
@@ -316,7 +319,7 @@ static std::string unicode_escape(std::string &&str) {
 static bool lex_sstr(Lexer &lex, Expr *&out)
 {
   input_t &in = *lex.engine.get();
-  Coordinates start(in.row, in.cur - in.sol);
+  Coordinates start = in.coord() - 1;
   std::string slice;
 
   while (true) {
@@ -343,7 +346,7 @@ static bool lex_sstr(Lexer &lex, Expr *&out)
 static bool lex_dstr(Lexer &lex, Expr *&out)
 {
   input_t &in = *lex.engine.get();
-  Coordinates start(in.row, in.cur - in.sol);
+  Coordinates start = in.coord() - 1;
   std::vector<Expr*> exprs;
   std::string slice;
   bool ok = true;
@@ -366,8 +369,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
           exprs.push_back(parse_expr(lex));
           if (lex.next.type == EOL) lex.consume();
           ok &= expect(BCLOSE, lex);
-          start.row = in.row;
-          start.column = in.cur - in.sol;
+          start = in.coord();
           continue;
         }
 
@@ -418,8 +420,7 @@ static Symbol lex_top(Lexer &lex) {
   input_t &in = *lex.engine.get();
   Coordinates start;
 top:
-  start.row = in.row;
-  start.column = in.cur - in.sol + 1;
+  start = in.coord();
   in.tok = in.cur;
   const unsigned char *YYCTXMARKER;
   (void)YYCTXMARKER;
@@ -675,7 +676,7 @@ void Lexer::consume() {
       std::string newindent(engine->tok+1, engine->cur);
       size_t check = std::min(newindent.size(), state->indent.size());
       if (!std::equal(newindent.begin(), newindent.begin()+check, state->indent.begin())) {
-        std::cerr << "Whitespace is neither a prefix nor a suffix of the previous line at " << next.location << std::endl;
+        std::cerr << "Whitespace is neither a prefix nor a suffix of the previous line at " << next.location.file() << std::endl;
         fail = true;
       }
       std::swap(state->indent, newindent);
@@ -688,7 +689,7 @@ void Lexer::consume() {
 static bool lex_jstr(JLexer &lex, Expr *&out, unsigned char eos)
 {
   input_t &in = *lex.engine.get();
-  Coordinates start(in.row, in.cur - in.sol);
+  Coordinates start = in.coord()-1;
   std::string slice;
   const unsigned char *YYCTXMARKER;
   (void)YYCTXMARKER;
@@ -832,8 +833,7 @@ static Symbol lex_json(JLexer &lex) {
   input_t &in = *lex.engine.get();
   Coordinates start;
 top:
-  start.row = in.row;
-  start.column = in.cur - in.sol + 1;
+  start = in.coord();
   in.tok = in.cur;
   const unsigned char *YYCTXMARKER;
   (void)YYCTXMARKER;
