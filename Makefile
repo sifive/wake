@@ -48,6 +48,6 @@ lib/wake/shim-wake:	$(patsubst %.c,%.o,$(wildcard shim/*.c))
 # Rely on wake to recreate this file if re2c is available
 %.cpp:	%.cpp.gz
 	gzip -dc $^ > $@.tmp
-	mv $@.tmp $@
+	mv -f $@.tmp $@
 
 .PRECIOUS:	src/symbol.cpp
