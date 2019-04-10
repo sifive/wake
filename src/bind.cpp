@@ -109,7 +109,7 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
       std::cerr << "Value definition cycle detected including:" << std::endl;
       int i = j;
       do {
-        std::cerr << "  " << defs[i].name << " at " << defs[i].expr->location << std::endl;
+        std::cerr << "  " << defs[i].name << " at " << defs[i].expr->location.file() << std::endl;
         i = p[i];
       } while (i != j);
       return 0;
@@ -288,7 +288,7 @@ static PatternTree *get_expansion(PatternTree *t, const std::vector<int> &path) 
 static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) {
   PatternRef &prototype = patterns[0];
   if (patterns.size() == 1) {
-    std::cerr << "Non-exhaustive match at " << prototype.location
+    std::cerr << "Non-exhaustive match at " << prototype.location.file()
       << "; missing: " << prototype.tree << std::endl;
     return nullptr;
   }
@@ -320,7 +320,7 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
         } else if (t->sum != sum) {
           std::cerr << "Constructor " << t->sum->members[t->cons].ast.name
             << " is not a member of " << sum->name
-            << " but is used in pattern at " << p->location
+            << " but is used in pattern at " << p->location.file()
             << "." << std::endl;
           return nullptr;
         } else if (t->sum && t->cons == (int)c) {
@@ -416,7 +416,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
     if (ast.name.empty()) out.sum = multiarg;
     if (!out.sum) {
       std::cerr << "Constructor " << ast.name
-        << " in pattern match not found at " << ast.location
+        << " in pattern match not found at " << ast.location.file()
         << "." << std::endl;
       out.var = 0;
     } else if (out.sum->members[out.cons].ast.args.size() != ast.args.size()) {
@@ -427,7 +427,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       }
       std::cerr  << " in pattern match has " << ast.args.size()
         << " parameters, but must have " << out.sum->members[out.cons].ast.args.size()
-        << " at " << ast.location
+        << " at " << ast.location.file()
         << "." << std::endl;
       out.sum = 0;
       out.var = 0;
@@ -490,7 +490,7 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
   if (!map->body) return nullptr;
   for (auto &p : patterns) {
     if (!p.uses) {
-      std::cerr << "Pattern unreachable in match at " << p.location << std::endl;
+      std::cerr << "Pattern unreachable in match at " << p.location.text() << std::endl;
       return nullptr;
     }
   }
@@ -673,6 +673,32 @@ struct NameBinding {
   }
 };
 
+struct FnErrorMessage : public TypeErrorMessage  {
+  const Location *lf;
+  FnErrorMessage(const Location *lf_) : lf(lf_) { }
+  void formatA(std::ostream &os) const { os << "Type error; expression " << lf->text() << " has type"; }
+  void formatB(std::ostream &os) const { os << "but is used as a function and must have function type"; }
+};
+
+struct ArgErrorMessage : public TypeErrorMessage {
+  const Location *lf, *la;
+  const char *arg;
+  ArgErrorMessage(const Location *lf_, const Location *la_, const char *arg_) : lf(lf_), la(la_), arg(arg_) { }
+  void formatA(std::ostream &os) const {
+    os << "Type error; function " << lf->text() << " expected argument";
+    if (arg && arg[0] && !strchr(arg, ' ') && strcmp(arg, "_")) os << " '" << arg << "'";
+    os << " of type";
+  }
+  void formatB(std::ostream &os) const { os << "but was supplied argument " << la->text() << " of type"; }
+};
+
+struct RecErrorMessage : public TypeErrorMessage  {
+  const Location *lf;
+  RecErrorMessage(const Location *lf_) : lf(lf_) { }
+  void formatA(std::ostream &os) const { os << "Type error; recursive use of " << lf->text() << " requires return type"; }
+  void formatB(std::ostream &os) const { os << "but the function body actually returns type"; }
+};
+
 static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   if (!expr) return false; // failed fracture
   expr->typeVar.setDOB();
@@ -680,9 +706,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     NameRef pos;
     if ((pos = binding->find(ref->name)).offset == -1) {
-      std::cerr << "Variable reference "
-        << ref->name << " is unbound at "
-        << ref->location << std::endl;
+      std::cerr << "Variable reference is unbound at "
+        << ref->location.text() << std::endl;
       return false;
     }
     ref->depth = pos.depth;
@@ -700,8 +725,10 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     binding->open = false;
     bool f = explore(app->fn .get(), pmap, binding);
     bool a = explore(app->val.get(), pmap, binding);
-    bool t = f && app->fn->typeVar.unify(TypeVar(FN, 2), &app->location);
-    bool ta = t && a && app->fn->typeVar[0].unify(app->val->typeVar, &app->location);
+    FnErrorMessage fnm(&app->fn->location);
+    bool t = f && app->fn->typeVar.unify(TypeVar(FN, 2), &fnm);
+    ArgErrorMessage argm(&app->fn->location, &app->val->location, t?app->fn->typeVar.getTag(0):0);
+    bool ta = t && a && app->fn->typeVar[0].unify(app->val->typeVar, &argm);
     bool tr = t && app->fn->typeVar[1].unify(app->typeVar, &app->location);
     return f && a && t && ta && tr;
   } else if (expr->type == &Lambda::type) {
@@ -711,7 +738,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       lambda->typeVar.setTag(0, lambda->name.c_str());
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), pmap, &bind);
-    bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &lambda->location);
+    RecErrorMessage recm(&lambda->body->location);
+    bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &recm);
     return out && t && tr;
   } else if (expr->type == &Memoize::type) {
     Memoize *memoize = reinterpret_cast<Memoize*>(expr);
@@ -792,7 +820,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     if (i == pmap.end()) {
       std::cerr << "Primitive reference "
         << prim->name << " is unbound at "
-        << prim->location << std::endl;
+        << prim->location.file() << std::endl;
       return false;
     } else {
       prim->flags = i->second.flags;
@@ -801,7 +829,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       bool ok = i->second.type(args, &prim->typeVar);
       if (!ok) std::cerr << "Primitive reference "
         << prim->name << " has wrong type signature at "
-        << prim->location << std::endl;
+        << prim->location.file() << std::endl;
       return ok;
     }
   } else {

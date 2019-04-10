@@ -53,15 +53,24 @@ or that your colleagues already built, you might appreciate wake.
 
 # Installing dependencies
 
+On Debian/Ubuntu (wheezy or later):
+
+    sudo apt-get install libfuse-dev libsqlite3-dev libgmp-dev libre2-dev libncurses5-dev pkg-config git g++ gcc
+
+On Redhat (7.0 or later):
+
+    sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm # For re2 on RHEL7
+    sudo yum install fuse-devel sqlite-devel gmp-devel re2-devel ncurses-devel pkgconfig git gcc gcc-c++
+
 On Mac OS with Mac Ports installed:
 
     sudo port install osxfuse sqlite3 gmp re2 ncurses pkgconfig
-    brew link re2
-    # maybe this next command gets rid of the gmp export below. If it does then remove the export below. Otherwise remove the brew link gmp
-    brew link gmp
 
 On Mac OS with Home Brew installed:
 
+    brew link re2
+    # maybe this next command gets rid of the gmp export below. If it does then remove the export below. Otherwise remove the brew link gmp
+    brew link gmp
     brew update
     sudo chown $USER /usr/local/Caskroom/
     brew tap homebrew/cask
@@ -83,11 +92,6 @@ On Mac OS with Home Brew installed:
     Please open the Security & Privacy System Preferences pane, go to the General preferences and allow loading system software from developer "Benjamin Fleischer".
 
     Then try mounting the volume again."
-
-
-On Debian/Ubuntu:
-
-    sudo apt-get install libfuse-dev libsqlite3-dev libgmp-dev libre2-dev libncurses5-dev pkg-config
 
 # Building wake
 

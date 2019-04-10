@@ -17,9 +17,13 @@ struct Status {
 
 extern std::list<Status> status_state;
 
-void status_init(bool tty);
+void status_init();
 void status_write(int fd, const char *data, int len);
 void status_refresh();
 void status_finish();
+
+void term_init(bool tty);
+const char *term_red();
+const char *term_normal();
 
 #endif

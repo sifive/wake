@@ -19,6 +19,6 @@ global def source file =
   | getJobOutput
 
 # Find sources files
-global def sources dir regexp =
+global def sources dir filterRegexp =
   def scan dir regexp = prim "sources"
-  waitOne (\_ scan dir regexp | map source) got_sources
+  waitOne (\_ scan dir filterRegexp | map source) got_sources

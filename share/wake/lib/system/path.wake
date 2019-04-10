@@ -69,7 +69,7 @@ global def writeIn parent mode name content =
   writeImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify content
 
 # Create all directories and the named file
-global def write rawpath content =
-  def path = simplify rawpath
-  def parent = simplify "{path}/.."
-  writeImp (mkdir parent, Nil) 0664 path content
+global def write path content =
+  def spath = simplify path
+  def parent = simplify "{spath}/.."
+  writeImp (mkdir parent, Nil) 0664 spath content

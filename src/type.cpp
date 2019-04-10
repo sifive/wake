@@ -2,6 +2,7 @@
 #include "location.h"
 #include "symbol.h"
 #include "expr.h"
+#include "status.h"
 #include <cstring>
 #include <iostream>
 #include <cassert>
@@ -130,78 +131,31 @@ bool TypeVar::do_unify(TypeVar &other) {
   }
 }
 
-void TypeVar::do_debug(std::ostream &os, TypeVar &other, int who, int p) {
-  TypeVar *a = find();
-  TypeVar *b = other.find();
-  TypeVar *w = who ? b : a;
-
-  if (a->nargs != b->nargs || strcmp(a->name, b->name)) {
-    // os << "[[[ ";
-    if (w->isFree()) {
-      os << "<infinite-type>";
-    } else if (!strncmp(w->name, "binary ", 7)) {
-      op_type q = op_precedence(w->name + 7);
-      if (q.p < p) os << "(";
-      os << "_ " << w->name+7  << " _";
-      if (q.p < p) os << ")";
-    } else if (!strncmp(w->name, "unary ", 6)) {
-      op_type q = op_precedence(w->name + 6);
-      if (q.p < p) os << "(";
-      os << w->name + 6 << " _";
-      if (q.p < p) os << ")";
-    } else if (w->nargs == 0) {
-      os << w->name;
-    } else {
-      op_type q = op_precedence("a");
-      if (q.p < p) os << "(";
-      os << w->name;
-      for (int i = 0; i < w->nargs; ++i)
-        os << " _";
-      if (q.p < p) os << ")";
-    }
-    // os << " ]]]";
-  } else if (a->epoch - globalEpoch != 1) {
-    os << "_";
-  } else if (!strncmp(a->name, "binary ", 7)) {
-    op_type q = op_precedence(a->name + 7);
-    if (q.p < p) os << "(";
-    a->cargs[0].var.do_debug(os, b->cargs[0].var, who, q.p + !q.l);
-    if (a->name[7] != ',') os << " ";
-    os << a->name + 7 << " ";
-    a->cargs[1].var.do_debug(os, b->cargs[1].var, who, q.p + q.l);
-    if (q.p < p) os << ")";
-  } else if (!strncmp(a->name, "unary ", 6)) {
-    op_type q = op_precedence(a->name + 6);
-    if (q.p < p) os << "(";
-    os << a->name + 6;
-    a->cargs[0].var.do_debug(os, b->cargs[0].var, who, q.p);
-    if (q.p < p) os << ")";
-  } else {
-    op_type q = op_precedence("a");
-    if (q.p < p) os << "(";
-    os << a->name;
-    for (int i = 0; i < a->nargs; ++i) {
-      os << " ";
-      a->cargs[i].var.do_debug(os, b->cargs[i].var, who, q.p+q.l);
-    }
-    if (q.p < p) os << ")";
-  }
+void LegacyErrorMessage::formatA(std::ostream &os) const {
+  os << "Type error; unable to unify";
+  if (l) os << " " << l->text() << " of";
+  os << " type";
 }
 
-bool TypeVar::unify(TypeVar &other, Location *location) {
+void LegacyErrorMessage::formatB(std::ostream &os) const {
+  os << "with incompatible type";
+}
+
+bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {
   globalEpoch += (-globalEpoch) & 3; // round up to a multiple of 4
   bool ok = do_unify(other);
+  globalEpoch += 4;
   if (!ok) {
     std::ostream &os = std::cerr;
-    os << "Type inference error";
-    if (location) os << " at " << *location;
+    message->formatA(os);
     os << ":" << std::endl << "    ";
-    do_debug(os, other, 0, 0);
-    os << std::endl << "  does not match:" << std::endl << "    ";
-    do_debug(os, other, 1, false);
+    globalEpoch += do_format(os, 0, *this, 0, &other, 0, 0);
+    os << std::endl << "  ";
+    message->formatB(os);
+    os << ":" << std::endl << "    ";
+    globalEpoch += do_format(os, 0, other, 0, this, 0, 0);
     os << std::endl;
   }
-  globalEpoch += 4;
   return ok;
 }
 
@@ -239,8 +193,9 @@ static void tag2str(std::ostream &os, int tag) {
   os << (char)('a' + (tag % radix));
 }
 
-int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag, int tags, int o) {
+int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag, const TypeVar *other, int tags, int o) {
   const TypeVar *a = value.find();
+  const TypeVar *b = other?other->find():0;
   int p;
 
   if (tag) {
@@ -251,7 +206,15 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const ch
     p = o;
   }
 
-  if (a->isFree()) {
+  if (b && (a->nargs != b->nargs || strcmp(a->name, b->name))) {
+    os << term_red();
+    if (a->isFree()) {
+      os << "<infinite-type>";
+    } else {
+      do_format(os, dob, value, 0, 0, tags, p);
+    }
+    os << term_normal();
+  } else if (a->isFree()) {
     int tag = a->epoch - globalEpoch;
     if (tag < 0) {
       tag = tags++;
@@ -264,16 +227,16 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const ch
   } else if (!strncmp(a->name, "binary ", 7)) {
     op_type q = op_precedence(a->name + 7);
     if (q.p < p) os << "(";
-    tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag, tags, q.p + !q.l);
+    tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag, b?&b->cargs[0].var:0, tags, q.p + !q.l);
     if (a->name[7] != ',') os << " ";
     os << a->name + 7 << " ";
-    tags = do_format(os, dob, a->cargs[1].var, a->cargs[1].tag, tags, q.p + q.l);
+    tags = do_format(os, dob, a->cargs[1].var, a->cargs[1].tag, b?&b->cargs[1].var:0, tags, q.p + q.l);
     if (q.p < p) os << ")";
   } else if (!strncmp(a->name, "unary ", 6)) {
     op_type q = op_precedence(a->name + 6);
     if (q.p < p) os << "(";
     os << a->name + 6;
-    tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag, tags, q.p);
+    tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag, b?&b->cargs[0].var:0, tags, q.p);
     if (q.p < p) os << ")";
   } else {
     op_type q = op_precedence("a");
@@ -281,7 +244,7 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const ch
     os << a->name;
     for (int i = 0; i < a->nargs; ++i) {
       os << " ";
-      tags = do_format(os, dob, a->cargs[i].var, a->cargs[i].tag, tags, q.p+q.l);
+      tags = do_format(os, dob, a->cargs[i].var, a->cargs[i].tag, b?&b->cargs[i].var:0, tags, q.p+q.l);
     }
     if (q.p < p) os << ")";
   }
@@ -290,10 +253,10 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const ch
 }
 
 void TypeVar::format(std::ostream &os, const TypeVar &top) const {
-  globalEpoch += TypeVar::do_format(os, top.var_dob, *this, 0, 0, 0);
+  globalEpoch += TypeVar::do_format(os, top.var_dob, *this, 0, 0, 0, 0);
 }
 
 std::ostream & operator << (std::ostream &os, const TypeVar &value) {
-  globalEpoch += TypeVar::do_format(os, value.var_dob, value, 0, 0, 0);
+  globalEpoch += TypeVar::do_format(os, value.var_dob, value, 0, 0, 0, 0);
   return os;
 }

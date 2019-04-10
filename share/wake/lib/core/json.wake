@@ -35,7 +35,7 @@ global def getJArray = match _
 global def parseJSONBody body = prim "json_body"
 global def parseJSONFile file = prim "json_file"
 
-global def escape =
+def escape =
   def fmt t = match _
     0xa = '\n', t
     0x9 = '\t', t
@@ -95,7 +95,7 @@ global def defaultJSONFormat =
 
 global def prettyJSONFormat = defaultJSONFormat | setJSONFormatIndent 2
 
-global def customFormatJSON fmt x = doFormat fmt x | cat
+global def customFormatJSON fmt body = doFormat fmt body | cat
 global def formatJSON = customFormatJSON defaultJSONFormat
 global def prettyJSON = customFormatJSON prettyJSONFormat
 
