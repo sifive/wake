@@ -4,6 +4,7 @@
 #include "hash.h"
 #include "datatype.h"
 #include "symbol.h"
+#include "status.h"
 #include <sstream>
 #include <cassert>
 #include <algorithm>
@@ -92,7 +93,7 @@ void Double::format(std::ostream &os, FormatState &state) const {
 }
 
 void Closure::format(std::ostream &os, FormatState &state) const {
-  os << "<" << lambda->location.file() << ">";
+  os << term_red() << "UNEVALUATED FUNCTION" << term_normal() << " <" << lambda->location.file() << ">";
   // !!! if (state.detailed) print referenced variables only
 }
 
