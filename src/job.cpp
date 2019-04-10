@@ -821,7 +821,7 @@ static PRIMFN(prim_job_create) {
   INTEGER(keep, 5);
 
   std::stringstream stack;
-  for (auto &i : binding->stack_trace()) stack << i << std::endl;
+  for (auto &i : binding->stack_trace()) stack << i.file() << std::endl;
   auto out = std::make_shared<Job>(
     jobtable->imp->db,
     dir->value,

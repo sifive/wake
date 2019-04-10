@@ -41,7 +41,7 @@ std::string Expr::to_str() const {
 void VarRef::format(std::ostream &os, int depth) const {
   os << pad(depth) << "VarRef(" << name;
   if (offset != -1) os << "," << depth << "," << offset;
-  os << "): " << typeVar << " @ " << location << std::endl;
+  os << "): " << typeVar << " @ " << location.file() << std::endl;
 }
 
 Hash VarRef::hash() {
@@ -54,7 +54,7 @@ Hash VarRef::hash() {
 }
 
 void Subscribe::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Subscribe(" << name << ") @ " << location << std::endl;
+  os << pad(depth) << "Subscribe(" << name << ") @ " << location.file() << std::endl;
 }
 
 Hash Subscribe::hash() {
@@ -62,7 +62,7 @@ Hash Subscribe::hash() {
 }
 
 void Memoize::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Memoize: " << typeVar << " @ " << location << std::endl;
+  os << pad(depth) << "Memoize: " << typeVar << " @ " << location.file() << std::endl;
   body->format(os, depth+2);
 }
 
@@ -71,7 +71,7 @@ Hash Memoize::hash() {
 }
 
 void Match::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Match: " << typeVar << " @ " << location << std::endl;
+  os << pad(depth) << "Match: " << typeVar << " @ " << location.file() << std::endl;
   for (auto &a: args)
     a->format(os, depth+2);
   for (auto &p: patterns) {
@@ -104,7 +104,7 @@ Hash Match::hash() {
 }
 
 void App::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "App: " << typeVar << " @ " << location << std::endl;
+  os << pad(depth) << "App: " << typeVar << " @ " << location.file() << std::endl;
   fn->format(os, depth+2);
   val->format(os, depth+2);
 }
@@ -118,7 +118,7 @@ Hash App::hash() {
 }
 
 void Lambda::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Lambda(" << name << "): " << typeVar << " @ " << location << std::endl;
+  os << pad(depth) << "Lambda(" << name << "): " << typeVar << " @ " << location.file() << std::endl;
   body->format(os, depth+2);
 }
 
@@ -127,7 +127,7 @@ Hash Lambda::hash() {
 }
 
 void DefMap::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "DefMap @ " << location << std::endl;
+  os << pad(depth) << "DefMap @ " << location.file() << std::endl;
   for (auto &i : map) {
     os << pad(depth+2) << i.first << " =" << std::endl;
     i.second->format(os, depth+4);
@@ -144,7 +144,7 @@ Hash DefMap::hash() {
 }
 
 void Literal::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Literal: " << typeVar << " @ " << location << " = " << value.get() << std::endl;
+  os << pad(depth) << "Literal: " << typeVar << " @ " << location.file() << " = " << value.get() << std::endl;
 }
 
 Hash Literal::hash() {
@@ -152,7 +152,7 @@ Hash Literal::hash() {
 }
 
 void Prim::format(std::ostream &os, int depth) const {
- os << pad(depth) << "Prim(" << args << "," << name << "): " << typeVar << " @ " << location << std::endl;
+ os << pad(depth) << "Prim(" << args << "," << name << "): " << typeVar << " @ " << location.file() << std::endl;
 }
 
 Hash Prim::hash() {
@@ -172,7 +172,7 @@ Hash Top::hash() {
 }
 
 void DefBinding::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "DefBinding: " << typeVar << " @ " << location << std::endl;
+  os << pad(depth) << "DefBinding: " << typeVar << " @ " << location.file() << std::endl;
 
   // invert name=>index map
   std::vector<const char*> names(order.size());
@@ -201,7 +201,7 @@ Hash DefBinding::hash() {
 }
 
 void Construct::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Construct(" << cons->ast.name << "): " << typeVar << " @ " << location << std::endl;
+  os << pad(depth) << "Construct(" << cons->ast.name << "): " << typeVar << " @ " << location.file() << std::endl;
 }
 
 Hash Construct::hash() {
@@ -209,7 +209,7 @@ Hash Construct::hash() {
 }
 
 void Destruct::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Destruct(" << sum.name << "): " << typeVar << " @ " << location << std::endl;
+  os << pad(depth) << "Destruct(" << sum.name << "): " << typeVar << " @ " << location.file() << std::endl;
 }
 
 Hash Destruct::hash() {

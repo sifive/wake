@@ -491,7 +491,7 @@ int main(int argc, char **argv) {
         Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
         std::cout << g << ": ";
         v->typeVar.format(std::cout, v->typeVar);
-        std::cout << " = <" << v->location << ">" << std::endl;
+        std::cout << " = <" << v->location.file() << ">" << std::endl;
       }
     }
   }

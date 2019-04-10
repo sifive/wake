@@ -40,7 +40,6 @@ struct Location {
   const char *filename;
   Coordinates start, end;
 
-  [[deprecated]] std::string str() const;
   Location(const char *filename_, Coordinates start_, Coordinates end_)
     : filename(filename_), start(start_), end(end_) { }
 
@@ -51,10 +50,6 @@ struct Location {
   FileLocation file() const { return FileLocation(this); }
   TextLocation text() const { return TextLocation(this); }
 };
-
-[[deprecated]] inline std::ostream & operator << (std::ostream &os, const Location &location) {
-  return os << location.file();
-}
 
 #define LOCATION Location(__FILE__, Coordinates(__LINE__), Coordinates(__LINE__))
 

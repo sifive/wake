@@ -11,7 +11,7 @@ static bool expect(SymbolType type, JLexer &jlex, std::ostream& errs) {
       errs << "Was expecting a "
         << symbolTable[type] << ", but got a "
         << symbolTable[jlex.next.type] << " at "
-        << jlex.next.location;
+        << jlex.next.location.text();
     jlex.fail = true;
     return false;
   }
@@ -67,7 +67,7 @@ static std::shared_ptr<Value> parse_jarray(JLexer &jlex, std::ostream& errs) {
         if (!jlex.fail)
           errs << "Was expecting COMMA/SCLOSE, got a "
             << symbolTable[jlex.next.type]
-            << " at " << jlex.next.location;
+            << " at " << jlex.next.location.text();
         jlex.fail = true;
         repeat = false;
         break;
@@ -119,7 +119,7 @@ static std::shared_ptr<Value> parse_jobject(JLexer &jlex, std::ostream& errs) {
         if (!jlex.fail)
           errs << "Was expecting ID/STR, got a "
             << symbolTable[jlex.next.type]
-            << " at " << jlex.next.location;
+            << " at " << jlex.next.location.text();
         jlex.fail = true;
         repeat = false;
         break;
@@ -145,7 +145,7 @@ static std::shared_ptr<Value> parse_jobject(JLexer &jlex, std::ostream& errs) {
         if (!jlex.fail)
           errs << "Was expecting COMMA/BCLOSE, got a "
             << symbolTable[jlex.next.type]
-            << " at " << jlex.next.location;
+            << " at " << jlex.next.location.text();
         jlex.fail = true;
         repeat = false;
         break;
@@ -202,7 +202,7 @@ static std::shared_ptr<Value> parse_jvalue(JLexer &jlex, std::ostream& errs) {
       if (!jlex.fail)
         errs << "Unexpected symbol "
           << symbolTable[jlex.next.type]
-          << " at " << jlex.next.location;
+          << " at " << jlex.next.location.text();
       jlex.fail = true;
       return nullptr;
     }

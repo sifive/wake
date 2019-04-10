@@ -27,7 +27,7 @@ bool AST::unify(TypeVar &out, const std::map<std::string, TypeVar*> &ids) {
   if (Lexer::isLower(name.c_str())) {
     auto it = ids.find(name);
     if (it == ids.end()) {
-      std::cerr << "Unbound type variable " << name << " at " << location << std::endl;
+      std::cerr << "Unbound type variable at " << location.text() << std::endl;
       return false;
     } else {
       return out.unify(*it->second, &location);

@@ -16,7 +16,7 @@ bool expect(SymbolType type, Lexer &lex) {
     std::cerr << "Was expecting a "
       << symbolTable[type] << ", but got a "
       << symbolTable[lex.next.type] << " at "
-      << lex.next.location << std::endl;
+      << lex.next.location.text() << std::endl;
     lex.fail = true;
     return false;
   }
@@ -27,7 +27,7 @@ static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
   if (lex.next.type != ID) {
     std::cerr << "Was expecting an ID argument, but got a "
       << symbolTable[lex.next.type] << " at "
-      << lex.next.location << std::endl;
+      << lex.next.location.text() << std::endl;
     lex.fail = true;
   }
 
@@ -46,14 +46,14 @@ static bool expectValue(const TypeDescriptor *type, Lexer &lex) {
         std::cerr << "Was expecting a "
           << type->name << ", but got a "
           << lit->value->type->name << " at "
-          << lex.next.location << std::endl;
+          << lex.next.location.text() << std::endl;
         lex.fail = true;
         return false;
       }
     } else {
       std::cerr << "Was expecting a "
         << type->name << ", but got an interpolated string at "
-        << lex.next.location << std::endl;
+        << lex.next.location.text() << std::endl;
       lex.fail = true;
       return false;
     }
@@ -82,14 +82,14 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state) {
 static bool check_constructors(const AST &ast) {
   if (!ast.args.empty() && ast.name == "_") {
     std::cerr << "Wildcard _"
-      << " cannot be used as a constructor at " << ast.location
+      << " cannot be used as a constructor at " << ast.location.text()
       << std::endl;
     return true;
   }
 
   if (!ast.args.empty() && !ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
     std::cerr << "Lower-case identifier " << ast.name
-      << " cannot be used as a constructor at " << ast.location
+      << " cannot be used as a constructor at " << ast.location.text()
       << std::endl;
     return true;
   }
@@ -136,7 +136,7 @@ static Expr *relabel_anon(Expr *out) {
 static void precedence_error(Lexer &lex) {
   std::cerr << "Lower precedence unary operator "
     << lex.text() << " must use ()s at "
-    << lex.next.location << std::endl;
+    << lex.next.location.file() << std::endl;
   lex.fail = true;
 }
 
@@ -171,7 +171,7 @@ static Expr *parse_match(int p, Lexer &lex) {
         repeat = false;
         break;
       default:
-        std::cerr << "Unexpected end of match definition at " << lex.next.location << std::endl;
+        std::cerr << "Unexpected end of match definition at " << lex.next.location.text() << std::endl;
         lex.fail = true;
         repeat = false;
         break;
@@ -228,7 +228,7 @@ static Expr *parse_match(int p, Lexer &lex) {
         lex.consume();
         break;
       default:
-        std::cerr << "Unexpected end of match definition at " << lex.next.location << std::endl;
+        std::cerr << "Unexpected end of match definition at " << lex.next.location.text() << std::endl;
         lex.fail = true;
         repeat = false;
         break;
@@ -269,7 +269,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
           skip = mpz_get_si(x);
         } else {
           std::cerr << "Integer argument to memoize too large at "
-             << location << std::endl;
+             << location.text() << std::endl;
           lex.fail = true;
         }
         location.end = lex.next.location.end;
@@ -326,7 +326,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       return new Prim(location, name);
     }
     case HERE: {
-      std::string name(lex.next.location.file);
+      std::string name(lex.next.location.filename);
       std::string::size_type cut = name.find_last_of('/');
       if (cut == std::string::npos) name = "."; else name.resize(cut);
       Expr *out = new Literal(lex.next.location, std::make_shared<String>(std::move(name)));
@@ -375,7 +375,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
     default: {
       std::cerr << "Was expecting an (OPERATOR/LAMBDA/ID/LITERAL/PRIM/POPEN), got a "
         << symbolTable[lex.next.type] << " at "
-        << lex.next.location << std::endl;
+        << lex.next.location.text() << std::endl;
       lex.fail = true;
       return new Literal(LOCATION, "bad unary");
     }
@@ -442,9 +442,8 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
   if (check_constructors(ast)) lex.fail = true;
 
   if (Lexer::isUpper(name.c_str())) {
-    std::cerr << "Upper-case identifier " << name
-      << " cannot be used as a function name at " << ast.location
-      << std::endl;
+    std::cerr << "Upper-case identifier cannot be used as a function name at "
+      << ast.location.text() << std::endl;
     lex.fail = true;
   }
 
@@ -494,8 +493,8 @@ static void bind_def(Lexer &lex, DefMap::defs &map, std::string name, Expr *def)
   if (i != map.end()) {
     std::cerr << "Duplicate def "
       << name << " at "
-      << i->second->location << " and "
-      << def->location << std::endl;
+      << i->second->location.text() << " and "
+      << def->location.text() << std::endl;
     lex.fail = true;
   }
   map[name] = std::unique_ptr<Expr>(def);
@@ -526,8 +525,8 @@ static void bind_global(const std::string &name, Top *top, Lexer &lex) {
   if (it != top->globals.end()) {
     std::cerr << "Duplicate global "
       << name << " at "
-      << top->defmaps.back()->map[name]->location << " and "
-      << top->defmaps[it->second]->map[name]->location << std::endl;
+      << top->defmaps.back()->map[name]->location.text() << " and "
+      << top->defmaps[it->second]->map[name]->location.text() << std::endl;
     lex.fail = true;
   } else {
     top->globals[name] = top->defmaps.size()-1;
@@ -577,7 +576,7 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
     default: {
       std::cerr << "Was expecting an (OPERATOR/ID/POPEN), got a "
         << symbolTable[lex.next.type] << " at "
-        << lex.next.location << std::endl;
+        << lex.next.location.text() << std::endl;
       lex.fail = true;
       return AST(lex.next.location);
     }
@@ -613,7 +612,7 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
         location.end = rhs.location.end;
         if (Lexer::isOperator(lhs.name.c_str())) {
           std::cerr << "Cannot supply additional constructor arguments to " << lhs.name
-            << " at " << location << std::endl;
+            << " at " << location.text() << std::endl;
           lex.fail = true;
         }
         lhs.args.emplace_back(std::move(rhs));
@@ -626,7 +625,7 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
           lex.consume();
           if (!lhs.args.empty() || Lexer::isOperator(lhs.name.c_str())) {
             std::cerr << "Left-hand-side of COLON must be a simple lower-case identifier, not "
-              << lhs.name << " at " << lhs.location << std::endl;
+              << lhs.name << " at " << lhs.location.file() << std::endl;
             lex.fail = true;
           }
           std::string tag = std::move(lhs.name);
@@ -661,7 +660,7 @@ static AST parse_type_def(Lexer &lex) {
   if (def.name == "_" || Lexer::isLower(def.name.c_str())) {
     std::cerr << "Type name must be upper-case or operator, not "
       << def.name << " at "
-      << def.location << std::endl;
+      << def.location.file() << std::endl;
     lex.fail = true;
   }
 
@@ -670,13 +669,13 @@ static AST parse_type_def(Lexer &lex) {
     if (!Lexer::isLower(x.name.c_str())) {
       std::cerr << "Type argument must be lower-case, not "
         << x.name << " at "
-        << x.location << std::endl;
+        << x.location.file() << std::endl;
       lex.fail = true;
     }
     if (!args.insert(x.name).second) {
       std::cerr << "Type argument "
         << x.name << " occurs more than once at "
-        << x.location << std::endl;
+        << x.location.file() << std::endl;
       lex.fail = true;
     }
   }
@@ -691,7 +690,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
       name == "CatStream" || name == "Exception" || name == FN ||
       name == "Job" || name == "Array" || name == "Double") {
     std::cerr << "Constuctor " << name
-      << " is reserved at " << sump->location << "." << std::endl;
+      << " is reserved at " << sump->location.file() << "." << std::endl;
     lex.fail = true;
   }
 
@@ -700,7 +699,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
         sump->members[0].ast.args.size() != 0 ||
         sump->members[1].ast.args.size() != 0) {
       std::cerr << "Special constructor Boolean not defined correctly at "
-        << sump->location << "." << std::endl;
+        << sump->location.file() << "." << std::endl;
       lex.fail = true;
     }
     Boolean = sump;
@@ -712,7 +711,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
         sump->members[1].ast.args.size() != 0 ||
         sump->members[2].ast.args.size() != 0) {
       std::cerr << "Special constructor Order not defined correctly at "
-        << sump->location << "." << std::endl;
+        << sump->location.file() << "." << std::endl;
       lex.fail = true;
     }
     Order = sump;
@@ -723,7 +722,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
         sump->members[0].ast.args.size() != 0 ||
         sump->members[1].ast.args.size() != 2) {
       std::cerr << "Special constructor List not defined correctly at "
-        << sump->location << "." << std::endl;
+        << sump->location.file() << "." << std::endl;
       lex.fail = true;
     }
     List = sump;
@@ -733,7 +732,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
     if (sump->members.size() != 1 ||
         sump->members[0].ast.args.size() != 2) {
       std::cerr << "Special constructor Pair not defined correctly at "
-        << sump->location << "." << std::endl;
+        << sump->location.file() << "." << std::endl;
       lex.fail = true;
     }
     Pair = sump;
@@ -743,7 +742,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
     if (sump->members.size() != 1 ||
         sump->members[0].ast.args.size() != 0) {
       std::cerr << "Special constructor Unit not defined correctly at "
-        << sump->location << "." << std::endl;
+        << sump->location.file() << "." << std::endl;
       lex.fail = true;
     }
     Unit = sump;
@@ -752,7 +751,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
   if (name == "JValue") {
     if (sump->members.size() != 7) {
       std::cerr << "Special constructor JValue not defined correctly at "
-        << sump->location << "." << std::endl;
+        << sump->location.file() << "." << std::endl;
       lex.fail = true;
     }
     JValue = sump;
@@ -797,7 +796,9 @@ static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
         break;
       }
       default: {
-        std::cerr << "Unexpected end of tuple definition at " << lex.next.location << std::endl;
+        std::cerr
+          << "Unexpected end of tuple definition at "
+          << lex.next.location.text() << std::endl;
         lex.fail = true;
         repeat = false;
         break;
@@ -914,13 +915,13 @@ static void parse_data_elt(Lexer &lex, Sum &sum) {
       std::cerr << "Constructor "
         << cons.name << " should not be tagged with "
         << cons.tag << " at "
-        << cons.location << std::endl;
+        << cons.location.file() << std::endl;
       lex.fail = true;
     }
     if (cons.name == "_" || Lexer::isLower(cons.name.c_str())) {
       std::cerr << "Constructor name must be upper-case or operator, not "
         << cons.name << " at "
-        << cons.location << std::endl;
+        << cons.location.file() << std::endl;
       lex.fail = true;
     }
     sum.addConstructor(std::move(cons));
@@ -950,7 +951,9 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
           break;
         }
         default: {
-          std::cerr << "Unexpected end of data definition at " << lex.next.location << std::endl;
+          std::cerr
+            << "Unexpected end of data definition at "
+            << lex.next.location.text() << std::endl;
           lex.fail = true;
           repeat = false;
           break;
@@ -987,7 +990,7 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
 static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top, bool global) {
   switch (lex.next.type) {
     default:
-       std::cerr << "Missing DEF after GLOBAL at " << lex.next.location << std::endl;
+       std::cerr << "Missing DEF after GLOBAL at " << lex.next.location.text() << std::endl;
        lex.fail = true;
     case DEF: {
       std::string name;

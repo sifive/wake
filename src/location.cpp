@@ -39,9 +39,3 @@ std::ostream & operator << (std::ostream &os, TextLocation location) {
   if (buf[0]) os << ")";
   return os;
 }
-
-std::string Location::str() const {
-  std::stringstream str;
-  str << *this;
-  return str.str();
-}

@@ -92,7 +92,7 @@ void Double::format(std::ostream &os, FormatState &state) const {
 }
 
 void Closure::format(std::ostream &os, FormatState &state) const {
-  os << "<" << lambda->location << ">";
+  os << "<" << lambda->location.file() << ">";
   // !!! if (state.detailed) print referenced variables only
 }
 
@@ -172,7 +172,7 @@ void Exception::format(std::ostream &os, FormatState &state) const {
       os << "(\"" << i->reason << "\"";
       for (auto &j : i->stack) {
         if (state.indent < 0) os << " "; else os << std::endl << pad(state.indent+4);
-        os << "from " << j;
+        os << "from " << j.file();
       }
       os << ")";
     }
