@@ -192,10 +192,10 @@ std::string Database::open(bool wait) {
   const char *sql_update_prior =
     "update jobs set use_id=? where job_id=?";
   const char *sql_delete_prior =
-    "delete from jobs where job_id in"
+    "delete from jobs where use_id<>?1 and job_id in"
     " (select j2.job_id from jobs j1, jobs j2"
-    "  where j1.job_id=?1 and j1.directory=j2.directory and j1.commandline=j2.commandline"
-    "  and j1.environment=j2.environment and j1.stdin=j2.stdin and j2.job_id<>?1)";
+    "  where j1.job_id=?2 and j1.directory=j2.directory and j1.commandline=j2.commandline"
+    "  and j1.environment=j2.environment and j1.stdin=j2.stdin and j2.job_id<>?2)";
   const char *sql_find_owner =
     "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id"
@@ -635,7 +635,8 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
     }
   }
 
-  bind_integer(why, imp->delete_prior, 1, job);
+  bind_integer(why, imp->delete_prior, 1, imp->run_id);
+  bind_integer(why, imp->delete_prior, 2, job);
   single_step (why, imp->delete_prior, imp->debugdb);
 
   bind_integer(why, imp->delete_overlap, 1, imp->run_id);
