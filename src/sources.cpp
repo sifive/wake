@@ -31,7 +31,7 @@ bool make_workspace(const std::string &dir) {
 bool chdir_workspace(std::string &prefix) {
   int attempts;
   std::string cwd = get_cwd();
-  for (attempts = 100; attempts && access("wake.db", W_OK|R_OK) == -1; --attempts) {
+  for (attempts = 100; attempts && access("wake.db", F_OK) == -1; --attempts) {
     if (chdir("..") == -1) return false;
   }
   std::string workspace = get_workspace();

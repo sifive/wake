@@ -66,6 +66,12 @@ std::string Database::open(bool wait) {
     return out;
   }
 
+#if SQLITE_VERSION_NUMBER >= 3007011
+  if (sqlite3_db_readonly(imp->db, 0)) {
+    return "read-only";
+  }
+#endif
+
   const char *schema_sql =
     "pragma journal_mode=wal;"
     "pragma synchronous=0;"
