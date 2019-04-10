@@ -17,12 +17,13 @@ std::ostream & operator << (std::ostream &os, TextLocation location) {
   const Location *l = location.l;
   FILE *f;
   char buf[40];
-  long get;
+  size_t get;
 
   if (l->start.bytes >= 0 &&
       l->filename[0] != '<' &&
       l->start.row == l->end.row &&
-      0 < (get = l->end.column - l->start.column + 1) && get < sizeof(buf) &&
+      l->end.column >= l->start.column &&
+      (get = l->end.column - l->start.column + 1) < sizeof(buf) &&
       (f = fopen(l->filename, "r")) != 0) {
     if (fseek(f, l->start.bytes, SEEK_SET) != -1 && fread(&buf[0], 1, get, f) == get) {
       buf[get] = 0;
