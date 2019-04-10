@@ -150,7 +150,7 @@ bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {
     message->formatA(os);
     os << ":" << std::endl << "    ";
     globalEpoch += do_format(os, 0, *this, 0, &other, 0, 0);
-    os << std::endl;
+    os << std::endl << "  ";
     message->formatB(os);
     os << ":" << std::endl << "    ";
     globalEpoch += do_format(os, 0, other, 0, this, 0, 0);

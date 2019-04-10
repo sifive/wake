@@ -686,7 +686,7 @@ struct ArgErrorMessage : public TypeErrorMessage {
   ArgErrorMessage(const Location *lf_, const Location *la_, const char *arg_) : lf(lf_), la(la_), arg(arg_) { }
   void formatA(std::ostream &os) const {
     os << "Type error; function " << lf->text() << " expected argument";
-    if (arg && !strchr(arg, ' ') && strcmp(arg, "_")) os << " '" << arg << "'";
+    if (arg && arg[0] && !strchr(arg, ' ') && strcmp(arg, "_")) os << " '" << arg << "'";
     os << " of type";
   }
   void formatB(std::ostream &os) const { os << "but was supplied argument " << la->text() << " of type"; }
