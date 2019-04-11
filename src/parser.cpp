@@ -417,10 +417,12 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
         break;
       }
       case SCLOSE: {
+        op_type op = op_precedence(",");
+        if (op.p < p) return lhs;
         lex.next.type = SEND;
-        auto op = new VarRef(lex.next.location, "binary ,");
+        auto opp = new VarRef(lex.next.location, "binary ,");
         auto rhs = new VarRef(lex.next.location, "Nil");
-        return new App(lex.next.location, new App(lex.next.location, op, lhs), rhs);
+        return new App(lex.next.location, new App(lex.next.location, opp, lhs), rhs);
       }
       case MATCH:
       case MEMOIZE:
@@ -640,6 +642,8 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
         break;
       }
       case SCLOSE: {
+        op_type op = op_precedence(",");
+        if (op.p < p) return lhs;
         lex.next.type = SEND;
         std::vector<AST> args;
         args.emplace_back(std::move(lhs));
