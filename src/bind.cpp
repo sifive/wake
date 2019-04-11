@@ -706,8 +706,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
     NameRef pos;
     if ((pos = binding->find(ref->name)).offset == -1) {
-      std::cerr << "Variable reference is unbound at "
-        << ref->location.text() << std::endl;
+      std::cerr << "Variable reference '" << ref->name << "' is unbound at "
+        << ref->location.file() << std::endl;
       return false;
     }
     ref->depth = pos.depth;
