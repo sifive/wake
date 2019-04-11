@@ -577,6 +577,21 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
       lex.consume();
       return out;
     }
+    case SOPEN: {
+      Location location = lex.next.location;
+      lex.consume();
+      if (lex.next.type == SCLOSE) {
+        location.end = lex.next.location.end;
+        lex.consume();
+        return AST(location, "Nil");
+      } else {
+        AST out = parse_ast(0, lex, state);
+        location.end = lex.next.location.end;
+        out.location = location;
+        if (expect(SEND, lex)) lex.consume();
+        return out;
+      }
+    }
     case POPEN: {
       Location location = lex.next.location;
       lex.consume();
@@ -624,8 +639,17 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
         lhs = AST(loc, std::move(name), std::move(args));
         break;
       }
+      case SCLOSE: {
+        lex.next.type = SEND;
+        std::vector<AST> args;
+        args.emplace_back(std::move(lhs));
+        args.emplace_back(lex.next.location, "Nil");
+        lhs = AST(lex.next.location, "binary ,", std::move(args));
+        break;
+      }
       case LITERAL:
       case ID:
+      case SOPEN:
       case POPEN: {
         op_type op = op_precedence("a"); // application
         if (op.p < p) return lhs;
