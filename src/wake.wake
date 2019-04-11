@@ -1,6 +1,6 @@
 def version_h _ =
-  def cmdline = which "git", "describe", "--tags", "--dirty", Nil
-  def git = volatileJob cmdline Nil (\_ Nil)
+  def cmdline = [which "git", "describe", "--tags", "--dirty"]
+  def git = volatileJob cmdline [] (\_ [])
   def body = "#define VERSION {git.getJobStdout}"
   write "{here}/version.h" body
 
@@ -9,8 +9,8 @@ def pkg name = match (pkgConfig name)
   None   = makeCPackage "" | editCPackageLFlags ("-l{name}", _)
 
 global def buildWake (Pair variant clib) =
-  def internalDeps = map (_ clib) (utf8proc, gopt, Nil)
-  def externalDeps = map pkg ("sqlite3", "ncurses", "gmp", "re2", Nil)
+  def internalDeps = map (_ clib) [utf8proc, gopt]
+  def externalDeps = map pkg ["sqlite3", "ncurses", "gmp", "re2"]
   def deps = internalDeps ++ externalDeps | flattenCPackages
   def reFiles = sources here '.*\.re'
   def headerFiles = version_h 0, deps.getCPackageHeaders ++ sources here '.*\.h'
