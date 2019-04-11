@@ -1139,6 +1139,7 @@ top:
       re2c:define:YYCURSOR = s;
 
       *                          { return op_type(-1, -1);}
+      "`"                        { return op_type(24, 1); }
       "."                        { return op_type(23, 1); }
       [smpa]                     { return op_type(APP_PRECEDENCE, 1); } // SUBSCRIBE/MEMOIZE/PRIM/APP
       Sm_comp                    { return op_type(21, 0); }
@@ -1150,7 +1151,7 @@ top:
       [/%] | Sm_divb             { return op_type(15, 1); }
       Sm_sumu                    { return op_type(14, 0); }
       [!] / [^=]                 { return op_type(13, 1); }
-      [`\-] | Sm_sumb            { return op_type(13, 1); }
+      [\-] | Sm_sumb             { return op_type(13, 1); }
       Sm_test | Sm_lt | Sm_gt    { return op_type(12, 1); }
       "!" | Sm_eq                { return op_type(11, 0); }
       Sm_andu                    { return op_type(10, 0); }
@@ -1160,10 +1161,10 @@ top:
       Sm_Sc | Sc                 { return op_type(6, 0);  }
       Sm_larrow | Sm_rarrow      { return op_type(5, 1);  }
       Sm_earrow                  { return op_type(4, 0);  }
-      ","                        { return op_type(3, 0);  }
-      Sm_quant                   { return op_type(2, 0);  }
-      [i\\]                      { return op_type(1, 0);  } // IF and LAMBDA
-      ":"                        { return op_type(0, 1);  }
+      Sm_quant                   { return op_type(3, 0);  }
+      ":"                        { return op_type(2, 1);  }
+      ","                        { return op_type(1, 0);  }
+      [i\\]                      { return op_type(0, 0);  } // IF and LAMBDA
       Sk                         { goto top; }
   */
 }
