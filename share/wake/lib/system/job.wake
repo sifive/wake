@@ -150,8 +150,8 @@ global def manualRunner Unit =
            def _ = launch job pool dir stdin env.implode cmd.implode status runtime cputime mem in out
            RunnerOutput (map getPathName vis) Nil Nil (getJobReality job)
   def score (Plan _ _ _ _ _ _ lo res _ _ _ _ _ _) = match res
-    Nil = if lo then 1.0 else raise "cannot detect outputs"
-    _   = raise "cannot supply resources"
+    Nil = if lo then 1.0 else raise "manual: cannot detect outputs"
+    _   = raise "manual: cannot supply resources"
   Runner "manual" score doit
 
 # For internal use in conjuction with setPlanRunner
@@ -232,7 +232,7 @@ global def runJob p = match p
                 False = raise "{name}: rejected by Plan"
                 True  =
                   def score = scorefn p
-                  if score <. 0.0 then raise "{name}: negative score" else score
+                  if score <=. 0.0 then raise "{name}: non-positive score" else score
               (Accept _ _) | reraise score | reraise fn
           try (Reject _.head) accept
         def best acc = match _ acc
@@ -242,10 +242,10 @@ global def runJob p = match p
         def opts = subscribe runner | map qualify
         match (opts | foldl best (Pair 0.0 None) | getPairSecond)
           Some r = r
-          None = raise "No runner available: {format opts}"
+          None = raise "No runner available: {map format opts | catWith ", "}"
     if isOnce pers
-    then runOnce   cmd env dir stdin finputs foutputs findexes vis (isKeep pers) run pool
-    else runAlways cmd env dir stdin finputs foutputs findexes vis (isKeep pers) run pool
+    then (runOnce   cmd env dir stdin finputs foutputs findexes vis (isKeep pers) _ pool) | reraise run
+    else (runAlways cmd env dir stdin finputs foutputs findexes vis (isKeep pers) _ pool) | reraise run
 
 def toUsage (Pair (Pair status runtime) (Pair (Pair cputime membytes) (Pair ibytes obytes))) =
   Usage status runtime cputime membytes ibytes obytes
@@ -308,8 +308,8 @@ global def fuseRunner Unit =
     | setRunnerOutputOutputs outputs
     | editRunnerOutputUsage usage
   def score (Plan _ _ _ _ _ _ lo res _ _ _ _ _ _) = match res
-    Nil = if lo then raise "would hide workspace" else 1.0
-    _   = raise "cannot supply resources"
+    Nil = if lo then raise "fuse: would hide workspace" else 1.0
+    _   = raise "fuse: cannot supply resources"
   makeRunner "fuse" score pre post manualRunner
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
