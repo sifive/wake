@@ -191,7 +191,7 @@ Expr *rebind_subscribe(ResolveBinding *binding, const Location &location, const 
     if (reference_map(iter, pub)) return new VarRef(location, pub);
   }
   // nil
-  return new VarRef(location, "Nil");
+  return new Lambda(location, "_ tail", new VarRef(location, "_ tail"));
 }
 
 struct PatternTree {
@@ -505,7 +505,10 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     return expr;
   } else if (expr->type == &Subscribe::type) {
     Subscribe *sub = reinterpret_cast<Subscribe*>(expr.get());
-    return std::unique_ptr<Expr>(rebind_subscribe(binding, sub->location, sub->name));
+    return std::unique_ptr<Expr>(
+      new App(sub->location,
+        rebind_subscribe(binding, sub->location, sub->name),
+        new VarRef(sub->location, "Nil")));
   } else if (expr->type == &App::type) {
     App *app = reinterpret_cast<App*>(expr.get());
     app->fn  = fracture(std::move(app->fn),  binding);
@@ -551,7 +554,10 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
       ResolveDef &def = dbinding.defs.back();
       Location l = i.second->location;
       def.name = std::move(name);
-      def.expr = std::unique_ptr<Expr>(new App(l, i.second.release(), rebind_subscribe(binding, l, i.first)));
+      def.expr = std::unique_ptr<Expr>(
+        new Lambda(l, "_ tail", new App(l,
+          i.second.release(),
+          new App(l, rebind_subscribe(binding, l, i.first), new VarRef(l, "_ tail")))));
     }
     dbinding.current_index = 0;
     for (auto &i : dbinding.defs) {
@@ -585,23 +591,22 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
         def.expr = std::move(i.second);
       }
       for (auto &i : b->publish) {
-        std::string name = "publish " + std::to_string(tbinding.depth) + " " + i.first;
-        Location l = i.second->location;
-        Expr *tail;
+        std::string pname = "publish " + std::to_string(tbinding.depth) + " " + i.first;
+        Expr *head = i.second.release();
         NameIndex::iterator pub;
-        if ((pub = tbinding.index.find(name)) == tbinding.index.end()) {
-          tail = rebind_subscribe(binding, l, i.first);
-        } else {
-          std::string name = "chain " + std::to_string(++chain);
-          tail = new VarRef(l, name);
-          tbinding.index[name] = pub->second;
-          tbinding.defs[pub->second].name = std::move(name);
+        if ((pub = tbinding.index.find(pname)) != tbinding.index.end()) {
+          std::string cname = "chain " + std::to_string(++chain);
+          tbinding.index[cname] = pub->second;
+          tbinding.defs[pub->second].name = cname;
+          Location l = head->location;
+          head = new Lambda(l, "_ tail", new App(l, head,
+            new App(l, new VarRef(l, std::move(cname)), new VarRef(l, "_ tail"))));
         }
-        tbinding.index[name] = tbinding.defs.size();
+        tbinding.index[pname] = tbinding.defs.size();
         tbinding.defs.resize(tbinding.defs.size()+1);
         ResolveDef &def = tbinding.defs.back();
-        def.name = std::move(name);
-        def.expr = std::unique_ptr<Expr>(new App(l, i.second.release(), tail));
+        def.name = std::move(pname);
+        def.expr = std::unique_ptr<Expr>(head);
       }
       ++tbinding.prefix;
     }
