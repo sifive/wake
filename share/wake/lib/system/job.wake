@@ -24,20 +24,28 @@ tuple RunnerOutput =
 
 # A Runner describes a way to invoke a Plan to get a Job
 tuple Runner =
-  Fn: Job => RunnerInput => RunnerOutput
+  global Name:  String
+  global Score: Plan => Double
+  Fn:           Job => RunnerInput => RunnerOutput
 
 # Create new Runner given pre- and post-hooks around an existing Runner
-global def makeRunner pre post (Runner run) =
+global def makeRunner name score pre post runf =
   def doit job preInput =
     def preOutput = pre preInput
     # Ensure that match does not re-raise the exception; must invoke run!
-    match (try (\_ Pair (cast preOutput) (cast preOutput)) preOutput)
-      Pair runInput state =
+    match (try (\_ Pair (cast preOutput) (cast preOutput)) preOutput) (runf Unit)
+      (Pair runInput state) (Runner _ _ run) =
         def runOutput = run job runInput
         def final _ = post (Pair runOutput state)
         # Don't run any 'post' steps until the Job has stopped running
         waitJobMerged final job
-  Runner doit
+  Runner name score doit
+
+global data Persistence =
+  ReRun	# Job should be re-executed on every runJob call
+  Once	# Job should only be run once in a given wake execution
+  Keep	# Job should output be reusable between wake invocations
+  Share	# Job should output be shared between workspaces
 
 # A Plan describes a not-yet-executed Job
 tuple Plan =
@@ -46,35 +54,63 @@ tuple Plan =
   global Environment:   List String  # KEY=VALUE environment variables fed to the command
   global Directory:     String       # The directory in which the command should be run
   global StandardInput: String       # The file to which standard input should be connected
-  Once_:                Boolean      # Should Job only be run once in a given wake execution
-  Keep_:                Boolean      # Should Job output be reusable between wake invocations
-  Share_:               Boolean      # Should Job output be shared between workspaces
-  global Runner:        Runner       # The runner to use when executing this job
+  global Persistence:   Persistence  # See Persistence table above
+  global LocalOnly:     Boolean      # Must run directly in the local workspace; no output detection performed
+  global Resources:     List String  # The resources a runner must provide to the job (licenses/etc)
+  global RunnerFilter:  Runner => Boolean # Reject from consideration Runners which the Plan deems inappropriate
   global FnInputs:      (List String => List String) # Modify the Runner's reported inputs  (files read)
   global FnOutputs:     (List String => List String) # Modify the Runner's reported outputs (files created)
   global FnIndexes:     (List String => List String) # Modify the Runner's reported indexes (directories listed)
+  Runner:               Option (Unit => Runner)      # Override the Runner used by this job
   Pool:                 Integer      # Resource pool used to pay for the Job
 
-global def getPlanOnce  = getPlanOnce_
-global def getPlanKeep  = getPlanKeep_
-global def getPlanShare = getPlanShare_
-global def editPlanOnce  f p = setPlanOnce  (f p.getPlanOnce_)
-global def editPlanKeep  f p = setPlanKeep  (f p.getPlanKeep_)
-global def editPlanShare f p = setPlanShare (f p.getPlanShare_)
+def isOnce = match _
+  ReRun = False
+  _     = True
+def isKeep = match _
+  ReRun = False
+  Once  = False
+  _     = True
+def isShare = match _
+  Share = True
+  _     = False
 
-# Maintain the invariant that: Share => Keep => Once
-global def setPlanOnce v p =
-  if v
-  then p | setPlanOnce_ True
-  else p | setPlanOnce_ False | setPlanKeep_ False | setPlanShare_ False
-global def setPlanKeep v p =
-  if v
-  then p | setPlanOnce_ True  | setPlanKeep_  True
-  else p | setPlanKeep_ False | setPlanShare_ False
-global def setPlanShare v p =
-  if v
-  then p | setPlanOnce_ True | setPlanKeep_ True | setPlanShare_ True
-  else p | setPlanShare_ False
+# Convenience accessor methods
+global def getPlanOnce  p = isOnce  (getPlanPersistence p)
+global def getPlanKeep  p = isKeep  (getPlanPersistence p)
+global def getPlanShare p = isShare (getPlanPersistence p)
+
+global def setPlanOnce  v p = editPlanOnce  (\_ v) p
+global def setPlanKeep  v p = editPlanKeep  (\_ v) p
+global def setPlanShare v p = editPlanShare (\_ v) p
+
+# Helper methods that maintain the invariant that: Share => Keep => Once
+global def editPlanOnce f =
+  def helper = match _
+    ReRun if   f False = Once
+    Once  if ! f True  = ReRun
+    Keep  if ! f True  = ReRun
+    Share if ! f True  = ReRun
+    x                  = x
+  editPlanPersistence helper _
+
+global def editPlanKeep f =
+  def helper = match _
+    ReRun if   f False = Keep
+    Once  if   f False = Keep
+    Keep  if ! f True  = Once
+    Share if ! f True  = Once
+    x                  = x
+  editPlanPersistence helper _
+
+global def editPlanShare f =
+  def helper = match _
+    ReRun if   f False = Share
+    Once  if   f False = Share
+    Keep  if   f False = Share
+    Share if ! f True  = Keep
+    x                  = x
+  editPlanPersistence helper _
 
 # The criteria which determine if Job execution can be skipped:
 #   Once  is True and a matching job was run by this wake invocation
@@ -91,19 +127,19 @@ global def setPlanShare v p =
 # Set reasonable defaults for all Plan arguments
 def id x = x
 global def makePlan cmd visible =
-  Plan cmd visible environment "." "" True True True fuseRunner id id id 1
+  Plan cmd visible environment "." "" Share False Nil (\_ True) id id id None 1
 
 global def makeManualPlan cmd visible foutputs =
-  Plan cmd visible environment "." "" True True True manualRunner id (\_ foutputs Unit) id 1
+  Plan cmd visible environment "." "" Share True Nil (\_ True) id (\_ foutputs Unit) id None 1
 
 def makeRawPlan cmd  =
-  Plan cmd Nil Nil "." "" False False False manualRunner id id id 1
+  Plan cmd Nil Nil "." "" ReRun True Nil (\_ True) id id id (Some manualRunner) 1
 
 def defaultUsage = Usage 0 0.0 0.0 0 0 0
 
 # This runner does not detect inputs/outputs/indexes on it's own
 # You must use Fn{Inputs,Outputs,Indexes} to fill in this information
-global def manualRunner =
+global def manualRunner Unit =
   def launch job pool dir stdin env cmd status runtime cputime membytes ibytes obytes = prim "job_launch"
   def doit job input =
    # Ensure that match does not re-raise the exception (launch must run)
@@ -113,9 +149,13 @@ global def manualRunner =
          Usage status runtime cputime mem in out =
            def _ = launch job pool dir stdin env.implode cmd.implode status runtime cputime mem in out
            RunnerOutput (map getPathName vis) Nil Nil (getJobReality job)
-  Runner doit
+  def score (Plan _ _ _ _ _ _ lo res _ _ _ _ _ _) = match res
+    Nil = if lo then 1.0 else raise "cannot detect outputs"
+    _   = raise "cannot supply resources"
+  Runner "manual" score doit
 
-global def virtualRunner =
+# For internal use in conjuction with setPlanRunner
+def virtualRunner Unit =
   def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
   def doit job input =
    # Ensure that match does not re-raise the exception (virtual must run)
@@ -128,10 +168,10 @@ global def virtualRunner =
            def s = if stuff ==* "" then status else status
            def _ = virtual job "" "" s runtime cputime mem in out # sets predict+reality
            RunnerOutput (map getPathName vis) Nil Nil (getJobReality job)
-  Runner doit
+  Runner "virtual" (\_ 0.0) doit
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
-def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool =
+def runAlways cmd env dir stdin finputs foutputs findexes vis keep run pool =
   def create dir stdin env cmd visible keep = prim "job_create"
   def finish job inputs outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
   def cache dir stdin env cmd visible = prim "job_cache"
@@ -166,14 +206,46 @@ def runAlways cmd env dir stdin finputs foutputs findexes vis keep share run poo
       Pair Nil      last = confirm last (build 0)
 
 # Only run if the first four arguments differ
-def runOnce cmd env dir stdin finputs foutputs findexes vis keep share run pool =
-  memoize 9 (runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool)
+def runOnce cmd env dir stdin finputs foutputs findexes vis keep run pool =
+  memoize 8 (runAlways cmd env dir stdin finputs foutputs findexes vis keep run pool)
+
+# Default runners provided by wake
+publish runner = manualRunner, fuseRunner, Nil
+
+data RunnerOption =
+  Accept (score: Double) (runnerFn: Job => RunnerInput => RunnerOutput)
+  Reject (why: String)
 
 # Run the job!
-global def runJob (Plan cmd vis env dir stdin once keep share (Runner run) finputs foutputs findexes pool) =
-  if once
-  then runOnce   cmd env dir stdin finputs foutputs findexes vis keep share run pool
-  else runAlways cmd env dir stdin finputs foutputs findexes vis keep share run pool
+global def runJob p = match p
+  Plan cmd vis env dir stdin pers lo res rf finputs foutputs findexes orun pool =
+    def run = match orun
+      Some rf = match (rf Unit)
+        Runner _ _ r = r
+      None =
+        # Transform the 'List (Unit => Runner)' into 'List RunnerOption' with no exceptions
+        def qualify runnerFn =
+          def runner = runnerFn Unit
+          def accept = match runner
+            Runner name scorefn fn =
+              def score = match (rf runner)
+                False = raise "{name}: rejected by Plan"
+                True  =
+                  def score = scorefn p
+                  if score <. 0.0 then raise "{name}: negative score" else score
+              (Accept _ _) | reraise score | reraise fn
+          try (Reject _.head) accept
+        def best acc = match _ acc
+          (Reject _) _ = acc
+          (Accept score fn) (Pair bests bestr) =
+            if score >. bests then Pair score (Some fn) else acc
+        def opts = subscribe runner | map qualify
+        match (opts | foldl best (Pair 0.0 None) | getPairSecond)
+          Some r = r
+          None = raise "No runner available: {format opts}"
+    if isOnce pers
+    then runOnce   cmd env dir stdin finputs foutputs findexes vis (isKeep pers) run pool
+    else runAlways cmd env dir stdin finputs foutputs findexes vis (isKeep pers) run pool
 
 def toUsage (Pair (Pair status runtime) (Pair (Pair cputime membytes) (Pair ibytes obytes))) =
   Usage status runtime cputime membytes ibytes obytes
@@ -216,7 +288,7 @@ global def getJobOutput = match _.getJobOutputs
 # Implement FUSE-based Runner
 def wakePath = prim "execpath" # location of the wake executable
 def fusePath = relative workspace (simplify "{wakePath}/../lib/wake/fuse-wake")
-global def fuseRunner =
+global def fuseRunner Unit =
   def pre input =
     def cmd = fusePath, input.getRunnerInputDirectory, input.getRunnerInputVisible | map getPathName
     def fuse = makeRawPlan cmd | setPlanPool 0 | runJob
@@ -235,7 +307,10 @@ global def fuseRunner =
     | setRunnerOutputInputs  inputs
     | setRunnerOutputOutputs outputs
     | editRunnerOutputUsage usage
-  makeRunner pre post manualRunner
+  def score (Plan _ _ _ _ _ _ lo res _ _ _ _ _ _) = match res
+    Nil = if lo then raise "would hide workspace" else 1.0
+    _   = raise "cannot supply resources"
+  makeRunner "fuse" score pre post manualRunner
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
 data Path = Path String
@@ -257,24 +332,88 @@ def hashcode f = memoize 0 (
     else raise "Failed to hash file {f}"
 )
 
-def stateRunner =
-  def add f h = prim "add_hash"
-  def hash = "0000000000000000000000000000000000000000000000000000000000000000"
-  def pre input =
-    match input.getRunnerInputCommand
-      _, file, Nil = Pair input file
-      _ = raise "stateRunner: invalid command-line"
-  def post (Pair output file) =
-    editRunnerOutputOutputs (add file hash, _) output
-  makeRunner pre post virtualRunner
-
 # Mark a file whose contents must not be tracked
 global def makeStatePath file =
+  def stateRunner Unit =
+    def add f h = prim "add_hash"
+    def hash = "0000000000000000000000000000000000000000000000000000000000000000"
+    def pre input =
+      match input.getRunnerInputCommand
+        _, file, Nil = Pair input file
+        _ = raise "stateRunner: invalid command-line"
+    def post (Pair output file) =
+      editRunnerOutputOutputs (add file hash, _) output
+    makeRunner "state" (\_ 0.0) pre post virtualRunner
   makePlan ("<state>", file, Nil) Nil
-  | setPlanRunner      stateRunner
+  | setPlanRunner      (Some stateRunner)
   | setPlanKeep        False
   | setPlanEnvironment Nil
   | setPlanFnOutputs   (file, _)
+  | runJob
+  | getJobOutput
+
+def mkdirImp inputs mode path =
+  def mkdirRunner Unit =
+    def imp m p = prim "mkdir"
+    def pre input =
+      match input.getRunnerInputCommand
+        _, _, mode, dir, Nil = Pair input (Pair mode dir)
+        _ = raise "mkdirRunner: invalid command-line"
+    def post (Pair output (Pair mode dir)) =
+      output
+      | editRunnerOutputOutputs (imp (int mode) dir, _)
+    makeRunner "mkdir" (\_ 0.0) pre post virtualRunner
+  makePlan ("<mkdir>", "-m", "0{strbase 8 mode}", path, Nil) inputs
+  | setPlanRunner      (Some mkdirRunner)
+  | setPlanKeep        False
+  | setPlanEnvironment Nil
+  | runJob
+  | getJobOutput
+
+# Create a directory in the parent
+global def mkdirIn parent mode name =
+  mkdirImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify
+
+# Make all every element in the directory path with mode 0775
+global def mkdir path =
+  def root = match _
+    "", x, t = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 "/{x}") t
+    x, t     = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 x) t
+    Nil      = raise "impossible"
+  path | simplify | tokenize "/" | root
+
+def writeImp inputs mode path content =
+  def writeRunner Unit =
+    def imp m p c = prim "write"
+    def pre input = Pair input Unit
+    def post (Pair output Unit) =
+      output
+      | editRunnerOutputOutputs (imp mode path content, _)
+    makeRunner "write" (\_ 0.0) pre post virtualRunner
+  makePlan ("<write>", str mode, path, Nil) inputs
+  | setPlanRunner      (Some writeRunner)
+  | setPlanOnce        False
+  | setPlanEnvironment Nil
+  | runJob
+  | getJobOutput
+
+# Create a file with the given mode in the specified directory
+global def writeIn parent mode name content =
+  writeImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify content
+
+# Create all directories and the named file
+global def write path content =
+  def spath = simplify path
+  def parent = simplify "{spath}/.."
+  writeImp (mkdir parent, Nil) 0664 spath content
+
+global def source file =
+  def get_modtime file = prim "get_modtime"
+  makePlan ("<source>", str (get_modtime file), file, Nil) Nil
+  | setPlanRunner      (Some virtualRunner)
+  | setPlanShare       False
+  | setPlanEnvironment Nil
+  | setPlanFnOutputs   (file.simplify, _)
   | runJob
   | getJobOutput
 
