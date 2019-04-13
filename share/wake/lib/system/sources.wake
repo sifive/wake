@@ -11,11 +11,10 @@ global def files dir regexp = prim "files"
 global def source file =
   def get_modtime file = prim "get_modtime"
   makePlan ("<source>", str (get_modtime file), file, Nil) Nil
-  | setPlanRunner      virtualRunner
   | setPlanShare       False
   | setPlanEnvironment Nil
   | setPlanFnOutputs   (file.simplify, _)
-  | runJob
+  | runJobWith virtualRunner
   | getJobOutput
 
 # Find sources files
