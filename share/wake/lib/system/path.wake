@@ -27,14 +27,13 @@ def mkdirRunner =
   def post (Pair output (Pair mode dir)) =
     output
     | editRunnerOutputOutputs (imp (int mode) dir, _)
-  makeRunner pre post virtualRunner
+  makeRunner "mkdir" (\_ 0.0) pre post virtualRunner
 
 def mkdirImp inputs mode path =
   makePlan ("<mkdir>", "-m", "0{strbase 8 mode}", path, Nil) inputs
-  | setPlanRunner      mkdirRunner
   | setPlanKeep        False
   | setPlanEnvironment Nil
-  | runJob
+  | runJobWith mkdirRunner
   | getJobOutput
 
 # Create a directory in the parent
@@ -56,12 +55,11 @@ def writeImp inputs mode path content =
     def post (Pair output Unit) =
       output
       | editRunnerOutputOutputs (imp mode path content, _)
-    makeRunner pre post virtualRunner
+    makeRunner "write" (\_ 0.0) pre post virtualRunner
   makePlan ("<write>", str mode, path, Nil) inputs
-  | setPlanRunner      writeRunner
   | setPlanOnce        False
   | setPlanEnvironment Nil
-  | runJob
+  | runJobWith writeRunner
   | getJobOutput
 
 # Create a file with the given mode in the specified directory

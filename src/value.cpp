@@ -4,6 +4,7 @@
 #include "hash.h"
 #include "datatype.h"
 #include "symbol.h"
+#include "status.h"
 #include <sstream>
 #include <cassert>
 #include <algorithm>
@@ -39,7 +40,7 @@ void Value::format(std::ostream &os, const Value *value, bool detailed, int inde
     if (state.current.value) {
       state.current.value->format(os, state);
     } else {
-      os << "<future>";
+      os << term_red() << "<future>" << term_normal();
     }
   }
 }

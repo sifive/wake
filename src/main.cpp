@@ -542,7 +542,7 @@ int main(int argc, char **argv) {
       types = &(*types)[1];
       std::cout << " = ";
       Value::format(std::cout, v, debug, verbose?0:-1);
-      if (v->type == &Closure::type)
+      if (v && v->type == &Closure::type)
         std::cout << ", " << term_red() << "AN UNEVALUATED FUNCTION" << term_normal();
       std::cout << std::endl;
       if (!v || v->type == &Exception::type) pass = false;
