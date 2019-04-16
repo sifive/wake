@@ -290,7 +290,7 @@ global def fuseRunner =
   def pre input =
     def cmd = fusePath, input.getRunnerInputDirectory, input.getRunnerInputVisible | map getPathName
     def fuse = makeRawPlan cmd | setPlanPool 0 | runJobWith manualRunner
-    def handle _ = raise "Could not start fuse-wake: {fuse.getJobStderr | tokenize "\n" | head}"
+    def handle _ = raise "Could not start fuse-wake ({str fuse.getJobStatus}): {fuse.getJobStderr | tokenize "\n" | head}"
     def root = try handle (extract 'OK: (.*)' fuse.getJobStderr)
     Pair (editRunnerInputDirectory ("{root.head}/{_}") input) fuse
   def post (Pair output fuse) =
