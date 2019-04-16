@@ -278,6 +278,7 @@ global def getJobInputs  job = fail job job.getJobFailedInputs
 global def getJobOutputs job = fail job job.getJobFailedOutputs
 global def getJobFailedInputs  job = tree job 1 | map getPairFirst | map Path
 global def getJobFailedOutputs job = tree job 2 | map getPairFirst | map Path
+global def getJobId job = prim "job_id"
 global def getJobOutput = match _.getJobOutputs
   x, Nil = x
   Nil    = raise "no outputs available"
