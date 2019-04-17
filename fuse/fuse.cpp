@@ -35,6 +35,7 @@
 #include <set>
 #include <string>
 #include <iostream>
+#include <fstream>
 
 //#define TRACE(x) do { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } while (0)
 #define TRACE(x) (void)x
@@ -787,8 +788,19 @@ int main(int argc, char *argv[])
 	// no fail operations
 	memset(&sa, 0, sizeof(sa));
 	umask(0);
-	for (int i = 1; i < argc; ++i)
-		files_visible.insert(argv[i]);
+
+	if (argc < 2) return 127;
+	std::ifstream ifs(argv[1]);
+	std::string content(
+		(std::istreambuf_iterator<char>(ifs)),
+		(std::istreambuf_iterator<char>()));
+	ifs.close();
+	unlink(argv[1]);
+
+	std::size_t i, j;
+	for (i = 0; (j = content.find('\0', i)) != std::string::npos; i = j+1)
+		files_visible.emplace(content, i, j-i);
+	content.clear();
 
 	rootfd = open(".", O_RDONLY);
 	if (rootfd == -1) {

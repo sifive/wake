@@ -13,7 +13,8 @@ tuple RunnerInput =
   global Environment:   List String
   global Directory:     String
   global StandardInput: String
-  global Record:        Option Usage
+  global Prefix:        String        # a unique prefix for this job
+  global Record:        Option Usage  # previous resource usage, if known
   Pool:                 Integer
 
 tuple RunnerOutput =
@@ -142,8 +143,8 @@ global def manualRunner =
   def launch job pool dir stdin env cmd status runtime cputime membytes ibytes obytes = prim "job_launch"
   def doit job input =
    # Ensure that match does not re-raise the exception (launch must run)
-   match (try (\_ RunnerInput (cast input) Nil Nil "" "" None 0) input)
-     RunnerInput cmd vis env dir stdin predict pool =
+   match (try (\_ RunnerInput (cast input) Nil Nil "" "" "" None 0) input)
+     RunnerInput cmd vis env dir stdin _ predict pool =
        match (getOrElse defaultUsage (try (\_ None) predict))
          Usage status runtime cputime mem in out =
            def _ = launch job pool dir stdin env.implode cmd.implode status runtime cputime mem in out
@@ -157,8 +158,8 @@ global def virtualRunner =
   def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
   def doit job input =
    # Ensure that match does not re-raise the exception (virtual must run)
-   match (try (\_ RunnerInput (cast input) Nil Nil "" "" None 0) input)
-     RunnerInput cmd vis env dir stdin predict pool =
+   match (try (\_ RunnerInput (cast input) Nil Nil "" "" "" None 0) input)
+     RunnerInput cmd vis env dir stdin _ predict pool =
        match (getOrElse defaultUsage (try (\_ None) predict))
          Usage status runtime cputime mem in out =
            # Make sure any exceptions get fed into virtual
@@ -175,7 +176,9 @@ def runAlways cmd env dir stdin finputs foutputs findexes vis keep run pool =
   def cache dir stdin env cmd visible = prim "job_cache"
   def build _ =
     def doit job =
-      def output = run job (RunnerInput cmd vis env dir stdin (getJobRecord job) pool)
+      def prefix = getJobId job | str
+      def usage = getJobRecord job
+      def output = run job (RunnerInput cmd vis env dir stdin prefix usage pool)
       def final _ =
         # Make sure we run finish even if the runner raises an exception
         match (try (\_ RunnerOutput (cast output) (cast output) (cast output) (cast output)) output)
@@ -278,6 +281,7 @@ global def getJobInputs  job = fail job job.getJobFailedInputs
 global def getJobOutputs job = fail job job.getJobFailedOutputs
 global def getJobFailedInputs  job = tree job 1 | map getPairFirst | map Path
 global def getJobFailedOutputs job = tree job 2 | map getPairFirst | map Path
+global def getJobId job = prim "job_id"
 global def getJobOutput = match _.getJobOutputs
   x, Nil = x
   Nil    = raise "no outputs available"
@@ -288,9 +292,14 @@ def wakePath = prim "execpath" # location of the wake executable
 def fusePath = relative workspace (simplify "{wakePath}/../lib/wake/fuse-wake")
 global def fuseRunner =
   def pre input =
-    def cmd = fusePath, input.getRunnerInputDirectory, input.getRunnerInputVisible | map getPathName
+    def mkdir mode path = prim "mkdir"
+    def write mode path content = prim "write"
+    def visibleFile =
+      (input.getRunnerInputDirectory, input.getRunnerInputVisible | map getPathName) | implode
+      | write 0664 "{mkdir 0775 '.build'}/{input.getRunnerInputPrefix}.visible"
+    def cmd = fusePath, visibleFile, Nil
     def fuse = makeRawPlan cmd | setPlanPool 0 | runJobWith manualRunner
-    def handle _ = raise "Could not start fuse-wake: {fuse.getJobStderr | tokenize "\n" | head}"
+    def handle _ = raise "Could not start fuse-wake ({str fuse.getJobStatus}): {fuse.getJobStderr | tokenize "\n" | head}"
     def root = try handle (extract 'OK: (.*)' fuse.getJobStderr)
     Pair (editRunnerInputDirectory ("{root.head}/{_}") input) fuse
   def post (Pair output fuse) =

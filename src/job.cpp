@@ -1068,6 +1068,19 @@ static PRIMFN(prim_job_tree) {
   }
 }
 
+static PRIMTYPE(type_job_id) {
+  return args.size() == 1 &&
+    args[0]->unify(Job::typeVar) &&
+    out->unify(Integer::typeVar);
+}
+
+static PRIMFN(prim_job_id) {
+  EXPECT(1);
+  JOBRESULT(arg0, 0);
+  auto out = std::make_shared<Integer>(arg0->job);
+  RETURN(out);
+}
+
 static PRIMTYPE(type_job_finish) {
   return args.size() == 9 &&
     args[0]->unify(Job::typeVar) &&
@@ -1312,6 +1325,7 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   prim_register(pmap, "job_kill",   prim_job_kill,   type_job_kill,    PRIM_SHALLOW);
   prim_register(pmap, "job_output", prim_job_output, type_job_output,  PRIM_SHALLOW|PRIM_PURE);
   prim_register(pmap, "job_tree",   prim_job_tree,   type_job_tree,    PRIM_SHALLOW|PRIM_PURE);
+  prim_register(pmap, "job_id",     prim_job_id,     type_job_id,      PRIM_SHALLOW|PRIM_PURE);
   prim_register(pmap, "job_reality",prim_job_reality,type_job_reality, PRIM_SHALLOW|PRIM_PURE);
   prim_register(pmap, "job_report", prim_job_report, type_job_report,  PRIM_SHALLOW|PRIM_PURE);
   prim_register(pmap, "job_record", prim_job_record, type_job_record,  PRIM_SHALLOW|PRIM_PURE);
