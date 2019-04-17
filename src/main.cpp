@@ -187,7 +187,7 @@ void print_help(const char *argv0) {
     << "    --check    -c    Rerun all jobs and confirm their output is reproducible"    << std::endl
     << "    --verbose  -v    Report job standard output and hash progres"                << std::endl
     << "    --debug    -d    Report stack frame information for exceptions and closures" << std::endl
-    << "    --quiet    -q    Surpress report of launched job command line arguments"     << std::endl
+    << "    --quiet    -q    Surpress report of launched jobs and final expressions"     << std::endl
     << "    --no-tty         Surpress interactive build progress interface"              << std::endl
     << "    --no-wait        Do not wait to obtain database lock; fail immediately"      << std::endl
     << "    --no-workspace   Do not open a database or scan for sources files"           << std::endl
@@ -301,11 +301,6 @@ int main(int argc, char **argv) {
   bool noparse = nodb || remove || list || output || input;
   bool notype = noparse || parse;
   bool noexecute = notype || add || tcheck || global;
-
-  if (quiet && verbose) {
-    std::cerr << "Cannot be both quiet and verbose!" << std::endl;
-    return 1;
-  }
 
   if (noparse && argc < 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
@@ -528,7 +523,7 @@ int main(int argc, char **argv) {
   if (JobTable::exit_now()) {
     std::cerr << "Early termination requested" << std::endl;
     pass = false;
-  } else {
+  } else if (!quiet) {
     std::vector<std::shared_ptr<Value> > outputs;
     outputs.reserve(targets.size());
     Binding *iter = reinterpret_cast<Closure*>(value.get())->binding.get();
