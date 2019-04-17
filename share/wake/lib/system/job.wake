@@ -292,7 +292,12 @@ def wakePath = prim "execpath" # location of the wake executable
 def fusePath = relative workspace (simplify "{wakePath}/../lib/wake/fuse-wake")
 global def fuseRunner =
   def pre input =
-    def cmd = fusePath, input.getRunnerInputDirectory, input.getRunnerInputVisible | map getPathName
+    def mkdir mode path = prim "mkdir"
+    def write mode path content = prim "write"
+    def visibleFile =
+      (input.getRunnerInputDirectory, input.getRunnerInputVisible | map getPathName) | implode
+      | write 0664 "{mkdir 0775 '.build'}/{input.getRunnerInputPrefix}.visible"
+    def cmd = fusePath, visibleFile, Nil
     def fuse = makeRawPlan cmd | setPlanPool 0 | runJobWith manualRunner
     def handle _ = raise "Could not start fuse-wake ({str fuse.getJobStatus}): {fuse.getJobStderr | tokenize "\n" | head}"
     def root = try handle (extract 'OK: (.*)' fuse.getJobStderr)
