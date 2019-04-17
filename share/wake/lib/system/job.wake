@@ -319,6 +319,53 @@ global def fuseRunner =
     _   = raise "fuse: cannot supply resources"
   makeRunner "fuse" score pre post manualRunner
 
+# Make a Runner that runs a named script to run jobs
+# score: Plan => Double; runJob chooses the runner with the largest score for a Plan
+# estimate: Usage => Option Usage; predict local usage based on prior recorded usage
+global def makeJSONRunner script score estimate =
+  def pre (RunnerInput command visible environment directory stdin prefix record _) =
+    def x → y = Pair x y
+    def json = JObject (
+      "command"     → command     | map JString | JArray,
+      "environment" → environment | map JString | JArray,
+      "visible"     → visible | map (_.getPathName.JString) | JArray,
+      "directory"   → JString directory,
+      "stdin"       → JString stdin,
+      match record
+        None = Nil
+        Some (Usage status runtime cputime membytes inbytes outbytes) =
+          "usage" → JObject (
+            "status"   → JInteger status,
+            "runtime"  → JDouble  runtime,
+            "cputime"  → JDouble  cputime,
+            "membytes" → JInteger membytes,
+            "inbytes"  → JInteger inbytes,
+            "outbytes" → JInteger outbytes,
+            Nil
+          ), Nil
+    )
+    def mkdir mode path = prim "mkdir"
+    def write mode path content = prim "write"
+    def inFile = prettyJSON json | write 0664 "{mkdir 0775 '.build'}/{prefix}.in.json"
+    def outFile = ".build/{prefix}.out.json"
+    def cmd = script.getPathName, inFile, outFile, Nil
+    def proxy = RunnerInput cmd Nil environment "." "" prefix (omapPartial estimate record) 1
+    Pair proxy outFile
+  def post (Pair output outFile) =
+    def content = parseJSONFile outFile
+    def usage = content // "usage"
+    def usageOut =
+      Usage
+      (usage // "status"   | getJInteger | getOrElse 255)
+      (usage // "runtime"  | getJDouble  | getOrElse 0.0)
+      (usage // "cputime"  | getJDouble  | getOrElse 0.0)
+      (usage // "membytes" | getJInteger | getOrElse 0)
+      (usage // "inbytes"  | getJInteger | getOrElse 0)
+      (usage // "outbytes" | getJInteger | getOrElse 0)
+    def getK str = content // str | getJArray | getOrElse Nil | mapPartial getJString
+    RunnerOutput (getK "inputs") (getK "outputs") (getK "indexes") usageOut
+  makeRunner "json-{script.getPathName}" score pre post manualRunner
+
 # Paths differ from Strings in that they have been hashed; their content is frozen
 data Path = Path String
 global def getPathName (Path name) = name
