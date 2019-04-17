@@ -517,6 +517,17 @@ static PRIMFN(prim_workspace) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_pid) {
+  return args.size() == 0 &&
+    out->unify(Integer::typeVar);
+}
+
+static PRIMFN(prim_pid) {
+  EXPECT(0);
+  auto out = std::make_shared<Integer>(getpid());
+  RETURN(out);
+}
+
 void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimMap &pmap) {
   // Re-ordering of sources/files would break their behaviour, so they are not pure.
   prim_register(pmap, "sources",     prim_sources,     type_sources,     PRIM_SHALLOW, sources);
@@ -526,4 +537,5 @@ void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimM
   prim_register(pmap, "relative",    prim_relative,    type_relative,    PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "execpath",    prim_execpath,    type_execpath,    PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "workspace",   prim_workspace,   type_workspace,   PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "pid",         prim_pid,         type_pid,         PRIM_PURE|PRIM_SHALLOW);
 }

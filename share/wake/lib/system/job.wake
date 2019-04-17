@@ -169,6 +169,8 @@ global def virtualRunner =
            RunnerOutput (map getPathName vis) Nil Nil (getJobReality job)
   Runner "virtual" (\_ 0.0) doit
 
+def pid = prim "pid"
+
 def implode l = cat (foldr (_, "\0", _) Nil l)
 def runAlways cmd env dir stdin finputs foutputs findexes vis keep run pool =
   def create dir stdin env cmd visible keep = prim "job_create"
@@ -176,7 +178,7 @@ def runAlways cmd env dir stdin finputs foutputs findexes vis keep run pool =
   def cache dir stdin env cmd visible = prim "job_cache"
   def build _ =
     def doit job =
-      def prefix = getJobId job | str
+      def prefix = "{str pid}.{str (getJobId job)}"
       def usage = getJobRecord job
       def output = run job (RunnerInput cmd vis env dir stdin prefix usage pool)
       def final _ =
