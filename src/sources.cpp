@@ -329,9 +329,9 @@ std::string get_workspace() {
   return cwd;
 }
 
-std::vector<std::shared_ptr<String> > find_all_sources(bool &ok) {
+std::vector<std::shared_ptr<String> > find_all_sources(bool &ok, bool workspace) {
   std::vector<std::shared_ptr<String> > out;
-  ok = ok && !scan(out);
+  if (workspace) ok = ok && !scan(out);
   std::string abs_libdir = find_execpath() + "/../share/wake/lib";
   std::string rel_libdir = make_relative(get_workspace(), make_canonical(abs_libdir));
   ok = ok && !push_files(out, rel_libdir);

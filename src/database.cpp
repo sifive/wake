@@ -54,11 +54,11 @@ struct Database::detail {
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
 Database::~Database() { close(); }
 
-std::string Database::open(bool wait) {
+std::string Database::open(bool wait, bool memory) {
   if (imp->db) return "";
   int ret;
 
-  ret = sqlite3_open_v2("wake.db", &imp->db, SQLITE_OPEN_READWRITE, 0);
+  ret = sqlite3_open_v2(memory?":memory:":"wake.db", &imp->db, SQLITE_OPEN_READWRITE, 0);
   if (ret != SQLITE_OK) {
     if (!imp->db) return "sqlite3_open: out of memory";
     std::string out = sqlite3_errmsg(imp->db);

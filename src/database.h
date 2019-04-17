@@ -45,7 +45,7 @@ struct Database {
   Database(bool debugdb);
   ~Database();
 
-  std::string open(bool wait);
+  std::string open(bool wait, bool memory);
   void close();
 
   void entropy(uint64_t *key, int words);
