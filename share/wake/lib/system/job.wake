@@ -366,6 +366,33 @@ global def makeJSONRunner script score estimate =
     RunnerOutput (getK "inputs") (getK "outputs") (getK "indexes") usageOut
   makeRunner "json-{script.getPathName}" score pre post manualRunner
 
+global def executeJSON json =
+  def makeVirtual visible =
+    def add f h = prim "add_hash"
+    Path (add visible "0")
+  def cmd   = json // "command"     | getJArray  | getOrElse Nil | mapPartial getJString
+  def vis   = json // "visible"     | getJArray  | getOrElse Nil | mapPartial getJString | map makeVirtual
+  def env   = json // "environment" | getJArray  | getOrElse Nil | mapPartial getJString
+  def dir   = json // "directory"   | getJString | getOrElse "."
+  def stdin = json // "stdin"       | getJString | getOrElse ""
+  def job = Plan cmd vis env dir stdin ReRun True Nil (\_ True) id id id 1 | runJobWith fuseRunner
+  def x → y = Pair x y
+  JObject (
+    "inputs"  → tree job 1 | map (_.getPairFirst.JString) | JArray,
+    "outputs" → tree job 2 | map (_.getPairFirst.JString) | JArray,
+    match job.getJobReport
+      Usage status runtime cputime membytes inbytes outbytes =
+        "usage" → JObject (
+          "status"   → JInteger status,
+          "runtime"  → JDouble runtime,
+          "cputime"  → JDouble cputime,
+          "membytes" → JInteger membytes,
+          "inbytes"  → JInteger inbytes,
+          "outbytes" → JInteger outbytes,
+          Nil
+        ), Nil
+  )
+
 # Paths differ from Strings in that they have been hashed; their content is frozen
 data Path = Path String
 global def getPathName (Path name) = name
