@@ -362,12 +362,6 @@ static void launch(JobTable *jobtable) {
     bool indirect = echo != task.cmdline;
     for (char &c : echo) if (c == 0) c = ' ';
     echo.resize(echo.size()-1); // trim trailing ' '
-    if (!i.job->stdin.empty()) {
-      echo += " < ";
-      echo += i.job->stdin;
-    }
-    i.job->stdin.clear();
-    i.job->cmdline.clear();
     if (i.pool) {
       double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
       i.status = status_state.emplace(status_state.end(), echo, predict, i.start);
@@ -375,11 +369,19 @@ static void launch(JobTable *jobtable) {
     if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
       std::stringstream s;
       s << echo;
-      if (indirect) s << " # launched by " << task.cmdline.c_str(); // c_str so it terminates at first null
+      if (!i.job->stdin.empty()) s << " < " << i.job->stdin;
+      if (indirect) {
+        for (char &c : task.cmdline) if (c == 0) c = ' ';
+        task.cmdline.resize(task.cmdline.size()-1);
+        s << " # launched by: " << task.cmdline; // c_str so it terminates at first null
+        if (!task.stdin.empty()) s << " < " << task.stdin;
+      }
       s << std::endl;
       std::string out = s.str();
       status_write(2, out.data(), out.size());
     }
+    i.job->stdin.clear();
+    i.job->cmdline.clear();
     jobtable->imp->tasks[i.pool].pop_front();
   }
 }
