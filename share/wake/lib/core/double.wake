@@ -54,6 +54,8 @@ global def double s = prim "ddbl"
 global def dhex = dformat DoubleHex 20
 global def dstr = dformat DoubleDefault 17
 
+global def dint x = double (str x)
+
 # Conversion methods
 global data DoubleClass =
   Infinite
@@ -72,6 +74,10 @@ global def dclass x =
 global def dfrexp x   = prim "dfrexp"
 global def dldexp f e = prim "dldexp"
 global def dmodf  x   = prim "dmodf"
+
+global def idouble x = match (dmodf x)
+ Pair x 0.0 = Some x
+ _ = None
 
 # Handy numerical functions
 global def dcos    x = prim "dcos"

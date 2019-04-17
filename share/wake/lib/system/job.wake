@@ -169,6 +169,8 @@ global def virtualRunner =
            RunnerOutput (map getPathName vis) Nil Nil (getJobReality job)
   Runner "virtual" (\_ 0.0) doit
 
+def pid = prim "pid"
+
 def implode l = cat (foldr (_, "\0", _) Nil l)
 def runAlways cmd env dir stdin finputs foutputs findexes vis keep run pool =
   def create dir stdin env cmd visible keep = prim "job_create"
@@ -176,7 +178,7 @@ def runAlways cmd env dir stdin finputs foutputs findexes vis keep run pool =
   def cache dir stdin env cmd visible = prim "job_cache"
   def build _ =
     def doit job =
-      def prefix = getJobId job | str
+      def prefix = "{str pid}.{str (getJobId job)}"
       def usage = getJobRecord job
       def output = run job (RunnerInput cmd vis env dir stdin prefix usage pool)
       def final _ =
@@ -318,6 +320,80 @@ global def fuseRunner =
     Nil = if lo then raise "fuse: would hide workspace" else 1.0
     _   = raise "fuse: cannot supply resources"
   makeRunner "fuse" score pre post manualRunner
+
+# Make a Runner that runs a named script to run jobs
+# score: Plan => Double; runJob chooses the runner with the largest score for a Plan
+# estimate: Usage => Option Usage; predict local usage based on prior recorded usage
+global def makeJSONRunner script score estimate =
+  def pre (RunnerInput command visible environment directory stdin prefix record _) =
+    def x → y = Pair x y
+    def json = JObject (
+      "command"     → command     | map JString | JArray,
+      "environment" → environment | map JString | JArray,
+      "visible"     → visible | map (_.getPathName.JString) | JArray,
+      "directory"   → JString directory,
+      "stdin"       → JString stdin,
+      match record
+        None = Nil
+        Some (Usage status runtime cputime membytes inbytes outbytes) =
+          "usage" → JObject (
+            "status"   → JInteger status,
+            "runtime"  → JDouble  runtime,
+            "cputime"  → JDouble  cputime,
+            "membytes" → JInteger membytes,
+            "inbytes"  → JInteger inbytes,
+            "outbytes" → JInteger outbytes,
+            Nil
+          ), Nil
+    )
+    def mkdir mode path = prim "mkdir"
+    def write mode path content = prim "write"
+    def inFile = prettyJSON json | write 0664 "{mkdir 0775 '.build'}/{prefix}.in.json"
+    def outFile = ".build/{prefix}.out.json"
+    def cmd = script.getPathName, inFile, outFile, Nil
+    def proxy = RunnerInput cmd Nil environment "." "" prefix (omapPartial estimate record) 1
+    Pair proxy outFile
+  def post (Pair output outFile) =
+    def content = parseJSONFile outFile
+    def usage = content // "usage"
+    def usageOut =
+      Usage
+      (usage // "status"   | getJInteger | getOrElse 255)
+      (usage // "runtime"  | getJDouble  | getOrElse 0.0)
+      (usage // "cputime"  | getJDouble  | getOrElse 0.0)
+      (usage // "membytes" | getJInteger | getOrElse 0)
+      (usage // "inbytes"  | getJInteger | getOrElse 0)
+      (usage // "outbytes" | getJInteger | getOrElse 0)
+    def getK str = content // str | getJArray | getOrElse Nil | mapPartial getJString
+    RunnerOutput (getK "inputs") (getK "outputs") (getK "indexes") usageOut
+  makeRunner "json-{script.getPathName}" score pre post manualRunner
+
+global def executeJSON json =
+  def makeVirtual visible =
+    def add f h = prim "add_hash"
+    Path (add visible "0")
+  def cmd   = json // "command"     | getJArray  | getOrElse Nil | mapPartial getJString
+  def vis   = json // "visible"     | getJArray  | getOrElse Nil | mapPartial getJString | map makeVirtual
+  def env   = json // "environment" | getJArray  | getOrElse Nil | mapPartial getJString
+  def dir   = json // "directory"   | getJString | getOrElse "."
+  def stdin = json // "stdin"       | getJString | getOrElse ""
+  def job = Plan cmd vis env dir stdin ReRun True Nil (\_ True) id id id 1 | runJobWith fuseRunner
+  def x → y = Pair x y
+  JObject (
+    "inputs"  → tree job 1 | map (_.getPairFirst.JString) | JArray,
+    "outputs" → tree job 2 | map (_.getPairFirst.JString) | JArray,
+    match job.getJobReport
+      Usage status runtime cputime membytes inbytes outbytes =
+        "usage" → JObject (
+          "status"   → JInteger status,
+          "runtime"  → JDouble runtime,
+          "cputime"  → JDouble cputime,
+          "membytes" → JInteger membytes,
+          "inbytes"  → JInteger inbytes,
+          "outbytes" → JInteger outbytes,
+          Nil
+        ), Nil
+  )
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
 data Path = Path String

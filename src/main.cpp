@@ -187,9 +187,10 @@ void print_help(const char *argv0) {
     << "    --check    -c    Rerun all jobs and confirm their output is reproducible"    << std::endl
     << "    --verbose  -v    Report job standard output and hash progres"                << std::endl
     << "    --debug    -d    Report stack frame information for exceptions and closures" << std::endl
-    << "    --quiet    -q    Surpress report of launched job command line arguments"     << std::endl
+    << "    --quiet    -q    Surpress report of launched jobs and final expressions"     << std::endl
     << "    --no-tty         Surpress interactive build progress interface"              << std::endl
     << "    --no-wait        Do not wait to obtain database lock; fail immediately"      << std::endl
+    << "    --no-workspace   Do not open a database or scan for sources files"           << std::endl
     << std::endl
     << "  Database introspection:" << std::endl
     << "    --input  FILES   Report recorded meta-data for jobs which read FILES"        << std::endl
@@ -229,6 +230,7 @@ int main(int argc, char **argv) {
     { 'd', "debug",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'q', "quiet",                 GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-wait",               GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "no-workspace",          GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-tty",                GOPT_ARGUMENT_FORBIDDEN },
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
@@ -253,6 +255,7 @@ int main(int argc, char **argv) {
   bool debug   = arg(options, "debug"   )->count;
   bool quiet   = arg(options, "quiet"   )->count;
   bool wait    =!arg(options, "no-wait" )->count;
+  bool workspace=!arg(options, "no-workspace")->count;
   bool tty     =!arg(options, "no-tty"  )->count;
   bool input   = arg(options, "input"   )->count;
   bool output  = arg(options, "output"  )->count;
@@ -299,11 +302,6 @@ int main(int argc, char **argv) {
   bool notype = noparse || parse;
   bool noexecute = notype || add || tcheck || global;
 
-  if (quiet && verbose) {
-    std::cerr << "Cannot be both quiet and verbose!" << std::endl;
-    return 1;
-  }
-
   if (noparse && argc < 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
     return 1;
@@ -315,7 +313,7 @@ int main(int argc, char **argv) {
       std::cerr << "Unable to initialize a workspace in " << init << std::endl;
       return 1;
     }
-  } else if (!chdir_workspace(prefix)) {
+  } else if (workspace && !chdir_workspace(prefix)) {
     std::cerr << "Unable to locate wake.db in any parent directory." << std::endl;
     return 1;
   }
@@ -323,7 +321,7 @@ int main(int argc, char **argv) {
   if (nodb) return 0;
 
   Database db(debugdb);
-  std::string fail = db.open(wait);
+  std::string fail = db.open(wait, !workspace);
   if (!fail.empty()) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;
     return 1;
@@ -387,7 +385,7 @@ int main(int argc, char **argv) {
   if (noparse) return 0;
 
   bool ok = true;
-  auto all_sources(find_all_sources(ok));
+  auto all_sources(find_all_sources(ok, workspace));
   if (!ok) std::cerr << "Source file enumeration failed" << std::endl;
 
   // Read all wake build files
@@ -525,7 +523,7 @@ int main(int argc, char **argv) {
   if (JobTable::exit_now()) {
     std::cerr << "Early termination requested" << std::endl;
     pass = false;
-  } else {
+  } else if (!quiet) {
     std::vector<std::shared_ptr<Value> > outputs;
     outputs.reserve(targets.size());
     Binding *iter = reinterpret_cast<Closure*>(value.get())->binding.get();

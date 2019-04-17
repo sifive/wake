@@ -39,6 +39,7 @@
 // Can be queried at multiple stages of the job's lifetime
 struct Job : public Value {
   Database *db;
+  std::string cmdline, stdin;
   int state;
   Hash code; // hash(dir, stdin, environ, cmdline)
   pid_t pid;
@@ -357,17 +358,30 @@ static void launch(JobTable *jobtable) {
     i.job->state |= STATE_FORKED;
     close(pipe_stdout[1]);
     close(pipe_stderr[1]);
-    for (char &c : task.cmdline) if (c == 0) c = ' ';
+    std::string echo(std::move(i.job->cmdline));
+    bool indirect = echo != task.cmdline;
+    for (char &c : echo) if (c == 0) c = ' ';
+    echo.resize(echo.size()-1); // trim trailing ' '
     if (i.pool) {
       double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
-      i.status = status_state.emplace(status_state.end(), task.cmdline, predict, i.start);
+      i.status = status_state.emplace(status_state.end(), echo, predict, i.start);
     }
     if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
       std::stringstream s;
-      s << task.cmdline << std::endl;
+      s << echo;
+      if (!i.job->stdin.empty()) s << " < " << i.job->stdin;
+      if (indirect) {
+        for (char &c : task.cmdline) if (c == 0) c = ' ';
+        task.cmdline.resize(task.cmdline.size()-1);
+        s << " # launched by: " << task.cmdline; // c_str so it terminates at first null
+        if (!task.stdin.empty()) s << " < " << task.stdin;
+      }
+      s << std::endl;
       std::string out = s.str();
       status_write(2, out.data(), out.size());
     }
+    i.job->stdin.clear();
+    i.job->cmdline.clear();
     jobtable->imp->tasks[i.pool].pop_front();
   }
 }
@@ -539,8 +553,8 @@ bool JobTable::wait(WorkQueue &queue) {
   return compute;
 }
 
-Job::Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline, bool keep_)
-  : Value(&type), db(db_), state(0), code(), pid(0), job(-1), keep(keep_)
+Job::Job(Database *db_, const std::string &dir, const std::string &stdin_, const std::string &environ, const std::string &cmdline_, bool keep_)
+  : Value(&type), db(db_), cmdline(cmdline_), stdin(stdin_), state(0), code(), pid(0), job(-1), keep(keep_)
 {
   std::vector<uint64_t> codes;
   type.hashcode.push(codes);
