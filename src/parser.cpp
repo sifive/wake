@@ -343,6 +343,21 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       location.end = id.second.end;
       return new Subscribe(location, id.first);
     }
+    case SOPEN: {
+      Location location = lex.next.location;
+      lex.consume();
+      if (lex.next.type == SCLOSE) {
+        location.end = lex.next.location.end;
+        lex.consume();
+        return new VarRef(location, "Nil");
+      } else {
+        Expr *out = parse_binary(0, lex, multiline);
+        location.end = lex.next.location.end;
+        out->location = location;
+        if (expect(SEND, lex)) lex.consume();
+        return out;
+      }
+    }
     case POPEN: {
       Location location = lex.next.location;
       lex.consume();
@@ -401,6 +416,12 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
         lhs = new App(app2_loc, new App(app1_loc, opp, lhs), rhs);
         break;
       }
+      case SCLOSE: {
+        lex.next.type = SEND;
+        auto op = new VarRef(lex.next.location, "binary ,");
+        auto rhs = new VarRef(lex.next.location, "Nil");
+        return new App(lex.next.location, new App(lex.next.location, op, lhs), rhs);
+      }
       case MATCH:
       case MEMOIZE:
       case LAMBDA:
@@ -410,6 +431,7 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
       case HERE:
       case SUBSCRIBE:
       case IF:
+      case SOPEN:
       case POPEN: {
         op_type op = op_precedence("a"); // application
         if (op.p < p) return lhs;
