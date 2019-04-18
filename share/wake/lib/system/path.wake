@@ -22,7 +22,7 @@ def mkdirRunner =
   def imp m p = prim "mkdir"
   def pre input =
     match input.getRunnerInputCommand
-      _, _, mode, dir, Nil = Pair input (Pair mode dir)
+      [_, _, mode, dir] = Pair input (Pair mode dir)
       _ = raise "mkdirRunner: invalid command-line"
   def post (Pair output (Pair mode dir)) =
     output
@@ -30,7 +30,7 @@ def mkdirRunner =
   makeRunner "mkdir" (\_ 0.0) pre post virtualRunner
 
 def mkdirImp inputs mode path =
-  makePlan ("<mkdir>", "-m", "0{strbase 8 mode}", path, Nil) inputs
+  makePlan ["<mkdir>", "-m", "0{strbase 8 mode}", path] inputs
   | setPlanKeep        False
   | setPlanEnvironment Nil
   | runJobWith mkdirRunner
@@ -38,7 +38,7 @@ def mkdirImp inputs mode path =
 
 # Create a directory in the parent
 global def mkdirIn parent mode name =
-  mkdirImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify
+  mkdirImp [parent] mode "{parent.getPathName}/{name}".simplify
 
 # Make all every element in the directory path with mode 0775
 global def mkdir path =
@@ -56,7 +56,7 @@ def writeImp inputs mode path content =
       output
       | editRunnerOutputOutputs (imp mode path content, _)
     makeRunner "write" (\_ 0.0) pre post virtualRunner
-  makePlan ("<write>", str mode, path, Nil) inputs
+  makePlan ["<write>", str mode, path] inputs
   | setPlanOnce        False
   | setPlanEnvironment Nil
   | runJobWith writeRunner
@@ -64,10 +64,10 @@ def writeImp inputs mode path content =
 
 # Create a file with the given mode in the specified directory
 global def writeIn parent mode name content =
-  writeImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify content
+  writeImp [parent] mode "{parent.getPathName}/{name}".simplify content
 
 # Create all directories and the named file
 global def write path content =
   def spath = simplify path
   def parent = simplify "{spath}/.."
-  writeImp (mkdir parent, Nil) 0664 spath content
+  writeImp [mkdir parent] 0664 spath content

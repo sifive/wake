@@ -15,11 +15,11 @@
 const char *symbolTable[] = {
   // WAKE:
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "VAL", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
-  "DATA", "EQUALS", "POPEN", "PCLOSE", "BOPEN", "BCLOSE", "IF", "THEN", "ELSE", "HERE", "MEMOIZE", "END",
-  "MATCH", "EOL", "INDENT", "DEDENT",
+  "DATA", "EQUALS", "POPEN", "PCLOSE", "BOPEN", "BCLOSE", "BEND", "IF", "THEN", "ELSE", "HERE", "MEMOIZE", "END",
+  "MATCH", "EOL", "INDENT", "DEDENT", "SOPEN", "SCLOSE", "SEND", "COLON",
   // JSON:
-  // "BOPEN", "BCLOSE",
-  "SOPEN", "SCLOSE", "COLON", "COMMA", "NULLVAL", "TRUE", "FALSE", "NUM", "DOUBLE", "STR"
+  // "BOPEN", "BCLOSE", "SOPEN", "SCLOSE", "COLON",
+  "COMMA", "NULLVAL", "TRUE", "FALSE", "NUM", "DOUBLE", "STR"
 };
 
 /*!max:re2c*/
@@ -500,6 +500,8 @@ top:
       ")"         { return mkSym(PCLOSE);    }
       "{"         { return mkSym(BOPEN);     }
       "}"         { return mkSym(BCLOSE);    }
+      "["         { return mkSym(SOPEN);     }
+      "]"         { return mkSym(SCLOSE);    }
 
       // operators
       Po_reserved = [;?@];

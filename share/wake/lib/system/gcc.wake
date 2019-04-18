@@ -1,13 +1,13 @@
-def c11Flags      = ("-std=c++11", Nil)
-def c99Flags      = ("-std=c99", Nil)
-def debugCFlags   = ("-Wall", "-Wextra", "-O0", "-g", "-pg", Nil)
-def debugLFlags   = ("-g", "-pg", Nil)
-def releaseCFlags = ("-Wall", "-O2", "-flto", Nil)
-def releaseLFlags = ("-flto", Nil)
+def c11Flags      = ["-std=c++11"]
+def c99Flags      = ["-std=c99"]
+def debugCFlags   = ["-Wall", "-Wextra", "-O0", "-g", "-pg"]
+def debugLFlags   = ["-g", "-pg"]
+def releaseCFlags = ["-Wall", "-O2", "-flto"]
+def releaseLFlags = ["-flto"]
 
 def doCompileC variant gcc flags headers cfile =
   def obj = replace '\.c(pp)?$' ".{variant}.o" cfile.getPathName
-  def cmdline = gcc, distinctBy scmpRaw flags ++ ("-c", cfile.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
+  def cmdline = gcc, distinctBy scmpRaw flags ++ ["-c", cfile.getPathName, "-frandom-seed={obj}", "-o", obj]
   def result = job cmdline (cfile, headers)
   result.getJobOutput
 
@@ -17,10 +17,10 @@ def doLinkO variant linker flags objects target =
   result.getJobOutput
 
 def makeCompileC variant gcc flags =
-  Pair variant (\extraFlags doCompileC variant gcc (flags ++ extraFlags)), Nil
+  [Pair variant (\extraFlags doCompileC variant gcc (flags ++ extraFlags))]
 
 def makeLinkO variant linker flags =
-  Pair variant (\extraFlags doLinkO variant linker (flags ++ extraFlags)), Nil
+  [Pair variant (\extraFlags doLinkO variant linker (flags ++ extraFlags))]
 
 publish compileC = makeCompileC "native-c99-debug"     (which "gcc") (c99Flags ++ debugCFlags)
 publish compileC = makeCompileC "native-c99-release"   (which "gcc") (c99Flags ++ releaseCFlags)

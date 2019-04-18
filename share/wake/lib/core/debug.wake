@@ -3,7 +3,7 @@ global def format any = prim "format"
 
 # Print any type to stdout; even exceptions
 global def print    str = prim "print"
-global def println  str = print (str, "\n", Nil).cat
+global def println  str = print "{str}\n"
 
 # Wait for the top of a value to be made available, then run (f x)
 # Eg: x = 1, 2, 3, Nil; waitOne f x waits for ',' to be known vs. Nil

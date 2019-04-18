@@ -285,9 +285,9 @@ global def getJobFailedInputs  job = tree job 1 | map getPairFirst | map Path
 global def getJobFailedOutputs job = tree job 2 | map getPairFirst | map Path
 global def getJobId job = prim "job_id"
 global def getJobOutput = match _.getJobOutputs
-  x, Nil = x
-  Nil    = raise "no outputs available"
-  _      = raise "more than one output found"
+  [x] = x
+  Nil = raise "no outputs available"
+  _   = raise "more than one output found"
 
 # Implement FUSE-based Runner
 def wakePath = prim "execpath" # location of the wake executable
@@ -409,7 +409,7 @@ def hashcode f = memoize 0 (
   def get f = prim "get_hash"
   def reuse = get f
   if reuse !=* "" then reuse else
-    def job = makeRawPlan ("<hash>", f, Nil) | runJobWith manualRunner
+    def job = makeRawPlan ["<hash>", f] | runJobWith manualRunner
     if job.getJobStatus == 0
     then extract '(.{64}).*' job.getJobStdout | head
     else raise "Failed to hash file {f}"
@@ -420,7 +420,7 @@ def stateRunner =
   def hash = "0000000000000000000000000000000000000000000000000000000000000000"
   def pre input =
     match input.getRunnerInputCommand
-      _, file, Nil = Pair input file
+      [_, file] = Pair input file
       _ = raise "stateRunner: invalid command-line"
   def post (Pair output file) =
     editRunnerOutputOutputs (add file hash, _) output
@@ -428,7 +428,7 @@ def stateRunner =
 
 # Mark a file whose contents must not be tracked
 global def makeStatePath file =
-  makePlan ("<state>", file, Nil) Nil
+  makePlan ["<state>", file] Nil
   | setPlanKeep        False
   | setPlanEnvironment Nil
   | setPlanFnOutputs   (file, _)
