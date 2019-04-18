@@ -30,7 +30,7 @@ global def foldl f a = match _
   h, t = foldl f (f a h) t
 
 global def scanl f a = match _
-  Nil  = a, Nil
+  Nil  = [a]
   h, t = a, scanl f (f a h) t
 
 global def foldr f a = match _
@@ -38,7 +38,7 @@ global def foldr f a = match _
   h, t = f h (foldr f a t)
 
 global def scanr f a = match _
-  Nil  = a, Nil
+  Nil  = [a]
   h, t =
     def finish r = f h r.head, r
     finish (scanr f a t)
