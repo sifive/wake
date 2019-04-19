@@ -63,6 +63,7 @@ public:
   const char *getTag(int i) const;
 
   void setDOB();
+  void setDOB(const TypeVar &other);
   void setTag(int i, const char *tag);
   bool unify(TypeVar &other,  const TypeErrorMessage *message);
   bool unify(TypeVar &&other, const TypeErrorMessage *message) { return unify(other, message); }

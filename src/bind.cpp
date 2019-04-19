@@ -754,8 +754,9 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     for (auto &i : def->val)
       ok = explore(i.get(), pmap, binding) && ok;
     for (int i = 0; i < (int)def->fun.size(); ++i) {
-      for (int j = i; j < (int)def->fun.size() && i == def->scc[j]; ++j)
-        if (def->fun[j]) def->fun[j]->typeVar.setDOB();
+      def->fun[i]->typeVar.setDOB();
+      for (int j = i+1; j < (int)def->fun.size() && i == def->scc[j]; ++j)
+        if (def->fun[j]) def->fun[j]->typeVar.setDOB(def->fun[i]->typeVar);
       bind.generalized = def->val.size() + def->scc[i];
       ok = explore(def->fun[i].get(), pmap, &bind) && ok;
     }
