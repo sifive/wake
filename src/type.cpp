@@ -45,6 +45,13 @@ void TypeVar::setDOB() {
   }
 }
 
+void TypeVar::setDOB(const TypeVar &other) {
+  if (!var_dob) {
+    assert (!parent && isFree());
+    free_dob = var_dob = other.var_dob;
+  }
+}
+
 void TypeVar::setTag(int i, const char *tag) {
   TypeVar *a = find();
   if (!a->cargs[i].tag) a->cargs[i].tag = tag;
