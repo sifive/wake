@@ -21,6 +21,7 @@ global def lcm x y = prim "lcm"
 global def powm x y m = prim "powm" # fast version of: (x^y) % m
 
 global def icmp x y = prim "icmp"
+global def x <=> y = icmp x y
 
 global def x <  y = lt icmp x y
 global def x >  y = y < x
