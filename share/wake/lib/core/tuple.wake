@@ -6,6 +6,9 @@ global tuple Pair a b =
   global First:  a
   global Second: b
 
+# we use pairs for key value maps a lot
+global def x → y = Pair x y
+
 global tuple Triple a b c =
   global First:  a
   global Second: b
