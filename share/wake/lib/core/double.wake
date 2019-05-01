@@ -23,11 +23,11 @@ global def dcmp x y = prim "dcmp"
 
 global def x <.  y = lt dcmp x y
 global def x >.  y = y <. x
-global def x >=. y = !(x <. y)
-global def x <=. y = !(y <. x)
+global def x >=. y = ! x <. y
+global def x <=. y = ! y <. x
 
 global def x ==. y = eq dcmp x y
-global def x !=. y = !(x ==. y)
+global def x !=. y = ! x ==. y
 
 global def dmin x y = if x <. y then x else y
 global def dmax x y = if x <. y then y else x

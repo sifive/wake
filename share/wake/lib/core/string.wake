@@ -49,27 +49,27 @@ global def scmpRaw x y = prim "scmp"
 # This is the string order you should probably be using
 global def x <~  y = lt scmpNFKC x y
 global def x >~  y = y <~ x
-global def x >=~ y = !(x <~ y)
-global def x <=~ y = !(y <~ x)
+global def x >=~ y = ! x <~ y
+global def x <=~ y = ! y <~ x
 
 global def x ==~ y = eq scmpNFKC x y
-global def x !=~ y = !(x ==~ y)
+global def x !=~ y = ! x ==~ y
 
 # Case insensitive order (^ = upper-case)
 global def x <^  y = lt scasecmpNFKC x y
 global def x >^  y = y <^ x
-global def x >=^ y = !(x <^ y)
-global def x <=^ y = !(y <^ x)
+global def x >=^ y = ! x <^ y
+global def x <=^ y = ! y <^ x
 
 global def x ==^ y = eq scasecmpNFKC x y
-global def x !=^ y = !(x ==^ y)
+global def x !=^ y = ! x ==^ y
 
 # Raw binary string order
 # Only use this for non-textual data
 global def x <*  y = lt scmpRaw x y
 global def x >*  y = y <* x
-global def x >=* y = !(x <* y)
-global def x <=* y = !(y <* x)
+global def x >=* y = ! x <* y
+global def x <=* y = ! y <* x
 
 global def x ==* y = eq scmpRaw x y
-global def x !=* y = !(x ==* y)
+global def x !=* y = ! x ==* y

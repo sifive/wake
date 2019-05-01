@@ -24,11 +24,11 @@ global def icmp x y = prim "icmp"
 
 global def x <  y = lt icmp x y
 global def x >  y = y < x
-global def x >= y = !(x < y)
-global def x <= y = !(y < x)
+global def x >= y = ! x < y
+global def x <= y = ! y < x
 
 global def x == y = eq icmp x y
-global def x != y = !(x == y)
+global def x != y = ! x == y
 
 global def min x y = if x < y then x else y
 global def max x y = if x < y then y else x

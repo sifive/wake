@@ -86,7 +86,7 @@ global def exists f l = match (find f l)
   Some _ = True
   None   = False
 
-global def forall f l = !exists (!f _) l
+global def forall f l = ! exists (! f _) l
 
 global def splitBy f = match _
   Nil  = Pair Nil Nil
