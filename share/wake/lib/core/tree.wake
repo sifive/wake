@@ -324,6 +324,23 @@ def upper f root =
     Bin s l x r = if f x then someL z i l else someR x (i+s) r
   none root
 
+# Extract all elements from the tree which are equal to y
+# => Pair (matches: List x) (rank: Integer)
+global def textract y (Tree cmp root) =
+  def helperR i out = match _ # i = size including self
+    Tip         = Pair out i
+    Bin s l x r = match (cmp x y)
+      LT = helperR i out r
+      GT = helperL (i-s) out l
+      EQ = helperL (i-s) (x, helperR i out r | getPairFirst) l
+  def helperL i out = match _ # i = size left of self
+    Tip         = Pair out i
+    Bin s l x r = match (cmp x y)
+      LT = helperR (i+s) out r
+      GT = helperL i out l
+      EQ = helperL i (x, helperR (i+s) out r | getPairFirst) l
+  helperL 0 Nil root
+
 # Returns True if there is a key in t = y
 global def x ∈ y = tcontains x y
 global def x ∉ y = ! x ∈ y
