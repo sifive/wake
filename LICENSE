@@ -1,0 +1,11 @@
+This source repository includes software from various sources.
+Each file includes a header which describes the relevant license.
+
+In broad strokes:
+  wake		LICENSE.Apache2		most source code
+  utf8proc	LICENSE.MIT		utf8proc/
+  Unicode data	LICENSE.UNICODE		utf8proc/utf8proc_data.c
+  gopt		LICENSE.TFL		gopt/
+  whereami	LICENSE.WTFPL		src/whereami*
+  SipHash	LICENSE.CC0		src/siphash.cpp
+  BLAKE2	LICENSE.CC0		shim/blake2*
