@@ -326,7 +326,6 @@ global def fuseRunner =
 # estimate: Usage => Option Usage; predict local usage based on prior recorded usage
 global def makeJSONRunner script score estimate =
   def pre (RunnerInput command visible environment directory stdin prefix record _) =
-    def x → y = Pair x y
     def json = JObject (
       "command"     → command     | map JString | JArray,
       "environment" → environment | map JString | JArray,
@@ -378,7 +377,6 @@ global def executeJSON json =
   def dir   = json // "directory"   | getJString | getOrElse "."
   def stdin = json // "stdin"       | getJString | getOrElse ""
   def job = Plan cmd vis env dir stdin ReRun True Nil (\_ True) id id id 1 | runJobWith fuseRunner
-  def x → y = Pair x y
   JObject (
     "inputs"  → tree job 1 | map (_.getPairFirst.JString) | JArray,
     "outputs" → tree job 2 | map (_.getPairFirst.JString) | JArray,

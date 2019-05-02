@@ -71,8 +71,8 @@ global def tinsertMulti y (Tree cmp root) =
 
 global def a ⊆ b = tsubset a b
 global def a ⊇ b = tsubset b a
-global def a ⊉ b = !(a ⊇ b)
-global def a ⊈ b = !(a ⊆ b)
+global def a ⊉ b = ! a ⊇ b
+global def a ⊈ b = ! a ⊆ b
 
 global def a ⊊ b = a ⊆ b && b ⊈ a # strict
 global def a ⊋ b = a ⊇ b && b ⊉ a # strict
@@ -193,7 +193,7 @@ global def texists f t = match (tfind f t)
   Some _ = True
   None   = False
 
-global def tforall f t = !texists (!f _) t
+global def tforall f t = ! texists (! f _) t
 
 # Split tree into those elements <, =, and > y
 global def tsplit y (Tree cmp root) =
@@ -326,7 +326,7 @@ def upper f root =
 
 # Returns True if there is a key in t = y
 global def x ∈ y = tcontains x y
-global def x ∉ y = !(x ∈ y)
+global def x ∉ y = ! x ∈ y
 global def x ∋ y = y ∈ x
 global def x ∌ y = y ∉ x
 global def tcontains y t =

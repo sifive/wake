@@ -1150,7 +1150,6 @@ top:
       Sm_divu                    { return op_type(16, 0); }
       [/%] | Sm_divb             { return op_type(15, 1); }
       Sm_sumu                    { return op_type(14, 0); }
-      [!] / [^=]                 { return op_type(13, 1); }
       [\-] | Sm_sumb             { return op_type(13, 1); }
       Sm_test | Sm_lt | Sm_gt    { return op_type(12, 1); }
       "!" | Sm_eq                { return op_type(11, 0); }

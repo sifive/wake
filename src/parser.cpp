@@ -241,6 +241,7 @@ static Expr *parse_match(int p, Lexer &lex) {
 
 static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
   TRACE("UNARY");
+  if (lex.next.type == EOL && multiline) lex.consume();
   switch (lex.next.type) {
     // Unary operators
     case OPERATOR: {
@@ -346,9 +347,10 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
     case POPEN: {
       Location location = lex.next.location;
       lex.consume();
+      bool eateol = lex.next.type == INDENT;
       Expr *out = parse_block(lex, multiline);
       location.end = lex.next.location.end;
-      if (lex.next.type == EOL) lex.consume();
+      if (eateol && expect(EOL, lex)) lex.consume();
       if (expect(PCLOSE, lex)) lex.consume();
       out->location = location;
       return out;
@@ -384,7 +386,6 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
 
 static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
   TRACE("BINARY");
-  if (lex.next.type == EOL && multiline) lex.consume();
   auto lhs = parse_unary(p, lex, multiline);
   for (;;) {
     switch (lex.next.type) {

@@ -7,3 +7,4 @@ global def argument | pipeFn = pipeFn argument # bash-style pipe operator
 # Avoid ()s without changing order
 global def dollarFn $ argument = dollarFn argument
 global def f ∘ g = \x f (g x)
+global def flip f x y = f y x
