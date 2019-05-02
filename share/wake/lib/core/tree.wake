@@ -179,6 +179,16 @@ global def tfind f (Tree _ root) =
       _        _    _       = None
   helper root
 
+# Highest rank element where cmp x y = EQ  => Option (Pair x rank)
+global def tfindCmp y (Tree cmp root) =
+  def helper = match _
+    Tip         = None
+    Bin s l x r = match (cmp x y)
+      EQ = Some (Pair x (s-size r-1))
+      LT = helper r
+      GT = helper l
+  helper root
+
 global def tsplitUntil f t =
   match (tfind f t)
     None = match t
