@@ -341,7 +341,7 @@ def upper f root =
 
 # Extract all elements from the tree which are equal to y
 # => Pair (matches: List x) (rank: Integer)
-global def textract y (Tree cmp root) =
+global def tequal y (Tree cmp root) =
   def helperR i out = match _ # i = size including self
     Tip         = Pair out i
     Bin s l x r = match (cmp x y)
