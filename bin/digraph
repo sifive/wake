@@ -1,0 +1,36 @@
+#! /bin/sh
+
+# Copyright 2019 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+sqlite3 wake.db <<EOF | dot -Tsvg > wake.svg
+with
+  jv(id, label) as (select job_id, substr(commandline, 0, instr(commandline, x'00'))
+    from jobs where use_id=(select max(run_id) from runs)),
+  fv(id, label) as (select t.file_id, f.path from jv j, filetree t, files f where j.id=t.job_id and f.file_id=t.file_id),
+  ei(fid, jid) as (select t.file_id, j.id from jv j, filetree t where j.id=t.job_id and t.access=1),
+  eo(jid, fid) as (select j.id, t.file_id from jv j, filetree t where j.id=t.job_id and t.access=2),
+  header(str) as (values('digraph {')),
+  footer(str) as (values('}')),
+  out(str, row) as (
+    select str, 1 as row from header union
+    select '  j' || id || ' [label="' || label || '"];', 2 as row from jv union
+    select '  f' || id || ' [label="' || label || '"];', 3 as row from fv union
+    select '  f' || fid || ' -> j' || jid || ';', 4 as row from ei union
+    select '  j' || jid || ' -> f' || fid || ';', 5 as row from eo union
+    select str, 6 as row from footer
+    order by row)
+select group_concat(str,x'0a') from out;
+EOF
