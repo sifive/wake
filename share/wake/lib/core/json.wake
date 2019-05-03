@@ -60,7 +60,7 @@ def escape =
     x if x < 16 = '\u000', strbase 16 x, t
     x           = '\u00',  strbase 16 x, t
   def helper = match _
-    s, c, t = s, str2bin c | fmt (helper t)
+    s, c, t = s, byteToInteger c | fmt (helper t)
     x = x
   _
   | replace '[\\"]' '\\\0'
