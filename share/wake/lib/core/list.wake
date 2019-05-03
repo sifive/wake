@@ -121,7 +121,7 @@ global def transpose l =
   if todo.empty then Nil else heads, transpose tails
 
 # f should be a less-than comparison
-global def sortBy f l = vlist (vsortBy f (lvector l))
+global def sortBy f l = vectorToList (vsortBy f (listToVector l))
 
 # keep only the first occurrence of a value
 global def distinctBy cmp =

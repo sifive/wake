@@ -417,10 +417,10 @@ Nevertheless, sometimes this syntax can be convenient, too.
 
     global def mathSymbols _ =
       def helper = match _
-        code, _, "Sm", _ = Some (code2str (intbase 16 code))
+        code, _, "Sm", _ = Some (integerToUnicode (intbase 16 code))
         _                = None
       def url = "ftp://ftp.unicode.org/Public/UNIDATA/UnicodeData.txt"
-      def lines = tokenize "\n" (read (curl url))
+      def lines = curl url | read | tokenize "\n"
       def codes = mapPartial (tokenize ";" _ | helper) lines
       catWith " " codes
     EOF
