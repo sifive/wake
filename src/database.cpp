@@ -130,13 +130,14 @@ std::string Database::open(bool wait, bool memory) {
     "  stat_id     integer references stats(stat_id)," // null if unmerged
     "  endtime     text    not null default '',"
     "  keep        integer not null default 0);"       // 0=false, 1=true
-    "create index if not exists job on jobs(directory, commandline, environment, stdin);"
+    "create index if not exists job on jobs(directory, commandline, environment, stdin, keep, job_id, stat_id);"
     "create table if not exists filetree("
-    "  access  integer not null," // 0=visible, 1=input, 2=output, 3=indexes
-    "  job_id  integer not null references jobs(job_id) on delete cascade,"
-    "  file_id integer not null references files(file_id),"
-    "  primary key(job_id, access, file_id) on conflict ignore);"
-    "create index if not exists filesearch on filetree(file_id, access);"
+    "  tree_id  integer primary key autoincrement,"
+    "  access   integer not null," // 0=visible, 1=input, 2=output, 3=indexes
+    "  job_id   integer not null references jobs(job_id) on delete cascade,"
+    "  file_id  integer not null references files(file_id),"
+    "  unique(job_id, access, file_id) on conflict ignore);"
+    "create index if not exists filesearch on filetree(file_id, access, job_id);"
     "create table if not exists log("
     "  log_id     integer primary key autoincrement,"
     "  job_id     integer not null references jobs(job_id) on delete cascade,"
@@ -196,7 +197,7 @@ std::string Database::open(bool wait, bool memory) {
     "select output from log where job_id=? and descriptor=? order by log_id";
   const char *sql_get_tree =
     "select f.path, f.hash from filetree t, files f"
-    " where t.job_id=? and t.access=? and f.file_id=t.file_id";
+    " where t.job_id=? and t.access=? and f.file_id=t.file_id order by t.tree_id";
   const char *sql_add_stats =
     "insert into stats(hashcode, status, runtime, cputime, membytes, ibytes, obytes)"
     " values(?, ?, ?, ?, ?, ?, ?)";

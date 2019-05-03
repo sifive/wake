@@ -322,8 +322,8 @@ global def fuseRunner =
   def post (Pair output fuse) =
     def _ = killJob fuse 14 # SIGALRM
     def result = extract "(.*\0)?\0(.*)" fuse.getJobStdout
-    def inputs  = result | at 0 | tokenize "\0" | reverse | tail
-    def outputs = result | at 1 | tokenize "\0" | reverse | tail
+    def inputs  = result | at 0 | tokenize "\0" | filter (_!=*"")
+    def outputs = result | at 1 | tokenize "\0" | filter (_!=*"")
     def usage (Usage ps pr pc pm pi po) = match fuse.getJobReport
       Usage fs _ fc fm fi fo =
         Usage (if fs == 0 then ps else fs) pr (fc +. pc) (fm + pm) (fi + pi) (fo + po)
