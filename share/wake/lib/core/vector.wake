@@ -17,7 +17,7 @@
 data Vector a = Vector (Array a) Integer Integer
 
 # Convert List a => Vector a
-global def lvector l =
+global def listToVector l =
   def llen = len l
   def vnew n = prim "vnew"
   # take out as an arg so vnew does not generalize
@@ -30,7 +30,7 @@ global def lvector l =
     out
   reraise llen (\l Vector (bind (vnew l)) 0 l)
 
-global def tvector t =
+global def treeToVector t =
   def len = tlen t
   def vnew n = prim "vnew"
   # take out as an arg so vnew does not generalize
@@ -43,7 +43,7 @@ global def tvector t =
 
 global def vempty (Vector _ s e) = s == e
 global def vlen (Vector _ s e) = e - s
-global def vlist = vfoldr (_,_) Nil
+global def vectorToList = vfoldr (_,_) Nil
 
 global def vsplitAt i (Vector v s e) =
   def x = min e (s + max 0 i)
