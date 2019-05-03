@@ -32,10 +32,10 @@ global def listToTree cmp list = vectorToTree cmp (listToVector list)
 global def listToTreeMulti cmp list = vectorToTreeMulti cmp (listToVector list)
 
 global def vectorToTreeMulti cmp v =
-  Tree cmp (build (vsortBy (lt cmp) v))
+  Tree cmp (build (vsortBy (cmp _ _ | isLT) v))
 
 global def vectorToTree cmp v =
-  Tree cmp (build (vdistinctRunBy (eq cmp) (vsortBy (lt cmp) v)))
+  Tree cmp (build (vdistinctRunBy (cmp _ _ | isEQ) (vsortBy (cmp _ _ | isLT) v)))
 
 def build v = match (vlen v)
   0 = Tip

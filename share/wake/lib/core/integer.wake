@@ -36,15 +36,14 @@ global def lcm x y = prim "lcm"
 global def powm x y m = prim "powm" # fast version of: (x^y) % m
 
 global def icmp x y = prim "icmp"
-global def x <=> y = icmp x y
+global def x <=> y = prim "icmp"
 
-global def x <  y = lt icmp x y
-global def x >  y = y < x
-global def x >= y = ! x < y
-global def x <= y = ! y < x
-
-global def x == y = eq icmp x y
-global def x != y = ! x == y
+global def x <  y = isLT (x <=> y)
+global def x >  y = isGT (x <=> y)
+global def x >= y = isGE (x <=> y)
+global def x <= y = isLE (x <=> y)
+global def x == y = isEQ (x <=> y)
+global def x != y = isNE (x <=> y)
 
 global def min x y = if x < y then x else y
 global def max x y = if x < y then y else x

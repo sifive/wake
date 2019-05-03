@@ -18,12 +18,26 @@ global data Order =
   EQ
   GT
 
-global def lt cmp x y =
-  match (cmp x y)
-    LT = True
-    _  = False
+global def isLT = match _
+  LT = True
+  _  = False
 
-global def eq cmp x y =
-  match (cmp x y)
-    EQ = True
-    _  = False
+global def isEQ = match _
+  EQ = True
+  _  = False
+
+global def isGT = match _
+  GT = True
+  _  = False
+
+global def isLE = match _
+  GT = False
+  _  = True
+
+global def isNE = match _
+  EQ = False
+  _  = True
+
+global def isGE = match _
+  LT = False
+  _  = True

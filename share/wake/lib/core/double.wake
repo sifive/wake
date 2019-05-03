@@ -35,15 +35,14 @@ global def ∛ x = root3 x
 global def ∜ x = root4 x
 
 global def dcmp x y = prim "dcmp"
-global def x <=>. y = dcmp x y
+global def x <=>. y = prim "dcmp"
 
-global def x <.  y = lt dcmp x y
-global def x >.  y = y <. x
-global def x >=. y = ! x <. y
-global def x <=. y = ! y <. x
-
-global def x ==. y = eq dcmp x y
-global def x !=. y = ! x ==. y
+global def x <.  y = isLT (x <=>. y)
+global def x >.  y = isGT (x <=>. y)
+global def x >=. y = isGE (x <=>. y)
+global def x <=. y = isLE (x <=>. y)
+global def x ==. y = isEQ (x <=>. y)
+global def x !=. y = isNE (x <=>. y)
 
 global def dmin x y = if x <. y then x else y
 global def dmax x y = if x <. y then y else x
