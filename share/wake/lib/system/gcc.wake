@@ -22,12 +22,12 @@ def releaseLFlags = ("-flto", Nil)
 
 def doCompileC variant gcc flags headers cfile =
   def obj = replace '\.c(pp)?$' ".{variant}.o" cfile.getPathName
-  def cmdline = gcc, distinctBy scmpRaw flags ++ ("-c", cfile.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
+  def cmdline = gcc, distinctBy scmp flags ++ ("-c", cfile.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
   def result = job cmdline (cfile, headers)
   result.getJobOutput
 
 def doLinkO variant linker flags objects target =
-  def cmdline = (linker, "-o", "{target}.{variant}", map getPathName objects) ++ distinctBy scmpRaw flags
+  def cmdline = (linker, "-o", "{target}.{variant}", map getPathName objects) ++ distinctBy scmp flags
   def result = job cmdline (mkdir "{target}/..", objects)
   result.getJobOutput
 

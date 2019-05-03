@@ -47,47 +47,47 @@ global def byteToInteger s = prim "str2bin"
 global def version = prim "version"
 
 # Unicode normalization methods
-global def sNFC x = prim "sNFC"
-global def sNFKC x = prim "sNFKC"
-global def scaseNFKC x = prim "scaseNFKC"
+global def unicodeCanonical  x = prim "sNFC"
+global def unicodeIdentifier x = prim "sNFKC"
+global def unicodeLowercase  x = prim "scaseNFKC"
 
 # Unicode NFC string comparison Ç == C+◌̧
-global def scmpNFC x y = scmpRaw (sNFC x) (sNFC y)
+global def scmpCanonical x y = scmp (unicodeCanonical x) (unicodeCanonical y)
 # Unicode NFKC string comparison (¼i⁹ = 1/4i9)
-global def scmpNFKC x y = scmpRaw (sNFKC x) (sNFKC y)
+global def scmpIdentifier x y = scmp (unicodeIdentifier x) (unicodeIdentifier y)
 # Unicode case insensitive NFKC comparison
-global def scasecmpNFKC x y = scmpRaw (scaseNFKC x) (scaseNFKC y)
+global def scmpLowercase x y = scmp (unicodeLowercase x) (unicodeLowercase y)
 # Raw binary string comparison; no normalization performed
-global def scmpRaw x y = prim "scmp"
+global def scmp x y = prim "scmp"
 
 # NFKC order (fancy format removed) -- secure default
 # This is the string order you should probably be using
-global def x <=>~y = scmpNFKC x y
-global def x <~  y = lt scmpNFKC x y
+global def x <=>~y = scmpIdentifier x y
+global def x <~  y = lt scmpIdentifier x y
 global def x >~  y = y <~ x
 global def x >=~ y = ! x <~ y
 global def x <=~ y = ! y <~ x
 
-global def x ==~ y = eq scmpNFKC x y
+global def x ==~ y = eq scmpIdentifier x y
 global def x !=~ y = ! x ==~ y
 
-# Case insensitive order (^ = upper-case)
-global def x <=>^y = scasecmpNFKC x y
-global def x <^  y = lt scasecmpNFKC x y
+# Case insensitive order (^ = capitals)
+global def x <=>^y = scmpLowercase x y
+global def x <^  y = lt scmpLowercase x y
 global def x >^  y = y <^ x
 global def x >=^ y = ! x <^ y
 global def x <=^ y = ! y <^ x
 
-global def x ==^ y = eq scasecmpNFKC x y
+global def x ==^ y = eq scmpLowercase x y
 global def x !=^ y = ! x ==^ y
 
 # Raw binary string order
 # Only use this for non-textual data
-global def x <=>*y = scmpRaw x y
-global def x <*  y = lt scmpRaw x y
+global def x <=>*y = scmp x y
+global def x <*  y = lt scmp x y
 global def x >*  y = y <* x
 global def x >=* y = ! x <* y
 global def x <=* y = ! y <* x
 
-global def x ==* y = eq scmpRaw x y
+global def x ==* y = eq scmp x y
 global def x !=* y = ! x ==* y
