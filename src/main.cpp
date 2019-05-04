@@ -202,7 +202,7 @@ void print_help(const char *argv0) {
     << "  Flags affecting build execution:" << std::endl
     << "    --jobs=NUM -jNUM Schedule local job execution to use <= NUM CPU-bound tasks" << std::endl
     << "    --check    -c    Rerun all jobs and confirm their output is reproducible"    << std::endl
-    << "    --verbose  -v    Report job standard output and hash progres"                << std::endl
+    << "    --verbose  -v    Report job standard output and hash progress"               << std::endl
     << "    --debug    -d    Report stack frame information for exceptions and closures" << std::endl
     << "    --quiet    -q    Surpress report of launched jobs and final expressions"     << std::endl
     << "    --no-tty         Surpress interactive build progress interface"              << std::endl
@@ -210,8 +210,8 @@ void print_help(const char *argv0) {
     << "    --no-workspace   Do not open a database or scan for sources files"           << std::endl
     << std::endl
     << "  Database introspection:" << std::endl
-    << "    --input  FILES   Report recorded meta-data for jobs which read FILES"        << std::endl
-    << "    --output FILES   Report recorded meta-data for jobs which wrote FILES"       << std::endl
+    << "    --input  -i FILE Report recorded meta-data for jobs which read FILES"        << std::endl
+    << "    --output -o FILE Report recorded meta-data for jobs which wrote FILES"       << std::endl
     << "    --verbose  -v    Report recorded standard output and error of matching jobs" << std::endl
     << "    --debug    -d    Report recorded stack frame of matching jobs"               << std::endl
     << "    --script   -s    Format reported jobs as an executable shell script"         << std::endl
