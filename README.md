@@ -68,23 +68,15 @@ On Mac OS with Mac Ports installed:
 
 On Mac OS with Home Brew installed:
 
-    brew link re2
-    # maybe this next command gets rid of the gmp export below. If it does then remove the export below. Otherwise remove the brew link gmp
-    brew link gmp
-    brew update
-    sudo chown $USER /usr/local/Caskroom/
+    brew install sqlite3 gmp re2 ncurses pkgconfig
+    
+Fuse is slightly more complicated, it requires permissions.
+
     brew tap homebrew/cask
     brew cask install osxfuse
-    sudo chown root:wheel /usr/local/Caskroom/
-    brew install sqlite3 gmp re2 ncurses pkgconfig gmp
-
-    Set up .pc files - [Installation instructions](https://mrcook.uk/how-to-install-go-ncurses-on-mac-osx)
-
-    export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:~/Dropbox/ncurses-pc-files/
-    export PKG_CONFIG_PATH=/usr/local/Cellar/ncurses/6.1/lib/pkgconfig:$PKG_CONFIG_PATH
-
-    export CPATH=/usr/local/Cellar/gmp/6.1.2_2/include:$CPATH
-
+    
+You should see something like the following, and MacOS may ask for your password.
+    
     You must reboot for the installation of osxfuse to take effect.
 
     System Extension Blocked
@@ -92,6 +84,8 @@ On Mac OS with Home Brew installed:
     Please open the Security & Privacy System Preferences pane, go to the General preferences and allow loading system software from developer "Benjamin Fleischer".
 
     Then try mounting the volume again."
+
+Give FUSE permission to run as stated in the instructions and you should be good to go.
 
 # Building wake
 
