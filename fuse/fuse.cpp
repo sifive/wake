@@ -1,16 +1,22 @@
-/*
-  Wake FUSE driver to capture inputs/outputs
-  FUSE: Filesystem in Userspace
-
-  Copyright (C) 2018       Wesley W. Terpstra <wesley@sifive.com>
-  Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
-  Copyright (C) 2011       Sebastian Pipping <sebastian@pipping.org>
-
-  This program can be distributed under the terms of the GNU GPL.
-  See the file COPYING.
-
-  g++ -std=c++11 -Wall fuse.cpp `pkg-config fuse --cflags --libs` -o fuse-wake
-*/
+/* Wake FUSE driver to capture inputs/outputs
+ *
+ * Copyright 2019 SiFive, Inc.
+ * Copyright 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
+ * Copyright 2011       Sebastian Pipping <sebastian@pipping.org>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You should have received a copy of LICENSE.Apache2 along with
+ * this software. If not, you may obtain a copy at
+ *
+ *    https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #define FUSE_USE_VERSION 26
 
