@@ -16,7 +16,7 @@
 # lists
 global data List a =
   Nil
-  a, List a
+  (head: a), (tail: List a)
 
 global def empty = match _
   Nil = True

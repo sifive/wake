@@ -88,13 +88,14 @@ build invokes the compileC function. In wake `f x y` is read as
 function `f` run on `x` and `y`. In C this would be `f(x, y)`. So
 compileC is being run on four arguments. 
 
-Notice that the type of compileC is `String => List String => List String => String => String`.
+Notice that the type of compileC is `String => List String => List Path => Path => Path`.
 This should be read as "a function that takes a String, then a List of
-Strings, then another List of Strings, another String, and finally returns a
-String."
+Strings, then a List of Paths, another Path, and finally returns a
+Path."
 
 Indeed, we can see in our use of compileC, we passed a String for the
-first and last arguments. The second and third arguments are Lists.
+first argument and `source` which produces a Path for the last argument.
+The second and third arguments are Lists.
 `Nil` is the empty List and `(x, y, Nil)` is a List with x and y.
 
 The arguments to compileC are:
@@ -103,7 +104,7 @@ The arguments to compileC are:
   3. a list of legal input files (more on this later)
   4. the name of the file to compile
 
-The output of compileC is the name of the object file produced.
+The output of compileC is the path of the object file produced.
 
 ## Compiling and linking two CPP files
 
@@ -179,6 +180,11 @@ argument to `sources` is a regular expression to select which files to
 return. We've used `''`s here which define strings with escapes disabled.
 If we had used `""`s we would have had to write `".*\\.h"`, instead.
 
+Note that source files are those files tracked by git. Wake will never
+return built files from a call to `sources`, helping repeatability.
+The same reasoning applies to `.wake` files. Wake will only read wake
+files that are tracked by version control.
+
 In a classic Makefile it would be considered bad form to list all header
 files as dependencies for all cpp files.  That's because make would
 recompile every cpp file whenever any header file changes.  In wake, we
@@ -213,13 +219,13 @@ your codebase so that all the files in the current directory should be
 linked together.  This example demonstrates how to support that.
 
 Notice that we've defined `compile` to be `compileC` with every argument
-supplied EXCEPT the name of the file to compile.  We could now write
-`compile "main.cpp"` to compile a single cpp file, saving some typing.
+supplied EXCEPT the `Path` of the file to compile.  We could now write
+`compile (source "main.cpp")` to compile a single cpp file, saving some typing.
 
 However, we can also use the `map` function to save even more!  We use the
-`sources` function to find all the cpp files.  That gives us a list of
-strings.  `compile` is a function which needs to take only one more
-`String`.  What `map` does is apply the function supplied as its first
+`sources` function to find all the cpp files.  That gives us a `List` of
+`Path`s.  `compile` is a function which needs to take only one more argument,
+a `Path`.  What `map` does is apply the function supplied as its first
 argument to every element in the list supplied as its second argument. 
 Thus, `objects` is now a list of all the object files created by compiling
 all the cpp files.  Our wake file is now both smaller and will automatically
@@ -270,14 +276,14 @@ most systems, `which "uname" = "/bin/uname"`.  Using `which` buys us a bit
 of indirection and is usually good form to use with jobs.
 
 `job` is the main method wake uses to invoke a job.  It takes two arguments,
-a list of strings for the command-line and a list of strings of legal
+a list of strings for the command-line and a list of paths of legal
 inputs.  As with `compileC` and `linkO`, every file in the workspace which
 the job needs must be listed in this second argument, or the job will not
 have access to them.  Indeed, both `compileC` and `linkO` are implemented by
 using `job` internally. The value returned by `job` can be accessed in many
-ways. `job.stdout` provides the standard output from the command.
-`job.status` is an `Integer` equal to the job's exit status. `job.outputs`
-returns a list of string pairs, with the output filename and it's hash.
+ways. `job.getJobStdout` provides the standard output from the command.
+`job.getJobStatus` is an `Integer` equal to the job's exit status.
+`job.getJobOutputs` returns a list paths created by the job.
 
 The `body` variable is created using string interpolation.  Inside a `""`
 string, you can include wake expressions within `{}`s and they will be
@@ -286,11 +292,42 @@ into the string body.  `version` is just a `String` with the current wake
 version.
 
 Finally, we create the output file `info.h` with the desired contents.
-`write` returns the file name created once the file has been written.
+`write` returns the path of created file once the file has been written.
 This way, anything that depends on the return of our `info_h` method will
 have to wait until `info.h` has been saved to disk. We also have an example
-of a comment, `# ...`, which translates the magic octal value `0644` to
-something more human-readable.
+of a comment, `# ...`, reminding us of the default permissions used.
+
+## Customizing job invocation
+
+    cat >> tutorial.wake <<EOF
+    global def hax _ =
+      makePlan (which "env", Nil) Nil
+      | setPlanEnvironment ("HAX=peanut", "FOO=bar", Nil)
+      | runJob
+      | getJobStdout
+      | println
+    wake 'hax 0'
+
+Till now, we've been running processes with the default execution plan.
+This means that all environment variables are removed and the job is
+executed in the root of the workspace. However, it is possible to
+customize the environment used by a job.
+
+The underlying job execution model of wake uses two phases. First one
+constructs a `Plan` object which describes what should be executed.
+The `Plan` is then transformed into a `Job` by `runJob`. Before one
+calls `runJob`, one can change various properties, like the environment
+variables in this example.
+
+This example also demonstrates the syntax `x | f 0 | g`. This should be
+read like the pipe operator in a shell script. Ultimately, it will be
+evaluated as `g (f 0 x)`, but when chaining together multiple
+transformations to data, the pipe syntax becomes more readable.
+
+Finally, `println` is very useful when debugging wake code. However,
+be forewarned that the execution order of wake is not sequential!
+This can result in `print` output that does not appear to follow the
+definition order of your build program.
 
 ## Target execution depending on prior targets
 
@@ -349,8 +386,8 @@ Consider the follow program:
 
     cat >>tutorial.wake <<EOF
     global data Animal =
-      Cat String
-      Dog Integer
+      Cat (name: String)
+      Dog (age: Integer)
 
     global def strAnimal a = match a
       Cat x = "a cat called {x}"
@@ -368,8 +405,8 @@ The general syntax is `data TYPE = (CONS TYPE*)+`.
 If we want the new type available to other files, we put a `global` in
 front of the `data`, just like with variables.
 
-As wake informs us, `Cat` is a variable that takes a `String` and returns an
-`Animal`. However, unlike normal variables, `Cat` is also a type constructor.
+As wake informs us, `Cat` is a function that takes a `String` and returns an
+`Animal`. However, unlike normal functions, `Cat` is also a type constructor.
 Type constructors differ from normal variables in that they are capitalized
 and can be used in pattern matches.
 
@@ -400,6 +437,7 @@ which fills the holes from left to right.
 
     wake '_ + 4'
     wake 'map (_ + 4) (seq 8)'
+    wake 'seq 1000 | filter (_%55==0) | map str | catWith " "'
 
 This hole-oriented syntax is not as powerful as lambda expressions, because
 each argument can only be used once.  Furthermore, the functions are created
