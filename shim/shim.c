@@ -115,8 +115,8 @@ int main(int argc, char **argv) {
   }
 
   if (strcmp(argv[5], "<hash>")) {
-    execv(argv[5], argv+5);
-    fprintf(stderr, "execv: %s: %s\n", argv[5], strerror(errno));
+    execvp(argv[5], argv+5);
+    fprintf(stderr, "execvp: %s: %s\n", argv[5], strerror(errno));
     return 127;
   } else {
     return do_hash(argv[6]);
