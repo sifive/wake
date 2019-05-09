@@ -45,7 +45,6 @@ global def foo a b =
     a + b
 ```
 
-
 * |, ., and →
     * the pipe character is like $ in haskell, but reversed.
     * `a b c` becomes `c | b | a`
@@ -101,6 +100,7 @@ Wake is generally functional.
     
     (_ + 2)
     ```
+    
 * common list functions (meanings are standard)
 
 |       |     |     |     |
@@ -139,4 +139,3 @@ Wake is generally functional.
 * FUSE
 * no guarantee of ordering
 * publish/subscribe
-* memoize
