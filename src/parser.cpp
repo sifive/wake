@@ -378,8 +378,8 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (op.p < p) precedence_error(lex);
       lex.consume();
       auto condE = parse_block(lex, multiline);
-      if (expect(THEN, lex)) lex.consume();
       if (lex.next.type == EOL && multiline) lex.consume();
+      if (expect(THEN, lex)) lex.consume();
       auto thenE = parse_block(lex, multiline);
       if (lex.next.type == EOL && multiline) lex.consume();
       if (expect(ELSE, lex)) lex.consume();
