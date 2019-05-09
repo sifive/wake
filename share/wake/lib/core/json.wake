@@ -120,10 +120,6 @@ global def x /| f = match x
   JArray l = JArray (filter f l)
   _ = if f x then JArray (x, Nil) else JArray Nil
 
-#global def x /. i = match x
-#  JArray l = at i l
-#  _ = if i == 0 then x else raise "index out of bounds"
-
 global def x // y =
   def helper tail = match _
     JString  _ = tail

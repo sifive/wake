@@ -13,6 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+global Result pass fail =
+  Pass pass
+  Fail fail
+
+global def isPass = match _
+  Pass _ = True
+  Fail _ = False
+
+global def isFail = match _
+  Pass _ = False
+  Fail _ = True
+
+global def getWhenFail fail = match _
+  Pass a = a
+  Fail _ = fail
+
+global def rmap fn = match _
+  Pass a = Pass (fn a)
+  Fail f = Fail f
+
+global def rmapFail fn = match _
+  Pass a = Pass a
+  Fail f = Fail (fn f)
+
 # exceptions
 def test  x = prim "test"
 def catch x = prim "catch"
