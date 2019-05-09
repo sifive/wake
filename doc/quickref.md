@@ -50,7 +50,7 @@ global def foo a b =
     * the pipe character is like $ in haskell, but reversed.
     * `a b c` becomes `c | b | a`
     * '.' is similar, but is used to calls look like OOP
-    * 'length string' would become 'string.length'
+    * `length string` would become `string.length`
     * wake fully supports unicode. A common use of this is in creating a Pair object
     * 'a → b' is the same as Pair a b
     * Be aware that there other supported unicode functions.
@@ -95,6 +95,21 @@ Wake is generally functional.
         x = fib(x-1) + fib(x-2) 
     ```
 
+* anonymous functions (lambda). Both forms work.
+    ```
+    (\x x + 2)
+    
+    (_ + 2)
+    ```
+* common list functions (meanings are standard)
+
+|       |     |     |     |
+| ---   | --- | --- | --- |
+| empty |   head | tail | map |
+| map | foldl | scanl | foldr | 
+| scanr | ++ (cocatenate lists) | reverse | flatten | 
+| len | exists | forall | filter 
+| zip| 
 
 ### Data Types
 
@@ -113,6 +128,8 @@ Wake is generally functional.
 ##### Json
 ##### jobs
 ##### sources
+
+#### Tuples
 
 ### Wakisms
 
