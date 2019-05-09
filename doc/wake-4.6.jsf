@@ -1,4 +1,4 @@
-# JOE syntax highlight file for Haskell
+# JOE syntax highlight file for wake
 
 =Idle
 =Comment
@@ -11,38 +11,34 @@
 =Number		+Constant
 =FloatNumber	+Number
 =DecNumber	+Number
+=DblNumber	+Number
 =HexNumber	+Number
 =OctNumber	+Number
 =BinNumber	+Number
 =String		+Constant
 =StringEscape	+Escape +String
-=Character	+String
-=CharacterEscape +StringEscape
 
-=StringGap
 =Special	+Escape
-=ModId		+Type
 =VarId		+Ident
 =ConId		+Ident
 =VarSym		+Operator
-=Pragma 	+Preproc
 
 :reset Idle
 	*		reset		
 	"a-z_"		varid		buffer recolor=-1
 	"A-Z"		conid		mark recolor=-1
-	"!$%&*+.\-/<>?^|~," varsym	buffer recolor=-1
-	"="		equal		recolor=-1
+	"`!$%&*+.\-/<>^|~," varsym	buffer recolor=-1
+	"=:"		equal		recolor=-1
 	"()\\"		special		recolor=-1
 	"#"		linecomment	recolor=-1
 	"0-9"		integerstart	mark noeat
 	"\'"		rawlit		recolor=-1
 	"\""		strlit		recolor=-1
-	"`@{}[]:;"	errorstate	noeat
+	"@{}[];?"	errorstate	noeat
 
 :equal Special
 	*		reset		noeat
-	"!$%&*+.-/<>?^|~,="	varsym	recolor=-2
+	"`!$%&*+.\-/<>^|~,=:"	varsym	recolor=-2
 
 :special Special
 	*		reset		noeat
@@ -57,6 +53,7 @@
 :varid VarId
 	*		reset		noeat strings
 	"data"		struct
+	"tuple"		struct
 	"def"		stmt
 	"else"		cond
 	"here"		kw
@@ -68,7 +65,6 @@
 	"publish"	kw
 	"subscribe"	kw
 	"then"		cond
-	"val"		stmt
 	"_"		kw
 done
 	"a-zA-Z0-9_'"	varid
@@ -87,7 +83,7 @@ done
 
 :varsym VarSym
 	*		reset		noeat
-	"!$%&*+.-/<>?^|~,=" varsym
+	"`!$%&*+.\-/<>^|~,=:" varsym
 
 :linecomment Comment comment
 	*		linecomment
@@ -100,6 +96,22 @@ done
 :decnum DecNumber
 	*		reset		noeat
 	"0-9_"		decnum
+	"."		fracnum
+	"eE"		expsign
+
+:fracnum DblNumber
+	*		reset		noeat
+	"0-9_"		fracnum
+	"eE"		expsign
+
+:expsign DblNumber
+	*		reset		noeat recolor=-2
+	"0-9_"		expnum		noeat
+	"+-"		expnum
+
+:expnum DblNumber
+	*		reset		noeat
+	"0-9_"		expnum
 	
 :intdispatch DecNumber
 	*		reset		noeat
