@@ -10,7 +10,7 @@ checked in to git.
 
 1. The commands available to wake are from
 the wake library (share/wake/lib) and all files *.wake in
-the current directory and below.
+the wake.db directory and below.
 
 1. wake is invoked normally, although arguments are generally quoted.
 ```bash
@@ -19,7 +19,7 @@ wake 'runThing "a string"'
 
 ### Syntax
 
-* Variables and functions defined the same way.
+- Variables and functions defined the same way.
 ```
 def foo x =
     x + 2 
@@ -46,18 +46,13 @@ global def foo a b =
 ```
 
 * |, ., and →
-    * the pipe character is like $ in haskell, but reversed.
-    * `a b c` becomes `c | b | a`
+    * the pipe character feeds an argument to a function, like in shells scripts.
+    * `a 0 (b 1 2 (c 3 d))` becomes `d | c 3 | b 1 2 | a 0`
     * '.' is similar, but is used to calls look like OOP
     * `length string` would become `string.length`
     * wake fully supports unicode. A common use of this is in creating a Pair object
     * 'a → b' is the same as Pair a b
     * Be aware that there other supported unicode functions.
-
-* printing output (for debugging)
-    * `println thing`
-    * `print thing`
-    
 
 ### functional programming constructs
 
@@ -78,7 +73,7 @@ Wake is generally functional.
     ```
 
 * pure functions
-    * functions usually have no side effect.
+    * functions usually have no side effects and are reordered.
     
 * statements
     * all commands return a value, and can be used interchangeably
@@ -94,7 +89,7 @@ Wake is generally functional.
     def fib x = match x
         0 = 0
         1 = 1
-        2 = 2
+        2 if True = 2
         x = fib(x-1) + fib(x-2) 
     ```
 
@@ -118,17 +113,15 @@ Wake is generally functional.
 ### Data Types
 
 ####primitives
-* string -> "A String"
-* array -> 1,2,3,Nil (a list of items seperated by commas ended by nil)
-* integer -> 7
-* double -> 3.2
-* tuple -> see below
-* exception -> see below
-* json -> see below
-* job -> see below
-* sources -> see below
-
-* There are tree and vector type. Read the code is these sound useful.
+* String -> "A String"
+* List a -> 1,2,3,Nil (a list of items seperated by commas ended by nil)
+* Integer -> 7
+* Double -> 3.2
+* Tuple -> see below
+* Exception -> see below
+* JSON -> see below
+* Job -> see below
+* Path -> see below
 
 ##### Tuples
 
@@ -144,7 +137,7 @@ global tuple Bob =
 
 ```
 
-Defining a tuple creates several methods for each field: 
+Defining a tuple creates several methods for each field:
 
 ```
 set<tuple name><field name>
@@ -179,13 +172,12 @@ global data JValue =
 
 ##### jobs
 
-Jobs are how wake runs external programs. They consist of a plan and a runner. The plan is a
-tuple describing how to run the program, and the runner is a function which reads the plan
-and runs the program.
+Jobs are how wake runs external programs. They are created by executing a Plan with a Runner. The Plan is a
+tuple describing how to run the program, and the Runner is a function which reads the Plan and runs the program.
 
 ##### sources
 
-##### The environment
+
 
 ### Wakisms
 
