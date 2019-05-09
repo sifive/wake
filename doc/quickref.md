@@ -118,18 +118,68 @@ Wake is generally functional.
 * array -> 1,2,3,Nil (a list of items seperated by commas ended by nil)
 * integer -> 7
 * double -> 3.2
+* tuple -> see below
 * exception -> see below
 * json -> see below
 * job -> see below
 * sources -> see below
 
+##### Tuples
+
+Tuple are how wake defines record types, much like a struct in c/c++. The name of a tuple data type
+begins with a capital letter.
+
+```bash
+
+global tuple Bob =
+    global First: Integer
+    global Second: Double
+    global Third: String
+
+```
+
+Defining a tuple creates several methods for each field: 
+
+```
+set<tuple name><field name>
+get<tuple name><field name>
+edit<tuple name><field name>
+
+setBobFirst a b
+getBobFirst a
+editBobFirst a b
+```
 
 ##### Exceptions
+
+* try
+* raise
+* cast
+* reraise
+
 ##### Json
+
+```bash
+# The JSON data type
+global data JValue =
+  JString  String
+  JInteger Integer
+  JDouble  Double
+  JBoolean Boolean
+  JNull
+  JObject  (List (Pair String JValue))
+  JArray   (List JValue)
+```
+
 ##### jobs
+
+Jobs are how wake runs external programs. They consist of a plan and a runner. The plan is a
+tuple describing how to run the program, and the runner is a function which reads the plan
+and runs the program.
+
 ##### sources
 
-#### Tuples
+
 
 ### Wakisms
 
@@ -139,3 +189,4 @@ Wake is generally functional.
 * FUSE
 * no guarantee of ordering
 * publish/subscribe
+* environment
