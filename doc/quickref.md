@@ -89,8 +89,15 @@ Wake is generally functional.
     def fib x = match x
         0 = 0
         1 = 1
-        2 if True = 2
-        x = fib(x-1) + fib(x-2) 
+        2 if x != 3 = 2
+        x = fib(x-1) + fib(x-2)
+        
+    def collatz x = match x
+        1 = 4
+        2 = 1
+        4 = 2
+        x if x % 2 == 0 = x / 2
+        x = 3 * x + 1
     ```
 
 * anonymous functions (lambda). Both forms work.
@@ -110,6 +117,11 @@ Wake is generally functional.
 | len | exists | forall | filter 
 | zip| 
 
+* printing output (for debugging)
+    * `println thing`
+    * `print thing`
+    * to format an object for printing: `format thing`
+
 ### Data Types
 
 ####primitives
@@ -122,6 +134,8 @@ Wake is generally functional.
 * JSON -> see below
 * Job -> see below
 * Path -> see below
+
+* There are tree and vector type. Read the code if these sound useful.
 
 ##### Tuples
 
@@ -175,14 +189,22 @@ global data JValue =
 Jobs are how wake runs external programs. They are created by executing a Plan with a Runner. The Plan is a
 tuple describing how to run the program, and the Runner is a function which reads the Plan and runs the program.
 
-##### sources
+##### sources and Path ojbects
 
+Sources are the set of files in git.
 
+A Path is either a) a file in git or b) a file produced from a build step
+
+To get a path, use the source function. For example, all the header files in this directory:
+
+```bash
+source '.*\.h' here
+```
+
+##### the environment
 
 ### Wakisms
 
-* paths
-* dependencies
 * database
 * FUSE
 * no guarantee of ordering
