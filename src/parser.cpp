@@ -210,7 +210,9 @@ static Expr *parse_match(int p, Lexer &lex) {
     Expr *guard = 0;
     if (lex.next.type == IF) {
       lex.consume();
+      bool eateol = lex.next.type == INDENT;
       guard = parse_block(lex, false);
+      if (eateol && expect(EOL, lex)) lex.consume();
     }
 
     for (size_t i = 0; i < state.guard.size(); ++i) {
@@ -378,8 +380,8 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (op.p < p) precedence_error(lex);
       lex.consume();
       auto condE = parse_block(lex, multiline);
-      if (expect(THEN, lex)) lex.consume();
       if (lex.next.type == EOL && multiline) lex.consume();
+      if (expect(THEN, lex)) lex.consume();
       auto thenE = parse_block(lex, multiline);
       if (lex.next.type == EOL && multiline) lex.consume();
       if (expect(ELSE, lex)) lex.consume();

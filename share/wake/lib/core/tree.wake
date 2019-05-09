@@ -449,9 +449,9 @@ def join3 l x r = match l r
   Tip _ = insertMin x r
   _ Tip = insertMax x l
   (Bin ls ll lx lr) (Bin rs rl rx rr) =
-    if      deltaQ*ls < deltaD*rs then balanceL (join3 l x rl) rx rr
-    else if deltaQ*rs < deltaD*ls then balanceR ll lx (join3 lr x r)
-    else Bin (ls+rs+1) l x r
+    if deltaQ*ls < deltaD*rs then balanceL (join3 l x rl) rx rr else
+    if deltaQ*rs < deltaD*ls then balanceR ll lx (join3 lr x r) else
+    Bin (ls+rs+1) l x r
 
 # Create a balanced tree with with order: l:Tree r:Tree
 def join2 l r = match l
