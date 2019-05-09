@@ -26,6 +26,10 @@ global def head = match _
   Nil  = raise "empty list"
   h, _ = h
 
+global def headOption = match _
+  Nil  = None
+  h, _ = Some h
+
 global def tail = match _
   Nil  = raise "empty list"
   _, t = t
