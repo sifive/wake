@@ -210,7 +210,9 @@ static Expr *parse_match(int p, Lexer &lex) {
     Expr *guard = 0;
     if (lex.next.type == IF) {
       lex.consume();
+      bool eateol = lex.next.type == INDENT;
       guard = parse_block(lex, false);
+      if (eateol && expect(EOL, lex)) lex.consume();
     }
 
     for (size_t i = 0; i < state.guard.size(); ++i) {
