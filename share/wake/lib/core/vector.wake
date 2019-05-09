@@ -262,9 +262,9 @@ global def vsortBy lt v =
       def len1 = len-1
       def lo = vat_ 0 r
       def hi = vat_ len1 r
-      if lo == hi then v
-      else if lo + len1 == hi then vreverse v
-      else match (vsplitAt mid v) (vsplitAt mid r)
+      if lo == hi then v else
+      if lo + len1 == hi then vreverse v else
+      match (vsplitAt mid v) (vsplitAt mid r)
         (Pair l r) (Pair rl rr) = merge (helper l rl) (helper r rr)
   helper v runs
 
