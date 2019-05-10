@@ -311,6 +311,7 @@ TypeVar Data::typeUnit("Unit", 0);
 TypeVar Data::typeJValue("JValue", 0);
 const TypeVar Data::typeList("List", 1);
 const TypeVar Data::typePair("Pair", 2);
+const TypeVar Data::typeResult("Result", 2);
 TypeVar &Data::getType() {
   assert (0); // unreachable
   return typeBoolean;

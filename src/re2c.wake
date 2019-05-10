@@ -16,9 +16,9 @@
 # Require re2c >= 1.0 for flag support
 def re2cOk Unit =
   def out = job (which "re2c", "--version", Nil) Nil | getJobStdout
-  def ver = try (\_ Nil) (out | extract `re2c ([0-9.]+)\n` | head | tokenize `\.` | map int)
+  def ver = extract "re2c ([0-9.]+)\n" out | map (tokenize `\.` _) | flatten
   match ver
-    x, y, _ = x >= 1
+    x, y, _ = int x >= 1
     _       = False
 
 def re2cReal file =

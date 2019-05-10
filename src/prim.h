@@ -103,6 +103,7 @@ std::shared_ptr<Value> make_bool(bool x);
 std::shared_ptr<Value> make_order(int x);
 std::shared_ptr<Value> make_tuple2(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second);
 std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values);
+std::shared_ptr<Value> make_result(bool ok, std::shared_ptr<Value> &&value);
 
 #define PRIM_PURE	1	// has no side-effects (can be duplicated / removed)
 #define PRIM_SHALLOW	2	// only wait for direct arguments (not children)

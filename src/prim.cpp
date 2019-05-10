@@ -161,6 +161,14 @@ std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values) 
   return out;
 }
 
+static std::unique_ptr<Lambda> eResult(new Lambda(LOCATION, "_", nullptr));
+std::shared_ptr<Value> make_result(bool ok, std::shared_ptr<Value> &&value) {
+  auto bind = std::make_shared<Binding>(nullptr, nullptr, eResult.get(), 1);
+  bind->future[0].value = std::move(value);
+  bind->state = 1;
+  return std::make_shared<Data>(&Result->members[ok?0:1], std::move(bind));
+}
+
 void prim_register(PrimMap &pmap, const char *key, PrimFn fn, PrimType type, int flags, void *data) {
   pmap.insert(std::make_pair(key, PrimDesc(fn, type, flags, data)));
   // pmap.emplace(key, PrimDesc(fn, type, flags, data));

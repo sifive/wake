@@ -42,20 +42,17 @@ tuple RunnerOutput =
 # A Runner describes a way to invoke a Plan to get a Job
 tuple Runner =
   global Name:  String
-  global Score: Plan => Double
+  global Score: Plan => Result Double String
   Fn:           Job => RunnerInput => RunnerOutput
 
 # Create new Runner given pre- and post-hooks around an existing Runner
 global def makeRunner name score pre post (Runner _ _ run) =
-  def doit job preInput =
-    def preOutput = pre preInput
-    # Ensure that match does not re-raise the exception; must invoke run!
-    match (try (\_ Pair (cast preOutput) (cast preOutput)) preOutput)
-      Pair runInput state =
-        def runOutput = run job runInput
-        def final _ = post (Pair runOutput state)
-        # Don't run any 'post' steps until the Job has stopped running
-        waitJobMerged final job
+  def doit job preInput = match (pre preInput)
+    Pass (Pair runInput state) =
+      def runOutput = run job runInput
+      def final _ = post (Pair runOutput state)
+      # Don't run any 'post' steps until the Job has stopped running
+      waitJobMerged final job
   Runner name score doit
 
 global data Persistence =
@@ -157,32 +154,26 @@ def defaultUsage = Usage 0 0.0 0.0 0 0 0
 # You must use Fn{Inputs,Outputs,Indexes} to fill in this information
 global def manualRunner =
   def launch job pool dir stdin env cmd status runtime cputime membytes ibytes obytes = prim "job_launch"
-  def doit job input =
-   # Ensure that match does not re-raise the exception (launch must run)
-   match (try (\_ RunnerInput (cast input) Nil Nil "" "" Nil "" None 0) input)
-     RunnerInput cmd vis env dir stdin _ _ predict pool =
-       match (getOrElse defaultUsage (try (\_ None) predict))
-         Usage status runtime cputime mem in out =
-           def _ = launch job pool dir stdin env.implode cmd.implode status runtime cputime mem in out
-           RunnerOutput (map getPathName vis) Nil Nil (getJobReality job)
+  def doit job (RunnerInput cmd vis env dir stdin _ _ predict pool) =
+    match (getOrElse defaultUsage predict)
+      Usage status runtime cputime mem in out =
+        def _ = launch job pool dir stdin env.implode cmd.implode status runtime cputime mem in out
+        RunnerOutput (map getPathName vis) Nil Nil (getJobReality job)
   def score (Plan _ _ _ _ _ _ lo res _ _ _ _ _) = match res
-    Nil = if lo then 1.0 else raise "manual: cannot detect outputs"
-    _   = raise "manual: cannot supply resources"
+    Nil = if lo then Pass 1.0 else Fail "cannot detect outputs"
+    _   = Fail "cannot supply resources"
   Runner "manual" score doit
 
 global def virtualRunner =
   def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
-  def doit job input =
-   # Ensure that match does not re-raise the exception (virtual must run)
-   match (try (\_ RunnerInput (cast input) Nil Nil "" "" Nil "" None 0) input)
-     RunnerInput cmd vis env dir stdin _ _ predict pool =
-       match (getOrElse defaultUsage (try (\_ None) predict))
-         Usage status runtime cputime mem in out =
-           # Make sure any exceptions get fed into virtual
-           def stuff = implode (dir, stdin, str pool, cmd ++ env)
-           def s = if stuff ==* "" then status else status
-           def _ = virtual job "" "" s runtime cputime mem in out # sets predict+reality
-           RunnerOutput (map getPathName vis) Nil Nil (getJobReality job)
+  def doit job (RunnerInput cmd vis env dir stdin _ _ predict pool) =
+    match (getOrElse defaultUsage predict)
+      Usage status runtime cputime mem in out =
+        # Make sure any exceptions get fed into virtual
+        def stuff = implode (dir, stdin, str pool, cmd ++ env)
+        def s = if stuff ==* "" then status else status
+        def _ = virtual job "" "" s runtime cputime mem in out # sets predict+reality
+        RunnerOutput (map getPathName vis) Nil Nil (getJobReality job)
   Runner "virtual" (\_ 0.0) doit
 
 def pid = prim "pid"
@@ -193,31 +184,24 @@ def runAlways cmd env dir stdin res finputs foutputs findexes vis keep run pool 
   def finish job inputs outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
   def cache dir stdin env cmd visible = prim "job_cache"
   def build _ =
-    def doit job =
-      def prefix = "{str pid}.{str (getJobId job)}"
-      def usage = getJobRecord job
-      def output = run job (RunnerInput cmd vis env dir stdin res prefix usage pool)
-      def final _ =
-        # Make sure we run finish even if the runner raises an exception
-        match (try (\_ RunnerOutput (cast output) (cast output) (cast output) (cast output)) output)
-          RunnerOutput inputs outputs indexes usage =
-            match (try (\_ defaultUsage) usage)
-              Usage status runtime cputime mem in out =
-                def input  = finputs  inputs  | map simplify | implode
-                def output = foutputs outputs | map addhash  | implode
-                finish job input output status runtime cputime mem in out
-      # Make sure we don't hash files before the job has stopped running
-      def _ = waitJobMerged final job
-      job
-    # Do not invoke the runner/finish if job create fails
-    def rawjob = create dir stdin env.implode cmd.implode (map getPathName vis).implode (if keep then 1 else 0)
-    reraise rawjob doit
+    def job = create dir stdin env.implode cmd.implode (map getPathName vis).implode (if keep then 1 else 0)
+    def prefix = "{str pid}.{str (getJobId job)}"
+    def usage = getJobRecord job
+    def output = run job (RunnerInput cmd vis env dir stdin res prefix usage pool)
+    def final _ = match output
+      RunnerOutput inputs outputs indexes (Usage status runtime cputime mem in out) =
+        def input  = finputs  inputs  | map simplify | implode
+        def output = foutputs outputs | map addhash  | implode
+        finish job input output status runtime cputime mem in out
+    # Make sure we don't hash files before the job has stopped running
+    def _ = waitJobMerged final job
+    job
   def confirm last job =
     def notOk (Pair name hash) = hashcode name !=* hash
     match (waitJobMerged (\_ find notOk last) job)
       None = job
       Some (Pair (Pair file saw) _) =
-        raise "Hash mismatch for {file} ({saw} != {hashcode file}); remove it"
+        panic "Hash mismatch for {file} ({saw} != {hashcode file}); remove it"
   match keep
     False = build 0
     True  = match (cache dir stdin env.implode cmd.implode (map getPathName vis).implode)
@@ -233,8 +217,8 @@ publish runner = manualRunner, fuseRunner, Nil
 
 def runJobImp cmd env dir stdin res finputs foutputs findexes vis pers run pool =
   if isOnce pers
-  then (runOnce   cmd env dir stdin res finputs foutputs findexes vis (isKeep pers) _ pool) | reraise run
-  else (runAlways cmd env dir stdin res finputs foutputs findexes vis (isKeep pers) _ pool) | reraise run
+  then runOnce   cmd env dir stdin res finputs foutputs findexes vis (isKeep pers) run pool
+  else runAlways cmd env dir stdin res finputs foutputs findexes vis (isKeep pers) run pool
 
 global def runJobWith (Runner _ _ run) (Plan cmd vis env dir stdin pers _ res _ finputs foutputs findexes pool) =
   runJobImp cmd env dir stdin res finputs foutputs findexes vis pers run pool
@@ -246,17 +230,13 @@ data RunnerOption =
 # Run the job!
 global def runJob p = match p
   Plan cmd vis env dir stdin pers lo res rf finputs foutputs findexes pool =
-    # Transform the 'List Runner' into 'List RunnerOption' with no exceptions
-    def qualify runner =
-      def accept = match runner
-        Runner name scorefn fn =
-          def score = match (rf runner)
-            False = raise "{name}: rejected by Plan"
-            True  =
-              def score = scorefn p
-              if score <=. 0.0 then raise "{name}: non-positive score" else score
-          (Accept _ _) | reraise score | reraise fn
-      try (Reject _.head) accept
+    # Transform the 'List Runner' into 'List RunnerOption'
+    def qualify runner = match runner
+      Runner name _ _ if ! rf runner = Reject "{name}: rejected by Plan"
+      Runner name scorefn fn = match (scorefn p)
+        Pass x if x <=. 0.0 = Reject "{name}: non-positive score"
+        Pass x = Accept x fn
+        Fail x = Reject "{name}: x"
     def best acc = match _ acc
       (Reject _) _ = acc
       (Accept score fn) (Pair bests bestr) =
@@ -264,7 +244,7 @@ global def runJob p = match p
     def opts = subscribe runner | map qualify
     match (opts | foldl best (Pair 0.0 None) | getPairSecond)
       Some r = runJobImp cmd env dir stdin res finputs foutputs findexes vis pers r pool
-      None = raise "No runner available: {map format opts | catWith ", "}"
+      None = Fail "No runner available: {map format opts | catWith ", "}"
 
 def toUsage (Pair (Pair status runtime) (Pair (Pair cputime membytes) (Pair ibytes obytes))) =
   Usage status runtime cputime membytes ibytes obytes
@@ -285,12 +265,12 @@ global def getJobReport =
 # From database, available the moment a Job exists
 global def getJobRecord =
   def raw job = prim "job_record"
-  raw _ | atOpt 0 | omap toUsage
+  raw _ | at 0 | omap toUsage
 
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
 def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
-def fail job ok = if job.getJobStatus == 0 then ok else raise "Non-zero exit status ({str job.getJobStatus})"
+def fail job ok = if job.getJobStatus == 0 then Pass ok else Fail "Non-zero exit status ({str job.getJobStatus})"
 global def killJob job signal = prim "job_kill" # s != 0 => kills; blocks till exit; return status
 global def getJobStatus  job = getJobReport job | getUsageStatus
 global def getJobStdout  job = stdio job 1
@@ -301,9 +281,9 @@ global def getJobFailedInputs  job = tree job 1 | map getPairFirst | map Path
 global def getJobFailedOutputs job = tree job 2 | map getPairFirst | map Path
 global def getJobId job = prim "job_id"
 global def getJobOutput = match _.getJobOutputs
-  x, Nil = x
-  Nil    = raise "no outputs available"
-  _      = raise "more than one output found"
+  x, Nil = Pass x
+  Nil    = Fail "no outputs available"
+  _      = Fail "more than one output found"
 
 # Implement FUSE-based Runner
 def wakePath = prim "execpath" # location of the wake executable
@@ -317,24 +297,25 @@ global def fuseRunner =
       | write 0664 "{mkdir 0775 '.build'}/{input.getRunnerInputPrefix}.visible"
     def cmd = fusePath, visibleFile, Nil
     def fuse = makeRawPlan cmd | setPlanPool 0 | runJobWith manualRunner
-    def handle _ = raise "Could not start fuse-wake ({str fuse.getJobStatus}): {fuse.getJobStderr | tokenize `\n` | head}"
-    def root = try handle (extract `OK: (.*)` fuse.getJobStderr)
-    Pair (editRunnerInputDirectory ("{root.head}/{_}") input) fuse
+    def handle _ = Fail "Could not start fuse-wake ({str fuse.getJobStatus}): {fuse.getJobStderr | tokenize `\n` | head | getOrElse "n/a"}"
+    match (extract `OK: (.*)` fuse.getJobStderr)
+      x, Nil = Pair (editRunnerInputDirectory ("{x}/{_}") input) fuse
+      _ = panic "failed" # !!!
   def post (Pair output fuse) =
     def _ = killJob fuse 14 # SIGALRM
-    def result = extract `(.*\0)?\0(.*)` fuse.getJobStdout
-    def inputs  = result | at 0 | tokenize `\0` | filter (_!=*"")
-    def outputs = result | at 1 | tokenize `\0` | filter (_!=*"")
     def usage (Usage ps pr pc pm pi po) = match fuse.getJobReport
       Usage fs _ fc fm fi fo =
         Usage (if fs == 0 then ps else fs) pr (fc +. pc) (fm + pm) (fi + pi) (fo + po)
-    output
-    | setRunnerOutputInputs  inputs
-    | setRunnerOutputOutputs outputs
-    | editRunnerOutputUsage usage
+    match (extract `(.*\0)?\0(.*)` fuse.getJobStdout)
+      inputs, outputs, Nil =
+        output
+        | setRunnerOutputInputs  (inputs  | tokenize `\0` | filter (_!=*""))
+        | setRunnerOutputOutputs (outputs | tokenize `\0` | filter (_!=*""))
+        | editRunnerOutputUsage usage
+      _ = panic "Could not parse fuse output"
   def score (Plan _ _ _ _ _ _ lo res _ _ _ _ _) = match res
-    Nil = if lo then raise "fuse: would hide workspace" else 1.0
-    _   = raise "fuse: cannot supply resources"
+    Nil = if lo then Fail "would hide workspace" else Pass 1.0
+    _   = Fail "cannot supply resources"
   makeRunner "fuse" score pre post manualRunner
 
 # Make a Runner that runs a named script to run jobs
@@ -428,9 +409,9 @@ def hashcode f = memoize 0 (
   def reuse = get f
   if reuse !=* "" then reuse else
     def job = makeRawPlan ("<hash>", f, Nil) | runJobWith manualRunner
-    if job.getJobStatus == 0
-    then extract `(.{64}).*` job.getJobStdout | head
-    else raise "Failed to hash file {f}"
+    match job.getJobStatus (extract `(.{64}).*` job.getJobStdout)
+      0 (x, Nil) = x
+      _ _ = panic "Failed to hash file {f}"
 )
 
 def stateRunner =
@@ -439,7 +420,7 @@ def stateRunner =
   def pre input =
     match input.getRunnerInputCommand
       _, file, Nil = Pair input file
-      _ = raise "stateRunner: invalid command-line"
+      _ = panic "stateRunner: invalid command-line"
   def post (Pair output file) =
     editRunnerOutputOutputs (add file hash, _) output
   makeRunner "state" (\_ 0.0) pre post virtualRunner

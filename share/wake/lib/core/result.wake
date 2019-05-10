@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-global Result pass fail =
+global data Result pass fail =
   Pass pass
   Fail fail
 
@@ -24,6 +24,14 @@ global def isPass = match _
 global def isFail = match _
   Pass _ = False
   Fail _ = True
+
+global def getPass = match _
+  Pass x = Some x
+  Fail _ = None
+
+global def getFail = match _
+  Pass _ = None
+  Fail x = Some x
 
 global def getWhenFail fail = match _
   Pass a = a
@@ -37,11 +45,4 @@ global def rmapFail fn = match _
   Pass a = Pass a
   Fail f = Fail (fn f)
 
-# exceptions
-def test  x = prim "test"
-def catch x = prim "catch"
-global def try handleCausesFn expr = if test expr then handleCausesFn (catch expr) else expr
-global def raise cause = prim "raise"
-global def cast exception = prim "cast"
-
-global def reraise expr mapFn = if test expr then cast expr else mapFn expr
+global def panic s = prim "raise" # !!! should terminate process

@@ -151,7 +151,7 @@ global def tappi f (Tree _ root) =
   helper 0 root
 
 # Extract the i-th ranked element
-global def tatOpt i (Tree _ root) =
+global def tat i (Tree _ root) =
   def helper i = match _
     Tip = None
     Bin _ l x r =
@@ -161,10 +161,6 @@ global def tatOpt i (Tree _ root) =
         EQ = Some x
         GT = helper (i-sizeL-1) r
   helper i root
-
-global def tat i l = match (tatOpt i l)
-  None   = raise "tat index out of bounds"
-  Some x = x
 
 # Split elements ranked [0,i) and [i,inf) into two trees
 global def tsplitAt i (Tree cmp root) =
@@ -488,7 +484,7 @@ def balanceL l x r = match l r
       (Bin lls _ _ _) (Bin lrs lrl lrx lrr) = match (ratioD*lrs < ratioQ*lls)
         True  = Bin (1+ls+rs) ll lx (Bin (1+rs+lrs) lr x r)
         False = Bin (1+ls+rs) (Bin (1+lls+size lrl) ll lx lrl) lrx (Bin (1+rs+size lrr) lrr x r)
-      _ _ = raise "Failure in Tree.balanceL"
+      _ _ = panic "Failure in Tree.balanceL"
     False = Bin (1+ls+rs) l x r
 
 def balanceR l x r = match l r
@@ -506,5 +502,5 @@ def balanceR l x r = match l r
       (Bin rls rll rlx rlr) (Bin rrs _ _ _) = match (ratioD*rls < ratioQ*rrs)
         True  = Bin (1+ls+rs) (Bin (1+ls+rls) l x rl) rx rr
         False = Bin (1+ls+rs) (Bin (1+ls+size rll) l x rll) rlx (Bin (1+rrs+size rlr) rlr rx rr)
-      _ _ = raise "Failure in Tree.balanceR"
+      _ _ = panic "Failure in Tree.balanceR"
     False = Bin (1+ls+rs) l x r

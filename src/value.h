@@ -160,9 +160,10 @@ struct Data : public Value {
   static TypeVar typeOrder;
   static TypeVar typeUnit;
   static TypeVar typeJValue;
-  // these two are const to prevent unify() on them; use clone
+  // these are const to prevent unify() on them; use clone
   static const TypeVar typeList;
   static const TypeVar typePair;
+  static const TypeVar typeResult;
   Data(Constructor *cons_, std::shared_ptr<Binding> &&binding_) : Value(&type), cons(cons_), binding(std::move(binding_)) { }
   void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();

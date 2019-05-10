@@ -28,6 +28,10 @@ global def getOrElse b = match _
   Some a = a
   None   = b
 
+global def getOrFail fn = match _
+  Some a = Pass a
+  None   = Fail (fn Unit)
+
 global def omap f = match _
   Some a = Some (f a)
   None   = None

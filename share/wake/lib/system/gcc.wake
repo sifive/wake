@@ -24,12 +24,12 @@ def doCompileC variant gcc flags headers cfile =
   def obj = replace `\.c(pp)?$` ".{variant}.o" cfile.getPathName
   def cmdline = gcc, distinctBy scmp flags ++ ("-c", cfile.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
   def result = job cmdline (cfile, headers)
-  result.getJobOutput
+  Pass result.getJobOutput
 
 def doLinkO variant linker flags objects target =
   def cmdline = (linker, "-o", "{target}.{variant}", map getPathName objects) ++ distinctBy scmp flags
   def result = job cmdline (mkdir "{target}/..", objects)
-  result.getJobOutput
+  Pass result.getJobOutput
 
 def makeCompileC variant gcc flags =
   Pair variant (\extraFlags doCompileC variant gcc (flags ++ extraFlags)), Nil
@@ -52,7 +52,7 @@ def pickVariant variant variants =
     Some (Pair x _) = x.getPairSecond
     None =
       def ok = catWith " " (map getPairFirst variants)
-      raise "No variant matches {variant}; options: {ok}"
+      \_\_\_ Fail "No variant matches {variant}; options: {ok}"
 
 global def compileC variant = pickVariant variant (subscribe compileC)
 global def linkO    variant = pickVariant variant (subscribe linkO)

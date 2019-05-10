@@ -41,9 +41,7 @@ def pkgConfigImp args = memoize 0 (
   if result.getJobStatus != 0 then None else Some output
 )
 
-def fail pkg = match _
-  Some x = x
-  None   = raise "pkg-config for {pkg} not found"
+def fail pkg = getOrFail "pkg-config for {pkg} not found" _
 
 global def cflags pkg = pkgConfigImp ("--short-errors", "--cflags", tokenize ` ` pkg) | fail pkg
 global def libs   pkg = pkgConfigImp ("--short-errors", "--libs",   tokenize ` ` pkg) | fail pkg

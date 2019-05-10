@@ -36,5 +36,6 @@ extern Sum *List; // Nil | a, b
 extern Sum *Pair; // Pair a b
 extern Sum *Unit; // Unit
 extern Sum *JValue; // JString String | JInteger Integer | JReal String | JBoolean Boolean | JNull | JObject  List (Pair String JValue) | JArray List JValue
+extern Sum *Result; // Pass x | Fail y
 
 #endif

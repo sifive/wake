@@ -29,5 +29,5 @@ global def environment = subscribe environment
 
 # Use of this function can lead to unnecessary rebuilds!
 global def getenv key =
-  def p x = prim "getenv"
-  reraise (p key) (Some _) | try (\_ None)
+  def p x = prim "getenv" #!!! make this return Pass/Fail
+  p key

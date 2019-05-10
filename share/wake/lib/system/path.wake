@@ -38,7 +38,7 @@ def mkdirRunner =
   def pre input =
     match input.getRunnerInputCommand
       _, _, mode, dir, Nil = Pair input (Pair mode dir)
-      _ = raise "mkdirRunner: invalid command-line"
+      _ = panic "mkdirRunner: invalid command-line"
   def post (Pair output (Pair mode dir)) =
     output
     | editRunnerOutputOutputs (imp (int mode) dir, _)
@@ -60,7 +60,7 @@ global def mkdir path =
   def root = match _
     "", x, t = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 "/{x}") t
     x, t     = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 x) t
-    Nil      = raise "impossible"
+    Nil      = panic "impossible"
   path | simplify | tokenize `/` | root
 
 def writeImp inputs mode path content =

@@ -25,20 +25,25 @@
 #include <iosfwd>
 
 static PRIMTYPE(type_re2) {
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(RegExp::typeVar);
+  result[1].unify(String::typeVar);
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
-    out->unify(RegExp::typeVar);
+    out->unify(result);
 }
 
 static PRIMFN(prim_re2) {
   EXPECT(1);
   STRING(arg0, 0);
-  auto out = std::make_shared<RegExp>(arg0->value);
-  if (out->exp.ok()) {
+  auto pass = std::make_shared<RegExp>(arg0->value);
+  if (pass->exp.ok()) {
+    auto out = make_result(true, std::move(pass));
     RETURN(out);
   } else {
-    auto exp = std::make_shared<Exception>(out->exp.error(), binding);
-    RETURN(exp);
+    auto out = make_result(false, std::make_shared<String>(pass->exp.error()));
+    RETURN(out);
   }
 }
 
@@ -101,14 +106,13 @@ static PRIMFN(prim_extract) {
   int matches = arg0->exp.NumberOfCapturingGroups() + 1;
   std::vector<re2::StringPiece> submatch(matches, nullptr);
   re2::StringPiece input(arg1->value);
-  if (!arg0->exp.Match(input, 0, arg1->value.size(), RE2::ANCHOR_BOTH, submatch.data(), matches)) {
-    auto exp = std::make_shared<Exception>("No match", binding);
-    RETURN(exp);
-  }
 
   std::vector<std::shared_ptr<Value> > strings;
-  strings.reserve(matches);
-  for (int i = 1; i < matches; ++i) strings.emplace_back(std::make_shared<String>(submatch[i].as_string()));
+  if (arg0->exp.Match(input, 0, arg1->value.size(), RE2::ANCHOR_BOTH, submatch.data(), matches)) {
+    strings.reserve(matches);
+    for (int i = 1; i < matches; ++i) strings.emplace_back(std::make_shared<String>(submatch[i].as_string()));
+  }
+
   auto out = make_list(std::move(strings));
   RETURN(out);
 }

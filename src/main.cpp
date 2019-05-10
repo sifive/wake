@@ -478,6 +478,11 @@ int main(int argc, char **argv) {
     ok = false;
   }
 
+  if (!Result) {
+    std::cerr << "Primitive data type Result not defined." << std::endl;
+    ok = false;
+  }
+
   if (!Unit) {
     std::cerr << "Primitive data type Unit not defined." << std::endl;
     ok = false;

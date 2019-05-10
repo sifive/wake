@@ -666,6 +666,7 @@ Sum *Boolean;
 Sum *Order;
 Sum *List;
 Sum *Pair;
+Sum *Result;
 Sum *Unit;
 Sum *JValue;
 
@@ -756,6 +757,17 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
       lex.fail = true;
     }
     Pair = sump;
+  }
+
+  if (name == "Result") {
+    if (sump->members.size() != 2 ||
+        sump->members[0].ast.args.size() != 1 ||
+        sump->members[1].ast.args.size() != 1) {
+      std::cerr << "Special constructor Result not defined correctly at "
+        << sump->location.file() << "." << std::endl;
+      lex.fail = true;
+    }
+    Result = sump;
   }
 
   if (name == "Unit") {
