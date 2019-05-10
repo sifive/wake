@@ -27,9 +27,9 @@ global def buildWake (Pair variant clib) =
   def internalDeps = map (_ clib) (utf8proc, gopt, Nil)
   def externalDeps = map pkg ("sqlite3", "ncurses", "gmp", "re2", Nil)
   def deps = internalDeps ++ externalDeps | flattenCPackages
-  def reFiles = sources here '.*\.re'
-  def headerFiles = version_h 0, deps.getCPackageHeaders ++ sources here '.*\.h'
-  def cppFiles = map re2c reFiles ++ sources here '.*\.cpp'
+  def reFiles = sources here `.*\.re`
+  def headerFiles = version_h 0, deps.getCPackageHeaders ++ sources here `.*\.h`
+  def cppFiles = map re2c reFiles ++ sources here `.*\.cpp`
   def compile = compileC variant deps.getCPackageCFlags headerFiles
   def objFiles = map compile cppFiles ++ deps.getCPackageObjects
   linkO variant deps.getCPackageLFlags objFiles "bin/wake"

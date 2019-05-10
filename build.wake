@@ -22,7 +22,7 @@ global def all variant = map (_ variant) targets
 
 global def install dest =
   def libdir = simplify "{here}/share/wake/lib"
-  def libfiles = sources libdir '.*'
+  def libfiles = sources libdir `.*`
   def binfiles = all default
   def releaseAs exe = cat (dest, "/", take 1 (extract `(.*)\.(.*)` exe))
   def libinstall = map (installIn dest) libfiles

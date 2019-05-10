@@ -15,7 +15,7 @@
 
 global def gopt variant =
   def cflags = "-I{here}", Nil
-  def headers = sources here '.*\.h'
+  def headers = sources here `.*\.h`
   def compile x = compileC variant cflags headers (source "{here}/{x}")
   def objects = ("gopt.c", "gopt-errors.c", Nil) | map compile
   CPackage "10.0" headers objects cflags Nil

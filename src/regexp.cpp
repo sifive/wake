@@ -24,23 +24,6 @@
 #include <string>
 #include <iosfwd>
 
-static std::unique_ptr<Receiver> cast_regexp(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, RegExp **reg) {
-  if (value->type != &RegExp::type) {
-    Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a RegExp", binding));
-    return std::unique_ptr<Receiver>();
-  } else {
-    *reg = reinterpret_cast<RegExp*>(value.get());
-    return completion;
-  }
-}
-
-#define REGEXP(arg, i)	 									\
-  RegExp *arg;											\
-  do {												\
-    completion = cast_regexp(queue, std::move(completion), binding, args[i], &arg);		\
-    if (!completion) return;									\
-  } while(0)
-
 static PRIMTYPE(type_re2) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&

@@ -30,6 +30,7 @@ struct Value;
 struct String;
 struct Integer;
 struct Double;
+struct RegExp;
 struct Data;
 
 /* Macros for handling inputs from wake */
@@ -78,6 +79,14 @@ std::unique_ptr<Receiver> cast_double(WorkQueue &queue, std::unique_ptr<Receiver
   do {											\
     completion = cast_double(queue, std::move(completion), binding, args[i], &arg);	\
     if (!completion) return;								\
+  } while(0)
+
+std::unique_ptr<Receiver> cast_regexp(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, RegExp **reg);
+#define REGEXP(arg, i)	 									\
+  RegExp *arg;											\
+  do {												\
+    completion = cast_regexp(queue, std::move(completion), binding, args[i], &arg);		\
+    if (!completion) return;									\
   } while(0)
 
 std::unique_ptr<Receiver> cast_data(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Data **data);
