@@ -20,39 +20,9 @@
 #include "heap.h"
 #include "hash.h"
 #include "type.h"
-#include <re2/re2.h>
 #include <iostream>
 #include <string>
 #include <iosfwd>
-
-struct RegExp : public Value {
-  RE2 exp;
-  static const TypeDescriptor type;
-  static TypeVar typeVar;
-  RegExp(const std::string &regexp, const RE2::Options &opts) : Value(&type), exp(re2::StringPiece(regexp), opts) { }
-
-  void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
-};
-
-const TypeDescriptor RegExp::type("RegExp");
-
-void RegExp::format(std::ostream &os, FormatState &state) const {
-  if (APP_PRECEDENCE < state.p()) os << "(";
-  os << "RegExp ";
-  String(exp.pattern()).format(os, state);
-  if (APP_PRECEDENCE < state.p()) os << ")";
-}
-
-TypeVar RegExp::typeVar("RegExp", 0);
-TypeVar &RegExp::getType() {
-  return typeVar;
-}
-
-Hash RegExp::hash() const {
-  return Hash(exp.pattern()) + type.hashcode;
-}
 
 static std::unique_ptr<Receiver> cast_regexp(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, RegExp **reg) {
   if (value->type != &RegExp::type) {
@@ -80,11 +50,7 @@ static PRIMTYPE(type_re2) {
 static PRIMFN(prim_re2) {
   EXPECT(1);
   STRING(arg0, 0);
-  RE2::Options options;
-  options.set_log_errors(false);
-  options.set_one_line(true);
-  options.set_dot_nl(true);
-  auto out = std::make_shared<RegExp>(arg0->value, options);
+  auto out = std::make_shared<RegExp>(arg0->value);
   if (out->exp.ok()) {
     RETURN(out);
   } else {

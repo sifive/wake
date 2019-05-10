@@ -30,6 +30,7 @@ Value::~Value() { }
 const TypeDescriptor String   ::type("String");
 const TypeDescriptor Integer  ::type("Integer");
 const TypeDescriptor Double   ::type("Double");
+const TypeDescriptor RegExp   ::type("RegExp");
 const TypeDescriptor Closure  ::type("Closure");
 const TypeDescriptor Data     ::type("Data");
 const TypeDescriptor Exception::type("Exception");
@@ -107,6 +108,21 @@ void Integer::format(std::ostream &os, FormatState &state) const {
 
 void Double::format(std::ostream &os, FormatState &state) const {
   os << str();
+}
+
+RE2::Options RegExp::defops() {
+  RE2::Options options;
+  options.set_log_errors(false);
+  options.set_one_line(true);
+  options.set_dot_nl(true);
+  return options;
+}
+
+void RegExp::format(std::ostream &os, FormatState &state) const {
+  if (APP_PRECEDENCE < state.p()) os << "(";
+  os << "RegExp ";
+  String(exp.pattern()).format(os, state);
+  if (APP_PRECEDENCE < state.p()) os << ")";
 }
 
 void Closure::format(std::ostream &os, FormatState &state) const {
@@ -251,6 +267,15 @@ std::string Double::str(int format, int precision) const {
 
 Hash Double::hash() const {
   return Hash(str(HEXFLOAT)) + type.hashcode;
+}
+
+TypeVar RegExp::typeVar("RegExp", 0);
+TypeVar &RegExp::getType() {
+  return typeVar;
+}
+
+Hash RegExp::hash() const {
+  return Hash(exp.pattern()) + type.hashcode;
 }
 
 TypeVar Exception::typeVar("Exception", 0);

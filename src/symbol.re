@@ -62,6 +62,7 @@ S = [\x24-\x24\x2b-\x2b\x3c-\x3e\x5e-\x5e\x60-\x60\x7c-\x7c\x7e-\x7e\xa2-\xa6\xa
 Sm = [\x2b-\x2b\x3c-\x3e\x7c-\x7c\x7e-\x7e\xac-\xac\xb1-\xb1\xd7-\xd7\xf7-\xf7\u03f6-\u03f6\u0606-\u0608\u2044-\u2044\u2052-\u2052\u207a-\u207c\u208a-\u208c\u2118-\u2118\u2140-\u2144\u214b-\u214b\u2190-\u2194\u219a-\u219b\u21a0-\u21a0\u21a3-\u21a3\u21a6-\u21a6\u21ae-\u21ae\u21ce-\u21cf\u21d2-\u21d2\u21d4-\u21d4\u21f4-\u22ff\u2320-\u2321\u237c-\u237c\u239b-\u23b3\u23dc-\u23e1\u25b7-\u25b7\u25c1-\u25c1\u25f8-\u25ff\u266f-\u266f\u27c0-\u27c4\u27c7-\u27e5\u27f0-\u27ff\u2900-\u2982\u2999-\u29d7\u29dc-\u29fb\u29fe-\u2aff\u2b30-\u2b44\u2b47-\u2b4c\ufb29-\ufb29\ufe62-\ufe62\ufe64-\ufe66\uff0b-\uff0b\uff1c-\uff1e\uff5c-\uff5c\uff5e-\uff5e\uffe2-\uffe2\uffe9-\uffec\U0001d6c1-\U0001d6c1\U0001d6db-\U0001d6db\U0001d6fb-\U0001d6fb\U0001d715-\U0001d715\U0001d735-\U0001d735\U0001d74f-\U0001d74f\U0001d76f-\U0001d76f\U0001d789-\U0001d789\U0001d7a9-\U0001d7a9\U0001d7c3-\U0001d7c3\U0001eef0-\U0001eef1];
 Sc = [\x24-\x24\xa2-\xa5\u058f-\u058f\u060b-\u060b\u09f2-\u09f3\u09fb-\u09fb\u0af1-\u0af1\u0bf9-\u0bf9\u0e3f-\u0e3f\u17db-\u17db\u20a0-\u20bd\ua838-\ua838\ufdfc-\ufdfc\ufe69-\ufe69\uff04-\uff04\uffe0-\uffe1\uffe5-\uffe6];
 Sk = [\x5e-\x5e\x60-\x60\xa8-\xa8\xaf-\xaf\xb4-\xb4\xb8-\xb8\u02c2-\u02c5\u02d2-\u02df\u02e5-\u02eb\u02ed-\u02ed\u02ef-\u02ff\u0375-\u0375\u0384-\u0385\u1fbd-\u1fbd\u1fbf-\u1fc1\u1fcd-\u1fcf\u1fdd-\u1fdf\u1fed-\u1fef\u1ffd-\u1ffe\u309b-\u309c\ua700-\ua716\ua720-\ua721\ua789-\ua78a\uab5b-\uab5b\ufbb2-\ufbc1\uff3e-\uff3e\uff40-\uff40\uffe3-\uffe3];
+Sk_notick = [\x5e-\x5e\xa8-\xa8\xaf-\xaf\xb4-\xb4\xb8-\xb8\u02c2-\u02c5\u02d2-\u02df\u02e5-\u02eb\u02ed-\u02ed\u02ef-\u02ff\u0375-\u0375\u0384-\u0385\u1fbd-\u1fbd\u1fbf-\u1fc1\u1fcd-\u1fcf\u1fdd-\u1fdf\u1fed-\u1fef\u1ffd-\u1ffe\u309b-\u309c\ua700-\ua716\ua720-\ua721\ua789-\ua78a\uab5b-\uab5b\ufbb2-\ufbc1\uff3e-\uff3e\uff40-\uff40\uffe3-\uffe3];
 So = [\xa6-\xa6\xa9-\xa9\xae-\xae\xb0-\xb0\u0482-\u0482\u058d-\u058e\u060e-\u060f\u06de-\u06de\u06e9-\u06e9\u06fd-\u06fe\u07f6-\u07f6\u09fa-\u09fa\u0b70-\u0b70\u0bf3-\u0bf8\u0bfa-\u0bfa\u0c7f-\u0c7f\u0d79-\u0d79\u0f01-\u0f03\u0f13-\u0f13\u0f15-\u0f17\u0f1a-\u0f1f\u0f34-\u0f34\u0f36-\u0f36\u0f38-\u0f38\u0fbe-\u0fc5\u0fc7-\u0fcc\u0fce-\u0fcf\u0fd5-\u0fd8\u109e-\u109f\u1390-\u1399\u1940-\u1940\u19de-\u19ff\u1b61-\u1b6a\u1b74-\u1b7c\u2100-\u2101\u2103-\u2106\u2108-\u2109\u2114-\u2114\u2116-\u2117\u211e-\u2123\u2125-\u2125\u2127-\u2127\u2129-\u2129\u212e-\u212e\u213a-\u213b\u214a-\u214a\u214c-\u214d\u214f-\u214f\u2195-\u2199\u219c-\u219f\u21a1-\u21a2\u21a4-\u21a5\u21a7-\u21ad\u21af-\u21cd\u21d0-\u21d1\u21d3-\u21d3\u21d5-\u21f3\u2300-\u2307\u230c-\u231f\u2322-\u2328\u232b-\u237b\u237d-\u239a\u23b4-\u23db\u23e2-\u23fa\u2400-\u2426\u2440-\u244a\u249c-\u24e9\u2500-\u25b6\u25b8-\u25c0\u25c2-\u25f7\u2600-\u266e\u2670-\u2767\u2794-\u27bf\u2800-\u28ff\u2b00-\u2b2f\u2b45-\u2b46\u2b4d-\u2b73\u2b76-\u2b95\u2b98-\u2bb9\u2bbd-\u2bc8\u2bca-\u2bd1\u2ce5-\u2cea\u2e80-\u2e99\u2e9b-\u2ef3\u2f00-\u2fd5\u2ff0-\u2ffb\u3004-\u3004\u3012-\u3013\u3020-\u3020\u3036-\u3037\u303e-\u303f\u3190-\u3191\u3196-\u319f\u31c0-\u31e3\u3200-\u321e\u322a-\u3247\u3250-\u3250\u3260-\u327f\u328a-\u32b0\u32c0-\u32fe\u3300-\u33ff\u4dc0-\u4dff\ua490-\ua4c6\ua828-\ua82b\ua836-\ua837\ua839-\ua839\uaa77-\uaa79\ufdfd-\ufdfd\uffe4-\uffe4\uffe8-\uffe8\uffed-\uffee\ufffc-\ufffd\U00010137-\U0001013f\U00010179-\U00010189\U0001018c-\U0001018c\U00010190-\U0001019b\U000101a0-\U000101a0\U000101d0-\U000101fc\U00010877-\U00010878\U00010ac8-\U00010ac8\U00016b3c-\U00016b3f\U00016b45-\U00016b45\U0001bc9c-\U0001bc9c\U0001d000-\U0001d0f5\U0001d100-\U0001d126\U0001d129-\U0001d164\U0001d16a-\U0001d16c\U0001d183-\U0001d184\U0001d18c-\U0001d1a9\U0001d1ae-\U0001d1dd\U0001d200-\U0001d241\U0001d245-\U0001d245\U0001d300-\U0001d356\U0001f000-\U0001f02b\U0001f030-\U0001f093\U0001f0a0-\U0001f0ae\U0001f0b1-\U0001f0bf\U0001f0c1-\U0001f0cf\U0001f0d1-\U0001f0f5\U0001f110-\U0001f12e\U0001f130-\U0001f16b\U0001f170-\U0001f19a\U0001f1e6-\U0001f202\U0001f210-\U0001f23a\U0001f240-\U0001f248\U0001f250-\U0001f251\U0001f300-\U0001f32c\U0001f330-\U0001f37d\U0001f380-\U0001f3ce\U0001f3d4-\U0001f3f7\U0001f400-\U0001f4fe\U0001f500-\U0001f54a\U0001f550-\U0001f579\U0001f57b-\U0001f5a3\U0001f5a5-\U0001f642\U0001f645-\U0001f6cf\U0001f6e0-\U0001f6ec\U0001f6f0-\U0001f6f3\U0001f700-\U0001f773\U0001f780-\U0001f7d4\U0001f800-\U0001f80b\U0001f810-\U0001f847\U0001f850-\U0001f859\U0001f860-\U0001f887\U0001f890-\U0001f8ad];
 N = [\x30-\x39\xb2-\xb3\xb9-\xb9\xbc-\xbe\u0660-\u0669\u06f0-\u06f9\u07c0-\u07c9\u0966-\u096f\u09e6-\u09ef\u09f4-\u09f9\u0a66-\u0a6f\u0ae6-\u0aef\u0b66-\u0b6f\u0b72-\u0b77\u0be6-\u0bf2\u0c66-\u0c6f\u0c78-\u0c7e\u0ce6-\u0cef\u0d66-\u0d75\u0de6-\u0def\u0e50-\u0e59\u0ed0-\u0ed9\u0f20-\u0f33\u1040-\u1049\u1090-\u1099\u1369-\u137c\u16ee-\u16f0\u17e0-\u17e9\u17f0-\u17f9\u1810-\u1819\u1946-\u194f\u19d0-\u19da\u1a80-\u1a89\u1a90-\u1a99\u1b50-\u1b59\u1bb0-\u1bb9\u1c40-\u1c49\u1c50-\u1c59\u2070-\u2070\u2074-\u2079\u2080-\u2089\u2150-\u2182\u2185-\u2189\u2460-\u249b\u24ea-\u24ff\u2776-\u2793\u2cfd-\u2cfd\u3007-\u3007\u3021-\u3029\u3038-\u303a\u3192-\u3195\u3220-\u3229\u3248-\u324f\u3251-\u325f\u3280-\u3289\u32b1-\u32bf\ua620-\ua629\ua6e6-\ua6ef\ua830-\ua835\ua8d0-\ua8d9\ua900-\ua909\ua9d0-\ua9d9\ua9f0-\ua9f9\uaa50-\uaa59\uabf0-\uabf9\uff10-\uff19\U00010107-\U00010133\U00010140-\U00010178\U0001018a-\U0001018b\U000102e1-\U000102fb\U00010320-\U00010323\U00010341-\U00010341\U0001034a-\U0001034a\U000103d1-\U000103d5\U000104a0-\U000104a9\U00010858-\U0001085f\U00010879-\U0001087f\U000108a7-\U000108af\U00010916-\U0001091b\U00010a40-\U00010a47\U00010a7d-\U00010a7e\U00010a9d-\U00010a9f\U00010aeb-\U00010aef\U00010b58-\U00010b5f\U00010b78-\U00010b7f\U00010ba9-\U00010baf\U00010e60-\U00010e7e\U00011052-\U0001106f\U000110f0-\U000110f9\U00011136-\U0001113f\U000111d0-\U000111d9\U000111e1-\U000111f4\U000112f0-\U000112f9\U000114d0-\U000114d9\U00011650-\U00011659\U000116c0-\U000116c9\U000118e0-\U000118f2\U00012400-\U0001246e\U00016a60-\U00016a69\U00016b50-\U00016b59\U00016b5b-\U00016b61\U0001d360-\U0001d371\U0001d7ce-\U0001d7ff\U0001e8c7-\U0001e8cf\U0001f100-\U0001f10c];
 Nd = [\x30-\x39\u0660-\u0669\u06f0-\u06f9\u07c0-\u07c9\u0966-\u096f\u09e6-\u09ef\u0a66-\u0a6f\u0ae6-\u0aef\u0b66-\u0b6f\u0be6-\u0bef\u0c66-\u0c6f\u0ce6-\u0cef\u0d66-\u0d6f\u0de6-\u0def\u0e50-\u0e59\u0ed0-\u0ed9\u0f20-\u0f29\u1040-\u1049\u1090-\u1099\u17e0-\u17e9\u1810-\u1819\u1946-\u194f\u19d0-\u19d9\u1a80-\u1a89\u1a90-\u1a99\u1b50-\u1b59\u1bb0-\u1bb9\u1c40-\u1c49\u1c50-\u1c59\ua620-\ua629\ua8d0-\ua8d9\ua900-\ua909\ua9d0-\ua9d9\ua9f0-\ua9f9\uaa50-\uaa59\uabf0-\uabf9\uff10-\uff19\U000104a0-\U000104a9\U00011066-\U0001106f\U000110f0-\U000110f9\U00011136-\U0001113f\U000111d0-\U000111d9\U000112f0-\U000112f9\U000114d0-\U000114d9\U00011650-\U00011659\U000116c0-\U000116c9\U000118e0-\U000118e9\U00016a60-\U00016a69\U00016b50-\U00016b59\U0001d7ce-\U0001d7ff];
@@ -333,6 +334,39 @@ static std::string unicode_escape(std::string &&str) {
   return out;
 }
 
+static bool lex_rstr(Lexer &lex, Expr *&out)
+{
+  input_t &in = *lex.engine.get();
+  Coordinates start = in.coord() - 1;
+  std::string slice;
+
+  while (true) {
+    in.tok = in.cur;
+    /*!re2c
+        re2c:define:YYCURSOR = in.cur;
+        re2c:define:YYMARKER = in.mar;
+        re2c:define:YYLIMIT = in.lim;
+        re2c:yyfill:enable = 1;
+        re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
+        re2c:define:YYFILL:naked = 1;
+        *                    { return false; }
+        "\\`"                { slice.push_back('\\'); continue; }
+        "`"                  { break; }
+        [^\x00]              { slice.append(in.tok, in.cur); continue; }
+    */
+  }
+
+  std::shared_ptr<RegExp> exp = std::make_shared<RegExp>(slice);
+  if (!exp->exp.ok()) {
+    lex.fail = true;
+    std::cerr << "Invalid regular expression at "
+      << SYM_LOCATION.file() << "; "
+      << exp->exp.error() << std::endl;
+  }
+  out = new Literal(SYM_LOCATION, std::move(exp));
+  return true;
+}
+
 static bool lex_sstr(Lexer &lex, Expr *&out)
 {
   input_t &in = *lex.engine.get();
@@ -385,7 +419,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
           lex.consume();
           exprs.push_back(parse_expr(lex));
           if (lex.next.type == EOL) lex.consume();
-          ok &= expect(BCLOSE, lex);
+          expect(BCLOSE, lex);
           start = in.coord();
           continue;
         }
@@ -466,11 +500,9 @@ top:
       nl lws*            { ++in.row; in.sol = in.tok+1; return mkSym(EOL); }
 
       // character and string literals
-      ['"] {
-        Expr *out = 0;
-        bool ok = in.cur[-1] == '"' ? lex_dstr(lex, out) : lex_sstr(lex, out);
-        return mkSym2(ok ? LITERAL : ERROR, out);
-      }
+      [`] { Expr *out = 0; bool ok = lex_rstr(lex, out); return mkSym2(ok ? LITERAL : ERROR, out); }
+      ['] { Expr *out = 0; bool ok = lex_sstr(lex, out); return mkSym2(ok ? LITERAL : ERROR, out); }
+      ["] { Expr *out = 0; bool ok = lex_dstr(lex, out); return mkSym2(ok ? LITERAL : ERROR, out); }
 
       // double literals
       dec = [1-9][0-9_]*;
@@ -523,7 +555,7 @@ top:
       Po_special  = ["#'\\];
       Po_op       = [!%&*,./:];
       // !!! TODO: Po, Pd(without -)
-      op = (Sk|Sc|Sm_op|Po_op|"-")+; // [`^] are Sk
+      op = (Sk_notick|Sc|Sm_op|Po_op|"-")+; // [`^] are Sk
 
       // identifiers
       modifier = Lm|M;

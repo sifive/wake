@@ -27,6 +27,7 @@
 #include <iosfwd>
 #include <limits>
 #include <gmp.h>
+#include <re2/re2.h>
 
 #define APP_PRECEDENCE 22
 
@@ -120,6 +121,18 @@ struct Double : public Value {
   Double(const char *str);
 
   std::string str(int format = DEFAULTFLOAT, int precision = limits::max_digits10) const;
+  void format(std::ostream &os, FormatState &state) const;
+  TypeVar &getType();
+  Hash hash() const;
+};
+
+struct RegExp : public Value {
+  RE2 exp;
+  static const TypeDescriptor type;
+  static TypeVar typeVar;
+  static RE2::Options defops();
+  RegExp(const std::string &regexp, const RE2::Options &opts = defops()) : Value(&type), exp(re2::StringPiece(regexp), opts) { }
+
   void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
