@@ -21,7 +21,7 @@ def releaseCFlags = ("-Wall", "-O2", "-flto", Nil)
 def releaseLFlags = ("-flto", Nil)
 
 def doCompileC variant gcc flags headers cfile =
-  def obj = replace '\.c(pp)?$' ".{variant}.o" cfile.getPathName
+  def obj = replace `\.c(pp)?$` ".{variant}.o" cfile.getPathName
   def cmdline = gcc, distinctBy scmp flags ++ ("-c", cfile.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
   def result = job cmdline (cfile, headers)
   result.getJobOutput
@@ -48,7 +48,7 @@ publish linkO = makeLinkO "native-cpp11-debug"   (which "g++") (debugLFlags)
 publish linkO = makeLinkO "native-cpp11-release" (which "g++") (releaseLFlags)
 
 def pickVariant variant variants =
-  match (find (matches variant _.getPairFirst) variants)
+  match (find (variant ==* _.getPairFirst) variants)
     Some (Pair x _) = x.getPairSecond
     None =
       def ok = catWith " " (map getPairFirst variants)

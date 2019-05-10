@@ -63,10 +63,10 @@ def escape =
     s, c, t = s, byteToInteger c | fmt (helper t)
     x = x
   _
-  | replace '[\\"]' '\\\0'
-  | replace "\0" '\\u0000'
-  | replace '[\x01-\x1f]' "\0\\0\0"
-  | tokenize "\0"
+  | replace `[\\"]` '\\\0'
+  | replace `\0` '\\u0000'
+  | replace `[\x01-\x1f]` "\0\\0\0"
+  | tokenize `\0`
   | helper
 
 tuple JSONFormat =

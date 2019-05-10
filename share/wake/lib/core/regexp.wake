@@ -18,26 +18,20 @@
 # quote: (str: String) => String
 global def quote str = prim "quote"
 
+# (str: String) => RegExp
+global def stringToRegExp str = prim "re2"
+
+global def regExpToString regexp = prim "re2str"
+
 # matches: (testRegexp: String) => (str: String) => Boolean
-global def matches testRegexp =
-  def compile r = prim "re2"
-  def matches r str = prim "match"
-  matches (compile testRegexp)
+global def matches testRegexp str = prim "match"
 
 # extract: (parensRegexp: String) => (str: String) => List String
-global def extract parensRegexp =
-  def compile r = prim "re2"
-  def extract r str = prim "extract"
-  extract (compile parensRegexp)
+# returns Nil on no match
+global def extract parensRegexp str = prim "extract"
 
 # replace: (locatorRegexp: String) => (replacement: String) => (str: String) => String
-global def replace locatorRegexp =
-  def compile r = prim "re2"
-  def replace r replacement str = prim "replace"
-  replace (compile locatorRegexp)
+global def replace locatorRegexp replacement str = prim "replace"
 
 # tokenize: (seperatorRegexp: String) => (str: String) => List String
-global def tokenize seperatorRegexp =
-  def compile r = prim "re2"
-  def tokenize r str = prim "tokenize"
-  tokenize (compile seperatorRegexp)
+global def tokenize seperatorRegexp str = prim "tokenize"

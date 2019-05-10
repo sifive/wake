@@ -317,14 +317,14 @@ global def fuseRunner =
       | write 0664 "{mkdir 0775 '.build'}/{input.getRunnerInputPrefix}.visible"
     def cmd = fusePath, visibleFile, Nil
     def fuse = makeRawPlan cmd | setPlanPool 0 | runJobWith manualRunner
-    def handle _ = raise "Could not start fuse-wake ({str fuse.getJobStatus}): {fuse.getJobStderr | tokenize "\n" | head}"
-    def root = try handle (extract 'OK: (.*)' fuse.getJobStderr)
+    def handle _ = raise "Could not start fuse-wake ({str fuse.getJobStatus}): {fuse.getJobStderr | tokenize `\n` | head}"
+    def root = try handle (extract `OK: (.*)` fuse.getJobStderr)
     Pair (editRunnerInputDirectory ("{root.head}/{_}") input) fuse
   def post (Pair output fuse) =
     def _ = killJob fuse 14 # SIGALRM
-    def result = extract "(.*\0)?\0(.*)" fuse.getJobStdout
-    def inputs  = result | at 0 | tokenize "\0" | filter (_!=*"")
-    def outputs = result | at 1 | tokenize "\0" | filter (_!=*"")
+    def result = extract `(.*\0)?\0(.*)` fuse.getJobStdout
+    def inputs  = result | at 0 | tokenize `\0` | filter (_!=*"")
+    def outputs = result | at 1 | tokenize `\0` | filter (_!=*"")
     def usage (Usage ps pr pc pm pi po) = match fuse.getJobReport
       Usage fs _ fc fm fi fo =
         Usage (if fs == 0 then ps else fs) pr (fc +. pc) (fm + pm) (fi + pi) (fo + po)
@@ -372,30 +372,30 @@ global def makeJSONRunner script score estimate =
     Pair proxy outFile
   def post (Pair output outFile) =
     def content = parseJSONFile outFile
-    def usage = content // "usage"
+    def usage = content // `usage`
     def usageOut =
       Usage
-      (usage // "status"   | getJInteger | getOrElse 255)
-      (usage // "runtime"  | getJDouble  | getOrElse 0.0)
-      (usage // "cputime"  | getJDouble  | getOrElse 0.0)
-      (usage // "membytes" | getJInteger | getOrElse 0)
-      (usage // "inbytes"  | getJInteger | getOrElse 0)
-      (usage // "outbytes" | getJInteger | getOrElse 0)
-    def getK str = content // str | getJArray | getOrElse Nil | mapPartial getJString
-    RunnerOutput (getK "inputs") (getK "outputs") (getK "indexes") usageOut
+      (usage // `status`   | getJInteger | getOrElse 255)
+      (usage // `runtime`  | getJDouble  | getOrElse 0.0)
+      (usage // `cputime`  | getJDouble  | getOrElse 0.0)
+      (usage // `membytes` | getJInteger | getOrElse 0)
+      (usage // `inbytes`  | getJInteger | getOrElse 0)
+      (usage // `outbytes` | getJInteger | getOrElse 0)
+    def getK exp = content // exp | getJArray | getOrElse Nil | mapPartial getJString
+    RunnerOutput (getK `inputs`) (getK `outputs`) (getK `indexes`) usageOut
   makeRunner "json-{script.getPathName}" score pre post manualRunner
 
 global def executeJSON json =
   def makeVirtual visible =
     def add f h = prim "add_hash"
     Path (add visible "0")
-  def cmd   = json // "command"     | getJArray  | getOrElse Nil | mapPartial getJString
-  def vis   = json // "visible"     | getJArray  | getOrElse Nil | mapPartial getJString | map makeVirtual
-  def env   = json // "environment" | getJArray  | getOrElse Nil | mapPartial getJString
-  def dir   = json // "directory"   | getJString | getOrElse "."
-  def stdin = json // "stdin"       | getJString | getOrElse ""
+  def cmd   = json // `command`     | getJArray  | getOrElse Nil | mapPartial getJString
+  def vis   = json // `visible`     | getJArray  | getOrElse Nil | mapPartial getJString | map makeVirtual
+  def env   = json // `environment` | getJArray  | getOrElse Nil | mapPartial getJString
+  def dir   = json // `directory`   | getJString | getOrElse "."
+  def stdin = json // `stdin`       | getJString | getOrElse ""
   # Resources should have been resolved by the runner prior to invocation by us
-  def res   = Nil # json // "resources"   | getJString | getOrElse Nil | mapPartial getJString
+  def res   = Nil # json // `resources`   | getJString | getOrElse Nil | mapPartial getJString
   def job = Plan cmd vis env dir stdin ReRun True res (\_ True) id id id 1 | runJobWith fuseRunner
   JObject (
     "inputs"  → tree job 1 | map (_.getPairFirst.JString) | JArray,
@@ -429,7 +429,7 @@ def hashcode f = memoize 0 (
   if reuse !=* "" then reuse else
     def job = makeRawPlan ("<hash>", f, Nil) | runJobWith manualRunner
     if job.getJobStatus == 0
-    then extract '(.{64}).*' job.getJobStdout | head
+    then extract `(.{64}).*` job.getJobStdout | head
     else raise "Failed to hash file {f}"
 )
 

@@ -61,7 +61,7 @@ global def mkdir path =
     "", x, t = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 "/{x}") t
     x, t     = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 x) t
     Nil      = raise "impossible"
-  path | simplify | tokenize "/" | root
+  path | simplify | tokenize `/` | root
 
 def writeImp inputs mode path content =
   def writeRunner =

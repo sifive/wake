@@ -37,7 +37,7 @@ def pkgConfigImp args = memoize 0 (
     makeManualPlan cmdline Nil (\_ Nil) # caching ok
     | editPlanEnvironment addenv
     | runJob
-  def output = result.getJobStdout | tokenize "\n" | head | tokenize " " | filter (_ !=* "")
+  def output = result.getJobStdout | tokenize `\n` | head | tokenize ` ` | filter (_ !=* "")
   if result.getJobStatus != 0 then None else Some output
 )
 
@@ -45,11 +45,11 @@ def fail pkg = match _
   Some x = x
   None   = raise "pkg-config for {pkg} not found"
 
-global def cflags pkg = pkgConfigImp ("--short-errors", "--cflags", tokenize " " pkg) | fail pkg
-global def libs   pkg = pkgConfigImp ("--short-errors", "--libs",   tokenize " " pkg) | fail pkg
+global def cflags pkg = pkgConfigImp ("--short-errors", "--cflags", tokenize ` ` pkg) | fail pkg
+global def libs   pkg = pkgConfigImp ("--short-errors", "--libs",   tokenize ` ` pkg) | fail pkg
 
 global def pkgConfig pkg =
-  def pkgs = tokenize " " pkg
+  def pkgs = tokenize ` ` pkg
   def version = pkgConfigImp ("--short-errors", "--modversion", pkgs)
   match version
     Some (version, _) =

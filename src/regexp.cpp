@@ -59,6 +59,19 @@ static PRIMFN(prim_re2) {
   }
 }
 
+static PRIMTYPE(type_re2str) {
+  return args.size() == 1 &&
+    args[0]->unify(RegExp::typeVar) &&
+    out->unify(String::typeVar);
+}
+
+static PRIMFN(prim_re2str) {
+  EXPECT(1);
+  REGEXP(arg0, 0);
+  auto out = std::make_shared<String>(arg0->exp.pattern());
+  RETURN(out);
+}
+
 static PRIMTYPE(type_quote) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
@@ -166,6 +179,7 @@ static PRIMFN(prim_tokenize) {
 
 void prim_register_regexp(PrimMap &pmap) {
   prim_register(pmap, "re2",      prim_re2,      type_re2,      PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "re2str",   prim_re2str,   type_re2str,   PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "quote",    prim_quote,    type_quote,    PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "match",    prim_match,    type_match,    PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "extract",  prim_extract,  type_extract,  PRIM_PURE|PRIM_SHALLOW);
