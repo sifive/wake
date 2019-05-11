@@ -37,14 +37,18 @@ global def vectorToTreeMulti cmp v =
 global def vectorToTree cmp v =
   Tree cmp (build (vdistinctRunBy (cmp _ _ | isEQ) (vsortBy (cmp _ _ | isLT) v)))
 
+def vat_ i v = match (vat i v)
+  Some x = x
+  _ = panic "unreachable"
+
 def build v = match (vlen v)
   0 = Tip
-  1 = Bin 1 Tip (vat 0 v) Tip
+  1 = Bin 1 Tip (vat_ 0 v) Tip
   len =
     def mid = len >> 1
     def l = vtake mid v
     def r = vdrop (mid+1) v
-    Bin len (build l) (vat mid v) (build r)
+    Bin len (build l) (vat_ mid v) (build r)
 
 global def tlen (Tree _ root) = size root
 def size = match _

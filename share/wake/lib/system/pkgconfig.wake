@@ -37,8 +37,9 @@ def pkgConfigImp args = memoize 0 (
     makeManualPlan cmdline Nil (\_ Nil) # caching ok
     | editPlanEnvironment addenv
     | runJob
-  def output = result.getJobStdout | tokenize `\n` | head | tokenize ` ` | filter (_ !=* "")
-  if result.getJobStatus != 0 then None else Some output
+  def output = result.getJobStdout | tokenize `\n` | head
+  def split = _ | tokenize ` ` | filter (_ !=* "")
+  if result.getJobStatus != 0 then None else omap split output
 )
 
 def fail pkg = getOrFail "pkg-config for {pkg} not found" _

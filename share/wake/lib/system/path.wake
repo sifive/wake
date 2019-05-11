@@ -35,17 +35,21 @@ global def workspace = prim "workspace"
 
 def mkdirRunner =
   def imp m p = prim "mkdir"
-  def pre input =
-    match input.getRunnerInputCommand
-      _, _, mode, dir, Nil = Pair input (Pair mode dir)
-      _ = panic "mkdirRunner: invalid command-line"
-  def post (Pair output (Pair mode dir)) =
-    output
-    | editRunnerOutputOutputs (imp (int mode) dir, _)
-  makeRunner "mkdir" (\_ 0.0) pre post virtualRunner
+  def pre = match _
+    Fail f = Pair (Fail f) (Pair "" "")
+    Pass input = match input.getRunnerInputCommand
+      _, _, mode, dir, Nil = Pair (Pass input) (Pair mode dir)
+      _ = Pair (panic "mkdirRunner: invalid command-line") (Pair "" "")
+  def post = match _
+    Pair (Fail f) _ = Fail f
+    Pair (Pass output) (Pair mode dir) =
+      output
+      | editRunnerOutputOutputs (imp (int mode) dir, _)
+      | Pass
+  makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
 
 def mkdirImp inputs mode path =
-  makePlan ("<mkdir>", "-m", "0{strbase 8 mode}", path, Nil) inputs
+  :!!! makePlan ("<mkdir>", "-m", "0{strbase 8 mode}", path, Nil) inputs
   | setPlanKeep        False
   | setPlanEnvironment Nil
   | runJobWith mkdirRunner
@@ -67,11 +71,14 @@ def writeImp inputs mode path content =
   def writeRunner =
     def imp m p c = prim "write"
     def pre input = Pair input Unit
-    def post (Pair output Unit) =
-      output
-      | editRunnerOutputOutputs (imp mode path content, _)
-    makeRunner "write" (\_ 0.0) pre post virtualRunner
-  makePlan ("<write>", str mode, path, Nil) inputs
+    def post = match _
+      Pair (Fail f) _ = Fail f
+      Pair (Pass output) Unit =
+        output
+        | editRunnerOutputOutputs (imp mode path content, _)
+        | Pass
+    makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
+  :!!! makePlan ("<write>", str mode, path, Nil) inputs
   | setPlanOnce        False
   | setPlanEnvironment Nil
   | runJobWith writeRunner

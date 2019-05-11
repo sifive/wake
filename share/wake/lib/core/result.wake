@@ -46,3 +46,15 @@ global def rmapFail fn = match _
   Fail f = Fail (fn f)
 
 global def panic s = prim "raise" # !!! should terminate process
+
+global def :!!! result = match result
+  Pass p = p
+  Fail f = panic (format f)
+
+global tuple Error =
+  global Cause: String
+  global Stack: List String
+
+global def makeError cause =
+  # !!! should use 'stack' prim
+ Fail (Error cause Nil)

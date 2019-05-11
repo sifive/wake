@@ -190,17 +190,21 @@ static PRIMFN(prim_write) {
 }
 
 static PRIMTYPE(type_getenv) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    out->unify(list);
 }
 
 static PRIMFN(prim_getenv) {
   EXPECT(1);
   STRING(arg0, 0);
   const char *env = getenv(arg0->value.c_str());
-  REQUIRE(env, arg0->value + " is unset in the environment");
-  auto out = std::make_shared<String>(env);
+  std::vector<std::shared_ptr<Value> > vals;
+  if (env) vals.emplace_back(std::make_shared<String>(env));
+  auto out = make_list(std::move(vals));
   RETURN(out);
 }
 

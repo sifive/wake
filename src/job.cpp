@@ -668,6 +668,27 @@ static void parse_usage(Usage *usage, std::shared_ptr<Value> &bad, const std::sh
   }
 }
 
+static PRIMTYPE(type_job_fail) {
+  return args.size() == 2 &&
+    args[0]->unify(Job::typeVar) &&
+    args[1]->unify(Data::typeError) &&
+    out->unify(Data::typeUnit);
+}
+
+static PRIMFN(prim_job_fail_launch) {
+  (void)data; // silence unused variable warning (EXPECT not called)
+  REQUIRE (args.size() == 2, "prim_job_bad_launch not called on 2 arguments");
+  JOBRESULT(job, 0);
+  job->bad_launch = args[1];
+}
+
+static PRIMFN(prim_job_fail_finish) {
+  (void)data; // silence unused variable warning (EXPECT not called)
+  REQUIRE (args.size() == 2, "prim_job_bad_finish not called on 2 arguments");
+  JOBRESULT(job, 0);
+  job->bad_finish = args[1];
+}
+
 static PRIMTYPE(type_job_launch) {
   return args.size() == 12 &&
     args[0]->unify(Job::typeVar) &&
@@ -1353,6 +1374,8 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   prim_register(pmap, "job_launch", prim_job_launch, type_job_launch,  PRIM_SHALLOW, jobtable);
   prim_register(pmap, "job_virtual",prim_job_virtual,type_job_virtual, PRIM_SHALLOW, jobtable);
   prim_register(pmap, "job_finish", prim_job_finish, type_job_finish,  PRIM_SHALLOW);
+  prim_register(pmap, "job_fail_launch", prim_job_fail_launch, type_job_fail, PRIM_SHALLOW);
+  prim_register(pmap, "job_fail_finish", prim_job_fail_finish, type_job_fail, PRIM_SHALLOW);
   prim_register(pmap, "job_kill",   prim_job_kill,   type_job_kill,    PRIM_SHALLOW);
   prim_register(pmap, "job_output", prim_job_output, type_job_output,  PRIM_SHALLOW|PRIM_PURE);
   prim_register(pmap, "job_tree",   prim_job_tree,   type_job_tree,    PRIM_SHALLOW|PRIM_PURE);

@@ -28,7 +28,11 @@ global def getOrElse b = match _
   Some a = a
   None   = b
 
-global def getOrFail fn = match _
+global def getOrFail f = match _
+  Some a = Pass a
+  None   = Fail f
+
+global def getOrFailFn fn = match _
   Some a = Pass a
   None   = Fail (fn Unit)
 
