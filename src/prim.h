@@ -40,7 +40,9 @@ struct Data;
   return;								\
 } while (0)
 
+// !!! make REQUIRE terminate gracefully
 #define REQUIRE(b) assert(b)
+
 #define EXPECT(num) do {	\
   (void)data;			\
   REQUIRE(args.size() == num);	\

@@ -37,7 +37,7 @@ def pkgConfigImp args = memoize 0 (
     makeManualPlan cmdline Nil (\_ Nil) # caching ok
     | editPlanEnvironment addenv
     | runJob
-  def output = result.getJobStdout | tokenize `\n` | head
+  def output = result.getJobStdout | getWhenFail "" | tokenize `\n` | head
   def split = _ | tokenize ` ` | filter (_ !=* "")
   if result.getJobStatus != 0 then None else omap split output
 )

@@ -626,6 +626,13 @@ static PRIMFN(prim_job_fail_finish) {
   EXPECT(2);
   JOB(job, 0);
   job->bad_finish = args[1];
+  job->report.found    = true;
+  job->report.status   = 128;
+  job->report.runtime  = 0;
+  job->report.cputime  = 0;
+  job->report.membytes = 0;
+  job->report.ibytes   = 0;
+  job->report.obytes   = 0;
   job->state |= STATE_FINISHED;
   job->process(queue);
 }
@@ -845,7 +852,9 @@ static std::shared_ptr<Value> make_usage(const Usage &usage) {
 
 void Job::process(WorkQueue &queue) {
   if ((state & STATE_STDOUT) && q_stdout) {
-    auto out = bad_launch ? bad_launch : std::make_shared<String>(db->get_output(job, 1));
+    auto out = bad_launch
+      ? make_result(false, std::shared_ptr<Value>(bad_launch))
+      : make_result(true, std::make_shared<String>(db->get_output(job, 1)));
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_stdout); iter; iter = std::move(next)) {
       next = std::move(iter->next);
@@ -855,7 +864,9 @@ void Job::process(WorkQueue &queue) {
   }
 
   if ((state & STATE_STDERR) && q_stderr) {
-    auto out = bad_launch ? bad_launch : std::make_shared<String>(db->get_output(job, 2));
+    auto out = bad_launch
+      ? make_result(false, std::shared_ptr<Value>(bad_launch))
+      : make_result(true, std::make_shared<String>(db->get_output(job, 2)));
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_stderr); iter; iter = std::move(next)) {
       next = std::move(iter->next);
@@ -865,7 +876,9 @@ void Job::process(WorkQueue &queue) {
   }
 
   if ((state & STATE_MERGED) && q_reality) {
-    auto out = bad_launch ? bad_launch : make_usage(reality);
+    auto out = bad_launch
+      ? make_result(false, std::shared_ptr<Value>(bad_launch))
+      : make_result(true, make_usage(reality));
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_reality); iter; iter = std::move(next)) {
       next = std::move(iter->next);
@@ -876,7 +889,9 @@ void Job::process(WorkQueue &queue) {
 
   if ((state & STATE_FINISHED) && q_inputs) {
     auto files = db->get_tree(1, job);
-    auto out = bad_finish ? bad_finish : convert_tree(std::move(files));
+    auto out = bad_finish
+      ? make_result(false, std::shared_ptr<Value>(bad_finish))
+      : make_result(true, convert_tree(std::move(files)));
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_inputs); iter; iter = std::move(next)) {
       next = std::move(iter->next);
@@ -887,7 +902,9 @@ void Job::process(WorkQueue &queue) {
 
   if ((state & STATE_FINISHED) && q_outputs) {
     auto files = db->get_tree(2, job);
-    auto out = bad_finish ? bad_finish : convert_tree(std::move(files));
+    auto out = bad_finish
+      ? make_result(false, std::shared_ptr<Value>(bad_finish))
+      : make_result(true, convert_tree(std::move(files)));
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_outputs); iter; iter = std::move(next)) {
       next = std::move(iter->next);
@@ -897,7 +914,9 @@ void Job::process(WorkQueue &queue) {
   }
 
   if ((state & STATE_FINISHED) && q_report) {
-    auto out = bad_launch ? bad_launch : make_usage(report);
+    auto out = bad_finish
+      ? make_result(false, std::shared_ptr<Value>(bad_finish))
+      : make_result(true, make_usage(report));
     std::unique_ptr<Receiver> iter, next;
     for (iter = std::move(q_report); iter; iter = std::move(next)) {
       next = std::move(iter->next);
@@ -908,10 +927,14 @@ void Job::process(WorkQueue &queue) {
 }
 
 static PRIMTYPE(type_job_output) {
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(String::typeVar);
+  result[1].unify(Data::typeError);
   return args.size() == 2 &&
     args[0]->unify(Job::typeVar) &&
     args[1]->unify(Integer::typeVar) &&
-    out->unify(String::typeVar);
+    out->unify(result);
 }
 
 static PRIMFN(prim_job_output) {
@@ -962,10 +985,14 @@ static PRIMTYPE(type_job_tree) {
   list[0].unify(pair);
   pair[0].unify(String::typeVar);
   pair[1].unify(String::typeVar);
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(list);
+  result[1].unify(Data::typeError);
   return args.size() == 2 &&
     args[0]->unify(Job::typeVar) &&
     args[1]->unify(Integer::typeVar) &&
-    out->unify(list);
+    out->unify(result);
 }
 
 static PRIMFN(prim_job_tree) {
@@ -1150,9 +1177,13 @@ static void usage_type(TypeVar &pair) {
 static PRIMTYPE(type_job_reality) {
   TypeVar pair;
   usage_type(pair);
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(pair);
+  result[1].unify(Data::typeError);
   return args.size() == 1 &&
     args[0]->unify(Job::typeVar) &&
-    out->unify(pair);
+    out->unify(result);
 }
 
 static PRIMFN(prim_job_reality) {
@@ -1166,9 +1197,13 @@ static PRIMFN(prim_job_reality) {
 static PRIMTYPE(type_job_report) {
   TypeVar pair;
   usage_type(pair);
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(pair);
+  result[1].unify(Data::typeError);
   return args.size() == 1 &&
     args[0]->unify(Job::typeVar) &&
-    out->unify(pair);
+    out->unify(result);
 }
 
 static PRIMFN(prim_job_report) {
