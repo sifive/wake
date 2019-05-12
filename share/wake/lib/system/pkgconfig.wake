@@ -13,20 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-global tuple CPackage =
+global tuple SysLib =
   global Verison: String
   global Headers: List Path
   global Objects: List Path
   global CFlags:  List String
   global LFlags:  List String
 
-global def makeCPackage version = CPackage version Nil Nil Nil Nil
-global def flattenCPackages packages =
-  def headers = map getCPackageHeaders packages | flatten
-  def objects = map getCPackageObjects packages | flatten
-  def cflags  = map getCPackageCFlags  packages | flatten
-  def lflags  = map getCPackageLFlags  packages | flatten
-  CPackage "" headers objects cflags lflags
+global def makeSysLib version = SysLib version Nil Nil Nil Nil
+global def flattenSysLibs packages =
+  def headers = map getSysLibHeaders packages | flatten
+  def objects = map getSysLibObjects packages | flatten
+  def cflags  = map getSysLibCFlags  packages | flatten
+  def lflags  = map getSysLibLFlags  packages | flatten
+  SysLib "" headers objects cflags lflags
 
 def pkgConfigImp args = memoize 0 (
   def cmdline = which "pkg-config", args
@@ -42,11 +42,6 @@ def pkgConfigImp args = memoize 0 (
   if result.getJobStatus != 0 then None else omap split output
 )
 
-def fail pkg = getOrFail "pkg-config for {pkg} not found" _
-
-global def cflags pkg = pkgConfigImp ("--short-errors", "--cflags", tokenize ` ` pkg) | fail pkg
-global def libs   pkg = pkgConfigImp ("--short-errors", "--libs",   tokenize ` ` pkg) | fail pkg
-
 global def pkgConfig pkg =
   def pkgs = tokenize ` ` pkg
   def version = pkgConfigImp ("--short-errors", "--modversion", pkgs)
@@ -55,6 +50,6 @@ global def pkgConfig pkg =
       def cflags  = pkgConfigImp ("--silence-errors", "--cflags", pkgs)
       def lflags  = pkgConfigImp ("--silence-errors", "--libs",   pkgs)
       match cflags lflags
-        (Some cflags) (Some lflags) = Some (CPackage version Nil Nil cflags lflags)
+        (Some cflags) (Some lflags) = Some (SysLib version Nil Nil cflags lflags)
         _ _ = None
     _ = None

@@ -21,4 +21,4 @@ global def utf8proc variant = match (pkgConfig "utf8proc")
     def headers = source "{here}/utf8proc_data.c", sources here `.*\.h`
     def compile x = :!!! compileC variant cflags headers (source "{here}/{x}")
     def objects = ("utf8proc.c", Nil) | map compile
-    CPackage "2.2.0" headers objects cflags Nil
+    SysLib "2.2.0" headers objects cflags Nil
