@@ -16,8 +16,9 @@
 def version_h _ =
   def cmdline = which "git", "describe", "--tags", "--dirty", Nil
   def git = volatileJob cmdline Nil (\_ Nil)
-  def body = "#define VERSION {git.getJobStdout | getWhenFail ""}" # !!! user invalid Path
-  write "{here}/version.h" body
+  match git.getJobStdout
+    Fail f = makeBadJob f
+    Pass stdout = write "{here}/version.h" "#define VERSION {stdout}"
 
 def pkg name = match (pkgConfig name)
   Some x = x

@@ -270,12 +270,10 @@ global def runJob p = match p
         def badfinish job e = prim "job_fail_finish"
         def badlaunch job e = prim "job_fail_launch"
         def job = create dir stdin env.implode cmd.implode (map getPathName vis).implode 0
-        match (makeError "No runner available: {map format opts | catWith ", "}")
-          Pass _ = panic "unreachable"
-          Fail error =
-            def _ = badlaunch job error
-            def _ = badfinish job error
-            job
+        def error = makeError "No runner available: {map format opts | catWith ", "}"
+        def _ = badlaunch job error
+        def _ = badfinish job error
+        job
 
 def toUsage (Pair (Pair status runtime) (Pair (Pair cputime membytes) (Pair ibytes obytes))) =
   Usage status runtime cputime membytes ibytes obytes
@@ -298,7 +296,7 @@ global def getJobRecord =
   def raw job = prim "job_record"
   raw _ | at 0 | omap toUsage
 
-global def makeBadJob cause = BadJob (Error cause (stack Unit))
+global def makeBadJob error = BadJob error
 
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
@@ -306,7 +304,7 @@ def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks til
 def guardPath job = match _
   Fail e = BadJob e, Nil
   Pass l if job.getJobStatus == 0 = map (\(Pair f _) File f) l
-  _ = makeBadJob "Non-zero exit status ({str job.getJobStatus})", Nil
+  _ = makeBadJob (makeError "Non-zero exit status ({str job.getJobStatus})"), Nil
 def mapPath = match _
   Fail e = BadJob e, Nil
   Pass l = map (\(Pair f _) File f) l
@@ -323,9 +321,9 @@ global def getJobOutput job = match (tree job 2)
   Fail e = BadJob e
   Pass l if job.getJobStatus == 0 = match l
     (Pair f _), Nil = File f
-    Nil    = makeBadJob "no outputs available"
-    _      = makeBadJob "more than one output found"
-  _ = makeBadJob "Non-zero exit status ({str job.getJobStatus})"
+    Nil    = makeBadJob (makeError "no outputs available")
+    _      = makeBadJob (makeError "more than one output found")
+  _ = makeBadJob (makeError "Non-zero exit status ({str job.getJobStatus})")
 
 # Implement FUSE-based Runner
 def wakePath = prim "execpath" # location of the wake executable
@@ -335,19 +333,19 @@ global def fuseRunner =
   def pre = match _
     Fail f = Pair (Fail f) None
     Pass input = match ((\m\p prim "mkdir") 0775 ".build")
-      Fail f = Pair (makeError f) None
+      Fail f = Pair (Fail (makeError f)) None
       Pass build = match (
         (input.getRunnerInputDirectory, input.getRunnerInputVisible | map getPathName)
         | implode
         | (\m\p\c prim "write") 0664 "{build}/{input.getRunnerInputPrefix}.visible"
       )
-        Fail f = Pair (makeError f) None
+        Fail f = Pair (Fail (makeError f)) None
         Pass visibleFile =
           def cmd = fusePath, visibleFile, Nil
           def fuse = makeRawPlan cmd | setPlanPool 0 | runJobWith manualRunner
           match (fuse.getJobStderr | rmap (extract `OK: (.*)`))
             Pass (x, Nil) = Pair (Pass (editRunnerInputDirectory ("{x}/{_}") input)) (Some fuse)
-            Pass _ = Pair (makeError "fuse-wake output invalid: {fuse.getJobStderr | getWhenFail ""}") (Some fuse)
+            Pass _ = Pair (Fail (makeError "fuse-wake output invalid: {fuse.getJobStderr | getWhenFail ""}")) (Some fuse)
             Fail f = Pair (Fail f) (Some fuse)
   def post = match _
     Pair x None = x
@@ -372,7 +370,7 @@ global def fuseRunner =
           | setRunnerOutputOutputs (outputs | tokenize `\0` | filter (_!=*""))
           | editRunnerOutputUsage usage
           | Pass
-        _ = makeError "could not parse fuse output"
+        _ = Fail (makeError "could not parse fuse output")
   def score (Plan _ _ _ _ _ _ lo res _ _ _ _ _) = match res
     Nil = if lo then Fail "would hide workspace" else Pass 1.0
     _   = Fail "cannot supply resources"
@@ -409,9 +407,9 @@ global def makeJSONRunner script score estimate =
               ), Nil
         )
         match ((\m\p prim "mkdir") 0775 ".build")
-          Fail f = Pair (makeError f) ""
+          Fail f = Pair (Fail (makeError f)) ""
           Pass build = match ((\m\p\c prim "write") 0664 "{build}/{prefix}.in.json" (prettyJSON json))
-            Fail f = Pair (makeError f) ""
+            Fail f = Pair (Fail (makeError f)) ""
             Pass inFile =
               def outFile = "{build}/{prefix}.out.json"
               def cmd = script.getPathName, inFile, outFile, Nil
@@ -505,7 +503,7 @@ def stateRunner =
     Fail f = Pair (Fail f) ""
     Pass input = match input.getRunnerInputCommand
       _, file, Nil = Pair (Pass input) file
-      _ = Pair (makeError "stateRunner: invalid command-line") ""
+      _ = Pair (Fail (makeError "stateRunner: invalid command-line")) ""
   def post = match _
     Pair (Fail f) _ = Fail f
     Pair (Pass output) file =

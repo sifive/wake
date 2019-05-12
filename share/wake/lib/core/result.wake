@@ -54,4 +54,4 @@ global tuple Error =
   global Stack: List String
 
 global def makeError cause =
-  Fail (Error cause (stack Unit))
+  Error cause (stack Unit)

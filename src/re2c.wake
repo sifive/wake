@@ -38,7 +38,9 @@ def re2cFake file =
   def cpp = replace `\.re$` ".cpp" file.getPathName
   def zip = source "{cpp}.gz"
   def cmd = which "gzip", "-dc", "{cpp}.gz", Nil
-  job cmd (zip, Nil) | getJobStdout | getWhenFail "" | write cpp # !!! user-makes an invalid path
+  match (job cmd (zip, Nil) | getJobStdout)
+    Fail f = makeBadJob f
+    Pass stdout = write cpp stdout
 
 global def re2c file =
   if re2cOk Unit then re2cReal file else re2cFake file
