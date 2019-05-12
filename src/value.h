@@ -171,28 +171,4 @@ struct Data : public Value {
   Hash hash() const;
 };
 
-struct Cause {
-  std::string reason;
-  std::vector<Location> stack;
-  Cause(const std::string &reason_, std::vector<Location> &&stack_);
-};
-
-struct Exception : public Value {
-  std::vector<std::shared_ptr<Cause> > causes;
-
-  static const TypeDescriptor type;
-  static TypeVar typeVar;
-  Exception() : Value(&type) { }
-  Exception(const std::string &reason, const std::shared_ptr<Binding> &binding);
-
-  Exception &operator += (const Exception &other) {
-    causes.insert(causes.end(), other.causes.begin(), other.causes.end());
-    return *this;
-  }
-
-  void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
-};
-
 #endif

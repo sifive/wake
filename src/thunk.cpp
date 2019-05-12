@@ -33,17 +33,11 @@ struct Application : public Receiver {
 };
 
 void Application::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
-  if (value->type == &Exception::type) {
-    Receiver::receive(queue, std::move(receiver), std::move(value));
-  } else if (value->type != &Closure::type) {
-    auto exception = std::make_shared<Exception>("Attempt to apply " + value->to_str() + " which is not a Closure", args->invoker);
-    Receiver::receive(queue, std::move(receiver), std::move(exception));
-  } else {
-    Closure *clo = reinterpret_cast<Closure*>(value.get());
-    args->next = clo->binding;
-    args->expr = clo->lambda;
-    queue.emplace(clo->lambda->body.get(), std::move(args), std::move(receiver));
-  }
+  assert (value->type == &Closure::type);
+  Closure *clo = reinterpret_cast<Closure*>(value.get());
+  args->next = clo->binding;
+  args->expr = clo->lambda;
+  queue.emplace(clo->lambda->body.get(), std::move(args), std::move(receiver));
 }
 
 struct Destructure : public Receiver {
@@ -56,30 +50,20 @@ struct Destructure : public Receiver {
 };
 
 void Destructure::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
-  if (value->type == &Exception::type) {
-    Receiver::receive(queue, std::move(receiver), std::move(value));
-  } else if (value->type != &Data::type) {
-    auto exception = std::make_shared<Exception>("Attempt to destructure " + value->to_str() + " which is not a Data", args->invoker);
-    Receiver::receive(queue, std::move(receiver), std::move(exception));
-  } else {
-    Data *data = reinterpret_cast<Data*>(value.get());
-    if (&des->sum.members[data->cons->index] != data->cons) {
-      auto exception = std::make_shared<Exception>("Attempt to destructure " + value->to_str() + " which is not a " + des->sum.name, args->invoker);
-      Receiver::receive(queue, std::move(receiver), std::move(exception));
-    } else {
-      // Create a binding to hold 'data' and 'fn'
-      auto flip = std::make_shared<Binding>(data->binding, queue.stack_trace?args:nullptr, des, 2);
-      flip->future[1].value = std::move(value);
-      flip->state = -1;
-      // Find the correct handler function
-      Binding *fn = args.get();
-      int limit = des->sum.members.size() - data->cons->index;
-      for (int i = 0; i < limit; ++i) fn = fn->next.get();
-      fn->future[0].depend(queue, Binding::make_completer(flip, 0));
-      // Invoke the chain expr to setup user function
-      queue.emplace(data->cons->expr.get(), std::move(flip), std::move(receiver));
-    }
-  }
+  assert (value->type == &Data::type);
+  Data *data = reinterpret_cast<Data*>(value.get());
+  assert (&des->sum.members[data->cons->index] == data->cons);
+  // Create a binding to hold 'data' and 'fn'
+  auto flip = std::make_shared<Binding>(data->binding, queue.stack_trace?args:nullptr, des, 2);
+  flip->future[1].value = std::move(value);
+  flip->state = -1;
+  // Find the correct handler function
+  Binding *fn = args.get();
+  int limit = des->sum.members.size() - data->cons->index;
+  for (int i = 0; i < limit; ++i) fn = fn->next.get();
+  fn->future[0].depend(queue, Binding::make_completer(flip, 0));
+  // Invoke the chain expr to setup user function
+  queue.emplace(data->cons->expr.get(), std::move(flip), std::move(receiver));
 }
 
 struct Primitive : public Finisher {

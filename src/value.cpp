@@ -27,13 +27,12 @@
 #include <algorithm>
 
 Value::~Value() { }
-const TypeDescriptor String   ::type("String");
-const TypeDescriptor Integer  ::type("Integer");
-const TypeDescriptor Double   ::type("Double");
-const TypeDescriptor RegExp   ::type("RegExp");
-const TypeDescriptor Closure  ::type("Closure");
-const TypeDescriptor Data     ::type("Data");
-const TypeDescriptor Exception::type("Exception");
+const TypeDescriptor String ::type("String");
+const TypeDescriptor Integer::type("Integer");
+const TypeDescriptor Double ::type("Double");
+const TypeDescriptor RegExp ::type("RegExp");
+const TypeDescriptor Closure::type("Closure");
+const TypeDescriptor Data   ::type("Data");
 
 void FormatState::resume() {
   stack.emplace_back(current.value, current.precedence, current.state+1);
@@ -192,31 +191,6 @@ void Data::format(std::ostream &os, FormatState &state) const {
   }
 }
 
-static std::string pad(int depth) {
-  return std::string(depth, ' ');
-}
-
-void Exception::format(std::ostream &os, FormatState &state) const {
-  if (APP_PRECEDENCE < state.p()) os << "(";
-  os << "Exception";
-
-  if (state.detailed) {
-    for (auto &i : causes) {
-      if (state.indent < 0) os << " "; else os << std::endl << pad(state.indent+2);
-      os << "(\"" << i->reason << "\"";
-      for (auto &j : i->stack) {
-        if (state.indent < 0) os << " "; else os << std::endl << pad(state.indent+4);
-        os << "from " << j.file();
-      }
-      os << ")";
-    }
-  } else {
-    os << " \"" << causes[0]->reason << "\"";
-  }
-
-  if (APP_PRECEDENCE < state.p()) os << ")";
-}
-
 TypeVar String::typeVar("String", 0);
 TypeVar &String::getType() {
   return typeVar;
@@ -278,16 +252,6 @@ Hash RegExp::hash() const {
   return Hash(exp.pattern()) + type.hashcode;
 }
 
-TypeVar Exception::typeVar("Exception", 0);
-TypeVar &Exception::getType() {
-  assert (0); // unreachable
-  return typeVar;
-}
-
-Hash Exception::hash() const {
-  return Hash(to_str()) + type.hashcode;
-}
-
 TypeVar Closure::typeVar("Closure", 0);
 TypeVar &Closure::getType() {
   assert (0); // unreachable
@@ -326,13 +290,6 @@ Hash Data::hash() const {
     binding->hashcode.push(codes);
   }
   return Hash(codes);
-}
-
-Cause::Cause(const std::string &reason_, std::vector<Location> &&stack_)
- : reason(reason_), stack(std::move(stack_)) { }
-
-Exception::Exception(const std::string &reason, const std::shared_ptr<Binding> &binding) : Value(&type) {
-  causes.emplace_back(std::make_shared<Cause>(reason, binding->stack_trace()));
 }
 
 std::string Integer::str(int base) const {

@@ -708,8 +708,8 @@ static AST parse_type_def(Lexer &lex) {
 
 static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
   if (name == "Integer" || name == "String" || name == "RegExp" ||
-      name == "CatStream" || name == "Exception" || name == FN ||
-      name == "Job" || name == "Array" || name == "Double") {
+      name == "CatStream" || name == FN || name == "Job" ||
+      name == "Array" || name == "Double") {
     std::cerr << "Constuctor " << name
       << " is reserved at " << sump->location.file() << "." << std::endl;
     lex.fail = true;
