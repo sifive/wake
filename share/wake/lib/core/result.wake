@@ -56,5 +56,5 @@ global tuple Error =
   global Stack: List String
 
 global def makeError cause =
-  # !!! should use 'stack' prim
- Fail (Error cause Nil)
+  def stack s = prim "stack"
+  Fail (Error cause (stack Unit))

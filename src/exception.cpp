@@ -20,8 +20,33 @@
 #include "heap.h"
 #include "type.h"
 #include "status.h"
+#include "location.h"
 #include <stdlib.h>
-#include <iostream>
+#include <sstream>
+
+static PRIMTYPE(type_stack) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
+  return args.size() == 1 &&
+    args[0]->unify(Data::typeUnit) &&
+    out->unify(list);
+}
+
+static PRIMFN(prim_stack) {
+  EXPECT(1);
+  auto trace = binding->stack_trace();
+  std::vector<std::shared_ptr<Value> > list;
+  list.reserve(trace.size());
+  for (auto &x : trace) {
+    std::stringstream str;
+    str << x.file();
+    list.emplace_back(std::make_shared<String>(str.str()));
+  }
+
+  auto out = make_list(std::move(list));
+  RETURN(out);
+}
 
 static PRIMTYPE(type_panic) {
   return args.size() == 1 &&
@@ -53,6 +78,7 @@ static PRIMFN(prim_unit) {
 }
 
 void prim_register_exception(PrimMap &pmap) {
+  prim_register(pmap, "stack",    prim_stack, type_stack, PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "panic",    prim_panic, type_panic, PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "wait_one", prim_unit,  type_unit,  PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "wait_all", prim_unit,  type_unit,  PRIM_PURE);
