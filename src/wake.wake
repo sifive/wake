@@ -30,6 +30,6 @@ global def buildWake (Pair variant clib) =
   def reFiles = sources here `.*\.re`
   def headerFiles = version_h 0, deps.getSysLibHeaders ++ sources here `.*\.h`
   def cppFiles = map re2c reFiles ++ sources here `.*\.cpp`
-  def compile = :!!! compileC variant deps.getSysLibCFlags headerFiles _
+  def compile = compileC variant deps.getSysLibCFlags headerFiles
   def objFiles = map compile cppFiles ++ deps.getSysLibObjects
   linkO variant deps.getSysLibLFlags objFiles "bin/wake"

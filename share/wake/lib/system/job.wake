@@ -159,12 +159,16 @@ global def manualRunner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput cmd vis env dir stdin _ _ predict pool) = match (getOrElse defaultUsage predict)
-      Usage status runtime cputime mem in out =
-        def _ = launch job pool dir stdin env.implode cmd.implode status runtime cputime mem in out
-        match (getJobReality job)
-          Pass reality = Pass (RunnerOutput (map getPathName vis) Nil Nil reality)
-          Fail f = Fail f
+    Pass (RunnerInput cmd vis env dir stdin _ _ predict pool) = match (findSome getPathError vis)
+      Some e =
+        def _ = badlaunch job e
+        Fail e
+      None = match (getOrElse defaultUsage predict)
+        Usage status runtime cputime mem in out =
+          def _ = launch job pool dir stdin env.implode cmd.implode status runtime cputime mem in out
+          match (getJobReality job)
+            Pass reality = Pass (RunnerOutput (map getPathName vis) Nil Nil reality)
+            Fail f = Fail f
   def score (Plan _ _ _ _ _ _ lo res _ _ _ _ _) = match res
     Nil = if lo then Pass 1.0 else Fail "cannot detect outputs"
     _   = Fail "cannot supply resources"
@@ -177,12 +181,16 @@ global def virtualRunner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput cmd vis env dir stdin _ _ predict pool) = match (getOrElse defaultUsage predict)
-      Usage status runtime cputime mem in out =
-        def _ = virtual job "" "" status runtime cputime mem in out # sets predict+reality
-        match (getJobReality job)
-          Pass reality = Pass (RunnerOutput (map getPathName vis) Nil Nil reality)
-          Fail f = Fail f
+    Pass (RunnerInput cmd vis env dir stdin _ _ predict pool) = match (findSome getPathError vis)
+      Some e =
+        def _ = badlaunch job e
+        Fail e
+      None = match (getOrElse defaultUsage predict)
+        Usage status runtime cputime mem in out =
+          def _ = virtual job "" "" status runtime cputime mem in out # sets predict+reality
+          match (getJobReality job)
+            Pass reality = Pass (RunnerOutput (map getPathName vis) Nil Nil reality)
+            Fail f = Fail f
   Runner "virtual" (\_ Pass 0.0) doit
 
 def pid = prim "pid"
@@ -290,29 +298,34 @@ global def getJobRecord =
   def raw job = prim "job_record"
   raw _ | at 0 | omap toUsage
 
+global def makeBadJob cause = BadJob (Error cause (stack Unit))
+
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
 def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
-def fail job = match _
-  Fail f = Fail f
-  Pass p if job.getJobStatus == 0 = Pass p
-  Pass _ = makeError "Non-zero exit status ({str job.getJobStatus})"
-def liftPath = rmap (map (\(Pair f _) Path f))
+def guardPath job = match _
+  Fail e = BadJob e, Nil
+  Pass l if job.getJobStatus == 0 = map (\(Pair f _) File f) l
+  _ = makeBadJob "Non-zero exit status ({str job.getJobStatus})", Nil
+def mapPath = match _
+  Fail e = BadJob e, Nil
+  Pass l = map (\(Pair f _) File f) l
 global def killJob job signal = prim "job_kill" # send signal to job
 global def getJobStatus  job = getJobReport job | rmap getUsageStatus | getWhenFail (-1) #!!!
 global def getJobStdout  job = stdio job 1
 global def getJobStderr  job = stdio job 2
-global def getJobInputs  job = fail job job.getJobFailedInputs
-global def getJobOutputs job = fail job job.getJobFailedOutputs
-global def getJobFailedInputs  job = tree job 1 | liftPath
-global def getJobFailedOutputs job = tree job 2 | liftPath
+global def getJobInputs  job = tree job 1 | guardPath job
+global def getJobOutputs job = tree job 2 | guardPath job
+global def getJobFailedInputs  job = tree job 1 | mapPath
+global def getJobFailedOutputs job = tree job 2 | mapPath
 global def getJobId job = prim "job_id"
-global def getJobOutput = match _.getJobOutputs
-    Fail f = Fail f
-    Pass l = match l
-      x, Nil = Pass x
-      Nil    = makeError "no outputs available"
-      _      = makeError "more than one output found"
+global def getJobOutput job = match (tree job 2)
+  Fail e = BadJob e
+  Pass l if job.getJobStatus == 0 = match l
+    (Pair f _), Nil = File f
+    Nil    = makeBadJob "no outputs available"
+    _      = makeBadJob "more than one output found"
+  _ = makeBadJob "Non-zero exit status ({str job.getJobStatus})"
 
 # Implement FUSE-based Runner
 def wakePath = prim "execpath" # location of the wake executable
@@ -371,41 +384,43 @@ global def fuseRunner =
 global def makeJSONRunner script score estimate =
   def pre = match _
     Fail f = Pair (Fail f) ""
-    Pass (RunnerInput command visible environment directory stdin res prefix record _) =
-      def json = JObject (
-        "command"     → command     | map JString | JArray,
-        "environment" → environment | map JString | JArray,
-        "visible"     → visible | map (_.getPathName.JString) | JArray,
-        "directory"   → JString directory,
-        "stdin"       → JString stdin,
-        "resources"   → res | map JString | JArray,
-        "version"     → JString version,
-        match record
-          None = Nil
-          Some (Usage status runtime cputime membytes inbytes outbytes) =
-            "usage" → JObject (
-              "status"   → JInteger status,
-              "runtime"  → JDouble  runtime,
-              "cputime"  → JDouble  cputime,
-              "membytes" → JInteger membytes,
-              "inbytes"  → JInteger inbytes,
-              "outbytes" → JInteger outbytes,
-              Nil
-            ), Nil
-      )
-      match ((\m\p prim "mkdir") 0775 ".build")
-        Fail f = Pair (makeError f) ""
-        Pass build = match ((\m\p\c prim "write") 0664 "{build}/{prefix}.in.json" (prettyJSON json))
+    Pass (RunnerInput command visible environment directory stdin res prefix record _) = match (findSome getPathError visible)
+      Some e = Pair (Fail e) ""
+      None =
+        def json = JObject (
+          "command"     → command     | map JString | JArray,
+          "environment" → environment | map JString | JArray,
+          "visible"     → visible | map (_.getPathName.JString) | JArray,
+          "directory"   → JString directory,
+          "stdin"       → JString stdin,
+          "resources"   → res | map JString | JArray,
+          "version"     → JString version,
+          match record
+            None = Nil
+            Some (Usage status runtime cputime membytes inbytes outbytes) =
+              "usage" → JObject (
+                "status"   → JInteger status,
+                "runtime"  → JDouble  runtime,
+                "cputime"  → JDouble  cputime,
+                "membytes" → JInteger membytes,
+                "inbytes"  → JInteger inbytes,
+                "outbytes" → JInteger outbytes,
+                Nil
+              ), Nil
+        )
+        match ((\m\p prim "mkdir") 0775 ".build")
           Fail f = Pair (makeError f) ""
-          Pass inFile =
-            def outFile = "{build}/{prefix}.out.json"
-            def cmd = script.getPathName, inFile, outFile, Nil
-            def proxy = RunnerInput cmd Nil environment "." "" Nil prefix (omapPartial estimate record) 1
-            Pair (Pass proxy) outFile
+          Pass build = match ((\m\p\c prim "write") 0664 "{build}/{prefix}.in.json" (prettyJSON json))
+            Fail f = Pair (makeError f) ""
+            Pass inFile =
+              def outFile = "{build}/{prefix}.out.json"
+              def cmd = script.getPathName, inFile, outFile, Nil
+              def proxy = RunnerInput cmd Nil environment "." "" Nil prefix (omapPartial estimate record) 1
+              Pair (Pass proxy) outFile
   def post = match _
     Pair (Fail f) _ = Fail f
     Pair (Pass output) outFile =
-      def content = parseJSONFile (Path outFile) | getWhenFail JNull
+      def content = parseJSONFile (File outFile) | getWhenFail JNull
       def usage = content // `usage`
       def usageOut =
         Usage
@@ -422,7 +437,7 @@ global def makeJSONRunner script score estimate =
 global def executeJSON json =
   def makeVirtual visible =
     def add f h = prim "add_hash"
-    Path (add visible "0")
+    File (add visible "0")
   def cmd   = json // `command`     | getJArray  | getOrElse Nil | mapPartial getJString
   def vis   = json // `visible`     | getJArray  | getOrElse Nil | mapPartial getJString | map makeVirtual
   def env   = json // `environment` | getJArray  | getOrElse Nil | mapPartial getJString
@@ -448,9 +463,21 @@ global def executeJSON json =
     )
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
-data Path = Path String
-global def getPathName (Path name) = name
-global def getPathParent (Path name) = Path (simplify "{name}/..")
+data Path =
+  File   (name: String)
+  BadJob (error: Error)
+
+global def getPathName path = match path
+  File name = name
+  BadJob _ = "BADJOB"
+
+global def getPathParent path = match path
+  File name = File (simplify "{name}/..")
+  BadJob e  = BadJob e
+
+global def getPathError path = match path
+  File _ = None
+  BadJob e = Some e
 
 def addhash f =
   def p = simplify f

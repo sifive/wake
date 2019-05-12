@@ -35,10 +35,9 @@ static PRIMTYPE(type_stack) {
 
 static PRIMFN(prim_stack) {
   EXPECT(1);
-  auto trace = binding->stack_trace();
   std::vector<std::shared_ptr<Value> > list;
-  list.reserve(trace.size());
-  for (auto &x : trace) {
+
+  if (queue.stack_trace) for (auto &x : binding->stack_trace()) {
     std::stringstream str;
     str << x.file();
     list.emplace_back(std::make_shared<String>(str.str()));

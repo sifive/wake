@@ -52,7 +52,7 @@ def pickVariant variant variants =
     Some (Pair x _) = x.getPairSecond
     None =
       def ok = catWith " " (map getPairFirst variants)
-      \_\_\_ makeError "No variant matches {variant}; options: {ok}"
+      \_\_\_ makeBadJob "No variant matches {variant}; options: {ok}"
 
 global def compileC variant = pickVariant variant (subscribe compileC)
 global def linkO    variant = pickVariant variant (subscribe linkO)

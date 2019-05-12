@@ -93,6 +93,14 @@ global def find f =
     h, t = if f h then Some (Pair h i) else helper (i+1) t
   helper 0
 
+global def findSome fn =
+  def helper = match _
+    Nil = None
+    h, t = match (fn h)
+      Some x = Some x
+      None = helper t
+  helper
+
 global def exists f l = match (find f l)
   Some _ = True
   None   = False
