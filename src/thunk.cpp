@@ -228,11 +228,11 @@ void Receive::eval(WorkQueue &queue) {
 
 void WorkQueue::run() {
   int count = 0;
-  while (!receives.empty()) {
+  while (!receives.empty() && !abort) {
     receives.front().eval(*this);
     receives.pop();
   }
-  while (!thunks.empty()) {
+  while (!thunks.empty() && !abort) {
     if (++count >= 10000) {
       if (JobTable::exit_now()) break;
       status_refresh();
@@ -240,7 +240,7 @@ void WorkQueue::run() {
     }
     thunks.front().eval(*this);
     thunks.pop();
-    while (!receives.empty()) {
+    while (!receives.empty() && !abort) {
       receives.front().eval(*this);
       receives.pop();
     }

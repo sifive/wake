@@ -49,7 +49,7 @@ global def panic s = prim "panic"
 
 global def :!!! result = match result
   Pass p = p
-  Fail f = panic (format f)
+  Fail (Error cause stack) = panic "Unexpected Error {cause}{map ("\n  from {_}") stack | cat}"
 
 global tuple Error =
   global Cause: String

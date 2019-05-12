@@ -20,11 +20,12 @@
 
 #include "type.h"
 #include "primfn.h"
+#include "status.h"
+#include "thunk.h"
 #include <map>
 #include <string>
 #include <vector>
 #include <memory>
-#include <assert.h>
 
 struct Receiver;
 struct Value;
@@ -40,8 +41,19 @@ struct Data;
   return;								\
 } while (0)
 
-// !!! make REQUIRE terminate gracefully
-#define REQUIRE(b) assert(b)
+void require_fail(const char *message, unsigned size, WorkQueue &queue, const Binding *binding);
+
+#define STR(x) #x
+#define STR2(x) STR(x)
+#define REQUIRE(b) do {							\
+  if (!(b)) {								\
+    const char message[] =						\
+      "Requirement " STR(b) " failed at " 				\
+      __FILE__ ":" STR2(__LINE__) "\n";					\
+    require_fail(message, sizeof(message), queue, binding.get());	\
+    return;								\
+  }									\
+} while (0)
 
 #define EXPECT(num) do {	\
   (void)data;			\

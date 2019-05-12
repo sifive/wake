@@ -57,9 +57,10 @@ static PRIMTYPE(type_panic) {
 static PRIMFN(prim_panic) {
   EXPECT(1);
   STRING(arg0, 0);
-  status_write(2, "PANIC: ", 7);
-  status_write(2, arg0->value.data(), arg0->value.size());
-  status_write(2, "\n", 1);
+  std::stringstream str;
+  str << "PANIC: " << arg0->value << std::endl;
+  std::string message = str.str();
+  status_write(2, message.data(), message.size());
   bool panic_called = true;
   REQUIRE(!panic_called);
 }

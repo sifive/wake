@@ -50,6 +50,7 @@ struct Receive {
 
 struct WorkQueue {
   bool stack_trace;
+  bool abort;
   std::queue<Thunk> thunks;
   std::queue<Receive> receives;
 

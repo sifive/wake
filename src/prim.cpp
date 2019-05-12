@@ -21,9 +21,24 @@
 #include "heap.h"
 #include "location.h"
 #include "parser.h"
+#include "status.h"
+#include "thunk.h"
 #include <cstdlib>
 #include <sstream>
 #include <iosfwd>
+
+void require_fail(const char *message, unsigned size, WorkQueue &queue, const Binding *binding) {
+  std::stringstream ss;
+  ss.write(message, size-1);
+  if (queue.stack_trace) {
+    for (auto &x : binding->stack_trace()) {
+      ss << "  from " << x.file() << std::endl;
+    }
+  }
+  std::string str = ss.str();
+  status_write(2, str.data(), str.size());
+  queue.abort = true;
+}
 
 std::shared_ptr<Value> make_unit() {
   return std::make_shared<Data>(&Unit->members[0], nullptr);

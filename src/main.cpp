@@ -537,15 +537,17 @@ int main(int argc, char **argv) {
   fflush(stdout);
   fflush(stderr);
 
+  queue.abort = false;
+
   status_init();
-  do { queue.run(); } while (jobtable.wait(queue));
+  do { queue.run(); } while (!queue.abort && jobtable.wait(queue));
   status_finish();
 
-  bool pass = true;
+  bool pass = !queue.abort;
   if (JobTable::exit_now()) {
     std::cerr << "Early termination requested" << std::endl;
     pass = false;
-  } else if (!quiet) {
+  } else if (!quiet && pass) {
     std::vector<std::shared_ptr<Value> > outputs;
     outputs.reserve(targets.size());
     Binding *iter = reinterpret_cast<Closure*>(value.get())->binding.get();
@@ -554,7 +556,6 @@ int main(int argc, char **argv) {
       iter = iter->next.get();
     }
 
-    pass = true;
     for (size_t i = 0; i < targets.size(); ++i) {
       Value *v = outputs[targets.size()-1-i].get();
       std::cout << targets[i] << ": ";

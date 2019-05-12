@@ -168,18 +168,11 @@ static PRIMFN(prim_cmp) {
   EXPECT(2);
   DOUBLE(arg0, 0);
   DOUBLE(arg1, 1);
-// !!!
-/*
-  if (std::isnan(arg0->value) || std::isnan(arg1->value)) {
-    RAISE("cannot order nan");
-  } else {
-*/
-    int x = (arg0->value > arg1->value) - (arg0->value < arg1->value);
-    auto out = make_order(x);
-    RETURN(out);
-/*
-  }
-*/
+  REQUIRE (!std::isnan(arg0->value));
+  REQUIRE (!std::isnan(arg1->value));
+  int x = (arg0->value > arg1->value) - (arg0->value < arg1->value);
+  auto out = make_order(x);
+  RETURN(out);
 }
 
 static PRIMTYPE(type_class) {

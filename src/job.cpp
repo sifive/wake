@@ -584,7 +584,7 @@ Job::Job(Database *db_, const std::string &dir, const std::string &stdin_, const
 
 #define JOB(arg, i) REQUIRE(args[i]->type == &Job::type); Job *arg = reinterpret_cast<Job*>(args[i].get());
 
-static void parse_usage(Usage *usage, std::shared_ptr<Value> *args) {
+static void parse_usage(Usage *usage, std::shared_ptr<Value> *args, WorkQueue &queue, const std::shared_ptr<Binding> &binding) {
   INTEGER(status, 0);
   DOUBLE(runtime, 1);
   DOUBLE(cputime, 2);
@@ -664,7 +664,7 @@ static PRIMFN(prim_job_launch) {
   STRING(env, 4);
   STRING(cmd, 5);
 
-  parse_usage(&job->predict, args.data()+6);
+  parse_usage(&job->predict, args.data()+6, queue, binding);
   job->predict.found = true;
 
   int poolv = mpz_get_si(pool->value);
@@ -703,7 +703,7 @@ static PRIMFN(prim_job_virtual) {
   STRING(stdout, 1);
   STRING(stderr, 2);
 
-  parse_usage(&job->predict, args.data()+3);
+  parse_usage(&job->predict, args.data()+3, queue, binding);
   job->predict.found = true;
   job->reality = job->predict;
 
@@ -1046,7 +1046,7 @@ static PRIMFN(prim_job_finish) {
   STRING(inputs, 1);
   STRING(outputs, 2);
 
-  parse_usage(&job->report, args.data()+3);
+  parse_usage(&job->report, args.data()+3, queue, binding);
   job->report.found = true;
 
   REQUIRE(job->state & STATE_MERGED);
