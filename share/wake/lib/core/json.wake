@@ -50,7 +50,9 @@ global def getJArray = match _
   _        = None
 
 global def parseJSONBody body = prim "json_body"
-global def parseJSONFile file = prim "json_file"
+global def parseJSONFile path =
+  def p f = prim "json_file"
+  p path.getPathName
 
 def escape =
   def fmt t = match _

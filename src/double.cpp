@@ -126,16 +126,14 @@ static PRIMFN(prim_str) {
     format = mpz_get_si(arg0->value);
     ok &= format >= 0 && format <= 3;
   }
-  REQUIRE(ok, arg0->to_str() + " is not a valid format [0,3]");
 
-  ok = mpz_fits_slong_p(arg1->value);
+  ok &= mpz_fits_slong_p(arg1->value);
   if (ok) {
     precision = mpz_get_si(arg1->value);
     ok &= precision >= 1 && precision <= 40;
   }
-  REQUIRE(ok, arg1->to_str() + " is not a valid precision [1,40]");
 
-  auto out = std::make_shared<String>(arg2->str(format, precision));
+  auto out = std::make_shared<String>(ok ? arg2->str(format, precision) : "");
   RETURN(out);
 }
 

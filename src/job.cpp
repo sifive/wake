@@ -582,23 +582,7 @@ Job::Job(Database *db_, const std::string &dir, const std::string &stdin_, const
   code = Hash(codes);
 }
 
-static std::unique_ptr<Receiver> cast_jobresult(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Job **job) {
-  if (value->type != &Job::type) {
-    Receiver::receive(queue, std::move(completion),
-      std::make_shared<Exception>(value->to_str() + " is not a Job", binding));
-    return std::unique_ptr<Receiver>();
-  } else {
-    *job = reinterpret_cast<Job*>(value.get());
-    return completion;
-  }
-}
-
-#define JOBRESULT(arg, i) 									\
-  Job *arg;										\
-  do {												\
-    completion = cast_jobresult(queue, std::move(completion), binding, args[i], &arg);		\
-    if (!completion) return;									\
-  } while(0)
+#define JOBRESULT(arg, i) REQUIRE(args[i]->type == &Job::type); Job *arg = reinterpret_cast<Job*>(args[i].get());
 
 static void parse_usage(Usage *usage, std::shared_ptr<Value> &bad, const std::shared_ptr<Binding> &binding, std::shared_ptr<Value> *args) {
   if (args[0]->type == &Integer::type) {
@@ -676,15 +660,13 @@ static PRIMTYPE(type_job_fail) {
 }
 
 static PRIMFN(prim_job_fail_launch) {
-  (void)data; // silence unused variable warning (EXPECT not called)
-  REQUIRE (args.size() == 2, "prim_job_bad_launch not called on 2 arguments");
+  EXPECT(2);
   JOBRESULT(job, 0);
   job->bad_launch = args[1];
 }
 
 static PRIMFN(prim_job_fail_finish) {
-  (void)data; // silence unused variable warning (EXPECT not called)
-  REQUIRE (args.size() == 2, "prim_job_bad_finish not called on 2 arguments");
+  EXPECT(2);
   JOBRESULT(job, 0);
   job->bad_finish = args[1];
 }
@@ -708,8 +690,7 @@ static PRIMTYPE(type_job_launch) {
 
 static PRIMFN(prim_job_launch) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
-  (void)data; // silence unused variable warning (EXPECT not called)
-  REQUIRE (args.size() == 12, "prim_job_launch not called on 12 arguments");
+  EXPECT(12);
   JOBRESULT(job, 0);
 
   int poolv = 0;
@@ -811,8 +792,7 @@ static PRIMTYPE(type_job_virtual) {
 }
 
 static PRIMFN(prim_job_virtual) {
-  (void)data; // silence unused variable warning (EXPECT not called)
-  REQUIRE (args.size() == 9, "prim_job_virtual not called on 8 arguments");
+  EXPECT(9);
   JOBRESULT(job, 0);
 
   if (job->state != 0) {
@@ -1064,7 +1044,8 @@ static PRIMFN(prim_job_output) {
     arg0->q_stderr = std::move(completion);
     arg0->process(queue);
   } else {
-    REQUIRE(false, "argument neither stdout(1) nor stderr(2)");
+    bool stdin_or_stderr = false;
+    REQUIRE(stdin_or_stderr);
   }
 }
 
@@ -1079,11 +1060,12 @@ static PRIMFN(prim_job_kill) {
   EXPECT(2);
   JOBRESULT(arg0, 0);
   INTEGER(arg1, 1);
-  REQUIRE(mpz_cmp_si(arg1->value, 256) < 0, "signal too large (> 256)");
-  REQUIRE(mpz_cmp_si(arg1->value, 0) > 0, "signal too small (<= 0)");
-  int sig = mpz_get_si(arg1->value);
-  if ((arg0->state & STATE_FORKED) && !(arg0->state & STATE_MERGED))
-    kill(arg0->pid, sig);
+
+  if (mpz_cmp_si(arg1->value, 256) < 0 && mpz_cmp_si(arg1->value, 0) > 0) {
+    int sig = mpz_get_si(arg1->value);
+    if ((arg0->state & STATE_FORKED) && !(arg0->state & STATE_MERGED))
+      kill(arg0->pid, sig);
+  }
 
   auto out = make_unit();
   RETURN(out);
@@ -1116,7 +1098,8 @@ static PRIMFN(prim_job_tree) {
     arg0->q_outputs = std::move(completion);
     arg0->process(queue);
   } else {
-    REQUIRE(false, "argument neither inputs(1) nor outputs(2)");
+    bool stdin_or_stderr = false;
+    REQUIRE(stdin_or_stderr);
   }
 }
 
@@ -1148,8 +1131,7 @@ static PRIMTYPE(type_job_finish) {
 }
 
 static PRIMFN(prim_job_finish) {
-  (void)data; // silence unused variable warning (EXPECT not called)
-  REQUIRE (args.size() == 9, "prim_job_finish not called on 9 arguments");
+  EXPECT(9);
   JOBRESULT(job, 0);
 
   if (!(job->state & STATE_MERGED)) {

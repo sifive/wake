@@ -422,12 +422,13 @@ static PRIMFN(prim_files) {
 
   std::vector<std::shared_ptr<String> > files;
   bool fail = push_files(files, root);
-  REQUIRE(!fail, "Directory listing failure");
-  auto match = sources(files, root, arg1->exp);
 
   std::vector<std::shared_ptr<Value> > downcast;
-  downcast.reserve(match.size());
-  for (auto &i : match) downcast.emplace_back(std::move(i));
+  if (!fail) {
+    auto match = sources(files, root, arg1->exp);
+    downcast.reserve(match.size());
+    for (auto &i : match) downcast.emplace_back(std::move(i));
+  }
 
   auto out = make_list(std::move(downcast));
   RETURN(out);

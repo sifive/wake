@@ -38,8 +38,8 @@ static PRIMTYPE(type_vnew) {
 static PRIMFN(prim_vnew) {
   EXPECT(1);
   INTEGER(arg0, 0);
-  REQUIRE(mpz_cmp_si(arg0->value, 0) >= 0, "vnew too small (< 0)");
-  REQUIRE(mpz_cmp_si(arg0->value, 1024*1024*1024) < 0, "vnew too large (> 1G)");
+  REQUIRE(mpz_cmp_si(arg0->value, 0) >= 0);
+  REQUIRE(mpz_cmp_si(arg0->value, 1024*1024*1024) < 0);
   auto out = std::make_shared<Data>(&vectorC,
     std::make_shared<Binding>(nullptr, nullptr, nullptr, mpz_get_si(arg0->value)));
   RETURN(out);
@@ -58,8 +58,8 @@ static PRIMFN(prim_vget) {
   EXPECT(2);
   DATA(vec, 0);
   INTEGER(arg1, 1);
-  REQUIRE(mpz_cmp_si(arg1->value, 0) >= 0, "vget too small (< 0)");
-  REQUIRE(mpz_cmp_si(arg1->value, vec->binding->nargs) < 0, "vget too large");
+  REQUIRE(mpz_cmp_si(arg1->value, 0) >= 0);
+  REQUIRE(mpz_cmp_si(arg1->value, vec->binding->nargs) < 0);
   vec->binding->future[mpz_get_si(arg1->value)].depend(queue, std::move(completion));
 }
 
@@ -74,8 +74,7 @@ static PRIMTYPE(type_vset) {
 }
 
 static PRIMFN(prim_vset) {
-  (void)data; // allow Exceptions to be written into vectors
-  REQUIRE(args.size() == 3, "prim_vset not called on 3 arguments");
+  EXPECT(3);
   DATA(vec, 0);
   INTEGER(arg1, 1);
 

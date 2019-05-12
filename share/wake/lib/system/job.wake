@@ -391,7 +391,7 @@ global def makeJSONRunner script score estimate =
   def post = match _
     Pair (Fail f) _ = Fail f
     Pair (Pass output) outFile =
-      def content = parseJSONFile outFile | getWhenFail JNull
+      def content = parseJSONFile (Path outFile) | getWhenFail JNull
       def usage = content // `usage`
       def usageOut =
         Usage

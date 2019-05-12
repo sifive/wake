@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <assert.h>
 
 struct Receiver;
 struct Value;
@@ -39,58 +40,17 @@ struct Data;
   return;								\
 } while (0)
 
-std::unique_ptr<Receiver> require(const char *fn, WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, bool ok, const std::string &str);
-#define REQUIRE(b, str) do {								\
-  completion = require(__FUNCTION__, queue, std::move(completion), binding, b, str);	\
-  if (!completion) return;								\
+#define REQUIRE(b) assert(b)
+#define EXPECT(num) do {	\
+  (void)data;			\
+  REQUIRE(args.size() == num);	\
 } while (0)
 
-std::unique_ptr<Receiver> expect_args(const char *fn, WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::vector<std::shared_ptr<Value> > &args, int expect);
-#define EXPECT(num) do { 									\
-  (void)data;											\
-  completion = expect_args(__FUNCTION__, queue, std::move(completion), binding, args, num);	\
-  if (!completion) return;									\
-} while (0)
-
-std::unique_ptr<Receiver> cast_string(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, String **str);
-#define STRING(arg, i) 									\
-  String *arg;										\
-  do {											\
-    completion = cast_string(queue, std::move(completion), binding, args[i], &arg);	\
-    if (!completion) return;								\
-  } while(0)
-
-std::unique_ptr<Receiver> cast_integer(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Integer **str);
-#define INTEGER(arg, i) 								\
-  Integer *arg;										\
-  do {											\
-    completion = cast_integer(queue, std::move(completion), binding, args[i], &arg);	\
-    if (!completion) return;								\
-  } while(0)
-
-std::unique_ptr<Receiver> cast_double(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Double **str);
-#define DOUBLE(arg, i) 									\
-  Double *arg;										\
-  do {											\
-    completion = cast_double(queue, std::move(completion), binding, args[i], &arg);	\
-    if (!completion) return;								\
-  } while(0)
-
-std::unique_ptr<Receiver> cast_regexp(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, RegExp **reg);
-#define REGEXP(arg, i)	 									\
-  RegExp *arg;											\
-  do {												\
-    completion = cast_regexp(queue, std::move(completion), binding, args[i], &arg);		\
-    if (!completion) return;									\
-  } while(0)
-
-std::unique_ptr<Receiver> cast_data(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, Data **data);
-#define DATA(arg, i) 									\
-  Data *arg;										\
-  do {											\
-    completion = cast_data(queue, std::move(completion), binding, args[i], &arg);	\
-    if (!completion) return;								\
-  } while(0)
+#define STRING(arg, i)  REQUIRE(args[i]->type == &String::type);  String  *arg = reinterpret_cast<String *>(args[i].get());
+#define INTEGER(arg, i) REQUIRE(args[i]->type == &Integer::type); Integer *arg = reinterpret_cast<Integer*>(args[i].get());
+#define DOUBLE(arg, i)  REQUIRE(args[i]->type == &Double::type);  Double  *arg = reinterpret_cast<Double *>(args[i].get());
+#define REGEXP(arg, i)	REQUIRE(args[i]->type == &RegExp::type);  RegExp  *arg = reinterpret_cast<RegExp *>(args[i].get());
+#define DATA(arg, i)    REQUIRE(args[i]->type == &Data::type);    Data    *arg = reinterpret_cast<Data   *>(args[i].get());
 
 /* Useful expressions for primitives */
 std::shared_ptr<Value> make_unit();

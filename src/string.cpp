@@ -63,22 +63,7 @@ Hash CatStream::hash() const {
   return Hash(str.str()) + type.hashcode;
 }
 
-static std::unique_ptr<Receiver> cast_catstream(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, CatStream **cat) {
-  if (value->type != &CatStream::type) {
-    Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a CatStream", binding));
-    return std::unique_ptr<Receiver>();
-  } else {
-    *cat = reinterpret_cast<CatStream*>(value.get());
-    return completion;
-  }
-}
-
-#define CATSTREAM(arg, i) 									\
-  CatStream *arg;										\
-  do {												\
-    completion = cast_catstream(queue, std::move(completion), binding, args[i], &arg);		\
-    if (!completion) return;									\
-  } while(0)
+#define CATSTREAM(arg, i) REQUIRE(args[i]->type == &CatStream::type); CatStream *arg = reinterpret_cast<CatStream*>(args[i].get());
 
 static PRIMTYPE(type_catopen) {
   return args.size() == 0 &&
@@ -137,7 +122,7 @@ static PRIMFN(prim_explode) {
   int got;
   for (const char *ptr = arg0->value.c_str(); *ptr; ptr += got) {
     got = pop_utf8(&rune, ptr);
-    REQUIRE(got > 0, "Invalid Unicode");
+    if (got < 1) got = 1;
     vals.emplace_back(std::make_shared<String>(std::string(ptr, got)));
   }
 
@@ -146,20 +131,30 @@ static PRIMFN(prim_explode) {
 }
 
 static PRIMTYPE(type_read) {
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(String::typeVar);
+  result[1].unify(String::typeVar);
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    out->unify(result);
 }
 
 static PRIMFN(prim_read) {
   EXPECT(1);
-  STRING(arg0, 0);
-  std::ifstream t(arg0->value);
-  REQUIRE(!t.fail(), "Could not read " + arg0->value);
-  std::stringstream buffer;
-  buffer << t.rdbuf();
-  REQUIRE(!t.bad(), "Could not read " + arg0->value);
-  auto out = std::make_shared<String>(buffer.str());
+  STRING(path, 0);
+  std::ifstream t(path->value);
+  if (!t.fail()) {
+    std::stringstream buffer;
+    buffer << t.rdbuf();
+    if (!t.bad()) {
+      auto out = make_result(true, std::make_shared<String>(buffer.str()));
+      RETURN(out);
+    }
+  }
+  std::stringstream str;
+  str << "read " << path->value << ": " << strerror(errno);
+  auto out = make_result(false, std::make_shared<String>(str.str()));
   RETURN(out);
 }
 
@@ -181,8 +176,8 @@ static PRIMFN(prim_write) {
   STRING(path, 1);
   STRING(body, 2);
 
-  REQUIRE(mpz_cmp_si(mode->value, 0) >= 0, "mode must be >= 0");
-  REQUIRE(mpz_cmp_si(mode->value, 0x1ff) <= 0, "mode must be <= 0x1ff");
+  REQUIRE(mpz_cmp_si(mode->value, 0) >= 0);
+  REQUIRE(mpz_cmp_si(mode->value, 0x1ff) <= 0);
   long mask = mpz_get_si(mode->value);
 
   std::ofstream t(path->value, std::ios_base::trunc);
@@ -235,8 +230,8 @@ static PRIMFN(prim_mkdir) {
   INTEGER(mode, 0);
   STRING(path, 1);
 
-  REQUIRE(mpz_cmp_si(mode->value, 0) >= 0, "mode must be >= 0");
-  REQUIRE(mpz_cmp_si(mode->value, 0x1ff) <= 0, "mode must be <= 0x1ff");
+  REQUIRE(mpz_cmp_si(mode->value, 0) >= 0);
+  REQUIRE(mpz_cmp_si(mode->value, 0x1ff) <= 0);
   long mask = mpz_get_si(mode->value);
 
   if (mkdir(path->value.c_str(), mask) != 0 && errno != EEXIST && errno != EISDIR) {
@@ -257,8 +252,7 @@ static PRIMTYPE(type_format) {
 }
 
 static PRIMFN(prim_format) {
-  REQUIRE(args.size() == 1, "prim_format expects 1 argument");
-  (void)data;
+  EXPECT(1);
   std::stringstream buffer;
   buffer << args[0].get();
   auto out = std::make_shared<String>(buffer.str());
@@ -322,7 +316,7 @@ static PRIMFN(prim_sNFC) {
     static_cast<utf8proc_option_t>(
       UTF8PROC_COMPOSE |
       UTF8PROC_REJECTNA));
-  REQUIRE(len >= 0, std::string("Could not normalize string ") + utf8proc_errmsg(len));
+  if (len < 0) RETURN(args[0]);
   auto out = std::make_shared<String>(std::string(
     reinterpret_cast<const char*>(dst),
     static_cast<size_t>(len)));
@@ -344,7 +338,7 @@ static PRIMFN(prim_sNFKC) {
       UTF8PROC_IGNORE    |
       UTF8PROC_LUMP      |
       UTF8PROC_REJECTNA));
-  REQUIRE(len >= 0, std::string("Could not normalize string ") + utf8proc_errmsg(len));
+  if (len < 0) RETURN(args[0]);
   auto out = std::make_shared<String>(std::string(
     reinterpret_cast<const char*>(dst),
     static_cast<size_t>(len)));
@@ -367,7 +361,7 @@ static PRIMFN(prim_scaseNFKC) {
       UTF8PROC_LUMP      |
       UTF8PROC_CASEFOLD  |
       UTF8PROC_REJECTNA));
-  REQUIRE(len >= 0, std::string("Could not normalize string ") + utf8proc_errmsg(len));
+  if (len < 0) RETURN(args[0]);
   auto out = std::make_shared<String>(std::string(
     reinterpret_cast<const char*>(dst),
     static_cast<size_t>(len)));
@@ -389,8 +383,7 @@ static PRIMFN(prim_code2str) {
   long x = ok ? mpz_get_si(arg0->value) : 0;
   ok = ok && x >= 0;
   ok = ok && push_utf8(str, x);
-  REQUIRE(ok, "Not a valid Unicode codepoint");
-  auto out = std::make_shared<String>(std::move(str));
+  auto out = std::make_shared<String>(ok ? std::move(str) : "");
   RETURN(out);
 }
 
@@ -400,9 +393,8 @@ static PRIMFN(prim_bin2str) {
   bool ok = mpz_fits_slong_p(arg0->value);
   long x = ok ? mpz_get_si(arg0->value) : 0;
   ok = ok && x >= 0 && x < 256;
-  REQUIRE(ok, "Not a valid byte");
   char c[2] = { static_cast<char>(x), 0 };
-  auto out = std::make_shared<String>(std::string(c));
+  auto out = std::make_shared<String>(ok ? std::string(c) : "");
   RETURN(out);
 }
 
@@ -417,8 +409,7 @@ static PRIMFN(prim_str2code) {
   STRING(arg0, 0);
   uint32_t rune;
   int x = pop_utf8(&rune, arg0->value.c_str());
-  REQUIRE (x >= 1, "Invalid UTF-8");
-  auto out = std::make_shared<Integer>(rune);
+  auto out = std::make_shared<Integer>(x >= 1 ? rune : arg0->value[0]);
   RETURN(out);
 }
 
@@ -442,7 +433,7 @@ static PRIMFN(prim_uname) {
   EXPECT(0);
   struct utsname uts;
   int ret = uname(&uts);
-  REQUIRE (ret == 0, "uname failed");
+  REQUIRE (ret == 0);
   auto out = make_tuple2(
     std::make_shared<String>(uts.sysname),
     std::make_shared<String>(uts.machine));
