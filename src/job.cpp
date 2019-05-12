@@ -582,74 +582,22 @@ Job::Job(Database *db_, const std::string &dir, const std::string &stdin_, const
   code = Hash(codes);
 }
 
-#define JOBRESULT(arg, i) REQUIRE(args[i]->type == &Job::type); Job *arg = reinterpret_cast<Job*>(args[i].get());
+#define JOB(arg, i) REQUIRE(args[i]->type == &Job::type); Job *arg = reinterpret_cast<Job*>(args[i].get());
 
-static void parse_usage(Usage *usage, std::shared_ptr<Value> &bad, const std::shared_ptr<Binding> &binding, std::shared_ptr<Value> *args) {
-  if (args[0]->type == &Integer::type) {
-    Integer *status = reinterpret_cast<Integer*>(args[0].get());
-    usage->status = mpz_get_si(status->value);
-  } else if (args[0]->type == &Exception::type) {
-    bad = args[0];
-    usage->status = 128;
-  } else {
-    bad = std::make_shared<Exception>("prim_job status not an Integer", binding);
-    usage->status = 128;
-  }
+static void parse_usage(Usage *usage, std::shared_ptr<Value> *args) {
+  INTEGER(status, 0);
+  DOUBLE(runtime, 1);
+  DOUBLE(cputime, 2);
+  INTEGER(membytes, 3);
+  INTEGER(ibytes, 4);
+  INTEGER(obytes, 5);
 
-  if (args[1]->type == &Double::type) {
-    Double *runtime = reinterpret_cast<Double*>(args[1].get());
-    usage->runtime = runtime->value;
-  } else if (args[1]->type == &Exception::type) {
-    bad = args[1];
-    usage->runtime = 0;
-  } else {
-    bad = std::make_shared<Exception>("prim_job runtime not a Double", binding);
-    usage->runtime = 0;
-  }
-
-  if (args[2]->type == &Double::type) {
-    Double *cputime = reinterpret_cast<Double*>(args[2].get());
-    usage->cputime = cputime->value;
-  } else if (args[2]->type == &Exception::type) {
-    bad = args[2];
-    usage->cputime = 0;
-  } else {
-    bad = std::make_shared<Exception>("prim_job cputime not a Double", binding);
-    usage->cputime = 0;
-  }
-
-  if (args[3]->type == &Integer::type) {
-    Integer *membytes = reinterpret_cast<Integer*>(args[3].get());
-    usage->membytes = mpz_get_si(membytes->value);
-  } else if (args[3]->type == &Exception::type) {
-    bad = args[3];
-    usage->membytes = 0;
-  } else {
-    bad = std::make_shared<Exception>("prim_job membytes not an Integer", binding);
-    usage->membytes = 0;
-  }
-
-  if (args[4]->type == &Integer::type) {
-    Integer *ibytes = reinterpret_cast<Integer*>(args[4].get());
-    usage->ibytes = mpz_get_si(ibytes->value);
-  } else if (args[4]->type == &Exception::type) {
-    bad = args[4];
-    usage->ibytes = 0;
-  } else {
-    bad = std::make_shared<Exception>("prim_job ibytes not an Integer", binding);
-    usage->ibytes = 0;
-  }
-
-  if (args[5]->type == &Integer::type) {
-    Integer *obytes = reinterpret_cast<Integer*>(args[5].get());
-    usage->obytes = mpz_get_si(obytes->value);
-  } else if (args[5]->type == &Exception::type) {
-    bad = args[5];
-    usage->obytes = 0;
-  } else {
-    bad = std::make_shared<Exception>("prim_job obytes not an Integer", binding);
-    usage->obytes = 0;
-  }
+  usage->status = mpz_get_si(status->value);
+  usage->runtime = runtime->value;
+  usage->cputime = cputime->value;
+  usage->membytes = mpz_get_si(membytes->value);
+  usage->ibytes = mpz_get_si(ibytes->value);
+  usage->obytes = mpz_get_si(obytes->value);
 }
 
 static PRIMTYPE(type_job_fail) {
@@ -661,14 +609,25 @@ static PRIMTYPE(type_job_fail) {
 
 static PRIMFN(prim_job_fail_launch) {
   EXPECT(2);
-  JOBRESULT(job, 0);
+  JOB(job, 0);
   job->bad_launch = args[1];
+  job->reality.found    = true;
+  job->reality.status   = 128;
+  job->reality.runtime  = 0;
+  job->reality.cputime  = 0;
+  job->reality.membytes = 0;
+  job->reality.ibytes   = 0;
+  job->reality.obytes   = 0;
+  job->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED;
+  job->process(queue);
 }
 
 static PRIMFN(prim_job_fail_finish) {
   EXPECT(2);
-  JOBRESULT(job, 0);
+  JOB(job, 0);
   job->bad_finish = args[1];
+  job->state |= STATE_FINISHED;
+  job->process(queue);
 }
 
 static PRIMTYPE(type_job_launch) {
@@ -691,87 +650,27 @@ static PRIMTYPE(type_job_launch) {
 static PRIMFN(prim_job_launch) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT(12);
-  JOBRESULT(job, 0);
+  JOB(job, 0);
+  INTEGER(pool, 1);
+  STRING(dir, 2);
+  STRING(stdin, 3);
+  STRING(env, 4);
+  STRING(cmd, 5);
 
-  int poolv = 0;
-  if (args[1]->type == &Integer::type) {
-    Integer *pool = reinterpret_cast<Integer*>(args[1].get());
-    if (mpz_cmp_si(pool->value, 0) < 0) {
-      job->bad_launch = std::make_shared<Exception>("prim_job_launch: pool must be >= 0", binding);
-    } else if (mpz_cmp_si(pool->value, POOLS) >= 0) {
-      job->bad_launch = std::make_shared<Exception>("prim_job_launch: pool must be < POOLS", binding);
-    } else {
-      poolv = mpz_get_si(pool->value);
-    }
-  } else if (args[1]->type == &Exception::type) {
-    job->bad_launch = args[1];
-  } else {
-    job->bad_launch = std::make_shared<Exception>("prim_job_launch arg1 not an Integer", binding);
-  }
-
-  std::string *dirv = 0;
-  if (args[2]->type == &String::type) {
-    String *dir = reinterpret_cast<String*>(args[2].get());
-    dirv = &dir->value;
-  } else if (args[2]->type == &Exception::type) {
-    job->bad_launch = args[2];
-  } else {
-    job->bad_launch = std::make_shared<Exception>("prim_job_launch arg2 not a String", binding);
-  }
-
-  std::string *stdinv = 0;
-  if (args[3]->type == &String::type) {
-    String *stdin = reinterpret_cast<String*>(args[3].get());
-    stdinv = &stdin->value;
-  } else if (args[3]->type == &Exception::type) {
-    job->bad_launch = args[3];
-  } else {
-    job->bad_launch = std::make_shared<Exception>("prim_job_launch arg3 not a String", binding);
-  }
-
-  std::string *envv = 0;
-  if (args[4]->type == &String::type) {
-    String *env = reinterpret_cast<String*>(args[4].get());
-    envv = &env->value;
-  } else if (args[4]->type == &Exception::type) {
-    job->bad_launch = args[4];
-  } else {
-    job->bad_launch = std::make_shared<Exception>("prim_job_launch arg4 not a String", binding);
-  }
-
-  std::string *cmdv = 0;
-  if (args[5]->type == &String::type) {
-    String *cmd = reinterpret_cast<String*>(args[5].get());
-    cmdv = &cmd->value;
-  } else if (args[5]->type == &Exception::type) {
-    job->bad_launch = args[5];
-  } else {
-    job->bad_launch = std::make_shared<Exception>("prim_job_launch arg5 not a String", binding);
-  }
-
-  if (job->state != 0) {
-    std::cerr << "ERROR: attempted to launch a FORKED job" << std::endl;
-    exit(1);
-  }
-
-  parse_usage(&job->predict, job->bad_launch, binding, args.data()+6);
+  parse_usage(&job->predict, args.data()+6);
   job->predict.found = true;
 
-  if (job->bad_launch) {
-    job->reality.found    = true;
-    job->reality.status   = 128;
-    job->reality.runtime  = 0;
-    job->reality.cputime  = 0;
-    job->reality.membytes = 0;
-    job->reality.ibytes   = 0;
-    job->reality.obytes   = 0;
-    job->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED;
-    job->process(queue);
-  } else {
-    jobtable->imp->tasks[poolv].emplace_back(
-      std::dynamic_pointer_cast<Job>(args[0]), *dirv, *stdinv, *envv, *cmdv);
-    launch(jobtable);
-  }
+  int poolv = mpz_get_si(pool->value);
+  REQUIRE(poolv >= 0 && poolv < POOLS);
+  REQUIRE (job->state == 0);
+
+  jobtable->imp->tasks[poolv].emplace_back(
+    std::dynamic_pointer_cast<Job>(args[0]),
+    dir->value,
+    stdin->value,
+    env->value,
+    cmd->value);
+  launch(jobtable);
 
   auto out = make_unit();
   RETURN(out);
@@ -793,36 +692,20 @@ static PRIMTYPE(type_job_virtual) {
 
 static PRIMFN(prim_job_virtual) {
   EXPECT(9);
-  JOBRESULT(job, 0);
+  JOB(job, 0);
+  STRING(stdout, 1);
+  STRING(stderr, 2);
 
-  if (job->state != 0) {
-    std::cerr << "ERROR: attempted to virtualize a FORKED job" << std::endl;
-    exit(1);
-  }
-
-  if (args[1]->type == &String::type) {
-    String *stdout = reinterpret_cast<String*>(args[1].get());
-    if (!stdout->value.empty())
-      job->db->save_output(job->job, 1, stdout->value.data(), stdout->value.size(), 0);
-  } else if (args[1]->type == &Exception::type) {
-    job->bad_launch = args[1];
-  } else {
-    job->bad_launch = std::make_shared<Exception>("prim_job_virtual arg1 not a String", binding);
-  }
-
-  if (args[2]->type == &String::type) {
-    String *stderr = reinterpret_cast<String*>(args[2].get());
-    if (!stderr->value.empty())
-      job->db->save_output(job->job, 2, stderr->value.data(), stderr->value.size(), 0);
-  } else if (args[2]->type == &Exception::type) {
-    job->bad_launch = args[2];
-  } else {
-    job->bad_launch = std::make_shared<Exception>("prim_job_virtual arg2 not a String", binding);
-  }
-
-  parse_usage(&job->predict, job->bad_launch, binding, args.data()+3);
+  parse_usage(&job->predict, args.data()+3);
   job->predict.found = true;
   job->reality = job->predict;
+
+  if (!stdout->value.empty())
+    job->db->save_output(job->job, 1, stdout->value.data(), stdout->value.size(), 0);
+  if (!stderr->value.empty())
+    job->db->save_output(job->job, 2, stderr->value.data(), stderr->value.size(), 0);
+
+  REQUIRE (job->state == 0);
 
   job->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED;
   job->process(queue);
@@ -1033,7 +916,7 @@ static PRIMTYPE(type_job_output) {
 
 static PRIMFN(prim_job_output) {
   EXPECT(2);
-  JOBRESULT(arg0, 0);
+  JOB(arg0, 0);
   INTEGER(arg1, 1);
   if (mpz_cmp_si(arg1->value, 1) == 0) {
     completion->next = std::move(arg0->q_stdout);
@@ -1058,7 +941,7 @@ static PRIMTYPE(type_job_kill) {
 
 static PRIMFN(prim_job_kill) {
   EXPECT(2);
-  JOBRESULT(arg0, 0);
+  JOB(arg0, 0);
   INTEGER(arg1, 1);
 
   if (mpz_cmp_si(arg1->value, 256) < 0 && mpz_cmp_si(arg1->value, 0) > 0) {
@@ -1087,7 +970,7 @@ static PRIMTYPE(type_job_tree) {
 
 static PRIMFN(prim_job_tree) {
   EXPECT(2);
-  JOBRESULT(arg0, 0);
+  JOB(arg0, 0);
   INTEGER(arg1, 1);
   if (mpz_cmp_si(arg1->value, 1) == 0) {
     completion->next = std::move(arg0->q_inputs);
@@ -1111,7 +994,7 @@ static PRIMTYPE(type_job_id) {
 
 static PRIMFN(prim_job_id) {
   EXPECT(1);
-  JOBRESULT(arg0, 0);
+  JOB(arg0, 0);
   auto out = std::make_shared<Integer>(arg0->job);
   RETURN(out);
 }
@@ -1132,48 +1015,18 @@ static PRIMTYPE(type_job_finish) {
 
 static PRIMFN(prim_job_finish) {
   EXPECT(9);
-  JOBRESULT(job, 0);
+  JOB(job, 0);
+  STRING(inputs, 1);
+  STRING(outputs, 2);
 
-  if (!(job->state & STATE_MERGED)) {
-    // fatal because it means the queue will not converge
-    std::cerr << "ERROR: attempted to finish an unmerged job" << std::endl;
-    exit(1);
-  }
-  if ((job->state & STATE_FINISHED)) {
-    std::cerr << "ERROR: attempted to finish a finished job" << std::endl;
-    exit(1);
-  }
-
-  // On an exception, we need to still FINISH, but with an exception from the inputs/outputs
-  std::string empty;
-  std::string *inputs;
-  std::string *outputs;
-
-  if (args[1]->type == &String::type) {
-    inputs = &reinterpret_cast<String*>(args[1].get())->value;
-  } else if (args[1]->type == &Exception::type) {
-    job->bad_finish = args[1];
-    inputs = &empty;
-  } else {
-    job->bad_finish = std::make_shared<Exception>("prim_job_finish arg1 not a string", binding);
-    inputs = &empty;
-  }
-
-  if (args[2]->type == &String::type) {
-    outputs = &reinterpret_cast<String*>(args[2].get())->value;
-  } else if (args[2]->type == &Exception::type) {
-    job->bad_finish = args[2];
-    outputs = &empty;
-  } else {
-    job->bad_finish = std::make_shared<Exception>("prim_job_finish arg2 not a string", binding);
-    outputs = &empty;
-  }
-
-  parse_usage(&job->report, job->bad_finish, binding, args.data()+3);
+  parse_usage(&job->report, args.data()+3);
   job->report.found = true;
 
+  REQUIRE(job->state & STATE_MERGED);
+  REQUIRE(!(job->state & STATE_FINISHED));
+
   bool keep = !job->bad_launch && !job->bad_finish && job->keep && job->report.status == 0;
-  job->db->finish_job(job->job, *inputs, *outputs, job->code.data[0], keep, job->report);
+  job->db->finish_job(job->job, inputs->value, outputs->value, job->code.data[0], keep, job->report);
   job->state |= STATE_FINISHED;
   job->process(queue);
 
@@ -1304,7 +1157,7 @@ static PRIMTYPE(type_job_reality) {
 
 static PRIMFN(prim_job_reality) {
   EXPECT(1);
-  JOBRESULT(job, 0);
+  JOB(job, 0);
   completion->next = std::move(job->q_reality);
   job->q_reality = std::move(completion);
   job->process(queue);
@@ -1320,7 +1173,7 @@ static PRIMTYPE(type_job_report) {
 
 static PRIMFN(prim_job_report) {
   EXPECT(1);
-  JOBRESULT(job, 0);
+  JOB(job, 0);
   completion->next = std::move(job->q_report);
   job->q_report = std::move(completion);
   job->process(queue);
@@ -1339,7 +1192,7 @@ static PRIMTYPE(type_job_record) {
 
 static PRIMFN(prim_job_record) {
   EXPECT(1);
-  JOBRESULT(job, 0);
+  JOB(job, 0);
 
   std::vector<std::shared_ptr<Value> > stats;
   if (job->record.found) stats.emplace_back(make_usage(job->record));
