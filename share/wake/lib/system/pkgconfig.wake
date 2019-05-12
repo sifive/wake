@@ -39,7 +39,7 @@ def pkgConfigImp args = memoize 0 (
     | runJob
   def output = result.getJobStdout | getWhenFail "" | tokenize `\n` | head
   def split = _ | tokenize ` ` | filter (_ !=* "")
-  if result.getJobStatus != 0 then None else omap split output
+  if result.isJobOk then omap split output else None
 )
 
 global def pkgConfig pkg =

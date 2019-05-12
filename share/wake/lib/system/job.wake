@@ -303,13 +303,12 @@ def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
 def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
 def guardPath job = match _
   Fail e = BadJob e, Nil
-  Pass l if job.getJobStatus == 0 = map (\(Pair f _) File f) l
-  _ = makeBadJob (makeError "Non-zero exit status ({str job.getJobStatus})"), Nil
+  Pass l if job.isJobOk = map (\(Pair f _) File f) l
+  _ = makeBadJob (makeError "Non-zero exit status ({format job.getJobStatus})"), Nil
 def mapPath = match _
   Fail e = BadJob e, Nil
   Pass l = map (\(Pair f _) File f) l
 global def killJob job signal = prim "job_kill" # send signal to job
-global def getJobStatus  job = getJobReport job | rmap getUsageStatus | getWhenFail (-1) #!!!
 global def getJobStdout  job = stdio job 1
 global def getJobStderr  job = stdio job 2
 global def getJobInputs  job = tree job 1 | guardPath job
@@ -319,11 +318,28 @@ global def getJobFailedOutputs job = tree job 2 | mapPath
 global def getJobId job = prim "job_id"
 global def getJobOutput job = match (tree job 2)
   Fail e = BadJob e
-  Pass l if job.getJobStatus == 0 = match l
+  Pass l if job.isJobOk = match l
     (Pair f _), Nil = File f
     Nil    = makeBadJob (makeError "no outputs available")
     _      = makeBadJob (makeError "more than one output found")
-  _ = makeBadJob (makeError "Non-zero exit status ({str job.getJobStatus})")
+  _ = makeBadJob (makeError "Non-zero exit status ({format job.getJobStatus})")
+
+global def isJobOk job = match (getJobReport job)
+  Fail _ = False
+  Pass u = u.getUsageStatus == 0
+
+global data Status =
+  Exited   Integer
+  Signaled Integer
+  Aborted  Error
+
+global def getJobStatus job = match (getJobReport job)
+  Fail f = Aborted f
+  Pass u =
+    def status = u.getUsageStatus
+    if status >= 0
+    then Exited status
+    else Signaled (-status)
 
 # Implement FUSE-based Runner
 def wakePath = prim "execpath" # location of the wake executable
@@ -491,8 +507,8 @@ def hashcode f = memoize 0 (
       job.getJobStdout
       | getWhenFail ""
       | extract `(.{64}).*`
-    match job.getJobStatus hash
-      0 (x, Nil) = x
+    match job.isJobOk hash
+      True (x, Nil) = x
       _ _ = panic "Failed to hash file {f}"
 )
 
