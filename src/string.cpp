@@ -164,11 +164,15 @@ static PRIMFN(prim_read) {
 }
 
 static PRIMTYPE(type_write) {
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(String::typeVar);
+  result[1].unify(String::typeVar);
   return args.size() == 3 &&
     args[0]->unify(Integer::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    out->unify(result);
 }
 
 static PRIMFN(prim_write) {
@@ -178,15 +182,22 @@ static PRIMFN(prim_write) {
   STRING(body, 2);
 
   REQUIRE(mpz_cmp_si(mode->value, 0) >= 0, "mode must be >= 0");
-  REQUIRE(mpz_cmp_si(mode->value, 0xffff) <= 0, "mode must be <= 0xffff");
+  REQUIRE(mpz_cmp_si(mode->value, 0x1ff) <= 0, "mode must be <= 0x1ff");
   long mask = mpz_get_si(mode->value);
 
   std::ofstream t(path->value, std::ios_base::trunc);
-  REQUIRE(!t.fail(), "Could not write " + path->value);
-  t << body->value;
-  chmod(path->value.c_str(), mask);
-  REQUIRE(!t.bad(), "Could not write " + path->value);
-  RETURN(args[1]);
+  if (!t.fail()) {
+    t << body->value;
+    if (!t.bad()) {
+      chmod(path->value.c_str(), mask);
+      auto out = make_result(true, std::shared_ptr<Value>(args[1]));
+      RETURN(out);
+    }
+  }
+  std::stringstream str;
+  str << "write " << path->value << ": " << strerror(errno);
+  auto out = make_result(false, std::make_shared<String>(str.str()));
+  RETURN(out);
 }
 
 static PRIMTYPE(type_getenv) {
@@ -209,10 +220,14 @@ static PRIMFN(prim_getenv) {
 }
 
 static PRIMTYPE(type_mkdir) {
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(String::typeVar);
+  result[1].unify(String::typeVar);
   return args.size() == 2 &&
     args[0]->unify(Integer::typeVar) &&
     args[1]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    out->unify(result);
 }
 
 static PRIMFN(prim_mkdir) {
@@ -221,16 +236,18 @@ static PRIMFN(prim_mkdir) {
   STRING(path, 1);
 
   REQUIRE(mpz_cmp_si(mode->value, 0) >= 0, "mode must be >= 0");
-  REQUIRE(mpz_cmp_si(mode->value, 0xffff) <= 0, "mode must be <= 0xffff");
+  REQUIRE(mpz_cmp_si(mode->value, 0x1ff) <= 0, "mode must be <= 0x1ff");
   long mask = mpz_get_si(mode->value);
 
   if (mkdir(path->value.c_str(), mask) != 0 && errno != EEXIST && errno != EISDIR) {
     std::stringstream str;
-    str << path->value << ": " << strerror(errno);
-    RAISE(str.str());
+    str << "mkdir " << path->value << ": " << strerror(errno);
+    auto out = make_result(false, std::make_shared<String>(str.str()));
+    RETURN(out);
+  } else {
+    auto out = make_result(true, std::move(args[1]));
+    RETURN(out);
   }
-
-  RETURN(args[1]);
 }
 
 static PRIMTYPE(type_format) {

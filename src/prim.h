@@ -45,11 +45,6 @@ std::unique_ptr<Receiver> require(const char *fn, WorkQueue &queue, std::unique_
   if (!completion) return;								\
 } while (0)
 
-#define RAISE(str) do {									\
-  require(__FUNCTION__, queue, std::move(completion), binding, false, str);		\
-  return;										\
-} while (0)
-
 std::unique_ptr<Receiver> expect_args(const char *fn, WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::vector<std::shared_ptr<Value> > &args, int expect);
 #define EXPECT(num) do { 									\
   (void)data;											\

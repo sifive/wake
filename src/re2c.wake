@@ -18,7 +18,7 @@ def re2cOk Unit =
   def out = job (which "re2c", "--version", Nil) Nil | getJobStdout
   def ver = extract `re2c ([0-9.]+)\n` out | map (tokenize `\.` _) | flatten
   match ver
-    x, y, _ = int x >= 1
+    x, y, _ = (int x | getOrElse 0) >= 1
     _       = False
 
 def re2cReal file =

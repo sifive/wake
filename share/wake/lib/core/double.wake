@@ -65,7 +65,10 @@ global def dformat x =
     DoubleDefault    = 3
   imp f
 
-global def double s = prim "ddbl"
+global def double s =
+  def p s = prim "ddbl"
+  p s | head
+
 global def dhex = dformat DoubleHex 20
 global def dstr = dformat DoubleDefault 17
 

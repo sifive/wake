@@ -45,7 +45,7 @@ global def rmapFail fn = match _
   Pass a = Pass a
   Fail f = Fail (fn f)
 
-global def panic s = prim "raise" # !!! should terminate process
+global def panic s = prim "panic"
 
 global def :!!! result = match result
   Pass p = p

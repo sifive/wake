@@ -119,16 +119,18 @@ static PRIMFN(prim_str) {
     base = mpz_get_si(arg0->value);
     ok &= base <= 62 && base >= -36 && base != 0 && base != 1 && base != -1;
   }
-  REQUIRE(ok, arg0->to_str() + " is not a valid base; [-36,62] \\ [-1,1]");
-  auto out = std::make_shared<String>(arg1->str(base));
+  auto out = std::make_shared<String>(ok ? arg1->str(base) : "");
   RETURN(out);
 }
 
 static PRIMTYPE(type_int) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(Integer::typeVar);
   return args.size() == 2 &&
     args[0]->unify(Integer::typeVar) &&
     args[1]->unify(String::typeVar) &&
-    out->unify(Integer::typeVar);
+    out->unify(list);
 }
 
 static PRIMFN(prim_int) {
@@ -141,13 +143,13 @@ static PRIMFN(prim_int) {
     base = mpz_get_si(arg0->value);
     ok &= base <= 62 && base >= 0 && base != 1;
   }
-  REQUIRE(ok, arg0->to_str() + " is not a valid base; 0 or [2,62]");
-  auto out = std::make_shared<Integer>();
-  if (mpz_set_str(out->value, arg1->value.c_str(), base)) {
-    RAISE("String " + arg1->value + " is not in Integer format");
-  } else {
-    RETURN(out);
+  std::vector<std::shared_ptr<Value> > vals;
+  auto val = std::make_shared<Integer>();
+  if (ok && !mpz_set_str(val->value, arg1->value.c_str(), base)) {
+    vals.emplace_back(std::move(val));
   }
+  auto out = make_list(std::move(vals));
+  RETURN(out);
 }
 
 // popcount, scan0, scan1 ?

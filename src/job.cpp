@@ -1064,7 +1064,7 @@ static PRIMFN(prim_job_output) {
     arg0->q_stderr = std::move(completion);
     arg0->process(queue);
   } else {
-    RAISE("argument neither stdout(1) nor stderr(2)");
+    REQUIRE(false, "argument neither stdout(1) nor stderr(2)");
   }
 }
 
@@ -1116,7 +1116,7 @@ static PRIMFN(prim_job_tree) {
     arg0->q_outputs = std::move(completion);
     arg0->process(queue);
   } else {
-    RAISE("argument neither inputs(1) nor outputs(2)");
+    REQUIRE(false, "argument neither inputs(1) nor outputs(2)");
   }
 }
 
@@ -1281,15 +1281,13 @@ static PRIMFN(prim_search_path) {
   for (const char *scan = tok; scan != end; ++scan) {
     if (*scan == ':' && scan != tok) {
       if (check_exec(tok, scan-tok, exec->value, out->value)) RETURN(out);
-      std::string path(tok, scan-tok);
-      path += "/";
-      path += exec->value;
       tok = scan+1;
     }
   }
 
   if (check_exec(tok, end-tok, exec->value, out->value)) RETURN(out);
-  RAISE(exec->value + " not found in " + path->value);
+  // If not found, return input unmodified => runJob fails somewhat gracefully
+  RETURN(args[1]);
 }
 
 static void usage_type(TypeVar &pair) {

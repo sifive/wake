@@ -227,9 +227,13 @@ static std::shared_ptr<Value> parse_jvalue(JLexer &jlex, std::ostream& errs) {
 }
 
 static PRIMTYPE(type_json) {
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(Data::typeJValue);
+  result[1].unify(String::typeVar);
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
-    out->unify(Data::typeJValue);
+    out->unify(result);
 }
 
 // JSON5Text:
@@ -239,10 +243,15 @@ static PRIMFN(prim_json_file) {
   STRING(file, 0);
   JLexer jlex(file->value.c_str());
   std::stringstream errs;
-  auto out = parse_jvalue(jlex, errs);
+  auto json = parse_jvalue(jlex, errs);
   expect(END, jlex, errs);
-  if (jlex.fail) RAISE(errs.str());
-  RETURN(out);
+  if (jlex.fail) {
+    auto out = make_result(false, std::make_shared<String>(errs.str()));
+    RETURN(out);
+  } else {
+    auto out = make_result(true, std::move(json));
+    RETURN(out);
+  }
 }
 
 static PRIMFN(prim_json_body) {
@@ -250,10 +259,15 @@ static PRIMFN(prim_json_body) {
   STRING(body, 0);
   JLexer jlex(body->value, "<input-string>");
   std::stringstream errs;
-  auto out = parse_jvalue(jlex, errs);
+  auto json = parse_jvalue(jlex, errs);
   expect(END, jlex, errs);
-  if (jlex.fail) RAISE(errs.str());
-  RETURN(out);
+  if (jlex.fail) {
+    auto out = make_result(false, std::make_shared<String>(errs.str()));
+    RETURN(out);
+  } else {
+    auto out = make_result(true, std::move(json));
+    RETURN(out);
+  }
 }
 
 void prim_register_json(PrimMap &pmap) {

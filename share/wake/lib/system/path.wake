@@ -42,10 +42,13 @@ def mkdirRunner =
       _ = Pair (panic "mkdirRunner: invalid command-line") (Pair "" "")
   def post = match _
     Pair (Fail f) _ = Fail f
-    Pair (Pass output) (Pair mode dir) =
-      output
-      | editRunnerOutputOutputs (imp (int mode) dir, _)
-      | Pass
+    Pair (Pass output) (Pair smode dir) =
+      def mode = int smode | getOrElse 0x200
+      if mode < 0 || mode > 0x1ff
+      then makeError "mkdir {dir}: Invalid mode ({smode})"
+      else match (imp mode dir)
+        Fail f = makeError f
+        Pass path = Pass (editRunnerOutputOutputs (path, _) output)
   makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
 
 def mkdirImp inputs mode path =
@@ -74,9 +77,11 @@ def writeImp inputs mode path content =
     def post = match _
       Pair (Fail f) _ = Fail f
       Pair (Pass output) Unit =
-        output
-        | editRunnerOutputOutputs (imp mode path content, _)
-        | Pass
+        if mode < 0 || mode > 0x1ff
+        then makeError "write {path}: Invalid mode ({strbase 8 mode})"
+        else match (imp mode path content)
+          Fail f = makeError f
+          Pass path = Pass (editRunnerOutputOutputs (path, _) output)
     makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
   :!!! makePlan ("<write>", str mode, path, Nil) inputs
   | setPlanOnce        False
