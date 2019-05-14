@@ -120,7 +120,7 @@ global def filter f l = splitBy f l | getPairFirst
 # Tranposition is only it's own inverse when the lists have non-increasing size
 global def transpose l =
   def todo = filter (!_.empty) l
-  def heads = map head todo
+  def heads = mapPartial head todo
   def tails = map tail todo
   if todo.empty then Nil else heads, transpose tails
 
