@@ -1074,7 +1074,7 @@ static PRIMTYPE(type_add_hash) {
 
 static long stat_mod_ns(const std::string &file) {
   struct stat sbuf;
-  stat(file.c_str(), &sbuf);
+  if (stat(file.c_str(), &sbuf) != 0) return -1;
   long modified = sbuf.st_mtim.tv_sec;
   modified *= 1000000000L;
   modified += sbuf.st_mtim.tv_nsec;
