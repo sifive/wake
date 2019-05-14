@@ -257,7 +257,7 @@ global def runJob p = match p
       Runner name scorefn fn = match (scorefn p)
         Pass x if x <=. 0.0 = Reject "{name}: non-positive score"
         Pass x = Accept x fn
-        Fail x = Reject "{name}: x"
+        Fail x = Reject "{name} {x}"
     def opts = subscribe runner | map qualify
     def best acc = match _ acc
       (Reject _) _ = acc
@@ -270,9 +270,13 @@ global def runJob p = match p
         def badfinish job e = prim "job_fail_finish"
         def badlaunch job e = prim "job_fail_launch"
         def job = create dir stdin env.implode cmd.implode (map getPathName vis).implode 0
-        def error = makeError "No runner available: {map format opts | catWith ", "}"
-        def _ = badlaunch job error
-        def _ = badfinish job error
+        def error =
+          def pretty = match _
+            Accept _ _ = ""
+            Reject why = why
+          makeError "No runner for '{job.getJobDescription}' available, because: {map pretty opts | catWith ", "}"
+        def l = badlaunch job error
+        def f = waitOne (\_ badfinish job error) l
         job
 
 def toUsage (Pair (Pair status runtime) (Pair (Pair cputime membytes) (Pair ibytes obytes))) =
@@ -304,7 +308,7 @@ def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks til
 def guardPath job = match _
   Fail e = BadJob e, Nil
   Pass l if job.isJobOk = map (\(Pair f _) File f) l
-  _ = makeBadJob (makeError "Non-zero exit status ({format job.getJobStatus})"), Nil
+  _ = makeBadJob (makeError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'"), Nil
 def mapPath = match _
   Fail e = BadJob e, Nil
   Pass l = map (\(Pair f _) File f) l
@@ -316,13 +320,14 @@ global def getJobOutputs job = tree job 2 | guardPath job
 global def getJobFailedInputs  job = tree job 1 | mapPath
 global def getJobFailedOutputs job = tree job 2 | mapPath
 global def getJobId job = prim "job_id"
+global def getJobDescription job = prim "job_desc"
 global def getJobOutput job = match (tree job 2)
   Fail e = BadJob e
   Pass l if job.isJobOk = match l
     (Pair f _), Nil = File f
-    Nil    = makeBadJob (makeError "no outputs available")
-    _      = makeBadJob (makeError "more than one output found")
-  _ = makeBadJob (makeError "Non-zero exit status ({format job.getJobStatus})")
+    Nil    = makeBadJob (makeError "No outputs available from '{job.getJobDescription}'")
+    _      = makeBadJob (makeError "More than one output found from '{job.getJobDescription}'")
+  _ = makeBadJob (makeError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'")
 
 global def isJobOk job = match (getJobReport job)
   Fail _ = False
@@ -361,7 +366,7 @@ global def fuseRunner =
           def fuse = makeRawPlan cmd | setPlanPool 0 | runJobWith manualRunner
           match (fuse.getJobStderr | rmap (extract `OK: (.*)`))
             Pass (x, Nil) = Pair (Pass (editRunnerInputDirectory ("{x}/{_}") input)) (Some fuse)
-            Pass _ = Pair (Fail (makeError "fuse-wake output invalid: {fuse.getJobStderr | getWhenFail ""}")) (Some fuse)
+            Pass _ = Pair (Fail (makeError "fuse-wake stderr invalid: {fuse.getJobStderr | getWhenFail ""}")) (Some fuse)
             Fail f = Pair (Fail f) (Some fuse)
   def post = match _
     Pair x None = x
@@ -386,7 +391,7 @@ global def fuseRunner =
           | setRunnerOutputOutputs (outputs | tokenize `\0` | filter (_!=*""))
           | editRunnerOutputUsage usage
           | Pass
-        _ = Fail (makeError "could not parse fuse output")
+        _ = Fail (makeError "fuse-wake stdout invalid: {fuse.getJobStdout | getWhenFail ""}")
   def score (Plan _ _ _ _ _ _ lo res _ _ _ _ _) = match res
     Nil = if lo then Fail "would hide workspace" else Pass 1.0
     _   = Fail "cannot supply resources"
@@ -461,7 +466,11 @@ global def executeJSON json =
   def res   = Nil # json // `resources`   | getJString | getOrElse Nil | mapPartial getJString
   def job = Plan cmd vis env dir stdin ReRun True res (\_ True) id id id 1 | runJobWith fuseRunner
   match job.getJobReport
-    Fail f = JObject ("cause" → JString f.getErrorCause, Nil)
+    Fail (Error cause stack) = JObject (
+      "cause" → JString cause,
+      "stack" → stack | map JString | JArray,
+      Nil
+    )
     Pass (Usage status runtime cputime membytes inbytes outbytes) = JObject (
       "inputs"  → tree job 1 | getWhenFail Nil | map (_.getPairFirst.JString) | JArray,
       "outputs" → tree job 2 | getWhenFail Nil | map (_.getPairFirst.JString) | JArray,
@@ -519,7 +528,7 @@ def stateRunner =
     Fail f = Pair (Fail f) ""
     Pass input = match input.getRunnerInputCommand
       _, file, Nil = Pair (Pass input) file
-      _ = Pair (Fail (makeError "stateRunner: invalid command-line")) ""
+      _ = panic "stateRunner: invalid command-line"
   def post = match _
     Pair (Fail f) _ = Fail f
     Pair (Pass output) file =

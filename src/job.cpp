@@ -323,6 +323,12 @@ static char **split_null(std::string &str) {
   return out;
 }
 
+static std::string pretty_cmd(std::string x) {
+  for (char &c : x) if (c == 0) c = ' ';
+  x.resize(x.size()-1); // trim trailing ' '
+  return x;
+}
+
 static void launch(JobTable *jobtable) {
   for (auto &i : jobtable->imp->table) {
     if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
@@ -375,30 +381,25 @@ static void launch(JobTable *jobtable) {
     i.job->state |= STATE_FORKED;
     close(pipe_stdout[1]);
     close(pipe_stderr[1]);
-    std::string echo(std::move(i.job->cmdline));
-    bool indirect = echo != task.cmdline;
-    for (char &c : echo) if (c == 0) c = ' ';
-    echo.resize(echo.size()-1); // trim trailing ' '
+    bool indirect = i.job->cmdline != task.cmdline;
     if (i.pool) {
       double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
-      i.status = status_state.emplace(status_state.end(), echo, predict, i.start);
+      i.status = status_state.emplace(status_state.end(), pretty_cmd(i.job->cmdline), predict, i.start);
     }
     if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
       std::stringstream s;
-      s << echo;
+      s << pretty_cmd(i.job->cmdline);
       if (!i.job->stdin.empty()) s << " < " << i.job->stdin;
       if (indirect) {
-        for (char &c : task.cmdline) if (c == 0) c = ' ';
-        task.cmdline.resize(task.cmdline.size()-1);
-        s << " # launched by: " << task.cmdline; // c_str so it terminates at first null
+        s << " # launched by: " << pretty_cmd(task.cmdline);
         if (!task.stdin.empty()) s << " < " << task.stdin;
       }
       s << std::endl;
       std::string out = s.str();
       status_write(2, out.data(), out.size());
     }
-    i.job->stdin.clear();
-    i.job->cmdline.clear();
+    // i.job->stdin.clear();
+    // i.job->cmdline.clear();
     jobtable->imp->tasks[i.pool].pop_front();
   }
 }
@@ -610,6 +611,9 @@ static PRIMTYPE(type_job_fail) {
 static PRIMFN(prim_job_fail_launch) {
   EXPECT(2);
   JOB(job, 0);
+
+  REQUIRE (job->state == 0);
+
   job->bad_launch = args[1];
   job->reality.found    = true;
   job->reality.status   = 128;
@@ -620,11 +624,18 @@ static PRIMFN(prim_job_fail_launch) {
   job->reality.obytes   = 0;
   job->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED;
   job->process(queue);
+
+  auto out = make_unit();
+  RETURN(out);
 }
 
 static PRIMFN(prim_job_fail_finish) {
   EXPECT(2);
   JOB(job, 0);
+
+  REQUIRE(job->state & STATE_MERGED);
+  REQUIRE(!(job->state & STATE_FINISHED));
+
   job->bad_finish = args[1];
   job->report.found    = true;
   job->report.status   = 128;
@@ -635,6 +646,9 @@ static PRIMFN(prim_job_fail_finish) {
   job->report.obytes   = 0;
   job->state |= STATE_FINISHED;
   job->process(queue);
+
+  auto out = make_unit();
+  RETURN(out);
 }
 
 static PRIMTYPE(type_job_launch) {
@@ -1026,6 +1040,19 @@ static PRIMFN(prim_job_id) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_job_desc) {
+  return args.size() == 1 &&
+    args[0]->unify(Job::typeVar) &&
+    out->unify(String::typeVar);
+}
+
+static PRIMFN(prim_job_desc) {
+  EXPECT(1);
+  JOB(arg0, 0);
+  auto out = std::make_shared<String>(pretty_cmd(arg0->cmdline));
+  RETURN(out);
+}
+
 static PRIMTYPE(type_job_finish) {
   return args.size() == 9 &&
     args[0]->unify(Job::typeVar) &&
@@ -1248,6 +1275,7 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   prim_register(pmap, "job_output", prim_job_output, type_job_output,  PRIM_SHALLOW|PRIM_PURE);
   prim_register(pmap, "job_tree",   prim_job_tree,   type_job_tree,    PRIM_SHALLOW|PRIM_PURE);
   prim_register(pmap, "job_id",     prim_job_id,     type_job_id,      PRIM_SHALLOW|PRIM_PURE);
+  prim_register(pmap, "job_desc",   prim_job_desc,   type_job_desc,    PRIM_SHALLOW|PRIM_PURE);
   prim_register(pmap, "job_reality",prim_job_reality,type_job_reality, PRIM_SHALLOW|PRIM_PURE);
   prim_register(pmap, "job_report", prim_job_report, type_job_report,  PRIM_SHALLOW|PRIM_PURE);
   prim_register(pmap, "job_record", prim_job_record, type_job_record,  PRIM_SHALLOW|PRIM_PURE);
