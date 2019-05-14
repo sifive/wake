@@ -315,11 +315,12 @@ global def vflatten vo =
 # Simple parallel construction
 global def vtab f n =
   def vnew n = prim "vnew"
+  def m = max 0 n
   def bind out =
     def vset o i v = prim "vset"
-    def _ = vappi (\i vset out i (f i)) n
-    Vector out 0 n
-  bind (vnew (max 0 n))
+    def _ = vappi (\i vset out i (f i)) m
+    Vector out 0 m
+  bind (vnew m)
 
 # f will be called more than once per element
 def vmapPartial f v =
