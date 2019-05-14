@@ -109,12 +109,11 @@ Wake is generally functional.
     
 * common list functions (meanings are standard)
 
-|       |     |     |     |
-| ---   | --- | --- | --- |
-| empty |   head | tail | map |
-| map | foldl | scanl | foldr | 
-| scanr | ++ (cocatenate lists) | reverse | flatten | 
-| len | exists | forall | filter 
+|       |     |     |     |     |
+| ---   | --- | --- | --- | --- |
+| empty |   head | tail | map | foldl |
+|scanl | foldr | scanr | ++ (cocatenate lists) | reverse |
+| flatten | len | exists | forall | filter| 
 | zip| 
 
 * printing output (for debugging)
@@ -125,12 +124,12 @@ Wake is generally functional.
 ### Data Types
 
 ####primitives
-* String -> "A String"
+* String -> "A String" : a string interpreted as unicode
+    * 'a binary string' : a raw binary string
 * List a -> 1,2,3,Nil (a list of items seperated by commas ended by nil)
 * Integer -> 7
 * Double -> 3.2
 * Tuple -> see below
-* Exception -> see below
 * JSON -> see below
 * Job -> see below
 * Path -> see below
@@ -139,8 +138,8 @@ Wake is generally functional.
 
 ##### Tuples
 
-Tuple are how wake defines record types, much like a struct in c/c++. The name of a tuple data type
-begins with a capital letter.
+Tuple are how wake defines record types, much like a struct in c/c++. The name of
+a tuple data type begins with a capital letter.
 
 ```bash
 
@@ -163,13 +162,6 @@ getBobFirst a
 editBobFirst a b
 ```
 
-##### Exceptions
-
-* try
-* raise
-* cast
-* reraise
-
 ##### Json
 
 ```bash
@@ -184,10 +176,23 @@ global data JValue =
   JArray   (List JValue)
 ```
 
+Wake has many useful function for extracting data from a json structure.
+
+
 ##### jobs
 
-Jobs are how wake runs external programs. They are created by executing a Plan with a Runner. The Plan is a
-tuple describing how to run the program, and the Runner is a function which reads the Plan and runs the program.
+Jobs are how wake runs external programs. They are created by executing a Plan with 
+a Runner. The Plan is a tuple describing how to run the program, and the Runner is 
+a function which reads the Plan and runs the program.
+
+```
+
+
+
+
+```
+
+
 
 ##### sources and Path ojbects
 
@@ -206,7 +211,26 @@ source '.*\.h' here
 ### Wakisms
 
 * database
+    * wake uses an sqlite3 database to track dependencies, job information and 
+    various other detail. This should be treated as an opaque resource.
 * FUSE
+    * wake uses a FUSE filesystem to track what files are actually opened when running
+    a job. 
 * no guarantee of ordering
+    * There is no guarantee of ordering if two statements don't depend on each other. This is
+    wake is able to parallelize programs.
 * publish/subscribe
+    * the publish and subscribe commands are used for global values. A published queue has
+    global scope.
+    ```
+    publish xfoo = "bar", Nil
+    publish xfoo = "baz", Nil
+    
+    global def readit _ =
+        subscribe xfoo
+    ```
+
 * environment
+    * the environment is in a published queue, and does not pick up the environment
+    from the parent process. It can also be accessed from the global variable `environment`.
+    
