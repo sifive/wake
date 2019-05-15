@@ -494,6 +494,10 @@ global def getPathName path = match path
   File name = name
   BadJob _ = "BADJOB"
 
+global def getPathResult path = match path
+  File name = Pass name
+  BadJob e  = Fail e
+
 global def getPathParent path = match path
   File name = File (simplify "{name}/..")
   BadJob e  = BadJob e

@@ -18,13 +18,15 @@ global def default = Pair "native-cpp11-release" "native-c99-release"
 global def debug   = Pair "native-cpp11-debug" "native-c99-debug"
 
 def targets = buildWake, buildFuse, buildShim, Nil
-global def all variant = map (_ variant) targets
+def allOut variant = map (_ variant) targets
+
+global def all variant = allOut variant | findSome getPathError | getOrPass "BUILT"
 
 global def install dest =
   def libdir = simplify "{here}/share/wake/lib"
   def libfiles = sources libdir `.*`
-  def binfiles = all default
+  def binfiles = allOut default
   def releaseAs exe = cat (dest, "/", take 1 (extract `(.*)\.(.*)` exe))
   def libinstall = map (installIn dest) libfiles
   def bininstall = map (\exe installAs (releaseAs exe.getPathName) exe) binfiles
-  libinstall ++ bininstall
+  libinstall ++ bininstall | findSome getPathError | getOrPass "INSTALLED"

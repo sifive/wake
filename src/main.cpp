@@ -566,7 +566,12 @@ int main(int argc, char **argv) {
       if (v && v->type == &Closure::type)
         std::cout << ", " << term_red() << "AN UNEVALUATED FUNCTION" << term_normal();
       std::cout << std::endl;
-      if (!v) pass = false;
+      if (!v) {
+        pass = false;
+      } else if (v->type == &Data::type) {
+        Data *d = reinterpret_cast<Data*>(v);
+        if (d->cons->index == 1) pass = false;
+      }
     }
   }
 
