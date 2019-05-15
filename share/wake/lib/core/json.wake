@@ -33,9 +33,9 @@ global def getJInteger = match _
   _                        = None
 global def getJDouble = match _
   JDouble x               = Some x
-  JInteger x              = Some (dint x)
+  JInteger x              = dint x
   JArray (JDouble x, Nil) = Some x
-  JArray (JInteger x, Nil)= Some (dint x)
+  JArray (JInteger x, Nil)= dint x
   _                       = None
 global def getJBoolean = match _
   JBoolean x               = Some x
@@ -50,7 +50,9 @@ global def getJArray = match _
   _        = None
 
 global def parseJSONBody body = prim "json_body"
-global def parseJSONFile file = prim "json_file"
+global def parseJSONFile path =
+  def p f = prim "json_file"
+  p path.getPathName
 
 def escape =
   def fmt t = match _
@@ -63,10 +65,10 @@ def escape =
     s, c, t = s, byteToInteger c | fmt (helper t)
     x = x
   _
-  | replace '[\\"]' '\\\0'
-  | replace "\0" '\\u0000'
-  | replace '[\x01-\x1f]' "\0\\0\0"
-  | tokenize "\0"
+  | replace `[\\"]` '\\\0'
+  | replace `\0` '\\u0000'
+  | replace `[\x01-\x1f]` "\0\\0\0"
+  | tokenize `\0`
   | helper
 
 tuple JSONFormat =
@@ -119,10 +121,6 @@ global def prettyJSON = customFormatJSON prettyJSONFormat
 global def x /| f = match x
   JArray l = JArray (filter f l)
   _ = if f x then JArray (x, Nil) else JArray Nil
-
-#global def x /. i = match x
-#  JArray l = at i l
-#  _ = if i == 0 then x else raise "index out of bounds"
 
 global def x // y =
   def helper tail = match _

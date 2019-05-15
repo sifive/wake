@@ -14,7 +14,8 @@
 # limitations under the License.
 
 global def buildFuse (Pair variant _) =
-  def compile = compileC variant (cflags "fuse") Nil
-  def cppFiles = sources here '.*\.cpp'
+  def fuse = pkgConfig "fuse" | getOrElse (makeSysLib "")
+  def compile = compileC variant fuse.getSysLibCFlags Nil
+  def cppFiles = sources here `.*\.cpp`
   def objFiles = map compile cppFiles
-  linkO variant (libs "fuse") objFiles "lib/wake/fuse-wake"
+  linkO variant fuse.getSysLibLFlags objFiles "lib/wake/fuse-wake"

@@ -35,14 +35,21 @@ global def workspace = prim "workspace"
 
 def mkdirRunner =
   def imp m p = prim "mkdir"
-  def pre input =
-    match input.getRunnerInputCommand
-      _, _, mode, dir, Nil = Pair input (Pair mode dir)
-      _ = raise "mkdirRunner: invalid command-line"
-  def post (Pair output (Pair mode dir)) =
-    output
-    | editRunnerOutputOutputs (imp (int mode) dir, _)
-  makeRunner "mkdir" (\_ 0.0) pre post virtualRunner
+  def pre = match _
+    Fail f = Pair (Fail f) (Pair "" "")
+    Pass input = match input.getRunnerInputCommand
+      _, _, mode, dir, Nil = Pair (Pass input) (Pair mode dir)
+      _ = panic "mkdirRunner: invalid command-line"
+  def post = match _
+    Pair (Fail f) _ = Fail f
+    Pair (Pass output) (Pair smode dir) =
+      def mode = int smode | getOrElse 0x200
+      if mode < 0 || mode > 0x1ff
+      then Fail (makeError "mkdir {dir}: Invalid mode ({smode})")
+      else match (imp mode dir)
+        Fail f = Fail (makeError f)
+        Pass path = Pass (editRunnerOutputOutputs (path, _) output)
+  makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
 
 def mkdirImp inputs mode path =
   makePlan ("<mkdir>", "-m", "0{strbase 8 mode}", path, Nil) inputs
@@ -60,17 +67,22 @@ global def mkdir path =
   def root = match _
     "", x, t = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 "/{x}") t
     x, t     = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 x) t
-    Nil      = raise "impossible"
-  path | simplify | tokenize "/" | root
+    Nil      = panic "impossible"
+  path | simplify | tokenize `/` | root
 
 def writeImp inputs mode path content =
   def writeRunner =
     def imp m p c = prim "write"
     def pre input = Pair input Unit
-    def post (Pair output Unit) =
-      output
-      | editRunnerOutputOutputs (imp mode path content, _)
-    makeRunner "write" (\_ 0.0) pre post virtualRunner
+    def post = match _
+      Pair (Fail f) _ = Fail f
+      Pair (Pass output) Unit =
+        if mode < 0 || mode > 0x1ff
+        then Fail (makeError "write {path}: Invalid mode ({strbase 8 mode})")
+        else match (imp mode path content)
+          Fail f = Fail (makeError f)
+          Pass path = Pass (editRunnerOutputOutputs (path, _) output)
+    makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
   makePlan ("<write>", str mode, path, Nil) inputs
   | setPlanOnce        False
   | setPlanEnvironment Nil

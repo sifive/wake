@@ -28,7 +28,7 @@ global def listToVector l =
       i+1
     def _ = foldl doit 0 l
     out
-  reraise llen (\l Vector (bind (vnew l)) 0 l)
+  Vector (bind (vnew llen)) 0 llen
 
 global def treeToVector t =
   def len = tlen t
@@ -39,7 +39,7 @@ global def treeToVector t =
     def f i x = vset out i x
     def _ = tappi f t
     out
-  reraise len (\l Vector (bind (vnew l)) 0 l)
+  Vector (bind (vnew len)) 0 len
 
 global def vempty (Vector _ s e) = s == e
 global def vlen (Vector _ s e) = e - s
@@ -52,14 +52,10 @@ global def vsplitAt i (Vector v s e) =
 global def vtake i v = vsplitAt i v | getPairFirst
 global def vdrop i v = vsplitAt i v | getPairSecond
 
-global def vatOpt i (Vector v s e) =
+global def vat i (Vector v s e) =
   def get v i = prim "vget"
   def j = i+s
   if i >= 0 && j < e then Some (get v j) else None
-
-global def vat i v = match (vatOpt i v)
-  None   = raise "vat index out of bounds"
-  Some x = x
 
 def vat_ i (Vector v s _) =
   def get v i = prim "vget"
@@ -145,7 +141,7 @@ global def vsplitBy f v =
       if t then vset take o x else vset drop (i-o) x
     def _ = vappi exec len
     Pair (Vector take 0 ntake) (Vector drop 0 ndrop)
-  reraise v (\_ bind (vnew ntake) (vnew ndrop))
+  bind (vnew ntake) (vnew ndrop)
 
 global def vfilter f v = vsplitBy f v | getPairFirst
 
@@ -160,7 +156,7 @@ global def vunfoldl f a n =
           helper a (i+1)
     def _ = helper a 0
     Vector out 0 n
-  if n < 0 then raise "vunfoldl: negative length ({str n})" else bind (vnew n)
+  bind (vnew (max 0 n))
 
 global def vscanl f a v =
   def len = vlen v
@@ -173,7 +169,7 @@ global def vscanl f a v =
       then Unit
       else helper (f a (vat_ i v)) (i+1)
     def _ = helper a 0
-    reraise out (Vector _ 0 (len+1))
+    Vector out 0 (len+1)
   bind (vnew (len+1))
 
 global def vscanr f a v =
@@ -188,7 +184,7 @@ global def vscanr f a v =
       then Unit
       else helper (f (vat_ i1 v) a) i1
     def _ = helper a len
-    reraise out (Vector _ 0 (len+1))
+    Vector out 0 (len+1)
   bind (vnew (len+1))
 
 # vscan = O(n), log n deep prefix-sum
@@ -230,7 +226,7 @@ global def vscanmap f a g v =
         def _ = helper (vat_ x temp) x e
         double e
     def _ = double 0
-    reraise out (Vector _ 0 len)
+    Vector out 0 len
   scatter (vnew len)
 global def vscan f a v = vscanmap f a (_) v
 
@@ -247,8 +243,8 @@ global def vsortBy lt v =
   def merge a b =
     def helper (Pair ai bi) =
       def doit x a b = Pair (Pair (ai+a) (bi+b)) x
-      match (vatOpt ai a) (vatOpt bi b)
-        None     None     = raise "impossible"
+      match (vat ai a) (vat bi b)
+        None     None     = panic "impossible"
         (Some x) None     = doit x 1 0
         None     (Some y) = doit y 0 1
         (Some x) (Some y) = match (lt y x)
@@ -296,7 +292,7 @@ global def vcmp f l r =
   helper 0
 
 global def vtranspose v =
-  def outer i = vmapPartial (vatOpt i _) v
+  def outer i = vmapPartial (vat i _) v
   vtab outer (vfoldmap max 0 vlen v)
 
 global def vflatten vo =
@@ -319,11 +315,12 @@ global def vflatten vo =
 # Simple parallel construction
 global def vtab f n =
   def vnew n = prim "vnew"
+  def m = max 0 n
   def bind out =
     def vset o i v = prim "vset"
-    def _ = vappi (\i vset out i (f i)) n
-    Vector out 0 n
-  if n < 0 then raise "vtab: negative length ({str n})" else bind (vnew n)
+    def _ = vappi (\i vset out i (f i)) m
+    Vector out 0 m
+  bind (vnew m)
 
 # f will be called more than once per element
 def vmapPartial f v =
@@ -340,7 +337,7 @@ def vmapPartial f v =
       Some x = vset out (vat_ i dest) x
       None   = Unit
     def _ = vappi exec leni
-    reraise out (Vector _ 0 leno)
+    Vector out 0 leno
   bind (vnew leno)
 
 def vappi f n =

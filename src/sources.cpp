@@ -391,29 +391,19 @@ static PRIMTYPE(type_sources) {
   list[0].unify(String::typeVar);
   return args.size() == 2 &&
     args[0]->unify(String::typeVar) &&
-    args[1]->unify(String::typeVar) &&
+    args[1]->unify(RegExp::typeVar) &&
     out->unify(list);
 }
 
 static PRIMFN(prim_sources) {
   EXPECT(2);
   STRING(arg0, 0);
-  STRING(arg1, 1);
+  REGEXP(arg1, 1);
 
   std::string root = make_canonical(arg0->value);
 
-  RE2::Options options;
-  options.set_log_errors(false);
-  options.set_one_line(true);
-  options.set_dot_nl(true);
-  RE2 exp(arg1->value, options);
-  if (!exp.ok()) {
-    auto fail = std::make_shared<Exception>(exp.error(), binding);
-    RETURN(fail);
-  }
-
   std::vector<std::shared_ptr<String> > *all = reinterpret_cast<std::vector<std::shared_ptr<String> >*>(data);
-  auto match = sources(*all, root, exp);
+  auto match = sources(*all, root, arg1->exp);
 
   std::vector<std::shared_ptr<Value> > downcast;
   downcast.reserve(match.size());
@@ -426,28 +416,19 @@ static PRIMFN(prim_sources) {
 static PRIMFN(prim_files) {
   EXPECT(2);
   STRING(arg0, 0);
-  STRING(arg1, 1);
+  REGEXP(arg1, 1);
 
   std::string root = make_canonical(arg0->value);
 
-  RE2::Options options;
-  options.set_log_errors(false);
-  options.set_one_line(true);
-  options.set_dot_nl(true);
-  RE2 exp(arg1->value, options);
-  if (!exp.ok()) {
-    auto fail = std::make_shared<Exception>(exp.error(), binding);
-    RETURN(fail);
-  }
-
   std::vector<std::shared_ptr<String> > files;
   bool fail = push_files(files, root);
-  REQUIRE(!fail, "Directory listing failure");
-  auto match = sources(files, root, exp);
 
   std::vector<std::shared_ptr<Value> > downcast;
-  downcast.reserve(match.size());
-  for (auto &i : match) downcast.emplace_back(std::move(i));
+  if (!fail) {
+    auto match = sources(files, root, arg1->exp);
+    downcast.reserve(match.size());
+    for (auto &i : match) downcast.emplace_back(std::move(i));
+  }
 
   auto out = make_list(std::move(downcast));
   RETURN(out);

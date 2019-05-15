@@ -27,6 +27,7 @@
 #include <iosfwd>
 #include <limits>
 #include <gmp.h>
+#include <re2/re2.h>
 
 #define APP_PRECEDENCE 22
 
@@ -125,6 +126,18 @@ struct Double : public Value {
   Hash hash() const;
 };
 
+struct RegExp : public Value {
+  RE2 exp;
+  static const TypeDescriptor type;
+  static TypeVar typeVar;
+  static RE2::Options defops();
+  RegExp(const std::string &regexp, const RE2::Options &opts = defops()) : Value(&type), exp(re2::StringPiece(regexp), opts) { }
+
+  void format(std::ostream &os, FormatState &state) const;
+  TypeVar &getType();
+  Hash hash() const;
+};
+
 struct Closure : public Value {
   Lambda *lambda;
   std::shared_ptr<Binding> binding;
@@ -147,34 +160,12 @@ struct Data : public Value {
   static TypeVar typeOrder;
   static TypeVar typeUnit;
   static TypeVar typeJValue;
-  // these two are const to prevent unify() on them; use clone
+  static TypeVar typeError;
+  // these are const to prevent unify() on them; use clone
   static const TypeVar typeList;
   static const TypeVar typePair;
+  static const TypeVar typeResult;
   Data(Constructor *cons_, std::shared_ptr<Binding> &&binding_) : Value(&type), cons(cons_), binding(std::move(binding_)) { }
-  void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
-};
-
-struct Cause {
-  std::string reason;
-  std::vector<Location> stack;
-  Cause(const std::string &reason_, std::vector<Location> &&stack_);
-};
-
-struct Exception : public Value {
-  std::vector<std::shared_ptr<Cause> > causes;
-
-  static const TypeDescriptor type;
-  static TypeVar typeVar;
-  Exception() : Value(&type) { }
-  Exception(const std::string &reason, const std::shared_ptr<Binding> &binding);
-
-  Exception &operator += (const Exception &other) {
-    causes.insert(causes.end(), other.causes.begin(), other.causes.end());
-    return *this;
-  }
-
   void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;

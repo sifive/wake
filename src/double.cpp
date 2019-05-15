@@ -126,35 +126,35 @@ static PRIMFN(prim_str) {
     format = mpz_get_si(arg0->value);
     ok &= format >= 0 && format <= 3;
   }
-  REQUIRE(ok, arg0->to_str() + " is not a valid format [0,3]");
 
-  ok = mpz_fits_slong_p(arg1->value);
+  ok &= mpz_fits_slong_p(arg1->value);
   if (ok) {
     precision = mpz_get_si(arg1->value);
     ok &= precision >= 1 && precision <= 40;
   }
-  REQUIRE(ok, arg1->to_str() + " is not a valid precision [1,40]");
 
-  auto out = std::make_shared<String>(arg2->str(format, precision));
+  auto out = std::make_shared<String>(ok ? arg2->str(format, precision) : "");
   RETURN(out);
 }
 
 static PRIMTYPE(type_dbl) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(Double::typeVar);
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
-    out->unify(Double::typeVar);
+    out->unify(list);
 }
 
 static PRIMFN(prim_dbl) {
   EXPECT(1);
   STRING(arg0, 0);
   char *end;
-  auto out = std::make_shared<Double>(strtod(arg0->value.c_str(), &end));
-  if (*end) {
-    RAISE("String " + arg0->value + " is not in Double format");
-  } else {
-    RETURN(out);
-  }
+  std::vector<std::shared_ptr<Value> > vals;
+  auto val = std::make_shared<Double>(strtod(arg0->value.c_str(), &end));
+  if (!*end) vals.emplace_back(std::move(val));
+  auto out = make_list(std::move(vals));
+  RETURN(out);
 }
 
 static PRIMTYPE(type_cmp) {
@@ -168,13 +168,11 @@ static PRIMFN(prim_cmp) {
   EXPECT(2);
   DOUBLE(arg0, 0);
   DOUBLE(arg1, 1);
-  if (std::isnan(arg0->value) || std::isnan(arg1->value)) {
-    RAISE("cannot order nan");
-  } else {
-    int x = (arg0->value > arg1->value) - (arg0->value < arg1->value);
-    auto out = make_order(x);
-    RETURN(out);
-  }
+  REQUIRE (!std::isnan(arg0->value));
+  REQUIRE (!std::isnan(arg1->value));
+  int x = (arg0->value > arg1->value) - (arg0->value < arg1->value);
+  auto out = make_order(x);
+  RETURN(out);
 }
 
 static PRIMTYPE(type_class) {

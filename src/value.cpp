@@ -27,12 +27,12 @@
 #include <algorithm>
 
 Value::~Value() { }
-const TypeDescriptor String   ::type("String");
-const TypeDescriptor Integer  ::type("Integer");
-const TypeDescriptor Double   ::type("Double");
-const TypeDescriptor Closure  ::type("Closure");
-const TypeDescriptor Data     ::type("Data");
-const TypeDescriptor Exception::type("Exception");
+const TypeDescriptor String ::type("String");
+const TypeDescriptor Integer::type("Integer");
+const TypeDescriptor Double ::type("Double");
+const TypeDescriptor RegExp ::type("RegExp");
+const TypeDescriptor Closure::type("Closure");
+const TypeDescriptor Data   ::type("Data");
 
 void FormatState::resume() {
   stack.emplace_back(current.value, current.precedence, current.state+1);
@@ -109,6 +109,21 @@ void Double::format(std::ostream &os, FormatState &state) const {
   os << str();
 }
 
+RE2::Options RegExp::defops() {
+  RE2::Options options;
+  options.set_log_errors(false);
+  options.set_one_line(true);
+  options.set_dot_nl(true);
+  return options;
+}
+
+void RegExp::format(std::ostream &os, FormatState &state) const {
+  if (APP_PRECEDENCE < state.p()) os << "(";
+  os << "RegExp ";
+  String(exp.pattern()).format(os, state);
+  if (APP_PRECEDENCE < state.p()) os << ")";
+}
+
 void Closure::format(std::ostream &os, FormatState &state) const {
   os << "<" << lambda->location.file() << ">";
   // !!! if (state.detailed) print referenced variables only
@@ -176,31 +191,6 @@ void Data::format(std::ostream &os, FormatState &state) const {
   }
 }
 
-static std::string pad(int depth) {
-  return std::string(depth, ' ');
-}
-
-void Exception::format(std::ostream &os, FormatState &state) const {
-  if (APP_PRECEDENCE < state.p()) os << "(";
-  os << "Exception";
-
-  if (state.detailed) {
-    for (auto &i : causes) {
-      if (state.indent < 0) os << " "; else os << std::endl << pad(state.indent+2);
-      os << "(\"" << i->reason << "\"";
-      for (auto &j : i->stack) {
-        if (state.indent < 0) os << " "; else os << std::endl << pad(state.indent+4);
-        os << "from " << j.file();
-      }
-      os << ")";
-    }
-  } else {
-    os << " \"" << causes[0]->reason << "\"";
-  }
-
-  if (APP_PRECEDENCE < state.p()) os << ")";
-}
-
 TypeVar String::typeVar("String", 0);
 TypeVar &String::getType() {
   return typeVar;
@@ -253,14 +243,13 @@ Hash Double::hash() const {
   return Hash(str(HEXFLOAT)) + type.hashcode;
 }
 
-TypeVar Exception::typeVar("Exception", 0);
-TypeVar &Exception::getType() {
-  assert (0); // unreachable
+TypeVar RegExp::typeVar("RegExp", 0);
+TypeVar &RegExp::getType() {
   return typeVar;
 }
 
-Hash Exception::hash() const {
-  return Hash(to_str()) + type.hashcode;
+Hash RegExp::hash() const {
+  return Hash(exp.pattern()) + type.hashcode;
 }
 
 TypeVar Closure::typeVar("Closure", 0);
@@ -284,8 +273,10 @@ TypeVar Data::typeBoolean("Boolean", 0);
 TypeVar Data::typeOrder("Order", 0);
 TypeVar Data::typeUnit("Unit", 0);
 TypeVar Data::typeJValue("JValue", 0);
+TypeVar Data::typeError("Error", 0);
 const TypeVar Data::typeList("List", 1);
 const TypeVar Data::typePair("Pair", 2);
+const TypeVar Data::typeResult("Result", 2);
 TypeVar &Data::getType() {
   assert (0); // unreachable
   return typeBoolean;
@@ -299,13 +290,6 @@ Hash Data::hash() const {
     binding->hashcode.push(codes);
   }
   return Hash(codes);
-}
-
-Cause::Cause(const std::string &reason_, std::vector<Location> &&stack_)
- : reason(reason_), stack(std::move(stack_)) { }
-
-Exception::Exception(const std::string &reason, const std::shared_ptr<Binding> &binding) : Value(&type) {
-  causes.emplace_back(std::make_shared<Cause>(reason, binding->stack_trace()));
 }
 
 std::string Integer::str(int base) const {

@@ -478,6 +478,11 @@ int main(int argc, char **argv) {
     ok = false;
   }
 
+  if (!Result) {
+    std::cerr << "Primitive data type Result not defined." << std::endl;
+    ok = false;
+  }
+
   if (!Unit) {
     std::cerr << "Primitive data type Unit not defined." << std::endl;
     ok = false;
@@ -532,15 +537,17 @@ int main(int argc, char **argv) {
   fflush(stdout);
   fflush(stderr);
 
+  queue.abort = false;
+
   status_init();
-  do { queue.run(); } while (jobtable.wait(queue));
+  do { queue.run(); } while (!queue.abort && jobtable.wait(queue));
   status_finish();
 
-  bool pass = true;
+  bool pass = !queue.abort;
   if (JobTable::exit_now()) {
     std::cerr << "Early termination requested" << std::endl;
     pass = false;
-  } else if (!quiet) {
+  } else if (!quiet && pass) {
     std::vector<std::shared_ptr<Value> > outputs;
     outputs.reserve(targets.size());
     Binding *iter = reinterpret_cast<Closure*>(value.get())->binding.get();
@@ -549,7 +556,6 @@ int main(int argc, char **argv) {
       iter = iter->next.get();
     }
 
-    pass = true;
     for (size_t i = 0; i < targets.size(); ++i) {
       Value *v = outputs[targets.size()-1-i].get();
       std::cout << targets[i] << ": ";
@@ -560,7 +566,12 @@ int main(int argc, char **argv) {
       if (v && v->type == &Closure::type)
         std::cout << ", " << term_red() << "AN UNEVALUATED FUNCTION" << term_normal();
       std::cout << std::endl;
-      if (!v || v->type == &Exception::type) pass = false;
+      if (!v) {
+        pass = false;
+      } else if (v->type == &Data::type) {
+        Data *d = reinterpret_cast<Data*>(v);
+        if (d->cons->index == 1) pass = false;
+      }
     }
   }
 

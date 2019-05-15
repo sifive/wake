@@ -57,7 +57,8 @@ static PRIMFN(prim_##name) {					\
   EXPECT(2);							\
   INTEGER(arg0, 0);						\
   INTEGER(arg1, 1);						\
-  REQUIRE(mpz_cmp_si(arg1->value, 0) != 0, "division by 0");	\
+  bool division_by_zero = mpz_cmp_si(arg1->value, 0) == 0;	\
+  REQUIRE(!division_by_zero);					\
   auto out = std::make_shared<Integer>();			\
   fn(out->value, arg0->value, arg1->value);			\
   RETURN(out);							\
@@ -66,22 +67,45 @@ static PRIMFN(prim_##name) {					\
 BINOP_ZERO(div, mpz_tdiv_q)
 BINOP_ZERO(mod, mpz_tdiv_r)
 
-#define BINOP_SI(name, fn)								\
+#define BINOP_SI2(name, fn1, fn2)							\
 static PRIMFN(prim_##name) {								\
   EXPECT(2);										\
   INTEGER(arg0, 0);									\
   INTEGER(arg1, 1);									\
-  REQUIRE(mpz_sgn(arg1->value) >= 0, arg1->to_str() + " is negative");			\
-  REQUIRE(mpz_cmp_si(arg1->value, 1<<20) < 0, arg1->to_str() + " is too large");	\
+  bool MB_size_shift =									\
+    mpz_cmp_si(arg1->value,  (1<<20)) >= 0 ||						\
+    mpz_cmp_si(arg1->value, -(1<<20)) <= 0;						\
+  REQUIRE(!MB_size_shift);								\
   auto out = std::make_shared<Integer>();						\
-  fn(out->value, arg0->value, mpz_get_si(arg1->value));					\
+  if (mpz_sgn(arg1->value) >= 0) {							\
+    fn1(out->value, arg0->value, mpz_get_si(arg1->value));				\
+  } else {										\
+    fn2(out->value, arg0->value, -mpz_get_si(arg1->value));				\
+  }											\
   RETURN(out);										\
 }
 
-BINOP_SI(shl, mpz_mul_2exp)
-BINOP_SI(shr, mpz_tdiv_q_2exp)
-BINOP_SI(exp, mpz_pow_ui)
-BINOP_SI(root,mpz_root)
+BINOP_SI2(shl,  mpz_mul_2exp,    mpz_tdiv_q_2exp)
+BINOP_SI2(shr,  mpz_tdiv_q_2exp, mpz_mul_2exp)
+
+#define BINOP_SI0(name, fn)								\
+static PRIMFN(prim_##name) {								\
+  EXPECT(2);										\
+  INTEGER(arg0, 0);									\
+  INTEGER(arg1, 1);									\
+  bool MB_size_shift =	mpz_cmp_si(arg1->value, (1<<20)) >= 0;				\
+  REQUIRE(!MB_size_shift);								\
+  auto out = std::make_shared<Integer>();						\
+  if (mpz_sgn(arg1->value) >= 0) {							\
+    fn(out->value, arg0->value, mpz_get_si(arg1->value));				\
+  } else {										\
+    mpz_set_si(out->value, 0);								\
+  }											\
+  RETURN(out);										\
+}
+
+BINOP_SI0(exp,  mpz_pow_ui)
+BINOP_SI0(root, mpz_root)
 
 static PRIMTYPE(type_powm) {
   return args.size() == 3 &&
@@ -96,7 +120,6 @@ static PRIMFN(prim_powm) {
   INTEGER(arg0, 0);
   INTEGER(arg1, 1);
   INTEGER(arg2, 2);
-  REQUIRE(mpz_sgn(arg1->value) >= 0, arg1->to_str() + " is negative");
   auto out = std::make_shared<Integer>();
   mpz_powm(out->value, arg0->value, arg1->value, arg2->value);
   RETURN(out);
@@ -119,16 +142,18 @@ static PRIMFN(prim_str) {
     base = mpz_get_si(arg0->value);
     ok &= base <= 62 && base >= -36 && base != 0 && base != 1 && base != -1;
   }
-  REQUIRE(ok, arg0->to_str() + " is not a valid base; [-36,62] \\ [-1,1]");
-  auto out = std::make_shared<String>(arg1->str(base));
+  auto out = std::make_shared<String>(ok ? arg1->str(base) : "");
   RETURN(out);
 }
 
 static PRIMTYPE(type_int) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(Integer::typeVar);
   return args.size() == 2 &&
     args[0]->unify(Integer::typeVar) &&
     args[1]->unify(String::typeVar) &&
-    out->unify(Integer::typeVar);
+    out->unify(list);
 }
 
 static PRIMFN(prim_int) {
@@ -141,13 +166,13 @@ static PRIMFN(prim_int) {
     base = mpz_get_si(arg0->value);
     ok &= base <= 62 && base >= 0 && base != 1;
   }
-  REQUIRE(ok, arg0->to_str() + " is not a valid base; 0 or [2,62]");
-  auto out = std::make_shared<Integer>();
-  if (mpz_set_str(out->value, arg1->value.c_str(), base)) {
-    RAISE("String " + arg1->value + " is not in Integer format");
-  } else {
-    RETURN(out);
+  std::vector<std::shared_ptr<Value> > vals;
+  auto val = std::make_shared<Integer>();
+  if (ok && !mpz_set_str(val->value, arg1->value.c_str(), base)) {
+    vals.emplace_back(std::move(val));
   }
+  auto out = make_list(std::move(vals));
+  RETURN(out);
 }
 
 // popcount, scan0, scan1 ?

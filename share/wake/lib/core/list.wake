@@ -23,15 +23,11 @@ global def empty = match _
   _   = False
 
 global def head = match _
-  Nil  = raise "empty list"
-  h, _ = h
-
-global def headOption = match _
   Nil  = None
   h, _ = Some h
 
 global def tail = match _
-  Nil  = raise "empty list"
+  Nil  = Nil
   _, t = t
 
 global def map f = match _
@@ -78,14 +74,10 @@ global def splitAt i l =
 global def take i l = splitAt i l | getPairFirst
 global def drop i l = splitAt i l | getPairSecond
 
-global def atOpt i l =
+global def at i l =
   if i < 0 then None else match (drop i l)
     Nil  = None
     x, _ = Some x
-
-global def at i l = match (atOpt i l)
-  None   = raise "at index out of bounds"
-  Some x = x
 
 global def splitUntil f l = match l
   Nil  = Pair Nil Nil
@@ -100,6 +92,14 @@ global def find f =
     Nil  = None
     h, t = if f h then Some (Pair h i) else helper (i+1) t
   helper 0
+
+global def findSome fn =
+  def helper = match _
+    Nil = None
+    h, t = match (fn h)
+      Some x = Some x
+      None = helper t
+  helper
 
 global def exists f l = match (find f l)
   Some _ = True
@@ -120,7 +120,7 @@ global def filter f l = splitBy f l | getPairFirst
 # Tranposition is only it's own inverse when the lists have non-increasing size
 global def transpose l =
   def todo = filter (!_.empty) l
-  def heads = map head todo
+  def heads = mapPartial head todo
   def tails = map tail todo
   if todo.empty then Nil else heads, transpose tails
 

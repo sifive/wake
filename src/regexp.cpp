@@ -20,77 +20,44 @@
 #include "heap.h"
 #include "hash.h"
 #include "type.h"
-#include <re2/re2.h>
 #include <iostream>
 #include <string>
 #include <iosfwd>
 
-struct RegExp : public Value {
-  RE2 exp;
-  static const TypeDescriptor type;
-  static TypeVar typeVar;
-  RegExp(const std::string &regexp, const RE2::Options &opts) : Value(&type), exp(re2::StringPiece(regexp), opts) { }
-
-  void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
-};
-
-const TypeDescriptor RegExp::type("RegExp");
-
-void RegExp::format(std::ostream &os, FormatState &state) const {
-  if (APP_PRECEDENCE < state.p()) os << "(";
-  os << "RegExp ";
-  String(exp.pattern()).format(os, state);
-  if (APP_PRECEDENCE < state.p()) os << ")";
-}
-
-TypeVar RegExp::typeVar("RegExp", 0);
-TypeVar &RegExp::getType() {
-  return typeVar;
-}
-
-Hash RegExp::hash() const {
-  return Hash(exp.pattern()) + type.hashcode;
-}
-
-static std::unique_ptr<Receiver> cast_regexp(WorkQueue &queue, std::unique_ptr<Receiver> completion, const std::shared_ptr<Binding> &binding, const std::shared_ptr<Value> &value, RegExp **reg) {
-  if (value->type != &RegExp::type) {
-    Receiver::receive(queue, std::move(completion), std::make_shared<Exception>(value->to_str() + " is not a RegExp", binding));
-    return std::unique_ptr<Receiver>();
-  } else {
-    *reg = reinterpret_cast<RegExp*>(value.get());
-    return completion;
-  }
-}
-
-#define REGEXP(arg, i)	 									\
-  RegExp *arg;											\
-  do {												\
-    completion = cast_regexp(queue, std::move(completion), binding, args[i], &arg);		\
-    if (!completion) return;									\
-  } while(0)
-
 static PRIMTYPE(type_re2) {
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(RegExp::typeVar);
+  result[1].unify(String::typeVar);
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
-    out->unify(RegExp::typeVar);
+    out->unify(result);
 }
 
 static PRIMFN(prim_re2) {
   EXPECT(1);
   STRING(arg0, 0);
-  RE2::Options options;
-  options.set_log_errors(false);
-  options.set_one_line(true);
-  options.set_dot_nl(true);
-  auto out = std::make_shared<RegExp>(arg0->value, options);
-  if (out->exp.ok()) {
+  auto pass = std::make_shared<RegExp>(arg0->value);
+  if (pass->exp.ok()) {
+    auto out = make_result(true, std::move(pass));
     RETURN(out);
   } else {
-    auto exp = std::make_shared<Exception>(out->exp.error(), binding);
-    RETURN(exp);
+    auto out = make_result(false, std::make_shared<String>(pass->exp.error()));
+    RETURN(out);
   }
+}
+
+static PRIMTYPE(type_re2str) {
+  return args.size() == 1 &&
+    args[0]->unify(RegExp::typeVar) &&
+    out->unify(String::typeVar);
+}
+
+static PRIMFN(prim_re2str) {
+  EXPECT(1);
+  REGEXP(arg0, 0);
+  auto out = std::make_shared<String>(arg0->exp.pattern());
+  RETURN(out);
 }
 
 static PRIMTYPE(type_quote) {
@@ -139,14 +106,13 @@ static PRIMFN(prim_extract) {
   int matches = arg0->exp.NumberOfCapturingGroups() + 1;
   std::vector<re2::StringPiece> submatch(matches, nullptr);
   re2::StringPiece input(arg1->value);
-  if (!arg0->exp.Match(input, 0, arg1->value.size(), RE2::ANCHOR_BOTH, submatch.data(), matches)) {
-    auto exp = std::make_shared<Exception>("No match", binding);
-    RETURN(exp);
-  }
 
   std::vector<std::shared_ptr<Value> > strings;
-  strings.reserve(matches);
-  for (int i = 1; i < matches; ++i) strings.emplace_back(std::make_shared<String>(submatch[i].as_string()));
+  if (arg0->exp.Match(input, 0, arg1->value.size(), RE2::ANCHOR_BOTH, submatch.data(), matches)) {
+    strings.reserve(matches);
+    for (int i = 1; i < matches; ++i) strings.emplace_back(std::make_shared<String>(submatch[i].as_string()));
+  }
+
   auto out = make_list(std::move(strings));
   RETURN(out);
 }
@@ -200,6 +166,7 @@ static PRIMFN(prim_tokenize) {
 
 void prim_register_regexp(PrimMap &pmap) {
   prim_register(pmap, "re2",      prim_re2,      type_re2,      PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "re2str",   prim_re2str,   type_re2str,   PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "quote",    prim_quote,    type_quote,    PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "match",    prim_match,    type_match,    PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "extract",  prim_extract,  type_extract,  PRIM_PURE|PRIM_SHALLOW);

@@ -666,6 +666,7 @@ Sum *Boolean;
 Sum *Order;
 Sum *List;
 Sum *Pair;
+Sum *Result;
 Sum *Unit;
 Sum *JValue;
 
@@ -707,8 +708,8 @@ static AST parse_type_def(Lexer &lex) {
 
 static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
   if (name == "Integer" || name == "String" || name == "RegExp" ||
-      name == "CatStream" || name == "Exception" || name == FN ||
-      name == "Job" || name == "Array" || name == "Double") {
+      name == "CatStream" || name == FN || name == "Job" ||
+      name == "Array" || name == "Double") {
     std::cerr << "Constuctor " << name
       << " is reserved at " << sump->location.file() << "." << std::endl;
     lex.fail = true;
@@ -756,6 +757,17 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
       lex.fail = true;
     }
     Pair = sump;
+  }
+
+  if (name == "Result") {
+    if (sump->members.size() != 2 ||
+        sump->members[0].ast.args.size() != 1 ||
+        sump->members[1].ast.args.size() != 1) {
+      std::cerr << "Special constructor Result not defined correctly at "
+        << sump->location.file() << "." << std::endl;
+      lex.fail = true;
+    }
+    Result = sump;
   }
 
   if (name == "Unit") {
