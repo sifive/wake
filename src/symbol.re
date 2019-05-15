@@ -19,6 +19,8 @@
 #include "value.h"
 #include "expr.h"
 #include "parser.h"
+#include "utf8.h"
+#include "lexint.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -30,22 +32,20 @@
 #include <utf8proc.h>
 
 const char *symbolTable[] = {
-  // WAKE:
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "VAL", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
   "DATA", "EQUALS", "POPEN", "PCLOSE", "BOPEN", "BCLOSE", "IF", "THEN", "ELSE", "HERE", "MEMOIZE", "END",
-  "MATCH", "EOL", "INDENT", "DEDENT",
-  // JSON:
-  // "BOPEN", "BCLOSE",
-  "SOPEN", "SCLOSE", "COLON", "COMMA", "NULLVAL", "TRUE", "FALSE", "NUM", "DOUBLE", "STR"
+  "MATCH", "EOL", "INDENT", "DEDENT", "COLON"
 };
-
-/*!max:re2c*/
-static const size_t SIZE = 64 * 1024;
 
 /*!re2c
   re2c:flags:tags = 1;
   re2c:tags:expression = "in.@@";
+  re2c:define:YYCTYPE = "unsigned char";
+  re2c:flags:8 = 1;
 */
+
+/*!max:re2c*/
+static const size_t SIZE = 64 * 1024;
 
 /*!re2c
 L = [\x41-\x5a\x61-\x7a\xaa-\xaa\xb5-\xb5\xba-\xba\xc0-\xd6\xd8-\xf6\xf8-\u02c1\u02c6-\u02d1\u02e0-\u02e4\u02ec-\u02ec\u02ee-\u02ee\u0370-\u0374\u0376-\u0377\u037a-\u037d\u037f-\u037f\u0386-\u0386\u0388-\u038a\u038c-\u038c\u038e-\u03a1\u03a3-\u03f5\u03f7-\u0481\u048a-\u052f\u0531-\u0556\u0559-\u0559\u0561-\u0587\u05d0-\u05ea\u05f0-\u05f2\u0620-\u064a\u066e-\u066f\u0671-\u06d3\u06d5-\u06d5\u06e5-\u06e6\u06ee-\u06ef\u06fa-\u06fc\u06ff-\u06ff\u0710-\u0710\u0712-\u072f\u074d-\u07a5\u07b1-\u07b1\u07ca-\u07ea\u07f4-\u07f5\u07fa-\u07fa\u0800-\u0815\u081a-\u081a\u0824-\u0824\u0828-\u0828\u0840-\u0858\u08a0-\u08b2\u0904-\u0939\u093d-\u093d\u0950-\u0950\u0958-\u0961\u0971-\u0980\u0985-\u098c\u098f-\u0990\u0993-\u09a8\u09aa-\u09b0\u09b2-\u09b2\u09b6-\u09b9\u09bd-\u09bd\u09ce-\u09ce\u09dc-\u09dd\u09df-\u09e1\u09f0-\u09f1\u0a05-\u0a0a\u0a0f-\u0a10\u0a13-\u0a28\u0a2a-\u0a30\u0a32-\u0a33\u0a35-\u0a36\u0a38-\u0a39\u0a59-\u0a5c\u0a5e-\u0a5e\u0a72-\u0a74\u0a85-\u0a8d\u0a8f-\u0a91\u0a93-\u0aa8\u0aaa-\u0ab0\u0ab2-\u0ab3\u0ab5-\u0ab9\u0abd-\u0abd\u0ad0-\u0ad0\u0ae0-\u0ae1\u0b05-\u0b0c\u0b0f-\u0b10\u0b13-\u0b28\u0b2a-\u0b30\u0b32-\u0b33\u0b35-\u0b39\u0b3d-\u0b3d\u0b5c-\u0b5d\u0b5f-\u0b61\u0b71-\u0b71\u0b83-\u0b83\u0b85-\u0b8a\u0b8e-\u0b90\u0b92-\u0b95\u0b99-\u0b9a\u0b9c-\u0b9c\u0b9e-\u0b9f\u0ba3-\u0ba4\u0ba8-\u0baa\u0bae-\u0bb9\u0bd0-\u0bd0\u0c05-\u0c0c\u0c0e-\u0c10\u0c12-\u0c28\u0c2a-\u0c39\u0c3d-\u0c3d\u0c58-\u0c59\u0c60-\u0c61\u0c85-\u0c8c\u0c8e-\u0c90\u0c92-\u0ca8\u0caa-\u0cb3\u0cb5-\u0cb9\u0cbd-\u0cbd\u0cde-\u0cde\u0ce0-\u0ce1\u0cf1-\u0cf2\u0d05-\u0d0c\u0d0e-\u0d10\u0d12-\u0d3a\u0d3d-\u0d3d\u0d4e-\u0d4e\u0d60-\u0d61\u0d7a-\u0d7f\u0d85-\u0d96\u0d9a-\u0db1\u0db3-\u0dbb\u0dbd-\u0dbd\u0dc0-\u0dc6\u0e01-\u0e30\u0e32-\u0e33\u0e40-\u0e46\u0e81-\u0e82\u0e84-\u0e84\u0e87-\u0e88\u0e8a-\u0e8a\u0e8d-\u0e8d\u0e94-\u0e97\u0e99-\u0e9f\u0ea1-\u0ea3\u0ea5-\u0ea5\u0ea7-\u0ea7\u0eaa-\u0eab\u0ead-\u0eb0\u0eb2-\u0eb3\u0ebd-\u0ebd\u0ec0-\u0ec4\u0ec6-\u0ec6\u0edc-\u0edf\u0f00-\u0f00\u0f40-\u0f47\u0f49-\u0f6c\u0f88-\u0f8c\u1000-\u102a\u103f-\u103f\u1050-\u1055\u105a-\u105d\u1061-\u1061\u1065-\u1066\u106e-\u1070\u1075-\u1081\u108e-\u108e\u10a0-\u10c5\u10c7-\u10c7\u10cd-\u10cd\u10d0-\u10fa\u10fc-\u1248\u124a-\u124d\u1250-\u1256\u1258-\u1258\u125a-\u125d\u1260-\u1288\u128a-\u128d\u1290-\u12b0\u12b2-\u12b5\u12b8-\u12be\u12c0-\u12c0\u12c2-\u12c5\u12c8-\u12d6\u12d8-\u1310\u1312-\u1315\u1318-\u135a\u1380-\u138f\u13a0-\u13f4\u1401-\u166c\u166f-\u167f\u1681-\u169a\u16a0-\u16ea\u16f1-\u16f8\u1700-\u170c\u170e-\u1711\u1720-\u1731\u1740-\u1751\u1760-\u176c\u176e-\u1770\u1780-\u17b3\u17d7-\u17d7\u17dc-\u17dc\u1820-\u1877\u1880-\u18a8\u18aa-\u18aa\u18b0-\u18f5\u1900-\u191e\u1950-\u196d\u1970-\u1974\u1980-\u19ab\u19c1-\u19c7\u1a00-\u1a16\u1a20-\u1a54\u1aa7-\u1aa7\u1b05-\u1b33\u1b45-\u1b4b\u1b83-\u1ba0\u1bae-\u1baf\u1bba-\u1be5\u1c00-\u1c23\u1c4d-\u1c4f\u1c5a-\u1c7d\u1ce9-\u1cec\u1cee-\u1cf1\u1cf5-\u1cf6\u1d00-\u1dbf\u1e00-\u1f15\u1f18-\u1f1d\u1f20-\u1f45\u1f48-\u1f4d\u1f50-\u1f57\u1f59-\u1f59\u1f5b-\u1f5b\u1f5d-\u1f5d\u1f5f-\u1f7d\u1f80-\u1fb4\u1fb6-\u1fbc\u1fbe-\u1fbe\u1fc2-\u1fc4\u1fc6-\u1fcc\u1fd0-\u1fd3\u1fd6-\u1fdb\u1fe0-\u1fec\u1ff2-\u1ff4\u1ff6-\u1ffc\u2071-\u2071\u207f-\u207f\u2090-\u209c\u2102-\u2102\u2107-\u2107\u210a-\u2113\u2115-\u2115\u2119-\u211d\u2124-\u2124\u2126-\u2126\u2128-\u2128\u212a-\u212d\u212f-\u2139\u213c-\u213f\u2145-\u2149\u214e-\u214e\u2183-\u2184\u2c00-\u2c2e\u2c30-\u2c5e\u2c60-\u2ce4\u2ceb-\u2cee\u2cf2-\u2cf3\u2d00-\u2d25\u2d27-\u2d27\u2d2d-\u2d2d\u2d30-\u2d67\u2d6f-\u2d6f\u2d80-\u2d96\u2da0-\u2da6\u2da8-\u2dae\u2db0-\u2db6\u2db8-\u2dbe\u2dc0-\u2dc6\u2dc8-\u2dce\u2dd0-\u2dd6\u2dd8-\u2dde\u2e2f-\u2e2f\u3005-\u3006\u3031-\u3035\u303b-\u303c\u3041-\u3096\u309d-\u309f\u30a1-\u30fa\u30fc-\u30ff\u3105-\u312d\u3131-\u318e\u31a0-\u31ba\u31f0-\u31ff\u3400-\u4db5\u4e00-\u9fcc\ua000-\ua48c\ua4d0-\ua4fd\ua500-\ua60c\ua610-\ua61f\ua62a-\ua62b\ua640-\ua66e\ua67f-\ua69d\ua6a0-\ua6e5\ua717-\ua71f\ua722-\ua788\ua78b-\ua78e\ua790-\ua7ad\ua7b0-\ua7b1\ua7f7-\ua801\ua803-\ua805\ua807-\ua80a\ua80c-\ua822\ua840-\ua873\ua882-\ua8b3\ua8f2-\ua8f7\ua8fb-\ua8fb\ua90a-\ua925\ua930-\ua946\ua960-\ua97c\ua984-\ua9b2\ua9cf-\ua9cf\ua9e0-\ua9e4\ua9e6-\ua9ef\ua9fa-\ua9fe\uaa00-\uaa28\uaa40-\uaa42\uaa44-\uaa4b\uaa60-\uaa76\uaa7a-\uaa7a\uaa7e-\uaaaf\uaab1-\uaab1\uaab5-\uaab6\uaab9-\uaabd\uaac0-\uaac0\uaac2-\uaac2\uaadb-\uaadd\uaae0-\uaaea\uaaf2-\uaaf4\uab01-\uab06\uab09-\uab0e\uab11-\uab16\uab20-\uab26\uab28-\uab2e\uab30-\uab5a\uab5c-\uab5f\uab64-\uab65\uabc0-\uabe2\uac00-\ud7a3\ud7b0-\ud7c6\ud7cb-\ud7fb\uf900-\ufa6d\ufa70-\ufad9\ufb00-\ufb06\ufb13-\ufb17\ufb1d-\ufb1d\ufb1f-\ufb28\ufb2a-\ufb36\ufb38-\ufb3c\ufb3e-\ufb3e\ufb40-\ufb41\ufb43-\ufb44\ufb46-\ufbb1\ufbd3-\ufd3d\ufd50-\ufd8f\ufd92-\ufdc7\ufdf0-\ufdfb\ufe70-\ufe74\ufe76-\ufefc\uff21-\uff3a\uff41-\uff5a\uff66-\uffbe\uffc2-\uffc7\uffca-\uffcf\uffd2-\uffd7\uffda-\uffdc\U00010000-\U0001000b\U0001000d-\U00010026\U00010028-\U0001003a\U0001003c-\U0001003d\U0001003f-\U0001004d\U00010050-\U0001005d\U00010080-\U000100fa\U00010280-\U0001029c\U000102a0-\U000102d0\U00010300-\U0001031f\U00010330-\U00010340\U00010342-\U00010349\U00010350-\U00010375\U00010380-\U0001039d\U000103a0-\U000103c3\U000103c8-\U000103cf\U00010400-\U0001049d\U00010500-\U00010527\U00010530-\U00010563\U00010600-\U00010736\U00010740-\U00010755\U00010760-\U00010767\U00010800-\U00010805\U00010808-\U00010808\U0001080a-\U00010835\U00010837-\U00010838\U0001083c-\U0001083c\U0001083f-\U00010855\U00010860-\U00010876\U00010880-\U0001089e\U00010900-\U00010915\U00010920-\U00010939\U00010980-\U000109b7\U000109be-\U000109bf\U00010a00-\U00010a00\U00010a10-\U00010a13\U00010a15-\U00010a17\U00010a19-\U00010a33\U00010a60-\U00010a7c\U00010a80-\U00010a9c\U00010ac0-\U00010ac7\U00010ac9-\U00010ae4\U00010b00-\U00010b35\U00010b40-\U00010b55\U00010b60-\U00010b72\U00010b80-\U00010b91\U00010c00-\U00010c48\U00011003-\U00011037\U00011083-\U000110af\U000110d0-\U000110e8\U00011103-\U00011126\U00011150-\U00011172\U00011176-\U00011176\U00011183-\U000111b2\U000111c1-\U000111c4\U000111da-\U000111da\U00011200-\U00011211\U00011213-\U0001122b\U000112b0-\U000112de\U00011305-\U0001130c\U0001130f-\U00011310\U00011313-\U00011328\U0001132a-\U00011330\U00011332-\U00011333\U00011335-\U00011339\U0001133d-\U0001133d\U0001135d-\U00011361\U00011480-\U000114af\U000114c4-\U000114c5\U000114c7-\U000114c7\U00011580-\U000115ae\U00011600-\U0001162f\U00011644-\U00011644\U00011680-\U000116aa\U000118a0-\U000118df\U000118ff-\U000118ff\U00011ac0-\U00011af8\U00012000-\U00012398\U00013000-\U0001342e\U00016800-\U00016a38\U00016a40-\U00016a5e\U00016ad0-\U00016aed\U00016b00-\U00016b2f\U00016b40-\U00016b43\U00016b63-\U00016b77\U00016b7d-\U00016b8f\U00016f00-\U00016f44\U00016f50-\U00016f50\U00016f93-\U00016f9f\U0001b000-\U0001b001\U0001bc00-\U0001bc6a\U0001bc70-\U0001bc7c\U0001bc80-\U0001bc88\U0001bc90-\U0001bc99\U0001d400-\U0001d454\U0001d456-\U0001d49c\U0001d49e-\U0001d49f\U0001d4a2-\U0001d4a2\U0001d4a5-\U0001d4a6\U0001d4a9-\U0001d4ac\U0001d4ae-\U0001d4b9\U0001d4bb-\U0001d4bb\U0001d4bd-\U0001d4c3\U0001d4c5-\U0001d505\U0001d507-\U0001d50a\U0001d50d-\U0001d514\U0001d516-\U0001d51c\U0001d51e-\U0001d539\U0001d53b-\U0001d53e\U0001d540-\U0001d544\U0001d546-\U0001d546\U0001d54a-\U0001d550\U0001d552-\U0001d6a5\U0001d6a8-\U0001d6c0\U0001d6c2-\U0001d6da\U0001d6dc-\U0001d6fa\U0001d6fc-\U0001d714\U0001d716-\U0001d734\U0001d736-\U0001d74e\U0001d750-\U0001d76e\U0001d770-\U0001d788\U0001d78a-\U0001d7a8\U0001d7aa-\U0001d7c2\U0001d7c4-\U0001d7cb\U0001e800-\U0001e8c4\U0001ee00-\U0001ee03\U0001ee05-\U0001ee1f\U0001ee21-\U0001ee22\U0001ee24-\U0001ee24\U0001ee27-\U0001ee27\U0001ee29-\U0001ee32\U0001ee34-\U0001ee37\U0001ee39-\U0001ee39\U0001ee3b-\U0001ee3b\U0001ee42-\U0001ee42\U0001ee47-\U0001ee47\U0001ee49-\U0001ee49\U0001ee4b-\U0001ee4b\U0001ee4d-\U0001ee4f\U0001ee51-\U0001ee52\U0001ee54-\U0001ee54\U0001ee57-\U0001ee57\U0001ee59-\U0001ee59\U0001ee5b-\U0001ee5b\U0001ee5d-\U0001ee5d\U0001ee5f-\U0001ee5f\U0001ee61-\U0001ee62\U0001ee64-\U0001ee64\U0001ee67-\U0001ee6a\U0001ee6c-\U0001ee72\U0001ee74-\U0001ee77\U0001ee79-\U0001ee7c\U0001ee7e-\U0001ee7e\U0001ee80-\U0001ee89\U0001ee8b-\U0001ee9b\U0001eea1-\U0001eea3\U0001eea5-\U0001eea9\U0001eeab-\U0001eebb\U00020000-\U0002a6d6\U0002a700-\U0002b734\U0002b740-\U0002b81d\U0002f800-\U0002fa1d];
@@ -149,6 +149,8 @@ struct input_t {
 };
 
 #define SYM_LOCATION Location(in.filename, start, in.coord()-1)
+#define mkSym2(x, v) Symbol(x, SYM_LOCATION, v)
+#define mkSym(x) Symbol(x, SYM_LOCATION)
 
 bool input_t::fill(size_t need) {
   if (eof) {
@@ -173,145 +175,6 @@ bool input_t::fill(size_t need) {
     lim += YYMAXFILL;
   }
   return true;
-}
-
-/*!re2c
-  re2c:define:YYCTYPE = "unsigned char";
-  re2c:flags:8 = 1;
-*/
-
-static uint32_t lex_oct(const unsigned char *s, const unsigned char *e)
-{
-  uint32_t u = 0;
-  for (++s; s < e; ++s) u = u*8 + *s - '0';
-  return u;
-}
-
-static uint32_t lex_hex(const unsigned char *s, const unsigned char *e)
-{
-  uint32_t u = 0;
-  for (s += 2; s < e;) {
-  /*!re2c
-      re2c:yyfill:enable = 0;
-      re2c:define:YYCURSOR = s;
-      *     { u = u*16 + s[-1] - '0' +  0; continue; }
-      [a-f] { u = u*16 + s[-1] - 'a' + 10; continue; }
-      [A-F] { u = u*16 + s[-1] - 'A' + 10; continue; }
-  */
-  }
-  return u;
-}
-
-enum
-{
-        Bit1    = 7,
-        Bitx    = 6,
-        Bit2    = 5,
-        Bit3    = 4,
-        Bit4    = 3,
-        Bit5    = 2,
-
-        T1      = ((1<<(Bit1+1))-1) ^ 0xFF,     /* 0000 0000 */
-        Tx      = ((1<<(Bitx+1))-1) ^ 0xFF,     /* 1000 0000 */
-        T2      = ((1<<(Bit2+1))-1) ^ 0xFF,     /* 1100 0000 */
-        T3      = ((1<<(Bit3+1))-1) ^ 0xFF,     /* 1110 0000 */
-        T4      = ((1<<(Bit4+1))-1) ^ 0xFF,     /* 1111 0000 */
-        T5      = ((1<<(Bit5+1))-1) ^ 0xFF,     /* 1111 1000 */
-
-        Rune1   = (1<<(Bit1+0*Bitx))-1,         /*                     0111 1111 */
-        Rune2   = (1<<(Bit2+1*Bitx))-1,         /*                0111 1111 1111 */
-        Rune3   = (1<<(Bit3+2*Bitx))-1,         /*           1111 1111 1111 1111 */
-        Rune4   = (1<<(Bit4+3*Bitx))-1,         /* 0001 1111 1111 1111 1111 1111 */
-
-        Maskx   = (1<<Bitx)-1,                  /* 0011 1111 */
-        Testx   = Maskx ^ 0xFF                  /* 1100 0000 */
-};
-
-#define LOW_SURROGATE  0xD800
-#define HIGH_SURROGATE 0xDC00
-#define END_SURROGATE  0xE000
-
-bool push_utf8(std::string &result, uint32_t c)
-{
-  if (c <= Rune1) {
-    result.push_back(static_cast<unsigned char>(c));
-  } else if (c <= Rune2) {
-    result.push_back(T2 | static_cast<unsigned char>(c >> 1*Bitx));
-    result.push_back(Tx | (c & Maskx));
-  } else if (c <= Rune3) {
-    if (LOW_SURROGATE <= c && c < END_SURROGATE)
-      return false;
-    result.push_back(T3 | static_cast<unsigned char>(c >> 2*Bitx));
-    result.push_back(Tx | ((c >> 1*Bitx) & Maskx));
-    result.push_back(Tx | (c & Maskx));
-  } else if (c <= Rune4) {
-    result.push_back(T4 | static_cast<unsigned char>(c >> 3*Bitx));
-    result.push_back(Tx | ((c >> 2*Bitx) & Maskx));
-    result.push_back(Tx | ((c >> 1*Bitx) & Maskx));
-    result.push_back(Tx | (c & Maskx));
-  } else {
-    return false;
-  }
-  return true;
-}
-
-int pop_utf8(uint32_t *rune, const char *str)
-{
-  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
-  int c, c1, c2, c3;
-  long l;
-
-  /*
-   * one character sequence
-   *  00000-0007F => T1
-   */
-  c = s[0];
-  if (c < Tx) {
-    *rune = c;
-    return 1;
-  }
-
-  /*
-   * two character sequence
-   *  0080-07FF => T2 Tx
-   */
-  c1 = s[1] ^ Tx;
-  if (c1 & Testx) return -1;
-  if (c < T3) {
-    if (c < T2) return -1;
-    l = ((c << Bitx) | c1) & Rune2;
-    if (l <= Rune1) return -1;
-    *rune = l;
-    return 2;
-  }
-
-  /*
-   * three character sequence
-   *  0800-FFFF => T3 Tx Tx
-   */
-  c2 = s[2] ^ Tx;
-  if (c2 & Testx) return -1;
-  if (c < T4) {
-    l = ((((c << Bitx) | c1) << Bitx) | c2) & Rune3;
-    if (l <= Rune2) return -1;
-    *rune = l;
-    return 3;
-  }
-
-  /*
-   * four character sequence (21-bit value)
-   *  10000-1FFFFF => T4 Tx Tx Tx
-   */
-  c3 = s[3] ^ Tx;
-  if (c3 & Testx) return -1;
-  if (c < T5) {
-    l = ((((((c << Bitx) | c1) << Bitx) | c2) << Bitx) | c3) & Rune4;
-    if (l <= Rune3) return -1;
-    *rune = l;
-    return 4;
-  }
-
-  return -1;
 }
 
 static ssize_t unicode_escape(const unsigned char *s, const unsigned char *e, char **out) {
@@ -382,7 +245,7 @@ static bool lex_sstr(Lexer &lex, Expr *&out)
   Coordinates start = in.coord() - 1;
   std::string slice;
 
-  while (true) {
+  while (true) { // !!! probably want to allow non-code-points => don't use re2c?
     in.tok = in.cur;
     /*!re2c
         re2c:define:YYCURSOR = in.cur;
@@ -472,9 +335,6 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
 
   return ok;
 }
-
-#define mkSym2(x, v) Symbol(x, SYM_LOCATION, v)
-#define mkSym(x) Symbol(x, SYM_LOCATION)
 
 static Symbol lex_top(Lexer &lex) {
   input_t &in = *lex.engine.get();
@@ -592,33 +452,13 @@ Lexer::Lexer(const char *file)
   if (engine->file) consume();
 }
 
-JLexer::JLexer(const char *file)
- : engine(new input_t(file, fopen(file, "r"))), next(ERROR, Location(file, Coordinates(), Coordinates())), fail(false)
-{
-  if (engine->file) consume();
-}
-
-static const unsigned char *ucast(const char *c) {
-  return reinterpret_cast<const unsigned char *>(c);
-}
-
 Lexer::Lexer(const std::string &cmdline, const char *target)
-  : engine(new input_t(target, ucast(cmdline.c_str()), YYMAXFILL+cmdline.size())), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
-{
-  consume();
-}
-
-JLexer::JLexer(const std::string &body, const char *target)
-  : engine(new input_t(target, ucast(body.c_str()), YYMAXFILL+body.size())), next(ERROR, LOCATION, 0), fail(false)
+  : engine(new input_t(target, reinterpret_cast<const unsigned char *>(cmdline.c_str()), YYMAXFILL+cmdline.size())), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
 {
   consume();
 }
 
 Lexer::~Lexer() {
-  if (engine->file) fclose(engine->file);
-}
-
-JLexer::~JLexer() {
   if (engine->file) fclose(engine->file);
 }
 
@@ -710,7 +550,6 @@ std::string input_t::text() const {
 }
 
 std::string Lexer::text() const { return engine->text(); }
-std::string JLexer::text() const { return engine->text(); }
 
 void Lexer::consume() {
   if (state->eol) {
@@ -738,395 +577,6 @@ void Lexer::consume() {
       consume();
     }
   }
-}
-
-static bool lex_jstr(JLexer &lex, Expr *&out, unsigned char eos)
-{
-  input_t &in = *lex.engine.get();
-  Coordinates start = in.coord()-1;
-  std::string slice;
-
-  while (true) {
-    in.tok = in.cur;
-    /*!re2c
-        re2c:define:YYCURSOR = in.cur;
-        re2c:define:YYMARKER = in.mar;
-        re2c:define:YYLIMIT = in.lim;
-        re2c:yyfill:enable = 1;
-        re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
-        re2c:define:YYFILL:naked = 1;
-
-        // LineTerminator ::
-        //   <LF>
-        //   <CR>
-        //   <LS>
-        //   <PS>
-        LineTerminator = [\n\r\u2028\u2029];
-
-        // LineTerminatorSequence ::
-        //   <LF>
-        //   <CR> [lookahead ∉ <LF> ]
-        //   <LS>
-        //   <PS>
-        //   <CR> <LF>
-        LineTerminatorSequence = [\n\r\u2028\u2029] | "\r\n";
-
-        // LineContinuation ::
-        //   \ LineTerminatorSequence
-        LineContinuation = "\\" LineTerminatorSequence;
-
-        // HexDigit ::
-        //   one of 0 1 2 3 4 5 6 7 8 9 a b c d e f A B C D E F
-        HexDigit = [0-9a-fA-F];
-
-        // SingleEscapeCharacter ::
-        //   one of ' " \ b f n r t v
-        // EscapeCharacter ::
-        //   SingleEscapeCharacter
-        //   DecimalDigit
-        //   x
-        //   u
-        // NonEscapeCharacter ::
-        //   SourceCharacter but not one of EscapeCharacter or LineTerminator
-        NonEscapeCharacter = [^'"\\bfnrtv0-9xu\n\r\u2028\u2029\x00];
-
-        // CharacterEscapeSequence ::
-        //   SingleEscapeCharacter
-        //   NonEscapeCharacter
-
-        // HexEscapeSequence ::
-        //   x HexDigit HexDigit
-        HexEscapeSequence = "x" HexDigit{2};
-
-        // UnicodeEscapeSequence ::
-        //   u HexDigit HexDigit HexDigit HexDigit
-        UnicodeEscapeSequence = "u" HexDigit{4};
-
-        // EscapeSequence ::
-        //   CharacterEscapeSequence
-        //   0 [lookahead ∉ DecimalDigit]
-        //   HexEscapeSequence
-        //   UnicodeEscapeSequence
-
-        // JSON5DoubleStringCharacter::
-        //   SourceCharacter but not one of " or \ or LineTerminator
-        //   \ EscapeSequence
-        //   LineContinuation
-        //   U+2028
-        //   U+2029
-        // JSON5SingleStringCharacter::
-        //   SourceCharacter but not one of ' or \ or LineTerminator
-        //   \ EscapeSequence
-        //   LineContinuation
-        //   U+2028
-        //   U+2029
-
-        // JSON5DoubleStringCharacters::
-        //   JSON5DoubleStringCharacter JSON5DoubleStringCharactersopt
-        // JSON5SingleStringCharacters::
-        //   JSON5SingleStringCharacter JSON5SingleStringCharactersopt
-
-        *                { return false; }
-        LineContinuation { continue; }
-        ["'] {
-          if (in.cur[-1] == eos) {
-             break;
-          } else {
-             slice.push_back(in.cur[-1]);
-             continue;
-          }
-        }
-
-	// Two surrogates => one character
-        "\\u" [dD] [89abAB] HexDigit{2} "\\u" [dD] [c-fC-F] HexDigit{2} {
-          uint32_t lo = lex_hex(in.tok,   in.tok+6);
-          uint32_t hi = lex_hex(in.tok+6, in.tok+12);
-          uint32_t x = ((lo & 0x3ff) << 10) + (hi & 0x3ff) + 0x10000;
-          if (!push_utf8(slice, x)) return false;
-          continue;
-        }
-	"\\u" HexDigit{4}       { if (!push_utf8(slice, lex_hex(in.tok, in.cur))) return false; continue; }
-	"\\x" HexDigit{2}       { if (!push_utf8(slice, lex_hex(in.tok, in.cur))) return false; continue; }
-        "\\0" / [^0-9]          { slice.push_back('\0'); continue; }
-        "\\b"                   { slice.push_back('\b'); continue; }
-        "\\t"                   { slice.push_back('\t'); continue; }
-        "\\n"                   { slice.push_back('\n'); continue; }
-        "\\v"                   { slice.push_back('\v'); continue; }
-        "\\f"                   { slice.push_back('\f'); continue; }
-        "\\r"                   { slice.push_back('\r'); continue; }
-        "\\'"                   { slice.push_back('\''); continue; }
-        "\\\""                  { slice.push_back('"');  continue; }
-        "\\\\"                  { slice.push_back('\\'); continue; }
-        "\\" NonEscapeCharacter { slice.append(in.tok+1, in.cur);  continue; }
-	"\\"                    { return false; }
-        [^\x00\r\n]             { slice.append(in.tok, in.cur); continue; }
-    */
-  }
-
-  std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
-  out = new Literal(SYM_LOCATION, std::move(str));
-  return true;
-}
-
-static void lex_jcomment(input_t &in) {
-  unsigned const char *s = in.tok;
-  unsigned const char *e = in.cur;
-  while (s != e) {
-    /*!re2c
-        re2c:yyfill:enable = 0;
-        re2c:define:YYCURSOR = s;
-        *               { continue; }
-        LineTerminator  { ++in.row; in.sol = s; continue; }
-    */
-  }
-}
-
-static Symbol lex_json(JLexer &lex) {
-  input_t &in = *lex.engine.get();
-  Coordinates start;
-top:
-  start = in.coord();
-  in.tok = in.cur;
-
-  /*!re2c
-      re2c:define:YYCURSOR = in.cur;
-      re2c:define:YYMARKER = in.mar;
-      re2c:define:YYLIMIT = in.lim;
-      re2c:yyfill:enable = 1;
-      re2c:define:YYFILL = "if (!in.fill(@@)) return mkSym(ERROR);";
-      re2c:define:YYFILL:naked = 1;
-
-      // WhiteSpace ::
-      //   <TAB>
-      //   <VT>
-      //   <FF>
-      //   <SP>
-      //   <NBSP>
-      //   <BOM>
-      //   <USP>
-      WhiteSpace = [\t\v\f \u00a0\ufeff] | Z;
-
-      // MultiLineNotForwardSlashOrAsteriskChar ::
-      //   SourceCharacter but not one of / or *
-      // PostAsteriskCommentChars ::
-      //   MultiLineNotForwardSlashOrAsteriskChar MultiLineCommentCharsopt
-      //   * PostAsteriskCommentCharsopt
-      // => PostAsteriskCommentCharsopt = "*"* ([^/*] MultiLineCommentCharsopt)?
-      // MultiLineNotAsteriskChar ::
-      //   SourceCharacter but not *
-      // MultiLineCommentChars ::
-      //   MultiLineNotAsteriskChar MultiLineCommentCharsopt
-      //   * PostAsteriskCommentCharsopt
-      // => MultiLineCommentCharsopt = [^*]* ("*" PostAsteriskCommentCharsopt)?
-
-      // To cut the cyclic definition above, note:
-      //   a = c* (x b)?
-      //   b = d* (y a)?
-      //   => a = c* (x d* (y c* (x d* (y c* (x d* ...)?)?)?)?)?
-      //   => a = c* (x d* y c*)* (x d*)?
-      //     where c = [^*], x = "*", d = "*", y = [^/*]
-      //   => MultiLineCommentCharsopt = [^*]* ("*" "*"* [^/*] [^*]*)* ("*" "*"*)?
-      MultiLineCommentCharsopt = [^\x00*]* ("*"+ [^\x00/*] [^\x00*]*)* "*"*;
-
-      // MultiLineComment ::
-      //   /* MultiLineCommentCharsopt */
-      MultiLineComment = "/*" MultiLineCommentCharsopt "*/";
-
-      // SingleLineCommentChar ::
-      //   SourceCharacter but not LineTerminator
-      // SingleLineCommentChars ::
-      //   SingleLineCommentChar SingleLineCommentCharsopt
-      // SingleLineComment ::
-      //   // SingleLineCommentCharsopt
-      SingleLineComment = "//" [^\n\r\u2028\u2029\x00]*;
-
-      // Comment ::
-      //   MultiLineComment
-      //   SingleLineComment
-      Comment = MultiLineComment | SingleLineComment;
-
-      // HexIntegerLiteral ::
-      //   0x HexDigit
-      //   0X HexDigit
-      //   HexIntegerLiteral HexDigit
-      HexIntegerLiteral = "0" [xX] HexDigit+;
-
-      // DecimalDigit ::
-      //   one of 0 1 2 3 4 5 6 7 8 9
-      DecimalDigit = [0-9];
-
-      // NonZeroDigit ::
-      //   one of 1 2 3 4 5 6 7 8 9
-      NonZeroDigit = [1-9];
-
-      // DecimalDigits ::
-      //   DecimalDigit
-      //   DecimalDigits DecimalDigit
-      DecimalDigits = DecimalDigit+;
-
-      // DecimalIntegerLiteral ::
-      //   0
-      //   NonZeroDigit DecimalDigitsopt
-      DecimalIntegerLiteral = "0" | NonZeroDigit DecimalDigits?;
-
-      // SignedInteger ::
-      //   DecimalDigits
-      //   + DecimalDigits
-      //   - DecimalDigits
-      // ExponentIndicator ::
-      //   one of e E
-      // ExponentPart ::
-      //   ExponentIndicator SignedInteger
-      ExponentPart = [eE] [+-]? DecimalDigits;
-
-      // DecimalLiteral ::
-      //   DecimalIntegerLiteral . DecimalDigitsopt ExponentPartopt
-      //   . DecimalDigits ExponentPartopt
-      //   DecimalIntegerLiteral ExponentPartopt
-      DecimalLiteral = (DecimalIntegerLiteral "." DecimalDigits? ExponentPart?)
-                     | ("." DecimalDigits ExponentPart?)
-                     | DecimalIntegerLiteral ExponentPart?;
-
-      // NumericLiteral ::
-      //   DecimalLiteral
-      //   HexIntegerLiteral
-      NumericLiteral = DecimalLiteral | HexIntegerLiteral;
-
-      // JSON5NumericLiteral::
-      //   NumericLiteral
-      //   Infinity
-      //   NaN
-      JSON5NumericLiteral = NumericLiteral | "Infinity" | "NaN";
-
-      // JSON5Number::
-      //   JSON5NumericLiteral
-      //   + JSON5NumericLiteral
-      //   - JSON5NumericLiteral
-      JSON5Number = [+-]? JSON5NumericLiteral;
-
-      // UnicodeLetter ::
-      //   any character in the Unicode categories “Uppercase letter (Lu)”, “Lowercase letter (Ll)”, “Titlecase letter (Lt)”, “Modifier letter (Lm)”, “Other letter (Lo)”, or “Letter number (Nl)”.
-      UnicodeLetter = Lu | Ll | Lt | Lm | Lo | Nl;
-      // UnicodeCombiningMark ::
-      //   any character in the Unicode categories “Non-spacing mark (Mn)” or “Combining spacing mark (Mc)”
-      UnicodeCombiningMark = Mn | Mc;
-      // UnicodeDigit ::
-      //   any character in the Unicode category “Decimal number (Nd)”
-      UnicodeDigit = Nd;
-      // UnicodeConnectorPunctuation ::
-      //   any character in the Unicode category “Connector punctuation (Pc)”
-      UnicodeConnectorPunctuation = Pc;
-
-      // IdentifierStart ::
-      //   UnicodeLetter
-      //   $
-      //   _
-      //   \ UnicodeEscapeSequence
-      IdentifierStart = UnicodeLetter | [$_] | ("\\" UnicodeEscapeSequence);
-
-      // IdentifierPart ::
-      //   IdentifierStart
-      //   UnicodeCombiningMark
-      //   UnicodeDigit
-      //   UnicodeConnectorPunctuation
-      //   <ZWNJ>
-      //   <ZWJ>
-      IdentifierPart = IdentifierStart | UnicodeCombiningMark | UnicodeDigit | UnicodeConnectorPunctuation | [\u200C\u200D];
-
-      // IdentifierName ::
-      //   IdentifierStart
-      //   IdentifierName IdentifierPart
-      // JSON5Identifier::
-      //   IdentifierName
-      JSON5Identifier = IdentifierStart IdentifierPart*;
-
-      // JSON5SourceCharacter::
-      //   SourceCharacter
-      // SourceCharacter ::
-      //   any Unicode code unit
-      * { return mkSym(ERROR); }
-
-      // Minor extension to json5; interpret NULL as EOF
-      end { return mkSym((in.lim - in.tok == YYMAXFILL) ? END : ERROR); }
-
-      // JSON5InputElement::
-      //   WhiteSpace
-      //   LineTerminator
-      //   Comment
-      //   JSON5Token
-      WhiteSpace      { goto top; }
-      LineTerminator  { ++in.row; in.sol = in.cur; goto top; }
-      Comment         {
-        lex_jcomment(in);
-        goto top;
-      }
-
-      // JSON5Token::
-      //   JSON5Identifier
-      //   JSON5Punctuator
-      //   JSON5String
-      //   JSON5Number
-
-      // Special case the integers
-      [+-]? (DecimalIntegerLiteral|HexIntegerLiteral) {
-        std::string integer(in.tok[0] == '+' ? in.tok+1 : in.tok, in.cur);
-        std::shared_ptr<Integer> value = std::make_shared<Integer>(integer.c_str());
-        return mkSym2(NUM, new Literal(SYM_LOCATION, std::move(value)));
-      }
-      [+-]? NumericLiteral {
-        const char *s1 = reinterpret_cast<const char*>(in.tok);
-        std::shared_ptr<Double> value = std::make_shared<Double>(s1);
-        return mkSym2(DOUBLE, new Literal(SYM_LOCATION, std::move(value)));
-      }
-      [+-]? "Infinity" {
-        double infy = (in.tok[0]=='-'?-1.0:1.0) / 0.0;
-        std::shared_ptr<Double> value = std::make_shared<Double>(infy);
-        return mkSym2(DOUBLE, new Literal(SYM_LOCATION, std::move(value)));
-      }
-      [+-]? "NaN" {
-        std::shared_ptr<Double> value = std::make_shared<Double>(0.0/0.0);
-        return mkSym2(DOUBLE, new Literal(SYM_LOCATION, std::move(value)));
-      }
-
-      // JSON5Punctuator::
-      //   one of {}[]:,
-      "{"             { return mkSym(BOPEN);   }
-      "}"             { return mkSym(BCLOSE);  }
-      "["             { return mkSym(SOPEN);   }
-      "]"             { return mkSym(SCLOSE);  }
-      ":"             { return mkSym(COLON);   }
-      ","             { return mkSym(COMMA);   }
-
-      // JSON5Null::
-      //   NullLiteral
-      // NullLiteral ::
-      //   null
-      "null"          { return mkSym(NULLVAL); }
-
-      // JSON5Boolean::
-      //   BooleanLiteral
-      // BooleanLiteral ::
-      //   true
-      //   false
-      "false"         { return mkSym(FALSE);   }
-      "true"          { return mkSym(TRUE);    }
-
-      JSON5Identifier { return mkSym(ID); }
-
-      // JSON5String::
-      //  " JSON5DoubleStringCharactersopt "
-      //  ' JSON5SingleStringCharactersopt '
-
-      ['"] {
-        Expr *out = 0;
-        bool ok = lex_jstr(lex, out, in.cur[-1]);
-        return mkSym2(ok ? STR : ERROR, out);
-      }
-  */
-}
-
-void JLexer::consume() {
-  next = lex_json(*this);
 }
 
 bool Lexer::isLower(const char *str) {

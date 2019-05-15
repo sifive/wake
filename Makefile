@@ -28,7 +28,7 @@ wake.db:	bin/wake lib/wake/fuse-wake lib/wake/shim-wake
 install:	all
 	./bin/wake install '"install"'
 
-bin/wake:	src/symbol.o								\
+bin/wake:	src/symbol.o common/jlexer.o common/lexint.o				\
 		$(patsubst %.cpp,%.o,$(wildcard src/*.cpp) $(wildcard common/*.cpp))	\
 		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
@@ -50,4 +50,4 @@ lib/wake/shim-wake:	$(patsubst %.c,%.o,$(wildcard shim/*.c))
 	gzip -dc $^ > $@.tmp
 	mv -f $@.tmp $@
 
-.PRECIOUS:	src/symbol.cpp
+.PRECIOUS:	src/symbol.cpp common/jlexer.cpp common/lexint.cpp

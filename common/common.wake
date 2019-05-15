@@ -16,6 +16,8 @@
 global def common variant =
   def cflags = "-I{here}", Nil
   def headers = sources here `.*\.h`
+  def reFiles = sources here `.*\.re`
+  def cppFiles = map re2c reFiles ++ sources here `.*\.cpp`
   def compile = compileC variant cflags headers
-  def objects = map compile (sources here `.*\.cpp`)
-  SysLib "2.2.0" headers objects cflags Nil
+  def objects = map compile cppFiles
+  SysLib "0.0" headers objects cflags Nil

@@ -23,6 +23,7 @@
 #include "type.h"
 #include "symbol.h"
 #include "status.h"
+#include "utf8.h"
 #include <sstream>
 #include <fstream>
 #include <iostream>
