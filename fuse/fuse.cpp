@@ -805,7 +805,7 @@ int main(int argc, char *argv[])
 
 	std::size_t i, j;
 	for (i = 0; (j = content.find('\0', i)) != std::string::npos; i = j+1)
-		files_visible.emplace(content, i, j-i);
+		files_visible.insert(std::string(content, i, j-i));
 	content.clear();
 
 	rootfd = open(".", O_RDONLY);
