@@ -169,9 +169,8 @@ global def manualRunner =
           match (getJobReality job)
             Pass reality = Pass (RunnerOutput (map getPathName vis) Nil Nil reality)
             Fail f = Fail f
-  def score (Plan _ _ _ _ _ _ lo res _ _ _ _ _) = match res
-    Nil = if lo then Pass 1.0 else Fail "cannot detect outputs"
-    _   = Fail "cannot supply resources"
+  def score (Plan _ _ _ _ _ _ lo _ _ _ _ _ _) =
+    if lo then Pass 1.0 else Fail "cannot detect outputs"
   Runner "manual" score doit
 
 global def virtualRunner =
@@ -392,9 +391,8 @@ global def fuseRunner =
           | editRunnerOutputUsage usage
           | Pass
         _ = Fail (makeError "fuse-wake stdout invalid: {fuse.getJobStdout | getWhenFail ""}")
-  def score (Plan _ _ _ _ _ _ lo res _ _ _ _ _) = match res
-    Nil = if lo then Fail "would hide workspace" else Pass 1.0
-    _   = Fail "cannot supply resources"
+  def score (Plan _ _ _ _ _ _ lo _ _ _ _ _ _) =
+    if lo then Fail "would hide workspace" else Pass 1.0
   makeRunner "fuse" score pre post manualRunner
 
 # Make a Runner that runs a named script to run jobs
