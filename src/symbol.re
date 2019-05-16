@@ -144,7 +144,6 @@ struct input_t {
 
   bool __attribute__ ((noinline)) fill(size_t need);
 
-  std::string text() const;
   Coordinates coord() const { return Coordinates(row, 1 + cur - sol, offset + cur - &buf[0]); }
 };
 
@@ -177,29 +176,33 @@ bool input_t::fill(size_t need) {
   return true;
 }
 
-static ssize_t unicode_escape(const unsigned char *s, const unsigned char *e, char **out) {
+static ssize_t unicode_escape(const unsigned char *s, const unsigned char *e, char **out, bool compat) {
   utf8proc_uint8_t *dst;
   ssize_t len;
+
+  utf8proc_option_t oCanon = static_cast<utf8proc_option_t>(
+      UTF8PROC_COMPOSE   |
+      UTF8PROC_IGNORE    |
+      UTF8PROC_LUMP      |
+      UTF8PROC_REJECTNA);
+  utf8proc_option_t oCompat = static_cast<utf8proc_option_t>(
+      UTF8PROC_COMPAT    |
+      oCanon);
 
   len = utf8proc_map(
     reinterpret_cast<const utf8proc_uint8_t*>(s),
     e - s,
     &dst,
-    static_cast<utf8proc_option_t>(
-      UTF8PROC_COMPOSE   |
-      UTF8PROC_COMPAT    |
-      UTF8PROC_IGNORE    |
-      UTF8PROC_LUMP      |
-      UTF8PROC_REJECTNA));
+    compat?oCompat:oCanon);
 
   *out = reinterpret_cast<char*>(dst);
   return len;
 }
 
-static std::string unicode_escape(std::string &&str) {
+static std::string unicode_escape_canon(std::string &&str) {
   char *cleaned;
   const unsigned char *data = reinterpret_cast<const unsigned char *>(str.data());
-  ssize_t len = unicode_escape(data, data + str.size(), &cleaned);
+  ssize_t len = unicode_escape(data, data + str.size(), &cleaned, false);
   if (len < 0) return std::move(str);
   std::string out(cleaned, len);
   free(cleaned);
@@ -228,7 +231,7 @@ static bool lex_rstr(Lexer &lex, Expr *&out)
     */
   }
 
-  std::shared_ptr<RegExp> exp = std::make_shared<RegExp>(slice);
+  std::shared_ptr<RegExp> exp = std::make_shared<RegExp>(unicode_escape_canon(std::move(slice)));
   if (!exp->exp.ok()) {
     lex.fail = true;
     std::cerr << "Invalid regular expression at "
@@ -245,7 +248,7 @@ static bool lex_sstr(Lexer &lex, Expr *&out)
   Coordinates start = in.coord() - 1;
   std::string slice;
 
-  while (true) { // !!! probably want to allow non-code-points => don't use re2c?
+  while (true) {
     in.tok = in.cur;
     /*!re2c
         re2c:define:YYCURSOR = in.cur;
@@ -254,9 +257,9 @@ static bool lex_sstr(Lexer &lex, Expr *&out)
         re2c:yyfill:enable = 1;
         re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
         re2c:define:YYFILL:naked = 1;
-        *                    { return false; }
+        *                    { slice.push_back(*in.tok); continue; }
+        [\x00]               { return false; }
         "'"                  { break; }
-        [^\x00]              { slice.append(in.tok, in.cur); continue; }
     */
   }
 
@@ -318,7 +321,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
     */
   }
 
-  std::shared_ptr<String> str = std::make_shared<String>(unicode_escape(std::move(slice)));
+  std::shared_ptr<String> str = std::make_shared<String>(unicode_escape_canon(std::move(slice)));
   exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
 
   if (exprs.size() == 1) {
@@ -533,23 +536,21 @@ static std::string op_escape(const char *str) {
   return out;
 }
 
-std::string input_t::text() const {
+std::string Lexer::id() const {
   std::string out;
   char *dst;
   ssize_t len;
 
-  len = unicode_escape(tok, cur, &dst);
+  len = unicode_escape(engine->tok, engine->cur, &dst, true); // compat
   if (len >= 0) {
     out = op_escape(dst);
     free(dst);
   } else {
-    out.assign(tok, cur);
+    out.assign(engine->tok, engine->cur);
   }
 
   return out;
 }
-
-std::string Lexer::text() const { return engine->text(); }
 
 void Lexer::consume() {
   if (state->eol) {

@@ -50,4 +50,4 @@ lib/wake/shim-wake:	$(patsubst %.c,%.o,$(wildcard shim/*.c))
 	gzip -dc $^ > $@.tmp
 	mv -f $@.tmp $@
 
-.PRECIOUS:	src/symbol.cpp common/jlexer.cpp common/lexint.cpp
+.PRECIOUS:	src/symbol.cpp common/jlexer.cpp

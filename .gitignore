@@ -3,7 +3,6 @@
 /wake.db
 /src/symbol.cpp
 /common/jlexer.cpp
-/common/lexint.cpp
 /bin/wake
 /bin/wake.*
 /src/version.h
