@@ -431,7 +431,7 @@ global def makeJSONRunner script score estimate =
             Fail f = Pair (Fail (makeError f)) ""
             Pass inFile =
               def outFile = "{build}/{prefix}.out.json"
-              def cmd = script.getPathName, inFile, outFile, Nil
+              def cmd = script, inFile, outFile, Nil
               def proxy = RunnerInput cmd Nil environment "." "" Nil prefix (omapPartial estimate record) 1
               Pair (Pass proxy) outFile
   def post = match _
@@ -449,7 +449,7 @@ global def makeJSONRunner script score estimate =
         (usage // `outbytes` | getJInteger | getOrElse 0)
       def getK exp = content // exp | getJArray | getOrElse Nil | mapPartial getJString
       Pass (RunnerOutput (getK `inputs`) (getK `outputs`) (getK `indexes`) usageOut)
-  makeRunner "json-{script.getPathName}" score pre post manualRunner
+  makeRunner "json-{script}" score pre post manualRunner
 
 global def executeJSON json =
   def makeVirtual visible =
