@@ -31,3 +31,47 @@ global def environment = subscribe environment
 global def getenv key =
   def p x = prim "getenv"
   head (p key)
+
+def test key = replace `=.*` "" _ ==* key
+def value pair = replace `[^=]*=` "" pair
+
+# Retrieve the value for 'key' from a KEY=VALUE environment list
+# (key: String) => (environment: List String) => Option String
+global def getEnvironment key environment =
+  def clean (Pair eq _) = value eq
+  find (test key) environment | omap clean
+
+# Remove a key from a KEY=VALUE environment list
+# (key: String) => (environment: List String) => List String
+global def unsetEnvironment key environment =
+  filter (! test key _) environment
+
+# Set key=value in an environment list, removing all prior values for that key
+# (key: String) => (value: String) => (environment: List String) => List String
+global def setEnvironment key value environment =
+  "{key}={value}", unsetEnvironment key environment
+
+# Update a key's value in a KEY=VALUE environment list
+# All prior values for that key are rmeoved
+# Only the first match (if any) is supplied to fn
+# (key: String) => (fn: Option String => Option String) => (environment: List String) => List String
+global def editEnvironment key fn environment =
+  match (splitBy (test key) environment)
+    Pair eq rest = match (head eq | omap value | fn)
+      Some v = "{key}={v}", rest
+      None = rest
+
+# Add a component to the PATH in a KEY=VALUE environment
+# (path: String) => (environment: List String) => List String
+global def addEnvironmentPath path environment =
+  def mod = match _
+    None = Some path
+    Some x = Some "{path}:{x}"
+  editEnvironment "PATH" mod environment
+
+# Optionally add a component to the PATH in a KEY=VALUE environment
+# (pathopt: Option String) => (environment: List String) => List String
+global def addEnvironmentPathOpt pathopt environment =
+  match pathopt
+    None = environment
+    Some x = addEnvironmentPath x environment
