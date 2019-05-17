@@ -458,20 +458,29 @@ global def makeJSONRunner script score estimate =
     Pair (Pass output) outFile =
       def unlink f = prim "unlink"
       def inFile = replace `\.out\.json$` ".in.json" outFile
-      def content = parseJSONFile (File outFile) | getWhenFail JNull
+      def json = parseJSONFile (File outFile)
       def _ = unlink inFile
-      def _ = waitOne (\_ unlink outFile) content
-      def usage = content // `usage`
-      def usageOut =
-        Usage
-        (usage // `status`   | getJInteger | getOrElse 255)
-        (usage // `runtime`  | getJDouble  | getOrElse 0.0)
-        (usage // `cputime`  | getJDouble  | getOrElse 0.0)
-        (usage // `membytes` | getJInteger | getOrElse 0)
-        (usage // `inbytes`  | getJInteger | getOrElse 0)
-        (usage // `outbytes` | getJInteger | getOrElse 0)
-      def getK exp = content // exp | getJArray | getOrElse Nil | mapPartial getJString
-      Pass (RunnerOutput (getK `inputs`) (getK `outputs`) (getK `indexes`) usageOut)
+      match json
+        Fail f = Fail (makeError f)
+        Pass content =
+          def _ = unlink outFile
+          def field name = match _ _
+             _ (Fail f) = Fail f
+             None (Pass fn) = Fail "{script} produced {outFile}, which is missing usage/{name}"
+             (Some x) (Pass fn) = Pass (fn x)
+          def usage = content // `usage`
+          def usageResult =
+            Pass (Usage _ _ _ _ _ _)
+            | field "status"   (usage // `status`   | getJInteger)
+            | field "runtime"  (usage // `runtime`  | getJDouble)
+            | field "cputime"  (usage // `cputime`  | getJDouble)
+            | field "membytes" (usage // `membytes` | getJInteger)
+            | field "inbytes"  (usage // `inbytes`  | getJInteger)
+            | field "outbytes" (usage // `outbytes` | getJInteger)
+          def getK exp = content // exp | getJArray | getOrElse Nil | mapPartial getJString
+          match usageResult
+            Fail f = Fail (makeError f)
+            Pass usage = Pass (RunnerOutput (getK `inputs`) (getK `outputs`) (getK `indexes`) usage)
   makeRunner "json-{script}" score pre post localRunner
 
 global def executeJSON json =

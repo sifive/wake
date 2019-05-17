@@ -207,8 +207,8 @@ static PRIMFN(prim_unlink) {
   EXPECT(1);
   STRING(path, 0);
 
-  bool unlink_ok = unlink(path->value.c_str()) == 0;
-  REQUIRE(unlink_ok);
+  // don't care if this succeeds
+  (void)unlink(path->value.c_str());
 
   auto out = make_unit();
   RETURN(out);
