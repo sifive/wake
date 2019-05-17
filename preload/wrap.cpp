@@ -1,5 +1,7 @@
+#include <algorithm>
 #include <string>
 #include <set>
+#include <vector>
 #include <iostream>
 #include <fstream>
 #include <sys/stat.h>
@@ -12,7 +14,10 @@
 #include <fcntl.h>
 #include "json5.h"
 
+extern char **environ;
+
 typedef std::set<std::string> sset;
+typedef std::vector<std::string> svec;
 
 static const JAST &get(const std::string &key, const JAST &jast) {
   static JAST null(JSON_NULLVAL);
@@ -23,7 +28,13 @@ static const JAST &get(const std::string &key, const JAST &jast) {
   return null;
 }
 
-static void make_shadow_tree(const std::string &root, const JAST &jast, sset &visible) {
+static std::string makeGuard(const std::string &file) {
+  size_t slash = file.find_last_of('/');
+  if (slash == std::string::npos) slash = 0; else ++slash;
+  return file.substr(0, slash) + ".guard-" + file.substr(slash);
+}
+
+static void make_shadow_tree(const std::string &root, const JAST &jast, sset &visible, sset &guards) {
   std::string roots = root + "/";
 
   for (auto &x : get("visible", jast).children) {
@@ -60,6 +71,15 @@ static void make_shadow_tree(const std::string &root, const JAST &jast, sset &vi
           std::cerr << "link " << target << ": " << strerror(errno) << std::endl;
           exit(1);
         }
+        std::string guard = makeGuard(file);
+        std::string target_guard = roots + guard;
+        int fd = open(target_guard.c_str(), O_CREAT|O_EXCL, 0664);
+        if (fd == -1) {
+          std::cerr << "open " << target_guard << ": " << strerror(errno) << std::endl;
+          exit(1);
+        }
+        close(fd);
+        guards.insert(guard);
       }
     }
   }
@@ -127,7 +147,56 @@ static void scan_shadow_tree(sset &exist, const std::string &path) {
   scan_shadow_tree(exist, "", dirfd);
 }
 
-static void relink_shadow_tree(const std::string &root, const sset &outputs) {
+static void compute_inout(const sset &exist, const sset &guards, const sset &visible, svec &inputs, svec &outputs) {
+  // First, compute exist - guards
+  svec emg;
+  auto e = exist.begin(), g = guards.begin();
+  while (e != exist.end() && g != guards.end()) {
+    int comp = e->compare(*g);
+    if      (comp < 0) emg.emplace_back(*e++);
+    else if (comp > 0) ++g;
+    else { ++e; ++g; }
+  }
+  while (e != exist.end()) emg.emplace_back(*e++);
+
+  // Next, consider the set relationships between emg and visible
+  auto m = emg.begin();
+  auto v = visible.begin();
+  while (m != emg.end() && v != visible.end()) {
+    int comp = m->compare(*v);
+    if (comp < 0) {
+      outputs.emplace_back(std::move(*m));
+      ++m;
+    } else if (comp > 0) {
+      std::cerr << "Visible file was deleted: " << *v << std::endl;
+      exit(1);
+    } else if (m->back() != '/') {
+      struct stat sbuf;
+      if (stat(m->c_str(), &sbuf) != 0) {
+        std::cerr << "stat " << *m << ": " << strerror(errno) << std::endl;
+        exit(1);
+      }
+      // struct timespec st_mtimespec
+      if (false) { // modified) {
+        outputs.emplace_back(std::move(*m));
+      } else if (exist.find(makeGuard(*m)) == exist.end()) {
+        inputs.emplace_back(std::move(*m));
+      }
+      ++m;
+      ++v;
+    } else {
+      ++m;
+      ++v;
+    }
+  }
+  for (; m != emg.end(); ++m) outputs.emplace_back(std::move(*m));
+  if (v != visible.end()) {
+    std::cerr << "Visible file was deleted: " << *v << std::endl;
+    exit(1);
+  }
+}
+
+static void relink_shadow_tree(const std::string &root, const svec &outputs) {
   std::string roots = root + "/";
   for (auto &x : outputs) {
     if (x.back() == '/') {
@@ -223,8 +292,8 @@ int main(int argc, const char **argv) {
     exit(1);
   }
 
-  sset visible;
-  make_shadow_tree(root, jast, visible);
+  sset visible, guards;
+  make_shadow_tree(root, jast, visible, guards);
 
   // Prepare the subcommand inputs
   std::vector<char *> arg, env;
@@ -238,8 +307,6 @@ int main(int argc, const char **argv) {
   std::string dir = root + "/" + get("directory", jast).value;
   std::string stdin = get("stdin", jast).value;
   if (stdin.empty()) stdin = "/dev/null";
-
-  std::string command = arg[0];
 
   struct timeval start;
   gettimeofday(&start, 0);
@@ -259,8 +326,9 @@ int main(int argc, const char **argv) {
       dup2(fd, 0);
       close(fd);
     }
-    execve(command.c_str(), arg.data(), env.data());
-    std::cerr << "execve " << command << ": " << strerror(errno) << std::endl;
+    environ = env.data();
+    execvp(arg[0], arg.data());
+    std::cerr << "execvp " << arg[0] << ": " << strerror(errno) << std::endl;
     exit(1);
   }
 
@@ -272,24 +340,17 @@ int main(int argc, const char **argv) {
   if (WIFEXITED(status)) {
     status = WEXITSTATUS(status);
   } else {
-    status = WTERMSIG(status);
+    status = -WTERMSIG(status);
   }
 
   struct timeval stop;
   gettimeofday(&stop, 0);
 
   sset exist;
+  svec inputs, outputs;
+
   scan_shadow_tree(exist, root);
-
-  sset inputs, outputs;
-  auto v = visible.begin(), e = exist.begin();
-  while (v != visible.end() && e != exist.end()) {
-    int comp = e->compare(*v);
-    if (comp < 0) { outputs.insert(*e); ++e; }
-    else if (comp > 0) { std::cerr << "Visible file was deleted: " << *v << std::endl; exit(1); }
-    else { ++e; ++v; }
-  }
-
+  compute_inout(exist, guards, visible, inputs, outputs);
   relink_shadow_tree(root, outputs);
   remove_shadow_tree(root, exist);
   
@@ -309,7 +370,7 @@ int main(int argc, const char **argv) {
     << "},\"inputs\":[";
 
   first = true; 
-  for (auto &x : visible) {
+  for (auto &x : inputs) {
     out << (first?"":",") << "\"" << escape(x) << "\"";
     first = false;
   }
