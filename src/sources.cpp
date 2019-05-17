@@ -20,7 +20,8 @@
 #include "primfn.h"
 #include "value.h"
 #include "heap.h"
-#include "whereami.h"
+#include "execpath.h"
+
 #include <re2/re2.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -231,17 +232,6 @@ static void distinct(std::vector<std::shared_ptr<String> > &sources) {
   std::sort(sources.begin(), sources.end(), str_lexical);
   auto it = std::unique(sources.begin(), sources.end(), str_equal);
   sources.resize(std::distance(sources.begin(), it));
-}
-
-std::string find_execpath() {
-  static std::string exepath;
-  if (exepath.empty()) {
-    int dirlen = wai_getExecutablePath(0, 0, 0) + 1;
-    std::unique_ptr<char[]> execbuf(new char[dirlen]);
-    wai_getExecutablePath(execbuf.get(), dirlen, &dirlen);
-    exepath.assign(execbuf.get(), dirlen);
-  }
-  return exepath;
 }
 
 // . => ., hax/ => hax, foo/.././bar.z => bar.z, foo/../../bar.z => ../bar.z

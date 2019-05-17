@@ -21,7 +21,7 @@
 #include "heap.h"
 #include "database.h"
 #include "location.h"
-#include "sources.h"
+#include "execpath.h"
 #include "status.h"
 #include "thunk.h"
 #include <sys/types.h>
