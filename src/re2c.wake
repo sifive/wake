@@ -34,13 +34,14 @@ def re2cReal file =
   def _ = job compress (result, Nil)
   result
 
-def re2cFake file =
+def re2cFake file = memoize 0 (
   def cpp = replace `\.re$` ".cpp" file.getPathName
   def zip = source "{cpp}.gz"
   def cmd = which "gzip", "-dc", "{cpp}.gz", Nil
   match (job cmd (zip, Nil) | getJobStdout)
     Fail f = makeBadJob f
     Pass stdout = write cpp stdout
+)
 
 global def re2c file =
   if re2cOk Unit then re2cReal file else re2cFake file

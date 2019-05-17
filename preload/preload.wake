@@ -13,26 +13,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-def shared = match sysname
-  "Darwin" = Triple "dylib" ("-fpic", Nil) ("-dynamiclib", "-current_version", "1.0", Nil)
-  "Linux"  = Triple "so"    ("-fpic", Nil) ("-shared", Nil)
-  _ = panic "Unknown OS"
+def loadenv = match sysname
+  "Darwin" = "DYLD_INSERT_LIBRARIES"
+  _ = "LD_PRELOAD"
 
-# DYLD_INSERT_LIBRARIES LD_PRELOAD
+def libext = match sysname
+  "Darwin" = "dylib"
+  _ = "so"
 
-def libext    = shared.getTripleFirst
-def libcflags = shared.getTripleSecond
-def liblflags = shared.getTripleThird
+def libcflags = match sysname
+  _ = "-fpic", Nil
 
-global def buildPreload (Pair variant clib) =
+def liblflags = match sysname
+  "Darwin" = "-dynamiclib", "-current_version", "1.0", Nil
+  _ = "-shared", Nil
+
+global def buildPreload (Pair variant _) =
   def json = common variant
   def headers = json.getSysLibHeaders ++ sources here `.*\.h`
   def cppFiles = sources here `.*\.cpp`
-  def cFiles = sources here `.*\.c`
-  def wrapObjFiles = map (compileC variant json.getSysLibCFlags headers) cppFiles
-  def shimObjFiles = map (compileC clib libcflags Nil) cFiles
-  def wrap = linkO variant Nil (wrapObjFiles ++ json.getSysLibObjects) "lib/wake/preload-wake"
-  def shim = linkO clib liblflags shimObjFiles "lib/wake/preload-wake.{libext}"
-  wrap, shim, Nil
+  def cppFlags = "-DEXT={libext}", "-DENV={loadenv}", json.getSysLibCFlags
+  def ofiles = map (compileC variant cppFlags headers) cppFiles
+  linkO variant Nil (ofiles ++ json.getSysLibObjects) "lib/wake/preload-wake"
+
+global def buildPrelib (Pair _ variant) =
+  def cfiles = sources here `.*\.c`
+  def ofiles = map (compileC variant libcflags Nil) cfiles
+  linkO variant liblflags ofiles "lib/wake/libpreload-wake.{libext}"
 
 # publish runner = makeJSONRunner "preload/wrap" (\_ Pass 2.0) (\_ None), Nil

@@ -14,6 +14,10 @@
 #include <fcntl.h>
 #include <string.h>
 #include "json5.h"
+#include "execpath.h"
+
+#define STR2(x) #x
+#define STR(x) STR2(x)
 
 extern char **environ;
 
@@ -298,6 +302,9 @@ int main(int argc, const char **argv) {
 
   // Prepare the subcommand inputs
   std::vector<char *> arg, env;
+  std::string preload = STR(ENV) "=" + find_execpath() + "/libpreload-wake." STR(EXT);
+  env.push_back(const_cast<char*>(preload.c_str()));
+
   for (auto &x : get("command", jast).children)
     arg.push_back(const_cast<char*>(x.second.value.c_str()));
   arg.push_back(0);
