@@ -19,6 +19,8 @@ CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsql
 		$(shell pkg-config --silence-errors --libs re2     || echo -lre2)	\
 		$(shell pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
+COMMON := common/jlexer.o $(patsubst %.cpp,%.o,$(wildcard common/*.cpp))
+
 all:		wake.db
 	./bin/wake all default
 
@@ -28,13 +30,13 @@ wake.db:	bin/wake lib/wake/fuse-wake lib/wake/shim-wake
 install:	all
 	./bin/wake install '"install"'
 
-bin/wake:	src/symbol.o common/jlexer.o common/lexint.o				\
-		$(patsubst %.cpp,%.o,$(wildcard src/*.cpp) $(wildcard common/*.cpp))	\
+bin/wake:	src/symbol.o $(COMMON)				\
+		$(patsubst %.cpp,%.o,$(wildcard src/*.cpp))	\
 		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
-lib/wake/fuse-wake:	fuse/fuse.cpp
-	$(CXX) $(CFLAGS) $(FUSE_CFLAGS) $< -o $@ $(LDFLAGS) $(FUSE_LDFLAGS)
+lib/wake/fuse-wake:	fuse/fuse.cpp $(COMMON)
+	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(FUSE_CFLAGS) $^ -o $@ $(LDFLAGS) $(FUSE_LDFLAGS)
 
 lib/wake/shim-wake:	$(patsubst %.c,%.o,$(wildcard shim/*.c))
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)

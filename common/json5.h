@@ -53,6 +53,9 @@ struct JAST {
 
   static bool parse(const char *file,  std::ostream& errs, JAST &out);
   static bool parse(std::string &body, std::ostream& errs, JAST &out);
+
+  const JAST &get(const std::string &key) const;
+  JAST &get(const std::string &key);
 };
 
 struct JSymbol {

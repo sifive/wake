@@ -42,9 +42,12 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include "json5.h"
 
 //#define TRACE(x) do { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } while (0)
 #define TRACE(x) (void)x
+
+extern char **environ;
 
 static int rootfd;
 std::set<std::string> files_visible;
@@ -711,25 +714,14 @@ static std::string path;
 static struct fuse* fh;
 static struct fuse_chan* fc;
 static sigset_t saved;
-static int logfd;
 static bool pass;
+static int pipefds[2];
 
 static struct fuse_operations wakefuse_ops;
 
-static void *wakefuse_init(struct fuse_conn_info *conn)
-{
-	std::cerr << "OK: " << path << std::flush;
-	dup2(logfd, 2); // close stderr for wake to capture
-	close(logfd);
-
-	// unblock signals
-	sigprocmask(SIG_SETMASK, &saved, 0);
-	return 0;
-}
-
 static void handle_exit(int sig)
 {
-	if (sig != SIGALRM) pass = false;
+	if (sig != SIGCHLD) pass = false;
 
 	// Unfortunately, fuse_unmount can fail if the filesystem is still in use.
 	// Yes, this can even happen on linux with MNT_DETACH / lazy umount.
@@ -750,6 +742,43 @@ static void handle_exit(int sig)
 		retry.it_value.tv_usec = 200000; // 200ms
 		setitimer(ITIMER_REAL, &retry, 0);
 	}
+}
+
+static void *wakefuse_init(struct fuse_conn_info *conn)
+{
+	if (pipefds[1] != -1) close(pipefds[1]);
+	pipefds[1] = -1;
+
+	// unblock signals
+	struct sigaction sa;
+	sa.sa_handler = handle_exit;
+	sa.sa_flags = SA_RESTART|SA_NOCLDSTOP;
+	sigaction(SIGCHLD, &sa, 0);
+	sigprocmask(SIG_SETMASK, &saved, 0);
+	return 0;
+}
+
+static char hex(unsigned char x) {
+  if (x < 10) return '0' + x;
+  return 'a' + x - 10;
+}
+
+static std::string escape(const std::string &x) {
+  std::string out;
+  char escape[] = "\\u0000";
+  for (char z : x) {
+    unsigned char c = z;
+    if (c == '"') out.append("\\\"");
+    else if (c == '\\') out.append("\\\\");
+    else if (z >= 0x20) {
+      out.push_back(c);
+    } else {
+      escape[4] = hex(z >> 4);
+      escape[5] = hex(z & 0xf);
+      out.append(escape);
+    }
+  }
+  return out;
 }
 
 int main(int argc, char *argv[])
@@ -787,59 +816,33 @@ int main(int argc, char *argv[])
 #endif
 
 	int status = 1;
+	JAST jast;
+	pid_t pid;
 	sigset_t block;
 	struct sigaction sa;
 	struct fuse_args args;
+	struct timeval start, stop;
+	std::vector<char *> arg, env;
 
 	// no fail operations
 	memset(&sa, 0, sizeof(sa));
 	umask(0);
 
-	if (argc < 2) return 127;
-	std::ifstream ifs(argv[1]);
-	std::string content(
-		(std::istreambuf_iterator<char>(ifs)),
-		(std::istreambuf_iterator<char>()));
-	ifs.close();
-	unlink(argv[1]);
-
-	std::size_t i, j;
-	for (i = 0; (j = content.find('\0', i)) != std::string::npos; i = j+1)
-		files_visible.insert(std::string(content, i, j-i));
-	content.clear();
-
-	rootfd = open(".", O_RDONLY);
-	if (rootfd == -1) {
-		perror("failed to open .");
+	if (argc != 3) {
+		std::cerr << "Syntax: fuse-wake <input-json> <output-json>" << std::endl;
 		goto term;
 	}
 
-	mkdir(".build", 0775);
-	logfd = open(".build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0666);
-	if (logfd == -1) {
-		perror("failed to open .build/fuse.log");
+	if (!JAST::parse(argv[1], std::cerr, jast))
 		goto term;
-	}
-
-	path = ".build/" + std::to_string(getpid());
-	if (mkdir(path.c_str(), 0775) != 0 && errno != EEXIST) {
-		perror("mkdir");
-		goto term;
-	}
-
-	args = FUSE_ARGS_INIT(0, NULL);
-	if (fuse_opt_add_arg(&args, "wake") != 0) {
-		fprintf(stderr, "fuse_opt_add_arg failed");
-		goto rmroot;
-	}
 
 	// block those signals where we wish to terminate cleanly
 	sigemptyset(&block);
 	sigaddset(&block, SIGHUP);
-	sigaddset(&block, SIGALRM);
 	sigaddset(&block, SIGINT);
 	sigaddset(&block, SIGQUIT);
 	sigaddset(&block, SIGTERM);
+	sigaddset(&block, SIGCHLD);
 	sigprocmask(SIG_BLOCK, &block, &saved);
 
 	// ignore these signals
@@ -851,12 +854,84 @@ int main(int argc, char *argv[])
 
 	// hook these signals
 	sa.sa_handler = handle_exit;
-	sa.sa_flags = SA_RESTART;
+	sa.sa_flags = SA_RESTART|SA_NOCLDSTOP;
 	sigaction(SIGHUP,  &sa, 0);
-	sigaction(SIGALRM, &sa, 0);
 	sigaction(SIGINT,  &sa, 0);
 	sigaction(SIGQUIT, &sa, 0);
 	sigaction(SIGTERM, &sa, 0);
+	sigaction(SIGCHLD, &sa, 0);
+
+	// Prepare the subcommand inputs
+	for (auto &x : jast.get("command").children)
+		arg.push_back(const_cast<char*>(x.second.value.c_str()));
+	arg.push_back(0);
+	for (auto &x : jast.get("environment").children)
+		env.push_back(const_cast<char*>(x.second.value.c_str()));
+	env.push_back(0);
+
+	path = ".build/" + std::to_string(getpid());
+
+	if (pipe(pipefds) != 0) {
+		std::cerr << "pipe: " << strerror(errno) << std::endl;
+		goto term;
+	}
+
+	gettimeofday(&start, 0);
+
+	pid = fork();
+	if (pid == 0) {
+		std::string dir = path + "/" + jast.get("directory").value;
+		std::string stdin = jast.get("stdin").value;
+		if (stdin.empty()) stdin = "/dev/null";
+
+		// Wait for fuse to be mounted
+		char c;
+		close(pipefds[1]);
+		read(pipefds[0], &c, 1);
+
+		if (chdir(dir.c_str()) != 0) {
+			std::cerr << "chdir " << dir << ": " << strerror(errno) << std::endl;
+			exit(1);
+		}
+
+		int fd = open(stdin.c_str(), O_RDONLY);
+		if (fd == -1) {
+			std::cerr << "open " << stdin << ":" << strerror(errno) << std::endl;
+			exit(1);
+		}
+
+		if (fd != 0) {
+			dup2(fd, 0);
+			close(fd);
+		}
+
+		environ = env.data();
+		execvp(arg[0], arg.data());
+		std::cerr << "execvp " << arg[0] << ": " << strerror(errno) << std::endl;
+		exit(1);
+	}
+	close(pipefds[0]);
+
+	for (auto &x : jast.get("visible").children)
+		files_visible.insert(x.second.value);
+
+	rootfd = open(".", O_RDONLY);
+	if (rootfd == -1) {
+		perror("failed to open .");
+		goto term;
+	}
+
+	mkdir(".build", 0775);
+	if (mkdir(path.c_str(), 0775) != 0 && errno != EEXIST) {
+		perror("mkdir");
+		goto term;
+	}
+
+	args = FUSE_ARGS_INIT(0, NULL);
+	if (fuse_opt_add_arg(&args, "wake") != 0) {
+		fprintf(stderr, "fuse_opt_add_arg failed");
+		goto rmroot;
+	}
 
 	fc = fuse_mount(path.c_str(), &args);
 	if (!fc) {
@@ -898,17 +973,73 @@ term:
 		sigaction(SIGUSR1, &sa, 0);
 		sigaction(SIGUSR2, &sa, 0);
 		sigaction(SIGHUP,  &sa, 0);
-		sigaction(SIGALRM, &sa, 0);
 		sigaction(SIGINT,  &sa, 0);
 		sigaction(SIGQUIT, &sa, 0);
 		sigaction(SIGTERM, &sa, 0);
+		sigaction(SIGCHLD, &sa, 0);
 		sigprocmask(SIG_SETMASK, &saved, 0);
 
-		for (auto &i : files_wrote) files_read.erase(i);
-		for (auto &i : files_read) std::cout << i << '\0';
-		std::cout << '\0';
-		for (auto &i : files_wrote) std::cout << i << '\0';
+		int child;
+		struct rusage rusage;
+		do wait4(pid, &child, 0, &rusage);
+		while (WIFSTOPPED(child));
+
+		if (WIFEXITED(child)) {
+			child = WEXITSTATUS(child);
+		} else {
+			child = -WTERMSIG(child);
+		}
+
+		gettimeofday(&stop, 0);
+
 		status = 0;
+		for (auto &i : files_wrote) files_read.erase(i);
+
+		std::ofstream out(argv[2], std::ios_base::trunc);
+		if (out.fail()) {
+			std::cerr << "ofstream " << argv[2] << ": " << strerror(errno) << std::endl;
+			status = 1;
+		}
+
+		struct rusage self;
+		getrusage(RUSAGE_SELF, &self);
+		rusage.ru_utime.tv_sec  += self.ru_utime.tv_sec;
+		rusage.ru_utime.tv_usec += self.ru_utime.tv_usec;
+		rusage.ru_stime.tv_sec  += self.ru_stime.tv_sec;
+		rusage.ru_stime.tv_usec += self.ru_stime.tv_usec;
+		rusage.ru_maxrss        += self.ru_maxrss;
+		rusage.ru_inblock       += self.ru_inblock;
+		rusage.ru_oublock       += self.ru_oublock;
+
+		bool first;
+		out << "{\"usage\":{\"status\":" << child
+		  << ",\"runtime\":" << (stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0)
+		  << ",\"cputime\":" << (rusage.ru_utime.tv_sec + rusage.ru_stime.tv_sec + (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0)
+		  << ",\"membytes\":" << rusage.ru_maxrss
+		  << ",\"inbytes\":" << rusage.ru_inblock * UINT64_C(512)
+		  << ",\"outbytes\":" << rusage.ru_oublock * UINT64_C(512)
+		  << "},\"inputs\":[";
+
+		first = true;
+		for (auto &x : files_read) {
+			out << (first?"":",") << "\"" << escape(x) << "\"";
+			first = false;
+		}
+
+		out << "],\"outputs\":[";
+
+		first = true;
+		for (auto &x : files_wrote) {
+			out << (first?"":",") << "\"" << escape(x) << "\"";
+			first = false;
+		}
+
+		out << "],\"indexes\":[]}" << std::endl;
+
+		if (out.bad()) {
+			std::cerr << "bad " << argv[2] << ": " << strerror(errno) << std::endl;
+			status = 1;
+		}
 	}
 
 	return status;

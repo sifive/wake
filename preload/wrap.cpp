@@ -24,15 +24,6 @@ extern char **environ;
 typedef std::set<std::string> sset;
 typedef std::vector<std::string> svec;
 
-static const JAST &get(const std::string &key, const JAST &jast) {
-  static JAST null(JSON_NULLVAL);
-  if (jast.kind == JSON_OBJECT)
-    for (auto &x : jast.children)
-      if (x.first == key)
-        return x.second;
-  return null;
-}
-
 static std::string makeGuard(const std::string &file) {
   size_t slash = file.find_last_of('/');
   if (slash == std::string::npos) slash = 0; else ++slash;
@@ -42,7 +33,7 @@ static std::string makeGuard(const std::string &file) {
 static void make_shadow_tree(const std::string &root, const JAST &jast, sset &visible, sset &guards) {
   std::string roots = root + "/";
 
-  for (auto &x : get("visible", jast).children) {
+  for (auto &x : jast.get("visible").children) {
     const std::string &file = x.second.value;
 
     for (size_t pos = file.find('/'); pos != std::string::npos; pos = file.find('/', pos+1)) {
@@ -282,7 +273,7 @@ int main(int argc, const char **argv) {
   JAST jast;
 
   if (argc != 3) {
-    std::cerr << "Syntax: preload-fuse <input-json> <output-json>" << std::endl;
+    std::cerr << "Syntax: preload-wake <input-json> <output-json>" << std::endl;
     exit(1);
   }
 
@@ -305,15 +296,15 @@ int main(int argc, const char **argv) {
   std::string preload = STR(ENV) "=" + find_execpath() + "/libpreload-wake." STR(EXT);
   env.push_back(const_cast<char*>(preload.c_str()));
 
-  for (auto &x : get("command", jast).children)
+  for (auto &x : jast.get("command").children)
     arg.push_back(const_cast<char*>(x.second.value.c_str()));
   arg.push_back(0);
-  for (auto &x : get("environment", jast).children)
+  for (auto &x : jast.get("environment").children)
     env.push_back(const_cast<char*>(x.second.value.c_str()));
   env.push_back(0);
 
-  std::string dir = root + "/" + get("directory", jast).value;
-  std::string stdin = get("stdin", jast).value;
+  std::string dir = root + "/" + jast.get("directory").value;
+  std::string stdin = jast.get("stdin").value;
   if (stdin.empty()) stdin = "/dev/null";
 
   struct timeval start;

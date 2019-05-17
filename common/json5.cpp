@@ -29,3 +29,21 @@ const char *jsymbolTable[] = {
   "SOPEN", "SCLOSE", "BOPEN", "BCLOSE",
   "COLON", "ID", "COMMA"
 };
+
+static JAST null(JSON_NULLVAL);
+
+const JAST &JAST::get(const std::string &key) const {
+  if (kind == JSON_OBJECT)
+    for (auto &x : children)
+      if (x.first == key)
+        return x.second;
+  return null;
+}
+
+JAST &JAST::get(const std::string &key) {
+  if (kind == JSON_OBJECT)
+    for (auto &x : children)
+      if (x.first == key)
+        return x.second;
+  return null;
+}
