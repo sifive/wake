@@ -12,6 +12,7 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <string.h>
 #include "json5.h"
 
 extern char **environ;

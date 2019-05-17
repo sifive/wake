@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdarg.h>
 #include <unistd.h>
 #include <dlfcn.h>
