@@ -34,7 +34,8 @@ def pkgConfigImp args = memoize 0 (
     Some p = "PKG_CONFIG_PATH={p}", list
     None   = list
   def result =
-    makeManualPlan cmdline Nil (\_ Nil) # caching ok
+    makePlan cmdline Nil
+    | setPlanLocalOnly True
     | editPlanEnvironment addenv
     | runJob
   def output = result.getJobStdout | getWhenFail "" | tokenize `\n` | head

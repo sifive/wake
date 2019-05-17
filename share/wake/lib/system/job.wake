@@ -142,9 +142,6 @@ def id x = x
 global def makePlan cmd visible =
   Plan cmd visible environment "." "" Share False Nil (\_ True) id id id 1
 
-global def makeManualPlan cmd visible foutputs =
-  Plan cmd visible environment "." "" Share True Nil (\_ True) id (\_ foutputs Unit) id 1
-
 def makeRawPlan cmd  =
   Plan cmd Nil Nil "." "" ReRun True Nil (\_ True) id id id 1
 
@@ -152,7 +149,7 @@ def defaultUsage = Usage 0 0.0 0.0 0 0 0
 
 # This runner does not detect inputs/outputs/indexes on it's own
 # You must use Fn{Inputs,Outputs,Indexes} to fill in this information
-global def manualRunner =
+global def localRunner =
   def launch job pool dir stdin env cmd status runtime cputime membytes ibytes obytes = prim "job_launch"
   def badlaunch job error = prim "job_fail_launch"
   def doit job = match _
@@ -171,7 +168,7 @@ global def manualRunner =
             Fail f = Fail f
   def score (Plan _ _ _ _ _ _ lo _ _ _ _ _ _) =
     if lo then Pass 1.0 else Fail "cannot detect outputs"
-  Runner "manual" score doit
+  Runner "local" score doit
 
 global def virtualRunner =
   def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
@@ -233,7 +230,7 @@ def runOnce cmd env dir stdin res finputs foutputs findexes vis keep run pool =
   memoize 9 (runAlways cmd env dir stdin res finputs foutputs findexes vis keep run pool)
 
 # Default runners provided by wake
-publish runner = manualRunner, fuseRunner, Nil
+publish runner = localRunner, defaultRunner, Nil
 
 def runJobImp cmd env dir stdin res finputs foutputs findexes vis pers run pool =
   if isOnce pers
@@ -362,7 +359,7 @@ global def fuseRunner =
         Fail f = Pair (Fail (makeError f)) None
         Pass visibleFile =
           def cmd = fusePath, visibleFile, Nil
-          def fuse = makeRawPlan cmd | setPlanPool 0 | runJobWith manualRunner
+          def fuse = makeRawPlan cmd | setPlanPool 0 | runJobWith localRunner
           match (fuse.getJobStderr | rmap (extract `OK: (.*)`))
             Pass (x, Nil) = Pair (Pass (editRunnerInputDirectory ("{x}/{_}") input)) (Some fuse)
             Pass _ = Pair (Fail (makeError "fuse-wake stderr invalid: {fuse.getJobStderr | getWhenFail ""}")) (Some fuse)
@@ -393,7 +390,27 @@ global def fuseRunner =
         _ = Fail (makeError "fuse-wake stdout invalid: {fuse.getJobStdout | getWhenFail ""}")
   def score (Plan _ _ _ _ _ _ lo _ _ _ _ _ _) =
     if lo then Fail "would hide workspace" else Pass 1.0
-  makeRunner "fuse" score pre post manualRunner
+  makeRunner "fuse" score pre post localRunner
+
+global def preloadRunner =
+  def preload = "{wakePath}/../lib/wake/preload-wake"
+  def score (Plan _ _ _ _ _ _ lo _ _ _ _ _ _) =
+    if lo then Fail "would hide workspace" else Pass 1.0
+  makeJSONRunner preload score (\_ None)
+
+def rOK = 0
+def wOK = 1
+def xOK = 2
+def access file mode = prim "access"
+
+global def defaultRunner = match (getenv "USE_FUSE_WAKE")
+  Some "0" = preloadRunner
+  Some _ = fuseRunner
+  None =
+    def fuse =
+      access "/dev/fuse" wOK ||
+      access "/dev/osxfuse0" wOK
+    if fuse then fuseRunner else preloadRunner
 
 # Make a Runner that runs a named script to run jobs
 # score: Plan => Double; runJob chooses the runner with the largest score for a Plan
@@ -449,7 +466,7 @@ global def makeJSONRunner script score estimate =
         (usage // `outbytes` | getJInteger | getOrElse 0)
       def getK exp = content // exp | getJArray | getOrElse Nil | mapPartial getJString
       Pass (RunnerOutput (getK `inputs`) (getK `outputs`) (getK `indexes`) usageOut)
-  makeRunner "json-{script}" score pre post manualRunner
+  makeRunner "json-{script}" score pre post localRunner
 
 global def executeJSON json =
   def makeVirtual visible =
@@ -513,7 +530,7 @@ def hashcode f = memoize 0 (
   def get f = prim "get_hash"
   def reuse = get f
   if reuse !=* "" then reuse else
-    def job = makeRawPlan ("<hash>", f, Nil) | runJobWith manualRunner
+    def job = makeRawPlan ("<hash>", f, Nil) | runJobWith localRunner
     def hash =
       job.getJobStdout
       | getWhenFail ""
@@ -583,7 +600,9 @@ global def alwaysJob cmd visible =
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
 global def manualJob cmd visible foutputs =
-  makeManualPlan cmd visible foutputs
+  makePlan cmd visible
+  | setPlanLocalOnly True
+  | setPlanFnOutputs (\_ foutputs Unit)
   | runJob
 
 # Use volatileJob when:
@@ -597,6 +616,8 @@ global def manualJob cmd visible foutputs =
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
 global def volatileJob cmd visible foutputs =
-  makeManualPlan cmd visible foutputs
+  makePlan cmd visible
+  | setPlanLocalOnly True
+  | setPlanFnOutputs (\_ foutputs Unit)
   | setPlanKeep False
   | runJob

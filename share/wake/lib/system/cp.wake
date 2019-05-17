@@ -18,8 +18,10 @@ global def installAs dest file =
   def cmd = which "cp", file.getPathName, sdest, Nil
   def inputs = mkdir "{dest}/..", file, Nil
   def foutputs _ = sdest, Nil
-  makeManualPlan cmd inputs foutputs
+  makePlan cmd inputs
   | setPlanEnvironment Nil
+  | setPlanLocalOnly True
+  | setPlanFnOutputs foutputs
   | runJob
   | getJobOutput
 

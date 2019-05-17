@@ -1263,6 +1263,24 @@ static PRIMFN(prim_job_record) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_access) {
+  return args.size() == 2 &&
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(Data::typeBoolean);
+}
+
+static PRIMFN(prim_access) {
+  EXPECT(2);
+  STRING(file, 0);
+  INTEGER(kind, 1);
+  int mode = R_OK;
+  if (mpz_cmp_si(kind->value, 1) == 0) mode = W_OK;
+  if (mpz_cmp_si(kind->value, 2) == 0) mode = X_OK;
+  auto out = make_bool(access(file->value.c_str(), mode) == 0);
+  RETURN(out);
+}
+
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   prim_register(pmap, "job_cache",  prim_job_cache,  type_job_cache,   PRIM_SHALLOW, jobtable);
   prim_register(pmap, "job_create", prim_job_create, type_job_create,  PRIM_SHALLOW, jobtable);
@@ -1283,4 +1301,5 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   prim_register(pmap, "get_hash",   prim_get_hash,   type_get_hash,    PRIM_SHALLOW, jobtable);
   prim_register(pmap, "get_modtime",prim_get_modtime,type_get_modtime, PRIM_SHALLOW);
   prim_register(pmap, "search_path",prim_search_path,type_search_path, PRIM_SHALLOW);
+  prim_register(pmap, "access",     prim_access,     type_access,      PRIM_SHALLOW);
 }
