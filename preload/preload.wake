@@ -25,7 +25,7 @@ def libcflags = match sysname
   _ = "-fpic", Nil
 
 def liblflags = match sysname
-  "Darwin" = "-dynamiclib", "-current_version", "1.0", Nil
+  "Darwin" = "-dynamiclib", Nil
   _ = "-shared", Nil
 
 global def buildPreload (Pair variant _) =

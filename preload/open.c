@@ -10,11 +10,18 @@
 #define O_TMPFILE 0
 #endif
 
-/*
-#define DYLD_INTERPOSE(_replacment,_replacee) \
-__attribute__((used)) static struct{ const void* replacment; const void* replacee; } _interpose_##_replacee \
-__attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long)&_replacment, (const void*)(unsigned long)&_replacee };
-*/
+#ifdef __APPLE__
+#define PREFIX(fn) my_##fn
+#define FORWARD(fn) orig = fn
+struct interpose { const void* my_fn; const void* orig_fn; };
+#define INTERPOSE(fn) \
+  const struct interpose __attribute__ ((section ("__DATA, __interpose"))) interpose_##fn = \
+  { (const void*)&my_##fn, (const void*)&fn };
+#else
+#define PREFIX(fn) fn
+#define FORWARD(fn) if (!orig) orig = dlsym(RTLD_NEXT, #fn)
+#define INTERPOSE(fn)
+#endif
 
 /*
  catopen
@@ -40,9 +47,9 @@ static void unlink_guard(const char *filename) {
 }
 
 #define OPEN(fn)						\
-int fn(const char *filename, int flags, ...) {			\
+int PREFIX(fn)(const char *filename, int flags, ...) {		\
   static int (*orig)(const char *, int, ...);			\
-  if (!orig) orig = dlsym(RTLD_NEXT, #fn);			\
+  FORWARD(fn);							\
   unlink_guard(filename);					\
   if ((flags & (O_CREAT|O_TMPFILE))) {				\
     va_list ap;							\
@@ -54,19 +61,22 @@ int fn(const char *filename, int flags, ...) {			\
   } else {							\
     return orig(filename, flags);				\
   }								\
-}
+}								\
+INTERPOSE(fn)
 
-OPEN(open);
-OPEN(open64);
-OPEN(__open);
-OPEN(__open64);
-OPEN(__open_2);
-OPEN(__open64_2);
+OPEN(open)
+#ifndef __APPLE__
+OPEN(open64)
+OPEN(__open)
+OPEN(__open64)
+OPEN(__open_2)
+OPEN(__open64_2)
+#endif
 
 #define OPENAT(fn)						\
-int fn(int dirfd, const char *filename, int flags, ...) {	\
+int PREFIX(fn)(int dirfd, const char *filename, int flags, ...) {\
   static int (*orig)(int dirfd, const char *, int, ...);	\
-  if (!orig) orig = dlsym(RTLD_NEXT, #fn);			\
+  FORWARD(fn);							\
   unlink_guard(filename);					\
   if ((flags & (O_CREAT|O_TMPFILE))) {				\
     va_list ap;							\
@@ -78,42 +88,54 @@ int fn(int dirfd, const char *filename, int flags, ...) {	\
   } else {							\
     return orig(dirfd, filename, flags);			\
   }								\
-}
+}								\
+INTERPOSE(fn)
 
-OPENAT(openat);
-OPENAT(openat64);
-OPENAT(__openat_2);
-OPENAT(__openat64_2);
+OPENAT(openat)
+#ifndef __APPLE__
+OPENAT(openat64)
+OPENAT(__openat_2)
+OPENAT(__openat64_2)
+#endif
 
 #define CREAT(fn)						\
-int fn(const char *filename, mode_t mode) {			\
+int PREFIX(fn)(const char *filename, mode_t mode) {		\
   static int (*orig)(const char *, mode_t);			\
-  if (!orig) orig = dlsym(RTLD_NEXT, #fn);			\
+  FORWARD(fn);							\
   unlink_guard(filename);					\
   return orig(filename, mode);					\
-}
+}								\
+INTERPOSE(fn)
 
-CREAT(creat);
-CREAT(creat64);
+CREAT(creat)
+#ifndef __APPLE__
+CREAT(creat64)
+#endif
 
 #define FOPEN(fn)						\
-FILE *fn(const char *filename, const char *mode) {		\
+FILE *PREFIX(fn)(const char *filename, const char *mode) {	\
   static FILE *(*orig)(const char *, const char *);		\
-  if (!orig) orig = dlsym(RTLD_NEXT, #fn);			\
+  FORWARD(fn);							\
   unlink_guard(filename);					\
   return orig(filename, mode);					\
-}
+}								\
+INTERPOSE(fn)
 
-FOPEN(fopen);
-FOPEN(fopen64);
+FOPEN(fopen)
+#ifndef __APPLE__
+FOPEN(fopen64)
+#endif
 
 #define FREOPEN(fn)						\
-FILE *fn(const char *filename, const char *mode, FILE *s) {	\
+FILE *PREFIX(fn)(const char *filename, const char *mode, FILE *s) {\
   static FILE *(*orig)(const char *, const char *, FILE *);	\
-  if (!orig) orig = dlsym(RTLD_NEXT, #fn);			\
+  FORWARD(fn);							\
   unlink_guard(filename);					\
   return orig(filename, mode, s);				\
-}
+}								\
+INTERPOSE(fn)
 
-FREOPEN(freopen);
-FREOPEN(freopen64);
+FREOPEN(freopen)
+#ifndef __APPLE__
+FREOPEN(freopen64)
+#endif
