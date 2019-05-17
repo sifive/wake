@@ -26,7 +26,7 @@ def libcflags = match sysname
 
 def liblflags = match sysname
   "Darwin" = "-dynamiclib", Nil
-  _ = "-shared", Nil
+  _ = "-shared", "-ldl", Nil
 
 global def buildPreload (Pair variant _) =
   def json = common variant

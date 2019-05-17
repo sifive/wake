@@ -393,10 +393,10 @@ global def fuseRunner =
   makeRunner "fuse" score pre post localRunner
 
 global def preloadRunner =
-  def preload = "{wakePath}/../lib/wake/preload-wake"
+  def preload = simplify "{wakePath}/../lib/wake/preload-wake"
   def score (Plan _ _ _ _ _ _ lo _ _ _ _ _ _) =
     if lo then Fail "would hide workspace" else Pass 1.0
-  makeJSONRunner preload score (\_ None)
+  makeJSONRunner preload score (Some _)
 
 def rOK = 0
 def wOK = 1
@@ -421,6 +421,8 @@ global def makeJSONRunner script score estimate =
     Pass (RunnerInput command visible environment directory stdin res prefix record _) = match (findSome getPathError visible)
       Some e = Pair (Fail e) ""
       None =
+        def pmkdir m p = prim "mkdir"
+        def pwrite m p d = prim "write"
         def json = JObject (
           "command"     → command     | map JString | JArray,
           "environment" → environment | map JString | JArray,
@@ -442,9 +444,9 @@ global def makeJSONRunner script score estimate =
                 Nil
               ), Nil
         )
-        match ((\m\p prim "mkdir") 0775 ".build")
+        match (pmkdir 0775 ".build")
           Fail f = Pair (Fail (makeError f)) ""
-          Pass build = match ((\m\p\c prim "write") 0664 "{build}/{prefix}.in.json" (prettyJSON json))
+          Pass build = match (pwrite 0664 "{build}/{prefix}.in.json" (prettyJSON json))
             Fail f = Pair (Fail (makeError f)) ""
             Pass inFile =
               def outFile = "{build}/{prefix}.out.json"
@@ -454,7 +456,11 @@ global def makeJSONRunner script score estimate =
   def post = match _
     Pair (Fail f) _ = Fail f
     Pair (Pass output) outFile =
+      def unlink f = prim "unlink"
+      def inFile = replace `\.out\.json$` ".in.json" outFile
       def content = parseJSONFile (File outFile) | getWhenFail JNull
+      def _ = unlink inFile
+      def _ = waitOne (\_ unlink outFile) content
       def usage = content // `usage`
       def usageOut =
         Usage
