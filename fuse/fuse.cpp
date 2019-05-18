@@ -718,12 +718,36 @@ static struct fuse_chan* fc;
 static sigset_t saved;
 static bool pass;
 static int pipefds[2];
+static pid_t pid;
+static int child = -256;
+static struct rusage rusage;
 
 static struct fuse_operations wakefuse_ops;
 
 static void handle_exit(int sig)
 {
-	if (sig != SIGCHLD) pass = false;
+	if (sig == SIGCHLD) {
+		struct rusage temp;
+		pid_t reaped;
+		int status;
+		bool stop;
+
+		stop = false;
+		while ((reaped = wait4(-1, &status, WNOHANG, &temp)) > 0) {
+			if (!WIFSTOPPED(status) && reaped == pid) {
+				stop = true;
+				rusage = temp;
+				if (WIFEXITED(status)) {
+					child = WEXITSTATUS(status);
+				} else {
+					child = -WTERMSIG(status);
+				}
+			}
+		}
+		if (!stop) return;
+	} else {
+		pass = false;
+	}
 
 	// Unfortunately, fuse_unmount can fail if the filesystem is still in use.
 	// Yes, this can even happen on linux with MNT_DETACH / lazy umount.
@@ -748,15 +772,16 @@ static void handle_exit(int sig)
 
 static void *wakefuse_init(struct fuse_conn_info *conn)
 {
-	if (pipefds[1] != -1) close(pipefds[1]);
-	pipefds[1] = -1;
-
 	// unblock signals
 	struct sigaction sa;
 	sa.sa_handler = handle_exit;
 	sa.sa_flags = SA_RESTART|SA_NOCLDSTOP;
 	sigaction(SIGCHLD, &sa, 0);
 	sigprocmask(SIG_SETMASK, &saved, 0);
+
+	if (pipefds[1] != -1) close(pipefds[1]);
+	pipefds[1] = -1;
+
 	return 0;
 }
 
@@ -819,7 +844,6 @@ int main(int argc, char *argv[])
 
 	int status = 1;
 	JAST jast;
-	pid_t pid;
 	sigset_t block;
 	struct sigaction sa;
 	struct fuse_args args;
@@ -890,6 +914,7 @@ int main(int argc, char *argv[])
 		char c;
 		close(pipefds[1]);
 		read(pipefds[0], &c, 1);
+		close(pipefds[0]);
 
 		if (chdir(dir.c_str()) != 0) {
 			std::cerr << "chdir " << dir << ": " << strerror(errno) << std::endl;
@@ -980,17 +1005,6 @@ term:
 		sigaction(SIGTERM, &sa, 0);
 		sigaction(SIGCHLD, &sa, 0);
 		sigprocmask(SIG_SETMASK, &saved, 0);
-
-		int child;
-		struct rusage rusage;
-		do wait4(pid, &child, 0, &rusage);
-		while (WIFSTOPPED(child));
-
-		if (WIFEXITED(child)) {
-			child = WEXITSTATUS(child);
-		} else {
-			child = -WTERMSIG(child);
-		}
 
 		gettimeofday(&stop, 0);
 
