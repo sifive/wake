@@ -1,0 +1,25 @@
+FROM centos:7.0.1406
+
+# The Docker CentOS image has a faked out systemd that needs to be replaced in
+# order for us to install some real packages.
+# https://stackoverflow.com/a/36632668/7433423
+RUN yum swap -y -- remove fakesystemd -- install systemd systemd-libs
+# Older versions of CentOS don't have great support for the overlay filesystem
+# that Docker uses, so install a yum plugin that is meant to address this issue.
+# https://github.com/CentOS/sig-cloud-instance-images/issues/15#issuecomment-252563831
+RUN yum --setopt=skip_missing_names_on_install=False install -y yum-plugin-ovl
+RUN yum -y update && yum clean all
+RUN yum --setopt=skip_missing_names_on_install=False install -y \
+  fuse-devel \
+  gcc-c++ \
+  git \
+  gmp-devel \
+  make \
+  ncurses-devel \
+  sqlite-devel
+# re2-devel is not an official CentOS package, so use the EPEL repository.
+RUN yum --setopt=skip_missing_names_on_install=False install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
+ yum --setopt=skip_missing_names_on_install=False install -y re2-devel
+WORKDIR /build
+COPY . /build
+RUN make bin/wake
