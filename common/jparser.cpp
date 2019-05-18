@@ -197,9 +197,14 @@ static JAST parse_jvalue(JLexer &jlex, std::ostream& errs) {
 
 bool JAST::parse(const char *file, std::ostream& errs, JAST &out) {
   JLexer jlex(file);
-  out = parse_jvalue(jlex, errs);
-  expect(JSON_END, jlex, errs);
-  return !jlex.fail;
+  if (jlex.fail) {
+    errs << "Open " << file << ": " << strerror(errno);
+    return false;
+  } else {
+    out = parse_jvalue(jlex, errs);
+    expect(JSON_END, jlex, errs);
+    return !jlex.fail;
+  }
 }
 
 bool JAST::parse(std::string &body, std::ostream& errs, JAST &out) {
