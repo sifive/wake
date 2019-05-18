@@ -16,6 +16,8 @@
  */
 
 #include "json5.h"
+#include <string.h>
+#include <errno.h>
 
 static bool expect(SymbolJSON type, JLexer &jlex, std::ostream& errs) {
   if (jlex.next.type != type) {
