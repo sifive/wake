@@ -345,13 +345,13 @@ global def getJobStatus job = match (getJobReport job)
 # Implement FUSE-based Runner
 def wakePath = prim "execpath" # location of the wake executable
 global def fuseRunner =
-  def fuse = relative workspace (simplify "{wakePath}/../lib/wake/fuse-wake")
+  def fuse = "{wakePath}/../lib/wake/fuse-wake"
   def score (Plan _ _ _ _ _ _ lo _ _ _ _ _ _) =
     if lo then Fail "would hide workspace" else Pass 1.0
   makeJSONRunner fuse score (Some _)
 
 global def preloadRunner =
-  def preload = simplify "{wakePath}/../lib/wake/preload-wake"
+  def preload = "{wakePath}/../lib/wake/preload-wake"
   def score (Plan _ _ _ _ _ _ lo _ _ _ _ _ _) =
     if lo then Fail "would hide workspace" else Pass 1.0
   makeJSONRunner preload score (Some _)
@@ -373,9 +373,12 @@ global def defaultRunner = match (getenv "USE_FUSE_WAKE")
 # Make a Runner that runs a named script to run jobs
 # score: Plan => Double; runJob chooses the runner with the largest score for a Plan
 # estimate: Usage => Option Usage; predict local usage based on prior recorded usage
-global def makeJSONRunner script score estimate =
+global def makeJSONRunner rawScript score estimate =
+  def script = which (simplify rawScript)
+  def ok = access script xOK
   def pre = match _
     Fail f = Pair (Fail f) ""
+    _ if ! ok = Pair (Fail (makeError "Runner {script} is not executable")) ""
     Pass (RunnerInput command visible environment directory stdin res prefix record _) = match (findSome getPathError visible)
       Some e = Pair (Fail e) ""
       None =
@@ -410,12 +413,14 @@ global def makeJSONRunner script score estimate =
               def outFile = "{build}/{prefix}.out.json"
               def cmd = script, inFile, outFile, Nil
               def proxy = RunnerInput cmd Nil environment "." "" Nil prefix (omapPartial estimate record) 1
-              Pair (Pass proxy) outFile
+              Pair (Pass proxy) inFile
   def post = match _
     Pair (Fail f) _ = Fail f
-    Pair (Pass output) outFile =
+    Pair (Pass (RunnerOutput _ _ _ (Usage x _ _ _ _ _))) inFile if x != 0 =
+      Fail (makeError "Non-zero exit status ({str x}) for JSON runner {script} on {inFile}")
+    Pair (Pass output) inFile =
       def unlink f = prim "unlink"
-      def inFile = replace `\.out\.json$` ".in.json" outFile
+      def outFile = replace `\.in\.json$` ".out.json" inFile
       def json = parseJSONFile (File outFile)
       def _ = unlink inFile
       match json

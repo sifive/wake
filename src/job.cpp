@@ -1164,6 +1164,9 @@ static PRIMFN(prim_search_path) {
   STRING(path, 0);
   STRING(exec, 1);
 
+  if (exec->value.empty() || exec->value[0] == '/')
+    RETURN(args[1]);
+
   auto out = std::make_shared<String>("");
   const char *tok = path->value.c_str();
   const char *end = tok + path->value.size();
