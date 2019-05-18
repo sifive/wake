@@ -21,10 +21,15 @@ CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsql
 
 COMMON := common/jlexer.o $(patsubst %.cpp,%.o,$(wildcard common/*.cpp))
 
+# If FUSE is unavalable during wake build, allow a linux-specific work-around
+ifeq ($(USE_FUSE_WAKE),0)
+EXTRA := lib/wake/libpreload-wake.so lib/wake/preload-wake
+endif
+
 all:		wake.db
 	./bin/wake all default
 
-wake.db:	bin/wake lib/wake/fuse-wake lib/wake/shim-wake
+wake.db:	bin/wake lib/wake/fuse-wake lib/wake/shim-wake $(EXTRA)
 	test -f $@ || ./bin/wake --init .
 
 install:	all
@@ -40,6 +45,12 @@ lib/wake/fuse-wake:	fuse/fuse.cpp $(COMMON)
 
 lib/wake/shim-wake:	$(patsubst %.c,%.o,$(wildcard shim/*.c))
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+lib/wake/preload-wake:	preload/wrap.cpp $(COMMON)
+	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) -DEXT=so -DENV=LD_PRELOAD -o $@ $^ $(LDFLAGS)
+
+lib/wake/libpreload-wake.so:	preload/open.c
+	$(CC) $(CFLAGS) -fpic -shared -o $@ $^ $(LFDLAGS) -ldl
 
 %.o:	%.cpp	$(filter-out src/version.h,$(wildcard */*.h))
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(CORE_CFLAGS) -o $@ -c $<
