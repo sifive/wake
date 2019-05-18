@@ -746,6 +746,8 @@ static void handle_exit(int sig)
 		}
 		if (!stop) return;
 	} else {
+		// Make sure to let the child process know to die as well
+		if (child == -256) kill(-pid, sig==SIGALRM?SIGTERM:sig);
 		pass = false;
 	}
 
@@ -772,13 +774,29 @@ static void handle_exit(int sig)
 
 static void *wakefuse_init(struct fuse_conn_info *conn)
 {
-	// unblock signals
 	struct sigaction sa;
+
+	// ignore these signals
+	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = SA_RESTART;
+	sigaction(SIGPIPE, &sa, 0);
+	sigaction(SIGUSR1, &sa, 0);
+	sigaction(SIGUSR2, &sa, 0);
+
+	// hook these signals
 	sa.sa_handler = handle_exit;
 	sa.sa_flags = SA_RESTART|SA_NOCLDSTOP;
+	sigaction(SIGHUP,  &sa, 0);
+	sigaction(SIGINT,  &sa, 0);
+	sigaction(SIGQUIT, &sa, 0);
+	sigaction(SIGTERM, &sa, 0);
+	sigaction(SIGALRM, &sa, 0);
 	sigaction(SIGCHLD, &sa, 0);
+
+	// unblock signals
 	sigprocmask(SIG_SETMASK, &saved, 0);
 
+	// unblock the child process
 	if (pipefds[1] != -1) close(pipefds[1]);
 	pipefds[1] = -1;
 
@@ -868,24 +886,9 @@ int main(int argc, char *argv[])
 	sigaddset(&block, SIGINT);
 	sigaddset(&block, SIGQUIT);
 	sigaddset(&block, SIGTERM);
+	sigaddset(&block, SIGALRM);
 	sigaddset(&block, SIGCHLD);
 	sigprocmask(SIG_BLOCK, &block, &saved);
-
-	// ignore these signals
-	sa.sa_handler = SIG_IGN;
-	sa.sa_flags = SA_RESTART;
-	sigaction(SIGPIPE, &sa, 0);
-	sigaction(SIGUSR1, &sa, 0);
-	sigaction(SIGUSR2, &sa, 0);
-
-	// hook these signals
-	sa.sa_handler = handle_exit;
-	sa.sa_flags = SA_RESTART|SA_NOCLDSTOP;
-	sigaction(SIGHUP,  &sa, 0);
-	sigaction(SIGINT,  &sa, 0);
-	sigaction(SIGQUIT, &sa, 0);
-	sigaction(SIGTERM, &sa, 0);
-	sigaction(SIGCHLD, &sa, 0);
 
 	// Prepare the subcommand inputs
 	for (auto &x : jast.get("command").children)
@@ -906,6 +909,10 @@ int main(int argc, char *argv[])
 
 	pid = fork();
 	if (pid == 0) {
+		// become a process group suitable for target by kill
+		setpgid(0, 0);
+		sigprocmask(SIG_SETMASK, &saved, 0);
+
 		std::string dir = path + "/" + jast.get("directory").value;
 		std::string stdin = jast.get("stdin").value;
 		if (stdin.empty()) stdin = "/dev/null";
@@ -993,6 +1000,11 @@ rmroot:
 	}
 term:
 	if (pass) {
+		// disarm any timer we had running
+		struct itimerval retry;
+		memset(&retry, 0, sizeof(retry));
+		setitimer(ITIMER_REAL, &retry, 0);
+
 		// re-enable signals to make it possible to interrupt output
 		sa.sa_handler = SIG_DFL;
 		sa.sa_flags = 0;
@@ -1003,6 +1015,7 @@ term:
 		sigaction(SIGINT,  &sa, 0);
 		sigaction(SIGQUIT, &sa, 0);
 		sigaction(SIGTERM, &sa, 0);
+		sigaction(SIGALRM, &sa, 0);
 		sigaction(SIGCHLD, &sa, 0);
 		sigprocmask(SIG_SETMASK, &saved, 0);
 
