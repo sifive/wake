@@ -897,7 +897,7 @@ int main(int argc, char *argv[])
 		// Wait for fuse to be mounted
 		char c;
 		close(pipefds[1]);
-		read(pipefds[0], &c, 1);
+		(void)read(pipefds[0], &c, 1);
 		close(pipefds[0]);
 
 		if (chdir(dir.c_str()) != 0) {

@@ -63,8 +63,20 @@ OPEN(open)
 OPEN(open64)
 OPEN(__open)
 OPEN(__open64)
-OPEN(__open_2)
-OPEN(__open64_2)
+#endif
+
+#define OPEN2(fn)						\
+int PREFIX(fn)(const char *filename, int flags) {		\
+  static int (*orig)(const char *, int);			\
+  FORWARD(fn);							\
+  unlink_guard(filename);					\
+  return orig(filename, flags);					\
+}								\
+INTERPOSE(fn)
+
+#ifndef __APPLE__
+OPEN2(__open_2)
+OPEN2(__open64_2)
 #endif
 
 #define OPENAT(fn)						\
@@ -88,8 +100,20 @@ INTERPOSE(fn)
 OPENAT(openat)
 #ifndef __APPLE__
 OPENAT(openat64)
-OPENAT(__openat_2)
-OPENAT(__openat64_2)
+#endif
+
+#define OPENAT2(fn)						\
+int PREFIX(fn)(int dirfd, const char *filename, int flags) {	\
+  static int (*orig)(int dirfd, const char *, int);		\
+  FORWARD(fn);							\
+  unlink_guard(filename);					\
+  return orig(dirfd, filename, flags);				\
+}								\
+INTERPOSE(fn)
+
+#ifndef __APPLE__
+OPENAT2(__openat_2)
+OPENAT2(__openat64_2)
 #endif
 
 #define CREAT(fn)						\
