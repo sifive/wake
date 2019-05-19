@@ -1164,20 +1164,20 @@ static PRIMFN(prim_search_path) {
   STRING(path, 0);
   STRING(exec, 1);
 
-  if (exec->value.empty() || exec->value[0] == '/')
+  if (exec->value.find('/') != std::string::npos)
     RETURN(args[1]);
 
   auto out = std::make_shared<String>("");
   const char *tok = path->value.c_str();
   const char *end = tok + path->value.size();
   for (const char *scan = tok; scan != end; ++scan) {
-    if (*scan == ':' && scan != tok) {
-      if (check_exec(tok, scan-tok, exec->value, out->value)) RETURN(out);
+    if (*scan == ':') {
+      if (scan != tok && check_exec(tok, scan-tok, exec->value, out->value)) RETURN(out);
       tok = scan+1;
     }
   }
 
-  if (check_exec(tok, end-tok, exec->value, out->value)) RETURN(out);
+  if (end != tok && check_exec(tok, end-tok, exec->value, out->value)) RETURN(out);
   // If not found, return input unmodified => runJob fails somewhat gracefully
   RETURN(args[1]);
 }

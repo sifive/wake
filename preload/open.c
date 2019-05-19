@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <stdarg.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -23,14 +24,7 @@ struct interpose { const void* my_fn; const void* orig_fn; };
 #define INTERPOSE(fn)
 #endif
 
-/*
- catopen
- execv[p][e]
- execl[pe]
- */
-
 static void unlink_guard(const char *filename) {
-  char buf[4096];
   char prefix[] = ".guard-";
 
   int last = 0, len;
@@ -38,12 +32,12 @@ static void unlink_guard(const char *filename) {
     if (filename[len] == '/')
       last = len + 1;
 
-  if (len + sizeof(prefix) > sizeof(buf)) return;
+  char buf[len + sizeof(prefix)];
+  memcpy(&buf[0], filename, last);
+  memcpy(&buf[last], prefix, sizeof(prefix)-1);
+  memcpy(&buf[last+sizeof(prefix)-1], filename+last, 1+len-last);
 
-  memcpy(buf, filename, last);
-  memcpy(buf+last, prefix, sizeof(prefix)-1);
-  memcpy(buf+last+sizeof(prefix)-1, filename+last, 1+len-last);
-  unlink(buf);
+  unlink(&buf[0]);
 }
 
 #define OPEN(fn)						\
@@ -139,3 +133,146 @@ FREOPEN(freopen)
 #ifndef __APPLE__
 FREOPEN(freopen64)
 #endif
+
+int PREFIX(execv)(const char *path, char *const argv[]) {
+  static int (*orig)(const char *, char *const []);
+  FORWARD(execv);
+  unlink_guard(path);
+  return orig(path, argv);
+}
+INTERPOSE(execv)
+
+static int check_exec(const char *prefix, int plen, const char *file, int flen) {
+  char path[plen+flen+2];
+  memcpy(&path[0], prefix, plen);
+  memcpy(&path[plen+1], file, flen);
+  path[plen] = '/';
+  path[plen+flen+1] = 0;
+  return access(&path[0], X_OK) == 0;
+}
+
+static int search(const char **prefix, const char *file, int flen) {
+  if (!*prefix) *prefix = ".:/bin:/usr/bin";
+  if (strchr(file, '/')) return 0;
+
+  const char *tok = *prefix;
+  const char *end = tok + strlen(tok);
+  for (const char *scan = tok; scan != end; ++scan) {
+    if (*scan == ':') {
+      if (scan != tok && check_exec(tok, scan-tok, file, flen)) {
+        *prefix = tok;
+        return scan-tok;
+      }
+      tok = scan+1;
+    }
+  }
+
+  if (end != tok && check_exec(tok, end-tok, file, flen)) {
+    *prefix = tok;
+    return end-tok;
+  } else {
+    return 0;
+  }
+}
+
+int PREFIX(execvp)(const char *file, char *const argv[]) {
+  const char *prefix = getenv("PATH");
+  int flen = strlen(file);
+  int plen = search(&prefix, file, flen);
+  if (plen > 0) {
+    char path[plen+flen+2];
+    memcpy(&path[0], prefix, plen);
+    memcpy(&path[plen+1], file, flen);
+    path[plen] = '/';
+    path[plen+flen+1] = 0;
+    return PREFIX(execv)(path, argv);
+  } else {
+    return PREFIX(execv)(file, argv);
+  }
+}
+INTERPOSE(execvp)
+
+int PREFIX(execve)(const char *filename, char *const argv[], char *const envp[]) {
+  static int (*orig)(const char *, char *const [], char *const []);
+  FORWARD(execve);
+  unlink_guard(filename);
+  return orig(filename, argv, envp);
+}
+INTERPOSE(execve)
+
+#ifdef __GNU__
+int PREFIX(execvpe)(const char *file, char *const argv[], char *const envp[]) {
+  const char *prefix = getenv("PATH");
+  int flen = strlen(file);
+  int plen = search(&prefix, file, flen);
+  if (plen > 0) {
+    char path[plen+flen+2];
+    memcpy(&path[0], prefix, plen);
+    memcpy(&path[plen+1], file, flen);
+    path[plen] = '/';
+    path[plen+flen+1] = 0;
+    return PREFIX(execve)(path, argv, envp);
+  } else {
+    return PREFIX(execve)(file, argv, envp);
+  }
+}
+INTERPOSE(execve)
+#endif
+
+int PREFIX(execl)(const char *path, const char *arg, ... /* (char  *) NULL */) {
+  int nargs;
+  va_list ap, ap2;
+
+  va_start(ap, arg);
+  va_copy(ap2, ap);
+  for (nargs = 1; va_arg(ap, char*); ++nargs) { }
+  va_end(ap);
+
+  char *argv[nargs+1];
+
+  argv[0] = (char*)arg;
+  for (nargs = 1; (argv[nargs] = va_arg(ap2, char*)); ++nargs) { }
+  va_end(ap2);
+
+  return PREFIX(execv)(path, argv);
+}
+INTERPOSE(execl)
+
+int PREFIX(execlp)(const char *file, const char *arg, ... /* (char  *) NULL */) {
+  int nargs;
+  va_list ap, ap2;
+
+  va_start(ap, arg);
+  va_copy(ap2, ap);
+  for (nargs = 1; va_arg(ap, char*); ++nargs) { }
+  va_end(ap);
+
+  char *argv[nargs+1];
+
+  argv[0] = (char*)arg;
+  for (nargs = 1; (argv[nargs] = va_arg(ap2, char*)); ++nargs) { }
+  va_end(ap2);
+
+  return PREFIX(execvp)(file, argv);
+}
+INTERPOSE(execlp)
+
+int PREFIX(execle)(const char *path, const char *arg, ... /*, (char *) NULL, char * const envp[] */) {
+  int nargs;
+  va_list ap, ap2;
+
+  va_start(ap, arg);
+  va_copy(ap2, ap);
+  for (nargs = 1; va_arg(ap, char*); ++nargs) { }
+  va_end(ap);
+
+  char *argv[nargs+1];
+
+  argv[0] = (char*)arg;
+  for (nargs = 1; (argv[nargs] = va_arg(ap2, char*)); ++nargs) { }
+  char * const * envp = va_arg(ap2, char * const *);
+  va_end(ap2);
+
+  return PREFIX(execve)(path, argv, envp);
+}
+INTERPOSE(execle)
