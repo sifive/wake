@@ -361,14 +361,14 @@ def wOK = 1
 def xOK = 2
 def access file mode = prim "access"
 
-global def defaultRunner = match (getenv "USE_FUSE_WAKE")
-  Some "0" = preloadRunner
-  Some _ = fuseRunner
-  None =
-    def fuse =
-      access "/dev/fuse" wOK ||
-      access "/dev/osxfuse0" wOK
-    if fuse then fuseRunner else preloadRunner
+global def defaultRunner = match sysname
+  "Darwin" = fuseRunner
+  _ = match (getenv "USE_FUSE_WAKE")
+    Some "0" = preloadRunner
+    Some _ = fuseRunner
+    None =
+      def fuse = access "/dev/fuse" wOK
+      if fuse then fuseRunner else preloadRunner
 
 # Make a Runner that runs a named script to run jobs
 # score: Plan => Double; runJob chooses the runner with the largest score for a Plan
