@@ -143,7 +143,11 @@ static void scan_shadow_tree(sset &exist, const std::string &path) {
   scan_shadow_tree(exist, "", dirfd);
 }
 
-static void compute_inout(const sset &exist, const sset &guards, const sset &visible, svec &inputs, svec &outputs) {
+#ifdef __APPLE__
+#define st_mtim st_mtimespec
+#endif
+
+static void compute_inout(const sset &exist, const sset &guards, const sset &visible, const struct timeval &start, svec &inputs, svec &outputs) {
   // First, compute exist - guards
   svec emg;
   auto e = exist.begin(), g = guards.begin();
@@ -172,8 +176,9 @@ static void compute_inout(const sset &exist, const sset &guards, const sset &vis
         std::cerr << "stat " << *m << ": " << strerror(errno) << std::endl;
         exit(1);
       }
-      // struct timespec st_mtimespec
-      if (false) { // modified) {
+      if (sbuf.st_mtim.tv_sec > start.tv_sec ||
+          (sbuf.st_mtim.tv_sec == start.tv_sec &&
+           sbuf.st_mtim.tv_nsec > start.tv_usec*1000)) {
         outputs.emplace_back(std::move(*m));
       } else if (exist.find(makeGuard(*m)) == exist.end()) {
         inputs.emplace_back(std::move(*m));
@@ -326,7 +331,7 @@ int main(int argc, const char **argv) {
   svec inputs, outputs;
 
   scan_shadow_tree(exist, root);
-  compute_inout(exist, guards, visible, inputs, outputs);
+  compute_inout(exist, guards, visible, start, inputs, outputs);
   relink_shadow_tree(root, outputs);
   remove_shadow_tree(root, exist);
   
