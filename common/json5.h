@@ -81,4 +81,6 @@ struct JLexer {
   void consume();
 };
 
+std::string json_escape(const std::string &x);
+
 #endif

@@ -110,7 +110,21 @@ static PRIMFN(prim_json_body) {
   }
 }
 
+static PRIMTYPE(type_jstr) {
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
+}
+
+static PRIMFN(prim_json_str) {
+  EXPECT(1);
+  STRING(str, 0);
+  auto out = std::make_shared<String>(json_escape(str->value));
+  RETURN(out);
+}
+
 void prim_register_json(PrimMap &pmap) {
   prim_register(pmap, "json_file", prim_json_file, type_json, PRIM_SHALLOW);
   prim_register(pmap, "json_body", prim_json_body, type_json, PRIM_SHALLOW|PRIM_PURE);
+  prim_register(pmap, "json_str",  prim_json_str,  type_jstr, PRIM_SHALLOW|PRIM_PURE);
 }

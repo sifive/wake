@@ -47,3 +47,26 @@ JAST &JAST::get(const std::string &key) {
         return x.second;
   return null;
 }
+
+static char hex(unsigned char x) {
+  if (x < 10) return '0' + x;
+  return 'a' + x - 10;
+}
+
+std::string json_escape(const std::string &x) {
+  std::string out;
+  char escape[] = "\\u0000";
+  for (char z : x) {
+    unsigned char c = z;
+    if (z == '"') out.append("\\\"");
+    else if (z == '\\') out.append("\\\\");
+    else if (c >= 0x20) {
+      out.push_back(c);
+    } else {
+      escape[4] = hex(c >> 4);
+      escape[5] = hex(c & 0xf);
+      out.append(escape);
+    }
+  }
+  return out;
+}

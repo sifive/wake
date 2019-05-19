@@ -803,29 +803,6 @@ static void *wakefuse_init(struct fuse_conn_info *conn)
 	return 0;
 }
 
-static char hex(unsigned char x) {
-  if (x < 10) return '0' + x;
-  return 'a' + x - 10;
-}
-
-static std::string escape(const std::string &x) {
-  std::string out;
-  char escape[] = "\\u0000";
-  for (char z : x) {
-    unsigned char c = z;
-    if (c == '"') out.append("\\\"");
-    else if (c == '\\') out.append("\\\\");
-    else if (z >= 0x20) {
-      out.push_back(c);
-    } else {
-      escape[4] = hex(z >> 4);
-      escape[5] = hex(z & 0xf);
-      out.append(escape);
-    }
-  }
-  return out;
-}
-
 int main(int argc, char *argv[])
 {
 	wakefuse_ops.init		= wakefuse_init;
@@ -1051,7 +1028,7 @@ term:
 
 		first = true;
 		for (auto &x : files_read) {
-			out << (first?"":",") << "\"" << escape(x) << "\"";
+			out << (first?"":",") << "\"" << json_escape(x) << "\"";
 			first = false;
 		}
 
@@ -1059,7 +1036,7 @@ term:
 
 		first = true;
 		for (auto &x : files_wrote) {
-			out << (first?"":",") << "\"" << escape(x) << "\"";
+			out << (first?"":",") << "\"" << json_escape(x) << "\"";
 			first = false;
 		}
 

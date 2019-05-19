@@ -54,22 +54,7 @@ global def parseJSONFile path =
   def p f = prim "json_file"
   p path.getPathName
 
-def escape =
-  def fmt t = match _
-    0xa = '\n', t
-    0x9 = '\t', t
-    0xd = '\r', t
-    x if x < 16 = '\u000', strbase 16 x, t
-    x           = '\u00',  strbase 16 x, t
-  def helper = match _
-    s, c, t = s, byteToInteger c | fmt (helper t)
-    x = x
-  _
-  | replace `[\\"]` '\\\0'
-  | replace `\0` '\\u0000'
-  | replace `[\x01-\x1f]` "\0\\0\0"
-  | tokenize `\0`
-  | helper
+global def jsonEscape str = prim "json_str"
 
 tuple JSONFormat =
   global String:  String  => String
@@ -98,7 +83,7 @@ def doFormat fmt lhs =
         else "[{tabbeder}", foldr helper ("{tabbed}]", rhs) list | tail
       JObject  list =
         def helper (Pair key value) acc =
-          ",{tabbeder}", '"', escape key ++ ("\":{space}", rec acc deeper value)
+          ",{tabbeder}", '"', jsonEscape key, ("\":{space}", rec acc deeper value)
         if list.empty then '{}', rhs
         else "\{{tabbeder}", foldr helper ("{tabbed}\}", rhs) list | tail
   rec Nil (if indent > 0 then Some "" else None) lhs
@@ -110,7 +95,7 @@ global def defaultJSONFormat =
       Infinite = "1e9999"
       NaN      = "NaN"
       _        = dstr d
-  JSONFormat (escape _ | cat) str formatDouble 0
+  JSONFormat jsonEscape str formatDouble 0
 
 global def prettyJSONFormat = defaultJSONFormat | setJSONFormatIndent 2
 
