@@ -23,6 +23,7 @@
 #include "type.h"
 #include "symbol.h"
 #include "status.h"
+#include "utf8.h"
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -33,6 +34,7 @@
 #include <errno.h>
 #include <cstring>
 #include <utf8proc.h>
+#include <unistd.h>
 
 struct CatStream : public Value {
   std::stringstream str;
@@ -192,6 +194,23 @@ static PRIMFN(prim_write) {
   std::stringstream str;
   str << "write " << path->value << ": " << strerror(errno);
   auto out = make_result(false, std::make_shared<String>(str.str()));
+  RETURN(out);
+}
+
+static PRIMTYPE(type_unlink) {
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
+    out->unify(Data::typeUnit);
+}
+
+static PRIMFN(prim_unlink) {
+  EXPECT(1);
+  STRING(path, 0);
+
+  // don't care if this succeeds
+  (void)unlink(path->value.c_str());
+
+  auto out = make_unit();
   RETURN(out);
 }
 
@@ -446,6 +465,7 @@ void prim_register_string(PrimMap &pmap, const char *version) {
   prim_register(pmap, "catadd",   prim_catadd,   type_catadd,              PRIM_SHALLOW);
   prim_register(pmap, "catclose", prim_catclose, type_catclose,            PRIM_SHALLOW);
   prim_register(pmap, "explode",  prim_explode,  type_explode,   PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "unlink",   prim_unlink,   type_unlink,              PRIM_SHALLOW);
   prim_register(pmap, "write",    prim_write,    type_write,               PRIM_SHALLOW);
   prim_register(pmap, "read",     prim_read,     type_read,                PRIM_SHALLOW);
   prim_register(pmap, "getenv",   prim_getenv,   type_getenv,    PRIM_PURE|PRIM_SHALLOW);

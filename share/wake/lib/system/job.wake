@@ -142,9 +142,6 @@ def id x = x
 global def makePlan cmd visible =
   Plan cmd visible environment "." "" Share False Nil (\_ True) id id id 1
 
-global def makeManualPlan cmd visible foutputs =
-  Plan cmd visible environment "." "" Share True Nil (\_ True) id (\_ foutputs Unit) id 1
-
 def makeRawPlan cmd  =
   Plan cmd Nil Nil "." "" ReRun True Nil (\_ True) id id id 1
 
@@ -152,7 +149,7 @@ def defaultUsage = Usage 0 0.0 0.0 0 0 0
 
 # This runner does not detect inputs/outputs/indexes on it's own
 # You must use Fn{Inputs,Outputs,Indexes} to fill in this information
-global def manualRunner =
+global def localRunner =
   def launch job pool dir stdin env cmd status runtime cputime membytes ibytes obytes = prim "job_launch"
   def badlaunch job error = prim "job_fail_launch"
   def doit job = match _
@@ -171,7 +168,7 @@ global def manualRunner =
             Fail f = Fail f
   def score (Plan _ _ _ _ _ _ lo _ _ _ _ _ _) =
     if lo then Pass 1.0 else Fail "cannot detect outputs"
-  Runner "manual" score doit
+  Runner "local" score doit
 
 global def virtualRunner =
   def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
@@ -233,7 +230,7 @@ def runOnce cmd env dir stdin res finputs foutputs findexes vis keep run pool =
   memoize 9 (runAlways cmd env dir stdin res finputs foutputs findexes vis keep run pool)
 
 # Default runners provided by wake
-publish runner = manualRunner, fuseRunner, Nil
+publish runner = localRunner, defaultRunner, Nil
 
 def runJobImp cmd env dir stdin res finputs foutputs findexes vis pers run pool =
   if isOnce pers
@@ -347,63 +344,46 @@ global def getJobStatus job = match (getJobReport job)
 
 # Implement FUSE-based Runner
 def wakePath = prim "execpath" # location of the wake executable
-def fusePath = relative workspace (simplify "{wakePath}/../lib/wake/fuse-wake")
 global def fuseRunner =
-  def sigalrm = 14
-  def pre = match _
-    Fail f = Pair (Fail f) None
-    Pass input = match ((\m\p prim "mkdir") 0775 ".build")
-      Fail f = Pair (Fail (makeError f)) None
-      Pass build = match (
-        (input.getRunnerInputDirectory, input.getRunnerInputVisible | map getPathName)
-        | implode
-        | (\m\p\c prim "write") 0664 "{build}/{input.getRunnerInputPrefix}.visible"
-      )
-        Fail f = Pair (Fail (makeError f)) None
-        Pass visibleFile =
-          def cmd = fusePath, visibleFile, Nil
-          def fuse = makeRawPlan cmd | setPlanPool 0 | runJobWith manualRunner
-          match (fuse.getJobStderr | rmap (extract `OK: (.*)`))
-            Pass (x, Nil) = Pair (Pass (editRunnerInputDirectory ("{x}/{_}") input)) (Some fuse)
-            Pass _ = Pair (Fail (makeError "fuse-wake stderr invalid: {fuse.getJobStderr | getWhenFail ""}")) (Some fuse)
-            Fail f = Pair (Fail f) (Some fuse)
-  def post = match _
-    Pair x None = x
-    Pair (Fail f) (Some fuse) =
-      def _ = killJob fuse sigalrm
-      Fail f
-    Pair (Pass output) (Some fuse) =
-      def _ = killJob fuse sigalrm
-      def usage (Usage ps pr pc pm pi po) = match fuse.getJobReport
-        Pass (Usage fs _ fc fm fi fo) =
-          Usage (if fs == 0 then ps else fs) pr (fc +. pc) (fm + pm) (fi + pi) (fo + po)
-        Fail _ =
-          Usage ps pr pc pm pi po
-      def fields =
-        fuse.getJobStdout
-        | getWhenFail ""
-        | extract `(.*\0)?\0(.*)`
-      match fields
-        inputs, outputs, Nil =
-          output
-          | setRunnerOutputInputs  (inputs  | tokenize `\0` | filter (_!=*""))
-          | setRunnerOutputOutputs (outputs | tokenize `\0` | filter (_!=*""))
-          | editRunnerOutputUsage usage
-          | Pass
-        _ = Fail (makeError "fuse-wake stdout invalid: {fuse.getJobStdout | getWhenFail ""}")
+  def fuse = "{wakePath}/../lib/wake/fuse-wake"
   def score (Plan _ _ _ _ _ _ lo _ _ _ _ _ _) =
     if lo then Fail "would hide workspace" else Pass 1.0
-  makeRunner "fuse" score pre post manualRunner
+  makeJSONRunner fuse score (Some _)
+
+global def preloadRunner =
+  def preload = "{wakePath}/../lib/wake/preload-wake"
+  def score (Plan _ _ _ _ _ _ lo _ _ _ _ _ _) =
+    if lo then Fail "would hide workspace" else Pass 1.0
+  makeJSONRunner preload score (Some _)
+
+def rOK = 0
+def wOK = 1
+def xOK = 2
+def access file mode = prim "access"
+
+global def defaultRunner = match sysname
+  "Darwin" = fuseRunner
+  _ = match (getenv "USE_FUSE_WAKE")
+    Some "0" = preloadRunner
+    Some _ = fuseRunner
+    None =
+      def fuse = access "/dev/fuse" wOK
+      if fuse then fuseRunner else preloadRunner
 
 # Make a Runner that runs a named script to run jobs
 # score: Plan => Double; runJob chooses the runner with the largest score for a Plan
 # estimate: Usage => Option Usage; predict local usage based on prior recorded usage
-global def makeJSONRunner script score estimate =
+global def makeJSONRunner rawScript score estimate =
+  def script = which (simplify rawScript)
+  def ok = access script xOK
   def pre = match _
     Fail f = Pair (Fail f) ""
+    _ if ! ok = Pair (Fail (makeError "Runner {script} is not executable")) ""
     Pass (RunnerInput command visible environment directory stdin res prefix record _) = match (findSome getPathError visible)
       Some e = Pair (Fail e) ""
       None =
+        def pmkdir m p = prim "mkdir"
+        def pwrite m p d = prim "write"
         def json = JObject (
           "command"     → command     | map JString | JArray,
           "environment" → environment | map JString | JArray,
@@ -425,31 +405,46 @@ global def makeJSONRunner script score estimate =
                 Nil
               ), Nil
         )
-        match ((\m\p prim "mkdir") 0775 ".build")
+        match (pmkdir 0775 ".build")
           Fail f = Pair (Fail (makeError f)) ""
-          Pass build = match ((\m\p\c prim "write") 0664 "{build}/{prefix}.in.json" (prettyJSON json))
+          Pass build = match (pwrite 0664 "{build}/{prefix}.in.json" (prettyJSON json))
             Fail f = Pair (Fail (makeError f)) ""
             Pass inFile =
               def outFile = "{build}/{prefix}.out.json"
-              def cmd = script.getPathName, inFile, outFile, Nil
+              def cmd = script, inFile, outFile, Nil
               def proxy = RunnerInput cmd Nil environment "." "" Nil prefix (omapPartial estimate record) 1
-              Pair (Pass proxy) outFile
+              Pair (Pass proxy) inFile
   def post = match _
     Pair (Fail f) _ = Fail f
-    Pair (Pass output) outFile =
-      def content = parseJSONFile (File outFile) | getWhenFail JNull
-      def usage = content // `usage`
-      def usageOut =
-        Usage
-        (usage // `status`   | getJInteger | getOrElse 255)
-        (usage // `runtime`  | getJDouble  | getOrElse 0.0)
-        (usage // `cputime`  | getJDouble  | getOrElse 0.0)
-        (usage // `membytes` | getJInteger | getOrElse 0)
-        (usage // `inbytes`  | getJInteger | getOrElse 0)
-        (usage // `outbytes` | getJInteger | getOrElse 0)
-      def getK exp = content // exp | getJArray | getOrElse Nil | mapPartial getJString
-      Pass (RunnerOutput (getK `inputs`) (getK `outputs`) (getK `indexes`) usageOut)
-  makeRunner "json-{script.getPathName}" score pre post manualRunner
+    Pair (Pass (RunnerOutput _ _ _ (Usage x _ _ _ _ _))) inFile if x != 0 =
+      Fail (makeError "Non-zero exit status ({str x}) for JSON runner {script} on {inFile}")
+    Pair (Pass output) inFile =
+      def unlink f = prim "unlink"
+      def outFile = replace `\.in\.json$` ".out.json" inFile
+      def json = parseJSONFile (File outFile)
+      def _ = unlink inFile
+      match json
+        Fail f = Fail (makeError f)
+        Pass content =
+          def _ = unlink outFile
+          def field name = match _ _
+             _ (Fail f) = Fail f
+             None (Pass fn) = Fail "{script} produced {outFile}, which is missing usage/{name}"
+             (Some x) (Pass fn) = Pass (fn x)
+          def usage = content // `usage`
+          def usageResult =
+            Pass (Usage _ _ _ _ _ _)
+            | field "status"   (usage // `status`   | getJInteger)
+            | field "runtime"  (usage // `runtime`  | getJDouble)
+            | field "cputime"  (usage // `cputime`  | getJDouble)
+            | field "membytes" (usage // `membytes` | getJInteger)
+            | field "inbytes"  (usage // `inbytes`  | getJInteger)
+            | field "outbytes" (usage // `outbytes` | getJInteger)
+          def getK exp = content // exp | getJArray | getOrElse Nil | mapPartial getJString
+          match usageResult
+            Fail f = Fail (makeError f)
+            Pass usage = Pass (RunnerOutput (getK `inputs`) (getK `outputs`) (getK `indexes`) usage)
+  makeRunner "json-{script}" score pre post localRunner
 
 global def executeJSON json =
   def makeVirtual visible =
@@ -513,7 +508,7 @@ def hashcode f = memoize 0 (
   def get f = prim "get_hash"
   def reuse = get f
   if reuse !=* "" then reuse else
-    def job = makeRawPlan ("<hash>", f, Nil) | runJobWith manualRunner
+    def job = makeRawPlan ("<hash>", f, Nil) | runJobWith localRunner
     def hash =
       job.getJobStdout
       | getWhenFail ""
@@ -583,7 +578,9 @@ global def alwaysJob cmd visible =
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
 global def manualJob cmd visible foutputs =
-  makeManualPlan cmd visible foutputs
+  makePlan cmd visible
+  | setPlanLocalOnly True
+  | setPlanFnOutputs (\_ foutputs Unit)
   | runJob
 
 # Use volatileJob when:
@@ -597,6 +594,8 @@ global def manualJob cmd visible foutputs =
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
 global def volatileJob cmd visible foutputs =
-  makeManualPlan cmd visible foutputs
+  makePlan cmd visible
+  | setPlanLocalOnly True
+  | setPlanFnOutputs (\_ foutputs Unit)
   | setPlanKeep False
   | runJob

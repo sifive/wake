@@ -2,6 +2,7 @@
 /.build
 /wake.db
 /src/symbol.cpp
+/common/jlexer.cpp
 /bin/wake
 /bin/wake.*
 /src/version.h
@@ -9,4 +10,7 @@
 /lib/wake/fuse-wake.*
 /lib/wake/shim-wake
 /lib/wake/shim-wake.*
+/lib/wake/libpreload-wake.*
+/lib/wake/preload-wake
+/lib/wake/preload-wake.*
 /install

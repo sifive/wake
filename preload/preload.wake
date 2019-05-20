@@ -1,0 +1,44 @@
+# Copyright 2019 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+def loadenv = match sysname
+  "Darwin" = "DYLD_INSERT_LIBRARIES"
+  _ = "LD_PRELOAD"
+
+def libext = match sysname
+  "Darwin" = "dylib"
+  _ = "so"
+
+def libcflags = match sysname
+  _ = "-fpic", Nil
+
+def liblflags = match sysname
+  "Darwin" = "-dynamiclib", Nil
+  _ = "-shared", "-ldl", Nil
+
+global def buildPreload (Pair variant _) =
+  def json = common variant
+  def headers = json.getSysLibHeaders ++ sources here `.*\.h`
+  def cppFiles = sources here `.*\.cpp`
+  def cppFlags = "-DEXT={libext}", "-DENV={loadenv}", json.getSysLibCFlags
+  def ofiles = map (compileC variant cppFlags headers) cppFiles
+  linkO variant Nil (ofiles ++ json.getSysLibObjects) "lib/wake/preload-wake"
+
+global def buildPrelib (Pair _ variant) =
+  def cfiles = sources here `.*\.c`
+  def ofiles = map (compileC variant libcflags Nil) cfiles
+  linkO variant liblflags ofiles "lib/wake/libpreload-wake.{libext}"
+
+# publish runner = makeJSONRunner "preload/wrap" (\_ Pass 2.0) (\_ None), Nil

@@ -21,7 +21,7 @@
 #include "heap.h"
 #include "database.h"
 #include "location.h"
-#include "sources.h"
+#include "execpath.h"
 #include "status.h"
 #include "thunk.h"
 #include <sys/types.h>
@@ -1145,13 +1145,6 @@ static PRIMFN(prim_get_modtime) {
   RETURN(out);
 }
 
-static bool check_exec(const char *tok, size_t len, const std::string &exec, std::string &out) {
-  out.assign(tok, len);
-  out += "/";
-  out += exec;
-  return access(out.c_str(), X_OK) == 0;
-}
-
 static PRIMTYPE(type_search_path) {
   return args.size() == 2 &&
     args[0]->unify(String::typeVar) &&
@@ -1164,19 +1157,8 @@ static PRIMFN(prim_search_path) {
   STRING(path, 0);
   STRING(exec, 1);
 
-  auto out = std::make_shared<String>("");
-  const char *tok = path->value.c_str();
-  const char *end = tok + path->value.size();
-  for (const char *scan = tok; scan != end; ++scan) {
-    if (*scan == ':' && scan != tok) {
-      if (check_exec(tok, scan-tok, exec->value, out->value)) RETURN(out);
-      tok = scan+1;
-    }
-  }
-
-  if (check_exec(tok, end-tok, exec->value, out->value)) RETURN(out);
-  // If not found, return input unmodified => runJob fails somewhat gracefully
-  RETURN(args[1]);
+  auto out = std::make_shared<String>(find_in_path(exec->value, path->value));
+  RETURN(out);
 }
 
 static void usage_type(TypeVar &pair) {
@@ -1263,6 +1245,24 @@ static PRIMFN(prim_job_record) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_access) {
+  return args.size() == 2 &&
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(Data::typeBoolean);
+}
+
+static PRIMFN(prim_access) {
+  EXPECT(2);
+  STRING(file, 0);
+  INTEGER(kind, 1);
+  int mode = R_OK;
+  if (mpz_cmp_si(kind->value, 1) == 0) mode = W_OK;
+  if (mpz_cmp_si(kind->value, 2) == 0) mode = X_OK;
+  auto out = make_bool(access(file->value.c_str(), mode) == 0);
+  RETURN(out);
+}
+
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   prim_register(pmap, "job_cache",  prim_job_cache,  type_job_cache,   PRIM_SHALLOW, jobtable);
   prim_register(pmap, "job_create", prim_job_create, type_job_create,  PRIM_SHALLOW, jobtable);
@@ -1283,4 +1283,5 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   prim_register(pmap, "get_hash",   prim_get_hash,   type_get_hash,    PRIM_SHALLOW, jobtable);
   prim_register(pmap, "get_modtime",prim_get_modtime,type_get_modtime, PRIM_SHALLOW);
   prim_register(pmap, "search_path",prim_search_path,type_search_path, PRIM_SHALLOW);
+  prim_register(pmap, "access",     prim_access,     type_access,      PRIM_SHALLOW);
 }

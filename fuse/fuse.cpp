@@ -34,6 +34,8 @@
 #include <errno.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
 #endif
@@ -42,6 +44,8 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include "json5.h"
+#include "execpath.h"
 
 //#define TRACE(x) do { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } while (0)
 #define TRACE(x) (void)x
@@ -711,25 +715,40 @@ static std::string path;
 static struct fuse* fh;
 static struct fuse_chan* fc;
 static sigset_t saved;
-static int logfd;
 static bool pass;
+static int pipefds[2];
+static pid_t pid;
+static int child = -256;
+static struct rusage rusage;
 
 static struct fuse_operations wakefuse_ops;
 
-static void *wakefuse_init(struct fuse_conn_info *conn)
-{
-	std::cerr << "OK: " << path << std::flush;
-	dup2(logfd, 2); // close stderr for wake to capture
-	close(logfd);
-
-	// unblock signals
-	sigprocmask(SIG_SETMASK, &saved, 0);
-	return 0;
-}
-
 static void handle_exit(int sig)
 {
-	if (sig != SIGALRM) pass = false;
+	if (sig == SIGCHLD) {
+		struct rusage temp;
+		pid_t reaped;
+		int status;
+		bool stop;
+
+		stop = false;
+		while ((reaped = wait4(-1, &status, WNOHANG, &temp)) > 0) {
+			if (!WIFSTOPPED(status) && reaped == pid) {
+				stop = true;
+				rusage = temp;
+				if (WIFEXITED(status)) {
+					child = WEXITSTATUS(status);
+				} else {
+					child = -WTERMSIG(status);
+				}
+			}
+		}
+		if (!stop) return;
+	} else if (sig != SIGALRM) {
+		// Make sure to let the child process know to die as well
+		if (child == -256) kill(-pid, sig);
+		pass = false;
+	}
 
 	// Unfortunately, fuse_unmount can fail if the filesystem is still in use.
 	// Yes, this can even happen on linux with MNT_DETACH / lazy umount.
@@ -750,6 +769,37 @@ static void handle_exit(int sig)
 		retry.it_value.tv_usec = 200000; // 200ms
 		setitimer(ITIMER_REAL, &retry, 0);
 	}
+}
+
+static void *wakefuse_init(struct fuse_conn_info *conn)
+{
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+
+	// ignore these signals
+	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = SA_RESTART;
+	sigaction(SIGPIPE, &sa, 0);
+	sigaction(SIGUSR1, &sa, 0);
+	sigaction(SIGUSR2, &sa, 0);
+
+	// hook these signals
+	sa.sa_handler = handle_exit;
+	sa.sa_flags = SA_RESTART|SA_NOCLDSTOP;
+	sigaction(SIGHUP,  &sa, 0);
+	sigaction(SIGINT,  &sa, 0);
+	sigaction(SIGQUIT, &sa, 0);
+	sigaction(SIGTERM, &sa, 0);
+	sigaction(SIGALRM, &sa, 0);
+	sigaction(SIGCHLD, &sa, 0);
+
+	// unblock the child process
+	close(pipefds[1]);
+
+	// unblock signals
+	sigprocmask(SIG_SETMASK, &saved, 0);
+
+	return 0;
 }
 
 int main(int argc, char *argv[])
@@ -787,26 +837,91 @@ int main(int argc, char *argv[])
 #endif
 
 	int status = 1;
+	JAST jast;
 	sigset_t block;
 	struct sigaction sa;
 	struct fuse_args args;
+	struct timeval start, stop;
+	std::vector<char *> arg, env;
 
-	// no fail operations
-	memset(&sa, 0, sizeof(sa));
+	if (argc != 3) {
+		std::cerr << "Syntax: fuse-wake <input-json> <output-json>" << std::endl;
+		goto term;
+	}
+
+	if (!JAST::parse(argv[1], std::cerr, jast))
+		goto term;
+
+	// block those signals where we wish to terminate cleanly
+	sigemptyset(&block);
+	sigaddset(&block, SIGHUP);
+	sigaddset(&block, SIGINT);
+	sigaddset(&block, SIGQUIT);
+	sigaddset(&block, SIGTERM);
+	sigaddset(&block, SIGALRM);
+	sigaddset(&block, SIGCHLD);
+	sigprocmask(SIG_BLOCK, &block, &saved);
+
+	// Prepare the subcommand inputs
+	for (auto &x : jast.get("command").children)
+		arg.push_back(const_cast<char*>(x.second.value.c_str()));
+	arg.push_back(0);
+	for (auto &x : jast.get("environment").children)
+		env.push_back(const_cast<char*>(x.second.value.c_str()));
+	env.push_back(0);
+
+	path = ".build/" + std::to_string(getpid());
+
+	if (pipe(pipefds) != 0) {
+		std::cerr << "pipe: " << strerror(errno) << std::endl;
+		goto term;
+	}
+
+	gettimeofday(&start, 0);
+
+	pid = fork();
+	if (pid == 0) {
+		// become a process group suitable for target by kill
+		setpgid(0, 0);
+		sigprocmask(SIG_SETMASK, &saved, 0);
+
+		std::string dir = path + "/" + jast.get("directory").value;
+		std::string stdin = jast.get("stdin").value;
+		if (stdin.empty()) stdin = "/dev/null";
+
+		// Wait for fuse to be mounted
+		char c;
+		close(pipefds[1]);
+		(void)read(pipefds[0], &c, 1);
+		close(pipefds[0]);
+
+		if (chdir(dir.c_str()) != 0) {
+			std::cerr << "chdir " << dir << ": " << strerror(errno) << std::endl;
+			exit(1);
+		}
+
+		int fd = open(stdin.c_str(), O_RDONLY);
+		if (fd == -1) {
+			std::cerr << "open " << stdin << ":" << strerror(errno) << std::endl;
+			exit(1);
+		}
+
+		if (fd != 0) {
+			dup2(fd, 0);
+			close(fd);
+		}
+
+		std::string command = find_in_path(arg[0], find_path(env.data()));
+		execve(command.c_str(), arg.data(), env.data());
+		std::cerr << "execve " << command << ": " << strerror(errno) << std::endl;
+		exit(1);
+	}
+	close(pipefds[0]);
+
 	umask(0);
 
-	if (argc < 2) return 127;
-	std::ifstream ifs(argv[1]);
-	std::string content(
-		(std::istreambuf_iterator<char>(ifs)),
-		(std::istreambuf_iterator<char>()));
-	ifs.close();
-	unlink(argv[1]);
-
-	std::size_t i, j;
-	for (i = 0; (j = content.find('\0', i)) != std::string::npos; i = j+1)
-		files_visible.insert(std::string(content, i, j-i));
-	content.clear();
+	for (auto &x : jast.get("visible").children)
+		files_visible.insert(x.second.value);
 
 	rootfd = open(".", O_RDONLY);
 	if (rootfd == -1) {
@@ -815,13 +930,6 @@ int main(int argc, char *argv[])
 	}
 
 	mkdir(".build", 0775);
-	logfd = open(".build/fuse.log", O_APPEND|O_RDWR|O_CREAT, 0666);
-	if (logfd == -1) {
-		perror("failed to open .build/fuse.log");
-		goto term;
-	}
-
-	path = ".build/" + std::to_string(getpid());
 	if (mkdir(path.c_str(), 0775) != 0 && errno != EEXIST) {
 		perror("mkdir");
 		goto term;
@@ -832,31 +940,6 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "fuse_opt_add_arg failed");
 		goto rmroot;
 	}
-
-	// block those signals where we wish to terminate cleanly
-	sigemptyset(&block);
-	sigaddset(&block, SIGHUP);
-	sigaddset(&block, SIGALRM);
-	sigaddset(&block, SIGINT);
-	sigaddset(&block, SIGQUIT);
-	sigaddset(&block, SIGTERM);
-	sigprocmask(SIG_BLOCK, &block, &saved);
-
-	// ignore these signals
-	sa.sa_handler = SIG_IGN;
-	sa.sa_flags = SA_RESTART;
-	sigaction(SIGPIPE, &sa, 0);
-	sigaction(SIGUSR1, &sa, 0);
-	sigaction(SIGUSR2, &sa, 0);
-
-	// hook these signals
-	sa.sa_handler = handle_exit;
-	sa.sa_flags = SA_RESTART;
-	sigaction(SIGHUP,  &sa, 0);
-	sigaction(SIGALRM, &sa, 0);
-	sigaction(SIGINT,  &sa, 0);
-	sigaction(SIGQUIT, &sa, 0);
-	sigaction(SIGTERM, &sa, 0);
 
 	fc = fuse_mount(path.c_str(), &args);
 	if (!fc) {
@@ -891,6 +974,12 @@ rmroot:
 	}
 term:
 	if (pass) {
+		// ignore any retry timer that might be pending
+		memset(&sa, 0, sizeof(sa));
+		sa.sa_handler = SIG_IGN;
+		sa.sa_flags = 0;
+		sigaction(SIGALRM, &sa, 0);
+
 		// re-enable signals to make it possible to interrupt output
 		sa.sa_handler = SIG_DFL;
 		sa.sa_flags = 0;
@@ -898,17 +987,62 @@ term:
 		sigaction(SIGUSR1, &sa, 0);
 		sigaction(SIGUSR2, &sa, 0);
 		sigaction(SIGHUP,  &sa, 0);
-		sigaction(SIGALRM, &sa, 0);
 		sigaction(SIGINT,  &sa, 0);
 		sigaction(SIGQUIT, &sa, 0);
 		sigaction(SIGTERM, &sa, 0);
+		sigaction(SIGCHLD, &sa, 0);
 		sigprocmask(SIG_SETMASK, &saved, 0);
 
-		for (auto &i : files_wrote) files_read.erase(i);
-		for (auto &i : files_read) std::cout << i << '\0';
-		std::cout << '\0';
-		for (auto &i : files_wrote) std::cout << i << '\0';
+		gettimeofday(&stop, 0);
+
 		status = 0;
+		for (auto &i : files_wrote) files_read.erase(i);
+
+		std::ofstream out(argv[2], std::ios_base::trunc);
+		if (out.fail()) {
+			std::cerr << "ofstream " << argv[2] << ": " << strerror(errno) << std::endl;
+			status = 1;
+		}
+
+		struct rusage self;
+		getrusage(RUSAGE_SELF, &self);
+		rusage.ru_utime.tv_sec  += self.ru_utime.tv_sec;
+		rusage.ru_utime.tv_usec += self.ru_utime.tv_usec;
+		rusage.ru_stime.tv_sec  += self.ru_stime.tv_sec;
+		rusage.ru_stime.tv_usec += self.ru_stime.tv_usec;
+		rusage.ru_maxrss        += self.ru_maxrss;
+		rusage.ru_inblock       += self.ru_inblock;
+		rusage.ru_oublock       += self.ru_oublock;
+
+		bool first;
+		out << "{\"usage\":{\"status\":" << child
+		  << ",\"runtime\":" << (stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0)
+		  << ",\"cputime\":" << (rusage.ru_utime.tv_sec + rusage.ru_stime.tv_sec + (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0)
+		  << ",\"membytes\":" << rusage.ru_maxrss
+		  << ",\"inbytes\":" << rusage.ru_inblock * UINT64_C(512)
+		  << ",\"outbytes\":" << rusage.ru_oublock * UINT64_C(512)
+		  << "},\"inputs\":[";
+
+		first = true;
+		for (auto &x : files_read) {
+			out << (first?"":",") << "\"" << json_escape(x) << "\"";
+			first = false;
+		}
+
+		out << "],\"outputs\":[";
+
+		first = true;
+		for (auto &x : files_wrote) {
+			out << (first?"":",") << "\"" << json_escape(x) << "\"";
+			first = false;
+		}
+
+		out << "],\"indexes\":[]}" << std::endl;
+
+		if (out.bad()) {
+			std::cerr << "bad " << argv[2] << ": " << strerror(errno) << std::endl;
+			status = 1;
+		}
 	}
 
 	return status;

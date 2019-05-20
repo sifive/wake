@@ -25,7 +25,7 @@ def pkg name = match (pkgConfig name)
   None   = makeSysLib "" | editSysLibLFlags ("-l{name}", _)
 
 global def buildWake (Pair variant clib) =
-  def internalDeps = map (_ clib) (utf8proc, gopt, Nil)
+  def internalDeps = common variant, map (_ clib) (utf8proc, gopt, Nil)
   def externalDeps = map pkg ("sqlite3", "ncurses", "gmp", "re2", Nil)
   def deps = internalDeps ++ externalDeps | flattenSysLibs
   def reFiles = sources here `.*\.re`

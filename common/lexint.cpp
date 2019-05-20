@@ -15,26 +15,23 @@
  * limitations under the License.
  */
 
-#ifndef SOURCES_H
-#define SOURCES_H
+#include "lexint.h"
 
-#include "primfn.h"
-#include <memory>
-#include <vector>
-#include <string>
+uint32_t lex_oct(const unsigned char *s, const unsigned char *e)
+{
+  uint32_t u = 0;
+  for (++s; s < e; ++s) u = u*8 + *s - '0';
+  return u;
+}
 
-struct Value;
-struct Receiver;
-struct String;
-
-bool chdir_workspace(std::string &prefix);
-bool make_workspace(const std::string &dir);
-std::string make_canonical(const std::string &x);
-
-std::string get_cwd();
-std::string get_workspace();
-
-std::vector<std::shared_ptr<String> > find_all_sources(bool &ok, bool workspace);
-std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<String> > &all, const std::string &base, const std::string &regexp);
-
-#endif
+uint32_t lex_hex(const unsigned char *s, const unsigned char *e)
+{
+  uint32_t u = 0;
+  for (s += 2; s < e; ++s) {
+    unsigned char c = *s;
+    if      (c < 'A') { u = u*16 + c - '0' +  0; continue; }
+    else if (c < 'a') { u = u*16 + c - 'A' + 10; continue; }
+    else              { u = u*16 + c - 'a' + 10; continue; }
+  }
+  return u;
+}

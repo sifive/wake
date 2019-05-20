@@ -48,7 +48,7 @@ static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
     lex.fail = true;
   }
 
-  auto out = std::make_pair(lex.text(), lex.next.location);
+  auto out = std::make_pair(lex.id(), lex.next.location);
   lex.consume();
   return out;
 }
@@ -152,7 +152,7 @@ static Expr *relabel_anon(Expr *out) {
 
 static void precedence_error(Lexer &lex) {
   std::cerr << "Lower precedence unary operator "
-    << lex.text() << " must use ()s at "
+    << lex.id() << " must use ()s at "
     << lex.next.location.file() << std::endl;
   lex.fail = true;
 }
@@ -265,9 +265,9 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
     // Unary operators
     case OPERATOR: {
       Location location = lex.next.location;
-      op_type op = op_precedence(lex.text().c_str());
+      op_type op = op_precedence(lex.id().c_str());
       if (op.p < p) precedence_error(lex);
-      auto opp = new VarRef(lex.next.location, "unary " + lex.text());
+      auto opp = new VarRef(lex.next.location, "unary " + lex.id());
       lex.consume();
       auto rhs = parse_binary(op.p + op.l, lex, multiline);
       location.end = rhs->location.end;
@@ -320,7 +320,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
     }
     // Terminals
     case ID: {
-      Expr *out = new VarRef(lex.next.location, lex.text());
+      Expr *out = new VarRef(lex.next.location, lex.id());
       lex.consume();
       return out;
     }
@@ -409,9 +409,9 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
   for (;;) {
     switch (lex.next.type) {
       case OPERATOR: {
-        op_type op = op_precedence(lex.text().c_str());
+        op_type op = op_precedence(lex.id().c_str());
         if (op.p < p) return lhs;
-        auto opp = new VarRef(lex.next.location, "binary " + lex.text());
+        auto opp = new VarRef(lex.next.location, "binary " + lex.id());
         lex.consume();
         auto rhs = parse_binary(op.p + op.l, lex, multiline);
         Location app1_loc = lhs->location;
@@ -559,9 +559,9 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
     // Unary operators
     case OPERATOR: {
       Location location = lex.next.location;
-      op_type op = op_precedence(lex.text().c_str());
+      op_type op = op_precedence(lex.id().c_str());
       if (op.p < p) precedence_error(lex);
-      std::string name = "unary " + lex.text();
+      std::string name = "unary " + lex.id();
       lex.consume();
       AST rhs = parse_ast(op.p + op.l, lex, state);
       location.end = rhs.location.end;
@@ -571,7 +571,7 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
     }
     // Terminals
     case ID: {
-      AST out(lex.next.location, lex.text());
+      AST out(lex.next.location, lex.id());
       lex.consume();
       return out;
     }
@@ -609,9 +609,9 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
   for (;;) {
     switch (lex.next.type) {
       case OPERATOR: {
-        op_type op = op_precedence(lex.text().c_str());
+        op_type op = op_precedence(lex.id().c_str());
         if (op.p < p) return lhs;
-        std::string name = "binary " + lex.text();
+        std::string name = "binary " + lex.id();
         lex.consume();
         auto rhs = parse_ast(op.p + op.l, lex, state);
         Location loc = lhs.location;
@@ -640,7 +640,7 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
       }
       case COLON: {
         if (state.type) {
-          op_type op = op_precedence(lex.text().c_str());
+          op_type op = op_precedence(lex.id().c_str());
           if (op.p < p) return lhs;
           lex.consume();
           if (!lhs.args.empty() || Lexer::isOperator(lhs.name.c_str())) {

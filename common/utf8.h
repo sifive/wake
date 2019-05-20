@@ -15,26 +15,12 @@
  * limitations under the License.
  */
 
-#ifndef SOURCES_H
-#define SOURCES_H
+#ifndef UTF8_H
+#define UTF8_H
 
-#include "primfn.h"
-#include <memory>
-#include <vector>
 #include <string>
 
-struct Value;
-struct Receiver;
-struct String;
-
-bool chdir_workspace(std::string &prefix);
-bool make_workspace(const std::string &dir);
-std::string make_canonical(const std::string &x);
-
-std::string get_cwd();
-std::string get_workspace();
-
-std::vector<std::shared_ptr<String> > find_all_sources(bool &ok, bool workspace);
-std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<String> > &all, const std::string &base, const std::string &regexp);
+bool push_utf8(std::string &result, uint32_t c);
+int pop_utf8(uint32_t *rune, const char *str);
 
 #endif
