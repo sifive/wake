@@ -17,6 +17,8 @@
 
 #include "whereami.h"
 #include "execpath.h"
+#include <unistd.h>
+#include <fcntl.h>
 #include <memory>
 
 std::string find_execpath() {
@@ -28,4 +30,31 @@ std::string find_execpath() {
     exepath.assign(execbuf.get(), dirlen);
   }
   return exepath;
+}
+
+static bool check_exec(const char *tok, size_t len, const std::string &exec, std::string &out) {
+  out.assign(tok, len);
+  out += "/";
+  out += exec;
+  return access(out.c_str(), X_OK) == 0;
+}
+
+std::string find_in_path(const std::string &file, const std::string &path) {
+  if (file.find('/') != std::string::npos)
+    return file;
+
+  std::string out;
+  const char *tok = path.c_str();
+  const char *end = tok + path.size();
+  for (const char *scan = tok; scan != end; ++scan) {
+    if (*scan == ':') {
+      if (scan != tok && check_exec(tok, scan-tok, file, out)) return out;
+      tok = scan+1;
+    }
+  }
+
+  if (end != tok && check_exec(tok, end-tok, file, out)) return out;
+
+  // If not found, return input unmodified => runJob fails somewhat gracefully
+  return file;
 }

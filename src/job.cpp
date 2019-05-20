@@ -1145,13 +1145,6 @@ static PRIMFN(prim_get_modtime) {
   RETURN(out);
 }
 
-static bool check_exec(const char *tok, size_t len, const std::string &exec, std::string &out) {
-  out.assign(tok, len);
-  out += "/";
-  out += exec;
-  return access(out.c_str(), X_OK) == 0;
-}
-
 static PRIMTYPE(type_search_path) {
   return args.size() == 2 &&
     args[0]->unify(String::typeVar) &&
@@ -1164,22 +1157,8 @@ static PRIMFN(prim_search_path) {
   STRING(path, 0);
   STRING(exec, 1);
 
-  if (exec->value.find('/') != std::string::npos)
-    RETURN(args[1]);
-
-  auto out = std::make_shared<String>("");
-  const char *tok = path->value.c_str();
-  const char *end = tok + path->value.size();
-  for (const char *scan = tok; scan != end; ++scan) {
-    if (*scan == ':') {
-      if (scan != tok && check_exec(tok, scan-tok, exec->value, out->value)) RETURN(out);
-      tok = scan+1;
-    }
-  }
-
-  if (end != tok && check_exec(tok, end-tok, exec->value, out->value)) RETURN(out);
-  // If not found, return input unmodified => runJob fails somewhat gracefully
-  RETURN(args[1]);
+  auto out = std::make_shared<String>(find_in_path(exec->value, path->value));
+  RETURN(out);
 }
 
 static void usage_type(TypeVar &pair) {

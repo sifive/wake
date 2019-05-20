@@ -19,6 +19,8 @@
 #define EXEC_PATH
 
 #include <string>
+
 std::string find_execpath();
+std::string find_in_path(const std::string &file, const std::string &path = ".:/bin/usr/bin");
 
 #endif
