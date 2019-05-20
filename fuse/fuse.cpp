@@ -744,9 +744,9 @@ static void handle_exit(int sig)
 			}
 		}
 		if (!stop) return;
-	} else {
+	} else if (sig != SIGALRM) {
 		// Make sure to let the child process know to die as well
-		if (child == -256) kill(-pid, sig==SIGALRM?SIGTERM:sig);
+		if (child == -256) kill(-pid, sig);
 		pass = false;
 	}
 
@@ -774,6 +774,7 @@ static void handle_exit(int sig)
 static void *wakefuse_init(struct fuse_conn_info *conn)
 {
 	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
 
 	// ignore these signals
 	sa.sa_handler = SIG_IGN;
@@ -792,12 +793,11 @@ static void *wakefuse_init(struct fuse_conn_info *conn)
 	sigaction(SIGALRM, &sa, 0);
 	sigaction(SIGCHLD, &sa, 0);
 
+	// unblock the child process
+	close(pipefds[1]);
+
 	// unblock signals
 	sigprocmask(SIG_SETMASK, &saved, 0);
-
-	// unblock the child process
-	if (pipefds[1] != -1) close(pipefds[1]);
-	pipefds[1] = -1;
 
 	return 0;
 }
@@ -843,10 +843,6 @@ int main(int argc, char *argv[])
 	struct fuse_args args;
 	struct timeval start, stop;
 	std::vector<char *> arg, env;
-
-	// no fail operations
-	memset(&sa, 0, sizeof(sa));
-	umask(0);
 
 	if (argc != 3) {
 		std::cerr << "Syntax: fuse-wake <input-json> <output-json>" << std::endl;
@@ -922,6 +918,8 @@ int main(int argc, char *argv[])
 	}
 	close(pipefds[0]);
 
+	umask(0);
+
 	for (auto &x : jast.get("visible").children)
 		files_visible.insert(x.second.value);
 
@@ -976,10 +974,11 @@ rmroot:
 	}
 term:
 	if (pass) {
-		// disarm any timer we had running
-		struct itimerval retry;
-		memset(&retry, 0, sizeof(retry));
-		setitimer(ITIMER_REAL, &retry, 0);
+		// ignore any retry timer that might be pending
+		memset(&sa, 0, sizeof(sa));
+		sa.sa_handler = SIG_IGN;
+		sa.sa_flags = 0;
+		sigaction(SIGALRM, &sa, 0);
 
 		// re-enable signals to make it possible to interrupt output
 		sa.sa_handler = SIG_DFL;
@@ -991,7 +990,6 @@ term:
 		sigaction(SIGINT,  &sa, 0);
 		sigaction(SIGQUIT, &sa, 0);
 		sigaction(SIGTERM, &sa, 0);
-		sigaction(SIGALRM, &sa, 0);
 		sigaction(SIGCHLD, &sa, 0);
 		sigprocmask(SIG_SETMASK, &saved, 0);
 
