@@ -307,6 +307,7 @@ int main(int argc, const char **argv) {
     }
 
     std::string command = find_in_path(arg[0], find_path(env.data()));
+    unlink(makeGuard(command).c_str());
     execve(command.c_str(), arg.data(), env.data());
     std::cerr << "execve " << command << ": " << strerror(errno) << std::endl;
     exit(1);
