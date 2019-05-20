@@ -19,6 +19,7 @@
 #include "execpath.h"
 #include <unistd.h>
 #include <fcntl.h>
+#include <string.h>
 #include <memory>
 
 std::string find_execpath() {
@@ -57,4 +58,13 @@ std::string find_in_path(const std::string &file, const std::string &path) {
 
   // If not found, return input unmodified => runJob fails somewhat gracefully
   return file;
+}
+
+std::string find_path(const char *const * env) {
+  for (; *env; ++env) {
+    if (!strcmp(*env, "PATH=")) {
+      return std::string(*env + 5);
+    }
+  }
+  return ".:/bin:/usr/bin";
 }

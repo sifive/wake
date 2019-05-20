@@ -19,8 +19,6 @@
 #define STR2(x) #x
 #define STR(x) STR2(x)
 
-extern char **environ;
-
 typedef std::set<std::string> sset;
 typedef std::vector<std::string> svec;
 
@@ -307,9 +305,10 @@ int main(int argc, const char **argv) {
       dup2(fd, 0);
       close(fd);
     }
-    environ = env.data();
-    execvp(arg[0], arg.data());
-    std::cerr << "execvp " << arg[0] << ": " << strerror(errno) << std::endl;
+
+    std::string command = find_in_path(arg[0], find_path(env.data()));
+    execve(command.c_str(), arg.data(), env.data());
+    std::cerr << "execve " << command << ": " << strerror(errno) << std::endl;
     exit(1);
   }
 

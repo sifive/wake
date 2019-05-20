@@ -45,11 +45,10 @@
 #include <iostream>
 #include <fstream>
 #include "json5.h"
+#include "execpath.h"
 
 //#define TRACE(x) do { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } while (0)
 #define TRACE(x) (void)x
-
-extern char **environ;
 
 static int rootfd;
 std::set<std::string> files_visible;
@@ -916,9 +915,9 @@ int main(int argc, char *argv[])
 			close(fd);
 		}
 
-		environ = env.data();
-		execvp(arg[0], arg.data());
-		std::cerr << "execvp " << arg[0] << ": " << strerror(errno) << std::endl;
+		std::string command = find_in_path(arg[0], find_path(env.data()));
+		execve(command.c_str(), arg.data(), env.data());
+		std::cerr << "execve " << command << ": " << strerror(errno) << std::endl;
 		exit(1);
 	}
 	close(pipefds[0]);
