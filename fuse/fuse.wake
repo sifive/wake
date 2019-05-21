@@ -18,6 +18,15 @@ global def buildFuse (Pair variant _) =
   def fuse = pkgConfig "fuse" | getOrElse (makeSysLib "")
   def deps = flattenSysLibs (json, fuse, Nil)
   def compile = compileC variant deps.getSysLibCFlags deps.getSysLibHeaders
-  def cppFiles = sources here `.*\.cpp`
+  def cppFiles = source "{here}/fuse.cpp", Nil
   def objFiles = map compile cppFiles ++ deps.getSysLibObjects
   linkO variant deps.getSysLibLFlags objFiles "lib/wake/fuse-wake"
+
+global def buildFuseDaemon (Pair variant _) =
+  def json = common variant
+  def fuse = pkgConfig "fuse" | getOrElse (makeSysLib "")
+  def deps = flattenSysLibs (json, fuse, Nil)
+  def compile = compileC variant deps.getSysLibCFlags deps.getSysLibHeaders
+  def cppFiles = source "{here}/daemon.cpp", Nil
+  def objFiles = map compile cppFiles ++ deps.getSysLibObjects
+  linkO variant deps.getSysLibLFlags objFiles "lib/wake/fuse-waked"
