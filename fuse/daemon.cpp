@@ -112,51 +112,106 @@ static std::pair<std::string, std::string> split_key(const char *path) {
 	}
 }
 
+struct Special {
+	Job *job;
+	char kind;
+	operator bool () const { return job; }
+};
+
+static Special is_special(const char *path) {
+	Special out;
+	bool special =
+		path[0] == '/' && path[1] == '.' && path[3] == '.' && path[4]
+		&& (path[2] == 'i' || path[2] == 'o' || path[2] == 'l');
+
+	if (special) {
+		auto it = context.jobs.find(path+4);
+		if (it != context.jobs.end()) {
+			out.kind = path[2];
+			out.job = &it->second;
+			return out;
+		}
+	}
+
+	out.kind = 0;
+	out.job = 0;
+	return out;
+}
+
 static int wakefuse_getattr(const char *path, struct stat *stbuf)
 {
 	TRACE(path);
 
-	int res;
-	auto key = split_key(path);
-	if (key.first.empty()) {
-		res = fstat(context.rootfd, stbuf);
-	} else {
-		auto it = context.jobs.find(key.first);
-		if (it == context.jobs.end()) {
-			return -ENOENT;
-		} else if (key.second == ".") {
-			res = fstat(context.rootfd, stbuf);
-		} else if (!it->second.is_readable(key.second)) {
-			return -ENOENT;
-		} else {
-			res = fstatat(context.rootfd, key.second.c_str(), stbuf, AT_SYMLINK_NOFOLLOW);
+	if (auto s = is_special(path)) {
+		int res = fstat(context.rootfd, stbuf);
+		if (res == -1) res = -errno;
+		stbuf->st_nlink = 1;
+		switch (s.kind) {
+			case 'i':
+				stbuf->st_mode = S_IFREG | 0644;
+				stbuf->st_size = s.job->json_in.size();
+				return res;
+			case 'o':
+				stbuf->st_mode = S_IFREG | 0444;
+				stbuf->st_size = s.job->json_out.size();
+				return res;
+			case 'l':
+				stbuf->st_mode = S_IFREG | 0444;
+				stbuf->st_size = 0;
+				return res;
+			default:
+				return -ENOENT; // unreachable
 		}
 	}
-	if (res == -1)
-		return -errno;
-	return 0;
+
+	auto key = split_key(path);
+	if (key.first.empty()) {
+		int res = fstat(context.rootfd, stbuf);
+		if (res == -1) res = -errno;
+		return res;
+	}
+
+	auto it = context.jobs.find(key.first);
+	if (it == context.jobs.end()) {
+		return -ENOENT;
+	}
+
+	if (key.second == ".") {
+		int res = fstat(context.rootfd, stbuf);
+		if (res == -1) res = -errno;
+		return res;
+	}
+
+	if (!it->second.is_readable(key.second)) {
+		return -ENOENT;
+	}
+
+	int res = fstatat(context.rootfd, key.second.c_str(), stbuf, AT_SYMLINK_NOFOLLOW);
+	if (res == -1) res = -errno;
+	return res;
 }
 
 static int wakefuse_access(const char *path, int mask)
 {
 	TRACE(path);
 
-	auto key = split_key(path);
-	if (key.first.empty()) {
-		if ((mask & W_OK))
-			return -EACCES;
-		return 0;
+	if (auto s = is_special(path)) {
+		switch (s.kind) {
+			case 'i': return (mask & X_OK) ? -EACCES : 0;
+			case 'o': return (mask & (X_OK|W_OK)) ? -EACCES : 0;
+			case 'l': return (mask & (X_OK|W_OK)) ? -EACCES : 0;
+			default:  return -ENOENT; // unreachable
+		}
 	}
+
+	auto key = split_key(path);
+	if (key.first.empty()) return 0;
 
 	auto it = context.jobs.find(key.first);
 	if (it == context.jobs.end())
 		return -ENOENT;
 
-	if (key.second == ".") {
-		if ((mask & W_OK))
-			return -EACCES;
-		return 0;
-	}
+	if (key.second == ".") return 0;
 
 	if (!it->second.is_readable(key.second))
 		return -ENOENT;
@@ -171,6 +226,9 @@ static int wakefuse_access(const char *path, int mask)
 static int wakefuse_readlink(const char *path, char *buf, size_t size)
 {
 	TRACE(path);
+
+	if (is_special(path))
+		return -EINVAL;
 
 	auto key = split_key(path);
 	if (key.first.empty())
@@ -203,75 +261,96 @@ static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	TRACE(path);
 
+	if (is_special(path))
+		return -ENOTDIR;
+
 	auto key = split_key(path);
 	if (key.first.empty()) {
 		for (auto &job : context.jobs) {
 			filler(buf, job.first.c_str(), 0, 0);
+			filler(buf, (".i." + job.first).c_str(), 0, 0);
+			filler(buf, (".o." + job.first).c_str(), 0, 0);
+			filler(buf, (".l." + job.first).c_str(), 0, 0);
 		}
-	} else {
-		auto it = context.jobs.find(key.first);
-		if (it == context.jobs.end())
-			return -ENOENT;
-
-		int dfd;
-		if (key.second == ".") {
-			dfd = dup(context.rootfd);
-		} else {
-			if (!it->second.is_readable(key.second))
-				return -ENOENT;
-			dfd = openat(context.rootfd, key.second.c_str(), O_RDONLY | O_NOFOLLOW);
-		}
-		if (dfd == -1)
-			return -errno;
-
-		DIR *dp = fdopendir(dfd);
-		if (dp == NULL) {
-			int res = -errno;
-			(void)close(dfd);
-			return res;
-		}
-
-		rewinddir(dp);
-		struct dirent *de;
-		while ((de = readdir(dp)) != NULL) {
-			struct stat st;
-			memset(&st, 0, sizeof(st));
-			st.st_ino = de->d_ino;
-			st.st_mode = de->d_type << 12;
-
-			std::string file = key.second;
-			if (!file.empty()) file += "/";
-			file += de->d_name;
-
-			if (!it->second.is_readable(file))
-				continue;
-
-			if (filler(buf, de->d_name, &st, 0))
-				break;
-		}
-
-		closedir(dp);
+		return 0;
 	}
 
+	auto it = context.jobs.find(key.first);
+	if (it == context.jobs.end())
+		return -ENOENT;
+
+	int dfd;
+	if (key.second == ".") {
+		dfd = dup(context.rootfd);
+	} else if (!it->second.is_readable(key.second)) {
+		return -ENOENT;
+	} else {
+		dfd = openat(context.rootfd, key.second.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY);
+	}
+	if (dfd == -1)
+		return -errno;
+
+	DIR *dp = fdopendir(dfd);
+	if (dp == NULL) {
+		int res = -errno;
+		(void)close(dfd);
+		return res;
+	}
+
+	rewinddir(dp);
+	struct dirent *de;
+	while ((de = readdir(dp)) != NULL) {
+		struct stat st;
+		memset(&st, 0, sizeof(st));
+		st.st_ino = de->d_ino;
+		st.st_mode = de->d_type << 12;
+
+		std::string file;
+		if (key.second != ".") {
+			file += key.second;
+			file += "/";
+		}
+		file += de->d_name;
+
+		if (!it->second.is_readable(file))
+			continue;
+
+		if (filler(buf, de->d_name, &st, 0))
+			break;
+	}
+
+	(void)closedir(dp);
 	return 0;
 }
 
-static int wakefuse_mknod(const char *path, mode_t mode, dev_t rdev)
+static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-	(void)rdev;
-
 	TRACE(path);
 
 	if (!S_ISREG(mode))
 		return -EPERM;
 
+	if (is_special(path))
+		return -EEXIST;
+
 	auto key = split_key(path);
 	if (key.first.empty())
 		return -EEXIST;
 
+	if (key.second == "." && key.first.size() > 3 &&
+	    key.first[0] == '.' && key.first[1] == 'l' && key.first[2] == '.') {
+		++context.jobs[key.first.substr(3)].uses;
+		fi->fh = -1;
+		return 0;
+	}
+
 	auto it = context.jobs.find(key.first);
-	if (it == context.jobs.end())
-		return -ENOENT;
+	if (it == context.jobs.end()) {
+		if (key.second == ".")
+			return -EACCES;
+		else
+			return -ENOENT;
+	}
 
 	if (key.second == ".")
 		return -EEXIST;
@@ -279,13 +358,15 @@ static int wakefuse_mknod(const char *path, mode_t mode, dev_t rdev)
 	if (!it->second.is_creatable(key.second))
 		return -EACCES;
 
-	int res = openat(context.rootfd, key.second.c_str(), O_CREAT | O_EXCL | O_WRONLY, mode);
-	if (res >= 0)
-		res = close(res);
+	int flag = O_CREAT | O_RDWR | O_NOFOLLOW;
+	if (!it->second.is_readable(key.second))
+		flag |= O_TRUNC;
 
-	if (res == -1)
+	int fd = openat(context.rootfd, key.second.c_str(), flag, mode);
+	if (fd == -1)
 		return -errno;
 
+	fi->fh = fd;
 	it->second.files_wrote.emplace(std::move(key.second));
 	return 0;
 }
@@ -294,13 +375,20 @@ static int wakefuse_mkdir(const char *path, mode_t mode)
 {
 	TRACE(path);
 
+	if (is_special(path))
+		return -EEXIST;
+
 	auto key = split_key(path);
 	if (key.first.empty())
 		return -EEXIST;
 
 	auto it = context.jobs.find(key.first);
-	if (it == context.jobs.end())
-		return -ENOENT;
+	if (it == context.jobs.end()) {
+		if (key.second == ".")
+			return -EACCES;
+		else
+			return -ENOENT;
+	}
 
 	if (key.second == ".")
 		return -EEXIST;
@@ -319,6 +407,9 @@ static int wakefuse_mkdir(const char *path, mode_t mode)
 static int wakefuse_unlink(const char *path)
 {
 	TRACE(path);
+
+	if (is_special(path))
+		return -EACCES;
 
 	auto key = split_key(path);
 	if (key.first.empty())
@@ -350,6 +441,9 @@ static int wakefuse_rmdir(const char *path)
 {
 	TRACE(path);
 
+	if (is_special(path))
+		return -EACCES;
+
 	auto key = split_key(path);
 	if (key.first.empty())
 		return -EACCES;
@@ -380,13 +474,20 @@ static int wakefuse_symlink(const char *from, const char *to)
 {
 	TRACE(to);
 
+	if (is_special(to))
+		return -EEXIST;
+
 	auto key = split_key(to);
 	if (key.first.empty())
 		return -EEXIST;
 
 	auto it = context.jobs.find(key.first);
-	if (it == context.jobs.end())
-		return -ENOENT;
+	if (it == context.jobs.end()) {
+		if (key.second == ".")
+			return -EACCES;
+		else
+			return -ENOENT;
+	}
 
 	if (key.second == ".")
 		return -EEXIST;
@@ -406,6 +507,12 @@ static int wakefuse_rename(const char *from, const char *to)
 {
 	TRACE(from);
 
+	if (is_special(to))
+		return -EEXIST;
+
+	if (is_special(from))
+		return -EACCES;
+
 	auto keyt = split_key(to);
 	if (keyt.first.empty())
 		return -EEXIST;
@@ -414,9 +521,6 @@ static int wakefuse_rename(const char *from, const char *to)
 	if (keyf.first.empty())
 		return -EACCES;
 
-	if (keyt.first != keyf.second)
-		return -EXDEV;
-
 	auto it = context.jobs.find(keyf.first);
 	if (it == context.jobs.end())
 		return -ENOENT;
@@ -424,8 +528,15 @@ static int wakefuse_rename(const char *from, const char *to)
 	if (keyf.second == ".")
 		return -EACCES;
 
-	if (keyt.second == ".")
-		return -EEXIST;
+	if (keyt.second == ".") {
+		if (context.jobs.find(keyt.first) == context.jobs.end())
+			return -EACCES;
+		else
+			return -EEXIST;
+	}
+
+	if (keyt.first != keyf.second)
+		return -EXDEV;
 
 	if (!it->second.is_readable(keyf.second))
 		return -ENOENT;
@@ -451,6 +562,12 @@ static int wakefuse_link(const char *from, const char *to)
 {
 	TRACE(from);
 
+	if (is_special(to))
+		return -EEXIST;
+
+	if (is_special(from))
+		return -EACCES;
+
 	auto keyt = split_key(to);
 	if (keyt.first.empty())
 		return -EEXIST;
@@ -459,18 +576,22 @@ static int wakefuse_link(const char *from, const char *to)
 	if (keyf.first.empty())
 		return -EACCES;
 
-	if (keyt.first != keyf.second)
-		return -EXDEV;
-
 	auto it = context.jobs.find(keyf.first);
 	if (it == context.jobs.end())
 		return -ENOENT;
 
-	if (keyt.second == ".")
-		return -EEXIST;
-
 	if (keyf.second == ".")
 		return -EACCES;
+
+	if (keyt.second == ".") {
+		if (context.jobs.find(keyt.first) == context.jobs.end())
+			return -EACCES;
+		else
+			return -EEXIST;
+	}
+
+	if (keyt.first != keyf.second)
+		return -EXDEV;
 
 	if (!it->second.is_readable(keyf.second))
 		return -ENOENT;
@@ -489,6 +610,9 @@ static int wakefuse_link(const char *from, const char *to)
 static int wakefuse_chmod(const char *path, mode_t mode)
 {
 	TRACE(path);
+
+	if (is_special(path))
+		return -EACCES;
 
 	auto key = split_key(path);
 	if (key.first.empty())
@@ -518,6 +642,9 @@ static int wakefuse_chown(const char *path, uid_t uid, gid_t gid)
 {
 	TRACE(path);
 
+	if (is_special(path))
+		return -EACCES;
+
 	auto key = split_key(path);
 	if (key.first.empty())
 		return -EACCES;
@@ -545,6 +672,9 @@ static int wakefuse_chown(const char *path, uid_t uid, gid_t gid)
 static int wakefuse_truncate(const char *path, off_t size)
 {
 	TRACE(path);
+
+	if (is_special(path))
+		return -EACCES;
 
 	auto key = split_key(path);
 	if (key.first.empty())
@@ -583,6 +713,9 @@ static int wakefuse_utimens(const char *path, const struct timespec ts[2])
 {
 	TRACE(path);
 
+	if (is_special(path))
+		return -EACCES;
+
 	auto key = split_key(path);
 	if (key.first.empty())
 		return -EACCES;
@@ -612,58 +745,36 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 {
 	TRACE(path);
 
-	auto key = split_key(path);
-	if (key.second == "." && key.first.size() > 3 && key.first[0] == '.' && key.first[2] == '.') {
-		switch (key.first[1]) {
-			case 'i': {
-				auto it = context.jobs.find(key.first.substr(3));
-				if (it == context.jobs.end()) return -ENOENT;
-				++it->second.json_in_uses;
-				break;
-			}
-			case 'o': {
-				auto it = context.jobs.find(key.first.substr(3));
-				if (it == context.jobs.end()) return -ENOENT;
-				++it->second.json_out_uses;
-				break;
-			}
-			case 'l': {
-				++context.jobs[key.first.substr(3)].uses;
-				break;
-			}
-			default: {
-				return -ENOENT;
-			}
+	if (auto s = is_special(path)) {
+		switch (s.kind) {
+			case 'i': ++s.job->json_in_uses; break;
+			case 'o': ++s.job->json_out_uses; break;
+			case 'l': ++s.job->uses; break;
+			default: return -ENOENT; // unreachable
 		}
-
 		fi->fh = -1;
-	} else if (key.first.empty() || key.second == ".") {
-		fi->fh = dup(context.rootfd);
-	} else {
-		int oflag = fi->flags;
-		auto it = context.jobs.find(key.first);
-		if (it == context.jobs.end())
-			return -ENOENT;
-
-		if ((oflag & O_CREAT)) {
-			if (!it->second.is_creatable(key.second))
-				return -EACCES;
-			if ((oflag & O_EXCL))
-				oflag = O_TRUNC | (oflag & ~O_EXCL);
-		}
-
-		if (!(oflag & O_CREAT) && !it->second.is_readable(key.second))
-			return -ENOENT;
-
-		int fd = openat(context.rootfd, key.second.c_str(), oflag, 0); // NOFOLLOW?
-		if (fd == -1)
-			return -errno;
-
-		if ((oflag & O_CREAT))
-			it->second.files_wrote.emplace(std::move(key.second));
-
-		fi->fh = fd;
+		return 0;
 	}
+
+	auto key = split_key(path);
+	if (key.first.empty())
+		return -EINVAL; // open is for files only
+
+	auto it = context.jobs.find(key.first);
+	if (it == context.jobs.end())
+		return -ENOENT;
+
+	if (key.second == ".")
+		return -EINVAL;
+
+	if (!it->second.is_readable(key.second))
+		return -ENOENT;
+
+	int fd = openat(context.rootfd, key.second.c_str(), O_RDWR | O_NOFOLLOW);
+	if (fd == -1)
+		return -errno;
+
+	fi->fh = fd;
 	return 0;
 }
 
@@ -695,19 +806,17 @@ static int wakefuse_read(const char *path, char *buf, size_t size, off_t offset,
 
 		it->second.files_read.emplace(std::move(key.second));
 		return res;
-	} else {
-		if (path[0] != '.' || !path[1] || path[2] != '.') {
-			return -EIO;
-		} else {
-			auto it = context.jobs.find(path+3);
-			if (it == context.jobs.end()) return -EIO;
-			switch (path[1]) {
-				case 'i': return read_str(it->second.json_in, buf, size, offset);
-				case 'o': return read_str(it->second.json_out, buf, size, offset);
-				default: return -EIO;
-			}
+	}
+
+	if (auto s = is_special(path)) {
+		switch (s.kind) {
+			case 'i': return read_str(s.job->json_in, buf, size, offset);
+			case 'o': return read_str(s.job->json_out, buf, size, offset);
+			default:  return 0;
 		}
 	}
+
+	return -EIO;
 }
 
 static int write_str(std::string &str, const char *buf, size_t size, off_t offset)
@@ -728,7 +837,7 @@ static int wakefuse_write(const char *path, const char *buf, size_t size,
 {
 	TRACE(path);
 
-	if (fi->fh == -1) {
+	if (fi->fh != -1) {
 		auto key = split_key(path);
 		auto it = context.jobs.find(key.first);
 		if (it == context.jobs.end())
@@ -740,18 +849,16 @@ static int wakefuse_write(const char *path, const char *buf, size_t size,
 
 		it->second.files_wrote.emplace(std::move(key.second));
 		return res;
-	} else {
-		if (path[0] != '.' || !path[1] || path[2] != '.') {
-			return -EIO;
-		} else {
-			auto it = context.jobs.find(path+3);
-			if (it == context.jobs.end()) return -EIO;
-			switch (path[1]) {
-				case 'i': return write_str(it->second.json_in, buf, size, offset);
-				default: return -EIO;
-			}
+	}
+
+	if (auto s = is_special(path)) {
+		switch (s.kind) {
+			case 'i': return write_str(s.job->json_in, buf, size, offset);
+			default:  return -EACCES;
 		}
 	}
+
+	return -EIO;
 }
 
 static int wakefuse_statfs(const char *path, struct statvfs *stbuf)
@@ -760,7 +867,7 @@ static int wakefuse_statfs(const char *path, struct statvfs *stbuf)
 
 	int fd;
 	auto key = split_key(path);
-	if (key.first.empty()) {
+	if (key.first.empty() || is_special(path)) {
 		fd = dup(context.rootfd);
 	} else {
 		auto it = context.jobs.find(key.first);
@@ -796,33 +903,18 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 		int res = close(fi->fh);
 		if (res == -1)
 			return -errno;
-	} else {
-		if (path[0] != '.' || !path[1] || path[2] != '.') {
-			return -EIO;
-		} else {
-			auto it = context.jobs.find(path+3);
-			if (it == context.jobs.end()) return -EIO;
-			switch (path[1]) {
-				case 'i': {
-					--it->second.json_in_uses;
-					break;
-				}
-				case 'o': {
-					--it->second.json_out_uses;
-					break;
-				}
-				case 'l': {
-					--it->second.uses;
-					break;
-				}
-				default: {
-					return -EIO;
-				}
-			}
+	}
+
+	if (auto s = is_special(path)) {
+		switch (s.kind) {
+			case 'i': --s.job->json_in_uses; break;
+			case 'o': --s.job->json_out_uses; break;
+			case 'l': --s.job->uses; break;
+			default: return -EIO;
 		}
 	}
 
-	return 0;
+	return -EIO;
 }
 
 static int wakefuse_fsync(const char *path, int isdatasync,
@@ -861,16 +953,19 @@ static int wakefuse_fallocate(const char *path, int mode,
 	if (mode)
 		return -EOPNOTSUPP;
 
+	if (is_special(path))
+		return -EACCES;
+
 	auto key = split_key(path);
 	if (key.first.empty())
-		return -EACCES;
+		return -EISDIR;
 
 	auto it = context.jobs.find(key.first);
 	if (it == context.jobs.end())
 		return -ENOENT;
 
 	if (key.second == ".")
-		return -EACCES;
+		return -EISDIR;
 
 	if (!it->second.is_readable(key.second))
 		return -ENOENT;
@@ -900,6 +995,9 @@ static int wakefuse_setxattr(const char *path, const char *name, const char *val
 			size_t size, int flags)
 {
 	TRACE(path);
+
+	if (is_special(path))
+		return -EACCES;
 
 	auto key = split_key(path);
 	if (key.first.empty())
@@ -939,6 +1037,9 @@ static int wakefuse_getxattr(const char *path, const char *name, char *value,
 {
 	TRACE(path);
 
+	if (is_special(path))
+		return -EACCES;
+
 	auto key = split_key(path);
 	if (key.first.empty())
 		return -EACCES;
@@ -974,6 +1075,9 @@ static int wakefuse_listxattr(const char *path, char *list, size_t size)
 {
 	TRACE(path);
 
+	if (is_special(path))
+		return -EACCES;
+
 	auto key = split_key(path);
 	if (key.first.empty())
 		return -EACCES;
@@ -1008,6 +1112,9 @@ static int wakefuse_listxattr(const char *path, char *list, size_t size)
 static int wakefuse_removexattr(const char *path, const char *name)
 {
 	TRACE(path);
+
+	if (is_special(path))
+		return -EACCES;
 
 	auto key = split_key(path);
 	if (key.first.empty())
@@ -1088,7 +1195,7 @@ int main(int argc, char *argv[])
 	wakefuse_ops.access		= wakefuse_access;
 	wakefuse_ops.readlink		= wakefuse_readlink;
 	wakefuse_ops.readdir		= wakefuse_readdir;
-	wakefuse_ops.mknod		= wakefuse_mknod;
+	wakefuse_ops.create		= wakefuse_create;
 	wakefuse_ops.mkdir		= wakefuse_mkdir;
 	wakefuse_ops.symlink		= wakefuse_symlink;
 	wakefuse_ops.unlink		= wakefuse_unlink;
@@ -1128,7 +1235,13 @@ int main(int argc, char *argv[])
 	}
 	path = argv[1];
 
-	log = open((path + ".log").c_str(), O_CREAT|O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+	null = open("/dev/null", O_RDONLY);
+	if (null == -1) {
+		perror("open /dev/null");
+		goto term;
+	}
+
+	log = open((path + ".log").c_str(), O_CREAT|O_RDWR|O_APPEND, 0644); // S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	if (log == -1) {
 		fprintf(stderr, "open %s.log: %s\n", path.c_str(), strerror(errno));
 		goto term;
@@ -1143,7 +1256,6 @@ int main(int argc, char *argv[])
 		goto term;
 	}
 
-	ftruncate(log, 0);
 	umask(0);
 
 	context.rootfd = open(".", O_RDONLY);
@@ -1154,17 +1266,6 @@ int main(int argc, char *argv[])
 
 	if (mkdir(path.c_str(), 0775) != 0 && errno != EEXIST) {
 		fprintf(stderr, "mkdir %s: %s\n", path.c_str(), strerror(errno));
-		goto term;
-	}
-
-	null = open("/dev/null", O_RDONLY);
-	if (null == -1) {
-		perror("open /dev/null");
-		goto term;
-	}
-
-	if (chdir("/") == -1) {
-		perror("chdir /");
 		goto term;
 	}
 
@@ -1219,19 +1320,19 @@ int main(int argc, char *argv[])
 
 	args = FUSE_ARGS_INIT(0, NULL);
 	if (fuse_opt_add_arg(&args, "wake") != 0) {
-		fprintf(stderr, "fuse_opt_add_arg failed");
+		fprintf(stderr, "fuse_opt_add_arg failed\n");
 		goto rmroot;
 	}
 
 	fc = fuse_mount(path.c_str(), &args);
 	if (!fc) {
-		fprintf(stderr, "fuse_mount failed");
+		fprintf(stderr, "fuse_mount failed\n");
 		goto freeargs;
 	}
 
 	fh = fuse_new(fc, &args, &wakefuse_ops, sizeof(wakefuse_ops), 0);
 	if (!fh) {
-		fprintf(stderr, "fuse_new failed");
+		fprintf(stderr, "fuse_new failed\n");
 		goto unmount;
 	}
 
@@ -1243,7 +1344,7 @@ int main(int argc, char *argv[])
 	if (log != STDOUT_FILENO && log != STDERR_FILENO) close(log);
 
 	if (null != STDIN_FILENO) {
-		dup2(null, STDERR_FILENO);
+		dup2(null, STDIN_FILENO);
 		close(null);
 	}
 
