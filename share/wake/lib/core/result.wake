@@ -45,6 +45,28 @@ global def rmapFail fn = match _
   Pass a = Pass a
   Fail f = Fail (fn f)
 
+global def findFail = findFailFn (_)
+global def findFailFn fn =
+  def helper = match _
+    Nil = Pass Nil
+    h, t = match (fn h)
+      Fail y = Fail y
+      Pass x = match (helper t)
+        Pass tt = Pass (x, tt)
+        z = z
+  helper
+
+global def findPass = findPassFn (_)
+global def findPassFn fn =
+  def helper = match _
+    Nil = Fail Nil
+    h, t = match (fn h)
+      Pass y = Pass y
+      Fail x = match (helper t)
+        Fail tt = Fail (x, tt)
+        z = z
+  helper
+
 global def panic s = prim "panic"
 
 global def stack s = prim "stack"

@@ -28,17 +28,9 @@ global def getOrElse b = match _
   Some a = a
   None   = b
 
-global def getOrFail f = match _
-  Some a = Pass a
-  None   = Fail f
-
-global def getOrPass p = match _
-  None   = Pass p
-  Some f = Fail f
-
-global def getOrFailFn fn = match _
-  Some a = Pass a
-  None   = Fail (fn Unit)
+global def getOrElseFn fn = match _
+  Some a = a
+  None   = fn Unit
 
 global def omap f = match _
   Some a = Some (f a)
@@ -51,3 +43,35 @@ global def omapPartial f = match _
 global def ofilter f = match _
   Some a if f a = Some a
   _ = None
+
+global def findSome = findSomeFn (_)
+global def findSomeFn fn =
+  def helper = match _
+    Nil = None
+    h, t = match (fn h)
+      Some x = Some x
+      None = helper t
+  helper
+
+global def findNone = findNoneFn (_)
+global def findNoneFn fn =
+  def helper = match _
+    Nil = Some Nil
+    h, t = match (fn h)
+      None = None
+      Some x = match (helper t)
+       Some t = Some (x, t)
+       n = n
+  helper
+
+# Promote Option to Result:
+
+global def getOrFail f = getOrFailFn (\_ f)
+global def getOrFailFn fn = match _
+  Some a = Pass a
+  None   = Fail (fn Unit)
+
+global def getOrPass p = getOrPassFn (\_ p)
+global def getOrPassFn fn = match _
+  None   = Pass (fn Unit)
+  Some f = Fail f
