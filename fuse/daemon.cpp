@@ -53,6 +53,10 @@
 #define st_ctim st_ctimespec
 #endif
 
+#ifndef ENOATTR
+#define ENOATTR ENODATA
+#endif
+
 //#define TRACE(x) do { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } while (0)
 #define TRACE(x) (void)x
 
@@ -258,9 +262,8 @@ static int wakefuse_getattr(const char *path, struct stat *stbuf)
 	}
 
 	auto it = context.jobs.find(key.first);
-	if (it == context.jobs.end()) {
+	if (it == context.jobs.end())
 		return -ENOENT;
-	}
 
 	if (key.second == ".") {
 		int res = fstat(context.rootfd, stbuf);
@@ -1163,11 +1166,11 @@ static int wakefuse_getxattr(const char *path, const char *name, char *value,
 	TRACE(path);
 
 	if (is_special(path))
-		return -EACCES;
+		return -ENOATTR;
 
 	auto key = split_key(path);
 	if (key.first.empty())
-		return -EACCES;
+		return -ENOATTR;
 
 	auto it = context.jobs.find(key.first);
 	if (it == context.jobs.end())
@@ -1205,11 +1208,11 @@ static int wakefuse_listxattr(const char *path, char *list, size_t size)
 	TRACE(path);
 
 	if (is_special(path))
-		return -EACCES;
+		return 0;
 
 	auto key = split_key(path);
 	if (key.first.empty())
-		return -EACCES;
+		return 0;
 
 	auto it = context.jobs.find(key.first);
 	if (it == context.jobs.end())
