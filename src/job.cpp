@@ -396,7 +396,7 @@ static void launch(JobTable *jobtable) {
       }
       s << std::endl;
       std::string out = s.str();
-      status_write(2, out.data(), out.size());
+      status_write(1, out.data(), out.size());
     }
     // i.job->stdin.clear();
     // i.job->cmdline.clear();
