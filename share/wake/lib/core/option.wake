@@ -28,6 +28,8 @@ global def getOrElse b = match _
   Some a = a
   None   = b
 
+# Returns the Option's value if Some, otherwise returns the result of fn
+# (fn: Unit => a) => Option a => a
 global def getOrElseFn fn = match _
   Some a = a
   None   = fn Unit
@@ -44,7 +46,12 @@ global def ofilter f = match _
   Some a if f a = Some a
   _ = None
 
+# Finds the first Some in a List of Option or returns None if List is all None
+# List (Option a) => Option a
 global def findSome = findSomeFn (_)
+# Applies a function that returns Option to each element of a List
+#   returning the first Some or a None
+# (fn: a => Option b) => List a => Option b
 global def findSomeFn fn =
   def helper = match _
     Nil = None
@@ -53,7 +60,12 @@ global def findSomeFn fn =
       None = helper t
   helper
 
+# If a List of Options is all Some, returns Some of the elements, otherwise None
+# List (Option a) => Option (List a)
 global def findNone = findNoneFn (_)
+# Applies a function that returns Option to each element of a List
+#   returning None if any result is None, otherwise aggregates the Somes into a List
+# (fn: a => Option b) => List a => Option (List b)
 global def findNoneFn fn =
   def helper = match _
     Nil = Some Nil
@@ -66,12 +78,20 @@ global def findNoneFn fn =
 
 # Promote Option to Result:
 
+# Converts Some to Pass or Fail
+# (f: a) => Option b => Result b a
 global def getOrFail f = getOrFailFn (\_ f)
+# Converts Some to Pass or Fail of output of fn
+# (fn: Unit => a) => Option b => Result b a
 global def getOrFailFn fn = match _
   Some a = Pass a
   None   = Fail (fn Unit)
 
+# Converts Some to Fail or Pass
+# (p: a) => Option b => Result a b
 global def getOrPass p = getOrPassFn (\_ p)
+# Converts Some to Fail or Pass of output of fn
+# (fn: Unit => a) => Option b => Result a b
 global def getOrPassFn fn = match _
   None   = Pass (fn Unit)
   Some f = Fail f

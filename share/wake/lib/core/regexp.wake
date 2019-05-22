@@ -15,6 +15,7 @@
 
 # Regular expressions
 
+# Turns a String into a properly quoted Regular Expression
 # quote: (str: String) => RegExp
 global def quote str =
   def res str = prim "quote"

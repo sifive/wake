@@ -34,6 +34,8 @@ global def map f = match _
   Nil  = Nil
   h, t = f h, map f t
 
+# Applies a function to each element of the List and builds a new List from the resulting elements
+# (f: a => List b) => List a => List b
 global def mapFlat f = match _
   Nil  = Nil
   h, t = f h ++ mapFlat f t
