@@ -55,12 +55,12 @@ or that your colleagues already built, you might appreciate wake.
 
 On Debian/Ubuntu (wheezy or later):
 
-    sudo apt-get install fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev
+    sudo apt-get install makedev fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev
 
 On Redhat (7.0 or later):
 
     sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm # For re2 on RHEL7
-    sudo yum install fuse fuse-devel sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel
+    sudo yum install makedev fuse fuse-devel sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel
 
 On Mac OS with Mac Ports installed:
 
