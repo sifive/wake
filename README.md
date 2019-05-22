@@ -55,12 +55,12 @@ or that your colleagues already built, you might appreciate wake.
 
 On Debian/Ubuntu (wheezy or later):
 
-    sudo apt-get install libfuse-dev libsqlite3-dev libgmp-dev libre2-dev libncurses5-dev pkg-config git g++ gcc
+    sudo apt-get install fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev
 
 On Redhat (7.0 or later):
 
     sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm # For re2 on RHEL7
-    sudo yum install fuse-devel sqlite-devel gmp-devel re2-devel ncurses-devel pkgconfig git gcc gcc-c++
+    sudo yum install fuse fuse-devel sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel
 
 On Mac OS with Mac Ports installed:
 
@@ -98,16 +98,16 @@ Give FUSE permission to run as stated in the instructions and you should be good
     ./bin/wake 'install "/usr/local"' # or wherever
 
 External dependencies:
- - c++ 11		GPLv3		https://www.gnu.org/software/gcc/
- - sqlite3-dev		public domain	https://www.sqlite.org/
- - libgmp-dev		LGPL v3		https://gmplib.org
- - libfuse-dev		LGPL v2.1	https://github.com/libfuse/libfuse
- - libre2-dev		BSD 3-clause	https://github.com/google/re2
- - libncurses5-dev	MIT		https://www.gnu.org/software/ncurses/
+ - c++ 11		>= 4.7	GPLv3		https://www.gnu.org/software/gcc/
+ - sqlite3-dev		>= 3.7	public domain	https://www.sqlite.org/
+ - libgmp-dev		>= 5.0	LGPL v3		https://gmplib.org
+ - libfuse-dev		>= 2.9	LGPL v2.1	https://github.com/libfuse/libfuse
+ - libre2-dev		>= 2014	BSD 3-clause	https://github.com/google/re2
+ - libncurses5-dev	>= 5.9	MIT		https://www.gnu.org/software/ncurses/
 
 Optional dependencies:
- - re2c			public domain	http://re2c.org
- - utf8proc		MIT 		https://juliastrings.github.io/utf8proc/
+ - re2c			>= 1.0	public domain	http://re2c.org
+ - utf8proc		>= 2.0	MIT 		https://juliastrings.github.io/utf8proc/
 
 Internal dependencies:
  - gopt			TFL		http://www.purposeful.co.uk/software/gopt/

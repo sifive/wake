@@ -96,7 +96,7 @@ void Job::parse() {
 
 	files_visible.clear();
 	for (auto &x : jast.get("visible").children)
-		files_visible.emplace(std::move(x.second.value));
+		files_visible.insert(std::move(x.second.value));
 }
 
 void Job::dump() {
@@ -339,7 +339,7 @@ static int wakefuse_readlink(const char *path, char *buf, size_t size)
 		return -errno;
 
 	buf[res] = '\0';
-	it->second.files_read.emplace(std::move(key.second));
+	it->second.files_read.insert(std::move(key.second));
 	return 0;
 }
 
@@ -459,7 +459,7 @@ static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info 
 		return -errno;
 
 	fi->fh = fd;
-	it->second.files_wrote.emplace(std::move(key.second));
+	it->second.files_wrote.insert(std::move(key.second));
 	return 0;
 }
 
@@ -492,7 +492,7 @@ static int wakefuse_mkdir(const char *path, mode_t mode)
 	if (res == -1 && (errno != EEXIST || it->second.is_readable(key.second)))
 		return -errno;
 
-	it->second.files_wrote.emplace(std::move(key.second));
+	it->second.files_wrote.insert(std::move(key.second));
 	return 0;
 }
 
@@ -591,7 +591,7 @@ static int wakefuse_symlink(const char *from, const char *to)
 	if (res == -1)
 		return -errno;
 
-	it->second.files_wrote.emplace(std::move(key.second));
+	it->second.files_wrote.insert(std::move(key.second));
 	return 0;
 }
 
@@ -645,7 +645,7 @@ static int wakefuse_rename(const char *from, const char *to)
 
 	it->second.files_wrote.erase(keyf.second);
 	it->second.files_read.erase(keyf.second);
-	it->second.files_wrote.emplace(std::move(keyt.second));
+	it->second.files_wrote.insert(std::move(keyt.second));
 
 	return 0;
 }
@@ -695,7 +695,7 @@ static int wakefuse_link(const char *from, const char *to)
 	if (res == -1)
 		return -errno;
 
-	it->second.files_wrote.emplace(std::move(keyt.second));
+	it->second.files_wrote.insert(std::move(keyt.second));
 	return 0;
 }
 
@@ -806,7 +806,7 @@ static int wakefuse_truncate(const char *path, off_t size)
 		(void)close(fd);
 		return res;
 	} else {
-		it->second.files_wrote.emplace(std::move(key.second));
+		it->second.files_wrote.insert(std::move(key.second));
 		(void)close(fd);
 		return 0;
 	}
@@ -840,7 +840,7 @@ static int wakefuse_utimens(const char *path, const struct timespec ts[2])
 	if (res == -1)
 		return -errno;
 
-	it->second.files_wrote.emplace(std::move(key.second));
+	it->second.files_wrote.insert(std::move(key.second));
 	return 0;
 }
 
@@ -909,7 +909,7 @@ static int wakefuse_read(const char *path, char *buf, size_t size, off_t offset,
 			res = -errno;
 
 		it->second.ibytes += res;
-		it->second.files_read.emplace(std::move(key.second));
+		it->second.files_read.insert(std::move(key.second));
 		return res;
 	}
 
@@ -953,7 +953,7 @@ static int wakefuse_write(const char *path, const char *buf, size_t size,
 			res = -errno;
 
 		it->second.obytes += res;
-		it->second.files_wrote.emplace(std::move(key.second));
+		it->second.files_wrote.insert(std::move(key.second));
 		return res;
 	}
 
@@ -1058,55 +1058,6 @@ static int wakefuse_fsync(const char *path, int isdatasync,
 	return 0;
 }
 
-static int wakefuse_fallocate(const char *path, int mode,
-			off_t offset, off_t length, struct fuse_file_info *fi)
-{
-	(void) fi;
-
-	TRACE(path);
-
-	if (mode)
-		return -EOPNOTSUPP;
-
-	if (is_special(path))
-		return -EACCES;
-
-	auto key = split_key(path);
-	if (key.first.empty())
-		return -EISDIR;
-
-	auto it = context.jobs.find(key.first);
-	if (it == context.jobs.end())
-		return -ENOENT;
-
-	if (key.second == ".")
-		return -EISDIR;
-
-	if (!it->second.is_readable(key.second))
-		return -ENOENT;
-
-	if (!it->second.is_writeable(key.second))
-		return -EACCES;
-
-	int fd = openat(context.rootfd, key.second.c_str(), O_WRONLY | O_NOFOLLOW);
-	if (fd == -1)
-		return -errno;
-
-#ifdef __APPLE__
-	int res = -ENOTSUP;
-#else
-	int res = posix_fallocate(fd, offset, length);
-#endif
-	if (res != 0) {
-		(void)close(fd);
-		return -res;
-	} else {
-		it->second.files_wrote.emplace(std::move(key.second));
-		(void)close(fd);
-		return 0;
-	}
-}
-
 static int wakefuse_setxattr(const char *path, const char *name, const char *value,
 #ifdef __APPLE__
 			size_t size, int flags, uint32_t position)
@@ -1150,7 +1101,7 @@ static int wakefuse_setxattr(const char *path, const char *name, const char *val
 		(void)close(fd);
 		return res;
 	} else {
-		it->second.files_wrote.emplace(std::move(key.second));
+		it->second.files_wrote.insert(std::move(key.second));
 		(void)close(fd);
 		return 0;
 	}
@@ -1197,7 +1148,7 @@ static int wakefuse_getxattr(const char *path, const char *name, char *value,
 		(void)close(fd);
 		return res;
 	} else {
-		it->second.files_read.emplace(std::move(key.second));
+		it->second.files_read.insert(std::move(key.second));
 		(void)close(fd);
 		return 0;
 	}
@@ -1239,7 +1190,7 @@ static int wakefuse_listxattr(const char *path, char *list, size_t size)
 		(void)close(fd);
 		return res;
 	} else {
-		it->second.files_read.emplace(std::move(key.second));
+		it->second.files_read.insert(std::move(key.second));
 		(void)close(fd);
 		return 0;
 	}
@@ -1283,11 +1234,58 @@ static int wakefuse_removexattr(const char *path, const char *name)
 		(void)close(fd);
 		return res;
 	} else {
-		it->second.files_wrote.emplace(std::move(key.second));
+		it->second.files_wrote.insert(std::move(key.second));
 		(void)close(fd);
 		return 0;
 	}
 }
+
+#ifdef HAVE_FALLOCATE
+static int wakefuse_fallocate(const char *path, int mode,
+			off_t offset, off_t length, struct fuse_file_info *fi)
+{
+	(void) fi;
+
+	TRACE(path);
+
+	if (mode)
+		return -EOPNOTSUPP;
+
+	if (is_special(path))
+		return -EACCES;
+
+	auto key = split_key(path);
+	if (key.first.empty())
+		return -EISDIR;
+
+	auto it = context.jobs.find(key.first);
+	if (it == context.jobs.end())
+		return -ENOENT;
+
+	if (key.second == ".")
+		return -EISDIR;
+
+	if (!it->second.is_readable(key.second))
+		return -ENOENT;
+
+	if (!it->second.is_writeable(key.second))
+		return -EACCES;
+
+	int fd = openat(context.rootfd, key.second.c_str(), O_WRONLY | O_NOFOLLOW);
+	if (fd == -1)
+		return -errno;
+
+	int res = posix_fallocate(fd, offset, length);
+	if (res != 0) {
+		(void)close(fd);
+		return -res;
+	} else {
+		it->second.files_wrote.insert(std::move(key.second));
+		(void)close(fd);
+		return 0;
+	}
+}
+#endif
 
 static std::string path;
 static struct fuse* fh;
@@ -1348,11 +1346,13 @@ int main(int argc, char *argv[])
 	wakefuse_ops.statfs		= wakefuse_statfs;
 	wakefuse_ops.release		= wakefuse_release;
 	wakefuse_ops.fsync		= wakefuse_fsync;
-	wakefuse_ops.fallocate		= wakefuse_fallocate;
 	wakefuse_ops.setxattr		= wakefuse_setxattr;
 	wakefuse_ops.getxattr		= wakefuse_getxattr;
 	wakefuse_ops.listxattr		= wakefuse_listxattr;
 	wakefuse_ops.removexattr	= wakefuse_removexattr;
+#ifdef HAVE_FALLOCATE
+	wakefuse_ops.fallocate		= wakefuse_fallocate;
+#endif
 
 	int status = 1;
 	sigset_t block;
