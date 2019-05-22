@@ -20,6 +20,7 @@
 
 #include <string>
 
+std::string get_cwd();
 std::string find_execpath();
 std::string find_in_path(const std::string &file, const std::string &path);
 std::string find_path(const char *const * env);

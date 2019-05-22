@@ -17,7 +17,7 @@
 global def default = Pair "native-cpp11-release" "native-c99-release"
 global def debug   = Pair "native-cpp11-debug" "native-c99-debug"
 
-def targets = buildWake, buildFuse, buildShim, buildPreload, buildPrelib, Nil
+def targets = buildWake, buildFuse, buildFuseDaemon, buildShim, buildPreload, buildPrelib, Nil
 def allOut variant = map (_ variant) targets
 
 global def all variant = allOut variant | findSomeFn getPathError | getOrPass "BUILT"
