@@ -164,15 +164,13 @@ int main(int argc, char *argv[])
 	if (!JAST::parse(opath.c_str(), ofs, jast))
 		return 1;
 
-	// !!! daemon must report I/O usage
-
 	bool first;
 	ofs << "{\"usage\":{\"status\":" << status
 	  << ",\"runtime\":" << (stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0)
 	  << ",\"cputime\":" << (rusage.ru_utime.tv_sec + rusage.ru_stime.tv_sec + (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0)
 	  << ",\"membytes\":" << rusage.ru_maxrss
-	  << ",\"inbytes\":" << rusage.ru_inblock * UINT64_C(512)
-	  << ",\"outbytes\":" << rusage.ru_oublock * UINT64_C(512)
+	  << ",\"inbytes\":" << jast.get("ibytes").value
+	  << ",\"outbytes\":" << jast.get("obytes").value
 	  << "},\"inputs\":[";
 
 	first = true;

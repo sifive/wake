@@ -62,11 +62,12 @@ struct Job {
 	std::set<std::string> files_wrote;
 	std::string json_in;
 	std::string json_out;
+	long ibytes, obytes;
 	int json_in_uses;
 	int json_out_uses;
 	int uses;
 
-	Job() : json_in_uses(0), json_out_uses(0), uses(0) { }
+	Job() : ibytes(0), obytes(0), json_in_uses(0), json_out_uses(0), uses(0) { }
 
 	void parse();
 	void dump();
@@ -95,7 +96,11 @@ void Job::dump() {
 	bool first;
 	std::stringstream s;
 
-	s << "{\"inputs\":[";
+	s << "{\"ibytes\":"
+	  << ibytes
+	  << ",\"obytes\":"
+	  << obytes
+	  << ",\"inputs\":[";
 
 	first = true;
 	for (auto &x : files_read) {
@@ -884,6 +889,7 @@ static int wakefuse_read(const char *path, char *buf, size_t size, off_t offset,
 		if (res == -1)
 			res = -errno;
 
+		it->second.ibytes += res;
 		it->second.files_read.emplace(std::move(key.second));
 		return res;
 	}
@@ -927,6 +933,7 @@ static int wakefuse_write(const char *path, const char *buf, size_t size,
 		if (res == -1)
 			res = -errno;
 
+		it->second.obytes += res;
 		it->second.files_wrote.emplace(std::move(key.second));
 		return res;
 	}
