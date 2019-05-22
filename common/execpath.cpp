@@ -20,7 +20,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include <errno.h>
 #include <memory>
+#include <vector>
 
 std::string find_execpath() {
   static std::string exepath;
@@ -67,4 +69,12 @@ std::string find_path(const char *const * env) {
     }
   }
   return ".:/bin:/usr/bin";
+}
+
+std::string get_cwd() {
+  std::vector<char> buf;
+  buf.resize(1024, '\0');
+  while (getcwd(buf.data(), buf.size()) == 0 && errno == ERANGE)
+    buf.resize(buf.size() * 2);
+  return buf.data();
 }

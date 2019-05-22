@@ -147,10 +147,11 @@ static PRIMFN(prim_read) {
   STRING(path, 0);
   std::ifstream t(path->value);
   if (!t.fail()) {
-    std::stringstream buffer;
-    buffer << t.rdbuf();
+    std::string content(
+      (std::istreambuf_iterator<char>(t)),
+      (std::istreambuf_iterator<char>()));
     if (!t.bad()) {
-      auto out = make_result(true, std::make_shared<String>(buffer.str()));
+      auto out = make_result(true, std::make_shared<String>(std::move(content)));
       RETURN(out);
     }
   }

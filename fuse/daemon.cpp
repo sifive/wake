@@ -153,28 +153,31 @@ static std::pair<std::string, std::string> split_key(const char *path) {
 }
 
 struct Special {
-	Job *job;
+	std::map<std::string, Job>::iterator job;
 	char kind;
-	operator bool () const { return job; }
+	Special() : job(), kind(0) { }
+	operator bool () const { return kind; }
 };
 
 static Special is_special(const char *path) {
 	Special out;
 	bool special =
 		path[0] == '/' && path[1] == '.' && path[3] == '.' && path[4]
-		&& (path[2] == 'i' || path[2] == 'o' || path[2] == 'l');
+		&& (path[2] == 'i' || path[2] == 'o' || path[2] == 'l' || path[2] == 'f');
 
 	if (special) {
+		if (path[2] == 'f') {
+			out.kind = strcmp(path+4, "wake") ? 0 : 'f';
+			return out;
+		}
 		auto it = context.jobs.find(path+4);
 		if (it != context.jobs.end()) {
 			out.kind = path[2];
-			out.job = &it->second;
+			out.job = it;
 			return out;
 		}
 	}
 
-	out.kind = 0;
-	out.job = 0;
 	return out;
 }
 
@@ -189,14 +192,15 @@ static int wakefuse_getattr(const char *path, struct stat *stbuf)
 		switch (s.kind) {
 			case 'i':
 				stbuf->st_mode = S_IFREG | 0644;
-				stbuf->st_size = s.job->json_in.size();
+				stbuf->st_size = s.job->second.json_in.size();
 				return res;
 			case 'o':
-				if (s.job->json_out_uses == 0) s.job->dump();
+				if (s.job->second.json_out_uses == 0) s.job->second.dump();
 				stbuf->st_mode = S_IFREG | 0444;
-				stbuf->st_size = s.job->json_out.size();
+				stbuf->st_size = s.job->second.json_out.size();
 				return res;
 			case 'l':
+			case 'f':
 				stbuf->st_mode = S_IFREG | 0444;
 				stbuf->st_size = 0;
 				return res;
@@ -239,9 +243,7 @@ static int wakefuse_access(const char *path, int mask)
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
 			case 'i': return (mask & X_OK) ? -EACCES : 0;
-			case 'o': return (mask & (X_OK|W_OK)) ? -EACCES : 0;
-			case 'l': return (mask & (X_OK|W_OK)) ? -EACCES : 0;
-			default:  return -ENOENT; // unreachable
+			default:  return (mask & (X_OK|W_OK)) ? -EACCES : 0;
 		}
 	}
 
@@ -257,7 +259,7 @@ static int wakefuse_access(const char *path, int mask)
 	if (!it->second.is_readable(key.second))
 		return -ENOENT;
 
-	int res = faccessat(context.rootfd, key.second.c_str(), mask, AT_SYMLINK_NOFOLLOW);
+	int res = faccessat(context.rootfd, key.second.c_str(), mask, 0);
 	if (res == -1)
 		return -errno;
 
@@ -307,6 +309,7 @@ static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	auto key = split_key(path);
 	if (key.first.empty()) {
+		filler(buf, ".f.wake", 0, 0);
 		for (auto &job : context.jobs) {
 			filler(buf, job.first.c_str(), 0, 0);
 			filler(buf, (".i." + job.first).c_str(), 0, 0);
@@ -576,7 +579,7 @@ static int wakefuse_rename(const char *from, const char *to)
 			return -EEXIST;
 	}
 
-	if (keyt.first != keyf.second)
+	if (keyt.first != keyf.first)
 		return -EXDEV;
 
 	if (!it->second.is_readable(keyf.second))
@@ -631,7 +634,7 @@ static int wakefuse_link(const char *from, const char *to)
 			return -EEXIST;
 	}
 
-	if (keyt.first != keyf.second)
+	if (keyt.first != keyf.first)
 		return -EXDEV;
 
 	if (!it->second.is_readable(keyf.second))
@@ -718,7 +721,7 @@ static int wakefuse_truncate(const char *path, off_t size)
 		switch (s.kind) {
 			case 'i':
 				if (size <= MAX_JSON) {
-					s.job->json_in.resize(size);
+					s.job->second.json_in.resize(size);
 					return 0;
 				} else {
 					return -ENOSPC;
@@ -799,9 +802,10 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
-			case 'i': ++s.job->json_in_uses; break;
-			case 'o': if (++s.job->json_out_uses == 1) s.job->dump(); break;
-			case 'l': ++s.job->uses; break;
+			case 'f': break;
+			case 'i': ++s.job->second.json_in_uses; break;
+			case 'o': if (++s.job->second.json_out_uses == 1) s.job->second.dump(); break;
+			case 'l': ++s.job->second.uses; break;
 			default: return -ENOENT; // unreachable
 		}
 		fi->fh = -1;
@@ -862,8 +866,8 @@ static int wakefuse_read(const char *path, char *buf, size_t size, off_t offset,
 
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
-			case 'i': return read_str(s.job->json_in, buf, size, offset);
-			case 'o': return read_str(s.job->json_out, buf, size, offset);
+			case 'i': return read_str(s.job->second.json_in, buf, size, offset);
+			case 'o': return read_str(s.job->second.json_out, buf, size, offset);
 			default:  return 0;
 		}
 	}
@@ -905,7 +909,7 @@ static int wakefuse_write(const char *path, const char *buf, size_t size,
 
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
-			case 'i': return write_str(s.job->json_in, buf, size, offset);
+			case 'i': return write_str(s.job->second.json_in, buf, size, offset);
 			default:  return -EACCES;
 		}
 	}
@@ -959,14 +963,20 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
-			case 'i': if (--s.job->json_in_uses == 0) s.job->parse(); break;
-			case 'o': --s.job->json_out_uses; break;
-			case 'l': --s.job->uses; break;
+			case 'f': break;
+			case 'i': if (--s.job->second.json_in_uses == 0) s.job->second.parse(); break;
+			case 'o': --s.job->second.json_out_uses; break;
+			case 'l': --s.job->second.uses; break;
 			default: return -EIO;
+		}
+		if (0 == s.job->second.uses &&
+		    0 == s.job->second.json_in_uses &&
+		    0 == s.job->second.json_out_uses) {
+			context.jobs.erase(s.job);
 		}
 	}
 
-	return -EIO;
+	return 0;
 }
 
 static int wakefuse_fsync(const char *path, int isdatasync,

@@ -322,14 +322,6 @@ static std::string make_relative(std::string &&dir, std::string &&path) {
   return x;
 }
 
-std::string get_cwd() {
-  std::vector<char> buf;
-  buf.resize(1024, '\0');
-  while (getcwd(buf.data(), buf.size()) == 0 && errno == ERANGE)
-    buf.resize(buf.size() * 2);
-  return buf.data();
-}
-
 std::string get_workspace() {
   static std::string cwd;
   if (cwd.empty()) cwd = get_cwd();
