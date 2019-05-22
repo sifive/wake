@@ -181,6 +181,21 @@ static Special is_special(const char *path) {
 	return out;
 }
 
+static void cancel_exit()
+{
+	struct itimerval retry;
+	memset(&retry, 0, sizeof(retry));
+	setitimer(ITIMER_REAL, &retry, 0);
+}
+
+static void schedule_exit()
+{
+	struct itimerval retry;
+	memset(&retry, 0, sizeof(retry));
+	retry.it_value.tv_sec = 5;
+	setitimer(ITIMER_REAL, &retry, 0);
+}
+
 static int wakefuse_getattr(const char *path, struct stat *stbuf)
 {
 	TRACE(path);
@@ -384,6 +399,7 @@ static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info 
 	if (key.second == "." && key.first.size() > 3 &&
 	    key.first[0] == '.' && key.first[1] == 'l' && key.first[2] == '.' && key.first[3] != '.') {
 		++context.jobs[key.first.substr(3)].uses;
+		cancel_exit();
 		fi->fh = -1;
 		return 0;
 	}
@@ -973,6 +989,8 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 		    0 == s.job->second.json_in_uses &&
 		    0 == s.job->second.json_out_uses) {
 			context.jobs.erase(s.job);
+			if (context.jobs.empty())
+				schedule_exit();
 		}
 	}
 
@@ -1243,10 +1261,7 @@ static void handle_exit(int sig)
 		fuse_unmount(path.c_str(), fc);
 		exit(0);
 	} else {
-		struct itimerval retry;
-		memset(&retry, 0, sizeof(retry));
-		retry.it_value.tv_usec = 200000; // 200ms
-		setitimer(ITIMER_REAL, &retry, 0);
+		schedule_exit();
 	}
 }
 

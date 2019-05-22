@@ -29,7 +29,7 @@ endif
 all:		wake.db
 	./bin/wake all default
 
-wake.db:	bin/wake lib/wake/fuse-wake lib/wake/shim-wake $(EXTRA)
+wake.db:	bin/wake lib/wake/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EXTRA)
 	test -f $@ || ./bin/wake --init .
 
 install:	all
@@ -41,6 +41,9 @@ bin/wake:	src/symbol.o $(COMMON)				\
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
 lib/wake/fuse-wake:	fuse/fuse.cpp $(COMMON)
+	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $^ -o $@ $(LDFLAGS)
+
+lib/wake/fuse-waked:	fuse/daemon.cpp $(COMMON)
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(FUSE_CFLAGS) $^ -o $@ $(LDFLAGS) $(FUSE_LDFLAGS)
 
 lib/wake/shim-wake:	$(patsubst %.c,%.o,$(wildcard shim/*.c))
