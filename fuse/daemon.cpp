@@ -24,7 +24,7 @@
 #define _XOPEN_SOURCE 700
 #endif
 
-#define MAX_JSON 65536
+#define MAX_JSON (1024*1024)
 
 #include <fuse.h>
 #include <stdio.h>
@@ -55,6 +55,9 @@
 
 //#define TRACE(x) do { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } while (0)
 #define TRACE(x) (void)x
+
+// We ensure STDIN is /dev/null, so this is a safe sentinel value for open files
+#define BAD_FD STDIN_FILENO
 
 struct Job {
 	std::set<std::string> files_visible;
@@ -426,7 +429,7 @@ static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info 
 	    key.first[0] == '.' && key.first[1] == 'l' && key.first[2] == '.' && key.first[3] != '.') {
 		++context.jobs[key.first.substr(3)].uses;
 		cancel_exit();
-		fi->fh = -1;
+		fi->fh = BAD_FD;
 		return 0;
 	}
 
@@ -850,7 +853,7 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 			case 'l': ++s.job->second.uses; break;
 			default: return -ENOENT; // unreachable
 		}
-		fi->fh = -1;
+		fi->fh = BAD_FD;
 		return 0;
 	}
 
@@ -878,7 +881,7 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 
 static int read_str(const std::string &str, char *buf, size_t size, off_t offset)
 {
-	if (offset >= str.size()) {
+	if (offset >= (ssize_t)str.size()) {
 		return 0;
 	} else {
 		size_t got = std::min(str.size() - (size_t)offset, size);
@@ -892,7 +895,7 @@ static int wakefuse_read(const char *path, char *buf, size_t size, off_t offset,
 {
 	TRACE(path);
 
-	if (fi->fh != -1) {
+	if (fi->fh != BAD_FD) {
 		auto key = split_key(path);
 		auto it = context.jobs.find(key.first);
 		if (it == context.jobs.end())
@@ -936,7 +939,7 @@ static int wakefuse_write(const char *path, const char *buf, size_t size,
 {
 	TRACE(path);
 
-	if (fi->fh != -1) {
+	if (fi->fh != BAD_FD) {
 		auto key = split_key(path);
 		auto it = context.jobs.find(key.first);
 		if (it == context.jobs.end())
@@ -1000,7 +1003,7 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 {
 	TRACE(path);
 
-	if (fi->fh != -1) {
+	if (fi->fh != BAD_FD) {
 		int res = close(fi->fh);
 		if (res == -1)
 			return -errno;
@@ -1033,7 +1036,7 @@ static int wakefuse_fsync(const char *path, int isdatasync,
 
 	TRACE(path);
 
-	if (fi->fh == -1)
+	if (fi->fh == BAD_FD)
 		return 0;
 
 #ifdef HAVE_FDATASYNC
