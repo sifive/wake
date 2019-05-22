@@ -161,6 +161,10 @@ int main(int argc, char *argv[])
 	struct timeval stop;
 	gettimeofday(&stop, 0);
 
+	// Cause the opath to be generated (this write will fail)
+	(void)write(livefd, &stop, 1);
+	(void)fsync(livefd);
+
 	if (!JAST::parse(opath.c_str(), ofs, jast))
 		return 1;
 

@@ -93,6 +93,8 @@ void Job::parse() {
 }
 
 void Job::dump() {
+	if (!json_out.empty()) return;
+
 	bool first;
 	std::stringstream s;
 
@@ -122,8 +124,9 @@ void Job::dump() {
 }
 
 struct Context {
-	int rootfd;
 	std::map<std::string, Job> jobs;
+	int rootfd, uses;
+	Context() : jobs(), rootfd(-1), uses(0) { }
 };
 
 static Context context;
@@ -169,24 +172,31 @@ struct Special {
 
 static Special is_special(const char *path) {
 	Special out;
-	bool special =
-		path[0] == '/' && path[1] == '.' && path[3] == '.' && path[4]
-		&& (path[2] == 'i' || path[2] == 'o' || path[2] == 'l' || path[2] == 'f');
 
-	if (special) {
-		if (path[2] == 'f') {
+	if (path[0] != '/' || path[1] != '.' || !path[2] || path[3] != '.' || !path[4])
+		return out;
+
+	auto it = context.jobs.find(path+4);
+	switch (path[2]) {
+		case 'f':
 			out.kind = strcmp(path+4, "wake") ? 0 : 'f';
 			return out;
-		}
-		auto it = context.jobs.find(path+4);
-		if (it != context.jobs.end()) {
-			out.kind = path[2];
-			out.job = it;
+		case 'o':
+			if (it != context.jobs.end() && !it->second.json_out.empty()) {
+				out.kind = path[2];
+				out.job = it;
+			}
 			return out;
-		}
+		case 'i':
+		case 'l':
+			if (it != context.jobs.end()) {
+				out.kind = path[2];
+				out.job = it;
+			}
+			return out;
+		default:
+			return out;
 	}
-
-	return out;
 }
 
 static void cancel_exit()
@@ -219,11 +229,13 @@ static int wakefuse_getattr(const char *path, struct stat *stbuf)
 				stbuf->st_size = s.job->second.json_in.size();
 				return res;
 			case 'o':
-				if (s.job->second.json_out_uses == 0) s.job->second.dump();
 				stbuf->st_mode = S_IFREG | 0444;
 				stbuf->st_size = s.job->second.json_out.size();
 				return res;
 			case 'l':
+				stbuf->st_mode = S_IFREG | 0644;
+				stbuf->st_size = 0;
+				return res;
 			case 'f':
 				stbuf->st_mode = S_IFREG | 0444;
 				stbuf->st_size = 0;
@@ -270,6 +282,7 @@ static int wakefuse_access(const char *path, int mask)
 
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
+			case 'o':
 			case 'i': return (mask & X_OK) ? -EACCES : 0;
 			default:  return (mask & (X_OK|W_OK)) ? -EACCES : 0;
 		}
@@ -831,9 +844,9 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
-			case 'f': break;
+			case 'f': ++context.uses; cancel_exit(); break;
 			case 'i': ++s.job->second.json_in_uses; break;
-			case 'o': if (++s.job->second.json_out_uses == 1) s.job->second.dump(); break;
+			case 'o': ++s.job->second.json_out_uses; break;
 			case 'l': ++s.job->second.uses; break;
 			default: return -ENOENT; // unreachable
 		}
@@ -941,6 +954,7 @@ static int wakefuse_write(const char *path, const char *buf, size_t size,
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
 			case 'i': return write_str(s.job->second.json_in, buf, size, offset);
+			case 'l': s.job->second.dump(); return -ENOSPC;
 			default:  return -EACCES;
 		}
 	}
@@ -994,7 +1008,7 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
-			case 'f': break;
+			case 'f': --context.uses; break;
 			case 'i': if (--s.job->second.json_in_uses == 0) s.job->second.parse(); break;
 			case 'o': --s.job->second.json_out_uses; break;
 			case 'l': --s.job->second.uses; break;
@@ -1004,7 +1018,7 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 		    0 == s.job->second.json_in_uses &&
 		    0 == s.job->second.json_out_uses) {
 			context.jobs.erase(s.job);
-			if (context.jobs.empty())
+			if (context.jobs.empty() && 0 == context.uses)
 				schedule_exit();
 		}
 	}
@@ -1339,6 +1353,7 @@ int main(int argc, char *argv[])
 	struct fuse_args args;
 	pid_t pid;
 	int log, null;
+	bool madedir;
 
 	if (argc != 2) {
 		fprintf(stderr, "Syntax: fuse-waked <mount-point>\n");
@@ -1375,15 +1390,16 @@ int main(int argc, char *argv[])
 		goto term;
 	}
 
-	if (mkdir(path.c_str(), 0775) != 0 && errno != EEXIST) {
+	madedir = mkdir(path.c_str(), 0775) == 0;
+	if (!madedir && errno != EEXIST) {
 		fprintf(stderr, "mkdir %s: %s\n", path.c_str(), strerror(errno));
-		goto term;
+		goto rmroot;
 	}
 
 	pid = fork();
 	if (pid == -1) {
 		perror("fork");
-		goto term;
+		goto rmroot;
 	} else if (pid != 0) {
 		status = 0;
 		goto term;
@@ -1391,13 +1407,13 @@ int main(int argc, char *argv[])
 
 	if (setsid() == -1) {
 		perror("setsid");
-		goto term;
+		goto rmroot;
 	}
 
 	pid = fork();
 	if (pid == -1) {
 		perror("fork2");
-		goto term;
+		goto rmroot;
 	} else if (pid != 0) {
 		status = 0;
 		goto term;
@@ -1476,7 +1492,7 @@ unmount:
 freeargs:
 	fuse_opt_free_args(&args);
 rmroot:
-	if (rmdir(path.c_str()) != 0) {
+	if (madedir && rmdir(path.c_str()) != 0) {
 		fprintf(stderr, "rmdir %s: %s\n", path.c_str(), strerror(errno));
 	}
 term:
