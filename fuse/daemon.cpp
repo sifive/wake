@@ -1017,13 +1017,14 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 			case 'l': --s.job->second.uses; break;
 			default: return -EIO;
 		}
-		if (0 == s.job->second.uses &&
+		if ('f' != s.kind  &&
+		    0 == s.job->second.uses &&
 		    0 == s.job->second.json_in_uses &&
 		    0 == s.job->second.json_out_uses) {
 			context.jobs.erase(s.job);
-			if (context.jobs.empty() && 0 == context.uses)
-				schedule_exit();
 		}
+		if (context.jobs.empty() && 0 == context.uses)
+			schedule_exit();
 	}
 
 	return 0;
