@@ -39,9 +39,7 @@
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <sys/file.h>
-#ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
-#endif
 
 #include <set>
 #include <map>
@@ -49,6 +47,11 @@
 #include <sstream>
 #include "json5.h"
 #include "execpath.h"
+
+#ifdef __APPLE__
+#define st_mtim st_mtimespec
+#define st_ctim st_ctimespec
+#endif
 
 //#define TRACE(x) do { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } while (0)
 #define TRACE(x) (void)x
@@ -204,6 +207,7 @@ static int wakefuse_getattr(const char *path, struct stat *stbuf)
 		int res = fstat(context.rootfd, stbuf);
 		if (res == -1) res = -errno;
 		stbuf->st_nlink = 1;
+		stbuf->st_ino = 0;
 		switch (s.kind) {
 			case 'i':
 				stbuf->st_mode = S_IFREG | 0644;
@@ -227,6 +231,8 @@ static int wakefuse_getattr(const char *path, struct stat *stbuf)
 	auto key = split_key(path);
 	if (key.first.empty()) {
 		int res = fstat(context.rootfd, stbuf);
+		stbuf->st_nlink = 1;
+		stbuf->st_ino = 0;
 		if (res == -1) res = -errno;
 		return res;
 	}
@@ -238,6 +244,8 @@ static int wakefuse_getattr(const char *path, struct stat *stbuf)
 
 	if (key.second == ".") {
 		int res = fstat(context.rootfd, stbuf);
+		stbuf->st_nlink = 1;
+		stbuf->st_ino = 0;
 		if (res == -1) res = -errno;
 		return res;
 	}
@@ -899,7 +907,7 @@ static int write_str(std::string &str, const char *buf, size_t size, off_t offse
 		size_t end = std::min((off_t)MAX_JSON, offset+(off_t)size);
 		size_t got = end - offset;
 		if (end > str.size()) str.resize(end);
-		str.replace(offset, got, buf);
+		str.replace(offset, got, buf, got);
 		return got;
 	}
 }
@@ -1022,7 +1030,6 @@ static int wakefuse_fsync(const char *path, int isdatasync,
 	return 0;
 }
 
-#ifdef HAVE_POSIX_FALLOCATE
 static int wakefuse_fallocate(const char *path, int mode,
 			off_t offset, off_t length, struct fuse_file_info *fi)
 {
@@ -1057,7 +1064,11 @@ static int wakefuse_fallocate(const char *path, int mode,
 	if (fd == -1)
 		return -errno;
 
+#ifdef __APPLE__
+	int res = -ENOTSUP;
+#else
 	int res = posix_fallocate(fd, offset, length);
+#endif
 	if (res != 0) {
 		(void)close(fd);
 		return -res;
@@ -1067,12 +1078,13 @@ static int wakefuse_fallocate(const char *path, int mode,
 		return 0;
 	}
 }
-#endif
 
-#ifdef HAVE_SETXATTR
-/* xattr operations are optional and can safely be left unimplemented */
 static int wakefuse_setxattr(const char *path, const char *name, const char *value,
+#ifdef __APPLE__
+			size_t size, int flags, uint32_t position)
+#else
 			size_t size, int flags)
+#endif
 {
 	TRACE(path);
 
@@ -1096,11 +1108,15 @@ static int wakefuse_setxattr(const char *path, const char *name, const char *val
 	if (!it->second.is_writeable(key.second))
 		return -EACCES;
 
-	fd = openat(context.rootfd, key.second.c_str(), O_WRONLY | O_NOFOLLOW);
+	int fd = openat(context.rootfd, key.second.c_str(), O_WRONLY | O_NOFOLLOW);
 	if (fd == -1)
 		return -errno;
 
-	res = fsetxattr(fd, name, value, size, flags);
+#ifdef __APPLE__
+	int res = fsetxattr(fd, name, value, size, position, flags);
+#else
+	int res = fsetxattr(fd, name, value, size, flags);
+#endif
 	if (res == -1) {
 		res = -errno;
 		(void)close(fd);
@@ -1113,7 +1129,11 @@ static int wakefuse_setxattr(const char *path, const char *name, const char *val
 }
 
 static int wakefuse_getxattr(const char *path, const char *name, char *value,
+#ifdef __APPLE__
+			size_t size, uint32_t position)
+#else
 			size_t size)
+#endif
 {
 	TRACE(path);
 
@@ -1139,7 +1159,11 @@ static int wakefuse_getxattr(const char *path, const char *name, char *value,
 	if (fd == -1)
 		return -errno;
 
-	res = fgetxattr(fd, name, value, size);
+#ifdef __APPLE__
+	int res = fgetxattr(fd, name, value, size, position, 0);
+#else
+	int res = fgetxattr(fd, name, value, size);
+#endif
 	if (res == -1) {
 		res = -errno;
 		(void)close(fd);
@@ -1177,7 +1201,11 @@ static int wakefuse_listxattr(const char *path, char *list, size_t size)
 	if (fd == -1)
 		return -errno;
 
+#ifdef __APPLE__
+	int res = flistxattr(fd, list, size, 0);
+#else
 	int res = flistxattr(fd, list, size);
+#endif
 	if (res == -1) {
 		res = -errno;
 		(void)close(fd);
@@ -1217,7 +1245,11 @@ static int wakefuse_removexattr(const char *path, const char *name)
 	if (fd == -1)
 		return -errno;
 
+#ifdef __APPLE__
+	int res = fremovexattr(fd, name, 0);
+#else
 	int res = fremovexattr(fd, name);
+#endif
 	if (res == -1) {
 		res = -errno;
 		(void)close(fd);
@@ -1228,7 +1260,6 @@ static int wakefuse_removexattr(const char *path, const char *name)
 		return 0;
 	}
 }
-#endif /* HAVE_SETXATTR */
 
 static std::string path;
 static struct fuse* fh;
@@ -1289,15 +1320,11 @@ int main(int argc, char *argv[])
 	wakefuse_ops.statfs		= wakefuse_statfs;
 	wakefuse_ops.release		= wakefuse_release;
 	wakefuse_ops.fsync		= wakefuse_fsync;
-#ifdef HAVE_POSIX_FALLOCATE
 	wakefuse_ops.fallocate		= wakefuse_fallocate;
-#endif
-#ifdef HAVE_SETXATTR
 	wakefuse_ops.setxattr		= wakefuse_setxattr;
 	wakefuse_ops.getxattr		= wakefuse_getxattr;
 	wakefuse_ops.listxattr		= wakefuse_listxattr;
 	wakefuse_ops.removexattr	= wakefuse_removexattr;
-#endif
 
 	int status = 1;
 	sigset_t block;

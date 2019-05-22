@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
 	}
 
 	// This stays open (keeping rpath live) until we terminate
-	int livefd = open(lpath.c_str(), O_CREAT|O_RDWR, 0644);
+	int livefd = open(lpath.c_str(), O_CREAT|O_RDWR|O_EXCL, 0644);
 	if (livefd == -1) {
 		std::cerr << "open " << rpath << ": " << strerror(errno) << std::endl;
 		return 1;
@@ -91,7 +91,6 @@ int main(int argc, char *argv[])
 
 	std::ofstream ijson(ipath);
 	ijson.write(json.data(), json.size());
-	ijson.write("", 1);
 	if (ijson.fail()) {
 		std::cerr << "write " << ipath << ": " << strerror(errno) << std::endl;
 		return 1;
