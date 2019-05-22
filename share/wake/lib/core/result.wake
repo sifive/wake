@@ -41,9 +41,13 @@ global def rmap fn = match _
   Pass a = Pass (fn a)
   Fail f = Fail f
 
+global def rmapPass fn = match _
+  Pass a = fn a
+  Fail f = Fail f
+
 global def rmapFail fn = match _
   Pass a = Pass a
-  Fail f = Fail (fn f)
+  Fail f = fn f
 
 global def findFail = findFailFn (_)
 global def findFailFn fn =
