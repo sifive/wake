@@ -41,10 +41,14 @@ global def rmap fn = match _
   Pass a = Pass (fn a)
   Fail f = Fail f
 
+# Applies a fallible function to Pass value or propogates Fail
+# (fn: a => Result b c) => Result a c => Result b c
 global def rmapPass fn = match _
   Pass a = fn a
   Fail f = Fail f
 
+# Applies a fallible function to Fail value or propogates Pass
+# (fn: a => Result b c) => Result b a => Result b c
 global def rmapFail fn = match _
   Pass a = Pass a
   Fail f = fn f
