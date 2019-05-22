@@ -46,8 +46,7 @@
 #include <set>
 #include <map>
 #include <string>
-#include <iostream>
-#include <fstream>
+#include <sstream>
 #include "json5.h"
 #include "execpath.h"
 
@@ -66,12 +65,53 @@ struct Job {
 
 	Job() : json_in_uses(0), json_out_uses(0), uses(0) { }
 
+	void parse();
+	void dump();
+
 	bool is_creatable(const std::string &path);
 	bool is_writeable(const std::string &path);
 	bool is_readable(const std::string &path);
 protected:
 	bool is_visible(const std::string &path);
 };
+
+void Job::parse() {
+	JAST jast;
+	std::stringstream s;
+	if (!JAST::parse(json_in, s, jast)) {
+		fprintf(stderr, "Parse error: %s\n", s.str().c_str());
+		return;
+	}
+
+	files_visible.clear();
+	for (auto &x : jast.get("visible").children)
+		files_visible.emplace(std::move(x.second.value));
+}
+
+void Job::dump() {
+	bool first;
+	std::stringstream s;
+
+	s << "{\"inputs\":[";
+
+	first = true;
+	for (auto &x : files_read) {
+		s << (first?"":",") << "\"" << json_escape(x) << "\"";
+		first = false;
+	}
+
+	s << "],\"outputs\":[";
+
+	first = true;
+	for (auto &x : files_wrote) {
+		s << (first?"":",") << "\"" << json_escape(x) << "\"";
+		first = false;
+	}
+
+	s << "]}" << std::endl;
+
+	json_out = s.str();
+}
 
 struct Context {
 	int rootfd;
@@ -152,6 +192,7 @@ static int wakefuse_getattr(const char *path, struct stat *stbuf)
 				stbuf->st_size = s.job->json_in.size();
 				return res;
 			case 'o':
+				if (s.job->json_out_uses == 0) s.job->dump();
 				stbuf->st_mode = S_IFREG | 0444;
 				stbuf->st_size = s.job->json_out.size();
 				return res;
@@ -216,7 +257,7 @@ static int wakefuse_access(const char *path, int mask)
 	if (!it->second.is_readable(key.second))
 		return -ENOENT;
 
-	int res = faccessat(context.rootfd, key.second.c_str(), mask, 0);
+	int res = faccessat(context.rootfd, key.second.c_str(), mask, AT_SYMLINK_NOFOLLOW);
 	if (res == -1)
 		return -errno;
 
@@ -338,7 +379,7 @@ static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info 
 		return -EEXIST;
 
 	if (key.second == "." && key.first.size() > 3 &&
-	    key.first[0] == '.' && key.first[1] == 'l' && key.first[2] == '.') {
+	    key.first[0] == '.' && key.first[1] == 'l' && key.first[2] == '.' && key.first[3] != '.') {
 		++context.jobs[key.first.substr(3)].uses;
 		fi->fh = -1;
 		return 0;
@@ -673,8 +714,19 @@ static int wakefuse_truncate(const char *path, off_t size)
 {
 	TRACE(path);
 
-	if (is_special(path))
-		return -EACCES;
+	if (auto s = is_special(path)) {
+		switch (s.kind) {
+			case 'i':
+				if (size <= MAX_JSON) {
+					s.job->json_in.resize(size);
+					return 0;
+				} else {
+					return -ENOSPC;
+				}
+			default:
+				return -EACCES;
+		}
+	}
 
 	auto key = split_key(path);
 	if (key.first.empty())
@@ -748,7 +800,7 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
 			case 'i': ++s.job->json_in_uses; break;
-			case 'o': ++s.job->json_out_uses; break;
+			case 'o': if (++s.job->json_out_uses == 1) s.job->dump(); break;
 			case 'l': ++s.job->uses; break;
 			default: return -ENOENT; // unreachable
 		}
@@ -824,7 +876,7 @@ static int write_str(std::string &str, const char *buf, size_t size, off_t offse
 	if (offset >= MAX_JSON) {
 		return 0;
 	} else {
-		size_t end = std::min((size_t)MAX_JSON, (size_t)offset+size);
+		size_t end = std::min((off_t)MAX_JSON, offset+(off_t)size);
 		size_t got = end - offset;
 		if (end > str.size()) str.resize(end);
 		str.replace(offset, got, buf);
@@ -907,7 +959,7 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
-			case 'i': --s.job->json_in_uses; break;
+			case 'i': if (--s.job->json_in_uses == 0) s.job->parse(); break;
 			case 'o': --s.job->json_out_uses; break;
 			case 'l': --s.job->uses; break;
 			default: return -EIO;
