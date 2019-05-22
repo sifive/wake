@@ -15,8 +15,13 @@
 
 # Regular expressions
 
-# quote: (str: String) => String
-global def quote str = prim "quote"
+# Turns a String into a properly quoted Regular Expression
+# quote: (str: String) => RegExp
+global def quote str =
+  def res str = prim "quote"
+  match (res str).stringToRegExp
+    Pass x = x
+    Fail _ = panic "Quoted String is invalid Regular Expression"
 
 # (str: String) => RegExp
 global def stringToRegExp str = prim "re2"

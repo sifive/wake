@@ -41,9 +41,49 @@ global def rmap fn = match _
   Pass a = Pass (fn a)
   Fail f = Fail f
 
+# Applies a fallible function to Pass value or propogates Fail
+# (fn: a => Result b c) => Result a c => Result b c
+global def rmapPass fn = match _
+  Pass a = fn a
+  Fail f = Fail f
+
+# Applies a fallible function to Fail value or propogates Pass
+# (fn: a => Result b c) => Result b a => Result b c
 global def rmapFail fn = match _
   Pass a = Pass a
-  Fail f = Fail (fn f)
+  Fail f = fn f
+
+# Finds the first Fail in a List of Result or aggregates Passes into a List
+# List (Result a b) => Result (List a) b
+global def findFail = findFailFn (_)
+# Applies a fallible function to each element of a List,
+#   returning the first Fail or aggregates the Passes into a List
+# (fn: a => Result b c) => List a => Result (List b) c
+global def findFailFn fn =
+  def helper = match _
+    Nil = Pass Nil
+    h, t = match (fn h)
+      Fail y = Fail y
+      Pass x = match (helper t)
+        Pass tt = Pass (x, tt)
+        z = z
+  helper
+
+# Finds the first Pass in a List of Result or aggregates Fails into a List
+# List (Result a b) => Result a (List b)
+global def findPass = findPassFn (_)
+# Applies a fallible function to each element of a List
+#  returning the first Pass or aggregates the Fails into a List
+# (fn: a => Result b c) => List a => Result b (List c)
+global def findPassFn fn =
+  def helper = match _
+    Nil = Fail Nil
+    h, t = match (fn h)
+      Pass y = Pass y
+      Fail x = match (helper t)
+        Fail tt = Fail (x, tt)
+        z = z
+  helper
 
 global def panic s = prim "panic"
 

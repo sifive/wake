@@ -156,7 +156,7 @@ global def localRunner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput cmd vis env dir stdin _ _ predict pool) = match (findSome getPathError vis)
+    Pass (RunnerInput cmd vis env dir stdin _ _ predict pool) = match (findSomeFn getPathError vis)
       Some e =
         def _ = badlaunch job e
         Fail e
@@ -177,7 +177,7 @@ global def virtualRunner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput cmd vis env dir stdin _ _ predict pool) = match (findSome getPathError vis)
+    Pass (RunnerInput cmd vis env dir stdin _ _ predict pool) = match (findSomeFn getPathError vis)
       Some e =
         def _ = badlaunch job e
         Fail e
@@ -379,7 +379,7 @@ global def makeJSONRunner rawScript score estimate =
   def pre = match _
     Fail f = Pair (Fail f) ""
     _ if ! ok = Pair (Fail (makeError "Runner {script} is not executable")) ""
-    Pass (RunnerInput command visible environment directory stdin res prefix record _) = match (findSome getPathError visible)
+    Pass (RunnerInput command visible environment directory stdin res prefix record _) = match (findSomeFn getPathError visible)
       Some e = Pair (Fail e) ""
       None =
         def pmkdir m p = prim "mkdir"
