@@ -16,9 +16,66 @@
 # Any => String conversion
 global def format any = prim "format"
 
+# These values often come from the wake command-line
+# default => Normal
+# -d      => Normal
+# -q      => Quiet
+# -v      => Verbose
+# -dv     => Debug
+global data LogLevel =
+  Debug
+  Verbose
+  Normal
+  Quiet
+
+global data EchoTarget =
+  Null
+  Stdout
+  Stderr # rendered in red if on a tty
+
+global def logError = match _
+  Quiet = Stderr
+  _     = Stderr
+
+global def logWarn = match _
+  Quiet = Null
+  _     = Stderr
+
+global def logNormal = match _
+  Quiet = Null
+  _     = Stdout
+
+global def logVerbose = match _
+  Debug   = Stdout
+  Verbose = Stdout
+  _       = Null
+
+global def logDebug = match _
+  Debug = Stdout
+  _     = Null
+
+# This is private so that users cannot make the build depend on it
+def logLevel = match (prim "level")
+  0 = Quiet
+  1 = Normal
+  2 = Verbose
+  _ = Debug
+
+# Print with a given verbosity
+global def printLevel logLevelFn =
+  def p i outputStr = prim "print"
+  match (logLevelFn logLevel)
+    Null   = (\_ Unit)
+    Stdout = p 1
+    Stderr = p 2
+
+global def printlnLevel logLevelFn =
+  def f = printLevel logLevelFn
+  (\outputStr f "{outputStr}\n")
+
 # Print any type to stdout; even exceptions
-global def print    str = prim "print"
-global def println  str = print (str, "\n", Nil).cat
+global def print   = printLevel logNormal
+global def println = printlnLevel logNormal
 
 # Wait for the top of a value to be made available, then run (f x)
 # Eg: x = 1, 2, 3, Nil; waitOne f x waits for ',' to be known vs. Nil

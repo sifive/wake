@@ -91,10 +91,10 @@ def doFormat fmt lhs =
 global def defaultJSONFormat =
   def formatDouble d =
     match (dclass d)
-      Infinite if d <. 0e0 = "-1e9999"
-      Infinite = "1e9999"
-      NaN      = "NaN"
-      _        = dstr d
+      DoubleInfinite if d <. 0e0 = "-1e9999"
+      DoubleInfinite = "1e9999"
+      DoubleNaN      = "NaN"
+      _              = dstr d
   JSONFormat jsonEscape str formatDouble 0
 
 global def prettyJSONFormat = defaultJSONFormat | setJSONFormatIndent 2

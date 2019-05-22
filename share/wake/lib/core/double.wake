@@ -76,18 +76,18 @@ global def dint x = double (str x)
 
 # Conversion methods
 global data DoubleClass =
-  Infinite
-  NaN
-  SubNormal
-  Normal
+  DoubleInfinite
+  DoubleNaN
+  DoubleSubNormal
+  DoubleNormal
 
 global def dclass x =
   def imp x = prim "dclass"
   match (imp x)
-    1 = Infinite
-    2 = NaN
-    4 = SubNormal
-    _ = Normal
+    1 = DoubleInfinite
+    2 = DoubleNaN
+    4 = DoubleSubNormal
+    _ = DoubleNormal
 
 global def dfrexp x   = prim "dfrexp"
 global def dldexp f e = prim "dldexp"

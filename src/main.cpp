@@ -441,8 +441,9 @@ int main(int argc, char **argv) {
 
   /* Primitives */
   JobTable jobtable(&db, njobs, verbose, quiet, check);
+  StringInfo info(verbose, debug, quiet, VERSION_STR);
   PrimMap pmap;
-  prim_register_string(pmap, VERSION_STR);
+  prim_register_string(pmap, &info);
   prim_register_vector(pmap);
   prim_register_integer(pmap);
   prim_register_double(pmap);

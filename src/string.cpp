@@ -280,15 +280,17 @@ static PRIMFN(prim_format) {
 }
 
 static PRIMTYPE(type_print) {
-  return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
+  return args.size() == 2 &&
+    args[0]->unify(Integer::typeVar) &&
+    args[1]->unify(String::typeVar) &&
     out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_print) {
-  EXPECT(1);
-  STRING(arg0, 0);
-  status_write(2, arg0->value.data(), arg0->value.size());
+  EXPECT(2);
+  INTEGER(fd, 0);
+  STRING(message, 1);
+  status_write(mpz_get_si(fd->value), message->value.data(), message->value.size());
   auto out = make_unit();
   RETURN(out);
 }
@@ -300,7 +302,34 @@ static PRIMTYPE(type_version) {
 
 static PRIMFN(prim_version) {
   EXPECT(0);
-  auto out = std::make_shared<String>((const char *)data);
+  StringInfo *info = reinterpret_cast<StringInfo*>(data);
+  auto out = std::make_shared<String>(info->version);
+  RETURN(out);
+}
+
+static PRIMTYPE(type_level) {
+  return args.size() == 0 &&
+    out->unify(Integer::typeVar);
+}
+
+static PRIMFN(prim_level) {
+  EXPECT(0);
+  StringInfo *info = reinterpret_cast<StringInfo*>(data);
+
+  int x;
+  if (info->quiet) {
+    x = 0;
+  } else if (info->verbose) {
+    if (info->debug) {
+      x = 3;
+    } else {
+      x = 2;
+    }
+  } else {
+    x = 1;
+  }
+
+  auto out = std::make_shared<Integer>(x);
   RETURN(out);
 }
 
@@ -460,7 +489,7 @@ static PRIMFN(prim_uname) {
   RETURN(out);
 }
 
-void prim_register_string(PrimMap &pmap, const char *version) {
+void prim_register_string(PrimMap &pmap, StringInfo *info) {
   // cat* use mutation and 'read' execution order can matter => not pure
   prim_register(pmap, "catopen",  prim_catopen,  type_catopen,             PRIM_SHALLOW);
   prim_register(pmap, "catadd",   prim_catadd,   type_catadd,              PRIM_SHALLOW);
@@ -473,7 +502,8 @@ void prim_register_string(PrimMap &pmap, const char *version) {
   prim_register(pmap, "mkdir",    prim_mkdir,    type_mkdir,               PRIM_SHALLOW);
   prim_register(pmap, "format",   prim_format,   type_format,    PRIM_PURE);
   prim_register(pmap, "print",    prim_print,    type_print,               PRIM_SHALLOW);
-  prim_register(pmap, "version",  prim_version,  type_version,   PRIM_PURE|PRIM_SHALLOW, (void*)version);
+  prim_register(pmap, "version",  prim_version,  type_version,   PRIM_PURE|PRIM_SHALLOW, (void*)info);
+  prim_register(pmap, "level",    prim_level,    type_level,     PRIM_PURE|PRIM_SHALLOW, (void*)info);
   prim_register(pmap, "scmp",     prim_scmp,     type_scmp,      PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "sNFC",     prim_sNFC,     type_normalize, PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "sNFKC",    prim_sNFKC,    type_normalize, PRIM_PURE|PRIM_SHALLOW);
