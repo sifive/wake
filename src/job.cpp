@@ -40,8 +40,6 @@
 #include <vector>
 #include <cstring>
 
-// How many job categories to support
-#define POOLS 2
 // How many times to SIGTERM a process before SIGKILL
 #define TERM_ATTEMPTS 6
 // How long between first and second SIGTERM attempt (exponentially increasing)
@@ -116,7 +114,6 @@ struct Task {
 
 // A JobEntry is a forked job with pid|stdout|stderr incomplete
 struct JobEntry {
-  int pool;
   std::shared_ptr<Job> job; // if unset, available for reuse
   int internal;
   pid_t pid;       //  0 if merged
@@ -137,7 +134,7 @@ double JobEntry::runtime(struct timeval now) {
 // Implementation details for a JobTable
 struct JobTable::detail {
   std::vector<JobEntry> table;
-  std::vector<std::list<Task> > tasks;
+  std::list<Task> tasks;
   sigset_t block; // signals that can race with pselect()
   Database *db;
   bool verbose;
@@ -163,16 +160,12 @@ bool JobTable::exit_now() {
 }
 
 JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool check) : imp(new JobTable::detail) {
-  imp->table.resize(max_jobs*POOLS);
-  imp->tasks.resize(POOLS);
+  imp->table.resize(max_jobs);
   imp->verbose = verbose;
   imp->quiet = quiet;
   imp->check = check;
   imp->db = db;
   sigemptyset(&imp->block);
-
-  for (unsigned i = 0; i < imp->table.size(); ++i)
-    imp->table[i].pool = i / max_jobs;
 
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
@@ -332,14 +325,14 @@ static std::string pretty_cmd(std::string x) {
 static void launch(JobTable *jobtable) {
   for (auto &i : jobtable->imp->table) {
     if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
-      if (i.job && i.pool) status_state.erase(i.status);
+      if (i.job) status_state.erase(i.status);
       i.job.reset();
     }
 
     if (i.job) continue;
-    if (jobtable->imp->tasks[i.pool].empty()) continue;
+    if (jobtable->imp->tasks.empty()) continue;
 
-    Task &task = jobtable->imp->tasks[i.pool].front();
+    Task &task = jobtable->imp->tasks.front();
     int pipe_stdout[2];
     int pipe_stderr[2];
     if (pipe(pipe_stdout) == -1 || pipe(pipe_stderr) == -1) {
@@ -382,11 +375,9 @@ static void launch(JobTable *jobtable) {
     close(pipe_stdout[1]);
     close(pipe_stderr[1]);
     bool indirect = i.job->cmdline != task.cmdline;
-    if (i.pool) {
-      double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
-      i.status = status_state.emplace(status_state.end(), pretty_cmd(i.job->cmdline), predict, i.start);
-    }
-    if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
+    double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
+    i.status = status_state.emplace(status_state.end(), pretty_cmd(i.job->cmdline), predict, i.start);
+    if (!jobtable->imp->quiet && (jobtable->imp->verbose || !i.internal)) {
       std::stringstream s;
       s << pretty_cmd(i.job->cmdline);
       if (!i.job->stdin.empty()) s << " < " << i.job->stdin;
@@ -400,7 +391,7 @@ static void launch(JobTable *jobtable) {
     }
     // i.job->stdin.clear();
     // i.job->cmdline.clear();
-    jobtable->imp->tasks[i.pool].pop_front();
+    jobtable->imp->tasks.pop_front();
   }
 }
 
@@ -477,11 +468,11 @@ bool JobTable::wait(WorkQueue &queue) {
         if (got == 0 || (got < 0 && errno != EINTR)) {
           close(i.pipe_stdout);
           i.pipe_stdout = -1;
-          if (i.pool) i.status->stdout = false;
+          i.status->stdout = false;
           i.job->state |= STATE_STDOUT;
           i.job->process(queue);
           ++done;
-          if (imp->verbose && i.pool && !i.internal) {
+          if (imp->verbose && !i.internal) {
             if (!i.stdout_buf.empty() && i.stdout_buf.back() != '\n')
               i.stdout_buf.push_back('\n');
             status_write(1, i.stdout_buf.data(), i.stdout_buf.size());
@@ -489,7 +480,7 @@ bool JobTable::wait(WorkQueue &queue) {
           }
         } else {
           i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
-          if (imp->verbose && i.pool && !i.internal) {
+          if (imp->verbose && !i.internal) {
             i.stdout_buf.append(buffer, got);
             size_t dump = i.stdout_buf.rfind('\n');
             if (dump != std::string::npos) {
@@ -504,11 +495,11 @@ bool JobTable::wait(WorkQueue &queue) {
         if (got == 0 || (got < 0 && errno != EINTR)) {
           close(i.pipe_stderr);
           i.pipe_stderr = -1;
-          if (i.pool) i.status->stderr = false;
+          i.status->stderr = false;
           i.job->state |= STATE_STDERR;
           i.job->process(queue);
           ++done;
-          if (!imp->quiet && i.pool) { // print stderr also for internal
+          if (!imp->quiet) { // print stderr also for internal
             if (!i.stderr_buf.empty() && i.stderr_buf.back() != '\n')
               i.stderr_buf.push_back('\n');
             status_write(2, i.stderr_buf.data(), i.stderr_buf.size());
@@ -516,7 +507,7 @@ bool JobTable::wait(WorkQueue &queue) {
           }
         } else {
           i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
-          if (!imp->quiet && i.pool) { // print stderr also for internal
+          if (!imp->quiet) { // print stderr also for internal
             i.stderr_buf.append(buffer, got);
             size_t dump = i.stderr_buf.rfind('\n');
             if (dump != std::string::npos) {
@@ -546,7 +537,7 @@ bool JobTable::wait(WorkQueue &queue) {
       for (auto &i : imp->table) {
         if (i.pid == pid) {
           i.pid = 0;
-          if (i.pool) i.status->merged = true;
+          i.status->merged = true;
           i.job->state |= STATE_MERGED;
           i.job->reality.found    = true;
           i.job->reality.status   = code;
@@ -652,40 +643,36 @@ static PRIMFN(prim_job_fail_finish) {
 }
 
 static PRIMTYPE(type_job_launch) {
-  return args.size() == 12 &&
+  return args.size() == 11 &&
     args[0]->unify(Job::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
+    args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
     args[3]->unify(String::typeVar) &&
     args[4]->unify(String::typeVar) &&
-    args[5]->unify(String::typeVar) &&
-    args[6]->unify(Integer::typeVar) &&
+    args[5]->unify(Integer::typeVar) &&
+    args[6]->unify(Double::typeVar) &&
     args[7]->unify(Double::typeVar) &&
-    args[8]->unify(Double::typeVar) &&
+    args[8]->unify(Integer::typeVar) &&
     args[9]->unify(Integer::typeVar) &&
     args[10]->unify(Integer::typeVar) &&
-    args[11]->unify(Integer::typeVar) &&
     out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_job_launch) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
-  EXPECT(12);
+  EXPECT(11);
   JOB(job, 0);
-  INTEGER(pool, 1);
-  STRING(dir, 2);
-  STRING(stdin, 3);
-  STRING(env, 4);
-  STRING(cmd, 5);
+  STRING(dir, 1);
+  STRING(stdin, 2);
+  STRING(env, 3);
+  STRING(cmd, 4);
 
-  parse_usage(&job->predict, args.data()+6, queue, binding);
+  parse_usage(&job->predict, args.data()+5, queue, binding);
   job->predict.found = true;
 
-  int poolv = mpz_get_si(pool->value);
-  REQUIRE(poolv >= 0 && poolv < POOLS);
   REQUIRE (job->state == 0);
 
-  jobtable->imp->tasks[poolv].emplace_back(
+  jobtable->imp->tasks.emplace_back(
     std::dynamic_pointer_cast<Job>(args[0]),
     dir->value,
     stdin->value,
