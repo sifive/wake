@@ -51,6 +51,7 @@ struct JobReflection {
   std::string stdout;
   std::string stderr;
   Usage usage;
+  std::vector<FileReflection> visible;
   std::vector<FileReflection> inputs;
   std::vector<FileReflection> outputs;
 };
@@ -94,6 +95,7 @@ struct Database {
     const std::string &environment,
     const std::string &commandline,
     // ^^^ only these matter to identify the job
+    const std::string &visible,
     const std::string &stack,
     long   *job); // key used for accesses below
   void finish_job(

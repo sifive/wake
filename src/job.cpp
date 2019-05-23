@@ -775,6 +775,7 @@ static PRIMFN(prim_job_create) {
     stdin->value,
     env->value,
     cmd->value,
+    visible->value,
     stack.str(),
     &out->job);
 
