@@ -302,6 +302,11 @@ int main(int argc, char **argv) {
     return 0;
   }
 
+  if (quiet && verbose) {
+    std::cerr << "Cannot specify both -v and -q!" << std::endl;
+    return 1;
+  }
+
   term_init(tty);
 
   int njobs = std::thread::hardware_concurrency();
@@ -548,7 +553,7 @@ int main(int argc, char **argv) {
   if (JobTable::exit_now()) {
     std::cerr << "Early termination requested" << std::endl;
     pass = false;
-  } else if (!quiet && pass) {
+  } else if (pass) {
     std::vector<std::shared_ptr<Value> > outputs;
     outputs.reserve(targets.size());
     Binding *iter = reinterpret_cast<Closure*>(value.get())->binding.get();
@@ -559,14 +564,18 @@ int main(int argc, char **argv) {
 
     for (size_t i = 0; i < targets.size(); ++i) {
       Value *v = outputs[targets.size()-1-i].get();
-      std::cout << targets[i] << ": ";
-      (*types)[0].format(std::cout, body->typeVar);
-      types = &(*types)[1];
-      std::cout << " = ";
-      Value::format(std::cout, v, debug, verbose?0:-1);
-      if (v && v->type == &Closure::type)
-        std::cout << ", " << term_red() << "AN UNEVALUATED FUNCTION" << term_normal();
-      std::cout << std::endl;
+      if (verbose) {
+        std::cout << targets[i] << ": ";
+        (*types)[0].format(std::cout, body->typeVar);
+        types = &(*types)[1];
+        std::cout << " = ";
+      }
+      if (!quiet) {
+        Value::format(std::cout, v, debug, verbose?0:-1);
+        if (v && v->type == &Closure::type)
+          std::cout << ", " << term_red() << "AN UNEVALUATED FUNCTION" << term_normal();
+        std::cout << std::endl;
+      }
       if (!v) {
         pass = false;
       } else if (v->type == &Data::type) {
