@@ -64,7 +64,7 @@ std::string find_in_path(const std::string &file, const std::string &path) {
 
 std::string find_path(const char *const * env) {
   for (; *env; ++env) {
-    if (!strcmp(*env, "PATH=")) {
+    if (!strncmp(*env, "PATH=", 5)) {
       return std::string(*env + 5);
     }
   }
