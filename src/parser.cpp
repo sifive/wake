@@ -597,6 +597,7 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
       std::cerr << "Was expecting an (OPERATOR/ID/POPEN), got a "
         << symbolTable[lex.next.type] << " at "
         << lex.next.location.text() << std::endl;
+      lex.consume();
       lex.fail = true;
       return AST(lex.next.location);
     }

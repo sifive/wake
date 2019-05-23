@@ -23,7 +23,7 @@ def version_h _ =
     | setPlanEcho Verbose
     | runJob
   match git.getJobStdout
-    Fail f = makeBadJob f
+    Fail f = makeBadPath f
     Pass stdout = write "{here}/version.h" "#define VERSION {stdout}"
 
 def pkg name = match (pkgConfig name)

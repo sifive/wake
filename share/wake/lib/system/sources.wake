@@ -27,7 +27,7 @@ global def source file =
   def get_modtime file = prim "get_modtime"
   def time = get_modtime file
   if time == -1
-  then makeBadJob (makeError "{file}: source does not exist")
+  then makeBadPath (makeError "{file}: source does not exist")
   else
     makePlan ("<source>", str time, file, Nil) Nil
     | setPlanShare       False
