@@ -37,6 +37,7 @@ struct Database::detail {
   sqlite3_stmt *del_target;
   sqlite3_stmt *begin_txn;
   sqlite3_stmt *commit_txn;
+  sqlite3_stmt *vacuum;
   sqlite3_stmt *predict_job;
   sqlite3_stmt *stats_job;
   sqlite3_stmt *insert_job;
@@ -62,10 +63,10 @@ struct Database::detail {
   long run_id;
   detail(bool debugdb_)
    : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), add_target(0), del_target(0), begin_txn(0),
-     commit_txn(0), predict_job(0), stats_job(0), insert_job(0), insert_tree(0), insert_log(0), wipe_file(0),
-     insert_file(0), update_file(0), get_log(0), get_tree(0), add_stats(0), link_stats(0), detect_overlap(0),
-     delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0), find_owner(0), fetch_hash(0),
-     delete_jobs(0), delete_dups(0), delete_stats(0) { }
+     commit_txn(0), vacuum(0), predict_job(0), stats_job(0), insert_job(0), insert_tree(0), insert_log(0),
+     wipe_file(0), insert_file(0), update_file(0), get_log(0), get_tree(0), add_stats(0), link_stats(0),
+     detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0), find_owner(0),
+     fetch_hash(0), delete_jobs(0), delete_dups(0), delete_stats(0) { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -170,6 +171,7 @@ std::string Database::open(bool wait, bool memory) {
   const char *sql_del_target = "delete from targets where expression=?";
   const char *sql_begin_txn = "begin transaction";
   const char *sql_commit_txn = "commit transaction";
+  const char *sql_vacuum = "vacuum";
   const char *sql_predict_job =
     "select status, runtime, cputime, membytes, ibytes, obytes"
     " from stats where hashcode=? order by stat_id desc limit 1";
@@ -253,6 +255,7 @@ std::string Database::open(bool wait, bool memory) {
   PREPARE(sql_del_target,     del_target);
   PREPARE(sql_begin_txn,      begin_txn);
   PREPARE(sql_commit_txn,     commit_txn);
+  PREPARE(sql_vacuum,         vacuum);
   PREPARE(sql_predict_job,    predict_job);
   PREPARE(sql_stats_job,      stats_job);
   PREPARE(sql_insert_job,     insert_job);
@@ -299,6 +302,7 @@ void Database::close() {
   FINALIZE(del_target);
   FINALIZE(begin_txn);
   FINALIZE(commit_txn);
+  FINALIZE(vacuum);
   FINALIZE(predict_job);
   FINALIZE(stats_job);
   FINALIZE(insert_job);
@@ -502,6 +506,7 @@ void Database::clean() {
   single_step("Could not clean database jobs",  imp->delete_jobs,  imp->debugdb);
   single_step("Could not clean database dups",  imp->delete_dups,  imp->debugdb);
   single_step("Could not clean database stats", imp->delete_stats, imp->debugdb);
+  single_step("Could not recover space",        imp->vacuum,       imp->debugdb);
 }
 
 void Database::begin_txn() {
