@@ -315,7 +315,7 @@ global def getJobRecord =
 
 global def makeBadPath error = BadPath error
 global def makeBadJob error =
-  def _ = printlnLevel logWarn "Deprecated used of makeBadJob. Use makeBadPath."
+  def _ = printlnLevel logWarn "Deprecated use of makeBadJob. Use makeBadPath."
   makeBadPath error
 
 # Control a running/finished Job
@@ -556,6 +556,7 @@ global def job cmd visible =
 # If you miss declared visible inputs, your build will fail so you can fix it.
 # If you declare too many visible inputs, cmd execution/replay will wait for unnecessary files.
 global def alwaysJob cmd visible =
+  def _ = printlnLevel logWarn "Deprecated use of alwaysJob. Use makePlan and runJob."
   makePlan cmd visible
   | setPlanKeep False
   | runJob
@@ -572,6 +573,7 @@ global def alwaysJob cmd visible =
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
 global def manualJob cmd visible foutputs =
+  def _ = printlnLevel logWarn "Deprecated use of manualJob. Use makePlan and runJob."
   makePlan cmd visible
   | setPlanLocalOnly True
   | setPlanFnOutputs (\_ foutputs Unit)
@@ -588,6 +590,7 @@ global def manualJob cmd visible foutputs =
 # If you miss declared outputs, dependant commands might fail or not run reproducibly.
 # If you declare too many outputs, the build will fail.
 global def volatileJob cmd visible foutputs =
+  def _ = printlnLevel logWarn "Deprecated use of volatileJob. Use makePlan and runJob."
   makePlan cmd visible
   | setPlanLocalOnly True
   | setPlanFnOutputs (\_ foutputs Unit)
