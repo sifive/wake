@@ -465,38 +465,6 @@ global def makeJSONRunner rawScript score estimate =
             Pass usage = Pass (RunnerOutput (getK `inputs`) (getK `outputs`) (getK `indexes`) usage)
   makeRunner "json-{script}" score pre post localRunner
 
-global def executeJSON json =
-  def makeVirtual visible =
-    def add f h = prim "add_hash"
-    File (add visible "0")
-  def cmd   = json // `command`     | getJArray  | getOrElse Nil | mapPartial getJString
-  def vis   = json // `visible`     | getJArray  | getOrElse Nil | mapPartial getJString | map makeVirtual
-  def env   = json // `environment` | getJArray  | getOrElse Nil | mapPartial getJString
-  def dir   = json // `directory`   | getJString | getOrElse "."
-  def stdin = json // `stdin`       | getJString | getOrElse ""
-  # Resources should have been resolved by the runner prior to invocation by us
-  def res   = Nil # json // `resources`   | getJString | getOrElse Nil | mapPartial getJString
-  def job = Plan cmd vis env dir stdin logNever logNever Debug ReRun True res (\_ True) id id id | runJobWith fuseRunner
-  match job.getJobReport
-    Fail (Error cause stack) = JObject (
-      "cause" → JString cause,
-      "stack" → stack | map JString | JArray,
-      Nil
-    )
-    Pass (Usage status runtime cputime membytes inbytes outbytes) = JObject (
-      "inputs"  → tree job 1 | getWhenFail Nil | map (_.getPairFirst.JString) | JArray,
-      "outputs" → tree job 2 | getWhenFail Nil | map (_.getPairFirst.JString) | JArray,
-      "usage" → JObject (
-        "status"   → JInteger status,
-        "runtime"  → JDouble runtime,
-        "cputime"  → JDouble cputime,
-        "membytes" → JInteger membytes,
-        "inbytes"  → JInteger inbytes,
-        "outbytes" → JInteger outbytes,
-        Nil
-      ), Nil
-    )
-
 # Paths differ from Strings in that they have been hashed; their content is frozen
 data Path =
   File   (name: String)
