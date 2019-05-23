@@ -23,14 +23,14 @@ tuple Usage =
 
 # RunnerInput is a subset of the fields supplied in the execution Plan
 tuple RunnerInput =
-  global Command:       List String
-  global Visible:       List Path
-  global Environment:   List String
-  global Directory:     String
-  global StandardInput: String
-  global Resources:     List String
-  global Prefix:        String        # a unique prefix for this job
-  global Record:        Option Usage  # previous resource usage, if known
+  global Command:     List String
+  global Visible:     List Path
+  global Environment: List String
+  global Directory:   String
+  global Stdin:       String
+  global Resources:   List String
+  global Prefix:      String        # a unique prefix for this job
+  global Record:      Option Usage  # previous resource usage, if known
 
 tuple RunnerOutput =
   global Inputs:  List String
@@ -62,18 +62,18 @@ global data Persistence =
 
 # A Plan describes a not-yet-executed Job
 tuple Plan =
-  global Command:       List String  # The command-line arguments (the first is the command to run)
-  global Visible:       List Path    # Only these files should be available to the command
-  global Environment:   List String  # KEY=VALUE environment variables fed to the command
-  global Directory:     String       # The directory in which the command should be run
-  global StandardInput: String       # The file to which standard input should be connected
-  global Persistence:   Persistence  # See Persistence table above
-  global LocalOnly:     Boolean      # Must run directly in the local workspace; no output detection performed
-  global Resources:     List String  # The resources a runner must provide to the job (licenses/etc)
-  global RunnerFilter:  Runner => Boolean # Reject from consideration Runners which the Plan deems inappropriate
-  global FnInputs:      (List String => List String) # Modify the Runner's reported inputs  (files read)
-  global FnOutputs:     (List String => List String) # Modify the Runner's reported outputs (files created)
-  global FnIndexes:     (List String => List String) # Modify the Runner's reported indexes (directories listed)
+  global Command:      List String  # The command-line arguments (the first is the command to run)
+  global Visible:      List Path    # Only these files should be available to the command
+  global Environment:  List String  # KEY=VALUE environment variables fed to the command
+  global Directory:    String       # The directory in which the command should be run
+  global Stdin:        String       # The file to which standard input should be connected
+  global Persistence:  Persistence  # See Persistence table above
+  global LocalOnly:    Boolean      # Must run directly in the local workspace; no output detection performed
+  global Resources:    List String  # The resources a runner must provide to the job (licenses/etc)
+  global RunnerFilter: Runner => Boolean # Reject from consideration Runners which the Plan deems inappropriate
+  global FnInputs:     (List String => List String) # Modify the Runner's reported inputs  (files read)
+  global FnOutputs:    (List String => List String) # Modify the Runner's reported outputs (files created)
+  global FnIndexes:    (List String => List String) # Modify the Runner's reported indexes (directories listed)
 
 def isOnce = match _
   ReRun = False
@@ -128,7 +128,7 @@ global def editPlanShare f =
 #   Keep  is True and there is matching output in the workspace
 #   Share is True and there is matching output in a shared cache
 # A Job is considered matching if:
-#   The Command, Environment, Directory, and StandardInput are exact matches
+#   The Command, Environment, Directory, and Stdin are exact matches
 #   FnInputs, FnOutputs, FnIndexes have the same hashcode
 # Output is considered matching if:
 #   The prior Outputs exist as the output of a matching Job
