@@ -523,6 +523,7 @@ def stateRunner =
 global def makeStatePath file =
   makePlan ("<state>", file, Nil) Nil
   | setPlanKeep        False
+  | setPlanEcho        Debug
   | setPlanEnvironment Nil
   | setPlanFnOutputs   (file, _)
   | runJobWith stateRunner

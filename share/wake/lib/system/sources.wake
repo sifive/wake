@@ -31,6 +31,7 @@ global def source file =
   else
     makePlan ("<source>", str time, file, Nil) Nil
     | setPlanShare       False
+    | setPlanEcho        Debug
     | setPlanEnvironment Nil
     | setPlanFnOutputs   (file.simplify, _)
     | runJobWith virtualRunner
