@@ -15,7 +15,13 @@
 
 def version_h _ =
   def cmdline = which "git", "describe", "--tags", "--dirty", Nil
-  def git = volatileJob cmdline Nil (\_ Nil)
+  def git =
+    makePlan cmdline Nil
+    | setPlanKeep False
+    | setPlanLocalOnly True
+    | setPlanStdout logNever
+    | setPlanEcho Verbose
+    | runJob
   match git.getJobStdout
     Fail f = makeBadJob f
     Pass stdout = write "{here}/version.h" "#define VERSION {stdout}"

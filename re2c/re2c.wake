@@ -16,7 +16,10 @@
 # Require re2c >= 1.0 for flag support
 def re2cOk Unit =
   def ver =
-    job (which "re2c", "--version", Nil) Nil
+    makePlan (which "re2c", "--version", Nil) Nil
+    | setPlanStdout logNever
+    | setPlanEcho Verbose
+    | runJob
     | getJobStdout
     | getWhenFail ""
     | extract `re2c ([0-9.]+)\n`
