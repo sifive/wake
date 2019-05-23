@@ -67,6 +67,9 @@ tuple Plan =
   global Environment:  List String  # KEY=VALUE environment variables fed to the command
   global Directory:    String       # The directory in which the command should be run
   global Stdin:        String       # The file to which standard input should be connected
+  global Stdout:       (LogLevel => EchoTarget) # How should standard output be displayed during a build
+  global Stderr:       (LogLevel => EchoTarget) # How should standard error be displayed during a build
+  global Echo:         LogLevel     # Print the command during builds when logLevel <= Echo
   global Persistence:  Persistence  # See Persistence table above
   global LocalOnly:    Boolean      # Must run directly in the local workspace; no output detection performed
   global Resources:    List String  # The resources a runner must provide to the job (licenses/etc)
@@ -138,10 +141,7 @@ global def editPlanShare f =
 # Set reasonable defaults for all Plan arguments
 def id x = x
 global def makePlan cmd visible =
-  Plan cmd visible environment "." "" Share False Nil (\_ True) id id id
-
-def makeRawPlan cmd  =
-  Plan cmd Nil Nil "." "" ReRun True Nil (\_ True) id id id
+  Plan cmd visible environment "." "" logVerbose logWarn Normal Share False Nil (\_ True) id id id
 
 def defaultUsage = Usage 0 0.0 0.0 0 0 0
 
@@ -164,7 +164,7 @@ global def localRunner =
           match (getJobReality job)
             Pass reality = Pass (RunnerOutput (map getPathName vis) Nil Nil reality)
             Fail f = Fail f
-  def score (Plan _ _ _ _ _ _ lo _ _ _ _ _) =
+  def score (Plan _ _ _ _ _ _ _ _ _ lo _ _ _ _ _) =
     if lo then Pass 1.0 else Fail "cannot detect outputs"
   Runner "local" score doit
 
@@ -190,13 +190,13 @@ global def virtualRunner =
 def pid = prim "pid"
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
-def runAlways cmd env dir stdin res finputs foutputs findexes vis keep run =
-  def create dir stdin env cmd visible keep = prim "job_create"
+def runAlways cmd env dir stdin res finputs foutputs findexes vis keep run log =
+  def create dir stdin env cmd visible keep log = prim "job_create"
   def finish job inputs outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
   def badfinish job error = prim "job_fail_finish"
   def cache dir stdin env cmd visible = prim "job_cache"
   def build Unit =
-    def job = create dir stdin env.implode cmd.implode (map getPathName vis).implode (if keep then 1 else 0)
+    def job = create dir stdin env.implode cmd.implode (map getPathName vis).implode (if keep then 1 else 0) log
     def prefix = "{str pid}.{str (getJobId job)}"
     def usage = getJobRecord job
     def output = run job (Pass (RunnerInput cmd vis env dir stdin res prefix usage))
@@ -224,19 +224,39 @@ def runAlways cmd env dir stdin res finputs foutputs findexes vis keep run =
       Pair Nil      last = confirm last (build Unit)
 
 # Only run if the first four arguments differ
-def runOnce cmd env dir stdin res finputs foutputs findexes vis keep run =
-  memoize 8 (runAlways cmd env dir stdin res finputs foutputs findexes vis keep run)
+def runOnce cmd env dir stdin res finputs foutputs findexes vis keep run log =
+  memoize 9 (runAlways cmd env dir stdin res finputs foutputs findexes vis keep run log)
 
 # Default runners provided by wake
 publish runner = localRunner, defaultRunner, Nil
 
-def runJobImp cmd env dir stdin res finputs foutputs findexes vis pers run =
+def runJobImp cmd env dir stdin res finputs foutputs findexes vis pers run log =
   if isOnce pers
-  then runOnce   cmd env dir stdin res finputs foutputs findexes vis (isKeep pers) run
-  else runAlways cmd env dir stdin res finputs foutputs findexes vis (isKeep pers) run
+  then runOnce   cmd env dir stdin res finputs foutputs findexes vis (isKeep pers) run log
+  else runAlways cmd env dir stdin res finputs foutputs findexes vis (isKeep pers) run log
 
-global def runJobWith (Runner _ _ run) (Plan cmd vis env dir stdin pers _ res _ finputs foutputs findexes) =
-  runJobImp cmd env dir stdin res finputs foutputs findexes vis pers run
+def logLevelRaw = prim "level"
+def logLevel = match logLevelRaw
+  0 = Quiet
+  1 = Normal
+  2 = Verbose
+  _ = Debug
+
+def jobLog stdout stderr echo =
+  def num = match _
+    Null   = 0
+    Stdout = 1
+    Stderr = 2
+  def thresh = match echo
+    Debug   = 3
+    Verbose = 2
+    Normal  = 1
+    Quiet   = 0
+  def bit = if thresh <= logLevelRaw then 1 else 0
+  bit << 4 + num (stderr logLevel) << 2 + num (stdout logLevel)
+
+global def runJobWith (Runner _ _ run) (Plan cmd vis env dir stdin stdout stderr echo pers _ res _ finputs foutputs findexes) =
+  runJobImp cmd env dir stdin res finputs foutputs findexes vis pers run (jobLog stdout stderr echo)
 
 data RunnerOption =
   Accept (score: Double) (runnerFn: Job => Result RunnerInput Error => Result RunnerOutput Error)
@@ -244,7 +264,7 @@ data RunnerOption =
 
 # Run the job!
 global def runJob p = match p
-  Plan cmd vis env dir stdin pers lo res rf finputs foutputs findexes =
+  Plan cmd vis env dir stdin stdout stderr echo pers lo res rf finputs foutputs findexes =
     # Transform the 'List Runner' into 'List RunnerOption'
     def qualify runner = match runner
       Runner name _ _ if ! rf runner = Reject "{name}: rejected by Plan"
@@ -257,13 +277,14 @@ global def runJob p = match p
       (Reject _) _ = acc
       (Accept score fn) (Pair bests bestr) =
         if score >. bests then Pair score (Some fn) else acc
+    def log = jobLog stdout stderr echo
     match (opts | foldl best (Pair 0.0 None) | getPairSecond)
-      Some r = runJobImp cmd env dir stdin res finputs foutputs findexes vis pers r
+      Some r = runJobImp cmd env dir stdin res finputs foutputs findexes vis pers r log
       None =
-        def create dir stdin env cmd visible keep = prim "job_create"
+        def create dir stdin env cmd visible keep log = prim "job_create"
         def badfinish job e = prim "job_fail_finish"
         def badlaunch job e = prim "job_fail_launch"
-        def job = create dir stdin env.implode cmd.implode (map getPathName vis).implode 0
+        def job = create dir stdin env.implode cmd.implode (map getPathName vis).implode 0 log
         def error =
           def pretty = match _
             Accept _ _ = ""
@@ -344,13 +365,13 @@ global def getJobStatus job = match (getJobReport job)
 def wakePath = prim "execpath" # location of the wake executable
 global def fuseRunner =
   def fuse = "{wakePath}/../lib/wake/fuse-wake"
-  def score (Plan _ _ _ _ _ _ lo _ _ _ _ _) =
+  def score (Plan _ _ _ _ _ _ _ _ _ lo _ _ _ _ _) =
     if lo then Fail "would hide workspace" else Pass 1.0
   makeJSONRunner fuse score (Some _)
 
 global def preloadRunner =
   def preload = "{wakePath}/../lib/wake/preload-wake"
-  def score (Plan _ _ _ _ _ _ lo _ _ _ _ _) =
+  def score (Plan _ _ _ _ _ _ _ _ _ lo _ _ _ _ _) =
     if lo then Fail "would hide workspace" else Pass 1.0
   makeJSONRunner preload score (Some _)
 
@@ -455,7 +476,7 @@ global def executeJSON json =
   def stdin = json // `stdin`       | getJString | getOrElse ""
   # Resources should have been resolved by the runner prior to invocation by us
   def res   = Nil # json // `resources`   | getJString | getOrElse Nil | mapPartial getJString
-  def job = Plan cmd vis env dir stdin ReRun True res (\_ True) id id id | runJobWith fuseRunner
+  def job = Plan cmd vis env dir stdin logNever logNever Debug ReRun True res (\_ True) id id id | runJobWith fuseRunner
   match job.getJobReport
     Fail (Error cause stack) = JObject (
       "cause" → JString cause,
@@ -506,7 +527,9 @@ def hashcode f = memoize 0 (
   def get f = prim "get_hash"
   def reuse = get f
   if reuse !=* "" then reuse else
-    def job = makeRawPlan ("<hash>", f, Nil) | runJobWith localRunner
+    def hashPlan cmd  =
+      Plan cmd Nil Nil "." "" logNever logError Verbose ReRun True Nil (\_ True) id id id
+    def job = hashPlan ("<hash>", f, Nil) | runJobWith localRunner
     def hash =
       job.getJobStdout
       | getWhenFail ""

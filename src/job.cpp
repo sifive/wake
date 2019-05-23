@@ -723,25 +723,27 @@ static PRIMFN(prim_job_virtual) {
 }
 
 static PRIMTYPE(type_job_create) {
-  return args.size() == 6 &&
+  return args.size() == 7 &&
     args[0]->unify(String::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
     args[3]->unify(String::typeVar) &&
     args[4]->unify(String::typeVar) &&
     args[5]->unify(Integer::typeVar) &&
+    args[6]->unify(Integer::typeVar) &&
     out->unify(Job::typeVar);
 }
 
 static PRIMFN(prim_job_create) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
-  EXPECT(6);
+  EXPECT(7);
   STRING(dir, 0);
   STRING(stdin, 1);
   STRING(env, 2);
   STRING(cmd, 3);
   STRING(visible, 4);
   INTEGER(keep, 5);
+  INTEGER(log, 5);
 
   std::stringstream stack;
   for (auto &i : binding->stack_trace()) stack << i.file() << std::endl;

@@ -54,6 +54,10 @@ global def logDebug = match _
   Debug = Stdout
   _     = Null
 
+global def logNever = match _
+  Debug = Null
+  _     = Null
+
 # This is private so that users cannot make the build depend on it
 def logLevel = match (prim "level")
   0 = Quiet
