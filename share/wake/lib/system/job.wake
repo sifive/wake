@@ -321,13 +321,16 @@ global def makeBadJob error =
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
 def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
+def treeOk (Pair f h) = match h
+  "BadHash" = BadPath (makeError "Could not hash {f}")
+  _ = Path f
 def guardPath job = match _
   Fail e = BadPath e, Nil
-  Pass l if job.isJobOk = map (\(Pair f _) Path f) l
+  Pass l if job.isJobOk = map treeOk l
   _ = makeBadPath (makeError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'"), Nil
 def mapPath = match _
   Fail e = BadPath e, Nil
-  Pass l = map (\(Pair f _) Path f) l
+  Pass l = map treeOk l
 global def killJob job signal = prim "job_kill" # send signal to job
 global def getJobStdout  job = stdio job 1
 global def getJobStderr  job = stdio job 2
@@ -505,7 +508,7 @@ def hashcode f = memoize 0 (
       | extract `(.{64}).*`
     match job.isJobOk hash
       True (x, Nil) = x
-      _ _ = panic "Failed to hash file {f}"
+      _ _ = "BadHash"
 )
 
 def stateRunner =
