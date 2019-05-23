@@ -87,13 +87,18 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug, b
       << "  In  bytes: " << job.usage.ibytes << std::endl
       << "  Out bytes: " << job.usage.obytes << std::endl
       << "  Status:    " << job.usage.status << std::endl
-      << "  Stdin:     " << job.stdin << std::endl
-      << "Inputs:" << std::endl;
+      << "  Stdin:     " << job.stdin << std::endl;
+    if (verbose) {
+      std::cout << "Visible:" << std::endl;
+      for (auto &in : job.visible)
+        std::cout << "  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
+                  << " " << in.path << std::endl;
+    }
+    std::cout << "Inputs:" << std::endl;
     for (auto &in : job.inputs)
       std::cout << "  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
                 << " " << in.path << std::endl;
-    std::cout
-      << "Outputs:" << std::endl;
+    std::cout << "Outputs:" << std::endl;
     for (auto &out : job.outputs)
       std::cout << "  " << out.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
                 << " " << out.path << std::endl;
@@ -162,13 +167,19 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
       << "#   Mem bytes: " << job.usage.membytes << std::endl
       << "#   In  bytes: " << job.usage.ibytes << std::endl
       << "#   Out bytes: " << job.usage.obytes << std::endl
-      << "#   Status:    " << job.usage.status << std::endl
+      << "#   Status:    " << job.usage.status << std::endl;
+    if (verbose) {
+      std::cout << "# Visible:" << std::endl;
+      for (auto &in : job.visible)
+        std::cout << "#  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
+                  << " " << in.path << std::endl;
+    }
+    std::cout
       << "# Inputs:" << std::endl;
     for (auto &in : job.inputs)
       std::cout << "#  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
                 << " " << in.path << std::endl;
-    std::cout
-      << "# Outputs:" << std::endl;
+    std::cout << "# Outputs:" << std::endl;
     for (auto &out : job.outputs)
       std::cout << "#  " << out.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
                 << " " << out.path << std::endl;

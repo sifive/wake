@@ -612,10 +612,12 @@ void Database::insert_job(
   const std::string &stdin,
   const std::string &environment,
   const std::string &commandline,
+  const std::string &visible,
   const std::string &stack,
   long  *job)
 {
   const char *why = "Could not insert a job";
+  begin_txn();
   bind_integer(why, imp->insert_job, 1, imp->run_id);
   bind_string (why, imp->insert_job, 2, directory);
   bind_blob   (why, imp->insert_job, 3, commandline);
@@ -624,6 +626,18 @@ void Database::insert_job(
   bind_string (why, imp->insert_job, 6, stdin);
   single_step (why, imp->insert_job, imp->debugdb);
   *job = sqlite3_last_insert_rowid(imp->db);
+  const char *tok = visible.c_str();
+  const char *end = tok + visible.size();
+  for (const char *scan = tok; scan != end; ++scan) {
+    if (*scan == 0 && scan != tok) {
+      bind_integer(why, imp->insert_tree, 1, VISIBLE);
+      bind_integer(why, imp->insert_tree, 2, *job);
+      bind_string (why, imp->insert_tree, 3, tok, scan-tok);
+      single_step (why, imp->insert_tree, imp->debugdb);
+      tok = scan+1;
+    }
+  }
+  end_txn();
 }
 
 void Database::finish_job(long job, const std::string &inputs, const std::string &outputs, uint64_t hashcode, bool keep, Usage reality) {
@@ -790,6 +804,14 @@ std::vector<JobReflection> Database::explain(const std::string &file, int use, b
     if (verbose) {
       desc.stdout = get_output(desc.job, 1);
       desc.stderr = get_output(desc.job, 2);
+      // visible
+      bind_integer(why, imp->get_tree, 1, desc.job);
+      bind_integer(why, imp->get_tree, 2, VISIBLE);
+      while (sqlite3_step(imp->get_tree) == SQLITE_ROW)
+        desc.visible.emplace_back(
+          rip_column(imp->get_tree, 0),
+          rip_column(imp->get_tree, 1));
+      finish_stmt(why, imp->get_tree, imp->debugdb);
     }
     // inputs
     bind_integer(why, imp->get_tree, 1, desc.job);
