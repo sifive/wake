@@ -313,18 +313,21 @@ global def getJobRecord =
   def raw job = prim "job_record"
   raw _ | at 0 | omap toUsage
 
-global def makeBadJob error = BadJob error
+global def makeBadPath error = BadPath error
+global def makeBadJob error =
+  def _ = printlnLevel logWarn "Deprecated used of makeBadJob. Use makeBadPath."
+  makeBadPath error
 
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
 def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
 def guardPath job = match _
-  Fail e = BadJob e, Nil
-  Pass l if job.isJobOk = map (\(Pair f _) File f) l
-  _ = makeBadJob (makeError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'"), Nil
+  Fail e = BadPath e, Nil
+  Pass l if job.isJobOk = map (\(Pair f _) Path f) l
+  _ = makeBadPath (makeError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'"), Nil
 def mapPath = match _
-  Fail e = BadJob e, Nil
-  Pass l = map (\(Pair f _) File f) l
+  Fail e = BadPath e, Nil
+  Pass l = map (\(Pair f _) Path f) l
 global def killJob job signal = prim "job_kill" # send signal to job
 global def getJobStdout  job = stdio job 1
 global def getJobStderr  job = stdio job 2
@@ -335,12 +338,12 @@ global def getJobFailedOutputs job = tree job 2 | mapPath
 global def getJobId job = prim "job_id"
 global def getJobDescription job = prim "job_desc"
 global def getJobOutput job = match (tree job 2)
-  Fail e = BadJob e
+  Fail e = BadPath e
   Pass l if job.isJobOk = match l
-    (Pair f _), Nil = File f
-    Nil    = makeBadJob (makeError "No outputs available from '{job.getJobDescription}'")
-    _      = makeBadJob (makeError "More than one output found from '{job.getJobDescription}'")
-  _ = makeBadJob (makeError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'")
+    (Pair f _), Nil = Path f
+    Nil    = makeBadPath (makeError "No outputs available from '{job.getJobDescription}'")
+    _      = makeBadPath (makeError "More than one output found from '{job.getJobDescription}'")
+  _ = makeBadPath (makeError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'")
 
 global def isJobOk job = match (getJobReport job)
   Fail _ = False
@@ -438,7 +441,7 @@ global def makeJSONRunner rawScript score estimate =
     Pair (Pass output) inFile =
       def unlink f = prim "unlink"
       def outFile = replace `\.in\.json$` ".out.json" inFile
-      def json = parseJSONFile (File outFile)
+      def json = parseJSONFile (Path outFile)
       def _ = unlink inFile
       match json
         Fail f = Fail (makeError f)
@@ -465,24 +468,24 @@ global def makeJSONRunner rawScript score estimate =
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
 data Path =
-  File   (name: String)
-  BadJob (error: Error)
+  Path    (name: String)
+  BadPath (error: Error)
 
 global def getPathName path = match path
-  File name = name
-  BadJob _ = "BADJOB"
+  Path name = name
+  BadPath _ = "BADPATH"
 
 global def getPathResult path = match path
-  File name = Pass name
-  BadJob e  = Fail e
+  Path name = Pass name
+  BadPath e = Fail e
 
 global def getPathParent path = match path
-  File name = File (simplify "{name}/..")
-  BadJob e  = BadJob e
+  Path name = Path (simplify "{name}/..")
+  BadPath e = BadPath e
 
 global def getPathError path = match path
-  File _ = None
-  BadJob e = Some e
+  Path _    = None
+  BadPath e = Some e
 
 def addhash f =
   def p = simplify f
