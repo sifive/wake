@@ -23,6 +23,12 @@ global def quote str =
     Pass x = x
     Fail _ = panic "Quoted String is invalid Regular Expression"
 
+global def regExpCat l =
+  def res = l | map regExpToString | cat | stringToRegExp
+  match res
+    Pass regex = regex
+    Fail _     = panic "Regexp concatenation failed!"
+
 # (str: String) => RegExp
 global def stringToRegExp str = prim "re2"
 
