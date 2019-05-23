@@ -173,7 +173,7 @@ global def virtualRunner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput cmd vis env dir stdin _ _ predict) = match (findSomeFn getPathError vis)
+    Pass (RunnerInput _ vis _ _ _ _ _ predict) = match (findSomeFn getPathError vis)
       Some e =
         def _ = badlaunch job e
         Fail e
@@ -251,7 +251,7 @@ def jobLog stdout stderr echo =
     Normal  = 1
     Quiet   = 0
   def bit = if thresh <= logLevelRaw then 1 else 0
-  bit << 4 + num (stderr logLevel) << 2 + num (stdout logLevel)
+  (bit << 4) + (num (stderr logLevel) << 2) + num (stdout logLevel)
 
 global def runJobWith (Runner _ _ run) (Plan cmd vis env dir stdin stdout stderr echo pers _ res _ finputs foutputs) =
   runJobImp cmd env dir stdin res finputs foutputs vis pers run (jobLog stdout stderr echo)
