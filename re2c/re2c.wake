@@ -18,6 +18,7 @@ def re2cOk Unit =
   def ver =
     makePlan (which "re2c", "--version", Nil) Nil
     | setPlanStdout logNever
+    | setPlanStderr logNever
     | setPlanEcho Verbose
     | runJob
     | getJobStdout
