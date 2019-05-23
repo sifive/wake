@@ -91,8 +91,16 @@ struct PrimDesc {
 typedef std::map<std::string, PrimDesc> PrimMap;
 struct JobTable;
 
+struct StringInfo {
+  bool verbose;
+  bool debug;
+  bool quiet;
+  const char *version;
+  StringInfo(bool v, bool d, bool q, const char *x) : verbose(v), debug(d), quiet(q), version(x) { }
+};
+
 void prim_register(PrimMap &pmap, const char *key, PrimFn fn, PrimType type, int flags, void *data = 0);
-void prim_register_string(PrimMap &pmap, const char *version);
+void prim_register_string(PrimMap &pmap, StringInfo *info);
 void prim_register_vector(PrimMap &pmap);
 void prim_register_integer(PrimMap &pmap);
 void prim_register_double(PrimMap &pmap);

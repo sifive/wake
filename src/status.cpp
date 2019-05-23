@@ -70,6 +70,11 @@ static void write_all(int fd, const char *data, size_t len)
   }
 }
 
+static void write_all_str(int fd, const char *data)
+{
+  write_all(fd, data, strlen(data));
+}
+
 static void status_clear()
 {
   if (tty) {
@@ -233,7 +238,9 @@ void status_init()
 void status_write(int fd, const char *data, int len)
 {
   status_clear();
+  if (fd == 2) write_all_str(2, term_red());
   write_all(fd, data, len);
+  if (fd == 2) write_all_str(2, term_normal());
   refresh_needed = true;
 }
 

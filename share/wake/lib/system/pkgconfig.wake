@@ -36,6 +36,8 @@ def pkgConfigImp args = memoize 0 (
   def result =
     makePlan cmdline Nil
     | setPlanLocalOnly True
+    | setPlanEcho Verbose
+    | setPlanStdout logNever
     | editPlanEnvironment addenv
     | runJob
   def output = result.getJobStdout | getWhenFail "" | tokenize `\n` | head

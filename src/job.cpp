@@ -40,8 +40,6 @@
 #include <vector>
 #include <cstring>
 
-// How many job categories to support
-#define POOLS 2
 // How many times to SIGTERM a process before SIGKILL
 #define TERM_ATTEMPTS 6
 // How long between first and second SIGTERM attempt (exponentially increasing)
@@ -53,6 +51,10 @@
 #define STATE_MERGED	8  // exit status in struct
 #define STATE_FINISHED	16 // inputs+outputs+status+runtime in database
 
+#define LOG_STDOUT(x) (x & 3)
+#define LOG_STDERR(x) ((x >> 2) & 3)
+#define LOG_ECHO(x) (x & 0x10)
+
 // Can be queried at multiple stages of the job's lifetime
 struct Job : public Value {
   Database *db;
@@ -62,6 +64,7 @@ struct Job : public Value {
   pid_t pid;
   long job;
   bool keep;
+  int log;
   std::shared_ptr<Value> bad_launch;
   std::shared_ptr<Value> bad_finish;
   Usage record;  // retrieved from DB (user-facing usage)
@@ -79,7 +82,7 @@ struct Job : public Value {
 
   static const TypeDescriptor type;
   static TypeVar typeVar;
-  Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline, bool keep);
+  Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline, bool keep, int log);
 
   void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
@@ -116,9 +119,7 @@ struct Task {
 
 // A JobEntry is a forked job with pid|stdout|stderr incomplete
 struct JobEntry {
-  int pool;
   std::shared_ptr<Job> job; // if unset, available for reuse
-  int internal;
   pid_t pid;       //  0 if merged
   int pipe_stdout; // -1 if closed
   int pipe_stderr; // -1 if closed
@@ -137,7 +138,7 @@ double JobEntry::runtime(struct timeval now) {
 // Implementation details for a JobTable
 struct JobTable::detail {
   std::vector<JobEntry> table;
-  std::vector<std::list<Task> > tasks;
+  std::list<Task> tasks;
   sigset_t block; // signals that can race with pselect()
   Database *db;
   bool verbose;
@@ -163,16 +164,12 @@ bool JobTable::exit_now() {
 }
 
 JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool check) : imp(new JobTable::detail) {
-  imp->table.resize(max_jobs*POOLS);
-  imp->tasks.resize(POOLS);
+  imp->table.resize(max_jobs);
   imp->verbose = verbose;
   imp->quiet = quiet;
   imp->check = check;
   imp->db = db;
   sigemptyset(&imp->block);
-
-  for (unsigned i = 0; i < imp->table.size(); ++i)
-    imp->table[i].pool = i / max_jobs;
 
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
@@ -332,14 +329,14 @@ static std::string pretty_cmd(std::string x) {
 static void launch(JobTable *jobtable) {
   for (auto &i : jobtable->imp->table) {
     if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
-      if (i.job && i.pool) status_state.erase(i.status);
+      if (i.job) status_state.erase(i.status);
       i.job.reset();
     }
 
     if (i.job) continue;
-    if (jobtable->imp->tasks[i.pool].empty()) continue;
+    if (jobtable->imp->tasks.empty()) continue;
 
-    Task &task = jobtable->imp->tasks[i.pool].front();
+    Task &task = jobtable->imp->tasks.front();
     int pipe_stdout[2];
     int pipe_stderr[2];
     if (pipe(pipe_stdout) == -1 || pipe(pipe_stderr) == -1) {
@@ -350,7 +347,6 @@ static void launch(JobTable *jobtable) {
     if ((flags = fcntl(pipe_stdout[0], F_GETFD, 0)) != -1) fcntl(pipe_stdout[0], F_SETFD, flags | FD_CLOEXEC);
     if ((flags = fcntl(pipe_stderr[0], F_GETFD, 0)) != -1) fcntl(pipe_stderr[0], F_SETFD, flags | FD_CLOEXEC);
     i.job = std::move(task.job);
-    i.internal = !strncmp(task.cmdline.c_str(), "<hash>", 6);
     i.pipe_stdout = pipe_stdout[0];
     i.pipe_stderr = pipe_stderr[0];
     gettimeofday(&i.start, 0);
@@ -382,25 +378,23 @@ static void launch(JobTable *jobtable) {
     close(pipe_stdout[1]);
     close(pipe_stderr[1]);
     bool indirect = i.job->cmdline != task.cmdline;
-    if (i.pool) {
-      double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
-      i.status = status_state.emplace(status_state.end(), pretty_cmd(i.job->cmdline), predict, i.start);
-    }
-    if (!jobtable->imp->quiet && i.pool && (jobtable->imp->verbose || !i.internal)) {
+    double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
+    i.status = status_state.emplace(status_state.end(), pretty_cmd(i.job->cmdline), predict, i.start);
+    if (LOG_ECHO(i.job->log)) {
       std::stringstream s;
       s << pretty_cmd(i.job->cmdline);
       if (!i.job->stdin.empty()) s << " < " << i.job->stdin;
-      if (indirect) {
+      if (indirect && jobtable->imp->verbose) {
         s << " # launched by: " << pretty_cmd(task.cmdline);
         if (!task.stdin.empty()) s << " < " << task.stdin;
       }
       s << std::endl;
       std::string out = s.str();
-      status_write(2, out.data(), out.size());
+      status_write(1, out.data(), out.size());
     }
     // i.job->stdin.clear();
     // i.job->cmdline.clear();
-    jobtable->imp->tasks[i.pool].pop_front();
+    jobtable->imp->tasks.pop_front();
   }
 }
 
@@ -477,23 +471,23 @@ bool JobTable::wait(WorkQueue &queue) {
         if (got == 0 || (got < 0 && errno != EINTR)) {
           close(i.pipe_stdout);
           i.pipe_stdout = -1;
-          if (i.pool) i.status->stdout = false;
+          i.status->stdout = false;
           i.job->state |= STATE_STDOUT;
           i.job->process(queue);
           ++done;
-          if (imp->verbose && i.pool && !i.internal) {
+          if (LOG_STDOUT(i.job->log)) {
             if (!i.stdout_buf.empty() && i.stdout_buf.back() != '\n')
               i.stdout_buf.push_back('\n');
-            status_write(1, i.stdout_buf.data(), i.stdout_buf.size());
+            status_write(LOG_STDOUT(i.job->log), i.stdout_buf.data(), i.stdout_buf.size());
             i.stdout_buf.clear();
           }
         } else {
           i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
-          if (imp->verbose && i.pool && !i.internal) {
+          if (LOG_STDOUT(i.job->log)) {
             i.stdout_buf.append(buffer, got);
             size_t dump = i.stdout_buf.rfind('\n');
             if (dump != std::string::npos) {
-              status_write(1, i.stdout_buf.data(), dump+1);
+              status_write(LOG_STDOUT(i.job->log), i.stdout_buf.data(), dump+1);
               i.stdout_buf.erase(0, dump+1);
             }
           }
@@ -504,23 +498,23 @@ bool JobTable::wait(WorkQueue &queue) {
         if (got == 0 || (got < 0 && errno != EINTR)) {
           close(i.pipe_stderr);
           i.pipe_stderr = -1;
-          if (i.pool) i.status->stderr = false;
+          i.status->stderr = false;
           i.job->state |= STATE_STDERR;
           i.job->process(queue);
           ++done;
-          if (!imp->quiet && i.pool) { // print stderr also for internal
+          if (LOG_STDERR(i.job->log)) {
             if (!i.stderr_buf.empty() && i.stderr_buf.back() != '\n')
               i.stderr_buf.push_back('\n');
-            status_write(2, i.stderr_buf.data(), i.stderr_buf.size());
+            status_write(LOG_STDERR(i.job->log), i.stderr_buf.data(), i.stderr_buf.size());
             i.stderr_buf.clear();
           }
         } else {
           i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
-          if (!imp->quiet && i.pool) { // print stderr also for internal
+          if (LOG_STDERR(i.job->log)) {
             i.stderr_buf.append(buffer, got);
             size_t dump = i.stderr_buf.rfind('\n');
             if (dump != std::string::npos) {
-              status_write(2, i.stderr_buf.data(), dump+1);
+              status_write(LOG_STDERR(i.job->log), i.stderr_buf.data(), dump+1);
               i.stderr_buf.erase(0, dump+1);
             }
           }
@@ -546,7 +540,7 @@ bool JobTable::wait(WorkQueue &queue) {
       for (auto &i : imp->table) {
         if (i.pid == pid) {
           i.pid = 0;
-          if (i.pool) i.status->merged = true;
+          i.status->merged = true;
           i.job->state |= STATE_MERGED;
           i.job->reality.found    = true;
           i.job->reality.status   = code;
@@ -571,8 +565,8 @@ bool JobTable::wait(WorkQueue &queue) {
   return compute;
 }
 
-Job::Job(Database *db_, const std::string &dir, const std::string &stdin_, const std::string &environ, const std::string &cmdline_, bool keep_)
-  : Value(&type), db(db_), cmdline(cmdline_), stdin(stdin_), state(0), code(), pid(0), job(-1), keep(keep_)
+Job::Job(Database *db_, const std::string &dir, const std::string &stdin_, const std::string &environ, const std::string &cmdline_, bool keep_, int log_)
+  : Value(&type), db(db_), cmdline(cmdline_), stdin(stdin_), state(0), code(), pid(0), job(-1), keep(keep_), log(log_)
 {
   std::vector<uint64_t> codes;
   type.hashcode.push(codes);
@@ -652,40 +646,36 @@ static PRIMFN(prim_job_fail_finish) {
 }
 
 static PRIMTYPE(type_job_launch) {
-  return args.size() == 12 &&
+  return args.size() == 11 &&
     args[0]->unify(Job::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
+    args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
     args[3]->unify(String::typeVar) &&
     args[4]->unify(String::typeVar) &&
-    args[5]->unify(String::typeVar) &&
-    args[6]->unify(Integer::typeVar) &&
+    args[5]->unify(Integer::typeVar) &&
+    args[6]->unify(Double::typeVar) &&
     args[7]->unify(Double::typeVar) &&
-    args[8]->unify(Double::typeVar) &&
+    args[8]->unify(Integer::typeVar) &&
     args[9]->unify(Integer::typeVar) &&
     args[10]->unify(Integer::typeVar) &&
-    args[11]->unify(Integer::typeVar) &&
     out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_job_launch) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
-  EXPECT(12);
+  EXPECT(11);
   JOB(job, 0);
-  INTEGER(pool, 1);
-  STRING(dir, 2);
-  STRING(stdin, 3);
-  STRING(env, 4);
-  STRING(cmd, 5);
+  STRING(dir, 1);
+  STRING(stdin, 2);
+  STRING(env, 3);
+  STRING(cmd, 4);
 
-  parse_usage(&job->predict, args.data()+6, queue, binding);
+  parse_usage(&job->predict, args.data()+5, queue, binding);
   job->predict.found = true;
 
-  int poolv = mpz_get_si(pool->value);
-  REQUIRE(poolv >= 0 && poolv < POOLS);
   REQUIRE (job->state == 0);
 
-  jobtable->imp->tasks[poolv].emplace_back(
+  jobtable->imp->tasks.emplace_back(
     std::dynamic_pointer_cast<Job>(args[0]),
     dir->value,
     stdin->value,
@@ -728,6 +718,15 @@ static PRIMFN(prim_job_virtual) {
 
   REQUIRE (job->state == 0);
 
+  if (LOG_ECHO(job->log)) {
+    std::stringstream s;
+    s << pretty_cmd(job->cmdline);
+    if (!job->stdin.empty()) s << " < " << job->stdin;
+    s << std::endl;
+    std::string out = s.str();
+    status_write(1, out.data(), out.size());
+  }
+
   job->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED;
   job->process(queue);
 
@@ -736,25 +735,27 @@ static PRIMFN(prim_job_virtual) {
 }
 
 static PRIMTYPE(type_job_create) {
-  return args.size() == 6 &&
+  return args.size() == 7 &&
     args[0]->unify(String::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
     args[3]->unify(String::typeVar) &&
     args[4]->unify(String::typeVar) &&
     args[5]->unify(Integer::typeVar) &&
+    args[6]->unify(Integer::typeVar) &&
     out->unify(Job::typeVar);
 }
 
 static PRIMFN(prim_job_create) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
-  EXPECT(6);
+  EXPECT(7);
   STRING(dir, 0);
   STRING(stdin, 1);
   STRING(env, 2);
   STRING(cmd, 3);
   STRING(visible, 4);
   INTEGER(keep, 5);
+  INTEGER(log, 6);
 
   std::stringstream stack;
   for (auto &i : binding->stack_trace()) stack << i.file() << std::endl;
@@ -764,7 +765,8 @@ static PRIMFN(prim_job_create) {
     stdin->value,
     env->value,
     cmd->value,
-    mpz_cmp_si(keep->value,0));
+    mpz_cmp_si(keep->value,0),
+    mpz_get_si(log->value));
 
   out->record = jobtable->imp->db->predict_job(out->code.data[0]);
 
@@ -836,7 +838,7 @@ static PRIMFN(prim_job_cache) {
 
   std::vector<std::shared_ptr<Value> > jobs;
   if (reuse.found && !jobtable->imp->check) {
-    auto out = std::make_shared<Job>(jobtable->imp->db, dir->value, stdin->value, env->value, cmd->value, true);
+    auto out = std::make_shared<Job>(jobtable->imp->db, dir->value, stdin->value, env->value, cmd->value, true, 0);
     out->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED|STATE_FINISHED;
     out->job = job;
     out->record  = reuse;
