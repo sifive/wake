@@ -1,17 +1,20 @@
 FROM centos:7.6.1810
 
 RUN yum -y update && yum clean all
+RUN yum --setopt=skip_missing_names_on_install=False install -y epel-release
 RUN yum --setopt=skip_missing_names_on_install=False install -y \
-  fuse-devel \
-  gcc-c++ \
   git \
-  gmp-devel \
+  which \
   make \
+  gcc \
+  gcc-c++ \
+  fuse-devel \
+  gmp-devel \
   ncurses-devel \
-  sqlite-devel
-# re2-devel is not an official CentOS package, so use the EPEL repository.
-RUN yum --setopt=skip_missing_names_on_install=False install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
- yum --setopt=skip_missing_names_on_install=False install -y re2-devel
+  sqlite-devel \
+  re2-devel
+
 WORKDIR /build
 COPY . /build
+
 RUN USE_FUSE_WAKE=0 make install
