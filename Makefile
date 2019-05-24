@@ -17,9 +17,10 @@ FUSE_LDFLAGS := $(shell pkg-config --silence-errors --libs fuse    || echo -lfus
 CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsqlite3)	\
 		$(shell pkg-config --silence-errors --libs gmp-6   || echo -lgmp)	\
 		$(shell pkg-config --silence-errors --libs re2     || echo -lre2)	\
-		$(shell pkg-config --silence-errors --libs ncurses || echo -lncurses)
+		$(shell pkg-config --silence-errors --libs ncurses tinfo || pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
 COMMON := common/jlexer.o $(patsubst %.cpp,%.o,$(wildcard common/*.cpp))
+WAKE_ENV := WAKE_PATH=$(shell dirname $(shell which $(firstword $(CC))))
 
 # If FUSE is unavalable during wake build, allow a linux-specific work-around
 ifeq ($(USE_FUSE_WAKE),0)
@@ -27,13 +28,13 @@ EXTRA := lib/wake/libpreload-wake.so lib/wake/preload-wake
 endif
 
 all:		wake.db
-	./bin/wake all default
+	$(WAKE_ENV) ./bin/wake all default
 
 wake.db:	bin/wake lib/wake/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EXTRA)
 	test -f $@ || ./bin/wake --init .
 
 install:	all
-	./bin/wake install '"install"'
+	$(WAKE_ENV) ./bin/wake install '"install"'
 
 bin/wake:	src/symbol.o $(COMMON)				\
 		$(patsubst %.cpp,%.o,$(wildcard src/*.cpp))	\
