@@ -24,6 +24,16 @@ jobs:
       - run: |
           docker build -f .circleci/dockerfiles/Dockerfile.centos_7_6 .
 
+  debian_wheezy:
+    docker:
+      - image: circleci/buildpack-deps:jessie
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run: |
+          docker build -f .circleci/dockerfiles/Dockerfile.debian_wheezy .
+
   debian_testing:
     docker:
       - image: circleci/buildpack-deps:jessie
@@ -61,5 +71,6 @@ workflows:
       - centos_6_6
       - centos_7_6
       - debian_testing
+      - debian_wheezy
       - ubuntu_16_04
       - ubuntu_18_04
