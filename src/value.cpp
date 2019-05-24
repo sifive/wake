@@ -112,11 +112,10 @@ void Double::format(std::ostream &os, FormatState &state) const {
 static const RE2::Options &defops(RE2::Options &&options) {
   options.set_log_errors(false);
   options.set_one_line(true);
-  options.set_dot_nl(true);
   return options;
 }
 
-RegExp::RegExp(const std::string &regexp) : RegExp(regexp, defops(RE2::Options())) { }
+RegExp::RegExp(const std::string &regexp) : RegExp("(?s)" + regexp, defops(RE2::Options())) { }
 
 void RegExp::format(std::ostream &os, FormatState &state) const {
   if (APP_PRECEDENCE < state.p()) os << "(";
