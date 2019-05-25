@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build-arch:
+	USE_FUSE_WAKE=0 make wake.db
+	USE_FUSE_WAKE=0 ./bin/wake all default
+
+override_dh_auto_install-arch:
+	USE_FUSE_WAKE=0 ./bin/wake 'install "{here}/debian/wake/usr"'
