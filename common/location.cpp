@@ -17,7 +17,7 @@
 
 #include "location.h"
 #include <sstream>
-#include <stdio.h>
+#include <fstream>
 
 std::ostream & operator << (std::ostream &os, FileLocation location) {
   const Location *l = location.l;
@@ -32,7 +32,6 @@ std::ostream & operator << (std::ostream &os, FileLocation location) {
 
 std::ostream & operator << (std::ostream &os, TextLocation location) {
   const Location *l = location.l;
-  FILE *f;
   char buf[40];
   size_t get;
 
@@ -40,14 +39,15 @@ std::ostream & operator << (std::ostream &os, TextLocation location) {
       l->filename[0] != '<' &&
       l->start.row == l->end.row &&
       l->end.column >= l->start.column &&
-      (get = l->end.column - l->start.column + 1) < sizeof(buf) &&
-      (f = fopen(l->filename, "r")) != 0) {
-    if (fseek(f, l->start.bytes, SEEK_SET) != -1 && fread(&buf[0], 1, get, f) == get) {
+      (get = l->end.column - l->start.column + 1) < sizeof(buf)) {
+    std::ifstream ifs(l->filename);
+    ifs.seekg(l->start.bytes);
+    ifs.read(&buf[0], get);
+    if (ifs) {
       buf[get] = 0;
     } else {
       buf[0] = 0;
     }
-    fclose(f);
   } else {
     buf[0] = 0;
   }
