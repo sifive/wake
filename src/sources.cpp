@@ -331,10 +331,24 @@ std::string get_workspace() {
 std::vector<std::shared_ptr<String> > find_all_sources(bool &ok, bool workspace) {
   std::vector<std::shared_ptr<String> > out;
   if (workspace) ok = ok && !scan(out);
+  return out;
+}
+
+std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace) {
+  std::vector<std::shared_ptr<String> > acc;
   std::string abs_libdir = find_execpath() + "/../share/wake/lib";
   std::string rel_libdir = make_relative(get_workspace(), make_canonical(abs_libdir));
-  ok = ok && !push_files(out, rel_libdir);
-  distinct(out);
+  ok = ok && !push_files(acc, rel_libdir);
+  if (workspace) ok = ok && !push_files(acc, ".");
+  distinct(acc);
+
+  RE2::Options options;
+  options.set_log_errors(false);
+  options.set_one_line(true);
+  RE2 exp("(?s).*[^/]\\.wake", options);
+
+  std::vector<std::string> out;
+  for (auto &i : acc) if (RE2::FullMatch(i->value, exp)) out.push_back(std::move(i->value));
   return out;
 }
 

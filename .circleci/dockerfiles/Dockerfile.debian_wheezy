@@ -4,6 +4,7 @@ RUN printf 'deb http://archive.debian.org/debian wheezy main\ndeb http://archive
 
 RUN apt-get update -o Acquire::Check-Valid-Until=false && apt-get install -y \
   build-essential \
+  devscripts \
   git \
   libfuse-dev \
   libgmp-dev \
@@ -18,4 +19,6 @@ RUN wget -q http://www.terpstra.ca/debian/pool/main/r/re2/libre2-dev_20140304+df
 WORKDIR /build
 COPY . /build
 
-RUN USE_FUSE_WAKE=0 make install
+RUN USE_FUSE_WAKE=0 make wake.db
+RUN USE_FUSE_WAKE=0 ./bin/wake tarball Unit
+RUN tar xvJf wake_*.tar.xz && cd wake-* && debuild -us -uc

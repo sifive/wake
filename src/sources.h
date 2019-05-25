@@ -33,6 +33,7 @@ std::string make_canonical(const std::string &x);
 
 std::string get_workspace();
 
+std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace);
 std::vector<std::shared_ptr<String> > find_all_sources(bool &ok, bool workspace);
 std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<String> > &all, const std::string &base, const std::string &regexp);
 

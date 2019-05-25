@@ -423,10 +423,11 @@ int main(int argc, char **argv) {
 
   // Read all wake build files
   std::unique_ptr<Top> top(new Top);
-  for (auto i : sources(all_sources, ".", "(.*/)?[^/]+\\.wake")) {
+  auto wakefiles = find_all_wakefiles(ok, workspace);
+  for (auto &i : wakefiles) {
     if (verbose && queue.stack_trace)
       std::cerr << "Parsing " << i << std::endl;
-    Lexer lex(i->value.c_str());
+    Lexer lex(i.c_str());
     parse_top(*top.get(), lex);
     if (lex.fail) ok = false;
   }
