@@ -32,6 +32,7 @@ syn match wakeUpperIdentifier "\<[A-Z][A-Za-z0-9_]*"
 syn region wakeString start=/\v"/ skip=/\v\\./ end=/\v"/ contains=wakeStringEscape
 syn match wakeStringEscape "\\[nrfvb\\\"]" contained
 syn region wakeRawString start=/\v'/ skip=/\v\\./ end=/\v'/
+syn region wakeRegexString start=/\v`/ skip=/\v\\./ end=/\v`/
 
 "===== Links =====
 hi link wakeKeyword Keyword
@@ -48,4 +49,5 @@ hi link wakeUpperIdentifier Type
 hi link wakeString String
 hi link wakeStringEscape Special
 hi link wakeRawString String
+hi link wakeRegexString String
 
