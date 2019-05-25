@@ -530,6 +530,8 @@ Usage Database::reuse_job(
   Usage out;
   long stat_id;
 
+  // When implementing indexed directories, beware of non-existent BADPATH files
+
   const char *why = "Could not check for a cached job";
   begin_txn();
   bind_string (why, imp->find_prior, 1, directory);
