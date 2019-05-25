@@ -1,13 +1,13 @@
-FROM centos:7.6.1810
+FROM centos:6.6
 
 RUN yum -y update && yum clean all
-RUN yum --setopt=skip_missing_names_on_install=False install -y epel-release
+RUN yum --setopt=skip_missing_names_on_install=False install -y epel-release centos-release-scl
 RUN yum --setopt=skip_missing_names_on_install=False install -y \
   git \
   which \
   make \
-  gcc \
-  gcc-c++ \
+  devtoolset-6-gcc \
+  devtoolset-6-gcc-c++ \
   fuse-devel \
   gmp-devel \
   ncurses-devel \
@@ -17,4 +17,5 @@ RUN yum --setopt=skip_missing_names_on_install=False install -y \
 WORKDIR /build
 COPY . /build
 
+SHELL [ "/usr/bin/scl", "enable", "devtoolset-6" ]
 RUN USE_FUSE_WAKE=0 make install

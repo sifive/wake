@@ -57,9 +57,10 @@ On Debian/Ubuntu (wheezy or later):
 
     sudo apt-get install makedev fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev
 
-On Redhat (7.0 or later):
+On Redhat (6.6 or later):
 
-    sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm # For re2 on RHEL7
+    sudo yum install epel-release epel-release centos-release-scl
+    # On RHEL6: sudo yum install devtoolset-6-gcc devtoolset-6-gcc-c++
     sudo yum install makedev fuse fuse-devel sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel
 
 On Mac OS with Mac Ports installed:
@@ -99,11 +100,11 @@ Give FUSE permission to run as stated in the instructions and you should be good
 
 External dependencies:
  - c++ 11		>= 4.7	GPLv3		https://www.gnu.org/software/gcc/
- - sqlite3-dev		>= 3.7	public domain	https://www.sqlite.org/
- - libgmp-dev		>= 5.0	LGPL v3		https://gmplib.org
- - libfuse-dev		>= 2.9	LGPL v2.1	https://github.com/libfuse/libfuse
- - libre2-dev		>= 2014	BSD 3-clause	https://github.com/google/re2
- - libncurses5-dev	>= 5.9	MIT		https://www.gnu.org/software/ncurses/
+ - sqlite3-dev		>= 3.6	public domain	https://www.sqlite.org/
+ - libgmp-dev		>= 4.3	LGPL v3		https://gmplib.org
+ - libfuse-dev		>= 2.8	LGPL v2.1	https://github.com/libfuse/libfuse
+ - libre2-dev		>= 2013	BSD 3-clause	https://github.com/google/re2
+ - libncurses5-dev	>= 5.7	MIT		https://www.gnu.org/software/ncurses/
 
 Optional dependencies:
  - re2c			>= 1.0	public domain	http://re2c.org

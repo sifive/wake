@@ -362,8 +362,7 @@ std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
-  options.set_dot_nl(true);
-  RE2 exp(regexp, options);
+  RE2 exp("(?s)" + regexp, options);
   return sources(all, base, exp);
 }
 

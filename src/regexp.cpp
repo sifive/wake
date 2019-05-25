@@ -56,7 +56,7 @@ static PRIMTYPE(type_re2str) {
 static PRIMFN(prim_re2str) {
   EXPECT(1);
   REGEXP(arg0, 0);
-  auto out = std::make_shared<String>(arg0->exp.pattern());
+  auto out = std::make_shared<String>(arg0->exp.pattern().substr(4)); // skip the (?s)
   RETURN(out);
 }
 

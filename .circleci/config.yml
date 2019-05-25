@@ -4,7 +4,7 @@
 # language tools since the entire build happens within Docker.
 version: 2.1
 jobs:
-  centos_7_0:
+  debian_wheezy:
     docker:
       - image: circleci/buildpack-deps:jessie
     steps:
@@ -12,7 +12,27 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: true
       - run: |
-          docker build -f .circleci/dockerfiles/Dockerfile.centos_7_0 .
+          docker build -f .circleci/dockerfiles/Dockerfile.debian_wheezy .
+
+  debian_testing:
+    docker:
+      - image: circleci/buildpack-deps:jessie
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run: |
+          docker build -f .circleci/dockerfiles/Dockerfile.debian_testing .
+
+  centos_6_6:
+    docker:
+      - image: circleci/buildpack-deps:jessie
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run: |
+          docker build -f .circleci/dockerfiles/Dockerfile.centos_6_6 .
 
   centos_7_6:
     docker:
@@ -23,16 +43,6 @@ jobs:
           docker_layer_caching: true
       - run: |
           docker build -f .circleci/dockerfiles/Dockerfile.centos_7_6 .
-
-  debian_10:
-    docker:
-      - image: circleci/buildpack-deps:jessie
-    steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - run: |
-          docker build -f .circleci/dockerfiles/Dockerfile.debian_10 .
 
   ubuntu_16_04:
     docker:
@@ -58,8 +68,9 @@ workflows:
   version: 2
   build:
     jobs:
-      - centos_7_0
+      - debian_testing # Newest everything
+      - debian_wheezy # Oldest supported compiler
+      - centos_6_6 # Oldest supported package versions
       - centos_7_6
-      - debian_10
-      - ubuntu_16_04
-      - ubuntu_18_04
+      - ubuntu_16_04 # LTS
+      - ubuntu_18_04 # LTS

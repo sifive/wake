@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
 	gettimeofday(&stop, 0);
 
 	// Cause the opath to be generated (this write will fail)
-	(void)write(livefd, &stop, 1);
+	(void)!write(livefd, &stop, 1); // the ! convinces older gcc that it's ok to ignore the write
 	(void)fsync(livefd);
 
 	if (!JAST::parse(opath.c_str(), ofs, jast))
