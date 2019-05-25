@@ -3,6 +3,7 @@ FROM debian:testing
 
 RUN apt-get update && apt-get install -y \
   build-essential \
+  devscripts \
   git \
   libfuse-dev \
   libgmp-dev \
@@ -14,4 +15,6 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /build
 COPY . /build
 
-RUN USE_FUSE_WAKE=0 make install
+RUN USE_FUSE_WAKE=0 make wake.db
+RUN USE_FUSE_WAKE=0 ./bin/wake tarball Unit
+RUN tar xvJf wake_*.tar.xz && cd wake-* && debuild -us -uc
