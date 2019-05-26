@@ -14,6 +14,6 @@ Depends: fuse, ${shlibs:Depends}, ${misc:Depends}
 Description: flexible build orchestration tool and language
  Wake is a build orchestration tool and language.
  If you have a build whose steps cannot be adequately expressed in
- make/tup/basel/etc, you probably need wake.
+ make/tup/bazel/etc, you probably need wake.
  If you don't want to waste time rebuilding things that don't need it,
  or that your colleagues already built, you might appreciate wake.
