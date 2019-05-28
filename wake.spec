@@ -1,0 +1,32 @@
+Name:          wake
+Version:       0.15
+Release:       0
+Summary:       flexible build orchestration tool and language
+License:       Apache-2; MIT; TFL; WTFPL; CC0
+URL:           https://github.com/sifive/wake
+Source0:       https://github.com/sifive/wake/releases/%{name}_%{version}.tar.xz
+Requires:      fuse
+BuildRequires: fuse-devel sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel
+
+%description
+Wake is a build orchestration tool and language.
+If you have a build whose steps cannot be adequately expressed in
+make/tup/bazel/etc, you probably need wake.
+If you don't want to waste time rebuilding things that don't need it,
+or that your colleagues already built, you might appreciate wake.
+
+%prep
+%setup -q
+
+%build
+USE_FUSE_WAKE=0 make wake.db
+USE_FUSE_WAKE=0 ./bin/wake all default
+
+%install
+USE_FUSE_WAKE=0 ./bin/wake 'install "%{buildroot}/usr"'
+
+%files
+/usr/*
+
+%changelog
+# let's skip this for now
