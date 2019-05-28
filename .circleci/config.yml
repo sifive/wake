@@ -1,93 +1,110 @@
-# We pick an arbitrary docker image provided by CircleCI, since all we want is a
-# Docker image that has the Docker client installed within it, and CircleCI
-# preinstalls the Docker client all on their images. We don't need any actual
-# language tools since the entire build happens within Docker.
 version: 2.1
 jobs:
   tarball:
     docker:
-      - image: circleci/buildpack-deps:jessie
+      - image: circleci/buildpack-deps:stretch
     steps:
       - checkout
-      - run: |
-          sudo apt-get install libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev
-      - run: |
-          USE_FUSE_WAKE=0 make tarball
+      - run: sudo apt-get update && sudo apt-get install -y build-essential libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev
+      - run: USE_FUSE_WAKE=0 make tarball
       - persist_to_workspace:
           root: .
           paths:
-            - Makefile
+            - wake_*.tar.xz
 
   debian_wheezy:
     docker:
-      - image: circleci/buildpack-deps:jessie
+      - image: debian:wheezy
     steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
       - run: |
-          docker build -f .circleci/dockerfiles/Dockerfile.debian_wheezy .
+          printf 'deb http://archive.debian.org/debian wheezy main\ndeb http://archive.debian.org/debian-security/ wheezy/updates main\n' > /etc/apt/sources.list
+      - run: apt-get update -o Acquire::Check-Valid-Until=false && apt-get install -y build-essential devscripts git libfuse-dev libgmp-dev libncurses5-dev libsqlite3-dev pkg-config wget
+      - run: |
+          wget -q http://www.terpstra.ca/debian/pool/main/r/re2/libre2-1_20140304+dfsg-2_amd64.deb && dpkg -i libre2-1_20140304+dfsg-2_amd64.deb
+          wget -q http://www.terpstra.ca/debian/pool/main/r/re2/libre2-dev_20140304+dfsg-2_amd64.deb && dpkg -i libre2-dev_20140304+dfsg-2_amd64.deb
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: |
+          tar xJf /tmp/workspace/wake_*.tar.xz
+          cd wake-*
+          debuild -us -uc
+      - persist_to_workspace:
+          root: .
+          paths:
+            - wake_*.deb
 
   debian_testing:
     docker:
-      - image: circleci/buildpack-deps:jessie
+      - image: debian:testing
     steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
+      - run: apt-get update && apt-get install -y build-essential devscripts git libfuse-dev libgmp-dev libncurses5-dev libre2-dev libsqlite3-dev pkg-config
+      - attach_workspace:
+          at: /tmp/workspace
       - run: |
-          docker build -f .circleci/dockerfiles/Dockerfile.debian_testing .
+          tar xJf /tmp/workspace/wake_*.tar.xz
+          cd wake-*
+          debuild -us -uc
 
   centos_6_6:
     docker:
-      - image: circleci/buildpack-deps:jessie
+      - image: centos:6.6
     steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
+      - run: yum -y update && yum clean all
+      - run: yum --setopt=skip_missing_names_on_install=False install -y epel-release centos-release-scl
+      - run: yum --setopt=skip_missing_names_on_install=False install -y tar xz git which make devtoolset-6-gcc devtoolset-6-gcc-c++ fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel
+      - attach_workspace:
+          at: /tmp/workspace
       - run: |
-          docker build -f .circleci/dockerfiles/Dockerfile.centos_6_6 .
+          tar xJf /tmp/workspace/wake_*.tar.xz
+          cd wake-*
+          /usr/bin/scl enable devtoolset-6 'USE_FUSE_WAKE=0 make install'
 
   centos_7_6:
     docker:
-      - image: circleci/buildpack-deps:jessie
+      - image: centos:7.6.1810
     steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
+      - run: yum -y update && yum clean all
+      - run: yum --setopt=skip_missing_names_on_install=False install -y epel-release
+      - run: yum --setopt=skip_missing_names_on_install=False install -y tar xz git which make gcc gcc-c++ fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel
+      - attach_workspace:
+          at: /tmp/workspace
       - run: |
-          docker build -f .circleci/dockerfiles/Dockerfile.centos_7_6 .
+          tar xJf /tmp/workspace/wake_*.tar.xz
+          cd wake-*
+          USE_FUSE_WAKE=0 make install
 
   ubuntu_16_04:
     docker:
-      - image: circleci/buildpack-deps:jessie
+      - image: ubuntu:16.04
     steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
+      - run: apt-get update && apt-get install -y build-essential debhelper devscripts git libfuse-dev libgmp-dev libncurses5-dev libre2-dev libsqlite3-dev pkg-config
+      - attach_workspace:
+          at: /tmp/workspace
       - run: |
-          docker build -f .circleci/dockerfiles/Dockerfile.ubuntu_16_04 .
+          tar xJf /tmp/workspace/wake_*.tar.xz
+          cd wake-*
+          debuild -us -uc
 
   ubuntu_18_04:
     docker:
-      - image: circleci/buildpack-deps:jessie
+      - image: ubuntu:18.04
     steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
+      - run: apt-get update && apt-get install -y build-essential debhelper devscripts git libfuse-dev libgmp-dev libncurses5-dev libre2-dev libsqlite3-dev pkg-config
+      - attach_workspace:
+          at: /tmp/workspace
       - run: |
-          docker build -f .circleci/dockerfiles/Dockerfile.ubuntu_18_04 .
+          tar xJf /tmp/workspace/wake_*.tar.xz
+          cd wake-*
+          debuild -us -uc
 
   release:
     docker:
-      - image: circleci/buildpack-deps:jessie
+      - image: circleci/buildpack-deps:stretch
     steps:
       - attach_workspace:
-          at: workspace
-      - run: |
-          echo Victory
+          at: /tmp/workspace
       - store_artifacts:
-          path: workspace/Makefile
+          path: /tmp/workspace
 
 workflows:
   version: 2
