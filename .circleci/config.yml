@@ -4,6 +4,20 @@
 # language tools since the entire build happens within Docker.
 version: 2.1
 jobs:
+  tarball:
+    docker:
+      - image: circleci/buildpack-deps:jessie
+    steps:
+      - checkout
+      - run: |
+          sudo apt-get install libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev
+      - run: |
+          USE_FUSE_WAKE=0 make tarball
+      - persist_to_workspace:
+          root: .
+          paths:
+            - Makefile
+
   debian_wheezy:
     docker:
       - image: circleci/buildpack-deps:jessie
@@ -64,13 +78,45 @@ jobs:
       - run: |
           docker build -f .circleci/dockerfiles/Dockerfile.ubuntu_18_04 .
 
+  release:
+    docker:
+      - image: circleci/buildpack-deps:jessie
+    steps:
+      - attach_workspace:
+          at: workspace
+      - run: |
+          echo Victory
+      - store_artifacts:
+          path: workspace/Makefile
+
 workflows:
   version: 2
   build:
     jobs:
-      - debian_testing # Newest everything
-      - debian_wheezy # Oldest supported compiler
-      - centos_6_6 # Oldest supported package versions
-      - centos_7_6
-      - ubuntu_16_04 # LTS
-      - ubuntu_18_04 # LTS
+      - tarball
+      - debian_testing:
+          requires:
+            - tarball
+      - debian_wheezy:
+          requires:
+            - tarball
+      - centos_6_6:
+          requires:
+            - tarball
+      - centos_7_6:
+          requires:
+            - tarball
+      - ubuntu_16_04:
+          requires:
+            - tarball
+      - ubuntu_18_04:
+          requires:
+            - tarball
+      - release:
+          requires:
+            - debian_testing # Newest everything
+            - debian_wheezy  # Oldest supported compiler
+            - centos_6_6     # Oldest supported package versions
+            - centos_7_6
+            - ubuntu_16_04   # LTS
+            - ubuntu_18_04   # LTS
