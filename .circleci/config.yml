@@ -28,10 +28,13 @@ jobs:
           tar xJf /tmp/workspace/wake_*.tar.xz
           cd wake-*
           debuild -us -uc
+          cd ..
+          mkdir wheezy
+          mv *.deb wheezy
       - persist_to_workspace:
           root: .
           paths:
-            - wake_*.deb
+            - wheezy
 
   debian_testing:
     docker:
@@ -44,6 +47,13 @@ jobs:
           tar xJf /tmp/workspace/wake_*.tar.xz
           cd wake-*
           debuild -us -uc
+          cd ..
+          mkdir testing
+          mv *.deb testing
+      - persist_to_workspace:
+          root: .
+          paths:
+            - testing
 
   centos_6_6:
     docker:
@@ -84,6 +94,13 @@ jobs:
           tar xJf /tmp/workspace/wake_*.tar.xz
           cd wake-*
           debuild -us -uc
+          cd ..
+          mkdir ubuntu_16_04
+          mv *.deb ubuntu_16_04
+      - persist_to_workspace:
+          root: .
+          paths:
+            - ubuntu_16_04
 
   ubuntu_18_04:
     docker:
@@ -96,6 +113,13 @@ jobs:
           tar xJf /tmp/workspace/wake_*.tar.xz
           cd wake-*
           debuild -us -uc
+          cd ..
+          mkdir ubuntu_18_04
+          mv *.deb ubuntu_18_04
+      - persist_to_workspace:
+          root: .
+          paths:
+            - ubuntu_18_04
 
   release:
     docker:
