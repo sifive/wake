@@ -48,8 +48,10 @@ global def tarball Unit = match (buildAs Unit) (buildOn Unit)
       "publish source =\n  {pub}Nil\n",
       Nil
     ).cat
+    def gnutar = which "gnutar"
+    def tar = if gnutar ==* "gnutar" then which "tar" else gnutar
     def cmd =
-      which "tar", "--mtime={time}", "--transform=s@^@wake-{release}/@",
+      tar, "--mtime={time}", "--transform=s@^@wake-{release}/@",
       "--owner=0", "--group=0", "--numeric-owner", "-cJf",
       "wake_{release}.tar.xz", map getPathName (manifest, srcs) | sortBy (_<*_)
     job cmd (manifest, srcs) | getJobOutput | getPathResult
