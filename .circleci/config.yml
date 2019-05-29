@@ -11,6 +11,8 @@ jobs:
           root: .
           paths:
             - wake_*.tar.xz
+            - wake.spec
+            - debian
 
   debian_wheezy:
     docker:
@@ -25,16 +27,18 @@ jobs:
       - attach_workspace:
           at: /tmp/workspace
       - run: |
-          tar xJf /tmp/workspace/wake_*.tar.xz
+          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
+          tar xJf wake_*.orig.tar.xz
           cd wake-*
+          cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
-          mkdir wheezy
-          mv *.deb wheezy
+          mkdir debian_wheezy
+          mv *.deb *.gz *.xz *.changes *.dsc debian_wheezy
       - persist_to_workspace:
           root: .
           paths:
-            - wheezy
+            - debian_wheezy
 
   debian_testing:
     docker:
@@ -44,30 +48,40 @@ jobs:
       - attach_workspace:
           at: /tmp/workspace
       - run: |
-          tar xJf /tmp/workspace/wake_*.tar.xz
+          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
+          tar xJf wake_*.orig.tar.xz
           cd wake-*
+          cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
-          mkdir testing
-          mv *.deb testing
+          mkdir debian_testing
+          mv *.deb *.xz *.changes *.dsc debian_testing
       - persist_to_workspace:
           root: .
           paths:
-            - testing
+            - debian_testing
 
   centos_6_6:
     docker:
       - image: centos:6.6
     steps:
       - run: yum -y update && yum clean all
+      - run: yum --setopt=skip_missing_names_on_install=False install -y rpm-build rpm-devel rpmlint make python bash coreutils diffutils patch rpmdevtools
       - run: yum --setopt=skip_missing_names_on_install=False install -y epel-release centos-release-scl
-      - run: yum --setopt=skip_missing_names_on_install=False install -y tar xz git which make devtoolset-6-gcc devtoolset-6-gcc-c++ fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel
+      - run: yum --setopt=skip_missing_names_on_install=False install -y tar xz git which make devtoolset-6-gcc devtoolset-6-gcc-c++ fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel gcc gcc-c++
       - attach_workspace:
           at: /tmp/workspace
       - run: |
-          tar xJf /tmp/workspace/wake_*.tar.xz
-          cd wake-*
-          /usr/bin/scl enable devtoolset-6 'USE_FUSE_WAKE=0 make install'
+          rpmdev-setuptree
+          cp /tmp/workspace/wake_*.tar.xz /root/rpmbuild/SOURCES
+          cp /tmp/workspace/wake.spec .
+          /usr/bin/scl enable devtoolset-6 'rpmbuild -ba wake.spec'
+          mkdir centos_6_6
+          cp /root/rpmbuild/RPMS/x86_64/*.rpm /root/rpmbuild/SRPMS/*.rpm centos_6_6
+      - persist_to_workspace:
+          root: .
+          paths:
+            - centos_6_6
 
   centos_7_6:
     docker:
@@ -81,9 +95,16 @@ jobs:
       - attach_workspace:
           at: /tmp/workspace
       - run: |
-          tar xJf /tmp/workspace/wake_*.tar.xz
-          cd wake-*
+          rpmdev-setuptree
+          cp /tmp/workspace/wake_*.tar.xz /root/rpmbuild/SOURCES
+          cp /tmp/workspace/wake.spec .
           rpmbuild -ba wake.spec
+          mkdir centos_7_6
+          cp /root/rpmbuild/RPMS/x86_64/*.rpm /root/rpmbuild/SRPMS/*.rpm centos_7_6
+      - persist_to_workspace:
+          root: .
+          paths:
+            - centos_7_6
 
   ubuntu_16_04:
     docker:
@@ -93,12 +114,14 @@ jobs:
       - attach_workspace:
           at: /tmp/workspace
       - run: |
-          tar xJf /tmp/workspace/wake_*.tar.xz
+          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
+          tar xJf wake_*.orig.tar.xz
           cd wake-*
+          cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
           mkdir ubuntu_16_04
-          mv *.deb ubuntu_16_04
+          mv *.deb *.xz *.changes *.dsc ubuntu_16_04
       - persist_to_workspace:
           root: .
           paths:
@@ -112,12 +135,14 @@ jobs:
       - attach_workspace:
           at: /tmp/workspace
       - run: |
-          tar xJf /tmp/workspace/wake_*.tar.xz
+          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
+          tar xJf wake_*.orig.tar.xz
           cd wake-*
+          cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
           mkdir ubuntu_18_04
-          mv *.deb ubuntu_18_04
+          mv *.deb *.xz *.changes *.dsc ubuntu_18_04
       - persist_to_workspace:
           root: .
           paths:
