@@ -11,16 +11,21 @@ Code sections are intended to be copy-pasted into a terminal.
     wake --init .
     wake '5 + 6'
 
-This sequence of commands creates a new workspace managed by wake.
-The `init` option is used to create an initial `wake.db` to record the state
-of the build in this workspace.
-Whenever you run wake, it searches for a `wake.db` in parent directories.
-The first `wake.db` found defines what wake considers to be the workspace.
-You can thus safely run wake in any sub-directory of tutorial and wake
-will be aware of all the relevant dependencies and rules.
+This sequence of commands creates a new workspace managed by wake.  The `init`
+option is used to create an initial `wake.db` to record the state of the build
+in this workspace.  Whenever you run wake, it searches for a `wake.db` in
+parent directories.  The first `wake.db` found defines what wake considers to
+be the workspace.  You can thus safely run wake in any sub-directory of
+tutorial and wake will be aware of all the relevant dependencies and rules.
 
-The final output of wake run on an expression is always of the form
-`expression: type = value`. In this case, 5 + 6 results in value 11,
+The final output of wake run on an expression is always the result of
+evaluating that expression. In this case, `5 + 6` results in value `11`.
+Wake will report more information when run in verbose mode: `wake -v`.
+
+    wake -v '5 + 6'
+
+The verbose output is of the form `expression: type = value`. The above
+will give `5 + 6: Integer = 11`. As before, `5 + 6` results in `11`,
 which is an `Integer`.
 
     git init .
@@ -75,7 +80,7 @@ what files wake is inspecting using `wake -v`.
 If the object file is removed, or main.cpp modified, then wake will,
 of course, rebuild the object file.
 
-    wake 'compileC'
+    wake -v 'compileC'
     cat tutorial.wake
 
 Now let's turn our attention back to the wake file.
@@ -86,17 +91,17 @@ don't want them to run unless specifically invoked.
 
 build invokes the compileC function. In wake `f x y` is read as
 function `f` run on `x` and `y`. In C this would be `f(x, y)`. So
-compileC is being run on four arguments. 
+compileC is being run on four arguments.
 
-Notice that the type of compileC is `String => List String => List Path => Path => Path`.
-This should be read as "a function that takes a String, then a List of
-Strings, then a List of Paths, another Path, and finally returns a
-Path."
+Notice that the type of compileC is `(variant: String) => (extraFlags: List String) => (headers: List Path) => (cfile: Path) => Path`.
+This should be read as "a function that takes a `String` named `variant`, then
+a `List` of `Strings` named `extraFlags`, then a `List` of `Paths` named
+`headers`, another Path named `cfile`, and finally returns a Path."
 
-Indeed, we can see in our use of compileC, we passed a String for the
-first argument and `source` which produces a Path for the last argument.
-The second and third arguments are Lists.
-`Nil` is the empty List and `(x, y, Nil)` is a List with x and y.
+Indeed, we can see in our use of compileC, we passed a String for the first
+argument and `source` which produces a Path for the last argument.  The second
+and third arguments are Lists.  `Nil` is the empty List and `(x, y, Nil)` is a
+List with x and y.
 
 The arguments to compileC are:
   1. the build variant as a String
@@ -104,13 +109,13 @@ The arguments to compileC are:
   3. a list of legal input files (more on this later)
   4. the name of the file to compile
 
-The output of compileC is the path of the object file produced.
+The output of compileC is the `Path` of the object file produced.
 
 ## Compiling and linking two CPP files
 
     echo 'int helper() { return 42; }' > help.cpp
     git add help.cpp
-    cat > tutorial.wake <<EOF
+    cat > tutorial.wake <<'EOF'
     def variant = "native-cpp11-release"
     global def build _ =
       def main = compileC variant ("-I.", Nil) Nil (source "main.cpp")
@@ -157,10 +162,10 @@ and the program re-linked.
     echo 'int helper();' > helper.h
     echo -e '#include "helper.h"\nint main() { return helper(); }' > main.cpp
     git add helper.h
-    cat > tutorial.wake <<EOF
+    cat > tutorial.wake <<'EOF'
     def variant = "native-cpp11-release"
     global def build _ =
-      def headers = sources here '.*\.h'
+      def headers = sources here `.*\.h`
       def main = compileC variant ("-I.", Nil) headers (source "main.cpp")
       def help = compileC variant ("-I.", Nil) headers (source "help.cpp")
       linkO variant ("-lm", Nil) (main, help, Nil) "tutorial"
@@ -177,8 +182,11 @@ In this example, we've used the `sources` command to find all the header
 files in the same directory and pass them as legal inputs to gcc.  The
 keyword `here` expands to the directory of the wake file.  The second
 argument to `sources` is a regular expression to select which files to
-return. We've used `''`s here which define strings with escapes disabled.
-If we had used `""`s we would have had to write `".*\\.h"`, instead.
+return. We've used ``` `` ```s here which define regular expression literals.
+These literals are similar to strings with escapes disabled. If we expressed
+this using `""`s we would have to write `".*\\.h"`. In addition, regular
+expression literals are type-checked to see if they describe legal regular
+expressions.
 
 Note that source files are those files tracked by git. Wake will never
 return built files from a call to `sources`, helping repeatability.
@@ -193,53 +201,60 @@ actually used and remembers this for later builds.  Therefore, it's best in
 wake to err on the side of caution (and convenience) by just listing all the
 headers in directories that are interesting to the cpp files.
 
-    wake -o main.native-cpp11-release.o 
+    wake -o main.native-cpp11-release.o
 
 For this file, wake recorded that it needed both `main.cpp` and `helper.h`.
 
-    wake -o help.native-cpp11-release.o 
+    wake -o help.native-cpp11-release.o
 
 For this file, wake recorded that it only needed `help.cpp`, despite
 `helper.h` being a legal input.
 
 ## Map and partial function evaluation
 
-    cat > tutorial.wake <<EOF
+    cat > tutorial.wake <<'EOF'
     def variant = "native-cpp11-release"
     global def build _ =
-      def headers = sources here '.*\.h'
+      def headers = sources here `.*\.h`
       def compile = compileC variant ("-I.", Nil) headers
-      def objects = map compile (sources here '.*\.cpp')
+      def objects = map compile (sources here `.*\.cpp`)
       linkO variant ("-lm", Nil) objects "tutorial"
     EOF
     wake 'build 0'
 
-Having to list all cpp files is cumbersome.  Probably you've organized
+Having to list all cpp files is cumbersome. You have probably organized
 your codebase so that all the files in the current directory should be
 linked together.  This example demonstrates how to support that.
 
-Notice that we've defined `compile` to be `compileC` with every argument
-supplied EXCEPT the `Path` of the file to compile.  We could now write
-`compile (source "main.cpp")` to compile a single cpp file, saving some typing.
+Notice that we have defined `compile` to be `compileC` with every argument
+supplied EXCEPT the `Path` of the file to compile. This is known as "partial
+function evaluation" or "currying". Thus, `compile` is a function that takes
+a `Path` and returns a `Path`. We could equivalently express `compile` as:
 
-However, we can also use the `map` function to save even more!  We use the
-`sources` function to find all the cpp files.  That gives us a `List` of
-`Path`s.  `compile` is a function which needs to take only one more argument,
-a `Path`.  What `map` does is apply the function supplied as its first
-argument to every element in the list supplied as its second argument. 
-Thus, `objects` is now a list of all the object files created by compiling
+    def compile x = compileC variant ("-I.", Nil) headers x
+
+The argument `x` here is a bit more explicit, but not strictly necessary.
+
+In either case, this allows us to write `compile (source "main.cpp")` to
+compile a single cpp file, saving some typing.  However, we can use the `map`
+function to save even more!  We use the `sources` function to find all the cpp
+files.  That gives us a `List` of `Paths`.  Recall that`compile` is a function
+that takes one argument, a `Path`.  `map` applies the function supplied as its
+first argument to every element of the `List` supplied as its second argument.
+Thus, `objects` is now a `List` of all the object files created by compiling
 all the cpp files.  Our wake file is now both smaller and will automatically
 work when new cpp files are added.
 
 ## Using libraries with pkg-config
 
-    cat > tutorial.wake <<EOF
+    cat > tutorial.wake <<'EOF'
     def variant = "native-cpp11-release"
     global def build _ =
-      def headers = sources here '.*\.h'
-      def compile = compileC variant (cflags "zlib") headers
-      def objects = map compile (sources here '.*\.cpp')
-      linkO variant (libs "zlib") objects "tutorial"
+      def headers = sources here `.*\.h`
+      def zlib = pkgConfig "zlib" | getOrElse (makeSysLib "")
+      def compile = compileC variant zlib.getSysLibCFlags headers
+      def objects = map compile (sources here `.*\.cpp`)
+      linkO variant zlib.getSysLibLFlags objects "tutorial"
     EOF
     wake 'build 0'
 
@@ -248,28 +263,31 @@ most well maintained libraries supply a pkg-config file (`*.pc`) that helps
 authors get the command-line arguments right without worrying where the
 library was installed.
 
-Wake has a pair of helper methods that make this easy, as shown.
+Wake has a helper function `pkgConfig` which returns a value that we can query
+for information about the library like the cflags and lflags as shown. Don't
+worry about the `| getOrElse ...` yet, more on that later.
 
 ## Dynamically creating a header file
 
-    cat >> tutorial.wake <<EOF
+    cat >> tutorial.wake <<'EOF'
     global def info_h _ =
       def cmdline = which "uname", "-sr", Nil
       def os = job cmdline Nil
-      def body = "#define OS {os.getJobStdout}#define WAKE {version}\n"
+      def str = os.getJobStdout | getWhenFail ""
+      def body = "#define OS {str}#define WAKE {version}\n"
       write "{here}/info.h" body # create with mode: rw-r--r--
     EOF
     wake 'info_h 0'
 
-This example creates a header file suitable for inclusion in our build. 
+This example creates a header file suitable for inclusion in our build.
 The produced header includes the operating system the build ran on and the
 version of wake used in the build.  We can make this non-source header file
 available by changing `tutorial.wake` to include:
 
-      def headers = info_h 0, sources here '.*\.h'
+      def headers = info_h 0, sources here `.*\.h`
 
 To understand what's happening in this example, let's break down all the new
-methods being leveraged. 
+methods being leveraged.
 
 `which` is a function which searches wake's path for the named program.  On
 most systems, `which "uname" = "/bin/uname"`.  Using `which` buys us a bit
@@ -280,10 +298,14 @@ a list of strings for the command-line and a list of paths of legal
 inputs.  As with `compileC` and `linkO`, every file in the workspace which
 the job needs must be listed in this second argument, or the job will not
 have access to them.  Indeed, both `compileC` and `linkO` are implemented by
-using `job` internally. The value returned by `job` can be accessed in many
-ways. `job.getJobStdout` provides the standard output from the command.
-`job.getJobStatus` is an `Integer` equal to the job's exit status.
-`job.getJobOutputs` returns a list paths created by the job.
+using `job` internally.
+
+The value returned by `job` can be accessed in many ways. In this case, we use
+`job.getJobStdout` to get the standard output from the command.  We'll address
+the `| getWhenFail ""` later. For now just note that since jobs can fail, we're
+using the empty string `""` as a default. There is other information we can get
+from `job`.  `job.getJobStatus` is an `Integer` equal to the job's exit status.
+`job.getJobOutputs` returns a `List` of `Paths` created by the job.
 
 The `body` variable is created using string interpolation.  Inside a `""`
 string, you can include wake expressions within `{}`s and they will be
@@ -299,16 +321,18 @@ of a comment, `# ...`, reminding us of the default permissions used.
 
 ## Customizing job invocation
 
-    cat >> tutorial.wake <<EOF
+    cat >> tutorial.wake <<'EOF'
     global def hax _ =
       makePlan (which "env", Nil) Nil
       | setPlanEnvironment ("HAX=peanut", "FOO=bar", Nil)
       | runJob
       | getJobStdout
+      | getWhenFail ""
       | println
+    EOF
     wake 'hax 0'
 
-Till now, we've been running processes with the default execution plan.
+Until now, we've been running processes with the default execution plan.
 This means that all environment variables are removed and the job is
 executed in the root of the workspace. However, it is possible to
 customize the environment used by a job.
@@ -343,48 +367,52 @@ wake:
       linkO variant Nil (object, Nil) "feature-detect"
 
     def run_feature_detect _ =
-      def cmdline = build_feature_detect 0, "--detect-stuff-to-build", Nil
-      def detect = job cmdline ("some-config-file", Nil)
-      tokenize " " detect.getJobStdout
+      def cmdline = (build_feature_detect 0).getPathName, "--detect-stuff-to-build", Nil
+      def detect = job cmdline (source "some-config-file", Nil)
+      def stdout = detect.getJobStdout | getWhenFail ""
+      def filenames = tokenize ` ` stdout
+      map source filenames
 
     global def complex_build _ =
-      def headers = sources here '.*\.h'
-      def compile = compileC variant (cflags "zlib") headers
+      def headers = sources here `.*\.h`
+      def zlib = pkgConfig "zlib" | getOrElse (makeSysLib "")
+      def compile = compileC variant zlib.getSysLibCFlags headers
       def objects = map compile (run_feature_detect 0)
-      linkO variant (libs "zlib") objects "tutorial"
+      linkO variant zlib.getSysLibLFlags objects "tutorial"
+
 
 ## Publish/Subscribe
 
-    cat >>tutorial.wake <<EOF
+    cat >>tutorial.wake <<'EOF'
     publish animal = "Cat", Nil
     publish animal = "Dog", Nil
-    publish animal = replace "u" "o" "Mouse", Nil
+    publish animal = replace `u` "o" "Mouse", Nil
     global def animals = subscribe animal
     EOF
     wake 'animals'
 
 Wake includes a publish/subscribe interface to support accumulating
-information between multiple files. `publish x = y` adds `y` to the list of
+information between multiple files. `publish x = y` adds `y` to the `List` of
 things which will be returned by a `subscribe x` expression. Note that
 `animal` is not a variable; it is a topic, which is in a different
-namespace than normal variables. Note that `y` must be a List type.
+namespace than normal variables. Note that `y` must be a `List`.
 
 This API can be used to accumulate all the unit tests in the workspace into
 a single location that runs them all at once.  Keep in mind that the
-published list can be of any type (including functions and data types), so
+published `List` can be of any type (including functions and data types), so
 the types of workspace-wide information that can be accumulated this way is
 wide open.  However, all publishes to a particular topic must agree to use
-the same type in the list, or the files will not type check.
+the same type in the `List`, or the files will not type check.
 
 ## Data types and pattern matching
 
 So far, we've gotten a lot done with primitive types (`Integer`, `String`,
-...) and Lists. However, wake does allow you to define your own data types.
+...) and `Lists`. However, wake does allow you to define your own data types.
 These can then be analyzed using pattern matching.
 
 Consider the follow program:
 
-    cat >>tutorial.wake <<EOF
+    cat >>tutorial.wake <<'EOF'
     global data Animal =
       Cat (name: String)
       Dog (age: Integer)
@@ -393,22 +421,41 @@ Consider the follow program:
       Cat x = "a cat called {x}"
       Dog y = "a {str y}-year-old dog"
     EOF
-    wake 'Cat'
+    wake -v 'Cat'
     wake 'strAnimal (Dog 12)'
     wake 'strAnimal (Cat "Fluffy")'
 
-The `data` keyword introduces a new type, `Animal`.
-Types are always capitalized, and use a different namespace from variables.
-As defined, `Animal` can either be a `Cat` or a `Dog`,
-where `Cat`s have names and `Dog`s have ages.
-The general syntax is `data TYPE = (CONS TYPE*)+`.
-If we want the new type available to other files, we put a `global` in
-front of the `data`, just like with variables.
+The `data` keyword introduces a new type, `Animal`.  Types are always
+capitalized, and use a different namespace from variables.  As defined,
+`Animal` can either be a `Cat` or a `Dog`, where `Cat`s have names and `Dog`s
+have ages.  The general syntax is `data TYPE = (CONS TYPE*)+`.  If we want the
+new type available to other files, we put a `global` in front of the `data`,
+just like with variables.
 
 As wake informs us, `Cat` is a function that takes a `String` and returns an
 `Animal`. However, unlike normal functions, `Cat` is also a type constructor.
 Type constructors differ from normal variables in that they are capitalized
 and can be used in pattern matches.
+
+The function `strAnimal` is an example of pattern matching. It consists of the
+keyword `match` followed by the value to pattern match. On the following lines
+we indent and provide one or more patterns.
+A pattern always starts with a type constructor followed by a
+number of values corresponding to the values in the constructor declaration.
+These values are followed by `=` and then an expression that is the result
+of when the pattern is matched. For example, in `Cat x = "a cat called {x}"`,
+`x` is a new variable binding corresponding to `name` in the declaration, thus
+it is a `String`. After `=` we have a `String` that is the result whenever `strAnimal`
+is passed a `Cat`.
+
+Note that when matching, the patterns must exhaustively catch all possibilities.
+For example, it would be illegal to `match` but only provide a pattern for `Cat`.
+A useful pattern is to provide a "default" pattern with `_` to match anything:
+
+    global def matchWithDefault a = match a
+      Cat x = "a cat called {x}"
+      _     = "not a cat!"
+
 
 ## Anonymous functions
 
@@ -417,7 +464,7 @@ This makes code more readable for other people.
 However, sometimes the function is really just an after-thought.
 For these cases wake makes it possible to define functions inline.
 
-    wake '\x x^2'
+    wake -v '\x x^2'
     wake 'map (\x x^2) (seq 10)'
 
 The backslash syntax is an easy-to-type stand-in for the lambda symbol, λ.
@@ -435,31 +482,31 @@ To make inline functions even easier to define, wake also supports a syntax
 where one specifies the holes `_` in an expression and a function is created
 which fills the holes from left to right.
 
-    wake '_ + 4'
+    wake -v '_ + 4'
     wake 'map (_ + 4) (seq 8)'
-    wake 'seq 1000 | filter (_%55==0) | map str | catWith " "'
+    wake 'seq 1000 | filter (_ % 55 == 0) | map str | catWith " "'
 
 This hole-oriented syntax is not as powerful as lambda expressions, because
 each argument can only be used once.  Furthermore, the functions are created
 at block boundaries, which include `()`s, which can limit their usefulness.
-Nevertheless, sometimes this syntax can be convenient, too.
+Nevertheless, this syntax can be convenient.
 
 ## Downloading and parsing files
 
-    cat >>tutorial.wake <<EOF
+    cat >>tutorial.wake <<'EOF'
     def curl url =
-      def file = simplify "{here}/{head (extract '.*/(.*)' url)}"
+      def file = simplify "{here}/{extract `.*/(.*)` url | head | getOrElse "file.txt"}"
       def cmdline = which "curl", "-o", file, url, Nil
       def curl = job cmdline Nil
       curl.getJobOutput
 
     global def mathSymbols _ =
       def helper = match _
-        code, _, "Sm", _ = Some (integerToUnicode (intbase 16 code))
+        code, _, "Sm", _ = intbase 16 code | omap integerToUnicode
         _                = None
       def url = "ftp://ftp.unicode.org/Public/UNIDATA/UnicodeData.txt"
-      def lines = curl url | read | tokenize "\n"
-      def codes = mapPartial (tokenize ";" _ | helper) lines
+      def lines = curl url | read | getWhenFail "" | tokenize `\n`
+      def codes = mapPartial (tokenize `;` _ | helper) lines
       catWith " " codes
     EOF
     wake 'mathSymbols 0'
@@ -470,10 +517,16 @@ curl and then grabs all the mathematical symbols from the table, formats
 them, and returns the output.
 
 As we've covered before, `job` is used to launch curl to download the table.
-The `curl` function also makes use of `extract` with a regular expression
-to split the filename out of the URL. `extract` returns a `List String`
-containing each occurrence of `()` in the regular expression. We also use
-the `simplify` function which transforms paths into canonical form. In this,
+The `curl` function also makes use of `extract` with a regular expression to
+split the filename out of the URL. `extract` returns a `List String` containing
+each occurrence of `()` in the regular expression. We then take the `head` of
+the `List` which returns an `Option` since a `List` may be empty. `Options` can
+either be `None`, which means no value is available, or `Some x`, which is a
+value `x`. `Option` is a data type like any other in wake.  It is particularly
+useful in those situations where one would use a null pointer in a language
+like C. `getOrElse` returns the value in a `Some`, or if the `Option` is
+`None`, returns the provided argument, in this case `"file.txt"`.  We also use
+the `simplify` function which transforms paths into canonical form.  In this,
 case `simplify` removes the leading `"./"`.
 
 If you look in `UnicodeData.txt`, you will see that it uses lines with comma
@@ -482,16 +535,19 @@ splits the `String` returned by `read` into each code point description.
 For each line, we then split it into the fields and pass the result to
 `helper`.
 
-`helper` uses a pattern match to extract the first and third arguments from
-the list. If the third argument is of class `"Sm"`, ie: symbols/math, then
-wake converts the hexadecimal from the first column into the Unicode code
-point for that value and returns a `String` containing the value.
+`helper` uses a pattern match to extract the first and third arguments from the
+`List`. If the third argument is of class `"Sm"`, ie: symbols/math, then wake
+converts the hexadecimal from the first column into the Unicode code point for
+that value and returns a `String` containing the value.  It uses the function
+`intbase` which converts a `String` encoded in a certain base into an `Option
+Integer`. The result is an `Option` since the `String` may not be a valid
+number in the given base. `omap` is similar to `map` except it works on
+`Options` instead of `Lists`. It will apply the given function to the value in
+a `Some` or simply return if the `Option` is a `None`.
 
-`mapPartial` uses `Option String`s.  Options can either be `None`, which
-means no value is available or `Some x` which is a value `x`.  `Option` is
-a data type like any other in wake.  It is particularly useful in those
-situations where one would use a null pointer in a language like C.  In this
-case, we use `Option` to only return values from `helper` where the code
+`mapPartial` is like `map`, except the function argument returns `Options`.
+`mapPartial` will include the values of any `Somes` while ignoring `Nones`.
+In this case, we use `Option` to only return values from `helper` where the code
 point is a math symbol. `mapPartial` then creates a list out of only those
 values helper returned. Try this, for an example:
 
