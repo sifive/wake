@@ -36,6 +36,9 @@ wake.db:	bin/wake lib/wake/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EX
 install:	all
 	$(WAKE_ENV) ./bin/wake install '"install"'
 
+tarball:	wake.db
+	$(WAKE_ENV) ./bin/wake tarball Unit
+
 bin/wake:	src/symbol.o $(COMMON)				\
 		$(patsubst %.cpp,%.o,$(wildcard src/*.cpp))	\
 		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c)

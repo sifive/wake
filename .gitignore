@@ -3,6 +3,7 @@
 /.fuse
 /.fuse.log
 /wake.db
+/wake.spec
 /src/symbol.cpp
 /common/jlexer.cpp
 /bin/wake
