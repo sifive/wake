@@ -1,6 +1,6 @@
 Name:          wake
-Version:       0.15
-Release:       0
+Version:       @VERSION@
+Release:       1
 Summary:       flexible build orchestration tool and language
 License:       Apache-2; MIT; TFL; WTFPL; CC0
 URL:           https://github.com/sifive/wake

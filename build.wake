@@ -39,6 +39,12 @@ global def tarball Unit = match (buildAs Unit) (buildOn Unit)
   (Fail f) _ = Fail f
   _ (Fail f) = Fail f
   (Pass release) (Pass time) =
+    def sed = source "src/sed-version"
+    def makeRelease file =
+      def in = source "{file}.in"
+      def cmd = sed.getPathName, release, in.getPathName, file, Nil
+      job cmd (sed, in, Nil) | getJobOutput
+    def _ = map makeRelease ("debian/changelog", "wake.spec", Nil) | format | println
     def srcs = sources "." `([^.][^/]*/)*[^.][^/]*` # ignore .foo/ files
     def pub = map (_.getPathName.format) srcs | foldr (_, ",\n  ", _) Nil | cat
     def manifest = write "manifest.wake" (

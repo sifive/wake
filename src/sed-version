@@ -1,0 +1,4 @@
+#! /bin/sh
+set -e
+sed "s/@VERSION@/$1/g" "$2" > "$3.tmp"
+mv "$3.tmp" "$3"

@@ -1,0 +1,11 @@
+wake (@VERSION@-1) unstable; urgency=medium
+
+  * Auto-generated release package.
+
+ -- Wesley W. Terpstra <terpstra@debian.org>  Sat, 25 May 2019 04:48:16 +0000
+
+wake (0.1-1) unstable; urgency=medium
+
+  * Initial Release.
+
+ -- Wesley W. Terpstra <terpstra@debian.org>  Sat, 25 May 2019 04:48:16 +0000
