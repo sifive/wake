@@ -18,6 +18,11 @@ def uname = prim "uname"
 global def sysname = uname.getPairFirst
 global def machine = uname.getPairSecond
 
+# Inject command-line specified path entries
+publish path = match (getenv "WAKE_PATH")
+  Some x = tokenize `:` x
+  None = Nil
+
 # Setup a default path
 publish path = "/usr/bin", Nil
 publish path = "/bin", Nil

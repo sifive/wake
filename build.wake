@@ -31,10 +31,6 @@ global def install dest =
   def bininstall = map (\exe installAs (releaseAs exe.getPathName) exe) binfiles
   libinstall ++ bininstall | findSomeFn getPathError | getOrPass "INSTALLED"
 
-publish path = match (getenv "WAKE_PATH")
-  Some x = tokenize `:` x
-  None = Nil
-
 global def tarball Unit = match (buildAs Unit) (buildOn Unit)
   (Fail f) _ = Fail f
   _ (Fail f) = Fail f
