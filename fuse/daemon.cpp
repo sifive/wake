@@ -57,8 +57,8 @@
 #define ENOATTR ENODATA
 #endif
 
-//#define TRACE(x) do { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } while (0)
-#define TRACE(x) (void)x
+#define TRACE(x) do { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } while (0)
+//#define TRACE(x) (void)x
 
 // We ensure STDIN is /dev/null, so this is a safe sentinel value for open files
 #define BAD_FD STDIN_FILENO
@@ -417,9 +417,7 @@ static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
 	TRACE(path);
-
-	if (!S_ISREG(mode))
-		return -EPERM;
+  fprintf(stderr, "perm: %x\n", mode);
 
 	if (is_special(path))
 		return -EEXIST;
@@ -450,13 +448,16 @@ static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info 
 	if (!it->second.is_creatable(key.second))
 		return -EACCES;
 
-	int flag = O_CREAT | O_RDWR | O_NOFOLLOW;
-	if (!it->second.is_readable(key.second))
-		flag |= O_TRUNC;
+	int flag = O_CREAT | O_TRUNC | O_NOFOLLOW | (fi->flags & O_ACCMODE);
+  int stmode = mode & ~S_IFMT;
 
-	int fd = openat(context.rootfd, key.second.c_str(), flag, mode);
+  unlinkat(context.rootfd, key.second.c_str(), 0);
+  int fd = openat(context.rootfd, key.second.c_str(), flag, stmode);
+  fprintf(stderr, "openat says: %d %d %x\n", fd, errno, stmode);
 	if (fd == -1)
 		return -errno;
+
+  fchmod(fd, stmode);
 
 	fi->fh = fd;
 	it->second.files_wrote.insert(std::move(key.second));
@@ -702,6 +703,7 @@ static int wakefuse_link(const char *from, const char *to)
 static int wakefuse_chmod(const char *path, mode_t mode)
 {
 	TRACE(path);
+  fprintf(stderr, "perm: %x\n", mode);
 
 	if (is_special(path))
 		return -EACCES;
@@ -723,7 +725,9 @@ static int wakefuse_chmod(const char *path, mode_t mode)
 	if (!it->second.is_writeable(key.second))
 		return -EACCES;
 
-	int res = fchmodat(context.rootfd, key.second.c_str(), mode, AT_SYMLINK_NOFOLLOW);
+  int stmode = mode & ~S_IFMT;
+	int res = fchmodat(context.rootfd, key.second.c_str(), stmode, 0);
+  fprintf(stderr, "chmod says: %d %d %x\n", res, errno, stmode);
 	if (res == -1)
 		return -errno;
 
@@ -874,7 +878,7 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 	if (!it->second.is_readable(key.second))
 		return -ENOENT;
 
-	int fd = openat(context.rootfd, key.second.c_str(), O_RDWR | O_NOFOLLOW);
+	int fd = openat(context.rootfd, key.second.c_str(), fi->flags);
 	if (fd == -1)
 		return -errno;
 
@@ -1346,10 +1350,10 @@ int main(int argc, char *argv[])
 	wakefuse_ops.statfs		= wakefuse_statfs;
 	wakefuse_ops.release		= wakefuse_release;
 	wakefuse_ops.fsync		= wakefuse_fsync;
-	wakefuse_ops.setxattr		= wakefuse_setxattr;
-	wakefuse_ops.getxattr		= wakefuse_getxattr;
-	wakefuse_ops.listxattr		= wakefuse_listxattr;
-	wakefuse_ops.removexattr	= wakefuse_removexattr;
+//	wakefuse_ops.setxattr		= wakefuse_setxattr;
+//	wakefuse_ops.getxattr		= wakefuse_getxattr;
+//	wakefuse_ops.listxattr		= wakefuse_listxattr;
+//	wakefuse_ops.removexattr	= wakefuse_removexattr;
 #ifdef HAVE_FALLOCATE
 	wakefuse_ops.fallocate		= wakefuse_fallocate;
 #endif
