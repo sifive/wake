@@ -13,9 +13,16 @@ the wake library (share/wake/lib) and all files *.wake in
 the wake.db directory and below.
 
 1. wake is invoked normally, although arguments are generally quoted.
-```bash
-wake 'runThing "a string"'
-```
+    ```
+    wake 'runThing "a string"'
+    ```
+
+1. Other useful flags
+    1. `wake -v <varible>` to get type information
+    1. `wake -o <file>` to get dependency information for job which write file
+    1. `wake -i <file>` to get dependency information for job which read file
+    1. `wake -g` To get a list of all global symbols
+
 
 ### Syntax
 
@@ -136,7 +143,7 @@ Wake is generally functional.
 
 * There are tree and vector type. Read the code if these sound useful.
 
-##### Tuples
+#### Tuples
 
 Tuple are how wake defines record types, much like a struct in c/c++. The name of
 a tuple data type begins with a capital letter.
@@ -162,7 +169,7 @@ getBobFirst a
 editBobFirst a b
 ```
 
-##### Json
+#### Json
 
 ```bash
 # The JSON data type
@@ -179,22 +186,28 @@ global data JValue =
 Wake has many useful function for extracting data from a json structure.
 
 
-##### jobs
+#### jobs
 
 Jobs are how wake runs external programs. They are created by executing a Plan with 
 a Runner. The Plan is a tuple describing how to run the program, and the Runner is 
-a function which reads the Plan and runs the program.
+a function which reads the Plan and runs the program. 
+
+Jobs provide wake's central useful functionality. Wake can be viewed as a functional
+programming language for running jobs.
 
 ```
+global def planit =
+  makePlan ('touch','foo',Nil) Nil
 
-
-
-
+global def runit _ =
+  planit
+  | runJob
+  | getJobStdout
+  | format
+  | println
 ```
 
-
-
-##### sources and Path ojbects
+#### sources and Path ojbects
 
 Sources are the set of files in git.
 
@@ -206,8 +219,6 @@ To get a path, use the source function. For example, all the header files in thi
 source '.*\.h' here
 ```
 
-##### the environment
-
 ### Wakisms
 
 * database
@@ -216,6 +227,7 @@ source '.*\.h' here
 * FUSE
     * wake uses a FUSE filesystem to track what files are actually opened when running
     a job. 
+    * this can be disabled for systems that can't run FUSE
 * no guarantee of ordering
     * There is no guarantee of ordering if two statements don't depend on each other. This is
     wake is able to parallelize programs.
