@@ -132,6 +132,7 @@ Wake is generally functional.
 * String -> "A String" : a string interpreted as unicode
     * a "" string also allows string interpolation using {}
         * for example  `"{foo}{4 + 3}"`
+        * also \ is interpreted in a double quoted string
     * 'a binary string' : a raw binary string
 * List a -> 1,2,3,Nil (a list of items seperated by commas ended by nil)
 * Integer -> 7
@@ -215,8 +216,8 @@ A Path is either a) a file in git or b) a file produced from a build step
 
 To get a path, use the source function. For example, all the header files in this directory:
 
-```bash
-source '.*\.h' here
+```
+source `.*\.h` here
 ```
 
 ### Wakisms
