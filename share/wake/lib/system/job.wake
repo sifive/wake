@@ -141,7 +141,7 @@ def id x = x
 global def makePlan cmd visible =
   Plan cmd visible environment "." "" logVerbose logWarn Normal Share False Nil (\_ True) id id
 
-def defaultUsage = Usage 0 0.0 0.0 0 0 0
+def defaultUsage = Usage 0 0.0 1.0 0 0 0
 
 # This runner does not detect inputs/outputs on it's own
 # You must use Fn{Inputs,Outputs} to fill in this information
