@@ -3,8 +3,6 @@
 ## Wake Quickref
 
 ### Invoking wake
-1. Before invoking a wake command, all wakefiles must be
-checked in to git. 
 
 1. A database must be created: `wake --init .`
 
@@ -69,14 +67,14 @@ Wake is generally functional.
     * All functions are first class object. Partials can be created by leaving off
     arguments to a function.
     
-    ```bash
+    ```
     def foo a b = 
-        a + b
+      a + b
         
     def foo2 = foo 2
        
      def bar a =
-        foo2 a
+      foo2 a
     ```
 
 * pure functions
@@ -92,19 +90,19 @@ Wake is generally functional.
 * pattern matching
     * There is a match statement
     
-    ```bash
+    ```
     def fib x = match x
-        0 = 0
-        1 = 1
-        2 if x != 3 = 2
-        x = fib(x-1) + fib(x-2)
+      0 = 0
+      1 = 1
+      2 = 2
+      x = fib(x-1) + fib(x-2)
         
-    def collatz x = match x
-        1 = 4
-        2 = 1
-        4 = 2
-        x if x % 2 == 0 = x / 2
-        x = 3 * x + 1
+    def collatz = match _
+      1 = 4
+      2 = 1
+      4 = 2
+      x if x % 2 == 0 = x / 2
+      _ = 3 * x + 1
     ```
 
 * anonymous functions (lambda). Both forms work.
@@ -132,6 +130,8 @@ Wake is generally functional.
 
 ####primitives
 * String -> "A String" : a string interpreted as unicode
+    * a "" string also allows string interpolation using {}
+        * for example  `"{foo}{4 + 3}"`
     * 'a binary string' : a raw binary string
 * List a -> 1,2,3,Nil (a list of items seperated by commas ended by nil)
 * Integer -> 7
@@ -223,7 +223,7 @@ source '.*\.h' here
 
 * database
     * wake uses an sqlite3 database to track dependencies, job information and 
-    various other detail. This should be treated as an opaque resource.
+    various other detail. This should be treated as an read-only resource.
 * FUSE
     * wake uses a FUSE filesystem to track what files are actually opened when running
     a job. 
