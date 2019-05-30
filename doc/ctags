@@ -1,0 +1,13 @@
+# move this file to ~/.ctags
+# then, remove the comment lines
+# Then ctags *.wake will creat a tags file for your wake files
+# https://vim.fandom.com/wiki/Browsing_programs_with_tags
+--langdef=wake
+--langmap=wake:.wake
+--regex-wake=/^def[ \t]*([a-zA-Z0-9_]+)/\1/d,definition/
+--regex-wake=/^global def[ \t]*([a-zA-Z0-9_]+)/\1/d,definition/
+--regex-wake=/^tuple[ \t]*([a-zA-Z0-9_]+)/\1/d,definition/
+--regex-wake=/^global tuple[ \t]*([a-zA-Z0-9_]+)/\1/d,definition/
+--regex-wake=/^data[ \t]*([a-zA-Z0-9_]+)/\1/d,definition/
+--regex-wake=/^global data[ \t]*([a-zA-Z0-9_]+)/\1/d,definition/
+
