@@ -34,11 +34,13 @@
 #include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <math.h>
 #include <sstream>
 #include <iostream>
 #include <list>
 #include <vector>
 #include <cstring>
+#include <queue>
 
 // How many times to SIGTERM a process before SIGKILL
 #define TERM_ATTEMPTS 6
@@ -88,6 +90,7 @@ struct Job : public Value {
   TypeVar &getType();
   Hash hash() const;
 
+  double threads() const;
   void process(WorkQueue &queue); // Run commands based on state
 };
 
@@ -106,6 +109,45 @@ TypeVar &Job::getType() {
 
 Hash Job::hash() const { return code; }
 
+double Job::threads() const {
+  double estimate;
+
+  if (predict.runtime == 0) {
+    // We have no prior execution statistics
+    // However, a Runner can still predict thread usage in this case using cputime.
+    estimate = predict.cputime;
+  } else {
+    // Estimate the threads required
+    estimate = predict.cputime / predict.runtime;
+  }
+
+  if (estimate > 1.0) {
+    // This is a multi-threaded Job. It needs more than one slot.
+    // Multiply by 1.3 to prevent runaway effect; see below
+    return estimate*1.3;
+  }
+
+  // This is probably a single-threaded job.
+
+  // If the job is bottlenecked by IO or something else, scheduling more jobs might help.
+  // However, suppose we previously 2N 100% CPU jobs on N cores. These jobs would also
+  // have an estimate of 0.5. If we made our decision based on that, we'd schedule 2N again.
+  // Worse, if there is even any additional overhead (there probably is), we will get an
+  // even lower estimate next time and schedule more and more and more jobs each run.
+
+  // To combat this effect, we conservatively double the CPU utilization of jobs.
+  // However, it's probably still single-threaded, so cap this pessimism there.
+  estimate *= 2.0;
+  if (estimate > 1.0) estimate = 1.0;
+
+  // Finally, the cputime/realtime will be VERY low if the job was executed remotely.
+  // However, even in that case we don't want to fork-bomb the local machine, so impose
+  // an absolute lower limit of 0.01 (ie: 100*max_jobs).
+  if (estimate < 0.01) estimate = 0.01;
+
+  return estimate;
+}
+
 // A Task is a job that is not yet forked
 struct Task {
   std::shared_ptr<Job> job;
@@ -116,6 +158,13 @@ struct Task {
   Task(const std::shared_ptr<Job> &job_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_)
   : job(job_), dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_) { }
 };
+
+static bool operator < (const std::unique_ptr<Task> &x, const std::unique_ptr<Task> &y) {
+  // 0 (unknown runtime) is infinity for this comparison (ie: run first)
+  double xr = x->job->predict.runtime;
+  double yr = y->job->predict.runtime;
+  return xr != 0 && (yr == 0 || xr < yr);
+}
 
 // A JobEntry is a forked job with pid|stdout|stderr incomplete
 struct JobEntry {
@@ -137,10 +186,11 @@ double JobEntry::runtime(struct timeval now) {
 
 // Implementation details for a JobTable
 struct JobTable::detail {
-  std::vector<JobEntry> table;
-  std::list<Task> tasks;
+  std::list<JobEntry> running;
+  std::priority_queue<std::unique_ptr<Task> > pending;
   sigset_t block; // signals that can race with pselect()
   Database *db;
+  double active, limit; // threads
   bool verbose;
   bool quiet;
   bool check;
@@ -164,11 +214,12 @@ bool JobTable::exit_now() {
 }
 
 JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool check) : imp(new JobTable::detail) {
-  imp->table.resize(max_jobs);
   imp->verbose = verbose;
   imp->quiet = quiet;
   imp->check = check;
   imp->db = db;
+  imp->active = 0;
+  imp->limit = max_jobs;
   sigemptyset(&imp->block);
 
   struct sigaction sa;
@@ -251,7 +302,7 @@ JobTable::~JobTable() {
     children = false;
 
     // Send every child SIGTERM
-    for (auto &i : imp->table) {
+    for (auto &i : imp->running) {
       if (i.pid == 0) continue;
       children = true;
       kill(i.pid, SIGTERM);
@@ -285,7 +336,7 @@ JobTable::~JobTable() {
         if (WIFSTOPPED(status)) continue;
 
         children = false;
-        for (auto &i : imp->table) {
+        for (auto &i : imp->running) {
           if (i.pid == pid) i.pid = 0;
           if (i.pid != 0) children = true;
         }
@@ -294,9 +345,12 @@ JobTable::~JobTable() {
   }
 
   // Force children to die
-  for (auto &i : imp->table) {
+  for (auto &i : imp->running) {
     if (i.pid == 0) continue;
-    std::cerr << "Force killing " << i.pid << " after " << TERM_ATTEMPTS << " attempts with SIGTERM" << std::endl;
+    std::stringstream s;
+    s << "Force killing " << i.pid << " after " << TERM_ATTEMPTS << " attempts with SIGTERM" << std::endl;
+    std::string out = s.str();
+    status_write(2, out.data(), out.size());
     kill(i.pid, SIGKILL);
   }
 }
@@ -326,17 +380,38 @@ static std::string pretty_cmd(std::string x) {
   return x;
 }
 
-static void launch(JobTable *jobtable) {
-  for (auto &i : jobtable->imp->table) {
+struct CompletedJobEntry {
+  JobTable *jobtable;
+  CompletedJobEntry(JobTable *jobtable_) : jobtable(jobtable_) { }
+
+  bool operator () (const JobEntry &i) {
     if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
-      if (i.job) status_state.erase(i.status);
-      i.job.reset();
+      status_state.erase(i.status);
+      jobtable->imp->active -= i.job->threads();
+      return true;
     }
+    return false;
+  }
+};
 
-    if (i.job) continue;
-    if (jobtable->imp->tasks.empty()) continue;
+static void launch(JobTable *jobtable) {
+  CompletedJobEntry pred(jobtable);
+  jobtable->imp->running.remove_if(pred);
 
-    Task &task = jobtable->imp->tasks.front();
+  // Note: We schedule jobs whenever we are under quota, without considering if the
+  // new job will cause us to exceed the quota. This is necessary, for two reasons:
+  //   1 - a job could require more compute than allowed; we require forward progress
+  //   2 - if the next optimal job to schedule needs more compute than available
+  //     a - it would waste idle compute if we don't schedule something
+  //     b - it would hurt the build critical path if we schedule a sub-optimal job
+  // => just oversubscribe compute and let the kernel sort it out
+  while (!jobtable->imp->pending.empty() && jobtable->imp->active < jobtable->imp->limit) {
+    Task &task = *jobtable->imp->pending.top();
+    jobtable->imp->active += task.job->threads();
+
+    jobtable->imp->running.emplace_back();
+    JobEntry &i = jobtable->imp->running.back();
+
     int pipe_stdout[2];
     int pipe_stderr[2];
     if (pipe(pipe_stdout) == -1 || pipe(pipe_stderr) == -1) {
@@ -392,9 +467,20 @@ static void launch(JobTable *jobtable) {
       std::string out = s.str();
       status_write(1, out.data(), out.size());
     }
+
+#if 0
+    std::stringstream s;
+    s << "Scheduled " << i.job->threads()
+      << " for a total of " << jobtable->imp->active
+      << " utilized cores and " << jobtable->imp->running.size()
+      << " running tasks." << std::endl;
+    std::string out = s.str();
+    status_write(2, out.data(), out.size());
+#endif
+
     // i.job->stdin.clear();
     // i.job->cmdline.clear();
-    jobtable->imp->tasks.pop_front();
+    jobtable->imp->pending.pop();
   }
 }
 
@@ -404,14 +490,12 @@ bool JobTable::wait(WorkQueue &queue) {
   memset(&nowait, 0, sizeof(nowait));
 
   bool compute = false;
-  while (!exit_now()) {
+  while (!exit_now() && !imp->running.empty()) {
     fd_set set;
     int nfds = 0;
-    int njobs = 0;
 
     FD_ZERO(&set);
-    for (auto &i : imp->table) {
-      if (i.job) ++njobs;
+    for (auto &i : imp->running) {
       if (i.pipe_stdout != -1) {
         if (i.pipe_stdout >= nfds) nfds = i.pipe_stdout + 1;
         FD_SET(i.pipe_stdout, &set);
@@ -421,7 +505,6 @@ bool JobTable::wait(WorkQueue &queue) {
         FD_SET(i.pipe_stderr, &set);
       }
     }
-    if (njobs == 0) break;
 
     // Block all signals we expect to interrupt pselect
     sigset_t saved;
@@ -465,7 +548,7 @@ bool JobTable::wait(WorkQueue &queue) {
 
     int done = 0;
 
-    if (retval > 0) for (auto &i : imp->table) {
+    if (retval > 0) for (auto &i : imp->running) {
       if (i.pipe_stdout != -1 && FD_ISSET(i.pipe_stdout, &set)) {
         int got = read(i.pipe_stdout, buffer, sizeof(buffer));
         if (got == 0 || (got < 0 && errno != EINTR)) {
@@ -537,7 +620,7 @@ bool JobTable::wait(WorkQueue &queue) {
         code = -WTERMSIG(status);
       }
 
-      for (auto &i : imp->table) {
+      for (auto &i : imp->running) {
         if (i.pid == pid) {
           i.pid = 0;
           i.status->merged = true;
@@ -675,12 +758,12 @@ static PRIMFN(prim_job_launch) {
 
   REQUIRE (job->state == 0);
 
-  jobtable->imp->tasks.emplace_back(
+  jobtable->imp->pending.emplace(new Task(
     std::dynamic_pointer_cast<Job>(args[0]),
     dir->value,
     stdin->value,
     env->value,
-    cmd->value);
+    cmd->value));
   launch(jobtable);
 
   auto out = make_unit();
