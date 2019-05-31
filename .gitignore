@@ -19,3 +19,6 @@
 /lib/wake/preload-wake
 /lib/wake/preload-wake.*
 /install
+*.swp
+*.swo
+*.swn

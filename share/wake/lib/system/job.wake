@@ -450,7 +450,7 @@ global def makeJSONRunner rawScript score estimate =
       def json = parseJSONFile (Path outFile)
       def _ = unlink inFile
       match json
-        Fail f = Fail (makeError f)
+        Fail f = Fail f
         Pass content =
           def _ = unlink outFile
           def field name = match _ _
