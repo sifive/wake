@@ -111,6 +111,9 @@ void Job::dump() {
 	  << obytes
 	  << ",\"inputs\":[";
 
+	for (auto &x : files_wrote)
+		files_read.erase(x);
+
 	first = true;
 	for (auto &x : files_read) {
 		s << (first?"":",") << "\"" << json_escape(x) << "\"";
