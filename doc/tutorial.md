@@ -11,15 +11,17 @@ Code sections are intended to be copy-pasted into a terminal.
     wake --init .
     wake '5 + 6'
 
-This sequence of commands creates a new workspace managed by wake.  The `init`
-option is used to create an initial `wake.db` to record the state of the build
-in this workspace.  Whenever you run wake, it searches for a `wake.db` in
-parent directories.  The first `wake.db` found defines what wake considers to
-be the workspace.  You can thus safely run wake in any sub-directory of
-tutorial and wake will be aware of all the relevant dependencies and rules.
+This sequence of commands creates a new workspace managed by wake.
+The `init` option is used to create an initial `wake.db` to record the state
+of the build in this workspace.
+Whenever you run wake, it searches for a `wake.db` in parent directories.
+The first `wake.db` found defines what wake considers to be the workspace.
+You can thus safely run wake in any sub-directory of `tutorial` and wake
+will be aware of all the relevant dependencies and rules.
 
 The final output of wake run on an expression is always the result of
-evaluating that expression. In this case, `5 + 6` results in value `11`.
+evaluating that expression.
+In this case, `5 + 6` results in value `11`.
 Wake will report more information when run in verbose mode: `wake -v`.
 
     wake -v '5 + 6'
@@ -94,14 +96,14 @@ function `f` run on `x` and `y`. In C this would be `f(x, y)`. So
 compileC is being run on four arguments.
 
 Notice that the type of compileC is `(variant: String) => (extraFlags: List String) => (headers: List Path) => (cfile: Path) => Path`.
-This should be read as "a function that takes a `String` named `variant`, then
-a `List` of `Strings` named `extraFlags`, then a `List` of `Paths` named
-`headers`, another Path named `cfile`, and finally returns a Path."
+This should be read as "a function that takes a `String` named `variant`,
+then a `List` of `Strings` named `extraFlags`, then a `List` of `Paths` named `headers`, 
+another Path named `cfile`, and finally returns a Path."
 
-Indeed, we can see in our use of compileC, we passed a String for the first
-argument and `source` which produces a Path for the last argument.  The second
-and third arguments are Lists.  `Nil` is the empty List and `(x, y, Nil)` is a
-List with x and y.
+Indeed, we can see in our use of compileC, we passed a String for the
+first argument and `source` which produces a Path for the last argument.
+The second and third arguments are Lists.
+`Nil` is the empty List and `(x, y, Nil)` is a List with x and y.
 
 The arguments to compileC are:
   1. the build variant as a String
@@ -183,10 +185,10 @@ files in the same directory and pass them as legal inputs to gcc.  The
 keyword `here` expands to the directory of the wake file.  The second
 argument to `sources` is a regular expression to select which files to
 return. We've used ``` `` ```s here which define regular expression literals.
-These literals are similar to strings with escapes disabled. If we expressed
-this using `""`s we would have to write `".*\\.h"`. In addition, regular
-expression literals are type-checked to see if they describe legal regular
-expressions.
+These literals are similar to strings with escapes disabled.
+If we expressed this as a `String` using `""`s we would have to write `".*\\.h"`
+and it would require a function call to convert it to a regular expression.
+In addition, the parser verifies that regular expression literals are legal.
 
 Note that source files are those files tracked by git. Wake will never
 return built files from a call to `sources`, helping repeatability.
@@ -226,21 +228,23 @@ Having to list all cpp files is cumbersome. You have probably organized
 your codebase so that all the files in the current directory should be
 linked together.  This example demonstrates how to support that.
 
-Notice that we have defined `compile` to be `compileC` with every argument
-supplied EXCEPT the `Path` of the file to compile. This is known as "partial
-function evaluation" or "currying". Thus, `compile` is a function that takes
-a `Path` and returns a `Path`. We could equivalently express `compile` as:
+Notice that we've defined `compile` to be `compileC` with every argument
+supplied EXCEPT the `Path` of the file to compile.
+This is known as "partial function evaluation" or "currying".
+Thus, `compile` is a function that takes a `Path` and returns a `Path`.
+We could equivalently express `compile` as:
 
     def compile x = compileC variant ("-I.", Nil) headers x
 
 The argument `x` here is a bit more explicit, but not strictly necessary.
 
 In either case, this allows us to write `compile (source "main.cpp")` to
-compile a single cpp file, saving some typing.  However, we can use the `map`
-function to save even more!  We use the `sources` function to find all the cpp
-files.  That gives us a `List` of `Paths`.  Recall that`compile` is a function
-that takes one argument, a `Path`.  `map` applies the function supplied as its
-first argument to every element of the `List` supplied as its second argument.
+compile a single cpp file, saving some typing.
+However, we can use the `map` function to save even more! We use the
+`sources` function to find all the cpp files. That gives us a `List` of
+`Paths`. Recall that`compile` is a function that takes one argument, a `Path`.
+`map` applies the function supplied as its first
+argument to every element of the `List` supplied as its second argument.
 Thus, `objects` is now a `List` of all the object files created by compiling
 all the cpp files.  Our wake file is now both smaller and will automatically
 work when new cpp files are added.
@@ -301,10 +305,10 @@ have access to them.  Indeed, both `compileC` and `linkO` are implemented by
 using `job` internally.
 
 The value returned by `job` can be accessed in many ways. In this case, we use
-`job.getJobStdout` to get the standard output from the command.  We'll address
-the `| getWhenFail ""` later. For now just note that since jobs can fail, we're
-using the empty string `""` as a default. There is other information we can get
-from `job`.  `job.getJobStatus` is an `Integer` equal to the job's exit status.
+`job.getJobStdout` to get the standard output from the command.
+We'll address the `| getWhenFail ""` later. For now just note that since jobs can fail,
+we're using the empty string `""` as a default. There is other information we can get from `job`.
+`job.getJobStatus` is an `Integer` equal to the job's exit status.
 `job.getJobOutputs` returns a `List` of `Paths` created by the job.
 
 The `body` variable is created using string interpolation.  Inside a `""`
@@ -425,12 +429,13 @@ Consider the follow program:
     wake 'strAnimal (Dog 12)'
     wake 'strAnimal (Cat "Fluffy")'
 
-The `data` keyword introduces a new type, `Animal`.  Types are always
-capitalized, and use a different namespace from variables.  As defined,
-`Animal` can either be a `Cat` or a `Dog`, where `Cat`s have names and `Dog`s
-have ages.  The general syntax is `data TYPE = (CONS TYPE*)+`.  If we want the
-new type available to other files, we put a `global` in front of the `data`,
-just like with variables.
+The `data` keyword introduces a new type, `Animal`.
+Types are always capitalized, and use a different namespace from variables.
+As defined, `Animal` can either be a `Cat` or a `Dog`,
+where `Cat`s have names and `Dog`s have ages.
+The general syntax is `data TYPE = (CONS TYPE*)+`.
+If we want the new type available to other files, we put a `global` in
+front of the `data`, just like with variables.
 
 As wake informs us, `Cat` is a function that takes a `String` and returns an
 `Animal`. However, unlike normal functions, `Cat` is also a type constructor.
@@ -495,7 +500,7 @@ Nevertheless, this syntax can be convenient.
 
     cat >>tutorial.wake <<'EOF'
     def curl url =
-      def file = simplify "{here}/{extract `.*/(.*)` url | head | getOrElse "file.txt"}"
+      def file = simplify "{here}/{replace `.*/` '' url}"
       def cmdline = which "curl", "-o", file, url, Nil
       def curl = job cmdline Nil
       curl.getJobOutput
@@ -517,15 +522,9 @@ curl and then grabs all the mathematical symbols from the table, formats
 them, and returns the output.
 
 As we've covered before, `job` is used to launch curl to download the table.
-The `curl` function also makes use of `extract` with a regular expression to
-split the filename out of the URL. `extract` returns a `List String` containing
-each occurrence of `()` in the regular expression. We then take the `head` of
-the `List` which returns an `Option` since a `List` may be empty. `Options` can
-either be `None`, which means no value is available, or `Some x`, which is a
-value `x`. `Option` is a data type like any other in wake.  It is particularly
-useful in those situations where one would use a null pointer in a language
-like C. `getOrElse` returns the value in a `Some`, or if the `Option` is
-`None`, returns the provided argument, in this case `"file.txt"`.  We also use
+The `curl` function also makes use of `replace` with a regular expression
+to split the filename out of the URL. `replace` accepts a "replacement" `String`
+which it substitutes for every substring that matches the regular expression. We also use
 the `simplify` function which transforms paths into canonical form.  In this,
 case `simplify` removes the leading `"./"`.
 
@@ -535,15 +534,19 @@ splits the `String` returned by `read` into each code point description.
 For each line, we then split it into the fields and pass the result to
 `helper`.
 
-`helper` uses a pattern match to extract the first and third arguments from the
-`List`. If the third argument is of class `"Sm"`, ie: symbols/math, then wake
-converts the hexadecimal from the first column into the Unicode code point for
-that value and returns a `String` containing the value.  It uses the function
-`intbase` which converts a `String` encoded in a certain base into an `Option
-Integer`. The result is an `Option` since the `String` may not be a valid
-number in the given base. `omap` is similar to `map` except it works on
-`Options` instead of `Lists`. It will apply the given function to the value in
-a `Some` or simply return if the `Option` is a `None`.
+`helper` uses a pattern match to extract the first and third arguments from
+the `List`. If the third argument is of class `"Sm"`, ie: symbols/math, then
+wake converts the hexadecimal from the first column into the Unicode code
+point for that value and returns a `String` containing the value.
+It uses the function `intbase` which converts a `String` encoded in a certain
+base into an `Option Integer`. `Options` can either be `None`, which
+means no value is available, or `Some x`, which is a value `x`. `Option` is
+a data type like any other in wake.  It is particularly useful in those
+situations where one would use a null pointer in a language like C.
+The result is an `Option` since the `String` may not be a valid number in the given base.
+`omap` is similar to `map` except it works on `Options` instead of `Lists`.
+It will apply the given function to the value in a `Some` or simply return if
+the `Option` is a `None`.
 
 `mapPartial` is like `map`, except the function argument returns `Options`.
 `mapPartial` will include the values of any `Somes` while ignoring `Nones`.
