@@ -569,14 +569,14 @@ static int wakefuse_unlink(const char *path)
 
 	auto key = split_key(path);
 	if (key.first.empty())
-		return -EACCES;
+		return -EPERM;
 
 	auto it = context.jobs.find(key.first);
 	if (it == context.jobs.end())
 		return -ENOENT;
 
 	if (key.second == ".")
-		return -EACCES;
+		return -EPERM;
 
 	if (!it->second.is_readable(key.second))
 		return -ENOENT;
@@ -598,7 +598,7 @@ static int wakefuse_rmdir(const char *path)
 	TRACE(path);
 
 	if (is_special(path))
-		return -EACCES;
+		return -ENOTDIR;
 
 	auto key = split_key(path);
 	if (key.first.empty())
