@@ -73,7 +73,7 @@ Wake is generally functional.
         
     def foo2 = foo 2
        
-     def bar a =
+    def bar a =
       foo2 a
     ```
 
@@ -102,7 +102,7 @@ Wake is generally functional.
       2 = 1
       4 = 2
       x if x % 2 == 0 = x / 2
-      _ = 3 * x + 1
+      x = 3 * x + 1
     ```
 
 * anonymous functions (lambda). Both forms work.
@@ -131,7 +131,7 @@ Wake is generally functional.
 ####primitives
 * String -> "A String" : a string interpreted as unicode
     * a "" string also allows string interpolation using {}
-        * for example  `"{foo}{4 + 3}"`
+        * for example  `"{foo}{str (4 + 3)}"`
         * also \ is interpreted in a double quoted string
     * 'a binary string' : a raw binary string
 * List a -> 1,2,3,Nil (a list of items seperated by commas ended by nil)
