@@ -414,12 +414,78 @@ static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return 0;
 }
 
-static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info *fi)
+static int wakefuse_mknod(const char *path, mode_t mode, dev_t rdev)
 {
 	TRACE(path);
 
-	if (!S_ISREG(mode))
-		return -EPERM;
+	if (is_special(path))
+		return -EEXIST;
+
+	auto key = split_key(path);
+	if (key.first.empty())
+		return -EEXIST;
+
+	auto it = context.jobs.find(key.first);
+	if (it == context.jobs.end()) {
+		if (key.second == ".")
+			return -EACCES;
+		else
+			return -ENOENT;
+	}
+
+	if (key.second == ".")
+		return -EEXIST;
+
+	if (!it->second.is_creatable(key.second))
+		return -EACCES;
+
+	int res;
+	if (S_ISREG(mode)) {
+		res = openat(context.rootfd, key.second.c_str(), O_CREAT | O_EXCL | O_WRONLY, mode);
+		if (res >= 0)
+			res = close(res);
+	} else if (S_ISDIR(mode)) {
+		res = mkdirat(context.rootfd, key.second.c_str(), mode);
+	} else if (S_ISFIFO(mode)) {
+#ifdef __APPLE__
+		res = mkfifo(key.second.c_str(), mode);
+#else
+		res = mkfifoat(context.rootfd, key.second.c_str(), mode);
+#endif
+#ifdef __FreeBSD__
+	} else if (S_ISSOCK(mode)) {
+		struct sockaddr_un su;
+		if (key.second.size() >= sizeof(su.sun_path))
+			return -ENAMETOOLONG;
+
+		int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+		if (fd >= 0) {
+			su.sun_family = AF_UNIX;
+			strncpy(su.sun_path, key.second.c_str(), sizeof(su.sun_path));
+			res = bindat(context.rootfd, fd, (struct sockaddr*)&su, sizeof(su));
+			if (res == 0)
+				res = close(fd);
+		} else {
+			res = -1;
+		}
+#endif
+	} else {
+#ifdef __APPLE__
+		res = mknod(key.second.c_str(), mode, rdev);
+#else
+		res = mknodat(context.rootfd, key.second.c_str(), mode, rdev);
+#endif
+	}
+
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+
+static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info *fi)
+{
+	TRACE(path);
 
 	if (is_special(path))
 		return -EEXIST;
@@ -450,11 +516,9 @@ static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info 
 	if (!it->second.is_creatable(key.second))
 		return -EACCES;
 
-	int flag = O_CREAT | O_RDWR | O_NOFOLLOW;
-	if (!it->second.is_readable(key.second))
-		flag |= O_TRUNC;
+	(void)unlinkat(context.rootfd, key.second.c_str(), 0);
 
-	int fd = openat(context.rootfd, key.second.c_str(), flag, mode);
+	int fd = openat(context.rootfd, key.second.c_str(), fi->flags, mode);
 	if (fd == -1)
 		return -errno;
 
@@ -1329,6 +1393,7 @@ int main(int argc, char *argv[])
 	wakefuse_ops.access		= wakefuse_access;
 	wakefuse_ops.readlink		= wakefuse_readlink;
 	wakefuse_ops.readdir		= wakefuse_readdir;
+	wakefuse_ops.mknod		= wakefuse_mknod;
 	wakefuse_ops.create		= wakefuse_create;
 	wakefuse_ops.mkdir		= wakefuse_mkdir;
 	wakefuse_ops.symlink		= wakefuse_symlink;
