@@ -1,44 +1,46 @@
 # JOE syntax highlight file for wake
 
 =Idle
-=Comment green
-=Keyword bold
-=Statement bold
-=Conditional
-=Structure
-=Bad red
+=Comment
+=Keyword
+=Statement	+Keyword
+=Conditional	+Statement +Keyword
+=Structure	+Type +Keyword
+=Bad
 =Constant
-=Number
-=FloatNumber
-=DecNumber
-=DblNumber
-=HexNumber
-=OctNumber
-=BinNumber
-=String blue
-=StringEscape bold blue
+=Number		+Constant
+=FloatNumber	+Number
+=DecNumber	+Number
+=DblNumber	+Number
+=HexNumber	+Number
+=OctNumber	+Number
+=BinNumber	+Number
+=RegExp		+Constant
+=String		+Constant
+=StringEscape	+Escape +String
 
-=Special yellow
-=VarId
-=ConId bold
-=VarSym green
+=Special	+Escape
+=VarId		+Ident
+=ConId		+Ident
+=VarSym		+Operator
 
 :reset Idle
 	*		reset		
 	"a-z_"		varid		buffer recolor=-1
 	"A-Z"		conid		mark recolor=-1
-	"`!$%&*+.\-/<>^|~," varsym	buffer recolor=-1
+	"!$%&*+.\-/<>^|~," varsym	buffer recolor=-1
 	"=:"		equal		recolor=-1
 	"()\\"		special		recolor=-1
 	"#"		linecomment	recolor=-1
 	"0-9"		integerstart	mark noeat
 	"\'"		rawlit		recolor=-1
+	"`"		reglit		recolor=-1
 	"\""		strlit		recolor=-1
 	"@{}[];?"	errorstate	noeat
 
 :equal Special
 	*		reset		noeat
-	"`!$%&*+.\-/<>^|~,=:"	varsym	recolor=-2
+	"!$%&*+.\-/<>^|~,=:"	varsym	recolor=-2
 
 :special Special
 	*		reset		noeat
@@ -83,7 +85,7 @@ done
 
 :varsym VarSym
 	*		reset		noeat
-	"`!$%&*+.\-/<>^|~,=:" varsym
+	"!$%&*+.\-/<>^|~,=:" varsym
 
 :linecomment Comment comment
 	*		linecomment
@@ -142,6 +144,11 @@ done
 :rawlit String string
 	*		rawlit
 	"\'"		reset
+
+:reglit String string
+	*		reglit
+	"\\\`"		reglit
+	"\`"		reset
 
 :strlit String string
 	*		strlit
