@@ -16,7 +16,11 @@
 # Read the file contents of a Path
 global def read path =
   def imp p = prim "read"
-  imp path.getPathName
+  match (getPathResult path)
+    Pass f = match (imp f)
+      Pass body = Pass body
+      Fail f = Fail (makeError f)
+    x = x
 
 # Simplify away the ..s and .s in a String
 global def simplify path = prim "simplify"
