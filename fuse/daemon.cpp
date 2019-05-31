@@ -943,7 +943,7 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 	if (!it->second.is_readable(key.second))
 		return -ENOENT;
 
-	int fd = openat(context.rootfd, key.second.c_str(), O_RDWR | O_NOFOLLOW);
+	int fd = openat(context.rootfd, key.second.c_str(), fi->flags);
 	if (fd == -1)
 		return -errno;
 
@@ -1089,7 +1089,7 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 			case 'l': --s.job->second.uses; break;
 			default: return -EIO;
 		}
-		if ('f' != s.kind  &&
+		if ('f' != s.kind &&
 		    0 == s.job->second.uses &&
 		    0 == s.job->second.json_in_uses &&
 		    0 == s.job->second.json_out_uses) {
