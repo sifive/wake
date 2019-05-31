@@ -273,9 +273,8 @@ static int wakefuse_getattr(const char *path, struct stat *stbuf)
 		return res;
 	}
 
-	if (!it->second.is_readable(key.second)) {
+	if (!it->second.is_readable(key.second))
 		return -ENOENT;
-	}
 
 	int res = fstatat(context.rootfd, key.second.c_str(), stbuf, AT_SYMLINK_NOFOLLOW);
 	if (res == -1) res = -errno;
@@ -359,9 +358,10 @@ static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		filler(buf, ".f.wake", 0, 0);
 		for (auto &job : context.jobs) {
 			filler(buf, job.first.c_str(), 0, 0);
-			filler(buf, (".i." + job.first).c_str(), 0, 0);
-			filler(buf, (".o." + job.first).c_str(), 0, 0);
 			filler(buf, (".l." + job.first).c_str(), 0, 0);
+			filler(buf, (".i." + job.first).c_str(), 0, 0);
+			if (!job.second.json_out.empty())
+			  filler(buf, (".o." + job.first).c_str(), 0, 0);
 		}
 		return 0;
 	}
