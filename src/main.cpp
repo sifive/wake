@@ -213,7 +213,7 @@ void print_help(const char *argv0) {
     << "  Flags affecting build execution:" << std::endl
     << "    --jobs=NUM -jNUM Schedule local job execution to use <= NUM CPU-bound tasks" << std::endl
     << "    --check    -c    Rerun all jobs and confirm their output is reproducible"    << std::endl
-    << "    --verbose  -v    Report job standard output and hash progress"               << std::endl
+    << "    --verbose  -v    Report hash progress and result expression types"           << std::endl
     << "    --debug    -d    Report stack frame information for exceptions and closures" << std::endl
     << "    --quiet    -q    Surpress report of launched jobs and final expressions"     << std::endl
     << "    --no-tty         Surpress interactive build progress interface"              << std::endl

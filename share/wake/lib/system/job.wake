@@ -141,7 +141,7 @@ def id x = x
 global def makePlan cmd visible =
   Plan cmd visible environment "." "" logVerbose logWarn Normal Share False Nil (\_ True) id id
 
-def defaultUsage = Usage 0 0.0 0.0 0 0 0
+def defaultUsage = Usage 0 0.0 1.0 0 0 0
 
 # This runner does not detect inputs/outputs on it's own
 # You must use Fn{Inputs,Outputs} to fill in this information
@@ -374,13 +374,13 @@ global def fuseRunner =
   def fuse = "{wakePath}/../lib/wake/fuse-wake"
   def score (Plan _ _ _ _ _ _ _ _ _ lo _ _ _ _) =
     if lo then Fail "would hide workspace" else Pass 1.0
-  makeJSONRunner fuse score (Some _)
+  makeJSONRunner fuse score (_)
 
 global def preloadRunner =
   def preload = "{wakePath}/../lib/wake/preload-wake"
   def score (Plan _ _ _ _ _ _ _ _ _ lo _ _ _ _) =
     if lo then Fail "would hide workspace" else Pass 1.0
-  makeJSONRunner preload score (Some _)
+  makeJSONRunner preload score (_)
 
 def rOK = 0
 def wOK = 1
@@ -398,7 +398,7 @@ global def defaultRunner = match sysname
 
 # Make a Runner that runs a named script to run jobs
 # score: Plan => Double; runJob chooses the runner with the largest score for a Plan
-# estimate: Usage => Option Usage; predict local usage based on prior recorded usage
+# estimate: Option Usage => Option Usage; predict local usage based on prior recorded usage
 global def makeJSONRunner rawScript score estimate =
   def script = which (simplify rawScript)
   def ok = access script xOK
@@ -438,7 +438,7 @@ global def makeJSONRunner rawScript score estimate =
             Pass inFile =
               def outFile = "{build}/{prefix}.out.json"
               def cmd = script, inFile, outFile, Nil
-              def proxy = RunnerInput cmd Nil environment "." "" Nil prefix (omapPartial estimate record)
+              def proxy = RunnerInput cmd Nil environment "." "" Nil prefix (estimate record)
               Pair (Pass proxy) inFile
   def post = match _
     Pair (Fail f) _ = Fail f
