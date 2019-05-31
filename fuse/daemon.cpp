@@ -273,9 +273,8 @@ static int wakefuse_getattr(const char *path, struct stat *stbuf)
 		return res;
 	}
 
-	if (!it->second.is_readable(key.second)) {
+	if (!it->second.is_readable(key.second))
 		return -ENOENT;
-	}
 
 	int res = fstatat(context.rootfd, key.second.c_str(), stbuf, AT_SYMLINK_NOFOLLOW);
 	if (res == -1) res = -errno;
@@ -359,9 +358,10 @@ static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		filler(buf, ".f.wake", 0, 0);
 		for (auto &job : context.jobs) {
 			filler(buf, job.first.c_str(), 0, 0);
-			filler(buf, (".i." + job.first).c_str(), 0, 0);
-			filler(buf, (".o." + job.first).c_str(), 0, 0);
 			filler(buf, (".l." + job.first).c_str(), 0, 0);
+			filler(buf, (".i." + job.first).c_str(), 0, 0);
+			if (!job.second.json_out.empty())
+			  filler(buf, (".o." + job.first).c_str(), 0, 0);
 		}
 		return 0;
 	}
@@ -414,12 +414,78 @@ static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return 0;
 }
 
-static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info *fi)
+static int wakefuse_mknod(const char *path, mode_t mode, dev_t rdev)
 {
 	TRACE(path);
 
-	if (!S_ISREG(mode))
-		return -EPERM;
+	if (is_special(path))
+		return -EEXIST;
+
+	auto key = split_key(path);
+	if (key.first.empty())
+		return -EEXIST;
+
+	auto it = context.jobs.find(key.first);
+	if (it == context.jobs.end()) {
+		if (key.second == ".")
+			return -EACCES;
+		else
+			return -ENOENT;
+	}
+
+	if (key.second == ".")
+		return -EEXIST;
+
+	if (!it->second.is_creatable(key.second))
+		return -EACCES;
+
+	int res;
+	if (S_ISREG(mode)) {
+		res = openat(context.rootfd, key.second.c_str(), O_CREAT | O_EXCL | O_WRONLY, mode);
+		if (res >= 0)
+			res = close(res);
+	} else if (S_ISDIR(mode)) {
+		res = mkdirat(context.rootfd, key.second.c_str(), mode);
+	} else if (S_ISFIFO(mode)) {
+#ifdef __APPLE__
+		res = mkfifo(key.second.c_str(), mode);
+#else
+		res = mkfifoat(context.rootfd, key.second.c_str(), mode);
+#endif
+#ifdef __FreeBSD__
+	} else if (S_ISSOCK(mode)) {
+		struct sockaddr_un su;
+		if (key.second.size() >= sizeof(su.sun_path))
+			return -ENAMETOOLONG;
+
+		int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+		if (fd >= 0) {
+			su.sun_family = AF_UNIX;
+			strncpy(su.sun_path, key.second.c_str(), sizeof(su.sun_path));
+			res = bindat(context.rootfd, fd, (struct sockaddr*)&su, sizeof(su));
+			if (res == 0)
+				res = close(fd);
+		} else {
+			res = -1;
+		}
+#endif
+	} else {
+#ifdef __APPLE__
+		res = mknod(key.second.c_str(), mode, rdev);
+#else
+		res = mknodat(context.rootfd, key.second.c_str(), mode, rdev);
+#endif
+	}
+
+	if (res == -1)
+		return -errno;
+
+	return 0;
+}
+
+static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info *fi)
+{
+	TRACE(path);
 
 	if (is_special(path))
 		return -EEXIST;
@@ -450,11 +516,9 @@ static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info 
 	if (!it->second.is_creatable(key.second))
 		return -EACCES;
 
-	int flag = O_CREAT | O_RDWR | O_NOFOLLOW;
-	if (!it->second.is_readable(key.second))
-		flag |= O_TRUNC;
+	(void)unlinkat(context.rootfd, key.second.c_str(), 0);
 
-	int fd = openat(context.rootfd, key.second.c_str(), flag, mode);
+	int fd = openat(context.rootfd, key.second.c_str(), fi->flags, mode);
 	if (fd == -1)
 		return -errno;
 
@@ -505,14 +569,14 @@ static int wakefuse_unlink(const char *path)
 
 	auto key = split_key(path);
 	if (key.first.empty())
-		return -EACCES;
+		return -EPERM;
 
 	auto it = context.jobs.find(key.first);
 	if (it == context.jobs.end())
 		return -ENOENT;
 
 	if (key.second == ".")
-		return -EACCES;
+		return -EPERM;
 
 	if (!it->second.is_readable(key.second))
 		return -ENOENT;
@@ -534,7 +598,7 @@ static int wakefuse_rmdir(const char *path)
 	TRACE(path);
 
 	if (is_special(path))
-		return -EACCES;
+		return -ENOTDIR;
 
 	auto key = split_key(path);
 	if (key.first.empty())
@@ -723,7 +787,12 @@ static int wakefuse_chmod(const char *path, mode_t mode)
 	if (!it->second.is_writeable(key.second))
 		return -EACCES;
 
+#ifdef __linux__
+	// Linux is broken and violates POSIX by returning EOPNOTSUPP even for non-symlinks
+	int res = fchmodat(context.rootfd, key.second.c_str(), mode, 0);
+#else
 	int res = fchmodat(context.rootfd, key.second.c_str(), mode, AT_SYMLINK_NOFOLLOW);
+#endif
 	if (res == -1)
 		return -errno;
 
@@ -874,7 +943,7 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 	if (!it->second.is_readable(key.second))
 		return -ENOENT;
 
-	int fd = openat(context.rootfd, key.second.c_str(), O_RDWR | O_NOFOLLOW);
+	int fd = openat(context.rootfd, key.second.c_str(), fi->flags);
 	if (fd == -1)
 		return -errno;
 
@@ -1020,7 +1089,7 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 			case 'l': --s.job->second.uses; break;
 			default: return -EIO;
 		}
-		if ('f' != s.kind  &&
+		if ('f' != s.kind &&
 		    0 == s.job->second.uses &&
 		    0 == s.job->second.json_in_uses &&
 		    0 == s.job->second.json_out_uses) {
@@ -1056,188 +1125,6 @@ static int wakefuse_fsync(const char *path, int isdatasync,
 		return -errno;
 
 	return 0;
-}
-
-static int wakefuse_setxattr(const char *path, const char *name, const char *value,
-#ifdef __APPLE__
-			size_t size, int flags, uint32_t position)
-#else
-			size_t size, int flags)
-#endif
-{
-	TRACE(path);
-
-	if (is_special(path))
-		return -EACCES;
-
-	auto key = split_key(path);
-	if (key.first.empty())
-		return -EACCES;
-
-	auto it = context.jobs.find(key.first);
-	if (it == context.jobs.end())
-		return -ENOENT;
-
-	if (key.second == ".")
-		return -EACCES;
-
-	if (!it->second.is_readable(key.second))
-		return -ENOENT;
-
-	if (!it->second.is_writeable(key.second))
-		return -EACCES;
-
-	int fd = openat(context.rootfd, key.second.c_str(), O_WRONLY | O_NOFOLLOW);
-	if (fd == -1)
-		return -errno;
-
-#ifdef __APPLE__
-	int res = fsetxattr(fd, name, value, size, position, flags);
-#else
-	int res = fsetxattr(fd, name, value, size, flags);
-#endif
-	if (res == -1) {
-		res = -errno;
-		(void)close(fd);
-		return res;
-	} else {
-		it->second.files_wrote.insert(std::move(key.second));
-		(void)close(fd);
-		return 0;
-	}
-}
-
-static int wakefuse_getxattr(const char *path, const char *name, char *value,
-#ifdef __APPLE__
-			size_t size, uint32_t position)
-#else
-			size_t size)
-#endif
-{
-	TRACE(path);
-
-	if (is_special(path))
-		return -ENOATTR;
-
-	auto key = split_key(path);
-	if (key.first.empty())
-		return -ENOATTR;
-
-	auto it = context.jobs.find(key.first);
-	if (it == context.jobs.end())
-		return -ENOENT;
-
-	int fd;
-	if (key.second == ".") {
-		fd = dup(context.rootfd);
-	} else {
-		if (!it->second.is_readable(key.second))
-			return -ENOENT;
-		fd = openat(context.rootfd, key.second.c_str(), O_RDONLY | O_NOFOLLOW);
-	}
-	if (fd == -1)
-		return -errno;
-
-#ifdef __APPLE__
-	int res = fgetxattr(fd, name, value, size, position, 0);
-#else
-	int res = fgetxattr(fd, name, value, size);
-#endif
-	if (res == -1) {
-		res = -errno;
-		(void)close(fd);
-		return res;
-	} else {
-		it->second.files_read.insert(std::move(key.second));
-		(void)close(fd);
-		return 0;
-	}
-}
-
-static int wakefuse_listxattr(const char *path, char *list, size_t size)
-{
-	TRACE(path);
-
-	if (is_special(path))
-		return 0;
-
-	auto key = split_key(path);
-	if (key.first.empty())
-		return 0;
-
-	auto it = context.jobs.find(key.first);
-	if (it == context.jobs.end())
-		return -ENOENT;
-
-	int fd;
-	if (key.second == ".") {
-		fd = dup(context.rootfd);
-	} else {
-		if (!it->second.is_readable(key.second))
-			return -ENOENT;
-		fd = openat(context.rootfd, key.second.c_str(), O_RDONLY | O_NOFOLLOW);
-	}
-	if (fd == -1)
-		return -errno;
-
-#ifdef __APPLE__
-	int res = flistxattr(fd, list, size, 0);
-#else
-	int res = flistxattr(fd, list, size);
-#endif
-	if (res == -1) {
-		res = -errno;
-		(void)close(fd);
-		return res;
-	} else {
-		it->second.files_read.insert(std::move(key.second));
-		(void)close(fd);
-		return 0;
-	}
-}
-
-static int wakefuse_removexattr(const char *path, const char *name)
-{
-	TRACE(path);
-
-	if (is_special(path))
-		return -EACCES;
-
-	auto key = split_key(path);
-	if (key.first.empty())
-		return -EACCES;
-
-	auto it = context.jobs.find(key.first);
-	if (it == context.jobs.end())
-		return -ENOENT;
-
-	if (key.second == ".")
-		return -EACCES;
-
-	if (!it->second.is_readable(key.second))
-		return -ENOENT;
-
-	if (!it->second.is_writeable(key.second))
-		return -EACCES;
-
-	int fd = openat(context.rootfd, key.second.c_str(), O_WRONLY | O_NOFOLLOW);
-	if (fd == -1)
-		return -errno;
-
-#ifdef __APPLE__
-	int res = fremovexattr(fd, name, 0);
-#else
-	int res = fremovexattr(fd, name);
-#endif
-	if (res == -1) {
-		res = -errno;
-		(void)close(fd);
-		return res;
-	} else {
-		it->second.files_wrote.insert(std::move(key.second));
-		(void)close(fd);
-		return 0;
-	}
 }
 
 #ifdef HAVE_FALLOCATE
@@ -1329,6 +1216,7 @@ int main(int argc, char *argv[])
 	wakefuse_ops.access		= wakefuse_access;
 	wakefuse_ops.readlink		= wakefuse_readlink;
 	wakefuse_ops.readdir		= wakefuse_readdir;
+	wakefuse_ops.mknod		= wakefuse_mknod;
 	wakefuse_ops.create		= wakefuse_create;
 	wakefuse_ops.mkdir		= wakefuse_mkdir;
 	wakefuse_ops.symlink		= wakefuse_symlink;
@@ -1346,10 +1234,7 @@ int main(int argc, char *argv[])
 	wakefuse_ops.statfs		= wakefuse_statfs;
 	wakefuse_ops.release		= wakefuse_release;
 	wakefuse_ops.fsync		= wakefuse_fsync;
-	wakefuse_ops.setxattr		= wakefuse_setxattr;
-	wakefuse_ops.getxattr		= wakefuse_getxattr;
-	wakefuse_ops.listxattr		= wakefuse_listxattr;
-	wakefuse_ops.removexattr	= wakefuse_removexattr;
+	// xattr were removed because they are not hashed!
 #ifdef HAVE_FALLOCATE
 	wakefuse_ops.fallocate		= wakefuse_fallocate;
 #endif
