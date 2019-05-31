@@ -192,7 +192,7 @@ int main(int argc, char *argv[])
 		first = false;
 	}
 
-	ofs << "],\"indexes\":[]}" << std::endl;
+	ofs << "]}" << std::endl;
 
 	return ofs.fail() ? 1 : 0;
 }
