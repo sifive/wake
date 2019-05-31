@@ -787,7 +787,12 @@ static int wakefuse_chmod(const char *path, mode_t mode)
 	if (!it->second.is_writeable(key.second))
 		return -EACCES;
 
+#ifdef __linux__
+	// Linux is broken and violates POSIX by returning EOPNOTSUPP even for non-symlinks
+	int res = fchmodat(context.rootfd, key.second.c_str(), mode, 0);
+#else
 	int res = fchmodat(context.rootfd, key.second.c_str(), mode, AT_SYMLINK_NOFOLLOW);
+#endif
 	if (res == -1)
 		return -errno;
 
