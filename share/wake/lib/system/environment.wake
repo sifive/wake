@@ -27,7 +27,7 @@ publish path = match (getenv "WAKE_PATH")
 publish path = "/usr/bin", Nil
 publish path = "/bin", Nil
 
-global def path = catWith ":" (subscribe path)
+global def path = catWith ":" (subscribe path | distinctBy scmp)
 publish environment = "PATH={path}", Nil
 
 global def environment = subscribe environment
