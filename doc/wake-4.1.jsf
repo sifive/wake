@@ -15,6 +15,7 @@
 =HexNumber
 =OctNumber
 =BinNumber
+=RegExp blue
 =String blue
 =StringEscape bold blue
 
@@ -27,18 +28,19 @@
 	*		reset		
 	"a-z_"		varid		buffer recolor=-1
 	"A-Z"		conid		mark recolor=-1
-	"`!$%&*+.\-/<>^|~," varsym	buffer recolor=-1
+	"!$%&*+.\-/<>^|~," varsym	buffer recolor=-1
 	"=:"		equal		recolor=-1
 	"()\\"		special		recolor=-1
 	"#"		linecomment	recolor=-1
 	"0-9"		integerstart	mark noeat
 	"\'"		rawlit		recolor=-1
+	"`"		reglit		recolor=-1
 	"\""		strlit		recolor=-1
 	"@{}[];?"	errorstate	noeat
 
 :equal Special
 	*		reset		noeat
-	"`!$%&*+.\-/<>^|~,=:"	varsym	recolor=-2
+	"!$%&*+.\-/<>^|~,=:"	varsym	recolor=-2
 
 :special Special
 	*		reset		noeat
@@ -83,7 +85,7 @@ done
 
 :varsym VarSym
 	*		reset		noeat
-	"`!$%&*+.\-/<>^|~,=:" varsym
+	"!$%&*+.\-/<>^|~,=:" varsym
 
 :linecomment Comment comment
 	*		linecomment
@@ -142,6 +144,11 @@ done
 :rawlit String string
 	*		rawlit
 	"\'"		reset
+
+:reglit String string
+	*		reglit
+	"\\\`"		reglit
+	"\`"		reset
 
 :strlit String string
 	*		strlit
