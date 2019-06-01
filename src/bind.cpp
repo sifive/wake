@@ -107,8 +107,10 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
   std::vector<int> d(defs.size(), 0), p(defs.size(), -1);
   std::queue<RelaxedVertex> q;
 
-  for (int i = 0; i < (int)defs.size(); ++i)
+  for (int i = 0; i < (int)defs.size(); ++i) {
+    if (!defs[i].expr) return nullptr;
     q.push(RelaxedVertex(i, 0));
+  }
 
   while (!q.empty()) {
     RelaxedVertex rv = q.front();
@@ -129,7 +131,7 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
         std::cerr << "  " << defs[i].name << " at " << defs[i].expr->location.file() << std::endl;
         i = p[i];
       } while (i != j);
-      return 0;
+      return nullptr;
     }
     int w = def.expr->type == &Lambda::type ? 0 : 1;
     for (auto i : def.edges) {
