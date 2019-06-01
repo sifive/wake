@@ -364,7 +364,7 @@ int main(int argc, const char **argv) {
     first = false;
   }
 
-  out << "],\"indexes\":[]}" << std::endl;
+  out << "]}" << std::endl;
 
   if (out.bad()) {
     std::cerr << "bad " << argv[2] << ": " << strerror(errno) << std::endl;

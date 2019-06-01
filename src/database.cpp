@@ -134,7 +134,7 @@ std::string Database::open(bool wait, bool memory) {
     "create index if not exists job on jobs(directory, commandline, environment, stdin, keep, job_id, stat_id);"
     "create table if not exists filetree("
     "  tree_id  integer primary key autoincrement,"
-    "  access   integer not null," // 0=visible, 1=input, 2=output, 3=indexes
+    "  access   integer not null," // 0=visible, 1=input, 2=output
     "  job_id   integer not null references jobs(job_id) on delete cascade,"
     "  file_id  integer not null references files(file_id),"
     "  unique(job_id, access, file_id) on conflict ignore);"

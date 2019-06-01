@@ -592,7 +592,7 @@ int main(int argc, char **argv) {
         pass = false;
       } else if (v->type == &Data::type) {
         Data *d = reinterpret_cast<Data*>(v);
-        if (d->cons->index == 1) pass = false;
+        if (d->cons->ast.name == "Fail") pass = false;
       }
     }
   }

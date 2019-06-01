@@ -115,3 +115,8 @@ Internal dependencies:
  - SipHash		public domain	https://github.com/veorq/SipHash
  - BLAKE2		public domain	https://github.com/BLAKE2/libb2
  - whereami		WTFPLV2		https://github.com/gpakosz/whereami
+
+# Tutorial
+
+    Documentation for wake can be found in share/doc/wake.
+    There is a tutorial and a quick reference guide.
