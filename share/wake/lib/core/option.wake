@@ -28,6 +28,12 @@ global def getOrElse b = match _
   Some a = a
   None   = b
 
+# Inteded use: int "x" | orElse (int "z") | getOrElse 4
+global def orElse = match _ _
+  _ (Some a) = Some a
+  (Some a) _ = Some a
+  None None  = None
+
 # Returns the Option's value if Some, otherwise returns the result of fn
 # (fn: Unit => a) => Option a => a
 global def getOrElseFn fn = match _
