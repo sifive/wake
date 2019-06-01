@@ -1,6 +1,6 @@
 # Bootstrap build file
 
-VERSION	:= $(shell git describe --tags --dirty)
+VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/^[^']*'\([^']*\)'.*/\1/p" manifest.wake; else git describe --tags --dirty; fi)
 
 CC	:= gcc -std=c99
 CXX	:= g++ -std=c++11
