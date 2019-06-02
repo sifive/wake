@@ -508,6 +508,11 @@ static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
 
   if (target) {
     Location l = body->location;
+    if (tohash == 0) {
+      std::cerr << "Target definition must have at least one hashed argument "
+        << l.text() << std::endl;
+      lex.fail = true;
+    }
     Expr *hash = new Prim(l, "hash");
     for (int i = 0; i < tohash; ++i) hash = new Lambda(l, "_", hash);
     for (int i = 0; i < tohash; ++i) hash = new App(l, hash, new VarRef(l, args[i]));
