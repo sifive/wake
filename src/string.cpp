@@ -47,16 +47,16 @@ struct CatStream : public Value {
   Hash hash() const;
 };
 
-const TypeDescriptor CatStream::type("CatStream");
+const TypeDescriptor CatStream::type("_CatStream");
 
 void CatStream::format(std::ostream &os, FormatState &state) const {
   if (APP_PRECEDENCE < state.p()) os << "(";
-  os << "CatStream ";
+  os << "_CatStream ";
   String(str.str()).format(os, state);
   if (APP_PRECEDENCE < state.p()) os << ")";
 }
 
-TypeVar CatStream::typeVar("CatStream", 0);
+TypeVar CatStream::typeVar("_CatStream", 0);
 TypeVar &CatStream::getType() {
   return typeVar;
 }
