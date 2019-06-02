@@ -466,6 +466,14 @@ static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
     lex.fail = true;
   }
 
+  int tohash = ast.args.size();
+  if (target && lex.next.type == LAMBDA) {
+    lex.consume();
+    AST sub = parse_ast(APP_PRECEDENCE, lex, state, AST(lex.next.location));
+    if (check_constructors(ast)) lex.fail = true;
+    for (auto &x : sub.args) ast.args.push_back(std::move(x));
+  }
+
   expect(EQUALS, lex);
   lex.consume();
 
@@ -478,28 +486,40 @@ static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
     pattern |= Lexer::isOperator(x.name.c_str()) || Lexer::isUpper(x.name.c_str());
   }
 
+  std::vector<std::string> args;
   if (!pattern) {
     // no pattern; simple lambdas for the arguments
-    for (auto i = ast.args.rbegin(); i != ast.args.rend(); ++i) {
-      Location location = body->location;
-      location.start = i->location.start;
-      body = new Lambda(location, i->name, body);
-    }
+    for (auto &x : ast.args) args.push_back(x.name);
   } else {
     // bind the arguments to anonymous lambdas and push the whole thing into a pattern
-    int args = ast.args.size();
+    int nargs = ast.args.size();
     Match *match = new Match(body->location);
-    if (args > 1) {
+    if (nargs > 1) {
       match->patterns.emplace_back(std::move(ast), body, nullptr);
     } else {
       match->patterns.emplace_back(std::move(ast.args.front()), body, nullptr);
     }
-    body = match;
-    for (int i = 0; i < args; ++i) {
-      body = new Lambda(body->location, "_ " + std::to_string(args-1-i), body);
+    for (int i = 0; i < nargs; ++i) {
+      args.push_back("_ " + std::to_string(i));
       match->args.emplace_back(new VarRef(LOCATION, "_ " + std::to_string(i)));
     }
+    body = match;
   }
+
+  if (target) {
+    Location l = body->location;
+    Expr *hash = new Prim(l, "hash");
+    for (int i = 0; i < tohash; ++i) hash = new Lambda(l, "_", hash);
+    for (int i = 0; i < tohash; ++i) hash = new App(l, hash, new VarRef(l, args[i]));
+    body = new App(l, new App(l, new App(l,
+      new Lambda(l, "_target", new Lambda(l, "_hash", new Lambda(l, "_fn", new Prim(l, "tget")))),
+      new VarRef(l, "table " + name)),
+      hash),
+      new Lambda(l, "_", body));
+  }
+
+  for (auto i = args.rbegin(); i != args.rend(); ++i)
+    body = new Lambda(body->location, *i, body);
 
   return body;
 }
