@@ -65,6 +65,7 @@ void require_fail(const char *message, unsigned size, WorkQueue &queue, const Bi
 #define DOUBLE(arg, i)  REQUIRE(args[i]->type == &Double::type);  Double  *arg = reinterpret_cast<Double *>(args[i].get());
 #define REGEXP(arg, i)	REQUIRE(args[i]->type == &RegExp::type);  RegExp  *arg = reinterpret_cast<RegExp *>(args[i].get());
 #define DATA(arg, i)    REQUIRE(args[i]->type == &Data::type);    Data    *arg = reinterpret_cast<Data   *>(args[i].get());
+#define CLOSURE(arg, i) REQUIRE(args[i]->type == &Closure::type); Closure *arg = reinterpret_cast<Closure*>(args[i].get());
 
 /* Useful expressions for primitives */
 std::shared_ptr<Value> make_unit();
@@ -106,6 +107,7 @@ void prim_register_integer(PrimMap &pmap);
 void prim_register_double(PrimMap &pmap);
 void prim_register_exception(PrimMap &pmap);
 void prim_register_regexp(PrimMap &pmap);
+void prim_register_target(PrimMap &pmap);
 void prim_register_json(PrimMap &pmap);
 void prim_register_job(JobTable *jobtable, PrimMap &pmap);
 void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimMap &pmap);
