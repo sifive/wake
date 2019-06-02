@@ -80,7 +80,6 @@ static bool expectValue(const TypeDescriptor *type, Lexer &lex) {
 }
 
 static Expr *parse_binary(int p, Lexer &lex, bool multiline);
-static Expr *parse_def(Lexer &lex, std::string &name);
 static Expr *parse_block(Lexer &lex, bool multiline);
 
 struct ASTState {
@@ -452,7 +451,7 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
   }
 }
 
-static Expr *parse_def(Lexer &lex, std::string &name) {
+static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
   lex.consume();
 
   ASTState state(false, false);
@@ -1031,6 +1030,14 @@ static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top, bool global) {
       if (global) bind_global(name, top, lex);
       break;
     }
+    case TARGET: {
+      std::string name;
+      auto def = parse_def(lex, name, true);
+      bind_def(lex, map, name, def);
+      bind_def(lex, map, "table " + name, new Prim(def->location, "tnew"));
+      if (global) bind_global(name, top, lex);
+      break;
+    }
     case TUPLE: {
       parse_tuple(lex, map, top, global);
       break;
@@ -1057,6 +1064,7 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
     bool repeat = true;
     while (repeat) {
       switch (lex.next.type) {
+        case TARGET:
         case DEF: {
           parse_decl(map, lex, 0, false);
           break;
@@ -1107,6 +1115,7 @@ void parse_top(Top &top, Lexer &lex) {
       }
       case TUPLE:
       case DATA:
+      case TARGET:
       case DEF: {
         parse_decl(defmap.map, lex, &top,false);
         break;
