@@ -26,9 +26,9 @@ def doCompileC variant gcc flags headers cfile =
   def result = job cmdline (cfile, headers)
   result.getJobOutput
 
-def doLinkO variant linker flags objects target =
-  def cmdline = (linker, "-o", "{target}.{variant}", map getPathName objects) ++ distinctBy scmp flags
-  def result = job cmdline (mkdir "{target}/..", objects)
+def doLinkO variant linker flags objects targ =
+  def cmdline = (linker, "-o", "{targ}.{variant}", map getPathName objects) ++ distinctBy scmp flags
+  def result = job cmdline (mkdir "{targ}/..", objects)
   result.getJobOutput
 
 def makeCompileC variant gcc flags =
