@@ -225,8 +225,8 @@ def runAlways cmd env dir stdin res finputs foutputs vis keep run log =
       Pair Nil      last = confirm last (build Unit)
 
 # Only run if the first four arguments differ
-def runOnce cmd env dir stdin res finputs foutputs vis keep run log =
-  memoize 8 (runAlways cmd env dir stdin res finputs foutputs vis keep run log)
+target runOnce cmd env dir stdin \ res finputs foutputs vis keep run log =
+  runAlways cmd env dir stdin res finputs foutputs vis keep run log
 
 # Default runners provided by wake
 publish runner = localRunner, defaultRunner, Nil
@@ -498,7 +498,7 @@ def addhash f =
   def add f h = prim "add_hash"
   add p (hashcode p)
 
-def hashcode f = memoize 0 (
+target hashcode f =
   def get f = prim "get_hash"
   def reuse = get f
   if reuse !=* "" then reuse else
@@ -512,7 +512,6 @@ def hashcode f = memoize 0 (
     match job.isJobOk hash
       True (x, Nil) = x
       _ _ = "BadHash"
-)
 
 def stateRunner =
   def add f h = prim "add_hash"
