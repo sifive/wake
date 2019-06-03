@@ -472,7 +472,10 @@ static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
     AST sub = parse_ast(APP_PRECEDENCE, lex, state, AST(lex.next.location));
     if (check_constructors(ast)) lex.fail = true;
     for (auto &x : sub.args) ast.args.push_back(std::move(x));
+    ast.location.end = sub.location.end;
   }
+
+  Location fn = ast.location;
 
   expect(EQUALS, lex);
   lex.consume();
@@ -493,7 +496,7 @@ static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
   } else {
     // bind the arguments to anonymous lambdas and push the whole thing into a pattern
     int nargs = ast.args.size();
-    Match *match = new Match(body->location);
+    Match *match = new Match(fn);
     if (nargs > 1) {
       match->patterns.emplace_back(std::move(ast), body, nullptr);
     } else {
@@ -501,30 +504,29 @@ static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
     }
     for (int i = 0; i < nargs; ++i) {
       args.push_back("_ " + std::to_string(i));
-      match->args.emplace_back(new VarRef(LOCATION, "_ " + std::to_string(i)));
+      match->args.emplace_back(new VarRef(fn, "_ " + std::to_string(i)));
     }
     body = match;
   }
 
   if (target) {
-    Location l = body->location;
     if (tohash == 0) {
       std::cerr << "Target definition must have at least one hashed argument "
-        << l.text() << std::endl;
+        << fn.text() << std::endl;
       lex.fail = true;
     }
-    Expr *hash = new Prim(l, "hash");
-    for (int i = 0; i < tohash; ++i) hash = new Lambda(l, "_", hash);
-    for (int i = 0; i < tohash; ++i) hash = new App(l, hash, new VarRef(l, args[i]));
-    body = new App(l, new App(l, new App(l,
-      new Lambda(l, "_target", new Lambda(l, "_hash", new Lambda(l, "_fn", new Prim(l, "tget")))),
-      new VarRef(l, "table " + name)),
+    Expr *hash = new Prim(fn, "hash");
+    for (int i = 0; i < tohash; ++i) hash = new Lambda(fn, "_", hash);
+    for (int i = 0; i < tohash; ++i) hash = new App(fn, hash, new VarRef(fn, args[i]));
+    body = new App(fn, new App(fn, new App(fn,
+      new Lambda(fn, "_target", new Lambda(fn, "_hash", new Lambda(fn, "_fn", new Prim(fn, "tget")))),
+      new VarRef(fn, "table " + name)),
       hash),
-      new Lambda(l, "_", body));
+      new Lambda(fn, "_", body));
   }
 
   for (auto i = args.rbegin(); i != args.rend(); ++i)
-    body = new Lambda(body->location, *i, body);
+    body = new Lambda(fn, *i, body);
 
   return body;
 }
@@ -661,12 +663,14 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
           lex.fail = true;
         }
         lhs.args.emplace_back(std::move(rhs));
+        lhs.location = location;
         break;
       }
       case COLON: {
         if (state.type) {
           op_type op = op_precedence(lex.id().c_str());
           if (op.p < p) return lhs;
+          Location tagloc = lhs.location;
           lex.consume();
           if (!lhs.args.empty() || Lexer::isOperator(lhs.name.c_str())) {
             std::cerr << "Left-hand-side of COLON must be a simple lower-case identifier, not "
@@ -676,6 +680,7 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
           std::string tag = std::move(lhs.name);
           lhs = parse_ast(op.p + op.l, lex, state);
           lhs.tag = std::move(tag);
+          lhs.location.start = tagloc.start;
           break;
         }
         // fall-through to default
