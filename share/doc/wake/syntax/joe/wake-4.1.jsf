@@ -63,6 +63,7 @@
 	"global"	kw
 	"match"		stmt
 	"memoize"	kw
+	"target"	kw
 	"prim"		kw
 	"publish"	kw
 	"subscribe"	kw

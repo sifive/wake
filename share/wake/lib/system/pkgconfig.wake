@@ -28,7 +28,7 @@ global def flattenSysLibs packages =
   def lflags  = map getSysLibLFlags  packages | flatten
   SysLib "" headers objects cflags lflags
 
-def pkgConfigImp args = memoize 0 (
+target pkgConfigImp args =
   def cmdline = which "pkg-config", args
   def addenv list = match (getenv "PKG_CONFIG_PATH")
     Some p = "PKG_CONFIG_PATH={p}", list
@@ -43,7 +43,6 @@ def pkgConfigImp args = memoize 0 (
   def output = result.getJobStdout | getWhenFail "" | tokenize `\n` | head
   def split = _ | tokenize ` ` | filter (_ !=* "")
   if result.isJobOk then omap split output else None
-)
 
 global def pkgConfig pkg =
   def pkgs = tokenize ` ` pkg

@@ -34,7 +34,7 @@
 const char *symbolTable[] = {
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "VAL", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
   "DATA", "EQUALS", "POPEN", "PCLOSE", "BOPEN", "BCLOSE", "IF", "THEN", "ELSE", "HERE", "MEMOIZE", "END",
-  "MATCH", "EOL", "INDENT", "DEDENT", "COLON"
+  "MATCH", "EOL", "INDENT", "DEDENT", "COLON", "TARGET"
 };
 
 /*!re2c
@@ -384,6 +384,7 @@ top:
       "tuple"     { return mkSym(TUPLE);     }
       "data"      { return mkSym(DATA);      }
       "global"    { return mkSym(GLOBAL);    }
+      "target"    { return mkSym(TARGET);    }
       "publish"   { return mkSym(PUBLISH);   }
       "subscribe" { return mkSym(SUBSCRIBE); }
       "prim"      { return mkSym(PRIM);      }

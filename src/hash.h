@@ -45,6 +45,10 @@ static inline bool operator < (Hash x, Hash y) {
   return x.data[0] < y.data[0];
 }
 
+static inline bool operator == (Hash x, Hash y) {
+  return x.data[0] == y.data[0] && x.data[1] == y.data[1];
+}
+
 static inline Hash operator + (Hash a, Hash b) {
   uint64_t stuff[4];
   stuff[0] = a.data[0];

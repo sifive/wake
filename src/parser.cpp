@@ -80,7 +80,6 @@ static bool expectValue(const TypeDescriptor *type, Lexer &lex) {
 }
 
 static Expr *parse_binary(int p, Lexer &lex, bool multiline);
-static Expr *parse_def(Lexer &lex, std::string &name);
 static Expr *parse_block(Lexer &lex, bool multiline);
 
 struct ASTState {
@@ -452,7 +451,7 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
   }
 }
 
-static Expr *parse_def(Lexer &lex, std::string &name) {
+static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
   lex.consume();
 
   ASTState state(false, false);
@@ -467,6 +466,17 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
     lex.fail = true;
   }
 
+  size_t tohash = ast.args.size();
+  if (target && lex.next.type == LAMBDA) {
+    lex.consume();
+    AST sub = parse_ast(APP_PRECEDENCE, lex, state, AST(lex.next.location));
+    if (check_constructors(ast)) lex.fail = true;
+    for (auto &x : sub.args) ast.args.push_back(std::move(x));
+    ast.location.end = sub.location.end;
+  }
+
+  Location fn = ast.location;
+
   expect(EQUALS, lex);
   lex.consume();
 
@@ -479,28 +489,48 @@ static Expr *parse_def(Lexer &lex, std::string &name) {
     pattern |= Lexer::isOperator(x.name.c_str()) || Lexer::isUpper(x.name.c_str());
   }
 
+  std::vector<std::string> args;
   if (!pattern) {
     // no pattern; simple lambdas for the arguments
-    for (auto i = ast.args.rbegin(); i != ast.args.rend(); ++i) {
-      Location location = body->location;
-      location.start = i->location.start;
-      body = new Lambda(location, i->name, body);
-    }
+    for (auto &x : ast.args) args.push_back(x.name);
   } else {
     // bind the arguments to anonymous lambdas and push the whole thing into a pattern
-    int args = ast.args.size();
-    Match *match = new Match(body->location);
-    if (args > 1) {
+    size_t nargs = ast.args.size();
+    Match *match = new Match(fn);
+    if (nargs > 1) {
       match->patterns.emplace_back(std::move(ast), body, nullptr);
     } else {
       match->patterns.emplace_back(std::move(ast.args.front()), body, nullptr);
     }
-    body = match;
-    for (int i = 0; i < args; ++i) {
-      body = new Lambda(body->location, "_ " + std::to_string(args-1-i), body);
-      match->args.emplace_back(new VarRef(LOCATION, "_ " + std::to_string(i)));
+    for (size_t i = 0; i < nargs; ++i) {
+      args.push_back("_ " + std::to_string(i));
+      match->args.emplace_back(new VarRef(fn, "_ " + std::to_string(i)));
     }
+    body = match;
   }
+
+  if (target) {
+    if (tohash == 0) {
+      std::cerr << "Target definition must have at least one hashed argument "
+        << fn.text() << std::endl;
+      lex.fail = true;
+    }
+    Expr *hash = new Prim(fn, "hash");
+    for (size_t i = 0; i < tohash; ++i) hash = new Lambda(fn, "_", hash);
+    for (size_t i = 0; i < tohash; ++i) hash = new App(fn, hash, new VarRef(fn, args[i]));
+    Expr *subhash = new Prim(fn, "hash");
+    for (size_t i = tohash; i < args.size(); ++i) subhash = new Lambda(fn, "_", subhash);
+    for (size_t i = tohash; i < args.size(); ++i) subhash = new App(fn, subhash, new VarRef(fn, args[i]));
+    body = new App(fn, new App(fn, new App(fn, new App(fn,
+      new Lambda(fn, "_target", new Lambda(fn, "_hash", new Lambda(fn, "_subhash", new Lambda(fn, "_fn", new Prim(fn, "tget"))))),
+      new VarRef(fn, "table " + name)),
+      hash),
+      subhash),
+      new Lambda(fn, "_", body));
+  }
+
+  for (auto i = args.rbegin(); i != args.rend(); ++i)
+    body = new Lambda(fn, *i, body);
 
   return body;
 }
@@ -637,12 +667,14 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
           lex.fail = true;
         }
         lhs.args.emplace_back(std::move(rhs));
+        lhs.location = location;
         break;
       }
       case COLON: {
         if (state.type) {
           op_type op = op_precedence(lex.id().c_str());
           if (op.p < p) return lhs;
+          Location tagloc = lhs.location;
           lex.consume();
           if (!lhs.args.empty() || Lexer::isOperator(lhs.name.c_str())) {
             std::cerr << "Left-hand-side of COLON must be a simple lower-case identifier, not "
@@ -652,6 +684,7 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
           std::string tag = std::move(lhs.name);
           lhs = parse_ast(op.p + op.l, lex, state);
           lhs.tag = std::move(tag);
+          lhs.location.start = tagloc.start;
           break;
         }
         // fall-through to default
@@ -709,8 +742,7 @@ static AST parse_type_def(Lexer &lex) {
 
 static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
   if (name == "Integer" || name == "String" || name == "RegExp" ||
-      name == "CatStream" || name == FN || name == "Job" ||
-      name == "Array" || name == "Double") {
+      name == FN || name == "Job" || name == "Array" || name == "Double") {
     std::cerr << "Constuctor " << name
       << " is reserved at " << sump->location.file() << "." << std::endl;
     lex.fail = true;
@@ -1032,6 +1064,14 @@ static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top, bool global) {
       if (global) bind_global(name, top, lex);
       break;
     }
+    case TARGET: {
+      std::string name;
+      auto def = parse_def(lex, name, true);
+      bind_def(lex, map, name, def);
+      bind_def(lex, map, "table " + name, new Prim(def->location, "tnew"));
+      if (global) bind_global(name, top, lex);
+      break;
+    }
     case TUPLE: {
       parse_tuple(lex, map, top, global);
       break;
@@ -1058,6 +1098,7 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
     bool repeat = true;
     while (repeat) {
       switch (lex.next.type) {
+        case TARGET:
         case DEF: {
           parse_decl(map, lex, 0, false);
           break;
@@ -1108,6 +1149,7 @@ void parse_top(Top &top, Lexer &lex) {
       }
       case TUPLE:
       case DATA:
+      case TARGET:
       case DEF: {
         parse_decl(defmap.map, lex, &top,false);
         break;

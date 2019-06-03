@@ -29,10 +29,9 @@ global def simplify path = prim "simplify"
 global def relative dir path = prim "relative"
 
 # Locate an executable in the search path
-global def whichIn path exec = memoize 0 (
+global target whichIn path exec =
   def imp path exec = prim "search_path"
   imp path exec
-)
 
 global def which exec = whichIn path exec
 global def workspace = prim "workspace"
