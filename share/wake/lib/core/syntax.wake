@@ -23,3 +23,7 @@ global def argument | pipeFn = pipeFn argument # bash-style pipe operator
 global def dollarFn $ argument = dollarFn argument
 global def f ∘ g = \x f (g x)
 global def flip f x y = f y x
+# Insert a debugging function
+global def tap tapFn argument =
+  def _ = tapFn argument
+  argument
