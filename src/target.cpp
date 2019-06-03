@@ -53,13 +53,13 @@ Hash Target::hash() const {
 #define TARGET(arg, i) REQUIRE(args[i]->type == &Target::type); Target *arg = reinterpret_cast<Target*>(args[i].get());
 
 static PRIMTYPE(type_hash) {
-  return args.size() > 0 &&
-    out->unify(Integer::typeVar);
+  return out->unify(Integer::typeVar);
 }
 
 static PRIMFN(prim_hash) {
+  Hash h;
+  if (binding) h = binding->hash();
   auto out = std::make_shared<Integer>();
-  Hash h = binding->hash();
   mpz_import(out->value, sizeof(h.data)/sizeof(h.data[0]), 1, sizeof(h.data[0]), 0, 0, &h.data[0]);
   RETURN(out);
 }
