@@ -466,7 +466,7 @@ static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
     lex.fail = true;
   }
 
-  int tohash = ast.args.size();
+  size_t tohash = ast.args.size();
   if (target && lex.next.type == LAMBDA) {
     lex.consume();
     AST sub = parse_ast(APP_PRECEDENCE, lex, state, AST(lex.next.location));
@@ -495,14 +495,14 @@ static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
     for (auto &x : ast.args) args.push_back(x.name);
   } else {
     // bind the arguments to anonymous lambdas and push the whole thing into a pattern
-    int nargs = ast.args.size();
+    size_t nargs = ast.args.size();
     Match *match = new Match(fn);
     if (nargs > 1) {
       match->patterns.emplace_back(std::move(ast), body, nullptr);
     } else {
       match->patterns.emplace_back(std::move(ast.args.front()), body, nullptr);
     }
-    for (int i = 0; i < nargs; ++i) {
+    for (size_t i = 0; i < nargs; ++i) {
       args.push_back("_ " + std::to_string(i));
       match->args.emplace_back(new VarRef(fn, "_ " + std::to_string(i)));
     }
@@ -516,12 +516,16 @@ static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
       lex.fail = true;
     }
     Expr *hash = new Prim(fn, "hash");
-    for (int i = 0; i < tohash; ++i) hash = new Lambda(fn, "_", hash);
-    for (int i = 0; i < tohash; ++i) hash = new App(fn, hash, new VarRef(fn, args[i]));
-    body = new App(fn, new App(fn, new App(fn,
-      new Lambda(fn, "_target", new Lambda(fn, "_hash", new Lambda(fn, "_fn", new Prim(fn, "tget")))),
+    for (size_t i = 0; i < tohash; ++i) hash = new Lambda(fn, "_", hash);
+    for (size_t i = 0; i < tohash; ++i) hash = new App(fn, hash, new VarRef(fn, args[i]));
+    Expr *subhash = new Prim(fn, "hash");
+    for (size_t i = tohash; i < args.size(); ++i) subhash = new Lambda(fn, "_", subhash);
+    for (size_t i = tohash; i < args.size(); ++i) subhash = new App(fn, subhash, new VarRef(fn, args[i]));
+    body = new App(fn, new App(fn, new App(fn, new App(fn,
+      new Lambda(fn, "_target", new Lambda(fn, "_hash", new Lambda(fn, "_subhash", new Lambda(fn, "_fn", new Prim(fn, "tget"))))),
       new VarRef(fn, "table " + name)),
       hash),
+      subhash),
       new Lambda(fn, "_", body));
   }
 
