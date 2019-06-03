@@ -69,7 +69,7 @@ On Mac OS with Mac Ports installed:
 
 On Mac OS with Home Brew installed:
 
-    brew install sqlite3 gmp re2 ncurses pkgconfig
+    brew install gmp re2 pkgconfig
     
 Fuse is slightly more complicated, it requires permissions.
 
