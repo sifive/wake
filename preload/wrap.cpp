@@ -34,6 +34,9 @@ static void make_shadow_tree(const std::string &root, const JAST &jast, sset &vi
   for (auto &x : jast.get("visible").children) {
     const std::string &file = x.second.value;
 
+    // absolute paths do need to made visible
+    if (file.empty() || file[0] == '/') continue;
+
     for (size_t pos = file.find('/'); pos != std::string::npos; pos = file.find('/', pos+1)) {
       std::string dir = file.substr(0, pos);
       if (visible.insert(dir + "/").second) {

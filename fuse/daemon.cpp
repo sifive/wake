@@ -94,9 +94,11 @@ void Job::parse() {
 		return;
 	}
 
+	// We only need to make the relative paths visible; absolute paths are already
 	files_visible.clear();
 	for (auto &x : jast.get("visible").children)
-		files_visible.insert(std::move(x.second.value));
+		if (!x.second.value.empty() && x.second.value[0] != '/')
+			files_visible.insert(std::move(x.second.value));
 }
 
 void Job::dump() {
