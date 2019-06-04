@@ -67,9 +67,11 @@ int main(int argc, char *argv[])
 	std::string ipath = mpath + "/.i." + name;
 	std::string opath = mpath + "/.o." + name;
 
+	int ffd = -1;
 	useconds_t wait = 10000; /* 10ms */
-	for (int retry = 0; retry < 10 && access(fpath.c_str(), R_OK) != 0; ++retry) {
+	for (int retry = 0; (ffd = open(fpath.c_str(), O_RDONLY)) == -1 && retry < 10; ++retry) {
 		if (fork() == 0) {
+			ofs.close();
 			execl(daemon.c_str(), "fuse-waked", mpath.c_str(), 0);
 			std::cerr << "execl " << daemon << ": " << strerror(errno) << std::endl;
 			exit(1);
@@ -78,17 +80,21 @@ int main(int argc, char *argv[])
 		wait <<= 1;
 	}
 
-	if (access(fpath.c_str(), R_OK) != 0) {
+	if (ffd == -1) {
 		std::cerr << "Could not contact FUSE daemon" << std::endl;
 		return 1;
 	}
 
 	// This stays open (keeping rpath live) until we terminate
+	// Note: O_CLOEXEC is NOT set; thus, children keep rpath live as well
 	int livefd = open(lpath.c_str(), O_CREAT|O_RDWR|O_EXCL, 0644);
 	if (livefd == -1) {
 		std::cerr << "open " << rpath << ": " << strerror(errno) << std::endl;
 		return 1;
 	}
+
+	// We can safely release the global handle now that we hold a livefd
+	(void)close(ffd);
 
 	std::ofstream ijson(ipath);
 	ijson.write(json.data(), json.size());
@@ -104,6 +110,7 @@ int main(int argc, char *argv[])
 
 	pid_t pid = fork();
 	if (pid == 0) {
+		ofs.close();
 		// Become a target for group death
 		// setpgid(0, 0);
 
