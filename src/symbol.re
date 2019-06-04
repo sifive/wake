@@ -72,11 +72,11 @@ Sm_prodb  = [\xd7\u2219\u2229\u2240\u2293\u2297\u2299\u229b\u22a0\u22a1\u22c4\u2
 Sm_divu   = [\u2210]; // ∐
 Sm_divb   = [\xf7\u2298\u27cc\u29b8\u29bc\u29f6\u29f7\u2a38\u2afb\u2afd]; // ÷ ⊘ ⟌ ⦸ ⦼ ⧶ ⧷ ⨸ ⫻ ⫽
 Sm_sumu   = [\u2211\u222b\u222e\u2231-\u2233\u22c3\u2a01\u2a03\u2a04\u2a06\u2a0a\u2a0b\u2a0d-\u2a1c\u2aff]; // ∑ ∫ ∮ ∱ ∲ ∳ ⋃ ⨁ ⨃ ⨄ ⨆ ⨊ ⨋ ⨍ ⨎ ⨏ ⨐ ⨑ ⨒ ⨓ ⨔ ⨕ ⨖ ⨗ ⨘ ⨙ ⨚ ⨛ ⨜ ⫿
-Sm_sumb   = [\x2b\x7e\xac\xb1\u0338\u2213\u2214\u222a\u2238-\u223b\u2242\u228c-\u228e\u2294-\u2296\u229e\u229f\u22b9\u22bb\u22d3\u29fa\u29fb\u29fe\u29ff\u2a22-\u2a2e\u2a39\u2a3a\u2a3f\u2a41\u2a42\u2a45\u2a4a\u2a4c\u2a4f\u2a50\u2a6a\u2a6b\u2aec\u2aed\u2afe]; // + ~ ¬ ± ̸ ∓ ∔ ∪ ∸ ∸ ∹ ∺ ∻ ≂ ⊌ ⊍ ⊎ ⊔ ⊕ ⊖ ⊞ ⊟ ⊹ ⊻ ⋓ ⧺ ⧻ ⧾ ⧿ ⨢ ⨣ ⨤ ⨥ ⨦ ⨧ ⨨ ⨩ ⨪ ⨫ ⨬ ⨭ ⨮ ⨹ ⨺ ⨿ ⩁ ⩂ ⩅ ⩊ ⩌ ⩏ ⩐ ⩪ ⩫ ⫬ ⫭ ⫾
+Sm_sumb   = [\x2b\x7e\xac\xb1\u2213\u2214\u222a\u2238-\u223b\u2242\u228c-\u228e\u2294-\u2296\u229e\u229f\u22b9\u22bb\u22d3\u29fa\u29fb\u29fe\u29ff\u2a22-\u2a2e\u2a39\u2a3a\u2a3f\u2a41\u2a42\u2a45\u2a4a\u2a4c\u2a4f\u2a50\u2a6a\u2a6b\u2aec\u2aed\u2afe]; // + ~ ¬ ± ∓ ∔ ∪ ∸ ∸ ∹ ∺ ∻ ≂ ⊌ ⊍ ⊎ ⊔ ⊕ ⊖ ⊞ ⊟ ⊹ ⊻ ⋓ ⧺ ⧻ ⧾ ⧿ ⨢ ⨣ ⨤ ⨥ ⨦ ⨧ ⨨ ⨩ ⨪ ⨫ ⨬ ⨭ ⨮ ⨹ ⨺ ⨿ ⩁ ⩂ ⩅ ⩊ ⩌ ⩏ ⩐ ⩪ ⩫ ⫬ ⫭ ⫾
 Sm_lt     = [\x3c\u2264\u2266\u2268\u226a\u226e\u2270\u2272\u2274\u2276\u2278\u227a\u227c\u227e\u2280\u2282\u2284\u2286\u2288\u228a\u228f\u2291\u22b0\u22b2\u22b4\u22b7\u22d0\u22d6\u22d8\u22da\u22dc\u22de\u22e0\u22e2\u22e4\u22e6\u22e8\u22ea\u22ec\u27c3\u27c8\u29c0\u29cf\u29e1\u2a79\u2a7b\u2a7d\u2a7f\u2a81\u2a83\u2a85\u2a87\u2a89\u2a8b\u2a8d\u2a8f\u2a91\u2a93\u2a95\u2a97\u2a99\u2a9b\u2a9d\u2a9f\u2aa1\u2aa3\u2aa6\u2aa8\u2aaa\u2aac\u2aaf\u2ab1\u2ab3\u2ab5\u2ab7\u2ab9\u2abb\u2abd\u2abf\u2ac1\u2ac3\u2ac5\u2ac7\u2ac9\u2acb\u2acd\u2acf\u2ad1\u2ad3\u2ad5\u2af7\u2af9]; // < ≤ ≦ ≨ ≪ ≮ ≰ ≲ ≴ ≶ ≸ ≺ ≼ ≾ ⊀ ⊂ ⊄ ⊆ ⊈ ⊊ ⊏ ⊑ ⊰ ⊲ ⊴ ⊷ ⋐ ⋖ ⋘ ⋚ ⋜ ⋞ ⋠ ⋢ ⋤ ⋦ ⋨ ⋪ ⋬ ⟃ ⟈ ⧀ ⧏ ⧡ ⩹ ⩻ ⩽ ⩿ ⪁ ⪃ ⪅ ⪇ ⪉ ⪋ ⪍ ⪏ ⪑ ⪓ ⪕ ⪗ ⪙ ⪛ ⪝ ⪟ ⪡ ⪣ ⪦ ⪨ ⪪ ⪬ ⪯ ⪱ ⪳ ⪵ ⪷ ⪹ ⪻ ⪽ ⪿ ⫁ ⫃ ⫅ ⫇ ⫉ ⫋ ⫍ ⫏ ⫑ ⫓ ⫕ ⫷ ⫹
 Sm_gt     = [\x3e\u2265\u2267\u2269\u226b\u226f\u2271\u2273\u2275\u2277\u2279\u227b\u227d\u227f\u2281\u2283\u2285\u2287\u2289\u228b\u2290\u2292\u22b1\u22b3\u22b5\u22b6\u22d1\u22d7\u22d9\u22db\u22dd\u22df\u22e1\u22e3\u22e5\u22e7\u22e9\u22eb\u22ed\u27c4\u27c9\u29c1\u29d0\u2a7a\u2a7c\u2a7e\u2a80\u2a82\u2a84\u2a86\u2a88\u2a8a\u2a8c\u2a8e\u2a90\u2a92\u2a94\u2a96\u2a98\u2a9a\u2a9c\u2a9e\u2aa0\u2aa2\u2aa7\u2aa9\u2aab\u2aad\u2ab0\u2ab2\u2ab4\u2ab6\u2ab8\u2aba\u2abc\u2abe\u2ac0\u2ac2\u2ac4\u2ac6\u2ac8\u2aca\u2acc\u2ace\u2ad0\u2ad2\u2ad4\u2ad6\u2af8\u2afa]; // > ≥ ≧ ≩ ≫ ≯ ≱ ≳ ≵ ≷ ≹ ≻ ≽ ≿ ⊁ ⊃ ⊅ ⊇ ⊉ ⊋ ⊐ ⊒ ⊱ ⊳ ⊵ ⊶ ⋑ ⋗ ⋙ ⋛ ⋝ ⋟ ⋡ ⋣ ⋥ ⋧ ⋩ ⋫ ⋭ ⟄ ⟉ ⧁ ⧐ ⩺ ⩼ ⩾ ⪀ ⪂ ⪄ ⪆ ⪈ ⪊ ⪌ ⪎ ⪐ ⪒ ⪔ ⪖ ⪘ ⪚ ⪜ ⪞ ⪠ ⪢ ⪧ ⪩ ⪫ ⪭ ⪰ ⪲ ⪴ ⪶ ⪸ ⪺ ⪼ ⪾ ⫀ ⫂ ⫄ ⫆ ⫈ ⫊ ⫌ ⫎ ⫐ ⫒ ⫔ ⫖ ⫸ ⫺
 Sm_eq     = [\x3d\u2243-\u2263\u226d\u229c\u22cd\u22d5\u29c2\u29c3\u29ce\u29e3-\u29e7\u2a46-\u2a49\u2a59\u2a66-\u2a69\u2a6c-\u2a73\u2a77\u2a78\u2aa4\u2aa5\u2aae\u2ad7\u2ad8]; // = ≃ ≄ ≅ ≆ ≇ ≈ ≉ ≊ ≋ ≌ ≍ ≎ ≏ ≐ ≑ ≒ ≓ ≔ ≕ ≖ ≗ ≘ ≙ ≚ ≛ ≜ ≝ ≞ ≟ ≠ ≡ ≢ ≣ ≭ ⊜ ⋍ ⋕ ⧂ ⧃ ⧎ ⧣ ⧤ ⧥ ⧦ ⧧ ⩆ ⩇ ⩈ ⩉ ⩙ ⩦ ⩧ ⩨ ⩩ ⩬ ⩭ ⩮ ⩯ ⩰ ⩱ ⩲ ⩳ ⩷ ⩸ ⪤ ⪥ ⪮ ⫗ ⫘
-Sm_test   = [\u0338\u2208\u2209\u220b\u220c\u221d\u221f-\u2222\u2225\u2226\u226c\u22be\u22bf\u22d4\u22f2\u22f3\u22f5\u22f6\u22f8-\u22fb\u22fd\u22ff\u237c\u27ca\u27d2\u299b-\u29af\u29b6\u29b7\u29b9\u29ba\u2a64\u2a65\u2ad9-\u2add\u2ae1\u2aee\u2af2-\u2af6\u2afc]; //  ̸ ∈ ∉ ∋ ∌ ∝ ∟ ∠ ∡ ∢ ∥ ∦ ≬ ⊾ ⊿ ⋔ ⋲ ⋳ ⋵ ⋶ ⋸ ⋹ ⋺ ⋻ ⋽ ⋿ ⍼ ⟊ ⟒ ⦛ ⦜ ⦝ ⦞ ⦟ ⦠ ⦡ ⦢ ⦣ ⦤ ⦥ ⦦ ⦧ ⦨ ⦩ ⦪ ⦫ ⦬ ⦭ ⦮ ⦯ ⦶ ⦷ ⦹ ⦺ ⩤ ⩥ ⫙ ⫚ ⫛ ⫝̸ ⫝ ⫡ ⫮ ⫲ ⫳ ⫴ ⫵ ⫶ ⫼
+Sm_test   = [\u2208\u2209\u220b\u220c\u221d\u221f-\u2222\u2225\u2226\u226c\u22be\u22bf\u22d4\u22f2\u22f3\u22f5\u22f6\u22f8-\u22fb\u22fd\u22ff\u237c\u27ca\u27d2\u299b-\u29af\u29b6\u29b7\u29b9\u29ba\u2a64\u2a65\u2ad9-\u2add\u2ae1\u2aee\u2af2-\u2af6\u2afc]; // ∈ ∉ ∋ ∌ ∝ ∟ ∠ ∡ ∢ ∥ ∦ ≬ ⊾ ⊿ ⋔ ⋲ ⋳ ⋵ ⋶ ⋸ ⋹ ⋺ ⋻ ⋽ ⋿ ⍼ ⟊ ⟒ ⦛ ⦜ ⦝ ⦞ ⦟ ⦠ ⦡ ⦢ ⦣ ⦤ ⦥ ⦦ ⦧ ⦨ ⦩ ⦪ ⦫ ⦬ ⦭ ⦮ ⦯ ⦶ ⦷ ⦹ ⦺ ⩤ ⩥ ⫙ ⫚ ⫛ ⫝̸ ⫝ ⫡ ⫮ ⫲ ⫳ ⫴ ⫵ ⫶ ⫼
 Sm_andu   = [\u22c0]; // ⋀
 Sm_andb   = [\u2227\u22bc\u22cf\u27ce\u27d1\u2a07\u2a51\u2a53\u2a55\u2a58\u2a5a\u2a5c\u2a5e-\u2a60]; // ∧ ⊼ ⋏ ⟎ ⟑ ⨇ ⩑ ⩓ ⩕ ⩘ ⩚ ⩜ ⩞ ⩞ ⩟ ⩟ ⩠ ⩠
 Sm_oru    = [\u22c1]; // ⋁
@@ -407,7 +407,7 @@ top:
       Po_special  = ["#'\\];
       Po_op       = [!%&*,./:];
       // !!! TODO: Po, Pd(without -)
-      op = (Sk_notick|Sc|Sm_op|Po_op|"-")+; // [`^] are Sk
+      op = (Sk_notick|Sc|Sm_op|Po_op|"-")+; // [^] is Sk
 
       // identifiers
       modifier = Lm|M;
@@ -620,7 +620,6 @@ top:
       re2c:define:YYCURSOR = s;
 
       *                          { return op_type(-1, -1);}
-      "`"                        { return op_type(24, 1); }
       "."                        { return op_type(23, 1); }
       [smpa]                     { return op_type(APP_PRECEDENCE, 1); } // SUBSCRIBE/MEMOIZE/PRIM/APP
       Sm_comp                    { return op_type(21, 0); }
