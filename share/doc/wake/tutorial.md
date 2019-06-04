@@ -567,6 +567,8 @@ Previously, we glossed over functions like `getOrElse` and `getWhenFail`.
 In this section we will explain those as well as the more general concept
 of dealing with operations that can fail in a build flow.
 
+### Option
+
 Many operations can fail like taking the first element (`head`) of a `List`
 (it may be empty) or reading a file (it may not exist).
 The simplest and most common way we deal with this in wake is with `Option` as we
@@ -583,6 +585,8 @@ A more concise way of accomplishing the same goal is to use `getOrElse` which wi
 return the value in a `Some` or a default if the `Option` is `None`.
 
     def myFunction l = head l | getOrElse 0
+
+### Result
 
 `Options` are a great way to deal with things that can fail in one obvious way
 (eg. `head` fails when the `List` is empty), but sometimes an operation may have
@@ -633,6 +637,8 @@ We can rewrite the above as simply:
 Or perhaps more clearly using `|`:
 
     global def safeRead filename = source filename | read | getWhenFail "Read failed!"
+
+### BadPath
 
 Besides `Option` and `Result`, there is a 3rd important piece to handling failure: `BadPath`.
 Recall that `Path` is the type used to represent paths on the file system.
