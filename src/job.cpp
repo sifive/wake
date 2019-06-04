@@ -293,6 +293,7 @@ JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool ch
   rlim_t requested = imp->max_children * 2 + MAX_SELF_FDS;
   rlim_t maximum = (limit.rlim_max == RLIM_INFINITY) ? OPEN_MAX : limit.rlim_max;
   if (maximum > OPEN_MAX) maximum = OPEN_MAX;
+  if (maximum > FD_SETSIZE) maximum = FD_SETSIZE;
 
   if (maximum > requested) {
     limit.rlim_cur = requested;
