@@ -262,6 +262,18 @@ JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool ch
   // These are handled in status.cpp
   sigaddset(&imp->block, SIGALRM);
   sigaddset(&imp->block, SIGWINCH);
+
+  // Allow wake to open as many file descriptors as possible
+  struct rlimit limit;
+  if (getrlimit(RLIMIT_NOFILE, &limit) != 0) {
+    perror("getrlimit(RLIMIT_NOFILE)");
+    exit(1);
+  }
+  limit.rlim_cur = limit.rlim_max;
+  if (setrlimit(RLIMIT_NOFILE, &limit) != 0) {
+    perror("setrlimit(RLIMIT_NOFILE)");
+    exit(1);
+  }
 }
 
 static struct timeval mytimersub(struct timeval a, struct timeval b) {
