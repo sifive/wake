@@ -196,7 +196,7 @@ struct JobTable::detail {
   sigset_t block; // signals that can race with pselect()
   Database *db;
   double active, limit; // CPUs
-  int max_children; // hard cap on jobs allowed
+  long max_children; // hard cap on jobs allowed
   bool verbose;
   bool quiet;
   bool check;
@@ -279,7 +279,15 @@ JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool ch
   // Calculate the maximum number of children to ever run
   imp->max_children = max_jobs * 100; // based on minimum 1% CPU utilization in Job::threads
   if (imp->max_children > MAX_CHILDREN) imp->max_children = MAX_CHILDREN; // wake hard cap
+#ifdef CHILD_MAX
   if (imp->max_children > CHILD_MAX/2) imp->max_children = CHILD_MAX/2;   // limits.h
+#endif
+  long sys_child_max = sysconf(_SC_CHILD_MAX);
+  if (sys_child_max != -1 && imp->max_children > sys_child_max/2) imp->max_children = sys_child_max/2;
+
+#ifndef OPEN_MAX
+#define OPEN_MAX 99999
+#endif
 
   // We want 2 descriptors (stdout+stderr) per job.
   rlim_t requested = imp->max_children * 2 + MAX_SELF_FDS;
@@ -294,11 +302,11 @@ JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool ch
     imp->max_children = (maximum - MAX_SELF_FDS) / 2;
     std::cerr << " children, but only got " << imp->max_children
       << ", because only " << maximum
-      << " file descriptors available." << std::endl;
+      << " file descriptors are available." << std::endl;
   }
 
 /*
-  std::cerr << "max children " << imp->max_children << "/" << CHILD_MAX
+  std::cerr << "max children " << imp->max_children << "/" << sys_child_max
     << " and " << limit.rlim_cur << "/" << maximum << std::endl;
 */
 
@@ -450,7 +458,7 @@ static void launch(JobTable *jobtable) {
   //     b - it would hurt the build critical path if we schedule a sub-optimal job
   // => just oversubscribe compute and let the kernel sort it out
   while (!jobtable->imp->pending.empty()
-      && jobtable->imp->running.size() < jobtable->imp->max_children
+      && jobtable->imp->running.size() < (size_t)jobtable->imp->max_children
       && jobtable->imp->active < jobtable->imp->limit) {
     Task &task = *jobtable->imp->pending.top();
     jobtable->imp->active += task.job->threads();
