@@ -30,6 +30,11 @@
 #include <string.h>
 #include <stdio.h>
 
+// How often is the status updated (should be a multiple of 2 for budget=0)
+#define REFRESH_HZ 6
+// Processes which last less than this time do not get displayed
+#define MIN_DRAW_TIME 0.2
+
 std::list<Status> status_state;
 
 static volatile bool refresh_needed = false;
@@ -77,7 +82,7 @@ static void write_all_str(int fd, const char *data)
 
 static void status_clear()
 {
-  if (tty) {
+  if (tty && used) {
     std::stringstream os;
     for (; used; --used) os << cuu1;
     os << cr;
@@ -115,6 +120,11 @@ static void status_redraw()
     double runtime =
       (now.tv_sec  - x.launch.tv_sec) +
       (now.tv_usec - x.launch.tv_usec) / 1000000.0;
+
+    if (x.budget < MIN_DRAW_TIME && runtime < MIN_DRAW_TIME) {
+      --total;
+      continue;
+    }
 
     int rest = cols - 10;
     std::string cut;
@@ -225,7 +235,7 @@ void status_init()
     // Setup a SIGALRM timer to trigger status redraw
     struct itimerval timer;
     timer.it_value.tv_sec = 0;
-    timer.it_value.tv_usec = 1000000/6; // refresh at 6Hz
+    timer.it_value.tv_usec = 1000000/REFRESH_HZ;
     timer.it_interval = timer.it_value;
 
     sa.sa_handler = handle_SIGALRM;
