@@ -116,7 +116,7 @@ static void status_redraw()
   }
 
   int total = status_state.size();
-  if (tty && rows > 4 && cols > 16) for (auto &x : status_state) {
+  if (tty && rows >= 6 && cols > 16) for (auto &x : status_state) {
     double runtime =
       (now.tv_sec  - x.launch.tv_sec) +
       (now.tv_usec - x.launch.tv_usec) / 1000000.0;
@@ -160,7 +160,7 @@ static void status_redraw()
 
     os << progress << cut << std::endl;
     ++used;
-    if (used != total && used == rows - 3) {
+    if (used != total && used == (rows/3)-1) { // use at most 1/3 of the space (rows >= 6)
       os << "... +" << (total-used) << " more" << std::endl;
       ++used;
       break;
