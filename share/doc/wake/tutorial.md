@@ -560,3 +560,135 @@ As a final note, wake files must be UTF-8 encoded.
 This means that you can use Unicode symbols in strings, comments,
 identifiers, and even operators.
 In fact, all the operators we just printed are legal in wake.
+
+## Dealing with failure
+
+Previously, we glossed over functions like `getOrElse` and `getWhenFail`.
+In this section we will explain those as well as the more general concept
+of dealing with operations that can fail in a build flow.
+
+### Option
+
+Many operations can fail like taking the first element (`head`) of a `List`
+(it may be empty) or reading a file (it may not exist).
+The simplest and most common way we deal with this in wake is with `Option` as we
+have seen before.
+
+    def myFunction l = match (head l)
+      Some elt = elt
+      None     = 0
+
+As in the above, we can use pattern matching on `Option` to deal with the possibility
+of `Some` or `None`. In this case, `myFunction` accepts a `List` of `Integers` and
+returns the first element of the list or `0` if the list is empty.
+A more concise way of accomplishing the same goal is to use `getOrElse` which will
+return the value in a `Some` or a default if the `Option` is `None`.
+
+    def myFunction l = head l | getOrElse 0
+
+### Result
+
+`Options` are a great way to deal with things that can fail in one obvious way
+(eg. `head` fails when the `List` is empty), but sometimes an operation may have
+multiple ways of failing (eg. reading a file, it may not exist or permission may be denied).
+wake provides a type called `Result` for dealing with such cases.
+`Result` is similar to `Option`: it can be either a `Pass p`,
+where `p` represents the value of correct operation, or a `Fail f`,
+where `f` is a description of how an operation failed.
+
+    echo "contents" > existing.txt
+    echo "contents" > denied.txt
+    chmod 000 denied.txt
+    git add existing.txt denied.txt
+    cat >> tutorial.wake <<'EOF'
+    global def goodRead _ = read (source "existing.txt")
+    global def deniedRead _ = read (source "denied.txt")
+    global def badRead _ = read (source "nonexisting.txt")
+    EOF
+    wake 'goodRead 0'
+    wake 'deniedRead 0'
+    wake 'badRead 0'
+
+You should see something like:
+
+    $ wake 'goodRead 0'
+    Pass "contents\n"
+    $ wake 'deniedRead 0'
+    Fail (Error "read denied.txt: Permission denied" Nil)
+    $ wake 'badRead 0'
+    Fail (Error "nonexisting.txt: source does not exist" Nil)
+
+Similarly to how we can `match` on `Options`, we can `match` on `Results`
+
+    cat >> tutorial.wake <<'EOF'
+    global def safeRead filename = match (read (source filename))
+      Pass txt = txt
+      Fail _ = "Read failed!"
+    EOF
+
+This will attempt to read a file and return its contents,
+returning `"Read failed!"` if the read failed for any reason.
+Similarly to `getOrElse`, there is a function `getWhenFail` that will return the value
+in a `Pass` or a default in the case of `Fail`.
+We can rewrite the above as simply:
+
+    global def safeRead filename = getWhenFail "Read failed!" (read (source filename))
+
+Or perhaps more clearly using `|`:
+
+    global def safeRead filename = source filename | read | getWhenFail "Read failed!"
+
+### BadPath
+
+Besides `Option` and `Result`, there is a 3rd important piece to handling failure: `BadPath`.
+Recall that `Path` is the type used to represent paths on the file system.
+The function `source` takes a `String` and returns a `Path` for a file under version control.
+But what if the file doesn't exist? Previously, we called `source` on a non-existant file,
+but we immediately called `read` on the returned `Path`. Try just `source`:
+
+    wake 'source "nonexisting.txt"'
+
+You should get `BadPath (Error "nonexisting.txt: source does not exist" Nil)`.
+Similarly to how `Result` can be either a `Pass` or a `Fail`,
+a `Path` can be either a `Path` or a `BadPath`.
+While this is technically redundant since `Result` could accomplish the same functionality,
+it is much more convenient than having to use `Result` all over the place.
+For example, without `BadPath`, source would have to return a `Result`,
+and we would have to handle the result in order to `read` it:
+
+    global def safeRead filename = match (source filename)
+      Pass path = match (read path)
+        Pass content = content
+        Fail _       = "Read failed!"
+      Fail _ = "Read failed!"
+
+Fundamentally, wake is about running jobs on files, and special support for
+`BadPath` makes this easier to express.
+
+When you pass `BadPaths` in the visible files to a job, the job will recognize this and
+propagate the failure.
+
+    wake 'job (which "gcc", "file.c", Nil) (source "file.c", Nil) | getJobOutputs'
+
+Since the `source` will return a `BadPath`, the job will propagate the failure:
+
+    BadPath (Error "file.c: source does not exist" Nil), Nil
+
+This means that when passing the outputs from one job to another,
+you don't have to worry about jobs failing, wake will handle it for you!
+
+You may have noticed that the `BadPath` above contains a type called `Error`.
+`Error` is a type that contains a `String` "cause", and a `List` of `Strings` stack trace.
+You'll notice the cause is `"file.c: source does not exist"`, but the stack is just `Nil`.
+Wake does not actually maintain a call stack like traditional languages,
+so by default `Errors` will contain an empty `List` for the stack.
+If you run wake with `-d` (or `--debug`), it will simulate a stack:
+
+    wake -d 'job (which "gcc", "file.c", Nil) (source "file.c", Nil) | getJobOutputs'
+
+You should see much more information. Note that inspection operations like `-o` or `-i`
+are also affected by `-v` and `-d`.
+
+You can construct an `Error` directly, or use `makeError` which simply takes a `String`
+cause and will record the Stack.
+
