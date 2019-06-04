@@ -50,7 +50,7 @@
 // The most file descriptors used by wake for itself (database/stdio/etc)
 #define MAX_SELF_FDS	24
 // The most children wake will ever allow to run at once
-#define MAX_CHILDREN	5000
+#define MAX_CHILDREN	500
 
 #define STATE_FORKED	1  // in database and running
 #define STATE_STDOUT	2  // stdout fully in database
@@ -295,7 +295,7 @@ JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool ch
   if (maximum > OPEN_MAX) maximum = OPEN_MAX;
   if (maximum > FD_SETSIZE) maximum = FD_SETSIZE;
 
-  if (maximum > requested) {
+  if (maximum >= requested) {
     limit.rlim_cur = requested;
   } else {
     limit.rlim_cur = maximum;
