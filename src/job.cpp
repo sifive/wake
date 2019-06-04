@@ -35,6 +35,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <math.h>
+#include <limits.h>
 #include <sstream>
 #include <iostream>
 #include <list>
@@ -46,6 +47,10 @@
 #define TERM_ATTEMPTS 6
 // How long between first and second SIGTERM attempt (exponentially increasing)
 #define TERM_BASE_GAP_MS 100
+// The most file descriptors used by wake for itself (database/stdio/etc)
+#define MAX_SELF_FDS	24
+// The most children wake will ever allow to run at once
+#define MAX_CHILDREN	5000
 
 #define STATE_FORKED	1  // in database and running
 #define STATE_STDOUT	2  // stdout fully in database
@@ -190,7 +195,8 @@ struct JobTable::detail {
   std::priority_queue<std::unique_ptr<Task> > pending;
   sigset_t block; // signals that can race with pselect()
   Database *db;
-  double active, limit; // threads
+  double active, limit; // CPUs
+  int max_children; // hard cap on jobs allowed
   bool verbose;
   bool quiet;
   bool check;
@@ -263,13 +269,39 @@ JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool ch
   sigaddset(&imp->block, SIGALRM);
   sigaddset(&imp->block, SIGWINCH);
 
-  // Allow wake to open as many file descriptors as possible
+  // Determine the available file descriptor limits
   struct rlimit limit;
   if (getrlimit(RLIMIT_NOFILE, &limit) != 0) {
     perror("getrlimit(RLIMIT_NOFILE)");
     exit(1);
   }
-  limit.rlim_cur = limit.rlim_max;
+
+  // Calculate the maximum number of children to ever run
+  imp->max_children = max_jobs * 100; // based on minimum 1% CPU utilization in Job::threads
+  if (imp->max_children > MAX_CHILDREN) imp->max_children = MAX_CHILDREN; // wake hard cap
+  if (imp->max_children > CHILD_MAX/2) imp->max_children = CHILD_MAX/2;   // limits.h
+
+  // We want 2 descriptors (stdout+stderr) per job.
+  rlim_t requested = imp->max_children * 2 + MAX_SELF_FDS;
+  rlim_t maximum = (limit.rlim_max == RLIM_INFINITY) ? OPEN_MAX : limit.rlim_max;
+  if (maximum > OPEN_MAX) maximum = OPEN_MAX;
+
+  if (maximum > requested) {
+    limit.rlim_cur = requested;
+  } else {
+    limit.rlim_cur = maximum;
+    std::cerr << "wake wanted a limit of " << imp->max_children;
+    imp->max_children = (maximum - MAX_SELF_FDS) / 2;
+    std::cerr << " children, but only got " << imp->max_children
+      << ", because only " << maximum
+      << " file descriptors available." << std::endl;
+  }
+
+/*
+  std::cerr << "max children " << imp->max_children << "/" << CHILD_MAX
+    << " and " << limit.rlim_cur << "/" << maximum << std::endl;
+*/
+
   if (setrlimit(RLIMIT_NOFILE, &limit) != 0) {
     perror("setrlimit(RLIMIT_NOFILE)");
     exit(1);
@@ -417,7 +449,9 @@ static void launch(JobTable *jobtable) {
   //     a - it would waste idle compute if we don't schedule something
   //     b - it would hurt the build critical path if we schedule a sub-optimal job
   // => just oversubscribe compute and let the kernel sort it out
-  while (!jobtable->imp->pending.empty() && jobtable->imp->active < jobtable->imp->limit) {
+  while (!jobtable->imp->pending.empty()
+      && jobtable->imp->running.size() < jobtable->imp->max_children
+      && jobtable->imp->active < jobtable->imp->limit) {
     Task &task = *jobtable->imp->pending.top();
     jobtable->imp->active += task.job->threads();
 
