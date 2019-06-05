@@ -42,12 +42,18 @@ struct Target : public Value {
 
   static const TypeDescriptor type;
   static TypeVar typeVar;
-  Target() : Value(&type) { }
+  static long live;
+
+  Target() : Value(&type) { ++live; }
+  ~Target() { --live; }
 
   void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 };
+
+long Target::live = 0;
+bool targets_live() { return Target::live != 0; }
 
 const TypeDescriptor Target::type("_Target");
 
@@ -99,6 +105,19 @@ static PRIMTYPE(type_tget) {
     out->unify((*args[3])[1]);
 }
 
+struct TargetReceiver : public Receiver {
+  std::shared_ptr<Value> target;
+  Hash hash;
+  void receive(WorkQueue &queue, std::shared_ptr<Value> &&value);
+  TargetReceiver(const std::shared_ptr<Value> &target_, Hash hash_)
+   : target(target_), hash(hash_) { }
+};
+
+void TargetReceiver::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
+  Target *t = reinterpret_cast<Target*>(target.get());
+  t->table[hash].future.broadcast(queue, std::move(value));
+}
+
 static PRIMFN(prim_tget) {
   EXPECT(4);
   TARGET(target, 0);
@@ -119,20 +138,21 @@ static PRIMFN(prim_tget) {
 
   if (!(ref.first->second.subhash == subhash)) {
     std::stringstream ss;
-    ss << "ERROR (this will be fatal in 0.16.0): Target subkey mismatch for " << binding->expr->location.text() << std::endl;
+    ss << "ERROR: Target subkey mismatch for " << binding->expr->location.text() << std::endl;
     if (queue.stack_trace)
       for (auto &x : binding->stack_trace())
         ss << "  from " << x.file() << std::endl;
     std::string str = ss.str();
     status_write(2, str.data(), str.size());
-    // queue.abort = true;
+    queue.abort = true;
   }
 
   if (ref.second) {
     auto bind = std::make_shared<Binding>(body->binding, queue.stack_trace?binding:nullptr, body->lambda, 1);
     bind->future[0].value = std::move(args[1]); // hash
     bind->state = 1;
-    queue.emplace(body->lambda->body.get(), std::move(bind), ref.first->second.future.make_completer());
+    queue.emplace(body->lambda->body.get(), std::move(bind), std::unique_ptr<Receiver>(
+      new TargetReceiver(args[0], hash)));
   }
 }
 

@@ -33,11 +33,7 @@ struct Completer : public Receiver {
 
 void Completer::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
   future->broadcast(queue, std::move(value));
-  if (binding) binding->future_completed(queue);
-}
-
-std::unique_ptr<Receiver> Future::make_completer() {
-  return std::unique_ptr<Receiver>(new Completer(nullptr, this));
+  binding->future_completed(queue);
 }
 
 void Future::broadcast(WorkQueue &queue, std::shared_ptr<Value> &&value_) {

@@ -57,17 +57,16 @@
 	"data"		struct
 	"tuple"		struct
 	"def"		stmt
+	"target"	stmt
+	"match"		stmt
+	"if"		cond
+	"then"		cond
 	"else"		cond
 	"here"		kw
-	"if"		cond
 	"global"	kw
-	"match"		stmt
-	"memoize"	kw
-	"target"	kw
 	"prim"		kw
 	"publish"	kw
 	"subscribe"	kw
-	"then"		cond
 	"_"		kw
 done
 	"a-zA-Z0-9_'"	varid

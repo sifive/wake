@@ -72,11 +72,10 @@ struct Future {
     }
   }
 
-  // for use with Memoize::values
-  std::unique_ptr<Receiver> make_completer();
+  // for use with prim_tget
+  void broadcast(WorkQueue &queue, std::shared_ptr<Value> &&value_);
 
 private:
-  void broadcast(WorkQueue &queue, std::shared_ptr<Value> &&value_);
   std::unique_ptr<Receiver> waiting;
 friend struct Completer;
 };

@@ -114,19 +114,6 @@ struct Literal : public Expr {
   Hash hash();
 };
 
-struct Memoize : public Expr {
-  long skip;
-  std::unique_ptr<Expr> body;
-  std::map<Hash, Future> values;
-
-  static const TypeDescriptor type;
-  Memoize(const Location &location_, long skip_, Expr *body_)
-   : Expr(&type, location_), skip(skip_), body(body_) { }
-
-  void format(std::ostream &os, int depth) const;
-  Hash hash();
-};
-
 struct Pattern {
   AST pattern;
   std::unique_ptr<Expr> expr;

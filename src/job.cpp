@@ -703,6 +703,33 @@ bool JobTable::wait(WorkQueue &queue) {
   return compute;
 }
 
+void JobTable::hang() {
+  struct timespec nowait;
+  memset(&nowait, 0, sizeof(nowait));
+
+  while (!exit_now()) {
+    // Block all signals we expect to interrupt pselect
+    sigset_t saved;
+    sigprocmask(SIG_BLOCK, &imp->block, &saved);
+    sigdelset(&saved, SIGCHLD);
+
+    // Check for all signals that are now blocked
+    struct timespec *timeout = exit_now() ? &nowait : 0;
+
+    // Wait for a status change, with signals atomically unblocked in pselect
+    int retval = pselect(0, 0, 0, 0, timeout, &saved);
+
+    // Restore signal mask
+    sigaddset(&saved, SIGCHLD);
+    sigprocmask(SIG_SETMASK, &saved, 0);
+
+    if (retval == -1 && errno != EINTR) {
+      perror("pselect");
+      exit(1);
+    }
+  }
+}
+
 Job::Job(Database *db_, const std::string &dir, const std::string &stdin_, const std::string &environ, const std::string &cmdline_, bool keep_, int log_)
   : Value(&type), db(db_), cmdline(cmdline_), stdin(stdin_), state(0), code(), pid(0), job(-1), keep(keep_), log(log_)
 {

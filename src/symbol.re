@@ -33,7 +33,7 @@
 
 const char *symbolTable[] = {
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "VAL", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
-  "DATA", "EQUALS", "POPEN", "PCLOSE", "BOPEN", "BCLOSE", "IF", "THEN", "ELSE", "HERE", "MEMOIZE", "END",
+  "DATA", "EQUALS", "POPEN", "PCLOSE", "BOPEN", "BCLOSE", "IF", "THEN", "ELSE", "HERE", "END",
   "MATCH", "EOL", "INDENT", "DEDENT", "COLON", "TARGET"
 };
 
@@ -393,7 +393,6 @@ top:
       "else"      { return mkSym(ELSE);      }
       "here"      { return mkSym(HERE);      }
       "match"     { return mkSym(MATCH);     }
-      "memoize"   { return mkSym(MEMOIZE);   }
       "\\"        { return mkSym(LAMBDA);    }
       "="         { return mkSym(EQUALS);    }
       ":"         { return mkSym(COLON);     }
@@ -621,7 +620,7 @@ top:
 
       *                          { return op_type(-1, -1);}
       "."                        { return op_type(23, 1); }
-      [smpa]                     { return op_type(APP_PRECEDENCE, 1); } // SUBSCRIBE/MEMOIZE/PRIM/APP
+      [smpa]                     { return op_type(APP_PRECEDENCE, 1); } // SUBSCRIBE/PRIM/APP
       Sm_comp                    { return op_type(21, 0); }
       Sm_unop                    { return op_type(20, 0); }
       "^"                        { return op_type(19, 0); }

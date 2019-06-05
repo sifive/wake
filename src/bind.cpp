@@ -546,10 +546,6 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     auto out = rebind_match(binding, std::move(m));
     if (!out) return out;
     return fracture(std::move(out), binding);
-  } else if (expr->type == &Memoize::type) {
-    Memoize *memoize = reinterpret_cast<Memoize*>(expr.get());
-    memoize->body = fracture(std::move(memoize->body), binding);
-    return expr;
   } else if (expr->type == &DefMap::type) {
     DefMap *def = reinterpret_cast<DefMap*>(expr.get());
     ResolveBinding dbinding;
@@ -760,11 +756,6 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     RecErrorMessage recm(&lambda->body->location);
     bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &recm);
     return out && t && tr;
-  } else if (expr->type == &Memoize::type) {
-    Memoize *memoize = reinterpret_cast<Memoize*>(expr);
-    bool out = explore(memoize->body.get(), pmap, binding);
-    bool t = out && memoize->typeVar.unify(memoize->body->typeVar, &memoize->location);
-    return out && t;
   } else if (expr->type == &DefBinding::type) {
     DefBinding *def = reinterpret_cast<DefBinding*>(expr);
     binding->open = false;

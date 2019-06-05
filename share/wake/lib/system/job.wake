@@ -317,9 +317,6 @@ global def getJobRecord =
   raw _ | at 0 | omap toUsage
 
 global def makeBadPath error = BadPath error
-global def makeBadJob error =
-  def _ = printlnLevel logWarn "Deprecated use of makeBadJob. Use makeBadPath."
-  makeBadPath error
 
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
@@ -547,54 +544,4 @@ global def makeStatePath file =
 # If you declare too many visible inputs, cmd execution/replay will wait for unnecessary files.
 global def job cmd visible =
   makePlan cmd visible
-  | runJob
-
-# Use alwaysJob when:
-#   cmd can run under FUSE
-#   cmd output can differ between invocations
-# Examples:
-#   date
-# alwaysJob only allows cmd access to 'visible', to prevent undeclared dependencies.
-# If you miss declared visible inputs, your build will fail so you can fix it.
-# If you declare too many visible inputs, cmd execution/replay will wait for unnecessary files.
-global def alwaysJob cmd visible =
-  def _ = printlnLevel logWarn "Deprecated use of alwaysJob. Use makePlan and runJob."
-  makePlan cmd visible
-  | setPlanKeep False
-  | runJob
-
-# Use manualJob when:
-#   cmd cannot run under FUSE, but you know which inputs and outputs cmd uses
-#   cmd guarantees to produce the same outputs given the same inputs
-# Examples:
-#   vcs
-# cmd will have access to the entire workspace.
-# manualJob behaves like normal target rule in a Makefile.
-# If you miss declared visible inputs, your build is not reproducible and may run in the wrong order.
-# If you declare too many visible inputs, cmd may be rerun and wait unnecessarily.
-# If you miss declared outputs, dependant commands might fail or not run reproducibly.
-# If you declare too many outputs, the build will fail.
-global def manualJob cmd visible foutputs =
-  def _ = printlnLevel logWarn "Deprecated use of manualJob. Use makePlan and runJob."
-  makePlan cmd visible
-  | setPlanLocalOnly True
-  | setPlanFnOutputs (\_ foutputs Unit)
-  | runJob
-
-# Use volatileJob when:
-#   cmd cannot run under FUSE, but you know which inputs and outputs cmd uses
-#   cmd output can differ between invocations
-# Examples:
-#   ???
-# volatileJob behaves like a PHONY target in a Makefile.
-# If you miss declared visible inputs, your build is not reproducible and may run in the wrong order.
-# If you declare too many visible inputs, cmd may wait unnecessarily.
-# If you miss declared outputs, dependant commands might fail or not run reproducibly.
-# If you declare too many outputs, the build will fail.
-global def volatileJob cmd visible foutputs =
-  def _ = printlnLevel logWarn "Deprecated use of volatileJob. Use makePlan and runJob."
-  makePlan cmd visible
-  | setPlanLocalOnly True
-  | setPlanFnOutputs (\_ foutputs Unit)
-  | setPlanKeep False
   | runJob
