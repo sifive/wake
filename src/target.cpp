@@ -99,6 +99,19 @@ static PRIMTYPE(type_tget) {
     out->unify((*args[3])[1]);
 }
 
+struct TargetReceiver : public Receiver {
+  std::shared_ptr<Value> target;
+  Hash hash;
+  void receive(WorkQueue &queue, std::shared_ptr<Value> &&value);
+  TargetReceiver(const std::shared_ptr<Value> &target_, Hash hash_)
+   : target(target_), hash(hash_) { }
+};
+
+void TargetReceiver::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
+  Target *t = reinterpret_cast<Target*>(target.get());
+  t->table[hash].future.broadcast(queue, std::move(value));
+}
+
 static PRIMFN(prim_tget) {
   EXPECT(4);
   TARGET(target, 0);
@@ -132,7 +145,8 @@ static PRIMFN(prim_tget) {
     auto bind = std::make_shared<Binding>(body->binding, queue.stack_trace?binding:nullptr, body->lambda, 1);
     bind->future[0].value = std::move(args[1]); // hash
     bind->state = 1;
-    queue.emplace(body->lambda->body.get(), std::move(bind), ref.first->second.future.make_completer());
+    queue.emplace(body->lambda->body.get(), std::move(bind), std::unique_ptr<Receiver>(
+      new TargetReceiver(args[0], hash)));
   }
 }
 
