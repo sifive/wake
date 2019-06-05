@@ -16,7 +16,7 @@
   :type '(integer))
 
 (defvar wake-keyword
-  '("def" "global" "publish" "subscribe" "if" "then" "else" "here" "prim" "match" "data" "memoize" "tuple"))
+  '("def" "target" "global" "publish" "subscribe" "if" "then" "else" "here" "prim" "match" "data" "tuple"))
 
 (defvar wake-keyword-regex (regexp-opt wake-keyword 'words))
 (defvar wake-identifier "\\([a-z_][A-Za-z0-9_]*\\)")
