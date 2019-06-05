@@ -72,7 +72,7 @@ struct Future {
     }
   }
 
-  // for use with Memoize::values
+  // for use with prim_tget
   std::unique_ptr<Receiver> make_completer();
 
 private:

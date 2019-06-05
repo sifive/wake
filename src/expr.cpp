@@ -35,7 +35,6 @@ const TypeDescriptor Destruct  ::type("Destruct");
 // these are removed by bind
 const TypeDescriptor Subscribe ::type("Subscribe");
 const TypeDescriptor Match     ::type("Match");
-const TypeDescriptor Memoize   ::type("Memoize");
 const TypeDescriptor DefMap    ::type("DefMap");
 const TypeDescriptor Top       ::type("Top");
 
@@ -76,15 +75,6 @@ void Subscribe::format(std::ostream &os, int depth) const {
 
 Hash Subscribe::hash() {
   assert(0 /* unreachable */);
-}
-
-void Memoize::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Memoize: " << typeVar << " @ " << location.file() << std::endl;
-  body->format(os, depth+2);
-}
-
-Hash Memoize::hash() {
-  return hashcode = body->hash() + type.hashcode;
 }
 
 void Match::format(std::ostream &os, int depth) const {

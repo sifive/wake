@@ -105,33 +105,6 @@ void MultiReceiver::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
     Finisher::finish(queue, std::move(shared->finisher));
 }
 
-struct Hasher : public Finisher {
-  std::unique_ptr<Receiver> receiver;
-  std::shared_ptr<Binding> binding;
-  Memoize *memoize;
-  Hasher(std::unique_ptr<Receiver> receiver_, std::shared_ptr<Binding> &&binding_, Memoize *memoize_)
-   : receiver(std::move(receiver_)), binding(std::move(binding_)), memoize(memoize_) { }
-  void finish(WorkQueue &queue);
-};
-
-void Hasher::finish(WorkQueue &queue)
-{
-  Binding *root = binding.get();
-  for (long j = 0; root && j < memoize->skip; ++j) root = root->next.get();
-
-  Hash hash;
-  if (root) hash = root->hash();
-
-  auto i = memoize->values.find(hash);
-  if (i == memoize->values.end()) {
-    Future &future = memoize->values[hash];
-    future.depend(queue, std::move(receiver));
-    queue.emplace(memoize->body.get(), std::move(binding), future.make_completer());
-  } else {
-    i->second.depend(queue, std::move(receiver));
-  }
-}
-
 void Thunk::eval(WorkQueue &queue) {
   if (expr->type == &VarRef::type) {
     VarRef *ref = reinterpret_cast<VarRef*>(expr);
@@ -156,12 +129,6 @@ void Thunk::eval(WorkQueue &queue) {
     Lambda *lambda = reinterpret_cast<Lambda*>(expr);
     auto closure = std::make_shared<Closure>(lambda, binding);
     Receiver::receive(queue, std::move(receiver), std::move(closure));
-  } else if (expr->type == &Memoize::type) {
-    Memoize *memoize = reinterpret_cast<Memoize*>(expr);
-    Binding *held = binding.get();
-    for (long i = 0; held && i < memoize->skip; ++i) held = held->next.get();
-    Binding::wait(held, queue, std::unique_ptr<Finisher>(
-      new Hasher(std::move(receiver), std::move(binding), memoize)));
   } else if (expr->type == &DefBinding::type) {
     DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
     auto defs = std::make_shared<Binding>(binding, queue.stack_trace?binding:nullptr, defbinding, defbinding->val.size());

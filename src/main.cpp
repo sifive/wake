@@ -543,7 +543,7 @@ int main(int argc, char **argv) {
   // Exit without execution for these arguments
   if (noexecute) return 0;
 
-  // Initialize expression hashes for memoize of closures
+  // Initialize expression hashes for hashing closures
   root->hash();
 
   db.prepare();
