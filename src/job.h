@@ -32,6 +32,7 @@ struct JobTable {
 
   // Wait for a job to complete; false -> no more active jobs
   bool wait(WorkQueue &queue);
+  void hang();
   static bool exit_now();
 };
 

@@ -563,6 +563,7 @@ int main(int argc, char **argv) {
   status_finish();
 
   bool pass = !queue.abort;
+  std::ostringstream os;
   if (JobTable::exit_now()) {
     std::cerr << "Early termination requested" << std::endl;
     pass = false;
@@ -578,16 +579,16 @@ int main(int argc, char **argv) {
     for (size_t i = 0; i < targets.size(); ++i) {
       Value *v = outputs[targets.size()-1-i].get();
       if (verbose) {
-        std::cout << targets[i] << ": ";
-        (*types)[0].format(std::cout, body->typeVar);
+        os << targets[i] << ": ";
+        (*types)[0].format(os, body->typeVar);
         types = &(*types)[1];
-        std::cout << " = ";
+        os << " = ";
       }
       if (!quiet) {
-        Value::format(std::cout, v, debug, verbose?0:-1);
+        Value::format(os, v, debug, verbose?0:-1);
         if (v && v->type == &Closure::type)
-          std::cout << ", " << term_red() << "AN UNEVALUATED FUNCTION" << term_normal();
-        std::cout << std::endl;
+          os << ", " << term_red() << "AN UNEVALUATED FUNCTION" << term_normal();
+        os << std::endl;
       }
       if (!v) {
         pass = false;
@@ -598,6 +599,19 @@ int main(int argc, char **argv) {
     }
   }
 
+  // Release the (hopefully last) value that holds the heap
+  value.reset();
+
+  // Clean and close the database
   db.clean();
+  db.close();
+
+  if (targets_live()) {
+    if (verbose) std::cerr << "Infinite target recursion detected" << std::endl;
+    jobtable.hang();
+  } else {
+    std::cout << os.str();
+  }
+
   return pass?0:1;
 }
