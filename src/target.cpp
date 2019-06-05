@@ -119,13 +119,13 @@ static PRIMFN(prim_tget) {
 
   if (!(ref.first->second.subhash == subhash)) {
     std::stringstream ss;
-    ss << "ERROR (this will be fatal in 0.16.0): Target subkey mismatch for " << binding->expr->location.text() << std::endl;
+    ss << "ERROR: Target subkey mismatch for " << binding->expr->location.text() << std::endl;
     if (queue.stack_trace)
       for (auto &x : binding->stack_trace())
         ss << "  from " << x.file() << std::endl;
     std::string str = ss.str();
     status_write(2, str.data(), str.size());
-    // queue.abort = true;
+    queue.abort = true;
   }
 
   if (ref.second) {
