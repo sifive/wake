@@ -479,8 +479,8 @@ global def getPathName path = match path
   BadPath _ = "BADPATH"
 
 global def getPathResult path = match path
-  Path name = Pass name
   BadPath e = Fail e
+  _         = Pass path
 
 global def getPathParent path = match path
   Path name = Path (simplify "{name}/..")

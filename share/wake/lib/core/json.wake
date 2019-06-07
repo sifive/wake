@@ -53,7 +53,7 @@ global def parseJSONBody body = prim "json_body"
 global def parseJSONFile path =
   def imp f = prim "json_file"
   match (getPathResult path)
-    Pass f = match (imp f)
+    Pass f = match (imp f.getPathName)
       Pass body = Pass body
       Fail f = Fail (makeError f)
     Fail f = Fail f

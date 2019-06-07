@@ -17,10 +17,10 @@
 global def read path =
   def imp p = prim "read"
   match (getPathResult path)
-    Pass f = match (imp f)
+    Pass f = match (imp f.getPathName)
       Pass body = Pass body
       Fail f = Fail (makeError f)
-    x = x
+    Fail e = Fail e
 
 # Simplify away the ..s and .s in a String
 global def simplify path = prim "simplify"
