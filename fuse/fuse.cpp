@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 	std::string name = std::to_string(getpid());
 	std::string daemon = find_execpath() + "/fuse-waked";
 	std::string mpath = get_cwd() + "/.fuse";
-	std::string fpath = mpath + "/.f.wake";
+	std::string fpath = mpath + "/.f.fuse-waked";
 	std::string rpath = mpath + "/" + name;
 	std::string lpath = mpath + "/.l." + name;
 	std::string ipath = mpath + "/.i." + name;
