@@ -70,7 +70,8 @@ int main(int argc, char *argv[])
 	int ffd = -1;
 	useconds_t wait = 10000; /* 10ms */
 	for (int retry = 0; (ffd = open(fpath.c_str(), O_RDONLY)) == -1 && retry < 10; ++retry) {
-		if (fork() == 0) {
+		pid_t pid = fork();
+		if (pid == 0) {
 			ofs.close();
 			execl(daemon.c_str(), "fuse-waked", mpath.c_str(), 0);
 			std::cerr << "execl " << daemon << ": " << strerror(errno) << std::endl;
@@ -78,6 +79,10 @@ int main(int argc, char *argv[])
 		}
 		usleep(wait);
 		wait <<= 1;
+
+		int status;
+		do waitpid(pid, &status, 0);
+		while (WIFSTOPPED(status));
 	}
 
 	if (ffd == -1) {
