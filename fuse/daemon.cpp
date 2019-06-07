@@ -191,7 +191,7 @@ static Special is_special(const char *path) {
 	auto it = context.jobs.find(path+4);
 	switch (path[2]) {
 		case 'f':
-			out.kind = strcmp(path+4, "wake") ? 0 : 'f';
+			out.kind = strcmp(path+4, "fuse-waked") ? 0 : 'f';
 			return out;
 		case 'o':
 			if (it != context.jobs.end() && !it->second.json_out.empty()) {
@@ -360,7 +360,7 @@ static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	auto key = split_key(path);
 	if (key.first.empty()) {
-		filler(buf, ".f.wake", 0, 0);
+		filler(buf, ".f.fuse-waked", 0, 0);
 		for (auto &job : context.jobs) {
 			filler(buf, job.first.c_str(), 0, 0);
 			filler(buf, (".l." + job.first).c_str(), 0, 0);
