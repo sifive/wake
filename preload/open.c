@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+#include <dirent.h>
 
 #ifndef O_TMPFILE
 #define O_TMPFILE 0
@@ -300,3 +301,31 @@ int PREFIX(execle)(const char *path, const char *arg, ... /*, (char *) NULL, cha
   return PREFIX(execve)(path, argv, envp);
 }
 INTERPOSE(execle)
+
+struct dirent *PREFIX(readdir)(DIR *dirp) {
+  static struct dirent *(*orig)(DIR *);
+  FORWARD(readdir);
+  struct dirent *out;
+  do out = orig(dirp);
+  while (out &&
+    out->d_name[0] == '.' && out->d_name[1] == 'g' &&
+    out->d_name[2] == 'u' && out->d_name[3] == 'a' &&
+    out->d_name[4] == 'r' && out->d_name[5] == 'd' &&
+    out->d_name[6] == '-');
+  return out;
+}
+INTERPOSE(readdir)
+
+int PREFIX(readdir_r)(DIR *dirp, struct dirent *entry, struct dirent **result) {
+  static int (*orig)(DIR *, struct dirent *, struct dirent **);
+  FORWARD(readdir_r);
+  int out;
+  do out = orig(dirp, entry, result);
+  while (*result &&
+    entry->d_name[0] == '.' && entry->d_name[1] == 'g' &&
+    entry->d_name[2] == 'u' && entry->d_name[3] == 'a' &&
+    entry->d_name[4] == 'r' && entry->d_name[5] == 'd' &&
+    entry->d_name[6] == '-');
+  return out;
+}
+INTERPOSE(readdir_r)
