@@ -165,10 +165,13 @@ struct Task {
 };
 
 static bool operator < (const std::unique_ptr<Task> &x, const std::unique_ptr<Task> &y) {
+  // anything with dependants on stderr/stdout is infinity (ie: run first)
+  if (x->job->q_stdout || x->job->q_stderr) return false;
+  if (y->job->q_stdout || y->job->q_stderr) return true;
   // 0 (unknown runtime) is infinity for this comparison (ie: run first)
-  double xr = x->job->predict.runtime;
-  double yr = y->job->predict.runtime;
-  return xr != 0 && (yr == 0 || xr < yr);
+  if (x->job->predict.runtime == 0) return false;
+  if (y->job->predict.runtime == 0) return true;
+  return x->job->predict.runtime < y->job->predict.runtime;
 }
 
 // A JobEntry is a forked job with pid|stdout|stderr incomplete
