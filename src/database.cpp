@@ -177,7 +177,7 @@ std::string Database::open(bool wait, bool memory) {
   const char *sql_commit_txn = "commit transaction";
   const char *sql_vacuum = "vacuum";
   const char *sql_predict_job =
-    "select status, runtime, cputime, membytes, ibytes, obytes"
+    "select status, runtime, cputime, membytes, ibytes, obytes, pathtime"
     " from stats where hashcode=? order by stat_id desc limit 1";
   const char *sql_stats_job =
     "select status, runtime, cputime, membytes, ibytes, obytes"
@@ -607,7 +607,7 @@ Usage Database::reuse_job(
   return out;
 }
 
-Usage Database::predict_job(uint64_t hashcode)
+Usage Database::predict_job(uint64_t hashcode, double *pathtime)
 {
   Usage out;
   const char *why = "Could not predict a job";
@@ -620,6 +620,7 @@ Usage Database::predict_job(uint64_t hashcode)
     out.membytes = sqlite3_column_int64 (imp->predict_job, 3);
     out.ibytes   = sqlite3_column_int64 (imp->predict_job, 4);
     out.obytes   = sqlite3_column_int64 (imp->predict_job, 5);
+    *pathtime    = sqlite3_column_double(imp->predict_job, 6);
   } else {
     out.found    = false;
     out.status   = 0;
@@ -628,6 +629,7 @@ Usage Database::predict_job(uint64_t hashcode)
     out.membytes = 0;
     out.ibytes   = 0;
     out.obytes   = 0;
+    *pathtime    = 0;
   }
   finish_stmt(why, imp->predict_job, imp->debugdb);
   return out;

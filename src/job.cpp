@@ -74,6 +74,7 @@ struct Job : public Value {
   int log;
   std::shared_ptr<Value> bad_launch;
   std::shared_ptr<Value> bad_finish;
+  double pathtime;
   Usage record;  // retrieved from DB (user-facing usage)
   Usage predict; // prediction of Runners given record (used by scheduler)
   Usage reality; // actual measured local usage
@@ -171,7 +172,7 @@ static bool operator < (const std::unique_ptr<Task> &x, const std::unique_ptr<Ta
   // 0 (unknown runtime) is infinity for this comparison (ie: run first)
   if (x->job->predict.runtime == 0) return false;
   if (y->job->predict.runtime == 0) return true;
-  return x->job->predict.runtime < y->job->predict.runtime;
+  return x->job->pathtime < y->job->pathtime;
 }
 
 // A JobEntry is a forked job with pid|stdout|stderr incomplete
@@ -547,6 +548,8 @@ bool JobTable::wait(WorkQueue &queue) {
   struct timespec nowait;
   memset(&nowait, 0, sizeof(nowait));
 
+  launch(this);
+
   bool compute = false;
   while (!exit_now() && !imp->running.empty()) {
     fd_set set;
@@ -697,7 +700,6 @@ bool JobTable::wait(WorkQueue &queue) {
     }
 
     if (done > 0) {
-      launch(this);
       compute = true;
       break;
     }
@@ -936,7 +938,7 @@ static PRIMFN(prim_job_create) {
     mpz_cmp_si(keep->value,0),
     mpz_get_si(log->value));
 
-  out->record = jobtable->imp->db->predict_job(out->code.data[0]);
+  out->record = jobtable->imp->db->predict_job(out->code.data[0], &out->pathtime);
 
   out->db->insert_job(
     dir->value,
