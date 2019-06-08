@@ -60,13 +60,16 @@ struct Database::detail {
   sqlite3_stmt *delete_jobs;
   sqlite3_stmt *delete_dups;
   sqlite3_stmt *delete_stats;
+  sqlite3_stmt *revtop_order;
+  sqlite3_stmt *setcrit_path;
+
   long run_id;
   detail(bool debugdb_)
    : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), add_target(0), del_target(0), begin_txn(0),
      commit_txn(0), vacuum(0), predict_job(0), stats_job(0), insert_job(0), insert_tree(0), insert_log(0),
      wipe_file(0), insert_file(0), update_file(0), get_log(0), get_tree(0), add_stats(0), link_stats(0),
      detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0), find_owner(0),
-     fetch_hash(0), delete_jobs(0), delete_dups(0), delete_stats(0) { }
+     fetch_hash(0), delete_jobs(0), delete_dups(0), delete_stats(0), revtop_order(0), setcrit_path(0) { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -117,10 +120,11 @@ std::string Database::open(bool wait, bool memory) {
     "  cputime    real    not null,"
     "  membytes   integer not null,"
     "  ibytes     integer not null,"
-    "  obytes     integer not null);"
+    "  obytes     integer not null,"
+    "  pathtime   real);"
     "create index if not exists stathash on stats(hashcode);"
     "create table if not exists jobs("
-    "  job_id      integer primary key,"
+    "  job_id      integer primary key autoincrement,"
     "  run_id      integer not null references runs(run_id),"
     "  use_id      integer not null references runs(run_id),"
     "  directory   text    not null,"
@@ -240,6 +244,13 @@ std::string Database::open(bool wait, bool memory) {
     " (select stat_id from stats"
     "  where stat_id not in (select stat_id from jobs)"
     "  order by stat_id desc limit 9999999 offset 4*(select count(*) from jobs))";
+  const char *sql_revtop_order =
+    "select job_id from jobs where use_id=(select max(run_id) from runs) order by job_id desc;";
+  const char *sql_setcrit_path =
+    "update stats set pathtime=runtime+("
+    "  select coalesce(max(s.pathtime),0) from filetree f1, filetree f2, jobs j, stats s"
+    "  where f1.job_id=?1 and f1.access=2 and f1.file_id=f2.file_id and f2.access=1 and f2.job_id=j.job_id and j.stat_id=s.stat_id"
+    ") where stat_id=(select stat_id from jobs where job_id=?1);";
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
@@ -278,6 +289,8 @@ std::string Database::open(bool wait, bool memory) {
   PREPARE(sql_delete_jobs,    delete_jobs);
   PREPARE(sql_delete_dups,    delete_dups);
   PREPARE(sql_delete_stats,   delete_stats);
+  PREPARE(sql_revtop_order,   revtop_order);
+  PREPARE(sql_setcrit_path,   setcrit_path);
 
   return "";
 }
@@ -325,6 +338,8 @@ void Database::close() {
   FINALIZE(delete_jobs);
   FINALIZE(delete_dups);
   FINALIZE(delete_stats);
+  FINALIZE(revtop_order);
+  FINALIZE(setcrit_path);
 
   if (imp->db) {
     int ret = sqlite3_close(imp->db);
@@ -503,6 +518,15 @@ void Database::prepare() {
 }
 
 void Database::clean() {
+  const char *why = "Could not compute critical path";
+  begin_txn();
+  while (sqlite3_step(imp->revtop_order) == SQLITE_ROW) {
+    bind_integer(why, imp->setcrit_path, 1, sqlite3_column_int64(imp->revtop_order, 0));
+    single_step(why, imp->setcrit_path, imp->debugdb);
+  }
+  finish_stmt(why, imp->revtop_order, imp->debugdb);
+  end_txn();
+
   single_step("Could not clean database jobs",  imp->delete_jobs,  imp->debugdb);
   single_step("Could not clean database dups",  imp->delete_dups,  imp->debugdb);
   single_step("Could not clean database stats", imp->delete_stats, imp->debugdb);
