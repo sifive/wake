@@ -851,7 +851,6 @@ static PRIMFN(prim_job_launch) {
     stdin->value,
     env->value,
     cmd->value));
-  launch(jobtable);
 
   auto out = make_unit();
   RETURN(out);
