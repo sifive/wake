@@ -206,7 +206,7 @@ static bool lex_rstr(Lexer &lex, Expr *&out)
         re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
         re2c:define:YYFILL:naked = 1;
         *                    { return false; }
-        "\\`"                { slice.push_back('\\'); continue; }
+        "\\`"                { slice.push_back('`'); continue; }
         "`"                  { break; }
         [^\x00]              { slice.append(in.tok, in.cur); continue; }
     */
