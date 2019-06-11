@@ -19,6 +19,7 @@
 #include "job.h"
 #include <sstream>
 #include <limits>
+#include <iomanip>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <signal.h>
@@ -174,14 +175,47 @@ static void status_redraw()
   }
 
   if (tty && rows3 > 0 && cols > 4 && status_state.remain > 0) {
-    os << "[";
+    std::stringstream eta;
+    long seconds = lround(status_state.remain);
+    if (seconds > 3600) {
+      eta << (seconds / 3600);
+      eta << ":" << std::setfill('0') << std::setw(2);
+    }
+    eta << ((seconds % 3600) / 60);
+    eta << ":" << std::setfill('0') << std::setw(2);
+    eta << (seconds % 60);
+    auto etas = eta.str();
+    long width = etas.size();
+
     double progress = status_state.total - status_state.remain;
     long hashes = lround(floor((cols-2)*progress/status_state.total));
     long current = lround(floor((cols-2)*(progress+status_state.current)*ALMOST_ONE/status_state.total)) - hashes;
     long spaces = cols-3-hashes-current;
-    for (; hashes;  --hashes)  os << "#";
-    for (; current; --current) os << ".";
-    for (; spaces;  --spaces)  os << " ";
+
+    os << "[";
+    if (spaces >= width+3) {
+      for (; hashes;  --hashes)  os << "#";
+      for (; current; --current) os << ".";
+      spaces -= width+2;
+      for (; spaces;  --spaces)  os << " ";
+      os << etas << "  ";
+    } else if (current >= width+4) {
+      current -= width+3;
+      for (; hashes;  --hashes)  os << "#";
+      for (; current; --current) os << ".";
+      os << " " << etas << " .";
+      for (; spaces;  --spaces)  os << " ";
+    } else if (hashes >= width+4) {
+      hashes -= width+3;
+      os << "# " << etas << " ";
+      for (; hashes;  --hashes)  os << "#";
+      for (; current; --current) os << ".";
+      for (; spaces;  --spaces)  os << " ";
+    } else {
+      for (; hashes;  --hashes)  os << "#";
+      for (; current; --current) os << ".";
+      for (; spaces;  --spaces)  os << " ";
+    }
     os << "]" << std::endl;
     ++used;
   }
