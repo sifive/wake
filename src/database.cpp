@@ -180,7 +180,7 @@ std::string Database::open(bool wait, bool memory) {
     "select status, runtime, cputime, membytes, ibytes, obytes, pathtime"
     " from stats where hashcode=? order by stat_id desc limit 1";
   const char *sql_stats_job =
-    "select status, runtime, cputime, membytes, ibytes, obytes"
+    "select status, runtime, cputime, membytes, ibytes, obytes, pathtime"
     " from stats where stat_id=?";
   const char *sql_insert_job =
     "insert into jobs(run_id, use_id, directory, commandline, environment, stack, stdin)"
@@ -549,7 +549,8 @@ Usage Database::reuse_job(
   const std::string &visible,
   bool check,
   long &job,
-  std::vector<FileReflection> &files)
+  std::vector<FileReflection> &files,
+  double *pathtime)
 {
   Usage out;
   long stat_id;
@@ -582,6 +583,7 @@ Usage Database::reuse_job(
     out.membytes = sqlite3_column_int64 (imp->stats_job, 3);
     out.ibytes   = sqlite3_column_int64 (imp->stats_job, 4);
     out.obytes   = sqlite3_column_int64 (imp->stats_job, 5);
+    *pathtime    = sqlite3_column_double(imp->stats_job, 6);
   } else {
     out.found = false;
   }

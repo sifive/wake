@@ -41,7 +41,8 @@
 #include <list>
 #include <vector>
 #include <cstring>
-#include <queue>
+#include <algorithm>
+#include <limits>
 
 // How many times to SIGTERM a process before SIGKILL
 #define TERM_ATTEMPTS 6
@@ -51,6 +52,10 @@
 #define MAX_SELF_FDS	24
 // The most children wake will ever allow to run at once
 #define MAX_CHILDREN	500
+
+// #define DEBUG_PROGRESS
+
+#define ALMOST_ONE (1.0 - 2*std::numeric_limits<double>::epsilon())
 
 #define STATE_FORKED	1  // in database and running
 #define STATE_STDOUT	2  // stdout fully in database
@@ -196,7 +201,7 @@ double JobEntry::runtime(struct timeval now) {
 // Implementation details for a JobTable
 struct JobTable::detail {
   std::list<JobEntry> running;
-  std::priority_queue<std::unique_ptr<Task> > pending;
+  std::vector<std::unique_ptr<Task> > pending;
   sigset_t block; // signals that can race with pselect()
   Database *db;
   double active, limit; // CPUs
@@ -462,10 +467,11 @@ static void launch(JobTable *jobtable) {
   //     a - it would waste idle compute if we don't schedule something
   //     b - it would hurt the build critical path if we schedule a sub-optimal job
   // => just oversubscribe compute and let the kernel sort it out
-  while (!jobtable->imp->pending.empty()
+  auto &heap = jobtable->imp->pending;
+  while (!heap.empty()
       && jobtable->imp->running.size() < (size_t)jobtable->imp->max_children
       && jobtable->imp->active < jobtable->imp->limit) {
-    Task &task = *jobtable->imp->pending.top();
+    Task &task = *heap.front();
     jobtable->imp->active += task.job->threads();
 
     jobtable->imp->running.emplace_back();
@@ -539,7 +545,9 @@ static void launch(JobTable *jobtable) {
 
     // i.job->stdin.clear();
     // i.job->cmdline.clear();
-    jobtable->imp->pending.pop();
+
+    std::pop_heap(heap.begin(), heap.end());
+    heap.resize(heap.size()-1);
   }
 }
 
@@ -695,6 +703,23 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->reality.ibytes   = rusage.ru_inblock * UINT64_C(512);
           i.job->reality.obytes   = rusage.ru_oublock * UINT64_C(512);
           i.job->process(queue);
+
+          // If this was the job on the critical path, adjust remain
+          if (i.job->pathtime == status_state.remain) {
+            double max = (i.job->pathtime - i.job->record.runtime) * ALMOST_ONE;
+            for (auto &j : imp->running)
+              if (j.job != i.job && j.job->pathtime > max)
+                max = j.job->pathtime;
+            for (auto &j : imp->pending)
+              if (j->job->pathtime > max)
+                max = j->job->pathtime;
+#ifdef DEBUG_PROGRESS
+            std::cerr << "RUN DONE CRIT: "
+              << status_state.remain << " => " << max << "  /  "
+              << status_state.total << std::endl;
+#endif
+            status_state.remain = max;
+          }
         }
       }
     }
@@ -845,12 +870,25 @@ static PRIMFN(prim_job_launch) {
 
   REQUIRE (job->state == 0);
 
-  jobtable->imp->pending.emplace(new Task(
+  auto &heap = jobtable->imp->pending;
+  heap.emplace_back(new Task(
     std::dynamic_pointer_cast<Job>(args[0]),
     dir->value,
     stdin->value,
     env->value,
     cmd->value));
+  std::push_heap(heap.begin(), heap.end());
+
+  // If a scheduled job claims a longer critical path, we need to adjust the total path time
+  if (job->pathtime >= status_state.remain) {
+#ifdef DEBUG_PROGRESS
+    std::cerr << "RUN RAISE CRIT: "
+      << status_state.remain << " => " << job->pathtime << "  /  "
+      << status_state.total  << " => " << (job->pathtime + status_state.total - status_state.remain) << std::endl;
+#endif
+    status_state.total += job->pathtime - status_state.remain;
+    status_state.remain = job->pathtime;
+  }
 
   auto out = make_unit();
   RETURN(out);
@@ -995,6 +1033,7 @@ static PRIMFN(prim_job_cache) {
   STRING(visible, 4);
 
   long job;
+  double pathtime;
   std::vector<FileReflection> files;
   Usage reuse = jobtable->imp->db->reuse_job(
     dir->value,
@@ -1004,7 +1043,8 @@ static PRIMFN(prim_job_cache) {
     visible->value,
     jobtable->imp->check,
     job,
-    files);
+    files,
+    &pathtime);
 
   std::vector<std::shared_ptr<Value> > jobs;
   if (reuse.found && !jobtable->imp->check) {
@@ -1014,7 +1054,26 @@ static PRIMFN(prim_job_cache) {
     out->record  = reuse;
     // predict + reality unusued since Job not run
     out->report  = reuse;
+    out->pathtime = pathtime;
     jobs.emplace_back(std::move(out));
+
+    // Even though this job is not run, it might have been the 'next' job of something that DID run
+    if (pathtime >= status_state.remain && pathtime*ALMOST_ONE*ALMOST_ONE <= status_state.remain) {
+      double max = (pathtime - reuse.runtime) * ALMOST_ONE;
+      for (auto &j : jobtable->imp->running)
+        if (j.job->pathtime > max)
+          max = j.job->pathtime;
+      for (auto &j : jobtable->imp->pending)
+        if (j->job->pathtime > max)
+          max = j->job->pathtime;
+#ifdef DEBUG_PROGRESS
+      std::cerr << "DECREASE CRIT: "
+        << status_state.remain << " => " << max << "  /  "
+        << status_state.total  << " => " << (status_state.total - status_state.remain - max) << std::endl;
+#endif
+      status_state.total -= status_state.remain - max;
+      status_state.remain = max;
+    }
   }
 
   auto out = make_tuple2(make_list(std::move(jobs)), convert_tree(std::move(files)));
