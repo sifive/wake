@@ -198,6 +198,11 @@ double JobEntry::runtime(struct timeval now) {
   return now.tv_sec - start.tv_sec + (now.tv_usec - start.tv_usec)/1000000.0;
 }
 
+struct CriticalJob {
+  double pathtime;
+  double runtime;
+};
+
 // Implementation details for a JobTable
 struct JobTable::detail {
   std::list<JobEntry> running;
@@ -209,7 +214,29 @@ struct JobTable::detail {
   bool verbose;
   bool quiet;
   bool check;
+  struct timeval wall;
+
+  CriticalJob critJob(double nexttime) const;
 };
+
+CriticalJob JobTable::detail::critJob(double nexttime) const {
+  CriticalJob out;
+  out.pathtime = nexttime;
+  out.runtime = 0;
+  for (auto &j : running) {
+    if (j.pid && j.job->pathtime > out.pathtime) {
+      out.pathtime = j.job->pathtime;
+      out.runtime = j.job->record.runtime;
+    }
+  }
+  for (auto &j : pending) {
+    if (j->job->pathtime > out.pathtime) {
+      out.pathtime = j->job->pathtime;
+      out.runtime = j->job->record.runtime;
+    }
+  }
+  return out;
+}
 
 static volatile bool child_ready = false;
 static volatile bool exit_asap = false;
@@ -706,29 +733,28 @@ bool JobTable::wait(WorkQueue &queue) {
 
           // If this was the job on the critical path, adjust remain
           if (i.job->pathtime == status_state.remain) {
-            double max = (i.job->pathtime - i.job->record.runtime) * ALMOST_ONE;
-            double run = 0;
-            for (auto &j : imp->running) {
-              if (j.pid && j.job->pathtime > max) {
-                max = j.job->pathtime;
-                run = j.job->record.runtime;
-              }
-            }
-            for (auto &j : imp->pending) {
-              if (j->job->pathtime > max) {
-                max = j->job->pathtime;
-                run = j->job->record.runtime;
-              }
-            }
+            auto crit = imp->critJob(ALMOST_ONE * (i.job->pathtime - i.job->record.runtime));
 #ifdef DEBUG_PROGRESS
             std::cerr << "RUN DONE CRIT: "
-              << status_state.remain << " => " << max << "  /  "
+              << status_state.remain << " => " << crit.pathtime << "  /  "
               << status_state.total << std::endl;
 #endif
-            status_state.remain = max;
-            status_state.current = run;
+            status_state.remain = crit.pathtime;
+            status_state.current = crit.runtime;
+            if (crit.runtime == 0) imp->wall = now;
           }
         }
+      }
+    }
+
+    // In case the expected next critical job is never scheduled, fall back to the next
+    double dwall = (now.tv_sec - imp->wall.tv_sec) + (now.tv_usec - imp->wall.tv_usec) / 1000000.0;
+    if (status_state.current == 0 && dwall*5 > status_state.remain) {
+      auto crit = imp->critJob(0);
+      if (crit.runtime != 0) {
+        status_state.total -= status_state.remain - crit.pathtime;
+        status_state.remain = crit.pathtime;
+        status_state.current = crit.runtime;
       }
     }
 
@@ -1068,28 +1094,16 @@ static PRIMFN(prim_job_cache) {
 
     // Even though this job is not run, it might have been the 'next' job of something that DID run
     if (pathtime >= status_state.remain && pathtime*ALMOST_ONE*ALMOST_ONE <= status_state.remain) {
-      double max = (pathtime - reuse.runtime) * ALMOST_ONE;
-      double run = 0;
-      for (auto &j : jobtable->imp->running) {
-        if (j.job->pathtime > max) {
-          max = j.job->pathtime;
-          run = j.job->record.runtime;
-        }
-      }
-      for (auto &j : jobtable->imp->pending) {
-        if (j->job->pathtime > max) {
-          max = j->job->pathtime;
-          run = j->job->record.runtime;
-        }
-      }
+      auto crit = jobtable->imp->critJob(ALMOST_ONE * (pathtime - reuse.runtime));
 #ifdef DEBUG_PROGRESS
       std::cerr << "DECREASE CRIT: "
-        << status_state.remain << " => " << max << "  /  "
-        << status_state.total  << " => " << (status_state.total - status_state.remain - max) << std::endl;
+        << status_state.remain << " => " << crit.pathtime << "  /  "
+        << status_state.total  << " => " << (status_state.total - status_state.remain - crit.pathtime) << std::endl;
 #endif
-      status_state.total -= status_state.remain - max;
-      status_state.remain = max;
-      status_state.current = run;
+      status_state.total -= status_state.remain - crit.pathtime;
+      status_state.remain = crit.pathtime;
+      status_state.current = crit.runtime;
+      if (crit.runtime == 0) gettimeofday(&jobtable->imp->wall, 0);
     }
   }
 
