@@ -116,7 +116,9 @@ static void status_redraw()
   }
 
   int total = status_state.jobs.size();
-  if (tty && rows >= 6 && cols > 16) for (auto &x : status_state.jobs) {
+  int rows3 = rows/3;
+  int overall = status_state.remain > 0 ? 1 : 0;
+  if (tty && rows3 >= 2+overall && cols > 16) for (auto &x : status_state.jobs) {
     double runtime =
       (now.tv_sec  - x.launch.tv_sec) +
       (now.tv_usec - x.launch.tv_usec) / 1000000.0;
@@ -160,11 +162,22 @@ static void status_redraw()
 
     os << progress << cut << std::endl;
     ++used;
-    if (used != total && used == (rows/3)-1) { // use at most 1/3 of the space (rows >= 6)
+    if (used != total && used == rows3-1-overall) { // use at most 1/3 of the space
       os << "... +" << (total-used) << " more" << std::endl;
       ++used;
       break;
     }
+  }
+
+  if (tty && rows3 > 0 && cols > 4 && status_state.remain > 0) {
+    os << "[";
+    double progress = status_state.total - status_state.remain;
+    long hashes = lround(floor((cols-2)*progress/status_state.total));
+    long spaces = cols-3-hashes;
+    for (; hashes; --hashes) os << "#";
+    for (; spaces; --spaces) os << " ";
+    os << "]" << std::endl;
+    ++used;
   }
 
   std::string s = os.str();
