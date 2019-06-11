@@ -37,8 +37,9 @@ struct StatusState {
   // critical path stats:
   double remain;
   double total;
+  double current;
 
-  StatusState() : jobs(), remain(0), total(0) { }
+  StatusState() : jobs(), remain(0), total(0), current(0) { }
 };
 
 extern StatusState status_state;

@@ -18,6 +18,7 @@
 #include "status.h"
 #include "job.h"
 #include <sstream>
+#include <limits>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <signal.h>
@@ -29,11 +30,14 @@
 #include <term.h>
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 
 // How often is the status updated (should be a multiple of 2 for budget=0)
 #define REFRESH_HZ 6
 // Processes which last less than this time do not get displayed
 #define MIN_DRAW_TIME 0.2
+
+#define ALMOST_ONE (1.0 - 2*std::numeric_limits<double>::epsilon())
 
 StatusState status_state;
 
@@ -173,9 +177,11 @@ static void status_redraw()
     os << "[";
     double progress = status_state.total - status_state.remain;
     long hashes = lround(floor((cols-2)*progress/status_state.total));
-    long spaces = cols-3-hashes;
-    for (; hashes; --hashes) os << "#";
-    for (; spaces; --spaces) os << " ";
+    long current = lround(floor((cols-2)*(progress+status_state.current)*ALMOST_ONE/status_state.total)) - hashes;
+    long spaces = cols-3-hashes-current;
+    for (; hashes;  --hashes)  os << "#";
+    for (; current; --current) os << ".";
+    for (; spaces;  --spaces)  os << " ";
     os << "]" << std::endl;
     ++used;
   }

@@ -707,18 +707,26 @@ bool JobTable::wait(WorkQueue &queue) {
           // If this was the job on the critical path, adjust remain
           if (i.job->pathtime == status_state.remain) {
             double max = (i.job->pathtime - i.job->record.runtime) * ALMOST_ONE;
-            for (auto &j : imp->running)
-              if (j.job != i.job && j.job->pathtime > max)
+            double run = 0;
+            for (auto &j : imp->running) {
+              if (j.job != i.job && j.job->pathtime > max) {
                 max = j.job->pathtime;
-            for (auto &j : imp->pending)
-              if (j->job->pathtime > max)
+                run = j.job->record.runtime;
+              }
+            }
+            for (auto &j : imp->pending) {
+              if (j->job->pathtime > max) {
                 max = j->job->pathtime;
+                run = j->job->record.runtime;
+              }
+            }
 #ifdef DEBUG_PROGRESS
             std::cerr << "RUN DONE CRIT: "
               << status_state.remain << " => " << max << "  /  "
               << status_state.total << std::endl;
 #endif
             status_state.remain = max;
+            status_state.current = run;
           }
         }
       }
@@ -888,6 +896,7 @@ static PRIMFN(prim_job_launch) {
 #endif
     status_state.total += job->pathtime - status_state.remain;
     status_state.remain = job->pathtime;
+    status_state.current = job->record.runtime;
   }
 
   auto out = make_unit();
@@ -1060,12 +1069,19 @@ static PRIMFN(prim_job_cache) {
     // Even though this job is not run, it might have been the 'next' job of something that DID run
     if (pathtime >= status_state.remain && pathtime*ALMOST_ONE*ALMOST_ONE <= status_state.remain) {
       double max = (pathtime - reuse.runtime) * ALMOST_ONE;
-      for (auto &j : jobtable->imp->running)
-        if (j.job->pathtime > max)
+      double run = 0;
+      for (auto &j : jobtable->imp->running) {
+        if (j.job->pathtime > max) {
           max = j.job->pathtime;
-      for (auto &j : jobtable->imp->pending)
-        if (j->job->pathtime > max)
+          run = j.job->record.runtime;
+        }
+      }
+      for (auto &j : jobtable->imp->pending) {
+        if (j->job->pathtime > max) {
           max = j->job->pathtime;
+          run = j->job->record.runtime;
+        }
+      }
 #ifdef DEBUG_PROGRESS
       std::cerr << "DECREASE CRIT: "
         << status_state.remain << " => " << max << "  /  "
@@ -1073,6 +1089,7 @@ static PRIMFN(prim_job_cache) {
 #endif
       status_state.total -= status_state.remain - max;
       status_state.remain = max;
+      status_state.current = run;
     }
   }
 
