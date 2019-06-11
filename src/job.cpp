@@ -709,7 +709,7 @@ bool JobTable::wait(WorkQueue &queue) {
             double max = (i.job->pathtime - i.job->record.runtime) * ALMOST_ONE;
             double run = 0;
             for (auto &j : imp->running) {
-              if (j.job != i.job && j.job->pathtime > max) {
+              if (j.pid && j.job->pathtime > max) {
                 max = j.job->pathtime;
                 run = j.job->record.runtime;
               }
