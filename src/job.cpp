@@ -443,7 +443,7 @@ struct CompletedJobEntry {
 
   bool operator () (const JobEntry &i) {
     if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
-      status_state.erase(i.status);
+      status_state.jobs.erase(i.status);
       jobtable->imp->active -= i.job->threads();
       return true;
     }
@@ -513,7 +513,7 @@ static void launch(JobTable *jobtable) {
     close(pipe_stderr[1]);
     bool indirect = i.job->cmdline != task.cmdline;
     double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
-    i.status = status_state.emplace(status_state.end(), pretty_cmd(i.job->cmdline), predict, i.start);
+    i.status = status_state.jobs.emplace(status_state.jobs.end(), pretty_cmd(i.job->cmdline), predict, i.start);
     if (LOG_ECHO(i.job->log)) {
       std::stringstream s;
       s << pretty_cmd(i.job->cmdline);

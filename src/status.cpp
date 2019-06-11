@@ -35,7 +35,7 @@
 // Processes which last less than this time do not get displayed
 #define MIN_DRAW_TIME 0.2
 
-std::list<Status> status_state;
+StatusState status_state;
 
 static volatile bool refresh_needed = false;
 static volatile bool resize_detected = false;
@@ -115,8 +115,8 @@ static void status_redraw()
     }
   }
 
-  int total = status_state.size();
-  if (tty && rows >= 6 && cols > 16) for (auto &x : status_state) {
+  int total = status_state.jobs.size();
+  if (tty && rows >= 6 && cols > 16) for (auto &x : status_state.jobs) {
     double runtime =
       (now.tv_sec  - x.launch.tv_sec) +
       (now.tv_usec - x.launch.tv_usec) / 1000000.0;
