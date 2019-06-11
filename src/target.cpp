@@ -38,11 +38,12 @@ struct HashHasher {
 };
 
 struct Target : public Value {
+  Location location;
   std::unordered_map<Hash, TargetValue, HashHasher> table;
 
   static const TypeDescriptor type;
   static TypeVar typeVar;
-  Target() : Value(&type) { }
+  Target(const Location &location_) : Value(&type), location(location_) { }
 
   void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
@@ -79,13 +80,13 @@ static PRIMFN(prim_hash) {
 }
 
 static PRIMTYPE(type_tnew) {
-  return args.size() == 0 &&
+  return args.size() == 1 &&
     out->unify(Target::typeVar);
 }
 
 static PRIMFN(prim_tnew) {
-  EXPECT(0);
-  auto out = std::make_shared<Target>();
+  EXPECT(1);
+  auto out = std::make_shared<Target>(binding->expr->location);
   RETURN(out);
 }
 
@@ -132,7 +133,7 @@ static PRIMFN(prim_tget) {
 
   if (!(ref.first->second.subhash == subhash)) {
     std::stringstream ss;
-    ss << "ERROR: Target subkey mismatch for " << binding->expr->location.text() << std::endl;
+    ss << "ERROR: Target subkey mismatch for " << target->location.text() << std::endl;
     if (queue.stack_trace)
       for (auto &x : binding->stack_trace())
         ss << "  from " << x.file() << std::endl;
