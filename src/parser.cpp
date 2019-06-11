@@ -1050,7 +1050,9 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
     }
     case TARGET: {
       auto def = parse_def(lex, true);
-      bind_def(lex, map, Definition("table " + def.name, def.location, new Prim(def.location, "tnew")));
+      auto &l = def.body->location;
+      bind_def(lex, map, Definition("table " + def.name, def.location,
+        new App(l, new Lambda(l, "_", new Prim(l, "tnew")), new VarRef(l, "Unit"))));
       bind_def(lex, map, std::move(def), global?top:0);
       break;
     }
