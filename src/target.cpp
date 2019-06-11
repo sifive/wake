@@ -23,7 +23,9 @@
 #include "expr.h"
 #include "type.h"
 #include <sstream>
+#include <iostream>
 #include <unordered_map>
+#include <list>
 
 struct TargetValue {
   Hash subhash;
@@ -38,23 +40,56 @@ struct HashHasher {
 };
 
 struct Target : public Value {
+  typedef std::list<std::weak_ptr<Target> > LiveList;
+
   Location location;
+  LiveList::iterator self;
   std::unordered_map<Hash, TargetValue, HashHasher> table;
 
   static const TypeDescriptor type;
   static TypeVar typeVar;
-  static long live;
+  static LiveList live;
 
-  Target(const Location &location_) : Value(&type), location(location_) { ++live; }
-  ~Target() { --live; }
+  Target(const Location &location_) : Value(&type), location(location_) { }
+  ~Target() { live.erase(self); }
 
   void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 };
 
-long Target::live = 0;
-bool targets_live() { return Target::live != 0; }
+Target::LiveList Target::live;
+bool targets_live(bool verbose) {
+  std::shared_ptr<Target> leak;
+  bool future = false;
+
+  // If any targets are live, we either have a leak or infinite recursion
+  for (auto x : Target::live) {
+    if (auto t = x.lock()) {
+      if (!leak) leak = t;
+      bool first = true;
+      for (auto &y : t->table) {
+        if (!y.second.future.value) {
+          if (verbose && !future) {
+            std::cerr << "Infinite target recursion detected" << std::endl;
+          }
+          if (verbose && first) {
+            std::cerr << "  in " << t->location.text() << std::endl;
+          }
+          first = false;
+          future = true;
+        }
+      }
+    }
+  }
+  if (verbose && !future && leak) {
+    std::cerr << "Memory leak detected involving " << leak->location.text()
+      << "; see https://github.com/sifive/wake/issues/184 for details." << std::endl;
+    for (auto &y : leak->table)
+      std::cerr << "  contains " << y.second.future.value << std::endl;
+  }
+  return future;
+}
 
 const TypeDescriptor Target::type("_Target");
 
@@ -93,6 +128,8 @@ static PRIMTYPE(type_tnew) {
 static PRIMFN(prim_tnew) {
   EXPECT(1);
   auto out = std::make_shared<Target>(binding->expr->location);
+  Target::live.push_front(out);
+  out->self = Target::live.begin();
   RETURN(out);
 }
 

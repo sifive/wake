@@ -776,8 +776,7 @@ int main(int argc, char **argv) {
   db.clean();
   db.close();
 
-  if (!queue.abort && targets_live()) {
-    if (verbose) std::cerr << "Infinite target recursion detected" << std::endl;
+  if (!JobTable::exit_now() && !queue.abort && targets_live(verbose)) {
     jobtable.hang();
   } else {
     std::cout << os.str();

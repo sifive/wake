@@ -111,6 +111,6 @@ void prim_register_target(PrimMap &pmap);
 void prim_register_json(PrimMap &pmap);
 void prim_register_job(JobTable *jobtable, PrimMap &pmap);
 void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimMap &pmap);
-bool targets_live();
+bool targets_live(bool verbose);
 
 #endif
