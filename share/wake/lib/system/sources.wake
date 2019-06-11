@@ -23,7 +23,7 @@ def got_sources = add_sources (subscribe source).implode # returns true
 # Depending on when the method is invoked, the results may vary
 global def files dir regexp = prim "files"
 
-global def source file =
+def raw_source file =
   def get_modtime file = prim "get_modtime"
   def time = get_modtime file
   if time == -1
@@ -33,11 +33,19 @@ global def source file =
     | setPlanShare       False
     | setPlanEcho        Debug
     | setPlanEnvironment Nil
-    | setPlanFnOutputs   (file.simplify, _)
+    | setPlanFnOutputs   (file, _)
     | runJobWith virtualRunner
     | getJobOutput
+
+global def source file =
+  def basename = replace `^.*/` '' file
+  def dirname = simplify "{file}/.."
+  match (sources dirname basename.quote)
+    Nil = makeBadPath "{file}: not a source file".makeError
+    x, Nil = x
+    _ = panic "unreachable: multiple sources match the same regexp"
 
 # Find sources files
 global def sources dir filterRegexp =
   def scan dir regexp = prim "sources"
-  waitOne (\_ scan dir filterRegexp | map source) got_sources
+  waitOne (\_ scan dir filterRegexp | map raw_source) got_sources

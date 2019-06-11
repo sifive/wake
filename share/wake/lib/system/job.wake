@@ -474,21 +474,25 @@ data Path =
   Path    (name: String)
   BadPath (error: Error)
 
-global def getPathName path = match path
-  Path name = name
-  BadPath _ = "BADPATH"
-
 global def getPathResult path = match path
   BadPath e = Fail e
   _         = Pass path
 
-global def getPathParent path = match path
-  Path name = Path (simplify "{name}/..")
-  BadPath e = BadPath e
-
 global def getPathError path = match path
   Path _    = None
   BadPath e = Some e
+
+global def getPathName path = match path
+  Path name = name
+  BadPath _ = "BADPATH"
+
+global def getPathChild path = match path
+  Path name = replace `^.*/` '' name
+  BadPath _ = "BADPATH"
+
+global def getPathParent path = match path
+  Path name = Path (simplify "{name}/..")
+  BadPath e = BadPath e
 
 def addhash f =
   def p = simplify f
