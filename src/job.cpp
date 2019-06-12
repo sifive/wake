@@ -41,7 +41,8 @@
 #include <list>
 #include <vector>
 #include <cstring>
-#include <queue>
+#include <algorithm>
+#include <limits>
 
 // How many times to SIGTERM a process before SIGKILL
 #define TERM_ATTEMPTS 6
@@ -51,6 +52,10 @@
 #define MAX_SELF_FDS	24
 // The most children wake will ever allow to run at once
 #define MAX_CHILDREN	500
+
+// #define DEBUG_PROGRESS
+
+#define ALMOST_ONE (1.0 - 2*std::numeric_limits<double>::epsilon())
 
 #define STATE_FORKED	1  // in database and running
 #define STATE_STDOUT	2  // stdout fully in database
@@ -74,6 +79,7 @@ struct Job : public Value {
   int log;
   std::shared_ptr<Value> bad_launch;
   std::shared_ptr<Value> bad_finish;
+  double pathtime;
   Usage record;  // retrieved from DB (user-facing usage)
   Usage predict; // prediction of Runners given record (used by scheduler)
   Usage reality; // actual measured local usage
@@ -165,10 +171,13 @@ struct Task {
 };
 
 static bool operator < (const std::unique_ptr<Task> &x, const std::unique_ptr<Task> &y) {
+  // anything with dependants on stderr/stdout is infinity (ie: run first)
+  if (x->job->q_stdout || x->job->q_stderr) return false;
+  if (y->job->q_stdout || y->job->q_stderr) return true;
   // 0 (unknown runtime) is infinity for this comparison (ie: run first)
-  double xr = x->job->predict.runtime;
-  double yr = y->job->predict.runtime;
-  return xr != 0 && (yr == 0 || xr < yr);
+  if (x->job->predict.runtime == 0) return false;
+  if (y->job->predict.runtime == 0) return true;
+  return x->job->pathtime < y->job->pathtime;
 }
 
 // A JobEntry is a forked job with pid|stdout|stderr incomplete
@@ -189,10 +198,15 @@ double JobEntry::runtime(struct timeval now) {
   return now.tv_sec - start.tv_sec + (now.tv_usec - start.tv_usec)/1000000.0;
 }
 
+struct CriticalJob {
+  double pathtime;
+  double runtime;
+};
+
 // Implementation details for a JobTable
 struct JobTable::detail {
   std::list<JobEntry> running;
-  std::priority_queue<std::unique_ptr<Task> > pending;
+  std::vector<std::unique_ptr<Task> > pending;
   sigset_t block; // signals that can race with pselect()
   Database *db;
   double active, limit; // CPUs
@@ -200,7 +214,29 @@ struct JobTable::detail {
   bool verbose;
   bool quiet;
   bool check;
+  struct timeval wall;
+
+  CriticalJob critJob(double nexttime) const;
 };
+
+CriticalJob JobTable::detail::critJob(double nexttime) const {
+  CriticalJob out;
+  out.pathtime = nexttime;
+  out.runtime = 0;
+  for (auto &j : running) {
+    if (j.pid && j.job->pathtime > out.pathtime) {
+      out.pathtime = j.job->pathtime;
+      out.runtime = j.job->record.runtime;
+    }
+  }
+  for (auto &j : pending) {
+    if (j->job->pathtime > out.pathtime) {
+      out.pathtime = j->job->pathtime;
+      out.runtime = j->job->record.runtime;
+    }
+  }
+  return out;
+}
 
 static volatile bool child_ready = false;
 static volatile bool exit_asap = false;
@@ -439,7 +475,7 @@ struct CompletedJobEntry {
 
   bool operator () (const JobEntry &i) {
     if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
-      status_state.erase(i.status);
+      status_state.jobs.erase(i.status);
       jobtable->imp->active -= i.job->threads();
       return true;
     }
@@ -458,10 +494,11 @@ static void launch(JobTable *jobtable) {
   //     a - it would waste idle compute if we don't schedule something
   //     b - it would hurt the build critical path if we schedule a sub-optimal job
   // => just oversubscribe compute and let the kernel sort it out
-  while (!jobtable->imp->pending.empty()
+  auto &heap = jobtable->imp->pending;
+  while (!heap.empty()
       && jobtable->imp->running.size() < (size_t)jobtable->imp->max_children
       && jobtable->imp->active < jobtable->imp->limit) {
-    Task &task = *jobtable->imp->pending.top();
+    Task &task = *heap.front();
     jobtable->imp->active += task.job->threads();
 
     jobtable->imp->running.emplace_back();
@@ -509,7 +546,7 @@ static void launch(JobTable *jobtable) {
     close(pipe_stderr[1]);
     bool indirect = i.job->cmdline != task.cmdline;
     double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
-    i.status = status_state.emplace(status_state.end(), pretty_cmd(i.job->cmdline), predict, i.start);
+    i.status = status_state.jobs.emplace(status_state.jobs.end(), pretty_cmd(i.job->cmdline), predict, i.start);
     if (LOG_ECHO(i.job->log)) {
       std::stringstream s;
       s << pretty_cmd(i.job->cmdline);
@@ -535,7 +572,9 @@ static void launch(JobTable *jobtable) {
 
     // i.job->stdin.clear();
     // i.job->cmdline.clear();
-    jobtable->imp->pending.pop();
+
+    std::pop_heap(heap.begin(), heap.end());
+    heap.resize(heap.size()-1);
   }
 }
 
@@ -543,6 +582,8 @@ bool JobTable::wait(WorkQueue &queue) {
   char buffer[4096];
   struct timespec nowait;
   memset(&nowait, 0, sizeof(nowait));
+
+  launch(this);
 
   bool compute = false;
   while (!exit_now() && !imp->running.empty()) {
@@ -689,12 +730,35 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->reality.ibytes   = rusage.ru_inblock * UINT64_C(512);
           i.job->reality.obytes   = rusage.ru_oublock * UINT64_C(512);
           i.job->process(queue);
+
+          // If this was the job on the critical path, adjust remain
+          if (i.job->pathtime == status_state.remain) {
+            auto crit = imp->critJob(ALMOST_ONE * (i.job->pathtime - i.job->record.runtime));
+#ifdef DEBUG_PROGRESS
+            std::cerr << "RUN DONE CRIT: "
+              << status_state.remain << " => " << crit.pathtime << "  /  "
+              << status_state.total << std::endl;
+#endif
+            status_state.remain = crit.pathtime;
+            status_state.current = crit.runtime;
+            if (crit.runtime == 0) imp->wall = now;
+          }
         }
       }
     }
 
+    // In case the expected next critical job is never scheduled, fall back to the next
+    double dwall = (now.tv_sec - imp->wall.tv_sec) + (now.tv_usec - imp->wall.tv_usec) / 1000000.0;
+    if (status_state.current == 0 && dwall*5 > status_state.remain) {
+      auto crit = imp->critJob(0);
+      if (crit.runtime != 0) {
+        status_state.total -= status_state.remain - crit.pathtime;
+        status_state.remain = crit.pathtime;
+        status_state.current = crit.runtime;
+      }
+    }
+
     if (done > 0) {
-      launch(this);
       compute = true;
       break;
     }
@@ -840,13 +904,26 @@ static PRIMFN(prim_job_launch) {
 
   REQUIRE (job->state == 0);
 
-  jobtable->imp->pending.emplace(new Task(
+  auto &heap = jobtable->imp->pending;
+  heap.emplace_back(new Task(
     std::dynamic_pointer_cast<Job>(args[0]),
     dir->value,
     stdin->value,
     env->value,
     cmd->value));
-  launch(jobtable);
+  std::push_heap(heap.begin(), heap.end());
+
+  // If a scheduled job claims a longer critical path, we need to adjust the total path time
+  if (job->pathtime >= status_state.remain) {
+#ifdef DEBUG_PROGRESS
+    std::cerr << "RUN RAISE CRIT: "
+      << status_state.remain << " => " << job->pathtime << "  /  "
+      << status_state.total  << " => " << (job->pathtime + status_state.total - status_state.remain) << std::endl;
+#endif
+    status_state.total += job->pathtime - status_state.remain;
+    status_state.remain = job->pathtime;
+    status_state.current = job->record.runtime;
+  }
 
   auto out = make_unit();
   RETURN(out);
@@ -933,7 +1010,7 @@ static PRIMFN(prim_job_create) {
     mpz_cmp_si(keep->value,0),
     mpz_get_si(log->value));
 
-  out->record = jobtable->imp->db->predict_job(out->code.data[0]);
+  out->record = jobtable->imp->db->predict_job(out->code.data[0], &out->pathtime);
 
   out->db->insert_job(
     dir->value,
@@ -991,6 +1068,7 @@ static PRIMFN(prim_job_cache) {
   STRING(visible, 4);
 
   long job;
+  double pathtime;
   std::vector<FileReflection> files;
   Usage reuse = jobtable->imp->db->reuse_job(
     dir->value,
@@ -1000,7 +1078,8 @@ static PRIMFN(prim_job_cache) {
     visible->value,
     jobtable->imp->check,
     job,
-    files);
+    files,
+    &pathtime);
 
   std::vector<std::shared_ptr<Value> > jobs;
   if (reuse.found && !jobtable->imp->check) {
@@ -1010,7 +1089,22 @@ static PRIMFN(prim_job_cache) {
     out->record  = reuse;
     // predict + reality unusued since Job not run
     out->report  = reuse;
+    out->pathtime = pathtime;
     jobs.emplace_back(std::move(out));
+
+    // Even though this job is not run, it might have been the 'next' job of something that DID run
+    if (pathtime >= status_state.remain && pathtime*ALMOST_ONE*ALMOST_ONE <= status_state.remain) {
+      auto crit = jobtable->imp->critJob(ALMOST_ONE * (pathtime - reuse.runtime));
+#ifdef DEBUG_PROGRESS
+      std::cerr << "DECREASE CRIT: "
+        << status_state.remain << " => " << crit.pathtime << "  /  "
+        << status_state.total  << " => " << (status_state.total - status_state.remain - crit.pathtime) << std::endl;
+#endif
+      status_state.total -= status_state.remain - crit.pathtime;
+      status_state.remain = crit.pathtime;
+      status_state.current = crit.runtime;
+      if (crit.runtime == 0) gettimeofday(&jobtable->imp->wall, 0);
+    }
   }
 
   auto out = make_tuple2(make_list(std::move(jobs)), convert_tree(std::move(files)));

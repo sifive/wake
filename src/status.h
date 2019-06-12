@@ -32,7 +32,17 @@ struct Status {
      launch(launch_) { }
 };
 
-extern std::list<Status> status_state;
+struct StatusState {
+  std::list<Status> jobs;
+  // critical path stats:
+  double remain;
+  double total;
+  double current;
+
+  StatusState() : jobs(), remain(0), total(0), current(0) { }
+};
+
+extern StatusState status_state;
 
 void status_init();
 void status_write(int fd, const char *data, int len);

@@ -86,9 +86,11 @@ struct Database {
     const std::string &visible,
     bool check,
     long &job,
-    std::vector<FileReflection> &out);
+    std::vector<FileReflection> &out,
+    double *pathtime);
   Usage predict_job(
-    uint64_t hashcode);
+    uint64_t hashcode,
+    double *pathtime);
   void insert_job( // also wipes out any old runs
     const std::string &directory,
     const std::string &stdin, // "" -> /dev/null

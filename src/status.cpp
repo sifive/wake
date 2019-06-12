@@ -18,6 +18,8 @@
 #include "status.h"
 #include "job.h"
 #include <sstream>
+#include <limits>
+#include <iomanip>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <signal.h>
@@ -29,13 +31,16 @@
 #include <term.h>
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 
 // How often is the status updated (should be a multiple of 2 for budget=0)
 #define REFRESH_HZ 6
 // Processes which last less than this time do not get displayed
 #define MIN_DRAW_TIME 0.2
 
-std::list<Status> status_state;
+#define ALMOST_ONE (1.0 - 2*std::numeric_limits<double>::epsilon())
+
+StatusState status_state;
 
 static volatile bool refresh_needed = false;
 static volatile bool resize_detected = false;
@@ -115,8 +120,10 @@ static void status_redraw()
     }
   }
 
-  int total = status_state.size();
-  if (tty && rows >= 6 && cols > 16) for (auto &x : status_state) {
+  int total = status_state.jobs.size();
+  int rows3 = rows/3;
+  int overall = status_state.remain > 0 ? 1 : 0;
+  if (tty && rows3 >= 2+overall && cols > 16) for (auto &x : status_state.jobs) {
     double runtime =
       (now.tv_sec  - x.launch.tv_sec) +
       (now.tv_usec - x.launch.tv_usec) / 1000000.0;
@@ -160,11 +167,61 @@ static void status_redraw()
 
     os << progress << cut << std::endl;
     ++used;
-    if (used != total && used == (rows/3)-1) { // use at most 1/3 of the space (rows >= 6)
+    if (used != total && used == rows3-1-overall) { // use at most 1/3 of the space
       os << "... +" << (total-used) << " more" << std::endl;
       ++used;
       break;
     }
+  }
+
+  if (tty && rows3 > 0 && cols > 4 && status_state.remain > 0) {
+    std::stringstream eta;
+    long seconds = lround(status_state.remain);
+    if (seconds > 3600) {
+      eta << (seconds / 3600);
+      eta << ":" << std::setfill('0') << std::setw(2);
+    }
+    eta << ((seconds % 3600) / 60);
+    eta << ":" << std::setfill('0') << std::setw(2);
+    eta << (seconds % 60);
+    auto etas = eta.str();
+    long width = etas.size();
+
+    assert (status_state.total >= status_state.remain);
+    assert (status_state.current >= 0);
+
+    double progress = status_state.total - status_state.remain;
+    long hashes = lround(floor((cols-2)*progress*ALMOST_ONE/status_state.total));
+    long current = lround(floor((cols-2)*(progress+status_state.current)*ALMOST_ONE/status_state.total)) - hashes;
+    long spaces = cols-3-hashes-current;
+    assert (spaces >= 0);
+
+    os << "[";
+    if (spaces >= width+3) {
+      for (; hashes;  --hashes)  os << "#";
+      for (; current; --current) os << ".";
+      spaces -= width+2;
+      for (; spaces;  --spaces)  os << " ";
+      os << etas << "  ";
+    } else if (current >= width+4) {
+      current -= width+3;
+      for (; hashes;  --hashes)  os << "#";
+      for (; current; --current) os << ".";
+      os << " " << etas << " .";
+      for (; spaces;  --spaces)  os << " ";
+    } else if (hashes >= width+4) {
+      hashes -= width+3;
+      os << "# " << etas << " ";
+      for (; hashes;  --hashes)  os << "#";
+      for (; current; --current) os << ".";
+      for (; spaces;  --spaces)  os << " ";
+    } else {
+      for (; hashes;  --hashes)  os << "#";
+      for (; current; --current) os << ".";
+      for (; spaces;  --spaces)  os << " ";
+    }
+    os << "]" << std::endl;
+    ++used;
   }
 
   std::string s = os.str();
