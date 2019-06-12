@@ -187,10 +187,14 @@ static void status_redraw()
     auto etas = eta.str();
     long width = etas.size();
 
+    assert (status_state.total >= status_state.remain);
+    assert (status_state.current >= 0);
+
     double progress = status_state.total - status_state.remain;
-    long hashes = lround(floor((cols-2)*progress/status_state.total));
+    long hashes = lround(floor((cols-2)*progress*ALMOST_ONE/status_state.total));
     long current = lround(floor((cols-2)*(progress+status_state.current)*ALMOST_ONE/status_state.total)) - hashes;
     long spaces = cols-3-hashes-current;
+    assert (spaces >= 0);
 
     os << "[";
     if (spaces >= width+3) {
