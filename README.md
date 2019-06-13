@@ -1,3 +1,6 @@
+[![GitHub tag (latest SemVer)](https://img.shields.io/github/tag/sifive/wake.svg?label=release)](https://github.com/sifive/wake/releases/latest)
+[![CircleCI](https://circleci.com/gh/sifive/wake/tree/master.svg?style=shield)](https://circleci.com/gh/sifive/wake/tree/master)
+
 # What is this?
 
 Wake is a build orchestration tool and language.
