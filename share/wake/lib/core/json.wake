@@ -111,6 +111,18 @@ global def x /| f = match x
   JArray l = JArray (filter f l)
   _ = if f x then JArray (x, Nil) else JArray Nil
 
+global def root /../ filterFn =
+  def helper node acc = match node
+    JArray l =
+      def tail = foldr helper acc l
+      if filterFn node then node, tail else tail
+    JObject l =
+      def tail = foldr (helper _.getPairSecond _) acc l
+      if filterFn node then node, tail else tail
+    _ =
+      if filterFn node then node, acc else acc
+  helper root Nil | JArray
+
 global def x // y =
   def helper tail = match _
     JString  _ = tail

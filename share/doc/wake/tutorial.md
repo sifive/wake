@@ -6,8 +6,8 @@ Code sections are intended to be copy-pasted into a terminal.
 ## Invoking wake
 
 
-    mkdir tutorial
-    cd tutorial
+    mkdir ~/tutorial
+    cd ~/tutorial
     wake --init .
     wake '5 + 6'
 
