@@ -118,5 +118,5 @@ Internal dependencies:
 
 # Tutorial
 
-    Documentation for wake can be found in share/doc/wake.
-    There is a tutorial and a quick reference guide.
+Documentation for wake can be found in [share/doc/wake](share/doc/wake).
+Try the [Tutorial](share/doc/wake/tutorial.md) and the [Quick Reference Guide](share/doc/wake/quickref.md).
