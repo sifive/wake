@@ -1,3 +1,5 @@
+[![][release-badge]][release] [![][ci-badge]][ci] [![][apache-2]](LICENSE)
+
 # What is this?
 
 Wake is a build orchestration tool and language.
@@ -120,3 +122,10 @@ Internal dependencies:
 
 Documentation for wake can be found in [share/doc/wake](share/doc/wake).
 Try the [Tutorial](share/doc/wake/tutorial.md) and the [Quick Reference Guide](share/doc/wake/quickref.md).
+
+
+[release-badge]: https://img.shields.io/github/tag/sifive/wake.svg?label=release
+[release]: https://github.com/sifive/wake/releases/latest
+[ci-badge]: https://circleci.com/gh/sifive/wake/tree/master.svg?style=shield
+[ci]: https://circleci.com/gh/sifive/wake/tree/master
+[apache-2]: https://img.shields.io/badge/license-Apache%202-blue.svg
