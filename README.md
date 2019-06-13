@@ -98,7 +98,7 @@ Give FUSE permission to run as stated in the instructions and you should be good
     #git checkout master    # Use development branch (e.g. recent bug fix)
     #git checkout v0.9      # Check out a specific version, like v0.9
     make
-    ./bin/wake 'install "/usr/local"' # or wherever
+    ./bin/wake 'install "'$HOME'/stuff"' # or wherever
 
 External dependencies:
  - c++ 11		>= 4.7	GPLv3		https://www.gnu.org/software/gcc/
