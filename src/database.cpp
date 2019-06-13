@@ -598,6 +598,11 @@ Usage Database::reuse_job(
   }
   finish_stmt(why, imp->get_tree, imp->debugdb);
 
+  // If we need to rerun the job (outputs don't exist), wipe the files-to-check list
+  if (!out.found) {
+    files.clear();
+  }
+
   if (out.found && !check) {
     bind_integer(why, imp->update_prior, 1, imp->run_id);
     bind_integer(why, imp->update_prior, 2, job);
