@@ -211,18 +211,19 @@ def runAlways cmd env dir stdin res finputs foutputs vis keep run log =
     # Make sure we don't hash files before the job has stopped running
     def _ = waitJobMerged final job
     job
-  def confirm last job =
+  def confirm abort last job =
     def notOk (Pair name hash) =
-      if hashcode name ==* hash
-      then False
-      else panic "Hash mismatch for {name} ({hash} != {hashcode name}); remove it"
-    def _ = waitJobMerged (\_ find notOk last) job
+      if hashcode name ==* hash then Unit else
+      if abort
+      then panic "The hashcode of output file '{name}' has changed from {hash} (when wake last ran) to {hashcode name} (when inspected this time). Presumably it was hand edited. Please move this file out of the way. Aborting the build to prevent loss of your data."
+      else printlnLevel logError "Wake was run with '-c' and the hashcode of output file '{name}' has changed, despite being produced from identical inputs. In the prior run, it was {hash} and now it is {hashcode name}. Hashes of dependent jobs using this file will not be checked."
+    def _ = waitJobMerged (\_ map notOk last) job
     job
   match keep
     False = build Unit
     True  = match (cache dir stdin env.implode cmd.implode (map getPathName vis).implode)
-      Pair (job, _) last = confirm last job
-      Pair Nil      last = confirm last (build Unit)
+      Pair (job, _) last = confirm True  last job
+      Pair Nil      last = confirm False last (build Unit)
 
 # Only run if the first four arguments differ
 target runOnce cmd env dir stdin \ res finputs foutputs vis keep run log =
