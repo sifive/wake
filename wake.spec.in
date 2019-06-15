@@ -4,6 +4,7 @@ Release:       1
 Summary:       flexible build orchestration tool and language
 License:       Apache-2; MIT; TFL; WTFPL; CC0
 URL:           https://github.com/sifive/wake
+Vendor:        SiFive, Inc.
 Source0:       https://github.com/sifive/wake/releases/%{name}_%{version}.tar.xz
 Requires:      fuse
 Prefix:        /usr
