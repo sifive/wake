@@ -146,7 +146,7 @@ static PRIMFN(prim_read) {
   EXPECT(1);
   STRING(path, 0);
   std::ifstream t(path->value, std::ios::in | std::ios::binary);
-  if (!t.fail()) {
+  if (t) {
     std::string content;
     t.seekg(0, t.end);
     auto size = t.tellg();
@@ -154,7 +154,7 @@ static PRIMFN(prim_read) {
       content.resize(size);
       t.seekg(0, t.beg);
       t.read(&content[0], content.size());
-      if (!t.bad()) {
+      if (t) {
         auto out = make_result(true, std::make_shared<String>(std::move(content)));
         RETURN(out);
       }
