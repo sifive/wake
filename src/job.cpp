@@ -752,7 +752,7 @@ bool JobTable::wait(WorkQueue &queue) {
     if (status_state.current == 0 && dwall*5 > status_state.remain) {
       auto crit = imp->critJob(0);
       if (crit.runtime != 0) {
-        status_state.total -= status_state.remain - crit.pathtime;
+        status_state.total = crit.pathtime + (status_state.total - status_state.remain);
         status_state.remain = crit.pathtime;
         status_state.current = crit.runtime;
       }
@@ -920,7 +920,7 @@ static PRIMFN(prim_job_launch) {
       << status_state.remain << " => " << job->pathtime << "  /  "
       << status_state.total  << " => " << (job->pathtime + status_state.total - status_state.remain) << std::endl;
 #endif
-    status_state.total += job->pathtime - status_state.remain;
+    status_state.total = job->pathtime + (status_state.total - status_state.remain);
     status_state.remain = job->pathtime;
     status_state.current = job->record.runtime;
   }
@@ -1100,7 +1100,7 @@ static PRIMFN(prim_job_cache) {
         << status_state.remain << " => " << crit.pathtime << "  /  "
         << status_state.total  << " => " << (status_state.total - status_state.remain - crit.pathtime) << std::endl;
 #endif
-      status_state.total -= status_state.remain - crit.pathtime;
+      status_state.total = crit.pathtime + (status_state.total - status_state.remain);
       status_state.remain = crit.pathtime;
       status_state.current = crit.runtime;
       if (crit.runtime == 0) gettimeofday(&jobtable->imp->wall, 0);
