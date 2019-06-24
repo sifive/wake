@@ -145,14 +145,19 @@ static PRIMTYPE(type_read) {
 static PRIMFN(prim_read) {
   EXPECT(1);
   STRING(path, 0);
-  std::ifstream t(path->value);
+  std::ifstream t(path->value, std::ios::in | std::ios::binary);
   if (!t.fail()) {
-    std::string content(
-      (std::istreambuf_iterator<char>(t)),
-      (std::istreambuf_iterator<char>()));
-    if (!t.bad()) {
-      auto out = make_result(true, std::make_shared<String>(std::move(content)));
-      RETURN(out);
+    std::string content;
+    t.seekg(0, t.end);
+    auto size = t.tellg();
+    if (size != -1) {
+      content.resize(size);
+      t.seekg(0, t.beg);
+      t.read(&content[0], content.size());
+      if (!t.bad()) {
+        auto out = make_result(true, std::make_shared<String>(std::move(content)));
+        RETURN(out);
+      }
     }
   }
   std::stringstream str;
