@@ -211,18 +211,21 @@ static Special is_special(const char *path) {
 	}
 }
 
+static int exit_attempts = 0;
+
 static void cancel_exit()
 {
 	struct itimerval retry;
 	memset(&retry, 0, sizeof(retry));
 	setitimer(ITIMER_REAL, &retry, 0);
+	exit_attempts = 0;
 }
 
 static void schedule_exit()
 {
 	struct itimerval retry;
 	memset(&retry, 0, sizeof(retry));
-	retry.it_value.tv_sec = 5;
+	retry.it_value.tv_sec = 2 << exit_attempts;
 	setitimer(ITIMER_REAL, &retry, 0);
 }
 
@@ -1196,6 +1199,7 @@ static void *wakefuse_init(struct fuse_conn_info *conn)
 
 static void handle_exit(int sig)
 {
+	static pid_t pid = -1;
 	// Unfortunately, fuse_unmount can fail if the filesystem is still in use.
 	// Yes, this can even happen on linux with MNT_DETACH / lazy umount.
 	// Worse, fuse_unmount closes descriptors and frees memory, so can only be called once.
@@ -1205,11 +1209,22 @@ static void handle_exit(int sig)
 	// If this succeeds, fuse_loop will terminate anyway.
 	// In case it fails, we setup an itimer to keep trying to unmount.
 
-	// We need to fork before fuse_unmount, in order to be able to try more than once.
-	if (fork() == 0) {
+	// Reap prior attempts
+	if (pid != -1) {
+		int status;
+		do waitpid(pid, &status, 0);
+		while (WIFSTOPPED(status));
+	}
+
+	if (exit_attempts == 4) {
+		fprintf(stderr, "Unable to cleanly exit after 4 unmount attempts\n");
+		exit(1);
+	} else if ((pid = fork()) == 0) {
+		// We need to fork before fuse_unmount, in order to be able to try more than once.
 		fuse_unmount(path.c_str(), fc);
 		exit(0);
 	} else {
+		++exit_attempts;
 		schedule_exit();
 	}
 }
