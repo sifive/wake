@@ -20,6 +20,7 @@
 #include "heap.h"
 #include "hash.h"
 #include "type.h"
+#include "sfinae.h"
 #include <iostream>
 #include <string>
 #include <iosfwd>
@@ -53,10 +54,15 @@ static PRIMTYPE(type_re2str) {
     out->unify(String::typeVar);
 }
 
+TEST_MEMBER(set_dot_nl);
+
 static PRIMFN(prim_re2str) {
   EXPECT(1);
   REGEXP(arg0, 0);
-  auto out = std::make_shared<String>(arg0->exp.pattern().substr(4)); // skip the (?s)
+  auto out =
+    has_set_dot_nl<RE2::Options>::value
+    ? std::make_shared<String>(arg0->exp.pattern())
+    : std::make_shared<String>(arg0->exp.pattern().substr(4)); // skip the (?s)
   RETURN(out);
 }
 

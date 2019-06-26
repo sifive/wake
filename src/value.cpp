@@ -22,6 +22,7 @@
 #include "datatype.h"
 #include "symbol.h"
 #include "status.h"
+#include "sfinae.h"
 #include <sstream>
 #include <cassert>
 #include <algorithm>
@@ -109,13 +110,40 @@ void Double::format(std::ostream &os, FormatState &state) const {
   os << str();
 }
 
+// Unfortunately, re2 does not define a VERSION macro.
+TEST_MEMBER(set_dot_nl);
+
+template <typename T>
+static typename enable_if<has_set_dot_nl<T>::value, void>::type
+maybe_set_dot_nl(T &x) {
+  x.set_dot_nl(true);
+}
+
+template <typename T>
+static typename enable_if<!has_set_dot_nl<T>::value, void>::type
+maybe_set_dot_nl(T &x) {
+  // noop
+}
+
+// This monstrous method is the only way I could find to
+// portably call methods on a temporary without a copy.
+// (older re2 did not have copy-construction for Options)
 static const RE2::Options &defops(RE2::Options &&options) {
   options.set_log_errors(false);
   options.set_one_line(true);
+  maybe_set_dot_nl(options);
   return options;
 }
 
-RegExp::RegExp(const std::string &regexp) : RegExp("(?s)" + regexp, defops(RE2::Options())) { }
+RegExp::RegExp(const std::string &regexp, const RE2::Options &opts)
+ : Value(&type),
+   exp(
+     has_set_dot_nl<RE2::Options>::value
+     ? re2::StringPiece(regexp)
+     : re2::StringPiece("(?s)" + regexp),
+     opts) { }
+RegExp::RegExp(const std::string &regexp)
+ : RegExp(regexp, defops(RE2::Options())) { }
 
 void RegExp::format(std::ostream &os, FormatState &state) const {
   if (APP_PRECEDENCE < state.p()) os << "(";

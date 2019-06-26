@@ -130,7 +130,7 @@ struct RegExp : public Value {
   RE2 exp;
   static const TypeDescriptor type;
   static TypeVar typeVar;
-  RegExp(const std::string &regexp, const RE2::Options &opts) : Value(&type), exp(re2::StringPiece(regexp), opts) { }
+  RegExp(const std::string &regexp, const RE2::Options &opts);
   RegExp(const std::string &regexp);
 
   void format(std::ostream &os, FormatState &state) const;
