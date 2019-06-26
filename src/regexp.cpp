@@ -79,6 +79,22 @@ static PRIMFN(prim_quote) {
   RETURN(out);
 }
 
+static bool check_re2_bug(const std::string &str) {
+  re2::StringPiece sp;
+  bool has_bug = sizeof(sp.size()) != sizeof(size_t);
+  bool big = (str.size() >> (sizeof(sp.size())*8-1)) != 0;
+  return has_bug && big;
+}
+
+const char re2_bug[] = "The re2 library is too old (< 2016-09) to be used on inputs larger than 2GiB\n";
+
+#define RE2_BUG(str) do {						\
+  if (check_re2_bug(str)) {						\
+    require_fail(re2_bug, sizeof(re2_bug), queue, binding.get());	\
+    return;								\
+  }									\
+} while (0)
+
 static PRIMTYPE(type_match) {
   return args.size() == 2 &&
     args[0]->unify(RegExp::typeVar) &&
@@ -90,6 +106,8 @@ static PRIMFN(prim_match) {
   EXPECT(2);
   REGEXP(arg0, 0);
   STRING(arg1, 1);
+  RE2_BUG(arg1->value);
+
   auto out = make_bool(RE2::FullMatch(arg1->value, arg0->exp));
   RETURN(out);
 }
@@ -108,6 +126,7 @@ static PRIMFN(prim_extract) {
   EXPECT(2);
   REGEXP(arg0, 0);
   STRING(arg1, 1);
+  RE2_BUG(arg1->value);
 
   int matches = arg0->exp.NumberOfCapturingGroups() + 1;
   std::vector<re2::StringPiece> submatch(matches, nullptr);
@@ -137,6 +156,9 @@ static PRIMFN(prim_replace) {
   STRING(arg1, 1);
   STRING(arg2, 2);
 
+  RE2_BUG(arg1->value);
+  RE2_BUG(arg2->value);
+
   auto out = std::make_shared<String>(arg2->value);
   RE2::GlobalReplace(&out->value, arg0->exp, arg1->value);
   RETURN(out);
@@ -156,6 +178,8 @@ static PRIMFN(prim_tokenize) {
   EXPECT(2);
   REGEXP(arg0, 0);
   STRING(arg1, 1);
+  RE2_BUG(arg1->value);
+
   re2::StringPiece input(arg1->value);
   re2::StringPiece hit;
   std::vector<std::shared_ptr<Value> > tokens;
