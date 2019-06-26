@@ -145,21 +145,30 @@ static PRIMTYPE(type_read) {
 static PRIMFN(prim_read) {
   EXPECT(1);
   STRING(path, 0);
+  char buf[4096];
+
   std::ifstream t(path->value, std::ios::in | std::ios::binary);
   if (t) {
     std::string content;
+
+    // If we can, try to guess the size needed for the file
     t.seekg(0, t.end);
     auto size = t.tellg();
-    if (size != -1) {
-      content.resize(size);
-      t.seekg(0, t.beg);
-      t.read(&content[0], content.size());
-      if (t) {
-        auto out = make_result(true, std::make_shared<String>(std::move(content)));
-        RETURN(out);
-      }
+    if (size != -1) content.reserve(size);
+    t.seekg(0, t.beg);
+    t.clear();
+
+    do {
+      t.read(&buf[0], sizeof(buf));
+      content.append(&buf[0], t.gcount());
+    } while (t);
+
+    if (!t.bad()) {
+      auto out = make_result(true, std::make_shared<String>(std::move(content)));
+      RETURN(out);
     }
   }
+
   std::stringstream str;
   str << "read " << path->value << ": " << strerror(errno);
   auto out = make_result(false, std::make_shared<String>(str.str()));
