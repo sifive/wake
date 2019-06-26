@@ -82,8 +82,8 @@ struct String : public Value {
 
   static const TypeDescriptor type;
   static TypeVar typeVar;
-  String(const std::string &value_) : Value(&type), value(value_) { }
-  String(std::string &&value_) : Value(&type), value(std::move(value_)) { }
+  String(const std::string &value_) : Value(&type), value(value_) { value.shrink_to_fit(); }
+  String(std::string &&value_) : Value(&type), value(std::move(value_)) { value.shrink_to_fit(); }
 
   void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
