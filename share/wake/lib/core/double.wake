@@ -14,40 +14,86 @@
 # limitations under the License.
 
 # double operations
+
+# Unary absolute value operator for a Double.
 global def dabs x = prim "dabs"
+
+# Unary negative sign for a Double.
 global def   -. x = prim "dneg"
+
+# Unary positive sign for a Double.
 global def   +. x = x
+
+# Binary addition operator for Doubles.
 global def x +. y = prim "dadd"
+
+# Binary subtraction operator for Doubles.
 global def x -. y = prim "dsub"
+
+# Binary multiplication operator for Doubles.
 global def x *. y = prim "dmul"
+
+# Binary division operator for Doubles.
 global def x /. y = prim "ddiv"
+
+# Binary exponentiation operator for Doubles.
 global def x ^. y = prim "dpow"
+
+# Computes x*y + z.
 global def dfma x y z = prim "dfma" # x*y + z
 
+# Creates a function that computes the nth root.
 global def droot n =
   def n1 = 1.0 /. n
   _ ^. n1
+
+# Unary operator for square root.
 global def dsqrt = droot 2.0
+
 def root3 = droot 3.0
+
 def root4 = droot 4.0
+
+# Unary operator for square root, using the unicode character.
 global def √ x = dsqrt x
+
+# Unary operator for cube root.
 global def ∛ x = root3 x
+
+# Unary operator for fourth root.
 global def ∜ x = root4 x
 
 global def dcmp x y = prim "dcmp"
 global def x <=>. y = prim "dcmp"
 
+# Binary Less-Than Operator.
 global def x <.  y = isLT (x <=>. y)
+
+# Binary Greater-Than Operator.
 global def x >.  y = isGT (x <=>. y)
+
+# Binary Greater-Or-Equal Operator.
 global def x >=. y = isGE (x <=>. y)
+
+# Binary Less-Or-Equal Operator.
 global def x <=. y = isLE (x <=>. y)
+
+# Binary Equal-To Operator.
 global def x ==. y = isEQ (x <=>. y)
+
+# Binary Not-Equal Operator.
 global def x !=. y = isNE (x <=>. y)
 
+# Computes the minimum of two Doubles.
 global def dmin x y = if x <. y then x else y
+
+# Computes the maximum of two Doubles.
 global def dmax x y = if x <. y then y else x
 
+# Product of a series of Doubles.
 global def ∏. l = foldl (_*._) 1.0 l
+
+# Sum of a series of Doubles.
 global def ∑. l = foldl (_+._) 0.0 l
 
 global data DoubleFormat =
@@ -98,12 +144,26 @@ global def idouble x = match (dmodf x)
  _ = None
 
 # Handy numerical functions
+
+# Calculates the cosine of a Double.
 global def dcos    x = prim "dcos"
+
+# Calculates the sine of a Double.
 global def dsin    x = prim "dsin"
+
+# Calculates the tangent of a Double.
 global def dtan    x = prim "dtan"
+
+# Calculates the inverse cosine of a Double.
 global def dacos   x = prim "dacos"
+
+# Calculates the inverse sine of a Double.
 global def dasin   x = prim "dasin"
+
+# Calculates e^x.
 global def dexp    x = prim "dexp"
+
+# Calculates the natural logarithm of x.
 global def dlog    x = prim "dlog"
 global def dexpm1  x = prim "dexpm1"
 global def dlog1p  x = prim "dlog1p"
@@ -111,9 +171,17 @@ global def derf    x = prim "derf"
 global def derfc   x = prim "derfc"
 global def dtgamma x = prim "dtgamma"
 global def dlgamma x = prim "dlgamma"
+
+# Calculates the inverse tangent of y/x, giving the angle of the point(x, y) in the coordinate plane. 
 global def datan x y = prim "datan"
 
 # Useful constants
+
+# Not a Number
 global def nan = 0.0 /. 0.0
+
+# Infinity
 global def inf = 1.0 /. 0.0
+
+# Pi 
 global def pi  = dacos 0.0 *. 2.0

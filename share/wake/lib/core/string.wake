@@ -65,28 +65,64 @@ global def scmp x y = prim "scmp"
 # NFKC order (fancy format removed) -- secure default
 # This is the string order you should probably be using
 global def x <=>~y = scmpIdentifier x y
+
+# Returns True if x is less than y.
 global def x <~  y = isLT (x <=>~ y)
+
+# Returns True if x is greater than y.
 global def x >~  y = isGT (x <=>~ y)
+
+# Returns True if x is greater than or equal to y.
 global def x >=~ y = isGE (x <=>~ y)
+
+# Returns True if x is less than or equal to y.
 global def x <=~ y = isLE (x <=>~ y)
+
+# Returns True if x is equal to y.
 global def x ==~ y = isEQ (x <=>~ y)
+
+# Returns True if x is not equal to y.
 global def x !=~ y = isNE (x <=>~ y)
 
 # Case insensitive order (^ = capitals ignored)
 global def x <=>^y = scmpLowercase x y
+
+# Returns True if x is less than y, ignoring case.
 global def x <^  y = isLT (x <=>^ y)
+
+# Returns True if x is greater than y, ignoring case.
 global def x >^  y = isGT (x <=>^ y)
+
+# Returns True if x is greater than or equal to y, ignoring case.
 global def x >=^ y = isGE (x <=>^ y)
+
+# Returns True if x is less than or equal to y, ignoring case.
 global def x <=^ y = isLE (x <=>^ y)
+
+# Returns True if x is equal to y, ignoring case.
 global def x ==^ y = isEQ (x <=>^ y)
+
+# Returns True if x is not equal to y, ignoring case.
 global def x !=^ y = isNE (x <=>^ y)
 
 # Raw binary string order
 # Only use this for non-textual data
 global def x <=>*y = scmp x y
+
+# Returns True if x is less than y, in raw binary representation.
 global def x <*  y = isLT (x <=>* y)
+
+# Returns True if x is greater than y, in raw binary representation.
 global def x >*  y = isGT (x <=>* y)
+
+# Returns True if x is greater than or equal to y, in raw binary representation.
 global def x >=* y = isGE (x <=>* y)
+
+# Returns True if x is less than or equal to y, in raw binary representation.
 global def x <=* y = isLE (x <=>* y)
+
+# Returns True if x is equal to y, in raw binary representation.
 global def x ==* y = isEQ (x <=>* y)
+
+# Returns True if x is not equal to y, in raw binary representation.
 global def x !=* y = isNE (x <=>* y)
