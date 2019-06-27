@@ -287,7 +287,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (Lexer::isUpper(ast.name.c_str()) || Lexer::isOperator(ast.name.c_str())) {
         Match *match = new Match(location);
         match->patterns.emplace_back(std::move(ast), rhs, nullptr);
-        match->args.emplace_back(new VarRef(LOCATION, "_ xx"));
+        match->args.emplace_back(new VarRef(location, "_ xx"));
         return new Lambda(location, "_ xx", match);
       } else {
         return new Lambda(location, ast.name, rhs);

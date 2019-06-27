@@ -25,6 +25,8 @@
 #include <iostream>
 #include <thread>
 #include <sstream>
+#include <fstream>
+#include <set>
 #include <random>
 #include <inttypes.h>
 #include <stdlib.h>
@@ -41,6 +43,7 @@
 #include "hash.h"
 #include "status.h"
 #include "gopt.h"
+#include "json5.h"
 
 #define SHORT_HASH 8
 
@@ -235,6 +238,7 @@ void print_help(const char *argv0) {
     << std::endl
     << "  Help functions:" << std::endl
     << "    --version        Print the version of wake on standard output"               << std::endl
+    << "    --html           Print all wake source files as cross-referenced HTML"       << std::endl
     << "    --globals  -g    Print all global variables available to the command-line"   << std::endl
     << "    --help     -h    Print this help message and exit"                           << std::endl
     << std::endl;
@@ -249,6 +253,101 @@ static struct option *arg(struct option opts[], const char *name) {
   std::cerr << "Wake option parser bug: " << name << std::endl;
   exit(1);
 }
+
+struct ParanOrder {
+  bool operator () (Expr *a, Expr *b) const {
+    if ((long)a->location.filename < (long)b->location.filename) return true;
+    if ((long)a->location.filename > (long)b->location.filename) return false;
+    if (a->location.start < b->location.start) return true;
+    if (a->location.start > b->location.start) return false;
+    return a->location.end > b->location.end;
+  }
+};
+
+struct JSONRender {
+  typedef std::set<Expr*, ParanOrder> ESet;
+  std::ostream &os;
+  ESet eset;
+  ESet::iterator it;
+
+  JSONRender(std::ostream &os_) : os(os_) { }
+
+  void explore(Expr *expr) {
+    if (expr->location.start.bytes >= 0)
+      eset.insert(expr);
+
+    if (expr->type == &App::type) {
+      App *app = reinterpret_cast<App*>(expr);
+      explore(app->val.get());
+      explore(app->fn.get());
+    } else if (expr->type == &Lambda::type) {
+      Lambda *lambda = reinterpret_cast<Lambda*>(expr);
+      explore (lambda->body.get());
+    } else if (expr->type == &DefBinding::type) {
+      DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
+      for (auto &i : defbinding->val) explore(i.get());
+      for (auto &i : defbinding->fun) explore(i.get());
+      explore(defbinding->body.get());
+    }
+  }
+
+  void dump() {
+    Location self = (*it)->location;
+
+    os
+      << "{\"type\":\"" << (*it)->type->name
+      << "\",\"range\":[" << self.start.bytes
+      << "," << (self.end.bytes+1)
+      << "],\"sourceType\":\"";
+    (*it)->typeVar.format(os, (*it)->typeVar);
+    os
+      << "\",\"body\":[";
+
+    ++it;
+
+    bool comma = false;
+    while (it != eset.end()) {
+      Location child = (*it)->location;
+      if (child.filename != self.filename) break;
+      if (child.start > self.end) break;
+      if (comma) os << ",";
+      comma = true;
+      dump();
+    }
+
+    os << "]}";
+  }
+
+  void render(Expr *root) {
+    explore(root);
+    it = eset.begin();
+
+    os << "{\"type\":\"Workspace\",\"body\":[";
+    bool comma = false;
+    while (it != eset.end()) {
+      const char *filename = (*it)->location.filename;
+      std::ifstream ifs(filename);
+      std::string content(
+        (std::istreambuf_iterator<char>(ifs)),
+        (std::istreambuf_iterator<char>()));
+      if (comma) os << ",";
+      comma = true;
+      os
+        << "{\"type\":\"Program\",\"filename\":\"" << json_escape(filename)
+        << "\",\"source\":\"" << json_escape(content)
+        << "\",\"range\":[0," << content.size()
+        << "],\"body\":[";
+      bool comma = false;
+      while (it != eset.end() && (*it)->location.filename == filename) {
+        if (comma) os << ",";
+        comma = true;
+        dump();
+      }
+      os << "]}";
+    }
+    os << "]}";
+  }
+};
 
 int main(int argc, char **argv) {
   struct option options[] {
@@ -269,6 +368,7 @@ int main(int argc, char **argv) {
     { 0,   "remove-task",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 0,   "version",               GOPT_ARGUMENT_FORBIDDEN },
     { 'g', "globals",               GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
     { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-parse",      GOPT_ARGUMENT_FORBIDDEN },
@@ -291,6 +391,7 @@ int main(int argc, char **argv) {
   bool list    = arg(options, "list-tasks")->count;
   bool add     = arg(options, "add-task")->count;
   bool version = arg(options, "version" )->count;
+  bool html    = arg(options, "html"    )->count;
   bool global  = arg(options, "globals" )->count;
   bool help    = arg(options, "help"    )->count;
   bool debugdb = arg(options, "debug-db")->count;
@@ -333,7 +434,7 @@ int main(int argc, char **argv) {
   bool nodb = init;
   bool noparse = nodb || remove || list || output || input;
   bool notype = noparse || parse;
-  bool noexecute = notype || add || tcheck || global;
+  bool noexecute = notype || add || html || tcheck || global;
 
   if (noparse && argc < 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
@@ -519,6 +620,12 @@ int main(int argc, char **argv) {
   }
 
   if (tcheck) std::cout << root.get();
+  if (html) {
+    std::cout << "<script src=\"wake.js\"></script><script type=\"wake\">";
+    JSONRender(std::cout).render(root.get());
+    std::cout << "</script>" << std::endl;
+  }
+
   for (auto &g : globals) {
     Expr *e = root.get();
     while (e && e->type == &DefBinding::type) {
