@@ -16,14 +16,15 @@
 # unit / void
 global data Unit = Unit
 
-# pairs
+# Creates a ``Pair``, a tuple containing two elements.
 global tuple Pair a b =
   global First:  a
   global Second: b
 
-# we use pairs for key value maps a lot
+# Defines an arrow operator as an alternate way to initialize a ``Pair``.
 global def x → y = Pair x y
 
+# Creates a ``Triple``, a tuple containing three elements.
 global tuple Triple a b c =
   global First:  a
   global Second: b

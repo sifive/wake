@@ -13,23 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# lists
+# Constructs a List object.  
 global data List a =
   Nil
   (head: a), (tail: List a)
 
+# Returns True if the list contains no elements, otherwise False.
 global def empty = match _
   Nil = True
   _   = False
 
+# Returns the first element of the list.
 global def head = match _
   Nil  = None
   h, _ = Some h
 
+# Returns a list of all elements, starting from the second.
 global def tail = match _
   Nil  = Nil
   _, t = t
 
+# Applies a function f to each element of the list.
 global def map f = match _
   Nil  = Nil
   h, t = f h, map f t

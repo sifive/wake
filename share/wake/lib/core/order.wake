@@ -13,31 +13,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Used for comparing quantities.  
+# Can hold the following values:
+# ``LT`` = Less Than
+# ``EQ`` = Equal
+# ``GT`` = Greater Than
 global data Order =
   LT
   EQ
   GT
 
+# Returns ``True`` if less than, otherwise ``False``.
 global def isLT = match _
   LT = True
   _  = False
 
+# Returns ``True`` if equal, otherwise ``False``.
 global def isEQ = match _
   EQ = True
   _  = False
 
+# Returns ``True`` if greater than, otherwise ``False``.
 global def isGT = match _
   GT = True
   _  = False
 
+# Returns ``True`` if less or equal, otherwise ``False``.
 global def isLE = match _
   GT = False
   _  = True
 
+# Returns ``True`` if not equal, otherwise ``False``.
 global def isNE = match _
   EQ = False
   _  = True
 
+# Returs ``True`` if greater or equal, otherwise ``False``.
 global def isGE = match _
   LT = False
   _  = True

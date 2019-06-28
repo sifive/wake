@@ -13,12 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Boolean type
+# Boolean type has two values: True and False.
 global data Boolean =
   True
   False
 
-# if is compiler sugar for match
+# Unary operator for NOT.
 global def !x     = if x then False else True
+# Binary operator for AND.
 global def x && y = if x then y else False
+# Binary operator for OR.
 global def x || y = if x then True else y

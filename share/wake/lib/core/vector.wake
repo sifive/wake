@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Vector type
+# Defines a new ``Vector``.
 data Vector a = Vector (Array a) Integer Integer
 
-# Convert List a => Vector a
+# Converts a ``List`` to a ``Vector``.
 global def listToVector l =
   def llen = len l
   def vnew n = prim "vnew"
@@ -30,6 +30,7 @@ global def listToVector l =
     out
   Vector (bind (vnew llen)) 0 llen
 
+# Converts a ``Tree`` to a ``Vector``.
 global def treeToVector t =
   def len = tlen t
   def vnew n = prim "vnew"
@@ -41,17 +42,28 @@ global def treeToVector t =
     out
   Vector (bind (vnew len)) 0 len
 
+# Returns ``True`` if the ``Vector`` has no entries, otherwise ``False``.
 global def vempty (Vector _ s e) = s == e
+
+# Returns the length of the ``Vector``.
 global def vlen (Vector _ s e) = e - s
+
+# Converts a ``List`` to a ``Vector``.
 global def vectorToList = vfoldr (_,_) Nil
 
+# Splits the ``Vector`` into two vectors, at the point ``i``.  
+# The ``i``th entry will end up in the second ``Vector``, provided that ``0 <= i < vlen(v)``.
 global def vsplitAt i (Vector v s e) =
   def x = min e (s + max 0 i)
   Pair (Vector v s x) (Vector v x e)
 
+# Returns the first ``i`` elements of the ``Vector``.
 global def vtake i v = vsplitAt i v | getPairFirst
+
+# Removes the first ``i`` elements of the ``Vector``.
 global def vdrop i v = vsplitAt i v | getPairSecond
 
+# Returns an ``Option``, containing either the ``i``th element of the vector, or ``None`` if ``i`` is out of range.
 global def vat i (Vector v s e) =
   def get v i = prim "vget"
   def j = i+s
@@ -61,6 +73,7 @@ def vat_ i (Vector v s _) =
   def get v i = prim "vget"
   get v (s+i)
 
+# Calls a function on every entry of a ``Vector``.
 global def vmap f v = vtab (\i f (vat_ i v)) (vlen v)
 global def vseq n = vtab (_) n
 global def vzip a b = vtab (\i Pair (vat_ i a) (vat_ i b)) (min (vlen a) (vlen b))
