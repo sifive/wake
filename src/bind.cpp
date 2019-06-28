@@ -643,7 +643,9 @@ struct NameRef {
   int depth;
   int offset;
   int def;
+  Location target;
   TypeVar *var;
+  NameRef() : depth(0), offset(-1), def(0), target(LOCATION), var(0) { }
 };
 
 struct NameBinding {
@@ -665,6 +667,7 @@ struct NameBinding {
       out.offset = 0;
       out.def = 0;
       out.var = &lambda->typeVar[0];
+      out.target = lambda->location;
     } else if (binding && (i = binding->order.find(x)) != binding->order.end()) {
       out.depth = 0;
       out.offset = i->second;
@@ -672,9 +675,11 @@ struct NameBinding {
       if (i->second < (int)binding->val.size()) {
         auto x = binding->val[i->second].get();
         out.var = x?&x->typeVar:0;
+        out.target = x->location;
       } else {
         auto x = binding->fun[i->second-binding->val.size()].get();
         out.var = x?&x->typeVar:0;
+        out.target = x->location;
       }
     } else if (next) {
       out = next->find(x);
@@ -726,6 +731,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     }
     ref->depth = pos.depth;
     ref->offset = pos.offset;
+    ref->target = pos.target;
     if (!pos.var) return true;
     if (pos.def) {
       TypeVar temp;

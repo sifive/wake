@@ -300,9 +300,18 @@ struct JSONRender {
       << "," << (self.end.bytes+1)
       << "],\"sourceType\":\"";
     (*it)->typeVar.format(os, (*it)->typeVar);
-    os
-      << "\",\"body\":[";
+    os << "\"";
 
+    if ((*it)->type == &VarRef::type) {
+      VarRef *ref = reinterpret_cast<VarRef*>(*it);
+      os
+        << ",\"target\":{\"filename\":\"" << json_escape(ref->target.filename)
+        << "\",\"range\":[" << ref->target.start.bytes
+        << "," << (ref->target.end.bytes+1)
+        << "]}";
+    }
+
+    os << ",\"body\":[";
     ++it;
 
     bool comma = false;
@@ -334,9 +343,9 @@ struct JSONRender {
       comma = true;
       os
         << "{\"type\":\"Program\",\"filename\":\"" << json_escape(filename)
-        << "\",\"source\":\"" << json_escape(content)
         << "\",\"range\":[0," << content.size()
-        << "],\"body\":[";
+        << "],\"source\":\"" << json_escape(content)
+        << "\",\"body\":[";
       bool comma = false;
       while (it != eset.end() && (*it)->location.filename == filename) {
         if (comma) os << ",";
