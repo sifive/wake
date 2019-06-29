@@ -621,6 +621,7 @@ int main(int argc, char **argv) {
 
   if (tcheck) std::cout << root.get();
   if (html) {
+    std::cout << "<meta charset=\"UTF-8\">" << std::endl;
     std::cout << "<script src=\"wake.js\"></script><script type=\"wake\">";
     JSONRender(std::cout).render(root.get());
     std::cout << "</script>" << std::endl;
