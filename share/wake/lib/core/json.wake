@@ -107,11 +107,13 @@ global def customFormatJSON fmt body = doFormat fmt body | cat
 global def formatJSON = customFormatJSON defaultJSONFormat
 global def prettyJSON = customFormatJSON prettyJSONFormat
 
-global def x /| f = match x
-  JArray l = JArray (filter f l)
-  _ = if f x then JArray (x, Nil) else JArray Nil
+global def root /| filterFn = jfilter filterFn root
+global def jfilter filterFn root = match root
+  JArray l = JArray (filter filterFn l)
+  _ = if filterFn root then JArray (root, Nil) else JArray Nil
 
-global def root /../ filterFn =
+global def root /../ filterFn = jfind filterFn root
+global def jfind filterFn root =
   def helper node acc = match node
     JArray l =
       def tail = foldr helper acc l
@@ -122,6 +124,11 @@ global def root /../ filterFn =
     _ =
       if filterFn node then node, acc else acc
   helper root Nil | JArray
+
+global def jempty root = empty (jlist root)
+global def jlist root = match root
+  JArray x = x
+  _ = root, Nil
 
 global def x // y =
   def helper tail = match _
