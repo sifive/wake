@@ -58,6 +58,23 @@ global def logNever = match _
   Debug = Null
   _     = Null
 
+# Useful helper method for inserting a debug step into a pipeline
+# def foo = "123123" | tap ("that: {_}") | int | getOrElse 0
+global def tap consumerFn value =
+  def _ = consumerFn value
+  value
+
+# Print the tap output to the console
+global def tapLevel level formatFn value =
+  def _ = printlnLevel level (formatFn value)
+  value
+
+global def tapError   = tapLevel logError
+global def tapWarn    = tapLevel logWarn
+global def tapNormal  = tapLevel logNormal
+global def tapVerbose = tapLevel logVerbose
+global def tapDebug   = tapLevel logDebug
+
 # This is private so that users cannot make the build depend on it
 def logLevel = match (prim "level")
   0 = Quiet
