@@ -643,7 +643,7 @@ int main(int argc, char **argv) {
       e = d->body.get();
       auto i = d->order.find(g);
       if (i != d->order.end()) {
-        int idx = i->second;
+        int idx = i->second.index;
         Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
         std::cout << g << ": ";
         v->typeVar.format(std::cout, v->typeVar);

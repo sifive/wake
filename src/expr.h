@@ -146,16 +146,21 @@ struct Subscribe : public Expr {
   Hash hash();
 };
 
-typedef std::map<std::string, int> DefOrder;
-
 struct DefMap : public Expr {
-  typedef std::map<std::string, std::unique_ptr<Expr> > defs;
-  defs map;
-  defs publish;
+  struct Value {
+    Location location;
+    std::unique_ptr<Expr> body;
+    Value(const Location &location_, std::unique_ptr<Expr> &&body_)
+     : location(location_), body(std::move(body_)) { }
+  };
+
+  typedef std::map<std::string, Value> Defs;
+  Defs map;
+  Defs publish;
   std::unique_ptr<Expr> body;
 
   static const TypeDescriptor type;
-  DefMap(const Location &location_, defs &&map_, defs &&publish_, Expr *body_)
+  DefMap(const Location &location_, Defs &&map_, Defs &&publish_, Expr *body_)
    : Expr(&type, location_), map(std::move(map_)), publish(std::move(publish_)), body(body_) { }
   DefMap(const Location &location_)
    : Expr(&type, location_), map(), publish(), body(new Literal(location, "top")) { }
@@ -166,6 +171,7 @@ struct DefMap : public Expr {
 
 struct Top : public Expr {
   typedef std::vector<std::unique_ptr<DefMap> > DefMaps;
+  typedef std::map<std::string, int> DefOrder;
   DefMaps defmaps;
   DefOrder globals;
   std::unique_ptr<Expr> body;
@@ -179,13 +185,20 @@ struct Top : public Expr {
 
 // Created by transforming DefMap+Top
 struct DefBinding : public Expr {
-  typedef std::vector<std::unique_ptr<Expr> > values;
-  typedef std::vector<std::unique_ptr<Lambda> > functions;
+  struct OrderValue {
+    Location location;
+    int index;
+    OrderValue(const Location &location_, int index_)
+     : location(location_), index(index_) { }
+  };
+  typedef std::vector<std::unique_ptr<Expr> > Values;
+  typedef std::vector<std::unique_ptr<Lambda> > Functions;
+  typedef std::map<std::string, OrderValue> Order;
 
   std::unique_ptr<Expr> body;
-  values val;     // access prior binding
-  functions fun;  // access current binding
-  DefOrder order; // values, then functions
+  Values val;     // access prior binding
+  Functions fun;  // access current binding
+  Order order; // values, then functions
   std::vector<int> scc; // SCC id per function
 
   static const TypeDescriptor type;

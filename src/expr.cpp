@@ -137,11 +137,11 @@ void DefMap::format(std::ostream &os, int depth) const {
   os << pad(depth) << "DefMap @ " << location.file() << std::endl;
   for (auto &i : map) {
     os << pad(depth+2) << i.first << " =" << std::endl;
-    i.second->format(os, depth+4);
+    i.second.body->format(os, depth+4);
   }
   for (auto &i : publish) {
     os << pad(depth+2) << "publish " << i.first << " =" << std::endl;
-    i.second->format(os, depth+4);
+    i.second.body->format(os, depth+4);
   }
   body->format(os, depth+2);
 }
@@ -183,7 +183,7 @@ void DefBinding::format(std::ostream &os, int depth) const {
 
   // invert name=>index map
   std::vector<const char*> names(order.size());
-  for (auto &i : order) names[i.second] = i.first.c_str();
+  for (auto &i : order) names[i.second.index] = i.first.c_str();
 
   for (int i = 0; i < (int)val.size(); ++i) {
     os << pad(depth+2) << "val " << names[i] << " = " << std::endl;

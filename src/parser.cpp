@@ -510,37 +510,37 @@ static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
   return body;
 }
 
-static void bind_def(Lexer &lex, DefMap::defs &map, std::string name, Expr *def) {
+static void bind_def(Lexer &lex, DefMap::Defs &map, std::string name, Expr *def) {
   if (name == "_")
     name += std::to_string(map.size());
 
-  auto i = map.find(name);
-  if (i != map.end()) {
+  Location l = def->location;
+  auto out = map.insert(std::make_pair(name, DefMap::Value(LOCATION, std::unique_ptr<Expr>(def))));
+  if (!out.second) {
     std::cerr << "Duplicate def "
       << name << " at "
-      << i->second->location.text() << " and "
-      << def->location.text() << std::endl;
+      << out.first->second.body->location.text() << " and "
+      << l.text() << std::endl;
     lex.fail = true;
   }
-  map[name] = std::unique_ptr<Expr>(def);
 }
 
-static void publish_def(DefMap::defs &publish, const std::string &name, Expr *def) {
+static void publish_def(DefMap::Defs &publish, const std::string &name, Expr *def) {
   // Build a prepender
   std::unique_ptr<Expr> tail(
     new App(def->location, new App(def->location,
       new VarRef(def->location, "binary ++"),
       def), new VarRef(def->location, "_ tail")));
 
-  DefMap::defs::iterator i;
+  DefMap::Defs::iterator i;
   if ((i = publish.find(name)) == publish.end()) {
-    i = publish.insert(std::make_pair(name, std::move(tail))).first;
+    i = publish.insert(std::make_pair(name, DefMap::Value(LOCATION, std::move(tail)))).first;
   } else {
     // Apply the existing prepender to us (we come after it)
-    i->second = std::unique_ptr<Expr>(new App(def->location, i->second.release(), tail.release()));
+    i->second.body = std::unique_ptr<Expr>(new App(def->location, i->second.body.release(), tail.release()));
   }
 
-  i->second = std::unique_ptr<Expr>(new Lambda(def->location, "_ tail", i->second.release()));
+  i->second.body = std::unique_ptr<Expr>(new Lambda(def->location, "_ tail", i->second.body.release()));
 }
 
 static void bind_global(const std::string &name, Top *top, Lexer &lex) {
@@ -550,8 +550,8 @@ static void bind_global(const std::string &name, Top *top, Lexer &lex) {
   if (it != top->globals.end()) {
     std::cerr << "Duplicate global "
       << name << " at "
-      << top->defmaps.back()->map[name]->location.text() << " and "
-      << top->defmaps[it->second]->map[name]->location.text() << std::endl;
+      << top->defmaps.back()->map.find(name)->second.body->location.text() << " and "
+      << top->defmaps[it->second]->map.find(name)->second.body->location.text() << std::endl;
     lex.fail = true;
   } else {
     top->globals[name] = top->defmaps.size()-1;
@@ -798,7 +798,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
   }
 }
 
-static void parse_tuple(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
+static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   AST def = parse_type_def(lex);
   if (!def) return;
 
@@ -968,7 +968,7 @@ static void parse_data_elt(Lexer &lex, Sum &sum) {
   }
 }
 
-static void parse_data(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
+static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   AST def = parse_type_def(lex);
   if (!def) return;
 
@@ -1027,7 +1027,7 @@ static void parse_data(Lexer &lex, DefMap::defs &map, Top *top, bool global) {
   check_special(lex, name, sump);
 }
 
-static void parse_decl(DefMap::defs &map, Lexer &lex, Top *top, bool global) {
+static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
   switch (lex.next.type) {
     default:
        std::cerr << "Missing DEF after GLOBAL at " << lex.next.location.text() << std::endl;
@@ -1067,8 +1067,8 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
     if (expect(EOL, lex)) lex.consume();
 
     Location location = lex.next.location;
-    DefMap::defs map;
-    DefMap::defs publish;
+    DefMap::Defs map;
+    DefMap::Defs publish;
 
     bool repeat = true;
     while (repeat) {
