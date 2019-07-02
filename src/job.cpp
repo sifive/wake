@@ -1086,9 +1086,10 @@ static PRIMFN(prim_job_cache) {
     auto out = std::make_shared<Job>(jobtable->imp->db, dir->value, stdin->value, env->value, cmd->value, true, 0);
     out->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED|STATE_FINISHED;
     out->job = job;
-    out->record  = reuse;
+    out->record = reuse;
     // predict + reality unusued since Job not run
-    out->report  = reuse;
+    out->report = reuse;
+    out->reality = reuse;
     out->pathtime = pathtime;
     jobs.emplace_back(std::move(out));
 
