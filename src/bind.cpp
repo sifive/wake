@@ -440,7 +440,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
     if (ast.name.empty()) out.sum = multiarg;
     if (!out.sum) {
       std::cerr << "Constructor " << ast.name
-        << " in pattern match not found at " << ast.location.file()
+        << " in pattern match not found at " << ast.token.file()
         << "." << std::endl;
       out.var = 0;
     } else if (out.sum->members[out.cons].ast.args.size() != ast.args.size()) {
@@ -451,7 +451,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       }
       std::cerr  << " in pattern match has " << ast.args.size()
         << " parameters, but must have " << out.sum->members[out.cons].ast.args.size()
-        << " at " << ast.location.file()
+        << " at " << ast.region.text()
         << "." << std::endl;
       out.sum = 0;
       out.var = 0;

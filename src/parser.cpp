@@ -97,15 +97,16 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state) {
 
 static bool check_constructors(const AST &ast) {
   if (!ast.args.empty() && ast.name == "_") {
-    std::cerr << "Wildcard _"
-      << " cannot be used as a constructor at " << ast.location.text()
+    std::cerr
+      << "Wildcard cannot be used as a constructor at " << ast.token.text()
       << std::endl;
     return true;
   }
 
   if (!ast.args.empty() && !ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
-    std::cerr << "Lower-case identifier " << ast.name
-      << " cannot be used as a constructor at " << ast.location.text()
+    std::cerr
+      << "Lower-case identifier cannot be used as a constructor at "
+      << ast.token.text()
       << std::endl;
     return true;
   }
@@ -447,7 +448,7 @@ static Definition parse_def(Lexer &lex, bool target = false) {
 
   if (Lexer::isUpper(name.c_str())) {
     std::cerr << "Upper-case identifier cannot be used as a function name at "
-      << ast.location.text() << std::endl;
+      << ast.token.text() << std::endl;
     lex.fail = true;
   }
 
@@ -457,10 +458,10 @@ static Definition parse_def(Lexer &lex, bool target = false) {
     AST sub = parse_ast(APP_PRECEDENCE, lex, state, AST(lex.next.location));
     if (check_constructors(ast)) lex.fail = true;
     for (auto &x : sub.args) ast.args.push_back(std::move(x));
-    ast.location.end = sub.location.end;
+    ast.region.end = sub.region.end;
   }
 
-  Location fn = ast.location;
+  Location fn = ast.region;
 
   expect(EQUALS, lex);
   lex.consume();
@@ -517,7 +518,7 @@ static Definition parse_def(Lexer &lex, bool target = false) {
   for (auto i = args.rbegin(); i != args.rend(); ++i)
     body = new Lambda(fn, *i, body);
 
-  return Definition(std::move(name), fn, body);
+  return Definition(std::move(name), ast.token, body);
 }
 
 static void bind_global(const std::string &name, Top *top, Lexer &lex) {
@@ -576,16 +577,17 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
   switch (lex.next.type) {
     // Unary operators
     case OPERATOR: {
-      Location location = lex.next.location;
       op_type op = op_precedence(lex.id().c_str());
       if (op.p < p) precedence_error(lex);
       std::string name = "unary " + lex.id();
+      Location token = lex.next.location;
       lex.consume();
       AST rhs = parse_ast(op.p + op.l, lex, state);
-      location.end = rhs.location.end;
       std::vector<AST> args;
       args.emplace_back(std::move(rhs));
-      return AST(location, std::move(name), std::move(args));
+      auto out = AST(token, std::move(name), std::move(args));
+      out.region.end = out.args.back().region.end;
+      return out;
     }
     // Terminals
     case ID: {
@@ -594,12 +596,12 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
       return out;
     }
     case POPEN: {
-      Location location = lex.next.location;
+      Location region = lex.next.location;
       lex.consume();
       AST out = parse_ast(0, lex, state);
-      location.end = lex.next.location.end;
+      region.end = lex.next.location.end;
       if (expect(PCLOSE, lex)) lex.consume();
-      out.location = location;
+      out.region = region;
       return out;
     }
     case LITERAL: {
@@ -631,14 +633,16 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
         op_type op = op_precedence(lex.id().c_str());
         if (op.p < p) return lhs;
         std::string name = "binary " + lex.id();
+        Location token = lex.next.location;
         lex.consume();
         auto rhs = parse_ast(op.p + op.l, lex, state);
-        Location loc = lhs.location;
-        loc.end = rhs.location.end;
+        Location region = lhs.region;
+        region.end = rhs.region.end;
         std::vector<AST> args;
         args.emplace_back(std::move(lhs));
         args.emplace_back(std::move(rhs));
-        lhs = AST(loc, std::move(name), std::move(args));
+        lhs = AST(token, std::move(name), std::move(args));
+        lhs.region = region;
         break;
       }
       case LITERAL:
@@ -647,32 +651,30 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
         op_type op = op_precedence("a"); // application
         if (op.p < p) return lhs;
         AST rhs = parse_ast(op.p + op.l, lex, state);
-        Location location = lhs.location;
-        location.end = rhs.location.end;
+        lhs.region.end = rhs.region.end;
         if (Lexer::isOperator(lhs.name.c_str())) {
           std::cerr << "Cannot supply additional constructor arguments to " << lhs.name
-            << " at " << location.text() << std::endl;
+            << " at " << lhs.region.text() << std::endl;
           lex.fail = true;
         }
         lhs.args.emplace_back(std::move(rhs));
-        lhs.location = location;
         break;
       }
       case COLON: {
         if (state.type) {
           op_type op = op_precedence(lex.id().c_str());
           if (op.p < p) return lhs;
-          Location tagloc = lhs.location;
+          Location tagloc = lhs.region;
           lex.consume();
           if (!lhs.args.empty() || Lexer::isOperator(lhs.name.c_str())) {
             std::cerr << "Left-hand-side of COLON must be a simple lower-case identifier, not "
-              << lhs.name << " at " << lhs.location.file() << std::endl;
+              << lhs.name << " at " << lhs.region.file() << std::endl;
             lex.fail = true;
           }
           std::string tag = std::move(lhs.name);
           lhs = parse_ast(op.p + op.l, lex, state);
           lhs.tag = std::move(tag);
-          lhs.location.start = tagloc.start;
+          lhs.region.start = tagloc.start;
           break;
         }
         // fall-through to default
@@ -703,7 +705,7 @@ static AST parse_type_def(Lexer &lex) {
   if (def.name == "_" || Lexer::isLower(def.name.c_str())) {
     std::cerr << "Type name must be upper-case or operator, not "
       << def.name << " at "
-      << def.location.file() << std::endl;
+      << def.token.file() << std::endl;
     lex.fail = true;
   }
 
@@ -712,13 +714,13 @@ static AST parse_type_def(Lexer &lex) {
     if (!Lexer::isLower(x.name.c_str())) {
       std::cerr << "Type argument must be lower-case, not "
         << x.name << " at "
-        << x.location.file() << std::endl;
+        << x.token.file() << std::endl;
       lex.fail = true;
     }
     if (!args.insert(x.name).second) {
       std::cerr << "Type argument "
         << x.name << " occurs more than once at "
-        << x.location.file() << std::endl;
+        << x.token.file() << std::endl;
       lex.fail = true;
     }
   }
@@ -732,7 +734,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
   if (name == "Integer" || name == "String" || name == "RegExp" ||
       name == FN || name == "Job" || name == "Array" || name == "Double") {
     std::cerr << "Constuctor " << name
-      << " is reserved at " << sump->location.file() << "." << std::endl;
+      << " is reserved at " << sump->token.file() << "." << std::endl;
     lex.fail = true;
   }
 
@@ -741,7 +743,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
         sump->members[0].ast.args.size() != 0 ||
         sump->members[1].ast.args.size() != 0) {
       std::cerr << "Special constructor Boolean not defined correctly at "
-        << sump->location.file() << "." << std::endl;
+        << sump->region.file() << "." << std::endl;
       lex.fail = true;
     }
     Boolean = sump;
@@ -753,7 +755,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
         sump->members[1].ast.args.size() != 0 ||
         sump->members[2].ast.args.size() != 0) {
       std::cerr << "Special constructor Order not defined correctly at "
-        << sump->location.file() << "." << std::endl;
+        << sump->region.file() << "." << std::endl;
       lex.fail = true;
     }
     Order = sump;
@@ -764,7 +766,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
         sump->members[0].ast.args.size() != 0 ||
         sump->members[1].ast.args.size() != 2) {
       std::cerr << "Special constructor List not defined correctly at "
-        << sump->location.file() << "." << std::endl;
+        << sump->region.file() << "." << std::endl;
       lex.fail = true;
     }
     List = sump;
@@ -774,7 +776,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
     if (sump->members.size() != 1 ||
         sump->members[0].ast.args.size() != 2) {
       std::cerr << "Special constructor Pair not defined correctly at "
-        << sump->location.file() << "." << std::endl;
+        << sump->region.file() << "." << std::endl;
       lex.fail = true;
     }
     Pair = sump;
@@ -785,7 +787,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
         sump->members[0].ast.args.size() != 1 ||
         sump->members[1].ast.args.size() != 1) {
       std::cerr << "Special constructor Result not defined correctly at "
-        << sump->location.file() << "." << std::endl;
+        << sump->region.file() << "." << std::endl;
       lex.fail = true;
     }
     Result = sump;
@@ -795,7 +797,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
     if (sump->members.size() != 1 ||
         sump->members[0].ast.args.size() != 0) {
       std::cerr << "Special constructor Unit not defined correctly at "
-        << sump->location.file() << "." << std::endl;
+        << sump->region.file() << "." << std::endl;
       lex.fail = true;
     }
     Unit = sump;
@@ -804,7 +806,7 @@ static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
   if (name == "JValue") {
     if (sump->members.size() != 7) {
       std::cerr << "Special constructor JValue not defined correctly at "
-        << sump->location.file() << "." << std::endl;
+        << sump->region.file() << "." << std::endl;
       lex.fail = true;
     }
     JValue = sump;
@@ -818,7 +820,8 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   std::string name = def.name;
   std::string tname = "destruct " + name;
   Sum sum(std::move(def));
-  AST tuple(sum.location, std::string(sum.name));
+  AST tuple(sum.token, std::string(sum.name));
+  tuple.region = sum.region;
   std::vector<bool> members;
 
   if (!expect(INDENT, lex)) return;
@@ -861,21 +864,21 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
 
   sum.addConstructor(std::move(tuple));
 
-  Location location = sum.location;
+  Location location = sum.token;
   Destruct *destruct = new Destruct(location, std::move(sum));
   Sum *sump = &destruct->sum;
   Expr *destructfn =
-    new Lambda(sump->location, "_",
-    new Lambda(sump->location, "_",
+    new Lambda(sump->token, "_",
+    new Lambda(sump->token, "_",
     destruct));
 
   Constructor &c = sump->members.back();
-  Expr *construct = new Construct(c.ast.location, sump, &c);
+  Expr *construct = new Construct(c.ast.token, sump, &c);
   for (size_t i = c.ast.args.size(); i > 0; --i)
-    construct = new Lambda(c.ast.location, c.ast.args[i-1].tag, construct);
+    construct = new Lambda(c.ast.token, c.ast.args[i-1].tag, construct);
 
-  bind_def(lex, map, Definition(c.ast.name, c.ast.location, construct), global?top:0); // !!!
-  bind_def(lex, map, Definition(tname, c.ast.location, destructfn), global?top:0);
+  bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
+  bind_def(lex, map, Definition(tname, c.ast.token, destructfn), global?top:0);
 
   check_special(lex, name, sump);
 
@@ -883,70 +886,71 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   int outer = 0;
   for (unsigned i = 0; i < members.size(); ++i) {
     std::string &mname = c.ast.args[i].tag;
+    Location memberToken = c.ast.args[i].token;
     bool global = members[i];
     if (mname.empty()) continue;
 
     // Implement get methods
-    Expr *getifn = new VarRef(sump->location, "_ " + std::to_string(outer+1));
+    Expr *getifn = new VarRef(memberToken, "_ " + std::to_string(outer+1));
     for (int inner = (int)members.size(); inner >= 0; --inner)
-      getifn = new Lambda(sump->location, "_ " + std::to_string(inner), getifn);
+      getifn = new Lambda(memberToken, "_ " + std::to_string(inner), getifn);
 
     std::string get = "get" + name + mname;
     Expr *getfn =
-      new Lambda(sump->location, "_ x",
-        new App(sump->location,
-          new App(sump->location,
-            new VarRef(sump->location, tname),
+      new Lambda(memberToken, "_ x",
+        new App(memberToken,
+          new App(memberToken,
+            new VarRef(memberToken, tname),
             getifn),
-          new VarRef(sump->location, "_ x")));
+          new VarRef(memberToken, "_ x")));
 
-    bind_def(lex, map, Definition(get, sump->location, getfn), global?top:0);
+    bind_def(lex, map, Definition(get, memberToken, getfn), global?top:0);
 
     // Implement edit methods
-    Expr *editifn = new VarRef(sump->location, name);
+    Expr *editifn = new VarRef(memberToken, name);
     for (int inner = 0; inner < (int)members.size(); ++inner)
-      editifn = new App(sump->location, editifn,
+      editifn = new App(memberToken, editifn,
         (inner == outer)
-        ? reinterpret_cast<Expr*>(new App(sump->location,
-           new VarRef(sump->location, "fn" + mname),
-           new VarRef(sump->location, "_ " + std::to_string(inner+1))))
-        : reinterpret_cast<Expr*>(new VarRef(sump->location, "_ " + std::to_string(inner+1))));
+        ? reinterpret_cast<Expr*>(new App(memberToken,
+           new VarRef(memberToken, "fn" + mname),
+           new VarRef(memberToken, "_ " + std::to_string(inner+1))))
+        : reinterpret_cast<Expr*>(new VarRef(memberToken, "_ " + std::to_string(inner+1))));
     for (int inner = (int)members.size(); inner >= 0; --inner)
-      editifn = new Lambda(sump->location, "_ " + std::to_string(inner), editifn);
+      editifn = new Lambda(memberToken, "_ " + std::to_string(inner), editifn);
 
     std::string edit = "edit" + name + mname;
     Expr *editfn =
-      new Lambda(sump->location, "fn" + mname,
-        new Lambda(sump->location, "_ x",
-          new App(sump->location,
-            new App(sump->location,
-              new VarRef(sump->location, tname),
+      new Lambda(memberToken, "fn" + mname,
+        new Lambda(memberToken, "_ x",
+          new App(memberToken,
+            new App(memberToken,
+              new VarRef(memberToken, tname),
               editifn),
-            new VarRef(sump->location, "_ x"))));
+            new VarRef(memberToken, "_ x"))));
 
-    bind_def(lex, map, Definition(edit, sump->location, editfn), global?top:0);
+    bind_def(lex, map, Definition(edit, memberToken, editfn), global?top:0);
 
     // Implement set methods
-    Expr *setifn = new VarRef(sump->location, name);
+    Expr *setifn = new VarRef(memberToken, name);
     for (int inner = 0; inner < (int)members.size(); ++inner)
-      setifn = new App(sump->location, setifn,
+      setifn = new App(memberToken, setifn,
         (inner == outer)
-        ? reinterpret_cast<Expr*>(new VarRef(sump->location, mname))
-        : reinterpret_cast<Expr*>(new VarRef(sump->location, "_ " + std::to_string(inner+1))));
+        ? reinterpret_cast<Expr*>(new VarRef(memberToken, mname))
+        : reinterpret_cast<Expr*>(new VarRef(memberToken, "_ " + std::to_string(inner+1))));
     for (int inner = (int)members.size(); inner >= 0; --inner)
-      setifn = new Lambda(sump->location, "_ " + std::to_string(inner), setifn);
+      setifn = new Lambda(memberToken, "_ " + std::to_string(inner), setifn);
 
     std::string set = "set" + name + mname;
     Expr *setfn =
-      new Lambda(sump->location, mname,
-        new Lambda(sump->location, "_ x",
-          new App(sump->location,
-            new App(sump->location,
-              new VarRef(sump->location, tname),
+      new Lambda(memberToken, mname,
+        new Lambda(memberToken, "_ x",
+          new App(memberToken,
+            new App(memberToken,
+              new VarRef(memberToken, tname),
               setifn),
-            new VarRef(sump->location, "_ x"))));
+            new VarRef(memberToken, "_ x"))));
 
-    bind_def(lex, map, Definition(set, sump->location, setfn), global?top:0);
+    bind_def(lex, map, Definition(set, memberToken, setfn), global?top:0);
 
     ++outer;
   }
@@ -962,13 +966,13 @@ static void parse_data_elt(Lexer &lex, Sum &sum) {
       std::cerr << "Constructor "
         << cons.name << " should not be tagged with "
         << cons.tag << " at "
-        << cons.location.file() << std::endl;
+        << cons.region.file() << std::endl;
       lex.fail = true;
     }
     if (cons.name == "_" || Lexer::isLower(cons.name.c_str())) {
       std::cerr << "Constructor name must be upper-case or operator, not "
         << cons.name << " at "
-        << cons.location.file() << std::endl;
+        << cons.token.file() << std::endl;
       lex.fail = true;
     }
     sum.addConstructor(std::move(cons));
@@ -1013,21 +1017,21 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   }
 
   std::string name = sum.name;
-  Location location = sum.location;
+  Location location = sum.token;
   Destruct *destruct = new Destruct(location, std::move(sum));
   Sum *sump = &destruct->sum;
-  Expr *destructfn = new Lambda(sump->location, "_", destruct);
+  Expr *destructfn = new Lambda(sump->token, "_", destruct);
 
   for (auto &c : sump->members) {
-    destructfn = new Lambda(sump->location, "_", destructfn);
-    Expr *construct = new Construct(c.ast.location, sump, &c);
+    destructfn = new Lambda(sump->token, "_", destructfn);
+    Expr *construct = new Construct(c.ast.token, sump, &c);
     for (size_t i = 0; i < c.ast.args.size(); ++i)
-      construct = new Lambda(c.ast.location, "_", construct);
+      construct = new Lambda(c.ast.token, "_", construct);
 
-    bind_def(lex, map, Definition(c.ast.name, c.ast.location, construct), global?top:0);
+    bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
   }
 
-  bind_def(lex, map, Definition("destruct " + name, sump->location, destructfn), global?top:0);
+  bind_def(lex, map, Definition("destruct " + name, sump->token, destructfn), global?top:0);
   check_special(lex, name, sump);
 }
 

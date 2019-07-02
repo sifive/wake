@@ -27,17 +27,17 @@
 
 struct TypeVar;
 struct AST {
-  Location location;
+  Location token, region;
   std::string name;
   std::string tag;
   std::vector<AST> args;
 
-  AST(const Location &location_, std::string &&name_, std::vector<AST> &&args_) :
-    location(location_), name(std::move(name_)), args(std::move(args_)) { }
-  AST(const Location &location_, std::string &&name_) :
-    location(location_), name(std::move(name_)) { }
-  AST(const Location &location_) :
-    location(location_) { }
+  AST(const Location &token_, std::string &&name_, std::vector<AST> &&args_) :
+    token(token_), region(token_), name(std::move(name_)), args(std::move(args_)) { }
+  AST(const Location &token_, std::string &&name_) :
+    token(token_), region(token_), name(std::move(name_)) { }
+  AST(const Location &token_) :
+    token(token_), region(token_) { }
 
   bool unify(TypeVar &out, const std::map<std::string, TypeVar*> &ids);
   operator bool() const { return !name.empty(); }
@@ -57,7 +57,7 @@ struct Constructor {
 
 struct Sum {
   std::string name;
-  Location location;
+  Location token, region;
   std::vector<std::string> args;
   std::vector<Constructor> members;
 
