@@ -62,6 +62,16 @@ std::string json_escape(const std::string &x) {
     else if (z == '\\') out.append("\\\\");
     else if (c >= 0x20) {
       out.push_back(c);
+    } else if (z == '\b') {
+      out.append("\\b");
+    } else if (z == '\f') {
+      out.append("\\f");
+    } else if (z == '\n') {
+      out.append("\\n");
+    } else if (z == '\r') {
+      out.append("\\r");
+    } else if (z == '\t') {
+      out.append("\\t");
     } else {
       escape[4] = hex(c >> 4);
       escape[5] = hex(c & 0xf);
