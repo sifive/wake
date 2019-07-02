@@ -63,7 +63,7 @@ void VarRef::format(std::ostream &os, int depth) const {
 Hash VarRef::hash() {
   uint64_t payload[4];
   payload[0] = type.hashcode.data[0];
-  payload[0] = type.hashcode.data[1];
+  payload[1] = type.hashcode.data[1];
   payload[2] = depth;
   payload[3] = offset;
   return hashcode = Hash(&payload[0], 32);
