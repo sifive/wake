@@ -665,20 +665,19 @@ struct NameBinding {
       out.offset = 0;
       out.def = 0;
       out.var = &lambda->typeVar[0];
-      out.target = lambda->location;
+      out.target = lambda->token;
     } else if (binding && (i = binding->order.find(x)) != binding->order.end()) {
       int idx = i->second.index;
       out.depth = 0;
       out.offset = idx;
       out.def = idx < generalized;
+      out.target = i->second.location;
       if (idx < (int)binding->val.size()) {
         auto x = binding->val[idx].get();
         out.var = x?&x->typeVar:0;
-        out.target = x->location;
       } else {
         auto x = binding->fun[idx-binding->val.size()].get();
         out.var = x?&x->typeVar:0;
-        out.target = x->location;
       }
     } else if (next) {
       out = next->find(x);

@@ -276,23 +276,26 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       return parse_match(p, lex);
     }
     case LAMBDA: {
-      Location location = lex.next.location;
       op_type op = op_precedence("\\");
       if (op.p < p) precedence_error(lex);
+      Location region = lex.next.location;
       lex.consume();
       ASTState state(false, false);
       AST ast = parse_ast(APP_PRECEDENCE+1, lex, state);
       if (check_constructors(ast)) lex.fail = true;
       auto rhs = parse_binary(op.p + op.l, lex, multiline);
-      location.end = rhs->location.end;
+      region.end = rhs->location.end;
+      Lambda *out;
       if (Lexer::isUpper(ast.name.c_str()) || Lexer::isOperator(ast.name.c_str())) {
-        Match *match = new Match(location);
+        Match *match = new Match(region);
         match->patterns.emplace_back(std::move(ast), rhs, nullptr);
-        match->args.emplace_back(new VarRef(location, "_ xx"));
-        return new Lambda(location, "_ xx", match);
+        match->args.emplace_back(new VarRef(region, "_ xx"));
+        out = new Lambda(region, "_ xx", match);
       } else {
-        return new Lambda(location, ast.name, rhs);
+        out = new Lambda(region, ast.name, rhs);
+        out->token = ast.token;
       }
+      return out;
     }
     // Terminals
     case ID: {
@@ -475,10 +478,10 @@ static Definition parse_def(Lexer &lex, bool target = false) {
     pattern |= Lexer::isOperator(x.name.c_str()) || Lexer::isUpper(x.name.c_str());
   }
 
-  std::vector<std::string> args;
+  std::vector<std::pair<std::string, Location> > args;
   if (!pattern) {
     // no pattern; simple lambdas for the arguments
-    for (auto &x : ast.args) args.push_back(x.name);
+    for (auto &x : ast.args) args.emplace_back(x.name, x.token);
   } else {
     // bind the arguments to anonymous lambdas and push the whole thing into a pattern
     size_t nargs = ast.args.size();
@@ -489,7 +492,7 @@ static Definition parse_def(Lexer &lex, bool target = false) {
       match->patterns.emplace_back(std::move(ast.args.front()), body, nullptr);
     }
     for (size_t i = 0; i < nargs; ++i) {
-      args.push_back("_ " + std::to_string(i));
+      args.emplace_back("_ " + std::to_string(i), LOCATION);
       match->args.emplace_back(new VarRef(fn, "_ " + std::to_string(i)));
     }
     body = match;
@@ -503,10 +506,10 @@ static Definition parse_def(Lexer &lex, bool target = false) {
     }
     Expr *hash = new Prim(fn, "hash");
     for (size_t i = 0; i < tohash; ++i) hash = new Lambda(fn, "_", hash);
-    for (size_t i = 0; i < tohash; ++i) hash = new App(fn, hash, new VarRef(fn, args[i]));
+    for (size_t i = 0; i < tohash; ++i) hash = new App(fn, hash, new VarRef(fn, args[i].first));
     Expr *subhash = new Prim(fn, "hash");
     for (size_t i = tohash; i < args.size(); ++i) subhash = new Lambda(fn, "_", subhash);
-    for (size_t i = tohash; i < args.size(); ++i) subhash = new App(fn, subhash, new VarRef(fn, args[i]));
+    for (size_t i = tohash; i < args.size(); ++i) subhash = new App(fn, subhash, new VarRef(fn, args[i].first));
     body = new App(fn, new App(fn, new App(fn, new App(fn,
       new Lambda(fn, "_target", new Lambda(fn, "_hash", new Lambda(fn, "_subhash", new Lambda(fn, "_fn", new Prim(fn, "tget"))))),
       new VarRef(fn, "table " + name)),
@@ -515,8 +518,11 @@ static Definition parse_def(Lexer &lex, bool target = false) {
       new Lambda(fn, "_", body));
   }
 
-  for (auto i = args.rbegin(); i != args.rend(); ++i)
-    body = new Lambda(fn, *i, body);
+  for (auto i = args.rbegin(); i != args.rend(); ++i) {
+    Lambda *lambda = new Lambda(fn, i->first, body);
+    lambda->token = i->second;
+    body = lambda;
+  }
 
   return Definition(std::move(name), ast.token, body);
 }

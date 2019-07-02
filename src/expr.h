@@ -81,10 +81,11 @@ struct App : public Expr {
 struct Lambda : public Expr {
   std::string name;
   std::unique_ptr<Expr> body;
+  Location token;
 
   static const TypeDescriptor type;
   Lambda(const Location &location_, const std::string &name_, Expr *body_)
-   : Expr(&type, location_), name(name_), body(body_) { }
+   : Expr(&type, location_), name(name_), body(body_), token(LOCATION) { }
 
   void format(std::ostream &os, int depth) const;
   Hash hash();
