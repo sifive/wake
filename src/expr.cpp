@@ -37,6 +37,9 @@ const TypeDescriptor Subscribe ::type("Subscribe");
 const TypeDescriptor Match     ::type("Match");
 const TypeDescriptor DefMap    ::type("DefMap");
 const TypeDescriptor Top       ::type("Top");
+// these are just useful for dumping json ast
+const TypeDescriptor VarDef    ::type("VarDef");
+const TypeDescriptor VarArg    ::type("VarArg");
 
 Literal::Literal(const Location &location_, std::shared_ptr<Value> &&value_)
  : Expr(&type, location_), value(std::move(value_)) { }
@@ -227,3 +230,15 @@ std::ostream & operator << (std::ostream &os, const Expr *expr) {
   expr->format(os, 0);
   return os;
 }
+
+void VarDef::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "VarDef @ " << location.file() << std::endl;
+}
+
+Hash VarDef::hash() { return Hash(); }
+
+void VarArg::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "VarArg @ " << location.file() << std::endl;
+}
+
+Hash VarArg::hash() { return Hash(); }

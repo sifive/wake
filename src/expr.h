@@ -236,4 +236,20 @@ struct Destruct : public Expr {
   Hash hash();
 };
 
+// A dummy expression never actually used in the AST
+struct VarDef : public Expr {
+  static const TypeDescriptor type;
+  VarDef(const Location &location_) : Expr(&type, location_) { }
+  void format(std::ostream &os, int depth) const;
+  Hash hash();
+};
+
+// A dummy expression never actually used in the AST
+struct VarArg : public Expr {
+  static const TypeDescriptor type;
+  VarArg(const Location &location_) : Expr(&type, location_) { }
+  void format(std::ostream &os, int depth) const;
+  Hash hash();
+};
+
 #endif

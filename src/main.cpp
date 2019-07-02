@@ -266,6 +266,7 @@ struct ParanOrder {
 
 struct JSONRender {
   typedef std::set<Expr*, ParanOrder> ESet;
+  std::vector<std::unique_ptr<Expr> > defs;
   std::ostream &os;
   ESet eset;
   ESet::iterator it;
@@ -282,11 +283,30 @@ struct JSONRender {
       explore(app->fn.get());
     } else if (expr->type == &Lambda::type) {
       Lambda *lambda = reinterpret_cast<Lambda*>(expr);
+      if (lambda->token.start.bytes >= 0) {
+        auto foo = new VarArg(lambda->token);
+        foo->typeVar.setDOB(lambda->typeVar);
+        lambda->typeVar[0].unify(foo->typeVar);
+        defs.emplace_back(foo);
+        eset.insert(foo);
+      }
       explore (lambda->body.get());
     } else if (expr->type == &DefBinding::type) {
       DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
       for (auto &i : defbinding->val) explore(i.get());
       for (auto &i : defbinding->fun) explore(i.get());
+      for (auto &i : defbinding->order) {
+        if (i.second.location.start.bytes >= 0) {
+          auto foo = new VarDef(i.second.location);
+          int val = i.second.index;
+          int fun = val - defbinding->val.size();
+          TypeVar &var = (fun >= 0) ? defbinding->fun[fun]->typeVar : defbinding->val[val]->typeVar;
+          foo->typeVar.setDOB(var);
+          var.unify(foo->typeVar);
+          defs.emplace_back(foo);
+          eset.insert(foo);
+        }
+      }
       explore(defbinding->body.get());
     }
   }
@@ -304,11 +324,13 @@ struct JSONRender {
 
     if ((*it)->type == &VarRef::type) {
       VarRef *ref = reinterpret_cast<VarRef*>(*it);
-      os
-        << ",\"target\":{\"filename\":\"" << json_escape(ref->target.filename)
-        << "\",\"range\":[" << ref->target.start.bytes
-        << "," << (ref->target.end.bytes+1)
-        << "]}";
+      if (ref->target.start.bytes >= 0) {
+        os
+          << ",\"target\":{\"filename\":\"" << json_escape(ref->target.filename)
+          << "\",\"range\":[" << ref->target.start.bytes
+          << "," << (ref->target.end.bytes+1)
+          << "]}";
+      }
     }
 
     os << ",\"body\":[";
