@@ -161,8 +161,8 @@ void Data::format(std::ostream &os, FormatState &state) const {
   const std::string &name = cons->ast.name;
 
   const Value* child = 0;
-  if (!cons->ast.args.empty()) {
-    int index = cons->ast.args.size() - 1 - state.get();
+  int index = cons->ast.args.size() - 1 - state.get();
+  if (index >= 0) {
     for (const Binding *iter = binding.get(); iter; iter = iter->next.get()) {
       if (index >= iter->nargs) {
         index -= iter->nargs;
