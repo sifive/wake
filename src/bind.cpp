@@ -158,9 +158,8 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
         defs[j].index = 0;
       } else {
         defs[j].index = -1;
-        defs[j].lowlink = -1;
-        defs[j].onstack = 0;
       }
+      defs[j].onstack = 0;
     }
     SCCState state;
     state.defs = &defs;
