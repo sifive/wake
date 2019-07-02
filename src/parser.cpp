@@ -426,12 +426,22 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
   }
 }
 
-static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
+struct Definition {
+  std::string name;
+  Location location;
+  std::unique_ptr<Expr> body;
+  Definition(std::string &&name_, const Location &location_, Expr *body_)
+   : name(std::move(name_)), location(location_), body(body_) { }
+  Definition(const std::string &name_, const Location &location_, Expr *body_)
+   : name(std::move(name_)), location(location_), body(body_) { }
+};
+
+static Definition parse_def(Lexer &lex, bool target = false) {
   lex.consume();
 
   ASTState state(false, false);
   AST ast = parse_ast(0, lex, state);
-  name = std::move(ast.name);
+  std::string name = std::move(ast.name);
   ast.name.clear();
   if (check_constructors(ast)) lex.fail = true;
 
@@ -507,55 +517,58 @@ static Expr *parse_def(Lexer &lex, std::string &name, bool target = false) {
   for (auto i = args.rbegin(); i != args.rend(); ++i)
     body = new Lambda(fn, *i, body);
 
-  return body;
-}
-
-static void bind_def(Lexer &lex, DefMap::Defs &map, std::string name, Expr *def) {
-  if (name == "_")
-    name += std::to_string(map.size());
-
-  Location l = def->location;
-  auto out = map.insert(std::make_pair(name, DefMap::Value(LOCATION, std::unique_ptr<Expr>(def))));
-  if (!out.second) {
-    std::cerr << "Duplicate def "
-      << name << " at "
-      << out.first->second.body->location.text() << " and "
-      << l.text() << std::endl;
-    lex.fail = true;
-  }
-}
-
-static void publish_def(DefMap::Defs &publish, const std::string &name, Expr *def) {
-  // Build a prepender
-  std::unique_ptr<Expr> tail(
-    new App(def->location, new App(def->location,
-      new VarRef(def->location, "binary ++"),
-      def), new VarRef(def->location, "_ tail")));
-
-  DefMap::Defs::iterator i;
-  if ((i = publish.find(name)) == publish.end()) {
-    i = publish.insert(std::make_pair(name, DefMap::Value(LOCATION, std::move(tail)))).first;
-  } else {
-    // Apply the existing prepender to us (we come after it)
-    i->second.body = std::unique_ptr<Expr>(new App(def->location, i->second.body.release(), tail.release()));
-  }
-
-  i->second.body = std::unique_ptr<Expr>(new Lambda(def->location, "_ tail", i->second.body.release()));
+  return Definition(std::move(name), fn, body);
 }
 
 static void bind_global(const std::string &name, Top *top, Lexer &lex) {
   if (!top || name == "_") return;
 
-  auto it = top->globals.find(name);
-  if (it != top->globals.end()) {
+  auto it = top->globals.insert(std::make_pair(name, top->defmaps.size()-1));
+  if (!it.second) {
     std::cerr << "Duplicate global "
       << name << " at "
       << top->defmaps.back()->map.find(name)->second.body->location.text() << " and "
-      << top->defmaps[it->second]->map.find(name)->second.body->location.text() << std::endl;
+      << top->defmaps[it.first->second]->map.find(name)->second.body->location.text() << std::endl;
     lex.fail = true;
-  } else {
-    top->globals[name] = top->defmaps.size()-1;
   }
+}
+
+static void bind_def(Lexer &lex, DefMap::Defs &map, Definition &&def, Top *top = 0) {
+  if (def.name == "_")
+    def.name = "_ " + std::to_string(map.size());
+
+  Location l = def.body->location;
+  auto out = map.insert(std::make_pair(std::move(def.name), DefMap::Value(def.location, std::move(def.body))));
+
+  if (!out.second) {
+    std::cerr << "Duplicate def "
+      << out.first->first << " at "
+      << out.first->second.body->location.text() << " and "
+      << l.text() << std::endl;
+    lex.fail = true;
+  }
+
+  bind_global(out.first->first, top, lex);
+}
+
+static void publish_def(DefMap::Defs &publish, Definition &&def) {
+  // Build a prepender
+  Location l = def.body->location;
+  std::unique_ptr<Expr> tail(
+    new App(l, new App(l,
+      new VarRef(l, "binary ++"),
+      def.body.release()),
+      new VarRef(l, "_ tail")));
+
+  DefMap::Defs::iterator i;
+  if ((i = publish.find(def.name)) == publish.end()) {
+    i = publish.insert(std::make_pair(std::move(def.name), DefMap::Value(def.location, std::move(tail)))).first;
+  } else {
+    // Apply the existing prepender to us (we come after it)
+    i->second.body = std::unique_ptr<Expr>(new App(l, i->second.body.release(), tail.release()));
+  }
+
+  i->second.body = std::unique_ptr<Expr>(new Lambda(l, "_ tail", i->second.body.release()));
 }
 
 static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
@@ -861,11 +874,8 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   for (size_t i = c.ast.args.size(); i > 0; --i)
     construct = new Lambda(c.ast.location, c.ast.args[i-1].tag, construct);
 
-  bind_def(lex, map, c.ast.name, construct);
-  if (global) bind_global(c.ast.name, top, lex);
-
-  bind_def(lex, map, tname, destructfn);
-  if (global) bind_global(tname, top, lex);
+  bind_def(lex, map, Definition(c.ast.name, c.ast.location, construct), global?top:0); // !!!
+  bind_def(lex, map, Definition(tname, c.ast.location, destructfn), global?top:0);
 
   check_special(lex, name, sump);
 
@@ -890,8 +900,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
             getifn),
           new VarRef(sump->location, "_ x")));
 
-    bind_def(lex, map, get, getfn);
-    if (global) bind_global(get, top, lex);
+    bind_def(lex, map, Definition(get, sump->location, getfn), global?top:0);
 
     // Implement edit methods
     Expr *editifn = new VarRef(sump->location, name);
@@ -915,8 +924,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
               editifn),
             new VarRef(sump->location, "_ x"))));
 
-    bind_def(lex, map, edit, editfn);
-    if (global) bind_global(edit, top, lex);
+    bind_def(lex, map, Definition(edit, sump->location, editfn), global?top:0);
 
     // Implement set methods
     Expr *setifn = new VarRef(sump->location, name);
@@ -938,8 +946,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
               setifn),
             new VarRef(sump->location, "_ x"))));
 
-    bind_def(lex, map, set, setfn);
-    if (global) bind_global(set, top, lex);
+    bind_def(lex, map, Definition(set, sump->location, setfn), global?top:0);
 
     ++outer;
   }
@@ -1017,13 +1024,10 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     for (size_t i = 0; i < c.ast.args.size(); ++i)
       construct = new Lambda(c.ast.location, "_", construct);
 
-    bind_def(lex, map, c.ast.name, construct);
-    if (global) bind_global(c.ast.name, top, lex);
+    bind_def(lex, map, Definition(c.ast.name, c.ast.location, construct), global?top:0);
   }
 
-  std::string tname = "destruct " + name;
-  bind_def(lex, map, tname, destructfn);
-  if (global) bind_global(tname, top, lex);
+  bind_def(lex, map, Definition("destruct " + name, sump->location, destructfn), global?top:0);
   check_special(lex, name, sump);
 }
 
@@ -1033,18 +1037,13 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
        std::cerr << "Missing DEF after GLOBAL at " << lex.next.location.text() << std::endl;
        lex.fail = true;
     case DEF: {
-      std::string name;
-      auto def = parse_def(lex, name);
-      bind_def(lex, map, name, def);
-      if (global) bind_global(name, top, lex);
+      bind_def(lex, map, parse_def(lex), global?top:0);
       break;
     }
     case TARGET: {
-      std::string name;
-      auto def = parse_def(lex, name, true);
-      bind_def(lex, map, name, def);
-      bind_def(lex, map, "table " + name, new Prim(def->location, "tnew"));
-      if (global) bind_global(name, top, lex);
+      auto def = parse_def(lex, true);
+      bind_def(lex, map, Definition("table " + def.name, def.location, new Prim(def.location, "tnew")));
+      bind_def(lex, map, std::move(def), global?top:0);
       break;
     }
     case TUPLE: {
@@ -1079,9 +1078,7 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
           break;
         }
         case PUBLISH: {
-          std::string name;
-          auto def = parse_def(lex, name);
-          publish_def(publish, name, def);
+          publish_def(publish, parse_def(lex));
           break;
         }
         default: {
@@ -1130,9 +1127,7 @@ void parse_top(Top &top, Lexer &lex) {
         break;
       }
       case PUBLISH: {
-        std::string name;
-        auto def = parse_def(lex, name);
-        publish_def(defmap.publish, name, def);
+        publish_def(defmap.publish, parse_def(lex));
         break;
       }
       default: {
