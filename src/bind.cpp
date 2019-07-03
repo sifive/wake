@@ -414,7 +414,9 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
   if (ast.name == "_") {
     // no-op; unbound
   } else if (!ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
-    expr = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, expr.release()));
+    Lambda *lambda = new Lambda(expr->location, ast.name, expr.release());
+    lambda->token = ast.token;
+    expr = std::unique_ptr<Expr>(lambda);
     guard = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, guard.release()));
     out.var = 0; // bound
   } else {
@@ -545,7 +547,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     lbinding.prefix = -1;
     lbinding.depth = binding->depth + 1;
     lbinding.index[lambda->name] = 0;
-    lbinding.defs.emplace_back(lambda->name, LOCATION, nullptr); // !!! LOCATION
+    lbinding.defs.emplace_back(lambda->name, LOCATION, nullptr);
     lambda->body = fracture(std::move(lambda->body), &lbinding);
     return expr;
   } else if (expr->type == &Match::type) {

@@ -892,7 +892,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   int outer = 0;
   for (unsigned i = 0; i < members.size(); ++i) {
     std::string &mname = c.ast.args[i].tag;
-    Location memberToken = c.ast.args[i].token;
+    Location memberToken = c.ast.args[i].region;
     bool global = members[i];
     if (mname.empty()) continue;
 

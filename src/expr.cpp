@@ -128,7 +128,7 @@ Hash App::hash() {
 }
 
 void Lambda::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Lambda(" << name << "): " << typeVar << " @ " << location.file() << std::endl;
+  os << pad(depth) << "Lambda(" << name << " @ " << token.file() << "): " << typeVar << " @ " << location.file() << std::endl;
   body->format(os, depth+2);
 }
 
