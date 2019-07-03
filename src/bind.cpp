@@ -554,6 +554,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     std::unique_ptr<Match> m(reinterpret_cast<Match*>(expr.release()));
     auto out = rebind_match(binding, std::move(m));
     if (!out) return out;
+    out->flags |= FLAG_AST;
     return fracture(std::move(out), binding);
   } else if (expr->type == &DefMap::type) {
     DefMap *def = reinterpret_cast<DefMap*>(expr.get());
@@ -579,7 +580,10 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     }
     dbinding.current_index = -1;
     std::unique_ptr<Expr> body = fracture(std::move(def->body), &dbinding);
-    return fracture_binding(def->location, dbinding.defs, std::move(body));
+    auto out = fracture_binding(def->location, dbinding.defs, std::move(body));
+    if ((def->flags & FLAG_AST) != 0)
+      out->flags |= FLAG_AST;
+    return out;
   } else if (expr->type == &Top::type) {
     Top *top = reinterpret_cast<Top*>(expr.get());
     ResolveBinding tbinding;

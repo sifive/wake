@@ -356,8 +356,8 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       lex.consume();
       bool eateol = lex.next.type == INDENT;
       Expr *out = parse_block(lex, multiline);
-      location.end = lex.next.location.end;
       if (eateol && expect(EOL, lex)) lex.consume();
+      location.end = lex.next.location.end;
       if (expect(PCLOSE, lex)) lex.consume();
       out->location = location;
       if (out->type == &Lambda::type) out->flags |= FLAG_AST;
@@ -1115,7 +1115,15 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
 
     auto body = relabel_anon(parse_binary(0, lex, true));
     location.end = body->location.end;
-    out = (publish.empty() && map.empty()) ? body : new DefMap(location, std::move(map), std::move(publish), body);
+    if (publish.empty() && map.empty()) {
+      out = body;
+    } else {
+      out = new DefMap(location, std::move(map), std::move(publish), body);
+      out->flags |= FLAG_AST;
+    }
+
+    out->location.start.bytes -= (out->location.start.column-1);
+    out->location.start.column = 1;
 
     if (expect(DEDENT, lex)) lex.consume();
     return out;
