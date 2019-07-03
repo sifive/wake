@@ -19,6 +19,9 @@
 #define JOB_H
 
 #include <memory>
+#ifdef __FreeBSD__
+#include <sys/time.h>
+#endif
 
 struct Database;
 struct WorkQueue;

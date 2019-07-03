@@ -78,7 +78,7 @@ static std::string slurp(int dirfd, bool &fail) {
       dup2(pipefd[1], 1);
       close(pipefd[1]);
     }
-    execlp("git", "git", "ls-files", "-z", 0);
+    execlp("git", "git", "ls-files", "-z", (void *)0);
     fprintf(stderr, "Failed to execlp(git): %s\n", strerror(errno));
     exit(1);
   } else {

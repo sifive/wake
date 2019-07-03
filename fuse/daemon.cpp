@@ -39,7 +39,12 @@
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <sys/file.h>
+#ifndef __FreeBSD__
 #include <sys/xattr.h>
+#else
+#include <sys/socket.h>
+#include <sys/un.h>
+#endif
 
 #include <set>
 #include <map>

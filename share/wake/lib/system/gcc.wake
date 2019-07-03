@@ -37,15 +37,28 @@ def makeCompileC variant gcc flags =
 def makeLinkO variant linker flags =
   Pair variant (\extraFlags doLinkO variant linker (flags ++ extraFlags)), Nil
 
-publish compileC = makeCompileC "native-c99-debug"     (which "gcc") (c99Flags ++ debugCFlags)
-publish compileC = makeCompileC "native-c99-release"   (which "gcc") (c99Flags ++ releaseCFlags)
-publish compileC = makeCompileC "native-cpp11-debug"   (which "g++") (c11Flags ++ debugCFlags)
-publish compileC = makeCompileC "native-cpp11-release" (which "g++") (c11Flags ++ releaseCFlags)
+def ccBinary = match sysname
+  "Linux" = 'gcc'
+  "Darwin" = 'gcc'
+  "FreeBSD" = 'cc'
+  _        = ''
 
-publish linkO = makeLinkO "native-c99-debug"     (which "gcc") (debugLFlags)
-publish linkO = makeLinkO "native-c99-release"   (which "gcc") (releaseLFlags)
-publish linkO = makeLinkO "native-cpp11-debug"   (which "g++") (debugLFlags)
-publish linkO = makeLinkO "native-cpp11-release" (which "g++") (releaseLFlags)
+def cppBinary = match sysname
+  "Linux" = 'g++'
+  "Darwin" = 'g++'
+  "FreeBSD" = 'c++'
+  _        = ''
+
+
+publish compileC = makeCompileC "native-c99-debug"     (which ccBinary) (c99Flags ++ debugCFlags)
+publish compileC = makeCompileC "native-c99-release"   (which ccBinary) (c99Flags ++ releaseCFlags)
+publish compileC = makeCompileC "native-cpp11-debug"   (which cppBinary) (c11Flags ++ debugCFlags)
+publish compileC = makeCompileC "native-cpp11-release" (which cppBinary) (c11Flags ++ releaseCFlags)
+
+publish linkO = makeLinkO "native-c99-debug"     (which ccBinary) (debugLFlags)
+publish linkO = makeLinkO "native-c99-release"   (which ccBinary) (releaseLFlags)
+publish linkO = makeLinkO "native-cpp11-debug"   (which cppBinary) (debugLFlags)
+publish linkO = makeLinkO "native-cpp11-release" (which cppBinary) (releaseLFlags)
 
 def pickVariant variant variants =
   match (find (variant ==* _.getPairFirst) variants)

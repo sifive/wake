@@ -2,12 +2,27 @@
 
 VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/^[^']*'\([^']*\)'.*/\1/p" manifest.wake; else git describe --tags --dirty; fi)
 
+ifeq ($(shell uname -s),FreeBSD)
+CC	:= cc -std=c99
+CXX	:= c++ -std=c++11
+else
 CC	:= gcc -std=c99
 CXX	:= g++ -std=c++11
+endif
 CFLAGS	:= -Wall -O2 -flto -DVERSION=$(VERSION)
-LDFLAGS	:=
 
+ifeq ($(shell uname -s),FreeBSD)
+LDFLAGS	:= -L/usr/local/lib
+else
+LDFLAGS	:= 
+endif
+
+ifeq ($(shell uname -s),FreeBSD)
+LOCAL_CFLAGS :=	-Iutf8proc -Igopt -Icommon -I/usr/local/include
+else
 LOCAL_CFLAGS :=	-Iutf8proc -Igopt -Icommon
+endif
+
 FUSE_CFLAGS  :=	$(shell pkg-config --silence-errors --cflags fuse)
 CORE_CFLAGS  := $(shell pkg-config --silence-errors --cflags sqlite3)	\
 		$(shell pkg-config --silence-errors --cflags gmp-6)	\
@@ -20,10 +35,19 @@ CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsql
 		$(shell pkg-config --silence-errors --libs ncurses tinfo || pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
 COMMON := common/jlexer.o $(patsubst %.cpp,%.o,$(wildcard common/*.cpp))
+ifeq ($(shell uname -s),FreeBSD)
+WAKE_ENV := WAKE_PATH=$(shell dirname $(shell which $(firstword $(CC)))):/usr/local/bin
+else
 WAKE_ENV := WAKE_PATH=$(shell dirname $(shell which $(firstword $(CC))))
+endif
+
 
 # If FUSE is unavalable during wake build, allow a linux-specific work-around
 ifeq ($(USE_FUSE_WAKE),0)
+EXTRA := lib/wake/libpreload-wake.so lib/wake/preload-wake
+endif
+
+ifeq ($(shell uname -s),FreeBSD)
 EXTRA := lib/wake/libpreload-wake.so lib/wake/preload-wake
 endif
 

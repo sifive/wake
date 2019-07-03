@@ -15,4 +15,5 @@
 
 publish path = match sysname
   "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
+  "FreeBSD" = "/usr/local/bin", Nil
   _        = Nil

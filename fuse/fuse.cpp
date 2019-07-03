@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
 		pid_t pid = fork();
 		if (pid == 0) {
 			ofs.close();
-			execl(daemon.c_str(), "fuse-waked", mpath.c_str(), 0);
+			execl(daemon.c_str(), "fuse-waked", mpath.c_str(), (void *)0);
 			std::cerr << "execl " << daemon << ": " << strerror(errno) << std::endl;
 			exit(1);
 		}

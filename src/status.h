@@ -20,6 +20,9 @@
 
 #include <list>
 #include <string>
+#ifdef __FreeBSD__
+#include "sys/time.h"
+#endif
 
 struct Status {
   std::string cmdline;
