@@ -32,7 +32,8 @@
 struct Receiver;
 struct Value;
 
-#define FLAG_TOUCHED 1
+#define FLAG_TOUCHED	1 // already explored for _
+#define FLAG_AST	2 // useful to include in AST
 
 /* Expression AST */
 struct Expr {
@@ -55,12 +56,12 @@ std::ostream & operator << (std::ostream &os, const Expr *expr);
 struct Prim : public Expr {
   std::string name;
 
-  int args, flags;
+  int args, pflags;
   PrimFn fn;
   void *data;
 
   static const TypeDescriptor type;
-  Prim(const Location &location_, const std::string &name_) : Expr(&type, location_), name(name_), args(0), flags(0) { }
+  Prim(const Location &location_, const std::string &name_) : Expr(&type, location_), name(name_), args(0), pflags(0) { }
 
   void format(std::ostream &os, int depth) const;
   Hash hash();

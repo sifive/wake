@@ -274,7 +274,7 @@ struct JSONRender {
   JSONRender(std::ostream &os_) : os(os_) { }
 
   void explore(Expr *expr) {
-    if (expr->location.start.bytes >= 0)
+    if (expr->location.start.bytes >= 0 && (expr->flags & FLAG_AST) != 0)
       eset.insert(expr);
 
     if (expr->type == &App::type) {
@@ -285,12 +285,12 @@ struct JSONRender {
       Lambda *lambda = reinterpret_cast<Lambda*>(expr);
       if (lambda->token.start.bytes >= 0) {
         auto foo = new VarArg(lambda->token);
-        foo->typeVar.setDOB(lambda->typeVar);
+        foo->typeVar.setDOB(lambda->typeVar[0]);
         lambda->typeVar[0].unify(foo->typeVar);
         defs.emplace_back(foo);
         eset.insert(foo);
       }
-      explore (lambda->body.get());
+      explore(lambda->body.get());
     } else if (expr->type == &DefBinding::type) {
       DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
       for (auto &i : defbinding->val) explore(i.get());

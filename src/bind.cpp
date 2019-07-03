@@ -839,7 +839,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
         << prim->location.file() << std::endl;
       return false;
     } else {
-      prim->flags = i->second.flags;
+      prim->pflags = i->second.flags;
       prim->fn   = i->second.fn;
       prim->data = i->second.data;
       bool ok = i->second.type(args, &prim->typeVar);

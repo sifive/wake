@@ -272,11 +272,12 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
         [{] {
           std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
           exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
+          exprs.back()->flags |= FLAG_AST;
           lex.consume();
           exprs.push_back(parse_expr(lex));
           if (lex.next.type == EOL) lex.consume();
           expect(BCLOSE, lex);
-          start = in.coord();
+          start = in.coord() - 1;
           continue;
         }
 
@@ -304,6 +305,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
 
   std::shared_ptr<String> str = std::make_shared<String>(unicode_escape_canon(std::move(slice)));
   exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
+  exprs.back()->flags |= FLAG_AST;
 
   if (exprs.size() == 1) {
     out = exprs.front();

@@ -267,10 +267,13 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       op_type op = op_precedence(lex.id().c_str());
       if (op.p < p) precedence_error(lex);
       auto opp = new VarRef(lex.next.location, "unary " + lex.id());
+      opp->flags |= FLAG_AST;
       lex.consume();
       auto rhs = parse_binary(op.p + op.l, lex, multiline);
       location.end = rhs->location.end;
-      return new App(location, opp, rhs);
+      App *out = new App(location, opp, rhs);
+      out->flags |= FLAG_AST;
+      return out;
     }
     case MATCH: {
       return parse_match(p, lex);
@@ -295,17 +298,20 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
         out = new Lambda(region, ast.name, rhs);
         out->token = ast.token;
       }
+      out->flags |= FLAG_AST;
       return out;
     }
     // Terminals
     case ID: {
       Expr *out = new VarRef(lex.next.location, lex.id());
+      out->flags |= FLAG_AST;
       lex.consume();
       return out;
     }
     case LITERAL: {
       Expr *out = lex.next.expr.release();
       lex.consume();
+      out->flags |= FLAG_AST;
       return out;
     }
     case PRIM: {
@@ -322,13 +328,16 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       } else {
         name = "bad_prim";
       }
-      return new Prim(location, name);
+      Prim *prim = new Prim(location, name);
+      prim->flags |= FLAG_AST;
+      return prim;
     }
     case HERE: {
       std::string name(lex.next.location.filename);
       std::string::size_type cut = name.find_last_of('/');
       if (cut == std::string::npos) name = "."; else name.resize(cut);
       Expr *out = new Literal(lex.next.location, std::make_shared<String>(std::move(name)));
+      out->flags |= FLAG_AST;
       lex.consume();
       return out;
     }
@@ -351,6 +360,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (eateol && expect(EOL, lex)) lex.consume();
       if (expect(PCLOSE, lex)) lex.consume();
       out->location = location;
+      if (out->type == &Lambda::type) out->flags |= FLAG_AST;
       return out;
     }
     case IF: {
@@ -366,11 +376,13 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (expect(ELSE, lex)) lex.consume();
       auto elseE = parse_block(lex, multiline);
       l.end = elseE->location.end;
-      return new App(l, new App(l, new App(l,
+      App *out = new App(l, new App(l, new App(l,
         new VarRef(l, "destruct Boolean"),
         new Lambda(l, "_", thenE)),
         new Lambda(l, "_", elseE)),
         condE);
+      out->flags |= FLAG_AST;
+      return out;
     }
     default: {
       std::cerr << "Was expecting an (OPERATOR/LAMBDA/ID/LITERAL/PRIM/POPEN), got a "
@@ -391,6 +403,7 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
         op_type op = op_precedence(lex.id().c_str());
         if (op.p < p) return lhs;
         auto opp = new VarRef(lex.next.location, "binary " + lex.id());
+        opp->flags |= FLAG_AST;
         lex.consume();
         auto rhs = parse_binary(op.p + op.l, lex, multiline);
         Location app1_loc = lhs->location;
@@ -398,6 +411,7 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
         app1_loc.end = opp->location.end;
         app2_loc.end = rhs->location.end;
         lhs = new App(app2_loc, new App(app1_loc, opp, lhs), rhs);
+        lhs->flags |= FLAG_AST;
         break;
       }
       case MATCH:
@@ -415,6 +429,7 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
         Location location = lhs->location;
         location.end = rhs->location.end;
         lhs = new App(location, lhs, rhs);
+        lhs->flags |= FLAG_AST;
         break;
       }
       case EOL: {
