@@ -33,7 +33,10 @@ function update () {
   let next = inner;
   for (let i = 0; i < depth; ++i) {
     let parent = next.parentElement;
-    if (!parent.getAttribute('sourceType')) break;
+    if (!parent.getAttribute('sourceType')) {
+      depth = i;
+      break;
+    }
     next = parent;
   }
   if (next != select) {
@@ -49,11 +52,6 @@ function update () {
   }
   select = next;
 }
-
-document.onMouseClick = function (that, event) {
-  usecss.firstChild.innerHTML = 'a[href=\'#' + that.id + '\'] { background-color: red; }';
-  event.stopPropagation();
-};
 
 document.onMouseOver = function (that, event) {
   inner = that;
@@ -75,6 +73,41 @@ document.addEventListener('keypress', function(event) {
   if (char == 43) { ++depth; update(); }
   if (char == 45 && depth > 0) { --depth; update(); }
 }, true);
+
+function smoothFromTo(fromX, fromY, destX, destY, step) {
+  const steps = 50;
+  const stepMs = 20;
+  const ratio = 0.01; // 0=jump < ratio < 1=linear
+
+  const progress = (Math.exp(-Math.log(ratio) * (steps - step) / steps) - 1) * ratio / (1 - ratio);
+  const stepX = destX + progress * (fromX - destX);
+  const stepY = destY + progress * (fromY - destY);
+
+  window.scrollTo(stepX, stepY);
+
+  if (step < steps)
+    setTimeout(function () { smoothFromTo(fromX, fromY, destX, destY, step+1); }, stepMs);
+}
+
+document.focusOn = function (that, event) {
+  const target = that.getAttribute('href').substring(1);
+  const where = document.getElementById(target).getBoundingClientRect();
+  const fromX = window.scrollX;
+  const fromY = window.scrollY;
+  const destX = (where.left + where.right  - window.innerWidth)  / 2 + fromX;
+  const destY = (where.top  + where.bottom - window.innerHeight) / 2 + fromY;
+
+  usecss.firstChild.innerHTML = 'span[id=\'' + target + '\'] { background-color: red; }';
+  window.location.hash = target;
+  event.preventDefault();
+
+  smoothFromTo(fromX, fromY, destX, destY, 1);
+};
+
+document.onMouseClick = function (that, event) {
+  usecss.firstChild.innerHTML = 'a[href=\'#' + that.id + '\'] { background-color: red; }';
+  event.stopPropagation();
+};
 
 function render(root) {
   const str = utf8.encode(root.source);
@@ -99,6 +132,7 @@ function render(root) {
 
     if (node.target) {
       res.setAttribute('href', '#' + node.target.filename + ':' + node.target.range.join(':'));
+      res.setAttribute('onclick', 'focusOn(this, event)');
     }
 
     let pointer = pRange[0];
