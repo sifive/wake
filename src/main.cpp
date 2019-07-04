@@ -44,6 +44,7 @@
 #include "status.h"
 #include "gopt.h"
 #include "json5.h"
+#include "execpath.h"
 
 #define SHORT_HASH 8
 
@@ -652,8 +653,20 @@ int main(int argc, char **argv) {
 
   if (tcheck) std::cout << root.get();
   if (html) {
+    std::ifstream style(find_execpath() + "/../share/wake/html/style.css");
+    std::ifstream utf8(find_execpath() + "/../share/wake/html/utf8.js");
+    std::ifstream main(find_execpath() + "/../share/wake/html/main.js");
     std::cout << "<meta charset=\"UTF-8\">" << std::endl;
-    std::cout << "<script src=\"wake.js\"></script><script type=\"wake\">";
+    std::cout << "<script type=\"text/javascript\">" << std::endl;
+    std::cout << utf8.rdbuf();
+    std::cout << "</script>" << std::endl;
+    std::cout << "<script type=\"text/javascript\">" << std::endl;
+    std::cout << main.rdbuf();
+    std::cout << "</script>" << std::endl;
+    std::cout << "<style type=\"text/css\">" << std::endl;
+    std::cout << style.rdbuf();
+    std::cout << "</style>" << std::endl;
+    std::cout << "<script type=\"wake\">";
     JSONRender(std::cout).render(root.get());
     std::cout << "</script>" << std::endl;
   }
