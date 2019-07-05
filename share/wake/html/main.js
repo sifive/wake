@@ -70,8 +70,8 @@ document.onMouseOut = function (that, event) {
 
 document.addEventListener('keypress', function(event) {
   const char = event.which || event.keyCode;
-  if (char == 43) { ++depth; update(); }
-  if (char == 45 && depth > 0) { --depth; update(); }
+  if (char === 43) { ++depth; update(); }
+  if (char === 45 && depth > 0) { --depth; update(); }
 }, true);
 
 function smoothFromTo(fromX, fromY, destX, destY, step) {
@@ -125,7 +125,7 @@ function render(root) {
       res.setAttribute('onmouseout', 'onMouseOut(this, event)');
     }
 
-    if (node.type == "VarDef" || node.type == "VarArg") {
+    if (node.type === 'VarDef' || node.type === 'VarArg') {
       res.setAttribute('id', root.filename + ':' + node.range.join(':'));
       res.setAttribute('onclick', 'onMouseClick(this, event)');
     }
