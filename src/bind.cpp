@@ -415,7 +415,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
     // no-op; unbound
   } else if (!ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
     Lambda *lambda = new Lambda(expr->location, ast.name, expr.release());
-    lambda->token = ast.token;
+    if (ast.name.substr(0, 3) != "_ k") lambda->token = ast.token;
     expr = std::unique_ptr<Expr>(lambda);
     guard = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, guard.release()));
     out.var = 0; // bound
