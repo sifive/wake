@@ -257,8 +257,9 @@ static struct option *arg(struct option opts[], const char *name) {
 
 struct ParanOrder {
   bool operator () (Expr *a, Expr *b) const {
-    if ((long)a->location.filename < (long)b->location.filename) return true;
-    if ((long)a->location.filename > (long)b->location.filename) return false;
+    int cmp = strcmp(a->location.filename, b->location.filename);
+    if (cmp < 0) return true;
+    if (cmp > 0) return false;
     if (a->location.start < b->location.start) return true;
     if (a->location.start > b->location.start) return false;
     return a->location.end > b->location.end;
