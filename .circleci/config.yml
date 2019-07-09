@@ -160,18 +160,20 @@ jobs:
 
   docs_deploy:
     docker:
-      - image: node:8.10.0
+      - image: circleci/buildpack-deps:stretch
     steps:
       - attach_workspace:
           at: /tmp/workspace
-      - run: |
-          npm install -g --silent gh-pages@2.0.1
-          git config user.email "ci-wake-build@sifive.com"
-          git config user.name "ci-wake-build"
       - add_ssh_keys:
           fingerprints:
             - "9d:87:e9:4d:46:91:1b:12:bb:a6:ef:16:f1:da:52:49"
-      - run: gh-pages --message "[skip ci] Updates" --dist /tmp/workspace/www
+      - run: |
+          echo "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==" > ~/.ssh/known_hosts
+          cd /tmp/workspace/www
+          git init
+          git add .
+          git -c user.email="ci-wake-build@sifive.com" -c user.name="ci-wake-build" commit -m "[skip ci] Deploy to GitHub Pages"
+          git push --force "git@github.com:sifive/wake.git" master:gh-pages
 
 workflows:
   version: 2
