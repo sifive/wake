@@ -20,7 +20,7 @@
 #include "symbol.h"
 #include <iostream>
 
-Sum::Sum(AST &&ast) : name(std::move(ast.name)), location(ast.location) {
+Sum::Sum(AST &&ast) : name(std::move(ast.name)), token(ast.token), region(ast.region) {
   for (auto &x : ast.args)
     args.push_back(std::move(x.name));
 }
@@ -44,10 +44,10 @@ bool AST::unify(TypeVar &out, const std::map<std::string, TypeVar*> &ids) {
   if (Lexer::isLower(name.c_str())) {
     auto it = ids.find(name);
     if (it == ids.end()) {
-      std::cerr << "Unbound type variable at " << location.text() << std::endl;
+      std::cerr << "Unbound type variable at " << token.text() << std::endl;
       return false;
     } else {
-      return out.unify(*it->second, &location);
+      return out.unify(*it->second, &region);
     }
   } else { // upper or operator
     TypeVar cons(name.c_str(), args.size());

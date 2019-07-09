@@ -37,6 +37,9 @@ const TypeDescriptor Subscribe ::type("Subscribe");
 const TypeDescriptor Match     ::type("Match");
 const TypeDescriptor DefMap    ::type("DefMap");
 const TypeDescriptor Top       ::type("Top");
+// these are just useful for dumping json ast
+const TypeDescriptor VarDef    ::type("VarDef");
+const TypeDescriptor VarArg    ::type("VarArg");
 
 Literal::Literal(const Location &location_, std::shared_ptr<Value> &&value_)
  : Expr(&type, location_), value(std::move(value_)) { }
@@ -125,7 +128,7 @@ Hash App::hash() {
 }
 
 void Lambda::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Lambda(" << name << "): " << typeVar << " @ " << location.file() << std::endl;
+  os << pad(depth) << "Lambda(" << name << " @ " << token.file() << "): " << typeVar << " @ " << location.file() << std::endl;
   body->format(os, depth+2);
 }
 
@@ -137,11 +140,11 @@ void DefMap::format(std::ostream &os, int depth) const {
   os << pad(depth) << "DefMap @ " << location.file() << std::endl;
   for (auto &i : map) {
     os << pad(depth+2) << i.first << " =" << std::endl;
-    i.second->format(os, depth+4);
+    i.second.body->format(os, depth+4);
   }
   for (auto &i : publish) {
     os << pad(depth+2) << "publish " << i.first << " =" << std::endl;
-    i.second->format(os, depth+4);
+    i.second.body->format(os, depth+4);
   }
   body->format(os, depth+2);
 }
@@ -183,7 +186,7 @@ void DefBinding::format(std::ostream &os, int depth) const {
 
   // invert name=>index map
   std::vector<const char*> names(order.size());
-  for (auto &i : order) names[i.second] = i.first.c_str();
+  for (auto &i : order) names[i.second.index] = i.first.c_str();
 
   for (int i = 0; i < (int)val.size(); ++i) {
     os << pad(depth+2) << "val " << names[i] << " = " << std::endl;
@@ -227,3 +230,15 @@ std::ostream & operator << (std::ostream &os, const Expr *expr) {
   expr->format(os, 0);
   return os;
 }
+
+void VarDef::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "VarDef @ " << location.file() << std::endl;
+}
+
+Hash VarDef::hash() { return Hash(); }
+
+void VarArg::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "VarArg @ " << location.file() << std::endl;
+}
+
+Hash VarArg::hash() { return Hash(); }

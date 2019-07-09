@@ -32,7 +32,8 @@
 struct Receiver;
 struct Value;
 
-#define FLAG_TOUCHED 1
+#define FLAG_TOUCHED	1 // already explored for _
+#define FLAG_AST	2 // useful to include in AST
 
 /* Expression AST */
 struct Expr {
@@ -55,12 +56,12 @@ std::ostream & operator << (std::ostream &os, const Expr *expr);
 struct Prim : public Expr {
   std::string name;
 
-  int args, flags;
+  int args, pflags;
   PrimFn fn;
   void *data;
 
   static const TypeDescriptor type;
-  Prim(const Location &location_, const std::string &name_) : Expr(&type, location_), name(name_), args(0), flags(0) { }
+  Prim(const Location &location_, const std::string &name_) : Expr(&type, location_), name(name_), args(0), pflags(0) { }
 
   void format(std::ostream &os, int depth) const;
   Hash hash();
@@ -81,10 +82,11 @@ struct App : public Expr {
 struct Lambda : public Expr {
   std::string name;
   std::unique_ptr<Expr> body;
+  Location token;
 
   static const TypeDescriptor type;
   Lambda(const Location &location_, const std::string &name_, Expr *body_)
-   : Expr(&type, location_), name(name_), body(body_) { }
+   : Expr(&type, location_), name(name_), body(body_), token(LOCATION) { }
 
   void format(std::ostream &os, int depth) const;
   Hash hash();
@@ -94,10 +96,11 @@ struct VarRef : public Expr {
   std::string name;
   int depth;
   int offset;
+  Location target;
 
   static const TypeDescriptor type;
   VarRef(const Location &location_, const std::string &name_, int depth_ = 0, int offset_ = -1)
-   : Expr(&type, location_), name(name_), depth(depth_), offset(offset_) { }
+   : Expr(&type, location_), name(name_), depth(depth_), offset(offset_), target(LOCATION) { }
 
   void format(std::ostream &os, int depth) const;
   Hash hash();
@@ -145,16 +148,21 @@ struct Subscribe : public Expr {
   Hash hash();
 };
 
-typedef std::map<std::string, int> DefOrder;
-
 struct DefMap : public Expr {
-  typedef std::map<std::string, std::unique_ptr<Expr> > defs;
-  defs map;
-  defs publish;
+  struct Value {
+    Location location;
+    std::unique_ptr<Expr> body;
+    Value(const Location &location_, std::unique_ptr<Expr> &&body_)
+     : location(location_), body(std::move(body_)) { }
+  };
+
+  typedef std::map<std::string, Value> Defs;
+  Defs map;
+  Defs publish;
   std::unique_ptr<Expr> body;
 
   static const TypeDescriptor type;
-  DefMap(const Location &location_, defs &&map_, defs &&publish_, Expr *body_)
+  DefMap(const Location &location_, Defs &&map_, Defs &&publish_, Expr *body_)
    : Expr(&type, location_), map(std::move(map_)), publish(std::move(publish_)), body(body_) { }
   DefMap(const Location &location_)
    : Expr(&type, location_), map(), publish(), body(new Literal(location, "top")) { }
@@ -165,6 +173,7 @@ struct DefMap : public Expr {
 
 struct Top : public Expr {
   typedef std::vector<std::unique_ptr<DefMap> > DefMaps;
+  typedef std::map<std::string, int> DefOrder;
   DefMaps defmaps;
   DefOrder globals;
   std::unique_ptr<Expr> body;
@@ -178,13 +187,20 @@ struct Top : public Expr {
 
 // Created by transforming DefMap+Top
 struct DefBinding : public Expr {
-  typedef std::vector<std::unique_ptr<Expr> > values;
-  typedef std::vector<std::unique_ptr<Lambda> > functions;
+  struct OrderValue {
+    Location location;
+    int index;
+    OrderValue(const Location &location_, int index_)
+     : location(location_), index(index_) { }
+  };
+  typedef std::vector<std::unique_ptr<Expr> > Values;
+  typedef std::vector<std::unique_ptr<Lambda> > Functions;
+  typedef std::map<std::string, OrderValue> Order;
 
   std::unique_ptr<Expr> body;
-  values val;     // access prior binding
-  functions fun;  // access current binding
-  DefOrder order; // values, then functions
+  Values val;     // access prior binding
+  Functions fun;  // access current binding
+  Order order; // values, then functions
   std::vector<int> scc; // SCC id per function
 
   static const TypeDescriptor type;
@@ -217,6 +233,22 @@ struct Destruct : public Expr {
   Destruct(const Location &location_, Sum &&sum_)
    : Expr(&type, location_), sum(std::move(sum_)) { }
 
+  void format(std::ostream &os, int depth) const;
+  Hash hash();
+};
+
+// A dummy expression never actually used in the AST
+struct VarDef : public Expr {
+  static const TypeDescriptor type;
+  VarDef(const Location &location_) : Expr(&type, location_) { }
+  void format(std::ostream &os, int depth) const;
+  Hash hash();
+};
+
+// A dummy expression never actually used in the AST
+struct VarArg : public Expr {
+  static const TypeDescriptor type;
+  VarArg(const Location &location_) : Expr(&type, location_) { }
   void format(std::ostream &os, int depth) const;
   Hash hash();
 };

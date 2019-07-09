@@ -33,9 +33,12 @@ typedef std::map<std::string, int> NameIndex;
 
 struct ResolveDef {
   std::string name;
+  Location location;
   std::unique_ptr<Expr> expr;
   std::set<int> edges; // edges: things this name uses
   int index, lowlink, onstack; // Tarjan SCC variables
+  ResolveDef(const std::string &name_, const Location &location_, std::unique_ptr<Expr>&& expr_)
+   : name(name_), location(location_), expr(std::move(expr_)) { }
 };
 
 struct SCCState {
@@ -76,7 +79,8 @@ static void SCC(SCCState &state, int vi) {
       ResolveDef &w = (*state.defs)[wi];
       state.S.pop_back();
       w.onstack = 0;
-      state.binding->order[w.name] = state.binding->fun.size() + state.binding->val.size();
+      auto out = state.binding->order.insert(std::make_pair(w.name, DefBinding::OrderValue(w.location, state.binding->fun.size() + state.binding->val.size())));
+      assert (out.second);
       state.binding->fun.emplace_back(reinterpret_cast<Lambda*>(w.expr.release()));
       state.binding->scc.push_back(scc_id);
     } while (wi != vi);
@@ -153,7 +157,8 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
     std::unique_ptr<DefBinding> bind(new DefBinding(location, std::move(out)));
     for (auto j : levels[i]) {
       if (defs[j].expr->type != &Lambda::type) {
-        bind->order[defs[j].name] = bind->val.size();
+        auto out = bind->order.insert(std::make_pair(defs[j].name, DefBinding::OrderValue(defs[j].location, bind->val.size())));
+        assert (out.second);
         bind->val.emplace_back(std::move(defs[j].expr));
         defs[j].index = 0;
       } else {
@@ -346,8 +351,9 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
           p->index = -2;
         }
       }
-      std::unique_ptr<Expr> &exp = map->map[cname];
-      exp = expand_patterns(bucket);
+      auto out = map->map.insert(std::make_pair(cname, DefMap::Value(LOCATION, expand_patterns(bucket))));
+      assert (out.second);
+      std::unique_ptr<Expr> &exp = out.first->second.body;
       if (!exp) return nullptr;
       for (int i = 0; i < args; ++i)
         exp = std::unique_ptr<Expr>(new Lambda(prototype.location,
@@ -408,7 +414,9 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
   if (ast.name == "_") {
     // no-op; unbound
   } else if (!ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
-    expr = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, expr.release()));
+    Lambda *lambda = new Lambda(expr->location, ast.name, expr.release());
+    if (ast.name.substr(0, 3) != "_ k") lambda->token = ast.token;
+    expr = std::unique_ptr<Expr>(lambda);
     guard = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, guard.release()));
     out.var = 0; // bound
   } else {
@@ -434,7 +442,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
     if (ast.name.empty()) out.sum = multiarg;
     if (!out.sum) {
       std::cerr << "Constructor " << ast.name
-        << " in pattern match not found at " << ast.location.file()
+        << " in pattern match not found at " << ast.token.file()
         << "." << std::endl;
       out.var = 0;
     } else if (out.sum->members[out.cons].ast.args.size() != ast.args.size()) {
@@ -445,7 +453,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       }
       std::cerr  << " in pattern match has " << ast.args.size()
         << " parameters, but must have " << out.sum->members[out.cons].ast.args.size()
-        << " at " << ast.location.file()
+        << " at " << ast.region.text()
         << "." << std::endl;
       out.sum = 0;
       out.var = 0;
@@ -467,7 +475,8 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
   int index = 0;
   std::vector<PatternTree> children;
   for (auto &a : match->args) {
-    map->map["_ a" + std::to_string(index)] = std::move(a);
+    auto out = map->map.insert(std::make_pair("_ a" + std::to_string(index), DefMap::Value(LOCATION, std::move(a))));
+    assert (out.second);
     children.emplace_back(index);
     multiarg.members.front().ast.args.emplace_back(AST(LOCATION));
     ++index;
@@ -490,10 +499,11 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
   bool ok = true;
   for (auto &p : match->patterns) {
     std::unique_ptr<Expr> nill;
-    std::unique_ptr<Expr> &expr = map->map["_ f" + std::to_string(f)];
-    std::unique_ptr<Expr> &guard = p.guard ? map->map["_ g" + std::to_string(f)] : nill;
-    expr = std::move(p.expr);
-    guard = std::move(p.guard);
+    auto out = map->map.insert(std::make_pair("_ f" + std::to_string(f), DefMap::Value(LOCATION, std::move(p.expr))));
+    assert (out.second);
+    std::unique_ptr<Expr> &expr = out.first->second.body;
+    std::unique_ptr<Expr> &guard =
+      p.guard ? map->map.insert(std::make_pair("_ g" + std::to_string(f), DefMap::Value(LOCATION, std::move(p.guard)))).first->second.body : nill;
     patterns.emplace_back(expr->location);
     patterns.back().index = f;
     patterns.back().guard = static_cast<bool>(guard);
@@ -537,13 +547,14 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     lbinding.prefix = -1;
     lbinding.depth = binding->depth + 1;
     lbinding.index[lambda->name] = 0;
-    lbinding.defs.resize(lbinding.defs.size()+1); // don't care
+    lbinding.defs.emplace_back(lambda->name, LOCATION, nullptr);
     lambda->body = fracture(std::move(lambda->body), &lbinding);
     return expr;
   } else if (expr->type == &Match::type) {
     std::unique_ptr<Match> m(reinterpret_cast<Match*>(expr.release()));
     auto out = rebind_match(binding, std::move(m));
     if (!out) return out;
+    out->flags |= FLAG_AST;
     return fracture(std::move(out), binding);
   } else if (expr->type == &DefMap::type) {
     DefMap *def = reinterpret_cast<DefMap*>(expr.get());
@@ -553,19 +564,14 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     dbinding.depth = binding->depth + 1;
     for (auto &i : def->map) {
       dbinding.index[i.first] = dbinding.defs.size();
-      dbinding.defs.resize(dbinding.defs.size()+1);
-      ResolveDef &def = dbinding.defs.back();
-      def.name = i.first;
-      def.expr = std::move(i.second);
+      dbinding.defs.emplace_back(i.first, i.second.location, std::move(i.second.body));
     }
     for (auto &i : def->publish) {
       std::string name = "publish " + std::to_string(dbinding.depth) + " " + i.first;
       dbinding.index[name] = dbinding.defs.size();
-      dbinding.defs.resize(dbinding.defs.size()+1);
-      ResolveDef &def = dbinding.defs.back();
-      Location l = i.second->location;
-      def.name = std::move(name);
-      def.expr = std::unique_ptr<Expr>(new App(l, i.second.release(), rebind_subscribe(binding, l, i.first)));
+      Location l = i.second.body->location;
+      dbinding.defs.emplace_back(name, i.second.location,
+        std::unique_ptr<Expr>(new App(l, i.second.body.release(), rebind_subscribe(binding, l, i.first))));
     }
     dbinding.current_index = 0;
     for (auto &i : dbinding.defs) {
@@ -574,7 +580,10 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     }
     dbinding.current_index = -1;
     std::unique_ptr<Expr> body = fracture(std::move(def->body), &dbinding);
-    return fracture_binding(def->location, dbinding.defs, std::move(body));
+    auto out = fracture_binding(def->location, dbinding.defs, std::move(body));
+    if ((def->flags & FLAG_AST) != 0)
+      out->flags |= FLAG_AST;
+    return out;
   } else if (expr->type == &Top::type) {
     Top *top = reinterpret_cast<Top*>(expr.get());
     ResolveBinding tbinding;
@@ -585,7 +594,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     for (auto &b : top->defmaps) {
       for (auto &i : b->map) {
         std::string name;
-        DefOrder::iterator glob;
+        Top::DefOrder::iterator glob;
         // If this file defines the global, put it at the global name; otherwise, localize the name
         if ((glob = top->globals.find(i.first)) != top->globals.end() && glob->second == tbinding.prefix) {
           name = i.first;
@@ -593,14 +602,11 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
           name = std::to_string(tbinding.prefix) + " " + i.first;
         }
         tbinding.index[name] = tbinding.defs.size();
-        tbinding.defs.resize(tbinding.defs.size()+1);
-        ResolveDef &def = tbinding.defs.back();
-        def.name = name;
-        def.expr = std::move(i.second);
+        tbinding.defs.emplace_back(name, i.second.location, std::move(i.second.body));
       }
       for (auto &i : b->publish) {
         std::string name = "publish " + std::to_string(tbinding.depth) + " " + i.first;
-        Location l = i.second->location;
+        Location l = i.second.body->location;
         Expr *tail;
         NameIndex::iterator pub;
         if ((pub = tbinding.index.find(name)) == tbinding.index.end()) {
@@ -612,10 +618,8 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
           tbinding.defs[pub->second].name = std::move(name);
         }
         tbinding.index[name] = tbinding.defs.size();
-        tbinding.defs.resize(tbinding.defs.size()+1);
-        ResolveDef &def = tbinding.defs.back();
-        def.name = std::move(name);
-        def.expr = std::unique_ptr<Expr>(new App(l, i.second.release(), tail));
+        tbinding.defs.emplace_back(name, i.second.location,
+          std::unique_ptr<Expr>(new App(l, i.second.body.release(), tail)));
       }
       ++tbinding.prefix;
     }
@@ -643,7 +647,9 @@ struct NameRef {
   int depth;
   int offset;
   int def;
+  Location target;
   TypeVar *var;
+  NameRef() : depth(0), offset(-1), def(0), target(LOCATION), var(0) { }
 };
 
 struct NameBinding {
@@ -659,21 +665,24 @@ struct NameBinding {
 
   NameRef find(const std::string &x) {
     NameRef out;
-    std::map<std::string, int>::iterator i;
+    DefBinding::Order::iterator i;
     if (lambda && lambda->name == x) {
       out.depth = 0;
       out.offset = 0;
       out.def = 0;
       out.var = &lambda->typeVar[0];
+      out.target = lambda->token;
     } else if (binding && (i = binding->order.find(x)) != binding->order.end()) {
+      int idx = i->second.index;
       out.depth = 0;
-      out.offset = i->second;
-      out.def = i->second < generalized;
-      if (i->second < (int)binding->val.size()) {
-        auto x = binding->val[i->second].get();
+      out.offset = idx;
+      out.def = idx < generalized;
+      out.target = i->second.location;
+      if (idx < (int)binding->val.size()) {
+        auto x = binding->val[idx].get();
         out.var = x?&x->typeVar:0;
       } else {
-        auto x = binding->fun[i->second-binding->val.size()].get();
+        auto x = binding->fun[idx-binding->val.size()].get();
         out.var = x?&x->typeVar:0;
       }
     } else if (next) {
@@ -726,6 +735,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     }
     ref->depth = pos.depth;
     ref->offset = pos.offset;
+    ref->target = pos.target;
     if (!pos.var) return true;
     if (pos.def) {
       TypeVar temp;
@@ -833,7 +843,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
         << prim->location.file() << std::endl;
       return false;
     } else {
-      prim->flags = i->second.flags;
+      prim->pflags = i->second.flags;
       prim->fn   = i->second.fn;
       prim->data = i->second.data;
       bool ok = i->second.type(args, &prim->typeVar);

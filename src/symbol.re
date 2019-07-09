@@ -272,11 +272,12 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
         [{] {
           std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
           exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
+          exprs.back()->flags |= FLAG_AST;
           lex.consume();
           exprs.push_back(parse_expr(lex));
           if (lex.next.type == EOL) lex.consume();
           expect(BCLOSE, lex);
-          start = in.coord();
+          start = in.coord() - 1;
           continue;
         }
 
@@ -304,15 +305,18 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
 
   std::shared_ptr<String> str = std::make_shared<String>(unicode_escape_canon(std::move(slice)));
   exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
+  exprs.back()->flags |= FLAG_AST;
 
   if (exprs.size() == 1) {
     out = exprs.front();
   } else {
     Expr *cat = new Prim(LOCATION, "catopen");
     for (auto expr : exprs)
-      cat = new App(expr->location, new App(LOCATION, new VarRef(LOCATION, "_ catadd"), cat), expr);
+      cat = new App(LOCATION, new App(LOCATION, new VarRef(LOCATION, "_ catadd"), cat), expr);
+    Location location = exprs.front()->location;
+    location.end = exprs.back()->location.end;
     cat = new App(LOCATION, new Lambda(LOCATION, "_", new Prim(LOCATION, "catclose")), cat);
-    cat = new App(LOCATION, new Lambda(LOCATION, "_ catadd", cat),
+    cat = new App(location, new Lambda(LOCATION, "_ catadd", cat),
             new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new Prim(LOCATION, "catadd"))));
     out = cat;
   }

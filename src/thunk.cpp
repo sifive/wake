@@ -169,7 +169,7 @@ void Thunk::eval(WorkQueue &queue) {
       Binding *held = binding.get();
       std::unique_ptr<Finisher> finisher(
         new Primitive(std::move(receiver), std::move(binding), prim));
-      if ((prim->flags & PRIM_SHALLOW)) {
+      if ((prim->pflags & PRIM_SHALLOW)) {
         auto shared = std::make_shared<MultiReceiverShared>(
           std::move(finisher), prim->args);
         for (iter = held; iter; iter = iter->next.get())
