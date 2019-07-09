@@ -118,11 +118,16 @@ Internal dependencies:
  - BLAKE2		public domain	https://github.com/BLAKE2/libb2
  - whereami		WTFPLV2		https://github.com/gpakosz/whereami
 
-# Tutorial
+# Documentation
 
 Documentation for wake can be found in [share/doc/wake](share/doc/wake).
-Try the [Tutorial](share/doc/wake/tutorial.md) and the [Quick Reference Guide](share/doc/wake/quickref.md).
 
+ - Try the [Tutorial](share/doc/wake/tutorial.md) for a step-by-step
+   introduction.
+ - The [Quick Reference Guide](share/doc/wake/quickref.md) is handy overview
+   of wake syntax in cheat-sheet form.
+ - The [Annotated Source Code](https://sifive.github.io/wake/) of wake can
+   be useful when trying to understand the standard library.
 
 [release-badge]: https://img.shields.io/github/tag/sifive/wake.svg?label=release
 [release]: https://github.com/sifive/wake/releases/latest
