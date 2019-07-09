@@ -6,13 +6,14 @@ jobs:
     steps:
       - checkout
       - run: sudo apt-get update && sudo apt-get install -y build-essential libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev
-      - run: USE_FUSE_WAKE=0 make tarball
+      - run: USE_FUSE_WAKE=0 make tarball && mkdir www && ./bin/wake --html > www/index.html
       - persist_to_workspace:
           root: .
           paths:
             - wake_*.tar.xz
             - wake.spec
             - debian
+            - www
 
   debian_wheezy:
     docker:
@@ -157,6 +158,21 @@ jobs:
       - store_artifacts:
           path: /tmp/workspace
 
+  docs_deploy:
+    docker:
+      - image: node:8.10.0
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: |
+          npm install -g --silent gh-pages@2.0.1
+          git config user.email "ci-wake-build@sifive.com"
+          git config user.name "ci-wake-build"
+      - add_ssh_keys:
+          fingerprints:
+            - "9d:87:e9:4d:46:91:1b:12:bb:a6:ef:16:f1:da:52:49"
+      - run: gh-pages --message "[skip ci] Updates" --dist /tmp/workspace/www
+
 workflows:
   version: 2
   build:
@@ -188,3 +204,9 @@ workflows:
             - centos_7_6
             - ubuntu_16_04   # LTS
             - ubuntu_18_04   # LTS
+      - docs_deploy:
+          requires:
+            - release
+          filters:
+            branches:
+              only: master
