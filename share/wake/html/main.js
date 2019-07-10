@@ -136,7 +136,7 @@ function render(root) {
     }
 
     let pointer = pRange[0];
-    body.map(child => {
+    if (body) body.map(child => {
       const cRange = child.range;
       if (pointer < cRange[0]) {
         const text = utf8.decode(str.slice(pointer, cRange[0]));

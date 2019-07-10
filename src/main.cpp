@@ -335,20 +335,20 @@ struct JSONRender {
       }
     }
 
-    os << ",\"body\":[";
     ++it;
 
-    bool comma = false;
+    bool body = false;
     while (it != eset.end()) {
       Location child = (*it)->location;
       if (child.filename != self.filename) break;
       if (child.start > self.end) break;
-      if (comma) os << ",";
-      comma = true;
+      if (body) os << ","; else os << ",\"body\":[";
+      body = true;
       dump();
     }
 
-    os << "]}";
+    if (body) os << "]";
+    os << "}";
   }
 
   void render(Expr *root) {
