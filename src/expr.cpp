@@ -142,9 +142,10 @@ void DefMap::format(std::ostream &os, int depth) const {
     os << pad(depth+2) << i.first << " =" << std::endl;
     i.second.body->format(os, depth+4);
   }
-  for (auto &i : publish) {
+  for (auto &i : pub) {
     os << pad(depth+2) << "publish " << i.first << " =" << std::endl;
-    i.second.body->format(os, depth+4);
+    for (auto &j : i.second)
+      j.body->format(os, depth+4);
   }
   body->format(os, depth+2);
 }
@@ -154,7 +155,7 @@ Hash DefMap::hash() {
 }
 
 std::unique_ptr<Expr> DefMap::dont_generalize(std::unique_ptr<DefMap> &&map) {
-  assert (map->publish.empty());
+  assert (map->pub.empty());
   std::unique_ptr<Expr> out = std::move(map->body);
   for (auto it = map->map.begin(); it != map->map.end(); ++it)
     out = std::unique_ptr<Expr>(new Lambda(map->location, it->first, out.release()));
