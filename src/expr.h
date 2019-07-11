@@ -244,7 +244,8 @@ struct Destruct : public Expr {
 // A dummy expression never actually used in the AST
 struct VarDef : public Expr {
   static const TypeDescriptor type;
-  VarDef(const Location &location_) : Expr(&type, location_) { }
+  Location target; // for publishes
+  VarDef(const Location &location_) : Expr(&type, location_), target(LOCATION) { }
   void format(std::ostream &os, int depth) const;
   Hash hash();
 };
