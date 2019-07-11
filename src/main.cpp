@@ -30,6 +30,7 @@
 #include <random>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "parser.h"
 #include "bind.h"
 #include "symbol.h"
@@ -299,14 +300,21 @@ struct JSONRender {
       for (auto &i : defbinding->fun) explore(i.get());
       for (auto &i : defbinding->order) {
         if (i.second.location.start.bytes >= 0) {
-          auto foo = new VarDef(i.second.location);
           int val = i.second.index;
           int fun = val - defbinding->val.size();
-          TypeVar &var = (fun >= 0) ? defbinding->fun[fun]->typeVar : defbinding->val[val]->typeVar;
-          foo->typeVar.setDOB(var);
-          var.unify(foo->typeVar);
-          defs.emplace_back(foo);
-          eset.insert(foo);
+          Expr *expr = (fun >= 0) ? defbinding->fun[fun].get() : defbinding->val[val].get();
+          auto def = new VarDef(i.second.location);
+          if (i.first.compare(0, 8, "publish ") == 0) {
+            assert (expr->type == &App::type);
+            App *app = reinterpret_cast<App*>(expr);
+            assert (app->val->type == &VarRef::type);
+            VarRef *ref = reinterpret_cast<VarRef*>(app->val.get());
+            def->target = ref->target;
+          }
+          def->typeVar.setDOB(expr->typeVar);
+          expr->typeVar.unify(def->typeVar);
+          defs.emplace_back(def);
+          eset.insert(def);
         }
       }
       explore(defbinding->body.get());
@@ -324,31 +332,40 @@ struct JSONRender {
     (*it)->typeVar.format(os, (*it)->typeVar);
     os << "\"";
 
+    Location target = LOCATION;
+
     if ((*it)->type == &VarRef::type) {
       VarRef *ref = reinterpret_cast<VarRef*>(*it);
-      if (ref->target.start.bytes >= 0) {
-        os
-          << ",\"target\":{\"filename\":\"" << json_escape(ref->target.filename)
-          << "\",\"range\":[" << ref->target.start.bytes
-          << "," << (ref->target.end.bytes+1)
-          << "]}";
-      }
+      target = ref->target;
     }
 
-    os << ",\"body\":[";
+    if ((*it)->type == &VarDef::type) {
+      VarDef *def = reinterpret_cast<VarDef*>(*it);
+      target = def->target;
+    }
+
+    if (target.start.bytes >= 0) {
+      os
+        << ",\"target\":{\"filename\":\"" << json_escape(target.filename)
+        << "\",\"range\":[" << target.start.bytes
+        << "," << (target.end.bytes+1)
+        << "]}";
+    }
+
     ++it;
 
-    bool comma = false;
+    bool body = false;
     while (it != eset.end()) {
       Location child = (*it)->location;
       if (child.filename != self.filename) break;
       if (child.start > self.end) break;
-      if (comma) os << ",";
-      comma = true;
+      if (body) os << ","; else os << ",\"body\":[";
+      body = true;
       dump();
     }
 
-    os << "]}";
+    if (body) os << "]";
+    os << "}";
   }
 
   void render(Expr *root) {

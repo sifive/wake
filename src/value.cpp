@@ -173,7 +173,7 @@ void Data::format(std::ostream &os, FormatState &state) const {
     }
   }
 
-  if (name.substr(0, 7) == "binary ") {
+  if (name.compare(0, 7, "binary ") == 0) {
     op_type q = op_precedence(name.c_str() + 7);
     switch (state.get()) {
     case 0:
@@ -191,7 +191,7 @@ void Data::format(std::ostream &os, FormatState &state) const {
       if (q.p < state.p()) os << ")";
       break;
     }
-  } else if (name.substr(0, 6) == "unary ") {
+  } else if (name.compare(0, 6, "unary ") == 0) {
     op_type q = op_precedence(name.c_str() + 6);
     switch (state.get()) {
     case 0:

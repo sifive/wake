@@ -342,7 +342,6 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       return out;
     }
     case SUBSCRIBE: {
-      std::string name;
       Location location = lex.next.location;
       op_type op = op_precedence("s");
       if (op.p < p) precedence_error(lex);
@@ -573,24 +572,8 @@ static void bind_def(Lexer &lex, DefMap::Defs &map, Definition &&def, Top *top =
   bind_global(out.first->first, top, lex);
 }
 
-static void publish_def(DefMap::Defs &publish, Definition &&def) {
-  // Build a prepender
-  Location l = def.body->location;
-  std::unique_ptr<Expr> tail(
-    new App(l, new App(l,
-      new VarRef(l, "binary ++"),
-      def.body.release()),
-      new VarRef(l, "_ tail")));
-
-  DefMap::Defs::iterator i;
-  if ((i = publish.find(def.name)) == publish.end()) {
-    i = publish.insert(std::make_pair(std::move(def.name), DefMap::Value(def.location, std::move(tail)))).first;
-  } else {
-    // Apply the existing prepender to us (we come after it)
-    i->second.body = std::unique_ptr<Expr>(new App(l, i->second.body.release(), tail.release()));
-  }
-
-  i->second.body = std::unique_ptr<Expr>(new Lambda(l, "_ tail", i->second.body.release()));
+static void publish_def(DefMap::Pubs &pub, Definition &&def) {
+  pub[def.name].emplace_back(def.location, std::move(def.body));
 }
 
 static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
@@ -1092,7 +1075,7 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
 
     Location location = lex.next.location;
     DefMap::Defs map;
-    DefMap::Defs publish;
+    DefMap::Pubs pub;
 
     bool repeat = true;
     while (repeat) {
@@ -1103,7 +1086,7 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
           break;
         }
         case PUBLISH: {
-          publish_def(publish, parse_def(lex));
+          publish_def(pub, parse_def(lex));
           break;
         }
         default: {
@@ -1115,10 +1098,10 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
 
     auto body = relabel_anon(parse_binary(0, lex, true));
     location.end = body->location.end;
-    if (publish.empty() && map.empty()) {
+    if (pub.empty() && map.empty()) {
       out = body;
     } else {
-      out = new DefMap(location, std::move(map), std::move(publish), body);
+      out = new DefMap(location, std::move(map), std::move(pub), body);
       out->flags |= FLAG_AST;
     }
 
@@ -1160,7 +1143,7 @@ void parse_top(Top &top, Lexer &lex) {
         break;
       }
       case PUBLISH: {
-        publish_def(defmap.publish, parse_def(lex));
+        publish_def(defmap.pub, parse_def(lex));
         break;
       }
       default: {

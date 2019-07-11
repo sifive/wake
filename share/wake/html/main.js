@@ -97,7 +97,7 @@ document.focusOn = function (that, event) {
   const destX = (where.left + where.right  - window.innerWidth)  / 2 + fromX;
   const destY = (where.top  + where.bottom - window.innerHeight) / 2 + fromY;
 
-  usecss.firstChild.innerHTML = 'span[id=\'' + target + '\'] { background-color: red; }';
+  usecss.firstChild.innerHTML = '*[id=\'' + target + '\'] { background-color: red; }';
   window.location.hash = target;
   event.preventDefault();
 
@@ -105,7 +105,7 @@ document.focusOn = function (that, event) {
 };
 
 document.onMouseClick = function (that, event) {
-  usecss.firstChild.innerHTML = 'a[href=\'#' + that.id + '\'] { background-color: red; }';
+  usecss.firstChild.innerHTML = '*[href=\'#' + that.id + '\'] { background-color: red; }';
   event.stopPropagation();
 };
 
@@ -136,7 +136,7 @@ function render(root) {
     }
 
     let pointer = pRange[0];
-    body.map(child => {
+    if (body) body.map(child => {
       const cRange = child.range;
       if (pointer < cRange[0]) {
         const text = utf8.decode(str.slice(pointer, cRange[0]));

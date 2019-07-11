@@ -157,18 +157,22 @@ struct DefMap : public Expr {
   };
 
   typedef std::map<std::string, Value> Defs;
+  typedef std::map<std::string, std::vector<Value> > Pubs;
   Defs map;
-  Defs publish;
+  Pubs pub;
   std::unique_ptr<Expr> body;
 
   static const TypeDescriptor type;
-  DefMap(const Location &location_, Defs &&map_, Defs &&publish_, Expr *body_)
-   : Expr(&type, location_), map(std::move(map_)), publish(std::move(publish_)), body(body_) { }
+  DefMap(const Location &location_, Defs &&map_, Pubs &&pub_, Expr *body_)
+   : Expr(&type, location_), map(std::move(map_)), pub(std::move(pub_)), body(body_) { }
   DefMap(const Location &location_)
-   : Expr(&type, location_), map(), publish(), body(new Literal(location, "top")) { }
+   : Expr(&type, location_), map(), pub(), body(new Literal(location, "top")) { }
 
   void format(std::ostream &os, int depth) const;
   Hash hash();
+
+  // Convert into (\a\b\c body) va vb vc ... to prevent type generalization
+  static std::unique_ptr<Expr> dont_generalize(std::unique_ptr<DefMap> &&map);
 };
 
 struct Top : public Expr {
@@ -240,7 +244,8 @@ struct Destruct : public Expr {
 // A dummy expression never actually used in the AST
 struct VarDef : public Expr {
   static const TypeDescriptor type;
-  VarDef(const Location &location_) : Expr(&type, location_) { }
+  Location target; // for publishes
+  VarDef(const Location &location_) : Expr(&type, location_), target(LOCATION) { }
   void format(std::ostream &os, int depth) const;
   Hash hash();
 };

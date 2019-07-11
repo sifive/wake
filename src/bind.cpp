@@ -207,7 +207,7 @@ static bool rebind_ref(ResolveBinding *binding, std::string &name) {
   return false;
 }
 
-Expr *rebind_subscribe(ResolveBinding *binding, const Location &location, const std::string &name) {
+static VarRef *rebind_subscribe(ResolveBinding *binding, const Location &location, const std::string &name) {
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
     std::string pub = "publish " + std::to_string(iter->depth) + " " + name;
@@ -215,6 +215,30 @@ Expr *rebind_subscribe(ResolveBinding *binding, const Location &location, const 
   }
   // nil
   return new VarRef(location, "Nil");
+}
+
+static void chain_publish(ResolveBinding *binding, DefMap::Pubs &pubs, int &chain) {
+  for (auto &i : pubs) {
+    std::string name = "publish " + std::to_string(binding->depth) + " " + i.first;
+    for (auto j = i.second.rbegin(); j != i.second.rend(); ++j) {
+      Location l = j->body->location;
+      Expr *tail;
+      NameIndex::iterator pub;
+      if ((pub = binding->index.find(name)) == binding->index.end()) {
+        tail = rebind_subscribe(binding, l, i.first);
+      } else {
+        std::string name = "publish " + std::to_string(binding->depth) + " " + std::to_string(++chain) + " " + i.first;
+        tail = new VarRef(l, name);
+        binding->index[name] = pub->second;
+        binding->defs[pub->second].name = std::move(name);
+      }
+      binding->index[name] = binding->defs.size();
+      binding->defs.emplace_back(name, j->location,
+        std::unique_ptr<Expr>(new App(l, new App(l,
+          new VarRef(l, "binary ++"),
+          j->body.release()), tail)));
+    }
+  }
 }
 
 struct PatternTree {
@@ -239,7 +263,7 @@ void PatternTree::format(std::ostream &os, int p) const
   }
 
   const std::string &name = sum->members[cons].ast.name;
-  if (name.substr(0, 7) == "binary ") {
+  if (name.compare(0, 7, "binary ") == 0) {
     op_type q = op_precedence(name.c_str() + 7);
     if (q.p < p) os << "(";
     children[0].format(os, q.p + !q.l);
@@ -247,7 +271,7 @@ void PatternTree::format(std::ostream &os, int p) const
     os << name.c_str() + 7 << " ";
     children[1].format(os, q.p + q.l);
     if (q.p < p) os << ")";
-  } else if (name.substr(0, 6) == "unary ") {
+  } else if (name.compare(0, 6, "unary ") == 0) {
     op_type q = op_precedence(name.c_str() + 6);
     if (q.p < p) os << "(";
     os << name.c_str() + 6;
@@ -415,7 +439,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
     // no-op; unbound
   } else if (!ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
     Lambda *lambda = new Lambda(expr->location, ast.name, expr.release());
-    if (ast.name.substr(0, 3) != "_ k") lambda->token = ast.token;
+    if (ast.name.compare(0, 3, "_ k") != 0) lambda->token = ast.token;
     expr = std::unique_ptr<Expr>(lambda);
     guard = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, guard.release()));
     out.var = 0; // bound
@@ -522,7 +546,8 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
       return nullptr;
     }
   }
-  return std::unique_ptr<Expr>(map.release());
+  // Convert DefMap into Lambda+App to prevent generalization of types
+  return DefMap::dont_generalize(std::move(map));
 }
 
 static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding *binding) {
@@ -533,7 +558,9 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     return expr;
   } else if (expr->type == &Subscribe::type) {
     Subscribe *sub = reinterpret_cast<Subscribe*>(expr.get());
-    return std::unique_ptr<Expr>(rebind_subscribe(binding, sub->location, sub->name));
+    VarRef *out = rebind_subscribe(binding, sub->location, sub->name);
+    out->flags |= FLAG_AST;
+    return std::unique_ptr<Expr>(out);
   } else if (expr->type == &App::type) {
     App *app = reinterpret_cast<App*>(expr.get());
     app->fn  = fracture(std::move(app->fn),  binding);
@@ -562,17 +589,12 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     dbinding.parent = binding;
     dbinding.prefix = -1;
     dbinding.depth = binding->depth + 1;
+    int chain = 0;
     for (auto &i : def->map) {
       dbinding.index[i.first] = dbinding.defs.size();
       dbinding.defs.emplace_back(i.first, i.second.location, std::move(i.second.body));
     }
-    for (auto &i : def->publish) {
-      std::string name = "publish " + std::to_string(dbinding.depth) + " " + i.first;
-      dbinding.index[name] = dbinding.defs.size();
-      Location l = i.second.body->location;
-      dbinding.defs.emplace_back(name, i.second.location,
-        std::unique_ptr<Expr>(new App(l, i.second.body.release(), rebind_subscribe(binding, l, i.first))));
-    }
+    chain_publish(&dbinding, def->pub, chain);
     dbinding.current_index = 0;
     for (auto &i : dbinding.defs) {
       i.expr = fracture(std::move(i.expr), &dbinding);
@@ -604,30 +626,16 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
         tbinding.index[name] = tbinding.defs.size();
         tbinding.defs.emplace_back(name, i.second.location, std::move(i.second.body));
       }
-      for (auto &i : b->publish) {
-        std::string name = "publish " + std::to_string(tbinding.depth) + " " + i.first;
-        Location l = i.second.body->location;
-        Expr *tail;
-        NameIndex::iterator pub;
-        if ((pub = tbinding.index.find(name)) == tbinding.index.end()) {
-          tail = rebind_subscribe(binding, l, i.first);
-        } else {
-          std::string name = "chain " + std::to_string(++chain);
-          tail = new VarRef(l, name);
-          tbinding.index[name] = pub->second;
-          tbinding.defs[pub->second].name = std::move(name);
-        }
-        tbinding.index[name] = tbinding.defs.size();
-        tbinding.defs.emplace_back(name, i.second.location,
-          std::unique_ptr<Expr>(new App(l, i.second.body.release(), tail)));
-      }
+      chain_publish(&tbinding, b->pub, chain);
       ++tbinding.prefix;
     }
 
     tbinding.current_index = 0;
     tbinding.prefix = 0;
     for (auto &b : top->defmaps) {
-      for (int i = 0; i < (int)b->map.size() + (int)b->publish.size(); ++i) {
+      int total = b->map.size();
+      for (auto &j : b->pub) total += j.second.size();
+      for (int i = 0; i < total; ++i) {
         tbinding.defs[tbinding.current_index].expr =
           fracture(std::move(tbinding.defs[tbinding.current_index].expr), &tbinding);
         ++tbinding.current_index;
