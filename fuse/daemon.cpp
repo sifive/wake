@@ -39,7 +39,8 @@
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <sys/file.h>
-#include <sys/xattr.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
 #include <set>
 #include <map>

@@ -2,8 +2,8 @@
 
 VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/^[^']*'\([^']*\)'.*/\1/p" manifest.wake; else git describe --tags --dirty; fi)
 
-CC	:= gcc -std=c99
-CXX	:= g++ -std=c++11
+CC	:= cc -std=c99
+CXX	:= c++ -std=c++11
 CFLAGS	:= -Wall -O2 -flto -DVERSION=$(VERSION)
 LDFLAGS	:=
 
