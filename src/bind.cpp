@@ -263,7 +263,7 @@ void PatternTree::format(std::ostream &os, int p) const
   }
 
   const std::string &name = sum->members[cons].ast.name;
-  if (name.substr(0, 7) == "binary ") {
+  if (name.compare(0, 7, "binary ") == 0) {
     op_type q = op_precedence(name.c_str() + 7);
     if (q.p < p) os << "(";
     children[0].format(os, q.p + !q.l);
@@ -271,7 +271,7 @@ void PatternTree::format(std::ostream &os, int p) const
     os << name.c_str() + 7 << " ";
     children[1].format(os, q.p + q.l);
     if (q.p < p) os << ")";
-  } else if (name.substr(0, 6) == "unary ") {
+  } else if (name.compare(0, 6, "unary ") == 0) {
     op_type q = op_precedence(name.c_str() + 6);
     if (q.p < p) os << "(";
     os << name.c_str() + 6;
@@ -439,7 +439,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
     // no-op; unbound
   } else if (!ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
     Lambda *lambda = new Lambda(expr->location, ast.name, expr.release());
-    if (ast.name.substr(0, 3) != "_ k") lambda->token = ast.token;
+    if (ast.name.compare(0, 3, "_ k") != 0) lambda->token = ast.token;
     expr = std::unique_ptr<Expr>(lambda);
     guard = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, guard.release()));
     out.var = 0; // bound
