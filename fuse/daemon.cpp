@@ -39,7 +39,6 @@
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <sys/file.h>
-#include <sys/xattr.h>
 
 #include <set>
 #include <map>
