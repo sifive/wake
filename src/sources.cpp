@@ -143,12 +143,13 @@ static bool scan(std::vector<std::shared_ptr<String> > &out, const std::string &
       }
 #endif
       if (recurse) {
+        std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
+        if (name == ".build" || name == ".fuse") continue;
         int fd = openat(dirfd, f->d_name, O_RDONLY);
         if (fd == -1) {
           fprintf(stderr, "Failed to openat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
           failed = true;
         } else {
-          std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
           failed = scan(out, name, fd);
         }
       }
@@ -178,7 +179,6 @@ static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::st
   bool failed = false;
   for (errno = 0; !failed && (f = readdir(dir)); errno = 0) {
     if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
-    std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
     bool recurse;
     struct stat sbuf;
 #ifdef DT_DIR
@@ -187,6 +187,7 @@ static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::st
     } else {
 #endif
       if (fstatat(dirfd, f->d_name, &sbuf, AT_SYMLINK_NOFOLLOW) != 0) {
+        fprintf(stderr, "Failed to fstatat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
         failed = true;
         recurse = false;
       } else {
@@ -195,12 +196,13 @@ static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::st
 #ifdef DT_DIR
     }
 #endif
+    std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
     if (recurse) {
+      if (name == ".build" || name == ".fuse") continue;
       int fd = openat(dirfd, f->d_name, O_RDONLY);
       if (fd == -1) {
         failed = true;
       } else {
-        std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
         failed = push_files(out, name, fd);
       }
     } else {
