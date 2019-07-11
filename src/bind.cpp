@@ -522,7 +522,8 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
       return nullptr;
     }
   }
-  return std::unique_ptr<Expr>(map.release());
+  // Convert DefMap into Lambda+App to prevent generalization of types
+  return DefMap::dont_generalize(std::move(map));
 }
 
 static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding *binding) {

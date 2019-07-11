@@ -169,6 +169,9 @@ struct DefMap : public Expr {
 
   void format(std::ostream &os, int depth) const;
   Hash hash();
+
+  // Convert into (\a\b\c body) va vb vc ... to prevent type generalization
+  static std::unique_ptr<Expr> dont_generalize(std::unique_ptr<DefMap> &&map);
 };
 
 struct Top : public Expr {
