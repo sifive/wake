@@ -207,7 +207,7 @@ static bool rebind_ref(ResolveBinding *binding, std::string &name) {
   return false;
 }
 
-Expr *rebind_subscribe(ResolveBinding *binding, const Location &location, const std::string &name) {
+VarRef *rebind_subscribe(ResolveBinding *binding, const Location &location, const std::string &name) {
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
     std::string pub = "publish " + std::to_string(iter->depth) + " " + name;
@@ -534,7 +534,9 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     return expr;
   } else if (expr->type == &Subscribe::type) {
     Subscribe *sub = reinterpret_cast<Subscribe*>(expr.get());
-    return std::unique_ptr<Expr>(rebind_subscribe(binding, sub->location, sub->name));
+    VarRef *out = rebind_subscribe(binding, sub->location, sub->name);
+    out->flags |= FLAG_AST;
+    return std::unique_ptr<Expr>(out);
   } else if (expr->type == &App::type) {
     App *app = reinterpret_cast<App*>(expr.get());
     app->fn  = fracture(std::move(app->fn),  binding);

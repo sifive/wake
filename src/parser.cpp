@@ -342,7 +342,6 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       return out;
     }
     case SUBSCRIBE: {
-      std::string name;
       Location location = lex.next.location;
       op_type op = op_precedence("s");
       if (op.p < p) precedence_error(lex);
