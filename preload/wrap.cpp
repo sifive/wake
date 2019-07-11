@@ -223,8 +223,9 @@ static void relink_shadow_tree(const std::string &root, const svec &outputs) {
       std::string target = roots + x;
       unlink(x.c_str());
       if (link(target.c_str(), x.c_str()) != 0) {
+        bool die = errno != EEXIST;
         std::cerr << "link " << x << ": " << strerror(errno) << std::endl;
-        exit(1);
+        if (die) exit(1);
       }
     }
   }
