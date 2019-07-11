@@ -25,6 +25,11 @@ struct Coordinates {
   long bytes;
   Coordinates(int r = 1, int c = 1, long b = -1) : row(r), column(c), bytes(b) { }
 
+  bool operator == (const Coordinates &c) const {
+    return row == c.row && column == c.column;
+  }
+  bool operator != (const Coordinates &c) const { return !(c == *this); }
+
   bool operator < (const Coordinates &c) const {
     if (row == c.row) { return column < c.column; }
     return row < c.row;
