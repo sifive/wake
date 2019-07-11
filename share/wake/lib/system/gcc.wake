@@ -37,15 +37,15 @@ def makeCompileC variant gcc flags =
 def makeLinkO variant linker flags =
   Pair variant (\extraFlags doLinkO variant linker (flags ++ extraFlags)), Nil
 
-publish compileC = makeCompileC "native-c99-debug"     (which "gcc") (c99Flags ++ debugCFlags)
-publish compileC = makeCompileC "native-c99-release"   (which "gcc") (c99Flags ++ releaseCFlags)
-publish compileC = makeCompileC "native-cpp11-debug"   (which "g++") (c11Flags ++ debugCFlags)
-publish compileC = makeCompileC "native-cpp11-release" (which "g++") (c11Flags ++ releaseCFlags)
+publish compileC = makeCompileC "native-c99-debug"     (which "cc") (c99Flags ++ debugCFlags)
+publish compileC = makeCompileC "native-c99-release"   (which "cc") (c99Flags ++ releaseCFlags)
+publish compileC = makeCompileC "native-cpp11-debug"   (which "c++") (c11Flags ++ debugCFlags)
+publish compileC = makeCompileC "native-cpp11-release" (which "c++") (c11Flags ++ releaseCFlags)
 
-publish linkO = makeLinkO "native-c99-debug"     (which "gcc") (debugLFlags)
-publish linkO = makeLinkO "native-c99-release"   (which "gcc") (releaseLFlags)
-publish linkO = makeLinkO "native-cpp11-debug"   (which "g++") (debugLFlags)
-publish linkO = makeLinkO "native-cpp11-release" (which "g++") (releaseLFlags)
+publish linkO = makeLinkO "native-c99-debug"     (which "cc") (debugLFlags)
+publish linkO = makeLinkO "native-c99-release"   (which "cc") (releaseLFlags)
+publish linkO = makeLinkO "native-cpp11-debug"   (which "c++") (debugLFlags)
+publish linkO = makeLinkO "native-cpp11-release" (which "c++") (releaseLFlags)
 
 def pickVariant variant variants =
   match (find (variant ==* _.getPairFirst) variants)
