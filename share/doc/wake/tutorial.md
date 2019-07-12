@@ -598,8 +598,8 @@ where `f` is a description of how an operation failed.
 
     echo "contents" > existing.txt
     echo "contents" > denied.txt
-    chmod 000 denied.txt
     git add existing.txt denied.txt
+    chmod 000 denied.txt
     cat >> tutorial.wake <<'EOF'
     global def goodRead _ = read (source "existing.txt")
     global def deniedRead _ = read (source "denied.txt")
