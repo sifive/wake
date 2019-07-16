@@ -42,18 +42,12 @@ struct Target : public Value {
 
   static const TypeDescriptor type;
   static TypeVar typeVar;
-  static long live;
-
-  Target() : Value(&type) { ++live; }
-  ~Target() { --live; }
+  Target() : Value(&type) { }
 
   void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 };
-
-long Target::live = 0;
-bool targets_live() { return Target::live != 0; }
 
 const TypeDescriptor Target::type("_Target");
 
