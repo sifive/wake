@@ -22,6 +22,7 @@
 #include "heap.h"
 #include "expr.h"
 #include "type.h"
+#include "status.h"
 #include <sstream>
 #include <unordered_map>
 
@@ -38,24 +39,32 @@ struct HashHasher {
 };
 
 struct Target : public Value {
+  Location location;
   std::unordered_map<Hash, TargetValue, HashHasher> table;
 
   static const TypeDescriptor type;
   static TypeVar typeVar;
-  static long live;
-
-  Target() : Value(&type) { ++live; }
-  ~Target() { --live; }
+  Target(const Location &location_) : Value(&type), location(location_) { }
+  ~Target();
 
   void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
   Hash hash() const;
 };
 
-long Target::live = 0;
-bool targets_live() { return Target::live != 0; }
-
 const TypeDescriptor Target::type("_Target");
+
+Target::~Target() {
+  for (auto &x : table) {
+    if (!x.second.future.value) {
+      std::stringstream ss;
+      ss << "Infinite recursion detected across " << location.text() << std::endl;
+      auto str = ss.str();
+      status_write(2, str.data(), str.size());
+      break;
+    }
+  }
+}
 
 void Target::format(std::ostream &os, FormatState &state) const {
   os << "_Target";
@@ -85,13 +94,13 @@ static PRIMFN(prim_hash) {
 }
 
 static PRIMTYPE(type_tnew) {
-  return args.size() == 0 &&
+  return args.size() == 1 &&
     out->unify(Target::typeVar);
 }
 
 static PRIMFN(prim_tnew) {
-  EXPECT(0);
-  auto out = std::make_shared<Target>();
+  EXPECT(1);
+  auto out = std::make_shared<Target>(binding->expr->location);
   RETURN(out);
 }
 
@@ -138,7 +147,7 @@ static PRIMFN(prim_tget) {
 
   if (!(ref.first->second.subhash == subhash)) {
     std::stringstream ss;
-    ss << "ERROR: Target subkey mismatch for " << binding->expr->location.text() << std::endl;
+    ss << "ERROR: Target subkey mismatch for " << target->location.text() << std::endl;
     if (queue.stack_trace)
       for (auto &x : binding->stack_trace())
         ss << "  from " << x.file() << std::endl;
