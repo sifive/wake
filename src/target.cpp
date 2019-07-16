@@ -22,6 +22,7 @@
 #include "heap.h"
 #include "expr.h"
 #include "type.h"
+#include "status.h"
 #include <sstream>
 #include <unordered_map>
 
@@ -44,6 +45,7 @@ struct Target : public Value {
   static const TypeDescriptor type;
   static TypeVar typeVar;
   Target(const Location &location_) : Value(&type), location(location_) { }
+  ~Target();
 
   void format(std::ostream &os, FormatState &state) const;
   TypeVar &getType();
@@ -51,6 +53,18 @@ struct Target : public Value {
 };
 
 const TypeDescriptor Target::type("_Target");
+
+Target::~Target() {
+  for (auto &x : table) {
+    if (!x.second.future.value) {
+      std::stringstream ss;
+      ss << "Infinite recursion detected across " << location.text() << std::endl;
+      auto str = ss.str();
+      status_write(2, str.data(), str.size());
+      break;
+    }
+  }
+}
 
 void Target::format(std::ostream &os, FormatState &state) const {
   os << "_Target";
