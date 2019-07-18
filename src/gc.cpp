@@ -17,6 +17,7 @@
 
 #include "gc.h"
 #include <string.h>
+#include <stdlib.h>
 #include <assert.h>
 
 HeapObject::~HeapObject() { }
@@ -40,7 +41,7 @@ Placement MovedObject::descend(PadObject *free) {
 }
 
 Heap::Heap() {
-  begin = static_cast<PadObject*>(malloc(sizeof(PadObject)*1024));
+  begin = static_cast<PadObject*>(::malloc(sizeof(PadObject)*1024));
   end = begin + 1024;
   free = begin;
   last_pads = 0;
@@ -55,7 +56,7 @@ void Heap::GC(size_t requested_pads) {
   size_t elems = (free - begin) * 2 + requested_pads;
   if (4*last_pads > elems) elems = 4*last_pads;
 
-  PadObject *newbegin = static_cast<PadObject*>(malloc(elems*sizeof(PadObject)));
+  PadObject *newbegin = static_cast<PadObject*>(::malloc(elems*sizeof(PadObject)));
   Placement progress(newbegin, newbegin);
 
   for (RootRing *root = roots.next; root != &roots; root = root->next) {
@@ -90,38 +91,38 @@ Placement Tree::descend(PadObject *free) {
   return Placement(next(), free);
 }
 
-struct String final : public GCObject<String> {
-  String(size_t length_) : length(length_) { }
-  String(const String &s);
+struct GString final : public GCObject<GString> {
+  GString(size_t length_) : length(length_) { }
+  GString(const GString &s);
 
   const char *c_str() const { return static_cast<const char*>(data()); }
 
-  static String* make(Heap &h, const char *str, size_t length);
-  static String* make(Heap &h, const char *str);
-  static String* make(Heap &h, size_t length);
+  static GString* make(Heap &h, const char *str, size_t length);
+  static GString* make(Heap &h, const char *str);
+  static GString* make(Heap &h, size_t length);
 
   size_t length;
   PadObject *next() { return Parent::next() + 1 + length/sizeof(PadObject); }
 };
 
-String* String::make(Heap &h, size_t length) {
-  return new (h.alloc((sizeof(String) + length) / sizeof(PadObject) + 1)) String(length);
+GString* GString::make(Heap &h, size_t length) {
+  return new (h.alloc((sizeof(GString) + length) / sizeof(PadObject) + 1)) GString(length);
 }
 
-String *String::make(Heap &h, const char *str) {
+GString *GString::make(Heap &h, const char *str) {
   auto out = make(h, strlen(str));
   memcpy(out->data(), str, out->length+1);
   return out;
 }
 
-String *String::make(Heap &h, const char *str, size_t length) {
+GString *GString::make(Heap &h, const char *str, size_t length) {
   auto out = make(h, length);
   memcpy(out->data(), str, length);
   static_cast<char*>(out->data())[length] = 0;
   return out;
 }
 
-String::String(const String &s) : length(s.length) {
+GString::GString(const GString &s) : length(s.length) {
   memcpy(data(), s.data(), length+1);
 }
 
@@ -130,15 +131,15 @@ String::String(const String &s) : length(s.length) {
 
 int main() {
   Heap h;
-  String::make(h, "Useless");
-  String *s = String::make(h, "Hello world!");
+  GString::make(h, "Useless");
+  GString *s = GString::make(h, "Hello world!");
   Tree *t = Tree::make(h, nullptr, nullptr, s);
   Tree *u = Tree::make(h, t, t, s);
   auto root = h.root(u);
   std::cout << "Consumed: " << h.used() << std::endl;
   h.GC(0);
   std::cout << "Consumed: " << h.used() << std::endl;
-  std::cout << static_cast<String*>(root->l->value.get())->c_str() << std::endl;
+  std::cout << static_cast<GString*>(root->l->value.get())->c_str() << std::endl;
   return 0;
 }
 */
