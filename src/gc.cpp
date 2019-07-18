@@ -16,6 +16,7 @@
  */
 
 #include "gc.h"
+#include <string.h>
 #include <assert.h>
 
 HeapObject::~HeapObject() { }

@@ -171,7 +171,7 @@ struct Heap {
   void GC(size_t requested_pads);
 
   PadObject *alloc(size_t requested_pads) {
-    if (end - free < requested_pads)
+    if (static_cast<size_t>(end - free) < requested_pads)
       throw GCNeededException(requested_pads);
     PadObject *out = free;
     free += requested_pads;
