@@ -18,19 +18,18 @@
 #include "tuple.h"
 
 struct BigTuple final : public GCObject<BigTuple, Tuple> {
-  size_t info;
+  size_t tsize;
 
   Future *at(size_t i);
   const Future *at(size_t i) const;
 
-  BigTuple(size_t size_, size_t cons_);
+  BigTuple(void *meta, size_t size_);
   BigTuple(const BigTuple &b);
 
   PadObject *next();
   Placement descend(PadObject *free) override;
 
   size_t size() const override;
-  size_t cons() const override;
   Future & operator [] (size_t i) override;
   const Future & operator [] (size_t i) const override;
 };
@@ -43,14 +42,13 @@ const Future *BigTuple::at(size_t i) const {
   return static_cast<const Future*>(data()) + i;
 }
 
-BigTuple::BigTuple(size_t size_, size_t cons_) : info(size_ << 16 | cons_) {
+BigTuple::BigTuple(void *meta, size_t size_) : GCObject<BigTuple, Tuple>(meta), tsize(size_) {
   for (size_t i = 0; i < size_; ++i)
     new (at(i)) Future();
 }
 
-BigTuple::BigTuple(const BigTuple &b) : info(b.info) {
-  size_t lim = size();
-  for (size_t i = 0; i < lim; ++i)
+BigTuple::BigTuple(const BigTuple &b) : GCObject<BigTuple, Tuple>(b), tsize(b.tsize) {
+  for (size_t i = 0; i < tsize; ++i)
     new (at(i)) Future(*b.at(i));
 }
 
@@ -66,11 +64,7 @@ Placement BigTuple::descend(PadObject *free) {
 }
 
 size_t BigTuple::size() const {
-  return info >> 16;
-}
-
-size_t BigTuple::cons() const {
-  return info & 0xFFFF;
+  return tsize;
 }
 
 Future & BigTuple::operator [] (size_t i) {
@@ -81,125 +75,99 @@ const Future & BigTuple::operator [] (size_t i) const {
   return *at(i);
 }
 
-template <size_t tsize, size_t tcons>
-struct SmallTuple final : public GCObject<SmallTuple<tsize, tcons>, Tuple> {
-  typedef GCObject<SmallTuple<tsize, tcons>, Tuple> Parent;
+template <size_t tsize>
+struct SmallTuple final : public GCObject<SmallTuple<tsize>, Tuple> {
+  typedef GCObject<SmallTuple<tsize>, Tuple> Parent;
 
   Future *at(size_t i);
   const Future *at(size_t i) const;
 
-  SmallTuple();
+  SmallTuple(void *meta);
   SmallTuple(const SmallTuple &b);
 
   PadObject *next();
   Placement descend(PadObject *free) override;
 
   size_t size() const override;
-  size_t cons() const override;
   Future & operator [] (size_t i) override;
   const Future & operator [] (size_t i) const override;
 };
 
-template <size_t tsize, size_t tcons>
-Future *SmallTuple<tsize, tcons>::at(size_t i) {
+template <size_t tsize>
+Future *SmallTuple<tsize>::at(size_t i) {
   return static_cast<Future*>(Parent::data()) + i;
 }
 
-template <size_t tsize, size_t tcons>
-const Future *SmallTuple<tsize, tcons>::at(size_t i) const {
+template <size_t tsize>
+const Future *SmallTuple<tsize>::at(size_t i) const {
   return static_cast<const Future*>(Parent::data()) + i;
 }
 
-template <size_t tsize, size_t tcons>
-SmallTuple<tsize, tcons>::SmallTuple() {
+template <size_t tsize>
+SmallTuple<tsize>::SmallTuple(void *meta) : GCObject<SmallTuple<tsize>, Tuple>(meta) {
   for (size_t i = 0; i < tsize; ++i)
     new (at(i)) Future();
 }
 
-template <size_t tsize, size_t tcons>
-SmallTuple<tsize, tcons>::SmallTuple(const SmallTuple &b) {
+template <size_t tsize>
+SmallTuple<tsize>::SmallTuple(const SmallTuple &b) : GCObject<SmallTuple<tsize>, Tuple>(b) {
   for (size_t i = 0; i < tsize; ++i)
     new (at(i)) Future(*b.at(i));
 }
 
-template <size_t tsize, size_t tcons>
-PadObject *SmallTuple<tsize, tcons>::next() {
+template <size_t tsize>
+PadObject *SmallTuple<tsize>::next() {
   return Parent::next() + tsize * (sizeof(Future)/sizeof(PadObject));
 }
 
-template <size_t tsize, size_t tcons>
-Placement SmallTuple<tsize, tcons>::descend(PadObject *free) {
+template <size_t tsize>
+Placement SmallTuple<tsize>::descend(PadObject *free) {
   for (size_t i = 0; i < tsize; ++i)
     free = (*this)[i].moveto(free);
   return Placement(next(), free);
 }
 
-template <size_t tsize, size_t tcons>
-size_t SmallTuple<tsize, tcons>::size() const {
+template <size_t tsize>
+size_t SmallTuple<tsize>::size() const {
   return tsize;
 }
 
-template <size_t tsize, size_t tcons>
-size_t SmallTuple<tsize, tcons>::cons() const {
-  return tcons;
-}
-
-template <size_t tsize, size_t tcons>
-Future & SmallTuple<tsize, tcons>::operator [] (size_t i) {
+template <size_t tsize>
+Future & SmallTuple<tsize>::operator [] (size_t i) {
   return *at(i);
 }
 
-template <size_t tsize, size_t tcons>
-const Future & SmallTuple<tsize, tcons>::operator [] (size_t i) const {
+template <size_t tsize>
+const Future & SmallTuple<tsize>::operator [] (size_t i) const {
   return *at(i);
 }
 
-size_t Tuple::reserve(size_t size, size_t cons) {
-  bool big = cons >= 4 || size == 0 || size > 4;
+size_t Tuple::reserve(void *meta, size_t size) {
+  bool big = size > 4;
   if (big) {
     return sizeof(BigTuple)/sizeof(PadObject) + size * (sizeof(Future)/sizeof(PadObject));
   } else {
-    return sizeof(SmallTuple<0,0>)/sizeof(PadObject) + size * (sizeof(Future)/sizeof(PadObject));
+    return sizeof(SmallTuple<0>)/sizeof(PadObject) + size * (sizeof(Future)/sizeof(PadObject));
   }
 }
 
-Tuple *Tuple::claim(Heap &h, size_t size, size_t cons) {
-  // size=0 must be big (otherwise it's smaller than a MovedObject)
-  bool big = cons >= 4 || size == 0 || size > 4;
+Tuple *Tuple::claim(Heap &h, void *meta, size_t size) {
+  bool big = size > 4;
   if (big) {
-    return new (h.claim(reserve(size,cons))) BigTuple(size, cons);
+    return new (h.claim(reserve(meta, size))) BigTuple(meta, size);
   } else {
-    PadObject *dest = h.claim(reserve(size, cons));
+    PadObject *dest = h.claim(reserve(meta, size));
     switch (size) {
-      case 1: switch (cons) {
-        case 0:  return new (dest) SmallTuple<1,0>();
-        case 1:  return new (dest) SmallTuple<1,1>();
-        case 2:  return new (dest) SmallTuple<1,2>();
-        default: return new (dest) SmallTuple<1,3>();
-      }
-      case 2: switch (cons) {
-        case 0:  return new (dest) SmallTuple<2,0>();
-        case 1:  return new (dest) SmallTuple<2,1>();
-        case 2:  return new (dest) SmallTuple<2,2>();
-        default: return new (dest) SmallTuple<2,3>();
-      }
-      case 3: switch (cons) {
-        case 0:  return new (dest) SmallTuple<3,0>();
-        case 1:  return new (dest) SmallTuple<3,1>();
-        case 2:  return new (dest) SmallTuple<3,2>();
-        default: return new (dest) SmallTuple<3,3>();
-      }
-      default: switch (cons) {
-        case 0:  return new (dest) SmallTuple<4,0>();
-        case 1:  return new (dest) SmallTuple<4,1>();
-        case 2:  return new (dest) SmallTuple<4,2>();
-        default: return new (dest) SmallTuple<4,3>();
-      }
+      case 0:  return new (dest) SmallTuple<0>(meta);
+      case 1:  return new (dest) SmallTuple<1>(meta);
+      case 2:  return new (dest) SmallTuple<2>(meta);
+      case 3:  return new (dest) SmallTuple<3>(meta);
+      default: return new (dest) SmallTuple<4>(meta);
     }
   }
 }
 
-Tuple *Tuple::alloc(Heap &h, size_t size, size_t cons) {
-  h.reserve(reserve(size, cons));
-  return claim(h, size, cons);
+Tuple *Tuple::alloc(Heap &h, void *meta, size_t size) {
+  h.reserve(reserve(meta, size));
+  return claim(h, meta, size);
 }

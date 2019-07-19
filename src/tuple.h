@@ -21,14 +21,18 @@
 #include "runtime.h"
 
 struct Tuple : public HeapObject {
+  // Either an Expr or a Constructor
+  void *meta;
+
+  Tuple(void *meta_) : meta(meta_) { }
+
   virtual size_t size() const = 0;
-  virtual size_t cons() const = 0;
   virtual Future & operator [] (size_t i) = 0;
   const virtual Future & operator [] (size_t i) const = 0;
 
-  static size_t reserve(size_t size, size_t cons);
-  static Tuple *claim(Heap &h, size_t size, size_t cons); // requires prior h.reserve
-  static Tuple *alloc(Heap &h, size_t size, size_t cons);
+  static size_t reserve(void *meta, size_t size);
+  static Tuple *claim(Heap &h, void *meta, size_t size); // requires prior h.reserve
+  static Tuple *alloc(Heap &h, void *meta, size_t size);
 };
 
 #endif

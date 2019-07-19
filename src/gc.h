@@ -214,6 +214,9 @@ struct alignas(PadObject) GCObject : public B {
   typedef GCObject<T, B> Parent;
   typedef B GrandParent;
 
+  template <typename ... ARGS>
+  GCObject(ARGS&&... args) : B(std::forward<ARGS>(args) ... ) { }
+
   T* self() { return static_cast<T*>(this); }
   const T* self() const { return static_cast<const T*>(this); }
 
@@ -247,14 +250,14 @@ template <typename T, typename B>
 template <typename ... ARGS>
 T *GCObject<T, B>::claim(Heap &h, ARGS&&... args) {
   static_assert(sizeof(MovedObject) <= sizeof(T), "HeapObject is too small");
-  return new (h.claim(sizeof(T)/sizeof(PadObject))) T { std::forward<ARGS>(args) ... };
+  return new (h.claim(sizeof(T)/sizeof(PadObject))) T(std::forward<ARGS>(args) ...);
 }
 
 template <typename T, typename B>
 template <typename ... ARGS>
 T *GCObject<T, B>::alloc(Heap &h, ARGS&&... args) {
   static_assert(sizeof(MovedObject) <= sizeof(T), "HeapObject is too small");
-  return new (h.alloc(sizeof(T)/sizeof(PadObject))) T { std::forward<ARGS>(args) ... };
+  return new (h.alloc(sizeof(T)/sizeof(PadObject))) T(std::forward<ARGS>(args) ... );
 }
 
 template <typename T, typename B>
