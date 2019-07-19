@@ -39,8 +39,8 @@ struct Continuation : public Work {
   HeapPointer<HeapObject> value;
 };
 
-struct Future {
-  void await(Runtime &runtime, Continuation *c) {
+struct alignas(PadObject) Future {
+  void await(Runtime &runtime, Continuation *c) const {
     HeapObject *obj = value.get();
     if (!obj || typeid(*obj) == typeid(Continuation)) {
       c->next = static_cast<Work*>(obj);
@@ -58,7 +58,7 @@ struct Future {
   PadObject *moveto(PadObject *free) { return value.moveto(free); }
 
 private:
-  HeapPointer<HeapObject> value;
+  mutable HeapPointer<HeapObject> value;
 };
 
 #endif

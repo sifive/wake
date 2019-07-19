@@ -229,12 +229,31 @@ struct alignas(PadObject) GCObject : public B {
   // redefine these if 'data' extends past sizeof(T)
   PadObject *next() { return static_cast<PadObject*>(static_cast<HeapObject*>(self() + 1)); }
   template <typename ... ARGS>
-  static T *make(Heap &h, ARGS&&... args);
+  static size_t reserve(ARGS&&... args);
+  template <typename ... ARGS>
+  static T *claim(Heap &h, ARGS&&... args); // require prior h.reserve
+  template <typename ... ARGS>
+  static T *alloc(Heap &h, ARGS&&... args);
 };
 
 template <typename T, typename B>
 template <typename ... ARGS>
-T *GCObject<T, B>::make(Heap &h, ARGS&&... args) {
+size_t GCObject<T, B>::reserve(ARGS&&... args) {
+  static_assert(sizeof(MovedObject) <= sizeof(T), "HeapObject is too small");
+  return sizeof(T)/sizeof(PadObject);
+}
+
+template <typename T, typename B>
+template <typename ... ARGS>
+T *GCObject<T, B>::claim(Heap &h, ARGS&&... args) {
+  static_assert(sizeof(MovedObject) <= sizeof(T), "HeapObject is too small");
+  return new (h.claim(sizeof(T)/sizeof(PadObject))) T { std::forward<ARGS>(args) ... };
+}
+
+template <typename T, typename B>
+template <typename ... ARGS>
+T *GCObject<T, B>::alloc(Heap &h, ARGS&&... args) {
+  static_assert(sizeof(MovedObject) <= sizeof(T), "HeapObject is too small");
   return new (h.alloc(sizeof(T)/sizeof(PadObject))) T { std::forward<ARGS>(args) ... };
 }
 
