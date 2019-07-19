@@ -54,7 +54,7 @@ struct RootRing {
   explicit RootRing(HeapObject *root_ = nullptr) : root(root_), prev(this), next(this) { }
 
   RootRing(const RootRing&) = delete;
-  RootRing& operator = (const RootRing&) = delete;
+  RootRing & operator = (const RootRing&) = delete;
 
   RootRing(RootRing &&x) {
     root = x.root;
@@ -83,7 +83,6 @@ struct RootRing {
   }
 };
 
-
 template <typename T>
 struct RootPointer {
   // construct using heap.root(ptr)
@@ -92,14 +91,14 @@ struct RootPointer {
   explicit operator bool() const { return ring.root; }
   void reset() { ring.root = nullptr; }
 
-  T* get() const { return static_cast<T*>(ring.root); }
-  T* operator -> () const { return get(); }
+  T *get() const { return static_cast<T*>(ring.root); }
+  T * operator -> () const { return get(); }
 
   template <typename Y>
-  RootPointer& operator = (HeapPointer<Y> x);
+  RootPointer & operator = (HeapPointer<Y> x);
   template <typename Y>
-  RootPointer& operator = (const RootPointer<Y> &x) { ring.root = static_cast<T*>(x.get()); return *this; }
-  RootPointer& operator = (T *x) { ring.root = x; return *this; }
+  RootPointer & operator = (const RootPointer<Y> &x) { ring.root = static_cast<T*>(x.get()); return *this; }
+  RootPointer & operator = (T *x) { ring.root = x; return *this; }
 
 private:
   RootRing ring;
@@ -116,14 +115,14 @@ struct HeapPointer {
   explicit operator bool() const { return obj; }
   void reset() { obj = nullptr; }
 
-  T* get() const { return static_cast<T*>(obj); }
-  T* operator -> () const { return get(); }
+  T *get() const { return static_cast<T*>(obj); }
+  T * operator -> () const { return get(); }
 
   template <typename Y>
-  HeapPointer& operator = (HeapPointer<Y> x) { obj = static_cast<T*>(x.get()); return *this; }
+  HeapPointer & operator = (HeapPointer<Y> x) { obj = static_cast<T*>(x.get()); return *this; }
   template <typename Y>
-  HeapPointer& operator = (const RootPointer<Y> &x) { obj = static_cast<T*>(x.get()); return *this; }
-  HeapPointer& operator = (T *x) { obj = x; return *this; }
+  HeapPointer & operator = (const RootPointer<Y> &x) { obj = static_cast<T*>(x.get()); return *this; }
+  HeapPointer & operator = (T *x) { obj = x; return *this; }
 
   PadObject *moveto(PadObject *free);
 
@@ -141,7 +140,7 @@ PadObject *HeapPointer<T>::moveto(PadObject *free) {
 
 template <typename T>
 template <typename Y>
-RootPointer<T>& RootPointer<T>::operator = (HeapPointer<Y> x) {
+RootPointer<T> &RootPointer<T>::operator = (HeapPointer<Y> x) {
   ring.root = static_cast<T*>(x.get());
   return *this;
 }
@@ -174,12 +173,23 @@ struct Heap {
   // Call this from main loop (no pointers on stack) when GCNeededException
   void GC(size_t requested_pads);
 
-  PadObject *alloc(size_t requested_pads) {
+  // Reserve enough space for a sequence of allocations
+  void reserve(size_t requested_pads) {
     if (static_cast<size_t>(end - free) < requested_pads)
       throw GCNeededException(requested_pads);
+  }
+
+  // Claim the space previously prepared by 'reserve'
+  PadObject *claim(size_t requested_pads) {
     PadObject *out = free;
     free += requested_pads;
     return out;
+  }
+
+  // Allocate memory for a single request
+  PadObject *alloc(size_t requested_pads) {
+    reserve(requested_pads);
+    return claim(requested_pads);
   }
 
   size_t used()  const { return (free - begin) * sizeof(PadObject); }
