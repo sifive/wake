@@ -20,6 +20,34 @@
 
 #include "runtime.h"
 
+struct alignas(PadObject) Promise {
+  explicit operator bool() const {
+    HeapObject *obj = value.get();
+    return obj && typeid(*obj) != typeid(Continuation);
+  }
+
+  void await(Runtime &runtime, Continuation *c) const {
+    if (*this) {
+      c->resume(runtime, value.get());
+    } else {
+      c->next = static_cast<Work*>(value.get());
+      value = c;
+    }
+  }
+
+  // Use only if the value is known to always be available
+  template <typename T>
+  T *coerce() { return static_cast<T*>(value.get()); }
+
+  // Call once only!
+  void fulfill(Runtime &runtime, HeapObject *obj);
+
+  PadObject *moveto(PadObject *free) { return value.moveto(free); }
+
+private:
+  mutable HeapPointer<HeapObject> value;
+};
+
 struct Tuple : public HeapObject {
   // Either an Expr or a Constructor
   void *meta;
@@ -27,10 +55,13 @@ struct Tuple : public HeapObject {
   Tuple(void *meta_) : meta(meta_) { }
 
   virtual size_t size() const = 0;
-  virtual Future & operator [] (size_t i) = 0;
-  const virtual Future & operator [] (size_t i) const = 0;
+  virtual Promise & operator [] (size_t i) = 0;
+  const virtual Promise & operator [] (size_t i) const = 0;
 
-  static size_t reserve(void *meta, size_t size);
+  static const size_t fulfiller_pads;
+  virtual Continuation *claim_fulfiller(Runtime &r, size_t i) = 0;
+
+  static size_t reserve(size_t size);
   static Tuple *claim(Heap &h, void *meta, size_t size); // requires prior h.reserve
   static Tuple *alloc(Heap &h, void *meta, size_t size);
 };

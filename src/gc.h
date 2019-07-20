@@ -42,6 +42,8 @@ struct HeapObject {
   virtual Placement descend(PadObject *free) = 0;
   virtual ~HeapObject();
 
+  PadObject *recurse(PadObject *free) { return free; }
+
   // this overload causes non-placement 'new' to become illegal (which we want)
   void *operator new(size_t size, void *free) { return free; }
 };
@@ -211,9 +213,6 @@ private:
 
 template <typename T, typename B = HeapObject>
 struct alignas(PadObject) GCObject : public B {
-  typedef GCObject<T, B> Parent;
-  typedef B GrandParent;
-
   template <typename ... ARGS>
   GCObject(ARGS&&... args) : B(std::forward<ARGS>(args) ... ) { }
 
@@ -227,12 +226,11 @@ struct alignas(PadObject) GCObject : public B {
   Placement moveto(PadObject *free) final override;
 
   // redefine this if object includes HeapPointers
-  Placement descend(PadObject *free) override;
+  Placement descend(PadObject *free) final override;
 
   // redefine these if 'data' extends past sizeof(T)
   PadObject *next() { return static_cast<PadObject*>(static_cast<HeapObject*>(self() + 1)); }
-  template <typename ... ARGS>
-  static size_t reserve(ARGS&&... args);
+  static size_t reserve();
   template <typename ... ARGS>
   static T *claim(Heap &h, ARGS&&... args); // require prior h.reserve
   template <typename ... ARGS>
@@ -240,8 +238,7 @@ struct alignas(PadObject) GCObject : public B {
 };
 
 template <typename T, typename B>
-template <typename ... ARGS>
-size_t GCObject<T, B>::reserve(ARGS&&... args) {
+size_t GCObject<T, B>::reserve() {
   static_assert(sizeof(MovedObject) <= sizeof(T), "HeapObject is too small");
   return sizeof(T)/sizeof(PadObject);
 }
@@ -274,7 +271,7 @@ Placement GCObject<T, B>::moveto(PadObject *free) {
 
 template <typename T, typename B>
 Placement GCObject<T, B>::descend(PadObject *free) {
-  return Placement(self()->next(), free);
+  return Placement(self()->next(), self()->recurse(free));
 }
 
 #endif

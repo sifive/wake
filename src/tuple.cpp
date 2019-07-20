@@ -17,114 +17,156 @@
 
 #include "tuple.h"
 
+void Promise::fulfill(Runtime &runtime, HeapObject *obj) {
+  if (value) {
+    Continuation *c = static_cast<Continuation*>(value.get());
+    while (c->next) {
+      c->value = obj;
+      c = static_cast<Continuation*>(c->next.get());
+    }
+    c->value = obj;
+    c->next = runtime.stack;
+    runtime.stack = value;
+  }
+  value = obj;
+}
+
+struct FulFiller final : public GCObject<FulFiller, Continuation> {
+  HeapPointer<Tuple> tuple;
+  size_t i;
+
+  FulFiller(Tuple *tuple_, size_t i_) : tuple(tuple_), i(i_) { }
+
+  PadObject *recurse(PadObject *free) {
+    free = Continuation::recurse(free);
+    free = tuple.moveto(free);
+    return free;
+  }
+
+  void execute(Runtime &runtime) {
+    (*tuple.get())[i].fulfill(runtime, value.get());
+  }
+};
+
 struct BigTuple final : public GCObject<BigTuple, Tuple> {
+  typedef GCObject<BigTuple, Tuple> Parent;
+
   size_t tsize;
 
-  Future *at(size_t i);
-  const Future *at(size_t i) const;
+  Promise *at(size_t i);
+  const Promise *at(size_t i) const;
 
   BigTuple(void *meta, size_t size_);
   BigTuple(const BigTuple &b);
 
   PadObject *next();
-  Placement descend(PadObject *free) override;
+  PadObject *recurse(PadObject *free);
 
   size_t size() const override;
-  Future & operator [] (size_t i) override;
-  const Future & operator [] (size_t i) const override;
+  Promise & operator [] (size_t i) override;
+  const Promise & operator [] (size_t i) const override;
+
+  Continuation *claim_fulfiller(Runtime &r, size_t i) override;
 };
 
-Future *BigTuple::at(size_t i) {
-  return static_cast<Future*>(data()) + i;
+Promise *BigTuple::at(size_t i) {
+  return static_cast<Promise*>(data()) + i;
 }
 
-const Future *BigTuple::at(size_t i) const {
-  return static_cast<const Future*>(data()) + i;
+const Promise *BigTuple::at(size_t i) const {
+  return static_cast<const Promise*>(data()) + i;
 }
 
 BigTuple::BigTuple(void *meta, size_t size_) : GCObject<BigTuple, Tuple>(meta), tsize(size_) {
   for (size_t i = 0; i < size_; ++i)
-    new (at(i)) Future();
+    new (at(i)) Promise();
 }
 
 BigTuple::BigTuple(const BigTuple &b) : GCObject<BigTuple, Tuple>(b), tsize(b.tsize) {
   for (size_t i = 0; i < tsize; ++i)
-    new (at(i)) Future(*b.at(i));
+    new (at(i)) Promise(*b.at(i));
 }
 
 PadObject *BigTuple::next() {
-  return Parent::next() + size() * (sizeof(Future)/sizeof(PadObject));
+  return Parent::next() + size() * (sizeof(Promise)/sizeof(PadObject));
 }
 
-Placement BigTuple::descend(PadObject *free) {
-  size_t lim = size();
-  for (size_t i = 0; i < lim; ++i)
+PadObject *BigTuple::recurse(PadObject *free) {
+  free = Parent::recurse(free);
+  for (size_t i = 0; i < tsize; ++i)
     free = (*this)[i].moveto(free);
-  return Placement(next(), free);
+  return free;
 }
 
 size_t BigTuple::size() const {
   return tsize;
 }
 
-Future & BigTuple::operator [] (size_t i) {
+Promise & BigTuple::operator [] (size_t i) {
   return *at(i);
 }
 
-const Future & BigTuple::operator [] (size_t i) const {
+const Promise & BigTuple::operator [] (size_t i) const {
   return *at(i);
+}
+
+Continuation *BigTuple::claim_fulfiller(Runtime &r, size_t i) {
+  return new (r.heap.claim(fulfiller_pads)) FulFiller(this, i);
 }
 
 template <size_t tsize>
 struct SmallTuple final : public GCObject<SmallTuple<tsize>, Tuple> {
   typedef GCObject<SmallTuple<tsize>, Tuple> Parent;
 
-  Future *at(size_t i);
-  const Future *at(size_t i) const;
+  Promise *at(size_t i);
+  const Promise *at(size_t i) const;
 
   SmallTuple(void *meta);
   SmallTuple(const SmallTuple &b);
 
   PadObject *next();
-  Placement descend(PadObject *free) override;
+  PadObject *recurse(PadObject *free);
 
   size_t size() const override;
-  Future & operator [] (size_t i) override;
-  const Future & operator [] (size_t i) const override;
+  Promise & operator [] (size_t i) override;
+  const Promise & operator [] (size_t i) const override;
+
+  Continuation *claim_fulfiller(Runtime &r, size_t i) override;
 };
 
 template <size_t tsize>
-Future *SmallTuple<tsize>::at(size_t i) {
-  return static_cast<Future*>(Parent::data()) + i;
+Promise *SmallTuple<tsize>::at(size_t i) {
+  return static_cast<Promise*>(Parent::data()) + i;
 }
 
 template <size_t tsize>
-const Future *SmallTuple<tsize>::at(size_t i) const {
-  return static_cast<const Future*>(Parent::data()) + i;
+const Promise *SmallTuple<tsize>::at(size_t i) const {
+  return static_cast<const Promise*>(Parent::data()) + i;
 }
 
 template <size_t tsize>
 SmallTuple<tsize>::SmallTuple(void *meta) : GCObject<SmallTuple<tsize>, Tuple>(meta) {
   for (size_t i = 0; i < tsize; ++i)
-    new (at(i)) Future();
+    new (at(i)) Promise();
 }
 
 template <size_t tsize>
 SmallTuple<tsize>::SmallTuple(const SmallTuple &b) : GCObject<SmallTuple<tsize>, Tuple>(b) {
   for (size_t i = 0; i < tsize; ++i)
-    new (at(i)) Future(*b.at(i));
+    new (at(i)) Promise(*b.at(i));
 }
 
 template <size_t tsize>
 PadObject *SmallTuple<tsize>::next() {
-  return Parent::next() + tsize * (sizeof(Future)/sizeof(PadObject));
+  return Parent::next() + tsize * (sizeof(Promise)/sizeof(PadObject));
 }
 
 template <size_t tsize>
-Placement SmallTuple<tsize>::descend(PadObject *free) {
+PadObject *SmallTuple<tsize>::recurse(PadObject *free) {
+  free = Parent::recurse(free);
   for (size_t i = 0; i < tsize; ++i)
     free = (*this)[i].moveto(free);
-  return Placement(next(), free);
+  return free;
 }
 
 template <size_t tsize>
@@ -133,30 +175,37 @@ size_t SmallTuple<tsize>::size() const {
 }
 
 template <size_t tsize>
-Future & SmallTuple<tsize>::operator [] (size_t i) {
+Promise & SmallTuple<tsize>::operator [] (size_t i) {
   return *at(i);
 }
 
 template <size_t tsize>
-const Future & SmallTuple<tsize>::operator [] (size_t i) const {
+const Promise & SmallTuple<tsize>::operator [] (size_t i) const {
   return *at(i);
 }
 
-size_t Tuple::reserve(void *meta, size_t size) {
+template <size_t tsize>
+Continuation *SmallTuple<tsize>::claim_fulfiller(Runtime &r, size_t i) {
+  return new (r.heap.claim(Tuple::fulfiller_pads)) FulFiller(this, i);
+}
+
+const size_t Tuple::fulfiller_pads = sizeof(FulFiller)/sizeof(PadObject);
+
+size_t Tuple::reserve(size_t size) {
   bool big = size > 4;
   if (big) {
-    return sizeof(BigTuple)/sizeof(PadObject) + size * (sizeof(Future)/sizeof(PadObject));
+    return sizeof(BigTuple)/sizeof(PadObject) + size * (sizeof(Promise)/sizeof(PadObject));
   } else {
-    return sizeof(SmallTuple<0>)/sizeof(PadObject) + size * (sizeof(Future)/sizeof(PadObject));
+    return sizeof(SmallTuple<0>)/sizeof(PadObject) + size * (sizeof(Promise)/sizeof(PadObject));
   }
 }
 
 Tuple *Tuple::claim(Heap &h, void *meta, size_t size) {
   bool big = size > 4;
   if (big) {
-    return new (h.claim(reserve(meta, size))) BigTuple(meta, size);
+    return new (h.claim(reserve(size))) BigTuple(meta, size);
   } else {
-    PadObject *dest = h.claim(reserve(meta, size));
+    PadObject *dest = h.claim(reserve(size));
     switch (size) {
       case 0:  return new (dest) SmallTuple<0>(meta);
       case 1:  return new (dest) SmallTuple<1>(meta);
@@ -168,6 +217,6 @@ Tuple *Tuple::claim(Heap &h, void *meta, size_t size) {
 }
 
 Tuple *Tuple::alloc(Heap &h, void *meta, size_t size) {
-  h.reserve(reserve(meta, size));
+  h.reserve(reserve(size));
   return claim(h, meta, size);
 }

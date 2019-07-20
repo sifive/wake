@@ -20,45 +20,46 @@
 
 #include "gc.h"
 
-struct Work;
+struct Runtime;
+
+struct Work : public HeapObject {
+  HeapPointer<Work> next;
+
+  virtual void execute(Runtime &runtime) = 0;
+
+  PadObject *recurse(PadObject *free) {
+    free = HeapObject::recurse(free);
+    free = next.moveto(free);
+    return free;
+  }
+};
 
 struct Runtime {
   Heap heap;
   RootPointer<Work> stack;
 
   Runtime();
-  void execute();
-};
+  void run();
 
-struct Work : public HeapObject {
-  HeapPointer<Work> next;
-  virtual void execute(Runtime &runtime) = 0;
+  void schedule(Work *work) {
+    work->next = stack;
+    stack = work;
+  }
 };
 
 struct Continuation : public Work {
   HeapPointer<HeapObject> value;
-};
 
-struct alignas(PadObject) Future {
-  void await(Runtime &runtime, Continuation *c) const {
-    HeapObject *obj = value.get();
-    if (!obj || typeid(*obj) == typeid(Continuation)) {
-      c->next = static_cast<Work*>(obj);
-      value = c;
-    } else {
-      c->value = value;
-      c->next = runtime.stack;
-      runtime.stack = c;
-    }
+  void resume(Runtime &runtime, HeapObject *obj) {
+    value = obj;
+    runtime.schedule(this);
   }
 
-  // Call once only!
-  void fill(Runtime &runtime, HeapObject *obj);
-
-  PadObject *moveto(PadObject *free) { return value.moveto(free); }
-
-private:
-  mutable HeapPointer<HeapObject> value;
+  PadObject *recurse(PadObject *free) {
+    free = Work::recurse(free);
+    free = value.moveto(free);
+    return free;
+  }
 };
 
 #endif
