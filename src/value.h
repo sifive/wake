@@ -18,15 +18,14 @@
 #ifndef VALUE_H
 #define VALUE_H
 
-#include "hash.h"
+#include "gc.h"
 #include "type.h"
 #include <string>
 #include <memory>
 #include <vector>
-#include <cstdint>
-#include <iosfwd>
 #include <limits>
 #include <gmp.h>
+#include <stdlib.h>
 #include <re2/re2.h>
 
 #define APP_PRECEDENCE 22
@@ -34,16 +33,13 @@
 /* Values */
 
 struct Lambda;
-struct Binding;
-struct Location;
-struct WorkQueue;
-struct Value;
+struct Tuple;
 
 struct FormatEntry {
-  const Value *value;
+  const HeapObject *value;
   int precedence;
   int state;
-  FormatEntry(const Value *value_ = nullptr, int precedence_ = 0, int state_ = 0)
+  FormatEntry(const HeapObject *value_ = nullptr, int precedence_ = 0, int state_ = 0)
    : value(value_), precedence(precedence_), state(state_) { }
 };
 
@@ -53,109 +49,126 @@ struct FormatState {
   bool detailed;
   int indent; // -1 -> single-line
   void resume();
-  void child(const Value *value, int precedence);
+  void child(const HeapObject *value, int precedence);
   int get() const { return current.state; }
   int p() const { return current.precedence; }
 };
 
-struct Value {
-  const TypeDescriptor *type;
+struct String final : public GCObject<String> {
+  typedef GCObject<String> Parent;
 
-  Value(const TypeDescriptor *type_) : type(type_) { }
-  virtual ~Value();
-
-  std::string to_str() const; // one-line version
-  static void format(std::ostream &os, const Value *value, bool detailed = false, int indent = -1);
-
-  virtual void format(std::ostream &os, FormatState &state) const = 0;
-  virtual TypeVar &getType() = 0;
-  virtual Hash hash() const = 0;
-};
-
-inline std::ostream & operator << (std::ostream &os, const Value *value) {
-  Value::format(os, value);
-  return os;
-}
-
-struct String : public Value {
-  std::string value;
-
-  static const TypeDescriptor type;
   static TypeVar typeVar;
-  String(const std::string &value_) : Value(&type), value(value_) { value.shrink_to_fit(); }
-  String(std::string &&value_) : Value(&type), value(std::move(value_)) { value.shrink_to_fit(); }
+  size_t length;
 
-  void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
+  String(size_t length_);
+  String(const String &s);
+
+  const char *c_str() const { return static_cast<const char*>(data()); }
+  char *c_str() { return static_cast<char*>(data()); }
+
+  void format(std::ostream &os, FormatState &state) const override;
+  PadObject *next();
+
+  static size_t reserve(size_t length);
+  static String *claim(Heap &h, size_t length);
+  static String *alloc(Heap &h, size_t length);
+
+  // Never call this during runtime! It can invalidate the heap.
+  static RootPointer<String> literal(Heap &h, const std::string &value);
 };
 
-struct Integer : public Value {
+// An exception-safe wrapper for mpz_t
+struct MPZ {
   mpz_t value;
+  MPZ() { mpz_init(value); }
+  MPZ(long v) { mpz_init_set_si(value, v); }
+  MPZ(const std::string &v) { mpz_init_set_str(value, v.c_str(), 0); }
+  ~MPZ() { mpz_clear(value); }
+  MPZ(const MPZ& x) = delete;
+  MPZ& operator = (const MPZ& x) = delete;
+};
 
-  static const TypeDescriptor type;
+struct Integer final : public GCObject<Integer> {
+  typedef GCObject<Integer> Parent;
+
   static TypeVar typeVar;
-  Integer(const char *value_) : Value(&type) { mpz_init_set_str(value, value_, 0); }
-  Integer(long value_) : Value(&type) { mpz_init_set_si(value, value_); }
-  Integer() : Value(&type) { mpz_init(value); }
-  ~Integer();
+  int length; // abs(length) = number of mp_limb_t in object
+
+  Integer(int length_);
+  Integer(const Integer &i);
 
   std::string str(int base = 10) const;
-  void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
+  void format(std::ostream &os, FormatState &state) const override;
+  PadObject *next();
+
+  static size_t reserve(const MPZ &mpz);
+  static Integer *claim(Heap &h, const MPZ& mpz);
+  static Integer *alloc(Heap &h, const MPZ& mpz);
+
+  // create a fake mpz_t out of the heap object
+  const __mpz_struct wrap() const {
+    __mpz_struct out;
+    out._mp_size = length;
+    out._mp_alloc = abs(length);
+    out._mp_d = static_cast<mp_limb_t*>(const_cast<void*>(data()));
+    return out;
+  }
+
+  // Never call this during runtime! It can invalidate the heap.
+  static RootPointer<Integer> literal(Heap &h, const std::string &str);
 };
 
 #define FIXED 0
 #define SCIENTIFIC 1
 #define HEXFLOAT 2
 #define DEFAULTFLOAT 3
-struct Double : public Value {
+struct Double final : public GCObject<Double> {
   typedef std::numeric_limits< double > limits;
+
+  static TypeVar typeVar;
   double value;
 
-  static const TypeDescriptor type;
-  static TypeVar typeVar;
-
-  Double(double value_ = 0) : Value(&type), value(value_) { }
-  Double(const char *str);
+  Double(double value_ = 0) : value(value_) { }
+  Double(const char *str) { char *end; value = strtod(str, &end); }
 
   std::string str(int format = DEFAULTFLOAT, int precision = limits::max_digits10) const;
   void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
+
+  // Never call this during runtime! It can invalidate the heap.
+  static RootPointer<Double> literal(Heap &h, const char *str);
 };
 
-struct RegExp : public Value {
-  RE2 exp;
-  static const TypeDescriptor type;
+struct RegExp final : public GCObject<RegExp, DestroyableObject> {
+  typedef GCObject<RegExp, DestroyableObject> Parent;
+
   static TypeVar typeVar;
-  RegExp(const std::string &regexp, const RE2::Options &opts);
-  RegExp(const std::string &regexp);
+  std::shared_ptr<RE2> exp;
+
+  RegExp(Heap &h, const std::string &regexp, const RE2::Options &opts);
+  RegExp(Heap &h, const std::string &regexp);
 
   void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
+
+  // Never call this during runtime! It can invalidate the heap.
+  static RootPointer<RegExp> literal(Heap &h, const std::string &value);
 };
 
-struct Closure : public Value {
+struct Closure final : public GCObject<Closure, HeapObject> {
+  static TypeVar typeVar;
   Lambda *lambda;
-  std::shared_ptr<Binding> binding;
+  HeapPointer<Tuple> scope;
 
-  static const TypeDescriptor type;
-  static TypeVar typeVar;
-  Closure(Lambda *lambda_, const std::shared_ptr<Binding> &binding_) : Value(&type), lambda(lambda_), binding(binding_) { }
-  void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
+  Closure(Lambda *lambda_, Tuple *scope_);
+  void format(std::ostream &os, FormatState &state) const override;
+
+  PadObject *recurse(PadObject *free) {
+    free = HeapObject::recurse(free);
+    free = scope.moveto(free);
+    return free;
+  }
 };
 
-struct Constructor;
-struct Data : public Value {
-  Constructor *cons;
-  std::shared_ptr<Binding> binding;
-
-  static const TypeDescriptor type;
+struct Data {
   static TypeVar typeBoolean;
   static TypeVar typeOrder;
   static TypeVar typeUnit;
@@ -165,10 +178,6 @@ struct Data : public Value {
   static const TypeVar typeList;
   static const TypeVar typePair;
   static const TypeVar typeResult;
-  Data(Constructor *cons_, std::shared_ptr<Binding> &&binding_) : Value(&type), cons(cons_), binding(std::move(binding_)) { }
-  void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
 };
 
 #endif

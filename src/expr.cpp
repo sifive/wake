@@ -41,11 +41,8 @@ const TypeDescriptor Top       ::type("Top");
 const TypeDescriptor VarDef    ::type("VarDef");
 const TypeDescriptor VarArg    ::type("VarArg");
 
-Literal::Literal(const Location &location_, std::shared_ptr<Value> &&value_)
+Literal::Literal(const Location &location_, RootPointer<HeapObject> &&value_)
  : Expr(&type, location_), value(std::move(value_)) { }
-
-Literal::Literal(const Location &location_, const char *value_)
- : Expr(&type, location_), value(std::make_shared<String>(value_)) { }
 
 static std::string pad(int depth) {
   return std::string(depth, ' ');

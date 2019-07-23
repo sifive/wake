@@ -88,7 +88,7 @@ BigTuple::BigTuple(const BigTuple &b) : GCObject<BigTuple, Tuple>(b), tsize(b.ts
 }
 
 PadObject *BigTuple::next() {
-  return Parent::next() + size() * (sizeof(Promise)/sizeof(PadObject));
+  return Parent::next() + tsize * (sizeof(Promise)/sizeof(PadObject));
 }
 
 PadObject *BigTuple::recurse(PadObject *free) {

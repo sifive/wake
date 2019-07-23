@@ -38,6 +38,8 @@ struct alignas(PadObject) Promise {
   // Use only if the value is known to always be available
   template <typename T>
   T *coerce() { return static_cast<T*>(value.get()); }
+  template <typename T>
+  const T *coerce() const { return static_cast<const T*>(value.get()); }
 
   // Call once only!
   void fulfill(Runtime &runtime, HeapObject *obj);

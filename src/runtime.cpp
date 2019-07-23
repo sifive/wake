@@ -18,6 +18,9 @@
 #include "runtime.h"
 #include "tuple.h"
 #include "expr.h"
+#include "value.h"
+
+Closure::Closure(Lambda *lambda_, Tuple *scope_) : lambda(lambda_), scope(scope_) { }
 
 void Work::format(std::ostream &os, FormatState &state) const {
   assert (0 /* unreachable */);
@@ -61,27 +64,8 @@ struct Interpret final : public GCObject<Interpret, Work> {
   }
 };
 
-struct FClosure final : public GCObject<FClosure, HeapObject> {
-  Lambda *lambda;
-  HeapPointer<Tuple> scope;
-
-  FClosure(Lambda *lambda_, Tuple *scope_)
-   : lambda(lambda_), scope(scope_) { }
-  void format(std::ostream &os, FormatState &state) const override;
-
-  PadObject *recurse(PadObject *free) {
-    free = HeapObject::recurse(free);
-    free = scope.moveto(free);
-    return free;
-  }
-};
-
-void FClosure::format(std::ostream &os, FormatState &state) const {
-  os << "<" << lambda->location.file() << ">";
-}
-
 void Lambda::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
-  cont->resume(runtime, FClosure::alloc(runtime.heap, this, scope));
+  cont->resume(runtime, Closure::alloc(runtime.heap, this, scope));
 }
 
 void VarRef::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
@@ -90,7 +74,7 @@ void VarRef::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
   int vals = scope->size() - 1;
   if (offset >= vals) {
     auto defs = static_cast<DefBinding*>(scope->meta);
-    cont->resume(runtime, FClosure::alloc(runtime.heap,
+    cont->resume(runtime, Closure::alloc(runtime.heap,
       defs->fun[offset-vals].get(), scope));
   } else {
     (*scope)[offset+1].await(runtime, cont);
@@ -111,7 +95,7 @@ struct FApp final : public GCObject<FApp, Continuation> {
   }
 
   void execute(Runtime &runtime) override {
-    auto clo = static_cast<FClosure*>(value.get());
+    auto clo = static_cast<Closure*>(value.get());
     bind->meta = clo->lambda;
     (*bind.get())[0].fulfill(runtime, clo->scope.get());
     runtime.schedule(Interpret::alloc(runtime.heap,
@@ -144,8 +128,7 @@ void DefBinding::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
 }
 
 void Literal::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
-  // !!! TODO
-  // cont->resume(runtime, root.get());
+  cont->resume(runtime, value.get());
 }
 
 void Prim::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
@@ -189,7 +172,7 @@ struct SelectDestructor final : public GCObject<SelectDestructor, Continuation> 
     for (int index = des->sum.members.size() - cons->index; index; --index)
       scope = (*scope.get())[0].coerce<Tuple>();
     // This coercion is safe because we evaluate pure lambda args before their consumer
-    auto closure = (*scope.get())[1].coerce<FClosure>();
+    auto closure = (*scope.get())[1].coerce<Closure>();
     auto body = closure->lambda->body.get();
     auto scope = closure->scope.get();
     // !!! avoid pointless copying; have handlers directly accept the tuple and use a DefMap:argX = atX tuple

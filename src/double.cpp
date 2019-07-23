@@ -23,11 +23,6 @@
 #include <cstdlib>
 #include <gmp.h>
 
-Double::Double(const char *str) : Value(&type) {
-  char *end;
-  value = strtod(str, &end);
-}
-
 static PRIMTYPE(type_unop) {
   return args.size() == 1 &&
     args[0]->unify(Double::typeVar) &&

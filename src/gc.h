@@ -21,6 +21,7 @@
 #include <memory>
 #include <ostream>
 #include <stdint.h>
+#include "hash.h"
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 8)
 #define alignas(x)
@@ -46,11 +47,20 @@ struct HeapObject {
   virtual void format(std::ostream &os, FormatState &state) const = 0;
   virtual ~HeapObject();
 
+  static void format(std::ostream &os, const HeapObject *value, bool detailed = false, int indent = -1);
+  std::string to_str() const;
+  Hash hash() const;
+
   PadObject *recurse(PadObject *free) { return free; }
 
   // this overload causes non-placement 'new' to become illegal (which we want)
   void *operator new(size_t size, void *free) { return free; }
 };
+
+inline std::ostream & operator << (std::ostream &os, const HeapObject *value) {
+  HeapObject::format(os, value);
+  return os;
+}
 
 struct RootRing {
   HeapObject *root;
@@ -93,6 +103,8 @@ template <typename T>
 struct RootPointer {
   // construct using heap.root(ptr)
   RootPointer(RootRing &o, HeapObject *obj) : ring(o, obj) { }
+  template <typename Y>
+  RootPointer(RootPointer<Y> &&r) : ring(std::move(r.ring)) { ring.root = static_cast<T*>(r.get()); }
 
   explicit operator bool() const { return ring.root; }
   void reset() { ring.root = nullptr; }
@@ -108,6 +120,8 @@ struct RootPointer {
 
 private:
   RootRing ring;
+  template <typename Y>
+  friend struct RootPointer;
 };
 
 template <typename T>

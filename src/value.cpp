@@ -23,31 +23,21 @@
 #include "symbol.h"
 #include "status.h"
 #include "sfinae.h"
+#include "tuple.h"
 #include <sstream>
 #include <cassert>
 #include <algorithm>
-
-Value::~Value() { }
-const TypeDescriptor String ::type("String");
-const TypeDescriptor Integer::type("Integer");
-const TypeDescriptor Double ::type("Double");
-const TypeDescriptor RegExp ::type("RegExp");
-const TypeDescriptor Closure::type("Closure");
-const TypeDescriptor Data   ::type("Data");
+#include <string.h>
 
 void FormatState::resume() {
   stack.emplace_back(current.value, current.precedence, current.state+1);
 }
 
-void FormatState::child(const Value *value, int precedence) {
+void FormatState::child(const HeapObject *value, int precedence) {
   stack.emplace_back(value, precedence, 0);
 }
 
-Integer::~Integer() {
-  mpz_clear(value);
-}
-
-void Value::format(std::ostream &os, const Value *value, bool detailed, int indent) {
+void HeapObject::format(std::ostream &os, const HeapObject *value, bool detailed, int indent) {
   FormatState state;
   state.detailed = detailed;
   state.indent = indent;
@@ -63,15 +53,53 @@ void Value::format(std::ostream &os, const Value *value, bool detailed, int inde
   }
 }
 
-std::string Value::to_str() const {
+std::string HeapObject::to_str() const {
   std::stringstream str;
   str << this;
   return str.str();
 }
 
-void String::format(std::ostream &os, FormatState &state) const {
-  os << "\"";
-  for (char ch : value) switch (ch) {
+TypeVar String::typeVar("String", 0);
+
+PadObject *String::next() {
+  return Parent::next() + 1 + length/sizeof(PadObject);
+}
+
+String::String(size_t length_) : length(length_) { }
+
+String::String(const String &s) : length(s.length) {
+  memcpy(data(), s.data(), length+1);
+}
+
+size_t String::reserve(size_t length) {
+  return sizeof(String)/sizeof(PadObject) + 1 + length/sizeof(PadObject);
+}
+
+String *String::claim(Heap &h, size_t length) {
+  return new (h.claim(reserve(length))) String(length);
+}
+
+String *String::alloc(Heap &h, size_t length) {
+  return new (h.alloc(reserve(length))) String(length);
+}
+
+RootPointer<String> String::literal(Heap &h, const std::string &value) {
+  String *out;
+  while (true) {
+    try {
+      out = alloc(h, value.size());
+      break;
+    } catch (GCNeededException gc) {
+      h.GC(gc.needed);
+    }
+  }
+  memcpy(out->data(), value.c_str(), value.size()+1);
+  return h.root(out);
+}
+
+static void cstr_format(std::ostream &os, const char *s, size_t len) {
+  const char *e = s + len;
+  for (const char *i = s; i != e; ++i) switch (char ch = *i) {
     case '"': os << "\\\""; break;
     case '\\': os << "\\\\"; break;
     case '{': os << "\\{"; break;
@@ -99,16 +127,112 @@ void String::format(std::ostream &os, FormatState &state) const {
       break;
     }
   }
+}
+
+void String::format(std::ostream &os, FormatState &state) const {
   os << "\"";
+  cstr_format(os, c_str(), length);
+  os << "\"";
+}
+
+TypeVar Integer::typeVar("Integer", 0);
+
+PadObject *Integer::next() {
+  return Parent::next() + (abs(length)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject);
+}
+
+Integer::Integer(int length_) : length(length_) { }
+
+Integer::Integer(const Integer &i) : length(i.length) {
+  memcpy(data(), i.data(), length * sizeof(mp_limb_t));
+}
+
+size_t Integer::reserve(const MPZ &mpz) {
+  return sizeof(Integer)/sizeof(PadObject) + (abs(mpz.value[0]._mp_size)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject);
+}
+
+Integer *Integer::claim(Heap &h, const MPZ &mpz) {
+  Integer *out = new (h.claim(reserve(mpz))) Integer(mpz.value[0]._mp_size);
+  memcpy(out->data(), mpz.value[0]._mp_d, sizeof(mp_limb_t)*abs(out->length));
+  return out;
+}
+
+Integer *Integer::alloc(Heap &h, const MPZ &mpz) {
+  Integer *out = new (h.alloc(reserve(mpz))) Integer(mpz.value[0]._mp_size);
+  memcpy(out->data(), mpz.value[0]._mp_d, sizeof(mp_limb_t)*abs(out->length));
+  return out;
+}
+
+RootPointer<Integer> Integer::literal(Heap &h, const std::string &value) {
+  Integer *out;
+  MPZ mpz(value);
+  while (true) {
+    try {
+      out = alloc(h, mpz);
+      break;
+    } catch (GCNeededException gc) {
+      h.GC(gc.needed);
+    }
+  }
+  return h.root(out);
+}
+
+std::string Integer::str(int base) const {
+  mpz_t value = { wrap() };
+  char buffer[mpz_sizeinbase(value, base) + 2];
+  mpz_get_str(buffer, base, value);
+  return buffer;
 }
 
 void Integer::format(std::ostream &os, FormatState &state) const {
   os << str();
 }
 
+TypeVar Double::typeVar("Double", 0);
+
+RootPointer<Double> Double::literal(Heap &h, const char *str) {
+  Double *out;
+  while (true) {
+    try {
+      out = alloc(h, str);
+      break;
+    } catch (GCNeededException gc) {
+      h.GC(gc.needed);
+    }
+  }
+  return h.root(out);
+}
+
 void Double::format(std::ostream &os, FormatState &state) const {
   os << str();
 }
+
+std::string Double::str(int format, int precision) const {
+  std::stringstream s;
+  char buf[80];
+  s.precision(precision);
+  switch (format) {
+    case FIXED:      s << std::fixed      << value; break;
+    case SCIENTIFIC: s << std::scientific << value; break;
+    // std::hexfloat is not available pre g++ 5.1
+    case HEXFLOAT:   snprintf(buf, sizeof(buf), "%.*a", precision, value); s << buf; break;
+    default: if (value < 0.1 && value > -0.1) s << std::scientific; s << value; break;
+  }
+  if (format == DEFAULTFLOAT) {
+    std::string out = s.str();
+    if (out.find('.') == std::string::npos &&
+        out.find('e') == std::string::npos &&
+        (out[0] == '-' ? out[1] >= '0' && out[1] <= '9'
+                       : out[0] >= '0' && out[0] <= '9')) {
+      s << "e0";
+    } else {
+      return out;
+    }
+  }
+  return s.str();
+}
+
+TypeVar RegExp::typeVar("RegExp", 0);
 
 // Unfortunately, re2 does not define a VERSION macro.
 TEST_MEMBER(set_dot_nl);
@@ -135,43 +259,48 @@ static const RE2::Options &defops(RE2::Options &&options) {
   return options;
 }
 
-RegExp::RegExp(const std::string &regexp, const RE2::Options &opts)
- : Value(&type),
-   exp(
+RegExp::RegExp(Heap &h, const std::string &regexp, const RE2::Options &opts)
+ : Parent(h), exp(std::make_shared<RE2>(
      has_set_dot_nl<RE2::Options>::value
      ? re2::StringPiece(regexp)
      : re2::StringPiece("(?s)" + regexp),
-     opts) { }
-RegExp::RegExp(const std::string &regexp)
- : RegExp(regexp, defops(RE2::Options())) { }
+     opts)) { }
+
+RegExp::RegExp(Heap &h, const std::string &regexp)
+ : RegExp(h, regexp, defops(RE2::Options())) { }
 
 void RegExp::format(std::ostream &os, FormatState &state) const {
   if (APP_PRECEDENCE < state.p()) os << "(";
-  os << "RegExp ";
-  String(exp.pattern()).format(os, state);
+  os << "RegExp `";
+  auto p = exp->pattern();
+  cstr_format(os, p.c_str(), p.size());
+  os << "`";
   if (APP_PRECEDENCE < state.p()) os << ")";
 }
 
-void Closure::format(std::ostream &os, FormatState &state) const {
-  os << "<" << lambda->location.file() << ">";
-  // !!! if (state.detailed) print referenced variables only
-}
-
-void Data::format(std::ostream &os, FormatState &state) const {
-  const std::string &name = cons->ast.name;
-
-  const Value* child = 0;
-  int index = cons->ast.args.size() - 1 - state.get();
-  if (index >= 0) {
-    for (const Binding *iter = binding.get(); iter; iter = iter->next.get()) {
-      if (index >= iter->nargs) {
-        index -= iter->nargs;
-      } else {
-        child = iter->future[iter->nargs-1-index].value.get();
-        break;
-      }
+RootPointer<RegExp> RegExp::literal(Heap &h, const std::string &value) {
+  RegExp *out;
+  while (true) {
+    try {
+      out = alloc(h, h, value);
+      break;
+    } catch (GCNeededException gc) {
+      h.GC(gc.needed);
     }
   }
+  return h.root(out);
+}
+
+TypeVar Closure::typeVar("Closure", 0);
+
+void Closure::format(std::ostream &os, FormatState &state) const {
+  os << "<" << lambda->location.file() << ">";
+}
+
+void Tuple::format(std::ostream &os, FormatState &state) const {
+  const HeapObject* child = (state.get() < size()) ? (*this)[state.get()].coerce<HeapObject>() : nullptr;
+  auto cons = static_cast<Constructor*>(meta);
+  const std::string &name = cons->ast.name;
 
   if (name.compare(0, 7, "binary ") == 0) {
     op_type q = op_precedence(name.c_str() + 7);
@@ -219,84 +348,6 @@ void Data::format(std::ostream &os, FormatState &state) const {
   }
 }
 
-TypeVar String::typeVar("String", 0);
-TypeVar &String::getType() {
-  return typeVar;
-}
-
-Hash String::hash() const {
-  return Hash(value) + type.hashcode;
-}
-
-TypeVar Integer::typeVar("Integer", 0);
-TypeVar &Integer::getType() {
-  return typeVar;
-}
-
-Hash Integer::hash() const {
-  return Hash(value[0]._mp_d, abs(value[0]._mp_size)*sizeof(mp_limb_t)) + type.hashcode;
-}
-
-TypeVar Double::typeVar("Double", 0);
-TypeVar &Double::getType() {
-  return typeVar;
-}
-
-std::string Double::str(int format, int precision) const {
-  std::stringstream s;
-  char buf[80];
-  s.precision(precision);
-  switch (format) {
-    case FIXED:      s << std::fixed      << value; break;
-    case SCIENTIFIC: s << std::scientific << value; break;
-    // std::hexfloat is not available pre g++ 5.1
-    case HEXFLOAT:   snprintf(buf, sizeof(buf), "%.*a", precision, value); s << buf; break;
-    default: if (value < 0.1 && value > -0.1) s << std::scientific; s << value; break;
-  }
-  if (format == DEFAULTFLOAT) {
-    std::string out = s.str();
-    if (out.find('.') == std::string::npos &&
-        out.find('e') == std::string::npos &&
-        (out[0] == '-' ? out[1] >= '0' && out[1] <= '9'
-                       : out[0] >= '0' && out[0] <= '9')) {
-      s << "e0";
-    } else {
-      return out;
-    }
-  }
-  return s.str();
-}
-
-Hash Double::hash() const {
-  return Hash(str(HEXFLOAT)) + type.hashcode;
-}
-
-TypeVar RegExp::typeVar("RegExp", 0);
-TypeVar &RegExp::getType() {
-  return typeVar;
-}
-
-Hash RegExp::hash() const {
-  return Hash(exp.pattern()) + type.hashcode;
-}
-
-TypeVar Closure::typeVar("Closure", 0);
-TypeVar &Closure::getType() {
-  assert (0); // unreachable
-  return typeVar;
-}
-
-Hash Closure::hash() const {
-  std::vector<uint64_t> codes;
-  type.hashcode.push(codes);
-  lambda->hashcode.push(codes);
-  if (binding) {
-    assert (binding->flags & FLAG_HASH_POST);
-    binding->hashcode.push(codes);
-  }
-  return Hash(codes);
-}
-
 TypeVar Data::typeBoolean("Boolean", 0);
 TypeVar Data::typeOrder("Order", 0);
 TypeVar Data::typeUnit("Unit", 0);
@@ -305,23 +356,3 @@ TypeVar Data::typeError("Error", 0);
 const TypeVar Data::typeList("List", 1);
 const TypeVar Data::typePair("Pair", 2);
 const TypeVar Data::typeResult("Result", 2);
-TypeVar &Data::getType() {
-  assert (0); // unreachable
-  return typeBoolean;
-}
-
-Hash Data::hash() const {
-  std::vector<uint64_t> codes;
-  Hash(cons->ast.name).push(codes);
-  if (binding) {
-    assert (binding->flags & FLAG_HASH_POST);
-    binding->hashcode.push(codes);
-  }
-  return Hash(codes);
-}
-
-std::string Integer::str(int base) const {
-  char buffer[mpz_sizeinbase(value, base) + 2];
-  mpz_get_str(buffer, base, value);
-  return buffer;
-}

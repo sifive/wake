@@ -24,6 +24,7 @@
 #include "heap.h"
 #include "type.h"
 #include "datatype.h"
+#include "gc.h"
 #include <memory>
 #include <string>
 #include <map>
@@ -115,11 +116,10 @@ struct VarRef : public Expr {
 };
 
 struct Literal : public Expr {
-  std::shared_ptr<Value> value;
+  RootPointer<HeapObject> value;
 
   static const TypeDescriptor type;
-  Literal(const Location &location_, std::shared_ptr<Value> &&value_);
-  Literal(const Location &location_, const char *value_);
+  Literal(const Location &location_, RootPointer<HeapObject> &&value_);
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
@@ -177,7 +177,7 @@ struct DefMap : public Expr {
   DefMap(const Location &location_, Defs &&map_, Pubs &&pub_, Expr *body_)
    : Expr(&type, location_), map(std::move(map_)), pub(std::move(pub_)), body(body_) { }
   DefMap(const Location &location_)
-   : Expr(&type, location_), map(), pub(), body(new Literal(location, "top")) { }
+   : Expr(&type, location_), map(), pub(), body(nullptr) { }
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;

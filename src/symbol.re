@@ -21,6 +21,7 @@
 #include "parser.h"
 #include "utf8.h"
 #include "lexint.h"
+#include "gc.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -212,12 +213,12 @@ static bool lex_rstr(Lexer &lex, Expr *&out)
     */
   }
 
-  std::shared_ptr<RegExp> exp = std::make_shared<RegExp>(unicode_escape_canon(std::move(slice)));
-  if (!exp->exp.ok()) {
+  RootPointer<RegExp> exp = RegExp::literal(lex.heap, unicode_escape_canon(std::move(slice)));
+  if (!exp->exp->ok()) {
     lex.fail = true;
     std::cerr << "Invalid regular expression at "
       << SYM_LOCATION.file() << "; "
-      << exp->exp.error() << std::endl;
+      << exp->exp->error() << std::endl;
   }
   out = new Literal(SYM_LOCATION, std::move(exp));
   return true;
@@ -245,8 +246,7 @@ static bool lex_sstr(Lexer &lex, Expr *&out)
   }
 
   // NOTE: unicode_escape NOT invoked; '' is raw "" is cleaned
-  std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
-  out = new Literal(SYM_LOCATION, std::move(str));
+  out = new Literal(SYM_LOCATION, String::literal(lex.heap, slice));
   return true;
 }
 
@@ -270,8 +270,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
 
         * { return false; }
         [{] {
-          std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
-          exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
+          exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, slice)));
           exprs.back()->flags |= FLAG_AST;
           lex.consume();
           exprs.push_back(parse_expr(lex));
@@ -303,8 +302,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
     */
   }
 
-  std::shared_ptr<String> str = std::make_shared<String>(unicode_escape_canon(std::move(slice)));
-  exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
+  exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, unicode_escape_canon(std::move(slice)))));
   exprs.back()->flags |= FLAG_AST;
 
   if (exprs.size() == 1) {
@@ -368,8 +366,7 @@ top:
       (double10 | double10e | double16 | double16e) {
         std::string x(in.tok, in.cur);
         std::remove(x.begin(), x.end(), '_');
-        std::shared_ptr<Double> value = std::make_shared<Double>(x.c_str());
-        return mkSym2(LITERAL, new Literal(SYM_LOCATION, std::move(value)));
+        return mkSym2(LITERAL, new Literal(SYM_LOCATION, Double::literal(lex.heap, x.c_str())));
       }
 
       // integer literals
@@ -379,8 +376,7 @@ top:
       (dec | oct | hex | bin) {
         std::string integer(in.tok, in.cur);
         std::remove(integer.begin(), integer.end(), '_');
-        std::shared_ptr<Integer> value = std::make_shared<Integer>(integer.c_str());
-        return mkSym2(LITERAL, new Literal(SYM_LOCATION, std::move(value)));
+        return mkSym2(LITERAL, new Literal(SYM_LOCATION, Integer::literal(lex.heap, integer)));
       }
 
       // keywords
