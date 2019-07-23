@@ -19,6 +19,7 @@
 #define GC_H
 
 #include <memory>
+#include <ostream>
 #include <stdint.h>
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 8)
@@ -29,6 +30,7 @@ struct Heap;
 struct HeapObject;
 struct DestroyableObject;
 struct PadObject;
+struct FormatState;
 template <typename T> struct HeapPointer;
 template <typename T> struct RootPointer;
 
@@ -41,6 +43,7 @@ struct Placement {
 struct HeapObject {
   virtual Placement moveto(PadObject *free) = 0;
   virtual Placement descend(PadObject *free) = 0;
+  virtual void format(std::ostream &os, FormatState &state) const = 0;
   virtual ~HeapObject();
 
   PadObject *recurse(PadObject *free) { return free; }
@@ -151,6 +154,7 @@ RootPointer<T> &RootPointer<T>::operator = (HeapPointer<Y> x) {
 struct PadObject final : public HeapObject {
   Placement moveto(PadObject *free) override;
   Placement descend(PadObject *free) override;
+  void format(std::ostream &os, FormatState &state) const override;
   static PadObject *place(PadObject *free) {
     new(free) PadObject();
     return free + 1;
@@ -162,6 +166,7 @@ struct alignas(PadObject) MovedObject final : public HeapObject {
   HeapObject *to;
   Placement moveto(PadObject *free) override;
   Placement descend(PadObject *free) override;
+  void format(std::ostream &os, FormatState &state) const override;
 };
 
 struct GCNeededException {

@@ -57,6 +57,7 @@ struct Tuple : public HeapObject {
   virtual size_t size() const = 0;
   virtual Promise & operator [] (size_t i) = 0;
   const virtual Promise & operator [] (size_t i) const = 0;
+  void format(std::ostream &os, FormatState &state) const override;
 
   static const size_t fulfiller_pads;
   virtual Continuation *claim_fulfiller(Runtime &r, size_t i) = 0;

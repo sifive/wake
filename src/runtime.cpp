@@ -19,6 +19,10 @@
 #include "tuple.h"
 #include "expr.h"
 
+void Work::format(std::ostream &os, FormatState &state) const {
+  assert (0 /* unreachable */);
+}
+
 Runtime::Runtime() : heap(), stack(heap.root<Work>(nullptr)) {
 }
 
@@ -63,6 +67,7 @@ struct FClosure final : public GCObject<FClosure, HeapObject> {
 
   FClosure(Lambda *lambda_, Tuple *scope_)
    : lambda(lambda_), scope(scope_) { }
+  void format(std::ostream &os, FormatState &state) const override;
 
   PadObject *recurse(PadObject *free) {
     free = HeapObject::recurse(free);
@@ -70,6 +75,10 @@ struct FClosure final : public GCObject<FClosure, HeapObject> {
     return free;
   }
 };
+
+void FClosure::format(std::ostream &os, FormatState &state) const {
+  os << "<" << lambda->location.file() << ">";
+}
 
 void Lambda::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
   cont->resume(runtime, FClosure::alloc(runtime.heap, this, scope));

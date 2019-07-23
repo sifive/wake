@@ -26,6 +26,7 @@ struct Work : public HeapObject {
   HeapPointer<Work> next;
 
   virtual void execute(Runtime &runtime) = 0;
+  void format(std::ostream &os, FormatState &state) const override;
 
   PadObject *recurse(PadObject *free) {
     free = HeapObject::recurse(free);

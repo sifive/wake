@@ -31,6 +31,10 @@ Placement PadObject::descend(PadObject *free) {
   return Placement(this + 1, free);
 }
 
+void PadObject::format(std::ostream &os, FormatState &state) const {
+  assert (0 /* unreachable */);
+}
+
 Placement MovedObject::moveto(PadObject *free) {
   return Placement(to, free);
 }
@@ -38,6 +42,10 @@ Placement MovedObject::moveto(PadObject *free) {
 Placement MovedObject::descend(PadObject *free) {
   assert(0 /* unreachable */);
   return Placement(0, 0);
+}
+
+void MovedObject::format(std::ostream &os, FormatState &state) const {
+  assert (0 /* unreachable */);
 }
 
 Heap::Heap() {
