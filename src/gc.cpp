@@ -45,10 +45,12 @@ Heap::Heap() {
   end = begin + 1024;
   free = begin;
   last_pads = 0;
+  finalize = nullptr;
 }
 
 Heap::~Heap() {
-  // !!! destruct objects
+  GC(0);
+  assert (free == begin);
   ::free(begin);
 }
 
@@ -70,9 +72,29 @@ void Heap::GC(size_t requested_pads) {
     progress = progress.obj->descend(progress.free);
   }
 
+  DestroyableObject *tail = nullptr;
+  HeapObject *next;
+  for (HeapObject *obj = finalize; obj; obj = next) {
+    if (typeid(*obj) == typeid(MovedObject)) {
+      MovedObject *mo = static_cast<MovedObject*>(obj);
+      DestroyableObject *keep = static_cast<DestroyableObject*>(mo->to);
+      next = keep->next;
+      keep->next = tail;
+      tail = keep;
+    } else {
+      next = static_cast<DestroyableObject*>(obj)->next;
+      obj->~HeapObject();
+    }
+  }
+  finalize = tail;
+
   ::free(begin);
   begin = newbegin;
   end = newbegin + elems;
   free = progress.free;
   last_pads = free - begin;
+}
+
+DestroyableObject::DestroyableObject(Heap &h) : next(h.finalize) {
+  h.finalize = this;
 }

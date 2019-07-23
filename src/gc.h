@@ -27,6 +27,7 @@
 
 struct Heap;
 struct HeapObject;
+struct DestroyableObject;
 struct PadObject;
 template <typename T> struct HeapPointer;
 template <typename T> struct RootPointer;
@@ -209,6 +210,8 @@ private:
   PadObject *free;
   size_t last_pads;
   RootRing roots;
+  HeapObject *finalize;
+friend struct DestroyableObject;
 };
 
 template <typename T, typename B = HeapObject>
@@ -273,5 +276,10 @@ template <typename T, typename B>
 Placement GCObject<T, B>::descend(PadObject *free) {
   return Placement(self()->next(), self()->recurse(free));
 }
+
+struct DestroyableObject : public HeapObject {
+  DestroyableObject(Heap &h);
+  HeapObject *next;
+};
 
 #endif

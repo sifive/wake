@@ -42,14 +42,16 @@ struct Symbol {
 struct input_t;
 struct state_t;
 
+struct Heap;
 struct Lexer {
+  Heap &heap;
   std::unique_ptr<input_t> engine;
   std::unique_ptr<state_t> state;
   Symbol next;
   bool fail;
 
-  Lexer(const char *file);
-  Lexer(const std::string &cmdline, const char *target);
+  Lexer(Heap &heap_, const char *file);
+  Lexer(Heap &heap_, const std::string &cmdline, const char *target);
   ~Lexer();
 
   std::string id() const;

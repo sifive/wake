@@ -434,14 +434,14 @@ struct state_t {
   }
 };
 
-Lexer::Lexer(const char *file)
- : engine(new input_t(file, fopen(file, "r"))), state(new state_t), next(ERROR, Location(file, Coordinates(), Coordinates())), fail(false)
+Lexer::Lexer(Heap &heap_, const char *file)
+ : heap(heap_), engine(new input_t(file, fopen(file, "r"))), state(new state_t), next(ERROR, Location(file, Coordinates(), Coordinates())), fail(false)
 {
   if (engine->file) consume();
 }
 
-Lexer::Lexer(const std::string &cmdline, const char *target)
-  : engine(new input_t(target, reinterpret_cast<const unsigned char *>(cmdline.c_str()), cmdline.size())), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
+Lexer::Lexer(Heap &heap_, const std::string &cmdline, const char *target)
+  : heap(heap_), engine(new input_t(target, reinterpret_cast<const unsigned char *>(cmdline.c_str()), cmdline.size())), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
 {
   consume();
 }

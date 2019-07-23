@@ -46,6 +46,7 @@
 #include "gopt.h"
 #include "json5.h"
 #include "execpath.h"
+#include "runtime.h"
 
 #define SHORT_HASH 8
 
@@ -573,12 +574,13 @@ int main(int argc, char **argv) {
   if (!ok) std::cerr << "Source file enumeration failed" << std::endl;
 
   // Read all wake build files
+  Runtime runtime;
   std::unique_ptr<Top> top(new Top);
   auto wakefiles = find_all_wakefiles(ok, workspace);
   for (auto &i : wakefiles) {
     if (verbose && queue.stack_trace)
       std::cerr << "Parsing " << i << std::endl;
-    Lexer lex(i.c_str());
+    Lexer lex(runtime.heap, i.c_str());
     parse_top(*top.get(), lex);
     if (lex.fail) ok = false;
   }
@@ -598,7 +600,7 @@ int main(int argc, char **argv) {
   if (argc > 1) target_names.back() = "<command-line>";
   TypeVar *types = &body->typeVar;
   for (size_t i = 0; i < targets.size(); ++i) {
-    Lexer lex(targets[i], target_names[i].c_str());
+    Lexer lex(runtime.heap, targets[i], target_names[i].c_str());
     body = new App(LOCATION, body, parse_command(lex));
     if (lex.fail) ok = false;
   }
