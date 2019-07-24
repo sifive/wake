@@ -19,7 +19,7 @@
 #include <cassert>
 #include <sstream>
 
-Expr::~Expr() { }
+Meta::~Meta() { }
 const TypeDescriptor Prim      ::type("Prim");
 const TypeDescriptor App       ::type("App");
 const TypeDescriptor Lambda    ::type("Lambda");

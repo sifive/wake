@@ -59,8 +59,8 @@ void require_fail(const char *message, unsigned size, Runtime &runtime, const Tu
 #define INTEGER(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Integer)); } while(0); Integer *arg = static_cast<Integer*>(args[i]);
 #define DOUBLE(arg, i)  do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Double));  } while(0); Double  *arg = static_cast<Double *>(args[i]);
 #define REGEXP(arg, i)	do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(RegExp));  } while(0); RegExp  *arg = static_cast<RegExp *>(args[i]);
-#define TUPLE(arg, i)   do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Tuple));   } while(0); Tuple   *arg = static_cast<Tuple  *>(args[i]);
 #define CLOSURE(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Closure)); } while(0); Closure *arg = static_cast<Closure*>(args[i]);
+#define TUPLE(arg, i)   Tuple   *arg = static_cast<Tuple  *>(args[i]);
 
 #define INTEGER_MPZ(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Integer)); } while(0); mpz_t arg = { static_cast<Integer*>(args[i])->wrap() };
 

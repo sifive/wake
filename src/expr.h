@@ -23,6 +23,7 @@
 #include "type.h"
 #include "datatype.h"
 #include "gc.h"
+#include "meta.h"
 #include <memory>
 #include <string>
 #include <map>
@@ -38,7 +39,7 @@ struct Continuation;
 #define FLAG_AST	2 // useful to include in AST
 
 /* Expression AST */
-struct Expr {
+struct Expr : public Meta {
   const TypeDescriptor *type;
   Location location;
   TypeVar typeVar;
@@ -46,7 +47,6 @@ struct Expr {
   long flags;
 
   Expr(const TypeDescriptor *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), flags(flags_) { }
-  virtual ~Expr();
 
   std::string to_str() const;
   virtual void format(std::ostream &os, int depth) const = 0;

@@ -30,6 +30,7 @@ struct Work : public HeapObject {
 
   virtual void execute(Runtime &runtime) = 0;
   void format(std::ostream &os, FormatState &state) const override;
+  bool is_work() const override;
 
   PadObject *recurse(PadObject *free) {
     free = HeapObject::recurse(free);

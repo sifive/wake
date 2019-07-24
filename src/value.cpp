@@ -167,7 +167,7 @@ TypeVar Integer::typeVar("Integer", 0);
 Integer::Integer(int length_) : length(length_) { }
 
 Integer::Integer(const Integer &i) : length(i.length) {
-  memcpy(data(), i.data(), length * sizeof(mp_limb_t));
+  memcpy(data(), i.data(), abs(length) * sizeof(mp_limb_t));
 }
 
 Integer *Integer::claim(Heap &h, const MPZ &mpz) {
@@ -278,7 +278,7 @@ void RegExp::format(std::ostream &os, FormatState &state) const {
   if (APP_PRECEDENCE < state.p()) os << "(";
   os << "RegExp `";
   auto p = exp->pattern();
-  String::cstr_format(os, p.c_str(), p.size());
+  os.write(p.c_str(), p.size());
   os << "`";
   if (APP_PRECEDENCE < state.p()) os << ")";
 }
@@ -295,13 +295,19 @@ void Closure::format(std::ostream &os, FormatState &state) const {
   os << "<" << lambda->location.file() << ">";
 }
 
+static const char *describe(Meta *meta) {
+  if (!meta) return "Tuple";
+  if (typeid(*meta) == typeid(Constructor))
+    return static_cast<Constructor*>(meta)->ast.name.c_str();
+  return static_cast<Expr*>(meta)->type->name;
+}
+
 void Tuple::format(std::ostream &os, FormatState &state) const {
   const HeapObject* child = (state.get() < (int)size()) ? at(state.get())->coerce<HeapObject>() : nullptr;
-  auto cons = static_cast<Constructor*>(meta);
-  const std::string &name = cons->ast.name;
+  const char *name = describe(meta);
 
-  if (name.compare(0, 7, "binary ") == 0) {
-    op_type q = op_precedence(name.c_str() + 7);
+  if (strncmp(name, "binary ", 7) == 0) {
+    op_type q = op_precedence(name + 7);
     switch (state.get()) {
     case 0:
       if (q.p < state.p()) os << "(";
@@ -310,7 +316,7 @@ void Tuple::format(std::ostream &os, FormatState &state) const {
       break;
     case 1:
       if (name[7] != ',') os << " ";
-      os << name.c_str() + 7 << " ";
+      os << name + 7 << " ";
       state.resume();
       state.child(child, q.p + q.l);
       break;
@@ -318,12 +324,12 @@ void Tuple::format(std::ostream &os, FormatState &state) const {
       if (q.p < state.p()) os << ")";
       break;
     }
-  } else if (name.compare(0, 6, "unary ") == 0) {
-    op_type q = op_precedence(name.c_str() + 6);
+  } else if (strncmp(name, "unary ", 6) == 0) {
+    op_type q = op_precedence(name + 6);
     switch (state.get()) {
     case 0:
       if (q.p < state.p()) os << "(";
-      os << name.c_str() + 6;
+      os << name + 6;
       state.resume();
       state.child(child, q.p);
       break;
@@ -333,15 +339,15 @@ void Tuple::format(std::ostream &os, FormatState &state) const {
     }
   } else {
     if (state.get() == 0) {
-      if (APP_PRECEDENCE < state.p() && !cons->ast.args.empty()) os << "(";
+      if (APP_PRECEDENCE < state.p() && !empty()) os << "(";
       os << name;
     }
-    if (state.get() < (int)cons->ast.args.size()) {
+    if (state.get() < (int)size()) {
       os << " ";
       state.resume();
       state.child(child, APP_PRECEDENCE+1);
     } else {
-      if (APP_PRECEDENCE < state.p() && !cons->ast.args.empty()) os << ")";
+      if (APP_PRECEDENCE < state.p() && !empty()) os << ")";
     }
   }
 }

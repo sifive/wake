@@ -21,18 +21,19 @@
 #include "runtime.h"
 #include <vector>
 struct Location;
+struct Meta;
 
 struct alignas(PadObject) Promise {
   explicit operator bool() const {
     HeapObject *obj = value.get();
-    return obj && typeid(*obj) != typeid(Continuation);
+    return obj && !obj->is_work();
   }
 
   void await(Runtime &runtime, Continuation *c) const {
     if (*this) {
       c->resume(runtime, value.get());
     } else {
-      c->next = static_cast<Work*>(value.get());
+      c->next = static_cast<Continuation*>(value.get());
       value = c;
     }
   }
@@ -46,31 +47,50 @@ struct alignas(PadObject) Promise {
   // Call once only!
   void fulfill(Runtime &runtime, HeapObject *obj);
   // Call only if the containing tuple was just constructed (no Continuations)
-  void instant_fulfill(HeapObject *obj) { value = obj; }
+  void instant_fulfill(HeapObject *obj) {
+#ifdef DEBUG_GC
+     assert(!obj || !value);
+     assert(!obj || !obj->is_work());
+#endif
+     value = obj;
+  }
 
   PadObject *moveto(PadObject *free) { return value.moveto(free); }
 
 private:
   mutable HeapPointer<HeapObject> value;
+friend struct Tuple;
 };
 
 struct Tuple : public HeapObject {
   // Either an Expr or a Constructor
-  void *meta;
+  Meta *meta;
 
-  Tuple(void *meta_) : meta(meta_) { }
+  Tuple(Meta *meta_) : meta(meta_) { }
 
   virtual size_t size() const = 0;
   virtual Promise *at(size_t i) = 0;
   const virtual Promise *at(size_t i) const = 0;
   void format(std::ostream &os, FormatState &state) const override;
 
+  bool empty() const { return size() == 0; }
+
   static const size_t fulfiller_pads;
   virtual Continuation *claim_fulfiller(Runtime &r, size_t i) = 0;
 
+  void claim_instant_fulfiller(Runtime &r, size_t i, Promise *p) {
+    if (*p) {
+      at(i)->instant_fulfill(p->coerce<HeapObject>());
+    } else {
+      Continuation *cont = claim_fulfiller(r, i);
+      cont->next = p->value;
+      p->value = cont;
+    }
+  }
+
   static size_t reserve(size_t size);
-  static Tuple *claim(Heap &h, void *meta, size_t size); // requires prior h.reserve
-  static Tuple *alloc(Heap &h, void *meta, size_t size);
+  static Tuple *claim(Heap &h, Meta *meta, size_t size); // requires prior h.reserve
+  static Tuple *alloc(Heap &h, Meta *meta, size_t size);
 
   std::vector<Location> stack_trace() const;
 };

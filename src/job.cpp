@@ -1144,7 +1144,8 @@ static size_t reserve_usage(const Usage &usage) {
        + Double::reserve()
        + Integer::reserve(m)
        + Integer::reserve(i)
-       + Integer::reserve(o);
+       + Integer::reserve(o)
+       + reserve_tuple2() * 5;
 }
 
 static HeapObject *claim_usage(Heap &h, const Usage &usage) {

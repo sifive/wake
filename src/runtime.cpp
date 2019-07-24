@@ -26,7 +26,11 @@
 Closure::Closure(Lambda *lambda_, Tuple *scope_) : lambda(lambda_), scope(scope_) { }
 
 void Work::format(std::ostream &os, FormatState &state) const {
-  assert (0 /* unreachable */);
+  os << "Work";
+}
+
+bool Work::is_work() const {
+  return true;
 }
 
 Runtime::Runtime()
@@ -129,9 +133,10 @@ struct CApp final : public GCObject<CApp, Continuation> {
 
   void execute(Runtime &runtime) override {
     auto clo = static_cast<Closure*>(value.get());
+    runtime.heap.reserve(Interpret::reserve());
     bind->meta = clo->lambda;
-    bind->at(0)->fulfill(runtime, clo->scope.get());
-    runtime.schedule(Interpret::alloc(runtime.heap,
+    bind->at(0)->instant_fulfill(clo->scope.get());
+    runtime.schedule(Interpret::claim(runtime.heap,
       clo->lambda->body.get(), bind.get(), cont.get()));
   }
 };
@@ -152,7 +157,7 @@ void DefBinding::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
   runtime.heap.reserve(Tuple::reserve(size) + Interpret::reserve() +
     val.size() * (Interpret::reserve() + Tuple::fulfiller_pads));
   Tuple *bind = Tuple::claim(runtime.heap, this, size);
-  bind->at(0)->fulfill(runtime, scope);
+  bind->at(0)->instant_fulfill(scope);
   runtime.schedule(Interpret::claim(runtime.heap,
     body.get(), bind, cont));
   for (auto it = val.rbegin(); it != val.rend(); ++it)
@@ -176,6 +181,7 @@ struct CPrim final : public GCObject<CPrim, Continuation> {
   PadObject *recurse(PadObject *free) {
     free = Continuation::recurse(free);
     free = scope.moveto(free);
+    free = wait.moveto(free);
     free = cont.moveto(free);
     return free;
   }
@@ -219,7 +225,7 @@ void Construct::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
   cont->resume(runtime, bind);
   // this will benefit greatly from App+App+App+Lam+Lam+Lam->DefMap fusion
   for (size_t i = size; i; --i) {
-    scope->at(1)->await(runtime, bind->claim_fulfiller(runtime, i-1));
+    bind->claim_instant_fulfiller(runtime, i-1, scope->at(1));
     scope = scope->at(0)->coerce<Tuple>();
   }
 }
@@ -252,21 +258,21 @@ struct SelectDestructor final : public GCObject<SelectDestructor, Continuation> 
     auto closure = scope->at(1)->coerce<Closure>();
     auto body = closure->lambda->body.get();
     auto scope = closure->scope.get();
+    // Add the tuple to the handler scope
+    auto next = Tuple::claim(runtime.heap, des, 2);
+    next->at(0)->instant_fulfill(scope);
+    next->at(1)->instant_fulfill(tuple);
+    scope = next;
     // !!! avoid pointless copying; have handlers directly accept the tuple and use a DefMap:argX = atX tuple
     // -> this would allow unused arguments to be deadcode optimized away
-    for (; size; --size) {
-      auto next = Tuple::claim(runtime.heap, des, 2);
-      next->at(0)->fulfill(runtime, scope);
-      tuple->at(size-1)->await(runtime, next->claim_fulfiller(runtime, 1));
+    for (size_t i = 0; i < size; ++i) {
+      next = Tuple::claim(runtime.heap, des, 2);
+      next->at(0)->instant_fulfill(scope);
+      next->claim_instant_fulfiller(runtime, 1, tuple->at(i));
       scope = next;
       body = static_cast<Lambda*>(body)->body.get();
     }
-    // !!! actually want to schedule this BEFORE the fulfillers above
-    auto next = Tuple::claim(runtime.heap, des, 2);
-    next->at(0)->fulfill(runtime, scope);
-    next->at(1)->fulfill(runtime, tuple);
-    // add scope with tuple itself
-    runtime.schedule(Interpret::claim(runtime.heap, body, next, cont.get()));
+    runtime.schedule(Interpret::claim(runtime.heap, body, scope, cont.get()));
   }
 };
 

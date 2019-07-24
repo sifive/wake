@@ -277,6 +277,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
           if (lex.next.type == EOL) lex.consume();
           expect(BCLOSE, lex);
           start = in.coord() - 1;
+          slice.clear();
           continue;
         }
 

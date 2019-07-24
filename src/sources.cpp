@@ -382,18 +382,15 @@ static PRIMFN(prim_sources) {
     high = std::lower_bound(low, high, prefixH, promise_lexical);
   }
 
-  std::vector<String*> found;
+  std::vector<HeapObject*> found;
   for (Promise *i = low; i != high; ++i) {
     String *s = i->coerce<String>();
     re2::StringPiece piece(s->c_str() + skip, s->length - skip);
     if (RE2::FullMatch(piece, *arg1->exp)) found.push_back(s);
   }
 
-  Tuple *out = Tuple::alloc(runtime.heap, nullptr, found.size());
-  for (size_t i = 0; i < out->size(); ++i)
-    out->at(i)->instant_fulfill(found[i]);
-
-  RETURN(out);
+  runtime.heap.reserve(reserve_list(found.size()));
+  RETURN(claim_list(runtime.heap, found.size(), found.data()));
 }
 
 static PRIMFN(prim_files) {

@@ -21,6 +21,9 @@
 #include <memory>
 #include <ostream>
 #include <stdint.h>
+#ifdef DEBUG_GC
+#include <cassert>
+#endif
 #include "hash.h"
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 8)
@@ -45,6 +48,7 @@ struct HeapObject {
   virtual Placement moveto(PadObject *free) = 0;
   virtual Placement descend(PadObject *free) = 0;
   virtual void format(std::ostream &os, FormatState &state) const = 0;
+  virtual bool is_work() const;
   virtual ~HeapObject();
 
   static void format(std::ostream &os, const HeapObject *value, bool detailed = false, int indent = -1);
@@ -104,7 +108,7 @@ struct RootPointer {
   // construct using heap.root(ptr)
   RootPointer(RootRing &o, HeapObject *obj) : ring(o, obj) { }
   template <typename Y>
-  RootPointer(RootPointer<Y> &&r) : ring(std::move(r.ring)) { ring.root = static_cast<T*>(r.get()); }
+  RootPointer(RootPointer<Y> &&r) : ring(std::move(r.ring)) { static_cast<T*>(r.get()); }
 
   explicit operator bool() const { return ring.root; }
   void reset() { ring.root = nullptr; }
@@ -218,7 +222,7 @@ struct Heap {
     PadObject *out = free;
     free += requested_pads;
 #ifdef DEBUG_GC
-    assert (requested_pads >= limit);
+    assert (requested_pads <= limit);
     limit -= requested_pads;
 #endif
     return out;

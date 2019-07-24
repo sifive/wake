@@ -19,8 +19,15 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#ifdef DEBUG_GC
+#include <iostream>
+#endif
 
 HeapObject::~HeapObject() { }
+
+bool HeapObject::is_work() const {
+  return false;
+}
 
 Placement PadObject::moveto(PadObject *free) {
   assert (0 /* unreachable */);
@@ -32,7 +39,7 @@ Placement PadObject::descend(PadObject *free) {
 }
 
 void PadObject::format(std::ostream &os, FormatState &state) const {
-  assert (0 /* unreachable */);
+  os << "PadObject";
 }
 
 Placement MovedObject::moveto(PadObject *free) {
@@ -45,7 +52,7 @@ Placement MovedObject::descend(PadObject *free) {
 }
 
 void MovedObject::format(std::ostream &os, FormatState &state) const {
-  assert (0 /* unreachable */);
+  to->format(os, state);
 }
 
 Heap::Heap() {
@@ -63,9 +70,9 @@ Heap::~Heap() {
 }
 
 void Heap::GC(size_t requested_pads) {
-  size_t elems = (free - begin) * 2 + requested_pads;
-  if (4*last_pads > elems) elems = 4*last_pads;
-
+  size_t no_gc_overrun = 2 * (free-begin) + requested_pads; // misalignment can at worst double usage
+  size_t estimate_desired_size = 4*last_pads + requested_pads;
+  size_t elems = std::max(no_gc_overrun, estimate_desired_size);
   PadObject *newbegin = static_cast<PadObject*>(::malloc(elems*sizeof(PadObject)));
   Placement progress(newbegin, newbegin);
 
@@ -101,6 +108,16 @@ void Heap::GC(size_t requested_pads) {
   end = newbegin + elems;
   free = progress.free;
   last_pads = free - begin;
+
+  // Contain heap growth due to no_gc_overrun pessimism
+  size_t desired_sized = 4*last_pads + requested_pads;
+  if (desired_sized < elems) {
+    end = newbegin + desired_sized;
+  }
+
+#ifdef DEBUG_GC
+  std::cerr << "GC: kept=" << last_pads << " desire=" << desired_sized << " size=" << elems << std::endl;
+#endif
 }
 
 DestroyableObject::DestroyableObject(Heap &h) : next(h.finalize) {

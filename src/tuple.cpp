@@ -20,6 +20,9 @@
 
 void Promise::fulfill(Runtime &runtime, HeapObject *obj) {
   if (value) {
+#ifdef DEBUG_GC
+    assert(value->is_work());
+#endif
     Continuation *c = static_cast<Continuation*>(value.get());
     while (c->next) {
       c->value = obj;
@@ -29,6 +32,10 @@ void Promise::fulfill(Runtime &runtime, HeapObject *obj) {
     c->next = runtime.stack;
     runtime.stack = value;
   }
+#ifdef DEBUG_GC
+  assert(obj);
+  assert(!obj->is_work());
+#endif
   value = obj;
 }
 
@@ -58,7 +65,7 @@ struct BigTuple final : public GCObject<BigTuple, Tuple> {
   Promise *at(size_t i) override;
   const Promise *at(size_t i) const override;
 
-  BigTuple(void *meta, size_t size_);
+  BigTuple(Meta *meta, size_t size_);
   BigTuple(const BigTuple &b);
 
   PadObject *next();
@@ -79,7 +86,7 @@ const Promise *BigTuple::at(size_t i) const {
   return static_cast<const Promise*>(data()) + i;
 }
 
-BigTuple::BigTuple(void *meta, size_t size_) : GCObject<BigTuple, Tuple>(meta), tsize(size_) {
+BigTuple::BigTuple(Meta *meta, size_t size_) : GCObject<BigTuple, Tuple>(meta), tsize(size_) {
   for (size_t i = 0; i < size_; ++i)
     new (at(i)) Promise();
 }
@@ -112,7 +119,7 @@ struct SmallTuple final : public GCObject<SmallTuple<tsize>, Tuple> {
   Promise *at(size_t i) override;
   const Promise *at(size_t i) const override;
 
-  SmallTuple(void *meta);
+  SmallTuple(Meta *meta);
   SmallTuple(const SmallTuple &b);
 
   PadObject *next();
@@ -137,7 +144,7 @@ const Promise *SmallTuple<tsize>::at(size_t i) const {
 }
 
 template <size_t tsize>
-SmallTuple<tsize>::SmallTuple(void *meta) : GCObject<SmallTuple<tsize>, Tuple>(meta) {
+SmallTuple<tsize>::SmallTuple(Meta *meta) : GCObject<SmallTuple<tsize>, Tuple>(meta) {
   for (size_t i = 0; i < tsize; ++i)
     new (at(i)) Promise();
 }
@@ -177,7 +184,7 @@ size_t Tuple::reserve(size_t size) {
   }
 }
 
-Tuple *Tuple::claim(Heap &h, void *meta, size_t size) {
+Tuple *Tuple::claim(Heap &h, Meta *meta, size_t size) {
   bool big = size > 4;
   if (big) {
     return new (h.claim(reserve(size))) BigTuple(meta, size);
@@ -193,7 +200,7 @@ Tuple *Tuple::claim(Heap &h, void *meta, size_t size) {
   }
 }
 
-Tuple *Tuple::alloc(Heap &h, void *meta, size_t size) {
+Tuple *Tuple::alloc(Heap &h, Meta *meta, size_t size) {
   h.reserve(reserve(size));
   return claim(h, meta, size);
 }
