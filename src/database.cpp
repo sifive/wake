@@ -542,6 +542,9 @@ void Database::end_txn() {
   single_step("Could not commit a transaction", imp->commit_txn, imp->debugdb);
 }
 
+// This function needs to be able to run twice in succession and return the same results
+// ... because heap allocations are created to hold the file list output by this function.
+// Fortunately, updating use_id is the only side-effect and it does not affect reuse_job.
 Usage Database::reuse_job(
   const std::string &directory,
   const std::string &stdin,

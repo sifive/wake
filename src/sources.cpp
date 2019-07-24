@@ -412,7 +412,8 @@ static PRIMFN(prim_files) {
   for (auto &x : match) need += String::reserve(x.size());
   runtime.heap.reserve(need);
 
-  std::vector<HeapObject*> out(match.size());
+  std::vector<HeapObject*> out;
+  out.reserve(match.size());
   for (auto &x : match)
     out.push_back(String::claim(runtime.heap, x));
 
