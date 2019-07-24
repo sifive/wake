@@ -321,7 +321,7 @@ void Closure::format(std::ostream &os, FormatState &state) const {
 }
 
 void Tuple::format(std::ostream &os, FormatState &state) const {
-  const HeapObject* child = (state.get() < size()) ? at(state.get())->coerce<HeapObject>() : nullptr;
+  const HeapObject* child = (state.get() < (int)size()) ? at(state.get())->coerce<HeapObject>() : nullptr;
   auto cons = static_cast<Constructor*>(meta);
   const std::string &name = cons->ast.name;
 

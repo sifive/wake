@@ -26,6 +26,7 @@
 #include <queue>
 #include <list>
 #include <cassert>
+#include <algorithm>
 
 typedef std::map<std::string, int> NameIndex;
 

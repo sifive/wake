@@ -21,6 +21,7 @@
 #include "value.h"
 #include "status.h"
 #include "job.h"
+#include <cassert>
 
 Closure::Closure(Lambda *lambda_, Tuple *scope_) : lambda(lambda_), scope(scope_) { }
 
