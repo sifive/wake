@@ -20,7 +20,6 @@
 
 #include "location.h"
 #include <memory>
-#include <cstdint>
 
 enum SymbolType {
   ERROR, ID, OPERATOR, LITERAL, DEF, TUPLE, GLOBAL, PUBLISH, SUBSCRIBE, PRIM, LAMBDA,

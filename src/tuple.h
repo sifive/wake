@@ -19,6 +19,8 @@
 #define TUPLE_H
 
 #include "runtime.h"
+#include <vector>
+struct Location;
 
 struct alignas(PadObject) Promise {
   explicit operator bool() const {
@@ -35,7 +37,7 @@ struct alignas(PadObject) Promise {
     }
   }
 
-  // Use only if the value is known to always be available
+  // Use only if the value is known to already be available 
   template <typename T>
   T *coerce() { return static_cast<T*>(value.get()); }
   template <typename T>
@@ -43,6 +45,8 @@ struct alignas(PadObject) Promise {
 
   // Call once only!
   void fulfill(Runtime &runtime, HeapObject *obj);
+  // Call only if the containing tuple was just constructed (no Continuations)
+  void instant_fulfill(HeapObject *obj) { value = obj; }
 
   PadObject *moveto(PadObject *free) { return value.moveto(free); }
 
@@ -57,8 +61,8 @@ struct Tuple : public HeapObject {
   Tuple(void *meta_) : meta(meta_) { }
 
   virtual size_t size() const = 0;
-  virtual Promise & operator [] (size_t i) = 0;
-  const virtual Promise & operator [] (size_t i) const = 0;
+  virtual Promise *at(size_t i) = 0;
+  const virtual Promise *at(size_t i) const = 0;
   void format(std::ostream &os, FormatState &state) const override;
 
   static const size_t fulfiller_pads;
@@ -67,6 +71,8 @@ struct Tuple : public HeapObject {
   static size_t reserve(size_t size);
   static Tuple *claim(Heap &h, void *meta, size_t size); // requires prior h.reserve
   static Tuple *alloc(Heap &h, void *meta, size_t size);
+
+  std::vector<Location> stack_trace() const;
 };
 
 #endif

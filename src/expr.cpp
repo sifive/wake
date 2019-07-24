@@ -16,10 +16,6 @@
  */
 
 #include "expr.h"
-#include "value.h"
-#include "hash.h"
-#include "thunk.h"
-#include "datatype.h"
 #include <cassert>
 #include <sstream>
 
@@ -41,8 +37,8 @@ const TypeDescriptor Top       ::type("Top");
 const TypeDescriptor VarDef    ::type("VarDef");
 const TypeDescriptor VarArg    ::type("VarArg");
 
-Literal::Literal(const Location &location_, RootPointer<HeapObject> &&value_)
- : Expr(&type, location_), value(std::move(value_)) { }
+Literal::Literal(const Location &location_, RootPointer<HeapObject> &&value_, TypeVar *litType_)
+ : Expr(&type, location_), value(std::move(value_)), litType(litType_) { }
 
 static std::string pad(int depth) {
   return std::string(depth, ' ');

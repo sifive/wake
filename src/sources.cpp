@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
+#if 0
 #include "sources.h"
 #include "prim.h"
 #include "primfn.h"
 #include "value.h"
-#include "heap.h"
 #include "execpath.h"
 
 #include <re2/re2.h>
@@ -374,7 +374,7 @@ static std::vector<std::shared_ptr<String> > sources(const std::vector<std::shar
   return out;
 }
 
-std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<String> > &all, const std::string &base, const std::string &regexp) {
+static std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<String> > &all, const std::string &base, const std::string &regexp) {
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
@@ -534,3 +534,4 @@ void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimM
   prim_register(pmap, "workspace",   prim_workspace,   type_workspace,   PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "pid",         prim_pid,         type_pid,         PRIM_PURE|PRIM_SHALLOW);
 }
+#endif

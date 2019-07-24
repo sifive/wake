@@ -53,6 +53,7 @@ struct JAST {
 
   static bool parse(const char *file,  std::ostream& errs, JAST &out);
   static bool parse(std::string &body, std::ostream& errs, JAST &out);
+  static bool parse(const char *body, size_t len, std::ostream& errs, JAST &out);
 
   const JAST &get(const std::string &key) const;
   JAST &get(const std::string &key);
@@ -76,11 +77,13 @@ struct JLexer {
 
   JLexer(const char *file);
   JLexer(const std::string &body);
+  JLexer(const char *body, size_t len);
   ~JLexer();
 
   void consume();
 };
 
-std::string json_escape(const std::string &x);
+std::string json_escape(const char *str, size_t len);
+inline std::string json_escape(const std::string &x) { return json_escape(x.c_str(), x.size()); }
 
 #endif

@@ -16,8 +16,8 @@
  */
 
 #include "prim.h"
+#include "type.h"
 #include "value.h"
-#include "heap.h"
 #include <cmath>
 #include <ctgmath>
 #include <cstdlib>
@@ -33,9 +33,8 @@ static PRIMTYPE(type_unop) {
 static PRIMFN(prim_##name) {			\
   EXPECT(1);					\
   DOUBLE(arg0, 0);				\
-  auto out = std::make_shared<Double>();	\
-  out->value = fn(arg0->value);			\
-  RETURN(out);					\
+  double out = fn(arg0->value);			\
+  RETURN(Double::alloc(runtime.heap, out));	\
 }
 
 static double neg(double x) { return -x; }
@@ -67,9 +66,8 @@ static PRIMFN(prim_##name) {			\
   EXPECT(2);					\
   DOUBLE(arg0, 0);				\
   DOUBLE(arg1, 1);				\
-  auto out = std::make_shared<Double>();	\
-  out->value = fn(arg0->value, arg1->value);	\
-  RETURN(out);					\
+  double out = fn(arg0->value, arg1->value);	\
+  RETURN(Double::alloc(runtime.heap, out));	\
 }
 
 static double add(double x, double y) { return x + y; }
@@ -97,8 +95,8 @@ static PRIMFN(prim_fma) {
   DOUBLE(arg0, 0);
   DOUBLE(arg1, 1);
   DOUBLE(arg2, 2);
-  auto out = std::make_shared<Double>(std::fma(arg0->value, arg1->value, arg2->value));
-  RETURN(out);
+  double out = std::fma(arg0->value, arg1->value, arg2->value);
+  RETURN(Double::alloc(runtime.heap, out));
 }
 
 static PRIMTYPE(type_str) {
@@ -111,25 +109,24 @@ static PRIMTYPE(type_str) {
 
 static PRIMFN(prim_str) {
   EXPECT(3);
-  INTEGER(arg0, 0);
-  INTEGER(arg1, 1);
+  INTEGER_MPZ(arg0, 0);
+  INTEGER_MPZ(arg1, 1);
   DOUBLE(arg2, 2);
   long format = 0, precision = 0;
 
-  bool ok = mpz_fits_slong_p(arg0->value);
+  bool ok = mpz_fits_slong_p(arg0);
   if (ok) {
-    format = mpz_get_si(arg0->value);
+    format = mpz_get_si(arg0);
     ok &= format >= 0 && format <= 3;
   }
 
-  ok &= mpz_fits_slong_p(arg1->value);
+  ok &= mpz_fits_slong_p(arg1);
   if (ok) {
-    precision = mpz_get_si(arg1->value);
+    precision = mpz_get_si(arg1);
     ok &= precision >= 1 && precision <= 40;
   }
 
-  auto out = std::make_shared<String>(ok ? arg2->str(format, precision) : "");
-  RETURN(out);
+  RETURN(String::alloc(runtime.heap, ok ? arg2->str(format, precision) : ""));
 }
 
 static PRIMTYPE(type_dbl) {
@@ -145,11 +142,15 @@ static PRIMFN(prim_dbl) {
   EXPECT(1);
   STRING(arg0, 0);
   char *end;
-  std::vector<std::shared_ptr<Value> > vals;
-  auto val = std::make_shared<Double>(strtod(arg0->value.c_str(), &end));
-  if (!*end) vals.emplace_back(std::move(val));
-  auto out = make_list(std::move(vals));
-  RETURN(out);
+  double val = strtod(arg0->c_str(), &end);
+  if (*end) {
+    RETURN(alloc_nil(runtime.heap));
+  } else {
+    size_t need = Double::reserve() + reserve_list(1);
+    runtime.heap.reserve(need);
+    HeapObject *out = Double::claim(runtime.heap, val);
+    RETURN(claim_list(runtime.heap, 1, &out));
+  }
 }
 
 static PRIMTYPE(type_cmp) {
@@ -166,8 +167,7 @@ static PRIMFN(prim_cmp) {
   REQUIRE (!std::isnan(arg0->value));
   REQUIRE (!std::isnan(arg1->value));
   int x = (arg0->value > arg1->value) - (arg0->value < arg1->value);
-  auto out = make_order(x);
-  RETURN(out);
+  RETURN(alloc_order(runtime.heap, x));
 }
 
 static PRIMTYPE(type_class) {
@@ -187,8 +187,7 @@ static PRIMFN(prim_class) {
     case FP_SUBNORMAL: code = 4; break;
     default:           code = 5; break;
   }
-  auto out = std::make_shared<Integer>(code);
-  RETURN(out);
+  RETURN(Integer::alloc(runtime.heap, code));
 }
 
 static PRIMTYPE(type_frexp) {
@@ -204,11 +203,18 @@ static PRIMTYPE(type_frexp) {
 static PRIMFN(prim_frexp) {
   EXPECT(1);
   DOUBLE(arg0, 0);
+
   int exp;
   double frac = std::frexp(arg0->value, &exp);
-  auto out = make_tuple2(
-    std::make_shared<Double>(frac),
-    std::make_shared<Integer>(exp));
+  MPZ val(exp);
+
+  size_t need = reserve_tuple2() + Double::reserve() + Integer::reserve(val);
+  runtime.heap.reserve(need);
+
+  auto out = claim_tuple2(
+    runtime.heap,
+    Double::claim(runtime.heap, frac),
+    Integer::claim(runtime.heap, val));
   RETURN(out);
 }
 
@@ -222,18 +228,15 @@ static PRIMTYPE(type_ldexp) {
 static PRIMFN(prim_ldexp) {
   EXPECT(2);
   DOUBLE(arg0, 0);
-  INTEGER(arg1, 1);
+  INTEGER_MPZ(arg1, 1);
 
-  if (mpz_cmp_si(arg1->value, -10000) < 0) {
-    auto out = std::make_shared<Double>(0.0);
-    RETURN(out);
-  } else if (mpz_cmp_si(arg1->value, 10000) > 0) {
-    auto out = std::make_shared<Double>(arg0->value / 0.0);
-    RETURN(out);
+  if (mpz_cmp_si(arg1, -10000) < 0) {
+    RETURN(Double::alloc(runtime.heap, 0.0));
+  } else if (mpz_cmp_si(arg1, 10000) > 0) {
+    RETURN(Double::alloc(runtime.heap, arg0->value / 0.0));
   } else {
-    auto res = std::ldexp(arg0->value, mpz_get_si(arg1->value));
-    auto out = std::make_shared<Double>(res);
-    RETURN(out);
+    auto res = std::ldexp(arg0->value, mpz_get_si(arg1));
+    RETURN(Double::alloc(runtime.heap, res));
   }
 }
 
@@ -250,13 +253,19 @@ static PRIMTYPE(type_modf) {
 static PRIMFN(prim_modf) {
   EXPECT(1);
   DOUBLE(arg0, 0);
+
   double intpart;
   double frac = std::modf(arg0->value, &intpart);
-  auto i = std::make_shared<Integer>();
-  mpz_set_d(i->value, arg0->value);
-  auto out = make_tuple2(
-    std::move(i),
-    std::make_shared<Double>(frac));
+  MPZ i;
+  mpz_set_d(i.value, arg0->value);
+
+  size_t need = reserve_tuple2() + Integer::reserve(i) + Double::reserve();
+  runtime.heap.reserve(need);
+
+  auto out = claim_tuple2(
+    runtime.heap,
+    Integer::claim(runtime.heap, i),
+    Double::claim(runtime.heap, frac));
   RETURN(out);
 }
 

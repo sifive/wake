@@ -19,6 +19,8 @@
 #include "tuple.h"
 #include "expr.h"
 #include "value.h"
+#include "status.h"
+#include "job.h"
 
 Closure::Closure(Lambda *lambda_, Tuple *scope_) : lambda(lambda_), scope(scope_) { }
 
@@ -26,11 +28,20 @@ void Work::format(std::ostream &os, FormatState &state) const {
   assert (0 /* unreachable */);
 }
 
-Runtime::Runtime() : heap(), stack(heap.root<Work>(nullptr)) {
+Runtime::Runtime()
+ : stack_trace(false), abort(false), heap(),
+   stack(heap.root<Work>(nullptr)),
+   output(heap.root<HeapObject>(nullptr)) {
 }
 
 void Runtime::run() {
-  while (stack) {
+  int count = 0;
+  while (stack && !abort) {
+    if (++count >= 10000) {
+      if (JobTable::exit_now()) break;
+      status_refresh();
+      count = 0;
+    }
     Work *w = stack.get();
     stack = w->next;
     try {
@@ -64,28 +75,56 @@ struct Interpret final : public GCObject<Interpret, Work> {
   }
 };
 
+struct CInit final : public GCObject<CInit, Continuation> {
+  void execute(Runtime &runtime) override {
+    runtime.output = value;
+  }
+};
+
+void Runtime::init(Expr *root) {
+  while (true) {
+    try {
+      heap.reserve(Interpret::reserve() + CInit::reserve());
+      break;
+    } catch (GCNeededException gc) {
+      heap.GC(gc.needed);
+    }
+  }
+
+  CInit *done = CInit::claim(heap);
+  schedule(Interpret::claim(heap, root, nullptr, done));
+}
+
+size_t Runtime::reserve_eval() {
+  return Interpret::reserve();
+}
+
+void Runtime::claim_eval(Expr *expr, Tuple *scope, Continuation *cont) {
+  schedule(Interpret::claim(heap, expr, scope, cont));
+}
+
 void Lambda::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
   cont->resume(runtime, Closure::alloc(runtime.heap, this, scope));
 }
 
 void VarRef::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
   for (int i = depth; i; --i)
-    scope = (*scope)[0].coerce<Tuple>();
+    scope = scope->at(0)->coerce<Tuple>();
   int vals = scope->size() - 1;
   if (offset >= vals) {
     auto defs = static_cast<DefBinding*>(scope->meta);
     cont->resume(runtime, Closure::alloc(runtime.heap,
       defs->fun[offset-vals].get(), scope));
   } else {
-    (*scope)[offset+1].await(runtime, cont);
+    scope->at(offset+1)->await(runtime, cont);
   }
 }
 
-struct FApp final : public GCObject<FApp, Continuation> {
+struct CApp final : public GCObject<CApp, Continuation> {
   HeapPointer<Tuple> bind;
   HeapPointer<Continuation> cont;
 
-  FApp(Tuple *bind_, Continuation *cont_) : bind(bind_), cont(cont_) { }
+  CApp(Tuple *bind_, Continuation *cont_) : bind(bind_), cont(cont_) { }
 
   PadObject *recurse(PadObject *free) {
     free = Continuation::recurse(free);
@@ -97,7 +136,7 @@ struct FApp final : public GCObject<FApp, Continuation> {
   void execute(Runtime &runtime) override {
     auto clo = static_cast<Closure*>(value.get());
     bind->meta = clo->lambda;
-    (*bind.get())[0].fulfill(runtime, clo->scope.get());
+    bind->at(0)->fulfill(runtime, clo->scope.get());
     runtime.schedule(Interpret::alloc(runtime.heap,
       clo->lambda->body.get(), bind.get(), cont.get()));
   }
@@ -105,11 +144,11 @@ struct FApp final : public GCObject<FApp, Continuation> {
 
 void App::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
   runtime.heap.reserve(Tuple::reserve(2) +
-    Interpret::reserve() + FApp::reserve() +
+    Interpret::reserve() + CApp::reserve() +
     Interpret::reserve() + Tuple::fulfiller_pads);
   Tuple *bind = Tuple::claim(runtime.heap, nullptr, 2);
   runtime.schedule(Interpret::claim(runtime.heap,
-    fn.get(), scope, FApp::claim(runtime.heap, bind, cont)));
+    fn.get(), scope, CApp::claim(runtime.heap, bind, cont)));
   runtime.schedule(Interpret::claim(runtime.heap,
     val.get(), scope, bind->claim_fulfiller(runtime, 1)));
 }
@@ -119,7 +158,7 @@ void DefBinding::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
   runtime.heap.reserve(Tuple::reserve(size) + Interpret::reserve() +
     val.size() * (Interpret::reserve() + Tuple::fulfiller_pads));
   Tuple *bind = Tuple::claim(runtime.heap, this, size);
-  (*bind)[0].fulfill(runtime, scope);
+  bind->at(0)->fulfill(runtime, scope);
   runtime.schedule(Interpret::claim(runtime.heap,
     body.get(), bind, cont));
   for (auto it = val.rbegin(); it != val.rend(); ++it)
@@ -131,8 +170,52 @@ void Literal::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
   cont->resume(runtime, value.get());
 }
 
+struct CPrim final : public GCObject<CPrim, Continuation> {
+  HeapPointer<Tuple> scope;
+  HeapPointer<Tuple> wait;
+  HeapPointer<Continuation> cont;
+  Prim *prim;
+
+  CPrim(Tuple *scope_, Tuple *wait_, Continuation *cont_, Prim *prim_)
+   : scope(scope_), wait(wait_), cont(cont_), prim(prim_) { }
+
+  PadObject *recurse(PadObject *free) {
+    free = Continuation::recurse(free);
+    free = scope.moveto(free);
+    free = cont.moveto(free);
+    return free;
+  }
+
+  void execute(Runtime &runtime) override {
+    for (; wait && *wait->at(1); wait = wait->at(0)->coerce<Tuple>()) { }
+    if (!wait) {
+      HeapObject *args[prim->args];
+      Tuple *it = scope.get();
+      for (size_t i = prim->args; i; --i) {
+        args[i-1] = it->at(1)->coerce<HeapObject>();
+        it = it->at(0)->coerce<Tuple>();
+      }
+      prim->fn(prim->data, runtime, cont.get(), scope.get(), prim->args, args);
+    } else {
+      wait->at(1)->await(runtime, this);
+    }
+  }
+};
+
 void Prim::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
-  // !!! TODO
+  Tuple *wait;
+  if (args > 0) {
+    wait = scope;
+    Tuple *cut = scope;
+    for (int i = 1; i < args; ++i)
+      cut = cut->at(0)->coerce<Tuple>();
+    cut->at(0)->instant_fulfill(nullptr);
+  } else {
+    wait = nullptr;
+  }
+
+  CPrim *prim = CPrim::alloc(runtime.heap, scope, wait, cont, this);
+  runtime.schedule(prim);
 }
 
 void Construct::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
@@ -142,8 +225,8 @@ void Construct::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
   cont->resume(runtime, bind);
   // this will benefit greatly from App+App+App+Lam+Lam+Lam->DefMap fusion
   for (size_t i = size; i; --i) {
-    (*scope)[1].await(runtime, bind->claim_fulfiller(runtime, i-1));
-    scope = (*scope)[0].coerce<Tuple>();
+    scope->at(1)->await(runtime, bind->claim_fulfiller(runtime, i-1));
+    scope = scope->at(0)->coerce<Tuple>();
   }
 }
 
@@ -162,7 +245,7 @@ struct SelectDestructor final : public GCObject<SelectDestructor, Continuation> 
     return free;
   }
 
-  void execute(Runtime &runtime) {
+  void execute(Runtime &runtime) override {
     auto tuple = static_cast<Tuple*>(value.get());
     auto cons = static_cast<Constructor*>(tuple->meta);
     size_t size = tuple->size();
@@ -170,29 +253,29 @@ struct SelectDestructor final : public GCObject<SelectDestructor, Continuation> 
     runtime.heap.reserve(size * (scope_cost + Tuple::fulfiller_pads) + scope_cost + Interpret::reserve());
     // Find the handler function body -- inlining + App fusion would eliminate this loop
     for (int index = des->sum.members.size() - cons->index; index; --index)
-      scope = (*scope.get())[0].coerce<Tuple>();
+      scope = scope->at(0)->coerce<Tuple>();
     // This coercion is safe because we evaluate pure lambda args before their consumer
-    auto closure = (*scope.get())[1].coerce<Closure>();
+    auto closure = scope->at(1)->coerce<Closure>();
     auto body = closure->lambda->body.get();
     auto scope = closure->scope.get();
     // !!! avoid pointless copying; have handlers directly accept the tuple and use a DefMap:argX = atX tuple
     // -> this would allow unused arguments to be deadcode optimized away
     for (; size; --size) {
       auto next = Tuple::claim(runtime.heap, des, 2);
-      (*next)[0].fulfill(runtime, scope);
-      (*tuple)[size-1].await(runtime, next->claim_fulfiller(runtime, 1));
+      next->at(0)->fulfill(runtime, scope);
+      tuple->at(size-1)->await(runtime, next->claim_fulfiller(runtime, 1));
       scope = next;
       body = static_cast<Lambda*>(body)->body.get();
     }
     // !!! actually want to schedule this BEFORE the fulfillers above
     auto next = Tuple::claim(runtime.heap, des, 2);
-    (*next)[0].fulfill(runtime, scope);
-    (*next)[1].fulfill(runtime, tuple);
+    next->at(0)->fulfill(runtime, scope);
+    next->at(1)->fulfill(runtime, tuple);
     // add scope with tuple itself
     runtime.schedule(Interpret::claim(runtime.heap, body, next, cont.get()));
   }
 };
 
 void Destruct::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
-  (*scope)[1].await(runtime, SelectDestructor::alloc(runtime.heap, scope, cont, this));
+  scope->at(1)->await(runtime, SelectDestructor::alloc(runtime.heap, scope, cont, this));
 }

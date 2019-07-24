@@ -19,7 +19,6 @@
 #define VALUE_H
 
 #include "gc.h"
-#include "type.h"
 #include <string>
 #include <memory>
 #include <vector>
@@ -34,6 +33,7 @@
 
 struct Lambda;
 struct Tuple;
+struct TypeVar;
 
 struct FormatEntry {
   const HeapObject *value;
@@ -65,13 +65,22 @@ struct String final : public GCObject<String> {
 
   const char *c_str() const { return static_cast<const char*>(data()); }
   char *c_str() { return static_cast<char*>(data()); }
+  std::string as_str() const { return std::string(c_str(), length); }
+  int compare(const String &other) const;
 
   void format(std::ostream &os, FormatState &state) const override;
-  PadObject *next();
+  static void cstr_format(std::ostream &os, const char *s, size_t len);
 
-  static size_t reserve(size_t length);
+  PadObject *next() { return Parent::next() + 1 + length/sizeof(PadObject); }
+  static size_t reserve(size_t length) { return sizeof(String)/sizeof(PadObject) + 1 + length/sizeof(PadObject); }
+
   static String *claim(Heap &h, size_t length);
+  static String *claim(Heap &h, const std::string &str);
+  static String *claim(Heap &h, const char *str, size_t length);
   static String *alloc(Heap &h, size_t length);
+  static String *alloc(Heap &h, const std::string &str);
+  static String *alloc(Heap &h, const char *str);
+  static String *alloc(Heap &h, const char *str, size_t length);
 
   // Never call this during runtime! It can invalidate the heap.
   static RootPointer<String> literal(Heap &h, const std::string &value);
@@ -99,9 +108,10 @@ struct Integer final : public GCObject<Integer> {
 
   std::string str(int base = 10) const;
   void format(std::ostream &os, FormatState &state) const override;
-  PadObject *next();
 
-  static size_t reserve(const MPZ &mpz);
+  PadObject *next() { return Parent::next() + (abs(length)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
+  static size_t reserve(const MPZ &mpz) { return sizeof(Integer)/sizeof(PadObject) + (abs(mpz.value[0]._mp_size)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
+
   static Integer *claim(Heap &h, const MPZ& mpz);
   static Integer *alloc(Heap &h, const MPZ& mpz);
 
@@ -144,8 +154,8 @@ struct RegExp final : public GCObject<RegExp, DestroyableObject> {
   static TypeVar typeVar;
   std::shared_ptr<RE2> exp;
 
-  RegExp(Heap &h, const std::string &regexp, const RE2::Options &opts);
-  RegExp(Heap &h, const std::string &regexp);
+  RegExp(Heap &h, const re2::StringPiece &regexp, const RE2::Options &opts);
+  RegExp(Heap &h, const re2::StringPiece &regexp);
 
   void format(std::ostream &os, FormatState &state) const;
 

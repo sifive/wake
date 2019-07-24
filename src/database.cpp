@@ -21,7 +21,6 @@
 #include <sstream>
 #include <sqlite3.h>
 #include <unistd.h>
-#include <cstdlib>
 
 #define VISIBLE 0
 #define INPUT 1

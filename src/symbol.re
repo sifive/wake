@@ -220,7 +220,7 @@ static bool lex_rstr(Lexer &lex, Expr *&out)
       << SYM_LOCATION.file() << "; "
       << exp->exp->error() << std::endl;
   }
-  out = new Literal(SYM_LOCATION, std::move(exp));
+  out = new Literal(SYM_LOCATION, std::move(exp), &RegExp::typeVar);
   return true;
 }
 
@@ -246,7 +246,7 @@ static bool lex_sstr(Lexer &lex, Expr *&out)
   }
 
   // NOTE: unicode_escape NOT invoked; '' is raw "" is cleaned
-  out = new Literal(SYM_LOCATION, String::literal(lex.heap, slice));
+  out = new Literal(SYM_LOCATION, String::literal(lex.heap, slice), &String::typeVar);
   return true;
 }
 
@@ -270,7 +270,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
 
         * { return false; }
         [{] {
-          exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, slice)));
+          exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, slice), &String::typeVar));
           exprs.back()->flags |= FLAG_AST;
           lex.consume();
           exprs.push_back(parse_expr(lex));
@@ -302,7 +302,8 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
     */
   }
 
-  exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, unicode_escape_canon(std::move(slice)))));
+  RootPointer<String> str = String::literal(lex.heap, unicode_escape_canon(std::move(slice)));
+  exprs.push_back(new Literal(SYM_LOCATION, std::move(str), &String::typeVar));
   exprs.back()->flags |= FLAG_AST;
 
   if (exprs.size() == 1) {
@@ -366,7 +367,7 @@ top:
       (double10 | double10e | double16 | double16e) {
         std::string x(in.tok, in.cur);
         std::remove(x.begin(), x.end(), '_');
-        return mkSym2(LITERAL, new Literal(SYM_LOCATION, Double::literal(lex.heap, x.c_str())));
+        return mkSym2(LITERAL, new Literal(SYM_LOCATION, Double::literal(lex.heap, x.c_str()), &Double::typeVar));
       }
 
       // integer literals
@@ -376,7 +377,7 @@ top:
       (dec | oct | hex | bin) {
         std::string integer(in.tok, in.cur);
         std::remove(integer.begin(), integer.end(), '_');
-        return mkSym2(LITERAL, new Literal(SYM_LOCATION, Integer::literal(lex.heap, integer)));
+        return mkSym2(LITERAL, new Literal(SYM_LOCATION, Integer::literal(lex.heap, integer), &Integer::typeVar));
       }
 
       // keywords

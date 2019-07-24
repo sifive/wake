@@ -15,11 +15,9 @@
  * limitations under the License.
  */
 
-#include "whereami.h"
 #include "execpath.h"
+#include "whereami.h"
 #include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
 #include <errno.h>
 #include <memory>
 #include <vector>

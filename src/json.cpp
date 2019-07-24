@@ -28,42 +28,66 @@ typedef std::numeric_limits<double> dlimits;
 static double nan() { return dlimits::quiet_NaN(); }
 static double inf(char c) { return c == '+' ? dlimits::infinity() : -dlimits::infinity(); }
 
-static std::unique_ptr<Lambda> eJValue(new Lambda(LOCATION, "_", nullptr));
-
-static std::shared_ptr<Value> getJValue(std::shared_ptr<Value> &&value, int member) {
-  auto bind = std::make_shared<Binding>(nullptr, nullptr, eJValue.get(), 1);
-  bind->future[0].value = value;
-  bind->state = 1;
-  return std::make_shared<Data>(&JValue->members[member], std::move(bind));
-}
-
-static std::shared_ptr<Value> consume_jast(JAST &&jast) {
+static size_t measure_jast(const JAST &jast) {
   switch (jast.kind) {
-    case JSON_NULLVAL:  return std::make_shared<Data>(&JValue->members[4], nullptr);
-    case JSON_TRUE:     return getJValue(make_bool(true), 3);
-    case JSON_FALSE:    return getJValue(make_bool(false), 3);
-    case JSON_INTEGER:  return getJValue(std::make_shared<Integer>(jast.value.c_str()), 1);
-    case JSON_DOUBLE:   return getJValue(std::make_shared<Double>(jast.value.c_str()), 2);
-    case JSON_INFINITY: return getJValue(std::make_shared<Double>(inf(jast.value[0])), 2);
-    case JSON_NAN:      return getJValue(std::make_shared<Double>(nan()), 2);
-    case JSON_STR:      return getJValue(std::make_shared<String>(std::move(jast.value)), 0);
+    case JSON_NULLVAL:  return Tuple::reserve(0);
+    case JSON_TRUE:     return Tuple::reserve(1);
+    case JSON_FALSE:    return Tuple::reserve(1);
+    case JSON_INTEGER:  return Tuple::reserve(1) + Integer::reserve(MPZ(jast.value));
+    case JSON_DOUBLE:   return Tuple::reserve(1) + Double::reserve();
+    case JSON_INFINITY: return Tuple::reserve(1) + Double::reserve();
+    case JSON_NAN:      return Tuple::reserve(1) + Double::reserve();
+    case JSON_STR:      return Tuple::reserve(1) + String::reserve(jast.value.size());
     case JSON_OBJECT: {
-      std::vector<std::shared_ptr<Value> > values;
-      values.reserve(jast.children.size());
+      size_t out = Tuple::reserve(1) + reserve_list(jast.children.size());
       for (auto &c : jast.children)
-        values.emplace_back(make_tuple2(
-          std::make_shared<String>(std::move(c.first)),
-          consume_jast(std::move(c.second))));
-      jast.children.clear();
-      return getJValue(make_list(std::move(values)), 5);
+        out += reserve_tuple2() + String::reserve(c.first.size()) + measure_jast(c.second);
+      return out;
     }
     case JSON_ARRAY: {
-      std::vector<std::shared_ptr<Value> > values;
+      size_t out = Tuple::reserve(1) + reserve_list(jast.children.size());
+      for (auto &c : jast.children)
+        out += measure_jast(c.second);
+      return out;
+    }
+    default: {
+      assert(0);
+      return 0;
+    }
+  }
+}
+
+static HeapObject *getJValue(Heap &h, HeapObject *value, int member) {
+  Tuple *out = Tuple::claim(h, &JValue->members[member], 1);
+  out->at(0)->instant_fulfill(value);
+  return out;
+}
+
+static HeapObject *convert_jast(Heap &h, const JAST &jast) {
+  switch (jast.kind) {
+    case JSON_NULLVAL:  return Tuple::claim(h, &JValue->members[4], 0);
+    case JSON_TRUE:     return getJValue(h, claim_bool(h, true),  3);
+    case JSON_FALSE:    return getJValue(h, claim_bool(h, false), 3);
+    case JSON_INTEGER:  return getJValue(h, Integer::claim(h, MPZ(jast.value)), 1);
+    case JSON_DOUBLE:   return getJValue(h, Double::claim(h, jast.value.c_str()), 2);
+    case JSON_INFINITY: return getJValue(h, Double::claim(h, inf(jast.value[0])), 2);
+    case JSON_NAN:      return getJValue(h, Double::claim(h, nan()), 2);
+    case JSON_STR:      return getJValue(h, String::claim(h, jast.value), 0);
+    case JSON_OBJECT: {
+      std::vector<HeapObject*> values;
       values.reserve(jast.children.size());
       for (auto &c : jast.children)
-        values.emplace_back(consume_jast(std::move(c.second)));
-      jast.children.clear();
-      return getJValue(make_list(std::move(values)), 6);
+        values.emplace_back(claim_tuple2(h, 
+          String::claim(h, c.first),
+          convert_jast(h, c.second)));
+      return getJValue(h, claim_list(h, values.size(), values.data()), 5);
+    }
+    case JSON_ARRAY: {
+      std::vector<HeapObject*> values;
+      values.reserve(jast.children.size());
+      for (auto &c : jast.children)
+        values.emplace_back(convert_jast(h, c.second));
+      return getJValue(h, claim_list(h, values.size(), values.data()), 6);
     }
     default: {
       assert(0);
@@ -87,12 +111,15 @@ static PRIMFN(prim_json_file) {
   STRING(file, 0);
   std::stringstream errs;
   JAST jast;
-  if (JAST::parse(file->value.c_str(), errs, jast)) {
-    auto out = make_result(true, consume_jast(std::move(jast)));
-    RETURN(out);
+  if (JAST::parse(file->c_str(), errs, jast)) {
+    size_t need = measure_jast(jast) + reserve_result();
+    runtime.heap.reserve(need);
+    RETURN(claim_result(runtime.heap, true, convert_jast(runtime.heap, jast)));
   } else {
-    auto out = make_result(false, std::make_shared<String>(errs.str()));
-    RETURN(out);
+    std::string s = errs.str();
+    size_t need = String::reserve(s.size()) + reserve_result();
+    runtime.heap.reserve(need);
+    RETURN(claim_result(runtime.heap, false, String::claim(runtime.heap, s)));
   }
 }
 
@@ -101,12 +128,15 @@ static PRIMFN(prim_json_body) {
   STRING(body, 0);
   std::stringstream errs;
   JAST jast;
-  if (JAST::parse(body->value, errs, jast)) {
-    auto out = make_result(true, consume_jast(std::move(jast)));
-    RETURN(out);
+  if (JAST::parse(body->c_str(), body->length, errs, jast)) {
+    size_t need = measure_jast(jast) + reserve_result();
+    runtime.heap.reserve(need);
+    RETURN(claim_result(runtime.heap, true, convert_jast(runtime.heap, jast)));
   } else {
-    auto out = make_result(false, std::make_shared<String>(errs.str()));
-    RETURN(out);
+    std::string s = errs.str();
+    size_t need = String::reserve(s.size()) + reserve_result();
+    runtime.heap.reserve(need);
+    RETURN(claim_result(runtime.heap, false, String::claim(runtime.heap, s)));
   }
 }
 
@@ -119,8 +149,7 @@ static PRIMTYPE(type_jstr) {
 static PRIMFN(prim_json_str) {
   EXPECT(1);
   STRING(str, 0);
-  auto out = std::make_shared<String>(json_escape(str->value));
-  RETURN(out);
+  RETURN(String::alloc(runtime.heap, json_escape(str->c_str(), str->length)));
 }
 
 void prim_register_json(PrimMap &pmap) {

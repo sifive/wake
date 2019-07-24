@@ -16,6 +16,7 @@
  */
 
 #include "tuple.h"
+#include "location.h"
 
 void Promise::fulfill(Runtime &runtime, HeapObject *obj) {
   if (value) {
@@ -44,7 +45,7 @@ struct FulFiller final : public GCObject<FulFiller, Continuation> {
   }
 
   void execute(Runtime &runtime) {
-    (*tuple.get())[i].fulfill(runtime, value.get());
+    tuple->at(i)->fulfill(runtime, value.get());
   }
 };
 
@@ -53,8 +54,9 @@ struct BigTuple final : public GCObject<BigTuple, Tuple> {
 
   size_t tsize;
 
-  Promise *at(size_t i);
-  const Promise *at(size_t i) const;
+  size_t size() const override;
+  Promise *at(size_t i) override;
+  const Promise *at(size_t i) const override;
 
   BigTuple(void *meta, size_t size_);
   BigTuple(const BigTuple &b);
@@ -62,12 +64,12 @@ struct BigTuple final : public GCObject<BigTuple, Tuple> {
   PadObject *next();
   PadObject *recurse(PadObject *free);
 
-  size_t size() const override;
-  Promise & operator [] (size_t i) override;
-  const Promise & operator [] (size_t i) const override;
-
   Continuation *claim_fulfiller(Runtime &r, size_t i) override;
 };
+
+size_t BigTuple::size() const {
+  return tsize;
+}
 
 Promise *BigTuple::at(size_t i) {
   return static_cast<Promise*>(data()) + i;
@@ -94,20 +96,8 @@ PadObject *BigTuple::next() {
 PadObject *BigTuple::recurse(PadObject *free) {
   free = Parent::recurse(free);
   for (size_t i = 0; i < tsize; ++i)
-    free = (*this)[i].moveto(free);
+    free = at(i)->moveto(free);
   return free;
-}
-
-size_t BigTuple::size() const {
-  return tsize;
-}
-
-Promise & BigTuple::operator [] (size_t i) {
-  return *at(i);
-}
-
-const Promise & BigTuple::operator [] (size_t i) const {
-  return *at(i);
 }
 
 Continuation *BigTuple::claim_fulfiller(Runtime &r, size_t i) {
@@ -118,8 +108,9 @@ template <size_t tsize>
 struct SmallTuple final : public GCObject<SmallTuple<tsize>, Tuple> {
   typedef GCObject<SmallTuple<tsize>, Tuple> Parent;
 
-  Promise *at(size_t i);
-  const Promise *at(size_t i) const;
+  size_t size() const override;
+  Promise *at(size_t i) override;
+  const Promise *at(size_t i) const override;
 
   SmallTuple(void *meta);
   SmallTuple(const SmallTuple &b);
@@ -127,12 +118,13 @@ struct SmallTuple final : public GCObject<SmallTuple<tsize>, Tuple> {
   PadObject *next();
   PadObject *recurse(PadObject *free);
 
-  size_t size() const override;
-  Promise & operator [] (size_t i) override;
-  const Promise & operator [] (size_t i) const override;
-
   Continuation *claim_fulfiller(Runtime &r, size_t i) override;
 };
+
+template <size_t tsize>
+size_t SmallTuple<tsize>::size() const {
+  return tsize;
+}
 
 template <size_t tsize>
 Promise *SmallTuple<tsize>::at(size_t i) {
@@ -165,23 +157,8 @@ template <size_t tsize>
 PadObject *SmallTuple<tsize>::recurse(PadObject *free) {
   free = Parent::recurse(free);
   for (size_t i = 0; i < tsize; ++i)
-    free = (*this)[i].moveto(free);
+    free = at(i)->moveto(free);
   return free;
-}
-
-template <size_t tsize>
-size_t SmallTuple<tsize>::size() const {
-  return tsize;
-}
-
-template <size_t tsize>
-Promise & SmallTuple<tsize>::operator [] (size_t i) {
-  return *at(i);
-}
-
-template <size_t tsize>
-const Promise & SmallTuple<tsize>::operator [] (size_t i) const {
-  return *at(i);
 }
 
 template <size_t tsize>
@@ -219,4 +196,14 @@ Tuple *Tuple::claim(Heap &h, void *meta, size_t size) {
 Tuple *Tuple::alloc(Heap &h, void *meta, size_t size) {
   h.reserve(reserve(size));
   return claim(h, meta, size);
+}
+
+std::vector<Location> Tuple::stack_trace() const {
+  std::vector<Location> out;
+/* !!!
+  for (const Binding *i = this; i; i = i->invoker.get())
+    if (i->expr->type != &DefBinding::type)
+      out.emplace_back(i->expr->location);
+*/
+  return out;
 }

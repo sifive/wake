@@ -15,15 +15,15 @@
  * limitations under the License.
  */
 
+#if 0
+
 #include "job.h"
 #include "prim.h"
 #include "value.h"
-#include "heap.h"
 #include "database.h"
 #include "location.h"
 #include "execpath.h"
 #include "status.h"
-#include "thunk.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -1521,3 +1521,5 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   prim_register(pmap, "search_path",prim_search_path,type_search_path, PRIM_SHALLOW);
   prim_register(pmap, "access",     prim_access,     type_access,      PRIM_SHALLOW);
 }
+
+#endif

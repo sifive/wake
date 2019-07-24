@@ -19,16 +19,16 @@
 #include "datatype.h"
 #include "type.h"
 #include "value.h"
-#include "heap.h"
-#include "expr.h"
+#include "tuple.h"
 #include "type.h"
 #include "status.h"
+#include "expr.h"
 #include <sstream>
 #include <unordered_map>
 
 struct TargetValue {
   Hash subhash;
-  Future future;
+  Promise promise;
 
   TargetValue() { }
   TargetValue(const Hash &subhash_) : subhash(subhash_) { }
@@ -38,25 +38,33 @@ struct HashHasher {
   size_t operator()(const Hash &h) const { return h.data[0]; }
 };
 
-struct Target : public Value {
+struct Target final : public GCObject<Target, DestroyableObject> {
+  typedef GCObject<Target, DestroyableObject> Parent;
+
   Location location;
   std::unordered_map<Hash, TargetValue, HashHasher> table;
 
-  static const TypeDescriptor type;
   static TypeVar typeVar;
-  Target(const Location &location_) : Value(&type), location(location_) { }
+  Target(Heap &h, const Location &location_) : Parent(h), location(location_) { }
+  Target(Target &&target) = default;
   ~Target();
 
-  void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
+  PadObject *recurse(PadObject *free);
+  void format(std::ostream &os, FormatState &state) const override;
 };
 
-const TypeDescriptor Target::type("_Target");
+TypeVar Target::typeVar("_Target", 0);
+
+PadObject *Target::recurse(PadObject *free) {
+  free = Parent::recurse(free);
+  for (auto &x : table)
+    free = x.second.promise.moveto(free);
+  return free;
+}
 
 Target::~Target() {
   for (auto &x : table) {
-    if (!x.second.future.value) {
+    if (!x.second.promise) {
       std::stringstream ss;
       ss << "Infinite recursion detected across " << location.text() << std::endl;
       auto str = ss.str();
@@ -70,27 +78,21 @@ void Target::format(std::ostream &os, FormatState &state) const {
   os << "_Target";
 }
 
-TypeVar Target::typeVar("_Target", 0);
-TypeVar &Target::getType() {
-  return typeVar;
-}
-
-Hash Target::hash() const {
-  return type.hashcode;
-}
-
-#define TARGET(arg, i) REQUIRE(args[i]->type == &Target::type); Target *arg = reinterpret_cast<Target*>(args[i].get());
+#define TARGET(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Target)); } while(0); Target *arg = static_cast<Target*>(args[i]);
 
 static PRIMTYPE(type_hash) {
   return out->unify(Integer::typeVar);
 }
 
 static PRIMFN(prim_hash) {
-  Hash h;
-  if (binding) h = binding->hash();
-  auto out = std::make_shared<Integer>();
-  mpz_import(out->value, sizeof(h.data)/sizeof(h.data[0]), 1, sizeof(h.data[0]), 0, 0, &h.data[0]);
-  RETURN(out);
+  // !!! FIX
+  std::vector<uint64_t> codes;
+  for (; scope; scope = scope->at(0)->coerce<Tuple>())
+    Hash(scope->at(1)->coerce<HeapObject>()->to_str()).push(codes); // !!! coerce is bad
+  Hash h(codes);
+  MPZ out;
+  mpz_import(out.value, sizeof(h.data)/sizeof(h.data[0]), 1, sizeof(h.data[0]), 0, 0, &h.data[0]);
+  RETURN(Integer::alloc(runtime.heap, out));
 }
 
 static PRIMTYPE(type_tnew) {
@@ -100,8 +102,7 @@ static PRIMTYPE(type_tnew) {
 
 static PRIMFN(prim_tnew) {
   EXPECT(1);
-  auto out = std::make_shared<Target>(binding->expr->location);
-  RETURN(out);
+  RETURN(Target::alloc(runtime.heap, runtime.heap, static_cast<Expr*>(scope->meta)->location));
 }
 
 static PRIMTYPE(type_tget) {
@@ -114,54 +115,62 @@ static PRIMTYPE(type_tget) {
     out->unify((*args[3])[1]);
 }
 
-struct TargetReceiver : public Receiver {
-  std::shared_ptr<Value> target;
+struct CTarget final : public GCObject<CTarget, Continuation> {
+  HeapPointer<Target> target;
   Hash hash;
-  void receive(WorkQueue &queue, std::shared_ptr<Value> &&value);
-  TargetReceiver(const std::shared_ptr<Value> &target_, Hash hash_)
+
+  CTarget(Target *target_, Hash hash_)
    : target(target_), hash(hash_) { }
+
+  PadObject *recurse(PadObject *free) {
+    free = Continuation::recurse(free);
+    free = target.moveto(free);
+    return free;
+  }
+
+  void execute(Runtime &runtime) override;
 };
 
-void TargetReceiver::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
-  Target *t = reinterpret_cast<Target*>(target.get());
-  t->table[hash].future.broadcast(queue, std::move(value));
+void CTarget::execute(Runtime &runtime) {
+  target->table[hash].promise.fulfill(runtime, value.get());
 }
 
 static PRIMFN(prim_tget) {
   EXPECT(4);
   TARGET(target, 0);
-  INTEGER(key, 1);
-  INTEGER(subkey, 2);
+  INTEGER_MPZ(key, 1);
+  INTEGER_MPZ(subkey, 2);
   CLOSURE(body, 3);
 
+  runtime.heap.reserve(Tuple::reserve(2) + Runtime::reserve_eval() + CTarget::reserve());
+
   Hash hash;
-  REQUIRE(mpz_sizeinbase(key->value, 2) <= 8*sizeof(hash.data));
-  mpz_export(&hash.data[0], 0, 1, sizeof(hash.data[0]), 0, 0, key->value);
+  REQUIRE(mpz_sizeinbase(key, 2) <= 8*sizeof(hash.data));
+  mpz_export(&hash.data[0], 0, 1, sizeof(hash.data[0]), 0, 0, key);
 
   Hash subhash;
-  REQUIRE(mpz_sizeinbase(subkey->value, 2) <= 8*sizeof(subhash.data));
-  mpz_export(&subhash.data[0], 0, 1, sizeof(subhash.data[0]), 0, 0, subkey->value);
+  REQUIRE(mpz_sizeinbase(subkey, 2) <= 8*sizeof(subhash.data));
+  mpz_export(&subhash.data[0], 0, 1, sizeof(subhash.data[0]), 0, 0, subkey);
 
   auto ref = target->table.insert(std::make_pair(hash, TargetValue(subhash)));
-  ref.first->second.future.depend(queue, std::move(completion));
+  ref.first->second.promise.await(runtime, continuation);
 
   if (!(ref.first->second.subhash == subhash)) {
     std::stringstream ss;
     ss << "ERROR: Target subkey mismatch for " << target->location.text() << std::endl;
-    if (queue.stack_trace)
-      for (auto &x : binding->stack_trace())
+    if (runtime.stack_trace)
+      for (auto &x : scope->stack_trace())
         ss << "  from " << x.file() << std::endl;
     std::string str = ss.str();
     status_write(2, str.data(), str.size());
-    queue.abort = true;
+    runtime.abort = true;
   }
 
   if (ref.second) {
-    auto bind = std::make_shared<Binding>(body->binding, queue.stack_trace?binding:nullptr, body->lambda, 1);
-    bind->future[0].value = std::move(args[1]); // hash
-    bind->state = 1;
-    queue.emplace(body->lambda->body.get(), std::move(bind), std::unique_ptr<Receiver>(
-      new TargetReceiver(args[0], hash)));
+    Tuple *bind = Tuple::claim(runtime.heap, body->lambda, 2);
+    bind->at(0)->instant_fulfill(body->scope.get());
+    bind->at(1)->instant_fulfill(args[1]); // hash
+    runtime.claim_eval(body->lambda->body.get(), bind, CTarget::claim(runtime.heap, target, hash));
   }
 }
 

@@ -18,30 +18,25 @@
 #ifndef PRIM_H
 #define PRIM_H
 
-#include "type.h"
 #include "primfn.h"
-#include "status.h"
-#include "thunk.h"
+#include "tuple.h"
 #include <map>
 #include <string>
 #include <vector>
-#include <memory>
 
-struct Receiver;
-struct Value;
 struct String;
 struct Integer;
 struct Double;
 struct RegExp;
-struct Data;
+struct Tuple;
 
 /* Macros for handling inputs from wake */
 #define RETURN(val) do {						\
-  Receiver::receive(queue, std::move(completion), std::move(val));	\
+  continuation->resume(runtime, val);					\
   return;								\
 } while (0)
 
-void require_fail(const char *message, unsigned size, WorkQueue &queue, const Binding *binding);
+void require_fail(const char *message, unsigned size, Runtime &runtime, const Tuple *scope);
 
 #define STR(x) #x
 #define STR2(x) STR(x)
@@ -50,30 +45,38 @@ void require_fail(const char *message, unsigned size, WorkQueue &queue, const Bi
     const char message[] =						\
       "Requirement " STR(b) " failed at " 				\
       __FILE__ ":" STR2(__LINE__) "\n";					\
-    require_fail(message, sizeof(message), queue, binding.get());	\
+    require_fail(message, sizeof(message), runtime, scope);		\
     return;								\
   }									\
 } while (0)
 
 #define EXPECT(num) do {	\
   (void)data;			\
-  REQUIRE(args.size() == num);	\
+  REQUIRE(nargs == num);	\
 } while (0)
 
-#define STRING(arg, i)  REQUIRE(args[i]->type == &String::type);  String  *arg = reinterpret_cast<String *>(args[i].get());
-#define INTEGER(arg, i) REQUIRE(args[i]->type == &Integer::type); Integer *arg = reinterpret_cast<Integer*>(args[i].get());
-#define DOUBLE(arg, i)  REQUIRE(args[i]->type == &Double::type);  Double  *arg = reinterpret_cast<Double *>(args[i].get());
-#define REGEXP(arg, i)	REQUIRE(args[i]->type == &RegExp::type);  RegExp  *arg = reinterpret_cast<RegExp *>(args[i].get());
-#define DATA(arg, i)    REQUIRE(args[i]->type == &Data::type);    Data    *arg = reinterpret_cast<Data   *>(args[i].get());
-#define CLOSURE(arg, i) REQUIRE(args[i]->type == &Closure::type); Closure *arg = reinterpret_cast<Closure*>(args[i].get());
+#define STRING(arg, i)  do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(String));  } while(0); String  *arg = static_cast<String *>(args[i]);
+#define INTEGER(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Integer)); } while(0); Integer *arg = static_cast<Integer*>(args[i]);
+#define DOUBLE(arg, i)  do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Double));  } while(0); Double  *arg = static_cast<Double *>(args[i]);
+#define REGEXP(arg, i)	do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(RegExp));  } while(0); RegExp  *arg = static_cast<RegExp *>(args[i]);
+#define TUPLE(arg, i)   do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Tuple));   } while(0); Tuple   *arg = static_cast<Tuple  *>(args[i]);
+#define CLOSURE(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Closure)); } while(0); Closure *arg = static_cast<Closure*>(args[i]);
+
+#define INTEGER_MPZ(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Integer)); } while(0); mpz_t arg = { static_cast<Integer*>(args[i])->wrap() };
 
 /* Useful expressions for primitives */
-std::shared_ptr<Value> make_unit();
-std::shared_ptr<Value> make_bool(bool x);
-std::shared_ptr<Value> make_order(int x);
-std::shared_ptr<Value> make_tuple2(std::shared_ptr<Value> &&first, std::shared_ptr<Value> &&second);
-std::shared_ptr<Value> make_list(std::vector<std::shared_ptr<Value> > &&values);
-std::shared_ptr<Value> make_result(bool ok, std::shared_ptr<Value> &&value);
+HeapObject *alloc_order(Heap &h, int x);
+HeapObject *alloc_nil(Heap &h);
+inline size_t reserve_unit() { return Tuple::reserve(0); }
+inline size_t reserve_bool() { return Tuple::reserve(0); }
+inline size_t reserve_tuple2() { return Tuple::reserve(2); }
+inline size_t reserve_result() { return Tuple::reserve(1); }
+inline size_t reserve_list(size_t elements) { return Tuple::reserve(2) * elements + Tuple::reserve(0); }
+HeapObject *claim_unit(Heap &h);
+HeapObject *claim_bool(Heap &h, bool x);
+HeapObject *claim_tuple2(Heap &h, HeapObject *first, HeapObject *second);
+HeapObject *claim_result(Heap &h, bool ok, HeapObject *value);
+HeapObject *claim_list(Heap &h, size_t elements, HeapObject** values);
 
 #define PRIM_PURE	1	// has no side-effects (can be duplicated / removed)
 #define PRIM_SHALLOW	2	// only wait for direct arguments (not children)
@@ -110,6 +113,6 @@ void prim_register_regexp(PrimMap &pmap);
 void prim_register_target(PrimMap &pmap);
 void prim_register_json(PrimMap &pmap);
 void prim_register_job(JobTable *jobtable, PrimMap &pmap);
-void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimMap &pmap);
+void prim_register_sources(RootPointer<Tuple> *sources, PrimMap &pmap);
 
 #endif

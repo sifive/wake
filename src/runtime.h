@@ -20,7 +20,10 @@
 
 #include "gc.h"
 
+struct Expr;
 struct Runtime;
+struct Continuation;
+struct Tuple;
 
 struct Work : public HeapObject {
   HeapPointer<Work> next;
@@ -36,8 +39,11 @@ struct Work : public HeapObject {
 };
 
 struct Runtime {
+  bool stack_trace;
+  bool abort;
   Heap heap;
   RootPointer<Work> stack;
+  RootPointer<HeapObject> output;
 
   Runtime();
   void run();
@@ -46,6 +52,11 @@ struct Runtime {
     work->next = stack;
     stack = work;
   }
+
+  void init(Expr *root);
+
+  static size_t reserve_eval();
+  void claim_eval(Expr *expr, Tuple *scope, Continuation *cont);
 };
 
 struct Continuation : public Work {

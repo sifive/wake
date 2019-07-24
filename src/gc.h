@@ -199,12 +199,19 @@ struct Heap {
   void reserve(size_t requested_pads) {
     if (static_cast<size_t>(end - free) < requested_pads)
       throw GCNeededException(requested_pads);
+#ifdef DEBUG_GC
+    limit = requested_pads;
+#endif
   }
 
   // Claim the space previously prepared by 'reserve'
   PadObject *claim(size_t requested_pads) {
     PadObject *out = free;
     free += requested_pads;
+#ifdef DEBUG_GC
+    assert (requested_pads >= limit);
+    limit -= requested_pads;
+#endif
     return out;
   }
 
@@ -230,6 +237,10 @@ private:
   size_t last_pads;
   RootRing roots;
   HeapObject *finalize;
+#ifdef DEBUG_GC
+  size_t limit;
+#endif
+
 friend struct DestroyableObject;
 };
 

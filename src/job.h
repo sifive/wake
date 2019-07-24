@@ -21,7 +21,7 @@
 #include <memory>
 
 struct Database;
-struct WorkQueue;
+struct Runtime;
 
 struct JobTable {
   struct detail;
@@ -31,7 +31,7 @@ struct JobTable {
   ~JobTable();
 
   // Wait for a job to complete; false -> no more active jobs
-  bool wait(WorkQueue &queue);
+  bool wait(Runtime &runtime);
   static bool exit_now();
 };
 

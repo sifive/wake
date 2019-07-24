@@ -16,17 +16,17 @@
  */
 
 #include "prim.h"
+#include "type.h"
 #include "value.h"
-#include "heap.h"
 #include <gmp.h>
 
 #define UNOP(name, fn)				\
 static PRIMFN(prim_##name) {			\
   EXPECT(1);					\
-  INTEGER(arg0, 0);				\
-  auto out = std::make_shared<Integer>();	\
-  fn(out->value, arg0->value);			\
-  RETURN(out);					\
+  INTEGER_MPZ(arg0, 0);				\
+  MPZ out;					\
+  fn(out.value, arg0);				\
+  RETURN(Integer::alloc(runtime.heap, out));	\
 }
 
 UNOP(com, mpz_com)
@@ -36,11 +36,11 @@ UNOP(neg, mpz_neg)
 #define BINOP(name, fn)				\
 static PRIMFN(prim_##name) {			\
   EXPECT(2);					\
-  INTEGER(arg0, 0);				\
-  INTEGER(arg1, 1);				\
-  auto out = std::make_shared<Integer>();	\
-  fn(out->value, arg0->value, arg1->value);	\
-  RETURN(out);					\
+  INTEGER_MPZ(arg0, 0);				\
+  INTEGER_MPZ(arg1, 1);				\
+  MPZ out;					\
+  fn(out.value, arg0, arg1);			\
+  RETURN(Integer::alloc(runtime.heap, out));	\
 }
 
 BINOP(add, mpz_add)
@@ -55,53 +55,51 @@ BINOP(lcm, mpz_lcm)
 #define BINOP_ZERO(name, fn)					\
 static PRIMFN(prim_##name) {					\
   EXPECT(2);							\
-  INTEGER(arg0, 0);						\
-  INTEGER(arg1, 1);						\
-  bool division_by_zero = mpz_cmp_si(arg1->value, 0) == 0;	\
+  INTEGER_MPZ(arg0, 0);						\
+  INTEGER_MPZ(arg1, 1);						\
+  bool division_by_zero = mpz_cmp_si(arg1, 0) == 0;		\
   REQUIRE(!division_by_zero);					\
-  auto out = std::make_shared<Integer>();			\
-  fn(out->value, arg0->value, arg1->value);			\
-  RETURN(out);							\
+  MPZ out;							\
+  fn(out.value, arg0, arg1);					\
+  RETURN(Integer::alloc(runtime.heap, out));			\
 }
 
 BINOP_ZERO(div, mpz_tdiv_q)
 BINOP_ZERO(mod, mpz_tdiv_r)
 
-#define BINOP_SI2(name, fn1, fn2)							\
-static PRIMFN(prim_##name) {								\
-  EXPECT(2);										\
-  INTEGER(arg0, 0);									\
-  INTEGER(arg1, 1);									\
-  bool MB_size_shift =									\
-    mpz_cmp_si(arg1->value,  (1<<20)) >= 0 ||						\
-    mpz_cmp_si(arg1->value, -(1<<20)) <= 0;						\
-  REQUIRE(!MB_size_shift);								\
-  auto out = std::make_shared<Integer>();						\
-  if (mpz_sgn(arg1->value) >= 0) {							\
-    fn1(out->value, arg0->value, mpz_get_si(arg1->value));				\
-  } else {										\
-    fn2(out->value, arg0->value, -mpz_get_si(arg1->value));				\
-  }											\
-  RETURN(out);										\
+#define BINOP_SI2(name, fn1, fn2)				\
+static PRIMFN(prim_##name) {					\
+  EXPECT(2);							\
+  INTEGER_MPZ(arg0, 0);						\
+  INTEGER_MPZ(arg1, 1);						\
+  bool MB_size_shift =						\
+    mpz_cmp_si(arg1,  (1<<20)) >= 0 ||				\
+    mpz_cmp_si(arg1, -(1<<20)) <= 0;				\
+  REQUIRE(!MB_size_shift);					\
+  MPZ out;							\
+  if (mpz_sgn(arg1) >= 0) {					\
+    fn1(out.value, arg0, mpz_get_si(arg1));			\
+  } else {							\
+    fn2(out.value, arg0, -mpz_get_si(arg1));			\
+  }								\
+  RETURN(Integer::alloc(runtime.heap, out));			\
 }
 
 BINOP_SI2(shl,  mpz_mul_2exp,    mpz_tdiv_q_2exp)
 BINOP_SI2(shr,  mpz_tdiv_q_2exp, mpz_mul_2exp)
 
-#define BINOP_SI0(name, fn)								\
-static PRIMFN(prim_##name) {								\
-  EXPECT(2);										\
-  INTEGER(arg0, 0);									\
-  INTEGER(arg1, 1);									\
-  bool MB_size_shift =	mpz_cmp_si(arg1->value, (1<<20)) >= 0;				\
-  REQUIRE(!MB_size_shift);								\
-  auto out = std::make_shared<Integer>();						\
-  if (mpz_sgn(arg1->value) >= 0) {							\
-    fn(out->value, arg0->value, mpz_get_si(arg1->value));				\
-  } else {										\
-    mpz_set_si(out->value, 0);								\
-  }											\
-  RETURN(out);										\
+#define BINOP_SI0(name, fn)					\
+static PRIMFN(prim_##name) {					\
+  EXPECT(2);							\
+  INTEGER_MPZ(arg0, 0);						\
+  INTEGER_MPZ(arg1, 1);						\
+  bool MB_size_shift =	mpz_cmp_si(arg1, (1<<20)) >= 0;		\
+  REQUIRE(!MB_size_shift);					\
+  MPZ out;							\
+  if (mpz_sgn(arg1) >= 0) {					\
+    fn(out.value, arg0, mpz_get_si(arg1));			\
+  }								\
+  RETURN(Integer::alloc(runtime.heap, out));			\
 }
 
 BINOP_SI0(exp,  mpz_pow_ui)
@@ -117,12 +115,12 @@ static PRIMTYPE(type_powm) {
 
 static PRIMFN(prim_powm) {
   EXPECT(3);
-  INTEGER(arg0, 0);
-  INTEGER(arg1, 1);
-  INTEGER(arg2, 2);
-  auto out = std::make_shared<Integer>();
-  mpz_powm(out->value, arg0->value, arg1->value, arg2->value);
-  RETURN(out);
+  INTEGER_MPZ(arg0, 0);
+  INTEGER_MPZ(arg1, 1);
+  INTEGER_MPZ(arg2, 2);
+  MPZ out;
+  mpz_powm(out.value, arg0, arg1, arg2);
+  RETURN(Integer::alloc(runtime.heap, out));
 }
 
 static PRIMTYPE(type_str) {
@@ -134,16 +132,21 @@ static PRIMTYPE(type_str) {
 
 static PRIMFN(prim_str) {
   EXPECT(2);
-  INTEGER(arg0, 0);
-  INTEGER(arg1, 1);
+  INTEGER_MPZ(arg0, 0);
+  INTEGER_MPZ(arg1, 1);
   long base = 0;
-  bool ok = mpz_fits_slong_p(arg0->value);
+  bool ok = mpz_fits_slong_p(arg0);
   if (ok) {
-    base = mpz_get_si(arg0->value);
+    base = mpz_get_si(arg0);
     ok &= base <= 62 && base >= -36 && base != 0 && base != 1 && base != -1;
   }
-  auto out = std::make_shared<String>(ok ? arg1->str(base) : "");
-  RETURN(out);
+  char buffer[mpz_sizeinbase(arg1, base) + 2];
+  if (ok) {
+    mpz_get_str(buffer, base, arg1);
+  } else {
+    buffer[0] = 0;
+  }
+  RETURN(String::alloc(runtime.heap, buffer));
 }
 
 static PRIMTYPE(type_int) {
@@ -158,21 +161,23 @@ static PRIMTYPE(type_int) {
 
 static PRIMFN(prim_int) {
   EXPECT(2);
-  INTEGER(arg0, 0);
+  INTEGER_MPZ(arg0, 0);
   STRING(arg1, 1);
   long base = 0;
-  bool ok = mpz_fits_slong_p(arg0->value);
+  bool ok = mpz_fits_slong_p(arg0);
   if (ok) {
-    base = mpz_get_si(arg0->value);
+    base = mpz_get_si(arg0);
     ok &= base <= 62 && base >= 0 && base != 1;
   }
-  std::vector<std::shared_ptr<Value> > vals;
-  auto val = std::make_shared<Integer>();
-  if (ok && !mpz_set_str(val->value, arg1->value.c_str(), base)) {
-    vals.emplace_back(std::move(val));
+  MPZ val;
+  if (ok && !mpz_set_str(val.value, arg1->c_str(), base)) {
+    size_t need = Integer::reserve(val) + reserve_list(1);
+    runtime.heap.reserve(need);
+    HeapObject *x = Integer::claim(runtime.heap, val);
+    RETURN(claim_list(runtime.heap, 1, &x));
+  } else {
+    RETURN(alloc_nil(runtime.heap));
   }
-  auto out = make_list(std::move(vals));
-  RETURN(out);
 }
 
 // popcount, scan0, scan1 ?
@@ -199,10 +204,9 @@ static PRIMTYPE(type_icmp) {
 
 static PRIMFN(prim_icmp) {
   EXPECT(2);
-  INTEGER(arg0, 0);
-  INTEGER(arg1, 1);
-  auto out = make_order(mpz_cmp(arg0->value, arg1->value));
-  RETURN(out);
+  INTEGER_MPZ(arg0, 0);
+  INTEGER_MPZ(arg1, 1);
+  RETURN(alloc_order(runtime.heap, mpz_cmp(arg0, arg1)));
 }
 
 void prim_register_integer(PrimMap &pmap) {

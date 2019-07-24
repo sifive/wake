@@ -20,8 +20,6 @@
 
 #include "location.h"
 #include "primfn.h"
-#include "hash.h"
-#include "heap.h"
 #include "type.h"
 #include "datatype.h"
 #include "gc.h"
@@ -117,9 +115,10 @@ struct VarRef : public Expr {
 
 struct Literal : public Expr {
   RootPointer<HeapObject> value;
+  TypeVar *litType;
 
   static const TypeDescriptor type;
-  Literal(const Location &location_, RootPointer<HeapObject> &&value_);
+  Literal(const Location &location_, RootPointer<HeapObject> &&value_, TypeVar *litType_);
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;

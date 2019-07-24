@@ -16,7 +16,6 @@
  */
 
 #include "location.h"
-#include <sstream>
 #include <fstream>
 
 std::ostream & operator << (std::ostream &os, FileLocation location) {

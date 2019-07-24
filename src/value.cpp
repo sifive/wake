@@ -16,17 +16,14 @@
  */
 
 #include "value.h"
+#include "type.h"
 #include "expr.h"
-#include "heap.h"
 #include "hash.h"
-#include "datatype.h"
 #include "symbol.h"
 #include "status.h"
 #include "sfinae.h"
 #include "tuple.h"
 #include <sstream>
-#include <cassert>
-#include <algorithm>
 #include <string.h>
 
 void FormatState::resume() {
@@ -61,26 +58,51 @@ std::string HeapObject::to_str() const {
 
 TypeVar String::typeVar("String", 0);
 
-PadObject *String::next() {
-  return Parent::next() + 1 + length/sizeof(PadObject);
-}
-
 String::String(size_t length_) : length(length_) { }
 
 String::String(const String &s) : length(s.length) {
   memcpy(data(), s.data(), length+1);
 }
 
-size_t String::reserve(size_t length) {
-  return sizeof(String)/sizeof(PadObject) + 1 + length/sizeof(PadObject);
-}
-
 String *String::claim(Heap &h, size_t length) {
   return new (h.claim(reserve(length))) String(length);
 }
 
+String *String::claim(Heap &h, const std::string &str) {
+  String *out = claim(h, str.size());
+  memcpy(out->c_str(), str.c_str(), str.size()+1);
+  return out;
+}
+
+String *String::claim(Heap &h, const char *str, size_t length) {
+  auto out = claim(h, length);
+  memcpy(out->c_str(), str, length);
+  out->c_str()[length] = 0;
+  return out;
+}
+
 String *String::alloc(Heap &h, size_t length) {
   return new (h.alloc(reserve(length))) String(length);
+}
+
+String *String::alloc(Heap &h, const std::string &str) {
+  String *out = alloc(h, str.size());
+  memcpy(out->data(), str.c_str(), str.size()+1);
+  return out;
+}
+
+String *String::alloc(Heap &h, const char *str, size_t length) {
+  String *out = alloc(h, length);
+  memcpy(out->c_str(), str, length);
+  out->c_str()[length] = 0;
+  return out;
+}
+
+String *String::alloc(Heap &h, const char *str) {
+  size_t size = strlen(str);
+  String *out = alloc(h, size);
+  memcpy(out->data(), str, size+1);
+  return out;
 }
 
 RootPointer<String> String::literal(Heap &h, const std::string &value) {
@@ -97,7 +119,7 @@ RootPointer<String> String::literal(Heap &h, const std::string &value) {
   return h.root(out);
 }
 
-static void cstr_format(std::ostream &os, const char *s, size_t len) {
+void String::cstr_format(std::ostream &os, const char *s, size_t len) {
   const char *e = s + len;
   for (const char *i = s; i != e; ++i) switch (char ch = *i) {
     case '"': os << "\\\""; break;
@@ -129,6 +151,15 @@ static void cstr_format(std::ostream &os, const char *s, size_t len) {
   }
 }
 
+int String::compare(const String &other) const {
+  int out = memcmp(data(), other.data(), std::min(length, other.length));
+  if (out == 0) {
+    if (length < other.length) out = -1;
+    if (length > other.length) out = 1;
+  }
+  return out;
+}
+
 void String::format(std::ostream &os, FormatState &state) const {
   os << "\"";
   cstr_format(os, c_str(), length);
@@ -137,18 +168,10 @@ void String::format(std::ostream &os, FormatState &state) const {
 
 TypeVar Integer::typeVar("Integer", 0);
 
-PadObject *Integer::next() {
-  return Parent::next() + (abs(length)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject);
-}
-
 Integer::Integer(int length_) : length(length_) { }
 
 Integer::Integer(const Integer &i) : length(i.length) {
   memcpy(data(), i.data(), length * sizeof(mp_limb_t));
-}
-
-size_t Integer::reserve(const MPZ &mpz) {
-  return sizeof(Integer)/sizeof(PadObject) + (abs(mpz.value[0]._mp_size)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject);
 }
 
 Integer *Integer::claim(Heap &h, const MPZ &mpz) {
@@ -259,21 +282,21 @@ static const RE2::Options &defops(RE2::Options &&options) {
   return options;
 }
 
-RegExp::RegExp(Heap &h, const std::string &regexp, const RE2::Options &opts)
+RegExp::RegExp(Heap &h, const re2::StringPiece &regexp, const RE2::Options &opts)
  : Parent(h), exp(std::make_shared<RE2>(
      has_set_dot_nl<RE2::Options>::value
      ? re2::StringPiece(regexp)
-     : re2::StringPiece("(?s)" + regexp),
+     : re2::StringPiece("(?s)" + regexp.as_string()),
      opts)) { }
 
-RegExp::RegExp(Heap &h, const std::string &regexp)
+RegExp::RegExp(Heap &h, const re2::StringPiece &regexp)
  : RegExp(h, regexp, defops(RE2::Options())) { }
 
 void RegExp::format(std::ostream &os, FormatState &state) const {
   if (APP_PRECEDENCE < state.p()) os << "(";
   os << "RegExp `";
   auto p = exp->pattern();
-  cstr_format(os, p.c_str(), p.size());
+  String::cstr_format(os, p.c_str(), p.size());
   os << "`";
   if (APP_PRECEDENCE < state.p()) os << ")";
 }
@@ -298,7 +321,7 @@ void Closure::format(std::ostream &os, FormatState &state) const {
 }
 
 void Tuple::format(std::ostream &os, FormatState &state) const {
-  const HeapObject* child = (state.get() < size()) ? (*this)[state.get()].coerce<HeapObject>() : nullptr;
+  const HeapObject* child = (state.get() < size()) ? at(state.get())->coerce<HeapObject>() : nullptr;
   auto cons = static_cast<Constructor*>(meta);
   const std::string &name = cons->ast.name;
 
