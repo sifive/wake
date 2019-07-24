@@ -56,6 +56,10 @@ std::string HeapObject::to_str() const {
   return str.str();
 }
 
+Hash HeapObject::hash() const {
+  return Hash(to_str()); // !!! FIXME -- sharing, functions, etc ...
+}
+
 TypeVar String::typeVar("String", 0);
 
 String::String(size_t length_) : length(length_) { }
@@ -106,16 +110,8 @@ String *String::alloc(Heap &h, const char *str) {
 }
 
 RootPointer<String> String::literal(Heap &h, const std::string &value) {
-  String *out;
-  while (true) {
-    try {
-      out = alloc(h, value.size());
-      break;
-    } catch (GCNeededException gc) {
-      h.GC(gc.needed);
-    }
-  }
-  memcpy(out->data(), value.c_str(), value.size()+1);
+  h.guarantee(reserve(value.size()));
+  String *out = claim(h, value);
   return h.root(out);
 }
 
@@ -151,11 +147,11 @@ void String::cstr_format(std::ostream &os, const char *s, size_t len) {
   }
 }
 
-int String::compare(const String &other) const {
-  int out = memcmp(data(), other.data(), std::min(length, other.length));
+int String::compare(const char *other_data, size_t other_length) const {
+  int out = memcmp(data(), other_data, std::min(length, other_length));
   if (out == 0) {
-    if (length < other.length) out = -1;
-    if (length > other.length) out = 1;
+    if (length < other_length) out = -1;
+    if (length > other_length) out = 1;
   }
   return out;
 }
@@ -187,16 +183,9 @@ Integer *Integer::alloc(Heap &h, const MPZ &mpz) {
 }
 
 RootPointer<Integer> Integer::literal(Heap &h, const std::string &value) {
-  Integer *out;
   MPZ mpz(value);
-  while (true) {
-    try {
-      out = alloc(h, mpz);
-      break;
-    } catch (GCNeededException gc) {
-      h.GC(gc.needed);
-    }
-  }
+  h.guarantee(reserve(mpz));
+  Integer *out = claim(h, mpz);
   return h.root(out);
 }
 
@@ -214,15 +203,8 @@ void Integer::format(std::ostream &os, FormatState &state) const {
 TypeVar Double::typeVar("Double", 0);
 
 RootPointer<Double> Double::literal(Heap &h, const char *str) {
-  Double *out;
-  while (true) {
-    try {
-      out = alloc(h, str);
-      break;
-    } catch (GCNeededException gc) {
-      h.GC(gc.needed);
-    }
-  }
+  h.guarantee(reserve());
+  Double *out = claim(h, str);
   return h.root(out);
 }
 
@@ -302,15 +284,8 @@ void RegExp::format(std::ostream &os, FormatState &state) const {
 }
 
 RootPointer<RegExp> RegExp::literal(Heap &h, const std::string &value) {
-  RegExp *out;
-  while (true) {
-    try {
-      out = alloc(h, h, value);
-      break;
-    } catch (GCNeededException gc) {
-      h.GC(gc.needed);
-    }
-  }
+  h.guarantee(reserve());
+  RegExp *out = claim(h, h, value);
   return h.root(out);
 }
 

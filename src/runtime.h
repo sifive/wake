@@ -44,6 +44,7 @@ struct Runtime {
   Heap heap;
   RootPointer<Work> stack;
   RootPointer<HeapObject> output;
+  RootPointer<Tuple> sources; // Vector String
 
   Runtime();
   void run();

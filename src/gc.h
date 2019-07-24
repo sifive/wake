@@ -204,6 +204,15 @@ struct Heap {
 #endif
   }
 
+  // This invalidates all non-RootPointers. Beware!
+  void guarantee(size_t requested_pads) {
+    if (static_cast<size_t>(end - free) < requested_pads)
+      GC(requested_pads);
+#ifdef DEBUG_GC
+    limit = requested_pads;
+#endif
+  }
+
   // Claim the space previously prepared by 'reserve'
   PadObject *claim(size_t requested_pads) {
     PadObject *out = free;

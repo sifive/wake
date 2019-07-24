@@ -32,7 +32,8 @@ void Work::format(std::ostream &os, FormatState &state) const {
 Runtime::Runtime()
  : stack_trace(false), abort(false), heap(),
    stack(heap.root<Work>(nullptr)),
-   output(heap.root<HeapObject>(nullptr)) {
+   output(heap.root<HeapObject>(nullptr)),
+   sources(heap.root<HeapObject>(nullptr)) {
 }
 
 void Runtime::run() {
@@ -83,15 +84,7 @@ struct CInit final : public GCObject<CInit, Continuation> {
 };
 
 void Runtime::init(Expr *root) {
-  while (true) {
-    try {
-      heap.reserve(Interpret::reserve() + CInit::reserve());
-      break;
-    } catch (GCNeededException gc) {
-      heap.GC(gc.needed);
-    }
-  }
-
+  heap.guarantee(Interpret::reserve() + CInit::reserve());
   CInit *done = CInit::claim(heap);
   schedule(Interpret::claim(heap, root, nullptr, done));
 }

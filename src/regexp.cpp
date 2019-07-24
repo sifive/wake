@@ -38,13 +38,16 @@ static PRIMTYPE(type_re2) {
 static PRIMFN(prim_re2) {
   EXPECT(1);
   STRING(arg0, 0);
-  size_t need = reserve_result() + RegExp::reserve() + 100; // !!! hope 100 covers error size
+  size_t need = reserve_result() + RegExp::reserve();
   runtime.heap.reserve(need);
   RegExp *regexp = RegExp::claim(runtime.heap, runtime.heap, sp(arg0));
   if (regexp->exp->ok()) {
     RETURN(claim_result(runtime.heap, true, regexp));
   } else {
-    String *fail = String::alloc(runtime.heap, regexp->exp->error());
+    // claim for RegExp again to guarantee forward progress
+    need += String::reserve(regexp->exp->error().size());
+    runtime.heap.reserve(need);
+    String *fail = String::claim(runtime.heap, regexp->exp->error());
     RETURN(claim_result(runtime.heap, false, fail));
   }
 }

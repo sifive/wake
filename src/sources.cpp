@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-#if 0
 #include "sources.h"
 #include "prim.h"
 #include "primfn.h"
+#include "type.h"
 #include "value.h"
 #include "execpath.h"
 
@@ -52,7 +52,7 @@ bool chdir_workspace(std::string &prefix) {
   for (attempts = 100; attempts && access("wake.db", F_OK) == -1; --attempts) {
     if (chdir("..") == -1) return false;
   }
-  std::string workspace = get_workspace();
+  std::string workspace = get_cwd();
   prefix.assign(cwd.begin() + workspace.size(), cwd.end());
   if (!prefix.empty())
     std::rotate(prefix.begin(), prefix.begin()+1, prefix.end());
@@ -101,7 +101,7 @@ static std::string slurp(int dirfd, bool &fail) {
   return str.str();
 }
 
-static bool scan(std::vector<std::shared_ptr<String> > &out, const std::string &path, int dirfd) {
+static bool scan(std::vector<std::string> &out, const std::string &path, int dirfd) {
   auto dir = fdopendir(dirfd);
   if (!dir) {
     fprintf(stderr, "Failed to fdopendir %s: %s\n", path.c_str(), strerror(errno));
@@ -120,7 +120,7 @@ static bool scan(std::vector<std::shared_ptr<String> > &out, const std::string &
       const char *end = tok + files.size();
       for (const char *scan = tok; scan != end; ++scan) {
         if (*scan == 0 && scan != tok) {
-          out.emplace_back(std::make_shared<String>(prefix + tok));
+          out.emplace_back(prefix + tok);
           tok = scan+1;
         }
       }
@@ -161,14 +161,14 @@ static bool scan(std::vector<std::shared_ptr<String> > &out, const std::string &
   return failed;
 }
 
-static bool scan(std::vector<std::shared_ptr<String> > &out) {
+static bool scan(std::vector<std::string> &out) {
   int flags, dirfd = open(".", O_RDONLY);
   if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1)
     fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
   return dirfd == -1 || scan(out, ".", dirfd);
 }
 
-static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::string &path, int dirfd) {
+static bool push_files(std::vector<std::string> &out, const std::string &path, int dirfd, const RE2 &re, size_t skip) {
   auto dir = fdopendir(dirfd);
   if (!dir) {
     close(dirfd);
@@ -203,10 +203,12 @@ static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::st
       if (fd == -1) {
         failed = true;
       } else {
-        failed = push_files(out, name, fd);
+        failed = push_files(out, name, fd, re, skip);
       }
     } else {
-      out.emplace_back(std::make_shared<String>(name));
+      re2::StringPiece p(name.c_str() + skip, name.size() - skip);
+      if (RE2::FullMatch(p, re))
+        out.emplace_back(std::move(name));
     }
   }
 
@@ -215,25 +217,11 @@ static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::st
   return failed;
 }
 
-static bool push_files(std::vector<std::shared_ptr<String> > &out, const std::string &path) {
+static bool push_files(std::vector<std::string> &out, const std::string &path, const RE2& re, size_t skip) {
   int flags, dirfd = open(path.c_str(), O_RDONLY);
   if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1)
     fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
-  return dirfd == -1 || push_files(out, path, dirfd);
-}
-
-static bool str_lexical(const std::shared_ptr<String> &a, const std::shared_ptr<String> &b) {
-  return a->value < b->value;
-}
-
-static bool str_equal(const std::shared_ptr<String> &a, const std::shared_ptr<String> &b) {
-  return a->value == b->value;
-}
-
-static void distinct(std::vector<std::shared_ptr<String> > &sources) {
-  std::sort(sources.begin(), sources.end(), str_lexical);
-  auto it = std::unique(sources.begin(), sources.end(), str_equal);
-  sources.resize(std::distance(sources.begin(), it));
+  return dirfd == -1 || push_files(out, path, dirfd, re, skip);
 }
 
 // . => ., hax/ => hax, foo/.././bar.z => bar.z, foo/../../bar.z => ../bar.z
@@ -324,62 +312,42 @@ static std::string make_relative(std::string &&dir, std::string &&path) {
   return x;
 }
 
-std::string get_workspace() {
-  static std::string cwd;
-  if (cwd.empty()) cwd = get_cwd();
-  return cwd;
-}
-
-std::vector<std::shared_ptr<String> > find_all_sources(bool &ok, bool workspace) {
-  std::vector<std::shared_ptr<String> > out;
-  if (workspace) ok = ok && !scan(out);
-  return out;
-}
-
 std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace) {
-  std::vector<std::shared_ptr<String> > acc;
-  std::string abs_libdir = find_execpath() + "/../share/wake/lib";
-  std::string rel_libdir = make_relative(get_workspace(), make_canonical(abs_libdir));
-  ok = ok && !push_files(acc, rel_libdir);
-  if (workspace) ok = ok && !push_files(acc, ".");
-  distinct(acc);
-
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
   RE2 exp("(?s).*[^/]\\.wake", options);
 
-  std::vector<std::string> out;
-  for (auto &i : acc) if (RE2::FullMatch(i->value, exp)) out.push_back(std::move(i->value));
-  return out;
+  std::string abs_libdir = find_execpath() + "/../share/wake/lib";
+  std::string rel_libdir = make_relative(get_cwd(), make_canonical(abs_libdir));
+
+  std::vector<std::string> acc;
+  ok = ok && !push_files(acc, rel_libdir, exp, 0);
+  if (workspace) ok = ok && !push_files(acc, ".", exp, 0);
+
+  // make the output distinct
+  std::sort(acc.begin(), acc.end());
+  auto it = std::unique(acc.begin(), acc.end());
+  acc.resize(std::distance(acc.begin(), it));
+
+  return acc;
 }
 
-static std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<String> > &all, const std::string &base, const RE2 &exp) {
-  std::vector<std::shared_ptr<String> > out;
+bool find_all_sources(Runtime &runtime, bool workspace) {
+  bool ok = true;
+  std::vector<std::string> found;
+  if (workspace) ok = !scan(found);
 
-  if (base == ".") {
-    for (auto &i : all) if (RE2::FullMatch(i->value, exp)) out.push_back(i);
-  } else {
-    long skip = base.size() + 1;
-    auto prefixL = std::make_shared<String>(base + "/");
-    auto prefixH = std::make_shared<String>(base + "0"); // '/' + 1 = '0'
-    auto low  = std::lower_bound(all.begin(), all.end(), prefixL, str_lexical);
-    auto high = std::lower_bound(all.begin(), all.end(), prefixH, str_lexical);
-    for (auto i = low; i != high; ++i) {
-      re2::StringPiece piece((*i)->value.data() + skip, (*i)->value.size() - skip);
-      if (RE2::FullMatch(piece, exp)) out.push_back(*i);
-    }
-  }
+  size_t need = Tuple::reserve(found.size());
+  for (auto &x : found) need += String::reserve(x.size());
+  runtime.heap.guarantee(need);
 
-  return out;
-}
+  Tuple *out = Tuple::claim(runtime.heap, nullptr, found.size());
+  for (size_t i = 0; i < out->size(); ++i)
+    out->at(i)->instant_fulfill(String::claim(runtime.heap, found[i]));
 
-static std::vector<std::shared_ptr<String> > sources(const std::vector<std::shared_ptr<String> > &all, const std::string &base, const std::string &regexp) {
-  RE2::Options options;
-  options.set_log_errors(false);
-  options.set_one_line(true);
-  RE2 exp("(?s)" + regexp, options);
-  return sources(all, base, exp);
+  runtime.sources = out;
+  return ok;
 }
 
 static PRIMTYPE(type_sources) {
@@ -392,21 +360,39 @@ static PRIMTYPE(type_sources) {
     out->unify(list);
 }
 
+static bool promise_lexical(const Promise &a, const std::string &b) {
+  return a.coerce<String>()->compare(b) < 0;
+}
+
 static PRIMFN(prim_sources) {
   EXPECT(2);
   STRING(arg0, 0);
   REGEXP(arg1, 1);
 
-  std::string root = make_canonical(arg0->value);
+  long skip = 0;
+  Promise *low  = runtime.sources->at(0);
+  Promise *high = low + runtime.sources->size();
 
-  std::vector<std::shared_ptr<String> > *all = reinterpret_cast<std::vector<std::shared_ptr<String> >*>(data);
-  auto match = sources(*all, root, arg1->exp);
+  std::string root = make_canonical(arg0->as_str());
+  if (root != ".") {
+    auto prefixL = root + "/";
+    auto prefixH = root + "0"; // '/' + 1 = '0'
+    skip = root.size() + 1;
+    low  = std::lower_bound(low, high, prefixL, promise_lexical);
+    high = std::lower_bound(low, high, prefixH, promise_lexical);
+  }
 
-  std::vector<std::shared_ptr<Value> > downcast;
-  downcast.reserve(match.size());
-  for (auto &i : match) downcast.emplace_back(std::move(i));
+  std::vector<String*> found;
+  for (Promise *i = low; i != high; ++i) {
+    String *s = i->coerce<String>();
+    re2::StringPiece piece(s->c_str() + skip, s->length - skip);
+    if (RE2::FullMatch(piece, *arg1->exp)) found.push_back(s);
+  }
 
-  auto out = make_list(std::move(downcast));
+  Tuple *out = Tuple::alloc(runtime.heap, nullptr, found.size());
+  for (size_t i = 0; i < out->size(); ++i)
+    out->at(i)->instant_fulfill(found[i]);
+
   RETURN(out);
 }
 
@@ -415,20 +401,22 @@ static PRIMFN(prim_files) {
   STRING(arg0, 0);
   REGEXP(arg1, 1);
 
-  std::string root = make_canonical(arg0->value);
+  std::string root = make_canonical(arg0->as_str());
+  size_t skip = (root == ".") ? 0 : (root.size() + 1);
 
-  std::vector<std::shared_ptr<String> > files;
-  bool fail = push_files(files, root);
+  std::vector<std::string> match;
+  bool fail = push_files(match, root, *arg1->exp, skip);
+  if (fail) match.clear(); // !!! There's a hole in the API
 
-  std::vector<std::shared_ptr<Value> > downcast;
-  if (!fail) {
-    auto match = sources(files, root, arg1->exp);
-    downcast.reserve(match.size());
-    for (auto &i : match) downcast.emplace_back(std::move(i));
-  }
+  size_t need = reserve_list(match.size());
+  for (auto &x : match) need += String::reserve(x.size());
+  runtime.heap.reserve(need);
 
-  auto out = make_list(std::move(downcast));
-  RETURN(out);
+  std::vector<HeapObject*> out(match.size());
+  for (auto &x : match)
+    out.push_back(String::claim(runtime.heap, x));
+
+  RETURN(claim_list(runtime.heap, out.size(), out.data()));
 }
 
 static PRIMTYPE(type_add_sources) {
@@ -437,25 +425,60 @@ static PRIMTYPE(type_add_sources) {
     out->unify(Data::typeUnit);
 }
 
+static bool promise_lt(const Promise &a, const Promise &b) {
+  return a.coerce<String>()->compare(*b.coerce<String>()) < 0;
+}
+
+static bool promise_eq(const Promise &a, const Promise &b) {
+  return a.coerce<String>()->compare(*b.coerce<String>()) == 0;
+}
+
 static PRIMFN(prim_add_sources) {
   EXPECT(1);
   STRING(arg0, 0);
 
-  std::vector<std::shared_ptr<String> > *all = reinterpret_cast<std::vector<std::shared_ptr<String> >*>(data);
-
-  const char *tok = arg0->value.data();
-  const char *end = tok + arg0->value.size();
+  size_t copy = runtime.sources->size();
+  size_t num = copy;
+  size_t need = reserve_unit();
+  const char *tok = arg0->c_str();
+  const char *end = tok + arg0->length;
   for (const char *scan = tok; scan != end; ++scan) {
     if (*scan == 0 && scan != tok) {
-      std::string name(tok);
-      all->emplace_back(std::make_shared<String>(make_canonical(name)));
+      ++num;
+      need += String::reserve(scan - tok);
       tok = scan+1;
     }
   }
 
-  distinct(*all);
-  auto out = make_unit();
-  RETURN(out);
+  need += 2*Tuple::reserve(num);
+  runtime.heap.reserve(need);
+  Tuple *tuple = Tuple::claim(runtime.heap, nullptr, num);
+
+  size_t i;
+  for (i = 0; i < copy; ++i)
+    tuple->at(i)->instant_fulfill(runtime.sources->at(i)->coerce<HeapObject>());
+
+  tok = arg0->c_str();
+  end = tok + arg0->length;
+  for (const char *scan = tok; scan != end; ++scan) {
+    if (*scan == 0 && scan != tok) {
+      tuple->at(i++)->instant_fulfill(String::claim(runtime.heap, tok, scan-tok));
+      tok = scan+1;
+    }
+  }
+
+  // make the output distinct
+  Promise *low = tuple->at(0);
+  Promise *high = low + tuple->size();
+  std::sort(low, high, promise_lt);
+  size_t keep = std::unique(low, high, promise_eq) - low;
+
+  Tuple *compact = Tuple::claim(runtime.heap, nullptr, keep);
+  for (size_t j = 0; j < keep; ++j)
+    compact->at(j)->instant_fulfill(tuple->at(j)->coerce<HeapObject>());
+
+  runtime.sources = compact;
+  RETURN(claim_unit(runtime.heap));
 }
 
 static PRIMTYPE(type_simplify) {
@@ -468,8 +491,7 @@ static PRIMFN(prim_simplify) {
   EXPECT(1);
   STRING(arg0, 0);
 
-  auto out = std::make_shared<String>(make_canonical(arg0->value));
-  RETURN(out);
+  RETURN(String::alloc(runtime.heap, make_canonical(arg0->as_str())));
 }
 
 static PRIMTYPE(type_relative) {
@@ -484,10 +506,9 @@ static PRIMFN(prim_relative) {
   STRING(dir, 0);
   STRING(path, 1);
 
-  auto out = std::make_shared<String>(make_relative(
-    make_canonical(dir->value),
-    make_canonical(path->value)));
-  RETURN(out);
+  RETURN(String::alloc(runtime.heap, make_relative(
+    make_canonical(dir->as_str()),
+    make_canonical(path->as_str()))));
 }
 
 static PRIMTYPE(type_execpath) {
@@ -497,8 +518,7 @@ static PRIMTYPE(type_execpath) {
 
 static PRIMFN(prim_execpath) {
   EXPECT(0);
-  auto out = std::make_shared<String>(find_execpath());
-  RETURN(out);
+  RETURN(String::alloc(runtime.heap, find_execpath()));
 }
 
 static PRIMTYPE(type_workspace) {
@@ -508,8 +528,7 @@ static PRIMTYPE(type_workspace) {
 
 static PRIMFN(prim_workspace) {
   EXPECT(0);
-  auto out = std::make_shared<String>(get_workspace());
-  RETURN(out);
+  RETURN(String::alloc(runtime.heap, get_cwd()));
 }
 
 static PRIMTYPE(type_pid) {
@@ -519,14 +538,14 @@ static PRIMTYPE(type_pid) {
 
 static PRIMFN(prim_pid) {
   EXPECT(0);
-  auto out = std::make_shared<Integer>(getpid());
-  RETURN(out);
+  MPZ out(getpid());
+  RETURN(Integer::alloc(runtime.heap, out));
 }
 
-void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimMap &pmap) {
+void prim_register_sources(PrimMap &pmap) {
   // Re-ordering of sources/files would break their behaviour, so they are not pure.
-  prim_register(pmap, "sources",     prim_sources,     type_sources,     PRIM_SHALLOW, sources);
-  prim_register(pmap, "add_sources", prim_add_sources, type_add_sources, PRIM_SHALLOW, sources);
+  prim_register(pmap, "sources",     prim_sources,     type_sources,     PRIM_SHALLOW);
+  prim_register(pmap, "add_sources", prim_add_sources, type_add_sources, PRIM_SHALLOW);
   prim_register(pmap, "files",       prim_files,       type_sources,     PRIM_SHALLOW);
   prim_register(pmap, "simplify",    prim_simplify,    type_simplify,    PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "relative",    prim_relative,    type_relative,    PRIM_PURE|PRIM_SHALLOW);
@@ -534,4 +553,3 @@ void prim_register_sources(std::vector<std::shared_ptr<String> > *sources, PrimM
   prim_register(pmap, "workspace",   prim_workspace,   type_workspace,   PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "pid",         prim_pid,         type_pid,         PRIM_PURE|PRIM_SHALLOW);
 }
-#endif

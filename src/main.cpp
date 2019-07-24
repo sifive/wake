@@ -552,12 +552,11 @@ int main(int argc, char **argv) {
 
   if (noparse) return 0;
 
-  bool ok = true;
-  auto all_sources(find_all_sources(ok, workspace));
+  Runtime runtime;
+  bool ok = find_all_sources(runtime, workspace);
   if (!ok) std::cerr << "Source file enumeration failed" << std::endl;
 
   // Read all wake build files
-  Runtime runtime;
   runtime.stack_trace = debug;
   std::unique_ptr<Top> top(new Top);
   auto wakefiles = find_all_wakefiles(ok, workspace);
@@ -606,7 +605,7 @@ int main(int argc, char **argv) {
   prim_register_target(pmap);
   prim_register_json(pmap);
   prim_register_job(&jobtable, pmap);
-  prim_register_sources(&all_sources, pmap);
+  prim_register_sources(pmap);
 
   if (parse) std::cout << top.get();
 

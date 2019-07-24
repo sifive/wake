@@ -66,7 +66,10 @@ struct String final : public GCObject<String> {
   const char *c_str() const { return static_cast<const char*>(data()); }
   char *c_str() { return static_cast<char*>(data()); }
   std::string as_str() const { return std::string(c_str(), length); }
-  int compare(const String &other) const;
+
+  int compare(const char *other_data, size_t other_len) const;
+  int compare(const String &other) const { return compare(other.c_str(), other.length); }
+  int compare(const std::string &other) const { return compare(other.c_str(), other.size()); }
 
   void format(std::ostream &os, FormatState &state) const override;
   static void cstr_format(std::ostream &os, const char *s, size_t len);

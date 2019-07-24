@@ -85,10 +85,10 @@ static PRIMTYPE(type_hash) {
 }
 
 static PRIMFN(prim_hash) {
-  // !!! FIX
+  // !!! FIX: must wait for values
   std::vector<uint64_t> codes;
-  for (; scope; scope = scope->at(0)->coerce<Tuple>())
-    Hash(scope->at(1)->coerce<HeapObject>()->to_str()).push(codes); // !!! coerce is bad
+  for (size_t i = 0; i < nargs; ++i)
+    args[i]->hash().push(codes);
   Hash h(codes);
   MPZ out;
   mpz_import(out.value, sizeof(h.data)/sizeof(h.data[0]), 1, sizeof(h.data[0]), 0, 0, &h.data[0]);

@@ -113,6 +113,6 @@ void prim_register_regexp(PrimMap &pmap);
 void prim_register_target(PrimMap &pmap);
 void prim_register_json(PrimMap &pmap);
 void prim_register_job(JobTable *jobtable, PrimMap &pmap);
-void prim_register_sources(RootPointer<Tuple> *sources, PrimMap &pmap);
+void prim_register_sources(PrimMap &pmap);
 
 #endif

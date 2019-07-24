@@ -200,7 +200,7 @@ Tuple *Tuple::alloc(Heap &h, void *meta, size_t size) {
 
 std::vector<Location> Tuple::stack_trace() const {
   std::vector<Location> out;
-/* !!!
+/* !!! stack tracing missing
   for (const Binding *i = this; i; i = i->invoker.get())
     if (i->expr->type != &DefBinding::type)
       out.emplace_back(i->expr->location);
