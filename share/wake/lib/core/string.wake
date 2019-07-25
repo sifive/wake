@@ -15,11 +15,14 @@
 
 # String methods
 
-global def cat strings =
-  def catopen    = prim "catopen"
-  def catclose c = prim "catclose"
-  def catadd c s = prim "catadd"
-  catclose (foldl catadd catopen strings)
+# !!! the 'helper' here is to force the list to exist before lcat is called
+global def cat listString =
+  def doit x = prim "lcat"
+  def helper = match _
+    "", t = helper t
+    _, t = helper t
+    Nil = doit listString
+  helper listString
 
 global def catWith separator strings =
   if strings.empty then "" else

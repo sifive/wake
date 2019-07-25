@@ -31,66 +31,61 @@
 #include <utf8proc.h>
 #include <unistd.h>
 
-struct CatStream final : public GCObject<CatStream, DestroyableObject> {
-  typedef GCObject<CatStream, DestroyableObject> Parent;
-
-  static TypeVar typeVar;
-  std::stringstream str;
-
-  CatStream(Heap &h) : Parent(h) { }
-  CatStream(CatStream &&c) : Parent(std::move(c)), str(std::move(c.str)) { }
-
-  void format(std::ostream &os, FormatState &state) const;
-};
-
-void CatStream::format(std::ostream &os, FormatState &state) const {
-  if (APP_PRECEDENCE < state.p()) os << "(";
-  os << "_CatStream";
-  std::string s = str.str();
-  String::cstr_format(os, s.c_str(), s.size());
-  if (APP_PRECEDENCE < state.p()) os << ")";
+static PRIMTYPE(type_vcat) {
+  bool ok = out->unify(String::typeVar);
+  for (auto x : args) ok &= x->unify(String::typeVar);
+  return ok;
 }
 
-TypeVar CatStream::typeVar("_CatStream", 0);
+static PRIMFN(prim_vcat) {
+  (void)data;
 
-#define CATSTREAM(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(CatStream));  } while(0); CatStream *arg = static_cast<CatStream*>(args[i]);
+  size_t size = 0;
+  for (size_t i = 0; i < nargs; ++i) {
+    STRING(s, i);
+    size += s->length;
+  }
 
-static PRIMTYPE(type_catopen) {
-  return args.size() == 0 &&
-    out->unify(CatStream::typeVar);
-}
+  String *out = String::alloc(runtime.heap, size);
+  out->c_str()[size] = 0;
 
-static PRIMFN(prim_catopen) {
-  EXPECT(0);
-  auto out = CatStream::alloc(runtime.heap, runtime.heap);
+  size = 0;
+  for (size_t i = 0; i < nargs; ++i) {
+    String *s = static_cast<String*>(args[i]);
+    memcpy(out->c_str() + size, s->c_str(), s->length);
+    size += s->length;
+  }
+
   RETURN(out);
 }
 
-static PRIMTYPE(type_catadd) {
-  return args.size() == 2 &&
-    args[0]->unify(CatStream::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    out->unify(CatStream::typeVar);
-}
-
-static PRIMFN(prim_catadd) {
-  EXPECT(2);
-  CATSTREAM(arg0, 0);
-  STRING(arg1, 1);
-  arg0->str.write(arg1->c_str(), arg1->length);
-  RETURN(args[0]);
-}
-
-static PRIMTYPE(type_catclose) {
+static PRIMTYPE(type_lcat) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
   return args.size() == 1 &&
-    args[0]->unify(CatStream::typeVar) &&
+    args[0]->unify(list) &&
     out->unify(String::typeVar);
 }
 
-static PRIMFN(prim_catclose) {
+static PRIMFN(prim_lcat) {
   EXPECT(1);
-  CATSTREAM(arg0, 0);
-  RETURN(String::alloc(runtime.heap, arg0->str.str()));
+
+  size_t size = 0;
+  for (Tuple *scan = static_cast<Tuple*>(args[0]); scan->size() == 2; scan = scan->at(1)->coerce<Tuple>())
+    size += scan->at(0)->coerce<String>()->length;
+
+  String *out = String::alloc(runtime.heap, size);
+  out->c_str()[size] = 0;
+
+  size = 0;
+  for (Tuple *scan = static_cast<Tuple*>(args[0]); scan->size() == 2; scan = scan->at(1)->coerce<Tuple>()) {
+    String *s = scan->at(0)->coerce<String>();
+    memcpy(out->c_str() + size, s->c_str(), s->length);
+    size += s->length;
+  }
+
+  RETURN(out);
 }
 
 static PRIMTYPE(type_explode) {
@@ -518,10 +513,8 @@ static PRIMFN(prim_uname) {
 }
 
 void prim_register_string(PrimMap &pmap, StringInfo *info) {
-  // cat* use mutation and 'read' execution order can matter => not pure
-  prim_register(pmap, "catopen",  prim_catopen,  type_catopen,             PRIM_SHALLOW);
-  prim_register(pmap, "catadd",   prim_catadd,   type_catadd,              PRIM_SHALLOW);
-  prim_register(pmap, "catclose", prim_catclose, type_catclose,            PRIM_SHALLOW);
+  prim_register(pmap, "vcat",     prim_vcat,     type_vcat,      PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "lcat",     prim_lcat,     type_lcat,      PRIM_PURE);
   prim_register(pmap, "explode",  prim_explode,  type_explode,   PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "unlink",   prim_unlink,   type_unlink,              PRIM_SHALLOW);
   prim_register(pmap, "write",    prim_write,    type_write,               PRIM_SHALLOW);

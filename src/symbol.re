@@ -254,6 +254,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
 {
   input_t &in = *lex.engine.get();
   Coordinates start = in.coord() - 1;
+  Coordinates first = start;
   std::vector<Expr*> exprs;
   std::string slice;
   bool ok = true;
@@ -310,14 +311,11 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
   if (exprs.size() == 1) {
     out = exprs.front();
   } else {
-    Expr *cat = new Prim(LOCATION, "catopen");
-    for (auto expr : exprs)
-      cat = new App(LOCATION, new App(LOCATION, new VarRef(LOCATION, "_ catadd"), cat), expr);
-    Location location = exprs.front()->location;
-    location.end = exprs.back()->location.end;
-    cat = new App(LOCATION, new Lambda(LOCATION, "_", new Prim(LOCATION, "catclose")), cat);
-    cat = new App(location, new Lambda(LOCATION, "_ catadd", cat),
-            new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new Prim(LOCATION, "catadd"))));
+    Expr *cat = new Prim(LOCATION, "vcat");
+    for (size_t i = 0; i < exprs.size(); ++i) cat = new Lambda(LOCATION, "_", cat);
+    for (auto expr : exprs) cat = new App(LOCATION, cat, expr);
+    cat->location = Location(in.filename, first, in.coord() - 1);
+    cat->flags |= FLAG_AST;
     out = cat;
   }
 
