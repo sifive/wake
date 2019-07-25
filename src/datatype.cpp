@@ -26,18 +26,9 @@ Sum::Sum(AST &&ast) : name(std::move(ast.name)), token(ast.token), region(ast.re
 }
 
 void Sum::addConstructor(AST &&ast) {
-  size_t nargs = ast.args.size();
   members.emplace_back(std::move(ast));
   Constructor &cons = members.back();
   cons.index = members.size()-1;
-
-  cons.expr = std::unique_ptr<Expr>(new App(LOCATION,
-    new VarRef(LOCATION, "_", 0, 0),
-    new VarRef(LOCATION, "_", 0, 1)));
-  for (size_t i = 0; i < nargs; ++i)
-    cons.expr = std::unique_ptr<Expr>(new App(LOCATION,
-      cons.expr.release(),
-      new VarRef(LOCATION, "_", nargs-i, 0)));
 }
 
 bool AST::unify(TypeVar &out, const std::map<std::string, TypeVar*> &ids) {

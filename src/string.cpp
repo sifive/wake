@@ -38,7 +38,7 @@ struct CatStream final : public GCObject<CatStream, DestroyableObject> {
   std::stringstream str;
 
   CatStream(Heap &h) : Parent(h) { }
-  CatStream(CatStream &&c) = default;
+  CatStream(CatStream &&c) : Parent(std::move(c)), str(std::move(c.str)) { }
 
   void format(std::ostream &os, FormatState &state) const;
 };

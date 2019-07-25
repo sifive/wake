@@ -108,7 +108,7 @@ struct RootPointer {
   // construct using heap.root(ptr)
   RootPointer(RootRing &o, HeapObject *obj) : ring(o, obj) { }
   template <typename Y>
-  RootPointer(RootPointer<Y> &&r) : ring(std::move(r.ring)) { static_cast<T*>(r.get()); }
+  RootPointer(RootPointer<Y> &&r) : ring(std::move(r.ring)) { }
 
   explicit operator bool() const { return ring.root; }
   void reset() { ring.root = nullptr; }
@@ -322,6 +322,7 @@ Placement GCObject<T, B>::descend(PadObject *free) {
 
 struct DestroyableObject : public HeapObject {
   DestroyableObject(Heap &h);
+  DestroyableObject(DestroyableObject &&d) = default;
   HeapObject *next;
 };
 
