@@ -15,7 +15,7 @@ to keep it up to date. Also, this only finds globals.
 usage:
 make sure that wake-db exists
 in the top of your workspace:
-waketags.py 
+waketags.py
 """
 
 
@@ -58,7 +58,7 @@ if __name__ == '__main__':
         try:
             tag, rest = a_line.split(':', 1)
         except ValueError:
-            print(f'badline: {a_line}', sys.stderr)
+            print('badline: %s' % a_line, sys.stderr)
             continue
 
         try:
@@ -75,7 +75,7 @@ if __name__ == '__main__':
         if file_line.startswith('['):
             file_line = file_line.split('-')[0][1:]
 
-        print(f'{tag}\t{file_name}\t{file_line};"', file=output)
+        print('%s\t%s\t%s;"' % (tag, file_name, file_line), file=output)
 
     tagfile = Path('tags').open(mode='w')
 
