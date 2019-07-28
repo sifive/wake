@@ -48,4 +48,5 @@ global def source file =
 # Find sources files
 global def sources dir filterRegexp =
   def scan dir regexp = prim "sources"
-  waitOne (\_ scan dir filterRegexp | map raw_source) got_sources
+  match got_sources
+    Unit = scan dir filterRegexp | map raw_source

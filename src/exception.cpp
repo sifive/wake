@@ -72,20 +72,7 @@ static PRIMFN(prim_panic) {
   REQUIRE(!panic_called);
 }
 
-static PRIMTYPE(type_unit) {
-  return args.size() == 1 &&
-    out->unify(Data::typeUnit);
-}
-
-static PRIMFN(prim_unit) {
-  EXPECT(1);
-  runtime.heap.reserve(reserve_unit());
-  RETURN(claim_unit(runtime.heap));
-}
-
 void prim_register_exception(PrimMap &pmap) {
   prim_register(pmap, "stack",    prim_stack, type_stack, PRIM_PURE|PRIM_SHALLOW);
   prim_register(pmap, "panic",    prim_panic, type_panic, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "wait_one", prim_unit,  type_unit,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "wait_all", prim_unit,  type_unit,  PRIM_PURE);
 }

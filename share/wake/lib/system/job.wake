@@ -292,8 +292,8 @@ global def runJob p = match p
             Accept _ _ = ""
             Reject why = why
           makeError "No runner for '{job.getJobDescription}' available, because: {map pretty opts | catWith ", "}"
-        def l = badlaunch job error
-        def f = waitOne (\_ badfinish job error) l
+        def _ = match (badlaunch job error)
+          Unit = badfinish job error
         job
 
 def toUsage (Pair (Pair status runtime) (Pair (Pair cputime membytes) (Pair ibytes obytes))) =
@@ -305,7 +305,9 @@ def getJobReality =
 
 def waitJobMerged f j =
   def raw job = prim "job_reality"
-  raw j | waitOne f
+  match (raw j)
+    Pass _ = f Unit
+    Fail _ = f Unit
 
 # Actual usage of a finished job
 global def getJobReport =
