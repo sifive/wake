@@ -82,7 +82,6 @@ size_t reserve_hash();
 Work *claim_hash(Heap &h, HeapObject *value, Continuation *continuation);
 
 #define PRIM_PURE	1	// has no side-effects (can be duplicated / removed)
-#define PRIM_SHALLOW	2	// only wait for direct arguments (not children)
 
 /* Register primitive functions */
 struct PrimDesc {

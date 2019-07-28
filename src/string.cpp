@@ -561,25 +561,25 @@ static PRIMFN(prim_uname) {
 }
 
 void prim_register_string(PrimMap &pmap, StringInfo *info) {
-  prim_register(pmap, "vcat",     prim_vcat,     type_vcat,      PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "vcat",     prim_vcat,     type_vcat,      PRIM_PURE);
   prim_register(pmap, "lcat",     prim_lcat,     type_lcat,      PRIM_PURE);
-  prim_register(pmap, "explode",  prim_explode,  type_explode,   PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "unlink",   prim_unlink,   type_unlink,              PRIM_SHALLOW);
-  prim_register(pmap, "write",    prim_write,    type_write,               PRIM_SHALLOW);
-  prim_register(pmap, "read",     prim_read,     type_read,                PRIM_SHALLOW);
-  prim_register(pmap, "getenv",   prim_getenv,   type_getenv,    PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "mkdir",    prim_mkdir,    type_mkdir,               PRIM_SHALLOW);
+  prim_register(pmap, "explode",  prim_explode,  type_explode,   PRIM_PURE);
+  prim_register(pmap, "unlink",   prim_unlink,   type_unlink,    0);
+  prim_register(pmap, "write",    prim_write,    type_write,     0);
+  prim_register(pmap, "read",     prim_read,     type_read,      0);
+  prim_register(pmap, "getenv",   prim_getenv,   type_getenv,    PRIM_PURE);
+  prim_register(pmap, "mkdir",    prim_mkdir,    type_mkdir,     0);
   prim_register(pmap, "format",   prim_format,   type_format,    PRIM_PURE);
-  prim_register(pmap, "print",    prim_print,    type_print,               PRIM_SHALLOW);
-  prim_register(pmap, "version",  prim_version,  type_version,   PRIM_PURE|PRIM_SHALLOW, (void*)info);
-  prim_register(pmap, "level",    prim_level,    type_level,     PRIM_PURE|PRIM_SHALLOW, (void*)info);
-  prim_register(pmap, "scmp",     prim_scmp,     type_scmp,      PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "sNFC",     prim_sNFC,     type_normalize, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "sNFKC",    prim_sNFKC,    type_normalize, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "scaseNFKC",prim_scaseNFKC,type_normalize, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "code2str", prim_code2str, type_code2str,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "bin2str",  prim_bin2str,  type_code2str,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "str2code", prim_str2code, type_str2code,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "str2bin",  prim_str2bin,  type_str2code,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "uname",    prim_uname,    type_uname,     PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "print",    prim_print,    type_print,     0);
+  prim_register(pmap, "version",  prim_version,  type_version,   PRIM_PURE, (void*)info);
+  prim_register(pmap, "level",    prim_level,    type_level,     PRIM_PURE, (void*)info);
+  prim_register(pmap, "scmp",     prim_scmp,     type_scmp,      PRIM_PURE);
+  prim_register(pmap, "sNFC",     prim_sNFC,     type_normalize, PRIM_PURE);
+  prim_register(pmap, "sNFKC",    prim_sNFKC,    type_normalize, PRIM_PURE);
+  prim_register(pmap, "scaseNFKC",prim_scaseNFKC,type_normalize, PRIM_PURE);
+  prim_register(pmap, "code2str", prim_code2str, type_code2str,  PRIM_PURE);
+  prim_register(pmap, "bin2str",  prim_bin2str,  type_code2str,  PRIM_PURE);
+  prim_register(pmap, "str2code", prim_str2code, type_str2code,  PRIM_PURE);
+  prim_register(pmap, "str2bin",  prim_str2bin,  type_str2code,  PRIM_PURE);
+  prim_register(pmap, "uname",    prim_uname,    type_uname,     PRIM_PURE);
 }

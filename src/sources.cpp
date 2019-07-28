@@ -542,12 +542,12 @@ static PRIMFN(prim_pid) {
 
 void prim_register_sources(PrimMap &pmap) {
   // Re-ordering of sources/files would break their behaviour, so they are not pure.
-  prim_register(pmap, "sources",     prim_sources,     type_sources,     PRIM_SHALLOW);
-  prim_register(pmap, "add_sources", prim_add_sources, type_add_sources, PRIM_SHALLOW);
-  prim_register(pmap, "files",       prim_files,       type_sources,     PRIM_SHALLOW);
-  prim_register(pmap, "simplify",    prim_simplify,    type_simplify,    PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "relative",    prim_relative,    type_relative,    PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "execpath",    prim_execpath,    type_execpath,    PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "workspace",   prim_workspace,   type_workspace,   PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "pid",         prim_pid,         type_pid,         PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "sources",     prim_sources,     type_sources,     0);
+  prim_register(pmap, "add_sources", prim_add_sources, type_add_sources, 0);
+  prim_register(pmap, "files",       prim_files,       type_sources,     0);
+  prim_register(pmap, "simplify",    prim_simplify,    type_simplify,    PRIM_PURE);
+  prim_register(pmap, "relative",    prim_relative,    type_relative,    PRIM_PURE);
+  prim_register(pmap, "execpath",    prim_execpath,    type_execpath,    PRIM_PURE);
+  prim_register(pmap, "workspace",   prim_workspace,   type_workspace,   PRIM_PURE);
+  prim_register(pmap, "pid",         prim_pid,         type_pid,         PRIM_PURE);
 }

@@ -223,11 +223,11 @@ static PRIMFN(prim_tokenize) {
 }
 
 void prim_register_regexp(PrimMap &pmap) {
-  prim_register(pmap, "re2",      prim_re2,      type_re2,      PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "re2str",   prim_re2str,   type_re2str,   PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "quote",    prim_quote,    type_quote,    PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "match",    prim_match,    type_match,    PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "extract",  prim_extract,  type_extract,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "replace",  prim_replace,  type_replace,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "tokenize", prim_tokenize, type_tokenize, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "re2",      prim_re2,      type_re2,      PRIM_PURE);
+  prim_register(pmap, "re2str",   prim_re2str,   type_re2str,   PRIM_PURE);
+  prim_register(pmap, "quote",    prim_quote,    type_quote,    PRIM_PURE);
+  prim_register(pmap, "match",    prim_match,    type_match,    PRIM_PURE);
+  prim_register(pmap, "extract",  prim_extract,  type_extract,  PRIM_PURE);
+  prim_register(pmap, "replace",  prim_replace,  type_replace,  PRIM_PURE);
+  prim_register(pmap, "tokenize", prim_tokenize, type_tokenize, PRIM_PURE);
 }

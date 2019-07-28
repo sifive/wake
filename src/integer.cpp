@@ -210,25 +210,25 @@ static PRIMFN(prim_icmp) {
 }
 
 void prim_register_integer(PrimMap &pmap) {
-  prim_register(pmap, "com", prim_com, type_unop,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "abs", prim_abs, type_unop,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "neg", prim_neg, type_unop,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "add", prim_add, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "sub", prim_sub, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "mul", prim_mul, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "div", prim_div, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "mod", prim_mod, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "xor", prim_xor, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "and", prim_and, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "or",  prim_or,  type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "gcd", prim_gcd, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "lcm", prim_lcm, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "shl", prim_shl, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "shr", prim_shr, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "exp", prim_exp, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "root",prim_root,type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "powm",prim_powm,type_powm,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "str", prim_str, type_str,   PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "int", prim_int, type_int,   PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "icmp",prim_icmp,type_icmp,  PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "com", prim_com, type_unop,  PRIM_PURE);
+  prim_register(pmap, "abs", prim_abs, type_unop,  PRIM_PURE);
+  prim_register(pmap, "neg", prim_neg, type_unop,  PRIM_PURE);
+  prim_register(pmap, "add", prim_add, type_binop, PRIM_PURE);
+  prim_register(pmap, "sub", prim_sub, type_binop, PRIM_PURE);
+  prim_register(pmap, "mul", prim_mul, type_binop, PRIM_PURE);
+  prim_register(pmap, "div", prim_div, type_binop, PRIM_PURE);
+  prim_register(pmap, "mod", prim_mod, type_binop, PRIM_PURE);
+  prim_register(pmap, "xor", prim_xor, type_binop, PRIM_PURE);
+  prim_register(pmap, "and", prim_and, type_binop, PRIM_PURE);
+  prim_register(pmap, "or",  prim_or,  type_binop, PRIM_PURE);
+  prim_register(pmap, "gcd", prim_gcd, type_binop, PRIM_PURE);
+  prim_register(pmap, "lcm", prim_lcm, type_binop, PRIM_PURE);
+  prim_register(pmap, "shl", prim_shl, type_binop, PRIM_PURE);
+  prim_register(pmap, "shr", prim_shr, type_binop, PRIM_PURE);
+  prim_register(pmap, "exp", prim_exp, type_binop, PRIM_PURE);
+  prim_register(pmap, "root",prim_root,type_binop, PRIM_PURE);
+  prim_register(pmap, "powm",prim_powm,type_powm,  PRIM_PURE);
+  prim_register(pmap, "str", prim_str, type_str,   PRIM_PURE);
+  prim_register(pmap, "int", prim_int, type_int,   PRIM_PURE);
+  prim_register(pmap, "icmp",prim_icmp,type_icmp,  PRIM_PURE);
 }

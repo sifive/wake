@@ -271,37 +271,37 @@ static PRIMFN(prim_modf) {
 
 void prim_register_double(PrimMap &pmap) {
   // basic functions
-  prim_register(pmap, "dabs", prim_abs, type_unop,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dneg", prim_neg, type_unop,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dadd", prim_add, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dsub", prim_sub, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dmul", prim_mul, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "ddiv", prim_div, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dpow", prim_pow, type_binop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dfma", prim_fma, type_fma,   PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dcmp", prim_cmp, type_cmp,   PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dstr", prim_str, type_str,   PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "ddbl", prim_dbl, type_dbl,   PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dabs", prim_abs, type_unop,  PRIM_PURE);
+  prim_register(pmap, "dneg", prim_neg, type_unop,  PRIM_PURE);
+  prim_register(pmap, "dadd", prim_add, type_binop, PRIM_PURE);
+  prim_register(pmap, "dsub", prim_sub, type_binop, PRIM_PURE);
+  prim_register(pmap, "dmul", prim_mul, type_binop, PRIM_PURE);
+  prim_register(pmap, "ddiv", prim_div, type_binop, PRIM_PURE);
+  prim_register(pmap, "dpow", prim_pow, type_binop, PRIM_PURE);
+  prim_register(pmap, "dfma", prim_fma, type_fma,   PRIM_PURE);
+  prim_register(pmap, "dcmp", prim_cmp, type_cmp,   PRIM_PURE);
+  prim_register(pmap, "dstr", prim_str, type_str,   PRIM_PURE);
+  prim_register(pmap, "ddbl", prim_dbl, type_dbl,   PRIM_PURE);
 
   // integer/double interop
-  prim_register(pmap, "dclass", prim_class, type_class, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dfrexp", prim_frexp, type_frexp, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dldexp", prim_ldexp, type_ldexp, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dmodf",  prim_modf,  type_modf,  PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dclass", prim_class, type_class, PRIM_PURE);
+  prim_register(pmap, "dfrexp", prim_frexp, type_frexp, PRIM_PURE);
+  prim_register(pmap, "dldexp", prim_ldexp, type_ldexp, PRIM_PURE);
+  prim_register(pmap, "dmodf",  prim_modf,  type_modf,  PRIM_PURE);
 
   // handy numeric functions
-  prim_register(pmap, "dcos",   prim_cos,   type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dsin",   prim_sin,   type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dtan",   prim_tan,   type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dacos",  prim_acos,  type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dasin",  prim_asin,  type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dexp",   prim_exp,   type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dlog",   prim_log,   type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dexpm1", prim_expm1, type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dlog1p", prim_log1p, type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "derf",   prim_erf,   type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "derfc",  prim_erfc,  type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dtgamma",prim_tgamma,type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "dlgamma",prim_lgamma,type_unop, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "datan",  prim_atan,  type_binop, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "dcos",   prim_cos,   type_unop, PRIM_PURE);
+  prim_register(pmap, "dsin",   prim_sin,   type_unop, PRIM_PURE);
+  prim_register(pmap, "dtan",   prim_tan,   type_unop, PRIM_PURE);
+  prim_register(pmap, "dacos",  prim_acos,  type_unop, PRIM_PURE);
+  prim_register(pmap, "dasin",  prim_asin,  type_unop, PRIM_PURE);
+  prim_register(pmap, "dexp",   prim_exp,   type_unop, PRIM_PURE);
+  prim_register(pmap, "dlog",   prim_log,   type_unop, PRIM_PURE);
+  prim_register(pmap, "dexpm1", prim_expm1, type_unop, PRIM_PURE);
+  prim_register(pmap, "dlog1p", prim_log1p, type_unop, PRIM_PURE);
+  prim_register(pmap, "derf",   prim_erf,   type_unop, PRIM_PURE);
+  prim_register(pmap, "derfc",  prim_erfc,  type_unop, PRIM_PURE);
+  prim_register(pmap, "dtgamma",prim_tgamma,type_unop, PRIM_PURE);
+  prim_register(pmap, "dlgamma",prim_lgamma,type_unop, PRIM_PURE);
+  prim_register(pmap, "datan",  prim_atan,  type_binop,PRIM_PURE);
 }

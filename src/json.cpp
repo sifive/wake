@@ -153,7 +153,7 @@ static PRIMFN(prim_json_str) {
 }
 
 void prim_register_json(PrimMap &pmap) {
-  prim_register(pmap, "json_file", prim_json_file, type_json, PRIM_SHALLOW);
-  prim_register(pmap, "json_body", prim_json_body, type_json, PRIM_SHALLOW|PRIM_PURE);
-  prim_register(pmap, "json_str",  prim_json_str,  type_jstr, PRIM_SHALLOW|PRIM_PURE);
+  prim_register(pmap, "json_file", prim_json_file, type_json, 0);
+  prim_register(pmap, "json_body", prim_json_body, type_json, PRIM_PURE);
+  prim_register(pmap, "json_str",  prim_json_str,  type_jstr, PRIM_PURE);
 }
