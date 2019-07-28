@@ -71,6 +71,7 @@ struct String final : public GCObject<String> {
   int compare(const String &other) const { return compare(other.c_str(), other.length); }
   int compare(const std::string &other) const { return compare(other.c_str(), other.size()); }
 
+  Hash hash() const override;
   void format(std::ostream &os, FormatState &state) const override;
   static void cstr_format(std::ostream &os, const char *s, size_t len);
 
@@ -111,6 +112,7 @@ struct Integer final : public GCObject<Integer> {
 
   std::string str(int base = 10) const;
   void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
 
   PadObject *next() { return Parent::next() + (abs(length)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
   static size_t reserve(const MPZ &mpz) { return sizeof(Integer)/sizeof(PadObject) + (abs(mpz.value[0]._mp_size)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
@@ -145,7 +147,8 @@ struct Double final : public GCObject<Double> {
   Double(const char *str) { char *end; value = strtod(str, &end); }
 
   std::string str(int format = DEFAULTFLOAT, int precision = limits::max_digits10) const;
-  void format(std::ostream &os, FormatState &state) const;
+  void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
 
   // Never call this during runtime! It can invalidate the heap.
   static RootPointer<Double> literal(Heap &h, const char *str);
@@ -160,19 +163,20 @@ struct RegExp final : public GCObject<RegExp, DestroyableObject> {
   RegExp(Heap &h, const re2::StringPiece &regexp, const RE2::Options &opts);
   RegExp(Heap &h, const re2::StringPiece &regexp);
 
-  void format(std::ostream &os, FormatState &state) const;
+  void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
 
   // Never call this during runtime! It can invalidate the heap.
   static RootPointer<RegExp> literal(Heap &h, const std::string &value);
 };
 
 struct Closure final : public GCObject<Closure, HeapObject> {
-  static TypeVar typeVar;
   Lambda *lambda;
   HeapPointer<Tuple> scope;
 
   Closure(Lambda *lambda_, Tuple *scope_);
   void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {

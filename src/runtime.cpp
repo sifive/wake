@@ -29,6 +29,11 @@ void Work::format(std::ostream &os, FormatState &state) const {
   os << "Work";
 }
 
+Hash Work::hash() const {
+  assert(0 /* unreachable */);
+  return Hash();
+}
+
 bool Work::is_work() const {
   return true;
 }

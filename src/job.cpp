@@ -78,7 +78,7 @@ struct Job final : public GCObject<Job> {
   long job;
   bool keep;
   int log;
-  HeapPointer<HeapObject> bad_launch;
+  HeapPointer<HeapObject> bad_launch; // !!! this ends up in the hash
   HeapPointer<HeapObject> bad_finish;
   double pathtime;
   Usage record;  // retrieved from DB (user-facing usage)
@@ -100,7 +100,8 @@ struct Job final : public GCObject<Job> {
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg);
 
-  void format(std::ostream &os, FormatState &state) const;
+  void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
 
   double threads() const;
 };
@@ -808,6 +809,10 @@ Job::Job(Database *db_, String *dir, String *stdin_, String *environ, String *cm
   Hash(environ->c_str(), environ->length).push(codes);
   Hash(cmdline->c_str(), cmdline->length).push(codes);
   code = Hash(codes);
+}
+
+Hash Job::hash() const {
+  return code;
 }
 
 #define JOB(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Job)); } while(0); Job *arg = static_cast<Job*>(args[i]);

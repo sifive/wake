@@ -25,6 +25,8 @@
 #include "expr.h"
 #include <sstream>
 #include <unordered_map>
+#include <queue>
+#include <bitset>
 
 struct TargetValue {
   Hash subhash;
@@ -53,6 +55,7 @@ struct Target final : public GCObject<Target, DestroyableObject> {
   T recurse(T arg);
 
   void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
 };
 
 TypeVar Target::typeVar("_Target", 0);
@@ -79,6 +82,11 @@ Target::~Target() {
 
 void Target::format(std::ostream &os, FormatState &state) const {
   os << "_Target";
+}
+
+Hash Target::hash() const {
+  // For reproducible execution, pretend a target is always empty
+  return Hash();
 }
 
 #define TARGET(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Target)); } while(0); Target *arg = static_cast<Target*>(args[i]);

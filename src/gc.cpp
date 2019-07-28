@@ -42,6 +42,11 @@ void PadObject::format(std::ostream &os, FormatState &state) const {
   os << "PadObject";
 }
 
+Hash PadObject::hash() const {
+  assert(0 /* unreachable */);
+  return Hash();
+}
+
 Placement MovedObject::moveto(PadObject *free) {
   return Placement(to, free);
 }
@@ -53,6 +58,11 @@ Placement MovedObject::descend(PadObject *free) {
 
 void MovedObject::format(std::ostream &os, FormatState &state) const {
   to->format(os, state);
+}
+
+Hash MovedObject::hash() const {
+  assert(0 /* unreachable */);
+  return Hash();
 }
 
 Heap::Heap() {

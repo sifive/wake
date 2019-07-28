@@ -49,12 +49,12 @@ struct HeapObject {
   virtual Placement moveto(PadObject *free) = 0;
   virtual Placement descend(PadObject *free) = 0;
   virtual void format(std::ostream &os, FormatState &state) const = 0;
+  virtual Hash hash() const = 0; // shallow hash of only this object
   virtual bool is_work() const;
   virtual ~HeapObject();
 
   static void format(std::ostream &os, const HeapObject *value, bool detailed = false, int indent = -1);
   std::string to_str() const;
-  Hash hash() const;
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) { return arg; }
@@ -177,6 +177,7 @@ struct PadObject final : public HeapObject {
   Placement moveto(PadObject *free) override;
   Placement descend(PadObject *free) override;
   void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
   static PadObject *place(PadObject *free) {
     new(free) PadObject();
     return free + 1;
@@ -189,6 +190,7 @@ struct alignas(PadObject) MovedObject final : public HeapObject {
   Placement moveto(PadObject *free) override;
   Placement descend(PadObject *free) override;
   void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
 };
 
 struct GCNeededException {

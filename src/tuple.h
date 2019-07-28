@@ -73,6 +73,7 @@ struct Tuple : public HeapObject {
   virtual Promise *at(size_t i) = 0;
   const virtual Promise *at(size_t i) const = 0;
   void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
 
   bool empty() const { return size() == 0; }
 

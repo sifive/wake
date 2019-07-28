@@ -162,6 +162,10 @@ void String::format(std::ostream &os, FormatState &state) const {
   os << "\"";
 }
 
+Hash String::hash() const {
+  return Hash(c_str(), length);
+}
+
 TypeVar Integer::typeVar("Integer", 0);
 
 Integer::Integer(int length_) : length(length_) { }
@@ -200,6 +204,10 @@ void Integer::format(std::ostream &os, FormatState &state) const {
   os << str();
 }
 
+Hash Integer::hash() const {
+  return Hash(data(), abs(length)*sizeof(mp_limb_t));
+}
+
 TypeVar Double::typeVar("Double", 0);
 
 RootPointer<Double> Double::literal(Heap &h, const char *str) {
@@ -210,6 +218,10 @@ RootPointer<Double> Double::literal(Heap &h, const char *str) {
 
 void Double::format(std::ostream &os, FormatState &state) const {
   os << str();
+}
+
+Hash Double::hash() const {
+  return Hash(&value, sizeof(value));
 }
 
 std::string Double::str(int format, int precision) const {
@@ -283,16 +295,22 @@ void RegExp::format(std::ostream &os, FormatState &state) const {
   if (APP_PRECEDENCE < state.p()) os << ")";
 }
 
+Hash RegExp::hash() const {
+  return Hash(exp->pattern());
+}
+
 RootPointer<RegExp> RegExp::literal(Heap &h, const std::string &value) {
   h.guarantee(reserve());
   RegExp *out = claim(h, h, value);
   return h.root(out);
 }
 
-TypeVar Closure::typeVar("Closure", 0);
-
 void Closure::format(std::ostream &os, FormatState &state) const {
   os << "<" << lambda->location.file() << ">";
+}
+
+Hash Closure::hash() const {
+  return lambda->hashcode;
 }
 
 static const char *describe(Meta *meta) {
@@ -300,6 +318,11 @@ static const char *describe(Meta *meta) {
   if (typeid(*meta) == typeid(Constructor))
     return static_cast<Constructor*>(meta)->ast.name.c_str();
   return static_cast<Expr*>(meta)->type->name;
+}
+
+Hash Tuple::hash() const {
+  size_t x = size();
+  return Hash(&x, sizeof(x));
 }
 
 void Tuple::format(std::ostream &os, FormatState &state) const {
