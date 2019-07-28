@@ -68,24 +68,48 @@ static PRIMTYPE(type_lcat) {
     out->unify(String::typeVar);
 }
 
-static PRIMFN(prim_lcat) {
-  EXPECT(1);
+struct CCat final : public GCObject<CCat, Continuation> {
+  HeapPointer<Tuple> list;
+  HeapPointer<Continuation> cont;
 
+  CCat(Tuple *list_, Continuation *cont_) : list(list_), cont(cont_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (list.*memberfn)(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
+  }
+
+  void execute(Runtime &runtime) override;
+};
+
+void CCat::execute(Runtime &runtime) {
   size_t size = 0;
-  for (Tuple *scan = static_cast<Tuple*>(args[0]); scan->size() == 2; scan = scan->at(1)->coerce<Tuple>())
+  for (Tuple *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Tuple>())
     size += scan->at(0)->coerce<String>()->length;
 
   String *out = String::alloc(runtime.heap, size);
   out->c_str()[size] = 0;
 
   size = 0;
-  for (Tuple *scan = static_cast<Tuple*>(args[0]); scan->size() == 2; scan = scan->at(1)->coerce<Tuple>()) {
+  for (Tuple *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Tuple>()) {
     String *s = scan->at(0)->coerce<String>();
     memcpy(out->c_str() + size, s->c_str(), s->length);
     size += s->length;
   }
 
-  RETURN(out);
+  cont->resume(runtime, out);
+}
+
+static PRIMFN(prim_lcat) {
+  EXPECT(1);
+  TUPLE(list, 0);
+  size_t need = reserve_hash() + CCat::reserve();
+  runtime.heap.reserve(need);
+  runtime.schedule(claim_hash(runtime.heap, list,
+    CCat::claim(runtime.heap, list, continuation)));
 }
 
 static PRIMTYPE(type_explode) {
@@ -294,11 +318,35 @@ static PRIMTYPE(type_format) {
     out->unify(String::typeVar);
 }
 
+struct CFormat final : public GCObject<CFormat, Continuation> {
+  HeapPointer<HeapObject> obj;
+  HeapPointer<Continuation> cont;
+
+  CFormat(HeapObject *obj_, Continuation *cont_) : obj(obj_), cont(cont_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (obj.*memberfn)(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
+  }
+
+  void execute(Runtime &runtime) override;
+};
+
+void CFormat::execute(Runtime &runtime) {
+  std::stringstream buffer;
+  buffer << obj.get();
+  cont->resume(runtime, String::alloc(runtime.heap, buffer.str()));
+}
+
 static PRIMFN(prim_format) {
   EXPECT(1);
-  std::stringstream buffer;
-  buffer << args[0];
-  RETURN(String::alloc(runtime.heap, buffer.str()));
+  size_t need = reserve_hash() + CFormat::reserve();
+  runtime.heap.reserve(need);
+  runtime.schedule(claim_hash(runtime.heap, args[0],
+    CFormat::claim(runtime.heap, args[0], continuation)));
 }
 
 static PRIMTYPE(type_print) {

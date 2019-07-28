@@ -78,6 +78,9 @@ HeapObject *claim_tuple2(Heap &h, HeapObject *first, HeapObject *second);
 HeapObject *claim_result(Heap &h, bool ok, HeapObject *value);
 HeapObject *claim_list(Heap &h, size_t elements, HeapObject** values);
 
+size_t reserve_hash();
+Work *claim_hash(Heap &h, HeapObject *value, Continuation *continuation);
+
 #define PRIM_PURE	1	// has no side-effects (can be duplicated / removed)
 #define PRIM_SHALLOW	2	// only wait for direct arguments (not children)
 

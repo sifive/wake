@@ -25,6 +25,8 @@
 #include <cstdlib>
 #include <sstream>
 #include <iosfwd>
+#include <unordered_map>
+#include <bitset>
 
 void require_fail(const char *message, unsigned size, Runtime &runtime, const Tuple *scope) {
   std::stringstream ss;
@@ -82,6 +84,81 @@ HeapObject *claim_list(Heap &h, size_t elements, HeapObject** values) {
     out = next;
   }
   return out;
+}
+
+struct HeapHash {
+  Hash code;
+  Promise *broken;
+};
+
+static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
+  std::unordered_map<uintptr_t, std::bitset<256> > explored;
+  size_t max_objs = runtime.heap.used() / sizeof(PadObject);
+  std::unique_ptr<HeapObject*[]> scratch(new HeapObject*[max_objs]);
+
+  HeapStep step;
+  scratch[0] = obj;
+  step.found = &scratch[1];
+  step.broken = nullptr;
+
+  Hash code;
+  for (HeapObject **done = scratch.get(); done != step.found; ++done) {
+    HeapObject *head = *done;
+
+    // Ensure we visit each object only once
+    uintptr_t key = reinterpret_cast<uintptr_t>(static_cast<void*>(head));
+    auto flag = explored[key>>8][key&0xFF];
+    if (flag) continue;
+    flag = true;
+
+    // Hash this object and enqueue its children for hashing
+    step = head->explore(step);
+    code = code + head->hash();
+  }
+
+  HeapHash out;
+  out.code = code;
+  out.broken = step.broken;
+  return out;
+}
+
+struct CHash final : public GCObject<CHash, Continuation> {
+  HeapPointer<HeapObject> obj;
+  HeapPointer<Continuation> cont;
+
+  CHash(HeapObject *obj_, Continuation *cont_) : obj(obj_), cont(cont_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (obj.*memberfn)(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
+  }
+
+  void execute(Runtime &runtime) override;
+};
+
+void CHash::execute(Runtime &runtime) {
+  MPZ out("0xffffFFFFffffFFFFffffFFFFffffFFFF"); // 128 bit
+  runtime.heap.reserve(Integer::reserve(out));
+
+  auto hash = deep_hash(runtime, obj.get());
+  if (hash.broken) {
+    hash.broken->await(runtime, this);
+  } else {
+    Hash &h = hash.code;
+    mpz_import(out.value, sizeof(h.data)/sizeof(h.data[0]), 1, sizeof(h.data[0]), 0, 0, &h.data[0]);
+    cont->resume(runtime, Integer::claim(runtime.heap, out));
+  }
+}
+
+size_t reserve_hash() {
+  return CHash::reserve();
+}
+
+Work *claim_hash(Heap &h, HeapObject *value, Continuation *continuation) {
+  return CHash::claim(h, value, continuation);
 }
 
 void prim_register(PrimMap &pmap, const char *key, PrimFn fn, PrimType type, int flags, void *data) {

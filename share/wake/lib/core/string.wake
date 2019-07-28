@@ -15,14 +15,7 @@
 
 # String methods
 
-# !!! the 'helper' here is to force the list to exist before lcat is called
-global def cat listString =
-  def doit x = prim "lcat"
-  def helper = match _
-    "", t = helper t
-    _, t = helper t
-    Nil = doit listString
-  helper listString
+global def cat listString = prim "lcat"
 
 global def catWith separator strings =
   if strings.empty then "" else

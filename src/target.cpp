@@ -25,7 +25,6 @@
 #include "expr.h"
 #include <sstream>
 #include <unordered_map>
-#include <bitset>
 
 struct TargetValue {
   Hash subhash;
@@ -96,81 +95,14 @@ Hash Target::hash() const {
 
 #define TARGET(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Target)); } while(0); Target *arg = static_cast<Target*>(args[i]);
 
-struct HeapHash {
-  Hash code;
-  Promise *broken;
-};
-
-static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
-  std::unordered_map<uintptr_t, std::bitset<256> > explored;
-  size_t max_objs = runtime.heap.used() / sizeof(PadObject);
-  std::unique_ptr<HeapObject*[]> scratch(new HeapObject*[max_objs]);
-
-  HeapStep step;
-  scratch[0] = obj;
-  step.found = &scratch[1];
-  step.broken = nullptr;
-
-  Hash code;
-  for (HeapObject **done = scratch.get(); done != step.found; ++done) {
-    HeapObject *head = *done;
-
-    // Ensure we visit each object only once
-    uintptr_t key = reinterpret_cast<uintptr_t>(static_cast<void*>(head));
-    auto flag = explored[key>>8][key&0xFF];
-    if (flag) continue;
-    flag = true;
-
-    // Hash this object and enqueue its children for hashing
-    step = head->explore(step);
-    code = code + head->hash();
-  }
-
-  HeapHash out;
-  out.code = code;
-  out.broken = step.broken;
-  return out;
-}
-
 static PRIMTYPE(type_hash) {
   return out->unify(Integer::typeVar);
 }
 
-struct CHash final : public GCObject<CHash, Continuation> {
-  HeapPointer<HeapObject> list;
-  HeapPointer<Continuation> cont;
-
-  CHash(HeapObject *list_, Continuation *cont_) : list(list_), cont(cont_) { }
-
-  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
-  T recurse(T arg) {
-    arg = Continuation::recurse<T, memberfn>(arg);
-    arg = (list.*memberfn)(arg);
-    arg = (cont.*memberfn)(arg);
-    return arg;
-  }
-
-  void execute(Runtime &runtime) override;
-};
-
-void CHash::execute(Runtime &runtime) {
-  MPZ out("0xffffFFFFffffFFFFffffFFFFffffFFFF"); // 128 bit
-  runtime.heap.reserve(Integer::reserve(out));
-
-  auto hash = deep_hash(runtime, list.get());
-  if (hash.broken) {
-    hash.broken->await(runtime, this);
-  } else {
-    Hash &h = hash.code;
-    mpz_import(out.value, sizeof(h.data)/sizeof(h.data[0]), 1, sizeof(h.data[0]), 0, 0, &h.data[0]);
-    cont->resume(runtime, Integer::claim(runtime.heap, out));
-  }
-}
-
 static PRIMFN(prim_hash) {
-  runtime.heap.reserve(reserve_list(nargs) + CHash::reserve());
+  runtime.heap.reserve(reserve_list(nargs) + reserve_hash());
   HeapObject *list = claim_list(runtime.heap, nargs, args);
-  runtime.schedule(CHash::claim(runtime.heap, list, continuation));
+  runtime.schedule(claim_hash(runtime.heap, list, continuation));
 }
 
 static PRIMTYPE(type_tnew) {
