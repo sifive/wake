@@ -36,6 +36,7 @@ struct HeapPointerBase;
 struct DestroyableObject;
 struct PadObject;
 struct FormatState;
+struct Promise;
 template <typename T> struct HeapPointer;
 template <typename T> struct RootPointer;
 
@@ -45,9 +46,15 @@ struct Placement {
   Placement(HeapObject *obj_, void *free_) : obj(obj_), free(static_cast<PadObject*>(free_)) { }
 };
 
+struct HeapStep {
+  Promise *broken; // non-zero if there is an unfulfilled Promise
+  HeapObject **found;
+};
+
 struct HeapObject {
   virtual Placement moveto(PadObject *free) = 0;
   virtual Placement descend(PadObject *free) = 0;
+  virtual HeapStep  explore(HeapStep step) = 0;
   virtual void format(std::ostream &os, FormatState &state) const = 0;
   virtual Hash hash() const = 0; // shallow hash of only this object
   virtual bool is_work() const;
@@ -133,6 +140,7 @@ private:
 struct HeapPointerBase {
   HeapPointerBase(HeapObject *obj_) : obj(obj_) { }
   PadObject *moveto(PadObject *free);
+  HeapStep explore(HeapStep step);
 
 protected:
   HeapObject *obj;
@@ -143,6 +151,11 @@ inline PadObject *HeapPointerBase::moveto(PadObject *free) {
   Placement out = obj->moveto(free);
   obj = out.obj;
   return out.free;
+}
+
+inline HeapStep HeapPointerBase::explore(HeapStep step) {
+  if (obj) *step.found++ = obj;
+  return step;
 }
 
 template <typename T>
@@ -176,6 +189,7 @@ RootPointer<T> &RootPointer<T>::operator = (HeapPointer<Y> x) {
 struct PadObject final : public HeapObject {
   Placement moveto(PadObject *free) override;
   Placement descend(PadObject *free) override;
+  HeapStep  explore(HeapStep step) override;
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
   static PadObject *place(PadObject *free) {
@@ -189,6 +203,7 @@ struct alignas(PadObject) MovedObject final : public HeapObject {
   HeapObject *to;
   Placement moveto(PadObject *free) override;
   Placement descend(PadObject *free) override;
+  HeapStep  explore(HeapStep step) override;
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
 };
@@ -274,11 +289,10 @@ struct alignas(PadObject) GCObject : public B {
   const void *data() const { return self() + 1; }
   void *data() { return self() + 1; }
 
-  // moving constructor
+  // Implement heap virtual methods using the type-specific 'recurse' method
   Placement moveto(PadObject *free) final override;
-
-  // redefine this if object includes HeapPointers
   Placement descend(PadObject *free) final override;
+  HeapStep explore(HeapStep step) final override;
 
   // redefine these if 'data' extends past sizeof(T)
   PadObject *next() { return static_cast<PadObject*>(static_cast<HeapObject*>(self() + 1)); }
@@ -324,6 +338,11 @@ Placement GCObject<T, B>::moveto(PadObject *free) {
 template <typename T, typename B>
 Placement GCObject<T, B>::descend(PadObject *free) {
   return Placement(self()->next(), self()->template recurse<PadObject *, &HeapPointerBase::moveto>(free));
+}
+
+template <typename T, typename B>
+HeapStep GCObject<T, B>::explore(HeapStep step) {
+  return self()->template recurse<HeapStep, &HeapPointerBase::explore>(step);
 }
 
 struct DestroyableObject : public HeapObject {

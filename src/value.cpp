@@ -56,10 +56,6 @@ std::string HeapObject::to_str() const {
   return str.str();
 }
 
-Hash HeapObject::hash() const {
-  return Hash(to_str()); // !!! FIXME -- sharing, functions, etc ...
-}
-
 TypeVar String::typeVar("String", 0);
 
 String::String(size_t length_) : length(length_) { }
@@ -321,8 +317,18 @@ static const char *describe(Meta *meta) {
 }
 
 Hash Tuple::hash() const {
-  size_t x = size();
-  return Hash(&x, sizeof(x));
+  uint64_t buf[2];
+
+  buf[0] = size();
+  if (!meta) {
+    buf[1] = ~static_cast<uint64_t>(0);
+  } else if (typeid(*meta) == typeid(Constructor)) {
+    buf[1] = static_cast<Constructor*>(meta)->index;
+  } else {
+    buf[1] = static_cast<Expr*>(meta)->type->hashcode.data[1];
+  }
+
+  return Hash(&buf[0], sizeof(buf));
 }
 
 void Tuple::format(std::ostream &os, FormatState &state) const {

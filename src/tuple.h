@@ -58,6 +58,13 @@ struct alignas(PadObject) Promise {
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) { return (value.*memberfn)(arg); }
 
+  template <>
+  HeapStep recurse<HeapStep, &HeapPointerBase::explore>(HeapStep step) {
+    if (*this) return value.explore(step);
+    step.broken = this;
+    return step;
+  }
+
 private:
   mutable HeapPointer<HeapObject> value;
 friend struct Tuple;

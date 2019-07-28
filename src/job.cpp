@@ -78,7 +78,7 @@ struct Job final : public GCObject<Job> {
   long job;
   bool keep;
   int log;
-  HeapPointer<HeapObject> bad_launch; // !!! this ends up in the hash
+  HeapPointer<HeapObject> bad_launch;
   HeapPointer<HeapObject> bad_finish;
   double pathtime;
   Usage record;  // retrieved from DB (user-facing usage)
@@ -99,6 +99,8 @@ struct Job final : public GCObject<Job> {
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg);
+  template <>
+  HeapStep recurse<HeapStep, &HeapPointerBase::explore>(HeapStep step);
 
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
@@ -120,6 +122,13 @@ T Job::recurse(T arg) {
   arg = (q_outputs.*memberfn)(arg);
   arg = (q_report.*memberfn)(arg);
   return arg;
+}
+
+template <>
+HeapStep Job::recurse<HeapStep, &HeapPointerBase::explore>(HeapStep step) {
+  // We don't want to explore the work-queues or bad_finish/launch children
+  // Instead, we front-loaded the hash calculation
+  return step;
 }
 
 // Check if Job can wake up any computation

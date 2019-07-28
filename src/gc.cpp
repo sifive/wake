@@ -38,6 +38,11 @@ Placement PadObject::descend(PadObject *free) {
   return Placement(this + 1, free);
 }
 
+HeapStep PadObject::explore(HeapStep step) {
+  assert(0 /* unreachable */);
+  return step;
+}
+
 void PadObject::format(std::ostream &os, FormatState &state) const {
   os << "PadObject";
 }
@@ -54,6 +59,10 @@ Placement MovedObject::moveto(PadObject *free) {
 Placement MovedObject::descend(PadObject *free) {
   assert(0 /* unreachable */);
   return Placement(0, 0);
+}
+
+HeapStep MovedObject::explore(HeapStep step) {
+  return to->explore(step);
 }
 
 void MovedObject::format(std::ostream &os, FormatState &state) const {

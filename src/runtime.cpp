@@ -94,9 +94,10 @@ struct CInit final : public GCObject<CInit, Continuation> {
 };
 
 void Runtime::init(Expr *root) {
-  heap.guarantee(Interpret::reserve() + CInit::reserve());
+  heap.guarantee(Tuple::reserve(0) + Interpret::reserve() + CInit::reserve());
   CInit *done = CInit::claim(heap);
-  schedule(Interpret::claim(heap, root, nullptr, done));
+  Tuple *eos = Tuple::claim(heap, nullptr, 0);
+  schedule(Interpret::claim(heap, root, eos, done));
 }
 
 size_t Runtime::reserve_eval() {
