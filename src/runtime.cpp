@@ -179,51 +179,39 @@ void Literal::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
 
 struct CPrim final : public GCObject<CPrim, Continuation> {
   HeapPointer<Tuple> scope;
-  HeapPointer<Tuple> wait;
   HeapPointer<Continuation> cont;
   Prim *prim;
 
-  CPrim(Tuple *scope_, Tuple *wait_, Continuation *cont_, Prim *prim_)
-   : scope(scope_), wait(wait_), cont(cont_), prim(prim_) { }
+  CPrim(Tuple *scope_, Continuation *cont_, Prim *prim_)
+   : scope(scope_), cont(cont_), prim(prim_) { }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
     arg = Continuation::recurse<T, memberfn>(arg);
     arg = (scope.*memberfn)(arg);
-    arg = (wait.*memberfn)(arg);
     arg = (cont.*memberfn)(arg);
     return arg;
   }
 
   void execute(Runtime &runtime) override {
-    for (; wait && *wait->at(1); wait = wait->at(0)->coerce<Tuple>()) { }
-    if (!wait) {
-      HeapObject *args[prim->args];
-      Tuple *it = scope.get();
-      for (size_t i = prim->args; i; --i) {
-        args[i-1] = it->at(1)->coerce<HeapObject>();
-        it = it->at(0)->coerce<Tuple>();
-      }
+    HeapObject *args[prim->args];
+    Tuple *it = scope.get();
+    size_t i;
+    for (i = prim->args; i; --i) {
+      if (!*it->at(1)) break;
+      args[i-1] = it->at(1)->coerce<HeapObject>();
+      it = it->at(0)->coerce<Tuple>();
+    }
+    if (i == 0) {
       prim->fn(prim->data, runtime, cont.get(), scope.get(), prim->args, args);
     } else {
-      wait->at(1)->await(runtime, this);
+      it->at(1)->await(runtime, this);
     }
   }
 };
 
 void Prim::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
-  Tuple *wait;
-  if (args > 0) {
-    wait = scope;
-    Tuple *cut = scope;
-    for (int i = 1; i < args; ++i)
-      cut = cut->at(0)->coerce<Tuple>();
-    cut->at(0)->instant_fulfill(nullptr);
-  } else {
-    wait = nullptr;
-  }
-
-  CPrim *prim = CPrim::alloc(runtime.heap, scope, wait, cont, this);
+  CPrim *prim = CPrim::alloc(runtime.heap, scope, cont, this);
   runtime.schedule(prim);
 }
 

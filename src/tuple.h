@@ -49,8 +49,8 @@ struct alignas(PadObject) Promise {
   // Call only if the containing tuple was just constructed (no Continuations)
   void instant_fulfill(HeapObject *obj) {
 #ifdef DEBUG_GC
-     assert(!obj || !value);
-     assert(!obj || !obj->is_work());
+     assert(!value);
+     assert(!obj->is_work());
 #endif
      value = obj;
   }
