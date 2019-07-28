@@ -69,11 +69,12 @@ struct Interpret final : public GCObject<Interpret, Work> {
   Interpret(Expr *expr_, Tuple *scope_, Continuation *cont_)
    : expr(expr_), scope(scope_), cont(cont_) { }
 
-  PadObject *recurse(PadObject *free) {
-    free = Work::recurse(free);
-    free = scope.moveto(free);
-    free = cont.moveto(free);
-    return free;
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Work::recurse<T, memberfn>(arg);
+    arg = (scope.*memberfn)(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
   }
 
   void execute(Runtime &runtime) override {
@@ -124,11 +125,12 @@ struct CApp final : public GCObject<CApp, Continuation> {
 
   CApp(Tuple *bind_, Continuation *cont_) : bind(bind_), cont(cont_) { }
 
-  PadObject *recurse(PadObject *free) {
-    free = Continuation::recurse(free);
-    free = bind.moveto(free);
-    free = cont.moveto(free);
-    return free;
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (bind.*memberfn)(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
   }
 
   void execute(Runtime &runtime) override {
@@ -178,12 +180,13 @@ struct CPrim final : public GCObject<CPrim, Continuation> {
   CPrim(Tuple *scope_, Tuple *wait_, Continuation *cont_, Prim *prim_)
    : scope(scope_), wait(wait_), cont(cont_), prim(prim_) { }
 
-  PadObject *recurse(PadObject *free) {
-    free = Continuation::recurse(free);
-    free = scope.moveto(free);
-    free = wait.moveto(free);
-    free = cont.moveto(free);
-    return free;
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (scope.*memberfn)(arg);
+    arg = (wait.*memberfn)(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
   }
 
   void execute(Runtime &runtime) override {
@@ -238,11 +241,12 @@ struct SelectDestructor final : public GCObject<SelectDestructor, Continuation> 
   SelectDestructor(Tuple *scope_, Continuation *cont_, Destruct *des_)
    : scope(scope_), cont(cont_), des(des_) { }
 
-  PadObject *recurse(PadObject *free) {
-    free = Continuation::recurse(free);
-    free = scope.moveto(free);
-    free = cont.moveto(free);
-    return free;
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (scope.*memberfn)(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
   }
 
   void execute(Runtime &runtime) override {

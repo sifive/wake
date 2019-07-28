@@ -32,10 +32,11 @@ struct Work : public HeapObject {
   void format(std::ostream &os, FormatState &state) const override;
   bool is_work() const override;
 
-  PadObject *recurse(PadObject *free) {
-    free = HeapObject::recurse(free);
-    free = next.moveto(free);
-    return free;
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = HeapObject::recurse<T, memberfn>(arg);
+    arg = (next.*memberfn)(arg);
+    return arg;
   }
 };
 
@@ -69,10 +70,11 @@ struct Continuation : public Work {
     runtime.schedule(this);
   }
 
-  PadObject *recurse(PadObject *free) {
-    free = Work::recurse(free);
-    free = value.moveto(free);
-    return free;
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Work::recurse<T, memberfn>(arg);
+    arg = (value.*memberfn)(arg);
+    return arg;
   }
 };
 

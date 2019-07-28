@@ -32,6 +32,7 @@
 
 struct Heap;
 struct HeapObject;
+struct HeapPointerBase;
 struct DestroyableObject;
 struct PadObject;
 struct FormatState;
@@ -55,7 +56,8 @@ struct HeapObject {
   std::string to_str() const;
   Hash hash() const;
 
-  PadObject *recurse(PadObject *free) { return free; }
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) { return arg; }
 
   // this overload causes non-placement 'new' to become illegal (which we want)
   void *operator new(size_t size, void *free) { return free; }
@@ -128,13 +130,28 @@ private:
   friend struct RootPointer;
 };
 
+struct HeapPointerBase {
+  HeapPointerBase(HeapObject *obj_) : obj(obj_) { }
+  PadObject *moveto(PadObject *free);
+
+protected:
+  HeapObject *obj;
+};
+
+inline PadObject *HeapPointerBase::moveto(PadObject *free) {
+  if (!obj) return free;
+  Placement out = obj->moveto(free);
+  obj = out.obj;
+  return out.free;
+}
+
 template <typename T>
-struct HeapPointer {
+struct HeapPointer : public HeapPointerBase {
   template <typename Y>
-  HeapPointer(HeapPointer<Y> x) : obj(static_cast<T*>(x.get())) { }
+  HeapPointer(HeapPointer<Y> x) : HeapPointerBase(static_cast<T*>(x.get())) { }
   template <typename Y>
-  HeapPointer(const RootPointer<Y> &x) : obj(static_cast<T*>(x.get())) { }
-  HeapPointer(T *x = nullptr) : obj(x) { }
+  HeapPointer(const RootPointer<Y> &x) : HeapPointerBase(static_cast<T*>(x.get())) { }
+  HeapPointer(T *x = nullptr) : HeapPointerBase(x) { }
 
   explicit operator bool() const { return obj; }
   void reset() { obj = nullptr; }
@@ -147,20 +164,7 @@ struct HeapPointer {
   template <typename Y>
   HeapPointer & operator = (const RootPointer<Y> &x) { obj = static_cast<T*>(x.get()); return *this; }
   HeapPointer & operator = (T *x) { obj = x; return *this; }
-
-  PadObject *moveto(PadObject *free);
-
-private:
-  HeapObject *obj;
 };
-
-template <typename T>
-PadObject *HeapPointer<T>::moveto(PadObject *free) {
-  if (!obj) return free;
-  Placement out = obj->moveto(free);
-  obj = out.obj;
-  return out.free;
-}
 
 template <typename T>
 template <typename Y>
@@ -317,7 +321,7 @@ Placement GCObject<T, B>::moveto(PadObject *free) {
 
 template <typename T, typename B>
 Placement GCObject<T, B>::descend(PadObject *free) {
-  return Placement(self()->next(), self()->recurse(free));
+  return Placement(self()->next(), self()->template recurse<PadObject *, &HeapPointerBase::moveto>(free));
 }
 
 struct DestroyableObject : public HeapObject {

@@ -55,7 +55,8 @@ struct alignas(PadObject) Promise {
      value = obj;
   }
 
-  PadObject *moveto(PadObject *free) { return value.moveto(free); }
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) { return (value.*memberfn)(arg); }
 
 private:
   mutable HeapPointer<HeapObject> value;

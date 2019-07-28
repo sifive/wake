@@ -49,17 +49,20 @@ struct Target final : public GCObject<Target, DestroyableObject> {
   Target(Target &&target) = default;
   ~Target();
 
-  PadObject *recurse(PadObject *free);
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg);
+
   void format(std::ostream &os, FormatState &state) const override;
 };
 
 TypeVar Target::typeVar("_Target", 0);
 
-PadObject *Target::recurse(PadObject *free) {
-  free = Parent::recurse(free);
+template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+T Target::recurse(T arg) {
+  arg = Parent::recurse<T, memberfn>(arg);
   for (auto &x : table)
-    free = x.second.promise.moveto(free);
-  return free;
+    arg = x.second.promise.recurse<T, memberfn>(arg);
+  return arg;
 }
 
 Target::~Target() {
@@ -122,10 +125,11 @@ struct CTarget final : public GCObject<CTarget, Continuation> {
   CTarget(Target *target_, Hash hash_)
    : target(target_), hash(hash_) { }
 
-  PadObject *recurse(PadObject *free) {
-    free = Continuation::recurse(free);
-    free = target.moveto(free);
-    return free;
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (target.*memberfn)(arg);
+    return arg;
   }
 
   void execute(Runtime &runtime) override;

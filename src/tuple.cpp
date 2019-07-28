@@ -45,10 +45,11 @@ struct FulFiller final : public GCObject<FulFiller, Continuation> {
 
   FulFiller(Tuple *tuple_, size_t i_) : tuple(tuple_), i(i_) { }
 
-  PadObject *recurse(PadObject *free) {
-    free = Continuation::recurse(free);
-    free = tuple.moveto(free);
-    return free;
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (tuple.*memberfn)(arg);
+    return arg;
   }
 
   void execute(Runtime &runtime) {
@@ -68,8 +69,9 @@ struct BigTuple final : public GCObject<BigTuple, Tuple> {
   BigTuple(Meta *meta, size_t size_);
   BigTuple(const BigTuple &b);
 
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg);
   PadObject *next();
-  PadObject *recurse(PadObject *free);
 
   Continuation *claim_fulfiller(Runtime &r, size_t i) override;
 };
@@ -100,11 +102,12 @@ PadObject *BigTuple::next() {
   return Parent::next() + tsize * (sizeof(Promise)/sizeof(PadObject));
 }
 
-PadObject *BigTuple::recurse(PadObject *free) {
-  free = Parent::recurse(free);
+template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+T BigTuple::recurse(T arg) {
+  arg = Parent::recurse<T, memberfn>(arg);
   for (size_t i = 0; i < tsize; ++i)
-    free = at(i)->moveto(free);
-  return free;
+    arg = at(i)->recurse<T, memberfn>(arg);
+  return arg;
 }
 
 Continuation *BigTuple::claim_fulfiller(Runtime &r, size_t i) {
@@ -122,8 +125,9 @@ struct SmallTuple final : public GCObject<SmallTuple<tsize>, Tuple> {
   SmallTuple(Meta *meta);
   SmallTuple(const SmallTuple &b);
 
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg);
   PadObject *next();
-  PadObject *recurse(PadObject *free);
 
   Continuation *claim_fulfiller(Runtime &r, size_t i) override;
 };
@@ -161,11 +165,12 @@ PadObject *SmallTuple<tsize>::next() {
 }
 
 template <size_t tsize>
-PadObject *SmallTuple<tsize>::recurse(PadObject *free) {
-  free = Parent::recurse(free);
+template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+T SmallTuple<tsize>::recurse(T arg) {
+  arg = Parent::template recurse<T, memberfn>(arg);
   for (size_t i = 0; i < tsize; ++i)
-    free = at(i)->moveto(free);
-  return free;
+    arg = at(i)->template recurse<T, memberfn>(arg);
+  return arg;
 }
 
 template <size_t tsize>

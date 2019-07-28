@@ -95,27 +95,30 @@ struct Job final : public GCObject<Job> {
   HeapPointer<Continuation> q_report;  // waken once job finished (inputs+outputs+report available)
 
   static TypeVar typeVar;
-  PadObject *recurse(PadObject *free);
   Job(Database *db_, String *dir, String *stdin, String *environ, String *cmdline, bool keep, int log);
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg);
 
   void format(std::ostream &os, FormatState &state) const;
 
   double threads() const;
 };
 
-PadObject *Job::recurse(PadObject *free) {
-  free = Parent::recurse(free);
-  free = cmdline.moveto(free);
-  free = stdin.moveto(free);
-  free = bad_launch.moveto(free);
-  free = bad_finish.moveto(free);
-  free = q_stdout.moveto(free);
-  free = q_stderr.moveto(free);
-  free = q_reality.moveto(free);
-  free = q_inputs.moveto(free);
-  free = q_outputs.moveto(free);
-  free = q_report.moveto(free);
-  return free;
+template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+T Job::recurse(T arg) {
+  arg = Parent::recurse<T, memberfn>(arg);
+  arg = (cmdline.*memberfn)(arg);
+  arg = (stdin.*memberfn)(arg);
+  arg = (bad_launch.*memberfn)(arg);
+  arg = (bad_finish.*memberfn)(arg);
+  arg = (q_stdout.*memberfn)(arg);
+  arg = (q_stderr.*memberfn)(arg);
+  arg = (q_reality.*memberfn)(arg);
+  arg = (q_inputs.*memberfn)(arg);
+  arg = (q_outputs.*memberfn)(arg);
+  arg = (q_report.*memberfn)(arg);
+  return arg;
 }
 
 // Check if Job can wake up any computation
@@ -123,16 +126,19 @@ struct WJob final : public GCObject<WJob, Work> {
   typedef GCObject<WJob, Work> Parent;
   HeapPointer<Job> job;
 
-  PadObject *recurse(PadObject *free);
   WJob(Job *job_) : job(job_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg);
 
   void execute(Runtime &runtime) override;
 };
 
-PadObject *WJob::recurse(PadObject *free) {
-  free = Parent::recurse(free);
-  free = job.moveto(free);
-  return free;
+template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+T WJob::recurse(T arg) {
+  arg = Parent::recurse<T, memberfn>(arg);
+  arg = (job.*memberfn)(arg);
+  return arg;
 }
 
 void Job::format(std::ostream &os, FormatState &state) const {

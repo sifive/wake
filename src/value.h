@@ -174,10 +174,11 @@ struct Closure final : public GCObject<Closure, HeapObject> {
   Closure(Lambda *lambda_, Tuple *scope_);
   void format(std::ostream &os, FormatState &state) const override;
 
-  PadObject *recurse(PadObject *free) {
-    free = HeapObject::recurse(free);
-    free = scope.moveto(free);
-    return free;
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = HeapObject::recurse<T, memberfn>(arg);
+    arg = (scope.*memberfn)(arg);
+    return arg;
   }
 };
 
