@@ -552,14 +552,18 @@ int main(int argc, char **argv) {
 
   if (noparse) return 0;
 
+  bool ok = true;
+  auto wakefiles = find_all_wakefiles(ok, workspace);
+  if (!ok) std::cerr << "Workspace wake file enumeration failed" << std::endl;
+
   Runtime runtime;
-  bool ok = find_all_sources(runtime, workspace);
-  if (!ok) std::cerr << "Source file enumeration failed" << std::endl;
+  bool sources = find_all_sources(runtime, workspace);
+  if (!sources) std::cerr << "Source file enumeration failed" << std::endl;
+  ok &= sources;
 
   // Read all wake build files
   runtime.stack_trace = debug;
   std::unique_ptr<Top> top(new Top);
-  auto wakefiles = find_all_wakefiles(ok, workspace);
   for (auto &i : wakefiles) {
     if (verbose && runtime.stack_trace)
       std::cerr << "Parsing " << i << std::endl;
