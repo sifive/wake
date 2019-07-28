@@ -53,9 +53,6 @@ struct Target final : public GCObject<Target, DestroyableObject> {
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg);
 
-  template <>
-  HeapStep recurse<HeapStep, &HeapPointerBase::explore>(HeapStep step);
-
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
 };
