@@ -115,11 +115,8 @@ void Lambda::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
 void VarRef::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
   for (int i = depth; i; --i)
     scope = scope->at(0)->coerce<Tuple>();
-  int vals = scope->size() - 1;
-  if (offset >= vals) {
-    auto defs = static_cast<DefBinding*>(scope->meta);
-    cont->resume(runtime, Closure::alloc(runtime.heap,
-      defs->fun[offset-vals].get(), scope));
+  if (lambda) {
+    cont->resume(runtime, Closure::alloc(runtime.heap, lambda, scope));
   } else {
     scope->at(offset+1)->await(runtime, cont);
   }
