@@ -16,7 +16,7 @@
 # Private implementation of global sources
 def add_sources str = prim "add_sources"
 def implode l = cat (foldr (_, "\0", _) Nil l)
-def got_sources = add_sources (subscribe source).implode # returns true
+def got_sources = add_sources (subscribe source | map simplify | implode)
 
 # Find files
 # WARNING! Use of this method can make a build unreproducible
@@ -48,4 +48,5 @@ global def source file =
 # Find sources files
 global def sources dir filterRegexp =
   def scan dir regexp = prim "sources"
-  waitOne (\_ scan dir filterRegexp | map raw_source) got_sources
+  match got_sources
+    Unit = scan dir filterRegexp | map raw_source

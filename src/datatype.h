@@ -50,7 +50,6 @@ struct Expr;
 struct Constructor {
   AST ast;
   int index; // sum->members[index] = this
-  std::unique_ptr<Expr> expr; // body of chain in: def chain a b c data fn = fn data a b c
   
   Constructor(AST &&ast_) : ast(ast_) { }
 };

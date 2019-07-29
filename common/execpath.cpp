@@ -15,14 +15,13 @@
  * limitations under the License.
  */
 
-#include "whereami.h"
 #include "execpath.h"
+#include "whereami.h"
 #include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
 #include <errno.h>
 #include <memory>
 #include <vector>
+#include <string.h>
 
 std::string find_execpath() {
   static std::string exepath;

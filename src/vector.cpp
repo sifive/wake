@@ -19,7 +19,6 @@
 #include "datatype.h"
 #include "type.h"
 #include "value.h"
-#include "heap.h"
 #include "expr.h"
 #include "type.h"
 #include <cassert>
@@ -37,12 +36,10 @@ static PRIMTYPE(type_vnew) {
 
 static PRIMFN(prim_vnew) {
   EXPECT(1);
-  INTEGER(arg0, 0);
-  REQUIRE(mpz_cmp_si(arg0->value, 0) >= 0);
-  REQUIRE(mpz_cmp_si(arg0->value, 1024*1024*1024) < 0);
-  auto out = std::make_shared<Data>(&vectorC,
-    std::make_shared<Binding>(nullptr, nullptr, nullptr, mpz_get_si(arg0->value)));
-  RETURN(out);
+  INTEGER_MPZ(arg0, 0);
+  REQUIRE(mpz_cmp_si(arg0, 0) >= 0);
+  REQUIRE(mpz_cmp_si(arg0, 1024*1024*1024) < 0);
+  RETURN(Record::alloc(runtime.heap, nullptr, mpz_get_si(arg0)));
 }
 
 static PRIMTYPE(type_vget) {
@@ -56,11 +53,11 @@ static PRIMTYPE(type_vget) {
 
 static PRIMFN(prim_vget) {
   EXPECT(2);
-  DATA(vec, 0);
-  INTEGER(arg1, 1);
-  REQUIRE(mpz_cmp_si(arg1->value, 0) >= 0);
-  REQUIRE(mpz_cmp_si(arg1->value, vec->binding->nargs) < 0);
-  vec->binding->future[mpz_get_si(arg1->value)].depend(queue, std::move(completion));
+  RECORD(vec, 0);
+  INTEGER_MPZ(arg1, 1);
+  REQUIRE(mpz_cmp_si(arg1, 0) >= 0);
+  REQUIRE(mpz_cmp_si(arg1, vec->size()) < 0);
+  vec->at(mpz_get_si(arg1))->await(runtime, continuation);
 }
 
 static PRIMTYPE(type_vset) {
@@ -75,26 +72,25 @@ static PRIMTYPE(type_vset) {
 
 static PRIMFN(prim_vset) {
   EXPECT(3);
-  DATA(vec, 0);
-  INTEGER(arg1, 1);
+  RECORD(vec, 0);
+  INTEGER_MPZ(arg1, 1);
+
+  // It's important to allocate before side-effects
+  // Failed allocation causes the method to be re-entered
+  runtime.heap.reserve(reserve_unit());
 
   // Getting this wrong means vector.wake is buggy and the heap will crash
-  assert(mpz_cmp_si(arg1->value, 0) >= 0);
-  assert(mpz_cmp_si(arg1->value, vec->binding->nargs) < 0);
-  assert(!vec->binding->future[mpz_get_si(arg1->value)].value);
+  assert(mpz_cmp_si(arg1, 0) >= 0);
+  assert(mpz_cmp_si(arg1, vec->size()) < 0);
+  Promise *p = vec->at(mpz_get_si(arg1));
+  assert(!*p);
 
-  Receiver::receive(
-    queue,
-    Binding::make_completer(vec->binding, mpz_get_si(arg1->value)),
-    std::move(args[2]));
-
-  auto out = make_unit();
-  RETURN(out);
+  p->fulfill(runtime, args[2]);
+  RETURN(claim_unit(runtime.heap));
 }
 
 void prim_register_vector(PrimMap &pmap) {
-  // We cannot safely reorder vget, so it is not PURE
-  prim_register(pmap, "vnew", prim_vnew, type_vnew, PRIM_SHALLOW);
-  prim_register(pmap, "vget", prim_vget, type_vget, PRIM_SHALLOW);
-  prim_register(pmap, "vset", prim_vset, type_vset, PRIM_SHALLOW);
+  prim_register(pmap, "vnew", prim_vnew, type_vnew, 0);
+  prim_register(pmap, "vget", prim_vget, type_vget, PRIM_PURE);
+  prim_register(pmap, "vset", prim_vset, type_vset, 0);
 }

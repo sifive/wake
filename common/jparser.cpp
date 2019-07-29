@@ -215,3 +215,10 @@ bool JAST::parse(std::string &body, std::ostream& errs, JAST &out) {
   expect(JSON_END, jlex, errs);
   return !jlex.fail;
 }
+
+bool JAST::parse(const char *body, size_t len, std::ostream& errs, JAST &out) {
+  JLexer jlex(body, len);
+  out = parse_jvalue(jlex, errs);
+  expect(JSON_END, jlex, errs);
+  return !jlex.fail;
+}

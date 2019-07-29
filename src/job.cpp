@@ -17,13 +17,12 @@
 
 #include "job.h"
 #include "prim.h"
+#include "type.h"
 #include "value.h"
-#include "heap.h"
 #include "database.h"
 #include "location.h"
 #include "execpath.h"
 #include "status.h"
-#include "thunk.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -68,17 +67,19 @@
 #define LOG_ECHO(x) (x & 0x10)
 
 // Can be queried at multiple stages of the job's lifetime
-struct Job : public Value {
+struct Job final : public GCObject<Job> {
+  typedef GCObject<Job> Parent;
+
   Database *db;
-  std::string cmdline, stdin;
+  HeapPointer<String> cmdline, stdin;
   int state;
   Hash code; // hash(dir, stdin, environ, cmdline)
   pid_t pid;
   long job;
   bool keep;
   int log;
-  std::shared_ptr<Value> bad_launch;
-  std::shared_ptr<Value> bad_finish;
+  HeapPointer<HeapObject> bad_launch;
+  HeapPointer<HeapObject> bad_finish;
   double pathtime;
   Usage record;  // retrieved from DB (user-facing usage)
   Usage predict; // prediction of Runners given record (used by scheduler)
@@ -86,26 +87,67 @@ struct Job : public Value {
   Usage report;  // usage to save into DB + report in Job API
 
   // There are 4 distinct wait queues for jobs
-  std::unique_ptr<Receiver> q_stdout;  // waken once stdout closed
-  std::unique_ptr<Receiver> q_stderr;  // waken once stderr closed
-  std::unique_ptr<Receiver> q_reality; // waken once job merged (reality available)
-  std::unique_ptr<Receiver> q_inputs;  // waken once job finished (inputs+outputs+report available)
-  std::unique_ptr<Receiver> q_outputs; // waken once job finished (inputs+outputs+report available)
-  std::unique_ptr<Receiver> q_report;  // waken once job finished (inputs+outputs+report available)
+  HeapPointer<Continuation> q_stdout;  // waken once stdout closed
+  HeapPointer<Continuation> q_stderr;  // waken once stderr closed
+  HeapPointer<Continuation> q_reality; // waken once job merged (reality available)
+  HeapPointer<Continuation> q_inputs;  // waken once job finished (inputs+outputs+report available)
+  HeapPointer<Continuation> q_outputs; // waken once job finished (inputs+outputs+report available)
+  HeapPointer<Continuation> q_report;  // waken once job finished (inputs+outputs+report available)
 
-  static const TypeDescriptor type;
   static TypeVar typeVar;
-  Job(Database *db_, const std::string &dir, const std::string &stdin, const std::string &environ, const std::string &cmdline, bool keep, int log);
+  Job(Database *db_, String *dir, String *stdin, String *environ, String *cmdline, bool keep, int log);
 
-  void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg);
+
+  void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
 
   double threads() const;
-  void process(WorkQueue &queue); // Run commands based on state
 };
 
-const TypeDescriptor Job::type("Job");
+template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+T Job::recurse(T arg) {
+  arg = Parent::recurse<T, memberfn>(arg);
+  arg = (cmdline.*memberfn)(arg);
+  arg = (stdin.*memberfn)(arg);
+  arg = (bad_launch.*memberfn)(arg);
+  arg = (bad_finish.*memberfn)(arg);
+  arg = (q_stdout.*memberfn)(arg);
+  arg = (q_stderr.*memberfn)(arg);
+  arg = (q_reality.*memberfn)(arg);
+  arg = (q_inputs.*memberfn)(arg);
+  arg = (q_outputs.*memberfn)(arg);
+  arg = (q_report.*memberfn)(arg);
+  return arg;
+}
+
+template <>
+HeapStep Job::recurse<HeapStep, &HeapPointerBase::explore>(HeapStep step) {
+  // We don't want to explore the work-queues or bad_finish/launch children
+  // Instead, we front-loaded the hash calculation
+  return step;
+}
+
+// Check if Job can wake up any computation
+struct WJob final : public GCObject<WJob, Work> {
+  typedef GCObject<WJob, Work> Parent;
+  HeapPointer<Job> job;
+
+  WJob(Job *job_) : job(job_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg);
+
+  void execute(Runtime &runtime) override;
+};
+
+template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+T WJob::recurse(T arg) {
+  arg = Parent::recurse<T, memberfn>(arg);
+  arg = (job.*memberfn)(arg);
+  return arg;
+}
 
 void Job::format(std::ostream &os, FormatState &state) const {
   if (APP_PRECEDENCE < state.p()) os << "(";
@@ -114,11 +156,6 @@ void Job::format(std::ostream &os, FormatState &state) const {
 }
 
 TypeVar Job::typeVar("Job", 0);
-TypeVar &Job::getType() {
-  return typeVar;
-}
-
-Hash Job::hash() const { return code; }
 
 double Job::threads() const {
   double estimate;
@@ -161,13 +198,13 @@ double Job::threads() const {
 
 // A Task is a job that is not yet forked
 struct Task {
-  std::shared_ptr<Job> job;
+  RootPointer<Job> job;
   std::string dir;
   std::string stdin;
   std::string environ;
   std::string cmdline;
-  Task(const std::shared_ptr<Job> &job_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_)
-  : job(job_), dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_) { }
+  Task(RootPointer<Job> &&job_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_)
+  : job(std::move(job_)), dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_) { }
 };
 
 static bool operator < (const std::unique_ptr<Task> &x, const std::unique_ptr<Task> &y) {
@@ -182,7 +219,7 @@ static bool operator < (const std::unique_ptr<Task> &x, const std::unique_ptr<Ta
 
 // A JobEntry is a forked job with pid|stdout|stderr incomplete
 struct JobEntry {
-  std::shared_ptr<Job> job; // if unset, available for reuse
+  RootPointer<Job> job; // if unset, available for reuse
   pid_t pid;       //  0 if merged
   int pipe_stdout; // -1 if closed
   int pipe_stderr; // -1 if closed
@@ -190,7 +227,7 @@ struct JobEntry {
   std::string stderr_buf;
   struct timeval start;
   std::list<Status>::iterator status;
-  JobEntry() : pid(0), pipe_stdout(-1), pipe_stderr(-1) { }
+  JobEntry(RootPointer<Job> &&job_) : job(std::move(job_)), pid(0), pipe_stdout(-1), pipe_stderr(-1) { }
   double runtime(struct timeval now);
 };
 
@@ -501,7 +538,7 @@ static void launch(JobTable *jobtable) {
     Task &task = *heap.front();
     jobtable->imp->active += task.job->threads();
 
-    jobtable->imp->running.emplace_back();
+    jobtable->imp->running.emplace_back(std::move(task.job));
     JobEntry &i = jobtable->imp->running.back();
 
     int pipe_stdout[2];
@@ -513,7 +550,6 @@ static void launch(JobTable *jobtable) {
     int flags;
     if ((flags = fcntl(pipe_stdout[0], F_GETFD, 0)) != -1) fcntl(pipe_stdout[0], F_SETFD, flags | FD_CLOEXEC);
     if ((flags = fcntl(pipe_stderr[0], F_GETFD, 0)) != -1) fcntl(pipe_stderr[0], F_SETFD, flags | FD_CLOEXEC);
-    i.job = std::move(task.job);
     i.pipe_stdout = pipe_stdout[0];
     i.pipe_stderr = pipe_stderr[0];
     gettimeofday(&i.start, 0);
@@ -544,13 +580,14 @@ static void launch(JobTable *jobtable) {
     i.job->state |= STATE_FORKED;
     close(pipe_stdout[1]);
     close(pipe_stderr[1]);
-    bool indirect = i.job->cmdline != task.cmdline;
+    bool indirect = i.job->cmdline->compare(task.cmdline) != 0;
     double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
-    i.status = status_state.jobs.emplace(status_state.jobs.end(), pretty_cmd(i.job->cmdline), predict, i.start);
+    std::string pretty = pretty_cmd(i.job->cmdline->as_str());
+    i.status = status_state.jobs.emplace(status_state.jobs.end(), pretty, predict, i.start);
     if (LOG_ECHO(i.job->log)) {
       std::stringstream s;
-      s << pretty_cmd(i.job->cmdline);
-      if (!i.job->stdin.empty()) s << " < " << i.job->stdin;
+      s << pretty;
+      if (i.job->stdin->length != 0) s << " < " << i.job->stdin->c_str();
       if (indirect && jobtable->imp->verbose) {
         s << " # launched by: " << pretty_cmd(task.cmdline);
         if (!task.stdin.empty()) s << " < " << task.stdin;
@@ -578,7 +615,7 @@ static void launch(JobTable *jobtable) {
   }
 }
 
-bool JobTable::wait(WorkQueue &queue) {
+bool JobTable::wait(Runtime &runtime) {
   char buffer[4096];
   struct timespec nowait;
   memset(&nowait, 0, sizeof(nowait));
@@ -652,7 +689,8 @@ bool JobTable::wait(WorkQueue &queue) {
           i.pipe_stdout = -1;
           i.status->stdout = false;
           i.job->state |= STATE_STDOUT;
-          i.job->process(queue);
+          runtime.heap.guarantee(WJob::reserve());
+          runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
           ++done;
           if (LOG_STDOUT(i.job->log)) {
             if (!i.stdout_buf.empty() && i.stdout_buf.back() != '\n')
@@ -679,7 +717,8 @@ bool JobTable::wait(WorkQueue &queue) {
           i.pipe_stderr = -1;
           i.status->stderr = false;
           i.job->state |= STATE_STDERR;
-          i.job->process(queue);
+          runtime.heap.guarantee(WJob::reserve());
+          runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
           ++done;
           if (LOG_STDERR(i.job->log)) {
             if (!i.stderr_buf.empty() && i.stderr_buf.back() != '\n')
@@ -729,7 +768,8 @@ bool JobTable::wait(WorkQueue &queue) {
           i.job->reality.membytes = rusage.ru_maxrss;
           i.job->reality.ibytes   = rusage.ru_inblock * UINT64_C(512);
           i.job->reality.obytes   = rusage.ru_oublock * UINT64_C(512);
-          i.job->process(queue);
+          runtime.heap.guarantee(WJob::reserve());
+          runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
 
           // If this was the job on the critical path, adjust remain
           if (i.job->pathtime == status_state.remain) {
@@ -767,34 +807,37 @@ bool JobTable::wait(WorkQueue &queue) {
   return compute;
 }
 
-Job::Job(Database *db_, const std::string &dir, const std::string &stdin_, const std::string &environ, const std::string &cmdline_, bool keep_, int log_)
-  : Value(&type), db(db_), cmdline(cmdline_), stdin(stdin_), state(0), code(), pid(0), job(-1), keep(keep_), log(log_)
+Job::Job(Database *db_, String *dir, String *stdin_, String *environ, String *cmdline_, bool keep_, int log_)
+  : db(db_), cmdline(cmdline_), stdin(stdin_), state(0), code(), pid(0), job(-1), keep(keep_), log(log_)
 {
   std::vector<uint64_t> codes;
-  type.hashcode.push(codes);
-  Hash(dir).push(codes);
-  Hash(stdin).push(codes);
-  Hash(environ).push(codes);
-  Hash(cmdline).push(codes);
+  Hash(dir->c_str(), dir->length).push(codes);
+  Hash(stdin->c_str(), stdin->length).push(codes);
+  Hash(environ->c_str(), environ->length).push(codes);
+  Hash(cmdline->c_str(), cmdline->length).push(codes);
   code = Hash(codes);
 }
 
-#define JOB(arg, i) REQUIRE(args[i]->type == &Job::type); Job *arg = reinterpret_cast<Job*>(args[i].get());
+Hash Job::hash() const {
+  return code;
+}
 
-static void parse_usage(Usage *usage, std::shared_ptr<Value> *args, WorkQueue &queue, const std::shared_ptr<Binding> &binding) {
-  INTEGER(status, 0);
-  DOUBLE(runtime, 1);
-  DOUBLE(cputime, 2);
-  INTEGER(membytes, 3);
-  INTEGER(ibytes, 4);
-  INTEGER(obytes, 5);
+#define JOB(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Job)); } while(0); Job *arg = static_cast<Job*>(args[i]);
 
-  usage->status = mpz_get_si(status->value);
-  usage->runtime = runtime->value;
-  usage->cputime = cputime->value;
-  usage->membytes = mpz_get_si(membytes->value);
-  usage->ibytes = mpz_get_si(ibytes->value);
-  usage->obytes = mpz_get_si(obytes->value);
+static void parse_usage(Usage *usage, HeapObject **args, Runtime &runtime, Scope *scope) {
+  INTEGER_MPZ(status, 0);
+  DOUBLE(rtime, 1);
+  DOUBLE(ctime, 2);
+  INTEGER_MPZ(membytes, 3);
+  INTEGER_MPZ(ibytes, 4);
+  INTEGER_MPZ(obytes, 5);
+
+  usage->status = mpz_get_si(status);
+  usage->runtime = rtime->value;
+  usage->cputime = ctime->value;
+  usage->membytes = mpz_get_si(membytes);
+  usage->ibytes = mpz_get_si(ibytes);
+  usage->obytes = mpz_get_si(obytes);
 }
 
 static PRIMTYPE(type_job_fail) {
@@ -810,6 +853,9 @@ static PRIMFN(prim_job_fail_launch) {
 
   REQUIRE (job->state == 0);
 
+  size_t need = reserve_unit() + WJob::reserve();
+  runtime.heap.reserve(need);
+
   job->bad_launch = args[1];
   job->reality.found    = true;
   job->reality.status   = 128;
@@ -819,10 +865,9 @@ static PRIMFN(prim_job_fail_launch) {
   job->reality.ibytes   = 0;
   job->reality.obytes   = 0;
   job->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED;
-  job->process(queue);
 
-  auto out = make_unit();
-  RETURN(out);
+  runtime.schedule(WJob::claim(runtime.heap, job));
+  RETURN(claim_unit(runtime.heap));
 }
 
 static PRIMFN(prim_job_fail_finish) {
@@ -831,6 +876,9 @@ static PRIMFN(prim_job_fail_finish) {
 
   REQUIRE(job->state & STATE_MERGED);
   REQUIRE(!(job->state & STATE_FINISHED));
+
+  size_t need = reserve_unit() + WJob::reserve();
+  runtime.heap.reserve(need);
 
   job->bad_finish = args[1];
   job->report.found    = true;
@@ -841,10 +889,9 @@ static PRIMFN(prim_job_fail_finish) {
   job->report.ibytes   = 0;
   job->report.obytes   = 0;
   job->state |= STATE_FINISHED;
-  job->process(queue);
 
-  auto out = make_unit();
-  RETURN(out);
+  runtime.schedule(WJob::claim(runtime.heap, job));
+  RETURN(claim_unit(runtime.heap));
 }
 
 static PRIMTYPE(type_job_launch) {
@@ -872,18 +919,19 @@ static PRIMFN(prim_job_launch) {
   STRING(env, 3);
   STRING(cmd, 4);
 
-  parse_usage(&job->predict, args.data()+5, queue, binding);
+  runtime.heap.reserve(reserve_unit());
+  parse_usage(&job->predict, args+5, runtime, scope);
   job->predict.found = true;
 
   REQUIRE (job->state == 0);
 
   auto &heap = jobtable->imp->pending;
   heap.emplace_back(new Task(
-    std::dynamic_pointer_cast<Job>(args[0]),
-    dir->value,
-    stdin->value,
-    env->value,
-    cmd->value));
+    runtime.heap.root(job),
+    dir->as_str(),
+    stdin->as_str(),
+    env->as_str(),
+    cmd->as_str()));
   std::push_heap(heap.begin(), heap.end());
 
   // If a scheduled job claims a longer critical path, we need to adjust the total path time
@@ -898,8 +946,7 @@ static PRIMFN(prim_job_launch) {
     status_state.current = job->record.runtime;
   }
 
-  auto out = make_unit();
-  RETURN(out);
+  RETURN(claim_unit(runtime.heap));
 }
 
 static PRIMTYPE(type_job_virtual) {
@@ -922,31 +969,33 @@ static PRIMFN(prim_job_virtual) {
   STRING(stdout, 1);
   STRING(stderr, 2);
 
-  parse_usage(&job->predict, args.data()+3, queue, binding);
+  size_t need = reserve_unit() + WJob::reserve();
+  runtime.heap.reserve(need);
+
+  parse_usage(&job->predict, args+3, runtime, scope);
   job->predict.found = true;
   job->reality = job->predict;
 
-  if (!stdout->value.empty())
-    job->db->save_output(job->job, 1, stdout->value.data(), stdout->value.size(), 0);
-  if (!stderr->value.empty())
-    job->db->save_output(job->job, 2, stderr->value.data(), stderr->value.size(), 0);
+  if (stdout->length != 0)
+    job->db->save_output(job->job, 1, stdout->c_str(), stdout->length, 0);
+  if (stderr->length != 0)
+    job->db->save_output(job->job, 2, stderr->c_str(), stderr->length, 0);
 
   REQUIRE (job->state == 0);
 
   if (LOG_ECHO(job->log)) {
     std::stringstream s;
-    s << pretty_cmd(job->cmdline);
-    if (!job->stdin.empty()) s << " < " << job->stdin;
+    s << pretty_cmd(job->cmdline->as_str());
+    if (job->stdin->length != 0) s << " < " << job->stdin->c_str();
     s << std::endl;
     std::string out = s.str();
     status_write(1, out.data(), out.size());
   }
 
   job->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED;
-  job->process(queue);
 
-  auto out = make_unit();
-  RETURN(out);
+  runtime.schedule(WJob::claim(runtime.heap, job));
+  RETURN(claim_unit(runtime.heap));
 }
 
 static PRIMTYPE(type_job_create) {
@@ -969,42 +1018,53 @@ static PRIMFN(prim_job_create) {
   STRING(env, 2);
   STRING(cmd, 3);
   STRING(visible, 4);
-  INTEGER(keep, 5);
-  INTEGER(log, 6);
+  INTEGER_MPZ(keep, 5);
+  INTEGER_MPZ(log, 6);
 
-  std::stringstream stack;
-  for (auto &i : binding->stack_trace()) stack << i.file() << std::endl;
-  auto out = std::make_shared<Job>(
+  Job *out = Job::alloc(
+    runtime.heap,
     jobtable->imp->db,
-    dir->value,
-    stdin->value,
-    env->value,
-    cmd->value,
-    mpz_cmp_si(keep->value,0),
-    mpz_get_si(log->value));
+    dir,
+    stdin,
+    env,
+    cmd,
+    mpz_cmp_si(keep,0),
+    mpz_get_si(log));
 
   out->record = jobtable->imp->db->predict_job(out->code.data[0], &out->pathtime);
 
+  std::stringstream stack;
+  for (auto &i : scope->stack_trace()) stack << i.file() << std::endl;
+
   out->db->insert_job(
-    dir->value,
-    stdin->value,
-    env->value,
-    cmd->value,
-    visible->value,
+    dir->as_str(),
+    stdin->as_str(),
+    env->as_str(),
+    cmd->as_str(),
+    visible->as_str(),
     stack.str(),
     &out->job);
 
   RETURN(out);
 }
 
-static std::shared_ptr<Value> convert_tree(std::vector<FileReflection> &&files) {
-  std::vector<std::shared_ptr<Value> > vals;
+static size_t reserve_tree(const std::vector<FileReflection> &files) {
+  size_t need = reserve_list(files.size());
+  for (auto &i : files)
+    need += reserve_tuple2()
+            + String::reserve(i.path.size())
+            + String::reserve(i.hash.size());
+  return need;
+}
+
+static HeapObject *claim_tree(Heap &h, const std::vector<FileReflection> &files) {
+  std::vector<HeapObject*> vals;
   vals.reserve(files.size());
   for (auto &i : files)
-    vals.emplace_back(make_tuple2(
-      std::static_pointer_cast<Value>(std::make_shared<String>(std::move(i.path))),
-      std::static_pointer_cast<Value>(std::make_shared<String>(std::move(i.hash)))));
-  return make_list(std::move(vals));
+    vals.emplace_back(claim_tuple2(h,
+      String::claim(h, i.path),
+      String::claim(h, i.hash)));
+  return claim_list(h, vals.size(), vals.data());
 }
 
 static PRIMTYPE(type_job_cache) {
@@ -1040,31 +1100,37 @@ static PRIMFN(prim_job_cache) {
   STRING(cmd, 3);
   STRING(visible, 4);
 
+  // This function can be rerun; it's side effect has no impact on re-execution of reuse_job.
   long job;
   double pathtime;
   std::vector<FileReflection> files;
   Usage reuse = jobtable->imp->db->reuse_job(
-    dir->value,
-    stdin->value,
-    env->value,
-    cmd->value,
-    visible->value,
+    dir->as_str(),
+    stdin->as_str(),
+    env->as_str(),
+    cmd->as_str(),
+    visible->as_str(),
     jobtable->imp->check,
     job,
     files,
     &pathtime);
 
-  std::vector<std::shared_ptr<Value> > jobs;
+  size_t need = reserve_tuple2() + reserve_tree(files) + reserve_list(1) + Job::reserve();
+  runtime.heap.reserve(need);
+
+  HeapObject *joblist;
   if (reuse.found && !jobtable->imp->check) {
-    auto out = std::make_shared<Job>(jobtable->imp->db, dir->value, stdin->value, env->value, cmd->value, true, 0);
-    out->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED|STATE_FINISHED;
-    out->job = job;
-    out->record = reuse;
+    Job *jobp = Job::claim(runtime.heap, jobtable->imp->db, dir, stdin, env, cmd, true, 0);
+    jobp->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED|STATE_FINISHED;
+    jobp->job = job;
+    jobp->record = reuse;
     // predict + reality unusued since Job not run
-    out->report = reuse;
-    out->reality = reuse;
-    out->pathtime = pathtime;
-    jobs.emplace_back(std::move(out));
+    jobp->report = reuse;
+    jobp->reality = reuse;
+    jobp->pathtime = pathtime;
+
+    HeapObject *obj = jobp;
+    joblist = claim_list(runtime.heap, 1, &obj);
 
     // Even though this job is not run, it might have been the 'next' job of something that DID run
     if (pathtime >= status_state.remain && pathtime*ALMOST_ONE*ALMOST_ONE <= status_state.remain) {
@@ -1079,101 +1145,44 @@ static PRIMFN(prim_job_cache) {
       status_state.current = crit.runtime;
       if (crit.runtime == 0) gettimeofday(&jobtable->imp->wall, 0);
     }
+  } else {
+    joblist = claim_list(runtime.heap, 0, nullptr);
   }
 
-  auto out = make_tuple2(make_list(std::move(jobs)), convert_tree(std::move(files)));
-  RETURN(out);
+  RETURN(claim_tuple2(runtime.heap, joblist, claim_tree(runtime.heap, files)));
 }
 
-static std::shared_ptr<Value> make_usage(const Usage &usage) {
+static size_t reserve_usage(const Usage &usage) {
+  MPZ s(usage.status);
+  MPZ m(usage.membytes);
+  MPZ i(usage.ibytes);
+  MPZ o(usage.obytes);
+  return Integer::reserve(s)
+       + Double::reserve()
+       + Double::reserve()
+       + Integer::reserve(m)
+       + Integer::reserve(i)
+       + Integer::reserve(o)
+       + reserve_tuple2() * 5;
+}
+
+static HeapObject *claim_usage(Heap &h, const Usage &usage) {
+  MPZ s(usage.status);
+  MPZ m(usage.membytes);
+  MPZ i(usage.ibytes);
+  MPZ o(usage.obytes);
   return
-    make_tuple2(
-      make_tuple2(
-        std::make_shared<Integer>(usage.status),
-        std::make_shared<Double>(usage.runtime)),
-      make_tuple2(
-        make_tuple2(
-          std::make_shared<Double>(usage.cputime),
-          std::make_shared<Integer>(usage.membytes)),
-        make_tuple2(
-          std::make_shared<Integer>(usage.ibytes),
-          std::make_shared<Integer>(usage.obytes))));
-}
-
-void Job::process(WorkQueue &queue) {
-  if ((state & STATE_STDOUT) && q_stdout) {
-    auto out = bad_launch
-      ? make_result(false, std::shared_ptr<Value>(bad_launch))
-      : make_result(true, std::make_shared<String>(db->get_output(job, 1)));
-    std::unique_ptr<Receiver> iter, next;
-    for (iter = std::move(q_stdout); iter; iter = std::move(next)) {
-      next = std::move(iter->next);
-      Receiver::receive(queue, std::move(iter), out);
-    }
-    q_stdout.reset();
-  }
-
-  if ((state & STATE_STDERR) && q_stderr) {
-    auto out = bad_launch
-      ? make_result(false, std::shared_ptr<Value>(bad_launch))
-      : make_result(true, std::make_shared<String>(db->get_output(job, 2)));
-    std::unique_ptr<Receiver> iter, next;
-    for (iter = std::move(q_stderr); iter; iter = std::move(next)) {
-      next = std::move(iter->next);
-      Receiver::receive(queue, std::move(iter), out);
-    }
-    q_stderr.reset();
-  }
-
-  if ((state & STATE_MERGED) && q_reality) {
-    auto out = bad_launch
-      ? make_result(false, std::shared_ptr<Value>(bad_launch))
-      : make_result(true, make_usage(reality));
-    std::unique_ptr<Receiver> iter, next;
-    for (iter = std::move(q_reality); iter; iter = std::move(next)) {
-      next = std::move(iter->next);
-      Receiver::receive(queue, std::move(iter), out);
-    }
-    q_reality.reset();
-  }
-
-  if ((state & STATE_FINISHED) && q_inputs) {
-    auto files = db->get_tree(1, job);
-    auto out = bad_finish
-      ? make_result(false, std::shared_ptr<Value>(bad_finish))
-      : make_result(true, convert_tree(std::move(files)));
-    std::unique_ptr<Receiver> iter, next;
-    for (iter = std::move(q_inputs); iter; iter = std::move(next)) {
-      next = std::move(iter->next);
-      Receiver::receive(queue, std::move(iter), out);
-    }
-    q_inputs.reset();
-  }
-
-  if ((state & STATE_FINISHED) && q_outputs) {
-    auto files = db->get_tree(2, job);
-    auto out = bad_finish
-      ? make_result(false, std::shared_ptr<Value>(bad_finish))
-      : make_result(true, convert_tree(std::move(files)));
-    std::unique_ptr<Receiver> iter, next;
-    for (iter = std::move(q_outputs); iter; iter = std::move(next)) {
-      next = std::move(iter->next);
-      Receiver::receive(queue, std::move(iter), out);
-    }
-    q_outputs.reset();
-  }
-
-  if ((state & STATE_FINISHED) && q_report) {
-    auto out = bad_finish
-      ? make_result(false, std::shared_ptr<Value>(bad_finish))
-      : make_result(true, make_usage(report));
-    std::unique_ptr<Receiver> iter, next;
-    for (iter = std::move(q_report); iter; iter = std::move(next)) {
-      next = std::move(iter->next);
-      Receiver::receive(queue, std::move(iter), out);
-    }
-    q_report.reset();
-  }
+    claim_tuple2(h,
+      claim_tuple2(h,
+        Integer::claim(h, s),
+        Double::claim(h, usage.runtime)),
+      claim_tuple2(h,
+        claim_tuple2(h,
+          Double::claim(h, usage.cputime),
+          Integer::claim(h, m)),
+        claim_tuple2(h,
+          Integer::claim(h, i),
+          Integer::claim(h, o))));
 }
 
 static PRIMTYPE(type_job_output) {
@@ -1190,15 +1199,16 @@ static PRIMTYPE(type_job_output) {
 static PRIMFN(prim_job_output) {
   EXPECT(2);
   JOB(arg0, 0);
-  INTEGER(arg1, 1);
-  if (mpz_cmp_si(arg1->value, 1) == 0) {
-    completion->next = std::move(arg0->q_stdout);
-    arg0->q_stdout = std::move(completion);
-    arg0->process(queue);
-  } else if (mpz_cmp_si(arg1->value, 2) == 0) {
-    completion->next = std::move(arg0->q_stderr);
-    arg0->q_stderr = std::move(completion);
-    arg0->process(queue);
+  INTEGER_MPZ(arg1, 1);
+
+  if (mpz_cmp_si(arg1, 1) == 0) {
+    runtime.schedule(WJob::alloc(runtime.heap, arg0));
+    continuation->next = arg0->q_stdout;
+    arg0->q_stdout = continuation;
+  } else if (mpz_cmp_si(arg1, 2) == 0) {
+    runtime.schedule(WJob::alloc(runtime.heap, arg0));
+    continuation->next = arg0->q_stderr;
+    arg0->q_stderr = continuation;
   } else {
     bool stdin_or_stderr = false;
     REQUIRE(stdin_or_stderr);
@@ -1215,16 +1225,17 @@ static PRIMTYPE(type_job_kill) {
 static PRIMFN(prim_job_kill) {
   EXPECT(2);
   JOB(arg0, 0);
-  INTEGER(arg1, 1);
+  INTEGER_MPZ(arg1, 1);
 
-  if (mpz_cmp_si(arg1->value, 256) < 0 && mpz_cmp_si(arg1->value, 0) > 0) {
-    int sig = mpz_get_si(arg1->value);
+  runtime.heap.reserve(reserve_unit());
+
+  if (mpz_cmp_si(arg1, 256) < 0 && mpz_cmp_si(arg1, 0) > 0) {
+    int sig = mpz_get_si(arg1);
     if ((arg0->state & STATE_FORKED) && !(arg0->state & STATE_MERGED))
       kill(arg0->pid, sig);
   }
 
-  auto out = make_unit();
-  RETURN(out);
+  RETURN(claim_unit(runtime.heap));
 }
 
 static PRIMTYPE(type_job_tree) {
@@ -1248,15 +1259,16 @@ static PRIMTYPE(type_job_tree) {
 static PRIMFN(prim_job_tree) {
   EXPECT(2);
   JOB(arg0, 0);
-  INTEGER(arg1, 1);
-  if (mpz_cmp_si(arg1->value, 1) == 0) {
-    completion->next = std::move(arg0->q_inputs);
-    arg0->q_inputs = std::move(completion);
-    arg0->process(queue);
-  } else if (mpz_cmp_si(arg1->value, 2) == 0) {
-    completion->next = std::move(arg0->q_outputs);
-    arg0->q_outputs = std::move(completion);
-    arg0->process(queue);
+  INTEGER_MPZ(arg1, 1);
+
+  if (mpz_cmp_si(arg1, 1) == 0) {
+    runtime.schedule(WJob::alloc(runtime.heap, arg0));
+    continuation->next = std::move(arg0->q_inputs);
+    arg0->q_inputs = std::move(continuation);
+  } else if (mpz_cmp_si(arg1, 2) == 0) {
+    runtime.schedule(WJob::alloc(runtime.heap, arg0));
+    continuation->next = std::move(arg0->q_outputs);
+    arg0->q_outputs = std::move(continuation);
   } else {
     bool stdin_or_stderr = false;
     REQUIRE(stdin_or_stderr);
@@ -1272,8 +1284,8 @@ static PRIMTYPE(type_job_id) {
 static PRIMFN(prim_job_id) {
   EXPECT(1);
   JOB(arg0, 0);
-  auto out = std::make_shared<Integer>(arg0->job);
-  RETURN(out);
+  MPZ out(arg0->job);
+  RETURN(Integer::alloc(runtime.heap, out));
 }
 
 static PRIMTYPE(type_job_desc) {
@@ -1285,8 +1297,7 @@ static PRIMTYPE(type_job_desc) {
 static PRIMFN(prim_job_desc) {
   EXPECT(1);
   JOB(arg0, 0);
-  auto out = std::make_shared<String>(pretty_cmd(arg0->cmdline));
-  RETURN(out);
+  RETURN(String::alloc(runtime.heap, pretty_cmd(arg0->cmdline->as_str())));
 }
 
 static PRIMTYPE(type_job_finish) {
@@ -1309,19 +1320,21 @@ static PRIMFN(prim_job_finish) {
   STRING(inputs, 1);
   STRING(outputs, 2);
 
-  parse_usage(&job->report, args.data()+3, queue, binding);
-  job->report.found = true;
-
   REQUIRE(job->state & STATE_MERGED);
   REQUIRE(!(job->state & STATE_FINISHED));
 
-  bool keep = !job->bad_launch && !job->bad_finish && job->keep && job->report.status == 0;
-  job->db->finish_job(job->job, inputs->value, outputs->value, job->code.data[0], keep, job->report);
-  job->state |= STATE_FINISHED;
-  job->process(queue);
+  size_t need = WJob::reserve() + reserve_unit();
+  runtime.heap.reserve(need);
 
-  auto out = make_unit();
-  RETURN(out);
+  parse_usage(&job->report, args+3, runtime, scope);
+  job->report.found = true;
+
+  bool keep = !job->bad_launch && !job->bad_finish && job->keep && job->report.status == 0;
+  job->db->finish_job(job->job, inputs->as_str(), outputs->as_str(), job->code.data[0], keep, job->report);
+  job->state |= STATE_FINISHED;
+
+  runtime.schedule(WJob::claim(runtime.heap, job));
+  RETURN(claim_unit(runtime.heap));
 }
 
 static PRIMTYPE(type_add_hash) {
@@ -1335,9 +1348,9 @@ static PRIMTYPE(type_add_hash) {
 #define st_mtim st_mtimespec
 #endif
 
-static long stat_mod_ns(const std::string &file) {
+static long stat_mod_ns(const char *file) {
   struct stat sbuf;
-  if (stat(file.c_str(), &sbuf) != 0) return -1;
+  if (stat(file, &sbuf) != 0) return -1;
   long modified = sbuf.st_mtim.tv_sec;
   modified *= 1000000000L;
   modified += sbuf.st_mtim.tv_nsec;
@@ -1349,7 +1362,7 @@ static PRIMFN(prim_add_hash) {
   EXPECT(2);
   STRING(file, 0);
   STRING(hash, 1);
-  jobtable->imp->db->add_hash(file->value, hash->value, stat_mod_ns(file->value));
+  jobtable->imp->db->add_hash(file->as_str(), hash->as_str(), stat_mod_ns(file->c_str()));
   RETURN(args[0]);
 }
 
@@ -1363,9 +1376,8 @@ static PRIMFN(prim_get_hash) {
   JobTable *jobtable = reinterpret_cast<JobTable*>(data);
   EXPECT(1);
   STRING(file, 0);
-  std::string hash = jobtable->imp->db->get_hash(file->value, stat_mod_ns(file->value));
-  auto out = std::make_shared<String>(std::move(hash));
-  RETURN(out);
+  std::string hash = jobtable->imp->db->get_hash(file->as_str(), stat_mod_ns(file->c_str()));
+  RETURN(String::alloc(runtime.heap, hash));
 }
 
 static PRIMTYPE(type_get_modtime) {
@@ -1377,8 +1389,8 @@ static PRIMTYPE(type_get_modtime) {
 static PRIMFN(prim_get_modtime) {
   EXPECT(1);
   STRING(file, 0);
-  auto out = std::make_shared<Integer>(stat_mod_ns(file->value));
-  RETURN(out);
+  MPZ out(stat_mod_ns(file->c_str()));
+  RETURN(Integer::alloc(runtime.heap, out));
 }
 
 static PRIMTYPE(type_search_path) {
@@ -1393,8 +1405,8 @@ static PRIMFN(prim_search_path) {
   STRING(path, 0);
   STRING(exec, 1);
 
-  auto out = std::make_shared<String>(find_in_path(exec->value, path->value));
-  RETURN(out);
+  auto out = find_in_path(exec->as_str(), path->as_str());
+  RETURN(String::alloc(runtime.heap, out));
 }
 
 static void usage_type(TypeVar &pair) {
@@ -1434,9 +1446,9 @@ static PRIMTYPE(type_job_reality) {
 static PRIMFN(prim_job_reality) {
   EXPECT(1);
   JOB(job, 0);
-  completion->next = std::move(job->q_reality);
-  job->q_reality = std::move(completion);
-  job->process(queue);
+  runtime.schedule(WJob::alloc(runtime.heap, job));
+  continuation->next = job->q_reality;
+  job->q_reality = continuation;
 }
 
 static PRIMTYPE(type_job_report) {
@@ -1454,9 +1466,9 @@ static PRIMTYPE(type_job_report) {
 static PRIMFN(prim_job_report) {
   EXPECT(1);
   JOB(job, 0);
-  completion->next = std::move(job->q_report);
-  job->q_report = std::move(completion);
-  job->process(queue);
+  runtime.schedule(WJob::alloc(runtime.heap, job));
+  continuation->next = job->q_report;
+  job->q_report = continuation;
 }
 
 static PRIMTYPE(type_job_record) {
@@ -1474,11 +1486,15 @@ static PRIMFN(prim_job_record) {
   EXPECT(1);
   JOB(job, 0);
 
-  std::vector<std::shared_ptr<Value> > stats;
-  if (job->record.found) stats.emplace_back(make_usage(job->record));
+  size_t need = reserve_usage(job->record) + reserve_list(1);
+  runtime.heap.reserve(need);
 
-  auto out = make_list(std::move(stats));
-  RETURN(out);
+  if (job->record.found) {
+    HeapObject *obj = claim_usage(runtime.heap, job->record);
+    RETURN(claim_list(runtime.heap, 1, &obj));
+  } else {
+    RETURN(claim_list(runtime.heap, 0, nullptr));
+  }
 }
 
 static PRIMTYPE(type_access) {
@@ -1491,33 +1507,130 @@ static PRIMTYPE(type_access) {
 static PRIMFN(prim_access) {
   EXPECT(2);
   STRING(file, 0);
-  INTEGER(kind, 1);
+  INTEGER_MPZ(kind, 1);
+
+  runtime.heap.reserve(reserve_bool());
   int mode = R_OK;
-  if (mpz_cmp_si(kind->value, 1) == 0) mode = W_OK;
-  if (mpz_cmp_si(kind->value, 2) == 0) mode = X_OK;
-  auto out = make_bool(access(file->value.c_str(), mode) == 0);
-  RETURN(out);
+  if (mpz_cmp_si(kind, 1) == 0) mode = W_OK;
+  if (mpz_cmp_si(kind, 2) == 0) mode = X_OK;
+  RETURN(claim_bool(runtime.heap, access(file->c_str(), mode) == 0));
 }
 
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
-  prim_register(pmap, "job_cache",  prim_job_cache,  type_job_cache,   PRIM_SHALLOW, jobtable);
-  prim_register(pmap, "job_create", prim_job_create, type_job_create,  PRIM_SHALLOW, jobtable);
-  prim_register(pmap, "job_launch", prim_job_launch, type_job_launch,  PRIM_SHALLOW, jobtable);
-  prim_register(pmap, "job_virtual",prim_job_virtual,type_job_virtual, PRIM_SHALLOW, jobtable);
-  prim_register(pmap, "job_finish", prim_job_finish, type_job_finish,  PRIM_SHALLOW);
-  prim_register(pmap, "job_fail_launch", prim_job_fail_launch, type_job_fail, PRIM_SHALLOW);
-  prim_register(pmap, "job_fail_finish", prim_job_fail_finish, type_job_fail, PRIM_SHALLOW);
-  prim_register(pmap, "job_kill",   prim_job_kill,   type_job_kill,    PRIM_SHALLOW);
-  prim_register(pmap, "job_output", prim_job_output, type_job_output,  PRIM_SHALLOW|PRIM_PURE);
-  prim_register(pmap, "job_tree",   prim_job_tree,   type_job_tree,    PRIM_SHALLOW|PRIM_PURE);
-  prim_register(pmap, "job_id",     prim_job_id,     type_job_id,      PRIM_SHALLOW|PRIM_PURE);
-  prim_register(pmap, "job_desc",   prim_job_desc,   type_job_desc,    PRIM_SHALLOW|PRIM_PURE);
-  prim_register(pmap, "job_reality",prim_job_reality,type_job_reality, PRIM_SHALLOW|PRIM_PURE);
-  prim_register(pmap, "job_report", prim_job_report, type_job_report,  PRIM_SHALLOW|PRIM_PURE);
-  prim_register(pmap, "job_record", prim_job_record, type_job_record,  PRIM_SHALLOW|PRIM_PURE);
-  prim_register(pmap, "add_hash",   prim_add_hash,   type_add_hash,    PRIM_SHALLOW, jobtable);
-  prim_register(pmap, "get_hash",   prim_get_hash,   type_get_hash,    PRIM_SHALLOW, jobtable);
-  prim_register(pmap, "get_modtime",prim_get_modtime,type_get_modtime, PRIM_SHALLOW);
-  prim_register(pmap, "search_path",prim_search_path,type_search_path, PRIM_SHALLOW);
-  prim_register(pmap, "access",     prim_access,     type_access,      PRIM_SHALLOW);
+  prim_register(pmap, "job_cache",  prim_job_cache,  type_job_cache,   0, jobtable);
+  prim_register(pmap, "job_create", prim_job_create, type_job_create,  0, jobtable);
+  prim_register(pmap, "job_launch", prim_job_launch, type_job_launch,  0, jobtable);
+  prim_register(pmap, "job_virtual",prim_job_virtual,type_job_virtual, 0, jobtable);
+  prim_register(pmap, "job_finish", prim_job_finish, type_job_finish,  0);
+  prim_register(pmap, "job_fail_launch", prim_job_fail_launch, type_job_fail, 0);
+  prim_register(pmap, "job_fail_finish", prim_job_fail_finish, type_job_fail, 0);
+  prim_register(pmap, "job_kill",   prim_job_kill,   type_job_kill,    0);
+  prim_register(pmap, "job_output", prim_job_output, type_job_output,  PRIM_PURE);
+  prim_register(pmap, "job_tree",   prim_job_tree,   type_job_tree,    PRIM_PURE);
+  prim_register(pmap, "job_id",     prim_job_id,     type_job_id,      PRIM_PURE);
+  prim_register(pmap, "job_desc",   prim_job_desc,   type_job_desc,    PRIM_PURE);
+  prim_register(pmap, "job_reality",prim_job_reality,type_job_reality, PRIM_PURE);
+  prim_register(pmap, "job_report", prim_job_report, type_job_report,  PRIM_PURE);
+  prim_register(pmap, "job_record", prim_job_record, type_job_record,  PRIM_PURE);
+  prim_register(pmap, "add_hash",   prim_add_hash,   type_add_hash,    0, jobtable);
+  // These are not pure, because they can't be reordered freely:
+  prim_register(pmap, "get_hash",   prim_get_hash,   type_get_hash,    0, jobtable);
+  prim_register(pmap, "get_modtime",prim_get_modtime,type_get_modtime, 0);
+  prim_register(pmap, "search_path",prim_search_path,type_search_path, 0);
+  prim_register(pmap, "access",     prim_access,     type_access,      0);
+}
+
+static void wake(Runtime &runtime, HeapPointer<Continuation> &q, HeapObject *value) {
+  Continuation *c = q.get();
+  while (c->next) {
+    c->value = value;
+    c = static_cast<Continuation*>(c->next.get());
+  }
+  c->value = value;
+  c->next = runtime.stack;
+  runtime.stack = q;
+  q.reset();
+}
+
+void WJob::execute(Runtime &runtime) {
+  // This function is a bit sneaky.
+  // We don't reserve memory for all potential wake-up events up-front.
+  // Instead, we allocate as we go, even causing side effects.
+  // Each side-effect is guarded by an 'if' so it only happens the first time.
+
+  if ((job->state & STATE_STDOUT) && job->q_stdout) {
+    HeapObject *what;
+    if (job->bad_launch) {
+      runtime.heap.reserve(reserve_result());
+      what = claim_result(runtime.heap, false, job->bad_launch.get());
+    } else {
+      std::string out(job->db->get_output(job->job, 1));
+      runtime.heap.reserve(reserve_result() + String::reserve(out.size()));
+      what = claim_result(runtime.heap, true, String::claim(runtime.heap, out));
+    }
+    wake(runtime, job->q_stdout, what);
+  }
+
+  if ((job->state & STATE_STDERR) && job->q_stderr) {
+    HeapObject *what;
+    if (job->bad_launch) {
+      runtime.heap.reserve(reserve_result());
+      what = claim_result(runtime.heap, false, job->bad_launch.get());
+    } else {
+      std::string out(job->db->get_output(job->job, 2));
+      runtime.heap.reserve(reserve_result() + String::reserve(out.size()));
+      what = claim_result(runtime.heap, true, String::claim(runtime.heap, out));
+    }
+    wake(runtime, job->q_stderr, what);
+  }
+
+  if ((job->state & STATE_MERGED) && job->q_reality) {
+    HeapObject *what;
+    if (job->bad_launch) {
+      runtime.heap.reserve(reserve_result());
+      what = claim_result(runtime.heap, false, job->bad_launch.get());
+    } else {
+      runtime.heap.reserve(reserve_result() + reserve_usage(job->reality));
+      what = claim_result(runtime.heap, true, claim_usage(runtime.heap, job->reality));
+    }
+    wake(runtime, job->q_reality, what);
+  }
+
+  if ((job->state & STATE_FINISHED) && job->q_inputs) {
+    HeapObject *what;
+    if (job->bad_finish) {
+      runtime.heap.reserve(reserve_result());
+      what = claim_result(runtime.heap, false, job->bad_finish.get());
+    } else {
+      auto files = job->db->get_tree(1, job->job);
+      runtime.heap.reserve(reserve_result() + reserve_tree(files));
+      what = claim_result(runtime.heap, true, claim_tree(runtime.heap, files));
+    }
+    wake(runtime, job->q_inputs, what);
+  }
+
+  if ((job->state & STATE_FINISHED) && job->q_outputs) {
+    HeapObject *what;
+    if (job->bad_finish) {
+      runtime.heap.reserve(reserve_result());
+      what = claim_result(runtime.heap, false, job->bad_finish.get());
+    } else {
+      auto files = job->db->get_tree(2, job->job);
+      runtime.heap.reserve(reserve_result() + reserve_tree(files));
+      what = claim_result(runtime.heap, true, claim_tree(runtime.heap, files));
+    }
+    wake(runtime, job->q_outputs, what);
+  }
+
+  if ((job->state & STATE_FINISHED) && job->q_report) {
+    HeapObject *what;
+    if (job->bad_finish) {
+      runtime.heap.reserve(reserve_result());
+      what = claim_result(runtime.heap, false, job->bad_finish.get());
+    } else {
+      runtime.heap.reserve(reserve_result() + reserve_usage(job->report));
+      what = claim_result(runtime.heap, true, claim_usage(runtime.heap, job->report));
+    }
+    wake(runtime, job->q_report, what);
+  }
 }

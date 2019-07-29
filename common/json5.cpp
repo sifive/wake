@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-#include "location.h"
 #include "json5.h"
 
 const char *jsymbolTable[] = {
@@ -53,10 +52,12 @@ static char hex(unsigned char x) {
   return 'a' + x - 10;
 }
 
-std::string json_escape(const std::string &x) {
+std::string json_escape(const char *str, size_t len) {
   std::string out;
   char escape[] = "\\u0000";
-  for (char z : x) {
+  const char *end = str + len;
+  for (const char *i = str; i != end; ++i) {
+    char z = *i;
     unsigned char c = z;
     if (z == '"') out.append("\\\"");
     else if (z == '\\') out.append("\\\\");

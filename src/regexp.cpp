@@ -17,13 +17,13 @@
 
 #include "prim.h"
 #include "value.h"
-#include "heap.h"
-#include "hash.h"
 #include "type.h"
 #include "sfinae.h"
-#include <iostream>
 #include <string>
-#include <iosfwd>
+
+static re2::StringPiece sp(String *s) {
+  return re2::StringPiece(s->c_str(), s->length);
+}
 
 static PRIMTYPE(type_re2) {
   TypeVar result;
@@ -38,13 +38,17 @@ static PRIMTYPE(type_re2) {
 static PRIMFN(prim_re2) {
   EXPECT(1);
   STRING(arg0, 0);
-  auto pass = std::make_shared<RegExp>(arg0->value);
-  if (pass->exp.ok()) {
-    auto out = make_result(true, std::move(pass));
-    RETURN(out);
+  size_t need = reserve_result() + RegExp::reserve();
+  runtime.heap.reserve(need);
+  RegExp *regexp = RegExp::claim(runtime.heap, runtime.heap, sp(arg0));
+  if (regexp->exp->ok()) {
+    RETURN(claim_result(runtime.heap, true, regexp));
   } else {
-    auto out = make_result(false, std::make_shared<String>(pass->exp.error()));
-    RETURN(out);
+    // claim for RegExp again to guarantee forward progress
+    need += String::reserve(regexp->exp->error().size());
+    runtime.heap.reserve(need);
+    String *fail = String::claim(runtime.heap, regexp->exp->error());
+    RETURN(claim_result(runtime.heap, false, fail));
   }
 }
 
@@ -61,9 +65,9 @@ static PRIMFN(prim_re2str) {
   REGEXP(arg0, 0);
   auto out =
     has_set_dot_nl<RE2::Options>::value
-    ? std::make_shared<String>(arg0->exp.pattern())
-    : std::make_shared<String>(arg0->exp.pattern().substr(4)); // skip the (?s)
-  RETURN(out);
+    ? arg0->exp->pattern()
+    : arg0->exp->pattern().substr(4);
+  RETURN(String::alloc(runtime.heap, out));
 }
 
 static PRIMTYPE(type_quote) {
@@ -75,22 +79,21 @@ static PRIMTYPE(type_quote) {
 static PRIMFN(prim_quote) {
   EXPECT(1);
   STRING(arg0, 0);
-  auto out = std::make_shared<String>(RE2::QuoteMeta(arg0->value));
-  RETURN(out);
+  RETURN(String::alloc(runtime.heap, RE2::QuoteMeta(sp(arg0))));
 }
 
-static bool check_re2_bug(const std::string &str) {
+static bool check_re2_bug(size_t size) {
   re2::StringPiece sp;
   bool has_bug = sizeof(sp.size()) != sizeof(size_t);
-  bool big = (str.size() >> (sizeof(sp.size())*8-1)) != 0;
+  bool big = (size >> (sizeof(sp.size())*8-1)) != 0;
   return has_bug && big;
 }
 
 const char re2_bug[] = "The re2 library is too old (< 2016-09) to be used on inputs larger than 2GiB\n";
 
 #define RE2_BUG(str) do {						\
-  if (check_re2_bug(str)) {						\
-    require_fail(re2_bug, sizeof(re2_bug), queue, binding.get());	\
+  if (check_re2_bug(str->length)) {					\
+    require_fail(re2_bug, sizeof(re2_bug), runtime, scope);		\
     return;								\
   }									\
 } while (0)
@@ -106,10 +109,11 @@ static PRIMFN(prim_match) {
   EXPECT(2);
   REGEXP(arg0, 0);
   STRING(arg1, 1);
-  RE2_BUG(arg1->value);
+  RE2_BUG(arg1);
 
-  auto out = make_bool(RE2::FullMatch(arg1->value, arg0->exp));
-  RETURN(out);
+  runtime.heap.reserve(reserve_bool());
+  auto out = RE2::FullMatch(sp(arg1), *arg0->exp);
+  RETURN(claim_bool(runtime.heap, out));
 }
 
 static PRIMTYPE(type_extract) {
@@ -126,20 +130,28 @@ static PRIMFN(prim_extract) {
   EXPECT(2);
   REGEXP(arg0, 0);
   STRING(arg1, 1);
-  RE2_BUG(arg1->value);
+  RE2_BUG(arg1);
 
-  int matches = arg0->exp.NumberOfCapturingGroups() + 1;
-  std::vector<re2::StringPiece> submatch(matches, nullptr);
-  re2::StringPiece input(arg1->value);
+  int matches = arg0->exp->NumberOfCapturingGroups();
+  re2::StringPiece submatch[matches+1];
+  re2::StringPiece input = sp(arg1);
 
-  std::vector<std::shared_ptr<Value> > strings;
-  if (arg0->exp.Match(input, 0, arg1->value.size(), RE2::ANCHOR_BOTH, submatch.data(), matches)) {
-    strings.reserve(matches);
-    for (int i = 1; i < matches; ++i) strings.emplace_back(std::make_shared<String>(submatch[i].as_string()));
+  if (arg0->exp->Match(input, 0, input.size(), RE2::ANCHOR_BOTH, submatch, matches+1)) {
+    size_t need = reserve_list(matches);
+    for (int i = 0; i < matches; ++i)
+      need += String::reserve(submatch[i+1].size());
+    runtime.heap.reserve(need);
+    // NOTE: if there is not enough space, this routine will be re-entered.
+    // This means submatches is recomputed with fresh/correct heap locations.
+    HeapObject *out[matches];
+    for (int i = 0; i < matches; ++i) {
+      re2::StringPiece &p = submatch[i+1];
+      out[i] = String::claim(runtime.heap, p.data(), p.size());
+    }
+    RETURN(claim_list(runtime.heap, matches, out));
+  } else {
+    RETURN(alloc_nil(runtime.heap));
   }
-
-  auto out = make_list(std::move(strings));
-  RETURN(out);
 }
 
 static PRIMTYPE(type_replace) {
@@ -156,12 +168,12 @@ static PRIMFN(prim_replace) {
   STRING(arg1, 1);
   STRING(arg2, 2);
 
-  RE2_BUG(arg1->value);
-  RE2_BUG(arg2->value);
+  RE2_BUG(arg1);
+  RE2_BUG(arg2);
 
-  auto out = std::make_shared<String>(arg2->value);
-  RE2::GlobalReplace(&out->value, arg0->exp, arg1->value);
-  RETURN(out);
+  std::string buffer = arg2->as_str();
+  RE2::GlobalReplace(&buffer, *arg0->exp, sp(arg1));
+  RETURN(String::alloc(runtime.heap, buffer));
 }
 
 static PRIMTYPE(type_tokenize) {
@@ -178,28 +190,44 @@ static PRIMFN(prim_tokenize) {
   EXPECT(2);
   REGEXP(arg0, 0);
   STRING(arg1, 1);
-  RE2_BUG(arg1->value);
+  RE2_BUG(arg1);
 
-  re2::StringPiece input(arg1->value);
+  re2::StringPiece input = sp(arg1);
   re2::StringPiece hit;
-  std::vector<std::shared_ptr<Value> > tokens;
-  while (arg0->exp.Match(input, 0, input.size(), RE2::UNANCHORED, &hit, 1)) {
+  std::vector<re2::StringPiece> tokens;
+  size_t need = 0;
+
+  while (arg0->exp->Match(input, 0, input.size(), RE2::UNANCHORED, &hit, 1)) {
     if (hit.empty()) break;
     re2::StringPiece token(input.data(), hit.data() - input.data());
-    tokens.emplace_back(std::make_shared<String>(token.as_string()));
+    tokens.emplace_back(token);
+    need += String::reserve(token.size());
     input.remove_prefix(token.size() + hit.size());
   }
-  tokens.emplace_back(std::make_shared<String>(input.as_string()));
-  auto out = make_list(std::move(tokens));
-  RETURN(out);
+  tokens.emplace_back(input);
+  need += String::reserve(input.size());
+
+  need += reserve_list(tokens.size());
+  runtime.heap.reserve(need);
+
+  // NOTE: if there is not enough space, this routine will be re-entered.
+  // This means tokens is recomputed with fresh/correct heap locations.
+
+  HeapObject *out[tokens.size()];
+  for (size_t i = 0; i < tokens.size(); ++i) {
+    re2::StringPiece &p = tokens[i];
+    out[i] = String::claim(runtime.heap, p.data(), p.size());
+  }
+
+  RETURN(claim_list(runtime.heap, tokens.size(), out));
 }
 
 void prim_register_regexp(PrimMap &pmap) {
-  prim_register(pmap, "re2",      prim_re2,      type_re2,      PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "re2str",   prim_re2str,   type_re2str,   PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "quote",    prim_quote,    type_quote,    PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "match",    prim_match,    type_match,    PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "extract",  prim_extract,  type_extract,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "replace",  prim_replace,  type_replace,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "tokenize", prim_tokenize, type_tokenize, PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "re2",      prim_re2,      type_re2,      PRIM_PURE);
+  prim_register(pmap, "re2str",   prim_re2str,   type_re2str,   PRIM_PURE);
+  prim_register(pmap, "quote",    prim_quote,    type_quote,    PRIM_PURE);
+  prim_register(pmap, "match",    prim_match,    type_match,    PRIM_PURE);
+  prim_register(pmap, "extract",  prim_extract,  type_extract,  PRIM_PURE);
+  prim_register(pmap, "replace",  prim_replace,  type_replace,  PRIM_PURE);
+  prim_register(pmap, "tokenize", prim_tokenize, type_tokenize, PRIM_PURE);
 }

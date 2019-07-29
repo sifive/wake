@@ -505,6 +505,12 @@ JLexer::JLexer(const std::string &body)
   consume();
 }
 
+JLexer::JLexer(const char *body, size_t len)
+  : engine(new jinput_t("string", reinterpret_cast<const unsigned char *>(body), len)), next(JSON_ERROR, LOCATION), fail(false)
+{
+  consume();
+}
+
 JLexer::~JLexer() {
   if (engine->file) fclose(engine->file);
 }

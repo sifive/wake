@@ -17,7 +17,6 @@
 
 #include "prim.h"
 #include "value.h"
-#include "heap.h"
 #include "type.h"
 #include "status.h"
 #include "location.h"
@@ -35,16 +34,25 @@ static PRIMTYPE(type_stack) {
 
 static PRIMFN(prim_stack) {
   EXPECT(1);
-  std::vector<std::shared_ptr<Value> > list;
+  std::vector<std::string> list;
 
-  if (queue.stack_trace) for (auto &x : binding->stack_trace()) {
+  size_t need = 0;
+  for (auto &x : scope->stack_trace()) {
     std::stringstream str;
     str << x.file();
-    list.emplace_back(std::make_shared<String>(str.str()));
+    list.emplace_back(str.str());
+    need += String::reserve(list.back().size());
   }
 
-  auto out = make_list(std::move(list));
-  RETURN(out);
+  need += reserve_list(list.size());
+  runtime.heap.reserve(need);
+
+  std::vector<HeapObject*> objs;
+  objs.reserve(list.size());
+  for (auto &s : list)
+    objs.push_back(String::claim(runtime.heap, s));
+
+  RETURN(claim_list(runtime.heap, objs.size(), objs.data()));
 }
 
 static PRIMTYPE(type_panic) {
@@ -57,29 +65,14 @@ static PRIMFN(prim_panic) {
   EXPECT(1);
   STRING(arg0, 0);
   std::stringstream str;
-  str << "PANIC: " << arg0->value << std::endl;
+  str << "PANIC: " << arg0->c_str() << std::endl;
   std::string message = str.str();
   status_write(2, message.data(), message.size());
   bool panic_called = true;
   REQUIRE(!panic_called);
 }
 
-static PRIMTYPE(type_unit) {
-  return args.size() == 1 &&
-    out->unify(Data::typeUnit);
-}
-
-static PRIMFN(prim_unit) {
-  (void)data; // silence unused variable warning (EXPECT not called)
-  (void)binding;
-  (void)args;
-  auto out = make_unit();
-  RETURN(out);
-}
-
 void prim_register_exception(PrimMap &pmap) {
-  prim_register(pmap, "stack",    prim_stack, type_stack, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "panic",    prim_panic, type_panic, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "wait_one", prim_unit,  type_unit,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "wait_all", prim_unit,  type_unit,  PRIM_PURE);
+  prim_register(pmap, "stack",    prim_stack, type_stack, PRIM_PURE);
+  prim_register(pmap, "panic",    prim_panic, type_panic, PRIM_PURE);
 }

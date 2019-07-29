@@ -15,11 +15,7 @@
 
 # String methods
 
-global def cat strings =
-  def catopen    = prim "catopen"
-  def catclose c = prim "catclose"
-  def catadd c s = prim "catadd"
-  catclose (foldl catadd catopen strings)
+global def cat listString = prim "lcat"
 
 global def catWith separator strings =
   if strings.empty then "" else

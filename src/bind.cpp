@@ -18,16 +18,15 @@
 #include "bind.h"
 #include "expr.h"
 #include "prim.h"
-#include "value.h"
 #include "symbol.h"
 #include <iostream>
-#include <algorithm>
 #include <vector>
 #include <map>
 #include <set>
 #include <queue>
 #include <list>
 #include <cassert>
+#include <algorithm>
 
 typedef std::map<std::string, int> NameIndex;
 
@@ -81,7 +80,7 @@ static void SCC(SCCState &state, int vi) {
       w.onstack = 0;
       auto out = state.binding->order.insert(std::make_pair(w.name, DefBinding::OrderValue(w.location, state.binding->fun.size() + state.binding->val.size())));
       assert (out.second);
-      state.binding->fun.emplace_back(reinterpret_cast<Lambda*>(w.expr.release()));
+      state.binding->fun.emplace_back(static_cast<Lambda*>(w.expr.release()));
       state.binding->scc.push_back(scc_id);
     } while (wi != vi);
   }
@@ -454,9 +453,9 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
         Expr *cons = iter->defs[it->second].expr.get();
         if (cons) {
           while (cons->type == &Lambda::type)
-            cons = reinterpret_cast<Lambda*>(cons)->body.get();
+            cons = static_cast<Lambda*>(cons)->body.get();
           if (cons->type == &Construct::type) {
-            Construct *c = reinterpret_cast<Construct*>(cons);
+            Construct *c = static_cast<Construct*>(cons);
             out.sum = c->sum;
             out.cons = c->cons->index;
           }
@@ -552,22 +551,22 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
 
 static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding *binding) {
   if (expr->type == &VarRef::type) {
-    VarRef *ref = reinterpret_cast<VarRef*>(expr.get());
+    VarRef *ref = static_cast<VarRef*>(expr.get());
     // don't fail if unbound; leave that for the second pass
     rebind_ref(binding, ref->name);
     return expr;
   } else if (expr->type == &Subscribe::type) {
-    Subscribe *sub = reinterpret_cast<Subscribe*>(expr.get());
+    Subscribe *sub = static_cast<Subscribe*>(expr.get());
     VarRef *out = rebind_subscribe(binding, sub->location, sub->name);
     out->flags |= FLAG_AST;
     return std::unique_ptr<Expr>(out);
   } else if (expr->type == &App::type) {
-    App *app = reinterpret_cast<App*>(expr.get());
+    App *app = static_cast<App*>(expr.get());
     app->fn  = fracture(std::move(app->fn),  binding);
     app->val = fracture(std::move(app->val), binding);
     return expr;
   } else if (expr->type == &Lambda::type) {
-    Lambda *lambda = reinterpret_cast<Lambda*>(expr.get());
+    Lambda *lambda = static_cast<Lambda*>(expr.get());
     ResolveBinding lbinding;
     lbinding.parent = binding;
     lbinding.current_index = 0;
@@ -578,13 +577,13 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     lambda->body = fracture(std::move(lambda->body), &lbinding);
     return expr;
   } else if (expr->type == &Match::type) {
-    std::unique_ptr<Match> m(reinterpret_cast<Match*>(expr.release()));
+    std::unique_ptr<Match> m(static_cast<Match*>(expr.release()));
     auto out = rebind_match(binding, std::move(m));
     if (!out) return out;
     out->flags |= FLAG_AST;
     return fracture(std::move(out), binding);
   } else if (expr->type == &DefMap::type) {
-    DefMap *def = reinterpret_cast<DefMap*>(expr.get());
+    DefMap *def = static_cast<DefMap*>(expr.get());
     ResolveBinding dbinding;
     dbinding.parent = binding;
     dbinding.prefix = -1;
@@ -607,7 +606,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
       out->flags |= FLAG_AST;
     return out;
   } else if (expr->type == &Top::type) {
-    Top *top = reinterpret_cast<Top*>(expr.get());
+    Top *top = static_cast<Top*>(expr.get());
     ResolveBinding tbinding;
     tbinding.parent = binding;
     tbinding.prefix = 0;
@@ -656,8 +655,9 @@ struct NameRef {
   int offset;
   int def;
   Location target;
+  Lambda *lambda;
   TypeVar *var;
-  NameRef() : depth(0), offset(-1), def(0), target(LOCATION), var(0) { }
+  NameRef() : depth(0), offset(-1), def(0), target(LOCATION), lambda(nullptr), var(nullptr) { }
 };
 
 struct NameBinding {
@@ -692,6 +692,7 @@ struct NameBinding {
       } else {
         auto x = binding->fun[idx-binding->val.size()].get();
         out.var = x?&x->typeVar:0;
+        out.lambda = x;
       }
     } else if (next) {
       out = next->find(x);
@@ -734,7 +735,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   if (!expr) return false; // failed fracture
   expr->typeVar.setDOB();
   if (expr->type == &VarRef::type) {
-    VarRef *ref = reinterpret_cast<VarRef*>(expr);
+    VarRef *ref = static_cast<VarRef*>(expr);
     NameRef pos;
     if ((pos = binding->find(ref->name)).offset == -1) {
       std::cerr << "Variable reference '" << ref->name << "' is unbound at "
@@ -743,6 +744,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     }
     ref->depth = pos.depth;
     ref->offset = pos.offset;
+    ref->lambda = pos.lambda;
     ref->target = pos.target;
     if (!pos.var) return true;
     if (pos.def) {
@@ -753,7 +755,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       return ref->typeVar.unify(*pos.var, &ref->location);
     }
   } else if (expr->type == &App::type) {
-    App *app = reinterpret_cast<App*>(expr);
+    App *app = static_cast<App*>(expr);
     binding->open = false;
     bool f = explore(app->fn .get(), pmap, binding);
     bool a = explore(app->val.get(), pmap, binding);
@@ -764,7 +766,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     bool tr = t && app->fn->typeVar[1].unify(app->typeVar, &app->location);
     return f && a && t && ta && tr;
   } else if (expr->type == &Lambda::type) {
-    Lambda *lambda = reinterpret_cast<Lambda*>(expr);
+    Lambda *lambda = static_cast<Lambda*>(expr);
     bool t = lambda->typeVar.unify(TypeVar(FN, 2), &lambda->location);
     if (t && lambda->name != "_" && lambda->name.find(' ') == std::string::npos)
       lambda->typeVar.setTag(0, lambda->name.c_str());
@@ -774,7 +776,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &recm);
     return out && t && tr;
   } else if (expr->type == &DefBinding::type) {
-    DefBinding *def = reinterpret_cast<DefBinding*>(expr);
+    DefBinding *def = static_cast<DefBinding*>(expr);
     binding->open = false;
     NameBinding bind(binding, def);
     bool ok = true;
@@ -792,10 +794,10 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     ok = ok && def->typeVar.unify(def->body->typeVar, &def->location) && ok;
     return ok;
   } else if (expr->type == &Literal::type) {
-    Literal *lit = reinterpret_cast<Literal*>(expr);
-    return lit->typeVar.unify(lit->value->getType(), &lit->location);
+    Literal *lit = static_cast<Literal*>(expr);
+    return lit->typeVar.unify(*lit->litType, &lit->location);
   } else if (expr->type == &Construct::type) {
-    Construct *cons = reinterpret_cast<Construct*>(expr);
+    Construct *cons = static_cast<Construct*>(expr);
     bool ok = cons->typeVar.unify(
       TypeVar(cons->sum->name.c_str(), cons->sum->args.size()));
     std::map<std::string, TypeVar*> ids;
@@ -810,7 +812,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     }
     return ok;
   } else if (expr->type == &Destruct::type) {
-    Destruct *des = reinterpret_cast<Destruct*>(expr);
+    Destruct *des = static_cast<Destruct*>(expr);
     // (typ => cons0 => b) => (typ => cons1 => b) => typ => b
     TypeVar &typ = binding->lambda->typeVar[0];
     bool ok = typ.unify(
@@ -838,7 +840,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     }
     return ok;
   } else if (expr->type == &Prim::type) {
-    Prim *prim = reinterpret_cast<Prim*>(expr);
+    Prim *prim = static_cast<Prim*>(expr);
     std::vector<TypeVar*> args;
     for (NameBinding *iter = binding; iter && iter->open && iter->lambda; iter = iter->next)
       args.push_back(&iter->lambda->typeVar[0]);

@@ -16,10 +16,6 @@
  */
 
 #include "expr.h"
-#include "value.h"
-#include "hash.h"
-#include "thunk.h"
-#include "datatype.h"
 #include <cassert>
 #include <sstream>
 
@@ -41,11 +37,8 @@ const TypeDescriptor Top       ::type("Top");
 const TypeDescriptor VarDef    ::type("VarDef");
 const TypeDescriptor VarArg    ::type("VarArg");
 
-Literal::Literal(const Location &location_, std::shared_ptr<Value> &&value_)
- : Expr(&type, location_), value(std::move(value_)) { }
-
-Literal::Literal(const Location &location_, const char *value_)
- : Expr(&type, location_), value(std::make_shared<String>(value_)) { }
+Literal::Literal(const Location &location_, RootPointer<HeapObject> &&value_, TypeVar *litType_)
+ : Expr(&type, location_), value(std::move(value_)), litType(litType_) { }
 
 static std::string pad(int depth) {
   return std::string(depth, ' ');
@@ -80,6 +73,10 @@ Hash Subscribe::hash() {
   assert(0 /* unreachable */);
 }
 
+void Subscribe::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
+  assert(0 /* unreachable */);
+}
+
 void Match::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Match: " << typeVar << " @ " << location.file() << std::endl;
   for (auto &a: args)
@@ -111,6 +108,10 @@ Hash Match::hash() {
     }
   }
   return hashcode = Hash(codes);
+}
+
+void Match::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
+  assert(0 /* unreachable */);
 }
 
 void App::format(std::ostream &os, int depth) const {
@@ -154,6 +155,10 @@ Hash DefMap::hash() {
   assert(0 /* unreachable */);
 }
 
+void DefMap::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
+  assert(0 /* unreachable */);
+}
+
 std::unique_ptr<Expr> DefMap::dont_generalize(std::unique_ptr<DefMap> &&map) {
   assert (map->pub.empty());
   std::unique_ptr<Expr> out = std::move(map->body);
@@ -189,6 +194,10 @@ void Top::format(std::ostream &os, int depth) const {
 }
 
 Hash Top::hash() {
+  assert(0 /* unreachable */);
+}
+
+void Top::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   assert(0 /* unreachable */);
 }
 
@@ -248,8 +257,16 @@ void VarDef::format(std::ostream &os, int depth) const {
 
 Hash VarDef::hash() { return Hash(); }
 
+void VarDef::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
+  assert(0 /* unreachable */);
+}
+
 void VarArg::format(std::ostream &os, int depth) const {
   os << pad(depth) << "VarArg @ " << location.file() << std::endl;
 }
 
 Hash VarArg::hash() { return Hash(); }
+
+void VarArg::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
+  assert(0 /* unreachable */);
+}

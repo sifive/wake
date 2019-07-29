@@ -21,6 +21,7 @@
 #include "parser.h"
 #include "utf8.h"
 #include "lexint.h"
+#include "gc.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -212,14 +213,14 @@ static bool lex_rstr(Lexer &lex, Expr *&out)
     */
   }
 
-  std::shared_ptr<RegExp> exp = std::make_shared<RegExp>(unicode_escape_canon(std::move(slice)));
-  if (!exp->exp.ok()) {
+  RootPointer<RegExp> exp = RegExp::literal(lex.heap, unicode_escape_canon(std::move(slice)));
+  if (!exp->exp->ok()) {
     lex.fail = true;
     std::cerr << "Invalid regular expression at "
       << SYM_LOCATION.file() << "; "
-      << exp->exp.error() << std::endl;
+      << exp->exp->error() << std::endl;
   }
-  out = new Literal(SYM_LOCATION, std::move(exp));
+  out = new Literal(SYM_LOCATION, std::move(exp), &RegExp::typeVar);
   return true;
 }
 
@@ -245,8 +246,7 @@ static bool lex_sstr(Lexer &lex, Expr *&out)
   }
 
   // NOTE: unicode_escape NOT invoked; '' is raw "" is cleaned
-  std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
-  out = new Literal(SYM_LOCATION, std::move(str));
+  out = new Literal(SYM_LOCATION, String::literal(lex.heap, slice), &String::typeVar);
   return true;
 }
 
@@ -254,6 +254,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
 {
   input_t &in = *lex.engine.get();
   Coordinates start = in.coord() - 1;
+  Coordinates first = start;
   std::vector<Expr*> exprs;
   std::string slice;
   bool ok = true;
@@ -270,14 +271,14 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
 
         * { return false; }
         [{] {
-          std::shared_ptr<String> str = std::make_shared<String>(std::move(slice));
-          exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
+          exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, slice), &String::typeVar));
           exprs.back()->flags |= FLAG_AST;
           lex.consume();
           exprs.push_back(parse_expr(lex));
           if (lex.next.type == EOL) lex.consume();
           expect(BCLOSE, lex);
           start = in.coord() - 1;
+          slice.clear();
           continue;
         }
 
@@ -303,21 +304,18 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
     */
   }
 
-  std::shared_ptr<String> str = std::make_shared<String>(unicode_escape_canon(std::move(slice)));
-  exprs.push_back(new Literal(SYM_LOCATION, std::move(str)));
+  RootPointer<String> str = String::literal(lex.heap, unicode_escape_canon(std::move(slice)));
+  exprs.push_back(new Literal(SYM_LOCATION, std::move(str), &String::typeVar));
   exprs.back()->flags |= FLAG_AST;
 
   if (exprs.size() == 1) {
     out = exprs.front();
   } else {
-    Expr *cat = new Prim(LOCATION, "catopen");
-    for (auto expr : exprs)
-      cat = new App(LOCATION, new App(LOCATION, new VarRef(LOCATION, "_ catadd"), cat), expr);
-    Location location = exprs.front()->location;
-    location.end = exprs.back()->location.end;
-    cat = new App(LOCATION, new Lambda(LOCATION, "_", new Prim(LOCATION, "catclose")), cat);
-    cat = new App(location, new Lambda(LOCATION, "_ catadd", cat),
-            new Lambda(LOCATION, "_", new Lambda(LOCATION, "_", new Prim(LOCATION, "catadd"))));
+    Expr *cat = new Prim(LOCATION, "vcat");
+    for (size_t i = 0; i < exprs.size(); ++i) cat = new Lambda(LOCATION, "_", cat);
+    for (auto expr : exprs) cat = new App(LOCATION, cat, expr);
+    cat->location = Location(in.filename, first, in.coord() - 1);
+    cat->flags |= FLAG_AST;
     out = cat;
   }
 
@@ -368,8 +366,7 @@ top:
       (double10 | double10e | double16 | double16e) {
         std::string x(in.tok, in.cur);
         std::remove(x.begin(), x.end(), '_');
-        std::shared_ptr<Double> value = std::make_shared<Double>(x.c_str());
-        return mkSym2(LITERAL, new Literal(SYM_LOCATION, std::move(value)));
+        return mkSym2(LITERAL, new Literal(SYM_LOCATION, Double::literal(lex.heap, x.c_str()), &Double::typeVar));
       }
 
       // integer literals
@@ -379,8 +376,7 @@ top:
       (dec | oct | hex | bin) {
         std::string integer(in.tok, in.cur);
         std::remove(integer.begin(), integer.end(), '_');
-        std::shared_ptr<Integer> value = std::make_shared<Integer>(integer.c_str());
-        return mkSym2(LITERAL, new Literal(SYM_LOCATION, std::move(value)));
+        return mkSym2(LITERAL, new Literal(SYM_LOCATION, Integer::literal(lex.heap, integer), &Integer::typeVar));
       }
 
       // keywords
@@ -434,14 +430,14 @@ struct state_t {
   }
 };
 
-Lexer::Lexer(const char *file)
- : engine(new input_t(file, fopen(file, "r"))), state(new state_t), next(ERROR, Location(file, Coordinates(), Coordinates())), fail(false)
+Lexer::Lexer(Heap &heap_, const char *file)
+ : heap(heap_), engine(new input_t(file, fopen(file, "r"))), state(new state_t), next(ERROR, Location(file, Coordinates(), Coordinates())), fail(false)
 {
   if (engine->file) consume();
 }
 
-Lexer::Lexer(const std::string &cmdline, const char *target)
-  : engine(new input_t(target, reinterpret_cast<const unsigned char *>(cmdline.c_str()), cmdline.size())), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
+Lexer::Lexer(Heap &heap_, const std::string &cmdline, const char *target)
+  : heap(heap_), engine(new input_t(target, reinterpret_cast<const unsigned char *>(cmdline.c_str()), cmdline.size())), state(new state_t), next(ERROR, LOCATION, 0), fail(false)
 {
   consume();
 }

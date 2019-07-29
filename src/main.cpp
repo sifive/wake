@@ -35,8 +35,6 @@
 #include "bind.h"
 #include "symbol.h"
 #include "value.h"
-#include "thunk.h"
-#include "heap.h"
 #include "expr.h"
 #include "job.h"
 #include "sources.h"
@@ -46,21 +44,9 @@
 #include "gopt.h"
 #include "json5.h"
 #include "execpath.h"
+#include "runtime.h"
 
 #define SHORT_HASH 8
-
-static WorkQueue queue;
-
-struct Output : public Receiver {
-  std::shared_ptr<Value> *save;
-  Output(std::shared_ptr<Value> *save_) : save(save_) { }
-  void receive(WorkQueue &queue, std::shared_ptr<Value> &&value);
-};
-
-void Output::receive(WorkQueue &queue, std::shared_ptr<Value> &&value) {
-  (void)queue; // we're done; no following actions to take!
-  *save = std::move(value);
-}
 
 static void indent(const std::string& tab, const std::string& body) {
   size_t i, j;
@@ -144,7 +130,7 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
   for (auto &job : jobs) {
     std::cout << std::endl << "# Wake job " << job.job << ":" << std::endl;
     std::cout << "cd ";
-    escape(get_workspace());
+    escape(get_cwd());
     std::cout << std::endl;
     if (job.directory != ".") {
       std::cout << "cd ";
@@ -281,11 +267,11 @@ struct JSONRender {
       eset.insert(expr);
 
     if (expr->type == &App::type) {
-      App *app = reinterpret_cast<App*>(expr);
+      App *app = static_cast<App*>(expr);
       explore(app->val.get());
       explore(app->fn.get());
     } else if (expr->type == &Lambda::type) {
-      Lambda *lambda = reinterpret_cast<Lambda*>(expr);
+      Lambda *lambda = static_cast<Lambda*>(expr);
       if (lambda->token.start.bytes >= 0) {
         auto foo = new VarArg(lambda->token);
         foo->typeVar.setDOB(lambda->typeVar[0]);
@@ -295,7 +281,7 @@ struct JSONRender {
       }
       explore(lambda->body.get());
     } else if (expr->type == &DefBinding::type) {
-      DefBinding *defbinding = reinterpret_cast<DefBinding*>(expr);
+      DefBinding *defbinding = static_cast<DefBinding*>(expr);
       for (auto &i : defbinding->val) explore(i.get());
       for (auto &i : defbinding->fun) explore(i.get());
       for (auto &i : defbinding->order) {
@@ -306,9 +292,9 @@ struct JSONRender {
           auto def = new VarDef(i.second.location);
           if (i.first.compare(0, 8, "publish ") == 0) {
             assert (expr->type == &App::type);
-            App *app = reinterpret_cast<App*>(expr);
+            App *app = static_cast<App*>(expr);
             assert (app->val->type == &VarRef::type);
-            VarRef *ref = reinterpret_cast<VarRef*>(app->val.get());
+            VarRef *ref = static_cast<VarRef*>(app->val.get());
             def->target = ref->target;
           }
           def->typeVar.setDOB(expr->typeVar);
@@ -335,12 +321,12 @@ struct JSONRender {
     Location target = LOCATION;
 
     if ((*it)->type == &VarRef::type) {
-      VarRef *ref = reinterpret_cast<VarRef*>(*it);
+      VarRef *ref = static_cast<VarRef*>(*it);
       target = ref->target;
     }
 
     if ((*it)->type == &VarDef::type) {
-      VarDef *def = reinterpret_cast<VarDef*>(*it);
+      VarDef *def = static_cast<VarDef*>(*it);
       target = def->target;
     }
 
@@ -451,8 +437,6 @@ int main(int argc, char **argv) {
   const char *jobs   = arg(options, "jobs"  )->argument;
   const char *init   = arg(options, "init"  )->argument;
   const char *remove = arg(options, "remove-task")->argument;
-
-  queue.stack_trace = debug;
 
   if (help) {
     print_help(argv[0]);
@@ -569,16 +553,21 @@ int main(int argc, char **argv) {
   if (noparse) return 0;
 
   bool ok = true;
-  auto all_sources(find_all_sources(ok, workspace));
-  if (!ok) std::cerr << "Source file enumeration failed" << std::endl;
+  auto wakefiles = find_all_wakefiles(ok, workspace);
+  if (!ok) std::cerr << "Workspace wake file enumeration failed" << std::endl;
+
+  Runtime runtime;
+  bool sources = find_all_sources(runtime, workspace);
+  if (!sources) std::cerr << "Source file enumeration failed" << std::endl;
+  ok &= sources;
 
   // Read all wake build files
+  Scope::debug = debug;
   std::unique_ptr<Top> top(new Top);
-  auto wakefiles = find_all_wakefiles(ok, workspace);
   for (auto &i : wakefiles) {
-    if (verbose && queue.stack_trace)
+    if (verbose && debug)
       std::cerr << "Parsing " << i << std::endl;
-    Lexer lex(i.c_str());
+    Lexer lex(runtime.heap, i.c_str());
     parse_top(*top.get(), lex);
     if (lex.fail) ok = false;
   }
@@ -590,7 +579,7 @@ int main(int argc, char **argv) {
 
   // Read all wake targets
   std::vector<std::string> target_names;
-  Expr *body = new Lambda(LOCATION, "_", new Literal(LOCATION, "top"));
+  Expr *body = new Lambda(LOCATION, "_", new Literal(LOCATION, String::literal(runtime.heap, "top"), &String::typeVar));
   for (size_t i = 0; i < targets.size() + globals.size(); ++i) {
     body = new Lambda(LOCATION, "_", body);
     target_names.emplace_back("<target-" + std::to_string(i) + ">");
@@ -598,7 +587,7 @@ int main(int argc, char **argv) {
   if (argc > 1) target_names.back() = "<command-line>";
   TypeVar *types = &body->typeVar;
   for (size_t i = 0; i < targets.size(); ++i) {
-    Lexer lex(targets[i], target_names[i].c_str());
+    Lexer lex(runtime.heap, targets[i], target_names[i].c_str());
     body = new App(LOCATION, body, parse_command(lex));
     if (lex.fail) ok = false;
   }
@@ -620,7 +609,7 @@ int main(int argc, char **argv) {
   prim_register_target(pmap);
   prim_register_json(pmap);
   prim_register_job(&jobtable, pmap);
-  prim_register_sources(&all_sources, pmap);
+  prim_register_sources(pmap);
 
   if (parse) std::cout << top.get();
 
@@ -692,7 +681,7 @@ int main(int argc, char **argv) {
   for (auto &g : globals) {
     Expr *e = root.get();
     while (e && e->type == &DefBinding::type) {
-      DefBinding *d = reinterpret_cast<DefBinding*>(e);
+      DefBinding *d = static_cast<DefBinding*>(e);
       e = d->body.get();
       auto i = d->order.find(g);
       if (i != d->order.end()) {
@@ -717,8 +706,7 @@ int main(int argc, char **argv) {
   root->hash();
 
   db.prepare();
-  std::shared_ptr<Value> value;
-  queue.emplace(root.get(), nullptr, std::unique_ptr<Receiver>(new Output(&value)));
+  runtime.init(root.get());
 
   // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
   std::cout << std::flush;
@@ -726,27 +714,28 @@ int main(int argc, char **argv) {
   fflush(stdout);
   fflush(stderr);
 
-  queue.abort = false;
+  runtime.abort = false;
 
   status_init();
-  do { queue.run(); } while (!queue.abort && jobtable.wait(queue));
+  do { runtime.run(); } while (!runtime.abort && jobtable.wait(runtime));
   status_finish();
 
-  bool pass = !queue.abort;
+  bool pass = !runtime.abort;
   if (JobTable::exit_now()) {
     std::cerr << "Early termination requested" << std::endl;
     pass = false;
   } else if (pass) {
-    std::vector<std::shared_ptr<Value> > outputs;
+    std::vector<Promise*> outputs;
     outputs.reserve(targets.size());
-    Binding *iter = reinterpret_cast<Closure*>(value.get())->binding.get();
+    Scope *iter = static_cast<Closure*>(runtime.output.get())->scope.get();
     for (size_t i = 0; i < targets.size(); ++i) {
-      outputs.emplace_back(iter->future[0].value);
+      outputs.emplace_back(iter->at(0));
       iter = iter->next.get();
     }
 
     for (size_t i = 0; i < targets.size(); ++i) {
-      Value *v = outputs[targets.size()-1-i].get();
+      Promise *p = outputs[targets.size()-1-i];
+      HeapObject *v = *p ? p->coerce<HeapObject>() : nullptr;
       if (verbose) {
         std::cout << targets[i] << ": ";
         (*types)[0].format(std::cout, body->typeVar);
@@ -754,16 +743,15 @@ int main(int argc, char **argv) {
         std::cout << " = ";
       }
       if (!quiet) {
-        Value::format(std::cout, v, debug, verbose?0:-1);
-        if (v && v->type == &Closure::type)
+        HeapObject::format(std::cout, v, debug, verbose?0:-1);
+        if (v && typeid(*v) == typeid(Closure))
           std::cout << ", " << term_red() << "AN UNEVALUATED FUNCTION" << term_normal();
         std::cout << std::endl;
       }
       if (!v) {
         pass = false;
-      } else if (v->type == &Data::type) {
-        Data *d = reinterpret_cast<Data*>(v);
-        if (d->cons->ast.name == "Fail") pass = false;
+      } else if (Record *r = dynamic_cast<Record*>(v)) {
+        if (r->cons->ast.name == "Fail") pass = false;
       }
     }
   }

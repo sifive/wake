@@ -17,93 +17,99 @@
 
 #include "prim.h"
 #include "value.h"
-#include "heap.h"
-#include "hash.h"
-#include "expr.h"
 #include "type.h"
-#include "symbol.h"
 #include "status.h"
 #include "utf8.h"
+#include "gc.h"
 #include <sstream>
 #include <fstream>
 #include <iostream>
-#include <iosfwd>
-#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <errno.h>
-#include <cstring>
+#include <string.h>
 #include <utf8proc.h>
 #include <unistd.h>
 
-struct CatStream : public Value {
-  std::stringstream str;
-  static const TypeDescriptor type;
-  static TypeVar typeVar;
-  CatStream() : Value(&type) { }
-
-  void format(std::ostream &os, FormatState &state) const;
-  TypeVar &getType();
-  Hash hash() const;
-};
-
-const TypeDescriptor CatStream::type("_CatStream");
-
-void CatStream::format(std::ostream &os, FormatState &state) const {
-  if (APP_PRECEDENCE < state.p()) os << "(";
-  os << "_CatStream ";
-  String(str.str()).format(os, state);
-  if (APP_PRECEDENCE < state.p()) os << ")";
+static PRIMTYPE(type_vcat) {
+  bool ok = out->unify(String::typeVar);
+  for (auto x : args) ok &= x->unify(String::typeVar);
+  return ok;
 }
 
-TypeVar CatStream::typeVar("_CatStream", 0);
-TypeVar &CatStream::getType() {
-  return typeVar;
-}
+static PRIMFN(prim_vcat) {
+  (void)data;
 
-Hash CatStream::hash() const {
-  return Hash(str.str()) + type.hashcode;
-}
+  size_t size = 0;
+  for (size_t i = 0; i < nargs; ++i) {
+    STRING(s, i);
+    size += s->length;
+  }
 
-#define CATSTREAM(arg, i) REQUIRE(args[i]->type == &CatStream::type); CatStream *arg = reinterpret_cast<CatStream*>(args[i].get());
+  String *out = String::alloc(runtime.heap, size);
+  out->c_str()[size] = 0;
 
-static PRIMTYPE(type_catopen) {
-  return args.size() == 0 &&
-    out->unify(CatStream::typeVar);
-}
+  size = 0;
+  for (size_t i = 0; i < nargs; ++i) {
+    String *s = static_cast<String*>(args[i]);
+    memcpy(out->c_str() + size, s->c_str(), s->length);
+    size += s->length;
+  }
 
-static PRIMFN(prim_catopen) {
-  EXPECT(0);
-  auto out = std::make_shared<CatStream>();
   RETURN(out);
 }
 
-static PRIMTYPE(type_catadd) {
-  return args.size() == 2 &&
-    args[0]->unify(CatStream::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    out->unify(CatStream::typeVar);
-}
-
-static PRIMFN(prim_catadd) {
-  EXPECT(2);
-  CATSTREAM(arg0, 0);
-  STRING(arg1, 1);
-  arg0->str << arg1->value;
-  RETURN(args[0]);
-}
-
-static PRIMTYPE(type_catclose) {
+static PRIMTYPE(type_lcat) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
   return args.size() == 1 &&
-    args[0]->unify(CatStream::typeVar) &&
+    args[0]->unify(list) &&
     out->unify(String::typeVar);
 }
 
-static PRIMFN(prim_catclose) {
+struct CCat final : public GCObject<CCat, Continuation> {
+  HeapPointer<Record> list;
+  HeapPointer<Continuation> cont;
+
+  CCat(Record *list_, Continuation *cont_) : list(list_), cont(cont_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (list.*memberfn)(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
+  }
+
+  void execute(Runtime &runtime) override;
+};
+
+void CCat::execute(Runtime &runtime) {
+  size_t size = 0;
+  for (Record *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Record>())
+    size += scan->at(0)->coerce<String>()->length;
+
+  String *out = String::alloc(runtime.heap, size);
+  out->c_str()[size] = 0;
+
+  size = 0;
+  for (Record *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Record>()) {
+    String *s = scan->at(0)->coerce<String>();
+    memcpy(out->c_str() + size, s->c_str(), s->length);
+    size += s->length;
+  }
+
+  cont->resume(runtime, out);
+}
+
+static PRIMFN(prim_lcat) {
   EXPECT(1);
-  CATSTREAM(arg0, 0);
-  auto out = std::make_shared<String>(arg0->str.str());
-  RETURN(out);
+  RECORD(list, 0);
+  size_t need = reserve_hash() + CCat::reserve();
+  runtime.heap.reserve(need);
+  runtime.schedule(claim_hash(runtime.heap, list,
+    CCat::claim(runtime.heap, list, continuation)));
 }
 
 static PRIMTYPE(type_explode) {
@@ -118,18 +124,22 @@ static PRIMTYPE(type_explode) {
 static PRIMFN(prim_explode) {
   EXPECT(1);
   STRING(arg0, 0);
-  std::vector<std::shared_ptr<Value> > vals;
+
+  // worst-case estimate
+  size_t need = reserve_list(arg0->length) + arg0->length * String::reserve(4);
+  runtime.heap.reserve(need);
+
+  std::vector<HeapObject*> vals;
   uint32_t rune;
 
   int got;
-  for (const char *ptr = arg0->value.c_str(); *ptr; ptr += got) {
+  for (const char *ptr = arg0->c_str(); *ptr; ptr += got) {
     got = pop_utf8(&rune, ptr);
     if (got < 1) got = 1;
-    vals.emplace_back(std::make_shared<String>(std::string(ptr, got)));
+    vals.push_back(String::claim(runtime.heap, ptr, got));
   }
 
-  auto out = make_list(std::move(vals));
-  RETURN(out);
+  RETURN(claim_list(runtime.heap, vals.size(), vals.data()));
 }
 
 static PRIMTYPE(type_read) {
@@ -145,34 +155,34 @@ static PRIMTYPE(type_read) {
 static PRIMFN(prim_read) {
   EXPECT(1);
   STRING(path, 0);
-  char buf[4096];
 
-  std::ifstream t(path->value, std::ios::in | std::ios::binary);
+  size_t max_error = path->length + 100;
+  size_t need_fail = reserve_result() + String::reserve(max_error);
+  runtime.heap.reserve(need_fail);
+
+  std::ifstream t(path->c_str(), std::ios::in | std::ios::binary);
   if (t) {
-    std::string content;
-
-    // If we can, try to guess the size needed for the file
     t.seekg(0, t.end);
     auto size = t.tellg();
-    if (size != -1) content.reserve(size);
-    t.seekg(0, t.beg);
-    t.clear();
 
-    do {
-      t.read(&buf[0], sizeof(buf));
-      content.append(&buf[0], t.gcount());
-    } while (t);
+    if (size != -1) {
+      size_t need_pass = need_fail + String::reserve(size);
+      runtime.heap.reserve(need_pass);
 
-    if (!t.bad()) {
-      auto out = make_result(true, std::make_shared<String>(std::move(content)));
-      RETURN(out);
+      String *out = String::claim(runtime.heap, size);
+      t.seekg(0, t.beg);
+      t.read(out->c_str(), out->length);
+      if (t) RETURN(claim_result(runtime.heap, true, out));
     }
   }
 
   std::stringstream str;
-  str << "read " << path->value << ": " << strerror(errno);
-  auto out = make_result(false, std::make_shared<String>(str.str()));
-  RETURN(out);
+  str << "read " << path->c_str() << ": " << strerror(errno);
+  std::string s = str.str();
+
+  size_t len = std::min(s.size(), max_error);
+  String *out = String::claim(runtime.heap, s.c_str(), len);
+  RETURN(claim_result(runtime.heap, false, out));
 }
 
 static PRIMTYPE(type_write) {
@@ -189,27 +199,36 @@ static PRIMTYPE(type_write) {
 
 static PRIMFN(prim_write) {
   EXPECT(3);
-  INTEGER(mode, 0);
+  INTEGER_MPZ(mode, 0);
   STRING(path, 1);
   STRING(body, 2);
 
-  REQUIRE(mpz_cmp_si(mode->value, 0) >= 0);
-  REQUIRE(mpz_cmp_si(mode->value, 0x1ff) <= 0);
-  long mask = mpz_get_si(mode->value);
+  // Reservation must happen first so we don't have re-entrant side-effects
+  size_t max_error = path->length + 100;
+  size_t need = reserve_result() + String::reserve(max_error);
+  runtime.heap.reserve(need);
 
-  std::ofstream t(path->value, std::ios_base::trunc);
+  REQUIRE(mpz_cmp_si(mode, 0) >= 0);
+  REQUIRE(mpz_cmp_si(mode, 0x1ff) <= 0);
+  long mask = mpz_get_si(mode);
+
+  std::ofstream t(path->c_str(), std::ios_base::trunc);
   if (!t.fail()) {
-    t << body->value;
+    t.write(body->c_str(), body->length);
     if (!t.bad()) {
-      chmod(path->value.c_str(), mask);
-      auto out = make_result(true, std::shared_ptr<Value>(args[1]));
+      chmod(path->c_str(), mask);
+      auto out = claim_result(runtime.heap, true, args[1]);
       RETURN(out);
     }
   }
+
   std::stringstream str;
-  str << "write " << path->value << ": " << strerror(errno);
-  auto out = make_result(false, std::make_shared<String>(str.str()));
-  RETURN(out);
+  str << "write " << path->c_str() << ": " << strerror(errno);
+  std::string s = str.str();
+
+  size_t len = std::min(s.size(), max_error);
+  String *out = String::claim(runtime.heap, s.c_str(), len);
+  RETURN(claim_result(runtime.heap, false, out));
 }
 
 static PRIMTYPE(type_unlink) {
@@ -222,11 +241,13 @@ static PRIMFN(prim_unlink) {
   EXPECT(1);
   STRING(path, 0);
 
-  // don't care if this succeeds
-  (void)unlink(path->value.c_str());
+  // Reservation must happen first so we don't have re-entrant side-effects
+  runtime.heap.reserve(reserve_unit());
 
-  auto out = make_unit();
-  RETURN(out);
+  // don't care if this succeeds
+  (void)unlink(path->c_str());
+
+  RETURN(claim_unit(runtime.heap));
 }
 
 static PRIMTYPE(type_getenv) {
@@ -241,11 +262,16 @@ static PRIMTYPE(type_getenv) {
 static PRIMFN(prim_getenv) {
   EXPECT(1);
   STRING(arg0, 0);
-  const char *env = getenv(arg0->value.c_str());
-  std::vector<std::shared_ptr<Value> > vals;
-  if (env) vals.emplace_back(std::make_shared<String>(env));
-  auto out = make_list(std::move(vals));
-  RETURN(out);
+  const char *env = getenv(arg0->c_str());
+  if (env) {
+    size_t len = strlen(env);
+    size_t need = reserve_list(1) + String::reserve(len);
+    runtime.heap.reserve(need);
+    HeapObject *out = String::claim(runtime.heap, env, len);
+    RETURN(claim_list(runtime.heap, 1, &out));
+  } else {
+    RETURN(alloc_nil(runtime.heap));
+  }
 }
 
 static PRIMTYPE(type_mkdir) {
@@ -261,21 +287,28 @@ static PRIMTYPE(type_mkdir) {
 
 static PRIMFN(prim_mkdir) {
   EXPECT(2);
-  INTEGER(mode, 0);
+  INTEGER_MPZ(mode, 0);
   STRING(path, 1);
 
-  REQUIRE(mpz_cmp_si(mode->value, 0) >= 0);
-  REQUIRE(mpz_cmp_si(mode->value, 0x1ff) <= 0);
-  long mask = mpz_get_si(mode->value);
+  // Reservation must happen first so we don't have re-entrant side-effects
+  size_t max_error = path->length + 100;
+  size_t need = reserve_result() + String::reserve(max_error);
+  runtime.heap.reserve(need);
 
-  if (mkdir(path->value.c_str(), mask) != 0 && errno != EEXIST && errno != EISDIR) {
+  REQUIRE(mpz_cmp_si(mode, 0) >= 0);
+  REQUIRE(mpz_cmp_si(mode, 0x1ff) <= 0);
+  long mask = mpz_get_si(mode);
+
+  if (mkdir(path->c_str(), mask) != 0 && errno != EEXIST && errno != EISDIR) {
     std::stringstream str;
-    str << "mkdir " << path->value << ": " << strerror(errno);
-    auto out = make_result(false, std::make_shared<String>(str.str()));
-    RETURN(out);
+    str << "mkdir " << path->c_str() << ": " << strerror(errno);
+    std::string s = str.str();
+
+    size_t len = std::min(s.size(), max_error);
+    String *out = String::claim(runtime.heap, s.c_str(), len);
+    RETURN(claim_result(runtime.heap, false, out));
   } else {
-    auto out = make_result(true, std::move(args[1]));
-    RETURN(out);
+    RETURN(claim_result(runtime.heap, true, args[1]));
   }
 }
 
@@ -285,12 +318,35 @@ static PRIMTYPE(type_format) {
     out->unify(String::typeVar);
 }
 
+struct CFormat final : public GCObject<CFormat, Continuation> {
+  HeapPointer<HeapObject> obj;
+  HeapPointer<Continuation> cont;
+
+  CFormat(HeapObject *obj_, Continuation *cont_) : obj(obj_), cont(cont_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (obj.*memberfn)(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
+  }
+
+  void execute(Runtime &runtime) override;
+};
+
+void CFormat::execute(Runtime &runtime) {
+  std::stringstream buffer;
+  buffer << obj.get();
+  cont->resume(runtime, String::alloc(runtime.heap, buffer.str()));
+}
+
 static PRIMFN(prim_format) {
   EXPECT(1);
-  std::stringstream buffer;
-  buffer << args[0].get();
-  auto out = std::make_shared<String>(buffer.str());
-  RETURN(out);
+  size_t need = reserve_hash() + CFormat::reserve();
+  runtime.heap.reserve(need);
+  runtime.schedule(claim_hash(runtime.heap, args[0],
+    CFormat::claim(runtime.heap, args[0], continuation)));
 }
 
 static PRIMTYPE(type_print) {
@@ -302,11 +358,11 @@ static PRIMTYPE(type_print) {
 
 static PRIMFN(prim_print) {
   EXPECT(2);
-  INTEGER(fd, 0);
+  INTEGER_MPZ(fd, 0);
   STRING(message, 1);
-  status_write(mpz_get_si(fd->value), message->value.data(), message->value.size());
-  auto out = make_unit();
-  RETURN(out);
+  runtime.heap.reserve(reserve_unit());
+  status_write(mpz_get_si(fd), message->c_str(), message->length);
+  RETURN(claim_unit(runtime.heap));
 }
 
 static PRIMTYPE(type_version) {
@@ -317,8 +373,7 @@ static PRIMTYPE(type_version) {
 static PRIMFN(prim_version) {
   EXPECT(0);
   StringInfo *info = reinterpret_cast<StringInfo*>(data);
-  auto out = std::make_shared<String>(info->version);
-  RETURN(out);
+  RETURN(String::alloc(runtime.heap, info->version));
 }
 
 static PRIMTYPE(type_level) {
@@ -343,8 +398,8 @@ static PRIMFN(prim_level) {
     x = 1;
   }
 
-  auto out = std::make_shared<Integer>(x);
-  RETURN(out);
+  MPZ out(x);
+  RETURN(Integer::alloc(runtime.heap, out));
 }
 
 static PRIMTYPE(type_scmp) {
@@ -358,8 +413,7 @@ static PRIMFN(prim_scmp) {
   EXPECT(2);
   STRING(arg0, 0);
   STRING(arg1, 1);
-  auto out = make_order(arg0->value.compare(arg1->value));
-  RETURN(out);
+  RETURN(alloc_order(runtime.heap, arg0->compare(*arg1)));
 }
 
 static PRIMTYPE(type_normalize) {
@@ -368,68 +422,66 @@ static PRIMTYPE(type_normalize) {
     out->unify(String::typeVar);
 }
 
+struct UTF8Out {
+  String *in;
+  utf8proc_uint8_t *dst;
+  ssize_t len;
+
+  ~UTF8Out() { if (len >= 0) free(dst); }
+  UTF8Out(String *in_, unsigned long opt) : in(in_) {
+    len = utf8proc_map(
+      reinterpret_cast<const utf8proc_uint8_t*>(in->c_str()),
+      in->length,
+      &dst,
+      static_cast<utf8proc_option_t>(opt));
+  }
+
+  String *copy(Heap &heap) const {
+    if (len < 0) return in;
+    return String::alloc(heap,
+      reinterpret_cast<const char*>(dst),
+      static_cast<size_t>(len));
+  }
+};
+
 static PRIMFN(prim_sNFC) {
   EXPECT(1);
   STRING(arg0, 0);
-  utf8proc_uint8_t *dst;
-  ssize_t len = utf8proc_map(
-    reinterpret_cast<const utf8proc_uint8_t*>(arg0->value.c_str()),
-    arg0->value.size(),
-    &dst,
-    static_cast<utf8proc_option_t>(
-      UTF8PROC_COMPOSE |
-      UTF8PROC_REJECTNA));
-  if (len < 0) RETURN(args[0]);
-  auto out = std::make_shared<String>(std::string(
-    reinterpret_cast<const char*>(dst),
-    static_cast<size_t>(len)));
-  free(dst);
-  RETURN(out);
+
+  UTF8Out out(arg0,
+    UTF8PROC_COMPOSE |
+    UTF8PROC_REJECTNA);
+
+  RETURN(out.copy(runtime.heap));
 }
 
 static PRIMFN(prim_sNFKC) {
   EXPECT(1);
   STRING(arg0, 0);
-  utf8proc_uint8_t *dst;
-  ssize_t len = utf8proc_map(
-    reinterpret_cast<const utf8proc_uint8_t*>(arg0->value.c_str()),
-    arg0->value.size(),
-    &dst,
-    static_cast<utf8proc_option_t>(
-      UTF8PROC_COMPOSE   |
-      UTF8PROC_COMPAT    |
-      UTF8PROC_IGNORE    |
-      UTF8PROC_LUMP      |
-      UTF8PROC_REJECTNA));
-  if (len < 0) RETURN(args[0]);
-  auto out = std::make_shared<String>(std::string(
-    reinterpret_cast<const char*>(dst),
-    static_cast<size_t>(len)));
-  free(dst);
-  RETURN(out);
+
+  UTF8Out out(arg0,
+    UTF8PROC_COMPOSE   |
+    UTF8PROC_COMPAT    |
+    UTF8PROC_IGNORE    |
+    UTF8PROC_LUMP      |
+    UTF8PROC_REJECTNA);
+
+  RETURN(out.copy(runtime.heap));
 }
 
 static PRIMFN(prim_scaseNFKC) {
   EXPECT(1);
   STRING(arg0, 0);
-  utf8proc_uint8_t *dst;
-  ssize_t len = utf8proc_map(
-    reinterpret_cast<const utf8proc_uint8_t*>(arg0->value.c_str()),
-    arg0->value.size(),
-    &dst,
-    static_cast<utf8proc_option_t>(
-      UTF8PROC_COMPOSE   |
-      UTF8PROC_COMPAT    |
-      UTF8PROC_IGNORE    |
-      UTF8PROC_LUMP      |
-      UTF8PROC_CASEFOLD  |
-      UTF8PROC_REJECTNA));
-  if (len < 0) RETURN(args[0]);
-  auto out = std::make_shared<String>(std::string(
-    reinterpret_cast<const char*>(dst),
-    static_cast<size_t>(len)));
-  free(dst);
-  RETURN(out);
+
+  UTF8Out out(arg0,
+    UTF8PROC_COMPOSE   |
+    UTF8PROC_COMPAT    |
+    UTF8PROC_IGNORE    |
+    UTF8PROC_LUMP      |
+    UTF8PROC_CASEFOLD  |
+    UTF8PROC_REJECTNA);
+
+  RETURN(out.copy(runtime.heap));
 }
 
 static PRIMTYPE(type_code2str) {
@@ -440,25 +492,23 @@ static PRIMTYPE(type_code2str) {
 
 static PRIMFN(prim_code2str) {
   EXPECT(1);
-  INTEGER(arg0, 0);
+  INTEGER_MPZ(arg0, 0);
   std::string str;
-  bool ok = mpz_fits_slong_p(arg0->value);
-  long x = ok ? mpz_get_si(arg0->value) : 0;
+  bool ok = mpz_fits_slong_p(arg0);
+  long x = ok ? mpz_get_si(arg0) : 0;
   ok = ok && x >= 0;
   ok = ok && push_utf8(str, x);
-  auto out = std::make_shared<String>(ok ? std::move(str) : "");
-  RETURN(out);
+  RETURN(String::alloc(runtime.heap, ok ? str : ""));
 }
 
 static PRIMFN(prim_bin2str) {
   EXPECT(1);
-  INTEGER(arg0, 0);
-  bool ok = mpz_fits_slong_p(arg0->value);
-  long x = ok ? mpz_get_si(arg0->value) : 0;
+  INTEGER_MPZ(arg0, 0);
+  bool ok = mpz_fits_slong_p(arg0);
+  long x = ok ? mpz_get_si(arg0) : 0;
   ok = ok && x >= 0 && x < 256;
   char c[2] = { static_cast<char>(x), 0 };
-  auto out = std::make_shared<String>(ok ? std::string(c) : "");
-  RETURN(out);
+  RETURN(String::alloc(runtime.heap, ok ? c : ""));
 }
 
 static PRIMTYPE(type_str2code) {
@@ -471,16 +521,16 @@ static PRIMFN(prim_str2code) {
   EXPECT(1);
   STRING(arg0, 0);
   uint32_t rune;
-  int x = pop_utf8(&rune, arg0->value.c_str());
-  auto out = std::make_shared<Integer>(x >= 1 ? rune : arg0->value[0]);
-  RETURN(out);
+  int x = pop_utf8(&rune, arg0->c_str());
+  MPZ out(x >= 1 ? rune : arg0->c_str()[0]);
+  RETURN(Integer::alloc(runtime.heap, out));
 }
 
 static PRIMFN(prim_str2bin) {
   EXPECT(1);
   STRING(arg0, 0);
-  auto out = std::make_shared<Integer>(static_cast<unsigned char>(arg0->value[0]));
-  RETURN(out);
+  MPZ out(static_cast<unsigned char>(arg0->c_str()[0]));
+  RETURN(Integer::alloc(runtime.heap, out));
 }
 
 static PRIMTYPE(type_uname) {
@@ -497,34 +547,39 @@ static PRIMFN(prim_uname) {
   struct utsname uts;
   int ret = uname(&uts);
   REQUIRE (ret == 0);
-  auto out = make_tuple2(
-    std::make_shared<String>(uts.sysname),
-    std::make_shared<String>(uts.machine));
+
+  size_t slen = strlen(uts.sysname);
+  size_t mlen = strlen(uts.machine);
+  size_t need = reserve_tuple2() + String::reserve(slen) + String::reserve(mlen);
+  runtime.heap.reserve(need);
+
+  auto out = claim_tuple2(
+    runtime.heap,
+    String::claim(runtime.heap, uts.sysname, slen),
+    String::claim(runtime.heap, uts.machine, mlen));
   RETURN(out);
 }
 
 void prim_register_string(PrimMap &pmap, StringInfo *info) {
-  // cat* use mutation and 'read' execution order can matter => not pure
-  prim_register(pmap, "catopen",  prim_catopen,  type_catopen,             PRIM_SHALLOW);
-  prim_register(pmap, "catadd",   prim_catadd,   type_catadd,              PRIM_SHALLOW);
-  prim_register(pmap, "catclose", prim_catclose, type_catclose,            PRIM_SHALLOW);
-  prim_register(pmap, "explode",  prim_explode,  type_explode,   PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "unlink",   prim_unlink,   type_unlink,              PRIM_SHALLOW);
-  prim_register(pmap, "write",    prim_write,    type_write,               PRIM_SHALLOW);
-  prim_register(pmap, "read",     prim_read,     type_read,                PRIM_SHALLOW);
-  prim_register(pmap, "getenv",   prim_getenv,   type_getenv,    PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "mkdir",    prim_mkdir,    type_mkdir,               PRIM_SHALLOW);
+  prim_register(pmap, "vcat",     prim_vcat,     type_vcat,      PRIM_PURE);
+  prim_register(pmap, "lcat",     prim_lcat,     type_lcat,      PRIM_PURE);
+  prim_register(pmap, "explode",  prim_explode,  type_explode,   PRIM_PURE);
+  prim_register(pmap, "unlink",   prim_unlink,   type_unlink,    0);
+  prim_register(pmap, "write",    prim_write,    type_write,     0);
+  prim_register(pmap, "read",     prim_read,     type_read,      0);
+  prim_register(pmap, "getenv",   prim_getenv,   type_getenv,    PRIM_PURE);
+  prim_register(pmap, "mkdir",    prim_mkdir,    type_mkdir,     0);
   prim_register(pmap, "format",   prim_format,   type_format,    PRIM_PURE);
-  prim_register(pmap, "print",    prim_print,    type_print,               PRIM_SHALLOW);
-  prim_register(pmap, "version",  prim_version,  type_version,   PRIM_PURE|PRIM_SHALLOW, (void*)info);
-  prim_register(pmap, "level",    prim_level,    type_level,     PRIM_PURE|PRIM_SHALLOW, (void*)info);
-  prim_register(pmap, "scmp",     prim_scmp,     type_scmp,      PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "sNFC",     prim_sNFC,     type_normalize, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "sNFKC",    prim_sNFKC,    type_normalize, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "scaseNFKC",prim_scaseNFKC,type_normalize, PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "code2str", prim_code2str, type_code2str,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "bin2str",  prim_bin2str,  type_code2str,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "str2code", prim_str2code, type_str2code,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "str2bin",  prim_str2bin,  type_str2code,  PRIM_PURE|PRIM_SHALLOW);
-  prim_register(pmap, "uname",    prim_uname,    type_uname,     PRIM_PURE|PRIM_SHALLOW);
+  prim_register(pmap, "print",    prim_print,    type_print,     0);
+  prim_register(pmap, "version",  prim_version,  type_version,   PRIM_PURE, (void*)info);
+  prim_register(pmap, "level",    prim_level,    type_level,     PRIM_PURE, (void*)info);
+  prim_register(pmap, "scmp",     prim_scmp,     type_scmp,      PRIM_PURE);
+  prim_register(pmap, "sNFC",     prim_sNFC,     type_normalize, PRIM_PURE);
+  prim_register(pmap, "sNFKC",    prim_sNFKC,    type_normalize, PRIM_PURE);
+  prim_register(pmap, "scaseNFKC",prim_scaseNFKC,type_normalize, PRIM_PURE);
+  prim_register(pmap, "code2str", prim_code2str, type_code2str,  PRIM_PURE);
+  prim_register(pmap, "bin2str",  prim_bin2str,  type_code2str,  PRIM_PURE);
+  prim_register(pmap, "str2code", prim_str2code, type_str2code,  PRIM_PURE);
+  prim_register(pmap, "str2bin",  prim_str2bin,  type_str2code,  PRIM_PURE);
+  prim_register(pmap, "uname",    prim_uname,    type_uname,     PRIM_PURE);
 }

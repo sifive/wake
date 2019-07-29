@@ -19,10 +19,9 @@
 #include "expr.h"
 #include "symbol.h"
 #include "value.h"
-#include "datatype.h"
 #include "location.h"
 #include <iostream>
-#include <list>
+#include <sstream>
 #include <set>
 
 //#define TRACE(x) do { fprintf(stderr, "%s\n", x); } while (0)
@@ -53,23 +52,21 @@ static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
   return out;
 }
 
-static bool expectValue(const TypeDescriptor *type, Lexer &lex) {
+static bool expectString(Lexer &lex) {
   if (expect(LITERAL, lex)) {
     if (lex.next.expr->type == &Literal::type) {
-      Literal *lit = reinterpret_cast<Literal*>(lex.next.expr.get());
-      if (lit->value->type == type) {
+      Literal *lit = static_cast<Literal*>(lex.next.expr.get());
+      HeapObject *obj = lit->value.get();
+      if (typeid(*obj) == typeid(String)) {
         return true;
       } else {
-        std::cerr << "Was expecting a "
-          << type->name << ", but got a "
-          << lit->value->type->name << " at "
+        std::cerr << "Was expecting a String, but got a different literal at "
           << lex.next.location.text() << std::endl;
         lex.fail = true;
         return false;
       }
     } else {
-      std::cerr << "Was expecting a "
-        << type->name << ", but got an interpolated string at "
+      std::cerr << "Was expecting a String, but got an interpolated string at "
         << lex.next.location.text() << std::endl;
       lex.fail = true;
       return false;
@@ -120,20 +117,20 @@ static int relabel_descend(Expr *expr, int index) {
   if (!(expr->flags & FLAG_TOUCHED)) {
     expr->flags |= FLAG_TOUCHED;
     if (expr->type == &VarRef::type) {
-      VarRef *ref = reinterpret_cast<VarRef*>(expr);
+      VarRef *ref = static_cast<VarRef*>(expr);
       if (ref->name != "_") return index;
       ++index;
       ref->name += " ";
       ref->name += std::to_string(index);
       return index;
     } else if (expr->type == &App::type) {
-      App *app = reinterpret_cast<App*>(expr);
+      App *app = static_cast<App*>(expr);
       return relabel_descend(app->val.get(), relabel_descend(app->fn.get(), index));
     } else if (expr->type == &Lambda::type) {
-      Lambda *lambda = reinterpret_cast<Lambda*>(expr);
+      Lambda *lambda = static_cast<Lambda*>(expr);
       return relabel_descend(lambda->body.get(), index);
     } else if (expr->type == &Match::type) {
-      Match *match = reinterpret_cast<Match*>(expr);
+      Match *match = static_cast<Match*>(expr);
       for (auto &v : match->args)
         index = relabel_descend(v.get(), index);
       return index;
@@ -218,9 +215,10 @@ static Expr *parse_match(int p, Lexer &lex) {
       Expr* e = state.guard[i];
       std::string comparison("scmp");
       if (e->type == &Literal::type) {
-        Literal *lit = reinterpret_cast<Literal*>(e);
-        if (lit->value->type == &Integer::type) comparison = "icmp";
-        if (lit->value->type == &Double::type) comparison = "dcmp";
+        Literal *lit = static_cast<Literal*>(e);
+        HeapObject *obj = lit->value.get();
+        if (typeid(*obj) == typeid(Integer)) comparison = "icmp";
+        if (typeid(*obj) == typeid(Double)) comparison = "dcmp";
       }
       if (!guard) guard = new VarRef(e->location, "True");
       guard = new App(e->location, new App(e->location, new App(e->location, new App(e->location,
@@ -320,9 +318,9 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       op_type op = op_precedence("p");
       if (op.p < p) precedence_error(lex);
       lex.consume();
-      if (expectValue(&String::type, lex)) {
-        Literal *lit = reinterpret_cast<Literal*>(lex.next.expr.get());
-        name = reinterpret_cast<String*>(lit->value.get())->value;
+      if (expectString(lex)) {
+        Literal *lit = static_cast<Literal*>(lex.next.expr.get());
+        name = static_cast<String*>(lit->value.get())->as_str();
         location.end = lex.next.location.end;
         lex.consume();
       } else {
@@ -336,7 +334,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       std::string name(lex.next.location.filename);
       std::string::size_type cut = name.find_last_of('/');
       if (cut == std::string::npos) name = "."; else name.resize(cut);
-      Expr *out = new Literal(lex.next.location, std::make_shared<String>(std::move(name)));
+      Expr *out = new Literal(lex.next.location, String::literal(lex.heap, name), &String::typeVar);
       out->flags |= FLAG_AST;
       lex.consume();
       return out;
@@ -388,7 +386,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
         << symbolTable[lex.next.type] << " at "
         << lex.next.location.text() << std::endl;
       lex.fail = true;
-      return new Literal(LOCATION, "bad unary");
+      return new Literal(LOCATION, String::literal(lex.heap, "bad unary"), &String::typeVar);
     }
   }
 }
@@ -915,10 +913,10 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     for (int inner = 0; inner < (int)members.size(); ++inner)
       editifn = new App(memberToken, editifn,
         (inner == outer)
-        ? reinterpret_cast<Expr*>(new App(memberToken,
+        ? static_cast<Expr*>(new App(memberToken,
            new VarRef(memberToken, "fn" + mname),
            new VarRef(memberToken, "_ " + std::to_string(inner+1))))
-        : reinterpret_cast<Expr*>(new VarRef(memberToken, "_ " + std::to_string(inner+1))));
+        : static_cast<Expr*>(new VarRef(memberToken, "_ " + std::to_string(inner+1))));
     for (int inner = (int)members.size(); inner >= 0; --inner)
       editifn = new Lambda(memberToken, "_ " + std::to_string(inner), editifn);
 
@@ -939,8 +937,8 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     for (int inner = 0; inner < (int)members.size(); ++inner)
       setifn = new App(memberToken, setifn,
         (inner == outer)
-        ? reinterpret_cast<Expr*>(new VarRef(memberToken, mname))
-        : reinterpret_cast<Expr*>(new VarRef(memberToken, "_ " + std::to_string(inner+1))));
+        ? static_cast<Expr*>(new VarRef(memberToken, mname))
+        : static_cast<Expr*>(new VarRef(memberToken, "_ " + std::to_string(inner+1))));
     for (int inner = (int)members.size(); inner >= 0; --inner)
       setifn = new Lambda(memberToken, "_ " + std::to_string(inner), setifn);
 
@@ -1051,8 +1049,11 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
     case TARGET: {
       auto def = parse_def(lex, true);
       auto &l = def.body->location;
+      std::stringstream s;
+      s << l.text();
       bind_def(lex, map, Definition("table " + def.name, def.location,
-        new App(l, new Lambda(l, "_", new Prim(l, "tnew")), new VarRef(l, "Unit"))));
+        new App(l, new Lambda(l, "_", new Prim(l, "tnew")),
+        new Literal(l, String::literal(lex.heap, s.str()), &String::typeVar))));
       bind_def(lex, map, std::move(def), global?top:0);
       break;
     }
