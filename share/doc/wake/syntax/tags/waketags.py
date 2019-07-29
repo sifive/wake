@@ -33,6 +33,10 @@ FILE_RE = compile(FILE_RE_STR)
 def get_wake_globals():
     proc = subprocess.run(['wake', '-g'], capture_output=True, text=True)
 
+    if proc.returncode != 0:
+        print("'wake -g' did not run succesfully")
+        sys.exit(proc.returncode)
+
     return proc.stdout.splitlines(keepends=False)
 
 
