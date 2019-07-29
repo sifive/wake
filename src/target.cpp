@@ -41,11 +41,11 @@ struct HashHasher {
 struct Target final : public GCObject<Target, DestroyableObject> {
   typedef GCObject<Target, DestroyableObject> Parent;
 
-  Location location;
+  HeapPointer<String> location;
   std::unordered_map<Hash, TargetValue, HashHasher> table;
 
   static TypeVar typeVar;
-  Target(Heap &h, const Location &location_) : Parent(h), location(location_) { }
+  Target(Heap &h, String *location_) : Parent(h), location(location_) { }
   Target(Target &&target) = default;
   ~Target();
 
@@ -61,6 +61,7 @@ TypeVar Target::typeVar("_Target", 0);
 template <typename T, T (HeapPointerBase::*memberfn)(T x)>
 T Target::recurse(T arg) {
   arg = Parent::recurse<T, memberfn>(arg);
+  arg = (location.*memberfn)(arg);
   for (auto &x : table)
     arg = x.second.promise.recurse<T, memberfn>(arg);
   return arg;
@@ -76,7 +77,7 @@ Target::~Target() {
   for (auto &x : table) {
     if (!x.second.promise) {
       std::stringstream ss;
-      ss << "Infinite recursion detected across " << location.text() << std::endl;
+      ss << "Infinite recursion detected across " << location->c_str() << std::endl;
       auto str = ss.str();
       status_write(2, str.data(), str.size());
       break;
@@ -107,12 +108,14 @@ static PRIMFN(prim_hash) {
 
 static PRIMTYPE(type_tnew) {
   return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
     out->unify(Target::typeVar);
 }
 
 static PRIMFN(prim_tnew) {
   EXPECT(1);
-  RETURN(Target::alloc(runtime.heap, runtime.heap, static_cast<Expr*>(scope->meta)->location));
+  STRING(location, 0);
+  RETURN(Target::alloc(runtime.heap, runtime.heap, location));
 }
 
 static PRIMTYPE(type_tget) {
@@ -168,7 +171,7 @@ static PRIMFN(prim_tget) {
 
   if (!(ref.first->second.subhash == subhash)) {
     std::stringstream ss;
-    ss << "ERROR: Target subkey mismatch for " << target->location.text() << std::endl;
+    ss << "ERROR: Target subkey mismatch for " << target->location->c_str() << std::endl;
     if (runtime.stack_trace)
       for (auto &x : scope->stack_trace())
         ss << "  from " << x.file() << std::endl;
