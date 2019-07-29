@@ -72,8 +72,6 @@ struct BigTuple final : public GCObject<BigTuple, Tuple> {
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg);
   PadObject *next();
-
-  Continuation *claim_fulfiller(Runtime &r, size_t i) override;
 };
 
 size_t BigTuple::size() const {
@@ -110,10 +108,6 @@ T BigTuple::recurse(T arg) {
   return arg;
 }
 
-Continuation *BigTuple::claim_fulfiller(Runtime &r, size_t i) {
-  return new (r.heap.claim(fulfiller_pads)) FulFiller(this, i);
-}
-
 template <size_t tsize>
 struct SmallTuple final : public GCObject<SmallTuple<tsize>, Tuple> {
   typedef GCObject<SmallTuple<tsize>, Tuple> Parent;
@@ -128,8 +122,6 @@ struct SmallTuple final : public GCObject<SmallTuple<tsize>, Tuple> {
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg);
   PadObject *next();
-
-  Continuation *claim_fulfiller(Runtime &r, size_t i) override;
 };
 
 template <size_t tsize>
@@ -173,8 +165,7 @@ T SmallTuple<tsize>::recurse(T arg) {
   return arg;
 }
 
-template <size_t tsize>
-Continuation *SmallTuple<tsize>::claim_fulfiller(Runtime &r, size_t i) {
+Continuation *Tuple::claim_fulfiller(Runtime &r, size_t i) {
   return new (r.heap.claim(Tuple::fulfiller_pads)) FulFiller(this, i);
 }
 
