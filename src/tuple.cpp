@@ -16,7 +16,7 @@
  */
 
 #include "tuple.h"
-#include "location.h"
+#include "expr.h"
 
 void Promise::fulfill(Runtime &runtime, HeapObject *obj) {
   if (value) {
@@ -96,7 +96,7 @@ TupleObject<T,B>::TupleObject(size_t size, ARGS&&... args) : GCObject<T,B>(std::
 
 template <typename T, typename B>
 TupleObject<T,B>::TupleObject(const TupleObject &b) : GCObject<T, B>(b) {
-  for (size_t i = 0; i < b.size(); ++i)
+  for (size_t i = 0; i < b.GCObject<T,B>::self()->size(); ++i)
     new (at(i)) Promise(*b.at(i));
 }
 
@@ -170,11 +170,91 @@ Record *Record::alloc(Heap &h, Constructor *cons, size_t size) {
   return claim(h, cons, size);
 }
 
-struct BigScope final : public TupleObject<BigScope, Scope> {
+struct alignas(PadObject) ScopeStack {
+  HeapPointer<Scope> parent;
+  Expr *expr;
+
+  ScopeStack(Scope *parent_, Expr* expr_) : parent(parent_), expr(expr_) { }
+};
+
+bool Scope::debug = false;
+
+void Scope::set_expr(Expr *expr) {
+  if (debug) stack()->expr = expr;
+}
+
+std::vector<Location> Scope::stack_trace() const {
+  std::vector<Location> out;
+  if (debug) {
+    const ScopeStack *s;
+    for (const Scope *i = this; i; i = s->parent.get()) {
+      s = i->stack();
+      if (s->expr->type != &DefBinding::type)
+        out.emplace_back(s->expr->location);
+    }
+  }
+  return out;
+}
+
+template <typename T>
+struct ScopeObject : public TupleObject<T, Scope> {
+  ScopeObject(size_t size, Scope *next, Scope *parent, Expr *expr);
+  ScopeObject(const ScopeObject &other);
+
+  template <typename R, R (HeapPointerBase::*memberfn)(R x)>
+  R recurse(R arg);
+  PadObject *next();
+
+  const ScopeStack *stack() const final override;
+  ScopeStack *stack() final override;
+};
+
+template <typename T>
+const ScopeStack *ScopeObject<T>::stack() const {
+  return reinterpret_cast<const ScopeStack*>(TupleObject<T,Scope>::at(GCObject<T,Scope>::self()->size()));
+}
+
+template <typename T>
+ScopeStack *ScopeObject<T>::stack() {
+  return reinterpret_cast<ScopeStack*>(TupleObject<T,Scope>::at(GCObject<T,Scope>::self()->size()));
+}
+
+template <typename T>
+PadObject *ScopeObject<T>::next() {
+  PadObject *end = TupleObject<T, Scope>::next();
+  if (Scope::debug) end += (sizeof(ScopeStack)/sizeof(PadObject));
+  return end;
+}
+
+template <typename T>
+ScopeObject<T>::ScopeObject(size_t size, Scope *next, Scope *parent, Expr *expr)
+ : TupleObject<T, Scope>(size, next) {
+  if (Scope::debug) {
+    new (TupleObject<T, Scope>::at(size)) ScopeStack(parent, expr);
+  }
+}
+
+template <typename T>
+ScopeObject<T>::ScopeObject(const ScopeObject &other)
+ : TupleObject<T, Scope>(other) {
+  if (Scope::debug) {
+    new (TupleObject<T, Scope>::at(other.GCObject<T,Scope>::self()->size())) ScopeStack(*other.stack());
+  }
+}
+
+template <typename T>
+template <typename R, R (HeapPointerBase::*memberfn)(R x)>
+R ScopeObject<T>::recurse(R arg) {
+  arg = TupleObject<T, Scope>::template recurse<R, memberfn>(arg);
+  if (Scope::debug && typeid(memberfn) != typeid(&HeapPointerBase::explore)) arg = (stack()->parent.*memberfn)(arg);
+  return arg;
+}
+
+struct BigScope final : public ScopeObject<BigScope> {
   size_t tsize;
 
-  BigScope(Scope *next, size_t tsize_)
-   : TupleObject<BigScope, Scope>(tsize_, next), tsize(tsize_) { }
+  BigScope(size_t tsize_, Scope *next, Scope *parent, Expr *expr)
+   : ScopeObject<BigScope>(tsize_, next, parent, expr), tsize(tsize_) { }
 
   size_t size() const override;
 };
@@ -184,9 +264,9 @@ size_t BigScope::size() const {
 }
 
 template <size_t tsize>
-struct SmallScope final : public TupleObject<SmallScope<tsize>, Scope> {
-  SmallScope(Scope *next)
-   : TupleObject<SmallScope<tsize>, Scope>(tsize, next) { }
+struct SmallScope final : public ScopeObject<SmallScope<tsize> > {
+  SmallScope(Scope *next, Scope *parent, Expr *expr)
+   : ScopeObject<SmallScope<tsize> >(tsize, next, parent, expr) { }
 
   size_t size() const override;
 };
@@ -196,44 +276,33 @@ size_t SmallScope<tsize>::size() const {
   return tsize;
 }
 
-bool Scope::debug = false;
-
-std::vector<Location> Scope::stack_trace() const {
-  std::vector<Location> out;
-/* !!! stack tracing missing
-  for (const Binding *i = this; i; i = i->invoker.get())
-    if (i->expr->type != &DefBinding::type)
-      out.emplace_back(i->expr->location);
-*/
-  return out;
-}
-
 size_t Scope::reserve(size_t size) {
   bool big = size > 4;
+  size_t add = size * (sizeof(Promise)/sizeof(PadObject)) + (debug?sizeof(ScopeStack)/sizeof(PadObject):0);
   if (big) {
-    return sizeof(BigScope)/sizeof(PadObject) + size * (sizeof(Promise)/sizeof(PadObject));
+    return sizeof(BigScope)/sizeof(PadObject) + add;
   } else {
-    return sizeof(SmallScope<0>)/sizeof(PadObject) + size * (sizeof(Promise)/sizeof(PadObject));
+    return sizeof(SmallScope<0>)/sizeof(PadObject) + add;
   }
 }
 
-Scope *Scope::claim(Heap &h, Scope *next, size_t size) {
+Scope *Scope::claim(Heap &h, size_t size, Scope *next, Scope *parent, Expr *expr) {
   bool big = size > 4;
   if (big) {
-    return new (h.claim(reserve(size))) BigScope(next, size);
+    return new (h.claim(reserve(size))) BigScope(size, next, parent, expr);
   } else {
     PadObject *dest = h.claim(reserve(size));
     switch (size) {
-      case 0:  return new (dest) SmallScope<0>(next);
-      case 1:  return new (dest) SmallScope<1>(next);
-      case 2:  return new (dest) SmallScope<2>(next);
-      case 3:  return new (dest) SmallScope<3>(next);
-      default: return new (dest) SmallScope<4>(next);
+      case 0:  return new (dest) SmallScope<0>(next, parent, expr);
+      case 1:  return new (dest) SmallScope<1>(next, parent, expr);
+      case 2:  return new (dest) SmallScope<2>(next, parent, expr);
+      case 3:  return new (dest) SmallScope<3>(next, parent, expr);
+      default: return new (dest) SmallScope<4>(next, parent, expr);
     }
   }
 }
 
-Scope *Scope::alloc(Heap &h, Scope *next, size_t size) {
+Scope *Scope::alloc(Heap &h, size_t size, Scope *next, Scope *parent, Expr *expr) {
   h.reserve(reserve(size));
-  return claim(h, next, size);
+  return claim(h, size, next, parent, expr);
 }

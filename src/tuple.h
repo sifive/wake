@@ -105,6 +105,7 @@ struct Record : public Tuple {
   static Record *alloc(Heap &h, Constructor *cons, size_t size);
 };
 
+struct ScopeStack;
 struct Scope : public Tuple {
   HeapPointer<Scope> next;
 
@@ -122,10 +123,13 @@ struct Scope : public Tuple {
 
   static bool debug;
   std::vector<Location> stack_trace() const;
+  virtual const ScopeStack *stack() const = 0;
+  virtual ScopeStack *stack() = 0;
+  void set_expr(Expr *expr);
 
   static size_t reserve(size_t size);
-  static Scope *claim(Heap &h, Scope *next, size_t size); // requires prior h.reserve
-  static Scope *alloc(Heap &h, Scope *next, size_t size);
+  static Scope *claim(Heap &h, size_t size, Scope *next, Scope *parent, Expr *expr); // requires prior h.reserve
+  static Scope *alloc(Heap &h, size_t size, Scope *next, Scope *parent, Expr *expr);
 };
 
 #endif

@@ -139,6 +139,7 @@ struct CApp final : public GCObject<CApp, Continuation> {
     auto clo = static_cast<Closure*>(value.get());
     runtime.heap.reserve(Interpret::reserve());
     bind->next = clo->scope.get();
+    bind->set_expr(clo->lambda);
     runtime.schedule(Interpret::claim(runtime.heap,
       clo->lambda->body.get(), bind.get(), cont.get()));
   }
@@ -148,7 +149,7 @@ void App::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   runtime.heap.reserve(Scope::reserve(1) +
     Interpret::reserve() + CApp::reserve() +
     Interpret::reserve() + Tuple::fulfiller_pads);
-  Scope *bind = Scope::claim(runtime.heap, nullptr, 1);
+  Scope *bind = Scope::claim(runtime.heap, 1, nullptr, scope, nullptr);
   runtime.schedule(Interpret::claim(runtime.heap,
     fn.get(), scope, CApp::claim(runtime.heap, bind, cont)));
   runtime.schedule(Interpret::claim(runtime.heap,
@@ -159,7 +160,7 @@ void DefBinding::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   size_t size = val.size();
   runtime.heap.reserve(Scope::reserve(size) + Interpret::reserve() +
     val.size() * (Interpret::reserve() + Tuple::fulfiller_pads));
-  Scope *bind = Scope::claim(runtime.heap, scope, size);
+  Scope *bind = Scope::claim(runtime.heap, size, scope, scope, this);
   runtime.schedule(Interpret::claim(runtime.heap,
     body.get(), bind, cont));
   for (auto it = val.rbegin(); it != val.rend(); ++it)
@@ -250,13 +251,13 @@ struct SelectDestructor final : public GCObject<SelectDestructor, Continuation> 
     auto body = closure->lambda->body.get();
     auto scope = closure->scope.get();
     // Add the record to the handler scope
-    auto next = Scope::claim(runtime.heap, scope, 1);
+    auto next = Scope::claim(runtime.heap, 1, scope, scope, des);
     next->at(0)->instant_fulfill(record);
     scope = next;
     // !!! avoid pointless copying; have handlers directly accept the tuple and use a DefMap:argX = atX tuple
     // -> this would allow unused arguments to be deadcode optimized away
     for (size_t i = 0; i < size; ++i) {
-      next = Scope::claim(runtime.heap, scope, 1);
+      next = Scope::claim(runtime.heap, 1, scope, scope, des);
       next->claim_instant_fulfiller(runtime, 0, record->at(i));
       scope = next;
       body = static_cast<Lambda*>(body)->body.get();

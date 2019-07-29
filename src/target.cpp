@@ -180,7 +180,7 @@ static PRIMFN(prim_tget) {
   }
 
   if (ref.second) {
-    Scope *bind = Scope::claim(runtime.heap, body->scope.get(), 1);
+    Scope *bind = Scope::claim(runtime.heap, 1, body->scope.get(), scope, body->lambda);
     bind->at(0)->instant_fulfill(args[1]); // hash
     runtime.claim_eval(body->lambda->body.get(), bind, CTarget::claim(runtime.heap, target, hash));
   }
