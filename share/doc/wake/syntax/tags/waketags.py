@@ -1,30 +1,30 @@
-#!/usr/bin/env python3.7
-import subprocess
-import sys
-from io import StringIO
-from pathlib import Path
-from re import compile
-
+#!/usr/bin/env python3
 """
-Leverage 'wake -g' to great a tags file
+Leverage 'wake -g' to create a tags file
 
 The main weakness of this approach is that it uses line numbers
 instead of regular expressions to find tags. Meaning frequent re-runs
 to keep it up to date. Also, this only finds globals.
 
-usage:
 make sure that wake-db exists
 in the top of your workspace:
+usage:
 waketags.py
 """
 
+import subprocess
+import sys
+from pathlib import Path
+from re import compile
 
-HEADER = \
-"""!_TAG_FILE_FORMAT       2       /extended format; --format=1 will not append ;" to lines/
+
+HEADER = """
+!_TAG_FILE_FORMAT       2       /extended format; --format=1 will not append ;" to lines/
 !_TAG_FILE_SORTED       1       /0=unsorted, 1=sorted, 2=foldcase/
 !_TAG_PROGRAM_AUTHOR    Chris Stillson  /stillson@sifive.com
 !_TAG_PROGRAM_NAME      waketags.py
-!_TAG_PROGRAM_VERSION   1.0     //"""
+!_TAG_PROGRAM_VERSION   1.0     //
+""".strip()
 
 FILE_RE_STR = r'(?P<sig>.*) = \<(?P<file>.*)\>$'
 FILE_RE = compile(FILE_RE_STR)
@@ -51,14 +51,13 @@ tempty: Tree a => Boolean = <../usr/local/share/wake/lib/core/tree.wake:58:[12-3
 """
 
 if __name__ == '__main__':
-
-    output = StringIO()
+    OUTPUT = []
 
     for a_line in get_wake_globals():
         try:
             tag, rest = a_line.split(':', 1)
         except ValueError:
-            print('badline: %s' % a_line, sys.stderr)
+            print('badline: %s' % a_line, file=sys.stderr)
             continue
 
         try:
@@ -75,13 +74,9 @@ if __name__ == '__main__':
         if file_line.startswith('['):
             file_line = file_line.split('-')[0][1:]
 
-        print('%s\t%s\t%s;"' % (tag, file_name, file_line), file=output)
+        OUTPUT.append((tag, file_name, file_line))
 
-    tagfile = Path('tags').open(mode='w')
-
-    print(HEADER, file=tagfile)
-
-    output.seek(0)
-    for out_line in sorted(output.readlines()):
-        print(out_line.strip(), file=tagfile)
-
+    TAGFILE = Path('tags').open(mode='w')
+    print(HEADER, file=TAGFILE)
+    for out_line in sorted(OUTPUT):
+        print("%s\t%s\t%s" % out_line, file=TAGFILE)
