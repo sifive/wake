@@ -32,7 +32,7 @@
 /* Values */
 
 struct Lambda;
-struct Tuple;
+struct Scope;
 struct TypeVar;
 
 struct FormatEntry {
@@ -172,9 +172,9 @@ struct RegExp final : public GCObject<RegExp, DestroyableObject> {
 
 struct Closure final : public GCObject<Closure, HeapObject> {
   Lambda *lambda;
-  HeapPointer<Tuple> scope;
+  HeapPointer<Scope> scope;
 
-  Closure(Lambda *lambda_, Tuple *scope_);
+  Closure(Lambda *lambda_, Scope *scope_);
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
 

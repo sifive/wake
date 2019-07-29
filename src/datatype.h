@@ -19,7 +19,6 @@
 #define DATA_TYPE_H
 
 #include "location.h"
-#include "meta.h"
 #include <vector>
 #include <string>
 #include <map>
@@ -48,7 +47,7 @@ std::ostream & operator << (std::ostream &os, const AST &ast);
 
 struct Sum;
 struct Expr;
-struct Constructor : public Meta {
+struct Constructor {
   AST ast;
   int index; // sum->members[index] = this
   

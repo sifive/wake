@@ -37,7 +37,7 @@ static PRIMFN(prim_stack) {
   std::vector<std::string> list;
 
   size_t need = 0;
-  if (runtime.stack_trace) for (auto &x : scope->stack_trace()) {
+  for (auto &x : scope->stack_trace()) {
     std::stringstream str;
     str << x.file();
     list.emplace_back(str.str());

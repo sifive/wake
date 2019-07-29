@@ -23,7 +23,8 @@
 struct Expr;
 struct Runtime;
 struct Continuation;
-struct Tuple;
+struct Record;
+struct Scope;
 
 struct Work : public HeapObject {
   HeapPointer<Work> next;
@@ -42,12 +43,11 @@ struct Work : public HeapObject {
 };
 
 struct Runtime {
-  bool stack_trace;
   bool abort;
   Heap heap;
   RootPointer<Work> stack;
   RootPointer<HeapObject> output;
-  RootPointer<Tuple> sources; // Vector String
+  RootPointer<Record> sources; // Vector String
 
   Runtime();
   void run();
@@ -60,7 +60,7 @@ struct Runtime {
   void init(Expr *root);
 
   static size_t reserve_eval();
-  void claim_eval(Expr *expr, Tuple *scope, Continuation *cont);
+  void claim_eval(Expr *expr, Scope *scope, Continuation *cont);
 };
 
 struct Continuation : public Work {

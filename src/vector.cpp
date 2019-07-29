@@ -39,7 +39,7 @@ static PRIMFN(prim_vnew) {
   INTEGER_MPZ(arg0, 0);
   REQUIRE(mpz_cmp_si(arg0, 0) >= 0);
   REQUIRE(mpz_cmp_si(arg0, 1024*1024*1024) < 0);
-  RETURN(Tuple::alloc(runtime.heap, nullptr, mpz_get_si(arg0)));
+  RETURN(Record::alloc(runtime.heap, nullptr, mpz_get_si(arg0)));
 }
 
 static PRIMTYPE(type_vget) {
@@ -53,7 +53,7 @@ static PRIMTYPE(type_vget) {
 
 static PRIMFN(prim_vget) {
   EXPECT(2);
-  TUPLE(vec, 0);
+  RECORD(vec, 0);
   INTEGER_MPZ(arg1, 1);
   REQUIRE(mpz_cmp_si(arg1, 0) >= 0);
   REQUIRE(mpz_cmp_si(arg1, vec->size()) < 0);
@@ -72,7 +72,7 @@ static PRIMTYPE(type_vset) {
 
 static PRIMFN(prim_vset) {
   EXPECT(3);
-  TUPLE(vec, 0);
+  RECORD(vec, 0);
   INTEGER_MPZ(arg1, 1);
 
   // It's important to allocate before side-effects

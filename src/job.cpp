@@ -824,7 +824,7 @@ Hash Job::hash() const {
 
 #define JOB(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Job)); } while(0); Job *arg = static_cast<Job*>(args[i]);
 
-static void parse_usage(Usage *usage, HeapObject **args, Runtime &runtime, Tuple *scope) {
+static void parse_usage(Usage *usage, HeapObject **args, Runtime &runtime, Scope *scope) {
   INTEGER_MPZ(status, 0);
   DOUBLE(rtime, 1);
   DOUBLE(ctime, 2);

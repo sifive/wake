@@ -21,15 +21,15 @@
 #include <memory>
 #include <vector>
 
-struct Tuple;
+struct Scope;
 struct Continuation;
 struct HeapObject;
 struct Runtime;
 struct TypeVar;
 
 typedef bool (*PrimType)(const std::vector<TypeVar*> &args, TypeVar *out);
-typedef void (*PrimFn)(void *data, Runtime &runtime, Continuation *continuation, Tuple *scope, size_t nargs, HeapObject **args);
+typedef void (*PrimFn)(void *data, Runtime &runtime, Continuation *continuation, Scope *scope, size_t nargs, HeapObject **args);
 #define PRIMTYPE(name) bool name(const std::vector<TypeVar*> &args, TypeVar *out)
-#define PRIMFN(name) void name(void *data, Runtime &runtime, Continuation *continuation, Tuple *scope, size_t nargs, HeapObject** args)
+#define PRIMFN(name) void name(void *data, Runtime &runtime, Continuation *continuation, Scope *scope, size_t nargs, HeapObject** args)
 
 #endif

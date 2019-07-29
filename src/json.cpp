@@ -30,22 +30,22 @@ static double inf(char c) { return c == '+' ? dlimits::infinity() : -dlimits::in
 
 static size_t measure_jast(const JAST &jast) {
   switch (jast.kind) {
-    case JSON_NULLVAL:  return Tuple::reserve(0);
-    case JSON_TRUE:     return Tuple::reserve(1);
-    case JSON_FALSE:    return Tuple::reserve(1);
-    case JSON_INTEGER:  return Tuple::reserve(1) + Integer::reserve(MPZ(jast.value));
-    case JSON_DOUBLE:   return Tuple::reserve(1) + Double::reserve();
-    case JSON_INFINITY: return Tuple::reserve(1) + Double::reserve();
-    case JSON_NAN:      return Tuple::reserve(1) + Double::reserve();
-    case JSON_STR:      return Tuple::reserve(1) + String::reserve(jast.value.size());
+    case JSON_NULLVAL:  return Record::reserve(0);
+    case JSON_TRUE:     return Record::reserve(1);
+    case JSON_FALSE:    return Record::reserve(1);
+    case JSON_INTEGER:  return Record::reserve(1) + Integer::reserve(MPZ(jast.value));
+    case JSON_DOUBLE:   return Record::reserve(1) + Double::reserve();
+    case JSON_INFINITY: return Record::reserve(1) + Double::reserve();
+    case JSON_NAN:      return Record::reserve(1) + Double::reserve();
+    case JSON_STR:      return Record::reserve(1) + String::reserve(jast.value.size());
     case JSON_OBJECT: {
-      size_t out = Tuple::reserve(1) + reserve_list(jast.children.size());
+      size_t out = Record::reserve(1) + reserve_list(jast.children.size());
       for (auto &c : jast.children)
         out += reserve_tuple2() + String::reserve(c.first.size()) + measure_jast(c.second);
       return out;
     }
     case JSON_ARRAY: {
-      size_t out = Tuple::reserve(1) + reserve_list(jast.children.size());
+      size_t out = Record::reserve(1) + reserve_list(jast.children.size());
       for (auto &c : jast.children)
         out += measure_jast(c.second);
       return out;
@@ -58,14 +58,14 @@ static size_t measure_jast(const JAST &jast) {
 }
 
 static HeapObject *getJValue(Heap &h, HeapObject *value, int member) {
-  Tuple *out = Tuple::claim(h, &JValue->members[member], 1);
+  Record *out = Record::claim(h, &JValue->members[member], 1);
   out->at(0)->instant_fulfill(value);
   return out;
 }
 
 static HeapObject *convert_jast(Heap &h, const JAST &jast) {
   switch (jast.kind) {
-    case JSON_NULLVAL:  return Tuple::claim(h, &JValue->members[4], 0);
+    case JSON_NULLVAL:  return Record::claim(h, &JValue->members[4], 0);
     case JSON_TRUE:     return getJValue(h, claim_bool(h, true),  3);
     case JSON_FALSE:    return getJValue(h, claim_bool(h, false), 3);
     case JSON_INTEGER:  return getJValue(h, Integer::claim(h, MPZ(jast.value)), 1);

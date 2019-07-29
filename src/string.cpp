@@ -69,10 +69,10 @@ static PRIMTYPE(type_lcat) {
 }
 
 struct CCat final : public GCObject<CCat, Continuation> {
-  HeapPointer<Tuple> list;
+  HeapPointer<Record> list;
   HeapPointer<Continuation> cont;
 
-  CCat(Tuple *list_, Continuation *cont_) : list(list_), cont(cont_) { }
+  CCat(Record *list_, Continuation *cont_) : list(list_), cont(cont_) { }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -87,14 +87,14 @@ struct CCat final : public GCObject<CCat, Continuation> {
 
 void CCat::execute(Runtime &runtime) {
   size_t size = 0;
-  for (Tuple *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Tuple>())
+  for (Record *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Record>())
     size += scan->at(0)->coerce<String>()->length;
 
   String *out = String::alloc(runtime.heap, size);
   out->c_str()[size] = 0;
 
   size = 0;
-  for (Tuple *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Tuple>()) {
+  for (Record *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Record>()) {
     String *s = scan->at(0)->coerce<String>();
     memcpy(out->c_str() + size, s->c_str(), s->length);
     size += s->length;
@@ -105,7 +105,7 @@ void CCat::execute(Runtime &runtime) {
 
 static PRIMFN(prim_lcat) {
   EXPECT(1);
-  TUPLE(list, 0);
+  RECORD(list, 0);
   size_t need = reserve_hash() + CCat::reserve();
   runtime.heap.reserve(need);
   runtime.schedule(claim_hash(runtime.heap, list,

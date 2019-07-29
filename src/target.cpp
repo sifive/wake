@@ -156,7 +156,7 @@ static PRIMFN(prim_tget) {
   INTEGER_MPZ(subkey, 2);
   CLOSURE(body, 3);
 
-  runtime.heap.reserve(Tuple::reserve(2) + Runtime::reserve_eval() + CTarget::reserve());
+  runtime.heap.reserve(Scope::reserve(1) + Runtime::reserve_eval() + CTarget::reserve());
 
   Hash hash;
   REQUIRE(mpz_sizeinbase(key, 2) <= 8*sizeof(hash.data));
@@ -172,18 +172,16 @@ static PRIMFN(prim_tget) {
   if (!(ref.first->second.subhash == subhash)) {
     std::stringstream ss;
     ss << "ERROR: Target subkey mismatch for " << target->location->c_str() << std::endl;
-    if (runtime.stack_trace)
-      for (auto &x : scope->stack_trace())
-        ss << "  from " << x.file() << std::endl;
+    for (auto &x : scope->stack_trace())
+      ss << "  from " << x.file() << std::endl;
     std::string str = ss.str();
     status_write(2, str.data(), str.size());
     runtime.abort = true;
   }
 
   if (ref.second) {
-    Tuple *bind = Tuple::claim(runtime.heap, body->lambda, 2);
-    bind->at(0)->instant_fulfill(body->scope.get());
-    bind->at(1)->instant_fulfill(args[1]); // hash
+    Scope *bind = Scope::claim(runtime.heap, body->scope.get(), 1);
+    bind->at(0)->instant_fulfill(args[1]); // hash
     runtime.claim_eval(body->lambda->body.get(), bind, CTarget::claim(runtime.heap, target, hash));
   }
 }

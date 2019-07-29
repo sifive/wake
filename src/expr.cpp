@@ -19,7 +19,7 @@
 #include <cassert>
 #include <sstream>
 
-Meta::~Meta() { }
+Expr::~Expr() { }
 const TypeDescriptor Prim      ::type("Prim");
 const TypeDescriptor App       ::type("App");
 const TypeDescriptor Lambda    ::type("Lambda");
@@ -73,7 +73,7 @@ Hash Subscribe::hash() {
   assert(0 /* unreachable */);
 }
 
-void Subscribe::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
+void Subscribe::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   assert(0 /* unreachable */);
 }
 
@@ -110,7 +110,7 @@ Hash Match::hash() {
   return hashcode = Hash(codes);
 }
 
-void Match::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
+void Match::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   assert(0 /* unreachable */);
 }
 
@@ -155,7 +155,7 @@ Hash DefMap::hash() {
   assert(0 /* unreachable */);
 }
 
-void DefMap::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
+void DefMap::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   assert(0 /* unreachable */);
 }
 
@@ -197,7 +197,7 @@ Hash Top::hash() {
   assert(0 /* unreachable */);
 }
 
-void Top::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
+void Top::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   assert(0 /* unreachable */);
 }
 
@@ -257,7 +257,7 @@ void VarDef::format(std::ostream &os, int depth) const {
 
 Hash VarDef::hash() { return Hash(); }
 
-void VarDef::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
+void VarDef::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   assert(0 /* unreachable */);
 }
 
@@ -267,6 +267,6 @@ void VarArg::format(std::ostream &os, int depth) const {
 
 Hash VarArg::hash() { return Hash(); }
 
-void VarArg::interpret(Runtime &runtime, Tuple *scope, Continuation *cont) {
+void VarArg::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   assert(0 /* unreachable */);
 }

@@ -23,7 +23,6 @@
 #include "type.h"
 #include "datatype.h"
 #include "gc.h"
-#include "meta.h"
 #include <memory>
 #include <string>
 #include <map>
@@ -32,14 +31,14 @@
 struct Receiver;
 struct Value;
 struct Runtime;
-struct Tuple;
+struct Scope;
 struct Continuation;
 
 #define FLAG_TOUCHED	1 // already explored for _
 #define FLAG_AST	2 // useful to include in AST
 
 /* Expression AST */
-struct Expr : public Meta {
+struct Expr {
   const TypeDescriptor *type;
   Location location;
   TypeVar typeVar;
@@ -47,11 +46,12 @@ struct Expr : public Meta {
   long flags;
 
   Expr(const TypeDescriptor *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), flags(flags_) { }
+  virtual ~Expr();
 
   std::string to_str() const;
   virtual void format(std::ostream &os, int depth) const = 0;
   virtual Hash hash() = 0;
-  virtual void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) = 0;
+  virtual void interpret(Runtime &runtime, Scope *scope, Continuation *cont) = 0;
 };
 
 std::ostream & operator << (std::ostream &os, const Expr *expr);
@@ -68,7 +68,7 @@ struct Prim : public Expr {
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 struct App : public Expr {
@@ -81,7 +81,7 @@ struct App : public Expr {
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 struct Lambda : public Expr {
@@ -95,7 +95,7 @@ struct Lambda : public Expr {
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 struct VarRef : public Expr {
@@ -111,7 +111,7 @@ struct VarRef : public Expr {
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 struct Literal : public Expr {
@@ -123,7 +123,7 @@ struct Literal : public Expr {
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 struct Pattern {
@@ -144,7 +144,7 @@ struct Match : public Expr {
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 struct Subscribe : public Expr {
@@ -156,7 +156,7 @@ struct Subscribe : public Expr {
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 struct DefMap : public Expr {
@@ -181,7 +181,7 @@ struct DefMap : public Expr {
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 
   // Convert into (\a\b\c body) va vb vc ... to prevent type generalization
   static std::unique_ptr<Expr> dont_generalize(std::unique_ptr<DefMap> &&map);
@@ -199,7 +199,7 @@ struct Top : public Expr {
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 // Created by transforming DefMap+Top
@@ -226,7 +226,7 @@ struct DefBinding : public Expr {
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 // Created by transforming Data
@@ -241,7 +241,7 @@ struct Construct : public Expr {
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 struct Sum;
@@ -254,7 +254,7 @@ struct Destruct : public Expr {
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 // A dummy expression never actually used in the AST
@@ -264,7 +264,7 @@ struct VarDef : public Expr {
   VarDef(const Location &location_) : Expr(&type, location_), target(LOCATION) { }
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 // A dummy expression never actually used in the AST
@@ -273,7 +273,7 @@ struct VarArg : public Expr {
   VarArg(const Location &location_) : Expr(&type, location_) { }
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
-  void interpret(Runtime &runtime, Tuple *scope, Continuation *cont) override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
 #endif

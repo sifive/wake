@@ -562,10 +562,10 @@ int main(int argc, char **argv) {
   ok &= sources;
 
   // Read all wake build files
-  runtime.stack_trace = debug;
+  Scope::debug = debug;
   std::unique_ptr<Top> top(new Top);
   for (auto &i : wakefiles) {
-    if (verbose && runtime.stack_trace)
+    if (verbose && debug)
       std::cerr << "Parsing " << i << std::endl;
     Lexer lex(runtime.heap, i.c_str());
     parse_top(*top.get(), lex);
@@ -727,10 +727,10 @@ int main(int argc, char **argv) {
   } else if (pass) {
     std::vector<Promise*> outputs;
     outputs.reserve(targets.size());
-    Tuple *iter = static_cast<Closure*>(runtime.output.get())->scope.get();
+    Scope *iter = static_cast<Closure*>(runtime.output.get())->scope.get();
     for (size_t i = 0; i < targets.size(); ++i) {
-      outputs.emplace_back(iter->at(1));
-      iter = iter->at(0)->coerce<Tuple>();
+      outputs.emplace_back(iter->at(0));
+      iter = iter->next.get();
     }
 
     for (size_t i = 0; i < targets.size(); ++i) {
@@ -750,10 +750,8 @@ int main(int argc, char **argv) {
       }
       if (!v) {
         pass = false;
-      } else if (typeid(*v) == typeid(Tuple)) {
-        Tuple *t = static_cast<Tuple*>(v);
-        auto cons = static_cast<Constructor*>(t->meta);
-        if (cons->ast.name == "Fail") pass = false;
+      } else if (Record *r = dynamic_cast<Record*>(v)) {
+        if (r->cons->ast.name == "Fail") pass = false;
       }
     }
   }

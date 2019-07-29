@@ -20,8 +20,9 @@
 
 #include "runtime.h"
 #include <vector>
+
 struct Location;
-struct Meta;
+struct Constructor;
 
 struct alignas(PadObject) Promise {
   explicit operator bool() const {
@@ -58,7 +59,6 @@ struct alignas(PadObject) Promise {
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) { return (value.*memberfn)(arg); }
 
-
 private:
   mutable HeapPointer<HeapObject> value;
 friend struct Tuple;
@@ -72,16 +72,9 @@ inline HeapStep Promise::recurse<HeapStep, &HeapPointerBase::explore>(HeapStep s
 }
 
 struct Tuple : public HeapObject {
-  // Either an Expr or a Constructor
-  Meta *meta;
-
-  Tuple(Meta *meta_) : meta(meta_) { }
-
   virtual size_t size() const = 0;
   virtual Promise *at(size_t i) = 0;
   virtual const Promise *at(size_t i) const = 0;
-  void format(std::ostream &os, FormatState &state) const override;
-  Hash hash() const override;
 
   bool empty() const { return size() == 0; }
 
@@ -97,12 +90,42 @@ struct Tuple : public HeapObject {
       p->value = cont;
     }
   }
+};
+
+struct Record : public Tuple {
+  Constructor *cons;
+
+  Record(Constructor *cons_) : cons(cons_) { }
+
+  void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
 
   static size_t reserve(size_t size);
-  static Tuple *claim(Heap &h, Meta *meta, size_t size); // requires prior h.reserve
-  static Tuple *alloc(Heap &h, Meta *meta, size_t size);
+  static Record *claim(Heap &h, Constructor *cons, size_t size); // requires prior h.reserve
+  static Record *alloc(Heap &h, Constructor *cons, size_t size);
+};
 
+struct Scope : public Tuple {
+  HeapPointer<Scope> next;
+
+  Scope(Scope *next_) : next(next_) { }
+
+  void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Tuple::recurse<T, memberfn>(arg);
+    arg = (next.*memberfn)(arg);
+    return arg;
+  }
+
+  static bool debug;
   std::vector<Location> stack_trace() const;
+
+  static size_t reserve(size_t size);
+  static Scope *claim(Heap &h, Scope *next, size_t size); // requires prior h.reserve
+  static Scope *alloc(Heap &h, Scope *next, size_t size);
 };
 
 #endif

@@ -28,7 +28,8 @@ struct String;
 struct Integer;
 struct Double;
 struct RegExp;
-struct Tuple;
+struct Scope;
+struct Record;
 
 /* Macros for handling inputs from wake */
 #define RETURN(val) do {						\
@@ -36,7 +37,7 @@ struct Tuple;
   return;								\
 } while (0)
 
-void require_fail(const char *message, unsigned size, Runtime &runtime, const Tuple *scope);
+void require_fail(const char *message, unsigned size, Runtime &runtime, const Scope *scope);
 
 #define STR(x) #x
 #define STR2(x) STR(x)
@@ -60,18 +61,18 @@ void require_fail(const char *message, unsigned size, Runtime &runtime, const Tu
 #define DOUBLE(arg, i)  do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Double));  } while(0); Double  *arg = static_cast<Double *>(args[i]);
 #define REGEXP(arg, i)	do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(RegExp));  } while(0); RegExp  *arg = static_cast<RegExp *>(args[i]);
 #define CLOSURE(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Closure)); } while(0); Closure *arg = static_cast<Closure*>(args[i]);
-#define TUPLE(arg, i)   Tuple   *arg = static_cast<Tuple  *>(args[i]);
+#define RECORD(arg, i)   Record *arg = static_cast<Record*>(args[i]);
 
 #define INTEGER_MPZ(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Integer)); } while(0); mpz_t arg = { static_cast<Integer*>(args[i])->wrap() };
 
 /* Useful expressions for primitives */
 HeapObject *alloc_order(Heap &h, int x);
 HeapObject *alloc_nil(Heap &h);
-inline size_t reserve_unit() { return Tuple::reserve(0); }
-inline size_t reserve_bool() { return Tuple::reserve(0); }
-inline size_t reserve_tuple2() { return Tuple::reserve(2); }
-inline size_t reserve_result() { return Tuple::reserve(1); }
-inline size_t reserve_list(size_t elements) { return Tuple::reserve(2) * elements + Tuple::reserve(0); }
+inline size_t reserve_unit() { return Record::reserve(0); }
+inline size_t reserve_bool() { return Record::reserve(0); }
+inline size_t reserve_tuple2() { return Record::reserve(2); }
+inline size_t reserve_result() { return Record::reserve(1); }
+inline size_t reserve_list(size_t elements) { return Record::reserve(2) * elements + Record::reserve(0); }
 HeapObject *claim_unit(Heap &h);
 HeapObject *claim_bool(Heap &h, bool x);
 HeapObject *claim_tuple2(Heap &h, HeapObject *first, HeapObject *second);

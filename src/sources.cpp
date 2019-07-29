@@ -338,11 +338,11 @@ bool find_all_sources(Runtime &runtime, bool workspace) {
   std::vector<std::string> found;
   if (workspace) ok = !scan(found);
 
-  size_t need = Tuple::reserve(found.size());
+  size_t need = Record::reserve(found.size());
   for (auto &x : found) need += String::reserve(x.size());
   runtime.heap.guarantee(need);
 
-  Tuple *out = Tuple::claim(runtime.heap, nullptr, found.size());
+  Record *out = Record::claim(runtime.heap, nullptr, found.size());
   for (size_t i = 0; i < out->size(); ++i)
     out->at(i)->instant_fulfill(String::claim(runtime.heap, found[i]));
 
@@ -448,9 +448,9 @@ static PRIMFN(prim_add_sources) {
     }
   }
 
-  need += 2*Tuple::reserve(num);
+  need += 2*Record::reserve(num);
   runtime.heap.reserve(need);
-  Tuple *tuple = Tuple::claim(runtime.heap, nullptr, num);
+  Record *tuple = Record::claim(runtime.heap, nullptr, num);
 
   size_t i;
   for (i = 0; i < copy; ++i)
@@ -471,7 +471,7 @@ static PRIMFN(prim_add_sources) {
   std::sort(low, high, promise_lt);
   size_t keep = std::unique(low, high, promise_eq) - low;
 
-  Tuple *compact = Tuple::claim(runtime.heap, nullptr, keep);
+  Record *compact = Record::claim(runtime.heap, nullptr, keep);
   for (size_t j = 0; j < keep; ++j)
     compact->at(j)->instant_fulfill(tuple->at(j)->coerce<HeapObject>());
 

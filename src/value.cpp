@@ -309,31 +309,16 @@ Hash Closure::hash() const {
   return lambda->hashcode;
 }
 
-static const char *describe(Meta *meta) {
-  if (!meta) return "Tuple";
-  if (typeid(*meta) == typeid(Constructor))
-    return static_cast<Constructor*>(meta)->ast.name.c_str();
-  return static_cast<Expr*>(meta)->type->name;
-}
-
-Hash Tuple::hash() const {
+Hash Record::hash() const {
   uint64_t buf[2];
-
   buf[0] = size();
-  if (!meta) {
-    buf[1] = ~static_cast<uint64_t>(0);
-  } else if (typeid(*meta) == typeid(Constructor)) {
-    buf[1] = static_cast<Constructor*>(meta)->index;
-  } else {
-    buf[1] = static_cast<Expr*>(meta)->type->hashcode.data[1];
-  }
-
+  buf[1] = cons?cons->index:~static_cast<uint64_t>(0);
   return Hash(&buf[0], sizeof(buf));
 }
 
-void Tuple::format(std::ostream &os, FormatState &state) const {
+void Record::format(std::ostream &os, FormatState &state) const {
   const HeapObject* child = (state.get() < (int)size()) ? at(state.get())->coerce<HeapObject>() : nullptr;
-  const char *name = describe(meta);
+  const char *name = cons?cons->ast.name.c_str():"Record";
 
   if (strncmp(name, "binary ", 7) == 0) {
     op_type q = op_precedence(name + 7);
@@ -378,6 +363,29 @@ void Tuple::format(std::ostream &os, FormatState &state) const {
     } else {
       if (APP_PRECEDENCE < state.p() && !empty()) os << ")";
     }
+  }
+}
+
+Hash Scope::hash() const {
+  uint64_t buf[1];
+  buf[0] = size();
+  return Hash(&buf[0], sizeof(buf));
+}
+
+void Scope::format(std::ostream &os, FormatState &state) const {
+  const HeapObject* child = (state.get() < (int)size()) ? at(state.get())->coerce<HeapObject>() : nullptr;
+
+  if (state.get() == 0) {
+    if (APP_PRECEDENCE < state.p() && !empty()) os << "(";
+    os << "Scope ";
+  }
+  if (state.get() < (int)size()) {
+    os << " ";
+    state.resume();
+    state.child(child, APP_PRECEDENCE+1);
+  } else {
+    if (APP_PRECEDENCE < state.p() && !empty()) os << ")";
+    if (next) state.child(next.get(), APP_PRECEDENCE+1);
   }
 }
 
