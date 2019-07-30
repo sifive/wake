@@ -46,6 +46,7 @@
 #include "execpath.h"
 #include "runtime.h"
 #include "shell.h"
+#include "markup.h"
 
 #define SHORT_HASH 8
 
@@ -217,149 +218,6 @@ static struct option *arg(struct option opts[], const char *name) {
   std::cerr << "Wake option parser bug: " << name << std::endl;
   exit(1);
 }
-
-struct ParanOrder {
-  bool operator () (Expr *a, Expr *b) const {
-    int cmp = strcmp(a->location.filename, b->location.filename);
-    if (cmp < 0) return true;
-    if (cmp > 0) return false;
-    if (a->location.start < b->location.start) return true;
-    if (a->location.start > b->location.start) return false;
-    return a->location.end > b->location.end;
-  }
-};
-
-struct JSONRender {
-  typedef std::set<Expr*, ParanOrder> ESet;
-  std::vector<std::unique_ptr<Expr> > defs;
-  std::ostream &os;
-  ESet eset;
-  ESet::iterator it;
-
-  JSONRender(std::ostream &os_) : os(os_) { }
-
-  void explore(Expr *expr) {
-    if (expr->location.start.bytes >= 0 && (expr->flags & FLAG_AST) != 0)
-      eset.insert(expr);
-
-    if (expr->type == &App::type) {
-      App *app = static_cast<App*>(expr);
-      explore(app->val.get());
-      explore(app->fn.get());
-    } else if (expr->type == &Lambda::type) {
-      Lambda *lambda = static_cast<Lambda*>(expr);
-      if (lambda->token.start.bytes >= 0) {
-        auto foo = new VarArg(lambda->token);
-        foo->typeVar.setDOB(lambda->typeVar[0]);
-        lambda->typeVar[0].unify(foo->typeVar);
-        defs.emplace_back(foo);
-        eset.insert(foo);
-      }
-      explore(lambda->body.get());
-    } else if (expr->type == &DefBinding::type) {
-      DefBinding *defbinding = static_cast<DefBinding*>(expr);
-      for (auto &i : defbinding->val) explore(i.get());
-      for (auto &i : defbinding->fun) explore(i.get());
-      for (auto &i : defbinding->order) {
-        if (i.second.location.start.bytes >= 0) {
-          int val = i.second.index;
-          int fun = val - defbinding->val.size();
-          Expr *expr = (fun >= 0) ? defbinding->fun[fun].get() : defbinding->val[val].get();
-          auto def = new VarDef(i.second.location);
-          if (i.first.compare(0, 8, "publish ") == 0) {
-            assert (expr->type == &App::type);
-            App *app = static_cast<App*>(expr);
-            assert (app->val->type == &VarRef::type);
-            VarRef *ref = static_cast<VarRef*>(app->val.get());
-            def->target = ref->target;
-          }
-          def->typeVar.setDOB(expr->typeVar);
-          expr->typeVar.unify(def->typeVar);
-          defs.emplace_back(def);
-          eset.insert(def);
-        }
-      }
-      explore(defbinding->body.get());
-    }
-  }
-
-  void dump() {
-    Location self = (*it)->location;
-
-    os
-      << "{\"type\":\"" << (*it)->type->name
-      << "\",\"range\":[" << self.start.bytes
-      << "," << (self.end.bytes+1)
-      << "],\"sourceType\":\"";
-    (*it)->typeVar.format(os, (*it)->typeVar);
-    os << "\"";
-
-    Location target = LOCATION;
-
-    if ((*it)->type == &VarRef::type) {
-      VarRef *ref = static_cast<VarRef*>(*it);
-      target = ref->target;
-    }
-
-    if ((*it)->type == &VarDef::type) {
-      VarDef *def = static_cast<VarDef*>(*it);
-      target = def->target;
-    }
-
-    if (target.start.bytes >= 0) {
-      os
-        << ",\"target\":{\"filename\":\"" << json_escape(target.filename)
-        << "\",\"range\":[" << target.start.bytes
-        << "," << (target.end.bytes+1)
-        << "]}";
-    }
-
-    ++it;
-
-    bool body = false;
-    while (it != eset.end()) {
-      Location child = (*it)->location;
-      if (child.filename != self.filename) break;
-      if (child.start > self.end) break;
-      if (body) os << ","; else os << ",\"body\":[";
-      body = true;
-      dump();
-    }
-
-    if (body) os << "]";
-    os << "}";
-  }
-
-  void render(Expr *root) {
-    explore(root);
-    it = eset.begin();
-
-    os << "{\"type\":\"Workspace\",\"body\":[";
-    bool comma = false;
-    while (it != eset.end()) {
-      const char *filename = (*it)->location.filename;
-      std::ifstream ifs(filename);
-      std::string content(
-        (std::istreambuf_iterator<char>(ifs)),
-        (std::istreambuf_iterator<char>()));
-      if (comma) os << ",";
-      comma = true;
-      os
-        << "{\"type\":\"Program\",\"filename\":\"" << json_escape(filename)
-        << "\",\"range\":[0," << content.size()
-        << "],\"source\":\"" << json_escape(content)
-        << "\",\"body\":[";
-      bool comma = false;
-      while (it != eset.end() && (*it)->location.filename == filename) {
-        if (comma) os << ",";
-        comma = true;
-        dump();
-      }
-      os << "]}";
-    }
-    os << "]}";
-  }
-};
 
 int main(int argc, char **argv) {
   struct option options[] {
@@ -635,24 +493,7 @@ int main(int argc, char **argv) {
   }
 
   if (tcheck) std::cout << root.get();
-  if (html) {
-    std::ifstream style(find_execpath() + "/../share/wake/html/style.css");
-    std::ifstream utf8(find_execpath() + "/../share/wake/html/utf8.js");
-    std::ifstream main(find_execpath() + "/../share/wake/html/main.js");
-    std::cout << "<meta charset=\"UTF-8\">" << std::endl;
-    std::cout << "<style type=\"text/css\">" << std::endl;
-    std::cout << style.rdbuf();
-    std::cout << "</style>" << std::endl;
-    std::cout << "<script type=\"text/javascript\">" << std::endl;
-    std::cout << utf8.rdbuf();
-    std::cout << "</script>" << std::endl;
-    std::cout << "<script type=\"text/javascript\">" << std::endl;
-    std::cout << main.rdbuf();
-    std::cout << "</script>" << std::endl;
-    std::cout << "<script type=\"wake\">";
-    JSONRender(std::cout).render(root.get());
-    std::cout << "</script>" << std::endl;
-  }
+  if (html) markup_html(std::cout, root.get());
 
   for (auto &g : globals) {
     Expr *e = root.get();
