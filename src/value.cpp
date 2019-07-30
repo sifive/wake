@@ -318,7 +318,7 @@ Hash Record::hash() const {
 
 void Record::format(std::ostream &os, FormatState &state) const {
   const HeapObject* child = (state.get() < (int)size()) ? at(state.get())->coerce<HeapObject>() : nullptr;
-  const char *name = cons?cons->ast.name.c_str():"Record";
+  const char *name = cons->ast.name.c_str();
 
   if (strncmp(name, "binary ", 7) == 0) {
     op_type q = op_precedence(name + 7);

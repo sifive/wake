@@ -56,7 +56,7 @@ struct Target final : public GCObject<Target, DestroyableObject> {
   Hash hash() const override;
 };
 
-TypeVar Target::typeVar("_Target", 0);
+TypeVar Target::typeVar("Target", 0);
 
 template <typename T, T (HeapPointerBase::*memberfn)(T x)>
 T Target::recurse(T arg) {
@@ -86,7 +86,7 @@ Target::~Target() {
 }
 
 void Target::format(std::ostream &os, FormatState &state) const {
-  os << "_Target";
+  os << "Target";
 }
 
 Hash Target::hash() const {

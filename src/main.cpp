@@ -25,12 +25,9 @@
 #include <iostream>
 #include <thread>
 #include <sstream>
-#include <fstream>
-#include <set>
 #include <random>
 #include <inttypes.h>
 #include <stdlib.h>
-#include <assert.h>
 #include "parser.h"
 #include "bind.h"
 #include "symbol.h"
@@ -39,139 +36,12 @@
 #include "job.h"
 #include "sources.h"
 #include "database.h"
-#include "hash.h"
 #include "status.h"
 #include "gopt.h"
-#include "json5.h"
-#include "execpath.h"
 #include "runtime.h"
 #include "shell.h"
-
-#define SHORT_HASH 8
-
-static void indent(const std::string& tab, const std::string& body) {
-  size_t i, j;
-  for (i = 0; (j = body.find('\n', i)) != std::string::npos; i = j+1) {
-    std::cout << "\n" << tab;
-    std::cout.write(body.data()+i, j-i);
-  }
-  std::cout.write(body.data()+i, body.size()-i);
-  std::cout << std::endl;
-}
-
-static void describe_human(const std::vector<JobReflection> &jobs, bool debug, bool verbose) {
-  for (auto &job : jobs) {
-    std::cout
-      << "Job " << job.job << ":" << std::endl
-      << "  Command-line:";
-    for (auto &arg : job.commandline) std::cout << " " << shell_escape(arg);
-    std::cout
-      << std::endl
-      << "  Environment:" << std::endl;
-    for (auto &env : job.environment)
-      std::cout << "    " << shell_escape(env) << std::endl;
-    std::cout
-      << "  Directory: " << job.directory << std::endl
-      << "  Built:     " << job.time << std::endl
-      << "  Runtime:   " << job.usage.runtime << std::endl
-      << "  CPUtime:   " << job.usage.cputime << std::endl
-      << "  Mem bytes: " << job.usage.membytes << std::endl
-      << "  In  bytes: " << job.usage.ibytes << std::endl
-      << "  Out bytes: " << job.usage.obytes << std::endl
-      << "  Status:    " << job.usage.status << std::endl
-      << "  Stdin:     " << job.stdin << std::endl;
-    if (verbose) {
-      std::cout << "Visible:" << std::endl;
-      for (auto &in : job.visible)
-        std::cout << "  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
-                  << " " << in.path << std::endl;
-    }
-    std::cout << "Inputs:" << std::endl;
-    for (auto &in : job.inputs)
-      std::cout << "  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
-                << " " << in.path << std::endl;
-    std::cout << "Outputs:" << std::endl;
-    for (auto &out : job.outputs)
-      std::cout << "  " << out.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
-                << " " << out.path << std::endl;
-    if (debug) {
-      std::cout << "Stack:";
-      indent("  ", job.stack);
-    }
-    if (!job.stdout.empty()) {
-      std::cout << "Stdout:";
-      indent("  ", job.stdout);
-    }
-    if (!job.stderr.empty()) {
-      std::cout << "Stderr:";
-      indent("  ", job.stderr);
-    }
-  }
-}
-
-static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, bool verbose) {
-  std::cout << "#! /bin/sh -ex" << std::endl;
-
-  for (auto &job : jobs) {
-    std::cout << std::endl << "# Wake job " << job.job << ":" << std::endl;
-    std::cout << "cd " << shell_escape(get_cwd()) << std::endl;
-    if (job.directory != ".") {
-      std::cout << "cd " << shell_escape(job.directory) << std::endl;
-    }
-    std::cout << "env -i \\" << std::endl;
-    for (auto &env : job.environment) {
-      std::cout << "\t" << shell_escape(env) << " \\" << std::endl;
-    }
-    for (auto &arg : job.commandline) {
-      std::cout << shell_escape(arg) << " \\" << std::endl << '\t';
-    }
-    std::cout << "< " << shell_escape(job.stdin) << std::endl << std::endl;
-    std::cout
-      << "# When wake ran this command:" << std::endl
-      << "#   Built:     " << job.time << std::endl
-      << "#   Runtime:   " << job.usage.runtime << std::endl
-      << "#   CPUtime:   " << job.usage.cputime << std::endl
-      << "#   Mem bytes: " << job.usage.membytes << std::endl
-      << "#   In  bytes: " << job.usage.ibytes << std::endl
-      << "#   Out bytes: " << job.usage.obytes << std::endl
-      << "#   Status:    " << job.usage.status << std::endl;
-    if (verbose) {
-      std::cout << "# Visible:" << std::endl;
-      for (auto &in : job.visible)
-        std::cout << "#  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
-                  << " " << in.path << std::endl;
-    }
-    std::cout
-      << "# Inputs:" << std::endl;
-    for (auto &in : job.inputs)
-      std::cout << "#  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
-                << " " << in.path << std::endl;
-    std::cout << "# Outputs:" << std::endl;
-    for (auto &out : job.outputs)
-      std::cout << "#  " << out.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
-                << " " << out.path << std::endl;
-    if (debug) {
-      std::cout << "# Stack:";
-      indent("#   ", job.stack);
-    }
-    if (!job.stdout.empty()) {
-      std::cout << "Stdout:";
-      indent("#   ", job.stdout);
-    }
-    if (!job.stderr.empty()) {
-      std::cout << "Stderr:";
-      indent("#   ", job.stderr);
-    }
-  }
-}
-
-void describe(const std::vector<JobReflection> &jobs, bool script, bool debug, bool verbose) {
-  if (script) {
-    describe_shell(jobs, debug, verbose);
-  } else {
-    describe_human(jobs, debug, verbose);
-  }
-}
+#include "markup.h"
+#include "describe.h"
 
 void print_help(const char *argv0) {
   std::cout << std::endl
@@ -217,149 +87,6 @@ static struct option *arg(struct option opts[], const char *name) {
   std::cerr << "Wake option parser bug: " << name << std::endl;
   exit(1);
 }
-
-struct ParanOrder {
-  bool operator () (Expr *a, Expr *b) const {
-    int cmp = strcmp(a->location.filename, b->location.filename);
-    if (cmp < 0) return true;
-    if (cmp > 0) return false;
-    if (a->location.start < b->location.start) return true;
-    if (a->location.start > b->location.start) return false;
-    return a->location.end > b->location.end;
-  }
-};
-
-struct JSONRender {
-  typedef std::set<Expr*, ParanOrder> ESet;
-  std::vector<std::unique_ptr<Expr> > defs;
-  std::ostream &os;
-  ESet eset;
-  ESet::iterator it;
-
-  JSONRender(std::ostream &os_) : os(os_) { }
-
-  void explore(Expr *expr) {
-    if (expr->location.start.bytes >= 0 && (expr->flags & FLAG_AST) != 0)
-      eset.insert(expr);
-
-    if (expr->type == &App::type) {
-      App *app = static_cast<App*>(expr);
-      explore(app->val.get());
-      explore(app->fn.get());
-    } else if (expr->type == &Lambda::type) {
-      Lambda *lambda = static_cast<Lambda*>(expr);
-      if (lambda->token.start.bytes >= 0) {
-        auto foo = new VarArg(lambda->token);
-        foo->typeVar.setDOB(lambda->typeVar[0]);
-        lambda->typeVar[0].unify(foo->typeVar);
-        defs.emplace_back(foo);
-        eset.insert(foo);
-      }
-      explore(lambda->body.get());
-    } else if (expr->type == &DefBinding::type) {
-      DefBinding *defbinding = static_cast<DefBinding*>(expr);
-      for (auto &i : defbinding->val) explore(i.get());
-      for (auto &i : defbinding->fun) explore(i.get());
-      for (auto &i : defbinding->order) {
-        if (i.second.location.start.bytes >= 0) {
-          int val = i.second.index;
-          int fun = val - defbinding->val.size();
-          Expr *expr = (fun >= 0) ? defbinding->fun[fun].get() : defbinding->val[val].get();
-          auto def = new VarDef(i.second.location);
-          if (i.first.compare(0, 8, "publish ") == 0) {
-            assert (expr->type == &App::type);
-            App *app = static_cast<App*>(expr);
-            assert (app->val->type == &VarRef::type);
-            VarRef *ref = static_cast<VarRef*>(app->val.get());
-            def->target = ref->target;
-          }
-          def->typeVar.setDOB(expr->typeVar);
-          expr->typeVar.unify(def->typeVar);
-          defs.emplace_back(def);
-          eset.insert(def);
-        }
-      }
-      explore(defbinding->body.get());
-    }
-  }
-
-  void dump() {
-    Location self = (*it)->location;
-
-    os
-      << "{\"type\":\"" << (*it)->type->name
-      << "\",\"range\":[" << self.start.bytes
-      << "," << (self.end.bytes+1)
-      << "],\"sourceType\":\"";
-    (*it)->typeVar.format(os, (*it)->typeVar);
-    os << "\"";
-
-    Location target = LOCATION;
-
-    if ((*it)->type == &VarRef::type) {
-      VarRef *ref = static_cast<VarRef*>(*it);
-      target = ref->target;
-    }
-
-    if ((*it)->type == &VarDef::type) {
-      VarDef *def = static_cast<VarDef*>(*it);
-      target = def->target;
-    }
-
-    if (target.start.bytes >= 0) {
-      os
-        << ",\"target\":{\"filename\":\"" << json_escape(target.filename)
-        << "\",\"range\":[" << target.start.bytes
-        << "," << (target.end.bytes+1)
-        << "]}";
-    }
-
-    ++it;
-
-    bool body = false;
-    while (it != eset.end()) {
-      Location child = (*it)->location;
-      if (child.filename != self.filename) break;
-      if (child.start > self.end) break;
-      if (body) os << ","; else os << ",\"body\":[";
-      body = true;
-      dump();
-    }
-
-    if (body) os << "]";
-    os << "}";
-  }
-
-  void render(Expr *root) {
-    explore(root);
-    it = eset.begin();
-
-    os << "{\"type\":\"Workspace\",\"body\":[";
-    bool comma = false;
-    while (it != eset.end()) {
-      const char *filename = (*it)->location.filename;
-      std::ifstream ifs(filename);
-      std::string content(
-        (std::istreambuf_iterator<char>(ifs)),
-        (std::istreambuf_iterator<char>()));
-      if (comma) os << ",";
-      comma = true;
-      os
-        << "{\"type\":\"Program\",\"filename\":\"" << json_escape(filename)
-        << "\",\"range\":[0," << content.size()
-        << "],\"source\":\"" << json_escape(content)
-        << "\",\"body\":[";
-      bool comma = false;
-      while (it != eset.end() && (*it)->location.filename == filename) {
-        if (comma) os << ",";
-        comma = true;
-        dump();
-      }
-      os << "]}";
-    }
-    os << "]}";
-  }
-};
 
 int main(int argc, char **argv) {
   struct option options[] {
@@ -575,58 +302,14 @@ int main(int argc, char **argv) {
   /* Primitives */
   JobTable jobtable(&db, njobs, verbose, quiet, check);
   StringInfo info(verbose, debug, quiet, VERSION_STR);
-  PrimMap pmap;
-  prim_register_string(pmap, &info);
-  prim_register_vector(pmap);
-  prim_register_integer(pmap);
-  prim_register_double(pmap);
-  prim_register_exception(pmap);
-  prim_register_regexp(pmap);
-  prim_register_target(pmap);
-  prim_register_json(pmap);
-  prim_register_job(&jobtable, pmap);
-  prim_register_sources(pmap);
+  PrimMap pmap = prim_register_all(&info, &jobtable);
 
   if (parse) std::cout << top.get();
 
   if (notype) return ok?0:1;
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
   if (!root) ok = false;
-
-  if (!Boolean) {
-    std::cerr << "Primitive data type Boolean not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!Order) {
-    std::cerr << "Primitive data type Order not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!List) {
-    std::cerr << "Primitive data type List not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!Pair) {
-    std::cerr << "Primitive data type Pair not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!Result) {
-    std::cerr << "Primitive data type Result not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!Unit) {
-    std::cerr << "Primitive data type Unit not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!JValue) {
-    std::cerr << "Primitive data type JValue not defined." << std::endl;
-    ok = false;
-  }
+  ok = ok && sums_ok();
 
   if (!ok) {
     if (add) std::cerr << ">>> Expression not added to the active target list <<<" << std::endl;
@@ -635,24 +318,7 @@ int main(int argc, char **argv) {
   }
 
   if (tcheck) std::cout << root.get();
-  if (html) {
-    std::ifstream style(find_execpath() + "/../share/wake/html/style.css");
-    std::ifstream utf8(find_execpath() + "/../share/wake/html/utf8.js");
-    std::ifstream main(find_execpath() + "/../share/wake/html/main.js");
-    std::cout << "<meta charset=\"UTF-8\">" << std::endl;
-    std::cout << "<style type=\"text/css\">" << std::endl;
-    std::cout << style.rdbuf();
-    std::cout << "</style>" << std::endl;
-    std::cout << "<script type=\"text/javascript\">" << std::endl;
-    std::cout << utf8.rdbuf();
-    std::cout << "</script>" << std::endl;
-    std::cout << "<script type=\"text/javascript\">" << std::endl;
-    std::cout << main.rdbuf();
-    std::cout << "</script>" << std::endl;
-    std::cout << "<script type=\"wake\">";
-    JSONRender(std::cout).render(root.get());
-    std::cout << "</script>" << std::endl;
-  }
+  if (html) markup_html(std::cout, root.get());
 
   for (auto &g : globals) {
     Expr *e = root.get();

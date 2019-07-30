@@ -21,6 +21,7 @@
 #include "type.h"
 #include "value.h"
 #include "execpath.h"
+#include "datatype.h"
 
 #include <re2/re2.h>
 #include <sys/types.h>
@@ -342,7 +343,7 @@ bool find_all_sources(Runtime &runtime, bool workspace) {
   for (auto &x : found) need += String::reserve(x.size());
   runtime.heap.guarantee(need);
 
-  Record *out = Record::claim(runtime.heap, nullptr, found.size());
+  Record *out = Record::claim(runtime.heap, &Constructor::array, found.size());
   for (size_t i = 0; i < out->size(); ++i)
     out->at(i)->instant_fulfill(String::claim(runtime.heap, found[i]));
 
@@ -450,7 +451,7 @@ static PRIMFN(prim_add_sources) {
 
   need += 2*Record::reserve(num);
   runtime.heap.reserve(need);
-  Record *tuple = Record::claim(runtime.heap, nullptr, num);
+  Record *tuple = Record::claim(runtime.heap, &Constructor::array, num);
 
   size_t i;
   for (i = 0; i < copy; ++i)
@@ -471,7 +472,7 @@ static PRIMFN(prim_add_sources) {
   std::sort(low, high, promise_lt);
   size_t keep = std::unique(low, high, promise_eq) - low;
 
-  Record *compact = Record::claim(runtime.heap, nullptr, keep);
+  Record *compact = Record::claim(runtime.heap, &Constructor::array, keep);
   for (size_t j = 0; j < keep; ++j)
     compact->at(j)->instant_fulfill(tuple->at(j)->coerce<HeapObject>());
 

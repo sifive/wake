@@ -161,3 +161,18 @@ Work *claim_hash(Heap &h, HeapObject *value, Continuation *continuation) {
 void prim_register(PrimMap &pmap, const char *key, PrimFn fn, PrimType type, int flags, void *data) {
   pmap.insert(std::make_pair(key, PrimDesc(fn, type, flags, data)));
 }
+
+PrimMap prim_register_all(StringInfo *info, JobTable *jobtable) {
+  PrimMap pmap;
+  prim_register_string(pmap, info);
+  prim_register_vector(pmap);
+  prim_register_integer(pmap);
+  prim_register_double(pmap);
+  prim_register_exception(pmap);
+  prim_register_regexp(pmap);
+  prim_register_target(pmap);
+  prim_register_json(pmap);
+  prim_register_job(jobtable, pmap);
+  prim_register_sources(pmap);
+  return pmap;
+}
