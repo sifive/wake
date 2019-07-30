@@ -27,6 +27,7 @@ bool expect(SymbolType type, Lexer &lex);
 void parse_top(Top &top, Lexer &lex);
 Expr *parse_command(Lexer &lex);
 Expr *parse_expr(Lexer &lex);
+bool sums_ok();
 
 // These types must be defined by prim.wake
 struct Sum;

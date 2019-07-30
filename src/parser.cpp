@@ -692,9 +692,50 @@ Sum *Boolean;
 Sum *Order;
 Sum *List;
 Sum *Pair;
-Sum *Result;
 Sum *Unit;
 Sum *JValue;
+Sum *Result;
+
+bool sums_ok() {
+  bool ok = true;
+
+  if (!Boolean) {
+    std::cerr << "Primitive data type Boolean not defined." << std::endl;
+    ok = false;
+  }
+
+  if (!Order) {
+    std::cerr << "Primitive data type Order not defined." << std::endl;
+    ok = false;
+  }
+
+  if (!List) {
+    std::cerr << "Primitive data type List not defined." << std::endl;
+    ok = false;
+  }
+
+  if (!Pair) {
+    std::cerr << "Primitive data type Pair not defined." << std::endl;
+    ok = false;
+  }
+
+  if (!Result) {
+    std::cerr << "Primitive data type Result not defined." << std::endl;
+    ok = false;
+  }
+
+  if (!Unit) {
+    std::cerr << "Primitive data type Unit not defined." << std::endl;
+    ok = false;
+  }
+
+  if (!JValue) {
+    std::cerr << "Primitive data type JValue not defined." << std::endl;
+    ok = false;
+  }
+
+  return ok;
+}
 
 static AST parse_type_def(Lexer &lex) {
   lex.consume();

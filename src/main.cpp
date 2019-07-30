@@ -450,41 +450,7 @@ int main(int argc, char **argv) {
   if (notype) return ok?0:1;
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
   if (!root) ok = false;
-
-  if (!Boolean) {
-    std::cerr << "Primitive data type Boolean not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!Order) {
-    std::cerr << "Primitive data type Order not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!List) {
-    std::cerr << "Primitive data type List not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!Pair) {
-    std::cerr << "Primitive data type Pair not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!Result) {
-    std::cerr << "Primitive data type Result not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!Unit) {
-    std::cerr << "Primitive data type Unit not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!JValue) {
-    std::cerr << "Primitive data type JValue not defined." << std::endl;
-    ok = false;
-  }
+  ok = ok && sums_ok();
 
   if (!ok) {
     if (add) std::cerr << ">>> Expression not added to the active target list <<<" << std::endl;
