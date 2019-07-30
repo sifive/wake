@@ -281,7 +281,10 @@ friend struct DestroyableObject;
 template <typename T, typename B = HeapObject>
 struct alignas(PadObject) GCObject : public B {
   template <typename ... ARGS>
-  GCObject(ARGS&&... args) : B(std::forward<ARGS>(args) ... ) { }
+  GCObject(ARGS&&... args) : B(std::forward<ARGS>(args) ... ) {
+    static_assert(sizeof(MovedObject) <= sizeof(T), "HeapObject is too small");
+    static_assert(sizeof(PadObject) == alignof(T), "HeapObject alignment wrong");
+  }
 
   T* self() { return static_cast<T*>(this); }
   const T* self() const { return static_cast<const T*>(this); }
@@ -305,21 +308,18 @@ struct alignas(PadObject) GCObject : public B {
 
 template <typename T, typename B>
 size_t GCObject<T, B>::reserve() {
-  static_assert(sizeof(MovedObject) <= sizeof(T), "HeapObject is too small");
   return sizeof(T)/sizeof(PadObject);
 }
 
 template <typename T, typename B>
 template <typename ... ARGS>
 T *GCObject<T, B>::claim(Heap &h, ARGS&&... args) {
-  static_assert(sizeof(MovedObject) <= sizeof(T), "HeapObject is too small");
   return new (h.claim(sizeof(T)/sizeof(PadObject))) T(std::forward<ARGS>(args) ...);
 }
 
 template <typename T, typename B>
 template <typename ... ARGS>
 T *GCObject<T, B>::alloc(Heap &h, ARGS&&... args) {
-  static_assert(sizeof(MovedObject) <= sizeof(T), "HeapObject is too small");
   return new (h.alloc(sizeof(T)/sizeof(PadObject))) T(std::forward<ARGS>(args) ... );
 }
 

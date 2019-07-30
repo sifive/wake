@@ -89,7 +89,7 @@ Heap::~Heap() {
 }
 
 void Heap::GC(size_t requested_pads) {
-  size_t no_gc_overrun = 2 * (free-begin) + requested_pads; // misalignment can at worst double usage
+  size_t no_gc_overrun = (free-begin) + requested_pads;
   size_t estimate_desired_size = 4*last_pads + requested_pads;
   size_t elems = std::max(no_gc_overrun, estimate_desired_size);
   PadObject *newbegin = static_cast<PadObject*>(::malloc(elems*sizeof(PadObject)));
