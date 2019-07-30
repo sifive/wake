@@ -23,6 +23,7 @@
 #include "location.h"
 #include "execpath.h"
 #include "status.h"
+#include "shell.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -500,10 +501,17 @@ static char **split_null(std::string &str) {
   return out;
 }
 
-static std::string pretty_cmd(std::string x) {
-  for (char &c : x) if (c == 0) c = ' ';
-  x.resize(x.size()-1); // trim trailing ' '
-  return x;
+static std::string pretty_cmd(const std::string &x) {
+  std::stringstream out;
+
+  size_t e;
+  for (size_t s = 0; s != x.size(); s = e+1) {
+    e = x.find('\0', s);
+    if (s) out << ' ';
+    out << shell_escape(x.c_str() + s);
+  }
+
+  return out.str();
 }
 
 struct CompletedJobEntry {
@@ -587,10 +595,10 @@ static void launch(JobTable *jobtable) {
     if (LOG_ECHO(i.job->log)) {
       std::stringstream s;
       s << pretty;
-      if (i.job->stdin->length != 0) s << " < " << i.job->stdin->c_str();
+      if (i.job->stdin->length != 0) s << " < " << shell_escape(i.job->stdin->c_str());
       if (indirect && jobtable->imp->verbose) {
         s << " # launched by: " << pretty_cmd(task.cmdline);
-        if (!task.stdin.empty()) s << " < " << task.stdin;
+        if (!task.stdin.empty()) s << " < " << shell_escape(task.stdin);
       }
       s << std::endl;
       std::string out = s.str();
@@ -986,7 +994,7 @@ static PRIMFN(prim_job_virtual) {
   if (LOG_ECHO(job->log)) {
     std::stringstream s;
     s << pretty_cmd(job->cmdline->as_str());
-    if (job->stdin->length != 0) s << " < " << job->stdin->c_str();
+    if (job->stdin->length != 0) s << " < " << shell_escape(job->stdin->c_str());
     s << std::endl;
     std::string out = s.str();
     status_write(1, out.data(), out.size());

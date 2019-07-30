@@ -45,6 +45,7 @@
 #include "json5.h"
 #include "execpath.h"
 #include "runtime.h"
+#include "shell.h"
 
 #define SHORT_HASH 8
 
@@ -63,12 +64,12 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug, b
     std::cout
       << "Job " << job.job << ":" << std::endl
       << "  Command-line:";
-    for (auto &arg : job.commandline) std::cout << " " << arg;
+    for (auto &arg : job.commandline) std::cout << " " << shell_escape(arg);
     std::cout
       << std::endl
       << "  Environment:" << std::endl;
     for (auto &env : job.environment)
-      std::cout << "    " << env << std::endl;
+      std::cout << "    " << shell_escape(env) << std::endl;
     std::cout
       << "  Directory: " << job.directory << std::endl
       << "  Built:     " << job.time << std::endl
@@ -108,49 +109,24 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug, b
   }
 }
 
-static void escape(const std::string &x) {
-  std::cout << "'";
-  size_t j;
-  for (size_t i = 0; i != std::string::npos; i = j) {
-    j = x.find('\'', i);
-    if (j != std::string::npos) {
-      std::cout.write(x.data()+i, j-i);
-      std::cout << "'\\''";
-      ++j;
-    } else {
-      std::cout.write(x.data()+i, x.size()-i);
-    }
-  }
-  std::cout << "'";
-}
-
 static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, bool verbose) {
   std::cout << "#! /bin/sh -ex" << std::endl;
 
   for (auto &job : jobs) {
     std::cout << std::endl << "# Wake job " << job.job << ":" << std::endl;
-    std::cout << "cd ";
-    escape(get_cwd());
-    std::cout << std::endl;
+    std::cout << "cd " << shell_escape(get_cwd()) << std::endl;
     if (job.directory != ".") {
-      std::cout << "cd ";
-      escape(job.directory);
-      std::cout << std::endl;
+      std::cout << "cd " << shell_escape(job.directory) << std::endl;
     }
     std::cout << "env -i \\" << std::endl;
     for (auto &env : job.environment) {
-      std::cout << "\t";
-      escape(env);
-      std::cout << " \\" << std::endl;
+      std::cout << "\t" << shell_escape(env) << " \\" << std::endl;
     }
     for (auto &arg : job.commandline) {
-      escape(arg);
-      std::cout << " \\" << std::endl << '\t';
+      std::cout << shell_escape(arg) << " \\" << std::endl << '\t';
     }
-    std::cout << "< ";
-    escape(job.stdin);
+    std::cout << "< " << shell_escape(job.stdin) << std::endl << std::endl;
     std::cout
-      << std::endl << std::endl
       << "# When wake ran this command:" << std::endl
       << "#   Built:     " << job.time << std::endl
       << "#   Runtime:   " << job.usage.runtime << std::endl
