@@ -23,12 +23,11 @@
 #include "type.h"
 #include <cassert>
 
-static Constructor vectorC(AST(LOCATION, "Array"));
-static const TypeVar vectorT("Array", 1);
+static const TypeVar arrayT("Array", 1);
 
 static PRIMTYPE(type_vnew) {
   TypeVar vec;
-  vectorT.clone(vec);
+  arrayT.clone(vec);
   return args.size() == 1 &&
     args[0]->unify(Integer::typeVar) &&
     out->unify(vec);
@@ -39,12 +38,12 @@ static PRIMFN(prim_vnew) {
   INTEGER_MPZ(arg0, 0);
   REQUIRE(mpz_cmp_si(arg0, 0) >= 0);
   REQUIRE(mpz_cmp_si(arg0, 1024*1024*1024) < 0);
-  RETURN(Record::alloc(runtime.heap, nullptr, mpz_get_si(arg0)));
+  RETURN(Record::alloc(runtime.heap, &Constructor::array, mpz_get_si(arg0)));
 }
 
 static PRIMTYPE(type_vget) {
   TypeVar vec;
-  vectorT.clone(vec);
+  arrayT.clone(vec);
   return args.size() == 2 &&
     args[0]->unify(vec) &&
     args[1]->unify(Integer::typeVar) &&
@@ -62,7 +61,7 @@ static PRIMFN(prim_vget) {
 
 static PRIMTYPE(type_vset) {
   TypeVar vec;
-  vectorT.clone(vec);
+  arrayT.clone(vec);
   return args.size() == 3 &&
     args[0]->unify(vec) &&
     args[1]->unify(Integer::typeVar) &&

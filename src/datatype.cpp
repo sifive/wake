@@ -20,6 +20,8 @@
 #include "symbol.h"
 #include <iostream>
 
+Constructor Constructor::array(AST(LOCATION, "Array"));
+
 Sum::Sum(AST &&ast) : name(std::move(ast.name)), token(ast.token), region(ast.region) {
   for (auto &x : ast.args)
     args.push_back(std::move(x.name));

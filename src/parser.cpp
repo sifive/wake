@@ -691,45 +691,105 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
 Sum *Boolean;
 Sum *Order;
 Sum *List;
-Sum *Pair;
 Sum *Unit;
-Sum *JValue;
+Sum *Pair;
 Sum *Result;
+Sum *JValue;
 
 bool sums_ok() {
   bool ok = true;
 
-  if (!Boolean) {
+  if (Boolean) {
+    if (Boolean->members.size() != 2 ||
+        Boolean->members[0].ast.args.size() != 0 ||
+        Boolean->members[1].ast.args.size() != 0) {
+      std::cerr << "Special constructor Boolean not defined correctly at "
+        << Boolean->region.file() << "." << std::endl;
+      ok = false;
+    }
+  } else {
     std::cerr << "Primitive data type Boolean not defined." << std::endl;
     ok = false;
   }
 
-  if (!Order) {
+  if (Order) {
+    if (Order->members.size() != 3 ||
+        Order->members[0].ast.args.size() != 0 ||
+        Order->members[1].ast.args.size() != 0 ||
+        Order->members[2].ast.args.size() != 0) {
+      std::cerr << "Special constructor Order not defined correctly at "
+        << Order->region.file() << "." << std::endl;
+      ok = false;
+    }
+  } else {
     std::cerr << "Primitive data type Order not defined." << std::endl;
     ok = false;
   }
 
-  if (!List) {
+  if (List) {
+    if (List->members.size() != 2 ||
+        List->members[0].ast.args.size() != 0 ||
+        List->members[1].ast.args.size() != 2) {
+      std::cerr << "Special constructor List not defined correctly at "
+        << List->region.file() << "." << std::endl;
+      ok = false;
+    }
+  } else {
     std::cerr << "Primitive data type List not defined." << std::endl;
     ok = false;
   }
 
-  if (!Pair) {
-    std::cerr << "Primitive data type Pair not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!Result) {
-    std::cerr << "Primitive data type Result not defined." << std::endl;
-    ok = false;
-  }
-
-  if (!Unit) {
+  if (Unit) {
+    if (Unit->members.size() != 1 ||
+        Unit->members[0].ast.args.size() != 0) {
+      std::cerr << "Special constructor Unit not defined correctly at "
+        << Unit->region.file() << "." << std::endl;
+      ok = false;
+    }
+  } else {
     std::cerr << "Primitive data type Unit not defined." << std::endl;
     ok = false;
   }
 
-  if (!JValue) {
+  if (Pair) {
+    if (Pair->members.size() != 1 ||
+        Pair->members[0].ast.args.size() != 2) {
+      std::cerr << "Special constructor Pair not defined correctly at "
+        << Pair->region.file() << "." << std::endl;
+      ok = false;
+    }
+  } else {
+    std::cerr << "Primitive data type Pair not defined." << std::endl;
+    ok = false;
+  }
+
+  if (Result) {
+    if (Result->members.size() != 2 ||
+        Result->members[0].ast.args.size() != 1 ||
+        Result->members[1].ast.args.size() != 1) {
+      std::cerr << "Special constructor Result not defined correctly at "
+        << Result->region.file() << "." << std::endl;
+      ok = false;
+    }
+  } else {
+    std::cerr << "Primitive data type Result not defined." << std::endl;
+    ok = false;
+  }
+
+  if (JValue) {
+    if (JValue->members.size() != 7 ||
+        JValue->members[0].ast.args.size() != 1 ||
+        JValue->members[1].ast.args.size() != 1 ||
+        JValue->members[2].ast.args.size() != 1 ||
+        JValue->members[3].ast.args.size() != 1 ||
+        JValue->members[4].ast.args.size() != 0 ||
+        JValue->members[5].ast.args.size() != 1 ||
+        JValue->members[6].ast.args.size() != 1) {
+      std::cerr << "Special constructor JValue not defined correctly at "
+        << JValue->region.file() << "." << std::endl;
+      ok = false;
+    }
+  } else {
     std::cerr << "Primitive data type JValue not defined." << std::endl;
     ok = false;
   }
@@ -774,86 +834,20 @@ static AST parse_type_def(Lexer &lex) {
 }
 
 static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
-  if (name == "Integer" || name == "String" || name == "RegExp" ||
+  if (name == "Integer" || name == "String" || name == "RegExp" || name == "Target" ||
       name == FN || name == "Job" || name == "Array" || name == "Double") {
     std::cerr << "Constuctor " << name
       << " is reserved at " << sump->token.file() << "." << std::endl;
     lex.fail = true;
   }
 
-  if (name == "Boolean") {
-    if (sump->members.size() != 2 ||
-        sump->members[0].ast.args.size() != 0 ||
-        sump->members[1].ast.args.size() != 0) {
-      std::cerr << "Special constructor Boolean not defined correctly at "
-        << sump->region.file() << "." << std::endl;
-      lex.fail = true;
-    }
-    Boolean = sump;
-  }
-
-  if (name == "Order") {
-    if (sump->members.size() != 3 ||
-        sump->members[0].ast.args.size() != 0 ||
-        sump->members[1].ast.args.size() != 0 ||
-        sump->members[2].ast.args.size() != 0) {
-      std::cerr << "Special constructor Order not defined correctly at "
-        << sump->region.file() << "." << std::endl;
-      lex.fail = true;
-    }
-    Order = sump;
-  }
-
-  if (name == "List") {
-    if (sump->members.size() != 2 ||
-        sump->members[0].ast.args.size() != 0 ||
-        sump->members[1].ast.args.size() != 2) {
-      std::cerr << "Special constructor List not defined correctly at "
-        << sump->region.file() << "." << std::endl;
-      lex.fail = true;
-    }
-    List = sump;
-  }
-
-  if (name == "Pair") {
-    if (sump->members.size() != 1 ||
-        sump->members[0].ast.args.size() != 2) {
-      std::cerr << "Special constructor Pair not defined correctly at "
-        << sump->region.file() << "." << std::endl;
-      lex.fail = true;
-    }
-    Pair = sump;
-  }
-
-  if (name == "Result") {
-    if (sump->members.size() != 2 ||
-        sump->members[0].ast.args.size() != 1 ||
-        sump->members[1].ast.args.size() != 1) {
-      std::cerr << "Special constructor Result not defined correctly at "
-        << sump->region.file() << "." << std::endl;
-      lex.fail = true;
-    }
-    Result = sump;
-  }
-
-  if (name == "Unit") {
-    if (sump->members.size() != 1 ||
-        sump->members[0].ast.args.size() != 0) {
-      std::cerr << "Special constructor Unit not defined correctly at "
-        << sump->region.file() << "." << std::endl;
-      lex.fail = true;
-    }
-    Unit = sump;
-  }
-
-  if (name == "JValue") {
-    if (sump->members.size() != 7) {
-      std::cerr << "Special constructor JValue not defined correctly at "
-        << sump->region.file() << "." << std::endl;
-      lex.fail = true;
-    }
-    JValue = sump;
-  }
+  if (name == "Boolean") Boolean = sump;
+  if (name == "Order")   Order = sump;
+  if (name == "List")    List = sump;
+  if (name == "Unit")    Unit = sump;
+  if (name == "Pair")    Pair = sump;
+  if (name == "Result")  Result = sump;
+  if (name == "JValue")  JValue = sump;
 }
 
 static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
