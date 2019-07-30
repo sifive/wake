@@ -70,14 +70,16 @@ static PRIMTYPE(type_lcat) {
 
 struct CCat final : public GCObject<CCat, Continuation> {
   HeapPointer<Record> list;
+  HeapPointer<Record> progress;
   HeapPointer<Continuation> cont;
 
-  CCat(Record *list_, Continuation *cont_) : list(list_), cont(cont_) { }
+  CCat(Record *list_, Continuation *cont_) : list(list_), progress(list_), cont(cont_) { }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
     arg = Continuation::recurse<T, memberfn>(arg);
     arg = (list.*memberfn)(arg);
+    arg = (progress.*memberfn)(arg);
     arg = (cont.*memberfn)(arg);
     return arg;
   }
@@ -86,30 +88,38 @@ struct CCat final : public GCObject<CCat, Continuation> {
 };
 
 void CCat::execute(Runtime &runtime) {
-  size_t size = 0;
-  for (Record *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Record>())
-    size += scan->at(0)->coerce<String>()->length;
+  while (progress->size() == 2 && *progress->at(0) && *progress->at(1))
+    progress = progress->at(1)->coerce<Record>();
 
-  String *out = String::alloc(runtime.heap, size);
-  out->c_str()[size] = 0;
+  if (progress->size() == 2) {
+    if (*progress->at(0)) {
+      progress->at(1)->await(runtime, this);
+    } else {
+      progress->at(0)->await(runtime, this);
+    }
+  } else {
+    size_t size = 0;
+    for (Record *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Record>())
+      size += scan->at(0)->coerce<String>()->length;
 
-  size = 0;
-  for (Record *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Record>()) {
-    String *s = scan->at(0)->coerce<String>();
-    memcpy(out->c_str() + size, s->c_str(), s->length);
-    size += s->length;
+    String *out = String::alloc(runtime.heap, size);
+    out->c_str()[size] = 0;
+
+    size = 0;
+    for (Record *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Record>()) {
+      String *s = scan->at(0)->coerce<String>();
+      memcpy(out->c_str() + size, s->c_str(), s->length);
+      size += s->length;
+    }
+
+    cont->resume(runtime, out);
   }
-
-  cont->resume(runtime, out);
 }
 
 static PRIMFN(prim_lcat) {
   EXPECT(1);
   RECORD(list, 0);
-  size_t need = reserve_hash() + CCat::reserve();
-  runtime.heap.reserve(need);
-  runtime.schedule(claim_hash(runtime.heap, list,
-    CCat::claim(runtime.heap, list, continuation)));
+  runtime.schedule(CCat::alloc(runtime.heap, list, continuation));
 }
 
 static PRIMTYPE(type_explode) {
