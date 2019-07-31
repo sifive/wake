@@ -43,7 +43,7 @@ static PRIMFN(prim_vcat) {
   size_t size = 0;
   for (size_t i = 0; i < nargs; ++i) {
     STRING(s, i);
-    size += s->length;
+    size += s->size();
   }
 
   String *out = String::alloc(runtime.heap, size);
@@ -52,8 +52,8 @@ static PRIMFN(prim_vcat) {
   size = 0;
   for (size_t i = 0; i < nargs; ++i) {
     String *s = static_cast<String*>(args[i]);
-    memcpy(out->c_str() + size, s->c_str(), s->length);
-    size += s->length;
+    memcpy(out->c_str() + size, s->c_str(), s->size());
+    size += s->size();
   }
 
   RETURN(out);
@@ -100,7 +100,7 @@ void CCat::execute(Runtime &runtime) {
   } else {
     size_t size = 0;
     for (Record *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Record>())
-      size += scan->at(0)->coerce<String>()->length;
+      size += scan->at(0)->coerce<String>()->size();
 
     String *out = String::alloc(runtime.heap, size);
     out->c_str()[size] = 0;
@@ -108,8 +108,8 @@ void CCat::execute(Runtime &runtime) {
     size = 0;
     for (Record *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Record>()) {
       String *s = scan->at(0)->coerce<String>();
-      memcpy(out->c_str() + size, s->c_str(), s->length);
-      size += s->length;
+      memcpy(out->c_str() + size, s->c_str(), s->size());
+      size += s->size();
     }
 
     cont->resume(runtime, out);
@@ -136,7 +136,7 @@ static PRIMFN(prim_explode) {
   STRING(arg0, 0);
 
   // worst-case estimate
-  size_t need = reserve_list(arg0->length) + arg0->length * String::reserve(4);
+  size_t need = reserve_list(arg0->size()) + arg0->size() * String::reserve(4);
   runtime.heap.reserve(need);
 
   std::vector<HeapObject*> vals;
@@ -166,7 +166,7 @@ static PRIMFN(prim_read) {
   EXPECT(1);
   STRING(path, 0);
 
-  size_t max_error = path->length + 100;
+  size_t max_error = path->size() + 100;
   size_t need_fail = reserve_result() + String::reserve(max_error);
   runtime.heap.reserve(need_fail);
 
@@ -181,7 +181,7 @@ static PRIMFN(prim_read) {
 
       String *out = String::claim(runtime.heap, size);
       t.seekg(0, t.beg);
-      t.read(out->c_str(), out->length);
+      t.read(out->c_str(), out->size());
       if (t) RETURN(claim_result(runtime.heap, true, out));
     }
   }
@@ -214,7 +214,7 @@ static PRIMFN(prim_write) {
   STRING(body, 2);
 
   // Reservation must happen first so we don't have re-entrant side-effects
-  size_t max_error = path->length + 100;
+  size_t max_error = path->size() + 100;
   size_t need = reserve_result() + String::reserve(max_error);
   runtime.heap.reserve(need);
 
@@ -224,7 +224,7 @@ static PRIMFN(prim_write) {
 
   std::ofstream t(path->c_str(), std::ios_base::trunc);
   if (!t.fail()) {
-    t.write(body->c_str(), body->length);
+    t.write(body->c_str(), body->size());
     if (!t.bad()) {
       chmod(path->c_str(), mask);
       auto out = claim_result(runtime.heap, true, args[1]);
@@ -301,7 +301,7 @@ static PRIMFN(prim_mkdir) {
   STRING(path, 1);
 
   // Reservation must happen first so we don't have re-entrant side-effects
-  size_t max_error = path->length + 100;
+  size_t max_error = path->size() + 100;
   size_t need = reserve_result() + String::reserve(max_error);
   runtime.heap.reserve(need);
 
@@ -371,7 +371,7 @@ static PRIMFN(prim_print) {
   INTEGER_MPZ(fd, 0);
   STRING(message, 1);
   runtime.heap.reserve(reserve_unit());
-  status_write(mpz_get_si(fd), message->c_str(), message->length);
+  status_write(mpz_get_si(fd), message->c_str(), message->size());
   RETURN(claim_unit(runtime.heap));
 }
 
@@ -441,7 +441,7 @@ struct UTF8Out {
   UTF8Out(String *in_, unsigned long opt) : in(in_) {
     len = utf8proc_map(
       reinterpret_cast<const utf8proc_uint8_t*>(in->c_str()),
-      in->length,
+      in->size(),
       &dst,
       static_cast<utf8proc_option_t>(opt));
   }

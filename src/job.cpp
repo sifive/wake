@@ -72,7 +72,7 @@ struct Job final : public GCObject<Job> {
   typedef GCObject<Job> Parent;
 
   Database *db;
-  HeapPointer<String> cmdline, stdin;
+  HeapPointer<String> cmdline, stdin, dir;
   int state;
   Hash code; // hash(dir, stdin, environ, cmdline)
   pid_t pid;
@@ -96,7 +96,7 @@ struct Job final : public GCObject<Job> {
   HeapPointer<Continuation> q_report;  // waken once job finished (inputs+outputs+report available)
 
   static TypeVar typeVar;
-  Job(Database *db_, String *dir, String *stdin, String *environ, String *cmdline, bool keep, int log);
+  Job(Database *db_, String *dir_, String *stdin_, String *environ, String *cmdline_, bool keep, int log);
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg);
@@ -112,6 +112,7 @@ T Job::recurse(T arg) {
   arg = Parent::recurse<T, memberfn>(arg);
   arg = (cmdline.*memberfn)(arg);
   arg = (stdin.*memberfn)(arg);
+  arg = (dir.*memberfn)(arg);
   arg = (bad_launch.*memberfn)(arg);
   arg = (bad_finish.*memberfn)(arg);
   arg = (q_stdout.*memberfn)(arg);
@@ -588,16 +589,19 @@ static void launch(JobTable *jobtable) {
     i.job->state |= STATE_FORKED;
     close(pipe_stdout[1]);
     close(pipe_stderr[1]);
-    bool indirect = i.job->cmdline->compare(task.cmdline) != 0;
+    bool indirect = *i.job->cmdline != task.cmdline;
     double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
     std::string pretty = pretty_cmd(i.job->cmdline->as_str());
     i.status = status_state.jobs.emplace(status_state.jobs.end(), pretty, predict, i.start);
     if (LOG_ECHO(i.job->log)) {
       std::stringstream s;
+      if (*i.job->dir != ".") s << "cd " << i.job->dir->c_str() << "; ";
       s << pretty;
-      if (i.job->stdin->length != 0) s << " < " << shell_escape(i.job->stdin->c_str());
+      if (!i.job->stdin->empty()) s << " < " << shell_escape(i.job->stdin->c_str());
       if (indirect && jobtable->imp->verbose) {
-        s << " # launched by: " << pretty_cmd(task.cmdline);
+        s << " # launched by: ";
+        if (task.dir != ".") s << "cd " << task.dir << "; ";
+        s << pretty_cmd(task.cmdline);
         if (!task.stdin.empty()) s << " < " << shell_escape(task.stdin);
       }
       s << std::endl;
@@ -815,14 +819,14 @@ bool JobTable::wait(Runtime &runtime) {
   return compute;
 }
 
-Job::Job(Database *db_, String *dir, String *stdin_, String *environ, String *cmdline_, bool keep_, int log_)
-  : db(db_), cmdline(cmdline_), stdin(stdin_), state(0), code(), pid(0), job(-1), keep(keep_), log(log_)
+Job::Job(Database *db_, String *dir_, String *stdin_, String *environ, String *cmdline_, bool keep_, int log_)
+  : db(db_), cmdline(cmdline_), stdin(stdin_), dir(dir_), state(0), code(), pid(0), job(-1), keep(keep_), log(log_)
 {
   std::vector<uint64_t> codes;
-  Hash(dir->c_str(), dir->length).push(codes);
-  Hash(stdin->c_str(), stdin->length).push(codes);
-  Hash(environ->c_str(), environ->length).push(codes);
-  Hash(cmdline->c_str(), cmdline->length).push(codes);
+  Hash(dir->c_str(), dir->size()).push(codes);
+  Hash(stdin->c_str(), stdin->size()).push(codes);
+  Hash(environ->c_str(), environ->size()).push(codes);
+  Hash(cmdline->c_str(), cmdline->size()).push(codes);
   code = Hash(codes);
 }
 
@@ -984,17 +988,17 @@ static PRIMFN(prim_job_virtual) {
   job->predict.found = true;
   job->reality = job->predict;
 
-  if (stdout->length != 0)
-    job->db->save_output(job->job, 1, stdout->c_str(), stdout->length, 0);
-  if (stderr->length != 0)
-    job->db->save_output(job->job, 2, stderr->c_str(), stderr->length, 0);
+  if (!stdout->empty())
+    job->db->save_output(job->job, 1, stdout->c_str(), stdout->size(), 0);
+  if (!stderr->empty())
+    job->db->save_output(job->job, 2, stderr->c_str(), stderr->size(), 0);
 
   REQUIRE (job->state == 0);
 
   if (LOG_ECHO(job->log)) {
     std::stringstream s;
     s << pretty_cmd(job->cmdline->as_str());
-    if (job->stdin->length != 0) s << " < " << shell_escape(job->stdin->c_str());
+    if (!job->stdin->empty()) s << " < " << shell_escape(job->stdin->c_str());
     s << std::endl;
     std::string out = s.str();
     status_write(1, out.data(), out.size());

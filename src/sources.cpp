@@ -386,7 +386,7 @@ static PRIMFN(prim_sources) {
   std::vector<HeapObject*> found;
   for (Promise *i = low; i != high; ++i) {
     String *s = i->coerce<String>();
-    re2::StringPiece piece(s->c_str() + skip, s->length - skip);
+    re2::StringPiece piece(s->c_str() + skip, s->size() - skip);
     if (RE2::FullMatch(piece, *arg1->exp)) found.push_back(s);
   }
 
@@ -440,7 +440,7 @@ static PRIMFN(prim_add_sources) {
   size_t num = copy;
   size_t need = reserve_unit();
   const char *tok = arg0->c_str();
-  const char *end = tok + arg0->length;
+  const char *end = tok + arg0->size();
   for (const char *scan = tok; scan != end; ++scan) {
     if (*scan == 0 && scan != tok) {
       ++num;
@@ -458,7 +458,7 @@ static PRIMFN(prim_add_sources) {
     tuple->at(i)->instant_fulfill(runtime.sources->at(i)->coerce<HeapObject>());
 
   tok = arg0->c_str();
-  end = tok + arg0->length;
+  end = tok + arg0->size();
   for (const char *scan = tok; scan != end; ++scan) {
     if (*scan == 0 && scan != tok) {
       tuple->at(i++)->instant_fulfill(String::claim(runtime.heap, tok, scan-tok));

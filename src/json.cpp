@@ -128,7 +128,7 @@ static PRIMFN(prim_json_body) {
   STRING(body, 0);
   std::stringstream errs;
   JAST jast;
-  if (JAST::parse(body->c_str(), body->length, errs, jast)) {
+  if (JAST::parse(body->c_str(), body->size(), errs, jast)) {
     size_t need = measure_jast(jast) + reserve_result();
     runtime.heap.reserve(need);
     RETURN(claim_result(runtime.heap, true, convert_jast(runtime.heap, jast)));
@@ -149,7 +149,7 @@ static PRIMTYPE(type_jstr) {
 static PRIMFN(prim_json_str) {
   EXPECT(1);
   STRING(str, 0);
-  RETURN(String::alloc(runtime.heap, json_escape(str->c_str(), str->length)));
+  RETURN(String::alloc(runtime.heap, json_escape(str->c_str(), str->size())));
 }
 
 void prim_register_json(PrimMap &pmap) {
