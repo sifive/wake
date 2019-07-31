@@ -152,6 +152,10 @@ int String::compare(const char *other_data, size_t other_length) const {
   return out;
 }
 
+int String::compare(const char *other_data) const {
+  return compare(other_data, strlen(other_data));
+}
+
 void String::format(std::ostream &os, FormatState &state) const {
   os << "\"";
   cstr_format(os, c_str(), length);

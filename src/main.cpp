@@ -271,7 +271,7 @@ int main(int argc, char **argv) {
     if (verbose && debug)
       std::cerr << "Parsing " << i << std::endl;
     Lexer lex(runtime.heap, i.c_str());
-    parse_top(*top.get(), lex);
+    parse_top(*top, lex);
     if (lex.fail) ok = false;
   }
 

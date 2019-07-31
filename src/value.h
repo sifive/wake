@@ -66,10 +66,20 @@ struct String final : public GCObject<String> {
   const char *c_str() const { return static_cast<const char*>(data()); }
   char *c_str() { return static_cast<char*>(data()); }
   std::string as_str() const { return std::string(c_str(), length); }
+  size_t size() { return length; }
+  bool empty() { return length == 0; }
 
+  int compare(const char *other) const;
   int compare(const char *other_data, size_t other_len) const;
   int compare(const String &other) const { return compare(other.c_str(), other.length); }
   int compare(const std::string &other) const { return compare(other.c_str(), other.size()); }
+
+  template <typename T> bool operator <  (T&& x) const { return compare(std::forward<T>(x)) <  0; }
+  template <typename T> bool operator <= (T&& x) const { return compare(std::forward<T>(x)) <= 0; }
+  template <typename T> bool operator == (T&& x) const { return compare(std::forward<T>(x)) == 0; }
+  template <typename T> bool operator != (T&& x) const { return compare(std::forward<T>(x)) != 0; }
+  template <typename T> bool operator >= (T&& x) const { return compare(std::forward<T>(x)) >= 0; }
+  template <typename T> bool operator >  (T&& x) const { return compare(std::forward<T>(x)) >  0; }
 
   Hash hash() const override;
   void format(std::ostream &os, FormatState &state) const override;

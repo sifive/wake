@@ -124,6 +124,7 @@ struct RootPointer {
 
   T *get() const { return static_cast<T*>(ring.root); }
   T * operator -> () const { return get(); }
+  T& operator * () const { return *get(); }
 
   template <typename Y>
   RootPointer & operator = (HeapPointer<Y> x);
@@ -171,6 +172,7 @@ struct HeapPointer : public HeapPointerBase {
 
   T *get() const { return static_cast<T*>(obj); }
   T * operator -> () const { return get(); }
+  T& operator * () const { return *get(); }
 
   template <typename Y>
   HeapPointer & operator = (HeapPointer<Y> x) { obj = static_cast<T*>(x.get()); return *this; }

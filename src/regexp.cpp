@@ -22,7 +22,7 @@
 #include <string>
 
 static re2::StringPiece sp(String *s) {
-  return re2::StringPiece(s->c_str(), s->length);
+  return re2::StringPiece(s->c_str(), s->size());
 }
 
 static PRIMTYPE(type_re2) {
@@ -92,7 +92,7 @@ static bool check_re2_bug(size_t size) {
 const char re2_bug[] = "The re2 library is too old (< 2016-09) to be used on inputs larger than 2GiB\n";
 
 #define RE2_BUG(str) do {						\
-  if (check_re2_bug(str->length)) {					\
+  if (check_re2_bug(str->size())) {					\
     require_fail(re2_bug, sizeof(re2_bug), runtime, scope);		\
     return;								\
   }									\
