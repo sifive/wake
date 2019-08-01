@@ -90,7 +90,21 @@ Sm_quant  = [\u2200\u2201\u2203\u2204\u220e\u2234\u2235\u2237]; // ∀ ∁ ∃ �
 Sm_wtf    = [\u0608\u22b8\u27d3\u27d4\u27dc\u27df\u2999\u299a\u29dc\u29df\u2a1e\u2a20\u2a21\u2aef-\u2af1]; // ؈ ⊸ ⟓ ⟔ ⟜ ⟟ ⦙ ⦚ ⧜ ⧟ ⨞ ⨠ ⨡ ⫯ ⫰ ⫱
 Sm_multi  = [\u2320\u2321\u237c\u239b-\u23b3\u23dc-\u23e1]; // ⌠ ⌡ ⍼ ⎛ ⎜ ⎝ ⎞ ⎟ ⎠ ⎡ ⎢ ⎣ ⎤ ⎥ ⎦ ⎧ ⎨ ⎩ ⎪ ⎫ ⎬ ⎭ ⎮ ⎯ ⎰ ⎱ ⎲ ⎳ ⏜ ⏝ ⏞ ⏟ ⏠ ⏡
 Sm_op = Sm_nfkc | Sm_norm | Sm_unop | Sm_comp | Sm_produ | Sm_prodb | Sm_divu | Sm_divb | Sm_sumu | Sm_sumb | Sm_lt | Sm_gt | Sm_eq | Sm_test | Sm_andu | Sm_andb | Sm_oru | Sm_orb | Sm_Sc | Sm_larrow | Sm_rarrow | Sm_earrow | Sm_quant;
+
+nl = [\n\v\f\r\x85\u2028\u2029] | "\r\n";
+notnl = [^\n\v\f\r\x85\u2028\u2029\x00];
+lws = [\t \xa0\u1680\u2000-\u200A\u202F\u205F\u3000];
 */
+
+struct state_t {
+  std::vector<int> tabs;
+  std::string indent;
+  bool eol;
+
+  state_t() : tabs(), indent(), eol(false) {
+    tabs.push_back(0);
+  }
+};
 
 struct input_t {
   unsigned char buf[SIZE + YYMAXFILL];
@@ -250,14 +264,29 @@ static bool lex_sstr(Lexer &lex, Expr *&out)
   return true;
 }
 
+static bool is_escape(Lexer &lex, std::string &slice, const std::string &prefix) {
+  if (prefix.empty()) {
+    return true;
+  } else if (slice.size() >= prefix.size() &&
+      std::equal(slice.end() - prefix.size(), slice.end(), prefix.begin())) {
+    slice.resize(slice.size() - prefix.size());
+    return true;
+  } else {
+    input_t &in = *lex.engine.get();
+    slice.append(in.tok, in.cur);
+    return false;
+  }
+}
+
 static bool lex_dstr(Lexer &lex, Expr *&out)
 {
   input_t &in = *lex.engine.get();
   Coordinates start = in.coord() - 1;
   Coordinates first = start;
   std::vector<Expr*> exprs;
-  std::string slice;
-  bool ok = true;
+  std::string slice, prefix, indent;
+  const unsigned char *nl, *lws, *body;
+  bool ok = true, multiline = false;
 
   while (true) {
     in.tok = in.cur;
@@ -270,37 +299,70 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
         re2c:define:YYFILL:naked = 1;
 
         * { return false; }
-        [{] {
-          exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, slice), &String::typeVar));
-          exprs.back()->flags |= FLAG_AST;
-          lex.consume();
-          exprs.push_back(parse_expr(lex));
-          if (lex.next.type == EOL) lex.consume();
-          expect(BCLOSE, lex);
-          start = in.coord() - 1;
-          slice.clear();
+        @nl nl @lws lws* @body {
+          ++in.row;
+          in.sol = in.tok+1;
+          Location nll(in.filename, Coordinates(in.row, 1), in.coord()-1);
+          if (!multiline) {
+            multiline = true;
+            indent.assign(lws, body);
+            prefix = slice;
+            slice.clear();
+            std::string &lindent = lex.state->indent;
+            if (!exprs.empty()) {
+              std::cerr << "Multiline string prefix cannot include interpolation at " << nll.file() << std::endl;
+              lex.fail = true;
+            } else if (body - lws <= lex.state->indent.size()) {
+              std::cerr << "Insufficient whitespace indentation at " << nll.file() << std::endl;
+              lex.fail = true;
+            } else if (!std::equal(lindent.begin(), lindent.end(), lws)) {
+              std::cerr << "Whitespace indentation does not match previous line at " << nll.file() << std::endl;
+              lex.fail = true;
+            }
+          } else {
+            slice.append(nl, lws);
+            if (body - lws < indent.size()) {
+              std::cerr << "Insufficient whitespace indentation at " << nll.file() << std::endl;
+              lex.fail = true;
+            } else if (!std::equal(indent.begin(), indent.end(), lws)) {
+              std::cerr << "Whitespace indentation does not match previous line at " << nll.file() << std::endl;
+              lex.fail = true;
+            } else {
+              slice.append(lws+indent.size(), body);
+            }
+          }
           continue;
         }
 
-        ["]                  { break; }
-        [^\n\\\x00]          { slice.append(in.tok, in.cur); continue; }
-        "\\{"                { slice.push_back('{');  continue; }
-        "\\}"                { slice.push_back('}');  continue; }
-        "\\a"                { slice.push_back('\a'); continue; }
-        "\\b"                { slice.push_back('\b'); continue; }
-        "\\f"                { slice.push_back('\f'); continue; }
-        "\\n"                { slice.push_back('\n'); continue; }
-        "\\r"                { slice.push_back('\r'); continue; }
-        "\\t"                { slice.push_back('\t'); continue; }
-        "\\v"                { slice.push_back('\v'); continue; }
-        "\\\\"               { slice.push_back('\\'); continue; }
-        "\\'"                { slice.push_back('\''); continue; }
-        "\\\""               { slice.push_back('"');  continue; }
-        "\\?"                { slice.push_back('?');  continue; }
-        "\\"  [0-7]{1,3}     { ok &= push_utf8(slice, lex_oct(in.tok, in.cur)); continue; }
-        "\\x" [0-9a-fA-F]{2} { ok &= push_utf8(slice, lex_hex(in.tok, in.cur)); continue; }
-        "\\u" [0-9a-fA-F]{4} { ok &= push_utf8(slice, lex_hex(in.tok, in.cur)); continue; }
-        "\\U" [0-9a-fA-F]{8} { ok &= push_utf8(slice, lex_hex(in.tok, in.cur)); continue; }
+        [{] {
+          if (is_escape(lex, slice, prefix)) {
+            exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, slice), &String::typeVar));
+            exprs.back()->flags |= FLAG_AST;
+            lex.consume();
+            exprs.push_back(parse_expr(lex));
+            if (lex.next.type == EOL) lex.consume();
+            expect(BCLOSE, lex);
+            start = in.coord() - 1;
+            slice.clear();
+          }
+          continue;
+        }
+
+        "\\a"                { if (is_escape(lex, slice, prefix)) slice.push_back('\a'); continue; }
+        "\\b"                { if (is_escape(lex, slice, prefix)) slice.push_back('\b'); continue; }
+        "\\f"                { if (is_escape(lex, slice, prefix)) slice.push_back('\f'); continue; }
+        "\\n"                { if (is_escape(lex, slice, prefix)) slice.push_back('\n'); continue; }
+        "\\r"                { if (is_escape(lex, slice, prefix)) slice.push_back('\r'); continue; }
+        "\\t"                { if (is_escape(lex, slice, prefix)) slice.push_back('\t'); continue; }
+        "\\v"                { if (is_escape(lex, slice, prefix)) slice.push_back('\v'); continue; }
+        "\\" (lws|[{}\\'"?]) { if (is_escape(lex, slice, prefix)) slice.append(in.tok+1, in.cur); continue; }
+        "\\"  [0-7]{1,3}     { if (is_escape(lex, slice, prefix)) ok &= push_utf8(slice, lex_oct(in.tok, in.cur)); continue; }
+        "\\x" [0-9a-fA-F]{2} { if (is_escape(lex, slice, prefix)) ok &= push_utf8(slice, lex_hex(in.tok, in.cur)); continue; }
+        "\\u" [0-9a-fA-F]{4} { if (is_escape(lex, slice, prefix)) ok &= push_utf8(slice, lex_hex(in.tok, in.cur)); continue; }
+        "\\U" [0-9a-fA-F]{8} { if (is_escape(lex, slice, prefix)) ok &= push_utf8(slice, lex_hex(in.tok, in.cur)); continue; }
+
+        ["]       { if (is_escape(lex, slice, prefix)) break; else continue; }
+        [^\\\x00] { slice.append(in.tok, in.cur); continue;  }
     */
   }
 
@@ -341,10 +403,6 @@ top:
 
       *   { return mkSym(ERROR); }
       end { return mkSym((in.lim - in.tok == YYMAXFILL) ? END : ERROR); }
-
-      nl = [\n\v\f\r\x85\u2028\u2029] | "\r\n";
-      notnl = [^\n\v\f\r\x85\u2028\u2029\x00];
-      lws = [\t \xa0\u1680\u2000-\u200A\u202F\u205F\u3000];
 
       // whitespace
       lws+               { goto top; }
@@ -419,16 +477,6 @@ top:
       op { return mkSym(OPERATOR); }
    */
 }
-
-struct state_t {
-  std::vector<int> tabs;
-  std::string indent;
-  bool eol;
-
-  state_t() : tabs(), indent(), eol(false) {
-    tabs.push_back(0);
-  }
-};
 
 Lexer::Lexer(Heap &heap_, const char *file)
  : heap(heap_), engine(new input_t(file, fopen(file, "r"))), state(new state_t), next(ERROR, Location(file, Coordinates(), Coordinates())), fail(false)
