@@ -923,7 +923,7 @@ static PRIMTYPE(type_job_launch) {
 }
 
 static PRIMFN(prim_job_launch) {
-  JobTable *jobtable = reinterpret_cast<JobTable*>(data);
+  JobTable *jobtable = static_cast<JobTable*>(data);
   EXPECT(11);
   JOB(job, 0);
   STRING(dir, 1);
@@ -1023,7 +1023,7 @@ static PRIMTYPE(type_job_create) {
 }
 
 static PRIMFN(prim_job_create) {
-  JobTable *jobtable = reinterpret_cast<JobTable*>(data);
+  JobTable *jobtable = static_cast<JobTable*>(data);
   EXPECT(7);
   STRING(dir, 0);
   STRING(stdin, 1);
@@ -1104,7 +1104,7 @@ static PRIMTYPE(type_job_cache) {
 }
 
 static PRIMFN(prim_job_cache) {
-  JobTable *jobtable = reinterpret_cast<JobTable*>(data);
+  JobTable *jobtable = static_cast<JobTable*>(data);
   EXPECT(5);
   STRING(dir, 0);
   STRING(stdin, 1);
@@ -1370,7 +1370,7 @@ static long stat_mod_ns(const char *file) {
 }
 
 static PRIMFN(prim_add_hash) {
-  JobTable *jobtable = reinterpret_cast<JobTable*>(data);
+  JobTable *jobtable = static_cast<JobTable*>(data);
   EXPECT(2);
   STRING(file, 0);
   STRING(hash, 1);
@@ -1385,7 +1385,7 @@ static PRIMTYPE(type_get_hash) {
 }
 
 static PRIMFN(prim_get_hash) {
-  JobTable *jobtable = reinterpret_cast<JobTable*>(data);
+  JobTable *jobtable = static_cast<JobTable*>(data);
   EXPECT(1);
   STRING(file, 0);
   std::string hash = jobtable->imp->db->get_hash(file->as_str(), stat_mod_ns(file->c_str()));
