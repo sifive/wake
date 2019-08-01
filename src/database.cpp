@@ -350,7 +350,7 @@ void Database::close() {
 static int fill_vector(void *data, int cols, char **text, char **colname) {
   (void)colname;
   if (cols >= 1) {
-    std::vector<std::string> *vec = reinterpret_cast<std::vector<std::string>*>(data);
+    std::vector<std::string> *vec = static_cast<std::vector<std::string>*>(data);
     vec->emplace_back(text[0]);
   }
   return 0;
@@ -454,7 +454,7 @@ static void bind_double(const char *why, sqlite3_stmt *stmt, int index, double x
 
 static std::string rip_column(sqlite3_stmt *stmt, int col) {
   return std::string(
-    reinterpret_cast<const char*>(sqlite3_column_blob(stmt, col)),
+    static_cast<const char*>(sqlite3_column_blob(stmt, col)),
     sqlite3_column_bytes(stmt, col));
 }
 
@@ -768,7 +768,7 @@ std::string Database::get_output(long job, int descriptor) {
   bind_integer(why, imp->get_log, 2, descriptor);
   while (sqlite3_step(imp->get_log) == SQLITE_ROW) {
     out.write(
-      reinterpret_cast<const char*>(sqlite3_column_blob(imp->get_log, 0)),
+      static_cast<const char*>(sqlite3_column_blob(imp->get_log, 0)),
       sqlite3_column_bytes(imp->get_log, 0));
   }
   finish_stmt(why, imp->get_log, imp->debugdb);

@@ -382,7 +382,7 @@ static PRIMTYPE(type_version) {
 
 static PRIMFN(prim_version) {
   EXPECT(0);
-  StringInfo *info = reinterpret_cast<StringInfo*>(data);
+  StringInfo *info = static_cast<StringInfo*>(data);
   RETURN(String::alloc(runtime.heap, info->version));
 }
 
@@ -393,7 +393,7 @@ static PRIMTYPE(type_level) {
 
 static PRIMFN(prim_level) {
   EXPECT(0);
-  StringInfo *info = reinterpret_cast<StringInfo*>(data);
+  StringInfo *info = static_cast<StringInfo*>(data);
 
   int x;
   if (info->quiet) {
