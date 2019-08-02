@@ -945,7 +945,7 @@ static int wakefuse_utimens(const char *path, const struct timespec ts[2])
 	if (!it->second.is_writeable(key.second))
 		return -EACCES;
 
-	int res = utimensat(context.rootfd, key.second.c_str(), ts, AT_SYMLINK_NOFOLLOW);
+	int res = maybe_utimensat(context.rootfd, key.second.c_str(), ts);
 	if (res == -1)
 		return -errno;
 
