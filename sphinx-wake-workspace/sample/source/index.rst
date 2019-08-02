@@ -10,7 +10,7 @@ Welcome to Wake's documentation!
    :maxdepth: 2
    :caption: Contents:
 	
-   share/share.rst
+   lib.rst
 
 Indices and tables
 ==================

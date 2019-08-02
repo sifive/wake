@@ -17,7 +17,7 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'wake-test'
+project = 'wake-manual'
 copyright = '2019, John Andrews'
 author = 'John Andrews'
 

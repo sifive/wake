@@ -5,7 +5,7 @@
 # from the environment for the first two.
 SPHINXOPTS    ?=
 SPHINXBUILD   ?= sphinx-build
-SPHINXPROJ    = wake-test
+SPHINXPROJ    = wake-manual
 SOURCEDIR     = source
 BUILDDIR      = build
 

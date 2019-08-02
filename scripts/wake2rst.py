@@ -54,7 +54,7 @@ def wake_rst_text_improved(filename):
             j = i - 1
             comment = ""
             while j > 0 and line_list[j] != "" and line_list[j][0] == '#':
-                comment += line_list[j][1:].strip() + '\n\t'
+                comment = line_list[j][1:].strip() + '\n\t' + comment
                 j -= 1
             if comment == "":
                 comment = "No description for this feature yet."
@@ -93,13 +93,14 @@ def wake_rst_text_improved(filename):
 '''
     Generates all the .rst files for the specified directory.
 '''
-def generate_all_rst(directory):
-    dirs = list(os.walk(directory))
+def generate_all_rst(root_directory, output):
+    dirs = list(os.walk(root_directory))
     print(dirs)
     for directory, folders, files in dirs:
-        toctree = '-' * len(directory) + '\n'
-        toctree += directory + '\n'
-        toctree += '-' * len(directory) + '\n\n'
+        reldir = directory[len(root_directory)+1:]
+        toctree = '-' * len(reldir) + '\n'
+        toctree += reldir + '\n'
+        toctree += '-' * len(reldir) + '\n\n'
         toctree += ".. toctree::\n"
         for folder in folders:
             toctree += '\t' + folder + '/' + folder + '.rst\n'
@@ -111,18 +112,12 @@ def generate_all_rst(directory):
         dir_folder = directory
         if ('/' in directory):
             dir_folder = directory[directory.rindex('/')+1:]
-        if not os.path.exists('sphinx-wake-workspace/sample/source/' + directory):
-            os.mkdir('sphinx-wake-workspace/sample/source/' + directory)
-        rst_output = open('sphinx-wake-workspace/sample/source/' + directory + '/' + dir_folder + ".rst", 'w')
+        if not os.path.exists(output + '/source/' + reldir):
+            os.mkdir(output + '/source/' + reldir)
+        rst_output = open(output + '/source/' + reldir + '/' + dir_folder + ".rst", 'w')
         rst_output.write(toctree + '\n\n' + rsts)
         rst_output.close()
         
-'''
-    Generates Sphinx documentation.
-'''
-def generate_sphinx():
-    os.chdir('sphinx-wake-workspace/sample')
-    subprocess.run(['make', 'html'])
-
-generate_all_rst('share')
-generate_sphinx()
+generate_all_rst('share/wake/lib', 'sphinx-wake-workspace/sample')
+os.chdir('sphinx-wake-workspace/sample')
+subprocess.run(['make', 'html'])
