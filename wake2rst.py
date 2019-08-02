@@ -26,7 +26,7 @@ def file_loc_to_sig_dict():
     return loc_to_feature_dict
 
 '''
-    Revised, more efficient method to generate .rst for a given file.
+    Returns the text of the RST for a certain specified file
 '''
 def wake_rst_text_improved(filename):
     length = len(filename)
@@ -64,6 +64,8 @@ def wake_rst_text_improved(filename):
                 func_type = locations[path_line_num]
                 first_colon = func_type.index(":")
                 func_type = func_type[first_colon+1:].strip()
+                comment = comment.replace('[[', ':wake:reref:`')
+                comment = comment.replace(']]', '`')
                 sig_comment_types += [(sig, comment, dec_type, func_type)]
     document = ""
     for sig, comm, dec_type, types in sig_comment_types:
@@ -94,6 +96,7 @@ def wake_rst_text_improved(filename):
 '''
 def generate_all_rst(directory):
     dirs = list(os.walk(directory))
+    print(dirs)
     for directory, folders, files in dirs:
         toctree = '-' * len(directory) + '\n'
         toctree += directory + '\n'
@@ -109,6 +112,22 @@ def generate_all_rst(directory):
         dir_folder = directory
         if ('/' in directory):
             dir_folder = directory[directory.rindex('/')+1:]
-        rst_output = open(directory + '/' + dir_folder + ".rst", 'w')
+        if not os.path.exists('sphinx-wake-workspace/sample/source/' + directory):
+            os.mkdir('sphinx-wake-workspace/sample/source/' + directory)
+        rst_output = open('sphinx-wake-workspace/sample/source/' + directory + '/' + dir_folder + ".rst", 'w')
         rst_output.write(toctree + '\n\n' + rsts)
         rst_output.close()
+        
+'''
+    Generates Sphinx documentation.
+'''
+def generate_sphinx():
+    os.chdir('sphinx-wake-workspace/sample')
+    subprocess.run(['make', 'html'])
+
+generate_all_rst('share')
+generate_sphinx()
+
+
+
+
