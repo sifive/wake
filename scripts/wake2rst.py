@@ -118,6 +118,6 @@ def generate_all_rst(root_directory, output):
         rst_output.write(toctree + '\n\n' + rsts)
         rst_output.close()
         
-generate_all_rst('share/wake/lib', 'sphinx-wake-workspace/sample')
-os.chdir('sphinx-wake-workspace/sample')
+generate_all_rst('share/wake/lib', 'scripts/sphinx')
+os.chdir('scripts/sphinx')
 subprocess.run(['make', 'html'])
