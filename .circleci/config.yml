@@ -5,8 +5,9 @@ jobs:
       - image: circleci/buildpack-deps:stretch
     steps:
       - checkout
-      - run: sudo apt-get update && sudo apt-get install -y build-essential libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev
+      - run: sudo apt-get update && sudo apt-get install -y build-essential libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx
       - run: USE_FUSE_WAKE=0 make tarball && mkdir www && ./bin/wake --html > www/index.html
+      - run: PATH=$(pwd)/bin:$PATH PYTHONPATH=$(pwd)/scripts python3 scripts/wake2rst.py
       - persist_to_workspace:
           root: .
           paths:
@@ -14,6 +15,7 @@ jobs:
             - wake.spec
             - debian
             - www
+            - scripts/sphinx/build/html
 
   debian_wheezy:
     docker:
@@ -169,7 +171,8 @@ jobs:
             - "9d:87:e9:4d:46:91:1b:12:bb:a6:ef:16:f1:da:52:49"
       - run: |
           echo "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==" > ~/.ssh/known_hosts
-          cd /tmp/workspace/www
+          cd /tmp/workspace/scripts/sphinx/build/html
+          cp /tmp/workspace/www/index.html .
           git init
           git add .
           git -c user.email="ci-wake-build@sifive.com" -c user.name="ci-wake-build" commit -m "[skip ci] Deploy to GitHub Pages"
