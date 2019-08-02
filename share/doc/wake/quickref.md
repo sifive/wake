@@ -134,6 +134,19 @@ Wake is generally functional.
         * for example  `"{foo}{str (4 + 3)}"`
         * also \ is interpreted in a double quoted string
     * 'a binary string' : a raw binary string
+    * Multiline strings are also supported
+        ```
+        def foo = "%
+          This string can include "double quotes" safely.
+          That's because the string will not end until we match the token %.
+           This line is indented by one space. It is illegal to use less spaces.
+          Also, this \n is not interpreted.
+          However, this %\n will have a line feed between "this" and "will".
+          The expression {abcdef} is not interpreted by wake.
+          However, %{str (55+5)} == 60, like you'd expect.
+          Any terminator can be chosen; replace % with any character you like.
+          %"
+        ```
 * List a -> 1,2,3,Nil (a list of items seperated by commas ended by nil)
 * Integer -> 7
 * Double -> 3.2
