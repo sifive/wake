@@ -48,6 +48,7 @@
 #include <sstream>
 #include "json5.h"
 #include "execpath.h"
+#include "sfinae.h"
 
 #ifdef __APPLE__
 #define st_mtim st_mtimespec
@@ -888,6 +889,36 @@ static int wakefuse_truncate(const char *path, off_t size)
 		(void)close(fd);
 		return 0;
 	}
+}
+
+template <typename T>
+struct has_utimensat {
+	typedef char no;
+	template <typename C>
+	static auto test(C c) -> decltype(utimensat(c, nullptr));
+	template <typename>
+	static no test(...);
+	static const bool value = sizeof(test<int>(0)) != sizeof(no);
+};
+
+template <typename T>
+static typename enable_if<has_utimensat<T>::value, int>::type
+maybe_utimensat(T dirfd, const char *path, const struct timespec timens[2]) {
+	return utimensat(dirfd, path, timens, AT_SYMLINK_NOFOLLOW);
+}
+
+template <typename T>
+static typename enable_if<!has_utimensat<T>::value, int>::type
+maybe_utimensat(T dirfd, const char *path, const struct timespec timens[2]) {
+	int fd = openat(dirfd, path, O_RDWR | O_NOFOLLOW);
+	struct timeval times[2];
+	times[0].tv_sec = timens[0].tv_sec;
+	times[1].tv_sec = timens[1].tv_sec;
+	times[0].tv_usec = timens[0].tv_nsec / 1000;
+	times[1].tv_usec = timens[1].tv_nsec / 1000;
+	int out = futimes(fd, times);
+	close(fd);
+	return out;
 }
 
 static int wakefuse_utimens(const char *path, const struct timespec ts[2])
