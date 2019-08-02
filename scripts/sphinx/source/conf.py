@@ -32,7 +32,7 @@ extensions = ['sphinx.ext.coverage', 'sphinx.ext.viewcode', 'wake.wake']
 templates_path = ['_templates']
 
 source_suffix = '.rst'
-
+master_doc = 'contents'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
