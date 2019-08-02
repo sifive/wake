@@ -76,7 +76,7 @@ static void write_all(int fd, const char *data, size_t len)
   size_t done;
   for (done = 0; !JobTable::exit_now() && done < len; done += got) {
     got = write(fd, data+done, len-done);
-    if (done < 0 && errno != EINTR) break;
+    if (got < 0 && errno != EINTR) break;
   }
 }
 
