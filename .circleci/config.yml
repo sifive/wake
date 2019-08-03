@@ -36,12 +36,12 @@ jobs:
           cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
-          mkdir debian_wheezy
-          mv *.deb *.gz *.xz *.changes *.dsc debian_wheezy
+          mkdir -p release/debian_wheezy
+          mv *.deb *.gz *.xz *.changes *.dsc release/debian_wheezy
       - persist_to_workspace:
           root: .
           paths:
-            - debian_wheezy
+            - release/debian_wheezy
 
   debian_testing:
     docker:
@@ -57,12 +57,12 @@ jobs:
           cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
-          mkdir debian_testing
-          mv *.deb *.xz *.changes *.dsc debian_testing
+          mkdir -p release/debian_testing
+          mv *.deb *.xz *.changes *.dsc release/debian_testing
       - persist_to_workspace:
           root: .
           paths:
-            - debian_testing
+            - release/debian_testing
 
   centos_6_6:
     docker:
@@ -79,12 +79,12 @@ jobs:
           cp /tmp/workspace/wake_*.tar.xz /root/rpmbuild/SOURCES
           cp /tmp/workspace/wake.spec .
           /usr/bin/scl enable devtoolset-6 'rpmbuild -ba wake.spec'
-          mkdir centos_6_6
-          cp /root/rpmbuild/RPMS/x86_64/*.rpm /root/rpmbuild/SRPMS/*.rpm centos_6_6
+          mkdir -p release/centos_6_6
+          cp /root/rpmbuild/RPMS/x86_64/*.rpm /root/rpmbuild/SRPMS/*.rpm release/centos_6_6
       - persist_to_workspace:
           root: .
           paths:
-            - centos_6_6
+            - release/centos_6_6
 
   centos_7_6:
     docker:
@@ -102,12 +102,12 @@ jobs:
           cp /tmp/workspace/wake_*.tar.xz /root/rpmbuild/SOURCES
           cp /tmp/workspace/wake.spec .
           rpmbuild -ba wake.spec
-          mkdir centos_7_6
-          cp /root/rpmbuild/RPMS/x86_64/*.rpm /root/rpmbuild/SRPMS/*.rpm centos_7_6
+          mkdir -p release/centos_7_6
+          cp /root/rpmbuild/RPMS/x86_64/*.rpm /root/rpmbuild/SRPMS/*.rpm release/centos_7_6
       - persist_to_workspace:
           root: .
           paths:
-            - centos_7_6
+            - release/centos_7_6
 
   ubuntu_16_04:
     docker:
@@ -123,12 +123,12 @@ jobs:
           cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
-          mkdir ubuntu_16_04
-          mv *.deb *.xz *.changes *.dsc ubuntu_16_04
+          mkdir -p release/ubuntu_16_04
+          mv *.deb *.xz *.changes *.dsc release/ubuntu_16_04
       - persist_to_workspace:
           root: .
           paths:
-            - ubuntu_16_04
+            - release/ubuntu_16_04
 
   ubuntu_18_04:
     docker:
@@ -144,12 +144,12 @@ jobs:
           cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
-          mkdir ubuntu_18_04
-          mv *.deb *.xz *.changes *.dsc ubuntu_18_04
+          mkdir -p release/ubuntu_18_04
+          mv *.deb *.xz *.changes *.dsc release/ubuntu_18_04
       - persist_to_workspace:
           root: .
           paths:
-            - ubuntu_18_04
+            - release/ubuntu_18_04
 
   release:
     docker:
@@ -157,8 +157,10 @@ jobs:
     steps:
       - attach_workspace:
           at: /tmp/workspace
+      - run: |
+          cp /tmp/workspace/wake_*.tar.xz /tmp/workspace/release
       - store_artifacts:
-          path: /tmp/workspace
+          path: /tmp/workspace/release
 
   docs_deploy:
     docker:
@@ -173,6 +175,7 @@ jobs:
           echo "github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==" > ~/.ssh/known_hosts
           cd /tmp/workspace/scripts/sphinx/build/html
           cp /tmp/workspace/www/index.html .
+          touch .nojekyll
           git init
           git add .
           git -c user.email="ci-wake-build@sifive.com" -c user.name="ci-wake-build" commit -m "[skip ci] Deploy to GitHub Pages"
