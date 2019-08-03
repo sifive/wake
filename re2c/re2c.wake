@@ -33,8 +33,9 @@ def re2cOk Unit =
 
 def re2cReal file =
   def cpp = replace `\.re$` ".cpp" file.getPathName
-  def cmdline = which "re2c", "-8", "-b", "--tags", "--no-generation-date", file.getPathName, "-o", cpp, Nil
-  def result = job cmdline (file, Nil) | getJobOutput
+  def cmdline = which "re2c", "-8", "-b", "--tags", "--no-generation-date", "-I", "re2c", "--input-encoding", "utf8", file.getPathName, "-o", cpp, Nil
+  def library = sources here `.*\.re`
+  def result = job cmdline (file, library) | getJobOutput
   def compress = which "gzip", "-nk9", result.getPathName, Nil
   def _ = job compress (result, Nil)
   result
