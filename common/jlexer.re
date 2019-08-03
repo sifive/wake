@@ -34,7 +34,7 @@ static const size_t SIZE = 4 * 1024;
 /*!include:re2c "unicode_categories.re" */
 
 struct jinput_t {
-  unsigned char buf[SIZE + YYMAXFILL];
+  unsigned char buf[SIZE + 1];
   const unsigned char *lim;
   const unsigned char *cur;
   const unsigned char *mar;
@@ -57,7 +57,7 @@ struct jinput_t {
      /*!stags:re2c format = "@@(NULL)"; separator = ","; */,
      offset(0), row(1), eof(false), filename(fn), file(0) { }
 
-  bool __attribute__ ((noinline)) fill(size_t need);
+  int __attribute__ ((noinline)) fill();
 
   Coordinates coord() const { return Coordinates(row, 1 + cur - sol, offset + cur - &buf[0]); }
 };
@@ -66,16 +66,11 @@ struct jinput_t {
 #define mkSym2(x, v) JSymbol(x, SYM_LOCATION, std::move(v))
 #define mkSym(x) JSymbol(x, SYM_LOCATION)
 
-bool jinput_t::fill(size_t need) {
-  if (eof) {
-    return false;
-  }
+int jinput_t::fill() {
+  if (eof) return 1;
 
   const size_t used = lim - tok;
   const size_t free = SIZE - used;
-  if (SIZE < used + need) {
-    return false;
-  }
 
   memmove(buf, tok, used);
   const unsigned char *newlim = buf + used;
@@ -90,13 +85,35 @@ bool jinput_t::fill(size_t need) {
   lim = newlim;
   if (file) lim += fread(buf + (lim - buf), 1, free, file);
 
-  if (lim < buf + SIZE) {
-    eof = true;
-    memset(buf + (lim - buf), 0, YYMAXFILL);
-    lim += YYMAXFILL;
-  }
+  eof = lim < buf + SIZE;
+  buf[lim - buf] = 0;
 
-  return true;
+  return 0;
+}
+
+static void lex_jcomment(jinput_t &in) {
+  unsigned const char *s = in.tok;
+  unsigned const char *e = in.cur;
+  const unsigned char *ignore;
+  (void)ignore;
+
+  while (s != e) {
+    /*!re2c
+        re2c:yyfill:enable = 0;
+        re2c:define:YYCURSOR = s;
+        re2c:define:YYMARKER = ignore;
+
+        // LineTerminator ::
+        //   <LF>
+        //   <CR>
+        //   <LS>
+        //   <PS>
+        LineTerminator = [\n\r\u2028\u2029];
+
+        *               { continue; }
+        LineTerminator  { ++in.row; in.sol = s; continue; }
+    */
+  }
 }
 
 static bool lex_jstr(JLexer &lex, std::string &out, unsigned char eos)
@@ -111,15 +128,8 @@ static bool lex_jstr(JLexer &lex, std::string &out, unsigned char eos)
         re2c:define:YYMARKER = in.mar;
         re2c:define:YYLIMIT = in.lim;
         re2c:yyfill:enable = 1;
-        re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
-        re2c:define:YYFILL:naked = 1;
-
-        // LineTerminator ::
-        //   <LF>
-        //   <CR>
-        //   <LS>
-        //   <PS>
-        LineTerminator = [\n\r\u2028\u2029];
+        re2c:define:YYFILL = "in.fill";
+        re2c:eof = 0;
 
         // LineTerminatorSequence ::
         //   <LF>
@@ -146,7 +156,7 @@ static bool lex_jstr(JLexer &lex, std::string &out, unsigned char eos)
         //   u
         // NonEscapeCharacter ::
         //   SourceCharacter but not one of EscapeCharacter or LineTerminator
-        NonEscapeCharacter = [^'"\\bfnrtv0-9xu\n\r\u2028\u2029\x00];
+        NonEscapeCharacter = [^'"\\bfnrtv0-9xu\n\r\u2028\u2029];
 
         // CharacterEscapeSequence ::
         //   SingleEscapeCharacter
@@ -185,6 +195,7 @@ static bool lex_jstr(JLexer &lex, std::string &out, unsigned char eos)
         //   JSON5SingleStringCharacter JSON5SingleStringCharactersopt
 
         *                { return false; }
+        $                { return false; }
         LineContinuation { continue; }
         ["'] {
           if (in.cur[-1] == eos) {
@@ -216,26 +227,13 @@ static bool lex_jstr(JLexer &lex, std::string &out, unsigned char eos)
         "\\\""                  { slice.push_back('"');  continue; }
         "\\\\"                  { slice.push_back('\\'); continue; }
         "\\" NonEscapeCharacter { slice.append(in.tok+1, in.cur);  continue; }
-	"\\"                    { return false; }
-        [^\x00\r\n]             { slice.append(in.tok, in.cur); continue; }
+        "\\"                    { return false; }
+        [^\r\n]                 { slice.append(in.tok, in.cur); continue; }
     */
   }
 
   out = std::move(slice);
   return true;
-}
-
-static void lex_jcomment(jinput_t &in) {
-  unsigned const char *s = in.tok;
-  unsigned const char *e = in.cur;
-  while (s != e) {
-    /*!re2c
-        re2c:yyfill:enable = 0;
-        re2c:define:YYCURSOR = s;
-        *               { continue; }
-        LineTerminator  { ++in.row; in.sol = s; continue; }
-    */
-  }
 }
 
 static JSymbol lex_json(JLexer &lex) {
@@ -250,8 +248,8 @@ top:
       re2c:define:YYMARKER = in.mar;
       re2c:define:YYLIMIT = in.lim;
       re2c:yyfill:enable = 1;
-      re2c:define:YYFILL = "if (!in.fill(@@)) return mkSym(JSON_ERROR);";
-      re2c:define:YYFILL:naked = 1;
+      re2c:define:YYFILL = "in.fill";
+      re2c:eof = 0;
 
       // WhiteSpace ::
       //   <TAB>
@@ -283,7 +281,7 @@ top:
       //   => a = c* (x d* y c*)* (x d*)?
       //     where c = [^*], x = "*", d = "*", y = [^/*]
       //   => MultiLineCommentCharsopt = [^*]* ("*" "*"* [^/*] [^*]*)* ("*" "*"*)?
-      MultiLineCommentCharsopt = [^\x00*]* ("*"+ [^\x00/*] [^\x00*]*)* "*"*;
+      MultiLineCommentCharsopt = [^*]* ("*"+ [^/*] [^*]*)* "*"*;
 
       // MultiLineComment ::
       //   /* MultiLineCommentCharsopt */
@@ -295,7 +293,7 @@ top:
       //   SingleLineCommentChar SingleLineCommentCharsopt
       // SingleLineComment ::
       //   // SingleLineCommentCharsopt
-      SingleLineComment = "//" [^\n\r\u2028\u2029\x00]*;
+      SingleLineComment = "//" [^\n\r\u2028\u2029]*;
 
       // Comment ::
       //   MultiLineComment
@@ -402,9 +400,7 @@ top:
       // SourceCharacter ::
       //   any Unicode code unit
       * { return mkSym(JSON_ERROR); }
-
-      // Minor extension to json5; interpret NULL as EOF
-      "\x00" { return mkSym((in.lim - in.tok == YYMAXFILL) ? JSON_END : JSON_ERROR); }
+      $ { return mkSym(JSON_END); }
 
       // JSON5InputElement::
       //   WhiteSpace
