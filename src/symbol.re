@@ -362,7 +362,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
         "\\U" [0-9a-fA-F]{8} { if (is_escape(lex, slice, prefix)) ok &= push_utf8(slice, lex_hex(in.tok, in.cur)); continue; }
 
         ["]       { if (is_escape(lex, slice, prefix)) break; else continue; }
-        [^\\\x00] { slice.append(in.tok, in.cur); continue;  }
+        [^\x00]   { slice.append(in.tok, in.cur); continue;  }
     */
   }
 
