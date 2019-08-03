@@ -57,17 +57,17 @@ or that your colleagues already built, you might appreciate wake.
 
 On Debian/Ubuntu (wheezy or later):
 
-    sudo apt-get install makedev fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev
+    sudo apt-get install makedev fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev dash
 
 On Redhat (6.6 or later):
 
     sudo yum install epel-release epel-release centos-release-scl
     # On RHEL6: sudo yum install devtoolset-6-gcc devtoolset-6-gcc-c++
-    sudo yum install makedev fuse fuse-devel sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel
+    sudo yum install makedev fuse fuse-devel sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel dash
 
 On FreeBSD (12 or later):
 
-    pkg install gmake pkgconf gmp re2 sqlite3 fusefs-libs
+    pkg install gmake pkgconf gmp re2 sqlite3 fusefs-libs dash
     echo 'fuse_load="YES"' >> /boot/loader.conf
     echo 'vfs.usermount=1' >> /etc/sysctl.conf
     pw groupmod operator -m YOUR-NON-ROOT-USER
@@ -75,11 +75,11 @@ On FreeBSD (12 or later):
 
 On Mac OS with Mac Ports installed:
 
-    sudo port install osxfuse sqlite3 gmp re2 ncurses pkgconfig
+    sudo port install osxfuse sqlite3 gmp re2 ncurses pkgconfig dash
 
 On Mac OS with Home Brew installed:
 
-    brew install gmp re2 pkgconfig
+    brew install gmp re2 pkgconfig dash
     
 Fuse is slightly more complicated, it requires permissions.
 
@@ -110,6 +110,7 @@ Give FUSE permission to run as stated in the instructions and you should be good
 
 External dependencies:
  - c++ 11		>= 4.7	GPLv3		https://www.gnu.org/software/gcc/
+ - dash			>= 0.5	BSD 3-clause	http://gondor.apana.org.au/~herbert/dash/
  - sqlite3-dev		>= 3.6	public domain	https://www.sqlite.org/
  - libgmp-dev		>= 4.3	LGPL v3		https://gmplib.org
  - libfuse-dev		>= 2.8	LGPL v2.1	https://github.com/libfuse/libfuse

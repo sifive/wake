@@ -1,4 +1,0 @@
-#! /bin/sh
-set -e
-gzip -dc "$1" > "$2.tmp"
-mv "$2.tmp" "$2"

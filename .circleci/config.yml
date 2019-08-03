@@ -71,7 +71,7 @@ jobs:
       - run: yum -y update && yum clean all
       - run: yum --setopt=skip_missing_names_on_install=False install -y rpm-build rpm-devel rpmlint make python bash coreutils diffutils patch rpmdevtools
       - run: yum --setopt=skip_missing_names_on_install=False install -y epel-release centos-release-scl
-      - run: yum --setopt=skip_missing_names_on_install=False install -y tar xz git which make devtoolset-6-gcc devtoolset-6-gcc-c++ fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel gcc gcc-c++
+      - run: yum --setopt=skip_missing_names_on_install=False install -y tar xz dash git which make devtoolset-6-gcc devtoolset-6-gcc-c++ fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel gcc gcc-c++
       - attach_workspace:
           at: /tmp/workspace
       - run: |
@@ -93,7 +93,7 @@ jobs:
       - run: yum -y update && yum clean all
       - run: yum --setopt=skip_missing_names_on_install=False install -y rpm-build rpm-devel rpmlint make python bash coreutils diffutils patch rpmdevtools
       - run: yum --setopt=skip_missing_names_on_install=False install -y epel-release
-      - run: yum --setopt=skip_missing_names_on_install=False install -y tar xz git which make gcc gcc-c++ fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel
+      - run: yum --setopt=skip_missing_names_on_install=False install -y tar xz dash git which make gcc gcc-c++ fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel
       - run: rpmdev-setuptree
       - attach_workspace:
           at: /tmp/workspace

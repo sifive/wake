@@ -46,10 +46,13 @@ global def tarball Unit = match (buildAs Unit) (buildOn Unit)
     # Create debian + RedHat package files
     def pkgfiles =
       def setVersion file =
-        def sed = source "src/sed-version"
         def in = source "{file}.in"
-        def cmd = sed.getPathName, release, in.getPathName, file, Nil
-        job cmd (sed, in, Nil) | getJobOutput
+        def script = "%
+          set -e
+          sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
+          mv "%{file}.tmp" "%{file}"
+          %"
+        shellJob script (in, Nil) | getJobOutput
       map setVersion ("debian/changelog", "wake.spec", Nil)
     # Identify those sources files to include in the tarball
     def srcs =
