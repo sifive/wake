@@ -52,6 +52,8 @@ static const size_t SIZE = 4 * 1024;
 
 /*!re2c
 Sk_notick = Sk \ [`];
+modifier = Lm|M;
+upper = Lt|Lu;
 
 // Sm categorized by operator precedence
 Sm_id     = [϶∂∅∆∇∞∿⋮⋯⋰⋱▷◁◸◹◺◻◼◽◾◿⟀⟁⦰⦱⦲⦳⦴⦵⦽⧄⧅⧈⧉⧊⧋⧌⧍⧖⧗⧝⧞⧠⧨⧩⧪⧫⧬⧭⧮⧯⧰⧱⧲⧳];
@@ -84,9 +86,99 @@ Sm_op = Sm_nfkc | Sm_norm | Sm_unop | Sm_comp | Sm_produ | Sm_prodb | Sm_divu | 
 
 nlc = [\n\v\f\r\x85\u2028\u2029];
 nl = nlc | "\r\n";
-notnl = [^\x00] \ nlc;
+notnl = [^] \ nlc;
 lws = [\t \xa0\u1680\u2000-\u200A\u202F\u205F\u3000];
 */
+
+bool Lexer::isLower(const char *str) {
+  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
+  const unsigned char *ignore;
+  (void)ignore;
+
+top:
+  /*!re2c
+      re2c:yyfill:enable = 0;
+      re2c:define:YYMARKER = ignore;
+      re2c:define:YYCURSOR = s;
+
+      *           { return true; }
+      "unary "    { return false; }
+      "binary "   { return false; }
+      modifier    { goto top; }
+      "_\x00"     { return false; }
+      upper       { return false; }
+  */
+}
+
+bool Lexer::isUpper(const char *str) {
+  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
+  const unsigned char *ignore;
+  (void)ignore;
+top:
+  /*!re2c
+      re2c:yyfill:enable = 0;
+      re2c:define:YYMARKER = ignore;
+      re2c:define:YYCURSOR = s;
+
+      *           { return false; }
+      modifier    { goto top; }
+      upper       { return true; }
+  */
+}
+
+bool Lexer::isOperator(const char *str) {
+  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
+  const unsigned char *ignore;
+  (void)ignore;
+  /*!re2c
+      re2c:yyfill:enable = 0;
+      re2c:define:YYMARKER = ignore;
+      re2c:define:YYCURSOR = s;
+
+      *           { return false; }
+      "unary "    { return true; }
+      "binary "   { return true; }
+  */
+}
+
+op_type op_precedence(const char *str) {
+  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
+  const unsigned char *ignore;
+  (void)ignore;
+top:
+  /*!re2c
+      re2c:yyfill:enable = 0;
+      re2c:define:YYMARKER = ignore;
+      re2c:define:YYCURSOR = s;
+
+      *                          { return op_type(-1, -1);}
+      "."                        { return op_type(23, 1); }
+      [smpa]                     { return op_type(APP_PRECEDENCE, 1); } // SUBSCRIBE/PRIM/APP
+      Sm_comp                    { return op_type(21, 0); }
+      Sm_unop                    { return op_type(20, 0); }
+      "^"                        { return op_type(19, 0); }
+      Sm_produ                   { return op_type(18, 0); }
+      "*" | Sm_prodb             { return op_type(17, 1); }
+      Sm_divu                    { return op_type(16, 0); }
+      [/%] | Sm_divb             { return op_type(15, 1); }
+      Sm_sumu                    { return op_type(14, 0); }
+      [\-] | Sm_sumb             { return op_type(13, 1); }
+      Sm_test | Sm_lt | Sm_gt    { return op_type(12, 1); }
+      "!" | Sm_eq                { return op_type(11, 0); }
+      Sm_andu                    { return op_type(10, 0); }
+      "&" | Sm_andb              { return op_type(9, 1);  }
+      Sm_oru                     { return op_type(8, 0);  }
+      "|" | Sm_orb               { return op_type(7, 1);  }
+      Sm_Sc | Sc                 { return op_type(6, 0);  }
+      Sm_larrow | Sm_rarrow      { return op_type(5, 1);  }
+      Sm_earrow                  { return op_type(4, 0);  }
+      Sm_quant                   { return op_type(3, 0);  }
+      ":"                        { return op_type(2, 1);  }
+      ","                        { return op_type(1, 0);  }
+      [i\\]                      { return op_type(0, 0);  } // IF and LAMBDA
+      Sk                         { goto top; }
+  */
+}
 
 struct state_t {
   std::vector<int> tabs;
@@ -99,7 +191,7 @@ struct state_t {
 };
 
 struct input_t {
-  unsigned char buf[SIZE + YYMAXFILL];
+  unsigned char buf[SIZE + 1];
   const unsigned char *lim;
   const unsigned char *cur;
   const unsigned char *mar;
@@ -122,7 +214,7 @@ struct input_t {
      /*!stags:re2c format = "@@(NULL)"; separator = ","; */,
      offset(0), row(1), eof(false), filename(fn), file(0) { }
 
-  bool __attribute__ ((noinline)) fill(size_t need);
+  int __attribute__ ((noinline)) fill();
 
   Coordinates coord() const { return Coordinates(row, 1 + cur - sol, offset + cur - &buf[0]); }
 };
@@ -131,16 +223,11 @@ struct input_t {
 #define mkSym2(x, v) Symbol(x, SYM_LOCATION, v)
 #define mkSym(x) Symbol(x, SYM_LOCATION)
 
-bool input_t::fill(size_t need) {
-  if (eof) {
-    return false;
-  }
+int input_t::fill() {
+  if (eof) return 1;
 
   const size_t used = lim - tok;
   const size_t free = SIZE - used;
-  if (SIZE < need+used) {
-    return false;
-  }
 
   memmove(buf, tok, used);
   const unsigned char *newlim = buf + used;
@@ -155,13 +242,10 @@ bool input_t::fill(size_t need) {
   lim = newlim;
   if (file) lim += fread(buf + (lim - buf), 1, free, file);
 
-  if (lim < buf + SIZE) {
-    eof = true;
-    memset(buf + (lim - buf), 0, YYMAXFILL);
-    lim += YYMAXFILL;
-  }
+  eof = lim < buf + SIZE;
+  buf[lim - buf] = 0;
 
-  return true;
+  return 0;
 }
 
 static ssize_t unicode_escape(const unsigned char *s, const unsigned char *e, char **out, bool compat) {
@@ -210,12 +294,14 @@ static bool lex_rstr(Lexer &lex, Expr *&out)
         re2c:define:YYMARKER = in.mar;
         re2c:define:YYLIMIT = in.lim;
         re2c:yyfill:enable = 1;
-        re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
-        re2c:define:YYFILL:naked = 1;
+        re2c:define:YYFILL = "in.fill";
+        re2c:eof = 0;
+
         *                    { return false; }
+        $                    { return false; }
         "\\`"                { slice.push_back('`'); continue; }
         "`"                  { break; }
-        [^\x00]              { slice.append(in.tok, in.cur); continue; }
+        notnl                { slice.append(in.tok, in.cur); continue; }
     */
   }
 
@@ -243,11 +329,13 @@ static bool lex_sstr(Lexer &lex, Expr *&out)
         re2c:define:YYMARKER = in.mar;
         re2c:define:YYLIMIT = in.lim;
         re2c:yyfill:enable = 1;
-        re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
-        re2c:define:YYFILL:naked = 1;
+        re2c:define:YYFILL = "in.fill";
+        re2c:eof = 0;
+
         *                    { slice.push_back(*in.tok); continue; }
-        [\x00]               { return false; }
+        $                    { return false; }
         "'"                  { break; }
+        nl                   { ++in.row; in.sol = in.tok+1; slice.append(in.tok, in.cur); continue; }
     */
   }
 
@@ -287,10 +375,12 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
         re2c:define:YYMARKER = in.mar;
         re2c:define:YYLIMIT = in.lim;
         re2c:yyfill:enable = 1;
-        re2c:define:YYFILL = "if (!in.fill(@@)) return false;";
-        re2c:define:YYFILL:naked = 1;
+        re2c:define:YYFILL = "in.fill";
+        re2c:eof = 0;
 
         * { return false; }
+        $ { return false; }
+
         @nl nl @lws lws* @body {
           ++in.row;
           in.sol = in.tok+1;
@@ -354,7 +444,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
         "\\U" [0-9a-fA-F]{8} { if (is_escape(lex, slice, prefix)) ok &= push_utf8(slice, lex_hex(in.tok, in.cur)); continue; }
 
         ["]       { if (is_escape(lex, slice, prefix)) break; else continue; }
-        [^\x00]   { slice.append(in.tok, in.cur); continue;  }
+        [^]       { slice.append(in.tok, in.cur); continue;  }
     */
   }
 
@@ -388,13 +478,11 @@ top:
       re2c:define:YYMARKER = in.mar;
       re2c:define:YYLIMIT = in.lim;
       re2c:yyfill:enable = 1;
-      re2c:define:YYFILL = "if (!in.fill(@@)) return mkSym(ERROR);";
-      re2c:define:YYFILL:naked = 1;
+      re2c:define:YYFILL = "in.fill";
+      re2c:eof = 0;
 
-      end = "\x00";
-
-      *   { return mkSym(ERROR); }
-      end { return mkSym((in.lim - in.tok == YYMAXFILL) ? END : ERROR); }
+      * { return mkSym(ERROR); }
+      $ { return mkSym(END); }
 
       // whitespace
       lws+               { goto top; }
@@ -459,8 +547,6 @@ top:
       op = (Sk_notick|Sc|Sm_op|Po_op|"-")+; // [^] is Sk
 
       // identifiers
-      modifier = Lm|M;
-      upper = Lt|Lu;
       start = L|So|Sm_id|Nl|"_";
       body = L|So|Sm_id|N|Pc|Lm|M;
       id = modifier* start body*;
@@ -486,9 +572,10 @@ Lexer::~Lexer() {
   if (engine->file) fclose(engine->file);
 }
 
-static std::string op_escape(const char *str) {
+static std::string op_escape(const char *str, size_t len) {
   std::string out;
   const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
+  const unsigned char *limit = s + len;
   const unsigned char *ignore;
   (void)ignore;
 
@@ -497,10 +584,12 @@ static std::string op_escape(const char *str) {
     /*!re2c
       re2c:yyfill:enable = 0;
       re2c:define:YYMARKER = ignore;
+      re2c:define:YYLIMIT  = limit;
       re2c:define:YYCURSOR = s;
+      re2c:eof = 0;
 
       *                { break; }
-      [\x00]           { break; }
+      $                { break; }
 
       // Two surrogates => one character in json identifiers
       "\\u" [dD] [89abAB] [0-9a-fA-F]{2} "\\u" [dD] [c-fC-F] [0-9a-fA-F]{2} {
@@ -561,7 +650,7 @@ std::string Lexer::id() const {
 
   len = unicode_escape(engine->tok, engine->cur, &dst, true); // compat
   if (len >= 0) {
-    out = op_escape(dst);
+    out = op_escape(dst, len);
     free(dst);
   } else {
     out.assign(engine->tok, engine->cur);
@@ -596,90 +685,4 @@ void Lexer::consume() {
       consume();
     }
   }
-}
-
-bool Lexer::isLower(const char *str) {
-  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
-  const unsigned char *ignore;
-  (void)ignore;
-top:
-  /*!re2c
-      re2c:yyfill:enable = 0;
-      re2c:define:YYMARKER = ignore;
-      re2c:define:YYCURSOR = s;
-      *           { return true; }
-      "unary "    { return false; }
-      "binary "   { return false; }
-      modifier    { goto top; }
-      "_\x00"     { return false; }
-      upper       { return false; }
-  */
-}
-
-bool Lexer::isUpper(const char *str) {
-  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
-  const unsigned char *ignore;
-  (void)ignore;
-top:
-  /*!re2c
-      re2c:yyfill:enable = 0;
-      re2c:define:YYMARKER = ignore;
-      re2c:define:YYCURSOR = s;
-      *           { return false; }
-      modifier    { goto top; }
-      upper       { return true; }
-  */
-}
-
-bool Lexer::isOperator(const char *str) {
-  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
-  const unsigned char *ignore;
-  (void)ignore;
-  /*!re2c
-      re2c:yyfill:enable = 0;
-      re2c:define:YYMARKER = ignore;
-      re2c:define:YYCURSOR = s;
-      *           { return false; }
-      "unary "    { return true; }
-      "binary "   { return true; }
-  */
-}
-
-op_type op_precedence(const char *str) {
-  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
-  const unsigned char *ignore;
-  (void)ignore;
-top:
-  /*!re2c
-      re2c:yyfill:enable = 0;
-      re2c:define:YYMARKER = ignore;
-      re2c:define:YYCURSOR = s;
-
-      *                          { return op_type(-1, -1);}
-      "."                        { return op_type(23, 1); }
-      [smpa]                     { return op_type(APP_PRECEDENCE, 1); } // SUBSCRIBE/PRIM/APP
-      Sm_comp                    { return op_type(21, 0); }
-      Sm_unop                    { return op_type(20, 0); }
-      "^"                        { return op_type(19, 0); }
-      Sm_produ                   { return op_type(18, 0); }
-      "*" | Sm_prodb             { return op_type(17, 1); }
-      Sm_divu                    { return op_type(16, 0); }
-      [/%] | Sm_divb             { return op_type(15, 1); }
-      Sm_sumu                    { return op_type(14, 0); }
-      [\-] | Sm_sumb             { return op_type(13, 1); }
-      Sm_test | Sm_lt | Sm_gt    { return op_type(12, 1); }
-      "!" | Sm_eq                { return op_type(11, 0); }
-      Sm_andu                    { return op_type(10, 0); }
-      "&" | Sm_andb              { return op_type(9, 1);  }
-      Sm_oru                     { return op_type(8, 0);  }
-      "|" | Sm_orb               { return op_type(7, 1);  }
-      Sm_Sc | Sc                 { return op_type(6, 0);  }
-      Sm_larrow | Sm_rarrow      { return op_type(5, 1);  }
-      Sm_earrow                  { return op_type(4, 0);  }
-      Sm_quant                   { return op_type(3, 0);  }
-      ":"                        { return op_type(2, 1);  }
-      ","                        { return op_type(1, 0);  }
-      [i\\]                      { return op_type(0, 0);  } // IF and LAMBDA
-      Sk                         { goto top; }
-  */
 }
