@@ -26,8 +26,9 @@ def re2cOk Unit =
     | extract `re2c ([0-9.]+)\n`
     | map (tokenize `\.` _)
     | flatten
+    | map int
   match ver
-    x, y, _ = (int x | getOrElse 0) >= 1
+    Some x, Some y, _ = x > 1 || (x == 1 && y >= 2)
     _       = False
 
 def re2cReal file =
