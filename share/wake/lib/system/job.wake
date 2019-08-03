@@ -141,6 +141,9 @@ def id x = x
 global def makePlan cmd visible =
   Plan cmd visible environment "." "" logVerbose logWarn Normal Share False Nil (\_ True) id id
 
+global def makeShellPlan script visible =
+  makePlan (which "dash", "-c", replace `\n` '; ' script, Nil) visible
+
 def defaultUsage = Usage 0 0.0 1.0 0 0 0
 
 # This runner does not detect inputs/outputs on it's own
@@ -551,4 +554,8 @@ global def makeStatePath file =
 # If you declare too many visible inputs, cmd execution/replay will wait for unnecessary files.
 global def job cmd visible =
   makePlan cmd visible
+  | runJob
+
+global def shellJob script visible =
+  makeShellPlan script visible
   | runJob
