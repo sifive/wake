@@ -312,7 +312,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
             if (!exprs.empty()) {
               std::cerr << "Multiline string prefix cannot include interpolation at " << nll.file() << std::endl;
               lex.fail = true;
-            } else if (body - lws <= lex.state->indent.size()) {
+            } else if (static_cast<size_t>(body - lws) <= lex.state->indent.size()) {
               std::cerr << "Insufficient whitespace indentation at " << nll.file() << std::endl;
               lex.fail = true;
             } else if (!std::equal(lindent.begin(), lindent.end(), lws)) {
@@ -321,7 +321,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
             }
           } else {
             slice.append(nl, lws);
-            if (body - lws < indent.size()) {
+            if (static_cast<size_t>(body - lws) < indent.size()) {
               std::cerr << "Insufficient whitespace indentation at " << nll.file() << std::endl;
               lex.fail = true;
             } else if (!std::equal(indent.begin(), indent.end(), lws)) {
