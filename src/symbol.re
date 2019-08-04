@@ -152,15 +152,13 @@ top:
       re2c:define:YYCURSOR = s;
 
       *                          { return op_type(-1, -1);}
-      "."                        { return op_type(23, 1); }
+      "."                        { return op_type(21, 1); }
       [smpa]                     { return op_type(APP_PRECEDENCE, 1); } // SUBSCRIBE/PRIM/APP
-      Sm_comp                    { return op_type(21, 0); }
-      Sm_unop                    { return op_type(20, 0); }
-      "^"                        { return op_type(19, 0); }
-      Sm_produ                   { return op_type(18, 0); }
-      "*" | Sm_prodb             { return op_type(17, 1); }
-      Sm_divu                    { return op_type(16, 0); }
-      [/%] | Sm_divb             { return op_type(15, 1); }
+      Sm_comp                    { return op_type(19, 0); }
+      Sm_unop                    { return op_type(18, 0); }
+      "^"                        { return op_type(17, 0); }
+      Sm_produ | Sm_divu         { return op_type(16, 0); }
+      [*/%] | Sm_prodb | Sm_divb { return op_type(15, 1); }
       Sm_sumu                    { return op_type(14, 0); }
       [\-] | Sm_sumb             { return op_type(13, 1); }
       Sm_test | Sm_lt | Sm_gt    { return op_type(12, 1); }
