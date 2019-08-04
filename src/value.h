@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <re2/re2.h>
 
-#define APP_PRECEDENCE 22
+#define APP_PRECEDENCE 20
 
 /* Values */
 
