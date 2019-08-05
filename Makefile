@@ -4,7 +4,7 @@ VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/
 
 CC	:= cc -std=c99
 CXX	:= c++ -std=c++11
-CFLAGS	:= -Wall -O2 -flto -DVERSION=$(VERSION)
+CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
 LDFLAGS	:=
 
 LOCAL_CFLAGS :=	-Iutf8proc -Igopt -Icommon
