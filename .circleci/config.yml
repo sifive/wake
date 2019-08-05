@@ -109,6 +109,27 @@ jobs:
           paths:
             - release/centos_7_6
 
+  ubuntu_14_04:
+    docker:
+      - image: ubuntu:14.04
+    steps:
+      - run: apt-get update && apt-get install -y build-essential debhelper devscripts git libfuse-dev libgmp-dev libncurses5-dev libre2-dev libsqlite3-dev pkg-config
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: |
+          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
+          tar xJf wake_*.orig.tar.xz
+          cd wake-*
+          cp -a /tmp/workspace/debian .
+          debuild -us -uc
+          cd ..
+          mkdir -p release/ubuntu_14_04
+          mv *.deb *.xz *.changes *.dsc release/ubuntu_14_04
+      - persist_to_workspace:
+          root: .
+          paths:
+            - release/ubuntu_14_04
+
   ubuntu_16_04:
     docker:
       - image: ubuntu:16.04
@@ -198,6 +219,9 @@ workflows:
       - centos_7_6:
           requires:
             - tarball
+      - ubuntu_14_04:
+          requires:
+            - tarball
       - ubuntu_16_04:
           requires:
             - tarball
@@ -210,6 +234,7 @@ workflows:
             - debian_wheezy  # Oldest supported compiler
             - centos_6_6     # Oldest supported package versions
             - centos_7_6
+            - ubuntu_14_04   # LTS
             - ubuntu_16_04   # LTS
             - ubuntu_18_04   # LTS
       - docs_deploy:
