@@ -983,7 +983,7 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 	if (!it->second.is_readable(key.second))
 		return -ENOENT;
 
-	int fd = openat(context.rootfd, key.second.c_str(), fi->flags);
+	int fd = openat(context.rootfd, key.second.c_str(), fi->flags, 0);
 	if (fd == -1)
 		return -errno;
 
