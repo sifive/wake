@@ -34,68 +34,107 @@ global def tail = match _
   _, t = t
 
 # Applies a function f to each element of the list.
-global def map f = match _
-  Nil  = Nil
-  h, t = f h, map f t
+global def map f =
+  def helper = match _
+    Nil  = Nil
+    h, t = f h, helper t
+  helper
 
 # Applies a function to each element of the List and builds a new List from the resulting elements
 # (f: a => List b) => List a => List b
-global def mapFlat f = match _
-  Nil  = Nil
-  h, t = f h ++ mapFlat f t
+global def mapFlat f =
+  def helper = match _
+    Nil  = Nil
+    h, t = f h ++ helper t
+  helper
 
-global def mapPartial f = match _
-  Nil  = Nil
-  h, t = match (f h)
-    Some x = x, mapPartial f t
-    None   = mapPartial f t
+global def mapPartial f =
+  def helper = match _
+    Nil  = Nil
+    h, t =
+      def sub = helper t
+      match (f h)
+        Some x = x, sub
+        None   = sub
+  helper
 
-global def foldl f a = match _
-  Nil  = a
-  h, t = foldl f (f a h) t
+global def foldl f =
+  def helper a = match _
+    Nil  = a
+    h, t = helper (f a h) t
+  helper
 
-global def scanl f a = match _
-  Nil  = a, Nil
-  h, t = a, scanl f (f a h) t
+global def scanl f =
+  def helper a = match _
+    Nil  = a, Nil
+    h, t = a, helper (f a h) t
+  helper
 
-global def foldr f a = match _
-  Nil  = a
-  h, t = f h (foldr f a t)
+global def foldr f =
+  def helper a = match _
+    Nil  = a
+    h, t = f h (helper a t)
+  helper
 
-global def scanr f a = match _
-  Nil  = a, Nil
-  h, t =
-    def finish r = f h r.head, r
-    finish (scanr f a t)
+global def scanr f =
+  def helper a = match _
+    Nil  = Pair a (a, Nil)
+    h, t =
+      def sub = helper a t
+      def head = f h sub.getPairFirst
+      Pair head (head, sub.getPairSecond)
+  helper _ _ | getPairSecond
 
 # list helpers
-global def l ++ r    = foldr (_,_) r l # ++ is required by the implementation of publish
-global def reverse l = foldl (\a\b b,a) Nil l
-global def flatten l = foldr (_++_) Nil l
-global def len l     = foldl (\a\_ a+1) 0 l
+def joinL x y = x, y # defined outside of ++ so l&r are not captured
+global def l ++ r  = foldr joinL r l # ++ is required by the implementation of publish
+global def reverse = foldl (\a\b b,a) Nil
+global def flatten = foldr (_++_) Nil
+global def len     = foldl (\a\_ a+1) 0
 
 # list choppers
 global def splitAt i l =
   if i <= 0 then Pair Nil l else match l
-    Nil  = Pair Nil l
-    h, t = match (splitAt (i-1) t)
-      Pair f s = Pair (h, f) s
+    Nil  = Pair Nil Nil
+    h, t =
+      def sub = splitAt (i-1) t
+      Pair (h, sub.getPairFirst) sub.getPairSecond
 
-global def take i l = splitAt i l | getPairFirst
-global def drop i l = splitAt i l | getPairSecond
+global def take i l =
+  if i <= 0 then Nil else match l
+    Nil = Nil
+    h, t = h, take (i-1) t
+
+global def drop i l =
+  if i <= 0 then l else match l
+    Nil = Nil
+    h, t = drop (i-1) t
 
 global def at i l =
-  if i < 0 then None else match (drop i l)
-    Nil  = None
-    x, _ = Some x
+  if i < 0 then None else head (drop i l)
 
-global def splitUntil f l = match l
-  Nil  = Pair Nil Nil
-  h, t = if f h then Pair Nil l else match (splitUntil f t)
-    Pair f s = Pair (h, f) s
+global def splitUntil f =
+  def helper l = match l
+    Nil  = Pair Nil Nil
+    h, t =
+      if f h
+      then Pair Nil l
+      else
+        def sub = helper t
+        Pair (h, sub.getPairFirst) sub.getPairSecond
+  helper
 
-global def takeUntil f l = splitUntil f l | getPairFirst
-global def dropUntil f l = splitUntil f l | getPairSecond
+global def takeUntil f =
+  def helper = match _
+    Nil  = Nil
+    h, t = if f h then Nil else h, helper t
+  helper
+
+global def dropUntil f =
+  def helper l = match l
+    Nil  = Nil
+    h, t = if f h then l else helper t
+  helper
 
 global def find f =
   def helper i = match _
@@ -103,28 +142,36 @@ global def find f =
     h, t = if f h then Some (Pair h i) else helper (i+1) t
   helper 0
 
-global def exists f l = match (find f l)
-  Some _ = True
-  None   = False
-
-global def forall f l = ! exists (! f _) l
+global def exists f l = find f l | isSome
+global def forall f =
+  def not = ! f _
+  ! exists not _
 
 global def splitBy f = match _
   Nil  = Pair Nil Nil
-  h, t = match (splitBy f t)
-    Pair x y =
-      if f h
-      then Pair (h, x) y
-      else Pair x (h, y)
+  h, t =
+    def sub = splitBy f t
+    if   f h
+    then Pair (h, sub.getPairFirst) sub.getPairSecond
+    else Pair sub.getPairFirst (h, sub.getPairSecond)
 
-global def filter f l = splitBy f l | getPairFirst
+global def filter f =
+  def helper = match _
+    Nil  = Nil
+    h, t =
+      def sub = helper t
+      if f h then h, sub else sub
+  helper
 
 # Tranposition is only it's own inverse when the lists have non-increasing size
+def mapTail = match _
+  Nil = Nil
+  Nil, t = mapTail t
+  (_, b), t = b, mapTail t
 global def transpose l =
-  def todo = filter (!_.empty) l
-  def heads = mapPartial head todo
-  def tails = map tail todo
-  if todo.empty then Nil else heads, transpose tails
+  def heads = mapPartial head l
+  def tails = mapTail l
+  if heads.empty then Nil else heads, transpose tails
 
 # f should be a less-than comparison
 global def sortBy f l = vectorToList (vsortBy f (listToVector l))
@@ -133,9 +180,9 @@ global def sortBy f l = vectorToList (vsortBy f (listToVector l))
 global def distinctBy cmp =
   def helper tree = match _
     Nil = Nil
-    x, tail = match (x ∈ tree)
-      True  = helper tree tail
-      False = x, helper (tinsert x tree) tail
+    x, tail =
+      def sub = helper (tinsert x tree) tail
+      if x ∈ tree then sub else x, sub
   helper (tnew cmp) _
 
 # f should be an equality comparison
@@ -167,6 +214,7 @@ global def zip = match _ _
   (lh,lt) (rh,rt) = Pair lh rh, zip lt rt
 
 global def unzip = match _
-  Nil           = Pair Nil Nil
-  (Pair a b), t = match (unzip t)
-    Pair c d = Pair (a, c) (b, d)
+  Nil         = Pair Nil Nil
+  Pair a b, t =
+    def sub = unzip t
+    Pair (a, sub.getPairFirst) (b, sub.getPairSecond)
