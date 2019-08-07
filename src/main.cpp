@@ -377,6 +377,7 @@ int main(int argc, char **argv) {
   status_init();
   do { runtime.run(); } while (!runtime.abort && jobtable.wait(runtime));
   status_finish();
+  runtime.heap.report();
 
   bool pass = !runtime.abort;
   if (JobTable::exit_now()) {

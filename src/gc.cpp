@@ -104,7 +104,9 @@ Heap::~Heap() {
   GC(0);
   assert (free == begin);
   ::free(begin);
+}
 
+void Heap::report() const {
   if (profile_heap) {
     std::stringstream s;
     s << "------------------------------------------" << std::endl;
@@ -113,7 +115,7 @@ Heap::~Heap() {
     s << "  Object type          Objects       Bytes" << std::endl;
     s << "  ----------------------------------------" << std::endl;
     for (size_t i = 0; i < sizeof(peak)/sizeof(peak[0]); ++i) {
-      HeapStats &x = peak[i];
+      const HeapStats &x = peak[i];
       if (!x.type) continue;
       s << "  "
         << std::setw(20) << std::left  << x.type
