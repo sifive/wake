@@ -692,6 +692,7 @@ struct NameBinding {
       } else {
         auto x = binding->fun[idx-binding->val.size()].get();
         out.var = x?&x->typeVar:0;
+        out.offset = out.def;
         out.lambda = x;
       }
     } else if (next) {

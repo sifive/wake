@@ -46,6 +46,7 @@ struct Runtime {
   bool abort;
   Heap heap;
   RootPointer<Work> stack;
+  RootPointer<Work> recurse;
   RootPointer<HeapObject> output;
   RootPointer<Record> sources; // Vector String
 

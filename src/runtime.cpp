@@ -41,29 +41,36 @@ bool Work::is_work() const {
 Runtime::Runtime(int profile_heap, double heap_factor)
  : abort(false), heap(profile_heap, heap_factor),
    stack(heap.root<Work>(nullptr)),
+   recurse(heap.root<Work>(nullptr)),
    output(heap.root<HeapObject>(nullptr)),
    sources(heap.root<HeapObject>(nullptr)) {
 }
 
 void Runtime::run() {
   int count = 0;
-  while (stack && !abort) {
-    if (++count >= 10000) {
-      if (JobTable::exit_now()) break;
-      status_refresh();
-      count = 0;
+  do {
+    while (stack && !abort) {
+      if (++count >= 10000) {
+        if (JobTable::exit_now()) break;
+        status_refresh();
+        count = 0;
+      }
+      Work *w = stack.get();
+      stack = w->next;
+      try {
+        w->execute(*this);
+      } catch (GCNeededException gc) {
+        // retry work after memory is available
+        w->next = stack;
+        stack = w;
+        heap.GC(gc.needed);
+      }
     }
-    Work *w = stack.get();
-    stack = w->next;
-    try {
-      w->execute(*this);
-    } catch (GCNeededException gc) {
-      // retry work after memory is available
-      w->next = stack;
-      stack = w;
-      heap.GC(gc.needed);
+    if (!stack) {
+      stack = recurse.get();
+      recurse = nullptr;
     }
-  }
+  } while (stack && !abort && !JobTable::exit_now());
 }
 
 struct Interpret final : public GCObject<Interpret, Work> {
@@ -115,7 +122,14 @@ void VarRef::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   for (int i = depth; i; --i)
     scope = scope->next.get();
   if (lambda) {
-    cont->resume(runtime, Closure::alloc(runtime.heap, lambda, scope));
+    Closure *c = Closure::alloc(runtime.heap, lambda, scope);
+    if (offset) { // not recursive
+      cont->resume(runtime, c);
+    } else {
+      cont->value = c;
+      cont->next = runtime.recurse;
+      runtime.recurse = cont;
+    }
   } else {
     scope->at(offset)->await(runtime, cont);
   }
