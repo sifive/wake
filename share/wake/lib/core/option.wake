@@ -88,8 +88,8 @@ global def findNoneFn fn =
     h, t = match (fn h)
       None = None
       Some x = match (helper t)
-       Some t = Some (x, t)
-       n = n
+        Some t = Some (x, t)
+        None   = None
   helper
 
 # Promote Option to Result:

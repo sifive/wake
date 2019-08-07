@@ -67,6 +67,7 @@ template <typename T, typename B>
 struct TupleObject : public GCObject<T, B> {
   Promise *at(size_t i) final override;
   const Promise *at(size_t i) const final override;
+  const char *type() const override;
 
   template <typename ... ARGS>
   TupleObject(size_t size, ARGS&&... args);
@@ -85,6 +86,11 @@ Promise *TupleObject<T,B>::at(size_t i) {
 template <typename T, typename B>
 const Promise *TupleObject<T,B>::at(size_t i) const {
   return static_cast<const Promise*>(GCObject<T,B>::data()) + i;
+}
+
+template <typename T, typename B>
+const char *TupleObject<T,B>::type() const {
+  return B::type();
 }
 
 template <typename T, typename B>
@@ -114,6 +120,10 @@ R TupleObject<T,B>::recurse(R arg) {
   return arg;
 }
 
+const char *Record::type() const {
+  return cons->ast.name.c_str();
+}
+
 struct BigRecord final : public TupleObject<BigRecord, Record> {
   size_t tsize;
 
@@ -126,6 +136,7 @@ struct BigRecord final : public TupleObject<BigRecord, Record> {
 size_t BigRecord::size() const {
   return tsize;
 }
+
 
 template <size_t tsize>
 struct SmallRecord final : public TupleObject<SmallRecord<tsize>, Record> {
@@ -178,6 +189,10 @@ struct alignas(PadObject) ScopeStack {
 };
 
 bool Scope::debug = false;
+
+const char *Scope::type() const {
+  return "StackTree";
+}
 
 void Scope::set_expr(Expr *expr) {
   if (debug) stack()->expr = expr;

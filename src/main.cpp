@@ -56,6 +56,8 @@ void print_help(const char *argv0) {
     << "    --no-tty         Surpress interactive build progress interface"              << std::endl
     << "    --no-wait        Do not wait to obtain database lock; fail immediately"      << std::endl
     << "    --no-workspace   Do not open a database or scan for sources files"           << std::endl
+    << "    --heap-factor X  Heap-size is X * live data after the last GC (default 4.0)" << std::endl
+    << "    --profile-heap   Report memory consumption on every garbage collection"      << std::endl
     << std::endl
     << "  Database introspection:" << std::endl
     << "    --input  -i FILE Report recorded meta-data for jobs which read FILES"        << std::endl
@@ -98,6 +100,8 @@ int main(int argc, char **argv) {
     { 0,   "no-wait",               GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-workspace",          GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-tty",                GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "heap-factor",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
+    { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
     { 's', "script",                GOPT_ARGUMENT_FORBIDDEN },
@@ -124,6 +128,7 @@ int main(int argc, char **argv) {
   bool wait    =!arg(options, "no-wait" )->count;
   bool workspace=!arg(options, "no-workspace")->count;
   bool tty     =!arg(options, "no-tty"  )->count;
+  int  profile = arg(options, "profile-heap")->count;
   bool input   = arg(options, "input"   )->count;
   bool output  = arg(options, "output"  )->count;
   bool script  = arg(options, "script"  )->count;
@@ -138,6 +143,7 @@ int main(int argc, char **argv) {
   bool tcheck  = arg(options, "stop-after-type-check")->count;
 
   const char *jobs   = arg(options, "jobs"  )->argument;
+  const char *heapf  = arg(options, "heap-factor")->argument;
   const char *init   = arg(options, "init"  )->argument;
   const char *remove = arg(options, "remove-task")->argument;
 
@@ -163,7 +169,17 @@ int main(int argc, char **argv) {
     char *tail;
     njobs = strtol(jobs, &tail, 0);
     if (*tail || njobs < 1) {
-      std::cerr << "Cannot run with " << jobs << " jobs!" << std::endl;
+      std::cerr << "Cannot run with " << jobs << " jobs (must be >= 1)!" << std::endl;
+      return 1;
+    }
+  }
+
+  double heap_factor = 4.0;
+  if (heapf) {
+    char *tail;
+    heap_factor = strtod(heapf, &tail);
+    if (*tail || heap_factor < 1.1) {
+      std::cerr << "Cannot run with " << heapf << " heap-factor (must be >= 1.1)!" << std::endl;
       return 1;
     }
   }
@@ -259,7 +275,7 @@ int main(int argc, char **argv) {
   auto wakefiles = find_all_wakefiles(ok, workspace);
   if (!ok) std::cerr << "Workspace wake file enumeration failed" << std::endl;
 
-  Runtime runtime;
+  Runtime runtime(profile, heap_factor);
   bool sources = find_all_sources(runtime, workspace);
   if (!sources) std::cerr << "Source file enumeration failed" << std::endl;
   ok &= sources;

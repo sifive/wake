@@ -21,6 +21,7 @@
 #include <memory>
 #include <ostream>
 #include <stdint.h>
+#include <typeinfo>
 #ifdef DEBUG_GC
 #include <cassert>
 #endif
@@ -55,6 +56,7 @@ struct HeapObject {
   virtual Placement moveto(PadObject *free) = 0;
   virtual Placement descend(PadObject *free) = 0;
   virtual HeapStep  explore(HeapStep step) = 0;
+  virtual const char *type() const = 0;
   virtual void format(std::ostream &os, FormatState &state) const = 0;
   virtual Hash hash() const = 0; // shallow hash of only this object
   virtual bool is_work() const;
@@ -192,6 +194,7 @@ struct PadObject final : public HeapObject {
   Placement moveto(PadObject *free) override;
   Placement descend(PadObject *free) override;
   HeapStep  explore(HeapStep step) override;
+  const char *type() const override;
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
   static PadObject *place(PadObject *free) {
@@ -206,6 +209,7 @@ struct alignas(PadObject) MovedObject final : public HeapObject {
   Placement moveto(PadObject *free) override;
   Placement descend(PadObject *free) override;
   HeapStep  explore(HeapStep step) override;
+  const char *type() const override;
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
 };
@@ -215,8 +219,14 @@ struct GCNeededException {
   GCNeededException(size_t needed_) : needed(needed_) { }
 };
 
+struct HeapStats {
+  const char *type;
+  size_t objects, pads;
+  HeapStats() : type(nullptr), objects(0), pads(0) { }
+};
+
 struct Heap {
-  Heap();
+  Heap(int profile_heap_, double heap_factor_);
   ~Heap();
 
   // Call this from main loop (no pointers on stack) when GCNeededException
@@ -267,10 +277,14 @@ struct Heap {
   RootPointer<T> root(HeapPointer<T> x) { return RootPointer<T>(roots, x.get()); }
 
 private:
+  int profile_heap;
+  double heap_factor;
   PadObject *begin;
   PadObject *end;
   PadObject *free;
   size_t last_pads;
+  size_t most_pads;
+  HeapStats peak[10];
   RootRing roots;
   HeapObject *finalize;
 #ifdef DEBUG_GC
@@ -298,6 +312,8 @@ struct alignas(PadObject) GCObject : public B {
   Placement moveto(PadObject *free) final override;
   Placement descend(PadObject *free) final override;
   HeapStep explore(HeapStep step) final override;
+  // Can be further specialized
+  const char *type() const override;
 
   // redefine these if 'data' extends past sizeof(T)
   PadObject *next() { return static_cast<PadObject*>(static_cast<HeapObject*>(self() + 1)); }
@@ -346,6 +362,14 @@ template <typename T, typename B>
 HeapStep GCObject<T, B>::explore(HeapStep step) {
   return self()->template recurse<HeapStep, &HeapPointerBase::explore>(step);
 }
+
+template <typename T, typename B>
+const char *GCObject<T, B>::type() const {
+  const char *out;
+  for (out = typeid(T).name(); *out >= '0' && *out <= '9'; ++out) { }
+  return out;
+}
+
 
 struct DestroyableObject : public HeapObject {
   DestroyableObject(Heap &h);
