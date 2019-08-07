@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
     { 0,   "no-workspace",          GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-tty",                GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "heap-factor",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
-    { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
     { 's', "script",                GOPT_ARGUMENT_FORBIDDEN },
@@ -128,7 +128,7 @@ int main(int argc, char **argv) {
   bool wait    =!arg(options, "no-wait" )->count;
   bool workspace=!arg(options, "no-workspace")->count;
   bool tty     =!arg(options, "no-tty"  )->count;
-  bool profile = arg(options, "profile-heap")->count;
+  int  profile = arg(options, "profile-heap")->count;
   bool input   = arg(options, "input"   )->count;
   bool output  = arg(options, "output"  )->count;
   bool script  = arg(options, "script"  )->count;

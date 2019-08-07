@@ -97,6 +97,7 @@ struct Record : public Tuple {
 
   Record(Constructor *cons_) : cons(cons_) { }
 
+  const char *type() const override;
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
 
@@ -111,6 +112,7 @@ struct Scope : public Tuple {
 
   Scope(Scope *next_) : next(next_) { }
 
+  const char *type() const override;
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
 
