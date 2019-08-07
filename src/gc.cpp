@@ -16,12 +16,13 @@
  */
 
 #include "gc.h"
+#include "status.h"
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
-#ifdef DEBUG_GC
-#include <iostream>
-#endif
+#include <sstream>
+
+#define INITIAL_HEAP_SIZE 1024
 
 HeapObject::~HeapObject() { }
 
@@ -74,23 +75,33 @@ Hash MovedObject::hash() const {
   return Hash();
 }
 
-Heap::Heap() {
-  begin = static_cast<PadObject*>(::malloc(sizeof(PadObject)*1024));
-  end = begin + 1024;
-  free = begin;
-  last_pads = 0;
-  finalize = nullptr;
+Heap::Heap(bool profile_heap_, double heap_factor_)
+ : profile_heap(profile_heap_),
+   heap_factor(heap_factor_),
+   begin(static_cast<PadObject*>(::malloc(sizeof(PadObject)*INITIAL_HEAP_SIZE))),
+   end(begin + INITIAL_HEAP_SIZE),
+   free(begin),
+   last_pads(0),
+   most_pads(0),
+   roots(),
+   finalize(nullptr) {
 }
 
 Heap::~Heap() {
   GC(0);
   assert (free == begin);
   ::free(begin);
+  if (profile_heap) {
+    std::stringstream s;
+    s << "GC: max_kept=" << most_pads << std::endl;
+    auto str = s.str();
+    status_write(2, str.data(), str.size());
+  }
 }
 
 void Heap::GC(size_t requested_pads) {
   size_t no_gc_overrun = (free-begin) + requested_pads;
-  size_t estimate_desired_size = 4*last_pads + requested_pads;
+  size_t estimate_desired_size = heap_factor*last_pads + requested_pads;
   size_t elems = std::max(no_gc_overrun, estimate_desired_size);
   PadObject *newbegin = static_cast<PadObject*>(::malloc(elems*sizeof(PadObject)));
   Placement progress(newbegin, newbegin);
@@ -127,16 +138,22 @@ void Heap::GC(size_t requested_pads) {
   end = newbegin + elems;
   free = progress.free;
   last_pads = free - begin;
+  if (last_pads > most_pads) {
+    most_pads = last_pads;
+  }
 
   // Contain heap growth due to no_gc_overrun pessimism
-  size_t desired_sized = 4*last_pads + requested_pads;
+  size_t desired_sized = heap_factor*last_pads + requested_pads;
   if (desired_sized < elems) {
     end = newbegin + desired_sized;
   }
 
-#ifdef DEBUG_GC
-  std::cerr << "GC: kept=" << last_pads << " desire=" << desired_sized << " size=" << elems << std::endl;
-#endif
+  if (profile_heap) {
+    std::stringstream s;
+    s << "GC: kept=" << last_pads << " desire=" << desired_sized << " size=" << elems << std::endl;
+    auto str = s.str();
+    status_write(2, str.data(), str.size());
+  }
 }
 
 DestroyableObject::DestroyableObject(Heap &h) : next(h.finalize) {

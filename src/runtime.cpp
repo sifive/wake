@@ -38,8 +38,8 @@ bool Work::is_work() const {
   return true;
 }
 
-Runtime::Runtime()
- : abort(false), heap(),
+Runtime::Runtime(bool profile_heap, double heap_factor)
+ : abort(false), heap(profile_heap, heap_factor),
    stack(heap.root<Work>(nullptr)),
    output(heap.root<HeapObject>(nullptr)),
    sources(heap.root<HeapObject>(nullptr)) {

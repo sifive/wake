@@ -216,7 +216,7 @@ struct GCNeededException {
 };
 
 struct Heap {
-  Heap();
+  Heap(bool profile_heap_, double heap_factor_);
   ~Heap();
 
   // Call this from main loop (no pointers on stack) when GCNeededException
@@ -267,10 +267,13 @@ struct Heap {
   RootPointer<T> root(HeapPointer<T> x) { return RootPointer<T>(roots, x.get()); }
 
 private:
+  bool profile_heap;
+  double heap_factor;
   PadObject *begin;
   PadObject *end;
   PadObject *free;
   size_t last_pads;
+  size_t most_pads;
   RootRing roots;
   HeapObject *finalize;
 #ifdef DEBUG_GC

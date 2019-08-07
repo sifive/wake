@@ -49,7 +49,7 @@ struct Runtime {
   RootPointer<HeapObject> output;
   RootPointer<Record> sources; // Vector String
 
-  Runtime();
+  Runtime(bool profile_heap, double heap_factor);
   void run();
 
   void schedule(Work *work) {
