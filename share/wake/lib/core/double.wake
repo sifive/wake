@@ -91,10 +91,12 @@ global def dmin x y = if x <. y then x else y
 global def dmax x y = if x <. y then y else x
 
 # Product of a series of Doubles.
-global def ∏. l = foldl (_*._) 1.0 l
+global def dprod = foldl (_*._) 1.0
+global def ∏. l = dprod l
 
 # Sum of a series of Doubles.
-global def ∑. l = foldl (_+._) 0.0 l
+global def dsum = foldl (_+._) 0.0
+global def ∑. l = dsum l
 
 global data DoubleFormat =
   DoubleFixed

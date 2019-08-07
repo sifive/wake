@@ -103,7 +103,9 @@ global def min x y = if x < y then x else y
 global def max x y = if x < y then y else x
 
 # Calculates the product of a list of integers.
-global def ∏ l = foldl (_*_) 1 l
+global def prod = foldl (_*_) 1
+global def ∏ l = prod l
 
 # Calculates the sum of a list of integers.
-global def ∑ l = foldl (_+_) 0 l
+global def sum = foldl (_+_) 0
+global def ∑ l = sum l
