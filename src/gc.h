@@ -231,6 +231,8 @@ struct Heap {
 
   // Call this from main loop (no pointers on stack) when GCNeededException
   void GC(size_t requested_pads);
+  // Report max heap usage
+  void report() const;
 
   // Reserve enough space for a sequence of allocations
   void reserve(size_t requested_pads) {
