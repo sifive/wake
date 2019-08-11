@@ -20,7 +20,7 @@
 
 void Promise::awaken(Runtime &runtime, HeapObject *obj) {
 #ifdef DEBUG_GC
-  assert(value->is_work());
+  assert(category() == WORK);
 #endif
   Continuation *c = static_cast<Continuation*>(value.get());
   while (c->next) {

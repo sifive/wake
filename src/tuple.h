@@ -25,9 +25,13 @@ struct Location;
 struct Constructor;
 
 struct alignas(PadObject) Promise {
-  explicit operator bool() const {
+  Category category() const {
     HeapObject *obj = value.get();
-    return obj && !obj->is_work();
+    return obj ? obj->category() : WORK;
+  }
+
+  explicit operator bool() const {
+    return category() == VALUE;
   }
 
   void await(Runtime &runtime, Continuation *c) const {
@@ -63,7 +67,7 @@ struct alignas(PadObject) Promise {
   void fulfill(Runtime &runtime, HeapObject *obj) {
 #ifdef DEBUG_GC
     assert(obj);
-    assert(!obj->is_work());
+    assert(obj->category() == VALUE);
 #endif
     if (value) awaken(runtime, obj);
     value = obj;
@@ -73,7 +77,7 @@ struct alignas(PadObject) Promise {
   void instant_fulfill(HeapObject *obj) {
 #ifdef DEBUG_GC
      assert(!value);
-     assert(!obj->is_work());
+     assert(obj->category() == VALUE);
 #endif
      value = obj;
   }

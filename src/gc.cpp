@@ -30,10 +30,6 @@
 
 HeapObject::~HeapObject() { }
 
-bool HeapObject::is_work() const {
-  return false;
-}
-
 Placement PadObject::moveto(PadObject *free) {
   assert (0 /* unreachable */);
   return Placement(0, 0);
@@ -61,6 +57,11 @@ Hash PadObject::hash() const {
   return Hash();
 }
 
+Category PadObject::category() const {
+  assert(0 /* unreachable */);
+  return VALUE;
+}
+
 Placement MovedObject::moveto(PadObject *free) {
   return Placement(to, free);
 }
@@ -85,6 +86,11 @@ void MovedObject::format(std::ostream &os, FormatState &state) const {
 Hash MovedObject::hash() const {
   assert(0 /* unreachable */);
   return Hash();
+}
+
+Category MovedObject::category() const {
+  assert(0 /* unreachable */);
+  return VALUE;
 }
 
 Heap::Heap(int profile_heap_, double heap_factor_)
@@ -233,6 +239,10 @@ void Heap::GC(size_t requested_pads) {
       }
     }
   }
+}
+
+Category Value::category() const {
+  return VALUE;
 }
 
 DestroyableObject::DestroyableObject(Heap &h) : next(h.finalize) {

@@ -34,8 +34,8 @@ Hash Work::hash() const {
   return Hash();
 }
 
-bool Work::is_work() const {
-  return true;
+Category Work::category() const {
+  return WORK;
 }
 
 Runtime::Runtime(int profile_heap, double heap_factor)
