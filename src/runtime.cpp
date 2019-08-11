@@ -38,6 +38,22 @@ Category Work::category() const {
   return WORK;
 }
 
+Category Deferral::category() const {
+  return DEFERRAL;
+}
+
+void Deferral::execute(Runtime &runtime) {
+  Continuation *c = static_cast<Continuation*>(uses.get());
+  while (c->next) {
+    c->value = value;
+    c = static_cast<Continuation*>(c->next.get());
+  }
+  c->value = value;
+  c->next = runtime.stack;
+  runtime.stack = uses;
+  uses = nullptr;
+}
+
 Runtime::Runtime(int profile_heap, double heap_factor)
  : abort(false), heap(profile_heap, heap_factor),
    stack(heap.root<Work>(nullptr)),

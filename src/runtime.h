@@ -82,4 +82,30 @@ struct Continuation : public Work {
   }
 };
 
+struct Deferral final : public GCObject<Deferral, Continuation> {
+  HeapPointer<Work> work; // nullptr => work already scheduled
+  HeapPointer<Continuation> uses; // nullptr => already executed
+  // HeapPointer<Deferral> strict;
+  // ... if we want full eager evaluation link deferrals to runtime
+  // ... to control memory, ensure no two executed deferrals are neighbours
+
+  Category category() const override;
+  void execute(Runtime &runtime) override;
+
+  void demand(Runtime &runtime) {
+    if (work) {
+      runtime.schedule(work.get());
+      work = nullptr;
+    }
+  }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (work.*memberfn)(arg);
+    arg = (uses.*memberfn)(arg);
+    return arg;
+  }
+};
+
 #endif

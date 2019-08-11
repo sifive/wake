@@ -52,7 +52,7 @@ struct HeapStep {
   HeapObject **found;
 };
 
-enum Category { VALUE, WORK };
+enum Category { VALUE, WORK, DEFERRAL };
 
 struct HeapObject {
   virtual Placement moveto(PadObject *free) = 0;
