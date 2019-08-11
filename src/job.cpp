@@ -68,8 +68,8 @@
 #define LOG_ECHO(x) (x & 0x10)
 
 // Can be queried at multiple stages of the job's lifetime
-struct Job final : public GCObject<Job> {
-  typedef GCObject<Job> Parent;
+struct Job final : public GCObject<Job, Value> {
+  typedef GCObject<Job, Value> Parent;
 
   Database *db;
   HeapPointer<String> cmdline, stdin, dir;

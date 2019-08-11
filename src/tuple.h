@@ -71,7 +71,7 @@ inline HeapStep Promise::recurse<HeapStep, &HeapPointerBase::explore>(HeapStep s
   return step;
 }
 
-struct Tuple : public HeapObject {
+struct Tuple : public Value {
   virtual size_t size() const = 0;
   virtual Promise *at(size_t i) = 0;
   virtual const Promise *at(size_t i) const = 0;

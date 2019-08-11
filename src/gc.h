@@ -296,7 +296,7 @@ private:
 friend struct DestroyableObject;
 };
 
-template <typename T, typename B = HeapObject>
+template <typename T, typename B>
 struct alignas(PadObject) GCObject : public B {
   template <typename ... ARGS>
   GCObject(ARGS&&... args) : B(std::forward<ARGS>(args) ... ) {
@@ -372,8 +372,10 @@ const char *GCObject<T, B>::type() const {
   return out;
 }
 
+struct Value : public HeapObject {
+};
 
-struct DestroyableObject : public HeapObject {
+struct DestroyableObject : public Value {
   DestroyableObject(Heap &h);
   DestroyableObject(DestroyableObject &&d) = default;
   HeapObject *next;

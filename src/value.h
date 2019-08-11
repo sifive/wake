@@ -54,8 +54,8 @@ struct FormatState {
   int p() const { return current.precedence; }
 };
 
-struct String final : public GCObject<String> {
-  typedef GCObject<String> Parent;
+struct String final : public GCObject<String, Value> {
+  typedef GCObject<String, Value> Parent;
 
   static TypeVar typeVar;
   size_t length;
@@ -111,8 +111,8 @@ struct MPZ {
   MPZ& operator = (const MPZ& x) = delete;
 };
 
-struct Integer final : public GCObject<Integer> {
-  typedef GCObject<Integer> Parent;
+struct Integer final : public GCObject<Integer, Value> {
+  typedef GCObject<Integer, Value> Parent;
 
   static TypeVar typeVar;
   int length; // abs(length) = number of mp_limb_t in object
@@ -147,7 +147,7 @@ struct Integer final : public GCObject<Integer> {
 #define SCIENTIFIC 1
 #define HEXFLOAT 2
 #define DEFAULTFLOAT 3
-struct Double final : public GCObject<Double> {
+struct Double final : public GCObject<Double, Value> {
   typedef std::numeric_limits< double > limits;
 
   static TypeVar typeVar;
@@ -180,7 +180,7 @@ struct RegExp final : public GCObject<RegExp, DestroyableObject> {
   static RootPointer<RegExp> literal(Heap &h, const std::string &value);
 };
 
-struct Closure final : public GCObject<Closure, HeapObject> {
+struct Closure final : public GCObject<Closure, Value> {
   Lambda *lambda;
   HeapPointer<Scope> scope;
 
