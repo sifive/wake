@@ -19,9 +19,7 @@
 #include "expr.h"
 
 void Promise::awaken(Runtime &runtime, HeapObject *obj) {
-#ifdef DEBUG_GC
-  assert(category() == WORK);
-#endif
+  if (value->category() == DEFERRAL) return;
   Continuation *c = static_cast<Continuation*>(value.get());
   while (c->next) {
     c->value = obj;
@@ -45,8 +43,17 @@ struct FulFiller final : public GCObject<FulFiller, Continuation> {
     return arg;
   }
 
-  void execute(Runtime &runtime) {
+  void execute(Runtime &runtime) override {
     tuple->at(i)->fulfill(runtime, value.get());
+  }
+
+  void demand(Runtime &runtime, Deferral *def) override {
+    Promise *p = tuple->at(i);
+    if (p->fresh()) {
+      p->defer(def);
+    } else {
+      def->demand(runtime);
+    }
   }
 };
 

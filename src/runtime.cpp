@@ -38,6 +38,10 @@ Category Work::category() const {
   return WORK;
 }
 
+void Continuation::demand(Runtime &runtime, Deferral *def) {
+  def->demand(runtime);
+}
+
 Category Deferral::category() const {
   return DEFERRAL;
 }

@@ -25,6 +25,7 @@ struct Runtime;
 struct Continuation;
 struct Record;
 struct Scope;
+struct Deferral;
 
 struct Work : public HeapObject {
   HeapPointer<Work> next;
@@ -69,6 +70,9 @@ struct Runtime {
 struct Continuation : public Work {
   HeapPointer<HeapObject> value;
 
+  // Should the deferral be forced?
+  virtual void demand(Runtime &runtime, Deferral *def);
+
   void resume(Runtime &runtime, HeapObject *obj) {
     value = obj;
     runtime.schedule(this);
@@ -93,10 +97,11 @@ struct Deferral final : public GCObject<Deferral, Continuation> {
   void execute(Runtime &runtime) override;
 
   void demand(Runtime &runtime) {
-    if (work) {
-      runtime.schedule(work.get());
-      work = nullptr;
-    }
+#ifdef DEBUG_GC
+    assert (work);
+#endif
+    runtime.schedule(work.get());
+    work = nullptr;
   }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>

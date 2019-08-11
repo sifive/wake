@@ -34,15 +34,30 @@ struct alignas(PadObject) Promise {
     return category() == VALUE;
   }
 
+  bool fresh() const { return !value; }
+
   void await(Runtime &runtime, Continuation *c) const {
 #ifdef DEBUG_GC
     assert(!c->next);
 #endif
-    if (*this) {
-      c->resume(runtime, value.get());
-    } else {
-      c->next = static_cast<Continuation*>(value.get());
-      value = c;
+    switch (category()) {
+      case VALUE:
+        c->resume(runtime, value.get());
+        break;
+      case WORK:
+        c->next = static_cast<Continuation*>(value.get());
+        value = c;
+        break;
+      case DEFERRAL:
+        Deferral *def = static_cast<Deferral*>(value.get());
+        if (def->work) {
+          c->next = def->uses;
+          def->uses = c;
+          c->demand(runtime, def);
+        } else {
+          value = c;
+        }
+        break;
     }
   }
 
@@ -76,10 +91,20 @@ struct alignas(PadObject) Promise {
   // Call only if the containing tuple was just constructed (no Continuations)
   void instant_fulfill(HeapObject *obj) {
 #ifdef DEBUG_GC
-     assert(!value);
-     assert(obj->category() == VALUE);
+    assert(!value);
+    assert(obj->category() == VALUE);
 #endif
-     value = obj;
+    value = obj;
+  }
+
+  void defer(Deferral *defer) {
+#ifdef DEBUG_GC
+    assert(!value);
+    assert(!defer->Work::next);
+    assert(defer->work);
+    assert(defer->uses);
+#endif
+    value = defer;
   }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
@@ -88,7 +113,6 @@ struct alignas(PadObject) Promise {
 private:
   void awaken(Runtime &runtime, HeapObject *obj);
   mutable HeapPointer<HeapObject> value;
-friend struct Tuple;
 };
 
 template <>
@@ -113,8 +137,7 @@ struct Tuple : public Value {
       at(i)->instant_fulfill(p->coerce<HeapObject>());
     } else {
       Continuation *cont = claim_fulfiller(r, i);
-      cont->next = p->value;
-      p->value = cont;
+      p->await(r, cont);
     }
   }
 };
