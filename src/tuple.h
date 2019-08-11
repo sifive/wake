@@ -31,6 +31,9 @@ struct alignas(PadObject) Promise {
   }
 
   void await(Runtime &runtime, Continuation *c) const {
+#ifdef DEBUG_GC
+    assert(!c->next);
+#endif
     if (*this) {
       c->resume(runtime, value.get());
     } else {
@@ -41,12 +44,31 @@ struct alignas(PadObject) Promise {
 
   // Use only if the value is known to already be available 
   template <typename T>
-  T *coerce() { return static_cast<T*>(value.get()); }
+  T *coerce() {
+#ifdef DEBUG_GC
+    assert (*this);
+#endif
+    return static_cast<T*>(value.get());
+  }
+
   template <typename T>
-  const T *coerce() const { return static_cast<const T*>(value.get()); }
+  const T *coerce() const {
+#ifdef DEBUG_GC
+    assert (*this);
+#endif
+    return static_cast<const T*>(value.get());
+  }
 
   // Call once only!
-  void fulfill(Runtime &runtime, HeapObject *obj);
+  void fulfill(Runtime &runtime, HeapObject *obj) {
+#ifdef DEBUG_GC
+    assert(obj);
+    assert(!obj->is_work());
+#endif
+    if (value) awaken(runtime, obj);
+    value = obj;
+  }
+
   // Call only if the containing tuple was just constructed (no Continuations)
   void instant_fulfill(HeapObject *obj) {
 #ifdef DEBUG_GC
@@ -60,6 +82,7 @@ struct alignas(PadObject) Promise {
   T recurse(T arg) { return (value.*memberfn)(arg); }
 
 private:
+  void awaken(Runtime &runtime, HeapObject *obj);
   mutable HeapPointer<HeapObject> value;
 friend struct Tuple;
 };

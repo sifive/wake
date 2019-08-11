@@ -92,6 +92,7 @@ void CCat::execute(Runtime &runtime) {
     progress = progress->at(1)->coerce<Record>();
 
   if (progress->size() == 2) {
+    Work::next = nullptr; // reschedule
     if (*progress->at(0)) {
       progress->at(1)->await(runtime, this);
     } else {

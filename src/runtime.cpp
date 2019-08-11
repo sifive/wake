@@ -200,6 +200,7 @@ struct CPrim final : public GCObject<CPrim, Continuation> {
     if (i == 0) {
       prim->fn(prim->data, runtime, cont.get(), scope.get(), prim->args, args);
     } else {
+      Work::next = nullptr; // reschedule
       it->at(0)->await(runtime, this);
     }
   }

@@ -18,25 +18,18 @@
 #include "tuple.h"
 #include "expr.h"
 
-void Promise::fulfill(Runtime &runtime, HeapObject *obj) {
-  if (value) {
+void Promise::awaken(Runtime &runtime, HeapObject *obj) {
 #ifdef DEBUG_GC
-    assert(value->is_work());
+  assert(value->is_work());
 #endif
-    Continuation *c = static_cast<Continuation*>(value.get());
-    while (c->next) {
-      c->value = obj;
-      c = static_cast<Continuation*>(c->next.get());
-    }
+  Continuation *c = static_cast<Continuation*>(value.get());
+  while (c->next) {
     c->value = obj;
-    c->next = runtime.stack;
-    runtime.stack = value;
+    c = static_cast<Continuation*>(c->next.get());
   }
-#ifdef DEBUG_GC
-  assert(obj);
-  assert(!obj->is_work());
-#endif
-  value = obj;
+  c->value = obj;
+  c->next = runtime.stack;
+  runtime.stack = value;
 }
 
 struct FulFiller final : public GCObject<FulFiller, Continuation> {

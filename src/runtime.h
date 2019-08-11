@@ -53,6 +53,9 @@ struct Runtime {
   void run();
 
   void schedule(Work *work) {
+#ifdef DEBUG_GC
+    assert(!work->next);
+#endif
     work->next = stack;
     stack = work;
   }
