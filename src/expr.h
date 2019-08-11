@@ -36,6 +36,7 @@ struct Continuation;
 
 #define FLAG_TOUCHED	1 // already explored for _
 #define FLAG_AST	2 // useful to include in AST
+#define FLAG_RECURSIVE	4
 
 /* Expression AST */
 struct Expr {
