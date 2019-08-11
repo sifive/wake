@@ -128,7 +128,7 @@ Wake is generally functional.
 
 ### Data Types
 
-####primitives
+#### Primitives
 * String -> "A String" : a string interpreted as unicode
     * a "" string also allows string interpolation using {}
         * for example  `"{foo}{str (4 + 3)}"`
@@ -200,11 +200,11 @@ global data JValue =
 Wake has many useful function for extracting data from a json structure.
 
 
-#### jobs
+#### Jobs
 
 Jobs are how wake runs external programs. They are created by executing a Plan with 
 a Runner. The Plan is a tuple describing how to run the program, and the Runner is 
-a function which reads the Plan and runs the program. 
+a function which reads the Plan and runs the program accordingly. 
 
 Jobs provide wake's central useful functionality. Wake can be viewed as a functional
 programming language for running jobs.
@@ -220,8 +220,31 @@ global def runit _ =
   | format
   | println
 ```
+#### Runners
 
-#### sources and Path ojbects
+Note: all definitions and functions referenced in this section can be found in [job.wake](https://github.com/sifive/wake/blob/master/share/wake/lib/system/job.wake).
+
+Runners are created using `makeRunner`. `makeRunner` is defined as follows:
+
+```global def makeRunner name score pre post (Runner _ _ run)```
+
+* The `score` argument is of type `Plan → Result Double String` and is called by `runJob` to produce a score representing the priority of a runner with respect to the given Plan. For example, if `plan.getPlanResources` returns list `("python/3.7.1", Nil)` then the RISC-V runner probably cannot provide that resource and should return something like `Fail RISCVRunner: cannot provide resource: python/3.7.1`. If the plan resources is `("riscv-tools/2019.02.0", Nil)` then the `score` function should return `Pass 1.0` or some other positive number.
+* The `pre` argument is of type `Result RunnerInput Error → Pair (Result RunnerInput Error) a`. The `RunnerInput` tuple is a subset of the Plan tuple, serving to restrict the fields that the runner can access. The `pre` function is called before the job is run, allowing the runner to modify the input to provide the requested resources. For example, the RISC-V runner would run `runnerInput | editRunnerInputEnvironment addRISCVEnvironment` where `addRISCVEnvironment` is a function that sets the RISCV environment variable. The return value of `pre` is the modified `RunnerInput` paired with a free `a` type that can contain any sideband data that the `pre` function needs to provide to the `post` function.
+* The `post` argument is of type `Pair (Result RunnerOutput Error) a → Result RunnerOutput Error` and is similar to the `pre` function but is called after the job has run. `post` is for editing the reported outputs/inputs/usage of the job. For example, the fuse runner uses the `post` hook to set the output and input files reported by the FUSE filesystem. 
+* The last argument is the base runner that the current runner is built on top of. This is because all runners must be built on top of a preexisting runner. For example, in environment-example-sifive, localRISCVRunner and defaultRISCVRunner are built on top of localRunner and defaultRunner respectively.
+* `publish runner` must be executed for Wake to recognize a runner
+
+Runners are chosen for a given Plan based on the value returned by their `score` function and the plan's `RunnerFilter` field.
+
+* In `runJob`,  `subscribe runner` is called to retrieve the list of all published runners. The `RunnerFilter` function inside the Plan tuple can be set to filter out runners that the plan wants to exclude from consideration. Then the `score` function of each runner is called and runners that return Fail or a score <= 0.0 are excluded. Of the remaining runners, the one with the highest score is picked. 
+* Local runners can only run when the Plan tuple has `LocalOnly` set to true
+* Default runners can only run when the Plan tuple has `LocalOnly` set to false
+
+#### Using environment packages 
+
+Environment packages can be added to a workspace to provide tools (using runners) for running the workflow. You can check out [environment-example-sifive](https://github.com/sifive/environment-example-sifive) as an example of an environment package that contains runners for Wake-based workflows. 
+
+#### sources and Path objects
 
 Sources are the set of files in git.
 
