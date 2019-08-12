@@ -42,23 +42,25 @@ void Continuation::consider(Runtime &runtime, Deferral *def) {
   def->demand(runtime, this);
 }
 
-Category Deferral::category() const {
-  return DEFERRAL;
-}
+struct CDeferral final : public GCObject<CDeferral, Continuation> {
+  HeapPointer<Deferral> def;
 
-void Deferral::execute(Runtime &runtime) {
-  Continuation *c = static_cast<Continuation*>(uses.get());
-#ifdef DEBUG_GC
-  assert(c);
-#endif
-  while (c->next) {
-    c->value = value;
-    c = static_cast<Continuation*>(c->next.get());
+  CDeferral(Deferral *def_) : def(def_) { }
+  void execute(Runtime &runtime) override;
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (def.*memberfn)(arg);
+    return arg;
   }
-  c->value = value;
-  c->next = runtime.stack;
-  runtime.stack = uses;
-  uses = nullptr;
+};
+
+void CDeferral::execute(Runtime &runtime) {
+#ifdef DEBUG_GC
+  assert(value->category() == VALUE);
+#endif
+  def->promise.fulfill(runtime, value.get());
 }
 
 Runtime::Runtime(int profile_heap, double heap_factor)
@@ -168,15 +170,15 @@ struct CApp final : public GCObject<CApp, Continuation> {
 
   void execute(Runtime &runtime) override {
     auto clo = static_cast<Closure*>(value.get());
-    runtime.heap.reserve(Interpret::reserve() + Deferral::reserve());
+    runtime.heap.reserve(Interpret::reserve() + Deferral::reserve() + CDeferral::reserve());
     bind->next = clo->scope.get();
     bind->set_expr(clo->lambda);
     Interpret *work = Interpret::claim(runtime.heap,
       clo->lambda->body.get(), bind.get(), cont.get());
     if ((clo->lambda->flags & FLAG_RECURSIVE)) {
-      Deferral *def = Deferral::claim(runtime.heap);
-      def->work = work;
-      work->cont = def;
+      Deferral *def = Deferral::claim(runtime.heap, work);
+      CDeferral *cdef = CDeferral::claim(runtime.heap, def);
+      work->cont = cdef;
       cont->consider(runtime, def);
       // If already demanded, remove the Deferral
       // This case is important for tail recursion

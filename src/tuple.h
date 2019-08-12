@@ -35,30 +35,7 @@ struct alignas(PadObject) Promise {
   }
 
   bool fresh() const { return !value; }
-
-  void await(Runtime &runtime, Continuation *c) const {
-#ifdef DEBUG_GC
-    assert(!c->next);
-#endif
-    switch (category()) {
-      case VALUE:
-        c->resume(runtime, value.get());
-        break;
-      case WORK:
-        c->next = static_cast<Continuation*>(value.get());
-        value = c;
-        break;
-      case DEFERRAL:
-        Deferral *def = static_cast<Deferral*>(value.get());
-        if (def->value) {
-          value = def->value;
-          c->resume(runtime, value.get());
-        } else {
-          c->consider(runtime, def);
-        }
-        break;
-    }
-  }
+  void await(Runtime &runtime, Continuation *c) const;
 
   // Use only if the value is known to already be available 
   template <typename T>
@@ -96,13 +73,7 @@ struct alignas(PadObject) Promise {
     value = obj;
   }
 
-  void defer(Deferral *defer) {
-#ifdef DEBUG_GC
-    assert(!value);
-    assert(!defer->value);
-#endif
-    value = defer;
-  }
+  void defer(Deferral *defer);
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) { return (value.*memberfn)(arg); }
@@ -110,7 +81,83 @@ struct alignas(PadObject) Promise {
 private:
   void awaken(Runtime &runtime, HeapObject *obj);
   mutable HeapPointer<HeapObject> value;
+friend struct Deferral;
 };
+
+struct Deferral final : public GCObject<Deferral, HeapObject> {
+  HeapPointer<Work> work; // nullptr => work already scheduled
+  Promise promise;
+  // HeapPointer<Deferral> strict;
+  // ... if we want full eager evaluation link deferrals to runtime
+  // ... to control memory, ensure no two executed deferrals are neighbours
+
+  Deferral(Work *work_) : work(work_) { }
+  void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
+  Category category() const override;
+
+  void demand(Runtime &runtime, Continuation *cont) {
+#ifdef DEBUG_GC
+    assert (!cont->next);
+    assert (promise.category() == WORK);
+#endif
+    if (work) {
+      work->next = runtime.lazy;
+      runtime.lazy = work;
+      work = nullptr;
+    }
+    cont->next = promise.value;
+    promise.value = cont;
+  }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = HeapObject::recurse<T, memberfn>(arg);
+    arg = (work.*memberfn)(arg);
+    arg = promise.recurse<T, memberfn>(arg);
+    return arg;
+  }
+};
+
+inline void Promise::await(Runtime &runtime, Continuation *c) const {
+#ifdef DEBUG_GC
+  assert(!c->next);
+  assert(c->category() == WORK);
+#endif
+  switch (category()) {
+    case VALUE:
+      c->resume(runtime, value.get());
+      break;
+    case WORK:
+      c->next = static_cast<Continuation*>(value.get());
+      value = c;
+      break;
+    case DEFERRAL:
+      Deferral *def = static_cast<Deferral*>(value.get());
+      switch (def->promise.category()) {
+        case VALUE:
+          value = def->promise.value.get();
+          c->resume(runtime, value.get());
+          break;
+#ifdef DEBUG_GC
+        case DEFERRAL:
+          assert(0 /* unreachable */);
+#endif
+        default: // WORK
+          c->consider(runtime, def);
+          break;
+      }
+      break;
+  }
+}
+
+inline void Promise::defer(Deferral *defer) {
+#ifdef DEBUG_GC
+  assert(!value);
+  assert(!defer->promise);
+#endif
+  value = defer;
+}
 
 template <>
 inline HeapStep Promise::recurse<HeapStep, &HeapPointerBase::explore>(HeapStep step) {

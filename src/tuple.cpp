@@ -17,6 +17,7 @@
 
 #include "tuple.h"
 #include "expr.h"
+#include <cassert>
 
 void Promise::awaken(Runtime &runtime, HeapObject *obj) {
   if (value->category() == DEFERRAL) return;
@@ -28,6 +29,19 @@ void Promise::awaken(Runtime &runtime, HeapObject *obj) {
   c->value = obj;
   c->next = runtime.stack;
   runtime.stack = value;
+}
+
+void Deferral::format(std::ostream &os, FormatState &state) const {
+  os << "Deferral";
+}
+
+Hash Deferral::hash() const {
+  assert(0 /* unreachable */);
+  return Hash();
+}
+
+Category Deferral::category() const {
+  return DEFERRAL;
 }
 
 struct FulFiller final : public GCObject<FulFiller, Continuation> {
