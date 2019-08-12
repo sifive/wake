@@ -178,6 +178,9 @@ struct CApp final : public GCObject<CApp, Continuation> {
       def->work = work;
       work->cont = def;
       cont->consider(runtime, def);
+      // If already demanded, remove the Deferral
+      // This case is important for tail recursion
+      if (!def->work) work->cont = cont.get();
     } else {
       runtime.schedule(work);
     }
