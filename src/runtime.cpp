@@ -61,12 +61,14 @@ void Deferral::execute(Runtime &runtime) {
 Runtime::Runtime(int profile_heap, double heap_factor)
  : abort(false), heap(profile_heap, heap_factor),
    stack(heap.root<Work>(nullptr)),
+   lazy(heap.root<Work>(nullptr)),
    output(heap.root<HeapObject>(nullptr)),
    sources(heap.root<HeapObject>(nullptr)) {
 }
 
 void Runtime::run() {
   int count = 0;
+top:
   while (stack && !abort) {
     if (++count >= 10000) {
       if (JobTable::exit_now()) break;
@@ -83,6 +85,12 @@ void Runtime::run() {
       stack = w;
       heap.GC(gc.needed);
     }
+  }
+  if (!stack && lazy) {
+    stack = lazy.get();
+    lazy = lazy->next;
+    stack->next = nullptr;
+    goto top;
   }
 }
 

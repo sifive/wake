@@ -47,6 +47,7 @@ struct Runtime {
   bool abort;
   Heap heap;
   RootPointer<Work> stack;
+  RootPointer<Work> lazy;
   RootPointer<HeapObject> output;
   RootPointer<Record> sources; // Vector String
 
@@ -99,8 +100,10 @@ struct Deferral final : public GCObject<Deferral, Continuation> {
   void demand(Runtime &runtime) {
 #ifdef DEBUG_GC
     assert (work);
+    assert (!work->next);
 #endif
-    runtime.schedule(work.get());
+    work->next = runtime.lazy;
+    runtime.lazy = work;
     work = nullptr;
   }
 
