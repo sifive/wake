@@ -53,7 +53,7 @@ struct alignas(PadObject) Promise {
         if (def->work) {
           c->next = def->uses;
           def->uses = c;
-          c->demand(runtime, def);
+          c->consider(runtime, def);
         } else {
           value = c;
         }

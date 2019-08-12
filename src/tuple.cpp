@@ -47,7 +47,7 @@ struct FulFiller final : public GCObject<FulFiller, Continuation> {
     tuple->at(i)->fulfill(runtime, value.get());
   }
 
-  void demand(Runtime &runtime, Deferral *def) override {
+  void consider(Runtime &runtime, Deferral *def) override {
     Promise *p = tuple->at(i);
     if (p->fresh()) {
       p->defer(def);

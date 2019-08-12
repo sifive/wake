@@ -70,8 +70,8 @@ struct Runtime {
 struct Continuation : public Work {
   HeapPointer<HeapObject> value;
 
-  // Should the deferral be forced?
-  virtual void demand(Runtime &runtime, Deferral *def);
+  // Should the deferral be demanded?
+  virtual void consider(Runtime &runtime, Deferral *def);
 
   void resume(Runtime &runtime, HeapObject *obj) {
     value = obj;

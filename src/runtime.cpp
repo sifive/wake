@@ -38,7 +38,7 @@ Category Work::category() const {
   return WORK;
 }
 
-void Continuation::demand(Runtime &runtime, Deferral *def) {
+void Continuation::consider(Runtime &runtime, Deferral *def) {
   def->demand(runtime);
 }
 
@@ -157,11 +157,20 @@ struct CApp final : public GCObject<CApp, Continuation> {
 
   void execute(Runtime &runtime) override {
     auto clo = static_cast<Closure*>(value.get());
-    runtime.heap.reserve(Interpret::reserve());
+    runtime.heap.reserve(Interpret::reserve() + Deferral::reserve());
     bind->next = clo->scope.get();
     bind->set_expr(clo->lambda);
-    runtime.schedule(Interpret::claim(runtime.heap,
-      clo->lambda->body.get(), bind.get(), cont.get()));
+    Interpret *work = Interpret::claim(runtime.heap,
+      clo->lambda->body.get(), bind.get(), cont.get());
+    if ((clo->lambda->flags & FLAG_RECURSIVE)) {
+      Deferral *def = Deferral::claim(runtime.heap);
+      def->uses = cont;
+      def->work = work;
+      work->cont = def;
+      cont->consider(runtime, def);
+    } else {
+      runtime.schedule(work);
+    }
   }
 };
 
