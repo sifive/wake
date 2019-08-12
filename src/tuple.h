@@ -50,12 +50,11 @@ struct alignas(PadObject) Promise {
         break;
       case DEFERRAL:
         Deferral *def = static_cast<Deferral*>(value.get());
-        if (def->work) {
-          c->next = def->uses;
-          def->uses = c;
-          c->consider(runtime, def);
+        if (def->value) {
+          value = def->value;
+          c->resume(runtime, value.get());
         } else {
-          value = c;
+          c->consider(runtime, def);
         }
         break;
     }
@@ -100,9 +99,7 @@ struct alignas(PadObject) Promise {
   void defer(Deferral *defer) {
 #ifdef DEBUG_GC
     assert(!value);
-    assert(!defer->Work::next);
-    assert(defer->work);
-    assert(defer->uses);
+    assert(!defer->value);
 #endif
     value = defer;
   }

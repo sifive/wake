@@ -39,7 +39,7 @@ Category Work::category() const {
 }
 
 void Continuation::consider(Runtime &runtime, Deferral *def) {
-  def->demand(runtime);
+  def->demand(runtime, this);
 }
 
 Category Deferral::category() const {
@@ -48,6 +48,9 @@ Category Deferral::category() const {
 
 void Deferral::execute(Runtime &runtime) {
   Continuation *c = static_cast<Continuation*>(uses.get());
+#ifdef DEBUG_GC
+  assert(c);
+#endif
   while (c->next) {
     c->value = value;
     c = static_cast<Continuation*>(c->next.get());
@@ -172,7 +175,6 @@ struct CApp final : public GCObject<CApp, Continuation> {
       clo->lambda->body.get(), bind.get(), cont.get());
     if ((clo->lambda->flags & FLAG_RECURSIVE)) {
       Deferral *def = Deferral::claim(runtime.heap);
-      def->uses = cont;
       def->work = work;
       work->cont = def;
       cont->consider(runtime, def);

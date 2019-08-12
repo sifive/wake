@@ -52,7 +52,7 @@ struct FulFiller final : public GCObject<FulFiller, Continuation> {
     if (p->fresh()) {
       p->defer(def);
     } else {
-      def->demand(runtime);
+      def->demand(runtime, this);
     }
   }
 };
