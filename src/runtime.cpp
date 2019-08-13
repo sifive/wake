@@ -235,17 +235,21 @@ struct CPrim final : public GCObject<CPrim, Continuation> {
   void execute(Runtime &runtime) override {
     HeapObject *args[prim->args];
     Scope *it = scope.get();
-    size_t i;
-    for (i = prim->args; i; --i) {
-      if (!*it->at(0)) break;
-      args[i-1] = it->at(0)->coerce<HeapObject>();
+    Promise *wait = nullptr;
+    for (size_t i = prim->args; i; --i) {
+      Promise *p = it->at(0);
+      if (p->force(runtime)) {
+        args[i-1] = p->coerce<HeapObject>();
+      } else {
+        wait = p;
+      }
       it = it->next.get();
     }
-    if (i == 0) {
-      prim->fn(prim->data, runtime, cont.get(), scope.get(), prim->args, args);
-    } else {
+    if (wait) {
       next = nullptr; // reschedule
-      it->at(0)->await(runtime, this);
+      wait->await(runtime, this);
+    } else {
+      prim->fn(prim->data, runtime, cont.get(), scope.get(), prim->args, args);
     }
   }
 };

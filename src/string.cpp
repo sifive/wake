@@ -92,6 +92,8 @@ static PRIMFN(prim_lcat) {
 
   size = 0;
   for (Record *scan = list; scan->size() == 2; scan = scan->at(1)->coerce<Record>()) {
+    scan->at(0)->force(runtime);
+    scan->at(1)->force(runtime);
     String *s = scan->at(0)->coerce<String>();
     memcpy(out->c_str() + size, s->c_str(), s->size());
     size += s->size();
