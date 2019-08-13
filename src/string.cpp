@@ -23,7 +23,6 @@
 #include "gc.h"
 #include <sstream>
 #include <fstream>
-#include <iostream>
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <errno.h>
@@ -76,64 +75,29 @@ static PRIMTYPE(type_lcat) {
   TypeVar list;
   Data::typeList.clone(list);
   list[0].unify(String::typeVar);
-  return args.size() == 1 &&
-    args[0]->unify(list) &&
+  return args.size() == 2 &&
+    args[0]->unify(Integer::typeVar) &&
+    args[1]->unify(list) &&
     out->unify(String::typeVar);
 }
 
-struct CCat final : public GCObject<CCat, Continuation> {
-  HeapPointer<Record> list;
-  HeapPointer<Record> progress;
-  HeapPointer<Continuation> cont;
-
-  CCat(Record *list_, Continuation *cont_) : list(list_), progress(list_), cont(cont_) { }
-
-  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
-  T recurse(T arg) {
-    arg = Continuation::recurse<T, memberfn>(arg);
-    arg = (list.*memberfn)(arg);
-    arg = (progress.*memberfn)(arg);
-    arg = (cont.*memberfn)(arg);
-    return arg;
-  }
-
-  void execute(Runtime &runtime) override;
-};
-
-void CCat::execute(Runtime &runtime) {
-  while (progress->size() == 2 && *progress->at(0) && *progress->at(1))
-    progress = progress->at(1)->coerce<Record>();
-
-  if (progress->size() == 2) {
-    next = nullptr; // reschedule
-    if (*progress->at(0)) {
-      progress->at(1)->await(runtime, this);
-    } else {
-      progress->at(0)->await(runtime, this);
-    }
-  } else {
-    size_t size = 0;
-    for (Record *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Record>())
-      size += scan->at(0)->coerce<String>()->size();
-
-    String *out = String::alloc(runtime.heap, size);
-    out->c_str()[size] = 0;
-
-    size = 0;
-    for (Record *scan = list.get(); scan->size() == 2; scan = scan->at(1)->coerce<Record>()) {
-      String *s = scan->at(0)->coerce<String>();
-      memcpy(out->c_str() + size, s->c_str(), s->size());
-      size += s->size();
-    }
-
-    cont->resume(runtime, out);
-  }
-}
-
 static PRIMFN(prim_lcat) {
-  EXPECT(1);
-  RECORD(list, 0);
-  runtime.schedule(CCat::alloc(runtime.heap, list, continuation));
+  EXPECT(2);
+  INTEGER_MPZ(size_mpz, 0);
+  RECORD(list, 1);
+
+  uint64_t size = mpz_get_si(size_mpz);
+  String *out = String::alloc(runtime.heap, size);
+  out->c_str()[size] = 0;
+
+  size = 0;
+  for (Record *scan = list; scan->size() == 2; scan = scan->at(1)->coerce<Record>()) {
+    String *s = scan->at(0)->coerce<String>();
+    memcpy(out->c_str() + size, s->c_str(), s->size());
+    size += s->size();
+  }
+
+  RETURN(out);
 }
 
 static PRIMTYPE(type_explode) {
