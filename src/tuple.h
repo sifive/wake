@@ -25,19 +25,20 @@ struct Location;
 struct Constructor;
 
 struct alignas(PadObject) Promise {
-  Category category() const {
-    HeapObject *obj = value.get();
-    return obj ? obj->category() : WORK;
-  }
+  // Returns true if the value is ready.
+  explicit operator bool() const;
 
-  explicit operator bool() const {
-    return category() == VALUE;
-  }
+  // Returns if already a value. If deferred, schedule it.
+  bool force(Runtime &runtime);
 
-  bool fresh() const { return !value; }
+  // Invoke the continuation once the Promise has a value
   void await(Runtime &runtime, Continuation *c) const;
 
-  // Use only if the value is known to already be available 
+  // Returns true if nothing is waiting on the Promise
+  bool fresh() const { return !value; }
+
+  // Extract the value directly, without waiting with await
+  // Use only if the value is known to already be available
   template <typename T>
   T *coerce() {
 #ifdef DEBUG_GC
@@ -46,6 +47,8 @@ struct alignas(PadObject) Promise {
     return static_cast<T*>(value.get());
   }
 
+  // Extract the value directly, without waiting with await
+  // Use only if the value is known to already be available
   template <typename T>
   const T *coerce() const {
 #ifdef DEBUG_GC
@@ -54,7 +57,7 @@ struct alignas(PadObject) Promise {
     return static_cast<const T*>(value.get());
   }
 
-  // Call once only!
+  // Call once only! => supplies the value
   void fulfill(Runtime &runtime, HeapObject *obj) {
 #ifdef DEBUG_GC
     assert(obj);
@@ -64,15 +67,18 @@ struct alignas(PadObject) Promise {
     value = obj;
   }
 
-  // Call only if the containing tuple was just constructed (no Continuations)
+  // Call only if the containing tuple was just constructed (await not called)
   void instant_fulfill(HeapObject *obj) {
 #ifdef DEBUG_GC
     assert(!value);
+    assert(obj);
     assert(obj->category() == VALUE);
 #endif
     value = obj;
   }
 
+  // Hook up a deferred evaluation to this Promise.
+  // It will only be run when/if something awaits the Promise.
   void defer(Deferral *defer);
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
@@ -96,16 +102,24 @@ struct Deferral final : public GCObject<Deferral, HeapObject> {
   Hash hash() const override;
   Category category() const override;
 
-  void demand(Runtime &runtime, Continuation *cont) {
+  // Schedule this deferred computation; we need it's value
+  void demand(Runtime &runtime) {
 #ifdef DEBUG_GC
-    assert (!cont->next);
-    assert (promise.category() == WORK);
+    assert (!promise);
 #endif
     if (work) {
       work->next = runtime.lazy;
       runtime.lazy = work;
       work = nullptr;
     }
+  }
+
+  // Schedule this deferred computation; we need it's value
+  void demand(Runtime &runtime, Continuation *cont) {
+#ifdef DEBUG_GC
+    assert (!cont->next);
+#endif
+    demand(runtime);
     cont->next = promise.value;
     promise.value = cont;
   }
@@ -119,25 +133,89 @@ struct Deferral final : public GCObject<Deferral, HeapObject> {
   }
 };
 
+inline Promise::operator bool() const {
+  HeapObject *obj = value.get();
+  if (!obj) {
+    return false;
+  } else switch (obj->category()) {
+    case VALUE:
+      return true;
+    case WORK:
+      return false;
+    default: // DEFERRAL:
+      Deferral *def = static_cast<Deferral*>(obj);
+      HeapObject *dobj = def->promise.value.get();
+      if (!dobj) {
+        return false;
+      } else switch (dobj->category()) {
+        case VALUE:
+          value = dobj;
+          return true;
+#ifdef DEBUG_GC
+        case DEFERRAL:
+          assert(0 /* unreachable */);
+#endif
+        default: // WORK
+          return false;
+      }
+  }
+}
+
+inline bool Promise::force(Runtime &runtime) {
+  HeapObject *obj = value.get();
+  if (!obj) {
+    return false;
+  } else switch (obj->category()) {
+    case VALUE:
+      return true;
+    case WORK:
+      return false;
+    default: // DEFERRAL:
+      Deferral *def = static_cast<Deferral*>(value.get());
+      HeapObject *dobj = def->promise.value.get();
+      if (!dobj) {
+        def->demand(runtime);
+        return false;
+      } else switch (dobj->category()) {
+        case VALUE:
+          value = dobj;
+          return true;
+#ifdef DEBUG_GC
+        case DEFERRAL:
+          assert(0 /* unreachable */);
+#endif
+        default: // WORK
+          def->demand(runtime);
+          return false;
+      }
+  }
+}
+
 inline void Promise::await(Runtime &runtime, Continuation *c) const {
 #ifdef DEBUG_GC
   assert(!c->next);
   assert(c->category() == WORK);
 #endif
-  switch (category()) {
+  HeapObject *obj = value.get();
+  if (!obj) {
+    value = c;
+  } else switch (obj->category()) {
     case VALUE:
-      c->resume(runtime, value.get());
+      c->resume(runtime, obj);
       break;
     case WORK:
-      c->next = static_cast<Continuation*>(value.get());
+      c->next = static_cast<Continuation*>(obj);
       value = c;
       break;
-    case DEFERRAL:
-      Deferral *def = static_cast<Deferral*>(value.get());
-      switch (def->promise.category()) {
+    default: // DEFERRAL:
+      Deferral *def = static_cast<Deferral*>(obj);
+      HeapObject *dobj = def->promise.value.get();
+      if (!dobj) {
+        c->consider(runtime, def);
+      } else switch (dobj->category()) {
         case VALUE:
-          value = def->promise.value.get();
-          c->resume(runtime, value.get());
+          value = dobj;
+          c->resume(runtime, dobj);
           break;
 #ifdef DEBUG_GC
         case DEFERRAL:
