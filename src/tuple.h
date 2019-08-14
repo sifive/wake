@@ -26,13 +26,13 @@ struct Constructor;
 
 struct alignas(PadObject) Promise {
   // Returns true if the value is ready.
-  explicit operator bool() const;
+  explicit operator bool();
 
   // Returns if already a value. If deferred, schedule it.
   bool force(Runtime &runtime);
 
   // Invoke the continuation once the Promise has a value
-  void await(Runtime &runtime, Continuation *c) const;
+  void await(Runtime &runtime, Continuation *c);
 
   // Returns true if nothing is waiting on the Promise
   bool fresh() const { return !value; }
@@ -42,7 +42,8 @@ struct alignas(PadObject) Promise {
   template <typename T>
   T *coerce() {
 #ifdef DEBUG_GC
-    assert (*this);
+    assert(value);
+    assert(value->category() == VALUE);
 #endif
     return static_cast<T*>(value.get());
   }
@@ -52,7 +53,8 @@ struct alignas(PadObject) Promise {
   template <typename T>
   const T *coerce() const {
 #ifdef DEBUG_GC
-    assert (*this);
+    assert(value);
+    assert(value->category() == VALUE);
 #endif
     return static_cast<const T*>(value.get());
   }
@@ -86,7 +88,7 @@ struct alignas(PadObject) Promise {
 
 private:
   void awaken(Runtime &runtime, HeapObject *obj);
-  mutable HeapPointer<HeapObject> value;
+  HeapPointer<HeapObject> value;
 friend struct Deferral;
 };
 
@@ -133,7 +135,7 @@ struct Deferral final : public GCObject<Deferral, HeapObject> {
   }
 };
 
-inline Promise::operator bool() const {
+inline Promise::operator bool() {
   HeapObject *obj = value.get();
   if (!obj) {
     return false;
@@ -191,7 +193,7 @@ inline bool Promise::force(Runtime &runtime) {
   }
 }
 
-inline void Promise::await(Runtime &runtime, Continuation *c) const {
+inline void Promise::await(Runtime &runtime, Continuation *c) {
 #ifdef DEBUG_GC
   assert(!c->next);
   assert(c->category() == WORK);
