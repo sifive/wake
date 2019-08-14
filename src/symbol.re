@@ -98,6 +98,7 @@ bool Lexer::isLower(const char *str) {
 top:
   /*!re2c
       re2c:yyfill:enable = 0;
+      re2c:eof = -1;
       re2c:define:YYMARKER = ignore;
       re2c:define:YYCURSOR = s;
 
@@ -117,6 +118,7 @@ bool Lexer::isUpper(const char *str) {
 top:
   /*!re2c
       re2c:yyfill:enable = 0;
+      re2c:eof = -1;
       re2c:define:YYMARKER = ignore;
       re2c:define:YYCURSOR = s;
 
@@ -132,6 +134,7 @@ bool Lexer::isOperator(const char *str) {
   (void)ignore;
   /*!re2c
       re2c:yyfill:enable = 0;
+      re2c:eof = -1;
       re2c:define:YYMARKER = ignore;
       re2c:define:YYCURSOR = s;
 
@@ -148,6 +151,7 @@ op_type op_precedence(const char *str) {
 top:
   /*!re2c
       re2c:yyfill:enable = 0;
+      re2c:eof = -1;
       re2c:define:YYMARKER = ignore;
       re2c:define:YYCURSOR = s;
 

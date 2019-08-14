@@ -28,14 +28,13 @@ def re2cOk Unit =
     | flatten
     | map int
   match ver
-    Some x, Some y, _ = x > 1 || (x == 1 && y >= 2)
+    Some x, Some y, Some z, _ = x > 1 || (x == 1 && (y > 2 || (y == 2 && z >= 1)))
     _       = False
 
 def re2cReal file =
   def cpp = replace `\.re$` ".cpp" file.getPathName
-  def cmdline = which "re2c", "-8", "--tags", "--no-generation-date", "-I", "re2c", "--input-encoding", "utf8", file.getPathName, "-o", cpp, Nil
-  def library = sources here `.*\.re`
-  def result = job cmdline (file, library) | getJobOutput
+  def cmdline = which "re2c", "-8", "--tags", "--no-generation-date", "--input-encoding", "utf8", file.getPathName, "-o", cpp, Nil
+  def result = job cmdline (file, Nil) | getJobOutput
   def compress = which "gzip", "-nk9", result.getPathName, Nil
   def _ = job compress (result, Nil)
   result
