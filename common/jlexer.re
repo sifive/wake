@@ -100,6 +100,7 @@ static void lex_jcomment(jinput_t &in) {
   while (s != e) {
     /*!re2c
         re2c:yyfill:enable = 0;
+        re2c:eof= -1;
         re2c:define:YYCURSOR = s;
         re2c:define:YYMARKER = ignore;
 
