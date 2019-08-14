@@ -667,6 +667,17 @@ static int wakefuse_symlink(const char *from, const char *to)
 	return 0;
 }
 
+static void move_members(std::set<std::string> &from, std::set<std::string> &to, const std::string &dir, const std::string &dest)
+{
+	auto i = from.upper_bound(dir + "/");
+	auto e = from.lower_bound(dir + "0");
+	while (i != e) {
+		auto kill = i++;
+		to.insert(dest + kill->substr(dir.size()));
+		from.erase(kill);
+	}
+}
+
 static int wakefuse_rename(const char *from, const char *to)
 {
 	TRACE(from);
@@ -717,7 +728,11 @@ static int wakefuse_rename(const char *from, const char *to)
 
 	it->second.files_wrote.erase(keyf.second);
 	it->second.files_read.erase(keyf.second);
-	it->second.files_wrote.insert(std::move(keyt.second));
+	it->second.files_wrote.insert(keyt.second);
+
+	// Move any children as well
+	move_members(it->second.files_wrote, it->second.files_wrote, keyf.second, keyt.second);
+	move_members(it->second.files_read,  it->second.files_wrote, keyf.second, keyt.second);
 
 	return 0;
 }
