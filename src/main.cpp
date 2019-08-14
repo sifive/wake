@@ -102,6 +102,7 @@ int main(int argc, char **argv) {
     { 0,   "no-tty",                GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "heap-factor",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
+    { 0,   "lazy",                  GOPT_ARGUMENT_FORBIDDEN },
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
     { 's', "script",                GOPT_ARGUMENT_FORBIDDEN },
@@ -129,6 +130,7 @@ int main(int argc, char **argv) {
   bool workspace=!arg(options, "no-workspace")->count;
   bool tty     =!arg(options, "no-tty"  )->count;
   int  profile = arg(options, "profile-heap")->count;
+  bool lazy    = arg(options, "lazy"    )->count;
   bool input   = arg(options, "input"   )->count;
   bool output  = arg(options, "output"  )->count;
   bool script  = arg(options, "script"  )->count;
@@ -275,7 +277,7 @@ int main(int argc, char **argv) {
   auto wakefiles = find_all_wakefiles(ok, workspace);
   if (!ok) std::cerr << "Workspace wake file enumeration failed" << std::endl;
 
-  Runtime runtime(profile, heap_factor);
+  Runtime runtime(profile, heap_factor, !lazy);
   bool sources = find_all_sources(runtime, workspace);
   if (!sources) std::cerr << "Source file enumeration failed" << std::endl;
   ok &= sources;

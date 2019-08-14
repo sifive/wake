@@ -44,14 +44,15 @@ struct Work : public HeapObject {
 };
 
 struct Runtime {
-  bool abort;
+  bool abort, strict;
   Heap heap;
   RootPointer<Work> stack;
   RootPointer<Work> lazy;
+  RootPointer<Deferral> deferred;
   RootPointer<HeapObject> output;
   RootPointer<Record> sources; // Vector String
 
-  Runtime(int profile_heap, double heap_factor);
+  Runtime(int profile_heap, double heap_factor, bool strict_);
   void run();
 
   void schedule(Work *work) {

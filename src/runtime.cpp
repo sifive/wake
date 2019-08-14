@@ -63,10 +63,11 @@ void CDeferral::execute(Runtime &runtime) {
   def->promise.fulfill(runtime, value.get());
 }
 
-Runtime::Runtime(int profile_heap, double heap_factor)
- : abort(false), heap(profile_heap, heap_factor),
+Runtime::Runtime(int profile_heap, double heap_factor, bool strict_)
+ : abort(false), strict(strict_), heap(profile_heap, heap_factor),
    stack(heap.root<Work>(nullptr)),
    lazy(heap.root<Work>(nullptr)),
+   deferred(heap.root<Work>(nullptr)),
    output(heap.root<HeapObject>(nullptr)),
    sources(heap.root<HeapObject>(nullptr)) {
 }
@@ -95,6 +96,13 @@ top:
     stack = lazy.get();
     lazy = lazy->next;
     stack->next = nullptr;
+    goto top;
+  }
+#ifdef DEBUG_GC
+  assert (!deferred || deferred->work);
+#endif
+  if (!stack && deferred) {
+    deferred->demand(*this);
     goto top;
   }
 }
@@ -182,7 +190,15 @@ struct CApp final : public GCObject<CApp, Continuation> {
       cont->consider(runtime, def);
       // If already demanded, remove the Deferral
       // This case is important for tail recursion
-      if (!def->work) work->cont = cont.get();
+      if (def->work) {
+        if (runtime.strict) {
+          def->next = runtime.deferred;
+          if (runtime.deferred) def->next->prev = def;
+          runtime.deferred = def;
+        }
+      } else {
+        work->cont = cont.get();
+      }
     } else {
       runtime.schedule(work);
     }

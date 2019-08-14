@@ -94,10 +94,8 @@ friend struct Deferral;
 
 struct Deferral final : public GCObject<Deferral, HeapObject> {
   HeapPointer<Work> work; // nullptr => work already scheduled
+  HeapPointer<Deferral> next, prev; // chain of deferred work for eager evaluation
   Promise promise;
-  // HeapPointer<Deferral> strict;
-  // ... if we want full eager evaluation link deferrals to runtime
-  // ... to control memory, ensure no two executed deferrals are neighbours
 
   Deferral(Work *work_) : work(work_) { }
   void format(std::ostream &os, FormatState &state) const override;
@@ -114,6 +112,11 @@ struct Deferral final : public GCObject<Deferral, HeapObject> {
       runtime.lazy = work;
       work = nullptr;
     }
+    if (prev) prev->next = next;
+    if (next) next->prev = prev;
+    if (runtime.deferred.get() == this) runtime.deferred = next;
+    next = nullptr;
+    prev = nullptr;
   }
 
   // Schedule this deferred computation; we need it's value
@@ -130,6 +133,8 @@ struct Deferral final : public GCObject<Deferral, HeapObject> {
   T recurse(T arg) {
     arg = HeapObject::recurse<T, memberfn>(arg);
     arg = (work.*memberfn)(arg);
+    arg = (next.*memberfn)(arg);
+    arg = (prev.*memberfn)(arg);
     arg = promise.recurse<T, memberfn>(arg);
     return arg;
   }
