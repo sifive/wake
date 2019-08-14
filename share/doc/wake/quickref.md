@@ -224,6 +224,14 @@ global def runit _ =
 
 Note: all definitions and functions referenced in this section can be found in [job.wake](https://github.com/sifive/wake/blob/master/share/wake/lib/system/job.wake).
 
+Runners are responsible for executing a Plan to run an external program. There are two built-in base runners: `localRunner` and `defaultRunner`. `defaultRunner` creates a sandbox for jobs to run in while `localRunner` runs jobs in the actual workspace. An additional distinction is `localRunner` does not detect inputs/outputs by itself. 
+
+Runners are chosen for a given Plan based on the value returned by their `score` function and the plan's `RunnerFilter` field. Multiple runners may be able to run a given Plan, so the `score` function selects the most appropriate one. 
+
+* In `runJob`,  `subscribe runner` is called to retrieve the list of all published runners. The `RunnerFilter` function inside the Plan tuple can be set to filter out runners that the plan wants to exclude from consideration. Then the `score` function of each runner is called and runners that return Fail or a score <= 0.0 are excluded. Of the remaining runners, the one with the highest score is picked.
+* Local runners can only run when the Plan tuple has `LocalOnly` set to true
+* Default runners can only run when the Plan tuple has `LocalOnly` set to false
+
 Runners are created using `makeRunner`. `makeRunner` is defined as follows:
 
 ```global def makeRunner name score pre post (Runner _ _ run)```
@@ -234,15 +242,9 @@ Runners are created using `makeRunner`. `makeRunner` is defined as follows:
 * The last argument is the base runner that the current runner is built on top of. This is because all runners must be built on top of a preexisting runner. For example, in environment-example-sifive, localRISCVRunner and defaultRISCVRunner are built on top of localRunner and defaultRunner respectively.
 * `publish runner` must be executed for Wake to recognize a runner
 
-Runners are chosen for a given Plan based on the value returned by their `score` function and the plan's `RunnerFilter` field.
-
-* In `runJob`,  `subscribe runner` is called to retrieve the list of all published runners. The `RunnerFilter` function inside the Plan tuple can be set to filter out runners that the plan wants to exclude from consideration. Then the `score` function of each runner is called and runners that return Fail or a score <= 0.0 are excluded. Of the remaining runners, the one with the highest score is picked. 
-* Local runners can only run when the Plan tuple has `LocalOnly` set to true
-* Default runners can only run when the Plan tuple has `LocalOnly` set to false
-
 #### Using environment packages 
 
-Environment packages can be added to a workspace to provide tools (using runners) for running the workflow. You can check out [environment-example-sifive](https://github.com/sifive/environment-example-sifive) as an example of an environment package that contains runners for Wake-based workflows. 
+Environment packages can be added to a workspace to provide tools (using runners) for running the workflow. They are composed of Wake files that define and publish runners. Environment packages should be defined for each unique running environment to decouple Wake rules from how tools are installed in each environment. You can check out [environment-example-sifive](https://github.com/sifive/environment-example-sifive) as an example of an environment package that contains runners for Wake-based workflows. 
 
 #### sources and Path objects
 
