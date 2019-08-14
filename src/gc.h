@@ -322,7 +322,7 @@ struct alignas(PadObject) GCObject : public B {
   const char *type() const override;
 
   // redefine these if 'data' extends past sizeof(T)
-  PadObject *next() { return static_cast<PadObject*>(static_cast<HeapObject*>(self() + 1)); }
+  PadObject *objend() { return static_cast<PadObject*>(static_cast<HeapObject*>(self() + 1)); }
   static size_t reserve();
   template <typename ... ARGS>
   static T *claim(Heap &h, ARGS&&... args); // require prior h.reserve
@@ -356,12 +356,12 @@ Placement GCObject<T, B>::moveto(PadObject *free) {
   T *to = new(free) T(std::move(*from));
   from->~T();
   new(from) MovedObject(to);
-  return Placement(to, to->next());
+  return Placement(to, to->objend());
 }
 
 template <typename T, typename B>
 Placement GCObject<T, B>::descend(PadObject *free) {
-  return Placement(self()->next(), self()->template recurse<PadObject *, &HeapPointerBase::moveto>(free));
+  return Placement(self()->objend(), self()->template recurse<PadObject *, &HeapPointerBase::moveto>(free));
 }
 
 template <typename T, typename B>

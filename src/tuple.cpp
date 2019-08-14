@@ -68,7 +68,7 @@ struct TupleObject : public GCObject<T, B> {
 
   template <typename R, R (HeapPointerBase::*memberfn)(R x)>
   R recurse(R arg);
-  PadObject *next();
+  PadObject *objend();
 };
 
 template <typename T, typename B>
@@ -100,8 +100,8 @@ TupleObject<T,B>::TupleObject(const TupleObject &b) : GCObject<T, B>(b) {
 }
 
 template <typename T, typename B>
-PadObject *TupleObject<T,B>::next() {
-  return GCObject<T,B>::next() + GCObject<T,B>::self()->size() * (sizeof(Promise)/sizeof(PadObject));
+PadObject *TupleObject<T,B>::objend() {
+  return GCObject<T,B>::objend() + GCObject<T,B>::self()->size() * (sizeof(Promise)/sizeof(PadObject));
 }
 
 template <typename T, typename B>
@@ -211,7 +211,7 @@ struct ScopeObject : public TupleObject<T, Scope> {
 
   template <typename R, R (HeapPointerBase::*memberfn)(R x)>
   R recurse(R arg);
-  PadObject *next();
+  PadObject *objend();
 
   const ScopeStack *stack() const final override;
   ScopeStack *stack() final override;
@@ -228,8 +228,8 @@ ScopeStack *ScopeObject<T>::stack() {
 }
 
 template <typename T>
-PadObject *ScopeObject<T>::next() {
-  PadObject *end = TupleObject<T, Scope>::next();
+PadObject *ScopeObject<T>::objend() {
+  PadObject *end = TupleObject<T, Scope>::objend();
   if (Scope::debug) end += (sizeof(ScopeStack)/sizeof(PadObject));
   return end;
 }

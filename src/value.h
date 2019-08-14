@@ -85,7 +85,7 @@ struct String final : public GCObject<String, Value> {
   void format(std::ostream &os, FormatState &state) const override;
   static void cstr_format(std::ostream &os, const char *s, size_t len);
 
-  PadObject *next() { return Parent::next() + 1 + length/sizeof(PadObject); }
+  PadObject *objend() { return Parent::objend() + 1 + length/sizeof(PadObject); }
   static size_t reserve(size_t length) { return sizeof(String)/sizeof(PadObject) + 1 + length/sizeof(PadObject); }
 
   static String *claim(Heap &h, size_t length);
@@ -124,7 +124,7 @@ struct Integer final : public GCObject<Integer, Value> {
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
 
-  PadObject *next() { return Parent::next() + (abs(length)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
+  PadObject *objend() { return Parent::objend() + (abs(length)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
   static size_t reserve(const MPZ &mpz) { return sizeof(Integer)/sizeof(PadObject) + (abs(mpz.value[0]._mp_size)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
 
   static Integer *claim(Heap &h, const MPZ& mpz);
