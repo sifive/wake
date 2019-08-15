@@ -44,10 +44,15 @@ tuple Runner =
   Fn:           Job => Result RunnerInput Error => Result RunnerOutput Error
 
 # Create new Runner given pre- and post-hooks around an existing Runner
-# The `score` argument is of type `Plan → Result Double String` and is called by `runJob` to produce a score representing the priority of a runner with respect to the given Plan. For example, if `plan.getPlanResources` returns list `("python/3.7.1", Nil)` then the RISC-V runner probably cannot provide that resource and should return something like `Fail RISCVRunner: cannot provide resource: python/3.7.1". If the plan resources is `("riscv-tools/2019.02.0", Nil)` then the `score` function should return `Pass 1.0` or some other positive number.
-# The `pre` argument is of type `Result RunnerInput Error → Pair (Result RunnerInput Error) a`. The `RunnerInput` tuple is a subset of the `Plan` tuple, serving to restrict the fields that the runner can access. The `pre` function is called before the job is run, allowing the runner to modify the input to provide the requested resources. For example, the RISC-V runner would run `runnerInput | editRunnerInputEnvironment addRISCVEnvironment` where `addRISCVEnvironment` is a function that sets the RISCV environment variable. The return value of `pre` is the modified `RunnerInput` paired with a free `a` type that can contain any sideband data that the `pre` function needs to provide to the `post` function.
-# The `post` argument is of type `Pair (Result RunnerOutput Error) a → Result RunnerOutput Error` and is similar to the `pre` function but is called after the job has run. `post` is for editing the reported outputs/inputs/usage of the job. For example, the fuse runner uses the `post` hook to set the `output` and `input` files reported by the FUSE filesystem. 
-# The last argument is the base runner that the current runner is built on top of. This is because all runners must be built on top of a preexisting runner. For example, in environment-example-sifive, localRISCVRunner and defaultRISCVRunner are built on top of localRunner and defaultRunner respectively.
+# param name: String
+# param score: type Plan → Result Double String 
+#   Called by runJob to produce a score representing the priority of a runner with respect to the given Plan. 
+# param pre: type Result RunnerInput Error → Pair (Result RunnerInput Error) a
+#   Called before the job is run, allowing the runner to modify the input to provide the requested resources. 
+# param post: type Pair (Result RunnerOutput Error) a → Result RunnerOutput Error
+#   Similar to the pre function but called after the job has run. post is for editing the reported outputs/inputs/usage of the job. 
+# param (Runner _ _ run): base runner that the current runner is built on top of
+#   i.e. localRISCVRunner is built on localRunner.
 
 global def makeRunner name score pre post (Runner _ _ run) =
   def doit job preInput = match (pre preInput)
