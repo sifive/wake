@@ -6,9 +6,9 @@ License:       Apache-2; MIT; TFL; WTFPL; CC0
 URL:           https://github.com/sifive/wake
 Vendor:        SiFive, Inc.
 Source0:       https://github.com/sifive/wake/releases/%{name}_%{version}.tar.xz
-Requires:      fuse
+Requires:      fuse dash
 Prefix:        /usr
-BuildRequires: fuse-devel sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel
+BuildRequires: fuse-devel dash sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel
 
 %description
 Wake is a build orchestration tool and language.
@@ -28,7 +28,10 @@ USE_FUSE_WAKE=0 make install
 mv install "%{buildroot}/usr"
 
 %files
-/usr/*
+/usr/bin/wake
+/usr/lib/wake
+/usr/share/wake
+%doc /usr/share/doc/wake
 
 %changelog
 # let's skip this for now

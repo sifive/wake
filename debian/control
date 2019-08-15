@@ -2,7 +2,7 @@ Source: wake
 Section: devel
 Priority: optional
 Maintainer: Wesley W. Terpstra <terpstra@debian.org>
-Build-Depends: debhelper (>= 9), libfuse-dev (>= 2.8.0), libsqlite3-dev (>= 3.6.0), libgmp-dev (>= 4.3.0), libncurses5-dev (>= 5.7), pkg-config, git, libre2-dev (>= 20130101)
+Build-Depends: debhelper (>= 9), libfuse-dev (>= 2.8.0), libsqlite3-dev (>= 3.6.0), libgmp-dev (>= 4.3.0), libncurses5-dev (>= 5.7), pkg-config, git, libre2-dev (>= 20130101), dash
 Standards-Version: 4.1.3
 Homepage: https://github.com/sifive/wake
 Vcs-Browser: https://github.com/sifive/wake
@@ -10,7 +10,7 @@ Vcs-Git: https://github.com/sifive/wake.git
 
 Package: wake
 Architecture: any
-Depends: fuse, ${shlibs:Depends}, ${misc:Depends}
+Depends: fuse, dash, ${shlibs:Depends}, ${misc:Depends}
 Description: flexible build orchestration tool and language
  Wake is a build orchestration tool and language.
  If you have a build whose steps cannot be adequately expressed in
