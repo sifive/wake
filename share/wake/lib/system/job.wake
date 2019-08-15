@@ -142,7 +142,7 @@ global def makePlan cmd visible =
   Plan cmd visible environment "." "" logVerbose logWarn Normal Share False Nil (\_ True) id id
 
 global def makeShellPlan script visible =
-  makePlan (which "dash", "-c", replace `\n` '; ' script, Nil) visible
+  makePlan (which "dash", "-c", script, Nil) visible
 
 def defaultUsage = Usage 0 0.0 1.0 0 0 0
 
