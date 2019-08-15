@@ -28,7 +28,10 @@ USE_FUSE_WAKE=0 make install
 mv install "%{buildroot}/usr"
 
 %files
-/usr/*
+/usr/bin/wake
+/usr/lib/wake
+/usr/share/wake
+%doc /usr/share/doc/wake
 
 %changelog
 # let's skip this for now
