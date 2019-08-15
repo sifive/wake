@@ -36,6 +36,7 @@ jobs:
           cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
+          apt-get install -y ./wake_*.deb
           mkdir -p release/debian_wheezy
           mv *.deb *.gz *.xz *.changes *.dsc release/debian_wheezy
       - persist_to_workspace:
@@ -57,6 +58,7 @@ jobs:
           cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
+          apt-get install -y ./wake_*.deb
           mkdir -p release/debian_testing
           mv *.deb *.xz *.changes *.dsc release/debian_testing
       - persist_to_workspace:
@@ -79,6 +81,7 @@ jobs:
           cp /tmp/workspace/wake_*.tar.xz /root/rpmbuild/SOURCES
           cp /tmp/workspace/wake.spec .
           /usr/bin/scl enable devtoolset-6 'rpmbuild -ba wake.spec'
+          yum -y install /root/rpmbuild/RPMS/x86_64/wake-*.rpm
           mkdir -p release/centos_6_6
           cp /root/rpmbuild/RPMS/x86_64/*.rpm /root/rpmbuild/SRPMS/*.rpm release/centos_6_6
       - persist_to_workspace:
@@ -102,6 +105,7 @@ jobs:
           cp /tmp/workspace/wake_*.tar.xz /root/rpmbuild/SOURCES
           cp /tmp/workspace/wake.spec .
           rpmbuild -ba wake.spec
+          yum -y install /root/rpmbuild/RPMS/x86_64/wake-*.rpm
           mkdir -p release/centos_7_6
           cp /root/rpmbuild/RPMS/x86_64/*.rpm /root/rpmbuild/SRPMS/*.rpm release/centos_7_6
       - persist_to_workspace:
@@ -126,6 +130,7 @@ jobs:
           cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
+          apt-get install -y ./wake_*.deb
           mkdir -p release/ubuntu_14_04
           mv *.deb *.xz *.changes *.dsc release/ubuntu_14_04
       - persist_to_workspace:
@@ -147,6 +152,7 @@ jobs:
           cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
+          apt-get install -y ./wake_*.deb
           mkdir -p release/ubuntu_16_04
           mv *.deb *.xz *.changes *.dsc release/ubuntu_16_04
       - persist_to_workspace:
@@ -168,6 +174,7 @@ jobs:
           cp -a /tmp/workspace/debian .
           debuild -us -uc
           cd ..
+          apt-get install -y ./wake_*.deb
           mkdir -p release/ubuntu_18_04
           mv *.deb *.xz *.changes *.dsc release/ubuntu_18_04
       - persist_to_workspace:
