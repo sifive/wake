@@ -1263,7 +1263,7 @@ static void handle_exit(int sig)
 		while (WIFSTOPPED(status));
 	}
 
-	if (exit_attempts == 4) {
+	if (exit_attempts == 3) {
 		fprintf(stderr, "Unable to cleanly exit after 4 unmount attempts\n");
 		exit(1);
 	} else if ((pid = fork()) == 0) {

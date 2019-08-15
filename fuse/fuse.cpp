@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
 
 	int ffd = -1;
 	useconds_t wait = 10000; /* 10ms */
-	for (int retry = 0; (ffd = open(fpath.c_str(), O_RDONLY)) == -1 && retry < 10; ++retry) {
+	for (int retry = 0; (ffd = open(fpath.c_str(), O_RDONLY)) == -1 && retry < 12; ++retry) {
 		pid_t pid = fork();
 		if (pid == 0) {
 			ofs.close();
