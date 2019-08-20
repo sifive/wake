@@ -34,8 +34,8 @@ Hash Work::hash() const {
   return Hash();
 }
 
-bool Work::is_work() const {
-  return true;
+Category Work::category() const {
+  return WORK;
 }
 
 Runtime::Runtime(int profile_heap, double heap_factor)
@@ -200,6 +200,7 @@ struct CPrim final : public GCObject<CPrim, Continuation> {
     if (i == 0) {
       prim->fn(prim->data, runtime, cont.get(), scope.get(), prim->args, args);
     } else {
+      next = nullptr; // reschedule
       it->at(0)->await(runtime, this);
     }
   }

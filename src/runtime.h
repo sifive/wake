@@ -32,7 +32,7 @@ struct Work : public HeapObject {
   virtual void execute(Runtime &runtime) = 0;
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
-  bool is_work() const override;
+  Category category() const override;
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -53,6 +53,9 @@ struct Runtime {
   void run();
 
   void schedule(Work *work) {
+#ifdef DEBUG_GC
+    assert(!work->next);
+#endif
     work->next = stack;
     stack = work;
   }

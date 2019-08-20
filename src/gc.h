@@ -52,6 +52,8 @@ struct HeapStep {
   HeapObject **found;
 };
 
+enum Category { VALUE, WORK };
+
 struct HeapObject {
   virtual Placement moveto(PadObject *free) = 0;
   virtual Placement descend(PadObject *free) = 0;
@@ -59,7 +61,7 @@ struct HeapObject {
   virtual const char *type() const = 0;
   virtual void format(std::ostream &os, FormatState &state) const = 0;
   virtual Hash hash() const = 0; // shallow hash of only this object
-  virtual bool is_work() const;
+  virtual Category category() const = 0;
   virtual ~HeapObject();
 
   static void format(std::ostream &os, const HeapObject *value, bool detailed = false, int indent = -1);
@@ -197,6 +199,7 @@ struct PadObject final : public HeapObject {
   const char *type() const override;
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
+  Category category() const override;
   static PadObject *place(PadObject *free) {
     new(free) PadObject();
     return free + 1;
@@ -212,6 +215,7 @@ struct alignas(PadObject) MovedObject final : public HeapObject {
   const char *type() const override;
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
+  Category category() const override;
 };
 
 struct GCNeededException {
@@ -296,7 +300,7 @@ private:
 friend struct DestroyableObject;
 };
 
-template <typename T, typename B = HeapObject>
+template <typename T, typename B>
 struct alignas(PadObject) GCObject : public B {
   template <typename ... ARGS>
   GCObject(ARGS&&... args) : B(std::forward<ARGS>(args) ... ) {
@@ -318,7 +322,7 @@ struct alignas(PadObject) GCObject : public B {
   const char *type() const override;
 
   // redefine these if 'data' extends past sizeof(T)
-  PadObject *next() { return static_cast<PadObject*>(static_cast<HeapObject*>(self() + 1)); }
+  PadObject *objend() { return static_cast<PadObject*>(static_cast<HeapObject*>(self() + 1)); }
   static size_t reserve();
   template <typename ... ARGS>
   static T *claim(Heap &h, ARGS&&... args); // require prior h.reserve
@@ -352,12 +356,12 @@ Placement GCObject<T, B>::moveto(PadObject *free) {
   T *to = new(free) T(std::move(*from));
   from->~T();
   new(from) MovedObject(to);
-  return Placement(to, to->next());
+  return Placement(to, to->objend());
 }
 
 template <typename T, typename B>
 Placement GCObject<T, B>::descend(PadObject *free) {
-  return Placement(self()->next(), self()->template recurse<PadObject *, &HeapPointerBase::moveto>(free));
+  return Placement(self()->objend(), self()->template recurse<PadObject *, &HeapPointerBase::moveto>(free));
 }
 
 template <typename T, typename B>
@@ -372,8 +376,11 @@ const char *GCObject<T, B>::type() const {
   return out;
 }
 
+struct Value : public HeapObject {
+  Category category() const override;
+};
 
-struct DestroyableObject : public HeapObject {
+struct DestroyableObject : public Value {
   DestroyableObject(Heap &h);
   DestroyableObject(DestroyableObject &&d) = default;
   HeapObject *next;

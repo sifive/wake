@@ -68,8 +68,8 @@
 #define LOG_ECHO(x) (x & 0x10)
 
 // Can be queried at multiple stages of the job's lifetime
-struct Job final : public GCObject<Job> {
-  typedef GCObject<Job> Parent;
+struct Job final : public GCObject<Job, Value> {
+  typedef GCObject<Job, Value> Parent;
 
   Database *db;
   HeapPointer<String> cmdline, stdin, dir;
@@ -214,9 +214,11 @@ static bool operator < (const std::unique_ptr<Task> &x, const std::unique_ptr<Ta
   if (x->job->q_stdout || x->job->q_stderr) return false;
   if (y->job->q_stdout || y->job->q_stderr) return true;
   // 0 (unknown runtime) is infinity for this comparison (ie: run first)
-  if (x->job->predict.runtime == 0) return false;
-  if (y->job->predict.runtime == 0) return true;
-  return x->job->pathtime < y->job->pathtime;
+  if (x->job->predict.runtime == 0 && y->job->predict.runtime != 0) return false;
+  if (y->job->predict.runtime == 0 && x->job->predict.runtime != 0) return true;
+  if (x->job->pathtime < y->job->pathtime) return true;
+  if (x->job->pathtime > y->job->pathtime) return false;
+  return x->job->job < y->job->job;
 }
 
 // A JobEntry is a forked job with pid|stdout|stderr incomplete

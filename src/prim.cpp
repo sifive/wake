@@ -142,6 +142,7 @@ void CHash::execute(Runtime &runtime) {
 
   auto hash = deep_hash(runtime, obj.get());
   if (hash.broken) {
+    next = nullptr; // reschedule
     hash.broken->await(runtime, this);
   } else {
     Hash &h = hash.code;

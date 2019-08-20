@@ -59,6 +59,19 @@ static PRIMFN(prim_vcat) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_strlen) {
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
+    out->unify(Integer::typeVar);
+}
+
+static PRIMFN(prim_strlen) {
+  EXPECT(1);
+  STRING(arg, 0);
+  MPZ out(arg->size());
+  RETURN(Integer::alloc(runtime.heap, out));
+}
+
 static PRIMTYPE(type_lcat) {
   TypeVar list;
   Data::typeList.clone(list);
@@ -92,6 +105,7 @@ void CCat::execute(Runtime &runtime) {
     progress = progress->at(1)->coerce<Record>();
 
   if (progress->size() == 2) {
+    next = nullptr; // reschedule
     if (*progress->at(0)) {
       progress->at(1)->await(runtime, this);
     } else {
@@ -571,6 +585,7 @@ static PRIMFN(prim_uname) {
 }
 
 void prim_register_string(PrimMap &pmap, StringInfo *info) {
+  prim_register(pmap, "strlen",   prim_strlen,   type_strlen,    PRIM_PURE);
   prim_register(pmap, "vcat",     prim_vcat,     type_vcat,      PRIM_PURE);
   prim_register(pmap, "lcat",     prim_lcat,     type_lcat,      PRIM_PURE);
   prim_register(pmap, "explode",  prim_explode,  type_explode,   PRIM_PURE);

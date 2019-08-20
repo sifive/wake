@@ -54,8 +54,8 @@ struct FormatState {
   int p() const { return current.precedence; }
 };
 
-struct String final : public GCObject<String> {
-  typedef GCObject<String> Parent;
+struct String final : public GCObject<String, Value> {
+  typedef GCObject<String, Value> Parent;
 
   static TypeVar typeVar;
   size_t length;
@@ -85,7 +85,7 @@ struct String final : public GCObject<String> {
   void format(std::ostream &os, FormatState &state) const override;
   static void cstr_format(std::ostream &os, const char *s, size_t len);
 
-  PadObject *next() { return Parent::next() + 1 + length/sizeof(PadObject); }
+  PadObject *objend() { return Parent::objend() + 1 + length/sizeof(PadObject); }
   static size_t reserve(size_t length) { return sizeof(String)/sizeof(PadObject) + 1 + length/sizeof(PadObject); }
 
   static String *claim(Heap &h, size_t length);
@@ -111,8 +111,8 @@ struct MPZ {
   MPZ& operator = (const MPZ& x) = delete;
 };
 
-struct Integer final : public GCObject<Integer> {
-  typedef GCObject<Integer> Parent;
+struct Integer final : public GCObject<Integer, Value> {
+  typedef GCObject<Integer, Value> Parent;
 
   static TypeVar typeVar;
   int length; // abs(length) = number of mp_limb_t in object
@@ -124,7 +124,7 @@ struct Integer final : public GCObject<Integer> {
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
 
-  PadObject *next() { return Parent::next() + (abs(length)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
+  PadObject *objend() { return Parent::objend() + (abs(length)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
   static size_t reserve(const MPZ &mpz) { return sizeof(Integer)/sizeof(PadObject) + (abs(mpz.value[0]._mp_size)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
 
   static Integer *claim(Heap &h, const MPZ& mpz);
@@ -147,7 +147,7 @@ struct Integer final : public GCObject<Integer> {
 #define SCIENTIFIC 1
 #define HEXFLOAT 2
 #define DEFAULTFLOAT 3
-struct Double final : public GCObject<Double> {
+struct Double final : public GCObject<Double, Value> {
   typedef std::numeric_limits< double > limits;
 
   static TypeVar typeVar;
@@ -180,7 +180,7 @@ struct RegExp final : public GCObject<RegExp, DestroyableObject> {
   static RootPointer<RegExp> literal(Heap &h, const std::string &value);
 };
 
-struct Closure final : public GCObject<Closure, HeapObject> {
+struct Closure final : public GCObject<Closure, Value> {
   Lambda *lambda;
   HeapPointer<Scope> scope;
 

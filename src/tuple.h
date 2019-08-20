@@ -25,12 +25,19 @@ struct Location;
 struct Constructor;
 
 struct alignas(PadObject) Promise {
-  explicit operator bool() const {
+  Category category() const {
     HeapObject *obj = value.get();
-    return obj && !obj->is_work();
+    return obj ? obj->category() : WORK;
+  }
+
+  explicit operator bool() const {
+    return category() == VALUE;
   }
 
   void await(Runtime &runtime, Continuation *c) const {
+#ifdef DEBUG_GC
+    assert(!c->next);
+#endif
     if (*this) {
       c->resume(runtime, value.get());
     } else {
@@ -41,17 +48,36 @@ struct alignas(PadObject) Promise {
 
   // Use only if the value is known to already be available 
   template <typename T>
-  T *coerce() { return static_cast<T*>(value.get()); }
+  T *coerce() {
+#ifdef DEBUG_GC
+    assert (*this);
+#endif
+    return static_cast<T*>(value.get());
+  }
+
   template <typename T>
-  const T *coerce() const { return static_cast<const T*>(value.get()); }
+  const T *coerce() const {
+#ifdef DEBUG_GC
+    assert (*this);
+#endif
+    return static_cast<const T*>(value.get());
+  }
 
   // Call once only!
-  void fulfill(Runtime &runtime, HeapObject *obj);
+  void fulfill(Runtime &runtime, HeapObject *obj) {
+#ifdef DEBUG_GC
+    assert(obj);
+    assert(obj->category() == VALUE);
+#endif
+    if (value) awaken(runtime, obj);
+    value = obj;
+  }
+
   // Call only if the containing tuple was just constructed (no Continuations)
   void instant_fulfill(HeapObject *obj) {
 #ifdef DEBUG_GC
      assert(!value);
-     assert(!obj->is_work());
+     assert(obj->category() == VALUE);
 #endif
      value = obj;
   }
@@ -60,6 +86,7 @@ struct alignas(PadObject) Promise {
   T recurse(T arg) { return (value.*memberfn)(arg); }
 
 private:
+  void awaken(Runtime &runtime, HeapObject *obj);
   mutable HeapPointer<HeapObject> value;
 friend struct Tuple;
 };
@@ -71,7 +98,7 @@ inline HeapStep Promise::recurse<HeapStep, &HeapPointerBase::explore>(HeapStep s
   return step;
 }
 
-struct Tuple : public HeapObject {
+struct Tuple : public Value {
   virtual size_t size() const = 0;
   virtual Promise *at(size_t i) = 0;
   virtual const Promise *at(size_t i) const = 0;
