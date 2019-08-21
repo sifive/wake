@@ -23,7 +23,6 @@
 #define VERSION_STR TOSTRING(VERSION)
 
 #include <iostream>
-#include <thread>
 #include <sstream>
 #include <random>
 #include <inttypes.h>
@@ -175,8 +174,6 @@ int main(int argc, char **argv) {
     }
   }
 
-  double njobs = std::thread::hardware_concurrency() * percent;
-
   double heap_factor = 4.0;
   if (heapf) {
     char *tail;
@@ -319,7 +316,7 @@ int main(int argc, char **argv) {
   top->body = std::unique_ptr<Expr>(body);
 
   /* Primitives */
-  JobTable jobtable(&db, njobs, verbose, quiet, check);
+  JobTable jobtable(&db, percent, verbose, quiet, check);
   StringInfo info(verbose, debug, quiet, VERSION_STR);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 

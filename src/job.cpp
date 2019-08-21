@@ -43,6 +43,7 @@
 #include <cstring>
 #include <algorithm>
 #include <limits>
+#include <thread>
 
 // How many times to SIGTERM a process before SIGKILL
 #define TERM_ATTEMPTS 6
@@ -296,13 +297,13 @@ bool JobTable::exit_now() {
   return exit_asap;
 }
 
-JobTable::JobTable(Database *db, double max_jobs, bool verbose, bool quiet, bool check) : imp(new JobTable::detail) {
+JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool check) : imp(new JobTable::detail) {
   imp->verbose = verbose;
   imp->quiet = quiet;
   imp->check = check;
   imp->db = db;
   imp->active = 0;
-  imp->limit = max_jobs;
+  imp->limit = std::thread::hardware_concurrency() * percent;
   sigemptyset(&imp->block);
 
   struct sigaction sa;
@@ -354,7 +355,7 @@ JobTable::JobTable(Database *db, double max_jobs, bool verbose, bool quiet, bool
   }
 
   // Calculate the maximum number of children to ever run
-  imp->max_children = max_jobs * 100; // based on minimum 1% CPU utilization in Job::threads
+  imp->max_children = imp->limit * 100; // based on minimum 1% CPU utilization in Job::threads
   if (imp->max_children > MAX_CHILDREN) imp->max_children = MAX_CHILDREN; // wake hard cap
 #ifdef CHILD_MAX
   if (imp->max_children > CHILD_MAX/2) imp->max_children = CHILD_MAX/2;   // limits.h
