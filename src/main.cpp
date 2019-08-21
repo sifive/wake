@@ -48,7 +48,7 @@ void print_help(const char *argv0) {
     << "Usage: " << argv0 << " [-cdghioqsv] [-j NUM] [--] [arg0 ...]" << std::endl
     << std::endl
     << "  Flags affecting build execution:" << std::endl
-    << "    --jobs=NUM -jNUM Schedule local job execution to use <= NUM CPU-bound tasks" << std::endl
+    << "    -pPERCENT        Schedule local jobs for <= PERCENT of system (default 90)"  << std::endl
     << "    --check    -c    Rerun all jobs and confirm their output is reproducible"    << std::endl
     << "    --verbose  -v    Report hash progress and result expression types"           << std::endl
     << "    --debug    -d    Report stack frame information for exceptions and closures" << std::endl
@@ -92,7 +92,7 @@ static struct option *arg(struct option opts[], const char *name) {
 
 int main(int argc, char **argv) {
   struct option options[] {
-    { 'j', "jobs",                  GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
+    { 'p', "percent",               GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 'c', "check",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'v', "verbose",               GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 'd', "debug",                 GOPT_ARGUMENT_FORBIDDEN },
@@ -142,10 +142,10 @@ int main(int argc, char **argv) {
   bool parse   = arg(options, "stop-after-parse")->count;
   bool tcheck  = arg(options, "stop-after-type-check")->count;
 
-  const char *jobs   = arg(options, "jobs"  )->argument;
-  const char *heapf  = arg(options, "heap-factor")->argument;
-  const char *init   = arg(options, "init"  )->argument;
-  const char *remove = arg(options, "remove-task")->argument;
+  const char *percents= arg(options, "percent")->argument;
+  const char *heapf   = arg(options, "heap-factor")->argument;
+  const char *init    = arg(options, "init")->argument;
+  const char *remove  = arg(options, "remove-task")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -164,15 +164,18 @@ int main(int argc, char **argv) {
 
   term_init(tty);
 
-  int njobs = std::thread::hardware_concurrency();
-  if (jobs) {
+  double percent = 0.9;
+  if (percents) {
     char *tail;
-    njobs = strtol(jobs, &tail, 0);
-    if (*tail || njobs < 1) {
-      std::cerr << "Cannot run with " << jobs << " jobs (must be >= 1)!" << std::endl;
+    percent = strtod(percents, &tail);
+    percent /= 100.0;
+    if (*tail || percent < 0.01 || percent > 0.99) {
+      std::cerr << "Cannot run with " << percents << "%  (must be >= 0.01 and <= 0.99)!" << std::endl;
       return 1;
     }
   }
+
+  double njobs = std::thread::hardware_concurrency() * percent;
 
   double heap_factor = 4.0;
   if (heapf) {

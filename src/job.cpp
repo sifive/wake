@@ -296,7 +296,7 @@ bool JobTable::exit_now() {
   return exit_asap;
 }
 
-JobTable::JobTable(Database *db, int max_jobs, bool verbose, bool quiet, bool check) : imp(new JobTable::detail) {
+JobTable::JobTable(Database *db, double max_jobs, bool verbose, bool quiet, bool check) : imp(new JobTable::detail) {
   imp->verbose = verbose;
   imp->quiet = quiet;
   imp->check = check;
