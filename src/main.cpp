@@ -163,6 +163,10 @@ int main(int argc, char **argv) {
 
   term_init(tty);
 
+  if (!percents) {
+    percents = getenv("WAKE_PERCENT");
+  }
+
   double percent = 0.9;
   if (percents) {
     char *tail;
