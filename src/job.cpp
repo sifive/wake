@@ -53,6 +53,8 @@
 #define MAX_SELF_FDS	24
 // The most children wake will ever allow to run at once
 #define MAX_CHILDREN	500
+// The default memory to provision for jobs (2MB)
+#define DEFAULT_PHYS_USAGE	(2*1024*1024)
 
 // #define DEBUG_PROGRESS
 
@@ -105,6 +107,7 @@ struct Job final : public GCObject<Job, Value> {
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
 
+  uint64_t memory() const;
   double threads() const;
 };
 
@@ -159,6 +162,14 @@ void Job::format(std::ostream &os, FormatState &state) const {
 }
 
 TypeVar Job::typeVar("Job", 0);
+
+uint64_t Job::memory() const {
+  if (predict.membytes == 0) {
+    return DEFAULT_PHYS_USAGE;
+  } else {
+    return predict.membytes;
+  }
+}
 
 double Job::threads() const {
   double estimate;
@@ -252,6 +263,7 @@ struct JobTable::detail {
   sigset_t block; // signals that can race with pselect()
   Database *db;
   double active, limit; // CPUs
+  uint64_t phys_active, phys_limit; // memory
   long max_children; // hard cap on jobs allowed
   bool verbose;
   bool quiet;
@@ -304,6 +316,10 @@ JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool 
   imp->db = db;
   imp->active = 0;
   imp->limit = std::thread::hardware_concurrency() * percent;
+  imp->phys_active = 0;
+  imp->phys_limit = sysconf(_SC_PHYS_PAGES);
+  imp->phys_limit *= sysconf(_SC_PAGESIZE);
+  imp->phys_limit *= percent;
   sigemptyset(&imp->block);
 
   struct sigaction sa;
@@ -526,6 +542,7 @@ struct CompletedJobEntry {
     if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
       status_state.jobs.erase(i.status);
       jobtable->imp->active -= i.job->threads();
+      jobtable->imp->phys_active -= i.job->memory();
       return true;
     }
     return false;
@@ -546,9 +563,11 @@ static void launch(JobTable *jobtable) {
   auto &heap = jobtable->imp->pending;
   while (!heap.empty()
       && jobtable->imp->running.size() < (size_t)jobtable->imp->max_children
-      && jobtable->imp->active < jobtable->imp->limit) {
+      && jobtable->imp->active < jobtable->imp->limit
+      && jobtable->imp->phys_active < jobtable->imp->phys_limit) {
     Task &task = *heap.front();
     jobtable->imp->active += task.job->threads();
+    jobtable->imp->phys_active += task.job->memory();
 
     jobtable->imp->running.emplace_back(std::move(task.job));
     JobEntry &i = jobtable->imp->running.back();
