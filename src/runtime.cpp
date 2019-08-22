@@ -223,12 +223,12 @@ void Construct::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   }
 }
 
-struct SelectDestructor final : public GCObject<SelectDestructor, Continuation> {
+struct CDestruct final : public GCObject<CDestruct, Continuation> {
   HeapPointer<Scope> scope;
   HeapPointer<Continuation> cont;
   Destruct *des;
 
-  SelectDestructor(Scope *scope_, Continuation *cont_, Destruct *des_)
+  CDestruct(Scope *scope_, Continuation *cont_, Destruct *des_)
    : scope(scope_), cont(cont_), des(des_) { }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
@@ -268,7 +268,7 @@ struct SelectDestructor final : public GCObject<SelectDestructor, Continuation> 
 };
 
 void Destruct::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  scope->at(0)->await(runtime, SelectDestructor::alloc(runtime.heap, scope, cont, this));
+  scope->at(0)->await(runtime, CDestruct::alloc(runtime.heap, scope, cont, this));
 }
 
 struct CGet final : public GCObject<CGet, Continuation> {
