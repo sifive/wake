@@ -39,6 +39,8 @@ struct HashHasher {
 };
 
 struct Target final : public GCObject<Target, DestroyableObject> {
+  static bool report_future_targets;
+
   typedef GCObject<Target, DestroyableObject> Parent;
 
   HeapPointer<String> location;
@@ -55,6 +57,12 @@ struct Target final : public GCObject<Target, DestroyableObject> {
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
 };
+
+bool Target::report_future_targets = true;
+
+void dont_report_future_targets() {
+  Target::report_future_targets = false;
+}
 
 TypeVar Target::typeVar("Target", 0);
 
@@ -74,7 +82,7 @@ HeapStep Target::recurse<HeapStep, &HeapPointerBase::explore>(HeapStep step) {
 }
 
 Target::~Target() {
-  for (auto &x : table) {
+  if (report_future_targets) for (auto &x : table) {
     if (!x.second.promise) {
       std::stringstream ss;
       ss << "Infinite recursion detected across " << location->c_str() << std::endl;
