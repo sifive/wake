@@ -383,11 +383,15 @@ int main(int argc, char **argv) {
   status_finish();
   runtime.heap.report();
 
-  bool pass = !runtime.abort;
-  if (JobTable::exit_now()) {
+  bool pass = true;
+  if (runtime.abort) {
+    dont_report_future_targets();
+    pass = false;
+  } else if (JobTable::exit_now()) {
+    dont_report_future_targets();
     std::cerr << "Early termination requested" << std::endl;
     pass = false;
-  } else if (pass) {
+  } else {
     std::vector<Promise*> outputs;
     outputs.reserve(targets.size());
     Scope *iter = static_cast<Closure*>(runtime.output.get())->scope.get();
