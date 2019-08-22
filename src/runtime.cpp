@@ -270,3 +270,27 @@ struct SelectDestructor final : public GCObject<SelectDestructor, Continuation> 
 void Destruct::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   scope->at(0)->await(runtime, SelectDestructor::alloc(runtime.heap, scope, cont, this));
 }
+
+struct CGet final : public GCObject<CGet, Continuation> {
+  HeapPointer<Continuation> cont;
+  size_t index;
+
+  CGet(Continuation *cont_, size_t index_)
+   : cont(cont_), index(index_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
+  }
+
+  void execute(Runtime &runtime) override {
+     auto clo = static_cast<Record*>(value.get());
+     clo->at(index)->await(runtime, cont.get());
+  }
+};
+
+void Get::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
+  scope->at(0)->await(runtime, CGet::alloc(runtime.heap, cont, index));
+}

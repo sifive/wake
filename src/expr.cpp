@@ -26,6 +26,7 @@ const TypeDescriptor Lambda    ::type("Lambda");
 const TypeDescriptor VarRef    ::type("VarRef");
 const TypeDescriptor Literal   ::type("Literal");
 const TypeDescriptor DefBinding::type("DefBinding");
+const TypeDescriptor Get       ::type("Get");
 const TypeDescriptor Construct ::type("Construct");
 const TypeDescriptor Destruct  ::type("Destruct");
 // these are removed by bind
@@ -228,6 +229,14 @@ Hash DefBinding::hash() {
     i->hash().push(codes);
   body->hash().push(codes);
   return hashcode = Hash(codes);
+}
+
+void Get::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Get(" << cons->ast.name << ", " << index << "): " << typeVar << " @ " << location.file() << std::endl;
+}
+
+Hash Get::hash() {
+  return hashcode = Hash(cons->ast.name) + Hash(index) + type.hashcode;
 }
 
 void Construct::format(std::ostream &os, int depth) const {

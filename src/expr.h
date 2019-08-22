@@ -232,6 +232,20 @@ struct DefBinding : public Expr {
 
 // Created by transforming Data
 struct Constructor;
+struct Get : public Expr {
+  Sum *sum;
+  Constructor *cons;
+  int index;
+
+  static const TypeDescriptor type;
+  Get(const Location &location_, Sum *sum_, Constructor *cons_, int index_)
+   : Expr(&type, location_), sum(sum_), cons(cons_), index(index_) { }
+
+  void format(std::ostream &os, int depth) const override;
+  Hash hash() override;
+  void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
+};
+
 struct Construct : public Expr {
   Sum *sum;
   Constructor *cons;
@@ -245,7 +259,6 @@ struct Construct : public Expr {
   void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
 };
 
-struct Sum;
 struct Destruct : public Expr {
   Sum sum;
 
