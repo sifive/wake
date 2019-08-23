@@ -645,7 +645,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     std::unique_ptr<Expr> body = fracture(std::move(top->body), &tbinding);
     return fracture_binding(top->location, tbinding.defs, std::move(body));
   } else {
-    // Literal/Prim/Construct/Destruct
+    // Literal/Prim/Construct/Destruct/Get
     return expr;
   }
 }
@@ -868,6 +868,16 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
         << prim->location.file() << std::endl;
       return ok;
     }
+  } else if (expr->type == &Get::type) {
+    Get *get = static_cast<Get*>(expr);
+    TypeVar &typ = binding->lambda->typeVar[0];
+    bool ok = typ.unify(
+      TypeVar(get->sum->name.c_str(), get->sum->args.size()));
+    std::map<std::string, TypeVar*> ids;
+    for (size_t i = 0; i < get->sum->args.size(); ++i)
+      ids[get->sum->args[i]] = &typ[i];
+    ok = get->cons->ast.args[get->index].unify(get->typeVar, ids) && ok;
+    return ok;
   } else {
     assert(0 /* unreachable */);
     return false;

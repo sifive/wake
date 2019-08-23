@@ -235,10 +235,10 @@ struct Constructor;
 struct Get : public Expr {
   Sum *sum;
   Constructor *cons;
-  int index;
+  size_t index;
 
   static const TypeDescriptor type;
-  Get(const Location &location_, Sum *sum_, Constructor *cons_, int index_)
+  Get(const Location &location_, Sum *sum_, Constructor *cons_, size_t index_)
    : Expr(&type, location_), sum(sum_), cons(cons_), index(index_) { }
 
   void format(std::ostream &os, int depth) const override;
