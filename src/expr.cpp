@@ -148,7 +148,7 @@ void DefMap::format(std::ostream &os, int depth) const {
     for (auto &j : i.second)
       j.body->format(os, depth+4);
   }
-  body->format(os, depth+2);
+  if (body) body->format(os, depth+2);
 }
 
 Hash DefMap::hash() {
