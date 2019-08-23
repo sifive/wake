@@ -928,19 +928,8 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     if (mname.empty()) continue;
 
     // Implement get methods
-    Expr *getifn = new VarRef(memberToken, "_ " + std::to_string(outer+1));
-    for (int inner = (int)members.size(); inner >= 0; --inner)
-      getifn = new Lambda(memberToken, "_ " + std::to_string(inner), getifn);
-
     std::string get = "get" + name + mname;
-    Expr *getfn =
-      new Lambda(memberToken, "_ x",
-        new App(memberToken,
-          new App(memberToken,
-            new VarRef(memberToken, tname),
-            getifn),
-          new VarRef(memberToken, "_ x")));
-
+    Expr *getfn = new Lambda(memberToken, "_", new Get(memberToken, sump, &c, i));
     bind_def(lex, map, Definition(get, memberToken, getfn), global?top:0);
 
     // Implement edit methods
