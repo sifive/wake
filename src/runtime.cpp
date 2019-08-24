@@ -241,9 +241,7 @@ struct CDestruct final : public GCObject<CDestruct, Continuation> {
 
   void execute(Runtime &runtime) override {
     auto record = static_cast<Record*>(value.get());
-    size_t size = record->size();
-    size_t scope_cost = Scope::reserve(1);
-    runtime.heap.reserve(size * (scope_cost + Tuple::fulfiller_pads) + scope_cost + Interpret::reserve());
+    runtime.heap.reserve(Scope::reserve(1) + Interpret::reserve());
     // Find the handler function body -- inlining + App fusion would eliminate this loop
     for (int index = des->sum.members.size() - record->cons->index; index; --index)
       scope = scope->next.get();
@@ -251,19 +249,9 @@ struct CDestruct final : public GCObject<CDestruct, Continuation> {
     auto closure = scope->at(0)->coerce<Closure>();
     auto body = closure->lambda->body.get();
     auto scope = closure->scope.get();
-    // Add the record to the handler scope
     auto next = Scope::claim(runtime.heap, 1, scope, scope, des);
     next->at(0)->instant_fulfill(record);
-    scope = next;
-    // !!! avoid pointless copying; have handlers directly accept the tuple and use a DefMap:argX = atX tuple
-    // -> this would allow unused arguments to be deadcode optimized away
-    for (size_t i = 0; i < size; ++i) {
-      next = Scope::claim(runtime.heap, 1, scope, scope, des);
-      next->claim_instant_fulfiller(runtime, 0, record->at(i));
-      scope = next;
-      body = static_cast<Lambda*>(body)->body.get();
-    }
-    runtime.schedule(Interpret::claim(runtime.heap, body, scope, cont.get()));
+    runtime.schedule(Interpret::claim(runtime.heap, body, next, cont.get()));
   }
 };
 

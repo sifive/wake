@@ -934,47 +934,35 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
 
     // Implement edit methods
     Expr *editifn = new VarRef(memberToken, name);
-    for (int inner = 0; inner < (int)members.size(); ++inner)
+    for (int inner = 0; inner < (int)members.size(); ++inner) {
+      auto get = new Get(memberToken, sump, &c, inner);
       editifn = new App(memberToken, editifn,
         (inner == outer)
         ? static_cast<Expr*>(new App(memberToken,
-           new VarRef(memberToken, "fn" + mname),
-           new VarRef(memberToken, "_ " + std::to_string(inner+1))))
-        : static_cast<Expr*>(new VarRef(memberToken, "_ " + std::to_string(inner+1))));
-    for (int inner = (int)members.size(); inner >= 0; --inner)
-      editifn = new Lambda(memberToken, "_ " + std::to_string(inner), editifn);
+           new VarRef(memberToken, "fn" + mname), get))
+        : static_cast<Expr*>(get));
+    }
 
     std::string edit = "edit" + name + mname;
     Expr *editfn =
       new Lambda(memberToken, "fn" + mname,
-        new Lambda(memberToken, "_ x",
-          new App(memberToken,
-            new App(memberToken,
-              new VarRef(memberToken, tname),
-              editifn),
-            new VarRef(memberToken, "_ x"))));
+        new Lambda(memberToken, "_ x", editifn));
 
     bind_def(lex, map, Definition(edit, memberToken, editfn), global?top:0);
 
     // Implement set methods
     Expr *setifn = new VarRef(memberToken, name);
-    for (int inner = 0; inner < (int)members.size(); ++inner)
+    for (int inner = 0; inner < (int)members.size(); ++inner) {
       setifn = new App(memberToken, setifn,
         (inner == outer)
         ? static_cast<Expr*>(new VarRef(memberToken, mname))
-        : static_cast<Expr*>(new VarRef(memberToken, "_ " + std::to_string(inner+1))));
-    for (int inner = (int)members.size(); inner >= 0; --inner)
-      setifn = new Lambda(memberToken, "_ " + std::to_string(inner), setifn);
+        : static_cast<Expr*>(new Get(memberToken, sump, &c, inner)));
+    }
 
     std::string set = "set" + name + mname;
     Expr *setfn =
       new Lambda(memberToken, mname,
-        new Lambda(memberToken, "_ x",
-          new App(memberToken,
-            new App(memberToken,
-              new VarRef(memberToken, tname),
-              setifn),
-            new VarRef(memberToken, "_ x"))));
+        new Lambda(memberToken, "_ x", setifn));
 
     bind_def(lex, map, Definition(set, memberToken, setfn), global?top:0);
 
