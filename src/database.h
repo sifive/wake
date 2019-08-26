@@ -135,6 +135,9 @@ struct Database {
 
   std::vector<JobReflection> failed(
     bool verbose);
+
+  std::vector<JobReflection> last(
+    bool verbose);
 };
 
 #endif

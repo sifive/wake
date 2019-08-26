@@ -54,6 +54,7 @@ struct Database::detail {
   sqlite3_stmt *update_prior;
   sqlite3_stmt *delete_prior;
   sqlite3_stmt *find_owner;
+  sqlite3_stmt *find_last;
   sqlite3_stmt *find_failed;
   sqlite3_stmt *fetch_hash;
   sqlite3_stmt *delete_jobs;
@@ -68,8 +69,8 @@ struct Database::detail {
      commit_txn(0), predict_job(0), stats_job(0), insert_job(0), insert_tree(0), insert_log(0),
      wipe_file(0), insert_file(0), update_file(0), get_log(0), get_tree(0), add_stats(0), link_stats(0),
      detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0), find_owner(0),
-     find_failed(0), fetch_hash(0), delete_jobs(0), delete_dups(0), delete_stats(0), revtop_order(0),
-     setcrit_path(0) { }
+     find_last(0), find_failed(0), fetch_hash(0), delete_jobs(0), delete_dups(0), delete_stats(0),
+     revtop_order(0), setcrit_path(0) { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -229,11 +230,15 @@ std::string Database::open(bool wait, bool memory) {
   const char *sql_find_owner =
     "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id"
-    " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id";
+    " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id order by j.job_id";
+  const char *sql_find_last =
+    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from jobs j left join stats s on j.stat_id=s.stat_id"
+    " where j.run_id==(select max(run_id) from jobs) and substr(cast(commandline as text),1,1) <> '<' order by j.job_id";
   const char *sql_find_failed =
     "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from jobs j left join stats s on j.stat_id=s.stat_id"
-    " where s.status != 0";
+    " where s.status<>0 order by j.job_id";
   const char *sql_fetch_hash =
     "select hash from files where path=? and modified=?";
   const char *sql_delete_jobs =
@@ -288,6 +293,7 @@ std::string Database::open(bool wait, bool memory) {
   PREPARE(sql_update_prior,   update_prior);
   PREPARE(sql_delete_prior,   delete_prior);
   PREPARE(sql_find_owner,     find_owner);
+  PREPARE(sql_find_last,      find_last);
   PREPARE(sql_find_failed,    find_failed);
   PREPARE(sql_fetch_hash,     fetch_hash);
   PREPARE(sql_delete_jobs,    delete_jobs);
@@ -337,6 +343,7 @@ void Database::close() {
   FINALIZE(update_prior);
   FINALIZE(delete_prior);
   FINALIZE(find_owner);
+  FINALIZE(find_last);
   FINALIZE(find_failed);
   FINALIZE(fetch_hash);
   FINALIZE(delete_jobs);
@@ -884,6 +891,10 @@ static std::vector<JobReflection> find_all(Database *db, sqlite3_stmt *query, bo
 
 std::vector<JobReflection> Database::failed(bool verbose) {
   return find_all(this, imp->find_failed, verbose);
+}
+
+std::vector<JobReflection> Database::last(bool verbose) {
+  return find_all(this, imp->find_last, verbose);
 }
 
 std::vector<JobReflection> Database::explain(const std::string &file, int use, bool verbose) {
