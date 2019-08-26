@@ -238,7 +238,7 @@ std::string Database::open(bool wait, bool memory) {
     "select hash from files where path=? and modified=?";
   const char *sql_delete_jobs =
     "delete from jobs where job_id in"
-    " (select job_id from jobs where keep=0 except select job_id from filetree where access=2)";
+    " (select job_id from jobs where keep=0 and use_id<>? except select job_id from filetree where access=2)";
   const char *sql_delete_dups =
     "delete from stats where stat_id in"
     " (select stat_id from (select hashcode, count(*) as num, max(stat_id) as keep from stats group by hashcode) d, stats s"
@@ -531,6 +531,7 @@ void Database::clean() {
   finish_stmt(why, imp->revtop_order, imp->debugdb);
   end_txn();
 
+  bind_integer(why, imp->delete_jobs, 1, imp->run_id);
   single_step("Could not clean database jobs",  imp->delete_jobs,  imp->debugdb);
   single_step("Could not clean database dups",  imp->delete_dups,  imp->debugdb);
   single_step("Could not clean database stats", imp->delete_stats, imp->debugdb);
