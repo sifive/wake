@@ -61,6 +61,7 @@ void print_help(const char *argv0) {
     << "  Database introspection:" << std::endl
     << "    --input  -i FILE Report recorded meta-data for jobs which read FILES"        << std::endl
     << "    --output -o FILE Report recorded meta-data for jobs which wrote FILES"       << std::endl
+    << "    --failed   -f    Report recorded meta-data for jobs which failed"            << std::endl
     << "    --verbose  -v    Report recorded standard output and error of matching jobs" << std::endl
     << "    --debug    -d    Report recorded stack frame of matching jobs"               << std::endl
     << "    --script   -s    Format reported jobs as an executable shell script"         << std::endl
@@ -103,6 +104,7 @@ int main(int argc, char **argv) {
     { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
+    { 'f', "failed",                GOPT_ARGUMENT_FORBIDDEN },
     { 's', "script",                GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "init",                  GOPT_ARGUMENT_REQUIRED  },
     { 0,   "list-tasks",            GOPT_ARGUMENT_FORBIDDEN },
@@ -130,6 +132,7 @@ int main(int argc, char **argv) {
   int  profile = arg(options, "profile-heap")->count;
   bool input   = arg(options, "input"   )->count;
   bool output  = arg(options, "output"  )->count;
+  bool failed  = arg(options, "failed"  )->count;
   bool script  = arg(options, "script"  )->count;
   bool list    = arg(options, "list-tasks")->count;
   bool add     = arg(options, "add-task")->count;
@@ -189,7 +192,7 @@ int main(int argc, char **argv) {
   }
 
   bool nodb = init;
-  bool noparse = nodb || remove || list || output || input;
+  bool noparse = nodb || remove || list || output || input || failed;
   bool notype = noparse || parse;
   bool noexecute = notype || add || html || tcheck || global;
 
@@ -271,6 +274,10 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; ++i) {
       describe(db.explain(make_canonical(prefix + argv[i]), 2, verbose), script, debug, verbose);
     }
+  }
+
+  if (failed) {
+    describe(db.failed(verbose), script, debug, verbose);
   }
 
   if (noparse) return 0;
