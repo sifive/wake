@@ -27,7 +27,7 @@ struct JobTable {
   struct detail;
   std::unique_ptr<detail> imp;
 
-  JobTable(Database *db, double percent, bool verbose, bool quiet, bool check);
+  JobTable(Database *db, double percent, bool verbose, bool quiet, bool check, bool batch);
   ~JobTable();
 
   // Wait for a job to complete; false -> no more active jobs

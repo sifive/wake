@@ -118,6 +118,10 @@ struct Database {
   std::string get_output(
     long job,
     int descriptor);
+  void replay_output(
+    long job,
+    bool stdout,
+    bool stderr);
 
   void add_hash(
     const std::string &file,
