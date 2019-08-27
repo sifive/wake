@@ -130,11 +130,11 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
       indent("#   ", job.stack);
     }
     if (!job.stdout.empty()) {
-      std::cout << "Stdout:";
+      std::cout << "# Stdout:";
       indent("#   ", job.stdout);
     }
     if (!job.stderr.empty()) {
-      std::cout << "Stderr:";
+      std::cout << "# Stderr:";
       indent("#   ", job.stderr);
     }
   }

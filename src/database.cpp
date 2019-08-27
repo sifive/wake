@@ -54,6 +54,8 @@ struct Database::detail {
   sqlite3_stmt *update_prior;
   sqlite3_stmt *delete_prior;
   sqlite3_stmt *find_owner;
+  sqlite3_stmt *find_last;
+  sqlite3_stmt *find_failed;
   sqlite3_stmt *fetch_hash;
   sqlite3_stmt *delete_jobs;
   sqlite3_stmt *delete_dups;
@@ -67,7 +69,8 @@ struct Database::detail {
      commit_txn(0), predict_job(0), stats_job(0), insert_job(0), insert_tree(0), insert_log(0),
      wipe_file(0), insert_file(0), update_file(0), get_log(0), get_tree(0), add_stats(0), link_stats(0),
      detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0), find_owner(0),
-     fetch_hash(0), delete_jobs(0), delete_dups(0), delete_stats(0), revtop_order(0), setcrit_path(0) { }
+     find_last(0), find_failed(0), fetch_hash(0), delete_jobs(0), delete_dups(0), delete_stats(0),
+     revtop_order(0), setcrit_path(0) { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -227,12 +230,20 @@ std::string Database::open(bool wait, bool memory) {
   const char *sql_find_owner =
     "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id"
-    " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id";
+    " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id order by j.job_id";
+  const char *sql_find_last =
+    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from jobs j left join stats s on j.stat_id=s.stat_id"
+    " where j.run_id==(select max(run_id) from jobs) and substr(cast(commandline as text),1,1) <> '<' order by j.job_id";
+  const char *sql_find_failed =
+    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from jobs j left join stats s on j.stat_id=s.stat_id"
+    " where s.status<>0 order by j.job_id";
   const char *sql_fetch_hash =
     "select hash from files where path=? and modified=?";
   const char *sql_delete_jobs =
     "delete from jobs where job_id in"
-    " (select job_id from jobs where keep=0 except select job_id from filetree where access=2)";
+    " (select job_id from jobs where keep=0 and use_id<>? except select job_id from filetree where access=2)";
   const char *sql_delete_dups =
     "delete from stats where stat_id in"
     " (select stat_id from (select hashcode, count(*) as num, max(stat_id) as keep from stats group by hashcode) d, stats s"
@@ -282,6 +293,8 @@ std::string Database::open(bool wait, bool memory) {
   PREPARE(sql_update_prior,   update_prior);
   PREPARE(sql_delete_prior,   delete_prior);
   PREPARE(sql_find_owner,     find_owner);
+  PREPARE(sql_find_last,      find_last);
+  PREPARE(sql_find_failed,    find_failed);
   PREPARE(sql_fetch_hash,     fetch_hash);
   PREPARE(sql_delete_jobs,    delete_jobs);
   PREPARE(sql_delete_dups,    delete_dups);
@@ -330,6 +343,8 @@ void Database::close() {
   FINALIZE(update_prior);
   FINALIZE(delete_prior);
   FINALIZE(find_owner);
+  FINALIZE(find_last);
+  FINALIZE(find_failed);
   FINALIZE(fetch_hash);
   FINALIZE(delete_jobs);
   FINALIZE(delete_dups);
@@ -523,6 +538,7 @@ void Database::clean() {
   finish_stmt(why, imp->revtop_order, imp->debugdb);
   end_txn();
 
+  bind_integer(why, imp->delete_jobs, 1, imp->run_id);
   single_step("Could not clean database jobs",  imp->delete_jobs,  imp->debugdb);
   single_step("Could not clean database dups",  imp->delete_dups,  imp->debugdb);
   single_step("Could not clean database stats", imp->delete_stats, imp->debugdb);
@@ -816,61 +832,74 @@ static std::vector<std::string> chop_null(const std::string &str) {
   return out;
 }
 
-std::vector<JobReflection> Database::explain(const std::string &file, int use, bool verbose) {
+static std::vector<JobReflection> find_all(Database *db, sqlite3_stmt *query, bool verbose) {
   const char *why = "Could not explain file";
   std::vector<JobReflection> out;
 
-  begin_txn();
-  bind_string (why, imp->find_owner, 1, file);
-  bind_integer(why, imp->find_owner, 2, use);
-  while (sqlite3_step(imp->find_owner) == SQLITE_ROW) {
+  db->begin_txn();
+  while (sqlite3_step(query) == SQLITE_ROW) {
     out.resize(out.size()+1);
     JobReflection &desc = out.back();
-    desc.job            = sqlite3_column_int64(imp->find_owner, 0);
-    desc.directory      = rip_column(imp->find_owner, 1);
-    desc.commandline    = chop_null(rip_column(imp->find_owner, 2));
-    desc.environment    = chop_null(rip_column(imp->find_owner, 3));
-    desc.stack          = rip_column(imp->find_owner, 4);
-    desc.stdin          = rip_column(imp->find_owner, 5);
-    desc.time           = rip_column(imp->find_owner, 6);
-    desc.usage.status   = sqlite3_column_int64 (imp->find_owner, 7);
-    desc.usage.runtime  = sqlite3_column_double(imp->find_owner, 8);
-    desc.usage.cputime  = sqlite3_column_double(imp->find_owner, 9);
-    desc.usage.membytes = sqlite3_column_int64 (imp->find_owner, 10);
-    desc.usage.ibytes   = sqlite3_column_int64 (imp->find_owner, 11);
-    desc.usage.obytes   = sqlite3_column_int64 (imp->find_owner, 12);
+    desc.job            = sqlite3_column_int64(query, 0);
+    desc.directory      = rip_column(query, 1);
+    desc.commandline    = chop_null(rip_column(query, 2));
+    desc.environment    = chop_null(rip_column(query, 3));
+    desc.stack          = rip_column(query, 4);
+    desc.stdin          = rip_column(query, 5);
+    desc.time           = rip_column(query, 6);
+    desc.usage.status   = sqlite3_column_int64 (query, 7);
+    desc.usage.runtime  = sqlite3_column_double(query, 8);
+    desc.usage.cputime  = sqlite3_column_double(query, 9);
+    desc.usage.membytes = sqlite3_column_int64 (query, 10);
+    desc.usage.ibytes   = sqlite3_column_int64 (query, 11);
+    desc.usage.obytes   = sqlite3_column_int64 (query, 12);
     if (desc.stdin.empty()) desc.stdin = "/dev/null";
     if (verbose) {
-      desc.stdout = get_output(desc.job, 1);
-      desc.stderr = get_output(desc.job, 2);
+      desc.stdout = db->get_output(desc.job, 1);
+      desc.stderr = db->get_output(desc.job, 2);
       // visible
-      bind_integer(why, imp->get_tree, 1, desc.job);
-      bind_integer(why, imp->get_tree, 2, VISIBLE);
-      while (sqlite3_step(imp->get_tree) == SQLITE_ROW)
+      bind_integer(why, db->imp->get_tree, 1, desc.job);
+      bind_integer(why, db->imp->get_tree, 2, VISIBLE);
+      while (sqlite3_step(db->imp->get_tree) == SQLITE_ROW)
         desc.visible.emplace_back(
-          rip_column(imp->get_tree, 0),
-          rip_column(imp->get_tree, 1));
-      finish_stmt(why, imp->get_tree, imp->debugdb);
+          rip_column(db->imp->get_tree, 0),
+          rip_column(db->imp->get_tree, 1));
+      finish_stmt(why, db->imp->get_tree, db->imp->debugdb);
     }
     // inputs
-    bind_integer(why, imp->get_tree, 1, desc.job);
-    bind_integer(why, imp->get_tree, 2, INPUT);
-    while (sqlite3_step(imp->get_tree) == SQLITE_ROW)
+    bind_integer(why, db->imp->get_tree, 1, desc.job);
+    bind_integer(why, db->imp->get_tree, 2, INPUT);
+    while (sqlite3_step(db->imp->get_tree) == SQLITE_ROW)
       desc.inputs.emplace_back(
-        rip_column(imp->get_tree, 0),
-        rip_column(imp->get_tree, 1));
-    finish_stmt(why, imp->get_tree, imp->debugdb);
+        rip_column(db->imp->get_tree, 0),
+        rip_column(db->imp->get_tree, 1));
+    finish_stmt(why, db->imp->get_tree, db->imp->debugdb);
     // outputs
-    bind_integer(why, imp->get_tree, 1, desc.job);
-    bind_integer(why, imp->get_tree, 2, OUTPUT);
-    while (sqlite3_step(imp->get_tree) == SQLITE_ROW)
+    bind_integer(why, db->imp->get_tree, 1, desc.job);
+    bind_integer(why, db->imp->get_tree, 2, OUTPUT);
+    while (sqlite3_step(db->imp->get_tree) == SQLITE_ROW)
       desc.outputs.emplace_back(
-        rip_column(imp->get_tree, 0),
-        rip_column(imp->get_tree, 1));
-    finish_stmt(why, imp->get_tree, imp->debugdb);
+        rip_column(db->imp->get_tree, 0),
+        rip_column(db->imp->get_tree, 1));
+    finish_stmt(why, db->imp->get_tree, db->imp->debugdb);
   }
-  finish_stmt(why, imp->find_owner, imp->debugdb);
-  end_txn();
+  finish_stmt(why, query, db->imp->debugdb);
+  db->end_txn();
 
   return out;
+}
+
+std::vector<JobReflection> Database::failed(bool verbose) {
+  return find_all(this, imp->find_failed, verbose);
+}
+
+std::vector<JobReflection> Database::last(bool verbose) {
+  return find_all(this, imp->find_last, verbose);
+}
+
+std::vector<JobReflection> Database::explain(const std::string &file, int use, bool verbose) {
+  const char *why = "Could not bind args";
+  bind_string (why, imp->find_owner, 1, file);
+  bind_integer(why, imp->find_owner, 2, use);
+  return find_all(this, imp->find_owner, verbose);
 }

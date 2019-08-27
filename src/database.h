@@ -132,6 +132,12 @@ struct Database {
     const std::string &file,
     int use,
     bool verbose);
+
+  std::vector<JobReflection> failed(
+    bool verbose);
+
+  std::vector<JobReflection> last(
+    bool verbose);
 };
 
 #endif
