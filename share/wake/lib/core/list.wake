@@ -80,9 +80,9 @@ global def scanr f =
   def helper a = match _
     Nil  = Pair a (a, Nil)
     h, t =
-      def sub = helper a t
-      def head = f h sub.getPairFirst
-      Pair head (head, sub.getPairSecond)
+      def Pair u v = helper a t
+      def head = f h u
+      Pair head (head, v)
   helper _ _ | getPairSecond
 
 # list helpers
@@ -97,8 +97,8 @@ global def splitAt i l =
   if i <= 0 then Pair Nil l else match l
     Nil  = Pair Nil Nil
     h, t =
-      def sub = splitAt (i-1) t
-      Pair (h, sub.getPairFirst) sub.getPairSecond
+      def Pair u v = splitAt (i-1) t
+      Pair (h, u) v
 
 global def take i l =
   if i <= 0 then Nil else match l
@@ -120,8 +120,8 @@ global def splitUntil f =
       if f h
       then Pair Nil l
       else
-        def sub = helper t
-        Pair (h, sub.getPairFirst) sub.getPairSecond
+        def Pair u v = helper t
+        Pair (h, u) v
   helper
 
 global def takeUntil f =
@@ -150,10 +150,10 @@ global def forall f =
 global def splitBy f = match _
   Nil  = Pair Nil Nil
   h, t =
-    def sub = splitBy f t
+    def Pair u v = splitBy f t
     if   f h
-    then Pair (h, sub.getPairFirst) sub.getPairSecond
-    else Pair sub.getPairFirst (h, sub.getPairSecond)
+    then Pair (h, u) v
+    else Pair u (h, v)
 
 global def filter f =
   def helper = match _
@@ -216,5 +216,5 @@ global def zip = match _ _
 global def unzip = match _
   Nil         = Pair Nil Nil
   Pair a b, t =
-    def sub = unzip t
-    Pair (a, sub.getPairFirst) (b, sub.getPairSecond)
+    def Pair u v = unzip t
+    Pair (a, u) (b, v)

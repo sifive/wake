@@ -173,14 +173,14 @@ global def localRunner =
       Some e =
         def _ = badlaunch job e
         Fail e
-      None = match predict
-        Usage status runtime cputime mem in out =
-          def _ = launch job dir stdin env.implode cmd.implode status runtime cputime mem in out
-          match (getJobReality job)
-            Pass reality = Pass (RunnerOutput (map getPathName vis) Nil reality)
-            Fail f = Fail f
-  def score (Plan _ _ _ _ _ _ _ _ _ lo _ _ _ _ _) =
-    if lo then Pass 1.0 else Fail "cannot detect outputs"
+      None =
+        def Usage status runtime cputime mem in out = predict
+        def _ = launch job dir stdin env.implode cmd.implode status runtime cputime mem in out
+        match (getJobReality job)
+          Pass reality = Pass (RunnerOutput (map getPathName vis) Nil reality)
+          Fail f = Fail f
+  def score plan =
+    if plan.getPlanLocalOnly then Pass 1.0 else Fail "cannot detect outputs"
   Runner "local" score doit
 
 global def virtualRunner =
@@ -194,12 +194,12 @@ global def virtualRunner =
       Some e =
         def _ = badlaunch job e
         Fail e
-      None = match predict
-        Usage status runtime cputime mem in out =
-          def _ = virtual job "" "" status runtime cputime mem in out # sets predict+reality
-          match (getJobReality job)
-            Pass reality = Pass (RunnerOutput (map getPathName vis) Nil reality)
-            Fail f = Fail f
+      None =
+        def Usage status runtime cputime mem in out = predict
+        def _ = virtual job "" "" status runtime cputime mem in out # sets predict+reality
+        match (getJobReality job)
+          Pass reality = Pass (RunnerOutput (map getPathName vis) Nil reality)
+          Fail f = Fail f
   Runner "virtual" (\_ Pass 0.0) doit
 
 def pid = prim "pid"
@@ -389,14 +389,14 @@ global def getJobStatus job = match (getJobReport job)
 def wakePath = prim "execpath" # location of the wake executable
 global def fuseRunner =
   def fuse = "{wakePath}/../lib/wake/fuse-wake"
-  def score (Plan _ _ _ _ _ _ _ _ _ lo _ _ _ _ _) =
-    if lo then Fail "would hide workspace" else Pass 1.0
+  def score plan =
+    if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
   makeJSONRunner fuse score (_)
 
 global def preloadRunner =
   def preload = "{wakePath}/../lib/wake/preload-wake"
-  def score (Plan _ _ _ _ _ _ _ _ _ lo _ _ _ _ _) =
-    if lo then Fail "would hide workspace" else Pass 1.0
+  def score plan =
+    if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
   makeJSONRunner preload score (_)
 
 def rOK = 0
@@ -425,6 +425,7 @@ global def makeJSONRunner rawScript score estimate =
     Pass (RunnerInput command visible environment directory stdin res prefix record) = match (findSomeFn getPathError visible)
       Some e = Pair (Fail e) ""
       None =
+        def Usage status runtime cputime membytes inbytes outbytes = record
         def pmkdir m p = prim "mkdir"
         def pwrite m p d = prim "write"
         def json = JObject (
@@ -435,17 +436,16 @@ global def makeJSONRunner rawScript score estimate =
           "stdin"       → JString stdin,
           "resources"   → res | map JString | JArray,
           "version"     → JString version,
-          match record
-            Usage status runtime cputime membytes inbytes outbytes =
-              "usage" → JObject (
-                "status"   → JInteger status,
-                "runtime"  → JDouble  runtime,
-                "cputime"  → JDouble  cputime,
-                "membytes" → JInteger membytes,
-                "inbytes"  → JInteger inbytes,
-                "outbytes" → JInteger outbytes,
-                Nil
-              ), Nil
+          "usage"       → JObject (
+            "status"    → JInteger status,
+            "runtime"   → JDouble  runtime,
+            "cputime"   → JDouble  cputime,
+            "membytes"  → JInteger membytes,
+            "inbytes"   → JInteger inbytes,
+            "outbytes"  → JInteger outbytes,
+            Nil
+          ),
+          Nil
         )
         match (pmkdir 0775 ".build")
           Fail f = Pair (Fail (makeError f)) ""
