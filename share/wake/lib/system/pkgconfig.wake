@@ -38,6 +38,7 @@ target pkgConfigImp args =
     | setPlanLocalOnly True
     | setPlanEcho Verbose
     | setPlanStdout logNever
+    | setPlanStderr logVerbose
     | editPlanEnvironment addenv
     | runJob
   def output = result.getJobStdout | getWhenFail "" | tokenize `\n` | head
