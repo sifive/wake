@@ -480,8 +480,8 @@ static std::vector<Definition> parse_def(Lexer &lex, bool target, bool publish) 
   if (check_constructors(ast)) lex.fail = true;
 
   bool extract = Lexer::isUpper(name.c_str());
-  if (extract && target) {
-    std::cerr << "Upper-case identifier cannot be used as a target name at "
+  if (extract && (target || publish)) {
+    std::cerr << "Upper-case identifier cannot be used as a target/publish name at "
       << ast.token.text() << std::endl;
     lex.fail = true;
     extract = false;
