@@ -452,8 +452,8 @@ struct Definition {
    : name(std::move(name_)), location(location_), body(body_) { }
 };
 
-static void extract_def(std::vector<Definition> &out, AST &&ast, Expr *body) {
-  std::string key = "extract " + std::to_string(out.size());
+static void extract_def(std::vector<Definition> &out, long index, AST &&ast, Expr *body) {
+  std::string key = "extract " + std::to_string(++index);
   out.emplace_back(key, ast.token, body);
   long x = 0;
   for (auto &m : ast.args) {
@@ -463,14 +463,14 @@ static void extract_def(std::vector<Definition> &out, AST &&ast, Expr *body) {
       new VarRef(m.token, s.str()),
       new VarRef(body->location, key));
     if (Lexer::isUpper(m.name.c_str())) {
-      extract_def(out, std::move(m), sub);
+      extract_def(out, index, std::move(m), sub);
     } else {
       out.emplace_back(m.name, m.token, sub);
     }
   }
 }
 
-static std::vector<Definition> parse_def(Lexer &lex, bool target, bool publish) {
+static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bool publish) {
   lex.consume();
 
   ASTState state(false, false);
@@ -507,7 +507,7 @@ static std::vector<Definition> parse_def(Lexer &lex, bool target, bool publish) 
   std::vector<Definition> out;
   if (extract) {
     ast.name = std::move(name);
-    extract_def(out, std::move(ast), body);
+    extract_def(out, index, std::move(ast), body);
     return out;
   }
 
@@ -1104,12 +1104,12 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
        std::cerr << "Missing DEF after GLOBAL at " << lex.next.location.text() << std::endl;
        lex.fail = true;
     case DEF: {
-      for (auto &def : parse_def(lex, false, false))
+      for (auto &def : parse_def(lex, map.size(), false, false))
          bind_def(lex, map, std::move(def), global?top:0);
       break;
     }
     case TARGET: {
-      auto defs = parse_def(lex, true, false);
+      auto defs = parse_def(lex, 0, true, false);
       assert (defs.size() == 1);
       auto &def = defs.front();
       auto &l = def.body->location;
@@ -1153,7 +1153,7 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
           break;
         }
         case PUBLISH: {
-          publish_defs(pub, parse_def(lex, false, true));
+          publish_defs(pub, parse_def(lex, 0, false, true));
           break;
         }
         default: {
@@ -1210,7 +1210,7 @@ void parse_top(Top &top, Lexer &lex) {
         break;
       }
       case PUBLISH: {
-        publish_defs(defmap.pub, parse_def(lex, false, true));
+        publish_defs(defmap.pub, parse_def(lex, 0, false, true));
         break;
       }
       default: {
