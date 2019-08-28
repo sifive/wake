@@ -452,7 +452,7 @@ struct Definition {
    : name(std::move(name_)), location(location_), body(body_) { }
 };
 
-static Definition parse_def(Lexer &lex, bool target = false) {
+static std::vector<Definition> parse_def(Lexer &lex, bool target, bool publish) {
   lex.consume();
 
   ASTState state(false, false);
@@ -461,10 +461,12 @@ static Definition parse_def(Lexer &lex, bool target = false) {
   ast.name.clear();
   if (check_constructors(ast)) lex.fail = true;
 
-  if (Lexer::isUpper(name.c_str())) {
-    std::cerr << "Upper-case identifier cannot be used as a function name at "
+  bool destruct = Lexer::isUpper(name.c_str());
+  if (destruct && target) {
+    std::cerr << "Upper-case identifier cannot be used as a target name at "
       << ast.token.text() << std::endl;
     lex.fail = true;
+    destruct = false;
   }
 
   size_t tohash = ast.args.size();
@@ -530,13 +532,20 @@ static Definition parse_def(Lexer &lex, bool target = false) {
       new Lambda(fn, "_", body));
   }
 
-  for (auto i = args.rbegin(); i != args.rend(); ++i) {
-    Lambda *lambda = new Lambda(fn, i->first, body);
-    lambda->token = i->second;
-    body = lambda;
+  if (publish && !args.empty()) {
+    std::cerr << "Publish definition may not be a function " << fn.text() << std::endl;
+    lex.fail = true;
+  } else {
+    for (auto i = args.rbegin(); i != args.rend(); ++i) {
+      Lambda *lambda = new Lambda(fn, i->first, body);
+      lambda->token = i->second;
+      body = lambda;
+    }
   }
 
-  return Definition(std::move(name), ast.token, body);
+  std::vector<Definition> out;
+  out.emplace_back(std::move(name), ast.token, body);
+  return out;
 }
 
 static void bind_global(const std::string &name, Top *top, Lexer &lex) {
@@ -570,8 +579,10 @@ static void bind_def(Lexer &lex, DefMap::Defs &map, Definition &&def, Top *top =
   bind_global(out.first->first, top, lex);
 }
 
-static void publish_def(DefMap::Pubs &pub, Definition &&def) {
-  pub[def.name].emplace_back(def.location, std::move(def.body));
+static void publish_defs(DefMap::Pubs &pub, std::vector<Definition> &&defs) {
+  for (auto &def : defs) {
+    pub[def.name].emplace_back(def.location, std::move(def.body));
+  }
 }
 
 static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
@@ -1063,11 +1074,14 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
        std::cerr << "Missing DEF after GLOBAL at " << lex.next.location.text() << std::endl;
        lex.fail = true;
     case DEF: {
-      bind_def(lex, map, parse_def(lex), global?top:0);
+      for (auto &def : parse_def(lex, false, false))
+         bind_def(lex, map, std::move(def), global?top:0);
       break;
     }
     case TARGET: {
-      auto def = parse_def(lex, true);
+      auto defs = parse_def(lex, true, false);
+      assert (defs.size() == 1);
+      auto &def = defs.front();
       auto &l = def.body->location;
       std::stringstream s;
       s << l.text();
@@ -1109,7 +1123,7 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
           break;
         }
         case PUBLISH: {
-          publish_def(pub, parse_def(lex));
+          publish_defs(pub, parse_def(lex, false, true));
           break;
         }
         default: {
@@ -1166,7 +1180,7 @@ void parse_top(Top &top, Lexer &lex) {
         break;
       }
       case PUBLISH: {
-        publish_def(defmap.pub, parse_def(lex));
+        publish_defs(defmap.pub, parse_def(lex, false, true));
         break;
       }
       default: {
