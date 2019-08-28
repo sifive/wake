@@ -223,12 +223,12 @@ void Construct::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   }
 }
 
-struct SelectDestructor final : public GCObject<SelectDestructor, Continuation> {
+struct CDestruct final : public GCObject<CDestruct, Continuation> {
   HeapPointer<Scope> scope;
   HeapPointer<Continuation> cont;
   Destruct *des;
 
-  SelectDestructor(Scope *scope_, Continuation *cont_, Destruct *des_)
+  CDestruct(Scope *scope_, Continuation *cont_, Destruct *des_)
    : scope(scope_), cont(cont_), des(des_) { }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
@@ -241,9 +241,7 @@ struct SelectDestructor final : public GCObject<SelectDestructor, Continuation> 
 
   void execute(Runtime &runtime) override {
     auto record = static_cast<Record*>(value.get());
-    size_t size = record->size();
-    size_t scope_cost = Scope::reserve(1);
-    runtime.heap.reserve(size * (scope_cost + Tuple::fulfiller_pads) + scope_cost + Interpret::reserve());
+    runtime.heap.reserve(Scope::reserve(1) + Interpret::reserve());
     // Find the handler function body -- inlining + App fusion would eliminate this loop
     for (int index = des->sum.members.size() - record->cons->index; index; --index)
       scope = scope->next.get();
@@ -251,22 +249,36 @@ struct SelectDestructor final : public GCObject<SelectDestructor, Continuation> 
     auto closure = scope->at(0)->coerce<Closure>();
     auto body = closure->lambda->body.get();
     auto scope = closure->scope.get();
-    // Add the record to the handler scope
     auto next = Scope::claim(runtime.heap, 1, scope, scope, des);
     next->at(0)->instant_fulfill(record);
-    scope = next;
-    // !!! avoid pointless copying; have handlers directly accept the tuple and use a DefMap:argX = atX tuple
-    // -> this would allow unused arguments to be deadcode optimized away
-    for (size_t i = 0; i < size; ++i) {
-      next = Scope::claim(runtime.heap, 1, scope, scope, des);
-      next->claim_instant_fulfiller(runtime, 0, record->at(i));
-      scope = next;
-      body = static_cast<Lambda*>(body)->body.get();
-    }
-    runtime.schedule(Interpret::claim(runtime.heap, body, scope, cont.get()));
+    runtime.schedule(Interpret::claim(runtime.heap, body, next, cont.get()));
   }
 };
 
 void Destruct::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  scope->at(0)->await(runtime, SelectDestructor::alloc(runtime.heap, scope, cont, this));
+  scope->at(0)->await(runtime, CDestruct::alloc(runtime.heap, scope, cont, this));
+}
+
+struct CGet final : public GCObject<CGet, Continuation> {
+  HeapPointer<Continuation> cont;
+  size_t index;
+
+  CGet(Continuation *cont_, size_t index_)
+   : cont(cont_), index(index_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
+  }
+
+  void execute(Runtime &runtime) override {
+     auto clo = static_cast<Record*>(value.get());
+     clo->at(index)->await(runtime, cont.get());
+  }
+};
+
+void Get::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
+  scope->at(0)->await(runtime, CGet::alloc(runtime.heap, cont, index));
 }

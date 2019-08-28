@@ -29,7 +29,7 @@ int siphash(const void *in, unsigned long inlen, uint64_t *out);
 struct Hash {
   uint64_t data[2];
 
-  Hash() : data{0,0} { }
+  Hash(uint64_t x = 0, uint64_t y = 0) : data{x,y} { }
   Hash(const void *in, unsigned long inlen) { siphash(in, inlen, &data[0]); }
   Hash(const std::vector<uint64_t> &out) { siphash(out.data(), out.size()*sizeof(uint64_t), &data[0]); }
   Hash(const std::string &str) { siphash(str.data(), str.size(), &data[0]); }

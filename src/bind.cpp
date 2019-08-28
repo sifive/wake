@@ -344,12 +344,13 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
     std::unique_ptr<DefMap> map(new DefMap(prototype.location));
     map->body = std::unique_ptr<Expr>(new VarRef(prototype.location, "destruct " + sum->name));
     for (size_t c = 0; c < sum->members.size(); ++c) {
+      Constructor &cons = sum->members[c];
       std::string cname = "_ c" + std::to_string(c);
       map->body = std::unique_ptr<Expr>(new App(prototype.location,
         map->body.release(),
         new VarRef(prototype.location, cname)));
       std::vector<PatternRef> bucket;
-      int args = sum->members[c].ast.args.size();
+      int args = cons.ast.args.size();
       int var = prototype.index;
       prototype.index += args;
       for (auto p = patterns.begin(); p != patterns.end(); ++p) {
@@ -374,14 +375,17 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
           p->index = -2;
         }
       }
-      auto out = map->map.insert(std::make_pair(cname, DefMap::Value(LOCATION, expand_patterns(bucket))));
+      std::unique_ptr<DefMap> rmap(new DefMap(prototype.location));
+      rmap->body = expand_patterns(bucket);
+      if (!rmap->body) return nullptr;
+      for (size_t i = args; i > 0; --i) {
+        auto out = rmap->map.insert(std::make_pair("_ a" + std::to_string(--var),
+          DefMap::Value(LOCATION, std::unique_ptr<Expr>(new Get(LOCATION, sum, &cons, i-1)))));
+        assert (out.second);
+      }
+      auto out = map->map.insert(std::make_pair(cname, DefMap::Value(LOCATION,
+        std::unique_ptr<Expr>(new Lambda(prototype.location, "_", rmap.release())))));
       assert (out.second);
-      std::unique_ptr<Expr> &exp = out.first->second.body;
-      if (!exp) return nullptr;
-      for (int i = 0; i < args; ++i)
-        exp = std::unique_ptr<Expr>(new Lambda(prototype.location,
-          "_ a" + std::to_string(--var), exp.release()));
-      exp = std::unique_ptr<Expr>(new Lambda(prototype.location, "_", exp.release()));
       for (auto p = patterns.rbegin(); p != patterns.rend(); ++p) {
         if (p->index == -1) {
           *p = std::move(bucket.back());
@@ -645,7 +649,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     std::unique_ptr<Expr> body = fracture(std::move(top->body), &tbinding);
     return fracture_binding(top->location, tbinding.defs, std::move(body));
   } else {
-    // Literal/Prim/Construct/Destruct
+    // Literal/Prim/Construct/Destruct/Get
     return expr;
   }
 }
@@ -743,8 +747,19 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     VarRef *ref = static_cast<VarRef*>(expr);
     NameRef pos;
     if ((pos = binding->find(ref->name)).offset == -1) {
-      std::cerr << "Variable reference '" << ref->name << "' is unbound at "
-        << ref->location.file() << std::endl;
+      size_t off = ref->name.find(':');
+      if (off != std::string::npos) {
+        size_t off2 = ref->name.find(':', off+1);
+        if (ref->name.back() == '0')
+          std::cerr << "Tuple '"
+            << ref->name.substr(3, off-3) << "' with "
+            << ref->name.substr(off+1, off2-off-1) << " arguments does not exist at "
+            << ref->location.file() << std::endl;
+        return false;
+      } else {
+        std::cerr << "Variable reference '" << ref->name << "' is unbound at "
+          << ref->location.file() << std::endl;
+      }
       return false;
     }
     ref->depth = pos.depth;
@@ -819,7 +834,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     return ok;
   } else if (expr->type == &Destruct::type) {
     Destruct *des = static_cast<Destruct*>(expr);
-    // (typ => cons0 => b) => (typ => cons1 => b) => typ => b
+    // (typ => b) => (typ => b) => typ => b
     TypeVar &typ = binding->lambda->typeVar[0];
     bool ok = typ.unify(
       TypeVar(des->sum.name.c_str(), des->sum.args.size()));
@@ -829,20 +844,10 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     NameBinding *iter = binding;
     for (size_t i = des->sum.members.size(); i; --i) {
       iter = iter->next;
-      TypeVar *tail = &iter->lambda->typeVar[0];
-      Constructor &cons = des->sum.members[i-1];
-      if (!tail->unify(TypeVar(FN, 2))) { ok = false; break; }
-      ok = (*tail)[0].unify(typ) && ok;
-      tail = &(*tail)[1];
-      size_t j;
-      for (j = 0; j < cons.ast.args.size(); ++j) {
-        if (!tail->unify(TypeVar(FN, 2))) { ok = false; break; }
-        ok = cons.ast.args[j].unify((*tail)[0], ids) && ok;
-        tail = &(*tail)[1];
-      }
-      if (j == cons.ast.args.size()) {
-        ok = des->typeVar.unify(*tail) && ok;
-      }
+      TypeVar &arg = iter->lambda->typeVar[0];
+      if (!arg.unify(TypeVar(FN, 2))) { ok = false; break; }
+      ok = arg[0].unify(typ) && ok;
+      ok = des->typeVar.unify(arg[1]) && ok;
     }
     return ok;
   } else if (expr->type == &Prim::type) {
@@ -868,6 +873,17 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
         << prim->location.file() << std::endl;
       return ok;
     }
+  } else if (expr->type == &Get::type) {
+    Get *get = static_cast<Get*>(expr);
+    while (!binding->lambda) binding = binding->next;
+    TypeVar &typ = binding->lambda->typeVar[0];
+    bool ok = typ.unify(
+      TypeVar(get->sum->name.c_str(), get->sum->args.size()));
+    std::map<std::string, TypeVar*> ids;
+    for (size_t i = 0; i < get->sum->args.size(); ++i)
+      ids[get->sum->args[i]] = &typ[i];
+    ok = get->cons->ast.args[get->index].unify(get->typeVar, ids) && ok;
+    return ok;
   } else {
     assert(0 /* unreachable */);
     return false;

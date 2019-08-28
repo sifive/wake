@@ -452,7 +452,25 @@ struct Definition {
    : name(std::move(name_)), location(location_), body(body_) { }
 };
 
-static Definition parse_def(Lexer &lex, bool target = false) {
+static void extract_def(std::vector<Definition> &out, long index, AST &&ast, Expr *body) {
+  std::string key = "extract " + std::to_string(++index);
+  out.emplace_back(key, ast.token, body);
+  long x = 0;
+  for (auto &m : ast.args) {
+    std::stringstream s;
+    s << "get" << ast.name << ":" << ast.args.size() << ":" << x++;
+    Expr *sub = new App(m.token,
+      new VarRef(m.token, s.str()),
+      new VarRef(body->location, key));
+    if (Lexer::isUpper(m.name.c_str())) {
+      extract_def(out, index, std::move(m), sub);
+    } else {
+      out.emplace_back(m.name, m.token, sub);
+    }
+  }
+}
+
+static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bool publish) {
   lex.consume();
 
   ASTState state(false, false);
@@ -461,10 +479,12 @@ static Definition parse_def(Lexer &lex, bool target = false) {
   ast.name.clear();
   if (check_constructors(ast)) lex.fail = true;
 
-  if (Lexer::isUpper(name.c_str())) {
-    std::cerr << "Upper-case identifier cannot be used as a function name at "
+  bool extract = Lexer::isUpper(name.c_str());
+  if (extract && (target || publish)) {
+    std::cerr << "Upper-case identifier cannot be used as a target/publish name at "
       << ast.token.text() << std::endl;
     lex.fail = true;
+    extract = false;
   }
 
   size_t tohash = ast.args.size();
@@ -483,6 +503,13 @@ static Definition parse_def(Lexer &lex, bool target = false) {
 
   Expr *body = parse_block(lex, false);
   if (expect(EOL, lex)) lex.consume();
+
+  std::vector<Definition> out;
+  if (extract) {
+    ast.name = std::move(name);
+    extract_def(out, index, std::move(ast), body);
+    return out;
+  }
 
   // do we need a pattern match? lower / wildcard are ok
   bool pattern = false;
@@ -530,13 +557,19 @@ static Definition parse_def(Lexer &lex, bool target = false) {
       new Lambda(fn, "_", body));
   }
 
-  for (auto i = args.rbegin(); i != args.rend(); ++i) {
-    Lambda *lambda = new Lambda(fn, i->first, body);
-    lambda->token = i->second;
-    body = lambda;
+  if (publish && !args.empty()) {
+    std::cerr << "Publish definition may not be a function " << fn.text() << std::endl;
+    lex.fail = true;
+  } else {
+    for (auto i = args.rbegin(); i != args.rend(); ++i) {
+      Lambda *lambda = new Lambda(fn, i->first, body);
+      lambda->token = i->second;
+      body = lambda;
+    }
   }
 
-  return Definition(std::move(name), ast.token, body);
+  out.emplace_back(std::move(name), ast.token, body);
+  return out;
 }
 
 static void bind_global(const std::string &name, Top *top, Lexer &lex) {
@@ -570,8 +603,10 @@ static void bind_def(Lexer &lex, DefMap::Defs &map, Definition &&def, Top *top =
   bind_global(out.first->first, top, lex);
 }
 
-static void publish_def(DefMap::Pubs &pub, Definition &&def) {
-  pub[def.name].emplace_back(def.location, std::move(def.body));
+static void publish_defs(DefMap::Pubs &pub, std::vector<Definition> &&defs) {
+  for (auto &def : defs) {
+    pub[def.name].emplace_back(def.location, std::move(def.body));
+  }
 }
 
 static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
@@ -928,64 +963,47 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     if (mname.empty()) continue;
 
     // Implement get methods
-    Expr *getifn = new VarRef(memberToken, "_ " + std::to_string(outer+1));
-    for (int inner = (int)members.size(); inner >= 0; --inner)
-      getifn = new Lambda(memberToken, "_ " + std::to_string(inner), getifn);
-
     std::string get = "get" + name + mname;
-    Expr *getfn =
-      new Lambda(memberToken, "_ x",
-        new App(memberToken,
-          new App(memberToken,
-            new VarRef(memberToken, tname),
-            getifn),
-          new VarRef(memberToken, "_ x")));
-
+    Expr *getfn = new Lambda(memberToken, "_", new Get(memberToken, sump, &c, i));
     bind_def(lex, map, Definition(get, memberToken, getfn), global?top:0);
+
+    // Implement def extractor methods
+    std::stringstream s;
+    s << "get" << name << ":" << c.ast.args.size() << ":" << i;
+    Expr *egetfn = new Lambda(memberToken, "_", new Get(memberToken, sump, &c, i));
+    bind_def(lex, map, Definition(s.str(), memberToken, egetfn), global?top:0);
 
     // Implement edit methods
     Expr *editifn = new VarRef(memberToken, name);
-    for (int inner = 0; inner < (int)members.size(); ++inner)
+    for (int inner = 0; inner < (int)members.size(); ++inner) {
+      auto get = new Get(memberToken, sump, &c, inner);
       editifn = new App(memberToken, editifn,
         (inner == outer)
         ? static_cast<Expr*>(new App(memberToken,
-           new VarRef(memberToken, "fn" + mname),
-           new VarRef(memberToken, "_ " + std::to_string(inner+1))))
-        : static_cast<Expr*>(new VarRef(memberToken, "_ " + std::to_string(inner+1))));
-    for (int inner = (int)members.size(); inner >= 0; --inner)
-      editifn = new Lambda(memberToken, "_ " + std::to_string(inner), editifn);
+           new VarRef(memberToken, "fn" + mname), get))
+        : static_cast<Expr*>(get));
+    }
 
     std::string edit = "edit" + name + mname;
     Expr *editfn =
       new Lambda(memberToken, "fn" + mname,
-        new Lambda(memberToken, "_ x",
-          new App(memberToken,
-            new App(memberToken,
-              new VarRef(memberToken, tname),
-              editifn),
-            new VarRef(memberToken, "_ x"))));
+        new Lambda(memberToken, "_ x", editifn));
 
     bind_def(lex, map, Definition(edit, memberToken, editfn), global?top:0);
 
     // Implement set methods
     Expr *setifn = new VarRef(memberToken, name);
-    for (int inner = 0; inner < (int)members.size(); ++inner)
+    for (int inner = 0; inner < (int)members.size(); ++inner) {
       setifn = new App(memberToken, setifn,
         (inner == outer)
         ? static_cast<Expr*>(new VarRef(memberToken, mname))
-        : static_cast<Expr*>(new VarRef(memberToken, "_ " + std::to_string(inner+1))));
-    for (int inner = (int)members.size(); inner >= 0; --inner)
-      setifn = new Lambda(memberToken, "_ " + std::to_string(inner), setifn);
+        : static_cast<Expr*>(new Get(memberToken, sump, &c, inner)));
+    }
 
     std::string set = "set" + name + mname;
     Expr *setfn =
       new Lambda(memberToken, mname,
-        new Lambda(memberToken, "_ x",
-          new App(memberToken,
-            new App(memberToken,
-              new VarRef(memberToken, tname),
-              setifn),
-            new VarRef(memberToken, "_ x"))));
+        new Lambda(memberToken, "_ x", setifn));
 
     bind_def(lex, map, Definition(set, memberToken, setfn), global?top:0);
 
@@ -1069,6 +1087,14 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   }
 
   bind_def(lex, map, Definition("destruct " + name, sump->token, destructfn), global?top:0);
+  for (auto &cons : sump->members) {
+    for (size_t i = 0; i < cons.ast.args.size(); ++i) {
+      Expr *body = new Lambda(sump->token, "_", new Get(sump->token, sump, &cons, i));
+      std::string name = "get " + cons.ast.name + " " + std::to_string(i);
+      bind_def(lex, map, Definition(name, sump->token, body), global?top:0);
+    }
+  }
+
   check_special(lex, name, sump);
 }
 
@@ -1078,11 +1104,13 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
        std::cerr << "Missing DEF after GLOBAL at " << lex.next.location.text() << std::endl;
        lex.fail = true;
     case DEF: {
-      bind_def(lex, map, parse_def(lex), global?top:0);
+      for (auto &def : parse_def(lex, map.size(), false, false))
+         bind_def(lex, map, std::move(def), global?top:0);
       break;
     }
     case TARGET: {
-      auto def = parse_def(lex, true);
+      auto defs = parse_def(lex, 0, true, false);
+      auto &def = defs.front();
       auto &l = def.body->location;
       std::stringstream s;
       s << l.text();
@@ -1124,7 +1152,7 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
           break;
         }
         case PUBLISH: {
-          publish_def(pub, parse_def(lex));
+          publish_defs(pub, parse_def(lex, 0, false, true));
           break;
         }
         default: {
@@ -1181,7 +1209,7 @@ void parse_top(Top &top, Lexer &lex) {
         break;
       }
       case PUBLISH: {
-        publish_def(defmap.pub, parse_def(lex));
+        publish_defs(defmap.pub, parse_def(lex, 0, false, true));
         break;
       }
       default: {
