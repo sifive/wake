@@ -45,6 +45,7 @@ struct Database::detail {
   sqlite3_stmt *insert_file;
   sqlite3_stmt *update_file;
   sqlite3_stmt *get_log;
+  sqlite3_stmt *replay_log;
   sqlite3_stmt *get_tree;
   sqlite3_stmt *add_stats;
   sqlite3_stmt *link_stats;
@@ -67,10 +68,10 @@ struct Database::detail {
   detail(bool debugdb_)
    : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), add_target(0), del_target(0), begin_txn(0),
      commit_txn(0), predict_job(0), stats_job(0), insert_job(0), insert_tree(0), insert_log(0),
-     wipe_file(0), insert_file(0), update_file(0), get_log(0), get_tree(0), add_stats(0), link_stats(0),
-     detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0), find_owner(0),
-     find_last(0), find_failed(0), fetch_hash(0), delete_jobs(0), delete_dups(0), delete_stats(0),
-     revtop_order(0), setcrit_path(0) { }
+     wipe_file(0), insert_file(0), update_file(0), get_log(0), replay_log(0), get_tree(0), add_stats(0),
+     link_stats(0), detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0),
+     find_owner(0), find_last(0), find_failed(0), fetch_hash(0), delete_jobs(0), delete_dups(0),
+     delete_stats(0), revtop_order(0), setcrit_path(0) { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -202,6 +203,8 @@ std::string Database::open(bool wait, bool memory) {
     "update files set hash=?, modified=? where path=?";
   const char *sql_get_log =
     "select output from log where job_id=? and descriptor=? order by log_id";
+  const char *sql_replay_log =
+    "select descriptor, output from log where job_id=? order by log_id";
   const char *sql_get_tree =
     "select f.path, f.hash from filetree t, files f"
     " where t.job_id=? and t.access=? and f.file_id=t.file_id order by t.tree_id";
@@ -284,6 +287,7 @@ std::string Database::open(bool wait, bool memory) {
   PREPARE(sql_insert_file,    insert_file);
   PREPARE(sql_update_file,    update_file);
   PREPARE(sql_get_log,        get_log);
+  PREPARE(sql_replay_log,     replay_log);
   PREPARE(sql_get_tree,       get_tree);
   PREPARE(sql_add_stats,      add_stats);
   PREPARE(sql_link_stats,     link_stats);
@@ -334,6 +338,7 @@ void Database::close() {
   FINALIZE(insert_file);
   FINALIZE(update_file);
   FINALIZE(get_log);
+  FINALIZE(replay_log);
   FINALIZE(get_tree);
   FINALIZE(add_stats);
   FINALIZE(link_stats);
@@ -789,6 +794,24 @@ std::string Database::get_output(long job, int descriptor) {
   }
   finish_stmt(why, imp->get_log, imp->debugdb);
   return out.str();
+}
+
+void Database::replay_output(long job, bool stdout, bool stderr) {
+  if (!stdout && !stderr) return;
+  const char *why = "Could not replay job output";
+  bind_integer(why, imp->replay_log, 1, job);
+  bool lf = false;
+  while (sqlite3_step(imp->replay_log) == SQLITE_ROW) {
+    int fd = sqlite3_column_int64(imp->replay_log, 0);
+    const char *str = static_cast<const char*>(sqlite3_column_blob(imp->replay_log, 1));
+    int len = sqlite3_column_bytes(imp->replay_log, 1);
+    if (len > 0 && ((fd == 2 && stderr) || (fd == 1 && stdout))) {
+      status_write(fd, str, len);
+      lf = str[len-1] != '\n';
+    }
+  }
+  finish_stmt(why, imp->replay_log, imp->debugdb);
+  if (lf) status_write(1, "\n", 1);
 }
 
 void Database::add_hash(const std::string &file, const std::string &hash, long modified) {

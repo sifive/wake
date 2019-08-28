@@ -334,7 +334,7 @@ int main(int argc, char **argv) {
   top->body = std::unique_ptr<Expr>(body);
 
   /* Primitives */
-  JobTable jobtable(&db, percent, verbose, quiet, check);
+  JobTable jobtable(&db, percent, verbose, quiet, check, !tty);
   StringInfo info(verbose, debug, quiet, VERSION_STR);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 

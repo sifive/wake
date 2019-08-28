@@ -241,6 +241,7 @@ struct JobEntry {
   int pipe_stderr; // -1 if closed
   std::string stdout_buf;
   std::string stderr_buf;
+  std::string echo_line;
   struct timeval start;
   std::list<Status>::iterator status;
   JobEntry(RootPointer<Job> &&job_) : job(std::move(job_)), pid(0), pipe_stdout(-1), pipe_stderr(-1) { }
@@ -268,6 +269,7 @@ struct JobTable::detail {
   bool verbose;
   bool quiet;
   bool check;
+  bool batch;
   struct timeval wall;
 
   CriticalJob critJob(double nexttime) const;
@@ -309,10 +311,11 @@ bool JobTable::exit_now() {
   return exit_asap;
 }
 
-JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool check) : imp(new JobTable::detail) {
+JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool check, bool batch) : imp(new JobTable::detail) {
   imp->verbose = verbose;
   imp->quiet = quiet;
   imp->check = check;
+  imp->batch = batch;
   imp->db = db;
   imp->active = 0;
   imp->limit = std::thread::hardware_concurrency() * percent;
@@ -534,25 +537,7 @@ static std::string pretty_cmd(const std::string &x) {
   return out.str();
 }
 
-struct CompletedJobEntry {
-  JobTable *jobtable;
-  CompletedJobEntry(JobTable *jobtable_) : jobtable(jobtable_) { }
-
-  bool operator () (const JobEntry &i) {
-    if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
-      status_state.jobs.erase(i.status);
-      jobtable->imp->active -= i.job->threads();
-      jobtable->imp->phys_active -= i.job->memory();
-      return true;
-    }
-    return false;
-  }
-};
-
 static void launch(JobTable *jobtable) {
-  CompletedJobEntry pred(jobtable);
-  jobtable->imp->running.remove_if(pred);
-
   // Note: We schedule jobs whenever we are under quota, without considering if the
   // new job will cause us to exceed the quota. This is necessary, for two reasons:
   //   1 - a job could require more compute than allowed; we require forward progress
@@ -628,7 +613,11 @@ static void launch(JobTable *jobtable) {
       }
       s << std::endl;
       std::string out = s.str();
-      status_write(1, out.data(), out.size());
+      if (jobtable->imp->batch) {
+        i.echo_line = std::move(out);
+      } else {
+        status_write(1, out.data(), out.size());
+      }
     }
 
 #if 0
@@ -648,6 +637,29 @@ static void launch(JobTable *jobtable) {
     heap.resize(heap.size()-1);
   }
 }
+
+struct CompletedJobEntry {
+  JobTable *jobtable;
+  CompletedJobEntry(JobTable *jobtable_) : jobtable(jobtable_) { }
+
+  bool operator () (const JobEntry &i) {
+    if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
+      status_state.jobs.erase(i.status);
+      jobtable->imp->active -= i.job->threads();
+      jobtable->imp->phys_active -= i.job->memory();
+      if (jobtable->imp->batch) {
+        if (!i.echo_line.empty())
+          status_write(1, i.echo_line.c_str(), i.echo_line.size());
+        jobtable->imp->db->replay_output(
+          i.job->job,
+          LOG_STDOUT(i.job->log),
+          LOG_STDERR(i.job->log));
+      }
+      return true;
+    }
+    return false;
+  }
+};
 
 bool JobTable::wait(Runtime &runtime) {
   char buffer[4096];
@@ -726,7 +738,7 @@ bool JobTable::wait(Runtime &runtime) {
           runtime.heap.guarantee(WJob::reserve());
           runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
           ++done;
-          if (LOG_STDOUT(i.job->log)) {
+          if (!imp->batch && LOG_STDOUT(i.job->log)) {
             if (!i.stdout_buf.empty() && i.stdout_buf.back() != '\n')
               i.stdout_buf.push_back('\n');
             status_write(LOG_STDOUT(i.job->log), i.stdout_buf.data(), i.stdout_buf.size());
@@ -734,7 +746,7 @@ bool JobTable::wait(Runtime &runtime) {
           }
         } else {
           i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
-          if (LOG_STDOUT(i.job->log)) {
+          if (!imp->batch && LOG_STDOUT(i.job->log)) {
             i.stdout_buf.append(buffer, got);
             size_t dump = i.stdout_buf.rfind('\n');
             if (dump != std::string::npos) {
@@ -754,7 +766,7 @@ bool JobTable::wait(Runtime &runtime) {
           runtime.heap.guarantee(WJob::reserve());
           runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
           ++done;
-          if (LOG_STDERR(i.job->log)) {
+          if (!imp->batch && LOG_STDERR(i.job->log)) {
             if (!i.stderr_buf.empty() && i.stderr_buf.back() != '\n')
               i.stderr_buf.push_back('\n');
             status_write(LOG_STDERR(i.job->log), i.stderr_buf.data(), i.stderr_buf.size());
@@ -762,7 +774,7 @@ bool JobTable::wait(Runtime &runtime) {
           }
         } else {
           i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
-          if (LOG_STDERR(i.job->log)) {
+          if (!imp->batch && LOG_STDERR(i.job->log)) {
             i.stderr_buf.append(buffer, got);
             size_t dump = i.stderr_buf.rfind('\n');
             if (dump != std::string::npos) {
@@ -831,6 +843,9 @@ bool JobTable::wait(Runtime &runtime) {
         status_state.current = crit.runtime;
       }
     }
+
+    CompletedJobEntry pred(this);
+    imp->running.remove_if(pred);
 
     if (done > 0) {
       compute = true;
@@ -1024,6 +1039,16 @@ static PRIMFN(prim_job_virtual) {
     s << std::endl;
     std::string out = s.str();
     status_write(1, out.data(), out.size());
+  }
+  if (LOG_STDOUT(job->log)) {
+    status_write(1, stdout->c_str(), stdout->size());
+    if (!stdout->empty() && stdout->c_str()[stdout->size()-1] != '\n')
+      status_write(1, "\n", 1);
+  }
+  if (LOG_STDERR(job->log)) {
+    status_write(1, stderr->c_str(), stderr->size());
+    if (!stderr->empty() && stderr->c_str()[stderr->size()-1] != '\n')
+      status_write(1, "\n", 1);
   }
 
   job->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED;
