@@ -452,6 +452,24 @@ struct Definition {
    : name(std::move(name_)), location(location_), body(body_) { }
 };
 
+static void extract_def(std::vector<Definition> &out, AST &&ast, Expr *body) {
+  std::string key = "extract " + std::to_string(out.size());
+  out.emplace_back(key, ast.token, body);
+  long x = 0;
+  for (auto &m : ast.args) {
+    std::stringstream s;
+    s << "get" << ast.name << ":" << ast.args.size() << ":" << x++;
+    Expr *sub = new App(m.token,
+      new VarRef(m.token, s.str()),
+      new VarRef(m.token, key));
+    if (Lexer::isUpper(m.name.c_str())) {
+      extract_def(out, std::move(m), sub);
+    } else {
+      out.emplace_back(m.name, m.token, sub);
+    }
+  }
+}
+
 static std::vector<Definition> parse_def(Lexer &lex, bool target, bool publish) {
   lex.consume();
 
@@ -461,12 +479,12 @@ static std::vector<Definition> parse_def(Lexer &lex, bool target, bool publish) 
   ast.name.clear();
   if (check_constructors(ast)) lex.fail = true;
 
-  bool destruct = Lexer::isUpper(name.c_str());
-  if (destruct && target) {
+  bool extract = Lexer::isUpper(name.c_str());
+  if (extract && target) {
     std::cerr << "Upper-case identifier cannot be used as a target name at "
       << ast.token.text() << std::endl;
     lex.fail = true;
-    destruct = false;
+    extract = false;
   }
 
   size_t tohash = ast.args.size();
@@ -485,6 +503,13 @@ static std::vector<Definition> parse_def(Lexer &lex, bool target, bool publish) 
 
   Expr *body = parse_block(lex, false);
   if (expect(EOL, lex)) lex.consume();
+
+  std::vector<Definition> out;
+  if (extract) {
+    ast.name = std::move(name);
+    extract_def(out, std::move(ast), body);
+    return out;
+  }
 
   // do we need a pattern match? lower / wildcard are ok
   bool pattern = false;
@@ -543,7 +568,6 @@ static std::vector<Definition> parse_def(Lexer &lex, bool target, bool publish) 
     }
   }
 
-  std::vector<Definition> out;
   out.emplace_back(std::move(name), ast.token, body);
   return out;
 }
@@ -942,6 +966,12 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     std::string get = "get" + name + mname;
     Expr *getfn = new Lambda(memberToken, "_", new Get(memberToken, sump, &c, i));
     bind_def(lex, map, Definition(get, memberToken, getfn), global?top:0);
+
+    // Implement def extractor methods
+    std::stringstream s;
+    s << "get" << name << ":" << c.ast.args.size() << ":" << i;
+    Expr *egetfn = new Lambda(memberToken, "_", new Get(memberToken, sump, &c, i));
+    bind_def(lex, map, Definition(s.str(), memberToken, egetfn), global?top:0);
 
     // Implement edit methods
     Expr *editifn = new VarRef(memberToken, name);
