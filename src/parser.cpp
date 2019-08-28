@@ -1110,7 +1110,6 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
     }
     case TARGET: {
       auto defs = parse_def(lex, 0, true, false);
-      assert (defs.size() == 1);
       auto &def = defs.front();
       auto &l = def.body->location;
       std::stringstream s;
