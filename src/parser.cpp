@@ -461,7 +461,7 @@ static void extract_def(std::vector<Definition> &out, AST &&ast, Expr *body) {
     s << "get" << ast.name << ":" << ast.args.size() << ":" << x++;
     Expr *sub = new App(m.token,
       new VarRef(m.token, s.str()),
-      new VarRef(m.token, key));
+      new VarRef(body->location, key));
     if (Lexer::isUpper(m.name.c_str())) {
       extract_def(out, std::move(m), sub);
     } else {
