@@ -391,13 +391,15 @@ global def fuseRunner =
   def fuse = "{wakePath}/../lib/wake/fuse-wake"
   def score plan =
     if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
-  makeJSONRunner fuse score (_)
+  makeJSONRunnerPlan fuse score
+  | makeJSONRunner
 
 global def preloadRunner =
   def preload = "{wakePath}/../lib/wake/preload-wake"
   def score plan =
     if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
-  makeJSONRunner preload score (_)
+  makeJSONRunnerPlan preload score
+  | makeJSONRunner
 
 def rOK = 0
 def wOK = 1
@@ -413,10 +415,31 @@ global def defaultRunner = match sysname
       def fuse = access "/dev/fuse" wOK
       if fuse then fuseRunner else preloadRunner
 
-# Make a Runner that runs a named script to run jobs
+# A plan describing how to construct a JSONRunner
+# RawScript: the path to the script to run jobs with
+# ExtraArgs: extra arguments to pass to ``RawScript``
+# Score: runJob chooses the runner with the largest score for a Plan
+# Estimate: predict local usage based on prior recorded usage
+tuple JSONRunnerPlan =
+  global RawScript: String
+  global ExtraArgs: List String
+  global Score: Plan => Result Double String
+  global Estimate: Usage => Usage
+
+# make a ``JSONRunnerPlan`` with ``Nil`` and ``(_)`` as defaults for ``ExtraArgs`` and ``Estimate`` respectively
+# rawScript: String; the path to the script to run jobs with
 # score: Plan => Double; runJob chooses the runner with the largest score for a Plan
-# estimate: Option Usage => Option Usage; predict local usage based on prior recorded usage
-global def makeJSONRunner rawScript score estimate =
+global def makeJSONRunnerPlan rawScript score =
+  JSONRunnerPlan rawScript Nil score (_)
+
+# Make a Runner that runs a named script to run jobs
+# plan: JSONRunnerPlan; a tuple containing the arguments for this function
+global def makeJSONRunner plan =
+  def rawScript = plan.getJSONRunnerPlanRawScript
+  def extraArgs = plan.getJSONRunnerPlanExtraArgs
+  def score = plan.getJSONRunnerPlanScore
+  def estimate = plan.getJSONRunnerPlanEstimate
+
   def script = which (simplify rawScript)
   def ok = access script xOK
   def pre = match _
@@ -453,7 +476,7 @@ global def makeJSONRunner rawScript score estimate =
             Fail f = Pair (Fail (makeError f)) ""
             Pass inFile =
               def outFile = "{build}/{prefix}.out.json"
-              def cmd = script, inFile, outFile, Nil
+              def cmd = script, inFile, outFile, extraArgs
               def proxy = RunnerInput cmd Nil environment "." "" Nil prefix (estimate record)
               Pair (Pass proxy) inFile
   def post = match _
