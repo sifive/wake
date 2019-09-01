@@ -25,6 +25,7 @@ struct Runtime;
 struct Continuation;
 struct Record;
 struct Scope;
+struct Deferral;
 
 struct Work : public HeapObject {
   HeapPointer<Work> next;
@@ -43,13 +44,15 @@ struct Work : public HeapObject {
 };
 
 struct Runtime {
-  bool abort;
+  bool abort, strict;
   Heap heap;
   RootPointer<Work> stack;
+  RootPointer<Work> lazy;
+  RootPointer<Deferral> deferred;
   RootPointer<HeapObject> output;
   RootPointer<Record> sources; // Vector String
 
-  Runtime(int profile_heap, double heap_factor);
+  Runtime(int profile_heap, double heap_factor, bool strict_);
   void run();
 
   void schedule(Work *work) {
@@ -68,6 +71,9 @@ struct Runtime {
 
 struct Continuation : public Work {
   HeapPointer<HeapObject> value;
+
+  // Should the deferral be demanded?
+  virtual void consider(Runtime &runtime, Deferral *def);
 
   void resume(Runtime &runtime, HeapObject *obj) {
     value = obj;

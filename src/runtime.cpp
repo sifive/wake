@@ -38,15 +38,43 @@ Category Work::category() const {
   return WORK;
 }
 
-Runtime::Runtime(int profile_heap, double heap_factor)
- : abort(false), heap(profile_heap, heap_factor),
+void Continuation::consider(Runtime &runtime, Deferral *def) {
+  def->demand(runtime, this);
+}
+
+struct CDeferral final : public GCObject<CDeferral, Continuation> {
+  HeapPointer<Deferral> def;
+
+  CDeferral(Deferral *def_) : def(def_) { }
+  void execute(Runtime &runtime) override;
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (def.*memberfn)(arg);
+    return arg;
+  }
+};
+
+void CDeferral::execute(Runtime &runtime) {
+#ifdef DEBUG_GC
+  assert(value->category() == VALUE);
+#endif
+  def->promise.fulfill(runtime, value.get());
+}
+
+Runtime::Runtime(int profile_heap, double heap_factor, bool strict_)
+ : abort(false), strict(strict_), heap(profile_heap, heap_factor),
    stack(heap.root<Work>(nullptr)),
+   lazy(heap.root<Work>(nullptr)),
+   deferred(heap.root<Work>(nullptr)),
    output(heap.root<HeapObject>(nullptr)),
    sources(heap.root<HeapObject>(nullptr)) {
 }
 
 void Runtime::run() {
   int count = 0;
+top:
   while (stack && !abort) {
     if (++count >= 10000) {
       if (JobTable::exit_now()) break;
@@ -63,6 +91,19 @@ void Runtime::run() {
       stack = w;
       heap.GC(gc.needed);
     }
+  }
+  if (!stack && lazy) {
+    stack = lazy.get();
+    lazy = lazy->next;
+    stack->next = nullptr;
+    goto top;
+  }
+#ifdef DEBUG_GC
+  assert (!deferred || deferred->work);
+#endif
+  if (!stack && deferred) {
+    deferred->demand(*this);
+    goto top;
   }
 }
 
@@ -137,11 +178,30 @@ struct CApp final : public GCObject<CApp, Continuation> {
 
   void execute(Runtime &runtime) override {
     auto clo = static_cast<Closure*>(value.get());
-    runtime.heap.reserve(Interpret::reserve());
+    runtime.heap.reserve(Interpret::reserve() + Deferral::reserve() + CDeferral::reserve());
     bind->next = clo->scope.get();
     bind->set_expr(clo->lambda);
-    runtime.schedule(Interpret::claim(runtime.heap,
-      clo->lambda->body.get(), bind.get(), cont.get()));
+    Interpret *work = Interpret::claim(runtime.heap,
+      clo->lambda->body.get(), bind.get(), cont.get());
+    if ((clo->lambda->flags & FLAG_RECURSIVE)) {
+      Deferral *def = Deferral::claim(runtime.heap, work);
+      CDeferral *cdef = CDeferral::claim(runtime.heap, def);
+      work->cont = cdef;
+      cont->consider(runtime, def);
+      // If already demanded, remove the Deferral
+      // This case is important for tail recursion
+      if (def->work) {
+        if (runtime.strict) {
+          def->next = runtime.deferred;
+          if (runtime.deferred) def->next->prev = def;
+          runtime.deferred = def;
+        }
+      } else {
+        work->cont = cont.get();
+      }
+    } else {
+      runtime.schedule(work);
+    }
   }
 };
 
@@ -191,17 +251,21 @@ struct CPrim final : public GCObject<CPrim, Continuation> {
   void execute(Runtime &runtime) override {
     HeapObject *args[prim->args];
     Scope *it = scope.get();
-    size_t i;
-    for (i = prim->args; i; --i) {
-      if (!*it->at(0)) break;
-      args[i-1] = it->at(0)->coerce<HeapObject>();
+    Promise *wait = nullptr;
+    for (size_t i = prim->args; i; --i) {
+      Promise *p = it->at(0);
+      if (p->force(runtime)) {
+        args[i-1] = p->coerce<HeapObject>();
+      } else {
+        wait = p;
+      }
       it = it->next.get();
     }
-    if (i == 0) {
-      prim->fn(prim->data, runtime, cont.get(), scope.get(), prim->args, args);
-    } else {
+    if (wait) {
       next = nullptr; // reschedule
-      it->at(0)->await(runtime, this);
+      wait->await(runtime, this);
+    } else {
+      prim->fn(prim->data, runtime, cont.get(), scope.get(), prim->args, args);
     }
   }
 };

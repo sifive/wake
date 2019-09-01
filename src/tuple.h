@@ -25,45 +25,41 @@ struct Location;
 struct Constructor;
 
 struct alignas(PadObject) Promise {
-  Category category() const {
-    HeapObject *obj = value.get();
-    return obj ? obj->category() : WORK;
-  }
+  // Returns true if the value is ready.
+  explicit operator bool();
 
-  explicit operator bool() const {
-    return category() == VALUE;
-  }
+  // Returns if already a value. If deferred, schedule it.
+  bool force(Runtime &runtime);
 
-  void await(Runtime &runtime, Continuation *c) const {
-#ifdef DEBUG_GC
-    assert(!c->next);
-#endif
-    if (*this) {
-      c->resume(runtime, value.get());
-    } else {
-      c->next = static_cast<Continuation*>(value.get());
-      value = c;
-    }
-  }
+  // Invoke the continuation once the Promise has a value
+  void await(Runtime &runtime, Continuation *c);
 
-  // Use only if the value is known to already be available 
+  // Returns true if nothing is waiting on the Promise
+  bool fresh() const { return !value; }
+
+  // Extract the value directly, without waiting with await
+  // Use only if the value is known to already be available
   template <typename T>
   T *coerce() {
 #ifdef DEBUG_GC
-    assert (*this);
+    assert(value);
+    assert(value->category() == VALUE);
 #endif
     return static_cast<T*>(value.get());
   }
 
+  // Extract the value directly, without waiting with await
+  // Use only if the value is known to already be available
   template <typename T>
   const T *coerce() const {
 #ifdef DEBUG_GC
-    assert (*this);
+    assert(value);
+    assert(value->category() == VALUE);
 #endif
     return static_cast<const T*>(value.get());
   }
 
-  // Call once only!
+  // Call once only! => supplies the value
   void fulfill(Runtime &runtime, HeapObject *obj) {
 #ifdef DEBUG_GC
     assert(obj);
@@ -73,23 +69,180 @@ struct alignas(PadObject) Promise {
     value = obj;
   }
 
-  // Call only if the containing tuple was just constructed (no Continuations)
+  // Call only if the containing tuple was just constructed (await not called)
   void instant_fulfill(HeapObject *obj) {
 #ifdef DEBUG_GC
-     assert(!value);
-     assert(obj->category() == VALUE);
+    assert(!value);
+    assert(obj);
+    assert(obj->category() == VALUE);
 #endif
-     value = obj;
+    value = obj;
   }
+
+  // Hook up a deferred evaluation to this Promise.
+  // It will only be run when/if something awaits the Promise.
+  void defer(Deferral *defer);
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) { return (value.*memberfn)(arg); }
 
 private:
   void awaken(Runtime &runtime, HeapObject *obj);
-  mutable HeapPointer<HeapObject> value;
-friend struct Tuple;
+  HeapPointer<HeapObject> value;
+friend struct Deferral;
 };
+
+struct Deferral final : public GCObject<Deferral, HeapObject> {
+  HeapPointer<Work> work; // nullptr => work already scheduled
+  HeapPointer<Deferral> next, prev; // chain of deferred work for eager evaluation
+  Promise promise;
+
+  Deferral(Work *work_) : work(work_) { }
+  void format(std::ostream &os, FormatState &state) const override;
+  Hash hash() const override;
+  Category category() const override;
+
+  // Schedule this deferred computation; we need it's value
+  void demand(Runtime &runtime) {
+#ifdef DEBUG_GC
+    assert (!promise);
+#endif
+    if (work) {
+      work->next = runtime.lazy;
+      runtime.lazy = work;
+      work = nullptr;
+    }
+    if (prev) prev->next = next;
+    if (next) next->prev = prev;
+    if (runtime.deferred.get() == this) runtime.deferred = next;
+    next = nullptr;
+    prev = nullptr;
+  }
+
+  // Schedule this deferred computation; we need it's value
+  void demand(Runtime &runtime, Continuation *cont) {
+#ifdef DEBUG_GC
+    assert (!cont->next);
+#endif
+    demand(runtime);
+    cont->next = promise.value;
+    promise.value = cont;
+  }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = HeapObject::recurse<T, memberfn>(arg);
+    arg = (work.*memberfn)(arg);
+    arg = (next.*memberfn)(arg);
+    arg = (prev.*memberfn)(arg);
+    arg = promise.recurse<T, memberfn>(arg);
+    return arg;
+  }
+};
+
+inline Promise::operator bool() {
+  HeapObject *obj = value.get();
+  if (!obj) {
+    return false;
+  } else switch (obj->category()) {
+    case VALUE:
+      return true;
+    case WORK:
+      return false;
+    default: // DEFERRAL:
+      Deferral *def = static_cast<Deferral*>(obj);
+      HeapObject *dobj = def->promise.value.get();
+      if (!dobj) {
+        return false;
+      } else switch (dobj->category()) {
+        case VALUE:
+          value = dobj;
+          return true;
+#ifdef DEBUG_GC
+        case DEFERRAL:
+          assert(0 /* unreachable */);
+#endif
+        default: // WORK
+          return false;
+      }
+  }
+}
+
+inline bool Promise::force(Runtime &runtime) {
+  HeapObject *obj = value.get();
+  if (!obj) {
+    return false;
+  } else switch (obj->category()) {
+    case VALUE:
+      return true;
+    case WORK:
+      return false;
+    default: // DEFERRAL:
+      Deferral *def = static_cast<Deferral*>(value.get());
+      HeapObject *dobj = def->promise.value.get();
+      if (!dobj) {
+        def->demand(runtime);
+        return false;
+      } else switch (dobj->category()) {
+        case VALUE:
+          value = dobj;
+          return true;
+#ifdef DEBUG_GC
+        case DEFERRAL:
+          assert(0 /* unreachable */);
+#endif
+        default: // WORK
+          def->demand(runtime);
+          return false;
+      }
+  }
+}
+
+inline void Promise::await(Runtime &runtime, Continuation *c) {
+#ifdef DEBUG_GC
+  assert(!c->next);
+  assert(c->category() == WORK);
+#endif
+  HeapObject *obj = value.get();
+  if (!obj) {
+    value = c;
+  } else switch (obj->category()) {
+    case VALUE:
+      c->resume(runtime, obj);
+      break;
+    case WORK:
+      c->next = static_cast<Continuation*>(obj);
+      value = c;
+      break;
+    default: // DEFERRAL:
+      Deferral *def = static_cast<Deferral*>(obj);
+      HeapObject *dobj = def->promise.value.get();
+      if (!dobj) {
+        c->consider(runtime, def);
+      } else switch (dobj->category()) {
+        case VALUE:
+          value = dobj;
+          c->resume(runtime, dobj);
+          break;
+#ifdef DEBUG_GC
+        case DEFERRAL:
+          assert(0 /* unreachable */);
+#endif
+        default: // WORK
+          c->consider(runtime, def);
+          break;
+      }
+      break;
+  }
+}
+
+inline void Promise::defer(Deferral *defer) {
+#ifdef DEBUG_GC
+  assert(!value);
+  assert(!defer->promise);
+#endif
+  value = defer;
+}
 
 template <>
 inline HeapStep Promise::recurse<HeapStep, &HeapPointerBase::explore>(HeapStep step) {
@@ -113,8 +266,7 @@ struct Tuple : public Value {
       at(i)->instant_fulfill(p->coerce<HeapObject>());
     } else {
       Continuation *cont = claim_fulfiller(r, i);
-      cont->next = p->value;
-      p->value = cont;
+      p->await(r, cont);
     }
   }
 };

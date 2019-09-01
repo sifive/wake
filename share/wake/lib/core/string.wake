@@ -17,7 +17,9 @@
 
 global def strlen string = prim "strlen"
 
-global def cat listString = prim "lcat"
+global def cat listString =
+  def imp size listString = prim "lcat"
+  imp (foldl (_ + strlen _) 0 listString) listString
 
 global def catWith separator strings =
   if strings.empty then "" else
