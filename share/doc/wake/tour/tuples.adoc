@@ -1,0 +1,94 @@
+= Tuples
+
+Tuples are immutable, https://en.wikipedia.org/wiki/Product_type[Product types], similar to structs in C/C++ or named tuples in Python.
+They are useful in organizing data and creating APIs that preserve backwards compatibility.
+
+== Definition
+
+=== Declaration
+
+Tuples are _declared_ with the `tuple` keyword and a name beginning with a capital letter followed by an equals sign.
+They may optionally have type parameters between the name and the equals sign.
+The declaration may be preceded by the `global` modifier which defines the scope of the <<construction, constructor>> and <<deconstruction, deconstructor>>.
+
+=== Fields
+
+Tuples are composed of one or more fields, each of which has a name beginning with a capital letter, and a type.
+The types may correspond to declared type parameters
+Each field may be preceded by the `global` modifier which defines the scope of the generated <<getters-setters-and-editors, getter, setter, and
+editor>>.
+
+=== Concrete Syntax
+
+----
+<modifier>? tuple <tuple name> <type parameter>* =
+  (<modifier>? <field name>: <field type>)+
+----
+
+=== Example
+
+We include a running example, `Cat, to help explain the features of tuples:
+
+[#cat-defn]
+----
+tuple Cat
+  global Name: String
+  global Age: Integer
+----
+
+== Construction
+
+Tuples are constructed by a function of the same name as that of the tuple itself.
+The function has `N` arguments, one for each field in the order of the definitions of the fields.
+
+In the definition of `Cat` <<cat-defn, above>>, one might notice that we included `global` modifiers on the fields, but not the declaration line.
+This pattern of keeping the constructor and deconstructor private helps with maintaining <<backwards-compatibility>> (more on that later).
+Of course, for others to use this type, we must then provide a `global` factory function that calls the private constructor:
+
+----
+global def makeCat name age = Cat name age
+----
+
+== Deconstruction
+
+Tuples can be used in pattern matching.
+Similarly to the constructor, the deconstructor uses the name of the tuple followed by each field.
+
+For our `Cat` example, we can write a function to get the `Name` using `match` and deconstruction:
+
+----
+global def printCatName cat = match cat
+  Cat n _ = println n
+----
+
+== Getters, Setters, and Editors
+
+For user convenience, Wake generates getter, setter, and editor functions for each field of a tuple.
+Even though the names may suggest mutation, all types in Wake are immutable so any `set` or `edit` function returns a new tuple.
+The generated functions are of the form `(get|set|edit)<tuple name><field name>`.
+
+The types of the getters are simply `<tuple type> => <field type>`
+In the case of our `Cat` example, `getCatAge` is of the type `Cat => Integer`.
+
+Setters have types of the form `<field type> => <tuple type> => <tuple type>`.
+One can think about this as a function of two arguments, a new value for the field and the old tuple, to the new tuple.
+In the case of `Cat`, `setCatName` is of the type `String => Cat => Cat` and case be used like so:
+----
+def nameCatBob cat = setCatName "Bob" cat
+----
+
+Editors are higher-order functions that take a function from the old value of the field to the new value.
+The editor will then apply this function and return a new value of the tuple.
+Editor functions are of the form `(<field type> => <field type>) => <tuple type> => <typle type>`.
+
+For example, we could increment the age of a cat by passing `_ + 1` to `editCatAge`:
+----
+# We increment a Cat's age on its birthday
+def celebrateCatBirthday cat = editCatAge (_ + 1) cat
+----
+
+== Type Parameterization
+
+== Backwards Compatibility
+
+
