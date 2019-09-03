@@ -373,11 +373,12 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (expect(ELSE, lex)) lex.consume();
       auto elseE = parse_block(lex, multiline);
       l.end = elseE->location.end;
+      Lambda *t = new Lambda(l, "_", thenE);
+      Lambda *e = new Lambda(l, "_", elseE);
+      t->fnname = " then";
+      e->fnname = " else";
       App *out = new App(l, new App(l, new App(l,
-        new VarRef(l, "destruct Boolean"),
-        new Lambda(l, "_", thenE)),
-        new Lambda(l, "_", elseE)),
-        condE);
+        new VarRef(l, "destruct Boolean"), t), e), condE);
       out->flags |= FLAG_AST;
       return out;
     }

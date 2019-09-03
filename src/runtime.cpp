@@ -249,7 +249,7 @@ struct CDestruct final : public GCObject<CDestruct, Continuation> {
     auto closure = scope->at(0)->coerce<Closure>();
     auto body = closure->lambda->body.get();
     auto scope = closure->scope.get();
-    auto next = Scope::claim(runtime.heap, 1, scope, scope, des);
+    auto next = Scope::claim(runtime.heap, 1, scope, scope, closure->lambda);
     next->at(0)->instant_fulfill(record);
     runtime.schedule(Interpret::claim(runtime.heap, body, next, cont.get()));
   }

@@ -17,6 +17,7 @@
 
 #include "tuple.h"
 #include "expr.h"
+#include <sstream>
 
 void Promise::awaken(Runtime &runtime, HeapObject *obj) {
 #ifdef DEBUG_GC
@@ -184,21 +185,28 @@ struct alignas(PadObject) ScopeStack {
 bool Scope::debug = false;
 
 const char *Scope::type() const {
-  return "StackTree";
+  return "ScopeTree";
 }
 
 void Scope::set_expr(Expr *expr) {
   if (debug) stack()->expr = expr;
 }
 
-std::vector<Location> Scope::stack_trace() const {
-  std::vector<Location> out;
+std::vector<std::string> Scope::stack_trace() const {
+  std::vector<std::string> out;
   if (debug) {
     const ScopeStack *s;
+    std::stringstream ss;
     for (const Scope *i = this; i; i = s->parent.get()) {
       s = i->stack();
-      if (s->expr->type != &DefBinding::type)
-        out.emplace_back(s->expr->location);
+      if (s->expr->type == &Lambda::type) {
+        const Lambda *l = static_cast<Lambda*>(s->expr);
+        ss << l->fnname << ": " << l->body->location.file();
+        auto x = ss.str();
+        ss.str(std::string());
+        if (out.empty() || out.back() != x)
+          out.emplace_back(std::move(x));
+      }
     }
   }
   return out;

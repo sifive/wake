@@ -130,7 +130,9 @@ Hash App::hash() {
 }
 
 void Lambda::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Lambda(" << name << " @ " << token.file() << "): " << typeVar << " @ " << location.file() << std::endl;
+  os << pad(depth) << "Lambda(" << name;
+  if (!fnname.empty()) os << ", " << fnname;
+  os << " @ " << token.file() << "): " << typeVar << " @ " << location.file() << std::endl;
   body->format(os, depth+2);
 }
 
@@ -158,16 +160,6 @@ Hash DefMap::hash() {
 
 void DefMap::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   assert(0 /* unreachable */);
-}
-
-std::unique_ptr<Expr> DefMap::dont_generalize(std::unique_ptr<DefMap> &&map) {
-  assert (map->pub.empty());
-  std::unique_ptr<Expr> out = std::move(map->body);
-  for (auto it = map->map.begin(); it != map->map.end(); ++it)
-    out = std::unique_ptr<Expr>(new Lambda(map->location, it->first, out.release()));
-  for (auto it = map->map.rbegin(); it != map->map.rend(); ++it)
-    out = std::unique_ptr<Expr>(new App(map->location, out.release(), it->second.body.release()));
-  return out;
 }
 
 void Literal::format(std::ostream &os, int depth) const {
