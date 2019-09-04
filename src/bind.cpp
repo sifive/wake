@@ -631,7 +631,7 @@ static std::unique_ptr<Expr> fracture(bool anon, const std::string& name, std::u
     return expr;
   } else if (expr->type == &Match::type) {
     std::unique_ptr<Match> m(static_cast<Match*>(expr.release()));
-    auto out = rebind_match(addanon(name, anon), binding, std::move(m));
+    auto out = rebind_match(name, binding, std::move(m));
     if (!out) return out;
     out->flags |= FLAG_AST;
     return fracture(anon, name, std::move(out), binding);
