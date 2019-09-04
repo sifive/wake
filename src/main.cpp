@@ -407,7 +407,7 @@ int main(int argc, char **argv) {
   status_finish();
 
   runtime.heap.report();
-  tree.report(profile);
+  tree.report(profile, targets.back());
 
   bool pass = true;
   if (runtime.abort) {

@@ -17,6 +17,7 @@
 
 #include "profile.h"
 #include "json5.h"
+#include "execpath.h"
 #include <fstream>
 #include <iostream>
 #include <string.h>
@@ -35,18 +36,24 @@ static unsigned dump_tree(std::ostream &os, const std::string &name, const Profi
     }
     os << "],";
   }
-  os << "\"name\":\"" << json_escape(name)
+  size_t colon = name.find(':');
+  os << "\"name\":\"" << json_escape(name.substr(0, colon))
+     << "\",\"file\":\"" << json_escape(name.substr(colon+2))
      << "\",\"value\":" << value
      << "}";
   return value;
 }
 
-void Profile::report(const char *file) const {
+void Profile::report(const char *file, const std::string &command) const {
   if (file) {
     std::ofstream f(file, std::ios_base::trunc);
     if (!f.fail()) {
-      dump_tree(f, "root", this);
-      f << std::endl; // flushes
+      f << "<meta charset=\"UTF-8\">" << std::endl;
+      f << "<style type=\"application/json\" id=\"dataset\">";
+      dump_tree(f, command + ": command-line", this);
+      f << "</style>" << std::endl;
+      std::ifstream html(find_execpath() + "/../share/wake/html/profile.html");
+      f << html.rdbuf();
     }
     if (f.fail()) {
       std::cerr << "Saving profile trace to '" << file << "': " << strerror(errno) << std::endl;

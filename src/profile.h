@@ -26,7 +26,7 @@ struct Profile {
   unsigned count;
 
   Profile() : count(0) { }
-  void report(const char *file) const;
+  void report(const char *file, const std::string &cmd) const;
 };
 
 #endif

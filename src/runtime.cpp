@@ -125,7 +125,8 @@ void Runtime::run() {
       if (Interpret *i = dynamic_cast<Interpret*>(w)) {
         auto stack = i->scope->stack_trace(false);
         Profile *node = profile;
-        for (auto &s : stack) node = &node->children[s];
+        for (auto it = stack.rbegin(); it != stack.rend(); ++it)
+          node = &node->children[*it];
         ++node->count;
         trace_needed = false;
       }
