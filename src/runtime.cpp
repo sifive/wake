@@ -21,7 +21,18 @@
 #include "value.h"
 #include "status.h"
 #include "job.h"
+#include "profile.h"
 #include <cassert>
+#include <sys/time.h>
+#include <signal.h>
+
+#define PROFILE_HZ 1000
+
+static volatile bool trace_needed = false;
+static void handle_SIGPROF(int sig) {
+  (void)sig;
+  trace_needed = true;
+}
 
 Closure::Closure(Lambda *lambda_, Scope *scope_) : lambda(lambda_), scope(scope_) { }
 
@@ -38,32 +49,34 @@ Category Work::category() const {
   return WORK;
 }
 
-Runtime::Runtime(int profile_heap, double heap_factor)
- : abort(false), heap(profile_heap, heap_factor),
+Runtime::Runtime(Profile *profile_, int profile_heap, double heap_factor)
+ : abort(false),
+   profile(profile_),
+   heap(profile_heap, heap_factor),
    stack(heap.root<Work>(nullptr)),
    output(heap.root<HeapObject>(nullptr)),
    sources(heap.root<HeapObject>(nullptr)) {
+  if (profile) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+
+    // Setup a SIGPROF timer to trigger stack tracing
+    struct itimerval timer;
+    timer.it_value.tv_sec = 0;
+    timer.it_value.tv_usec = 1000000/PROFILE_HZ;
+    timer.it_interval = timer.it_value;
+
+    sa.sa_handler = handle_SIGPROF;
+    sa.sa_flags = SA_RESTART;
+    sigaction(SIGPROF, &sa, 0);
+    setitimer(ITIMER_PROF, &timer, 0);
+  }
 }
 
-void Runtime::run() {
-  int count = 0;
-  while (stack && !abort) {
-    if (++count >= 10000) {
-      if (JobTable::exit_now()) break;
-      status_refresh();
-      count = 0;
-    }
-    Work *w = stack.get();
-    stack = w->next;
-    try {
-      w->execute(*this);
-    } catch (GCNeededException gc) {
-      // retry work after memory is available
-      w->next = stack;
-      stack = w;
-      heap.GC(gc.needed);
-    }
-  }
+Runtime::~Runtime() {
+  struct itimerval timer;
+  memset(&timer, 0, sizeof(timer));
+  setitimer(ITIMER_PROF, &timer, 0);
 }
 
 struct Interpret final : public GCObject<Interpret, Work> {
@@ -86,6 +99,39 @@ struct Interpret final : public GCObject<Interpret, Work> {
     expr->interpret(runtime, scope.get(), cont.get());
   }
 };
+
+void Runtime::run() {
+  int count = 0;
+  bool lprofile = profile;
+  trace_needed = false; // don't count time spent waiting for Jobs
+  while (stack && !abort) {
+    if (++count >= 10000) {
+      if (JobTable::exit_now()) break;
+      status_refresh();
+      count = 0;
+    }
+    Work *w = stack.get();
+    stack = w->next;
+    try {
+      w->execute(*this);
+    } catch (GCNeededException gc) {
+      // retry work after memory is available
+      w->next = stack;
+      stack = w;
+      heap.GC(gc.needed);
+      trace_needed = false; // don't count time spent running GC
+    }
+    if (lprofile && trace_needed) {
+      if (Interpret *i = dynamic_cast<Interpret*>(w)) {
+        auto stack = i->scope->stack_trace(false);
+        Profile *node = profile;
+        for (auto &s : stack) node = &node->children[s];
+        ++node->count;
+        trace_needed = false;
+      }
+    }
+  }
+}
 
 struct CInit final : public GCObject<CInit, Continuation> {
   void execute(Runtime &runtime) override {

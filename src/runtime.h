@@ -42,14 +42,17 @@ struct Work : public HeapObject {
   }
 };
 
+struct Profile;
 struct Runtime {
   bool abort;
+  Profile *profile;
   Heap heap;
   RootPointer<Work> stack;
   RootPointer<HeapObject> output;
   RootPointer<Record> sources; // Vector String
 
-  Runtime(int profile_heap, double heap_factor);
+  Runtime(Profile *profile_, int profile_heap, double heap_factor);
+  ~Runtime();
   void run();
 
   void schedule(Work *work) {
