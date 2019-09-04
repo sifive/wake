@@ -276,6 +276,7 @@ std::vector<std::string> Scope::stack_trace(bool indent_compress) const {
       s = i->stack();
       if (s->expr->type == &Lambda::type) {
         const Lambda *l = static_cast<Lambda*>(s->expr);
+        if (l->fnname.empty()) continue;
         ss << l->fnname << ": " << l->body->location.file();
         auto x = ss.str();
         ss.str(std::string());
