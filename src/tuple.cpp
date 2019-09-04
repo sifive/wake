@@ -225,11 +225,11 @@ static std::vector<std::string> scompress(std::vector<std::string> &&raw, bool i
         if (unsigned reps = (f+1-s)/stride) {
           unsigned e = s + reps*stride;
           unsigned prng = 0;
-          for (int j = s-stride; j < s; ++j) {
+          for (unsigned j = s-stride; j < s; ++j) {
             ++run[j].depth;
             prng = prng * 0x3ba78125 ^ static_cast<unsigned char>(run[j].value);
           }
-          for (int j = s; j < e; ++j) {
+          for (unsigned j = s; j < e; ++j) {
             prng *= 0x1b642835;
             run[j].value = prng >> 24;
             run[j].depth++;
