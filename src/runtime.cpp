@@ -114,22 +114,22 @@ void Runtime::run() {
     stack = w->next;
     try {
       w->execute(*this);
+      if (lprofile && trace_needed) {
+        if (Interpret *i = dynamic_cast<Interpret*>(w)) {
+          auto stack = i->scope->stack_trace(false);
+          Profile *node = profile;
+          for (auto it = stack.rbegin(); it != stack.rend(); ++it)
+            node = &node->children[*it];
+          ++node->count;
+          trace_needed = false;
+        }
+      }
     } catch (GCNeededException gc) {
       // retry work after memory is available
       w->next = stack;
       stack = w;
       heap.GC(gc.needed);
       trace_needed = false; // don't count time spent running GC
-    }
-    if (lprofile && trace_needed) {
-      if (Interpret *i = dynamic_cast<Interpret*>(w)) {
-        auto stack = i->scope->stack_trace(false);
-        Profile *node = profile;
-        for (auto it = stack.rbegin(); it != stack.rend(); ++it)
-          node = &node->children[*it];
-        ++node->count;
-        trace_needed = false;
-      }
     }
   }
 }
