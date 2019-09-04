@@ -246,6 +246,7 @@ void term_init(bool tty_)
   tty = tty_;
 
   if (tty) {
+    if (isatty(1) != 1) tty = false;
     if (isatty(2) != 1) tty = false;
   }
 
