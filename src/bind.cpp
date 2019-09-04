@@ -567,9 +567,11 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
     patterns.back().guard = static_cast<bool>(guard);
     patterns.back().tree = cons_lookup(binding, p.expr, p.guard, p.pattern, &multiarg);
     ok &= !patterns.front().tree.sum || patterns.back().tree.sum;
-    cases[f] = std::unique_ptr<Expr>(case_name(new Lambda(p.expr->location, "_", p.expr.release()), fnname + ".case"  + std::to_string(f)));
+    std::string cname = match->patterns.size() == 1 ? fnname : fnname + ".case"  + std::to_string(f);
+    std::string gname = match->patterns.size() == 1 ? fnname : fnname + ".guard"  + std::to_string(f);
+    cases[f] = std::unique_ptr<Expr>(case_name(new Lambda(p.expr->location, "_", p.expr.release()), cname));
     if (guard)
-      guards[f] = std::unique_ptr<Expr>(case_name(new Lambda(p.guard->location, "_", p.guard.release()), fnname + ".guard" + std::to_string(f)));
+      guards[f] = std::unique_ptr<Expr>(case_name(new Lambda(p.guard->location, "_", p.guard.release()), gname));
     ++f;
   }
   if (!ok) return nullptr;
