@@ -375,8 +375,8 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       l.end = elseE->location.end;
       Lambda *t = new Lambda(l, "_", thenE);
       Lambda *e = new Lambda(l, "_", elseE);
-      t->fnname = " then";
-      e->fnname = " else";
+      t->fnname = " .then";
+      e->fnname = " .else";
       App *out = new App(l, new App(l, new App(l,
         new VarRef(l, "destruct Boolean"), t), e), condE);
       out->flags |= FLAG_AST;
@@ -544,18 +544,20 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
         << fn.text() << std::endl;
       lex.fail = true;
     }
-    Expr *hash = new Prim(fn, "hash");
-    for (size_t i = 0; i < tohash; ++i) hash = new Lambda(fn, "_", hash);
-    for (size_t i = 0; i < tohash; ++i) hash = new App(fn, hash, new VarRef(fn, args[i].first));
-    Expr *subhash = new Prim(fn, "hash");
-    for (size_t i = tohash; i < args.size(); ++i) subhash = new Lambda(fn, "_", subhash);
-    for (size_t i = tohash; i < args.size(); ++i) subhash = new App(fn, subhash, new VarRef(fn, args[i].first));
-    body = new App(fn, new App(fn, new App(fn, new App(fn,
-      new Lambda(fn, "_target", new Lambda(fn, "_hash", new Lambda(fn, "_subhash", new Lambda(fn, "_fn", new Prim(fn, "tget"))))),
-      new VarRef(fn, "table " + name)),
-      hash),
-      subhash),
-      new Lambda(fn, "_", body));
+    Location bl = body->location;
+    Expr *hash = new Prim(bl, "hash");
+    for (size_t i = 0; i < tohash; ++i) hash = new Lambda(bl, "_", hash);
+    for (size_t i = 0; i < tohash; ++i) hash = new App(bl, hash, new VarRef(bl, args[i].first));
+    Expr *subhash = new Prim(bl, "hash");
+    for (size_t i = tohash; i < args.size(); ++i) subhash = new Lambda(bl, "_", subhash);
+    for (size_t i = tohash; i < args.size(); ++i) subhash = new App(bl, subhash, new VarRef(bl, args[i].first));
+    Lambda *gen = new Lambda(bl, "_", body);
+    Lambda *tget = new Lambda(bl, "_fn", new Prim(bl, "tget"));
+    gen->fnname = " ";
+    tget->fnname = " ";
+    body = new App(bl, new App(bl, new App(bl, new App(bl,
+      new Lambda(bl, "_target", new Lambda(bl, "_hash", new Lambda(bl, "_subhash", tget))),
+      new VarRef(bl, "table " + name)), hash), subhash), gen);
   }
 
   if (publish && !args.empty()) {

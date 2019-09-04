@@ -623,8 +623,7 @@ static std::unique_ptr<Expr> fracture(bool anon, const std::string& name, std::u
       if (lambda->fnname.empty()) {
         lambda->fnname = addanon(name, anon);
       } else if (lambda->fnname[0] == ' ') {
-        lambda->fnname[0] = '.';
-        lambda->fnname = name + lambda->fnname;
+        lambda->fnname = name + lambda->fnname.substr(1);
       }
       lambda->body = fracture(false, lambda->fnname, std::move(lambda->body), &lbinding);
     }
