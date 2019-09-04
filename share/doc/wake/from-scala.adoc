@@ -344,11 +344,9 @@ val newResult = result.flatMap(reciprocal)
 |
 [source,wake]
 ----
-def reciprocal d =
-  if (d == 0.0)
-    makeError("Divide by zero")
-  else
-    1.0 / d
+def reciprocal = match _
+  0.0 = Fail (makeError "Divide by zero")
+  d   = Pass (1.0 / d)
 
 val result = Pass 1
 def newResult = result \| rmapPass reciprocal
@@ -396,6 +394,6 @@ tuple Foo =
 
 def foo = Foo "foo" 0
 def myFooString = foo \| getFooMyString
-def myFooCopy = foo \| editFooMyInt 1
+def myFooCopy = foo \| setFooMyInt 1
 ----
 |===
