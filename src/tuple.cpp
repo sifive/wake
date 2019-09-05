@@ -17,6 +17,8 @@
 
 #include "tuple.h"
 #include "expr.h"
+#include <sstream>
+#include <unordered_map>
 
 void Promise::awaken(Runtime &runtime, HeapObject *obj) {
 #ifdef DEBUG_GC
@@ -184,24 +186,106 @@ struct alignas(PadObject) ScopeStack {
 bool Scope::debug = false;
 
 const char *Scope::type() const {
-  return "StackTree";
+  return "ScopeTree";
 }
 
 void Scope::set_expr(Expr *expr) {
   if (debug) stack()->expr = expr;
 }
 
-std::vector<Location> Scope::stack_trace() const {
-  std::vector<Location> out;
-  if (debug) {
-    const ScopeStack *s;
-    for (const Scope *i = this; i; i = s->parent.get()) {
-      s = i->stack();
-      if (s->expr->type != &DefBinding::type)
-        out.emplace_back(s->expr->location);
+struct Compressor {
+  uint32_t value;
+  uint16_t depth;
+  uint8_t erased; // 1 or 0
+  uint8_t pad; // 0
+
+  Compressor(uint32_t value_, uint16_t depth_ = 0, bool erased_ = false)
+   : value(value_), depth(depth_), erased(erased_), pad(0) { }
+
+  bool operator == (Compressor o) const {
+    return value == o.value && depth == o.depth && erased == o.erased && pad == o.pad;
+  }
+};
+
+static std::vector<std::string> scompress(std::vector<std::string> &&raw, bool indent_compress) {
+  std::unordered_map<std::string, uint32_t> map;
+  std::vector<Compressor> run;
+  run.reserve(raw.size());
+  for (unsigned i = 0; i < raw.size(); ++i)
+    run.emplace_back(map.insert(std::make_pair(raw[i], i)).first->second);
+  map.clear();
+  // Magic O(nlogn) stack compression algorithm
+  for (unsigned stride = 1; stride <= run.size()/2; ++stride) {
+    for (unsigned i = stride; i < run.size(); i += stride) {
+      if (run[i-stride] == run[i]) {
+        unsigned s = i, f = i;
+        while (s > stride && run[s-stride-1] == run[s-1]) --s;
+        while (f+1 < run.size() && run[f-stride+1] == run[f+1]) ++f;
+        while (run[s-stride].erased && s < f) ++s;
+        if (unsigned reps = (f+1-s)/stride) {
+          unsigned e = s + reps*stride;
+          unsigned prng = 0;
+          for (unsigned j = s-stride; j < s; ++j) {
+            ++run[j].depth;
+            prng = prng * 0x3ba78125 ^ static_cast<unsigned char>(run[j].value);
+          }
+          for (unsigned j = s; j < e; ++j) {
+            prng *= 0x1b642835;
+            run[j].value = prng >> 24;
+            run[j].depth++;
+            run[j].erased = true;
+          }
+          --run[e-1].depth;
+        }
+        i = f;
+      }
+    }
+  }
+  std::string pad;
+  std::vector<uint16_t> depths;
+  std::vector<std::string> out;
+  unsigned stride = 0;
+  for (unsigned i = 0; i < run.size(); ++i) {
+    Compressor c = run[i];
+    if (c.erased) {
+      if (!stride) stride = i-depths.back();
+      if (c.depth < depths.size()) {
+        if (indent_compress) {
+          unsigned repeat = ((i+1)-depths.back()) / stride;
+          pad.resize(depths.size()*2, ' ');
+          out.push_back(pad + "x " + std::to_string(repeat));
+        }
+        stride = 0;
+        depths.pop_back();
+      }
+    } else {
+      if (indent_compress) pad.resize(c.depth*2, ' ');
+      while (c.depth > depths.size()) { depths.push_back(i); }
+      out.push_back(pad + raw[c.value]);
     }
   }
   return out;
+}
+
+std::vector<std::string> Scope::stack_trace(bool indent_compress) const {
+  std::vector<std::string> out;
+  if (debug) {
+    const ScopeStack *s;
+    std::stringstream ss;
+    for (const Scope *i = this; i; i = s->parent.get()) {
+      s = i->stack();
+      if (s->expr->type == &Lambda::type) {
+        const Lambda *l = static_cast<Lambda*>(s->expr);
+        if (l->fnname.empty()) continue;
+        ss << l->fnname << ": " << l->body->location.file();
+        auto x = ss.str();
+        ss.str(std::string());
+        if (out.empty() || out.back() != x)
+          out.emplace_back(std::move(x));
+      }
+    }
+  }
+  return scompress(std::move(out), indent_compress);
 }
 
 template <typename T>

@@ -118,7 +118,7 @@ global def editPlanOnce f =
     Keep  if ! f True  = ReRun
     Share if ! f True  = ReRun
     x                  = x
-  editPlanPersistence helper _
+  editPlanPersistence helper
 
 global def editPlanKeep f =
   def helper = match _
@@ -127,7 +127,7 @@ global def editPlanKeep f =
     Keep  if ! f True  = Once
     Share if ! f True  = Once
     x                  = x
-  editPlanPersistence helper _
+  editPlanPersistence helper
 
 global def editPlanShare f =
   def helper = match _
@@ -136,7 +136,7 @@ global def editPlanShare f =
     Keep  if   f False = Share
     Share if ! f True  = Keep
     x                  = x
-  editPlanPersistence helper _
+  editPlanPersistence helper
 
 # The criteria which determine if Job execution can be skipped:
 #   Once  is True and a matching job was run by this wake invocation
@@ -316,25 +316,25 @@ global def runJob p = match p
 def toUsage (Pair (Pair status runtime) (Pair (Pair cputime membytes) (Pair ibytes obytes))) =
   Usage status runtime cputime membytes ibytes obytes
 
-def getJobReality =
+def getJobReality job =
   def raw job = prim "job_reality"
-  raw _ | rmap toUsage
+  raw job | rmap toUsage
 
-def waitJobMerged f j =
+def waitJobMerged f job =
   def raw job = prim "job_reality"
-  match (raw j)
+  match (raw job)
     Pass _ = f Unit
     Fail _ = f Unit
 
 # Actual usage of a finished job
-global def getJobReport =
+global def getJobReport job =
   def raw job = prim "job_report"
-  raw _ | rmap toUsage
+  raw job | rmap toUsage
 
 # From database, available the moment a Job exists
-global def getJobRecord =
+global def getJobRecord job =
   def raw job = prim "job_record"
-  raw _ | at 0 | omap toUsage
+  raw job | at 0 | omap toUsage
 
 global def makeBadPath error = BadPath error
 

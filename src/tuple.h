@@ -151,7 +151,7 @@ struct Scope : public Tuple {
   }
 
   static bool debug;
-  std::vector<Location> stack_trace() const;
+  std::vector<std::string> stack_trace(bool indent_compress = true) const;
   virtual const ScopeStack *stack() const = 0;
   virtual ScopeStack *stack() = 0;
   void set_expr(Expr *expr);

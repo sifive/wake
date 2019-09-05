@@ -1093,7 +1093,7 @@ static PRIMFN(prim_job_create) {
   out->record = jobtable->imp->db->predict_job(out->code.data[0], &out->pathtime);
 
   std::stringstream stack;
-  for (auto &i : scope->stack_trace()) stack << i.file() << std::endl;
+  for (auto &x : scope->stack_trace()) stack << x << std::endl;
 
   out->db->insert_job(
     dir->as_str(),

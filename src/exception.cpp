@@ -34,15 +34,11 @@ static PRIMTYPE(type_stack) {
 
 static PRIMFN(prim_stack) {
   EXPECT(1);
-  std::vector<std::string> list;
 
   size_t need = 0;
-  for (auto &x : scope->stack_trace()) {
-    std::stringstream str;
-    str << x.file();
-    list.emplace_back(str.str());
-    need += String::reserve(list.back().size());
-  }
+  auto list = scope->stack_trace();
+  for (auto &x : list)
+    need += String::reserve(x.size());
 
   need += reserve_list(list.size());
   runtime.heap.reserve(need);

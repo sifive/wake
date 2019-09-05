@@ -32,7 +32,7 @@ void require_fail(const char *message, unsigned size, Runtime &runtime, const Sc
   std::stringstream ss;
   ss.write(message, size-1);
   for (auto &x : scope->stack_trace())
-    ss << "  from " << x.file() << std::endl;
+    ss << "  from " << x << std::endl;
   std::string str = ss.str();
   status_write(2, str.data(), str.size());
   runtime.abort = true;

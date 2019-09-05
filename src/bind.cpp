@@ -101,6 +101,20 @@ struct RelaxedVertex {
   RelaxedVertex(int v_, int d_) : v(v_), d(d_) { }
 };
 
+static std::string addanon(const std::string &x, bool anon) {
+  if (anon) {
+    return x + ".anon";
+  } else {
+    return x;
+  }
+}
+
+static std::string trim(const std::string &x) {
+  size_t space = x.find(' ');
+  bool keep = space == std::string::npos;
+  return keep ? x : x.substr(space+1);
+}
+
 static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vector<ResolveDef> &defs, std::unique_ptr<Expr> body) {
   // Bellman-Ford algorithm, run for longest path
   // if f uses [yg], then d[f] must be <= d[yg]
@@ -331,7 +345,7 @@ static PatternTree *get_expansion(PatternTree *t, const std::vector<int> &path) 
 
 // invariants: !patterns.empty(); patterns have detail >= patterns[0]
 // post-condition: patterns unchanged (internal mutation is reversed)
-static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) {
+static std::unique_ptr<Expr> expand_patterns(const Location &location, const std::string &fnname, std::vector<PatternRef> &patterns) {
   PatternRef &prototype = patterns[0];
   if (patterns.size() == 1) {
     std::cerr << "Non-exhaustive match at " << prototype.location.file()
@@ -341,14 +355,14 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
   std::vector<int> expand;
   Sum *sum = find_mismatch(expand, prototype.tree, patterns[1].tree);
   if (sum) {
-    std::unique_ptr<DefMap> map(new DefMap(prototype.location));
-    map->body = std::unique_ptr<Expr>(new VarRef(prototype.location, "destruct " + sum->name));
+    std::unique_ptr<DefMap> map(new DefMap(location));
+    map->body = std::unique_ptr<Expr>(new VarRef(location, "destruct " + sum->name));
     for (size_t c = 0; c < sum->members.size(); ++c) {
       Constructor &cons = sum->members[c];
       std::string cname = "_ c" + std::to_string(c);
-      map->body = std::unique_ptr<Expr>(new App(prototype.location,
+      map->body = std::unique_ptr<Expr>(new App(location,
         map->body.release(),
-        new VarRef(prototype.location, cname)));
+        new VarRef(location, cname)));
       std::vector<PatternRef> bucket;
       int args = cons.ast.args.size();
       int var = prototype.index;
@@ -375,16 +389,17 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
           p->index = -2;
         }
       }
-      std::unique_ptr<DefMap> rmap(new DefMap(prototype.location));
-      rmap->body = expand_patterns(bucket);
+      std::unique_ptr<DefMap> rmap(new DefMap(location));
+      rmap->body = expand_patterns(location, fnname, bucket);
       if (!rmap->body) return nullptr;
       for (size_t i = args; i > 0; --i) {
         auto out = rmap->map.insert(std::make_pair("_ a" + std::to_string(--var),
           DefMap::Value(LOCATION, std::unique_ptr<Expr>(new Get(LOCATION, sum, &cons, i-1)))));
         assert (out.second);
       }
-      auto out = map->map.insert(std::make_pair(cname, DefMap::Value(LOCATION,
-        std::unique_ptr<Expr>(new Lambda(prototype.location, "_", rmap.release())))));
+      Lambda *lam = new Lambda(location, "_", rmap.release());
+      lam->fnname = fnname;
+      auto out = map->map.insert(std::make_pair(cname, DefMap::Value(LOCATION, std::unique_ptr<Expr>(lam))));
       assert (out.second);
       for (auto p = patterns.rbegin(); p != patterns.rend(); ++p) {
         if (p->index == -1) {
@@ -399,39 +414,38 @@ static std::unique_ptr<Expr> expand_patterns(std::vector<PatternRef> &patterns) 
         }
       }
     }
-    map->body = std::unique_ptr<Expr>(new App(prototype.location,
+    map->body = std::unique_ptr<Expr>(new App(location,
       map->body.release(),
-      new VarRef(prototype.location, "_ a" + std::to_string(
+      new VarRef(location, "_ a" + std::to_string(
         get_expansion(&prototype.tree, expand)->var))));
     return std::unique_ptr<Expr>(map.release());
   } else {
     PatternRef &p = patterns[1];
     ++p.uses;
     std::unique_ptr<Expr> guard_true(fill_pattern(
-      new App(p.location,
-        new VarRef(p.location, "_ f" + std::to_string(p.index)),
-        new VarRef(p.location, "_ a0")),
+      new App(location,
+        new VarRef(location, "_ f" + std::to_string(p.index)),
+        new VarRef(location, "_ a0")),
       prototype.tree, p.tree));
     if (!p.guard) {
       return guard_true;
     } else {
       PatternRef save(std::move(patterns[1]));
       patterns.erase(patterns.begin()+1);
-      std::unique_ptr<Expr> guard_false(expand_patterns(patterns));
+      std::unique_ptr<Expr> guard_false(expand_patterns(location, fnname, patterns));
       patterns.emplace(patterns.begin()+1, std::move(save));
       if (!guard_false) return nullptr;
       std::unique_ptr<Expr> guard(fill_pattern(
-        new App(p.location,
-          new VarRef(p.location, "_ g" + std::to_string(p.index)),
-          new VarRef(p.location, "_ a0")),
+        new App(location,
+          new VarRef(location, "_ g" + std::to_string(p.index)),
+          new VarRef(location, "_ a0")),
         prototype.tree, p.tree));
-      std::unique_ptr<Expr> out(
-        new App(p.location, new App(p.location, new App(p.location,
-          new VarRef(p.location, "destruct Boolean"),
-          new Lambda(p.location, "_", guard_true.release())),
-          new Lambda(p.location, "_", guard_false.release())),
+      return std::unique_ptr<Expr>(
+        new App(location, new App(location, new App(location,
+          new VarRef(location, "destruct Boolean"),
+          new Lambda(location, "_", guard_true .release(), fnname.c_str())),
+          new Lambda(location, "_", guard_false.release(), fnname.c_str())),
           guard.release()));
-      return out;
     }
   }
 }
@@ -493,29 +507,48 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
   return out;
 }
 
-static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_ptr<Match> match) {
-  std::unique_ptr<DefMap> map(new DefMap(match->location));
+static std::unique_ptr<Expr> flat_def1(const Location &location, const std::string &prefix, const std::vector<std::unique_ptr<Expr> >& args, std::unique_ptr<Expr>&& out) {
+  for (unsigned i = 0; i < args.size(); ++i) {
+    if (!args[i]) continue;
+    out = std::unique_ptr<Expr>(new Lambda(location, prefix + std::to_string(i), out.release()));
+  }
+  return std::move(out);
+}
+
+static std::unique_ptr<Expr> flat_def2(const Location &location, std::vector<std::unique_ptr<Expr> >&& args, std::unique_ptr<Expr>&& out) {
+  for (auto it = args.rbegin(); it != args.rend(); ++it) {
+    if (!*it) continue;
+    out = std::unique_ptr<Expr>(new App(location, out.release(), it->release()));
+  }
+  return std::move(out);
+}
+
+static Lambda *case_name(Lambda *l, const std::string &fnname) {
+  Lambda *x;
+  for (x = l; x->body; x = static_cast<Lambda*>(x->body.get()))
+    if (x->body->type != &Lambda::type) break;
+  x->fnname = fnname;
+  return l;
+}
+
+static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBinding *binding, std::unique_ptr<Match> match) {
   std::vector<PatternRef> patterns;
   Sum multiarg(AST(LOCATION));
   multiarg.members.emplace_back(AST(LOCATION));
 
-  int index = 0;
   std::vector<PatternTree> children;
-  for (auto &a : match->args) {
-    auto out = map->map.insert(std::make_pair("_ a" + std::to_string(index), DefMap::Value(LOCATION, std::move(a))));
-    assert (out.second);
+  for (int index = 0; index < (int)match->args.size(); ++index) {
     children.emplace_back(index);
     multiarg.members.front().ast.args.emplace_back(AST(LOCATION));
-    ++index;
   }
 
   patterns.emplace_back(match->location);
   PatternRef &prototype = patterns.front();
   prototype.uses = 1;
-  prototype.index = index;
+  prototype.index = match->args.size();
   prototype.guard = false;
 
-  if (index == 1) {
+  if (prototype.index == 1) {
     prototype.tree = std::move(children.front());
   } else {
     prototype.tree.children = std::move(children);
@@ -524,36 +557,44 @@ static std::unique_ptr<Expr> rebind_match(ResolveBinding *binding, std::unique_p
 
   int f = 0;
   bool ok = true;
+  std::vector<std::unique_ptr<Expr> > cases, guards;
+  cases.resize(match->patterns.size());
+  guards.resize(match->patterns.size());
   for (auto &p : match->patterns) {
-    std::unique_ptr<Expr> nill;
-    auto out = map->map.insert(std::make_pair("_ f" + std::to_string(f), DefMap::Value(LOCATION, std::move(p.expr))));
-    assert (out.second);
-    std::unique_ptr<Expr> &expr = out.first->second.body;
-    std::unique_ptr<Expr> &guard =
-      p.guard ? map->map.insert(std::make_pair("_ g" + std::to_string(f), DefMap::Value(LOCATION, std::move(p.guard)))).first->second.body : nill;
-    patterns.emplace_back(expr->location);
+    bool guard = static_cast<bool>(p.guard);
+    patterns.emplace_back(p.expr->location);
     patterns.back().index = f;
     patterns.back().guard = static_cast<bool>(guard);
-    patterns.back().tree = cons_lookup(binding, expr, guard, p.pattern, &multiarg);
+    patterns.back().tree = cons_lookup(binding, p.expr, p.guard, p.pattern, &multiarg);
     ok &= !patterns.front().tree.sum || patterns.back().tree.sum;
-    expr = std::unique_ptr<Expr>(new Lambda(expr->location, "_", expr.release()));
-    guard = std::unique_ptr<Expr>(new Lambda(expr->location, "_", guard.release()));
+    std::string cname = match->patterns.size() == 1 ? fnname : fnname + ".case"  + std::to_string(f);
+    std::string gname = match->patterns.size() == 1 ? fnname : fnname + ".guard"  + std::to_string(f);
+    cases[f] = std::unique_ptr<Expr>(case_name(new Lambda(p.expr->location, "_", p.expr.release()), cname));
+    if (guard)
+      guards[f] = std::unique_ptr<Expr>(case_name(new Lambda(p.guard->location, "_", p.guard.release()), gname));
     ++f;
   }
   if (!ok) return nullptr;
-  map->body = expand_patterns(patterns);
-  if (!map->body) return nullptr;
+  auto body = expand_patterns(match->location, fnname, patterns);
+  if (!body) return nullptr;
   for (auto &p : patterns) {
     if (!p.uses) {
       std::cerr << "Pattern unreachable in match at " << p.location.text() << std::endl;
       return nullptr;
     }
   }
-  // Convert DefMap into Lambda+App to prevent generalization of types
-  return DefMap::dont_generalize(std::move(map));
+  // Bind cases to pattern destruct tree (not a DefMap so as to forbid generalization)
+  body = flat_def1(match->location, "_ a", match->args, std::move(body));
+  body = flat_def1(match->location, "_ f", cases, std::move(body));
+  body = flat_def1(match->location, "_ g", guards, std::move(body));
+  case_name(static_cast<Lambda*>(body.get()), fnname);
+  body = flat_def2(match->location, std::move(guards), std::move(body));
+  body = flat_def2(match->location, std::move(cases), std::move(body));
+  body = flat_def2(match->location, std::move(match->args), std::move(body));
+  return body;
 }
 
-static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding *binding) {
+static std::unique_ptr<Expr> fracture(bool anon, const std::string& name, std::unique_ptr<Expr> expr, ResolveBinding *binding) {
   if (expr->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(expr.get());
     // don't fail if unbound; leave that for the second pass
@@ -566,8 +607,8 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     return std::unique_ptr<Expr>(out);
   } else if (expr->type == &App::type) {
     App *app = static_cast<App*>(expr.get());
-    app->fn  = fracture(std::move(app->fn),  binding);
-    app->val = fracture(std::move(app->val), binding);
+    app->fn  = fracture(true, name, std::move(app->fn),  binding);
+    app->val = fracture(true, name, std::move(app->val), binding);
     return expr;
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr.get());
@@ -578,14 +619,23 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     lbinding.depth = binding->depth + 1;
     lbinding.index[lambda->name] = 0;
     lbinding.defs.emplace_back(lambda->name, LOCATION, nullptr);
-    lambda->body = fracture(std::move(lambda->body), &lbinding);
+    if (lambda->body->type == &Lambda::type) {
+      lambda->body = fracture(anon, name, std::move(lambda->body), &lbinding);
+    } else {
+      if (lambda->fnname.empty()) {
+        lambda->fnname = addanon(name, anon);
+      } else if (lambda->fnname[0] == ' ') {
+        lambda->fnname = name + lambda->fnname.substr(1);
+      }
+      lambda->body = fracture(false, lambda->fnname, std::move(lambda->body), &lbinding);
+    }
     return expr;
   } else if (expr->type == &Match::type) {
     std::unique_ptr<Match> m(static_cast<Match*>(expr.release()));
-    auto out = rebind_match(binding, std::move(m));
+    auto out = rebind_match(name, binding, std::move(m));
     if (!out) return out;
     out->flags |= FLAG_AST;
-    return fracture(std::move(out), binding);
+    return fracture(anon, name, std::move(out), binding);
   } else if (expr->type == &DefMap::type) {
     DefMap *def = static_cast<DefMap*>(expr.get());
     ResolveBinding dbinding;
@@ -600,11 +650,11 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
     chain_publish(&dbinding, def->pub, chain);
     dbinding.current_index = 0;
     for (auto &i : dbinding.defs) {
-      i.expr = fracture(std::move(i.expr), &dbinding);
+      i.expr = fracture(false, addanon(name, anon) + "." + trim(i.name), std::move(i.expr), &dbinding);
       ++dbinding.current_index;
     }
     dbinding.current_index = -1;
-    std::unique_ptr<Expr> body = fracture(std::move(def->body), &dbinding);
+    std::unique_ptr<Expr> body = fracture(true, name, std::move(def->body), &dbinding);
     auto out = fracture_binding(def->location, dbinding.defs, std::move(body));
     if ((def->flags & FLAG_AST) != 0)
       out->flags |= FLAG_AST;
@@ -639,14 +689,14 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Expr> expr, ResolveBinding
       int total = b->map.size();
       for (auto &j : b->pub) total += j.second.size();
       for (int i = 0; i < total; ++i) {
-        tbinding.defs[tbinding.current_index].expr =
-          fracture(std::move(tbinding.defs[tbinding.current_index].expr), &tbinding);
+        ResolveDef &def = tbinding.defs[tbinding.current_index];
+        def.expr = fracture(false, trim(def.name), std::move(def.expr), &tbinding);
         ++tbinding.current_index;
       }
       ++tbinding.prefix;
     }
     tbinding.current_index = -1;
-    std::unique_ptr<Expr> body = fracture(std::move(top->body), &tbinding);
+    std::unique_ptr<Expr> body = fracture(true, name, std::move(top->body), &tbinding);
     return fracture_binding(top->location, tbinding.defs, std::move(body));
   } else {
     // Literal/Prim/Construct/Destruct/Get
@@ -892,7 +942,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
 
 std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap) {
   NameBinding bottom;
-  std::unique_ptr<Expr> out = fracture(std::move(top), 0);
+  std::unique_ptr<Expr> out = fracture(false, "", std::move(top), 0);
   if (out && !explore(out.get(), pmap, &bottom)) out.reset();
   return out;
 }

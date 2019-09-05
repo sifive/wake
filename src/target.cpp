@@ -181,7 +181,7 @@ static PRIMFN(prim_tget) {
     std::stringstream ss;
     ss << "ERROR: Target subkey mismatch for " << target->location->c_str() << std::endl;
     for (auto &x : scope->stack_trace())
-      ss << "  from " << x.file() << std::endl;
+      ss << "  from " << x << std::endl;
     std::string str = ss.str();
     status_write(2, str.data(), str.size());
     runtime.abort = true;

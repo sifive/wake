@@ -86,13 +86,13 @@ struct App : public Expr {
 };
 
 struct Lambda : public Expr {
-  std::string name;
+  std::string name, fnname;
   std::unique_ptr<Expr> body;
   Location token;
 
   static const TypeDescriptor type;
-  Lambda(const Location &location_, const std::string &name_, Expr *body_)
-   : Expr(&type, location_), name(name_), body(body_), token(LOCATION) { }
+  Lambda(const Location &location_, const std::string &name_, Expr *body_, const char *fnname_ = "")
+   : Expr(&type, location_), name(name_), fnname(fnname_), body(body_), token(LOCATION) { }
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
@@ -183,9 +183,6 @@ struct DefMap : public Expr {
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
   void interpret(Runtime &runtime, Scope *scope, Continuation *cont) override;
-
-  // Convert into (\a\b\c body) va vb vc ... to prevent type generalization
-  static std::unique_ptr<Expr> dont_generalize(std::unique_ptr<DefMap> &&map);
 };
 
 struct Top : public Expr {

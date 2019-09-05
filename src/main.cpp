@@ -41,6 +41,7 @@
 #include "shell.h"
 #include "markup.h"
 #include "describe.h"
+#include "profile.h"
 
 void print_help(const char *argv0) {
   std::cout << std::endl
@@ -57,6 +58,7 @@ void print_help(const char *argv0) {
     << "    --no-workspace   Do not open a database or scan for sources files"           << std::endl
     << "    --heap-factor X  Heap-size is X * live data after the last GC (default 4.0)" << std::endl
     << "    --profile-heap   Report memory consumption on every garbage collection"      << std::endl
+    << "    --profile=FILE   Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
     << std::endl
     << "  Database introspection:" << std::endl
     << "    --input  -i FILE Report recorded meta-data for jobs which read FILES"        << std::endl
@@ -103,6 +105,7 @@ int main(int argc, char **argv) {
     { 0,   "no-tty",                GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "heap-factor",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
+    { 0,   "profile",               GOPT_ARGUMENT_REQUIRED  },
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
     { 'l', "last",                  GOPT_ARGUMENT_FORBIDDEN },
@@ -131,7 +134,7 @@ int main(int argc, char **argv) {
   bool wait    =!arg(options, "no-wait" )->count;
   bool workspace=!arg(options, "no-workspace")->count;
   bool tty     =!arg(options, "no-tty"  )->count;
-  int  profile = arg(options, "profile-heap")->count;
+  int  profileh= arg(options, "profile-heap")->count;
   bool input   = arg(options, "input"   )->count;
   bool output  = arg(options, "output"  )->count;
   bool last    = arg(options, "last"    )->count;
@@ -149,6 +152,7 @@ int main(int argc, char **argv) {
 
   const char *percents= arg(options, "percent")->argument;
   const char *heapf   = arg(options, "heap-factor")->argument;
+  const char *profile = arg(options, "profile")->argument;
   const char *init    = arg(options, "init")->argument;
   const char *remove  = arg(options, "remove-task")->argument;
 
@@ -164,6 +168,11 @@ int main(int argc, char **argv) {
 
   if (quiet && verbose) {
     std::cerr << "Cannot specify both -v and -q!" << std::endl;
+    return 1;
+  }
+
+  if (profile && !debug) {
+    std::cerr << "Cannot profile without stack trace support (-d)!" << std::endl;
     return 1;
   }
 
@@ -293,7 +302,8 @@ int main(int argc, char **argv) {
   auto wakefiles = find_all_wakefiles(ok, workspace);
   if (!ok) std::cerr << "Workspace wake file enumeration failed" << std::endl;
 
-  Runtime runtime(profile, heap_factor);
+  Profile tree;
+  Runtime runtime(profile ? &tree : nullptr, profileh, heap_factor);
   bool sources = find_all_sources(runtime, workspace);
   if (!sources) std::cerr << "Source file enumeration failed" << std::endl;
   ok &= sources;
@@ -395,7 +405,9 @@ int main(int argc, char **argv) {
   status_init();
   do { runtime.run(); } while (!runtime.abort && jobtable.wait(runtime));
   status_finish();
+
   runtime.heap.report();
+  tree.report(profile, targets.empty() ? "" : targets.back());
 
   bool pass = true;
   if (runtime.abort) {

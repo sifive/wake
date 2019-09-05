@@ -223,11 +223,11 @@ static Expr *parse_match(int p, Lexer &lex) {
       if (!guard) guard = new VarRef(e->location, "True");
       guard = new App(e->location, new App(e->location, new App(e->location, new App(e->location,
         new VarRef(e->location, "destruct Order"),
-        new Lambda(e->location, "_", new VarRef(e->location, "False"))),
-        new Lambda(e->location, "_", guard)),
-        new Lambda(e->location, "_", new VarRef(e->location, "False"))),
+        new Lambda(e->location, "_", new VarRef(e->location, "False"), " ")),
+        new Lambda(e->location, "_", guard, " ")),
+        new Lambda(e->location, "_", new VarRef(e->location, "False"), " ")),
         new App(e->location, new App(e->location,
-          new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison))),
+          new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison), " ")),
           e), new VarRef(e->location, "_ k" + std::to_string(i))));
     }
 
@@ -375,8 +375,8 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       l.end = elseE->location.end;
       App *out = new App(l, new App(l, new App(l,
         new VarRef(l, "destruct Boolean"),
-        new Lambda(l, "_", thenE)),
-        new Lambda(l, "_", elseE)),
+        new Lambda(l, "_", thenE, " .then")),
+        new Lambda(l, "_", elseE, " .else")),
         condE);
       out->flags |= FLAG_AST;
       return out;
@@ -543,18 +543,18 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
         << fn.text() << std::endl;
       lex.fail = true;
     }
-    Expr *hash = new Prim(fn, "hash");
-    for (size_t i = 0; i < tohash; ++i) hash = new Lambda(fn, "_", hash);
-    for (size_t i = 0; i < tohash; ++i) hash = new App(fn, hash, new VarRef(fn, args[i].first));
-    Expr *subhash = new Prim(fn, "hash");
-    for (size_t i = tohash; i < args.size(); ++i) subhash = new Lambda(fn, "_", subhash);
-    for (size_t i = tohash; i < args.size(); ++i) subhash = new App(fn, subhash, new VarRef(fn, args[i].first));
-    body = new App(fn, new App(fn, new App(fn, new App(fn,
-      new Lambda(fn, "_target", new Lambda(fn, "_hash", new Lambda(fn, "_subhash", new Lambda(fn, "_fn", new Prim(fn, "tget"))))),
-      new VarRef(fn, "table " + name)),
-      hash),
-      subhash),
-      new Lambda(fn, "_", body));
+    Location bl = body->location;
+    Expr *hash = new Prim(bl, "hash");
+    for (size_t i = 0; i < tohash; ++i) hash = new Lambda(bl, "_", hash, " ");
+    for (size_t i = 0; i < tohash; ++i) hash = new App(bl, hash, new VarRef(bl, args[i].first));
+    Expr *subhash = new Prim(bl, "hash");
+    for (size_t i = tohash; i < args.size(); ++i) subhash = new Lambda(bl, "_", subhash, " ");
+    for (size_t i = tohash; i < args.size(); ++i) subhash = new App(bl, subhash, new VarRef(bl, args[i].first));
+    Lambda *gen = new Lambda(bl, "_", body, " ");
+    Lambda *tget = new Lambda(bl, "_fn", new Prim(bl, "tget"), " ");
+    body = new App(bl, new App(bl, new App(bl, new App(bl,
+      new Lambda(bl, "_target", new Lambda(bl, "_hash", new Lambda(bl, "_subhash", tget))),
+      new VarRef(bl, "table " + name)), hash), subhash), gen);
   }
 
   if (publish && !args.empty()) {
@@ -587,7 +587,7 @@ static void bind_global(const std::string &name, Top *top, Lexer &lex) {
 
 static void bind_def(Lexer &lex, DefMap::Defs &map, Definition &&def, Top *top = 0) {
   if (def.name == "_")
-    def.name = "_ " + std::to_string(map.size());
+    def.name = "_" + std::to_string(map.size()) + " _";
 
   Location l = def.body->location;
   auto out = map.insert(std::make_pair(std::move(def.name), DefMap::Value(def.location, std::move(def.body))));
@@ -1115,7 +1115,7 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
       std::stringstream s;
       s << l.text();
       bind_def(lex, map, Definition("table " + def.name, def.location,
-        new App(l, new Lambda(l, "_", new Prim(l, "tnew")),
+        new App(l, new Lambda(l, "_", new Prim(l, "tnew"), " "),
         new Literal(l, String::literal(lex.heap, s.str()), &String::typeVar))));
       bind_def(lex, map, std::move(def), global?top:0);
       break;
