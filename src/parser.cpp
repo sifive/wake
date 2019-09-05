@@ -587,7 +587,7 @@ static void bind_global(const std::string &name, Top *top, Lexer &lex) {
 
 static void bind_def(Lexer &lex, DefMap::Defs &map, Definition &&def, Top *top = 0) {
   if (def.name == "_")
-    def.name = "_ " + std::to_string(map.size());
+    def.name = "_" + std::to_string(map.size()) + " _";
 
   Location l = def.body->location;
   auto out = map.insert(std::make_pair(std::move(def.name), DefMap::Value(def.location, std::move(def.body))));
