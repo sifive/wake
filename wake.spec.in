@@ -24,8 +24,7 @@ or that your colleagues already built, you might appreciate wake.
 USE_FUSE_WAKE=0 make all
 
 %install
-USE_FUSE_WAKE=0 make install
-mv install "%{buildroot}/usr"
+USE_FUSE_WAKE=0 make DESTDIR=%{buildroot}/usr install
 
 %files
 /usr/bin/wake
