@@ -440,12 +440,12 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
           new VarRef(location, "_ g" + std::to_string(p.index)),
           new VarRef(location, "_ a0")),
         prototype.tree, p.tree));
-      Lambda *t = new Lambda(location, "_", guard_true.release());
-      Lambda *f = new Lambda(location, "_", guard_false.release());
-      t->fnname = f->fnname = fnname;
       return std::unique_ptr<Expr>(
         new App(location, new App(location, new App(location,
-          new VarRef(location, "destruct Boolean"), t), f), guard.release()));
+          new VarRef(location, "destruct Boolean"),
+          new Lambda(location, "_", guard_true .release(), fnname.c_str())),
+          new Lambda(location, "_", guard_false.release(), fnname.c_str())),
+          guard.release()));
     }
   }
 }

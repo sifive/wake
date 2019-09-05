@@ -458,7 +458,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
     out = exprs.front();
   } else {
     Expr *cat = new Prim(LOCATION, "vcat");
-    for (size_t i = 0; i < exprs.size(); ++i) cat = new Lambda(LOCATION, "_", cat);
+    for (size_t i = 0; i < exprs.size(); ++i) cat = new Lambda(LOCATION, "_", cat, i?"":" ");
     for (auto expr : exprs) cat = new App(LOCATION, cat, expr);
     cat->location = Location(in.filename, first, in.coord() - 1);
     cat->flags |= FLAG_AST;

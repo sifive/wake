@@ -223,11 +223,11 @@ static Expr *parse_match(int p, Lexer &lex) {
       if (!guard) guard = new VarRef(e->location, "True");
       guard = new App(e->location, new App(e->location, new App(e->location, new App(e->location,
         new VarRef(e->location, "destruct Order"),
-        new Lambda(e->location, "_", new VarRef(e->location, "False"))),
-        new Lambda(e->location, "_", guard)),
-        new Lambda(e->location, "_", new VarRef(e->location, "False"))),
+        new Lambda(e->location, "_", new VarRef(e->location, "False"), " ")),
+        new Lambda(e->location, "_", guard, " ")),
+        new Lambda(e->location, "_", new VarRef(e->location, "False"), " ")),
         new App(e->location, new App(e->location,
-          new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison))),
+          new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison), " ")),
           e), new VarRef(e->location, "_ k" + std::to_string(i))));
     }
 
@@ -373,12 +373,11 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (expect(ELSE, lex)) lex.consume();
       auto elseE = parse_block(lex, multiline);
       l.end = elseE->location.end;
-      Lambda *t = new Lambda(l, "_", thenE);
-      Lambda *e = new Lambda(l, "_", elseE);
-      t->fnname = " .then";
-      e->fnname = " .else";
       App *out = new App(l, new App(l, new App(l,
-        new VarRef(l, "destruct Boolean"), t), e), condE);
+        new VarRef(l, "destruct Boolean"),
+        new Lambda(l, "_", thenE, " .then")),
+        new Lambda(l, "_", elseE, " .else")),
+        condE);
       out->flags |= FLAG_AST;
       return out;
     }
@@ -546,15 +545,13 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
     }
     Location bl = body->location;
     Expr *hash = new Prim(bl, "hash");
-    for (size_t i = 0; i < tohash; ++i) hash = new Lambda(bl, "_", hash);
+    for (size_t i = 0; i < tohash; ++i) hash = new Lambda(bl, "_", hash, " ");
     for (size_t i = 0; i < tohash; ++i) hash = new App(bl, hash, new VarRef(bl, args[i].first));
     Expr *subhash = new Prim(bl, "hash");
-    for (size_t i = tohash; i < args.size(); ++i) subhash = new Lambda(bl, "_", subhash);
+    for (size_t i = tohash; i < args.size(); ++i) subhash = new Lambda(bl, "_", subhash, " ");
     for (size_t i = tohash; i < args.size(); ++i) subhash = new App(bl, subhash, new VarRef(bl, args[i].first));
-    Lambda *gen = new Lambda(bl, "_", body);
-    Lambda *tget = new Lambda(bl, "_fn", new Prim(bl, "tget"));
-    gen->fnname = " ";
-    tget->fnname = " ";
+    Lambda *gen = new Lambda(bl, "_", body, " ");
+    Lambda *tget = new Lambda(bl, "_fn", new Prim(bl, "tget"), " ");
     body = new App(bl, new App(bl, new App(bl, new App(bl,
       new Lambda(bl, "_target", new Lambda(bl, "_hash", new Lambda(bl, "_subhash", tget))),
       new VarRef(bl, "table " + name)), hash), subhash), gen);
@@ -1118,7 +1115,7 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
       std::stringstream s;
       s << l.text();
       bind_def(lex, map, Definition("table " + def.name, def.location,
-        new App(l, new Lambda(l, "_", new Prim(l, "tnew")),
+        new App(l, new Lambda(l, "_", new Prim(l, "tnew"), " "),
         new Literal(l, String::literal(lex.heap, s.str()), &String::typeVar))));
       bind_def(lex, map, std::move(def), global?top:0);
       break;
