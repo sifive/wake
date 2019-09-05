@@ -42,7 +42,7 @@ target pkgConfigImp args =
     | editPlanEnvironment addenv
     | runJob
   def output = result.getJobStdout | getWhenFail "" | tokenize `\n` | head
-  def split = _ | tokenize ` ` | filter (_ !=* "")
+  def split s = tokenize ` ` s | filter (_ !=* "")
   if result.isJobOk then omap split output else None
 
 global def pkgConfig pkg =

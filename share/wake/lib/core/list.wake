@@ -183,7 +183,7 @@ global def distinctBy cmp =
     x, tail =
       def sub = helper (tinsert x tree) tail
       if x ∈ tree then sub else x, sub
-  helper (tnew cmp) _
+  helper (tnew cmp)
 
 # f should be an equality comparison
 # keep only the first occurrence in a run of equal values
