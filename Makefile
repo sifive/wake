@@ -6,6 +6,7 @@ CC	:= cc -std=c99
 CXX	:= c++ -std=c++11
 CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
 LDFLAGS	:=
+DESTDIR ?= /usr/local
 
 LOCAL_CFLAGS :=	-Iutf8proc -Igopt -Icommon
 FUSE_CFLAGS  :=	$(shell pkg-config --silence-errors --cflags fuse)
@@ -38,7 +39,7 @@ wake.db:	bin/wake lib/wake/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EX
 	test -f $@ || ./bin/wake --init .
 
 install:	all
-	$(WAKE_ENV) ./bin/wake install '"install"'
+	$(WAKE_ENV) ./bin/wake install '"$(DESTDIR)"'
 
 tarball:	wake.db
 	$(WAKE_ENV) ./bin/wake tarball Unit
