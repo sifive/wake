@@ -44,6 +44,10 @@
 #include <algorithm>
 #include <limits>
 #include <thread>
+#ifdef __APPLE__
+#include <mach/mach_host.h>
+#include <mach/mach_init.h>
+#endif
 
 // How many times to SIGTERM a process before SIGKILL
 #define TERM_ATTEMPTS 6
@@ -320,9 +324,22 @@ JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool 
   imp->active = 0;
   imp->limit = std::thread::hardware_concurrency() * percent;
   imp->phys_active = 0;
+
+#ifdef __APPLE__
+  struct host_basic_info hostinfo;
+  mach_msg_type_number_t count = HOST_BASIC_INFO_COUNT;
+  int result = host_info(mach_host_self(), HOST_BASIC_INFO,  reinterpret_cast<host_info_t>(&hostinfo), &count);
+  if (result != KERN_SUCCESS || count != HOST_BASIC_INFO_COUNT) {
+    fprintf(stderr, "host_info failed\n");
+    exit(1);
+  }
+  imp->phys_limit = static_cast<uint64_t>(hostinfo.max_mem);
+#else
   imp->phys_limit = sysconf(_SC_PHYS_PAGES);
   imp->phys_limit *= sysconf(_SC_PAGESIZE);
+#endif
   imp->phys_limit *= percent;
+
   sigemptyset(&imp->block);
 
   struct sigaction sa;

@@ -133,10 +133,10 @@ static PRIMFN(prim_extract) {
   RE2_BUG(arg1);
 
   int matches = arg0->exp->NumberOfCapturingGroups();
-  re2::StringPiece submatch[matches+1];
+  std::vector<re2::StringPiece> submatch(matches+1);
   re2::StringPiece input = sp(arg1);
 
-  if (arg0->exp->Match(input, 0, input.size(), RE2::ANCHOR_BOTH, submatch, matches+1)) {
+  if (arg0->exp->Match(input, 0, input.size(), RE2::ANCHOR_BOTH, &submatch[0], matches+1)) {
     size_t need = reserve_list(matches);
     for (int i = 0; i < matches; ++i)
       need += String::reserve(submatch[i+1].size());
