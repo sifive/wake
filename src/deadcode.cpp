@@ -20,18 +20,95 @@
 #include "prim.h"
 #include <assert.h>
 
-unsigned Stack::size() const {
+struct AppStack {
+  int cutoff;
+  Expr *arg;
+  AppStack *next;
+};
+
+static Expr *lambda_fusion(Expr *expr, AppStack *stack, std::vector<int> &expand, int depth)  {
+  if (expr->type == &VarRef::type) {
+    VarRef *ref = static_cast<VarRef*>(expr);
+    ref->index = (depth-1) - expand[expand.size()-1-ref->index];
+    return ref;
+  } else if (expr->type == &App::type) {
+    App *app = static_cast<App*>(expr);
+    AppStack frame;
+    frame.cutoff = expand.size();
+    frame.arg = app->val.release();
+    frame.next = stack;
+    Expr *out = lambda_fusion(app->fn.release(), &frame, expand, depth);
+    if (frame.arg) {
+      app->fn = std::unique_ptr<Expr>(out);
+      app->val = std::unique_ptr<Expr>(lambda_fusion(frame.arg, nullptr, expand, depth));
+      return app;
+    } else {
+      return out;
+    }
+  } else if (expr->type == &Lambda::type) {
+    Lambda *lambda = static_cast<Lambda*>(expr);
+    if (stack) {
+      std::vector<int> cut(expand.begin(), expand.begin()+stack->cutoff);
+      expand.push_back(depth);
+      auto val = lambda_fusion(stack->arg, nullptr, cut, depth);
+      auto body = lambda_fusion(lambda->body.release(), stack->next, expand, depth+1);
+      DefBinding *def = new DefBinding(lambda->location, std::unique_ptr<Expr>(body));
+      def->order.insert(std::make_pair(lambda->name, DefBinding::OrderValue(lambda->token, 0)));
+      def->val.emplace_back(std::unique_ptr<Expr>(val));
+      stack->arg = nullptr;
+      expand.pop_back();
+      return def;
+    } else {
+      expand.push_back(depth);
+      auto y = lambda_fusion(lambda->body.release(), nullptr, expand, depth+1);
+      expand.pop_back();
+      lambda->body = std::unique_ptr<Expr>(y);
+      return lambda;
+    }
+  } else if (expr->type == &DefBinding::type) {
+    DefBinding *def = static_cast<DefBinding*>(expr);
+    for (auto &x : def->val) {
+      auto y = lambda_fusion(x.release(), nullptr, expand, depth);
+      x = std::unique_ptr<Expr>(y);
+    }
+    for (unsigned i = 0; i < def->val.size(); ++i)
+      expand.push_back(depth+i);
+    depth += def->val.size();
+    for (auto &x : def->fun) {
+      auto y = lambda_fusion(x.release(), nullptr, expand, depth);
+      x = std::unique_ptr<Lambda>(static_cast<Lambda*>(y));
+    }
+    auto y = lambda_fusion(def->body.release(), stack, expand, depth);
+    def->body = std::unique_ptr<Expr>(y);
+    depth -= def->val.size();
+    expand.resize(expand.size() - def->val.size());
+    return def;
+  } else { // Literal/Construct/Destruct/Prim/Get
+    return expr;
+  }
+}
+
+struct ScopeStack {
+  Expr  *expr;
+  ScopeStack *next;
+
+  Expr *resolve(VarRef *ref);
+  Expr *index(unsigned i); // flat index
+  unsigned size() const;
+};
+
+unsigned ScopeStack::size() const {
   if (expr->type == &Lambda::type) return 1;
   return static_cast<DefBinding*>(expr)->val.size();
 }
 
-Expr *Stack::resolve(VarRef *ref) {
+Expr *ScopeStack::resolve(VarRef *ref) {
   if (ref->lambda) return ref->lambda;
   return index(ref->index);
 }
 
-Expr *Stack::index(unsigned i) {
-  Stack *s = this;
+Expr *ScopeStack::index(unsigned i) {
+  ScopeStack *s = this;
   size_t idx, size;
   for (idx = i; idx >= (size = s->size()); idx -= size)
     s = s->next;
@@ -41,8 +118,8 @@ Expr *Stack::index(unsigned i) {
 }
 
 // meta is a purity bitmask
-static void forward_purity(Expr *expr, Stack *stack) {
-  Stack frame;
+static void forward_purity(Expr *expr, ScopeStack *stack) {
+  ScopeStack frame;
   frame.next = stack;
   frame.expr = expr;
   if (expr->type == &VarRef::type) {
@@ -113,8 +190,8 @@ static void forward_purity(Expr *expr, Stack *stack) {
 }
 
 // We only explore DefBinding children with uses
-static void backward_usage(Expr *expr, Stack *stack) {
-  Stack frame;
+static void backward_usage(Expr *expr, ScopeStack *stack) {
+  ScopeStack frame;
   frame.next = stack;
   frame.expr = expr;
   if (expr->type == &VarRef::type) {
@@ -203,6 +280,8 @@ static void forward_reduction(Expr *expr, std::vector<int> &compress) {
 }
 
 void optimize_deadcode(Expr *expr) {
+  std::vector<int> expand;
+  lambda_fusion(expr, nullptr, expand, 0);
   forward_purity(expr, nullptr);
   backward_usage(expr, nullptr);
   std::vector<int> compress;

@@ -19,16 +19,6 @@
 #define OPTIMIZE_H
 
 struct Expr;
-struct VarRef;
-struct Stack {
-  Expr  *expr;
-  Stack *next;
-
-  Expr *resolve(VarRef *ref);
-  Expr *index(unsigned i); // flat index
-  unsigned size() const;
-};
-
 void optimize_deadcode(Expr *expr);
 
 #endif
