@@ -89,7 +89,7 @@ static void forward_purity(Expr *expr, Stack *stack) {
     Destruct *des = static_cast<Destruct*>(expr);
     // Result only pure when all handlers are pure
     uint64_t isect = ~static_cast<uint64_t>(0);
-    for (unsigned i = 0; i < des->sum.members.size(); ++i) {
+    for (unsigned i = 0; i < des->sum->members.size(); ++i) {
       Expr *handler = stack->index(i+1);
       isect &= handler?handler->meta:1;
     }

@@ -938,7 +938,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
 
   Location location = sum.token;
   Destruct *destruct = new Destruct(location, std::move(sum));
-  Sum *sump = &destruct->sum;
+  std::shared_ptr<Sum> sump = destruct->sum;
   Expr *destructfn =
     new Lambda(sump->token, "_",
     new Lambda(sump->token, "_",
@@ -952,7 +952,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
   bind_def(lex, map, Definition(tname, c.ast.token, destructfn), global?top:0);
 
-  check_special(lex, name, sump);
+  check_special(lex, name, sump.get());
 
   // Create get/set/edit helper methods
   int outer = 0;
@@ -1074,7 +1074,7 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   std::string name = sum.name;
   Location location = sum.token;
   Destruct *destruct = new Destruct(location, std::move(sum));
-  Sum *sump = &destruct->sum;
+  std::shared_ptr<Sum> sump = destruct->sum;
   Expr *destructfn = new Lambda(sump->token, "_", destruct);
 
   for (auto &c : sump->members) {
@@ -1095,7 +1095,7 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     }
   }
 
-  check_special(lex, name, sump);
+  check_special(lex, name, sump.get());
 }
 
 static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {

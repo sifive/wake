@@ -291,7 +291,7 @@ struct CDestruct final : public GCObject<CDestruct, Continuation> {
     auto record = static_cast<Record*>(value.get());
     runtime.heap.reserve(Scope::reserve(1) + Interpret::reserve());
     // Find the handler function body -- inlining + App fusion would eliminate this loop
-    for (int index = des->sum.members.size() - record->cons->index; index; --index)
+    for (int index = des->sum->members.size() - record->cons->index; index; --index)
       scope = scope->next.get();
     // This coercion is safe because we evaluate pure lambda args before their consumer
     auto closure = scope->at(0)->coerce<Closure>();

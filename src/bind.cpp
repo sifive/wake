@@ -255,7 +255,7 @@ static void chain_publish(ResolveBinding *binding, DefMap::Pubs &pubs, int &chai
 }
 
 struct PatternTree {
-  Sum *sum; // nullptr if unexpanded
+  std::shared_ptr<Sum> sum; // nullptr if unexpanded
   int cons;
   int var; // -1 if unbound/_
   std::vector<PatternTree> children;
@@ -315,11 +315,11 @@ struct PatternRef {
 };
 
 // assumes a detail <= b
-static Sum *find_mismatch(std::vector<int> &path, const PatternTree &a, const PatternTree &b) {
+static std::shared_ptr<Sum> find_mismatch(std::vector<int> &path, const PatternTree &a, const PatternTree &b) {
   if (!a.sum) return b.sum;
   for (size_t i = 0; i < a.children.size(); ++i) {
     path.push_back(i);
-    Sum *out = find_mismatch(path, a.children[i], b.children[i]);
+    std::shared_ptr<Sum> out = find_mismatch(path, a.children[i], b.children[i]);
     if (out) return out;
     path.pop_back();
   }
@@ -353,7 +353,7 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
     return nullptr;
   }
   std::vector<int> expand;
-  Sum *sum = find_mismatch(expand, prototype.tree, patterns[1].tree);
+  std::shared_ptr<Sum> sum = find_mismatch(expand, prototype.tree, patterns[1].tree);
   if (sum) {
     std::unique_ptr<DefMap> map(new DefMap(location));
     map->body = std::unique_ptr<Expr>(new VarRef(location, "destruct " + sum->name));
@@ -454,7 +454,7 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
   }
 }
 
-static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, std::unique_ptr<Expr> &guard, const AST &ast, Sum *multiarg) {
+static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, std::unique_ptr<Expr> &guard, const AST &ast, std::shared_ptr<Sum> multiarg) {
   PatternTree out;
   if (ast.name == "_") {
     // no-op; unbound
@@ -537,13 +537,13 @@ static Lambda *case_name(Lambda *l, const std::string &fnname) {
 
 static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBinding *binding, std::unique_ptr<Match> match) {
   std::vector<PatternRef> patterns;
-  Sum multiarg(AST(LOCATION));
-  multiarg.members.emplace_back(AST(LOCATION));
+  std::shared_ptr<Sum> multiarg = std::make_shared<Sum>(AST(LOCATION));
+  multiarg->members.emplace_back(AST(LOCATION));
 
   std::vector<PatternTree> children;
   for (int index = 0; index < (int)match->args.size(); ++index) {
     children.emplace_back(index);
-    multiarg.members.front().ast.args.emplace_back(AST(LOCATION));
+    multiarg->members.front().ast.args.emplace_back(AST(LOCATION));
   }
 
   patterns.emplace_back(match->location);
@@ -556,7 +556,7 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
     prototype.tree = std::move(children.front());
   } else {
     prototype.tree.children = std::move(children);
-    prototype.tree.sum = &multiarg;
+    prototype.tree.sum = multiarg;
   }
 
   int f = 0;
@@ -569,7 +569,7 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
     patterns.emplace_back(p.expr->location);
     patterns.back().index = f;
     patterns.back().guard = static_cast<bool>(guard);
-    patterns.back().tree = cons_lookup(binding, p.expr, p.guard, p.pattern, &multiarg);
+    patterns.back().tree = cons_lookup(binding, p.expr, p.guard, p.pattern, multiarg);
     ok &= !patterns.front().tree.sum || patterns.back().tree.sum;
     std::string cname = match->patterns.size() == 1 ? fnname : fnname + ".case"  + std::to_string(f);
     std::string gname = match->patterns.size() == 1 ? fnname : fnname + ".guard"  + std::to_string(f);
@@ -887,12 +887,12 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     // (typ => b) => (typ => b) => typ => b
     TypeVar &typ = binding->lambda->typeVar[0];
     bool ok = typ.unify(
-      TypeVar(des->sum.name.c_str(), des->sum.args.size()));
+      TypeVar(des->sum->name.c_str(), des->sum->args.size()));
     std::map<std::string, TypeVar*> ids;
-    for (size_t i = 0; i < des->sum.args.size(); ++i)
-      ids[des->sum.args[i]] = &typ[i];
+    for (size_t i = 0; i < des->sum->args.size(); ++i)
+      ids[des->sum->args[i]] = &typ[i];
     NameBinding *iter = binding;
-    for (size_t i = des->sum.members.size(); i; --i) {
+    for (size_t i = des->sum->members.size(); i; --i) {
       iter = iter->next;
       TypeVar &arg = iter->lambda->typeVar[0];
       if (!arg.unify(TypeVar(FN, 2))) { ok = false; break; }

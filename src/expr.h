@@ -234,12 +234,12 @@ struct DefBinding : public Expr {
 // Created by transforming Data
 struct Constructor;
 struct Get : public Expr {
-  Sum *sum;
+  std::shared_ptr<Sum> sum;
   Constructor *cons;
   size_t index;
 
   static const TypeDescriptor type;
-  Get(const Location &location_, Sum *sum_, Constructor *cons_, size_t index_)
+  Get(const Location &location_, const std::shared_ptr<Sum> &sum_, Constructor *cons_, size_t index_)
    : Expr(&type, location_), sum(sum_), cons(cons_), index(index_) { }
 
   void format(std::ostream &os, int depth) const override;
@@ -248,11 +248,11 @@ struct Get : public Expr {
 };
 
 struct Construct : public Expr {
-  Sum *sum;
+  std::shared_ptr<Sum> sum;
   Constructor *cons;
 
   static const TypeDescriptor type;
-  Construct(const Location &location_, Sum *sum_, Constructor *cons_)
+  Construct(const Location &location_, const std::shared_ptr<Sum> &sum_, Constructor *cons_)
    : Expr(&type, location_), sum(sum_), cons(cons_) { }
 
   void format(std::ostream &os, int depth) const override;
@@ -261,11 +261,11 @@ struct Construct : public Expr {
 };
 
 struct Destruct : public Expr {
-  Sum sum;
+  std::shared_ptr<Sum> sum;
 
   static const TypeDescriptor type;
   Destruct(const Location &location_, Sum &&sum_)
-   : Expr(&type, location_), sum(std::move(sum_)) { }
+   : Expr(&type, location_), sum(std::make_shared<Sum>(sum_)) { }
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
