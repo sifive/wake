@@ -705,13 +705,12 @@ static std::unique_ptr<Expr> fracture(bool anon, const std::string& name, std::u
 }
 
 struct NameRef {
-  int depth;
-  int offset;
+  int index;
   int def;
   Location target;
   Lambda *lambda;
   TypeVar *var;
-  NameRef() : depth(0), offset(-1), def(0), target(LOCATION), lambda(nullptr), var(nullptr) { }
+  NameRef() : index(-1), def(0), target(LOCATION), lambda(nullptr), var(nullptr) { }
 };
 
 struct NameBinding {
@@ -729,22 +728,21 @@ struct NameBinding {
     NameRef out;
     DefBinding::Order::iterator i;
     if (lambda && lambda->name == x) {
-      out.depth = 0;
-      out.offset = 0;
+      out.index = 0;
       out.def = 0;
       out.var = &lambda->typeVar[0];
       out.target = lambda->token;
     } else if (binding && (i = binding->order.find(x)) != binding->order.end()) {
       int idx = i->second.index;
-      out.depth = 0;
-      out.offset = idx;
       out.def = idx < generalized;
       out.target = i->second.location;
       if (idx < (int)binding->val.size()) {
         auto x = binding->val[idx].get();
+        out.index = idx;
         out.var = x?&x->typeVar:0;
       } else {
         auto x = binding->fun[idx-binding->val.size()].get();
+        out.index = 0;
         out.var = x?&x->typeVar:0;
         out.lambda = x;
         if (idx >= generalized) { // recursive use
@@ -755,10 +753,12 @@ struct NameBinding {
       }
     } else if (next) {
       out = next->find(x);
-      ++out.depth;
+      if (binding)
+        out.index += binding->val.size();
+      if (lambda)
+        ++out.index;
     } else {
-      out.depth = 0;
-      out.offset = -1;
+      out.index = -1;
     }
     return out;
   }
@@ -796,7 +796,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   if (expr->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(expr);
     NameRef pos;
-    if ((pos = binding->find(ref->name)).offset == -1) {
+    if ((pos = binding->find(ref->name)).index == -1) {
       size_t off = ref->name.find(':');
       if (off != std::string::npos) {
         size_t off2 = ref->name.find(':', off+1);
@@ -812,8 +812,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       }
       return false;
     }
-    ref->depth = pos.depth;
-    ref->offset = pos.offset;
+    ref->index = pos.index;
     ref->lambda = pos.lambda;
     ref->target = pos.target;
     if (!pos.var) return true;

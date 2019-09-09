@@ -101,14 +101,13 @@ struct Lambda : public Expr {
 
 struct VarRef : public Expr {
   std::string name;
-  int depth;
-  int offset;
+  int index;
   Lambda *lambda;
   Location target;
 
   static const TypeDescriptor type;
-  VarRef(const Location &location_, const std::string &name_, int depth_ = 0, int offset_ = -1)
-   : Expr(&type, location_), name(name_), depth(depth_), offset(offset_), lambda(nullptr), target(LOCATION) { }
+  VarRef(const Location &location_, const std::string &name_, int index_ = 0)
+   : Expr(&type, location_), name(name_), index(index_), lambda(nullptr), target(LOCATION) { }
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;

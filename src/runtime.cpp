@@ -159,12 +159,13 @@ void Lambda::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
 }
 
 void VarRef::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  for (int i = depth; i; --i)
+  size_t idx, size;
+  for (idx = index; idx >= (size = scope->size()); idx -= size)
     scope = scope->next.get();
   if (lambda) {
     cont->resume(runtime, Closure::alloc(runtime.heap, lambda, scope));
   } else {
-    scope->at(offset)->await(runtime, cont);
+    scope->at(idx)->await(runtime, cont);
   }
 }
 

@@ -53,17 +53,16 @@ std::string Expr::to_str() const {
 
 void VarRef::format(std::ostream &os, int depth) const {
   os << pad(depth) << "VarRef(" << name;
-  if (offset != -1) os << "," << depth << "," << offset;
+  if (index != -1) os << "," << index;
   os << "): " << typeVar << " @ " << location.file() << std::endl;
 }
 
 Hash VarRef::hash() {
-  uint64_t payload[4];
+  uint64_t payload[3];
   payload[0] = type.hashcode.data[0];
   payload[1] = type.hashcode.data[1];
-  payload[2] = depth;
-  payload[3] = offset;
-  return hashcode = Hash(&payload[0], 32);
+  payload[2] = index;
+  return hashcode = Hash(&payload[0], 24);
 }
 
 void Subscribe::format(std::ostream &os, int depth) const {
