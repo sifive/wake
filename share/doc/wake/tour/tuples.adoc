@@ -1,0 +1,183 @@
+= Tuples
+
+Tuples are immutable, https://en.wikipedia.org/wiki/Product_type[Product types], similar to structs in C/C++ or named tuples in Python.
+They are useful in grouping data and creating APIs that preserve backwards compatibility.
+
+== Definition
+
+=== Declaration
+
+Tuples are _declared_ with the `tuple` keyword and a name beginning with a capital letter followed by an equals sign.
+They may optionally have type parameters between the name and the equals sign.
+The declaration may be preceded by the `global` modifier which defines the scope of the <<construction, constructor>> and <<deconstruction, deconstructor>>.
+
+=== Fields
+
+Tuples are composed of one or more fields, each of which has a name beginning with a capital letter followed by a colon, and a type.
+The types may correspond to declared type parameters.
+Each field may be preceded by the `global` modifier which defines the scope of the <<accessors, accessor functions>>.
+
+=== Concrete Syntax
+
+----
+<modifier>? tuple <tuple name> <type parameter>* =
+  (<modifier>? <field name>: <field type>)+
+----
+
+=== Example
+
+We include a running example, `Cat, to help explain the features of tuples:
+
+[#cat-defn]
+----
+tuple Cat =
+  global Name: String
+  global Age: Integer
+----
+
+[#construction]
+== Construction
+
+Tuples are constructed by a function of the same name as that of the tuple itself.
+The function has `N` arguments, one for each field in the order of the definitions of the fields.
+
+In the definition of `Cat` <<cat-defn, above>>, one might notice that we included `global` modifiers on the fields, but not the declaration line.
+This pattern of keeping the constructor and deconstructor private helps with creating extensible APIs that preserve <<backwards-compatibility>> (more on that later).
+Of course, if the constructor is private and we want others to be able to use this type,
+we must provide a `global` factory function that calls the constructor:
+
+----
+global def makeCat name age = Cat name age
+----
+
+[#deconstruction]
+== Deconstruction
+
+Tuples can be used in pattern matching.
+Similarly to the constructor, the deconstructor uses the name of the tuple followed by each field.
+
+For our `Cat` example, we can write a function to get the `Name` using `match` and deconstruction:
+
+----
+global def printCatName cat = match cat
+  Cat n _ = println n
+----
+
+[#accessors]
+== Accessor Functions
+
+For user convenience, Wake generates accessor functions (a getter, setter, and editor)
+for each field of a tuple.
+Although the function names may suggest mutation, all types in Wake are immutable so any `set` or `edit` function returns a new tuple.
+The generated functions are of the form `(get|set|edit)<tuple name><field name>`.
+
+The types of the getters are simply `<tuple type> => <field type>`
+In the case of our `Cat` example, `getCatAge` is of the type `Cat => Integer`.
+
+Setters have types of the form `<field type> => <tuple type> => <tuple type>`.
+One can think about this as a function of two arguments, a new value for the field and the old tuple, to the new tuple.
+In the case of `Cat`, `setCatName` is of the type `String => Cat => Cat` and may be used like so:
+----
+def nameCatBob cat = setCatName "Bob" cat
+----
+
+Editors are higher-order functions that take a function from the old value of the field to the new value.
+The editor will then apply this function and return a new value of the tuple.
+Editor functions are of the form `(<field type> => <field type>) => <tuple type> => <typle type>`.
+
+For example, we could increment the age of a cat by passing `_ + 1` to `editCatAge`:
+----
+def celebrateCatBirthday cat = editCatAge (_ + 1) cat
+----
+
+== Type Parameterization
+
+Tuples support type parameters declared as identifiers beginning with a lower-case letter.
+These parameters allow a single tuple definition to handle different types for its members.
+For example, consider the `Pair` tuple from the standard library.
+
+----
+global tuple Pair a b =
+  global First:  a
+  global Second: b
+----
+
+`Pair` is similar to what one generally refers to as a "tuple" in languages like Scala or Python.
+There are two type parameters, `a` and `b`, one for each of the two fields of the `Pair`.
+Thus we are able to create `Pairs` of arbitrary types, eg. `Pair 3 "hi"` is a `Pair Integer String`,
+`Pair (_ + 1) (Cat "Bill" 4)` is a `Pair (Integer => Integer) Cat`.
+
+In practice, type parameters are primarily used to parameterize data structures by the type of their element.
+
+[#backwards-compatibility]
+== Backwards Compatibility
+
+Perhaps the most important use case of tuples is for creating flexible APIs that can evolve over time while maintaining backwards compatibility.
+
+=== The Importance of Private Constructors and Deconstructors
+
+Because Wake is a strongly and statically typed language,
+adding an argument to a function changes its definition and thus breaks all usages of it.
+As discussed <<construction, previously>>, a tuple's constructor takes `N` arguments, one for each field.
+Thus, adding a field to a tuple adds a field to the constructor and requires changing all uses of that constructor.
+If we make the constructor and deconstructor of a tuple private, however,
+we can guarantee that such breakages are limited to the declaration file.
+Critically, such breakages will not occur is *user* code, allowing us to evolve the API in a backwards-compatible way.
+
+=== Adding Fields to Tuples
+
+Assuming we have made our constructor and deconstructor private,
+we can extend tuples in a backwards-compatible way.
+When we add the field, we simply update our factory function to provide a default value
+for the new field, and then users of the new API can take advantage of the generated
+accessors to utilize it.
+
+For example, consider the `Cat` example from <<cat-defn, before>>.
+We had the foresight to make the constructor and deconstructor private,
+instead only exposing a global factory function.
+If we want to extend `Cat` with an optional `Owner` field, we can do so without breaking existing usages of `Cat`:
+
+----
+tuple Cat =
+  global Name: String
+  global Age: Integer
+  global Owner: Option String
+----
+
+We update our factory function to provide a default value for the new field:
+
+----
+global def makeCat name age = Cat name age None
+----
+
+Now, all existing usages of `Cat` will continue to work,
+while users can take advantage of the generated accessors to use the new field:
+
+----
+def myCat =
+  makeCat "Bill" 3
+  | setCatOwner (Some "Sarah")
+----
+
+=== Deleting Fields From Tuples
+
+It is also possible to maintain backwards compatibility while removing a field.
+Since the only exposed API to a given field are the generated accessor functions,
+we can simply delete the field and implement the removed accessor functions.
+
+For example, perhaps we decide to remove `Owner` from `Cat`:
+
+----
+tuple Cat =
+  global Name: String
+  global Age: Integer
+  # DELETED: global Owner: Option String
+
+global def getCatOwner cat = None
+global def setCatOwner owner cat = cat
+global def editCatOwner fn cat = cat
+----
+
+Of course, such efforts only guarantee source compatibility--uses of the API
+continue to type check and run.
+There is no guarantee about actual code using the API so deleting functionality should only be done with extreme care.
