@@ -52,8 +52,11 @@ std::string Expr::to_str() const {
 }
 
 void VarRef::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "VarRef(" << name;
-  if (index != -1) os << "," << index;
+  os << pad(depth) << "VarRef(";
+  if ((flags & FLAG_PURE)) os << "PURE, ";
+  if ((flags & FLAG_USED)) os << "USED, ";
+  os << meta << ", ";
+  if (index != -1) os << name << "," << index;
   os << "): " << typeVar << " @ " << location.file() << std::endl;
 }
 
@@ -115,7 +118,11 @@ void Match::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
 }
 
 void App::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "App: " << typeVar << " @ " << location.file() << std::endl;
+  os << pad(depth) << "App: ";
+  if ((flags & FLAG_PURE)) os << "PURE ";
+  if ((flags & FLAG_USED)) os << "USED, ";
+  os << meta << " ";
+  os << typeVar << " @ " << location.file() << std::endl;
   fn->format(os, depth+2);
   val->format(os, depth+2);
 }
@@ -129,7 +136,10 @@ Hash App::hash() {
 }
 
 void Lambda::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Lambda(" << name;
+  os << pad(depth) << "Lambda(";
+  if ((flags & FLAG_PURE)) os << "PURE, ";
+  if ((flags & FLAG_USED)) os << "USED, ";
+  os << meta << " " << name;
   if (!fnname.empty()) os << ", " << fnname;
   os << " @ " << token.file() << "): " << typeVar << " @ " << location.file() << std::endl;
   body->format(os, depth+2);
@@ -194,7 +204,10 @@ void Top::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
 }
 
 void DefBinding::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "DefBinding: " << typeVar << " @ " << location.file() << std::endl;
+  os << pad(depth) << "DefBinding: ";
+  if ((flags & FLAG_PURE)) os << "PURE ";
+  if ((flags & FLAG_USED)) os << "USED, ";
+  os << meta << " " << typeVar << " @ " << location.file() << std::endl;
 
   // invert name=>index map
   std::vector<const char*> names(order.size());

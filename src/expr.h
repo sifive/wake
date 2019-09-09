@@ -34,9 +34,11 @@ struct Runtime;
 struct Scope;
 struct Continuation;
 
-#define FLAG_TOUCHED	1 // already explored for _
-#define FLAG_AST	2 // useful to include in AST
-#define FLAG_RECURSIVE	4
+#define FLAG_TOUCHED   0x01 // already explored for _
+#define FLAG_AST       0x02 // useful to include in AST
+#define FLAG_RECURSIVE 0x04
+#define FLAG_USED      0x08
+#define FLAG_PURE      0x10
 
 /* Expression AST */
 struct Expr {
@@ -44,10 +46,13 @@ struct Expr {
   Location location;
   TypeVar typeVar;
   Hash hashcode;
+  uint64_t meta;
   long flags;
 
-  Expr(const TypeDescriptor *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), flags(flags_) { }
+  Expr(const TypeDescriptor *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), meta(0), flags(flags_) { }
   virtual ~Expr();
+
+  void set(long flag, long value /* 0 or 1 */) { flags = (flags & ~flag) | (-value & flag); }
 
   std::string to_str() const;
   virtual void format(std::ostream &os, int depth) const = 0;
