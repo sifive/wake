@@ -18,6 +18,7 @@
 #ifndef TYPE_H
 #define TYPE_H
 
+#include "dsu.h"
 #include <ostream>
 struct Location;
 
@@ -38,40 +39,39 @@ struct LegacyErrorMessage : public TypeErrorMessage {
 struct TypeChild;
 struct TypeVar {
 private:
-  mutable TypeVar *parent;
+  struct Imp {
+    // Scratch variables useful for tree traversals
+    mutable TypeVar *link;
+    mutable int epoch;
 
-  // Scratch variables useful for tree traversals
-  mutable TypeVar *link;
-  mutable int epoch;
+    // free_dob is the DOB of a free variable, unified to the oldest
+    int free_dob;
+    int nargs;
+    TypeChild *cargs;
+    const char *name;
 
+    bool isFree() const { return name[0] == 0; }
+    bool contains(const Imp *other) const;
+    void do_sweep() const;
+    void do_cap(int dob);
+
+    Imp(const char *name_, int nargs_);
+    Imp();
+    ~Imp();
+  };
+
+  // Handle to the set leader
+  DSU<Imp> imp;
   // var_dob is unchanging after setDOB
-  // free_dob is the DOB of a free variable, unified to the oldest
-  int var_dob, free_dob;
-  int nargs;
-  TypeChild *cargs;
-  const char *name;
+  int var_dob;
 
-  bool contains(const TypeVar *other) const;
-  void do_sweep() const;
   static void do_clone(TypeVar &out, const TypeVar &x, int dob);
   static int do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag, const TypeVar *other, int tags, int p);
   bool do_unify(TypeVar &other);
-  void do_cap(int dob);
-
-  bool isFree() const { return name[0] == 0; }
 
 public:
-  TypeVar(const TypeVar& other) = delete;
-  TypeVar(TypeVar &&other) = delete;
-  TypeVar& operator = (const TypeVar &other) = delete;
-  TypeVar& operator = (TypeVar &&other) = delete;
-
-  ~TypeVar();
   TypeVar(); // free type-var
   TypeVar(const char *name_, int nargs_);
-
-  const TypeVar *find() const;
-  TypeVar *find();
 
   const TypeVar & operator[](int i) const;
   TypeVar & operator[](int i);
@@ -100,10 +100,10 @@ struct TypeChild {
   TypeChild();
 };
 
-inline const TypeVar & TypeVar::operator[](int i) const { return find()->cargs[i].var; }
-inline       TypeVar & TypeVar::operator[](int i) { return find()->cargs[i].var; }
+inline const TypeVar & TypeVar::operator[](int i) const { return imp->cargs[i].var; }
+inline       TypeVar & TypeVar::operator[](int i) { return imp->cargs[i].var; }
 
-inline const char *TypeVar::getName() const { return find()->name; }
-inline const char *TypeVar::getTag(int i) const { return find()->cargs[i].tag; }
+inline const char *TypeVar::getName() const { return imp->name; }
+inline const char *TypeVar::getTag(int i) const { return imp->cargs[i].tag; }
 
 #endif

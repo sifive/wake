@@ -27,88 +27,75 @@
 static int globalClock = 0;
 static int globalEpoch = 1; // before a tagging pass, globalEpoch > TypeVar.epoch for all TypeVars
 
-TypeChild::TypeChild() : var(), tag(0) { }
+TypeVar::Imp::Imp() : link(nullptr), epoch(0), free_dob(0), nargs(0), cargs(nullptr), name("") { }
+TypeVar::TypeVar() : imp(new Imp), var_dob(0) { }
+TypeChild::TypeChild() : var(), tag(nullptr) { }
 
-TypeVar::TypeVar() : parent(0), epoch(0), var_dob(0), free_dob(0), nargs(0), cargs(0), name("") { }
-
-TypeVar::TypeVar(const char *name_, int nargs_)
- : parent(0), epoch(0), var_dob(++globalClock), free_dob(var_dob), nargs(nargs_), name(name_) {
+TypeVar::Imp::Imp(const char *name_, int nargs_)
+ : link(nullptr), epoch(0), free_dob(++globalClock), nargs(nargs_), name(name_) {
   cargs = nargs > 0 ? new TypeChild[nargs] : 0;
   for (int i = 0; i < nargs; ++i) {
-    cargs[i].var.free_dob = cargs[i].var.var_dob = ++globalClock;
+    cargs[i].var.imp->free_dob = cargs[i].var.var_dob = ++globalClock;
   }
 }
 
-TypeVar::~TypeVar() {
+TypeVar::TypeVar(const char *name_, int nargs_) : imp(new Imp(name_, nargs_)), var_dob(imp->free_dob) { }
+
+TypeVar::Imp::~Imp() {
   if (nargs) delete [] cargs;
-}
-
-const TypeVar *TypeVar::find() const {
-  if (parent == 0) return this;
-  parent = parent->find();
-  return parent;
-}
-
-TypeVar *TypeVar::find() {
-  if (parent == 0) return this;
-  parent = parent->find();
-  return parent;
 }
 
 void TypeVar::setDOB() {
   if (!var_dob) {
-    assert (!parent && isFree());
-    free_dob = var_dob = ++globalClock;
+    assert (imp->isFree());
+    imp->free_dob = var_dob = ++globalClock;
   }
 }
 
 void TypeVar::setDOB(const TypeVar &other) {
   if (!var_dob) {
-    assert (!parent && isFree());
-    free_dob = var_dob = other.var_dob;
+    assert (imp->isFree());
+    imp->free_dob = var_dob = other.var_dob;
   }
 }
 
 void TypeVar::setTag(int i, const char *tag) {
-  TypeVar *a = find();
+  Imp *a = imp.get();
   if (!a->cargs[i].tag) a->cargs[i].tag = tag;
 }
 
-bool TypeVar::contains(const TypeVar *other) const {
-  const TypeVar *a = find();
+bool TypeVar::Imp::contains(const Imp *other) const {
+  const Imp *a = this, *b = other;
   if (a->epoch < globalEpoch) a->epoch = globalEpoch;
   if (!(a->epoch & 2)) {
     a->epoch |= 2;
-    if (a == other) return true;
+    if (a == b) return true;
     for (int i = 0; i < a->nargs; ++i)
-      if (a->cargs[i].var.contains(other))
+      if (a->cargs[i].var.imp->contains(other))
         return true;
   }
   return false;
 }
 
-void TypeVar::do_sweep() const {
-  const TypeVar *a = find();
-  if ((a->epoch & 2)) {
-    a->epoch &= ~2;
-    for (int i = 0; i < a->nargs; ++i)
-      a->cargs[i].var.do_sweep();
+void TypeVar::Imp::do_sweep() const {
+  if ((epoch & 2)) {
+    epoch &= ~2;
+    for (int i = 0; i < nargs; ++i)
+      cargs[i].var.imp->do_sweep();
   }
 }
 
-void TypeVar::do_cap(int dob) {
-  TypeVar *a = find();
-  if (dob < a->free_dob) a->free_dob = dob;
-  for (int i = 0; i < a->nargs; ++i)
-    a->cargs[i].var.do_cap(dob);
+void TypeVar::Imp::do_cap(int dob) {
+  if (dob < free_dob) free_dob = dob;
+  for (int i = 0; i < nargs; ++i)
+    cargs[i].var.imp->do_cap(dob);
 }
 
-// Always point RHS at LHS (so RHS can be a temporary)
 bool TypeVar::do_unify(TypeVar &other) {
-  TypeVar *a = find();
-  TypeVar *b = other.find();
-  assert (a->var_dob);
-  assert (b->var_dob);
+  Imp *a = imp.get();
+  Imp *b = other.imp.get();
+  assert (var_dob);
+  assert (other.var_dob);
 
   if (a == b) {
     return true;
@@ -117,7 +104,7 @@ bool TypeVar::do_unify(TypeVar &other) {
     a->do_sweep();
     if (!infinite) {
       a->do_cap(b->free_dob);
-      b->parent = a;
+      imp.union_consume(other.imp);
     }
     return !infinite;
   } else if (a->isFree()) {
@@ -129,7 +116,7 @@ bool TypeVar::do_unify(TypeVar &other) {
       std::swap(a->cargs,    b->cargs);
       std::swap(a->free_dob, b->free_dob);
       a->do_cap(b->free_dob);
-      b->parent = a;
+      imp.union_consume(other.imp);
     }
     return !infinite;
   } else if (strcmp(a->name, b->name) || a->nargs != b->nargs) {
@@ -145,7 +132,7 @@ bool TypeVar::do_unify(TypeVar &other) {
       }
     }
     if (ok) {
-      b->parent = a;
+      imp.union_consume(other.imp);
       // we cannot clear cargs, because other TypeVars might point through our children
     } else {
       if (a->epoch < globalEpoch) a->epoch = globalEpoch;
@@ -184,29 +171,30 @@ bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {
 }
 
 void TypeVar::do_clone(TypeVar &out, const TypeVar &x, int dob) {
-  out.free_dob = out.var_dob = ++globalClock;
-  const TypeVar *in = x.find();
+  out.imp->free_dob = out.var_dob = ++globalClock;
+  const Imp *in = x.imp.get();
   if (in->isFree() && in->free_dob < dob) { // no need to clone
-    out.parent = const_cast<TypeVar*>(in);
+    x.imp.union_consume(out.imp);
   } else {
     if (in->epoch < globalEpoch) { // not previously cloned
       in->epoch = globalEpoch;
       in->link = &out;
-      out.name = in->name;
-      out.nargs = in->nargs;
-      out.cargs = out.nargs > 0 ? new TypeChild[out.nargs] : 0;
-      for (int i = 0; i < out.nargs; ++i) {
-        do_clone(out.cargs[i].var, in->cargs[i].var, dob);
-        out.cargs[i].tag = in->cargs[i].tag;
+      Imp *imp = out.imp.get();
+      imp->name = in->name;
+      imp->nargs = in->nargs;
+      imp->cargs = imp->nargs > 0 ? new TypeChild[imp->nargs] : 0;
+      for (int i = 0; i < imp->nargs; ++i) {
+        do_clone(imp->cargs[i].var, in->cargs[i].var, dob);
+        imp->cargs[i].tag = in->cargs[i].tag;
       }
     } else { // this TypeVar was already cloned; replicate sharing
-      out.parent = in->link;
+      in->link->imp.union_consume(out.imp);
     }
   }
 }
 
 void TypeVar::clone(TypeVar &into) const {
-  assert (!into.parent && into.isFree());
+  assert (into.imp->isFree());
   do_clone(into, *this, var_dob);
   ++globalEpoch;
 }
@@ -218,8 +206,8 @@ static void tag2str(std::ostream &os, int tag) {
 }
 
 int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag, const TypeVar *other, int tags, int o) {
-  const TypeVar *a = value.find();
-  const TypeVar *b = other?other->find():0;
+  const Imp *a = value.imp.get();
+  const Imp *b = other?other->imp.get():nullptr;
   int p;
 
   if (tag) {
