@@ -123,6 +123,7 @@ int main(int argc, char **argv) {
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-parse",      GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "stop-after-optimize",   GOPT_ARGUMENT_FORBIDDEN },
     { 0,   0,                       GOPT_LAST}};
 
   argc = gopt(argv, options);
@@ -150,6 +151,7 @@ int main(int argc, char **argv) {
   bool debugdb = arg(options, "debug-db")->count;
   bool parse   = arg(options, "stop-after-parse")->count;
   bool tcheck  = arg(options, "stop-after-type-check")->count;
+  bool optim   = arg(options, "stop-after-optimize")->count;
 
   const char *percents= arg(options, "percent")->argument;
   const char *heapf   = arg(options, "heap-factor")->argument;
@@ -207,7 +209,7 @@ int main(int argc, char **argv) {
   bool nodb = init;
   bool noparse = nodb || remove || list || output || input || last || failed;
   bool notype = noparse || parse;
-  bool noexecute = notype || add || html || tcheck || global;
+  bool noexecute = notype || add || html || tcheck || optim || global;
 
   if (noparse && argc < 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
@@ -365,6 +367,7 @@ int main(int argc, char **argv) {
   if (tcheck) std::cout << root.get();
   if (html) markup_html(std::cout, root.get());
   optimize_deadcode(root.get());
+  if (optim) std::cout << root.get();
 
   for (auto &g : globals) {
     Expr *e = root.get();
