@@ -155,7 +155,7 @@ while users can take advantage of the generated accessors to use the new field:
 
 ----
 def myCat =
-  Cat "Bill" 3
+  makeCat "Bill" 3
   | setCatOwner (Some "Sarah")
 ----
 
