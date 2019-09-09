@@ -745,11 +745,8 @@ struct NameBinding {
         out.index = 0;
         out.var = x?&x->typeVar:0;
         out.lambda = x;
-        if (idx >= generalized) { // recursive use
-          while (x->body->type == &Lambda::type)
-            x = static_cast<Lambda*>(x->body.get());
+        if (idx >= generalized) // recursive use
           x->flags |= FLAG_RECURSIVE;
-        }
       }
     } else if (next) {
       out = next->find(x);
@@ -821,7 +818,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       pos.var->clone(temp);
       return ref->typeVar.unify(temp, &ref->location);
     } else {
-      ref->flags |= FLAG_RECURSIVE;
+      if (pos.lambda) ref->flags |= FLAG_RECURSIVE;
       return ref->typeVar.unify(*pos.var, &ref->location);
     }
   } else if (expr->type == &App::type) {
