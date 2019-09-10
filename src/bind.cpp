@@ -754,10 +754,12 @@ struct NameBinding {
       }
     } else if (next) {
       out = next->find(x);
-      if (binding)
-        out.index += binding->val.size();
-      if (lambda)
-        ++out.index;
+      if (out.index >= 0) {
+        if (binding)
+          out.index += binding->val.size();
+        if (lambda)
+          ++out.index;
+      }
     } else {
       out.index = -1;
     }
