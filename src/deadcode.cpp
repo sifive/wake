@@ -43,6 +43,7 @@ static Expr *lambda_fusion(Expr *expr, AppStack *stack, std::vector<int> &expand
       app->val = std::unique_ptr<Expr>(lambda_fusion(frame.arg, nullptr, expand, depth));
       return app;
     } else {
+      delete expr;
       return out;
     }
   } else if (expr->type == &Lambda::type) {
@@ -57,6 +58,7 @@ static Expr *lambda_fusion(Expr *expr, AppStack *stack, std::vector<int> &expand
       def->val.emplace_back(std::unique_ptr<Expr>(val));
       stack->arg = nullptr;
       expand.pop_back();
+      delete expr;
       return def;
     } else {
       expand.push_back(depth);
