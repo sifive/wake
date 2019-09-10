@@ -88,27 +88,27 @@ static Expr *lambda_fusion(Expr *expr, AppStack *stack, std::vector<int> &expand
   }
 }
 
-struct ScopeStack {
+struct DefStack {
   Expr  *expr;
-  ScopeStack *next;
+  DefStack *next;
 
   Expr *resolve(VarRef *ref);
   Expr *index(unsigned i); // flat index
   unsigned size() const;
 };
 
-unsigned ScopeStack::size() const {
+unsigned DefStack::size() const {
   if (expr->type == &Lambda::type) return 1;
   return static_cast<DefBinding*>(expr)->val.size();
 }
 
-Expr *ScopeStack::resolve(VarRef *ref) {
+Expr *DefStack::resolve(VarRef *ref) {
   if (ref->lambda) return ref->lambda;
   return index(ref->index);
 }
 
-Expr *ScopeStack::index(unsigned i) {
-  ScopeStack *s = this;
+Expr *DefStack::index(unsigned i) {
+  DefStack *s = this;
   size_t idx, size;
   for (idx = i; idx >= (size = s->size()); idx -= size)
     s = s->next;
@@ -118,8 +118,8 @@ Expr *ScopeStack::index(unsigned i) {
 }
 
 // meta is a purity bitmask
-static void forward_purity(Expr *expr, ScopeStack *stack) {
-  ScopeStack frame;
+static void forward_purity(Expr *expr, DefStack *stack) {
+  DefStack frame;
   frame.next = stack;
   frame.expr = expr;
   if (expr->type == &VarRef::type) {
@@ -190,8 +190,8 @@ static void forward_purity(Expr *expr, ScopeStack *stack) {
 }
 
 // We only explore DefBinding children with uses
-static int backward_usage(Expr *expr, ScopeStack *stack) {
-  ScopeStack frame;
+static int backward_usage(Expr *expr, DefStack *stack) {
+  DefStack frame;
   frame.next = stack;
   frame.expr = expr;
   if (expr->type == &VarRef::type) {
@@ -212,6 +212,9 @@ static int backward_usage(Expr *expr, ScopeStack *stack) {
     for (auto &x : def->val) x->set(FLAG_USED, 0);
     for (auto &x : def->fun) x->set(FLAG_USED, 0);
     int out = backward_usage(def->body.get(), &frame);
+    for (auto &x : def->val) {
+      if (--out >= 0) x->set(FLAG_USED, 1);
+    }
     for (auto it = def->fun.rbegin(); it != def->fun.rend(); ++it) {
       if (!((*it)->flags & FLAG_USED)) continue;
       backward_usage(it->get(), &frame);
@@ -221,14 +224,13 @@ static int backward_usage(Expr *expr, ScopeStack *stack) {
       if (!((*it)->flags & FLAG_USED)) continue;
       backward_usage(it->get(), stack);
     }
-    for (auto &x : def->val) {
-      if (--out >= 0) x->set(FLAG_USED, 1);
-    }
     return out;
   } else if (expr->type == &Prim::type) {
     Prim *prim = static_cast<Prim*>(expr);
     return prim->args;
-  } // else: Literal/Construct/Destruct/Get
+  } else { // else: Literal/Construct/Destruct/Get
+    return 0;
+  }
 }
 
 // need the reduction contraction relabel map
