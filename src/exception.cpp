@@ -69,6 +69,7 @@ static PRIMFN(prim_panic) {
 }
 
 void prim_register_exception(PrimMap &pmap) {
-  prim_register(pmap, "stack",    prim_stack, type_stack, PRIM_PURE);
-  prim_register(pmap, "panic",    prim_panic, type_panic, PRIM_PURE);
+  // These should not be evaluated in const prop, but can be removed
+  prim_register(pmap, "stack",    prim_stack, type_stack, PRIM_REMOVE);
+  prim_register(pmap, "panic",    prim_panic, type_panic, PRIM_REMOVE);
 }

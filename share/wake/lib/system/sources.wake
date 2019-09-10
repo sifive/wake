@@ -49,4 +49,5 @@ global def source file =
 global def sources dir filterRegexp =
   def scan dir regexp = prim "sources"
   match got_sources
-    Unit = scan dir filterRegexp | map raw_source
+    True  = scan dir filterRegexp | map raw_source
+    False = panic "unreachable"
