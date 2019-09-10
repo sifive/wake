@@ -118,7 +118,7 @@ Expr *DefStack::index(unsigned i) {
 }
 
 // meta is a purity bitmask
-static void forward_purity(Expr *expr, DefStack *stack) {
+static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
   DefStack frame;
   frame.next = stack;
   frame.expr = expr;
@@ -127,41 +127,51 @@ static void forward_purity(Expr *expr, DefStack *stack) {
     Expr *target = stack->resolve(ref);
     // The VarRef itself has no effect, but applying it might
     ref->meta = (target?target->meta:0) | 1;
-    // I choose to allow recursive functions to be pure unless they have
-    // actual side-effects.  This does mean we might eliminate an unused
-    // result computed by a pure function which runs forever.
-    if ((ref->flags & FLAG_RECURSIVE))
-      ref->meta = ~static_cast<uint64_t>(0);
     ref->set(FLAG_PURE, 1);
+    return false;
   } else if (expr->type == &App::type) {
     App *app = static_cast<App*>(expr);
-    forward_purity(app->val.get(), stack);
-    forward_purity(app->fn.get(), stack);
+    bool out = false;
+    out = forward_purity(app->val.get(), stack, first) || out;
+    out = forward_purity(app->fn.get(), stack, first) || out;
     app->meta = (app->fn->meta >> 1) & ~!(app->fn->meta & app->val->meta & 1);
     app->set(FLAG_PURE, expr->meta & 1);
+    return out;
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr);
-    forward_purity(lambda->body.get(), &frame);
+    bool out = forward_purity(lambda->body.get(), &frame, first);
     lambda->meta = (lambda->body->meta << 1) | 1;
     lambda->set(FLAG_PURE, 1);
+    return out;
   } else if (expr->type == &DefBinding::type) {
     DefBinding *def = static_cast<DefBinding*>(expr);
-    for (auto &x : def->val) forward_purity(x.get(), stack);
-    for (auto &x : def->fun) forward_purity(x.get(), &frame);
-    forward_purity(def->body.get(), &frame);
+    bool out = false;
+    // Assume best-case (pure) recursive functions on initial pass
+    std::vector<uint64_t> prior;
+    prior.reserve(def->fun.size());
+    for (auto &x : def->fun) prior.push_back(first ? ~static_cast<uint64_t>(0) : x->meta);
+    for (auto &x : def->val) out = forward_purity(x.get(), stack, first) || out;
+    for (auto &x : def->fun) out = forward_purity(x.get(), &frame, first) || out;
+    out = forward_purity(def->body.get(), &frame, first) || out;
+    // Detect any changes to definition types
+    for (unsigned i = 0; !out && i < prior.size(); ++i)
+      out = prior[i] != def->fun[i]->meta;
     // Result only pure when all vals and body are pure
     uint64_t isect = def->body->meta;
     for (auto &x : def->val) isect &= x->meta;
     def->meta = isect;
     def->set(FLAG_PURE, def->meta & 1);
+    return out;
   } else if (expr->type == &Literal::type) {
     Literal *lit = static_cast<Literal*>(expr);
     lit->meta = 1;
     lit->set(FLAG_PURE, 1);
+    return false;
   } else if (expr->type == &Construct::type) {
     Construct *cons = static_cast<Construct*>(expr);
     cons->meta = 1;
     cons->set(FLAG_PURE, 1);
+    return false;
   } else if (expr->type == &Destruct::type) {
     Destruct *des = static_cast<Destruct*>(expr);
     // Result only pure when all handlers are pure
@@ -176,16 +186,20 @@ static void forward_purity(Expr *expr, DefStack *stack) {
     // Apply the handler
     des->meta = (isect >> 1) & ~!(isect & vmeta & 1);
     des->set(FLAG_PURE, des->meta&1);
+    return false;
   } else if (expr->type == &Prim::type) {
     Prim *prim = static_cast<Prim*>(expr);
     prim->meta = (prim->pflags & PRIM_PURE) != 0;
     prim->set(FLAG_PURE, prim->meta);
+    return false;
   } else if (expr->type == &Get::type) {
     Get *get = static_cast<Get*>(expr);
     get->meta = 1;
     get->set(FLAG_PURE, 1);
+    return false;
   } else {
     assert(0 /* unreachable */);
+    return false;
   }
 }
 
@@ -293,7 +307,8 @@ static void forward_reduction(Expr *expr, std::vector<int> &compress) {
 void optimize_deadcode(Expr *expr) {
   std::vector<int> expand;
   lambda_fusion(expr, nullptr, expand, 0);
-  forward_purity(expr, nullptr);
+  // Find the purity fixed-point (typically only needs 2 passes)
+  for (bool first = true; forward_purity(expr, nullptr, first); first = false) { }
   backward_usage(expr, nullptr);
   std::vector<int> compress;
   compress.push_back(0);
