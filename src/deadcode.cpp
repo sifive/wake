@@ -190,7 +190,7 @@ static void forward_purity(Expr *expr, ScopeStack *stack) {
 }
 
 // We only explore DefBinding children with uses
-static void backward_usage(Expr *expr, ScopeStack *stack) {
+static int backward_usage(Expr *expr, ScopeStack *stack) {
   ScopeStack frame;
   frame.next = stack;
   frame.expr = expr;
@@ -198,18 +198,20 @@ static void backward_usage(Expr *expr, ScopeStack *stack) {
     VarRef *ref = static_cast<VarRef*>(expr);
     Expr *target = stack->resolve(ref);
     if (target) target->set(FLAG_USED, 1);
+    return 0;
   } else if (expr->type == &App::type) {
     App *app = static_cast<App*>(expr);
     backward_usage(app->fn.get(), stack);
     backward_usage(app->val.get(), stack);
+    return 0;
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr);
-    backward_usage(lambda->body.get(), &frame);
+    return backward_usage(lambda->body.get(), &frame) - 1;
   } else if (expr->type == &DefBinding::type) {
     DefBinding *def = static_cast<DefBinding*>(expr);
     for (auto &x : def->val) x->set(FLAG_USED, 0);
     for (auto &x : def->fun) x->set(FLAG_USED, 0);
-    backward_usage(def->body.get(), &frame);
+    int out = backward_usage(def->body.get(), &frame);
     for (auto it = def->fun.rbegin(); it != def->fun.rend(); ++it) {
       if (!((*it)->flags & FLAG_USED)) continue;
       backward_usage(it->get(), &frame);
@@ -219,7 +221,14 @@ static void backward_usage(Expr *expr, ScopeStack *stack) {
       if (!((*it)->flags & FLAG_USED)) continue;
       backward_usage(it->get(), stack);
     }
-  } // else: Literal/Construct/Destruct/Prim/Get
+    for (auto &x : def->val) {
+      if (--out >= 0) x->set(FLAG_USED, 1);
+    }
+    return out;
+  } else if (expr->type == &Prim::type) {
+    Prim *prim = static_cast<Prim*>(expr);
+    return prim->args;
+  } // else: Literal/Construct/Destruct/Get
 }
 
 // need the reduction contraction relabel map
