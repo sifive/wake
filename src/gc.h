@@ -85,8 +85,11 @@ struct RootRing {
   RootRing *next;
 
   explicit RootRing(HeapObject *root_ = nullptr) : root(root_), prev(this), next(this) { }
+  RootRing(const RootRing &ring) : root(ring.root), prev(ring.prev), next(const_cast<RootRing*>(&ring)) {
+    prev->next = this;
+    next->prev = this;
+  }
 
-  RootRing(const RootRing&) = delete;
   RootRing & operator = (const RootRing&) = delete;
 
   RootRing(RootRing &&x) {

@@ -20,76 +20,6 @@
 #include "prim.h"
 #include <assert.h>
 
-struct AppStack {
-  int cutoff;
-  Expr *arg;
-  AppStack *next;
-};
-
-static Expr *lambda_fusion(Expr *expr, AppStack *stack, std::vector<int> &expand, int depth)  {
-  if (expr->type == &VarRef::type) {
-    VarRef *ref = static_cast<VarRef*>(expr);
-    ref->index = (depth-1) - expand[expand.size()-1-ref->index];
-    return ref;
-  } else if (expr->type == &App::type) {
-    App *app = static_cast<App*>(expr);
-    AppStack frame;
-    frame.cutoff = expand.size();
-    frame.arg = app->val.release();
-    frame.next = stack;
-    Expr *out = lambda_fusion(app->fn.release(), &frame, expand, depth);
-    if (frame.arg) {
-      app->fn = std::unique_ptr<Expr>(out);
-      app->val = std::unique_ptr<Expr>(lambda_fusion(frame.arg, nullptr, expand, depth));
-      return app;
-    } else {
-      delete expr;
-      return out;
-    }
-  } else if (expr->type == &Lambda::type) {
-    Lambda *lambda = static_cast<Lambda*>(expr);
-    if (stack) {
-      std::vector<int> cut(expand.begin(), expand.begin()+stack->cutoff);
-      expand.push_back(depth);
-      auto val = lambda_fusion(stack->arg, nullptr, cut, depth);
-      auto body = lambda_fusion(lambda->body.release(), stack->next, expand, depth+1);
-      DefBinding *def = new DefBinding(lambda->location, std::unique_ptr<Expr>(body));
-      def->order.insert(std::make_pair(lambda->name, DefBinding::OrderValue(lambda->token, 0)));
-      def->val.emplace_back(std::unique_ptr<Expr>(val));
-      stack->arg = nullptr;
-      expand.pop_back();
-      delete expr;
-      return def;
-    } else {
-      expand.push_back(depth);
-      auto y = lambda_fusion(lambda->body.release(), nullptr, expand, depth+1);
-      expand.pop_back();
-      lambda->body = std::unique_ptr<Expr>(y);
-      return lambda;
-    }
-  } else if (expr->type == &DefBinding::type) {
-    DefBinding *def = static_cast<DefBinding*>(expr);
-    for (auto &x : def->val) {
-      auto y = lambda_fusion(x.release(), nullptr, expand, depth);
-      x = std::unique_ptr<Expr>(y);
-    }
-    for (unsigned i = 0; i < def->val.size(); ++i)
-      expand.push_back(depth+i);
-    depth += def->val.size();
-    for (auto &x : def->fun) {
-      auto y = lambda_fusion(x.release(), nullptr, expand, depth);
-      x = std::unique_ptr<Lambda>(static_cast<Lambda*>(y));
-    }
-    auto y = lambda_fusion(def->body.release(), stack, expand, depth);
-    def->body = std::unique_ptr<Expr>(y);
-    depth -= def->val.size();
-    expand.resize(expand.size() - def->val.size());
-    return def;
-  } else { // Literal/Construct/Destruct/Prim/Get
-    return expr;
-  }
-}
-
 struct DefStack {
   Expr  *expr;
   DefStack *next;
@@ -117,6 +47,134 @@ Expr *DefStack::index(unsigned i) {
 
   if (s->expr->type == &Lambda::type) return nullptr;
   return static_cast<DefBinding*>(s->expr)->val[idx].get();
+}
+
+struct AppStack {
+  int cutoff;
+  Expr *arg;
+  AppStack *next;
+};
+
+static Expr *clone(Expr *expr) {
+  if (expr->type == &VarRef::type) {
+    return new VarRef(*static_cast<VarRef*>(expr));
+  } else if (expr->type == &App::type) {
+    App *app = static_cast<App*>(expr);
+    App *out = new App(*app);
+    out->val = std::unique_ptr<Expr>(clone(app->val.get()));
+    out->fn  = std::unique_ptr<Expr>(clone(app->fn .get()));
+    return out;
+  } else if (expr->type == &Lambda::type) {
+    Lambda *lambda = static_cast<Lambda*>(expr);
+    Lambda *out = new Lambda(*lambda);
+    out->body = std::unique_ptr<Expr>(clone(lambda->body.get()));
+    return out;
+  } else if (expr->type == &DefBinding::type) {
+    DefBinding *def = static_cast<DefBinding*>(expr);
+    DefBinding *out = new DefBinding(*def);
+    for (auto &x : def->val) out->val.emplace_back(clone(x.get()));
+    for (auto &x : def->fun) out->fun.emplace_back(static_cast<Lambda*>(clone(x.get())));
+    out->body = std::unique_ptr<Expr>(clone(def->body.get()));
+    return out;
+  } else if (expr->type == &Literal::type) {
+    return new Literal(*static_cast<Literal*>(expr));
+  } else if (expr->type == &Construct::type) {
+    return new Construct(*static_cast<Construct*>(expr));
+  } else if (expr->type == &Destruct::type) {
+    return new Destruct(*static_cast<Destruct*>(expr));
+  } else if (expr->type == &Prim::type) {
+    return new Prim(*static_cast<Prim*>(expr));
+  } else if (expr->type == &Get::type) {
+    return new Get(*static_cast<Get*>(expr));
+  } else {
+    assert(0 /* unreachable */);
+    return nullptr;
+  }
+}
+
+static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std::vector<int> &expand, int depth)  {
+  if (expr->type == &VarRef::type) {
+    VarRef *ref = static_cast<VarRef*>(expr);
+    ref->index = (depth-1) - expand[expand.size()-1-ref->index];
+    Expr *target = dstack->resolve(ref);
+    return ref;
+/*
+    if (!target) {
+      return ref;
+    } else if (target->type == &VarRef::type) {
+      std::vector<int> cut(expand.begin(), expand.begin()+index);
+      return forward_inline(clone(target), astack, dstack, cut, depth);
+//    } else if (target->type == &Lambda::type && astack && !(target->flags & FLAG_RECURSIVE)) {
+    } else {
+      return ref;
+    }
+*/
+  } else if (expr->type == &App::type) {
+    App *app = static_cast<App*>(expr);
+    AppStack frame;
+    frame.cutoff = expand.size();
+    frame.arg = app->val.release();
+    frame.next = astack;
+    Expr *out = forward_inline(app->fn.release(), &frame, dstack, expand, depth);
+    if (frame.arg) {
+      app->fn = std::unique_ptr<Expr>(out);
+      app->val = std::unique_ptr<Expr>(forward_inline(frame.arg, nullptr, dstack, expand, depth));
+      return app;
+    } else {
+      delete expr;
+      return out;
+    }
+  } else if (expr->type == &Lambda::type) {
+    DefStack frame;
+    frame.next = dstack;
+    Lambda *lambda = static_cast<Lambda*>(expr);
+    if (astack) {
+      // Transform App+Lambda => DefBinding
+      DefBinding *def = new DefBinding(lambda->location, nullptr);
+      def->order.insert(std::make_pair(lambda->name, DefBinding::OrderValue(lambda->token, 0)));
+      frame.expr = def;
+      // Expand the argument in our outer scope
+      std::vector<int> cut(expand.begin(), expand.begin()+astack->cutoff);
+      def->val.emplace_back(std::unique_ptr<Expr>(
+        forward_inline(astack->arg, nullptr, dstack, cut, depth)));
+      astack->arg = nullptr;
+      // Expand the body in the def scope
+      expand.push_back(depth);
+      def->body = std::unique_ptr<Expr>(
+        forward_inline(lambda->body.release(), astack->next, &frame, expand, depth+1));
+      expand.pop_back();
+      delete expr;
+      return def;
+    } else {
+      frame.expr = expr;
+      expand.push_back(depth);
+      auto y = forward_inline(lambda->body.release(), nullptr, &frame, expand, depth+1);
+      expand.pop_back();
+      lambda->body = std::unique_ptr<Expr>(y);
+      return lambda;
+    }
+  } else if (expr->type == &DefBinding::type) {
+    DefBinding *def = static_cast<DefBinding*>(expr);
+    DefStack frame;
+    frame.next = dstack;
+    frame.expr = def;
+    for (auto &x : def->val)
+      x = std::unique_ptr<Expr>(
+        forward_inline(x.release(), nullptr, dstack, expand, depth));
+    for (unsigned i = 0; i < def->val.size(); ++i)
+      expand.push_back(depth+i);
+    depth += def->val.size();
+    for (auto &x : def->fun)
+      x = std::unique_ptr<Lambda>(static_cast<Lambda*>(
+        forward_inline(x.release(), nullptr, &frame, expand, depth)));
+    def->body = std::unique_ptr<Expr>(
+      forward_inline(def->body.release(), astack, &frame, expand, depth));
+    depth -= def->val.size();
+    expand.resize(expand.size() - def->val.size());
+    return def;
+  } else { // Literal/Construct/Destruct/Prim/Get
+    return expr;
+  }
 }
 
 // meta is a purity bitmask
@@ -308,7 +366,7 @@ static void forward_reduction(Expr *expr, std::vector<int> &compress) {
 
 void optimize_deadcode(Expr *expr) {
   std::vector<int> expand;
-  lambda_fusion(expr, nullptr, expand, 0);
+  forward_inline(expr, nullptr, nullptr, expand, 0);
   // Find the purity fixed-point (typically only needs 2 passes)
   for (bool first = true; forward_purity(expr, nullptr, first); first = false) { }
   backward_usage(expr, nullptr);
