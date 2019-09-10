@@ -255,7 +255,7 @@ static void chain_publish(ResolveBinding *binding, DefMap::Pubs &pubs, int &chai
 }
 
 struct PatternTree {
-  Sum *sum; // nullptr if unexpanded
+  std::shared_ptr<Sum> sum; // nullptr if unexpanded
   int cons;
   int var; // -1 if unbound/_
   std::vector<PatternTree> children;
@@ -315,11 +315,11 @@ struct PatternRef {
 };
 
 // assumes a detail <= b
-static Sum *find_mismatch(std::vector<int> &path, const PatternTree &a, const PatternTree &b) {
+static std::shared_ptr<Sum> find_mismatch(std::vector<int> &path, const PatternTree &a, const PatternTree &b) {
   if (!a.sum) return b.sum;
   for (size_t i = 0; i < a.children.size(); ++i) {
     path.push_back(i);
-    Sum *out = find_mismatch(path, a.children[i], b.children[i]);
+    std::shared_ptr<Sum> out = find_mismatch(path, a.children[i], b.children[i]);
     if (out) return out;
     path.pop_back();
   }
@@ -353,16 +353,20 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
     return nullptr;
   }
   std::vector<int> expand;
-  Sum *sum = find_mismatch(expand, prototype.tree, patterns[1].tree);
+  std::shared_ptr<Sum> sum = find_mismatch(expand, prototype.tree, patterns[1].tree);
   if (sum) {
     std::unique_ptr<DefMap> map(new DefMap(location));
     map->body = std::unique_ptr<Expr>(new VarRef(location, "destruct " + sum->name));
     for (size_t c = 0; c < sum->members.size(); ++c) {
       Constructor &cons = sum->members[c];
       std::string cname = "_ c" + std::to_string(c);
-      map->body = std::unique_ptr<Expr>(new App(location,
-        map->body.release(),
-        new VarRef(location, cname)));
+      if (sum->members.size() == 1) {
+        map->body = std::unique_ptr<Expr>(new VarRef(location, cname));
+      } else {
+        map->body = std::unique_ptr<Expr>(new App(location,
+          map->body.release(),
+          new VarRef(location, cname)));
+      }
       std::vector<PatternRef> bucket;
       int args = cons.ast.args.size();
       int var = prototype.index;
@@ -450,7 +454,7 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
   }
 }
 
-static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, std::unique_ptr<Expr> &guard, const AST &ast, Sum *multiarg) {
+static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, std::unique_ptr<Expr> &guard, const AST &ast, std::shared_ptr<Sum> multiarg) {
   PatternTree out;
   if (ast.name == "_") {
     // no-op; unbound
@@ -533,13 +537,13 @@ static Lambda *case_name(Lambda *l, const std::string &fnname) {
 
 static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBinding *binding, std::unique_ptr<Match> match) {
   std::vector<PatternRef> patterns;
-  Sum multiarg(AST(LOCATION));
-  multiarg.members.emplace_back(AST(LOCATION));
+  std::shared_ptr<Sum> multiarg = std::make_shared<Sum>(AST(LOCATION));
+  multiarg->members.emplace_back(AST(LOCATION));
 
   std::vector<PatternTree> children;
   for (int index = 0; index < (int)match->args.size(); ++index) {
     children.emplace_back(index);
-    multiarg.members.front().ast.args.emplace_back(AST(LOCATION));
+    multiarg->members.front().ast.args.emplace_back(AST(LOCATION));
   }
 
   patterns.emplace_back(match->location);
@@ -552,7 +556,7 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
     prototype.tree = std::move(children.front());
   } else {
     prototype.tree.children = std::move(children);
-    prototype.tree.sum = &multiarg;
+    prototype.tree.sum = multiarg;
   }
 
   int f = 0;
@@ -565,7 +569,7 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
     patterns.emplace_back(p.expr->location);
     patterns.back().index = f;
     patterns.back().guard = static_cast<bool>(guard);
-    patterns.back().tree = cons_lookup(binding, p.expr, p.guard, p.pattern, &multiarg);
+    patterns.back().tree = cons_lookup(binding, p.expr, p.guard, p.pattern, multiarg);
     ok &= !patterns.front().tree.sum || patterns.back().tree.sum;
     std::string cname = match->patterns.size() == 1 ? fnname : fnname + ".case"  + std::to_string(f);
     std::string gname = match->patterns.size() == 1 ? fnname : fnname + ".guard"  + std::to_string(f);
@@ -705,13 +709,12 @@ static std::unique_ptr<Expr> fracture(bool anon, const std::string& name, std::u
 }
 
 struct NameRef {
-  int depth;
-  int offset;
+  int index;
   int def;
   Location target;
   Lambda *lambda;
   TypeVar *var;
-  NameRef() : depth(0), offset(-1), def(0), target(LOCATION), lambda(nullptr), var(nullptr) { }
+  NameRef() : index(-1), def(0), target(LOCATION), lambda(nullptr), var(nullptr) { }
 };
 
 struct NameBinding {
@@ -729,36 +732,36 @@ struct NameBinding {
     NameRef out;
     DefBinding::Order::iterator i;
     if (lambda && lambda->name == x) {
-      out.depth = 0;
-      out.offset = 0;
+      out.index = 0;
       out.def = 0;
       out.var = &lambda->typeVar[0];
       out.target = lambda->token;
     } else if (binding && (i = binding->order.find(x)) != binding->order.end()) {
       int idx = i->second.index;
-      out.depth = 0;
-      out.offset = idx;
       out.def = idx < generalized;
       out.target = i->second.location;
       if (idx < (int)binding->val.size()) {
         auto x = binding->val[idx].get();
+        out.index = idx;
         out.var = x?&x->typeVar:0;
       } else {
         auto x = binding->fun[idx-binding->val.size()].get();
+        out.index = 0;
         out.var = x?&x->typeVar:0;
         out.lambda = x;
-        if (idx >= generalized) { // recursive use
-          while (x->body->type == &Lambda::type)
-            x = static_cast<Lambda*>(x->body.get());
+        if (idx >= generalized) // recursive use
           x->flags |= FLAG_RECURSIVE;
-        }
       }
     } else if (next) {
       out = next->find(x);
-      ++out.depth;
+      if (out.index >= 0) {
+        if (binding)
+          out.index += binding->val.size();
+        if (lambda)
+          ++out.index;
+      }
     } else {
-      out.depth = 0;
-      out.offset = -1;
+      out.index = -1;
     }
     return out;
   }
@@ -796,7 +799,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   if (expr->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(expr);
     NameRef pos;
-    if ((pos = binding->find(ref->name)).offset == -1) {
+    if ((pos = binding->find(ref->name)).index == -1) {
       size_t off = ref->name.find(':');
       if (off != std::string::npos) {
         size_t off2 = ref->name.find(':', off+1);
@@ -812,8 +815,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       }
       return false;
     }
-    ref->depth = pos.depth;
-    ref->offset = pos.offset;
+    ref->index = pos.index;
     ref->lambda = pos.lambda;
     ref->target = pos.target;
     if (!pos.var) return true;
@@ -822,7 +824,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       pos.var->clone(temp);
       return ref->typeVar.unify(temp, &ref->location);
     } else {
-      ref->flags |= FLAG_RECURSIVE;
+      if (pos.lambda) ref->flags |= FLAG_RECURSIVE;
       return ref->typeVar.unify(*pos.var, &ref->location);
     }
   } else if (expr->type == &App::type) {
@@ -887,12 +889,12 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     // (typ => b) => (typ => b) => typ => b
     TypeVar &typ = binding->lambda->typeVar[0];
     bool ok = typ.unify(
-      TypeVar(des->sum.name.c_str(), des->sum.args.size()));
+      TypeVar(des->sum->name.c_str(), des->sum->args.size()));
     std::map<std::string, TypeVar*> ids;
-    for (size_t i = 0; i < des->sum.args.size(); ++i)
-      ids[des->sum.args[i]] = &typ[i];
+    for (size_t i = 0; i < des->sum->args.size(); ++i)
+      ids[des->sum->args[i]] = &typ[i];
     NameBinding *iter = binding;
-    for (size_t i = des->sum.members.size(); i; --i) {
+    for (size_t i = des->sum->members.size(); i; --i) {
       iter = iter->next;
       TypeVar &arg = iter->lambda->typeVar[0];
       if (!arg.unify(TypeVar(FN, 2))) { ok = false; break; }

@@ -159,12 +159,13 @@ void Lambda::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
 }
 
 void VarRef::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  for (int i = depth; i; --i)
+  size_t idx, size;
+  for (idx = index; idx >= (size = scope->size()); idx -= size)
     scope = scope->next.get();
   if (lambda) {
     cont->resume(runtime, Closure::alloc(runtime.heap, lambda, scope));
   } else {
-    scope->at(offset)->await(runtime, cont);
+    scope->at(idx)->await(runtime, cont);
   }
 }
 
@@ -290,7 +291,7 @@ struct CDestruct final : public GCObject<CDestruct, Continuation> {
     auto record = static_cast<Record*>(value.get());
     runtime.heap.reserve(Scope::reserve(1) + Interpret::reserve());
     // Find the handler function body -- inlining + App fusion would eliminate this loop
-    for (int index = des->sum.members.size() - record->cons->index; index; --index)
+    for (int index = des->sum->members.size() - record->cons->index; index; --index)
       scope = scope->next.get();
     // This coercion is safe because we evaluate pure lambda args before their consumer
     auto closure = scope->at(0)->coerce<Closure>();

@@ -34,9 +34,11 @@ struct Runtime;
 struct Scope;
 struct Continuation;
 
-#define FLAG_TOUCHED	1 // already explored for _
-#define FLAG_AST	2 // useful to include in AST
-#define FLAG_RECURSIVE	4
+#define FLAG_TOUCHED   0x01 // already explored for _
+#define FLAG_AST       0x02 // useful to include in AST
+#define FLAG_RECURSIVE 0x04
+#define FLAG_USED      0x08
+#define FLAG_PURE      0x10
 
 /* Expression AST */
 struct Expr {
@@ -44,10 +46,13 @@ struct Expr {
   Location location;
   TypeVar typeVar;
   Hash hashcode;
+  uint64_t meta;
   long flags;
 
-  Expr(const TypeDescriptor *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), flags(flags_) { }
+  Expr(const TypeDescriptor *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), meta(0), flags(flags_) { }
   virtual ~Expr();
+
+  void set(long flag, long value /* 0 or 1 */) { flags = (flags & ~flag) | (-value & flag); }
 
   std::string to_str() const;
   virtual void format(std::ostream &os, int depth) const = 0;
@@ -101,14 +106,13 @@ struct Lambda : public Expr {
 
 struct VarRef : public Expr {
   std::string name;
-  int depth;
-  int offset;
+  int index;
   Lambda *lambda;
   Location target;
 
   static const TypeDescriptor type;
-  VarRef(const Location &location_, const std::string &name_, int depth_ = 0, int offset_ = -1)
-   : Expr(&type, location_), name(name_), depth(depth_), offset(offset_), lambda(nullptr), target(LOCATION) { }
+  VarRef(const Location &location_, const std::string &name_, int index_ = 0)
+   : Expr(&type, location_), name(name_), index(index_), lambda(nullptr), target(LOCATION) { }
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
@@ -230,12 +234,12 @@ struct DefBinding : public Expr {
 // Created by transforming Data
 struct Constructor;
 struct Get : public Expr {
-  Sum *sum;
+  std::shared_ptr<Sum> sum;
   Constructor *cons;
   size_t index;
 
   static const TypeDescriptor type;
-  Get(const Location &location_, Sum *sum_, Constructor *cons_, size_t index_)
+  Get(const Location &location_, const std::shared_ptr<Sum> &sum_, Constructor *cons_, size_t index_)
    : Expr(&type, location_), sum(sum_), cons(cons_), index(index_) { }
 
   void format(std::ostream &os, int depth) const override;
@@ -244,11 +248,11 @@ struct Get : public Expr {
 };
 
 struct Construct : public Expr {
-  Sum *sum;
+  std::shared_ptr<Sum> sum;
   Constructor *cons;
 
   static const TypeDescriptor type;
-  Construct(const Location &location_, Sum *sum_, Constructor *cons_)
+  Construct(const Location &location_, const std::shared_ptr<Sum> &sum_, Constructor *cons_)
    : Expr(&type, location_), sum(sum_), cons(cons_) { }
 
   void format(std::ostream &os, int depth) const override;
@@ -257,11 +261,11 @@ struct Construct : public Expr {
 };
 
 struct Destruct : public Expr {
-  Sum sum;
+  std::shared_ptr<Sum> sum;
 
   static const TypeDescriptor type;
   Destruct(const Location &location_, Sum &&sum_)
-   : Expr(&type, location_), sum(std::move(sum_)) { }
+   : Expr(&type, location_), sum(std::make_shared<Sum>(sum_)) { }
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;

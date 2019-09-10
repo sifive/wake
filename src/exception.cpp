@@ -20,6 +20,7 @@
 #include "type.h"
 #include "status.h"
 #include "location.h"
+#include "expr.h"
 #include <stdlib.h>
 #include <sstream>
 
@@ -68,7 +69,23 @@ static PRIMFN(prim_panic) {
   REQUIRE(!panic_called);
 }
 
+static PRIMTYPE(type_id) {
+  return args.size() == 1 &&
+    args[0]->unify(*out);
+}
+
+static PRIMFN(prim_id) {
+  EXPECT(1);
+  RETURN(args[0]);
+}
+
 void prim_register_exception(PrimMap &pmap) {
-  prim_register(pmap, "stack",    prim_stack, type_stack, PRIM_PURE);
-  prim_register(pmap, "panic",    prim_panic, type_panic, PRIM_PURE);
+  // These should not be evaluated in const prop, but can be removed
+  prim_register(pmap, "stack",    prim_stack, type_stack, PRIM_REMOVE);
+  prim_register(pmap, "panic",    prim_panic, type_panic, PRIM_REMOVE);
+  prim_register(pmap, "use",      prim_id,    type_id,    PRIM_IMPURE);
+}
+
+Expr *force_use(Expr *expr) {
+  return new App(LOCATION, new Lambda(LOCATION, "_", new Prim(LOCATION, "use")), expr);
 }

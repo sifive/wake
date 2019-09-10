@@ -421,7 +421,7 @@ static PRIMFN(prim_files) {
 static PRIMTYPE(type_add_sources) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar) &&
-    out->unify(Data::typeUnit);
+    out->unify(Data::typeBoolean);
 }
 
 static bool promise_lt(const Promise &a, const Promise &b) {
@@ -438,7 +438,7 @@ static PRIMFN(prim_add_sources) {
 
   size_t copy = runtime.sources->size();
   size_t num = copy;
-  size_t need = reserve_unit();
+  size_t need = reserve_bool();
   const char *tok = arg0->c_str();
   const char *end = tok + arg0->size();
   for (const char *scan = tok; scan != end; ++scan) {
@@ -477,7 +477,7 @@ static PRIMFN(prim_add_sources) {
     compact->at(j)->instant_fulfill(tuple->at(j)->coerce<HeapObject>());
 
   runtime.sources = compact;
-  RETURN(claim_unit(runtime.heap));
+  RETURN(claim_bool(runtime.heap, true));
 }
 
 static PRIMTYPE(type_simplify) {
@@ -542,10 +542,11 @@ static PRIMFN(prim_pid) {
 }
 
 void prim_register_sources(PrimMap &pmap) {
-  // Re-ordering of sources/files would break their behaviour, so they are not pure.
-  prim_register(pmap, "sources",     prim_sources,     type_sources,     0);
-  prim_register(pmap, "add_sources", prim_add_sources, type_add_sources, 0);
-  prim_register(pmap, "files",       prim_files,       type_sources,     0);
+  // These interact with the filesystem, so defer use
+  prim_register(pmap, "add_sources", prim_add_sources, type_add_sources, PRIM_REMOVE);
+  prim_register(pmap, "sources",     prim_sources,     type_sources,     PRIM_REMOVE);
+  prim_register(pmap, "files",       prim_files,       type_sources,     PRIM_REMOVE);
+  // Simple functions
   prim_register(pmap, "simplify",    prim_simplify,    type_simplify,    PRIM_PURE);
   prim_register(pmap, "relative",    prim_relative,    type_relative,    PRIM_PURE);
   prim_register(pmap, "execpath",    prim_execpath,    type_execpath,    PRIM_PURE);

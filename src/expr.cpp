@@ -52,18 +52,20 @@ std::string Expr::to_str() const {
 }
 
 void VarRef::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "VarRef(" << name;
-  if (offset != -1) os << "," << depth << "," << offset;
+  os << pad(depth) << "VarRef(";
+  if ((flags & FLAG_PURE)) os << "PURE, ";
+  if ((flags & FLAG_USED)) os << "USED, ";
+  os << meta << ", ";
+  if (index != -1) os << name << "," << index;
   os << "): " << typeVar << " @ " << location.file() << std::endl;
 }
 
 Hash VarRef::hash() {
-  uint64_t payload[4];
+  uint64_t payload[3];
   payload[0] = type.hashcode.data[0];
   payload[1] = type.hashcode.data[1];
-  payload[2] = depth;
-  payload[3] = offset;
-  return hashcode = Hash(&payload[0], 32);
+  payload[2] = index;
+  return hashcode = Hash(&payload[0], 24);
 }
 
 void Subscribe::format(std::ostream &os, int depth) const {
@@ -116,7 +118,11 @@ void Match::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
 }
 
 void App::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "App: " << typeVar << " @ " << location.file() << std::endl;
+  os << pad(depth) << "App: ";
+  if ((flags & FLAG_PURE)) os << "PURE ";
+  if ((flags & FLAG_USED)) os << "USED, ";
+  os << meta << " ";
+  os << typeVar << " @ " << location.file() << std::endl;
   fn->format(os, depth+2);
   val->format(os, depth+2);
 }
@@ -130,7 +136,10 @@ Hash App::hash() {
 }
 
 void Lambda::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Lambda(" << name;
+  os << pad(depth) << "Lambda(";
+  if ((flags & FLAG_PURE)) os << "PURE, ";
+  if ((flags & FLAG_USED)) os << "USED, ";
+  os << meta << " " << name;
   if (!fnname.empty()) os << ", " << fnname;
   os << " @ " << token.file() << "): " << typeVar << " @ " << location.file() << std::endl;
   body->format(os, depth+2);
@@ -195,7 +204,10 @@ void Top::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
 }
 
 void DefBinding::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "DefBinding: " << typeVar << " @ " << location.file() << std::endl;
+  os << pad(depth) << "DefBinding: ";
+  if ((flags & FLAG_PURE)) os << "PURE ";
+  if ((flags & FLAG_USED)) os << "USED, ";
+  os << meta << " " << typeVar << " @ " << location.file() << std::endl;
 
   // invert name=>index map
   std::vector<const char*> names(order.size());
@@ -240,11 +252,11 @@ Hash Construct::hash() {
 }
 
 void Destruct::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Destruct(" << sum.name << "): " << typeVar << " @ " << location.file() << std::endl;
+  os << pad(depth) << "Destruct(" << sum->name << "): " << typeVar << " @ " << location.file() << std::endl;
 }
 
 Hash Destruct::hash() {
-  return hashcode = Hash(sum.name) + type.hashcode;
+  return hashcode = Hash(sum->name) + type.hashcode;
 }
 
 std::ostream & operator << (std::ostream &os, const Expr *expr) {

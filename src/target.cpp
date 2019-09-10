@@ -196,6 +196,6 @@ static PRIMFN(prim_tget) {
 
 void prim_register_target(PrimMap &pmap) {
   prim_register(pmap, "hash", prim_hash, type_hash, PRIM_PURE);
-  prim_register(pmap, "tnew", prim_tnew, type_tnew, 0);
-  prim_register(pmap, "tget", prim_tget, type_tget, 0);
+  prim_register(pmap, "tnew", prim_tnew, type_tnew, PRIM_REMOVE);
+  prim_register(pmap, "tget", prim_tget, type_tget, PRIM_IMPURE); // because handler function may be impure
 }
