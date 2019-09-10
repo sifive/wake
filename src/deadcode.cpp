@@ -26,6 +26,7 @@ struct DefStack {
 
   Expr *resolve(VarRef *ref);
   Expr *index(unsigned i); // flat index
+  DefStack *unwind(unsigned &i);
   unsigned size() const;
 };
 
@@ -47,6 +48,14 @@ Expr *DefStack::index(unsigned i) {
 
   if (s->expr->type == &Lambda::type) return nullptr;
   return static_cast<DefBinding*>(s->expr)->val[idx].get();
+}
+
+DefStack *DefStack::unwind(unsigned &i) {
+  DefStack *s = this;
+  size_t size;
+  for (; i >= (size = s->size()); i-= size)
+    s = s->next;
+  return s;
 }
 
 struct AppStack {
@@ -95,20 +104,32 @@ static Expr *clone(Expr *expr) {
 static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std::vector<int> &expand, int depth)  {
   if (expr->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(expr);
-    ref->index = (depth-1) - expand[expand.size()-1-ref->index];
+    unsigned index = ref->index;
+    ref->index = (depth-1) - expand[expand.size()-1-index];
     Expr *target = dstack->resolve(ref);
-    return ref;
-/*
-    if (!target) {
-      return ref;
-    } else if (target->type == &VarRef::type) {
-      std::vector<int> cut(expand.begin(), expand.begin()+index);
-      return forward_inline(clone(target), astack, dstack, cut, depth);
-//    } else if (target->type == &Lambda::type && astack && !(target->flags & FLAG_RECURSIVE)) {
+    if (target && target->type == &VarRef::type) {
+      VarRef *sub = static_cast<VarRef*>(target);
+      unsigned left = ref->index;
+      DefStack *val = dstack->unwind(left);
+      ref->index = (ref->index-left)+val->size()+sub->index;
+      ref->lambda = sub->lambda;
+      target = dstack->resolve(ref);
+    }
+    if (false) { // target && target->type == &Lambda::type && astack) {
+      unsigned undo = ref->index;
+      DefStack *scope = dstack->unwind(undo);
+      undo = ref->index - undo;
+      if (!ref->lambda) // In case it's a val = lambda and not a fun = lambda
+        undo += scope->size();
+      size_t keep = depth - undo;
+      std::vector<int> simple;
+      simple.resize(keep);
+      for (unsigned i = 0; i < keep; ++i) simple.push_back(i);
+      delete ref;
+      return forward_inline(clone(target), astack, dstack, simple, depth);
     } else {
       return ref;
     }
-*/
   } else if (expr->type == &App::type) {
     App *app = static_cast<App*>(expr);
     AppStack frame;
