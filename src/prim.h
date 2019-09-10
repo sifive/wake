@@ -30,6 +30,7 @@ struct Double;
 struct RegExp;
 struct Scope;
 struct Record;
+struct Expr;
 
 /* Macros for handling inputs from wake */
 #define RETURN(val) do {						\
@@ -83,6 +84,7 @@ size_t reserve_hash();
 Work *claim_hash(Heap &h, HeapObject *value, Continuation *continuation);
 
 void dont_report_future_targets();
+Expr *force_use(Expr *expr);
 
 #define PRIM_IMPURE	0	// must be evaluated at runtime
 #define PRIM_REMOVE	1	// unused invocations can be removed

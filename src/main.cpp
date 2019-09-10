@@ -338,11 +338,11 @@ int main(int argc, char **argv) {
   TypeVar *types = &body->typeVar;
   for (size_t i = 0; i < targets.size(); ++i) {
     Lexer lex(runtime.heap, targets[i], target_names[i].c_str());
-    body = new App(LOCATION, body, parse_command(lex));
+    body = new App(LOCATION, body, force_use(parse_command(lex)));
     if (lex.fail) ok = false;
   }
   for (auto &g : globals)
-    body = new App(LOCATION, body, new VarRef(LOCATION, g));
+    body = new App(LOCATION, body, force_use(new VarRef(LOCATION, g)));
 
   top->body = std::unique_ptr<Expr>(body);
 
