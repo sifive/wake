@@ -67,7 +67,11 @@ struct AppStack {
 
 static Expr *clone(Expr *expr) {
   if (expr->type == &VarRef::type) {
-    return new VarRef(*static_cast<VarRef*>(expr));
+    VarRef *var = static_cast<VarRef*>(expr);
+    VarRef *out = new VarRef(*var);
+    if (var->lambda && (var->lambda->flags & FLAG_MOVED))
+      out->lambda = static_cast<Lambda*>(reinterpret_cast<void*>(var->lambda->meta));
+    return out;
   } else if (expr->type == &App::type) {
     App *app = static_cast<App*>(expr);
     App *out = new App(*app);
@@ -82,8 +86,20 @@ static Expr *clone(Expr *expr) {
   } else if (expr->type == &DefBinding::type) {
     DefBinding *def = static_cast<DefBinding*>(expr);
     DefBinding *out = new DefBinding(*def);
-    for (auto &x : def->val) out->val.emplace_back(clone(x.get()));
-    for (auto &x : def->fun) out->fun.emplace_back(static_cast<Lambda*>(clone(x.get())));
+    // create forwarding pointers for fun VarRefs
+    for (auto &x : def->fun) {
+      out->fun.emplace_back(new Lambda(*x));
+      x->set(FLAG_MOVED, 1);
+      x->meta = reinterpret_cast<uintptr_t>(static_cast<void*>(out->fun.back().get()));
+    }
+    for (auto &x : def->val)
+      out->val.emplace_back(clone(x.get()));
+    for (unsigned i = 0; i < def->fun.size(); ++i)
+      out->fun[i]->body = std::unique_ptr<Expr>(clone(def->fun[i]->body.get()));
+    for (unsigned i = 0; i < def->fun.size(); ++i) {
+      def->fun[i]->set(FLAG_MOVED, 0);
+      def->fun[i]->meta = out->fun[i]->meta;
+    }
     out->body = std::unique_ptr<Expr>(clone(def->body.get()));
     return out;
   } else if (expr->type == &Literal::type) {

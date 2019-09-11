@@ -39,6 +39,7 @@ struct Continuation;
 #define FLAG_RECURSIVE 0x04
 #define FLAG_USED      0x08
 #define FLAG_PURE      0x10
+#define FLAG_MOVED     0x20
 
 /* Expression AST */
 struct Expr {
