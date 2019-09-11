@@ -369,19 +369,23 @@ static void forward_reduction(Expr *expr, std::vector<int> &compress) {
     DefBinding::Values val;
     DefBinding::Functions fun;
     std::vector<DefBinding::Order::iterator> refs(def->order.size());
+    std::vector<unsigned> scc;
     for (auto it = def->order.begin(); it != def->order.end(); ++it) {
       refs[it->second.index] = it;
     }
     for (auto &x : def->val) {
-      if ((x->flags & FLAG_USED)) {
+      if ((x->flags & FLAG_USED))
         forward_reduction(x.get(), compress);
-      }
     }
     for (auto it = def->val.rbegin(); it != def->val.rend(); ++it) {
       int bump = ((*it)->flags&FLAG_USED)?1:0;
       compress.push_back(compress.back() + bump);
     }
-    int kept = 0, index = 0;
+    for (unsigned i = 0; i < def->fun.size(); ++i) {
+      if ((def->fun[i]->flags & FLAG_USED))
+        scc.push_back(def->scc[i]);
+    }
+    unsigned kept = 0, index = 0;
     for (auto &x : def->val) {
       if ((x->flags & FLAG_USED)) {
         val.emplace_back(std::move(x));
@@ -403,6 +407,7 @@ static void forward_reduction(Expr *expr, std::vector<int> &compress) {
     compress.resize(compress.size() - def->val.size());
     def->val = std::move(val);
     def->fun = std::move(fun);
+    def->scc = std::move(scc);
   } // else: Literal/Construct/Destruct/Prim/Get
 }
 
