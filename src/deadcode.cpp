@@ -312,17 +312,15 @@ static int backward_usage(Expr *expr, DefStack *stack) {
     for (auto &x : def->val) {
       if (--out >= 0) x->set(FLAG_USED, 1);
     }
-    // expand use between mutually recursive methods (they reference forward)
-    for (unsigned i = 0, j; i < def->fun.size(); i = j) {
+    for (unsigned i = def->fun.size(), j; i > 0; i = j) {
+      unsigned scc = def->scc[i-1];
       bool used = false;
-      for (j = i; j < def->fun.size() && i == def->scc[j]; ++j)
-        used = (def->fun[j]->flags & FLAG_USED) || used;
-      for (j = i; j < def->fun.size() && i == def->scc[j]; ++j)
-        def->fun[j]->set(FLAG_USED, used);
-    }
-    for (auto it = def->fun.rbegin(); it != def->fun.rend(); ++it) {
-      if (!((*it)->flags & FLAG_USED)) continue;
-      backward_usage(it->get(), &frame);
+      for (j = i; j > 0 && scc == def->scc[j-1]; --j)
+        used = (def->fun[j-1]->flags & FLAG_USED) || used;
+      for (j = i; j > 0 && scc == def->scc[j-1]; --j) {
+        def->fun[j-1]->set(FLAG_USED, used);
+        if (used) backward_usage(def->fun[j-1].get(), &frame);
+      }
     }
     for (auto it = def->val.rbegin(); it != def->val.rend(); ++it) {
       if (!((*it)->flags & FLAG_PURE)) (*it)->set(FLAG_USED, 1);
