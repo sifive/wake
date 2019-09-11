@@ -96,11 +96,11 @@ static Expr *clone(Expr *expr) {
       out->val.emplace_back(clone(x.get()));
     for (unsigned i = 0; i < def->fun.size(); ++i)
       out->fun[i]->body = std::unique_ptr<Expr>(clone(def->fun[i]->body.get()));
+    out->body = std::unique_ptr<Expr>(clone(def->body.get()));
     for (unsigned i = 0; i < def->fun.size(); ++i) {
       def->fun[i]->set(FLAG_MOVED, 0);
       def->fun[i]->meta = out->fun[i]->meta;
     }
-    out->body = std::unique_ptr<Expr>(clone(def->body.get()));
     return out;
   } else if (expr->type == &Literal::type) {
     return new Literal(*static_cast<Literal*>(expr));
@@ -133,7 +133,7 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
       ref->lambda = sub->lambda;
       target = dstack->resolve(ref);
     }
-    if (false) { // target && target->type == &Lambda::type && !(target->flags & FLAG_RECURSIVE) && astack && target->meta < 200) {
+    if (target && target->type == &Lambda::type && !(target->flags & FLAG_RECURSIVE) && astack && target->meta < 100) {
       unsigned undo = ref->index;
       DefStack *scope = dstack->unwind(undo);
       undo = ref->index - undo;

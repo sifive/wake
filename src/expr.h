@@ -86,7 +86,7 @@ struct App : public Expr {
   App(const Location &location_, Expr *fn_, Expr *val_)
    : Expr(&type, location_), fn(fn_), val(val_) { }
   App(const App &app)
-   : Expr(&type, app.location), fn(), val() { }
+   : Expr(app), fn(), val() { }
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
@@ -102,7 +102,7 @@ struct Lambda : public Expr {
   Lambda(const Location &location_, const std::string &name_, Expr *body_, const char *fnname_ = "")
    : Expr(&type, location_), name(name_), fnname(fnname_), body(body_), token(LOCATION) { }
   Lambda(const Lambda &lambda)
-   : Expr(&type, lambda.location), name(lambda.name), fnname(lambda.fnname), body(), token(lambda.token) { }
+   : Expr(lambda), name(lambda.name), fnname(lambda.fnname), body(), token(lambda.token) { }
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
@@ -231,7 +231,7 @@ struct DefBinding : public Expr {
   DefBinding(const Location &location_, std::unique_ptr<Expr> body_)
    : Expr(&type, location_), body(std::move(body_)) { }
   DefBinding(const DefBinding &def)
-   : Expr(&type, def.location), body(), val(), fun(), order(def.order), scc(def.scc) { }
+   : Expr(def), body(), val(), fun(), order(def.order), scc(def.scc) { }
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
