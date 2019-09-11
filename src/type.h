@@ -96,7 +96,7 @@ friend std::ostream & operator << (std::ostream &os, const TypeVar &value);
 
 struct TypeChild {
   struct TypeVar var;
-  const char *tag;
+  std::string tag;
   TypeChild();
 };
 
@@ -104,6 +104,6 @@ inline const TypeVar & TypeVar::operator[](int i) const { return imp->cargs[i].v
 inline       TypeVar & TypeVar::operator[](int i) { return imp->cargs[i].var; }
 
 inline const char *TypeVar::getName() const { return imp->name; }
-inline const char *TypeVar::getTag(int i) const { return imp->cargs[i].tag; }
+inline const char *TypeVar::getTag(int i) const { return imp->cargs[i].tag.c_str(); }
 
 #endif
