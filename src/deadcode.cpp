@@ -102,6 +102,7 @@ static Expr *clone(Expr *expr) {
   }
 }
 
+// meta indicates expression tree size to guide inlining threshold
 static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std::vector<int> &expand, int depth)  {
   if (expr->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(expr);
@@ -116,7 +117,7 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
       ref->lambda = sub->lambda;
       target = dstack->resolve(ref);
     }
-    if (false) { // target && target->type == &Lambda::type && !(target->flags & FLAG_RECURSIVE) && astack && depth < 20) {
+    if (false) { // target && target->type == &Lambda::type && !(target->flags & FLAG_RECURSIVE) && astack && target->meta < 200) {
       unsigned undo = ref->index;
       DefStack *scope = dstack->unwind(undo);
       undo = ref->index - undo;
@@ -129,6 +130,7 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
       delete ref;
       return forward_inline(clone(target), astack, dstack, simple, depth);
     } else {
+      ref->meta = 1;
       return ref;
     }
   } else if (expr->type == &App::type) {
@@ -142,6 +144,7 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
     if (frame.arg) {
       app->fn = std::unique_ptr<Expr>(out);
       app->val = std::unique_ptr<Expr>(forward_inline(frame.arg, nullptr, dstack, expand, depth));
+      app->meta = 1 + app->fn->meta + app->val->meta;
       return app;
     } else {
       delete expr;
@@ -167,6 +170,7 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
         forward_inline(lambda->body.release(), astack->next, &frame, expand, depth+1));
       expand.pop_back();
       delete expr;
+      def->meta = 1 + def->body->meta + def->val[0]->meta;
       return def;
     } else {
       frame.expr = expr;
@@ -174,6 +178,7 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
       auto y = forward_inline(lambda->body.release(), nullptr, &frame, expand, depth+1);
       expand.pop_back();
       lambda->body = std::unique_ptr<Expr>(y);
+      lambda->meta = lambda->body->meta + 1;
       return lambda;
     }
   } else if (expr->type == &DefBinding::type) {
@@ -194,8 +199,13 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
       forward_inline(def->body.release(), astack, &frame, expand, depth));
     depth -= def->val.size();
     expand.resize(expand.size() - def->val.size());
+    uint64_t meta = 1 + def->body->meta;
+    for (auto &x : def->val) meta += x->meta;
+    for (auto &x : def->fun) meta += x->meta;
+    def->meta = meta;
     return def;
   } else { // Literal/Construct/Destruct/Prim/Get
+    expr->meta = 1;
     return expr;
   }
 }
