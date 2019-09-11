@@ -59,6 +59,7 @@ DefStack *DefStack::unwind(unsigned &i) {
 }
 
 struct AppStack {
+  std::vector<int> *expand;
   int cutoff;
   Expr *arg;
   AppStack *next;
@@ -115,7 +116,7 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
       ref->lambda = sub->lambda;
       target = dstack->resolve(ref);
     }
-    if (false) { // target && target->type == &Lambda::type && astack) {
+    if (target && target->type == &Lambda::type && !(target->flags & FLAG_RECURSIVE) && astack && depth < 20) {
       unsigned undo = ref->index;
       DefStack *scope = dstack->unwind(undo);
       undo = ref->index - undo;
@@ -123,7 +124,7 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
         undo += scope->size();
       size_t keep = depth - undo;
       std::vector<int> simple;
-      simple.resize(keep);
+      simple.reserve(keep);
       for (unsigned i = 0; i < keep; ++i) simple.push_back(i);
       delete ref;
       return forward_inline(clone(target), astack, dstack, simple, depth);
@@ -133,6 +134,7 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
   } else if (expr->type == &App::type) {
     App *app = static_cast<App*>(expr);
     AppStack frame;
+    frame.expand = &expand;
     frame.cutoff = expand.size();
     frame.arg = app->val.release();
     frame.next = astack;
@@ -155,7 +157,7 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
       def->order.insert(std::make_pair(lambda->name, DefBinding::OrderValue(lambda->token, 0)));
       frame.expr = def;
       // Expand the argument in our outer scope
-      std::vector<int> cut(expand.begin(), expand.begin()+astack->cutoff);
+      std::vector<int> cut(astack->expand->begin(), astack->expand->begin()+astack->cutoff);
       def->val.emplace_back(std::unique_ptr<Expr>(
         forward_inline(astack->arg, nullptr, dstack, cut, depth)));
       astack->arg = nullptr;
@@ -323,7 +325,18 @@ static int backward_usage(Expr *expr, DefStack *stack) {
   } else if (expr->type == &Prim::type) {
     Prim *prim = static_cast<Prim*>(expr);
     return prim->args;
-  } else { // else: Literal/Construct/Destruct/Get
+  } else if (expr->type == &Destruct::type) {
+    Destruct *des = static_cast<Destruct*>(expr);
+    return des->sum->members.size() + 1;
+  } else if (expr->type == &Construct::type) {
+    Construct *con = static_cast<Construct*>(expr);
+    return con->cons->ast.args.size();
+  } else if (expr->type == &Get::type) {
+    return 1;
+  } else if (expr->type == &Literal::type) {
+    return 0;
+  } else {
+    assert(0 /* unreachable */);
     return 0;
   }
 }
