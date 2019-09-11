@@ -160,7 +160,7 @@ void Lambda::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
 
 void VarRef::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   size_t idx, size;
-  for (idx = index; idx >= (size = scope->size()); idx -= size)
+  for (idx = index; scope && idx >= (size = scope->size()); idx -= size)
     scope = scope->next.get();
   if (lambda) {
     cont->resume(runtime, Closure::alloc(runtime.heap, lambda, scope));

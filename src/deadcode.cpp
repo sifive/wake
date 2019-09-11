@@ -53,7 +53,7 @@ Expr *DefStack::index(unsigned i) {
 DefStack *DefStack::unwind(unsigned &i) {
   DefStack *s = this;
   size_t size;
-  for (; i >= (size = s->size()); i-= size)
+  for (; s && i >= (size = s->size()); i-= size)
     s = s->next;
   return s;
 }
@@ -441,7 +441,8 @@ static void forward_reduction(Expr *expr, std::vector<int> &compress) {
 
 void optimize_deadcode(Expr *expr) {
   std::vector<int> expand;
-  forward_inline(expr, nullptr, nullptr, expand, 0);
+  expand.push_back(0);
+  forward_inline(expr, nullptr, nullptr, expand, 1);
   // Find the purity fixed-point (typically only needs 2 passes)
   for (bool first = true; forward_purity(expr, nullptr, first); first = false) { }
   backward_usage(expr, nullptr);
