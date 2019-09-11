@@ -244,7 +244,7 @@ static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
     out = forward_purity(app->val.get(), stack, first) || out;
     out = forward_purity(app->fn.get(), stack, first) || out;
     app->meta = (app->fn->meta >> 1) & ~!(app->fn->meta & app->val->meta & 1);
-    app->set(FLAG_PURE, expr->meta & 1);
+    app->set(FLAG_PURE, app->meta & 1);
     return out;
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr);
@@ -255,10 +255,14 @@ static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
   } else if (expr->type == &DefBinding::type) {
     DefBinding *def = static_cast<DefBinding*>(expr);
     bool out = false;
-    // Assume best-case (pure) recursive functions on initial pass
+    // Record prior def purity for comparison to after iteration
     std::vector<uintptr_t> prior;
     prior.reserve(def->fun.size());
-    for (auto &x : def->fun) prior.push_back(first ? ~static_cast<uintptr_t>(0) : x->meta);
+    for (auto &x : def->fun) {
+      // Assume best-case (pure) recursive functions on initial pass
+      if (first) x->meta = ~static_cast<uintptr_t>(0);
+      prior.push_back(x->meta);
+    }
     for (auto &x : def->val) out = forward_purity(x.get(), stack, first) || out;
     for (auto &x : def->fun) out = forward_purity(x.get(), &frame, first) || out;
     out = forward_purity(def->body.get(), &frame, first) || out;
@@ -298,7 +302,7 @@ static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
     return false;
   } else if (expr->type == &Prim::type) {
     Prim *prim = static_cast<Prim*>(expr);
-    prim->meta = (prim->pflags & PRIM_PURE) != 0;
+    prim->meta = (prim->pflags & PRIM_REMOVE) != 0;
     prim->set(FLAG_PURE, prim->meta);
     return false;
   } else if (expr->type == &Get::type) {
