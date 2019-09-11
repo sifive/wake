@@ -49,7 +49,7 @@ struct SCCState {
   int level;
 };
 
-static void SCC(SCCState &state, int vi) {
+static void SCC(SCCState &state, unsigned vi) {
   ResolveDef &v = (*state.defs)[vi];
 
   v.index = state.index;
@@ -72,7 +72,7 @@ static void SCC(SCCState &state, int vi) {
   }
 
   if (v.lowlink == v.index) {
-    int wi, scc_id = state.binding->fun.size();
+    unsigned wi, scc_id = state.binding->fun.size();
     do {
       wi = state.S.back();
       ResolveDef &w = (*state.defs)[wi];
@@ -855,9 +855,9 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     bool ok = true;
     for (auto &i : def->val)
       ok = explore(i.get(), pmap, binding) && ok;
-    for (int i = 0; i < (int)def->fun.size(); ++i) {
+    for (unsigned i = 0; i < def->fun.size(); ++i) {
       def->fun[i]->typeVar.setDOB();
-      for (int j = i+1; j < (int)def->fun.size() && i == def->scc[j]; ++j)
+      for (unsigned j = i+1; j < def->fun.size() && i == def->scc[j]; ++j)
         if (def->fun[j]) def->fun[j]->typeVar.setDOB(def->fun[i]->typeVar);
       bind.generalized = def->val.size() + def->scc[i];
       ok = explore(def->fun[i].get(), pmap, &bind) && ok;

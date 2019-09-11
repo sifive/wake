@@ -116,7 +116,7 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
       ref->lambda = sub->lambda;
       target = dstack->resolve(ref);
     }
-    if (target && target->type == &Lambda::type && !(target->flags & FLAG_RECURSIVE) && astack && depth < 20) {
+    if (false) { // target && target->type == &Lambda::type && !(target->flags & FLAG_RECURSIVE) && astack && depth < 20) {
       unsigned undo = ref->index;
       DefStack *scope = dstack->unwind(undo);
       undo = ref->index - undo;
@@ -311,6 +311,14 @@ static int backward_usage(Expr *expr, DefStack *stack) {
     int out = backward_usage(def->body.get(), &frame);
     for (auto &x : def->val) {
       if (--out >= 0) x->set(FLAG_USED, 1);
+    }
+    // expand use between mutually recursive methods (they reference forward)
+    for (unsigned i = 0, j; i < def->fun.size(); i = j) {
+      bool used = false;
+      for (j = i; j < def->fun.size() && i == def->scc[j]; ++j)
+        used = (def->fun[j]->flags & FLAG_USED) || used;
+      for (j = i; j < def->fun.size() && i == def->scc[j]; ++j)
+        def->fun[j]->set(FLAG_USED, used);
     }
     for (auto it = def->fun.rbegin(); it != def->fun.rend(); ++it) {
       if (!((*it)->flags & FLAG_USED)) continue;

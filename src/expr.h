@@ -224,7 +224,7 @@ struct DefBinding : public Expr {
   Values val;     // access prior binding
   Functions fun;  // access current binding
   Order order; // values, then functions
-  std::vector<int> scc; // SCC id per function
+  std::vector<unsigned> scc; // SCC id per function
 
   static const TypeDescriptor type;
   DefBinding(const Location &location_, std::unique_ptr<Expr> body_)
