@@ -199,7 +199,7 @@ static Expr *forward_inline(Expr *expr, AppStack *astack, DefStack *dstack, std:
       forward_inline(def->body.release(), astack, &frame, expand, depth));
     depth -= def->val.size();
     expand.resize(expand.size() - def->val.size());
-    uint64_t meta = 1 + def->body->meta;
+    uintptr_t meta = 1 + def->body->meta;
     for (auto &x : def->val) meta += x->meta;
     for (auto &x : def->fun) meta += x->meta;
     def->meta = meta;
@@ -240,9 +240,9 @@ static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
     DefBinding *def = static_cast<DefBinding*>(expr);
     bool out = false;
     // Assume best-case (pure) recursive functions on initial pass
-    std::vector<uint64_t> prior;
+    std::vector<uintptr_t> prior;
     prior.reserve(def->fun.size());
-    for (auto &x : def->fun) prior.push_back(first ? ~static_cast<uint64_t>(0) : x->meta);
+    for (auto &x : def->fun) prior.push_back(first ? ~static_cast<uintptr_t>(0) : x->meta);
     for (auto &x : def->val) out = forward_purity(x.get(), stack, first) || out;
     for (auto &x : def->fun) out = forward_purity(x.get(), &frame, first) || out;
     out = forward_purity(def->body.get(), &frame, first) || out;
@@ -250,7 +250,7 @@ static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
     for (unsigned i = 0; !out && i < prior.size(); ++i)
       out = prior[i] != def->fun[i]->meta;
     // Result only pure when all vals and body are pure
-    uint64_t isect = def->body->meta;
+    uintptr_t isect = def->body->meta;
     for (auto &x : def->val) isect &= x->meta;
     def->meta = isect;
     def->set(FLAG_PURE, def->meta & 1);
@@ -268,14 +268,14 @@ static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
   } else if (expr->type == &Destruct::type) {
     Destruct *des = static_cast<Destruct*>(expr);
     // Result only pure when all handlers are pure
-    uint64_t isect = ~static_cast<uint64_t>(0);
+    uintptr_t isect = ~static_cast<uintptr_t>(0);
     for (unsigned i = 0; i < des->sum->members.size(); ++i) {
       Expr *handler = stack->index(i+1);
       isect &= handler?handler->meta:1;
     }
     // The tuple will be evaluated
     Expr *tuple = stack->index(0);
-    uint64_t vmeta = tuple?tuple->meta:0;
+    uintptr_t vmeta = tuple?tuple->meta:0;
     // Apply the handler
     des->meta = (isect >> 1) & ~!(isect & vmeta & 1);
     des->set(FLAG_PURE, des->meta&1);

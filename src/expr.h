@@ -46,7 +46,7 @@ struct Expr {
   Location location;
   TypeVar typeVar;
   Hash hashcode;
-  uint64_t meta;
+  uintptr_t meta;
   long flags;
 
   Expr(const TypeDescriptor *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), meta(0), flags(flags_) { }
