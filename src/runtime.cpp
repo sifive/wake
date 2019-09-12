@@ -264,9 +264,9 @@ void Construct::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   runtime.heap.reserve(Record::reserve(size) + size * Tuple::fulfiller_pads);
   Record *bind = Record::claim(runtime.heap, cons, size);
   cont->resume(runtime, bind);
-  // this will benefit greatly from App+App+App+Lam+Lam+Lam->DefMap fusion
-  for (size_t i = size; i; --i) {
-    bind->claim_instant_fulfiller(runtime, i-1, scope->at(0));
+  for (size_t i = size, j; i; i -= j) {
+    for (j = 0; j < scope->size(); ++j)
+      bind->claim_instant_fulfiller(runtime, i-j-1, scope->at(j));
     scope = scope->next.get();
   }
 }

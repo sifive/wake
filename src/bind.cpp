@@ -876,12 +876,21 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     std::map<std::string, TypeVar*> ids;
     for (size_t i = 0; i < cons->sum->args.size(); ++i)
       ids[cons->sum->args[i]] = &cons->typeVar[i];
-    NameBinding *iter = binding;
-    for (size_t i = cons->cons->ast.args.size(); i; --i) {
-      ok = cons->cons->ast.args[i-1].unify(iter->lambda->typeVar[0], ids) && ok;
-      if (!cons->cons->ast.args[i-1].tag.empty())
-        iter->lambda->typeVar.setTag(0, cons->cons->ast.args[i-1].tag.c_str());
-      iter = iter->next;
+    if (binding->lambda) {
+      NameBinding *iter = binding;
+      std::vector<AST> &v = cons->cons->ast.args;
+      for (size_t i = v.size(); i; --i) {
+        TypeVar &ty = iter->lambda->typeVar;
+        ok = v[i-1].unify(ty[0], ids) && ok;
+        if (!v[i-1].tag.empty()) ty.setTag(0, v[i-1].tag.c_str());
+        iter = iter->next;
+      }
+    } else {
+      DefBinding::Values &vals = binding->binding->val;
+      std::vector<AST> &v = cons->cons->ast.args;
+      size_t num = v.size();
+      for (size_t i = 0; i < num; ++i)
+        ok = v[num-1-i].unify(vals[i]->typeVar, ids) && ok;
     }
     return ok;
   } else if (expr->type == &Destruct::type) {
