@@ -349,13 +349,18 @@ static int backward_usage(Expr *expr, DefStack *stack) {
         used = (def->fun[j-1]->flags & FLAG_USED) || used;
       for (j = i; j > 0 && scc == def->scc[j-1]; --j) {
         def->fun[j-1]->set(FLAG_USED, used);
-        if (used) backward_usage(def->fun[j-1].get(), &frame);
+        if (used) {
+          int fun = backward_usage(def->fun[j-1].get(), &frame);
+          fun -= def->val.size();
+          if (fun > out) out = fun;
+        }
       }
     }
     for (auto it = def->val.rbegin(); it != def->val.rend(); ++it) {
       if (!((*it)->flags & FLAG_PURE)) (*it)->set(FLAG_USED, 1);
       if (!((*it)->flags & FLAG_USED)) continue;
-      backward_usage(it->get(), stack);
+      int val = backward_usage(it->get(), stack);
+      if (val > out) out = val;
     }
     return out;
   } else if (expr->type == &Prim::type) {
