@@ -303,6 +303,10 @@ static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
   } else if (expr->type == &Prim::type) {
     Prim *prim = static_cast<Prim*>(expr);
     prim->meta = (prim->pflags & PRIM_REMOVE) != 0;
+    if ((prim->pflags & PRIM_TGET)) {
+      Expr *fn = stack->index(0);
+      if (fn) prim->meta = fn->meta >> 1;
+    }
     prim->set(FLAG_PURE, prim->meta);
     return false;
   } else if (expr->type == &Get::type) {
