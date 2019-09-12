@@ -39,6 +39,7 @@ struct Continuation;
 #define FLAG_RECURSIVE 0x04
 #define FLAG_USED      0x08
 #define FLAG_PURE      0x10
+#define FLAG_MOVED     0x20
 
 /* Expression AST */
 struct Expr {
@@ -46,7 +47,7 @@ struct Expr {
   Location location;
   TypeVar typeVar;
   Hash hashcode;
-  uint64_t meta;
+  uintptr_t meta;
   long flags;
 
   Expr(const TypeDescriptor *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), meta(0), flags(flags_) { }
@@ -84,6 +85,8 @@ struct App : public Expr {
   static const TypeDescriptor type;
   App(const Location &location_, Expr *fn_, Expr *val_)
    : Expr(&type, location_), fn(fn_), val(val_) { }
+  App(const App &app)
+   : Expr(app), fn(), val() { }
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
@@ -98,6 +101,8 @@ struct Lambda : public Expr {
   static const TypeDescriptor type;
   Lambda(const Location &location_, const std::string &name_, Expr *body_, const char *fnname_ = "")
    : Expr(&type, location_), name(name_), fnname(fnname_), body(body_), token(LOCATION) { }
+  Lambda(const Lambda &lambda)
+   : Expr(lambda), name(lambda.name), fnname(lambda.fnname), body(), token(lambda.token) { }
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;
@@ -220,11 +225,13 @@ struct DefBinding : public Expr {
   Values val;     // access prior binding
   Functions fun;  // access current binding
   Order order; // values, then functions
-  std::vector<int> scc; // SCC id per function
+  std::vector<unsigned> scc; // SCC id per function
 
   static const TypeDescriptor type;
   DefBinding(const Location &location_, std::unique_ptr<Expr> body_)
    : Expr(&type, location_), body(std::move(body_)) { }
+  DefBinding(const DefBinding &def)
+   : Expr(def), body(), val(), fun(), order(def.order), scc(def.scc) { }
 
   void format(std::ostream &os, int depth) const override;
   Hash hash() override;

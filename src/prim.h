@@ -90,6 +90,7 @@ Expr *force_use(Expr *expr);
 #define PRIM_REMOVE	1	// unused invocations can be removed
 #define PRIM_CONST	2	// can be evaluted during const-prop
 #define PRIM_PURE	3	// REMOVE+CONST
+#define PRIM_TGET	4	// special-case needed to forward purity
 
 /* Register primitive functions */
 struct PrimDesc {

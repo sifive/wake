@@ -18,7 +18,9 @@
 #ifndef OPTIMIZE_H
 #define OPTIMIZE_H
 
+#include <memory>
+
 struct Expr;
-void optimize_deadcode(Expr *expr);
+std::unique_ptr<Expr> optimize_deadcode(std::unique_ptr<Expr> expr);
 
 #endif

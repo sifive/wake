@@ -49,7 +49,7 @@ struct SCCState {
   int level;
 };
 
-static void SCC(SCCState &state, int vi) {
+static void SCC(SCCState &state, unsigned vi) {
   ResolveDef &v = (*state.defs)[vi];
 
   v.index = state.index;
@@ -72,7 +72,7 @@ static void SCC(SCCState &state, int vi) {
   }
 
   if (v.lowlink == v.index) {
-    int wi, scc_id = state.binding->fun.size();
+    unsigned wi, scc_id = state.binding->fun.size();
     do {
       wi = state.S.back();
       ResolveDef &w = (*state.defs)[wi];
@@ -855,9 +855,9 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     bool ok = true;
     for (auto &i : def->val)
       ok = explore(i.get(), pmap, binding) && ok;
-    for (int i = 0; i < (int)def->fun.size(); ++i) {
+    for (unsigned i = 0; i < def->fun.size(); ++i) {
       def->fun[i]->typeVar.setDOB();
-      for (int j = i+1; j < (int)def->fun.size() && i == def->scc[j]; ++j)
+      for (unsigned j = i+1; j < def->fun.size() && i == def->scc[j]; ++j)
         if (def->fun[j]) def->fun[j]->typeVar.setDOB(def->fun[i]->typeVar);
       bind.generalized = def->val.size() + def->scc[i];
       ok = explore(def->fun[i].get(), pmap, &bind) && ok;
@@ -876,12 +876,21 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     std::map<std::string, TypeVar*> ids;
     for (size_t i = 0; i < cons->sum->args.size(); ++i)
       ids[cons->sum->args[i]] = &cons->typeVar[i];
-    NameBinding *iter = binding;
-    for (size_t i = cons->cons->ast.args.size(); i; --i) {
-      ok = cons->cons->ast.args[i-1].unify(iter->lambda->typeVar[0], ids) && ok;
-      if (!cons->cons->ast.args[i-1].tag.empty())
-        iter->lambda->typeVar.setTag(0, cons->cons->ast.args[i-1].tag.c_str());
-      iter = iter->next;
+    if (binding->lambda) {
+      NameBinding *iter = binding;
+      std::vector<AST> &v = cons->cons->ast.args;
+      for (size_t i = v.size(); i; --i) {
+        TypeVar &ty = iter->lambda->typeVar;
+        ok = v[i-1].unify(ty[0], ids) && ok;
+        if (!v[i-1].tag.empty()) ty.setTag(0, v[i-1].tag.c_str());
+        iter = iter->next;
+      }
+    } else {
+      DefBinding::Values &vals = binding->binding->val;
+      std::vector<AST> &v = cons->cons->ast.args;
+      size_t num = v.size();
+      for (size_t i = 0; i < num; ++i)
+        ok = v[num-1-i].unify(vals[i]->typeVar, ids) && ok;
     }
     return ok;
   } else if (expr->type == &Destruct::type) {
