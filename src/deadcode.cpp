@@ -414,8 +414,10 @@ static std::unique_ptr<Expr> forward_reduction(std::unique_ptr<Expr> expr, std::
       refs[it->second.index] = it;
     }
     for (auto &x : def->val) {
-      if ((x->flags & FLAG_USED))
+      if ((x->flags & FLAG_USED)) {
         x = forward_reduction(std::move(x), compress);
+        x->set(FLAG_USED, 1); // in case replaced/shortened
+      }
     }
     for (auto it = def->val.rbegin(); it != def->val.rend(); ++it) {
       int bump = ((*it)->flags&FLAG_USED)?1:0;
@@ -436,8 +438,8 @@ static std::unique_ptr<Expr> forward_reduction(std::unique_ptr<Expr> expr, std::
     }
     for (auto &x : def->fun) {
       if ((x->flags & FLAG_USED)) {
-        x = static_unique_pointer_cast<Lambda>(forward_reduction(std::move(x), compress));
-        fun.emplace_back(std::move(x));
+        fun.emplace_back(static_unique_pointer_cast<Lambda>(
+          forward_reduction(std::move(x), compress)));
         refs[index++]->second.index = kept++;
       } else {
         def->order.erase(refs[index++]);
@@ -448,7 +450,11 @@ static std::unique_ptr<Expr> forward_reduction(std::unique_ptr<Expr> expr, std::
     def->val = std::move(val);
     def->fun = std::move(fun);
     def->scc = std::move(scc);
-    return expr;
+    if (def->order.empty()) {
+      return std::move(def->body);
+    } else {
+      return expr;
+    }
   } else { // Literal/Construct/Destruct/Prim/Get
     return expr;
   }
