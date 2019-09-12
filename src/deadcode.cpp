@@ -271,7 +271,7 @@ static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
       out = prior[i] != def->fun[i]->meta;
     // Result only pure when all vals and body are pure
     uintptr_t isect = def->body->meta;
-    for (auto &x : def->val) isect &= x->meta;
+    for (auto &x : def->val) isect &= ~!(x->meta & 1);
     def->meta = isect;
     def->set(FLAG_PURE, def->meta & 1);
     return out;
