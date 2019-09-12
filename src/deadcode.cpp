@@ -186,7 +186,7 @@ static std::unique_ptr<Expr> forward_inline(std::unique_ptr<Expr> expr, AppStack
       def->body = forward_inline(std::move(lambda->body), astack->next, &frame, expand, depth+1);
       expand.pop_back();
       def->meta = 1 + def->body->meta + def->val[0]->meta;
-      return def;
+      return static_unique_pointer_cast<Expr>(std::move(def));
     } else {
       frame.expr = expr.get();
       expand.push_back(depth);
@@ -222,6 +222,10 @@ static std::unique_ptr<Expr> forward_inline(std::unique_ptr<Expr> expr, AppStack
   }
 }
 
+static uintptr_t filter_lowest(uintptr_t x) {
+  return (x&1) | (~static_cast<uintptr_t>(0) << 1);
+}
+
 // meta is a purity bitmask
 static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
   DefStack frame;
@@ -239,7 +243,7 @@ static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
     bool out = false;
     out = forward_purity(app->val.get(), stack, first) || out;
     out = forward_purity(app->fn.get(), stack, first) || out;
-    app->meta = (app->fn->meta >> 1) & ~!(app->fn->meta & app->val->meta & 1);
+    app->meta = (app->fn->meta >> 1) & filter_lowest(app->fn->meta & app->val->meta);
     app->set(FLAG_PURE, app->meta & 1);
     return out;
   } else if (expr->type == &Lambda::type) {
@@ -267,7 +271,7 @@ static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
       out = prior[i] != def->fun[i]->meta;
     // Result only pure when all vals and body are pure
     uintptr_t isect = def->body->meta;
-    for (auto &x : def->val) isect &= ~!(x->meta & 1);
+    for (auto &x : def->val) isect &= filter_lowest(x->meta);
     def->meta = isect;
     def->set(FLAG_PURE, def->meta & 1);
     return out;
@@ -293,7 +297,7 @@ static bool forward_purity(Expr *expr, DefStack *stack, bool first) {
     Expr *tuple = stack->index(0);
     uintptr_t vmeta = tuple?tuple->meta:0;
     // Apply the handler
-    des->meta = (isect >> 1) & ~!(isect & vmeta & 1);
+    des->meta = (isect >> 1) & filter_lowest(isect & vmeta);
     des->set(FLAG_PURE, des->meta&1);
     return false;
   } else if (expr->type == &Prim::type) {
