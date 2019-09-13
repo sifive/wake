@@ -56,7 +56,7 @@ static bool expectString(Lexer &lex) {
   if (expect(LITERAL, lex)) {
     if (lex.next.expr->type == &Literal::type) {
       Literal *lit = static_cast<Literal*>(lex.next.expr.get());
-      HeapObject *obj = lit->value.get();
+      HeapObject *obj = lit->value->get();
       if (typeid(*obj) == typeid(String)) {
         return true;
       } else {
@@ -216,7 +216,7 @@ static Expr *parse_match(int p, Lexer &lex) {
       std::string comparison("scmp");
       if (e->type == &Literal::type) {
         Literal *lit = static_cast<Literal*>(e);
-        HeapObject *obj = lit->value.get();
+        HeapObject *obj = lit->value->get();
         if (typeid(*obj) == typeid(Integer)) comparison = "icmp";
         if (typeid(*obj) == typeid(Double)) comparison = "dcmp";
       }
@@ -320,7 +320,7 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       lex.consume();
       if (expectString(lex)) {
         Literal *lit = static_cast<Literal*>(lex.next.expr.get());
-        name = static_cast<String*>(lit->value.get())->as_str();
+        name = static_cast<String*>(lit->value->get())->as_str();
         location.end = lex.next.location.end;
         lex.consume();
       } else {

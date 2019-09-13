@@ -381,7 +381,21 @@ const char *GCObject<T, B>::type() const {
 
 struct Value : public HeapObject {
   Category category() const override;
+  size_t hashid() const;
+  virtual bool operator == (const Value &x) const;
 };
+
+inline bool operator == (const std::shared_ptr<RootPointer<Value> > &x, const std::shared_ptr<RootPointer<Value> > &y) {
+  return **x == **y;
+}
+
+namespace std {
+  template <> struct hash<std::shared_ptr<RootPointer<Value> > > {
+    size_t operator () (const std::shared_ptr<RootPointer<Value> > &x) const {
+      return (*x)->hashid();
+    }
+  };
+}
 
 struct DestroyableObject : public Value {
   DestroyableObject(Heap &h);

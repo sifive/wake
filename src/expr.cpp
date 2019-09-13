@@ -38,8 +38,8 @@ const TypeDescriptor Top       ::type("Top");
 const TypeDescriptor VarDef    ::type("VarDef");
 const TypeDescriptor VarArg    ::type("VarArg");
 
-Literal::Literal(const Location &location_, RootPointer<HeapObject> &&value_, TypeVar *litType_)
- : Expr(&type, location_), value(std::move(value_)), litType(litType_) { }
+Literal::Literal(const Location &location_, RootPointer<Value> &&value_, TypeVar *litType_)
+ : Expr(&type, location_), value(std::make_shared<RootPointer<Value> >(std::move(value_))), litType(litType_) { }
 
 static std::string pad(int depth) {
   return std::string(depth, ' ');
@@ -172,11 +172,11 @@ void DefMap::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
 }
 
 void Literal::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Literal: " << typeVar << " @ " << location.file() << " = " << value.get() << std::endl;
+  os << pad(depth) << "Literal: " << typeVar << " @ " << location.file() << " = " << value->get() << std::endl;
 }
 
 Hash Literal::hash() {
-  return hashcode = value->hash() + type.hashcode;
+  return hashcode = (*value)->hash() + type.hashcode;
 }
 
 void Prim::format(std::ostream &os, int depth) const {
