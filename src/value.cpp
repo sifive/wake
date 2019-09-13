@@ -25,6 +25,19 @@
 #include "tuple.h"
 #include <sstream>
 #include <string.h>
+#include <assert.h>
+
+size_t Value::hashid() const {
+  Hash h = hash();
+  size_t type = typeid(*this).hash_code();
+  return type ^ h.data[0] ^ h.data[1];
+}
+
+bool Value::operator == (const Value &x) const {
+  assert(0 /* unreachable */);
+  if (typeid(&x) != typeid(this)) return false;
+  return hash() == x.hash();
+}
 
 void FormatState::resume() {
   stack.emplace_back(current.value, current.precedence, current.state+1);
@@ -166,6 +179,11 @@ Hash String::hash() const {
   return Hash(c_str(), length);
 }
 
+bool String::operator == (const Value &x) const {
+  if (typeid(&x) != typeid(this)) return false;
+  return compare(static_cast<const String &>(x)) == 0;
+}
+
 TypeVar Integer::typeVar("Integer", 0);
 
 Integer::Integer(int length_) : length(length_) { }
@@ -208,6 +226,12 @@ Hash Integer::hash() const {
   return Hash(data(), abs(length)*sizeof(mp_limb_t));
 }
 
+bool Integer::operator == (const Value &x) const {
+  if (typeid(&x) != typeid(this)) return false;
+  mpz_t a = { wrap() }, b = { static_cast<const Integer &>(x).wrap() };
+  return mpz_cmp(a, b) == 0;
+}
+
 TypeVar Double::typeVar("Double", 0);
 
 RootPointer<Double> Double::literal(Heap &h, const char *str) {
@@ -222,6 +246,11 @@ void Double::format(std::ostream &os, FormatState &state) const {
 
 Hash Double::hash() const {
   return Hash(&value, sizeof(value));
+}
+
+bool Double::operator == (const Value &x) const {
+  if (typeid(&x) != typeid(this)) return false;
+  return value == static_cast<const Double &>(x).value;
 }
 
 std::string Double::str(int format, int precision) const {
@@ -297,6 +326,11 @@ void RegExp::format(std::ostream &os, FormatState &state) const {
 
 Hash RegExp::hash() const {
   return Hash(exp->pattern());
+}
+
+bool RegExp::operator == (const Value &x) const {
+  if (typeid(&x) != typeid(this)) return false;
+  return exp->pattern() == static_cast<const RegExp &>(x).exp->pattern();
 }
 
 RootPointer<RegExp> RegExp::literal(Heap &h, const std::string &value) {

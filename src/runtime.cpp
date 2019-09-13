@@ -217,7 +217,7 @@ void DefBinding::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
 }
 
 void Literal::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  cont->resume(runtime, value.get());
+  cont->resume(runtime, value->get());
 }
 
 struct CPrim final : public GCObject<CPrim, Continuation> {

@@ -19,6 +19,9 @@
 #include "expr.h"
 #include "prim.h"
 #include <assert.h>
+#include <unordered_set>
+
+typedef std::unordered_set<std::shared_ptr<RootPointer<Value> > > ConstantPool;
 
 struct DefStack {
   Expr  *expr;
@@ -149,6 +152,8 @@ static std::unique_ptr<Expr> forward_inline(std::unique_ptr<Expr> expr, AppStack
       simple.reserve(keep);
       for (unsigned i = 0; i < keep; ++i) simple.push_back(i);
       return forward_inline(std::unique_ptr<Expr>(clone(target)), astack, dstack, simple, depth);
+    } else if (target && target->type == &Literal::type) {
+      return std::unique_ptr<Expr>(new Literal(*static_cast<Literal*>(target)));
     } else {
       ref->meta = 1;
       return expr;
@@ -388,20 +393,20 @@ static int backward_usage(Expr *expr, DefStack *stack) {
 
 // need the reduction contraction relabel map
 // compress = prefix sum of stack usage bitmap
-static std::unique_ptr<Expr> forward_reduction(std::unique_ptr<Expr> expr, std::vector<int> &compress) {
+static std::unique_ptr<Expr> forward_reduction(std::unique_ptr<Expr> expr, ConstantPool &pool, std::vector<int> &compress) {
   if (expr->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(expr.get());
     ref->index = compress.back() - compress[compress.size()-1-ref->index];
     return expr;
   } else if (expr->type == &App::type) {
     App *app = static_cast<App*>(expr.get());
-    app->val = forward_reduction(std::move(app->val), compress);
-    app->fn = static_unique_pointer_cast<Lambda>(forward_reduction(std::move(app->fn), compress));
+    app->val = forward_reduction(std::move(app->val), pool, compress);
+    app->fn = static_unique_pointer_cast<Lambda>(forward_reduction(std::move(app->fn), pool, compress));
     return expr;
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr.get());
     compress.push_back(compress.back()+1);
-    lambda->body = forward_reduction(std::move(lambda->body), compress);
+    lambda->body = forward_reduction(std::move(lambda->body), pool, compress);
     compress.pop_back();
     return expr;
   } else if (expr->type == &DefBinding::type) {
@@ -415,7 +420,7 @@ static std::unique_ptr<Expr> forward_reduction(std::unique_ptr<Expr> expr, std::
     }
     for (auto &x : def->val) {
       if ((x->flags & FLAG_USED)) {
-        x = forward_reduction(std::move(x), compress);
+        x = forward_reduction(std::move(x), pool, compress);
         x->set(FLAG_USED, 1); // in case replaced/shortened
       }
     }
@@ -439,13 +444,13 @@ static std::unique_ptr<Expr> forward_reduction(std::unique_ptr<Expr> expr, std::
     for (auto &x : def->fun) {
       if ((x->flags & FLAG_USED)) {
         fun.emplace_back(static_unique_pointer_cast<Lambda>(
-          forward_reduction(std::move(x), compress)));
+          forward_reduction(std::move(x), pool, compress)));
         refs[index++]->second.index = kept++;
       } else {
         def->order.erase(refs[index++]);
       }
     }
-    def->body = forward_reduction(std::move(def->body), compress);
+    def->body = forward_reduction(std::move(def->body), pool, compress);
     compress.resize(compress.size() - def->val.size());
     def->val = std::move(val);
     def->fun = std::move(fun);
@@ -455,7 +460,12 @@ static std::unique_ptr<Expr> forward_reduction(std::unique_ptr<Expr> expr, std::
     } else {
       return expr;
     }
-  } else { // Literal/Construct/Destruct/Prim/Get
+  } else if (expr->type == &Literal::type) {
+    Literal *lit = static_cast<Literal*>(expr.get());
+    auto x = pool.insert(lit->value);
+    lit->value = *x.first;
+    return expr;
+  } else { // Construct/Destruct/Prim/Get
     return expr;
   }
 }
@@ -469,5 +479,6 @@ std::unique_ptr<Expr> optimize_deadcode(std::unique_ptr<Expr> expr) {
   backward_usage(expr.get(), nullptr);
   std::vector<int> compress;
   compress.push_back(0);
-  return forward_reduction(std::move(expr), compress);
+  ConstantPool pool;
+  return forward_reduction(std::move(expr), pool, compress);
 }

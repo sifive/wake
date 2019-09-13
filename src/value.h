@@ -82,6 +82,7 @@ struct String final : public GCObject<String, Value> {
   template <typename T> bool operator >  (T&& x) const { return compare(std::forward<T>(x)) >  0; }
 
   Hash hash() const override;
+  bool operator == (const Value &x) const override;
   void format(std::ostream &os, FormatState &state) const override;
   static void cstr_format(std::ostream &os, const char *s, size_t len);
 
@@ -123,6 +124,7 @@ struct Integer final : public GCObject<Integer, Value> {
   std::string str(int base = 10) const;
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
+  bool operator == (const Value &x) const override;
 
   PadObject *objend() { return Parent::objend() + (abs(length)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
   static size_t reserve(const MPZ &mpz) { return sizeof(Integer)/sizeof(PadObject) + (abs(mpz.value[0]._mp_size)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
@@ -159,6 +161,7 @@ struct Double final : public GCObject<Double, Value> {
   std::string str(int format = DEFAULTFLOAT, int precision = limits::max_digits10) const;
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
+  bool operator == (const Value &x) const override;
 
   // Never call this during runtime! It can invalidate the heap.
   static RootPointer<Double> literal(Heap &h, const char *str);
@@ -175,6 +178,7 @@ struct RegExp final : public GCObject<RegExp, DestroyableObject> {
 
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
+  bool operator == (const Value &x) const override;
 
   // Never call this during runtime! It can invalidate the heap.
   static RootPointer<RegExp> literal(Heap &h, const std::string &value);
