@@ -2,7 +2,7 @@ wake (@VERSION@-1) unstable; urgency=medium
 
   * New upstream release.
 
- -- Wesley W. Terpstra <terpstra@debian.org>  Thu, 13 Jun 2019 16:46:49 -0700
+ -- Wesley W. Terpstra <terpstra@debian.org>  Fri, 13 Sep 2019 11:45:14 -0700
 
 wake (0.15.1-1) unstable; urgency=medium
 
