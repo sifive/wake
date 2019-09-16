@@ -65,6 +65,16 @@ On Redhat (6.6 or later):
     # On RHEL6: sudo yum install devtoolset-6-gcc devtoolset-6-gcc-c++
     sudo yum install makedev fuse fuse-devel sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel dash
 
+On Arch Linux:
+ 
+ Install from official repo(stable version):
+ 
+    sudo pacman -S wake
+ 
+ Install from AUR(git master version), use `pakku` or some other AUR helpers:
+ 
+    sudo pakku -S wake-git
+
 On FreeBSD (12 or later):
 
     pkg install gmake pkgconf gmp re2 sqlite3 fusefs-libs dash
