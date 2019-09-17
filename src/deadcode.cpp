@@ -126,8 +126,13 @@ std::unique_ptr<T> static_unique_pointer_cast(std::unique_ptr<F>&& x) {
   return std::unique_ptr<T>(static_cast<T*>(x.release()));
 }
 
+struct InlineArgs {
+  size_t threshold;
+  InlineArgs(size_t threshold_) : threshold(threshold_) { }
+};
+
 // meta indicates expression tree size to guide inlining threshold
-static std::unique_ptr<Expr> forward_inline(std::unique_ptr<Expr> expr, AppStack *astack, DefStack *dstack, std::vector<int> &expand, int depth)  {
+static std::unique_ptr<Expr> forward_inline(InlineArgs args, std::unique_ptr<Expr> expr, AppStack *astack, DefStack *dstack, std::vector<int> &expand, int depth)  {
   if (expr->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(expr.get());
     unsigned index = ref->index;
@@ -141,7 +146,7 @@ static std::unique_ptr<Expr> forward_inline(std::unique_ptr<Expr> expr, AppStack
       ref->lambda = sub->lambda;
       target = dstack->resolve(ref);
     }
-    if (target && target->type == &Lambda::type && !(target->flags & FLAG_RECURSIVE) && astack && target->meta < 100) {
+    if (target && target->type == &Lambda::type && !(target->flags & FLAG_RECURSIVE) && astack && target->meta < args.threshold) {
       unsigned undo = ref->index;
       DefStack *scope = dstack->unwind(undo);
       undo = ref->index - undo;
@@ -151,7 +156,7 @@ static std::unique_ptr<Expr> forward_inline(std::unique_ptr<Expr> expr, AppStack
       std::vector<int> simple;
       simple.reserve(keep);
       for (unsigned i = 0; i < keep; ++i) simple.push_back(i);
-      return forward_inline(std::unique_ptr<Expr>(clone(target)), astack, dstack, simple, depth);
+      return forward_inline(args, std::unique_ptr<Expr>(clone(target)), astack, dstack, simple, depth);
     } else if (target && target->type == &Literal::type) {
       return std::unique_ptr<Expr>(new Literal(*static_cast<Literal*>(target)));
     } else {
@@ -165,10 +170,10 @@ static std::unique_ptr<Expr> forward_inline(std::unique_ptr<Expr> expr, AppStack
     frame.cutoff = expand.size();
     frame.arg = std::move(app->val);
     frame.next = astack;
-    auto out = forward_inline(std::move(app->fn), &frame, dstack, expand, depth);
+    auto out = forward_inline(args, std::move(app->fn), &frame, dstack, expand, depth);
     if (frame.arg) {
       app->fn = std::move(out);
-      app->val = forward_inline(std::move(frame.arg), nullptr, dstack, expand, depth);
+      app->val = forward_inline(args, std::move(frame.arg), nullptr, dstack, expand, depth);
       app->meta = 1 + app->fn->meta + app->val->meta;
       return expr;
     } else {
@@ -185,17 +190,17 @@ static std::unique_ptr<Expr> forward_inline(std::unique_ptr<Expr> expr, AppStack
       frame.expr = def.get();
       // Expand the argument in our outer scope
       std::vector<int> cut(astack->expand->begin(), astack->expand->begin()+astack->cutoff);
-      def->val.emplace_back(forward_inline(std::move(astack->arg), nullptr, dstack, cut, depth));
+      def->val.emplace_back(forward_inline(args, std::move(astack->arg), nullptr, dstack, cut, depth));
       // Expand the body in the def scope
       expand.push_back(depth);
-      def->body = forward_inline(std::move(lambda->body), astack->next, &frame, expand, depth+1);
+      def->body = forward_inline(args, std::move(lambda->body), astack->next, &frame, expand, depth+1);
       expand.pop_back();
       def->meta = 1 + def->body->meta + def->val[0]->meta;
       return static_unique_pointer_cast<Expr>(std::move(def));
     } else {
       frame.expr = expr.get();
       expand.push_back(depth);
-      lambda->body = forward_inline(std::move(lambda->body), nullptr, &frame, expand, depth+1);
+      lambda->body = forward_inline(args, std::move(lambda->body), nullptr, &frame, expand, depth+1);
       lambda->meta = lambda->body->meta + 1;
       expand.pop_back();
       return expr;
@@ -206,14 +211,14 @@ static std::unique_ptr<Expr> forward_inline(std::unique_ptr<Expr> expr, AppStack
     frame.next = dstack;
     frame.expr = def;
     for (auto &x : def->val)
-      x = forward_inline(std::move(x), nullptr, dstack, expand, depth);
+      x = forward_inline(args, std::move(x), nullptr, dstack, expand, depth);
     for (unsigned i = 0; i < def->val.size(); ++i)
       expand.push_back(depth+i);
     depth += def->val.size();
     for (auto &x : def->fun)
       x = static_unique_pointer_cast<Lambda>(
-        forward_inline(std::move(x), nullptr, &frame, expand, depth));
-    def->body = forward_inline(std::move(def->body), astack, &frame, expand, depth);
+        forward_inline(args, std::move(x), nullptr, &frame, expand, depth));
+    def->body = forward_inline(args, std::move(def->body), astack, &frame, expand, depth);
     depth -= def->val.size();
     expand.resize(expand.size() - def->val.size());
     uintptr_t meta = 1 + def->body->meta;
@@ -471,14 +476,20 @@ static std::unique_ptr<Expr> forward_reduction(std::unique_ptr<Expr> expr, Const
 }
 
 std::unique_ptr<Expr> optimize_deadcode(std::unique_ptr<Expr> expr) {
-  std::vector<int> expand;
-  expand.push_back(0);
-  expr = forward_inline(std::move(expr), nullptr, nullptr, expand, 1);
-  // Find the purity fixed-point (typically only needs 2 passes)
-  for (bool first = true; forward_purity(expr.get(), nullptr, first); first = false) { }
-  backward_usage(expr.get(), nullptr);
-  std::vector<int> compress;
-  compress.push_back(0);
-  ConstantPool pool;
-  return forward_reduction(std::move(expr), pool, compress);
+  std::vector<InlineArgs> passes;
+  passes.push_back(20);
+  passes.push_back(50);
+  for (auto &pass : passes) {
+    std::vector<int> expand;
+    expand.push_back(0);
+    expr = forward_inline(pass, std::move(expr), nullptr, nullptr, expand, 1);
+    // Find the purity fixed-point (typically only needs 2 passes)
+    for (bool first = true; forward_purity(expr.get(), nullptr, first); first = false) { }
+    backward_usage(expr.get(), nullptr);
+    std::vector<int> compress;
+    compress.push_back(0);
+    ConstantPool pool;
+    expr = forward_reduction(std::move(expr), pool, compress);
+  }
+  return expr;
 }
