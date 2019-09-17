@@ -48,9 +48,9 @@ private:
     int free_dob;
     int nargs;
     TypeChild *cargs;
-    const char *name;
+    std::string name;
 
-    bool isFree() const { return name[0] == 0; }
+    bool isFree() const;
     bool contains(const Imp *other) const;
     void do_sweep() const;
     void do_cap(int dob);
@@ -103,7 +103,7 @@ struct TypeChild {
 inline const TypeVar & TypeVar::operator[](int i) const { return imp->cargs[i].var; }
 inline       TypeVar & TypeVar::operator[](int i) { return imp->cargs[i].var; }
 
-inline const char *TypeVar::getName() const { return imp->name; }
+inline const char *TypeVar::getName() const { return imp->name.c_str(); }
 inline const char *TypeVar::getTag(int i) const { return imp->cargs[i].tag.c_str(); }
 
 #endif

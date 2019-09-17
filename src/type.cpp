@@ -27,7 +27,7 @@
 static int globalClock = 0;
 static int globalEpoch = 1; // before a tagging pass, globalEpoch > TypeVar.epoch for all TypeVars
 
-TypeVar::Imp::Imp() : link(nullptr), epoch(0), free_dob(0), nargs(0), cargs(nullptr), name("") { }
+TypeVar::Imp::Imp() : link(nullptr), epoch(0), free_dob(0), nargs(0), cargs(nullptr), name() { }
 TypeVar::TypeVar() : imp(new Imp), var_dob(0) { }
 TypeChild::TypeChild() : var(), tag() { }
 
@@ -62,6 +62,10 @@ void TypeVar::setDOB(const TypeVar &other) {
 void TypeVar::setTag(int i, const char *tag) {
   Imp *a = imp.get();
   if (a->cargs[i].tag.empty()) a->cargs[i].tag = tag;
+}
+
+bool TypeVar::Imp::isFree() const {
+  return name.empty();
 }
 
 bool TypeVar::Imp::contains(const Imp *other) const {
@@ -119,7 +123,7 @@ bool TypeVar::do_unify(TypeVar &other) {
       imp.union_consume(other.imp);
     }
     return !infinite;
-  } else if (strcmp(a->name, b->name) || a->nargs != b->nargs) {
+  } else if (a->name != b->name || a->nargs != b->nargs) {
     return false;
   } else {
     bool ok = true;
@@ -218,7 +222,7 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const ch
     p = o;
   }
 
-  if (b && (a->nargs != b->nargs || strcmp(a->name, b->name))) {
+  if (b && (a->nargs != b->nargs || a->name != b->name)) {
     os << term_red();
     if (a->isFree()) {
       os << "<infinite-type>";
@@ -236,18 +240,18 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const ch
     tag2str(os, tag);
   } else if (a->nargs == 0) {
     os << a->name;
-  } else if (!strncmp(a->name, "binary ", 7)) {
-    op_type q = op_precedence(a->name + 7);
+  } else if (!a->name.compare(0, 7, "binary ", 7)) {
+    op_type q = op_precedence(a->name.c_str() + 7);
     if (q.p < p) os << "(";
     tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag.c_str(), b?&b->cargs[0].var:0, tags, q.p + !q.l);
     if (a->name[7] != ',') os << " ";
-    os << a->name + 7 << " ";
+    os << a->name.c_str() + 7 << " ";
     tags = do_format(os, dob, a->cargs[1].var, a->cargs[1].tag.c_str(), b?&b->cargs[1].var:0, tags, q.p + q.l);
     if (q.p < p) os << ")";
-  } else if (!strncmp(a->name, "unary ", 6)) {
-    op_type q = op_precedence(a->name + 6);
+  } else if (!a->name.compare(0, 6, "unary ")) {
+    op_type q = op_precedence(a->name.c_str() + 6);
     if (q.p < p) os << "(";
-    os << a->name + 6;
+    os << a->name.c_str() + 6;
     tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag.c_str(), b?&b->cargs[0].var:0, tags, q.p);
     if (q.p < p) os << ")";
   } else {
