@@ -27,6 +27,7 @@
 
 struct Value;
 struct Expr;
+struct SourceMap;
 
 struct TermFormat {
   int depth;
@@ -39,7 +40,7 @@ struct Term {
 
   std::string label; // not unique
   uintptr_t meta;    // passes can stash info here
-  virtual void update(const std::vector<size_t> &map) = 0;
+  virtual void update(const SourceMap &map) = 0;
   virtual void format(std::ostream &os, TermFormat &format) const = 0;
   virtual std::unique_ptr<Term> clone() const = 0;
   virtual ~Term();
@@ -49,13 +50,13 @@ struct Term {
 };
 
 struct Leaf : public Term {
-  void update(const std::vector<size_t> &map) final override;
+  void update(const SourceMap &map) final override;
   Leaf(const char *label_) : Term(label_) { }
 };
 
 struct Redux : public Term {
   std::vector<size_t> args;
-  void update(const std::vector<size_t> &map) final override;
+  void update(const SourceMap &map) final override;
   void format_args(std::ostream &os, TermFormat &format) const;
   Redux(const char *label_, std::vector<size_t> &&args_) : Term(label_), args(std::move(args_)) { }
 };
@@ -118,83 +119,167 @@ struct RCon final : public Redux {
 struct RFun final : public Term {
   size_t output; // output can refer to a non-member Term
   std::vector<std::unique_ptr<Term> > terms;
-  void update(const std::vector<size_t> &map) final override;
+  void update(const SourceMap &map) final override;
   void format(std::ostream &os, TermFormat &format) const override;
   RFun(const char *label_, size_t output_ = Term::invalid)
    : Term(label_), output(output_) { }
   std::unique_ptr<Term> clone() const override; // shallow (terms uncopied)
 };
 
-struct CheckPoint {
-  size_t terms;
-  size_t map;
-  CheckPoint(size_t terms_, size_t map_) : terms(terms_), map(map_) { }
+struct TargetScope {
+  // Finish the rewrite and claim term 0
+  std::unique_ptr<Term> finish();
+
+  Term *operator [] (size_t index);
+  size_t append(std::unique_ptr<Term> term);
+  size_t append(Term *term) { return append(std::unique_ptr<Term>(term)); }
+
+  size_t end() const;
+  std::vector<std::unique_ptr<Term> > unwind(size_t newend);
+
+private:
+  std::vector<std::unique_ptr<Term> > terms; // new AST
 };
 
-struct TermRewriter {
-  // Update references of an old Redux (must call this before replace)
-  void update(Redux *redux) const;
-  void update(Term *term) const;
+inline std::unique_ptr<Term> TargetScope::finish() {
+  std::unique_ptr<Term> out = std::move(terms[0]);
+  terms.clear();
+  return out;
+}
 
-  // Streaming manipulation of terms
-  size_t replace(std::unique_ptr<Term> term); // new AST updates an old AST Term (refs get updated)
-  size_t insert(std::unique_ptr<Term> term);  // insert a Term not present in old AST (no prior refs)
-  size_t insert(Term *term) { return insert(std::unique_ptr<Term>(term)); }
-  void remove(); // remove a Term which was in the old AST (dangling refs assert fail)
+inline Term *TargetScope::operator [] (size_t index) {
+  return terms[index].get();
+}
 
-  Term *operator [] (size_t index); // inspect a Term in new AST
+inline size_t TargetScope::append(std::unique_ptr<Term> term) {
+  size_t out = terms.size();
+  terms.emplace_back(std::move(term));
+  return out;
+}
+
+inline size_t TargetScope::end() const {
+  return terms.size();
+}
+
+struct SourceMap {
+  size_t operator [] (size_t index) const;
+
+  // These methods should only be used indirectly via a TermStream:
+  SourceMap(size_t start_ = 0); // The mapping is initialized with [0,start) -> [0,start)
+
+  void place(size_t at); // in the TargetScope, this Term's index is 'at'
+  void discard();        // this Term will not appear in TargetScope
+
+  size_t end() const;
+  void unwind(size_t newend);
+
+private:
+  size_t start;
+  std::vector<size_t> map; // from old AST to new AST
+};
+
+inline size_t SourceMap::operator [] (size_t index) const {
+  if (index < start) return index;
+  return map[index - start];
+}
+
+inline SourceMap::SourceMap(size_t start_) : start(start_) { }
+
+inline void SourceMap::place(size_t at) {
+  map.emplace_back(at);
+}
+
+inline void SourceMap::discard() {
+  map.emplace_back(Term::invalid);
+}
+
+inline size_t SourceMap::end() const {
+  return start + map.size();
+}
+
+inline void SourceMap::unwind(size_t newend) {
+  map.resize(newend - start);
+}
+
+struct CheckPoint {
+  size_t target;
+  size_t source;
+  CheckPoint(size_t target_, size_t source_) : target(target_), source(source_) { }
+};
+
+struct TermStream {
+  // The stream is initialized with the mapping [0,start) -> [0,start)
+  TermStream(TargetScope &scope_, size_t start_ = 0);
+
+  // Retrieve the mapping for rewriting Terms
+  const SourceMap &map() const;
+  SourceMap &map();
+  TargetScope &scope();
+
+  // This new TargetScope Term corresponds to a Term from the SourceMap
+  size_t transfer(std::unique_ptr<Term> term);
+  size_t transfer(Term *term) { return transfer(std::unique_ptr<Term>(term)); }
+
+  // This new TargetScope Term was created from nothing
+  size_t include(std::unique_ptr<Term> term);
+  size_t include(Term *term) { return include(std::unique_ptr<Term>(term)); }
+
+  // Skip a Term from SourceMap (no Term in TargetScope corresponds)
+  void discard();
+
+  // Retrieve a Term from the TargetScope
+  Term *operator [] (size_t index);
 
   // Save the state of the rewriter to mark a function start
   CheckPoint begin() const;
   // Restore the state of the rewriter, popping the function body
-  std::vector<std::unique_ptr<Term> > end(CheckPoint p);
-
-  // Finish the rewrite and claim term 0
-  std::unique_ptr<Term> finish();
+  std::vector<std::unique_ptr<Term> > end(CheckPoint cp);
 
 private:
-  std::vector<size_t> map; // from old AST to new AST
-  std::vector<std::unique_ptr<Term> > terms; // new AST
+  TargetScope &tscope;
+  SourceMap smap;
 };
 
-inline void TermRewriter::update(Redux *redux) const {
-  redux->update(map); // faster (update is final)
+inline TermStream::TermStream(TargetScope &scope_, size_t start_)
+ : tscope(scope_), smap(start_) { }
+
+inline const SourceMap &TermStream::map() const {
+  return smap;
 }
 
-inline void TermRewriter::update(Term *term) const {
-  term->update(map);
+inline SourceMap &TermStream::map() {
+  return smap;
 }
 
-inline size_t TermRewriter::replace(std::unique_ptr<Term> term) {
-  size_t out = terms.size();
-  map.push_back(out);
-  terms.emplace_back(std::move(term));
+inline TargetScope &TermStream::scope() {
+  return tscope;
+}
+
+inline size_t TermStream::transfer(std::unique_ptr<Term> term) {
+  size_t out = tscope.append(std::move(term));
+  smap.place(out);
   return out;
 }
 
-inline size_t TermRewriter::insert(std::unique_ptr<Term> term) {
-  size_t out = terms.size();
-  terms.emplace_back(std::move(term));
-  return out;
+inline size_t TermStream::include(std::unique_ptr<Term> term) {
+  return tscope.append(std::move(term));
 }
 
-inline void TermRewriter::remove() {
-  map.push_back(Term::invalid);
+inline void TermStream::discard() {
+  smap.discard();
 }
 
-inline Term *TermRewriter::operator [] (size_t index) {
-  return terms[index].get();
+inline Term *TermStream::operator [] (size_t index) {
+  return tscope[index];
 }
 
-inline CheckPoint TermRewriter::begin() const {
-  return CheckPoint(terms.size(), map.size());
+inline CheckPoint TermStream::begin() const {
+  return CheckPoint(tscope.end(), smap.end());
 }
 
-inline std::unique_ptr<Term> TermRewriter::finish() {
-  std::unique_ptr<Term> out = std::move(terms[0]);
-  terms.clear();
-  map.clear();
-  return out;
+inline std::vector<std::unique_ptr<Term> > TermStream::end(CheckPoint cp) {
+  smap.unwind(cp.source);
+  return tscope.unwind(cp.target);
 }
 
 #endif

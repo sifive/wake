@@ -49,7 +49,7 @@ size_t TermStack::index(unsigned i) {
   return static_cast<DefBinding*>(s->expr)->val[idx]->meta;
 }
 
-static void doit(TermRewriter &state, TermStack *stack, Expr *expr) {
+static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
   TermStack frame;
   frame.next = stack;
   frame.expr = expr;
@@ -58,99 +58,95 @@ static void doit(TermRewriter &state, TermStack *stack, Expr *expr) {
     ref->meta = stack->resolve(ref);
   } else if (expr->type == &App::type) {
     App *app = static_cast<App*>(expr);
-    doit(state, stack, app->fn .get());
-    doit(state, stack, app->val.get());
-    app->meta = state.insert(new RApp(app->fn->meta, app->val->meta));
+    doit(scope, stack, app->fn .get());
+    doit(scope, stack, app->val.get());
+    app->meta = scope.append(new RApp(app->fn->meta, app->val->meta));
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr);
     RFun *fun = new RFun(lambda->fnname.empty() ? "anon" : lambda->fnname.c_str());
-    lambda->meta = state.insert(fun);
-    CheckPoint cp = state.begin();
-    state.insert(new RArg(lambda->name.c_str()));
-    doit(state, &frame, lambda->body.get());
+    lambda->meta = scope.append(fun);
+    size_t cp = scope.append(new RArg(lambda->name.c_str()));
+    doit(scope, &frame, lambda->body.get());
     fun->output = lambda->body->meta;
-    fun->terms = state.end(cp);
+    fun->terms = scope.unwind(cp);
   } else if (expr->type == &DefBinding::type) {
     DefBinding *def = static_cast<DefBinding*>(expr);
-    for (auto &x : def->val) doit(state, stack, x.get());
+    for (auto &x : def->val) doit(scope, stack, x.get());
     for (unsigned i = 0, j; i < def->fun.size(); i = j) {
       unsigned scc = def->scc[i];
       for (j = i+1; j < def->fun.size() && scc == def->scc[j]; ++j) { }
       if (j == i+1) {
-        doit(state, &frame, def->fun[i].get());
+        doit(scope, &frame, def->fun[i].get());
       } else {
         size_t null = 1;
         RFun *mutual = new RFun("mutual");
-        size_t mid = state.insert(mutual);
-        CheckPoint mcp = state.begin();
-        state.insert(new RArg("_"));
+        size_t mid = scope.append(mutual);
+        size_t mcp = scope.append(new RArg("_"));
         for (j = i; j < def->fun.size() && scc == def->scc[j]; ++j) {
           RFun *proxy = new RFun("proxy");
-          def->fun[j]->meta = state.insert(proxy);
-          CheckPoint cp = state.begin();
-          size_t x = state.insert(new RArg("_"));
-          size_t a = state.insert(new RApp(mid, null));
-          size_t g = state.insert(new RGet(j-i, a));
-          proxy->output = state.insert(new RApp(g, x));
-          proxy->terms = state.end(cp);
+          def->fun[j]->meta = scope.append(proxy);
+          size_t x = scope.append(new RArg("_"));
+          size_t a = scope.append(new RApp(mid, null));
+          size_t g = scope.append(new RGet(j-i, a));
+          proxy->output = scope.append(new RApp(g, x));
+          proxy->terms = scope.unwind(x);
         }
         std::vector<size_t> imp;
         for (j = i; j < def->fun.size() && scc == def->scc[j]; ++j) {
-          doit(state, &frame, def->fun[j].get());
+          doit(scope, &frame, def->fun[j].get());
           imp.push_back(def->fun[j]->meta);
         }
-        mutual->output = state.insert(new RCon(0, std::move(imp)));
-        mutual->terms = state.end(mcp);
-        size_t tid = state.insert(new RApp(mid, null));
+        mutual->output = scope.append(new RCon(0, std::move(imp)));
+        mutual->terms = scope.unwind(mcp);
+        size_t tid = scope.append(new RApp(mid, null));
         for (j = i; j < def->fun.size() && scc == def->scc[j]; ++j) {
-          def->fun[j]->meta = state.insert(new RGet(j-i, tid));
+          def->fun[j]->meta = scope.append(new RGet(j-i, tid));
         }
       }
     }
     for (auto &x : def->order) {
       int i = x.second.index, n = def->val.size();
       Expr *what = i>=n ? def->fun[i-n].get() : def->val[i].get();
-      state[what->meta]->label = x.first;
+      scope[what->meta]->label = x.first;
     }
-    doit(state, &frame, def->body.get());
+    doit(scope, &frame, def->body.get());
     def->meta = def->body->meta;
   } else if (expr->type == &Literal::type) {
     Literal *lit = static_cast<Literal*>(expr);
-    lit->meta = state.insert(new RLit(lit->value));
+    lit->meta = scope.append(new RLit(lit->value));
   } else if (expr->type == &Construct::type) {
     Construct *con = static_cast<Construct*>(expr);
     std::vector<size_t> args;
     for (unsigned i = con->cons->ast.args.size(); i > 0; --i)
       args.push_back(stack->index(i-1));
-    con->meta = state.insert(new RCon(con->cons->index, std::move(args)));
+    con->meta = scope.append(new RCon(con->cons->index, std::move(args)));
   } else if (expr->type == &Destruct::type) {
     Destruct *des = static_cast<Destruct*>(expr);
     std::vector<size_t> args;
     for (unsigned i = des->sum->members.size()+1; i > 0; --i)
       args.push_back(stack->index(i-1));
-    des->meta = state.insert(new RDes(std::move(args)));
+    des->meta = scope.append(new RDes(std::move(args)));
   } else if (expr->type == &Prim::type) {
     Prim *prim = static_cast<Prim*>(expr);
     std::vector<size_t> args;
     for (unsigned i = prim->args; i > 0; --i)
       args.push_back(stack->index(i-1));
-    prim->meta = state.insert(
+    prim->meta = scope.append(
       new RPrim(prim->name.c_str(), prim->fn, prim->data, prim->pflags, std::move(args)));
   } else if (expr->type == &Get::type) {
     Get *get = static_cast<Get*>(expr);
-    get->meta = state.insert(new RGet(get->index, stack->index(0)));
+    get->meta = scope.append(new RGet(get->index, stack->index(0)));
   } else {
     assert(0 /* unreachable */);
   }
 }
 
 std::unique_ptr<Term> Term::fromExpr(std::unique_ptr<Expr> expr) {
-  TermRewriter state;
+  TargetScope scope;
   RFun *out = new RFun("top");
-  state.insert(out);
-  CheckPoint cp = state.begin();
-  doit(state, nullptr, expr.get());
+  size_t cp = scope.append(out);
+  doit(scope, nullptr, expr.get());
   out->output = expr->meta;
-  out->terms = state.end(cp);
-  return state.finish();
+  out->terms = scope.unwind(cp+1);
+  return scope.finish();
 }

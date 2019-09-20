@@ -20,10 +20,10 @@
 
 Term::~Term() { }
 
-void Leaf::update(const std::vector<size_t> &map) {
+void Leaf::update(const SourceMap &map) {
 }
 
-void Redux::update(const std::vector<size_t> &map) {
+void Redux::update(const SourceMap &map) {
   for (auto &x : args) x = map[x];
 }
 
@@ -108,7 +108,7 @@ static std::string pad(int depth) {
   return std::string(depth, ' ');
 }
 
-void RFun::update(const std::vector<size_t> &map) {
+void RFun::update(const SourceMap &map) {
   output = map[output];
 }
 
@@ -133,12 +133,11 @@ std::unique_ptr<Term> RFun::clone() const {
   return out;
 }
 
-std::vector<std::unique_ptr<Term> > TermRewriter::end(CheckPoint p) {
+std::vector<std::unique_ptr<Term> > TargetScope::unwind(size_t newend) {
   std::vector<std::unique_ptr<Term> > out;
-  map.resize(p.map);
-  out.reserve(terms.size() - p.terms);
-  for (size_t i = p.terms; i < terms.size(); ++i)
+  out.reserve(terms.size() - newend);
+  for (size_t i = newend; i < terms.size(); ++i)
     out.emplace_back(std::move(terms[i]));
-  terms.resize(p.terms);
+  terms.resize(newend);
   return out;
 }
