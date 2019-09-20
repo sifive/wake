@@ -27,10 +27,12 @@
 
 struct Value;
 struct Expr;
+struct RFun;
 
 struct TermFormat {
   int depth;
-  TermFormat() : depth(0) { }
+  size_t id;
+  TermFormat() : depth(0), id(0) { }
 };
 
 struct Term {
@@ -43,7 +45,7 @@ struct Term {
   virtual ~Term();
   Term(const char *label_) : label(label_) { }
 
-  static std::unique_ptr<Term> fromExpr(Expr *expr);
+  static std::unique_ptr<Term> fromExpr(std::unique_ptr<Expr> expr);
 };
 
 struct Leaf : public Term {
@@ -106,12 +108,18 @@ struct RCon final : public Redux {
 };
 
 struct RFun final : public Term {
-  size_t start, output; // output can refer to a non-member Term
+  size_t output; // output can refer to a non-member Term
   std::vector<std::unique_ptr<Term> > terms;
   void update(const std::vector<size_t> &map) final override;
   void format(std::ostream &os, TermFormat &format) const override;
-  RFun(const char *label_, size_t start_, size_t output_ = Term::invalid)
-   : Term(label_), start(start_), output(output_) { }
+  RFun(const char *label_, size_t output_ = Term::invalid)
+   : Term(label_), output(output_) { }
+};
+
+struct CheckPoint {
+  size_t terms;
+  size_t map;
+  CheckPoint(size_t terms_, size_t map_) : terms(terms_), map(map_) { }
 };
 
 struct TermRewriter {
@@ -126,19 +134,15 @@ struct TermRewriter {
 
   Term *operator [] (size_t index); // inspect a Term in new AST
 
-  // Create a new function with the same label+meta as base
-  // Until exit, terms is empty and output is Term::invalid
-  size_t enter_replace(Term *base); // record start, copy label+meta
-  size_t enter_insert(Term *base); // record start, copy label+meta
-  // Complete a function, filling terms
-  size_t exit(size_t output);
+  // Save the state of the rewriter to mark a function start
+  CheckPoint begin() const;
+  // Restore the state of the rewriter, popping the function body
+  std::vector<std::unique_ptr<Term> > end(CheckPoint p);
 
-  // Finish the rewite; call after exit of the top function
+  // Finish the rewrite and claim term 0
   std::unique_ptr<Term> finish();
 
 private:
-  std::unique_ptr<Term> enter(Term *base);
-  std::vector<size_t> stack; // location of incomplete function starts
   std::vector<size_t> map; // from old AST to new AST
   std::vector<std::unique_ptr<Term> > terms; // new AST
 };
@@ -170,6 +174,17 @@ inline void TermRewriter::remove() {
 
 inline Term *TermRewriter::operator [] (size_t index) {
   return terms[index].get();
+}
+
+inline CheckPoint TermRewriter::begin() const {
+  return CheckPoint(terms.size(), map.size());
+}
+
+inline std::unique_ptr<Term> TermRewriter::finish() {
+  std::unique_ptr<Term> out = std::move(terms[0]);
+  terms.clear();
+  map.clear();
+  return out;
 }
 
 #endif

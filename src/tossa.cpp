@@ -66,14 +66,17 @@ static void doit(TermRewriter &state, TermStack *stack, Expr *expr) {
     app->meta = state.insert(std::unique_ptr<Term>(out));
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr);
-    RArg arg(lambda->fnname.empty() ? "anon" : lambda->fnname.c_str());
-    lambda->meta = state.enter_insert(&arg);
+    RFun *fun = new RFun(lambda->fnname.empty() ? "anon" : lambda->fnname.c_str());
+    lambda->meta = state.insert(std::unique_ptr<Term>(fun));
+    CheckPoint cp = state.begin();
     state.insert(std::unique_ptr<Term>(new RArg(lambda->name.c_str())));
     doit(state, &frame, lambda->body.get());
-    state.exit(lambda->body->meta);
+    fun->output = lambda->body->meta;
+    fun->terms = state.end(cp);
   } else if (expr->type == &DefBinding::type) {
     DefBinding *def = static_cast<DefBinding*>(expr);
     for (auto &x : def->val) doit(state, stack, x.get());
+    for (auto &x : def->fun) x->meta = Term::invalid;
     for (auto &x : def->fun) doit(state, &frame, x.get()); // !!! mutual bad
     for (auto &x : def->order) {
       int i = x.second.index, n = def->val.size();
@@ -112,11 +115,13 @@ static void doit(TermRewriter &state, TermStack *stack, Expr *expr) {
     assert(0 /* unreachable */);
   }
 }
-std::unique_ptr<Term> Term::fromExpr(Expr *expr) {
+std::unique_ptr<Term> Term::fromExpr(std::unique_ptr<Expr> expr) {
   TermRewriter state;
-  RArg arg("top");
-  state.enter_insert(&arg);
-  doit(state, nullptr, expr);
-  state.exit(expr->meta);
+  RFun *out = new RFun("top");
+  state.insert(std::unique_ptr<Term>(out));
+  CheckPoint cp = state.begin();
+  doit(state, nullptr, expr.get());
+  out->output = expr->meta;
+  out->terms = state.end(cp);
   return state.finish();
 }

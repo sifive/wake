@@ -17,7 +17,6 @@
 
 #include "ssa.h"
 #include "value.h"
-#include <assert.h>
 
 Term::~Term() { }
 
@@ -33,6 +32,7 @@ void Redux::format_args(std::ostream &os, TermFormat &format) const {
   for (auto x : args) {
     if (!first) os << " ";
     os << x;
+    if (x >= format.id) os << " !!!";
     first = false;
   }
 }
@@ -81,58 +81,30 @@ static std::string pad(int depth) {
 }
 
 void RFun::update(const std::vector<size_t> &map) {
-  assert(0 /* unreachable */);
+  output = map[output];
 }
 
 void RFun::format(std::ostream &os, TermFormat &format) const {
-  os << "FunRet:" << output << "\n";
+  os << "FunRet:" << output;
+  if (output > format.id + terms.size()) os << " !!!";
+  os << "\n";
   format.depth += 2;
-  for (size_t i = 0; i < terms.size(); ++i) {
-    const Term *x = terms[i].get();
-    os << pad(format.depth+2) << (start+i);
-    if (!x->label.empty())
-      os << " (" << x->label << ")";
+  for (auto &x : terms) {
+    os << pad(format.depth+2) << ++format.id;
+    if (!x->label.empty()) os << " (" << x->label << ")";
     os << " = ";
     x->format(os, format);
   }
+  format.id -= terms.size();
   format.depth -= 2;
 }
 
-std::unique_ptr<Term> TermRewriter::enter(Term *base) {
-  size_t body = terms.size() + 1;
-  stack.emplace_back(body);
-  std::unique_ptr<Term> out(new RFun(base->label.c_str(), body));
-  out->meta = base->meta;
+std::vector<std::unique_ptr<Term> > TermRewriter::end(CheckPoint p) {
+  std::vector<std::unique_ptr<Term> > out;
+  map.resize(p.map);
+  out.reserve(terms.size() - p.terms);
+  for (size_t i = p.terms; i < terms.size(); ++i)
+    out.emplace_back(std::move(terms[i]));
+  terms.resize(p.terms);
   return out;
-}
-
-size_t TermRewriter::enter_replace(Term *base) {
-  return replace(enter(base));
-}
-
-size_t TermRewriter::enter_insert(Term *base) {
-  return insert(enter(base));
-}
-
-size_t TermRewriter::exit(size_t output) {
-  size_t body = stack.back();
-  size_t fn = body-1;
-  stack.pop_back();
-  RFun *fun = static_cast<RFun*>(terms[fn].get());
-  fun->output = output;
-  fun->terms.clear();
-  fun->terms.reserve(terms.size() - body);
-  for (unsigned i = body; i < terms.size(); ++i)
-    fun->terms.emplace_back(std::move(terms[i]));
-  map.resize(body);
-  terms.resize(body);
-  return fn;
-}
-
-std::unique_ptr<Term> TermRewriter::finish() {
-  assert(stack.size() == 0);
-  assert(terms.size() == 1);
-  return std::move(terms[0]);
-  terms.clear();
-  map.clear();
 }
