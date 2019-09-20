@@ -57,7 +57,7 @@ struct Redux : public Term {
   std::vector<size_t> args;
   void update(const std::vector<size_t> &map) final override;
   void format_args(std::ostream &os, TermFormat &format) const;
-  Redux(const char *label_) : Term(label_) { }
+  Redux(const char *label_, std::vector<size_t> &&args_) : Term(label_), args(std::move(args_)) { }
 };
 
 struct RArg final : public Leaf {
@@ -74,7 +74,7 @@ struct RLit final : public Leaf {
 struct RApp final : public Redux {
   // arg0 = fn, arg1+ = arguments
   void format(std::ostream &os, TermFormat &format) const override;
-  RApp(const char *label_ = "") : Redux(label_) { }
+  RApp(size_t fn, size_t arg, const char *label_ = "") : Redux(label_, {fn, arg}) { }
 };
 
 struct RPrim final : public Redux {
@@ -83,28 +83,29 @@ struct RPrim final : public Redux {
   void *data;
   int pflags;
   void format(std::ostream &os, TermFormat &format) const override;
-  RPrim(const char *name_, PrimFn fn_, void *data_, int pflags_, const char *label_ = "")
-   : Redux(label_), name(name_), fn(fn_), data(data_), pflags(pflags_) { }
+  RPrim(const char *name_, PrimFn fn_, void *data_, int pflags_, std::vector<size_t> &&args_, const char *label_ = "")
+   : Redux(label_, std::move(args_)), name(name_), fn(fn_), data(data_), pflags(pflags_) { }
 };
 
 struct RGet final : public Redux {
   // arg0 = object
   size_t index;
   void format(std::ostream &os, TermFormat &format) const override;
-  RGet(size_t index_, const char *label_ = "") : Redux(label_), index(index_) { }
+  RGet(size_t index_, size_t obj, const char *label_ = "") : Redux(label_, {obj}), index(index_) { }
 };
 
 struct RDes final : public Redux {
-  // arg0 = object, args1+ = handlers for cases
+  // args = handlers for cases, then obj
   void format(std::ostream &os, TermFormat &format) const override;
-  RDes(const char *label_ = "") : Redux(label_) { }
+  RDes(std::vector<size_t> &&args_, const char *label_ = "") : Redux(label_, std::move(args_)) { }
 };
 
 struct RCon final : public Redux {
   // arg0+ = tuple elements
   size_t kind;
   void format(std::ostream &os, TermFormat &format) const override;
-  RCon(size_t kind_, const char *label_ = "") : Redux(label_), kind(kind_) { }
+  RCon(size_t kind_, std::vector<size_t> &&args_, const char *label_ = "")
+   : Redux(label_, std::move(args_)), kind(kind_) { }
 };
 
 struct RFun final : public Term {
@@ -130,6 +131,7 @@ struct TermRewriter {
   // Streaming manipulation of terms
   size_t replace(std::unique_ptr<Term> term); // new AST updates an old AST Term (refs get updated)
   size_t insert(std::unique_ptr<Term> term);  // insert a Term not present in old AST (no prior refs)
+  size_t insert(Term *term) { return insert(std::unique_ptr<Term>(term)); }
   void remove(); // remove a Term which was in the old AST (dangling refs assert fail)
 
   Term *operator [] (size_t index); // inspect a Term in new AST

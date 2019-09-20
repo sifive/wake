@@ -60,24 +60,53 @@ static void doit(TermRewriter &state, TermStack *stack, Expr *expr) {
     App *app = static_cast<App*>(expr);
     doit(state, stack, app->fn .get());
     doit(state, stack, app->val.get());
-    RApp *out = new RApp();
-    out->args.push_back(app->fn->meta);
-    out->args.push_back(app->val->meta);
-    app->meta = state.insert(std::unique_ptr<Term>(out));
+    app->meta = state.insert(new RApp(app->fn->meta, app->val->meta));
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr);
     RFun *fun = new RFun(lambda->fnname.empty() ? "anon" : lambda->fnname.c_str());
-    lambda->meta = state.insert(std::unique_ptr<Term>(fun));
+    lambda->meta = state.insert(fun);
     CheckPoint cp = state.begin();
-    state.insert(std::unique_ptr<Term>(new RArg(lambda->name.c_str())));
+    state.insert(new RArg(lambda->name.c_str()));
     doit(state, &frame, lambda->body.get());
     fun->output = lambda->body->meta;
     fun->terms = state.end(cp);
   } else if (expr->type == &DefBinding::type) {
     DefBinding *def = static_cast<DefBinding*>(expr);
     for (auto &x : def->val) doit(state, stack, x.get());
-    for (auto &x : def->fun) x->meta = Term::invalid;
-    for (auto &x : def->fun) doit(state, &frame, x.get()); // !!! mutual bad
+    for (unsigned i = 0, j; i < def->fun.size(); i = j) {
+      unsigned scc = def->scc[i];
+      for (j = i+1; j < def->fun.size() && scc == def->scc[j]; ++j) { }
+      if (j == i+1) {
+        doit(state, &frame, def->fun[i].get());
+      } else {
+        size_t null = 1;
+        RFun *mutual = new RFun("mutual");
+        size_t mid = state.insert(mutual);
+        CheckPoint mcp = state.begin();
+        state.insert(new RArg("_"));
+        for (j = i; j < def->fun.size() && scc == def->scc[j]; ++j) {
+          RFun *proxy = new RFun("proxy");
+          def->fun[j]->meta = state.insert(proxy);
+          CheckPoint cp = state.begin();
+          size_t x = state.insert(new RArg("_"));
+          size_t a = state.insert(new RApp(mid, null));
+          size_t g = state.insert(new RGet(j-i, a));
+          proxy->output = state.insert(new RApp(g, x));
+          proxy->terms = state.end(cp);
+        }
+        std::vector<size_t> imp;
+        for (j = i; j < def->fun.size() && scc == def->scc[j]; ++j) {
+          doit(state, &frame, def->fun[j].get());
+          imp.push_back(def->fun[j]->meta);
+        }
+        mutual->output = state.insert(new RCon(0, std::move(imp)));
+        mutual->terms = state.end(mcp);
+        size_t tid = state.insert(new RApp(mid, null));
+        for (j = i; j < def->fun.size() && scc == def->scc[j]; ++j) {
+          def->fun[j]->meta = state.insert(new RGet(j-i, tid));
+        }
+      }
+    }
     for (auto &x : def->order) {
       int i = x.second.index, n = def->val.size();
       Expr *what = i>=n ? def->fun[i-n].get() : def->val[i].get();
@@ -87,38 +116,38 @@ static void doit(TermRewriter &state, TermStack *stack, Expr *expr) {
     def->meta = def->body->meta;
   } else if (expr->type == &Literal::type) {
     Literal *lit = static_cast<Literal*>(expr);
-    lit->meta = state.insert(std::unique_ptr<Term>(new RLit(lit->value)));
+    lit->meta = state.insert(new RLit(lit->value));
   } else if (expr->type == &Construct::type) {
     Construct *con = static_cast<Construct*>(expr);
-    RCon *out = new RCon(con->cons->index);
+    std::vector<size_t> args;
     for (unsigned i = con->cons->ast.args.size(); i > 0; --i)
-      out->args.push_back(stack->index(i-1));
-    con->meta = state.insert(std::unique_ptr<Term>(out));
+      args.push_back(stack->index(i-1));
+    con->meta = state.insert(new RCon(con->cons->index, std::move(args)));
   } else if (expr->type == &Destruct::type) {
     Destruct *des = static_cast<Destruct*>(expr);
-    RDes *out = new RDes();
+    std::vector<size_t> args;
     for (unsigned i = des->sum->members.size()+1; i > 0; --i)
-      out->args.push_back(stack->index(i-1));
-    des->meta = state.insert(std::unique_ptr<Term>(out));
+      args.push_back(stack->index(i-1));
+    des->meta = state.insert(new RDes(std::move(args)));
   } else if (expr->type == &Prim::type) {
     Prim *prim = static_cast<Prim*>(expr);
-    RPrim *out = new RPrim(prim->name.c_str(), prim->fn, prim->data, prim->pflags);
+    std::vector<size_t> args;
     for (unsigned i = prim->args; i > 0; --i)
-      out->args.push_back(stack->index(i-1));
-    prim->meta = state.insert(std::unique_ptr<Term>(out));
+      args.push_back(stack->index(i-1));
+    prim->meta = state.insert(
+      new RPrim(prim->name.c_str(), prim->fn, prim->data, prim->pflags, std::move(args)));
   } else if (expr->type == &Get::type) {
     Get *get = static_cast<Get*>(expr);
-    RGet *out = new RGet(get->index);
-    out->args.push_back(stack->index(0));
-    get->meta = state.insert(std::unique_ptr<Term>(out));
+    get->meta = state.insert(new RGet(get->index, stack->index(0)));
   } else {
     assert(0 /* unreachable */);
   }
 }
+
 std::unique_ptr<Term> Term::fromExpr(std::unique_ptr<Expr> expr) {
   TermRewriter state;
   RFun *out = new RFun("top");
-  state.insert(std::unique_ptr<Term>(out));
+  state.insert(out);
   CheckPoint cp = state.begin();
   doit(state, nullptr, expr.get());
   out->output = expr->meta;
