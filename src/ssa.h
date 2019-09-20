@@ -27,7 +27,6 @@
 
 struct Value;
 struct Expr;
-struct RFun;
 
 struct TermFormat {
   int depth;
@@ -42,6 +41,7 @@ struct Term {
   uintptr_t meta;    // passes can stash info here
   virtual void update(const std::vector<size_t> &map) = 0;
   virtual void format(std::ostream &os, TermFormat &format) const = 0;
+  virtual std::unique_ptr<Term> clone() const = 0;
   virtual ~Term();
   Term(const char *label_) : label(label_) { }
 
@@ -63,18 +63,21 @@ struct Redux : public Term {
 struct RArg final : public Leaf {
   void format(std::ostream &os, TermFormat &format) const override;
   RArg(const char *label_ = "") : Leaf(label_) { }
+  std::unique_ptr<Term> clone() const override;
 };
 
 struct RLit final : public Leaf {
   std::shared_ptr<RootPointer<Value> > value;
   void format(std::ostream &os, TermFormat &format) const override;
   RLit(std::shared_ptr<RootPointer<Value> > value_, const char *label_ = "") : Leaf(label_), value(std::move(value_)) { }
+  std::unique_ptr<Term> clone() const override;
 };
 
 struct RApp final : public Redux {
   // arg0 = fn, arg1+ = arguments
   void format(std::ostream &os, TermFormat &format) const override;
   RApp(size_t fn, size_t arg, const char *label_ = "") : Redux(label_, {fn, arg}) { }
+  std::unique_ptr<Term> clone() const override;
 };
 
 struct RPrim final : public Redux {
@@ -85,6 +88,7 @@ struct RPrim final : public Redux {
   void format(std::ostream &os, TermFormat &format) const override;
   RPrim(const char *name_, PrimFn fn_, void *data_, int pflags_, std::vector<size_t> &&args_, const char *label_ = "")
    : Redux(label_, std::move(args_)), name(name_), fn(fn_), data(data_), pflags(pflags_) { }
+  std::unique_ptr<Term> clone() const override;
 };
 
 struct RGet final : public Redux {
@@ -92,12 +96,14 @@ struct RGet final : public Redux {
   size_t index;
   void format(std::ostream &os, TermFormat &format) const override;
   RGet(size_t index_, size_t obj, const char *label_ = "") : Redux(label_, {obj}), index(index_) { }
+  std::unique_ptr<Term> clone() const override;
 };
 
 struct RDes final : public Redux {
   // args = handlers for cases, then obj
   void format(std::ostream &os, TermFormat &format) const override;
   RDes(std::vector<size_t> &&args_, const char *label_ = "") : Redux(label_, std::move(args_)) { }
+  std::unique_ptr<Term> clone() const override;
 };
 
 struct RCon final : public Redux {
@@ -106,6 +112,7 @@ struct RCon final : public Redux {
   void format(std::ostream &os, TermFormat &format) const override;
   RCon(size_t kind_, std::vector<size_t> &&args_, const char *label_ = "")
    : Redux(label_, std::move(args_)), kind(kind_) { }
+  std::unique_ptr<Term> clone() const override;
 };
 
 struct RFun final : public Term {
@@ -115,6 +122,7 @@ struct RFun final : public Term {
   void format(std::ostream &os, TermFormat &format) const override;
   RFun(const char *label_, size_t output_ = Term::invalid)
    : Term(label_), output(output_) { }
+  std::unique_ptr<Term> clone() const override; // shallow (terms uncopied)
 };
 
 struct CheckPoint {

@@ -41,9 +41,17 @@ void RArg::format(std::ostream &os, TermFormat &format) const {
   os << "<arg>\n";
 }
 
+std::unique_ptr<Term> RArg::clone() const {
+  return std::unique_ptr<Term>(new RArg(*this));
+}
+
 void RLit::format(std::ostream &os, TermFormat &format) const {
   HeapObject::format(os, value->get());
   os << "\n";
+}
+
+std::unique_ptr<Term> RLit::clone() const {
+  return std::unique_ptr<Term>(new RLit(*this));
 }
 
 void RApp::format(std::ostream &os, TermFormat &format) const {
@@ -52,10 +60,18 @@ void RApp::format(std::ostream &os, TermFormat &format) const {
   os << ")\n";
 }
 
+std::unique_ptr<Term> RApp::clone() const {
+  return std::unique_ptr<Term>(new RApp(*this));
+}
+
 void RPrim::format(std::ostream &os, TermFormat &format) const {
   os << name << "(";
   format_args(os, format);
   os << ")\n";
+}
+
+std::unique_ptr<Term> RPrim::clone() const {
+  return std::unique_ptr<Term>(new RPrim(*this));
 }
 
 void RGet::format(std::ostream &os, TermFormat &format) const {
@@ -64,16 +80,28 @@ void RGet::format(std::ostream &os, TermFormat &format) const {
   os << ")\n";
 }
 
+std::unique_ptr<Term> RGet::clone() const {
+  return std::unique_ptr<Term>(new RGet(*this));
+}
+
 void RDes::format(std::ostream &os, TermFormat &format) const {
   os << "Des(";
   format_args(os, format);
   os << ")\n";
 }
 
+std::unique_ptr<Term> RDes::clone() const {
+  return std::unique_ptr<Term>(new RDes(*this));
+}
+
 void RCon::format(std::ostream &os, TermFormat &format) const {
   os << "Con:" << kind << "(";
   format_args(os, format);
   os << ")\n";
+}
+
+std::unique_ptr<Term> RCon::clone() const {
+  return std::unique_ptr<Term>(new RCon(*this));
 }
 
 static std::string pad(int depth) {
@@ -97,6 +125,12 @@ void RFun::format(std::ostream &os, TermFormat &format) const {
   }
   format.id -= terms.size();
   format.depth -= 2;
+}
+
+std::unique_ptr<Term> RFun::clone() const {
+  std::unique_ptr<Term> out(new RFun(label.c_str(), output));
+  out->meta = meta;
+  return out;
 }
 
 std::vector<std::unique_ptr<Term> > TermRewriter::end(CheckPoint p) {
