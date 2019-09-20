@@ -42,7 +42,7 @@
 #include "markup.h"
 #include "describe.h"
 #include "profile.h"
-#include "optimize.h"
+#include "ssa.h"
 
 void print_help(const char *argv0) {
   std::cout << std::endl
@@ -366,8 +366,11 @@ int main(int argc, char **argv) {
 
   if (tcheck) std::cout << root.get();
   if (html) markup_html(std::cout, root.get());
-  root = optimize_deadcode(std::move(root));
-  if (optim) std::cout << root.get();
+  if (optim) {
+    TermFormat format;
+    auto tree = Term::fromExpr(root.get());
+    tree->format(std::cout, format);
+  }
 
   for (auto &g : globals) {
     Expr *e = root.get();
