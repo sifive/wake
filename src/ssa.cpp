@@ -141,3 +141,8 @@ std::vector<std::unique_ptr<Term> > TargetScope::unwind(size_t newend) {
   terms.resize(newend);
   return out;
 }
+
+void ReverseScope::push(const std::vector<std::unique_ptr<Term> > &terms) {
+  for (auto &x : terms)
+    scope.emplace_back(x.get());
+}

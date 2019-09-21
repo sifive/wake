@@ -15,12 +15,32 @@
  * limitations under the License.
  */
 
-#ifndef OPTIMIZE_H
-#define OPTIMIZE_H
+#include "ssa.h"
 
-#include <memory>
+struct PassInline {
+  TermStream stream;
+};
 
-struct Expr;
-std::unique_ptr<Expr> optimize_deadcode(std::unique_ptr<Expr> expr);
+void RArg::pass_inline(PassInline &p) {
+}
 
-#endif
+void RLit::pass_inline(PassInline &p) {
+}
+
+void RApp::pass_inline(PassInline &p) {
+}
+
+void RPrim::pass_inline(PassInline &p) {
+}
+
+void RGet::pass_inline(PassInline &p) {
+}
+
+void RDes::pass_inline(PassInline &p) {
+}
+
+void RCon::pass_inline(PassInline &p) {
+}
+
+void RFun::pass_inline(PassInline &p) {
+}
