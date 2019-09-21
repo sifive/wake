@@ -58,6 +58,15 @@ struct Term {
   virtual void pass_usage (PassUsage  &p) = 0;
   virtual void pass_sweep (PassSweep  &p) = 0;
   virtual void pass_inline(PassInline &p) = 0;
+
+  // The top-level pass invocations
+  static std::unique_ptr<Term> pass_purity(std::unique_ptr<Term> term);
+  static std::unique_ptr<Term> pass_usage (std::unique_ptr<Term> term);
+  static std::unique_ptr<Term> pass_sweep (std::unique_ptr<Term> term);
+  static std::unique_ptr<Term> pass_inline(std::unique_ptr<Term> term);
+
+  // The overall optimization strategy
+  static std::unique_ptr<Term> optimize(std::unique_ptr<Term> term);
 };
 
 struct Leaf : public Term {

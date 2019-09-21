@@ -368,7 +368,7 @@ int main(int argc, char **argv) {
   if (html) markup_html(std::cout, root.get());
   if (optim) {
     TermFormat format;
-    auto tree = Term::fromExpr(std::move(root));
+    auto tree = Term::optimize(Term::fromExpr(std::move(root)));
     tree->format(std::cout, format);
   }
 

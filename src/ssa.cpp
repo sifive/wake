@@ -120,7 +120,7 @@ void RFun::format(std::ostream &os, TermFormat &format) const {
   for (auto &x : terms) {
     os << pad(format.depth+2) << ++format.id;
     if (!x->label.empty()) os << " (" << x->label << ")";
-    os << " = ";
+    os << " [" << x->meta << "] = ";
     x->format(os, format);
   }
   format.id -= terms.size();
@@ -145,4 +145,9 @@ std::vector<std::unique_ptr<Term> > TargetScope::unwind(size_t newend) {
 void ReverseScope::push(const std::vector<std::unique_ptr<Term> > &terms) {
   for (auto &x : terms)
     scope.emplace_back(x.get());
+}
+
+std::unique_ptr<Term> Term::optimize(std::unique_ptr<Term> term) {
+  term = Term::pass_purity(std::move(term));
+  return term;
 }
