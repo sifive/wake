@@ -336,6 +336,9 @@ inline std::vector<std::unique_ptr<Term> > TermStream::end(CheckPoint cp) {
 
 struct ReverseScope {
   Term *pop();
+  Term *peek();
+  Term *operator [] (size_t i);
+  void push(Term *term);
   void push(const std::vector<std::unique_ptr<Term> > &terms);
 
 private:
@@ -346,6 +349,18 @@ inline Term *ReverseScope::pop() {
   Term *out = scope.back();
   scope.pop_back();
   return out;
+}
+
+inline Term *ReverseScope::peek() {
+  return scope.back();
+}
+
+inline Term *ReverseScope::operator [] (size_t i) {
+  return scope[i];
+}
+
+inline void ReverseScope::push(Term *term) {
+  scope.emplace_back(term);
 }
 
 #endif

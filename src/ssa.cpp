@@ -149,5 +149,6 @@ void ReverseScope::push(const std::vector<std::unique_ptr<Term> > &terms) {
 
 std::unique_ptr<Term> Term::optimize(std::unique_ptr<Term> term) {
   term = Term::pass_purity(std::move(term));
+  term = Term::pass_usage(std::move(term));
   return term;
 }

@@ -21,26 +21,52 @@ struct PassUsage {
   ReverseScope scope;
 };
 
+static void redux_usage(PassUsage &p, Redux *r) {
+  for (auto x : r->args)
+    p.scope[x]->meta = 0;
+}
+
 void RArg::pass_usage(PassUsage &p) {
+  // uses nothing
 }
 
 void RLit::pass_usage(PassUsage &p) {
+  // uses nothing
 }
 
 void RApp::pass_usage(PassUsage &p) {
+  redux_usage(p, this);
 }
 
 void RPrim::pass_usage(PassUsage &p) {
+  redux_usage(p, this);
 }
 
 void RGet::pass_usage(PassUsage &p) {
+  redux_usage(p, this);
 }
 
 void RDes::pass_usage(PassUsage &p) {
+  redux_usage(p, this);
 }
 
 void RCon::pass_usage(PassUsage &p) {
+  redux_usage(p, this);
 }
 
 void RFun::pass_usage(PassUsage &p) {
+  p.scope.push(terms);
+  p.scope[output]->meta = 0;
+  for (unsigned i = 0; i < terms.size(); ++i) {
+    Term *t = p.scope.peek();
+    if (!(t->meta & 1)) t->pass_usage(p);
+    p.scope.pop();
+  }
+}
+
+std::unique_ptr<Term> Term::pass_usage(std::unique_ptr<Term> term) {
+  PassUsage pass;
+  pass.scope.push(term.get());
+  term->pass_usage(pass);
+  return term;
 }
