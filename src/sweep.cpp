@@ -19,7 +19,13 @@
 
 struct PassSweep {
   TermStream stream;
+  PassSweep(TargetScope &scope) : stream(scope) { }
 };
+
+static void redux_sweep(PassSweep &p, Redux *r) {
+  r->update(p.stream.map());
+  for (auto x : r->args) ++p.stream[x]->meta;
+}
 
 void RArg::pass_sweep(PassSweep &p) {
 }
@@ -28,19 +34,45 @@ void RLit::pass_sweep(PassSweep &p) {
 }
 
 void RApp::pass_sweep(PassSweep &p) {
+  redux_sweep(p, this);
 }
 
 void RPrim::pass_sweep(PassSweep &p) {
+  redux_sweep(p, this);
 }
 
 void RGet::pass_sweep(PassSweep &p) {
+  redux_sweep(p, this);
 }
 
 void RDes::pass_sweep(PassSweep &p) {
+  redux_sweep(p, this);
 }
 
 void RCon::pass_sweep(PassSweep &p) {
+  redux_sweep(p, this);
 }
 
 void RFun::pass_sweep(PassSweep &p) {
+  CheckPoint cp = p.stream.begin();
+  for (auto &x : terms) {
+    if (x->meta) {
+      p.stream.discard();
+    } else {
+      Term *t = x.get();
+      p.stream.transfer(std::move(x));
+      t->pass_sweep(p);
+    }
+  }
+  update(p.stream.map());
+  ++p.stream[output]->meta;
+  terms = p.stream.end(cp);
+}
+
+std::unique_ptr<Term> Term::pass_sweep(std::unique_ptr<Term> term) {
+  TargetScope scope;
+  PassSweep pass(scope);
+  pass.stream.transfer(std::move(term));
+  scope[0]->pass_sweep(pass);
+  return scope.finish();
 }

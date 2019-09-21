@@ -59,7 +59,8 @@ void RFun::pass_usage(PassUsage &p) {
   p.scope[output]->meta = 0;
   for (unsigned i = 0; i < terms.size(); ++i) {
     Term *t = p.scope.peek();
-    if (!(t->meta & 1)) t->pass_usage(p);
+    if (t->id() == typeid(RArg)) t->meta = 0;
+    else if (!(t->meta & 1)) t->pass_usage(p);
     p.scope.pop();
   }
 }
