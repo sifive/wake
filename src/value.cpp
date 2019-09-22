@@ -35,7 +35,7 @@ size_t Value::hashid() const {
 
 bool Value::operator == (const Value &x) const {
   assert(0 /* unreachable */);
-  if (typeid(&x) != typeid(this)) return false;
+  if (typeid(x) != typeid(*this)) return false;
   return hash() == x.hash();
 }
 
@@ -180,7 +180,7 @@ Hash String::hash() const {
 }
 
 bool String::operator == (const Value &x) const {
-  if (typeid(&x) != typeid(this)) return false;
+  if (typeid(x) != typeid(*this)) return false;
   return compare(static_cast<const String &>(x)) == 0;
 }
 
@@ -227,7 +227,7 @@ Hash Integer::hash() const {
 }
 
 bool Integer::operator == (const Value &x) const {
-  if (typeid(&x) != typeid(this)) return false;
+  if (typeid(x) != typeid(*this)) return false;
   mpz_t a = { wrap() }, b = { static_cast<const Integer &>(x).wrap() };
   return mpz_cmp(a, b) == 0;
 }
@@ -249,7 +249,7 @@ Hash Double::hash() const {
 }
 
 bool Double::operator == (const Value &x) const {
-  if (typeid(&x) != typeid(this)) return false;
+  if (typeid(x) != typeid(*this)) return false;
   return value == static_cast<const Double &>(x).value;
 }
 
@@ -329,7 +329,7 @@ Hash RegExp::hash() const {
 }
 
 bool RegExp::operator == (const Value &x) const {
-  if (typeid(&x) != typeid(this)) return false;
+  if (typeid(x) != typeid(*this)) return false;
   return exp->pattern() == static_cast<const RegExp &>(x).exp->pattern();
 }
 

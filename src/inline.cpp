@@ -16,9 +16,25 @@
  */
 
 #include "ssa.h"
+#include <unordered_map>
+
+static bool operator == (const std::shared_ptr<RootPointer<Value> > &x, const std::shared_ptr<RootPointer<Value> > &y) {
+  return **x == **y;
+}
+
+namespace std {
+  template <> struct hash<std::shared_ptr<RootPointer<Value> > > {
+    size_t operator () (const std::shared_ptr<RootPointer<Value> > &x) const {
+      return (*x)->hashid();
+    }
+  };
+}
+
+typedef std::unordered_map<std::shared_ptr<RootPointer<Value> >, size_t> ConstantPool;
 
 struct PassInline {
   TermStream stream;
+  ConstantPool pool;
   PassInline(TargetScope &scope) : stream(scope) { }
 };
 
@@ -27,7 +43,29 @@ void RArg::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 }
 
 void RLit::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
-  p.stream.transfer(std::move(self));
+  size_t me = p.stream.scope().end();
+  auto ins = p.pool.insert(std::make_pair(value, me));
+  if (ins.second) {
+    // First ever use of this constant
+    p.stream.transfer(std::move(self));
+  } else {
+    // Can share same object in heap
+    value = ins.first->first;
+    // Check if this literal is already in scope
+    size_t prior = ins.first->second;
+    if (prior < p.stream.scope().end() && p.stream[prior]->id() == typeid(RLit)) {
+      RLit *lit = static_cast<RLit*>(p.stream[prior]);
+      if (lit->value == value) {
+        p.stream.discard(prior);
+      } else {
+        ins.first->second = me;
+        p.stream.transfer(std::move(self));
+      }
+    } else {
+      ins.first->second = me;
+      p.stream.transfer(std::move(self));
+    }
+  }
 }
 
 void RApp::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
