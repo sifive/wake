@@ -19,10 +19,10 @@
 #include "prim.h"
 
 struct PassPurity {
-  TermStream stream;
+  ScopeAnalysis scope;
   bool first;
   bool fixed;
-  PassPurity(TargetScope &scope) : stream(scope), first(true) { }
+  PassPurity() : first(true) { }
 };
 
 static uintptr_t filter_lowest(uintptr_t x) {
@@ -41,7 +41,7 @@ void RLit::pass_purity(PassPurity &p) {
 
 void RApp::pass_purity(PassPurity &p) {
   // The unapplied function itself does not cause an effect
-  uintptr_t acc = p.stream[args[0]]->meta | 1;
+  uintptr_t acc = p.scope[args[0]]->meta | 1;
   // Each application accumulates a chance to zero the lowest bit
   for (unsigned i = 1; i < args.size(); ++i)
     acc = (acc >> 1) & filter_lowest(acc);
@@ -53,7 +53,7 @@ void RPrim::pass_purity(PassPurity &p) {
   meta = (pflags & PRIM_REMOVE) != 0;
   // Special-case for tget (purity depends on purity of fn arg)
   if ((pflags & PRIM_TGET))
-    meta = p.stream[args[3]]->meta >> 1;
+    meta = p.scope[args[3]]->meta >> 1;
 }
 
 void RGet::pass_purity(PassPurity &p) {
@@ -65,7 +65,7 @@ void RDes::pass_purity(PassPurity &p) {
  // Result is only pure when all applied handlers are pure
  uintptr_t acc = ~static_cast<uintptr_t>(0);
  for (unsigned i = 0, num = args.size()-1; i < num; ++i)
-   acc &= p.stream[args[i]]->meta;
+   acc &= p.scope[args[i]]->meta;
  meta = acc >> 1;
 }
 
@@ -79,30 +79,26 @@ void RFun::pass_purity(PassPurity &p) {
   uintptr_t save = meta;
   uintptr_t acc = 1;
   int args = 0;
-  CheckPoint cp = p.stream.begin();
   for (auto &x : terms) {
-    Term *t = x.get();
-    p.stream.transfer(std::move(x));
-    t->pass_purity(p);
-    args += t->id() == typeid(RArg);
-    acc &= t->meta;
+    p.scope.push(x.get());
+    x->pass_purity(p);
+    args += x->id() == typeid(RArg);
+    acc &= x->meta;
   }
   // Effects of body
-  acc = filter_lowest(acc) & p.stream[output]->meta;
+  acc = filter_lowest(acc) & p.scope[output]->meta;
   // Purity from lambda
   meta = (acc << args) | ((1 << args) - 1);
   if (save != meta) p.fixed = false;
-  terms = p.stream.end(cp);
+  p.scope.pop(terms.size());
 }
 
 std::unique_ptr<Term> Term::pass_purity(std::unique_ptr<Term> term) {
-  TargetScope scope;
-  PassPurity pass(scope);
+  PassPurity pass;
   do {
     pass.fixed = true;
-    pass.stream.transfer(std::move(term));
-    scope[0]->pass_purity(pass);
-    term = scope.finish();
+    pass.scope.push(term.get());
+    term->pass_purity(pass);
     pass.first = false;
   } while (!pass.fixed);
   return term;

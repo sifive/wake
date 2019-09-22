@@ -22,9 +22,6 @@ const size_t Term::invalid;
 
 Term::~Term() { }
 
-void Leaf::update(const SourceMap &map) {
-}
-
 void Redux::update(const SourceMap &map) {
   for (auto &x : args) x = map[x];
 }
@@ -110,6 +107,12 @@ static std::string pad(int depth) {
   return std::string(depth, ' ');
 }
 
+RFun::RFun(const RFun &o) : Term(o), output(o.output) {
+  terms.reserve(o.terms.size());
+  for (auto &x : o.terms)
+    terms.emplace_back(x->clone());
+}
+
 void RFun::update(const SourceMap &map) {
   output = map[output];
 }
@@ -130,9 +133,7 @@ void RFun::format(std::ostream &os, TermFormat &format) const {
 }
 
 std::unique_ptr<Term> RFun::clone() const {
-  std::unique_ptr<Term> out(new RFun(label.c_str(), output));
-  out->meta = meta;
-  return out;
+  return std::unique_ptr<Term>(new RFun(*this));
 }
 
 std::vector<std::unique_ptr<Term> > TargetScope::unwind(size_t newend) {
@@ -144,14 +145,14 @@ std::vector<std::unique_ptr<Term> > TargetScope::unwind(size_t newend) {
   return out;
 }
 
-void ReverseScope::push(const std::vector<std::unique_ptr<Term> > &terms) {
-  for (auto &x : terms)
-    scope.emplace_back(x.get());
+void ScopeAnalysis::push(const std::vector<std::unique_ptr<Term> > &terms) {
+  for (auto &x : terms) scope.emplace_back(x.get());
 }
 
 std::unique_ptr<Term> Term::optimize(std::unique_ptr<Term> term) {
   term = Term::pass_purity(std::move(term));
-  term = Term::pass_usage(std::move(term));
-  term = Term::pass_sweep(std::move(term));
+  term = Term::pass_usage (std::move(term));
+  term = Term::pass_sweep (std::move(term));
+  term = Term::pass_inline(std::move(term));
   return term;
 }

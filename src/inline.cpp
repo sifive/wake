@@ -19,28 +19,65 @@
 
 struct PassInline {
   TermStream stream;
+  PassInline(TargetScope &scope) : stream(scope) { }
 };
 
-void RArg::pass_inline(PassInline &p) {
+void RArg::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  p.stream.transfer(std::move(self));
 }
 
-void RLit::pass_inline(PassInline &p) {
+void RLit::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  p.stream.transfer(std::move(self));
 }
 
-void RApp::pass_inline(PassInline &p) {
+void RApp::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  update(p.stream.map());
+  p.stream.transfer(std::move(self));
 }
 
-void RPrim::pass_inline(PassInline &p) {
+void RPrim::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  update(p.stream.map());
+  p.stream.transfer(std::move(self));
 }
 
-void RGet::pass_inline(PassInline &p) {
+void RGet::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  update(p.stream.map());
+  Term *input = p.stream[args[0]];
+  if (input->id() == typeid(RCon)) {
+    RCon *con = static_cast<RCon*>(input);
+    p.stream.discard(con->args[index]);
+  } else {
+    p.stream.transfer(std::move(self));
+  }
 }
 
-void RDes::pass_inline(PassInline &p) {
+void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  update(p.stream.map());
+  Term *input = p.stream[args.back()];
+  if (input->id() == typeid(RCon)) {
+    RCon *con = static_cast<RCon*>(input);
+    p.stream.discard(args[con->kind]);
+  } else {
+    p.stream.transfer(std::move(self));
+  }
 }
 
-void RCon::pass_inline(PassInline &p) {
+void RCon::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  update(p.stream.map());
+  p.stream.transfer(std::move(self));
 }
 
-void RFun::pass_inline(PassInline &p) {
+void RFun::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  p.stream.transfer(std::move(self));
+  CheckPoint cp = p.stream.begin();
+  for (auto &x : terms) x->pass_inline(p, std::move(x));
+  update(p.stream.map());
+  terms = p.stream.end(cp);
+}
+
+std::unique_ptr<Term> Term::pass_inline(std::unique_ptr<Term> term) {
+  TargetScope scope;
+  PassInline pass(scope);
+  term->pass_inline(pass, std::move(term));
+  return scope.finish();
 }

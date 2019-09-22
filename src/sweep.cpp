@@ -22,11 +22,6 @@ struct PassSweep {
   PassSweep(TargetScope &scope) : stream(scope) { }
 };
 
-static void redux_sweep(PassSweep &p, Redux *r) {
-  r->update(p.stream.map());
-  for (auto x : r->args) ++p.stream[x]->meta;
-}
-
 void RArg::pass_sweep(PassSweep &p) {
 }
 
@@ -34,23 +29,23 @@ void RLit::pass_sweep(PassSweep &p) {
 }
 
 void RApp::pass_sweep(PassSweep &p) {
-  redux_sweep(p, this);
+  update(p.stream.map());
 }
 
 void RPrim::pass_sweep(PassSweep &p) {
-  redux_sweep(p, this);
+  update(p.stream.map());
 }
 
 void RGet::pass_sweep(PassSweep &p) {
-  redux_sweep(p, this);
+  update(p.stream.map());
 }
 
 void RDes::pass_sweep(PassSweep &p) {
-  redux_sweep(p, this);
+  update(p.stream.map());
 }
 
 void RCon::pass_sweep(PassSweep &p) {
-  redux_sweep(p, this);
+  update(p.stream.map());
 }
 
 void RFun::pass_sweep(PassSweep &p) {
@@ -65,7 +60,6 @@ void RFun::pass_sweep(PassSweep &p) {
     }
   }
   update(p.stream.map());
-  ++p.stream[output]->meta;
   terms = p.stream.end(cp);
 }
 

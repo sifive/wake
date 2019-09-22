@@ -18,12 +18,11 @@
 #include "ssa.h"
 
 struct PassUsage {
-  ReverseScope scope;
+  ScopeAnalysis scope;
 };
 
 static void redux_usage(PassUsage &p, Redux *r) {
-  for (auto x : r->args)
-    p.scope[x]->meta = 0;
+  for (auto x : r->args) p.scope[x]->meta = 0;
 }
 
 void RArg::pass_usage(PassUsage &p) {
@@ -57,8 +56,9 @@ void RCon::pass_usage(PassUsage &p) {
 void RFun::pass_usage(PassUsage &p) {
   p.scope.push(terms);
   p.scope[output]->meta = 0;
+  size_t last = p.scope.last();
   for (unsigned i = 0; i < terms.size(); ++i) {
-    Term *t = p.scope.peek();
+    Term *t = p.scope[last-i];
     if (t->id() == typeid(RArg)) t->meta = 0;
     else if (!(t->meta & 1)) t->pass_usage(p);
     p.scope.pop();

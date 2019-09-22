@@ -31,6 +31,7 @@ struct SourceMap;
 struct PassPurity;
 struct PassUsage;
 struct PassSweep;
+struct PassWiden;
 struct PassInline;
 
 struct TermFormat {
@@ -44,7 +45,6 @@ struct Term {
 
   std::string label; // not unique
   uintptr_t meta;    // passes can stash info here
-  virtual void update(const SourceMap &map) = 0;
   virtual void format(std::ostream &os, TermFormat &format) const = 0;
   virtual std::unique_ptr<Term> clone() const = 0;
   virtual ~Term();
@@ -57,7 +57,7 @@ struct Term {
   virtual void pass_purity(PassPurity &p) = 0;
   virtual void pass_usage (PassUsage  &p) = 0;
   virtual void pass_sweep (PassSweep  &p) = 0;
-  virtual void pass_inline(PassInline &p) = 0;
+  virtual void pass_inline(PassInline &p, std::unique_ptr<Term> self) = 0;
 
   // The top-level pass invocations
   static std::unique_ptr<Term> pass_purity(std::unique_ptr<Term> term);
@@ -69,14 +69,18 @@ struct Term {
   static std::unique_ptr<Term> optimize(std::unique_ptr<Term> term);
 };
 
+template <typename T, typename F>
+std::unique_ptr<T> static_unique_pointer_cast(std::unique_ptr<F>&& x) {
+  return std::unique_ptr<T>(static_cast<T*>(x.release()));
+}
+
 struct Leaf : public Term {
-  void update(const SourceMap &map) final override;
   Leaf(const char *label_) : Term(label_) { }
 };
 
 struct Redux : public Term {
   std::vector<size_t> args;
-  void update(const SourceMap &map) final override;
+  void update(const SourceMap &map);
   void format_args(std::ostream &os, TermFormat &format) const;
   Redux(const char *label_, std::vector<size_t> &&args_) : Term(label_), args(std::move(args_)) { }
 };
@@ -88,7 +92,7 @@ struct RArg final : public Leaf {
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
-  void pass_inline(PassInline &p) override;
+  void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
 };
 
 struct RLit final : public Leaf {
@@ -99,7 +103,7 @@ struct RLit final : public Leaf {
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
-  void pass_inline(PassInline &p) override;
+  void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
 };
 
 struct RApp final : public Redux {
@@ -110,7 +114,7 @@ struct RApp final : public Redux {
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
-  void pass_inline(PassInline &p) override;
+  void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
 };
 
 struct RPrim final : public Redux {
@@ -125,7 +129,7 @@ struct RPrim final : public Redux {
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
-  void pass_inline(PassInline &p) override;
+  void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
 };
 
 struct RGet final : public Redux {
@@ -137,7 +141,7 @@ struct RGet final : public Redux {
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
-  void pass_inline(PassInline &p) override;
+  void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
 };
 
 struct RDes final : public Redux {
@@ -148,7 +152,7 @@ struct RDes final : public Redux {
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
-  void pass_inline(PassInline &p) override;
+  void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
 };
 
 struct RCon final : public Redux {
@@ -161,21 +165,22 @@ struct RCon final : public Redux {
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
-  void pass_inline(PassInline &p) override;
+  void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
 };
 
 struct RFun final : public Term {
   size_t output; // output can refer to a non-member Term
   std::vector<std::unique_ptr<Term> > terms;
-  void update(const SourceMap &map) final override;
+  RFun(const RFun &o);
+  void update(const SourceMap &map);
   void format(std::ostream &os, TermFormat &format) const override;
   RFun(const char *label_, size_t output_ = Term::invalid)
    : Term(label_), output(output_) { }
-  std::unique_ptr<Term> clone() const override; // shallow (terms uncopied)
+  std::unique_ptr<Term> clone() const override;
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
-  void pass_inline(PassInline &p) override;
+  void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
 };
 
 struct TargetScope {
@@ -220,7 +225,6 @@ struct SourceMap {
   SourceMap(size_t start_ = 0); // The mapping is initialized with [0,start) -> [0,start)
 
   void place(size_t at); // in the TargetScope, this Term's index is 'at'
-  void discard();        // this Term will not appear in TargetScope
 
   size_t end() const;
   void unwind(size_t newend);
@@ -239,10 +243,6 @@ inline SourceMap::SourceMap(size_t start_) : start(start_) { }
 
 inline void SourceMap::place(size_t at) {
   map.emplace_back(at);
-}
-
-inline void SourceMap::discard() {
-  map.emplace_back(Term::invalid);
 }
 
 inline size_t SourceMap::end() const {
@@ -277,7 +277,7 @@ struct TermStream {
   size_t include(Term *term) { return include(std::unique_ptr<Term>(term)); }
 
   // Skip a Term from SourceMap (no Term in TargetScope corresponds)
-  void discard();
+  void discard(size_t at = Term::invalid);
 
   // Retrieve a Term from the TargetScope
   Term *operator [] (size_t index);
@@ -317,8 +317,8 @@ inline size_t TermStream::include(std::unique_ptr<Term> term) {
   return tscope.append(std::move(term));
 }
 
-inline void TermStream::discard() {
-  smap.discard();
+inline void TermStream::discard(size_t at) {
+  smap.place(at);
 }
 
 inline Term *TermStream::operator [] (size_t index) {
@@ -334,33 +334,31 @@ inline std::vector<std::unique_ptr<Term> > TermStream::end(CheckPoint cp) {
   return tscope.unwind(cp.target);
 }
 
-struct ReverseScope {
-  Term *pop();
-  Term *peek();
+struct ScopeAnalysis {
+  size_t last();
   Term *operator [] (size_t i);
-  void push(Term *term);
   void push(const std::vector<std::unique_ptr<Term> > &terms);
+  void push(Term *term);
+  void pop(size_t n = 1);
 
 private:
   std::vector<Term*> scope;
 };
 
-inline Term *ReverseScope::pop() {
-  Term *out = scope.back();
-  scope.pop_back();
-  return out;
+inline size_t ScopeAnalysis::last() {
+  return scope.size()-1;
 }
 
-inline Term *ReverseScope::peek() {
-  return scope.back();
-}
-
-inline Term *ReverseScope::operator [] (size_t i) {
+inline Term *ScopeAnalysis::operator [] (size_t i) {
   return scope[i];
 }
 
-inline void ReverseScope::push(Term *term) {
+inline void ScopeAnalysis::push(Term *term) {
   scope.emplace_back(term);
+}
+
+inline void ScopeAnalysis::pop(size_t n) {
+  scope.resize(scope.size() - n);
 }
 
 #endif
