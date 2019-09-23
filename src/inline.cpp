@@ -149,7 +149,7 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   Term *input = p.stream[args.back()];
   if (input->id() == typeid(RCon)) {
     RCon *con = static_cast<RCon*>(input);
-    p.stream.discard(args[con->kind]);
+    p.stream.discard(args[con->kind->index]);
   } else {
     p.stream.transfer(std::move(self));
   }

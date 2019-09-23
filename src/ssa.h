@@ -21,6 +21,7 @@
 #include "primfn.h"
 #include "gc.h"
 #include "location.h"
+#include "datatype.h"
 #include <vector>
 #include <memory>
 #include <ostream>
@@ -158,10 +159,10 @@ struct RDes final : public Redux {
 
 struct RCon final : public Redux {
   // arg0+ = tuple elements
-  size_t kind;
+  std::shared_ptr<Constructor> kind;
   void format(std::ostream &os, TermFormat &format) const override;
-  RCon(size_t kind_, std::vector<size_t> &&args_, const char *label_ = "")
-   : Redux(label_, std::move(args_)), kind(kind_) { }
+  RCon(std::shared_ptr<Constructor> kind_, std::vector<size_t> &&args_, const char *label_ = "")
+   : Redux(label_, std::move(args_)), kind(std::move(kind_)) { }
   std::unique_ptr<Term> clone() const override;
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;

@@ -97,7 +97,9 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
           doit(scope, &frame, def->fun[j].get());
           imp.push_back(def->fun[j]->meta);
         }
-        mutual->output = scope.append(new RCon(0, std::move(imp)));
+        auto random = std::make_shared<int>(0);
+        auto cons = std::shared_ptr<Constructor>(random, &Constructor::array);
+        mutual->output = scope.append(new RCon(std::move(cons), std::move(imp)));
         mutual->terms = scope.unwind(mcp);
         size_t tid = scope.append(new RApp(mid, null));
         for (j = i; j < def->fun.size() && scc == def->scc[j]; ++j) {
@@ -121,7 +123,7 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
     std::vector<size_t> args;
     for (unsigned i = con->cons->ast.args.size(); i > 0; --i)
       args.push_back(stack->index(i-1));
-    con->meta = scope.append(new RCon(con->cons->index, std::move(args)));
+    con->meta = scope.append(new RCon(std::shared_ptr<Constructor>(con->sum, con->cons), std::move(args)));
   } else if (expr->type == &Destruct::type) {
     Destruct *des = static_cast<Destruct*>(expr);
     std::vector<size_t> args;

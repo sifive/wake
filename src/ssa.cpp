@@ -94,7 +94,7 @@ std::unique_ptr<Term> RDes::clone() const {
 }
 
 void RCon::format(std::ostream &os, TermFormat &format) const {
-  os << "Con:" << kind << "(";
+  os << "Con:" << kind->ast.name << "(";
   format_args(os, format);
   os << ")\n";
 }
