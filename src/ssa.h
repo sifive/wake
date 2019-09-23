@@ -20,6 +20,7 @@
 
 #include "primfn.h"
 #include "gc.h"
+#include "location.h"
 #include <vector>
 #include <memory>
 #include <ostream>
@@ -171,14 +172,15 @@ struct RCon final : public Redux {
 #define RFUN_RECURSIVE 1
 
 struct RFun final : public Term {
+  Location location;
   size_t flags;
   size_t output; // output can refer to a non-member Term
   std::vector<std::unique_ptr<Term> > terms;
   RFun(const RFun &o);
   void update(const SourceMap &map);
   void format(std::ostream &os, TermFormat &format) const override;
-  RFun(const char *label_, size_t flags_, size_t output_ = Term::invalid)
-   : Term(label_), flags(flags_), output(output_) { }
+  RFun(const Location &location_, const char *label_, size_t flags_, size_t output_ = Term::invalid)
+   : Term(label_), location(location_), flags(flags_), output(output_) { }
   std::unique_ptr<Term> clone() const override;
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;

@@ -185,6 +185,7 @@ void RFun::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
     for (auto &x : child->terms)
       terms.emplace_back(std::move(x));
     output = child->output;
+    label = child->label;
   }
 
   meta = make_meta(0, args); // size does not count in recursive use
