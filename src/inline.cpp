@@ -77,28 +77,51 @@ void RLit::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 
 void RApp::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   update(p.stream.map());
-  Term *fn = p.stream[args[0]];
-  size_t fnargs = meta_args(fn->meta);
-  if (fnargs == 1 && meta_size(fn->meta) < 100) {
-    auto fun = static_unique_pointer_cast<RFun>(fn->clone());
-    PassInline q(p.stream.scope(), args[0]); // refs up to fun are unmodified
-    q.pool = std::move(p.pool);
-    q.stream.discard(); // discard name of inlined fn
-    q.stream.discard(args[1]); // bind argument to our application
-    for (unsigned i = 1; i < fun->terms.size(); ++i) {
-      std::unique_ptr<Term> &x = fun->terms[i];
-      x->pass_inline(q, std::move(x));
+  size_t fnargs = meta_args(p.stream[args[0]]->meta);
+  if (fnargs == args.size()-1) {
+    std::vector<size_t> fargs;
+    Term *term = this;
+    size_t fnid;
+    do {
+      RApp *app = static_cast<RApp*>(term);
+      for (size_t i = app->args.size()-1; i > 0; --i)
+        fargs.push_back(app->args[i]);
+      fnid = app->args[0];
+      term = p.stream[fnid];
+    } while (term->id() == typeid(RApp));
+
+    if (false && meta_size(term->meta) < 100 && !(static_cast<RFun*>(term)->flags & RFUN_RECURSIVE)) {
+      auto fun = static_unique_pointer_cast<RFun>(term->clone());
+      PassInline q(p.stream.scope(), fnid); // refs up to fun are unmodified
+      q.pool = std::move(p.pool);
+      q.stream.discard(); // discard name of inlined fn
+      for (size_t i = fargs.size(); i > 0; --i)
+        q.stream.discard(fargs[i-1]); // bind arguments to inline function
+      for (size_t i = fargs.size(); i < fun->terms.size(); ++i) {
+        std::unique_ptr<Term> &x = fun->terms[i];
+        x->pass_inline(q, std::move(x));
+      }
+      fun->update(q.stream.map());
+      p.stream.discard(fun->output); // replace App with function output
+      p.pool = std::move(q.pool);
+    } else {
+      // Combine App() but don't inline
+      args.clear();
+      args.emplace_back(fnid);
+      for (size_t i = fargs.size(); i > 0; --i)
+        args.emplace_back(fargs[i-1]);
+      meta = make_meta(1, 0);
+      p.stream.transfer(std::move(self));
     }
-    fun->update(q.stream.map());
-    p.pool = std::move(q.pool);
-    p.stream.discard(fun->output); // replace App with function output
-  } else if (fnargs == 0) {
-    // unknown function applied
-    meta = make_meta(1, 0);
-    p.stream.transfer(std::move(self));
   } else {
-    meta = make_meta(1, fnargs-1);
-    p.stream.transfer(std::move(self));
+    if (fnargs == 0) {
+      // unknown function applied; do not optimize App
+      meta = make_meta(1, 0);
+      p.stream.transfer(std::move(self));
+    } else {
+      meta = make_meta(1, fnargs+1-args.size());
+      p.stream.transfer(std::move(self));
+    }
   }
 }
 
@@ -139,13 +162,39 @@ void RCon::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 }
 
 void RFun::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
-  meta = make_meta(0, 0); // 0 args prevents inlining
   p.stream.transfer(std::move(self));
   CheckPoint cp = p.stream.begin();
-  for (auto &x : terms) x->pass_inline(p, std::move(x));
+
+  size_t args = 0, ate = 0;
+  while (true) {
+    for (; args < terms.size(); ++args) {
+      std::unique_ptr<Term> &x = terms[args];
+      if (x->id() != typeid(RArg)) break;
+      x->pass_inline(p, std::move(x));
+    }
+    // consider also combining out-of-band function return ref?
+    if (args != terms.size()-1) break;
+    if (output != cp.source+args) break;
+    if (terms[args]->id() != typeid(RFun)) break;
+    if ((static_cast<RFun*>(terms[args].get())->flags & RFUN_RECURSIVE)) break;
+    // steal all the grandchildren
+    std::unique_ptr<RFun> child(static_cast<RFun*>(terms[args].release()));
+    p.stream.discard();
+    terms.pop_back();
+    for (auto &x : child->terms)
+      terms.emplace_back(std::move(x));
+    output = child->output - ++ate;
+  }
+
+  meta = make_meta(0, args); // size does not count in recursive use
+  for (size_t i = args; i < terms.size(); ++i) {
+    std::unique_ptr<Term> &x = terms[i];
+    x->pass_inline(p, std::move(x));
+  }
+
   update(p.stream.map());
-  size_t args = (flags & RFUN_RECURSIVE) ? 0 : 1; // + meta_args(p.stream[output]->meta);
   terms = p.stream.end(cp);
+
   size_t size = 1;
   for (auto &x : terms) size += meta_size(x->meta);
   meta = make_meta(size, args);
