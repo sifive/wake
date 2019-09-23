@@ -86,8 +86,8 @@ global def scanr f =
   helper _ _ | getPairSecond
 
 # list helpers
-def joinL x y = x, y # defined outside of ++ so l&r are not captured
-global def l ++ r  = foldr joinL r l # ++ is required by the implementation of publish
+def lcat = foldr (_,_) # curried to expose recursive helper outside of ++
+global def l ++ r  = lcat r l # ++ is required by the implementation of publish
 global def reverse = foldl (\a\b b,a) Nil
 global def flatten = foldr (_++_) Nil
 global def len     = foldl (\a\_ a+1) 0
