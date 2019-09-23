@@ -107,7 +107,7 @@ static std::string pad(int depth) {
   return std::string(depth, ' ');
 }
 
-RFun::RFun(const RFun &o) : Term(o), output(o.output) {
+RFun::RFun(const RFun &o) : Term(o), flags(o.flags), output(o.output) {
   terms.reserve(o.terms.size());
   for (auto &x : o.terms)
     terms.emplace_back(x->clone());
@@ -118,7 +118,7 @@ void RFun::update(const SourceMap &map) {
 }
 
 void RFun::format(std::ostream &os, TermFormat &format) const {
-  os << "FunRet:" << output;
+  os << "Fun(" << flags << ")Ret:" << output;
   if (output > format.id + terms.size()) os << " !!!";
   os << "\n";
   format.depth += 2;

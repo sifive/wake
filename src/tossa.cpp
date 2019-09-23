@@ -63,7 +63,8 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
     app->meta = scope.append(new RApp(app->fn->meta, app->val->meta));
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr);
-    RFun *fun = new RFun(lambda->fnname.empty() ? "anon" : lambda->fnname.c_str());
+    size_t flags = (lambda->flags & FLAG_RECURSIVE) ? RFUN_RECURSIVE : 0;
+    RFun *fun = new RFun(lambda->fnname.empty() ? "anon" : lambda->fnname.c_str(), flags);
     lambda->meta = scope.append(fun);
     size_t cp = scope.append(new RArg(lambda->name.c_str()));
     doit(scope, &frame, lambda->body.get());
@@ -79,11 +80,11 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
         doit(scope, &frame, def->fun[i].get());
       } else {
         size_t null = 1;
-        RFun *mutual = new RFun("mutual");
+        RFun *mutual = new RFun("mutual", RFUN_RECURSIVE);
         size_t mid = scope.append(mutual);
         size_t mcp = scope.append(new RArg("_"));
         for (j = i; j < def->fun.size() && scc == def->scc[j]; ++j) {
-          RFun *proxy = new RFun("proxy");
+          RFun *proxy = new RFun("proxy", 0);
           def->fun[j]->meta = scope.append(proxy);
           size_t x = scope.append(new RArg("_"));
           size_t a = scope.append(new RApp(mid, null));
@@ -143,7 +144,7 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
 
 std::unique_ptr<Term> Term::fromExpr(std::unique_ptr<Expr> expr) {
   TargetScope scope;
-  RFun *out = new RFun("top");
+  RFun *out = new RFun("top", 0);
   size_t cp = scope.append(out);
   doit(scope, nullptr, expr.get());
   out->output = expr->meta;

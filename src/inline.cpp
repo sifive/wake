@@ -32,17 +32,24 @@ namespace std {
 
 typedef std::unordered_map<std::shared_ptr<RootPointer<Value> >, size_t> ConstantPool;
 
+// In this pass, meta = the size of the AST & number of unapplied args
+static size_t make_meta(size_t size, size_t args) { return (size << 8) | args; }
+static size_t meta_size(size_t meta) { return meta >> 8; }
+static size_t meta_args(size_t meta) { return meta & 255; }
+
 struct PassInline {
   TermStream stream;
   ConstantPool pool;
-  PassInline(TargetScope &scope) : stream(scope) { }
+  PassInline(TargetScope &scope, size_t start = 0) : stream(scope, start) { }
 };
 
 void RArg::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  meta = make_meta(1, 0); // we don't know the number unapplied args, but 0 prevents inlining anyway
   p.stream.transfer(std::move(self));
 }
 
 void RLit::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  meta = make_meta(1, 0);
   size_t me = p.stream.scope().end();
   auto ins = p.pool.insert(std::make_pair(value, me));
   if (ins.second) {
@@ -70,15 +77,39 @@ void RLit::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 
 void RApp::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   update(p.stream.map());
-  p.stream.transfer(std::move(self));
+  Term *fn = p.stream[args[0]];
+  size_t fnargs = meta_args(fn->meta);
+  if (fnargs == 1 && meta_size(fn->meta) < 100) {
+    auto fun = static_unique_pointer_cast<RFun>(fn->clone());
+    PassInline q(p.stream.scope(), args[0]); // refs up to fun are unmodified
+    q.pool = std::move(p.pool);
+    q.stream.discard(); // discard name of inlined fn
+    q.stream.discard(args[1]); // bind argument to our application
+    for (unsigned i = 1; i < fun->terms.size(); ++i) {
+      std::unique_ptr<Term> &x = fun->terms[i];
+      x->pass_inline(q, std::move(x));
+    }
+    fun->update(q.stream.map());
+    p.pool = std::move(q.pool);
+    p.stream.discard(fun->output); // replace App with function output
+  } else if (fnargs == 0) {
+    // unknown function applied
+    meta = make_meta(1, 0);
+    p.stream.transfer(std::move(self));
+  } else {
+    meta = make_meta(1, fnargs-1);
+    p.stream.transfer(std::move(self));
+  }
 }
 
 void RPrim::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  meta = make_meta(1, 0);
   update(p.stream.map());
   p.stream.transfer(std::move(self));
 }
 
 void RGet::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  meta = make_meta(1, 0);
   update(p.stream.map());
   Term *input = p.stream[args[0]];
   if (input->id() == typeid(RCon)) {
@@ -90,6 +121,7 @@ void RGet::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 }
 
 void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  meta = make_meta(1, 0);
   update(p.stream.map());
   Term *input = p.stream[args.back()];
   if (input->id() == typeid(RCon)) {
@@ -101,16 +133,22 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 }
 
 void RCon::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  meta = make_meta(1, 0);
   update(p.stream.map());
   p.stream.transfer(std::move(self));
 }
 
 void RFun::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  meta = make_meta(0, 0); // 0 args prevents inlining
   p.stream.transfer(std::move(self));
   CheckPoint cp = p.stream.begin();
   for (auto &x : terms) x->pass_inline(p, std::move(x));
   update(p.stream.map());
+  size_t args = (flags & RFUN_RECURSIVE) ? 0 : 1; // + meta_args(p.stream[output]->meta);
   terms = p.stream.end(cp);
+  size_t size = 1;
+  for (auto &x : terms) size += meta_size(x->meta);
+  meta = make_meta(size, args);
 }
 
 std::unique_ptr<Term> Term::pass_inline(std::unique_ptr<Term> term) {
