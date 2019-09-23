@@ -43,7 +43,7 @@ void RApp::pass_purity(PassPurity &p) {
   // The unapplied function itself does not cause an effect
   uintptr_t acc = p.scope[args[0]]->meta | 1;
   // Each application accumulates a chance to zero the lowest bit
-  for (unsigned i = 1; i < args.size(); ++i)
+  for (size_t i = 1; i < args.size(); ++i)
     acc = (acc >> 1) & filter_lowest(acc);
   meta = acc;
 }
@@ -64,7 +64,7 @@ void RGet::pass_purity(PassPurity &p) {
 void RDes::pass_purity(PassPurity &p) {
  // Result is only pure when all applied handlers are pure
  uintptr_t acc = ~static_cast<uintptr_t>(0);
- for (unsigned i = 0, num = args.size()-1; i < num; ++i)
+ for (size_t i = 0, num = args.size()-1; i < num; ++i)
    acc &= p.scope[args[i]]->meta;
  meta = acc >> 1;
 }
@@ -95,9 +95,9 @@ void RFun::pass_purity(PassPurity &p) {
 
 std::unique_ptr<Term> Term::pass_purity(std::unique_ptr<Term> term) {
   PassPurity pass;
+  pass.scope.push(term.get());
   do {
     pass.fixed = true;
-    pass.scope.push(term.get());
     term->pass_purity(pass);
     pass.first = false;
   } while (!pass.fixed);
