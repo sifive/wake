@@ -35,11 +35,13 @@ struct PassUsage;
 struct PassSweep;
 struct PassWiden;
 struct PassInline;
+struct PassScope;
 
 struct TermFormat {
   int depth;
   size_t id;
-  TermFormat() : depth(0), id(0) { }
+  bool scoped;
+  TermFormat(bool scoped_ = false) : depth(0), id(0), scoped(scoped_) { }
 };
 
 struct Term {
@@ -60,6 +62,7 @@ struct Term {
   virtual void pass_usage (PassUsage  &p) = 0;
   virtual void pass_sweep (PassSweep  &p) = 0;
   virtual void pass_inline(PassInline &p, std::unique_ptr<Term> self) = 0;
+  virtual void pass_scope (PassScope  &p) = 0;
 
   // The top-level pass invocations
   static std::unique_ptr<Term> pass_purity(std::unique_ptr<Term> term);
@@ -69,6 +72,8 @@ struct Term {
 
   // The overall optimization strategy
   static std::unique_ptr<Term> optimize(std::unique_ptr<Term> term);
+  // Convert Redux argument references to Scope indexes
+  static std::unique_ptr<Term> scope(std::unique_ptr<Term> term);
 };
 
 template <typename T, typename F>
@@ -78,13 +83,20 @@ std::unique_ptr<T> static_unique_pointer_cast(std::unique_ptr<F>&& x) {
 
 struct Leaf : public Term {
   Leaf(const char *label_) : Term(label_) { }
+  void pass_scope(PassScope &p) override;
 };
+
+// After scope pass, Redux.args is suitable for interpretation
+inline size_t arg_depth (size_t arg) { return arg & 65535; }
+inline size_t arg_offset(size_t arg) { return arg >> 16; }
+inline size_t make_arg(size_t depth, size_t offset) { return (offset << 16) | depth; }
 
 struct Redux : public Term {
   std::vector<size_t> args;
   void update(const SourceMap &map);
   void format_args(std::ostream &os, TermFormat &format) const;
   Redux(const char *label_, std::vector<size_t> &&args_) : Term(label_), args(std::move(args_)) { }
+  void pass_scope(PassScope &p) override;
 };
 
 struct RArg final : public Leaf {
@@ -187,6 +199,7 @@ struct RFun final : public Term {
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
+  void pass_scope (PassScope  &p) override;
 };
 
 struct TargetScope {

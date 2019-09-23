@@ -30,8 +30,12 @@ void Redux::format_args(std::ostream &os, TermFormat &format) const {
   bool first = true;
   for (auto x : args) {
     if (!first) os << " ";
-    os << x;
-    if (x >= format.id) os << " !!!";
+    if (format.scoped) {
+      os << arg_depth(x) << ":" << arg_offset(x);
+    } else {
+      os << x;
+      if (x >= format.id) os << " !!!";
+    }
     first = false;
   }
 }
@@ -118,12 +122,23 @@ void RFun::update(const SourceMap &map) {
 }
 
 void RFun::format(std::ostream &os, TermFormat &format) const {
-  os << "Fun(" << location.file() << "," << flags << ") returns " << output;
-  if (output > format.id + terms.size()) os << " !!!";
+  os << "Fun(" << location.file() << "," << flags << ") returns ";
+  if (format.scoped) {
+    os << arg_depth(output) << ":" << arg_offset(output);
+  } else {
+    os << output;
+    if (output > format.id + terms.size()) os << " !!!";
+  }
   os << "\n";
   format.depth += 2;
+  size_t index = 0;
   for (auto &x : terms) {
-    os << pad(format.depth+2) << ++format.id;
+    os << pad(format.depth);
+    if (format.scoped) {
+      os << index++;
+    } else {
+      os << ++format.id;
+    }
     if (!x->label.empty()) os << " (" << x->label << ")";
     os << " [" << x->meta << "] = ";
     x->format(os, format);
