@@ -20,7 +20,8 @@
 
 #include "gc.h"
 
-struct Expr;
+struct RFun;
+struct Closure;
 struct Runtime;
 struct Continuation;
 struct Record;
@@ -63,10 +64,11 @@ struct Runtime {
     stack = work;
   }
 
-  void init(Expr *root);
+  void init(RFun *root);
 
-  static size_t reserve_eval();
-  void claim_eval(Expr *expr, Scope *scope, Continuation *cont);
+  // Caller must guarantee clo->applied==0 and clo->fun.args()==1
+  static size_t reserve_apply(RFun *fun);
+  void claim_apply(Closure *clo, HeapObject *value, Continuation *cont, Scope *caller);
 };
 
 struct Continuation : public Work {

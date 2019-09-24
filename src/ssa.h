@@ -36,6 +36,7 @@ struct PassSweep;
 struct PassWiden;
 struct PassInline;
 struct PassScope;
+struct InterpretContext;
 
 struct TermFormat {
   int depth;
@@ -49,13 +50,14 @@ struct Term {
 
   std::string label; // not unique
   uintptr_t meta;    // passes can stash info here
-  virtual void format(std::ostream &os, TermFormat &format) const = 0;
-  virtual std::unique_ptr<Term> clone() const = 0;
-  virtual ~Term();
+
   Term(const char *label_) : label(label_) { }
   const std::type_info &id() { return typeid(*this); }
 
-  static std::unique_ptr<Term> fromExpr(std::unique_ptr<Expr> expr);
+  virtual ~Term();
+  virtual std::unique_ptr<Term> clone() const = 0;
+  virtual void format(std::ostream &os, TermFormat &format) const = 0;
+  virtual void interpret(InterpretContext &context) = 0;
 
   // All terms must implement their pass behaviour
   virtual void pass_purity(PassPurity &p) = 0;
@@ -70,6 +72,8 @@ struct Term {
   static std::unique_ptr<Term> pass_sweep (std::unique_ptr<Term> term);
   static std::unique_ptr<Term> pass_inline(std::unique_ptr<Term> term);
 
+  // Create SSA from AST
+  static std::unique_ptr<Term> fromExpr(std::unique_ptr<Expr> expr);
   // The overall optimization strategy
   static std::unique_ptr<Term> optimize(std::unique_ptr<Term> term);
   // Convert Redux argument references to Scope indexes
@@ -93,16 +97,21 @@ inline size_t make_arg(size_t depth, size_t offset) { return (offset << 16) | de
 
 struct Redux : public Term {
   std::vector<size_t> args;
+
+  Redux(const char *label_, std::vector<size_t> &&args_) : Term(label_), args(std::move(args_)) { }
   void update(const SourceMap &map);
   void format_args(std::ostream &os, TermFormat &format) const;
-  Redux(const char *label_, std::vector<size_t> &&args_) : Term(label_), args(std::move(args_)) { }
+
   void pass_scope(PassScope &p) override;
 };
 
 struct RArg final : public Leaf {
-  void format(std::ostream &os, TermFormat &format) const override;
   RArg(const char *label_ = "") : Leaf(label_) { }
+
   std::unique_ptr<Term> clone() const override;
+  void format(std::ostream &os, TermFormat &format) const override;
+  void interpret(InterpretContext &context) override;
+
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -111,9 +120,13 @@ struct RArg final : public Leaf {
 
 struct RLit final : public Leaf {
   std::shared_ptr<RootPointer<Value> > value;
-  void format(std::ostream &os, TermFormat &format) const override;
+
   RLit(std::shared_ptr<RootPointer<Value> > value_, const char *label_ = "") : Leaf(label_), value(std::move(value_)) { }
+
   std::unique_ptr<Term> clone() const override;
+  void format(std::ostream &os, TermFormat &format) const override;
+  void interpret(InterpretContext &context) override;
+
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -122,9 +135,12 @@ struct RLit final : public Leaf {
 
 struct RApp final : public Redux {
   // arg0 = fn, arg1+ = arguments
-  void format(std::ostream &os, TermFormat &format) const override;
   RApp(size_t fn, size_t arg, const char *label_ = "") : Redux(label_, {fn, arg}) { }
+
   std::unique_ptr<Term> clone() const override;
+  void format(std::ostream &os, TermFormat &format) const override;
+  void interpret(InterpretContext &context) override;
+
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -136,10 +152,14 @@ struct RPrim final : public Redux {
   PrimFn fn;
   void *data;
   int pflags;
-  void format(std::ostream &os, TermFormat &format) const override;
+
   RPrim(const char *name_, PrimFn fn_, void *data_, int pflags_, std::vector<size_t> &&args_, const char *label_ = "")
    : Redux(label_, std::move(args_)), name(name_), fn(fn_), data(data_), pflags(pflags_) { }
+
   std::unique_ptr<Term> clone() const override;
+  void format(std::ostream &os, TermFormat &format) const override;
+  void interpret(InterpretContext &context) override;
+
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -149,9 +169,13 @@ struct RPrim final : public Redux {
 struct RGet final : public Redux {
   // arg0 = object
   size_t index;
-  void format(std::ostream &os, TermFormat &format) const override;
+
   RGet(size_t index_, size_t obj, const char *label_ = "") : Redux(label_, {obj}), index(index_) { }
+
   std::unique_ptr<Term> clone() const override;
+  void format(std::ostream &os, TermFormat &format) const override;
+  void interpret(InterpretContext &context) override;
+
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -160,9 +184,12 @@ struct RGet final : public Redux {
 
 struct RDes final : public Redux {
   // args = handlers for cases, then obj
-  void format(std::ostream &os, TermFormat &format) const override;
   RDes(std::vector<size_t> &&args_, const char *label_ = "") : Redux(label_, std::move(args_)) { }
+
   std::unique_ptr<Term> clone() const override;
+  void format(std::ostream &os, TermFormat &format) const override;
+  void interpret(InterpretContext &context) override;
+
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -172,10 +199,14 @@ struct RDes final : public Redux {
 struct RCon final : public Redux {
   // arg0+ = tuple elements
   std::shared_ptr<Constructor> kind;
-  void format(std::ostream &os, TermFormat &format) const override;
+
   RCon(std::shared_ptr<Constructor> kind_, std::vector<size_t> &&args_, const char *label_ = "")
    : Redux(label_, std::move(args_)), kind(std::move(kind_)) { }
+
+  void format(std::ostream &os, TermFormat &format) const override;
   std::unique_ptr<Term> clone() const override;
+  void interpret(InterpretContext &context) override;
+
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -189,12 +220,18 @@ struct RFun final : public Term {
   size_t flags;
   size_t output; // output can refer to a non-member Term
   std::vector<std::unique_ptr<Term> > terms;
+
   RFun(const RFun &o);
-  void update(const SourceMap &map);
-  void format(std::ostream &os, TermFormat &format) const override;
   RFun(const Location &location_, const char *label_, size_t flags_, size_t output_ = Term::invalid)
    : Term(label_), location(location_), flags(flags_), output(output_) { }
+
+  void update(const SourceMap &map);
+  size_t args() const;
+
   std::unique_ptr<Term> clone() const override;
+  void format(std::ostream &os, TermFormat &format) const override;
+  void interpret(InterpretContext &context) override;
+
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;

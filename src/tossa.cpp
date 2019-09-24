@@ -149,6 +149,7 @@ std::unique_ptr<Term> Term::fromExpr(std::unique_ptr<Expr> expr) {
   TargetScope scope;
   RFun *out = new RFun(LOCATION, "top", 0);
   size_t cp = scope.append(out);
+  scope.append(new RArg("_"));
   doit(scope, nullptr, expr.get());
   out->output = expr->meta;
   out->terms = scope.unwind(cp+1);

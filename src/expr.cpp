@@ -76,10 +76,6 @@ Hash Subscribe::hash() {
   assert(0 /* unreachable */);
 }
 
-void Subscribe::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  assert(0 /* unreachable */);
-}
-
 void Match::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Match: " << typeVar << " @ " << location.file() << std::endl;
   for (auto &a: args)
@@ -111,10 +107,6 @@ Hash Match::hash() {
     }
   }
   return hashcode = Hash(codes);
-}
-
-void Match::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  assert(0 /* unreachable */);
 }
 
 void App::format(std::ostream &os, int depth) const {
@@ -167,10 +159,6 @@ Hash DefMap::hash() {
   assert(0 /* unreachable */);
 }
 
-void DefMap::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  assert(0 /* unreachable */);
-}
-
 void Literal::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Literal: " << typeVar << " @ " << location.file() << " = " << value->get() << std::endl;
 }
@@ -196,10 +184,6 @@ void Top::format(std::ostream &os, int depth) const {
 }
 
 Hash Top::hash() {
-  assert(0 /* unreachable */);
-}
-
-void Top::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
   assert(0 /* unreachable */);
 }
 
@@ -270,16 +254,8 @@ void VarDef::format(std::ostream &os, int depth) const {
 
 Hash VarDef::hash() { return Hash(); }
 
-void VarDef::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  assert(0 /* unreachable */);
-}
-
 void VarArg::format(std::ostream &os, int depth) const {
   os << pad(depth) << "VarArg @ " << location.file() << std::endl;
 }
 
 Hash VarArg::hash() { return Hash(); }
-
-void VarArg::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  assert(0 /* unreachable */);
-}

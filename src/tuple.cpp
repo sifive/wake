@@ -16,7 +16,7 @@
  */
 
 #include "tuple.h"
-#include "expr.h"
+#include "ssa.h"
 #include <sstream>
 #include <unordered_map>
 
@@ -178,9 +178,9 @@ Record *Record::alloc(Heap &h, Constructor *cons, size_t size) {
 
 struct alignas(PadObject) ScopeStack {
   HeapPointer<Scope> parent;
-  Expr *expr;
+  RFun *fun;
 
-  ScopeStack(Scope *parent_, Expr* expr_) : parent(parent_), expr(expr_) { }
+  ScopeStack(Scope *parent_, RFun* fun_) : parent(parent_), fun(fun_) { }
 };
 
 bool Scope::debug = false;
@@ -189,8 +189,8 @@ const char *Scope::type() const {
   return "ScopeTree";
 }
 
-void Scope::set_expr(Expr *expr) {
-  if (debug) stack()->expr = expr;
+void Scope::set_fun(RFun *fun) {
+  if (debug) stack()->fun = fun;
 }
 
 struct Compressor {
@@ -274,15 +274,11 @@ std::vector<std::string> Scope::stack_trace(bool indent_compress) const {
     std::stringstream ss;
     for (const Scope *i = this; i; i = s->parent.get()) {
       s = i->stack();
-      if (s->expr->type == &Lambda::type) {
-        const Lambda *l = static_cast<Lambda*>(s->expr);
-        if (l->fnname.empty()) continue;
-        ss << l->fnname << ": " << l->body->location.file();
-        auto x = ss.str();
-        ss.str(std::string());
-        if (out.empty() || out.back() != x)
-          out.emplace_back(std::move(x));
-      }
+      ss << s->fun->label << ": " << s->fun->location.file();
+      auto x = ss.str();
+      ss.str(std::string());
+      if (out.empty() || out.back() != x)
+        out.emplace_back(std::move(x));
     }
   }
   return scompress(std::move(out), indent_compress);
@@ -290,7 +286,7 @@ std::vector<std::string> Scope::stack_trace(bool indent_compress) const {
 
 template <typename T>
 struct ScopeObject : public TupleObject<T, Scope> {
-  ScopeObject(size_t size, Scope *next, Scope *parent, Expr *expr);
+  ScopeObject(size_t size, Scope *next, Scope *parent, RFun *fun);
   ScopeObject(const ScopeObject &other);
 
   template <typename R, R (HeapPointerBase::*memberfn)(R x)>
@@ -319,10 +315,10 @@ PadObject *ScopeObject<T>::objend() {
 }
 
 template <typename T>
-ScopeObject<T>::ScopeObject(size_t size, Scope *next, Scope *parent, Expr *expr)
+ScopeObject<T>::ScopeObject(size_t size, Scope *next, Scope *parent, RFun *fun)
  : TupleObject<T, Scope>(size, next) {
   if (Scope::debug) {
-    new (TupleObject<T, Scope>::at(size)) ScopeStack(parent, expr);
+    new (TupleObject<T, Scope>::at(size)) ScopeStack(parent, fun);
   }
 }
 
@@ -345,8 +341,8 @@ R ScopeObject<T>::recurse(R arg) {
 struct BigScope final : public ScopeObject<BigScope> {
   size_t tsize;
 
-  BigScope(size_t tsize_, Scope *next, Scope *parent, Expr *expr)
-   : ScopeObject<BigScope>(tsize_, next, parent, expr), tsize(tsize_) { }
+  BigScope(size_t tsize_, Scope *next, Scope *parent, RFun *fun)
+   : ScopeObject<BigScope>(tsize_, next, parent, fun), tsize(tsize_) { }
 
   size_t size() const override;
 };
@@ -357,8 +353,8 @@ size_t BigScope::size() const {
 
 template <size_t tsize>
 struct SmallScope final : public ScopeObject<SmallScope<tsize> > {
-  SmallScope(Scope *next, Scope *parent, Expr *expr)
-   : ScopeObject<SmallScope<tsize> >(tsize, next, parent, expr) { }
+  SmallScope(Scope *next, Scope *parent, RFun *fun)
+   : ScopeObject<SmallScope<tsize> >(tsize, next, parent, fun) { }
 
   size_t size() const override;
 };
@@ -378,23 +374,23 @@ size_t Scope::reserve(size_t size) {
   }
 }
 
-Scope *Scope::claim(Heap &h, size_t size, Scope *next, Scope *parent, Expr *expr) {
+Scope *Scope::claim(Heap &h, size_t size, Scope *next, Scope *parent, RFun *fun) {
   bool big = size > 4;
   if (big) {
-    return new (h.claim(reserve(size))) BigScope(size, next, parent, expr);
+    return new (h.claim(reserve(size))) BigScope(size, next, parent, fun);
   } else {
     PadObject *dest = h.claim(reserve(size));
     switch (size) {
-      case 0:  return new (dest) SmallScope<0>(next, parent, expr);
-      case 1:  return new (dest) SmallScope<1>(next, parent, expr);
-      case 2:  return new (dest) SmallScope<2>(next, parent, expr);
-      case 3:  return new (dest) SmallScope<3>(next, parent, expr);
-      default: return new (dest) SmallScope<4>(next, parent, expr);
+      case 0:  return new (dest) SmallScope<0>(next, parent, fun);
+      case 1:  return new (dest) SmallScope<1>(next, parent, fun);
+      case 2:  return new (dest) SmallScope<2>(next, parent, fun);
+      case 3:  return new (dest) SmallScope<3>(next, parent, fun);
+      default: return new (dest) SmallScope<4>(next, parent, fun);
     }
   }
 }
 
-Scope *Scope::alloc(Heap &h, size_t size, Scope *next, Scope *parent, Expr *expr) {
+Scope *Scope::alloc(Heap &h, size_t size, Scope *next, Scope *parent, RFun *fun) {
   h.reserve(reserve(size));
-  return claim(h, size, next, parent, expr);
+  return claim(h, size, next, parent, fun);
 }

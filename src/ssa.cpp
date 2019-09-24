@@ -121,6 +121,13 @@ void RFun::update(const SourceMap &map) {
   output = map[output];
 }
 
+size_t RFun::args() const {
+  for (size_t out = 0; out < terms.size(); ++out)
+    if (terms[out]->id() != typeid(RArg))
+      return out;
+  return terms.size();
+}
+
 void RFun::format(std::ostream &os, TermFormat &format) const {
   os << "Fun(" << location.file() << "," << flags << ") returns ";
   if (format.scoped) {

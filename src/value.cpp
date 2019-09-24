@@ -18,6 +18,7 @@
 #include "value.h"
 #include "type.h"
 #include "expr.h"
+#include "ssa.h"
 #include "hash.h"
 #include "symbol.h"
 #include "status.h"
@@ -340,11 +341,11 @@ RootPointer<RegExp> RegExp::literal(Heap &h, const std::string &value) {
 }
 
 void Closure::format(std::ostream &os, FormatState &state) const {
-  os << "<" << lambda->location.file() << ">";
+  os << "<" << fun->location.file() << ">";
 }
 
 Hash Closure::hash() const {
-  return lambda->hashcode;
+  return 0; // !!! lambda->hashcode;
 }
 
 Hash Record::hash() const {

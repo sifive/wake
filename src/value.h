@@ -31,7 +31,7 @@
 
 /* Values */
 
-struct Lambda;
+struct RFun;
 struct Scope;
 struct TypeVar;
 
@@ -185,10 +185,11 @@ struct RegExp final : public GCObject<RegExp, DestroyableObject> {
 };
 
 struct Closure final : public GCObject<Closure, Value> {
-  Lambda *lambda;
+  RFun *fun;
+  size_t applied;
   HeapPointer<Scope> scope;
 
-  Closure(Lambda *lambda_, Scope *scope_);
+  Closure(RFun *fun_, size_t applied_, Scope *scope_);
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
 

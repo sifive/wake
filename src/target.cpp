@@ -164,7 +164,7 @@ static PRIMFN(prim_tget) {
   INTEGER_MPZ(subkey, 2);
   CLOSURE(body, 3);
 
-  runtime.heap.reserve(Scope::reserve(1) + Runtime::reserve_eval() + CTarget::reserve());
+  runtime.heap.reserve(Runtime::reserve_apply(body->fun) + CTarget::reserve());
 
   Hash hash;
   REQUIRE(mpz_sizeinbase(key, 2) <= 8*sizeof(hash.data));
@@ -187,11 +187,8 @@ static PRIMFN(prim_tget) {
     runtime.abort = true;
   }
 
-  if (ref.second) {
-    Scope *bind = Scope::claim(runtime.heap, 1, body->scope.get(), scope, body->lambda);
-    bind->at(0)->instant_fulfill(args[1]); // hash
-    runtime.claim_eval(body->lambda->body.get(), bind, CTarget::claim(runtime.heap, target, hash));
-  }
+  if (ref.second)
+    runtime.claim_apply(body, args[1], CTarget::claim(runtime.heap, target, hash), scope);
 }
 
 void prim_register_target(PrimMap &pmap) {

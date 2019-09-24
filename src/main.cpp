@@ -366,12 +366,6 @@ int main(int argc, char **argv) {
 
   if (tcheck) std::cout << root.get();
   if (html) markup_html(std::cout, root.get());
-  if (optim) {
-    TermFormat format;
-    auto tree = Term::optimize(Term::fromExpr(std::move(root)));
-    tree->format(std::cout, format);
-  }
-
   for (auto &g : globals) {
     Expr *e = root.get();
     while (e && e->type == &DefBinding::type) {
@@ -393,14 +387,25 @@ int main(int argc, char **argv) {
     if (verbose) std::cout << "Added target " << (targets.size()-1) << " = " << targets.back() << std::endl;
   }
 
+  // Convert AST to optimized SSA
+  std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root));
+  ssa = Term::optimize(std::move(ssa));
+
+  // Upon request, dump out the SSA
+  if (optim) {
+    TermFormat format;
+    ssa->format(std::cout, format);
+  }
+
   // Exit without execution for these arguments
   if (noexecute) return 0;
 
   // Initialize expression hashes for hashing closures
-  root->hash();
+  ssa = Term::scope(std::move(ssa));
+  //root->hash();
 
   db.prepare();
-  runtime.init(root.get());
+  runtime.init(static_cast<RFun*>(ssa.get()));
 
   // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
   std::cout << std::flush;
