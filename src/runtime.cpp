@@ -123,7 +123,7 @@ void Interpret::execute(Runtime &runtime) {
   context.cont = nullptr;
 
   size_t limit = fun->terms.size();
-  bool tail = fun->output == make_arg(0, limit-1);
+  bool tail = fun->output == make_arg(0, limit-1) && fun->terms.back()->tailCallOk();
   if (tail) --limit;
 
   next = nullptr; // potentially reschedule
@@ -172,16 +172,33 @@ Promise *InterpretContext::arg(Scope *it, size_t arg) {
   return it->at(arg_offset(arg));
 }
 
+bool RArg::tailCallOk() const {
+  // We don't invoke return, so cannot be tail called
+  return false;
+}
+
 void RArg::interpret(InterpretContext &context) {
-  // noop; filled in by App
+  // No-Op; filled in by App during Scope construction
+}
+
+bool RLit::tailCallOk() const {
+  return true;
 }
 
 void RLit::interpret(InterpretContext &context) {
   context.finish(value->get());
 }
 
+bool RFun::tailCallOk() const {
+  return !(flags & RFUN_RECURSIVE);
+}
+
 void RFun::interpret(InterpretContext &context) {
   context.finish(Closure::alloc(context.runtime.heap, this, 0, context.scope));
+}
+
+bool RCon::tailCallOk() const {
+  return true;
 }
 
 void RCon::interpret(InterpretContext &context) {
@@ -212,6 +229,10 @@ struct CGet final : public GCObject<CGet, Continuation> {
      record->at(index)->await(runtime, cont.get());
   }
 };
+
+bool RGet::tailCallOk() const {
+  return true;
+}
 
 void RGet::interpret(InterpretContext &context) {
   Promise *arg = context.arg(args[0]);
@@ -248,6 +269,10 @@ struct CDes final : public GCObject<CDes, Continuation> {
     runtime.claim_apply(handler, record, cont.get(), scope.get());
   }
 };
+
+bool RDes::tailCallOk() const {
+  return true;
+}
 
 void RDes::interpret(InterpretContext &context) {
   Promise *arg = context.arg(args.back());
@@ -307,6 +332,10 @@ Promise *CPrim::doit(Runtime &runtime, Scope *scope, RPrim *prim, Continuation *
   } else {
     return p;
   }
+}
+
+bool RPrim::tailCallOk() const {
+  return true;
 }
 
 void RPrim::interpret(InterpretContext &context) {
@@ -385,6 +414,10 @@ void CApp::doit(Runtime &runtime, Closure *closure, RApp *app, Scope *caller, Co
     cont->resume(runtime,
       Closure::claim(runtime.heap, fun, applied+nargs, bind));
   }
+}
+
+bool RApp::tailCallOk() const {
+  return true;
 }
 
 void RApp::interpret(InterpretContext &context) {
