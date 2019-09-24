@@ -105,7 +105,7 @@ struct InterpretContext {
   Interpret *interpret;
   Scope *scope;
   size_t output; // index into scope
-  Continuation *cont; // optional
+  Continuation *cont; // set for tail calls
 
   InterpretContext(Runtime &runtime_) : runtime(runtime_) { }
   static Promise *arg(Scope *scope, size_t arg);
@@ -130,7 +130,7 @@ void Interpret::execute(Runtime &runtime) {
   for (context.output = index; context.output < limit; context.output = index) {
     fun->terms[context.output]->interpret(context);
     index = context.output+1;
-    if (next) return;
+    if (!context.interpret) return;
   }
 
   if (tail) {
@@ -185,10 +185,10 @@ void RFun::interpret(InterpretContext &context) {
 }
 
 void RCon::interpret(InterpretContext &context) {
-  size_t size = kind->ast.args.size();
+  size_t size = args.size();
   context.runtime.heap.reserve(Record::reserve(size) + size * Tuple::fulfiller_pads);
   Record *bind = Record::claim(context.runtime.heap, kind.get(), size);
-  for (size_t i = 0; i < args.size(); ++i)
+  for (size_t i = 0; i < size; ++i)
     bind->claim_instant_fulfiller(context.runtime, i, context.arg(args[i]));
   context.finish(bind);
 }
@@ -255,7 +255,10 @@ void RDes::interpret(InterpretContext &context) {
     Record *record = arg->coerce<Record>();
     Closure *handler = InterpretContext::arg(context.scope, args[record->cons->index])->coerce<Closure>();
     context.runtime.heap.reserve(context.runtime.reserve_apply(handler->fun));
-    if (context.interpret) context.runtime.schedule(context.interpret);
+    if (context.interpret) {
+      context.runtime.schedule(context.interpret);
+      context.interpret = nullptr;
+    }
     context.runtime.claim_apply(handler, record, context.defer(), context.scope);
   } else {
     context.runtime.heap.reserve(Tuple::fulfiller_pads + CDes::reserve());
@@ -308,9 +311,10 @@ Promise *CPrim::doit(Runtime &runtime, Scope *scope, RPrim *prim, Continuation *
 
 void RPrim::interpret(InterpretContext &context) {
   context.runtime.heap.reserve(Tuple::fulfiller_pads + CPrim::reserve());
+  // !!! argh - the cont gets scheduled => everything waits on it
   Continuation *cont = context.defer(); // !!! pointless deferral for pure Prims
   if (Promise *p = CPrim::doit(context.runtime, context.scope, this, cont)) {
-    CPrim *prim = CPrim::claim(context.runtime.heap, context.scope, context.defer(), this);
+    CPrim *prim = CPrim::claim(context.runtime.heap, context.scope, cont, this);
     p->await(context.runtime, prim);
   }
 }
@@ -330,13 +334,14 @@ struct CApp final : public GCObject<CApp, Continuation> {
     return arg;
   }
 
-  static void doit(Runtime &runtime, Closure *closure, RApp *app, Scope *caller, Continuation *cont, Interpret *resume);
+  static void doit(Runtime &runtime, Closure *closure, RApp *app, Scope *caller, Continuation *cont, Interpret *&resume);
   void execute(Runtime &runtime) override {
-    doit(runtime, static_cast<Closure*>(value.get()), app, caller.get(), cont.get(), nullptr);
+    Interpret *null = nullptr;
+    doit(runtime, static_cast<Closure*>(value.get()), app, caller.get(), cont.get(), null);
   }
 };
 
-void CApp::doit(Runtime &runtime, Closure *closure, RApp *app, Scope *caller, Continuation *cont, Interpret *resume) {
+void CApp::doit(Runtime &runtime, Closure *closure, RApp *app, Scope *caller, Continuation *cont, Interpret *&resume) {
   RFun *fun = closure->fun;
   size_t applied = closure->applied;
   size_t nargs = app->args.size() - 1;
@@ -348,8 +353,8 @@ void CApp::doit(Runtime &runtime, Closure *closure, RApp *app, Scope *caller, Co
     runtime.heap.reserve(Scope::reserve(terms) + fargs*Tuple::fulfiller_pads + Interpret::reserve());
     // Skip over partially applied arguments
     Scope *it = callee;
-    for (size_t pop = applied; pop; pop -= it->size())
-      it = it->next.get();
+    for (size_t pop = applied; pop; it = it->next.get())
+      pop -= it->size();
     // Fully applied function; allocate "stack" frame
     Scope *bind = Scope::claim(runtime.heap, terms, it, caller, fun);
     // Fill in App() args
@@ -361,18 +366,21 @@ void CApp::doit(Runtime &runtime, Closure *closure, RApp *app, Scope *caller, Co
     while (pop) {
       size_t size = it->size();
       pop -= size;
-      for (size_t i = 0; i <= size; ++i)
+      for (size_t i = 0; i < size; ++i)
         bind->claim_instant_fulfiller(runtime, pop+i, it->at(i));
       it = it->next.get();
     }
     // Schedule an Interpreter
     Interpret *interpret = Interpret::claim(runtime.heap, fun, bind, cont);
-    if (resume) runtime.schedule(resume);
+    if (resume) {
+      runtime.schedule(resume);
+      resume = nullptr;
+    }
     runtime.schedule(interpret);
   } else {
     runtime.heap.reserve(Scope::reserve(nargs) + nargs*Tuple::fulfiller_pads + Closure::reserve());
     Scope *bind = Scope::claim(runtime.heap, nargs, callee, caller, fun);
-    for (size_t i = 0; i <= nargs; ++i)
+    for (size_t i = 0; i < nargs; ++i)
       bind->claim_instant_fulfiller(runtime, i, InterpretContext::arg(caller, app->args[i+1]));
     cont->resume(runtime,
       Closure::claim(runtime.heap, fun, applied+nargs, bind));
@@ -398,8 +406,7 @@ void Runtime::claim_apply(Closure *closure, HeapObject *value, Continuation *con
   RFun *fun = closure->fun;
   Scope *bind = Scope::claim(heap, fun->terms.size(), closure->scope.get(), caller, fun);
   bind->at(0)->instant_fulfill(value);
-  Interpret *interpret = Interpret::claim(heap, fun, bind, cont);
-  schedule(interpret);
+  schedule(Interpret::claim(heap, fun, bind, cont));
 }
 
 void Runtime::run() {

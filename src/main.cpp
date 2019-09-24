@@ -335,7 +335,7 @@ int main(int argc, char **argv) {
     target_names.emplace_back("<target-" + std::to_string(i) + ">");
   }
   if (argc > 1) target_names.back() = "<command-line>";
-  TypeVar *types = &body->typeVar;
+  TypeVar types = body->typeVar;
   for (size_t i = 0; i < targets.size(); ++i) {
     Lexer lex(runtime.heap, targets[i], target_names[i].c_str());
     body = new App(LOCATION, body, force_use(parse_command(lex)));
@@ -390,10 +390,11 @@ int main(int argc, char **argv) {
   // Convert AST to optimized SSA
   std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root));
   ssa = Term::optimize(std::move(ssa));
+  ssa = Term::scope(std::move(ssa));
 
   // Upon request, dump out the SSA
   if (optim) {
-    TermFormat format;
+    TermFormat format(true);
     ssa->format(std::cout, format);
   }
 
@@ -401,7 +402,6 @@ int main(int argc, char **argv) {
   if (noexecute) return 0;
 
   // Initialize expression hashes for hashing closures
-  ssa = Term::scope(std::move(ssa));
   //root->hash();
 
   db.prepare();
@@ -444,8 +444,8 @@ int main(int argc, char **argv) {
       HeapObject *v = *p ? p->coerce<HeapObject>() : nullptr;
       if (verbose) {
         std::cout << targets[i] << ": ";
-        (*types)[0].format(std::cout, body->typeVar);
-        types = &(*types)[1];
+        types[0].format(std::cout, body->typeVar);
+        types = types[1];
         std::cout << " = ";
       }
       if (!quiet) {
