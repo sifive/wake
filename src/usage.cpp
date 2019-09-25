@@ -22,7 +22,7 @@ struct PassUsage {
 };
 
 static void redux_usage(PassUsage &p, Redux *r) {
-  for (auto x : r->args) p.scope[x]->meta = 0;
+  for (auto x : r->args) ++p.scope[x]->meta;
 }
 
 void RArg::pass_usage(PassUsage &p) {
@@ -54,13 +54,18 @@ void RCon::pass_usage(PassUsage &p) {
 }
 
 void RFun::pass_usage(PassUsage &p) {
-  p.scope.push(terms);
-  p.scope[output]->meta = 0;
+  for (auto &x : terms) {
+    x->meta = 0;
+    p.scope.push(x.get());
+  }
+  ++p.scope[output]->meta;
   size_t last = p.scope.last();
   for (unsigned i = 0; i < terms.size(); ++i) {
     Term *t = p.scope[last-i];
-    if (t->id() == typeid(RArg)) t->meta = 0;
-    else if (!(t->meta & 1)) t->pass_usage(p);
+    bool used = t->meta > 0 || !t->get(SSA_DROP);
+    t->set(SSA_USED, used);
+    t->set(SSA_SINGLETON, t->meta == 1);
+    if (used) t->pass_usage(p);
     p.scope.pop();
   }
 }
@@ -69,5 +74,7 @@ std::unique_ptr<Term> Term::pass_usage(std::unique_ptr<Term> term) {
   PassUsage pass;
   pass.scope.push(term.get());
   term->pass_usage(pass);
+  term->set(SSA_USED, true);
+  term->set(SSA_SINGLETON, true);
   return term;
 }

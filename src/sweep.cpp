@@ -51,7 +51,7 @@ void RCon::pass_sweep(PassSweep &p) {
 void RFun::pass_sweep(PassSweep &p) {
   CheckPoint cp = p.stream.begin();
   for (auto &x : terms) {
-    if (x->meta) {
+    if (!x->get(SSA_USED)) {
       p.stream.discard();
     } else {
       Term *t = x.get();

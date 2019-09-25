@@ -46,8 +46,9 @@ struct TermFormat {
 };
 
 #define SSA_RECURSIVE	0x1
-#define SSA_PURE	0x2
-#define SSA_SINGLETON	0x4
+#define SSA_DROP	0x2
+#define SSA_USED	0x4
+#define SSA_SINGLETON	0x8
 
 struct Term {
   static const size_t invalid = ~static_cast<size_t>(0);
@@ -58,6 +59,8 @@ struct Term {
 
   Term(const char *label_, size_t flags_ = 0, uintptr_t meta_ = 0) : label(label_), flags(flags_), meta(meta_) { }
   const std::type_info &id() { return typeid(*this); }
+  void set(size_t flag, bool value) { flags = (flags & ~flag) | (-static_cast<size_t>(value) & flag); }
+  bool get(size_t flag) const { return flags & flag; }
 
   virtual ~Term();
   virtual std::unique_ptr<Term> clone() const = 0;
@@ -405,7 +408,6 @@ inline std::vector<std::unique_ptr<Term> > TermStream::end(CheckPoint cp) {
 struct ScopeAnalysis {
   size_t last();
   Term *operator [] (size_t i);
-  void push(const std::vector<std::unique_ptr<Term> > &terms);
   void push(Term *term);
   void pop(size_t n = 1);
 

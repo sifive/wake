@@ -138,7 +138,6 @@ void RFun::format(std::ostream &os, TermFormat &format) const {
       os << " " << arg_depth(x) << ":" << arg_offset(x);
     os << "\n";
   }
-  os << pad(format.depth) << "flags:   " << flags << "\n";
   os << pad(format.depth) << "returns: ";
   if (format.scoped) {
     os << arg_depth(output) << ":" << arg_offset(output);
@@ -155,7 +154,7 @@ void RFun::format(std::ostream &os, TermFormat &format) const {
       os << ++format.id;
     }
     if (!x->label.empty()) os << " (" << x->label << ")";
-    os << " [" << x->meta << "] = ";
+    os << " [" << x->flags << "," << x->meta << "] = ";
     x->format(os, format);
   }
   format.id -= terms.size();
@@ -173,10 +172,6 @@ std::vector<std::unique_ptr<Term> > TargetScope::unwind(size_t newend) {
     out.emplace_back(std::move(terms[i]));
   terms.resize(newend);
   return out;
-}
-
-void ScopeAnalysis::push(const std::vector<std::unique_ptr<Term> > &terms) {
-  for (auto &x : terms) scope.emplace_back(x.get());
 }
 
 std::unique_ptr<Term> Term::optimize(std::unique_ptr<Term> term) {

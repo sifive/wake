@@ -32,11 +32,13 @@ static uintptr_t filter_lowest(uintptr_t x) {
 void RArg::pass_purity(PassPurity &p) {
   // An argument has no effects unless it is applied
   meta = 1;
+  // NOT safe to SSA_DROP
 }
 
 void RLit::pass_purity(PassPurity &p) {
   // Literals have no effects
   meta = 1;
+  flags |= SSA_DROP;
 }
 
 void RApp::pass_purity(PassPurity &p) {
@@ -46,6 +48,7 @@ void RApp::pass_purity(PassPurity &p) {
   for (size_t i = 1; i < args.size(); ++i)
     acc = (acc >> 1) & filter_lowest(acc);
   meta = acc;
+  if ((meta & 1)) flags |= SSA_DROP;
 }
 
 void RPrim::pass_purity(PassPurity &p) {
@@ -54,28 +57,33 @@ void RPrim::pass_purity(PassPurity &p) {
   // Special-case for tget (purity depends on purity of fn arg)
   if ((pflags & PRIM_TGET))
     meta = p.scope[args[3]]->meta >> 1;
+  if ((meta & 1)) flags |= SSA_DROP;
 }
 
 void RGet::pass_purity(PassPurity &p) {
   // Gets destructure only => pure
   meta = 1;
+  flags |= SSA_DROP;
 }
 
 void RDes::pass_purity(PassPurity &p) {
- // Result is only pure when all applied handlers are pure
- uintptr_t acc = ~static_cast<uintptr_t>(0);
- for (size_t i = 0, num = args.size()-1; i < num; ++i)
-   acc &= p.scope[args[i]]->meta;
- meta = acc >> 1;
+  // Result is only pure when all applied handlers are pure
+  uintptr_t acc = ~static_cast<uintptr_t>(0);
+  for (size_t i = 0, num = args.size()-1; i < num; ++i)
+    acc &= p.scope[args[i]]->meta;
+  meta = acc >> 1;
+  if ((meta & 1)) flags |= SSA_DROP;
 }
 
 void RCon::pass_purity(PassPurity &p) {
   meta = 1;
+  flags |= SSA_DROP;
 }
 
 void RFun::pass_purity(PassPurity &p) {
   if (p.first)
     meta = ~static_cast<uintptr_t>(0); // visible in recursive use
+  flags |= SSA_DROP;
   uintptr_t save = meta;
   uintptr_t acc = 1;
   int args = 0;
