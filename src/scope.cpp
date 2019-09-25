@@ -17,11 +17,13 @@
 
 #include "ssa.h"
 #include "prim.h"
+#include <set>
 
 struct PassScope {
   PassScope *next;
   size_t start;
   size_t index;
+  std::set<size_t> escapes;
   PassScope(PassScope *next_, size_t start_) : next(next_), start(start_), index(start_) { }
 };
 
@@ -29,6 +31,7 @@ static size_t scope_arg(PassScope *top, size_t input) {
   size_t depth = 0;
   while (input < top->start) {
     ++depth;
+    top->escapes.insert(input);
     top = top->next;
   }
   return make_arg(depth, input - top->start);
@@ -48,6 +51,20 @@ void RFun::pass_scope(PassScope &p) {
   for (auto &term : terms) {
     term->pass_scope(frame);
     ++frame.index;
+  }
+
+  escapes.reserve(frame.escapes.size());
+  for (auto it = frame.escapes.rbegin(); it != frame.escapes.rend(); ++it)
+    escapes.push_back(*it);
+
+  size_t depth = 1;
+  PassScope *it = &p;
+  for (auto &x : escapes) {
+    while (x < it->start) {
+      ++depth;
+      it = it->next;
+    }
+    x = make_arg(depth, x - it->start);
   }
 }
 

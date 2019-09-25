@@ -129,7 +129,17 @@ size_t RFun::args() const {
 }
 
 void RFun::format(std::ostream &os, TermFormat &format) const {
-  os << "Fun(" << location.file() << "," << flags << ") returns ";
+  format.depth += 2;
+  size_t index = 0;
+  os << "Fun(" << location.file() << "):" << std::endl;
+  if (!escapes.empty()) {
+    os << pad(format.depth) << "escapes:";
+    for (auto x : escapes)
+      os << " " << arg_depth(x) << ":" << arg_offset(x);
+    os << "\n";
+  }
+  os << pad(format.depth) << "flags:   " << flags << "\n";
+  os << pad(format.depth) << "returns: ";
   if (format.scoped) {
     os << arg_depth(output) << ":" << arg_offset(output);
   } else {
@@ -137,8 +147,6 @@ void RFun::format(std::ostream &os, TermFormat &format) const {
     if (output > format.id + terms.size()) os << " !!!";
   }
   os << "\n";
-  format.depth += 2;
-  size_t index = 0;
   for (auto &x : terms) {
     os << pad(format.depth);
     if (format.scoped) {

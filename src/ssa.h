@@ -228,6 +228,7 @@ struct RFun final : public Term {
   size_t flags;
   size_t output; // output can refer to a non-member Term
   std::vector<std::unique_ptr<Term> > terms;
+  std::vector<size_t> escapes;
 
   RFun(const RFun &o);
   RFun(const Location &location_, const char *label_, size_t flags_, size_t output_ = Term::invalid)
