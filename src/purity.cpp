@@ -48,7 +48,7 @@ void RApp::pass_purity(PassPurity &p) {
   for (size_t i = 1; i < args.size(); ++i)
     acc = (acc >> 1) & filter_lowest(acc);
   meta = acc;
-  if ((meta & 1)) flags |= SSA_DROP;
+  set(SSA_DROP, meta & 1);
 }
 
 void RPrim::pass_purity(PassPurity &p) {
@@ -57,7 +57,7 @@ void RPrim::pass_purity(PassPurity &p) {
   // Special-case for tget (purity depends on purity of fn arg)
   if ((pflags & PRIM_TGET))
     meta = p.scope[args[3]]->meta >> 1;
-  if ((meta & 1)) flags |= SSA_DROP;
+  set(SSA_DROP, meta & 1);
 }
 
 void RGet::pass_purity(PassPurity &p) {
@@ -72,7 +72,7 @@ void RDes::pass_purity(PassPurity &p) {
   for (size_t i = 0, num = args.size()-1; i < num; ++i)
     acc &= p.scope[args[i]]->meta;
   meta = acc >> 1;
-  if ((meta & 1)) flags |= SSA_DROP;
+  set(SSA_DROP, meta & 1);
 }
 
 void RCon::pass_purity(PassPurity &p) {
