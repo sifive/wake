@@ -31,8 +31,8 @@ static double inf(char c) { return c == '+' ? dlimits::infinity() : -dlimits::in
 static size_t measure_jast(const JAST &jast) {
   switch (jast.kind) {
     case JSON_NULLVAL:  return Record::reserve(0);
-    case JSON_TRUE:     return Record::reserve(1);
-    case JSON_FALSE:    return Record::reserve(1);
+    case JSON_TRUE:     return Record::reserve(1) + reserve_bool();
+    case JSON_FALSE:    return Record::reserve(1) + reserve_bool();
     case JSON_INTEGER:  return Record::reserve(1) + Integer::reserve(MPZ(jast.value));
     case JSON_DOUBLE:   return Record::reserve(1) + Double::reserve();
     case JSON_INFINITY: return Record::reserve(1) + Double::reserve();
