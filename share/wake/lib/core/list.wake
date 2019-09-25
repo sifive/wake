@@ -202,9 +202,9 @@ global def cmp f = match _ _
     EQ = cmp f lt rt
     x  = x
 
-global def tab f n =
-  def helper i = if i >= n then Nil else f i, helper (i+1)
-  helper 0
+global def tab f =
+  def helper a n = if n <= 0 then a else helper (f (n-1), a) (n-1)
+  helper Nil
 
 global def seq = tab (_)
 
