@@ -79,7 +79,7 @@ struct Term {
   static std::unique_ptr<Term> pass_purity(std::unique_ptr<Term> term);
   static std::unique_ptr<Term> pass_usage (std::unique_ptr<Term> term);
   static std::unique_ptr<Term> pass_sweep (std::unique_ptr<Term> term);
-  static std::unique_ptr<Term> pass_inline(std::unique_ptr<Term> term);
+  static std::unique_ptr<Term> pass_inline(std::unique_ptr<Term> term, size_t threshold);
 
   // Create SSA from AST
   static std::unique_ptr<Term> fromExpr(std::unique_ptr<Expr> expr);

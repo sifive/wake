@@ -40,7 +40,8 @@ static size_t meta_args(size_t meta) { return meta & 255; }
 struct PassInline {
   TermStream stream;
   ConstantPool pool;
-  PassInline(TargetScope &scope, size_t start = 0) : stream(scope, start) { }
+  size_t threshold;
+  PassInline(TargetScope &scope, size_t threshold_, size_t start = 0) : stream(scope, start), threshold(threshold_) { }
 };
 
 void RArg::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
@@ -90,9 +91,9 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
       term = p.stream[fnid];
     } while (term->id() == typeid(RApp));
 
-    if (meta_size(term->meta) < 100 && !term->get(SSA_RECURSIVE)) {
+    if (meta_size(term->meta) < p.threshold && !term->get(SSA_RECURSIVE)) {
       auto fun = static_unique_pointer_cast<RFun>(term->clone());
-      PassInline q(p.stream.scope(), fnid); // refs up to fun are unmodified
+      PassInline q(p.stream.scope(), p.threshold, fnid); // refs up to fun are unmodified
       q.pool = std::move(p.pool);
       q.stream.discard(); // discard name of inlined fn
       for (size_t i = fargs.size(); i > 0; --i)
@@ -209,9 +210,9 @@ void RFun::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   meta = make_meta(size, args);
 }
 
-std::unique_ptr<Term> Term::pass_inline(std::unique_ptr<Term> term) {
+std::unique_ptr<Term> Term::pass_inline(std::unique_ptr<Term> term, size_t threshold) {
   TargetScope scope;
-  PassInline pass(scope);
+  PassInline pass(scope, threshold);
   term->pass_inline(pass, std::move(term));
   return scope.finish();
 }

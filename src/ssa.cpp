@@ -178,7 +178,7 @@ std::unique_ptr<Term> Term::optimize(std::unique_ptr<Term> term) {
   term = Term::pass_purity(std::move(term));
   term = Term::pass_usage (std::move(term));
   term = Term::pass_sweep (std::move(term));
-  term = Term::pass_inline(std::move(term));
+  term = Term::pass_inline(std::move(term), 100);
   term = Term::pass_purity(std::move(term));
   term = Term::pass_usage (std::move(term));
   term = Term::pass_sweep (std::move(term));
