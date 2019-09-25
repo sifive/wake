@@ -91,7 +91,7 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
       term = p.stream[fnid];
     } while (term->id() == typeid(RApp));
 
-    if (meta_size(term->meta) < p.threshold && !term->get(SSA_RECURSIVE)) {
+    if ((term->get(SSA_SINGLETON) || meta_size(term->meta) < p.threshold) && !term->get(SSA_RECURSIVE)) {
       auto fun = static_unique_pointer_cast<RFun>(term->clone());
       PassInline q(p.stream.scope(), p.threshold, fnid); // refs up to fun are unmodified
       q.pool = std::move(p.pool);
