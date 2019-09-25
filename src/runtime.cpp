@@ -190,7 +190,7 @@ void RLit::interpret(InterpretContext &context) {
 }
 
 bool RFun::tailCallOk() const {
-  return !(flags & RFUN_RECURSIVE);
+  return !(flags & SSA_RECURSIVE);
 }
 
 void RFun::interpret(InterpretContext &context) {

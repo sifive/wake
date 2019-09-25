@@ -45,13 +45,18 @@ struct TermFormat {
   TermFormat(bool scoped_ = false) : depth(0), id(0), scoped(scoped_) { }
 };
 
+#define SSA_RECURSIVE	0x1
+#define SSA_PURE	0x2
+#define SSA_SINGLETON	0x4
+
 struct Term {
   static const size_t invalid = ~static_cast<size_t>(0);
 
   std::string label; // not unique
-  uintptr_t meta;    // passes can stash info here
+  size_t flags;      // SSA flags, accumulated over many passes
+  uintptr_t meta;    // temporary scratch space for a pass
 
-  Term(const char *label_) : label(label_) { }
+  Term(const char *label_, size_t flags_ = 0, uintptr_t meta_ = 0) : label(label_), flags(flags_), meta(meta_) { }
   const std::type_info &id() { return typeid(*this); }
 
   virtual ~Term();
@@ -221,18 +226,15 @@ struct RCon final : public Redux {
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
 };
 
-#define RFUN_RECURSIVE 1
-
 struct RFun final : public Term {
   Location location;
-  size_t flags;
   size_t output; // output can refer to a non-member Term
   std::vector<std::unique_ptr<Term> > terms;
   std::vector<size_t> escapes;
 
   RFun(const RFun &o);
   RFun(const Location &location_, const char *label_, size_t flags_, size_t output_ = Term::invalid)
-   : Term(label_), location(location_), flags(flags_), output(output_) { }
+   : Term(label_, flags_), location(location_), output(output_) { }
 
   void update(const SourceMap &map);
   size_t args() const;

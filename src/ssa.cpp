@@ -111,7 +111,7 @@ static std::string pad(int depth) {
   return std::string(depth, ' ');
 }
 
-RFun::RFun(const RFun &o) : Term(o), location(o.location), flags(o.flags), output(o.output) {
+RFun::RFun(const RFun &o) : Term(o), location(o.location), output(o.output) {
   terms.reserve(o.terms.size());
   for (auto &x : o.terms)
     terms.emplace_back(x->clone());

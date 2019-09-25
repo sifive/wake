@@ -90,7 +90,7 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
       term = p.stream[fnid];
     } while (term->id() == typeid(RApp));
 
-    if (meta_size(term->meta) < 100 && !(static_cast<RFun*>(term)->flags & RFUN_RECURSIVE)) {
+    if (meta_size(term->meta) < 100 && !(static_cast<RFun*>(term)->flags & SSA_RECURSIVE)) {
       auto fun = static_unique_pointer_cast<RFun>(term->clone());
       PassInline q(p.stream.scope(), fnid); // refs up to fun are unmodified
       q.pool = std::move(p.pool);
@@ -183,7 +183,7 @@ void RFun::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
     if (args != terms.size()-1) break;
     if (output-ate != cp.source+args) break;
     if (terms[args]->id() != typeid(RFun)) break;
-    if ((static_cast<RFun*>(terms[args].get())->flags & RFUN_RECURSIVE)) break;
+    if ((static_cast<RFun*>(terms[args].get())->flags & SSA_RECURSIVE)) break;
     // steal all the grandchildren
     std::unique_ptr<RFun> child(static_cast<RFun*>(terms[args].release()));
     p.stream.discard();

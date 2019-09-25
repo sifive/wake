@@ -63,7 +63,7 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
     app->meta = scope.append(new RApp(app->fn->meta, app->val->meta));
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr);
-    size_t flags = (lambda->flags & FLAG_RECURSIVE) ? RFUN_RECURSIVE : 0;
+    size_t flags = (lambda->flags & FLAG_RECURSIVE) ? SSA_RECURSIVE : 0;
     RFun *fun = new RFun(lambda->body->location, lambda->fnname.empty() ? "anon" : lambda->fnname.c_str(), flags);
     lambda->meta = scope.append(fun);
     size_t cp = scope.append(new RArg(lambda->name.c_str()));
@@ -80,7 +80,7 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
         doit(scope, &frame, def->fun[i].get());
       } else {
         size_t null = 1;
-        RFun *mutual = new RFun(LOCATION, "mutual", RFUN_RECURSIVE);
+        RFun *mutual = new RFun(LOCATION, "mutual", SSA_RECURSIVE);
         size_t mid = scope.append(mutual);
         size_t mcp = scope.append(new RArg("_"));
         for (j = i; j < def->fun.size() && scc == def->scc[j]; ++j) {
