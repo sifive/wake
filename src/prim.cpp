@@ -17,6 +17,7 @@
 
 #include "prim.h"
 #include "value.h"
+#include "ssa.h"
 #include "expr.h"
 #include "tuple.h"
 #include "location.h"
@@ -87,6 +88,24 @@ struct HeapHash {
   Hash code;
   Promise *broken;
 };
+
+HeapStep Closure::explore_escape(HeapStep step) {
+  Scope *it = scope.get();
+  for (size_t i = 0, size; i < applied; i += size) {
+    size = it->size();
+    for (size_t j = size; j > 0; --j)
+      step = it->at(j-1)->template recurse<HeapStep, &HeapPointerBase::explore>(step);
+  }
+  size_t depth = 1;
+  for (auto x: fun->escapes) {
+    while (arg_depth(x) > depth) {
+      it = it->next.get();
+      ++depth;
+    }
+    step = it->at(arg_offset(x))->template recurse<HeapStep, &HeapPointerBase::explore>(step);
+  }
+  return step;
+}
 
 static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
   std::unordered_map<uintptr_t, std::bitset<256> > explored;

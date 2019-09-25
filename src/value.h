@@ -192,6 +192,7 @@ struct Closure final : public GCObject<Closure, Value> {
   Closure(RFun *fun_, size_t applied_, Scope *scope_);
   void format(std::ostream &os, FormatState &state) const override;
   Hash hash() const override;
+  HeapStep explore_escape(HeapStep step);
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -200,6 +201,11 @@ struct Closure final : public GCObject<Closure, Value> {
     return arg;
   }
 };
+
+template <>
+inline HeapStep Closure::recurse<HeapStep, &HeapPointerBase::explore>(HeapStep step) {
+  return explore_escape(step);
+}
 
 struct Data {
   static TypeVar typeBoolean;
