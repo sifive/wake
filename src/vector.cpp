@@ -56,7 +56,14 @@ static PRIMFN(prim_vget) {
   INTEGER_MPZ(arg1, 1);
   REQUIRE(mpz_cmp_si(arg1, 0) >= 0);
   REQUIRE(mpz_cmp_si(arg1, vec->size()) < 0);
-  vec->at(mpz_get_si(arg1))->await(runtime, continuation);
+
+  Promise *p = vec->at(mpz_get_si(arg1));
+  if (*p) {
+    scope->at(output)->fulfill(runtime, p->coerce<HeapObject>());
+  } else  {
+    runtime.heap.reserve(Tuple::fulfiller_pads);
+    p->await(runtime, scope->claim_fulfiller(runtime, output));
+  }
 }
 
 static PRIMTYPE(type_vset) {

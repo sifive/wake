@@ -34,7 +34,7 @@ struct Expr;
 
 /* Macros for handling inputs from wake */
 #define RETURN(val) do {						\
-  continuation->resume(runtime, val);					\
+  scope->at(output)->fulfill(runtime, val);				\
   return;								\
 } while (0)
 

@@ -109,7 +109,8 @@ static PRIMTYPE(type_hash) {
 }
 
 static PRIMFN(prim_hash) {
-  runtime.heap.reserve(reserve_list(nargs) + reserve_hash());
+  runtime.heap.reserve(Tuple::fulfiller_pads + reserve_list(nargs) + reserve_hash());
+  Continuation *continuation = scope->claim_fulfiller(runtime, output);
   HeapObject *list = claim_list(runtime.heap, nargs, args);
   runtime.schedule(claim_hash(runtime.heap, list, continuation));
 }
@@ -164,7 +165,8 @@ static PRIMFN(prim_tget) {
   INTEGER_MPZ(subkey, 2);
   CLOSURE(body, 3);
 
-  runtime.heap.reserve(Runtime::reserve_apply(body->fun) + CTarget::reserve());
+  runtime.heap.reserve(Tuple::fulfiller_pads + Runtime::reserve_apply(body->fun) + CTarget::reserve());
+  Continuation *continuation = scope->claim_fulfiller(runtime, output);
 
   Hash hash;
   REQUIRE(mpz_sizeinbase(key, 2) <= 8*sizeof(hash.data));

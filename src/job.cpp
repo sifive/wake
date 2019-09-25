@@ -1277,12 +1277,15 @@ static PRIMFN(prim_job_output) {
   JOB(arg0, 0);
   INTEGER_MPZ(arg1, 1);
 
+  runtime.heap.reserve(Tuple::fulfiller_pads + WJob::reserve());
+  Continuation *continuation = scope->claim_fulfiller(runtime, output);
+
   if (mpz_cmp_si(arg1, 1) == 0) {
-    runtime.schedule(WJob::alloc(runtime.heap, arg0));
+    runtime.schedule(WJob::claim(runtime.heap, arg0));
     continuation->next = arg0->q_stdout;
     arg0->q_stdout = continuation;
   } else if (mpz_cmp_si(arg1, 2) == 0) {
-    runtime.schedule(WJob::alloc(runtime.heap, arg0));
+    runtime.schedule(WJob::claim(runtime.heap, arg0));
     continuation->next = arg0->q_stderr;
     arg0->q_stderr = continuation;
   } else {
@@ -1337,12 +1340,15 @@ static PRIMFN(prim_job_tree) {
   JOB(arg0, 0);
   INTEGER_MPZ(arg1, 1);
 
+  runtime.heap.reserve(Tuple::fulfiller_pads + WJob::reserve());
+  Continuation *continuation = scope->claim_fulfiller(runtime, output);
+
   if (mpz_cmp_si(arg1, 1) == 0) {
-    runtime.schedule(WJob::alloc(runtime.heap, arg0));
+    runtime.schedule(WJob::claim(runtime.heap, arg0));
     continuation->next = std::move(arg0->q_inputs);
     arg0->q_inputs = std::move(continuation);
   } else if (mpz_cmp_si(arg1, 2) == 0) {
-    runtime.schedule(WJob::alloc(runtime.heap, arg0));
+    runtime.schedule(WJob::claim(runtime.heap, arg0));
     continuation->next = std::move(arg0->q_outputs);
     arg0->q_outputs = std::move(continuation);
   } else {
@@ -1522,7 +1528,11 @@ static PRIMTYPE(type_job_reality) {
 static PRIMFN(prim_job_reality) {
   EXPECT(1);
   JOB(job, 0);
-  runtime.schedule(WJob::alloc(runtime.heap, job));
+
+  runtime.heap.reserve(Tuple::fulfiller_pads + WJob::reserve());
+  Continuation *continuation = scope->claim_fulfiller(runtime, output);
+
+  runtime.schedule(WJob::claim(runtime.heap, job));
   continuation->next = job->q_reality;
   job->q_reality = continuation;
 }
@@ -1542,7 +1552,11 @@ static PRIMTYPE(type_job_report) {
 static PRIMFN(prim_job_report) {
   EXPECT(1);
   JOB(job, 0);
-  runtime.schedule(WJob::alloc(runtime.heap, job));
+
+  runtime.heap.reserve(Tuple::fulfiller_pads + WJob::reserve());
+  Continuation *continuation = scope->claim_fulfiller(runtime, output);
+
+  runtime.schedule(WJob::claim(runtime.heap, job));
   continuation->next = job->q_report;
   job->q_report = continuation;
 }

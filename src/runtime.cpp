@@ -294,30 +294,29 @@ void RDes::interpret(InterpretContext &context) {
 
 struct CPrim final : public GCObject<CPrim, Continuation> {
   HeapPointer<Scope> scope;
-  HeapPointer<Continuation> cont;
+  size_t output;
   RPrim *prim;
 
-  CPrim(Scope *scope_, Continuation *cont_, RPrim *prim_)
-   : scope(scope_), cont(cont_), prim(prim_) { }
+  CPrim(Scope *scope_, size_t output_, RPrim *prim_)
+   : scope(scope_), output(output_), prim(prim_) { }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
     arg = Continuation::recurse<T, memberfn>(arg);
     arg = (scope.*memberfn)(arg);
-    arg = (cont.*memberfn)(arg);
     return arg;
   }
 
-  static Promise *doit(Runtime &runtime, Scope *scope, RPrim *prim, Continuation *cont);
+  static Promise *doit(Runtime &runtime, Scope *scope, size_t output, RPrim *prim);
   void execute(Runtime &runtime) override {
-    if (Promise *p = doit(runtime, scope.get(), prim, cont.get())) {
+    if (Promise *p = doit(runtime, scope.get(), output, prim)) {
       next = nullptr; // reschedule
       p->await(runtime, this);
     }
   }
 };
 
-Promise *CPrim::doit(Runtime &runtime, Scope *scope, RPrim *prim, Continuation *cont) {
+Promise *CPrim::doit(Runtime &runtime, Scope *scope, size_t output, RPrim *prim) {
   HeapObject *pargs[prim->args.size()];
   Promise *p = nullptr;
   size_t i;
@@ -327,7 +326,7 @@ Promise *CPrim::doit(Runtime &runtime, Scope *scope, RPrim *prim, Continuation *
     pargs[i] = p->coerce<HeapObject>();
   }
   if (i == prim->args.size()) {
-    prim->fn(prim->data, runtime, cont, scope, prim->args.size(), pargs);
+    prim->fn(prim->data, runtime, scope, output, prim->args.size(), pargs);
     return nullptr;
   } else {
     return p;
@@ -335,42 +334,42 @@ Promise *CPrim::doit(Runtime &runtime, Scope *scope, RPrim *prim, Continuation *
 }
 
 bool RPrim::tailCallOk() const {
-  return true;
+  return false;
 }
 
 void RPrim::interpret(InterpretContext &context) {
   context.runtime.heap.reserve(Tuple::fulfiller_pads + CPrim::reserve());
-  // !!! argh - the cont gets scheduled => everything waits on it
-  Continuation *cont = context.defer(); // !!! pointless deferral for pure Prims
-  if (Promise *p = CPrim::doit(context.runtime, context.scope, this, cont)) {
-    CPrim *prim = CPrim::claim(context.runtime.heap, context.scope, cont, this);
+  if (Promise *p = CPrim::doit(context.runtime, context.scope, context.output, this)) {
+    CPrim *prim = CPrim::claim(context.runtime.heap, context.scope, context.output, this);
     p->await(context.runtime, prim);
   }
 }
 
 struct CApp final : public GCObject<CApp, Continuation> {
-  HeapPointer<Scope> caller;
   HeapPointer<Continuation> cont;
+  HeapPointer<Scope> caller;
+  size_t output;
   RApp *app;
 
-  CApp(Scope *caller_, Continuation *cont_, RApp *app_) : caller(caller_), cont(cont_), app(app_) { }
+  CApp(Continuation *cont_, Scope *caller_, size_t output_, RApp *app_)
+   : cont(cont_), caller(caller_), output(output_), app(app_) { }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
     arg = Continuation::recurse<T, memberfn>(arg);
-    arg = (caller.*memberfn)(arg);
     arg = (cont.*memberfn)(arg);
+    arg = (caller.*memberfn)(arg);
     return arg;
   }
 
-  static void doit(Runtime &runtime, Closure *closure, RApp *app, Scope *caller, Continuation *cont, Interpret *&resume);
+  static void doit(Runtime &runtime, Closure *closure, Continuation *cont, Scope *caller, size_t output, RApp *app, Interpret *&resume);
   void execute(Runtime &runtime) override {
     Interpret *null = nullptr;
-    doit(runtime, static_cast<Closure*>(value.get()), app, caller.get(), cont.get(), null);
+    doit(runtime, static_cast<Closure*>(value.get()), cont.get(), caller.get(), output, app, null);
   }
 };
 
-void CApp::doit(Runtime &runtime, Closure *closure, RApp *app, Scope *caller, Continuation *cont, Interpret *&resume) {
+void CApp::doit(Runtime &runtime, Closure *closure, Continuation *cont, Scope *caller, size_t output, RApp *app, Interpret *&resume) {
   RFun *fun = closure->fun;
   size_t applied = closure->applied;
   size_t nargs = app->args.size() - 1;
@@ -379,7 +378,7 @@ void CApp::doit(Runtime &runtime, Closure *closure, RApp *app, Scope *caller, Co
   Scope *callee = closure->scope.get();
   
   if (applied + nargs == fargs) {
-    runtime.heap.reserve(Scope::reserve(terms) + fargs*Tuple::fulfiller_pads + Interpret::reserve());
+    runtime.heap.reserve(Scope::reserve(terms) + (1+fargs)*Tuple::fulfiller_pads + Interpret::reserve());
     // Skip over partially applied arguments
     Scope *it = callee;
     for (size_t pop = applied; pop; it = it->next.get())
@@ -400,7 +399,8 @@ void CApp::doit(Runtime &runtime, Closure *closure, RApp *app, Scope *caller, Co
       it = it->next.get();
     }
     // Schedule an Interpreter
-    Interpret *interpret = Interpret::claim(runtime.heap, fun, bind, cont);
+    Interpret *interpret = Interpret::claim(runtime.heap, fun, bind,
+      cont ? cont : caller->claim_fulfiller(runtime, output));
     if (resume) {
       runtime.schedule(resume);
       resume = nullptr;
@@ -411,8 +411,12 @@ void CApp::doit(Runtime &runtime, Closure *closure, RApp *app, Scope *caller, Co
     Scope *bind = Scope::claim(runtime.heap, nargs, callee, caller, fun);
     for (size_t i = 0; i < nargs; ++i)
       bind->claim_instant_fulfiller(runtime, i, InterpretContext::arg(caller, app->args[i+1]));
-    cont->resume(runtime,
-      Closure::claim(runtime.heap, fun, applied+nargs, bind));
+    Closure *closure = Closure::claim(runtime.heap, fun, applied+nargs, bind);
+    if (cont) {
+      cont->resume(runtime, closure);
+    } else {
+      caller->at(output)->fulfill(runtime, closure);
+    }
   }
 }
 
@@ -421,13 +425,11 @@ bool RApp::tailCallOk() const {
 }
 
 void RApp::interpret(InterpretContext &context) {
-  context.runtime.heap.reserve(Tuple::fulfiller_pads + CApp::reserve());
-  Continuation *cont = context.defer();
   Promise *fn = context.arg(args[0]);
   if (*fn) {
-    CApp::doit(context.runtime, fn->coerce<Closure>(), this, context.scope, cont, context.interpret);
+    CApp::doit(context.runtime, fn->coerce<Closure>(), context.cont, context.scope, context.output, this, context.interpret);
   } else {
-    fn->await(context.runtime, CApp::claim(context.runtime.heap, context.scope, cont, this));
+    fn->await(context.runtime, CApp::alloc(context.runtime.heap, context.cont, context.scope, context.output, this));
   }
 }
 
