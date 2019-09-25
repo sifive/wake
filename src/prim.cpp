@@ -108,9 +108,9 @@ HeapStep Closure::explore_escape(HeapStep step) {
 }
 
 static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
-  std::unordered_map<uintptr_t, std::bitset<256> > explored;
-  size_t max_objs = runtime.heap.used() / sizeof(PadObject);
-  std::unique_ptr<HeapObject*[]> scratch(new HeapObject*[max_objs]);
+  std::unordered_map<uintptr_t, size_t> explored;
+  size_t max_edges = runtime.heap.used() / sizeof(PadObject);
+  std::unique_ptr<HeapObject*[]> scratch(new HeapObject*[max_edges]);
 
   HeapStep step;
   scratch[0] = obj;
@@ -121,11 +121,14 @@ static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
   for (HeapObject **done = scratch.get(); done != step.found; ++done) {
     HeapObject *head = *done;
 
-    // Ensure we visit each object only once
+    // Assign objects virtual addreses based on visitation order
     uintptr_t key = reinterpret_cast<uintptr_t>(static_cast<void*>(head));
-    auto flag = explored[key>>8][key&0xFF];
-    if (flag) continue;
-    flag = true;
+    auto out = explored.insert(std::make_pair(key, done - scratch.get()));
+
+    // Include hash of child's virtual address
+    code = code + out.first->second;
+    // Only visit object once
+    if (!out.second) continue;
 
     // Hash this object and enqueue its children for hashing
     step = head->explore(step);
