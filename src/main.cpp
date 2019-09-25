@@ -82,7 +82,7 @@ void print_help(const char *argv0) {
     << "    --globals  -g    Print all global variables available to the command-line"   << std::endl
     << "    --help     -h    Print this help message and exit"                           << std::endl
     << std::endl;
-    // debug-db, stop-after-* are secret undocumented options
+    // debug-db, no-optimize, stop-after-* are secret undocumented options
 }
 
 static struct option *arg(struct option opts[], const char *name) {
@@ -123,7 +123,8 @@ int main(int argc, char **argv) {
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-parse",      GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "stop-after-optimize",   GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "stop-after-ssa",        GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "no-optimize",           GOPT_ARGUMENT_FORBIDDEN },
     { 0,   0,                       GOPT_LAST}};
 
   argc = gopt(argv, options);
@@ -151,7 +152,8 @@ int main(int argc, char **argv) {
   bool debugdb = arg(options, "debug-db")->count;
   bool parse   = arg(options, "stop-after-parse")->count;
   bool tcheck  = arg(options, "stop-after-type-check")->count;
-  bool optim   = arg(options, "stop-after-optimize")->count;
+  bool dumpssa = arg(options, "stop-after-ssa")->count;
+  bool optim   =!arg(options, "no-optimize")->count;
 
   const char *percents= arg(options, "percent")->argument;
   const char *heapf   = arg(options, "heap-factor")->argument;
@@ -209,7 +211,7 @@ int main(int argc, char **argv) {
   bool nodb = init;
   bool noparse = nodb || remove || list || output || input || last || failed;
   bool notype = noparse || parse;
-  bool noexecute = notype || add || html || tcheck || optim || global;
+  bool noexecute = notype || add || html || tcheck || dumpssa || global;
 
   if (noparse && argc < 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
@@ -389,11 +391,11 @@ int main(int argc, char **argv) {
 
   // Convert AST to optimized SSA
   std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root));
-  ssa = Term::optimize(std::move(ssa));
+  if (optim) ssa = Term::optimize(std::move(ssa));
   ssa = Term::scope(std::move(ssa));
 
   // Upon request, dump out the SSA
-  if (optim) {
+  if (dumpssa) {
     TermFormat format(true);
     ssa->format(std::cout, format);
   }
