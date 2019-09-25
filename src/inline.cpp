@@ -75,12 +75,12 @@ void RLit::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   }
 }
 
-void RApp::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
-  update(p.stream.map());
+static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
+  std::vector<size_t> &args = self->args;
   size_t fnargs = meta_args(p.stream[args[0]]->meta);
   if (fnargs == args.size()-1) {
     std::vector<size_t> fargs;
-    Term *term = this;
+    Term *term = self.get();
     size_t fnid;
     do {
       RApp *app = static_cast<RApp*>(term);
@@ -110,19 +110,24 @@ void RApp::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
       args.emplace_back(fnid);
       for (size_t i = fargs.size(); i > 0; --i)
         args.emplace_back(fargs[i-1]);
-      meta = make_meta(1, 0);
+      self->meta = make_meta(1, 0);
       p.stream.transfer(std::move(self));
     }
   } else {
     if (fnargs == 0) {
       // unknown function applied; do not optimize App
-      meta = make_meta(1, 0);
+      self->meta = make_meta(1, 0);
       p.stream.transfer(std::move(self));
     } else {
-      meta = make_meta(1, fnargs+1-args.size());
+      self->meta = make_meta(1, fnargs+1-args.size());
       p.stream.transfer(std::move(self));
     }
   }
+}
+
+void RApp::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
+  update(p.stream.map());
+  rapp_inline(p, static_unique_pointer_cast<RApp>(std::move(self)));
 }
 
 void RPrim::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
@@ -149,7 +154,9 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   Term *input = p.stream[args.back()];
   if (input->id() == typeid(RCon)) {
     RCon *con = static_cast<RCon*>(input);
-    p.stream.discard(args[con->kind->index]);
+    std::unique_ptr<RApp> app(
+      new RApp(args[con->kind->index], args.back(), label.c_str()));
+    rapp_inline(p, std::move(app));
   } else {
     p.stream.transfer(std::move(self));
   }
