@@ -542,10 +542,11 @@ static PRIMFN(prim_pid) {
 }
 
 void prim_register_sources(PrimMap &pmap) {
-  // These interact with the filesystem, so defer use
-  prim_register(pmap, "add_sources", prim_add_sources, type_add_sources, PRIM_REMOVE);
-  prim_register(pmap, "sources",     prim_sources,     type_sources,     PRIM_REMOVE);
-  prim_register(pmap, "files",       prim_files,       type_sources,     PRIM_REMOVE);
+  // Observes the filesystem, so must be ordered
+  prim_register(pmap, "files",       prim_files,       type_sources,     PRIM_ORDERED);
+  // Sources do not change after wake starts
+  prim_register(pmap, "add_sources", prim_add_sources, type_add_sources, PRIM_PURE);
+  prim_register(pmap, "sources",     prim_sources,     type_sources,     PRIM_PURE);
   // Simple functions
   prim_register(pmap, "simplify",    prim_simplify,    type_simplify,    PRIM_PURE);
   prim_register(pmap, "relative",    prim_relative,    type_relative,    PRIM_PURE);

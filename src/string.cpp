@@ -84,16 +84,17 @@ static PRIMTYPE(type_lcat) {
 struct CCat final : public GCObject<CCat, Continuation> {
   HeapPointer<Record> list;
   HeapPointer<Record> progress;
-  HeapPointer<Continuation> cont;
+  HeapPointer<Scope> scope;
+  size_t output;
 
-  CCat(Record *list_, Continuation *cont_) : list(list_), progress(list_), cont(cont_) { }
+  CCat(Record *list_, Scope *scope_, size_t output_) : list(list_), progress(list_), scope(scope_), output(output_) { }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
     arg = Continuation::recurse<T, memberfn>(arg);
     arg = (list.*memberfn)(arg);
     arg = (progress.*memberfn)(arg);
-    arg = (cont.*memberfn)(arg);
+    arg = (scope.*memberfn)(arg);
     return arg;
   }
 
@@ -126,14 +127,14 @@ void CCat::execute(Runtime &runtime) {
       size += s->size();
     }
 
-    cont->resume(runtime, out);
+    scope->at(output)->fulfill(runtime, out);
   }
 }
 
 static PRIMFN(prim_lcat) {
   EXPECT(1);
   RECORD(list, 0);
-  runtime.schedule(CCat::alloc(runtime.heap, list, continuation));
+  runtime.schedule(CCat::alloc(runtime.heap, list, scope, output));
 }
 
 static PRIMTYPE(type_explode) {
@@ -367,10 +368,10 @@ void CFormat::execute(Runtime &runtime) {
 
 static PRIMFN(prim_format) {
   EXPECT(1);
-  size_t need = reserve_hash() + CFormat::reserve();
-  runtime.heap.reserve(need);
+  runtime.heap.reserve(Tuple::fulfiller_pads + reserve_hash() + CFormat::reserve());
   runtime.schedule(claim_hash(runtime.heap, args[0],
-    CFormat::claim(runtime.heap, args[0], continuation)));
+    CFormat::claim(runtime.heap, args[0],
+      scope->claim_fulfiller(runtime, output))));
 }
 
 static PRIMTYPE(type_print) {
@@ -606,5 +607,5 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "mkdir",    prim_mkdir,    type_mkdir,     PRIM_IMPURE);
   prim_register(pmap, "unlink",   prim_unlink,   type_unlink,    PRIM_IMPURE);
   prim_register(pmap, "write",    prim_write,    type_write,     PRIM_IMPURE);
-  prim_register(pmap, "read",     prim_read,     type_read,      PRIM_REMOVE);
+  prim_register(pmap, "read",     prim_read,     type_read,      PRIM_ORDERED);
 }

@@ -51,7 +51,7 @@ struct Constructor {
   AST ast;
   int index; // sum->members[index] = this
 
-  Constructor(AST &&ast_) : ast(ast_) { }
+  Constructor(AST &&ast_) : ast(ast_), index(0) { }
   static Constructor array;
 };
 

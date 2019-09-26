@@ -20,7 +20,8 @@
 
 #include "gc.h"
 
-struct Expr;
+struct RFun;
+struct Closure;
 struct Runtime;
 struct Continuation;
 struct Record;
@@ -46,12 +47,13 @@ struct Profile;
 struct Runtime {
   bool abort;
   Profile *profile;
+  uint64_t debug_hash;
   Heap heap;
   RootPointer<Work> stack;
   RootPointer<HeapObject> output;
   RootPointer<Record> sources; // Vector String
 
-  Runtime(Profile *profile_, int profile_heap, double heap_factor);
+  Runtime(Profile *profile_, int profile_heap, double heap_factor, uint64_t debug_hash_);
   ~Runtime();
   void run();
 
@@ -63,10 +65,11 @@ struct Runtime {
     stack = work;
   }
 
-  void init(Expr *root);
+  void init(RFun *root);
 
-  static size_t reserve_eval();
-  void claim_eval(Expr *expr, Scope *scope, Continuation *cont);
+  // Caller must guarantee clo->applied==0 and clo->fun.args()==1
+  static size_t reserve_apply(RFun *fun);
+  void claim_apply(Closure *clo, HeapObject *value, Continuation *cont, Scope *caller);
 };
 
 struct Continuation : public Work {

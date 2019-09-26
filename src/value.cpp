@@ -18,6 +18,7 @@
 #include "value.h"
 #include "type.h"
 #include "expr.h"
+#include "ssa.h"
 #include "hash.h"
 #include "symbol.h"
 #include "status.h"
@@ -35,7 +36,7 @@ size_t Value::hashid() const {
 
 bool Value::operator == (const Value &x) const {
   assert(0 /* unreachable */);
-  if (typeid(&x) != typeid(this)) return false;
+  if (typeid(x) != typeid(*this)) return false;
   return hash() == x.hash();
 }
 
@@ -180,7 +181,7 @@ Hash String::hash() const {
 }
 
 bool String::operator == (const Value &x) const {
-  if (typeid(&x) != typeid(this)) return false;
+  if (typeid(x) != typeid(*this)) return false;
   return compare(static_cast<const String &>(x)) == 0;
 }
 
@@ -227,7 +228,7 @@ Hash Integer::hash() const {
 }
 
 bool Integer::operator == (const Value &x) const {
-  if (typeid(&x) != typeid(this)) return false;
+  if (typeid(x) != typeid(*this)) return false;
   mpz_t a = { wrap() }, b = { static_cast<const Integer &>(x).wrap() };
   return mpz_cmp(a, b) == 0;
 }
@@ -249,7 +250,7 @@ Hash Double::hash() const {
 }
 
 bool Double::operator == (const Value &x) const {
-  if (typeid(&x) != typeid(this)) return false;
+  if (typeid(x) != typeid(*this)) return false;
   return value == static_cast<const Double &>(x).value;
 }
 
@@ -329,7 +330,7 @@ Hash RegExp::hash() const {
 }
 
 bool RegExp::operator == (const Value &x) const {
-  if (typeid(&x) != typeid(this)) return false;
+  if (typeid(x) != typeid(*this)) return false;
   return exp->pattern() == static_cast<const RegExp &>(x).exp->pattern();
 }
 
@@ -340,11 +341,11 @@ RootPointer<RegExp> RegExp::literal(Heap &h, const std::string &value) {
 }
 
 void Closure::format(std::ostream &os, FormatState &state) const {
-  os << "<" << lambda->location.file() << ">";
+  os << "<" << fun->location.file() << ">";
 }
 
 Hash Closure::hash() const {
-  return lambda->hashcode;
+  return fun->hash + Hash(applied);
 }
 
 Hash Record::hash() const {
@@ -355,8 +356,12 @@ Hash Record::hash() const {
 }
 
 void Record::format(std::ostream &os, FormatState &state) const {
-  const HeapObject* child = (state.get() < (int)size()) ? at(state.get())->coerce<HeapObject>() : nullptr;
   const char *name = cons->ast.name.c_str();
+  const HeapObject* child = nullptr;
+  if (state.get() < (int)size()) {
+    const Promise *p = at(state.get());
+    if (*p) child = p->coerce<HeapObject>();
+  }
 
   if (strncmp(name, "binary ", 7) == 0) {
     op_type q = op_precedence(name + 7);

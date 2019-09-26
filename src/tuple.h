@@ -154,11 +154,11 @@ struct Scope : public Tuple {
   std::vector<std::string> stack_trace(bool indent_compress = true) const;
   virtual const ScopeStack *stack() const = 0;
   virtual ScopeStack *stack() = 0;
-  void set_expr(Expr *expr);
+  void set_fun(RFun *fun);
 
   static size_t reserve(size_t size);
-  static Scope *claim(Heap &h, size_t size, Scope *next, Scope *parent, Expr *expr); // requires prior h.reserve
-  static Scope *alloc(Heap &h, size_t size, Scope *next, Scope *parent, Expr *expr);
+  static Scope *claim(Heap &h, size_t size, Scope *next, Scope *parent, RFun *fun); // requires prior h.reserve
+  static Scope *alloc(Heap &h, size_t size, Scope *next, Scope *parent, RFun *fun);
 };
 
 #endif

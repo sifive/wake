@@ -89,8 +89,8 @@ Hash MovedObject::hash() const {
 }
 
 Category MovedObject::category() const {
-  assert(0 /* unreachable */);
-  return VALUE;
+  // invoked by ~Target
+  return to->category();
 }
 
 Heap::Heap(int profile_heap_, double heap_factor_)

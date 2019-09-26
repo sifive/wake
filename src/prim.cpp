@@ -17,6 +17,7 @@
 
 #include "prim.h"
 #include "value.h"
+#include "ssa.h"
 #include "expr.h"
 #include "tuple.h"
 #include "location.h"
@@ -88,10 +89,29 @@ struct HeapHash {
   Promise *broken;
 };
 
+HeapStep Closure::explore_escape(HeapStep step) {
+  Scope *it = scope.get();
+  for (size_t i = 0, size; i < applied; i += size) {
+    size = it->size();
+    for (size_t j = size; j > 0; --j)
+      step = it->at(j-1)->recurse<HeapStep, &HeapPointerBase::explore>(step);
+    it = it->next.get();
+  }
+  size_t depth = 1;
+  for (auto x: fun->escapes) {
+    while (arg_depth(x) > depth) {
+      it = it->next.get();
+      ++depth;
+    }
+    step = it->at(arg_offset(x))->recurse<HeapStep, &HeapPointerBase::explore>(step);
+  }
+  return step;
+}
+
 static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
-  std::unordered_map<uintptr_t, std::bitset<256> > explored;
-  size_t max_objs = runtime.heap.used() / sizeof(PadObject);
-  std::unique_ptr<HeapObject*[]> scratch(new HeapObject*[max_objs]);
+  std::unordered_map<uintptr_t, size_t> explored;
+  size_t max_edges = runtime.heap.used() / sizeof(PadObject);
+  std::unique_ptr<HeapObject*[]> scratch(new HeapObject*[max_edges]);
 
   HeapStep step;
   scratch[0] = obj;
@@ -102,11 +122,14 @@ static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
   for (HeapObject **done = scratch.get(); done != step.found; ++done) {
     HeapObject *head = *done;
 
-    // Ensure we visit each object only once
+    // Assign objects virtual addreses based on visitation order
     uintptr_t key = reinterpret_cast<uintptr_t>(static_cast<void*>(head));
-    auto flag = explored[key>>8][key&0xFF];
-    if (flag) continue;
-    flag = true;
+    auto out = explored.insert(std::make_pair(key, done - scratch.get()));
+
+    // Include hash of child's virtual address
+    code = code + out.first->second;
+    // Only visit object once
+    if (!out.second) continue;
 
     // Hash this object and enqueue its children for hashing
     step = head->explore(step);
@@ -147,6 +170,13 @@ void CHash::execute(Runtime &runtime) {
   } else {
     Hash &h = hash.code;
     mpz_import(out.value, sizeof(h.data)/sizeof(h.data[0]), 1, sizeof(h.data[0]), 0, 0, &h.data[0]);
+    if (runtime.debug_hash && h.data[0] == runtime.debug_hash) {
+      runtime.debug_hash = 0;
+      std::stringstream ss;
+      ss << "Debug-target hash input was: " << obj.get() << std::endl;
+      std::string str = ss.str();
+      status_write(2, str.data(), str.size());
+    }
     cont->resume(runtime, Integer::claim(runtime.heap, out));
   }
 }

@@ -17,7 +17,7 @@
 
 #include "runtime.h"
 #include "tuple.h"
-#include "expr.h"
+#include "ssa.h"
 #include "value.h"
 #include "status.h"
 #include "job.h"
@@ -34,7 +34,8 @@ static void handle_SIGPROF(int sig) {
   trace_needed = true;
 }
 
-Closure::Closure(Lambda *lambda_, Scope *scope_) : lambda(lambda_), scope(scope_) { }
+Closure::Closure(RFun *fun_, size_t applied_, Scope *scope_)
+ : fun(fun_), applied(applied_), scope(scope_) { }
 
 void Work::format(std::ostream &os, FormatState &state) const {
   os << "Work";
@@ -49,9 +50,10 @@ Category Work::category() const {
   return WORK;
 }
 
-Runtime::Runtime(Profile *profile_, int profile_heap, double heap_factor)
+Runtime::Runtime(Profile *profile_, int profile_heap, double heap_factor, uint64_t debug_hash_)
  : abort(false),
    profile(profile_),
+   debug_hash(debug_hash_),
    heap(profile_heap, heap_factor),
    stack(heap.root<Work>(nullptr)),
    output(heap.root<HeapObject>(nullptr)),
@@ -80,12 +82,13 @@ Runtime::~Runtime() {
 }
 
 struct Interpret final : public GCObject<Interpret, Work> {
-  Expr *expr;
+  RFun *fun;
+  size_t index;
   HeapPointer<Scope> scope;
   HeapPointer<Continuation> cont;
 
-  Interpret(Expr *expr_, Scope *scope_, Continuation *cont_)
-   : expr(expr_), scope(scope_), cont(cont_) { }
+  Interpret(RFun *fun_, Scope *scope_, Continuation *cont_)
+   : fun(fun_), index(0), scope(scope_), cont(cont_) { }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -95,10 +98,352 @@ struct Interpret final : public GCObject<Interpret, Work> {
     return arg;
   }
 
+  void execute(Runtime &runtime) override;
+};
+
+struct InterpretContext {
+  Runtime &runtime;
+  Interpret *interpret;
+  Scope *scope;
+  size_t output; // index into scope
+  Continuation *cont; // set for tail calls
+
+  InterpretContext(Runtime &runtime_) : runtime(runtime_) { }
+  static Promise *arg(Scope *scope, size_t arg);
+
+  Promise *arg(size_t arg_) { return arg(scope, arg_); }
+  Continuation *defer();
+  void finish(HeapObject *obj);
+  void finish(Promise *p);
+};
+
+void Interpret::execute(Runtime &runtime) {
+  InterpretContext context(runtime);
+  context.interpret = this;
+  context.scope = scope.get();
+  context.cont = nullptr;
+
+  size_t limit = fun->terms.size();
+  bool tail = fun->output == make_arg(0, limit-1) && fun->terms.back()->tailCallOk();
+  if (tail) --limit;
+
+  next = nullptr; // potentially reschedule
+  for (context.output = index; context.output < limit; context.output = index) {
+    fun->terms[context.output]->interpret(context);
+    index = context.output+1;
+    if (!context.interpret) return;
+  }
+
+  if (tail) {
+    context.interpret = nullptr;
+    context.cont = cont.get();
+    fun->terms.back()->interpret(context);
+  } else {
+    context.arg(fun->output)->await(runtime, cont.get());
+  }
+}
+
+Continuation *InterpretContext::defer() {
+  if (cont) {
+    return cont;
+  } else {
+    return scope->claim_fulfiller(runtime, output);
+  }
+}
+
+void InterpretContext::finish(HeapObject *obj) {
+  if (cont) {
+    cont->resume(runtime, obj);
+  } else {
+    scope->at(output)->instant_fulfill(obj);
+  }
+}
+
+void InterpretContext::finish(Promise *p) {
+  if (*p) {
+    finish(p->coerce<HeapObject>());
+  } else {
+    p->await(runtime, defer());
+  }
+}
+
+Promise *InterpretContext::arg(Scope *it, size_t arg) {
+  for (size_t depth = arg_depth(arg); depth > 0; --depth)
+    it = it->next.get();
+  return it->at(arg_offset(arg));
+}
+
+bool RArg::tailCallOk() const {
+  // We don't invoke return, so cannot be tail called
+  return false;
+}
+
+void RArg::interpret(InterpretContext &context) {
+  // No-Op; filled in by App during Scope construction
+}
+
+bool RLit::tailCallOk() const {
+  return true;
+}
+
+void RLit::interpret(InterpretContext &context) {
+  context.finish(value->get());
+}
+
+bool RFun::tailCallOk() const {
+  return !get(SSA_RECURSIVE);
+}
+
+void RFun::interpret(InterpretContext &context) {
+  context.finish(Closure::alloc(context.runtime.heap, this, 0, context.scope));
+}
+
+bool RCon::tailCallOk() const {
+  return true;
+}
+
+void RCon::interpret(InterpretContext &context) {
+  size_t size = args.size();
+  context.runtime.heap.reserve(Record::reserve(size) + size * Tuple::fulfiller_pads);
+  Record *bind = Record::claim(context.runtime.heap, kind.get(), size);
+  for (size_t i = 0; i < size; ++i)
+    bind->claim_instant_fulfiller(context.runtime, i, context.arg(args[i]));
+  context.finish(bind);
+}
+
+struct CGet final : public GCObject<CGet, Continuation> {
+  HeapPointer<Continuation> cont;
+  size_t index;
+
+  CGet(Continuation *cont_, size_t index_)
+   : cont(cont_), index(index_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
+  }
+
   void execute(Runtime &runtime) override {
-    expr->interpret(runtime, scope.get(), cont.get());
+     Record *record = static_cast<Record*>(value.get());
+     record->at(index)->await(runtime, cont.get());
   }
 };
+
+bool RGet::tailCallOk() const {
+  return true;
+}
+
+void RGet::interpret(InterpretContext &context) {
+  Promise *arg = context.arg(args[0]);
+  if (*arg) {
+    context.runtime.heap.reserve(Tuple::fulfiller_pads);
+    context.finish(arg->coerce<Record>()->at(index));
+  } else {
+    context.runtime.heap.reserve(Tuple::fulfiller_pads + CGet::reserve());
+    arg->await(context.runtime,
+      CGet::claim(context.runtime.heap, context.defer(), index));
+  }    
+}
+
+struct CDes final : public GCObject<CDes, Continuation> {
+  HeapPointer<Scope> scope;
+  HeapPointer<Continuation> cont;
+  RDes *des;
+
+  CDes(Scope *scope_, Continuation *cont_, RDes *des_)
+   : scope(scope_), cont(cont_), des(des_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (scope.*memberfn)(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
+  }
+
+  void execute(Runtime &runtime) override {
+    Record *record = static_cast<Record*>(value.get());
+    Closure *handler = InterpretContext::arg(scope.get(), des->args[record->cons->index])->coerce<Closure>();
+    runtime.heap.reserve(runtime.reserve_apply(handler->fun));
+    runtime.claim_apply(handler, record, cont.get(), scope.get());
+  }
+};
+
+bool RDes::tailCallOk() const {
+  return true;
+}
+
+void RDes::interpret(InterpretContext &context) {
+  Promise *arg = context.arg(args.back());
+  if (*arg) {
+    Record *record = arg->coerce<Record>();
+    Closure *handler = InterpretContext::arg(context.scope, args[record->cons->index])->coerce<Closure>();
+    context.runtime.heap.reserve(context.runtime.reserve_apply(handler->fun));
+    if (context.interpret) {
+      context.runtime.schedule(context.interpret);
+      context.interpret = nullptr;
+    }
+    context.runtime.claim_apply(handler, record, context.defer(), context.scope);
+  } else {
+    context.runtime.heap.reserve(Tuple::fulfiller_pads + CDes::reserve());
+    arg->await(context.runtime,
+      CDes::claim(context.runtime.heap, context.scope, context.defer(), this));
+  }
+}
+
+struct CPrim final : public GCObject<CPrim, Continuation> {
+  HeapPointer<Scope> scope;
+  size_t output;
+  RPrim *prim;
+
+  CPrim(Scope *scope_, size_t output_, RPrim *prim_)
+   : scope(scope_), output(output_), prim(prim_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (scope.*memberfn)(arg);
+    return arg;
+  }
+
+  static Promise *doit(Runtime &runtime, Scope *scope, size_t output, RPrim *prim);
+  void execute(Runtime &runtime) override {
+    if (Promise *p = doit(runtime, scope.get(), output, prim)) {
+      next = nullptr; // reschedule
+      p->await(runtime, this);
+    }
+  }
+};
+
+Promise *CPrim::doit(Runtime &runtime, Scope *scope, size_t output, RPrim *prim) {
+  HeapObject *pargs[prim->args.size()];
+  Promise *p = nullptr;
+  size_t i;
+  for (i = 0; i < prim->args.size(); ++i) {
+    p = InterpretContext::arg(scope, prim->args[i]);
+    if (!*p) break;
+    pargs[i] = p->coerce<HeapObject>();
+  }
+  if (i == prim->args.size()) {
+    prim->fn(prim->data, runtime, scope, output, prim->args.size(), pargs);
+    return nullptr;
+  } else {
+    return p;
+  }
+}
+
+bool RPrim::tailCallOk() const {
+  return false;
+}
+
+void RPrim::interpret(InterpretContext &context) {
+  context.runtime.heap.reserve(Tuple::fulfiller_pads + CPrim::reserve());
+  if (Promise *p = CPrim::doit(context.runtime, context.scope, context.output, this)) {
+    CPrim *prim = CPrim::claim(context.runtime.heap, context.scope, context.output, this);
+    p->await(context.runtime, prim);
+  }
+}
+
+struct CApp final : public GCObject<CApp, Continuation> {
+  HeapPointer<Continuation> cont;
+  HeapPointer<Scope> caller;
+  size_t output;
+  RApp *app;
+
+  CApp(Continuation *cont_, Scope *caller_, size_t output_, RApp *app_)
+   : cont(cont_), caller(caller_), output(output_), app(app_) { }
+
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (cont.*memberfn)(arg);
+    arg = (caller.*memberfn)(arg);
+    return arg;
+  }
+
+  static void doit(Runtime &runtime, Closure *closure, Continuation *cont, Scope *caller, size_t output, RApp *app, Interpret *&resume);
+  void execute(Runtime &runtime) override {
+    Interpret *null = nullptr;
+    doit(runtime, static_cast<Closure*>(value.get()), cont.get(), caller.get(), output, app, null);
+  }
+};
+
+void CApp::doit(Runtime &runtime, Closure *closure, Continuation *cont, Scope *caller, size_t output, RApp *app, Interpret *&resume) {
+  RFun *fun = closure->fun;
+  size_t applied = closure->applied;
+  size_t nargs = app->args.size() - 1;
+  size_t fargs = fun->args();
+  size_t terms = fun->terms.size();
+  Scope *callee = closure->scope.get();
+  
+  if (applied + nargs == fargs) {
+    runtime.heap.reserve(Scope::reserve(terms) + (1+fargs)*Tuple::fulfiller_pads + Interpret::reserve());
+    // Skip over partially applied arguments
+    Scope *it = callee;
+    for (size_t pop = applied; pop; it = it->next.get())
+      pop -= it->size();
+    // Fully applied function; allocate "stack" frame
+    Scope *bind = Scope::claim(runtime.heap, terms, it, caller, fun);
+    // Fill in App() args
+    for (size_t i = 0; i < nargs; ++i)
+      bind->claim_instant_fulfiller(runtime, applied+i, InterpretContext::arg(caller, app->args[i+1]));
+    // Forward the partially applied arguments
+    it = callee;
+    size_t pop = applied;
+    while (pop) {
+      size_t size = it->size();
+      pop -= size;
+      for (size_t i = 0; i < size; ++i)
+        bind->claim_instant_fulfiller(runtime, pop+i, it->at(i));
+      it = it->next.get();
+    }
+    // Schedule an Interpreter
+    Interpret *interpret = Interpret::claim(runtime.heap, fun, bind,
+      cont ? cont : caller->claim_fulfiller(runtime, output));
+    if (resume) {
+      runtime.schedule(resume);
+      resume = nullptr;
+    }
+    runtime.schedule(interpret);
+  } else {
+    runtime.heap.reserve(Scope::reserve(nargs) + nargs*Tuple::fulfiller_pads + Closure::reserve());
+    Scope *bind = Scope::claim(runtime.heap, nargs, callee, caller, fun);
+    for (size_t i = 0; i < nargs; ++i)
+      bind->claim_instant_fulfiller(runtime, i, InterpretContext::arg(caller, app->args[i+1]));
+    Closure *closure = Closure::claim(runtime.heap, fun, applied+nargs, bind);
+    if (cont) {
+      cont->resume(runtime, closure);
+    } else {
+      caller->at(output)->fulfill(runtime, closure);
+    }
+  }
+}
+
+bool RApp::tailCallOk() const {
+  return true;
+}
+
+void RApp::interpret(InterpretContext &context) {
+  Promise *fn = context.arg(args[0]);
+  if (*fn) {
+    CApp::doit(context.runtime, fn->coerce<Closure>(), context.cont, context.scope, context.output, this, context.interpret);
+  } else {
+    fn->await(context.runtime, CApp::alloc(context.runtime.heap, context.cont, context.scope, context.output, this));
+  }
+}
+
+size_t Runtime::reserve_apply(RFun *fun) {
+  return Scope::reserve(fun->terms.size()) + Tuple::fulfiller_pads + Interpret::reserve();
+}
+
+void Runtime::claim_apply(Closure *closure, HeapObject *value, Continuation *cont, Scope *caller) {
+  RFun *fun = closure->fun;
+  Scope *bind = Scope::claim(heap, fun->terms.size(), closure->scope.get(), caller, fun);
+  bind->at(0)->instant_fulfill(value);
+  schedule(Interpret::claim(heap, fun, bind, cont));
+}
 
 void Runtime::run() {
   int count = 0;
@@ -140,193 +485,9 @@ struct CInit final : public GCObject<CInit, Continuation> {
   }
 };
 
-void Runtime::init(Expr *root) {
-  heap.guarantee(Interpret::reserve() + CInit::reserve());
+void Runtime::init(RFun *root) {
+  heap.guarantee(CInit::reserve() + Closure::reserve() + reserve_apply(root));
   CInit *done = CInit::claim(heap);
-  schedule(Interpret::claim(heap, root, nullptr, done));
-}
-
-size_t Runtime::reserve_eval() {
-  return Interpret::reserve();
-}
-
-void Runtime::claim_eval(Expr *expr, Scope *scope, Continuation *cont) {
-  schedule(Interpret::claim(heap, expr, scope, cont));
-}
-
-void Lambda::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  cont->resume(runtime, Closure::alloc(runtime.heap, this, scope));
-}
-
-void VarRef::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  size_t idx, size;
-  for (idx = index; scope && idx >= (size = scope->size()); idx -= size)
-    scope = scope->next.get();
-  if (lambda) {
-    cont->resume(runtime, Closure::alloc(runtime.heap, lambda, scope));
-  } else {
-    scope->at(idx)->await(runtime, cont);
-  }
-}
-
-struct CApp final : public GCObject<CApp, Continuation> {
-  HeapPointer<Scope> bind;
-  HeapPointer<Continuation> cont;
-
-  CApp(Scope *bind_, Continuation *cont_) : bind(bind_), cont(cont_) { }
-
-  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
-  T recurse(T arg) {
-    arg = Continuation::recurse<T, memberfn>(arg);
-    arg = (bind.*memberfn)(arg);
-    arg = (cont.*memberfn)(arg);
-    return arg;
-  }
-
-  void execute(Runtime &runtime) override {
-    auto clo = static_cast<Closure*>(value.get());
-    runtime.heap.reserve(Interpret::reserve());
-    bind->next = clo->scope.get();
-    bind->set_expr(clo->lambda);
-    runtime.schedule(Interpret::claim(runtime.heap,
-      clo->lambda->body.get(), bind.get(), cont.get()));
-  }
-};
-
-void App::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  runtime.heap.reserve(Scope::reserve(1) +
-    Interpret::reserve() + CApp::reserve() +
-    Interpret::reserve() + Tuple::fulfiller_pads);
-  Scope *bind = Scope::claim(runtime.heap, 1, nullptr, scope, nullptr);
-  runtime.schedule(Interpret::claim(runtime.heap,
-    fn.get(), scope, CApp::claim(runtime.heap, bind, cont)));
-  runtime.schedule(Interpret::claim(runtime.heap,
-    val.get(), scope, bind->claim_fulfiller(runtime, 0)));
-}
-
-void DefBinding::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  size_t size = val.size();
-  runtime.heap.reserve(Scope::reserve(size) + Interpret::reserve() +
-    val.size() * (Interpret::reserve() + Tuple::fulfiller_pads));
-  Scope *bind = Scope::claim(runtime.heap, size, scope, scope, this);
-  runtime.schedule(Interpret::claim(runtime.heap,
-    body.get(), bind, cont));
-  for (auto it = val.rbegin(); it != val.rend(); ++it)
-    runtime.schedule(Interpret::claim(runtime.heap,
-      it->get(), scope, bind->claim_fulfiller(runtime, --size)));
-}
-
-void Literal::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  cont->resume(runtime, value->get());
-}
-
-struct CPrim final : public GCObject<CPrim, Continuation> {
-  HeapPointer<Scope> scope;
-  HeapPointer<Continuation> cont;
-  Prim *prim;
-
-  CPrim(Scope *scope_, Continuation *cont_, Prim *prim_)
-   : scope(scope_), cont(cont_), prim(prim_) { }
-
-  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
-  T recurse(T arg) {
-    arg = Continuation::recurse<T, memberfn>(arg);
-    arg = (scope.*memberfn)(arg);
-    arg = (cont.*memberfn)(arg);
-    return arg;
-  }
-
-  void execute(Runtime &runtime) override {
-    HeapObject *args[prim->args];
-    Scope *it = scope.get();
-    size_t i;
-    for (i = prim->args; i; --i) {
-      if (!*it->at(0)) break;
-      args[i-1] = it->at(0)->coerce<HeapObject>();
-      it = it->next.get();
-    }
-    if (i == 0) {
-      prim->fn(prim->data, runtime, cont.get(), scope.get(), prim->args, args);
-    } else {
-      next = nullptr; // reschedule
-      it->at(0)->await(runtime, this);
-    }
-  }
-};
-
-void Prim::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  CPrim *prim = CPrim::alloc(runtime.heap, scope, cont, this);
-  runtime.schedule(prim);
-}
-
-void Construct::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  size_t size = cons->ast.args.size();
-  runtime.heap.reserve(Record::reserve(size) + size * Tuple::fulfiller_pads);
-  Record *bind = Record::claim(runtime.heap, cons, size);
-  cont->resume(runtime, bind);
-  for (size_t i = size, j; i; i -= j) {
-    for (j = 0; j < scope->size(); ++j)
-      bind->claim_instant_fulfiller(runtime, i-j-1, scope->at(j));
-    scope = scope->next.get();
-  }
-}
-
-struct CDestruct final : public GCObject<CDestruct, Continuation> {
-  HeapPointer<Scope> scope;
-  HeapPointer<Continuation> cont;
-  Destruct *des;
-
-  CDestruct(Scope *scope_, Continuation *cont_, Destruct *des_)
-   : scope(scope_), cont(cont_), des(des_) { }
-
-  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
-  T recurse(T arg) {
-    arg = Continuation::recurse<T, memberfn>(arg);
-    arg = (scope.*memberfn)(arg);
-    arg = (cont.*memberfn)(arg);
-    return arg;
-  }
-
-  void execute(Runtime &runtime) override {
-    auto record = static_cast<Record*>(value.get());
-    runtime.heap.reserve(Scope::reserve(1) + Interpret::reserve());
-    // Find the handler function body -- inlining + App fusion would eliminate this loop
-    for (int index = des->sum->members.size() - record->cons->index; index; --index)
-      scope = scope->next.get();
-    // This coercion is safe because we evaluate pure lambda args before their consumer
-    auto closure = scope->at(0)->coerce<Closure>();
-    auto body = closure->lambda->body.get();
-    auto scope = closure->scope.get();
-    auto next = Scope::claim(runtime.heap, 1, scope, scope, closure->lambda);
-    next->at(0)->instant_fulfill(record);
-    runtime.schedule(Interpret::claim(runtime.heap, body, next, cont.get()));
-  }
-};
-
-void Destruct::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  scope->at(0)->await(runtime, CDestruct::alloc(runtime.heap, scope, cont, this));
-}
-
-struct CGet final : public GCObject<CGet, Continuation> {
-  HeapPointer<Continuation> cont;
-  size_t index;
-
-  CGet(Continuation *cont_, size_t index_)
-   : cont(cont_), index(index_) { }
-
-  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
-  T recurse(T arg) {
-    arg = Continuation::recurse<T, memberfn>(arg);
-    arg = (cont.*memberfn)(arg);
-    return arg;
-  }
-
-  void execute(Runtime &runtime) override {
-     auto clo = static_cast<Record*>(value.get());
-     clo->at(index)->await(runtime, cont.get());
-  }
-};
-
-void Get::interpret(Runtime &runtime, Scope *scope, Continuation *cont) {
-  scope->at(0)->await(runtime, CGet::alloc(runtime.heap, cont, index));
+  Closure *clo = Closure::claim(heap, root, 0, nullptr);
+  claim_apply(clo, clo, done, nullptr);
 }

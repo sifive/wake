@@ -31,12 +31,12 @@ bool sums_ok();
 
 // These types must be defined by prim.wake
 struct Sum;
-extern Sum *Boolean; // True | False
-extern Sum *Order; // LT | EQ | GT
-extern Sum *List; // Nil | a, b
-extern Sum *Pair; // Pair a b
-extern Sum *Unit; // Unit
-extern Sum *JValue; // JString String | JInteger Integer | JReal String | JBoolean Boolean | JNull | JObject  List (Pair String JValue) | JArray List JValue
-extern Sum *Result; // Pass x | Fail y
+extern std::shared_ptr<Sum> Boolean; // True | False
+extern std::shared_ptr<Sum> Order; // LT | EQ | GT
+extern std::shared_ptr<Sum> List; // Nil | a, b
+extern std::shared_ptr<Sum> Pair; // Pair a b
+extern std::shared_ptr<Sum> Unit; // Unit
+extern std::shared_ptr<Sum> JValue; // JString String | JInteger Integer | JReal String | JBoolean Boolean | JNull | JObject  List (Pair String JValue) | JArray List JValue
+extern std::shared_ptr<Sum> Result; // Pass x | Fail y
 
 #endif

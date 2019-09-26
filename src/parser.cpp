@@ -723,13 +723,13 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
   }
 }
 
-Sum *Boolean;
-Sum *Order;
-Sum *List;
-Sum *Unit;
-Sum *Pair;
-Sum *Result;
-Sum *JValue;
+std::shared_ptr<Sum> Boolean;
+std::shared_ptr<Sum> Order;
+std::shared_ptr<Sum> List;
+std::shared_ptr<Sum> Unit;
+std::shared_ptr<Sum> Pair;
+std::shared_ptr<Sum> Result;
+std::shared_ptr<Sum> JValue;
 
 bool sums_ok() {
   bool ok = true;
@@ -868,7 +868,7 @@ static AST parse_type_def(Lexer &lex) {
   return def;
 }
 
-static void check_special(Lexer &lex, const std::string &name, Sum *sump) {
+static void check_special(Lexer &lex, const std::string &name, const std::shared_ptr<Sum> &sump) {
   if (name == "Integer" || name == "String" || name == "RegExp" || name == "Target" ||
       name == FN || name == "Job" || name == "Array" || name == "Double") {
     std::cerr << "Constuctor " << name
@@ -952,7 +952,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
   bind_def(lex, map, Definition(tname, c.ast.token, destructfn), global?top:0);
 
-  check_special(lex, name, sump.get());
+  check_special(lex, name, sump);
 
   // Create get/set/edit helper methods
   size_t outer = 0;
@@ -1106,7 +1106,7 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     }
   }
 
-  check_special(lex, name, sump.get());
+  check_special(lex, name, sump);
 }
 
 static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {

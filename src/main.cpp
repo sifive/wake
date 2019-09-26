@@ -42,7 +42,7 @@
 #include "markup.h"
 #include "describe.h"
 #include "profile.h"
-#include "optimize.h"
+#include "ssa.h"
 
 void print_help(const char *argv0) {
   std::cout << std::endl
@@ -82,7 +82,7 @@ void print_help(const char *argv0) {
     << "    --globals  -g    Print all global variables available to the command-line"   << std::endl
     << "    --help     -h    Print this help message and exit"                           << std::endl
     << std::endl;
-    // debug-db, stop-after-* are secret undocumented options
+    // debug-db, no-optimize, stop-after-* are secret undocumented options
 }
 
 static struct option *arg(struct option opts[], const char *name) {
@@ -121,9 +121,11 @@ int main(int argc, char **argv) {
     { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
     { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "debug-target",          GOPT_ARGUMENT_REQUIRED  },
     { 0,   "stop-after-parse",      GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "stop-after-optimize",   GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "stop-after-ssa",        GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "no-optimize",           GOPT_ARGUMENT_FORBIDDEN },
     { 0,   0,                       GOPT_LAST}};
 
   argc = gopt(argv, options);
@@ -151,13 +153,15 @@ int main(int argc, char **argv) {
   bool debugdb = arg(options, "debug-db")->count;
   bool parse   = arg(options, "stop-after-parse")->count;
   bool tcheck  = arg(options, "stop-after-type-check")->count;
-  bool optim   = arg(options, "stop-after-optimize")->count;
+  bool dumpssa = arg(options, "stop-after-ssa")->count;
+  bool optim   =!arg(options, "no-optimize")->count;
 
   const char *percents= arg(options, "percent")->argument;
   const char *heapf   = arg(options, "heap-factor")->argument;
   const char *profile = arg(options, "profile")->argument;
   const char *init    = arg(options, "init")->argument;
   const char *remove  = arg(options, "remove-task")->argument;
+  const char *hash    = arg(options, "debug-target")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -209,7 +213,7 @@ int main(int argc, char **argv) {
   bool nodb = init;
   bool noparse = nodb || remove || list || output || input || last || failed;
   bool notype = noparse || parse;
-  bool noexecute = notype || add || html || tcheck || optim || global;
+  bool noexecute = notype || add || html || tcheck || dumpssa || global;
 
   if (noparse && argc < 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
@@ -305,8 +309,18 @@ int main(int argc, char **argv) {
   auto wakefiles = find_all_wakefiles(ok, workspace);
   if (!ok) std::cerr << "Workspace wake file enumeration failed" << std::endl;
 
+  uint64_t target_hash = 0;
+  if (hash) {
+    char *tail;
+    target_hash = strtoull(hash, &tail, 0);
+    if (*tail) {
+      std::cerr << "Cannot run with debug-target=" << hash << "  (must be a number)!" << std::endl;
+      return 1;
+    }
+  }
+
   Profile tree;
-  Runtime runtime(profile ? &tree : nullptr, profileh, heap_factor);
+  Runtime runtime(profile ? &tree : nullptr, profileh, heap_factor, target_hash);
   bool sources = find_all_sources(runtime, workspace);
   if (!sources) std::cerr << "Source file enumeration failed" << std::endl;
   ok &= sources;
@@ -335,7 +349,7 @@ int main(int argc, char **argv) {
     target_names.emplace_back("<target-" + std::to_string(i) + ">");
   }
   if (argc > 1) target_names.back() = "<command-line>";
-  TypeVar *types = &body->typeVar;
+  TypeVar types = body->typeVar;
   for (size_t i = 0; i < targets.size(); ++i) {
     Lexer lex(runtime.heap, targets[i], target_names[i].c_str());
     body = new App(LOCATION, body, force_use(parse_command(lex)));
@@ -366,9 +380,6 @@ int main(int argc, char **argv) {
 
   if (tcheck) std::cout << root.get();
   if (html) markup_html(std::cout, root.get());
-  root = optimize_deadcode(std::move(root));
-  if (optim) std::cout << root.get();
-
   for (auto &g : globals) {
     Expr *e = root.get();
     while (e && e->type == &DefBinding::type) {
@@ -390,14 +401,29 @@ int main(int argc, char **argv) {
     if (verbose) std::cout << "Added target " << (targets.size()-1) << " = " << targets.back() << std::endl;
   }
 
+  // Convert AST to optimized SSA
+  std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root));
+  if (optim) {
+    // Full optimization schedule
+    ssa = Term::optimize(std::move(ssa));
+  } else {
+    // We need at least these two passes to compute function hashes
+    ssa = Term::pass_purity(std::move(ssa), PRIM_ORDERED, SSA_ORDERED);
+    ssa = Term::pass_cse   (std::move(ssa));
+  }
+  ssa = Term::scope(std::move(ssa));
+
+  // Upon request, dump out the SSA
+  if (dumpssa) {
+    TermFormat format(true);
+    ssa->format(std::cout, format);
+  }
+
   // Exit without execution for these arguments
   if (noexecute) return 0;
 
-  // Initialize expression hashes for hashing closures
-  root->hash();
-
   db.prepare();
-  runtime.init(root.get());
+  runtime.init(static_cast<RFun*>(ssa.get()));
 
   // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
   std::cout << std::flush;
@@ -436,8 +462,8 @@ int main(int argc, char **argv) {
       HeapObject *v = *p ? p->coerce<HeapObject>() : nullptr;
       if (verbose) {
         std::cout << targets[i] << ": ";
-        (*types)[0].format(std::cout, body->typeVar);
-        types = &(*types)[1];
+        types[0].format(std::cout, body->typeVar);
+        types = types[1];
         std::cout << " = ";
       }
       if (!quiet) {

@@ -109,7 +109,8 @@ static PRIMTYPE(type_hash) {
 }
 
 static PRIMFN(prim_hash) {
-  runtime.heap.reserve(reserve_list(nargs) + reserve_hash());
+  runtime.heap.reserve(Tuple::fulfiller_pads + reserve_list(nargs) + reserve_hash());
+  Continuation *continuation = scope->claim_fulfiller(runtime, output);
   HeapObject *list = claim_list(runtime.heap, nargs, args);
   runtime.schedule(claim_hash(runtime.heap, list, continuation));
 }
@@ -164,7 +165,8 @@ static PRIMFN(prim_tget) {
   INTEGER_MPZ(subkey, 2);
   CLOSURE(body, 3);
 
-  runtime.heap.reserve(Scope::reserve(1) + Runtime::reserve_eval() + CTarget::reserve());
+  runtime.heap.reserve(Tuple::fulfiller_pads + Runtime::reserve_apply(body->fun) + CTarget::reserve());
+  Continuation *continuation = scope->claim_fulfiller(runtime, output);
 
   Hash hash;
   REQUIRE(mpz_sizeinbase(key, 2) <= 8*sizeof(hash.data));
@@ -182,20 +184,21 @@ static PRIMFN(prim_tget) {
     ss << "ERROR: Target subkey mismatch for " << target->location->c_str() << std::endl;
     for (auto &x : scope->stack_trace())
       ss << "  from " << x << std::endl;
+    ss << "To debug, rerun your wake command with these additional options:" << std::endl;
+    ss << "  --debug-target=" << hash.data[0] << " to see the unique target arguments (before the '\\')" << std::endl;
+    ss << "  --debug-target=" << ref.first->second.subhash.data[0] << " to see the first invocation's extra arguments" << std::endl;
+    ss << "  --debug-target=" << subhash.data[0] << " to see the second invocation's extra arguments" << std::endl;
     std::string str = ss.str();
     status_write(2, str.data(), str.size());
     runtime.abort = true;
   }
 
-  if (ref.second) {
-    Scope *bind = Scope::claim(runtime.heap, 1, body->scope.get(), scope, body->lambda);
-    bind->at(0)->instant_fulfill(args[1]); // hash
-    runtime.claim_eval(body->lambda->body.get(), bind, CTarget::claim(runtime.heap, target, hash));
-  }
+  if (ref.second)
+    runtime.claim_apply(body, args[1], CTarget::claim(runtime.heap, target, hash), scope);
 }
 
 void prim_register_target(PrimMap &pmap) {
   prim_register(pmap, "hash", prim_hash, type_hash, PRIM_PURE);
-  prim_register(pmap, "tnew", prim_tnew, type_tnew, PRIM_REMOVE);
-  prim_register(pmap, "tget", prim_tget, type_tget, PRIM_IMPURE|PRIM_TGET); // special-case; handler function may be (im)pure
+  prim_register(pmap, "tnew", prim_tnew, type_tnew, PRIM_ORDERED);
+  prim_register(pmap, "tget", prim_tget, type_tget, PRIM_FNARG); // kind depends on function argument
 }
