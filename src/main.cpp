@@ -391,7 +391,14 @@ int main(int argc, char **argv) {
 
   // Convert AST to optimized SSA
   std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root));
-  if (optim) ssa = Term::optimize(std::move(ssa));
+  if (optim) {
+    // Full optimization schedule
+    ssa = Term::optimize(std::move(ssa));
+  } else {
+    // We need at least these two passes to compute function hashes
+    ssa = Term::pass_purity(std::move(ssa), PRIM_ORDERED, SSA_ORDERED);
+    ssa = Term::pass_cse   (std::move(ssa));
+  }
   ssa = Term::scope(std::move(ssa));
 
   // Upon request, dump out the SSA
@@ -402,9 +409,6 @@ int main(int argc, char **argv) {
 
   // Exit without execution for these arguments
   if (noexecute) return 0;
-
-  // Initialize expression hashes for hashing closures
-  //root->hash();
 
   db.prepare();
   runtime.init(static_cast<RFun*>(ssa.get()));
