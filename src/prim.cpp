@@ -95,6 +95,7 @@ HeapStep Closure::explore_escape(HeapStep step) {
     size = it->size();
     for (size_t j = size; j > 0; --j)
       step = it->at(j-1)->template recurse<HeapStep, &HeapPointerBase::explore>(step);
+    it = it->next.get();
   }
   size_t depth = 1;
   for (auto x: fun->escapes) {
