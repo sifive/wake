@@ -47,11 +47,12 @@ struct TermFormat {
   TermFormat(bool scoped_ = false) : depth(0), id(0), scoped(scoped_) { }
 };
 
-#define SSA_RECURSIVE	0x1
-#define SSA_ORDERED	0x2
-#define SSA_EFFECT	0x4
-#define SSA_USED	0x8
+#define SSA_RECURSIVE	0x01
+#define SSA_ORDERED	0x02
+#define SSA_EFFECT	0x04
+#define SSA_USED	0x08
 #define SSA_SINGLETON	0x10
+#define SSA_FRCON	0x20
 
 struct Term {
   static const size_t invalid = ~static_cast<size_t>(0);

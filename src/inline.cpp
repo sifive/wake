@@ -152,14 +152,48 @@ void RGet::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   meta = make_meta(1, 0);
   update(p.stream.map());
-  Term *input = p.stream[args.back()];
-  if (input->id() == typeid(RCon)) {
-    RCon *con = static_cast<RCon*>(input);
-    std::unique_ptr<RApp> app(
-      new RApp(args[con->kind->index], args.back(), label.c_str()));
+  bool same = false;
+  for (unsigned i = 1; i < args.size()-1; ++i)
+    same &= args[0] == args[i];
+  if (same) {
+    std::unique_ptr<RApp> app(new RApp(args[0], args.back(), label.c_str()));
     rapp_inline(p, std::move(app));
   } else {
-    p.stream.transfer(std::move(self));
+    Term *input = p.stream[args.back()];
+    if (input->id() == typeid(RCon)) {
+      RCon *con = static_cast<RCon*>(input);
+      std::unique_ptr<RApp> app(
+        new RApp(args[con->kind->index], args.back(), label.c_str()));
+      rapp_inline(p, std::move(app));
+    } else if (!input->get(SSA_ORDERED) && input->id() == typeid(RDes)) {
+      RDes *des = static_cast<RDes*>(input);
+      bool known = true;
+      for (unsigned i = 0; i < des->args.size()-1; ++i)
+        known &= p.stream[des->args[i]]->get(SSA_FRCON);
+      if (known) {
+        // create new functions which composes the two RDes
+        std::vector<size_t> compose;
+        for (unsigned i = 0; i < des->args.size()-1; ++i) {
+          size_t fnid = p.stream.scope().end();
+          compose.push_back(fnid);
+          RFun *f = new RFun(LOCATION, label.c_str(), 0, fnid+3);
+          std::vector<size_t> cargs(args);
+          cargs.back() = fnid+2;
+          f->terms.emplace_back(new RArg());
+          f->terms.emplace_back(new RApp(des->args[i], fnid+1));
+          f->terms.emplace_back(new RDes(std::move(cargs)));
+          PassInline q(p.stream.scope(), p.threshold, fnid); // refs up to fun are unmodified
+          q.pool = std::move(p.pool);
+          f->pass_inline(q, std::unique_ptr<Term>(f));
+          p.pool = std::move(q.pool);
+        }
+        args = std::move(compose);
+        args.push_back(des->args.back());
+      }
+      p.stream.transfer(std::move(self));
+    } else {
+      p.stream.transfer(std::move(self));
+    }
   }
 }
 
@@ -203,6 +237,8 @@ void RFun::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   }
 
   update(p.stream.map());
+  // Detect if function returns a Constructor
+  set(SSA_FRCON, p.stream[output]->id() == typeid(RCon));
   terms = p.stream.end(cp);
 
   size_t size = 1;
