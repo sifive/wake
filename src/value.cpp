@@ -345,7 +345,7 @@ void Closure::format(std::ostream &os, FormatState &state) const {
 }
 
 Hash Closure::hash() const {
-  return applied; // !!! lambda->hashcode;
+  return fun->hash + Hash(applied);
 }
 
 Hash Record::hash() const {
