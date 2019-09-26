@@ -50,9 +50,10 @@ Category Work::category() const {
   return WORK;
 }
 
-Runtime::Runtime(Profile *profile_, int profile_heap, double heap_factor)
+Runtime::Runtime(Profile *profile_, int profile_heap, double heap_factor, uint64_t debug_hash_)
  : abort(false),
    profile(profile_),
+   debug_hash(debug_hash_),
    heap(profile_heap, heap_factor),
    stack(heap.root<Work>(nullptr)),
    output(heap.root<HeapObject>(nullptr)),

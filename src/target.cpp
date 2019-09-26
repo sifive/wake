@@ -184,6 +184,10 @@ static PRIMFN(prim_tget) {
     ss << "ERROR: Target subkey mismatch for " << target->location->c_str() << std::endl;
     for (auto &x : scope->stack_trace())
       ss << "  from " << x << std::endl;
+    ss << "To debug, rerun your wake command with these additional options:" << std::endl;
+    ss << "  --debug-target=" << hash.data[0] << " to see the unique target arguments (before the '\\')" << std::endl;
+    ss << "  --debug-target=" << ref.first->second.subhash.data[0] << " to see the first invocation's extra arguments" << std::endl;
+    ss << "  --debug-target=" << subhash.data[0] << " to see the second invocation's extra arguments" << std::endl;
     std::string str = ss.str();
     status_write(2, str.data(), str.size());
     runtime.abort = true;

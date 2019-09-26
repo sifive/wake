@@ -121,6 +121,7 @@ int main(int argc, char **argv) {
     { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
     { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "debug-target",          GOPT_ARGUMENT_REQUIRED  },
     { 0,   "stop-after-parse",      GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-ssa",        GOPT_ARGUMENT_FORBIDDEN },
@@ -160,6 +161,7 @@ int main(int argc, char **argv) {
   const char *profile = arg(options, "profile")->argument;
   const char *init    = arg(options, "init")->argument;
   const char *remove  = arg(options, "remove-task")->argument;
+  const char *hash    = arg(options, "debug-target")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -307,8 +309,18 @@ int main(int argc, char **argv) {
   auto wakefiles = find_all_wakefiles(ok, workspace);
   if (!ok) std::cerr << "Workspace wake file enumeration failed" << std::endl;
 
+  uint64_t target_hash = 0;
+  if (hash) {
+    char *tail;
+    target_hash = strtoull(hash, &tail, 0);
+    if (*tail) {
+      std::cerr << "Cannot run with debug-target=" << hash << "  (must be a number)!" << std::endl;
+      return 1;
+    }
+  }
+
   Profile tree;
-  Runtime runtime(profile ? &tree : nullptr, profileh, heap_factor);
+  Runtime runtime(profile ? &tree : nullptr, profileh, heap_factor, target_hash);
   bool sources = find_all_sources(runtime, workspace);
   if (!sources) std::cerr << "Source file enumeration failed" << std::endl;
   ok &= sources;

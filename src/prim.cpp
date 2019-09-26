@@ -170,6 +170,13 @@ void CHash::execute(Runtime &runtime) {
   } else {
     Hash &h = hash.code;
     mpz_import(out.value, sizeof(h.data)/sizeof(h.data[0]), 1, sizeof(h.data[0]), 0, 0, &h.data[0]);
+    if (runtime.debug_hash && h.data[0] == runtime.debug_hash) {
+      runtime.debug_hash = 0;
+      std::stringstream ss;
+      ss << "Debug-target hash input was: " << obj.get() << std::endl;
+      std::string str = ss.str();
+      status_write(2, str.data(), str.size());
+    }
     cont->resume(runtime, Integer::claim(runtime.heap, out));
   }
 }
