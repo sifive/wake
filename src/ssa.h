@@ -22,6 +22,7 @@
 #include "gc.h"
 #include "location.h"
 #include "datatype.h"
+#include "hash.h"
 #include <vector>
 #include <memory>
 #include <ostream>
@@ -35,6 +36,7 @@ struct PassUsage;
 struct PassSweep;
 struct PassWiden;
 struct PassInline;
+struct PassCSE;
 struct PassScope;
 struct InterpretContext;
 
@@ -73,6 +75,7 @@ struct Term {
   virtual void pass_usage (PassUsage  &p) = 0;
   virtual void pass_sweep (PassSweep  &p) = 0;
   virtual void pass_inline(PassInline &p, std::unique_ptr<Term> self) = 0;
+  virtual void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) = 0;
   virtual void pass_scope (PassScope  &p) = 0;
 
   // The top-level pass invocations
@@ -80,6 +83,7 @@ struct Term {
   static std::unique_ptr<Term> pass_usage (std::unique_ptr<Term> term);
   static std::unique_ptr<Term> pass_sweep (std::unique_ptr<Term> term);
   static std::unique_ptr<Term> pass_inline(std::unique_ptr<Term> term, size_t threshold);
+  static std::unique_ptr<Term> pass_cse   (std::unique_ptr<Term> term);
 
   // Create SSA from AST
   static std::unique_ptr<Term> fromExpr(std::unique_ptr<Expr> expr);
@@ -126,6 +130,7 @@ struct RArg final : public Leaf {
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
+  void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
 };
 
 struct RLit final : public Leaf {
@@ -142,6 +147,7 @@ struct RLit final : public Leaf {
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
+  void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
 };
 
 struct RApp final : public Redux {
@@ -157,6 +163,7 @@ struct RApp final : public Redux {
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
+  void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
 };
 
 struct RPrim final : public Redux {
@@ -177,6 +184,7 @@ struct RPrim final : public Redux {
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
+  void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
 };
 
 struct RGet final : public Redux {
@@ -194,6 +202,7 @@ struct RGet final : public Redux {
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
+  void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
 };
 
 struct RDes final : public Redux {
@@ -209,6 +218,7 @@ struct RDes final : public Redux {
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
+  void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
 };
 
 struct RCon final : public Redux {
@@ -227,10 +237,12 @@ struct RCon final : public Redux {
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
+  void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
 };
 
 struct RFun final : public Term {
   Location location;
+  Hash hash; // unique function identifier
   size_t output; // output can refer to a non-member Term
   std::vector<std::unique_ptr<Term> > terms;
   std::vector<size_t> escapes;
@@ -251,6 +263,7 @@ struct RFun final : public Term {
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
+  void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
   void pass_scope (PassScope  &p) override;
 };
 

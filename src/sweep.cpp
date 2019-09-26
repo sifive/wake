@@ -51,12 +51,12 @@ void RCon::pass_sweep(PassSweep &p) {
 void RFun::pass_sweep(PassSweep &p) {
   CheckPoint cp = p.stream.begin();
   for (auto &x : terms) {
-    if (!x->get(SSA_USED)) {
-      p.stream.discard();
-    } else {
+    if (x->get(SSA_USED)) {
       Term *t = x.get();
       p.stream.transfer(std::move(x));
       t->pass_sweep(p);
+    } else {
+      p.stream.discard();
     }
   }
   update(p.stream.map());
