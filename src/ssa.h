@@ -48,9 +48,10 @@ struct TermFormat {
 };
 
 #define SSA_RECURSIVE	0x1
-#define SSA_DROP	0x2
-#define SSA_USED	0x4
-#define SSA_SINGLETON	0x8
+#define SSA_ORDERED	0x2
+#define SSA_EFFECT	0x4
+#define SSA_USED	0x8
+#define SSA_SINGLETON	0x10
 
 struct Term {
   static const size_t invalid = ~static_cast<size_t>(0);
@@ -79,7 +80,7 @@ struct Term {
   virtual void pass_scope (PassScope  &p) = 0;
 
   // The top-level pass invocations
-  static std::unique_ptr<Term> pass_purity(std::unique_ptr<Term> term);
+  static std::unique_ptr<Term> pass_purity(std::unique_ptr<Term> term, int pflag, size_t sflag);
   static std::unique_ptr<Term> pass_usage (std::unique_ptr<Term> term);
   static std::unique_ptr<Term> pass_sweep (std::unique_ptr<Term> term);
   static std::unique_ptr<Term> pass_inline(std::unique_ptr<Term> term, size_t threshold);

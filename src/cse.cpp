@@ -71,11 +71,13 @@ static Hash hash_redux(PassCSE &p, Redux *redux, size_t type, Hash hash) {
 
 static void cse_reduce(PassCSE &p, Hash hash, std::unique_ptr<Term> self) {
   auto ins = p.table.insert(std::make_pair(hash, p.stream.scope().end()));
-  if (ins.second) {
+  if (ins.second || self->get(SSA_ORDERED)) {
     p.undo->push_back(hash);
     p.stream.transfer(std::move(self));
   } else {
-    p.stream.discard(ins.first->second);
+    size_t prior = ins.first->second;
+    p.stream[prior]->set(SSA_SINGLETON, false);
+    p.stream.discard(prior);
   }
 }
 

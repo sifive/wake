@@ -62,7 +62,7 @@ void RFun::pass_usage(PassUsage &p) {
   size_t last = p.scope.last();
   for (unsigned i = 0; i < terms.size(); ++i) {
     Term *t = p.scope[last-i];
-    bool used = t->meta > 0 || !t->get(SSA_DROP);
+    bool used = t->meta > 0 || t->get(SSA_EFFECT);
     t->set(SSA_USED, used);
     t->set(SSA_SINGLETON, t->meta == 1);
     if (used) t->pass_usage(p);

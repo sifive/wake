@@ -607,5 +607,5 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "mkdir",    prim_mkdir,    type_mkdir,     PRIM_IMPURE);
   prim_register(pmap, "unlink",   prim_unlink,   type_unlink,    PRIM_IMPURE);
   prim_register(pmap, "write",    prim_write,    type_write,     PRIM_IMPURE);
-  prim_register(pmap, "read",     prim_read,     type_read,      PRIM_REMOVE);
+  prim_register(pmap, "read",     prim_read,     type_read,      PRIM_ORDERED);
 }

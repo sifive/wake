@@ -20,9 +20,11 @@
 
 struct PassPurity {
   ScopeAnalysis scope;
+  int pflag;
+  size_t sflag;
   bool first;
   bool fixed;
-  PassPurity() : first(true) { }
+  PassPurity(int pflag_, size_t sflag_) : pflag(pflag_), sflag(sflag_), first(true) { }
 };
 
 static uintptr_t filter_lowest(uintptr_t x) {
@@ -32,13 +34,13 @@ static uintptr_t filter_lowest(uintptr_t x) {
 void RArg::pass_purity(PassPurity &p) {
   // An argument has no effects unless it is applied
   meta = 1;
-  // NOT safe to SSA_DROP
+  // NOT safe to drop/cse
+  flags |= p.sflag;
 }
 
 void RLit::pass_purity(PassPurity &p) {
   // Literals have no effects
   meta = 1;
-  flags |= SSA_DROP;
 }
 
 void RApp::pass_purity(PassPurity &p) {
@@ -48,22 +50,21 @@ void RApp::pass_purity(PassPurity &p) {
   for (size_t i = 1; i < args.size(); ++i)
     acc = (acc >> 1) & filter_lowest(acc);
   meta = acc;
-  set(SSA_DROP, meta & 1);
+  set(p.sflag, !(meta & 1));
 }
 
 void RPrim::pass_purity(PassPurity &p) {
-  // Pure only if it is safe to remove this primitive
-  meta = (pflags & PRIM_REMOVE) != 0;
+  // Pure only if the flag is clear
+  meta = (pflags & p.pflag) == 0;
   // Special-case for tget (purity depends on purity of fn arg)
-  if ((pflags & PRIM_TGET))
+  if ((pflags & PRIM_FNARG))
     meta = p.scope[args[3]]->meta >> 1;
-  set(SSA_DROP, meta & 1);
+  set(p.sflag, !(meta & 1));
 }
 
 void RGet::pass_purity(PassPurity &p) {
   // Gets destructure only => pure
   meta = 1;
-  flags |= SSA_DROP;
 }
 
 void RDes::pass_purity(PassPurity &p) {
@@ -72,18 +73,16 @@ void RDes::pass_purity(PassPurity &p) {
   for (size_t i = 0, num = args.size()-1; i < num; ++i)
     acc &= p.scope[args[i]]->meta;
   meta = acc >> 1;
-  set(SSA_DROP, meta & 1);
+  set(p.sflag, !(meta & 1));
 }
 
 void RCon::pass_purity(PassPurity &p) {
   meta = 1;
-  flags |= SSA_DROP;
 }
 
 void RFun::pass_purity(PassPurity &p) {
   if (p.first)
     meta = ~static_cast<uintptr_t>(0); // visible in recursive use
-  flags |= SSA_DROP;
   uintptr_t save = meta;
   uintptr_t acc = 1;
   int args = 0;
@@ -101,8 +100,8 @@ void RFun::pass_purity(PassPurity &p) {
   p.scope.pop(terms.size());
 }
 
-std::unique_ptr<Term> Term::pass_purity(std::unique_ptr<Term> term) {
-  PassPurity pass;
+std::unique_ptr<Term> Term::pass_purity(std::unique_ptr<Term> term, int pflag, size_t sflag) {
+  PassPurity pass(pflag, sflag);
   pass.scope.push(term.get());
   do {
     pass.fixed = true;

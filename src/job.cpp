@@ -1607,15 +1607,15 @@ static PRIMFN(prim_access) {
 }
 
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
-  // These can be deadcode eliminated, but not const-prop evaluated (they don't return)
-  prim_register(pmap, "job_output", prim_job_output, type_job_output,  PRIM_REMOVE);
-  prim_register(pmap, "job_tree",   prim_job_tree,   type_job_tree,    PRIM_REMOVE);
-  prim_register(pmap, "job_id",     prim_job_id,     type_job_id,      PRIM_REMOVE);
-  prim_register(pmap, "job_desc",   prim_job_desc,   type_job_desc,    PRIM_REMOVE);
-  prim_register(pmap, "job_reality",prim_job_reality,type_job_reality, PRIM_REMOVE);
-  prim_register(pmap, "job_report", prim_job_report, type_job_report,  PRIM_REMOVE);
-  prim_register(pmap, "job_record", prim_job_record, type_job_record,  PRIM_REMOVE);
-  // These are straight-up impure and must not be affected
+  // These require a Job argument so won't get const-prop evaluated (they don't return)
+  prim_register(pmap, "job_output", prim_job_output, type_job_output,  PRIM_PURE);
+  prim_register(pmap, "job_tree",   prim_job_tree,   type_job_tree,    PRIM_PURE);
+  prim_register(pmap, "job_id",     prim_job_id,     type_job_id,      PRIM_PURE);
+  prim_register(pmap, "job_desc",   prim_job_desc,   type_job_desc,    PRIM_PURE);
+  prim_register(pmap, "job_reality",prim_job_reality,type_job_reality, PRIM_PURE);
+  prim_register(pmap, "job_report", prim_job_report, type_job_report,  PRIM_PURE);
+  prim_register(pmap, "job_record", prim_job_record, type_job_record,  PRIM_PURE);
+  // These should not be eliminated (they have effects)
   prim_register(pmap, "job_cache",  prim_job_cache,  type_job_cache,   PRIM_IMPURE, jobtable);
   prim_register(pmap, "job_create", prim_job_create, type_job_create,  PRIM_IMPURE, jobtable);
   prim_register(pmap, "job_launch", prim_job_launch, type_job_launch,  PRIM_IMPURE, jobtable);
@@ -1625,11 +1625,11 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   prim_register(pmap, "job_fail_finish", prim_job_fail_finish, type_job_fail, PRIM_IMPURE);
   prim_register(pmap, "job_kill",   prim_job_kill,   type_job_kill,    PRIM_IMPURE);
   prim_register(pmap, "add_hash",   prim_add_hash,   type_add_hash,    PRIM_IMPURE, jobtable);
-  // Dead-code elimination ok, but not const-prop ok (must be ordered wrt. filesystem)
-  prim_register(pmap, "get_hash",   prim_get_hash,   type_get_hash,    PRIM_REMOVE, jobtable);
-  prim_register(pmap, "get_modtime",prim_get_modtime,type_get_modtime, PRIM_REMOVE);
-  prim_register(pmap, "search_path",prim_search_path,type_search_path, PRIM_REMOVE);
-  prim_register(pmap, "access",     prim_access,     type_access,      PRIM_REMOVE);
+  // Dead-code elimination ok, but not CSE/const-prop ok (must be ordered wrt. filesystem)
+  prim_register(pmap, "get_hash",   prim_get_hash,   type_get_hash,    PRIM_ORDERED, jobtable);
+  prim_register(pmap, "get_modtime",prim_get_modtime,type_get_modtime, PRIM_ORDERED);
+  prim_register(pmap, "search_path",prim_search_path,type_search_path, PRIM_ORDERED);
+  prim_register(pmap, "access",     prim_access,     type_access,      PRIM_ORDERED);
 }
 
 static void wake(Runtime &runtime, HeapPointer<Continuation> &q, HeapObject *value) {
