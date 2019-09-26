@@ -79,7 +79,6 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
       if (j == i+1) {
         doit(scope, &frame, def->fun[i].get());
       } else {
-        size_t null = 1;
         RFun *mutual = new RFun(LOCATION, "mutual", SSA_RECURSIVE);
         size_t mid = scope.append(mutual);
         size_t mcp = scope.append(new RArg("_"));
@@ -87,7 +86,7 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
           RFun *proxy = new RFun(def->fun[j]->body->location, "proxy", 0);
           def->fun[j]->meta = scope.append(proxy);
           size_t x = scope.append(new RArg("_"));
-          size_t a = scope.append(new RApp(mid, null));
+          size_t a = scope.append(new RApp(mid, mid));
           size_t g = scope.append(new RGet(j-i, a));
           proxy->output = scope.append(new RApp(g, x));
           proxy->terms = scope.unwind(x);
@@ -101,7 +100,7 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
         auto cons = std::shared_ptr<Constructor>(random, &Constructor::array);
         mutual->output = scope.append(new RCon(std::move(cons), std::move(imp)));
         mutual->terms = scope.unwind(mcp);
-        size_t tid = scope.append(new RApp(mid, null));
+        size_t tid = scope.append(new RApp(mid, mid));
         for (j = i; j < def->fun.size() && scc == def->scc[j]; ++j) {
           def->fun[j]->meta = scope.append(new RGet(j-i, tid));
         }
