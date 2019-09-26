@@ -616,7 +616,9 @@ static void launch(JobTable *jobtable) {
     bool indirect = *i.job->cmdline != task.cmdline;
     double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
     std::string pretty = pretty_cmd(i.job->cmdline->as_str());
-    i.status = status_state.jobs.emplace(status_state.jobs.end(), pretty, predict, i.start);
+    std::string clone(pretty);
+    for (auto &c : clone) if (c == '\n') c = ' ';
+    i.status = status_state.jobs.emplace(status_state.jobs.end(), clone, predict, i.start);
     if (LOG_ECHO(i.job->log)) {
       std::stringstream s;
       if (*i.job->dir != ".") s << "cd " << i.job->dir->c_str() << "; ";
