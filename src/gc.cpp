@@ -93,35 +93,106 @@ Category MovedObject::category() const {
   return to->category();
 }
 
+struct HeapStats {
+  const char *type;
+  size_t objects, pads;
+  HeapStats() : type(nullptr), objects(0), pads(0) { }
+};
+
+struct Space {
+  size_t size;
+  size_t alloc;
+  PadObject *array;
+
+  Space(size_t size_ = INITIAL_HEAP_SIZE);
+  ~Space();
+
+  void resize(size_t size_);
+};
+
+Space::Space(size_t size_)
+ : size(size_),
+   alloc(size_),
+   array(static_cast<PadObject*>(::malloc(sizeof(PadObject)*size))) {
+  assert(array);
+}
+
+Space::~Space() {
+  ::free(array);
+}
+
+void Space::resize(size_t size_) {
+  if (alloc < size_ || 3*size_ < alloc) {
+    alloc = size_ + (size_ >> 1);
+    void *tmp = ::realloc(array, sizeof(PadObject)*alloc);
+    assert(tmp);
+    array = static_cast<PadObject*>(tmp);
+  }
+  size = size_;
+}
+
+struct Heap::Imp {
+  int profile_heap;
+  double heap_factor;
+  Space spaces[2];
+  int space;
+  size_t last_pads;
+  size_t most_pads;
+  HeapStats peak[10];
+  HeapObject *finalize;
+
+  Imp(int profile_heap_, double heap_factor_)
+   : profile_heap(profile_heap_),
+     heap_factor(heap_factor_),
+     spaces(),
+     space(0),
+     last_pads(0),
+     most_pads(0),
+     peak(),
+     finalize(nullptr) { }
+};
+
 Heap::Heap(int profile_heap_, double heap_factor_)
- : profile_heap(profile_heap_),
-   heap_factor(heap_factor_),
-   begin(static_cast<PadObject*>(::malloc(sizeof(PadObject)*INITIAL_HEAP_SIZE))),
-   end(begin + INITIAL_HEAP_SIZE),
-   free(begin),
-   last_pads(0),
-   most_pads(0),
-   peak(),
+ : imp(new Imp(profile_heap_, heap_factor_)),
    roots(),
-   finalize(nullptr) {
+   free(imp->spaces[imp->space].array),
+   end(free + imp->spaces[imp->space].size) {
 }
 
 Heap::~Heap() {
   GC(0);
-  assert (free == begin);
-  ::free(begin);
+  assert (free == imp->spaces[imp->space].array);
+}
+
+size_t Heap::used() const {
+  return (free - imp->spaces[imp->space].array) * sizeof(PadObject);
+}
+
+size_t Heap::alloc() const {
+  return (end - imp->spaces[imp->space].array) * sizeof(PadObject);
+}
+
+size_t Heap::avail() const {
+  return (end - free) * sizeof(PadObject);
+}
+
+void *Heap::scratch(size_t bytes) {
+  size_t size = (bytes+sizeof(PadObject)-1)/sizeof(PadObject);
+  Space &idle = imp->spaces[imp->space ^ 1];
+  if (idle.alloc < size) idle.resize(size);
+  return idle.array;
 }
 
 void Heap::report() const {
-  if (profile_heap) {
+  if (imp->profile_heap) {
     std::stringstream s;
     s << "------------------------------------------" << std::endl;
-    s << "Peak live heap " << (most_pads*8) << " bytes" << std::endl;
+    s << "Peak live heap " << (imp->most_pads*8) << " bytes" << std::endl;
     s << "------------------------------------------" << std::endl;
     s << "  Object type          Objects       Bytes" << std::endl;
     s << "  ----------------------------------------" << std::endl;
-    for (size_t i = 0; i < sizeof(peak)/sizeof(peak[0]); ++i) {
-      const HeapStats &x = peak[i];
+    for (size_t i = 0; i < sizeof(imp->peak)/sizeof(imp->peak[0]); ++i) {
+      const HeapStats &x = imp->peak[i];
       if (!x.type) continue;
       s << "  "
         << std::setw(20) << std::left  << x.type
@@ -147,11 +218,16 @@ struct StatOrder {
 };
 
 void Heap::GC(size_t requested_pads) {
-  size_t no_gc_overrun = (free-begin) + requested_pads;
-  size_t estimate_desired_size = heap_factor*last_pads + requested_pads;
+  Space &from = imp->spaces[imp->space];
+  size_t no_gc_overrun = (free-from.array) + requested_pads;
+  size_t estimate_desired_size = imp->heap_factor*imp->last_pads + requested_pads;
   size_t elems = std::max(no_gc_overrun, estimate_desired_size);
-  PadObject *newbegin = static_cast<PadObject*>(::malloc(elems*sizeof(PadObject)));
-  Placement progress(newbegin, newbegin);
+
+  imp->space ^= 1;
+  Space &to = imp->spaces[imp->space];
+  to.resize(elems);
+
+  Placement progress(to.array, to.array);
   std::map<const char *, ObjectStats> stats;
 
   for (RootRing *root = roots.next; root != &roots; root = root->next) {
@@ -161,7 +237,7 @@ void Heap::GC(size_t requested_pads) {
     root->root = out.obj;
   }
 
-  int profile = profile_heap;
+  int profile = imp->profile_heap;
   while (progress.obj != progress.free) {
     auto next = progress.obj->descend(progress.free);
     if (profile) {
@@ -174,7 +250,7 @@ void Heap::GC(size_t requested_pads) {
 
   DestroyableObject *tail = nullptr;
   HeapObject *next;
-  for (HeapObject *obj = finalize; obj; obj = next) {
+  for (HeapObject *obj = imp->finalize; obj; obj = next) {
     if (typeid(*obj) == typeid(MovedObject)) {
       MovedObject *mo = static_cast<MovedObject*>(obj);
       DestroyableObject *keep = static_cast<DestroyableObject*>(mo->to);
@@ -186,28 +262,26 @@ void Heap::GC(size_t requested_pads) {
       obj->~HeapObject();
     }
   }
-  finalize = tail;
+  imp->finalize = tail;
 
-  ::free(begin);
-  begin = newbegin;
-  end = newbegin + elems;
+  end = to.array + elems;
   free = progress.free;
-  last_pads = free - begin;
+  imp->last_pads = free - to.array;
   // Contain heap growth due to no_gc_overrun pessimism
-  size_t desired_sized = heap_factor*last_pads + requested_pads;
+  size_t desired_sized = imp->heap_factor*imp->last_pads + requested_pads;
   if (desired_sized < elems) {
-    end = newbegin + desired_sized;
+    end = to.array + desired_sized;
   }
 
-  if (profile_heap) {
+  if (imp->profile_heap) {
     std::stringstream s;
     StatOrder order;
     std::vector<StatOrder::Kind> top(stats.begin(), stats.end());
     std::sort(top.begin(), top.end(), order);
 
-    if (profile_heap > 1 && !top.empty()) {
+    if (imp->profile_heap > 1 && !top.empty()) {
       s << "------------------------------------------" << std::endl;
-      s << "Live heap " << (last_pads*8) << " bytes" << std::endl;
+      s << "Live heap " << (imp->last_pads*8) << " bytes" << std::endl;
       s << "------------------------------------------" << std::endl;
       s << "  Object type          Objects       Bytes" << std::endl;
       s << "  ----------------------------------------" << std::endl;
@@ -226,16 +300,17 @@ void Heap::GC(size_t requested_pads) {
       status_write(2, str.data(), str.size());
     }
 
-    if (last_pads > most_pads) {
-      most_pads = last_pads;
+    if (imp->last_pads > imp->most_pads) {
+      imp->most_pads = imp->last_pads;
       size_t max = top.size();
-      if (max > sizeof(peak)/sizeof(peak[0]))
-        max = sizeof(peak)/sizeof(peak[0]);
+      if (max > sizeof(imp->peak)/sizeof(imp->peak[0]))
+        max = sizeof(imp->peak)/sizeof(imp->peak[0]);
       for (size_t i = 0; i < max; ++i) {
         StatOrder::Kind &x = top[i];
-        peak[i].type = x.first;
-        peak[i].objects = x.second.objects;
-        peak[i].pads = x.second.pads;
+        HeapStats &hs = imp->peak[i];
+        hs.type = x.first;
+        hs.objects = x.second.objects;
+        hs.pads = x.second.pads;
       }
     }
   }
@@ -245,6 +320,6 @@ Category Value::category() const {
   return VALUE;
 }
 
-DestroyableObject::DestroyableObject(Heap &h) : next(h.finalize) {
-  h.finalize = this;
+DestroyableObject::DestroyableObject(Heap &h) : next(h.imp->finalize) {
+  h.imp->finalize = this;
 }

@@ -226,12 +226,6 @@ struct GCNeededException {
   GCNeededException(size_t needed_) : needed(needed_) { }
 };
 
-struct HeapStats {
-  const char *type;
-  size_t objects, pads;
-  HeapStats() : type(nullptr), objects(0), pads(0) { }
-};
-
 struct Heap {
   Heap(int profile_heap_, double heap_factor_);
   ~Heap();
@@ -276,9 +270,12 @@ struct Heap {
     return claim(requested_pads);
   }
 
-  size_t used()  const { return (free - begin) * sizeof(PadObject); }
-  size_t alloc() const { return (end - begin) * sizeof(PadObject); }
-  size_t avail() const { return (end - free) * sizeof(PadObject); }
+  size_t used()  const;
+  size_t alloc() const;
+  size_t avail() const;
+
+  // Grab a large temporary buffer from the GC's unused space
+  void *scratch(size_t bytes);
 
   template <typename T>
   RootPointer<T> root(T *obj) { return RootPointer<T>(roots, obj); }
@@ -286,16 +283,11 @@ struct Heap {
   RootPointer<T> root(HeapPointer<T> x) { return RootPointer<T>(roots, x.get()); }
 
 private:
-  int profile_heap;
-  double heap_factor;
-  PadObject *begin;
-  PadObject *end;
-  PadObject *free;
-  size_t last_pads;
-  size_t most_pads;
-  HeapStats peak[10];
+  struct Imp;
+  std::unique_ptr<Imp> imp;
   RootRing roots;
-  HeapObject *finalize;
+  PadObject *free;
+  PadObject *end;
 #ifdef DEBUG_GC
   size_t limit;
 #endif
