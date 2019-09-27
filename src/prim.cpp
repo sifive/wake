@@ -110,8 +110,8 @@ HeapStep Closure::explore_escape(HeapStep step) {
 
 static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
   std::unordered_map<uintptr_t, size_t> explored;
-  size_t max_edges = runtime.heap.used() / sizeof(PadObject);
-  std::unique_ptr<HeapObject*[]> scratch(new HeapObject*[max_edges]);
+  void *vscratch = runtime.heap.scratch(runtime.heap.used());
+  HeapObject **scratch = static_cast<HeapObject**>(vscratch);
 
   HeapStep step;
   scratch[0] = obj;
@@ -119,12 +119,12 @@ static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
   step.broken = nullptr;
 
   Hash code;
-  for (HeapObject **done = scratch.get(); done != step.found; ++done) {
+  for (HeapObject **done = scratch; done != step.found; ++done) {
     HeapObject *head = *done;
 
     // Assign objects virtual addreses based on visitation order
     uintptr_t key = reinterpret_cast<uintptr_t>(static_cast<void*>(head));
-    auto out = explored.insert(std::make_pair(key, done - scratch.get()));
+    auto out = explored.insert(std::make_pair(key, done - scratch));
 
     // Include hash of child's virtual address
     code = code + out.first->second;

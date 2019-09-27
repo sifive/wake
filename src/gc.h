@@ -274,6 +274,9 @@ struct Heap {
   size_t alloc() const;
   size_t avail() const;
 
+  // Grab a large temporary buffer from the GC's unused space
+  void *scratch(size_t bytes);
+
   template <typename T>
   RootPointer<T> root(T *obj) { return RootPointer<T>(roots, obj); }
   template <typename T>

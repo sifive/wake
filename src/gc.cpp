@@ -176,6 +176,13 @@ size_t Heap::avail() const {
   return (end - free) * sizeof(PadObject);
 }
 
+void *Heap::scratch(size_t bytes) {
+  size_t size = (bytes+sizeof(PadObject)-1)/sizeof(PadObject);
+  Space &idle = imp->spaces[imp->space ^ 1];
+  if (idle.alloc < size) idle.resize(size);
+  return idle.array;
+}
+
 void Heap::report() const {
   if (imp->profile_heap) {
     std::stringstream s;
