@@ -28,29 +28,6 @@
 
 #define INITIAL_HEAP_SIZE 1024
 
-struct HeapStats {
-  const char *type;
-  size_t objects, pads;
-  HeapStats() : type(nullptr), objects(0), pads(0) { }
-};
-
-struct Heap::Imp {
-  int profile_heap;
-  double heap_factor;
-  size_t last_pads;
-  size_t most_pads;
-  HeapStats peak[10];
-  HeapObject *finalize;
-
-  Imp(int profile_heap_, double heap_factor_)
-   : profile_heap(profile_heap_),
-     heap_factor(heap_factor_),
-     last_pads(0),
-     most_pads(0),
-     peak(),
-     finalize(nullptr) { }
-};
-
 HeapObject::~HeapObject() { }
 
 Placement PadObject::moveto(PadObject *free) {
@@ -116,18 +93,87 @@ Category MovedObject::category() const {
   return to->category();
 }
 
+struct HeapStats {
+  const char *type;
+  size_t objects, pads;
+  HeapStats() : type(nullptr), objects(0), pads(0) { }
+};
+
+struct Space {
+  size_t size;
+  size_t alloc;
+  PadObject *array;
+
+  Space(size_t size_ = INITIAL_HEAP_SIZE);
+  ~Space();
+
+  void resize(size_t size_);
+};
+
+Space::Space(size_t size_)
+ : size(size_),
+   alloc(size_),
+   array(static_cast<PadObject*>(::malloc(sizeof(PadObject)*size))) {
+  assert(array);
+}
+
+Space::~Space() {
+  ::free(array);
+}
+
+void Space::resize(size_t size_) {
+  if (alloc < size_ || 3*size_ < alloc) {
+    alloc = size_ + (size_ >> 1);
+    void *tmp = ::realloc(array, sizeof(PadObject)*alloc);
+    assert(tmp);
+    array = static_cast<PadObject*>(tmp);
+  }
+  size = size_;
+}
+
+struct Heap::Imp {
+  int profile_heap;
+  double heap_factor;
+  Space spaces[2];
+  int space;
+  size_t last_pads;
+  size_t most_pads;
+  HeapStats peak[10];
+  HeapObject *finalize;
+
+  Imp(int profile_heap_, double heap_factor_)
+   : profile_heap(profile_heap_),
+     heap_factor(heap_factor_),
+     spaces(),
+     space(0),
+     last_pads(0),
+     most_pads(0),
+     peak(),
+     finalize(nullptr) { }
+};
+
 Heap::Heap(int profile_heap_, double heap_factor_)
  : imp(new Imp(profile_heap_, heap_factor_)),
    roots(),
-   begin(static_cast<PadObject*>(::malloc(sizeof(PadObject)*INITIAL_HEAP_SIZE))),
-   end(begin + INITIAL_HEAP_SIZE),
-   free(begin) {
+   free(imp->spaces[imp->space].array),
+   end(free + imp->spaces[imp->space].size) {
 }
 
 Heap::~Heap() {
   GC(0);
-  assert (free == begin);
-  ::free(begin);
+  assert (free == imp->spaces[imp->space].array);
+}
+
+size_t Heap::used() const {
+  return (free - imp->spaces[imp->space].array) * sizeof(PadObject);
+}
+
+size_t Heap::alloc() const {
+  return (end - imp->spaces[imp->space].array) * sizeof(PadObject);
+}
+
+size_t Heap::avail() const {
+  return (end - free) * sizeof(PadObject);
 }
 
 void Heap::report() const {
@@ -165,11 +211,16 @@ struct StatOrder {
 };
 
 void Heap::GC(size_t requested_pads) {
-  size_t no_gc_overrun = (free-begin) + requested_pads;
+  Space &from = imp->spaces[imp->space];
+  size_t no_gc_overrun = (free-from.array) + requested_pads;
   size_t estimate_desired_size = imp->heap_factor*imp->last_pads + requested_pads;
   size_t elems = std::max(no_gc_overrun, estimate_desired_size);
-  PadObject *newbegin = static_cast<PadObject*>(::malloc(elems*sizeof(PadObject)));
-  Placement progress(newbegin, newbegin);
+
+  imp->space ^= 1;
+  Space &to = imp->spaces[imp->space];
+  to.resize(elems);
+
+  Placement progress(to.array, to.array);
   std::map<const char *, ObjectStats> stats;
 
   for (RootRing *root = roots.next; root != &roots; root = root->next) {
@@ -206,15 +257,13 @@ void Heap::GC(size_t requested_pads) {
   }
   imp->finalize = tail;
 
-  ::free(begin);
-  begin = newbegin;
-  end = newbegin + elems;
+  end = to.array + elems;
   free = progress.free;
-  imp->last_pads = free - begin;
+  imp->last_pads = free - to.array;
   // Contain heap growth due to no_gc_overrun pessimism
   size_t desired_sized = imp->heap_factor*imp->last_pads + requested_pads;
   if (desired_sized < elems) {
-    end = newbegin + desired_sized;
+    end = to.array + desired_sized;
   }
 
   if (imp->profile_heap) {

@@ -270,9 +270,9 @@ struct Heap {
     return claim(requested_pads);
   }
 
-  size_t used()  const { return (free - begin) * sizeof(PadObject); }
-  size_t alloc() const { return (end - begin) * sizeof(PadObject); }
-  size_t avail() const { return (end - free) * sizeof(PadObject); }
+  size_t used()  const;
+  size_t alloc() const;
+  size_t avail() const;
 
   template <typename T>
   RootPointer<T> root(T *obj) { return RootPointer<T>(roots, obj); }
@@ -283,9 +283,8 @@ private:
   struct Imp;
   std::unique_ptr<Imp> imp;
   RootRing roots;
-  PadObject *begin;
-  PadObject *end;
   PadObject *free;
+  PadObject *end;
 #ifdef DEBUG_GC
   size_t limit;
 #endif
