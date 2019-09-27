@@ -226,12 +226,6 @@ struct GCNeededException {
   GCNeededException(size_t needed_) : needed(needed_) { }
 };
 
-struct HeapStats {
-  const char *type;
-  size_t objects, pads;
-  HeapStats() : type(nullptr), objects(0), pads(0) { }
-};
-
 struct Heap {
   Heap(int profile_heap_, double heap_factor_);
   ~Heap();
@@ -286,16 +280,12 @@ struct Heap {
   RootPointer<T> root(HeapPointer<T> x) { return RootPointer<T>(roots, x.get()); }
 
 private:
-  int profile_heap;
-  double heap_factor;
+  struct Imp;
+  std::unique_ptr<Imp> imp;
+  RootRing roots;
   PadObject *begin;
   PadObject *end;
   PadObject *free;
-  size_t last_pads;
-  size_t most_pads;
-  HeapStats peak[10];
-  RootRing roots;
-  HeapObject *finalize;
 #ifdef DEBUG_GC
   size_t limit;
 #endif
