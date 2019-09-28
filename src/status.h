@@ -47,7 +47,7 @@ extern StatusState status_state;
 
 void status_init();
 void status_write(int fd, const char *data, int len);
-void status_refresh();
+void status_refresh(bool idle);
 void status_finish();
 
 void term_init(bool tty);

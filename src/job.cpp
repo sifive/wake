@@ -727,7 +727,7 @@ bool JobTable::wait(Runtime &runtime) {
       }
     }
 #endif
-    status_refresh();
+    status_refresh(true);
 
     // Wait for a status change, with signals atomically unblocked in pselect
     int retval = pselect(nfds, &set, 0, 0, timeout, &saved);
