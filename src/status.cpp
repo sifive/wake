@@ -43,6 +43,7 @@
 StatusState status_state;
 
 static volatile bool refresh_needed = false;
+static volatile bool spinner_update = false;
 static volatile bool resize_detected = false;
 
 static bool tty = false;
@@ -52,6 +53,7 @@ static const char *cr;
 static const char *ed;
 static const char *sgr0;
 static int used = 0;
+static int ticks = 0;
 
 const char *term_red()
 {
@@ -104,7 +106,7 @@ static int ilog10(int x)
   return out;
 }
 
-static void status_redraw()
+static void status_redraw(bool idle)
 {
   std::stringstream os;
   struct timeval now;
@@ -174,7 +176,7 @@ static void status_redraw()
     }
   }
 
-  if (tty && rows3 > 0 && cols > 4 && status_state.remain > 0) {
+  if (tty && rows3 > 0 && cols > 6 && status_state.remain > 0) {
     std::stringstream eta;
     long seconds = lround(status_state.remain);
     if (seconds > 3600) {
@@ -191,9 +193,9 @@ static void status_redraw()
     assert (status_state.current >= 0);
 
     double progress = status_state.total - status_state.remain;
-    long hashes = lround(floor((cols-2)*progress*ALMOST_ONE/status_state.total));
-    long current = lround(floor((cols-2)*(progress+status_state.current)*ALMOST_ONE/status_state.total)) - hashes;
-    long spaces = cols-3-hashes-current;
+    long hashes = lround(floor((cols-4)*progress*ALMOST_ONE/status_state.total));
+    long current = lround(floor((cols-4)*(progress+status_state.current)*ALMOST_ONE/status_state.total)) - hashes;
+    long spaces = cols-5-hashes-current;
     assert (spaces >= 0);
 
     os << "[";
@@ -220,9 +222,20 @@ static void status_redraw()
       for (; current; --current) os << ".";
       for (; spaces;  --spaces)  os << " ";
     }
-    os << "]" << std::endl;
+    os << "]";
+    if (idle) {
+      os << " ." << std::endl;
+    } else {
+      os << " " << "/-\\|"[ticks] << std::endl;
+      ticks = (ticks+spinner_update) & 3;
+    }
+    ++used;
+  } else if (tty && !idle) {
+    os << std::string(cols-2, ' ') << "/-\\|"[ticks] << std::endl;
+    ticks = (ticks+spinner_update) & 3;
     ++used;
   }
+  spinner_update = false;
 
   std::string s = os.str();
   write_all(2, s.data(), s.size());
@@ -232,6 +245,7 @@ static void handle_SIGALRM(int sig)
 {
   (void)sig;
   refresh_needed = true;
+  spinner_update = true;
 }
 
 static void handle_SIGWINCH(int sig)
@@ -312,11 +326,11 @@ void status_write(int fd, const char *data, int len)
   refresh_needed = true;
 }
 
-void status_refresh()
+void status_refresh(bool idle)
 {
   if (refresh_needed) {
     status_clear();
-    status_redraw();
+    status_redraw(idle);
   }
 }
 

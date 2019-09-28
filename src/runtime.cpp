@@ -452,7 +452,7 @@ void Runtime::run() {
   while (stack && !abort) {
     if (++count >= 10000) {
       if (JobTable::exit_now()) break;
-      status_refresh();
+      status_refresh(false);
       count = 0;
     }
     Work *w = stack.get();
