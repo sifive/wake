@@ -84,11 +84,11 @@ void RGet::pass_scope(PassScope &p) {
 }
 
 void RDes::pass_scope(PassScope &p) {
-  scope_redux(p, this, typeid(RGet).hash_code());
+  scope_redux(p, this, typeid(RDes).hash_code());
 }
 
 void RCon::pass_scope(PassScope &p) {
-  scope_redux(p, this, typeid(RGet).hash_code());
+  scope_redux(p, this, typeid(RCon).hash_code());
   Hash(kind->ast.name).push(p.codes);
 }
 
