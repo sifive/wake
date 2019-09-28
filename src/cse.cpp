@@ -153,12 +153,11 @@ void RFun::pass_cse(PassCSE &p, std::unique_ptr<Term> self) {
     x.push(codes);
     p.table.erase(x);
   }
-  hash = Hash(codes);
 
   p.undo = save;
   auto me = p.stream.end(fun);
   p.starts.pop_back();
-  cse_reduce(p, hash, std::move(me[0]));
+  cse_reduce(p, Hash(codes), std::move(me[0]));
 }
 
 std::unique_ptr<Term> Term::pass_cse(std::unique_ptr<Term> term) {

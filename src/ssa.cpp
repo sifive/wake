@@ -138,6 +138,7 @@ void RFun::format(std::ostream &os, TermFormat &format) const {
     for (auto x : escapes)
       os << " " << arg_depth(x) << ":" << arg_offset(x);
     os << "\n";
+    os << pad(format.depth) << "hash: " << hash.data[0] << "\n";
   }
   os << pad(format.depth) << "returns: ";
   if (format.scoped) {

@@ -97,13 +97,11 @@ HeapStep Closure::explore_escape(HeapStep step) {
       step = it->at(j-1)->recurse<HeapStep, &HeapPointerBase::explore>(step);
     it = it->next.get();
   }
-  size_t depth = 1;
   for (auto x: fun->escapes) {
-    while (arg_depth(x) > depth) {
-      it = it->next.get();
-      ++depth;
-    }
-    step = it->at(arg_offset(x))->recurse<HeapStep, &HeapPointerBase::explore>(step);
+    Scope *s = it;
+    for (size_t depth = 0; depth < arg_depth(x); ++depth)
+      s = s->next.get();
+    step = s->at(arg_offset(x))->recurse<HeapStep, &HeapPointerBase::explore>(step);
   }
   return step;
 }
