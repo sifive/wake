@@ -102,7 +102,6 @@ std::unique_ptr<T> static_unique_pointer_cast(std::unique_ptr<F>&& x) {
 
 struct Leaf : public Term {
   Leaf(const char *label_) : Term(label_) { }
-  void pass_scope(PassScope &p) override;
 };
 
 // After scope pass, Redux.args is suitable for interpretation
@@ -116,8 +115,6 @@ struct Redux : public Term {
   Redux(const char *label_, std::vector<size_t> &&args_) : Term(label_), args(std::move(args_)) { }
   void update(const SourceMap &map);
   void format_args(std::ostream &os, TermFormat &format) const;
-
-  void pass_scope(PassScope &p) override;
 };
 
 struct RArg final : public Leaf {
@@ -133,6 +130,7 @@ struct RArg final : public Leaf {
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
   void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
+  void pass_scope (PassScope  &p) override;
 };
 
 struct RLit final : public Leaf {
@@ -150,6 +148,7 @@ struct RLit final : public Leaf {
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
   void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
+  void pass_scope (PassScope  &p) override;
 };
 
 struct RApp final : public Redux {
@@ -166,6 +165,7 @@ struct RApp final : public Redux {
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
   void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
+  void pass_scope (PassScope  &p) override;
 };
 
 struct RPrim final : public Redux {
@@ -187,6 +187,7 @@ struct RPrim final : public Redux {
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
   void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
+  void pass_scope (PassScope  &p) override;
 };
 
 struct RGet final : public Redux {
@@ -205,6 +206,7 @@ struct RGet final : public Redux {
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
   void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
+  void pass_scope (PassScope  &p) override;
 };
 
 struct RDes final : public Redux {
@@ -221,6 +223,7 @@ struct RDes final : public Redux {
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
   void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
+  void pass_scope (PassScope  &p) override;
 };
 
 struct RCon final : public Redux {
@@ -240,6 +243,7 @@ struct RCon final : public Redux {
   void pass_sweep (PassSweep  &p) override;
   void pass_inline(PassInline &p, std::unique_ptr<Term> self) override;
   void pass_cse   (PassCSE    &p, std::unique_ptr<Term> self) override;
+  void pass_scope (PassScope  &p) override;
 };
 
 struct RFun final : public Term {
