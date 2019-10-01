@@ -505,7 +505,7 @@ top:
       double16e = "0x" [0-9a-fA-F_]+ [pP] [+-]? [0-9a-fA-F_]+;
       (double10 | double10e | double16 | double16e) {
         std::string x(in.tok, in.cur);
-        std::remove(x.begin(), x.end(), '_');
+        x.resize(std::remove(x.begin(), x.end(), '_') - x.begin());
         return mkSym2(LITERAL, new Literal(SYM_LOCATION, Double::literal(lex.heap, x.c_str()), &Double::typeVar));
       }
 
@@ -515,7 +515,7 @@ top:
       bin = '0b' [01_]+;
       (dec | oct | hex | bin) {
         std::string integer(in.tok, in.cur);
-        std::remove(integer.begin(), integer.end(), '_');
+        integer.resize(std::remove(integer.begin(), integer.end(), '_') - integer.begin());
         return mkSym2(LITERAL, new Literal(SYM_LOCATION, Integer::literal(lex.heap, integer), &Integer::typeVar));
       }
 
