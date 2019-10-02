@@ -890,6 +890,14 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   AST def = parse_type_def(lex);
   if (!def) return;
 
+  if (Lexer::isOperator(def.name.c_str())) {
+    std::cerr << "Tuple name must not be operator, was "
+      << def.name << " at "
+      << def.token.file() << std::endl;
+    lex.fail = true;
+    return;
+  }
+
   std::string name = def.name;
   std::string tname = "destruct " + name;
   Sum sum(std::move(def));
