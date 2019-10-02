@@ -462,7 +462,7 @@ static void extract_def(std::vector<Definition> &out, long index, AST &&ast, Exp
     Expr *sub = new App(m.token,
       new VarRef(m.token, s.str()),
       new VarRef(body->location, key));
-    if (Lexer::isUpper(m.name.c_str())) {
+    if (Lexer::isUpper(m.name.c_str()) || Lexer::isOperator(m.name.c_str())) {
       extract_def(out, index, std::move(m), sub);
     } else {
       out.emplace_back(m.name, m.token, sub);
@@ -472,6 +472,7 @@ static void extract_def(std::vector<Definition> &out, long index, AST &&ast, Exp
 
 static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bool publish) {
   lex.consume();
+  bool openParen = lex.next.type == POPEN;
 
   ASTState state(false, false);
   AST ast = parse_ast(0, lex, state);
@@ -479,7 +480,7 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
   ast.name.clear();
   if (check_constructors(ast)) lex.fail = true;
 
-  bool extract = Lexer::isUpper(name.c_str());
+  bool extract = Lexer::isUpper(name.c_str()) || (openParen && Lexer::isOperator(name.c_str()));
   if (extract && (target || publish)) {
     std::cerr << "Upper-case identifier cannot be used as a target/publish name at "
       << ast.token.text() << std::endl;
