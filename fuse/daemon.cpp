@@ -24,7 +24,7 @@
 #define _XOPEN_SOURCE 700
 #endif
 
-#define MAX_JSON (1024*1024)
+#define MAX_JSON (1024*1024*1024)
 
 #include <fuse.h>
 #include <stdio.h>
