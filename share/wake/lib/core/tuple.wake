@@ -36,9 +36,7 @@ global tuple Triple a b c =
 #   def (x,, y,, z,, Unit) = tuple
 #   def _ = println (str tuple._0)
 #   def _ = println (dstr tuple._2)
-global tuple a,, b =
-  A: a
-  B: b
+global data a,, b = a,, b
 
 # Handy accessor methods
 global def _0 (x,, _) = x
