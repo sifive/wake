@@ -1107,6 +1107,17 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     }
   }
 
+  if (sump->members.size() == 1) {
+    Constructor &cons = sump->members[0];
+    std::stringstream s;
+    for (size_t i = 0; i < cons.ast.args.size(); ++i) {
+      Expr *body = new Lambda(sump->token, "_", new Get(sump->token, sump, &cons, i));
+      std::stringstream s;
+      s << "get" << name << ":" << cons.ast.args.size() << ":" << i;
+      bind_def(lex, map, Definition(s.str(), sump->token, body), global?top:0);
+    }
+  }
+
   check_special(lex, name, sump);
 }
 
