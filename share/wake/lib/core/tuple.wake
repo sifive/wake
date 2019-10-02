@@ -29,3 +29,25 @@ global tuple Triple a b c =
   global First:  a
   global Second: b
   global Third:  c
+
+# Variable length Tuples (terminate with Unit)
+# Examples:
+#   def tuple = (1,, "xx",, 1e8,, Unit)
+#   def (x,, y,, z,, Unit) = tuple
+#   def _ = println (str tuple._0)
+#   def _ = println (dstr tuple._2)
+global tuple a,, b =
+  A: a
+  B: b
+
+# Handy accessor methods
+global def _0 (x,, _) = x
+global def _1 (_,, x,, _) = x
+global def _2 (_,, _,, x,, _) = x
+global def _3 (_,, _,, _,, x,, _) = x
+global def _4 (_,, _,, _,, _,, x,, _) = x
+global def _5 (_,, _,, _,, _,, _,, x,, _) = x
+global def _6 (_,, _,, _,, _,, _,, _,, x,, _) = x
+global def _7 (_,, _,, _,, _,, _,, _,, _,, x,, _) = x
+global def _8 (_,, _,, _,, _,, _,, _,, _,, _,, x,, _) = x
+global def _9 (_,, _,, _,, _,, _,, _,, _,, _,, _,, x,, _) = x
