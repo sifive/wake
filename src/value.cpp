@@ -28,16 +28,20 @@
 #include <string.h>
 #include <assert.h>
 
-size_t Value::hashid() const {
-  Hash h = hash();
-  size_t type = typeid(*this).hash_code();
-  return type ^ h.data[0] ^ h.data[1];
-}
+// typeid().hash_code() changes between runs
+#define TYPE_STRING	1
+#define TYPE_INTEGER	2
+#define TYPE_DOUBLE	3
+#define TYPE_REGEXP	4
 
 bool Value::operator == (const Value &x) const {
   assert(0 /* unreachable */);
-  if (typeid(x) != typeid(*this)) return false;
-  return hash() == x.hash();
+  return false;
+}
+
+size_t Value::hashid() const {
+  assert(0 /* unreachable */);
+  return 0;
 }
 
 void FormatState::resume() {
@@ -180,6 +184,11 @@ Hash String::hash() const {
   return Hash(c_str(), length);
 }
 
+size_t String::hashid() const {
+  Hash h = hash();
+  return h.data[0] ^ h.data[1] ^ TYPE_STRING;
+}
+
 bool String::operator == (const Value &x) const {
   if (typeid(x) != typeid(*this)) return false;
   return compare(static_cast<const String &>(x)) == 0;
@@ -227,6 +236,11 @@ Hash Integer::hash() const {
   return Hash(data(), abs(length)*sizeof(mp_limb_t));
 }
 
+size_t Integer::hashid() const {
+  Hash h = hash();
+  return h.data[0] ^ h.data[1] ^ TYPE_INTEGER;
+}
+
 bool Integer::operator == (const Value &x) const {
   if (typeid(x) != typeid(*this)) return false;
   mpz_t a = { wrap() }, b = { static_cast<const Integer &>(x).wrap() };
@@ -247,6 +261,11 @@ void Double::format(std::ostream &os, FormatState &state) const {
 
 Hash Double::hash() const {
   return Hash(&value, sizeof(value));
+}
+
+size_t Double::hashid() const {
+  Hash h = hash();
+  return h.data[0] ^ h.data[1] ^ TYPE_DOUBLE;
 }
 
 bool Double::operator == (const Value &x) const {
@@ -327,6 +346,11 @@ void RegExp::format(std::ostream &os, FormatState &state) const {
 
 Hash RegExp::hash() const {
   return Hash(exp->pattern());
+}
+
+size_t RegExp::hashid() const {
+  Hash h = hash();
+  return h.data[0] ^ h.data[1] ^ TYPE_REGEXP;
 }
 
 bool RegExp::operator == (const Value &x) const {
