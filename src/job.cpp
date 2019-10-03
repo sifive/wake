@@ -1114,13 +1114,15 @@ static PRIMFN(prim_job_create) {
   std::stringstream stack;
   for (auto &x : scope->stack_trace()) stack << x << std::endl;
 
+  uint64_t signature = 0;
   out->db->insert_job(
     dir->as_str(),
-    stdin->as_str(),
-    env->as_str(),
     cmd->as_str(),
-    visible->as_str(),
+    env->as_str(),
+    stdin->as_str(),
+    signature,
     stack.str(),
+    visible->as_str(),
     &out->job);
 
   RETURN(out);
@@ -1181,12 +1183,14 @@ static PRIMFN(prim_job_cache) {
   // This function can be rerun; it's side effect has no impact on re-execution of reuse_job.
   long job;
   double pathtime;
+  uint64_t signature = 0;
   std::vector<FileReflection> files;
   Usage reuse = jobtable->imp->db->reuse_job(
     dir->as_str(),
-    stdin->as_str(),
     env->as_str(),
     cmd->as_str(),
+    stdin->as_str(),
+    signature,
     visible->as_str(),
     jobtable->imp->check,
     job,
