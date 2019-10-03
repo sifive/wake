@@ -31,11 +31,12 @@ global tuple Triple a b c =
   global Third:  c
 
 # Variable length Tuples (terminate with Unit)
+# aka: a List with fixed length and heterogeneous element types
 # Examples:
-#   def tuple = (1,, "xx",, 1e8,, Unit)
-#   def (x,, y,, z,, Unit) = tuple
-#   def _ = println (str tuple._0)
-#   def _ = println (dstr tuple._2)
+#   def tup = (1,, "xx",, 1e8,, Unit)
+#   def (x,, y,, z,, Unit) = tup
+#   def _ = println (str tup._0)
+#   def _ = println (dstr tup._2)
 global data a,, b = a,, b
 
 # Handy accessor methods
