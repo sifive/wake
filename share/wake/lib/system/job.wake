@@ -206,15 +206,17 @@ def pid = prim "pid"
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
 def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run log =
-  def create dir stdin env cmd visible keep log = prim "job_create"
+  def create dir stdin env cmd signature visible keep log = prim "job_create"
   def finish job inputs outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
   def badfinish job error = prim "job_fail_finish"
-  def cache dir stdin env cmd visible = prim "job_cache"
+  def cache dir stdin env cmd signature visible = prim "job_cache"
+  def signature cmd res fni fno keep = prim "hash"
+  def hash = signature cmd res finputs foutputs keep
   def build Unit =
     def getPathOpt = match _
       Path name = Some name
       BadPath _ = None
-    def job = create dir stdin env.implode cmd.implode (mapPartial getPathOpt vis).implode (if keep then 1 else 0) log
+    def job = create dir stdin env.implode cmd.implode hash (mapPartial getPathOpt vis).implode (if keep then 1 else 0) log
     def prefix = "{str pid}.{str (getJobId job)}"
     def usage = getJobRecord job | getOrElse uusage
     def output = run job (Pass (RunnerInput cmd vis env dir stdin res prefix usage))
@@ -239,7 +241,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run log =
     job
   match keep
     False = build Unit
-    True  = match (cache dir stdin env.implode cmd.implode (map getPathName vis).implode)
+    True  = match (cache dir stdin env.implode cmd.implode hash (map getPathName vis).implode)
       Pair (job, _) last = confirm True  last job
       Pair Nil      last = confirm False last (build Unit)
 
@@ -301,10 +303,10 @@ global def runJob p = match p
     match (opts | foldl best (Pair 0.0 None) | getPairSecond)
       Some r = runJobImp cmd env dir stdin res usage finputs foutputs vis pers r log
       None =
-        def create dir stdin env cmd visible keep log = prim "job_create"
+        def create dir stdin env cmd signature visible keep log = prim "job_create"
         def badfinish job e = prim "job_fail_finish"
         def badlaunch job e = prim "job_fail_launch"
-        def job = create dir stdin env.implode cmd.implode "" 0 log
+        def job = create dir stdin env.implode cmd.implode 0 "" 0 log
         def error =
           def pretty = match _
             Accept _ _ = ""

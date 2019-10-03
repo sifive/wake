@@ -80,9 +80,10 @@ struct Database {
 
   Usage reuse_job(
     const std::string &directory,
-    const std::string &stdin, // "" -> /dev/null
     const std::string &environment,
     const std::string &commandline,
+    const std::string &stdin, // "" -> /dev/null
+    uint64_t          signature,
     const std::string &visible,
     bool check,
     long &job,
@@ -93,12 +94,13 @@ struct Database {
     double *pathtime);
   void insert_job( // also wipes out any old runs
     const std::string &directory,
-    const std::string &stdin, // "" -> /dev/null
     const std::string &environment,
     const std::string &commandline,
+    const std::string &stdin, // "" -> /dev/null
     // ^^^ only these matter to identify the job
-    const std::string &visible,
+    uint64_t          signature, // this must match to qualify for reuse
     const std::string &stack,
+    const std::string &visible,
     long   *job); // key used for accesses below
   void finish_job(
     long job,

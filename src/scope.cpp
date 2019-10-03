@@ -18,6 +18,16 @@
 #include "ssa.h"
 #include "hash.h"
 
+// typeid hash_code is not stable between invocations
+#define TYPE_RARG	0
+#define TYPE_RLIT	1
+#define TYPE_RAPP	2
+#define TYPE_RPRIM	3
+#define TYPE_RGET	4
+#define TYPE_RDES	5
+#define TYPE_RCON	6
+#define TYPE_RFUN	7
+
 struct PassScope {
   PassScope *next;
   size_t start;
@@ -52,13 +62,13 @@ static size_t scope_arg(PassScope &p, size_t input) {
 }
 
 void RArg::pass_scope(PassScope &p) {
-  p.codes.push_back(typeid(RArg).hash_code());
+  p.codes.push_back(TYPE_RARG);
 }
 
 void RLit::pass_scope(PassScope &p) {
   HeapObject *obj = value->get();
-  p.codes.push_back(typeid(RLit).hash_code());
-  p.codes.push_back(typeid(*obj).hash_code());
+  p.codes.push_back(TYPE_RLIT);
+  p.codes.push_back(static_cast<Value*>(obj)->hashid());
   (*value)->hash().push(p.codes);
 }
 
@@ -70,25 +80,25 @@ static void scope_redux(PassScope &p, Redux *redux, size_t type) {
 }
 
 void RApp::pass_scope(PassScope &p) {
-  scope_redux(p, this, typeid(RApp).hash_code());
+  scope_redux(p, this, TYPE_RAPP);
 }
 
 void RPrim::pass_scope(PassScope &p) {
-  scope_redux(p, this, typeid(RPrim).hash_code());
+  scope_redux(p, this, TYPE_RPRIM);
   Hash(name).push(p.codes);
 }
 
 void RGet::pass_scope(PassScope &p) {
-  scope_redux(p, this, typeid(RGet).hash_code());
+  scope_redux(p, this, TYPE_RGET);
   p.codes.push_back(index);
 }
 
 void RDes::pass_scope(PassScope &p) {
-  scope_redux(p, this, typeid(RDes).hash_code());
+  scope_redux(p, this, TYPE_RDES);
 }
 
 void RCon::pass_scope(PassScope &p) {
-  scope_redux(p, this, typeid(RCon).hash_code());
+  scope_redux(p, this, TYPE_RCON);
   Hash(kind->ast.name).push(p.codes);
 }
 
@@ -104,7 +114,7 @@ void RFun::pass_scope(PassScope &p) {
   hash = Hash(frame.codes);
   escapes = std::move(frame.escapes);
 
-  p.codes.push_back(typeid(RFun).hash_code());
+  p.codes.push_back(TYPE_RFUN);
   hash.push(p.codes);
   for (auto &x : escapes) x = scope_arg(p, x);
 }

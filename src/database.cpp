@@ -133,12 +133,13 @@ std::string Database::open(bool wait, bool memory) {
     "  directory   text    not null,"
     "  commandline blob    not null,"
     "  environment blob    not null,"
-    "  stack       blob    not null,"
     "  stdin       text    not null," // might point outside the workspace
+    "  signature   integer not null," // hash(FnInputs, FnOutputs, Resources, Keep)
+    "  stack       blob    not null,"
     "  stat_id     integer references stats(stat_id)," // null if unmerged
     "  endtime     text    not null default '',"
     "  keep        integer not null default 0);"       // 0=false, 1=true
-    "create index if not exists job on jobs(directory, commandline, environment, stdin, keep, job_id, stat_id);"
+    "create index if not exists job on jobs(directory, commandline, environment, stdin, signature, keep, job_id, stat_id);"
     "create table if not exists filetree("
     "  tree_id  integer primary key autoincrement,"
     "  access   integer not null," // 0=visible, 1=input, 2=output
@@ -185,8 +186,8 @@ std::string Database::open(bool wait, bool memory) {
     "select status, runtime, cputime, membytes, ibytes, obytes, pathtime"
     " from stats where stat_id=?";
   const char *sql_insert_job =
-    "insert into jobs(run_id, use_id, directory, commandline, environment, stack, stdin)"
-    " values(?, ?1, ?, ?, ?, ?, ?)";
+    "insert into jobs(run_id, use_id, directory, commandline, environment, stdin, signature, stack)"
+    " values(?, ?1, ?, ?, ?, ?, ?, ?)";
   const char *sql_insert_tree =
     "insert into filetree(access, job_id, file_id)"
     " values(?, ?, (select file_id from files where path=?))";
@@ -222,7 +223,7 @@ std::string Database::open(bool wait, bool memory) {
     "  where t1.job_id=?2 and t1.access=2 and t2.file_id=t1.file_id and t2.access=2 and t2.job_id<>?2)";
   const char *sql_find_prior =
     "select job_id, stat_id from jobs where "
-    "directory=? and commandline=? and environment=? and stdin=? and keep=1";
+    "directory=? and commandline=? and environment=? and stdin=? and signature=? and keep=1";
   const char *sql_update_prior =
     "update jobs set use_id=? where job_id=?";
   const char *sql_delete_prior =
@@ -568,9 +569,10 @@ void Database::end_txn() {
 // Fortunately, updating use_id is the only side-effect and it does not affect reuse_job.
 Usage Database::reuse_job(
   const std::string &directory,
-  const std::string &stdin,
   const std::string &environment,
   const std::string &commandline,
+  const std::string &stdin,
+  uint64_t           signature,
   const std::string &visible,
   bool check,
   long &job,
@@ -588,6 +590,7 @@ Usage Database::reuse_job(
   bind_blob   (why, imp->find_prior, 2, commandline);
   bind_blob   (why, imp->find_prior, 3, environment);
   bind_string (why, imp->find_prior, 4, stdin);
+  bind_integer(why, imp->find_prior, 5, signature);
   out.found = sqlite3_step(imp->find_prior) == SQLITE_ROW;
   if (out.found) {
     job     = sqlite3_column_int64(imp->find_prior, 0);
@@ -669,11 +672,12 @@ Usage Database::predict_job(uint64_t hashcode, double *pathtime)
 
 void Database::insert_job(
   const std::string &directory,
-  const std::string &stdin,
-  const std::string &environment,
   const std::string &commandline,
-  const std::string &visible,
+  const std::string &environment,
+  const std::string &stdin,
+  uint64_t          signature,
   const std::string &stack,
+  const std::string &visible,
   long  *job)
 {
   const char *why = "Could not insert a job";
@@ -682,8 +686,9 @@ void Database::insert_job(
   bind_string (why, imp->insert_job, 2, directory);
   bind_blob   (why, imp->insert_job, 3, commandline);
   bind_blob   (why, imp->insert_job, 4, environment);
-  bind_blob   (why, imp->insert_job, 5, stack);
-  bind_string (why, imp->insert_job, 6, stdin);
+  bind_string (why, imp->insert_job, 5, stdin);
+  bind_integer(why, imp->insert_job, 6, signature);
+  bind_blob   (why, imp->insert_job, 7, stack);
   single_step (why, imp->insert_job, imp->debugdb);
   *job = sqlite3_last_insert_rowid(imp->db);
   const char *tok = visible.c_str();

@@ -1077,27 +1077,33 @@ static PRIMFN(prim_job_virtual) {
 }
 
 static PRIMTYPE(type_job_create) {
-  return args.size() == 7 &&
+  return args.size() == 8 &&
     args[0]->unify(String::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
     args[3]->unify(String::typeVar) &&
-    args[4]->unify(String::typeVar) &&
-    args[5]->unify(Integer::typeVar) &&
+    args[4]->unify(Integer::typeVar) &&
+    args[5]->unify(String::typeVar) &&
     args[6]->unify(Integer::typeVar) &&
+    args[7]->unify(Integer::typeVar) &&
     out->unify(Job::typeVar);
 }
 
 static PRIMFN(prim_job_create) {
   JobTable *jobtable = static_cast<JobTable*>(data);
-  EXPECT(7);
+  EXPECT(8);
   STRING(dir, 0);
   STRING(stdin, 1);
   STRING(env, 2);
   STRING(cmd, 3);
-  STRING(visible, 4);
-  INTEGER_MPZ(keep, 5);
-  INTEGER_MPZ(log, 6);
+  INTEGER_MPZ(signature, 4);
+  STRING(visible, 5);
+  INTEGER_MPZ(keep, 6);
+  INTEGER_MPZ(log, 7);
+
+  Hash hash;
+  REQUIRE(mpz_sizeinbase(signature, 2) <= 8*sizeof(hash.data));
+  mpz_export(&hash.data[0], 0, 1, sizeof(hash.data[0]), 0, 0, signature);
 
   Job *out = Job::alloc(
     runtime.heap,
@@ -1116,11 +1122,12 @@ static PRIMFN(prim_job_create) {
 
   out->db->insert_job(
     dir->as_str(),
-    stdin->as_str(),
-    env->as_str(),
     cmd->as_str(),
-    visible->as_str(),
+    env->as_str(),
+    stdin->as_str(),
+    hash.data[0],
     stack.str(),
+    visible->as_str(),
     &out->job);
 
   RETURN(out);
@@ -1160,23 +1167,29 @@ static PRIMTYPE(type_job_cache) {
   jlist[0].unify(Job::typeVar);
   pair[0].unify(jlist);
   pair[1].unify(plist);
-  return args.size() == 5 &&
+  return args.size() == 6 &&
     args[0]->unify(String::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
     args[3]->unify(String::typeVar) &&
-    args[4]->unify(String::typeVar) &&
+    args[4]->unify(Integer::typeVar) &&
+    args[5]->unify(String::typeVar) &&
     out->unify(pair);
 }
 
 static PRIMFN(prim_job_cache) {
   JobTable *jobtable = static_cast<JobTable*>(data);
-  EXPECT(5);
+  EXPECT(6);
   STRING(dir, 0);
   STRING(stdin, 1);
   STRING(env, 2);
   STRING(cmd, 3);
-  STRING(visible, 4);
+  INTEGER_MPZ(signature, 4);
+  STRING(visible, 5);
+
+  Hash hash;
+  REQUIRE(mpz_sizeinbase(signature, 2) <= 8*sizeof(hash.data));
+  mpz_export(&hash.data[0], 0, 1, sizeof(hash.data[0]), 0, 0, signature);
 
   // This function can be rerun; it's side effect has no impact on re-execution of reuse_job.
   long job;
@@ -1184,9 +1197,10 @@ static PRIMFN(prim_job_cache) {
   std::vector<FileReflection> files;
   Usage reuse = jobtable->imp->db->reuse_job(
     dir->as_str(),
-    stdin->as_str(),
     env->as_str(),
     cmd->as_str(),
+    stdin->as_str(),
+    hash.data[0],
     visible->as_str(),
     jobtable->imp->check,
     job,

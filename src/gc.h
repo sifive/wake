@@ -373,7 +373,7 @@ const char *GCObject<T, B>::type() const {
 
 struct Value : public HeapObject {
   Category category() const override;
-  size_t hashid() const;
+  virtual size_t hashid() const;
   virtual bool operator == (const Value &x) const;
 };
 
