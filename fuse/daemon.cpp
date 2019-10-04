@@ -49,6 +49,7 @@
 #include "json5.h"
 #include "execpath.h"
 #include "sfinae.h"
+#include "unlink.h"
 
 #ifdef __APPLE__
 #define st_mtim st_mtimespec
@@ -723,6 +724,9 @@ static int wakefuse_rename(const char *from, const char *to)
 
 	if (!it->second.is_creatable(keyt.second))
 		return -EACCES;
+
+	if (!it->second.is_readable(keyt.second))
+		deep_unlink(context.rootfd, keyt.second.c_str());
 
 	int res = renameat(context.rootfd, keyf.second.c_str(), context.rootfd, keyt.second.c_str());
 	if (res == -1)
