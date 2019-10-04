@@ -15,6 +15,7 @@
 #include <string.h>
 #include "json5.h"
 #include "execpath.h"
+#include "unlink.h"
 
 #define STR2(x) #x
 #define STR(x) STR2(x)
@@ -231,30 +232,6 @@ static void relink_shadow_tree(const std::string &root, const svec &outputs) {
   }
 }
 
-static void remove_shadow_tree(const std::string &root, const sset &exist) {
-  std::string roots = root + "/";
-  for (auto it = exist.rbegin(); it != exist.rend(); ++it) {
-    std::string target = roots + *it;
-    if (it->back() == '/') {
-      target.resize(target.size()-1);
-      if (rmdir(target.c_str()) != 0) {
-        std::cerr << "rmdir " << target << ": " << strerror(errno) << std::endl;
-        exit(1);
-      }
-    } else {
-      if (unlink(target.c_str()) != 0) {
-        std::cerr << "unlink " << target << ": " << strerror(errno) << std::endl;
-        exit(1);
-      }
-    }
-  }
-
-  if (rmdir(root.c_str()) != 0) {
-    std::cerr << "rmdir " << root << ": " << strerror(errno) << std::endl;
-    exit(1);
-  }
-}
-
 int main(int argc, const char **argv) {
   JAST jast;
 
@@ -339,7 +316,7 @@ int main(int argc, const char **argv) {
   scan_shadow_tree(exist, root);
   compute_inout(exist, guards, visible, start, inputs, outputs);
   relink_shadow_tree(root, outputs);
-  remove_shadow_tree(root, exist);
+  deep_unlink(AT_FDCWD, root.c_str());
   
   std::ofstream out(argv[2], std::ios_base::trunc);
   if (out.fail()) {
