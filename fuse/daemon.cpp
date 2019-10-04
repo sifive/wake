@@ -82,7 +82,6 @@ struct Job {
 	void parse();
 	void dump();
 
-	bool is_creatable(const std::string &path);
 	bool is_writeable(const std::string &path);
 	bool is_readable(const std::string &path);
 protected:
@@ -154,11 +153,6 @@ bool Job::is_visible(const std::string &path) {
 		&& i->size() > path.size()
 		&& (*i)[path.size()] == '/'
 		&& 0 == i->compare(0, path.size(), path);
-}
-
-bool Job::is_creatable(const std::string &path) {
-	return true;
-	// is_writeable(path) || faccessat(context.rootfd, path.c_str(), R_OK, 0) != 0;
 }
 
 bool Job::is_writeable(const std::string &path) {
@@ -447,8 +441,8 @@ static int wakefuse_mknod(const char *path, mode_t mode, dev_t rdev)
 	if (key.second == ".")
 		return -EEXIST;
 
-	if (!it->second.is_creatable(key.second))
-		return -EACCES;
+	if (!it->second.is_readable(key.second))
+		(void)deep_unlink(context.rootfd, key.second.c_str());
 
 	int res;
 	if (S_ISREG(mode)) {
@@ -491,6 +485,7 @@ static int wakefuse_mknod(const char *path, mode_t mode, dev_t rdev)
 	if (res == -1)
 		return -errno;
 
+	it->second.files_wrote.insert(std::move(key.second));
 	return 0;
 }
 
@@ -524,10 +519,8 @@ static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info 
 	if (key.second == ".")
 		return -EEXIST;
 
-	if (!it->second.is_creatable(key.second))
-		return -EACCES;
-
-	(void)unlinkat(context.rootfd, key.second.c_str(), 0);
+	if (!it->second.is_readable(key.second))
+		(void)deep_unlink(context.rootfd, key.second.c_str());
 
 	int fd = openat(context.rootfd, key.second.c_str(), fi->flags, mode);
 	if (fd == -1)
@@ -560,11 +553,11 @@ static int wakefuse_mkdir(const char *path, mode_t mode)
 	if (key.second == ".")
 		return -EEXIST;
 
-	if (!it->second.is_creatable(key.second))
-		return -EACCES;
+	if (!it->second.is_readable(key.second))
+		(void)deep_unlink(context.rootfd, key.second.c_str());
 
 	int res = mkdirat(context.rootfd, key.second.c_str(), mode);
-	if (res == -1 && (errno != EEXIST || it->second.is_readable(key.second)))
+	if (res == -1)
 		return -errno;
 
 	it->second.files_wrote.insert(std::move(key.second));
@@ -659,8 +652,8 @@ static int wakefuse_symlink(const char *from, const char *to)
 	if (key.second == ".")
 		return -EEXIST;
 
-	if (!it->second.is_creatable(key.second))
-		return -EACCES;
+	if (!it->second.is_readable(key.second))
+		(void)deep_unlink(context.rootfd, key.second.c_str());
 
 	int res = symlinkat(from, context.rootfd, key.second.c_str());
 	if (res == -1)
@@ -722,11 +715,8 @@ static int wakefuse_rename(const char *from, const char *to)
 	if (!it->second.is_writeable(keyf.second))
 		return -EACCES;
 
-	if (!it->second.is_creatable(keyt.second))
-		return -EACCES;
-
 	if (!it->second.is_readable(keyt.second))
-		deep_unlink(context.rootfd, keyt.second.c_str());
+		(void)deep_unlink(context.rootfd, keyt.second.c_str());
 
 	int res = renameat(context.rootfd, keyf.second.c_str(), context.rootfd, keyt.second.c_str());
 	if (res == -1)
@@ -781,8 +771,8 @@ static int wakefuse_link(const char *from, const char *to)
 	if (!it->second.is_readable(keyf.second))
 		return -ENOENT;
 
-	if (!it->second.is_creatable(keyt.second))
-		return -EACCES;
+	if (!it->second.is_readable(keyt.second))
+		(void)deep_unlink(context.rootfd, keyt.second.c_str());
 
 	int res = linkat(context.rootfd, keyf.second.c_str(), context.rootfd, keyt.second.c_str(), 0);
 	if (res == -1)
