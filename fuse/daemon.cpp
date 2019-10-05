@@ -923,7 +923,7 @@ template <typename T>
 struct has_utimensat {
 	typedef char no;
 	template <typename C>
-	static auto test(C c) -> decltype(utimensat(c, nullptr));
+	static auto test(C c) -> decltype(utimensat(c, nullptr, nullptr, 0));
 	template <typename>
 	static no test(...);
 	static const bool value = sizeof(test<int>(0)) != sizeof(no);
