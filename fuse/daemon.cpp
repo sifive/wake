@@ -938,7 +938,7 @@ maybe_utimensat(T dirfd, const char *path, const struct timespec timens[2]) {
 template <typename T>
 static typename enable_if<!has_utimensat<T>::value, int>::type
 maybe_utimensat(T dirfd, const char *path, const struct timespec timens[2]) {
-	int fd = openat(dirfd, path, O_RDWR | O_NOFOLLOW);
+	int fd = openat(dirfd, path, O_RDONLY | O_NOFOLLOW);
 	struct timeval times[2];
 	times[0].tv_sec = timens[0].tv_sec;
 	times[1].tv_sec = timens[1].tv_sec;
