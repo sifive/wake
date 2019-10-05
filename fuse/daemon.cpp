@@ -84,7 +84,6 @@ struct Job {
 
 	bool is_writeable(const std::string &path);
 	bool is_readable(const std::string &path);
-protected:
 	bool is_visible(const std::string &path);
 };
 
@@ -715,7 +714,10 @@ static int wakefuse_rename(const char *from, const char *to)
 	if (!it->second.is_writeable(keyf.second))
 		return -EACCES;
 
-	if (!it->second.is_readable(keyt.second))
+	if (it->second.is_visible(keyt.second))
+		return -EACCES;
+
+	if (!it->second.is_writeable(keyt.second))
 		(void)deep_unlink(context.rootfd, keyt.second.c_str());
 
 	int res = renameat(context.rootfd, keyf.second.c_str(), context.rootfd, keyt.second.c_str());
