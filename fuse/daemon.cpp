@@ -1085,12 +1085,14 @@ static int wakefuse_write(const char *path, const char *buf, size_t size,
 		if (it == context.jobs.end())
 			return -ENOENT;
 
+		if (!it->second.is_writeable(key.second))
+			return -EACCES;
+
 		int res = pwrite(fi->fh, buf, size, offset);
 		if (res == -1)
 			res = -errno;
 
 		it->second.obytes += res;
-		it->second.files_wrote.insert(std::move(key.second));
 		return res;
 	}
 
