@@ -298,13 +298,15 @@ static int wakefuse_access(const char *path, int mask)
 	}
 
 	auto key = split_key(path);
-	if (key.first.empty()) return 0;
+	if (key.first.empty())
+		return 0;
 
 	auto it = context.jobs.find(key.first);
 	if (it == context.jobs.end())
 		return -ENOENT;
 
-	if (key.second == ".") return 0;
+	if (key.second == ".")
+		return 0;
 
 	if (!it->second.is_readable(key.second))
 		return -ENOENT;
@@ -440,7 +442,10 @@ static int wakefuse_mknod(const char *path, mode_t mode, dev_t rdev)
 	if (key.second == ".")
 		return -EEXIST;
 
-	if (!it->second.is_readable(key.second))
+	if (it->second.is_visible(key.second))
+		return -EEXIST;
+
+	if (!it->second.is_writeable(key.second))
 		(void)deep_unlink(context.rootfd, key.second.c_str());
 
 	int res;
@@ -518,7 +523,10 @@ static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info 
 	if (key.second == ".")
 		return -EEXIST;
 
-	if (!it->second.is_readable(key.second))
+	if (it->second.is_visible(key.second))
+		return -EEXIST;
+
+	if (!it->second.is_writeable(key.second))
 		(void)deep_unlink(context.rootfd, key.second.c_str());
 
 	int fd = openat(context.rootfd, key.second.c_str(), fi->flags, mode);
@@ -552,7 +560,10 @@ static int wakefuse_mkdir(const char *path, mode_t mode)
 	if (key.second == ".")
 		return -EEXIST;
 
-	if (!it->second.is_readable(key.second))
+	if (it->second.is_visible(key.second))
+		return -EEXIST;
+
+	if (!it->second.is_writeable(key.second))
 		(void)deep_unlink(context.rootfd, key.second.c_str());
 
 	int res = mkdirat(context.rootfd, key.second.c_str(), mode);
@@ -651,7 +662,10 @@ static int wakefuse_symlink(const char *from, const char *to)
 	if (key.second == ".")
 		return -EEXIST;
 
-	if (!it->second.is_readable(key.second))
+	if (it->second.is_visible(key.second))
+		return -EEXIST;
+
+	if (!it->second.is_writeable(key.second))
 		(void)deep_unlink(context.rootfd, key.second.c_str());
 
 	int res = symlinkat(from, context.rootfd, key.second.c_str());
@@ -678,14 +692,14 @@ static int wakefuse_rename(const char *from, const char *to)
 	TRACE(from);
 
 	if (is_special(to))
-		return -EEXIST;
+		return -EACCES;
 
 	if (is_special(from))
 		return -EACCES;
 
 	auto keyt = split_key(to);
 	if (keyt.first.empty())
-		return -EEXIST;
+		return -ENOTEMPTY;
 
 	auto keyf = split_key(from);
 	if (keyf.first.empty())
@@ -773,7 +787,10 @@ static int wakefuse_link(const char *from, const char *to)
 	if (!it->second.is_readable(keyf.second))
 		return -ENOENT;
 
-	if (!it->second.is_readable(keyt.second))
+	if (it->second.is_visible(keyt.second))
+		return -EEXIST;
+
+	if (!it->second.is_writeable(keyt.second))
 		(void)deep_unlink(context.rootfd, keyt.second.c_str());
 
 	int res = linkat(context.rootfd, keyf.second.c_str(), context.rootfd, keyt.second.c_str(), 0);
