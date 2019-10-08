@@ -560,30 +560,6 @@ target hashcode f =
       True (x, Nil) = x
       _ _ = "BadHash"
 
-def stateRunner =
-  def add f h = prim "add_hash"
-  def hash = "0000000000000000000000000000000000000000000000000000000000000000"
-  def pre = match _
-    Fail f = Pair (Fail f) ""
-    Pass input = match input.getRunnerInputCommand
-      _, file, Nil = Pair (Pass input) file
-      _ = panic "stateRunner: invalid command-line"
-  def post = match _
-    Pair (Fail f) _ = Fail f
-    Pair (Pass output) file =
-      Pass (editRunnerOutputOutputs (add file hash, _) output)
-  makeRunner "state" (\_ Pass 0.0) pre post virtualRunner
-
-# Mark a file whose contents must not be tracked
-global def makeStatePath file =
-  makePlan ("<state>", file, Nil) Nil
-  | setPlanKeep        False
-  | setPlanEcho        Debug
-  | setPlanEnvironment Nil
-  | setPlanFnOutputs   (file, _)
-  | runJobWith stateRunner
-  | getJobOutput
-
 # Whenever possible, use 'job' if:
 #   cmd can run under FUSE
 #   cmd guarantees to produce the same outputs given the same inputs
