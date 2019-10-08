@@ -138,6 +138,12 @@ global def editPlanShare f =
     x                  = x
   editPlanPersistence helper
 
+# Get a unique hash-code for the job
+global def getPlanHash plan =
+  def signature cmd env dir stdin = prim "hash"
+  def Plan cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ = plan
+  signature cmd env dir stdin
+
 # The criteria which determine if Job execution can be skipped:
 #   Once  is True and a matching job was run by this wake invocation
 #   Keep  is True and there is matching output in the workspace
