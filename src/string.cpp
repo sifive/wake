@@ -21,6 +21,7 @@
 #include "status.h"
 #include "utf8.h"
 #include "gc.h"
+#include "shell.h"
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -585,6 +586,18 @@ static PRIMFN(prim_uname) {
   RETURN(out);
 }
 
+static PRIMTYPE(type_shell_str) {
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
+}
+
+static PRIMFN(prim_shell_str) {
+  EXPECT(1);
+  STRING(str, 0);
+  RETURN(String::alloc(runtime.heap, shell_escape(str->c_str())));
+}
+
 void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "strlen",   prim_strlen,   type_strlen,    PRIM_PURE);
   prim_register(pmap, "vcat",     prim_vcat,     type_vcat,      PRIM_PURE);
@@ -603,6 +616,7 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "str2code", prim_str2code, type_str2code,  PRIM_PURE);
   prim_register(pmap, "str2bin",  prim_str2bin,  type_str2code,  PRIM_PURE);
   prim_register(pmap, "uname",    prim_uname,    type_uname,     PRIM_PURE);
+  prim_register(pmap, "shell_str",prim_shell_str,type_shell_str, PRIM_PURE);
   prim_register(pmap, "print",    prim_print,    type_print,     PRIM_IMPURE);
   prim_register(pmap, "mkdir",    prim_mkdir,    type_mkdir,     PRIM_IMPURE);
   prim_register(pmap, "unlink",   prim_unlink,   type_unlink,    PRIM_IMPURE);
