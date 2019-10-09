@@ -33,7 +33,7 @@ TypeChild::TypeChild() : var(), tag() { }
 
 TypeVar::Imp::Imp(const char *name_, int nargs_)
  : link(nullptr), epoch(0), free_dob(++globalClock), nargs(nargs_), name(name_) {
-  cargs = nargs > 0 ? new TypeChild[nargs] : 0;
+  cargs = nargs > 0 ? new TypeChild[nargs] : nullptr;
   for (int i = 0; i < nargs; ++i) {
     cargs[i].var.imp->free_dob = cargs[i].var.var_dob = ++globalClock;
   }

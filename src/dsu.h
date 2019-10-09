@@ -26,6 +26,11 @@ public:
   // Construct a new member in a new set
   DSU(T *payload_);
 
+  DSU(DSU &&x) = default;
+  DSU(const DSU &x) = default;
+  DSU &operator = (const DSU &x) = default;
+  DSU &operator = (DSU &&x) = default;
+
   // Access the payload of the set (common to all members)
   T *get();
   const T* get() const;

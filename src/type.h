@@ -58,6 +58,9 @@ private:
     Imp(const char *name_, int nargs_);
     Imp();
     ~Imp();
+
+    Imp(const Imp &x) = delete;
+    Imp& operator = (const Imp &x) = delete;
   };
 
   // Handle to the set leader
@@ -72,6 +75,11 @@ private:
 public:
   TypeVar(); // free type-var
   TypeVar(const char *name_, int nargs_);
+
+  TypeVar(const TypeVar &x) = default;
+  TypeVar(TypeVar &&x) = default;
+  TypeVar &operator = (const TypeVar &x) = default;
+  TypeVar &operator = (TypeVar &&x) = default;
 
   const TypeVar & operator[](int i) const;
   TypeVar & operator[](int i);
