@@ -455,8 +455,9 @@ int main(int argc, char **argv) {
       HeapObject *v = *p ? p->coerce<HeapObject>() : nullptr;
       if (verbose) {
         std::cout << targets[i] << ": ";
-        types[0].format(std::cout, body->typeVar);
-        types = types[1];
+        types[0].format(std::cout, types);
+        TypeVar tmp = types[1];
+        types = tmp;
         std::cout << " = ";
       }
       if (!quiet) {
