@@ -58,6 +58,9 @@ private:
     Imp(const char *name_, int nargs_);
     Imp();
     ~Imp();
+
+    Imp(const Imp &x) = delete;
+    Imp& operator = (const Imp &x) = delete;
   };
 
   // Handle to the set leader
