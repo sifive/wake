@@ -138,6 +138,12 @@ global def editPlanShare f =
     x                  = x
   editPlanPersistence helper
 
+# Get a unique hash-code for the job
+global def getPlanHash plan =
+  def signature cmd env dir stdin = prim "hash"
+  def Plan cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ = plan
+  signature cmd env dir stdin
+
 # The criteria which determine if Job execution can be skipped:
 #   Once  is True and a matching job was run by this wake invocation
 #   Keep  is True and there is matching output in the workspace
@@ -559,30 +565,6 @@ target hashcode f =
     match job.isJobOk hash
       True (x, Nil) = x
       _ _ = "BadHash"
-
-def stateRunner =
-  def add f h = prim "add_hash"
-  def hash = "0000000000000000000000000000000000000000000000000000000000000000"
-  def pre = match _
-    Fail f = Pair (Fail f) ""
-    Pass input = match input.getRunnerInputCommand
-      _, file, Nil = Pair (Pass input) file
-      _ = panic "stateRunner: invalid command-line"
-  def post = match _
-    Pair (Fail f) _ = Fail f
-    Pair (Pass output) file =
-      Pass (editRunnerOutputOutputs (add file hash, _) output)
-  makeRunner "state" (\_ Pass 0.0) pre post virtualRunner
-
-# Mark a file whose contents must not be tracked
-global def makeStatePath file =
-  makePlan ("<state>", file, Nil) Nil
-  | setPlanKeep        False
-  | setPlanEcho        Debug
-  | setPlanEnvironment Nil
-  | setPlanFnOutputs   (file, _)
-  | runJobWith stateRunner
-  | getJobOutput
 
 # Whenever possible, use 'job' if:
 #   cmd can run under FUSE

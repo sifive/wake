@@ -1,0 +1,87 @@
+# Copyright 2019 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This API makes it possible to include a non-source file into a wake build.
+# Generally, one should obtain Paths from sources or as the output of Jobs.
+# This API is useful for things like a comannd-line-supplied input file.
+global def claimFileAsPath existingFile desiredWorkspacePath =
+  def get_modtime file = prim "get_modtime"
+  def time = get_modtime existingFile
+  if time == -1
+  then makeBadPath (makeError "{existingFile}: claimed file does not exist")
+  else
+    makePlan (which "ln", "-f", existingFile, desiredWorkspacePath, Nil) Nil
+    | setPlanLocalOnly   True
+    | setPlanPersistence ReRun
+    | setPlanEcho        Verbose
+    | setPlanStdout      logNever
+    | setPlanStderr      logNever
+    | setPlanFnOutputs   (\_ desiredWorkspacePath, Nil)
+    | runJobWith localRunner
+    | getJobOutput
+
+target tarExe Unit =
+  def gnutar = which "gnutar"
+  if gnutar ==* "gnutar" then which "tar" else gnutar
+
+def tar output paths =
+  def cmd =
+    # Intentionally record mtime => needed for incremental builds
+    tarExe Unit, "--numeric-owner", "--owner=0", "--group=0", "-cf",
+    output, map getPathName paths | sortBy (_<*_)
+  makePlan cmd paths
+  | setPlanLocalOnly True
+  | setPlanEcho      Verbose
+  | setPlanFnOutputs (\_ output, Nil)
+  | runJobWith       localRunner
+  | getJobOutput
+
+# This API allows a Job to access those outputs from its last invocation
+# which are accepted by reusedOutputFilterFn. To use this method, you must
+# guarantee that all output contents will be the same whether or not the
+# previous outputs were made available or not. Also, for incremental jobs,
+# all visible files are considered as inputs, since the job might not read
+# all inputs on each run, based on (for example) timestamps.
+global def runIncrementalJob stateFileLabel reusedOutputFilterFn plan =
+  def code = plan | getPlanHash | strbase 62
+  def pre  = "{stateFileLabel}-pre-{code}.tar"
+  def post = "{stateFileLabel}-post-{code}.tar"
+  def escape s = prim "shell_str"
+  def preTar = claimFileAsPath post pre
+  def untar = match preTar.getPathError
+    None   = "tar -xf {escape pre}\n"
+    Some _ = ""
+  def stateFiles = match preTar.getPathError
+    None   = preTar, Nil
+    Some _ = Nil
+  def cd =
+    if plan.getPlanDirectory ==* "."
+    then ""
+    else "cd {plan.getPlanDirectory}\n"
+  def orig = plan.getPlanCommand | map escape | catWith " "
+  def script = "{untar}{cd}{orig}"
+  def job =
+    plan
+    | setPlanDirectory "."
+    | setPlanCommand   (which "dash", "-c", script, Nil)
+    | editPlanVisible  (stateFiles ++ _)
+    | setPlanFnInputs  (\_ plan.getPlanVisible | map getPathName)
+    | runJob
+  def postTar =
+    job
+    | getJobOutputs
+    | filter reusedOutputFilterFn
+    | tar post
+  job
