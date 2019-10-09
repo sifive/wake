@@ -51,10 +51,13 @@ def tar output paths =
 # This API allows a Job to access those outputs from its last invocation
 # which are accepted by reusedOutputFilterFn. To use this method, you must
 # guarantee that all output contents will be the same whether or not the
-# previous outputs were made available or not.
+# previous outputs were made available or not. Also, for incremental jobs,
+# all visible files are considered as inputs, since the job might not read
+# all inputs on each run, based on (for example) timestamps.
 global def runIncrementalJob stateFileLabel reusedOutputFilterFn plan =
-  def pre  = "{stateFileLabel}-pre-{plan.getPlanHash.str}.tar"
-  def post = "{stateFileLabel}-post-{plan.getPlanHash.str}.tar"
+  def code = plan | getPlanHash | strbase 62
+  def pre  = "{stateFileLabel}-pre-{code}.tar"
+  def post = "{stateFileLabel}-post-{code}.tar"
   def escape s = prim "shell_str"
   def preTar = claimFileAsPath post pre
   def untar = match preTar.getPathError
