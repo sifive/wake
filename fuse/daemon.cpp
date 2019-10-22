@@ -922,7 +922,7 @@ static int wakefuse_truncate(const char *path, off_t size)
 template <typename T>
 struct has_utimensat {
 	typedef char no;
-	struct timespec ts[2];
+	static struct timespec ts[2];
 	template <typename C>
 	static auto test(C c) -> decltype(utimensat(c, "", ts, 0));
 	template <typename>

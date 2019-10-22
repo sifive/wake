@@ -124,7 +124,7 @@ Space::~Space() {
 void Space::resize(size_t size_) {
   if (alloc < size_ || 3*size_ < alloc) {
     alloc = size_ + (size_ >> 1);
-    void *tmp = ::realloc(array, sizeof(PadObject)*alloc);
+    void *tmp = ::realloc(static_cast<void*>(array), sizeof(PadObject)*alloc);
     assert(tmp);
     array = static_cast<PadObject*>(tmp);
   }
