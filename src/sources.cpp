@@ -406,6 +406,8 @@ static PRIMFN(prim_files) {
   bool fail = push_files(match, root, *arg1->exp, skip);
   if (fail) match.clear(); // !!! There's a hole in the API
 
+  std::sort(match.begin(), match.end());
+
   size_t need = reserve_list(match.size());
   for (auto &x : match) need += String::reserve(x.size());
   runtime.heap.reserve(need);
