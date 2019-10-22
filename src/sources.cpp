@@ -170,6 +170,7 @@ static bool scan(std::vector<std::string> &out) {
 }
 
 static bool push_files(std::vector<std::string> &out, const std::string &path, int dirfd, const RE2 &re, size_t skip) {
+  size_t len = out.size();
   auto dir = fdopendir(dirfd);
   if (!dir) {
     close(dirfd);
@@ -180,6 +181,10 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
   bool failed = false;
   for (errno = 0; !failed && (f = readdir(dir)); errno = 0) {
     if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
+    if (path != "." && !strcmp(&f->d_name[0], "wake.db")) {
+      out.resize(len);
+      return false;
+    }
     bool recurse;
     struct stat sbuf;
 #ifdef DT_DIR
