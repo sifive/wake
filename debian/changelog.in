@@ -1,8 +1,8 @@
 wake (@VERSION@-1) unstable; urgency=medium
 
-  * New upstream release.
+  * Increase maximum size of JSON files to 128 MiB.
 
- -- Wesley W. Terpstra <terpstra@debian.org>  Fri, 13 Sep 2019 11:45:14 -0700
+ -- Richard Xia <richardxia@richardxia.com>  Mon, 11 Nov 2019 09:57:15 -0700
 
 wake (0.15.2-1) unstable; urgency=medium
 
