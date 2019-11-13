@@ -1,5 +1,11 @@
 wake (@VERSION@-1) unstable; urgency=medium
 
+  * Increase maximum size of JSON files to 128 MiB.
+
+ -- Jack Koenig <jack.koenig3@gmail.com>  Tue, 12 Nov 2019 18:10:23 -0700
+
+wake (0.17.0-1) unstable; urgency=medium
+
   * Auto-generated release package.
 
  -- Wesley W. Terpstra <terpstra@debian.org>  Mon, 30 Sep 2019 13:52:02 -0700
