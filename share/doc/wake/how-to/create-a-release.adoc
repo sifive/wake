@@ -1,0 +1,74 @@
+= Creating a new release of Wake
+
+The following describes the steps for creating a new release of Wake and publishing the artifacts to GitHub.
+
+1. Pick a release branch to release from, e.g. `v0.15`. The `v0.15` release branch will contain all the point releases such as `v0.15.0`, `v0.15.1`, etc.
++
+[source,shell]
+----
+$ git checkout v0.15
+----
+
+2. Make sure the branch is up to date with GitHub.
++
+[source,shell]
+----
+$ git pull
+----
+
+3. Create a branch from the release branch to contain the last set of changes for the release, e.g. `release-0.15.3`.
++
+[source,shell]
+----
+$ git checkout -b release-0.15.3
+----
+
+4. Open `debian/changelog.in` in a text editor.
+   Check to see whether the top-most release note corresponds to the previous release or whether it is a placeholder for the next release.
+   If you see the previous release's version number in the release note second from the top, then the top-most release note is a placeholder for the next release. In this case, go to step 6.
+   If instead it looks like the top-most release _is_ the previous release, then go to step 5.
+
+5. Create a copy of the top-most release note immediately below it.
+   In the second instance, replace the `@VERSION@` string with the actual version number of the previous release.
+
+5. Update the top-most release note to contain the actual release information.
+   Update the text to describe the release itself.
+   Update the author, email, and the release date to match the actual release information.
+
+7. Commit the changes to `changelog.in`.
++
+[source,shell]
+----
+$ git add debian/changelog.in
+$ git commit -m "Set release date."
+----
+
+8. Create a tag with the version string you want to use, e.g. `v0.15.3`, and push the tag to GitHub. It is important that this happens before pushing the branch and opening a pull request in order for the build CI job to correctly identify the branch as being a tag.
++
+[source,shell]
+----
+$ git tag v0.15.3
+$ git push origin v0.15.3
+----
+
+9. Push the branch to GitHub.
++
+[source,shell]
+----
+$ git push origin release-0.15.3
+----
+
+10. Open a pull request on GitHub. Make sure you set the base branch to the release branch (e.g. `v0.15`), not `master`.
+
+11. Wait for the CI jobs to pass.
+    Double check that the build artifacts corresponding to the distribution-specific releases look correct.
+    One thing to look for is whether CI correctly associated the tag name with the pull request build.
+    If it did not work correctly, then you'll see a file name with the previous version tag along with part of the Git commit hash, e.g. `wake_0.15.2.4+g28fb3f8.tar.xz`
+
+12. Assuming everything has passed, merge the pull request.
+
+13. Take the artifacts from the CI build and upload them to the GitHub release.
+    Note that you will need to manually rename the artifacts to add in the distribution version's prefix.
+    E.g. For the Ubuntu 16.04 build artifact, you should rename it from `wake_0.15.3-1_amd64.deb` to `ubuntu-16-04-wake_0.15.3-1_amd64.deb`.
+
+14. Finally, update the release on GitHub with the release information.
