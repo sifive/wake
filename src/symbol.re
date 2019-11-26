@@ -301,7 +301,8 @@ static bool lex_rstr(Lexer &lex, Expr *&out)
 
         *                    { return false; }
         $                    { return false; }
-        "\\`"                { slice.push_back('`'); continue; }
+        "\\\\"               { slice.append("\\\\"); continue; }
+        "\\`"                { slice.append("\\`");  continue; }
         "`"                  { break; }
         notnl                { slice.append(in.tok, in.cur); continue; }
     */
