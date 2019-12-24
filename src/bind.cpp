@@ -360,13 +360,9 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
     for (size_t c = 0; c < sum->members.size(); ++c) {
       Constructor &cons = sum->members[c];
       std::string cname = "_ c" + std::to_string(c);
-      if (sum->members.size() == 1) {
-        map->body = std::unique_ptr<Expr>(new VarRef(location, cname));
-      } else {
-        map->body = std::unique_ptr<Expr>(new App(location,
-          map->body.release(),
-          new VarRef(location, cname)));
-      }
+      map->body = std::unique_ptr<Expr>(new App(location,
+        map->body.release(),
+        new VarRef(location, cname)));
       std::vector<PatternRef> bucket;
       int args = cons.ast.args.size();
       int var = prototype.index;
