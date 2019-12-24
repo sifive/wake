@@ -53,11 +53,16 @@ bool chdir_workspace(std::string &prefix) {
   for (attempts = 100; attempts && access("wake.db", F_OK) == -1; --attempts) {
     if (chdir("..") == -1) return false;
   }
+  if (attempts == 0) return false;
   std::string workspace = get_cwd();
+  if (cwd.substr(0, workspace.size()) != workspace) {
+    fprintf(stderr, "Workspace directory is not a parent of current directory\n");
+    return false;
+  }
   prefix.assign(cwd.begin() + workspace.size(), cwd.end());
   if (!prefix.empty())
     std::rotate(prefix.begin(), prefix.begin()+1, prefix.end());
-  return attempts != 0;
+  return true;
 }
 
 static std::string slurp(int dirfd, bool &fail) {
