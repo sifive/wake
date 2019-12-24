@@ -160,7 +160,11 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
     rapp_inline(p, std::move(app));
   } else {
     Term *input = p.stream[args.back()];
-    if (input->id() == typeid(RCon)) {
+    if (args.size() == 2) {
+      std::unique_ptr<RApp> app(
+        new RApp(args[0], args.back(), label.c_str()));
+      rapp_inline(p, std::move(app));
+    } else if (input->id() == typeid(RCon)) {
       RCon *con = static_cast<RCon*>(input);
       std::unique_ptr<RApp> app(
         new RApp(args[con->kind->index], args.back(), label.c_str()));
