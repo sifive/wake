@@ -49,7 +49,12 @@ global def getJArray = match _
   JArray x = Some x
   _        = None
 
-global def parseJSONBody body = prim "json_body"
+global def parseJSONBody body =
+  def imp b = prim "json_body"
+  match (imp body)
+    Pass jvalue = Pass jvalue
+    Fail cause = Fail (makeError cause)
+
 global def parseJSONFile path =
   def imp f = prim "json_file"
   match (getPathResult path)
