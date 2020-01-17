@@ -372,9 +372,7 @@ struct Value : public HeapObject {
   Category category() const override;
   // Shallow inspection of this object (including type)
   virtual bool operator == (const Value &x) const;
-  virtual Hash hash() const = 0;
-  // Deprecated:
-  virtual size_t hashid() const;
+  virtual Hash shallow_hash() const = 0;
 };
 
 struct DestroyableObject : public Value {

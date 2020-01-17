@@ -34,6 +34,9 @@ struct Hash {
   Hash(const std::vector<uint64_t> &out) { siphash(out.data(), out.size()*sizeof(uint64_t), &data[0]); }
   Hash(const std::string &str) { siphash(str.data(), str.size(), &data[0]); }
 
+  Hash operator ^ (uint64_t z) const { return Hash(data[0] ^ z, data[1]); }
+  size_t mix() const { return data[0] ^ data[1]; }
+
   void push(std::vector<uint64_t> &out) const {
     out.push_back(data[0]);
     out.push_back(data[1]);

@@ -25,7 +25,7 @@ static bool operator == (const std::shared_ptr<RootPointer<Value> > &x, const st
 namespace std {
   template <> struct hash<std::shared_ptr<RootPointer<Value> > > {
     size_t operator () (const std::shared_ptr<RootPointer<Value> > &x) const {
-      return (*x)->hashid();
+      return (*x)->shallow_hash().mix(); // !!! want deep
     }
   };
 }

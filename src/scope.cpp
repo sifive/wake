@@ -68,8 +68,8 @@ void RArg::pass_scope(PassScope &p) {
 void RLit::pass_scope(PassScope &p) {
   HeapObject *obj = value->get();
   p.codes.push_back(TYPE_RLIT);
-  p.codes.push_back(static_cast<Value*>(obj)->hashid());
-  (*value)->hash().push(p.codes);
+  static_cast<Value*>(obj)->shallow_hash().push(p.codes);
+  (*value)->shallow_hash().push(p.codes); // !!! need deep
 }
 
 static void scope_redux(PassScope &p, Redux *redux, size_t type) {

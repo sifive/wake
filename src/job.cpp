@@ -109,7 +109,7 @@ struct Job final : public GCObject<Job, Value> {
   T recurse(T arg);
 
   void format(std::ostream &os, FormatState &state) const override;
-  Hash hash() const override;
+  Hash shallow_hash() const override;
 
   uint64_t memory() const;
   double threads() const;
@@ -886,8 +886,8 @@ Job::Job(Database *db_, String *dir_, String *stdin_, String *environ, String *c
   code = Hash(codes);
 }
 
-Hash Job::hash() const {
-  return Hash(job);
+Hash Job::shallow_hash() const {
+  return Hash(job) ^ TYPE_JOB;
 }
 
 #define JOB(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Job)); } while(0); Job *arg = static_cast<Job*>(args[i]);

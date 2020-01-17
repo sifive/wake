@@ -55,7 +55,7 @@ struct Target final : public GCObject<Target, DestroyableObject> {
   T recurse(T arg);
 
   void format(std::ostream &os, FormatState &state) const override;
-  Hash hash() const override;
+  Hash shallow_hash() const override;
 };
 
 bool Target::report_future_targets = true;
@@ -97,9 +97,9 @@ void Target::format(std::ostream &os, FormatState &state) const {
   os << "Target";
 }
 
-Hash Target::hash() const {
+Hash Target::shallow_hash() const {
   // For reproducible execution, pretend a target is always empty
-  return Hash();
+  return Hash() ^ TYPE_TARGET;
 }
 
 #define TARGET(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Target)); } while(0); Target *arg = static_cast<Target*>(args[i]);

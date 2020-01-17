@@ -90,7 +90,7 @@ void RArg::pass_cse(PassCSE &p, std::unique_ptr<Term> self) {
 void RLit::pass_cse(PassCSE &p, std::unique_ptr<Term> self) {
   HeapObject *obj = value->get();
   Hash h = Hash(typeid(RLit).hash_code(), typeid(*obj).hash_code())
-         + (*value)->hash();
+         + (*value)->shallow_hash(); // !!! want deep
   cse_reduce(p, h, std::move(self));
 }
 

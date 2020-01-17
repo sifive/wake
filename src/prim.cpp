@@ -133,7 +133,7 @@ static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
 
     // Hash this object and enqueue its children for hashing
     step = value->explore(step);
-    code = code + value->hash();
+    code = code + value->shallow_hash();
   }
 
   HeapHash out;

@@ -28,20 +28,9 @@
 #include <string.h>
 #include <assert.h>
 
-// typeid().hash_code() changes between runs
-#define TYPE_STRING	1
-#define TYPE_INTEGER	2
-#define TYPE_DOUBLE	3
-#define TYPE_REGEXP	4
-
 bool Value::operator == (const Value &x) const {
   assert(0 /* unreachable */);
   return false;
-}
-
-size_t Value::hashid() const {
-  assert(0 /* unreachable */);
-  return 0;
 }
 
 void FormatState::resume() {
@@ -180,13 +169,8 @@ void String::format(std::ostream &os, FormatState &state) const {
   os << "\"";
 }
 
-Hash String::hash() const {
-  return Hash(c_str(), length);
-}
-
-size_t String::hashid() const {
-  Hash h = hash();
-  return h.data[0] ^ h.data[1] ^ TYPE_STRING;
+Hash String::shallow_hash() const {
+  return Hash(c_str(), length) ^ TYPE_STRING;
 }
 
 bool String::operator == (const Value &x) const {
@@ -232,13 +216,8 @@ void Integer::format(std::ostream &os, FormatState &state) const {
   os << str();
 }
 
-Hash Integer::hash() const {
-  return Hash(data(), abs(length)*sizeof(mp_limb_t));
-}
-
-size_t Integer::hashid() const {
-  Hash h = hash();
-  return h.data[0] ^ h.data[1] ^ TYPE_INTEGER;
+Hash Integer::shallow_hash() const {
+  return Hash(data(), abs(length)*sizeof(mp_limb_t)) ^ TYPE_INTEGER;
 }
 
 bool Integer::operator == (const Value &x) const {
@@ -259,13 +238,8 @@ void Double::format(std::ostream &os, FormatState &state) const {
   os << str();
 }
 
-Hash Double::hash() const {
-  return Hash(&value, sizeof(value));
-}
-
-size_t Double::hashid() const {
-  Hash h = hash();
-  return h.data[0] ^ h.data[1] ^ TYPE_DOUBLE;
+Hash Double::shallow_hash() const {
+  return Hash(&value, sizeof(value)) ^ TYPE_DOUBLE;
 }
 
 bool Double::operator == (const Value &x) const {
@@ -344,13 +318,8 @@ void RegExp::format(std::ostream &os, FormatState &state) const {
   if (APP_PRECEDENCE < state.p()) os << ")";
 }
 
-Hash RegExp::hash() const {
-  return Hash(exp->pattern());
-}
-
-size_t RegExp::hashid() const {
-  Hash h = hash();
-  return h.data[0] ^ h.data[1] ^ TYPE_REGEXP;
+Hash RegExp::shallow_hash() const {
+  return Hash(exp->pattern()) ^ TYPE_REGEXP;
 }
 
 bool RegExp::operator == (const Value &x) const {
@@ -368,15 +337,15 @@ void Closure::format(std::ostream &os, FormatState &state) const {
   os << "<" << fun->location.file() << ">";
 }
 
-Hash Closure::hash() const {
-  return fun->hash + Hash(applied);
+Hash Closure::shallow_hash() const {
+  return (fun->hash + Hash(applied)) ^ TYPE_CLOSURE;
 }
 
-Hash Record::hash() const {
+Hash Record::shallow_hash() const {
   uint64_t buf[2];
   buf[0] = size();
   buf[1] = cons?cons->index:~static_cast<uint64_t>(0);
-  return Hash(&buf[0], sizeof(buf));
+  return Hash(&buf[0], sizeof(buf)) ^ TYPE_RECORD;
 }
 
 void Record::format(std::ostream &os, FormatState &state) const {
@@ -433,10 +402,10 @@ void Record::format(std::ostream &os, FormatState &state) const {
   }
 }
 
-Hash Scope::hash() const {
+Hash Scope::shallow_hash() const {
   uint64_t buf[1];
   buf[0] = size();
-  return Hash(&buf[0], sizeof(buf));
+  return Hash(&buf[0], sizeof(buf)) ^ TYPE_SCOPE;
 }
 
 void Scope::format(std::ostream &os, FormatState &state) const {
