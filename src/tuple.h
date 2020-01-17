@@ -85,6 +85,8 @@ struct alignas(PadObject) Promise {
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) { return (value.*memberfn)(arg); }
 
+  void reset() { value.reset(); }
+
 private:
   void awaken(Runtime &runtime, HeapObject *obj);
   mutable HeapPointer<HeapObject> value;

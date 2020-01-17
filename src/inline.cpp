@@ -16,6 +16,7 @@
  */
 
 #include "ssa.h"
+#include "prim.h"
 #include "runtime.h"
 #include <unordered_map>
 
@@ -41,10 +42,15 @@ static size_t meta_args(size_t meta) { return meta & 255; }
 struct PassInlineCommon {
   TargetScope scope;
   ConstantPool pool;
+  RootPointer<Scope> output;
   size_t threshold;
 
   PassInlineCommon(Runtime *runtime, size_t threshold_) :
-    scope(), pool(128, DeepHash(runtime), DeepHash(runtime)), threshold(threshold_) { }
+    scope(),
+    pool(128, DeepHash(runtime), DeepHash(runtime)),
+    output((runtime->heap.guarantee(Scope::reserve(1)),
+            runtime->heap.root(Scope::claim(runtime->heap, 1, nullptr, nullptr, nullptr)))),
+    threshold(threshold_) { }
   Runtime *runtime() { return pool.hash_function().runtime; }
 };
 
@@ -144,7 +150,34 @@ void RApp::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 void RPrim::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   meta = make_meta(1, 0);
   update(p.stream.map());
-  p.stream.transfer(std::move(self));
+  bool eval = (pflags & PRIM_IMPURE) == PRIM_PURE;
+  Value *lit[args.size()];
+  for (unsigned i = 0; eval && i < args.size(); ++i) {
+    Term *term = p.stream[args[i]];
+    eval = term->id() == typeid(RLit);
+    if (eval) lit[i] = static_cast<RLit*>(term)->value->get();
+  }
+  if (eval) {
+    Runtime &runtime = *p.common.runtime();
+    while (true) {
+      try {
+        (*fn)(data, runtime, p.common.output.get(), 0, args.size(), &lit[0]);
+        break;
+      } catch (GCNeededException gc) {
+        runtime.heap.GC(gc.needed);
+      }
+    }
+    Promise *q = p.common.output->at(0);
+    if (*q) {
+      std::unique_ptr<RLit> out(new RLit(std::make_shared<RootPointer<Value> >(runtime.heap.root(q->coerce<Value>()))));
+      q->reset();
+      out->pass_inline(p, std::move(out));
+    } else {
+      p.stream.transfer(std::move(self));
+    }
+  } else {
+    p.stream.transfer(std::move(self));
+  }
 }
 
 void RGet::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
@@ -154,6 +187,13 @@ void RGet::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   if (input->id() == typeid(RCon)) {
     RCon *con = static_cast<RCon*>(input);
     p.stream.discard(con->args[index]);
+  } else if (input->id() == typeid(RLit)) {
+    RLit *lit = static_cast<RLit*>(input);
+    Record *record = static_cast<Record*>(lit->value->get());
+    Value *elt = record->at(index)->coerce<Value>();
+    std::unique_ptr<RLit> out(new RLit(std::make_shared<RootPointer<Value> >(
+      p.common.runtime()->heap.root(elt))));
+    out->pass_inline(p, std::move(out));
   } else {
     p.stream.transfer(std::move(self));
   }
@@ -178,6 +218,12 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
       RCon *con = static_cast<RCon*>(input);
       std::unique_ptr<RApp> app(
         new RApp(args[con->kind->index], args.back(), label.c_str()));
+      rapp_inline(p, std::move(app));
+    } else if (input->id() == typeid(RLit)) {
+      RLit *lit = static_cast<RLit*>(input);
+      Record *record = static_cast<Record*>(lit->value->get());
+      std::unique_ptr<RApp> app(
+        new RApp(args[record->cons->index], args.back(), label.c_str()));
       rapp_inline(p, std::move(app));
     } else if (!input->get(SSA_ORDERED) && input->id() == typeid(RDes)) {
       RDes *des = static_cast<RDes*>(input);
