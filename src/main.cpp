@@ -403,8 +403,8 @@ int main(int argc, char **argv) {
 
   // Convert AST to optimized SSA
   std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root));
-  if (optim) ssa = Term::optimize(std::move(ssa));
-  ssa = Term::scope(std::move(ssa));
+  if (optim) ssa = Term::optimize(std::move(ssa), runtime);
+  ssa = Term::scope(std::move(ssa), runtime);
 
   // Upon request, dump out the SSA
   if (dumpssa) {

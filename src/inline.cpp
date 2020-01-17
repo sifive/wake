@@ -16,21 +16,22 @@
  */
 
 #include "ssa.h"
+#include "runtime.h"
 #include <unordered_map>
 
-static bool operator == (const std::shared_ptr<RootPointer<Value> > &x, const std::shared_ptr<RootPointer<Value> > &y) {
-  return **x == **y;
-}
+struct DeepHash {
+  Runtime *runtime;
+  DeepHash(Runtime *runtime_) : runtime(runtime_) { }
 
-namespace std {
-  template <> struct hash<std::shared_ptr<RootPointer<Value> > > {
-    size_t operator () (const std::shared_ptr<RootPointer<Value> > &x) const {
-      return (*x)->shallow_hash().mix(); // !!! want deep
-    }
-  };
-}
+  size_t operator ()(const std::shared_ptr<RootPointer<Value> > &x) const {
+    return (*x)->deep_hash(runtime->heap).mix();
+  }
+  bool operator ()(const std::shared_ptr<RootPointer<Value> > &x, const std::shared_ptr<RootPointer<Value> > &y) const {
+    return (*x)->deep_hash(runtime->heap) == (*y)->deep_hash(runtime->heap);
+  }
+};
 
-typedef std::unordered_map<std::shared_ptr<RootPointer<Value> >, size_t> ConstantPool;
+typedef std::unordered_map<std::shared_ptr<RootPointer<Value> >, size_t, DeepHash, DeepHash> ConstantPool;
 
 // In this pass, meta = the size of the AST & number of unapplied args
 static size_t make_meta(size_t size, size_t args) { return (size << 8) | args; }
@@ -38,10 +39,12 @@ static size_t meta_size(size_t meta) { return meta >> 8; }
 static size_t meta_args(size_t meta) { return meta & 255; }
 
 struct PassInline {
-  TermStream stream;
   ConstantPool pool;
+  TermStream stream;
   size_t threshold;
-  PassInline(TargetScope &scope, size_t threshold_, size_t start = 0) : stream(scope, start), threshold(threshold_) { }
+
+  PassInline(Runtime *runtime, TargetScope &scope, size_t threshold_, size_t start = 0)
+   : pool(128, DeepHash(runtime), DeepHash(runtime)), stream(scope, start), threshold(threshold_) { }
 };
 
 void RArg::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
@@ -93,7 +96,7 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
 
     if ((term->get(SSA_SINGLETON) || meta_size(term->meta) < p.threshold) && !term->get(SSA_RECURSIVE)) {
       auto fun = static_unique_pointer_cast<RFun>(term->clone());
-      PassInline q(p.stream.scope(), p.threshold, fnid); // refs up to fun are unmodified
+      PassInline q(nullptr, p.stream.scope(), p.threshold, fnid); // refs up to fun are unmodified
       q.pool = std::move(p.pool);
       q.stream.discard(); // discard name of inlined fn
       for (size_t i = fargs.size(); i > 0; --i)
@@ -186,7 +189,7 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
           f->terms.emplace_back(new RArg());
           f->terms.emplace_back(new RApp(des->args[i], fnid+1));
           f->terms.emplace_back(new RDes(std::move(cargs)));
-          PassInline q(p.stream.scope(), p.threshold, fnid); // refs up to fun are unmodified
+          PassInline q(nullptr, p.stream.scope(), p.threshold, fnid); // refs up to fun are unmodified
           q.pool = std::move(p.pool);
           f->pass_inline(q, std::unique_ptr<Term>(f));
           p.pool = std::move(q.pool);
@@ -250,9 +253,9 @@ void RFun::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   meta = make_meta(size, args);
 }
 
-std::unique_ptr<Term> Term::pass_inline(std::unique_ptr<Term> term, size_t threshold) {
+std::unique_ptr<Term> Term::pass_inline(std::unique_ptr<Term> term, size_t threshold, Runtime &runtime) {
   TargetScope scope;
-  PassInline pass(scope, threshold);
+  PassInline pass(&runtime, scope, threshold);
   term->pass_inline(pass, std::move(term));
   return scope.finish();
 }

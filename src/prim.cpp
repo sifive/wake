@@ -106,9 +106,9 @@ HeapStep Closure::explore_escape(HeapStep step) {
   return step;
 }
 
-static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
+static HeapHash deep_hash_imp(Heap &heap, HeapObject *obj) {
   std::unordered_map<uintptr_t, size_t> explored;
-  void *vscratch = runtime.heap.scratch(runtime.heap.used());
+  void *vscratch = heap.scratch(heap.used());
   HeapObject **scratch = static_cast<HeapObject**>(vscratch);
 
   HeapStep step;
@@ -142,6 +142,12 @@ static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
   return out;
 }
 
+Hash Value::deep_hash(Heap &heap) {
+  HeapHash x = deep_hash_imp(heap, this);
+  assert (!x.broken);
+  return x.code;
+}
+
 struct CHash final : public GCObject<CHash, Continuation> {
   HeapPointer<HeapObject> obj;
   HeapPointer<Continuation> cont;
@@ -163,7 +169,7 @@ void CHash::execute(Runtime &runtime) {
   MPZ out("0xffffFFFFffffFFFFffffFFFFffffFFFF"); // 128 bit
   runtime.heap.reserve(Integer::reserve(out));
 
-  auto hash = deep_hash(runtime, obj.get());
+  auto hash = deep_hash_imp(runtime.heap, obj.get());
   if (hash.broken) {
     next = nullptr; // reschedule
     hash.broken->await(runtime, this);
