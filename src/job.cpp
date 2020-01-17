@@ -887,7 +887,7 @@ Job::Job(Database *db_, String *dir_, String *stdin_, String *environ, String *c
 }
 
 Hash Job::hash() const {
-  return code;
+  return Hash(job);
 }
 
 #define JOB(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Job)); } while(0); Job *arg = static_cast<Job*>(args[i]);
