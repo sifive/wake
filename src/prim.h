@@ -132,7 +132,7 @@ Expr *force_use(Expr *expr);
  */
 #define PRIM_EFFECT	2
 
-#define PRIM_IMPURE	PRIM_EFFECT|PRIM_ORDERED
+#define PRIM_IMPURE	(PRIM_EFFECT|PRIM_ORDERED)
 
 /* This primitive has a function argument which it will invoke.
  * The status of the primitive depends on that argument.
