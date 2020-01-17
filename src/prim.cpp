@@ -119,9 +119,11 @@ static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
   Hash code;
   for (HeapObject **done = scratch; done != step.found; ++done) {
     HeapObject *head = *done;
+    assert (head->category() == VALUE);
+    Value *value = static_cast<Value*>(head);
 
     // Assign objects virtual addreses based on visitation order
-    uintptr_t key = reinterpret_cast<uintptr_t>(static_cast<void*>(head));
+    uintptr_t key = reinterpret_cast<uintptr_t>(static_cast<void*>(value));
     auto out = explored.insert(std::make_pair(key, done - scratch));
 
     // Include hash of child's virtual address
@@ -130,8 +132,8 @@ static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
     if (!out.second) continue;
 
     // Hash this object and enqueue its children for hashing
-    step = head->explore(step);
-    code = code + head->hash();
+    step = value->explore(step);
+    code = code + value->hash();
   }
 
   HeapHash out;

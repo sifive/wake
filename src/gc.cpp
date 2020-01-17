@@ -52,11 +52,6 @@ void PadObject::format(std::ostream &os, FormatState &state) const {
   os << "PadObject";
 }
 
-Hash PadObject::hash() const {
-  assert(0 /* unreachable */);
-  return Hash();
-}
-
 Category PadObject::category() const {
   assert(0 /* unreachable */);
   return VALUE;
@@ -81,11 +76,6 @@ HeapStep MovedObject::explore(HeapStep step) {
 
 void MovedObject::format(std::ostream &os, FormatState &state) const {
   to->format(os, state);
-}
-
-Hash MovedObject::hash() const {
-  assert(0 /* unreachable */);
-  return Hash();
 }
 
 Category MovedObject::category() const {

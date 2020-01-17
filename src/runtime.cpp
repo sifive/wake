@@ -41,11 +41,6 @@ void Work::format(std::ostream &os, FormatState &state) const {
   os << "Work";
 }
 
-Hash Work::hash() const {
-  assert(0 /* unreachable */);
-  return Hash();
-}
-
 Category Work::category() const {
   return WORK;
 }

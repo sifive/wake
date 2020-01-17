@@ -60,7 +60,6 @@ struct HeapObject {
   virtual HeapStep  explore(HeapStep step) = 0;
   virtual const char *type() const = 0;
   virtual void format(std::ostream &os, FormatState &state) const = 0;
-  virtual Hash hash() const = 0; // shallow hash of only this object
   virtual Category category() const = 0;
   virtual ~HeapObject();
 
@@ -201,7 +200,6 @@ struct PadObject final : public HeapObject {
   HeapStep  explore(HeapStep step) override;
   const char *type() const override;
   void format(std::ostream &os, FormatState &state) const override;
-  Hash hash() const override;
   Category category() const override;
   static PadObject *place(PadObject *free) {
     new(free) PadObject();
@@ -217,7 +215,6 @@ struct alignas(PadObject) MovedObject final : public HeapObject {
   HeapStep  explore(HeapStep step) override;
   const char *type() const override;
   void format(std::ostream &os, FormatState &state) const override;
-  Hash hash() const override;
   Category category() const override;
 };
 
@@ -373,8 +370,11 @@ const char *GCObject<T, B>::type() const {
 
 struct Value : public HeapObject {
   Category category() const override;
-  virtual size_t hashid() const;
+  // Shallow inspection of this object (including type)
   virtual bool operator == (const Value &x) const;
+  virtual Hash hash() const = 0;
+  // Deprecated:
+  virtual size_t hashid() const;
 };
 
 struct DestroyableObject : public Value {
