@@ -38,13 +38,22 @@ static size_t make_meta(size_t size, size_t args) { return (size << 8) | args; }
 static size_t meta_size(size_t meta) { return meta >> 8; }
 static size_t meta_args(size_t meta) { return meta & 255; }
 
-struct PassInline {
+struct PassInlineCommon {
+  TargetScope scope;
   ConstantPool pool;
-  TermStream stream;
   size_t threshold;
 
-  PassInline(Runtime *runtime, TargetScope &scope, size_t threshold_, size_t start = 0)
-   : pool(128, DeepHash(runtime), DeepHash(runtime)), stream(scope, start), threshold(threshold_) { }
+  PassInlineCommon(Runtime *runtime, size_t threshold_) :
+    scope(), pool(128, DeepHash(runtime), DeepHash(runtime)), threshold(threshold_) { }
+  Runtime *runtime() { return pool.hash_function().runtime; }
+};
+
+struct PassInline {
+  PassInlineCommon &common;
+  TermStream stream;
+
+  PassInline(PassInlineCommon &common_, size_t start = 0)
+   : common(common_), stream(common.scope, start) { }
 };
 
 void RArg::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
@@ -55,7 +64,7 @@ void RArg::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 void RLit::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   meta = make_meta(1, 0);
   size_t me = p.stream.scope().end();
-  auto ins = p.pool.insert(std::make_pair(value, me));
+  auto ins = p.common.pool.insert(std::make_pair(value, me));
   if (ins.second) {
     // First ever use of this constant
     p.stream.transfer(std::move(self));
@@ -94,10 +103,9 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
       term = p.stream[fnid];
     } while (term->id() == typeid(RApp));
 
-    if ((term->get(SSA_SINGLETON) || meta_size(term->meta) < p.threshold) && !term->get(SSA_RECURSIVE)) {
+    if ((term->get(SSA_SINGLETON) || meta_size(term->meta) < p.common.threshold) && !term->get(SSA_RECURSIVE)) {
       auto fun = static_unique_pointer_cast<RFun>(term->clone());
-      PassInline q(nullptr, p.stream.scope(), p.threshold, fnid); // refs up to fun are unmodified
-      q.pool = std::move(p.pool);
+      PassInline q(p.common, fnid); // refs up to fun are unmodified
       q.stream.discard(); // discard name of inlined fn
       for (size_t i = fargs.size(); i > 0; --i)
         q.stream.discard(fargs[i-1]); // bind arguments to inline function
@@ -107,7 +115,6 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
       }
       fun->update(q.stream.map());
       p.stream.discard(fun->output); // replace App with function output
-      p.pool = std::move(q.pool);
     } else {
       // Combine App() but don't inline
       args.clear();
@@ -189,10 +196,8 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
           f->terms.emplace_back(new RArg());
           f->terms.emplace_back(new RApp(des->args[i], fnid+1));
           f->terms.emplace_back(new RDes(std::move(cargs)));
-          PassInline q(nullptr, p.stream.scope(), p.threshold, fnid); // refs up to fun are unmodified
-          q.pool = std::move(p.pool);
+          PassInline q(p.common, fnid); // refs up to fun are unmodified
           f->pass_inline(q, std::unique_ptr<Term>(f));
-          p.pool = std::move(q.pool);
         }
         args = std::move(compose);
         args.push_back(des->args.back());
@@ -254,8 +259,8 @@ void RFun::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 }
 
 std::unique_ptr<Term> Term::pass_inline(std::unique_ptr<Term> term, size_t threshold, Runtime &runtime) {
-  TargetScope scope;
-  PassInline pass(&runtime, scope, threshold);
+  PassInlineCommon common(&runtime, threshold);
+  PassInline pass(common);
   term->pass_inline(pass, std::move(term));
-  return scope.finish();
+  return common.scope.finish();
 }
