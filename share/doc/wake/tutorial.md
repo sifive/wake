@@ -692,3 +692,36 @@ are also affected by `-v` and `-d`.
 You can construct an `Error` directly, or use `makeError` which simply takes a `String`
 cause and will record the Stack.
 
+### Ignore wake source files
+
+There are occasions where you want wake to ignore wake source files (`*.wake`).
+Examples include testing, where you could exclude some files from regular usage,
+or a directory structure that includes duplicate repository checkouts, where
+duplicate symbol definitions would raise an error.
+
+Wake can look for files named `.wakeignore` containing patterns.
+The pattern language is shell filename globbing with leading directory match.
+One pattern per line, each relative to the path of the `.wakeignore` file.
+Patterns will only match against files with the `.wake` filename extension.
+
+An example:
+
+    workspace
+        ├── wake.db
+        ├── repo1
+        │   └── foo.wake
+        └── repo2
+            ├── .wakeignore
+            └── repo1
+                └── foo.wake
+
+If `repo1` is checked-out out twice like above, then if a `.wakeignore` file
+at path `workspace/repo2` contained `repo1` then `foo.wake` would not
+be read twice.
+
+The following patterns in `workspace/repo2/.wakeignore` would all match
+the above `repo2/repo1/foo.wake`:
+
+    repo1
+    repo1/foo.wake
+    */*.wake
