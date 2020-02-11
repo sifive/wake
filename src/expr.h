@@ -37,16 +37,12 @@ struct Continuation;
 #define FLAG_TOUCHED   0x01 // already explored for _
 #define FLAG_AST       0x02 // useful to include in AST
 #define FLAG_RECURSIVE 0x04
-#define FLAG_USED      0x08
-#define FLAG_PURE      0x10
-#define FLAG_MOVED     0x20
 
 /* Expression AST */
 struct Expr {
   const TypeDescriptor *type;
   Location location;
   TypeVar typeVar;
-  Hash hashcode;
   uintptr_t meta;
   long flags;
 
@@ -57,7 +53,6 @@ struct Expr {
 
   std::string to_str() const;
   virtual void format(std::ostream &os, int depth) const = 0;
-  virtual Hash hash() = 0;
 };
 
 std::ostream & operator << (std::ostream &os, const Expr *expr);
@@ -73,7 +68,6 @@ struct Prim : public Expr {
   Prim(const Location &location_, const std::string &name_) : Expr(&type, location_), name(name_), args(0), pflags(0) { }
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 struct App : public Expr {
@@ -87,7 +81,6 @@ struct App : public Expr {
    : Expr(app), fn(), val() { }
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 struct Lambda : public Expr {
@@ -102,7 +95,6 @@ struct Lambda : public Expr {
    : Expr(lambda), name(lambda.name), fnname(lambda.fnname), body(), token(lambda.token) { }
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 struct VarRef : public Expr {
@@ -116,7 +108,6 @@ struct VarRef : public Expr {
    : Expr(&type, location_), name(name_), index(index_), lambda(nullptr), target(LOCATION) { }
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 struct Literal : public Expr {
@@ -127,7 +118,6 @@ struct Literal : public Expr {
   Literal(const Location &location_, RootPointer<Value> &&value_, TypeVar *litType_);
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 struct Pattern {
@@ -147,7 +137,6 @@ struct Match : public Expr {
    : Expr(&type, location_) { }
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 struct Subscribe : public Expr {
@@ -158,7 +147,6 @@ struct Subscribe : public Expr {
    : Expr(&type, location_), name(name_) { }
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 struct DefMap : public Expr {
@@ -182,7 +170,6 @@ struct DefMap : public Expr {
    : Expr(&type, location_), map(), pub(), body(nullptr) { }
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 struct Top : public Expr {
@@ -196,7 +183,6 @@ struct Top : public Expr {
   Top() : Expr(&type, LOCATION), defmaps(), globals() { }
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 // Created by transforming DefMap+Top
@@ -224,7 +210,6 @@ struct DefBinding : public Expr {
    : Expr(def), body(), val(), fun(), order(def.order), scc(def.scc) { }
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 // Created by transforming Data
@@ -239,7 +224,6 @@ struct Get : public Expr {
    : Expr(&type, location_), sum(sum_), cons(cons_), index(index_) { }
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 struct Construct : public Expr {
@@ -251,7 +235,6 @@ struct Construct : public Expr {
    : Expr(&type, location_), sum(sum_), cons(cons_) { }
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 struct Destruct : public Expr {
@@ -262,7 +245,6 @@ struct Destruct : public Expr {
    : Expr(&type, location_), sum(std::make_shared<Sum>(sum_)) { }
 
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 // A dummy expression never actually used in the AST
@@ -271,7 +253,6 @@ struct VarDef : public Expr {
   Location target; // for publishes
   VarDef(const Location &location_) : Expr(&type, location_), target(LOCATION) { }
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 // A dummy expression never actually used in the AST
@@ -279,7 +260,6 @@ struct VarArg : public Expr {
   static const TypeDescriptor type;
   VarArg(const Location &location_) : Expr(&type, location_) { }
   void format(std::ostream &os, int depth) const override;
-  Hash hash() override;
 };
 
 #endif
