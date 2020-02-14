@@ -74,7 +74,7 @@ global def mkdir path =
     Nil      = panic "impossible"
   path | simplify | tokenize `/` | root
 
-def writeImp inputs mode path content =
+target writeImp inputs mode path content =
   def writeRunner =
     def imp m p c = prim "write"
     def pre input = Pair input Unit
