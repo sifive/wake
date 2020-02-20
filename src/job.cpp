@@ -86,8 +86,8 @@ struct Job final : public GCObject<Job, Value> {
   long job;
   bool keep;
   int log;
-  HeapPointer<HeapObject> bad_launch;
-  HeapPointer<HeapObject> bad_finish;
+  HeapPointer<Value> bad_launch;
+  HeapPointer<Value> bad_finish;
   double pathtime;
   Usage record;  // retrieved from DB (user-facing usage)
   Usage predict; // prediction of Runners given record (used by scheduler)
@@ -892,7 +892,7 @@ Hash Job::hash() const {
 
 #define JOB(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Job)); } while(0); Job *arg = static_cast<Job*>(args[i]);
 
-static void parse_usage(Usage *usage, HeapObject **args, Runtime &runtime, Scope *scope) {
+static void parse_usage(Usage *usage, Value **args, Runtime &runtime, Scope *scope) {
   INTEGER_MPZ(status, 0);
   DOUBLE(rtime, 1);
   DOUBLE(ctime, 2);
@@ -1142,8 +1142,8 @@ static size_t reserve_tree(const std::vector<FileReflection> &files) {
   return need;
 }
 
-static HeapObject *claim_tree(Heap &h, const std::vector<FileReflection> &files) {
-  std::vector<HeapObject*> vals;
+static Value *claim_tree(Heap &h, const std::vector<FileReflection> &files) {
+  std::vector<Value*> vals;
   vals.reserve(files.size());
   for (auto &i : files)
     vals.emplace_back(claim_tuple2(h,
@@ -1210,7 +1210,7 @@ static PRIMFN(prim_job_cache) {
   size_t need = reserve_tuple2() + reserve_tree(files) + reserve_list(1) + Job::reserve();
   runtime.heap.reserve(need);
 
-  HeapObject *joblist;
+  Value *joblist;
   if (reuse.found && !jobtable->imp->check) {
     Job *jobp = Job::claim(runtime.heap, jobtable->imp->db, dir, stdin, env, cmd, true, 0);
     jobp->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED|STATE_FINISHED;
@@ -1221,7 +1221,7 @@ static PRIMFN(prim_job_cache) {
     jobp->reality = reuse;
     jobp->pathtime = pathtime;
 
-    HeapObject *obj = jobp;
+    Value *obj = jobp;
     joblist = claim_list(runtime.heap, 1, &obj);
 
     // Even though this job is not run, it might have been the 'next' job of something that DID run
@@ -1258,7 +1258,7 @@ static size_t reserve_usage(const Usage &usage) {
        + reserve_tuple2() * 5;
 }
 
-static HeapObject *claim_usage(Heap &h, const Usage &usage) {
+static Value *claim_usage(Heap &h, const Usage &usage) {
   MPZ s(usage.status);
   MPZ m(usage.membytes);
   MPZ i(usage.ibytes);
@@ -1596,7 +1596,7 @@ static PRIMFN(prim_job_record) {
   runtime.heap.reserve(need);
 
   if (job->record.found) {
-    HeapObject *obj = claim_usage(runtime.heap, job->record);
+    Value *obj = claim_usage(runtime.heap, job->record);
     RETURN(claim_list(runtime.heap, 1, &obj));
   } else {
     RETURN(claim_list(runtime.heap, 0, nullptr));

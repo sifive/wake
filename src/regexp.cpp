@@ -143,7 +143,7 @@ static PRIMFN(prim_extract) {
     runtime.heap.reserve(need);
     // NOTE: if there is not enough space, this routine will be re-entered.
     // This means submatches is recomputed with fresh/correct heap locations.
-    HeapObject *out[matches];
+    Value *out[matches];
     for (int i = 0; i < matches; ++i) {
       re2::StringPiece &p = submatch[i+1];
       out[i] = String::claim(runtime.heap, p.data(), p.size());
@@ -213,7 +213,7 @@ static PRIMFN(prim_tokenize) {
   // NOTE: if there is not enough space, this routine will be re-entered.
   // This means tokens is recomputed with fresh/correct heap locations.
 
-  HeapObject *out[tokens.size()];
+  Value *out[tokens.size()];
   for (size_t i = 0; i < tokens.size(); ++i) {
     re2::StringPiece &p = tokens[i];
     out[i] = String::claim(runtime.heap, p.data(), p.size());

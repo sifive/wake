@@ -111,7 +111,7 @@ static PRIMTYPE(type_hash) {
 static PRIMFN(prim_hash) {
   runtime.heap.reserve(Tuple::fulfiller_pads + reserve_list(nargs) + reserve_hash());
   Continuation *continuation = scope->claim_fulfiller(runtime, output);
-  HeapObject *list = claim_list(runtime.heap, nargs, args);
+  Value *list = claim_list(runtime.heap, nargs, args);
   runtime.schedule(claim_hash(runtime.heap, list, continuation));
 }
 

@@ -44,7 +44,7 @@ static PRIMFN(prim_stack) {
   need += reserve_list(list.size());
   runtime.heap.reserve(need);
 
-  std::vector<HeapObject*> objs;
+  std::vector<Value*> objs;
   objs.reserve(list.size());
   for (auto &s : list)
     objs.push_back(String::claim(runtime.heap, s));

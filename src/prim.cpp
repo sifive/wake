@@ -39,7 +39,7 @@ void require_fail(const char *message, unsigned size, Runtime &runtime, const Sc
   runtime.abort = true;
 }
 
-HeapObject *alloc_order(Heap &h, int x) {
+Value *alloc_order(Heap &h, int x) {
   int m;
   if (x < 0) m = 0;
   else if (x > 0) m = 2;
@@ -47,32 +47,32 @@ HeapObject *alloc_order(Heap &h, int x) {
   return Record::alloc(h, &Order->members[m], 0);
 }
 
-HeapObject *alloc_nil(Heap &h) {
+Value *alloc_nil(Heap &h) {
   return Record::alloc(h, &List->members[0], 0);
 }
 
-HeapObject *claim_unit(Heap &h) {
+Value *claim_unit(Heap &h) {
   return Record::claim(h, &Unit->members[0], 0);
 }
 
-HeapObject *claim_bool(Heap &h, bool x) {
+Value *claim_bool(Heap &h, bool x) {
   return Record::claim(h, &Boolean->members[x?0:1], 0);
 }
 
-HeapObject *claim_tuple2(Heap &h, HeapObject *first, HeapObject *second) {
+Value *claim_tuple2(Heap &h, Value *first, Value *second) {
   Record *out = Record::claim(h, &Pair->members[0], 2);
   out->at(0)->instant_fulfill(first);
   out->at(1)->instant_fulfill(second);
   return out;
 }
 
-HeapObject *claim_result(Heap &h, bool ok, HeapObject *value) {
+Value *claim_result(Heap &h, bool ok, Value *value) {
   Record *out = Record::claim(h, &Result->members[ok?0:1], 1);
   out->at(0)->instant_fulfill(value);
   return out;
 }
 
-HeapObject *claim_list(Heap &h, size_t elements, HeapObject** values) {
+Value *claim_list(Heap &h, size_t elements, Value** values) {
   Record *out = Record::claim(h, &List->members[0], 0);
   while (elements) {
     --elements;
@@ -183,7 +183,7 @@ size_t reserve_hash() {
   return CHash::reserve();
 }
 
-Work *claim_hash(Heap &h, HeapObject *value, Continuation *continuation) {
+Work *claim_hash(Heap &h, Value *value, Continuation *continuation) {
   return CHash::claim(h, value, continuation);
 }
 

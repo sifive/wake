@@ -155,7 +155,7 @@ static PRIMFN(prim_explode) {
   size_t need = reserve_list(arg0->size()) + arg0->size() * String::reserve(4);
   runtime.heap.reserve(need);
 
-  std::vector<HeapObject*> vals;
+  std::vector<Value*> vals;
   uint32_t rune;
 
   int got;
@@ -293,7 +293,7 @@ static PRIMFN(prim_getenv) {
     size_t len = strlen(env);
     size_t need = reserve_list(1) + String::reserve(len);
     runtime.heap.reserve(need);
-    HeapObject *out = String::claim(runtime.heap, env, len);
+    Value *out = String::claim(runtime.heap, env, len);
     RETURN(claim_list(runtime.heap, 1, &out));
   } else {
     RETURN(alloc_nil(runtime.heap));

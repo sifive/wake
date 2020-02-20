@@ -148,7 +148,7 @@ static PRIMFN(prim_dbl) {
   } else {
     size_t need = Double::reserve() + reserve_list(1);
     runtime.heap.reserve(need);
-    HeapObject *out = Double::claim(runtime.heap, val);
+    Value *out = Double::claim(runtime.heap, val);
     RETURN(claim_list(runtime.heap, 1, &out));
   }
 }

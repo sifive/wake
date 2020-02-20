@@ -57,13 +57,13 @@ static size_t measure_jast(const JAST &jast) {
   }
 }
 
-static HeapObject *getJValue(Heap &h, HeapObject *value, int member) {
+static Value *getJValue(Heap &h, Value *value, int member) {
   Record *out = Record::claim(h, &JValue->members[member], 1);
   out->at(0)->instant_fulfill(value);
   return out;
 }
 
-static HeapObject *convert_jast(Heap &h, const JAST &jast) {
+static Value *convert_jast(Heap &h, const JAST &jast) {
   switch (jast.kind) {
     case JSON_NULLVAL:  return Record::claim(h, &JValue->members[4], 0);
     case JSON_TRUE:     return getJValue(h, claim_bool(h, true),  3);
@@ -74,7 +74,7 @@ static HeapObject *convert_jast(Heap &h, const JAST &jast) {
     case JSON_NAN:      return getJValue(h, Double::claim(h, nan()), 2);
     case JSON_STR:      return getJValue(h, String::claim(h, jast.value), 0);
     case JSON_OBJECT: {
-      std::vector<HeapObject*> values;
+      std::vector<Value*> values;
       values.reserve(jast.children.size());
       for (auto &c : jast.children)
         values.emplace_back(claim_tuple2(h, 
@@ -83,7 +83,7 @@ static HeapObject *convert_jast(Heap &h, const JAST &jast) {
       return getJValue(h, claim_list(h, values.size(), values.data()), 5);
     }
     case JSON_ARRAY: {
-      std::vector<HeapObject*> values;
+      std::vector<Value*> values;
       values.reserve(jast.children.size());
       for (auto &c : jast.children)
         values.emplace_back(convert_jast(h, c.second));

@@ -173,7 +173,7 @@ static PRIMFN(prim_int) {
   if (ok && !mpz_set_str(val.value, arg1->c_str(), base)) {
     size_t need = Integer::reserve(val) + reserve_list(1);
     runtime.heap.reserve(need);
-    HeapObject *x = Integer::claim(runtime.heap, val);
+    Value *x = Integer::claim(runtime.heap, val);
     RETURN(claim_list(runtime.heap, 1, &x));
   } else {
     RETURN(alloc_nil(runtime.heap));

@@ -22,13 +22,13 @@
 #include <vector>
 
 struct Scope;
-struct HeapObject;
+struct Value;
 struct Runtime;
 struct TypeVar;
 
 typedef bool (*PrimType)(const std::vector<TypeVar*> &args, TypeVar *out);
-typedef void (*PrimFn)(void *data, Runtime &runtime, Scope *scope, size_t output, size_t nargs, HeapObject **args);
+typedef void (*PrimFn)(void *data, Runtime &runtime, Scope *scope, size_t output, size_t nargs, Value **args);
 #define PRIMTYPE(name) bool name(const std::vector<TypeVar*> &args, TypeVar *out)
-#define PRIMFN(name) void name(void *data, Runtime &runtime, Scope *scope, size_t output, size_t nargs, HeapObject** args)
+#define PRIMFN(name) void name(void *data, Runtime &runtime, Scope *scope, size_t output, size_t nargs, Value** args)
 
 #endif
