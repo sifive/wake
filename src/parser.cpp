@@ -1107,13 +1107,6 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   }
 
   bind_def(lex, map, Definition("destruct " + name, sump->token, destructfn), global?top:0);
-  for (auto &cons : sump->members) {
-    for (size_t i = 0; i < cons.ast.args.size(); ++i) {
-      Expr *body = new Lambda(sump->token, "_", new Get(sump->token, sump, &cons, i));
-      std::string name = "get " + cons.ast.name + " " + std::to_string(i);
-      bind_def(lex, map, Definition(name, sump->token, body), global?top:0);
-    }
-  }
 
   if (sump->members.size() == 1) {
     Constructor &cons = sump->members[0];
