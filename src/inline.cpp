@@ -190,7 +190,8 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
         for (unsigned i = 0; i < des->args.size()-1; ++i) {
           size_t fnid = p.stream.scope().end();
           compose.push_back(fnid);
-          RFun *f = new RFun(LOCATION, label.c_str(), 0, fnid+3);
+          RFun *prior = static_cast<RFun*>(p.stream[des->args[i]]);
+          RFun *f = new RFun(prior->location, prior->label.c_str(), 0, fnid+3);
           std::vector<size_t> cargs(args);
           cargs.back() = fnid+2;
           f->terms.emplace_back(new RArg());
