@@ -221,14 +221,15 @@ static Expr *parse_match(int p, Lexer &lex) {
         if (typeid(*obj) == typeid(Double)) comparison = "dcmp";
       }
       if (!guard) guard = new VarRef(e->location, "True");
-      guard = new App(e->location, new App(e->location, new App(e->location, new App(e->location,
-        new VarRef(e->location, "destruct Order"),
-        new Lambda(e->location, "_", new VarRef(e->location, "False"), " ")),
-        new Lambda(e->location, "_", guard, " ")),
-        new Lambda(e->location, "_", new VarRef(e->location, "False"), " ")),
-        new App(e->location, new App(e->location,
+
+      Match *match = new Match(e->location);
+      match->args.emplace_back(new App(e->location, new App(e->location,
           new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison), " ")),
           e), new VarRef(e->location, "_ k" + std::to_string(i))));
+      match->patterns.emplace_back(AST(e->location, "LT"), new VarRef(e->location, "False"), nullptr);
+      match->patterns.emplace_back(AST(e->location, "GT"), new VarRef(e->location, "False"), nullptr);
+      match->patterns.emplace_back(AST(e->location, "EQ"), guard, nullptr);
+      guard = match;
     }
 
     if (expect(EQUALS, lex)) lex.consume();
@@ -373,11 +374,10 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (expect(ELSE, lex)) lex.consume();
       auto elseE = parse_block(lex, multiline);
       l.end = elseE->location.end;
-      App *out = new App(l, new App(l, new App(l,
-        new VarRef(l, "destruct Boolean"),
-        new Lambda(l, "_", thenE, " .then")),
-        new Lambda(l, "_", elseE, " .else")),
-        condE);
+      Match *out = new Match(l);
+      out->args.emplace_back(condE);
+      out->patterns.emplace_back(AST(l, "True"),  thenE, nullptr);
+      out->patterns.emplace_back(AST(l, "False"), elseE, nullptr);
       out->flags |= FLAG_AST;
       return out;
     }
