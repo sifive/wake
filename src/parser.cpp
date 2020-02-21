@@ -899,10 +899,9 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   }
 
   std::string name = def.name;
-  std::string tname = "destruct " + name;
-  Sum sum(std::move(def));
-  AST tuple(sum.token, std::string(sum.name));
-  tuple.region = sum.region;
+  std::shared_ptr<Sum> sump = std::make_shared<Sum>(std::move(def));
+  AST tuple(sump->token, std::string(sump->name));
+  tuple.region = sump->region;
   std::vector<bool> members;
 
   if (!expect(INDENT, lex)) return;
@@ -943,15 +942,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     }
   }
 
-  sum.addConstructor(std::move(tuple));
-
-  Location location = sum.token;
-  Destruct *destruct = new Destruct(location, std::move(sum));
-  std::shared_ptr<Sum> sump = destruct->sum;
-  Expr *destructfn =
-    new Lambda(sump->token, "_",
-    new Lambda(sump->token, "_",
-    destruct));
+  sump->addConstructor(std::move(tuple));
 
   Constructor &c = sump->members.back();
   Expr *construct = new Construct(c.ast.token, sump, &c);
@@ -959,7 +950,6 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     construct = new Lambda(c.ast.token, c.ast.args[i-1].tag, construct);
 
   bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
-  bind_def(lex, map, Definition(tname, c.ast.token, destructfn), global?top:0);
 
   check_special(lex, name, sump);
 
@@ -1058,7 +1048,7 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   AST def = parse_type_def(lex);
   if (!def) return;
 
-  Sum sum(std::move(def));
+  auto sump = std::make_shared<Sum>(std::move(def));
 
   if (lex.next.type == INDENT) {
     lex.consume();
@@ -1066,7 +1056,7 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
 
     bool repeat = true;
     while (repeat) {
-      parse_data_elt(lex, sum);
+      parse_data_elt(lex, *sump);
       switch (lex.next.type) {
         case DEDENT:
           repeat = false;
@@ -1087,18 +1077,11 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
       }
     }
   } else {
-    parse_data_elt(lex, sum);
+    parse_data_elt(lex, *sump);
     lex.consume();
   }
 
-  std::string name = sum.name;
-  Location location = sum.token;
-  Destruct *destruct = new Destruct(location, std::move(sum));
-  std::shared_ptr<Sum> sump = destruct->sum;
-  Expr *destructfn = new Lambda(sump->token, "_", destruct);
-
   for (auto &c : sump->members) {
-    destructfn = new Lambda(sump->token, "_", destructfn);
     Expr *construct = new Construct(c.ast.token, sump, &c);
     for (size_t i = 0; i < c.ast.args.size(); ++i)
       construct = new Lambda(c.ast.token, "_", construct);
@@ -1106,20 +1089,18 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
   }
 
-  bind_def(lex, map, Definition("destruct " + name, sump->token, destructfn), global?top:0);
-
   if (sump->members.size() == 1) {
     Constructor &cons = sump->members[0];
     std::stringstream s;
     for (size_t i = 0; i < cons.ast.args.size(); ++i) {
       Expr *body = new Lambda(sump->token, "_", new Get(sump->token, sump, &cons, i));
       std::stringstream s;
-      s << "get" << name << ":" << cons.ast.args.size() << ":" << i;
+      s << "get" << sump->name << ":" << cons.ast.args.size() << ":" << i;
       bind_def(lex, map, Definition(s.str(), sump->token, body), global?top:0);
     }
   }
 
-  check_special(lex, name, sump);
+  check_special(lex, sump->name, sump);
 }
 
 static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
