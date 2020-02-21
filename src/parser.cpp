@@ -966,12 +966,6 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     Expr *getfn = new Lambda(memberToken, "_", new Get(memberToken, sump, &c, i));
     bind_def(lex, map, Definition(get, memberToken, getfn), global?top:0);
 
-    // Implement def extractor methods
-    std::stringstream s;
-    s << "get" << name << ":" << c.ast.args.size() << ":" << i;
-    Expr *egetfn = new Lambda(memberToken, "_", new Get(memberToken, sump, &c, i));
-    bind_def(lex, map, Definition(s.str(), memberToken, egetfn), global?top:0);
-
     // Implement edit methods
     DefMap *editmap = new DefMap(memberToken);
     editmap->body = std::unique_ptr<Expr>(new Construct(memberToken, sump, &c));
@@ -1087,17 +1081,6 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
       construct = new Lambda(c.ast.token, "_", construct);
 
     bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
-  }
-
-  if (sump->members.size() == 1) {
-    Constructor &cons = sump->members[0];
-    std::stringstream s;
-    for (size_t i = 0; i < cons.ast.args.size(); ++i) {
-      Expr *body = new Lambda(sump->token, "_", new Get(sump->token, sump, &cons, i));
-      std::stringstream s;
-      s << "get" << sump->name << ":" << cons.ast.args.size() << ":" << i;
-      bind_def(lex, map, Definition(s.str(), sump->token, body), global?top:0);
-    }
   }
 
   check_special(lex, sump->name, sump);
