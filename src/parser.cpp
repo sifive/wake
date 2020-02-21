@@ -455,17 +455,17 @@ struct Definition {
 static void extract_def(std::vector<Definition> &out, long index, AST &&ast, Expr *body) {
   std::string key = "extract " + std::to_string(++index);
   out.emplace_back(key, ast.token, body);
-  long x = 0;
   for (auto &m : ast.args) {
-    std::stringstream s;
-    s << "get" << ast.name << ":" << ast.args.size() << ":" << x++;
-    Expr *sub = new App(m.token,
-      new VarRef(m.token, s.str()),
-      new VarRef(body->location, key));
+    AST pattern(m.token, std::string(ast.name));
+    std::string mname("_" + m.name);
+    for (auto &n : ast.args) pattern.args.push_back(AST(m.token, &n == &m ? mname : "_"));
+    Match *match = new Match(m.token);
+    match->args.emplace_back(new VarRef(body->location, key));
+    match->patterns.emplace_back(std::move(pattern), new VarRef(m.token, mname), nullptr);
     if (Lexer::isUpper(m.name.c_str()) || Lexer::isOperator(m.name.c_str())) {
-      extract_def(out, index, std::move(m), sub);
+      extract_def(out, index, std::move(m), match);
     } else {
-      out.emplace_back(m.name, m.token, sub);
+      out.emplace_back(m.name, m.token, match);
     }
   }
 }

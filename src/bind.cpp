@@ -797,19 +797,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     VarRef *ref = static_cast<VarRef*>(expr);
     NameRef pos;
     if ((pos = binding->find(ref->name)).index == -1) {
-      size_t off = ref->name.find(':');
-      if (off != std::string::npos) {
-        size_t off2 = ref->name.find(':', off+1);
-        if (ref->name.back() == '0')
-          std::cerr << "Tuple '"
-            << ref->name.substr(3, off-3) << "' with "
-            << ref->name.substr(off+1, off2-off-1) << " arguments does not exist at "
-            << ref->location.file() << std::endl;
-        return false;
-      } else {
-        std::cerr << "Variable reference '" << ref->name << "' is unbound at "
-          << ref->location.file() << std::endl;
-      }
+      std::cerr << "Variable reference '" << ref->name << "' is unbound at "
+        << ref->location.file() << std::endl;
       return false;
     }
     ref->index = pos.index;
