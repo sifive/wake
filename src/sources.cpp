@@ -344,6 +344,15 @@ bool get_ignore_patterns(std::string& file, std::vector<std::string>& patterns) 
   std::string line;
   if (in.is_open()) {
     while(std::getline(in, line)) {
+      // strip trailing whitespace (including windows CR)
+      size_t found = line.find_last_not_of(" \t\f\v\n\r");
+      if (found != std::string::npos) {
+        line.erase(found+1);
+      } else {
+        line.clear(); // entirely whitespace
+      }
+      // allow empty lines and comments
+      if (line == "" || line[0] == '#') continue;
       patterns.emplace_back(std::move(line));
     }
     in.close();
