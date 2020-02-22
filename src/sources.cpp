@@ -391,7 +391,7 @@ void filter_ignore_patterns(std::vector<std::string>& wake_paths) {
     // Get the path prefix of the ignore_path.
     // dirname() modifies its argument.
     auto ignore_path = *ip;
-    auto ignore_prefix = std::string(dirname(strdup(ignore_path.c_str())));
+    auto ignore_prefix = std::string(dirname(strdup(ignore_path.c_str()))); // this leaks memory
 
     for (auto wp = wake_paths.begin(); wp != wake_paths.end(); ) {
       std::string wake_path = *wp;
