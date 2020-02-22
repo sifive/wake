@@ -325,7 +325,7 @@ void extract_wakeignore_paths(std::vector<std::string>& paths, std::vector<std::
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
-  RE2 exp("(.*/)*\\.wakeignore", options);
+  RE2 exp("(?s)(.*/)*\\.wakeignore", options);
 
   // erase() provides a new iterator to handle the invalidation
   for (auto p = paths.begin(); p < paths.end(); /**/) {
@@ -420,9 +420,9 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace) {
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
-  std::string wakefiles = "((?s).*[^/]\\.wake)";
+  std::string wakefiles = "(.*[^/]\\.wake)";
   std::string ignorefiles = "((.*/)*\\.wakeignore)";
-  RE2 exp(wakefiles + "|" + ignorefiles, options);
+  RE2 exp("(?s)" + wakefiles + "|" + ignorefiles, options);
 
   std::string abs_libdir = find_execpath() + "/../share/wake/lib";
   std::string rel_libdir = make_relative(get_cwd(), make_canonical(abs_libdir));
