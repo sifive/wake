@@ -413,6 +413,7 @@ void filter_ignore_patterns(std::vector<std::string>& wake_paths) {
         relative_wake_path = no_prefix;
       }
 
+      // this re-reads the .wakeignore file over and over
       if ((has_common_prefix || root_prefix) &&
           match(ignore_path, relative_wake_path)) {
 
