@@ -699,10 +699,19 @@ Examples include testing, where you could exclude some files from regular usage,
 or a directory structure that includes duplicate repository checkouts, where
 duplicate symbol definitions would raise an error.
 
-Wake can look for files named `.wakeignore` containing patterns.
-The pattern language is shell filename globbing with leading directory match.
+Wake looks for files named `.wakeignore` containing patterns.
+The pattern language is shell filename globbing.
 One pattern per line, each relative to the path of the `.wakeignore` file.
-Patterns will only match against files with the `.wake` filename extension.
+
+The concrete syntax is:
+- empty lines are ignored
+- lines starting with a `#` are comments and are ignored
+- `?` matches a single non-slash character
+- `*` matches any number (including zero) of non-slash characters
+- `[a-z]` matches a single lower-case character
+- `/**/` in an expression like `foo/**/bar` stands in for any number of directories (including zero)
+- `foo/**` recursively matches all contents of the directory `foo`
+- `**/bar` matches all files `bar` contained in this directory or any subdirectory
 
 An example:
 
@@ -716,12 +725,13 @@ An example:
                 └── foo.wake
 
 If `repo1` is checked-out out twice like above, then if a `.wakeignore` file
-at path `workspace/repo2` contained `repo1` then `foo.wake` would not
+at path `workspace/repo2` contained `repo1/**` then `foo.wake` would not
 be read twice.
 
 The following patterns in `workspace/repo2/.wakeignore` would all match
-the above `repo2/repo1/foo.wake`:
+the above `foo.wake`:
 
-    repo1
     repo1/foo.wake
-    */*.wake
+    repo1/**
+    repo1/**/foo.wake
+    **/[a-z]?[o].wake

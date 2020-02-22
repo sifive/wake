@@ -27,7 +27,7 @@ prereq off
 msg=$(wake)
 check "Wake should raise error for repeated symbol" [ $? -ne 0 ]
 
-echo "repo1" > other_dir/.wakeignore
+echo "repo1/**" > other_dir/.wakeignore
 msg=$(wake)
 check "Wake should ignore repeated symbol" [ $? -eq 0 ]
 
