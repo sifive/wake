@@ -23,7 +23,6 @@
 #include "execpath.h"
 #include "datatype.h"
 
-#include <libgen.h>
 #include <re2/re2.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -34,11 +33,9 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
-#include <fnmatch.h>
 #include <cstring>
 #include <sstream>
 #include <iostream>
-#include <fstream>
 #include <algorithm>
 
 bool make_workspace(const std::string &dir) {
@@ -321,118 +318,11 @@ static std::string make_relative(std::string &&dir, std::string &&path) {
   return x;
 }
 
-void extract_wakeignore_paths(std::vector<std::string>& paths, std::vector<std::string>& ignore_paths) {
-  RE2::Options options;
-  options.set_log_errors(false);
-  options.set_one_line(true);
-  RE2 exp("(?s)(.*/)*\\.wakeignore", options);
-
-  // erase() provides a new iterator to handle the invalidation
-  for (auto p = paths.begin(); p != paths.end(); /**/) {
-    std::string &path = *p;
-    if (RE2::FullMatch(path, exp)) {
-        ignore_paths.emplace_back(std::move(path));
-        p = paths.erase(p);
-    } else {
-        ++p;
-    }
-  }
-}
-
-bool get_ignore_patterns(std::string& file, std::vector<std::string>& patterns) {
-  std::ifstream in(file);
-  std::string line;
-  if (in.is_open()) {
-    while(std::getline(in, line)) {
-      // strip trailing whitespace (including windows CR)
-      size_t found = line.find_last_not_of(" \t\f\v\n\r");
-      if (found != std::string::npos) {
-        line.erase(found+1);
-      } else {
-        line.clear(); // entirely whitespace
-      }
-      // allow empty lines and comments
-      if (line == "" || line[0] == '#') continue;
-      patterns.emplace_back(std::move(line));
-    }
-    in.close();
-  } else {
-    std::cerr << "Failed to read " << file << std::endl;
-    return false;
-  }
-  return true;
-}
-
-bool match(std::string ignore_path, std::string wake_path) {
-  // Extract patterns from the .wakeignore file
-  std::vector<std::string> patterns;
-  get_ignore_patterns(ignore_path, patterns);
-
-  // Use fnmatch to implement glob-like patterns
-  for (auto p = patterns.begin(); p != patterns.end(); ++p) {
-    auto pattern = p->c_str();
-    auto candidate = wake_path.c_str();
-    if (fnmatch(pattern, candidate, FNM_PATHNAME) == 0) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// For each .wakeignore file, check to see if the *.wake source file
-// matches the pattern in the .wakeignore file.
-// For .wakeignore files that are not at the root of the workspace,
-// the relative path is taken into account.
-void filter_ignore_patterns(std::vector<std::string>& wake_paths) {
-  std::vector<std::string> ignore_paths;
-  extract_wakeignore_paths(wake_paths, ignore_paths);
-
-  for (auto ip = ignore_paths.begin(); ip != ignore_paths.end(); ++ip) {
-    // Get the path prefix of the ignore_path.
-    // dirname() modifies its argument.
-    auto ignore_path = *ip;
-    auto ignore_prefix = std::string(dirname(strdup(ignore_path.c_str()))); // this leaks memory
-
-    for (auto wp = wake_paths.begin(); wp != wake_paths.end(); ) {
-      std::string wake_path = *wp;
-
-      // Only process deeper into the path
-      if (wake_path.compare(0, 2, "..") == 0) {
-        ++wp;
-        continue;
-      }
-
-      auto has_common_prefix = wake_path.compare(0, ignore_prefix.length(), ignore_prefix) == 0;
-      auto root_prefix = ignore_prefix.compare(".") == 0;
-      auto relative_wake_path = wake_path;
-
-      if (has_common_prefix && !root_prefix) {
-        // If the prefix is not '.' then it has a '/' to also be removed.
-        std::string no_prefix(wake_path);
-        no_prefix.erase(0, ignore_prefix.length()+1);
-        relative_wake_path = no_prefix;
-      }
-
-      // this re-reads the .wakeignore file over and over
-      if ((has_common_prefix || root_prefix) &&
-          match(ignore_path, relative_wake_path)) {
-
-        std::cerr << "- Not processing wake source '" << wake_path << "' due to '" << ignore_path << "'" << std::endl;
-        wp = wake_paths.erase(wp);
-      } else {
-        ++wp;
-      }
-    }
-  }
-}
-
 std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace) {
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
-  std::string wakefiles = "(.*[^/]\\.wake)";
-  std::string ignorefiles = "((.*/)*\\.wakeignore)";
-  RE2 exp("(?s)" + wakefiles + "|" + ignorefiles, options);
+  RE2 exp("(?s).*[^/]\\.wake", options);
 
   std::string abs_libdir = find_execpath() + "/../share/wake/lib";
   std::string rel_libdir = make_relative(get_cwd(), make_canonical(abs_libdir));
@@ -445,9 +335,6 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace) {
   std::sort(acc.begin(), acc.end());
   auto it = std::unique(acc.begin(), acc.end());
   acc.resize(std::distance(acc.begin(), it));
-
-  // Remove .wake source files based on patterns in .wakeignore files
-  filter_ignore_patterns(acc);
 
   return acc;
 }
