@@ -372,7 +372,7 @@ bool match(std::string ignore_path, std::string wake_path) {
   for (auto p = patterns.begin(); p != patterns.end(); ++p) {
     auto pattern = p->c_str();
     auto candidate = wake_path.c_str();
-    if (fnmatch(pattern, candidate, FNM_LEADING_DIR) == 0) {
+    if (fnmatch(pattern, candidate, FNM_PATHNAME) == 0) {
       return true;
     }
   }
