@@ -421,7 +421,6 @@ static void filter_wakefiles(std::vector<std::string> &wakefiles, bool verbose) 
     bool skip = false;
     for (auto &filter : filters) {
       re2::StringPiece piece(wakefile.c_str() + filter.prefix, wakefile.size() - filter.prefix);
-      std::cerr << piece << std::endl;
       if (RE2::FullMatch(piece, *filter.exp)) {
         if (verbose) {
           fprintf(stderr, "Skipping %s due to %s.wakeignore\n",
@@ -440,7 +439,7 @@ static void filter_wakefiles(std::vector<std::string> &wakefiles, bool verbose) 
   }
 }
 
-std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace) {
+std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose) {
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
@@ -458,7 +457,7 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace) {
   auto it = std::unique(acc.begin(), acc.end());
   acc.resize(std::distance(acc.begin(), it));
 
-  filter_wakefiles(acc, true);
+  filter_wakefiles(acc, verbose);
 
   return acc;
 }
