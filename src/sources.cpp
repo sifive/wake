@@ -329,9 +329,9 @@ void extract_wakeignore_paths(std::vector<std::string>& paths, std::vector<std::
 
   // erase() provides a new iterator to handle the invalidation
   for (auto p = paths.begin(); p != paths.end(); /**/) {
-    auto path = *p;
+    std::string &path = *p;
     if (RE2::FullMatch(path, exp)) {
-        ignore_paths.push_back(path);
+        ignore_paths.emplace_back(std::move(path));
         p = paths.erase(p);
     } else {
         p++;
@@ -344,7 +344,7 @@ bool get_ignore_patterns(std::string& file, std::vector<std::string>& patterns) 
   std::string line;
   if (in.is_open()) {
     while(std::getline(in, line)) {
-      patterns.push_back(line);
+      patterns.emplace_back(std::move(line));
     }
     in.close();
   } else {
