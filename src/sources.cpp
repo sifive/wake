@@ -328,7 +328,7 @@ void extract_wakeignore_paths(std::vector<std::string>& paths, std::vector<std::
   RE2 exp("(?s)(.*/)*\\.wakeignore", options);
 
   // erase() provides a new iterator to handle the invalidation
-  for (auto p = paths.begin(); p < paths.end(); /**/) {
+  for (auto p = paths.begin(); p != paths.end(); /**/) {
     auto path = *p;
     if (RE2::FullMatch(path, exp)) {
         ignore_paths.push_back(path);
@@ -360,7 +360,7 @@ bool match(std::string ignore_path, std::string wake_path) {
   get_ignore_patterns(ignore_path, patterns);
 
   // Use fnmatch to implement glob-like patterns
-  for (auto p = patterns.begin(); p < patterns.end(); p++) {
+  for (auto p = patterns.begin(); p != patterns.end(); p++) {
     auto pattern = p->c_str();
     auto candidate = wake_path.c_str();
     if (fnmatch(pattern, candidate, FNM_LEADING_DIR) == 0) {
@@ -378,13 +378,13 @@ void filter_ignore_patterns(std::vector<std::string>& wake_paths) {
   std::vector<std::string> ignore_paths;
   extract_wakeignore_paths(wake_paths, ignore_paths);
 
-  for (auto ip = ignore_paths.begin(); ip < ignore_paths.end(); ip++) {
+  for (auto ip = ignore_paths.begin(); ip != ignore_paths.end(); ip++) {
     // Get the path prefix of the ignore_path.
     // dirname() modifies its argument.
     auto ignore_path = *ip;
     auto ignore_prefix = std::string(dirname(strdup(ignore_path.c_str())));
 
-    for (auto wp = wake_paths.begin(); wp < wake_paths.end(); ) {
+    for (auto wp = wake_paths.begin(); wp != wake_paths.end(); ) {
       std::string wake_path = *wp;
 
       // Only process deeper into the path
