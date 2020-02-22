@@ -321,9 +321,10 @@ static std::string make_relative(std::string &&dir, std::string &&path) {
 
 struct WakeFilter {
   size_t prefix;
+  bool allow;
   std::unique_ptr<RE2> exp;
-  WakeFilter(size_t prefix_, const std::string &exp, const RE2::Options &opts)
-   : prefix(prefix_), exp(new RE2(exp, opts)) { }
+  WakeFilter(size_t prefix_, bool allow_, const std::string &exp, const RE2::Options &opts)
+   : prefix(prefix_), allow(allow_), exp(new RE2(exp, opts)) { }
 };
 
 static void process_ignorefile(const std::string &path, std::vector<WakeFilter> &filters) {
@@ -345,8 +346,11 @@ static void process_ignorefile(const std::string &path, std::vector<WakeFilter> 
     }
     // allow empty lines and comments
     if (line == "" || line[0] == '#') continue;
+    // check for negation
+    bool allow = line[0] == '!';
+    if (allow || line[0] == '\\') line.erase(0, 1);
     // create a regular expression for .gitignore style syntax
-    std::string exp;
+    std::string exp("(?s)");
     size_t s = 0, e;
     while ((e = line.find_first_of("[?*", s)) != std::string::npos) {
       re2::StringPiece piece(line.c_str() + s, e - s);
@@ -380,7 +384,7 @@ static void process_ignorefile(const std::string &path, std::vector<WakeFilter> 
       }
     }
     exp.append(RE2::QuoteMeta(line.c_str() + s));
-    filters.emplace_back(path.size(), exp, options);
+    filters.emplace_back(path.size(), allow, exp, options);
   }
 }
 
@@ -419,19 +423,20 @@ static void filter_wakefiles(std::vector<std::string> &wakefiles, bool verbose) 
 
     // See if any rules exclude this file
     bool skip = false;
+    size_t prefix = std::string::npos;
     for (auto &filter : filters) {
       re2::StringPiece piece(wakefile.c_str() + filter.prefix, wakefile.size() - filter.prefix);
       if (RE2::FullMatch(piece, *filter.exp)) {
-        if (verbose) {
-          fprintf(stderr, "Skipping %s due to %s.wakeignore\n",
-            wakefile.c_str(), wakefile.substr(0, filter.prefix).c_str());
-        }
-        skip = true;
-        break;
+        skip = !filter.allow;
+        prefix = filter.prefix;
       }
     }
 
     if (skip) {
+      if (verbose) {
+        fprintf(stderr, "Skipping %s due to %s.wakeignore\n",
+          wakefile.c_str(), wakefile.substr(0, prefix).c_str());
+      }
       p = wakefiles.erase(p);
     } else {
       ++p;
