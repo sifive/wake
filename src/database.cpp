@@ -630,7 +630,6 @@ Usage Database::reuse_job(
   bind_integer(why, imp->get_tree, 1, job);
   bind_integer(why, imp->get_tree, 2, INPUT);
   while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
-    std::string path = rip_column(imp->get_tree, 0);
     if (vis.find(rip_column(imp->get_tree, 0)) == vis.end()) out.found = false;
   }
   finish_stmt(why, imp->get_tree, imp->debugdb);
