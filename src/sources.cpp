@@ -426,7 +426,7 @@ static void filter_wakefiles(std::vector<std::string> &wakefiles, bool verbose) 
     size_t prefix = std::string::npos;
     for (auto &filter : filters) {
       re2::StringPiece piece(wakefile.c_str() + filter.prefix, wakefile.size() - filter.prefix);
-      if (RE2::FullMatch(piece, *filter.exp)) {
+      if (skip == filter.allow && RE2::FullMatch(piece, *filter.exp)) {
         skip = !filter.allow;
         prefix = filter.prefix;
       }
