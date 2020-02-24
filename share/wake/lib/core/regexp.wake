@@ -29,8 +29,16 @@ global def regExpCat l =
     Pass regex = regex
     Fail _     = panic "Regexp concatenation failed!"
 
-# (str: String) => RegExp
+# (str: String) => Result RegExp String
 global def stringToRegExp str = prim "re2"
+
+# (glob: String) => RegExp
+# All input strings should be legal
+global def globToRegExp glob =
+  def glob2regexp glob = prim "glob2regexp"
+  match (stringToRegExp (glob2regexp glob))
+    Pass x = x
+    Fail reason = panic "Failed to convert glob: {reason}"
 
 global def regExpToString regexp = prim "re2str"
 
