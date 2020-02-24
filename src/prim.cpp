@@ -28,6 +28,7 @@
 #include <iosfwd>
 #include <unordered_map>
 #include <bitset>
+#include <cassert>
 
 void require_fail(const char *message, unsigned size, Runtime &runtime, const Scope *scope) {
   std::stringstream ss;
