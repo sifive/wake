@@ -540,7 +540,7 @@ static PRIMFN(prim_sources) {
     high = std::lower_bound(low, high, prefixH, promise_lexical);
   }
 
-  std::vector<HeapObject*> found;
+  std::vector<Value*> found;
   for (Promise *i = low; i != high; ++i) {
     String *s = i->coerce<String>();
     re2::StringPiece piece(s->c_str() + skip, s->size() - skip);
@@ -567,7 +567,7 @@ static PRIMFN(prim_files) {
   for (auto &x : match) need += String::reserve(x.size());
   runtime.heap.reserve(need);
 
-  std::vector<HeapObject*> out;
+  std::vector<Value*> out;
   out.reserve(match.size());
   for (auto &x : match)
     out.push_back(String::claim(runtime.heap, x));

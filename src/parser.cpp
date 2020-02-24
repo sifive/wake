@@ -221,14 +221,15 @@ static Expr *parse_match(int p, Lexer &lex) {
         if (typeid(*obj) == typeid(Double)) comparison = "dcmp";
       }
       if (!guard) guard = new VarRef(e->location, "True");
-      guard = new App(e->location, new App(e->location, new App(e->location, new App(e->location,
-        new VarRef(e->location, "destruct Order"),
-        new Lambda(e->location, "_", new VarRef(e->location, "False"), " ")),
-        new Lambda(e->location, "_", guard, " ")),
-        new Lambda(e->location, "_", new VarRef(e->location, "False"), " ")),
-        new App(e->location, new App(e->location,
+
+      Match *match = new Match(e->location);
+      match->args.emplace_back(new App(e->location, new App(e->location,
           new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison), " ")),
           e), new VarRef(e->location, "_ k" + std::to_string(i))));
+      match->patterns.emplace_back(AST(e->location, "LT"), new VarRef(e->location, "False"), nullptr);
+      match->patterns.emplace_back(AST(e->location, "GT"), new VarRef(e->location, "False"), nullptr);
+      match->patterns.emplace_back(AST(e->location, "EQ"), guard, nullptr);
+      guard = match;
     }
 
     if (expect(EQUALS, lex)) lex.consume();
@@ -373,11 +374,10 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (expect(ELSE, lex)) lex.consume();
       auto elseE = parse_block(lex, multiline);
       l.end = elseE->location.end;
-      App *out = new App(l, new App(l, new App(l,
-        new VarRef(l, "destruct Boolean"),
-        new Lambda(l, "_", thenE, " .then")),
-        new Lambda(l, "_", elseE, " .else")),
-        condE);
+      Match *out = new Match(l);
+      out->args.emplace_back(condE);
+      out->patterns.emplace_back(AST(l, "True"),  thenE, nullptr);
+      out->patterns.emplace_back(AST(l, "False"), elseE, nullptr);
       out->flags |= FLAG_AST;
       return out;
     }
@@ -455,17 +455,17 @@ struct Definition {
 static void extract_def(std::vector<Definition> &out, long index, AST &&ast, Expr *body) {
   std::string key = "extract " + std::to_string(++index);
   out.emplace_back(key, ast.token, body);
-  long x = 0;
   for (auto &m : ast.args) {
-    std::stringstream s;
-    s << "get" << ast.name << ":" << ast.args.size() << ":" << x++;
-    Expr *sub = new App(m.token,
-      new VarRef(m.token, s.str()),
-      new VarRef(body->location, key));
+    AST pattern(m.token, std::string(ast.name));
+    std::string mname("_" + m.name);
+    for (auto &n : ast.args) pattern.args.push_back(AST(m.token, &n == &m ? mname : "_"));
+    Match *match = new Match(m.token);
+    match->args.emplace_back(new VarRef(body->location, key));
+    match->patterns.emplace_back(std::move(pattern), new VarRef(m.token, mname), nullptr);
     if (Lexer::isUpper(m.name.c_str()) || Lexer::isOperator(m.name.c_str())) {
-      extract_def(out, index, std::move(m), sub);
+      extract_def(out, index, std::move(m), match);
     } else {
-      out.emplace_back(m.name, m.token, sub);
+      out.emplace_back(m.name, m.token, match);
     }
   }
 }
@@ -899,10 +899,9 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   }
 
   std::string name = def.name;
-  std::string tname = "destruct " + name;
-  Sum sum(std::move(def));
-  AST tuple(sum.token, std::string(sum.name));
-  tuple.region = sum.region;
+  std::shared_ptr<Sum> sump = std::make_shared<Sum>(std::move(def));
+  AST tuple(sump->token, std::string(sump->name));
+  tuple.region = sump->region;
   std::vector<bool> members;
 
   if (!expect(INDENT, lex)) return;
@@ -943,15 +942,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     }
   }
 
-  sum.addConstructor(std::move(tuple));
-
-  Location location = sum.token;
-  Destruct *destruct = new Destruct(location, std::move(sum));
-  std::shared_ptr<Sum> sump = destruct->sum;
-  Expr *destructfn =
-    new Lambda(sump->token, "_",
-    new Lambda(sump->token, "_",
-    destruct));
+  sump->addConstructor(std::move(tuple));
 
   Constructor &c = sump->members.back();
   Expr *construct = new Construct(c.ast.token, sump, &c);
@@ -959,7 +950,6 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     construct = new Lambda(c.ast.token, c.ast.args[i-1].tag, construct);
 
   bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
-  bind_def(lex, map, Definition(tname, c.ast.token, destructfn), global?top:0);
 
   check_special(lex, name, sump);
 
@@ -975,12 +965,6 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     std::string get = "get" + name + mname;
     Expr *getfn = new Lambda(memberToken, "_", new Get(memberToken, sump, &c, i));
     bind_def(lex, map, Definition(get, memberToken, getfn), global?top:0);
-
-    // Implement def extractor methods
-    std::stringstream s;
-    s << "get" << name << ":" << c.ast.args.size() << ":" << i;
-    Expr *egetfn = new Lambda(memberToken, "_", new Get(memberToken, sump, &c, i));
-    bind_def(lex, map, Definition(s.str(), memberToken, egetfn), global?top:0);
 
     // Implement edit methods
     DefMap *editmap = new DefMap(memberToken);
@@ -1058,7 +1042,7 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   AST def = parse_type_def(lex);
   if (!def) return;
 
-  Sum sum(std::move(def));
+  auto sump = std::make_shared<Sum>(std::move(def));
 
   if (lex.next.type == INDENT) {
     lex.consume();
@@ -1066,7 +1050,7 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
 
     bool repeat = true;
     while (repeat) {
-      parse_data_elt(lex, sum);
+      parse_data_elt(lex, *sump);
       switch (lex.next.type) {
         case DEDENT:
           repeat = false;
@@ -1087,18 +1071,11 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
       }
     }
   } else {
-    parse_data_elt(lex, sum);
+    parse_data_elt(lex, *sump);
     lex.consume();
   }
 
-  std::string name = sum.name;
-  Location location = sum.token;
-  Destruct *destruct = new Destruct(location, std::move(sum));
-  std::shared_ptr<Sum> sump = destruct->sum;
-  Expr *destructfn = new Lambda(sump->token, "_", destruct);
-
   for (auto &c : sump->members) {
-    destructfn = new Lambda(sump->token, "_", destructfn);
     Expr *construct = new Construct(c.ast.token, sump, &c);
     for (size_t i = 0; i < c.ast.args.size(); ++i)
       construct = new Lambda(c.ast.token, "_", construct);
@@ -1106,27 +1083,7 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
   }
 
-  bind_def(lex, map, Definition("destruct " + name, sump->token, destructfn), global?top:0);
-  for (auto &cons : sump->members) {
-    for (size_t i = 0; i < cons.ast.args.size(); ++i) {
-      Expr *body = new Lambda(sump->token, "_", new Get(sump->token, sump, &cons, i));
-      std::string name = "get " + cons.ast.name + " " + std::to_string(i);
-      bind_def(lex, map, Definition(name, sump->token, body), global?top:0);
-    }
-  }
-
-  if (sump->members.size() == 1) {
-    Constructor &cons = sump->members[0];
-    std::stringstream s;
-    for (size_t i = 0; i < cons.ast.args.size(); ++i) {
-      Expr *body = new Lambda(sump->token, "_", new Get(sump->token, sump, &cons, i));
-      std::stringstream s;
-      s << "get" << name << ":" << cons.ast.args.size() << ":" << i;
-      bind_def(lex, map, Definition(s.str(), sump->token, body), global?top:0);
-    }
-  }
-
-  check_special(lex, name, sump);
+  check_special(lex, sump->name, sump);
 }
 
 static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {

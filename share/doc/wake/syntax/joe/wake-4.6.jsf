@@ -64,6 +64,14 @@
 	"else"		cond
 	"here"		kw
 	"global"	kw
+	"export"	kw
+	"import"	kw
+	"package"	kw
+	"from"		kw
+	"type"		kw
+	"topic"		kw
+	"unary"		kw
+	"binary"	kw
 	"prim"		kw
 	"publish"	kw
 	"subscribe"	kw

@@ -67,21 +67,21 @@ void require_fail(const char *message, unsigned size, Runtime &runtime, const Sc
 #define INTEGER_MPZ(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Integer)); } while(0); mpz_t arg = { static_cast<Integer*>(args[i])->wrap() };
 
 /* Useful expressions for primitives */
-HeapObject *alloc_order(Heap &h, int x);
-HeapObject *alloc_nil(Heap &h);
+Value *alloc_order(Heap &h, int x);
+Value *alloc_nil(Heap &h);
 inline size_t reserve_unit() { return Record::reserve(0); }
 inline size_t reserve_bool() { return Record::reserve(0); }
 inline size_t reserve_tuple2() { return Record::reserve(2); }
 inline size_t reserve_result() { return Record::reserve(1); }
 inline size_t reserve_list(size_t elements) { return Record::reserve(2) * elements + Record::reserve(0); }
-HeapObject *claim_unit(Heap &h);
-HeapObject *claim_bool(Heap &h, bool x);
-HeapObject *claim_tuple2(Heap &h, HeapObject *first, HeapObject *second);
-HeapObject *claim_result(Heap &h, bool ok, HeapObject *value);
-HeapObject *claim_list(Heap &h, size_t elements, HeapObject** values);
+Value *claim_unit(Heap &h);
+Value *claim_bool(Heap &h, bool x);
+Value *claim_tuple2(Heap &h, Value *first, Value *second);
+Value *claim_result(Heap &h, bool ok, Value *value);
+Value *claim_list(Heap &h, size_t elements, Value** values);
 
 size_t reserve_hash();
-Work *claim_hash(Heap &h, HeapObject *value, Continuation *continuation);
+Work *claim_hash(Heap &h, Value *value, Continuation *continuation);
 
 void dont_report_future_targets();
 Expr *force_use(Expr *expr);
@@ -132,7 +132,7 @@ Expr *force_use(Expr *expr);
  */
 #define PRIM_EFFECT	2
 
-#define PRIM_IMPURE	PRIM_EFFECT|PRIM_ORDERED
+#define PRIM_IMPURE	(PRIM_EFFECT|PRIM_ORDERED)
 
 /* This primitive has a function argument which it will invoke.
  * The status of the primitive depends on that argument.

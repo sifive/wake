@@ -28,6 +28,7 @@
 #include <iosfwd>
 #include <unordered_map>
 #include <bitset>
+#include <cassert>
 
 void require_fail(const char *message, unsigned size, Runtime &runtime, const Scope *scope) {
   std::stringstream ss;
@@ -39,7 +40,7 @@ void require_fail(const char *message, unsigned size, Runtime &runtime, const Sc
   runtime.abort = true;
 }
 
-HeapObject *alloc_order(Heap &h, int x) {
+Value *alloc_order(Heap &h, int x) {
   int m;
   if (x < 0) m = 0;
   else if (x > 0) m = 2;
@@ -47,32 +48,32 @@ HeapObject *alloc_order(Heap &h, int x) {
   return Record::alloc(h, &Order->members[m], 0);
 }
 
-HeapObject *alloc_nil(Heap &h) {
+Value *alloc_nil(Heap &h) {
   return Record::alloc(h, &List->members[0], 0);
 }
 
-HeapObject *claim_unit(Heap &h) {
+Value *claim_unit(Heap &h) {
   return Record::claim(h, &Unit->members[0], 0);
 }
 
-HeapObject *claim_bool(Heap &h, bool x) {
+Value *claim_bool(Heap &h, bool x) {
   return Record::claim(h, &Boolean->members[x?0:1], 0);
 }
 
-HeapObject *claim_tuple2(Heap &h, HeapObject *first, HeapObject *second) {
+Value *claim_tuple2(Heap &h, Value *first, Value *second) {
   Record *out = Record::claim(h, &Pair->members[0], 2);
   out->at(0)->instant_fulfill(first);
   out->at(1)->instant_fulfill(second);
   return out;
 }
 
-HeapObject *claim_result(Heap &h, bool ok, HeapObject *value) {
+Value *claim_result(Heap &h, bool ok, Value *value) {
   Record *out = Record::claim(h, &Result->members[ok?0:1], 1);
   out->at(0)->instant_fulfill(value);
   return out;
 }
 
-HeapObject *claim_list(Heap &h, size_t elements, HeapObject** values) {
+Value *claim_list(Heap &h, size_t elements, Value** values) {
   Record *out = Record::claim(h, &List->members[0], 0);
   while (elements) {
     --elements;
@@ -106,9 +107,9 @@ HeapStep Closure::explore_escape(HeapStep step) {
   return step;
 }
 
-static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
+static HeapHash deep_hash_imp(Heap &heap, HeapObject *obj) {
   std::unordered_map<uintptr_t, size_t> explored;
-  void *vscratch = runtime.heap.scratch(runtime.heap.used());
+  void *vscratch = heap.scratch(heap.used());
   HeapObject **scratch = static_cast<HeapObject**>(vscratch);
 
   HeapStep step;
@@ -119,9 +120,11 @@ static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
   Hash code;
   for (HeapObject **done = scratch; done != step.found; ++done) {
     HeapObject *head = *done;
+    assert (head->category() == VALUE);
+    Value *value = static_cast<Value*>(head);
 
     // Assign objects virtual addreses based on visitation order
-    uintptr_t key = reinterpret_cast<uintptr_t>(static_cast<void*>(head));
+    uintptr_t key = reinterpret_cast<uintptr_t>(static_cast<void*>(value));
     auto out = explored.insert(std::make_pair(key, done - scratch));
 
     // Include hash of child's virtual address
@@ -130,14 +133,20 @@ static HeapHash deep_hash(Runtime &runtime, HeapObject *obj) {
     if (!out.second) continue;
 
     // Hash this object and enqueue its children for hashing
-    step = head->explore(step);
-    code = code + head->hash();
+    step = value->explore(step);
+    code = code + value->shallow_hash();
   }
 
   HeapHash out;
   out.code = code;
   out.broken = step.broken;
   return out;
+}
+
+Hash Value::deep_hash(Heap &heap) {
+  HeapHash x = deep_hash_imp(heap, this);
+  assert (!x.broken);
+  return x.code;
 }
 
 struct CHash final : public GCObject<CHash, Continuation> {
@@ -161,7 +170,7 @@ void CHash::execute(Runtime &runtime) {
   MPZ out("0xffffFFFFffffFFFFffffFFFFffffFFFF"); // 128 bit
   runtime.heap.reserve(Integer::reserve(out));
 
-  auto hash = deep_hash(runtime, obj.get());
+  auto hash = deep_hash_imp(runtime.heap, obj.get());
   if (hash.broken) {
     next = nullptr; // reschedule
     hash.broken->await(runtime, this);
@@ -183,7 +192,7 @@ size_t reserve_hash() {
   return CHash::reserve();
 }
 
-Work *claim_hash(Heap &h, HeapObject *value, Continuation *continuation) {
+Work *claim_hash(Heap &h, Value *value, Continuation *continuation) {
   return CHash::claim(h, value, continuation);
 }
 

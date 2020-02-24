@@ -17,6 +17,7 @@
 
 #include "ssa.h"
 #include "hash.h"
+#include "runtime.h"
 
 // typeid hash_code is not stable between invocations
 #define TYPE_RARG	0
@@ -29,12 +30,14 @@
 #define TYPE_RFUN	7
 
 struct PassScope {
+  Runtime &runtime;
   PassScope *next;
   size_t start;
   size_t index;
   std::vector<size_t> escapes;
   std::vector<uint64_t> codes;
-  PassScope(PassScope *next_, size_t start_) : next(next_), start(start_), index(start_) { }
+  PassScope(Runtime &runtime_, PassScope *next_, size_t start_)
+   : runtime(runtime_), next(next_), start(start_), index(start_) { }
 };
 
 static size_t scope_arg(PassScope &p, size_t input) {
@@ -66,10 +69,8 @@ void RArg::pass_scope(PassScope &p) {
 }
 
 void RLit::pass_scope(PassScope &p) {
-  HeapObject *obj = value->get();
   p.codes.push_back(TYPE_RLIT);
-  p.codes.push_back(static_cast<Value*>(obj)->hashid());
-  (*value)->hash().push(p.codes);
+  (*value)->deep_hash(p.runtime.heap).push(p.codes);
 }
 
 static void scope_redux(PassScope &p, Redux *redux, size_t type) {
@@ -103,7 +104,7 @@ void RCon::pass_scope(PassScope &p) {
 }
 
 void RFun::pass_scope(PassScope &p) {
-  PassScope frame(&p, p.index + 1);
+  PassScope frame(p.runtime, &p, p.index + 1);
 
   output = scope_arg(frame, output);
   for (auto &term : terms) {
@@ -119,8 +120,8 @@ void RFun::pass_scope(PassScope &p) {
   for (auto &x : escapes) x = scope_arg(p, x);
 }
 
-std::unique_ptr<Term> Term::scope(std::unique_ptr<Term> term) {
-  PassScope pass(nullptr, 0);
+std::unique_ptr<Term> Term::scope(std::unique_ptr<Term> term, Runtime &runtime) {
+  PassScope pass(runtime, nullptr, 0);
   term->pass_scope(pass);
   return term;
 }

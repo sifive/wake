@@ -356,7 +356,9 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
   std::shared_ptr<Sum> sum = find_mismatch(expand, prototype.tree, patterns[1].tree);
   if (sum) {
     std::unique_ptr<DefMap> map(new DefMap(location));
-    map->body = std::unique_ptr<Expr>(new VarRef(location, "destruct " + sum->name));
+    Expr *body = new Lambda(location, "_", new Destruct(location, sum));
+    for (size_t i = 0; i < sum->members.size(); ++i) body = new Lambda(location, "_", body);
+    map->body = std::unique_ptr<Expr>(body);
     for (size_t c = 0; c < sum->members.size(); ++c) {
       Constructor &cons = sum->members[c];
       std::string cname = "_ c" + std::to_string(c);
@@ -440,12 +442,11 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
           new VarRef(location, "_ g" + std::to_string(p.index)),
           new VarRef(location, "_ a0")),
         prototype.tree, p.tree));
-      return std::unique_ptr<Expr>(
-        new App(location, new App(location, new App(location,
-          new VarRef(location, "destruct Boolean"),
-          new Lambda(location, "_", guard_true .release(), fnname.c_str())),
-          new Lambda(location, "_", guard_false.release(), fnname.c_str())),
-          guard.release()));
+      Match *match = new Match(location);
+      match->args.emplace_back(std::move(guard));
+      match->patterns.emplace_back(AST(location, "True"),  guard_true .release(), nullptr);
+      match->patterns.emplace_back(AST(location, "False"), guard_false.release(), nullptr);
+      return std::unique_ptr<Expr>(match);
     }
   }
 }
@@ -796,19 +797,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     VarRef *ref = static_cast<VarRef*>(expr);
     NameRef pos;
     if ((pos = binding->find(ref->name)).index == -1) {
-      size_t off = ref->name.find(':');
-      if (off != std::string::npos) {
-        size_t off2 = ref->name.find(':', off+1);
-        if (ref->name.back() == '0')
-          std::cerr << "Tuple '"
-            << ref->name.substr(3, off-3) << "' with "
-            << ref->name.substr(off+1, off2-off-1) << " arguments does not exist at "
-            << ref->location.file() << std::endl;
-        return false;
-      } else {
-        std::cerr << "Variable reference '" << ref->name << "' is unbound at "
-          << ref->location.file() << std::endl;
-      }
+      std::cerr << "Variable reference '" << ref->name << "' is unbound at "
+        << ref->location.file() << std::endl;
       return false;
     }
     ref->index = pos.index;

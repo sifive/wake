@@ -41,11 +41,6 @@ void Work::format(std::ostream &os, FormatState &state) const {
   os << "Work";
 }
 
-Hash Work::hash() const {
-  assert(0 /* unreachable */);
-  return Hash();
-}
-
 Category Work::category() const {
   return WORK;
 }
@@ -318,13 +313,13 @@ struct CPrim final : public GCObject<CPrim, Continuation> {
 };
 
 Promise *CPrim::doit(Runtime &runtime, Scope *scope, size_t output, RPrim *prim) {
-  HeapObject *pargs[prim->args.size()];
+  Value *pargs[prim->args.size()];
   Promise *p = nullptr;
   size_t i;
   for (i = 0; i < prim->args.size(); ++i) {
     p = InterpretContext::arg(scope, prim->args[i]);
     if (!*p) break;
-    pargs[i] = p->coerce<HeapObject>();
+    pargs[i] = p->coerce<Value>();
   }
   if (i == prim->args.size()) {
     prim->fn(prim->data, runtime, scope, output, prim->args.size(), pargs);

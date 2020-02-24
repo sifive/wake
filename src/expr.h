@@ -241,8 +241,8 @@ struct Destruct : public Expr {
   std::shared_ptr<Sum> sum;
 
   static const TypeDescriptor type;
-  Destruct(const Location &location_, Sum &&sum_)
-   : Expr(&type, location_), sum(std::make_shared<Sum>(sum_)) { }
+  Destruct(const Location &location_, const std::shared_ptr<Sum> &sum_)
+   : Expr(&type, location_), sum(sum_) { }
 
   void format(std::ostream &os, int depth) const override;
 };

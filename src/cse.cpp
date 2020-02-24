@@ -33,9 +33,10 @@ struct PassCSE {
   std::vector<Hash> *undo;
   std::vector<size_t> starts;
   std::unordered_map<Hash, size_t> table;
+  Runtime &runtime;
 
-  PassCSE(TargetScope &scope, std::vector<Hash> *undo_)
-   : stream(scope), undo(undo_) { }
+  PassCSE(TargetScope &scope, std::vector<Hash> *undo_, Runtime &runtime_)
+   : stream(scope), undo(undo_), runtime(runtime_) { }
 };
 
 static Hash hash_arg(PassCSE &p, size_t input) {
@@ -90,7 +91,7 @@ void RArg::pass_cse(PassCSE &p, std::unique_ptr<Term> self) {
 void RLit::pass_cse(PassCSE &p, std::unique_ptr<Term> self) {
   HeapObject *obj = value->get();
   Hash h = Hash(typeid(RLit).hash_code(), typeid(*obj).hash_code())
-         + (*value)->hash();
+         + (*value)->deep_hash(p.runtime.heap);
   cse_reduce(p, h, std::move(self));
 }
 
@@ -160,10 +161,10 @@ void RFun::pass_cse(PassCSE &p, std::unique_ptr<Term> self) {
   cse_reduce(p, Hash(codes), std::move(me[0]));
 }
 
-std::unique_ptr<Term> Term::pass_cse(std::unique_ptr<Term> term) {
+std::unique_ptr<Term> Term::pass_cse(std::unique_ptr<Term> term, Runtime &runtime) {
   TargetScope scope;
   std::vector<Hash> undo;
-  PassCSE pass(scope, &undo);
+  PassCSE pass(scope, &undo, runtime);
   term->pass_cse(pass, std::move(term));
   return scope.finish();
 }

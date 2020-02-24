@@ -29,6 +29,17 @@
 
 #define APP_PRECEDENCE 20
 
+// typeid().hash_code() changes between runs
+#define TYPE_STRING	1
+#define TYPE_INTEGER	2
+#define TYPE_DOUBLE	3
+#define TYPE_REGEXP	4
+#define TYPE_JOB	5
+#define TYPE_CLOSURE	6
+#define TYPE_RECORD	7
+#define TYPE_SCOPE	8
+#define TYPE_TARGET	9
+
 /* Values */
 
 struct RFun;
@@ -81,9 +92,7 @@ struct String final : public GCObject<String, Value> {
   template <typename T> bool operator >= (T&& x) const { return compare(std::forward<T>(x)) >= 0; }
   template <typename T> bool operator >  (T&& x) const { return compare(std::forward<T>(x)) >  0; }
 
-  Hash hash() const override;
-  size_t hashid() const override;
-  bool operator == (const Value &x) const override;
+  Hash shallow_hash() const override;
   void format(std::ostream &os, FormatState &state) const override;
   static void cstr_format(std::ostream &os, const char *s, size_t len);
 
@@ -124,9 +133,7 @@ struct Integer final : public GCObject<Integer, Value> {
 
   std::string str(int base = 10) const;
   void format(std::ostream &os, FormatState &state) const override;
-  Hash hash() const override;
-  size_t hashid() const override;
-  bool operator == (const Value &x) const override;
+  Hash shallow_hash() const override;
 
   PadObject *objend() { return Parent::objend() + (abs(length)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
   static size_t reserve(const MPZ &mpz) { return sizeof(Integer)/sizeof(PadObject) + (abs(mpz.value[0]._mp_size)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
@@ -162,9 +169,7 @@ struct Double final : public GCObject<Double, Value> {
 
   std::string str(int format = DEFAULTFLOAT, int precision = limits::max_digits10) const;
   void format(std::ostream &os, FormatState &state) const override;
-  Hash hash() const override;
-  size_t hashid() const override;
-  bool operator == (const Value &x) const override;
+  Hash shallow_hash() const override;
 
   // Never call this during runtime! It can invalidate the heap.
   static RootPointer<Double> literal(Heap &h, const char *str);
@@ -180,9 +185,7 @@ struct RegExp final : public GCObject<RegExp, DestroyableObject> {
   RegExp(Heap &h, const re2::StringPiece &regexp);
 
   void format(std::ostream &os, FormatState &state) const override;
-  Hash hash() const override;
-  size_t hashid() const override;
-  bool operator == (const Value &x) const override;
+  Hash shallow_hash() const override;
 
   // Never call this during runtime! It can invalidate the heap.
   static RootPointer<RegExp> literal(Heap &h, const std::string &value);
@@ -195,7 +198,7 @@ struct Closure final : public GCObject<Closure, Value> {
 
   Closure(RFun *fun_, size_t applied_, Scope *scope_);
   void format(std::ostream &os, FormatState &state) const override;
-  Hash hash() const override;
+  Hash shallow_hash() const override;
   HeapStep explore_escape(HeapStep step);
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
