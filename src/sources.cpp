@@ -327,6 +327,64 @@ struct WakeFilter {
    : prefix(prefix_), allow(allow_), exp(new RE2(exp, opts)) { }
 };
 
+static std::string glob2regexp(const std::string &glob) {
+  std::string exp("(?s)");
+  size_t s = 0, e;
+  while ((e = glob.find_first_of("\\[?*", s)) != std::string::npos) {
+    re2::StringPiece piece(glob.c_str() + s, e - s);
+    exp.append(RE2::QuoteMeta(piece));
+    if (glob[e] == '\\') {
+      // Trailing \ is left as a raw '\'
+      // Don't bother escaping a codepoint start
+      if (e+1 == glob.size() || static_cast<unsigned char>(glob[e+1]) >= 0x80) {
+        s = e + 1;
+      } else {
+        re2::StringPiece piece(glob.c_str() + e + 1, 1);
+        exp.append(RE2::QuoteMeta(piece));
+        s = e + 2;
+      }
+    } else if (glob[e] == '[') {
+      // To include ']' in a clause, use: []abc]
+      // If no closing ']' is found, just stop processing the glob
+      size_t c = glob.find_first_of("]", e+2);
+      if (c == std::string::npos) { s = e; break; }
+      exp.push_back('[');
+      size_t is = e+1, ie;
+      while ((ie = glob.find_first_of("\\[", is)) != std::string::npos) {
+        exp.append(glob, is, ie - is);
+        exp.push_back('\\');
+        exp.push_back(glob[ie]);
+        is = ie+1;
+      }
+      exp.append(glob, is, c - is);
+      exp.push_back(']');
+      s = c+1;
+    } else if (glob[e] == '?') {
+      // ? can match any non-/ character
+      exp.append("[^/]");
+      s = e+1;
+    } else if (e > 0 && glob.size() == e+2 && glob[e-1] == '/' && glob[e+1] == '*') {
+      // trailing /** -> match everything inside
+      exp.append(".+");
+      s = e+2;
+    } else if (e == 0 && glob.size() > 2 && glob[1] == '*' && glob[2] == '/') {
+      // leading **/ -> any subdirectory
+      exp.append("([^/]*/)*");
+      s = e+3;
+    } else if (e > 0 && glob.size() > e+2 && glob[e-1] == '/' && glob[e+1] == '*' && glob[e+2] == '/') {
+      // /**/ somewhere in the string
+      exp.append("([^/]*/)*");
+      s = e+3;
+    } else {
+      // just a normal * -> match any number of non-/ characters
+      exp.append("[^/]*");
+      s = e+1;
+    }
+  }
+  exp.append(RE2::QuoteMeta(glob.c_str() + s));
+  return exp;
+}
+
 static void process_ignorefile(const std::string &path, std::vector<WakeFilter> &filters) {
   std::ifstream in(path + ".wakeignore");
   if (!in.is_open()) return;
@@ -348,43 +406,9 @@ static void process_ignorefile(const std::string &path, std::vector<WakeFilter> 
     if (line == "" || line[0] == '#') continue;
     // check for negation
     bool allow = line[0] == '!';
-    if (allow || line[0] == '\\') line.erase(0, 1);
+    if (allow) line.erase(0, 1);
     // create a regular expression for .gitignore style syntax
-    std::string exp("(?s)");
-    size_t s = 0, e;
-    while ((e = line.find_first_of("[?*", s)) != std::string::npos) {
-      re2::StringPiece piece(line.c_str() + s, e - s);
-      exp.append(RE2::QuoteMeta(piece));
-      if (line[e] == '[') {
-        // copy [...] from glob to regexp unmodified
-        size_t c = line.find_first_of("]", e+1);
-        if (c == std::string::npos) { s = e; break; }
-        exp.append(line, e, c-e+1);
-        s = c+1;
-      } else if (line[e] == '?') {
-        // ? can match any non-/ character
-        exp.append("[^/]");
-        s = e+1;
-      } else if (e > 0 && line.size() == e+2 && line[e-1] == '/' && line[e+1] == '*') {
-        // trailing /** -> match everything inside
-        exp.append(".+");
-        s = e+2;
-      } else if (e == 0 && line.size() > 3 && line[1] == '*' && line[2] == '/') {
-        // leading **/ -> any subdirectory
-        exp.append("([^/]*/)*");
-        s = e+3;
-      } else if (e > 0 && line.size() > e+2 && line[e-1] == '/' && line[e+1] == '*' && line[e+2] == '/') {
-        // /**/ somewhere in the string
-        exp.append("([^/]*/)*");
-        s = e+3;
-      } else {
-        // just a normal * -> match any number of non-/ characters
-        exp.append("[^/]*");
-        s = e+1;
-      }
-    }
-    exp.append(RE2::QuoteMeta(line.c_str() + s));
-    filters.emplace_back(path.size(), allow, exp, options);
+    filters.emplace_back(path.size(), allow, glob2regexp(line), options);
   }
 }
 
@@ -674,6 +698,19 @@ static PRIMFN(prim_pid) {
   RETURN(Integer::alloc(runtime.heap, out));
 }
 
+static PRIMTYPE(type_glob2regexp) {
+  return args.size() == 1 &&
+    args[0]->unify(String::typeVar) &&
+    out->unify(String::typeVar);
+}
+
+static PRIMFN(prim_glob2regexp) {
+  EXPECT(1);
+  STRING(glob, 0);
+
+  RETURN(String::alloc(runtime.heap, glob2regexp(glob->as_str())));
+}
+
 void prim_register_sources(PrimMap &pmap) {
   // Observes the filesystem, so must be ordered
   prim_register(pmap, "files",       prim_files,       type_sources,     PRIM_ORDERED);
@@ -683,6 +720,7 @@ void prim_register_sources(PrimMap &pmap) {
   // Simple functions
   prim_register(pmap, "simplify",    prim_simplify,    type_simplify,    PRIM_PURE);
   prim_register(pmap, "relative",    prim_relative,    type_relative,    PRIM_PURE);
+  prim_register(pmap, "glob2regexp", prim_glob2regexp, type_glob2regexp, PRIM_PURE);
   prim_register(pmap, "execpath",    prim_execpath,    type_execpath,    PRIM_PURE);
   prim_register(pmap, "workspace",   prim_workspace,   type_workspace,   PRIM_PURE);
   prim_register(pmap, "pid",         prim_pid,         type_pid,         PRIM_PURE);
