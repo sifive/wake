@@ -306,7 +306,7 @@ int main(int argc, char **argv) {
   if (noparse) return 0;
 
   bool ok = true;
-  auto wakefiles = find_all_wakefiles(ok, workspace);
+  auto wakefiles = find_all_wakefiles(ok, workspace, verbose);
   if (!ok) std::cerr << "Workspace wake file enumeration failed" << std::endl;
 
   uint64_t target_hash = 0;
