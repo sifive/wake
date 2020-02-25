@@ -967,48 +967,43 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     bind_def(lex, map, Definition(get, memberToken, getfn), global?top:0);
 
     // Implement edit methods
-    DefMap *editmap = new DefMap(memberToken);
-    editmap->body = std::unique_ptr<Expr>(new Construct(memberToken, sump, &c));
+    Expr *editfn = new Construct(memberToken, sump, &c);
+    for (size_t inner = 0; inner < members.size(); ++inner)
+      editfn = new Lambda(memberToken, "_", editfn);
     for (size_t inner = 0; inner < members.size(); ++inner) {
-      Expr *select = new Get(memberToken, sump, &c, inner);
+      Expr *elt =
+        new App(memberToken,
+          new Lambda(memberToken, "_", new Get(memberToken, sump, &c, inner)),
+          new VarRef(memberToken, "_ x"));
       if (inner == outer)
-        select =
-          new App(memberToken,
-            new VarRef(memberToken, "fn" + mname),
-            new App(memberToken,
-              new Lambda(memberToken, "_", select),
-              new VarRef(memberToken, "_ x")));
-      std::string x = std::to_string(members.size()-inner);
-      std::string name = std::string(4 - x.size(), '0') + x;
-      editmap->map.insert(std::make_pair(name,
-        DefMap::Value(memberToken, std::unique_ptr<Expr>(select))));
+        elt = new App(memberToken, new VarRef(memberToken, "fn" + mname), elt);
+      editfn = new App(memberToken, editfn, elt);
     }
+    editfn =
+      new Lambda(memberToken, "fn" + mname,
+        new Lambda(memberToken, "_ x", editfn));
 
     std::string edit = "edit" + name + mname;
-    Expr *editfn =
-      new Lambda(memberToken, "fn" + mname,
-        new Lambda(memberToken, "_ x", editmap));
-
     bind_def(lex, map, Definition(edit, memberToken, editfn), global?top:0);
 
     // Implement set methods
-    DefMap *setmap = new DefMap(memberToken);
-    setmap->body = std::unique_ptr<Expr>(new Construct(memberToken, sump, &c));
+    Expr *setfn = new Construct(memberToken, sump, &c);
+    for (size_t inner = 0; inner < members.size(); ++inner)
+      setfn = new Lambda(memberToken, "_", setfn);
     for (size_t inner = 0; inner < members.size(); ++inner) {
-      std::string x = std::to_string(members.size()-inner);
-      std::string name = std::string(4 - x.size(), '0') + x;
-      setmap->map.insert(std::make_pair(name,
-        DefMap::Value(memberToken, std::unique_ptr<Expr>(
-          (inner == outer)
-          ? static_cast<Expr*>(new VarRef(memberToken, mname))
-          : static_cast<Expr*>(new Get(memberToken, sump, &c, inner))))));
+      Expr *elt;
+      if (inner == outer) {
+        elt = new VarRef(memberToken, mname);
+      } else {
+        elt = new App(memberToken,
+          new Lambda(memberToken, "_", new Get(memberToken, sump, &c, inner)),
+          new VarRef(memberToken, "_ x"));
+      }
+      setfn = new App(memberToken, setfn, elt);
     }
+    setfn = new Lambda(memberToken, mname, new Lambda(memberToken, "_ x", setfn));
 
     std::string set = "set" + name + mname;
-    Expr *setfn =
-      new Lambda(memberToken, mname,
-        new Lambda(memberToken, "_ x", setmap));
-
     bind_def(lex, map, Definition(set, memberToken, setfn), global?top:0);
 
     ++outer;
