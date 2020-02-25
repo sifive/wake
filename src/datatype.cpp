@@ -33,7 +33,7 @@ void Sum::addConstructor(AST &&ast) {
   cons.index = members.size()-1;
 }
 
-bool AST::unify(TypeVar &out, const std::map<std::string, TypeVar*> &ids) {
+bool AST::unify(TypeVar &out, const std::unordered_map<std::string, TypeVar*> &ids) {
   if (Lexer::isLower(name.c_str())) {
     auto it = ids.find(name);
     if (it == ids.end()) {

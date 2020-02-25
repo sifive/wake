@@ -22,7 +22,7 @@
 #include <assert.h>
 #include <sstream>
 #include <iomanip>
-#include <map>
+#include <unordered_map>
 #include <vector>
 #include <algorithm>
 
@@ -218,7 +218,7 @@ void Heap::GC(size_t requested_pads) {
   to.resize(elems);
 
   Placement progress(to.array, to.array);
-  std::map<const char *, ObjectStats> stats;
+  std::unordered_map<const char *, ObjectStats> stats;
 
   for (RootRing *root = roots.next; root != &roots; root = root->next) {
     if (!root->root) continue;

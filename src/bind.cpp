@@ -21,14 +21,14 @@
 #include "symbol.h"
 #include <iostream>
 #include <vector>
-#include <map>
+#include <unordered_map>
 #include <set>
 #include <queue>
 #include <list>
 #include <cassert>
 #include <algorithm>
 
-typedef std::map<std::string, int> NameIndex;
+typedef std::unordered_map<std::string, int> NameIndex;
 
 struct ResolveDef {
   std::string name;
@@ -859,7 +859,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     Construct *cons = static_cast<Construct*>(expr);
     bool ok = cons->typeVar.unify(
       TypeVar(cons->sum->name.c_str(), cons->sum->args.size()));
-    std::map<std::string, TypeVar*> ids;
+    std::unordered_map<std::string, TypeVar*> ids;
     for (size_t i = 0; i < cons->sum->args.size(); ++i)
       ids[cons->sum->args[i]] = &cons->typeVar[i];
     if (binding->lambda) {
@@ -885,7 +885,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     TypeVar &typ = binding->lambda->typeVar[0];
     bool ok = typ.unify(
       TypeVar(des->sum->name.c_str(), des->sum->args.size()));
-    std::map<std::string, TypeVar*> ids;
+    std::unordered_map<std::string, TypeVar*> ids;
     for (size_t i = 0; i < des->sum->args.size(); ++i)
       ids[des->sum->args[i]] = &typ[i];
     NameBinding *iter = binding;
@@ -926,7 +926,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     TypeVar &typ = binding->lambda->typeVar[0];
     bool ok = typ.unify(
       TypeVar(get->sum->name.c_str(), get->sum->args.size()));
-    std::map<std::string, TypeVar*> ids;
+    std::unordered_map<std::string, TypeVar*> ids;
     for (size_t i = 0; i < get->sum->args.size(); ++i)
       ids[get->sum->args[i]] = &typ[i];
     ok = get->cons->ast.args[get->index].unify(get->typeVar, ids) && ok;

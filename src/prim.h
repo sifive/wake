@@ -20,7 +20,7 @@
 
 #include "primfn.h"
 #include "tuple.h"
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -150,7 +150,7 @@ struct PrimDesc {
    : fn(fn_), type(type_), flags(flags_), data(data_) { }
 };
 
-typedef std::map<std::string, PrimDesc> PrimMap;
+typedef std::unordered_map<std::string, PrimDesc> PrimMap;
 struct JobTable;
 
 struct StringInfo {

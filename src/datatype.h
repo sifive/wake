@@ -21,7 +21,7 @@
 #include "location.h"
 #include <vector>
 #include <string>
-#include <map>
+#include <unordered_map>
 #include <ostream>
 #include <memory>
 
@@ -39,7 +39,7 @@ struct AST {
   AST(const Location &token_) :
     token(token_), region(token_) { }
 
-  bool unify(TypeVar &out, const std::map<std::string, TypeVar*> &ids);
+  bool unify(TypeVar &out, const std::unordered_map<std::string, TypeVar*> &ids);
   operator bool() const { return !name.empty(); }
 };
 

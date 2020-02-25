@@ -25,7 +25,7 @@
 #include "gc.h"
 #include <memory>
 #include <string>
-#include <map>
+#include <unordered_map>
 #include <vector>
 
 struct Receiver;
@@ -157,8 +157,8 @@ struct DefMap : public Expr {
      : location(location_), body(std::move(body_)) { }
   };
 
-  typedef std::map<std::string, Value> Defs;
-  typedef std::map<std::string, std::vector<Value> > Pubs;
+  typedef std::unordered_map<std::string, Value> Defs;
+  typedef std::unordered_map<std::string, std::vector<Value> > Pubs;
   Defs map;
   Pubs pub;
   std::unique_ptr<Expr> body;
@@ -174,7 +174,7 @@ struct DefMap : public Expr {
 
 struct Top : public Expr {
   typedef std::vector<std::unique_ptr<DefMap> > DefMaps;
-  typedef std::map<std::string, int> DefOrder;
+  typedef std::unordered_map<std::string, int> DefOrder;
   DefMaps defmaps;
   DefOrder globals;
   std::unique_ptr<Expr> body;
@@ -195,7 +195,7 @@ struct DefBinding : public Expr {
   };
   typedef std::vector<std::unique_ptr<Expr> > Values;
   typedef std::vector<std::unique_ptr<Lambda> > Functions;
-  typedef std::map<std::string, OrderValue> Order;
+  typedef std::unordered_map<std::string, OrderValue> Order;
 
   std::unique_ptr<Expr> body;
   Values val;     // access prior binding
