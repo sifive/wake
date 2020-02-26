@@ -19,18 +19,19 @@ global def sysname = uname.getPairFirst
 global def machine = uname.getPairSecond
 
 # Inject command-line specified path entries
-publish path = match (getenv "WAKE_PATH")
-  Some x = tokenize `:` x
-  None = Nil
+#!!!
+#publish path = match (getenv "WAKE_PATH")
+#  Some x = tokenize `:` x
+#  None = Nil
 
 # Setup a default path
-publish path = "/usr/bin", Nil
-publish path = "/bin", Nil
+#publish path = "/usr/bin", Nil
+#publish path = "/bin", Nil
 
-global def path = catWith ":" (subscribe path | distinctBy scmp)
-publish environment = "PATH={path}", Nil
+global def path = catWith ":" ("/opt/local/bin", "/usr/bin", "/bin", Nil) #(subscribe path | distinctBy scmp)
+#publish environment = "PATH={path}", Nil
 
-global def environment = subscribe environment
+global def environment = "PATH={path}", Nil #subscribe environment
 
 # Use of this function can lead to unnecessary rebuilds!
 global def getenv key =

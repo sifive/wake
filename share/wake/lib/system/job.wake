@@ -256,7 +256,8 @@ target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run log =
   runAlways cmd env dir stdin res usage finputs foutputs vis keep run log
 
 # Default runners provided by wake
-publish runner = localRunner, defaultRunner, Nil
+#publish runner = localRunner, defaultRunner, Nil
+def runners = localRunner, defaultRunner, Nil
 
 def runJobImp cmd env dir stdin res usage finputs foutputs vis pers run log =
   if isOnce pers
@@ -300,7 +301,7 @@ global def runJob p = match p
         Pass x if x <=. 0.0 = Reject "{name}: non-positive score"
         Pass x = Accept x fn
         Fail x = Reject "{name} {x}"
-    def opts = subscribe runner | map qualify
+    def opts = map qualify runners # subscribe runner | map qualify
     def best acc = match _ acc
       (Reject _) _ = acc
       (Accept score fn) (Pair bests bestr) =
