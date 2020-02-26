@@ -149,43 +149,78 @@ struct Subscribe : public Expr {
   void format(std::ostream &os, int depth) const override;
 };
 
-struct DefMap : public Expr {
-  struct Value {
-    Location location;
-    std::unique_ptr<Expr> body;
-    Value(const Location &location_, std::unique_ptr<Expr> &&body_)
-     : location(location_), body(std::move(body_)) { }
-  };
+struct DefValue {
+  Location location;
+  std::unique_ptr<Expr> body;
+  DefValue(const Location &location_, std::unique_ptr<Expr> &&body_)
+   : location(location_), body(std::move(body_)) { }
+};
 
-  typedef std::map<std::string, Value> Defs;
-  typedef std::map<std::string, std::vector<Value> > Pubs;
-  Defs map;
-  Pubs pub;
+struct SymbolSource {
+  Location location;
+  std::string qualified; // from@package
+
+  SymbolSource(const Location &location_) : location(location_) { }
+  SymbolSource(const Location &location_, const std::string &qualified_)
+   : location(location_), qualified(qualified_) { }
+};
+
+struct Symbols {
+  typedef std::map<std::string, SymbolSource> SymbolMap; // to -> from@package
+  SymbolMap defs;
+  // SymbolMap types;
+  // SymbolMap topics;
+  void format(const char *kind, std::ostream &os, int depth) const;
+};
+
+struct DefMap : public Expr {
+  typedef std::map<std::string, DefValue> Defs;
+  Defs defs;
+  Symbols imports;
   std::unique_ptr<Expr> body;
 
   static const TypeDescriptor type;
-  DefMap(const Location &location_, Defs &&map_, Pubs &&pub_, Expr *body_)
-   : Expr(&type, location_), map(std::move(map_)), pub(std::move(pub_)), body(body_) { }
+  DefMap(const Location &location_, Defs &&defs_, Expr *body_)
+   : Expr(&type, location_), defs(std::move(defs_)), body(body_) { }
   DefMap(const Location &location_)
-   : Expr(&type, location_), map(), pub(), body(nullptr) { }
+   : Expr(&type, location_), defs(), body(nullptr) { }
+
+  void format(std::ostream &os, int depth) const override;
+};
+
+struct File {
+  typedef std::vector<std::pair<std::string, DefValue> > Pubs;
+  std::unique_ptr<DefMap> content;
+  Symbols local; // these override content->imports
+  Pubs pubs; // eval within local>content.imports>package>top.globals
+};
+
+struct Package : public Expr {
+  std::string name;
+  std::vector<File> files;
+  Symbols package;
+  Symbols exports; // subset of package; used to fill imports
+  // topics ... should have scope: file-local type > import > package-level > global
+  // types  ... one way to omit file-local: illegal to have import + package-level collision
+
+  static const TypeDescriptor type;
+  Package() : Expr(&type, LOCATION) { }
 
   void format(std::ostream &os, int depth) const override;
 };
 
 struct Top : public Expr {
-  typedef std::vector<std::unique_ptr<DefMap> > DefMaps;
-  typedef std::map<std::string, int> DefOrder;
-  DefMaps defmaps;
-  DefOrder globals;
+  std::vector<std::unique_ptr<Package> > packages;
+  Symbols globals;
   std::unique_ptr<Expr> body;
 
   static const TypeDescriptor type;
-  Top() : Expr(&type, LOCATION), defmaps(), globals() { }
+  Top() : Expr(&type, LOCATION), packages(), globals() { }
 
   void format(std::ostream &os, int depth) const override;
 };
 
-// Created by transforming DefMap+Top
+// Created by transforming DefMap+Package+Top
 struct DefBinding : public Expr {
   struct OrderValue {
     Location location;

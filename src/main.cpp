@@ -338,7 +338,7 @@ int main(int argc, char **argv) {
 
   std::vector<std::string> globals;
   if (global)
-    for (auto &g : top->globals)
+    for (auto &g : top->globals.defs)
       globals.push_back(g.first);
 
   // Read all wake targets

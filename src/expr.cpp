@@ -33,6 +33,7 @@ const TypeDescriptor Destruct  ::type("Destruct");
 const TypeDescriptor Subscribe ::type("Subscribe");
 const TypeDescriptor Match     ::type("Match");
 const TypeDescriptor DefMap    ::type("DefMap");
+const TypeDescriptor Package   ::type("Package");
 const TypeDescriptor Top       ::type("Top");
 // these are just useful for dumping json ast
 const TypeDescriptor VarDef    ::type("VarDef");
@@ -92,18 +93,32 @@ void Lambda::format(std::ostream &os, int depth) const {
   body->format(os, depth+2);
 }
 
+void Symbols::format(const char *kind, std::ostream &os, int depth) const {
+  for (auto &i : defs) {
+    os << pad(depth) << kind << " " << i.first << " = " << i.second.qualified << std::endl;
+  }
+}
+
 void DefMap::format(std::ostream &os, int depth) const {
   os << pad(depth) << "DefMap @ " << location.file() << std::endl;
-  for (auto &i : map) {
+  for (auto &i : defs) {
     os << pad(depth+2) << i.first << " =" << std::endl;
     i.second.body->format(os, depth+4);
   }
-  for (auto &i : pub) {
-    os << pad(depth+2) << "publish " << i.first << " =" << std::endl;
-    for (auto &j : i.second)
-      j.body->format(os, depth+4);
-  }
+  imports.format("import", os, depth+2);
   if (body) body->format(os, depth+2);
+}
+
+void Package::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Package " << name << " @ " << location.file() << std::endl;
+  exports.format("export", os, depth+2);
+  for (auto &i : files) {
+    i.content->format(os, depth+2);
+    for (auto &j : i.pubs) {
+      os << pad(depth+4) << "publish " << j.first << " = " << std::endl;
+      j.second.body->format(os, depth+6);
+    }
+  }
 }
 
 void Literal::format(std::ostream &os, int depth) const {
@@ -115,10 +130,10 @@ void Prim::format(std::ostream &os, int depth) const {
 }
 
 void Top::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Top; globals =";
-  for (auto &i : globals) os << " " << i.first;
-  os << std::endl;
-  for (auto &i : defmaps) i->format(os, depth+2);
+  os << pad(depth) << "Top" << std::endl;
+  globals.format("global", os, depth+2);
+  for (auto &i : packages)
+    i->format(os, depth+2);
   body->format(os, depth+2);
 }
 

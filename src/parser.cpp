@@ -573,25 +573,41 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
   return out;
 }
 
-static void bind_global(const std::string &name, Top *top, Lexer &lex) {
-  if (!top || name == "_") return;
+static void bind_global(const Definition &def, Symbols *globals, Lexer &lex) {
+  if (!globals || def.name == "_") return;
 
-  auto it = top->globals.insert(std::make_pair(name, top->defmaps.size()-1));
+  auto it = globals->defs.insert(std::make_pair(def.name, def.location));
   if (!it.second) {
     std::cerr << "Duplicate global "
-      << name << " at "
-      << top->defmaps.back()->map.find(name)->second.body->location.text() << " and "
-      << top->defmaps[it.first->second]->map.find(name)->second.body->location.text() << std::endl;
+      << def.name << " at "
+      << it.first->second.location.text() << " and "
+      << def.location.text() << std::endl;
     lex.fail = true;
   }
 }
 
-static void bind_def(Lexer &lex, DefMap::Defs &map, Definition &&def, Top *top = 0) {
+static void bind_export(const Definition &def, Symbols *exports, Lexer &lex) {
+  if (!exports || def.name == "_") return;
+
+  auto it = exports->defs.insert(std::make_pair(def.name, def.location));
+  if (!it.second) {
+    std::cerr << "Duplicate export "
+      << def.name << " at "
+      << it.first->second.location.text() << " and "
+      << def.location.text() << std::endl;
+    lex.fail = true;
+  }
+}
+
+static void bind_def(Lexer &lex, DefMap &map, Definition &&def, Symbols *exports, Symbols *globals) {
+  bind_global(def, globals, lex);
+  bind_export(def, exports, lex);
+
   if (def.name == "_")
-    def.name = "_" + std::to_string(map.size()) + " _";
+    def.name = "_" + std::to_string(map.defs.size()) + " _";
 
   Location l = def.body->location;
-  auto out = map.insert(std::make_pair(std::move(def.name), DefMap::Value(def.location, std::move(def.body))));
+  auto out = map.defs.insert(std::make_pair(std::move(def.name), DefValue(def.location, std::move(def.body))));
 
   if (!out.second) {
     std::cerr << "Duplicate def "
@@ -599,14 +615,6 @@ static void bind_def(Lexer &lex, DefMap::Defs &map, Definition &&def, Top *top =
       << out.first->second.body->location.text() << " and "
       << l.text() << std::endl;
     lex.fail = true;
-  }
-
-  bind_global(out.first->first, top, lex);
-}
-
-static void publish_defs(DefMap::Pubs &pub, std::vector<Definition> &&defs) {
-  for (auto &def : defs) {
-    pub[def.name].emplace_back(def.location, std::move(def.body));
   }
 }
 
@@ -886,7 +894,10 @@ static void check_special(Lexer &lex, const std::string &name, const std::shared
   if (name == "JValue")  JValue = sump;
 }
 
-static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
+#define FLAG_GLOBAL 1
+#define FLAG_EXPORT 2
+static void parse_tuple(Lexer &lex, Package &package, Symbols *exports, Symbols *globals, bool exportb, bool globalb) {
+  DefMap &map = *package.files.back().content;
   AST def = parse_type_def(lex);
   if (!def) return;
 
@@ -902,7 +913,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   std::shared_ptr<Sum> sump = std::make_shared<Sum>(std::move(def));
   AST tuple(sump->token, std::string(sump->name));
   tuple.region = sump->region;
-  std::vector<bool> members;
+  std::vector<int> members;
 
   if (!expect(INDENT, lex)) return;
   lex.consume();
@@ -911,15 +922,20 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
 
   bool repeat = true;
   while (repeat) {
-    bool global = lex.next.type == GLOBAL;
-    if (global) lex.consume();
+    int flags = 0;
+    bool quals = true;
+    while (quals) switch (lex.next.type) {
+      case GLOBAL: lex.consume(); flags |= FLAG_GLOBAL; break;
+      case EXPORT: lex.consume(); flags |= FLAG_EXPORT; break;
+      default: quals = false; break;
+    }
 
     ASTState state(true, false);
     AST member = parse_ast(0, lex, state);
     if (check_constructors(member)) lex.fail = true;
     if (member) {
       tuple.args.push_back(member);
-      members.push_back(global);
+      members.push_back(flags);
     }
 
     switch (lex.next.type) {
@@ -949,7 +965,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   for (size_t i = c.ast.args.size(); i > 0; --i)
     construct = new Lambda(c.ast.token, c.ast.args[i-1].tag, construct);
 
-  bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
+  bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), exportb?exports:nullptr, globalb?globals:nullptr);
 
   check_special(lex, name, sump);
 
@@ -958,13 +974,14 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   for (size_t i = 0; i < members.size(); ++i) {
     std::string &mname = c.ast.args[i].tag;
     Location memberToken = c.ast.args[i].region;
-    bool global = members[i];
+    bool globalb = (members[i] & FLAG_GLOBAL) != 0;
+    bool exportb = (members[i] & FLAG_EXPORT) != 0;
     if (mname.empty()) continue;
 
     // Implement get methods
     std::string get = "get" + name + mname;
     Expr *getfn = new Lambda(memberToken, "_", new Get(memberToken, sump, &c, i));
-    bind_def(lex, map, Definition(get, memberToken, getfn), global?top:0);
+    bind_def(lex, map, Definition(get, memberToken, getfn), exportb?exports:nullptr, globalb?globals:nullptr);
 
     // Implement edit methods
     DefMap *editmap = new DefMap(memberToken);
@@ -980,8 +997,8 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
               new VarRef(memberToken, "_ x")));
       std::string x = std::to_string(members.size()-inner);
       std::string name = std::string(4 - x.size(), '0') + x;
-      editmap->map.insert(std::make_pair(name,
-        DefMap::Value(memberToken, std::unique_ptr<Expr>(select))));
+      editmap->defs.insert(std::make_pair(name,
+        DefValue(memberToken, std::unique_ptr<Expr>(select))));
     }
 
     std::string edit = "edit" + name + mname;
@@ -989,7 +1006,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
       new Lambda(memberToken, "fn" + mname,
         new Lambda(memberToken, "_ x", editmap));
 
-    bind_def(lex, map, Definition(edit, memberToken, editfn), global?top:0);
+    bind_def(lex, map, Definition(edit, memberToken, editfn), exportb?exports:nullptr, globalb?globals:nullptr);
 
     // Implement set methods
     DefMap *setmap = new DefMap(memberToken);
@@ -997,8 +1014,8 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     for (size_t inner = 0; inner < members.size(); ++inner) {
       std::string x = std::to_string(members.size()-inner);
       std::string name = std::string(4 - x.size(), '0') + x;
-      setmap->map.insert(std::make_pair(name,
-        DefMap::Value(memberToken, std::unique_ptr<Expr>(
+      setmap->defs.insert(std::make_pair(name,
+        DefValue(memberToken, std::unique_ptr<Expr>(
           (inner == outer)
           ? static_cast<Expr*>(new VarRef(memberToken, mname))
           : static_cast<Expr*>(new Get(memberToken, sump, &c, inner))))));
@@ -1009,7 +1026,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
       new Lambda(memberToken, mname,
         new Lambda(memberToken, "_ x", setmap));
 
-    bind_def(lex, map, Definition(set, memberToken, setfn), global?top:0);
+    bind_def(lex, map, Definition(set, memberToken, setfn), exportb?exports:nullptr, globalb?globals:nullptr);
 
     ++outer;
   }
@@ -1038,7 +1055,9 @@ static void parse_data_elt(Lexer &lex, Sum &sum) {
   }
 }
 
-static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
+static void parse_data(Lexer &lex, Package &package, Symbols *exports, Symbols *globals, bool exportb, bool globalb) {
+  DefMap &map = *package.files.back().content;
+
   AST def = parse_type_def(lex);
   if (!def) return;
 
@@ -1080,20 +1099,29 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     for (size_t i = 0; i < c.ast.args.size(); ++i)
       construct = new Lambda(c.ast.token, "_", construct);
 
-    bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
+    bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), exportb?exports:nullptr, globalb?globals:nullptr);
   }
 
   check_special(lex, sump->name, sump);
 }
 
-static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
+static void parse_importexport(Package &package, Lexer &lex) {
+  // !!!
+}
+
+static void parse_import(DefMap &map, Lexer &lex) {
+  // !!!
+}
+
+static void parse_decl(Lexer &lex, DefMap &map, Symbols *exports, Symbols *globals) {
   switch (lex.next.type) {
-    default:
-       std::cerr << "Missing DEF after GLOBAL at " << lex.next.location.text() << std::endl;
-       lex.fail = true;
+    case FROM: {
+      parse_import(map, lex);
+      break;
+    }
     case DEF: {
-      for (auto &def : parse_def(lex, map.size(), false, false))
-         bind_def(lex, map, std::move(def), global?top:0);
+      for (auto &def : parse_def(lex, map.defs.size(), false, false))
+         bind_def(lex, map, std::move(def), exports, globals);
       break;
     }
     case TARGET: {
@@ -1103,17 +1131,14 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
       std::stringstream s;
       s << l.text();
       bind_def(lex, map, Definition("table " + def.name, def.location,
-        new App(l, new Lambda(l, "_", new Prim(l, "tnew"), " "),
-        new Literal(l, String::literal(lex.heap, s.str()), &String::typeVar))));
-      bind_def(lex, map, std::move(def), global?top:0);
+          new App(l, new Lambda(l, "_", new Prim(l, "tnew"), " "),
+          new Literal(l, String::literal(lex.heap, s.str()), &String::typeVar))),
+        nullptr, nullptr);
+      bind_def(lex, map, std::move(def), exports, globals);
       break;
     }
-    case TUPLE: {
-      parse_tuple(lex, map, top, global);
-      break;
-    }
-    case DATA: {
-      parse_data(lex, map, top, global);
+    default: {
+      // should be unreachable
       break;
     }
   }
@@ -1121,26 +1146,19 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
 
 static Expr *parse_block(Lexer &lex, bool multiline) {
   TRACE("BLOCK");
-  Expr *out;
 
   if (lex.next.type == INDENT) {
     lex.consume();
     if (expect(EOL, lex)) lex.consume();
 
-    Location location = lex.next.location;
-    DefMap::Defs map;
-    DefMap::Pubs pub;
+    DefMap *map = new DefMap(lex.next.location);
 
     bool repeat = true;
     while (repeat) {
       switch (lex.next.type) {
         case TARGET:
         case DEF: {
-          parse_decl(map, lex, 0, false);
-          break;
-        }
-        case PUBLISH: {
-          publish_defs(pub, parse_def(lex, 0, false, true));
+          parse_decl(lex, *map, nullptr, nullptr);
           break;
         }
         default: {
@@ -1150,54 +1168,117 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
       }
     }
 
-    auto body = relabel_anon(parse_binary(0, lex, true));
-    location.end = body->location.end;
-    if (pub.empty() && map.empty()) {
-      out = body;
-    } else {
-      out = new DefMap(location, std::move(map), std::move(pub), body);
-      out->flags |= FLAG_AST;
-    }
+    map->body = std::unique_ptr<Expr>(relabel_anon(parse_binary(0, lex, true)));
+    map->location.end = map->body->location.end;
+    map->flags |= FLAG_AST;
 
-    out->location.start.bytes -= (out->location.start.column-1);
-    out->location.start.column = 1;
+    map->location.start.bytes -= (map->location.start.column-1);
+    map->location.start.column = 1;
 
     if (expect(DEDENT, lex)) lex.consume();
-    return out;
+    return map;
   } else {
-    out = relabel_anon(parse_binary(0, lex, multiline));
+    return relabel_anon(parse_binary(0, lex, multiline));
   }
-
-  return out;
 }
 
 Expr *parse_expr(Lexer &lex) {
   return parse_binary(0, lex, false);
 }
 
+static void parse_package(Package &package, Lexer &lex) {
+  lex.consume();
+  auto id = get_arg_loc(lex);
+  if (expect(EOL, lex)) lex.consume();
+  if (package.name.empty()) {
+    package.name = id.first;
+  } else {
+    std::cerr << "Package name redefined at " << lex.next.location.text()
+      << " from '" << package.name << "'" << std::endl;
+    lex.fail = true;
+  }
+}
+
+static void no_tags(Lexer &lex, bool exportb, bool globalb) {
+  if (exportb) {
+    std::cerr << "Cannot prefix "
+      << symbolTable[lex.next.type] << " with 'export' at "
+      << lex.next.location.text() << std::endl;
+    lex.fail = true;
+  }
+  if (globalb) {
+    std::cerr << "Cannot prefix "
+      << symbolTable[lex.next.type] << " with 'global' at "
+      << lex.next.location.text() << std::endl;
+    lex.fail = true;
+  }
+}
+
 void parse_top(Top &top, Lexer &lex) {
   TRACE("TOP");
   if (lex.next.type == EOL) lex.consume();
-  top.defmaps.emplace_back(new DefMap(lex.next.location));
-  DefMap &defmap = *top.defmaps.back();
+  top.packages.emplace_back(new Package);
+  Package &package = *top.packages.back();
+  package.files.resize(1);
+  File &file = package.files.back();
+  file.content = std::unique_ptr<DefMap>(new DefMap(lex.next.location));
+  DefMap &map = *file.content;
 
-  bool repeat = true;
+  bool repeat  = true;
+  bool exportb = false;
+  bool globalb = false;
   while (repeat) {
     switch (lex.next.type) {
       case GLOBAL: {
         lex.consume();
-        parse_decl(defmap.map, lex, &top, true);
+        globalb = true;
         break;
       }
-      case TUPLE:
-      case DATA:
-      case TARGET:
-      case DEF: {
-        parse_decl(defmap.map, lex, &top,false);
+      case EXPORT: {
+        lex.consume();
+        exportb = true;
+        break;
+      }
+      case PACKAGE: {
+        no_tags(lex, exportb, globalb);
+        parse_package(package, lex);
+        exportb = false;
+        globalb = false;
+        break;
+      }
+      case FROM: {
+        no_tags(lex, exportb, globalb);
+        parse_importexport(package, lex);
+        exportb = false;
+        globalb = false;
+        break;
+      }
+      case TUPLE: {
+        parse_tuple(lex, package, &package.exports, &top.globals, exportb, globalb);
+        exportb = false;
+        globalb = false;
+        break;
+      }
+      case DATA: {
+        parse_data(lex, package, &package.exports, &top.globals, exportb, globalb);
+        exportb = false;
+        globalb = false;
         break;
       }
       case PUBLISH: {
-        publish_defs(defmap.pub, parse_def(lex, 0, false, true));
+        no_tags(lex, exportb, globalb);
+        for (auto &def : parse_def(lex, 0, false, true)) {
+          file.pubs.emplace_back(def.name, DefValue(def.location, std::move(def.body)));
+        }
+        exportb = false;
+        globalb = false;
+        break;
+      }
+      case DEF:
+      case TARGET: {
+        parse_decl(lex, map, exportb?&package.exports:nullptr, globalb?&top.globals:nullptr);
+        exportb = false;
+        globalb = false;
         break;
       }
       default: {
@@ -1207,8 +1288,23 @@ void parse_top(Top &top, Lexer &lex) {
     }
   }
 
-  defmap.location.end = lex.next.location.start;
+  map.location.end = lex.next.location.start;
   expect(END, lex);
+
+  static size_t anon_file = 0;
+  if (package.name.empty()) {
+    package.name = std::to_string(++anon_file);
+  }
+  for (auto &exp : package.exports.defs) {
+    if (exp.second.qualified.empty()) {
+      exp.second.qualified = exp.first + "@" + package.name;
+    }
+  }
+  for (auto &glb : top.globals.defs) {
+    if (glb.second.qualified.empty()) {
+      glb.second.qualified = glb.first + "@" + package.name;
+    }
+  }
 }
 
 Expr *parse_command(Lexer &lex) {
