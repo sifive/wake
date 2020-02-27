@@ -576,27 +576,15 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
 static void bind_global(const Definition &def, Symbols *globals, Lexer &lex) {
   if (!globals || def.name == "_") return;
 
-  auto it = globals->defs.insert(std::make_pair(def.name, def.location));
-  if (!it.second) {
-    std::cerr << "Duplicate global "
-      << def.name << " at "
-      << it.first->second.location.text() << " and "
-      << def.location.text() << std::endl;
-    lex.fail = true;
-  }
+  globals->defs.insert(std::make_pair(def.name, def.location));
+  // Duplicate globals will be detected as file-local conflicts
 }
 
 static void bind_export(const Definition &def, Symbols *exports, Lexer &lex) {
   if (!exports || def.name == "_") return;
 
-  auto it = exports->defs.insert(std::make_pair(def.name, def.location));
-  if (!it.second) {
-    std::cerr << "Duplicate export "
-      << def.name << " at "
-      << it.first->second.location.text() << " and "
-      << def.location.text() << std::endl;
-    lex.fail = true;
-  }
+  exports->defs.insert(std::make_pair(def.name, def.location));
+  // Duplicate exports will be detected as file-local conflicts
 }
 
 static void bind_def(Lexer &lex, DefMap &map, Definition &&def, Symbols *exports, Symbols *globals) {
@@ -1105,18 +1093,244 @@ static void parse_data(Lexer &lex, Package &package, Symbols *exports, Symbols *
   check_special(lex, sump->name, sump);
 }
 
-static void parse_importexport(Package &package, Lexer &lex) {
-  // !!!
+static void parse_import(const std::string &pkgname, DefMap &map, Lexer &lex) {
+  Symbols::SymbolMap *target;
+
+  // Special case for wildcard import
+  if (lex.next.type == ID && lex.id() == "_") {
+    lex.consume();
+    map.imports.import_all.emplace_back(pkgname);
+    if (expect(EOL, lex)) lex.consume();
+    return;
+  }
+
+  switch (lex.next.type) {
+    case DEF:
+      lex.consume();
+      target = &map.imports.defs;
+      break;
+    case TYPE:
+      lex.consume();
+      target = &map.imports.types;
+      break;
+    case TOPIC:
+      lex.consume();
+      target = &map.imports.topics;
+      break;
+    default:
+      target = &map.imports.mixed;
+      break;
+  }
+
+  bool unary = false;
+  bool binary = false;
+  switch (lex.next.type) {
+    case UNARY:
+      lex.consume();
+      unary = true;
+      break;
+    case BINARY:
+      lex.consume();
+      binary = true;
+      break;
+    default:
+      break;
+  }
+
+  while (lex.next.type == ID || lex.next.type == OPERATOR) {
+    SymbolType kind = lex.next.type;
+    std::string source, name = lex.id();
+    Location location = lex.next.location;
+    lex.consume();
+
+    if (lex.next.type == EQUALS) {
+      lex.consume();
+      if (lex.next.type == kind) {
+        source = lex.id() + "@" + pkgname;
+        lex.consume();
+      } else {
+        std::cerr << "Was expecting an "
+          << symbolTable[kind] << ", got an "
+          << symbolTable[lex.next.type] << " at "
+          << lex.next.location.text() << std::endl;
+        lex.fail = true;
+      }
+    } else {
+      source = name + "@" + pkgname;
+    }
+
+    if (name == "_" || source.substr(0,2) == "_@") {
+      std::cerr << "Import of _ must immediately follow the import keyword at "
+        << location.text() << std::endl;
+      lex.fail = true;
+      continue;
+    }
+
+    if (kind == OPERATOR) {
+      if (unary) {
+        name = "unary " + name;
+        source = "unary " + source;
+      } else if (binary) {
+        name = "binary " + name;
+        source = "binary " + source;
+      } else {
+        name = "op " + name;
+        source = "op " + source;
+      }
+    }
+
+    auto it = target->insert(std::make_pair(std::move(name), SymbolSource(location, source)));
+    if (!it.second) {
+      std::cerr << "Duplicate import symbol "
+        << name << " at "
+        << it.first->second.location.text() << " and "
+        << location.text() << std::endl;
+      lex.fail = true;
+    }
+  }
+
+  if (expect(EOL, lex)) lex.consume();
 }
 
-static void parse_import(DefMap &map, Lexer &lex) {
-  // !!!
+static void parse_export(const std::string &pkgname, Package &package, Lexer &lex) {
+  Symbols::SymbolMap *exports, *local;
+  switch (lex.next.type) {
+    case DEF:
+      lex.consume();
+      exports = &package.exports.defs;
+      local = &package.files.back().local.defs;
+      break;
+    case TYPE:
+      lex.consume();
+      exports = &package.exports.types;
+      local = &package.files.back().local.types;
+      break;
+    case TOPIC:
+      lex.consume();
+      exports = &package.exports.topics;
+      local = &package.files.back().local.topics;
+      break;
+    default:
+      exports = nullptr;
+      local = nullptr;
+      std::cerr << "Was expecting a DEF/TYPE/TOPIC, got a "
+        << symbolTable[lex.next.type] << " at "
+        << lex.next.location.text() << std::endl;
+      lex.fail = true;
+      break;
+  }
+
+  bool unary = false;
+  bool binary = false;
+  switch (lex.next.type) {
+    case UNARY:
+      lex.consume();
+      unary = true;
+      break;
+    case BINARY:
+      lex.consume();
+      binary = true;
+      break;
+    default:
+      break;
+  }
+
+  while (lex.next.type == ID || lex.next.type == OPERATOR) {
+    SymbolType kind = lex.next.type;
+    std::string source, name = lex.id();
+    Location location = lex.next.location;
+    lex.consume();
+
+    if (lex.next.type == EQUALS) {
+      lex.consume();
+      if (lex.next.type == kind) {
+        source = lex.id() + "@" + pkgname;
+        location.end = lex.next.location.end;
+        lex.consume();
+      } else {
+        std::cerr << "Was expecting an "
+          << symbolTable[kind] << ", got an "
+          << symbolTable[lex.next.type] << " at "
+          << lex.next.location.text() << std::endl;
+        lex.fail = true;
+        continue;
+      }
+    } else {
+      source = name + "@" + pkgname;
+    }
+
+    if (name == "_" || source.substr(0,2) == "_@") {
+      std::cerr << "Cannot re-export _ from another package at "
+        << location.text() << std::endl;
+      lex.fail = true;
+      continue;
+    }
+
+    if (kind == OPERATOR) {
+      if (unary) {
+        name = "unary " + name;
+        source = "unary " + source;
+      } else if (binary) {
+        name = "binary " + name;
+        source = "binary " + source;
+      } else {
+        std::cerr << "Cannot re-export an operator without specifying unary/binary at "
+          << location.text() << std::endl;
+        lex.fail = true;
+        continue;
+      }
+    }
+
+    if (!exports) continue;
+
+    exports->insert(std::make_pair(name, SymbolSource(location, source)));
+    // duplciates will be detected as file-local
+
+    auto it = local->insert(std::make_pair(name, SymbolSource(location, source)));
+    if (!it.second) {
+      std::cerr << "Duplicate file-local symbol "
+        << name << " at "
+        << it.first->second.location.text() << " and "
+        << location.text() << std::endl;
+      lex.fail = true;
+    }
+  }
+
+  if (expect(EOL, lex)) lex.consume();
+}
+
+static void parse_from_import(DefMap &map, Lexer &lex) {
+  lex.consume();
+  auto id = get_arg_loc(lex);
+  if (expect(IMPORT, lex)) lex.consume();
+  parse_import(id.first, map, lex);
+}
+
+static void parse_from_importexport(Package &package, Lexer &lex) {
+  lex.consume();
+  auto id = get_arg_loc(lex);
+
+  switch (lex.next.type) {
+    case IMPORT:
+      lex.consume();
+      parse_import(id.first, *package.files.back().content, lex);
+      break;
+    case EXPORT:
+      lex.consume();
+      parse_export(id.first, package, lex);
+      break;
+    default:
+      std::cerr << "Was expecting an IMPORT/EXPORT, got a "
+        << symbolTable[lex.next.type] << " at "
+        << lex.next.location.text() << std::endl;
+      lex.fail = true;
+  }
 }
 
 static void parse_decl(Lexer &lex, DefMap &map, Symbols *exports, Symbols *globals) {
   switch (lex.next.type) {
     case FROM: {
-      parse_import(map, lex);
+      parse_from_import(map, lex);
       break;
     }
     case DEF: {
@@ -1156,6 +1370,7 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
     bool repeat = true;
     while (repeat) {
       switch (lex.next.type) {
+        case FROM:
         case TARGET:
         case DEF: {
           parse_decl(lex, *map, nullptr, nullptr);
@@ -1216,14 +1431,15 @@ static void no_tags(Lexer &lex, bool exportb, bool globalb) {
 
 void parse_top(Top &top, Lexer &lex) {
   TRACE("TOP");
-  if (lex.next.type == EOL) lex.consume();
-  top.packages.emplace_back(new Package);
-  Package &package = *top.packages.back();
-  package.files.resize(1);
-  File &file = package.files.back();
+
+  std::unique_ptr<Package> package(new Package);
+  package->files.resize(1);
+  File &file = package->files.back();
   file.content = std::unique_ptr<DefMap>(new DefMap(lex.next.location));
   DefMap &map = *file.content;
+  Symbols globals;
 
+  if (lex.next.type == EOL) lex.consume();
   bool repeat  = true;
   bool exportb = false;
   bool globalb = false;
@@ -1241,26 +1457,26 @@ void parse_top(Top &top, Lexer &lex) {
       }
       case PACKAGE: {
         no_tags(lex, exportb, globalb);
-        parse_package(package, lex);
+        parse_package(*package, lex);
         exportb = false;
         globalb = false;
         break;
       }
       case FROM: {
         no_tags(lex, exportb, globalb);
-        parse_importexport(package, lex);
+        parse_from_importexport(*package, lex);
         exportb = false;
         globalb = false;
         break;
       }
       case TUPLE: {
-        parse_tuple(lex, package, &package.exports, &top.globals, exportb, globalb);
+        parse_tuple(lex, *package, &package->exports, &globals, exportb, globalb);
         exportb = false;
         globalb = false;
         break;
       }
       case DATA: {
-        parse_data(lex, package, &package.exports, &top.globals, exportb, globalb);
+        parse_data(lex, *package, &package->exports, &globals, exportb, globalb);
         exportb = false;
         globalb = false;
         break;
@@ -1276,7 +1492,7 @@ void parse_top(Top &top, Lexer &lex) {
       }
       case DEF:
       case TARGET: {
-        parse_decl(lex, map, exportb?&package.exports:nullptr, globalb?&top.globals:nullptr);
+        parse_decl(lex, map, exportb?&package->exports:nullptr, globalb?&globals:nullptr);
         exportb = false;
         globalb = false;
         break;
@@ -1292,18 +1508,64 @@ void parse_top(Top &top, Lexer &lex) {
   expect(END, lex);
 
   static size_t anon_file = 0;
-  if (package.name.empty()) {
-    package.name = std::to_string(++anon_file);
+  if (package->name.empty()) {
+    package->name = std::to_string(++anon_file);
   }
-  for (auto &exp : package.exports.defs) {
+
+  for (auto &exp : package->exports.defs) {
     if (exp.second.qualified.empty()) {
-      exp.second.qualified = exp.first + "@" + package.name;
+      exp.second.qualified = exp.first + "@" + package->name;
     }
   }
-  for (auto &glb : top.globals.defs) {
+
+  for (auto &glb : globals.defs) {
     if (glb.second.qualified.empty()) {
-      glb.second.qualified = glb.first + "@" + package.name;
+      glb.second.qualified = glb.first + "@" + package->name;
     }
+    auto it = top.globals.defs.insert(std::make_pair(glb.first, glb.second));
+    if (!it.second) {
+      std::cerr << "Duplicate global "
+        << glb.first << " at "
+        << it.first->second.location.text() << " and "
+        << glb.second.location.text() << std::endl;
+      lex.fail = true;
+    }
+  }
+
+  // localize all top-level symbols
+  DefMap::Defs defs(std::move(map.defs));
+  map.defs.clear();
+  for (auto &def : defs) {
+    auto name = def.first + "@" + package->name;
+    auto it = file.local.defs.insert(std::make_pair(def.first, SymbolSource(def.second.location, name)));
+    if (!it.second) {
+      std::cerr << "Duplicate file-local symbol "
+        << def.first << " at "
+        << it.first->second.location.text() << " and "
+        << def.second.location.text() << std::endl;
+      lex.fail = true;
+    }
+    map.defs.insert(std::make_pair(std::move(name), std::move(def.second)));
+  }
+
+  auto it = top.packages.insert(std::make_pair(package->name, nullptr));
+  if (it.second) {
+    package->package = file.local;
+    it.first->second = std::move(package);
+  } else {
+    for (auto &x : file.local.defs) {
+      auto ins = it.first->second->package.defs.insert(x);
+      if (!ins.second) {
+        std::cerr << "Duplicate package-local symbol "
+          << x.first << " at "
+          << ins.first->second.location.text() << " and "
+          << x.second.location.text() << std::endl;
+        lex.fail = true;
+      }
+    }
+    it.first->second->exports.defs.insert(package->exports.defs.begin(), package->exports.defs.end());
+    // duplicated export already reported as package-local duplicate
+    it.first->second->files.emplace_back(std::move(file));
   }
 }
 

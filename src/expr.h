@@ -168,15 +168,20 @@ struct SymbolSource {
 struct Symbols {
   typedef std::map<std::string, SymbolSource> SymbolMap; // to -> from@package
   SymbolMap defs;
-  // SymbolMap types;
-  // SymbolMap topics;
+  SymbolMap types;
+  SymbolMap topics;
   void format(const char *kind, std::ostream &os, int depth) const;
+};
+
+struct Imports : public Symbols {
+  SymbolMap mixed; // import from all of defs+types+topics (must be at least one)
+  std::vector<std::string> import_all;
 };
 
 struct DefMap : public Expr {
   typedef std::map<std::string, DefValue> Defs;
   Defs defs;
-  Symbols imports;
+  Imports imports;
   std::unique_ptr<Expr> body;
 
   static const TypeDescriptor type;
@@ -193,6 +198,8 @@ struct File {
   std::unique_ptr<DefMap> content;
   Symbols local; // these override content->imports
   Pubs pubs; // eval within local>content.imports>package>top.globals
+  // topics
+  // types
 };
 
 struct Package : public Expr {
@@ -200,8 +207,6 @@ struct Package : public Expr {
   std::vector<File> files;
   Symbols package;
   Symbols exports; // subset of package; used to fill imports
-  // topics ... should have scope: file-local type > import > package-level > global
-  // types  ... one way to omit file-local: illegal to have import + package-level collision
 
   static const TypeDescriptor type;
   Package() : Expr(&type, LOCATION) { }
@@ -210,7 +215,8 @@ struct Package : public Expr {
 };
 
 struct Top : public Expr {
-  std::vector<std::unique_ptr<Package> > packages;
+  typedef std::map<std::string, std::unique_ptr<Package> > Packages;
+  Packages packages;
   Symbols globals;
   std::unique_ptr<Expr> body;
 
