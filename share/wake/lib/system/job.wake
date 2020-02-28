@@ -13,37 +13,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-tuple Usage = # Unknown quantities are 0
-  global Status:   Integer
-  global Runtime:  Double
-  global CPUtime:  Double
-  global MemBytes: Integer
-  global InBytes:  Integer
-  global OutBytes: Integer
+package wake
 
-global def getUsageThreads (Usage _ run cpu _ _ _) =
+tuple Usage = # Unknown quantities are 0
+  export Status:   Integer
+  export Runtime:  Double
+  export CPUtime:  Double
+  export MemBytes: Integer
+  export InBytes:  Integer
+  export OutBytes: Integer
+
+export def getUsageThreads (Usage _ run cpu _ _ _) =
   if run ==. 0.0 then cpu else cpu /. run
 
 # RunnerInput is a subset of the fields supplied in the execution Plan
 tuple RunnerInput =
-  global Command:     List String
-  global Visible:     List Path
-  global Environment: List String
-  global Directory:   String
-  global Stdin:       String
-  global Resources:   List String
-  global Prefix:      String        # a unique prefix for this job
-  global Record:      Usage         # previous resource usage
+  export Command:     List String
+  export Visible:     List Path
+  export Environment: List String
+  export Directory:   String
+  export Stdin:       String
+  export Resources:   List String
+  export Prefix:      String        # a unique prefix for this job
+  export Record:      Usage         # previous resource usage
 
 tuple RunnerOutput =
-  global Inputs:  List String
-  global Outputs: List String
-  global Usage:   Usage
+  export Inputs:  List String
+  export Outputs: List String
+  export Usage:   Usage
 
 # A Runner describes a way to invoke a Plan to get a Job
 tuple Runner =
-  global Name:  String
-  global Score: Plan => Result Double String
+  export Name:  String
+  export Score: Plan => Result Double String
   Fn:           Job => Result RunnerInput Error => Result RunnerOutput Error
 
 # Create new Runner given pre- and post-hooks around an existing Runner
@@ -57,7 +59,7 @@ tuple Runner =
 # param (Runner _ _ run): base runner that the current runner is built on top of
 #   i.e. localRISCVRunner is built on localRunner.
 
-global def makeRunner name score pre post (Runner _ _ run) =
+export def makeRunner name score pre post (Runner _ _ run) =
   def doit job preInput = match (pre preInput)
     Pair runInput state =
       def runOutput = run job runInput
@@ -66,7 +68,7 @@ global def makeRunner name score pre post (Runner _ _ run) =
       waitJobMerged final job
   Runner name score doit
 
-global data Persistence =
+export data Persistence =
   ReRun	# Job should be re-executed on every runJob call
   Once	# Job should only be run once in a given wake execution
   Keep	# Job should output be reusable between wake invocations
@@ -74,21 +76,21 @@ global data Persistence =
 
 # A Plan describes a not-yet-executed Job
 tuple Plan =
-  global Command:      List String  # The command-line arguments (the first is the command to run)
-  global Visible:      List Path    # Only these files should be available to the command
-  global Environment:  List String  # KEY=VALUE environment variables fed to the command
-  global Directory:    String       # The directory in which the command should be run
-  global Stdin:        String       # The file to which standard input should be connected
-  global Stdout:       (LogLevel => EchoTarget) # How should standard output be displayed during a build
-  global Stderr:       (LogLevel => EchoTarget) # How should standard error be displayed during a build
-  global Echo:         LogLevel     # Print the command during builds when logLevel <= Echo
-  global Persistence:  Persistence  # See Persistence table above
-  global LocalOnly:    Boolean      # Must run directly in the local workspace; no output detection performed
-  global Resources:    List String  # The resources a runner must provide to the job (licenses/etc)
-  global RunnerFilter: Runner => Boolean # Reject from consideration Runners which the Plan deems inappropriate
-  global Usage:        Usage        # User-supplied usage prediction; overruled by database statistics (if any)
-  global FnInputs:     (List String => List String) # Modify the Runner's reported inputs  (files read)
-  global FnOutputs:    (List String => List String) # Modify the Runner's reported outputs (files created)
+  export Command:      List String  # The command-line arguments (the first is the command to run)
+  export Visible:      List Path    # Only these files should be available to the command
+  export Environment:  List String  # KEY=VALUE environment variables fed to the command
+  export Directory:    String       # The directory in which the command should be run
+  export Stdin:        String       # The file to which standard input should be connected
+  export Stdout:       (LogLevel => EchoTarget) # How should standard output be displayed during a build
+  export Stderr:       (LogLevel => EchoTarget) # How should standard error be displayed during a build
+  export Echo:         LogLevel     # Print the command during builds when logLevel <= Echo
+  export Persistence:  Persistence  # See Persistence table above
+  export LocalOnly:    Boolean      # Must run directly in the local workspace; no output detection performed
+  export Resources:    List String  # The resources a runner must provide to the job (licenses/etc)
+  export RunnerFilter: Runner => Boolean # Reject from consideration Runners which the Plan deems inappropriate
+  export Usage:        Usage        # User-supplied usage prediction; overruled by database statistics (if any)
+  export FnInputs:     (List String => List String) # Modify the Runner's reported inputs  (files read)
+  export FnOutputs:    (List String => List String) # Modify the Runner's reported outputs (files created)
 
 def isOnce = match _
   ReRun = False
@@ -102,16 +104,16 @@ def isShare = match _
   _     = False
 
 # Convenience accessor methods
-global def getPlanOnce  p = isOnce  (getPlanPersistence p)
-global def getPlanKeep  p = isKeep  (getPlanPersistence p)
-global def getPlanShare p = isShare (getPlanPersistence p)
+export def getPlanOnce  p = isOnce  (getPlanPersistence p)
+export def getPlanKeep  p = isKeep  (getPlanPersistence p)
+export def getPlanShare p = isShare (getPlanPersistence p)
 
-global def setPlanOnce  v p = editPlanOnce  (\_ v) p
-global def setPlanKeep  v p = editPlanKeep  (\_ v) p
-global def setPlanShare v p = editPlanShare (\_ v) p
+export def setPlanOnce  v p = editPlanOnce  (\_ v) p
+export def setPlanKeep  v p = editPlanKeep  (\_ v) p
+export def setPlanShare v p = editPlanShare (\_ v) p
 
 # Helper methods that maintain the invariant that: Share => Keep => Once
-global def editPlanOnce f =
+export def editPlanOnce f =
   def helper = match _
     ReRun if   f False = Once
     Once  if ! f True  = ReRun
@@ -120,7 +122,7 @@ global def editPlanOnce f =
     x                  = x
   editPlanPersistence helper
 
-global def editPlanKeep f =
+export def editPlanKeep f =
   def helper = match _
     ReRun if   f False = Keep
     Once  if   f False = Keep
@@ -129,7 +131,7 @@ global def editPlanKeep f =
     x                  = x
   editPlanPersistence helper
 
-global def editPlanShare f =
+export def editPlanShare f =
   def helper = match _
     ReRun if   f False = Share
     Once  if   f False = Share
@@ -139,7 +141,7 @@ global def editPlanShare f =
   editPlanPersistence helper
 
 # Get a unique hash-code for the job
-global def getPlanHash plan =
+export def getPlanHash plan =
   def signature cmd env dir stdin = prim "hash"
   def Plan cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ = plan
   signature cmd env dir stdin
@@ -158,17 +160,17 @@ global def getPlanHash plan =
 
 # Set reasonable defaults for all Plan arguments
 def id x = x
-global def makePlan cmd visible =
+export def makePlan cmd visible =
   Plan cmd visible environment "." "" logVerbose logWarn Normal Share False Nil (\_ True) defaultUsage id id
 
-global def makeShellPlan script visible =
+export def makeShellPlan script visible =
   makePlan (which "dash", "-c", script, Nil) visible
 
 def defaultUsage = Usage 0 0.0 1.0 0 0 0
 
 # This runner does not detect inputs/outputs on it's own
 # You must use Fn{Inputs,Outputs} to fill in this information
-global def localRunner =
+export def localRunner =
   def launch job dir stdin env cmd status runtime cputime membytes ibytes obytes = prim "job_launch"
   def badlaunch job error = prim "job_fail_launch"
   def doit job = match _
@@ -189,7 +191,7 @@ global def localRunner =
     if plan.getPlanLocalOnly then Pass 1.0 else Fail "cannot detect outputs"
   Runner "local" score doit
 
-global def virtualRunner =
+export def virtualRunner =
   def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
   def badlaunch job error = prim "job_fail_launch"
   def doit job = match _
@@ -264,13 +266,6 @@ def runJobImp cmd env dir stdin res usage finputs foutputs vis pers run log =
   then runOnce   cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run log
   else runAlways cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run log
 
-def logLevelRaw = prim "level"
-def logLevel = match logLevelRaw
-  0 = Quiet
-  1 = Normal
-  2 = Verbose
-  _ = Debug
-
 def jobLog stdout stderr echo =
   def num = match _
     Null   = 0
@@ -284,7 +279,7 @@ def jobLog stdout stderr echo =
   def bit = if thresh <= logLevelRaw then 1 else 0
   (bit << 4) + (num (stderr logLevel) << 2) + num (stdout logLevel)
 
-global def runJobWith (Runner _ _ run) (Plan cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs) =
+export def runJobWith (Runner _ _ run) (Plan cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs) =
   runJobImp cmd env dir stdin res usage finputs foutputs vis pers run (jobLog stdout stderr echo)
 
 data RunnerOption =
@@ -292,7 +287,7 @@ data RunnerOption =
   Reject (why: String)
 
 # Run the job!
-global def runJob p = match p
+export def runJob p = match p
   Plan cmd vis env dir stdin stdout stderr echo pers lo res rf usage finputs foutputs =
     # Transform the 'List Runner' into 'List RunnerOption'
     def qualify runner = match runner
@@ -337,16 +332,16 @@ def waitJobMerged f job =
     Fail _ = f Unit
 
 # Actual usage of a finished job
-global def getJobReport job =
+export def getJobReport job =
   def raw job = prim "job_report"
   raw job | rmap toUsage
 
 # From database, available the moment a Job exists
-global def getJobRecord job =
+export def getJobRecord job =
   def raw job = prim "job_record"
   raw job | at 0 | omap toUsage
 
-global def makeBadPath error = BadPath error
+export def makeBadPath error = BadPath error
 
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
@@ -361,16 +356,16 @@ def guardPath job = match _
 def mapPath = match _
   Fail e = BadPath e, Nil
   Pass l = map treeOk l
-global def killJob job signal = prim "job_kill" # send signal to job
-global def getJobStdout  job = stdio job 1
-global def getJobStderr  job = stdio job 2
-global def getJobInputs  job = tree job 1 | guardPath job
-global def getJobOutputs job = tree job 2 | guardPath job
-global def getJobFailedInputs  job = tree job 1 | mapPath
-global def getJobFailedOutputs job = tree job 2 | mapPath
-global def getJobId job = prim "job_id"
-global def getJobDescription job = prim "job_desc"
-global def getJobOutput job = match (tree job 2)
+export def killJob job signal = prim "job_kill" # send signal to job
+export def getJobStdout  job = stdio job 1
+export def getJobStderr  job = stdio job 2
+export def getJobInputs  job = tree job 1 | guardPath job
+export def getJobOutputs job = tree job 2 | guardPath job
+export def getJobFailedInputs  job = tree job 1 | mapPath
+export def getJobFailedOutputs job = tree job 2 | mapPath
+export def getJobId job = prim "job_id"
+export def getJobDescription job = prim "job_desc"
+export def getJobOutput job = match (tree job 2)
   Fail e = BadPath e
   Pass l if job.isJobOk = match l
     (Pair f _), Nil = Path f
@@ -378,16 +373,16 @@ global def getJobOutput job = match (tree job 2)
     _      = makeBadPath (makeError "More than one output found from '{job.getJobDescription}'")
   _ = makeBadPath (makeError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'")
 
-global def isJobOk job = match (getJobReport job)
+export def isJobOk job = match (getJobReport job)
   Fail _ = False
   Pass u = u.getUsageStatus == 0
 
-global data Status =
+export data Status =
   Exited   Integer
   Signaled Integer
   Aborted  Error
 
-global def getJobStatus job = match (getJobReport job)
+export def getJobStatus job = match (getJobReport job)
   Fail f = Aborted f
   Pass u =
     def status = u.getUsageStatus
@@ -397,14 +392,14 @@ global def getJobStatus job = match (getJobReport job)
 
 # Implement FUSE-based Runner
 def wakePath = prim "execpath" # location of the wake executable
-global def fuseRunner =
+export def fuseRunner =
   def fuse = "{wakePath}/../lib/wake/fuse-wake"
   def score plan =
     if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
   makeJSONRunnerPlan fuse score
   | makeJSONRunner
 
-global def preloadRunner =
+export def preloadRunner =
   def preload = "{wakePath}/../lib/wake/preload-wake"
   def score plan =
     if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
@@ -416,7 +411,7 @@ def wOK = 1
 def xOK = 2
 def access file mode = prim "access"
 
-global def defaultRunner = match sysname
+export def defaultRunner = match sysname
   "Darwin" = fuseRunner
   _ = match (getenv "USE_FUSE_WAKE")
     Some "0" = preloadRunner
@@ -431,20 +426,20 @@ global def defaultRunner = match sysname
 # Score: runJob chooses the runner with the largest score for a Plan
 # Estimate: predict local usage based on prior recorded usage
 tuple JSONRunnerPlan =
-  global RawScript: String
-  global ExtraArgs: List String
-  global Score: Plan => Result Double String
-  global Estimate: Usage => Usage
+  export RawScript: String
+  export ExtraArgs: List String
+  export Score: Plan => Result Double String
+  export Estimate: Usage => Usage
 
 # make a ``JSONRunnerPlan`` with ``Nil`` and ``(_)`` as defaults for ``ExtraArgs`` and ``Estimate`` respectively
 # rawScript: String; the path to the script to run jobs with
 # score: Plan => Double; runJob chooses the runner with the largest score for a Plan
-global def makeJSONRunnerPlan rawScript score =
+export def makeJSONRunnerPlan rawScript score =
   JSONRunnerPlan rawScript Nil score (_)
 
 # Make a Runner that runs a named script to run jobs
 # plan: JSONRunnerPlan; a tuple containing the arguments for this function
-global def makeJSONRunner plan =
+export def makeJSONRunner plan =
   def rawScript = plan.getJSONRunnerPlanRawScript
   def extraArgs = plan.getJSONRunnerPlanExtraArgs
   def score = plan.getJSONRunnerPlanScore
@@ -526,23 +521,23 @@ data Path =
   Path    (name: String)
   BadPath (error: Error)
 
-global def getPathResult path = match path
+export def getPathResult path = match path
   BadPath e = Fail e
   _         = Pass path
 
-global def getPathError path = match path
+export def getPathError path = match path
   Path _    = None
   BadPath e = Some e
 
-global def getPathName path = match path
+export def getPathName path = match path
   Path name = name
   BadPath _ = "BADPATH"
 
-global def getPathChild path = match path
+export def getPathChild path = match path
   Path name = replace `^.*/` '' name
   BadPath _ = "BADPATH"
 
-global def getPathParent path = match path
+export def getPathParent path = match path
   Path name = Path (simplify "{name}/..")
   BadPath e = BadPath e
 
@@ -575,10 +570,10 @@ target hashcode f =
 # job only allows cmd access to 'visible', to prevent undeclared dependencies.
 # If you miss declared visible inputs, your build will fail so you can fix it.
 # If you declare too many visible inputs, cmd execution/replay will wait for unnecessary files.
-global def job cmd visible =
+export def job cmd visible =
   makePlan cmd visible
   | runJob
 
-global def shellJob script visible =
+export def shellJob script visible =
   makeShellPlan script visible
   | runJob

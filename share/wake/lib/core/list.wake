@@ -13,28 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 # Constructs a List object.  
 global data List a =
   Nil
   (head: a), (tail: List a)
 
 # Returns True if the list contains no elements, otherwise False.
-global def empty = match _
+export def empty = match _
   Nil = True
   _   = False
 
 # Returns the first element of the list.
-global def head = match _
+export def head = match _
   Nil  = None
   h, _ = Some h
 
 # Returns a list of all elements, starting from the second.
-global def tail = match _
+export def tail = match _
   Nil  = Nil
   _, t = t
 
 # Applies a function f to each element of the list.
-global def map f =
+export def map f =
   def helper = match _
     Nil  = Nil
     h, t = f h, helper t
@@ -42,13 +44,13 @@ global def map f =
 
 # Applies a function to each element of the List and builds a new List from the resulting elements
 # (f: a => List b) => List a => List b
-global def mapFlat f =
+export def mapFlat f =
   def helper = match _
     Nil  = Nil
     h, t = f h ++ helper t
   helper
 
-global def mapPartial f =
+export def mapPartial f =
   def helper = match _
     Nil  = Nil
     h, t =
@@ -58,25 +60,25 @@ global def mapPartial f =
         None   = sub
   helper
 
-global def foldl f =
+export def foldl f =
   def helper a = match _
     Nil  = a
     h, t = helper (f a h) t
   helper
 
-global def scanl f =
+export def scanl f =
   def helper a = match _
     Nil  = a, Nil
     h, t = a, helper (f a h) t
   helper
 
-global def foldr f =
+export def foldr f =
   def helper a = match _
     Nil  = a
     h, t = f h (helper a t)
   helper
 
-global def scanr f =
+export def scanr f =
   def helper a = match _
     Nil  = Pair a (a, Nil)
     h, t =
@@ -87,33 +89,33 @@ global def scanr f =
 
 # list helpers
 def lcat = foldr (_,_) # curried to expose recursive helper outside of ++
-global def l ++ r  = lcat r l # ++ is required by the implementation of publish
-global def reverse = foldl (\a\b b,a) Nil
-global def flatten = foldr (_++_) Nil
-global def len     = foldl (\a\_ a+1) 0
+export def l ++ r  = lcat r l # ++ is required by the implementation of publish
+export def reverse = foldl (\a\b b,a) Nil
+export def flatten = foldr (_++_) Nil
+export def len     = foldl (\a\_ a+1) 0
 
 # list choppers
-global def splitAt i l =
+export def splitAt i l =
   if i <= 0 then Pair Nil l else match l
     Nil  = Pair Nil Nil
     h, t =
       def Pair u v = splitAt (i-1) t
       Pair (h, u) v
 
-global def take i l =
+export def take i l =
   if i <= 0 then Nil else match l
     Nil = Nil
     h, t = h, take (i-1) t
 
-global def drop i l =
+export def drop i l =
   if i <= 0 then l else match l
     Nil = Nil
     h, t = drop (i-1) t
 
-global def at i l =
+export def at i l =
   if i < 0 then None else head (drop i l)
 
-global def splitUntil f =
+export def splitUntil f =
   def helper l = match l
     Nil  = Pair Nil Nil
     h, t =
@@ -124,30 +126,30 @@ global def splitUntil f =
         Pair (h, u) v
   helper
 
-global def takeUntil f =
+export def takeUntil f =
   def helper = match _
     Nil  = Nil
     h, t = if f h then Nil else h, helper t
   helper
 
-global def dropUntil f =
+export def dropUntil f =
   def helper l = match l
     Nil  = Nil
     h, t = if f h then l else helper t
   helper
 
-global def find f =
+export def find f =
   def helper i = match _
     Nil  = None
     h, t = if f h then Some (Pair h i) else helper (i+1) t
   helper 0
 
-global def exists f l = find f l | isSome
-global def forall f =
+export def exists f l = find f l | isSome
+export def forall f =
   def not = ! f _
   ! exists not _
 
-global def splitBy f = match _
+export def splitBy f = match _
   Nil  = Pair Nil Nil
   h, t =
     def Pair u v = splitBy f t
@@ -155,7 +157,7 @@ global def splitBy f = match _
     then Pair (h, u) v
     else Pair u (h, v)
 
-global def filter f =
+export def filter f =
   def helper = match _
     Nil  = Nil
     h, t =
@@ -168,16 +170,16 @@ def mapTail = match _
   Nil = Nil
   Nil, t = mapTail t
   (_, b), t = b, mapTail t
-global def transpose l =
+export def transpose l =
   def heads = mapPartial head l
   def tails = mapTail l
   if heads.empty then Nil else heads, transpose tails
 
 # f should be a less-than comparison
-global def sortBy f l = vectorToList (vsortBy f (listToVector l))
+export def sortBy f l = vectorToList (vsortBy f (listToVector l))
 
 # keep only the first occurrence of a value
-global def distinctBy cmp =
+export def distinctBy cmp =
   def helper tree = match _
     Nil = Nil
     x, tail =
@@ -187,14 +189,14 @@ global def distinctBy cmp =
 
 # f should be an equality comparison
 # keep only the first occurrence in a run of equal values
-global def distinctRunBy f l = match l
+export def distinctRunBy f l = match l
   x, y, t =
     if f x y
     then distinctRunBy f (x, t)
     else x, distinctRunBy f (y, t)
   _ = l
 
-global def cmp f = match _ _
+export def cmp f = match _ _
   Nil     Nil     = EQ
   Nil     _       = LT
   _       Nil     = GT
@@ -202,18 +204,18 @@ global def cmp f = match _ _
     EQ = cmp f lt rt
     x  = x
 
-global def tab f =
+export def tab f =
   def helper a n = if n <= 0 then a else helper (f (n-1), a) (n-1)
   helper Nil
 
-global def seq = tab (_)
+export def seq = tab (_)
 
-global def zip = match _ _
+export def zip = match _ _
   Nil     _       = Nil
   _       Nil     = Nil
   (lh,lt) (rh,rt) = Pair lh rh, zip lt rt
 
-global def unzip = match _
+export def unzip = match _
   Nil         = Pair Nil Nil
   Pair a b, t =
     def Pair u v = unzip t

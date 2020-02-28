@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 def c11Flags      = ("-std=c++11", Nil)
 def c99Flags      = ("-std=c99", Nil)
 def debugCFlags   = ("-Wall", "-Wextra", "-O0", "-g", "-pg", Nil)
@@ -68,5 +70,5 @@ def pickVariant variant variants =
       def ok = catWith " " (map getPairFirst variants)
       \_\_\_ makeBadPath (makeError "No variant matches {variant}; options: {ok}")
 
-global def compileC variant = pickVariant variant compileCs # (subscribe compileC)
-global def linkO    variant = pickVariant variant linkOs # (subscribe linkO)
+export def compileC variant = pickVariant variant compileCs # (subscribe compileC)
+export def linkO    variant = pickVariant variant linkOs # (subscribe linkO)

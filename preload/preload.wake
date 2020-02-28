@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package build_wake
+from wake import _
+
 def loadenv = match sysname
   "Darwin" = "DYLD_INSERT_LIBRARIES"
   _ = "LD_PRELOAD"
@@ -28,7 +31,7 @@ def liblflags = match sysname
   "Darwin" = "-dynamiclib", Nil
   _ = "-shared", "-ldl", Nil
 
-global def buildPreload (Pair variant _) =
+export def buildPreload (Pair variant _) =
   def json = common variant
   def headers = json.getSysLibHeaders ++ sources here `.*\.h`
   def cppFiles = sources here `.*\.cpp`
@@ -36,7 +39,7 @@ global def buildPreload (Pair variant _) =
   def ofiles = map (compileC variant cppFlags headers) cppFiles
   linkO variant Nil (ofiles ++ json.getSysLibObjects) "lib/wake/preload-wake"
 
-global def buildPrelib (Pair _ variant) =
+export def buildPrelib (Pair _ variant) =
   def cfiles = sources here `.*\.c`
   def ofiles = map (compileC variant libcflags Nil) cfiles
   linkO variant liblflags ofiles "lib/wake/libpreload-wake.{libext}"

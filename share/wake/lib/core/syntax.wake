@@ -13,17 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 # Syntax helpers
 
 # Flip function and object order
-global def argument . memberFn = memberFn argument # obj.method-style syntax (. precedence > application)
-global def argument | pipeFn = pipeFn argument # bash-style pipe operator
+export def argument . memberFn = memberFn argument # obj.method-style syntax (. precedence > application)
+export def argument | pipeFn = pipeFn argument # bash-style pipe operator
 
 # Avoid ()s without changing order
-global def dollarFn $ argument = dollarFn argument
+export def dollarFn $ argument = dollarFn argument
 
 # The ring operator is used to denote the composition of functions.
-global def f ∘ g = \x f (g x)
+export def f ∘ g = \x f (g x)
 
 # Allows flipping the parameters of a function.
-global def flip f x y = f y x
+export def flip f x y = f y x

@@ -13,20 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package build_wake
+from wake import _
+
 # Useful build variants (arguments to all)
-global def default = Pair "native-cpp11-release" "native-c99-release"
-global def debug   = Pair "native-cpp11-debug" "native-c99-debug"
+global export def default = Pair "native-cpp11-release" "native-c99-release"
+global export def debug   = Pair "native-cpp11-debug" "native-c99-debug"
 
 # Build all wake targets
 def targets = buildWake, buildFuse, buildFuseDaemon, buildShim, buildPreload, buildPrelib, Nil
 def allOut variant = map (_ variant) targets
-global def all variant =
+global export def all variant =
   allOut variant
   | findSomeFn getPathError
   | getOrPass "BUILT"
 
 # Install wake into a target location
-global def install dest =
+export def install dest =
   def datfiles = sources "{here}/share" `.*`
   def binfiles = allOut default
   def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
@@ -39,7 +42,7 @@ global def install dest =
   | getOrPass "INSTALLED"
 
 # Create a release tarball
-global def tarball Unit = match (buildAs Unit) (buildOn Unit)
+export def tarball Unit = match (buildAs Unit) (buildOn Unit)
   (Fail f) _ = Fail f
   _ (Fail f) = Fail f
   (Pass release) (Pass time) =

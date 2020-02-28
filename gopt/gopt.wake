@@ -13,7 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-global def gopt variant =
+package build_wake
+from wake import _
+
+export def gopt variant =
   def cflags = "-I{here}", Nil
   def headers = sources here `.*\.h`
   def compile x = compileC variant cflags headers (source "{here}/{x}")

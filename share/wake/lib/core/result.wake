@@ -13,53 +13,55 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-global data Result pass fail =
+package wake
+
+export data Result pass fail =
   Pass pass
   Fail fail
 
-global def isPass = match _
+export def isPass = match _
   Pass _ = True
   Fail _ = False
 
-global def isFail = match _
+export def isFail = match _
   Pass _ = False
   Fail _ = True
 
-global def getPass = match _
+export def getPass = match _
   Pass x = Some x
   Fail _ = None
 
-global def getFail = match _
+export def getFail = match _
   Pass _ = None
   Fail x = Some x
 
-global def getWhenFail fail = match _
+export def getWhenFail fail = match _
   Pass a = a
   Fail _ = fail
 
-global def rmap fn = match _
+export def rmap fn = match _
   Pass a = Pass (fn a)
   Fail f = Fail f
 
 # Applies a fallible function to Pass value or propogates Fail
 # (fn: a => Result b c) => Result a c => Result b c
-global def rmapPass fn = match _
+export def rmapPass fn = match _
   Pass a = fn a
   Fail f = Fail f
 
 # Applies a fallible function to Fail value or propogates Pass
 # (fn: a => Result b c) => Result b a => Result b c
-global def rmapFail fn = match _
+export def rmapFail fn = match _
   Pass a = Pass a
   Fail f = fn f
 
 # Finds the first Fail in a List of Result or aggregates Passes into a List
 # List (Result a b) => Result (List a) b
-global def findFail = findFailFn (_)
+export def findFail = findFailFn (_)
 # Applies a fallible function to each element of a List,
 #   returning the first Fail or aggregates the Passes into a List
 # (fn: a => Result b c) => List a => Result (List b) c
-global def findFailFn fn =
+export def findFailFn fn =
   def helper = match _
     Nil = Pass Nil
     h, t = match (fn h)
@@ -71,11 +73,11 @@ global def findFailFn fn =
 
 # Finds the first Pass in a List of Result or aggregates Fails into a List
 # List (Result a b) => Result a (List b)
-global def findPass = findPassFn (_)
+export def findPass = findPassFn (_)
 # Applies a fallible function to each element of a List
 #  returning the first Pass or aggregates the Fails into a List
 # (fn: a => Result b c) => List a => Result b (List c)
-global def findPassFn fn =
+export def findPassFn fn =
   def helper = match _
     Nil = Fail Nil
     h, t = match (fn h)
@@ -85,13 +87,13 @@ global def findPassFn fn =
         z = z
   helper
 
-global def panic s = prim "panic"
+export def panic s = prim "panic"
 
-global def stack s = prim "stack"
+export def stack s = prim "stack"
 
-global tuple Error =
-  global Cause: String
-  global Stack: List String
+export tuple Error =
+  export Cause: String
+  export Stack: List String
 
-global def makeError cause =
+export def makeError cause =
   Error cause (stack Unit)

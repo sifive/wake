@@ -13,8 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package build_wake
+from wake import _
+
 # Prefer to use system utf8proc if available
-global def utf8proc variant = match (pkgConfig "utf8proc")
+export def utf8proc variant = match (pkgConfig "utf8proc")
   Some x = x
   None   =
     def cflags = "-I{here}", Nil

@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package build_wake
+from wake import _
+
 # Require re2c >= 1.0 for flag support
 def re2cOk Unit =
   def ver =
@@ -52,5 +55,5 @@ def re2cFake file =
     %"
   shellJob script (zip, Nil) | getJobOutput
 
-global def re2c file =
+export def re2c file =
   if re2cOk Unit then re2cReal file else re2cFake file

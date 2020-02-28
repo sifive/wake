@@ -13,7 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-global def buildAs Unit = match Nil #(subscribe releaseAs)
+package build_wake
+from wake import _
+
+export def buildAs Unit = match Nil #(subscribe releaseAs)
   version, Nil = Pass version
   _ =
     def cmdline = which "git", "describe", "--tags", "--dirty", Nil
@@ -32,7 +35,7 @@ global def buildAs Unit = match Nil #(subscribe releaseAs)
     #  0.15.0~alpha.4+g6efe8e9~dirty ... which sorts correctly for both rpm+deb
     # ^      ^     ^ ^        ^
 
-global def buildOn Unit = match Nil #(subscribe releaseOn)
+export def buildOn Unit = match Nil #(subscribe releaseOn)
   date, Nil = Pass date
   _ =
     def cmdline = which "git", "show", "-s", "--format=%ci", "HEAD", Nil

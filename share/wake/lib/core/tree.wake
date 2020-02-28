@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 # balanced order-statistic trees
 data Tree a = Tree (a => a => Order) (TreeNode a) # cmp root
 data TreeNode a =
@@ -26,22 +28,18 @@ def ratioQ = 3
 def ratioD = 2
 
 # Create a new Tree, sorted by cmp.
-global def tnew cmp = Tree cmp Tip
+export def tnew cmp = Tree cmp Tip
 
 # Convert a List to a Tree.
-global def listToTree cmp list = vectorToTree cmp (listToVector list)
-global def listToTreeMulti cmp list = vectorToTreeMulti cmp (listToVector list)
+export def listToTree cmp list = vectorToTree cmp (listToVector list)
+export def listToTreeMulti cmp list = vectorToTreeMulti cmp (listToVector list)
 
-global def vectorToTreeMulti cmp v =
+export def vectorToTreeMulti cmp v =
   Tree cmp (build (vsortBy (cmp _ _ | isLT) v))
 
 # Convert a Vector to a Tree.
-global def vectorToTree cmp v =
+export def vectorToTree cmp v =
   Tree cmp (build (vdistinctRunBy (cmp _ _ | isEQ) (vsortBy (cmp _ _ | isLT) v)))
-
-def vat_ i v = match (vat i v)
-  Some x = x
-  _ = panic "unreachable"
 
 def build v = match (vlen v)
   0 = Tip
@@ -53,18 +51,18 @@ def build v = match (vlen v)
     Bin len (build l) (vat_ mid v) (build r)
 
 # Returns the total length of the Tree.
-global def tlen (Tree _ root) = size root
+export def tlen (Tree _ root) = size root
 def size = match _
   Tip         = 0
   Bin s _ _ _ = s
 
 # Returns True if the Tree is empty, False otherwise.
-global def tempty (Tree _ root) = match root
+export def tempty (Tree _ root) = match root
   Tip = True
   _   = False
 
 # Insert y into the tree only if no other keys = y
-global def tinsert y (Tree cmp root) =
+export def tinsert y (Tree cmp root) =
   def helper t = match t
     Tip         = Bin 1 Tip y Tip
     Bin _ l x r = match (cmp x y)
@@ -74,7 +72,7 @@ global def tinsert y (Tree cmp root) =
   Tree cmp (helper root)
 
 # Insert y into the tree, removing any existing keys = y
-global def tinsertReplace y (Tree cmp root) =
+export def tinsertReplace y (Tree cmp root) =
   def helper t = match t
     Tip         = Bin 1 Tip y Tip
     Bin s l x r = match (cmp x y)
@@ -84,7 +82,7 @@ global def tinsertReplace y (Tree cmp root) =
   Tree cmp (helper root)
 
 # Insert y into the tree at the lowest rank of keys = y
-global def tinsertMulti y (Tree cmp root) =
+export def tinsertMulti y (Tree cmp root) =
   def helper = match _
     Tip         = Bin 1 Tip y Tip
     Bin _ l x r = match (cmp x y)
@@ -93,25 +91,25 @@ global def tinsertMulti y (Tree cmp root) =
   Tree cmp (helper root)
 
 # Returns True if a is a subset of b, otherwise False.
-global def a ⊆ b = tsubset a b
+export def a ⊆ b = tsubset a b
 
 # Returns True if a is a superset of b, otherwise False.
-global def a ⊇ b = tsubset b a
+export def a ⊇ b = tsubset b a
 
 # Returns True if a is NOT a superset of b, otherwise False.
-global def a ⊉ b = ! a ⊇ b
+export def a ⊉ b = ! a ⊇ b
 
 # Returns True if a is NOT a subset of b, otherwise False.
-global def a ⊈ b = ! a ⊆ b
+export def a ⊈ b = ! a ⊆ b
 
 # Returns True if a is a proper subset of b, otherwise False.
-global def a ⊊ b = a ⊆ b && b ⊈ a # strict
+export def a ⊊ b = a ⊆ b && b ⊈ a # strict
 
 # Returns True if a is a proper superset of b, otherwise False.
-global def a ⊋ b = a ⊇ b && b ⊉ a # strict
+export def a ⊋ b = a ⊇ b && b ⊉ a # strict
 
 # Returns True if every element of a is also in b, otherwise false.
-global def tsubset (Tree _ aroot) (Tree cmp broot) =
+export def tsubset (Tree _ aroot) (Tree cmp broot) =
   def helper a b = match a b
     Tip _ = True
     _ Tip = False
@@ -120,7 +118,7 @@ global def tsubset (Tree _ aroot) (Tree cmp broot) =
   helper aroot broot
 
 # Deletes all keys that are equal to y.
-global def tdelete y (Tree cmp root) =
+export def tdelete y (Tree cmp root) =
   Tree cmp (delete cmp y root)
 def delete cmp y t =
   def helper = match _
@@ -132,32 +130,32 @@ def delete cmp y t =
   helper t
 
 # Folds from left to right.
-global def tfoldl f a (Tree _ root) =
+export def tfoldl f a (Tree _ root) =
   def helper a = match _
     Tip         = a
     Bin _ l x r = helper (f (helper a l) x) r
   helper a root
 
 # Folds from right to left.
-global def tfoldr f a (Tree _ root) =
+export def tfoldr f a (Tree _ root) =
   def helper a = match _
     Tip         = a
     Bin _ l x r = helper (f x (helper a r)) l
   helper a root
 
 # Fold in parallel; assumes f is an associative operator and has type: a => a => a
-global def tfoldmap f a g (Tree _ root) =
+export def tfoldmap f a g (Tree _ root) =
   def helper a = match _
     Tip = g a
     Bin _ l x r = f (helper a l) (helper x r)
   helper a root
 
-global def tfold f a t = tfoldmap f a (_) t
+export def tfold f a t = tfoldmap f a (_) t
 
 # Converts a Tree to a List.
-global def treeToList = tfoldr (_,_) Nil
+export def treeToList = tfoldr (_,_) Nil
 
-global def tappi f (Tree _ root) =
+export def tappi f (Tree _ root) =
   def helper i = match _
     Tip = Unit
     Bin _ l x r =
@@ -169,7 +167,7 @@ global def tappi f (Tree _ root) =
   helper 0 root
 
 # Extract the i-th ranked element
-global def tat i (Tree _ root) =
+export def tat i (Tree _ root) =
   def helper i = match _
     Tip = None
     Bin _ l x r =
@@ -181,7 +179,7 @@ global def tat i (Tree _ root) =
   helper i root
 
 # Split elements ranked [0,i) and [i,inf) into two trees
-global def tsplitAt i (Tree cmp root) =
+export def tsplitAt i (Tree cmp root) =
   def helper i = match _
     Tip = Pair Tip Tip
     Bin _ l x r =
@@ -194,11 +192,11 @@ global def tsplitAt i (Tree cmp root) =
   match (helper i root)
     Pair l r = Pair (Tree cmp l) (Tree cmp r)
 
-global def ttake i t = tsplitAt i t | getPairFirst
-global def tdrop i t = tsplitAt i t | getPairSecond
+export def ttake i t = tsplitAt i t | getPairFirst
+export def tdrop i t = tsplitAt i t | getPairSecond
 
 # Lowest rank element where f x = True  => Option (Pair x rank)
-global def tfind f (Tree _ root) =
+export def tfind f (Tree _ root) =
   def helper = match _
     Tip         = None
     Bin s l x r = match (helper l) (f x) (helper r)
@@ -208,24 +206,24 @@ global def tfind f (Tree _ root) =
       _        _    _       = None
   helper root
 
-global def tsplitUntil f t =
+export def tsplitUntil f t =
   match (tfind f t)
     None = match t
       (Tree cmp _) = Pair t (Tree cmp Tip)
     Some (Pair _ i) = tsplitAt i t
 
-global def ttakeUntil f t = tsplitUntil f t | getPairFirst
-global def tdropUntil f t = tsplitUntil f t | getPairSecond
+export def ttakeUntil f t = tsplitUntil f t | getPairFirst
+export def tdropUntil f t = tsplitUntil f t | getPairSecond
 
 # Returns True if there exists an x in t where f x = True
-global def texists f t = match (tfind f t)
+export def texists f t = match (tfind f t)
   Some _ = True
   None   = False
 
-global def tforall f t = ! texists (! f _) t
+export def tforall f t = ! texists (! f _) t
 
 # Split tree into those elements <, =, and > y
-global def tsplit y (Tree cmp root) =
+export def tsplit y (Tree cmp root) =
   match (split y cmp root)
     Triple l e g = Triple (Tree cmp l) (Tree cmp e) (Tree cmp g)
 
@@ -256,7 +254,7 @@ def split y cmp root =
   helper root
 
 # Split tree into those elements where f x = True and those where f x = False
-global def tsplitBy f (Tree cmp root) =
+export def tsplitBy f (Tree cmp root) =
   def helper t = match t
     Tip = Pair Tip Tip
     Bin _ l x r = match (helper l) (helper r)
@@ -268,7 +266,7 @@ global def tsplitBy f (Tree cmp root) =
     Pair t f = Pair (Tree cmp t) (Tree cmp f)
 
 # Remove all elements x such that f x = False.
-global def tfilter f (Tree cmp root) =
+export def tfilter f (Tree cmp root) =
   def helper t = match t
     Tip = Tip
     Bin _ l x r =
@@ -278,8 +276,8 @@ global def tfilter f (Tree cmp root) =
   Tree cmp (helper root)
 
 # Return the smallest element in the tree.
-global def tmin (Tree _ root) = min root
-def min root =
+export def tmin (Tree _ root) = min_ root
+def min_ root =
   def none = match _
     Tip         = None
     Bin _ l x _ = some x l
@@ -289,8 +287,8 @@ def min root =
   none root
 
 # Return the largest element in the tree.
-global def tmax (Tree _ root) = max root
-def max root =
+export def tmax (Tree _ root) = max_ root
+def max_ root =
   def none = match _
     Tip         = None
     Bin _ _ x r = some x r
@@ -300,14 +298,14 @@ def max root =
   none root
 
 # Lowest rank element with x >= y.
-global def tlowerGE y (Tree cmp root) =
+export def tlowerGE y (Tree cmp root) =
   def f x = match (cmp x y)
     LT = False
     _  = True
   lower f root
 
 # Lowest rank element with x > y.
-global def tlowerGT y (Tree cmp root) =
+export def tlowerGT y (Tree cmp root) =
   def f x = match (cmp x y)
     GT = True
     _  = False
@@ -327,14 +325,14 @@ def lower f root =
   none root
 
 # Highest rank element with x < y
-global def tupperLT y (Tree cmp root) =
+export def tupperLT y (Tree cmp root) =
   def f x = match (cmp x y)
     LT = False
     _  = True
   upper f root
 
 # Highest rank element with x <= y
-global def tupperLE y (Tree cmp root) =
+export def tupperLE y (Tree cmp root) =
   def f x = match (cmp x y)
     GT = True
     _  = False
@@ -355,7 +353,7 @@ def upper f root =
 
 # Extract all elements from the tree which are equal to y
 # => Pair (matches: List x) (rank: Integer)
-global def tequal y (Tree cmp root) =
+export def tequal y (Tree cmp root) =
   def helperR i out = match _ # i = size including self
     Tip         = Pair out i
     Bin s l x r = match (cmp x y)
@@ -371,18 +369,18 @@ global def tequal y (Tree cmp root) =
   helperL 0 Nil root
 
 # Returns True if x is an element of y, False otherwise.
-global def x ∈ y = tcontains x y
+export def x ∈ y = tcontains x y
 
 # Returns True if x is NOT an element of y, False otherwise.
-global def x ∉ y = ! x ∈ y
+export def x ∉ y = ! x ∈ y
 
 # Returns True if x contains y, False otherwise.
-global def x ∋ y = y ∈ x
+export def x ∋ y = y ∈ x
 
 # Returns True if x does NOT contain y, False otherwise.
-global def x ∌ y = y ∉ x
+export def x ∌ y = y ∉ x
 
-global def tcontains y t =
+export def tcontains y t =
   match t (tupperLE y t)
     (Tree cmp _) None              = False
     (Tree cmp _) (Some (Pair x _)) = match (cmp x y)
@@ -390,18 +388,18 @@ global def tcontains y t =
       _  = False
 
 # Eliminate duplicates, as identified by cmp
-global def tdistinctBy cmp t = match t
+export def tdistinctBy cmp t = match t
   Tree tcmp _ = listToTree tcmp (distinctBy cmp (treeToList t))
 
 # Eliminate duplicates, as identified by f
-global def tdistinctRunBy f t = match t
+export def tdistinctRunBy f t = match t
   Tree cmp _ = Tree cmp (build (vdistinctRunBy f (treeToVector t)))
 
 # Returns the union of trees a and b, keeps only values from a if they are equal to values in b.
-global def a ∪ b = tunion a b
+export def a ∪ b = tunion a b
 
 # Returns the union of two trees, given their roots.
-global def tunion (Tree _ aroot) (Tree cmp broot) =
+export def tunion (Tree _ aroot) (Tree cmp broot) =
   Tree cmp (union cmp aroot broot)
 def union cmp aroot broot =
   def helper a b = match a b
@@ -412,8 +410,8 @@ def union cmp aroot broot =
   helper aroot broot
 
 # Union of two trees, keeping equal values of a before equal values of b
-global def a ⊎ b = tunionMulti a b
-global def tunionMulti (Tree _ aroot) (Tree cmp broot) =
+export def a ⊎ b = tunionMulti a b
+export def tunionMulti (Tree _ aroot) (Tree cmp broot) =
   Tree cmp (unionMulti cmp aroot broot)
 
 def unionMulti cmp aroot broot =
@@ -431,8 +429,8 @@ def unionMulti cmp aroot broot =
   helper aroot broot
 
 # Returns the set difference of A and B, that is, a tree containing all elements of A which are not in B.
-global def a ∖ b = tsubtract a b
-global def tsubtract (Tree _ aroot) (Tree cmp broot) =
+export def a ∖ b = tsubtract a b
+export def tsubtract (Tree _ aroot) (Tree cmp broot) =
   def helper a b = match a b
     Tip _ = Tip
     _ Tip = a
@@ -441,8 +439,8 @@ global def tsubtract (Tree _ aroot) (Tree cmp broot) =
   Tree cmp (helper aroot broot)
 
 # Returns a tree containing all elements of A which are also in B.
-global def a ∩ b = tintersect a b
-global def tintersect (Tree _ aroot) (Tree cmp broot) =
+export def a ∩ b = tintersect a b
+export def tintersect (Tree _ aroot) (Tree cmp broot) =
   def helper a b = match a b
     Tip _ = Tip
     _ Tip = Tip
@@ -457,7 +455,7 @@ global def tintersect (Tree _ aroot) (Tree cmp broot) =
   Tree cmp (helper aroot broot)
 
 # Pretty print the tree shape for debug
-#global def tshape (Tree _ root) =
+#export def tshape (Tree _ root) =
 #  def row x =
 #    def helper i = match _
 #      Tip = Nil

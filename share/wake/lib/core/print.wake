@@ -13,8 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 # Any => String conversion
-global def format any = prim "format"
+export def format any = prim "format"
 
 # These values often come from the wake command-line
 # default => Normal
@@ -22,78 +24,79 @@ global def format any = prim "format"
 # -q      => Quiet
 # -v      => Verbose
 # -dv     => Debug
-global data LogLevel =
+export data LogLevel =
   Debug
   Verbose
   Normal
   Quiet
 
-global data EchoTarget =
+export data EchoTarget =
   Null
   Stdout
   Stderr # rendered in red if on a tty
 
-global def logError = match _
+export def logError = match _
   Quiet = Stderr
   _     = Stderr
 
-global def logWarn = match _
+export def logWarn = match _
   Quiet = Null
   _     = Stderr
 
-global def logNormal = match _
+export def logNormal = match _
   Quiet = Null
   _     = Stdout
 
-global def logVerbose = match _
+export def logVerbose = match _
   Debug   = Stdout
   Verbose = Stdout
   _       = Null
 
-global def logDebug = match _
+export def logDebug = match _
   Debug = Stdout
   _     = Null
 
-global def logNever = match _
+export def logNever = match _
   Debug = Null
   _     = Null
 
 # Useful helper method for inserting a debug step into a pipeline
 # def foo = "123123" | tap ("that: {_}") | int | getOrElse 0
-global def tap consumerFn value =
+export def tap consumerFn value =
   def _ = consumerFn value
   value
 
 # Print the tap output to the console
-global def tapLevel level formatFn value =
+export def tapLevel level formatFn value =
   def _ = printlnLevel level (formatFn value)
   value
 
-global def tapError   = tapLevel logError
-global def tapWarn    = tapLevel logWarn
-global def tapNormal  = tapLevel logNormal
-global def tapVerbose = tapLevel logVerbose
-global def tapDebug   = tapLevel logDebug
+export def tapError   = tapLevel logError
+export def tapWarn    = tapLevel logWarn
+export def tapNormal  = tapLevel logNormal
+export def tapVerbose = tapLevel logVerbose
+export def tapDebug   = tapLevel logDebug
 
 # This is private so that users cannot make the build depend on it
-def logLevel = match (prim "level")
+def logLevelRaw = prim "level"
+def logLevel = match logLevelRaw
   0 = Quiet
   1 = Normal
   2 = Verbose
   _ = Debug
 
 # Print with a given verbosity
-global def printLevel logLevelFn =
+export def printLevel logLevelFn =
   def p i outputStr = prim "print"
   match (logLevelFn logLevel)
     Null   = (\_ Unit)
     Stdout = p 1
     Stderr = p 2
 
-global def printlnLevel logLevelFn =
+export def printlnLevel logLevelFn =
   def f = printLevel logLevelFn
   (\outputStr f "{outputStr}\n")
 
 # Print any type to stdout; even exceptions
-global def print   = printLevel logNormal
-global def println = printlnLevel logNormal
+export def print   = printLevel logNormal
+export def println = printlnLevel logNormal

@@ -13,7 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-global def common variant =
+package build_wake
+from wake import _
+
+export def common variant =
   def cflags = "-I{here}", Nil
   def headers = sources here `.*\.h`
   def reFiles = sources here `.*\.re`
