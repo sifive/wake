@@ -180,6 +180,8 @@ struct Symbols {
   SymbolMap types;
   SymbolMap topics;
   void format(const char *kind, std::ostream &os, int depth) const;
+  bool join(const Symbols &symbols, const char *scope);
+  void setpkg(const std::string &pkgname);
 };
 
 struct Imports : public Symbols {

@@ -18,6 +18,7 @@
 #include "expr.h"
 #include <cassert>
 #include <sstream>
+#include <iostream>
 
 Expr::~Expr() { }
 const TypeDescriptor Prim      ::type("Prim");
@@ -97,6 +98,47 @@ void Symbols::format(const char *kind, std::ostream &os, int depth) const {
   for (auto &i : defs) {
     os << pad(depth) << kind << " " << i.first << " = " << i.second.qualified << std::endl;
   }
+}
+
+static bool smap_join(Symbols::SymbolMap &dest, const Symbols::SymbolMap &src, const char *scope, const char *kind) {
+  bool ok = true;
+  for (auto &sym : src) {
+    auto it = dest.insert(sym);
+    if (!it.second) {
+      ok = false;
+      if (scope) {
+        std::cerr << "Duplicate "
+          << scope << " "
+          << kind << " '"
+          << sym.first << "' at "
+          << it.first->second.location.text() << " and "
+          << sym.second.location.text() << std::endl;
+      }
+    }
+  }
+  return ok;
+}
+
+bool Symbols::join(const Symbols &symbols, const char *scope) {
+  bool ok = true;
+  if (!smap_join(defs,   symbols.defs,   scope, "definition")) ok = false;
+  if (!smap_join(types,  symbols.types,  scope, "type"))       ok = false;
+  if (!smap_join(topics, symbols.topics, scope, "topic"))      ok = false;
+  return ok;
+}
+
+static void smap_setpkg(Symbols::SymbolMap &dest, const std::string &pkgname) {
+  for (auto &sym : dest) {
+    if (sym.second.qualified.empty()) {
+      sym.second.qualified = sym.first + "@" + pkgname;
+    }
+  }
+}
+
+void Symbols::setpkg(const std::string &pkgname) {
+  smap_setpkg(defs,   pkgname);
+  smap_setpkg(types,  pkgname);
+  smap_setpkg(topics, pkgname);
 }
 
 void DefMap::format(std::ostream &os, int depth) const {

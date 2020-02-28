@@ -609,11 +609,12 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
 
 struct SymMover {
   std::pair<const std::string, SymbolSource> &sym;
+  const char *kind;
   std::string def;
   bool warn;
   Package *package;
 
-  SymMover(Top &top, std::pair<const std::string, SymbolSource> &sym_) : sym(sym_) {
+  SymMover(Top &top, std::pair<const std::string, SymbolSource> &sym_, const char *kind_) : sym(sym_), kind(kind_) {
     size_t at = sym.second.qualified.find_first_of('@');
     def.assign(sym.second.qualified, 0, at);
 
@@ -622,7 +623,7 @@ struct SymMover {
     if (it == top.packages.end()) {
       warn = false;
       package = nullptr;
-      std::cerr << "Import of '" << def
+      std::cerr << "Import of " << kind << " '" << def
         << "' is from non-existent package '" << pkg
         << "' at " << sym.second.location.text() << std::endl;
     } else {
@@ -633,7 +634,7 @@ struct SymMover {
 
   ~SymMover() {
     if (warn) {
-      std::cerr << "Import of '" << def
+      std::cerr << "Import of " << kind << " '" << def
         << "' from package '" << package->name
         << "' is not exported at " << sym.second.location.text() << std::endl;
     }
@@ -641,21 +642,24 @@ struct SymMover {
 
   void consider(const Symbols::SymbolMap &from, Symbols::SymbolMap &to) {
     if (def.compare(0, 3, "op ") == 0) {
-      if (from.find("unary " + def.substr(3)) != from.end()) {
+      auto unary = from.find("unary " + def.substr(3));
+      if (unary != from.end()) {
         to.insert(std::make_pair(
           "unary " + sym.first.substr(3),
-          sym.second.clone("unary " + sym.second.qualified.substr(3))));
+          sym.second.clone(unary->second.qualified)));
         warn = false;
       }
-      if (from.find("binary " + def.substr(3)) != from.end()) {
+      auto binary = from.find("binary " + def.substr(3));
+      if (binary != from.end()) {
         to.insert(std::make_pair(
           "binary " + sym.first.substr(3),
-          sym.second.clone("binary " + sym.second.qualified.substr(3))));
+          sym.second.clone(binary->second.qualified)));
         warn = false;
       }
     } else {
-      if (from.find(def) != from.end()) {
-        to.insert(sym);
+      auto it = from.find(def);
+      if (it != from.end()) {
+        to.insert(std::make_pair(sym.first, sym.second.clone(it->second.qualified)));
         warn = false;
       }
     }
@@ -669,7 +673,7 @@ struct SymMover {
 static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location &location) {
   Symbols::SymbolMap mixed(std::move(imports.mixed));
   for (auto &d : mixed) {
-    SymMover mover(top, d);
+    SymMover mover(top, d, "symbol");
     mover.defs  (imports.defs);
     mover.types (imports.types);
     mover.topics(imports.topics);
@@ -677,19 +681,19 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location
 
   Symbols::SymbolMap defs(std::move(imports.defs));
   for (auto &d : defs) {
-    SymMover mover(top, d);
+    SymMover mover(top, d, "definition");
     mover.defs(imports.defs);
   }
 
   Symbols::SymbolMap topics(std::move(imports.topics));
   for (auto &d : topics) {
-    SymMover mover(top, d);
+    SymMover mover(top, d, "topic");
     mover.topics(imports.topics);
   }
 
   Symbols::SymbolMap types(std::move(imports.types));
   for (auto &d : types) {
-    SymMover mover(top, d);
+    SymMover mover(top, d, "type");
     mover.types(imports.types);
   }
 
@@ -697,7 +701,7 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location
   for (auto &p : imports.import_all) {
     auto it = top.packages.find(p);
     if (it == top.packages.end()) {
-      std::cerr << "Import from non-existent package '" << p
+      std::cerr << "Full import from non-existent package '" << p
         << "' at " << location.text() << std::endl;
     } else {
       out.push_back(&it->second->exports);
@@ -707,7 +711,7 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location
   return out;
 }
 
-static std::unique_ptr<Expr> fracture(bool anon, const std::string &name, std::unique_ptr<Expr> expr, ResolveBinding *binding) {
+static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &name, std::unique_ptr<Expr> expr, ResolveBinding *binding) {
   if (expr->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(expr.get());
     // don't fail if unbound; leave that for the second pass
@@ -720,8 +724,8 @@ static std::unique_ptr<Expr> fracture(bool anon, const std::string &name, std::u
     return std::unique_ptr<Expr>(out);
   } else if (expr->type == &App::type) {
     App *app = static_cast<App*>(expr.get());
-    app->fn  = fracture(true, name, std::move(app->fn),  binding);
-    app->val = fracture(true, name, std::move(app->val), binding);
+    app->fn  = fracture(top, true, name, std::move(app->fn),  binding);
+    app->val = fracture(top, true, name, std::move(app->val), binding);
     return expr;
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr.get());
@@ -729,14 +733,14 @@ static std::unique_ptr<Expr> fracture(bool anon, const std::string &name, std::u
     lbinding.index[lambda->name] = 0;
     lbinding.defs.emplace_back(lambda->name, LOCATION, nullptr);
     if (lambda->body->type == &Lambda::type) {
-      lambda->body = fracture(anon, name, std::move(lambda->body), &lbinding);
+      lambda->body = fracture(top, anon, name, std::move(lambda->body), &lbinding);
     } else {
       if (lambda->fnname.empty()) {
         lambda->fnname = addanon(name, anon);
       } else if (lambda->fnname[0] == ' ') {
         lambda->fnname = name + lambda->fnname.substr(1);
       }
-      lambda->body = fracture(false, lambda->fnname, std::move(lambda->body), &lbinding);
+      lambda->body = fracture(top, false, lambda->fnname, std::move(lambda->body), &lbinding);
     }
     return expr;
   } else if (expr->type == &Match::type) {
@@ -744,32 +748,32 @@ static std::unique_ptr<Expr> fracture(bool anon, const std::string &name, std::u
     auto out = rebind_match(name, binding, std::move(m));
     if (!out) return out;
     out->flags |= FLAG_AST;
-    return fracture(anon, name, std::move(out), binding);
+    return fracture(top, anon, name, std::move(out), binding);
   } else if (expr->type == &DefMap::type) {
     DefMap *def = static_cast<DefMap*>(expr.get());
     ResolveBinding dbinding(binding);
+    dbinding.symbols = process_import(top, def->imports, def->location);
     for (auto &i : def->defs) {
       dbinding.index[i.first] = dbinding.defs.size();
       dbinding.defs.emplace_back(i.first, i.second.location, std::move(i.second.body));
     }
     //chain_publish(&dbinding, def->pub, chain);
     for (auto &i : dbinding.defs) {
-      i.expr = fracture(false, addanon(name, anon) + "." + trim(i.name), std::move(i.expr), &dbinding);
+      i.expr = fracture(top, false, addanon(name, anon) + "." + trim(i.name), std::move(i.expr), &dbinding);
       ++dbinding.current_index;
     }
     dbinding.current_index = -1;
-    std::unique_ptr<Expr> body = fracture(true, name, std::move(def->body), &dbinding);
+    std::unique_ptr<Expr> body = fracture(top, true, name, std::move(def->body), &dbinding);
     auto out = fracture_binding(def->location, dbinding.defs, std::move(body));
     if ((def->flags & FLAG_AST) != 0)
       out->flags |= FLAG_AST;
     return out;
   } else if (expr->type == &Top::type) {
-    Top *top = static_cast<Top*>(expr.get());
     ResolveBinding gbinding(nullptr);   // global mapping + qualified defines
     ResolveBinding pbinding(&gbinding); // package mapping
     ResolveBinding ibinding(&pbinding); // file import mapping
     ResolveBinding dbinding(&ibinding); // file local mapping
-    for (auto &p : top->packages) {
+    for (auto &p : top.packages) {
       for (auto &f : p.second->files) {
         for (auto &d : f.content->defs) {
           gbinding.index[d.first] = gbinding.defs.size();
@@ -777,24 +781,24 @@ static std::unique_ptr<Expr> fracture(bool anon, const std::string &name, std::u
         }
       }
     }
-    gbinding.symbols.push_back(&top->globals);
-    for (auto &p : top->packages) {
+    gbinding.symbols.push_back(&top.globals);
+    for (auto &p : top.packages) {
       pbinding.symbols.clear();
       pbinding.symbols.push_back(&p.second->package);
       for (auto &f : p.second->files) {
-        ibinding.symbols = process_import(*top, f.content->imports, f.content->location);
+        ibinding.symbols = process_import(top, f.content->imports, f.content->location);
         dbinding.symbols.clear();
         dbinding.symbols.push_back(&f.local);
         for (auto &d : f.content->defs) {
           ResolveDef &def = gbinding.defs[gbinding.current_index];
-          def.expr = fracture(false, trim(def.name), std::move(def.expr), &dbinding);
+          def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &dbinding);
           ++gbinding.current_index;
         }
       }
     }
     gbinding.current_index = -1;
-    std::unique_ptr<Expr> body = fracture(true, name, std::move(top->body), &gbinding);
-    return fracture_binding(top->location, gbinding.defs, std::move(body));
+    std::unique_ptr<Expr> body = fracture(top, true, name, std::move(top.body), &gbinding);
+    return fracture_binding(top.location, gbinding.defs, std::move(body));
   } else {
     // Literal/Prim/Construct/Destruct/Get
     return expr;
@@ -1035,12 +1039,21 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
 
 std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap) {
   NameBinding bottom;
-  std::unique_ptr<Expr> out = fracture(false, "", std::move(top), 0);
+  std::unique_ptr<Expr> out = fracture(*top, false, "", std::move(top), 0);
   if (out && !explore(out.get(), pmap, &bottom)) out.reset();
   return out;
 }
 
-static bool contract(const Top &top, SymbolSource &sym) {
+struct Contractor {
+  const Top &top;
+  bool warn;
+  const char *kind;
+  virtual Symbols::SymbolMap &member(Symbols &sym) const = 0;
+  Contractor(const Top &top_, bool warn_, const char *kind_)
+   : top(top_), warn(warn_), kind(kind_) {}
+};
+
+static bool contract(const Contractor &con, SymbolSource &sym) {
   // Leaves don't need contraction
   if ((sym.flags & SYM_LEAF) != 0) return true;
 
@@ -1049,29 +1062,36 @@ static bool contract(const Top &top, SymbolSource &sym) {
   std::string def(sym.qualified, 0, at);
 
   if ((sym.flags & SYM_GRAY) != 0) {
-    std::cerr << "Re-export of '" << def
-      << "', imported from '" << pkg
-      << "', has cyclic definition at "
-      << sym.location.text() << std::endl;
+    if (con.warn) {
+      std::cerr << "Re-export of '" << def
+        << "', imported from '" << pkg
+        << "', has cyclic definition at "
+        << sym.location.text() << std::endl;
+    }
     return false;
   }
 
-  auto ip = top.packages.find(pkg);
-  if (ip == top.packages.end()) {
-    std::cerr << "Re-export of '" << def
-      << "' is from non-existent package '" << pkg
-      << "' at " << sym.location.text() << std::endl;
+  auto ip = con.top.packages.find(pkg);
+  if (ip == con.top.packages.end()) {
+    if (con.warn) {
+      std::cerr << "Re-export of '" << def
+        << "' is from non-existent package '" << pkg
+        << "' at " << sym.location.text() << std::endl;
+    }
     return false;
   } else {
-    auto ie = ip->second->exports.defs.find(def); // !!!
-    if (ie == ip->second->exports.defs.end()) {
-      std::cerr << "Re-export of '" << def
-        << "' is not exported from '" << pkg
-        << "' at " << sym.location.text() << std::endl;
+    auto map = con.member(ip->second->exports);
+    auto ie = map.find(def);
+    if (ie == map.end()) {
+      if (con.warn) {
+        std::cerr << "Re-export of '" << def
+          << "' is not exported from '" << pkg
+          << "' at " << sym.location.text() << std::endl;
+      }
       return false;
     }
     sym.flags |= SYM_GRAY;
-    bool ok = contract(top, ie->second);
+    bool ok = contract(con, ie->second);
     sym.flags &= ~SYM_GRAY;
     sym.flags |= SYM_LEAF;
     sym.qualified = ie->second.qualified;
@@ -1079,21 +1099,51 @@ static bool contract(const Top &top, SymbolSource &sym) {
   }
 }
 
+struct DefContractor final : public Contractor {
+  DefContractor(const Top &top, bool warn) : Contractor(top, warn, "definition") { }
+  Symbols::SymbolMap &member(Symbols &sym) const override { return sym.defs; }
+};
+
+static bool contract_def(Top &top, SymbolSource &sym, bool warn) {
+  DefContractor con(top, warn);
+  return contract(con, sym);
+}
+
+struct TypeContractor final : public Contractor {
+  TypeContractor(const Top &top, bool warn) : Contractor(top, warn, "type") { }
+  Symbols::SymbolMap &member(Symbols &sym) const override { return sym.types; }
+};
+
+static bool contract_type(Top &top, SymbolSource &sym, bool warn) {
+  TypeContractor con(top, warn);
+  return contract(con, sym);
+}
+
+struct TopicContractor final : public Contractor {
+  TopicContractor(const Top &top, bool warn) : Contractor(top, warn, "topic") { }
+  Symbols::SymbolMap &member(Symbols &sym) const override { return sym.topics; }
+};
+
+static bool contract_topic(Top &top, SymbolSource &sym, bool warn) {
+  TopicContractor con(top, warn);
+  return contract(con, sym);
+}
+
+static bool sym_contract(Top &top, Symbols &symbols, bool warn) {
+  bool ok = true;
+  for (auto &d : symbols.defs)   if (!contract_def  (top, d.second, warn)) ok = false;
+  for (auto &d : symbols.types)  if (!contract_type (top, d.second, warn)) ok = false;
+  for (auto &d : symbols.topics) if (!contract_topic(top, d.second, warn)) ok = false;
+  return ok;
+}
+
 bool flatten_exports(Top &top) {
   bool ok = true;
   for (auto &p : top.packages) {
-    for (auto &d : p.second->exports.defs) { // !!!
-      if (!contract(top, d.second)) {
-        ok = false;
-      }
-    }
-    for (auto &d : p.second->package.defs) {
-      contract(top, d.second);
-    }
+    if (!sym_contract(top, p.second->exports, true)) ok = false;
+    if (!sym_contract(top, p.second->package, false)) ok = false;
     for (auto &f : p.second->files) {
-      for (auto &d : f.local.defs) {
-        contract(top, d.second);
-      }
+      if (!sym_contract(top, f.local, false)) ok = false;
     }
   }
   return ok;
