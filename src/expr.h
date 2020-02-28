@@ -156,13 +156,22 @@ struct DefValue {
    : location(location_), body(std::move(body_)) { }
 };
 
+#define SYM_LEAF 1 // qualified = a definition
+#define SYM_GRAY 2 // currently exploring this symbol
+
 struct SymbolSource {
   Location location;
   std::string qualified; // from@package
+  long flags;
 
-  SymbolSource(const Location &location_) : location(location_) { }
-  SymbolSource(const Location &location_, const std::string &qualified_)
-   : location(location_), qualified(qualified_) { }
+  SymbolSource(const Location &location_, long flags_ = 0)
+   : location(location_), qualified(), flags(flags_) { }
+  SymbolSource(const Location &location_, const std::string &qualified_, long flags_ = 0)
+   : location(location_), qualified(qualified_), flags(flags_) { }
+
+  SymbolSource clone(const std::string &qualified) const {
+    return SymbolSource(location, qualified, flags);
+  }
 };
 
 struct Symbols {
@@ -174,7 +183,7 @@ struct Symbols {
 };
 
 struct Imports : public Symbols {
-  SymbolMap mixed; // import from all of defs+types+topics (must be at least one)
+  SymbolMap mixed;
   std::vector<std::string> import_all;
 };
 
@@ -196,7 +205,7 @@ struct DefMap : public Expr {
 struct File {
   typedef std::vector<std::pair<std::string, DefValue> > Pubs;
   std::unique_ptr<DefMap> content;
-  Symbols local; // these override content->imports
+  Symbols local;
   Pubs pubs; // eval within local>content.imports>package>top.globals
   // topics
   // types

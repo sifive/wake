@@ -576,14 +576,14 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
 static void bind_global(const Definition &def, Symbols *globals, Lexer &lex) {
   if (!globals || def.name == "_") return;
 
-  globals->defs.insert(std::make_pair(def.name, def.location));
+  globals->defs.insert(std::make_pair(def.name, SymbolSource(def.location, SYM_LEAF)));
   // Duplicate globals will be detected as file-local conflicts
 }
 
 static void bind_export(const Definition &def, Symbols *exports, Lexer &lex) {
   if (!exports || def.name == "_") return;
 
-  exports->defs.insert(std::make_pair(def.name, def.location));
+  exports->defs.insert(std::make_pair(def.name, SymbolSource(def.location, SYM_LEAF)));
   // Duplicate exports will be detected as file-local conflicts
 }
 
@@ -1512,17 +1512,17 @@ void parse_top(Top &top, Lexer &lex) {
     package->name = std::to_string(++anon_file);
   }
 
-  for (auto &exp : package->exports.defs) {
+  for (auto &exp : package->exports.defs) { // !!!
     if (exp.second.qualified.empty()) {
       exp.second.qualified = exp.first + "@" + package->name;
     }
   }
 
-  for (auto &glb : globals.defs) {
+  for (auto &glb : globals.defs) { // !!! types/topics
     if (glb.second.qualified.empty()) {
       glb.second.qualified = glb.first + "@" + package->name;
     }
-    auto it = top.globals.defs.insert(std::make_pair(glb.first, glb.second));
+    auto it = top.globals.defs.insert(glb);
     if (!it.second) {
       std::cerr << "Duplicate global "
         << glb.first << " at "
@@ -1537,7 +1537,7 @@ void parse_top(Top &top, Lexer &lex) {
   map.defs.clear();
   for (auto &def : defs) {
     auto name = def.first + "@" + package->name;
-    auto it = file.local.defs.insert(std::make_pair(def.first, SymbolSource(def.second.location, name)));
+    auto it = file.local.defs.insert(std::make_pair(def.first, SymbolSource(def.second.location, name, SYM_LEAF)));
     if (!it.second) {
       std::cerr << "Duplicate file-local symbol "
         << def.first << " at "
@@ -1553,7 +1553,7 @@ void parse_top(Top &top, Lexer &lex) {
     package->package = file.local;
     it.first->second = std::move(package);
   } else {
-    for (auto &x : file.local.defs) {
+    for (auto &x : file.local.defs) { // !!!
       auto ins = it.first->second->package.defs.insert(x);
       if (!ins.second) {
         std::cerr << "Duplicate package-local symbol "

@@ -133,7 +133,7 @@ void Top::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Top" << std::endl;
   globals.format("global", os, depth+2);
   for (auto &i : packages)
-    i->format(os, depth+2);
+    i.second->format(os, depth+2);
   body->format(os, depth+2);
 }
 

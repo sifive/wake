@@ -365,6 +365,7 @@ int main(int argc, char **argv) {
   StringInfo info(verbose, debug, quiet, VERSION_STR);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 
+  if (!flatten_exports(*top)) ok = false;
   if (parse) std::cout << top.get();
 
   if (notype) return ok?0:1;

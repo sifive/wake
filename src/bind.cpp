@@ -89,10 +89,29 @@ static void SCC(SCCState &state, unsigned vi) {
 struct ResolveBinding {
   ResolveBinding *parent;
   int current_index;
-  int prefix;
   int depth;
   NameIndex index;
   std::vector<ResolveDef> defs;
+  std::vector<Symbols*> symbols;
+
+  ResolveBinding(ResolveBinding *parent_)
+   : parent(parent_), current_index(0), depth(parent_?parent_->depth+1:0) { }
+
+  void qualify(std::string &name) {
+    SymbolSource *override = nullptr;
+    for (auto sym : symbols) {
+      auto it = sym->defs.find(name);
+      if (it != sym->defs.end()) {
+        if (override) {
+          std::cerr << "Ambiguous import of '" << name
+            << "' from " << override->location.text()
+            << " and " << it->second.location.text() << std::endl;
+        }
+        override = &it->second;
+      }
+    }
+    if (override) name = override->qualified;
+  }
 };
 
 struct RelaxedVertex {
@@ -208,13 +227,7 @@ static bool reference_map(ResolveBinding *binding, const std::string &name) {
 static bool rebind_ref(ResolveBinding *binding, std::string &name) {
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
-    if (iter->prefix >= 0) {
-      std::string file_local = std::to_string(iter->prefix) + " " + name;
-      if (reference_map(iter, file_local)) {
-        name = file_local;
-        return true;
-      }
-    }
+    iter->qualify(name);
     if (reference_map(iter, name)) return true;
   }
   return false;
@@ -230,6 +243,7 @@ static VarRef *rebind_subscribe(ResolveBinding *binding, const Location &locatio
   return new VarRef(location, "Nil");
 }
 
+/*
 static void chain_publish(ResolveBinding *binding, DefMap::Pubs &pubs, int &chain) {
   for (auto &i : pubs) {
     std::string name = "publish " + std::to_string(binding->depth) + " " + i.first;
@@ -253,6 +267,7 @@ static void chain_publish(ResolveBinding *binding, DefMap::Pubs &pubs, int &chai
     }
   }
 }
+*/
 
 struct PatternTree {
   std::shared_ptr<Sum> sum; // nullptr if unexpanded
@@ -395,13 +410,13 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
       rmap->body = expand_patterns(location, fnname, bucket);
       if (!rmap->body) return nullptr;
       for (size_t i = args; i > 0; --i) {
-        auto out = rmap->map.insert(std::make_pair("_ a" + std::to_string(--var),
-          DefMap::Value(LOCATION, std::unique_ptr<Expr>(new Get(LOCATION, sum, &cons, i-1)))));
+        auto out = rmap->defs.insert(std::make_pair("_ a" + std::to_string(--var),
+          DefValue(LOCATION, std::unique_ptr<Expr>(new Get(LOCATION, sum, &cons, i-1)))));
         assert (out.second);
       }
       Lambda *lam = new Lambda(location, "_", rmap.release());
       lam->fnname = fnname;
-      auto out = map->map.insert(std::make_pair(cname, DefMap::Value(LOCATION, std::unique_ptr<Expr>(lam))));
+      auto out = map->defs.insert(std::make_pair(cname, DefValue(LOCATION, std::unique_ptr<Expr>(lam))));
       assert (out.second);
       for (auto p = patterns.rbegin(); p != patterns.rend(); ++p) {
         if (p->index == -1) {
@@ -451,7 +466,7 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
   }
 }
 
-static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, std::unique_ptr<Expr> &guard, const AST &ast, std::shared_ptr<Sum> multiarg) {
+static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, std::unique_ptr<Expr> &guard, AST &ast, std::shared_ptr<Sum> multiarg) {
   PatternTree out;
   if (ast.name == "_") {
     // no-op; unbound
@@ -463,11 +478,8 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
     out.var = 0; // bound
   } else {
     for (ResolveBinding *iter = binding; iter; iter = iter->parent) {
-      NameIndex::iterator it = iter->index.end();
-      if (iter->prefix >= 0)
-        it = iter->index.find(std::to_string(iter->prefix) + " " + ast.name);
-      if (it == iter->index.end())
-        it = iter->index.find(ast.name);
+      iter->qualify(ast.name);
+      auto it = iter->index.find(ast.name);
       if (it != iter->index.end()) {
         Expr *cons = iter->defs[it->second].expr.get();
         if (cons) {
@@ -595,7 +607,107 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
   return body;
 }
 
-static std::unique_ptr<Expr> fracture(bool anon, const std::string& name, std::unique_ptr<Expr> expr, ResolveBinding *binding) {
+struct SymMover {
+  std::pair<const std::string, SymbolSource> &sym;
+  std::string def;
+  bool warn;
+  Package *package;
+
+  SymMover(Top &top, std::pair<const std::string, SymbolSource> &sym_) : sym(sym_) {
+    size_t at = sym.second.qualified.find_first_of('@');
+    def.assign(sym.second.qualified, 0, at);
+
+    std::string pkg(sym.second.qualified, at+1);
+    auto it = top.packages.find(pkg);
+    if (it == top.packages.end()) {
+      warn = false;
+      package = nullptr;
+      std::cerr << "Import of '" << def
+        << "' is from non-existent package '" << pkg
+        << "' at " << sym.second.location.text() << std::endl;
+    } else {
+      warn = true;
+      package = it->second.get();
+    }
+  }
+
+  ~SymMover() {
+    if (warn) {
+      std::cerr << "Import of '" << def
+        << "' from package '" << package->name
+        << "' is not exported at " << sym.second.location.text() << std::endl;
+    }
+  }
+
+  void consider(const Symbols::SymbolMap &from, Symbols::SymbolMap &to) {
+    if (def.compare(0, 3, "op ") == 0) {
+      if (from.find("unary " + def.substr(3)) != from.end()) {
+        to.insert(std::make_pair(
+          "unary " + sym.first.substr(3),
+          sym.second.clone("unary " + sym.second.qualified.substr(3))));
+        warn = false;
+      }
+      if (from.find("binary " + def.substr(3)) != from.end()) {
+        to.insert(std::make_pair(
+          "binary " + sym.first.substr(3),
+          sym.second.clone("binary " + sym.second.qualified.substr(3))));
+        warn = false;
+      }
+    } else {
+      if (from.find(def) != from.end()) {
+        to.insert(sym);
+        warn = false;
+      }
+    }
+  }
+
+  void defs  (Symbols::SymbolMap &defs)   { if (package) consider(package->exports.defs,   defs);   }
+  void types (Symbols::SymbolMap &types)  { if (package) consider(package->exports.types,  types);  }
+  void topics(Symbols::SymbolMap &topics) { if (package) consider(package->exports.topics, topics); }
+};
+
+static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location &location) {
+  Symbols::SymbolMap mixed(std::move(imports.mixed));
+  for (auto &d : mixed) {
+    SymMover mover(top, d);
+    mover.defs  (imports.defs);
+    mover.types (imports.types);
+    mover.topics(imports.topics);
+  }
+
+  Symbols::SymbolMap defs(std::move(imports.defs));
+  for (auto &d : defs) {
+    SymMover mover(top, d);
+    mover.defs(imports.defs);
+  }
+
+  Symbols::SymbolMap topics(std::move(imports.topics));
+  for (auto &d : topics) {
+    SymMover mover(top, d);
+    mover.topics(imports.topics);
+  }
+
+  Symbols::SymbolMap types(std::move(imports.types));
+  for (auto &d : types) {
+    SymMover mover(top, d);
+    mover.types(imports.types);
+  }
+
+  std::vector<Symbols*> out;
+  for (auto &p : imports.import_all) {
+    auto it = top.packages.find(p);
+    if (it == top.packages.end()) {
+      std::cerr << "Import from non-existent package '" << p
+        << "' at " << location.text() << std::endl;
+    } else {
+      out.push_back(&it->second->exports);
+    }
+  }
+  out.push_back(&imports);
+  return out;
+}
+
+static std::unique_ptr<Expr> fracture(bool anon, const std::string &name, std::unique_ptr<Expr> expr, ResolveBinding *binding) {
   if (expr->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(expr.get());
     // don't fail if unbound; leave that for the second pass
@@ -613,11 +725,7 @@ static std::unique_ptr<Expr> fracture(bool anon, const std::string& name, std::u
     return expr;
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr.get());
-    ResolveBinding lbinding;
-    lbinding.parent = binding;
-    lbinding.current_index = 0;
-    lbinding.prefix = -1;
-    lbinding.depth = binding->depth + 1;
+    ResolveBinding lbinding(binding);
     lbinding.index[lambda->name] = 0;
     lbinding.defs.emplace_back(lambda->name, LOCATION, nullptr);
     if (lambda->body->type == &Lambda::type) {
@@ -639,17 +747,12 @@ static std::unique_ptr<Expr> fracture(bool anon, const std::string& name, std::u
     return fracture(anon, name, std::move(out), binding);
   } else if (expr->type == &DefMap::type) {
     DefMap *def = static_cast<DefMap*>(expr.get());
-    ResolveBinding dbinding;
-    dbinding.parent = binding;
-    dbinding.prefix = -1;
-    dbinding.depth = binding->depth + 1;
-    int chain = 0;
-    for (auto &i : def->map) {
+    ResolveBinding dbinding(binding);
+    for (auto &i : def->defs) {
       dbinding.index[i.first] = dbinding.defs.size();
       dbinding.defs.emplace_back(i.first, i.second.location, std::move(i.second.body));
     }
-    chain_publish(&dbinding, def->pub, chain);
-    dbinding.current_index = 0;
+    //chain_publish(&dbinding, def->pub, chain);
     for (auto &i : dbinding.defs) {
       i.expr = fracture(false, addanon(name, anon) + "." + trim(i.name), std::move(i.expr), &dbinding);
       ++dbinding.current_index;
@@ -662,43 +765,36 @@ static std::unique_ptr<Expr> fracture(bool anon, const std::string& name, std::u
     return out;
   } else if (expr->type == &Top::type) {
     Top *top = static_cast<Top*>(expr.get());
-    ResolveBinding tbinding;
-    tbinding.parent = binding;
-    tbinding.prefix = 0;
-    tbinding.depth = binding ? binding->depth+1 : 0;
-    int chain = 0;
-    for (auto &b : top->defmaps) {
-      for (auto &i : b->map) {
-        std::string name;
-        Top::DefOrder::iterator glob;
-        // If this file defines the global, put it at the global name; otherwise, localize the name
-        if ((glob = top->globals.find(i.first)) != top->globals.end() && glob->second == tbinding.prefix) {
-          name = i.first;
-        } else {
-          name = std::to_string(tbinding.prefix) + " " + i.first;
+    ResolveBinding gbinding(nullptr);   // global mapping + qualified defines
+    ResolveBinding pbinding(&gbinding); // package mapping
+    ResolveBinding ibinding(&pbinding); // file import mapping
+    ResolveBinding dbinding(&ibinding); // file local mapping
+    for (auto &p : top->packages) {
+      for (auto &f : p.second->files) {
+        for (auto &d : f.content->defs) {
+          gbinding.index[d.first] = gbinding.defs.size();
+          gbinding.defs.emplace_back(d.first, d.second.location, std::move(d.second.body));
         }
-        tbinding.index[name] = tbinding.defs.size();
-        tbinding.defs.emplace_back(name, i.second.location, std::move(i.second.body));
       }
-      chain_publish(&tbinding, b->pub, chain);
-      ++tbinding.prefix;
     }
-
-    tbinding.current_index = 0;
-    tbinding.prefix = 0;
-    for (auto &b : top->defmaps) {
-      int total = b->map.size();
-      for (auto &j : b->pub) total += j.second.size();
-      for (int i = 0; i < total; ++i) {
-        ResolveDef &def = tbinding.defs[tbinding.current_index];
-        def.expr = fracture(false, trim(def.name), std::move(def.expr), &tbinding);
-        ++tbinding.current_index;
+    gbinding.symbols.push_back(&top->globals);
+    for (auto &p : top->packages) {
+      pbinding.symbols.clear();
+      pbinding.symbols.push_back(&p.second->package);
+      for (auto &f : p.second->files) {
+        ibinding.symbols = process_import(*top, f.content->imports, f.content->location);
+        dbinding.symbols.clear();
+        dbinding.symbols.push_back(&f.local);
+        for (auto &d : f.content->defs) {
+          ResolveDef &def = gbinding.defs[gbinding.current_index];
+          def.expr = fracture(false, trim(def.name), std::move(def.expr), &dbinding);
+          ++gbinding.current_index;
+        }
       }
-      ++tbinding.prefix;
     }
-    tbinding.current_index = -1;
-    std::unique_ptr<Expr> body = fracture(true, name, std::move(top->body), &tbinding);
-    return fracture_binding(top->location, tbinding.defs, std::move(body));
+    gbinding.current_index = -1;
+    std::unique_ptr<Expr> body = fracture(true, name, std::move(top->body), &gbinding);
+    return fracture_binding(top->location, gbinding.defs, std::move(body));
   } else {
     // Literal/Prim/Construct/Destruct/Get
     return expr;
@@ -942,4 +1038,63 @@ std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap) {
   std::unique_ptr<Expr> out = fracture(false, "", std::move(top), 0);
   if (out && !explore(out.get(), pmap, &bottom)) out.reset();
   return out;
+}
+
+static bool contract(const Top &top, SymbolSource &sym) {
+  // Leaves don't need contraction
+  if ((sym.flags & SYM_LEAF) != 0) return true;
+
+  size_t at = sym.qualified.find_first_of('@');
+  std::string pkg(sym.qualified, at+1);
+  std::string def(sym.qualified, 0, at);
+
+  if ((sym.flags & SYM_GRAY) != 0) {
+    std::cerr << "Re-export of '" << def
+      << "', imported from '" << pkg
+      << "', has cyclic definition at "
+      << sym.location.text() << std::endl;
+    return false;
+  }
+
+  auto ip = top.packages.find(pkg);
+  if (ip == top.packages.end()) {
+    std::cerr << "Re-export of '" << def
+      << "' is from non-existent package '" << pkg
+      << "' at " << sym.location.text() << std::endl;
+    return false;
+  } else {
+    auto ie = ip->second->exports.defs.find(def); // !!!
+    if (ie == ip->second->exports.defs.end()) {
+      std::cerr << "Re-export of '" << def
+        << "' is not exported from '" << pkg
+        << "' at " << sym.location.text() << std::endl;
+      return false;
+    }
+    sym.flags |= SYM_GRAY;
+    bool ok = contract(top, ie->second);
+    sym.flags &= ~SYM_GRAY;
+    sym.flags |= SYM_LEAF;
+    sym.qualified = ie->second.qualified;
+    return ok;
+  }
+}
+
+bool flatten_exports(Top &top) {
+  bool ok = true;
+  for (auto &p : top.packages) {
+    for (auto &d : p.second->exports.defs) { // !!!
+      if (!contract(top, d.second)) {
+        ok = false;
+      }
+    }
+    for (auto &d : p.second->package.defs) {
+      contract(top, d.second);
+    }
+    for (auto &f : p.second->files) {
+      for (auto &d : f.local.defs) {
+        contract(top, d.second);
+      }
+    }
+  }
+  return ok;
 }
