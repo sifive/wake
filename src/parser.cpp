@@ -220,15 +220,15 @@ static Expr *parse_match(int p, Lexer &lex) {
         if (typeid(*obj) == typeid(Integer)) comparison = "icmp";
         if (typeid(*obj) == typeid(Double)) comparison = "dcmp";
       }
-      if (!guard) guard = new VarRef(e->location, "True");
+      if (!guard) guard = new VarRef(e->location, "True@wake");
 
       Match *match = new Match(e->location);
       match->args.emplace_back(new App(e->location, new App(e->location,
           new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison), " ")),
           e), new VarRef(e->location, "_ k" + std::to_string(i))));
-      match->patterns.emplace_back(AST(e->location, "LT"), new VarRef(e->location, "False"), nullptr);
-      match->patterns.emplace_back(AST(e->location, "GT"), new VarRef(e->location, "False"), nullptr);
-      match->patterns.emplace_back(AST(e->location, "EQ"), guard, nullptr);
+      match->patterns.emplace_back(AST(e->location, "LT@wake"), new VarRef(e->location, "False@wake"), nullptr);
+      match->patterns.emplace_back(AST(e->location, "GT@wake"), new VarRef(e->location, "False@wake"), nullptr);
+      match->patterns.emplace_back(AST(e->location, "EQ@wake"), guard, nullptr);
       guard = match;
     }
 
@@ -376,8 +376,8 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       l.end = elseE->location.end;
       Match *out = new Match(l);
       out->args.emplace_back(condE);
-      out->patterns.emplace_back(AST(l, "True"),  thenE, nullptr);
-      out->patterns.emplace_back(AST(l, "False"), elseE, nullptr);
+      out->patterns.emplace_back(AST(l, "True@wake"),  thenE, nullptr);
+      out->patterns.emplace_back(AST(l, "False@wake"), elseE, nullptr);
       out->flags |= FLAG_AST;
       return out;
     }
@@ -1143,19 +1143,19 @@ static void parse_import(const std::string &pkgname, DefMap &map, Lexer &lex) {
   }
 
   while (lex.next.type == ID || lex.next.type == OPERATOR) {
-    SymbolType kind = lex.next.type;
+    SymbolType idop = lex.next.type;
     std::string source, name = lex.id();
     Location location = lex.next.location;
     lex.consume();
 
     if (lex.next.type == EQUALS) {
       lex.consume();
-      if (lex.next.type == kind) {
+      if (lex.next.type == idop) {
         source = lex.id() + "@" + pkgname;
         lex.consume();
       } else {
         std::cerr << "Was expecting an "
-          << symbolTable[kind] << ", got an "
+          << symbolTable[idop] << ", got an "
           << symbolTable[lex.next.type] << " at "
           << lex.next.location.text() << std::endl;
         lex.fail = true;
@@ -1171,7 +1171,7 @@ static void parse_import(const std::string &pkgname, DefMap &map, Lexer &lex) {
       continue;
     }
 
-    if (kind == OPERATOR) {
+    if (idop == OPERATOR) {
       if (unary) {
         name = "unary " + name;
         source = "unary " + source;
@@ -1187,7 +1187,7 @@ static void parse_import(const std::string &pkgname, DefMap &map, Lexer &lex) {
     auto it = target->insert(std::make_pair(std::move(name), SymbolSource(location, source)));
     if (!it.second) {
       std::cerr << "Duplicate imported "
-        << kind << " '" << name << "' at "
+        << kind << " '" << it.first->first << "' at "
         << it.first->second.location.text() << " and "
         << location.text() << std::endl;
       lex.fail = true;
@@ -1245,20 +1245,20 @@ static void parse_export(const std::string &pkgname, Package &package, Lexer &le
   }
 
   while (lex.next.type == ID || lex.next.type == OPERATOR) {
-    SymbolType kind = lex.next.type;
+    SymbolType idop = lex.next.type;
     std::string source, name = lex.id();
     Location location = lex.next.location;
     lex.consume();
 
     if (lex.next.type == EQUALS) {
       lex.consume();
-      if (lex.next.type == kind) {
+      if (lex.next.type == idop) {
         source = lex.id() + "@" + pkgname;
         location.end = lex.next.location.end;
         lex.consume();
       } else {
         std::cerr << "Was expecting an "
-          << symbolTable[kind] << ", got an "
+          << symbolTable[idop] << ", got an "
           << symbolTable[lex.next.type] << " at "
           << lex.next.location.text() << std::endl;
         lex.fail = true;
@@ -1275,7 +1275,7 @@ static void parse_export(const std::string &pkgname, Package &package, Lexer &le
       continue;
     }
 
-    if (kind == OPERATOR) {
+    if (idop == OPERATOR) {
       if (unary) {
         name = "unary " + name;
         source = "unary " + source;
@@ -1418,7 +1418,7 @@ static void parse_package(Package &package, Lexer &lex) {
   if (package.name.empty()) {
     package.name = id.first;
   } else {
-    std::cerr << "Package name redefined at " << lex.next.location.text()
+    std::cerr << "Package name redefined at " << id.second.text()
       << " from '" << package.name << "'" << std::endl;
     lex.fail = true;
   }

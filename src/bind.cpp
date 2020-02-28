@@ -240,7 +240,7 @@ static VarRef *rebind_subscribe(ResolveBinding *binding, const Location &locatio
     if (reference_map(iter, pub)) return new VarRef(location, pub);
   }
   // nil
-  return new VarRef(location, "Nil");
+  return new VarRef(location, "Nil@wake");
 }
 
 /*
@@ -262,7 +262,7 @@ static void chain_publish(ResolveBinding *binding, DefMap::Pubs &pubs, int &chai
       binding->index[name] = binding->defs.size();
       binding->defs.emplace_back(name, j->location,
         std::unique_ptr<Expr>(new App(l, new App(l,
-          new VarRef(l, "binary ++"),
+          new VarRef(l, "binary ++@wake"),
           j->body.release()), tail)));
     }
   }
@@ -459,8 +459,8 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
         prototype.tree, p.tree));
       Match *match = new Match(location);
       match->args.emplace_back(std::move(guard));
-      match->patterns.emplace_back(AST(location, "True"),  guard_true .release(), nullptr);
-      match->patterns.emplace_back(AST(location, "False"), guard_false.release(), nullptr);
+      match->patterns.emplace_back(AST(location, "True@wake"),  guard_true .release(), nullptr);
+      match->patterns.emplace_back(AST(location, "False@wake"), guard_false.release(), nullptr);
       return std::unique_ptr<Expr>(match);
     }
   }
