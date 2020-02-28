@@ -79,8 +79,9 @@ void print_help(const char *argv0) {
     << "  Help functions:" << std::endl
     << "    --version        Print the version of wake on standard output"               << std::endl
     << "    --html           Print all wake source files as cross-referenced HTML"       << std::endl
-    << "    --globals  -g    Print all global variables available to the command-line"   << std::endl
-    << "    --help     -h    Print this help message and exit"                           << std::endl
+    << "    --globals -g     Print all global variables available to the command-line"   << std::endl
+    << "    --exports -e PKG Print all exported symbols for package PKG"                 << std::endl
+    << "    --help    -h     Print this help message and exit"                           << std::endl
     << std::endl;
     // debug-db, no-optimize, stop-after-* are secret undocumented options
 }
@@ -118,6 +119,7 @@ int main(int argc, char **argv) {
     { 0,   "remove-task",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 0,   "version",               GOPT_ARGUMENT_FORBIDDEN },
     { 'g', "globals",               GOPT_ARGUMENT_FORBIDDEN },
+    { 'e', "exports",               GOPT_ARGUMENT_REQUIRED  },
     { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
     { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
@@ -162,6 +164,7 @@ int main(int argc, char **argv) {
   const char *init    = arg(options, "init")->argument;
   const char *remove  = arg(options, "remove-task")->argument;
   const char *hash    = arg(options, "debug-target")->argument;
+  const char *exports = arg(options, "exports")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -213,7 +216,7 @@ int main(int argc, char **argv) {
   bool nodb = init;
   bool noparse = nodb || remove || list || output || input || last || failed;
   bool notype = noparse || parse;
-  bool noexecute = notype || add || html || tcheck || dumpssa || global;
+  bool noexecute = notype || add || html || tcheck || dumpssa || global || exports;
 
   if (noparse && argc < 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
@@ -336,15 +339,22 @@ int main(int argc, char **argv) {
     if (lex.fail) ok = false;
   }
 
-  std::vector<std::string> globals;
+  std::vector<std::pair<std::string, std::string> > defs;
   if (global)
     for (auto &g : top->globals.defs)
-      globals.push_back(g.first);
+      defs.emplace_back(g.first, g.second.qualified);
+
+  if (exports) {
+    auto it = top->packages.find(exports);
+    if (it != top->packages.end())
+      for (auto &e : it->second->exports.defs)
+        defs.emplace_back(e.first, e.second.qualified);
+  }
 
   // Read all wake targets
   std::vector<std::string> target_names;
   Expr *body = new Lambda(LOCATION, "_", new Literal(LOCATION, String::literal(runtime.heap, "top"), &String::typeVar));
-  for (size_t i = 0; i < targets.size() + globals.size(); ++i) {
+  for (size_t i = 0; i < targets.size() + defs.size(); ++i) {
     body = new Lambda(LOCATION, "_", body);
     target_names.emplace_back("<target-" + std::to_string(i) + ">");
   }
@@ -355,8 +365,8 @@ int main(int argc, char **argv) {
     body = new App(LOCATION, body, force_use(parse_command(lex)));
     if (lex.fail) ok = false;
   }
-  for (auto &g : globals)
-    body = new App(LOCATION, body, force_use(new VarRef(LOCATION, g)));
+  for (auto &d : defs)
+    body = new App(LOCATION, body, force_use(new VarRef(LOCATION, d.second)));
 
   top->body = std::unique_ptr<Expr>(body);
 
@@ -381,16 +391,16 @@ int main(int argc, char **argv) {
 
   if (tcheck) std::cout << root.get();
   if (html) markup_html(std::cout, root.get());
-  for (auto &g : globals) {
+  for (auto &g : defs) {
     Expr *e = root.get();
     while (e && e->type == &DefBinding::type) {
       DefBinding *d = static_cast<DefBinding*>(e);
       e = d->body.get();
-      auto i = d->order.find(g);
+      auto i = d->order.find(g.second);
       if (i != d->order.end()) {
         int idx = i->second.index;
         Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
-        std::cout << g << ": ";
+        std::cout << g.first << ": ";
         v->typeVar.format(std::cout, v->typeVar);
         std::cout << " = <" << v->location.file() << ">" << std::endl;
       }
