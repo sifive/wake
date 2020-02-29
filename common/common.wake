@@ -16,7 +16,7 @@
 package build_wake
 from wake import _
 
-export def common variant =
+def common variant =
   def cflags = "-I{here}", Nil
   def headers = sources here `.*\.h`
   def reFiles = sources here `.*\.re`

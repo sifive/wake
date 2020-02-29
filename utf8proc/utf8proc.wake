@@ -17,7 +17,7 @@ package build_wake
 from wake import _
 
 # Prefer to use system utf8proc if available
-export def utf8proc variant = match (pkgConfig "utf8proc")
+def utf8proc variant = match (pkgConfig "utf8proc")
   Some x = x
   None   =
     def cflags = "-I{here}", Nil

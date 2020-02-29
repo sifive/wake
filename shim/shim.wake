@@ -16,7 +16,7 @@
 package build_wake
 from wake import _
 
-export def buildShim (Pair _ variant) =
+def buildShim (Pair _ variant) =
   def compile = compileC variant Nil (sources here `.*\.h`)
   def cppFiles = sources here `.*\.c`
   def objFiles = map compile cppFiles

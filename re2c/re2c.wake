@@ -55,5 +55,5 @@ def re2cFake file =
     %"
   shellJob script (zip, Nil) | getJobOutput
 
-export def re2c file =
+def re2c file =
   if re2cOk Unit then re2cReal file else re2cFake file

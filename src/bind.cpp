@@ -789,7 +789,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
         ibinding.symbols = process_import(top, f.content->imports, f.content->location);
         dbinding.symbols.clear();
         dbinding.symbols.push_back(&f.local);
-        for (auto &d : f.content->defs) {
+        for (size_t i = 0; i < f.content->defs.size(); ++i) {
           ResolveDef &def = gbinding.defs[gbinding.current_index];
           def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &dbinding);
           ++gbinding.current_index;
@@ -1039,7 +1039,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
 
 std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap) {
   NameBinding bottom;
-  std::unique_ptr<Expr> out = fracture(*top, false, "", std::move(top), 0);
+  Top &topr = *top;
+  std::unique_ptr<Expr> out = fracture(topr, false, "", std::move(top), 0);
   if (out && !explore(out.get(), pmap, &bottom)) out.reset();
   return out;
 }
