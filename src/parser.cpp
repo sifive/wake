@@ -626,6 +626,11 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
     // Terminals
     case ID: {
       AST out(lex.next.location, lex.id());
+      if (out.name == "_" && state.type) {
+        std::cerr << "Type signatures may not include _ at "
+          << lex.next.location.file() << std::endl;
+        lex.fail = true;
+      }
       lex.consume();
       return out;
     }
@@ -880,6 +885,42 @@ static void check_special(Lexer &lex, const std::string &name, const std::shared
   if (name == "Pair")    Pair = sump;
   if (name == "Result")  Result = sump;
   if (name == "JValue")  JValue = sump;
+}
+
+static void parse_topic(Lexer &lex, Package &package, Symbols *exports, Symbols *globals, bool exportb, bool globalb) {
+  lex.consume();
+
+  auto id = get_arg_loc(lex);
+  if (!Lexer::isLower(id.first.c_str())) {
+    std::cerr << "Topic identifier '" << id.first
+      << "' is not lower-case at "
+      << id.second.file() << std::endl;
+    lex.fail = true;
+  }
+
+  if (expect(COLON, lex)) lex.consume();
+
+  ASTState state(true, false);
+  AST def = parse_ast(0, lex, state);
+  if (check_constructors(def)) lex.fail = true;
+
+  // Confirm there are no open type variables
+  TypeVar x;
+  x.setDOB();
+  std::map<std::string, TypeVar*> ids;
+  if (!def.unify(x, ids)) lex.fail = true;
+
+  if (expect(EOL, lex)) lex.consume();
+
+  auto it = package.topics.insert(std::make_pair(id.first, Topic(id.second, std::move(def))));
+  if (!it.second) {
+    std::cerr << "Duplicate topic " << id.first
+      << " at " << id.second.file() << std::endl;
+    lex.fail = true;
+  }
+
+  if (exportb) exports->topics.insert(std::make_pair(id.first, SymbolSource(id.second, SYM_LEAF)));
+  if (globalb) globals->topics.insert(std::make_pair(id.first, SymbolSource(id.second, SYM_LEAF)));
 }
 
 #define FLAG_GLOBAL 1
@@ -1479,6 +1520,12 @@ void parse_top(Top &top, Lexer &lex) {
         globalb = false;
         break;
       }
+      case TOPIC: {
+        parse_topic(lex, *package, &package->exports, &globals, exportb, globalb);
+        exportb = false;
+        globalb = false;
+        break;
+      }
       case TUPLE: {
         parse_tuple(lex, *package, &package->exports, &globals, exportb, globalb);
         exportb = false;
@@ -1543,6 +1590,12 @@ void parse_top(Top &top, Lexer &lex) {
     map.defs.insert(std::make_pair(std::move(name), std::move(def.second)));
   }
 
+  // localize all topics
+  for (auto &topic : package->topics) {
+    auto name = topic.first + "@" + package->name;
+    file.local.topics.insert(std::make_pair(topic.first, SymbolSource(topic.second.location, name, SYM_LEAF)));
+  }
+
   auto it = top.packages.insert(std::make_pair(package->name, nullptr));
   if (it.second) {
     package->package = file.local;
@@ -1552,6 +1605,8 @@ void parse_top(Top &top, Lexer &lex) {
     it.first->second->exports.join(package->exports, nullptr);
     // duplicated export already reported as package-local duplicate
     it.first->second->files.emplace_back(std::move(file));
+    // duplicated topics already reported as package-local duplicate
+    it.first->second->topics.insert(package->topics.begin(), package->topics.end());
   }
 }
 

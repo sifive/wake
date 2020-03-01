@@ -213,11 +213,19 @@ struct File {
   // types
 };
 
+struct Topic {
+  Location location;
+  AST type;
+  Topic(const Location &location_, AST &&type_) : location(location_), type(std::move(type_)) { }
+};
+
 struct Package : public Expr {
+  typedef std::map<std::string, Topic> Topics;
   std::string name;
   std::vector<File> files;
   Symbols package;
   Symbols exports; // subset of package; used to fill imports
+  Topics topics;
 
   static const TypeDescriptor type;
   Package() : Expr(&type, LOCATION) { }

@@ -20,6 +20,7 @@ def uname = prim "uname"
 export def sysname = uname.getPairFirst
 export def machine = uname.getPairSecond
 
+export topic path: String
 # Inject command-line specified path entries
 #!!!
 #publish path = match (getenv "WAKE_PATH")
@@ -33,6 +34,7 @@ export def machine = uname.getPairSecond
 export def path = catWith ":" ("/opt/local/bin", "/usr/bin", "/bin", Nil) #(subscribe path | distinctBy scmp)
 #publish environment = "PATH={path}", Nil
 
+export topic environment: String
 export def environment = "PATH={path}", Nil #subscribe environment
 
 # Use of this function can lead to unnecessary rebuilds!
