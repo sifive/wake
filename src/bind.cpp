@@ -97,13 +97,13 @@ struct ResolveBinding {
   ResolveBinding(ResolveBinding *parent_)
    : parent(parent_), current_index(0), depth(parent_?parent_->depth+1:0) { }
 
-  void qualify(std::string &name) {
+  void qualify_def(std::string &name) {
     SymbolSource *override = nullptr;
     for (auto sym : symbols) {
       auto it = sym->defs.find(name);
       if (it != sym->defs.end()) {
         if (override) {
-          std::cerr << "Ambiguous import of '" << name
+          std::cerr << "Ambiguous import of definition '" << name
             << "' from " << override->location.text()
             << " and " << it->second.location.text() << std::endl;
         }
@@ -111,6 +111,23 @@ struct ResolveBinding {
       }
     }
     if (override) name = override->qualified;
+  }
+
+  bool qualify_topic(std::string &name) {
+    SymbolSource *override = nullptr;
+    for (auto sym : symbols) {
+      auto it = sym->topics.find(name);
+      if (it != sym->topics.end()) {
+        if (override) {
+          std::cerr << "Ambiguous import of topic '" << name
+            << "' from " << override->location.text()
+            << " and " << it->second.location.text() << std::endl;
+        }
+        override = &it->second;
+      }
+    }
+    if (override) name = override->qualified;
+    return override;
   }
 };
 
@@ -227,47 +244,38 @@ static bool reference_map(ResolveBinding *binding, const std::string &name) {
 static bool rebind_ref(ResolveBinding *binding, std::string &name) {
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
-    iter->qualify(name);
+    iter->qualify_def(name);
     if (reference_map(iter, name)) return true;
   }
   return false;
 }
 
-static VarRef *rebind_subscribe(ResolveBinding *binding, const Location &location, const std::string &name) {
+static VarRef *rebind_subscribe(ResolveBinding *binding, const Location &location, std::string &name) {
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
-    std::string pub = "publish " + std::to_string(iter->depth) + " " + name;
-    if (reference_map(iter, pub)) return new VarRef(location, pub);
+    if (iter->qualify_topic(name)) break;
   }
-  // nil
-  return new VarRef(location, "Nil@wake");
+  if (!iter) {
+    std::cerr << "Subscribe of '" << name
+      << "' is to a non-existent topic at "
+      << location.file() << std::endl;
+  }
+  return new VarRef(location, "topic " + name);
 }
 
-/*
-static void chain_publish(ResolveBinding *binding, DefMap::Pubs &pubs, int &chain) {
-  for (auto &i : pubs) {
-    std::string name = "publish " + std::to_string(binding->depth) + " " + i.first;
-    for (auto j = i.second.rbegin(); j != i.second.rend(); ++j) {
-      Location l = j->body->location;
-      Expr *tail;
-      NameIndex::iterator pub;
-      if ((pub = binding->index.find(name)) == binding->index.end()) {
-        tail = rebind_subscribe(binding, l, i.first);
-      } else {
-        std::string name = "publish " + std::to_string(binding->depth) + " " + std::to_string(++chain) + " " + i.first;
-        tail = new VarRef(l, name);
-        binding->index[name] = pub->second;
-        binding->defs[pub->second].name = std::move(name);
-      }
-      binding->index[name] = binding->defs.size();
-      binding->defs.emplace_back(name, j->location,
-        std::unique_ptr<Expr>(new App(l, new App(l,
-          new VarRef(l, "binary ++@wake"),
-          j->body.release()), tail)));
-    }
+static std::string rebind_publish(ResolveBinding *binding, const Location &location, const std::string &key) {
+  std::string name(key);
+  ResolveBinding *iter;
+  for (iter = binding; iter; iter = iter->parent) {
+    if (iter->qualify_topic(name)) break;
   }
+  if (!iter) {
+    std::cerr << "Publish to '" << name
+      << "' is to a non-existent topic at "
+      << location.file() << std::endl;
+  }
+  return name;
 }
-*/
 
 struct PatternTree {
   std::shared_ptr<Sum> sum; // nullptr if unexpanded
@@ -478,7 +486,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
     out.var = 0; // bound
   } else {
     for (ResolveBinding *iter = binding; iter; iter = iter->parent) {
-      iter->qualify(ast.name);
+      iter->qualify_def(ast.name);
       auto it = iter->index.find(ast.name);
       if (it != iter->index.end()) {
         Expr *cons = iter->defs[it->second].expr.get();
@@ -721,7 +729,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     Subscribe *sub = static_cast<Subscribe*>(expr.get());
     VarRef *out = rebind_subscribe(binding, sub->location, sub->name);
     out->flags |= FLAG_AST;
-    return std::unique_ptr<Expr>(out);
+    return fracture(top, true, name, std::unique_ptr<Expr>(out), binding);
   } else if (expr->type == &App::type) {
     App *app = static_cast<App*>(expr.get());
     app->fn  = fracture(top, true, name, std::move(app->fn),  binding);
@@ -757,7 +765,6 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       dbinding.index[i.first] = dbinding.defs.size();
       dbinding.defs.emplace_back(i.first, i.second.location, std::move(i.second.body));
     }
-    //chain_publish(&dbinding, def->pub, chain);
     for (auto &i : dbinding.defs) {
       i.expr = fracture(top, false, addanon(name, anon) + "." + trim(i.name), std::move(i.expr), &dbinding);
       ++dbinding.current_index;
@@ -773,12 +780,26 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     ResolveBinding pbinding(&gbinding); // package mapping
     ResolveBinding ibinding(&pbinding); // file import mapping
     ResolveBinding dbinding(&ibinding); // file local mapping
+    size_t publish = 0;
     for (auto &p : top.packages) {
       for (auto &f : p.second->files) {
         for (auto &d : f.content->defs) {
           gbinding.index[d.first] = gbinding.defs.size();
           gbinding.defs.emplace_back(d.first, d.second.location, std::move(d.second.body));
         }
+        for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
+          auto name = "publish " + it->first + " " + std::to_string(++publish);
+          gbinding.index[name] = gbinding.defs.size();
+          gbinding.defs.emplace_back(name, it->second.location, std::move(it->second.body));
+        }
+      }
+    }
+    for (auto &p : top.packages) {
+      for (auto &t : p.second->topics) {
+        auto name = "topic " + t.first + "@" + p.first;
+        gbinding.index[name] = gbinding.defs.size();
+        gbinding.defs.emplace_back(name, t.second.location,
+          std::unique_ptr<Expr>(new VarRef(t.second.location, "Nil@wake")));
       }
     }
     gbinding.symbols.push_back(&top.globals);
@@ -794,6 +815,27 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
           def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &dbinding);
           ++gbinding.current_index;
         }
+        for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
+          ResolveDef &def = gbinding.defs[gbinding.current_index];
+          Location &l = def.location;
+          def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &dbinding);
+          auto qualified = rebind_publish(&dbinding, l, it->first);
+          if (qualified.find('@') != std::string::npos) {
+            ResolveDef &topic = gbinding.defs[gbinding.index["topic " + qualified]];
+            topic.expr = std::unique_ptr<Expr>(new App(l, new App(l,
+              new VarRef(l, "binary ++@wake"),
+              new VarRef(l, def.name)),
+              topic.expr.release()));
+          }
+          ++gbinding.current_index;
+        }
+      }
+    }
+    for (auto &p : top.packages) {
+      for (size_t i = 0; i < p.second->topics.size(); ++i) {
+        ResolveDef &def = gbinding.defs[gbinding.current_index];
+        def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &gbinding);
+        ++gbinding.current_index;
       }
     }
     gbinding.current_index = -1;
