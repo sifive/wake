@@ -310,8 +310,7 @@ struct Destruct : public Expr {
 // A dummy expression never actually used in the AST
 struct VarDef : public Expr {
   static const TypeDescriptor type;
-  Location target; // for publishes
-  VarDef(const Location &location_) : Expr(&type, location_), target(LOCATION) { }
+  VarDef(const Location &location_) : Expr(&type, location_) { }
   void format(std::ostream &os, int depth) const override;
 };
 
