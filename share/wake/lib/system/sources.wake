@@ -16,8 +16,9 @@
 package wake
 
 # Private implementation of global sources
+export topic source: String
 def add_sources str = prim "add_sources"
-def got_sources = add_sources "\0" # (subscribe source | map simplify | implode)
+def got_sources = add_sources (subscribe source | map simplify | implode)
 
 # Find files
 # WARNING! Use of this method can make a build unreproducible

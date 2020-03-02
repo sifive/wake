@@ -39,29 +39,17 @@ def makeCompileC variant gcc flags =
 def makeLinkO variant linker flags =
   Pair variant (\extraFlags doLinkO variant linker (flags ++ extraFlags)), Nil
 
-def compileCs =
-  makeCompileC "native-c99-debug"     (which "cc") (c99Flags ++ debugCFlags)    ++
-  makeCompileC "native-c99-release"   (which "cc") (c99Flags ++ releaseCFlags)  ++
-  makeCompileC "native-cpp11-debug"   (which "c++") (c11Flags ++ debugCFlags)   ++
-  makeCompileC "native-cpp11-release" (which "c++") (c11Flags ++ releaseCFlags) ++
-  Nil
+export topic compileC: Pair String ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Path)
+publish compileC = makeCompileC "native-c99-debug"     (which "cc") (c99Flags ++ debugCFlags)
+publish compileC = makeCompileC "native-c99-release"   (which "cc") (c99Flags ++ releaseCFlags)
+publish compileC = makeCompileC "native-cpp11-debug"   (which "c++") (c11Flags ++ debugCFlags)
+publish compileC = makeCompileC "native-cpp11-release" (which "c++") (c11Flags ++ releaseCFlags)
 
-#publish compileC = makeCompileC "native-c99-debug"     (which "cc") (c99Flags ++ debugCFlags)
-#publish compileC = makeCompileC "native-c99-release"   (which "cc") (c99Flags ++ releaseCFlags)
-#publish compileC = makeCompileC "native-cpp11-debug"   (which "c++") (c11Flags ++ debugCFlags)
-#publish compileC = makeCompileC "native-cpp11-release" (which "c++") (c11Flags ++ releaseCFlags)
-
-def linkOs =
-  makeLinkO "native-c99-debug"     (which "cc") (debugLFlags)    ++
-  makeLinkO "native-c99-release"   (which "cc") (releaseLFlags)  ++
-  makeLinkO "native-cpp11-debug"   (which "c++") (debugLFlags)   ++
-  makeLinkO "native-cpp11-release" (which "c++") (releaseLFlags) ++
-  Nil
-
-#publish linkO = makeLinkO "native-c99-debug"     (which "cc") (debugLFlags)
-#publish linkO = makeLinkO "native-c99-release"   (which "cc") (releaseLFlags)
-#publish linkO = makeLinkO "native-cpp11-debug"   (which "c++") (debugLFlags)
-#publish linkO = makeLinkO "native-cpp11-release" (which "c++") (releaseLFlags)
+export topic linkO: Pair String ((extraFlags: List String) => (objects: List Path) => (targ: String) => Path)
+publish linkO = makeLinkO "native-c99-debug"     (which "cc") (debugLFlags)
+publish linkO = makeLinkO "native-c99-release"   (which "cc") (releaseLFlags)
+publish linkO = makeLinkO "native-cpp11-debug"   (which "c++") (debugLFlags)
+publish linkO = makeLinkO "native-cpp11-release" (which "c++") (releaseLFlags)
 
 def pickVariant variant variants =
   match (find (variant ==* _.getPairFirst) variants)
@@ -70,5 +58,5 @@ def pickVariant variant variants =
       def ok = catWith " " (map getPairFirst variants)
       \_\_\_ makeBadPath (makeError "No variant matches {variant}; options: {ok}")
 
-export def compileC variant = pickVariant variant compileCs # (subscribe compileC)
-export def linkO    variant = pickVariant variant linkOs # (subscribe linkO)
+export def compileC variant = pickVariant variant (subscribe compileC)
+export def linkO    variant = pickVariant variant (subscribe linkO)

@@ -16,7 +16,8 @@
 package build_wake
 from wake import _
 
-def buildAs Unit = match Nil #(subscribe releaseAs)
+topic releaseAs: String
+def buildAs Unit = match (subscribe releaseAs)
   version, Nil = Pass version
   _ =
     def cmdline = which "git", "describe", "--tags", "--dirty", Nil
@@ -35,7 +36,8 @@ def buildAs Unit = match Nil #(subscribe releaseAs)
     #  0.15.0~alpha.4+g6efe8e9~dirty ... which sorts correctly for both rpm+deb
     # ^      ^     ^ ^        ^
 
-def buildOn Unit = match Nil #(subscribe releaseOn)
+topic releaseOn: String
+def buildOn Unit = match (subscribe releaseOn)
   date, Nil = Pass date
   _ =
     def cmdline = which "git", "show", "-s", "--format=%ci", "HEAD", Nil

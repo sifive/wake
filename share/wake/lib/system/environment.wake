@@ -20,22 +20,23 @@ def uname = prim "uname"
 export def sysname = uname.getPairFirst
 export def machine = uname.getPairSecond
 
+# Default search path for new Plans
 export topic path: String
+export def path = catWith ":" (subscribe path | distinctBy scmp)
+publish environment = "PATH={path}", Nil
+
 # Inject command-line specified path entries
-#!!!
-#publish path = match (getenv "WAKE_PATH")
-#  Some x = tokenize `:` x
-#  None = Nil
+publish path = match (getenv "WAKE_PATH")
+  Some x = tokenize `:` x
+  None = Nil
 
 # Setup a default path
-#publish path = "/usr/bin", Nil
-#publish path = "/bin", Nil
+publish path = "/usr/bin", Nil
+publish path = "/bin", Nil
 
-export def path = catWith ":" ("/opt/local/bin", "/usr/bin", "/bin", Nil) #(subscribe path | distinctBy scmp)
-#publish environment = "PATH={path}", Nil
-
+# Default environment for new Plans
 export topic environment: String
-export def environment = "PATH={path}", Nil #subscribe environment
+export def environment = subscribe environment
 
 # Use of this function can lead to unnecessary rebuilds!
 export def getenv key =
