@@ -606,6 +606,20 @@ static void bind_def(Lexer &lex, DefMap &map, Definition &&def, Symbols *exports
   }
 }
 
+static void bind_type(Lexer &lex, Package &package, const std::string &name, const Location &location, Symbols *exports, Symbols *globals) {
+  if (globals) globals->types.insert(std::make_pair(name, SymbolSource(location, SYM_LEAF)));
+  if (exports) exports->types.insert(std::make_pair(name, SymbolSource(location, SYM_LEAF)));
+
+  auto it = package.package.types.insert(std::make_pair(name, SymbolSource(location, SYM_LEAF)));
+  if (!it.second) {
+    std::cerr << "Duplicate type "
+      << it.first->first << " at "
+      << it.first->second.location.text() << " and "
+      << location.text() << std::endl;
+    lex.fail = true;
+  }
+}
+
 static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
   TRACE("UNARY_AST");
   switch (lex.next.type) {
@@ -950,12 +964,13 @@ static void parse_tuple(Lexer &lex, Package &package, Symbols *exports, Symbols 
   lex.consume();
 
   bool repeat = true;
+  bool exportt = exportb, globalt = globalb;
   while (repeat) {
     int flags = 0;
     bool quals = true;
     while (quals) switch (lex.next.type) {
-      case GLOBAL: lex.consume(); flags |= FLAG_GLOBAL; break;
-      case EXPORT: lex.consume(); flags |= FLAG_EXPORT; break;
+      case GLOBAL: lex.consume(); flags |= FLAG_GLOBAL; globalt = true; break;
+      case EXPORT: lex.consume(); flags |= FLAG_EXPORT; exportt = true; break;
       default: quals = false; break;
     }
 
@@ -994,6 +1009,7 @@ static void parse_tuple(Lexer &lex, Package &package, Symbols *exports, Symbols 
   for (size_t i = c.ast.args.size(); i > 0; --i)
     construct = new Lambda(c.ast.token, c.ast.args[i-1].tag, construct);
 
+  bind_type(lex, package, sump->name, sump->token, exportt?exports:nullptr, globalt?globals:nullptr);
   bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), exportb?exports:nullptr, globalb?globals:nullptr);
 
   check_special(lex, name, sump);
@@ -1123,6 +1139,7 @@ static void parse_data(Lexer &lex, Package &package, Symbols *exports, Symbols *
     lex.consume();
   }
 
+  bind_type(lex, package, sump->name, sump->token, exportb?exports:nullptr, globalb?globals:nullptr);
   for (auto &c : sump->members) {
     Expr *construct = new Construct(c.ast.token, sump, &c);
     for (size_t i = 0; i < c.ast.args.size(); ++i)
@@ -1599,6 +1616,12 @@ const char *parse_top(Top &top, Lexer &lex) {
   for (auto &topic : package->topics) {
     auto name = topic.first + "@" + package->name;
     file.local.topics.insert(std::make_pair(topic.first, SymbolSource(topic.second.location, name, SYM_LEAF)));
+  }
+
+  // localize all types
+  for (auto &type : package->package.types) {
+    auto name = type.first + "@" + package->name;
+    file.local.types.insert(std::make_pair(type.first, SymbolSource(type.second.location, name, SYM_LEAF)));
   }
 
   auto it = top.packages.insert(std::make_pair(package->name, nullptr));
