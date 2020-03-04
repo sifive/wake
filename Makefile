@@ -42,7 +42,7 @@ install:	all
 	$(WAKE_ENV) ./bin/wake install '"$(DESTDIR)"'
 
 tarball:	wake.db
-	$(WAKE_ENV) ./bin/wake tarball 0
+	$(WAKE_ENV) ./bin/wake tarball Unit
 
 bin/wake:	src/symbol.o $(COMMON)				\
 		$(patsubst %.cpp,%.o,$(wildcard src/*.cpp))	\
