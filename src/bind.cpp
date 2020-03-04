@@ -828,14 +828,23 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
         for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
           ResolveDef &def = gbinding.defs[gbinding.current_index];
           Location &l = def.location;
-          def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &dbinding);
           auto qualified = rebind_publish(&dbinding, l, it->first);
-          if (qualified.find('@') != std::string::npos) {
-            ResolveDef &topic = gbinding.defs[gbinding.index["topic " + qualified]];
-            topic.expr = std::unique_ptr<Expr>(new App(l, new App(l,
+          size_t at = qualified.find('@');
+          if (at != std::string::npos) {
+            auto pkg = top.packages.find(qualified.substr(at+1));
+            auto topic = pkg->second->topics.find(qualified.substr(0, at));
+            std::vector<AST> args;
+            args.emplace_back(topic->second.type);
+            AST signature(topic->second.type.region, "List", std::move(args));
+            def.expr = fracture(top, false, trim(def.name), std::unique_ptr<Expr>(
+              new Ascribe(def.expr->location, std::move(signature), def.expr.release())), &dbinding);
+            ResolveDef &topicdef = gbinding.defs[gbinding.index["topic " + qualified]];
+            topicdef.expr = std::unique_ptr<Expr>(new App(l, new App(l,
               new VarRef(l, "binary ++@wake"),
               new VarRef(l, def.name)),
-              topic.expr.release()));
+              topicdef.expr.release()));
+          } else {
+            def.expr.reset();
           }
           ++gbinding.current_index;
         }
