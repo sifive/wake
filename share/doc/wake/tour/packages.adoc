@@ -261,9 +261,10 @@ In both cases, a package scope must be selected to produce useful work.
 
 First, wake progressively searches from the current directory
 up to the workspace root for wake files.
-If no wake files are found, no package is selected.
+If no wake files are found, the `wake` package is selected.
 If the wake files found share a common package, that package is selected.
-Otherwise, no package is selected and one must be manually selected using '-p'.
+Otherwise, the `wake` package is selected,
+though this many be manually overridden using the '--in' command-line option.
 
 By default, when evaluating the command-line,
 wake passes all non-options to the selected package's `main` function.

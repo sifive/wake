@@ -59,7 +59,8 @@ void print_help(const char *argv0) {
     << "    --no-workspace   Do not open a database or scan for sources files"           << std::endl
     << "    --heap-factor X  Heap-size is X * live data after the last GC (default 4.0)" << std::endl
     << "    --profile-heap   Report memory consumption on every garbage collection"      << std::endl
-    << "    --profile=FILE   Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
+    << "    --profile FILE   Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
+    << "    --in      PKG    Use PKG as the select package (default: current directory)" << std::endl
     << std::endl
     << "  Database introspection:" << std::endl
     << "    --input  -i FILE Report recorded meta-data for jobs which read FILES"        << std::endl
@@ -108,6 +109,7 @@ int main(int argc, char **argv) {
     { 0,   "heap-factor",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 0,   "profile",               GOPT_ARGUMENT_REQUIRED  },
+    { 0,   "in",                    GOPT_ARGUMENT_REQUIRED  },
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
     { 'l', "last",                  GOPT_ARGUMENT_FORBIDDEN },
@@ -165,6 +167,7 @@ int main(int argc, char **argv) {
   const char *remove  = arg(options, "remove-task")->argument;
   const char *hash    = arg(options, "debug-target")->argument;
   const char *exports = arg(options, "exports")->argument;
+  const char *in      = arg(options, "in")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -361,6 +364,17 @@ int main(int argc, char **argv) {
           warned_conflict = true;
         }
       }
+    }
+  }
+
+  if (in) {
+    auto it = top->packages.find(in);
+    if (it == top->packages.end()) {
+      std::cerr << "Package '" << in
+        << "' selected by --in does not exist!" << std::endl;
+      ok = false;
+    } else {
+      top->def_package = in;
     }
   }
 
