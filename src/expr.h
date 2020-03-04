@@ -187,6 +187,7 @@ struct Symbols {
 struct Imports : public Symbols {
   SymbolMap mixed;
   std::vector<std::string> import_all;
+  bool empty() const { return import_all.empty() && mixed.empty() && defs.empty() && types.empty() && topics.empty(); }
 };
 
 struct DefMap : public Expr {
@@ -237,10 +238,11 @@ struct Top : public Expr {
   typedef std::map<std::string, std::unique_ptr<Package> > Packages;
   Packages packages;
   Symbols globals;
+  const char *def_package;
   std::unique_ptr<Expr> body;
 
   static const TypeDescriptor type;
-  Top() : Expr(&type, LOCATION), packages(), globals() { }
+  Top() : Expr(&type, LOCATION), packages(), globals(), def_package(nullptr) { }
 
   void format(std::ostream &os, int depth) const override;
 };

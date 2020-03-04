@@ -838,8 +838,19 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
         ++gbinding.current_index;
       }
     }
+    Package &defp = *top.packages[top.def_package];
     gbinding.current_index = -1;
-    std::unique_ptr<Expr> body = fracture(top, true, name, std::move(top.body), &gbinding);
+    pbinding.symbols.clear();
+    ibinding.symbols.clear();
+    dbinding.symbols.clear();
+    dbinding.symbols.push_back(&defp.package);
+    std::set<std::string> imports;
+    for (auto &file : defp.files)
+      for (auto &bulk : file.content->imports.import_all)
+        imports.insert(bulk);
+    for (auto &imp : imports)
+      ibinding.symbols.push_back(&top.packages[imp]->exports);
+    std::unique_ptr<Expr> body = fracture(top, true, name, std::move(top.body), &dbinding);
     return fracture_binding(top.location, gbinding.defs, std::move(body));
   } else {
     // Literal/Prim/Construct/Destruct/Get

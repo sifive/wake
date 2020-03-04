@@ -1480,7 +1480,7 @@ static void no_tags(Lexer &lex, bool exportb, bool globalb) {
   }
 }
 
-void parse_top(Top &top, Lexer &lex) {
+const char *parse_top(Top &top, Lexer &lex) {
   TRACE("TOP");
 
   std::unique_ptr<Package> package(new Package);
@@ -1564,6 +1564,11 @@ void parse_top(Top &top, Lexer &lex) {
   map.location.end = lex.next.location.start;
   expect(END, lex);
 
+  // Set a default import
+  if (file.content->imports.empty())
+    file.content->imports.import_all.push_back("wake");
+
+  // Set a default package name
   static size_t anon_file = 0;
   if (package->name.empty()) {
     package->name = std::to_string(++anon_file);
@@ -1608,6 +1613,8 @@ void parse_top(Top &top, Lexer &lex) {
     // duplicated topics already reported as package-local duplicate
     it.first->second->topics.insert(package->topics.begin(), package->topics.end());
   }
+
+  return it.first->second->name.c_str();
 }
 
 Expr *parse_command(Lexer &lex) {

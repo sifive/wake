@@ -223,7 +223,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  std::string prefix;
+  std::string prefix; // "" | .+/
   if (init) {
     if (!make_workspace(init)) {
       std::cerr << "Unable to initialize a workspace in " << init << std::endl;
@@ -328,6 +328,10 @@ int main(int argc, char **argv) {
   if (!sources) std::cerr << "Source file enumeration failed" << std::endl;
   ok &= sources;
 
+  // Select a default package
+  int longest_prefix = -1;
+  bool warned_conflict = false;
+
   // Read all wake build files
   Scope::debug = debug;
   std::unique_ptr<Top> top(new Top);
@@ -335,9 +339,33 @@ int main(int argc, char **argv) {
     if (verbose && debug)
       std::cerr << "Parsing " << i << std::endl;
     Lexer lex(runtime.heap, i.c_str());
-    parse_top(*top, lex);
+    auto package = parse_top(*top, lex);
     if (lex.fail) ok = false;
+    // Does this file inform our choice of a default package?
+    size_t slash = i.find_last_of('/');
+    std::string dir(i, 0, slash==std::string::npos?0:(slash+1)); // "" | .+/
+    if (prefix.compare(0, dir.size(), dir) == 0) { // dir = prefix or parent of prefix?
+      int dirlen = dir.size();
+      if (dirlen > longest_prefix) {
+        longest_prefix = dirlen;
+        top->def_package = package;
+        warned_conflict = false;
+      } else if (dirlen == longest_prefix) {
+        if (top->def_package != package && !warned_conflict) {
+          std::cerr << "Directory " << dir
+            << " has wakefiles with both package '" << top->def_package
+            << "' and '" << package
+            << "'. This prevents default package selection;"
+            << " defaulting to package 'wake'." << std::endl;
+          top->def_package = "wake";
+          warned_conflict = true;
+        }
+      }
+    }
   }
+
+  // No wake files in the path from workspace to the current directory
+  if (!top->def_package) top->def_package = "wake";
 
   std::vector<std::pair<std::string, std::string> > defs;
   if (global)
