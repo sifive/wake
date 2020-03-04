@@ -60,6 +60,7 @@ struct Sum {
   Location token, region;
   std::vector<std::string> args;
   std::vector<Constructor> members;
+  bool scoped;
 
   Sum(AST &&ast);
   void addConstructor(AST &&ast);

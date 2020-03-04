@@ -411,6 +411,18 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
         lhs->flags |= FLAG_AST;
         break;
       }
+      case COLON: {
+        op_type op = op_precedence(lex.id().c_str());
+        if (op.p < p) return lhs;
+        lex.consume();
+        ASTState state(true, false);
+        AST signature = parse_ast(op.p + op.l, lex, state);
+        if (check_constructors(signature)) lex.fail = true;
+        Location location = lhs->location;
+        location.end = signature.region.end;
+        lhs = new Ascribe(location, std::move(signature), lhs);
+        break;
+      }
       case MATCH:
       case LAMBDA:
       case ID:

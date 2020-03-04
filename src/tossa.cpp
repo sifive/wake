@@ -114,6 +114,10 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
     }
     doit(scope, &frame, def->body.get());
     def->meta = def->body->meta;
+  } else if (expr->type == &Ascribe::type) {
+    Ascribe *asc = static_cast<Ascribe*>(expr);
+    doit(scope, stack, asc->body.get());
+    asc->meta = asc->body->meta;
   } else if (expr->type == &Literal::type) {
     Literal *lit = static_cast<Literal*>(expr);
     lit->meta = scope.append(new RLit(lit->value));

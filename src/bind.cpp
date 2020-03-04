@@ -775,6 +775,16 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     if ((def->flags & FLAG_AST) != 0)
       out->flags |= FLAG_AST;
     return out;
+  } else if (expr->type == &Construct::type) {
+    Construct *con = static_cast<Construct*>(expr.get());
+    if (!con->sum->scoped) {
+      con->sum->scoped = true;
+    }
+    return expr;
+  } else if (expr->type == &Ascribe::type) {
+    Ascribe *asc = static_cast<Ascribe*>(expr.get());
+    asc->body = fracture(top, true, name, std::move(asc->body), binding);
+    return expr;
   } else if (expr->type == &Top::type) {
     ResolveBinding gbinding(nullptr);   // global mapping + qualified defines
     ResolveBinding pbinding(&gbinding); // package mapping
@@ -853,7 +863,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(top.body), &dbinding);
     return fracture_binding(top.location, gbinding.defs, std::move(body));
   } else {
-    // Literal/Prim/Construct/Destruct/Get
+    // Literal/Prim/Destruct/Get
     return expr;
   }
 }
@@ -934,6 +944,13 @@ struct ArgErrorMessage : public TypeErrorMessage {
     os << " of type";
   }
   void formatB(std::ostream &os) const { os << "but was supplied argument " << la->text() << " of type"; }
+};
+
+struct AscErrorMessage : public TypeErrorMessage {
+  const Location *body, *type;
+  AscErrorMessage(const Location *body_, const Location *type_) : body(body_), type(type_) { }
+  void formatA(std::ostream &os) const { os << "Type error; expression " << body->text() << " of type"; }
+  void formatB(std::ostream &os) const { os << "does not match explicit type ascription at " << type->file() << " of"; }
 };
 
 struct RecErrorMessage : public TypeErrorMessage  {
@@ -1050,6 +1067,14 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       ok = des->typeVar.unify(arg[1]) && ok;
     }
     return ok;
+  } else if (expr->type == &Ascribe::type) {
+    Ascribe *asc = static_cast<Ascribe*>(expr);
+    std::map<std::string, TypeVar*> ids;
+    bool b = explore(asc->body.get(), pmap, binding);
+    bool ts = asc->signature.unify(asc->typeVar, ids);
+    AscErrorMessage ascm(&asc->body->location, &asc->signature.region);
+    bool tb = asc->body->typeVar.unify(asc->typeVar, &ascm);
+    return b && tb && ts;
   } else if (expr->type == &Prim::type) {
     Prim *prim = static_cast<Prim*>(expr);
     std::vector<TypeVar*> args;

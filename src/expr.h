@@ -149,6 +149,17 @@ struct Subscribe : public Expr {
   void format(std::ostream &os, int depth) const override;
 };
 
+struct Ascribe : public Expr {
+  AST signature;
+  std::unique_ptr<Expr> body;
+
+  static const TypeDescriptor type;
+  Ascribe(const Location &location_, AST &&signature_, Expr *body_)
+   : Expr(&type, location_), signature(std::move(signature_)), body(body_) { }
+
+  void format(std::ostream &os, int depth) const override;
+};
+
 struct DefValue {
   Location location;
   std::unique_ptr<Expr> body;
@@ -209,9 +220,7 @@ struct File {
   typedef std::vector<std::pair<std::string, DefValue> > Pubs;
   std::unique_ptr<DefMap> content;
   Symbols local;
-  Pubs pubs; // eval within local>content.imports>package>top.globals
-  // topics
-  // types
+  Pubs pubs;
 };
 
 struct Topic {

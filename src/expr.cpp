@@ -32,6 +32,7 @@ const TypeDescriptor Construct ::type("Construct");
 const TypeDescriptor Destruct  ::type("Destruct");
 // these are removed by bind
 const TypeDescriptor Subscribe ::type("Subscribe");
+const TypeDescriptor Ascribe   ::type("Ascribe");
 const TypeDescriptor Match     ::type("Match");
 const TypeDescriptor DefMap    ::type("DefMap");
 const TypeDescriptor Package   ::type("Package");
@@ -62,6 +63,12 @@ void VarRef::format(std::ostream &os, int depth) const {
 
 void Subscribe::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Subscribe(" << name << ") @ " << location.file() << std::endl;
+}
+
+void Ascribe::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Ascribe @ " << location.file() << std::endl;
+  os << pad(depth+2) << "signature = " << signature << std::endl;
+  body->format(os, depth+2);
 }
 
 void Match::format(std::ostream &os, int depth) const {
