@@ -50,8 +50,9 @@ struct Expr;
 struct Constructor {
   AST ast;
   int index; // sum->members[index] = this
+  bool scoped;
 
-  Constructor(AST &&ast_) : ast(ast_), index(0) { }
+  Constructor(AST &&ast_) : ast(ast_), index(0), scoped(false) { }
   static Constructor array;
 };
 

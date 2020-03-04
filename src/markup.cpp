@@ -77,11 +77,12 @@ void JSONRender::explore(Expr *expr) {
         int fun = val - defbinding->val.size();
         Expr *expr = (fun >= 0) ? defbinding->fun[fun].get() : defbinding->val[val].get();
         if (i.first.compare(0, 6, "topic ") == 0) {
-          // expr = VarRef(Nil) | App(App(VarRef(++),VarRef(pub)), expr)
+          // expr = VarRef(Nil) | App(App(VarRef(++),Ascribe(VarRef(pub))), expr)
           while (expr->type == &App::type) {
             App *app1 = static_cast<App*>(expr);
             App *app2 = static_cast<App*>(app1->fn.get());
-            VarRef *pub = static_cast<VarRef*>(app2->val.get());
+            Ascribe *asc = static_cast<Ascribe*>(app2->val.get());
+            VarRef *pub = static_cast<VarRef*>(asc->body.get());
             auto ref = new VarRef(pub->target, i.first);
             ref->target = i.second.location;
             ref->typeVar.setDOB(expr->typeVar);

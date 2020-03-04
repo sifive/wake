@@ -209,7 +209,7 @@ static void tag2str(std::ostream &os, int tag) {
   os << (char)('a' + (tag % radix));
 }
 
-int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag, const TypeVar *other, int tags, int o) {
+int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag, const TypeVar *other, int tags, int o, bool qualify) {
   const Imp *a = value.imp.get();
   const Imp *b = other?other->imp.get():nullptr;
   int p;
@@ -222,12 +222,22 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const ch
     p = o;
   }
 
+  size_t at;
+  if (qualify) {
+    at = a->name.size();
+  } else {
+    at = a->name.find_first_of('@');
+    if (at == std::string::npos) at = a->name.size();
+  }
+
   if (b && (a->nargs != b->nargs || a->name != b->name)) {
     os << term_red();
     if (a->isFree()) {
       os << "<infinite-type>";
     } else {
-      do_format(os, dob, value, "", 0, tags, p);
+      size_t bat = b->name.find_first_of('@');
+      if (bat == std::string::npos) bat = b->name.size();
+      do_format(os, dob, value, "", 0, tags, p, a->name.compare(0, at, b->name, 0, bat) == 0);
     }
     os << term_normal();
   } else if (a->isFree()) {
@@ -239,25 +249,26 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const ch
     if (a->free_dob < dob) os << "_";
     tag2str(os, tag);
   } else if (a->nargs == 0) {
-    os << a->name;
+    os.write(a->name.c_str(), at);
   } else if (!a->name.compare(0, 7, "binary ", 7)) {
     op_type q = op_precedence(a->name.c_str() + 7);
     if (q.p < p) os << "(";
     tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag.c_str(), b?&b->cargs[0].var:0, tags, q.p + !q.l);
     if (a->name[7] != ',') os << " ";
-    os << a->name.c_str() + 7 << " ";
+    os.write(a->name.c_str() + 7, at-7);
+    os << " ";
     tags = do_format(os, dob, a->cargs[1].var, a->cargs[1].tag.c_str(), b?&b->cargs[1].var:0, tags, q.p + q.l);
     if (q.p < p) os << ")";
   } else if (!a->name.compare(0, 6, "unary ")) {
     op_type q = op_precedence(a->name.c_str() + 6);
     if (q.p < p) os << "(";
-    os << a->name.c_str() + 6;
+    os.write(a->name.c_str() + 6, at-6);
     tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag.c_str(), b?&b->cargs[0].var:0, tags, q.p);
     if (q.p < p) os << ")";
   } else {
     op_type q = op_precedence("a");
     if (q.p < p) os << "(";
-    os << a->name;
+    os.write(a->name.c_str(), at);
     for (int i = 0; i < a->nargs; ++i) {
       os << " ";
       tags = do_format(os, dob, a->cargs[i].var, a->cargs[i].tag.c_str(), b?&b->cargs[i].var:0, tags, q.p+q.l);

@@ -129,6 +129,23 @@ struct ResolveBinding {
     if (override) name = override->qualified;
     return override;
   }
+
+  bool qualify_type(std::string &name) {
+    SymbolSource *override = nullptr;
+    for (auto sym : symbols) {
+      auto it = sym->types.find(name);
+      if (it != sym->types.end()) {
+        if (override) {
+          std::cerr << "Ambiguous import of type '" << name
+            << "' from " << override->location.text()
+            << " and " << it->second.location.text() << std::endl;
+        }
+        override = &it->second;
+      }
+    }
+    if (override) name = override->qualified;
+    return override;
+  }
 };
 
 struct RelaxedVertex {
@@ -719,6 +736,32 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location
   return out;
 }
 
+static bool qualify_type(ResolveBinding *binding, std::string &name, const Location &location) {
+  ResolveBinding *iter;
+  for (iter = binding; iter; iter = iter->parent) {
+    if (iter->qualify_type(name)) break;
+  }
+
+  if (iter) {
+    return true;
+  } else {
+    std::cerr << "Type signature '" << name
+      << "' refers to a non-existent type "
+      << location.file() << std::endl;
+    return false;
+  }
+}
+
+static bool qualify_type(ResolveBinding *binding, AST &type) {
+  // Type variables do not get qualified
+  if (Lexer::isLower(type.name.c_str())) return true;
+  bool ok = qualify_type(binding, type.name, type.token);
+  for (auto &x : type.args)
+    if (!qualify_type(binding, x))
+      ok = false;
+  return ok;
+}
+
 static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &name, std::unique_ptr<Expr> expr, ResolveBinding *binding) {
   if (expr->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(expr.get());
@@ -777,13 +820,27 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     return out;
   } else if (expr->type == &Construct::type) {
     Construct *con = static_cast<Construct*>(expr.get());
+    bool ok = true;
     if (!con->sum->scoped) {
       con->sum->scoped = true;
+      if (!qualify_type(binding, con->sum->name, con->sum->token))
+        ok = false;
     }
+    if (!con->cons->scoped) {
+      con->cons->scoped = true;
+      for (auto &arg : con->cons->ast.args)
+        if (!qualify_type(binding, arg))
+          ok = false;
+    }
+    if (!ok) expr.reset();
     return expr;
   } else if (expr->type == &Ascribe::type) {
     Ascribe *asc = static_cast<Ascribe*>(expr.get());
-    asc->body = fracture(top, true, name, std::move(asc->body), binding);
+    if (qualify_type(binding, asc->signature)) {
+      asc->body = fracture(top, true, name, std::move(asc->body), binding);
+    } else {
+      expr.reset();
+    }
     return expr;
   } else if (expr->type == &Top::type) {
     ResolveBinding gbinding(nullptr);   // global mapping + qualified defines
@@ -791,6 +848,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     ResolveBinding ibinding(&pbinding); // file import mapping
     ResolveBinding dbinding(&ibinding); // file local mapping
     size_t publish = 0;
+    bool fail = false;
     for (auto &p : top.packages) {
       for (auto &f : p.second->files) {
         for (auto &d : f.content->defs) {
@@ -805,11 +863,13 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       }
     }
     for (auto &p : top.packages) {
-      for (auto &t : p.second->topics) {
-        auto name = "topic " + t.first + "@" + p.first;
-        gbinding.index[name] = gbinding.defs.size();
-        gbinding.defs.emplace_back(name, t.second.location,
-          std::unique_ptr<Expr>(new VarRef(t.second.location, "Nil@wake")));
+      for (auto &f : p.second->files) {
+        for (auto &t : f.topics) {
+          auto name = "topic " + t.first + "@" + p.first;
+          gbinding.index[name] = gbinding.defs.size();
+          gbinding.defs.emplace_back(name, t.second.location,
+            std::unique_ptr<Expr>(new VarRef(t.second.location, "Nil@wake")));
+        }
       }
     }
     gbinding.symbols.push_back(&top.globals);
@@ -827,36 +887,50 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
         }
         for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
           ResolveDef &def = gbinding.defs[gbinding.current_index];
-          Location &l = def.location;
-          auto qualified = rebind_publish(&dbinding, l, it->first);
+          auto qualified = rebind_publish(&dbinding, def.location, it->first);
           size_t at = qualified.find('@');
           if (at != std::string::npos) {
-            auto pkg = top.packages.find(qualified.substr(at+1));
-            auto topic = pkg->second->topics.find(qualified.substr(0, at));
-            std::vector<AST> args;
-            args.emplace_back(topic->second.type);
-            AST signature(topic->second.type.region, "List", std::move(args));
-            def.expr = fracture(top, false, trim(def.name), std::unique_ptr<Expr>(
-              new Ascribe(def.expr->location, std::move(signature), def.expr.release())), &dbinding);
-            ResolveDef &topicdef = gbinding.defs[gbinding.index["topic " + qualified]];
+            def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &dbinding);
+            ResolveDef &topicdef = gbinding.defs[gbinding.index.find("topic " + qualified)->second];
+            Location &l = def.expr->location;
             topicdef.expr = std::unique_ptr<Expr>(new App(l, new App(l,
               new VarRef(l, "binary ++@wake"),
               new VarRef(l, def.name)),
               topicdef.expr.release()));
           } else {
-            def.expr.reset();
+            fail = true;
           }
           ++gbinding.current_index;
+        }
+        for (auto &t : f.topics) {
+          if (!qualify_type(&dbinding, t.second.type))
+            fail = true;
         }
       }
     }
     for (auto &p : top.packages) {
-      for (size_t i = 0; i < p.second->topics.size(); ++i) {
-        ResolveDef &def = gbinding.defs[gbinding.current_index];
-        def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &gbinding);
-        ++gbinding.current_index;
+      for (auto &f : p.second->files) {
+        for (auto &t : f.topics) {
+          ResolveDef &def = gbinding.defs[gbinding.current_index];
+          def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &gbinding);
+          ++gbinding.current_index;
+
+          // Form the type required for publishes
+          std::vector<AST> args;
+          args.emplace_back(t.second.type); // qualified by prior pass
+          AST signature(t.second.type.region, "List@wake", std::move(args));
+
+          // Insert Ascribe requirements on all publishes
+          for (Expr *next, *iter = def.expr.get(); iter->type == &App::type; iter = next) {
+            App *app1 = static_cast<App*>(iter);
+            App *app2 = static_cast<App*>(app1->fn.get());
+            app2->val = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), app2->val.release()));
+            next = app1->val.get();
+          }
+        }
       }
     }
+
     Package &defp = *top.packages[top.def_package];
     gbinding.current_index = -1;
     pbinding.symbols.clear();
@@ -869,8 +943,11 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
         imports.insert(bulk);
     for (auto &imp : imports)
       ibinding.symbols.push_back(&top.packages[imp]->exports);
+
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(top.body), &dbinding);
-    return fracture_binding(top.location, gbinding.defs, std::move(body));
+    auto out = fracture_binding(top.location, gbinding.defs, std::move(body));
+    if (fail) out.reset();
+    return out;
   } else {
     // Literal/Prim/Destruct/Get
     return expr;

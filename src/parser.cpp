@@ -771,7 +771,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type Boolean not defined." << std::endl;
+    std::cerr << "Required data type Boolean@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -785,7 +785,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type Order not defined." << std::endl;
+    std::cerr << "Required data type Order@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -798,7 +798,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type List not defined." << std::endl;
+    std::cerr << "Required data type List@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -810,7 +810,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type Unit not defined." << std::endl;
+    std::cerr << "Required data type Unit@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -822,7 +822,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type Pair not defined." << std::endl;
+    std::cerr << "Required data type Pair@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -835,7 +835,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type Result not defined." << std::endl;
+    std::cerr << "Required data type Result@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -853,7 +853,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type JValue not defined." << std::endl;
+    std::cerr << "Required data type JValue@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -897,13 +897,6 @@ static AST parse_type_def(Lexer &lex) {
 }
 
 static void check_special(Lexer &lex, const std::string &name, const std::shared_ptr<Sum> &sump) {
-  if (name == "Integer" || name == "String" || name == "RegExp" || name == "Target" ||
-      name == FN || name == "Job" || name == "Array" || name == "Double") {
-    std::cerr << "Constuctor " << name
-      << " is reserved at " << sump->token.file() << "." << std::endl;
-    lex.fail = true;
-  }
-
   if (name == "Boolean") Boolean = sump;
   if (name == "Order")   Order = sump;
   if (name == "List")    List = sump;
@@ -914,6 +907,7 @@ static void check_special(Lexer &lex, const std::string &name, const std::shared
 }
 
 static void parse_topic(Lexer &lex, Package &package, Symbols *exports, Symbols *globals, bool exportb, bool globalb) {
+  File &file = package.files.back();
   lex.consume();
 
   auto id = get_arg_loc(lex);
@@ -938,7 +932,7 @@ static void parse_topic(Lexer &lex, Package &package, Symbols *exports, Symbols 
 
   if (expect(EOL, lex)) lex.consume();
 
-  auto it = package.topics.insert(std::make_pair(id.first, Topic(id.second, std::move(def))));
+  auto it = file.topics.insert(std::make_pair(id.first, Topic(id.second, std::move(def))));
   if (!it.second) {
     std::cerr << "Duplicate topic " << id.first
       << " at " << id.second.file() << std::endl;
@@ -1024,7 +1018,7 @@ static void parse_tuple(Lexer &lex, Package &package, Symbols *exports, Symbols 
   bind_type(lex, package, sump->name, sump->token, exportt?exports:nullptr, globalt?globals:nullptr);
   bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), exportb?exports:nullptr, globalb?globals:nullptr);
 
-  check_special(lex, name, sump);
+  if (package.name == "wake") check_special(lex, name, sump);
 
   // Create get/set/edit helper methods
   size_t outer = 0;
@@ -1160,7 +1154,7 @@ static void parse_data(Lexer &lex, Package &package, Symbols *exports, Symbols *
     bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), exportb?exports:nullptr, globalb?globals:nullptr);
   }
 
-  check_special(lex, sump->name, sump);
+  if (package.name == "wake") check_special(lex, sump->name, sump);
 }
 
 static void parse_import(const std::string &pkgname, DefMap &map, Lexer &lex) {
@@ -1485,7 +1479,10 @@ static void parse_package(Package &package, Lexer &lex) {
   lex.consume();
   auto id = get_arg_loc(lex);
   if (expect(EOL, lex)) lex.consume();
-  if (package.name.empty()) {
+  if (id.first == "builtin") {
+    std::cerr << "Package name 'builtin' is illegal." << std::endl;
+    lex.fail = true;
+  } else if (package.name.empty()) {
     package.name = id.first;
   } else {
     std::cerr << "Package name redefined at " << id.second.text()
@@ -1625,7 +1622,7 @@ const char *parse_top(Top &top, Lexer &lex) {
   }
 
   // localize all topics
-  for (auto &topic : package->topics) {
+  for (auto &topic : file.topics) {
     auto name = topic.first + "@" + package->name;
     file.local.topics.insert(std::make_pair(topic.first, SymbolSource(topic.second.location, name, SYM_LEAF)));
   }
@@ -1645,8 +1642,6 @@ const char *parse_top(Top &top, Lexer &lex) {
     it.first->second->exports.join(package->exports, nullptr);
     // duplicated export already reported as package-local duplicate
     it.first->second->files.emplace_back(std::move(file));
-    // duplicated topics already reported as package-local duplicate
-    it.first->second->topics.insert(package->topics.begin(), package->topics.end());
   }
 
   return it.first->second->name.c_str();

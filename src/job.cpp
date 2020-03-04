@@ -165,7 +165,7 @@ void Job::format(std::ostream &os, FormatState &state) const {
   if (APP_PRECEDENCE < state.p()) os << ")";
 }
 
-TypeVar Job::typeVar("Job", 0);
+TypeVar Job::typeVar("Job@builtin", 0);
 
 uint64_t Job::memory() const {
   if (predict.membytes == 0) {

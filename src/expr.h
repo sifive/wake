@@ -216,26 +216,26 @@ struct DefMap : public Expr {
   void format(std::ostream &os, int depth) const override;
 };
 
-struct File {
-  typedef std::vector<std::pair<std::string, DefValue> > Pubs;
-  std::unique_ptr<DefMap> content;
-  Symbols local;
-  Pubs pubs;
-};
-
 struct Topic {
   Location location;
   AST type;
   Topic(const Location &location_, AST &&type_) : location(location_), type(std::move(type_)) { }
 };
 
-struct Package : public Expr {
+struct File {
+  typedef std::vector<std::pair<std::string, DefValue> > Pubs;
   typedef std::map<std::string, Topic> Topics;
+  std::unique_ptr<DefMap> content;
+  Symbols local;
+  Pubs pubs;
+  Topics topics;
+};
+
+struct Package : public Expr {
   std::string name;
   std::vector<File> files;
   Symbols package;
   Symbols exports; // subset of package; used to fill imports
-  Topics topics;
 
   static const TypeDescriptor type;
   Package() : Expr(&type, LOCATION) { }
@@ -251,7 +251,7 @@ struct Top : public Expr {
   std::unique_ptr<Expr> body;
 
   static const TypeDescriptor type;
-  Top() : Expr(&type, LOCATION), packages(), globals(), def_package(nullptr) { }
+  Top();
 
   void format(std::ostream &os, int depth) const override;
 };
