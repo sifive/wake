@@ -1286,6 +1286,7 @@ static void parse_export(const std::string &pkgname, Package &package, Lexer &le
     default:
       exports = nullptr;
       local = nullptr;
+      kind = nullptr;
       std::cerr << "Was expecting a DEF/TYPE/TOPIC, got a "
         << symbolTable[lex.next.type] << " at "
         << lex.next.location.text() << std::endl;
