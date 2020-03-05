@@ -517,6 +517,7 @@ export def makeJSONRunner plan =
   makeRunner "json-{script}" score pre post localRunner
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
+from wake export type Path # Path constructor stays private!
 data Path =
   Path    (name: String)
   BadPath (error: Error)

@@ -1612,11 +1612,17 @@ const char *parse_top(Top &top, Lexer &lex) {
     auto name = def.first + "@" + package->name;
     auto it = file.local.defs.insert(std::make_pair(def.first, SymbolSource(def.second.location, name, SYM_LEAF)));
     if (!it.second) {
-      std::cerr << "Duplicate file-local definition "
-        << def.first << " at "
-        << it.first->second.location.text() << " and "
-        << def.second.location.text() << std::endl;
-      lex.fail = true;
+      if (it.first->second.qualified == name) {
+        it.first->second.location = def.second.location;
+        it.first->second.flags |= SYM_LEAF;
+        package->exports.defs.find(def.first)->second.flags |= SYM_LEAF;
+      } else {
+        std::cerr << "Duplicate file-local definition "
+          << def.first << " at "
+          << it.first->second.location.text() << " and "
+          << def.second.location.text() << std::endl;
+        lex.fail = true;
+      }
     }
     map.defs.insert(std::make_pair(std::move(name), std::move(def.second)));
   }
@@ -1624,13 +1630,39 @@ const char *parse_top(Top &top, Lexer &lex) {
   // localize all topics
   for (auto &topic : file.topics) {
     auto name = topic.first + "@" + package->name;
-    file.local.topics.insert(std::make_pair(topic.first, SymbolSource(topic.second.location, name, SYM_LEAF)));
+    auto it = file.local.topics.insert(std::make_pair(topic.first, SymbolSource(topic.second.location, name, SYM_LEAF)));
+    if (!it.second) {
+      if (it.first->second.qualified == name) {
+        it.first->second.location = topic.second.location;
+        it.first->second.flags |= SYM_LEAF;
+        package->exports.topics.find(topic.first)->second.flags |= SYM_LEAF;
+      } else {
+        std::cerr << "Duplicate file-local topic "
+          << topic.first << " at "
+          << it.first->second.location.text() << " and "
+          << topic.second.location.text() << std::endl;
+        lex.fail = true;
+      }
+    }
   }
 
   // localize all types
   for (auto &type : package->package.types) {
     auto name = type.first + "@" + package->name;
-    file.local.types.insert(std::make_pair(type.first, SymbolSource(type.second.location, name, SYM_LEAF)));
+    auto it = file.local.types.insert(std::make_pair(type.first, SymbolSource(type.second.location, name, SYM_LEAF)));
+    if (!it.second) {
+      if (it.first->second.qualified == name) {
+        it.first->second.location = type.second.location;
+        it.first->second.flags |= SYM_LEAF;
+        package->exports.types.find(type.first)->second.flags |= SYM_LEAF;
+      } else {
+        std::cerr << "Duplicate file-local type "
+          << type.first << " at "
+          << it.first->second.location.text() << " and "
+          << type.second.location.text() << std::endl;
+        lex.fail = true;
+      }
+    }
   }
 
   auto it = top.packages.insert(std::make_pair(package->name, nullptr));

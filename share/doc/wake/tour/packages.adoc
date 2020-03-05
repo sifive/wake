@@ -233,7 +233,6 @@ Furthermore, one must use the most precise form of identifier selection.
 When an identifier is re-exported,
 it becomes a package export and
 is placed into both file-local and package-level identifier <<resolution,scope>>.
-Thus, `from wake export map` will conflict with any other `def map` in the package.
 
 ----
 package example
@@ -241,16 +240,14 @@ data MyBoolean =
   MyTrue
   MyFalse
 
-from example export def YourTrue=MyTrue
-from example export type YourBoolean=MyBoolean
+from example export def MyTrue
+from example export type MyBoolean
 ----
 
 This example demonstrates how re-export syntax can be used to slice
 identifiers more finely than the standard `export` keyword prefix.
 In this situation, only one of the type constructors was exported.
-Note that `from example export def MyTrue` would fail,
-because it would re-introduce `MyTrue`
-as a conflicting package-level identifier.
+A same-package export must be used in file which declares the identifier.
 
 [[command-line]]
 == Command-line
