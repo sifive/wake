@@ -921,12 +921,16 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
           AST signature(t.second.type.region, "List@wake", std::move(args));
 
           // Insert Ascribe requirements on all publishes
-          for (Expr *next, *iter = def.expr.get(); iter->type == &App::type; iter = next) {
+          Expr *next = nullptr;
+          for (Expr *iter = def.expr.get(); iter->type == &App::type; iter = next) {
             App *app1 = static_cast<App*>(iter);
             App *app2 = static_cast<App*>(app1->fn.get());
             app2->val = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), app2->val.release()));
             next = app1->val.get();
           }
+
+          // If the topic is empty, still force the type
+          if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), def.expr.release()));
         }
       }
     }

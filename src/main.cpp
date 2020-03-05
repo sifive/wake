@@ -25,6 +25,7 @@
 #include <iostream>
 #include <sstream>
 #include <random>
+#include <set>
 #include <inttypes.h>
 #include <stdlib.h>
 #include "parser.h"
@@ -337,15 +338,27 @@ int main(int argc, char **argv) {
   if (!top->def_package) top->def_package = "wake";
 
   std::vector<std::pair<std::string, std::string> > defs;
-  if (global)
+  std::set<std::string> types;
+
+  if (global) {
     for (auto &g : top->globals.defs)
       defs.emplace_back(g.first, g.second.qualified);
+    for (auto &t : top->globals.topics)
+      defs.emplace_back("topic " + t.first, "topic " + t.second.qualified);
+    for (auto &t : top->globals.types)
+      types.insert(t.first);
+  }
 
   if (exports) {
     auto it = top->packages.find(exports);
-    if (it != top->packages.end())
+    if (it != top->packages.end()) {
       for (auto &e : it->second->exports.defs)
         defs.emplace_back(e.first, e.second.qualified);
+      for (auto &t : it->second->exports.topics)
+        defs.emplace_back("topic " + t.first, "topic " + t.second.qualified);
+      for (auto &t : it->second->exports.types)
+        types.insert(t.first);
+    }
   }
 
   std::string command;
@@ -365,7 +378,7 @@ int main(int argc, char **argv) {
   for (size_t i = 0; i <= defs.size(); ++i) {
     body = new Lambda(LOCATION, "_", body);
   }
-  TypeVar types = body->typeVar;
+  TypeVar type = body->typeVar;
   {
     Lexer lex(runtime.heap, command, "<command-line>");
     body = new App(LOCATION, body, force_use(parse_command(lex)));
@@ -396,6 +409,22 @@ int main(int argc, char **argv) {
 
   if (tcheck) std::cout << root.get();
   if (html) markup_html(std::cout, root.get());
+
+  if (!types.empty()) {
+    std::cout << "types";
+    for (auto &t : types) {
+      std::cout << " ";
+      if (t.compare(0, 7, "binary ") == 0) {
+        std::cout << t.c_str() + 7;
+      } else if (t.compare(0, 6, "unary ") == 0) {
+        std::cout << t.c_str() + 6;
+      } else {
+        std::cout << t.c_str();
+      }
+    }
+    std::cout << std::endl;
+  }
+
   for (auto &g : defs) {
     Expr *e = root.get();
     while (e && e->type == &DefBinding::type) {
@@ -457,7 +486,7 @@ int main(int argc, char **argv) {
     HeapObject *v = *p ? p->coerce<HeapObject>() : nullptr;
     if (verbose) {
       std::cout << command << ": ";
-      types[0].format(std::cout, types);
+      type[0].format(std::cout, type);
       std::cout << " = ";
     }
     if (!quiet) {
