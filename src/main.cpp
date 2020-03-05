@@ -244,16 +244,6 @@ int main(int argc, char **argv) {
     db.entropy(&sip_key[0], 2);
   }
 
-  std::vector<std::string> targets;
-  if (argc > 1) {
-    std::stringstream expr;
-    for (int i = 1; i < argc; ++i) {
-      if (i != 1) expr << " ";
-      expr << argv[i];
-    }
-    targets.push_back(expr.str());
-  }
-
   if (input) {
     for (int i = 1; i < argc; ++i) {
       describe(db.explain(make_canonical(prefix + argv[i]), 1, verbose), script, debug, verbose);
@@ -358,17 +348,26 @@ int main(int argc, char **argv) {
         defs.emplace_back(e.first, e.second.qualified);
   }
 
-  // Read all wake targets
-  std::vector<std::string> target_names;
-  Expr *body = new Lambda(LOCATION, "_", new Literal(LOCATION, String::literal(runtime.heap, "top"), &String::typeVar));
-  for (size_t i = 0; i < targets.size() + defs.size(); ++i) {
-    body = new Lambda(LOCATION, "_", body);
-    target_names.emplace_back("<target-" + std::to_string(i) + ">");
+  std::string command;
+  if (argc > 1) {
+    std::stringstream expr;
+    for (int i = 1; i < argc; ++i) {
+      if (i != 1) expr << " ";
+      expr << argv[i];
+    }
+    command = expr.str();
+  } else {
+    command = "Pass \"no command supplied\"";
   }
-  if (argc > 1) target_names.back() = "<command-line>";
+
+  // Read all wake targets
+  Expr *body = new Lambda(LOCATION, "_", new Literal(LOCATION, String::literal(runtime.heap, "top"), &String::typeVar));
+  for (size_t i = 0; i <= defs.size(); ++i) {
+    body = new Lambda(LOCATION, "_", body);
+  }
   TypeVar types = body->typeVar;
-  for (size_t i = 0; i < targets.size(); ++i) {
-    Lexer lex(runtime.heap, targets[i], target_names[i].c_str());
+  {
+    Lexer lex(runtime.heap, command, "<command-line>");
     body = new App(LOCATION, body, force_use(parse_command(lex)));
     if (lex.fail) ok = false;
   }
@@ -443,7 +442,7 @@ int main(int argc, char **argv) {
   status_finish();
 
   runtime.heap.report();
-  tree.report(profile, targets.empty() ? "" : targets.back());
+  tree.report(profile, command);
 
   bool pass = true;
   if (runtime.abort) {
@@ -454,35 +453,21 @@ int main(int argc, char **argv) {
     std::cerr << "Early termination requested" << std::endl;
     pass = false;
   } else {
-    std::vector<Promise*> outputs;
-    outputs.reserve(targets.size());
-    Scope *iter = static_cast<Closure*>(runtime.output.get())->scope.get();
-    for (size_t i = 0; i < targets.size(); ++i) {
-      outputs.emplace_back(iter->at(0));
-      iter = iter->next.get();
+    Promise *p = static_cast<Closure*>(runtime.output.get())->scope->at(0);
+    HeapObject *v = *p ? p->coerce<HeapObject>() : nullptr;
+    if (verbose) {
+      std::cout << command << ": ";
+      types[0].format(std::cout, types);
+      std::cout << " = ";
     }
-
-    for (size_t i = 0; i < targets.size(); ++i) {
-      Promise *p = outputs[targets.size()-1-i];
-      HeapObject *v = *p ? p->coerce<HeapObject>() : nullptr;
-      if (verbose) {
-        std::cout << targets[i] << ": ";
-        types[0].format(std::cout, types);
-        TypeVar tmp = types[1];
-        types = tmp;
-        std::cout << " = ";
-      }
-      if (!quiet) {
-        HeapObject::format(std::cout, v, debug, verbose?0:-1);
-        if (v && typeid(*v) == typeid(Closure))
-          std::cout << ", " << term_red() << "AN UNEVALUATED FUNCTION" << term_normal();
-        std::cout << std::endl;
-      }
-      if (!v) {
-        pass = false;
-      } else if (Record *r = dynamic_cast<Record*>(v)) {
-        if (r->cons->ast.name == "Fail") pass = false;
-      }
+    if (!quiet) {
+      HeapObject::format(std::cout, v, debug, verbose?0:-1);
+      std::cout << std::endl;
+    }
+    if (!v) {
+      pass = false;
+    } else if (Record *r = dynamic_cast<Record*>(v)) {
+      if (r->cons->ast.name == "Fail") pass = false;
     }
   }
 
