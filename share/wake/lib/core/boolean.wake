@@ -16,7 +16,7 @@
 package wake
 
 # Boolean type has two values: True and False.
-global export data Boolean =
+export data Boolean =
   True
   False
 

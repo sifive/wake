@@ -16,7 +16,7 @@
 package wake
 
 # Constructs a List object.  
-global data List a =
+export data List a =
   Nil
   (head: a), (tail: List a)
 

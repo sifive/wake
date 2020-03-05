@@ -51,14 +51,12 @@ Top::Top() : Expr(&type, LOCATION), packages(), globals(), def_package(nullptr) 
   builtin->package.types.insert(std::make_pair("Double",   SymbolSource(LOCATION, "Double@builtin",   SYM_LEAF)));
   builtin->package.types.insert(std::make_pair("RegExp",   SymbolSource(LOCATION, "RegExp@builtin",   SYM_LEAF)));
   builtin->package.types.insert(std::make_pair("binary =>",SymbolSource(LOCATION, "binary =>@builtin",SYM_LEAF)));
-  // These types come from the runtime... and perhaps need not be global
-  builtin->package.types.insert(std::make_pair("Array",    SymbolSource(LOCATION, "Array@builtin",    SYM_LEAF)));
-  builtin->package.types.insert(std::make_pair("Target",   SymbolSource(LOCATION, "Target@builtin",   SYM_LEAF)));
-  builtin->package.types.insert(std::make_pair("Job",      SymbolSource(LOCATION, "Job@builtin",      SYM_LEAF)));
-
-  // Make builtin types avaiable via 'import' and as globals
-  builtin->exports = builtin->package;
   globals = builtin->package;
+
+  // These types come from the runtime.
+  builtin->package.types.insert(std::make_pair("Array",    SymbolSource(LOCATION, "Array@builtin",    SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("Job",      SymbolSource(LOCATION, "Job@builtin",      SYM_LEAF)));
+  builtin->exports = builtin->package;
 }
 
 Literal::Literal(const Location &location_, RootPointer<Value> &&value_, TypeVar *litType_)

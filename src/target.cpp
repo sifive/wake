@@ -64,6 +64,7 @@ void dont_report_future_targets() {
   Target::report_future_targets = false;
 }
 
+// This type is NOT exported; it should be invisible to users
 TypeVar Target::typeVar("Target@builtin", 0);
 
 template <typename T, T (HeapPointerBase::*memberfn)(T x)>
