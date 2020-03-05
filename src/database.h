@@ -68,10 +68,6 @@ struct Database {
 
   void entropy(uint64_t *key, int words);
 
-  std::vector<std::string> get_targets();
-  void add_target(const std::string &target);
-  void del_target(const std::string &target);
-
   void prepare(); // prepare for job execution
   void clean(); // finished execution; sweep stale jobs
 

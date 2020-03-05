@@ -33,8 +33,6 @@ struct Database::detail {
   sqlite3 *db;
   sqlite3_stmt *get_entropy;
   sqlite3_stmt *set_entropy;
-  sqlite3_stmt *add_target;
-  sqlite3_stmt *del_target;
   sqlite3_stmt *begin_txn;
   sqlite3_stmt *commit_txn;
   sqlite3_stmt *predict_job;
@@ -67,7 +65,7 @@ struct Database::detail {
 
   long run_id;
   detail(bool debugdb_)
-   : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), add_target(0), del_target(0), begin_txn(0),
+   : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), begin_txn(0),
      commit_txn(0), predict_job(0), stats_job(0), insert_job(0), insert_tree(0), insert_log(0),
      wipe_file(0), insert_file(0), update_file(0), get_log(0), replay_log(0), get_tree(0), add_stats(0),
      link_stats(0), detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0),
@@ -102,8 +100,6 @@ std::string Database::open(bool wait, bool memory) {
     "pragma synchronous=0;"
     "pragma locking_mode=exclusive;"
     "pragma foreign_keys=on;"
-    "create table if not exists targets("
-    "  expression text primary key);"
     "create table if not exists entropy("
     "  row_id integer primary key autoincrement,"
     "  seed   integer not null);"
@@ -176,8 +172,6 @@ std::string Database::open(bool wait, bool memory) {
   // prepare statements
   const char *sql_get_entropy = "select seed from entropy order by row_id";
   const char *sql_set_entropy = "insert into entropy(seed) values(?)";
-  const char *sql_add_target = "insert into targets(expression) values(?)";
-  const char *sql_del_target = "delete from targets where expression=?";
   const char *sql_begin_txn = "begin transaction";
   const char *sql_commit_txn = "commit transaction";
   const char *sql_predict_job =
@@ -276,8 +270,6 @@ std::string Database::open(bool wait, bool memory) {
 
   PREPARE(sql_get_entropy,    get_entropy);
   PREPARE(sql_set_entropy,    set_entropy);
-  PREPARE(sql_add_target,     add_target);
-  PREPARE(sql_del_target,     del_target);
   PREPARE(sql_begin_txn,      begin_txn);
   PREPARE(sql_commit_txn,     commit_txn);
   PREPARE(sql_predict_job,    predict_job);
@@ -327,8 +319,6 @@ void Database::close() {
 
   FINALIZE(get_entropy);
   FINALIZE(set_entropy);
-  FINALIZE(add_target);
-  FINALIZE(del_target);
   FINALIZE(begin_txn);
   FINALIZE(commit_txn);
   FINALIZE(predict_job);
@@ -367,15 +357,6 @@ void Database::close() {
     }
   }
   imp->db = 0;
-}
-
-static int fill_vector(void *data, int cols, char **text, char **colname) {
-  (void)colname;
-  if (cols >= 1) {
-    std::vector<std::string> *vec = static_cast<std::vector<std::string>*>(data);
-    vec->emplace_back(text[0]);
-  }
-  return 0;
 }
 
 static void finish_stmt(const char *why, sqlite3_stmt *stmt, bool debug) {
@@ -500,28 +481,6 @@ void Database::entropy(uint64_t *key, int words) {
   }
 
   end_txn();
-}
-
-std::vector<std::string> Database::get_targets() {
-  std::vector<std::string> out;
-  int ret = sqlite3_exec(imp->db, "select expression from targets;", &fill_vector, &out, 0);
-  if (ret != SQLITE_OK) {
-    std::cerr << "Could not enumerate wake targets: " << sqlite3_errmsg(imp->db) << std::endl;
-    exit(1);
-  }
-  return out;
-}
-
-void Database::add_target(const std::string &target) {
-  const char *why = "Could not add a wake target";
-  bind_string(why, imp->add_target, 1, target);
-  single_step(why, imp->add_target, imp->debugdb);
-}
-
-void Database::del_target(const std::string &target) {
-  const char *why = "Could not remove a wake target";
-  bind_string(why, imp->del_target, 1, target);
-  single_step(why, imp->del_target, imp->debugdb);
 }
 
 void Database::prepare() {

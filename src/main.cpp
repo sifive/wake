@@ -62,7 +62,8 @@ void print_help(const char *argv0) {
     << "    --profile FILE   Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
     << "    --in      PKG    Use PKG as the select package (default: current directory)" << std::endl
     << std::endl
-    << "  Database introspection:" << std::endl
+    << "  Database commands:" << std::endl
+    << "    --init      DIR  Create or replace a wake.db in the specified directory"     << std::endl
     << "    --input  -i FILE Report recorded meta-data for jobs which read FILES"        << std::endl
     << "    --output -o FILE Report recorded meta-data for jobs which wrote FILES"       << std::endl
     << "    --last     -l    Report recorded meta-data for all jobs run by last build"   << std::endl
@@ -70,12 +71,6 @@ void print_help(const char *argv0) {
     << "    --verbose  -v    Report recorded standard output and error of matching jobs" << std::endl
     << "    --debug    -d    Report recorded stack frame of matching jobs"               << std::endl
     << "    --script   -s    Format reported jobs as an executable shell script"         << std::endl
-    << std::endl
-    << "  Persistent tasks:" << std::endl
-    << "    --init=DIR       Create or replace a wake.db in the specified directory"     << std::endl
-    << "    --list-tasks     List all database-saved tasks which run on every build"     << std::endl
-    << "    --add-task EXPR+ Add a persistent task to the database for future builds"    << std::endl
-    << "    --remove-task=N  Remove persistent task #N from the database"                << std::endl
     << std::endl
     << "  Help functions:" << std::endl
     << "    --version        Print the version of wake on standard output"               << std::endl
@@ -116,9 +111,6 @@ int main(int argc, char **argv) {
     { 'f', "failed",                GOPT_ARGUMENT_FORBIDDEN },
     { 's', "script",                GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "init",                  GOPT_ARGUMENT_REQUIRED  },
-    { 0,   "list-tasks",            GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "add-task",              GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "remove-task",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 0,   "version",               GOPT_ARGUMENT_FORBIDDEN },
     { 'g', "globals",               GOPT_ARGUMENT_FORBIDDEN },
     { 'e', "exports",               GOPT_ARGUMENT_REQUIRED  },
@@ -148,8 +140,6 @@ int main(int argc, char **argv) {
   bool last    = arg(options, "last"    )->count;
   bool failed  = arg(options, "failed"  )->count;
   bool script  = arg(options, "script"  )->count;
-  bool list    = arg(options, "list-tasks")->count;
-  bool add     = arg(options, "add-task")->count;
   bool version = arg(options, "version" )->count;
   bool html    = arg(options, "html"    )->count;
   bool global  = arg(options, "globals" )->count;
@@ -164,7 +154,6 @@ int main(int argc, char **argv) {
   const char *heapf   = arg(options, "heap-factor")->argument;
   const char *profile = arg(options, "profile")->argument;
   const char *init    = arg(options, "init")->argument;
-  const char *remove  = arg(options, "remove-task")->argument;
   const char *hash    = arg(options, "debug-target")->argument;
   const char *exports = arg(options, "exports")->argument;
   const char *in      = arg(options, "in")->argument;
@@ -217,9 +206,9 @@ int main(int argc, char **argv) {
   }
 
   bool nodb = init;
-  bool noparse = nodb || remove || list || output || input || last || failed;
+  bool noparse = nodb || output || input || last || failed;
   bool notype = noparse || parse;
-  bool noexecute = notype || add || html || tcheck || dumpssa || global || exports;
+  bool noexecute = notype || html || tcheck || dumpssa || global || exports;
 
   if (noparse && argc < 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
@@ -255,38 +244,14 @@ int main(int argc, char **argv) {
     db.entropy(&sip_key[0], 2);
   }
 
-  std::vector<std::string> targets = db.get_targets();
-  if (list) {
-    std::cout << "Active wake targets:" << std::endl;
-    int j = 0;
-    for (auto &i : targets)
-      std::cout << "  " << j++ << " = " << i << std::endl;
-  }
-
-  if (remove) {
-    char *tail;
-    int victim = strtol(remove, &tail, 0);
-    if (*tail || victim < 0 || victim >= (int)targets.size()) {
-      std::cerr << "Could not remove target " << remove << "; there are only " << targets.size() << std::endl;
-      return 1;
+  std::vector<std::string> targets;
+  if (argc > 1) {
+    std::stringstream expr;
+    for (int i = 1; i < argc; ++i) {
+      if (i != 1) expr << " ";
+      expr << argv[i];
     }
-    if (verbose) std::cout << "Removed target " << victim << " = " << targets[victim] << std::endl;
-    db.del_target(targets[victim]);
-    targets.erase(targets.begin() + victim);
-  }
-
-  if (add && argc < 1) {
-    std::cerr << "You must specify positional arguments to use for the wake bulid target" << std::endl;
-    return 1;
-  } else {
-    if (argc > 1) {
-      std::stringstream expr;
-      for (int i = 1; i < argc; ++i) {
-        if (i != 1) expr << " ";
-        expr << argv[i];
-      }
-      targets.push_back(expr.str());
-    }
+    targets.push_back(expr.str());
   }
 
   if (input) {
@@ -426,7 +391,6 @@ int main(int argc, char **argv) {
   ok = ok && sums_ok();
 
   if (!ok) {
-    if (add) std::cerr << ">>> Expression not added to the active target list <<<" << std::endl;
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }
@@ -447,11 +411,6 @@ int main(int argc, char **argv) {
         std::cout << " = <" << v->location.file() << ">" << std::endl;
       }
     }
-  }
-
-  if (add) {
-    db.add_target(targets.back());
-    if (verbose) std::cout << "Added target " << (targets.size()-1) << " = " << targets.back() << std::endl;
   }
 
   // Convert AST to optimized SSA
