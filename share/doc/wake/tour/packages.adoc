@@ -1,0 +1,277 @@
+= Packages
+
+Every wake file is a member of a package.
+Packages can <<exports,export>> identifiers which may then be <<imports,imported>> by other packages.
+Indeed, even the wake standard library lives in a package,
+which must be imported by all but the most trivial of files.
+Therefore, you will need to interact with the package system.
+
+== Package names
+
+----
+package hello_sifive
+----
+
+Files declare their package membership using the `package` keyword.
+Only one package statement is legal per file.
+If a file does not declare a package name,
+then the file belongs to an unnamed package containing only that file.
+
+Package names must be legal wake identifiers.
+That means package names must start with a letter and cannot contain operators (like `.`) in them.
+To reduce the chance that two packages accidentally select the same name in a large workspace,
+the convention is to treat package names like Internet host names with `_` between words.
+In other words, it is good practice to end a package name with `_company`.
+If you are working on project `cats` in division `love` of company `hugs`,
+then `package cats_love_hugs` would be a safe choice.
+
+In general, a single directory should not contain wake files from different packages.
+If you adhere to this convention,
+the wake command-line can automatically access the current directory's package
+(more on this <<command-line,later>>).
+Splitting a large package across multiple directories,
+perhaps to co-locate build files with source files,
+is considered good practice.
+
+[[exports]]
+== Exports
+
+By default, all top-level identifiers in a file are package-local, i.e. not exported.
+Packages use the `export` keyword to make identifiers available to other packages.
+
+----
+package math_megacorp
+export def pi = 3.141592654
+def e = 2.718281828
+----
+
+In the above example, all files in package `math_megacorp` can access both `pi` and `e`.
+It would be an error if a different file in `math_megacorp` also defined `e`.
+
+The definition `pi` is available for import by other packages.
+By contrast, the definition of `e` is invisible to other packages; they cannot import it.
+
+----
+export def f x = x * x
+export def a &*& b = and a b
+export target fib n = match n
+  0 = 1
+  1 = 1
+  _ = fib (n-1) + fib (n-2)
+export data MyBoolean =
+  MyTrue
+  MyFalse
+export tuple Friend =
+  export Name: String
+  Age: Integer
+export topic friends: Friend
+----
+
+The `export` keyword can be applied to all the top-level expressions above.
+The first two examples export definitions of the function `f` and the binary operator `&*&`.
+The `target` example exports a memoized function,
+detailed in the <<targets#,Target Memoization documentation>>.
+
+[[categories]]
+In wake, there are actually three different categories of identifiers:
+definitions, types, and topics.
+Identifiers which appear after a `tuple`, `data`, or `:` refer to types.
+Identifiers after a `publish`, `subscribe`, or `topic` keyword refer to topics.
+All other identifiers refer to definitions, the most common category.
+
+The expression `export data MyBoolean` in the example triggers the export of three identifiers:
+
+- the type `MyBoolean`
+- the definition `MyTrue`, used to construct a `MyBoolean` and match it in patterns
+- the definition `MyFalse`
+
+If only some of these identifiers should be exported,
+this can be achieved by using a <<re-export,re-export>>, detailed later.
+
+The expression `export tuple Friend` in the example triggers both the export of the type `Friend`
+and the definition `Friend`, used to construct a `Friend` and match it in patterns.
+The subsequent `export Name` triggers the export of the type `Friend` and definitions
+`getFriendName`, `setFriendName`, and `editFriendName`.
+By contrast, the `getFriendAge` definition is not exported.
+See the <<tuples#,Tuples documentation>> for more details.
+
+Finally, `export topic friends` trigers the export of the topic `friends`.
+See the <<publish-subscribe#,Publish/Subscribe documentation>> for more details.
+
+[[imports]]
+== Imports
+
+----
+from wake import _
+from wake import map foldl Pair
+from wake import myMap=map foldl myFoldr=foldr
+from wake import def map foldl
+from wake import def unary + -
+from wake import def binary * /
+from wake import type Pair Result
+from wake import topic environment path
+
+def myfun x =
+  from wake import * +
+  (x * x) + x
+----
+
+The wake `import` syntax allows for a varying degree of specificity to make
+it convenient in the common case, but precise enough where needed.
+
+The `from pkg import _` syntax bulk imports all exports from package `pkg` into scope.
+The `import` expression can be used at the file top-level (i.e., unindented), which makes the
+imported identifiers available to the entire contents of the file (but not the package).
+By contrast, `import` inside a function definition only makes the imported identifiers
+available to the contents of that definition.
+In both cases, any local `def` expressions will silently override the import.
+
+The syntax `from pkg import x y Z` will import from all three wake <<categories,identifier categories>>.
+Thus, if there is a type `Z` and a definition `Z`, this example will import both.
+If no identifier is found in any of the categories, the import results in an error.
+
+- Use `from pkg import def x y Z` to explicitly only import definitions.
+- Use `from pkg import type Pair Result` to only import types.
+- Use `from pkg import topic path environment` to only import topics.
+
+[[unary-binary]]
+The last remaining wrinkle is that operators in wake have two forms: unary and binary.
+----
+def a + b = ... # binary
+def +a    = ... # unary
+def expr  = +4 + 6 # uses both
+----
+
+The syntax `from wake import +` will import both the unary and binary versions of `+`
+from all identifier categories (yes, you can have a type called `+`, though not a topic).
+By contrast, `from wake import unary +` will only import the unary version from all categories.
+Finally, `from wake import def unary +` will specifically import only the unary definition.
+In all cases, if no identifiers match, the import will result in an error.
+
+----
+from wake import def myfun=map myfun=foldl
+----
+It is illegal to import something to the same identifier twice.
+In the above example, both `map` and `foldl` were imported to the same identifier `myfun`.
+This is illegal.
+
+----
+from wake import _
+from wake import map
+----
+By contrast, it is legal to import the same identifier twice if one
+(or more) of the imports was a bulk `_` import.
+Instead, any attempt to use `map` will result in an ambiguous import error.
+This special case exists to make it possible to bulk import from two
+packages which have an identifier conflict.
+If the conflicting identifier from one of the packages is needed,
+it can be specifically imported under a new unambiguous name.
+
+For backwards compatibility, if a wake file has no top-level imports,
+it implicitly bulk imports all identifiers from the `wake` package.
+This behaviour will be removed before the release of 1.0.
+
+[[globals]]
+== Globals
+
+For backwards compatibility, wake supports a `global` keyword.
+This deprecated feature selects the same identifiers as <<exports,export>>.
+However, `global` identifiers are not available for <<imports,import>>.
+Instead, a global identifier is available for resolution to all wake files in the workspace.
+
+[[resolution]]
+== Identifier resolution
+
+----
+package example
+from pkg1 import _
+def y = ...
+def example =
+  from pkg2 import _
+  def z = ...
+  identifier
+----
+
+To find `identifier`, wake looks through these scopes:
+
+- definition-local identifiers (`z` in the example)
+- definition-local imports (`pkg2` exports)
+- file-local identifiers (`y`)
+- file-local imports (`pkg1` exports)
+- same-package identifiers (`example` identifiers, which includes at least `y`)
+- global identifiers
+
+Each level of scope can redefine identifiers from outer scopes.
+References to a redefined identifier silently select the innermost scope.
+If you are ever unsure how an identifier is resolved,
+click on it in the html-marked-up sources
+(`wake --html > foo.html`).
+
+[[re-export]]
+== Re-exports
+
+It is sometimes useful to export an identifier from a package that did not define it.
+This can be used, for example, to create versioned API packages,
+which export exactly the same identifiers and functionality even as the unversioned
+package evolves.
+
+----
+package v1_wake
+from wake export def map foldl
+from wake export def binary + - * /
+from wake export topic path environment
+from wake export type Pair Result
+----
+
+Compared to the very similar <<imports,import>> syntax,
+re-export syntax uses the `export` keyword instead of the `import` keyword.
+Furthermore, one must use the most precise form of identifier selection.
+`from wake export +` would be illegal as this might pull
+<<unary-binary,unary or binary>> identifiers from both definition and type
+<<categories,categories>>.
+
+When an identifier is re-exported,
+it becomes a package export and
+is placed into both file-local and package-level identifier <<resolution,scope>>.
+
+----
+package example
+data MyBoolean =
+  MyTrue
+  MyFalse
+
+from example export def MyTrue
+from example export type MyBoolean
+----
+
+This example demonstrates how re-export syntax can be used to slice
+identifiers more finely than the standard `export` keyword prefix.
+In this situation, only one of the type constructors was exported.
+A same-package export must be used in file which declares the identifier.
+
+[[command-line]]
+== Command-line
+
+When wake is invoked from the command-line,
+it can be used to evaluate an expression or invoke a `main` function.
+In both cases, a package scope must be selected to produce useful work.
+
+First, wake progressively searches from the current directory
+up to the workspace root for wake files.
+If no wake files are found, the `wake` package is selected.
+If the wake files found share a common package, that package is selected.
+Otherwise, the `wake` package is selected,
+though this many be manually overridden using the '--in' command-line option.
+
+By default, when evaluating the command-line,
+wake passes all non-options to the selected package's `main` function.
+This function can then trigger the appropriate build.
+If an appropriate wake file is placed in the workspace root,
+this can make invoking the build as simple as running `wake` with no options.
+
+When invoked with `wake -r '5 + 6'`,
+wake will evaluate the next argument as an expression.
+That expression is evaluated within the scope of the selected package.
+Thus, it has access to even unexported package-level identifiers.
+Furthermore, all bulk imports made by files in the selected package are also
+made available to the expression.

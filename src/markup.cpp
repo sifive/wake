@@ -76,18 +76,28 @@ void JSONRender::explore(Expr *expr) {
         int val = i.second.index;
         int fun = val - defbinding->val.size();
         Expr *expr = (fun >= 0) ? defbinding->fun[fun].get() : defbinding->val[val].get();
-        auto def = new VarDef(i.second.location);
-        if (i.first.compare(0, 8, "publish ") == 0) {
-          assert (expr->type == &App::type);
-          App *app = static_cast<App*>(expr);
-          assert (app->val->type == &VarRef::type);
-          VarRef *ref = static_cast<VarRef*>(app->val.get());
-          def->target = ref->target;
+        if (i.first.compare(0, 6, "topic ") == 0) {
+          // expr = VarRef(Nil) | App(App(VarRef(++),Ascribe(VarRef(pub))), expr)
+          while (expr->type == &App::type) {
+            App *app1 = static_cast<App*>(expr);
+            App *app2 = static_cast<App*>(app1->fn.get());
+            Ascribe *asc = static_cast<Ascribe*>(app2->val.get());
+            VarRef *pub = static_cast<VarRef*>(asc->body.get());
+            auto ref = new VarRef(pub->target, i.first);
+            ref->target = i.second.location;
+            ref->typeVar.setDOB(expr->typeVar);
+            expr->typeVar.unify(ref->typeVar);
+            eset.insert(ref);
+            expr = app1->val.get();
+          }
         }
-        def->typeVar.setDOB(expr->typeVar);
-        expr->typeVar.unify(def->typeVar);
-        defs.emplace_back(def);
-        eset.insert(def);
+        if (i.first.compare(0, 8, "publish ") != 0) {
+          auto def = new VarDef(i.second.location);
+          def->typeVar.setDOB(expr->typeVar);
+          expr->typeVar.unify(def->typeVar);
+          defs.emplace_back(def);
+          eset.insert(def);
+        }
       }
     }
     explore(defbinding->body.get());
@@ -105,24 +115,17 @@ void JSONRender::dump() {
   (*it)->typeVar.format(os, (*it)->typeVar);
   os << "\"";
 
-  Location target = LOCATION;
 
   if ((*it)->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(*it);
-    target = ref->target;
-  }
-
-  if ((*it)->type == &VarDef::type) {
-    VarDef *def = static_cast<VarDef*>(*it);
-    target = def->target;
-  }
-
-  if (target.start.bytes >= 0) {
-    os
-      << ",\"target\":{\"filename\":\"" << json_escape(target.filename)
-      << "\",\"range\":[" << target.start.bytes
-      << "," << (target.end.bytes+1)
-      << "]}";
+    Location &target = ref->target;
+    if (target.start.bytes >= 0) {
+      os
+        << ",\"target\":{\"filename\":\"" << json_escape(target.filename)
+        << "\",\"range\":[" << target.start.bytes
+        << "," << (target.end.bytes+1)
+        << "]}";
+    }
   }
 
   ++it;

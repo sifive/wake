@@ -22,7 +22,7 @@
 #include <ostream>
 struct Location;
 
-#define FN "binary =>"
+#define FN "binary =>@builtin"
 
 struct TypeErrorMessage {
   virtual void formatA(std::ostream &os) const = 0;
@@ -69,7 +69,7 @@ private:
   int var_dob;
 
   static void do_clone(TypeVar &out, const TypeVar &x, int dob);
-  static int do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag, const TypeVar *other, int tags, int p);
+  static int do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag, const TypeVar *other, int tags, int p, bool qualify = false);
   bool do_unify(TypeVar &other);
 
 public:

@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 # This API makes it possible to include a non-source file into a wake build.
 # Generally, one should obtain Paths from sources or as the output of Jobs.
 # This API is useful for things like a comannd-line-supplied input file.
-global def claimFileAsPath existingFile desiredWorkspacePath =
+export def claimFileAsPath existingFile desiredWorkspacePath =
   def get_modtime file = prim "get_modtime"
   def time = get_modtime existingFile
   if time == -1
@@ -54,7 +56,7 @@ def tar output paths =
 # previous outputs were made available or not. Also, for incremental jobs,
 # all visible files are considered as inputs, since the job might not read
 # all inputs on each run, based on (for example) timestamps.
-global def runIncrementalJob stateFileLabel reusedOutputFilterFn plan =
+export def runIncrementalJob stateFileLabel reusedOutputFilterFn plan =
   def code = plan | getPlanHash | strbase 62
   def pre  = "{stateFileLabel}-pre-{code}.tar"
   def post = "{stateFileLabel}-post-{code}.tar"

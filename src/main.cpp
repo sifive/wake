@@ -59,7 +59,8 @@ void print_help(const char *argv0) {
     << "    --no-workspace   Do not open a database or scan for sources files"           << std::endl
     << "    --heap-factor X  Heap-size is X * live data after the last GC (default 4.0)" << std::endl
     << "    --profile-heap   Report memory consumption on every garbage collection"      << std::endl
-    << "    --profile=FILE   Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
+    << "    --profile FILE   Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
+    << "    --in      PKG    Use PKG as the select package (default: current directory)" << std::endl
     << std::endl
     << "  Database introspection:" << std::endl
     << "    --input  -i FILE Report recorded meta-data for jobs which read FILES"        << std::endl
@@ -79,8 +80,9 @@ void print_help(const char *argv0) {
     << "  Help functions:" << std::endl
     << "    --version        Print the version of wake on standard output"               << std::endl
     << "    --html           Print all wake source files as cross-referenced HTML"       << std::endl
-    << "    --globals  -g    Print all global variables available to the command-line"   << std::endl
-    << "    --help     -h    Print this help message and exit"                           << std::endl
+    << "    --globals -g     Print all global variables available to the command-line"   << std::endl
+    << "    --exports -e PKG Print all exported symbols for package PKG"                 << std::endl
+    << "    --help    -h     Print this help message and exit"                           << std::endl
     << std::endl;
     // debug-db, no-optimize, stop-after-* are secret undocumented options
 }
@@ -107,6 +109,7 @@ int main(int argc, char **argv) {
     { 0,   "heap-factor",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 0,   "profile",               GOPT_ARGUMENT_REQUIRED  },
+    { 0,   "in",                    GOPT_ARGUMENT_REQUIRED  },
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
     { 'l', "last",                  GOPT_ARGUMENT_FORBIDDEN },
@@ -118,6 +121,7 @@ int main(int argc, char **argv) {
     { 0,   "remove-task",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 0,   "version",               GOPT_ARGUMENT_FORBIDDEN },
     { 'g', "globals",               GOPT_ARGUMENT_FORBIDDEN },
+    { 'e', "exports",               GOPT_ARGUMENT_REQUIRED  },
     { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
     { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
@@ -162,6 +166,8 @@ int main(int argc, char **argv) {
   const char *init    = arg(options, "init")->argument;
   const char *remove  = arg(options, "remove-task")->argument;
   const char *hash    = arg(options, "debug-target")->argument;
+  const char *exports = arg(options, "exports")->argument;
+  const char *in      = arg(options, "in")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -213,14 +219,14 @@ int main(int argc, char **argv) {
   bool nodb = init;
   bool noparse = nodb || remove || list || output || input || last || failed;
   bool notype = noparse || parse;
-  bool noexecute = notype || add || html || tcheck || dumpssa || global;
+  bool noexecute = notype || add || html || tcheck || dumpssa || global || exports;
 
   if (noparse && argc < 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
     return 1;
   }
 
-  std::string prefix;
+  std::string prefix; // "" | .+/
   if (init) {
     if (!make_workspace(init)) {
       std::cerr << "Unable to initialize a workspace in " << init << std::endl;
@@ -325,6 +331,10 @@ int main(int argc, char **argv) {
   if (!sources) std::cerr << "Source file enumeration failed" << std::endl;
   ok &= sources;
 
+  // Select a default package
+  int longest_prefix = -1;
+  bool warned_conflict = false;
+
   // Read all wake build files
   Scope::debug = debug;
   std::unique_ptr<Top> top(new Top);
@@ -332,19 +342,61 @@ int main(int argc, char **argv) {
     if (verbose && debug)
       std::cerr << "Parsing " << i << std::endl;
     Lexer lex(runtime.heap, i.c_str());
-    parse_top(*top, lex);
+    auto package = parse_top(*top, lex);
     if (lex.fail) ok = false;
+    // Does this file inform our choice of a default package?
+    size_t slash = i.find_last_of('/');
+    std::string dir(i, 0, slash==std::string::npos?0:(slash+1)); // "" | .+/
+    if (prefix.compare(0, dir.size(), dir) == 0) { // dir = prefix or parent of prefix?
+      int dirlen = dir.size();
+      if (dirlen > longest_prefix) {
+        longest_prefix = dirlen;
+        top->def_package = package;
+        warned_conflict = false;
+      } else if (dirlen == longest_prefix) {
+        if (top->def_package != package && !warned_conflict) {
+          std::cerr << "Directory " << dir
+            << " has wakefiles with both package '" << top->def_package
+            << "' and '" << package
+            << "'. This prevents default package selection;"
+            << " defaulting to package 'wake'." << std::endl;
+          top->def_package = "wake";
+          warned_conflict = true;
+        }
+      }
+    }
   }
 
-  std::vector<std::string> globals;
+  if (in) {
+    auto it = top->packages.find(in);
+    if (it == top->packages.end()) {
+      std::cerr << "Package '" << in
+        << "' selected by --in does not exist!" << std::endl;
+      ok = false;
+    } else {
+      top->def_package = in;
+    }
+  }
+
+  // No wake files in the path from workspace to the current directory
+  if (!top->def_package) top->def_package = "wake";
+
+  std::vector<std::pair<std::string, std::string> > defs;
   if (global)
-    for (auto &g : top->globals)
-      globals.push_back(g.first);
+    for (auto &g : top->globals.defs)
+      defs.emplace_back(g.first, g.second.qualified);
+
+  if (exports) {
+    auto it = top->packages.find(exports);
+    if (it != top->packages.end())
+      for (auto &e : it->second->exports.defs)
+        defs.emplace_back(e.first, e.second.qualified);
+  }
 
   // Read all wake targets
   std::vector<std::string> target_names;
   Expr *body = new Lambda(LOCATION, "_", new Literal(LOCATION, String::literal(runtime.heap, "top"), &String::typeVar));
-  for (size_t i = 0; i < targets.size() + globals.size(); ++i) {
+  for (size_t i = 0; i < targets.size() + defs.size(); ++i) {
     body = new Lambda(LOCATION, "_", body);
     target_names.emplace_back("<target-" + std::to_string(i) + ">");
   }
@@ -355,8 +407,8 @@ int main(int argc, char **argv) {
     body = new App(LOCATION, body, force_use(parse_command(lex)));
     if (lex.fail) ok = false;
   }
-  for (auto &g : globals)
-    body = new App(LOCATION, body, force_use(new VarRef(LOCATION, g)));
+  for (auto &d : defs)
+    body = new App(LOCATION, body, force_use(new VarRef(LOCATION, d.second)));
 
   top->body = std::unique_ptr<Expr>(body);
 
@@ -365,6 +417,7 @@ int main(int argc, char **argv) {
   StringInfo info(verbose, debug, quiet, VERSION_STR);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 
+  if (!flatten_exports(*top)) ok = false;
   if (parse) std::cout << top.get();
 
   if (notype) return ok?0:1;
@@ -380,16 +433,16 @@ int main(int argc, char **argv) {
 
   if (tcheck) std::cout << root.get();
   if (html) markup_html(std::cout, root.get());
-  for (auto &g : globals) {
+  for (auto &g : defs) {
     Expr *e = root.get();
     while (e && e->type == &DefBinding::type) {
       DefBinding *d = static_cast<DefBinding*>(e);
       e = d->body.get();
-      auto i = d->order.find(g);
+      auto i = d->order.find(g.second);
       if (i != d->order.end()) {
         int idx = i->second.index;
         Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
-        std::cout << g << ": ";
+        std::cout << g.first << ": ";
         v->typeVar.format(std::cout, v->typeVar);
         std::cout << " = <" << v->location.file() << ">" << std::endl;
       }

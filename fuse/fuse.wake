@@ -13,14 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-global def buildFuse (Pair variant _) =
+package build_wake
+from wake import _
+
+def buildFuse (Pair variant _) =
   def json = common variant
   def compile = compileC variant json.getSysLibCFlags json.getSysLibHeaders
   def cppFiles = source "{here}/fuse.cpp", Nil
   def objFiles = map compile cppFiles ++ json.getSysLibObjects
   linkO variant json.getSysLibLFlags objFiles "lib/wake/fuse-wake"
 
-global def buildFuseDaemon (Pair variant _) =
+def buildFuseDaemon (Pair variant _) =
   def json = common variant
   def fuse = pkgConfig "fuse" | getOrElse (makeSysLib "")
   def deps = flattenSysLibs (json, fuse, Nil)

@@ -13,99 +13,101 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 # integer operations
 
 # Unary positive sign operator for Integers.
-global def +x = x
+export def +x = x
 
 # Unary negative sign operator for Integers.
-global def -x = prim "neg"
+export def -x = prim "neg"
 
 # Unary two's complement operator for Integers.
-global def ~x = prim "com"
+export def ~x = prim "com"
 
 # Binary addition operator for Integers.
-global def x + y = prim "add"
+export def x + y = prim "add"
 
 # Binary subtraction operator for Integers.
-global def x - y = prim "sub"
+export def x - y = prim "sub"
 
 # Binary multiplication operator for Integers.
-global def x * y = prim "mul"
+export def x * y = prim "mul"
 
 # Binary division operator for Integers.
-global def x / y = prim "div"
+export def x / y = prim "div"
 
 # Binary remainder operator for Integers.
-global def x % y = prim "mod"
+export def x % y = prim "mod"
 
 # Binary left shift operator for Integers.
-global def x << y = prim "shl"
+export def x << y = prim "shl"
 
 # Binary right shift operator for Integers.
-global def x >> y = prim "shr"
+export def x >> y = prim "shr"
 
 # Binary exponentiation operator for Integers.
-global def x ^ y = prim "exp"
+export def x ^ y = prim "exp"
 
 # Returns the nth root of x.
-global def root x n = (\_\_ prim "root") n x
+export def root x n = (\_\_ prim "root") n x
 
 # Unary square root operator. 
-global def sqrt x = root 2 x
+export def sqrt x = root 2 x
 
 # Unary absolute-value operator.
-global def abs x = prim "abs"
+export def abs x = prim "abs"
 
 # Binary bitwise XOR operator.
-global def xor x y = prim "xor"
+export def xor x y = prim "xor"
 
 # Binary bitwise AND operator.
-global def and x y = prim "and"
+export def and x y = prim "and"
 
 # Binary bitwise OR operator.
-global def or  x y = prim "or"
+export def or  x y = prim "or"
 
 # Greatest Common Divisor.
-global def gcd x y = prim "gcd"
+export def gcd x y = prim "gcd"
 
 # Least Common Multiple.
-global def lcm x y = prim "lcm"
+export def lcm x y = prim "lcm"
 
 # Computes (x^y) % m.  
-global def powm x y m = prim "powm" # fast version of: (x^y) % m
+export def powm x y m = prim "powm" # fast version of: (x^y) % m
 
-global def icmp x y = prim "icmp"
-global def x <=> y = prim "icmp"
+export def icmp x y = prim "icmp"
+export def x <=> y = prim "icmp"
 
 # Binary Less-Than operator for Integers.
-global def x <  y = isLT (x <=> y)
+export def x <  y = isLT (x <=> y)
 
 # Binary Greater-Than operator for Integers.
-global def x >  y = isGT (x <=> y)
+export def x >  y = isGT (x <=> y)
 
 # Binary Greater-Or-Equal operator for Integers.
-global def x >= y = isGE (x <=> y)
+export def x >= y = isGE (x <=> y)
 
 # Binary Less-Or-Equal operator for Integers.
-global def x <= y = isLE (x <=> y)
+export def x <= y = isLE (x <=> y)
 
 # Binary Is-Equal operator for Integers.
-global def x == y = isEQ (x <=> y)
+export def x == y = isEQ (x <=> y)
 
 # Binary Not-Equal operator for Integers.
-global def x != y = isNE (x <=> y)
+export def x != y = isNE (x <=> y)
 
 # Calculates the minimum of two Integers.
-global def min x y = if x < y then x else y
+export def min x y = if x < y then x else y
 
 # Calculates the maximum of two Integers.
-global def max x y = if x < y then y else x
+export def max x y = if x < y then y else x
 
 # Calculates the product of a list of integers.
-global def prod = foldl (_*_) 1
-global def ∏ l = prod l
+export def prod = foldl (_*_) 1
+export def ∏ l = prod l
 
 # Calculates the sum of a list of integers.
-global def sum = foldl (_+_) 0
-global def ∑ l = sum l
+export def sum = foldl (_+_) 0
+export def ∑ l = sum l

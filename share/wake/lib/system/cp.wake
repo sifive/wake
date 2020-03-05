@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-global def installAs dest file = match file.getPathResult
+package wake
+
+export def installAs dest file = match file.getPathResult
   Fail e = makeBadPath e
   Pass _ =
     def sdest = simplify dest
@@ -27,5 +29,5 @@ global def installAs dest file = match file.getPathResult
     | runJob
     | getJobOutput
 
-global def installIn dir file =
+export def installIn dir file =
   installAs "{dir}/{file.getPathName}" file

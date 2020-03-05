@@ -220,15 +220,15 @@ static Expr *parse_match(int p, Lexer &lex) {
         if (typeid(*obj) == typeid(Integer)) comparison = "icmp";
         if (typeid(*obj) == typeid(Double)) comparison = "dcmp";
       }
-      if (!guard) guard = new VarRef(e->location, "True");
+      if (!guard) guard = new VarRef(e->location, "True@wake");
 
       Match *match = new Match(e->location);
       match->args.emplace_back(new App(e->location, new App(e->location,
           new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison), " ")),
           e), new VarRef(e->location, "_ k" + std::to_string(i))));
-      match->patterns.emplace_back(AST(e->location, "LT"), new VarRef(e->location, "False"), nullptr);
-      match->patterns.emplace_back(AST(e->location, "GT"), new VarRef(e->location, "False"), nullptr);
-      match->patterns.emplace_back(AST(e->location, "EQ"), guard, nullptr);
+      match->patterns.emplace_back(AST(e->location, "LT@wake"), new VarRef(e->location, "False@wake"), nullptr);
+      match->patterns.emplace_back(AST(e->location, "GT@wake"), new VarRef(e->location, "False@wake"), nullptr);
+      match->patterns.emplace_back(AST(e->location, "EQ@wake"), guard, nullptr);
       guard = match;
     }
 
@@ -376,8 +376,8 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       l.end = elseE->location.end;
       Match *out = new Match(l);
       out->args.emplace_back(condE);
-      out->patterns.emplace_back(AST(l, "True"),  thenE, nullptr);
-      out->patterns.emplace_back(AST(l, "False"), elseE, nullptr);
+      out->patterns.emplace_back(AST(l, "True@wake"),  thenE, nullptr);
+      out->patterns.emplace_back(AST(l, "False@wake"), elseE, nullptr);
       out->flags |= FLAG_AST;
       return out;
     }
@@ -409,6 +409,18 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
         app2_loc.end = rhs->location.end;
         lhs = new App(app2_loc, new App(app1_loc, opp, lhs), rhs);
         lhs->flags |= FLAG_AST;
+        break;
+      }
+      case COLON: {
+        op_type op = op_precedence(lex.id().c_str());
+        if (op.p < p) return lhs;
+        lex.consume();
+        ASTState state(true, false);
+        AST signature = parse_ast(op.p + op.l, lex, state);
+        if (check_constructors(signature)) lex.fail = true;
+        Location location = lhs->location;
+        location.end = signature.region.end;
+        lhs = new Ascribe(location, std::move(signature), lhs);
         break;
       }
       case MATCH:
@@ -573,40 +585,50 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
   return out;
 }
 
-static void bind_global(const std::string &name, Top *top, Lexer &lex) {
-  if (!top || name == "_") return;
+static void bind_global(const Definition &def, Symbols *globals, Lexer &lex) {
+  if (!globals || def.name == "_") return;
 
-  auto it = top->globals.insert(std::make_pair(name, top->defmaps.size()-1));
-  if (!it.second) {
-    std::cerr << "Duplicate global "
-      << name << " at "
-      << top->defmaps.back()->map.find(name)->second.body->location.text() << " and "
-      << top->defmaps[it.first->second]->map.find(name)->second.body->location.text() << std::endl;
-    lex.fail = true;
-  }
+  globals->defs.insert(std::make_pair(def.name, SymbolSource(def.location, SYM_LEAF)));
+  // Duplicate globals will be detected as file-local conflicts
 }
 
-static void bind_def(Lexer &lex, DefMap::Defs &map, Definition &&def, Top *top = 0) {
+static void bind_export(const Definition &def, Symbols *exports, Lexer &lex) {
+  if (!exports || def.name == "_") return;
+
+  exports->defs.insert(std::make_pair(def.name, SymbolSource(def.location, SYM_LEAF)));
+  // Duplicate exports will be detected as file-local conflicts
+}
+
+static void bind_def(Lexer &lex, DefMap &map, Definition &&def, Symbols *exports, Symbols *globals) {
+  bind_global(def, globals, lex);
+  bind_export(def, exports, lex);
+
   if (def.name == "_")
-    def.name = "_" + std::to_string(map.size()) + " _";
+    def.name = "_" + std::to_string(map.defs.size()) + " _";
 
   Location l = def.body->location;
-  auto out = map.insert(std::make_pair(std::move(def.name), DefMap::Value(def.location, std::move(def.body))));
+  auto out = map.defs.insert(std::make_pair(std::move(def.name), DefValue(def.location, std::move(def.body))));
 
   if (!out.second) {
-    std::cerr << "Duplicate def "
+    std::cerr << "Duplicate definition "
       << out.first->first << " at "
       << out.first->second.body->location.text() << " and "
       << l.text() << std::endl;
     lex.fail = true;
   }
-
-  bind_global(out.first->first, top, lex);
 }
 
-static void publish_defs(DefMap::Pubs &pub, std::vector<Definition> &&defs) {
-  for (auto &def : defs) {
-    pub[def.name].emplace_back(def.location, std::move(def.body));
+static void bind_type(Lexer &lex, Package &package, const std::string &name, const Location &location, Symbols *exports, Symbols *globals) {
+  if (globals) globals->types.insert(std::make_pair(name, SymbolSource(location, SYM_LEAF)));
+  if (exports) exports->types.insert(std::make_pair(name, SymbolSource(location, SYM_LEAF)));
+
+  auto it = package.package.types.insert(std::make_pair(name, SymbolSource(location, SYM_LEAF)));
+  if (!it.second) {
+    std::cerr << "Duplicate type "
+      << it.first->first << " at "
+      << it.first->second.location.text() << " and "
+      << location.text() << std::endl;
+    lex.fail = true;
   }
 }
 
@@ -630,6 +652,11 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
     // Terminals
     case ID: {
       AST out(lex.next.location, lex.id());
+      if (out.name == "_" && state.type) {
+        std::cerr << "Type signatures may not include _ at "
+          << lex.next.location.file() << std::endl;
+        lex.fail = true;
+      }
       lex.consume();
       return out;
     }
@@ -744,7 +771,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type Boolean not defined." << std::endl;
+    std::cerr << "Required data type Boolean@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -758,7 +785,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type Order not defined." << std::endl;
+    std::cerr << "Required data type Order@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -771,7 +798,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type List not defined." << std::endl;
+    std::cerr << "Required data type List@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -783,7 +810,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type Unit not defined." << std::endl;
+    std::cerr << "Required data type Unit@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -795,7 +822,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type Pair not defined." << std::endl;
+    std::cerr << "Required data type Pair@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -808,7 +835,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type Result not defined." << std::endl;
+    std::cerr << "Required data type Result@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -826,7 +853,7 @@ bool sums_ok() {
       ok = false;
     }
   } else {
-    std::cerr << "Primitive data type JValue not defined." << std::endl;
+    std::cerr << "Required data type JValue@wake not defined." << std::endl;
     ok = false;
   }
 
@@ -870,13 +897,6 @@ static AST parse_type_def(Lexer &lex) {
 }
 
 static void check_special(Lexer &lex, const std::string &name, const std::shared_ptr<Sum> &sump) {
-  if (name == "Integer" || name == "String" || name == "RegExp" || name == "Target" ||
-      name == FN || name == "Job" || name == "Array" || name == "Double") {
-    std::cerr << "Constuctor " << name
-      << " is reserved at " << sump->token.file() << "." << std::endl;
-    lex.fail = true;
-  }
-
   if (name == "Boolean") Boolean = sump;
   if (name == "Order")   Order = sump;
   if (name == "List")    List = sump;
@@ -886,7 +906,47 @@ static void check_special(Lexer &lex, const std::string &name, const std::shared
   if (name == "JValue")  JValue = sump;
 }
 
-static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
+static void parse_topic(Lexer &lex, Package &package, Symbols *exports, Symbols *globals, bool exportb, bool globalb) {
+  File &file = package.files.back();
+  lex.consume();
+
+  auto id = get_arg_loc(lex);
+  if (!Lexer::isLower(id.first.c_str())) {
+    std::cerr << "Topic identifier '" << id.first
+      << "' is not lower-case at "
+      << id.second.file() << std::endl;
+    lex.fail = true;
+  }
+
+  if (expect(COLON, lex)) lex.consume();
+
+  ASTState state(true, false);
+  AST def = parse_ast(0, lex, state);
+  if (check_constructors(def)) lex.fail = true;
+
+  // Confirm there are no open type variables
+  TypeVar x;
+  x.setDOB();
+  std::map<std::string, TypeVar*> ids;
+  if (!def.unify(x, ids)) lex.fail = true;
+
+  if (expect(EOL, lex)) lex.consume();
+
+  auto it = file.topics.insert(std::make_pair(id.first, Topic(id.second, std::move(def))));
+  if (!it.second) {
+    std::cerr << "Duplicate topic " << id.first
+      << " at " << id.second.file() << std::endl;
+    lex.fail = true;
+  }
+
+  if (exportb) exports->topics.insert(std::make_pair(id.first, SymbolSource(id.second, SYM_LEAF)));
+  if (globalb) globals->topics.insert(std::make_pair(id.first, SymbolSource(id.second, SYM_LEAF)));
+}
+
+#define FLAG_GLOBAL 1
+#define FLAG_EXPORT 2
+static void parse_tuple(Lexer &lex, Package &package, Symbols *exports, Symbols *globals, bool exportb, bool globalb) {
+  DefMap &map = *package.files.back().content;
   AST def = parse_type_def(lex);
   if (!def) return;
 
@@ -902,7 +962,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   std::shared_ptr<Sum> sump = std::make_shared<Sum>(std::move(def));
   AST tuple(sump->token, std::string(sump->name));
   tuple.region = sump->region;
-  std::vector<bool> members;
+  std::vector<int> members;
 
   if (!expect(INDENT, lex)) return;
   lex.consume();
@@ -910,16 +970,22 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   lex.consume();
 
   bool repeat = true;
+  bool exportt = exportb, globalt = globalb;
   while (repeat) {
-    bool global = lex.next.type == GLOBAL;
-    if (global) lex.consume();
+    int flags = 0;
+    bool quals = true;
+    while (quals) switch (lex.next.type) {
+      case GLOBAL: lex.consume(); flags |= FLAG_GLOBAL; globalt = true; break;
+      case EXPORT: lex.consume(); flags |= FLAG_EXPORT; exportt = true; break;
+      default: quals = false; break;
+    }
 
     ASTState state(true, false);
     AST member = parse_ast(0, lex, state);
     if (check_constructors(member)) lex.fail = true;
     if (member) {
       tuple.args.push_back(member);
-      members.push_back(global);
+      members.push_back(flags);
     }
 
     switch (lex.next.type) {
@@ -949,22 +1015,24 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
   for (size_t i = c.ast.args.size(); i > 0; --i)
     construct = new Lambda(c.ast.token, c.ast.args[i-1].tag, construct);
 
-  bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
+  bind_type(lex, package, sump->name, sump->token, exportt?exports:nullptr, globalt?globals:nullptr);
+  bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), exportb?exports:nullptr, globalb?globals:nullptr);
 
-  check_special(lex, name, sump);
+  if (package.name == "wake") check_special(lex, name, sump);
 
   // Create get/set/edit helper methods
   size_t outer = 0;
   for (size_t i = 0; i < members.size(); ++i) {
     std::string &mname = c.ast.args[i].tag;
     Location memberToken = c.ast.args[i].region;
-    bool global = members[i];
+    bool globalb = (members[i] & FLAG_GLOBAL) != 0;
+    bool exportb = (members[i] & FLAG_EXPORT) != 0;
     if (mname.empty()) continue;
 
     // Implement get methods
     std::string get = "get" + name + mname;
     Expr *getfn = new Lambda(memberToken, "_", new Get(memberToken, sump, &c, i));
-    bind_def(lex, map, Definition(get, memberToken, getfn), global?top:0);
+    bind_def(lex, map, Definition(get, memberToken, getfn), exportb?exports:nullptr, globalb?globals:nullptr);
 
     // Implement edit methods
     DefMap *editmap = new DefMap(memberToken);
@@ -980,8 +1048,8 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
               new VarRef(memberToken, "_ x")));
       std::string x = std::to_string(members.size()-inner);
       std::string name = std::string(4 - x.size(), '0') + x;
-      editmap->map.insert(std::make_pair(name,
-        DefMap::Value(memberToken, std::unique_ptr<Expr>(select))));
+      editmap->defs.insert(std::make_pair(name,
+        DefValue(memberToken, std::unique_ptr<Expr>(select))));
     }
 
     std::string edit = "edit" + name + mname;
@@ -989,7 +1057,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
       new Lambda(memberToken, "fn" + mname,
         new Lambda(memberToken, "_ x", editmap));
 
-    bind_def(lex, map, Definition(edit, memberToken, editfn), global?top:0);
+    bind_def(lex, map, Definition(edit, memberToken, editfn), exportb?exports:nullptr, globalb?globals:nullptr);
 
     // Implement set methods
     DefMap *setmap = new DefMap(memberToken);
@@ -997,8 +1065,8 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     for (size_t inner = 0; inner < members.size(); ++inner) {
       std::string x = std::to_string(members.size()-inner);
       std::string name = std::string(4 - x.size(), '0') + x;
-      setmap->map.insert(std::make_pair(name,
-        DefMap::Value(memberToken, std::unique_ptr<Expr>(
+      setmap->defs.insert(std::make_pair(name,
+        DefValue(memberToken, std::unique_ptr<Expr>(
           (inner == outer)
           ? static_cast<Expr*>(new VarRef(memberToken, mname))
           : static_cast<Expr*>(new Get(memberToken, sump, &c, inner))))));
@@ -1009,7 +1077,7 @@ static void parse_tuple(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
       new Lambda(memberToken, mname,
         new Lambda(memberToken, "_ x", setmap));
 
-    bind_def(lex, map, Definition(set, memberToken, setfn), global?top:0);
+    bind_def(lex, map, Definition(set, memberToken, setfn), exportb?exports:nullptr, globalb?globals:nullptr);
 
     ++outer;
   }
@@ -1038,7 +1106,9 @@ static void parse_data_elt(Lexer &lex, Sum &sum) {
   }
 }
 
-static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
+static void parse_data(Lexer &lex, Package &package, Symbols *exports, Symbols *globals, bool exportb, bool globalb) {
+  DefMap &map = *package.files.back().content;
+
   AST def = parse_type_def(lex);
   if (!def) return;
 
@@ -1075,25 +1145,271 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
     lex.consume();
   }
 
+  bind_type(lex, package, sump->name, sump->token, exportb?exports:nullptr, globalb?globals:nullptr);
   for (auto &c : sump->members) {
     Expr *construct = new Construct(c.ast.token, sump, &c);
     for (size_t i = 0; i < c.ast.args.size(); ++i)
       construct = new Lambda(c.ast.token, "_", construct);
 
-    bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), global?top:0);
+    bind_def(lex, map, Definition(c.ast.name, c.ast.token, construct), exportb?exports:nullptr, globalb?globals:nullptr);
   }
 
-  check_special(lex, sump->name, sump);
+  if (package.name == "wake") check_special(lex, sump->name, sump);
 }
 
-static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
+static void parse_import(const std::string &pkgname, DefMap &map, Lexer &lex) {
+  Symbols::SymbolMap *target;
+  const char *kind;
+
+  // Special case for wildcard import
+  if (lex.next.type == ID && lex.id() == "_") {
+    lex.consume();
+    map.imports.import_all.emplace_back(pkgname);
+    if (expect(EOL, lex)) lex.consume();
+    return;
+  }
+
   switch (lex.next.type) {
+    case DEF:
+      lex.consume();
+      target = &map.imports.defs;
+      kind = "definition";
+      break;
+    case TYPE:
+      lex.consume();
+      target = &map.imports.types;
+      kind = "type";
+      break;
+    case TOPIC:
+      lex.consume();
+      target = &map.imports.topics;
+      kind = "topic";
+      break;
     default:
-       std::cerr << "Missing DEF after GLOBAL at " << lex.next.location.text() << std::endl;
-       lex.fail = true;
+      target = &map.imports.mixed;
+      kind = "symbol";
+      break;
+  }
+
+  bool unary = false;
+  bool binary = false;
+  switch (lex.next.type) {
+    case UNARY:
+      lex.consume();
+      unary = true;
+      break;
+    case BINARY:
+      lex.consume();
+      binary = true;
+      break;
+    default:
+      break;
+  }
+
+  while (lex.next.type == ID || lex.next.type == OPERATOR) {
+    SymbolType idop = lex.next.type;
+    std::string source, name = lex.id();
+    Location location = lex.next.location;
+    lex.consume();
+
+    if (lex.next.type == EQUALS) {
+      lex.consume();
+      if (lex.next.type == idop) {
+        source = lex.id() + "@" + pkgname;
+        lex.consume();
+      } else {
+        std::cerr << "Was expecting an "
+          << symbolTable[idop] << ", got an "
+          << symbolTable[lex.next.type] << " at "
+          << lex.next.location.text() << std::endl;
+        lex.fail = true;
+      }
+    } else {
+      source = name + "@" + pkgname;
+    }
+
+    if (name == "_" || source.substr(0,2) == "_@") {
+      std::cerr << "Import of _ must immediately follow the import keyword at "
+        << location.text() << std::endl;
+      lex.fail = true;
+      continue;
+    }
+
+    if (idop == OPERATOR) {
+      if (unary) {
+        name = "unary " + name;
+        source = "unary " + source;
+      } else if (binary) {
+        name = "binary " + name;
+        source = "binary " + source;
+      } else {
+        name = "op " + name;
+        source = "op " + source;
+      }
+    }
+
+    auto it = target->insert(std::make_pair(std::move(name), SymbolSource(location, source)));
+    if (!it.second) {
+      std::cerr << "Duplicate imported "
+        << kind << " '" << it.first->first << "' at "
+        << it.first->second.location.text() << " and "
+        << location.text() << std::endl;
+      lex.fail = true;
+    }
+  }
+
+  if (expect(EOL, lex)) lex.consume();
+}
+
+static void parse_export(const std::string &pkgname, Package &package, Lexer &lex) {
+  Symbols::SymbolMap *exports, *local;
+  const char *kind;
+  switch (lex.next.type) {
+    case DEF:
+      lex.consume();
+      exports = &package.exports.defs;
+      local = &package.files.back().local.defs;
+      kind = "definition";
+      break;
+    case TYPE:
+      lex.consume();
+      exports = &package.exports.types;
+      local = &package.files.back().local.types;
+      kind = "type";
+      break;
+    case TOPIC:
+      lex.consume();
+      exports = &package.exports.topics;
+      local = &package.files.back().local.topics;
+      kind = "topic";
+      break;
+    default:
+      exports = nullptr;
+      local = nullptr;
+      std::cerr << "Was expecting a DEF/TYPE/TOPIC, got a "
+        << symbolTable[lex.next.type] << " at "
+        << lex.next.location.text() << std::endl;
+      lex.fail = true;
+      break;
+  }
+
+  bool unary = false;
+  bool binary = false;
+  switch (lex.next.type) {
+    case UNARY:
+      lex.consume();
+      unary = true;
+      break;
+    case BINARY:
+      lex.consume();
+      binary = true;
+      break;
+    default:
+      break;
+  }
+
+  while (lex.next.type == ID || lex.next.type == OPERATOR) {
+    SymbolType idop = lex.next.type;
+    std::string source, name = lex.id();
+    Location location = lex.next.location;
+    lex.consume();
+
+    if (lex.next.type == EQUALS) {
+      lex.consume();
+      if (lex.next.type == idop) {
+        source = lex.id() + "@" + pkgname;
+        location.end = lex.next.location.end;
+        lex.consume();
+      } else {
+        std::cerr << "Was expecting an "
+          << symbolTable[idop] << ", got an "
+          << symbolTable[lex.next.type] << " at "
+          << lex.next.location.text() << std::endl;
+        lex.fail = true;
+        continue;
+      }
+    } else {
+      source = name + "@" + pkgname;
+    }
+
+    if (name == "_" || source.substr(0,2) == "_@") {
+      std::cerr << "Cannot re-export _ from another package at "
+        << location.text() << std::endl;
+      lex.fail = true;
+      continue;
+    }
+
+    if (idop == OPERATOR) {
+      if (unary) {
+        name = "unary " + name;
+        source = "unary " + source;
+      } else if (binary) {
+        name = "binary " + name;
+        source = "binary " + source;
+      } else {
+        std::cerr << "Cannot re-export an operator without specifying unary/binary at "
+          << location.text() << std::endl;
+        lex.fail = true;
+        continue;
+      }
+    }
+
+    if (!exports) continue;
+
+    exports->insert(std::make_pair(name, SymbolSource(location, source)));
+    // duplciates will be detected as file-local
+
+    auto it = local->insert(std::make_pair(name, SymbolSource(location, source)));
+    if (!it.second) {
+      std::cerr << "Duplicate file-local "
+        << kind << " '"
+        << name << "' at "
+        << it.first->second.location.text() << " and "
+        << location.text() << std::endl;
+      lex.fail = true;
+    }
+  }
+
+  if (expect(EOL, lex)) lex.consume();
+}
+
+static void parse_from_import(DefMap &map, Lexer &lex) {
+  lex.consume();
+  auto id = get_arg_loc(lex);
+  if (expect(IMPORT, lex)) lex.consume();
+  parse_import(id.first, map, lex);
+}
+
+static void parse_from_importexport(Package &package, Lexer &lex) {
+  lex.consume();
+  auto id = get_arg_loc(lex);
+
+  switch (lex.next.type) {
+    case IMPORT:
+      lex.consume();
+      parse_import(id.first, *package.files.back().content, lex);
+      break;
+    case EXPORT:
+      lex.consume();
+      parse_export(id.first, package, lex);
+      break;
+    default:
+      std::cerr << "Was expecting an IMPORT/EXPORT, got a "
+        << symbolTable[lex.next.type] << " at "
+        << lex.next.location.text() << std::endl;
+      lex.fail = true;
+  }
+}
+
+static void parse_decl(Lexer &lex, DefMap &map, Symbols *exports, Symbols *globals) {
+  switch (lex.next.type) {
+    case FROM: {
+      parse_from_import(map, lex);
+      break;
+    }
     case DEF: {
-      for (auto &def : parse_def(lex, map.size(), false, false))
-         bind_def(lex, map, std::move(def), global?top:0);
+      for (auto &def : parse_def(lex, map.defs.size(), false, false))
+         bind_def(lex, map, std::move(def), exports, globals);
       break;
     }
     case TARGET: {
@@ -1103,17 +1419,14 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
       std::stringstream s;
       s << l.text();
       bind_def(lex, map, Definition("table " + def.name, def.location,
-        new App(l, new Lambda(l, "_", new Prim(l, "tnew"), " "),
-        new Literal(l, String::literal(lex.heap, s.str()), &String::typeVar))));
-      bind_def(lex, map, std::move(def), global?top:0);
+          new App(l, new Lambda(l, "_", new Prim(l, "tnew"), " "),
+          new Literal(l, String::literal(lex.heap, s.str()), &String::typeVar))),
+        nullptr, nullptr);
+      bind_def(lex, map, std::move(def), exports, globals);
       break;
     }
-    case TUPLE: {
-      parse_tuple(lex, map, top, global);
-      break;
-    }
-    case DATA: {
-      parse_data(lex, map, top, global);
+    default: {
+      // should be unreachable
       break;
     }
   }
@@ -1121,26 +1434,20 @@ static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
 
 static Expr *parse_block(Lexer &lex, bool multiline) {
   TRACE("BLOCK");
-  Expr *out;
 
   if (lex.next.type == INDENT) {
     lex.consume();
     if (expect(EOL, lex)) lex.consume();
 
-    Location location = lex.next.location;
-    DefMap::Defs map;
-    DefMap::Pubs pub;
+    DefMap *map = new DefMap(lex.next.location);
 
     bool repeat = true;
     while (repeat) {
       switch (lex.next.type) {
+        case FROM:
         case TARGET:
         case DEF: {
-          parse_decl(map, lex, 0, false);
-          break;
-        }
-        case PUBLISH: {
-          publish_defs(pub, parse_def(lex, 0, false, true));
+          parse_decl(lex, *map, nullptr, nullptr);
           break;
         }
         default: {
@@ -1150,54 +1457,127 @@ static Expr *parse_block(Lexer &lex, bool multiline) {
       }
     }
 
-    auto body = relabel_anon(parse_binary(0, lex, true));
-    location.end = body->location.end;
-    if (pub.empty() && map.empty()) {
-      out = body;
-    } else {
-      out = new DefMap(location, std::move(map), std::move(pub), body);
-      out->flags |= FLAG_AST;
-    }
+    map->body = std::unique_ptr<Expr>(relabel_anon(parse_binary(0, lex, true)));
+    map->location.end = map->body->location.end;
+    map->flags |= FLAG_AST;
 
-    out->location.start.bytes -= (out->location.start.column-1);
-    out->location.start.column = 1;
+    map->location.start.bytes -= (map->location.start.column-1);
+    map->location.start.column = 1;
 
     if (expect(DEDENT, lex)) lex.consume();
-    return out;
+    return map;
   } else {
-    out = relabel_anon(parse_binary(0, lex, multiline));
+    return relabel_anon(parse_binary(0, lex, multiline));
   }
-
-  return out;
 }
 
 Expr *parse_expr(Lexer &lex) {
   return parse_binary(0, lex, false);
 }
 
-void parse_top(Top &top, Lexer &lex) {
-  TRACE("TOP");
-  if (lex.next.type == EOL) lex.consume();
-  top.defmaps.emplace_back(new DefMap(lex.next.location));
-  DefMap &defmap = *top.defmaps.back();
+static void parse_package(Package &package, Lexer &lex) {
+  lex.consume();
+  auto id = get_arg_loc(lex);
+  if (expect(EOL, lex)) lex.consume();
+  if (id.first == "builtin") {
+    std::cerr << "Package name 'builtin' is illegal." << std::endl;
+    lex.fail = true;
+  } else if (package.name.empty()) {
+    package.name = id.first;
+  } else {
+    std::cerr << "Package name redefined at " << id.second.text()
+      << " from '" << package.name << "'" << std::endl;
+    lex.fail = true;
+  }
+}
 
-  bool repeat = true;
+static void no_tags(Lexer &lex, bool exportb, bool globalb) {
+  if (exportb) {
+    std::cerr << "Cannot prefix "
+      << symbolTable[lex.next.type] << " with 'export' at "
+      << lex.next.location.text() << std::endl;
+    lex.fail = true;
+  }
+  if (globalb) {
+    std::cerr << "Cannot prefix "
+      << symbolTable[lex.next.type] << " with 'global' at "
+      << lex.next.location.text() << std::endl;
+    lex.fail = true;
+  }
+}
+
+const char *parse_top(Top &top, Lexer &lex) {
+  TRACE("TOP");
+
+  std::unique_ptr<Package> package(new Package);
+  package->files.resize(1);
+  File &file = package->files.back();
+  file.content = std::unique_ptr<DefMap>(new DefMap(lex.next.location));
+  DefMap &map = *file.content;
+  Symbols globals;
+
+  if (lex.next.type == EOL) lex.consume();
+  bool repeat  = true;
+  bool exportb = false;
+  bool globalb = false;
   while (repeat) {
     switch (lex.next.type) {
       case GLOBAL: {
         lex.consume();
-        parse_decl(defmap.map, lex, &top, true);
+        globalb = true;
         break;
       }
-      case TUPLE:
-      case DATA:
-      case TARGET:
-      case DEF: {
-        parse_decl(defmap.map, lex, &top,false);
+      case EXPORT: {
+        lex.consume();
+        exportb = true;
+        break;
+      }
+      case PACKAGE: {
+        no_tags(lex, exportb, globalb);
+        parse_package(*package, lex);
+        exportb = false;
+        globalb = false;
+        break;
+      }
+      case FROM: {
+        no_tags(lex, exportb, globalb);
+        parse_from_importexport(*package, lex);
+        exportb = false;
+        globalb = false;
+        break;
+      }
+      case TOPIC: {
+        parse_topic(lex, *package, &package->exports, &globals, exportb, globalb);
+        exportb = false;
+        globalb = false;
+        break;
+      }
+      case TUPLE: {
+        parse_tuple(lex, *package, &package->exports, &globals, exportb, globalb);
+        exportb = false;
+        globalb = false;
+        break;
+      }
+      case DATA: {
+        parse_data(lex, *package, &package->exports, &globals, exportb, globalb);
+        exportb = false;
+        globalb = false;
         break;
       }
       case PUBLISH: {
-        publish_defs(defmap.pub, parse_def(lex, 0, false, true));
+        no_tags(lex, exportb, globalb);
+        for (auto &def : parse_def(lex, 0, false, true)) {
+          file.pubs.emplace_back(def.name, DefValue(def.location, std::move(def.body)));
+        }
+        exportb = false;
+        globalb = false;
+        break;
+      }
+      case DEF:
+      case TARGET: {
+        parse_decl(lex, map, exportb?&package->exports:nullptr, globalb?&globals:nullptr);
+        exportb = false;
+        globalb = false;
         break;
       }
       default: {
@@ -1207,8 +1587,96 @@ void parse_top(Top &top, Lexer &lex) {
     }
   }
 
-  defmap.location.end = lex.next.location.start;
+  map.location.end = lex.next.location.start;
   expect(END, lex);
+
+  // Set a default import
+  if (file.content->imports.empty())
+    file.content->imports.import_all.push_back("wake");
+
+  // Set a default package name
+  static size_t anon_file = 0;
+  if (package->name.empty()) {
+    package->name = std::to_string(++anon_file);
+  }
+
+  package->exports.setpkg(package->name);
+  globals.setpkg(package->name);
+
+  if (!top.globals.join(globals, "global")) lex.fail = true;
+
+  // localize all top-level symbols
+  DefMap::Defs defs(std::move(map.defs));
+  map.defs.clear();
+  for (auto &def : defs) {
+    auto name = def.first + "@" + package->name;
+    auto it = file.local.defs.insert(std::make_pair(def.first, SymbolSource(def.second.location, name, SYM_LEAF)));
+    if (!it.second) {
+      if (it.first->second.qualified == name) {
+        it.first->second.location = def.second.location;
+        it.first->second.flags |= SYM_LEAF;
+        package->exports.defs.find(def.first)->second.flags |= SYM_LEAF;
+      } else {
+        std::cerr << "Duplicate file-local definition "
+          << def.first << " at "
+          << it.first->second.location.text() << " and "
+          << def.second.location.text() << std::endl;
+        lex.fail = true;
+      }
+    }
+    map.defs.insert(std::make_pair(std::move(name), std::move(def.second)));
+  }
+
+  // localize all topics
+  for (auto &topic : file.topics) {
+    auto name = topic.first + "@" + package->name;
+    auto it = file.local.topics.insert(std::make_pair(topic.first, SymbolSource(topic.second.location, name, SYM_LEAF)));
+    if (!it.second) {
+      if (it.first->second.qualified == name) {
+        it.first->second.location = topic.second.location;
+        it.first->second.flags |= SYM_LEAF;
+        package->exports.topics.find(topic.first)->second.flags |= SYM_LEAF;
+      } else {
+        std::cerr << "Duplicate file-local topic "
+          << topic.first << " at "
+          << it.first->second.location.text() << " and "
+          << topic.second.location.text() << std::endl;
+        lex.fail = true;
+      }
+    }
+  }
+
+  // localize all types
+  for (auto &type : package->package.types) {
+    auto name = type.first + "@" + package->name;
+    auto it = file.local.types.insert(std::make_pair(type.first, SymbolSource(type.second.location, name, SYM_LEAF)));
+    if (!it.second) {
+      if (it.first->second.qualified == name) {
+        it.first->second.location = type.second.location;
+        it.first->second.flags |= SYM_LEAF;
+        package->exports.types.find(type.first)->second.flags |= SYM_LEAF;
+      } else {
+        std::cerr << "Duplicate file-local type "
+          << type.first << " at "
+          << it.first->second.location.text() << " and "
+          << type.second.location.text() << std::endl;
+        lex.fail = true;
+      }
+    }
+  }
+
+  auto it = top.packages.insert(std::make_pair(package->name, nullptr));
+  if (it.second) {
+    package->package = file.local;
+    it.first->second = std::move(package);
+  } else {
+    if (!it.first->second->package.join(file.local, "package-local")) lex.fail = true;
+    it.first->second->exports.join(package->exports, nullptr);
+    // duplicated export already reported as package-local duplicate
+    it.first->second->files.emplace_back(std::move(file));
+  }
+
+  return it.first->second->name.c_str();
 }
 
 Expr *parse_command(Lexer &lex) {

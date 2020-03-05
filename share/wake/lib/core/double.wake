@@ -13,98 +13,100 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 # double operations
 
 # Unary absolute value operator for a Double.
-global def dabs x = prim "dabs"
+export def dabs x = prim "dabs"
 
 # Unary negative sign for a Double.
-global def   -. x = prim "dneg"
+export def   -. x = prim "dneg"
 
 # Unary positive sign for a Double.
-global def   +. x = x
+export def   +. x = x
 
 # Binary addition operator for Doubles.
-global def x +. y = prim "dadd"
+export def x +. y = prim "dadd"
 
 # Binary subtraction operator for Doubles.
-global def x -. y = prim "dsub"
+export def x -. y = prim "dsub"
 
 # Binary multiplication operator for Doubles.
-global def x *. y = prim "dmul"
+export def x *. y = prim "dmul"
 
 # Binary division operator for Doubles.
-global def x /. y = prim "ddiv"
+export def x /. y = prim "ddiv"
 
 # Binary exponentiation operator for Doubles.
-global def x ^. y = prim "dpow"
+export def x ^. y = prim "dpow"
 
 # Computes x*y + z.
-global def dfma x y z = prim "dfma" # x*y + z
+export def dfma x y z = prim "dfma" # x*y + z
 
 # Creates a function that computes the nth root.
-global def droot n =
+export def droot n =
   def n1 = 1.0 /. n
   _ ^. n1
 
 # Unary operator for square root.
-global def dsqrt = droot 2.0
+export def dsqrt = droot 2.0
 
 def root3 = droot 3.0
 
 def root4 = droot 4.0
 
 # Unary operator for square root, using the unicode character.
-global def √ x = dsqrt x
+export def √ x = dsqrt x
 
 # Unary operator for cube root.
-global def ∛ x = root3 x
+export def ∛ x = root3 x
 
 # Unary operator for fourth root.
-global def ∜ x = root4 x
+export def ∜ x = root4 x
 
-global def dcmp x y = prim "dcmp"
-global def x <=>. y = prim "dcmp"
+export def dcmp x y = prim "dcmp"
+export def x <=>. y = prim "dcmp"
 
 # Binary Less-Than Operator.
-global def x <.  y = isLT (x <=>. y)
+export def x <.  y = isLT (x <=>. y)
 
 # Binary Greater-Than Operator.
-global def x >.  y = isGT (x <=>. y)
+export def x >.  y = isGT (x <=>. y)
 
 # Binary Greater-Or-Equal Operator.
-global def x >=. y = isGE (x <=>. y)
+export def x >=. y = isGE (x <=>. y)
 
 # Binary Less-Or-Equal Operator.
-global def x <=. y = isLE (x <=>. y)
+export def x <=. y = isLE (x <=>. y)
 
 # Binary Equal-To Operator.
-global def x ==. y = isEQ (x <=>. y)
+export def x ==. y = isEQ (x <=>. y)
 
 # Binary Not-Equal Operator.
-global def x !=. y = isNE (x <=>. y)
+export def x !=. y = isNE (x <=>. y)
 
 # Computes the minimum of two Doubles.
-global def dmin x y = if x <. y then x else y
+export def dmin x y = if x <. y then x else y
 
 # Computes the maximum of two Doubles.
-global def dmax x y = if x <. y then y else x
+export def dmax x y = if x <. y then y else x
 
 # Product of a series of Doubles.
-global def dprod = foldl (_*._) 1.0
-global def ∏. l = dprod l
+export def dprod = foldl (_*._) 1.0
+export def ∏. l = dprod l
 
 # Sum of a series of Doubles.
-global def dsum = foldl (_+._) 0.0
-global def ∑. l = dsum l
+export def dsum = foldl (_+._) 0.0
+export def ∑. l = dsum l
 
-global data DoubleFormat =
+export data DoubleFormat =
   DoubleFixed
   DoubleScientific
   DoubleHex
   DoubleDefault
 
-global def dformat x =
+export def dformat x =
   def imp f p x = prim "dstr"
   def f = match x
     DoubleFixed      = 0
@@ -113,23 +115,23 @@ global def dformat x =
     DoubleDefault    = 3
   imp f
 
-global def double s =
+export def double s =
   def p s = prim "ddbl"
   p s | head
 
-global def dhex = dformat DoubleHex 20
-global def dstr = dformat DoubleDefault 17
+export def dhex = dformat DoubleHex 20
+export def dstr = dformat DoubleDefault 17
 
-global def dint x = double (str x)
+export def dint x = double (str x)
 
 # Conversion methods
-global data DoubleClass =
+export data DoubleClass =
   DoubleInfinite
   DoubleNaN
   DoubleSubNormal
   DoubleNormal
 
-global def dclass x =
+export def dclass x =
   def imp x = prim "dclass"
   match (imp x)
     1 = DoubleInfinite
@@ -137,53 +139,53 @@ global def dclass x =
     4 = DoubleSubNormal
     _ = DoubleNormal
 
-global def dfrexp x   = prim "dfrexp"
-global def dldexp f e = prim "dldexp"
-global def dmodf  x   = prim "dmodf"
+export def dfrexp x   = prim "dfrexp"
+export def dldexp f e = prim "dldexp"
+export def dmodf  x   = prim "dmodf"
 
-global def idouble x = match (dmodf x)
+export def idouble x = match (dmodf x)
  Pair x 0.0 = Some x
  _ = None
 
 # Handy numerical functions
 
 # Calculates the cosine of a Double.
-global def dcos    x = prim "dcos"
+export def dcos    x = prim "dcos"
 
 # Calculates the sine of a Double.
-global def dsin    x = prim "dsin"
+export def dsin    x = prim "dsin"
 
 # Calculates the tangent of a Double.
-global def dtan    x = prim "dtan"
+export def dtan    x = prim "dtan"
 
 # Calculates the inverse cosine of a Double.
-global def dacos   x = prim "dacos"
+export def dacos   x = prim "dacos"
 
 # Calculates the inverse sine of a Double.
-global def dasin   x = prim "dasin"
+export def dasin   x = prim "dasin"
 
 # Calculates e^x.
-global def dexp    x = prim "dexp"
+export def dexp    x = prim "dexp"
 
 # Calculates the natural logarithm of x.
-global def dlog    x = prim "dlog"
-global def dexpm1  x = prim "dexpm1"
-global def dlog1p  x = prim "dlog1p"
-global def derf    x = prim "derf"
-global def derfc   x = prim "derfc"
-global def dtgamma x = prim "dtgamma"
-global def dlgamma x = prim "dlgamma"
+export def dlog    x = prim "dlog"
+export def dexpm1  x = prim "dexpm1"
+export def dlog1p  x = prim "dlog1p"
+export def derf    x = prim "derf"
+export def derfc   x = prim "derfc"
+export def dtgamma x = prim "dtgamma"
+export def dlgamma x = prim "dlgamma"
 
 # Calculates the inverse tangent of y/x, giving the angle of the point(x, y) in the coordinate plane. 
-global def datan x y = prim "datan"
+export def datan x y = prim "datan"
 
 # Useful constants
 
 # Not a Number
-global def nan = 0.0 /. 0.0
+export def nan = 0.0 /. 0.0
 
 # Infinity
-global def inf = 1.0 /. 0.0
+export def inf = 1.0 /. 0.0
 
 # Pi 
-global def pi  = dacos 0.0 *. 2.0
+export def pi  = dacos 0.0 *. 2.0

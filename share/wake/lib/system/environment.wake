@@ -13,10 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 # System information
 def uname = prim "uname"
-global def sysname = uname.getPairFirst
-global def machine = uname.getPairSecond
+export def sysname = uname.getPairFirst
+export def machine = uname.getPairSecond
+
+# Default search path for new Plans
+export topic path: String
+export def path = catWith ":" (subscribe path | distinctBy scmp)
+publish environment = "PATH={path}", Nil
 
 # Inject command-line specified path entries
 publish path = match (getenv "WAKE_PATH")
@@ -27,13 +34,12 @@ publish path = match (getenv "WAKE_PATH")
 publish path = "/usr/bin", Nil
 publish path = "/bin", Nil
 
-global def path = catWith ":" (subscribe path | distinctBy scmp)
-publish environment = "PATH={path}", Nil
-
-global def environment = subscribe environment
+# Default environment for new Plans
+export topic environment: String
+export def environment = subscribe environment
 
 # Use of this function can lead to unnecessary rebuilds!
-global def getenv key =
+export def getenv key =
   def p x = prim "getenv"
   head (p key)
 
@@ -42,25 +48,25 @@ def value pair = replace `[^=]*=` "" pair
 
 # Retrieve the value for 'key' from a KEY=VALUE environment list
 # (key: String) => (environment: List String) => Option String
-global def getEnvironment key environment =
+export def getEnvironment key environment =
   def clean (Pair eq _) = value eq
   find (test key) environment | omap clean
 
 # Remove a key from a KEY=VALUE environment list
 # (key: String) => (environment: List String) => List String
-global def unsetEnvironment key environment =
+export def unsetEnvironment key environment =
   filter (! test key _) environment
 
 # Set key=value in an environment list, removing all prior values for that key
 # (key: String) => (value: String) => (environment: List String) => List String
-global def setEnvironment key value environment =
+export def setEnvironment key value environment =
   "{key}={value}", unsetEnvironment key environment
 
 # Update a key's value in a KEY=VALUE environment list
 # All prior values for that key are rmeoved
 # Only the first match (if any) is supplied to fn
 # (key: String) => (fn: Option String => Option String) => (environment: List String) => List String
-global def editEnvironment key fn environment =
+export def editEnvironment key fn environment =
   match (splitBy (test key) environment)
     Pair eq rest = match (head eq | omap value | fn)
       Some v = "{key}={v}", rest
@@ -68,7 +74,7 @@ global def editEnvironment key fn environment =
 
 # Add a component to the PATH in a KEY=VALUE environment
 # (path: String) => (environment: List String) => List String
-global def addEnvironmentPath path environment =
+export def addEnvironmentPath path environment =
   def mod = match _
     None = Some path
     Some x = Some "{path}:{x}"
@@ -76,7 +82,7 @@ global def addEnvironmentPath path environment =
 
 # Optionally add a component to the PATH in a KEY=VALUE environment
 # (pathopt: Option String) => (environment: List String) => List String
-global def addEnvironmentPathOpt pathopt environment =
+export def addEnvironmentPathOpt pathopt environment =
   match pathopt
     None = environment
     Some x = addEnvironmentPath x environment

@@ -149,43 +149,114 @@ struct Subscribe : public Expr {
   void format(std::ostream &os, int depth) const override;
 };
 
-struct DefMap : public Expr {
-  struct Value {
-    Location location;
-    std::unique_ptr<Expr> body;
-    Value(const Location &location_, std::unique_ptr<Expr> &&body_)
-     : location(location_), body(std::move(body_)) { }
-  };
-
-  typedef std::map<std::string, Value> Defs;
-  typedef std::map<std::string, std::vector<Value> > Pubs;
-  Defs map;
-  Pubs pub;
+struct Ascribe : public Expr {
+  AST signature;
   std::unique_ptr<Expr> body;
 
   static const TypeDescriptor type;
-  DefMap(const Location &location_, Defs &&map_, Pubs &&pub_, Expr *body_)
-   : Expr(&type, location_), map(std::move(map_)), pub(std::move(pub_)), body(body_) { }
+  Ascribe(const Location &location_, AST &&signature_, Expr *body_)
+   : Expr(&type, location_), signature(std::move(signature_)), body(body_) { }
+
+  void format(std::ostream &os, int depth) const override;
+};
+
+struct DefValue {
+  Location location;
+  std::unique_ptr<Expr> body;
+  DefValue(const Location &location_, std::unique_ptr<Expr> &&body_)
+   : location(location_), body(std::move(body_)) { }
+};
+
+#define SYM_LEAF 1 // qualified = a definition
+#define SYM_GRAY 2 // currently exploring this symbol
+
+struct SymbolSource {
+  Location location;
+  std::string qualified; // from@package
+  long flags;
+
+  SymbolSource(const Location &location_, long flags_ = 0)
+   : location(location_), qualified(), flags(flags_) { }
+  SymbolSource(const Location &location_, const std::string &qualified_, long flags_ = 0)
+   : location(location_), qualified(qualified_), flags(flags_) { }
+
+  SymbolSource clone(const std::string &qualified) const {
+    return SymbolSource(location, qualified, flags);
+  }
+};
+
+struct Symbols {
+  typedef std::map<std::string, SymbolSource> SymbolMap; // to -> from@package
+  SymbolMap defs;
+  SymbolMap types;
+  SymbolMap topics;
+  void format(const char *kind, std::ostream &os, int depth) const;
+  bool join(const Symbols &symbols, const char *scope);
+  void setpkg(const std::string &pkgname);
+};
+
+struct Imports : public Symbols {
+  SymbolMap mixed;
+  std::vector<std::string> import_all;
+  bool empty() const { return import_all.empty() && mixed.empty() && defs.empty() && types.empty() && topics.empty(); }
+};
+
+struct DefMap : public Expr {
+  typedef std::map<std::string, DefValue> Defs;
+  Defs defs;
+  Imports imports;
+  std::unique_ptr<Expr> body;
+
+  static const TypeDescriptor type;
+  DefMap(const Location &location_, Defs &&defs_, Expr *body_)
+   : Expr(&type, location_), defs(std::move(defs_)), body(body_) { }
   DefMap(const Location &location_)
-   : Expr(&type, location_), map(), pub(), body(nullptr) { }
+   : Expr(&type, location_), defs(), body(nullptr) { }
+
+  void format(std::ostream &os, int depth) const override;
+};
+
+struct Topic {
+  Location location;
+  AST type;
+  Topic(const Location &location_, AST &&type_) : location(location_), type(std::move(type_)) { }
+};
+
+struct File {
+  typedef std::vector<std::pair<std::string, DefValue> > Pubs;
+  typedef std::map<std::string, Topic> Topics;
+  std::unique_ptr<DefMap> content;
+  Symbols local;
+  Pubs pubs;
+  Topics topics;
+};
+
+struct Package : public Expr {
+  std::string name;
+  std::vector<File> files;
+  Symbols package;
+  Symbols exports; // subset of package; used to fill imports
+
+  static const TypeDescriptor type;
+  Package() : Expr(&type, LOCATION) { }
 
   void format(std::ostream &os, int depth) const override;
 };
 
 struct Top : public Expr {
-  typedef std::vector<std::unique_ptr<DefMap> > DefMaps;
-  typedef std::map<std::string, int> DefOrder;
-  DefMaps defmaps;
-  DefOrder globals;
+  typedef std::map<std::string, std::unique_ptr<Package> > Packages;
+  Packages packages;
+  Symbols globals;
+  const char *def_package;
   std::unique_ptr<Expr> body;
 
   static const TypeDescriptor type;
-  Top() : Expr(&type, LOCATION), defmaps(), globals() { }
+  Top();
 
   void format(std::ostream &os, int depth) const override;
 };
 
-// Created by transforming DefMap+Top
+// Created by transforming DefMap+Package+Top
 struct DefBinding : public Expr {
   struct OrderValue {
     Location location;
@@ -250,8 +321,7 @@ struct Destruct : public Expr {
 // A dummy expression never actually used in the AST
 struct VarDef : public Expr {
   static const TypeDescriptor type;
-  Location target; // for publishes
-  VarDef(const Location &location_) : Expr(&type, location_), target(LOCATION) { }
+  VarDef(const Location &location_) : Expr(&type, location_) { }
   void format(std::ostream &os, int depth) const override;
 };
 

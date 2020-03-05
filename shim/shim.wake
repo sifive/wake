@@ -13,7 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-global def buildShim (Pair _ variant) =
+package build_wake
+from wake import _
+
+def buildShim (Pair _ variant) =
   def compile = compileC variant Nil (sources here `.*\.h`)
   def cppFiles = sources here `.*\.c`
   def objFiles = map compile cppFiles

@@ -24,7 +24,7 @@ struct Top;
 struct Expr;
 
 bool expect(SymbolType type, Lexer &lex);
-void parse_top(Top &top, Lexer &lex);
+const char *parse_top(Top &top, Lexer &lex);
 Expr *parse_command(Lexer &lex);
 Expr *parse_expr(Lexer &lex);
 bool sums_ok();

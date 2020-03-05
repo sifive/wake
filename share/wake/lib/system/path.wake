@@ -13,8 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 # Read the file contents of a Path
-global def read path =
+export def read path =
   def imp p = prim "read"
   match (getPathResult path)
     Pass f = match (imp f.getPathName)
@@ -23,18 +25,18 @@ global def read path =
     Fail e = Fail e
 
 # Simplify away the ..s and .s in a String
-global def simplify path = prim "simplify"
+export def simplify path = prim "simplify"
 
 # Reframe path into a form accesible relative to dir
-global def relative dir path = prim "relative"
+export def relative dir path = prim "relative"
 
 # Locate an executable in the search path
-global target whichIn path exec =
+export target whichIn path exec =
   def imp path exec = prim "search_path"
   imp path exec
 
-global def which exec = whichIn path exec
-global def workspace = prim "workspace"
+export def which exec = whichIn path exec
+export def workspace = prim "workspace"
 
 def mkdirRunner =
   def imp m p = prim "mkdir"
@@ -63,11 +65,11 @@ def mkdirImp inputs mode path =
   | getJobOutput
 
 # Create a directory in the parent
-global def mkdirIn parent mode name =
+export def mkdirIn parent mode name =
   mkdirImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify
 
 # Make all every element in the directory path with mode 0775
-global def mkdir path =
+export def mkdir path =
   def root = match _
     "", x, t = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 "/{x}") t
     x, t     = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 x) t
@@ -95,11 +97,11 @@ target writeImp inputs mode path content =
   | getJobOutput
 
 # Create a file with the given mode in the specified directory
-global def writeIn parent mode name content =
+export def writeIn parent mode name content =
   writeImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify content
 
 # Create all directories and the named file
-global def write path content =
+export def write path content =
   def spath = simplify path
   def parent = simplify "{spath}/.."
   writeImp (mkdir parent, Nil) 0664 spath content

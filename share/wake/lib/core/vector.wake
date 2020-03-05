@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 # Defines a new ``Vector``.
 data Vector a = Vector (Array a) Integer Integer
 
 # Converts a ``List`` to a ``Vector``.
-global def listToVector l =
+export def listToVector l =
   def llen = len l
   def vnew n = prim "vnew"
   # take out as an arg so vnew does not generalize
@@ -31,7 +33,7 @@ global def listToVector l =
   Vector (bind (vnew llen)) 0 llen
 
 # Converts a ``Tree`` to a ``Vector``.
-global def treeToVector t =
+export def treeToVector t =
   def len = tlen t
   def vnew n = prim "vnew"
   # take out as an arg so vnew does not generalize
@@ -43,28 +45,28 @@ global def treeToVector t =
   Vector (bind (vnew len)) 0 len
 
 # Returns ``True`` if the ``Vector`` has no entries, otherwise ``False``.
-global def vempty (Vector _ s e) = s == e
+export def vempty (Vector _ s e) = s == e
 
 # Returns the length of the ``Vector``.
-global def vlen (Vector _ s e) = e - s
+export def vlen (Vector _ s e) = e - s
 
 # Converts a ``List`` to a ``Vector``.
-global def vectorToList = vfoldr (_,_) Nil
+export def vectorToList = vfoldr (_,_) Nil
 
 # Splits the ``Vector`` into two vectors, at the point ``i``.  
 # The ``i``th entry will end up in the second ``Vector``, provided that ``0 <= i < vlen(v)``.
-global def vsplitAt i (Vector v s e) =
+export def vsplitAt i (Vector v s e) =
   def x = min e (s + max 0 i)
   Pair (Vector v s x) (Vector v x e)
 
 # Returns the first ``i`` elements of the ``Vector``.
-global def vtake i v = vsplitAt i v | getPairFirst
+export def vtake i v = vsplitAt i v | getPairFirst
 
 # Removes the first ``i`` elements of the ``Vector``.
-global def vdrop i v = vsplitAt i v | getPairSecond
+export def vdrop i v = vsplitAt i v | getPairSecond
 
 # Returns an ``Option``, containing either the ``i``th element of the vector, or ``None`` if ``i`` is out of range.
-global def vat i (Vector v s e) =
+export def vat i (Vector v s e) =
   def get v i = prim "vget"
   def j = i+s
   if i >= 0 && j < e then Some (get v j) else None
@@ -74,19 +76,19 @@ def vat_ i (Vector v s _) =
   get v (s+i)
 
 # Calls a function on every entry of a ``Vector``.
-global def vmap f v = vtab (\i f (vat_ i v)) (vlen v)
-global def vseq n = vtab (_) n
-global def vzip a b = vtab (\i Pair (vat_ i a) (vat_ i b)) (min (vlen a) (vlen b))
-global def vunzip v =
+export def vmap f v = vtab (\i f (vat_ i v)) (vlen v)
+export def vseq n = vtab (_) n
+export def vzip a b = vtab (\i Pair (vat_ i a) (vat_ i b)) (min (vlen a) (vlen b))
+export def vunzip v =
   Pair
   (vtab (vat_ _ v | getPairFirst)  (vlen v))
   (vtab (vat_ _ v | getPairSecond) (vlen v))
-global def vreverse v =
+export def vreverse v =
   def n = vlen v
   def n1 = n-1
   vtab (\i vat_ (n1-i) v) n
 
-global def vfoldl f a v =
+export def vfoldl f a v =
   def len = vlen v
   def helper a i =
     if i == len
@@ -94,14 +96,14 @@ global def vfoldl f a v =
     else helper (f a (vat_ i v)) (i+1)
   helper a 0
 
-global def vfoldr f a v =
+export def vfoldr f a v =
   def helper a i =
     if i == -1
     then a
     else helper (f (vat_ i v) a) (i-1)
   helper a (vlen v - 1)
 
-global def vfoldmap f a g v =
+export def vfoldmap f a g v =
   def len = vlen v
   def helper a s e =
     def mid = (e + s) >> 1
@@ -112,9 +114,9 @@ global def vfoldmap f a g v =
     f l r
   if len == 0 then a else helper a 0 len
 
-global def vfold f a v = vfoldmap f a (_) v
+export def vfold f a v = vfoldmap f a (_) v
 
-global def vfind f v =
+export def vfind f v =
   def len = vlen v
   def helper i =
     if i == len then None else
@@ -122,23 +124,23 @@ global def vfind f v =
       if f x then Some (Pair x i) else helper (i+1)
   helper 0
 
-global def vsplitUntil f v =
+export def vsplitUntil f v =
   match (vfind f v)
     None = match v
       (Vector z _ _) = Pair v (Vector z 0 0)
     Some (Pair _ i) = vsplitAt i v
 
-global def vtakeUntil f t = vsplitUntil f t | getPairFirst
-global def vdropUntil f t = vsplitUntil f t | getPairSecond
+export def vtakeUntil f t = vsplitUntil f t | getPairFirst
+export def vdropUntil f t = vsplitUntil f t | getPairSecond
 
 # Returns True if there exists an x where f x = True
-global def vexists f t = match (vfind f t)
+export def vexists f t = match (vfind f t)
   Some _ = True
   None   = False
 
-global def vforall f t = !vexists (!f _) t
+export def vforall f t = !vexists (!f _) t
 
-global def vsplitBy f v =
+export def vsplitBy f v =
   def len = vlen v
   def vnew n = prim "vnew"
   def select = vmap f v
@@ -156,9 +158,9 @@ global def vsplitBy f v =
     Pair (Vector take 0 ntake) (Vector drop 0 ndrop)
   bind (vnew ntake) (vnew ndrop)
 
-global def vfilter f v = vsplitBy f v | getPairFirst
+export def vfilter f v = vsplitBy f v | getPairFirst
 
-global def vunfoldl f a n =
+export def vunfoldl f a n =
   def vnew n = prim "vnew"
   def bind out =
     def vset o i v = prim "vset"
@@ -171,7 +173,7 @@ global def vunfoldl f a n =
     Vector out 0 n
   bind (vnew (max 0 n))
 
-global def vscanl f a v =
+export def vscanl f a v =
   def len = vlen v
   def vnew n = prim "vnew"
   def bind out =
@@ -185,7 +187,7 @@ global def vscanl f a v =
     Vector out 0 (len+1)
   bind (vnew (len+1))
 
-global def vscanr f a v =
+export def vscanr f a v =
   def len = vlen v
   def vnew n = prim "vnew"
   def bind out =
@@ -202,7 +204,7 @@ global def vscanr f a v =
 
 # vscan = O(n), log n deep prefix-sum
 # f called exactly once per input
-global def vscanmap f a g v =
+export def vscanmap f a g v =
   def len = vlen v + 1
   def vnew n = prim "vnew"
   def vset o i v = prim "vset"
@@ -241,10 +243,10 @@ global def vscanmap f a g v =
     def _ = double 0
     Vector out 0 len
   scatter (vnew len)
-global def vscan f a v = vscanmap f a (_) v
+export def vscan f a v = vscanmap f a (_) v
 
 # Merge-sort, if sorted then O(n) else O(nlogn)
-global def vsortBy lt v =
+export def vsortBy lt v =
   def nondesc i = # 1 if v(i) > v(i+1)
     def vi = vat_ i v
     def vi1 = vat_ (i+1) v
@@ -277,7 +279,7 @@ global def vsortBy lt v =
         (Pair l r) (Pair rl rr) = merge (helper l rl) (helper r rr)
   helper v runs
 
-global def vdistinctBy cmp v =
+export def vdistinctBy cmp v =
   def gen (Pair tree i) =
     def x = vat_ i v
     def i1 = i + 1
@@ -286,7 +288,7 @@ global def vdistinctBy cmp v =
     else Pair (Pair (tinsert x tree) i1) (Some x)
   vmapPartial (_) (vunfoldl gen (Pair (tnew cmp) 0) (vlen v))
 
-global def vdistinctRunBy eq v =
+export def vdistinctRunBy eq v =
   def keep i =
     def vi = vat_ i v
     if i == 0 then Some vi else
@@ -294,7 +296,7 @@ global def vdistinctRunBy eq v =
       if eq vi1 vi then None else Some vi
   vmapPartial (_) (vtab keep (vlen v))
 
-global def vcmp f l r =
+export def vcmp f l r =
   def len = min (vlen l) (vlen r)
   def helper i =
     if i == len then
@@ -304,11 +306,11 @@ global def vcmp f l r =
       x  = x
   helper 0
 
-global def vtranspose v =
+export def vtranspose v =
   def outer i = vmapPartial (vat i _) v
   vtab outer (vfoldmap max 0 vlen v)
 
-global def vflatten vo =
+export def vflatten vo =
   def leno = vlen vo
   def offset = vscanmap (_+_) 0 vlen vo
   def flat = vat_ leno offset
@@ -326,7 +328,7 @@ global def vflatten vo =
   bind (vnew flat)
 
 # Simple parallel construction
-global def vtab f n =
+export def vtab f n =
   def vnew n = prim "vnew"
   def m = max 0 n
   def bind out =

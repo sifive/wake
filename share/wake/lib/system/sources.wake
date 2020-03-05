@@ -13,15 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 # Private implementation of global sources
+export topic source: String
 def add_sources str = prim "add_sources"
-def implode l = cat (foldr (_, "\0", _) Nil l)
 def got_sources = add_sources (subscribe source | map simplify | implode)
 
 # Find files
 # WARNING! Use of this method can make a build unreproducible
 # Depending on when the method is invoked, the results may vary
-global def files dir regexp = prim "files"
+export def files dir regexp = prim "files"
 
 def raw_source file =
   def get_modtime file = prim "get_modtime"
@@ -37,7 +39,7 @@ def raw_source file =
     | runJobWith virtualRunner
     | getJobOutput
 
-global def source file =
+export def source file =
   def basename = replace `^.*/` '' file
   def dirname = simplify "{file}/.."
   match (sources dirname basename.quote)
@@ -46,7 +48,7 @@ global def source file =
     _ = panic "unreachable: multiple sources match the same regexp"
 
 # Find sources files
-global def sources dir filterRegexp =
+export def sources dir filterRegexp =
   def scan dir regexp = prim "sources"
   match got_sources
     True  = scan dir filterRegexp | map raw_source

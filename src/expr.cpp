@@ -18,6 +18,7 @@
 #include "expr.h"
 #include <cassert>
 #include <sstream>
+#include <iostream>
 
 Expr::~Expr() { }
 const TypeDescriptor Prim      ::type("Prim");
@@ -31,12 +32,34 @@ const TypeDescriptor Construct ::type("Construct");
 const TypeDescriptor Destruct  ::type("Destruct");
 // these are removed by bind
 const TypeDescriptor Subscribe ::type("Subscribe");
+const TypeDescriptor Ascribe   ::type("Ascribe");
 const TypeDescriptor Match     ::type("Match");
 const TypeDescriptor DefMap    ::type("DefMap");
+const TypeDescriptor Package   ::type("Package");
 const TypeDescriptor Top       ::type("Top");
 // these are just useful for dumping json ast
 const TypeDescriptor VarDef    ::type("VarDef");
 const TypeDescriptor VarArg    ::type("VarArg");
+
+Top::Top() : Expr(&type, LOCATION), packages(), globals(), def_package(nullptr) {
+  Package *builtin = new Package();
+  packages.insert(std::make_pair("builtin", std::unique_ptr<Package>(builtin)));
+
+  // These types can be constructed by literals, so must always be in scope!
+  builtin->package.types.insert(std::make_pair("String",   SymbolSource(LOCATION, "String@builtin",   SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("Integer",  SymbolSource(LOCATION, "Integer@builtin",  SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("Double",   SymbolSource(LOCATION, "Double@builtin",   SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("RegExp",   SymbolSource(LOCATION, "RegExp@builtin",   SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("binary =>",SymbolSource(LOCATION, "binary =>@builtin",SYM_LEAF)));
+  // These types come from the runtime... and perhaps need not be global
+  builtin->package.types.insert(std::make_pair("Array",    SymbolSource(LOCATION, "Array@builtin",    SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("Target",   SymbolSource(LOCATION, "Target@builtin",   SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("Job",      SymbolSource(LOCATION, "Job@builtin",      SYM_LEAF)));
+
+  // Make builtin types avaiable via 'import' and as globals
+  builtin->exports = builtin->package;
+  globals = builtin->package;
+}
 
 Literal::Literal(const Location &location_, RootPointer<Value> &&value_, TypeVar *litType_)
  : Expr(&type, location_), value(std::make_shared<RootPointer<Value> >(std::move(value_))), litType(litType_) { }
@@ -60,6 +83,12 @@ void VarRef::format(std::ostream &os, int depth) const {
 
 void Subscribe::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Subscribe(" << name << ") @ " << location.file() << std::endl;
+}
+
+void Ascribe::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Ascribe @ " << location.file() << std::endl;
+  os << pad(depth+2) << "signature = " << signature << std::endl;
+  body->format(os, depth+2);
 }
 
 void Match::format(std::ostream &os, int depth) const {
@@ -92,18 +121,73 @@ void Lambda::format(std::ostream &os, int depth) const {
   body->format(os, depth+2);
 }
 
+void Symbols::format(const char *kind, std::ostream &os, int depth) const {
+  for (auto &i : defs) {
+    os << pad(depth) << kind << " " << i.first << " = " << i.second.qualified << std::endl;
+  }
+}
+
+static bool smap_join(Symbols::SymbolMap &dest, const Symbols::SymbolMap &src, const char *scope, const char *kind) {
+  bool ok = true;
+  for (auto &sym : src) {
+    auto it = dest.insert(sym);
+    if (!it.second) {
+      ok = false;
+      if (scope) {
+        std::cerr << "Duplicate "
+          << scope << " "
+          << kind << " '"
+          << sym.first << "' at "
+          << it.first->second.location.text() << " and "
+          << sym.second.location.text() << std::endl;
+      }
+    }
+  }
+  return ok;
+}
+
+bool Symbols::join(const Symbols &symbols, const char *scope) {
+  bool ok = true;
+  if (!smap_join(defs,   symbols.defs,   scope, "definition")) ok = false;
+  if (!smap_join(types,  symbols.types,  scope, "type"))       ok = false;
+  if (!smap_join(topics, symbols.topics, scope, "topic"))      ok = false;
+  return ok;
+}
+
+static void smap_setpkg(Symbols::SymbolMap &dest, const std::string &pkgname) {
+  for (auto &sym : dest) {
+    if (sym.second.qualified.empty()) {
+      sym.second.qualified = sym.first + "@" + pkgname;
+    }
+  }
+}
+
+void Symbols::setpkg(const std::string &pkgname) {
+  smap_setpkg(defs,   pkgname);
+  smap_setpkg(types,  pkgname);
+  smap_setpkg(topics, pkgname);
+}
+
 void DefMap::format(std::ostream &os, int depth) const {
   os << pad(depth) << "DefMap @ " << location.file() << std::endl;
-  for (auto &i : map) {
+  for (auto &i : defs) {
     os << pad(depth+2) << i.first << " =" << std::endl;
     i.second.body->format(os, depth+4);
   }
-  for (auto &i : pub) {
-    os << pad(depth+2) << "publish " << i.first << " =" << std::endl;
-    for (auto &j : i.second)
-      j.body->format(os, depth+4);
-  }
+  imports.format("import", os, depth+2);
   if (body) body->format(os, depth+2);
+}
+
+void Package::format(std::ostream &os, int depth) const {
+  os << pad(depth) << "Package " << name << " @ " << location.file() << std::endl;
+  exports.format("export", os, depth+2);
+  for (auto &i : files) {
+    i.content->format(os, depth+2);
+    for (auto &j : i.pubs) {
+      os << pad(depth+4) << "publish " << j.first << " = " << std::endl;
+      j.second.body->format(os, depth+6);
+    }
+  }
 }
 
 void Literal::format(std::ostream &os, int depth) const {
@@ -115,10 +199,10 @@ void Prim::format(std::ostream &os, int depth) const {
 }
 
 void Top::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Top; globals =";
-  for (auto &i : globals) os << " " << i.first;
-  os << std::endl;
-  for (auto &i : defmaps) i->format(os, depth+2);
+  os << pad(depth) << "Top" << std::endl;
+  globals.format("global", os, depth+2);
+  for (auto &i : packages)
+    i.second->format(os, depth+2);
   body->format(os, depth+2);
 }
 

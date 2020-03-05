@@ -13,14 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package build_wake
-from wake import _
+package wake
 
-def common variant =
-  def cflags = "-I{here}", Nil
-  def headers = sources here `.*\.h`
-  def reFiles = sources here `.*\.re`
-  def cppFiles = map re2c reFiles ++ sources here `.*\.cpp`
-  def compile = compileC variant cflags headers
-  def objects = map compile cppFiles
-  SysLib "0.0" headers objects cflags Nil
+# Put builtin types also into the wake namespace
+from builtin export type binary =>
+from builtin export type String Integer Double RegExp
+from builtin export type Array Target Job

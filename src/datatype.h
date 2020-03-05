@@ -50,8 +50,9 @@ struct Expr;
 struct Constructor {
   AST ast;
   int index; // sum->members[index] = this
+  bool scoped;
 
-  Constructor(AST &&ast_) : ast(ast_), index(0) { }
+  Constructor(AST &&ast_) : ast(ast_), index(0), scoped(false) { }
   static Constructor array;
 };
 
@@ -60,6 +61,7 @@ struct Sum {
   Location token, region;
   std::vector<std::string> args;
   std::vector<Constructor> members;
+  bool scoped;
 
   Sum(AST &&ast);
   void addConstructor(AST &&ast);

@@ -23,7 +23,7 @@
 #include "type.h"
 #include <cassert>
 
-static const TypeVar arrayT("Array", 1);
+static const TypeVar arrayT("Array@builtin", 1);
 
 static PRIMTYPE(type_vnew) {
   TypeVar vec;

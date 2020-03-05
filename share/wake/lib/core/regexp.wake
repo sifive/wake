@@ -13,44 +13,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+package wake
+
 # Regular expressions
 
 # Turns a String into a properly quoted Regular Expression
 # quote: (str: String) => RegExp
-global def quote str =
+export def quote str =
   def res str = prim "quote"
   match (res str).stringToRegExp
     Pass x = x
     Fail _ = panic "Quoted String is invalid Regular Expression"
 
-global def regExpCat l =
+export def regExpCat l =
   def res = l | map regExpToString | cat | stringToRegExp
   match res
     Pass regex = regex
     Fail _     = panic "Regexp concatenation failed!"
 
 # (str: String) => Result RegExp String
-global def stringToRegExp str = prim "re2"
+export def stringToRegExp str = prim "re2"
 
 # (glob: String) => RegExp
 # All input strings should be legal
-global def globToRegExp glob =
+export def globToRegExp glob =
   def glob2regexp glob = prim "glob2regexp"
   match (stringToRegExp (glob2regexp glob))
     Pass x = x
     Fail reason = panic "Failed to convert glob: {reason}"
 
-global def regExpToString regexp = prim "re2str"
+export def regExpToString regexp = prim "re2str"
 
 # matches: (testRegexp: String) => (str: String) => Boolean
-global def matches testRegexp str = prim "match"
+export def matches testRegexp str = prim "match"
 
 # extract: (parensRegexp: String) => (str: String) => List String
 # returns Nil on no match
-global def extract parensRegexp str = prim "extract"
+export def extract parensRegexp str = prim "extract"
 
 # replace: (locatorRegexp: String) => (replacement: String) => (str: String) => String
-global def replace locatorRegexp replacement str = prim "replace"
+export def replace locatorRegexp replacement str = prim "replace"
 
 # tokenize: (seperatorRegexp: String) => (str: String) => List String
-global def tokenize seperatorRegexp str = prim "tokenize"
+export def tokenize seperatorRegexp str = prim "tokenize"

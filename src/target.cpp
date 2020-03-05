@@ -64,7 +64,7 @@ void dont_report_future_targets() {
   Target::report_future_targets = false;
 }
 
-TypeVar Target::typeVar("Target", 0);
+TypeVar Target::typeVar("Target@builtin", 0);
 
 template <typename T, T (HeapPointerBase::*memberfn)(T x)>
 T Target::recurse(T arg) {
