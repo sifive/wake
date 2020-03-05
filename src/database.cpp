@@ -17,6 +17,7 @@
 
 #include "database.h"
 #include "status.h"
+#include <unordered_set>
 #include <iostream>
 #include <sstream>
 #include <sqlite3.h>
@@ -614,6 +615,26 @@ Usage Database::reuse_job(
   }
   finish_stmt(why, imp->stats_job, imp->debugdb);
 
+  // Create a hash table of visible files
+  std::unordered_set<std::string> vis;
+  const char *tok = visible.c_str();
+  const char *end = tok + visible.size();
+  for (const char *scan = tok; scan != end; ++scan) {
+    if (*scan == 0 && scan != tok) {
+      vis.emplace(tok, scan-tok);
+      tok = scan+1;
+    }
+  }
+
+  // Confirm all inputs are still visible
+  bind_integer(why, imp->get_tree, 1, job);
+  bind_integer(why, imp->get_tree, 2, INPUT);
+  while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
+    if (vis.find(rip_column(imp->get_tree, 0)) == vis.end()) out.found = false;
+  }
+  finish_stmt(why, imp->get_tree, imp->debugdb);
+
+  // Confirm all outputs still exist, and report their old hashes
   bind_integer(why, imp->get_tree, 1, job);
   bind_integer(why, imp->get_tree, 2, OUTPUT);
   while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
