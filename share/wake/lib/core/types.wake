@@ -18,4 +18,4 @@ package wake
 # Put builtin types also into the wake namespace
 from builtin export type binary =>
 from builtin export type String Integer Double RegExp
-from builtin export type Array Target Job
+from builtin export type Array Job
