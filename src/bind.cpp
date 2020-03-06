@@ -892,10 +892,10 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
           if (at != std::string::npos) {
             def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &dbinding);
             ResolveDef &topicdef = gbinding.defs[gbinding.index.find("topic " + qualified)->second];
-            Location &l = def.expr->location;
+            Location &l = topicdef.expr->location;
             topicdef.expr = std::unique_ptr<Expr>(new App(l, new App(l,
               new VarRef(l, "binary ++@wake"),
-              new VarRef(l, def.name)),
+              new VarRef(def.expr->location, def.name)),
               topicdef.expr.release()));
           } else {
             fail = true;
@@ -925,12 +925,12 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
           for (Expr *iter = def.expr.get(); iter->type == &App::type; iter = next) {
             App *app1 = static_cast<App*>(iter);
             App *app2 = static_cast<App*>(app1->fn.get());
-            app2->val = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), app2->val.release()));
+            app2->val = std::unique_ptr<Expr>(new Ascribe(def.expr->location, AST(signature), app2->val.release()));
             next = app1->val.get();
           }
 
           // If the topic is empty, still force the type
-          if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), def.expr.release()));
+          if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(def.expr->location, AST(signature), def.expr.release()));
         }
       }
     }
