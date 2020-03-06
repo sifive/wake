@@ -559,6 +559,17 @@ static PRIMFN(prim_str2bin) {
   RETURN(Integer::alloc(runtime.heap, out));
 }
 
+static PRIMTYPE(type_prefix) {
+  return args.size() == 0 &&
+    out->unify(String::typeVar);
+}
+
+static PRIMFN(prim_prefix) {
+  EXPECT(0);
+  StringInfo *info = static_cast<StringInfo*>(data);
+  RETURN(String::alloc(runtime.heap, info->prefix));
+}
+
 static PRIMTYPE(type_uname) {
   TypeVar pair;
   Data::typePair.clone(pair);
@@ -607,6 +618,7 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "format",   prim_format,   type_format,    PRIM_PURE);
   prim_register(pmap, "version",  prim_version,  type_version,   PRIM_PURE, (void*)info);
   prim_register(pmap, "level",    prim_level,    type_level,     PRIM_PURE, (void*)info);
+  prim_register(pmap, "prefix",   prim_prefix,   type_prefix,    PRIM_PURE, (void*)info);
   prim_register(pmap, "scmp",     prim_scmp,     type_scmp,      PRIM_PURE);
   prim_register(pmap, "sNFC",     prim_sNFC,     type_normalize, PRIM_PURE);
   prim_register(pmap, "sNFKC",    prim_sNFKC,    type_normalize, PRIM_PURE);
