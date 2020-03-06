@@ -391,7 +391,7 @@ int main(int argc, char **argv) {
 
   /* Primitives */
   JobTable jobtable(&db, percent, verbose, quiet, check, !tty);
-  StringInfo info(verbose, debug, quiet, VERSION_STR);
+  StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(prefix));
   PrimMap pmap = prim_register_all(&info, &jobtable);
 
   if (!flatten_exports(*top)) ok = false;

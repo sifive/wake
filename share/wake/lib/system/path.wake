@@ -37,6 +37,7 @@ export target whichIn path exec =
 
 export def which exec = whichIn path exec
 export def workspace = prim "workspace"
+export def cwd = prim "prefix"
 
 def mkdirRunner =
   def imp m p = prim "mkdir"
