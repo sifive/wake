@@ -159,8 +159,9 @@ struct StringInfo {
   bool quiet;
   std::string version;
   std::string prefix;
-  StringInfo(bool v, bool d, bool q, const std::string &version_, const std::string &prefix_)
-   : verbose(v), debug(d), quiet(q), version(version_), prefix(prefix_) { }
+  char **cmdline;
+  StringInfo(bool v, bool d, bool q, const std::string &version_, const std::string &prefix_, char **cmdline_)
+   : verbose(v), debug(d), quiet(q), version(version_), prefix(prefix_), cmdline(cmdline_) { }
 };
 
 void prim_register(PrimMap &pmap, const char *key, PrimFn fn, PrimType type, int flags, void *data = 0);

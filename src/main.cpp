@@ -384,6 +384,8 @@ int main(int argc, char **argv) {
 
   TypeVar type = body->typeVar;
   std::string command;
+  char *none = nullptr;
+  char **cmdline = &none;
   if (exec) {
     command = exec;
     Lexer lex(runtime.heap, command, "<execute-argument>");
@@ -391,8 +393,9 @@ int main(int argc, char **argv) {
     if (lex.fail) ok = false;
   } else if (argc > 1) {
     command = argv[1];
+    cmdline = argv+2;
     body = new App(LOCATION, body, force_use(
-      new App(LOCATION, new VarRef(LOCATION, argv[1]), new VarRef(LOCATION, "Nil@wake"))));
+      new App(LOCATION, new VarRef(LOCATION, argv[1]), new Prim(LOCATION, "cmdline"))));
   } else {
     body = new App(LOCATION, body, force_use(new VarRef(LOCATION, "Nil@wake")));
   }
@@ -407,7 +410,7 @@ int main(int argc, char **argv) {
 
   /* Primitives */
   JobTable jobtable(&db, percent, verbose, quiet, check, !tty);
-  StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(prefix));
+  StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(prefix), cmdline);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
