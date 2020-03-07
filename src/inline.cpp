@@ -18,6 +18,7 @@
 #include "ssa.h"
 #include "runtime.h"
 #include <unordered_map>
+#include <assert.h>
 
 struct DeepHash {
   Runtime *runtime;
@@ -93,32 +94,52 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
   size_t fnargs = meta_args(p.stream[args[0]]->meta);
   if (fnargs == args.size()-1) {
     std::vector<size_t> fargs;
-    Term *term = self.get();
     size_t fnid;
+    Term *term = self.get();
+    bool singleton = true;
     do {
       RApp *app = static_cast<RApp*>(term);
-      for (size_t i = app->args.size()-1; i > 0; --i)
-        fargs.push_back(app->args[i]);
+      for (size_t i = app->args.size()-1; i > 0; --i) {
+        size_t argid = app->args[i];
+        fargs.push_back(argid);
+        if (!singleton) p.stream[argid]->set(SSA_SINGLETON, false);
+      }
       fnid = app->args[0];
       term = p.stream[fnid];
+      if (!term->get(SSA_SINGLETON)) singleton = false;
     } while (term->id() == typeid(RApp));
-
-    if ((term->get(SSA_SINGLETON) || meta_size(term->meta) < p.common.threshold) && !term->get(SSA_RECURSIVE)) {
-      auto fun = static_unique_pointer_cast<RFun>(term->clone());
+    assert (!term->get(SSA_MOVED));
+    if (!term->get(SSA_RECURSIVE) && (singleton || meta_size(term->meta) < p.common.threshold)) {
+      std::unique_ptr<RFun> copy;
+      RFun *fun;
+      if (singleton) {
+        // We will move the original; preventing exponwntial growth
+        fun = static_cast<RFun*>(term);
+      } else {
+        copy = static_unique_pointer_cast<RFun>(term->clone(p.stream.scope(), fnid));
+        fun = copy.get();
+      }
       PassInline q(p.common, fnid); // refs up to fun are unmodified
       q.stream.discard(); // discard name of inlined fn
-      for (size_t i = fargs.size(); i > 0; --i)
-        q.stream.discard(fargs[i-1]); // bind arguments to inline function
+      size_t n1 = fargs.size()-1;
+      for (size_t i = 0; i <= n1; ++i)
+        q.stream.discard(fargs[n1-i], fun->terms[i]->get(SSA_SINGLETON)); // bind arguments to inline function
       for (size_t i = fargs.size(); i < fun->terms.size(); ++i) {
         std::unique_ptr<Term> &x = fun->terms[i];
         x->pass_inline(q, std::move(x));
       }
       fun->update(q.stream.map());
-      p.stream.discard(fun->output); // replace App with function output
+      p.stream.discard(fun->output, self->get(SSA_SINGLETON)); // replace App with function output
+      if (singleton) {
+        fun->output = 0;
+        fun->terms.resize(fargs.size());
+        fun->set(SSA_MOVED, true);
+      }
     } else {
       // Combine App() but don't inline
       args.clear();
       args.emplace_back(fnid);
+      if (!singleton) p.stream[fnid]->set(SSA_SINGLETON, false);
       for (size_t i = fargs.size(); i > 0; --i)
         args.emplace_back(fargs[i-1]);
       self->meta = make_meta(1, 0);
@@ -185,6 +206,10 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
       for (unsigned i = 0; i < des->args.size()-1; ++i)
         known &= p.stream[des->args[i]]->get(SSA_FRCON);
       if (known) {
+        for (unsigned i = 0; i < args.size()-1; ++i)
+          p.stream[args[i]]->set(SSA_SINGLETON, false);
+        for (unsigned i = 0; i < des->args.size()-1; ++i)
+          p.stream[des->args[i]]->set(SSA_SINGLETON, false);
         // create new functions which composes the two RDes
         std::vector<size_t> compose;
         for (unsigned i = 0; i < des->args.size()-1; ++i) {

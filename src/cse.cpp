@@ -77,7 +77,6 @@ static void cse_reduce(PassCSE &p, Hash hash, std::unique_ptr<Term> self) {
     p.stream.transfer(std::move(self));
   } else {
     size_t prior = ins.first->second;
-    p.stream[prior]->set(SSA_SINGLETON, false);
     p.stream.discard(prior);
   }
 }

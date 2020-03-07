@@ -38,6 +38,7 @@ struct PassWiden;
 struct PassInline;
 struct PassCSE;
 struct PassScope;
+struct TargetScope;
 struct InterpretContext;
 
 struct TermFormat {
@@ -53,6 +54,7 @@ struct TermFormat {
 #define SSA_USED	0x08
 #define SSA_SINGLETON	0x10
 #define SSA_FRCON	0x20
+#define SSA_MOVED	0x40
 
 struct Term {
   static const size_t invalid = ~static_cast<size_t>(0);
@@ -67,7 +69,7 @@ struct Term {
   bool get(size_t flag) const { return flags & flag; }
 
   virtual ~Term();
-  virtual std::unique_ptr<Term> clone() const = 0;
+  virtual std::unique_ptr<Term> clone(TargetScope &scope, size_t id) const = 0;
   virtual void format(std::ostream &os, TermFormat &format) const = 0;
   virtual void interpret(InterpretContext &context) = 0;
   virtual bool tailCallOk() const = 0;
@@ -120,7 +122,7 @@ struct Redux : public Term {
 struct RArg final : public Leaf {
   RArg(const char *label_ = "") : Leaf(label_) { }
 
-  std::unique_ptr<Term> clone() const override;
+  std::unique_ptr<Term> clone(TargetScope &scope, size_t id) const override;
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
@@ -138,7 +140,7 @@ struct RLit final : public Leaf {
 
   RLit(std::shared_ptr<RootPointer<Value> > value_, const char *label_ = "") : Leaf(label_), value(std::move(value_)) { }
 
-  std::unique_ptr<Term> clone() const override;
+  std::unique_ptr<Term> clone(TargetScope &scope, size_t id) const override;
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
@@ -155,7 +157,7 @@ struct RApp final : public Redux {
   // arg0 = fn, arg1+ = arguments
   RApp(size_t fn, size_t arg, const char *label_ = "") : Redux(label_, {fn, arg}) { }
 
-  std::unique_ptr<Term> clone() const override;
+  std::unique_ptr<Term> clone(TargetScope &scope, size_t id) const override;
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
@@ -177,7 +179,7 @@ struct RPrim final : public Redux {
   RPrim(const char *name_, PrimFn fn_, void *data_, int pflags_, std::vector<size_t> &&args_, const char *label_ = "")
    : Redux(label_, std::move(args_)), name(name_), fn(fn_), data(data_), pflags(pflags_) { }
 
-  std::unique_ptr<Term> clone() const override;
+  std::unique_ptr<Term> clone(TargetScope &scope, size_t id) const override;
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
@@ -196,7 +198,7 @@ struct RGet final : public Redux {
 
   RGet(size_t index_, size_t obj, const char *label_ = "") : Redux(label_, {obj}), index(index_) { }
 
-  std::unique_ptr<Term> clone() const override;
+  std::unique_ptr<Term> clone(TargetScope &scope, size_t id) const override;
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
@@ -213,7 +215,7 @@ struct RDes final : public Redux {
   // args = handlers for cases, then obj
   RDes(std::vector<size_t> &&args_, const char *label_ = "") : Redux(label_, std::move(args_)) { }
 
-  std::unique_ptr<Term> clone() const override;
+  std::unique_ptr<Term> clone(TargetScope &scope, size_t id) const override;
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
@@ -234,7 +236,7 @@ struct RCon final : public Redux {
    : Redux(label_, std::move(args_)), kind(std::move(kind_)) { }
 
   void format(std::ostream &os, TermFormat &format) const override;
-  std::unique_ptr<Term> clone() const override;
+  std::unique_ptr<Term> clone(TargetScope &scope, size_t id) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
 
@@ -253,14 +255,14 @@ struct RFun final : public Term {
   std::vector<std::unique_ptr<Term> > terms;
   std::vector<size_t> escapes;
 
-  RFun(const RFun &o);
+  RFun(const RFun &o, TargetScope &scope, size_t id);
   RFun(const Location &location_, const char *label_, size_t flags_, size_t output_ = Term::invalid)
    : Term(label_, flags_), location(location_), output(output_) { }
 
   void update(const SourceMap &map);
   size_t args() const;
 
-  std::unique_ptr<Term> clone() const override;
+  std::unique_ptr<Term> clone(TargetScope &scope, size_t id) const override;
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
@@ -367,7 +369,8 @@ struct TermStream {
   size_t include(Term *term) { return include(std::unique_ptr<Term>(term)); }
 
   // Skip a Term from SourceMap (no Term in TargetScope corresponds)
-  void discard(size_t at = Term::invalid);
+  void discard(size_t at, bool singleton = false);
+  void discard();
 
   // Retrieve a Term from the TargetScope
   Term *operator [] (size_t index);
@@ -407,8 +410,13 @@ inline size_t TermStream::include(std::unique_ptr<Term> term) {
   return tscope.append(std::move(term));
 }
 
-inline void TermStream::discard(size_t at) {
+inline void TermStream::discard(size_t at, bool singleton) {
+  if (!singleton) tscope[at]->set(SSA_SINGLETON, false);
   smap.place(at);
+}
+
+inline void TermStream::discard() {
+  smap.place(Term::invalid);
 }
 
 inline Term *TermStream::operator [] (size_t index) {

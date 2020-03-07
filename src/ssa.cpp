@@ -45,7 +45,7 @@ void RArg::format(std::ostream &os, TermFormat &format) const {
   os << "<arg>\n";
 }
 
-std::unique_ptr<Term> RArg::clone() const {
+std::unique_ptr<Term> RArg::clone(TargetScope &scope, size_t id) const {
   return std::unique_ptr<Term>(new RArg(*this));
 }
 
@@ -54,7 +54,7 @@ void RLit::format(std::ostream &os, TermFormat &format) const {
   os << "\n";
 }
 
-std::unique_ptr<Term> RLit::clone() const {
+std::unique_ptr<Term> RLit::clone(TargetScope &scope, size_t id) const {
   return std::unique_ptr<Term>(new RLit(*this));
 }
 
@@ -64,8 +64,17 @@ void RApp::format(std::ostream &os, TermFormat &format) const {
   os << ")\n";
 }
 
-std::unique_ptr<Term> RApp::clone() const {
-  return std::unique_ptr<Term>(new RApp(*this));
+static void clear_singleton(TargetScope &scope, size_t id, size_t x) {
+  if (x < id) scope[x]->set(SSA_SINGLETON, false);
+}
+static void clear_singleton(TargetScope &scope, size_t id, const std::vector<size_t> &args) {
+  for (auto x : args) clear_singleton(scope, id, x);
+}
+
+std::unique_ptr<Term> RApp::clone(TargetScope &scope, size_t id) const {
+  std::unique_ptr<RApp> out(new RApp(*this));
+  clear_singleton(scope, id, out->args);
+  return static_unique_pointer_cast<Term>(std::move(out));
 }
 
 void RPrim::format(std::ostream &os, TermFormat &format) const {
@@ -74,8 +83,10 @@ void RPrim::format(std::ostream &os, TermFormat &format) const {
   os << ")\n";
 }
 
-std::unique_ptr<Term> RPrim::clone() const {
-  return std::unique_ptr<Term>(new RPrim(*this));
+std::unique_ptr<Term> RPrim::clone(TargetScope &scope, size_t id) const {
+  std::unique_ptr<RPrim> out(new RPrim(*this));
+  clear_singleton(scope, id, out->args);
+  return static_unique_pointer_cast<Term>(std::move(out));
 }
 
 void RGet::format(std::ostream &os, TermFormat &format) const {
@@ -84,8 +95,10 @@ void RGet::format(std::ostream &os, TermFormat &format) const {
   os << ")\n";
 }
 
-std::unique_ptr<Term> RGet::clone() const {
-  return std::unique_ptr<Term>(new RGet(*this));
+std::unique_ptr<Term> RGet::clone(TargetScope &scope, size_t id) const {
+  std::unique_ptr<RGet> out(new RGet(*this));
+  clear_singleton(scope, id, out->args);
+  return static_unique_pointer_cast<Term>(std::move(out));
 }
 
 void RDes::format(std::ostream &os, TermFormat &format) const {
@@ -94,8 +107,10 @@ void RDes::format(std::ostream &os, TermFormat &format) const {
   os << ")\n";
 }
 
-std::unique_ptr<Term> RDes::clone() const {
-  return std::unique_ptr<Term>(new RDes(*this));
+std::unique_ptr<Term> RDes::clone(TargetScope &scope, size_t id) const {
+  std::unique_ptr<RDes> out(new RDes(*this));
+  clear_singleton(scope, id, out->args);
+  return static_unique_pointer_cast<Term>(std::move(out));
 }
 
 void RCon::format(std::ostream &os, TermFormat &format) const {
@@ -104,18 +119,21 @@ void RCon::format(std::ostream &os, TermFormat &format) const {
   os << ")\n";
 }
 
-std::unique_ptr<Term> RCon::clone() const {
-  return std::unique_ptr<Term>(new RCon(*this));
+std::unique_ptr<Term> RCon::clone(TargetScope &scope, size_t id) const {
+  std::unique_ptr<RCon> out(new RCon(*this));
+  clear_singleton(scope, id, out->args);
+  return static_unique_pointer_cast<Term>(std::move(out));
 }
 
 static std::string pad(int depth) {
   return std::string(depth, ' ');
 }
 
-RFun::RFun(const RFun &o) : Term(o), location(o.location), output(o.output) {
+RFun::RFun(const RFun &o, TargetScope &scope, size_t id) : Term(o), location(o.location), output(o.output) {
   terms.reserve(o.terms.size());
   for (auto &x : o.terms)
-    terms.emplace_back(x->clone());
+    terms.emplace_back(x->clone(scope, id));
+  clear_singleton(scope, id, output);
 }
 
 void RFun::update(const SourceMap &map) {
@@ -162,8 +180,8 @@ void RFun::format(std::ostream &os, TermFormat &format) const {
   format.depth -= 2;
 }
 
-std::unique_ptr<Term> RFun::clone() const {
-  return std::unique_ptr<Term>(new RFun(*this));
+std::unique_ptr<Term> RFun::clone(TargetScope &scope, size_t id) const {
+  return std::unique_ptr<Term>(new RFun(*this, scope, id));
 }
 
 std::vector<std::unique_ptr<Term> > TargetScope::unwind(size_t newend) {
