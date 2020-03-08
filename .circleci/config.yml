@@ -58,7 +58,7 @@ jobs:
           debuild -us -uc
           cd ..
           apt-get install -y ./wake_*.deb
-          wake --no-workspace 'shellJob "ls /" Nil | getJobStdout'
+          wake --no-workspace -x 'shellJob "ls /" Nil | getJobStdout'
           mkdir -p release/debian_testing
           mv *.deb *.xz *.changes *.dsc release/debian_testing
       - persist_to_workspace:
@@ -82,7 +82,7 @@ jobs:
           cp /tmp/workspace/wake.spec .
           /usr/bin/scl enable devtoolset-6 'rpmbuild -ba wake.spec'
           yum -y install /root/rpmbuild/RPMS/x86_64/wake-*.rpm
-          wake --no-workspace 'shellJob "ls /" Nil | getJobStdout'
+          wake --no-workspace -x 'shellJob "ls /" Nil | getJobStdout'
           mkdir -p release/centos_6_6
           cp /root/rpmbuild/RPMS/x86_64/*.rpm /root/rpmbuild/SRPMS/*.rpm release/centos_6_6
       - persist_to_workspace:
@@ -107,7 +107,7 @@ jobs:
           cp /tmp/workspace/wake.spec .
           rpmbuild -ba wake.spec
           yum -y install /root/rpmbuild/RPMS/x86_64/wake-*.rpm
-          wake --no-workspace 'shellJob "ls /" Nil | getJobStdout'
+          wake --no-workspace -x 'shellJob "ls /" Nil | getJobStdout'
           mkdir -p release/centos_7_6
           cp /root/rpmbuild/RPMS/x86_64/*.rpm /root/rpmbuild/SRPMS/*.rpm release/centos_7_6
       - persist_to_workspace:
@@ -154,7 +154,7 @@ jobs:
           debuild -us -uc
           cd ..
           apt-get install -y ./wake_*.deb
-          wake --no-workspace 'shellJob "ls /" Nil | getJobStdout'
+          wake --no-workspace -x 'shellJob "ls /" Nil | getJobStdout'
           mkdir -p release/ubuntu_16_04
           mv *.deb *.xz *.changes *.dsc release/ubuntu_16_04
       - persist_to_workspace:
@@ -177,7 +177,7 @@ jobs:
           debuild -us -uc
           cd ..
           apt-get install -y ./wake_*.deb
-          wake --no-workspace 'shellJob "ls /" Nil | getJobStdout'
+          wake --no-workspace -x 'shellJob "ls /" Nil | getJobStdout'
           mkdir -p release/ubuntu_18_04
           mv *.deb *.xz *.changes *.dsc release/ubuntu_18_04
       - persist_to_workspace:
