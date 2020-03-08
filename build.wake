@@ -26,6 +26,10 @@ export def build = match _
   "tarball", Nil = tarball Unit
   _ = Fail "no target specified (try: build default/debug/tarball)".makeError
 
+export def install = match _
+  dest, Nil = doInstall (in cwd dest)
+  _ = Fail "no directory specified (try: install /opt/local)".makeError
+
 # Build all wake targets
 def targets = buildWake, buildFuse, buildFuseDaemon, buildShim, buildPreload, buildPrelib, Nil
 def allOut variant = map (_ variant) targets
@@ -35,7 +39,7 @@ def all variant =
   | getOrPass "BUILT"
 
 # Install wake into a target location
-def install dest =
+def doInstall dest =
   def datfiles = sources "{here}/share" `.*`
   def binfiles = allOut default
   def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe

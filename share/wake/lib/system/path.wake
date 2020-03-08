@@ -27,7 +27,19 @@ export def read path =
 # Simplify away the ..s and .s in a String
 export def simplify path = prim "simplify"
 
+# Concatenate two paths
+#  join "foo"  "bar"    => "foo/bar"
+#  join "foo"  "/bar "  => "/bar"
+#  join "/foo" "bar"    => "/foo/bar"
+#  join "foo"  "../bar" => "bar"
+export def in dir path =
+  if matches `/.*` path then path else simplify "{dir}/{path}"
+
 # Reframe path into a form accesible relative to dir
+# For example:
+#  relative "bin" "bin/usr" => "usr"
+#  relative "bin" "bin"     => "."
+#  relative "bin" "hax"     => "../hax"
 export def relative dir path = prim "relative"
 
 # Locate an executable in the search path
@@ -36,7 +48,13 @@ export target whichIn path exec =
   imp path exec
 
 export def which exec = whichIn path exec
+
+# Absolute path to the workspace root.
+# All paths in wake are relative to the workspace root; you probably just want "."
+# The absolute path should rarely be used because it breaks build relocatability
 export def workspace = prim "workspace"
+
+# The directory within which wake was invoked (relative to the workspace root)
 export def cwd = prim "prefix"
 
 def mkdirRunner =
