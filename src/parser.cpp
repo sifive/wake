@@ -488,6 +488,7 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
 
   ASTState state(false, false);
   AST ast = parse_ast(0, lex, state);
+  if (ast.name.empty()) ast.name = "undef";
   std::string name = std::move(ast.name);
   ast.name.clear();
   if (check_constructors(ast)) lex.fail = true;
