@@ -60,6 +60,7 @@ void print_help(const char *argv0) {
     << "    --heap-factor X  Heap-size is X * live data after the last GC (default 4.0)" << std::endl
     << "    --profile-heap   Report memory consumption on every garbage collection"      << std::endl
     << "    --profile=FILE   Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
+    << "    --exec -x EXPR   Execute expression EXPR"                                    << std::endl
     << std::endl
     << "  Database introspection:" << std::endl
     << "    --input  -i FILE Report recorded meta-data for jobs which read FILES"        << std::endl
@@ -107,6 +108,7 @@ int main(int argc, char **argv) {
     { 0,   "heap-factor",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 0,   "profile",               GOPT_ARGUMENT_REQUIRED  },
+    { 'x', "exec",                  GOPT_ARGUMENT_REQUIRED  },
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
     { 'l', "last",                  GOPT_ARGUMENT_FORBIDDEN },
@@ -162,6 +164,7 @@ int main(int argc, char **argv) {
   const char *init    = arg(options, "init")->argument;
   const char *remove  = arg(options, "remove-task")->argument;
   const char *hash    = arg(options, "debug-target")->argument;
+  const char *exec    = arg(options, "exec")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -273,7 +276,11 @@ int main(int argc, char **argv) {
     std::cerr << "You must specify positional arguments to use for the wake bulid target" << std::endl;
     return 1;
   } else {
+    if (exec) {
+      targets.push_back(exec);
+    }
     if (argc > 1) {
+      std::cerr << "Warning: please evaluate expressions with -x 'EXPR', as this will be required in v0.18" << std::endl;
       std::stringstream expr;
       for (int i = 1; i < argc; ++i) {
         if (i != 1) expr << " ";
