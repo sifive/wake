@@ -1111,6 +1111,12 @@ static void parse_data(Lexer &lex, DefMap::Defs &map, Top *top, bool global) {
 
 static void parse_decl(DefMap::Defs &map, Lexer &lex, Top *top, bool global) {
   switch (lex.next.type) {
+    case ID:
+       if (lex.id() == "topic") {
+         while (lex.next.type != EOL) lex.consume();
+         lex.consume();
+         break;
+       }
     default:
        std::cerr << "Missing DEF after GLOBAL at " << lex.next.location.text() << std::endl;
        lex.fail = true;
@@ -1215,6 +1221,7 @@ void parse_top(Top &top, Lexer &lex) {
       case TUPLE:
       case DATA:
       case TARGET:
+      case ID:
       case DEF: {
         parse_decl(defmap.map, lex, &top,false);
         break;
