@@ -815,7 +815,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     dbinding.current_index = -1;
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(def->body), &dbinding);
     auto out = fracture_binding(def->location, dbinding.defs, std::move(body));
-    if ((def->flags & FLAG_AST) != 0)
+    if (out && (def->flags & FLAG_AST) != 0)
       out->flags |= FLAG_AST;
     return out;
   } else if (expr->type == &Construct::type) {
