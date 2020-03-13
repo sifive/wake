@@ -47,10 +47,10 @@
 
 void print_help(const char *argv0) {
   std::cout << std::endl
-    << "Usage: " << argv0 << " [-cvdqiolfdsgh] [-p PERCENT] [--] [arg0 ...]" << std::endl
+    << "Usage: " << argv0 << " [-cvdqiolfdsgh] [-p PERCENT] [--] [subcommand ...]" << std::endl
     << std::endl
     << "  Flags affecting build execution:" << std::endl
-    << "    -pPERCENT        Schedule local jobs for <= PERCENT of system (default 90)"  << std::endl
+    << "    -p PERCENT       Schedule local jobs for <= PERCENT of system (default 90)"  << std::endl
     << "    --check    -c    Rerun all jobs and confirm their output is reproducible"    << std::endl
     << "    --verbose  -v    Report hash progress and result expression types"           << std::endl
     << "    --debug    -d    Report stack frame information for exceptions and closures" << std::endl
@@ -62,6 +62,7 @@ void print_help(const char *argv0) {
     << "    --profile-heap   Report memory consumption on every garbage collection"      << std::endl
     << "    --profile FILE   Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
     << "    --in      PKG    Use PKG as the select package (default: current directory)" << std::endl
+    << "    --exec -x EXPR   Execute expression EXPR instead of subcommand function"     << std::endl
     << std::endl
     << "  Database commands:" << std::endl
     << "    --init      DIR  Create or replace a wake.db in the specified directory"     << std::endl
@@ -106,6 +107,7 @@ int main(int argc, char **argv) {
     { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 0,   "profile",               GOPT_ARGUMENT_REQUIRED  },
     { 0,   "in",                    GOPT_ARGUMENT_REQUIRED  },
+    { 'x', "exec",                  GOPT_ARGUMENT_REQUIRED  },
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
     { 'l', "last",                  GOPT_ARGUMENT_FORBIDDEN },
@@ -158,6 +160,7 @@ int main(int argc, char **argv) {
   const char *hash    = arg(options, "debug-target")->argument;
   const char *exports = arg(options, "exports")->argument;
   const char *in      = arg(options, "in")->argument;
+  const char *exec    = arg(options, "exec")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -206,12 +209,16 @@ int main(int argc, char **argv) {
     }
   }
 
+  // Arguments are forbidden with these options
+  bool noargs = init || last || failed || html || global || exports || exec;
+  bool targets = argc == 1 && !noargs;
+
   bool nodb = init;
   bool noparse = nodb || output || input || last || failed;
   bool notype = noparse || parse;
-  bool noexecute = notype || html || tcheck || dumpssa || global || exports;
+  bool noexecute = notype || html || tcheck || dumpssa || global || exports || targets;
 
-  if (noparse && argc < 1) {
+  if (noargs && argc > 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
     return 1;
   }
@@ -336,6 +343,7 @@ int main(int argc, char **argv) {
 
   // No wake files in the path from workspace to the current directory
   if (!top->def_package) top->def_package = "wake";
+  if (!flatten_exports(*top)) ok = false;
 
   std::vector<std::pair<std::string, std::string> > defs;
   std::set<std::string> types;
@@ -361,43 +369,50 @@ int main(int argc, char **argv) {
     }
   }
 
-  std::string command;
-  if (argc > 1) {
-    std::stringstream expr;
-    for (int i = 1; i < argc; ++i) {
-      if (i != 1) expr << " ";
-      expr << argv[i];
+  if (targets) {
+    auto it = top->packages.find(top->def_package);
+    if (it != top->packages.end()) {
+      for (auto &e : it->second->exports.defs)
+        defs.emplace_back(e.first, e.second.qualified);
     }
-    command = expr.str();
-  } else {
-    command = "Pass \"no command supplied\"";
   }
 
-  // Read all wake targets
   Expr *body = new Lambda(LOCATION, "_", new Literal(LOCATION, String::literal(runtime.heap, "top"), &String::typeVar));
   for (size_t i = 0; i <= defs.size(); ++i) {
     body = new Lambda(LOCATION, "_", body);
   }
+
   TypeVar type = body->typeVar;
-  {
-    Lexer lex(runtime.heap, command, "<command-line>");
+  std::string command;
+  char *none = nullptr;
+  char **cmdline = &none;
+  if (exec) {
+    command = exec;
+    Lexer lex(runtime.heap, command, "<execute-argument>");
     body = new App(LOCATION, body, force_use(parse_command(lex)));
     if (lex.fail) ok = false;
+  } else if (argc > 1) {
+    command = argv[1];
+    cmdline = argv+2;
+    body = new App(LOCATION, body, force_use(
+      new App(LOCATION, new VarRef(LOCATION, argv[1]), new Prim(LOCATION, "cmdline"))));
+  } else {
+    body = new App(LOCATION, body, force_use(new VarRef(LOCATION, "Nil@wake")));
   }
+
   for (auto &d : defs)
     body = new App(LOCATION, body, force_use(new VarRef(LOCATION, d.second)));
 
   top->body = std::unique_ptr<Expr>(body);
 
+  if (parse) std::cout << top.get();
+  if (notype) return ok?0:1;
+
   /* Primitives */
   JobTable jobtable(&db, percent, verbose, quiet, check, !tty);
-  StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(prefix));
+  StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(prefix), cmdline);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 
-  if (!flatten_exports(*top)) ok = false;
-  if (parse) std::cout << top.get();
-
-  if (notype) return ok?0:1;
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
   if (!root) ok = false;
   ok = ok && sums_ok();
@@ -425,6 +440,8 @@ int main(int argc, char **argv) {
     std::cout << std::endl;
   }
 
+  if (targets) std::cout << "Available wake subcommands:" << std::endl;
+
   for (auto &g : defs) {
     Expr *e = root.get();
     while (e && e->type == &DefBinding::type) {
@@ -434,9 +451,17 @@ int main(int argc, char **argv) {
       if (i != d->order.end()) {
         int idx = i->second.index;
         Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
-        std::cout << g.first << ": ";
-        v->typeVar.format(std::cout, v->typeVar);
-        std::cout << " = <" << v->location.file() << ">" << std::endl;
+        if (targets) {
+          if (strcmp(v->typeVar      .getName(), FN))               continue;
+          if (strcmp(v->typeVar[0]   .getName(), "List@wake"))      continue;
+          if (strcmp(v->typeVar[0][0].getName(), "String@builtin")) continue;
+          if (strcmp(v->typeVar[1]   .getName(), "Result@wake"))    continue;
+          std::cout << "  " << g.first << std::endl;
+        } else {
+          std::cout << g.first << ": ";
+          v->typeVar.format(std::cout, v->typeVar);
+          std::cout << " = <" << v->location.file() << ">" << std::endl;
+        }
       }
     }
   }

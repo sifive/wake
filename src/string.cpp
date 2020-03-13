@@ -570,6 +570,32 @@ static PRIMFN(prim_prefix) {
   RETURN(String::alloc(runtime.heap, info->prefix));
 }
 
+static PRIMTYPE(type_cmdline) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(String::typeVar);
+  return args.size() == 0 &&
+    out->unify(list);
+}
+
+static PRIMFN(prim_cmdline) {
+  EXPECT(0);
+  StringInfo *info = static_cast<StringInfo*>(data);
+
+  size_t need = 0, len = 0;
+  for (char **arg = info->cmdline; *arg; ++arg) {
+    need += String::reserve(strlen(*arg));
+    ++len;
+  }
+  need += reserve_list(len);
+  runtime.heap.reserve(need);
+
+  std::vector<Value*> vals;
+  for (char **arg = info->cmdline; *arg; ++arg)
+    vals.push_back(String::claim(runtime.heap, *arg));
+  RETURN(claim_list(runtime.heap, vals.size(), vals.data()));
+}
+
 static PRIMTYPE(type_uname) {
   TypeVar pair;
   Data::typePair.clone(pair);
@@ -619,6 +645,7 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "version",  prim_version,  type_version,   PRIM_PURE, (void*)info);
   prim_register(pmap, "level",    prim_level,    type_level,     PRIM_PURE, (void*)info);
   prim_register(pmap, "prefix",   prim_prefix,   type_prefix,    PRIM_PURE, (void*)info);
+  prim_register(pmap, "cmdline",  prim_cmdline,  type_cmdline,   PRIM_PURE, (void*)info);
   prim_register(pmap, "scmp",     prim_scmp,     type_scmp,      PRIM_PURE);
   prim_register(pmap, "sNFC",     prim_sNFC,     type_normalize, PRIM_PURE);
   prim_register(pmap, "sNFKC",    prim_sNFKC,    type_normalize, PRIM_PURE);

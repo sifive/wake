@@ -29,7 +29,7 @@ EXTRA := lib/wake/libpreload-wake.so lib/wake/preload-wake
 endif
 
 all:		wake.db
-	$(WAKE_ENV) ./bin/wake all default
+	$(WAKE_ENV) ./bin/wake build default
 
 clean:
 	rm -f bin/* lib/wake/* */*.o common/jlexer.cpp src/symbol.cpp src/version.h wake.db
@@ -39,10 +39,10 @@ wake.db:	bin/wake lib/wake/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EX
 	test -f $@ || ./bin/wake --init .
 
 install:	all
-	$(WAKE_ENV) ./bin/wake install '"$(DESTDIR)"'
+	$(WAKE_ENV) ./bin/wake install $(DESTDIR)
 
 tarball:	wake.db
-	$(WAKE_ENV) ./bin/wake tarball Unit
+	$(WAKE_ENV) ./bin/wake build tarball
 
 bin/wake:	src/symbol.o $(COMMON)				\
 		$(patsubst %.cpp,%.o,$(wildcard src/*.cpp))	\

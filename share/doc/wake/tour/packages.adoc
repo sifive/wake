@@ -253,7 +253,7 @@ A same-package export must be used in file which declares the identifier.
 == Command-line
 
 When wake is invoked from the command-line,
-it can be used to evaluate an expression or invoke a `main` function.
+it can be used to evaluate an expression or invoke a subcommand.
 In both cases, a package scope must be selected to produce useful work.
 
 First, wake progressively searches from the current directory
@@ -264,12 +264,12 @@ Otherwise, the `wake` package is selected,
 though this many be manually overridden using the '--in' command-line option.
 
 By default, when evaluating the command-line,
-wake passes all non-options to the selected package's `main` function.
+wake passes all non-options to the selected subcommand function.
 This function can then trigger the appropriate build.
 If an appropriate wake file is placed in the workspace root,
-this can make invoking the build as simple as running `wake` with no options.
+this can make invoking the build as simple as running `wake all` with no options.
 
-When invoked with `wake -r '5 + 6'`,
+When invoked with `wake -x '5 + 6'`,
 wake will evaluate the next argument as an expression.
 That expression is evaluated within the scope of the selected package.
 Thus, it has access to even unexported package-level identifiers.
