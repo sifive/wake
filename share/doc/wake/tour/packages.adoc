@@ -96,7 +96,6 @@ By contrast, the `getFriendAge` definition is not exported.
 See the <<tuples#,Tuples documentation>> for more details.
 
 Finally, `export topic friends` trigers the export of the topic `friends`.
-See the <<publish-subscribe#,Publish/Subscribe documentation>> for more details.
 
 [[imports]]
 == Imports

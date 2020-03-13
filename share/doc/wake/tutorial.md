@@ -9,7 +9,7 @@ Code sections are intended to be copy-pasted into a terminal.
     mkdir ~/tutorial
     cd ~/tutorial
     wake --init .
-    wake '5 + 6'
+    wake -x '5 + 6'
 
 This sequence of commands creates a new workspace managed by wake.
 The `init` option is used to create an initial `wake.db` to record the state
@@ -19,41 +19,40 @@ The first `wake.db` found defines what wake considers to be the workspace.
 You can thus safely run wake in any sub-directory of `tutorial` and wake
 will be aware of all the relevant dependencies and rules.
 
-The final output of wake run on an expression is always the result of
-evaluating that expression.
+The output of wake run on `-x 'expression'` is the result of evaluating that expression.
 In this case, `5 + 6` results in value `11`.
 Wake will report more information when run in verbose mode: `wake -v`.
 
-    wake -v '5 + 6'
+    wake -vx '5 + 6'
 
 The verbose output is of the form `expression: type = value`. The above
 will give `5 + 6: Integer = 11`. As before, `5 + 6` results in `11`,
 which is an `Integer`.
 
     git init .
-    echo 'global def hello = "Hello World"' > tutorial.wake
+    echo 'def hello = "Hello World"' > tutorial.wake
     git add tutorial.wake
-    wake hello
+    wake -x 'hello'
 
-Wake processes all versioned wake files (`*.wake`) which are in the workspace.
-A very common mistake is to create a new wake file and run wake without first
-adding that file to version control. In that case, the file will not be read,
-and you will likely get an error like `Variable reference xyz is unbound`.
-
+Wake processes all wake files (`*.wake`) which are in the workspace,
+so our new file `tutorial.wake` is available to us from the command-line.
 The syntax `def x = y` introduces a new variable `x` whose value is equal
-to `y`. In this case, `y` is just a `String`. The `global` is necessary to
-make `"hello"` available to other wake files, including what we type on the
-command-line.
+to `y`. In this case, `y` is just a `String`.
 
 ## Compiling a CPP file
 
     echo 'int main() { return 0; }' > main.cpp
-    echo 'global def build x = compileC "native-cpp11-release" ("-I.", Nil) Nil (source "main.cpp")' > tutorial.wake
+    echo 'def build x = compileC "native-cpp11-release" ("-I.", Nil) Nil (source "main.cpp")' > tutorial.wake
     git add main.cpp
-    wake 'build 0'
+    wake build
 
 Let's just ignore the wake file for the moment and focus on how wake behaves.
-First, by default wake prints out the jobs it has executed.
+First, notice that we did not use `-x` when invoking wake this time.
+The default operation of wake invokes the subcommand (in this case `build`)
+specified on the command-line, with any additional command-line arguments
+passed to that function.
+
+By default wake prints out the jobs it has executed.
 In this case, that means we see that it ran g++ to produce an object file.
 
     wake -o main.native-cpp11-release.o
@@ -69,7 +68,7 @@ For header files, this can be a large number of files, so you might want
 to pipe the output to less.
 
     touch main.cpp
-    wake 'build 0'
+    wake build
 
 Notice that wake does not rebuild the object file in this case.  It
 checked that the hash of the input has not changed and concluded that
@@ -77,12 +76,12 @@ the existing output would have been reproduced by gcc. You can see
 what files wake is inspecting using `wake -v`.
 
     rm *.o
-    wake 'build 0'
+    wake build
 
 If the object file is removed, or main.cpp modified, then wake will,
 of course, rebuild the object file.
 
-    wake -v 'compileC'
+    wake -vx 'compileC'
     cat tutorial.wake
 
 Now let's turn our attention back to the wake file.
@@ -119,12 +118,12 @@ The output of compileC is the `Path` of the object file produced.
     git add help.cpp
     cat > tutorial.wake <<'EOF'
     def variant = "native-cpp11-release"
-    global def build _ =
+    def build _ =
       def main = compileC variant ("-I.", Nil) Nil (source "main.cpp")
       def help = compileC variant ("-I.", Nil) Nil (source "help.cpp")
       linkO variant ("-lm", Nil) (main, help, Nil) "tutorial"
     EOF
-    wake 'build 0'
+    wake build
 
 We've changed a few things.  Trivial stuff first: We put the build variant
 into a shared variable so we can change it more easily.  We replaced the
@@ -138,7 +137,7 @@ variables.  Also, wake is whitespace sensitive.  It knows that `main` and
 `help` are variables defined inside `build`, while `variant` is not.
 
     rm *.o
-    wake 'build 0'
+    wake build
 
 Blink and you'll miss it.  Wake ran both the compile for `main.cpp` and
 `help.cpp` at the same time.  Even though our wake file said to compile
@@ -154,7 +153,7 @@ there was no need to re-link the program.  Similarly, whitespace only
 changes to the files will not cause a re-link.
 
     echo 'int main() { return 2; }' > main.cpp
-    wake 'build 0'
+    wake build
 
 Of course, if you change `main.cpp` meaningfully, both it will be recompiled
 and the program re-linked.
@@ -166,13 +165,13 @@ and the program re-linked.
     git add helper.h
     cat > tutorial.wake <<'EOF'
     def variant = "native-cpp11-release"
-    global def build _ =
+    def build _ =
       def headers = sources here `.*\.h`
       def main = compileC variant ("-I.", Nil) headers (source "main.cpp")
       def help = compileC variant ("-I.", Nil) headers (source "help.cpp")
       linkO variant ("-lm", Nil) (main, help, Nil) "tutorial"
     EOF
-    wake 'build 0'
+    wake build
 
 Recall that the third argument to `compileC` is a list of legal input files.
 Wake forbids jobs from reading files in the workspace that are not declared
@@ -192,8 +191,6 @@ In addition, the parser verifies that regular expression literals are legal.
 
 Note that source files are those files tracked by git. Wake will never
 return built files from a call to `sources`, helping repeatability.
-The same reasoning applies to `.wake` files. Wake will only read wake
-files that are tracked by version control.
 
 In a classic Makefile it would be considered bad form to list all header
 files as dependencies for all cpp files.  That's because make would
@@ -216,13 +213,13 @@ For this file, wake recorded that it only needed `help.cpp`, despite
 
     cat > tutorial.wake <<'EOF'
     def variant = "native-cpp11-release"
-    global def build _ =
+    def build _ =
       def headers = sources here `.*\.h`
       def compile = compileC variant ("-I.", Nil) headers
       def objects = map compile (sources here `.*\.cpp`)
       linkO variant ("-lm", Nil) objects "tutorial"
     EOF
-    wake 'build 0'
+    wake build
 
 Having to list all cpp files is cumbersome. You have probably organized
 your codebase so that all the files in the current directory should be
@@ -253,14 +250,14 @@ work when new cpp files are added.
 
     cat > tutorial.wake <<'EOF'
     def variant = "native-cpp11-release"
-    global def build _ =
+    def build _ =
       def headers = sources here `.*\.h`
       def zlib = pkgConfig "zlib" | getOrElse (makeSysLib "")
       def compile = compileC variant zlib.getSysLibCFlags headers
-      def objects = map compile (sources here `.*\.cpp`)
+      def objects = sources here `.*\.cpp` | map compile
       linkO variant zlib.getSysLibLFlags objects "tutorial"
     EOF
-    wake 'build 0'
+    wake build
 
 It's pretty common for programs to depend on system libraries.  These days,
 most well maintained libraries supply a pkg-config file (`*.pc`) that helps
@@ -274,14 +271,14 @@ worry about the `| getOrElse ...` yet, more on that later.
 ## Dynamically creating a header file
 
     cat >> tutorial.wake <<'EOF'
-    global def info_h _ =
+    def info_h _ =
       def cmdline = which "uname", "-sr", Nil
       def os = job cmdline Nil
       def str = os.getJobStdout | getWhenFail ""
       def body = "#define OS {str}#define WAKE {version}\n"
       write "{here}/info.h" body # create with mode: rw-r--r--
     EOF
-    wake 'info_h 0'
+    wake info_h
 
 This example creates a header file suitable for inclusion in our build.
 The produced header includes the operating system the build ran on and the
@@ -326,7 +323,7 @@ of a comment, `# ...`, reminding us of the default permissions used.
 ## Customizing job invocation
 
     cat >> tutorial.wake <<'EOF'
-    global def hax _ =
+    def hax _ =
       makePlan (which "env", Nil) Nil
       | setPlanEnvironment ("HAX=peanut", "FOO=bar", Nil)
       | runJob
@@ -334,7 +331,7 @@ of a comment, `# ...`, reminding us of the default permissions used.
       | getWhenFail ""
       | println
     EOF
-    wake 'hax 0'
+    wake hax
 
 Until now, we've been running processes with the default execution plan.
 This means that all environment variables are removed and the job is
@@ -377,7 +374,7 @@ wake:
       def filenames = tokenize ` ` stdout
       map source filenames
 
-    global def complex_build _ =
+    def complex_build _ =
       def headers = sources here `.*\.h`
       def zlib = pkgConfig "zlib" | getOrElse (makeSysLib "")
       def compile = compileC variant zlib.getSysLibCFlags headers
@@ -388,12 +385,13 @@ wake:
 ## Publish/Subscribe
 
     cat >>tutorial.wake <<'EOF'
+    topic animal: String
     publish animal = "Cat", Nil
     publish animal = "Dog", Nil
     publish animal = replace `u` "o" "Mouse", Nil
-    global def animals = subscribe animal
+    def animals = subscribe animal
     EOF
-    wake 'animals'
+    wake -x 'animals'
 
 Wake includes a publish/subscribe interface to support accumulating
 information between multiple files. `publish x = y` adds `y` to the `List` of
@@ -417,24 +415,24 @@ These can then be analyzed using pattern matching.
 Consider the follow program:
 
     cat >>tutorial.wake <<'EOF'
-    global data Animal =
+    data Animal =
       Cat (name: String)
       Dog (age: Integer)
 
-    global def strAnimal a = match a
+    def strAnimal a = match a
       Cat x = "a cat called {x}"
       Dog y = "a {str y}-year-old dog"
     EOF
-    wake -v 'Cat'
-    wake 'strAnimal (Dog 12)'
-    wake 'strAnimal (Cat "Fluffy")'
+    wake -vx 'Cat'
+    wake -x 'strAnimal (Dog 12)'
+    wake -x 'strAnimal (Cat "Fluffy")'
 
 The `data` keyword introduces a new type, `Animal`.
 Types are always capitalized, and use a different namespace from variables.
 As defined, `Animal` can either be a `Cat` or a `Dog`,
 where `Cat`s have names and `Dog`s have ages.
 The general syntax is `data TYPE = (CONS TYPE*)+`.
-If we want the new type available to other files, we put a `global` in
+If we want the new type available to other files, we put an `export` in
 front of the `data`, just like with variables.
 
 As wake informs us, `Cat` is a function that takes a `String` and returns an
@@ -457,7 +455,7 @@ Note that when matching, the patterns must exhaustively catch all possibilities.
 For example, it would be illegal to `match` but only provide a pattern for `Cat`.
 A useful pattern is to provide a "default" pattern with `_` to match anything:
 
-    global def matchWithDefault a = match a
+    def matchWithDefault a = match a
       Cat x = "a cat called {x}"
       _     = "not a cat!"
 
@@ -469,8 +467,8 @@ This makes code more readable for other people.
 However, sometimes the function is really just an after-thought.
 For these cases wake makes it possible to define functions inline.
 
-    wake -v '\x x^2'
-    wake 'map (\x x^2) (seq 10)'
+    wake -vx '\x x^2'
+    wake -x 'map (\x x^2) (seq 10)'
 
 The backslash syntax is an easy-to-type stand-in for the lambda symbol, λ.
 While we've not talked about it, the wake language implements a "typed lambda
@@ -481,15 +479,15 @@ The general syntax is `\ PATTERN BODY`. Yes, you can pattern match directly
 inside a lambda expression. For that matter, you can do it with `def NAME
 PATTERN = BODY` as well. For example:
 
-    wake '(\ (Pair x y) x + y) (Pair 1 2)'
+    wake -x '(\ (Pair x y) x + y) (Pair 1 2)'
 
 To make inline functions even easier to define, wake also supports a syntax
 where one specifies the holes `_` in an expression and a function is created
 which fills the holes from left to right.
 
-    wake -v '_ + 4'
-    wake 'map (_ + 4) (seq 8)'
-    wake 'seq 1000 | filter (_ % 55 == 0) | map str | catWith " "'
+    wake -vx '_ + 4'
+    wake -x 'map (_ + 4) (seq 8)'
+    wake -x 'seq 1000 | filter (_ % 55 == 0) | map str | catWith " "'
 
 This hole-oriented syntax is not as powerful as lambda expressions, because
 each argument can only be used once.  Furthermore, the functions are created
@@ -505,7 +503,7 @@ Nevertheless, this syntax can be convenient.
       def curl = job cmdline Nil
       curl.getJobOutput
 
-    global def mathSymbols _ =
+    def mathSymbols _ =
       def helper = match _
         code, _, "Sm", _ = intbase 16 code | omap integerToUnicode
         _                = None
@@ -514,7 +512,7 @@ Nevertheless, this syntax can be convenient.
       def codes = mapPartial (tokenize `;` _ | helper) lines
       catWith " " codes
     EOF
-    wake 'mathSymbols 0'
+    wake mathSymbols
 
 Above is a fun example using wake as a hybrid build/programming language.
 This wake code downloads the Unicode symbol tables from the Internet using
@@ -528,7 +526,7 @@ which it substitutes for every substring that matches the regular expression. We
 the `simplify` function which transforms paths into canonical form.  In this,
 case `simplify` removes the leading `"./"`.
 
-If you look in `UnicodeData.txt`, you will see that it uses lines with comma
+If you look in `UnicodeData.txt`, you will see that it uses lines with semicolon
 separated values, one for each Unicode code point.  Thus `lines` simply
 splits the `String` returned by `read` into each code point description.
 For each line, we then split it into the fields and pass the result to
@@ -554,7 +552,7 @@ In this case, we use `Option` to only return values from `helper` where the code
 point is a math symbol. `mapPartial` then creates a list out of only those
 values helper returned. Try this, for an example:
 
-    wake 'mapPartial (_) (None, Some "xx", Some "yy", None, Nil)'
+    wake -x 'mapPartial (_) (None, Some "xx", Some "yy", None, Nil)'
 
 As a final note, wake files must be UTF-8 encoded.
 This means that you can use Unicode symbols in strings, comments,
@@ -601,27 +599,27 @@ where `f` is a description of how an operation failed.
     git add existing.txt denied.txt
     chmod 000 denied.txt
     cat >> tutorial.wake <<'EOF'
-    global def goodRead _ = read (source "existing.txt")
-    global def deniedRead _ = read (source "denied.txt")
-    global def badRead _ = read (source "nonexisting.txt")
+    def goodRead _ = read (source "existing.txt")
+    def deniedRead _ = read (source "denied.txt")
+    def badRead _ = read (source "nonexisting.txt")
     EOF
-    wake 'goodRead 0'
-    wake 'deniedRead 0'
-    wake 'badRead 0'
+    wake goodRead
+    wake deniedRead
+    wake badRead
 
 You should see something like:
 
-    $ wake 'goodRead 0'
+    $ wake goodRead
     Pass "contents\n"
-    $ wake 'deniedRead 0'
+    $ wake deniedRead
     Fail (Error "read denied.txt: Permission denied" Nil)
-    $ wake 'badRead 0'
+    $ wake badRead
     Fail (Error "nonexisting.txt: source does not exist" Nil)
 
 Similarly to how we can `match` on `Options`, we can `match` on `Results`
 
     cat >> tutorial.wake <<'EOF'
-    global def safeRead filename = match (read (source filename))
+    def safeRead filename = match (read (source filename))
       Pass txt = txt
       Fail _ = "Read failed!"
     EOF
@@ -632,11 +630,11 @@ Similarly to `getOrElse`, there is a function `getWhenFail` that will return the
 in a `Pass` or a default in the case of `Fail`.
 We can rewrite the above as simply:
 
-    global def safeRead filename = getWhenFail "Read failed!" (read (source filename))
+    def safeRead filename = getWhenFail "Read failed!" (read (source filename))
 
 Or perhaps more clearly using `|`:
 
-    global def safeRead filename = source filename | read | getWhenFail "Read failed!"
+    def safeRead filename = source filename | read | getWhenFail "Read failed!"
 
 ### BadPath
 
@@ -646,7 +644,7 @@ The function `source` takes a `String` and returns a `Path` for a file under ver
 But what if the file doesn't exist? Previously, we called `source` on a non-existant file,
 but we immediately called `read` on the returned `Path`. Try just `source`:
 
-    wake 'source "nonexisting.txt"'
+    wake -x 'source "nonexisting.txt"'
 
 You should get `BadPath (Error "nonexisting.txt: source does not exist" Nil)`.
 Similarly to how `Result` can be either a `Pass` or a `Fail`,
@@ -656,7 +654,7 @@ it is much more convenient than having to use `Result` all over the place.
 For example, without `BadPath`, source would have to return a `Result`,
 and we would have to handle the result in order to `read` it:
 
-    global def safeRead filename = match (source filename)
+    def safeRead filename = match (source filename)
       Pass path = match (read path)
         Pass content = content
         Fail _       = "Read failed!"
@@ -668,7 +666,7 @@ Fundamentally, wake is about running jobs on files, and special support for
 When you pass `BadPaths` in the visible files to a job, the job will recognize this and
 propagate the failure.
 
-    wake 'job (which "gcc", "file.c", Nil) (source "file.c", Nil) | getJobOutputs'
+    wake -x 'job (which "gcc", "file.c", Nil) (source "file.c", Nil) | getJobOutputs'
 
 Since the `source` will return a `BadPath`, the job will propagate the failure:
 
@@ -684,13 +682,22 @@ Wake does not actually maintain a call stack like traditional languages,
 so by default `Errors` will contain an empty `List` for the stack.
 If you run wake with `-d` (or `--debug`), it will simulate a stack:
 
-    wake -d 'job (which "gcc", "file.c", Nil) (source "file.c", Nil) | getJobOutputs'
+    wake -dx 'job (which "gcc", "file.c", Nil) (source "file.c", Nil) | getJobOutputs'
 
 You should see much more information. Note that inspection operations like `-o` or `-i`
 are also affected by `-v` and `-d`.
 
 You can construct an `Error` directly, or use `makeError` which simply takes a `String`
 cause and will record the Stack.
+
+### Packages
+
+When you run wake from the command-line, you have access to all the defined
+values in the current directory's package.
+However, packages do not have access to each others defines.
+The moment you have more than one wake file, you will need to define
+packages for your files.
+The package system in wake has its [own documentation](tour/packages.adoc).
 
 ### Ignore wake source files
 
