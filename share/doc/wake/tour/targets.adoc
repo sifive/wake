@@ -1,0 +1,126 @@
+= Target Memoization in Wake
+
+While the wake language is mostly functional, it is not completely pure.
+Wake has side-effects like running jobs and printing.
+It also has memoization, a contained means of storing computation described below.
+
+Consider the Fibonacci function:
+
+----
+def fib n = if n < 2 then 1 else fib (n-1) + fib (n-2)
+----
+
+Evaluating this function on `20` completes relatively quickly, 
+but running it on `40` is another story entirely.
+Wake appears to run forever (really, just a very very long time).
+
+The problem is that each invocation of `fib` causes two more invocations of `fib`.
+This results in a chain reaction where `fib` is called an exponentially
+increasing number of times depending on its input.
+
+Let's try the special `target` keyword:
+
+----
+target fib n = if n < 2 then 1 else fib (n-1) + fib (n-2)
+----
+
+Now `fib 40` completes quickly! In fact, fib `40000` also returns a result.
+
+What has happened here is that `target fib` now remembers and re-uses
+the results of previous invocations.
+`fib 4` will call `fib 3` and `fib 2`.
+`fib 3` will call `fib 2` and `fib 1`.
+However, the common invocation of `fib 2` now happens only once.
+The `target` remembers the result;
+this is called memoization.
+
+While `target` is useful for speeding up toy functions,
+its real use is in saving work in a build system.
+A wake build system typically includes build rules
+which invoke further rules upon which they depend.
+Imagine job `C` depends on jobs `B` and `A`,
+but job `B` also depends on job `A`.
+We don't want `A` to be executed twice!
+
+Fortunately, wake's `Plan` API includes by default the option to run jobs once.
+Internally, this API uses a `target` to prevent re-execution of the job.
+However, this use of `target` will not suffice in a large build.
+
+In a large build, top-level functions which produce a `Path` for other functions
+should generally be defined using `target`.
+That way, even if the function is invoked twice by dependencies,
+it will only need to be evaluated once.
+In a build involving many targets which depend on many targets,
+the result can be an exponential speed-up,
+like we saw in the `fib` example.
+
+A `target` can also be defined inside a function.
+These targets only retain their saved values
+while the enclosing function can access them.
+
+----
+def wrappedFib n =
+  target fib n = if n < 2 then 1 else fib (n-1) + fib (n-2)
+  fib n
+----
+
+In this example, `wrappedFib` uses an internal `target fib` to compute the
+Fibonacci result.
+However, between invocations of `wrappedFib` the partial results are not retained.
+Nested targets can be useful because they don't consume memory for the entire execution of wake.
+For example, a function might need to compute a large number of uninteresting intermediate values
+in order to compute the value of interest (which might be saved).
+
+One way to think about a `target` is that it defines a table,
+like in a database or a key-value map.
+E.g., `target foo x y = z` defined a table with the key `Pair x y` and the value `z`.
+From that point-of-view, it is perhaps unsurprising that it is sometimes
+useful to compute `z` with some inputs which are not part of the key.
+
+----
+target myWrite filename \ contents = write filename contents
+----
+
+In the above example, `myWrite "file" "content"` will create a file called `file`
+and fill it with the string `content`, returning a `Path` for the created file.
+If someone tries to write the same file with the same contents again,
+then the same `Path` will be returned.
+
+However, what if someone tried to write the same file, but with different contents?
+If we allowed that, there would be a race condition in the build system!
+Let's see what happens:
+
+----
+$ wake -x '("bar", "bar", Nil) | map (myWrite "foo")'
+Path "foo", Path "foo", Nil
+$ wake -x '("bar", "baz", Nil) | map (myWrite "foo")'
+ERROR: Target subkey mismatch for 'myWrite filename \ contents' (demo.wake:1:[8-34])
+----
+
+In the first invocation, both calls succeed, and `foo` was only created once.
+In the second invocation, one of the calls fails with a `Target subkey mismatch`.
+These failures are fatal in wake, because it is never clear which invocation failed,
+due to the out-of-order parallel evaluation strategy used by wake.
+Nevertheless, it is probably better if a buggy build fails spectacularly,
+than succeeds only sporadically.
+
+Finally, be warned of this common `target` gotcha:
+
+----
+target foo x = match _
+  None   = None
+  Some y = x + y
+----
+
+Normally in wake, for defines (`def`), the above function is the same as this:
+
+----
+target foo x y = match y
+  None   = None
+  Some y = x + y
+----
+
+However, in the `target` situation, these are quite different.
+The first `target foo` is memoizing a function result,
+while the second `target foo` is memoizing an `Integer` result
+(probably what was intended).

@@ -9,13 +9,14 @@ They are useful in grouping data and creating APIs that preserve backwards compa
 
 Tuples are _declared_ with the `tuple` keyword and a name beginning with a capital letter followed by an equals sign.
 They may optionally have type parameters between the name and the equals sign.
-The declaration may be preceded by the `global` modifier which defines the scope of the <<construction, constructor>> and <<deconstruction, deconstructor>>.
+The declaration may be preceded by the `export` modifier which defines the scope of the <<construction, constructor>> and <<deconstruction, deconstructor>>;
+for more information see the <<packages#,Packages documentation>>.
 
 === Fields
 
 Tuples are composed of one or more fields, each of which has a name beginning with a capital letter followed by a colon, and a type.
 The types may correspond to declared type parameters.
-Each field may be preceded by the `global` modifier which defines the scope of the <<accessors, accessor functions>>.
+Each field may be preceded by the `export` modifier which defines the scope of the <<accessors, accessor functions>>.
 
 === Concrete Syntax
 
@@ -26,13 +27,13 @@ Each field may be preceded by the `global` modifier which defines the scope of t
 
 === Example
 
-We include a running example, `Cat, to help explain the features of tuples:
+We include a running example, `Cat`, to help explain the features of tuples:
 
 [#cat-defn]
 ----
 tuple Cat =
-  global Name: String
-  global Age: Integer
+  export Name: String
+  export Age: Integer
 ----
 
 [#construction]
@@ -41,13 +42,13 @@ tuple Cat =
 Tuples are constructed by a function of the same name as that of the tuple itself.
 The function has `N` arguments, one for each field in the order of the definitions of the fields.
 
-In the definition of `Cat` <<cat-defn, above>>, one might notice that we included `global` modifiers on the fields, but not the declaration line.
+In the definition of `Cat` <<cat-defn, above>>, one might notice that we included `export` modifiers on the fields, but not the declaration line.
 This pattern of keeping the constructor and deconstructor private helps with creating extensible APIs that preserve <<backwards-compatibility>> (more on that later).
 Of course, if the constructor is private and we want others to be able to use this type,
 we must provide a `global` factory function that calls the constructor:
 
 ----
-global def makeCat name age = Cat name age
+export def makeCat name age = Cat name age
 ----
 
 [#deconstruction]
@@ -59,9 +60,24 @@ Similarly to the constructor, the deconstructor uses the name of the tuple follo
 For our `Cat` example, we can write a function to get the `Name` using `match` and deconstruction:
 
 ----
-global def printCatName cat = match cat
+def printCatName cat = match cat
   Cat n _ = println n
 ----
+
+Alternatively, we can also bind a variable into scope in a def clause:
+
+----
+def printCatName cat =
+  def Cat n = cat
+  println n
+----
+
+Even simpler, we can deconstruct the tuple in the function arguments:
+
+----
+def printCatName (Cat n) = println n
+----
+
 
 [#accessors]
 == Accessor Functions
@@ -97,9 +113,9 @@ These parameters allow a single tuple definition to handle different types for i
 For example, consider the `Pair` tuple from the standard library.
 
 ----
-global tuple Pair a b =
-  global First:  a
-  global Second: b
+export tuple Pair a b =
+  export First:  a
+  export Second: b
 ----
 
 `Pair` is similar to what one generally refers to as a "tuple" in languages like Scala or Python.
@@ -121,7 +137,7 @@ adding an argument to a function changes its definition and thus breaks all usag
 As discussed <<construction, previously>>, a tuple's constructor takes `N` arguments, one for each field.
 Thus, adding a field to a tuple adds a field to the constructor and requires changing all uses of that constructor.
 If we make the constructor and deconstructor of a tuple private, however,
-we can guarantee that such breakages are limited to the declaration file.
+we can guarantee that such breakages are limited to the declaration package.
 Critically, such breakages will not occur is *user* code, allowing us to evolve the API in a backwards-compatible way.
 
 === Adding Fields to Tuples
@@ -139,15 +155,15 @@ If we want to extend `Cat` with an optional `Owner` field, we can do so without 
 
 ----
 tuple Cat =
-  global Name: String
-  global Age: Integer
-  global Owner: Option String
+  export Name: String
+  export Age: Integer
+  export Owner: Option String
 ----
 
 We update our factory function to provide a default value for the new field:
 
 ----
-global def makeCat name age = Cat name age None
+export def makeCat name age = Cat name age None
 ----
 
 Now, all existing usages of `Cat` will continue to work,
@@ -169,13 +185,13 @@ For example, perhaps we decide to remove `Owner` from `Cat`:
 
 ----
 tuple Cat =
-  global Name: String
-  global Age: Integer
-  # DELETED: global Owner: Option String
+  export Name: String
+  export Age: Integer
+  # DELETED: export Owner: Option String
 
-global def getCatOwner cat = None
-global def setCatOwner owner cat = cat
-global def editCatOwner fn cat = cat
+export def getCatOwner cat = None
+export def setCatOwner owner cat = cat
+export def editCatOwner fn cat = cat
 ----
 
 Of course, such efforts only guarantee source compatibility--uses of the API

@@ -271,9 +271,9 @@ source `.*\.h` here
     * There is no guarantee of ordering if two statements don't depend on each other. This is
     wake is able to parallelize programs.
 * publish/subscribe
-    * the publish and subscribe commands are used for global values. A published queue has
-    global scope.
+    * the publish and subscribe commands are used for global values.
     ```
+    topic xfoo: String
     publish xfoo = "bar", Nil
     publish xfoo = "baz", Nil
     
@@ -282,7 +282,7 @@ source `.*\.h` here
     ```
 
 * environment
-    * the environment is in a published queue, and does not pick up the environment
+    * the environment is in a published topic, and does not pick up the environment
     from the parent process. It can also be accessed from the global variable `environment`.
     
 
