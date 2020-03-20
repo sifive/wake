@@ -1,3 +1,5 @@
+%include {#include <string.h>}
+
 dnl Left-associative prEfix-heavy (prefix, operand, self, next)
 define(`LE',
 $1_binary_$3 ::= $1_binary_$3 $2 $1_unary_$3.
@@ -63,7 +65,7 @@ expression_binary_app ::= expression_match.
 expression_match ::= MATCH.
 
 expression_full ::= expression_binary_comma.
-expression_full ::= LAMBDA term_pattern expression_full.
+expression_full ::= LAMBDA ID expression_full.
 expression_full ::= IF block THEN block ELSE block.
 
 block ::= expression_full.
