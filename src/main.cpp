@@ -484,10 +484,12 @@ int main(int argc, char **argv) {
         int idx = i->second.index;
         Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
         if (targets) {
-          if (strcmp(v->typeVar      .getName(), FN))               continue;
-          if (strcmp(v->typeVar[0]   .getName(), "List@wake"))      continue;
-          if (strcmp(v->typeVar[0][0].getName(), "String@builtin")) continue;
-          if (strcmp(v->typeVar[1]   .getName(), "Result@wake"))    continue;
+          TypeVar fn(FN, 2);
+          TypeVar list;
+          Data::typeList.clone(list);
+          fn[0].unify(list);
+          list[0].unify(String::typeVar);
+          if (!v->typeVar.unify(fn)) continue;
           std::cout << "  " << g.first << std::endl;
         } else {
           std::cout << g.first << ": ";
