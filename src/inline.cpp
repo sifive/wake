@@ -116,6 +116,8 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
         // We will move the original; preventing exponwntial growth
         fun = static_cast<RFun*>(term);
       } else {
+        // Temporarily mark this term recursive in case it gets closed by a Y-combinator
+        term->set(SSA_RECURSIVE, true);
         copy = static_unique_pointer_cast<RFun>(term->clone(p.stream.scope(), fnid));
         fun = copy.get();
       }
@@ -134,6 +136,8 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
         fun->output = 0;
         fun->terms.resize(fargs.size());
         fun->set(SSA_MOVED, true);
+      } else {
+        term->set(SSA_RECURSIVE, false);
       }
     } else {
       // Combine App() but don't inline
