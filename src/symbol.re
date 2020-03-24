@@ -36,7 +36,7 @@ const char *symbolTable[] = {
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "VAL", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
   "DATA", "EQUALS", "POPEN", "PCLOSE", "BOPEN", "BCLOSE", "IF", "THEN", "ELSE", "HERE", "END",
   "MATCH", "EOL", "INDENT", "DEDENT", "COLON", "TARGET", "PACKAGE", "IMPORT", "EXPORT", "FROM",
-  "TYPE", "TOPIC", "UNARY", "BINARY"
+  "TYPE", "TOPIC", "UNARY", "BINARY", "WHEN"
 };
 
 /*!re2c
@@ -523,6 +523,7 @@ top:
 
       // keywords
       "def"       { return mkSym(DEF);       }
+      "when"      { return mkSym(WHEN);      }
       "tuple"     { return mkSym(TUPLE);     }
       "data"      { return mkSym(DATA);      }
       "global"    { return mkSym(GLOBAL);    }

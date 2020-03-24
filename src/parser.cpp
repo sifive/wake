@@ -1434,38 +1434,71 @@ static void parse_decl(Lexer &lex, DefMap &map, Symbols *exports, Symbols *globa
   }
 }
 
+static Expr *parse_block_body(Lexer &lex);
+static Expr *parse_when(Lexer &lex) {
+  Location l = lex.next.location;
+  lex.consume();
+
+  ASTState state(false, false);
+  AST ast = parse_ast(0, lex, state);
+
+  expect(EQUALS, lex);
+  lex.consume();
+
+  Expr *rhs = parse_block(lex, false);
+  if (expect(EOL, lex)) lex.consume();
+
+  Expr *block = parse_block_body(lex);
+
+  Match *out = new Match(l, true);
+  out->args.emplace_back(rhs);
+  out->patterns.emplace_back(std::move(ast), block, nullptr);
+  out->location.end = block->location.end;
+
+  return out;
+}
+
+static Expr *parse_block_body(Lexer &lex) {
+  DefMap *map = new DefMap(lex.next.location);
+
+  bool repeat = true;
+  while (repeat) {
+    switch (lex.next.type) {
+      case FROM:
+      case TARGET:
+      case DEF: {
+        parse_decl(lex, *map, nullptr, nullptr);
+        break;
+      }
+      default: {
+        repeat = false;
+        break;
+      }
+    }
+  }
+
+  if (lex.next.type == WHEN) {
+    map->body = std::unique_ptr<Expr>(parse_when(lex));
+  } else {
+    map->body = std::unique_ptr<Expr>(relabel_anon(parse_binary(0, lex, true)));
+  }
+
+  map->location.end = map->body->location.end;
+  map->flags |= FLAG_AST;
+
+  map->location.start.bytes -= (map->location.start.column-1);
+  map->location.start.column = 1;
+
+  return map;
+}
+
 static Expr *parse_block(Lexer &lex, bool multiline) {
   TRACE("BLOCK");
 
   if (lex.next.type == INDENT) {
     lex.consume();
     if (expect(EOL, lex)) lex.consume();
-
-    DefMap *map = new DefMap(lex.next.location);
-
-    bool repeat = true;
-    while (repeat) {
-      switch (lex.next.type) {
-        case FROM:
-        case TARGET:
-        case DEF: {
-          parse_decl(lex, *map, nullptr, nullptr);
-          break;
-        }
-        default: {
-          repeat = false;
-          break;
-        }
-      }
-    }
-
-    map->body = std::unique_ptr<Expr>(relabel_anon(parse_binary(0, lex, true)));
-    map->location.end = map->body->location.end;
-    map->flags |= FLAG_AST;
-
-    map->location.start.bytes -= (map->location.start.column-1);
-    map->location.start.column = 1;
-
+    Expr *map = parse_block_body(lex);
     if (expect(DEDENT, lex)) lex.consume();
     return map;
   } else {

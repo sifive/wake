@@ -129,12 +129,13 @@ struct Pattern {
 };
 
 struct Match : public Expr {
+  bool refutable;
   std::vector<std::unique_ptr<Expr> > args;
   std::vector<Pattern> patterns;
 
   static const TypeDescriptor type;
-  Match(const Location &location_)
-   : Expr(&type, location_) { }
+  Match(const Location &location_, bool refutable_ = false)
+   : Expr(&type, location_), refutable(refutable_) { }
 
   void format(std::ostream &os, int depth) const override;
 };

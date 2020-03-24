@@ -347,7 +347,10 @@ struct PatternRef {
   PatternTree tree;
   int index; // for prototype: next var name, for patterns: function index
   int uses;
-  bool guard;
+  union {
+    bool guard;     // for non-prototype
+    bool refutable; // for prototype
+  };
 
   PatternRef(const Location &location_) : location(location_), uses(0) { }
   PatternRef(PatternRef &&other) = default;
@@ -383,14 +386,34 @@ static PatternTree *get_expansion(PatternTree *t, const std::vector<int> &path) 
   return t;
 }
 
+static Expr *build_identity(const Location &l, PatternTree &tree) {
+  if (tree.sum) {
+    Constructor &cons = tree.sum->members[tree.cons];
+    Expr *out = new Construct(l, tree.sum, &cons);
+    for (size_t i = 0; i < tree.children.size(); ++i)
+      out = new Lambda(l, "_", out);
+    for (auto &c : tree.children) {
+      out = new App(l, out, build_identity(l, c));
+    }
+    return out;
+  } else {
+    return new VarRef(l, "_ a" + std::to_string(tree.var));
+  }
+}
+
 // invariants: !patterns.empty(); patterns have detail >= patterns[0]
 // post-condition: patterns unchanged (internal mutation is reversed)
-static std::unique_ptr<Expr> expand_patterns(const Location &location, const std::string &fnname, std::vector<PatternRef> &patterns) {
+static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vector<PatternRef> &patterns) {
   PatternRef &prototype = patterns[0];
+  Location &location = prototype.location;
   if (patterns.size() == 1) {
-    std::cerr << "Non-exhaustive match at " << prototype.location.file()
-      << "; missing: " << prototype.tree << std::endl;
-    return nullptr;
+    if (prototype.refutable) {
+      return std::unique_ptr<Expr>(build_identity(location, prototype.tree));
+    } else {
+      std::cerr << "Non-exhaustive match at " << location.file()
+        << "; missing: " << prototype.tree << std::endl;
+      return nullptr;
+    }
   }
   std::vector<int> expand;
   std::shared_ptr<Sum> sum = find_mismatch(expand, prototype.tree, patterns[1].tree);
@@ -432,7 +455,7 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
         }
       }
       std::unique_ptr<DefMap> rmap(new DefMap(location));
-      rmap->body = expand_patterns(location, fnname, bucket);
+      rmap->body = expand_patterns(fnname, bucket);
       if (!rmap->body) return nullptr;
       for (size_t i = args; i > 0; --i) {
         auto out = rmap->defs.insert(std::make_pair("_ a" + std::to_string(--var),
@@ -474,7 +497,7 @@ static std::unique_ptr<Expr> expand_patterns(const Location &location, const std
     } else {
       PatternRef save(std::move(patterns[1]));
       patterns.erase(patterns.begin()+1);
-      std::unique_ptr<Expr> guard_false(expand_patterns(location, fnname, patterns));
+      std::unique_ptr<Expr> guard_false(expand_patterns(fnname, patterns));
       patterns.emplace(patterns.begin()+1, std::move(save));
       if (!guard_false) return nullptr;
       std::unique_ptr<Expr> guard(fill_pattern(
@@ -584,7 +607,7 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
   PatternRef &prototype = patterns.front();
   prototype.uses = 1;
   prototype.index = match->args.size();
-  prototype.guard = false;
+  prototype.refutable = match->refutable;
 
   if (prototype.index == 1) {
     prototype.tree = std::move(children.front());
@@ -613,7 +636,7 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
     ++f;
   }
   if (!ok) return nullptr;
-  auto body = expand_patterns(match->location, fnname, patterns);
+  auto body = expand_patterns(fnname, patterns);
   if (!body) return nullptr;
   for (auto &p : patterns) {
     if (!p.uses) {
