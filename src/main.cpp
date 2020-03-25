@@ -121,6 +121,8 @@ int main(int argc, char **argv) {
     { 0,   "version",               GOPT_ARGUMENT_FORBIDDEN },
     { 'g', "globals",               GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "ctags",                 GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "etags",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-target",          GOPT_ARGUMENT_REQUIRED  },
@@ -150,6 +152,8 @@ int main(int argc, char **argv) {
   bool add     = arg(options, "add-task")->count;
   bool version = arg(options, "version" )->count;
   bool html    = arg(options, "html"    )->count;
+  bool ctags   = arg(options, "ctags"   )->count;
+  bool etags   = arg(options, "etags"   )->count;
   bool global  = arg(options, "globals" )->count;
   bool help    = arg(options, "help"    )->count;
   bool debugdb = arg(options, "debug-db")->count;
@@ -216,7 +220,7 @@ int main(int argc, char **argv) {
   bool nodb = init;
   bool noparse = nodb || remove || list || output || input || last || failed;
   bool notype = noparse || parse;
-  bool noexecute = notype || add || html || tcheck || dumpssa || global;
+  bool noexecute = notype || add || html || ctags || etags || tcheck || dumpssa || global;
 
   if (noparse && argc < 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
@@ -344,7 +348,7 @@ int main(int argc, char **argv) {
   }
 
   std::vector<std::string> globals;
-  if (global)
+  if (global || ctags || etags)
     for (auto &g : top->globals)
       globals.push_back(g.first);
 
@@ -387,21 +391,24 @@ int main(int argc, char **argv) {
 
   if (tcheck) std::cout << root.get();
   if (html) markup_html(std::cout, root.get());
-  for (auto &g : globals) {
-    Expr *e = root.get();
-    while (e && e->type == &DefBinding::type) {
-      DefBinding *d = static_cast<DefBinding*>(e);
-      e = d->body.get();
-      auto i = d->order.find(g);
-      if (i != d->order.end()) {
-        int idx = i->second.index;
-        Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
-        std::cout << g << ": ";
-        v->typeVar.format(std::cout, v->typeVar);
-        std::cout << " = <" << v->location.file() << ">" << std::endl;
+  if (ctags) markup_ctags(std::cout, root.get(), globals);
+  if (etags) markup_etags(std::cout, root.get(), globals);
+  if (global)
+    for (auto &g : globals) {
+      Expr *e = root.get();
+      while (e && e->type == &DefBinding::type) {
+        DefBinding *d = static_cast<DefBinding*>(e);
+        e = d->body.get();
+        auto i = d->order.find(g);
+        if (i != d->order.end()) {
+          int idx = i->second.index;
+          Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
+          std::cout << g << ": ";
+          v->typeVar.format(std::cout, v->typeVar);
+          std::cout << " = <" << v->location.file() << ">" << std::endl;
+        }
       }
     }
-  }
 
   if (add) {
     db.add_target(targets.back());
