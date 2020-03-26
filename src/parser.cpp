@@ -1477,7 +1477,7 @@ static Expr *parse_block_body(Lexer &lex) {
     }
   }
 
-  if (lex.next.type == WHEN) {
+  if (lex.next.type == REQUIRE) {
     map->body = std::unique_ptr<Expr>(parse_when(lex));
   } else {
     map->body = std::unique_ptr<Expr>(relabel_anon(parse_binary(0, lex, true)));
