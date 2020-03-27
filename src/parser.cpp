@@ -153,6 +153,29 @@ static void precedence_error(Lexer &lex) {
     << lex.next.location.file() << std::endl;
   lex.fail = true;
 }
+static Expr *add_literal_guards(Expr *guard, const ASTState &state) {
+  for (size_t i = 0; i < state.guard.size(); ++i) {
+    Expr* e = state.guard[i];
+    std::string comparison("scmp");
+    if (e->type == &Literal::type) {
+      Literal *lit = static_cast<Literal*>(e);
+      HeapObject *obj = lit->value->get();
+      if (typeid(*obj) == typeid(Integer)) comparison = "icmp";
+      if (typeid(*obj) == typeid(Double)) comparison = "dcmp";
+    }
+    if (!guard) guard = new VarRef(e->location, "True@wake");
+
+    Match *match = new Match(e->location);
+    match->args.emplace_back(new App(e->location, new App(e->location,
+        new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison), " ")),
+        e), new VarRef(e->location, "_ k" + std::to_string(i))));
+    match->patterns.emplace_back(AST(e->location, "LT@wake"), new VarRef(e->location, "False@wake"), nullptr);
+    match->patterns.emplace_back(AST(e->location, "GT@wake"), new VarRef(e->location, "False@wake"), nullptr);
+    match->patterns.emplace_back(AST(e->location, "EQ@wake"), guard, nullptr);
+    guard = match;
+  }
+  return guard;
+}
 
 static Expr *parse_match(int p, Lexer &lex) {
   Location location = lex.next.location;
@@ -203,7 +226,7 @@ static Expr *parse_match(int p, Lexer &lex) {
       : parse_ast(0, lex, state);
     if (check_constructors(ast)) lex.fail = true;
 
-    Expr *guard = 0;
+    Expr *guard = nullptr;
     if (lex.next.type == IF) {
       lex.consume();
       bool eateol = lex.next.type == INDENT;
@@ -211,26 +234,7 @@ static Expr *parse_match(int p, Lexer &lex) {
       if (eateol && expect(EOL, lex)) lex.consume();
     }
 
-    for (size_t i = 0; i < state.guard.size(); ++i) {
-      Expr* e = state.guard[i];
-      std::string comparison("scmp");
-      if (e->type == &Literal::type) {
-        Literal *lit = static_cast<Literal*>(e);
-        HeapObject *obj = lit->value->get();
-        if (typeid(*obj) == typeid(Integer)) comparison = "icmp";
-        if (typeid(*obj) == typeid(Double)) comparison = "dcmp";
-      }
-      if (!guard) guard = new VarRef(e->location, "True@wake");
-
-      Match *match = new Match(e->location);
-      match->args.emplace_back(new App(e->location, new App(e->location,
-          new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison), " ")),
-          e), new VarRef(e->location, "_ k" + std::to_string(i))));
-      match->patterns.emplace_back(AST(e->location, "LT@wake"), new VarRef(e->location, "False@wake"), nullptr);
-      match->patterns.emplace_back(AST(e->location, "GT@wake"), new VarRef(e->location, "False@wake"), nullptr);
-      match->patterns.emplace_back(AST(e->location, "EQ@wake"), guard, nullptr);
-      guard = match;
-    }
+    guard = add_literal_guards(guard, state);
 
     if (expect(EQUALS, lex)) lex.consume();
     Expr *expr = parse_block(lex, false);
@@ -1434,38 +1438,80 @@ static void parse_decl(Lexer &lex, DefMap &map, Symbols *exports, Symbols *globa
   }
 }
 
+static Expr *parse_block_body(Lexer &lex);
+static Expr *parse_require(Lexer &lex) {
+  Location l = lex.next.location;
+  lex.consume();
+
+  ASTState state(false, true);
+  AST ast = parse_ast(0, lex, state);
+  auto guard = add_literal_guards(nullptr, state);
+
+  expect(EQUALS, lex);
+  lex.consume();
+
+  Expr *rhs = parse_block(lex, false);
+
+  Expr *otherwise = nullptr;
+  if (lex.next.type == ELSE) {
+    lex.consume();
+    otherwise = parse_block(lex, false);
+  }
+
+  if (expect(EOL, lex)) lex.consume();
+
+  Expr *block = parse_block_body(lex);
+
+  Match *out = new Match(l, true);
+  out->args.emplace_back(rhs);
+  out->patterns.emplace_back(std::move(ast), block, guard);
+  out->location.end = block->location.end;
+  out->otherwise = std::unique_ptr<Expr>(otherwise);
+
+  return out;
+}
+
+static Expr *parse_block_body(Lexer &lex) {
+  DefMap *map = new DefMap(lex.next.location);
+
+  bool repeat = true;
+  while (repeat) {
+    switch (lex.next.type) {
+      case FROM:
+      case TARGET:
+      case DEF: {
+        parse_decl(lex, *map, nullptr, nullptr);
+        break;
+      }
+      default: {
+        repeat = false;
+        break;
+      }
+    }
+  }
+
+  if (lex.next.type == REQUIRE) {
+    map->body = std::unique_ptr<Expr>(parse_require(lex));
+  } else {
+    map->body = std::unique_ptr<Expr>(relabel_anon(parse_binary(0, lex, true)));
+  }
+
+  map->location.end = map->body->location.end;
+  map->flags |= FLAG_AST;
+
+  map->location.start.bytes -= (map->location.start.column-1);
+  map->location.start.column = 1;
+
+  return map;
+}
+
 static Expr *parse_block(Lexer &lex, bool multiline) {
   TRACE("BLOCK");
 
   if (lex.next.type == INDENT) {
     lex.consume();
     if (expect(EOL, lex)) lex.consume();
-
-    DefMap *map = new DefMap(lex.next.location);
-
-    bool repeat = true;
-    while (repeat) {
-      switch (lex.next.type) {
-        case FROM:
-        case TARGET:
-        case DEF: {
-          parse_decl(lex, *map, nullptr, nullptr);
-          break;
-        }
-        default: {
-          repeat = false;
-          break;
-        }
-      }
-    }
-
-    map->body = std::unique_ptr<Expr>(relabel_anon(parse_binary(0, lex, true)));
-    map->location.end = map->body->location.end;
-    map->flags |= FLAG_AST;
-
-    map->location.start.bytes -= (map->location.start.column-1);
-    map->location.start.column = 1;
-
+    Expr *map = parse_block_body(lex);
     if (expect(DEDENT, lex)) lex.consume();
     return map;
   } else {

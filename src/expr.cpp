@@ -233,6 +233,8 @@ void Construct::format(std::ostream &os, int depth) const {
 
 void Destruct::format(std::ostream &os, int depth) const {
   os << pad(depth) << "Destruct(" << sum->name << "): " << typeVar << " @ " << location.file() << std::endl;
+  for (auto &lam : cases) lam->format(os, depth+2);
+  arg->format(os, depth+2);
 }
 
 std::ostream & operator << (std::ostream &os, const Expr *expr) {

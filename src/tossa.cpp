@@ -130,8 +130,12 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
   } else if (expr->type == &Destruct::type) {
     Destruct *des = static_cast<Destruct*>(expr);
     std::vector<size_t> args;
-    for (unsigned i = des->sum->members.size()+1; i > 0; --i)
-      args.push_back(stack->index(i-1));
+    for (auto &x : des->cases) {
+      doit(scope, stack, x.get());
+      args.push_back(x->meta);
+    }
+    doit(scope, stack, des->arg.get());
+    args.push_back(des->arg->meta);
     des->meta = scope.append(new RDes(std::move(args)));
   } else if (expr->type == &Prim::type) {
     Prim *prim = static_cast<Prim*>(expr);

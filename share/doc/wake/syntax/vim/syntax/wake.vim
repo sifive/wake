@@ -17,7 +17,7 @@ syn match lineComment "#.*"
 
 " Keywords
 " TODO Should important globals from prim.wake we marked keywords?
-syn keyword wakeKeyword if then else here global subscribe match data tuple
+syn keyword wakeKeyword if then else here global export import package from type topic binary unary subscribe match require data tuple prim
 
 " definitions
 " TODO How can we handle `def x + y` = syntax?

@@ -25,8 +25,8 @@ jobs:
           printf 'deb http://archive.debian.org/debian wheezy main\ndeb http://archive.debian.org/debian-security/ wheezy/updates main\n' > /etc/apt/sources.list
       - run: apt-get update -o Acquire::Check-Valid-Until=false && apt-get install -y build-essential devscripts git libfuse-dev libgmp-dev libncurses5-dev libsqlite3-dev pkg-config wget
       - run: |
-          wget -q https://terpstra.ca/debian/pool/main/r/re2/libre2-1_20140304+dfsg-2_amd64.deb && dpkg -i libre2-1_20140304+dfsg-2_amd64.deb
-          wget -q https://terpstra.ca/debian/pool/main/r/re2/libre2-dev_20140304+dfsg-2_amd64.deb && dpkg -i libre2-dev_20140304+dfsg-2_amd64.deb
+          wget -q https://github.com/sifive/wake/releases/download/v0.17.2/libre2-1_20140304+dfsg-2_amd64.deb && dpkg -i libre2-1_20140304+dfsg-2_amd64.deb
+          wget -q https://github.com/sifive/wake/releases/download/v0.17.2/libre2-dev_20140304+dfsg-2_amd64.deb && dpkg -i libre2-dev_20140304+dfsg-2_amd64.deb
       - attach_workspace:
           at: /tmp/workspace
       - run: |
@@ -121,8 +121,8 @@ jobs:
     steps:
       - run: apt-get update && apt-get install -y build-essential debhelper devscripts git libfuse-dev libgmp-dev libncurses5-dev libsqlite3-dev pkg-config wget
       - run: |
-          wget -q https://terpstra.ca/debian/pool/main/r/re2/libre2-1_20140304+dfsg-2_amd64.deb && dpkg -i libre2-1_20140304+dfsg-2_amd64.deb
-          wget -q https://terpstra.ca/debian/pool/main/r/re2/libre2-dev_20140304+dfsg-2_amd64.deb && dpkg -i libre2-dev_20140304+dfsg-2_amd64.deb
+          wget -q https://github.com/sifive/wake/releases/download/v0.17.2/libre2-1_20140304+dfsg-2_amd64.deb && dpkg -i libre2-1_20140304+dfsg-2_amd64.deb
+          wget -q https://github.com/sifive/wake/releases/download/v0.17.2/libre2-dev_20140304+dfsg-2_amd64.deb && dpkg -i libre2-dev_20140304+dfsg-2_amd64.deb
       - attach_workspace:
           at: /tmp/workspace
       - run: |

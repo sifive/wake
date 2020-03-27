@@ -129,12 +129,14 @@ struct Pattern {
 };
 
 struct Match : public Expr {
+  bool refutable;
   std::vector<std::unique_ptr<Expr> > args;
   std::vector<Pattern> patterns;
+  std::unique_ptr<Expr> otherwise;
 
   static const TypeDescriptor type;
-  Match(const Location &location_)
-   : Expr(&type, location_) { }
+  Match(const Location &location_, bool refutable_ = false)
+   : Expr(&type, location_), refutable(refutable_) { }
 
   void format(std::ostream &os, int depth) const override;
 };
@@ -310,10 +312,12 @@ struct Construct : public Expr {
 
 struct Destruct : public Expr {
   std::shared_ptr<Sum> sum;
+  std::unique_ptr<Expr> arg;
+  DefBinding::Values cases;
 
   static const TypeDescriptor type;
-  Destruct(const Location &location_, const std::shared_ptr<Sum> &sum_)
-   : Expr(&type, location_), sum(sum_) { }
+  Destruct(const Location &location_, const std::shared_ptr<Sum> &sum_, Expr *arg_)
+   : Expr(&type, location_), sum(sum_), arg(arg_) { }
 
   void format(std::ostream &os, int depth) const override;
 };

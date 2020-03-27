@@ -36,7 +36,7 @@ const char *symbolTable[] = {
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "VAL", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",
   "DATA", "EQUALS", "POPEN", "PCLOSE", "BOPEN", "BCLOSE", "IF", "THEN", "ELSE", "HERE", "END",
   "MATCH", "EOL", "INDENT", "DEDENT", "COLON", "TARGET", "PACKAGE", "IMPORT", "EXPORT", "FROM",
-  "TYPE", "TOPIC", "UNARY", "BINARY"
+  "TYPE", "TOPIC", "UNARY", "BINARY", "REQUIRE"
 };
 
 /*!re2c
@@ -535,6 +535,7 @@ top:
       "else"      { return mkSym(ELSE);      }
       "here"      { return mkSym(HERE);      }
       "match"     { return mkSym(MATCH);     }
+      "require"   { return mkSym(REQUIRE);   }
       "package"   { return mkSym(PACKAGE);   }
       "import"    { return mkSym(IMPORT);    }
       "export"    { return mkSym(EXPORT);    }
