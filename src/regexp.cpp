@@ -25,6 +25,20 @@ static re2::StringPiece sp(String *s) {
   return re2::StringPiece(s->c_str(), s->size());
 }
 
+static PRIMTYPE(type_rcmp) {
+  return args.size() == 2 &&
+    args[0]->unify(RegExp::typeVar) &&
+    args[1]->unify(RegExp::typeVar) &&
+    out->unify(Data::typeOrder);
+}
+
+static PRIMFN(prim_rcmp) {
+  EXPECT(2);
+  REGEXP(arg0, 0);
+  REGEXP(arg1, 1);
+  RETURN(alloc_order(runtime.heap, arg0->exp->pattern().compare(arg1->exp->pattern())));
+}
+
 static PRIMTYPE(type_re2) {
   TypeVar result;
   Data::typeResult.clone(result);
@@ -223,6 +237,7 @@ static PRIMFN(prim_tokenize) {
 }
 
 void prim_register_regexp(PrimMap &pmap) {
+  prim_register(pmap, "rcmp",     prim_rcmp,     type_rcmp,     PRIM_PURE);
   prim_register(pmap, "re2",      prim_re2,      type_re2,      PRIM_PURE);
   prim_register(pmap, "re2str",   prim_re2str,   type_re2str,   PRIM_PURE);
   prim_register(pmap, "quote",    prim_quote,    type_quote,    PRIM_PURE);
