@@ -47,7 +47,7 @@
 
 void print_help(const char *argv0) {
   std::cout << std::endl
-    << "Usage: " << argv0 << " [-cvdqiolfdsgh] [-p PERCENT] [--] [subcommand ...]" << std::endl
+    << "Usage: " << argv0 << " [OPTIONS] [target] [target options ...]" << std::endl
     << std::endl
     << "  Flags affecting build execution:" << std::endl
     << "    -p PERCENT       Schedule local jobs for <= PERCENT of system (default 90)"  << std::endl
@@ -61,8 +61,8 @@ void print_help(const char *argv0) {
     << "    --heap-factor X  Heap-size is X * live data after the last GC (default 4.0)" << std::endl
     << "    --profile-heap   Report memory consumption on every garbage collection"      << std::endl
     << "    --profile FILE   Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
-    << "    --in      PKG    Use PKG as the select package (default: current directory)" << std::endl
-    << "    --exec -x EXPR   Execute expression EXPR instead of subcommand function"     << std::endl
+    << "    --in      PKG    Evaluate command-line in package PKG (default current dir)" << std::endl
+    << "    --exec -x EXPR   Execute expression EXPR instead of a target function"       << std::endl
     << std::endl
     << "  Database commands:" << std::endl
     << "    --init      DIR  Create or replace a wake.db in the specified directory"     << std::endl
@@ -440,7 +440,7 @@ int main(int argc, char **argv) {
     std::cout << std::endl;
   }
 
-  if (targets) std::cout << "Available wake subcommands:" << std::endl;
+  if (targets) std::cout << "Available wake targets:" << std::endl;
 
   for (auto &g : defs) {
     Expr *e = root.get();
