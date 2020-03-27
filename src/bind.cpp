@@ -651,7 +651,7 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
     }
   }
   map->location = map->body->location;
-  return map;
+  return std::unique_ptr<Expr>(map.release());
 }
 
 struct SymMover {
