@@ -48,6 +48,7 @@
 void print_help(const char *argv0) {
   std::cout << std::endl
     << "Usage: " << argv0 << " [OPTIONS] [target] [target options ...]" << std::endl
+    << "Usage in script: #! /usr/bin/env wake [OPTIONS] -:target" << std::endl
     << std::endl
     << "  Flags affecting build execution:" << std::endl
     << "    -p PERCENT       Schedule local jobs for <= PERCENT of system (default 90)"  << std::endl
@@ -127,6 +128,7 @@ int main(int argc, char **argv) {
     { 0,   "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-ssa",        GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-optimize",           GOPT_ARGUMENT_FORBIDDEN },
+    { ':', "shebang",               GOPT_ARGUMENT_REQUIRED  },
     { 0,   0,                       GOPT_LAST}};
 
   argc = gopt(argv, options);
@@ -164,6 +166,7 @@ int main(int argc, char **argv) {
   const char *chdir   = arg(options, "chdir")->argument;
   const char *in      = arg(options, "in")->argument;
   const char *exec    = arg(options, "exec")->argument;
+  char       *shebang = arg(options, "shebang")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -182,6 +185,16 @@ int main(int argc, char **argv) {
 
   if (profile && !debug) {
     std::cerr << "Cannot profile without stack trace support (-d)!" << std::endl;
+    return 1;
+  }
+
+  if (shebang && chdir) {
+    std::cerr << "Cannot specify chdir and shebang simultaneously!" << std::endl;
+    return 1;
+  }
+
+  if (shebang && argc < 2) {
+    std::cerr << "Shebang invocation requires a script name as the first non-option argument" << std::endl;
     return 1;
   }
 
@@ -210,6 +223,13 @@ int main(int argc, char **argv) {
       std::cerr << "Cannot run with " << heapf << " heap-factor (must be >= 1.1)!" << std::endl;
       return 1;
     }
+  }
+
+  // Change directory to the location of the invoked script
+  // and execute the specified target function
+  if (shebang) {
+    chdir = argv[1];
+    argv[1] = shebang;
   }
 
   // Arguments are forbidden with these options
