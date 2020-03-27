@@ -311,10 +311,12 @@ struct Construct : public Expr {
 
 struct Destruct : public Expr {
   std::shared_ptr<Sum> sum;
+  std::unique_ptr<Expr> arg;
+  DefBinding::Values cases;
 
   static const TypeDescriptor type;
-  Destruct(const Location &location_, const std::shared_ptr<Sum> &sum_)
-   : Expr(&type, location_), sum(sum_) { }
+  Destruct(const Location &location_, const std::shared_ptr<Sum> &sum_, Expr *arg_)
+   : Expr(&type, location_), sum(sum_), arg(arg_) { }
 
   void format(std::ostream &os, int depth) const override;
 };
