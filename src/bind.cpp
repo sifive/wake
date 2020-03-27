@@ -344,6 +344,8 @@ void PatternTree::format(std::ostream &os, int p) const
   }
 }
 
+enum Refutable { TOTAL, IDENTITY, OTHERWISE };
+
 struct PatternRef {
   Location location; // patterns (right-hand-side), prototype (first arg)
   Location guard_location;
@@ -352,7 +354,7 @@ struct PatternRef {
   int uses;
   union {
     bool guard;     // for non-prototype
-    bool refutable; // for prototype
+    Refutable refutable; // for prototype
   };
 
   PatternRef(const Location &location_) : location(location_), guard_location(LOCATION), uses(0) { }
@@ -410,8 +412,10 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
   PatternRef &prototype = patterns[0];
   Location &location = prototype.location;
   if (patterns.size() == 1) {
-    if (prototype.refutable) {
+    if (prototype.refutable == IDENTITY) {
       return std::unique_ptr<Expr>(build_identity(location, prototype.tree));
+    } else if (prototype.refutable == OTHERWISE) {
+      return std::unique_ptr<Expr>(new App(LOCATION, new VarRef(LOCATION, "_ else"), new VarRef(LOCATION, "_ a0")));
     } else {
       std::cerr << "Non-exhaustive match at " << location.file()
         << "; missing: " << prototype.tree << std::endl;
@@ -596,7 +600,15 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
   PatternRef &prototype = patterns.front();
   prototype.uses = 1;
   prototype.index = match->args.size();
-  prototype.refutable = match->refutable;
+  prototype.refutable = match->refutable ? IDENTITY : TOTAL;
+
+  if (match->otherwise) {
+    prototype.location = match->otherwise->location;
+    prototype.refutable = OTHERWISE;
+    auto out = map->defs.insert(std::make_pair("_ else", DefValue(LOCATION, std::unique_ptr<Expr>(
+      new Lambda(LOCATION, "_", match->otherwise.release())))));
+    assert (out.second);
+  }
 
   if (prototype.index == 1) {
     prototype.tree = std::move(children.front());

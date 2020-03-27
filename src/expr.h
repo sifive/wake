@@ -132,6 +132,7 @@ struct Match : public Expr {
   bool refutable;
   std::vector<std::unique_ptr<Expr> > args;
   std::vector<Pattern> patterns;
+  std::unique_ptr<Expr> otherwise;
 
   static const TypeDescriptor type;
   Match(const Location &location_, bool refutable_ = false)

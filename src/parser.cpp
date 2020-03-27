@@ -1451,6 +1451,13 @@ static Expr *parse_require(Lexer &lex) {
   lex.consume();
 
   Expr *rhs = parse_block(lex, false);
+
+  Expr *otherwise = nullptr;
+  if (lex.next.type == ELSE) {
+    lex.consume();
+    otherwise = parse_block(lex, false);
+  }
+
   if (expect(EOL, lex)) lex.consume();
 
   Expr *block = parse_block_body(lex);
@@ -1459,6 +1466,7 @@ static Expr *parse_require(Lexer &lex) {
   out->args.emplace_back(rhs);
   out->patterns.emplace_back(std::move(ast), block, guard);
   out->location.end = block->location.end;
+  out->otherwise = std::unique_ptr<Expr>(otherwise);
 
   return out;
 }
