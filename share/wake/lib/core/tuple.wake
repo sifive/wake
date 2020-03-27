@@ -32,23 +32,24 @@ export tuple Triple a b c =
   export Second: b
   export Third:  c
 
-# Variable length Tuples (terminate with Unit)
+# Variable length Tuples (terminate with Unit if you want ._x accessors)
 # aka: a List with fixed length and heterogeneous element types
 # Examples:
-#   def tup = (1,, "xx",, 1e8,, Unit)
-#   def (x,, y,, z,, Unit) = tup
+#   def tup = (1; "xx"; 1e8; Unit)
+#   def (x; y; z; Unit) = tup
 #   def _ = println (str tup._0)
 #   def _ = println (dstr tup._2)
-export data a,, b = a,, b
+#   def (a; b) = (5; "z")
+export data a; b = a; b
 
 # Handy accessor methods
-export def _0 (x,, _) = x
-export def _1 (_,, x,, _) = x
-export def _2 (_,, _,, x,, _) = x
-export def _3 (_,, _,, _,, x,, _) = x
-export def _4 (_,, _,, _,, _,, x,, _) = x
-export def _5 (_,, _,, _,, _,, _,, x,, _) = x
-export def _6 (_,, _,, _,, _,, _,, _,, x,, _) = x
-export def _7 (_,, _,, _,, _,, _,, _,, _,, x,, _) = x
-export def _8 (_,, _,, _,, _,, _,, _,, _,, _,, x,, _) = x
-export def _9 (_,, _,, _,, _,, _,, _,, _,, _,, _,, x,, _) = x
+export def _0 (x; _) = x
+export def _1 (_; x; _) = x
+export def _2 (_; _; x; _) = x
+export def _3 (_; _; _; x; _) = x
+export def _4 (_; _; _; _; x; _) = x
+export def _5 (_; _; _; _; _; x; _) = x
+export def _6 (_; _; _; _; _; _; x; _) = x
+export def _7 (_; _; _; _; _; _; _; x; _) = x
+export def _8 (_; _; _; _; _; _; _; _; x; _) = x
+export def _9 (_; _; _; _; _; _; _; _; _; x; _) = x
