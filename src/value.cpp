@@ -339,7 +339,7 @@ void Record::format(std::ostream &os, FormatState &state) const {
       state.child(child, q.p + !q.l);
       break;
     case 1:
-      if (name[7] != ',') os << " ";
+      if (name[7] != ',' && name[7] != ';') os << " ";
       os << name + 7 << " ";
       state.resume();
       state.child(child, q.p + q.l);

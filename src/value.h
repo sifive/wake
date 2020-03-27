@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <re2/re2.h>
 
-#define APP_PRECEDENCE 20
+#define APP_PRECEDENCE 21
 
 // typeid().hash_code() changes between runs
 #define TYPE_STRING	1

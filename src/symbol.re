@@ -157,27 +157,28 @@ top:
       re2c:define:YYCURSOR = s;
 
       *                          { return op_type(-1, -1);}
-      "."                        { return op_type(21, 1); }
+      "."                        { return op_type(22, 1); }
       [smpa]                     { return op_type(APP_PRECEDENCE, 1); } // SUBSCRIBE/PRIM/APP
-      Sm_comp                    { return op_type(19, 0); }
-      Sm_unop                    { return op_type(18, 0); }
-      "^"                        { return op_type(17, 0); }
-      Sm_produ | Sm_divu         { return op_type(16, 0); }
-      [*/%] | Sm_prodb | Sm_divb { return op_type(15, 1); }
-      Sm_sumu                    { return op_type(14, 0); }
-      [\-] | Sm_sumb             { return op_type(13, 1); }
-      Sm_test | Sm_lt | Sm_gt    { return op_type(12, 1); }
-      "!" | Sm_eq                { return op_type(11, 0); }
-      Sm_andu                    { return op_type(10, 0); }
-      "&" | Sm_andb              { return op_type(9, 1);  }
-      Sm_oru                     { return op_type(8, 0);  }
-      "|" | Sm_orb               { return op_type(7, 1);  }
-      Sm_Sc | Sc                 { return op_type(6, 0);  }
-      Sm_larrow | Sm_rarrow      { return op_type(5, 1);  }
-      Sm_earrow                  { return op_type(4, 0);  }
-      Sm_quant                   { return op_type(3, 0);  }
-      ":"                        { return op_type(2, 1);  }
-      ","                        { return op_type(1, 0);  }
+      Sm_comp                    { return op_type(20, 0); }
+      Sm_unop                    { return op_type(19, 0); }
+      "^"                        { return op_type(18, 0); }
+      Sm_produ | Sm_divu         { return op_type(17, 0); }
+      [*/%] | Sm_prodb | Sm_divb { return op_type(16, 1); }
+      Sm_sumu                    { return op_type(15, 0); }
+      [\-] | Sm_sumb             { return op_type(14, 1); }
+      Sm_test | Sm_lt | Sm_gt    { return op_type(13, 1); }
+      "!" | Sm_eq                { return op_type(12, 0); }
+      Sm_andu                    { return op_type(11, 0); }
+      "&" | Sm_andb              { return op_type(10, 1);  }
+      Sm_oru                     { return op_type(9, 0);  }
+      "|" | Sm_orb               { return op_type(8, 1);  }
+      Sm_Sc | Sc                 { return op_type(7, 0);  }
+      Sm_larrow | Sm_rarrow      { return op_type(6, 1);  }
+      Sm_earrow                  { return op_type(5, 0);  }
+      Sm_quant                   { return op_type(4, 0);  }
+      ":"                        { return op_type(3, 1);  }
+      ","                        { return op_type(2, 0);  }
+      ";"                        { return op_type(1, 0);  }
       [i\\]                      { return op_type(0, 0);  } // IF and LAMBDA
       Sk                         { goto top; }
   */
@@ -553,9 +554,9 @@ top:
       "}"         { return mkSym(BCLOSE);    }
 
       // operators
-      Po_reserved = [;?@];
+      Po_reserved = [?@];
       Po_special  = ["#'\\];
-      Po_op       = [!%&*,./:];
+      Po_op       = [!%&*,./:;];
       // !!! TODO: Po, Pd(without -)
       op = (Sk_notick|Sc|Sm_op|Po_op|"-")+; // [^] is Sk
 
