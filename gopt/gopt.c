@@ -210,6 +210,7 @@ int gopt (char **argv, struct option *options)
     }
     else
     {
+      doubledash = 1; // added for wake to pass options after target to target commands
       argv[operand_count] = argv[i];
       operand_count++;
     }

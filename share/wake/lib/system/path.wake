@@ -55,7 +55,7 @@ export def which exec = whichIn path exec
 export def workspace = prim "workspace"
 
 # The directory within which wake was invoked (relative to the workspace root)
-export def cwd = prim "prefix"
+export def cwd = prim "cwd"
 
 def mkdirRunner =
   def imp m p = prim "mkdir"
