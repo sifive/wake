@@ -77,8 +77,8 @@ void print_help(const char *argv0) {
     << "  Help functions:" << std::endl
     << "    --version        Print the version of wake on standard output"               << std::endl
     << "    --html           Print all wake source files as cross-referenced HTML"       << std::endl
-    << "    --globals -g     Print all global variables available to the command-line"   << std::endl
-    << "    --exports -e PKG Print all exported symbols for package PKG"                 << std::endl
+    << "    --globals -g     Print global symbols made available to all wake files"      << std::endl
+    << "    --exports -e     Print symbols exported by the selected package (see --in)"  << std::endl
     << "    --help    -h     Print this help message and exit"                           << std::endl
     << std::endl;
     // debug-db, no-optimize, stop-after-* are secret undocumented options
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
     { 0,   "init",                  GOPT_ARGUMENT_REQUIRED  },
     { 0,   "version",               GOPT_ARGUMENT_FORBIDDEN },
     { 'g', "globals",               GOPT_ARGUMENT_FORBIDDEN },
-    { 'e', "exports",               GOPT_ARGUMENT_REQUIRED  },
+    { 'e', "exports",               GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
     { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
@@ -152,13 +152,13 @@ int main(int argc, char **argv) {
   bool tcheck  = arg(options, "stop-after-type-check")->count;
   bool dumpssa = arg(options, "stop-after-ssa")->count;
   bool optim   =!arg(options, "no-optimize")->count;
+  bool exports = arg(options, "exports")->count;
 
   const char *percents= arg(options, "percent")->argument;
   const char *heapf   = arg(options, "heap-factor")->argument;
   const char *profile = arg(options, "profile")->argument;
   const char *init    = arg(options, "init")->argument;
   const char *hash    = arg(options, "debug-target")->argument;
-  const char *exports = arg(options, "exports")->argument;
   const char *in      = arg(options, "in")->argument;
   const char *exec    = arg(options, "exec")->argument;
 
@@ -358,7 +358,7 @@ int main(int argc, char **argv) {
   }
 
   if (exports) {
-    auto it = top->packages.find(exports);
+    auto it = top->packages.find(top->def_package);
     if (it != top->packages.end()) {
       for (auto &e : it->second->exports.defs)
         defs.emplace_back(e.first, e.second.qualified);
