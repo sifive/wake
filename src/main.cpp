@@ -394,8 +394,15 @@ int main(int argc, char **argv) {
   } else if (argc > 1) {
     command = argv[1];
     cmdline = argv+2;
-    body = new App(LOCATION, body, force_use(
-      new App(LOCATION, new VarRef(LOCATION, argv[1]), new Prim(LOCATION, "cmdline"))));
+    Lexer lex(runtime.heap, command, "<target-argument>");
+    Expr *var = parse_command(lex);
+    if (var->type == &VarRef::type) {
+      body = new App(LOCATION, body, force_use(
+        new App(LOCATION, var, new Prim(LOCATION, "cmdline"))));
+    } else {
+      std::cerr << "Specified target '" << argv[1] << "' is not a legal identifier" << std::endl;
+      ok = false;
+    }
   } else {
     body = new App(LOCATION, body, force_use(new VarRef(LOCATION, "Nil@wake")));
   }
