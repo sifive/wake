@@ -59,6 +59,7 @@
 	"def"		stmt
 	"target"	stmt
 	"match"		stmt
+	"require"	stmt
 	"if"		cond
 	"then"		cond
 	"else"		cond
