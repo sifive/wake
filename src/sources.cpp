@@ -48,21 +48,56 @@ bool make_workspace(const std::string &dir) {
   return true;
 }
 
-bool chdir_workspace(std::string &prefix) {
+static std::string make_relative(std::string &&dir, std::string &&path);
+bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &src_dir) {
+  wake_cwd = get_cwd();
+
+  if (chdirto) {
+    int res = chdir(chdirto);
+    if (res == -1 && errno == ENOTDIR) {
+      // allow -C path-to-a-file
+      std::string tail(chdirto);
+      size_t eop = tail.find_last_of('/');
+      if (eop != std::string::npos) {
+        tail.resize(eop);
+        res = chdir(tail.c_str());
+      }
+    }
+    if (res == -1) {
+      std::cerr << "Failed to change directory to '" << chdirto << "': " << strerror(errno) << std::endl;
+      return false;
+    }
+  }
+
+  src_dir = get_cwd();
+
   int attempts;
-  std::string cwd = get_cwd();
   for (attempts = 100; attempts && access("wake.db", F_OK) == -1; --attempts) {
     if (chdir("..") == -1) return false;
   }
   if (attempts == 0) return false;
+
   std::string workspace = get_cwd();
-  if (cwd.substr(0, workspace.size()) != workspace) {
-    fprintf(stderr, "Workspace directory is not a parent of current directory\n");
+  if (src_dir.compare(0, workspace.size(), workspace) != 0 ||
+       (workspace.size() < src_dir.size() && src_dir[workspace.size()] != '/')) {
+    fprintf(stderr, "Workspace directory is not a parent of current directory (or --chdir)\n");
     return false;
   }
-  prefix.assign(cwd.begin() + workspace.size(), cwd.end());
-  if (!prefix.empty())
-    std::rotate(prefix.begin(), prefix.begin()+1, prefix.end());
+
+  // remove prefix
+  src_dir.erase(src_dir.begin(), src_dir.begin() + workspace.size());
+  // move leading '/' (if any) to end:
+  if (!src_dir.empty())
+    std::rotate(src_dir.begin(), src_dir.begin()+1, src_dir.end());
+
+  wake_cwd = make_relative(std::move(workspace), std::move(wake_cwd));
+  // Make wake_cwd suitable for prepend to paths in main.cpp
+  if (wake_cwd == ".") {
+    wake_cwd = "";
+  } else {
+    wake_cwd += '/';
+  }
+
   return true;
 }
 

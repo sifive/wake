@@ -23,7 +23,7 @@
 
 struct Runtime;
 
-bool chdir_workspace(std::string &prefix);
+bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &src_dir);
 bool make_workspace(const std::string &dir);
 std::string make_canonical(const std::string &x);
 

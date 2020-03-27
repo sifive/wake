@@ -60,9 +60,10 @@ void print_help(const char *argv0) {
     << "    --no-workspace   Do not open a database or scan for sources files"           << std::endl
     << "    --heap-factor X  Heap-size is X * live data after the last GC (default 4.0)" << std::endl
     << "    --profile-heap   Report memory consumption on every garbage collection"      << std::endl
-    << "    --profile FILE   Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
-    << "    --in      PKG    Evaluate command-line in package PKG (default current dir)" << std::endl
-    << "    --exec -x EXPR   Execute expression EXPR instead of a target function"       << std::endl
+    << "    --profile  FILE  Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
+    << "    --chdir -C PATH  Locate database and default package starting from PATH"     << std::endl
+    << "    --in       PKG   Evaluate command-line in package PKG (default is chdir)"    << std::endl
+    << "    --exec -x  EXPR  Execute expression EXPR instead of a target function"       << std::endl
     << std::endl
     << "  Database commands:" << std::endl
     << "    --init      DIR  Create or replace a wake.db in the specified directory"     << std::endl
@@ -106,6 +107,7 @@ int main(int argc, char **argv) {
     { 0,   "heap-factor",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 0,   "profile",               GOPT_ARGUMENT_REQUIRED  },
+    { 'C', "chdir",                 GOPT_ARGUMENT_REQUIRED  },
     { 0,   "in",                    GOPT_ARGUMENT_REQUIRED  },
     { 'x', "exec",                  GOPT_ARGUMENT_REQUIRED  },
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
@@ -159,6 +161,7 @@ int main(int argc, char **argv) {
   const char *profile = arg(options, "profile")->argument;
   const char *init    = arg(options, "init")->argument;
   const char *hash    = arg(options, "debug-target")->argument;
+  const char *chdir   = arg(options, "chdir")->argument;
   const char *in      = arg(options, "in")->argument;
   const char *exec    = arg(options, "exec")->argument;
 
@@ -223,13 +226,15 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  std::string prefix; // "" | .+/
+  // wake_cwd is the path where wake was invoked, relative to the workspace root (may have leading ../)
+  // src_dir is the chdir path (-C) used to select the default package, relative to the workspace root (always a subdir)
+  std::string wake_cwd, src_dir; // form: "" | .+/
   if (init) {
     if (!make_workspace(init)) {
       std::cerr << "Unable to initialize a workspace in " << init << std::endl;
       return 1;
     }
-  } else if (workspace && !chdir_workspace(prefix)) {
+  } else if (workspace && !chdir_workspace(chdir, wake_cwd, src_dir)) {
     std::cerr << "Unable to locate wake.db in any parent directory." << std::endl;
     return 1;
   }
@@ -254,13 +259,13 @@ int main(int argc, char **argv) {
 
   if (input) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(prefix + argv[i]), 1, verbose), script, debug, verbose);
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1, verbose), script, debug, verbose);
     }
   }
 
   if (output) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(prefix + argv[i]), 2, verbose), script, debug, verbose);
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2, verbose), script, debug, verbose);
     }
   }
 
@@ -295,7 +300,7 @@ int main(int argc, char **argv) {
   ok &= sources;
 
   // Select a default package
-  int longest_prefix = -1;
+  int longest_src_dir = -1;
   bool warned_conflict = false;
 
   // Read all wake build files
@@ -310,13 +315,13 @@ int main(int argc, char **argv) {
     // Does this file inform our choice of a default package?
     size_t slash = i.find_last_of('/');
     std::string dir(i, 0, slash==std::string::npos?0:(slash+1)); // "" | .+/
-    if (prefix.compare(0, dir.size(), dir) == 0) { // dir = prefix or parent of prefix?
+    if (src_dir.compare(0, dir.size(), dir) == 0) { // dir = prefix or parent of src_dir?
       int dirlen = dir.size();
-      if (dirlen > longest_prefix) {
-        longest_prefix = dirlen;
+      if (dirlen > longest_src_dir) {
+        longest_src_dir = dirlen;
         top->def_package = package;
         warned_conflict = false;
-      } else if (dirlen == longest_prefix) {
+      } else if (dirlen == longest_src_dir) {
         if (top->def_package != package && !warned_conflict) {
           std::cerr << "Directory " << dir
             << " has wakefiles with both package '" << top->def_package
@@ -417,7 +422,7 @@ int main(int argc, char **argv) {
 
   /* Primitives */
   JobTable jobtable(&db, percent, verbose, quiet, check, !tty);
-  StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(prefix), cmdline);
+  StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(wake_cwd), cmdline);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
