@@ -156,10 +156,15 @@ void LegacyErrorMessage::formatB(std::ostream &os) const {
   os << "with incompatible type";
 }
 
-bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {
+bool TypeVar::tryUnify(TypeVar &other) {
   globalEpoch += (-globalEpoch) & 3; // round up to a multiple of 4
   bool ok = do_unify(other);
   globalEpoch += 4;
+  return ok;
+}
+
+bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {
+  bool ok = tryUnify(other);
   if (!ok) {
     std::ostream &os = std::cerr;
     message->formatA(os);

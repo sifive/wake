@@ -484,12 +484,16 @@ int main(int argc, char **argv) {
         int idx = i->second.index;
         Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
         if (targets) {
-          TypeVar fn(FN, 2);
+          TypeVar clone;
+          v->typeVar.clone(clone);
+          TypeVar fn1(FN, 2);
+          TypeVar fn2(FN, 2);
           TypeVar list;
           Data::typeList.clone(list);
-          fn[0].unify(list);
+          fn1[0].unify(list);
           list[0].unify(String::typeVar);
-          if (!v->typeVar.unify(fn)) continue;
+          if (!clone.tryUnify(fn1)) continue;   // must accept List String
+          if (clone[1].tryUnify(fn2)) continue; // and not return a function
           std::cout << "  " << g.first << std::endl;
         } else {
           std::cout << g.first << ": ";
