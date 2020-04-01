@@ -30,9 +30,8 @@ def re2cOk Unit =
     | map (tokenize `\.` _)
     | flatten
     | map int
-  match ver
-    Some x, Some y, Some z, _ = x > 1 || (x == 1 && (y > 2 || (y == 2 && z >= 1)))
-    _       = False
+  require Some x, Some y, Some z, _ = ver else False
+  x > 1 || (x == 1 && (y > 2 || (y == 2 && z >= 1)))
 
 def re2cReal file =
   def cpp = replace `\.re$` ".cpp" file.getPathName
