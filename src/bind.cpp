@@ -413,8 +413,10 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
   Location &location = prototype.location;
   if (patterns.size() == 1) {
     if (prototype.refutable == IDENTITY) {
+      ++prototype.uses;
       return std::unique_ptr<Expr>(build_identity(location, prototype.tree));
     } else if (prototype.refutable == OTHERWISE) {
+      ++prototype.uses;
       return std::unique_ptr<Expr>(new App(LOCATION, new VarRef(LOCATION, "_ else"), new VarRef(LOCATION, "_ a0")));
     } else {
       std::cerr << "Non-exhaustive match at " << location.file()
@@ -649,6 +651,10 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
       std::cerr << "Pattern unreachable in match at " << p.location.text() << std::endl;
       return nullptr;
     }
+  }
+  if (match->refutable && patterns.front().uses <= 1) {
+    std::cerr << "The required pattern at " << match->location.file() << " can never fail; use def instead." << std::endl;
+    return nullptr;
   }
   map->location = map->body->location;
   return std::unique_ptr<Expr>(map.release());
