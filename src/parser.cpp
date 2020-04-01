@@ -1422,10 +1422,10 @@ static void parse_decl(Lexer &lex, DefMap &map, Symbols *exports, Symbols *globa
     case TARGET: {
       auto defs = parse_def(lex, 0, true, false);
       auto &def = defs.front();
-      auto &l = def.body->location;
+      Location l = LOCATION;
       std::stringstream s;
-      s << l.text();
-      bind_def(lex, map, Definition("table " + def.name, def.location,
+      s << def.body->location.text();
+      bind_def(lex, map, Definition("table " + def.name, l,
           new App(l, new Lambda(l, "_", new Prim(l, "tnew"), " "),
           new Literal(l, String::literal(lex.heap, s.str()), &String::typeVar))),
         nullptr, nullptr);
