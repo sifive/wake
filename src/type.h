@@ -92,6 +92,7 @@ public:
   void setTag(int i, const char *tag);
   bool unify(TypeVar &other,  const TypeErrorMessage *message);
   bool unify(TypeVar &&other, const TypeErrorMessage *message) { return unify(other, message); }
+  bool tryUnify(TypeVar &other); // no error printed on failed
   //  Deprecated:
   bool unify(TypeVar &other,  const Location *l = 0) { LegacyErrorMessage m(l); return unify(other, &m); }
   bool unify(TypeVar &&other, const Location *l = 0) { LegacyErrorMessage m(l); return unify(other, &m); }
