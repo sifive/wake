@@ -1452,14 +1452,17 @@ static Expr *parse_require(Lexer &lex) {
   lex.consume();
 
   Expr *rhs = parse_block(lex, false);
+  bool eol = lex.next.type == EOL;
+  if (eol) lex.consume();
 
   Expr *otherwise = nullptr;
   if (lex.next.type == ELSE) {
     lex.consume();
     otherwise = parse_block(lex, false);
+    if (expect(EOL, lex)) lex.consume();
+  } else if (!eol) {
+    expect(EOL, lex);
   }
-
-  if (expect(EOL, lex)) lex.consume();
 
   Expr *block = parse_block_body(lex);
 
