@@ -82,13 +82,10 @@ bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &sr
   if (attempts == 0) {
     if (witlock == -1) {
       return false;
-    } else {
+    } else if (fchdir(witlock) != 0 || !make_workspace(".")) {
       // Attempt to auto-initialize a database
-      fchdir(witlock);
-      if (!make_workspace(".")) {
-        close(witlock);
-        return false;
-      }
+      close(witlock);
+      return false;
     }
   }
 
