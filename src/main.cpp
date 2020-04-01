@@ -373,6 +373,27 @@ int main(int argc, char **argv) {
   std::vector<std::pair<std::string, std::string> > defs;
   std::set<std::string> types;
 
+  if (targets) {
+    // When the package is wake, it means we did not find a package.
+    if (strcmp(top->def_package, "wake")) {
+      auto it = top->packages.find(top->def_package);
+      if (it != top->packages.end()) {
+        for (auto &e : it->second->exports.defs)
+          defs.emplace_back(e.first, e.second.qualified);
+      }
+    }
+    if (defs.empty()) {
+      ok = false;
+      std::cerr
+        << "No targets were found to recommend for use on the command-line."      << std::endl << std::endl
+        << "Potential solutions include:"                                         << std::endl
+        << "  cd project-directory; wake # lists targets for current directory"   << std::endl
+        << "  wake --in project          # lists targets for a specific project"  << std::endl << std::endl
+        << "If you are a developer, you should also consider adding:"             << std::endl
+        << "  export target build string_list = ... # to your wake build scripts" << std::endl << std::endl;
+    }
+  }
+
   if (global) {
     for (auto &g : top->globals.defs)
       defs.emplace_back(g.first, g.second.qualified);
@@ -391,14 +412,6 @@ int main(int argc, char **argv) {
         defs.emplace_back("topic " + t.first, "topic " + t.second.qualified);
       for (auto &t : it->second->exports.types)
         types.insert(t.first);
-    }
-  }
-
-  if (targets) {
-    auto it = top->packages.find(top->def_package);
-    if (it != top->packages.end()) {
-      for (auto &e : it->second->exports.defs)
-        defs.emplace_back(e.first, e.second.qualified);
     }
   }
 
@@ -484,12 +497,16 @@ int main(int argc, char **argv) {
         int idx = i->second.index;
         Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
         if (targets) {
-          TypeVar fn(FN, 2);
+          TypeVar clone;
+          v->typeVar.clone(clone);
+          TypeVar fn1(FN, 2);
+          TypeVar fn2(FN, 2);
           TypeVar list;
           Data::typeList.clone(list);
-          fn[0].unify(list);
+          fn1[0].unify(list);
           list[0].unify(String::typeVar);
-          if (!v->typeVar.unify(fn)) continue;
+          if (!clone.tryUnify(fn1)) continue;   // must accept List String
+          if (clone[1].tryUnify(fn2)) continue; // and not return a function
           std::cout << "  " << g.first << std::endl;
         } else {
           std::cout << g.first << ": ";
