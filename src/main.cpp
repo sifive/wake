@@ -373,6 +373,27 @@ int main(int argc, char **argv) {
   std::vector<std::pair<std::string, std::string> > defs;
   std::set<std::string> types;
 
+  if (targets) {
+    // When the package is wake, it means we did not find a package.
+    if (strcmp(top->def_package, "wake")) {
+      auto it = top->packages.find(top->def_package);
+      if (it != top->packages.end()) {
+        for (auto &e : it->second->exports.defs)
+          defs.emplace_back(e.first, e.second.qualified);
+      }
+    }
+    if (defs.empty()) {
+      ok = false;
+      std::cerr
+        << "No targets were found to recommend for use on the command-line."      << std::endl << std::endl
+        << "Potential solutions include:"                                         << std::endl
+        << "  cd project-directory; wake # lists targets for current directory"   << std::endl
+        << "  wake --in project          # lists targets for a specific project"  << std::endl << std::endl
+        << "If you are a developer, you should also consider adding:"             << std::endl
+        << "  export target build string_list = ... # to your wake build scripts" << std::endl << std::endl;
+    }
+  }
+
   if (global) {
     for (auto &g : top->globals.defs)
       defs.emplace_back(g.first, g.second.qualified);
@@ -391,14 +412,6 @@ int main(int argc, char **argv) {
         defs.emplace_back("topic " + t.first, "topic " + t.second.qualified);
       for (auto &t : it->second->exports.types)
         types.insert(t.first);
-    }
-  }
-
-  if (targets) {
-    auto it = top->packages.find(top->def_package);
-    if (it != top->packages.end()) {
-      for (auto &e : it->second->exports.defs)
-        defs.emplace_back(e.first, e.second.qualified);
     }
   }
 
