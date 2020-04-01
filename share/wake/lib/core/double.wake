@@ -24,7 +24,7 @@ export def dabs x = prim "dabs"
 export def   -. x = prim "dneg"
 
 # Unary positive sign for a Double.
-export def   +. x = x
+export def   +. x = x : Double
 
 # Binary addition operator for Doubles.
 export def x +. y = prim "dadd"

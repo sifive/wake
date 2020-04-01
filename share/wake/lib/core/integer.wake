@@ -18,7 +18,7 @@ package wake
 # integer operations
 
 # Unary positive sign operator for Integers.
-export def +x = x
+export def +x = x : Integer
 
 # Unary negative sign operator for Integers.
 export def -x = prim "neg"
