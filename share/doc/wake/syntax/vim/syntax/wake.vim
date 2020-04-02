@@ -17,11 +17,15 @@ syn match lineComment "#.*"
 
 " Keywords
 " TODO Should important globals from prim.wake we marked keywords?
-syn keyword wakeKeyword if then else here global export import package from type topic binary unary subscribe match require data tuple prim
+syn keyword wakeKeyword if then else here global type topic subscribe match require data tuple prim
+
+syn keyword wakeOperatorModifier binary unary
+syn keyword wakeInclude package export import from
+syn keyword wakeException panic
 
 " definitions
 " TODO How can we handle `def x + y` = syntax?
-syn keyword wakeDef def publish target nextgroup=wakeOperator,wakeLowerIdentifier skipwhite
+syn keyword wakeDef def publish target topic nextgroup=wakeOperatorModifier,wakeOperator,wakeLowerIdentifier skipwhite
 syn match wakeDefName "[^ =:;()[]\+" contained skipwhite
 syn match wakeOperator "[+-=$]\+" contained
 syn match wakeLowerIdentifier "[a-z][A-Za-z0-9_]*" contained
@@ -52,7 +56,10 @@ hi link lineComment Comment
 hi link wakeDef Keyword
 hi link wakeDefName Function
 hi link wakeLowerIdentifier Function
+hi link wakeOperatorModifier Keyword
 hi link wakeOperator Function
+hi link wakeInclude Include
+hi link wakeException Exception
 
 hi link wakeUpperIdentifier Type
 
