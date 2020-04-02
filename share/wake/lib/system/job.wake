@@ -393,7 +393,7 @@ export def getJobStatus job = match (getJobReport job)
 # Implement FUSE-based Runner
 def wakePath = prim "execpath" # location of the wake executable
 export def fuseRunner =
-  def fuse = "{wakePath}/../lib/wake/fuse-wake"
+  def fuse = "{wakePath}/../bubblewrap/wrap"
   def score plan =
     if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
   makeJSONRunnerPlan fuse score

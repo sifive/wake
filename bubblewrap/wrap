@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+
+# XXX Don't use this for your builds.
+
+ORIG_DIR=$PWD
+INPUT_JSON=$1
+OUTPUT_JSON=$2
+
+cat $INPUT_JSON 1>&2
+
+# README
+#
+# There's a lot wrong with this, this is a POC to show bubblewrap could be used
+# for wake's sandboxing.
+# fuse-wake has a API of sorts, input and outputs jsons, so we use that.
+#
+#
+# Things I've been mulling over:
+# 1. Writing this in a real language
+# 2. Using sandboxfs or wake-fuse to control visible input/output files,
+#    rather than the cludgy symlinks and moves.
+# 3. non-jq json input/outputs
+# 4. Re-use of the basefs between jobs
+# 5. How to specify what basefs you want
+# 6. Integrating fuse-overlayfs into bubblewrap
+# 7. Integrating sandboxfs or wake-fuse into bubblewrap
+# 8. Adding more to this list..
+# 9. Conventions for where things should be, example: the workspace
+#10. ...
+
+###############################################################################
+
+# JSON input parsing
+BW_DIR=$(jq -r '.directory' < $INPUT_JSON)
+BW_COMMAND=$(jq -r '.command | join (" ")' < $INPUT_JSON)
+BW_VISIBLE=$(jq -r '.visible | join (" ")' < $INPUT_JSON)
+BW_ENVIRONMENT=$(jq -r '.environment | join ("\n")' < $INPUT_JSON )
+BW_SETENVS=$(for E in $BW_ENVIRONMENT; do echo "--setenv $E" | sed -e 's/=/ /'; done )
+
+#[[ $BW_DIR -ne "." ]] && echo unimplemented && exit 1
+
+###############################################################################
+
+# deal with this better somehow
+TEMPDIR=$(mktemp -d -p $PWD -t .bwrap.XXXXXXXXX)
+cd $TEMPDIR
+
+# Untar a base image
+mkdir base       # root filesystem, the bottom layer of the overlay.
+(
+  cd base;
+  tar xf /tmp/centos8.1.1911.tar;
+  find . -type d | xargs chmod u+w # so we can delete the files later
+)
+export BASE_DIR=$PWD/base
+
+###############################################################################
+
+# XXX. This is slow. But will do for now. Replace with something-FUSE.
+# Link the visible files into an area that can be mounted in
+mkdir -p visibles/workspace/
+(for F in $BW_VISIBLE; do
+  cd $ORIG_DIR
+  CP_DEST=$TEMPDIR/visibles/workspace/$(dirname $F)
+  mkdir -p ${CP_DEST}
+  cp $F ${CP_DEST}/
+done)
+
+###############################################################################
+
+# Mount base image within the new filesystem namespace.
+mkdir output     # all filesystem changes during bwrap execution
+mkdir workdir    # scratch dir for overlayfs
+mkdir mountpoint # the combined view from the overlay
+BR_MOUNTPOINT=mountpoint
+
+onexit () {
+  fusermount -u mountpoint
+  [ -z $DEBUG ] && rm -rf $TEMPDIR
+}
+trap onexit EXIT
+fuse-overlayfs -o lowerdir=${BASE_DIR}:visibles,upperdir=output,workdir=workdir mountpoint
+
+###############################################################################
+
+# Run bubblewrap (bwrap)
+
+# We turn off access to the exterior host's network, ipc and hostname namespace.
+# and mount in /proc /sys /dev from the host system.
+# A bash executable is assumed to be in the base image mounted at BR_MOUNTPOINT.
+# Options to bwrap have ordering, earlier options applied first.
+# The / filesystem is read-write, but the overlayfs will catch all writes and
+# the initial base filesystem will be unmodified.
+# 'env' will clear the environment variables that bwrap would otherwise capture.
+# File 99 is bind mounted into the container at /entrypoint, its content comes
+# from the temporary pipe file containing the echo.
+
+WORKSPACE=/workspace
+
+RUN_IN_CONTAINER="
+$BW_COMMAND
+"
+
+ACTION=/entrypoint
+if [ ${DEBUG} ] ; then
+  ACTION="-i" # Run interactive
+fi
+
+env -i bwrap                           \
+    --die-with-parent                  \
+    --unshare-net                      \
+    --unshare-ipc                      \
+    --bind         $BR_MOUNTPOINT /    \
+    --proc         /proc               \
+    --bind         /sys /sys           \
+    --dev-bind     /dev /dev           \
+    --chdir        $WORKSPACE/$BW_DIR  \
+    --setenv       PS1 "bubblewrap $ " \
+    $BW_SETENVS                        \
+    --unshare-uts                      \
+    --hostname     hostname            \
+    --file         99 /entrypoint      \
+    /bin/bash $ACTION                  \
+    99< <(echo "$RUN_IN_CONTAINER")    \
+RESULT=$?
+
+# XXX This is slow. Should use hardlinks or have used FUSE earlier.
+# Put the outputs into the workspace
+cp -R ${TEMPDIR}/output/workspace/* ${ORIG_DIR}/
+
+OUT="${ORIG_DIR}/$OUTPUT_JSON"
+OUTFILES=$(find ${TEMPDIR}/output)
+
+function join_comma { echo -n "\"$1\""; shift; for a in $@; do printf ",\"$a\""; done }
+INPUTS_WITH_COMMAS=$(join_comma $BW_VISIBLE)
+OUTPUTS_WITH_COMMAS=$(join_comma $OUTFILES )
+
+echo '{ "usage": { "status": "'${RESULT}'", "runtime":1.0, "cputime":1.0, "membytes":1, "inbytes":1, "outbytes":1}, "inputs":['${INPUTS_WITH_COMMAS}'], "outputs":['${OUTPUTS_WITH_COMMAS}'] }' &> "$OUT"
+echo inputs $INPUTS_WITH_COMMAS $BW_INPUTS 1>&2
+echo outputs $OUTPUTS_WITH_COMMAS $BW_OUTPUTS 1>&2
+cat $OUT 1>&2
