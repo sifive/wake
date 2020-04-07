@@ -94,6 +94,12 @@ export def reverse = foldl (\a\b b,a) Nil
 export def flatten = foldr (_++_) Nil
 export def len     = foldl (\a\_ a+1) 0
 
+# Place item at start of list. This is O(1).
+export def prepend item list = item, list
+
+# Place item at end of list. This is O(n), use prepend or ',' for O(1).
+export def append  item list = list ++ (item, Nil)
+
 # list choppers
 export def splitAt i l =
   if i <= 0 then Pair Nil l else match l
