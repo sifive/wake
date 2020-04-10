@@ -82,9 +82,7 @@ static void cse_reduce(PassCSE &p, Hash hash, std::unique_ptr<Term> self) {
 }
 
 void RArg::pass_cse(PassCSE &p, std::unique_ptr<Term> self) {
-  Hash h = Hash(typeid(RArg).hash_code())
-         + hash_arg(p, p.stream.scope().end());
-  cse_reduce(p, h, std::move(self));
+  p.stream.transfer(std::move(self));
 }
 
 void RLit::pass_cse(PassCSE &p, std::unique_ptr<Term> self) {
@@ -135,24 +133,35 @@ void RFun::pass_cse(PassCSE &p, std::unique_ptr<Term> self) {
   p.stream.transfer(std::move(self));
   CheckPoint body = p.stream.begin();
 
+  size_t args = 0;
   std::vector<Hash> undo;
   std::vector<Hash> *save = p.undo;
   p.undo = &undo;
 
-  for (auto &x : terms)
+  for (auto &x : terms) {
+    if (x->id() == typeid(RArg)) ++args;
     x->pass_cse(p, std::move(x));
+  }
   update(p.stream.map());
   terms = p.stream.end(body);
 
   std::vector<uint64_t> codes;
-  codes.reserve(undo.size() * 2 + 4);
+  codes.reserve(undo.size() * 2 + 6);
   codes.push_back(typeid(RFun).hash_code());
+  codes.push_back(p.starts.size()); // See comment [*]
+  codes.push_back(args);
   codes.push_back(terms.size());
   hash_arg(p, output).push(codes);
   for (auto x : undo) {
     x.push(codes);
     p.table.erase(x);
   }
+
+  // [*] CSE cannot merge functions of different depths,
+  //     because we hash only depth:offset references.
+  //     Thus, fn1's 1:0 might be his argument, whereas
+  //     fn2's 1:0 might be his parent's argument.
+  //     Fortunately, lifting equalizes identical fn levels.
 
   p.undo = save;
   auto me = p.stream.end(fun);
