@@ -21,6 +21,8 @@ def debugCFlags   = ("-Wall", "-Wextra", "-O0", "-g", "-pg", Nil)
 def debugLFlags   = ("-g", "-pg", Nil)
 def releaseCFlags = ("-Wall", "-O2", "-flto", Nil)
 def releaseLFlags = ("-flto", Nil)
+def staticCFlags =  ("-Wall", "-O2", "-flto", Nil)
+def staticLFlags  = ("-flto", "-static", "-s", Nil)
 
 def doCompileC variant gcc flags headers cfile =
   def obj = replace `\.c(pp)?$` ".{variant}.o" cfile.getPathName
@@ -40,16 +42,20 @@ def makeLinkO variant linker flags =
   Pair variant (\extraFlags doLinkO variant linker (flags ++ extraFlags)), Nil
 
 export topic compileC: Pair String ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Path)
-publish compileC = makeCompileC "native-c99-debug"     (which "cc") (c99Flags ++ debugCFlags)
-publish compileC = makeCompileC "native-c99-release"   (which "cc") (c99Flags ++ releaseCFlags)
+publish compileC = makeCompileC "native-c99-debug"     (which "cc")  (c99Flags ++ debugCFlags)
+publish compileC = makeCompileC "native-c99-release"   (which "cc")  (c99Flags ++ releaseCFlags)
+publish compileC = makeCompileC "native-c99-static"    (which "cc")  (c99Flags ++ staticCFlags)
 publish compileC = makeCompileC "native-cpp11-debug"   (which "c++") (c11Flags ++ debugCFlags)
 publish compileC = makeCompileC "native-cpp11-release" (which "c++") (c11Flags ++ releaseCFlags)
+publish compileC = makeCompileC "native-cpp11-static"  (which "c++") (c11Flags ++ staticCFlags)
 
 export topic linkO: Pair String ((extraFlags: List String) => (objects: List Path) => (targ: String) => Path)
 publish linkO = makeLinkO "native-c99-debug"     (which "cc") (debugLFlags)
 publish linkO = makeLinkO "native-c99-release"   (which "cc") (releaseLFlags)
+publish linkO = makeLinkO "native-c99-static"    (which "cc") (staticLFlags)
 publish linkO = makeLinkO "native-cpp11-debug"   (which "c++") (debugLFlags)
 publish linkO = makeLinkO "native-cpp11-release" (which "c++") (releaseLFlags)
+publish linkO = makeLinkO "native-cpp11-static"  (which "c++") (staticLFlags)
 
 def pickVariant variant variants =
   match (find (variant ==* _.getPairFirst) variants)

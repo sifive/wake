@@ -17,17 +17,22 @@ package build_wake
 from wake import _
 
 # Useful build variants (arguments to all)
-def default = Pair "native-cpp11-release" "native-c99-release"
-def debug   = Pair "native-cpp11-debug" "native-c99-debug"
+def toVariant = match _
+  "default" = Pass (Pair "native-cpp11-release" "native-c99-release")
+  "static"  = Pass (Pair "native-cpp11-static" "native-c99-static")
+  "debug"   = Pass (Pair "native-cpp11-debug" "native-c99-debug")
+  s = Fail "Unknown bulid target ({s})".makeError
 
 export def build = match _
-  "default", Nil = all default
-  "debug",   Nil = all debug
   "tarball", Nil = tarball Unit
+  kind, Nil =
+    require Pass variant = toVariant kind
+    all variant
   _ = Fail "no target specified (try: build default/debug/tarball)".makeError
 
 export def install = match _
-  dest, Nil = doInstall (in cwd dest)
+  dest, kind, Nil = doInstall (in cwd dest) kind
+  dest, Nil = doInstall (in cwd dest) "default"
   _ = Fail "no directory specified (try: install /opt/local)".makeError
 
 # Build all wake targets
@@ -39,9 +44,10 @@ def all variant =
   | getOrPass "BUILT"
 
 # Install wake into a target location
-def doInstall dest =
+def doInstall dest kind =
+  require Pass variant = toVariant kind
   def datfiles = sources "{here}/share" `.*`
-  def binfiles = allOut default
+  def binfiles = allOut variant
   def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
   def datinstall = map (installIn dest) datfiles
   def bininstall = map releaseBin binfiles
