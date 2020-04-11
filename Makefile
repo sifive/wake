@@ -44,6 +44,9 @@ install:	all
 tarball:	wake.db
 	$(WAKE_ENV) ./bin/wake build tarball
 
+static:	wake.db
+	$(WAKE_ENV) ./bin/wake static
+
 bin/wake:	src/symbol.o $(COMMON)				\
 		$(patsubst %.cpp,%.o,$(wildcard src/*.cpp))	\
 		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c)
