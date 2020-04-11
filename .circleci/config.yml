@@ -17,6 +17,18 @@ jobs:
             - www
             - scripts/sphinx/build/html
 
+  alpine:
+    docker:
+      - image: alpine:3.11.5
+    steps:
+      - run: apk add g++ make pkgconf git gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev dash sqlite-static ncurses-static
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: |
+          tar xJf /tmp/workspace/wake_*.tar.xz
+          cd wake-*
+          USE_FUSE_WAKE=0 make DESTDIR=/tmp/workspace/hax install
+
   debian_wheezy:
     docker:
       - image: debian:wheezy
@@ -220,6 +232,9 @@ workflows:
   build:
     jobs:
       - tarball
+      - alpine:
+          requires:
+            - tarball
       - debian_testing:
           requires:
             - tarball
@@ -243,6 +258,7 @@ workflows:
             - tarball
       - release:
           requires:
+            - alpine
             - debian_testing # Newest everything
             - debian_wheezy  # Oldest supported compiler
             - centos_6_6     # Oldest supported package versions
