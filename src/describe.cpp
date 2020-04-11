@@ -54,7 +54,7 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug, b
       << "  In  bytes: " << job.usage.ibytes << std::endl
       << "  Out bytes: " << job.usage.obytes << std::endl
       << "  Status:    " << job.usage.status << std::endl
-      << "  Stdin:     " << job.stdin << std::endl;
+      << "  Stdin:     " << job.stdin_file << std::endl;
     if (verbose) {
       std::cout << "Visible:" << std::endl;
       for (auto &in : job.visible)
@@ -73,13 +73,13 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug, b
       std::cout << "Stack:";
       indent("  ", job.stack);
     }
-    if (!job.stdout.empty()) {
+    if (!job.stdout_payload.empty()) {
       std::cout << "Stdout:";
-      indent("  ", job.stdout);
+      indent("  ", job.stdout_payload);
     }
-    if (!job.stderr.empty()) {
+    if (!job.stderr_payload.empty()) {
       std::cout << "Stderr:";
-      indent("  ", job.stderr);
+      indent("  ", job.stderr_payload);
     }
   }
 }
@@ -100,7 +100,7 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
     for (auto &arg : job.commandline) {
       std::cout << shell_escape(arg) << " \\" << std::endl << '\t';
     }
-    std::cout << "< " << shell_escape(job.stdin) << std::endl << std::endl;
+    std::cout << "< " << shell_escape(job.stdin_file) << std::endl << std::endl;
     std::cout
       << "# When wake ran this command:" << std::endl
       << "#   Built:     " << job.time << std::endl
@@ -129,13 +129,13 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
       std::cout << "# Stack:";
       indent("#   ", job.stack);
     }
-    if (!job.stdout.empty()) {
+    if (!job.stdout_payload.empty()) {
       std::cout << "# Stdout:";
-      indent("#   ", job.stdout);
+      indent("#   ", job.stdout_payload);
     }
-    if (!job.stderr.empty()) {
+    if (!job.stderr_payload.empty()) {
       std::cout << "# Stderr:";
-      indent("#   ", job.stderr);
+      indent("#   ", job.stderr_payload);
     }
   }
 }

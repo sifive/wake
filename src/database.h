@@ -46,10 +46,10 @@ struct JobReflection {
   std::vector<std::string> commandline;
   std::vector<std::string> environment;
   std::string stack;
-  std::string stdin;
+  std::string stdin_file;
   std::string time;
-  std::string stdout;
-  std::string stderr;
+  std::string stdout_payload;
+  std::string stderr_payload;
   Usage usage;
   std::vector<FileReflection> visible;
   std::vector<FileReflection> inputs;
@@ -78,7 +78,7 @@ struct Database {
     const std::string &directory,
     const std::string &environment,
     const std::string &commandline,
-    const std::string &stdin, // "" -> /dev/null
+    const std::string &stdin_file, // "" -> /dev/null
     uint64_t          signature,
     const std::string &visible,
     bool check,
@@ -92,7 +92,7 @@ struct Database {
     const std::string &directory,
     const std::string &environment,
     const std::string &commandline,
-    const std::string &stdin, // "" -> /dev/null
+    const std::string &stdin_file, // "" -> /dev/null
     // ^^^ only these matter to identify the job
     uint64_t          signature, // this must match to qualify for reuse
     const std::string &stack,
@@ -118,8 +118,8 @@ struct Database {
     int descriptor);
   void replay_output(
     long job,
-    bool stdout,
-    bool stderr);
+    bool dump_stdout,
+    bool dump_stderr);
 
   void add_hash(
     const std::string &file,
