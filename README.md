@@ -73,6 +73,10 @@ On FreeBSD (12 or later):
     pw groupmod operator -m YOUR-NON-ROOT-USER
     reboot
 
+On Alpine Linux (3.11.5 or later):
+
+    apk add g++ make pkgconf git gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev dash
+
 On Mac OS with Mac Ports installed:
 
     sudo port install osxfuse sqlite3 gmp re2 ncurses pkgconfig dash

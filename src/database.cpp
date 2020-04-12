@@ -531,7 +531,7 @@ Usage Database::reuse_job(
   const std::string &directory,
   const std::string &environment,
   const std::string &commandline,
-  const std::string &stdin,
+  const std::string &stdin_file,
   uint64_t           signature,
   const std::string &visible,
   bool check,
@@ -549,7 +549,7 @@ Usage Database::reuse_job(
   bind_string (why, imp->find_prior, 1, directory);
   bind_blob   (why, imp->find_prior, 2, commandline);
   bind_blob   (why, imp->find_prior, 3, environment);
-  bind_string (why, imp->find_prior, 4, stdin);
+  bind_string (why, imp->find_prior, 4, stdin_file);
   bind_integer(why, imp->find_prior, 5, signature);
   out.found = sqlite3_step(imp->find_prior) == SQLITE_ROW;
   if (out.found) {
@@ -654,7 +654,7 @@ void Database::insert_job(
   const std::string &directory,
   const std::string &commandline,
   const std::string &environment,
-  const std::string &stdin,
+  const std::string &stdin_file,
   uint64_t          signature,
   const std::string &stack,
   const std::string &visible,
@@ -666,7 +666,7 @@ void Database::insert_job(
   bind_string (why, imp->insert_job, 2, directory);
   bind_blob   (why, imp->insert_job, 3, commandline);
   bind_blob   (why, imp->insert_job, 4, environment);
-  bind_string (why, imp->insert_job, 5, stdin);
+  bind_string (why, imp->insert_job, 5, stdin_file);
   bind_integer(why, imp->insert_job, 6, signature);
   bind_blob   (why, imp->insert_job, 7, stack);
   single_step (why, imp->insert_job, imp->debugdb);
@@ -781,8 +781,8 @@ std::string Database::get_output(long job, int descriptor) {
   return out.str();
 }
 
-void Database::replay_output(long job, bool stdout, bool stderr) {
-  if (!stdout && !stderr) return;
+void Database::replay_output(long job, bool dump_stdout, bool dump_stderr) {
+  if (!dump_stdout && !dump_stderr) return;
   const char *why = "Could not replay job output";
   bind_integer(why, imp->replay_log, 1, job);
   bool lf = false;
@@ -790,7 +790,7 @@ void Database::replay_output(long job, bool stdout, bool stderr) {
     int fd = sqlite3_column_int64(imp->replay_log, 0);
     const char *str = static_cast<const char*>(sqlite3_column_blob(imp->replay_log, 1));
     int len = sqlite3_column_bytes(imp->replay_log, 1);
-    if (len > 0 && ((fd == 2 && stderr) || (fd == 1 && stdout))) {
+    if (len > 0 && ((fd == 2 && dump_stderr) || (fd == 1 && dump_stdout))) {
       status_write(fd, str, len);
       lf = str[len-1] != '\n';
     }
@@ -853,7 +853,7 @@ static std::vector<JobReflection> find_all(Database *db, sqlite3_stmt *query, bo
     desc.commandline    = chop_null(rip_column(query, 2));
     desc.environment    = chop_null(rip_column(query, 3));
     desc.stack          = rip_column(query, 4);
-    desc.stdin          = rip_column(query, 5);
+    desc.stdin_file     = rip_column(query, 5);
     desc.time           = rip_column(query, 6);
     desc.usage.status   = sqlite3_column_int64 (query, 7);
     desc.usage.runtime  = sqlite3_column_double(query, 8);
@@ -861,10 +861,10 @@ static std::vector<JobReflection> find_all(Database *db, sqlite3_stmt *query, bo
     desc.usage.membytes = sqlite3_column_int64 (query, 10);
     desc.usage.ibytes   = sqlite3_column_int64 (query, 11);
     desc.usage.obytes   = sqlite3_column_int64 (query, 12);
-    if (desc.stdin.empty()) desc.stdin = "/dev/null";
+    if (desc.stdin_file.empty()) desc.stdin_file = "/dev/null";
     if (verbose) {
-      desc.stdout = db->get_output(desc.job, 1);
-      desc.stderr = db->get_output(desc.job, 2);
+      desc.stdout_payload = db->get_output(desc.job, 1);
+      desc.stderr_payload = db->get_output(desc.job, 2);
       // visible
       bind_integer(why, db->imp->get_tree, 1, desc.job);
       bind_integer(why, db->imp->get_tree, 2, VISIBLE);

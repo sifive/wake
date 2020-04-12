@@ -79,7 +79,7 @@ struct Job final : public GCObject<Job, Value> {
   typedef GCObject<Job, Value> Parent;
 
   Database *db;
-  HeapPointer<String> cmdline, stdin, dir;
+  HeapPointer<String> cmdline, stdin_file, dir;
   int state;
   Hash code; // hash(dir, stdin, environ, cmdline)
   pid_t pid;
@@ -103,7 +103,7 @@ struct Job final : public GCObject<Job, Value> {
   HeapPointer<Continuation> q_report;  // waken once job finished (inputs+outputs+report available)
 
   static TypeVar typeVar;
-  Job(Database *db_, String *dir_, String *stdin_, String *environ, String *cmdline_, bool keep, int log);
+  Job(Database *db_, String *dir_, String *stdin_file_, String *environ, String *cmdline_, bool keep, int log);
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg);
@@ -119,7 +119,7 @@ template <typename T, T (HeapPointerBase::*memberfn)(T x)>
 T Job::recurse(T arg) {
   arg = Parent::recurse<T, memberfn>(arg);
   arg = (cmdline.*memberfn)(arg);
-  arg = (stdin.*memberfn)(arg);
+  arg = (stdin_file.*memberfn)(arg);
   arg = (dir.*memberfn)(arg);
   arg = (bad_launch.*memberfn)(arg);
   arg = (bad_finish.*memberfn)(arg);
@@ -218,11 +218,11 @@ double Job::threads() const {
 struct Task {
   RootPointer<Job> job;
   std::string dir;
-  std::string stdin;
+  std::string stdin_file;
   std::string environ;
   std::string cmdline;
-  Task(RootPointer<Job> &&job_, const std::string &dir_, const std::string &stdin_, const std::string &environ_, const std::string &cmdline_)
-  : job(std::move(job_)), dir(dir_), stdin(stdin_), environ(environ_), cmdline(cmdline_) { }
+  Task(RootPointer<Job> &&job_, const std::string &dir_, const std::string &stdin_file_, const std::string &environ_, const std::string &cmdline_)
+  : job(std::move(job_)), dir(dir_), stdin_file(stdin_file_), environ(environ_), cmdline(cmdline_) { }
 };
 
 static bool operator < (const std::unique_ptr<Task> &x, const std::unique_ptr<Task> &y) {
@@ -588,7 +588,7 @@ static void launch(JobTable *jobtable) {
     gettimeofday(&i.start, 0);
     std::stringstream prelude;
     prelude << find_execpath() << "/../lib/wake/shim-wake" << '\0'
-      << (task.stdin.empty() ? "/dev/null" : task.stdin.c_str()) << '\0'
+      << (task.stdin_file.empty() ? "/dev/null" : task.stdin_file.c_str()) << '\0'
       << std::to_string(pipe_stdout[1]) << '\0'
       << std::to_string(pipe_stderr[1]) << '\0'
       << task.dir << '\0';
@@ -623,12 +623,12 @@ static void launch(JobTable *jobtable) {
       std::stringstream s;
       if (*i.job->dir != ".") s << "cd " << i.job->dir->c_str() << "; ";
       s << pretty;
-      if (!i.job->stdin->empty()) s << " < " << shell_escape(i.job->stdin->c_str());
+      if (!i.job->stdin_file->empty()) s << " < " << shell_escape(i.job->stdin_file->c_str());
       if (indirect && jobtable->imp->verbose) {
         s << " # launched by: ";
         if (task.dir != ".") s << "cd " << task.dir << "; ";
         s << pretty_cmd(task.cmdline);
-        if (!task.stdin.empty()) s << " < " << shell_escape(task.stdin);
+        if (!task.stdin_file.empty()) s << " < " << shell_escape(task.stdin_file);
       }
       s << std::endl;
       std::string out = s.str();
@@ -649,7 +649,7 @@ static void launch(JobTable *jobtable) {
     status_write(2, out.data(), out.size());
 #endif
 
-    // i.job->stdin.clear();
+    // i.job->stdin_file.clear();
     // i.job->cmdline.clear();
 
     std::pop_heap(heap.begin(), heap.end());
@@ -752,7 +752,7 @@ bool JobTable::wait(Runtime &runtime) {
         if (got == 0 || (got < 0 && errno != EINTR)) {
           close(i.pipe_stdout);
           i.pipe_stdout = -1;
-          i.status->stdout = false;
+          i.status->wait_stdout = false;
           i.job->state |= STATE_STDOUT;
           runtime.heap.guarantee(WJob::reserve());
           runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
@@ -780,7 +780,7 @@ bool JobTable::wait(Runtime &runtime) {
         if (got == 0 || (got < 0 && errno != EINTR)) {
           close(i.pipe_stderr);
           i.pipe_stderr = -1;
-          i.status->stderr = false;
+          i.status->wait_stderr = false;
           i.job->state |= STATE_STDERR;
           runtime.heap.guarantee(WJob::reserve());
           runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
@@ -875,12 +875,12 @@ bool JobTable::wait(Runtime &runtime) {
   return compute;
 }
 
-Job::Job(Database *db_, String *dir_, String *stdin_, String *environ, String *cmdline_, bool keep_, int log_)
-  : db(db_), cmdline(cmdline_), stdin(stdin_), dir(dir_), state(0), code(), pid(0), job(-1), keep(keep_), log(log_)
+Job::Job(Database *db_, String *dir_, String *stdin_file_, String *environ, String *cmdline_, bool keep_, int log_)
+  : db(db_), cmdline(cmdline_), stdin_file(stdin_file_), dir(dir_), state(0), code(), pid(0), job(-1), keep(keep_), log(log_)
 {
   std::vector<uint64_t> codes;
   Hash(dir->c_str(), dir->size()).push(codes);
-  Hash(stdin->c_str(), stdin->size()).push(codes);
+  Hash(stdin_file->c_str(), stdin_file->size()).push(codes);
   Hash(environ->c_str(), environ->size()).push(codes);
   Hash(cmdline->c_str(), cmdline->size()).push(codes);
   code = Hash(codes);
@@ -983,7 +983,7 @@ static PRIMFN(prim_job_launch) {
   EXPECT(11);
   JOB(job, 0);
   STRING(dir, 1);
-  STRING(stdin, 2);
+  STRING(stdin_file, 2);
   STRING(env, 3);
   STRING(cmd, 4);
 
@@ -997,7 +997,7 @@ static PRIMFN(prim_job_launch) {
   heap.emplace_back(new Task(
     runtime.heap.root(job),
     dir->as_str(),
-    stdin->as_str(),
+    stdin_file->as_str(),
     env->as_str(),
     cmd->as_str()));
   std::push_heap(heap.begin(), heap.end());
@@ -1034,8 +1034,8 @@ static PRIMTYPE(type_job_virtual) {
 static PRIMFN(prim_job_virtual) {
   EXPECT(9);
   JOB(job, 0);
-  STRING(stdout, 1);
-  STRING(stderr, 2);
+  STRING(stdout_payload, 1);
+  STRING(stderr_payload, 2);
 
   size_t need = reserve_unit() + WJob::reserve();
   runtime.heap.reserve(need);
@@ -1044,29 +1044,29 @@ static PRIMFN(prim_job_virtual) {
   job->predict.found = true;
   job->reality = job->predict;
 
-  if (!stdout->empty())
-    job->db->save_output(job->job, 1, stdout->c_str(), stdout->size(), 0);
-  if (!stderr->empty())
-    job->db->save_output(job->job, 2, stderr->c_str(), stderr->size(), 0);
+  if (!stdout_payload->empty())
+    job->db->save_output(job->job, 1, stdout_payload->c_str(), stdout_payload->size(), 0);
+  if (!stderr_payload->empty())
+    job->db->save_output(job->job, 2, stderr_payload->c_str(), stderr_payload->size(), 0);
 
   REQUIRE (job->state == 0);
 
   if (LOG_ECHO(job->log)) {
     std::stringstream s;
     s << pretty_cmd(job->cmdline->as_str());
-    if (!job->stdin->empty()) s << " < " << shell_escape(job->stdin->c_str());
+    if (!job->stdin_file->empty()) s << " < " << shell_escape(job->stdin_file->c_str());
     s << std::endl;
     std::string out = s.str();
     status_write(1, out.data(), out.size());
   }
   if (LOG_STDOUT(job->log)) {
-    status_write(1, stdout->c_str(), stdout->size());
-    if (!stdout->empty() && stdout->c_str()[stdout->size()-1] != '\n')
+    status_write(1, stdout_payload->c_str(), stdout_payload->size());
+    if (!stdout_payload->empty() && stdout_payload->c_str()[stdout_payload->size()-1] != '\n')
       status_write(1, "\n", 1);
   }
   if (LOG_STDERR(job->log)) {
-    status_write(1, stderr->c_str(), stderr->size());
-    if (!stderr->empty() && stderr->c_str()[stderr->size()-1] != '\n')
+    status_write(1, stderr_payload->c_str(), stderr_payload->size());
+    if (!stderr_payload->empty() && stderr_payload->c_str()[stderr_payload->size()-1] != '\n')
       status_write(1, "\n", 1);
   }
 
@@ -1093,7 +1093,7 @@ static PRIMFN(prim_job_create) {
   JobTable *jobtable = static_cast<JobTable*>(data);
   EXPECT(8);
   STRING(dir, 0);
-  STRING(stdin, 1);
+  STRING(stdin_file, 1);
   STRING(env, 2);
   STRING(cmd, 3);
   INTEGER_MPZ(signature, 4);
@@ -1109,7 +1109,7 @@ static PRIMFN(prim_job_create) {
     runtime.heap,
     jobtable->imp->db,
     dir,
-    stdin,
+    stdin_file,
     env,
     cmd,
     mpz_cmp_si(keep,0),
@@ -1124,7 +1124,7 @@ static PRIMFN(prim_job_create) {
     dir->as_str(),
     cmd->as_str(),
     env->as_str(),
-    stdin->as_str(),
+    stdin_file->as_str(),
     hash.data[0],
     stack.str(),
     visible->as_str(),
@@ -1181,7 +1181,7 @@ static PRIMFN(prim_job_cache) {
   JobTable *jobtable = static_cast<JobTable*>(data);
   EXPECT(6);
   STRING(dir, 0);
-  STRING(stdin, 1);
+  STRING(stdin_file, 1);
   STRING(env, 2);
   STRING(cmd, 3);
   INTEGER_MPZ(signature, 4);
@@ -1199,7 +1199,7 @@ static PRIMFN(prim_job_cache) {
     dir->as_str(),
     env->as_str(),
     cmd->as_str(),
-    stdin->as_str(),
+    stdin_file->as_str(),
     hash.data[0],
     visible->as_str(),
     jobtable->imp->check,
@@ -1212,7 +1212,7 @@ static PRIMFN(prim_job_cache) {
 
   Value *joblist;
   if (reuse.found && !jobtable->imp->check) {
-    Job *jobp = Job::claim(runtime.heap, jobtable->imp->db, dir, stdin, env, cmd, true, 0);
+    Job *jobp = Job::claim(runtime.heap, jobtable->imp->db, dir, stdin_file, env, cmd, true, 0);
     jobp->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED|STATE_FINISHED;
     jobp->job = job;
     jobp->record = reuse;

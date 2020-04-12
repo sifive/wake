@@ -17,6 +17,32 @@ jobs:
             - www
             - scripts/sphinx/build/html
 
+  alpine:
+    docker:
+      - image: alpine:3.11.5
+    steps:
+      - run: apk add g++ make pkgconf git tar xz gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev dash sqlite-static ncurses-static
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: |
+          wget https://github.com/libfuse/libfuse/releases/download/fuse-2.9.9/fuse-2.9.9.tar.gz
+          tar xvzf fuse-2.9.9.tar.gz
+          cd fuse-2.9.9
+          ./configure
+          make
+          cp lib/.libs/libfuse.a /usr/lib
+          cd ..
+          tar xJf /tmp/workspace/wake_*.tar.xz
+          cd wake-*
+          USE_FUSE_WAKE=0 make static
+          cd ..
+          mkdir -p release/alpine
+          mv wake-*/wake-static_* release/alpine
+      - persist_to_workspace:
+          root: .
+          paths:
+            - release/alpine
+
   debian_wheezy:
     docker:
       - image: debian:wheezy
@@ -220,6 +246,9 @@ workflows:
   build:
     jobs:
       - tarball
+      - alpine:
+          requires:
+            - tarball
       - debian_testing:
           requires:
             - tarball
@@ -243,6 +272,7 @@ workflows:
             - tarball
       - release:
           requires:
+            - alpine
             - debian_testing # Newest everything
             - debian_wheezy  # Oldest supported compiler
             - centos_6_6     # Oldest supported package versions

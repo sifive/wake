@@ -146,9 +146,9 @@ static void status_redraw(bool idle)
 
     char progress[] = "[      ] ";
     if (x.merged) {
-      if (!x.stdout) {
+      if (!x.wait_stdout) {
         strcpy(progress, "[stdout] ");
-      } else if (!x.stderr) {
+      } else if (!x.wait_stderr) {
         strcpy(progress, "[stderr] ");
       } else {
         strcpy(progress, "[merged] ");

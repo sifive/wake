@@ -78,7 +78,7 @@ int PREFIX(fn)(const char *filename, int flags, ...) {		\
 INTERPOSE(fn)
 
 OPEN(open)
-#ifndef __APPLE__
+#if defined(__GLIBC__)
 OPEN(open64)
 OPEN(__open)
 OPEN(__open64)
@@ -93,7 +93,7 @@ int PREFIX(fn)(const char *filename, int flags) {		\
 }								\
 INTERPOSE(fn)
 
-#ifndef __APPLE__
+#if defined(__GLIBC__)
 OPEN2(__open_2)
 OPEN2(__open64_2)
 #endif
@@ -117,7 +117,7 @@ int PREFIX(fn)(int dirfd, const char *filename, int flags, ...) {\
 INTERPOSE(fn)
 
 OPENAT(openat)
-#ifndef __APPLE__
+#if defined(__GLIBC__)
 OPENAT(openat64)
 #endif
 
@@ -130,7 +130,7 @@ int PREFIX(fn)(int dirfd, const char *filename, int flags) {	\
 }								\
 INTERPOSE(fn)
 
-#ifndef __APPLE__
+#if defined(__GLIBC__)
 OPENAT2(__openat_2)
 OPENAT2(__openat64_2)
 #endif
@@ -145,7 +145,7 @@ int PREFIX(fn)(const char *filename, mode_t mode) {		\
 INTERPOSE(fn)
 
 CREAT(creat)
-#ifndef __APPLE__
+#if defined(__GLIBC__)
 CREAT(creat64)
 #endif
 
@@ -159,7 +159,7 @@ FILE *PREFIX(fn)(const char *filename, const char *mode) {	\
 INTERPOSE(fn)
 
 FOPEN(fopen)
-#ifndef __APPLE__
+#if defined(__GLIBC__)
 FOPEN(fopen64)
 #endif
 
@@ -173,7 +173,7 @@ FILE *PREFIX(fn)(const char *filename, const char *mode, FILE *s) {\
 INTERPOSE(fn)
 
 FREOPEN(freopen)
-#ifndef __APPLE__
+#if defined(__GLIBC__)
 FREOPEN(freopen64)
 #endif
 

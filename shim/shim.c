@@ -16,13 +16,13 @@
  */
 
 /* Wake vfork exec shim */
-#include <sys/errno.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #include "blake2.h"
 
