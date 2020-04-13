@@ -1,0 +1,16 @@
+#! /bin/sh
+
+# eg: https://6075-148184315-gh.circle-artifacts.com/0/tmp/workspace/release
+url="$1"
+
+# eg: 0.18.1
+version="$2"
+
+curl -o wake_${version}.tar.xz                    ${url}/wake_${version}.tar.xz
+curl -o centos-6-6-wake-${version}-1.x86_64.rpm   ${url}/centos_6_6/wake-${version}-1.x86_64.rpm
+curl -o centos-7-6-wake-${version}-1.x86_64.rpm   ${url}/centos_7_6/wake-${version}-1.x86_64.rpm
+curl -o debian-sarge-wake_${version}-1_amd64.deb  ${url}/debian_testing/wake_${version}-1_amd64.deb
+curl -o debian-wheezy-wake_${version}-1_amd64.deb ${url}/debian_wheezy/wake_${version}-1_amd64.deb
+curl -o ubuntu-14-04-wake_${version}-1_amd64.deb  ${url}/ubuntu_14_04/wake_${version}-1_amd64.deb
+curl -o ubuntu-16-04-wake_${version}-1_amd64.deb  ${url}/ubuntu_16_04/wake_${version}-1_amd64.deb
+curl -o ubuntu-18-04-wake_${version}-1_amd64.deb  ${url}/ubuntu_18_04/wake_${version}-1_amd64.deb
