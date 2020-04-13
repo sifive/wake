@@ -433,10 +433,10 @@ int main(int argc, char **argv) {
     command = argv[1];
     cmdline = argv+2;
     Lexer lex(runtime.heap, command, "<target-argument>");
-    Expr *var = parse_command(lex);
+    std::unique_ptr<Expr> var(parse_command(lex));
     if (var->type == &VarRef::type) {
       body = new App(LOCATION, body, force_use(
-        new App(LOCATION, var, new Prim(LOCATION, "cmdline"))));
+        new App(LOCATION, var.release(), new Prim(LOCATION, "cmdline"))));
     } else {
       std::cerr << "Specified target '" << argv[1] << "' is not a legal identifier" << std::endl;
       ok = false;
