@@ -154,19 +154,57 @@ static PRIMFN(prim_dbl) {
 }
 
 static PRIMTYPE(type_cmp) {
+  TypeVar list;
+  Data::typeList.clone(list);
+  list[0].unify(Data::typeOrder);
   return args.size() == 2 &&
     args[0]->unify(Double::typeVar) &&
     args[1]->unify(Double::typeVar) &&
-    out->unify(Data::typeOrder);
+    out->unify(list);
 }
 
 static PRIMFN(prim_cmp) {
   EXPECT(2);
   DOUBLE(arg0, 0);
   DOUBLE(arg1, 1);
-  REQUIRE (!std::isnan(arg0->value));
-  REQUIRE (!std::isnan(arg1->value));
-  int x = (arg0->value > arg1->value) - (arg0->value < arg1->value);
+  if (std::isnan(arg0->value) || std::isnan(arg1->value)) {
+    RETURN(alloc_nil(runtime.heap));
+  } else {
+    size_t need = reserve_order() + reserve_list(1);
+    runtime.heap.reserve(need);
+    int x = (arg0->value > arg1->value) - (arg0->value < arg1->value);
+    Value *out = alloc_order(runtime.heap, x);
+    RETURN(claim_list(runtime.heap, 1, &out));
+  }
+}
+
+static PRIMTYPE(type_cmp_nan_lt) {
+  return args.size() == 2 &&
+    args[0]->unify(Double::typeVar) &&
+    args[1]->unify(Double::typeVar) &&
+    out->unify(Data::typeOrder);
+}
+
+static PRIMFN(prim_cmp_nan_lt) {
+  EXPECT(2);
+  DOUBLE(arg0, 0);
+  DOUBLE(arg1, 1);
+  int x;
+  bool n0 = std::isnan(arg0->value);
+  bool n1 = std::isnan(arg1->value);
+  if (n0) {
+    if (n1) {
+      x = 0;
+    } else {
+      x = -1; // nan < x
+    }
+  } else {
+    if (n1) {
+      x = 1; // x > nan
+    } else {
+      x = (arg0->value > arg1->value) - (arg0->value < arg1->value);
+    }
+  }
   RETURN(alloc_order(runtime.heap, x));
 }
 
@@ -282,6 +320,8 @@ void prim_register_double(PrimMap &pmap) {
   prim_register(pmap, "dcmp", prim_cmp, type_cmp,   PRIM_PURE);
   prim_register(pmap, "dstr", prim_str, type_str,   PRIM_PURE);
   prim_register(pmap, "ddbl", prim_dbl, type_dbl,   PRIM_PURE);
+
+  prim_register(pmap, "dcmp_nan_lt", prim_cmp_nan_lt, type_cmp_nan_lt, PRIM_PURE);
 
   // integer/double interop
   prim_register(pmap, "dclass", prim_class, type_class, PRIM_PURE);

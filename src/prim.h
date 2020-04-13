@@ -71,6 +71,7 @@ Value *alloc_order(Heap &h, int x);
 Value *alloc_nil(Heap &h);
 inline size_t reserve_unit() { return Record::reserve(0); }
 inline size_t reserve_bool() { return Record::reserve(0); }
+inline size_t reserve_order() { return Record::reserve(0); }
 inline size_t reserve_tuple2() { return Record::reserve(2); }
 inline size_t reserve_result() { return Record::reserve(1); }
 inline size_t reserve_list(size_t elements) { return Record::reserve(2) * elements + Record::reserve(0); }
