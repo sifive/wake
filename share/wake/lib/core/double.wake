@@ -65,26 +65,34 @@ export def ∛ x = root3 x
 # Unary operator for fourth root.
 export def ∜ x = root4 x
 
-export def dcmp x y = prim "dcmp"
-export def x <=>. y = prim "dcmp"
+export def dcmp x y =
+  def imp x y = prim "dcmp"
+  imp x y | head
+
+# Comparison of two Doubles => Option Order
+# None if either are NaN
+export def x <=>. y = dcmp x y
+
+# IEEE 754 requires comparisons with NaN to return False (except for !=)
+def dhelper x y fn = x <=>. y | omap fn | getOrElse False
 
 # Binary Less-Than Operator.
-export def x <.  y = isLT (x <=>. y)
+export def x <.  y = dhelper x y isLT
 
 # Binary Greater-Than Operator.
-export def x >.  y = isGT (x <=>. y)
+export def x >.  y = dhelper x y isGT
 
 # Binary Greater-Or-Equal Operator.
-export def x >=. y = isGE (x <=>. y)
+export def x >=. y = dhelper x y isGE
 
 # Binary Less-Or-Equal Operator.
-export def x <=. y = isLE (x <=>. y)
+export def x <=. y = dhelper x y isLE
 
 # Binary Equal-To Operator.
-export def x ==. y = isEQ (x <=>. y)
+export def x ==. y = dhelper x y isEQ
 
 # Binary Not-Equal Operator.
-export def x !=. y = isNE (x <=>. y)
+export def x !=. y = x <=>. y | omap isNE | getOrElse True
 
 # Computes the minimum of two Doubles.
 export def dmin x y = if x <. y then x else y

@@ -161,7 +161,7 @@ static Expr *add_literal_guards(Expr *guard, const ASTState &state) {
       Literal *lit = static_cast<Literal*>(e);
       HeapObject *obj = lit->value->get();
       if (typeid(*obj) == typeid(Integer)) comparison = "icmp";
-      if (typeid(*obj) == typeid(Double)) comparison = "dcmp";
+      if (typeid(*obj) == typeid(Double)) comparison = "dcmp_nan_lt";
       if (typeid(*obj) == typeid(RegExp)) comparison = "rcmp";
     }
     if (!guard) guard = new VarRef(e->location, "True@wake");
