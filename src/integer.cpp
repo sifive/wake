@@ -118,6 +118,8 @@ static PRIMFN(prim_powm) {
   INTEGER_MPZ(arg0, 0);
   INTEGER_MPZ(arg1, 1);
   INTEGER_MPZ(arg2, 2);
+  bool division_by_zero = mpz_cmp_si(arg2, 0) == 0;
+  REQUIRE(!division_by_zero);
   MPZ out;
   mpz_powm(out.value, arg0, arg1, arg2);
   RETURN(Integer::alloc(runtime.heap, out));
