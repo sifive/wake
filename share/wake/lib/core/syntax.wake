@@ -29,3 +29,16 @@ export def f ∘ g = \x f (g x)
 
 # Allows flipping the parameters of a function.
 export def flip f x y = f y x
+
+# Wait for 'x' to be computed before invoking (f x).
+# If 'x' is a list, f will run once 'x' can be distinguished between Nil and (_, _).
+# Normally, 'f x' may invoke 'f' before even this basic fact is known.
+# You generally only need 'wait' when interfacing with other wake primitives.
+# Therefore, ask a wake expert before you resort to using this function.
+# The correct way to sequence events is by consuming the results of prior events in later events.
+# A 'match x' expression on list 'x' with different case results also acts like 'wait'.
+export def wait f x =
+  def imp x = prim "true"
+  match (imp x)
+    True  = f x
+    False = panic "unreachable"

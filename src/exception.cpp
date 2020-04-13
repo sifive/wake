@@ -79,11 +79,23 @@ static PRIMFN(prim_id) {
   RETURN(args[0]);
 }
 
+static PRIMTYPE(type_true) {
+  return args.size() == 1 &&
+    out->unify(Data::typeBoolean);
+}
+
+static PRIMFN(prim_true) {
+  EXPECT(1);
+  runtime.heap.reserve(reserve_bool());
+  RETURN(claim_bool(runtime.heap, true));
+}
+
 void prim_register_exception(PrimMap &pmap) {
   // These should not be evaluated in const prop, but can be removed
   prim_register(pmap, "stack",    prim_stack, type_stack, PRIM_ORDERED);
   prim_register(pmap, "panic",    prim_panic, type_panic, PRIM_ORDERED);
   prim_register(pmap, "use",      prim_id,    type_id,    PRIM_IMPURE);
+  prim_register(pmap, "true",     prim_true,  type_true,  PRIM_PURE);
 }
 
 Expr *force_use(Expr *expr) {
