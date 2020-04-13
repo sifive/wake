@@ -72,10 +72,6 @@ static PRIMFN(prim_##name) {					\
   EXPECT(2);							\
   INTEGER_MPZ(arg0, 0);						\
   INTEGER_MPZ(arg1, 1);						\
-  bool MB_size_shift =						\
-    mpz_cmp_si(arg1,  (1<<20)) >= 0 ||				\
-    mpz_cmp_si(arg1, -(1<<20)) <= 0;				\
-  REQUIRE(!MB_size_shift);					\
   MPZ out;							\
   if (mpz_sgn(arg1) >= 0) {					\
     fn1(out.value, arg0, mpz_get_si(arg1));			\
@@ -93,8 +89,6 @@ static PRIMFN(prim_##name) {					\
   EXPECT(2);							\
   INTEGER_MPZ(arg0, 0);						\
   INTEGER_MPZ(arg1, 1);						\
-  bool MB_size_shift =	mpz_cmp_si(arg1, (1<<20)) >= 0;		\
-  REQUIRE(!MB_size_shift);					\
   MPZ out;							\
   if (mpz_sgn(arg1) >= 0) {					\
     fn(out.value, arg0, mpz_get_si(arg1));			\

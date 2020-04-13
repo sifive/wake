@@ -37,7 +37,6 @@ static PRIMFN(prim_vnew) {
   EXPECT(1);
   INTEGER_MPZ(arg0, 0);
   REQUIRE(mpz_cmp_si(arg0, 0) >= 0);
-  REQUIRE(mpz_cmp_si(arg0, 1024*1024*1024) < 0);
   RETURN(Record::alloc(runtime.heap, &Constructor::array, mpz_get_si(arg0)));
 }
 
