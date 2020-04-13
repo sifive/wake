@@ -469,6 +469,9 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
       rmap->body = expand_patterns(fnname, bucket);
       if (!rmap->body) return nullptr;
       for (size_t i = args; i > 0; --i) {
+        // This bare Get causes it to depend on the case function's first argument.
+        // While this is nominally the same as the destructor's argument, writing
+        // the function this way prevents lifting the Get out of the case.
         auto out = rmap->defs.insert(std::make_pair("_ a" + std::to_string(--var),
           DefValue(LOCATION, std::unique_ptr<Expr>(new Get(LOCATION, sum, &cons, i-1)))));
         assert (out.second);
