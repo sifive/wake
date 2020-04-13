@@ -291,6 +291,10 @@ void RFun::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 std::unique_ptr<Term> Term::pass_inline(std::unique_ptr<Term> term, size_t threshold, Runtime &runtime) {
   PassInlineCommon common(&runtime, threshold);
   PassInline pass(common);
+  // Top-level functions are not candidates for movement (inlining is still ok)
+  // If we allowed it, function hashes become sensitive to non-local source changes.
+  for (auto &t : static_cast<RFun*>(term.get())->terms)
+    t->set(SSA_SINGLETON, false);
   term->pass_inline(pass, std::move(term));
   return common.scope.finish();
 }
