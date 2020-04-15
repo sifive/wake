@@ -73,6 +73,7 @@ struct Term {
   virtual void format(std::ostream &os, TermFormat &format) const = 0;
   virtual void interpret(InterpretContext &context) = 0;
   virtual bool tailCallOk() const = 0;
+  virtual bool recomputeOk() const = 0;
 
   // All terms must implement their pass behaviour
   virtual void pass_purity(PassPurity &p) = 0;
@@ -126,6 +127,7 @@ struct RArg final : public Leaf {
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
+  bool recomputeOk() const override;
 
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
@@ -144,6 +146,7 @@ struct RLit final : public Leaf {
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
+  bool recomputeOk() const override;
 
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
@@ -156,11 +159,13 @@ struct RLit final : public Leaf {
 struct RApp final : public Redux {
   // arg0 = fn, arg1+ = arguments
   RApp(size_t fn, size_t arg, const char *label_ = "") : Redux(label_, {fn, arg}) { }
+  RApp(std::vector<size_t> &&args, const char *label_ = "") : Redux(label_, std::move(args)) { }
 
   std::unique_ptr<Term> clone(TargetScope &scope, size_t id) const override;
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
+  bool recomputeOk() const override;
 
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
@@ -183,6 +188,7 @@ struct RPrim final : public Redux {
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
+  bool recomputeOk() const override;
 
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
@@ -202,6 +208,7 @@ struct RGet final : public Redux {
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
+  bool recomputeOk() const override;
 
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
@@ -219,6 +226,7 @@ struct RDes final : public Redux {
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
+  bool recomputeOk() const override;
 
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
@@ -239,6 +247,7 @@ struct RCon final : public Redux {
   std::unique_ptr<Term> clone(TargetScope &scope, size_t id) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
+  bool recomputeOk() const override;
 
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
@@ -266,6 +275,7 @@ struct RFun final : public Term {
   void format(std::ostream &os, TermFormat &format) const override;
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
+  bool recomputeOk() const override;
 
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;

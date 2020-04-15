@@ -39,6 +39,38 @@ static size_t make_meta(size_t size, size_t args) { return (size << 8) | args; }
 static size_t meta_size(size_t meta) { return meta >> 8; }
 static size_t meta_args(size_t meta) { return meta & 255; }
 
+bool RArg::recomputeOk() const {
+  return true;
+}
+
+bool RLit::recomputeOk() const {
+  return true;
+}
+
+bool RApp::recomputeOk() const {
+  return meta_args(meta) > 0;
+}
+
+bool RPrim::recomputeOk() const {
+  return !get(SSA_ORDERED);
+}
+
+bool RGet::recomputeOk() const {
+  return true;
+}
+
+bool RCon::recomputeOk() const {
+  return true;
+}
+
+bool RDes::recomputeOk() const {
+  return false;
+}
+
+bool RFun::recomputeOk() const {
+  return true;
+}
+
 struct PassInlineCommon {
   TargetScope scope;
   ConstantPool pool;
@@ -290,9 +322,46 @@ void RFun::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   }
 
   update(p.stream.map());
-  // Detect if function returns a Constructor
-  set(SSA_FRCON, p.stream[output]->id() == typeid(RCon));
+  Term *out = p.stream[output];
   terms = p.stream.end(cp);
+
+  // Determine if this function is a candidate for eta-expansion
+  if (!get(SSA_MOVED) && meta_args(out->meta) > 0 && meta_size(out->meta) < p.common.threshold && !out->get(SSA_RECURSIVE)) {
+    bool candidate = true;
+    for (auto &x : terms)
+      if (!x->recomputeOk())
+        candidate = false;
+    if (candidate) {
+      CheckPoint cp = p.stream.begin();
+      PassInline q(p.common, cp.target); // refs up to fun are unmodified
+      // Move all original args
+      for (size_t i = 0; i < args; ++i) {
+        std::unique_ptr<Term> &x = terms[i];
+        x->pass_inline(q, std::move(x));
+      }
+      // Insert new args
+      std::vector<size_t> appargs;
+      for (size_t i = 0; i < meta_args(out->meta); ++i)
+        appargs.push_back(q.stream.include(new RArg));
+      // Transfer the rest
+      for (size_t i = args; i < terms.size(); ++i) {
+        std::unique_ptr<Term> &x = terms[i];
+        x->pass_inline(q, std::move(x));
+      }
+      update(q.stream.map());
+      appargs.insert(appargs.begin(), output);
+      output = q.stream.map().end();
+      rapp_inline(q, std::unique_ptr<RApp>(new RApp(std::move(appargs))));
+      update(q.stream.map());
+      // Reseal the function
+      args += meta_args(out->meta);
+      out = p.stream[output];
+      terms = p.stream.end(cp);
+    }
+  }
+
+  // Detect if function returns a Constructor
+  set(SSA_FRCON, out->id() == typeid(RCon));
 
   size_t size = 1;
   for (auto &x : terms) size += meta_size(x->meta);
