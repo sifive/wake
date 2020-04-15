@@ -91,7 +91,8 @@ void RLit::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 
 static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
   std::vector<size_t> &args = self->args;
-  size_t fnargs = meta_args(p.stream[args[0]]->meta);
+  Term *fn = p.stream[args[0]];
+  size_t fnargs = meta_args(fn->meta);
   if (fnargs == args.size()-1) {
     std::vector<size_t> fargs;
     size_t fnid;
@@ -153,6 +154,20 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
     if (fnargs == 0) {
       // unknown function applied; do not optimize App
       self->meta = make_meta(1, 0);
+      p.stream.transfer(std::move(self));
+    } else if (fn->id() == typeid(RApp)) {
+      self->meta = make_meta(1, fnargs+1-args.size());
+      RApp *fnapp = static_cast<RApp*>(fn);
+      if (fnapp->get(SSA_SINGLETON)) {
+        assert (!fnapp->get(SSA_MOVED));
+        fnapp->set(SSA_MOVED, true);
+        fnapp->args.insert(fnapp->args.end(), args.begin()+1, args.end());
+        args.assign(1, fnapp->args.front());
+        std::swap(fnapp->args, args);
+      } else {
+        args.erase(args.begin());
+        args.insert(args.begin(), fnapp->args.begin(), fnapp->args.end());
+      }
       p.stream.transfer(std::move(self));
     } else {
       self->meta = make_meta(1, fnargs+1-args.size());
