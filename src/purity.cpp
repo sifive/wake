@@ -34,8 +34,6 @@ static uintptr_t filter_lowest(uintptr_t x) {
 void RArg::pass_purity(PassPurity &p) {
   // An argument has no effects unless it is applied
   meta = 1;
-  // NOT safe to drop/cse
-  flags |= p.sflag;
 }
 
 void RLit::pass_purity(PassPurity &p) {

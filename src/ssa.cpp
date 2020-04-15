@@ -173,7 +173,12 @@ void RFun::format(std::ostream &os, TermFormat &format) const {
       os << ++format.id;
     }
     if (!x->label.empty()) os << " (" << x->label << ")";
-    os << " [" << x->flags << "," << x->meta << "] = ";
+    os << " [";
+    os << ((x->flags & SSA_RECURSIVE)?"R":"");
+    os << ((x->flags & SSA_EFFECT)?"E":(x->flags & SSA_ORDERED)?"O":"");
+    os << (!(x->flags & SSA_USED)?"U":!(x->flags & SSA_SINGLETON)?"X":"");
+    os << ((x->flags & SSA_MOVED)?"M":"");
+    os << "," << x->meta << "] = ";
     x->format(os, format);
   }
   format.id -= terms.size();
