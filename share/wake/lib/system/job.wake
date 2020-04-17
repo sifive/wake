@@ -550,16 +550,22 @@ target hashcode f =
   def get f = prim "get_hash"
   def reuse = get f
   if reuse !=* "" then reuse else
-    def hashPlan cmd  =
-      Plan cmd Nil Nil "." "" logNever logError Verbose ReRun True Nil (\_ True) hashUsage id id
-    def job = hashPlan ("<hash>", f, Nil) | runJobWith localRunner
-    def hash =
-      job.getJobStdout
-      | getWhenFail ""
-      | extract `(.{64}).*`
-    match job.isJobOk hash
-      True (x, Nil) = x
-      _ _ = "BadHash"
+    def create dir stdin env cmd signature visible keep log = prim "job_create"
+    def launch job dir stdin env cmd status runtime cputime membytes ibytes obytes = prim "job_launch"
+    def finish job inputs outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
+    def badfinish job error = prim "job_fail_finish"
+    def cmd = ("<hash>", f, Nil).implode
+    def job = create "." "" "\0" cmd 0 "\0" 0 (jobLog logNever logError Verbose)
+    def Unit = launch job "." "" "\0" cmd 0 0.0 1.0 0 0 0
+    match job.getJobReality
+      Fail e =
+        def Unit = badfinish job e
+        "BadHash"
+      Pass (Usage status runtime cputime mem in out) =
+        def Unit = finish job "\0" "\0" status runtime cputime mem in out
+        require 0 = status else "BadHash"
+        require (code, Nil) = job.getJobStdout | getWhenFail "" | extract `(.{64}).*` else "BadHash"
+        code
 
 # Whenever possible, use 'job' if:
 #   cmd can run under FUSE
