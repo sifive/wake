@@ -99,14 +99,14 @@ jobs:
       - run: yum -y update && yum clean all
       - run: yum --setopt=skip_missing_names_on_install=False install -y rpm-build rpm-devel rpmlint make python bash coreutils diffutils patch rpmdevtools
       - run: yum --setopt=skip_missing_names_on_install=False install -y epel-release centos-release-scl
-      - run: yum --setopt=skip_missing_names_on_install=False install -y tar xz dash git which make devtoolset-6-gcc devtoolset-6-gcc-c++ fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel gcc gcc-c++
+      - run: yum --setopt=skip_missing_names_on_install=False install -y tar xz dash git which make devtoolset-7-gcc devtoolset-7-gcc-c++ fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel gcc gcc-c++
       - attach_workspace:
           at: /tmp/workspace
       - run: |
           rpmdev-setuptree
           cp /tmp/workspace/wake_*.tar.xz /root/rpmbuild/SOURCES
           cp /tmp/workspace/wake.spec .
-          /usr/bin/scl enable devtoolset-6 'rpmbuild -ba wake.spec'
+          /usr/bin/scl enable devtoolset-7 'rpmbuild -ba wake.spec'
           yum -y install /root/rpmbuild/RPMS/x86_64/wake-*.rpm
           wake --no-workspace -x 'shellJob "ls /" Nil | getJobStdout'
           mkdir -p release/centos_6_6
