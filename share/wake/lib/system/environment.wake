@@ -31,8 +31,13 @@ publish path = match (getenv "WAKE_PATH")
   None = Nil
 
 # Setup a default path
-publish path = "/usr/bin", Nil
-publish path = "/bin", Nil
+publish path =
+  def default = "/usr/bin", "/bin", Nil
+  match (getenv "WAKE_STRICT_PATH")
+    Some "1" = Nil
+    Some _ = default
+    None = default
+
 
 # Default environment for new Plans
 export topic environment: String
