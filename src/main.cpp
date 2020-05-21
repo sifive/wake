@@ -59,6 +59,7 @@ void print_help(const char *argv0) {
     << "    --no-tty         Surpress interactive build progress interface"              << std::endl
     << "    --no-wait        Do not wait to obtain database lock; fail immediately"      << std::endl
     << "    --no-workspace   Do not open a database or scan for sources files"           << std::endl
+    << "    --strict-path    Set PATH shell variable as empty (default is /usr/bin:/bin)"<< std::endl
     << "    --heap-factor X  Heap-size is X * live data after the last GC (default 4.0)" << std::endl
     << "    --profile-heap   Report memory consumption on every garbage collection"      << std::endl
     << "    --profile  FILE  Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
@@ -105,6 +106,7 @@ int main(int argc, char **argv) {
     { 0,   "no-wait",               GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-workspace",          GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-tty",                GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "strict-path",           GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "heap-factor",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 0,   "profile",               GOPT_ARGUMENT_REQUIRED  },
@@ -157,6 +159,7 @@ int main(int argc, char **argv) {
   bool dumpssa = arg(options, "stop-after-ssa")->count;
   bool optim   =!arg(options, "no-optimize")->count;
   bool exports = arg(options, "exports")->count;
+  bool strict_path = arg(options, "strict-path")->count;
 
   const char *percents= arg(options, "percent")->argument;
   const char *heapf   = arg(options, "heap-factor")->argument;
@@ -202,6 +205,10 @@ int main(int argc, char **argv) {
 
   if (!percents) {
     percents = getenv("WAKE_PERCENT");
+  }
+
+  if (strict_path) {
+    setenv("WAKE_STRICT_PATH", "1", 1);
   }
 
   double percent = 0.9;
