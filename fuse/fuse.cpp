@@ -31,6 +31,38 @@
 #include "json5.h"
 #include "execpath.h"
 
+#ifdef __linux__
+// For unshare and bind mount
+#include <sched.h>
+#include <sys/mount.h>
+
+static void write_file(const char *file, const char *content, int len)
+{
+	int fd;
+
+	fd = open(file, O_WRONLY);
+	if (fd < 0) {
+		std::cerr << "open " << file << ": " << strerror(errno) << std::endl;
+		exit(1);
+	}
+
+	if (write(fd, content, len) != len) {
+		std::cerr << "write " << file << ": " << strerror(errno) << std::endl;
+		exit(1);
+	}
+
+	close(fd);
+}
+
+static void map_id(const char *file, uint32_t from, uint32_t to)
+{
+	char buf[80];
+	snprintf(buf, sizeof(buf), "%u %u 1", from, to);
+	write_file(file, buf, strlen(buf));
+}
+
+#endif
+
 int main(int argc, char *argv[])
 {
 	if (argc != 3) {
@@ -60,7 +92,8 @@ int main(int argc, char *argv[])
 
 	std::string name = std::to_string(getpid());
 	std::string daemon = find_execpath() + "/fuse-waked";
-	std::string mpath = get_cwd() + "/.fuse";
+	std::string cwd   = get_cwd();
+	std::string mpath = cwd + "/.fuse";
 	std::string fpath = mpath + "/.f.fuse-waked";
 	std::string rpath = mpath + "/" + name;
 	std::string lpath = mpath + "/.l." + name;
@@ -129,9 +162,38 @@ int main(int argc, char *argv[])
 			env.push_back(const_cast<char*>(x.second.value.c_str()));
 		env.push_back(0);
 
-		std::string dir = rpath + "/" + jast.get("directory").value;
+		std::string subdir = jast.get("directory").value;
 		std::string stdin = jast.get("stdin").value;
 		if (stdin.empty()) stdin = "/dev/null";
+
+#ifdef __linux__
+		// Allow overriding this to; e.g /build
+		std::string workspace = cwd;
+
+		uid_t real_euid = geteuid();
+		gid_t real_egid = getegid();
+
+		// Enter a new mount namespace we can control
+		if (0 != unshare(CLONE_NEWNS|CLONE_NEWUSER)) {
+			std::cerr << "unshare: " << strerror(errno) << std::endl;
+			exit(1);
+		}
+
+		// Return to our original UID (otherwise we are nobody)
+		write_file("/proc/self/setgroups", "deny", 4);
+		map_id("/proc/self/uid_map", real_euid, real_euid);
+		map_id("/proc/self/gid_map", real_egid, real_egid);
+
+		// Mount the fuse-visibility-protected view onto the workspace
+		if (0 != mount(rpath.c_str(), workspace.c_str(), NULL, MS_BIND, NULL)) {
+			std::cerr << "mount " << rpath << ": " << strerror(errno) << std::endl;
+			exit(1);
+		}
+
+		std::string dir = workspace + "/" + subdir;
+#else
+		std::string dir = rpath + "/" + subdir;
+#endif
 
 		if (chdir(dir.c_str()) != 0) {
 			std::cerr << "chdir " << dir << ": " << strerror(errno) << std::endl;
