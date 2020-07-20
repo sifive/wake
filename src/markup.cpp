@@ -20,8 +20,10 @@
 #include "execpath.h"
 #include "json5.h"
 #include <set>
+#include <map>
 #include <vector>
 #include <fstream>
+#include <sstream>
 #include <assert.h>
 
 struct ParanOrder {
@@ -194,4 +196,71 @@ void markup_html(std::ostream &os, Expr *root) {
   os << "<script type=\"wake\">";
   JSONRender(os).render(root);
   os << "</script>" << std::endl;
+}
+
+void markup_ctags(std::ostream &os, Expr *root, const std::vector<std::pair<std::string, std::string>>& globals) {
+  for (auto &g : globals) {
+    Expr *e = root;
+    while (e && e->type == &DefBinding::type) {
+      DefBinding *d = static_cast<DefBinding*>(e);
+      e = d->body.get();
+      auto i = d->order.find(g.second);
+      if (i != d->order.end()) {
+        int idx = i->second.index;
+        Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
+
+        os << g.first << "\t" << v->location.filename << "\t" << v->location.start.row << std::endl;
+      }
+    }
+  }
+}
+
+void markup_etags(std::ostream &os, Expr *root, const std::vector<std::pair<std::string, std::string>>& globals) {
+
+  typedef std::vector<std::pair<std::string, Location>> Symbols;
+  std::map<std::string, Symbols> files;
+
+  for (auto &g : globals) {
+    Expr *e = root;
+    while (e && e->type == &DefBinding::type) {
+      DefBinding *d = static_cast<DefBinding*>(e);
+      e = d->body.get();
+      auto i = d->order.find(g.second);
+      if (i != d->order.end()) {
+        int idx = i->second.index;
+        Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
+        std::string filename = v->location.filename;
+        std::map<std::string, Symbols>::iterator it;
+        if ((it = files.find(filename)) != files.end()) {
+          (*it).second.push_back(std::make_pair(g.first, v->location));
+        }
+        else {
+          Symbols symbols;
+          symbols.push_back(std::make_pair(g.first, v->location));
+          files.insert(std::make_pair(filename,symbols));
+        }
+      }
+    }
+  }
+
+  for(auto file : files) {
+    std::ifstream ifs(file.first.c_str(), std::ios_base::in);
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(ifs, line)) {
+      lines.push_back(line);
+    }
+
+    std::stringbuf buffer;
+    std::ostream bufos (&buffer);
+    for(auto symbol : file.second) {
+      auto row = symbol.second.start.row;
+      auto bytes = symbol.second.start.bytes;
+      assert(unsigned(row) <= lines.size());
+      bufos << lines[row-1] << char(0x7f) << symbol.first<< char(0x01) << row << "," << bytes << std::endl;
+    }
+
+    os << char(0x0c) << std::endl << file.first << "," << buffer.str().size() << std::endl;
+    os << buffer.str();
+  }
 }
