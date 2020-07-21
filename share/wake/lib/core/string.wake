@@ -53,6 +53,9 @@ export def unicodeCanonical  x = prim "sNFC"
 export def unicodeIdentifier x = prim "sNFKC"
 export def unicodeLowercase  x = prim "scaseNFKC"
 
+# Sort a list of strings
+export def sortStrings list = sortBy (_ <~ _) list
+
 # Unicode NFC string comparison Ç == C+◌̧
 export def scmpCanonical x y = scmp (unicodeCanonical x) (unicodeCanonical y)
 # Unicode NFKC string comparison (¼i⁹ = 1/4i9)
