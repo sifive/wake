@@ -3,7 +3,7 @@ jobs:
   tarball:
     machine:
       image: ubuntu-1604:202007-01
-#    resource_class: large
+#    resource_class: large # paywalled feature: 4 cores
     steps:
       - checkout
       - run: sudo apt-get update && sudo apt-get install -y build-essential libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx
@@ -21,7 +21,7 @@ jobs:
   alpine:
     machine:
       image: ubuntu-1604:202007-01
-#      docker_layer_caching: true
+#      docker_layer_caching: true # paywalled feature: retain docker build results between runs
 #    resource_class: large
     steps:
       - attach_workspace:
