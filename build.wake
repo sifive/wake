@@ -63,16 +63,16 @@ def a ;& b =
 def tarball Unit =
   require Pass (release; time) = buildAs Unit ;& buildOn Unit
   # Create debian + RedHat package files
-  def pkgfiles =
-    def setVersion file =
-      def in = source "{file}.in"
-      def script = "%
-        set -e
-        sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
-        mv "%{file}.tmp" "%{file}"
-        %"
-      shellJob script (in, Nil) | getJobOutput
-    map setVersion ("debian/changelog", "wake.spec", Nil)
+  def setVersion file =
+    def in = source "{file}.in"
+    def script = "%
+      set -e
+      sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
+      mv "%{file}.tmp" "%{file}"
+      %"
+    shellJob script (in, Nil) | getJobOutput
+  def changelog = setVersion "debian/changelog"
+  def spec = setVersion "wake.spec"
   # Identify those sources files to include in the tarball
   def srcs =
     sources "." `([^.][^/]*/)*[^.][^/]*` # ignore .foo/ files srcs
@@ -99,13 +99,13 @@ def tarball Unit =
     def cmd =
       def gnutar = which "gnutar"
       def tar = if gnutar ==* "gnutar" then which "tar" else gnutar
-      def files = map getPathName (manifest, srcs) | sortBy (_<*_)
+      def files = map getPathName (manifest, spec, srcs) | sortBy (_<*_)
       tar, "--mtime={time}", "--transform=s@^@wake-{release}/@",
       "--owner=0", "--group=0", "--numeric-owner", "-cJf",
       "wake_{release}.tar.xz", files
-    job cmd (manifest, srcs)
+    job cmd (manifest, spec, srcs)
     | getJobOutput
-  findFailFn getPathResult (tarball, pkgfiles)
+  findFailFn getPathResult (tarball, changelog, Nil)
 
 export def static _ =
   def filesResult = doInstall "tmp" "static"

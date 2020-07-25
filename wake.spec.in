@@ -21,10 +21,10 @@ or that your colleagues already built, you might appreciate wake.
 %setup -q
 
 %build
-USE_FUSE_WAKE=0 make all
+make all
 
 %install
-USE_FUSE_WAKE=0 make DESTDIR=%{buildroot}/usr install
+make DESTDIR=%{buildroot}/usr install
 
 %files
 /usr/bin/wake

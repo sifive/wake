@@ -4,8 +4,8 @@
 	dh $@
 
 override_dh_auto_build-arch:
-	USE_FUSE_WAKE=0 make wake.db
-	USE_FUSE_WAKE=0 ./bin/wake build default
+	make wake.db
+	./bin/wake build default
 
 override_dh_auto_install-arch:
-	USE_FUSE_WAKE=0 ./bin/wake install "debian/wake/usr"
+	./bin/wake install "debian/wake/usr"

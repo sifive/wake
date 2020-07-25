@@ -1,211 +1,180 @@
 version: 2.1
 jobs:
   tarball:
-    docker:
-      - image: circleci/buildpack-deps:stretch
+    machine:
+      image: ubuntu-1604:202007-01
+#    resource_class: large # paywalled feature: 4 cores
     steps:
       - checkout
       - run: sudo apt-get update && sudo apt-get install -y build-essential libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx
-      - run: USE_FUSE_WAKE=0 make tarball && mkdir www && ./bin/wake --no-workspace --html > www/index.html
+      - run: make tarball && mkdir www && ./bin/wake --no-workspace --html > www/index.html
       - run: PATH=$(pwd)/bin:$PATH PYTHONPATH=$(pwd)/scripts python3 scripts/wake2rst.py
       - persist_to_workspace:
           root: .
           paths:
+            - .circleci/dockerfiles
             - wake_*.tar.xz
-            - wake.spec
             - debian
             - www
             - scripts/sphinx/build/html
 
   alpine:
-    docker:
-      - image: alpine:3.11.5
+    machine:
+      image: ubuntu-1604:202007-01
+#      docker_layer_caching: true # paywalled feature: retain docker build results between runs
+#    resource_class: large
     steps:
-      - run: apk add g++ make pkgconf git tar xz gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev dash sqlite-static ncurses-static
       - attach_workspace:
           at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/alpine -t wake-alpine .
       - run: |
-          wget https://github.com/libfuse/libfuse/releases/download/fuse-2.9.9/fuse-2.9.9.tar.gz
-          tar xvzf fuse-2.9.9.tar.gz
-          cd fuse-2.9.9
-          ./configure
-          make
-          cp lib/.libs/libfuse.a /usr/lib
-          cd ..
           tar xJf /tmp/workspace/wake_*.tar.xz
-          cd wake-*
-          USE_FUSE_WAKE=0 make static
-          cd ..
-          mkdir -p release/alpine
-          mv wake-*/wake-static_* release/alpine
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine make -C wake-* static
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-alpine /bin/sh -c "tar xJf wake-*/wake-static_*; ./wake-*/bin/wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          install -D -t release/alpine wake-*/wake-static_*
       - persist_to_workspace:
           root: .
           paths:
             - release/alpine
 
   debian_wheezy:
-    docker:
-      - image: debian:wheezy
+    machine:
+      image: ubuntu-1604:202007-01
+#      docker_layer_caching: true
+#    resource_class: large
     steps:
-      - run: |
-          printf 'deb http://archive.debian.org/debian wheezy main\ndeb http://archive.debian.org/debian-security/ wheezy/updates main\n' > /etc/apt/sources.list
-      - run: apt-get update -o Acquire::Check-Valid-Until=false && apt-get install -y build-essential devscripts git libfuse-dev libgmp-dev libncurses5-dev libsqlite3-dev pkg-config wget
-      - run: |
-          wget -q https://github.com/sifive/wake/releases/download/v0.17.2/libre2-1_20140304+dfsg-2_amd64.deb && dpkg -i libre2-1_20140304+dfsg-2_amd64.deb
-          wget -q https://github.com/sifive/wake/releases/download/v0.17.2/libre2-dev_20140304+dfsg-2_amd64.deb && dpkg -i libre2-dev_20140304+dfsg-2_amd64.deb
       - attach_workspace:
           at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/debian-wheezy -t wake-debian-wheezy .
       - run: |
           x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
           tar xJf wake_*.orig.tar.xz
-          cd wake-*
-          cp -a /tmp/workspace/debian .
-          debuild -us -uc
-          cd ..
-          mkdir -p release/debian_wheezy
-          mv *.deb *.gz *.xz *.changes *.dsc release/debian_wheezy
+          cp -a /tmp/workspace/debian wake-*
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-wheezy debuild -us -uc
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-debian-wheezy /bin/sh -c "dpkg -i *.deb; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          install -D -t release/debian_wheezy *.deb *.gz *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
           paths:
             - release/debian_wheezy
 
   debian_testing:
-    docker:
-      - image: debian:testing
+    machine:
+      image: ubuntu-1604:202007-01
+#      docker_layer_caching: true
+#    resource_class: large
     steps:
-      - run: apt-get update && apt-get install -y build-essential devscripts git libfuse-dev libgmp-dev libncurses5-dev libre2-dev libsqlite3-dev pkg-config
       - attach_workspace:
           at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/debian-testing -t wake-debian-testing .
       - run: |
           x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
           tar xJf wake_*.orig.tar.xz
-          cd wake-*
-          cp -a /tmp/workspace/debian .
-          debuild -us -uc
-          cd ..
-          apt-get install -y ./wake_*.deb
-          wake --no-workspace -x 'shellJob "ls /" Nil | getJobStdout'
-          mkdir -p release/debian_testing
-          mv *.deb *.xz *.changes *.dsc release/debian_testing
+          cp -a /tmp/workspace/debian wake-*
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-testing debuild -us -uc
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-debian-testing /bin/sh -c "dpkg -i *.deb; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          install -D -t release/debian_testing *.deb *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
           paths:
             - release/debian_testing
 
   centos_6_6:
-    docker:
-      - image: centos:6.6
+    machine:
+      image: ubuntu-1604:202007-01
+#      docker_layer_caching: true
+#    resource_class: large
     steps:
-      - run: yum -y update && yum clean all
-      - run: yum --setopt=skip_missing_names_on_install=False install -y rpm-build rpm-devel rpmlint make python bash coreutils diffutils patch rpmdevtools
-      - run: yum --setopt=skip_missing_names_on_install=False install -y epel-release centos-release-scl
-      - run: yum --setopt=skip_missing_names_on_install=False install -y tar xz dash git which make devtoolset-7-gcc devtoolset-7-gcc-c++ fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel gcc gcc-c++
       - attach_workspace:
           at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/centos-6.6 -t wake-centos-6.6 .
       - run: |
-          rpmdev-setuptree
-          cp /tmp/workspace/wake_*.tar.xz /root/rpmbuild/SOURCES
-          cp /tmp/workspace/wake.spec .
-          /usr/bin/scl enable devtoolset-7 'rpmbuild -ba wake.spec'
-          yum -y install /root/rpmbuild/RPMS/x86_64/wake-*.rpm
-          wake --no-workspace -x 'shellJob "ls /" Nil | getJobStdout'
-          mkdir -p release/centos_6_6
-          cp /root/rpmbuild/RPMS/x86_64/*.rpm /root/rpmbuild/SRPMS/*.rpm release/centos_6_6
+          cp /tmp/workspace/wake_*.tar.xz .
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-6.6 /usr/bin/scl enable devtoolset-7 'chown root.root wake_*.tar.xz; rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz'
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-centos-6.6 /bin/sh -c "rpm -i x86_64/*.rpm; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          install -D -t release/centos_6_6 x86_64/*.rpm
       - persist_to_workspace:
           root: .
           paths:
             - release/centos_6_6
 
   centos_7_6:
-    docker:
-      - image: centos:7.6.1810
+    machine:
+      image: ubuntu-1604:202007-01
+#      docker_layer_caching: true
+#    resource_class: large
     steps:
-      - run: yum -y update && yum clean all
-      - run: yum --setopt=skip_missing_names_on_install=False install -y rpm-build rpm-devel rpmlint make python bash coreutils diffutils patch rpmdevtools
-      - run: yum --setopt=skip_missing_names_on_install=False install -y epel-release
-      - run: yum --setopt=skip_missing_names_on_install=False install -y tar xz dash git which make gcc gcc-c++ fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel
-      - run: rpmdev-setuptree
       - attach_workspace:
           at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/centos-7.6 -t wake-centos-7.6 .
       - run: |
-          rpmdev-setuptree
-          cp /tmp/workspace/wake_*.tar.xz /root/rpmbuild/SOURCES
-          cp /tmp/workspace/wake.spec .
-          rpmbuild -ba wake.spec
-          yum -y install /root/rpmbuild/RPMS/x86_64/wake-*.rpm
-          wake --no-workspace -x 'shellJob "ls /" Nil | getJobStdout'
-          mkdir -p release/centos_7_6
-          cp /root/rpmbuild/RPMS/x86_64/*.rpm /root/rpmbuild/SRPMS/*.rpm release/centos_7_6
+          cp /tmp/workspace/wake_*.tar.xz .
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-7.6 rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-centos-7.6 /bin/sh -c "rpm -i x86_64/*.rpm; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          install -D -t release/centos_7_6 x86_64/*.rpm
       - persist_to_workspace:
           root: .
           paths:
             - release/centos_7_6
 
   ubuntu_14_04:
-    docker:
-      - image: ubuntu:14.04
+    machine:
+      image: ubuntu-1604:202007-01
+#      docker_layer_caching: true
+#    resource_class: large
     steps:
-      - run: apt-get update && apt-get install -y build-essential debhelper devscripts git libfuse-dev libgmp-dev libncurses5-dev libsqlite3-dev pkg-config wget
-      - run: |
-          wget -q https://github.com/sifive/wake/releases/download/v0.17.2/libre2-1_20140304+dfsg-2_amd64.deb && dpkg -i libre2-1_20140304+dfsg-2_amd64.deb
-          wget -q https://github.com/sifive/wake/releases/download/v0.17.2/libre2-dev_20140304+dfsg-2_amd64.deb && dpkg -i libre2-dev_20140304+dfsg-2_amd64.deb
       - attach_workspace:
           at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/ubuntu-14.04 -t wake-ubuntu-14.04 .
       - run: |
           x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
           tar xJf wake_*.orig.tar.xz
-          cd wake-*
-          cp -a /tmp/workspace/debian .
-          debuild -us -uc
-          cd ..
-          mkdir -p release/ubuntu_14_04
-          mv *.deb *.xz *.changes *.dsc release/ubuntu_14_04
+          cp -a /tmp/workspace/debian wake-*
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-ubuntu-14.04 debuild -us -uc
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-ubuntu-14.04 /bin/sh -c "dpkg -i *.deb; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          install -D -t release/ubuntu_14_04 *.deb *.gz *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
           paths:
             - release/ubuntu_14_04
 
   ubuntu_16_04:
-    docker:
-      - image: ubuntu:16.04
+    machine:
+      image: ubuntu-1604:202007-01
+#      docker_layer_caching: true
+#    resource_class: large
     steps:
-      - run: apt-get update && apt-get install -y build-essential debhelper devscripts git libfuse-dev libgmp-dev libncurses5-dev libre2-dev libsqlite3-dev pkg-config
       - attach_workspace:
           at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/ubuntu-16.04 -t wake-ubuntu-16.04 .
       - run: |
           x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
           tar xJf wake_*.orig.tar.xz
-          cd wake-*
-          cp -a /tmp/workspace/debian .
-          debuild -us -uc
-          cd ..
-          apt-get install -y ./wake_*.deb
-          wake --no-workspace -x 'shellJob "ls /" Nil | getJobStdout'
-          mkdir -p release/ubuntu_16_04
-          mv *.deb *.xz *.changes *.dsc release/ubuntu_16_04
+          cp -a /tmp/workspace/debian wake-*
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /build/$(ls -d wake-*) wake-ubuntu-16.04 debuild -us -uc
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-ubuntu-16.04 /bin/sh -c "dpkg -i *.deb; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          install -D -t release/ubuntu_16_04 *.deb *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
           paths:
             - release/ubuntu_16_04
 
   ubuntu_18_04:
-    docker:
-      - image: ubuntu:18.04
+    machine:
+      image: ubuntu-1604:202007-01
+#      docker_layer_caching: true
+#    resource_class: large
     steps:
-      - run: apt-get update && apt-get install -y build-essential debhelper devscripts git libfuse-dev libgmp-dev libncurses5-dev libre2-dev libsqlite3-dev pkg-config
       - attach_workspace:
           at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/ubuntu-18.04 -t wake-ubuntu-18.04 .
       - run: |
           x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
           tar xJf wake_*.orig.tar.xz
-          cd wake-*
-          cp -a /tmp/workspace/debian .
-          debuild -us -uc
-          cd ..
-          apt-get install -y ./wake_*.deb
-          wake --no-workspace -x 'shellJob "ls /" Nil | getJobStdout'
-          mkdir -p release/ubuntu_18_04
-          mv *.deb *.xz *.changes *.dsc release/ubuntu_18_04
+          cp -a /tmp/workspace/debian wake-*
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-ubuntu-18.04 debuild -us -uc
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-ubuntu-18.04 /bin/sh -c "dpkg -i *.deb; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          install -D -t release/ubuntu_18_04 *.deb *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
           paths:
