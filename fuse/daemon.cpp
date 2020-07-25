@@ -1421,7 +1421,16 @@ int main(int argc, char *argv[])
 	sigaction(SIGALRM, &sa, 0);
 
 	args = FUSE_ARGS_INIT(0, NULL);
-	if (fuse_opt_add_arg(&args, "wake") != 0) {
+#if FUSE_VERSION >= 24 && FUSE_VERSION < 30 && !defined(__APPLE__)
+	/* Allow mounting on non-empty .fuse directories
+	 * This anti-feature was added in 2.4.0 and removed in 3.0.0.
+	 */
+	if (fuse_opt_add_arg(&args, "wake")     != 0 ||
+	    fuse_opt_add_arg(&args, "-o")       != 0 ||
+	    fuse_opt_add_arg(&args, "nonempty") != 0) {
+#else
+	if (fuse_opt_add_arg(&args, "wake")     != 0) {
+#endif
 		fprintf(stderr, "fuse_opt_add_arg failed\n");
 		goto rmroot;
 	}
