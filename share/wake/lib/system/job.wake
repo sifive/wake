@@ -91,6 +91,7 @@ tuple Plan =
   export Usage:        Usage        # User-supplied usage prediction; overruled by database statistics (if any)
   export FnInputs:     (List String => List String) # Modify the Runner's reported inputs  (files read)
   export FnOutputs:    (List String => List String) # Modify the Runner's reported outputs (files created)
+  export Label:        String       # Human-readable label chosen by Plan author to describe the job intent
 
 def isOnce = match _
   ReRun = False
@@ -143,7 +144,7 @@ export def editPlanShare f =
 # Get a unique hash-code for the job
 export def getPlanHash plan =
   def signature cmd env dir stdin = prim "hash"
-  def Plan cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ = plan
+  def Plan cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ _ = plan
   signature cmd env dir stdin
 
 # The criteria which determine if Job execution can be skipped:
@@ -161,7 +162,7 @@ export def getPlanHash plan =
 # Set reasonable defaults for all Plan arguments
 def id x = x
 export def makePlan cmd visible =
-  Plan cmd visible environment "." "" logVerbose logWarn Normal Share False Nil (\_ True) defaultUsage id id
+  Plan cmd visible environment "." "" logVerbose logWarn Normal Share False Nil (\_ True) defaultUsage id id ""
 
 export def makeShellPlan script visible =
   makePlan (which "dash", "-c", script, Nil) visible
@@ -279,7 +280,7 @@ def jobLog stdout stderr echo =
   def bit = if thresh <= logLevelRaw then 1 else 0
   (bit << 4) + (num (stderr logLevel) << 2) + num (stdout logLevel)
 
-export def runJobWith (Runner _ _ run) (Plan cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs) =
+export def runJobWith (Runner _ _ run) (Plan cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs _) =
   runJobImp cmd env dir stdin res usage finputs foutputs vis pers run (jobLog stdout stderr echo)
 
 data RunnerOption =
@@ -288,7 +289,8 @@ data RunnerOption =
 
 # Run the job!
 export def runJob p = match p
-  Plan cmd vis env dir stdin stdout stderr echo pers lo res rf usage finputs foutputs =
+  Plan cmd vis env dir stdin stdout stderr echo pers lo res rf usage finputs foutputs label =
+    def resources = override label res
     # Transform the 'List Runner' into 'List RunnerOption'
     def qualify runner = match runner
       Runner name _ _ if ! rf runner = Reject "{name}: rejected by Plan"
@@ -303,7 +305,7 @@ export def runJob p = match p
         if score >. bests then Pair score (Some fn) else acc
     def log = jobLog stdout stderr echo
     match (opts | foldl best (Pair 0.0 None) | getPairSecond)
-      Some r = runJobImp cmd env dir stdin res usage finputs foutputs vis pers r log
+      Some r = runJobImp cmd env dir stdin resources usage finputs foutputs vis pers r log
       None =
         def create dir stdin env cmd signature visible keep log = prim "job_create"
         def badfinish job e = prim "job_fail_finish"
@@ -317,6 +319,15 @@ export def runJob p = match p
         # Make sure badlaunch completes before badfinish
         def _ = wait (\_ badfinish job error) (badlaunch job error)
         job
+
+# Provide a matching function and a replacement resource to override a resource
+# A non matching function should return the original resource
+global topic resourceOverrides: ((label: String) => (origResource: String) => (newResource: String))
+
+def override label defaultResources =
+  def fns = subscribe resourceOverrides
+  def fnsWithLabel resource = map (_ label resource) fns
+  map (\r fnsWithLabel r) defaultResources | flatten
 
 def toUsage (Pair (Pair status runtime) (Pair (Pair cputime membytes) (Pair ibytes obytes))) =
   Usage status runtime cputime membytes ibytes obytes
@@ -551,7 +562,7 @@ target hashcode f =
   def reuse = get f
   if reuse !=* "" then reuse else
     def hashPlan cmd  =
-      Plan cmd Nil Nil "." "" logNever logError Verbose ReRun True Nil (\_ True) hashUsage id id
+      Plan cmd Nil Nil "." "" logNever logError Verbose ReRun True Nil (\_ True) hashUsage id id ""
     def job = hashPlan ("<hash>", f, Nil) | runJobWith localRunner
     def hash =
       job.getJobStdout
