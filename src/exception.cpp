@@ -97,7 +97,3 @@ void prim_register_exception(PrimMap &pmap) {
   prim_register(pmap, "use",      prim_id,    type_id,    PRIM_IMPURE);
   prim_register(pmap, "true",     prim_true,  type_true,  PRIM_PURE);
 }
-
-Expr *force_use(Expr *expr) {
-  return new App(LOCATION, new Lambda(LOCATION, "_", new Prim(LOCATION, "use")), expr);
-}

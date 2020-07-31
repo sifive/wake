@@ -415,19 +415,13 @@ int main(int argc, char **argv) {
     }
   }
 
-  Expr *body = new Lambda(LOCATION, "_", new Literal(LOCATION, String::literal(runtime.heap, "top"), &String::typeVar));
-  for (size_t i = 0; i <= defs.size(); ++i) {
-    body = new Lambda(LOCATION, "_", body);
-  }
-
-  TypeVar type = body->typeVar;
   std::string command;
   char *none = nullptr;
   char **cmdline = &none;
   if (exec) {
     command = exec;
     Lexer lex(runtime.heap, command, "<execute-argument>");
-    body = new App(LOCATION, body, force_use(parse_command(lex)));
+    top->body = std::unique_ptr<Expr>(parse_command(lex));
     if (lex.fail) ok = false;
   } else if (argc > 1) {
     command = argv[1];
@@ -435,20 +429,16 @@ int main(int argc, char **argv) {
     Lexer lex(runtime.heap, command, "<target-argument>");
     std::unique_ptr<Expr> var(parse_command(lex));
     if (var->type == &VarRef::type) {
-      body = new App(LOCATION, body, force_use(
-        new App(LOCATION, var.release(), new Prim(LOCATION, "cmdline"))));
+      top->body = std::unique_ptr<Expr>(new App(LOCATION, var.release(), new Prim(LOCATION, "cmdline")));
     } else {
       std::cerr << "Specified target '" << argv[1] << "' is not a legal identifier" << std::endl;
       ok = false;
     }
   } else {
-    body = new App(LOCATION, body, force_use(new VarRef(LOCATION, "Nil@wake")));
+    top->body = std::unique_ptr<Expr>(new VarRef(LOCATION, "Nil@wake"));
   }
 
-  for (auto &d : defs)
-    body = new App(LOCATION, body, force_use(new VarRef(LOCATION, d.second)));
-
-  top->body = std::unique_ptr<Expr>(body);
+  TypeVar type = top->body->typeVar;
 
   if (parse) std::cout << top.get();
   if (notype) return ok?0:1;
@@ -558,11 +548,10 @@ int main(int argc, char **argv) {
     std::cerr << "Early termination requested" << std::endl;
     pass = false;
   } else {
-    Promise *p = static_cast<Closure*>(runtime.output.get())->scope->at(0);
-    HeapObject *v = *p ? p->coerce<HeapObject>() : nullptr;
+    HeapObject *v = runtime.output.get();
     if (verbose) {
       std::cout << command << ": ";
-      type[0].format(std::cout, type);
+      type.format(std::cout, type);
       std::cout << " = ";
     }
     if (!quiet) {
