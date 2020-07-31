@@ -9,5 +9,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: install
+      run: apt-get install git fuse libfuse-dev libgmp-dev libncurses5-dev libre2-dev libsqlite3-dev pkg-config
     - name: make
       run: make
