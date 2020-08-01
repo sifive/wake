@@ -470,7 +470,7 @@ struct Definition {
 };
 
 static void extract_def(std::vector<Definition> &out, long index, AST &&ast, Expr *body) {
-  std::string key = "extract " + std::to_string(++index);
+  std::string key = "_ extract " + std::to_string(++index);
   out.emplace_back(key, ast.token, body);
   for (auto &m : ast.args) {
     AST pattern(m.token, std::string(ast.name));
@@ -1053,7 +1053,7 @@ static void parse_tuple(Lexer &lex, Package &package, Symbols *exports, Symbols 
               new Lambda(memberToken, "_", select),
               new VarRef(memberToken, "_ x")));
       std::string x = std::to_string(members.size()-inner);
-      std::string name = std::string(4 - x.size(), '0') + x;
+      std::string name = "_ a" + std::string(4 - x.size(), '0') + x;
       editmap->defs.insert(std::make_pair(name,
         DefValue(memberToken, std::unique_ptr<Expr>(select))));
     }
@@ -1070,7 +1070,7 @@ static void parse_tuple(Lexer &lex, Package &package, Symbols *exports, Symbols 
     setmap->body = std::unique_ptr<Expr>(new Construct(memberToken, sump, &c));
     for (size_t inner = 0; inner < members.size(); ++inner) {
       std::string x = std::to_string(members.size()-inner);
-      std::string name = std::string(4 - x.size(), '0') + x;
+      std::string name = "_ a" + std::string(4 - x.size(), '0') + x;
       setmap->defs.insert(std::make_pair(name,
         DefValue(memberToken, std::unique_ptr<Expr>(
           (inner == outer)
