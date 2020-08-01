@@ -406,10 +406,10 @@ export def preloadRunner =
   makeJSONRunnerPlan preload score
   | makeJSONRunner
 
-def rOK = 0
-def wOK = 1
-def xOK = 2
-def access file mode = prim "access"
+export def rOK = 0
+export def wOK = 1
+export def xOK = 2
+export def access file mode = prim "access"
 
 export def defaultRunner = match sysname
   "Darwin" = fuseRunner
