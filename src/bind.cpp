@@ -826,6 +826,9 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       }
       lambda->body = fracture(top, false, lambda->fnname, std::move(lambda->body), &lbinding);
     }
+    if (lbinding.defs.back().uses == 0 && !lambda->name.empty() && lambda->name[0] != '_') {
+      std::cerr << "Unused function argument '" << lambda->name << "' at <" << lambda->token.file() << ">." << std::endl;
+    }
     return expr;
   } else if (expr->type == &Match::type) {
     std::unique_ptr<Match> m(static_cast<Match*>(expr.release()));
@@ -854,7 +857,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     dbinding.current_index = -1;
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(def->body), &dbinding);
     for (auto &i : dbinding.defs) {
-      if (i.uses == 0 && i.name[0] != '_') {
+      if (i.uses == 0 && !i.name.empty() && i.name[0] != '_') {
         std::cerr << "Unused local definition of '" << i.name << "' at <" << i.location.file() << ">." << std::endl;
       }
     }
@@ -876,6 +879,12 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
         if (!qualify_type(binding, arg))
           ok = false;
     }
+    if (binding->defs.size() == 1 && !binding->defs[0].expr) {
+      // Use all lambda arguments
+      size_t todo = con->cons->ast.args.size();
+      for (ResolveBinding *iter = binding; todo != 0;  iter = iter->parent, --todo)
+        ++iter->defs[0].uses;
+    } // else: edit/set function
     if (!ok) expr.reset();
     return expr;
   } else if (expr->type == &Ascribe::type) {
@@ -885,6 +894,13 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     } else {
       expr.reset();
     }
+    return expr;
+  } else if (expr->type == &Prim::type) {
+    // Use all the arguments
+    for (ResolveBinding *iter = binding;
+         iter && iter->defs.size() == 1 && !iter->defs[0].expr;
+         iter = iter->parent)
+      ++iter->defs[0].uses;
     return expr;
   } else if (expr->type == &Top::type) {
     ResolveBinding gbinding(nullptr);   // global mapping + qualified defines
@@ -1017,7 +1033,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
 
     // Report unused definitions
     for (auto &def : gbinding.defs) {
-      if (def.uses == 0 && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
+      if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
         size_t at = def.name.find_first_of('@');
         std::cerr << "Unused top-level definition of '" << def.name.substr(0, at) << "' at <" << def.location.file() << ">." << std::endl;
       }
@@ -1027,7 +1043,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     if (fail) out.reset();
     return out;
   } else {
-    // Literal/Prim/Get
+    // Literal/Get
     return expr;
   }
 }
