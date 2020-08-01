@@ -78,7 +78,7 @@ export def tinsert y (Tree cmp root) =
 export def tinsertReplace y (Tree cmp root) =
   def helper t = match t
     Tip         = Bin 1 Tip y Tip
-    Bin s l x r = match (cmp x y)
+    Bin _ l x r = match (cmp x y)
       GT = join3 (helper l) x r
       EQ = join3 (delete cmp y l) y (delete cmp y r)
       LT = join3 l x (helper r)
@@ -385,7 +385,7 @@ export def x ∌ y = y ∉ x
 
 export def tcontains y t =
   match t (tupperLE y t)
-    (Tree cmp _) None              = False
+    (Tree _   _) None              = False
     (Tree cmp _) (Some (Pair x _)) = match (cmp x y)
       EQ = True
       _  = False

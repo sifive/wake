@@ -179,7 +179,7 @@ export def localRunner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput label cmd vis env dir stdin _ _ predict) = match (findSomeFn getPathError vis)
+    Pass (RunnerInput _ cmd vis env dir stdin _ _ predict) = match (findSomeFn getPathError vis)
       Some e =
         def _ = badlaunch job e
         Fail e
@@ -290,7 +290,7 @@ data RunnerOption =
 
 # Run the job!
 export def runJob p = match p
-  Plan label cmd vis env dir stdin stdout stderr echo pers lo res rf usage finputs foutputs =
+  Plan label cmd vis env dir stdin stdout stderr echo pers _lo res rf usage finputs foutputs =
     # Transform the 'List Runner' into 'List RunnerOption'
     def qualify runner = match runner
       Runner name _ _ if ! rf runner = Reject "{name}: rejected by Plan"
@@ -301,7 +301,7 @@ export def runJob p = match p
     def opts = subscribe runner | map qualify
     def best acc = match _ acc
       (Reject _) _ = acc
-      (Accept score fn) (Pair bests bestr) =
+      (Accept score fn) (Pair bests _bestr) =
         if score >. bests then Pair score (Some fn) else acc
     def log = jobLog stdout stderr echo
     match (opts | foldl best (Pair 0.0 None) | getPairSecond)
@@ -488,7 +488,7 @@ export def makeJSONRunner plan =
     Pair (Fail f) _ = Fail f
     Pair (Pass (RunnerOutput _ _ (Usage x _ _ _ _ _))) inFile if x != 0 =
       Fail (makeError "Non-zero exit status ({str x}) for JSON runner {script} on {inFile}")
-    Pair (Pass output) inFile =
+    Pair (Pass _) inFile =
       def unlink f = prim "unlink"
       def outFile = replace `\.in\.json$` ".out.json" inFile
       def json = parseJSONFile (Path outFile)
