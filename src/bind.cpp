@@ -907,16 +907,6 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       }
     }
     for (auto &p : top.packages) {
-      for (auto &e : p.second->exports.defs) {
-        auto it = gbinding.index.find(e.second.qualified);
-        if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
-      }
-    }
-    for (auto &g: top.globals.defs) {
-      auto it = gbinding.index.find(g.second.qualified);
-      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
-    }
-    for (auto &p : top.packages) {
       for (auto &f : p.second->files) {
         for (auto &t : f.topics) {
           auto name = "topic " + t.first + "@" + p.first;
@@ -963,7 +953,6 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       }
     }
 
-    size_t all_but_topics = gbinding.current_index;
     for (auto &p : top.packages) {
       for (auto &f : p.second->files) {
         for (auto &t : f.topics) {
@@ -1006,8 +995,28 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
 
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(top.body), &dbinding);
 
-    for (size_t i = 0; i < all_but_topics; ++i) {
-      ResolveDef &def = gbinding.defs[i];
+    // Mark exports and globals as uses
+    for (auto &g: top.globals.defs) {
+      auto it = gbinding.index.find(g.second.qualified);
+      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+    }
+    for (auto &g: top.globals.topics) {
+      auto it = gbinding.index.find("topic " + g.second.qualified);
+      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+    }
+    for (auto &p : top.packages) {
+      for (auto &e : p.second->exports.defs) {
+        auto it = gbinding.index.find(e.second.qualified);
+        if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+      }
+      for (auto &e : p.second->exports.topics) {
+        auto it = gbinding.index.find("topic " + e.second.qualified);
+        if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+      }
+    }
+
+    // Report unused definitions
+    for (auto &def : gbinding.defs) {
       if (def.uses == 0 && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
         size_t at = def.name.find_first_of('@');
         std::cerr << "Unused top-level definition of '" << def.name.substr(0, at) << "' at <" << def.location.file() << ">." << std::endl;
