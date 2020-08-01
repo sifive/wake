@@ -1038,6 +1038,7 @@ static void parse_tuple(Lexer &lex, Package &package, Symbols *exports, Symbols 
     // Implement get methods
     std::string get = "get" + name + mname;
     Expr *getfn = new Lambda(memberToken, "_", new Get(memberToken, sump, &c, i));
+    getfn->flags |= FLAG_SYNTHETIC;
     bind_def(lex, map, Definition(get, memberToken, getfn), exportb?exports:nullptr, globalb?globals:nullptr);
 
     // Implement edit methods
@@ -1063,6 +1064,7 @@ static void parse_tuple(Lexer &lex, Package &package, Symbols *exports, Symbols 
       new Lambda(memberToken, "fn" + mname,
         new Lambda(memberToken, "_ x", editmap));
 
+    editfn->flags |= FLAG_SYNTHETIC;
     bind_def(lex, map, Definition(edit, memberToken, editfn), exportb?exports:nullptr, globalb?globals:nullptr);
 
     // Implement set methods
@@ -1083,6 +1085,7 @@ static void parse_tuple(Lexer &lex, Package &package, Symbols *exports, Symbols 
       new Lambda(memberToken, mname,
         new Lambda(memberToken, "_ x", setmap));
 
+    setfn->flags |= FLAG_SYNTHETIC;
     bind_def(lex, map, Definition(set, memberToken, setfn), exportb?exports:nullptr, globalb?globals:nullptr);
 
     ++outer;
