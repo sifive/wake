@@ -37,8 +37,9 @@ struct ResolveDef {
   std::unique_ptr<Expr> expr;
   std::set<int> edges; // edges: things this name uses
   int index, lowlink, onstack; // Tarjan SCC variables
+  int uses;
   ResolveDef(const std::string &name_, const Location &location_, std::unique_ptr<Expr>&& expr_)
-   : name(name_), location(location_), expr(std::move(expr_)) { }
+   : name(name_), location(location_), expr(std::move(expr_)), uses(0) { }
 };
 
 struct SCCState {
@@ -253,6 +254,7 @@ static bool reference_map(ResolveBinding *binding, const std::string &name) {
   if ((i = binding->index.find(name)) != binding->index.end()) {
     if (binding->current_index != -1)
       binding->defs[binding->current_index].edges.insert(i->second);
+    ++binding->defs[i->second].uses;
     return true;
   } else {
     return false;
@@ -851,6 +853,11 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     }
     dbinding.current_index = -1;
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(def->body), &dbinding);
+    for (auto &i : dbinding.defs) {
+      if (i.uses == 0 && i.name[0] != '_') {
+        std::cerr << "Unused local definition of '" << i.name << "' at <" << i.location.file() << ">." << std::endl;
+      }
+    }
     auto out = fracture_binding(def->location, dbinding.defs, std::move(body));
     if (out && (def->flags & FLAG_AST) != 0)
       out->flags |= FLAG_AST;
@@ -900,6 +907,16 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       }
     }
     for (auto &p : top.packages) {
+      for (auto &e : p.second->exports.defs) {
+        auto it = gbinding.index.find(e.second.qualified);
+        if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+      }
+    }
+    for (auto &g: top.globals.defs) {
+      auto it = gbinding.index.find(g.second.qualified);
+      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+    }
+    for (auto &p : top.packages) {
       for (auto &f : p.second->files) {
         for (auto &t : f.topics) {
           auto name = "topic " + t.first + "@" + p.first;
@@ -945,6 +962,8 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
         }
       }
     }
+
+    size_t all_but_topics = gbinding.current_index;
     for (auto &p : top.packages) {
       for (auto &f : p.second->files) {
         for (auto &t : f.topics) {
@@ -986,6 +1005,15 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       ibinding.symbols.push_back(&top.packages[imp]->exports);
 
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(top.body), &dbinding);
+
+    for (size_t i = 0; i < all_but_topics; ++i) {
+      ResolveDef &def = gbinding.defs[i];
+      if (def.uses == 0 && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
+        size_t at = def.name.find_first_of('@');
+        std::cerr << "Unused top-level definition of '" << def.name.substr(0, at) << "' at <" << def.location.file() << ">." << std::endl;
+      }
+    }
+
     auto out = fracture_binding(top.location, gbinding.defs, std::move(body));
     if (fail) out.reset();
     return out;
