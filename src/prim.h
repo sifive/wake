@@ -85,7 +85,6 @@ size_t reserve_hash();
 Work *claim_hash(Heap &h, Value *value, Continuation *continuation);
 
 void dont_report_future_targets();
-Expr *force_use(Expr *expr);
 
 /* The evaluation order of wake makes two guarantees:
  *   [1] Exactly the effects of straight-line execution are produced.

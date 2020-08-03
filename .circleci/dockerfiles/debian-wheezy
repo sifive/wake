@@ -1,0 +1,9 @@
+FROM debian:wheezy
+
+RUN printf 'deb http://archive.debian.org/debian wheezy main\ndeb http://archive.debian.org/debian-security/ wheezy/updates main\n' > /etc/apt/sources.list
+RUN apt-get update -o Acquire::Check-Valid-Until=false && apt-get install -y build-essential devscripts git fuse libfuse-dev libgmp-dev libncurses5-dev libsqlite3-dev pkg-config wget
+
+WORKDIR /build
+
+RUN wget -q https://github.com/sifive/wake/releases/download/v0.17.2/libre2-1_20140304+dfsg-2_amd64.deb && dpkg -i libre2-1_20140304+dfsg-2_amd64.deb
+RUN wget -q https://github.com/sifive/wake/releases/download/v0.17.2/libre2-dev_20140304+dfsg-2_amd64.deb && dpkg -i libre2-dev_20140304+dfsg-2_amd64.deb

@@ -540,6 +540,10 @@ export def getPathParent path = match path
   Path name = Path (simplify "{name}/..")
   BadPath e = BadPath e
 
+export def sortPaths paths =
+  def fn a b = a.getPathName <~ b.getPathName
+  sortBy fn paths
+
 def addhash f =
   def p = simplify f
   def add f h = prim "add_hash"
