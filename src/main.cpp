@@ -404,9 +404,9 @@ int main(int argc, char **argv) {
     for (auto &g : top->globals.defs)
       defs.emplace_back(g.first, g.second.qualified);
     for (auto &t : top->globals.topics)
-      defs.emplace_back("topic " + t.first, "topic " + t.second.qualified);
+      defs.emplace_back(t.first, t.second.qualified);
     for (auto &t : top->globals.types)
-      types.insert(t.first);
+      defs.emplace_back(t.first, t.second.qualified);
   }
 
   if (exports) {
