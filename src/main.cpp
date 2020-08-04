@@ -26,6 +26,7 @@
 #include <sstream>
 #include <random>
 #include <set>
+#include <algorithm>
 #include <inttypes.h>
 #include <stdlib.h>
 #include "parser.h"
