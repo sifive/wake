@@ -513,6 +513,7 @@ int main(int argc, char **argv) {
     }
   }
 
+  sort(defs.begin(), defs.end());
   if (ctags) markup_ctags(std::cout, root.get(), defs);
   if (etags) markup_etags(std::cout, root.get(), defs);
 
