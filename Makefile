@@ -33,7 +33,7 @@ all:		wake.db
 
 clean:
 	rm -f bin/* lib/wake/* */*.o common/jlexer.cpp src/symbol.cpp src/version.h wake.db
-	touch bin/stamp lib/wake/stamp
+	touch bin/stamp lib/wake/stamp build/wake/stamp
 
 wake.db:	bin/wake lib/wake/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EXTRA)
 	test -f $@ || ./bin/wake --init .

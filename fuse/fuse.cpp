@@ -90,8 +90,9 @@ int main(int argc, char *argv[])
 	if (!JAST::parse(json, std::cerr, jast))
 		return 1;
 
-	std::string name = std::to_string(getpid());
-	std::string daemon = find_execpath() + "/fuse-waked";
+	std::string exedir = find_execpath();
+	std::string daemon = exedir + "/fuse-waked";
+	std::string name  = std::to_string(getpid());
 	std::string cwd   = get_cwd();
 	std::string mpath = cwd + "/.fuse";
 	std::string fpath = mpath + "/.f.fuse-waked";
@@ -170,18 +171,24 @@ int main(int argc, char *argv[])
 		uid_t real_euid = geteuid();
 		gid_t real_egid = getegid();
 
-		// Allow overriding this to; e.g /mnt
+		// Allow overriding this to a repeatable build directory
 		std::string workspace = cwd;
 		uid_t euid = real_euid;
 		gid_t egid = real_egid;
 		int flags = CLONE_NEWNS|CLONE_NEWUSER;
 
 		for (auto &res : jast.get("resources").children) {
-		  std::string &key = res.second.value;
-		  if (key == "isolate/workspace") workspace = "/mnt";
-		  if (key == "isolate/user") { euid = egid = 0; }
-		  if (key == "isolate/host") flags |= CLONE_NEWUTS;
-		  if (key == "isolate/net") flags |= CLONE_NEWNET;
+			std::string &key = res.second.value;
+			if (key == "isolate/user") euid = egid = 0;
+			if (key == "isolate/host") flags |= CLONE_NEWUTS;
+			if (key == "isolate/net") flags |= CLONE_NEWNET;
+			if (key == "isolate/workspace") {
+				if (access("/var/cache/wake", R_OK) == 0) {
+					workspace = "/var/cache/wake";
+				} else {
+					workspace = exedir + "/../../build/wake";
+				}
+			}
 		}
 
 		// Enter a new mount namespace we can control
