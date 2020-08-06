@@ -22,6 +22,10 @@
 #include <sstream>
 #include <sqlite3.h>
 #include <unistd.h>
+#include <string.h>
+
+// Increment every time the database schema changes
+#define SCHEMA_VERSION "1"
 
 #define VISIBLE 0
 #define INPUT 1
@@ -76,6 +80,26 @@ struct Database::detail {
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
 Database::~Database() { close(); }
 
+static int schema_cb(void *data, int columns, char **values, char **labels) {
+  // values[0] = 0 if a fresh DB
+  // values[1] = schema version
+
+  // Returning non-zero causes SQLITE_ABORT
+  if (columns != 2) return -1;
+
+  // New DB? Ok to use it
+  if (!strcmp(values[0], "0")) return 0;
+
+  // No version set? This must be a pre-0.19 database.
+  if (!values[1]) return -1;
+
+  // Matching version? Ok to use it
+  if (!strcmp(values[1], SCHEMA_VERSION)) return 0;
+
+  // Versions do not match
+  return -1;
+}
+
 std::string Database::open(bool wait, bool memory) {
   if (imp->db) return "";
   int ret;
@@ -94,12 +118,15 @@ std::string Database::open(bool wait, bool memory) {
   }
 #endif
 
+  // Increment the SCHEMA_VERSION every time the below string changes.
   const char *schema_sql =
     "pragma auto_vacuum=incremental;"
     "pragma journal_mode=wal;"
     "pragma synchronous=0;"
     "pragma locking_mode=exclusive;"
     "pragma foreign_keys=on;"
+    "create table if not exists schema("
+    "  version integer primary key);"
     "create table if not exists entropy("
     "  row_id integer primary key autoincrement,"
     "  seed   integer not null);"
@@ -156,7 +183,18 @@ std::string Database::open(bool wait, bool memory) {
   while (true) {
     char *fail;
     ret = sqlite3_exec(imp->db, schema_sql, 0, 0, &fail);
-    if (ret == SQLITE_OK) break;
+    if (ret == SQLITE_OK) {
+      // Use an empty entropy table as a proxy for a new database (it gets filled automatically)
+      const char *get_version = "select (select count(row_id) from entropy), (select max(version) from schema);";
+      const char *set_version = "insert or ignore into schema(version) values(" SCHEMA_VERSION ");";
+      ret = sqlite3_exec(imp->db, get_version, &schema_cb, 0, 0);
+      if (ret == SQLITE_OK) {
+        sqlite3_exec(imp->db, set_version, 0, 0, 0);
+        break;
+      } else {
+        return "produced by an incompatible verison of wake; remove it.";
+      }
+    }
 
     std::string out = fail;
     sqlite3_free(fail);
