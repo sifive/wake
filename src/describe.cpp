@@ -36,8 +36,10 @@ static void indent(const std::string& tab, const std::string& body) {
 
 static void describe_human(const std::vector<JobReflection> &jobs, bool debug, bool verbose) {
   for (auto &job : jobs) {
-    std::cout
-      << "Job " << job.job << ":" << std::endl
+    std::cout << "Job " << job.job;
+    if (!job.label.empty())
+      std::cout << " (" << job.label << ")";
+    std::cout << ":" << std::endl
       << "  Command-line:";
     for (auto &arg : job.commandline) std::cout << " " << shell_escape(arg);
     std::cout
@@ -88,7 +90,9 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
   std::cout << "#! /bin/sh -ex" << std::endl;
 
   for (auto &job : jobs) {
-    std::cout << std::endl << "# Wake job " << job.job << ":" << std::endl;
+    std::cout << std::endl << "# Wake job " << job.job;
+    if (!job.label.empty()) std::cout << " (" << job.label << ")";
+    std::cout << ":" << std::endl;
     std::cout << "cd " << shell_escape(get_cwd()) << std::endl;
     if (job.directory != ".") {
       std::cout << "cd " << shell_escape(job.directory) << std::endl;
