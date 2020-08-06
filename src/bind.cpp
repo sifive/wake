@@ -31,6 +31,8 @@
 
 typedef std::map<std::string, int> NameIndex;
 
+int warnings = 0;
+
 struct ResolveDef {
   std::string name;
   Location location;
@@ -104,10 +106,12 @@ struct ResolveBinding {
     for (auto sym : symbols) {
       auto it = sym->defs.find(name);
       if (it != sym->defs.end()) {
-        if (override) {
-          std::cerr << "Ambiguous import of definition '" << name
-            << "' from " << override->location.text()
-            << " and " << it->second.location.text() << std::endl;
+        if (override && it->second.qualified != override->qualified) {
+          ++warnings;
+          std::cerr << "(warning) Ambiguous import of definition '" << name
+            << "' from <" << override->location.file()
+            << "> and <" << it->second.location.file()
+            << ">" << std::endl;
         }
         override = &it->second;
       }
@@ -120,10 +124,12 @@ struct ResolveBinding {
     for (auto sym : symbols) {
       auto it = sym->topics.find(name);
       if (it != sym->topics.end()) {
-        if (override) {
-          std::cerr << "Ambiguous import of topic '" << name
-            << "' from " << override->location.text()
-            << " and " << it->second.location.text() << std::endl;
+        if (override && it->second.qualified != override->qualified) {
+          ++warnings;
+          std::cerr << "(warning) Ambiguous import of topic '" << name
+            << "' from <" << override->location.file()
+            << "> and <" << it->second.location.file()
+            << ">" << std::endl;
         }
         override = &it->second;
       }
@@ -137,10 +143,12 @@ struct ResolveBinding {
     for (auto sym : symbols) {
       auto it = sym->types.find(name);
       if (it != sym->types.end()) {
-        if (override) {
-          std::cerr << "Ambiguous import of type '" << name
-            << "' from " << override->location.text()
-            << " and " << it->second.location.text() << std::endl;
+        if (override && it->second.qualified != override->qualified) {
+          ++warnings;
+          std::cerr << "(warning) Ambiguous import of type '" << name
+            << "' from <" << override->location.file()
+            << "> and <" << it->second.location.file()
+            << ">" << std::endl;
         }
         override = &it->second;
       }
@@ -279,6 +287,7 @@ static VarRef *rebind_subscribe(ResolveBinding *binding, const Location &locatio
     std::cerr << "Subscribe of '" << name
       << "' is to a non-existent topic at "
       << location.file() << std::endl;
+    return nullptr;
   }
   return new VarRef(location, "topic " + name);
 }
@@ -679,7 +688,8 @@ struct SymMover {
     if (it == top.packages.end()) {
       warn = false;
       package = nullptr;
-      std::cerr << "Import of " << kind << " '" << def
+      ++warnings;
+      std::cerr << "(warning) Import of " << kind << " '" << def
         << "' is from non-existent package '" << pkg
         << "' at " << sym.second.location.text() << std::endl;
     } else {
@@ -690,7 +700,8 @@ struct SymMover {
 
   ~SymMover() {
     if (warn) {
-      std::cerr << "Import of " << kind << " '" << def
+      ++warnings;
+      std::cerr << "(warning) Import of " << kind << " '" << def
         << "' from package '" << package->name
         << "' is not exported at " << sym.second.location.text() << std::endl;
     }
@@ -757,7 +768,8 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location
   for (auto &p : imports.import_all) {
     auto it = top.packages.find(p);
     if (it == top.packages.end()) {
-      std::cerr << "Full import from non-existent package '" << p
+      ++warnings; // !!! segfaults
+      std::cerr << "(warning) Full import from non-existent package '" << p
         << "' at " << location.text() << std::endl;
     } else {
       out.push_back(&it->second->exports);
@@ -802,6 +814,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
   } else if (expr->type == &Subscribe::type) {
     Subscribe *sub = static_cast<Subscribe*>(expr.get());
     VarRef *out = rebind_subscribe(binding, sub->location, sub->name);
+    if (!out) return nullptr;
     out->flags |= FLAG_AST;
     return fracture(top, true, name, std::unique_ptr<Expr>(out), binding);
   } else if (expr->type == &App::type) {
@@ -825,7 +838,11 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       lambda->body = fracture(top, false, lambda->fnname, std::move(lambda->body), &lbinding);
     }
     if (lbinding.defs.back().uses == 0 && !lambda->name.empty() && lambda->name[0] != '_') {
-      std::cerr << "Unused function argument '" << lambda->name << "' at <" << lambda->token.file() << ">." << std::endl;
+      ++warnings;
+      std::cerr
+        << "(warning) Unused function argument '" << lambda->name
+        << "' at <" << lambda->token.file()
+        << ">; consider renaming to _" << lambda->name << std::endl;
     }
     return expr;
   } else if (expr->type == &Match::type) {
@@ -856,7 +873,11 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(def->body), &dbinding);
     for (auto &i : dbinding.defs) {
       if (i.uses == 0 && !i.name.empty() && i.name[0] != '_') {
-        std::cerr << "Unused local definition of '" << i.name << "' at <" << i.location.file() << ">." << std::endl;
+        ++warnings;
+        std::cerr
+          << "(warning) Unused local definition of '" << i.name
+          << "' at <" << i.location.file()
+          << ">; consider removing or renaming to _" << i.name << std::endl;
       }
     }
     auto out = fracture_binding(def->location, dbinding.defs, std::move(body));
@@ -1033,7 +1054,12 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     for (auto &def : gbinding.defs) {
       if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
         size_t at = def.name.find_first_of('@');
-        std::cerr << "Unused top-level definition of '" << def.name.substr(0, at) << "' at <" << def.location.file() << ">." << std::endl;
+        std::string name = def.name.substr(0, at);
+        ++warnings;
+        std::cerr
+          << "(warning) Unused top-level definition of '" << name
+          << "' at <" << def.location.file()
+          << ">; consider removing or renaming to _" <<  name << std::endl;
       }
     }
 
