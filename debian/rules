@@ -9,3 +9,4 @@ override_dh_auto_build-arch:
 
 override_dh_auto_install-arch:
 	./bin/wake install "debian/wake/usr"
+	mkdir -p debian/wake/var/cache/wake

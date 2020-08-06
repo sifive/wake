@@ -391,6 +391,13 @@ export def getJobStatus job = match (getJobReport job)
     else Signaled (-status)
 
 # Implement FUSE-based Runner
+# The FUSE runner on linux supports a few isolation options via resources:
+# - "isolate/user": the Job will appear to run as root
+# - "isolate/host": make the hostname appear to be "build.local"
+# - "isolate/net": disables network access
+# - "isolate/workspace": makes the build appear run in /var/cache/wake
+#    ... if /var/cache/wake does not exist, a directory 'build/wake' is
+#        used relative to where wake has been installed
 def wakePath = prim "execpath" # location of the wake executable
 export def fuseRunner =
   def fuse = "{wakePath}/../lib/wake/fuse-wake"

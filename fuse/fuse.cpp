@@ -90,8 +90,9 @@ int main(int argc, char *argv[])
 	if (!JAST::parse(json, std::cerr, jast))
 		return 1;
 
-	std::string name = std::to_string(getpid());
-	std::string daemon = find_execpath() + "/fuse-waked";
+	std::string exedir = find_execpath();
+	std::string daemon = exedir + "/fuse-waked";
+	std::string name  = std::to_string(getpid());
 	std::string cwd   = get_cwd();
 	std::string mpath = cwd + "/.fuse";
 	std::string fpath = mpath + "/.f.fuse-waked";
@@ -167,22 +168,45 @@ int main(int argc, char *argv[])
 		if (stdin.empty()) stdin = "/dev/null";
 
 #ifdef __linux__
-		// Allow overriding this to; e.g /build
-		std::string workspace = cwd;
-
 		uid_t real_euid = geteuid();
 		gid_t real_egid = getegid();
 
+		// Allow overriding this to a repeatable build directory
+		std::string workspace = cwd;
+		uid_t euid = real_euid;
+		gid_t egid = real_egid;
+		int flags = CLONE_NEWNS|CLONE_NEWUSER;
+
+		for (auto &res : jast.get("resources").children) {
+			std::string &key = res.second.value;
+			if (key == "isolate/user") euid = egid = 0;
+			if (key == "isolate/host") flags |= CLONE_NEWUTS;
+			if (key == "isolate/net") flags |= CLONE_NEWNET;
+			if (key == "isolate/workspace") {
+				if (access("/var/cache/wake", R_OK) == 0) {
+					workspace = "/var/cache/wake";
+				} else {
+					workspace = exedir + "/../../build/wake";
+				}
+			}
+		}
+
 		// Enter a new mount namespace we can control
-		if (0 != unshare(CLONE_NEWNS|CLONE_NEWUSER)) {
+		if (0 != unshare(flags)) {
 			std::cerr << "unshare: " << strerror(errno) << std::endl;
 			exit(1);
 		}
 
-		// Return to our original UID (otherwise we are nobody)
+		// Wipe out our hostname
+		if (0 != (flags & CLONE_NEWUTS)) {
+			sethostname("build", 5);
+			setdomainname("local", 5);
+		}
+
+		// Map our UID to either our original UID or root
 		write_file("/proc/self/setgroups", "deny", 4);
-		map_id("/proc/self/uid_map", real_euid, real_euid);
-		map_id("/proc/self/gid_map", real_egid, real_egid);
+		map_id("/proc/self/uid_map", euid, real_euid);
+		map_id("/proc/self/gid_map", egid, real_egid);
 
 		// Mount the fuse-visibility-protected view onto the workspace
 		if (0 != mount(rpath.c_str(), workspace.c_str(), NULL, MS_BIND, NULL)) {
