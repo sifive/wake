@@ -768,7 +768,7 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location
   for (auto &p : imports.import_all) {
     auto it = top.packages.find(p);
     if (it == top.packages.end()) {
-      ++warnings; // !!! segfaults
+      ++warnings;
       std::cerr << "(warning) Full import from non-existent package '" << p
         << "' at " << location.text() << std::endl;
     } else {
@@ -1025,8 +1025,11 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     for (auto &file : defp.files)
       for (auto &bulk : file.content->imports.import_all)
         imports.insert(bulk);
-    for (auto &imp : imports)
-      ibinding.symbols.push_back(&top.packages[imp]->exports);
+    for (auto &imp : imports) {
+      auto it = top.packages.find(imp);
+      if (it != top.packages.end())
+        ibinding.symbols.push_back(&it->second->exports);
+    }
 
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(top.body), &dbinding);
 
