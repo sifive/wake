@@ -27,13 +27,17 @@ def staticLFlags  = ("-flto", "-static", "-s", Nil)
 def doCompileC variant gcc flags headers cfile =
   def obj = replace `\.c(pp)?$` ".{variant}.o" cfile.getPathName
   def cmdline = gcc, distinctBy scmp flags ++ ("-c", cfile.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
-  def result = job cmdline (cfile, headers)
-  result.getJobOutput
+  makePlan cmdline (cfile, headers)
+  | setPlanLabel "compile {replace `^.*/` '' gcc} {obj}"
+  | runJob
+  | getJobOutput
 
 def doLinkO variant linker flags objects targ =
   def cmdline = (linker, "-o", "{targ}.{variant}", map getPathName objects) ++ distinctBy scmp flags
-  def result = job cmdline (mkdir "{targ}/..", objects)
-  result.getJobOutput
+  makePlan cmdline (mkdir "{targ}/..", objects)
+  | setPlanLabel "link {replace `^.*/` '' linker} {targ}"
+  | runJob
+  | getJobOutput
 
 def makeCompileC variant gcc flags =
   Pair variant (\extraFlags doCompileC variant gcc (flags ++ extraFlags)), Nil

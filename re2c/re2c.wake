@@ -36,7 +36,11 @@ def re2cOk Unit =
 def re2cReal file =
   def cpp = replace `\.re$` ".cpp" file.getPathName
   def cmdline = which "re2c", "-8", "--tags", "--no-generation-date", "--input-encoding", "utf8", file.getPathName, "-o", cpp, Nil
-  def result = job cmdline (file, Nil) | getJobOutput
+  def result =
+    makePlan cmdline (file, Nil)
+    | setPlanLabel "re2c {cpp}"
+    | runJob
+    | getJobOutput
   def compress = which "gzip", "-nk9", result.getPathName, Nil
   def zip = job compress (result, Nil)
   match zip.getJobStatus
