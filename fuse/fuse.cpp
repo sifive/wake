@@ -167,22 +167,39 @@ int main(int argc, char *argv[])
 		if (stdin.empty()) stdin = "/dev/null";
 
 #ifdef __linux__
-		// Allow overriding this to; e.g /build
-		std::string workspace = cwd;
-
 		uid_t real_euid = geteuid();
 		gid_t real_egid = getegid();
 
+		// Allow overriding this to; e.g /mnt
+		std::string workspace = cwd;
+		uid_t euid = real_euid;
+		gid_t egid = real_egid;
+		int flags = CLONE_NEWNS|CLONE_NEWUSER;
+
+		for (auto &res : jast.get("resources").children) {
+		  std::string &key = res.second.value;
+		  if (key == "isolate/workspace") workspace = "/mnt";
+		  if (key == "isolate/user") { euid = egid = 0; }
+		  if (key == "isolate/host") flags |= CLONE_NEWUTS;
+		  if (key == "isolate/net") flags |= CLONE_NEWNET;
+		}
+
 		// Enter a new mount namespace we can control
-		if (0 != unshare(CLONE_NEWNS|CLONE_NEWUSER)) {
+		if (0 != unshare(flags)) {
 			std::cerr << "unshare: " << strerror(errno) << std::endl;
 			exit(1);
 		}
 
-		// Return to our original UID (otherwise we are nobody)
+		// Wipe out our hostname
+		if (0 != (flags & CLONE_NEWUTS)) {
+			sethostname("build", 5);
+			setdomainname("local", 5);
+		}
+
+		// Map our UID to either our original UID or root
 		write_file("/proc/self/setgroups", "deny", 4);
-		map_id("/proc/self/uid_map", real_euid, real_euid);
-		map_id("/proc/self/gid_map", real_egid, real_egid);
+		map_id("/proc/self/uid_map", euid, real_euid);
+		map_id("/proc/self/gid_map", egid, real_egid);
 
 		// Mount the fuse-visibility-protected view onto the workspace
 		if (0 != mount(rpath.c_str(), workspace.c_str(), NULL, MS_BIND, NULL)) {
