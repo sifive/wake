@@ -130,6 +130,7 @@ int main(int argc, char **argv) {
     { 0,   "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-ssa",        GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-optimize",           GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "export-api",            GOPT_ARGUMENT_REQUIRED  },
     { ':', "shebang",               GOPT_ARGUMENT_REQUIRED  },
     { 0,   0,                       GOPT_LAST}};
 
@@ -170,6 +171,7 @@ int main(int argc, char **argv) {
   const char *in      = arg(options, "in")->argument;
   const char *exec    = arg(options, "exec")->argument;
   char       *shebang = arg(options, "shebang")->argument;
+  const char *api     = arg(options, "export-api")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -236,13 +238,13 @@ int main(int argc, char **argv) {
   }
 
   // Arguments are forbidden with these options
-  bool noargs = init || last || failed || html || global || exports || exec;
+  bool noargs = init || last || failed || html || global || exports || api || exec;
   bool targets = argc == 1 && !noargs;
 
   bool nodb = init;
   bool noparse = nodb || output || input || last || failed;
   bool notype = noparse || parse;
-  bool noexecute = notype || html || tcheck || dumpssa || global || exports || targets;
+  bool noexecute = notype || html || tcheck || dumpssa || global || exports || api || targets;
 
   if (noargs && argc > 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
@@ -371,6 +373,7 @@ int main(int argc, char **argv) {
 
   // No wake files in the path from workspace to the current directory
   if (!top->def_package) top->def_package = "nothing";
+  std::string export_package = top->def_package;
   if (!flatten_exports(*top)) ok = false;
 
   std::vector<std::pair<std::string, std::string> > defs;
@@ -403,7 +406,7 @@ int main(int argc, char **argv) {
       types.insert(t.first);
   }
 
-  if (exports) {
+  if (exports || api) {
     auto it = top->packages.find(top->def_package);
     if (it != top->packages.end()) {
       for (auto &e : it->second->exports.defs)
@@ -460,7 +463,11 @@ int main(int argc, char **argv) {
   if (tcheck) std::cout << root.get();
   if (html) markup_html(std::cout, root.get());
 
-  if (!types.empty()) {
+  if (api) {
+    std::vector<std::string> mixed(types.begin(), types.end());
+    std::cout << "package " << api << std::endl;
+    format_reexports(std::cout, export_package.c_str(), "type", mixed);
+  } else if (!types.empty()) {
     std::cout << "types";
     for (auto &t : types) {
       std::cout << " ";
@@ -477,31 +484,44 @@ int main(int argc, char **argv) {
 
   if (targets) std::cout << "Available wake targets:" << std::endl;
 
-  for (auto &g : defs) {
-    Expr *e = root.get();
-    while (e && e->type == &DefBinding::type) {
-      DefBinding *d = static_cast<DefBinding*>(e);
-      e = d->body.get();
-      auto i = d->order.find(g.second);
-      if (i != d->order.end()) {
-        int idx = i->second.index;
-        Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
-        if (targets) {
-          TypeVar clone;
-          v->typeVar.clone(clone);
-          TypeVar fn1(FN, 2);
-          TypeVar fn2(FN, 2);
-          TypeVar list;
-          Data::typeList.clone(list);
-          fn1[0].unify(list);
-          list[0].unify(String::typeVar);
-          if (!clone.tryUnify(fn1)) continue;   // must accept List String
-          if (clone[1].tryUnify(fn2)) continue; // and not return a function
-          std::cout << "  " << g.first << std::endl;
-        } else {
-          std::cout << g.first << ": ";
-          v->typeVar.format(std::cout, v->typeVar);
-          std::cout << " = <" << v->location.file() << ">" << std::endl;
+  if (api) {
+    std::vector<std::string> def, topic;
+    for (auto &d: defs) {
+      if (d.first.compare(0, 6, "topic ") == 0) {
+        topic.emplace_back(d.first.substr(6));
+      } else {
+        def.emplace_back(d.first);
+      }
+    }
+    format_reexports(std::cout, export_package.c_str(), "def", def);
+    format_reexports(std::cout, export_package.c_str(), "topic", topic);
+  } else {
+    for (auto &g : defs) {
+      Expr *e = root.get();
+      while (e && e->type == &DefBinding::type) {
+        DefBinding *d = static_cast<DefBinding*>(e);
+        e = d->body.get();
+        auto i = d->order.find(g.second);
+        if (i != d->order.end()) {
+          int idx = i->second.index;
+          Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
+          if (targets) {
+            TypeVar clone;
+            v->typeVar.clone(clone);
+            TypeVar fn1(FN, 2);
+            TypeVar fn2(FN, 2);
+            TypeVar list;
+            Data::typeList.clone(list);
+            fn1[0].unify(list);
+            list[0].unify(String::typeVar);
+            if (!clone.tryUnify(fn1)) continue;   // must accept List String
+            if (clone[1].tryUnify(fn2)) continue; // and not return a function
+            std::cout << "  " << g.first << std::endl;
+          } else {
+            std::cout << g.first << ": ";
+            v->typeVar.format(std::cout, v->typeVar);
+            std::cout << " = <" << v->location.file() << ">" << std::endl;
+          }
         }
       }
     }
