@@ -347,8 +347,8 @@ int main(int argc, char **argv) {
             << " has wakefiles with both package '" << top->def_package
             << "' and '" << package
             << "'. This prevents default package selection;"
-            << " defaulting to package 'wake'." << std::endl;
-          top->def_package = "wake";
+            << " defaulting to no package." << std::endl;
+          top->def_package = nullptr;
           warned_conflict = true;
         }
       }
@@ -367,20 +367,17 @@ int main(int argc, char **argv) {
   }
 
   // No wake files in the path from workspace to the current directory
-  if (!top->def_package) top->def_package = "wake";
+  if (!top->def_package) top->def_package = "nothing";
   if (!flatten_exports(*top)) ok = false;
 
   std::vector<std::pair<std::string, std::string> > defs;
   std::set<std::string> types;
 
   if (targets) {
-    // When the package is wake, it means we did not find a package.
-    if (strcmp(top->def_package, "wake")) {
-      auto it = top->packages.find(top->def_package);
-      if (it != top->packages.end()) {
-        for (auto &e : it->second->exports.defs)
-          defs.emplace_back(e.first, e.second.qualified);
-      }
+    auto it = top->packages.find(top->def_package);
+    if (it != top->packages.end()) {
+      for (auto &e : it->second->exports.defs)
+        defs.emplace_back(e.first, e.second.qualified);
     }
     if (defs.empty()) {
       ok = false;
