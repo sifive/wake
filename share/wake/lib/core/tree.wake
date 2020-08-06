@@ -17,6 +17,9 @@ package wake
 
 # balanced order-statistic trees
 data Tree a = Tree (a => a => Order) (TreeNode a) # cmp root
+
+from wake export type Tree
+
 data TreeNode a =
   Tip
   Bin Integer (TreeNode a) a (TreeNode a) # size left key right
