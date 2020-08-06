@@ -1077,29 +1077,31 @@ static PRIMFN(prim_job_virtual) {
 }
 
 static PRIMTYPE(type_job_create) {
-  return args.size() == 8 &&
+  return args.size() == 9 &&
     args[0]->unify(String::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
     args[3]->unify(String::typeVar) &&
-    args[4]->unify(Integer::typeVar) &&
-    args[5]->unify(String::typeVar) &&
-    args[6]->unify(Integer::typeVar) &&
+    args[4]->unify(String::typeVar) &&
+    args[5]->unify(Integer::typeVar) &&
+    args[6]->unify(String::typeVar) &&
     args[7]->unify(Integer::typeVar) &&
+    args[8]->unify(Integer::typeVar) &&
     out->unify(Job::typeVar);
 }
 
 static PRIMFN(prim_job_create) {
   JobTable *jobtable = static_cast<JobTable*>(data);
-  EXPECT(8);
-  STRING(dir, 0);
-  STRING(stdin_file, 1);
-  STRING(env, 2);
-  STRING(cmd, 3);
-  INTEGER_MPZ(signature, 4);
-  STRING(visible, 5);
-  INTEGER_MPZ(keep, 6);
-  INTEGER_MPZ(log, 7);
+  EXPECT(9);
+  STRING(label, 0);
+  STRING(dir, 1);
+  STRING(stdin_file, 2);
+  STRING(env, 3);
+  STRING(cmd, 4);
+  INTEGER_MPZ(signature, 5);
+  STRING(visible, 6);
+  INTEGER_MPZ(keep, 7);
+  INTEGER_MPZ(log, 8);
 
   Hash hash;
   REQUIRE(mpz_sizeinbase(signature, 2) <= 8*sizeof(hash.data));
