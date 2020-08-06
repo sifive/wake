@@ -42,6 +42,7 @@ struct Usage {
 
 struct JobReflection {
   long job;
+  std::string label;
   std::string directory;
   std::vector<std::string> commandline;
   std::vector<std::string> environment;
@@ -95,6 +96,7 @@ struct Database {
     const std::string &stdin_file, // "" -> /dev/null
     // ^^^ only these matter to identify the job
     uint64_t          signature, // this must match to qualify for reuse
+    const std::string &label,
     const std::string &stack,
     const std::string &visible,
     long   *job); // key used for accesses below
