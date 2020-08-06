@@ -116,7 +116,7 @@ export def take i l =
 export def drop i l =
   if i <= 0 then l else match l
     Nil = Nil
-    h, t = drop (i-1) t
+    _, t = drop (i-1) t
 
 export def at i l =
   if i < 0 then None else head (drop i l)

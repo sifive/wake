@@ -36,7 +36,8 @@ struct Continuation;
 
 #define FLAG_TOUCHED   0x01 // already explored for _
 #define FLAG_AST       0x02 // useful to include in AST
-#define FLAG_RECURSIVE 0x04
+#define FLAG_RECURSIVE 0x04 // recursive function
+#define FLAG_SYNTHETIC 0x08 // sugar-generated function
 
 /* Expression AST */
 struct Expr {

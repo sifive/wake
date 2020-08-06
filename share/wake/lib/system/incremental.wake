@@ -81,7 +81,7 @@ export def runIncrementalJob stateFileLabel reusedOutputFilterFn plan =
     | editPlanVisible  (stateFiles ++ _)
     | setPlanFnInputs  (\_ plan.getPlanVisible | map getPathName)
     | runJob
-  def postTar =
+  def _postTar = # ignored, but executed
     job
     | getJobOutputs
     | filter reusedOutputFilterFn

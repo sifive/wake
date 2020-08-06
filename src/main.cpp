@@ -59,6 +59,7 @@ void print_help(const char *argv0) {
     << "    --no-tty         Surpress interactive build progress interface"              << std::endl
     << "    --no-wait        Do not wait to obtain database lock; fail immediately"      << std::endl
     << "    --no-workspace   Do not open a database or scan for sources files"           << std::endl
+    << "    --fatal-warnings Do not execute if there are any warnings"                   << std::endl
     << "    --heap-factor X  Heap-size is X * live data after the last GC (default 4.0)" << std::endl
     << "    --profile-heap   Report memory consumption on every garbage collection"      << std::endl
     << "    --profile  FILE  Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
@@ -105,6 +106,7 @@ int main(int argc, char **argv) {
     { 0,   "no-wait",               GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-workspace",          GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-tty",                GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "fatal-warnings",        GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "heap-factor",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 0,   "profile",               GOPT_ARGUMENT_REQUIRED  },
@@ -141,6 +143,7 @@ int main(int argc, char **argv) {
   bool wait    =!arg(options, "no-wait" )->count;
   bool workspace=!arg(options, "no-workspace")->count;
   bool tty     =!arg(options, "no-tty"  )->count;
+  bool fwarning= arg(options, "fatal-warnings")->count;
   int  profileh= arg(options, "profile-heap")->count;
   bool input   = arg(options, "input"   )->count;
   bool output  = arg(options, "output"  )->count;
@@ -449,7 +452,7 @@ int main(int argc, char **argv) {
   if (!root) ok = false;
   ok = ok && sums_ok();
 
-  if (!ok) {
+  if (!ok || (fwarning && warnings)) {
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }
