@@ -19,9 +19,13 @@
 #define MARKUP_H
 
 #include <ostream>
+#include <vector>
+#include <string>
+
 struct Expr;
 
 void markup_json(std::ostream &os, Expr *root);
 void markup_html(std::ostream &os, Expr *root);
+void format_reexports(std::ostream &os, const char *package, const char *kind, const std::vector<std::string> &mixed);
 
 #endif

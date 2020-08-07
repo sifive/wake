@@ -101,7 +101,9 @@ Finally, `export topic friends` trigers the export of the topic `friends`.
 == Imports
 
 ----
-from wake import _
+# Use the wake v0.19 API by default
+from v0_19_wake import _
+# Import additional symbols from the most recent API version of wake
 from wake import map foldl Pair
 from wake import myMap=map foldl myFoldr=foldr
 from wake import def map foldl
@@ -257,9 +259,10 @@ In both cases, a package scope must be selected to produce useful work.
 
 First, wake progressively searches from the current directory
 up to the workspace root for wake files.
-If no wake files are found, the `wake` package is selected.
+If no wake files are found, the `nothing` package is selected,
+which just imports the exported API of the `wake` package.
 If the wake files found share a common package, that package is selected.
-Otherwise, the `wake` package is selected,
+Otherwise, the `nothing` package is selected,
 though this many be manually overridden using the '--in' command-line option.
 
 By default, when evaluating the command-line,

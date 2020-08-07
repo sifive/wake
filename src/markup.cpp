@@ -195,3 +195,31 @@ void markup_html(std::ostream &os, Expr *root) {
   JSONRender(os).render(root);
   os << "</script>" << std::endl;
 }
+
+void format_reexports(std::ostream &os, const char *package, const char *kind, const std::vector<std::string> &mixed) {
+  std::set<std::string> id, binary, unary;
+  for (auto &t : mixed) {
+    if (t.compare(0, 7, "binary ") == 0) {
+      binary.insert(t.substr(7));
+    } else if (t.compare(0, 6, "unary ") == 0) {
+      unary.insert(t.substr(6));
+    } else {
+      id.insert(t);
+    }
+  }
+  if (!id.empty()) {
+    os << "from " << package << " export " << kind;
+    for (auto &i : id) os << " " << i;
+    os << std::endl;
+  }
+  if (!unary.empty()) {
+    os << "from " << package << " export " << kind << " unary";
+    for (auto &i : unary) os << " " << i;
+    os << std::endl;
+  }
+  if (!binary.empty()) {
+    os << "from " << package << " export " << kind << " binary";
+    for (auto &i : binary) os << " " << i;
+    os << std::endl;
+  }
+}

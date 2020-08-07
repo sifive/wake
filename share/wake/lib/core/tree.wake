@@ -432,7 +432,6 @@ def unionMulti cmp aroot broot =
   helper aroot broot
 
 # Returns the set difference of A and B, that is, a tree containing all elements of A which are not in B.
-export def a ∖ b = tsubtract a b
 export def tsubtract (Tree _ aroot) (Tree cmp broot) =
   def helper a b = match a b
     Tip _ = Tip
