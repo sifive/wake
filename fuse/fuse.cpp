@@ -199,8 +199,12 @@ int main(int argc, char *argv[])
 
 		// Wipe out our hostname
 		if (0 != (flags & CLONE_NEWUTS)) {
-			sethostname("build", 5);
-			setdomainname("local", 5);
+			if (sethostname("build", 5) != 0) {
+				std::cerr << "sethostname(build): " << strerror(errno) << std::endl;
+			}
+			if (setdomainname("local", 5) != 0) {
+				std::cerr << "sedomainname(local): " << strerror(errno) << std::endl;
+			}
 		}
 
 		// Map our UID to either our original UID or root
