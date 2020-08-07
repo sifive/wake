@@ -79,7 +79,7 @@ struct Job final : public GCObject<Job, Value> {
   typedef GCObject<Job, Value> Parent;
 
   Database *db;
-  HeapPointer<String> cmdline, stdin_file, dir;
+  HeapPointer<String> label, cmdline, stdin_file, dir;
   int state;
   Hash code; // hash(dir, stdin, environ, cmdline)
   pid_t pid;
@@ -103,7 +103,7 @@ struct Job final : public GCObject<Job, Value> {
   HeapPointer<Continuation> q_report;  // waken once job finished (inputs+outputs+report available)
 
   static TypeVar typeVar;
-  Job(Database *db_, String *dir_, String *stdin_file_, String *environ, String *cmdline_, bool keep, int log);
+  Job(Database *db_, String *label_, String *dir_, String *stdin_file_, String *environ, String *cmdline_, bool keep, int log);
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg);
@@ -118,6 +118,7 @@ struct Job final : public GCObject<Job, Value> {
 template <typename T, T (HeapPointerBase::*memberfn)(T x)>
 T Job::recurse(T arg) {
   arg = Parent::recurse<T, memberfn>(arg);
+  arg = (label.*memberfn)(arg);
   arg = (cmdline.*memberfn)(arg);
   arg = (stdin_file.*memberfn)(arg);
   arg = (dir.*memberfn)(arg);
@@ -616,7 +617,7 @@ static void launch(JobTable *jobtable) {
     bool indirect = *i.job->cmdline != task.cmdline;
     double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
     std::string pretty = pretty_cmd(i.job->cmdline->as_str());
-    std::string clone(pretty);
+    std::string clone(i.job->label->empty() ? pretty : i.job->label->as_str());
     for (auto &c : clone) if (c == '\n') c = ' ';
     i.status = status_state.jobs.emplace(status_state.jobs.end(), clone, predict, i.start);
     if (LOG_ECHO(i.job->log)) {
@@ -875,8 +876,8 @@ bool JobTable::wait(Runtime &runtime) {
   return compute;
 }
 
-Job::Job(Database *db_, String *dir_, String *stdin_file_, String *environ, String *cmdline_, bool keep_, int log_)
-  : db(db_), cmdline(cmdline_), stdin_file(stdin_file_), dir(dir_), state(0), code(), pid(0), job(-1), keep(keep_), log(log_)
+Job::Job(Database *db_, String *label_, String *dir_, String *stdin_file_, String *environ, String *cmdline_, bool keep_, int log_)
+  : db(db_), label(label_), cmdline(cmdline_), stdin_file(stdin_file_), dir(dir_), state(0), code(), pid(0), job(-1), keep(keep_), log(log_)
 {
   std::vector<uint64_t> codes;
   Hash(dir->c_str(), dir->size()).push(codes);
@@ -1077,29 +1078,31 @@ static PRIMFN(prim_job_virtual) {
 }
 
 static PRIMTYPE(type_job_create) {
-  return args.size() == 8 &&
+  return args.size() == 9 &&
     args[0]->unify(String::typeVar) &&
     args[1]->unify(String::typeVar) &&
     args[2]->unify(String::typeVar) &&
     args[3]->unify(String::typeVar) &&
-    args[4]->unify(Integer::typeVar) &&
-    args[5]->unify(String::typeVar) &&
-    args[6]->unify(Integer::typeVar) &&
+    args[4]->unify(String::typeVar) &&
+    args[5]->unify(Integer::typeVar) &&
+    args[6]->unify(String::typeVar) &&
     args[7]->unify(Integer::typeVar) &&
+    args[8]->unify(Integer::typeVar) &&
     out->unify(Job::typeVar);
 }
 
 static PRIMFN(prim_job_create) {
   JobTable *jobtable = static_cast<JobTable*>(data);
-  EXPECT(8);
-  STRING(dir, 0);
-  STRING(stdin_file, 1);
-  STRING(env, 2);
-  STRING(cmd, 3);
-  INTEGER_MPZ(signature, 4);
-  STRING(visible, 5);
-  INTEGER_MPZ(keep, 6);
-  INTEGER_MPZ(log, 7);
+  EXPECT(9);
+  STRING(label, 0);
+  STRING(dir, 1);
+  STRING(stdin_file, 2);
+  STRING(env, 3);
+  STRING(cmd, 4);
+  INTEGER_MPZ(signature, 5);
+  STRING(visible, 6);
+  INTEGER_MPZ(keep, 7);
+  INTEGER_MPZ(log, 8);
 
   Hash hash;
   REQUIRE(mpz_sizeinbase(signature, 2) <= 8*sizeof(hash.data));
@@ -1108,6 +1111,7 @@ static PRIMFN(prim_job_create) {
   Job *out = Job::alloc(
     runtime.heap,
     jobtable->imp->db,
+    label,
     dir,
     stdin_file,
     env,
@@ -1126,6 +1130,7 @@ static PRIMFN(prim_job_create) {
     env->as_str(),
     stdin_file->as_str(),
     hash.data[0],
+    label->as_str(),
     stack.str(),
     visible->as_str(),
     &out->job);
@@ -1212,7 +1217,7 @@ static PRIMFN(prim_job_cache) {
 
   Value *joblist;
   if (reuse.found && !jobtable->imp->check) {
-    Job *jobp = Job::claim(runtime.heap, jobtable->imp->db, dir, stdin_file, env, cmd, true, 0);
+    Job *jobp = Job::claim(runtime.heap, jobtable->imp->db, dir, dir, stdin_file, env, cmd, true, 0);
     jobp->state = STATE_FORKED|STATE_STDOUT|STATE_STDERR|STATE_MERGED|STATE_FINISHED;
     jobp->job = job;
     jobp->record = reuse;

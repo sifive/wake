@@ -21,7 +21,7 @@ def toVariant = match _
   "default" = Pass (Pair "native-cpp11-release" "native-c99-release")
   "static"  = Pass (Pair "native-cpp11-static" "native-c99-static")
   "debug"   = Pass (Pair "native-cpp11-debug" "native-c99-debug")
-  s = Fail "Unknown bulid target ({s})".makeError
+  s = Fail "Unknown build target ({s})".makeError
 
 export def build = match _
   "tarball", Nil = tarball Unit | rmap (\_ "TARBALL")
@@ -42,7 +42,7 @@ def all variant = map (_ variant) targets | findFailFn getPathResult
 # Install wake into a target location
 def doInstall dest kind =
   require Pass variant = toVariant kind
-  def datfiles = sources "{here}/share" `.*`
+  def datfiles = source "{here}/build/wake/stamp", sources "{here}/share" `.*`
   def binfilesResult = all variant
   def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
   def datinstall = map (installIn dest) datfiles

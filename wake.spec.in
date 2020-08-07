@@ -25,11 +25,14 @@ make all
 
 %install
 make DESTDIR=%{buildroot}/usr install
+mkdir -p %{buildroot}/var/cache/wake
 
 %files
 /usr/bin/wake
 /usr/lib/wake
 /usr/share/wake
+/usr/build/wake
+%dir /var/cache/wake
 %doc /usr/share/doc/wake
 
 %changelog

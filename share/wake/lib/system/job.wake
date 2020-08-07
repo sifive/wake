@@ -28,6 +28,7 @@ export def getUsageThreads (Usage _ run cpu _ _ _) =
 
 # RunnerInput is a subset of the fields supplied in the execution Plan
 tuple RunnerInput =
+  export Label:       String
   export Command:     List String
   export Visible:     List Path
   export Environment: List String
@@ -76,6 +77,7 @@ export data Persistence =
 
 # A Plan describes a not-yet-executed Job
 tuple Plan =
+  export Label:        String       # The label used when showing the command during execution
   export Command:      List String  # The command-line arguments (the first is the command to run)
   export Visible:      List Path    # Only these files should be available to the command
   export Environment:  List String  # KEY=VALUE environment variables fed to the command
@@ -143,7 +145,7 @@ export def editPlanShare f =
 # Get a unique hash-code for the job
 export def getPlanHash plan =
   def signature cmd env dir stdin = prim "hash"
-  def Plan cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ = plan
+  def Plan _ cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ = plan
   signature cmd env dir stdin
 
 # The criteria which determine if Job execution can be skipped:
@@ -161,7 +163,7 @@ export def getPlanHash plan =
 # Set reasonable defaults for all Plan arguments
 def id x = x
 export def makePlan cmd visible =
-  Plan cmd visible environment "." "" logVerbose logWarn Normal Share False Nil (\_ True) defaultUsage id id
+  Plan "" cmd visible environment "." "" logVerbose logWarn Normal Share False Nil (\_ True) defaultUsage id id
 
 export def makeShellPlan script visible =
   makePlan (which "dash", "-c", script, Nil) visible
@@ -177,7 +179,7 @@ export def localRunner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput cmd vis env dir stdin _ _ predict) = match (findSomeFn getPathError vis)
+    Pass (RunnerInput _ cmd vis env dir stdin _ _ predict) = match (findSomeFn getPathError vis)
       Some e =
         def _ = badlaunch job e
         Fail e
@@ -198,7 +200,7 @@ export def virtualRunner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput _ vis _ _ _ _ _ predict) = match (findSomeFn getPathError vis)
+    Pass (RunnerInput _ _ vis _ _ _ _ _ predict) = match (findSomeFn getPathError vis)
       Some e =
         def _ = badlaunch job e
         Fail e
@@ -213,8 +215,8 @@ export def virtualRunner =
 def pid = prim "pid"
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
-def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run log =
-  def create dir stdin env cmd signature visible keep log = prim "job_create"
+def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run log label =
+  def create label dir stdin env cmd signature visible keep log = prim "job_create"
   def finish job inputs outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
   def badfinish job error = prim "job_fail_finish"
   def cache dir stdin env cmd signature visible = prim "job_cache"
@@ -224,10 +226,10 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run log =
     def getPathOpt = match _
       Path name = Some name
       BadPath _ = None
-    def job = create dir stdin env.implode cmd.implode hash (mapPartial getPathOpt vis).implode (if keep then 1 else 0) log
+    def job = create label dir stdin env.implode cmd.implode hash (mapPartial getPathOpt vis).implode (if keep then 1 else 0) log
     def prefix = "{str pid}.{str (getJobId job)}"
     def usage = getJobRecord job | getOrElse uusage
-    def output = run job (Pass (RunnerInput cmd vis env dir stdin res prefix usage))
+    def output = run job (Pass (RunnerInput label cmd vis env dir stdin res prefix usage))
     def final _ = match output
       Fail e =
         badfinish job e
@@ -254,17 +256,17 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run log =
       Pair Nil      last = confirm False last (build Unit)
 
 # Only run if the first four arguments differ
-target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run log =
-  runAlways cmd env dir stdin res usage finputs foutputs vis keep run log
+target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run log label =
+  runAlways cmd env dir stdin res usage finputs foutputs vis keep run log label
 
 # Default runners provided by wake
 export topic runner: Runner
 publish runner = localRunner, defaultRunner, Nil
 
-def runJobImp cmd env dir stdin res usage finputs foutputs vis pers run log =
+def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run log =
   if isOnce pers
-  then runOnce   cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run log
-  else runAlways cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run log
+  then runOnce   cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run log label
+  else runAlways cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run log label
 
 def jobLog stdout stderr echo =
   def num = match _
@@ -279,8 +281,8 @@ def jobLog stdout stderr echo =
   def bit = if thresh <= logLevelRaw then 1 else 0
   (bit << 4) + (num (stderr logLevel) << 2) + num (stdout logLevel)
 
-export def runJobWith (Runner _ _ run) (Plan cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs) =
-  runJobImp cmd env dir stdin res usage finputs foutputs vis pers run (jobLog stdout stderr echo)
+export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs) =
+  runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (jobLog stdout stderr echo)
 
 data RunnerOption =
   Accept (score: Double) (runnerFn: Job => Result RunnerInput Error => Result RunnerOutput Error)
@@ -288,7 +290,7 @@ data RunnerOption =
 
 # Run the job!
 export def runJob p = match p
-  Plan cmd vis env dir stdin stdout stderr echo pers lo res rf usage finputs foutputs =
+  Plan label cmd vis env dir stdin stdout stderr echo pers _lo res rf usage finputs foutputs =
     # Transform the 'List Runner' into 'List RunnerOption'
     def qualify runner = match runner
       Runner name _ _ if ! rf runner = Reject "{name}: rejected by Plan"
@@ -299,16 +301,16 @@ export def runJob p = match p
     def opts = subscribe runner | map qualify
     def best acc = match _ acc
       (Reject _) _ = acc
-      (Accept score fn) (Pair bests bestr) =
+      (Accept score fn) (Pair bests _bestr) =
         if score >. bests then Pair score (Some fn) else acc
     def log = jobLog stdout stderr echo
     match (opts | foldl best (Pair 0.0 None) | getPairSecond)
-      Some r = runJobImp cmd env dir stdin res usage finputs foutputs vis pers r log
+      Some r = runJobImp label cmd env dir stdin res usage finputs foutputs vis pers r log
       None =
-        def create dir stdin env cmd signature visible keep log = prim "job_create"
+        def create label dir stdin env cmd signature visible keep log = prim "job_create"
         def badfinish job e = prim "job_fail_finish"
         def badlaunch job e = prim "job_fail_launch"
-        def job = create dir stdin env.implode cmd.implode 0 "" 0 log
+        def job = create label dir stdin env.implode cmd.implode 0 "" 0 log
         def error =
           def pretty = match _
             Accept _ _ = ""
@@ -389,6 +391,13 @@ export def getJobStatus job = match (getJobReport job)
     else Signaled (-status)
 
 # Implement FUSE-based Runner
+# The FUSE runner on linux supports a few isolation options via resources:
+# - "isolate/user": the Job will appear to run as root
+# - "isolate/host": make the hostname appear to be "build.local"
+# - "isolate/net": disables network access
+# - "isolate/workspace": makes the build appear run in /var/cache/wake
+#    ... if /var/cache/wake does not exist, a directory 'build/wake' is
+#        used relative to where wake has been installed
 def wakePath = prim "execpath" # location of the wake executable
 export def fuseRunner =
   def fuse = "{wakePath}/../lib/wake/fuse-wake"
@@ -404,10 +413,10 @@ export def preloadRunner =
   makeJSONRunnerPlan preload score
   | makeJSONRunner
 
-def rOK = 0
-def wOK = 1
-def xOK = 2
-def access file mode = prim "access"
+export def rOK = 0
+export def wOK = 1
+export def xOK = 2
+export def access file mode = prim "access"
 
 export def defaultRunner = match sysname
   "Darwin" = fuseRunner
@@ -448,7 +457,7 @@ export def makeJSONRunner plan =
   def pre = match _
     Fail f = Pair (Fail f) ""
     _ if ! ok = Pair (Fail (makeError "Runner {script} is not executable")) ""
-    Pass (RunnerInput command visible environment directory stdin res prefix record) = match (findSomeFn getPathError visible)
+    Pass (RunnerInput label command visible environment directory stdin res prefix record) = match (findSomeFn getPathError visible)
       Some e = Pair (Fail e) ""
       None =
         def Usage status runtime cputime membytes inbytes outbytes = record
@@ -480,13 +489,13 @@ export def makeJSONRunner plan =
             Pass inFile =
               def outFile = "{build}/{prefix}.out.json"
               def cmd = script, inFile, outFile, extraArgs
-              def proxy = RunnerInput cmd Nil environment "." "" Nil prefix (estimate record)
+              def proxy = RunnerInput label cmd Nil environment "." "" Nil prefix (estimate record)
               Pair (Pass proxy) inFile
   def post = match _
     Pair (Fail f) _ = Fail f
     Pair (Pass (RunnerOutput _ _ (Usage x _ _ _ _ _))) inFile if x != 0 =
       Fail (makeError "Non-zero exit status ({str x}) for JSON runner {script} on {inFile}")
-    Pair (Pass output) inFile =
+    Pair (Pass _) inFile =
       def unlink f = prim "unlink"
       def outFile = replace `\.in\.json$` ".out.json" inFile
       def json = parseJSONFile (Path outFile)
@@ -555,7 +564,7 @@ target hashcode f =
   def reuse = get f
   if reuse !=* "" then reuse else
     def hashPlan cmd  =
-      Plan cmd Nil Nil "." "" logNever logError Verbose ReRun True Nil (\_ True) hashUsage id id
+      Plan "" cmd Nil Nil "." "" logNever logError Verbose ReRun True Nil (\_ True) hashUsage id id
     def job = hashPlan ("<hash>", f, Nil) | runJobWith localRunner
     def hash =
       job.getJobStdout

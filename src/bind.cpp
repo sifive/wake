@@ -31,14 +31,17 @@
 
 typedef std::map<std::string, int> NameIndex;
 
+int warnings = 0;
+
 struct ResolveDef {
   std::string name;
   Location location;
   std::unique_ptr<Expr> expr;
   std::set<int> edges; // edges: things this name uses
   int index, lowlink, onstack; // Tarjan SCC variables
+  int uses;
   ResolveDef(const std::string &name_, const Location &location_, std::unique_ptr<Expr>&& expr_)
-   : name(name_), location(location_), expr(std::move(expr_)) { }
+   : name(name_), location(location_), expr(std::move(expr_)), uses(0) { }
 };
 
 struct SCCState {
@@ -103,10 +106,12 @@ struct ResolveBinding {
     for (auto sym : symbols) {
       auto it = sym->defs.find(name);
       if (it != sym->defs.end()) {
-        if (override) {
-          std::cerr << "Ambiguous import of definition '" << name
-            << "' from " << override->location.text()
-            << " and " << it->second.location.text() << std::endl;
+        if (override && it->second.qualified != override->qualified) {
+          ++warnings;
+          std::cerr << "(warning) Ambiguous import of definition '" << name
+            << "' from <" << override->location.file()
+            << "> and <" << it->second.location.file()
+            << ">" << std::endl;
         }
         override = &it->second;
       }
@@ -119,10 +124,12 @@ struct ResolveBinding {
     for (auto sym : symbols) {
       auto it = sym->topics.find(name);
       if (it != sym->topics.end()) {
-        if (override) {
-          std::cerr << "Ambiguous import of topic '" << name
-            << "' from " << override->location.text()
-            << " and " << it->second.location.text() << std::endl;
+        if (override && it->second.qualified != override->qualified) {
+          ++warnings;
+          std::cerr << "(warning) Ambiguous import of topic '" << name
+            << "' from <" << override->location.file()
+            << "> and <" << it->second.location.file()
+            << ">" << std::endl;
         }
         override = &it->second;
       }
@@ -136,10 +143,12 @@ struct ResolveBinding {
     for (auto sym : symbols) {
       auto it = sym->types.find(name);
       if (it != sym->types.end()) {
-        if (override) {
-          std::cerr << "Ambiguous import of type '" << name
-            << "' from " << override->location.text()
-            << " and " << it->second.location.text() << std::endl;
+        if (override && it->second.qualified != override->qualified) {
+          ++warnings;
+          std::cerr << "(warning) Ambiguous import of type '" << name
+            << "' from <" << override->location.file()
+            << "> and <" << it->second.location.file()
+            << ">" << std::endl;
         }
         override = &it->second;
       }
@@ -253,6 +262,7 @@ static bool reference_map(ResolveBinding *binding, const std::string &name) {
   if ((i = binding->index.find(name)) != binding->index.end()) {
     if (binding->current_index != -1)
       binding->defs[binding->current_index].edges.insert(i->second);
+    ++binding->defs[i->second].uses;
     return true;
   } else {
     return false;
@@ -277,6 +287,7 @@ static VarRef *rebind_subscribe(ResolveBinding *binding, const Location &locatio
     std::cerr << "Subscribe of '" << name
       << "' is to a non-existent topic at "
       << location.file() << std::endl;
+    return nullptr;
   }
   return new VarRef(location, "topic " + name);
 }
@@ -497,24 +508,31 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
   } else {
     PatternRef &p = patterns[1];
     ++p.uses;
-    std::unique_ptr<Expr> guard_true(fill_pattern(
-      new App(p.location,
-        new VarRef(p.location, "_ f" + std::to_string(p.index)),
-        new VarRef(p.location, "_ a0")),
-      prototype.tree, p.tree));
     if (!p.guard) {
-      return guard_true;
+      return std::unique_ptr<Expr>(
+        new App(p.location,
+          fill_pattern(
+            new VarRef(p.location, "_ f" + std::to_string(p.index)),
+            prototype.tree, p.tree),
+          new VarRef(p.location, "Unit@wake")));
     } else {
       PatternRef save(std::move(patterns[1]));
       patterns.erase(patterns.begin()+1);
       std::unique_ptr<Expr> guard_false(expand_patterns(fnname, patterns));
       patterns.emplace(patterns.begin()+1, std::move(save));
       if (!guard_false) return nullptr;
-      Destruct *des = new Destruct(location, Boolean, fill_pattern(
-        new App(p.guard_location,
-          new VarRef(location, "_ g" + std::to_string(p.index)),
-          new VarRef(location, "_ a0")),
-        prototype.tree, p.tree));
+      std::unique_ptr<Expr> guard_true(new App(LOCATION, new App(LOCATION,
+        new VarRef(LOCATION, "getPairFirst@wake"),
+        fill_pattern(
+          new VarRef(p.location, "_ f" + std::to_string(p.index)),
+          prototype.tree, p.tree)),
+        new VarRef(LOCATION, "Unit@wake")));
+      Destruct *des = new Destruct(location, Boolean, new App(LOCATION, new App(LOCATION,
+        new VarRef(LOCATION, "getPairSecond@wake"),
+        fill_pattern(
+          new VarRef(location, "_ f" + std::to_string(p.index)),
+          prototype.tree, p.tree)),
+        new VarRef(LOCATION, "Unit@wake")));
       des->cases.emplace_back(new Lambda(guard_true->location, "_", guard_true.release()));
       des->cases.emplace_back(new Lambda(guard_false->location, "_", guard_false.release()));
       des->location = des->cases.front()->location;
@@ -523,7 +541,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
   }
 }
 
-static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, std::unique_ptr<Expr> &guard, AST &ast, std::shared_ptr<Sum> multiarg) {
+static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, AST &ast, std::shared_ptr<Sum> multiarg) {
   PatternTree out(ast.region);
   if (ast.name == "_") {
     // no-op; unbound
@@ -531,7 +549,6 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
     Lambda *lambda = new Lambda(expr->location, ast.name, expr.release());
     if (ast.name.compare(0, 3, "_ k") != 0) lambda->token = ast.token;
     expr = std::unique_ptr<Expr>(lambda);
-    guard = std::unique_ptr<Expr>(new Lambda(expr->location, ast.name, guard.release()));
     out.var = 0; // bound
   } else {
     for (ResolveBinding *iter = binding; iter; iter = iter->parent) {
@@ -570,19 +587,11 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       out.var = 0;
     } else {
       for (auto a = ast.args.rbegin(); a != ast.args.rend(); ++a)
-        out.children.push_back(cons_lookup(binding, expr, guard, *a, 0));
+        out.children.push_back(cons_lookup(binding, expr, *a, 0));
       std::reverse(out.children.begin(), out.children.end());
     }
   }
   return out;
-}
-
-static Lambda *case_name(Lambda *l, const std::string &fnname) {
-  Lambda *x;
-  for (x = l; x->body; x = static_cast<Lambda*>(x->body.get()))
-    if (x->body->type != &Lambda::type) break;
-  x->fnname = fnname;
-  return l;
 }
 
 static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBinding *binding, std::unique_ptr<Match> match) {
@@ -625,25 +634,25 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
   int f = 0;
   bool ok = true;
   for (auto &p : match->patterns) {
-    bool guard = static_cast<bool>(p.guard);
     patterns.emplace_back(p.expr->location);
     patterns.back().index = f;
-    patterns.back().guard = guard;
-    if (guard) patterns.back().guard_location = p.guard->location;
-    patterns.back().tree = cons_lookup(binding, p.expr, p.guard, p.pattern, multiarg);
-    ok &= !patterns.front().tree.sum || patterns.back().tree.sum;
+    patterns.back().guard = static_cast<bool>(p.guard);
+    std::unique_ptr<Expr> expr;
     if (true) {
       std::string cname = match->patterns.size() == 1 ? fnname : fnname + ".case"  + std::to_string(f);
-      auto out = map->defs.insert(std::make_pair("_ f" + std::to_string(f), DefValue(LOCATION, std::unique_ptr<Expr>(
-        case_name(new Lambda(p.expr->location, "_", p.expr.release()), cname)))));
-      assert (out.second);
+      expr = std::unique_ptr<Expr>(new Lambda(p.expr->location, "_", p.expr.release(), cname.c_str()));
     }
-    if (guard) {
+    if (p.guard) {
+      patterns.back().guard_location = p.guard->location;
       std::string gname = match->patterns.size() == 1 ? fnname : fnname + ".guard"  + std::to_string(f);
-      auto out = map->defs.insert(std::make_pair("_ g" + std::to_string(f), DefValue(LOCATION, std::unique_ptr<Expr>(
-        case_name(new Lambda(p.guard->location, "_", p.guard.release()), gname)))));
-      assert (out.second);
+      expr = std::unique_ptr<Expr>(new App(LOCATION,
+        new App(LOCATION, new VarRef(LOCATION, "Pair@wake"), expr.release()),
+        new Lambda(p.guard->location, "_", p.guard.release(), gname.c_str())));
     }
+    patterns.back().tree = cons_lookup(binding, expr, p.pattern, multiarg);
+    auto out = map->defs.insert(std::make_pair("_ f" + std::to_string(f), DefValue(LOCATION, std::move(expr))));
+    assert (out.second);
+    ok &= !patterns.front().tree.sum || patterns.back().tree.sum;
     ++f;
   }
   if (!ok) return nullptr;
@@ -679,7 +688,8 @@ struct SymMover {
     if (it == top.packages.end()) {
       warn = false;
       package = nullptr;
-      std::cerr << "Import of " << kind << " '" << def
+      ++warnings;
+      std::cerr << "(warning) Import of " << kind << " '" << def
         << "' is from non-existent package '" << pkg
         << "' at " << sym.second.location.text() << std::endl;
     } else {
@@ -690,7 +700,8 @@ struct SymMover {
 
   ~SymMover() {
     if (warn) {
-      std::cerr << "Import of " << kind << " '" << def
+      ++warnings;
+      std::cerr << "(warning) Import of " << kind << " '" << def
         << "' from package '" << package->name
         << "' is not exported at " << sym.second.location.text() << std::endl;
     }
@@ -757,7 +768,8 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location
   for (auto &p : imports.import_all) {
     auto it = top.packages.find(p);
     if (it == top.packages.end()) {
-      std::cerr << "Full import from non-existent package '" << p
+      ++warnings;
+      std::cerr << "(warning) Full import from non-existent package '" << p
         << "' at " << location.text() << std::endl;
     } else {
       out.push_back(&it->second->exports);
@@ -802,6 +814,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
   } else if (expr->type == &Subscribe::type) {
     Subscribe *sub = static_cast<Subscribe*>(expr.get());
     VarRef *out = rebind_subscribe(binding, sub->location, sub->name);
+    if (!out) return nullptr;
     out->flags |= FLAG_AST;
     return fracture(top, true, name, std::unique_ptr<Expr>(out), binding);
   } else if (expr->type == &App::type) {
@@ -823,6 +836,13 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
         lambda->fnname = name + lambda->fnname.substr(1);
       }
       lambda->body = fracture(top, false, lambda->fnname, std::move(lambda->body), &lbinding);
+    }
+    if (lbinding.defs.back().uses == 0 && !lambda->name.empty() && lambda->name[0] != '_') {
+      ++warnings;
+      std::cerr
+        << "(warning) Unused function argument '" << lambda->name
+        << "' at <" << lambda->token.file()
+        << ">; consider renaming to _" << lambda->name << std::endl;
     }
     return expr;
   } else if (expr->type == &Match::type) {
@@ -851,6 +871,15 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     }
     dbinding.current_index = -1;
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(def->body), &dbinding);
+    for (auto &i : dbinding.defs) {
+      if (i.uses == 0 && !i.name.empty() && i.name[0] != '_') {
+        ++warnings;
+        std::cerr
+          << "(warning) Unused local definition of '" << i.name
+          << "' at <" << i.location.file()
+          << ">; consider removing or renaming to _" << i.name << std::endl;
+      }
+    }
     auto out = fracture_binding(def->location, dbinding.defs, std::move(body));
     if (out && (def->flags & FLAG_AST) != 0)
       out->flags |= FLAG_AST;
@@ -869,6 +898,12 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
         if (!qualify_type(binding, arg))
           ok = false;
     }
+    if (binding->defs.size() == 1 && !binding->defs[0].expr) {
+      // Use all lambda arguments
+      size_t todo = con->cons->ast.args.size();
+      for (ResolveBinding *iter = binding; todo != 0;  iter = iter->parent, --todo)
+        ++iter->defs[0].uses;
+    } // else: edit/set function
     if (!ok) expr.reset();
     return expr;
   } else if (expr->type == &Ascribe::type) {
@@ -878,6 +913,13 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     } else {
       expr.reset();
     }
+    return expr;
+  } else if (expr->type == &Prim::type) {
+    // Use all the arguments
+    for (ResolveBinding *iter = binding;
+         iter && iter->defs.size() == 1 && !iter->defs[0].expr;
+         iter = iter->parent)
+      ++iter->defs[0].uses;
     return expr;
   } else if (expr->type == &Top::type) {
     ResolveBinding gbinding(nullptr);   // global mapping + qualified defines
@@ -945,6 +987,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
         }
       }
     }
+
     for (auto &p : top.packages) {
       for (auto &f : p.second->files) {
         for (auto &t : f.topics) {
@@ -982,15 +1025,52 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     for (auto &file : defp.files)
       for (auto &bulk : file.content->imports.import_all)
         imports.insert(bulk);
-    for (auto &imp : imports)
-      ibinding.symbols.push_back(&top.packages[imp]->exports);
+    for (auto &imp : imports) {
+      auto it = top.packages.find(imp);
+      if (it != top.packages.end())
+        ibinding.symbols.push_back(&it->second->exports);
+    }
 
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(top.body), &dbinding);
+
+    // Mark exports and globals as uses
+    for (auto &g: top.globals.defs) {
+      auto it = gbinding.index.find(g.second.qualified);
+      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+    }
+    for (auto &g: top.globals.topics) {
+      auto it = gbinding.index.find("topic " + g.second.qualified);
+      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+    }
+    for (auto &p : top.packages) {
+      for (auto &e : p.second->exports.defs) {
+        auto it = gbinding.index.find(e.second.qualified);
+        if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+      }
+      for (auto &e : p.second->exports.topics) {
+        auto it = gbinding.index.find("topic " + e.second.qualified);
+        if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+      }
+    }
+
+    // Report unused definitions
+    for (auto &def : gbinding.defs) {
+      if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
+        size_t at = def.name.find_first_of('@');
+        std::string name = def.name.substr(0, at);
+        ++warnings;
+        std::cerr
+          << "(warning) Unused top-level definition of '" << name
+          << "' at <" << def.location.file()
+          << ">; consider removing or renaming to _" <<  name << std::endl;
+      }
+    }
+
     auto out = fracture_binding(top.location, gbinding.defs, std::move(body));
     if (fail) out.reset();
     return out;
   } else {
-    // Literal/Prim/Get
+    // Literal/Get
     return expr;
   }
 }

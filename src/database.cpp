@@ -22,6 +22,10 @@
 #include <sstream>
 #include <sqlite3.h>
 #include <unistd.h>
+#include <string.h>
+
+// Increment every time the database schema changes
+#define SCHEMA_VERSION "1"
 
 #define VISIBLE 0
 #define INPUT 1
@@ -76,6 +80,26 @@ struct Database::detail {
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
 Database::~Database() { close(); }
 
+static int schema_cb(void *data, int columns, char **values, char **labels) {
+  // values[0] = 0 if a fresh DB
+  // values[1] = schema version
+
+  // Returning non-zero causes SQLITE_ABORT
+  if (columns != 2) return -1;
+
+  // New DB? Ok to use it
+  if (!strcmp(values[0], "0")) return 0;
+
+  // No version set? This must be a pre-0.19 database.
+  if (!values[1]) return -1;
+
+  // Matching version? Ok to use it
+  if (!strcmp(values[1], SCHEMA_VERSION)) return 0;
+
+  // Versions do not match
+  return -1;
+}
+
 std::string Database::open(bool wait, bool memory) {
   if (imp->db) return "";
   int ret;
@@ -94,12 +118,15 @@ std::string Database::open(bool wait, bool memory) {
   }
 #endif
 
+  // Increment the SCHEMA_VERSION every time the below string changes.
   const char *schema_sql =
     "pragma auto_vacuum=incremental;"
     "pragma journal_mode=wal;"
     "pragma synchronous=0;"
     "pragma locking_mode=exclusive;"
     "pragma foreign_keys=on;"
+    "create table if not exists schema("
+    "  version integer primary key);"
     "create table if not exists entropy("
     "  row_id integer primary key autoincrement,"
     "  seed   integer not null);"
@@ -127,6 +154,7 @@ std::string Database::open(bool wait, bool memory) {
     "  job_id      integer primary key autoincrement,"
     "  run_id      integer not null references runs(run_id),"
     "  use_id      integer not null references runs(run_id),"
+    "  label       text    not null,"
     "  directory   text    not null,"
     "  commandline blob    not null,"
     "  environment blob    not null,"
@@ -155,7 +183,18 @@ std::string Database::open(bool wait, bool memory) {
   while (true) {
     char *fail;
     ret = sqlite3_exec(imp->db, schema_sql, 0, 0, &fail);
-    if (ret == SQLITE_OK) break;
+    if (ret == SQLITE_OK) {
+      // Use an empty entropy table as a proxy for a new database (it gets filled automatically)
+      const char *get_version = "select (select count(row_id) from entropy), (select max(version) from schema);";
+      const char *set_version = "insert or ignore into schema(version) values(" SCHEMA_VERSION ");";
+      ret = sqlite3_exec(imp->db, get_version, &schema_cb, 0, 0);
+      if (ret == SQLITE_OK) {
+        sqlite3_exec(imp->db, set_version, 0, 0, 0);
+        break;
+      } else {
+        return "produced by an incompatible verison of wake; remove it.";
+      }
+    }
 
     std::string out = fail;
     sqlite3_free(fail);
@@ -181,8 +220,8 @@ std::string Database::open(bool wait, bool memory) {
     "select status, runtime, cputime, membytes, ibytes, obytes, pathtime"
     " from stats where stat_id=?";
   const char *sql_insert_job =
-    "insert into jobs(run_id, use_id, directory, commandline, environment, stdin, signature, stack)"
-    " values(?, ?1, ?, ?, ?, ?, ?, ?)";
+    "insert into jobs(run_id, use_id, label, directory, commandline, environment, stdin, signature, stack)"
+    " values(?, ?1, ?, ?, ?, ?, ?, ?, ?)";
   const char *sql_insert_tree =
     "insert into filetree(access, job_id, file_id)"
     " values(?, ?, (select file_id from files where path=?))";
@@ -227,15 +266,15 @@ std::string Database::open(bool wait, bool memory) {
     "  where j1.job_id=?2 and j1.directory=j2.directory and j1.commandline=j2.commandline"
     "  and j1.environment=j2.environment and j1.stdin=j2.stdin and j2.job_id<>?2)";
   const char *sql_find_owner =
-    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id"
     " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id order by j.job_id";
   const char *sql_find_last =
-    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from jobs j left join stats s on j.stat_id=s.stat_id"
     " where j.run_id==(select max(run_id) from jobs) and substr(cast(commandline as text),1,1) <> '<' order by j.job_id";
   const char *sql_find_failed =
-    "select j.job_id, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from jobs j left join stats s on j.stat_id=s.stat_id"
     " where s.status<>0 order by j.job_id";
   const char *sql_fetch_hash =
@@ -656,6 +695,7 @@ void Database::insert_job(
   const std::string &environment,
   const std::string &stdin_file,
   uint64_t          signature,
+  const std::string &label,
   const std::string &stack,
   const std::string &visible,
   long  *job)
@@ -663,12 +703,13 @@ void Database::insert_job(
   const char *why = "Could not insert a job";
   begin_txn();
   bind_integer(why, imp->insert_job, 1, imp->run_id);
-  bind_string (why, imp->insert_job, 2, directory);
-  bind_blob   (why, imp->insert_job, 3, commandline);
-  bind_blob   (why, imp->insert_job, 4, environment);
-  bind_string (why, imp->insert_job, 5, stdin_file);
-  bind_integer(why, imp->insert_job, 6, signature);
-  bind_blob   (why, imp->insert_job, 7, stack);
+  bind_string (why, imp->insert_job, 2, label);
+  bind_string (why, imp->insert_job, 3, directory);
+  bind_blob   (why, imp->insert_job, 4, commandline);
+  bind_blob   (why, imp->insert_job, 5, environment);
+  bind_string (why, imp->insert_job, 6, stdin_file);
+  bind_integer(why, imp->insert_job, 7, signature);
+  bind_blob   (why, imp->insert_job, 8, stack);
   single_step (why, imp->insert_job, imp->debugdb);
   *job = sqlite3_last_insert_rowid(imp->db);
   const char *tok = visible.c_str();
@@ -849,18 +890,19 @@ static std::vector<JobReflection> find_all(Database *db, sqlite3_stmt *query, bo
     out.resize(out.size()+1);
     JobReflection &desc = out.back();
     desc.job            = sqlite3_column_int64(query, 0);
-    desc.directory      = rip_column(query, 1);
-    desc.commandline    = chop_null(rip_column(query, 2));
-    desc.environment    = chop_null(rip_column(query, 3));
-    desc.stack          = rip_column(query, 4);
-    desc.stdin_file     = rip_column(query, 5);
-    desc.time           = rip_column(query, 6);
-    desc.usage.status   = sqlite3_column_int64 (query, 7);
-    desc.usage.runtime  = sqlite3_column_double(query, 8);
-    desc.usage.cputime  = sqlite3_column_double(query, 9);
-    desc.usage.membytes = sqlite3_column_int64 (query, 10);
-    desc.usage.ibytes   = sqlite3_column_int64 (query, 11);
-    desc.usage.obytes   = sqlite3_column_int64 (query, 12);
+    desc.label          = rip_column(query, 1);
+    desc.directory      = rip_column(query, 2);
+    desc.commandline    = chop_null(rip_column(query, 3));
+    desc.environment    = chop_null(rip_column(query, 4));
+    desc.stack          = rip_column(query, 5);
+    desc.stdin_file     = rip_column(query, 6);
+    desc.time           = rip_column(query, 7);
+    desc.usage.status   = sqlite3_column_int64 (query, 8);
+    desc.usage.runtime  = sqlite3_column_double(query, 9);
+    desc.usage.cputime  = sqlite3_column_double(query, 10);
+    desc.usage.membytes = sqlite3_column_int64 (query, 11);
+    desc.usage.ibytes   = sqlite3_column_int64 (query, 12);
+    desc.usage.obytes   = sqlite3_column_int64 (query, 13);
     if (desc.stdin_file.empty()) desc.stdin_file = "/dev/null";
     if (verbose) {
       desc.stdout_payload = db->get_output(desc.job, 1);

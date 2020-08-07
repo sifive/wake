@@ -21,11 +21,13 @@
 #include <ostream>
 #include <vector>
 #include <string>
+
 struct Expr;
 
 void markup_json(std::ostream &os, Expr *root);
 void markup_html(std::ostream &os, Expr *root);
 void markup_ctags(std::ostream &os, Expr *root, const std::vector<std::pair<std::string, std::string> >& globals);
 void markup_etags(std::ostream &os, Expr *root, const std::vector<std::pair<std::string, std::string> >& globals);
+void format_reexports(std::ostream &os, const char *package, const char *kind, const std::vector<std::string> &mixed);
 
 #endif
