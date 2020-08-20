@@ -35,10 +35,9 @@ export def getOrElse b = match _
  
 # Inteded use: ``int "x" | orElse (int "z") | getOrElse 4``
 # In this case, returns ``x`` if it exists, otherwise ``z``.  Returns ``None`` if both are empty.
-export def orElse = match _ _
-  _ (Some a) = Some a
-  (Some a) _ = Some a
-  None None  = None
+export def orElse alt = match _
+  Some a = a
+  None   = alt
 
 # Returns the Option's value if Some, otherwise returns the result of fn
 # (fn: Unit => a) => Option a => a
