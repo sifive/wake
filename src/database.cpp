@@ -20,6 +20,7 @@
 #include <unordered_set>
 #include <iostream>
 #include <sstream>
+#include <set>
 #include <sqlite3.h>
 #include <unistd.h>
 #include <string.h>
@@ -741,17 +742,36 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   bind_integer(why, imp->link_stats, 2, keep?1:0);
   bind_integer(why, imp->link_stats, 3, job);
   single_step (why, imp->link_stats, imp->debugdb);
+  // Grab the visible set
+  std::set<std::string> visible;
+  bind_integer(why, imp->get_tree, 1, job);
+  bind_integer(why, imp->get_tree, 2, VISIBLE);
+  while (sqlite3_step(imp->get_tree) == SQLITE_ROW)
+    visible.insert(rip_column(imp->get_tree, 0));
+  finish_stmt(why, imp->get_tree, imp->debugdb);
+  // Insert inputs, confirming they are visible
   const char *tok = inputs.c_str();
   const char *end = tok + inputs.size();
   for (const char *scan = tok; scan != end; ++scan) {
     if (*scan == 0 && scan != tok) {
-      bind_integer(why, imp->insert_tree, 1, INPUT);
-      bind_integer(why, imp->insert_tree, 2, job);
-      bind_string (why, imp->insert_tree, 3, tok, scan-tok);
-      single_step (why, imp->insert_tree, imp->debugdb);
+      std::string input(tok, scan-tok);
+      if (visible.find(input) == visible.end()) {
+        std::stringstream s;
+        s << "Job " << job
+          << " erroneously added input '" << input
+          << "' which was not a visible file." << std::endl;
+        std::string out = s.str();
+        status_write(2, out.data(), out.size());
+      } else {
+        bind_integer(why, imp->insert_tree, 1, INPUT);
+        bind_integer(why, imp->insert_tree, 2, job);
+        bind_string (why, imp->insert_tree, 3, tok, scan-tok);
+        single_step (why, imp->insert_tree, imp->debugdb);
+      }
       tok = scan+1;
     }
   }
+  // Insert outputs
   tok = outputs.c_str();
   end = tok + outputs.size();
   for (const char *scan = tok; scan != end; ++scan) {
