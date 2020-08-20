@@ -102,7 +102,7 @@ std::unique_ptr<Term> RGet::clone(TargetScope &scope, size_t id) const {
 }
 
 void RDes::format(std::ostream &os, TermFormat &format) const {
-  os << "Des(";
+  os << "Des:" << sum->name << "(";
   format_args(os, format);
   os << ")\n";
 }

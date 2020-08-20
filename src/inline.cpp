@@ -223,7 +223,7 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
           cargs.back() = fnid+2;
           f->terms.emplace_back(new RArg());
           f->terms.emplace_back(new RApp(des->args[i], fnid+1));
-          f->terms.emplace_back(new RDes(std::move(cargs)));
+          f->terms.emplace_back(new RDes(sum, std::move(cargs)));
           PassInline q(p.common, fnid); // refs up to fun are unmodified
           f->pass_inline(q, std::unique_ptr<Term>(f));
         }

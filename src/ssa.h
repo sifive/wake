@@ -212,8 +212,11 @@ struct RGet final : public Redux {
 };
 
 struct RDes final : public Redux {
+  std::shared_ptr<Sum> sum;
+
   // args = handlers for cases, then obj
-  RDes(std::vector<size_t> &&args_, const char *label_ = "") : Redux(label_, std::move(args_)) { }
+  RDes(const std::shared_ptr<Sum> &sum_, std::vector<size_t> &&args_, const char *label_ = "")
+   : Redux(label_, std::move(args_)), sum(sum_) { }
 
   std::unique_ptr<Term> clone(TargetScope &scope, size_t id) const override;
   void format(std::ostream &os, TermFormat &format) const override;

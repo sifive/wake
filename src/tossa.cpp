@@ -136,7 +136,7 @@ static void doit(TargetScope &scope, TermStack *stack, Expr *expr) {
     }
     doit(scope, stack, des->arg.get());
     args.push_back(des->arg->meta);
-    des->meta = scope.append(new RDes(std::move(args)));
+    des->meta = scope.append(new RDes(des->sum, std::move(args)));
   } else if (expr->type == &Prim::type) {
     Prim *prim = static_cast<Prim*>(expr);
     std::vector<size_t> args;
