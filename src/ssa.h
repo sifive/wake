@@ -31,6 +31,8 @@
 struct Value;
 struct Expr;
 struct SourceMap;
+struct PassCases;
+struct PassDecon;
 struct PassPurity;
 struct PassUsage;
 struct PassSweep;
@@ -75,6 +77,8 @@ struct Term {
   virtual bool tailCallOk() const = 0;
 
   // All terms must implement their pass behaviour
+  virtual void pass_cases (PassCases  &p) = 0;
+  virtual void pass_decon (PassDecon  &p, std::unique_ptr<Term> self) = 0;
   virtual void pass_purity(PassPurity &p) = 0;
   virtual void pass_usage (PassUsage  &p) = 0;
   virtual void pass_sweep (PassSweep  &p) = 0;
@@ -83,6 +87,8 @@ struct Term {
   virtual void pass_scope (PassScope  &p) = 0;
 
   // The top-level pass invocations
+  static std::unique_ptr<Term> pass_cases (std::unique_ptr<Term> term);
+  static std::unique_ptr<Term> pass_decon (std::unique_ptr<Term> term);
   static std::unique_ptr<Term> pass_purity(std::unique_ptr<Term> term, int pflag, size_t sflag);
   static std::unique_ptr<Term> pass_usage (std::unique_ptr<Term> term);
   static std::unique_ptr<Term> pass_sweep (std::unique_ptr<Term> term);
@@ -127,6 +133,8 @@ struct RArg final : public Leaf {
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
 
+  void pass_cases (PassCases  &p) override;
+  void pass_decon (PassDecon  &p, std::unique_ptr<Term> self) override;
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -145,6 +153,8 @@ struct RLit final : public Leaf {
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
 
+  void pass_cases (PassCases  &p) override;
+  void pass_decon (PassDecon  &p, std::unique_ptr<Term> self) override;
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -162,6 +172,8 @@ struct RApp final : public Redux {
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
 
+  void pass_cases (PassCases  &p) override;
+  void pass_decon (PassDecon  &p, std::unique_ptr<Term> self) override;
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -184,6 +196,8 @@ struct RPrim final : public Redux {
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
 
+  void pass_cases (PassCases  &p) override;
+  void pass_decon (PassDecon  &p, std::unique_ptr<Term> self) override;
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -203,6 +217,8 @@ struct RGet final : public Redux {
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
 
+  void pass_cases (PassCases  &p) override;
+  void pass_decon (PassDecon  &p, std::unique_ptr<Term> self) override;
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -223,6 +239,8 @@ struct RDes final : public Redux {
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
 
+  void pass_cases (PassCases  &p) override;
+  void pass_decon (PassDecon  &p, std::unique_ptr<Term> self) override;
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -243,6 +261,8 @@ struct RCon final : public Redux {
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
 
+  void pass_cases (PassCases  &p) override;
+  void pass_decon (PassDecon  &p, std::unique_ptr<Term> self) override;
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
@@ -270,6 +290,8 @@ struct RFun final : public Term {
   void interpret(InterpretContext &context) override;
   bool tailCallOk() const override;
 
+  void pass_cases (PassCases  &p) override;
+  void pass_decon (PassDecon  &p, std::unique_ptr<Term> self) override;
   void pass_purity(PassPurity &p) override;
   void pass_usage (PassUsage  &p) override;
   void pass_sweep (PassSweep  &p) override;
