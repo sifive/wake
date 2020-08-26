@@ -410,10 +410,8 @@ JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool 
   if (maximum > OPEN_MAX) maximum = OPEN_MAX;
   if (maximum > FD_SETSIZE) maximum = FD_SETSIZE;
 
-  if (maximum >= requested) {
-    limit.rlim_cur = requested;
-  } else {
-    limit.rlim_cur = maximum;
+  if (maximum < requested) {
+    requested = maximum;
     std::cerr << "wake wanted a limit of " << imp->max_children;
     imp->max_children = (maximum - MAX_SELF_FDS) / 2;
     std::cerr << " children, but only got " << imp->max_children
@@ -423,12 +421,16 @@ JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool 
 
 /*
   std::cerr << "max children " << imp->max_children << "/" << sys_child_max
-    << " and " << limit.rlim_cur << "/" << maximum << std::endl;
+    << " and " << requested << "/" << maximum << std::endl;
 */
 
-  if (setrlimit(RLIMIT_NOFILE, &limit) != 0) {
-    perror("setrlimit(RLIMIT_NOFILE)");
-    exit(1);
+  // Don't decrease limit for child processes
+  if (requested > limit.rlim_cur) {
+    limit.rlim_cur = requested;
+    if (setrlimit(RLIMIT_NOFILE, &limit) != 0) {
+      perror("setrlimit(RLIMIT_NOFILE)");
+      exit(1);
+    }
   }
 }
 
