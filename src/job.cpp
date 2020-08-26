@@ -394,11 +394,15 @@ JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool 
   // Calculate the maximum number of children to ever run
   imp->max_children = imp->limit * 100; // based on minimum 1% CPU utilization in Job::threads
   if (imp->max_children > MAX_CHILDREN) imp->max_children = MAX_CHILDREN; // wake hard cap
-#ifdef CHILD_MAX
-  if (imp->max_children > CHILD_MAX/2) imp->max_children = CHILD_MAX/2;   // limits.h
-#endif
+
   long sys_child_max = sysconf(_SC_CHILD_MAX);
-  if (sys_child_max != -1 && imp->max_children > sys_child_max/2) imp->max_children = sys_child_max/2;
+  if (sys_child_max != -1) {
+    if (imp->max_children > sys_child_max/2) imp->max_children = sys_child_max/2;
+  } else {
+#ifdef CHILD_MAX
+    if (imp->max_children > CHILD_MAX/2) imp->max_children = CHILD_MAX/2;   // limits.h
+#endif
+  }
 
 #ifndef OPEN_MAX
 #define OPEN_MAX 99999
@@ -407,13 +411,10 @@ JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool 
   // We want 2 descriptors (stdout+stderr) per job.
   rlim_t requested = imp->max_children * 2 + MAX_SELF_FDS;
   rlim_t maximum = (limit.rlim_max == RLIM_INFINITY) ? OPEN_MAX : limit.rlim_max;
-  if (maximum > OPEN_MAX) maximum = OPEN_MAX;
   if (maximum > FD_SETSIZE) maximum = FD_SETSIZE;
 
-  if (maximum >= requested) {
-    limit.rlim_cur = requested;
-  } else {
-    limit.rlim_cur = maximum;
+  if (maximum < requested) {
+    requested = maximum;
     std::cerr << "wake wanted a limit of " << imp->max_children;
     imp->max_children = (maximum - MAX_SELF_FDS) / 2;
     std::cerr << " children, but only got " << imp->max_children
@@ -423,12 +424,16 @@ JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool 
 
 /*
   std::cerr << "max children " << imp->max_children << "/" << sys_child_max
-    << " and " << limit.rlim_cur << "/" << maximum << std::endl;
+    << " and " << requested << "/" << maximum << std::endl;
 */
 
-  if (setrlimit(RLIMIT_NOFILE, &limit) != 0) {
-    perror("setrlimit(RLIMIT_NOFILE)");
-    exit(1);
+  // Don't decrease limit for child processes
+  if (requested > limit.rlim_cur) {
+    limit.rlim_cur = requested;
+    if (setrlimit(RLIMIT_NOFILE, &limit) != 0) {
+      perror("setrlimit(RLIMIT_NOFILE)");
+      exit(1);
+    }
   }
 }
 
