@@ -394,11 +394,15 @@ JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool 
   // Calculate the maximum number of children to ever run
   imp->max_children = imp->limit * 100; // based on minimum 1% CPU utilization in Job::threads
   if (imp->max_children > MAX_CHILDREN) imp->max_children = MAX_CHILDREN; // wake hard cap
-#ifdef CHILD_MAX
-  if (imp->max_children > CHILD_MAX/2) imp->max_children = CHILD_MAX/2;   // limits.h
-#endif
+
   long sys_child_max = sysconf(_SC_CHILD_MAX);
-  if (sys_child_max != -1 && imp->max_children > sys_child_max/2) imp->max_children = sys_child_max/2;
+  if (sys_child_max != -1) {
+    if (imp->max_children > sys_child_max/2) imp->max_children = sys_child_max/2;
+  } else {
+#ifdef CHILD_MAX
+    if (imp->max_children > CHILD_MAX/2) imp->max_children = CHILD_MAX/2;   // limits.h
+#endif
+  }
 
 #ifndef OPEN_MAX
 #define OPEN_MAX 99999
