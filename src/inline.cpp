@@ -131,6 +131,8 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
         x->pass_inline(q, std::move(x));
       }
       fun->update(q.stream.map());
+      // Keep the result label, if possible
+      if (!self->label.empty()) q.stream[fun->output]->label = std::move(self->label);
       p.stream.discard(fun->output, self->get(SSA_SINGLETON)); // replace App with function output
       if (singleton) {
         fun->output = 0;

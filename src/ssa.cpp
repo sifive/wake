@@ -173,7 +173,22 @@ void RFun::format(std::ostream &os, TermFormat &format) const {
       os << ++format.id;
     }
     if (!x->label.empty()) os << " (" << x->label << ")";
-    os << " [" << x->flags << "," << x->meta << "] = ";
+    os << " [";
+    if ((x->flags & SSA_RECURSIVE) != 0) {
+      os << "R"; // recursive
+      // only functions can be recursive => not E or O
+    } else if ((x->flags & SSA_EFFECT) != 0) {
+      os << "E"; // effects
+      // if effects are produced, must also be ordered
+    } else if ((x->flags & SSA_ORDERED) != 0) {
+      os << "O"; // ordered
+    } else if ((x->flags & SSA_USED) == 0) {
+      os << "U"; // unused, and not an effect!
+    } else {
+      // nothing interesting
+      os << "-";
+    }
+    os << "," << x->meta << "] = ";
     x->format(os, format);
   }
   format.id -= terms.size();
