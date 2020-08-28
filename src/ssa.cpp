@@ -210,6 +210,7 @@ std::vector<std::unique_ptr<Term> > TargetScope::unwind(size_t newend) {
 
 std::unique_ptr<Term> Term::optimize(std::unique_ptr<Term> term, Runtime &runtime) {
   term = Term::pass_purity(std::move(term), PRIM_EFFECT,  SSA_EFFECT);
+  term = Term::pass_purity(std::move(term), PRIM_ORDERED, SSA_ORDERED);
   term = Term::pass_usage (std::move(term));
   term = Term::pass_sweep (std::move(term));
   term = Term::pass_inline(std::move(term), 20, runtime);
