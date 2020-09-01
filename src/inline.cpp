@@ -137,6 +137,7 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
       if (singleton) {
         fun->output = 0;
         fun->terms.resize(fargs.size());
+        fun->meta = make_meta(0, fargs.size());
         fun->set(SSA_MOVED, true);
       } else {
         term->set(SSA_RECURSIVE, false);
