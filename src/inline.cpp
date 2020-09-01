@@ -108,6 +108,7 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
       term = p.stream[fnid];
       if (!term->get(SSA_SINGLETON)) singleton = false;
     } while (term->id() == typeid(RApp));
+    if (term->label == "_ guard") singleton = true;
     assert (!term->get(SSA_MOVED));
     if (!term->get(SSA_RECURSIVE) && (singleton || meta_size(term->meta) < p.common.threshold)) {
       std::unique_ptr<RFun> copy;
