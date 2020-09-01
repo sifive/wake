@@ -203,7 +203,7 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
         new RApp(args[con->kind->index], args.back(), label.c_str()));
       rapp_inline(p, std::move(app));
     } else {
-      if (!input->get(SSA_ORDERED) && input->get(SSA_FRCON)) {
+      if (!input->get(SSA_ORDERED) && input->get(SSA_FRCON) && input->get(SSA_SINGLETON)) {
         RDes *des = static_cast<RDes*>(input);
         for (unsigned i = 0; i < args.size()-1; ++i)
           p.stream[args[i]]->set(SSA_SINGLETON, false);
