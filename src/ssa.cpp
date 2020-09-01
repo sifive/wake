@@ -219,6 +219,7 @@ std::unique_ptr<Term> Term::optimize(std::unique_ptr<Term> term, Runtime &runtim
   term = Term::pass_usage (std::move(term));
   term = Term::pass_sweep (std::move(term));
   term = Term::pass_cse   (std::move(term), runtime);
+  term = Term::pass_usage (std::move(term));
   term = Term::pass_inline(std::move(term), 50, runtime);
   term = Term::pass_purity(std::move(term), PRIM_EFFECT,  SSA_EFFECT);
   term = Term::pass_purity(std::move(term), PRIM_ORDERED, SSA_ORDERED);
