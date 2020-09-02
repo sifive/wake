@@ -544,7 +544,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
       des->cases.emplace_back(new Lambda(guard_false->location, "_", guard_false.release()));
       des->location = des->cases.front()->location;
       fmap->body = std::move(des);
-      return fmap;
+      return std::unique_ptr<Expr>(std::move(fmap));
     }
   }
 }
