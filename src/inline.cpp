@@ -108,6 +108,7 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
       term = p.stream[fnid];
       if (!term->get(SSA_SINGLETON)) singleton = false;
     } while (term->id() == typeid(RApp));
+    if (term->label == "_ guard") singleton = true;
     assert (!term->get(SSA_MOVED));
     if (!term->get(SSA_RECURSIVE) && (singleton || meta_size(term->meta) < p.common.threshold)) {
       std::unique_ptr<RFun> copy;
@@ -137,6 +138,7 @@ static void rapp_inline(PassInline &p, std::unique_ptr<RApp> self) {
       if (singleton) {
         fun->output = 0;
         fun->terms.resize(fargs.size());
+        fun->meta = make_meta(0, fargs.size());
         fun->set(SSA_MOVED, true);
       } else {
         term->set(SSA_RECURSIVE, false);
@@ -202,12 +204,9 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
       std::unique_ptr<RApp> app(
         new RApp(args[con->kind->index], args.back(), label.c_str()));
       rapp_inline(p, std::move(app));
-    } else if (!input->get(SSA_ORDERED) && input->id() == typeid(RDes)) {
-      RDes *des = static_cast<RDes*>(input);
-      bool known = true;
-      for (unsigned i = 0; i < des->args.size()-1; ++i)
-        known &= p.stream[des->args[i]]->get(SSA_FRCON);
-      if (known) {
+    } else {
+      if (!input->get(SSA_ORDERED) && input->get(SSA_FRCON) && input->get(SSA_SINGLETON)) {
+        RDes *des = static_cast<RDes*>(input);
         for (unsigned i = 0; i < args.size()-1; ++i)
           p.stream[args[i]]->set(SSA_SINGLETON, false);
         for (unsigned i = 0; i < des->args.size()-1; ++i)
@@ -231,8 +230,11 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
         args.push_back(des->args.back());
       }
       p.stream.transfer(std::move(self));
-    } else {
-      p.stream.transfer(std::move(self));
+
+      bool known = true;
+      for (unsigned i = 0; i < args.size()-1; ++i)
+        known &= p.stream[args[i]]->get(SSA_FRCON);
+      set(SSA_FRCON, known);
     }
   }
 }
@@ -240,6 +242,7 @@ void RDes::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 void RCon::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
   meta = make_meta(1, 0);
   update(p.stream.map());
+  set(SSA_FRCON, true);
   p.stream.transfer(std::move(self));
 }
 
@@ -278,7 +281,7 @@ void RFun::pass_inline(PassInline &p, std::unique_ptr<Term> self) {
 
   update(p.stream.map());
   // Detect if function returns a Constructor
-  set(SSA_FRCON, p.stream[output]->id() == typeid(RCon));
+  set(SSA_FRCON, p.stream[output]->get(SSA_FRCON));
   terms = p.stream.end(cp);
 
   size_t size = 1;

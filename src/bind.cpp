@@ -521,22 +521,30 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
       std::unique_ptr<Expr> guard_false(expand_patterns(fnname, patterns));
       patterns.emplace(patterns.begin()+1, std::move(save));
       if (!guard_false) return nullptr;
-      std::unique_ptr<Expr> guard_true(new App(LOCATION, new App(LOCATION,
-        new VarRef(LOCATION, "getPairFirst@wake"),
+      std::unique_ptr<DefMap> fmap(new DefMap(LOCATION));
+      fmap->defs.insert(std::make_pair("_ guardpair", DefValue(LOCATION, std::unique_ptr<Expr>(
         fill_pattern(
           new VarRef(p.location, "_ f" + std::to_string(p.index)),
-          prototype.tree, p.tree)),
+          prototype.tree, p.tree)))));
+      fmap->defs.insert(std::make_pair("_ rhs", DefValue(LOCATION, std::unique_ptr<Expr>(
+        new App(LOCATION,
+          new VarRef(LOCATION, "getPairFirst@wake"),
+          new VarRef(LOCATION, "_ guardpair"))))));
+      fmap->defs.insert(std::make_pair("_ guard", DefValue(LOCATION, std::unique_ptr<Expr>(
+        new App(LOCATION,
+          new VarRef(LOCATION, "getPairSecond@wake"),
+          new VarRef(LOCATION, "_ guardpair"))))));
+      std::unique_ptr<Expr> guard_true(new App(LOCATION,
+        new VarRef(LOCATION, "_ rhs"),
         new VarRef(LOCATION, "Unit@wake")));
-      Destruct *des = new Destruct(location, Boolean, new App(LOCATION, new App(LOCATION,
-        new VarRef(LOCATION, "getPairSecond@wake"),
-        fill_pattern(
-          new VarRef(location, "_ f" + std::to_string(p.index)),
-          prototype.tree, p.tree)),
-        new VarRef(LOCATION, "Unit@wake")));
+      std::unique_ptr<Destruct> des(new Destruct(location, Boolean, new App(LOCATION,
+        new VarRef(LOCATION, "_ guard"),
+        new VarRef(LOCATION, "Unit@wake"))));
       des->cases.emplace_back(new Lambda(guard_true->location, "_", guard_true.release()));
       des->cases.emplace_back(new Lambda(guard_false->location, "_", guard_false.release()));
       des->location = des->cases.front()->location;
-      return std::unique_ptr<Expr>(des);
+      fmap->body = std::move(des);
+      return std::unique_ptr<Expr>(std::move(fmap));
     }
   }
 }
