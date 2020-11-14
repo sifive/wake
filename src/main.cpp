@@ -434,6 +434,7 @@ int main(int argc, char **argv) {
     if (var->type == &VarRef::type) {
       top->body = std::unique_ptr<Expr>(new App(LOCATION, var.release(), new Prim(LOCATION, "cmdline")));
     } else {
+      top->body = std::unique_ptr<Expr>(new Prim(LOCATION, "cmdline"));
       std::cerr << "Specified target '" << argv[1] << "' is not a legal identifier" << std::endl;
       ok = false;
     }
