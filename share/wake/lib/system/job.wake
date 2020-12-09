@@ -564,7 +564,7 @@ target hashcode f =
   def reuse = get f
   if reuse !=* "" then reuse else
     def hashPlan cmd  =
-      Plan "" cmd Nil Nil "." "" logNever logError Verbose ReRun True Nil (\_ True) hashUsage id id
+      Plan "" cmd Nil Nil "." "" logNever logError Debug ReRun True Nil (\_ True) hashUsage id id
     def job = hashPlan ("<hash>", f, Nil) | runJobWith localRunner
     def hash =
       job.getJobStdout
