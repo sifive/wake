@@ -19,12 +19,20 @@ package wake
 # Generally, one should obtain Paths from sources or as the output of Jobs.
 # This API is useful for things like a comannd-line-supplied input file.
 export def claimFileAsPath existingFile desiredWorkspacePath =
+  def fileName = replace `.*/` "" desiredWorkspacePath
+  def dirName = extract `(.*)/.*` desiredWorkspacePath | head | getOrElse "."
+  claimFileAsPathIn (mkdir dirName) existingFile fileName
+
+export def claimFileAsPathIn outputDirectory existingFile desiredName =
   def get_modtime file = prim "get_modtime"
   def time = get_modtime existingFile
   if time == -1
   then makeBadPath (makeError "{existingFile}: claimed file does not exist")
   else
-    makePlan (which "ln", "-f", existingFile, desiredWorkspacePath, Nil) Nil
+    def desiredWorkspacePath = simplify "{outputDirectory.getPathName}/{desiredName}"
+    def visible = outputDirectory, Nil
+    def cmdline = which "ln", "-f", existingFile, desiredWorkspacePath, Nil
+    makePlan cmdline visible
     | setPlanLocalOnly   True
     | setPlanPersistence ReRun
     | setPlanEcho        Verbose
