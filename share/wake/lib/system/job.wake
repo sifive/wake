@@ -163,7 +163,7 @@ export def getPlanHash plan =
 # Set reasonable defaults for all Plan arguments
 def id x = x
 export def makePlan cmd visible =
-  Plan "" cmd visible environment "." "" logVerbose logWarn Normal Share False Nil (\_ True) defaultUsage id id
+  Plan "" cmd visible environment "." "" logVerbose logWarn Verbose Share False Nil (\_ True) defaultUsage id id
 
 export def makeShellPlan script visible =
   makePlan (which "dash", "-c", script, Nil) visible
