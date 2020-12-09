@@ -507,7 +507,7 @@ Nevertheless, this syntax can be convenient.
       def helper = match _
         code, _, "Sm", _ = intbase 16 code | omap integerToUnicode
         _                = None
-      def url = "ftp://ftp.unicode.org/Public/UNIDATA/UnicodeData.txt"
+      def url = "https://www.unicode.org/Public/9.0.0/ucd/UnicodeData.txt"
       def lines = curl url | read | getWhenFail "" | tokenize `\n`
       def codes = mapPartial (tokenize `;` _ | helper) lines
       catWith " " codes
