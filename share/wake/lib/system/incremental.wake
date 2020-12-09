@@ -38,10 +38,10 @@ target tarExe Unit =
   def gnutar = which "gnutar"
   if gnutar ==* "gnutar" then which "tar" else gnutar
 
-def tar output paths =
+def targz output paths =
   def cmd =
-    # Intentionally record mtime => needed for incremental builds
-    tarExe Unit, "--numeric-owner", "--owner=0", "--group=0", "-cf",
+    # Intentionally record mtime in ns (posix) => needed for incremental builds
+    tarExe Unit, "--numeric-owner", "--owner=0", "--group=0", "--format=posix", "-czf",
     output, map getPathName paths | sortBy (_<*_)
   makePlan cmd paths
   | setPlanLocalOnly True
@@ -58,13 +58,11 @@ def tar output paths =
 # all inputs on each run, based on (for example) timestamps.
 export def runIncrementalJob stateFileLabel reusedOutputFilterFn plan =
   def code = plan | getPlanHash | strbase 62
-  def pre  = "{stateFileLabel}-pre-{code}.tar"
-  def post = "{stateFileLabel}-post-{code}.tar"
+  def pre  = "{stateFileLabel}-pre-{code}.tar.gz"
+  def post = "{stateFileLabel}-post-{code}.tar.gz"
   def escape s = prim "shell_str"
   def preTar = claimFileAsPath post pre
-  def untar = match preTar.getPathError
-    None   = "tar -xf {escape pre}\n"
-    Some _ = ""
+  def untar = "! test -f {escape pre} || tar -xzf {escape pre}\n"
   def stateFiles = match preTar.getPathError
     None   = preTar, Nil
     Some _ = Nil
@@ -77,7 +75,7 @@ export def runIncrementalJob stateFileLabel reusedOutputFilterFn plan =
   def job =
     plan
     | setPlanDirectory "."
-    | setPlanCommand   (which "dash", "-c", script, Nil)
+    | setPlanCommand   (which "dash", "-ec", script, Nil)
     | editPlanVisible  (stateFiles ++ _)
     | setPlanFnInputs  (\_ plan.getPlanVisible | map getPathName)
     | runJob
@@ -85,5 +83,5 @@ export def runIncrementalJob stateFileLabel reusedOutputFilterFn plan =
     job
     | getJobOutputs
     | filter reusedOutputFilterFn
-    | tar post
+    | targz post
   job
