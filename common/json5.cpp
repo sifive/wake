@@ -47,6 +47,11 @@ JAST &JAST::get(const std::string &key) {
   return null;
 }
 
+JAST &JAST::add(std::string &&key, SymbolJSON kind, std::string &&value) {
+  children.emplace_back(std::move(key), JAST(kind, std::move(value)));
+  return children.back().second;
+}
+
 static char hex(unsigned char x) {
   if (x < 10) return '0' + x;
   return 'a' + x - 10;
@@ -80,4 +85,39 @@ std::string json_escape(const char *str, size_t len) {
     }
   }
   return out;
+}
+
+static std::ostream &formatObject(std::ostream &os, const JAST &jast) {
+  os << "{";
+  for (size_t i = 0; i < jast.children.size(); ++i) {
+    if (i != 0) os << ',';
+    const JChild &child = jast.children[i];
+    os << '"' << json_escape(child.first) << "\":" << child.second;
+  }
+  return os << "}";
+}
+
+static std::ostream &formatArray(std::ostream &os, const JAST &jast) {
+  os << "[";
+  for (size_t i = 0; i < jast.children.size(); ++i) {
+    if (i != 0) os << ',';
+    os << jast.children[i].second;
+  }
+  return os << "]";
+}
+
+std::ostream & operator << (std::ostream &os, const JAST &jast) {
+  switch (jast.kind) {
+    case JSON_NULLVAL:  return os << "null";
+    case JSON_TRUE:     return os << "true";
+    case JSON_FALSE:    return os << "false";
+    case JSON_NAN:      return os << "NaN";
+    case JSON_INTEGER:  return os << jast.value;
+    case JSON_DOUBLE:   return os << jast.value;
+    case JSON_INFINITY: return os << jast.value << "Infinity";
+    case JSON_STR:      return os << '"' << json_escape(jast.value) << '"';
+    case JSON_OBJECT:   return formatObject(os, jast);
+    case JSON_ARRAY:    return formatArray(os, jast);
+    default:            return os << "corrupt";
+  }
 }

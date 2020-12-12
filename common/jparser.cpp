@@ -53,7 +53,7 @@ static JAST parse_jarray(JLexer &jlex, std::ostream& errs) {
       break;
     }
 
-    values.emplace_back("", parse_jvalue(jlex, errs));
+    values.emplace_back(std::string(), parse_jvalue(jlex, errs));
     switch (jlex.next.type) {
       case JSON_COMMA: {
         jlex.consume();
