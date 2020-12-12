@@ -1,4 +1,5 @@
 *.o
+/.vscode
 /.build
 /.fuse
 /.fuse.log
@@ -9,6 +10,8 @@
 /bin/wake
 /bin/wake.*
 /src/version.h
+/lib/wake/bsp-wake
+/lib/wake/bsp-wake.*
 /lib/wake/fuse-wake
 /lib/wake/fuse-wake.*
 /lib/wake/fuse-waked
