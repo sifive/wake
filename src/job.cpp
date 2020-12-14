@@ -1445,6 +1445,23 @@ static PRIMFN(prim_job_finish) {
   RETURN(claim_unit(runtime.heap));
 }
 
+static PRIMTYPE(type_job_tag) {
+  return args.size() == 2 &&
+    args[0]->unify(Job::typeVar) &&
+    args[1]->unify(String::typeVar) &&
+    out->unify(Data::typeUnit);
+}
+
+static PRIMFN(prim_job_tag) {
+  EXPECT(2);
+  JOB(job, 0);
+  STRING(tag, 1);
+
+  runtime.heap.reserve(reserve_unit());
+  job->db->tag_job(job->job, tag->as_str());
+  RETURN(claim_unit(runtime.heap));
+}
+
 static PRIMTYPE(type_add_hash) {
   return args.size() == 2 &&
     args[0]->unify(String::typeVar) &&
@@ -1647,6 +1664,7 @@ void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
   prim_register(pmap, "job_launch", prim_job_launch, type_job_launch,  PRIM_IMPURE, jobtable);
   prim_register(pmap, "job_virtual",prim_job_virtual,type_job_virtual, PRIM_IMPURE, jobtable);
   prim_register(pmap, "job_finish", prim_job_finish, type_job_finish,  PRIM_IMPURE);
+  prim_register(pmap, "job_tag",    prim_job_tag,    type_job_tag,     PRIM_IMPURE);
   prim_register(pmap, "job_fail_launch", prim_job_fail_launch, type_job_fail, PRIM_IMPURE);
   prim_register(pmap, "job_fail_finish", prim_job_fail_finish, type_job_fail, PRIM_IMPURE);
   prim_register(pmap, "job_kill",   prim_job_kill,   type_job_kill,    PRIM_IMPURE);

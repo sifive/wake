@@ -109,6 +109,10 @@ struct Database {
     Usage reality);
   std::vector<FileReflection> get_tree(int kind, long job);
 
+  void tag_job(
+    long job,
+    const std::string &uri);
+
   void save_output( // call only if needs_build -> true
     long job,
     int descriptor,
