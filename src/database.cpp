@@ -67,6 +67,7 @@ struct Database::detail {
   sqlite3_stmt *delete_stats;
   sqlite3_stmt *revtop_order;
   sqlite3_stmt *setcrit_path;
+  sqlite3_stmt *tag_job;
 
   long run_id;
   detail(bool debugdb_)
@@ -179,7 +180,11 @@ std::string Database::open(bool wait, bool memory) {
     "  descriptor integer not null," // 1=stdout, 2=stderr"
     "  seconds    real    not null," // seconds after job start
     "  output     text    not null);"
-    "create index if not exists logorder on log(job_id, descriptor, log_id);";
+    "create index if not exists logorder on log(job_id, descriptor, log_id);"
+    "create table if not exists tags("
+    "  job_id     integer not null references jobs(job_id) on delete cascade,"
+    "  uri        text,"
+    "  unique(job_id, uri) on conflict ignore);";
 
   while (true) {
     char *fail;
@@ -299,6 +304,8 @@ std::string Database::open(bool wait, bool memory) {
     "  select coalesce(max(s.pathtime),0) from filetree f1, filetree f2, jobs j, stats s"
     "  where f1.job_id=?1 and f1.access=2 and f1.file_id=f2.file_id and f2.access=1 and f2.job_id=j.job_id and j.stat_id=s.stat_id"
     ") where stat_id=(select stat_id from jobs where job_id=?1);";
+  const char *sql_tag_job =
+    "insert into tags(job_id, uri) values(?, ?)";
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
@@ -339,6 +346,7 @@ std::string Database::open(bool wait, bool memory) {
   PREPARE(sql_delete_stats,   delete_stats);
   PREPARE(sql_revtop_order,   revtop_order);
   PREPARE(sql_setcrit_path,   setcrit_path);
+  PREPARE(sql_tag_job,        tag_job);
 
   return "";
 }
@@ -388,6 +396,7 @@ void Database::close() {
   FINALIZE(delete_stats);
   FINALIZE(revtop_order);
   FINALIZE(setcrit_path);
+  FINALIZE(tag_job);
 
   if (imp->db) {
     int ret = sqlite3_close(imp->db);
@@ -803,6 +812,13 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   end_txn();
 
   if (fail) exit(1);
+}
+
+void Database::tag_job(long job, const std::string &uri) {
+  const char *why = "Could not tag a job";
+  bind_integer(why, imp->tag_job, 1, job);
+  bind_string (why, imp->tag_job, 2, uri);
+  single_step (why, imp->tag_job, imp->debugdb);
 }
 
 std::vector<FileReflection> Database::get_tree(int kind, long job)  {
