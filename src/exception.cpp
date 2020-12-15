@@ -65,8 +65,7 @@ static PRIMFN(prim_panic) {
   str << "PANIC: " << arg0->c_str() << std::endl;
   std::string message = str.str();
   status_write(2, message.data(), message.size());
-  bool panic_called = true;
-  REQUIRE(!panic_called);
+  require_fail("", 1, runtime, scope);
 }
 
 static PRIMTYPE(type_id) {
