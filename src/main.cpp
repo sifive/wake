@@ -207,8 +207,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (bsp) tty = false;
-  term_init(tty, bsp);
+  term_init(tty && !bsp, bsp);
 
   if (!percents) {
     percents = getenv("WAKE_PERCENT");

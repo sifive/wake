@@ -782,7 +782,7 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
           << " erroneously added input '" << input
           << "' which was not a visible file." << std::endl;
         std::string out = s.str();
-        status_write(2, out.data(), out.size());
+        status_write(2, out.data(), out.size(), job);
       } else {
         bind_integer(why, imp->insert_tree, 1, INPUT);
         bind_integer(why, imp->insert_tree, 2, job);
@@ -819,7 +819,7 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
     std::stringstream s;
     s << "File output by multiple Jobs: " << rip_column(imp->detect_overlap, 0) << std::endl;
     std::string out = s.str();
-    status_write(2, out.data(), out.size());
+    status_write(2, out.data(), out.size(), job);
     fail = true;
   }
   finish_stmt(why, imp->detect_overlap, imp->debugdb);
@@ -880,12 +880,12 @@ void Database::replay_output(long job, bool dump_stdout, bool dump_stderr) {
     const char *str = static_cast<const char*>(sqlite3_column_blob(imp->replay_log, 1));
     int len = sqlite3_column_bytes(imp->replay_log, 1);
     if (len > 0 && ((fd == 2 && dump_stderr) || (fd == 1 && dump_stdout))) {
-      status_write(fd, str, len);
+      status_write(fd, str, len, job);
       lf = str[len-1] != '\n';
     }
   }
   finish_stmt(why, imp->replay_log, imp->debugdb);
-  if (lf) status_write(1, "\n", 1);
+  if (lf) status_write(1, "\n", 1, job);
 }
 
 void Database::add_hash(const std::string &file, const std::string &hash, long modified) {

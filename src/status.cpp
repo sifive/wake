@@ -320,7 +320,14 @@ void status_init()
   }
 }
 
-void status_write(int fd, const char *data, int len)
+static void bsp_out(const JAST &jast) {
+  std::stringstream os;
+  os << jast << std::endl;
+  std::string out = os.str();
+  write_all(1, out.c_str(), out.size());
+}
+
+void status_write(int fd, const char *data, int len, long job)
 {
   if (bsp) {
     if (len > 0 && (len != 1 || data[0] != '\n')) {
@@ -329,11 +336,13 @@ void status_write(int fd, const char *data, int len)
       notification.add("method", "build/logMessage");
       JAST &params = notification.add("params", JSON_OBJECT);
       params.add("type", JSON_INTEGER, fd==2/*stderr*/?"2"/*warning*/:"3"/*info*/);
+      if (job != -1) {
+        JAST &task = params.add("task", JSON_OBJECT);
+        task.add("id", std::to_string(job));
+        task.add("parents", JSON_ARRAY);
+      }
       params.add("message", std::string(data, len));
-      std::stringstream os;
-      os << notification << std::endl;
-      std::string out = os.str();
-      write_all(1, out.c_str(), out.size());
+      bsp_out(notification);
     }
   } else {
     status_clear();
@@ -362,10 +371,35 @@ void status_finish()
   }
 }
 
-StatusState::Handle StatusState::add(const std::string &cmdline, double budget, const struct timeval &launch) {
-  return jobs.emplace(jobs.end(), cmdline, budget, launch);
+StatusState::Handle StatusState::add(const std::string &cmdline, double budget, const struct timeval &launch, long job) {
+  if (bsp) {
+    JAST notification(JSON_OBJECT);
+    notification.add("jsonrpc", "2.0");
+    notification.add("method", "build/taskStart");
+    JAST &params = notification.add("params", JSON_OBJECT);
+    JAST &task = params.add("taskId", JSON_OBJECT);
+    task.add("id", std::to_string(job));
+    task.add("parent", JSON_ARRAY);
+    params.add("eventTime", JSON_INTEGER, std::to_string(launch.tv_sec*1000L + launch.tv_usec/1000));
+    params.add("message", std::string(cmdline));
+    bsp_out(notification);
+  }
+  return jobs.emplace(jobs.end(), cmdline, budget, launch, job);
 }
 
-void StatusState::remove(StatusState::Handle sh) {
+void StatusState::remove(StatusState::Handle sh, int exitstatus, double runtime) {
+  if (bsp) {
+    JAST notification(JSON_OBJECT);
+    notification.add("jsonrpc", "2.0");
+    notification.add("method", "build/taskFinish");
+    JAST &params = notification.add("params", JSON_OBJECT);
+    JAST &task = params.add("taskId", JSON_OBJECT);
+    task.add("id", std::to_string(sh->job));
+    task.add("parent", JSON_ARRAY);
+    long msec = (runtime+sh->launch.tv_sec)*1000L + sh->launch.tv_usec/1000;
+    params.add("eventTime", JSON_INTEGER, std::to_string(msec));
+    params.add("status", JSON_INTEGER, exitstatus==0?"1"/*ok*/:"2"/*error*/);
+    bsp_out(notification);
+  }
   jobs.erase(sh);
 }

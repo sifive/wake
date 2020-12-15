@@ -523,7 +523,7 @@ JobTable::~JobTable() {
     std::stringstream s;
     s << "Force killing " << i.pid << " after " << TERM_ATTEMPTS << " attempts with SIGTERM" << std::endl;
     std::string out = s.str();
-    status_write(2, out.data(), out.size());
+    status_write(2, out.data(), out.size(), i.job->job);
     kill(i.pid, SIGKILL);
   }
 }
@@ -624,7 +624,7 @@ static void launch(JobTable *jobtable) {
     std::string pretty = pretty_cmd(i.job->cmdline->as_str());
     std::string clone(i.job->label->empty() ? pretty : i.job->label->as_str());
     for (auto &c : clone) if (c == '\n') c = ' ';
-    i.status = status_state.add(clone, predict, i.start);
+    i.status = status_state.add(clone, predict, i.start, i.job->job);
     if (LOG_ECHO(i.job->log)) {
       std::stringstream s;
       if (*i.job->dir != ".") s << "cd " << i.job->dir->c_str() << "; ";
@@ -641,7 +641,7 @@ static void launch(JobTable *jobtable) {
       if (jobtable->imp->batch) {
         i.echo_line = std::move(out);
       } else {
-        status_write(1, out.data(), out.size());
+        status_write(1, out.data(), out.size(), i.job->job);
       }
     }
 
@@ -669,17 +669,17 @@ struct CompletedJobEntry {
 
   bool operator () (const JobEntry &i) {
     if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
-      status_state.remove(i.status);
       jobtable->imp->active -= i.job->threads();
       jobtable->imp->phys_active -= i.job->memory();
       if (jobtable->imp->batch) {
         if (!i.echo_line.empty())
-          status_write(1, i.echo_line.c_str(), i.echo_line.size());
+          status_write(1, i.echo_line.c_str(), i.echo_line.size(), i.job->job);
         jobtable->imp->db->replay_output(
           i.job->job,
           LOG_STDOUT(i.job->log),
           LOG_STDERR(i.job->log));
       }
+      status_state.remove(i.status, i.job->reality.status, i.job->reality.runtime);
       return true;
     }
     return false;
@@ -765,7 +765,7 @@ bool JobTable::wait(Runtime &runtime) {
           ++done;
           if (!imp->batch && LOG_STDOUT(i.job->log) && !i.stdout_buf.empty()) {
             if (i.stdout_buf.back() != '\n') i.stdout_buf.push_back('\n');
-            status_write(LOG_STDOUT(i.job->log), i.stdout_buf.data(), i.stdout_buf.size());
+            status_write(LOG_STDOUT(i.job->log), i.stdout_buf.data(), i.stdout_buf.size(), i.job->job);
             i.stdout_buf.clear();
           }
         } else {
@@ -774,7 +774,7 @@ bool JobTable::wait(Runtime &runtime) {
             i.stdout_buf.append(buffer, got);
             size_t dump = i.stdout_buf.rfind('\n');
             if (dump != std::string::npos) {
-              status_write(LOG_STDOUT(i.job->log), i.stdout_buf.data(), dump+1);
+              status_write(LOG_STDOUT(i.job->log), i.stdout_buf.data(), dump+1, i.job->job);
               i.stdout_buf.erase(0, dump+1);
             }
           }
@@ -792,7 +792,7 @@ bool JobTable::wait(Runtime &runtime) {
           ++done;
           if (!imp->batch && LOG_STDERR(i.job->log) && !i.stderr_buf.empty()) {
             if (i.stderr_buf.back() != '\n') i.stderr_buf.push_back('\n');
-            status_write(LOG_STDERR(i.job->log), i.stderr_buf.data(), i.stderr_buf.size());
+            status_write(LOG_STDERR(i.job->log), i.stderr_buf.data(), i.stderr_buf.size(), i.job->job);
             i.stderr_buf.clear();
           }
         } else {
@@ -801,7 +801,7 @@ bool JobTable::wait(Runtime &runtime) {
             i.stderr_buf.append(buffer, got);
             size_t dump = i.stderr_buf.rfind('\n');
             if (dump != std::string::npos) {
-              status_write(LOG_STDERR(i.job->log), i.stderr_buf.data(), dump+1);
+              status_write(LOG_STDERR(i.job->log), i.stderr_buf.data(), dump+1, i.job->job);
               i.stderr_buf.erase(0, dump+1);
             }
           }

@@ -27,10 +27,11 @@ struct Status {
   double budget;
   bool merged, wait_stdout, wait_stderr;
   struct timeval launch;
-  Status(const std::string &cmdline_, double budget_, const struct timeval &launch_)
+  long job;
+  Status(const std::string &cmdline_, double budget_, const struct timeval &launch_, long job_)
    : cmdline(cmdline_), budget(budget_),
      merged(false), wait_stdout(true), wait_stderr(true),
-     launch(launch_) { }
+     launch(launch_), job(job_) { }
 };
 
 struct StatusState {
@@ -41,8 +42,8 @@ struct StatusState {
   typedef std::list<Status>::iterator Handle;
 
   StatusState() : remain(0), total(0), current(0), jobs() { }
-  Handle add(const std::string &cmdline, double budget, const struct timeval &launch);
-  void remove(Handle sh);
+  Handle add(const std::string &cmdline, double budget, const struct timeval &launch, long job);
+  void remove(Handle sh, int exitstatus, double runtime);
 
   const std::list<Status> &getJobs() const { return jobs; }
 
@@ -53,7 +54,7 @@ private:
 extern StatusState status_state;
 
 void status_init();
-void status_write(int fd, const char *data, int len);
+void status_write(int fd, const char *data, int len, long job = -1);
 void status_refresh(bool idle);
 void status_finish();
 
