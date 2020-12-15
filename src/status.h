@@ -34,13 +34,20 @@ struct Status {
 };
 
 struct StatusState {
-  std::list<Status> jobs;
   // critical path stats:
   double remain;
   double total;
   double current;
+  typedef std::list<Status>::iterator Handle;
 
-  StatusState() : jobs(), remain(0), total(0), current(0) { }
+  StatusState() : remain(0), total(0), current(0), jobs() { }
+  Handle add(const std::string &cmdline, double budget, const struct timeval &launch);
+  void remove(Handle sh);
+
+  const std::list<Status> &getJobs() const { return jobs; }
+
+private:
+  std::list<Status> jobs;
 };
 
 extern StatusState status_state;

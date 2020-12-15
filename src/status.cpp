@@ -122,10 +122,10 @@ static void status_redraw(bool idle)
     }
   }
 
-  int total = status_state.jobs.size();
+  int total = status_state.getJobs().size();
   int rows3 = rows/3;
   int overall = status_state.remain > 0 ? 1 : 0;
-  if (tty && rows3 >= 2+overall && cols > 16) for (auto &x : status_state.jobs) {
+  if (tty && rows3 >= 2+overall && cols > 16) for (auto &x : status_state.getJobs()) {
     double runtime =
       (now.tv_sec  - x.launch.tv_sec) +
       (now.tv_usec - x.launch.tv_usec) / 1000000.0;
@@ -342,4 +342,12 @@ void status_finish()
     memset(&timer, 0, sizeof(timer));
     setitimer(ITIMER_REAL, &timer, 0);
   }
+}
+
+StatusState::Handle StatusState::add(const std::string &cmdline, double budget, const struct timeval &launch) {
+  return jobs.emplace(jobs.end(), cmdline, budget, launch);
+}
+
+void StatusState::remove(StatusState::Handle sh) {
+  jobs.erase(sh);
 }

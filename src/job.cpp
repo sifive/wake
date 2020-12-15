@@ -624,7 +624,7 @@ static void launch(JobTable *jobtable) {
     std::string pretty = pretty_cmd(i.job->cmdline->as_str());
     std::string clone(i.job->label->empty() ? pretty : i.job->label->as_str());
     for (auto &c : clone) if (c == '\n') c = ' ';
-    i.status = status_state.jobs.emplace(status_state.jobs.end(), clone, predict, i.start);
+    i.status = status_state.add(clone, predict, i.start);
     if (LOG_ECHO(i.job->log)) {
       std::stringstream s;
       if (*i.job->dir != ".") s << "cd " << i.job->dir->c_str() << "; ";
@@ -669,7 +669,7 @@ struct CompletedJobEntry {
 
   bool operator () (const JobEntry &i) {
     if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
-      status_state.jobs.erase(i.status);
+      status_state.remove(i.status);
       jobtable->imp->active -= i.job->threads();
       jobtable->imp->phys_active -= i.job->memory();
       if (jobtable->imp->batch) {
