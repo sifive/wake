@@ -68,6 +68,8 @@ struct Database::detail {
   sqlite3_stmt *revtop_order;
   sqlite3_stmt *setcrit_path;
   sqlite3_stmt *tag_job;
+  sqlite3_stmt *get_tags;
+  sqlite3_stmt *get_edges;
 
   long run_id;
   detail(bool debugdb_)
@@ -76,7 +78,7 @@ struct Database::detail {
      wipe_file(0), insert_file(0), update_file(0), get_log(0), replay_log(0), get_tree(0), add_stats(0),
      link_stats(0), detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0),
      find_owner(0), find_last(0), find_failed(0), fetch_hash(0), delete_jobs(0), delete_dups(0),
-     delete_stats(0), revtop_order(0), setcrit_path(0) { }
+     delete_stats(0), revtop_order(0), setcrit_path(0), tag_job(0), get_tags(0), get_edges(0) { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -298,14 +300,20 @@ std::string Database::open(bool wait, bool memory) {
     "  where stat_id not in (select stat_id from jobs)"
     "  order by stat_id desc limit 9999999 offset 4*(select count(*) from jobs))";
   const char *sql_revtop_order =
-    "select job_id from jobs where use_id=(select max(run_id) from runs) order by job_id desc;";
+    "select job_id from jobs where use_id=(select max(run_id) from runs) order by job_id desc";
   const char *sql_setcrit_path =
     "update stats set pathtime=runtime+("
     "  select coalesce(max(s.pathtime),0) from filetree f1, filetree f2, jobs j, stats s"
     "  where f1.job_id=?1 and f1.access=2 and f1.file_id=f2.file_id and f2.access=1 and f2.job_id=j.job_id and j.stat_id=s.stat_id"
-    ") where stat_id=(select stat_id from jobs where job_id=?1);";
+    ") where stat_id=(select stat_id from jobs where job_id=?1)";
   const char *sql_tag_job =
     "insert into tags(job_id, uri) values(?, ?)";
+  const char *sql_get_tags =
+    "select job_id, uri from tags";
+  const char *sql_get_edges =
+    "select distinct user.job_id as user, used.job_id as used"
+    "  from filetree user, filetree used"
+    "   where user.access=1 and user.file_id=used.file_id and used.access=2";
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
@@ -347,6 +355,8 @@ std::string Database::open(bool wait, bool memory) {
   PREPARE(sql_revtop_order,   revtop_order);
   PREPARE(sql_setcrit_path,   setcrit_path);
   PREPARE(sql_tag_job,        tag_job);
+  PREPARE(sql_get_tags,       get_tags);
+  PREPARE(sql_get_edges,      get_edges);
 
   return "";
 }
@@ -397,6 +407,8 @@ void Database::close() {
   FINALIZE(revtop_order);
   FINALIZE(setcrit_path);
   FINALIZE(tag_job);
+  FINALIZE(get_tags);
+  FINALIZE(get_edges);
 
   if (imp->db) {
     int ret = sqlite3_close(imp->db);
@@ -988,4 +1000,26 @@ std::vector<JobReflection> Database::explain(const std::string &file, int use, b
   bind_string (why, imp->find_owner, 1, file);
   bind_integer(why, imp->find_owner, 2, use);
   return find_all(this, imp->find_owner, verbose);
+}
+
+std::vector<JobEdge> Database::get_edges() {
+  std::vector<JobEdge> out;
+  while (sqlite3_step(imp->get_edges) == SQLITE_ROW) {
+    out.emplace_back(
+      sqlite3_column_int64(imp->get_edges, 0),
+      sqlite3_column_int64(imp->get_edges, 1));
+  }
+  finish_stmt("Could not retrieve edges", imp->get_edges, imp->debugdb);
+  return out;
+}
+
+std::vector<JobTag> Database::get_tags() {
+  std::vector<JobTag> out;
+  while (sqlite3_step(imp->get_tags) == SQLITE_ROW) {
+    out.emplace_back(
+      sqlite3_column_int64(imp->get_tags, 0),
+      rip_column(imp->get_tags, 1));
+  }
+  finish_stmt("Could not retrieve tags", imp->get_tags, imp->debugdb);
+  return out;
 }

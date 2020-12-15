@@ -19,8 +19,10 @@
 #define DESCRIBE
 
 #include "database.h"
+#include "json5.h"
 #include <vector>
 
 void describe(const std::vector<JobReflection> &jobs, bool script, bool debug, bool verbose);
+JAST create_tagdag(Database &db, const std::string &tag);
 
 #endif

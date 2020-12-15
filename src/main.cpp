@@ -130,6 +130,7 @@ int main(int argc, char **argv) {
     { 0,   "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-ssa",        GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-optimize",           GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "tag-dag",               GOPT_ARGUMENT_REQUIRED  },
     { 0,   "export-api",            GOPT_ARGUMENT_REQUIRED  },
     { ':', "shebang",               GOPT_ARGUMENT_REQUIRED  },
     { 0,   0,                       GOPT_LAST}};
@@ -171,6 +172,7 @@ int main(int argc, char **argv) {
   const char *in      = arg(options, "in")->argument;
   const char *exec    = arg(options, "exec")->argument;
   char       *shebang = arg(options, "shebang")->argument;
+  const char *tagdag  = arg(options, "tag-dag")->argument;
   const char *api     = arg(options, "export-api")->argument;
 
   if (help) {
@@ -242,7 +244,7 @@ int main(int argc, char **argv) {
   bool targets = argc == 1 && !noargs;
 
   bool nodb = init;
-  bool noparse = nodb || output || input || last || failed;
+  bool noparse = nodb || output || input || last || failed || tagdag;
   bool notype = noparse || parse;
   bool noexecute = notype || html || tcheck || dumpssa || global || exports || api || targets;
 
@@ -300,6 +302,11 @@ int main(int argc, char **argv) {
 
   if (failed) {
     describe(db.failed(verbose), script, debug, verbose);
+  }
+
+  if (tagdag) {
+    JAST json = create_tagdag(db, tagdag);
+    std::cout << json << std::endl;
   }
 
   if (noparse) return 0;

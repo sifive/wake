@@ -57,6 +57,18 @@ struct JobReflection {
   std::vector<FileReflection> outputs;
 };
 
+struct JobTag {
+  long job;
+  std::string uri;
+  JobTag(long job_, std::string &&uri_) : job(job_), uri(std::move(uri_)) { }
+};
+
+struct JobEdge {
+  long user;
+  long used;
+  JobEdge(long user_, long used_) : user(user_), used(used_) { }
+};
+
 struct Database {
   struct detail;
   std::unique_ptr<detail> imp;
@@ -146,6 +158,9 @@ struct Database {
 
   std::vector<JobReflection> last(
     bool verbose);
+
+  std::vector<JobEdge> get_edges();
+  std::vector<JobTag> get_tags();
 };
 
 #endif
