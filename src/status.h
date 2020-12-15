@@ -57,7 +57,7 @@ void status_write(int fd, const char *data, int len);
 void status_refresh(bool idle);
 void status_finish();
 
-void term_init(bool tty);
+void term_init(bool tty, bool bsp);
 const char *term_red();
 const char *term_normal();
 

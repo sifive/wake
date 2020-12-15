@@ -130,6 +130,7 @@ int main(int argc, char **argv) {
     { 0,   "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-ssa",        GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-optimize",           GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "bsp",                   GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "tag-dag",               GOPT_ARGUMENT_REQUIRED  },
     { 0,   "export-api",            GOPT_ARGUMENT_REQUIRED  },
     { ':', "shebang",               GOPT_ARGUMENT_REQUIRED  },
@@ -161,6 +162,7 @@ int main(int argc, char **argv) {
   bool tcheck  = arg(options, "stop-after-type-check")->count;
   bool dumpssa = arg(options, "stop-after-ssa")->count;
   bool optim   =!arg(options, "no-optimize")->count;
+  bool bsp     = arg(options, "bsp")->count;
   bool exports = arg(options, "exports")->count;
 
   const char *percents= arg(options, "percent")->argument;
@@ -205,7 +207,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  term_init(tty);
+  if (bsp) tty = false;
+  term_init(tty, bsp);
 
   if (!percents) {
     percents = getenv("WAKE_PERCENT");
@@ -565,8 +568,10 @@ int main(int argc, char **argv) {
   do { runtime.run(); } while (!runtime.abort && jobtable.wait(runtime));
   status_finish();
 
-  runtime.heap.report();
-  tree.report(profile, command);
+  if (!bsp) {
+    runtime.heap.report();
+    tree.report(profile, command);
+  }
 
   bool pass = true;
   if (runtime.abort) {
@@ -578,12 +583,12 @@ int main(int argc, char **argv) {
     pass = false;
   } else {
     HeapObject *v = runtime.output.get();
-    if (verbose) {
+    if (verbose && !bsp) {
       std::cout << command << ": ";
       type.format(std::cout, type);
       std::cout << " = ";
     }
-    if (!quiet) {
+    if (!quiet && !bsp) {
       HeapObject::format(std::cout, v, debug, verbose?0:-1);
       std::cout << std::endl;
     }

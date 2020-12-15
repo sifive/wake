@@ -17,6 +17,7 @@
 
 #include "status.h"
 #include "job.h"
+#include "json5.h"
 #include <sstream>
 #include <limits>
 #include <iomanip>
@@ -47,6 +48,7 @@ static volatile bool spinner_update = false;
 static volatile bool resize_detected = false;
 
 static bool tty = false;
+static bool bsp = false;
 static int rows = 0, cols = 0;
 static const char *cuu1;
 static const char *cr;
@@ -255,9 +257,10 @@ static void handle_SIGWINCH(int sig)
   resize_detected = true;
 }
 
-void term_init(bool tty_)
+void term_init(bool tty_, bool bsp_)
 {
   tty = tty_;
+  bsp = bsp_;
 
   if (tty) {
     if (isatty(1) != 1) tty = false;
@@ -319,11 +322,26 @@ void status_init()
 
 void status_write(int fd, const char *data, int len)
 {
-  status_clear();
-  if (fd == 2) write_all_str(2, term_red());
-  write_all(fd, data, len);
-  if (fd == 2) write_all_str(2, term_normal());
-  refresh_needed = true;
+  if (bsp) {
+    if (len > 0 && (len != 1 || data[0] != '\n')) {
+      JAST notification(JSON_OBJECT);
+      notification.add("jsonrpc", "2.0");
+      notification.add("method", "build/logMessage");
+      JAST &params = notification.add("params", JSON_OBJECT);
+      params.add("type", JSON_INTEGER, fd==2/*stderr*/?"2"/*warning*/:"3"/*info*/);
+      params.add("message", std::string(data, len));
+      std::stringstream os;
+      os << notification << std::endl;
+      std::string out = os.str();
+      write_all(1, out.c_str(), out.size());
+    }
+  } else {
+    status_clear();
+    if (fd == 2) write_all_str(2, term_red());
+    write_all(fd, data, len);
+    if (fd == 2) write_all_str(2, term_normal());
+    refresh_needed = true;
+  }
 }
 
 void status_refresh(bool idle)
