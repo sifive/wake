@@ -763,9 +763,8 @@ bool JobTable::wait(Runtime &runtime) {
           runtime.heap.guarantee(WJob::reserve());
           runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
           ++done;
-          if (!imp->batch && LOG_STDOUT(i.job->log)) {
-            if (!i.stdout_buf.empty() && i.stdout_buf.back() != '\n')
-              i.stdout_buf.push_back('\n');
+          if (!imp->batch && LOG_STDOUT(i.job->log) && !i.stdout_buf.empty()) {
+            if (i.stdout_buf.back() != '\n') i.stdout_buf.push_back('\n');
             status_write(LOG_STDOUT(i.job->log), i.stdout_buf.data(), i.stdout_buf.size());
             i.stdout_buf.clear();
           }
@@ -791,9 +790,8 @@ bool JobTable::wait(Runtime &runtime) {
           runtime.heap.guarantee(WJob::reserve());
           runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
           ++done;
-          if (!imp->batch && LOG_STDERR(i.job->log)) {
-            if (!i.stderr_buf.empty() && i.stderr_buf.back() != '\n')
-              i.stderr_buf.push_back('\n');
+          if (!imp->batch && LOG_STDERR(i.job->log) && !i.stderr_buf.empty()) {
+            if (i.stderr_buf.back() != '\n') i.stderr_buf.push_back('\n');
             status_write(LOG_STDERR(i.job->log), i.stderr_buf.data(), i.stderr_buf.size());
             i.stderr_buf.clear();
           }
@@ -1065,14 +1063,14 @@ static PRIMFN(prim_job_virtual) {
     std::string out = s.str();
     status_write(1, out.data(), out.size());
   }
-  if (LOG_STDOUT(job->log)) {
+  if (LOG_STDOUT(job->log) && !stdout_payload->empty()) {
     status_write(1, stdout_payload->c_str(), stdout_payload->size());
-    if (!stdout_payload->empty() && stdout_payload->c_str()[stdout_payload->size()-1] != '\n')
+    if (stdout_payload->c_str()[stdout_payload->size()-1] != '\n')
       status_write(1, "\n", 1);
   }
-  if (LOG_STDERR(job->log)) {
+  if (LOG_STDERR(job->log) && !stderr_payload->empty()) {
     status_write(1, stderr_payload->c_str(), stderr_payload->size());
-    if (!stderr_payload->empty() && stderr_payload->c_str()[stderr_payload->size()-1] != '\n')
+    if (stderr_payload->c_str()[stderr_payload->size()-1] != '\n')
       status_write(1, "\n", 1);
   }
 
