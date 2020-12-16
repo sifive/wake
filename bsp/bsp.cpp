@@ -22,6 +22,9 @@
 #include <fstream>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <string.h>
 
 #include "json5.h"
 #include "execpath.h"
@@ -48,7 +51,7 @@ static const char *ParseError           = "-32700";
 //static const char *InvalidRequest       = "-32600";
 static const char *MethodNotFound       = "-32601";
 static const char *InvalidParams        = "-32602";
-//static const char *InternalError        = "-32603";
+static const char *InternalError        = "-32603";
 //static const char *serverErrorStart     = "-32099";
 //static const char *serverErrorEnd       = "-32000";
 static const char *ServerNotInitialized = "-32002";
@@ -100,6 +103,105 @@ static bool initialize(JAST &response, const JAST &params) {
   return ok;
 }
 
+struct ExecuteWakeProcess {
+  JAST result;
+  JAST error;
+  std::vector<std::string> cmdline;
+  int status;
+
+  ExecuteWakeProcess();
+  virtual void gotLine(const JAST &row) = 0;
+
+  void errorMessage(std::string &&message);
+  void errorPrefix(std::string &&message);
+
+  void execute();
+};
+
+ExecuteWakeProcess::ExecuteWakeProcess() : result(JSON_OBJECT), error(JSON_NULLVAL) {
+  std::string myDir = find_execpath();
+  cmdline.push_back(myDir + "/../../bin/wake");
+}
+
+void ExecuteWakeProcess::errorMessage(std::string &&message) {
+  if (error.kind == JSON_NULLVAL) {
+    error.kind = JSON_OBJECT;
+    error.add("code", JSON_INTEGER, InternalError);
+    error.add("message", std::move(message));
+  }
+}
+
+void ExecuteWakeProcess::errorPrefix(std::string &&message) {
+  errorMessage(message + ": " + strerror(errno));
+}
+
+// Yes, reading line-by-line without blocking from a subprocess really is this hard in C.
+void ExecuteWakeProcess::execute() {
+  int pipefds[2];
+  if (pipe(pipefds) != 0) {
+    errorPrefix("pipe");
+    return;
+  }
+
+  pid_t child = fork();
+  if (child == 0) {
+    // Redirect stdout to the pipe
+    close(pipefds[0]);
+    if (pipefds[1] != STDOUT_FILENO) {
+      dup2(pipefds[1], STDOUT_FILENO);
+      close(pipefds[1]);
+    }
+
+    // Launch subprocess with specified arguments
+    std::vector<char*> args;
+    for (auto &arg : cmdline)
+      args.push_back(const_cast<char*>(arg.c_str()));
+    args.push_back(0);
+    execv(cmdline[0].c_str(), args.data());
+
+    exit(1);
+  }
+
+  if (child == -1) errorPrefix("fork");
+  if (close(pipefds[1]) != 0) errorPrefix("close1");
+
+  std::string buffer;
+  char block[4096];
+  ssize_t got;
+  while ((got = read(pipefds[0], &block[0], sizeof(block))) > 0) {
+    buffer.append(&block[0], got);
+    size_t start = 0, end;
+    while ((end = buffer.find_first_of('\n', start)) != std::string::npos) {
+      JAST line;
+      std::stringstream parseErrors;
+      std::string json(buffer, start, end-start);
+      if (JAST::parse(json, parseErrors, line)) {
+        gotLine(line);
+      } else {
+        errorPrefix("failed to parse wake output: " + parseErrors.str());
+      }
+      start = end+1;
+    }
+    buffer.erase(buffer.begin(), buffer.begin() + start);
+  }
+
+  if (!buffer.empty()) {
+      JAST line;
+      std::stringstream parseErrors;
+      if (JAST::parse(buffer, parseErrors, line)) {
+        gotLine(line);
+      } else {
+        errorMessage("failed to parse wake output: " + parseErrors.str());
+      }
+  }
+
+  if (got < 0) errorPrefix("read");
+  if (close(pipefds[0]) != 0) errorPrefix("close");
+
+  if (waitpid(child, &status, 0) == -1) errorPrefix("waitpid");
+}
+
+
 static void makeAbsolute(JAST &node) {
   for (auto &child : node.children) makeAbsolute(child.second);
   if (node.kind == JSON_STR && node.value.compare(0, sizeof(workspace)-1, &workspace[0]) == 0) {
@@ -107,22 +209,44 @@ static void makeAbsolute(JAST &node) {
   }
 }
 
-static void enumerateTargets(JAST &response) {
-  std::vector<std::string> bspTargets;
-  // !!! invoke wake on a topic here?
-  bspTargets.push_back("build/java/edu.berkeley.cs/chisel3-core_2.12.12-3.4.0/bsp/buildTarget.json");
-  bspTargets.push_back("build/java/edu.berkeley.cs/chisel3-macros_2.12.12-3.4.0/bsp/buildTarget.json");
-  bspTargets.push_back("build/java/edu.berkeley.cs/rocket-chip_2.12.12-0.1/bsp/buildTarget.json");
-  bspTargets.push_back("build/java/edu.berkeley.cs/chisel3_2.12.12-3.4.0/bsp/buildTarget.json");
+struct EnumerateTargetsState : public ExecuteWakeProcess {
+  JAST &targets;
 
-  JAST &targets = response.add("result", JSON_OBJECT).add("targets", JSON_ARRAY);
-  for (auto &file : bspTargets) {
+  EnumerateTargetsState() : targets(result.add("targets", JSON_ARRAY)) {
+    cmdline.push_back("--tag-dag");
+    cmdline.push_back(std::string(bsp) + ".*");
+  }
+
+  void gotLine(const JAST &row) override;
+};
+
+void EnumerateTargetsState::gotLine(const JAST &row) {
+  for (auto &child : row.children) {
+    const JAST &uri = child.second.get("uri");
+    const JAST &deps = child.second.get("deps");
+    std::string buildTargetPath = uri.value.substr(sizeof(bsp)-1) + "/buildTarget.json";
+
     JAST buildTarget;
     std::stringstream parseErrors;
-    if (JAST::parse(file.c_str(), parseErrors, buildTarget)) {
+    if (JAST::parse(buildTargetPath.c_str(), parseErrors, buildTarget)) {
       makeAbsolute(buildTarget);
+      JAST &dependencies = buildTarget.add("dependencies", JSON_ARRAY);
+      for (auto &dep : deps.children)
+        dependencies.add(JSON_OBJECT).add("uri", std::string(dep.second.value));
       targets.children.emplace_back(std::string(), std::move(buildTarget));
+    } else {
+      errorMessage("failed to parse " + buildTargetPath + ": " + parseErrors.str());
     }
+  }
+}
+
+static void enumerateTargets(JAST &response) {
+  EnumerateTargetsState state;
+  state.execute();
+  if (state.error.kind == JSON_NULLVAL) {
+    response.children.emplace_back("result", std::move(state.result));
+  } else {
+    response.children.emplace_back("error", std::move(state.error));
   }
 }
 
@@ -146,9 +270,8 @@ static void clean(JAST &response, const JAST &params) {
   result.add("cleaned", JSON_TRUE);
 }
 
-static void executeTarget(const std::string &method, JAST &response, const JAST &params) {
+static void staticTarget(const std::string &method, JAST &response, const JAST &params) {
   JAST &items = response.add("result", JSON_OBJECT).add("items", JSON_ARRAY);
-  // This case applies for scalacOptions, sources, dependencySources, resources, scalaMainClasses, scalaTestClasses
   for (auto &x : params.get("targets").children) {
     const std::string &uri = x.second.get("uri").value;
     if (uri.compare(0, sizeof(bsp)-1, &bsp[0]) != 0) continue;
@@ -238,8 +361,8 @@ int main(int argc, const char **argv) {
       } else if (method == "buildTarget/cleanCache") {
         clean(response, params);
       } else if (method.compare(0, sizeof(buildTarget)-1, &buildTarget[0]) == 0) {
-        // Dispatch request to static JSON files or scripts
-        executeTarget(method.substr(sizeof(buildTarget)-1), response, params);
+        // Dispatch request to static JSON files
+        staticTarget(method.substr(sizeof(buildTarget)-1), response, params);
       } else {
         JAST &error = response.add("error", JSON_OBJECT);
         error.add("code", JSON_INTEGER, MethodNotFound);
