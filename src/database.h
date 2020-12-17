@@ -44,6 +44,7 @@ struct JobTag {
   long job;
   std::string uri;
   std::string content;
+  JobTag(JobTag &&o) = default;
   JobTag(long job_, std::string &&uri_, std::string &&content_)
    : job(job_), uri(std::move(uri_)), content(std::move(content_)) { }
 };

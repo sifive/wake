@@ -241,10 +241,10 @@ JAST create_tagdag(Database &db, const std::string &tagExpr) {
   RE2 exp(tagExpr);
 
   // Pick only those tags that match the RegExp
-  std::unordered_map<long, std::string> relevant;
+  std::unordered_multimap<long, JobTag> relevant;
   for (auto &tag : db.get_tags())
     if (RE2::FullMatch(tag.uri, exp))
-      relevant[tag.job] = std::move(tag.uri);
+      relevant.emplace(tag.job, std::move(tag));
 
   // Create a bidirectional view of the graph
   std::unordered_map<long, GraphNode> graph;
@@ -256,7 +256,7 @@ JAST create_tagdag(Database &db, const std::string &tagExpr) {
 
   // Working queue for Job ids
   std::deque<long> queue;
-  // Compressed map for URIs
+  // Compressed map for tags
   std::vector<JobTag> uris;
 
   // Explore from all nodes which use nothing (ie: build leafs)
@@ -275,10 +275,11 @@ JAST create_tagdag(Database &db, const std::string &tagExpr) {
       me.closure |= graph[usesJob].closure;
 
     // If we are relevant, add us to the bitvector, and top-sort the relevant jobs
-    auto rel = relevant.find(job);
-    if (rel != relevant.end()) {
+    auto rel = relevant.equal_range(job);
+    if (rel.first != rel.second) {
       me.closure.toggle(uris.size());
-      uris.emplace_back(job, std::move(rel->second), "");
+      for (; rel.first != rel.second; ++rel.first)
+        uris.emplace_back(std::move(rel.first->second));
     }
 
     // Enqueue anything for which we are the last dependent
@@ -317,11 +318,15 @@ JAST create_tagdag(Database &db, const std::string &tagExpr) {
     me.closure.toggle(max);
 
     JAST &entry = out.add(JSON_OBJECT);
-    entry.add("uri", std::move(uris[max].uri));
-    JAST &deps = entry.add("deps", JSON_ARRAY);
+    entry.add("job", JSON_INTEGER, std::to_string(uris[max].job));
 
+    JAST &tags = entry.add("tags", JSON_OBJECT);
+    for (size_t i = max; i < uris.size() && uris[i].job == job; ++i)
+      tags.add(std::move(uris[i].uri), std::move(uris[i].content));
+
+    JAST &deps = entry.add("deps", JSON_ARRAY);
     while ((max = me.closure.max()) != -1) {
-      deps.add(std::string(uris[max].uri));
+      deps.add(JSON_INTEGER, std::to_string(uris[max].job));
       // Elminate transitively reachable children
       me.closure.clear(graph[uris[max].job].closure);
     }
