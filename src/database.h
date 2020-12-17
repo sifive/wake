@@ -152,6 +152,10 @@ struct Database {
     long modified);
 
   std::vector<JobReflection> explain(
+    long job,
+    bool verbose);
+
+  std::vector<JobReflection> explain(
     const std::string &file,
     int use,
     bool verbose);

@@ -264,7 +264,7 @@ JAST create_tagdag(Database &db, const std::string &tagExpr) {
     auto rel = relevant.find(job);
     if (rel != relevant.end()) {
       me.closure.toggle(uris.size());
-      uris.emplace_back(job, std::move(rel->second));
+      uris.emplace_back(job, std::move(rel->second), "");
     }
 
     // Enqueue anything for which we are the last dependent
