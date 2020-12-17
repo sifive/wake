@@ -300,29 +300,29 @@ int main(int argc, char **argv) {
   }
 
   if (job) {
-    auto hits = db.explain(std::atol(job), verbose);
+    auto hits = db.explain(std::atol(job), verbose || tag);
     describe(hits, script, debug, verbose, tag);
     if (hits.empty()) std::cerr << "Job '" << job << "' was not found in the database!" << std::endl;
   }
 
   if (input) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1, verbose), script, debug, verbose, tag);
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1, verbose || tag), script, debug, verbose, tag);
     }
   }
 
   if (output) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2, verbose), script, debug, verbose, tag);
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2, verbose || tag), script, debug, verbose, tag);
     }
   }
 
   if (last) {
-    describe(db.last(verbose), script, debug, verbose, tag);
+    describe(db.last(verbose || tag), script, debug, verbose, tag);
   }
 
   if (failed) {
-    describe(db.failed(verbose), script, debug, verbose, tag);
+    describe(db.failed(verbose || tag), script, debug, verbose, tag);
   }
 
   if (tagdag) {
