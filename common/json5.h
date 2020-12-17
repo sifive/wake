@@ -39,7 +39,8 @@ enum SymbolJSON {
 extern const char *jsymbolTable[];
 
 struct JAST;
-typedef std::vector<std::pair<std::string, JAST> > JChildren;
+typedef std::pair<std::string, JAST> JChild;
+typedef std::vector<JChild> JChildren;
 
 struct JAST {
   SymbolJSON kind;
@@ -57,7 +58,18 @@ struct JAST {
 
   const JAST &get(const std::string &key) const;
   JAST &get(const std::string &key);
+
+  // Add a child to a JObject
+  JAST &add(std::string &&key, SymbolJSON kind, std::string &&value);
+  JAST &add(std::string &&key, std::string &&value) { return add(std::move(key), JSON_STR, std::move(value)); }
+  JAST &add(std::string &&key, SymbolJSON kind)     { return add(std::move(key), kind,     std::string());    }
+  // Add a child to a JArray
+  JAST &add(SymbolJSON kind, std::string &&value) { return add(std::string(), kind,     std::move(value)); }
+  JAST &add(SymbolJSON kind)                      { return add(std::string(), kind,     std::string());    }
+  JAST &add(std::string &&value)                  { return add(std::string(), JSON_STR, std::move(value)); }
 };
+
+std::ostream & operator << (std::ostream &os, const JAST &jast);
 
 struct JSymbol {
   SymbolJSON type;
