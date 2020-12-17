@@ -87,6 +87,13 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug, b
       std::cout << "Stderr:";
       indent("  ", job.stderr_payload);
     }
+    if (!job.tags.empty()) {
+      std::cout << "Tags:" << std::endl;
+      for (auto &x : job.tags) {
+        std::cout << "  " << x.uri << ": ";
+        indent("    ", x.content);
+      }
+    }
   }
 }
 
@@ -144,6 +151,13 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
     if (!job.stderr_payload.empty()) {
       std::cout << "# Stderr:";
       indent("#   ", job.stderr_payload);
+    }
+    if (!job.tags.empty()) {
+      std::cout << "# Tags:" << std::endl;
+      for (auto &x : job.tags) {
+        std::cout << "   " << x.uri << ": ";
+        indent("#     ", x.content);
+      }
     }
   }
 }

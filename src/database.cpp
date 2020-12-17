@@ -70,6 +70,7 @@ struct Database::detail {
   sqlite3_stmt *setcrit_path;
   sqlite3_stmt *tag_job;
   sqlite3_stmt *get_tags;
+  sqlite3_stmt *get_all_tags;
   sqlite3_stmt *get_edges;
 
   long run_id;
@@ -79,7 +80,7 @@ struct Database::detail {
      wipe_file(0), insert_file(0), update_file(0), get_log(0), replay_log(0), get_tree(0), add_stats(0),
      link_stats(0), detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0),
      find_job(0), find_owner(0), find_last(0), find_failed(0), fetch_hash(0), delete_jobs(0), delete_dups(0),
-     delete_stats(0), revtop_order(0), setcrit_path(0), tag_job(0), get_tags(0), get_edges(0) { }
+     delete_stats(0), revtop_order(0), setcrit_path(0), tag_job(0), get_tags(0), get_all_tags(0), get_edges(0) { }
 };
 
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
@@ -315,6 +316,8 @@ std::string Database::open(bool wait, bool memory) {
   const char *sql_tag_job =
     "insert into tags(job_id, uri, content) values(?, ?, ?)";
   const char *sql_get_tags =
+    "select job_id, uri, content from tags where job_id=?";
+  const char *sql_get_all_tags =
     "select job_id, uri, content from tags";
   const char *sql_get_edges =
     "select distinct user.job_id as user, used.job_id as used"
@@ -363,6 +366,7 @@ std::string Database::open(bool wait, bool memory) {
   PREPARE(sql_setcrit_path,   setcrit_path);
   PREPARE(sql_tag_job,        tag_job);
   PREPARE(sql_get_tags,       get_tags);
+  PREPARE(sql_get_all_tags,   get_all_tags);
   PREPARE(sql_get_edges,      get_edges);
 
   return "";
@@ -416,6 +420,7 @@ void Database::close() {
   FINALIZE(setcrit_path);
   FINALIZE(tag_job);
   FINALIZE(get_tags);
+  FINALIZE(get_all_tags);
   FINALIZE(get_edges);
 
   if (imp->db) {
@@ -965,6 +970,14 @@ static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
         rip_column(db->imp->get_tree, 0),
         rip_column(db->imp->get_tree, 1));
     finish_stmt(why, db->imp->get_tree, db->imp->debugdb);
+    // tags
+    bind_integer(why, db->imp->get_tags, 1, desc.job);
+    while (sqlite3_step(db->imp->get_tags) == SQLITE_ROW)
+      desc.tags.emplace_back(
+        sqlite3_column_int64(db->imp->get_tags, 0),
+        rip_column(db->imp->get_tags, 1),
+        rip_column(db->imp->get_tags, 2));
+    finish_stmt(why, db->imp->get_tags, db->imp->debugdb);
   }
   // inputs
   bind_integer(why, db->imp->get_tree, 1, desc.job);
@@ -1033,12 +1046,13 @@ std::vector<JobEdge> Database::get_edges() {
 
 std::vector<JobTag> Database::get_tags() {
   std::vector<JobTag> out;
-  while (sqlite3_step(imp->get_tags) == SQLITE_ROW) {
+  while (sqlite3_step(imp->get_all_tags) == SQLITE_ROW) {
     out.emplace_back(
-      sqlite3_column_int64(imp->get_tags, 0),
-      rip_column(imp->get_tags, 1),
-      rip_column(imp->get_tags, 2));
+      sqlite3_column_int64(imp->get_all_tags, 0),
+      rip_column(imp->get_all_tags, 1),
+      rip_column(imp->get_all_tags, 2));
   }
-  finish_stmt("Could not retrieve tags", imp->get_tags, imp->debugdb);
+  finish_stmt("Could not retrieve tags", imp->get_all_tags, imp->debugdb);
   return out;
 }
+

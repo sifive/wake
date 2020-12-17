@@ -40,6 +40,14 @@ struct Usage {
   Usage() : found(false) { }
 };
 
+struct JobTag {
+  long job;
+  std::string uri;
+  std::string content;
+  JobTag(long job_, std::string &&uri_, std::string &&content_)
+   : job(job_), uri(std::move(uri_)), content(std::move(content_)) { }
+};
+
 struct JobReflection {
   long job;
   std::string label;
@@ -55,14 +63,7 @@ struct JobReflection {
   std::vector<FileReflection> visible;
   std::vector<FileReflection> inputs;
   std::vector<FileReflection> outputs;
-};
-
-struct JobTag {
-  long job;
-  std::string uri;
-  std::string content;
-  JobTag(long job_, std::string &&uri_, std::string &&content_)
-   : job(job_), uri(std::move(uri_)), content(std::move(content_)) { }
+  std::vector<JobTag> tags;
 };
 
 struct JobEdge {
