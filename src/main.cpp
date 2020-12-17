@@ -71,6 +71,7 @@ void print_help(const char *argv0) {
     << "    --init      DIR  Create or replace a wake.db in the specified directory"     << std::endl
     << "    --input  -i FILE Report recorded meta-data for jobs which read FILES"        << std::endl
     << "    --output -o FILE Report recorded meta-data for jobs which wrote FILES"       << std::endl
+    << "    --job       JOB  Report recorded meta-data for the specified job id"         << std::endl
     << "    --last     -l    Report recorded meta-data for all jobs run by last build"   << std::endl
     << "    --failed   -f    Report recorded meta-data for jobs which failed last build" << std::endl
     << "    --verbose  -v    Report recorded standard output and error of matching jobs" << std::endl
@@ -113,6 +114,7 @@ int main(int argc, char **argv) {
     { 'C', "chdir",                 GOPT_ARGUMENT_REQUIRED  },
     { 0,   "in",                    GOPT_ARGUMENT_REQUIRED  },
     { 'x', "exec",                  GOPT_ARGUMENT_REQUIRED  },
+    { 0,   "job",                   GOPT_ARGUMENT_REQUIRED  },
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
     { 'l', "last",                  GOPT_ARGUMENT_FORBIDDEN },
@@ -130,6 +132,8 @@ int main(int argc, char **argv) {
     { 0,   "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-ssa",        GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-optimize",           GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "tag-dag",               GOPT_ARGUMENT_REQUIRED  },
+    { 0,   "tag",                   GOPT_ARGUMENT_REQUIRED  },
     { 0,   "export-api",            GOPT_ARGUMENT_REQUIRED  },
     { 0,   "stdout",                GOPT_ARGUMENT_REQUIRED  },
     { 0,   "stderr",                GOPT_ARGUMENT_REQUIRED  },
@@ -175,7 +179,10 @@ int main(int argc, char **argv) {
   const char *chdir   = arg(options, "chdir")->argument;
   const char *in      = arg(options, "in")->argument;
   const char *exec    = arg(options, "exec")->argument;
+  const char *job     = arg(options, "job")->argument;
   char       *shebang = arg(options, "shebang")->argument;
+  const char *tagdag  = arg(options, "tag-dag")->argument;
+  const char *tag     = arg(options, "tag")->argument;
   const char *api     = arg(options, "export-api")->argument;
   const char *fd1     = arg(options, "stdout")->argument;
   const char *fd2     = arg(options, "stderr")->argument;
@@ -252,7 +259,7 @@ int main(int argc, char **argv) {
   bool targets = argc == 1 && !noargs;
 
   bool nodb = init;
-  bool noparse = nodb || output || input || last || failed;
+  bool noparse = nodb || job || output || input || last || failed || tagdag;
   bool notype = noparse || parse;
   bool noexecute = notype || html || tcheck || dumpssa || global || exports || api || targets;
 
@@ -292,24 +299,35 @@ int main(int argc, char **argv) {
     db.entropy(&sip_key[0], 2);
   }
 
+  if (job) {
+    auto hits = db.explain(std::atol(job), verbose || tag);
+    describe(hits, script, debug, verbose, tag);
+    if (hits.empty()) std::cerr << "Job '" << job << "' was not found in the database!" << std::endl;
+  }
+
   if (input) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1, verbose), script, debug, verbose);
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1, verbose || tag), script, debug, verbose, tag);
     }
   }
 
   if (output) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2, verbose), script, debug, verbose);
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2, verbose || tag), script, debug, verbose, tag);
     }
   }
 
   if (last) {
-    describe(db.last(verbose), script, debug, verbose);
+    describe(db.last(verbose || tag), script, debug, verbose, tag);
   }
 
   if (failed) {
-    describe(db.failed(verbose), script, debug, verbose);
+    describe(db.failed(verbose || tag), script, debug, verbose, tag);
+  }
+
+  if (tagdag) {
+    JAST json = create_tagdag(db, tagdag);
+    std::cout << json << std::endl;
   }
 
   if (noparse) return 0;

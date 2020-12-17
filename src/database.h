@@ -40,6 +40,15 @@ struct Usage {
   Usage() : found(false) { }
 };
 
+struct JobTag {
+  long job;
+  std::string uri;
+  std::string content;
+  JobTag(JobTag &&o) = default;
+  JobTag(long job_, std::string &&uri_, std::string &&content_)
+   : job(job_), uri(std::move(uri_)), content(std::move(content_)) { }
+};
+
 struct JobReflection {
   long job;
   std::string label;
@@ -55,6 +64,13 @@ struct JobReflection {
   std::vector<FileReflection> visible;
   std::vector<FileReflection> inputs;
   std::vector<FileReflection> outputs;
+  std::vector<JobTag> tags;
+};
+
+struct JobEdge {
+  long user;
+  long used;
+  JobEdge(long user_, long used_) : user(user_), used(used_) { }
 };
 
 struct Database {
@@ -109,6 +125,11 @@ struct Database {
     Usage reality);
   std::vector<FileReflection> get_tree(int kind, long job);
 
+  void tag_job(
+    long job,
+    const std::string &uri,
+    const std::string &content);
+
   void save_output( // call only if needs_build -> true
     long job,
     int descriptor,
@@ -133,6 +154,10 @@ struct Database {
     long modified);
 
   std::vector<JobReflection> explain(
+    long job,
+    bool verbose);
+
+  std::vector<JobReflection> explain(
     const std::string &file,
     int use,
     bool verbose);
@@ -142,6 +167,9 @@ struct Database {
 
   std::vector<JobReflection> last(
     bool verbose);
+
+  std::vector<JobEdge> get_edges();
+  std::vector<JobTag> get_tags();
 };
 
 #endif
