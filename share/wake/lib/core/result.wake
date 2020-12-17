@@ -97,3 +97,14 @@ export tuple Error =
 
 export def makeError cause =
   Error cause (stack Unit)
+
+# String => Result a Error => Result a Error
+# Internal, but useful helper function to enrich error messages.
+# This should probably be in the wake standard library.
+def addErrorContext prefix = match _
+  Pass x = Pass x
+  Fail (Error cause stack) = Fail (Error "{prefix}: {cause}" stack)
+
+# String => Result a Error
+# Handy method to fail with the specified message
+def failWithError msg = Fail (makeError msg)
