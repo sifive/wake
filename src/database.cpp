@@ -184,8 +184,9 @@ std::string Database::open(bool wait, bool memory) {
     "  output     text    not null);"
     "create index if not exists logorder on log(job_id, descriptor, log_id);"
     "create table if not exists tags("
-    "  job_id     integer not null references jobs(job_id) on delete cascade,"
-    "  uri        text,"
+    "  job_id  integer not null references jobs(job_id) on delete cascade,"
+    "  uri     text,"
+    "  content text,"
     "  unique(job_id, uri) on conflict ignore);";
 
   while (true) {
@@ -307,9 +308,9 @@ std::string Database::open(bool wait, bool memory) {
     "  where f1.job_id=?1 and f1.access=2 and f1.file_id=f2.file_id and f2.access=1 and f2.job_id=j.job_id and j.stat_id=s.stat_id"
     ") where stat_id=(select stat_id from jobs where job_id=?1)";
   const char *sql_tag_job =
-    "insert into tags(job_id, uri) values(?, ?)";
+    "insert into tags(job_id, uri, content) values(?, ?, ?)";
   const char *sql_get_tags =
-    "select job_id, uri from tags";
+    "select job_id, uri, content from tags";
   const char *sql_get_edges =
     "select distinct user.job_id as user, used.job_id as used"
     "  from filetree user, filetree used"
@@ -826,10 +827,11 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   if (fail) exit(1);
 }
 
-void Database::tag_job(long job, const std::string &uri) {
+void Database::tag_job(long job, const std::string &uri, const std::string &content) {
   const char *why = "Could not tag a job";
   bind_integer(why, imp->tag_job, 1, job);
   bind_string (why, imp->tag_job, 2, uri);
+  bind_string (why, imp->tag_job, 3, content);
   single_step (why, imp->tag_job, imp->debugdb);
 }
 
@@ -1015,7 +1017,8 @@ std::vector<JobTag> Database::get_tags() {
   while (sqlite3_step(imp->get_tags) == SQLITE_ROW) {
     out.emplace_back(
       sqlite3_column_int64(imp->get_tags, 0),
-      rip_column(imp->get_tags, 1));
+      rip_column(imp->get_tags, 1),
+      rip_column(imp->get_tags, 2));
   }
   finish_stmt("Could not retrieve tags", imp->get_tags, imp->debugdb);
   return out;

@@ -60,7 +60,9 @@ struct JobReflection {
 struct JobTag {
   long job;
   std::string uri;
-  JobTag(long job_, std::string &&uri_) : job(job_), uri(std::move(uri_)) { }
+  std::string content;
+  JobTag(long job_, std::string &&uri_, std::string &&content_)
+   : job(job_), uri(std::move(uri_)), content(std::move(content_)) { }
 };
 
 struct JobEdge {
@@ -123,7 +125,8 @@ struct Database {
 
   void tag_job(
     long job,
-    const std::string &uri);
+    const std::string &uri,
+    const std::string &content);
 
   void save_output( // call only if needs_build -> true
     long job,

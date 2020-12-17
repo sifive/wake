@@ -1444,19 +1444,21 @@ static PRIMFN(prim_job_finish) {
 }
 
 static PRIMTYPE(type_job_tag) {
-  return args.size() == 2 &&
+  return args.size() == 3 &&
     args[0]->unify(Job::typeVar) &&
     args[1]->unify(String::typeVar) &&
+    args[2]->unify(String::typeVar) &&
     out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_job_tag) {
-  EXPECT(2);
+  EXPECT(3);
   JOB(job, 0);
-  STRING(tag, 1);
+  STRING(uri, 1);
+  STRING(content, 2);
 
   runtime.heap.reserve(reserve_unit());
-  job->db->tag_job(job->job, tag->as_str());
+  job->db->tag_job(job->job, uri->as_str(), content->as_str());
   RETURN(claim_unit(runtime.heap));
 }
 
