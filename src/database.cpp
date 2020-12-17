@@ -189,7 +189,7 @@ std::string Database::open(bool wait, bool memory) {
     "  job_id  integer not null references jobs(job_id) on delete cascade,"
     "  uri     text,"
     "  content text,"
-    "  unique(job_id, uri) on conflict ignore);";
+    "  unique(job_id, uri) on conflict replace);";
 
   while (true) {
     char *fail;
