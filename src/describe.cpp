@@ -189,7 +189,7 @@ public:
   void clear(const BitVector &o);
 
 private:
-  std::vector<uint64_t> imp;
+  mutable std::vector<uint64_t> imp;
 };
 
 bool BitVector::get(size_t i) const {
@@ -205,17 +205,18 @@ void BitVector::toggle(size_t i) {
 }
 
 long BitVector::max() const {
-  size_t i = imp.size();
-  do {
-    uint64_t x = imp[--i];
+  while (!imp.empty()) {
+    uint64_t x = imp.back();
     if (x != 0) {
       // Find the highest set bit
       int best = 0;
       for (int i = 0; i < 64; ++i)
         if (((x >> i) & 1)) best = i;
-      return (i*64) + best;
+      return ((imp.size()-1)*64) + best;
+    } else {
+      imp.pop_back();
     }
-  } while (i != 0);
+  }
   return -1;
 }
 
