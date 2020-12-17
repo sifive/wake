@@ -543,6 +543,10 @@ export def getPathParent path = match path
   Path name = Path (simplify "{name}/..")
   BadPath e = BadPath e
 
+export def isPathDir = match _
+  BadPath _ = False
+  Path str = matches `0+` (hashcode str)
+
 export def sortPaths paths =
   def fn a b = a.getPathName <~ b.getPathName
   sortBy fn paths
