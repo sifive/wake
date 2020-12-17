@@ -120,8 +120,8 @@ struct Database {
     int descriptor);
   void replay_output(
     long job,
-    bool dump_stdout,
-    bool dump_stderr);
+    const char *stdout,
+    const char *stderr);
 
   void add_hash(
     const std::string &file,

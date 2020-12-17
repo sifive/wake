@@ -191,8 +191,7 @@ void Heap::report() const {
         << std::endl;
     }
     s << "------------------------------------------" << std::endl;
-    auto str = s.str();
-    status_write(2, str.data(), str.size());
+    status_write(STREAM_LOG, s.str());
   }
 }
 
@@ -286,8 +285,7 @@ void Heap::GC(size_t requested_pads) {
           << std::endl;
       }
       s << "------------------------------------------" << std::endl;
-      auto str = s.str();
-      status_write(2, str.data(), str.size());
+      status_write(STREAM_LOG, s.str());
     }
 
     if (imp->last_pads > imp->most_pads) {

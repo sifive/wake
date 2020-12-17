@@ -45,13 +45,35 @@ struct StatusState {
 
 extern StatusState status_state;
 
+#define STREAM_LOG	"debug"
+#define STREAM_INFO	"info"
+#define STREAM_ECHO	"echo"
+#define STREAM_WARNING	"warning"
+#define STREAM_ERROR	"error"
+
 void status_init();
-void status_write(int fd, const char *data, int len);
+void status_write(const char *name, const char *data, int len);
+inline void status_write(const char *name, const std::string &str) { status_write(name, str.data(), str.size()); }
 void status_refresh(bool idle);
 void status_finish();
 
+void status_set_colour(const char *name, int colour);
+void status_set_fd(const char *name, int fd);
+void status_set_bulk_fd(int fd, const char *streams);
+
 void term_init(bool tty);
-const char *term_red();
+
+#define TERM_BLACK	0
+#define TERM_RED	1
+#define TERM_GREEN	2
+#define TERM_YELLOW	3
+#define TERM_BLUE	4
+#define TERM_MAGENTA	5
+#define TERM_CYAN	6
+#define TERM_WHITE	7
+#define TERM_DEFAULT	9
+
+const char *term_colour(int code);
 const char *term_normal();
 
 #endif

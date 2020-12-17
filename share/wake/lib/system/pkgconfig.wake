@@ -38,9 +38,8 @@ target pkgConfigImp args =
   def result =
     makePlan cmdline Nil
     | setPlanLocalOnly True
-    | setPlanEcho Verbose
     | setPlanStdout logNever
-    | setPlanStderr logVerbose
+    | setPlanStderr logDebug
     | editPlanEnvironment addenv
     | runJob
   def output = result.getJobStdout | getWhenFail "" | tokenize `\n` | head

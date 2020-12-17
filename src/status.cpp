@@ -18,6 +18,7 @@
 #include "status.h"
 #include "job.h"
 #include <sstream>
+#include <unordered_map>
 #include <limits>
 #include <iomanip>
 #include <sys/ioctl.h>
@@ -55,14 +56,14 @@ static const char *sgr0;
 static int used = 0;
 static int ticks = 0;
 
-const char *term_red()
+const char *term_colour(int code)
 {
   static char setaf_lit[] = "setaf";
   char *out;
   if (!sgr0) return "";
   out = tigetstr(setaf_lit);
   if (!out || out == (char*)-1) return "";
-  out = tparm(out, 1); // red
+  out = tparm(out, code);
   if (!out || out == (char*)-1) return "";
   return out;
 }
@@ -317,13 +318,48 @@ void status_init()
   }
 }
 
-void status_write(int fd, const char *data, int len)
+struct StreamSettings {
+  int fd;
+  int colour;
+  StreamSettings() : fd(-1), colour(TERM_DEFAULT) { }
+};
+
+static std::unordered_map<std::string, StreamSettings> settings;
+
+void status_set_colour(const char *name, int colour)
 {
-  status_clear();
-  if (fd == 2) write_all_str(2, term_red());
-  write_all(fd, data, len);
-  if (fd == 2) write_all_str(2, term_normal());
-  refresh_needed = true;
+  settings[name].colour = colour;
+}
+
+void status_set_fd(const char *name, int fd)
+{
+  settings[name].fd = fd;
+}
+
+void status_set_bulk_fd(int fd, const char *streams)
+{
+  if (!streams) return;
+  const char *start = streams;
+  while (*start) {
+    const char *end = start;
+    while (*end && *end != ',') { ++end; }
+    status_set_fd(std::string(start, end-start).c_str(), fd);
+    start = *end?(end+1):end;
+  }
+}
+
+void status_write(const char *name, const char *data, int len)
+{
+  StreamSettings s = settings[name];
+  if (s.fd != -1) {
+    status_clear();
+    if (s.colour != TERM_DEFAULT)
+      write_all_str(s.fd, term_colour(s.colour));
+    write_all(s.fd, data, len);
+    if (s.colour != TERM_DEFAULT)
+      write_all_str(s.fd, term_normal());
+    refresh_needed = true;
+  }
 }
 
 void status_refresh(bool idle)

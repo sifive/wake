@@ -33,7 +33,7 @@ def raw_source file =
   else
     makePlan ("<source>", str time, file, Nil) Nil
     | setPlanShare       False
-    | setPlanEcho        Debug
+    | setPlanEcho        logDebug
     | setPlanEnvironment Nil
     | setPlanFnOutputs   (file, _)
     | runJobWith virtualRunner

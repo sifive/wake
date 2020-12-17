@@ -25,7 +25,6 @@ def buildAs Unit = match (subscribe releaseAs)
     | setPlanKeep False
     | setPlanLocalOnly True
     | setPlanStdout logNever
-    | setPlanEcho Verbose
     | runJob
     | getJobStdout
     | rmap (replace `^v|\n.*` '')
@@ -45,7 +44,6 @@ def buildOn Unit = match (subscribe releaseOn)
     | setPlanKeep False
     | setPlanLocalOnly True
     | setPlanStdout logNever
-    | setPlanEcho Verbose
     | runJob
     | getJobStdout
     | rmap (replace `\n.*` '')
