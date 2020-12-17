@@ -306,10 +306,13 @@ export def runJob p = match p
         def _ = wait (\_ badfinish job error) (badlaunch job error)
         job
 
-# Job => String => String => Unit
+# SString => String => Job => Job
 # Set the value of a tag on a Job
 # This is useful for post-build reflection into the database
-export def setJobTag job key value = prim "job_tag"
+export def setJobTag key value job =
+  def p job key value = prim "job_tag"
+  def _ = p job key value
+  job
 
 def toUsage (Pair (Pair status runtime) (Pair (Pair cputime membytes) (Pair ibytes obytes))) =
   Usage status runtime cputime membytes ibytes obytes
