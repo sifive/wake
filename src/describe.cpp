@@ -201,7 +201,7 @@ bool BitVector::get(size_t i) const {
 void BitVector::toggle(size_t i) {
   size_t j = i / 64, k = i % 64;
   if (j >= imp.size()) imp.resize(j+1, 0);
-  imp[j] ^= 1 << k;
+  imp[j] ^= static_cast<uint64_t>(1) << k;
 }
 
 long BitVector::max() const {
@@ -242,6 +242,19 @@ struct GraphNode {
   BitVector closure;
   GraphNode() : usedUp(0), usesUp(0) { }
 };
+
+std::ostream & operator << (std::ostream &os, const GraphNode &node) {
+  os << "  uses";
+  for (auto x : node.uses) os << " " << x;
+  os << std::endl;
+  os <<"  usedBy";
+  for (auto x : node.usedBy) os << " " << x;
+  os << std::endl;
+  os << "  closure ";
+  for (long i = 0; i <= node.closure.max(); ++i)
+    os << (node.closure.get(i)?"X":" ");
+  return os << std::endl;
+}
 
 JAST create_tagdag(Database &db, const std::string &tagExpr) {
   RE2 exp(tagExpr);
@@ -291,6 +304,7 @@ JAST create_tagdag(Database &db, const std::string &tagExpr) {
     // Enqueue anything for which we are the last dependent
     for (auto userJob : me.usedBy) {
       GraphNode &user = graph[userJob];
+      assert (user.usesUp < user.uses.size());
       if (++user.usesUp == user.uses.size())
         queue.push_back(userJob);
     }
@@ -311,6 +325,7 @@ JAST create_tagdag(Database &db, const std::string &tagExpr) {
     // Enqueue anything for which we are the last user
     for (auto usesJob : me.uses) {
       GraphNode &uses = graph[usesJob];
+      assert (uses.usedUp < uses.usedBy.size());
       if (++uses.usedUp == uses.usedBy.size())
         queue.push_back(usesJob);
     }
@@ -332,9 +347,13 @@ JAST create_tagdag(Database &db, const std::string &tagExpr) {
 
     JAST &deps = entry.add("deps", JSON_ARRAY);
     while ((max = me.closure.max()) != -1) {
-      deps.add(JSON_INTEGER, std::to_string(uris[max].job));
+      long depJob = uris[max].job;
+      GraphNode &dep = graph[depJob];
+      // Add this dependency
+      deps.add(JSON_INTEGER, std::to_string(depJob));
       // Elminate transitively reachable children
-      me.closure.clear(graph[uris[max].job].closure);
+      assert (dep.closure.get(max));
+      me.closure.clear(dep.closure);
     }
   }
 
