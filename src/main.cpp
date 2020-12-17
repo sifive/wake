@@ -133,6 +133,7 @@ int main(int argc, char **argv) {
     { 0,   "stop-after-ssa",        GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-optimize",           GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "tag-dag",               GOPT_ARGUMENT_REQUIRED  },
+    { 0,   "tag",                   GOPT_ARGUMENT_REQUIRED  },
     { 0,   "export-api",            GOPT_ARGUMENT_REQUIRED  },
     { 0,   "stdout",                GOPT_ARGUMENT_REQUIRED  },
     { 0,   "stderr",                GOPT_ARGUMENT_REQUIRED  },
@@ -181,6 +182,7 @@ int main(int argc, char **argv) {
   const char *job     = arg(options, "job")->argument;
   char       *shebang = arg(options, "shebang")->argument;
   const char *tagdag  = arg(options, "tag-dag")->argument;
+  const char *tag     = arg(options, "tag")->argument;
   const char *api     = arg(options, "export-api")->argument;
   const char *fd1     = arg(options, "stdout")->argument;
   const char *fd2     = arg(options, "stderr")->argument;
@@ -299,28 +301,28 @@ int main(int argc, char **argv) {
 
   if (job) {
     auto hits = db.explain(std::atol(job), verbose);
-    describe(hits, script, debug, verbose);
+    describe(hits, script, debug, verbose, tag);
     if (hits.empty()) std::cerr << "Job '" << job << "' was not found in the database!" << std::endl;
   }
 
   if (input) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1, verbose), script, debug, verbose);
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1, verbose), script, debug, verbose, tag);
     }
   }
 
   if (output) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2, verbose), script, debug, verbose);
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2, verbose), script, debug, verbose, tag);
     }
   }
 
   if (last) {
-    describe(db.last(verbose), script, debug, verbose);
+    describe(db.last(verbose), script, debug, verbose, tag);
   }
 
   if (failed) {
-    describe(db.failed(verbose), script, debug, verbose);
+    describe(db.failed(verbose), script, debug, verbose, tag);
   }
 
   if (tagdag) {

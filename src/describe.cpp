@@ -162,8 +162,13 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
   }
 }
 
-void describe(const std::vector<JobReflection> &jobs, bool script, bool debug, bool verbose) {
-  if (script) {
+void describe(const std::vector<JobReflection> &jobs, bool script, bool debug, bool verbose, const char *taguri) {
+  if (taguri) {
+    for (auto &job : jobs)
+      for (auto &tag : job.tags)
+        if (tag.uri == taguri)
+          std::cout << tag.content << std::endl;
+  } else if (script) {
     describe_shell(jobs, debug, verbose);
   } else {
     describe_human(jobs, debug, verbose);

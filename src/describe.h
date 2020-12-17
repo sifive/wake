@@ -22,7 +22,7 @@
 #include "json5.h"
 #include <vector>
 
-void describe(const std::vector<JobReflection> &jobs, bool script, bool debug, bool verbose);
+void describe(const std::vector<JobReflection> &jobs, bool script, bool debug, bool verbose, const char *tag);
 JAST create_tagdag(Database &db, const std::string &tag);
 
 #endif
