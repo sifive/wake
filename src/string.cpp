@@ -375,19 +375,35 @@ static PRIMFN(prim_format) {
       scope->claim_fulfiller(runtime, output))));
 }
 
+static PRIMTYPE(type_colour) {
+  return args.size() == 2 &&
+    args[0]->unify(String::typeVar) &&
+    args[1]->unify(Integer::typeVar) &&
+    out->unify(Data::typeUnit);
+}
+
+static PRIMFN(prim_colour) {
+  EXPECT(2);
+  STRING(stream, 0);
+  INTEGER_MPZ(code, 1);
+  runtime.heap.reserve(reserve_unit());
+  status_set_colour(stream->c_str(), mpz_get_si(code));
+  RETURN(claim_unit(runtime.heap));
+}
+
 static PRIMTYPE(type_print) {
   return args.size() == 2 &&
-    args[0]->unify(Integer::typeVar) &&
+    args[0]->unify(String::typeVar) &&
     args[1]->unify(String::typeVar) &&
     out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_print) {
   EXPECT(2);
-  INTEGER_MPZ(fd, 0);
+  STRING(stream, 0);
   STRING(message, 1);
   runtime.heap.reserve(reserve_unit());
-  status_write(mpz_get_si(fd), message->c_str(), message->size());
+  status_write(stream->c_str(), message->c_str(), message->size());
   RETURN(claim_unit(runtime.heap));
 }
 
@@ -656,6 +672,7 @@ void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "str2bin",  prim_str2bin,  type_str2code,  PRIM_PURE);
   prim_register(pmap, "uname",    prim_uname,    type_uname,     PRIM_PURE);
   prim_register(pmap, "shell_str",prim_shell_str,type_shell_str, PRIM_PURE);
+  prim_register(pmap, "colour",   prim_colour,   type_colour,    PRIM_IMPURE);
   prim_register(pmap, "print",    prim_print,    type_print,     PRIM_IMPURE);
   prim_register(pmap, "mkdir",    prim_mkdir,    type_mkdir,     PRIM_IMPURE);
   prim_register(pmap, "unlink",   prim_unlink,   type_unlink,    PRIM_IMPURE);

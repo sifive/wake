@@ -131,6 +131,11 @@ int main(int argc, char **argv) {
     { 0,   "stop-after-ssa",        GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "no-optimize",           GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "export-api",            GOPT_ARGUMENT_REQUIRED  },
+    { 0,   "stdout",                GOPT_ARGUMENT_REQUIRED  },
+    { 0,   "stderr",                GOPT_ARGUMENT_REQUIRED  },
+    { 0,   "fd:3",                  GOPT_ARGUMENT_REQUIRED  },
+    { 0,   "fd:4",                  GOPT_ARGUMENT_REQUIRED  },
+    { 0,   "fd:5",                  GOPT_ARGUMENT_REQUIRED  },
     { ':', "shebang",               GOPT_ARGUMENT_REQUIRED  },
     { 0,   0,                       GOPT_LAST}};
 
@@ -172,6 +177,11 @@ int main(int argc, char **argv) {
   const char *exec    = arg(options, "exec")->argument;
   char       *shebang = arg(options, "shebang")->argument;
   const char *api     = arg(options, "export-api")->argument;
+  const char *fd1     = arg(options, "stdout")->argument;
+  const char *fd2     = arg(options, "stderr")->argument;
+  const char *fd3     = arg(options, "fd:3")->argument;
+  const char *fd4     = arg(options, "fd:4")->argument;
+  const char *fd5     = arg(options, "fd:5")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -445,6 +455,20 @@ int main(int argc, char **argv) {
 
   if (parse) std::cout << top.get();
   if (notype) return ok?0:1;
+
+  /* Setup logging streams */
+  if (quiet)   fd1 = "error";
+  if (verbose) fd1 = "info,echo,warning,error";
+  if (debug)   fd1 = "debug,info,echo,warning,error";
+  if (!tty && !fd1) fd1 = "info,echo,warning,error";
+  if (!fd1) fd1 = "warning,error";
+  if (!fd2) fd2 = "error";
+
+  status_set_bulk_fd(1, fd1);
+  status_set_bulk_fd(2, fd2);
+  status_set_bulk_fd(3, fd3);
+  status_set_bulk_fd(4, fd4);
+  status_set_bulk_fd(5, fd5);
 
   /* Primitives */
   JobTable jobtable(&db, percent, verbose, quiet, check, !tty);

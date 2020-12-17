@@ -47,7 +47,7 @@ void HeapObject::format(std::ostream &os, const HeapObject *value, bool detailed
     if (state.current.value) {
       state.current.value->format(os, state);
     } else {
-      os << term_red() << "<future>" << term_normal();
+      os << term_colour(TERM_RED) << "<future>" << term_normal();
     }
   }
 }

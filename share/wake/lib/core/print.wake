@@ -18,85 +18,69 @@ package wake
 # Any => String conversion
 export def format any = prim "format"
 
-# These values often come from the wake command-line
-# default => Normal
-# -d      => Normal
-# -q      => Quiet
-# -v      => Verbose
-# -dv     => Debug
-export data LogLevel =
-  Debug
-  Verbose
-  Normal
-  Quiet
+# LogLevel is an opaque type
+from wake export type LogLevel
+data LogLevel = LogLevel (name: String)
 
-export data EchoTarget =
-  Null
-  Stdout
-  Stderr # rendered in red if on a tty
+# LogLevel => String
+# Get a printable value for a LogLevel
+export def getLogLevelName (LogLevel name) = name
 
-export def logError = match _
-  Quiet = Stderr
-  _     = Stderr
+# The colours available for use with LogLevels
+export data Colour =
+  Black
+  Red
+  Green
+  Yellow
+  Blue
+  Magenta
+  Cyan
+  White
 
-export def logWarn = match _
-  Quiet = Null
-  _     = Stderr
+# Define a new log level
+export def makeLogLevel name colour =
+  def set name code = prim "colour"
+  def code = match colour
+    None         = 9
+    Some Black   = 0
+    Some Red     = 1
+    Some Green   = 2
+    Some Yellow  = 3
+    Some Blue    = 4
+    Some Magenta = 5
+    Some Cyan    = 6
+    Some White   = 7
+  def _ = set name code
+  LogLevel name
 
-export def logNormal = match _
-  Quiet = Null
-  _     = Stdout
-
-export def logVerbose = match _
-  Debug   = Stdout
-  Verbose = Stdout
-  _       = Null
-
-export def logDebug = match _
-  Debug = Stdout
-  _     = Null
-
-export def logNever = match _
-  Debug = Null
-  _     = Null
+# The standard logging levels used in wake
+#   logError   goes to stderr
+#   logWarning goes to stdout unless quiet
+#   logEcho    goes to stdout on verbose
+#   logInfo    goes to stdout on verbose
+#   logDebug   goes to stdotu on debug
+export def logError   = makeLogLevel "error"   (Some Red)
+export def logWarning = makeLogLevel "warning" (Some Yellow)
+export def logEcho    = makeLogLevel "echo"    None
+export def logInfo    = makeLogLevel "info"    None
+export def logDebug   = makeLogLevel "debug"   (Some Blue)
+export def logNever   = makeLogLevel "null"    None
 
 # Useful helper method for inserting a debug step into a pipeline
-# def foo = "123123" | tap ("that: {_}") | int | getOrElse 0
+# def foo = "123123" | tap (println "that: {format _}") | int | getOrElse 0
 export def tap consumerFn value =
   def _ = consumerFn value
   value
 
-# Print the tap output to the console
-export def tapLevel level formatFn value =
-  def _ = printlnLevel level (formatFn value)
-  value
-
-export def tapError   = tapLevel logError
-export def tapWarn    = tapLevel logWarn
-export def tapNormal  = tapLevel logNormal
-export def tapVerbose = tapLevel logVerbose
-export def tapDebug   = tapLevel logDebug
-
-# This is private so that users cannot make the build depend on it
-def logLevelRaw = prim "level"
-def logLevel = match logLevelRaw
-  0 = Quiet
-  1 = Normal
-  2 = Verbose
-  _ = Debug
-
 # Print with a given verbosity
-export def printLevel logLevelFn =
-  def p i outputStr = prim "print"
-  match (logLevelFn logLevel)
-    Null   = (\_ Unit)
-    Stdout = p 1
-    Stderr = p 2
+export def printLevel (LogLevel name) =
+  def p stream outputStr = prim "print"
+  p name
 
-export def printlnLevel logLevelFn =
-  def f = printLevel logLevelFn
+export def printlnLevel level =
+  def f = printLevel level
   (\outputStr f "{outputStr}\n")
 
 # Print any type to stdout; even exceptions
-export def print   = printLevel logNormal
-export def println = printlnLevel logNormal
+export def print   = printLevel logInfo
+export def println = printlnLevel logInfo

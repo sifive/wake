@@ -236,7 +236,7 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const ch
   }
 
   if (b && (a->nargs != b->nargs || a->name != b->name)) {
-    os << term_red();
+    os << term_colour(TERM_RED);
     if (a->isFree()) {
       os << "<infinite-type>";
     } else {

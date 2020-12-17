@@ -83,9 +83,9 @@ tuple Plan =
   export Environment:  List String  # KEY=VALUE environment variables fed to the command
   export Directory:    String       # The directory in which the command should be run
   export Stdin:        String       # The file to which standard input should be connected
-  export Stdout:       (LogLevel => EchoTarget) # How should standard output be displayed during a build
-  export Stderr:       (LogLevel => EchoTarget) # How should standard error be displayed during a build
-  export Echo:         LogLevel     # Print the command during builds when logLevel <= Echo
+  export Stdout:       LogLevel     # How should standard output be displayed during a build
+  export Stderr:       LogLevel     # How should standard error be displayed during a build
+  export Echo:         LogLevel     # Echo the command to this stream
   export Persistence:  Persistence  # See Persistence table above
   export LocalOnly:    Boolean      # Must run directly in the local workspace; no output detection performed
   export Resources:    List String  # The resources a runner must provide to the job (licenses/etc)
@@ -163,7 +163,7 @@ export def getPlanHash plan =
 # Set reasonable defaults for all Plan arguments
 def id x = x
 export def makePlan cmd visible =
-  Plan "" cmd visible environment "." "" logVerbose logWarn Normal Share False Nil (\_ True) defaultUsage id id
+  Plan "" cmd visible environment "." "" logInfo logWarning logEcho Share False Nil (\_ True) defaultUsage id id
 
 export def makeShellPlan script visible =
   makePlan (which "dash", "-c", script, Nil) visible
@@ -215,8 +215,8 @@ export def virtualRunner =
 def pid = prim "pid"
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
-def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run log label =
-  def create label dir stdin env cmd signature visible keep log = prim "job_create"
+def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo stdout stderr label =
+  def create label dir stdin env cmd signature visible keep echo stdout stderr = prim "job_create"
   def finish job inputs outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
   def badfinish job error = prim "job_fail_finish"
   def cache dir stdin env cmd signature visible = prim "job_cache"
@@ -226,7 +226,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run log lab
     def getPathOpt = match _
       Path name = Some name
       BadPath _ = None
-    def job = create label dir stdin env.implode cmd.implode hash (mapPartial getPathOpt vis).implode (if keep then 1 else 0) log
+    def job = create label dir stdin env.implode cmd.implode hash (mapPartial getPathOpt vis).implode (if keep then 1 else 0) echo stdout stderr
     def prefix = "{str pid}.{str (getJobId job)}"
     def usage = getJobRecord job | getOrElse uusage
     def output = run job (Pass (RunnerInput label cmd vis env dir stdin res prefix usage))
@@ -256,33 +256,20 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run log lab
       Pair Nil      last = confirm False last (build Unit)
 
 # Only run if the first four arguments differ
-target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run log label =
-  runAlways cmd env dir stdin res usage finputs foutputs vis keep run log label
+target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run echo stdout stderr label =
+  runAlways cmd env dir stdin res usage finputs foutputs vis keep run echo stdout stderr label
 
 # Default runners provided by wake
 export topic runner: Runner
 publish runner = localRunner, defaultRunner, Nil
 
-def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run log =
+def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (LogLevel echo) (LogLevel stdout) (LogLevel stderr) =
   if isOnce pers
-  then runOnce   cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run log label
-  else runAlways cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run log label
-
-def jobLog stdout stderr echo =
-  def num = match _
-    Null   = 0
-    Stdout = 1
-    Stderr = 2
-  def thresh = match echo
-    Debug   = 3
-    Verbose = 2
-    Normal  = 1
-    Quiet   = 0
-  def bit = if thresh <= logLevelRaw then 1 else 0
-  (bit << 4) + (num (stderr logLevel) << 2) + num (stdout logLevel)
+  then runOnce   cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run echo stdout stderr label
+  else runAlways cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run echo stdout stderr label
 
 export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs) =
-  runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (jobLog stdout stderr echo)
+  runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run echo stdout stderr
 
 data RunnerOption =
   Accept (score: Double) (runnerFn: Job => Result RunnerInput Error => Result RunnerOutput Error)
@@ -303,14 +290,13 @@ export def runJob p = match p
       (Reject _) _ = acc
       (Accept score fn) (Pair bests _bestr) =
         if score >. bests then Pair score (Some fn) else acc
-    def log = jobLog stdout stderr echo
     match (opts | foldl best (Pair 0.0 None) | getPairSecond)
-      Some r = runJobImp label cmd env dir stdin res usage finputs foutputs vis pers r log
+      Some r = runJobImp label cmd env dir stdin res usage finputs foutputs vis pers r echo stdout stderr
       None =
-        def create label dir stdin env cmd signature visible keep log = prim "job_create"
+        def create label dir stdin env cmd signature visible keep echo stdout stderr = prim "job_create"
         def badfinish job e = prim "job_fail_finish"
         def badlaunch job e = prim "job_fail_launch"
-        def job = create label dir stdin env.implode cmd.implode 0 "" 0 log
+        def job = create label dir stdin env.implode cmd.implode 0 "" 0 "echo" "info" "error"
         def error =
           def pretty = match _
             Accept _ _ = ""
@@ -564,7 +550,7 @@ target hashcode f =
   def reuse = get f
   if reuse !=* "" then reuse else
     def hashPlan cmd  =
-      Plan "" cmd Nil Nil "." "" logNever logError Verbose ReRun True Nil (\_ True) hashUsage id id
+      Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun True Nil (\_ True) hashUsage id id
     def job = hashPlan ("<hash>", f, Nil) | runJobWith localRunner
     def hash =
       job.getJobStdout

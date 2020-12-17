@@ -35,8 +35,7 @@ void require_fail(const char *message, unsigned size, Runtime &runtime, const Sc
   ss.write(message, size-1);
   for (auto &x : scope->stack_trace())
     ss << "  from " << x << std::endl;
-  std::string str = ss.str();
-  status_write(2, str.data(), str.size());
+  status_write(STREAM_ERROR, ss.str());
   runtime.abort = true;
 }
 
@@ -181,8 +180,7 @@ void CHash::execute(Runtime &runtime) {
       runtime.debug_hash = 0;
       std::stringstream ss;
       ss << "Debug-target hash input was: " << obj.get() << std::endl;
-      std::string str = ss.str();
-      status_write(2, str.data(), str.size());
+      status_write(STREAM_ERROR, ss.str());
     }
     cont->resume(runtime, Integer::claim(runtime.heap, out));
   }
