@@ -258,7 +258,7 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
 #endif
     std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
     if (recurse) {
-      if (name == ".build" || name == ".fuse") continue;
+      if (name == ".build" || name == ".fuse" || name == ".git") continue;
       int fd = openat(dirfd, f->d_name, O_RDONLY);
       if (fd == -1) {
         failed = true;
