@@ -475,10 +475,10 @@ int main(int argc, char **argv) {
   if (notype) return ok?0:1;
 
   /* Setup logging streams */
-  if (quiet)   fd1 = "error";
-  if (verbose) fd1 = "info,echo,warning,error";
-  if (debug)   fd1 = "debug,info,echo,warning,error";
-  if (!tty && !fd1) fd1 = "info,echo,warning,error";
+  if (debug   && !fd1) fd1 = "debug,info,echo,warning,error";
+  if (verbose && !fd1) fd1 = "info,echo,warning,error";
+  if (quiet   && !fd1) fd1 = "error";
+  if (!tty    && !fd1) fd1 = "info,echo,warning,error";
   if (!fd1) fd1 = "warning,error";
   if (!fd2) fd2 = "error";
 
