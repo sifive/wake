@@ -168,20 +168,22 @@ void ExecuteWakeProcess::execute() {
   if (child == 0) {
     // Close the reading side of the pipe
     for (int i = 0; i < PIPES; ++i)
-      close(pipefds[i][0]);
+      if (close(pipefds[i][0]) != 0)
+        exit(42);
 
     // We need to dup2 pipefds[i][0,PIPES) to [1,PIPES]
     // Unfortunately, some of the these might be in the way
     // dup() any of them that are in the way, out of the way
     for (int i = 0; i < PIPES; ++i)
       while (pipefds[i][1] >= 1 && pipefds[i][1] <= PIPES)
-        pipefds[i][1] = dup(pipefds[i][1]);
+        if ((pipefds[i][1] = dup(pipefds[i][1])) == -1)
+          exit(43);
 
     // Put the pipes in their proper final position
     // This also closes any transient descriptors from dup() above
     for (int i = 0; i < PIPES; ++i) {
-      dup2(pipefds[i][1], i+1);
-      close(pipefds[i][1]);
+      if (dup2(pipefds[i][1], i+1) == -1) exit(44);
+      if (close(pipefds[i][1]) != 0) exit(45);
     }
 
     // Launch subprocess with specified arguments
@@ -191,7 +193,7 @@ void ExecuteWakeProcess::execute() {
     args.push_back(0);
     execv(cmdline[0].c_str(), args.data());
 
-    exit(1);
+    exit(46);
   }
 
   if (child == -1) errorPrefix("fork");
