@@ -128,6 +128,7 @@ struct ExecuteWakeProcess {
 ExecuteWakeProcess::ExecuteWakeProcess() : result(JSON_OBJECT), error(JSON_NULLVAL) {
   std::string myDir = find_execpath();
   cmdline.push_back(myDir + "/../../bin/wake");
+  cmdline.push_back("--quiet");
   cmdline.push_back("--stdout=bsp");
   cmdline.push_back("--stderr=error");
   cmdline.push_back("--fd:3=warning");
@@ -257,7 +258,7 @@ void ExecuteWakeProcess::executeLine(int i, std::string &&line) {
     log.add("method", "build/logMessage");
     JAST &params = log.add("params", JSON_OBJECT);
     params.add("type", JSON_INTEGER, code);
-    params.add("messages", std::move(line));
+    params.add("message", std::move(line));
     sendMessage(log);
   }
 }
@@ -324,9 +325,40 @@ static void enumerateTargets(JAST &response) {
   }
 }
 
+static void makeTime(JAST &node) {
+  struct timeval tv;
+  for (auto &child : node.children) makeTime(child.second);
+  if (node.kind == JSON_STR && node.value == "time://now" && gettimeofday(&tv, 0) == 0) {
+    node.value = std::to_string(tv.tv_sec*1000L + tv.tv_usec/1000);
+  }
+}
+
+struct CompileState : public ExecuteWakeProcess {
+  CompileState() {
+    cmdline.push_back("--in");
+    cmdline.push_back("scala_federation_sifive");
+    cmdline.push_back("-x");
+    cmdline.push_back("federation defaultScalaContext");
+  }
+
+  void gotLine(JAST &row) override;
+};
+
+void CompileState::gotLine(JAST &row) {
+  makeTime(row);
+  sendMessage(row);
+}
+
 static void compile(JAST &response, const JAST &params) {
-  JAST &result = response.add("result", JSON_OBJECT);
-  result.add("statusCode", JSON_INTEGER, "0");
+  CompileState state;
+  state.execute();
+  if (state.error.kind == JSON_NULLVAL) {
+    JAST &result = response.add("result", JSON_OBJECT);
+    bool ok = WIFEXITED(state.status) && WEXITSTATUS(state.status) == 0;
+    result.add("statusCode", JSON_INTEGER, ok?"1":"2");
+  } else {
+    response.children.emplace_back("error", std::move(state.error));
+  }
 }
 
 static void test(JAST &response, const JAST &params) {
