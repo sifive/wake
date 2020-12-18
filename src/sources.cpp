@@ -75,25 +75,25 @@ bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &sr
   src_dir = get_cwd();
 
   int attempts;
-  int witlock = -1;
+  int wakeroot = -1;
   for (attempts = 100; attempts && access("wake.db", F_OK) == -1; --attempts) {
-    if (witlock == -1 && access("wit-lock.json", R_OK) == 0) witlock = open(".", O_RDONLY);
+    if (wakeroot == -1 && access(".wakeroot", R_OK) == 0) wakeroot = open(".", O_RDONLY);
     if (chdir("..") == -1) return false;
   }
 
   // Could not find a wake database in parent directories
   if (attempts == 0) {
-    if (witlock == -1) {
+    if (wakeroot == -1) {
       return false;
-    } else if (fchdir(witlock) != 0 || !make_workspace(".")) {
+    } else if (fchdir(wakeroot) != 0 || !make_workspace(".")) {
       // Attempt to auto-initialize a database
-      close(witlock);
+      close(wakeroot);
       return false;
     }
   }
 
-  // Close wit-lock handle, if any
-  if (witlock != -1) close(witlock);
+  // Close wakeroot handle, if any
+  if (wakeroot != -1) close(wakeroot);
 
   std::string workspace = get_cwd();
   if (src_dir.compare(0, workspace.size(), workspace) != 0 ||
