@@ -208,10 +208,25 @@ int main(int argc, char *argv[])
 		map_id("/proc/self/uid_map", euid, real_euid);
 		map_id("/proc/self/gid_map", egid, real_egid);
 
+		// Detect if there is a problem with access() before mount
+		if (access(rpath.c_str(), X_OK) != 0)
+			std::cerr << "access " << rpath << ": " << strerror(errno) << std::endl;
+		if (access(mpath.c_str(), X_OK) != 0)
+			std::cerr << "access " << mpath << ": " << strerror(errno) << std::endl;
+		if (access(cwd.c_str(), X_OK) != 0)
+			std::cerr << "access " << cwd << ": " << strerror(errno) << std::endl;
+
 		// Mount the fuse-visibility-protected view onto the workspace
-		if (0 != mount(rpath.c_str(), workspace.c_str(), NULL, MS_BIND, NULL)) {
+		int attempt = 0;
+		while (0 != mount(rpath.c_str(), workspace.c_str(), NULL, MS_BIND, NULL)) {
 			std::cerr << "mount " << rpath << ": " << strerror(errno) << std::endl;
-			exit(1);
+			if (attempt != 3) {
+				sleep(1);
+				++attempt;
+			} else {
+				std::cerr << "Giving up; failed to mount fuse-protected view of the workspace" << std::endl;
+				exit(2);
+			}
 		}
 
 		std::string dir = workspace + "/" + subdir;
