@@ -125,6 +125,8 @@ struct ExecuteWakeProcess {
   void executeLine(int i, std::string &&line);
 };
 
+static bool quiet = true;
+
 ExecuteWakeProcess::ExecuteWakeProcess() : result(JSON_OBJECT), error(JSON_NULLVAL) {
   std::string myDir = find_execpath();
   cmdline.push_back(myDir + "/../../bin/wake");
@@ -132,8 +134,12 @@ ExecuteWakeProcess::ExecuteWakeProcess() : result(JSON_OBJECT), error(JSON_NULLV
   cmdline.push_back("--stdout=bsp");
   cmdline.push_back("--stderr=error");
   cmdline.push_back("--fd:3=warning");
-  cmdline.push_back("--fd:4=info,echo");
-  cmdline.push_back("--fd:5=debug");
+  if (quiet) {
+    cmdline.push_back("--fd:4=info");
+  } else {
+    cmdline.push_back("--fd:4=info,echo");
+    cmdline.push_back("--fd:5=debug");
+  }
 }
 
 void ExecuteWakeProcess::errorMessage(std::string &&message) {
@@ -411,6 +417,8 @@ static void staticTarget(const std::string &method, JAST &response, const JAST &
 
 int main(int argc, const char **argv) {
   bool initialized = false;
+
+  if (getenv("BSP_VERBOSE")) quiet = false;
 
   // Process requests until something goes wrong
   while (true) {
