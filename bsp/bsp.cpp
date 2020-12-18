@@ -18,10 +18,13 @@
 
 #include <iostream>
 #include <string>
+#include <map>
 #include <sstream>
 #include <fstream>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string.h>
@@ -32,6 +35,9 @@
 #ifndef VERSION
 #include "../src/version.h"
 #endif
+
+// Number of pipes to the wake subprocess
+#define PIPES 5
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -110,17 +116,23 @@ struct ExecuteWakeProcess {
   int status;
 
   ExecuteWakeProcess();
-  virtual void gotLine(const JAST &row) = 0;
+  virtual void gotLine(JAST &row) = 0;
 
   void errorMessage(std::string &&message);
   void errorPrefix(std::string &&message);
 
   void execute();
+  void executeLine(int i, std::string &&line);
 };
 
 ExecuteWakeProcess::ExecuteWakeProcess() : result(JSON_OBJECT), error(JSON_NULLVAL) {
   std::string myDir = find_execpath();
   cmdline.push_back(myDir + "/../../bin/wake");
+  cmdline.push_back("--stdout=bsp");
+  cmdline.push_back("--stderr=error");
+  cmdline.push_back("--fd:3=warning");
+  cmdline.push_back("--fd:4=info,echo");
+  cmdline.push_back("--fd:5=debug");
 }
 
 void ExecuteWakeProcess::errorMessage(std::string &&message) {
@@ -137,19 +149,24 @@ void ExecuteWakeProcess::errorPrefix(std::string &&message) {
 
 // Yes, reading line-by-line without blocking from a subprocess really is this hard in C.
 void ExecuteWakeProcess::execute() {
-  int pipefds[2];
-  if (pipe(pipefds) != 0) {
-    errorPrefix("pipe");
-    return;
+  int pipefds[PIPES][2];
+  for (int i = 0; i < PIPES; ++i) {
+    if (pipe(&pipefds[i][0]) != 0) {
+      errorPrefix("pipe");
+      return;
+    }
   }
 
   pid_t child = fork();
   if (child == 0) {
     // Redirect stdout to the pipe
-    close(pipefds[0]);
-    if (pipefds[1] != STDOUT_FILENO) {
-      dup2(pipefds[1], STDOUT_FILENO);
-      close(pipefds[1]);
+    for (int i = 0; i < PIPES; ++i) {
+      close(pipefds[i][0]);
+      // !!!
+      if (pipefds[i][1] != i+1) {
+        dup2(pipefds[i][1], i+1);
+        close(pipefds[i][1]);
+      }
     }
 
     // Launch subprocess with specified arguments
@@ -163,44 +180,87 @@ void ExecuteWakeProcess::execute() {
   }
 
   if (child == -1) errorPrefix("fork");
-  if (close(pipefds[1]) != 0) errorPrefix("close1");
+  for (int i = 0; i < PIPES; ++i)
+    if (close(pipefds[i][1]) != 0)
+       errorPrefix("close1");
 
-  std::string buffer;
+  // Gather output from wake here
+  std::string buffer[PIPES];
   char block[4096];
-  ssize_t got;
-  while ((got = read(pipefds[0], &block[0], sizeof(block))) > 0) {
-    buffer.append(&block[0], got);
-    size_t start = 0, end;
-    while ((end = buffer.find_first_of('\n', start)) != std::string::npos) {
-      JAST line;
-      std::stringstream parseErrors;
-      std::string json(buffer, start, end-start);
-      if (JAST::parse(json, parseErrors, line)) {
-        gotLine(line);
-      } else {
-        errorPrefix("failed to parse wake output: " + parseErrors.str());
-      }
-      start = end+1;
+
+  while (true) {
+    fd_set rfds;
+    FD_ZERO(&rfds);
+    int nfds = 0;
+
+    for (int i = 0; i < PIPES; ++i) {
+      if (pipefds[i][0] == -1) continue;
+      FD_SET(pipefds[i][0], &rfds);
+      if (pipefds[i][0] >= nfds) nfds = pipefds[i][0]+1;
     }
-    buffer.erase(buffer.begin(), buffer.begin() + start);
-  }
 
-  if (!buffer.empty()) {
-      JAST line;
-      std::stringstream parseErrors;
-      if (JAST::parse(buffer, parseErrors, line)) {
-        gotLine(line);
-      } else {
-        errorMessage("failed to parse wake output: " + parseErrors.str());
+    if (nfds == 0) break;
+    int ret = select(nfds, &rfds, 0, 0, 0);
+    if (ret <= 0) { errorPrefix("select"); break; }
+
+    ssize_t got;
+    for (int i = 0; i < PIPES; ++i) {
+      if (pipefds[i][0] == -1) continue;
+      if (!FD_ISSET(pipefds[i][0], &rfds)) continue;
+      got = read(pipefds[i][0], &block[0], sizeof(block));
+
+      if (got > 0) {
+        buffer[i].append(&block[0], got);
+        size_t start = 0, end;
+        while ((end = buffer[i].find_first_of('\n', start)) != std::string::npos) {
+          executeLine(i, buffer[i].substr(start, end-start));
+          start = end+1;
+        }
+        buffer[i].erase(buffer[i].begin(), buffer[i].begin() + start);
+      } else { // got <= 0
+        if (got < 0) errorPrefix("read");
+        if (close(pipefds[i][0]) != 0) errorPrefix("close");
+        pipefds[i][0] = -1;
+        if (got < 0) errorPrefix("read");
       }
+    }
   }
 
-  if (got < 0) errorPrefix("read");
-  if (close(pipefds[0]) != 0) errorPrefix("close");
+  for (int i = 0; i < PIPES; ++i) {
+    if (!buffer[i].empty()) {
+      executeLine(i, std::move(buffer[i]));
+    }
+  }
 
   if (waitpid(child, &status, 0) == -1) errorPrefix("waitpid");
 }
 
+void ExecuteWakeProcess::executeLine(int i, std::string &&line) {
+  if (i == 0) {
+    JAST json;
+    std::stringstream parseErrors;
+    if (JAST::parse(line, parseErrors, json)) {
+      gotLine(json);
+    } else {
+      errorPrefix("failed to parse wake output: " + parseErrors.str());
+    }
+  } else {
+    const char *code = "";
+    switch (i) {
+    case 1: code = "1"; break; // stderr => error   (1)
+    case 2: code = "2"; break; // fd:3   => warning (2)
+    case 3: code = "3"; break; // fd:4   => info    (3)
+    case 4: code = "4"; break; // fd:5   => log     (4)
+    }
+    JAST log(JSON_OBJECT);
+    log.add("jsonrpc", "2.0");
+    log.add("method", "build/logMessage");
+    JAST &params = log.add("params", JSON_OBJECT);
+    params.add("type", JSON_INTEGER, code);
+    params.add("messages", std::move(line));
+    sendMessage(log);
+  }
+}
 
 static void makeAbsolute(JAST &node) {
   for (auto &child : node.children) makeAbsolute(child.second);
@@ -214,29 +274,43 @@ struct EnumerateTargetsState : public ExecuteWakeProcess {
 
   EnumerateTargetsState() : targets(result.add("targets", JSON_ARRAY)) {
     cmdline.push_back("--tag-dag");
-    cmdline.push_back(std::string(bsp) + ".*");
+    cmdline.push_back("bsp\\.buildTarget");
   }
 
-  void gotLine(const JAST &row) override;
+  void gotLine(JAST &row) override;
 };
 
-void EnumerateTargetsState::gotLine(const JAST &row) {
-  for (auto &child : row.children) {
-    const JAST &uri = child.second.get("uri");
-    const JAST &deps = child.second.get("deps");
-    std::string buildTargetPath = uri.value.substr(sizeof(bsp)-1) + "/buildTarget.json";
+void EnumerateTargetsState::gotLine(JAST &row) {
+  // Map from jobid => targetid
+  std::map<std::string, std::string> idmap;
+  std::vector<JAST> docs;
+  // First pass: extract the document and dependency info
+  for (auto &job : row.children) {
+    std::string &jobid = job.second.get("job").value;
+    std::string &targetStr = job.second.get("tags").get("bsp.buildTarget").value;
 
-    JAST buildTarget;
+    JAST target;
     std::stringstream parseErrors;
-    if (JAST::parse(buildTargetPath.c_str(), parseErrors, buildTarget)) {
-      makeAbsolute(buildTarget);
-      JAST &dependencies = buildTarget.add("dependencies", JSON_ARRAY);
-      for (auto &dep : deps.children)
-        dependencies.add(JSON_OBJECT).add("uri", std::string(dep.second.value));
-      targets.children.emplace_back(std::string(), std::move(buildTarget));
+    if (JAST::parse(targetStr, parseErrors, target)) {
+      // Copy job-identifier dependencies into target
+      JAST &dependencies = target.add("dependencies", JSON_ARRAY);
+      for (auto &dep : job.second.get("deps").children)
+        dependencies.add(JSON_OBJECT).value = dep.second.value;
+      // Save target and record jobid=>targetid
+      idmap[jobid] = target.get("id").get("uri").value;
+      docs.emplace_back(std::move(target));
     } else {
-      errorMessage("failed to parse " + buildTargetPath + ": " + parseErrors.str());
+      errorMessage("failed to parse tag 'bsp.buildTarget' for job " + jobid + ": " + parseErrors.str());
     }
+  }
+  // Second pass: resolve references in documents and output them
+  for (auto &target : docs) {
+    // Resolve job identifiers into bsp:// identifiers
+    for (auto &dep : target.get("dependencies").children)
+      dep.second.add("uri", std::string(idmap[dep.second.value]));
+    // Resolve workspace:// identifiers
+    makeAbsolute(target);
+    targets.children.emplace_back(std::string(), std::move(target));
   }
 }
 
@@ -270,17 +344,38 @@ static void clean(JAST &response, const JAST &params) {
   result.add("cleaned", JSON_TRUE);
 }
 
-static void staticTarget(const std::string &method, JAST &response, const JAST &params) {
-  JAST &items = response.add("result", JSON_OBJECT).add("items", JSON_ARRAY);
+struct ExtractBSPDocument : public ExecuteWakeProcess {
+  JAST &items;
+
+  ExtractBSPDocument(const std::string &method, const JAST &params);
+  void gotLine(JAST &row) override;
+};
+
+ExtractBSPDocument::ExtractBSPDocument(const std::string &method, const JAST &params)
+ : items(result.add("items", JSON_ARRAY))
+{
+  cmdline.push_back("--tag");
+  cmdline.push_back("bsp." + method);
+  cmdline.push_back("-o");
   for (auto &x : params.get("targets").children) {
     const std::string &uri = x.second.get("uri").value;
     if (uri.compare(0, sizeof(bsp)-1, &bsp[0]) != 0) continue;
-    std::string path = uri.substr(sizeof(bsp)-1) + "/" + method + ".json";
-    JAST ast;
-    std::stringstream parseErrors;
-    if (!JAST::parse(path.c_str(), parseErrors, ast)) continue;
-    makeAbsolute(ast);
-    items.children.emplace_back(std::string(), std::move(ast));
+    cmdline.emplace_back(uri.substr(sizeof(bsp)-1));
+  }
+}
+
+void ExtractBSPDocument::gotLine(JAST &row) {
+  makeAbsolute(row);
+  items.children.emplace_back(std::string(), std::move(row));
+}
+
+static void staticTarget(const std::string &method, JAST &response, const JAST &params) {
+  ExtractBSPDocument state(method, params);
+  state.execute();
+  if (state.error.kind == JSON_NULLVAL) {
+    response.children.emplace_back("result", std::move(state.result));
+  } else {
+    response.children.emplace_back("error", std::move(state.error));
   }
 }
 
