@@ -334,11 +334,9 @@ static void makeTime(JAST &node) {
 }
 
 struct CompileState : public ExecuteWakeProcess {
-  CompileState() {
-    cmdline.push_back("--in");
-    cmdline.push_back("scala_federation_sifive");
-    cmdline.push_back("-x");
-    cmdline.push_back("federation defaultScalaContext");
+  CompileState(int argc, const char **argv) {
+    for (int i = 1; i < argc; ++i)
+      cmdline.push_back(argv[i]);
   }
 
   void gotLine(JAST &row) override;
@@ -349,8 +347,8 @@ void CompileState::gotLine(JAST &row) {
   sendMessage(row);
 }
 
-static void compile(JAST &response, const JAST &params) {
-  CompileState state;
+static void compile(JAST &response, const JAST &params, int argc, const char **argv) {
+  CompileState state(argc, argv);
   state.execute();
   if (state.error.kind == JSON_NULLVAL) {
     JAST &result = response.add("result", JSON_OBJECT);
@@ -464,8 +462,12 @@ int main(int argc, const char **argv) {
 
       if (method == "build/exit") {
         return initialized?1:0;
+      } else if (method == "build/initialized") {
+        // Trigger initial compile of the workspace
+        CompileState state(argc, argv);
+        state.execute();
       } else if (id.kind == JSON_NULLVAL) {
-        // Just ignore notifications (eg: build/initialized)
+        // Just ignore notifications
         continue;
       } else if (method == "build/initialize") {
         initialized = initialize(response, params);
@@ -480,7 +482,7 @@ int main(int argc, const char **argv) {
         // Query the wake db for BSP targets and collate their descriptions
         enumerateTargets(response);
       } else if (method == "buildTarget/compile") {
-        compile(response, params);
+        compile(response, params, argc, argv);
       } else if (method == "buildTarget/run") {
         run(response, params);
       } else if (method == "buildTarget/test") {
