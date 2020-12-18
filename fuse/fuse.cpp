@@ -228,7 +228,8 @@ int main(int argc, char *argv[])
 				sleep(1);
 				++attempt;
 			} else {
-				exit(1);
+				std::cerr << "Giving up; failed to mount fuse-protected view of the workspace" << std::endl;
+				exit(2);
 			}
 		}
 
