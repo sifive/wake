@@ -87,7 +87,7 @@ static bool initialize(JAST &response, const JAST &params) {
   bool ok = true;
   if (ok) ok = 0 == uri.compare(0, 7, "file://");
   if (ok) ok = 0 == chdir(uri.c_str() + 7);
-  if (ok) ok = 0 == access("wake.db", W_OK);
+  if (ok) ok = 0 == access("wake.db", W_OK) || (0 == access(".wakeroot", R_OK) && 0 == access(".", W_OK));
 
   if (!ok) {
     JAST &error = response.add("error", JSON_OBJECT);
