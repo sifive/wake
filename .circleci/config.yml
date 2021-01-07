@@ -79,25 +79,6 @@ jobs:
           paths:
             - release/debian_testing
 
-  centos_6_6:
-    machine:
-      image: ubuntu-1604:202007-01
-#      docker_layer_caching: true
-#    resource_class: large
-    steps:
-      - attach_workspace:
-          at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/centos-6.6 -t wake-centos-6.6 .
-      - run: |
-          cp /tmp/workspace/wake_*.tar.xz .
-          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-6.6 /usr/bin/scl enable devtoolset-7 'chown root.root wake_*.tar.xz; rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz'
-          docker run --rm --mount type=bind,source=$PWD,target=/build wake-centos-6.6 /bin/sh -c "rpm -i x86_64/*.rpm; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
-          install -D -t release/centos_6_6 x86_64/*.rpm
-      - persist_to_workspace:
-          root: .
-          paths:
-            - release/centos_6_6
-
   centos_7_6:
     machine:
       image: ubuntu-1604:202007-01
@@ -224,9 +205,6 @@ workflows:
       - debian_wheezy:
           requires:
             - tarball
-      - centos_6_6:
-          requires:
-            - tarball
       - centos_7_6:
           requires:
             - tarball
@@ -244,7 +222,6 @@ workflows:
             - alpine
             - debian_testing # Newest everything
             - debian_wheezy  # Oldest supported compiler
-            - centos_6_6     # Oldest supported package versions
             - centos_7_6
             - ubuntu_14_04   # LTS
             - ubuntu_16_04   # LTS
