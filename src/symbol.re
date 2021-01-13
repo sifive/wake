@@ -423,7 +423,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
 
         [{] {
           if (is_escape(lex, slice, prefix)) {
-            exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, slice), &String::typeVar));
+            exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, unicode_escape_canon(std::move(slice))), &String::typeVar));
             exprs.back()->flags |= FLAG_AST;
             lex.consume();
             exprs.push_back(parse_expr(lex));
