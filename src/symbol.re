@@ -289,6 +289,9 @@ static bool lex_rstr(Lexer &lex, Expr *&out)
 {
   input_t &in = *lex.engine.get();
   Coordinates start = in.coord() - 1;
+  Coordinates first = start;
+  std::vector<Expr*> exprs;
+  std::string check;
   std::string slice;
 
   while (true) {
@@ -303,6 +306,21 @@ static bool lex_rstr(Lexer &lex, Expr *&out)
 
         *                    { return false; }
         $                    { return false; }
+        "\${"		     {
+          Coordinates expr = in.coord();
+          std::string str = unicode_escape_canon(std::move(slice));
+          check.append(str);
+          exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, std::move(str)), &String::typeVar));
+          exprs.back()->flags |= FLAG_AST;
+          lex.consume();
+          exprs.push_back(parse_expr(lex));
+          if (lex.next.type == EOL) lex.consume();
+          expect(BCLOSE, lex);
+          check.append(2 + in.coord().bytes - expr.bytes, '.');
+          start = in.coord() - 1;
+          slice.clear();
+          continue;
+        }
         "\\\\"               { slice.append("\\\\"); continue; }
         "\\`"                { slice.append("\\`");  continue; }
         "`"                  { break; }
@@ -310,14 +328,37 @@ static bool lex_rstr(Lexer &lex, Expr *&out)
     */
   }
 
-  RootPointer<RegExp> exp = RegExp::literal(lex.heap, unicode_escape_canon(std::move(slice)));
-  if (!exp->exp->ok()) {
+  std::shared_ptr<RE2> exp;
+
+  if (exprs.empty()) {
+    RootPointer<RegExp> val = RegExp::literal(lex.heap, unicode_escape_canon(std::move(slice)));
+    exp = val->exp;
+    out = new Literal(SYM_LOCATION, std::move(val), &RegExp::typeVar);
+  } else {
+    std::string str = unicode_escape_canon(std::move(slice));
+    check.append(str);
+    exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, std::move(str)), &String::typeVar));
+    exprs.back()->flags |= FLAG_AST;
+
+    // Not actually used beyond confirming this is a valid regular expression
+    exp = std::make_shared<RE2>(re2::StringPiece(check));
+
+    Expr *cat = new Prim(LOCATION, "rcat");
+    for (size_t i = 0; i < exprs.size(); ++i) cat = new Lambda(LOCATION, "_", cat, i?"":" ");
+    Location catloc = Location(in.filename, first, in.coord() - 1);
+    for (auto expr : exprs) cat = new App(catloc, cat, expr);
+    cat->location = catloc;
+    cat->flags |= FLAG_AST;
+    out = cat;
+  }
+
+  if (!exp->ok()) {
     lex.fail = true;
     std::cerr << "Invalid regular expression at "
       << SYM_LOCATION.file() << "; "
-      << exp->exp->error() << std::endl;
+      << exp->error() << std::endl;
   }
-  out = new Literal(SYM_LOCATION, std::move(exp), &RegExp::typeVar);
+
   return true;
 }
 
