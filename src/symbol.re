@@ -423,7 +423,7 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
 
         [{] {
           if (is_escape(lex, slice, prefix)) {
-            exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, slice), &String::typeVar));
+            exprs.push_back(new Literal(SYM_LOCATION, String::literal(lex.heap, unicode_escape_canon(std::move(slice))), &String::typeVar));
             exprs.back()->flags |= FLAG_AST;
             lex.consume();
             exprs.push_back(parse_expr(lex));
@@ -461,9 +461,9 @@ static bool lex_dstr(Lexer &lex, Expr *&out)
     out = exprs.front();
   } else {
     Expr *cat = new Prim(LOCATION, "vcat");
-    for (size_t i = 0; i < exprs.size(); ++i) cat = new Lambda(LOCATION, "_", cat, i?"":" ");
-    for (auto expr : exprs) cat = new App(LOCATION, cat, expr);
-    cat->location = Location(in.filename, first, in.coord() - 1);
+    Location full(in.filename, first, in.coord() - 1);
+    for (size_t i = 0; i < exprs.size(); ++i) cat = new Lambda(full, "_", cat, i?"":" ");
+    for (auto expr : exprs) cat = new App(full, cat, expr);
     cat->flags |= FLAG_AST;
     out = cat;
   }
