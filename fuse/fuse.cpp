@@ -30,6 +30,7 @@
 
 #include "json5.h"
 #include "execpath.h"
+#include "membytes.h"
 
 #ifdef __linux__
 // For unshare and bind mount
@@ -291,7 +292,7 @@ int main(int argc, char *argv[])
 	ofs << "{\"usage\":{\"status\":" << status
 	  << ",\"runtime\":" << (stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0)
 	  << ",\"cputime\":" << (rusage.ru_utime.tv_sec + rusage.ru_stime.tv_sec + (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0)
-	  << ",\"membytes\":" << rusage.ru_maxrss
+	  << ",\"membytes\":" << MEMBYTES(rusage)
 	  << ",\"inbytes\":" << jast.get("ibytes").value
 	  << ",\"outbytes\":" << jast.get("obytes").value
 	  << "},\"inputs\":[";

@@ -24,6 +24,7 @@
 #include "execpath.h"
 #include "status.h"
 #include "shell.h"
+#include "membytes.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -829,7 +830,7 @@ bool JobTable::wait(Runtime &runtime) {
           i.job->reality.runtime  = i.runtime(now);
           i.job->reality.cputime  = (rusage.ru_utime.tv_sec  + rusage.ru_stime.tv_sec) +
                                     (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0;
-          i.job->reality.membytes = rusage.ru_maxrss;
+          i.job->reality.membytes = MEMBYTES(rusage);
           i.job->reality.ibytes   = rusage.ru_inblock * UINT64_C(512);
           i.job->reality.obytes   = rusage.ru_oublock * UINT64_C(512);
           runtime.heap.guarantee(WJob::reserve());
