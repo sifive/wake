@@ -1294,7 +1294,7 @@ static void *wakefuse_init(struct fuse_conn_info *conn)
 
 static void handle_exit(int sig)
 {
-	// It is possible that SIGLARM still gets delivered after a successful call to cancel_exit
+	// It is possible that SIGALRM still gets delivered after a successful call to cancel_exit
 	// In that case, we need to uphold the promise of cancel_exit
 	if (sig == SIGALRM && 0 == exit_attempts && !context.should_exit()) return;
 
