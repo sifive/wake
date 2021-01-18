@@ -1496,14 +1496,10 @@ int main(int argc, char *argv[])
 		close(null);
 	}
 
-	fprintf(stderr, "Starting main FUSE event loop\n");
-	fflush(stderr);
 	if (fuse_loop(fh) != 0) {
 		fprintf(stderr, "fuse_loop failed");
 		goto unmount;
 	}
-	fprintf(stderr, "Exited FUSE event loop cleanly\n");
-	fflush(stderr);
 
 	status = 0;
 
