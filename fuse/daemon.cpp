@@ -85,6 +85,7 @@ struct Job {
 	bool is_writeable(const std::string &path);
 	bool is_readable(const std::string &path);
 	bool is_visible(const std::string &path);
+	bool should_erase() const;
 };
 
 void Job::parse() {
@@ -140,7 +141,12 @@ struct Context {
 	std::map<std::string, Job> jobs;
 	int rootfd, uses;
 	Context() : jobs(), rootfd(-1), uses(0) { }
+	bool should_exit() const;
 };
+
+bool Context::should_exit() const {
+	return 0 == uses && jobs.empty();
+}
 
 static Context context;
 
@@ -160,6 +166,10 @@ bool Job::is_writeable(const std::string &path) {
 
 bool Job::is_readable(const std::string &path) {
 	return is_visible(path) || is_writeable(path);
+}
+
+bool Job::should_erase() const {
+	return 0 == uses && 0 == json_in_uses && 0 == json_out_uses;
 }
 
 static std::pair<std::string, std::string> split_key(const char *path) {
@@ -207,14 +217,23 @@ static Special is_special(const char *path) {
 	}
 }
 
-static int exit_attempts = 0;
+// If exit_attempts is > 0, we are in the impossible-to-stop process of exiting.
+// On a clean shutdown, exit_attempts will only ever be increased if context.should_exit() is true.
+static volatile int exit_attempts = 0;
 
-static void cancel_exit()
+// You must make context.should_exit() false BEFORE calling cancel_exit.
+// Return of 'true' guarantees the process will not exit
+static bool cancel_exit()
 {
+	// It's too late to stop exiting if even one attempt has been made
+	// The umount process is asynchronous and outside our ability to stop
+	if (exit_attempts > 0) return false;
+
 	struct itimerval retry;
 	memset(&retry, 0, sizeof(retry));
 	setitimer(ITIMER_REAL, &retry, 0);
-	exit_attempts = 0;
+
+	return true;
 }
 
 static void schedule_exit()
@@ -506,8 +525,14 @@ static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info 
 
 	if (key.second == "." && key.first.size() > 3 &&
 	    key.first[0] == '.' && key.first[1] == 'l' && key.first[2] == '.' && key.first[3] != '.') {
-		++context.jobs[key.first.substr(3)].uses;
-		cancel_exit();
+		std::string jobid = key.first.substr(3);
+		Job &job = context.jobs[jobid];
+		++job.uses;
+		if (!cancel_exit()) {
+			--job.uses;
+			if (job.should_erase())	context.jobs.erase(jobid);
+			return -EPERM;
+		}
 		fi->fh = BAD_FD;
 		return 0;
 	}
@@ -988,10 +1013,21 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
-			case 'f': ++context.uses; cancel_exit(); break;
 			case 'i': ++s.job->second.json_in_uses; break;
 			case 'o': ++s.job->second.json_out_uses; break;
 			case 'l': ++s.job->second.uses; break;
+			case 'f': {
+				// This lowers context.should_exit().
+				// Consequently, exit_attempts no longer transitions from 0 to non-zero for a clean exit.
+				++context.uses;
+				if (!cancel_exit()) {
+					// Could not abort exit; reject open attempt.
+					// This will cause the fuse.cpp client to restart a fresh daemon.
+					--context.uses;
+					return -ENOENT;
+				}
+				break;
+			}
 			default: return -ENOENT; // unreachable
 		}
 		fi->fh = BAD_FD;
@@ -1160,12 +1196,8 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 			case 'l': --s.job->second.uses; break;
 			default: return -EIO;
 		}
-		if ('f' != s.kind &&
-		    0 == s.job->second.uses &&
-		    0 == s.job->second.json_in_uses &&
-		    0 == s.job->second.json_out_uses) {
+		if ('f' != s.kind && s.job->second.should_erase())
 			context.jobs.erase(s.job);
-		}
 		if (context.jobs.empty() && 0 == context.uses)
 			schedule_exit();
 	}
@@ -1262,6 +1294,10 @@ static void *wakefuse_init(struct fuse_conn_info *conn)
 
 static void handle_exit(int sig)
 {
+	// It is possible that SIGLARM still gets delivered after a successful call to cancel_exit
+	// In that case, we need to uphold the promise of cancel_exit
+	if (sig == SIGALRM && 0 == exit_attempts && !context.should_exit()) return;
+
 	static pid_t pid = -1;
 	// Unfortunately, fuse_unmount can fail if the filesystem is still in use.
 	// Yes, this can even happen on linux with MNT_DETACH / lazy umount.
@@ -1287,6 +1323,7 @@ static void handle_exit(int sig)
 		fuse_unmount(path.c_str(), fc);
 		exit(0);
 	} else {
+		// By incrementing exit_attempts, we ensure cancel_exit never stops the next scheduled attempt
 		++exit_attempts;
 		schedule_exit();
 	}
