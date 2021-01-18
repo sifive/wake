@@ -558,18 +558,23 @@ static std::string pretty_cmd(const std::string &x) {
 }
 
 static void launch(JobTable *jobtable) {
-  // Note: We schedule jobs whenever we are under quota, without considering if the
+  // Note: We schedule jobs whenever we are under CPU quota, without considering if the
   // new job will cause us to exceed the quota. This is necessary, for two reasons:
   //   1 - a job could require more compute than allowed; we require forward progress
   //   2 - if the next optimal job to schedule needs more compute than available
   //     a - it would waste idle compute if we don't schedule something
   //     b - it would hurt the build critical path if we schedule a sub-optimal job
   // => just oversubscribe compute and let the kernel sort it out
+  // For memory, we follow a more conservative policy. We don't start a job that would
+  // oversubscribe RAM, unless there are no other jobs running yet. The rational:
+  //   - exceeding memory would slow down the build due to thrashing
+  //   - RAM is never "wasted" (disk cache / etc), so just wait for the next critical job
+  //   - even if a job uses more memory than the system has, eventually attempt it anyway (progress)
   auto &heap = jobtable->imp->pending;
   while (!heap.empty()
       && jobtable->imp->running.size() < (size_t)jobtable->imp->max_children
       && jobtable->imp->active < jobtable->imp->limit
-      && jobtable->imp->phys_active < jobtable->imp->phys_limit) {
+      && (jobtable->imp->phys_active == 0 || jobtable->imp->phys_active + heap.front()->job->memory() < jobtable->imp->phys_limit)) {
     Task &task = *heap.front();
     jobtable->imp->active += task.job->threads();
     jobtable->imp->phys_active += task.job->memory();
