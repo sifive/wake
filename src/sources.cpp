@@ -119,7 +119,7 @@ bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &sr
   return true;
 }
 
-static std::string slurp(int dirfd, bool &fail) {
+static std::string slurp(int dirfd, bool submodules, bool &fail) {
   std::stringstream str;
   char buf[4096];
   int got, status, pipefd[2];
@@ -138,7 +138,11 @@ static std::string slurp(int dirfd, bool &fail) {
       dup2(pipefd[1], 1);
       close(pipefd[1]);
     }
-    execlp("git", "git", "ls-files", "-z", nullptr);
+    if (submodules) {
+      execlp("git", "git", "config", "-f", ".gitmodules", "-z", "--get-regexp", "^submodule[.].*[.]path$", nullptr);
+    } else {
+      execlp("git", "git", "ls-files", "-z", nullptr);
+    }
     fprintf(stderr, "Failed to execlp(git): %s\n", strerror(errno));
     exit(1);
   } else {
@@ -153,7 +157,7 @@ static std::string slurp(int dirfd, bool &fail) {
     if (WIFSIGNALED(status)) {
       fprintf(stderr, "Failed to reap git: killed by %d\n", WTERMSIG(status));
       fail = true;
-    } else if (WEXITSTATUS(status)) {
+    } else if (WEXITSTATUS(status) && !submodules) {
       fprintf(stderr, "Failed to reap git: exited with %d\n", WEXITSTATUS(status));
       fail = true;
     }
@@ -161,7 +165,7 @@ static std::string slurp(int dirfd, bool &fail) {
   return str.str();
 }
 
-static bool scan(std::vector<std::string> &out, const std::string &path, int dirfd) {
+static bool scan(std::vector<std::string> &files, std::vector<std::string> &submods, const std::string &path, int dirfd) {
   auto dir = fdopendir(dirfd);
   if (!dir) {
     fprintf(stderr, "Failed to fdopendir %s: %s\n", path.c_str(), strerror(errno));
@@ -174,14 +178,26 @@ static bool scan(std::vector<std::string> &out, const std::string &path, int dir
   for (errno = 0; !failed && (f = readdir(dir)); errno = 0) {
     if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
     if (!strcmp(f->d_name, ".git")) {
-      std::string files(slurp(dirfd, failed));
+      std::string fileStr(slurp(dirfd, false, failed));
+      std::string submodStr(slurp(dirfd, true, failed));
       std::string prefix(path == "." ? "" : (path + "/"));
-      const char *tok = files.data();
-      const char *end = tok + files.size();
+      const char *tok = fileStr.data();
+      const char *end = tok + fileStr.size();
       for (const char *scan = tok; scan != end; ++scan) {
         if (*scan == 0 && scan != tok) {
-          out.emplace_back(prefix + tok);
+          files.emplace_back(prefix + tok);
           tok = scan+1;
+        }
+      }
+      tok = submodStr.data();
+      end = tok + submodStr.size();
+      const char *value = nullptr;
+      for (const char *scan = tok; scan != end; ++scan) {
+        if (*scan == '\n' && !value) value = scan+1;
+        if (*scan == 0 && scan != tok && value) {
+          submods.emplace_back(prefix + value);
+          tok = scan+1;
+          value = nullptr;
         }
       }
     } else {
@@ -210,7 +226,7 @@ static bool scan(std::vector<std::string> &out, const std::string &path, int dir
           fprintf(stderr, "Failed to openat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
           failed = true;
         } else {
-          failed = scan(out, name, fd);
+          failed = scan(files, submods, name, fd);
         }
       }
     }
@@ -221,11 +237,11 @@ static bool scan(std::vector<std::string> &out, const std::string &path, int dir
   return failed;
 }
 
-static bool scan(std::vector<std::string> &out) {
+static bool scan(std::vector<std::string> &files, std::vector<std::string> &submods) {
   int flags, dirfd = open(".", O_RDONLY);
   if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1)
     fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
-  return dirfd == -1 || scan(out, ".", dirfd);
+  return dirfd == -1 || scan(files, submods, ".", dirfd);
 }
 
 static bool push_files(std::vector<std::string> &out, const std::string &path, int dirfd, const RE2 &re, size_t skip) {
@@ -546,16 +562,33 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
 
 bool find_all_sources(Runtime &runtime, bool workspace) {
   bool ok = true;
-  std::vector<std::string> found;
-  if (workspace) ok = !scan(found);
+  std::vector<std::string> files, submods, difference;
+  if (workspace) ok = !scan(files, submods);
 
-  size_t need = Record::reserve(found.size());
-  for (auto &x : found) need += String::reserve(x.size());
+  std::sort(files.begin(), files.end());
+  std::sort(submods.begin(), submods.end());
+
+  // Compute difference = files - submodes
+  difference.reserve(files.size());
+  auto fi = files.begin(), si = submods.begin();
+  while (fi != files.end()) {
+    if (si == submods.end()) {
+      difference.emplace_back(std::move(*fi++));
+    } else if (*fi < *si) {
+      difference.emplace_back(std::move(*fi++));
+    } else {
+      if (*si == *fi) ++fi;
+      ++si;
+    }
+  }
+
+  size_t need = Record::reserve(difference.size());
+  for (auto &x : difference) need += String::reserve(x.size());
   runtime.heap.guarantee(need);
 
-  Record *out = Record::claim(runtime.heap, &Constructor::array, found.size());
+  Record *out = Record::claim(runtime.heap, &Constructor::array, difference.size());
   for (size_t i = 0; i < out->size(); ++i)
-    out->at(i)->instant_fulfill(String::claim(runtime.heap, found[i]));
+    out->at(i)->instant_fulfill(String::claim(runtime.heap, difference[i]));
 
   runtime.sources = out;
   return ok;
