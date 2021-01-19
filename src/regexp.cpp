@@ -236,6 +236,50 @@ static PRIMFN(prim_tokenize) {
   RETURN(claim_list(runtime.heap, tokens.size(), out));
 }
 
+static PRIMTYPE(type_rcat) {
+  bool ok = out->unify(RegExp::typeVar);
+  for (size_t i = 0; i < args.size(); ++i) {
+    if (i % 2 == 0) {
+      ok &= args[i]->unify(String::typeVar);
+    } else {
+      ok &= args[i]->unify(RegExp::typeVar);
+    }
+  }
+  return ok;
+}
+
+static PRIMFN(prim_rcat) {
+  (void)data;
+
+  runtime.heap.reserve(RegExp::reserve());
+
+  int offset = has_set_dot_nl<RE2::Options>::value ? 0 : 4;
+
+  size_t size = 0;
+  for (size_t i = 0; i < nargs; ++i) {
+    if (i % 2 == 0) {
+      STRING(s, i);
+      size += s->size();
+    } else {
+      REGEXP(r, i);
+      size += r->exp->pattern().size() - offset;
+    }
+  }
+
+  std::string out;
+  for (size_t i = 0; i < nargs; ++i) {
+    if (i % 2 == 0) {
+      String *s = static_cast<String*>(args[i]);
+      out.append(s->c_str(), s->size());
+    } else {
+      const std::string &pattern = static_cast<RegExp*>(args[i])->exp->pattern();
+      out.append(pattern.c_str() + offset, pattern.size() - offset);
+    }
+  }
+
+  RETURN(RegExp::claim(runtime.heap, runtime.heap, out));
+}
+
 void prim_register_regexp(PrimMap &pmap) {
   prim_register(pmap, "rcmp",     prim_rcmp,     type_rcmp,     PRIM_PURE);
   prim_register(pmap, "re2",      prim_re2,      type_re2,      PRIM_PURE);
@@ -245,4 +289,5 @@ void prim_register_regexp(PrimMap &pmap) {
   prim_register(pmap, "extract",  prim_extract,  type_extract,  PRIM_PURE);
   prim_register(pmap, "replace",  prim_replace,  type_replace,  PRIM_PURE);
   prim_register(pmap, "tokenize", prim_tokenize, type_tokenize, PRIM_PURE);
+  prim_register(pmap, "rcat",     prim_rcat,     type_rcat,     PRIM_PURE);
 }
