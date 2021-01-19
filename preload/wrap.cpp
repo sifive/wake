@@ -34,6 +34,7 @@
 #include "json5.h"
 #include "execpath.h"
 #include "unlink.h"
+#include "membytes.h"
 
 #define STR2(x) #x
 #define STR(x) STR2(x)
@@ -346,7 +347,7 @@ int main(int argc, const char **argv) {
   out << "{\"usage\":{\"status\":" << status
     << ",\"runtime\":" << (stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0)
     << ",\"cputime\":" << (rusage.ru_utime.tv_sec + rusage.ru_stime.tv_sec + (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0)
-    << ",\"membytes\":" << rusage.ru_maxrss
+    << ",\"membytes\":" << MEMBYTES(rusage)
     << ",\"inbytes\":" << rusage.ru_inblock * UINT64_C(512)
     << ",\"outbytes\":" << rusage.ru_oublock * UINT64_C(512)
     << "},\"inputs\":[";
