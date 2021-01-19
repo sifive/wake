@@ -119,7 +119,7 @@ bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &sr
   return true;
 }
 
-static std::string slurp(int dirfd, bool submodules, bool &fail) {
+static std::string slurp(int dirfd, const char * const * argv, bool &fail) {
   std::stringstream str;
   char buf[4096];
   int got, status, pipefd[2];
@@ -138,11 +138,7 @@ static std::string slurp(int dirfd, bool submodules, bool &fail) {
       dup2(pipefd[1], 1);
       close(pipefd[1]);
     }
-    if (submodules) {
-      execlp("git", "git", "config", "-f", ".gitmodules", "-z", "--get-regexp", "^submodule[.].*[.]path$", nullptr);
-    } else {
-      execlp("git", "git", "ls-files", "-z", nullptr);
-    }
+    execvp(argv[0], const_cast<char *const *>(argv));
     fprintf(stderr, "Failed to execlp(git): %s\n", strerror(errno));
     exit(1);
   } else {
@@ -157,7 +153,7 @@ static std::string slurp(int dirfd, bool submodules, bool &fail) {
     if (WIFSIGNALED(status)) {
       fprintf(stderr, "Failed to reap git: killed by %d\n", WTERMSIG(status));
       fail = true;
-    } else if (WEXITSTATUS(status) && !submodules) {
+    } else if (WEXITSTATUS(status)) {
       fprintf(stderr, "Failed to reap git: exited with %d\n", WEXITSTATUS(status));
       fail = true;
     }
@@ -178,8 +174,13 @@ static bool scan(std::vector<std::string> &files, std::vector<std::string> &subm
   for (errno = 0; !failed && (f = readdir(dir)); errno = 0) {
     if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
     if (!strcmp(f->d_name, ".git")) {
-      std::string fileStr(slurp(dirfd, false, failed));
-      std::string submodStr(slurp(dirfd, true, failed));
+      static const char *fileArgs[] = { "git", "ls-files", "-z", nullptr };
+      std::string fileStr(slurp(dirfd, &fileArgs[0], failed));
+      std::string submodStr;
+      if (faccessat(dirfd, ".gitmodules", R_OK, 0) == 0) {
+        static const char *submodArgs[] = { "git", "config", "-f", ".gitmodules", "-z", "--get-regexp", "^submodule[.].*[.]path$", nullptr };
+        submodStr = slurp(dirfd, &submodArgs[0], failed);
+      }
       std::string prefix(path == "." ? "" : (path + "/"));
       const char *tok = fileStr.data();
       const char *end = tok + fileStr.size();
