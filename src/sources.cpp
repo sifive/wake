@@ -341,7 +341,8 @@ static std::string make_relative(std::string &&dir, std::string &&path) {
     return std::move(path);
   }
 
-  if (dir == ".") dir = ""; else dir += '/';
+  if (dir == ".") dir = "";
+  else if (dir != "/") dir += '/';
   path += '/';
 
   size_t skip = 0, end = std::min(path.size(), dir.size());

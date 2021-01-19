@@ -29,5 +29,21 @@ export def installAs dest file = match file.getPathResult
     | runJob
     | getJobOutput
 
-export def installIn dir file =
-  installAs "{dir}/{file.getPathName}" file
+# Copy a file from one directory subtree to another
+# installIn "/to" "from"  "from/subdir/file"  => "/to/subdir/file"
+# installIn "/to" "."     "from/subdir/file"  => "/to/from/subdir/file"
+# installIn "/to" "/from" "/from/subdir/file" => "/to/subdir/file"
+# installIn "/to" "/"     "/from/subdir/file" => "/to/from/subdir/file"
+# These fail:
+# installIn "/to" "from"  "subdir/file"
+# installIn "/to" "/from" "/subdir/file"
+# installIn "/to" "from"  "/from/subdir/file"
+# installIn "/to" "/from" "from/subdir/file"
+export def installIn toRoot fromRoot sourcePath =
+  require Path sourceStr = sourcePath
+  def rel = relative fromRoot sourceStr
+  def isAbs = matches `/.*`
+  def uneq a b = (a && !b) || (!a && b)
+  if matches `[.][.]/.*` rel || uneq fromRoot.isAbs sourceStr.isAbs
+  then makeBadPath (makeError "{sourceStr} is not contained in {fromRoot}")
+  else installAs (in toRoot rel) sourcePath
