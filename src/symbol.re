@@ -306,6 +306,10 @@ static bool lex_rstr(Lexer &lex, Expr *&out)
 
         *                    { return false; }
         $                    { return false; }
+        "\\\\"               { slice.append("\\\\"); continue; }
+        "\\`"                { slice.append("\\`");  continue; }
+        "`"                  { break; }
+        "\\\$"               { slice.append("\\$");  continue; }
         "\${"		     {
           Coordinates expr = in.coord();
           std::string str = unicode_escape_canon(std::move(slice));
@@ -321,9 +325,6 @@ static bool lex_rstr(Lexer &lex, Expr *&out)
           slice.clear();
           continue;
         }
-        "\\\\"               { slice.append("\\\\"); continue; }
-        "\\`"                { slice.append("\\`");  continue; }
-        "`"                  { break; }
         notnl                { slice.append(in.tok, in.cur); continue; }
     */
   }
