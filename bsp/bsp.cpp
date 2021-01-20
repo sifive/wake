@@ -279,10 +279,14 @@ void ExecuteWakeProcess::executeLine(int i, std::string &&line) {
   }
 }
 
-static void makeAbsolute(JAST &node) {
-  for (auto &child : node.children) makeAbsolute(child.second);
+static void adjustJSON(JAST &node) {
+  struct timeval tv;
+  for (auto &child : node.children) adjustJSON(child.second);
   if (node.kind == JSON_STR && node.value.compare(0, sizeof(workspace)-1, &workspace[0]) == 0) {
     node.value = rooturi + node.value.substr(sizeof(workspace)-1);
+  }
+  if (node.kind == JSON_STR && node.value == "time://now" && gettimeofday(&tv, 0) == 0) {
+    node.value = std::to_string(tv.tv_sec*1000L + tv.tv_usec/1000);
   }
 }
 
@@ -326,7 +330,7 @@ void EnumerateTargetsState::gotLine(JAST &row) {
     for (auto &dep : target.get("dependencies").children)
       dep.second.add("uri", std::string(idmap[dep.second.value]));
     // Resolve workspace:// identifiers
-    makeAbsolute(target);
+    adjustJSON(target);
     targets.children.emplace_back(std::string(), std::move(target));
   }
 }
@@ -341,14 +345,6 @@ static void enumerateTargets(JAST &response) {
   }
 }
 
-static void makeTime(JAST &node) {
-  struct timeval tv;
-  for (auto &child : node.children) makeTime(child.second);
-  if (node.kind == JSON_STR && node.value == "time://now" && gettimeofday(&tv, 0) == 0) {
-    node.value = std::to_string(tv.tv_sec*1000L + tv.tv_usec/1000);
-  }
-}
-
 struct CompileState : public ExecuteWakeProcess {
   CompileState(int argc, const char **argv) {
     for (int i = 1; i < argc; ++i)
@@ -359,7 +355,7 @@ struct CompileState : public ExecuteWakeProcess {
 };
 
 void CompileState::gotLine(JAST &row) {
-  makeTime(row);
+  adjustJSON(row);
   sendMessage(row);
 }
 
@@ -411,7 +407,7 @@ ExtractBSPDocument::ExtractBSPDocument(const std::string &method, const JAST &pa
 }
 
 void ExtractBSPDocument::gotLine(JAST &row) {
-  makeAbsolute(row);
+  adjustJSON(row);
   items.children.emplace_back(std::string(), std::move(row));
 }
 
