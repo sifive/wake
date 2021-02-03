@@ -62,6 +62,45 @@ static void map_id(const char *file, uint32_t from, uint32_t to)
 	write_file(file, buf, strlen(buf));
 }
 
+static bool bind_mount(const std::string& source, const std::string& destination, bool readonly)
+{
+	const char* src = source.c_str();
+	const char* dest = destination.c_str();
+
+	if (0 != mount(src, dest, NULL, MS_BIND, NULL)) {
+		std::cerr << "bind mount (" << source << " -> " << destination << "): "
+			<< strerror(errno) << std::endl;
+		return false;
+	}
+	// Re-mount to set destination as read-only.
+	// Source filesystem must not have 'MS_NODEV' (a.k.a. 'nodev') set.
+	if (readonly) {
+		if (0 != mount(src, dest, NULL, MS_BIND | MS_RDONLY | MS_REMOUNT, NULL)) {
+			std::cerr << "bind mount (" << source << " -> " << destination << "): "
+				<< strerror(errno) << std::endl;
+			return false;
+		}
+	}
+	return true;
+}
+
+// Do the mounts specified in the parsed input json.
+// The input/caller responsibility to ensure that the mountpoint exists,
+// that the platform supports the mount type/options, and to correctly order
+// the layered mounts.
+static bool do_mounts_from_json(const JAST& jast)
+{
+	for (auto &x : jast.get("mounts").children) {
+		const std::string& src = x.second.get("source").value;
+		const std::string& dest = x.second.get("destination").value;
+		bool readonly = x.second.get("read-only").kind == JSON_TRUE;
+
+		if (!bind_mount(src, dest, readonly))
+			return false;
+	}
+	return true;
+}
+
 #endif
 
 int main(int argc, char *argv[])
@@ -204,7 +243,7 @@ int main(int argc, char *argv[])
 				std::cerr << "sethostname(build): " << strerror(errno) << std::endl;
 			}
 			if (setdomainname("local", 5) != 0) {
-				std::cerr << "sedomainname(local): " << strerror(errno) << std::endl;
+				std::cerr << "setdomainname(local): " << strerror(errno) << std::endl;
 			}
 		}
 
@@ -214,12 +253,15 @@ int main(int argc, char *argv[])
 		map_id("/proc/self/gid_map", egid, real_egid);
 
 		// Mount the fuse-visibility-protected view onto the workspace
-		if (0 != mount(rpath.c_str(), workspace.c_str(), NULL, MS_BIND, NULL)) {
-			std::cerr << "mount " << rpath << ": " << strerror(errno) << std::endl;
+		if (!bind_mount(rpath, workspace, false))
 			exit(1);
-		}
 
 		std::string dir = workspace + "/" + subdir;
+
+		// Mounts from the parsed input json.
+		if (!do_mounts_from_json(jast))
+			exit(1);
+
 #else
 		std::string dir = rpath + "/" + subdir;
 #endif
