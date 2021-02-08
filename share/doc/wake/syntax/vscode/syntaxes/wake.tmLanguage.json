@@ -1,0 +1,155 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"scopeName": "source.wake",
+	"name": "wake",
+	"patterns": [
+		{
+			"include": "#expression"
+		}
+	],
+	"repository": {
+		"expression": {
+			"patterns": [
+				{ "include": "#comments" },
+				{ "include": "#parens" },
+				{ "include": "#keyword" },
+				{ "include": "#operator" },
+				{ "include": "#identifier" },
+				{ "include": "#literal" }
+			]
+		},
+		"parens": {
+			"name": "expression.group",
+			"begin": "\\(",
+			"end": "\\)",
+			"beginCaptures": { "0": { "name": "keyword.operator.wake" } },
+			"endCaptures": { "0": { "name": "keyword.operator.wake" } },
+			"patterns": [ { "include": "#expression" } ]
+		},
+		"keyword": {
+			"patterns": [{
+				"name": "keyword.control.wake",
+				"match": "\\b(_|def|tuple|data|global|target|publish|subscribe|prim|if|then|else|here|match|require|package|import|export|from|type|topic|unary|binary)\\b"
+			}]
+		},
+		"operator": {
+			"name":	"keyword.operator.wake",
+			"match": "[~!$%^&*+=\\\\|;<,.>/-]+"
+		},
+		"identifier": {
+			"name": "meta.identifier.wake",
+			"match": "[A-Za-z_][A-Za-z_0-9]*"
+		},
+		"literal": {
+			"patterns": [
+				{ "include": "#double" },
+				{ "include": "#integer" },
+				{ "include": "#double-string" },
+				{ "include": "#single-string" },
+				{ "include": "#regexp-string" }
+			]
+		},
+		"comments": {
+			"name": "comment.line.wake",
+			"match": "#.*"
+		},
+		"double": {
+			"patterns": [
+				{
+					"name": "constant.numeric.double.wake",
+					"match": "([1-9][0-9_]*|0)\\.[0-9_]+([eE][+-]?[0-9_]+)?"
+				},
+				{
+					"name": "constant.numeric.double.wake",
+					"match": "([1-9][0-9_]*|0)([eE][+-]?[0-9_]+)"
+				},
+				{
+					"name": "constant.numeric.double.hex.wake",
+					"match": "0x[0-9a-fA-F_]+\\.[0-9a-fA-F_]+([pP][+-]?[0-9a-fA-F_]+)?"
+				},
+				{
+					"name": "constant.numeric.double.hex.wake",
+					"match": "0x[0-9a-fA-F_]+[pP][+-]?[0-9a-fA-F_]+"
+				}
+			]
+		},
+		"integer": {
+			"patterns": [
+				{
+					"name": "constant.numeric.integer.hex.wake",
+					"match": "0x[0-9a-fA-F_]+"
+				},
+				{
+					"name": "constant.numeric.integer.binary.wake",
+					"match": "0b[01_]+"
+				},
+				{
+					"name": "constant.numeric.integer.octal.wake",
+					"match": "0[0-7_]+"
+				},
+				{
+					"name": "constant.numeric.integer.wake",
+					"match": "[1-9][0-9_]*|0"
+				}
+			]
+		},
+		"single-string": {
+			"name": "string.quoted.single.wake",
+			"begin": "'",
+			"end": "'",
+			"patterns": []
+		},
+		"regexp-string": {
+			"name": "string.regexp.wake",
+			"begin": "`",
+			"end": "`",
+			"patterns": [
+				{
+					"name": "string.regexp.wake",
+					"match": "\\\\[`$\\\\]"
+				},
+				{
+					"name": "string.regexp.interpolated.wake",
+					"begin": "\\${",
+					"end": "}",
+					"patterns": [ { "include": "#expression" } ]
+				}
+			]
+		},
+		"double-string": {
+			"name": "string.quoted.double.wake",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.wake",
+					"match": "\\\\[abfnrtv {}\\\\'\"?]"
+				},
+				{
+					"name": "constant.character.escape.wake",
+					"match": "\\\\[0-7]{1,3}"
+				},
+				{
+					"name": "constant.character.escape.wake",
+					"match": "\\\\x[0-9a-fA-F]{2}"
+				},
+				{
+					"name": "constant.character.escape.wake",
+					"match": "\\\\u[0-9a-fA-F]{4}"
+				},
+				{
+					"name": "constant.character.escape.wake",
+					"match": "\\\\U[0-9a-fA-F]{8}"
+				},
+				{
+					"name": "string.interpolated",
+					"begin": "{",
+					"end": "}",
+					"beginCaptures": { "0": { "name": "keyword.operator.wake" } },
+					"endCaptures": { "0": { "name": "keyword.operator.wake" } },
+					"patterns": [ { "include": "#expression" } ]
+                }
+			]
+		}
+	}
+}
