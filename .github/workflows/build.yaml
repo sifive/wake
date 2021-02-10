@@ -1,0 +1,23 @@
+name: "Test"
+
+on:
+    pull_request:
+
+jobs:
+    build:
+        name: "MacOS build"
+        runs-on: macos-latest
+
+        steps:
+            - name: "Clone wake"
+              uses: actions/checkout@v2
+              with:
+                fetch-depth: 0
+
+            - name: "Install deps"
+              run: |
+                brew install re2
+                brew install --cask osxfuse
+
+            - name: "Build wake"
+              run: make all -j3
