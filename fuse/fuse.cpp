@@ -25,6 +25,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 
@@ -84,24 +85,70 @@ static bool bind_mount(const std::string& source, const std::string& destination
 	return true;
 }
 
+static bool validate_mount(const std::string& op, const std::string& source)
+{
+	static const std::vector<std::string> mount_ops {
+		// must be sorted
+		"bind",
+		"workspace"
+	};
+
+	if (!std::binary_search(mount_ops.begin(), mount_ops.end(), op)) {
+		std::cerr << "unknown mount type: '" << op << "'" << std::endl;
+		return false;
+	}
+
+	if (op == "workspace" && source.length() != 0) {
+		std::cerr << "mount: 'workspace' can not have 'source' option" << std::endl;
+		return false;
+	}
+	return true;
+}
+
 // Do the mounts specified in the parsed input json.
 // The input/caller responsibility to ensure that the mountpoint exists,
 // that the platform supports the mount type/options, and to correctly order
 // the layered mounts.
-static bool do_mounts_from_json(const JAST& jast)
+static bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_path)
 {
 	for (auto &x : jast.get("mounts").children) {
+		const std::string& op = x.second.get("type").value;
 		const std::string& src = x.second.get("source").value;
 		const std::string& dest = x.second.get("destination").value;
 		bool readonly = x.second.get("read-only").kind == JSON_TRUE;
 
-		if (!bind_mount(src, dest, readonly))
+		if (!validate_mount(op, src))
 			return false;
+
+		if (op == "bind" && !bind_mount(src, dest, readonly))
+			return false;
+
+		if (op == "workspace" && !bind_mount(fuse_mount_path, dest, false))
+			return false;
+
 	}
 	return true;
 }
 
 #endif
+
+static bool get_workspace_dir(const JAST& jast,
+		const std::string& host_workspace_dir, std::string& out)
+{
+	for (auto &x : jast.get("mounts").children) {
+		const std::string& op = x.second.get("type").value;
+		if (op == "workspace") {
+			out = x.second.get("destination").value;
+
+			// make a workspace relative path into absolute path
+			if (out.at(0) != '/')
+				out = host_workspace_dir + "/" + out;
+
+			return true;
+		}
+	}
+	return false;
+}
 
 int main(int argc, char *argv[])
 {
@@ -134,8 +181,10 @@ int main(int argc, char *argv[])
 	std::string daemon = exedir + "/fuse-waked";
 	std::string name  = std::to_string(getpid());
 	std::string cwd   = get_cwd();
+	// mpath is where the fuse filesystem is mounted
 	std::string mpath = cwd + "/.fuse";
 	std::string fpath = mpath + "/.f.fuse-waked";
+	// rpath is a subdir in the fuse filesystem that will be used by this fuse-wake
 	std::string rpath = mpath + "/" + name;
 	std::string lpath = mpath + "/.l." + name;
 	std::string ipath = mpath + "/.i." + name;
@@ -222,13 +271,6 @@ int main(int argc, char *argv[])
 			if (key == "isolate/user") euid = egid = 0;
 			if (key == "isolate/host") flags |= CLONE_NEWUTS;
 			if (key == "isolate/net") flags |= CLONE_NEWNET;
-			if (key == "isolate/workspace") {
-				if (access("/var/cache/wake", R_OK) == 0) {
-					workspace = "/var/cache/wake";
-				} else {
-					workspace = exedir + "/../../build/wake";
-				}
-			}
 		}
 
 		// Enter a new mount namespace we can control
@@ -252,16 +294,16 @@ int main(int argc, char *argv[])
 		map_id("/proc/self/uid_map", euid, real_euid);
 		map_id("/proc/self/gid_map", egid, real_egid);
 
-		// Mount the fuse-visibility-protected view onto the workspace
-		if (!bind_mount(rpath, workspace, false))
-			exit(1);
-
-		std::string dir = workspace + "/" + subdir;
-
 		// Mounts from the parsed input json.
-		if (!do_mounts_from_json(jast))
+		if (!do_mounts_from_json(jast, rpath))
 			exit(1);
 
+		std::string dir;
+		if (!get_workspace_dir(jast, cwd, dir)) {
+			std::cerr << "'workspace' mount entry is missing from input" << std::endl;
+			exit(1);
+		}
+		dir = dir + "/" + subdir;
 #else
 		std::string dir = rpath + "/" + subdir;
 #endif
