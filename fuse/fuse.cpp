@@ -130,8 +130,6 @@ static bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_
 	return true;
 }
 
-#endif
-
 static bool get_workspace_dir(const JAST& jast,
 		const std::string& host_workspace_dir, std::string& out)
 {
@@ -149,6 +147,7 @@ static bool get_workspace_dir(const JAST& jast,
 	}
 	return false;
 }
+#endif
 
 int main(int argc, char *argv[])
 {
