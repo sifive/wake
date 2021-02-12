@@ -68,7 +68,7 @@ static bool bind_mount(const std::string& source, const std::string& destination
 	const char* src = source.c_str();
 	const char* dest = destination.c_str();
 
-	if (0 != mount(src, dest, NULL, MS_BIND, NULL)) {
+	if (0 != mount(src, dest, NULL, MS_BIND | MS_REC, NULL)) {
 		std::cerr << "bind mount (" << source << " -> " << destination << "): "
 			<< strerror(errno) << std::endl;
 		return false;
@@ -76,7 +76,7 @@ static bool bind_mount(const std::string& source, const std::string& destination
 	// Re-mount to set destination as read-only.
 	// Source filesystem must not have 'MS_NODEV' (a.k.a. 'nodev') set.
 	if (readonly) {
-		if (0 != mount(src, dest, NULL, MS_BIND | MS_RDONLY | MS_REMOUNT, NULL)) {
+		if (0 != mount(src, dest, NULL, MS_BIND | MS_REC | MS_RDONLY | MS_REMOUNT, NULL)) {
 			std::cerr << "bind mount (" << source << " -> " << destination << "): "
 				<< strerror(errno) << std::endl;
 			return false;
