@@ -255,7 +255,7 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
 
   struct dirent *f;
   bool failed = false;
-  for (errno = 0; !failed && (f = readdir(dir)); errno = 0) {
+  for (errno = 0; 0 != (f = readdir(dir)); errno = 0) {
     if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
     bool recurse;
     struct stat sbuf;
@@ -282,7 +282,8 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
         fprintf(stderr, "Failed to openat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
         failed = true;
       } else {
-        failed = push_files(out, name, fd, re, skip);
+        if (push_files(out, name, fd, re, skip))
+          failed = true;
       }
     } else {
       re2::StringPiece p(name.c_str() + skip, name.size() - skip);
