@@ -249,6 +249,7 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
   auto dir = fdopendir(dirfd);
   if (!dir) {
     close(dirfd);
+    fprintf(stderr, "Failed to fdopendirt %s: %s\n", path.c_str(), strerror(errno));
     return true;
   }
 
@@ -278,6 +279,7 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
       if (name == ".build" || name == ".fuse" || name == ".git") continue;
       int fd = openat(dirfd, f->d_name, O_RDONLY);
       if (fd == -1) {
+        fprintf(stderr, "Failed to openat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
         failed = true;
       } else {
         failed = push_files(out, name, fd, re, skip);
@@ -289,8 +291,16 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
     }
   }
 
-  failed = errno         != 0 || failed;
-  failed = closedir(dir) != 0 || failed;
+  if (errno != 0 && !failed) {
+    fprintf(stderr, "Failed to readdir %s: %s\n", path.c_str(), strerror(errno));
+    failed = true;
+  }
+
+  if (closedir(dir) != 0) {
+    fprintf(stderr, "Failed to closedir %s: %s\n", path.c_str(), strerror(errno));
+    failed = true;
+  }
+
   return failed;
 }
 
