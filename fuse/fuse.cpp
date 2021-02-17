@@ -24,6 +24,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
 #include <algorithm>
 #include <iostream>
@@ -88,11 +89,15 @@ static bool bind_mount(const std::string& source, const std::string& destination
 	return true;
 }
 
-static bool validate_mount(const std::string& op, const std::string& source)
+static bool validate_mount(
+	const std::string& op,
+	const std::string& source,
+	const std::string& after_pivot)
 {
 	static const std::vector<std::string> mount_ops {
 		// must be sorted
 		"bind",
+		"pivot-root",
 		"workspace"
 	};
 
@@ -101,8 +106,60 @@ static bool validate_mount(const std::string& op, const std::string& source)
 		return false;
 	}
 
-	if (op == "workspace" && source.length() != 0) {
-		std::cerr << "mount: 'workspace' can not have 'source' option" << std::endl;
+	if (op != "bind" && source.length() != 0) {
+		std::cerr << "mount: " << op << " can not have 'source' option" << std::endl;
+		return false;
+	}
+	if (op != "workspace" && after_pivot.length() != 0) {
+		std::cerr << "mount: " << op << " can not have 'after-pivot' option" << std::endl;
+		return false;
+	}
+
+	return true;
+}
+
+// The pivot_root syscall has no glibc wrapper.
+static int pivot_root(const char* new_root, const char* put_old) {
+#ifndef __NR_pivot_root
+#error 'pivot_root' syscall number missing from <sys/syscall.h>
+#endif
+	return syscall(__NR_pivot_root, new_root, put_old);
+}
+
+/* Many systems have an ancient manpage entry for pivot_root,
+ * See 2019-era docs at: https://lwn.net/Articles/800381/
+ *
+ * new_root and put_old may be the same directory.
+ * In particular, the following sequence allows a pivot-root operation without needing
+ * to create and remove a temporary directory:
+ *
+ *   chdir(new_root);
+ *   pivot_root(".", ".");
+ *   umount2(".", MNT_DETACH);
+ *
+ * This sequence succeeds because the pivot_root() call stacks the old root mount point
+ * on top of the new root mount point at /. At that point, the calling process's root
+ * directory and current working directory refer to the new root mount point (new_root).
+ * During the subsequent umount() call, resolution of "." starts with new_root and then
+ * moves up the list of mounts stacked at /, with the result that old root mount point
+ * is unmounted.
+ */
+static bool do_pivot(const std::string& newroot) {
+	// The pivot_root syscall requires that the new root location is a mountpoint.
+	// Bind mount the new root onto itself to ensure this.
+	if (!bind_mount(newroot, newroot, false)) {
+		return false;
+	}
+	if (0 != chdir(newroot.c_str())) {
+		std::cerr << "chdir: " << strerror(errno) << std::endl;
+		return false;
+	}
+	if (0 != pivot_root(".", ".")) {
+		std::cerr << "pivot_root(\".\", \".\"): " << strerror(errno) << std::endl;
+		return false;
+	}
+	if (0 != umount2(".", MNT_DETACH)) {
+		std::cerr << "umount2: " << strerror(errno) << std::endl;
 		return false;
 	}
 	return true;
@@ -118,9 +175,10 @@ static bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_
 		const std::string& op = x.second.get("type").value;
 		const std::string& src = x.second.get("source").value;
 		const std::string& dest = x.second.get("destination").value;
+		const std::string& after_pivot = x.second.get("after-pivot").value;
 		bool readonly = x.second.get("read-only").kind == JSON_TRUE;
 
-		if (!validate_mount(op, src))
+		if (!validate_mount(op, src, after_pivot))
 			return false;
 
 		if (op == "bind" && !bind_mount(src, dest, readonly))
@@ -129,22 +187,30 @@ static bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_
 		if (op == "workspace" && !bind_mount(fuse_mount_path, dest, false))
 			return false;
 
+		if (op == "pivot-root" && !do_pivot(dest))
+			return false;
+
 	}
 	return true;
 }
 
-static bool get_workspace_dir(const JAST& jast,
-		const std::string& host_workspace_dir, std::string& out)
+static bool get_workspace_dir(
+	const JAST& jast,
+	const std::string& host_workspace_dir,
+	std::string& out)
 {
 	for (auto &x : jast.get("mounts").children) {
 		const std::string& op = x.second.get("type").value;
 		if (op == "workspace") {
-			out = x.second.get("destination").value;
-
-			// make a workspace relative path into absolute path
-			if (out.at(0) != '/')
-				out = host_workspace_dir + "/" + out;
-
+			std::string after_pivot = x.second.get("after-pivot").value;
+			if (after_pivot.length() > 0) {
+				out = after_pivot;
+			} else {
+				out = x.second.get("destination").value;
+				// convert a workspace relative path into absolute path
+				if (out.at(0) != '/')
+					out = host_workspace_dir + "/" + out;
+			}
 			return true;
 		}
 	}
