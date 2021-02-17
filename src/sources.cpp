@@ -171,7 +171,7 @@ static bool scan(std::vector<std::string> &files, std::vector<std::string> &subm
 
   struct dirent *f;
   bool failed = false;
-  for (errno = 0; !failed && (f = readdir(dir)); errno = 0) {
+  for (errno = 0; 0 != (f = readdir(dir)); errno = 0) {
     if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
     if (!strcmp(f->d_name, ".git")) {
       static const char *fileArgs[] = { "git", "ls-files", "-z", nullptr };
@@ -227,14 +227,23 @@ static bool scan(std::vector<std::string> &files, std::vector<std::string> &subm
           fprintf(stderr, "Failed to openat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
           failed = true;
         } else {
-          failed = scan(files, submods, name, fd);
+          if (scan(files, submods, name, fd))
+            failed = true;
         }
       }
     }
   }
 
-  failed = errno         != 0 || failed;
-  failed = closedir(dir) != 0 || failed;
+  if (errno != 0 && !failed) {
+    fprintf(stderr, "Failed to readdir %s: %s\n", path.c_str(), strerror(errno));
+    failed = true;
+  }
+
+  if (closedir(dir) != 0) {
+    fprintf(stderr, "Failed to closedir %s: %s\n", path.c_str(), strerror(errno));
+    failed = true;
+  }
+
   return failed;
 }
 
