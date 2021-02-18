@@ -98,6 +98,7 @@ static bool validate_mount(
 		// must be sorted
 		"bind",
 		"pivot-root",
+		"tmpfs",
 		"workspace"
 	};
 
@@ -165,6 +166,15 @@ static bool do_pivot(const std::string& newroot) {
 	return true;
 }
 
+static bool mount_tmpfs(const std::string& destination) {
+	if (0 != mount("tmpfs", destination.c_str(), "tmpfs", 0UL, NULL)) {
+		std::cerr << "tmpfs mount (" << destination << "): "
+			<< strerror(errno) << std::endl;
+		return false;
+	}
+	return true;
+}
+
 // Do the mounts specified in the parsed input json.
 // The input/caller responsibility to ensure that the mountpoint exists,
 // that the platform supports the mount type/options, and to correctly order
@@ -188,6 +198,9 @@ static bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_
 			return false;
 
 		if (op == "pivot-root" && !do_pivot(dest))
+			return false;
+
+		if (op == "tmpfs" && !mount_tmpfs(dest))
 			return false;
 
 	}
