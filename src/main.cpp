@@ -332,9 +332,13 @@ int main(int argc, char **argv) {
 
   if (noparse) return 0;
 
-  bool ok = true;
-  auto wakefiles = find_all_wakefiles(ok, workspace, verbose);
-  if (!ok) std::cerr << "Workspace wake file enumeration failed" << std::endl;
+  bool enumok = true;
+  auto wakefiles = find_all_wakefiles(enumok, workspace, verbose);
+  if (!enumok) {
+    if (verbose) std::cerr << "Workspace wake file enumeration failed" << std::endl;
+    // Try to run the build anyway; if wake files are missing, it will fail later
+    // The unreadable location might be irrelevant to the build
+  }
 
   uint64_t target_hash = 0;
   if (hash) {
@@ -349,14 +353,18 @@ int main(int argc, char **argv) {
   Profile tree;
   Runtime runtime(profile ? &tree : nullptr, profileh, heap_factor, target_hash);
   bool sources = find_all_sources(runtime, workspace);
-  if (!sources) std::cerr << "Source file enumeration failed" << std::endl;
-  ok &= sources;
+  if (!sources) {
+    if (verbose) std::cerr << "Source file enumeration failed" << std::endl;
+    // Try to run the build anyway; if sources are missing, it will fail later
+    // The unreadable location might be irrelevant to the build
+  }
 
   // Select a default package
   int longest_src_dir = -1;
   bool warned_conflict = false;
 
   // Read all wake build files
+  bool ok = true;
   Scope::debug = debug;
   std::unique_ptr<Top> top(new Top);
   for (auto &i : wakefiles) {
