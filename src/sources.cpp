@@ -569,8 +569,8 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
   std::string rel_libdir = make_relative(get_cwd(), make_canonical(abs_libdir));
 
   std::vector<std::string> acc;
-  ok = ok && !push_files(acc, rel_libdir, exp, 0);
-  if (workspace) ok = ok && !push_files(acc, ".", exp, 0);
+  if (push_files(acc, rel_libdir, exp, 0)) ok = false;
+  if (workspace && push_files(acc, ".", exp, 0)) ok = false;
 
   // make the output distinct
   std::sort(acc.begin(), acc.end());
@@ -669,7 +669,7 @@ static PRIMFN(prim_files) {
 
   std::vector<std::string> match;
   bool fail = push_files(match, root, *arg1->exp, skip);
-  if (fail) match.clear(); // !!! There's a hole in the API
+  (void)fail; // !!! There's a hole in the API
 
   size_t need = reserve_list(match.size());
   for (auto &x : match) need += String::reserve(x.size());
