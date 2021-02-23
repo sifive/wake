@@ -38,6 +38,8 @@
 // For unshare and bind mount
 #include <sched.h>
 #include <sys/mount.h>
+#include <sys/prctl.h>
+#include <sys/sysmacros.h>
 
 static void write_file(const char *file, const char *content, int len)
 {
@@ -98,6 +100,7 @@ static bool validate_mount(
 		// must be sorted
 		"bind",
 		"pivot-root",
+		"squashfs",
 		"tmpfs",
 		"workspace"
 	};
@@ -107,7 +110,7 @@ static bool validate_mount(
 		return false;
 	}
 
-	if (op != "bind" && source.length() != 0) {
+	if ((op != "bind" && op != "squashfs") && source.length() != 0) {
 		std::cerr << "mount: " << op << " can not have 'source' option" << std::endl;
 		return false;
 	}
@@ -175,6 +178,48 @@ static bool mount_tmpfs(const std::string& destination) {
 	return true;
 }
 
+static bool equal_dev_ids(dev_t a, dev_t b) {
+	return major(a) == major(b) && minor(a) == minor(b);
+}
+
+static bool mount_squashfs(const std::string& source, const std::string& mountpoint) {
+	pid_t pid = fork();
+	if (pid == 0) {
+		// kernel to send SIGKILL to squashfuse when fuse-wake terminates
+		if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
+			std::cerr << "squashfuse prctl: " << strerror(errno) << std::endl;
+			exit(1);
+		}
+		execlp("squashfuse", "squashfuse", "-f", source.c_str(), mountpoint.c_str(), NULL);
+		std::cerr << "execlp squashfuse: " << strerror(errno) << std::endl;
+		exit(1);
+	}
+
+	// Wait for the mount to exist before we continue by checking if the
+	// stat() device id or the inode changes.
+	struct stat before;
+	if (0 != stat(mountpoint.c_str(), &before)) {
+		std::cerr << "stat (" << mountpoint << "): " << strerror(errno) << std::endl;
+		return false;
+	}
+
+	for (int i = 1; i < 15; i++) {
+		struct stat after;
+		if (0 != stat(mountpoint.c_str(), &after)) {
+			std::cerr << "stat (" << mountpoint << "): " << strerror(errno) << std::endl;
+			return false;
+		}
+
+		if (!equal_dev_ids(before.st_dev, after.st_dev) || (before.st_ino != after.st_ino))
+			return true;
+		else
+			usleep(i * 10000); // i * 10ms
+	}
+
+	std::cerr << "squashfs mount missing: " << mountpoint << std::endl;
+	return false;
+}
+
 // Do the mounts specified in the parsed input json.
 // The input/caller responsibility to ensure that the mountpoint exists,
 // that the platform supports the mount type/options, and to correctly order
@@ -201,6 +246,9 @@ static bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_
 			return false;
 
 		if (op == "tmpfs" && !mount_tmpfs(dest))
+			return false;
+
+		if (op == "squashfs" && !mount_squashfs(src, dest))
 			return false;
 
 	}
