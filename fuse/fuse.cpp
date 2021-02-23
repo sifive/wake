@@ -203,7 +203,7 @@ static bool mount_squashfs(const std::string& source, const std::string& mountpo
 		return false;
 	}
 
-	for (int i = 1; i < 15; i++) {
+	for (int i = 0; i < 10; i++) {
 		struct stat after;
 		if (0 != stat(mountpoint.c_str(), &after)) {
 			std::cerr << "stat (" << mountpoint << "): " << strerror(errno) << std::endl;
@@ -213,7 +213,7 @@ static bool mount_squashfs(const std::string& source, const std::string& mountpo
 		if (!equal_dev_ids(before.st_dev, after.st_dev) || (before.st_ino != after.st_ino))
 			return true;
 		else
-			usleep(i * 10000); // i * 10ms
+			usleep(10000 << i); // 10ms * 2^i
 	}
 
 	std::cerr << "squashfs mount missing: " << mountpoint << std::endl;
