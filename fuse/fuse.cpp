@@ -277,6 +277,48 @@ static bool get_workspace_dir(
 	}
 	return false;
 }
+
+static bool setup_user_namespaces(const JAST& jast) {
+	uid_t real_euid = geteuid();
+	gid_t real_egid = getegid();
+
+	uid_t euid = real_euid;
+	gid_t egid = real_egid;
+	int flags = CLONE_NEWNS|CLONE_NEWUSER;
+
+	for (auto &res : jast.get("resources").children) {
+		const std::string &key = res.second.value;
+		if (key == "isolate/user") euid = egid = 0;
+		if (key == "isolate/host") flags |= CLONE_NEWUTS;
+		if (key == "isolate/net") flags |= CLONE_NEWNET;
+	}
+
+	// Enter a new mount namespace we can control
+	if (0 != unshare(flags)) {
+		std::cerr << "unshare: " << strerror(errno) << std::endl;
+		return false;
+	}
+
+	// Wipe out our hostname
+	if (0 != (flags & CLONE_NEWUTS)) {
+		if (sethostname("build", 5) != 0) {
+			std::cerr << "sethostname(build): " << strerror(errno) << std::endl;
+			return false;
+		}
+		if (setdomainname("local", 5) != 0) {
+			std::cerr << "setdomainname(local): " << strerror(errno) << std::endl;
+			return false;
+		}
+	}
+
+	// Map our UID to either our original UID or root
+	write_file("/proc/self/setgroups", "deny", 4);
+	map_id("/proc/self/uid_map", euid, real_euid);
+	map_id("/proc/self/gid_map", egid, real_egid);
+
+	return true;
+}
+
 #endif
 
 int main(int argc, char *argv[])
@@ -386,42 +428,9 @@ int main(int argc, char *argv[])
 		if (stdin.empty()) stdin = "/dev/null";
 
 #ifdef __linux__
-		uid_t real_euid = geteuid();
-		gid_t real_egid = getegid();
 
-		// Allow overriding this to a repeatable build directory
-		std::string workspace = cwd;
-		uid_t euid = real_euid;
-		gid_t egid = real_egid;
-		int flags = CLONE_NEWNS|CLONE_NEWUSER;
-
-		for (auto &res : jast.get("resources").children) {
-			std::string &key = res.second.value;
-			if (key == "isolate/user") euid = egid = 0;
-			if (key == "isolate/host") flags |= CLONE_NEWUTS;
-			if (key == "isolate/net") flags |= CLONE_NEWNET;
-		}
-
-		// Enter a new mount namespace we can control
-		if (0 != unshare(flags)) {
-			std::cerr << "unshare: " << strerror(errno) << std::endl;
+		if (!setup_user_namespaces(jast))
 			exit(1);
-		}
-
-		// Wipe out our hostname
-		if (0 != (flags & CLONE_NEWUTS)) {
-			if (sethostname("build", 5) != 0) {
-				std::cerr << "sethostname(build): " << strerror(errno) << std::endl;
-			}
-			if (setdomainname("local", 5) != 0) {
-				std::cerr << "setdomainname(local): " << strerror(errno) << std::endl;
-			}
-		}
-
-		// Map our UID to either our original UID or root
-		write_file("/proc/self/setgroups", "deny", 4);
-		map_id("/proc/self/uid_map", euid, real_euid);
-		map_id("/proc/self/gid_map", egid, real_egid);
 
 		// Mounts from the parsed input json.
 		if (!do_mounts_from_json(jast, rpath))
