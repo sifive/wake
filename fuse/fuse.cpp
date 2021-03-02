@@ -58,8 +58,12 @@ int run_fuse(
 	std::string fpath = mpath + "/.f.fuse-waked";
 	// rpath is a subdir in the fuse filesystem that will be used by this fuse-wake
 	std::string rpath = mpath + "/" + name;
+	// Lock file held by each child of fuse-wake. When all children close it,
+	// the daemon releases the resources for that job
 	std::string lpath = mpath + "/.l." + name;
+	// Input (as json) to the fuse daemon to setup visible files.
 	std::string ipath = mpath + "/.i." + name;
+	// Result metadata from the daemon
 	std::string opath = mpath + "/.o." + name;
 
 	int ffd = -1;
