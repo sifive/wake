@@ -21,7 +21,7 @@
 
 #include <string>
 
-int run_fuse(
+int run_in_fuse(
 	const std::string& daemon_path,
 	const std::string& working_dir,
 	const std::string& json,

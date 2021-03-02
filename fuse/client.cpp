@@ -20,6 +20,8 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "execpath.h"
 #include "fuse.h"
@@ -41,9 +43,16 @@ int main(int argc, char *argv[])
 		(std::istreambuf_iterator<char>()));
 	if (ifs.fail()) {
 		std::cerr << "read " << argv[1] << ": " << strerror(errno) << std::endl;
-		return 2;
+		return 1;
 	}
 	ifs.close();
+
+	// Open the output file
+	int out_fd = open(result_path.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0664);
+	if (out_fd < 0) {
+		std::cerr << "open " << result_path << ": " << strerror(errno) << std::endl;
+		return 1;
+	}
 
 	const std::string daemon = find_execpath() + "/fuse-waked";
 	const std::string working_dir = get_cwd();
@@ -51,16 +60,15 @@ int main(int argc, char *argv[])
 	// Run the command contained in the json with the fuse daemon filtering
 	// the filesystem view of the workspace dir.
 	// Stdin/out/err will be closed.
-	int res = run_fuse(daemon, working_dir, json, result);
+	int res = run_in_fuse(daemon, working_dir, json, result);
 
 	// Write output as json to argv[2]
-	std::ofstream ofs(result_path, std::ios_base::trunc);
-	if (ofs.fail()) {
-		// stderr was closed by run_fuse().
-		return 3;
-	}
-	ofs << result;
-	ofs.close();
+	ssize_t wrote = write(out_fd, result.c_str(), result.length());
+	if (wrote == -1)
+		return errno;
+
+	if (0 != close(out_fd))
+		return errno;
 
 	return res;
 }
