@@ -37,7 +37,12 @@
 #include "namespace.h"
 #endif
 
-int run_fuse(const std::string& working_dir, const std::string& json, std::string& result_json) {
+int run_fuse(
+	const std::string& daemon_path,
+	const std::string& working_dir,
+	const std::string& json,
+	std::string& result_json)
+{
 	if (0 != chdir(working_dir.c_str())) {
 		std::cerr << "chdir " << working_dir << ": " << strerror(errno) << std::endl;
 		return 1;
@@ -47,8 +52,6 @@ int run_fuse(const std::string& working_dir, const std::string& json, std::strin
 	if (!JAST::parse(json, std::cerr, jast))
 		return 1;
 
-	std::string exedir = find_execpath();
-	std::string daemon = exedir + "/fuse-waked";
 	std::string name  = std::to_string(getpid());
 	// mpath is where the fuse filesystem is mounted
 	std::string mpath = working_dir + "/.fuse";
@@ -65,8 +68,8 @@ int run_fuse(const std::string& working_dir, const std::string& json, std::strin
 		pid_t pid = fork();
 		if (pid == 0) {
 			const char *env[2] = { "PATH=/usr/bin:/bin:/usr/sbin:/sbin", 0 };
-			execle(daemon.c_str(), "fuse-waked", mpath.c_str(), nullptr, env);
-			std::cerr << "execl " << daemon << ": " << strerror(errno) << std::endl;
+			execle(daemon_path.c_str(), "fuse-waked", mpath.c_str(), nullptr, env);
+			std::cerr << "execl " << daemon_path << ": " << strerror(errno) << std::endl;
 			exit(1);
 		}
 		usleep(wait);

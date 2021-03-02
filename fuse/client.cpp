@@ -45,11 +45,13 @@ int main(int argc, char *argv[])
 	}
 	ifs.close();
 
+	const std::string daemon = find_execpath() + "/fuse-waked";
+	const std::string working_dir = get_cwd();
+	std::string result;
 	// Run the command contained in the json with the fuse daemon filtering
 	// the filesystem view of the workspace dir.
-	std::string working_dir = get_cwd();
-	std::string result;
-	int res = run_fuse(working_dir, json, result);
+	// Stdin/out/err will be closed.
+	int res = run_fuse(daemon, working_dir, json, result);
 
 	// Write output as json to argv[2]
 	std::ofstream ofs(result_path, std::ios_base::trunc);
