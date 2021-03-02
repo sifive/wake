@@ -47,8 +47,9 @@ int main(int argc, char *argv[])
 
 	// Run the command contained in the json with the fuse daemon filtering
 	// the filesystem view of the workspace dir.
+	std::string working_dir = get_cwd();
 	std::string result;
-	int res = run_fuse(json, result);
+	int res = run_fuse(working_dir, json, result);
 
 	// Write output as json to argv[2]
 	std::ofstream ofs(result_path, std::ios_base::trunc);

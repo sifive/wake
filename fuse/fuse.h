@@ -21,6 +21,6 @@
 
 #include <string>
 
-int run_fuse(const std::string& json, std::string& result_json);
+int run_fuse(const std::string& working_dir, const std::string& json, std::string& result_json);
 
 #endif
