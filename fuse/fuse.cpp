@@ -27,6 +27,7 @@
 #include <sys/wait.h>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 #include "json5.h"
 #include "execpath.h"
@@ -36,29 +37,7 @@
 #include "namespace.h"
 #endif
 
-int main(int argc, char *argv[])
-{
-	if (argc != 3) {
-		std::cerr << "Syntax: fuse-wake <input-json> <output-json>" << std::endl;
-		return 1;
-	}
-
-	std::ifstream ifs(argv[1]);
-	std::string json(
-		(std::istreambuf_iterator<char>(ifs)),
-		(std::istreambuf_iterator<char>()));
-	if (ifs.fail()) {
-		std::cerr << "read " << argv[1] << ": " << strerror(errno) << std::endl;
-		return 1;
-	}
-	ifs.close();
-
-	std::ofstream ofs(argv[2], std::ios_base::trunc);
-	if (ofs.fail()) {
-		std::cerr << "write " << argv[2] << ": " << strerror(errno) << std::endl;
-		return 1;
-	}
-
+int run_fuse(const std::string& json, std::string& result_json) {
 	JAST jast;
 	if (!JAST::parse(json, std::cerr, jast))
 		return 1;
@@ -81,7 +60,6 @@ int main(int argc, char *argv[])
 	for (int retry = 0; (ffd = open(fpath.c_str(), O_RDONLY)) == -1 && retry < 12; ++retry) {
 		pid_t pid = fork();
 		if (pid == 0) {
-			ofs.close();
 			const char *env[2] = { "PATH=/usr/bin:/bin:/usr/sbin:/sbin", 0 };
 			execle(daemon.c_str(), "fuse-waked", mpath.c_str(), nullptr, env);
 			std::cerr << "execl " << daemon << ": " << strerror(errno) << std::endl;
@@ -118,14 +96,12 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	ijson.close();
-	json.clear();
 
 	struct timeval start;
 	gettimeofday(&start, 0);
 
 	pid_t pid = fork();
 	if (pid == 0) {
-		ofs.close();
 		// Become a target for group death
 		// setpgid(0, 0);
 
@@ -207,11 +183,15 @@ int main(int argc, char *argv[])
 	(void)!write(livefd, &stop, 1); // the ! convinces older gcc that it's ok to ignore the write
 	(void)fsync(livefd);
 
-	if (!JAST::parse(opath.c_str(), ofs, jast))
+	std::stringstream ss;
+	if (!JAST::parse(opath.c_str(), ss, jast)) {
+		// stderr is closed, so report the error on the only output we have
+		result_json = ss.str();
 		return 1;
+	}
 
 	bool first;
-	ofs << "{\"usage\":{\"status\":" << status
+	ss << "{\"usage\":{\"status\":" << status
 	  << ",\"runtime\":" << (stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0)
 	  << ",\"cputime\":" << (rusage.ru_utime.tv_sec + rusage.ru_stime.tv_sec + (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0)
 	  << ",\"membytes\":" << MEMBYTES(rusage)
@@ -221,19 +201,20 @@ int main(int argc, char *argv[])
 
 	first = true;
 	for (auto &x : jast.get("inputs").children) {
-		ofs << (first?"":",") << "\"" << json_escape(x.second.value) << "\"";
+		ss << (first?"":",") << "\"" << json_escape(x.second.value) << "\"";
 		first = false;
 	}
 
-	ofs << "],\"outputs\":[";
+	ss << "],\"outputs\":[";
 
 	first = true;
 	for (auto &x : jast.get("outputs").children) {
-		ofs << (first?"":",") << "\"" << json_escape(x.second.value) << "\"";
+		ss << (first?"":",") << "\"" << json_escape(x.second.value) << "\"";
 		first = false;
 	}
 
-	ofs << "]}" << std::endl;
+	ss << "]}" << std::endl;
+	result_json = ss.str();
 
-	return ofs.fail() ? 1 : 0;
+	return ss.fail() ? 1 : 0;
 }

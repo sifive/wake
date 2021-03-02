@@ -18,8 +18,8 @@ from wake import _
 
 def buildFuse (Pair variant _) =
   def json = common variant
-  def compile = compileC variant json.getSysLibCFlags (source "fuse/namespace.h", json.getSysLibHeaders)
-  def cppFiles = sources "fuse" `(fuse|namespace).cpp`
+  def compile = compileC variant json.getSysLibCFlags (sources "fuse" `.*\.h` ++ json.getSysLibHeaders)
+  def cppFiles = sources "fuse" `(fuse|client|namespace).cpp`
   def objFiles = map compile cppFiles ++ json.getSysLibObjects
   linkO variant json.getSysLibLFlags objFiles "lib/wake/fuse-wake"
 

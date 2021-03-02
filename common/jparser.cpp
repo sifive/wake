@@ -209,7 +209,7 @@ bool JAST::parse(const char *file, std::ostream& errs, JAST &out) {
   }
 }
 
-bool JAST::parse(std::string &body, std::ostream& errs, JAST &out) {
+bool JAST::parse(const std::string &body, std::ostream& errs, JAST &out) {
   JLexer jlex(body);
   out = parse_jvalue(jlex, errs);
   expect(JSON_END, jlex, errs);
