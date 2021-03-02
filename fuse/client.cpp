@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 		(std::istreambuf_iterator<char>()));
 	if (ifs.fail()) {
 		std::cerr << "read " << argv[1] << ": " << strerror(errno) << std::endl;
-		return 1;
+		return 2;
 	}
 	ifs.close();
 
@@ -56,8 +56,8 @@ int main(int argc, char *argv[])
 	// Write output as json to argv[2]
 	std::ofstream ofs(result_path, std::ios_base::trunc);
 	if (ofs.fail()) {
-		std::cerr << "write " << result_path << ": " << strerror(errno) << std::endl;
-		return 1;
+		// stderr was closed by run_fuse().
+		return 3;
 	}
 	ofs << result;
 	ofs.close();
