@@ -53,7 +53,7 @@ struct JAST {
   JAST(SymbolJSON kind_, JChildren &&children_) : kind(kind_), children(std::move(children_)) { }
 
   static bool parse(const char *file,  std::ostream& errs, JAST &out);
-  static bool parse(std::string &body, std::ostream& errs, JAST &out);
+  static bool parse(const std::string &body, std::ostream& errs, JAST &out);
   static bool parse(const char *body, size_t len, std::ostream& errs, JAST &out);
 
   const JAST &get(const std::string &key) const;
