@@ -47,11 +47,11 @@ jobs:
           at: /tmp/workspace
       - run: docker build -f /tmp/workspace/.circleci/dockerfiles/debian-wheezy -t wake-debian-wheezy .
       - run: |
-          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
-          tar xJf wake_*.orig.tar.xz
-          cp -a /tmp/workspace/debian wake-*
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-wheezy debuild -us -uc
-          docker run --rm --mount type=bind,source=$PWD,target=/build wake-debian-wheezy /bin/sh -c "dpkg -i *.deb; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
+          tar xJf wake_*.orig.tar.xz && \
+          cp -a /tmp/workspace/debian wake-* && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-wheezy debuild -us -uc && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-debian-wheezy /bin/sh -c "dpkg -i *.deb; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'" && \
           install -D -t release/debian_wheezy *.deb *.gz *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .

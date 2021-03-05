@@ -6,7 +6,7 @@ License:       Apache-2; MIT; TFL; WTFPL; CC0
 URL:           https://github.com/sifive/wake
 Vendor:        SiFive, Inc.
 Source0:       https://github.com/sifive/wake/releases/%{name}_%{version}.tar.xz
-Requires:      fuse dash
+Requires:      fuse dash squashfuse
 Prefix:        /usr
 BuildRequires: fuse-devel dash sqlite-devel gmp-devel ncurses-devel pkgconfig git gcc gcc-c++ re2-devel
 
@@ -29,6 +29,7 @@ mkdir -p %{buildroot}/var/cache/wake
 
 %files
 /usr/bin/wake
+/usr/bin/wakebox
 /usr/lib/wake
 /usr/share/wake
 /usr/build/wake

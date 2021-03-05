@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 	// Run the command contained in the json with the fuse daemon filtering
 	// the filesystem view of the workspace dir.
 	// Stdin/out/err will be closed.
-	int res = run_in_fuse(daemon, working_dir, json, result);
+	int res = run_in_fuse(daemon, working_dir, json, true, result);
 
 	// Write output as json to argv[2]
 	ssize_t wrote = write(out_fd, result.c_str(), result.length());

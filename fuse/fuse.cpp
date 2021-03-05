@@ -41,6 +41,7 @@ int run_in_fuse(
 	const std::string& daemon_path,
 	const std::string& working_dir,
 	const std::string& json,
+	bool use_stdin_file,
 	std::string& result_json)
 {
 	if (0 != chdir(working_dir.c_str())) {
@@ -126,8 +127,6 @@ int run_in_fuse(
 		env.push_back(0);
 
 		std::string subdir = jast.get("directory").value;
-		std::string stdin = jast.get("stdin").value;
-		if (stdin.empty()) stdin = "/dev/null";
 
 #ifdef __linux__
 
@@ -153,15 +152,19 @@ int run_in_fuse(
 			exit(1);
 		}
 
-		int fd = open(stdin.c_str(), O_RDONLY);
-		if (fd == -1) {
-			std::cerr << "open " << stdin << ":" << strerror(errno) << std::endl;
-			exit(1);
-		}
+		if (use_stdin_file) {
+			std::string stdin = jast.get("stdin").value;
+			if (stdin.empty()) stdin = "/dev/null";
 
-		if (fd != STDIN_FILENO) {
-			dup2(fd, STDIN_FILENO);
-			close(fd);
+			int fd = open(stdin.c_str(), O_RDONLY);
+			if (fd == -1) {
+				std::cerr << "open " << stdin << ":" << strerror(errno) << std::endl;
+				exit(1);
+			}
+			if (fd != STDIN_FILENO) {
+				dup2(fd, STDIN_FILENO);
+				close(fd);
+			}
 		}
 
 		std::string command = find_in_path(arg[0], find_path(env.data()));

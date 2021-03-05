@@ -49,7 +49,7 @@ static:	wake.db
 
 bin/wake:	src/symbol.o $(COMMON)				\
 		$(patsubst %.cpp,%.o,$(wildcard src/*.cpp))	\
-		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c)
+		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c gopt/gopt-arg.c)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
 lib/wake/fuse-wake:	fuse/client.cpp fuse/fuse.cpp fuse/namespace.cpp $(COMMON)
