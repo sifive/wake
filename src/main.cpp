@@ -26,6 +26,7 @@
 #include <sstream>
 #include <random>
 #include <set>
+#include <algorithm>
 #include <inttypes.h>
 #include <stdlib.h>
 #include "parser.h"
@@ -82,6 +83,8 @@ void print_help(const char *argv0) {
     << "    --version        Print the version of wake on standard output"               << std::endl
     << "    --html           Print all wake source files as cross-referenced HTML"       << std::endl
     << "    --globals -g     Print global symbols made available to all wake files"      << std::endl
+    << "    --ctags          Generate ctags file"                                        << std::endl
+    << "    --etags          Generate etags file"                                        << std::endl
     << "    --exports -e     Print symbols exported by the selected package (see --in)"  << std::endl
     << "    --help    -h     Print this help message and exit"                           << std::endl
     << std::endl;
@@ -125,6 +128,8 @@ int main(int argc, char **argv) {
     { 'g', "globals",               GOPT_ARGUMENT_FORBIDDEN },
     { 'e', "exports",               GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "ctags",                 GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "etags",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-target",          GOPT_ARGUMENT_REQUIRED  },
@@ -162,6 +167,8 @@ int main(int argc, char **argv) {
   bool script  = arg(options, "script"  )->count;
   bool version = arg(options, "version" )->count;
   bool html    = arg(options, "html"    )->count;
+  bool ctags   = arg(options, "ctags"   )->count;
+  bool etags   = arg(options, "etags"   )->count;
   bool global  = arg(options, "globals" )->count;
   bool help    = arg(options, "help"    )->count;
   bool debugdb = arg(options, "debug-db")->count;
@@ -255,13 +262,13 @@ int main(int argc, char **argv) {
   }
 
   // Arguments are forbidden with these options
-  bool noargs = init || last || failed || html || global || exports || api || exec;
+  bool noargs = init || last || failed || html || global || ctags || etags || exports || api || exec;
   bool targets = argc == 1 && !noargs;
 
   bool nodb = init;
   bool noparse = nodb || job || output || input || last || failed || tagdag;
   bool notype = noparse || parse;
-  bool noexecute = notype || html || tcheck || dumpssa || global || exports || api || targets;
+  bool noexecute = notype || html || tcheck || dumpssa || global || ctags || etags || exports || api || targets;
 
   if (noargs && argc > 1) {
     std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
@@ -433,13 +440,13 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (global) {
+  if (global || ctags || etags) {
     for (auto &g : top->globals.defs)
       defs.emplace_back(g.first, g.second.qualified);
     for (auto &t : top->globals.topics)
-      defs.emplace_back("topic " + t.first, "topic " + t.second.qualified);
+      defs.emplace_back(t.first, "topic " + t.second.qualified);
     for (auto &t : top->globals.types)
-      types.insert(t.first);
+      defs.emplace_back(t.first, t.second.qualified);
   }
 
   if (exports || api) {
@@ -576,6 +583,10 @@ int main(int argc, char **argv) {
       }
     }
   }
+
+  sort(defs.begin(), defs.end());
+  if (ctags) markup_ctags(std::cout, root.get(), defs);
+  if (etags) markup_etags(std::cout, root.get(), defs);
 
   // Convert AST to optimized SSA
   std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root));
