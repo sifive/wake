@@ -465,7 +465,7 @@ export def makeJSONRunner plan =
           "stdin"       → JString stdin,
           "resources"   → res | map JString | JArray,
           "version"     → JString version,
-          "mounts"      → JArray (
+          "mount-ops"      → JArray (
             JObject (
               "type"        → JString "workspace",
               "destination" → JString ".",
