@@ -91,6 +91,8 @@ static bool validate_mount(
 	static const std::vector<std::string> mount_ops {
 		// must be sorted
 		"bind",
+		"create-dir",
+		"create-file",
 		"pivot-root",
 		"squashfs",
 		"tmpfs",
@@ -212,13 +214,34 @@ static bool mount_squashfs(const std::string& source, const std::string& mountpo
 	return false;
 }
 
+bool create_dir(const std::string& dest) {
+	if (0 == mkdir(dest.c_str(), 0777))
+		return true;
+
+	std::cerr << "mkdir (" << dest << "): " << strerror(errno) << std::endl;
+	return false;
+}
+
+bool create_file(const std::string& dest) {
+	int fd = creat(dest.c_str(), 0777);
+	if (fd < 0) {
+		std::cerr << "creat (" << dest << "): " << strerror(errno) << std::endl;
+		return false;
+	}
+	if (0 != close(fd)) {
+		std::cerr << "close (" << dest << "): " << strerror(errno) << std::endl;
+		return false;
+	}
+	return true;
+}
+
 // Do the mounts specified in the parsed input json.
 // The input/caller responsibility to ensure that the mountpoint exists,
 // that the platform supports the mount type/options, and to correctly order
 // the layered mounts.
 bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_path)
 {
-	for (auto &x : jast.get("mounts").children) {
+	for (auto &x : jast.get("mount-ops").children) {
 		const std::string& op = x.second.get("type").value;
 		const std::string& src = x.second.get("source").value;
 		const std::string& dest = x.second.get("destination").value;
@@ -243,6 +266,12 @@ bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_path)
 		if (op == "squashfs" && !mount_squashfs(src, dest))
 			return false;
 
+		if (op == "create-dir" && !create_dir(dest))
+			return false;
+
+		if (op == "create-file" && !create_file(dest))
+			return false;
+
 	}
 	return true;
 }
@@ -252,7 +281,7 @@ bool get_workspace_dir(
 	const std::string& host_workspace_dir,
 	std::string& out)
 {
-	for (auto &x : jast.get("mounts").children) {
+	for (auto &x : jast.get("mount-ops").children) {
 		const std::string& op = x.second.get("type").value;
 		if (op == "workspace") {
 			std::string after_pivot = x.second.get("after-pivot").value;
