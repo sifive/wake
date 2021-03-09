@@ -86,13 +86,15 @@ static bool bind_mount(const std::string& source, const std::string& destination
 static bool validate_mount(
 	const std::string& op,
 	const std::string& source,
-	const std::string& after_pivot)
+	const std::string& after_pivot,
+	const std::string& username)
 {
 	static const std::vector<std::string> mount_ops {
 		// must be sorted
 		"bind",
 		"create-dir",
 		"create-file",
+		"map-user-id",
 		"pivot-root",
 		"squashfs",
 		"tmpfs",
@@ -105,11 +107,15 @@ static bool validate_mount(
 	}
 
 	if ((op != "bind" && op != "squashfs") && source.length() != 0) {
-		std::cerr << "mount: " << op << " can not have 'source' option" << std::endl;
+		std::cerr << "mount-ops: " << op << " can not have 'source' option" << std::endl;
 		return false;
 	}
 	if (op != "workspace" && after_pivot.length() != 0) {
-		std::cerr << "mount: " << op << " can not have 'after-pivot' option" << std::endl;
+		std::cerr << "mount-ops: " << op << " can not have 'after-pivot' option" << std::endl;
+		return false;
+	}
+	if (op != "map-user-id" && username.length() != 0) {
+		std::cerr << "mount-ops: " << op << " can not have 'username' option" << std::endl;
 		return false;
 	}
 
@@ -235,6 +241,44 @@ bool create_file(const std::string& dest) {
 	return true;
 }
 
+// Write a file that will serve as a 'passwd' file.
+// A temp file is created and bind-mounted (by default) at /etc/passwd and
+// will be automatically removed when this process terminates.
+bool map_user_id(const std::string& username, const std::string& destination) {
+	char name[] = "/tmp/wake.XXXXXX";
+	int fd = mkostemp(name, O_CLOEXEC);
+	if (fd < 0) {
+		std::cerr << "mkstemp: " << strerror(errno) << std::endl;
+		return false;
+	}
+	// We rely on our userid having already changed if it is going to.
+	auto id = std::to_string(getuid());
+	std::string users =
+		username + ":x:" + id + ":" + id +":" + username + ":/home/" + username + ":/bin/sh\n";
+	if (-1 == write(fd, users.c_str(), users.length())) {
+		std::cerr << "write (" << name << "): " << strerror(errno) << std::endl;
+		return false;
+	}
+
+	std::string mountpoint = "/etc/passwd";
+	if (destination.length() > 0)
+		mountpoint = destination;
+	if (!bind_mount(name, mountpoint, false))
+		return false;
+
+	if (0 != close(fd)) {
+		std::cerr << "close (" << name << "): " << strerror(errno) << std::endl;
+		return false;
+	}
+	// Delete the temp file.
+	// It will continue to live only as long as the bind mountpoint.
+	if (0 != unlink(name)) {
+		std::cerr << "unlink (" << name << "): " << strerror(errno) << std::endl;
+		return false;
+	}
+	return true;
+}
+
 // Do the mounts specified in the parsed input json.
 // The input/caller responsibility to ensure that the mountpoint exists,
 // that the platform supports the mount type/options, and to correctly order
@@ -246,9 +290,10 @@ bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_path)
 		const std::string& src = x.second.get("source").value;
 		const std::string& dest = x.second.get("destination").value;
 		const std::string& after_pivot = x.second.get("after-pivot").value;
+		const std::string& username = x.second.get("username").value;
 		bool readonly = x.second.get("read-only").kind == JSON_TRUE;
 
-		if (!validate_mount(op, src, after_pivot))
+		if (!validate_mount(op, src, after_pivot, username))
 			return false;
 
 		if (op == "bind" && !bind_mount(src, dest, readonly))
@@ -270,6 +315,9 @@ bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_path)
 			return false;
 
 		if (op == "create-file" && !create_file(dest))
+			return false;
+
+		if (op == "map-user-id" && !map_user_id(username, dest))
 			return false;
 
 	}
