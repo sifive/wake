@@ -305,11 +305,19 @@ bool setup_user_namespaces(const JAST& jast) {
 
 	uid_t euid = real_euid;
 	gid_t egid = real_egid;
+
+	const std::string id_user = jast.get("user-id").value;
+	if (!id_user.empty())
+		euid = std::stoi(id_user);
+
+	const std::string id_group = jast.get("group-id").value;
+	if (!id_group.empty())
+		egid = std::stoi(id_group);
+
 	int flags = CLONE_NEWNS|CLONE_NEWUSER;
 
 	for (auto &res : jast.get("resources").children) {
 		const std::string &key = res.second.value;
-		if (key == "isolate/user") euid = egid = 0;
 		if (key == "isolate/host") flags |= CLONE_NEWUTS;
 		if (key == "isolate/net") flags |= CLONE_NEWNET;
 	}
