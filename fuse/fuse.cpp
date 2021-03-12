@@ -23,6 +23,7 @@
 #include <signal.h>
 #include <string.h>
 #include <sys/time.h>
+#include <sys/prctl.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <iostream>
@@ -113,6 +114,12 @@ int run_in_fuse(
 
 	pid_t pid = fork();
 	if (pid == 0) {
+		// Kernel to send signal to child process if parent dies
+		if (prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) {
+			std::cerr << "prctl: " << strerror(errno) << std::endl;
+			exit(1);
+		}
+
 		// Become a target for group death
 		// setpgid(0, 0);
 
