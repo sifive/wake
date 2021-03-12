@@ -18,10 +18,17 @@ from wake import _
 
 def buildFuse (Pair variant _) =
   def json = common variant
-  def compile = compileC variant json.getSysLibCFlags (sources "fuse" `.*\.h` ++ json.getSysLibHeaders)
-  def cppFiles = sources "fuse" `(fuse|client|namespace).cpp`
-  def objFiles = map compile cppFiles ++ json.getSysLibObjects
+  def headers = json.getSysLibHeaders ++ sources "fuse" `.*\.h`
+  def client = compileC variant json.getSysLibCFlags headers (source "fuse/client.cpp")
+  def objFiles = client, buildFuseLibObjs variant
   linkO variant json.getSysLibLFlags objFiles "lib/wake/fuse-wake"
+
+def buildFuseLibObjs variant =
+  def json = common variant
+  def headers = json.getSysLibHeaders ++ sources "fuse" `.*\.h`
+  def cppFiles = sources "fuse" `(fuse|namespace).cpp`
+  def compile = compileC variant json.getSysLibCFlags headers
+  map compile cppFiles ++ json.getSysLibObjects
 
 def buildFuseDaemon (Pair variant _) =
   def json = common variant

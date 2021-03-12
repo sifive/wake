@@ -7,8 +7,7 @@
 /wake.spec
 /src/symbol.cpp
 /common/jlexer.cpp
-/bin/wake
-/bin/wake.*
+/bin/wake*
 /src/version.h
 /lib/wake/bsp-wake
 /lib/wake/bsp-wake.*

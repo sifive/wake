@@ -1,5 +1,4 @@
-/* Wake FUSE launcher to capture inputs/outputs
- *
+/*
  * Copyright 2019 SiFive, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,16 +15,17 @@
  * limitations under the License.
  */
 
-#ifndef FUSE_H
-#define FUSE_H
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include <string>
+#include "gopt-arg.h"
 
-int run_in_fuse(
-	const std::string& daemon_path,
-	const std::string& working_dir,
-	const std::string& json,
-	bool use_stdin_file,
-	std::string& result_json);
+struct option *arg(struct option opts[], const char *name) {
+  for (int i = 0; !(opts[i].flags & GOPT_LAST); ++i)
+    if (!strcmp(opts[i].long_name, name))
+      return opts + i;
 
-#endif
+  fprintf(stderr, "Wake option parser bug: %s\n", name);
+  exit(1);
+}

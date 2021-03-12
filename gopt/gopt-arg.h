@@ -1,6 +1,5 @@
-/* Wake FUSE launcher to capture inputs/outputs
- *
- * Copyright 2019 SiFive, Inc.
+/*
+ * Copyright 2021 SiFive, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +15,22 @@
  * limitations under the License.
  */
 
-#ifndef FUSE_H
-#define FUSE_H
+#ifndef GOPT_ARG_H_INCLUDED
+#define GOPT_ARG_H_INCLUDED
 
-#include <string>
+#include "gopt.h"
 
-int run_in_fuse(
-	const std::string& daemon_path,
-	const std::string& working_dir,
-	const std::string& json,
-	bool use_stdin_file,
-	std::string& result_json);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/*
+  Search for an option by long name.
+*/
+struct option *arg(struct option opts[], const char *name);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

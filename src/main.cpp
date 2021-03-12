@@ -38,6 +38,7 @@
 #include "database.h"
 #include "status.h"
 #include "gopt.h"
+#include "gopt-arg.h"
 #include "runtime.h"
 #include "shell.h"
 #include "markup.h"
@@ -86,15 +87,6 @@ void print_help(const char *argv0) {
     << "    --help    -h     Print this help message and exit"                           << std::endl
     << std::endl;
     // debug-db, no-optimize, stop-after-* are secret undocumented options
-}
-
-static struct option *arg(struct option opts[], const char *name) {
-  for (int i = 0; !(opts[i].flags & GOPT_LAST); ++i)
-    if (!strcmp(opts[i].long_name, name))
-      return opts + i;
-
-  std::cerr << "Wake option parser bug: " << name << std::endl;
-  exit(1);
 }
 
 int main(int argc, char **argv) {
