@@ -1,0 +1,9 @@
+FROM centos:8.3.2011
+
+RUN echo fastestmirror=1 >> /etc/dnf/dnf.conf
+RUN dnf clean all
+RUN dnf install -y epel-release
+RUN dnf install -y rpm-build rpm-devel rpmlint make python36 bash diffutils patch rpmdevtools tar xz dash git which make gcc gcc-c++ fuse fuse-devel gmp-devel ncurses-devel sqlite-devel re2-devel squashfuse
+RUN rpmdev-setuptree
+
+WORKDIR /build

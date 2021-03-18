@@ -17,6 +17,8 @@ make/tup/bazel/etc, you probably need wake.
 If you don't want to waste time rebuilding things that don't need it,
 or that your colleagues already built, you might appreciate wake.
 
+%global debug_package %{nil}
+
 %prep
 %setup -q
 
