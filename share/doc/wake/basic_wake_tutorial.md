@@ -6,7 +6,14 @@
 
 2. Run command for wake: `wake -vx '<function_name> <parameter_if_any>'`
 
-* If you want to display a string you can that using the below function by writing the string to be displayed inisde "" and call the function abc . Ex: wake -x 'abc'
+3. To know about various wake options run `wake --help`. `v` stands for verbosity and `x` stands for execute the expression.
+
+4. Create a file with `.wake` extension and copy the functions mentioned in this tutorial and run them using `wake` command in the terminal.  
+
+5. For more information on wake library click [here](https://sifive.github.io/wake/)
+
+### wake `Hello World`
+* If you want to display a string you can do that using the below function by writing the string to be displayed inside "" and call the function abc . Ex: `wake -x 'abc'`. This will call the function `abc` and prints `Hello World`. 
 ```
 def abc = "Hello World"
 ```
@@ -14,8 +21,8 @@ def abc = "Hello World"
 * The other way to do this is `wake -x '"Hello World"'`
 
 ### Defining Functions
-A function may be defines using the keyword def. Simple function definition takes the form
-`def <fun name> <parameter> = <expression>`
+A function may be defined using the keyword `def`. Simple function definition takes the form
+`def <function name> <parameter list> = <expression>`
 
 * Below function  double takes an argment x and gives the output by multiplying the x by 2
 ```
@@ -32,7 +39,7 @@ def triple x = 3*x
 def inc x = x+1
 ```
 
-* Function adda takes an argument of type string and concantenates it with b and gives the output
+* Function adda takes an argument of type string and concatenates it with b and gives the output. `{ }` is the string interpolation operator
 ```
 def adda s = "{s}b"
 ```
@@ -42,17 +49,17 @@ def adda s = "{s}b"
 def times4 x = double (double x)
 ```
 
-* Function aveI takes 2 arguments x and y and adds two values and divide the result by 2. This function shows the other was of defining the parameters using lambda operator
+* Function aveI(averageOfInteger) takes 2 arguments x and y and adds two values and divide the result by 2. This function shows the other was of defining the parameters using lambda operator. The traditional way of defining the parameter is `def aveI x y = (x+y)/2`. Either of them are logically same.
 ```
 def aveI = \x\y (x+y)/2
 ```
 
-* Function aveR takes 2 arguments of type double and divides the result by 2
+* Function aveR(averageOfReal) takes 2 arguments of type double and divides the result by 2
 ```
 def aveR = \x\y (x +. y) /. 2.0
 ```
 
-* Function aveR adds 2 values and provides the remainder 
+* Function aveM(Modulus) adds 2 values and provides the remainder 
 ```
 def aveM = \x\y (x+y) % 2
 ```
@@ -62,22 +69,36 @@ def aveM = \x\y (x+y) % 2
 def duplicate s  ="{s}{s}"
 ```
 
-* integerToUnicode function takes the ASCII input and provides its equivalent character
+* integerToUnicode is a `wake built-in function` which takes the ASCII input and provides its equivalent character
 ```
 wake -x 'integerToUnicode 99'
 ```
 
-* unicodeToInteger function gives the ASCII value of the given character
+* unicodeToInteger is a `wake built-in function` which gives the ASCII value of the given character.
 ```
 wake -x 'unicodeToInteger "a"'
 ```
 
-* strlen function returns the length of the given string
+* strlen is a `wake built-in function` which returns the length of the given string.
 ```
 wake -x 'strlen "abcde"'
 ```
 
-* Below function takes a string and returns the middle character of the string
+* `|`is the pipeFn which takes the argument from the left hand side of the `|` and provides it to the right hand side function. This makes the function to be more readable. `(a(b(c(d))))` is represented as `d | c | b | a`. In both the cases d is evaluated first then followed by c , b and a.
+
+### Wake Built-In Functions
+Few of the commonly used built-in functions in this tutorial is given below
+* `explode` breaks the string into a list of string character.
+* `take` takes first `n` elements in the list.
+* `drop` drops first `n` elements in the list.
+* `reverse` reverses the elements in the list.
+* `head` returns the first element in the list.
+* `tail` returns the list by removing the `head`.
+* `cat` concatenates the elements in list of string to a string. 
+* `prepend` places the given data at the begining(head) of the given list
+* `append` appends the given data at the end of the given list  
+
+* Below function takes a string and returns the middle character of the string.
 ```
 def middle fullstring =
   def len = if (strlen fullstring % 2 == 0) then (strlen fullstring / 2) else  ((strlen fullstring / 2) + 1)
@@ -85,7 +106,7 @@ def middle fullstring =
   outputstr
 ```
 
-* Below function takes a string and returns the string removing the first and last character
+* Below function takes a string and returns the string removing the first and last character.
 ```
 def dtrunc fullstring =
   def len = strlen fullstring
@@ -128,10 +149,21 @@ wake -x '"bad"| explode | drop 1| prepend "c" | cat'
 ```
 ### Tuple
 A tuple is collection of items of different types. `get`,`set` and `edit` are the three inbuilt methods that can be used with the tuples.
-* Below example shows the declaration of a tuple. For more information about the tuple look into wake database
+* Below example shows the declaration of a tuple. 
 ```
-def abcd = 1;"xx";1e5;Unit
+tuple Collection =
+  global IntValue : Integer
+  global DoubleValue : Double
+  global StringValue : String
 ```
+
+`set<tuple name><field Name>` 
+`set` operation sets(writes) value to the tuple field
+`get<tuple name><field Name>` 
+`get` operation gets(reads) value to the tuple field
+`edit<tuple name><field Name>` 
+`edit` operation moidfies value to the tuple field
+
 ### List
 A List is a sequence of items of same type. Empty list returns `Nil`. `head` returns the first element in the list. `tail` returns the rest of the list without the `head`. 
 * Example shows how to prepend the list of integers with the given value
@@ -142,7 +174,7 @@ def listprepend data1 = prepend data1 d
 
 * Example creates a list of given elements
 ```
-def fone xx = xx,xx,xx,Nil
+def listcreate xx = xx,xx,xx,Nil
 ```
 * Try out these examples
 ```
@@ -193,7 +225,7 @@ wake -x 'cat((tail (explode "seat")) ++(take 1(explode "seat")))'
 def madeup a b c =  (b + strlen c), a 
 ```
 
-* Below example multiplies a given number by 6. The other way to implement this is (def times6 x = double x | triple) 
+* Below example multiplies a given number by 6. The other way to implement this is `def times6 x = double x | triple`
 ```
 def times6 x = triple (double x)
 ```
