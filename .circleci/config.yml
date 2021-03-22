@@ -28,9 +28,9 @@ jobs:
           at: /tmp/workspace
       - run: docker build -f /tmp/workspace/.circleci/dockerfiles/alpine -t wake-alpine .
       - run: |
-          tar xJf /tmp/workspace/wake_*.tar.xz
-          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine make -C wake-* static
-          docker run --rm --mount type=bind,source=$PWD,target=/build wake-alpine /bin/sh -c "tar xJf wake-*/wake-static_*; ./wake-*/bin/wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          tar xJf /tmp/workspace/wake_*.tar.xz && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine make -C wake-* static && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-alpine /bin/sh -c "tar xJf wake-*/wake-static_* && ./wake-*/bin/wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'" && \
           install -D -t release/alpine wake-*/wake-static_*
       - persist_to_workspace:
           root: .
@@ -51,7 +51,7 @@ jobs:
           tar xJf wake_*.orig.tar.xz && \
           cp -a /tmp/workspace/debian wake-* && \
           docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-wheezy debuild -us -uc && \
-          docker run --rm --mount type=bind,source=$PWD,target=/build wake-debian-wheezy /bin/sh -c "dpkg -i *.deb; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'" && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-debian-wheezy /bin/sh -c "dpkg -i *.deb && wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'" && \
           install -D -t release/debian_wheezy *.deb *.gz *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
@@ -68,11 +68,11 @@ jobs:
           at: /tmp/workspace
       - run: docker build -f /tmp/workspace/.circleci/dockerfiles/debian-testing -t wake-debian-testing .
       - run: |
-          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
-          tar xJf wake_*.orig.tar.xz
-          cp -a /tmp/workspace/debian wake-*
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-testing debuild -us -uc
-          docker run --rm --mount type=bind,source=$PWD,target=/build wake-debian-testing /bin/sh -c "dpkg -i *.deb; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
+          tar xJf wake_*.orig.tar.xz && \
+          cp -a /tmp/workspace/debian wake-* && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-testing debuild -us -uc && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-debian-testing /bin/sh -c "dpkg -i *.deb && wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'" && \
           install -D -t release/debian_testing *.deb *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
@@ -89,14 +89,31 @@ jobs:
           at: /tmp/workspace
       - run: docker build -f /tmp/workspace/.circleci/dockerfiles/centos-7.6 -t wake-centos-7.6 .
       - run: |
-          cp /tmp/workspace/wake_*.tar.xz .
-          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-7.6 rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz
-          docker run --rm --mount type=bind,source=$PWD,target=/build wake-centos-7.6 /bin/sh -c "rpm -i x86_64/*.rpm; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          cp /tmp/workspace/wake_*.tar.xz . && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-7.6 rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-centos-7.6 /bin/sh -c "rpm -i x86_64/*.rpm && wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'" && \
           install -D -t release/centos_7_6 x86_64/*.rpm
       - persist_to_workspace:
           root: .
           paths:
             - release/centos_7_6
+
+  centos_8_3:
+    machine:
+      image: ubuntu-1604:202007-01
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/centos-8.3 -t wake-centos-8.3 .
+      - run: |
+          cp /tmp/workspace/wake_*.tar.xz . && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-centos-8.3 rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz &&\
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-centos-8.3 /bin/sh -c "rpm -i x86_64/*.rpm && wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'" && \
+          install -D -t release/centos_8_3 x86_64/*.rpm
+      - persist_to_workspace:
+          root: .
+          paths:
+            - release/centos_8_3
 
   ubuntu_14_04:
     machine:
@@ -108,11 +125,11 @@ jobs:
           at: /tmp/workspace
       - run: docker build -f /tmp/workspace/.circleci/dockerfiles/ubuntu-14.04 -t wake-ubuntu-14.04 .
       - run: |
-          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
-          tar xJf wake_*.orig.tar.xz
-          cp -a /tmp/workspace/debian wake-*
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-ubuntu-14.04 debuild -us -uc
-          docker run --rm --mount type=bind,source=$PWD,target=/build wake-ubuntu-14.04 /bin/sh -c "dpkg -i *.deb; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
+          tar xJf wake_*.orig.tar.xz && \
+          cp -a /tmp/workspace/debian wake-* && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-ubuntu-14.04 debuild -us -uc && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-ubuntu-14.04 /bin/sh -c "dpkg -i *.deb && wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'" && \
           install -D -t release/ubuntu_14_04 *.deb *.gz *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
@@ -129,11 +146,11 @@ jobs:
           at: /tmp/workspace
       - run: docker build -f /tmp/workspace/.circleci/dockerfiles/ubuntu-16.04 -t wake-ubuntu-16.04 .
       - run: |
-          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
-          tar xJf wake_*.orig.tar.xz
-          cp -a /tmp/workspace/debian wake-*
-          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /build/$(ls -d wake-*) wake-ubuntu-16.04 debuild -us -uc
-          docker run --rm --mount type=bind,source=$PWD,target=/build wake-ubuntu-16.04 /bin/sh -c "dpkg -i *.deb; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
+          tar xJf wake_*.orig.tar.xz && \
+          cp -a /tmp/workspace/debian wake-* && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /build/$(ls -d wake-*) wake-ubuntu-16.04 debuild -us -uc && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-ubuntu-16.04 /bin/sh -c "dpkg -i *.deb && wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'" && \
           install -D -t release/ubuntu_16_04 *.deb *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
@@ -150,11 +167,11 @@ jobs:
           at: /tmp/workspace
       - run: docker build -f /tmp/workspace/.circleci/dockerfiles/ubuntu-18.04 -t wake-ubuntu-18.04 .
       - run: |
-          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz"
-          tar xJf wake_*.orig.tar.xz
-          cp -a /tmp/workspace/debian wake-*
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-ubuntu-18.04 debuild -us -uc
-          docker run --rm --mount type=bind,source=$PWD,target=/build wake-ubuntu-18.04 /bin/sh -c "dpkg -i *.deb; wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'"
+          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
+          tar xJf wake_*.orig.tar.xz && \
+          cp -a /tmp/workspace/debian wake-* && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-ubuntu-18.04 debuild -us -uc && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build wake-ubuntu-18.04 /bin/sh -c "dpkg -i *.deb && wake --no-workspace -x 'shellJob \"ls /\" Nil | getJobStdout'" && \
           install -D -t release/ubuntu_18_04 *.deb *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
@@ -208,6 +225,9 @@ workflows:
       - centos_7_6:
           requires:
             - tarball
+      - centos_8_3:
+          requires:
+            - tarball
       - ubuntu_14_04:
           requires:
             - tarball
@@ -223,6 +243,7 @@ workflows:
             - debian_testing # Newest everything
             - debian_wheezy  # Oldest supported compiler
             - centos_7_6
+            - centos_8_3
             - ubuntu_14_04   # LTS
             - ubuntu_16_04   # LTS
             - ubuntu_18_04   # LTS
