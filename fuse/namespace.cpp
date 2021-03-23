@@ -85,15 +85,13 @@ static bool bind_mount(const std::string& source, const std::string& destination
 
 static bool validate_mount(
 	const std::string& op,
-	const std::string& source,
-	const std::string& after_pivot)
+	const std::string& source)
 {
 	static const std::vector<std::string> mount_ops {
 		// must be sorted
 		"bind",
 		"create-dir",
 		"create-file",
-		"pivot-root",
 		"squashfs",
 		"tmpfs",
 		"workspace"
@@ -106,10 +104,6 @@ static bool validate_mount(
 
 	if ((op != "bind" && op != "squashfs") && source.length() != 0) {
 		std::cerr << "mount: " << op << " can not have 'source' option" << std::endl;
-		return false;
-	}
-	if (op != "workspace" && after_pivot.length() != 0) {
-		std::cerr << "mount: " << op << " can not have 'after-pivot' option" << std::endl;
 		return false;
 	}
 
@@ -241,38 +235,51 @@ bool create_file(const std::string& dest) {
 // the layered mounts.
 bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_path)
 {
+	std::string mount_prefix;
+
 	for (auto &x : jast.get("mount-ops").children) {
 		const std::string& op = x.second.get("type").value;
 		const std::string& src = x.second.get("source").value;
 		const std::string& dest = x.second.get("destination").value;
-		const std::string& after_pivot = x.second.get("after-pivot").value;
 		bool readonly = x.second.get("read-only").kind == JSON_TRUE;
 
-		if (!validate_mount(op, src, after_pivot))
+		if (dest == "/") {
+			// All mount ops from here onward will have a prefixed destination.
+			// The prefix will be pivoted to after the final mount op.
+			mount_prefix = "/tmp/.wakebox-mount";
+			// Re-use if it already exists.
+			if (0 != mkdir(mount_prefix.c_str(), 0777) && errno != EEXIST) {
+				std::cerr << "mkdir (" << mount_prefix << "): " << strerror(errno) << std::endl;
+				return false;
+			}
+		}
+		const std::string& target = mount_prefix + dest;
+
+		if (!validate_mount(op, src))
 			return false;
 
-		if (op == "bind" && !bind_mount(src, dest, readonly))
+		if (op == "bind" && !bind_mount(src, target, readonly))
 			return false;
 
-		if (op == "workspace" && !bind_mount(fuse_mount_path, dest, false))
+		if (op == "workspace" && !bind_mount(fuse_mount_path, target, false))
 			return false;
 
-		if (op == "pivot-root" && !do_pivot(dest))
+		if (op == "tmpfs" && !mount_tmpfs(target))
 			return false;
 
-		if (op == "tmpfs" && !mount_tmpfs(dest))
+		if (op == "squashfs" && !mount_squashfs(src, target))
 			return false;
 
-		if (op == "squashfs" && !mount_squashfs(src, dest))
+		if (op == "create-dir" && !create_dir(target))
 			return false;
 
-		if (op == "create-dir" && !create_dir(dest))
+		if (op == "create-file" && !create_file(target))
 			return false;
-
-		if (op == "create-file" && !create_file(dest))
-			return false;
-
 	}
+
+	if (!mount_prefix.empty() && !do_pivot(mount_prefix))
+		return false;
+
 	return true;
 }
 
@@ -284,15 +291,10 @@ bool get_workspace_dir(
 	for (auto &x : jast.get("mount-ops").children) {
 		const std::string& op = x.second.get("type").value;
 		if (op == "workspace") {
-			std::string after_pivot = x.second.get("after-pivot").value;
-			if (after_pivot.length() > 0) {
-				out = after_pivot;
-			} else {
-				out = x.second.get("destination").value;
-				// convert a workspace relative path into absolute path
-				if (out.at(0) != '/')
-					out = host_workspace_dir + "/" + out;
-			}
+			out = x.second.get("destination").value;
+			// convert a workspace relative path into absolute path
+			if (out.at(0) != '/')
+				out = host_workspace_dir + "/" + out;
 			return true;
 		}
 	}
