@@ -73,12 +73,18 @@ int main(int argc, char *argv[])
 	}
 	ifs.close();
 
-	const std::string daemon = find_execpath() + "/../lib/wake/fuse-waked";
-	const std::string working_dir = get_cwd();
+	fuse_args args;
+	if (!json_as_struct(json, args)) {
+		return 1;
+	}
+	args.daemon_path = find_execpath() + "/../lib/wake/fuse-waked";
+	args.working_dir = get_cwd();
+	args.use_stdin_file = use_stdin_file;
+
 	std::string result;
 
 	if (!has_output)
-		return run_in_fuse(daemon, working_dir, json, use_stdin_file, result);
+		return run_in_fuse(args, result);
 
 	// Open the output file
 	int out_fd = open(result_path, O_WRONLY | O_CREAT | O_CLOEXEC, 0664);
@@ -87,7 +93,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	int res = run_in_fuse(daemon, working_dir, json, use_stdin_file, result);
+	int res = run_in_fuse(args, result);
 	// write output stats as json
 	ssize_t wrote = write(out_fd, result.c_str(), result.length());
 	if (wrote == -1)
