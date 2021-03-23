@@ -2,27 +2,44 @@
 
 ### Invoking wake
 
-1. Create a wake database: `wake --init .`
+1. Create a folder inside `/scratch` directory. `mkdir /scratch/<your_name>/wake_tutorial`.
 
-2. Run command for wake: `wake -vx '<function_name> <parameter_if_any>'`
+2. `cd` into the directory. `cd /scratch/<your_name>/wake_tutorial`.
 
-3. To know about various wake options run `wake --help`. `v` stands for verbosity and `x` stands for execute the expression.
+3. Create a wake database: `wake --init .`.After this you will see a `wake.db` file created inside the folder.
 
-4. Create a file with `.wake` extension and copy the functions mentioned in this tutorial and run them using `wake` command in the terminal.  
+4. Create a file with `.wake` extension and copy the functions mentioned in this tutorial and run using `wake` command in the terminal as mentioned in Step 5.  
 
-5. For more information on wake library click [here](https://sifive.github.io/wake/)
+5. Run command for wake: `wake -vx '<function_name> <parameter_if_any>'`. Ex: `wake -x 'double 2'`.
+   
+   `v` stands for verbosity and `x` stands for execute the expression.
+
+6. To know about various wake options run `wake --help`. 
+
+7. For more information on wake library click [here](https://sifive.github.io/wake/).
 
 ### wake `Hello World`
-* If you want to display a string you can do that using the below function by writing the string to be displayed inside "" and call the function abc . Ex: `wake -x 'abc'`. This will call the function `abc` and prints `Hello World`. 
+* If you want to display a string you can do that using the below function by writing the string to be displayed inside "" and call the function `abc`.
+
+Copy the below function into a `.wake` file you created in step 4
 ```
 def abc = "Hello World"
 ```
+Then execute the following command 
+```
+wake -x 'abc'
+```
+This will call the function `abc` and print `Hello World`.
 
-* The other way to do this is `wake -x '"Hello World"'`
+* You can also do this without a `.wake` file by doing it all in one command: `wake -x '"Hello World"'`
 
 ### Defining Functions
-A function may be defined using the keyword `def`. Simple function definition takes the form
+A function should be defined using the keyword `def`. Simple function definition takes the form
 `def <function name> <parameter list> = <expression>`
+
+We cannot specify explicitly the return type and type of the parameters. Usually when the function body is of multi-line the return value is specified by the last line in the function.
+
+Note: The only thing you can define functions are using `def` keyword. In wake we deal everything with functions.
 
 * Below function  double takes an argment x and gives the output by multiplying the x by 2
 ```
@@ -48,6 +65,8 @@ def adda s = "{s}b"
 ```
 def times4 x = double (double x)
 ```
+#### lambda operator (\)
+The lambda operator can be used to define paramaters of a function. 
 
 * Function aveI(averageOfInteger) takes 2 arguments x and y and adds two values and divide the result by 2. This function shows the other was of defining the parameters using lambda operator. The traditional way of defining the parameter is `def aveI x y = (x+y)/2`. Either of them are logically same.
 ```
@@ -63,6 +82,22 @@ def aveR = \x\y (x +. y) /. 2.0
 ```
 def aveM = \x\y (x+y) % 2
 ```
+### Wake Built-In Functions
+Few of the commonly used built-in functions in this tutorial is given below
+#### Operation on String
+* `explode` breaks a string into a list of string character.
+* `strlen` returns the length of the given string.
+* `cat` concatenates the elements in list of string to a string. 
+#### Operation on List
+* `take` takes first `n` elements in the list.
+* `drop` drops first `n` elements in the list.
+* `reverse` reverses the elements in the list.
+* `head` returns the first element in the list.
+* `tail` returns the list by removing the `head`.
+* `prepend` places the given data at the begining(head) of the given list.
+* `append` appends the given data at the end of the given list.
+* `++` concatenates any number of list into a single list.
+* `len` returns the length of the given list.
 
 * Function duplicate concantenates or copies a given string twice
 ```
@@ -84,37 +119,53 @@ wake -x 'unicodeToInteger "a"'
 wake -x 'strlen "abcde"'
 ```
 
-* `|`is the pipeFn which takes the argument from the left hand side of the `|` and provides it to the right hand side function. This makes the function to be more readable. `(a(b(c(d))))` is represented as `d | c | b | a`. In both the cases d is evaluated first then followed by c , b and a.
+### List
+A List is a sequence of items of same type. Empty list returns `Nil`. `head` returns the first element in the list. `tail` returns the rest of the list without the `head`. 
+* Example shows how to prepend the list of integers with the given value
+```
+def d = 1,2,3,Nil
+def listprepend data1 = prepend data1 d
+```
 
-### Wake Built-In Functions
-Few of the commonly used built-in functions in this tutorial is given below
-* `explode` breaks the string into a list of string character.
-* `take` takes first `n` elements in the list.
-* `drop` drops first `n` elements in the list.
-* `reverse` reverses the elements in the list.
-* `head` returns the first element in the list.
-* `tail` returns the list by removing the `head`.
-* `cat` concatenates the elements in list of string to a string. 
-* `prepend` places the given data at the begining(head) of the given list
-* `append` appends the given data at the end of the given list  
+* Example creates a list of given elements
+```
+def listcreate xx = xx,xx,xx,Nil
+```
+
+### Type Inference
+* Here the paramater c has to be string since function strlen as been applied to it, and b has to be integer as it is being added to the output of `strlen c` and a is list of integers which prepends the output of `(b + strlen c)`.
+```
+def madeup a b c =  (b + strlen c), a 
+```
+
+#### Parenthesis vs Pipe
+* `|`is the pipeFn which takes the argument from the left hand side of the `|` and provides it to the right hand side function. This makes the function to be more readable. `(a(b(c(d))))` is represented as `d | c | b | a`. In both the cases d is evaluated first then followed by c , b and a.
+```
+def reversestring s = cat (reverse (explode (s)))
+```
+
+The same can be expressed with the pipe function as below
+```
+def reversestring s = s | explode | reverse | cat
+```
 
 * Below function takes a string and returns the middle character of the string.
 ```
 def middle fullstring =
-  def len = if (strlen fullstring % 2 == 0) then (strlen fullstring / 2) else  ((strlen fullstring / 2) + 1)
-  def outputstr = explode fullstring | take len | reverse | head 
+  def slength = if (strlen fullstring % 2 == 0) then (strlen fullstring / 2) else  ((strlen fullstring / 2) + 1)
+  def outputstr = explode fullstring | take slength | reverse | head 
   outputstr
 ```
 
 * Below function takes a string and returns the string removing the first and last character.
 ```
 def dtrunc fullstring =
-  def len = strlen fullstring
-  def outputstr = explode fullstring | take (len-1) | tail | cat
+  def slength = strlen fullstring
+  def outputstr = explode fullstring | take (slength-1) | tail | cat
   outputstr
 ```
 
-* Function incfirst takes a string and a character string and replaces the first character of the string with the given character string
+* Function incfirst takes a string and a character and replaces the first character of the string with the given character
 ```
 def incfirst fullstring chrstr = explode fullstring | tail | prepend chrstr | cat
 ```
@@ -164,19 +215,7 @@ tuple Collection =
 `edit<tuple name><field Name>` 
 `edit` operation moidfies value to the tuple field
 
-### List
-A List is a sequence of items of same type. Empty list returns `Nil`. `head` returns the first element in the list. `tail` returns the rest of the list without the `head`. 
-* Example shows how to prepend the list of integers with the given value
-```
-def d = 1,2,3,Nil
-def listprepend data1 = prepend data1 d
-```
-
-* Example creates a list of given elements
-```
-def listcreate xx = xx,xx,xx,Nil
-```
-* Try out these examples
+* Try out these examples which act on strings
 ```
 wake -x '"south" | explode | take 1| cat'
 wake -x '"north"| explode | tail | take 1 | cat'
@@ -199,6 +238,9 @@ def roll s = "{fourth s}{first s}{second s}{third s}"
 def exch s = "{second s}{first s}{third s}{fourth s}"
 ```
 
+### Map
+Map is a higher order function which takes a function and applies the same to every element in the list.
+
 * Below example shows how to declare a list of strings and apply map function to it. Map is a predefined function that maps to the every element in the list
 ```
 def words = "ache", "vile", "amid", "evil", "ogre" , Nil
@@ -217,12 +259,6 @@ def fd fullstring = fullstring | exch | fc | exch
 * This examples convert the string "seat" -> "eats"
 ```
 wake -x 'cat((tail (explode "seat")) ++(take 1(explode "seat")))'
-```
-
-### Type Inference
-* Here the paramater c has to be string since function strlen as been applied to it, and b has to be integer as it is being added and a also should be an integer because it is list of integers 
-```
-def madeup a b c =  (b + strlen c), a 
 ```
 
 * Below example multiplies a given number by 6. The other way to implement this is `def times6 x = double x | triple`
@@ -253,10 +289,30 @@ def op9 = map double (1,2,3,Nil) | map inc
 def sumadd x y = x+y 
 ```
 ### Pattern Matching
+The first thing that comes to mind is string matching. It is similar to the Switch statement where it will check for the matching case and outputs appropriate results.
 ```
 def past = match _
   "run" = "ran"
   n = cat(n,"ed",Nil)
+```
+
+* Compares the given string and outputs the appropriate string
+```
+def past2 = match _
+  "run" = "ran"
+  "swim" = "swam"
+  n = "{n}ed"
+```
+
+* Compares the given string and outputs the appropriate string
+```
+def franglais = match _
+  "house" = "maison"
+  "dog" = "chien"
+  "beware" = "regarde"
+  "at" = "dans"
+  "the"= "le"
+   n = n
 ```
 
 ### Recursive function
@@ -446,14 +502,6 @@ def diff n m = match n m
 * Concantenates the given string with "ed"
 `def past1 n = "{n}ed"`
 
-* Compares the given string and outputs the appropriate string(Pattern Matching)
-```
-def past2 = match _
-  "run" = "ran"
-  "swim" = "swam"
-  n = "{n}ed"
-```
-
 * Multiplies every element in a list by 2
 `def multiply n = n | map (\x 2*x)`
 
@@ -474,17 +522,6 @@ def past2 = match _
 
 * Convert the String separated by spaces  into list of string 
 `def lex s = s | tokenize ` ``
-
-* Compares the given string and outputs the appropriate string(Pattern Matching)
-```
-def franglais = match _
-  "house" = "maison"
-  "dog" = "chien"
-  "beware" = "regarde"
-  "at" = "dans"
-  "the"= "le"
-   n = n
-```
 
 * Doubles every element in the list
 ```
@@ -518,8 +555,7 @@ def takespace n = match n
   Nil = Nil
   h,t = if (h ==* " ") then h,takespace t else Nil
 ```
-### Map
-map is a higher order function which takes a function and applies the same to every element in the list.
+
 * Concantenates every list of string with "io"
 `def map1 n = n | map (\s "{s}io")`
 
@@ -606,6 +642,7 @@ def median l =
 ```
 
 ### Queues
+Wake doesnt have a built-in queue. Examples shows how to create a queue and few functions that can act on queue. 
 The front of the queue is at the right, nearest the bus stop, items are added to the left. Consider the bus queue shown, boris is at the front of the queue, ivan is last. 
 `"ivan" $$ "tanya" $$ "boris" $$ P`
 * Created a data type Queue which is nothing but a FIFO.
@@ -653,6 +690,7 @@ def doomsday = match _
   q = front q $$ doomsday (remove q)
 ```
 ## Tree
+Tree is also one of the data structure that represent hierarchical data. The topmost node is known as root node. Every node contains some data.
 Tree is already implemented in wake by default.
 * Creates a Tree from a list
 `wake -x 'seq 5 |map str| listToTree (_ <=>* _)'`
