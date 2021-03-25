@@ -41,6 +41,23 @@ We cannot specify explicitly the return type and type of the parameters. Usually
 
 Note: The only thing you can define functions are using `def` keyword. In wake we deal everything with functions.
 
+#### Few operators that work on Integer data type
+* `+` Addition Operator
+* `-` Subtraction Operator
+* `*` Multiplication Operator
+* `/` Division Operator
+* `^` Exponent Operator
+* `%` Modulus Operator
+* `>>` Right shift Operator
+* `<<` Left shift Operator
+
+#### Few operators that work on Double data type
+* `+.` Addition Operator
+* `-.` Subtraction Operator
+* `*.` Multiplication Operator
+* `/.` Division Operator
+* `^.` Exponent Operator
+
 * Below function  double takes an argment x and gives the output by multiplying the x by 2
 ```
 def double x = 2*x
@@ -65,6 +82,17 @@ def adda s = "{s}b"
 ```
 def times4 x = double (double x)
 ```
+
+* Adds 2 integer values and gives out the result
+```
+def sumadd x y = x+y 
+```
+
+* power 2 3 = 8
+```
+def power x n = x^n
+```
+
 #### lambda operator (\)
 The lambda operator can be used to define paramaters of a function. 
 
@@ -82,6 +110,7 @@ def aveR = \x\y (x +. y) /. 2.0
 ```
 def aveM = \x\y (x+y) % 2
 ```
+
 ### Wake Built-In Functions
 Few of the commonly used built-in functions in this tutorial is given below
 #### Operation on String
@@ -120,16 +149,22 @@ wake -x 'strlen "abcde"'
 ```
 
 ### List
-A List is a sequence of items of same type. Empty list returns `Nil`. `head` returns the first element in the list. `tail` returns the rest of the list without the `head`. 
+A List is a sequence of items of same type. Empty list returns `Nil`. `head` returns the first element in the list. `tail` returns the rest of the list without the `head`.
+
+* Example creates a list of given elements
+```
+def listcreate xx = xx,xx,xx,Nil
+```
+ 
 * Example shows how to prepend the list of integers with the given value
 ```
 def d = 1,2,3,Nil
 def listprepend data1 = prepend data1 d
 ```
 
-* Example creates a list of given elements
+* concantenates 2 lists using ++ operator
 ```
-def listcreate xx = xx,xx,xx,Nil
+wake -x '(1,2,3,Nil) ++ (4,5,6,Nil)'
 ```
 
 ### Type Inference
@@ -198,22 +233,6 @@ wake -x '"been"| explode | take 3| cat'
 ```
 wake -x '"bad"| explode | drop 1| prepend "c" | cat' 
 ```
-### Tuple
-A tuple is collection of items of different types. `get`,`set` and `edit` are the three inbuilt methods that can be used with the tuples.
-* Below example shows the declaration of a tuple. 
-```
-tuple Collection =
-  global IntValue : Integer
-  global DoubleValue : Double
-  global StringValue : String
-```
-
-`set<tuple name><field Name>` 
-`set` operation sets(writes) value to the tuple field
-`get<tuple name><field Name>` 
-`get` operation gets(reads) value to the tuple field
-`edit<tuple name><field Name>` 
-`edit` operation moidfies value to the tuple field
 
 * Try out these examples which act on strings
 ```
@@ -238,16 +257,6 @@ def roll s = "{fourth s}{first s}{second s}{third s}"
 def exch s = "{second s}{first s}{third s}{fourth s}"
 ```
 
-### Map
-Map is a higher order function which takes a function and applies the same to every element in the list.
-
-* Below example shows how to declare a list of strings and apply map function to it. Map is a predefined function that maps to the every element in the list
-```
-def words = "ache", "vile", "amid", "evil", "ogre" , Nil
-def mapping words = words | map roll
-def mapping2 words = map exch words
-```
-
 * Try out these examples and record the results
 ```
 def what fullstring = fullstring| roll | roll | roll| exch |  roll
@@ -261,15 +270,43 @@ def fd fullstring = fullstring | exch | fc | exch
 wake -x 'cat((tail (explode "seat")) ++(take 1(explode "seat")))'
 ```
 
-* Below example multiplies a given number by 6. The other way to implement this is `def times6 x = double x | triple`
+### Tuple
+A tuple is collection of items of different types. `get`,`set` and `edit` are the three inbuilt methods that can be used with the tuples.
+* Below example shows the declaration of a tuple. 
 ```
-def times6 x = triple (double x)
+tuple Collection =
+  global IntValue : Integer
+  global DoubleValue : Double
+  global StringValue : String
 ```
+
+`set<tuple name><field Name>` 
+`set` operation sets(writes) value to the tuple field
+`get<tuple name><field Name>` 
+`get` operation gets(reads) value to the tuple field
+`edit<tuple name><field Name>` 
+`edit` operation moidfies value to the tuple field
+
+### Map
+Map is a higher order function which takes a function and applies the same to every element in the list.
+
+* Below example shows how to declare a list of strings and apply map function to it. Map is a predefined function that maps to the every element in the list
+```
+def words = "ache", "vile", "amid", "evil", "ogre" , Nil
+def mapping words = words | map roll
+def mapping2 words = map exch words
+```
+
+### Higher Order function
+A function which does one of the following is a higher order function
+1. Takes one or more functions as argument
+2. Returns a function as its result
 
 * Funtion tea shows the way to pass a function as a argument 
 ```
 def tea f = f 4
 ```
+* `Map is the best example for a Higher Order Function` 
 
 * Try out these examples and record the result
 ```
@@ -283,11 +320,11 @@ def op7 = tea inc | double
 def op8 = map double (1,2,3,Nil)
 def op9 = map double (1,2,3,Nil) | map inc
 ```
+* Below example multiplies a given number by 6. The other way to implement this is `def times6 x = double x | triple`
+```
+def times6 x = triple (double x)
+```
 
-* Adds 2 integer values and gives out the result
-```
-def sumadd x y = x+y 
-```
 ### Pattern Matching
 The first thing that comes to mind is string matching. It is similar to the Switch statement where it will check for the matching case and outputs appropriate results.
 ```
@@ -318,15 +355,17 @@ def franglais = match _
 ### Recursive function
 Using recursive functions we can achieve the sort of results which would require loops in a traditional language. Recursive functions tend to be much shorter and clearer. A recursive function is one which calls itself either directly or indirectly. Traditionally, the first recursive function considered is factorial.
 * Using if statement as well as using match function
-`def facto1 n = if n == 0 then 1 else  n * facto (n-1)`
+```
+def facto1 n = if n == 0 then 1 else  n * facto (n-1)
+```
 
-* facto 5 = 5*4*3*2*1 = 120
+* facto 5 = `5*4*3*2*1` = 120
 ```
 def facto = match _
   0 = 1
   n = n * facto (n-1) 
 ```
-
+#### Recursion on Integers
 * Try out these recursive functions and record the result
 ```
 def t1 = match _
@@ -391,16 +430,19 @@ def listcopy l n = match n
 ```
 
 * listto 4 = (1,2,3,4,Nil)
-`def listto n = listfrom n | reverse`
+```
+def listto n = listfrom n | reverse
+```
 
 * listodd 7 = (7,5,3,1,Nil)
-`def listodd n = if(n<0) then Nil else if(n%2 ==1) then n,listodd (n-2) else n`
+```
+def listodd n = if(n<0) then Nil else if(n%2 ==1) then n,listodd (n-2) else n
+```
 
 * sumenes 8 = 8+6+4+2+0 = 20
-`def sumevens n = if (n==0) then 0 else if (n%2 ==0) then n + sumevens (n-2) else n`
-
-* power 2 3 = 8
-`def power x n = x^n`
+```
+def sumevens n = if (n==0) then 0 else if (n%2 ==0) then n + sumevens (n-2) else n
+```
 
 ```
 def natstring = "succ"
@@ -408,16 +450,13 @@ def nat n = match n
   0 = "zero"
   n = "{natstring}({nat(n-1)})"
 ```
-
+#### Recursion On Lists
 * Adds all the elements in a list and provids the sum
 ```
 def sum n = match n 
   Nil = 0
   h,t = h + sum t
 ```
-
-* concantenates 2 lists using ++ operator
-`wake -x '(1,2,3,Nil) ++ (4,5,6,Nil)'`
 
 * Doubles every element in the list
 ```
@@ -426,7 +465,9 @@ def doublelist n = match n
     h,t = 2*h, doublelist t
 ```
 * The other way of multiplying every element in a list
-`def doublelist2 = map (2*_)`
+```
+def doublelist2 = map (2*_)
+```
 
 * Duplicates every element in a list
 ```
@@ -443,39 +484,61 @@ def dupelist1 n = mapFlat (\x (x,x,Nil) ) n
 
 def dupelist3 = mapFlat (\x (x,x,Nil) ) 
 ```
-
+#### More Examples
 * Returns the length of a list
-`def length n = len n`
+```
+def length n = len n
+```
 
 * Multiples every element in a list and gives the result
-`def prodlist n = foldr (_ * _)1 n`
+```
+def prodlist n = foldr (_ * _)1 n
+```
 
 * vallist ("1","2","3","4",Nil) = (1,2,3,4,Nil)
-`def vallist n =n | map (\x x | int | getOrElse 0)`
+```
+def vallist n =n | map (\x x | int | getOrElse 0)
+```
 
 * spacelist ("1","2","3",Nil) = ("1","","2","","3","",Nil) 
-`def spacelist n = n | mapFlat (\x(x,"",Nil))`
+```
+def spacelist n = n | mapFlat (\x(x,"",Nil))
+```
 
 * flatten converts list if lists into a list
-`wake -x 'flatten ((1,2,3,Nil),(4,5,6,Nil),Nil)'`
+```
+wake -x 'flatten ((1,2,3,Nil),(4,5,6,Nil),Nil)'
+```
 
 * Returns the last element in the list
-`def last1 n = n | reverse | head`
+```
+def last1 n = n | reverse | head
+```
 
 * Finds a given element in a given list or else returns None 
-`wake -x '(1,2,3,1,Nil)| find (\x x==2)'`
+```
+wake -x '(1,2,3,1,Nil)| find (\x x==2)'
+```
 
 * Multiply every element in list by 4
-`wake -x '(1,2,3,Nil)|map (\x 4*x)'`
+```
+wake -x '(1,2,3,Nil)|map (\x 4*x)'
+```
 
 * Counts the no of 1's in a given list
-`def count1 n = n | filter (\x x == 1) | len  `
+```
+def count1 n = n | filter (\x x == 1) | len  
+```
 
 * Creates a list of Pairs
-`def zipop n m =  zip n m`
+```
+def zipop n m =  zip n m
+```
 
 * Concantenates 2 lists by taking elements from each lists alternatively
-`def altern n m = zip n m | mapFlat (\x (x.getPairFirst, x.getPairSecond,Nil) )`
+```
+def altern n m = zip n m | mapFlat (\x (x.getPairFirst, x.getPairSecond,Nil) )
+```
 
 * Functions same as above using match function
 ```
@@ -486,10 +549,14 @@ def altern1 m n = match m n
 ```
 
 * Returns the head from list (list Integers)
-`def hdify n = n | map (\x x | head | getOrElse 0)`
+```
+def hdify n = n | map (\x x | head | getOrElse 0)
+```
 
 * Returns the tail from list (list Integers)
-`def tlify n = n | map (\x x | tail)`
+```
+def tlify n = n | map (\x x | tail)
+```
 
 * Outputs the extra element in the list by comapring the length of the given 2 lists
 ```
@@ -500,28 +567,44 @@ def diff n m = match n m
 ```
 
 * Concantenates the given string with "ed"
-`def past1 n = "{n}ed"`
+```
+def past1 n = "{n}ed"
+```
 
 * Multiplies every element in a list by 2
-`def multiply n = n | map (\x 2*x)`
+```
+def multiply n = n | map (\x 2*x)
+```
 
 * Returns the element in the list of the given index n
-`def index n l = l | drop n | head`
+```
+def index n l = l | drop n | head
+```
 
 * Takes first n elements from the given list
-`def takeN n m = m | take n`
+```
+def takeN n m = m | take n
+```
 
 * Drops first n elements from the given list
-`def dropN n m = m | drop n`
+```
+def dropN n m = m | drop n
+```
 
 * Creates a list with n as its first element and m as the last element 
-`def upto n m = m-n+1 | seq | map (\x x+n)`
+```
+def upto n m = m-n+1 | seq | map (\x x+n)
+```
 
 * Adds a space after a given string     
-`def addspace s = "{s} "`
+```
+def addspace s = "{s} "
+```
 
 * Convert the String separated by spaces  into list of string 
-`def lex s = s | tokenize ` ``
+```
+def lex s = s | tokenize ` `
+```
 
 * Doubles every element in the list
 ```
@@ -538,10 +621,14 @@ def inclist n = match n
 ```
 
 * Doubles every element in the list using map function
-`def doublistmap n = n | map (\n 2*n)`
+```
+def doublistmap n = n | map (\n 2*n)
+```
 
 * Increment every element in the list using map function
-`def inclistmap n = n | map (\n n+1) `
+```
+def inclistmap n = n | map (\n n+1) 
+```
 
 * Returns a list with the leading spaces removed
 ```
@@ -557,22 +644,34 @@ def takespace n = match n
 ```
 
 * Concantenates every list of string with "io"
-`def map1 n = n | map (\s "{s}io")`
+```
+def map1 n = n | map (\s "{s}io")
+```
 
 * Creates a list (list Integers) from a given list of integers
-`def map2 n = n | map (\x x,Nil)`
+```
+def map2 n = n | map (\x x,Nil)
+```
 
 * Outputs the first element from the list (list Integers)
-`def map3 n = n | map (\x x | head | getOrElse 0)`
+```
+def map3 n = n | map (\x x | head | getOrElse 0)
+```
 
 * Creates a list of strings by talking the last character of a string
-`def map4 n = n | map (\x last x)`
+```
+def map4 n = n | map (\x last x)
+```
 
 * Multiplies every element of the list by 3
-`def ftrl n = n | map (\x 3*x)`
+```
+def ftrl n = n | map (\x 3*x)
+```
 
 * Takes the first character from the list of strings and creates a new list
-`def fhel n = n | map (\x first x)`
+```
+def fhel n = n | map (\x first x)
+```
 
 * removes first 2 characters from the list of strings and creates a new list
 ```
@@ -581,7 +680,9 @@ def fttl n = n | map (\x tailstring x)
 ```
 
 * Prepend and Appends every element in a list of string by "s" "m"
-`def fsml n = n | map (\x "s{x}m")`
+```
+def fsml n = n | map (\x "s{x}m")
+```
 
 ### Creating your own Data types
 * Example shows how to create a data type of our own
@@ -618,10 +719,24 @@ def listexample3 l = l | tail
 ```
 `wake -x '("abc","def",Nil) | map(explode)|map ( head)'`
 
-* Find the sum of elements in a list using foldr function. Here n refers to the deafult value which the function retursn if the list l is empty(Nil).
-`def suma l n= l | foldr(_+_)n`
+* Find the sum of elements in a list using foldr function. Here n refers to the deafult value which the function returns if the list l is empty(Nil).
+```
+def suma l n= l | foldr(_+_)n
+```
 
-* Nested Function: Example
+* Finds the mean in the given list of integers
+```
+def mean l = l | foldr(_+_)0 | (\x x/ len l)
+```
+
+* Finds the median in the given list of integers
+```
+def median l = 
+  def length = if (len l %2 ==0) then ((len l) /2)-1 else ((len l)/2)
+  l | drop length | head
+```
+
+#### Mutually Recursive Functions: Example
 ```
 def foo n = match n 
   0 = "toff"
@@ -629,16 +744,6 @@ def foo n = match n
 def bar n = match n
   0 = "beerut"
   n = foo(n-1)
-```
-
-* Finds the mean in the given list of integers
-`def mean l = l | foldr(_+_)0 | (\x x/ len l)`
-
-* Finds the median in the given list of integers
-```
-def median l = 
-  def length = if (len l %2 ==0) then ((len l) /2)-1 else ((len l)/2)
-  l | drop length | head
 ```
 
 ### Queues
@@ -651,6 +756,7 @@ data Queue a =
   P
   a $$ Queue a
 ```
+
 The operations on a queue are front and remove. front returns the element at the front of the queue (without altering the queue), remove returns the rest of the queue with the first element removed. Note that both of these are strictly functions not procedures, remove does not change an existing queue it simply returns part of the queue, the original is still intact after the function call.
 
 * front returns the first element in a queue
@@ -689,10 +795,15 @@ def doomsday = match _
   P = P
   q = front q $$ doomsday (remove q)
 ```
+
 ## Tree
 Tree is also one of the data structure that represent hierarchical data. The topmost node is known as root node. Every node contains some data.
 Tree is already implemented in wake by default.
 * Creates a Tree from a list
-`wake -x 'seq 5 |map str| listToTree (_ <=>* _)'`
-`wake -x 'listToTree (_ <=> _) (seq 20)'`
+```
+wake -x 'seq 5 |map str| listToTree (_ <=>* _)'
+```
 
+```
+wake -x 'listToTree (_ <=> _) (seq 20)'`
+```
