@@ -20,12 +20,34 @@
 #define FUSE_H
 
 #include <string>
+#include <vector>
+#include "namespace.h"
 
-int run_in_fuse(
-	const std::string& daemon_path,
-	const std::string& working_dir,
-	const std::string& json,
-	bool use_stdin_file,
-	std::string& result_json);
+struct json_args {
+	std::vector<std::string> command;
+	std::vector<std::string> environment;
+	std::vector<std::string> visible;
+	std::string directory;
+	std::string stdin_file;
+
+	std::string hostname;
+	std::string domainname;
+	bool isolate_network;
+
+	int userid;
+	int groupid;
+
+	std::vector<mount_op> mount_ops;
+};
+
+struct fuse_args : public json_args {
+	std::string working_dir;
+	std::string daemon_path;
+	bool use_stdin_file;
+};
+
+bool json_as_struct(const std::string& json, json_args& result);
+
+int run_in_fuse(const fuse_args& args, std::string& result_json);
 
 #endif

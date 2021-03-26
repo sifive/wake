@@ -18,14 +18,35 @@
 #ifndef NAMESPACE_H
 #define NAMESPACE_H
 
-#ifdef __linux__
 
 #include <string>
+
+struct mount_op {
+	std::string type;
+	std::string source;
+	std::string destination;
+	bool read_only;
+};
+
+#ifdef __linux__
+
 struct JAST;
 
-bool setup_user_namespaces(const JAST& jast);
-bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_path);
-bool get_workspace_dir(const JAST& jast, const std::string& host_workspace_dir, std::string& out);
+bool setup_user_namespaces(
+	int id_user,
+	int id_group,
+	bool isolate_network,
+	const std::string& hostname,
+	const std::string& domainname);
+
+bool do_mounts(
+	const std::vector<mount_op>& mount_ops,
+	const std::string& fuse_mount_path);
+
+bool get_workspace_dir(
+	const std::vector<mount_op>& mount_ops,
+	const std::string& host_workspace_dir,
+	std::string& out);
 
 #endif
 

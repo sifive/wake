@@ -29,33 +29,78 @@
 #include <fstream>
 #include <sstream>
 
+#include "fuse.h"
 #include "json5.h"
 #include "execpath.h"
 #include "membytes.h"
-
-#ifdef __linux__
 #include "namespace.h"
-#endif
 
-int run_in_fuse(
-	const std::string& daemon_path,
-	const std::string& working_dir,
-	const std::string& json,
-	bool use_stdin_file,
-	std::string& result_json)
-{
-	if (0 != chdir(working_dir.c_str())) {
-		std::cerr << "chdir " << working_dir << ": " << strerror(errno) << std::endl;
+bool json_as_struct(const std::string& json, json_args& result) {
+	JAST jast;
+	if (!JAST::parse(json, std::cerr, jast))
+		return false;
+
+	for (auto &x : jast.get("command").children)
+		result.command.push_back(x.second.value);
+
+	for (auto &x : jast.get("environment").children)
+		result.environment.push_back(x.second.value);
+
+	for (auto &x : jast.get("visible").children)
+		result.visible.push_back(x.second.value);
+
+	result.directory = jast.get("directory").value;
+	result.stdin_file = jast.get("stdin").value;
+
+	result.isolate_network = jast.get("isolate-network").kind == JSON_TRUE;
+
+	result.hostname = jast.get("hostname").value;
+	result.domainname = jast.get("domainname").value;
+
+	std::string userid = jast.get("user-id").value;
+	result.userid = !userid.empty() ? std::stoi(userid) : geteuid();
+
+	std::string groupid = jast.get("group-id").value;
+	result.groupid = !groupid.empty() ? std::stoi(groupid) : getegid();
+
+	for (auto &x : jast.get("mount-ops").children) {
+		result.mount_ops.push_back({
+			x.second.get("type").value,
+			x.second.get("source").value,
+			x.second.get("destination").value,
+			x.second.get("read_only").kind == JSON_TRUE
+		});
+	}
+	return true;
+}
+
+static int execve_wrapper(const std::vector<std::string>& command, const std::vector<std::string>& environment) {
+	std::vector<const char *> cmd_args;
+	for (auto &s : command)
+		cmd_args.push_back(s.c_str());
+	cmd_args.push_back(0);
+
+	std::vector<const char *> env;
+	for (auto &e : environment)
+		env.push_back(e.c_str());
+	env.push_back(0);
+
+	std::string command_path = find_in_path(cmd_args[0], find_path(env.data()));
+	execve(command_path.c_str(),
+		const_cast<char * const *>(cmd_args.data()),
+		const_cast<char * const *>(env.data()));
+	return errno;
+}
+
+int run_in_fuse(const fuse_args& args, std::string& result_json) {
+	if (0 != chdir(args.working_dir.c_str())) {
+		std::cerr << "chdir " << args.working_dir << ": " << strerror(errno) << std::endl;
 		return 1;
 	}
 
-	JAST jast;
-	if (!JAST::parse(json, std::cerr, jast))
-		return 1;
-
 	std::string name  = std::to_string(getpid());
 	// mpath is where the fuse filesystem is mounted
-	std::string mpath = working_dir + "/.fuse";
+	std::string mpath = args.working_dir + "/.fuse";
 	std::string fpath = mpath + "/.f.fuse-waked";
 	// rpath is a subdir in the fuse filesystem that will be used by this fuse-wake
 	std::string rpath = mpath + "/" + name;
@@ -73,8 +118,8 @@ int run_in_fuse(
 		pid_t pid = fork();
 		if (pid == 0) {
 			const char *env[2] = { "PATH=/usr/bin:/bin:/usr/sbin:/sbin", 0 };
-			execle(daemon_path.c_str(), "fuse-waked", mpath.c_str(), nullptr, env);
-			std::cerr << "execl " << daemon_path << ": " << strerror(errno) << std::endl;
+			execle(args.daemon_path.c_str(), "fuse-waked", mpath.c_str(), nullptr, env);
+			std::cerr << "execl " << args.daemon_path << ": " << strerror(errno) << std::endl;
 			exit(1);
 		}
 		usleep(wait);
@@ -101,8 +146,14 @@ int run_in_fuse(
 	// We can safely release the global handle now that we hold a livefd
 	(void)close(ffd);
 
+	// The fuse-waked process takes an input file containing visible files, json formatted.
+	JAST for_daemon(JSON_OBJECT);
+	auto& visible = for_daemon.add("visible", JSON_ARRAY);
+	for (auto s : args.visible)
+		visible.add(std::move(s));
+
 	std::ofstream ijson(ipath);
-	ijson.write(json.data(), json.size());
+	ijson << for_daemon;
 	if (ijson.fail()) {
 		std::cerr << "write " << ipath << ": " << strerror(errno) << std::endl;
 		return 1;
@@ -114,37 +165,26 @@ int run_in_fuse(
 
 	pid_t pid = fork();
 	if (pid == 0) {
-		// Become a target for group death
-		// setpgid(0, 0);
-
-		// Prepare the subcommand inputs
-		std::vector<char *> arg, env;
-		for (auto &x : jast.get("command").children)
-			arg.push_back(const_cast<char*>(x.second.value.c_str()));
-		arg.push_back(0);
-		for (auto &x : jast.get("environment").children)
-			env.push_back(const_cast<char*>(x.second.value.c_str()));
-		env.push_back(0);
-
-		std::string subdir = jast.get("directory").value;
-
 #ifdef __linux__
-
-		if (!setup_user_namespaces(jast))
+		if (!setup_user_namespaces(
+			args.userid,
+			args.groupid,
+			args.isolate_network,
+			args.hostname,
+			args.domainname))
 			exit(1);
 
-		// Mounts from the parsed input json.
-		if (!do_mounts_from_json(jast, rpath))
+		if (!do_mounts(args.mount_ops, rpath))
 			exit(1);
 
 		std::string dir;
-		if (!get_workspace_dir(jast, working_dir, dir)) {
+		if (!get_workspace_dir(args.mount_ops, args.working_dir, dir)) {
 			std::cerr << "'workspace' mount entry is missing from input" << std::endl;
 			exit(1);
 		}
-		dir = dir + "/" + subdir;
+		dir = dir + "/" + args.directory;
 #else
-		std::string dir = rpath + "/" + subdir;
+		std::string dir = rpath + "/" + args.directory;
 #endif
 
 		if (chdir(dir.c_str()) != 0) {
@@ -152,8 +192,8 @@ int run_in_fuse(
 			exit(1);
 		}
 
-		if (use_stdin_file) {
-			std::string stdin = jast.get("stdin").value;
+		if (args.use_stdin_file) {
+			std::string stdin = args.stdin_file;
 			if (stdin.empty()) stdin = "/dev/null";
 
 			int fd = open(stdin.c_str(), O_RDONLY);
@@ -167,12 +207,10 @@ int run_in_fuse(
 			}
 		}
 
-		std::string command = find_in_path(arg[0], find_path(env.data()));
-		execve(command.c_str(), arg.data(), env.data());
-		std::cerr << "execve " << command << ": " << strerror(errno) << std::endl;
+		int err = execve_wrapper(args.command, args.environment);
+		std::cerr << "execve " << args.command[0] << ": " << strerror(err) << std::endl;
 		exit(1);
 	}
-	jast.children.clear();
 
 	// Don't hold IO open while waiting
 	(void)close(STDIN_FILENO);
@@ -197,6 +235,7 @@ int run_in_fuse(
 	(void)!write(livefd, &stop, 1); // the ! convinces older gcc that it's ok to ignore the write
 	(void)fsync(livefd);
 
+	JAST jast;
 	std::stringstream ss;
 	if (!JAST::parse(opath.c_str(), ss, jast)) {
 		// stderr is closed, so report the error on the only output we have
@@ -204,7 +243,6 @@ int run_in_fuse(
 		return 1;
 	}
 
-	bool first;
 	ss << "{\"usage\":{\"status\":" << status
 	  << ",\"runtime\":" << (stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0)
 	  << ",\"cputime\":" << (rusage.ru_utime.tv_sec + rusage.ru_stime.tv_sec + (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0)
@@ -213,7 +251,7 @@ int run_in_fuse(
 	  << ",\"outbytes\":" << jast.get("obytes").value
 	  << "},\"inputs\":[";
 
-	first = true;
+	bool first = true;
 	for (auto &x : jast.get("inputs").children) {
 		ss << (first?"":",") << "\"" << json_escape(x.second.value) << "\"";
 		first = false;

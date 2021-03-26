@@ -31,7 +31,9 @@
 #include <sys/syscall.h>
 #include <sys/sysmacros.h>
 #include <sys/wait.h>
+
 #include "json5.h"
+#include "namespace.h"
 
 static void write_file(const char *file, const char *content, int len)
 {
@@ -208,7 +210,7 @@ static bool mount_squashfs(const std::string& source, const std::string& mountpo
 	return false;
 }
 
-bool create_dir(const std::string& dest) {
+static bool create_dir(const std::string& dest) {
 	if (0 == mkdir(dest.c_str(), 0777))
 		return true;
 
@@ -216,7 +218,7 @@ bool create_dir(const std::string& dest) {
 	return false;
 }
 
-bool create_file(const std::string& dest) {
+static bool create_file(const std::string& dest) {
 	int fd = creat(dest.c_str(), 0777);
 	if (fd < 0) {
 		std::cerr << "creat (" << dest << "): " << strerror(errno) << std::endl;
@@ -233,17 +235,11 @@ bool create_file(const std::string& dest) {
 // The input/caller responsibility to ensure that the mountpoint exists,
 // that the platform supports the mount type/options, and to correctly order
 // the layered mounts.
-bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_path)
+bool do_mounts(const std::vector<mount_op>& mount_ops, const std::string& fuse_mount_path)
 {
 	std::string mount_prefix;
-
-	for (auto &x : jast.get("mount-ops").children) {
-		const std::string& op = x.second.get("type").value;
-		const std::string& src = x.second.get("source").value;
-		const std::string& dest = x.second.get("destination").value;
-		bool readonly = x.second.get("read-only").kind == JSON_TRUE;
-
-		if (dest == "/") {
+	for (auto &x : mount_ops) {
+		if (x.destination == "/") {
 			// All mount ops from here onward will have a prefixed destination.
 			// The prefix will be pivoted to after the final mount op.
 			mount_prefix = "/tmp/.wakebox-mount";
@@ -253,27 +249,27 @@ bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_path)
 				return false;
 			}
 		}
-		const std::string& target = mount_prefix + dest;
+		const std::string& target = mount_prefix + x.destination;
 
-		if (!validate_mount(op, src))
+		if (!validate_mount(x.type, x.source))
 			return false;
 
-		if (op == "bind" && !bind_mount(src, target, readonly))
+		if (x.type == "bind" && !bind_mount(x.source, target, x.read_only))
 			return false;
 
-		if (op == "workspace" && !bind_mount(fuse_mount_path, target, false))
+		if (x.type == "workspace" && !bind_mount(fuse_mount_path, target, false))
 			return false;
 
-		if (op == "tmpfs" && !mount_tmpfs(target))
+		if (x.type == "tmpfs" && !mount_tmpfs(target))
 			return false;
 
-		if (op == "squashfs" && !mount_squashfs(src, target))
+		if (x.type == "squashfs" && !mount_squashfs(x.source, target))
 			return false;
 
-		if (op == "create-dir" && !create_dir(target))
+		if (x.type == "create-dir" && !create_dir(target))
 			return false;
 
-		if (op == "create-file" && !create_file(target))
+		if (x.type == "create-file" && !create_file(target))
 			return false;
 	}
 
@@ -284,14 +280,13 @@ bool do_mounts_from_json(const JAST& jast, const std::string& fuse_mount_path)
 }
 
 bool get_workspace_dir(
-	const JAST& jast,
+	const std::vector<mount_op>& mount_ops,
 	const std::string& host_workspace_dir,
 	std::string& out)
 {
-	for (auto &x : jast.get("mount-ops").children) {
-		const std::string& op = x.second.get("type").value;
-		if (op == "workspace") {
-			out = x.second.get("destination").value;
+	for (auto &x : mount_ops) {
+		if (x.type == "workspace") {
+			out = x.destination;
 			// convert a workspace relative path into absolute path
 			if (out.at(0) != '/')
 				out = host_workspace_dir + "/" + out;
@@ -301,28 +296,26 @@ bool get_workspace_dir(
 	return false;
 }
 
-bool setup_user_namespaces(const JAST& jast) {
+bool setup_user_namespaces(
+	int id_user,
+	int id_group,
+	bool isolate_network,
+	const std::string& hostname,
+	const std::string& domainname)
+{
 	uid_t real_euid = geteuid();
 	gid_t real_egid = getegid();
 
-	uid_t euid = real_euid;
-	gid_t egid = real_egid;
-
-	const std::string id_user = jast.get("user-id").value;
-	if (!id_user.empty())
-		euid = std::stoi(id_user);
-
-	const std::string id_group = jast.get("group-id").value;
-	if (!id_group.empty())
-		egid = std::stoi(id_group);
+	uid_t euid = id_user;
+	gid_t egid = id_group;
 
 	int flags = CLONE_NEWNS|CLONE_NEWUSER;
 
-	for (auto &res : jast.get("resources").children) {
-		const std::string &key = res.second.value;
-		if (key == "isolate/host") flags |= CLONE_NEWUTS;
-		if (key == "isolate/net") flags |= CLONE_NEWNET;
-	}
+	if (!hostname.empty() || !domainname.empty())
+		flags |= CLONE_NEWUTS;
+
+	if (isolate_network)
+		flags |= CLONE_NEWNET;
 
 	// Enter a new mount namespace we can control
 	if (0 != unshare(flags)) {
@@ -330,15 +323,11 @@ bool setup_user_namespaces(const JAST& jast) {
 		return false;
 	}
 
-	// Wipe out our hostname
-	if (0 != (flags & CLONE_NEWUTS)) {
-		if (sethostname("build", 5) != 0) {
-			std::cerr << "sethostname(build): " << strerror(errno) << std::endl;
-		}
-		if (setdomainname("local", 5) != 0) {
-			std::cerr << "setdomainname(local): " << strerror(errno) << std::endl;
-		}
-	}
+	if (!hostname.empty() && sethostname(hostname.c_str(), hostname.length()) != 0)
+		std::cerr << "sethostname(" << hostname << "): " << strerror(errno) << std::endl;
+
+	if (!domainname.empty() && setdomainname(domainname.c_str(), domainname.length()) != 0)
+		std::cerr << "setdomainname(" << domainname << "): " << strerror(errno) << std::endl;
 
 	// Map our UID to either our original UID or root
 	write_file("/proc/self/setgroups", "deny", 4);

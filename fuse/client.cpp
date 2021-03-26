@@ -54,13 +54,19 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	const std::string daemon = find_execpath() + "/fuse-waked";
-	const std::string working_dir = get_cwd();
+	fuse_args args;
+	if (!json_as_struct(json, args)) {
+		return 1;
+	}
+	args.daemon_path = find_execpath() + "/fuse-waked";
+	args.working_dir = get_cwd();
+	args.use_stdin_file = true;
+
 	std::string result;
 	// Run the command contained in the json with the fuse daemon filtering
 	// the filesystem view of the workspace dir.
 	// Stdin/out/err will be closed.
-	int res = run_in_fuse(daemon, working_dir, json, true, result);
+	int res = run_in_fuse(args, result);
 
 	// Write output as json to argv[2]
 	ssize_t wrote = write(out_fd, result.c_str(), result.length());
