@@ -210,7 +210,7 @@ static bool mount_squashfs(const std::string& source, const std::string& mountpo
 	return false;
 }
 
-bool create_dir(const std::string& dest) {
+static bool create_dir(const std::string& dest) {
 	if (0 == mkdir(dest.c_str(), 0777))
 		return true;
 
@@ -218,7 +218,7 @@ bool create_dir(const std::string& dest) {
 	return false;
 }
 
-bool create_file(const std::string& dest) {
+static bool create_file(const std::string& dest) {
 	int fd = creat(dest.c_str(), 0777);
 	if (fd < 0) {
 		std::cerr << "creat (" << dest << "): " << strerror(errno) << std::endl;
@@ -235,7 +235,7 @@ bool create_file(const std::string& dest) {
 // The input/caller responsibility to ensure that the mountpoint exists,
 // that the platform supports the mount type/options, and to correctly order
 // the layered mounts.
-bool do_mounts(const std::vector<mount_op> mount_ops, const std::string& fuse_mount_path)
+bool do_mounts(const std::vector<mount_op>& mount_ops, const std::string& fuse_mount_path)
 {
 	std::string mount_prefix;
 	for (auto &x : mount_ops) {
@@ -280,7 +280,7 @@ bool do_mounts(const std::vector<mount_op> mount_ops, const std::string& fuse_mo
 }
 
 bool get_workspace_dir(
-	const std::vector<mount_op> mount_ops,
+	const std::vector<mount_op>& mount_ops,
 	const std::string& host_workspace_dir,
 	std::string& out)
 {
@@ -300,8 +300,8 @@ bool setup_user_namespaces(
 	int id_user,
 	int id_group,
 	bool isolate_network,
-	std::string hostname,
-	std::string domainname)
+	const std::string& hostname,
+	const std::string& domainname)
 {
 	uid_t real_euid = geteuid();
 	gid_t real_egid = getegid();
@@ -309,7 +309,10 @@ bool setup_user_namespaces(
 	uid_t euid = id_user;
 	gid_t egid = id_group;
 
-	int flags = CLONE_NEWNS|CLONE_NEWUSER|CLONE_NEWUTS;
+	int flags = CLONE_NEWNS|CLONE_NEWUSER;
+
+	if (!hostname.empty() || !domainname.empty())
+		flags |= CLONE_NEWUTS;
 
 	if (isolate_network)
 		flags |= CLONE_NEWNET;
@@ -320,10 +323,10 @@ bool setup_user_namespaces(
 		return false;
 	}
 
-	if (sethostname(hostname.c_str(), hostname.length()) != 0)
+	if (!hostname.empty() && sethostname(hostname.c_str(), hostname.length()) != 0)
 		std::cerr << "sethostname(" << hostname << "): " << strerror(errno) << std::endl;
 
-	if (setdomainname(domainname.c_str(), domainname.length()) != 0)
+	if (!domainname.empty() && setdomainname(domainname.c_str(), domainname.length()) != 0)
 		std::cerr << "setdomainname(" << domainname << "): " << strerror(errno) << std::endl;
 
 	// Map our UID to either our original UID or root

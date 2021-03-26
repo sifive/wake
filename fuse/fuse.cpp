@@ -33,12 +33,9 @@
 #include "json5.h"
 #include "execpath.h"
 #include "membytes.h"
-
-#ifdef __linux__
 #include "namespace.h"
-#endif
 
-bool json_as_struct(std::string json, json_args& result) {
+bool json_as_struct(const std::string& json, json_args& result) {
 	JAST jast;
 	if (!JAST::parse(json, std::cerr, jast))
 		return false;
@@ -55,14 +52,10 @@ bool json_as_struct(std::string json, json_args& result) {
 	result.directory = jast.get("directory").value;
 	result.stdin_file = jast.get("stdin").value;
 
-#ifdef __linux__
 	result.isolate_network = jast.get("isolate-network").kind == JSON_TRUE;
 
-	std::string hostname = jast.get("hostname").value;
-	result.hostname = !hostname.empty() ? hostname : "build";
-
-	std::string domainname = jast.get("domainname").value;
-	result.domainname = !domainname.empty() ? domainname : "local";
+	result.hostname = jast.get("hostname").value;
+	result.domainname = jast.get("domainname").value;
 
 	std::string userid = jast.get("user-id").value;
 	result.userid = !userid.empty() ? std::stoi(userid) : geteuid();
@@ -78,11 +71,10 @@ bool json_as_struct(std::string json, json_args& result) {
 			x.second.get("read_only").kind == JSON_TRUE
 		});
 	}
-#endif
 	return true;
 }
 
-void execve_wrapper(std::vector<std::string> command, std::vector<std::string> environment) {
+static int execve_wrapper(const std::vector<std::string>& command, const std::vector<std::string>& environment) {
 	std::vector<const char *> cmd_args;
 	for (auto &s : command)
 		cmd_args.push_back(s.c_str());
@@ -97,11 +89,10 @@ void execve_wrapper(std::vector<std::string> command, std::vector<std::string> e
 	execve(command_path.c_str(),
 		const_cast<char * const *>(cmd_args.data()),
 		const_cast<char * const *>(env.data()));
-
-	std::cerr << "execve " << command_path << ": " << strerror(errno) << std::endl;
+	return errno;
 }
 
-int run_in_fuse(fuse_args args, std::string& result_json) {
+int run_in_fuse(const fuse_args& args, std::string& result_json) {
 	if (0 != chdir(args.working_dir.c_str())) {
 		std::cerr << "chdir " << args.working_dir << ": " << strerror(errno) << std::endl;
 		return 1;
@@ -156,15 +147,13 @@ int run_in_fuse(fuse_args args, std::string& result_json) {
 	(void)close(ffd);
 
 	// The fuse-waked process takes an input file containing visible files, json formatted.
+	JAST for_daemon(JSON_OBJECT);
+	auto& visible = for_daemon.add("visible", JSON_ARRAY);
+	for (auto s : args.visible)
+		visible.add(std::move(s));
+
 	std::ofstream ijson(ipath);
-	bool first = true;
-	ijson << "{ \"visible\": [";
-	for (auto &s : args.visible) {
-		ijson << (first ? "\"" : ", \"") ;
-		ijson << s << "\"";
-		first = false;
-	}
-	ijson << "]}";
+	ijson << for_daemon;
 	if (ijson.fail()) {
 		std::cerr << "write " << ipath << ": " << strerror(errno) << std::endl;
 		return 1;
@@ -218,7 +207,8 @@ int run_in_fuse(fuse_args args, std::string& result_json) {
 			}
 		}
 
-		execve_wrapper(args.command, args.environment);
+		int err = execve_wrapper(args.command, args.environment);
+		std::cerr << "execve " << args.command[0] << ": " << strerror(err) << std::endl;
 		exit(1);
 	}
 
@@ -261,7 +251,7 @@ int run_in_fuse(fuse_args args, std::string& result_json) {
 	  << ",\"outbytes\":" << jast.get("obytes").value
 	  << "},\"inputs\":[";
 
-	first = true;
+	bool first = true;
 	for (auto &x : jast.get("inputs").children) {
 		ss << (first?"":",") << "\"" << json_escape(x.second.value) << "\"";
 		first = false;

@@ -21,10 +21,7 @@
 
 #include <string>
 #include <vector>
-
-#ifdef __linux__
 #include "namespace.h"
-#endif
 
 struct json_args {
 	std::vector<std::string> command;
@@ -33,7 +30,6 @@ struct json_args {
 	std::string directory;
 	std::string stdin_file;
 
-#ifdef __linux__
 	std::string hostname;
 	std::string domainname;
 	bool isolate_network;
@@ -42,17 +38,16 @@ struct json_args {
 	int groupid;
 
 	std::vector<mount_op> mount_ops;
-#endif
 };
 
-struct fuse_args : json_args {
+struct fuse_args : public json_args {
 	std::string working_dir;
 	std::string daemon_path;
 	bool use_stdin_file;
 };
 
-bool json_as_struct(std::string json, json_args& result);
+bool json_as_struct(const std::string& json, json_args& result);
 
-int run_in_fuse(fuse_args args, std::string& result_json);
+int run_in_fuse(const fuse_args& args, std::string& result_json);
 
 #endif
