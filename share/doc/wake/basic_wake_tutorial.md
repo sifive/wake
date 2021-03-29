@@ -1,5 +1,7 @@
 ## Wake Tutorial
 
+This tutorial will teach you the basics of Wake language. After completeing this tutorial, you will have typed and executed many basic wake functions.
+
 ### Invoking wake
 
 1. Create a folder inside `/scratch` directory. `mkdir /scratch/<your_name>/wake_tutorial`.
@@ -38,6 +40,10 @@ A function should be defined using the keyword `def`. Simple function definition
 `def <function name> <parameter list> = <expression>`
 
 We cannot specify explicitly the return type and type of the parameters. Usually when the function body is of multi-line the return value is specified by the last line in the function.
+
+Functions can be defined with the keyword `global` which makes the function to be accessed outside the file where it is being defined.
+
+We can arbitrarily deeply put `def` inside another `def`. The internal `def` is bound to the function itself and cannot be accesible outside the function.
 
 Note: The only thing you can define functions are using `def` keyword. In wake we deal everything with functions.
 
@@ -94,9 +100,9 @@ def power x n = x^n
 ```
 
 #### lambda operator (\)
-The lambda operator can be used to define paramaters of a function. 
+The lambda operator `\` is an alternative way to define the parameters of a function. 
 
-* Function aveI(averageOfInteger) takes 2 arguments x and y and adds two values and divide the result by 2. This function shows the other was of defining the parameters using lambda operator. The traditional way of defining the parameter is `def aveI x y = (x+y)/2`. Either of them are logically same.
+* Function aveI(averageOfInteger) takes 2 arguments x and y. It adds the two values and divides the result by 2.Previously we saw that we could define this as `def aveI x y = (x+y)/2`.The function below shows the lambda operator way of defining the parameters. The two definitions are logically the same.
 ```
 def aveI = \x\y (x+y)/2
 ```
@@ -117,6 +123,12 @@ Few of the commonly used built-in functions in this tutorial is given below
 * `explode` breaks a string into a list of string character.
 * `strlen` returns the length of the given string.
 * `cat` concatenates the elements in list of string to a string. 
+
+* strlen returns the length of the given string.
+```
+wake -x 'strlen "abcde"'
+```
+
 #### Operation on List
 * `take` takes first `n` elements in the list.
 * `drop` drops first `n` elements in the list.
@@ -127,12 +139,16 @@ Few of the commonly used built-in functions in this tutorial is given below
 * `append` appends the given data at the end of the given list.
 * `++` concatenates any number of list into a single list.
 * `len` returns the length of the given list.
+* `flatten` converts the list of list into a list.
+* `mapFlat` applies a function to each element in the list and builds a new list from the resulting elements.
+* `filter`  applies a function and builds a new list from it.
+* `zip` takes 2 lists and converts them to list of Pairs
 
 * Function duplicate concantenates or copies a given string twice
 ```
 def duplicate s  ="{s}{s}"
 ```
-
+#### Miscellaneous Built-In Functions 
 * integerToUnicode is a `wake built-in function` which takes the ASCII input and provides its equivalent character
 ```
 wake -x 'integerToUnicode 99'
@@ -141,11 +157,6 @@ wake -x 'integerToUnicode 99'
 * unicodeToInteger is a `wake built-in function` which gives the ASCII value of the given character.
 ```
 wake -x 'unicodeToInteger "a"'
-```
-
-* strlen is a `wake built-in function` which returns the length of the given string.
-```
-wake -x 'strlen "abcde"'
 ```
 
 ### List
@@ -162,18 +173,27 @@ def d = 1,2,3,Nil
 def listprepend data1 = prepend data1 d
 ```
 
+* `Note: Parenthesis in wake is used to enforce a specific order of evaluation(precedence of operators) in expressions.`
 * concantenates 2 lists using ++ operator
 ```
 wake -x '(1,2,3,Nil) ++ (4,5,6,Nil)'
 ```
+### Option
+`Option` is a data type in wake. It will either return `Some x` which is a value `x` or `None` which means nothing.
 
 ### Type Inference
-* Here the paramater c has to be string since function strlen as been applied to it, and b has to be integer as it is being added to the output of `strlen c` and a is list of integers which prepends the output of `(b + strlen c)`.
+`wake` does not allow you to specify the types of parameters or return values. All types are inferred.
+
+* Here:
+** the parameter `c` has to be string since function `strlen` has been applied to it
+** `b` has to be integer as it is being added to the output of `strlen c` 
+** `a` is a list of integers because it prepends the output of `(b + strlen c)`.
+
 ```
 def madeup a b c =  (b + strlen c), a 
 ```
 
-#### Parenthesis vs Pipe
+### Parenthesis vs Pipe
 * `|`is the pipeFn which takes the argument from the left hand side of the `|` and provides it to the right hand side function. This makes the function to be more readable. `(a(b(c(d))))` is represented as `d | c | b | a`. In both the cases d is evaluated first then followed by c , b and a.
 ```
 def reversestring s = cat (reverse (explode (s)))
@@ -183,6 +203,8 @@ The same can be expressed with the pipe function as below
 ```
 def reversestring s = s | explode | reverse | cat
 ```
+#### `if`..`then`..`else`..
+It is similar to the traditional `if` construct we use in C language. `if(condition == true)` `then (do this)` `else (do something else)`
 
 * Below function takes a string and returns the middle character of the string.
 ```
@@ -287,16 +309,6 @@ tuple Collection =
 `edit<tuple name><field Name>` 
 `edit` operation moidfies value to the tuple field
 
-### Map
-Map is a higher order function which takes a function and applies the same to every element in the list.
-
-* Below example shows how to declare a list of strings and apply map function to it. Map is a predefined function that maps to the every element in the list
-```
-def words = "ache", "vile", "amid", "evil", "ogre" , Nil
-def mapping words = words | map roll
-def mapping2 words = map exch words
-```
-
 ### Higher Order function
 A function which does one of the following is a higher order function
 1. Takes one or more functions as argument
@@ -307,6 +319,16 @@ A function which does one of the following is a higher order function
 def tea f = f 4
 ```
 * `Map is the best example for a Higher Order Function` 
+
+### Map
+Map is a higher order function which takes a function and applies the same to every element in the list.
+
+* Below example shows how to declare a list of strings and apply map function to it. Map is a predefined function that maps to the every element in the list
+```
+def words = "ache", "vile", "amid", "evil", "ogre" , Nil
+def mapping words = words | map roll
+def mapping2 words = map exch words
+```
 
 * Try out these examples and record the result
 ```
@@ -320,10 +342,6 @@ def op7 = tea inc | double
 def op8 = map double (1,2,3,Nil)
 def op9 = map double (1,2,3,Nil) | map inc
 ```
-* Below example multiplies a given number by 6. The other way to implement this is `def times6 x = double x | triple`
-```
-def times6 x = triple (double x)
-```
 
 ### Pattern Matching
 The first thing that comes to mind is string matching. It is similar to the Switch statement where it will check for the matching case and outputs appropriate results.
@@ -332,6 +350,9 @@ def past = match _
   "run" = "ran"
   n = cat(n,"ed",Nil)
 ```
+* `_` here means that it will do a match on any input that has been passed to  the function as an argument. So that we dont need to define any parameter and we can do a match by just placing `_`
+
+* `If the argument passed to this function is `run` then the output will be `ran`. If the argument passed is other than `ran`  then it will cat `ed` with the input passed and output the result`
 
 * Compares the given string and outputs the appropriate string
 ```
@@ -359,12 +380,23 @@ Using recursive functions we can achieve the sort of results which would require
 def facto1 n = if n == 0 then 1 else  n * facto (n-1)
 ```
 
-* facto 5 = `5*4*3*2*1` = 120
 ```
 def facto = match _
   0 = 1
   n = n * facto (n-1) 
 ```
+
+* Ex: `facto 5 ` 
+```
+facto = 5 * facto (5-1)
+      = 5 * 4 * facto (4-1)
+      = 5 * 4 * 3 * facto (3-1)
+      = 5 * 4 * 3 * 2 * facto (2-1)
+      = 5 * 4 * 3 * 2 * 1 * facto (1-1)
+      = 5 * 4 * 3 * 2 * 1 * 1
+      = 120
+```
+
 #### Recursion on Integers
 * Try out these recursive functions and record the result
 ```
@@ -457,6 +489,15 @@ def sum n = match n
   Nil = 0
   h,t = h + sum t
 ```
+* Ex: `sum (1,2,3,Nil)`
+
+```
+sum = 1 + sum (2,3,Nil)
+    = 1 + 2 + sum (3,Nil)
+    = 1 + 2 + 3 + sum (Nil)
+    = 1 + 2 + 3 + 0
+    = 6
+```
 
 * Doubles every element in the list
 ```
@@ -490,7 +531,7 @@ def dupelist3 = mapFlat (\x (x,x,Nil) )
 def length n = len n
 ```
 
-* Multiples every element in a list and gives the result
+* Multiples every element in a list and gives the result. `_` here means that it will multiply the data whatever being passed to the function `foldr`.
 ```
 def prodlist n = foldr (_ * _)1 n
 ```
@@ -505,7 +546,7 @@ def vallist n =n | map (\x x | int | getOrElse 0)
 def spacelist n = n | mapFlat (\x(x,"",Nil))
 ```
 
-* flatten converts list if lists into a list
+* flatten converts list of lists into a list
 ```
 wake -x 'flatten ((1,2,3,Nil),(4,5,6,Nil),Nil)'
 ```
@@ -652,6 +693,7 @@ def map1 n = n | map (\s "{s}io")
 ```
 def map2 n = n | map (\x x,Nil)
 ```
+* `getOrElse` returns the `Option`s value if it exists or else it will return a value(`0` in this case) passed along with it if the `Option` is empty
 
 * Outputs the first element from the list (list Integers)
 ```
@@ -682,27 +724,6 @@ def fttl n = n | map (\x tailstring x)
 * Prepend and Appends every element in a list of string by "s" "m"
 ```
 def fsml n = n | map (\x "s{x}m")
-```
-
-### Creating your own Data types
-* Example shows how to create a data type of our own
-```
-global data Direction =
-  North
-  South
-  East
-  West
-```
-
-* Example shows the data type Money which can be in the form of Cash or the Cheque.
-```
-global data Money =
-  Cash Integer
-  Cheque (Pair String Double)
-```
-```
-def amount  = Cash 50
-def chequeamount = Cheque (Pair "HDFC" 350.00)
 ```
 
 * Try out these and record the output
@@ -744,6 +765,27 @@ def foo n = match n
 def bar n = match n
   0 = "beerut"
   n = foo(n-1)
+```
+
+### Creating your own Data types
+* Example shows how to create a data type of our own
+```
+global data Direction =
+  North
+  South
+  East
+  West
+```
+
+* Example shows the data type Money which can be in the form of Cash or the Cheque.
+```
+global data Money =
+  Cash Integer
+  Cheque (Pair String Double)
+```
+```
+def amount  = Cash 50
+def chequeamount = Cheque (Pair "HDFC" 350.00)
 ```
 
 ### Queues
