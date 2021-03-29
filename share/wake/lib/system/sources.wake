@@ -31,7 +31,7 @@ def raw_source file =
   if time == -1
   then makeBadPath (makeError "{file}: source does not exist")
   else
-    makePlan ("<source>", str time, file, Nil) Nil
+    makeExecPlan ("<source>", str time, file, Nil) Nil
     | setPlanShare       False
     | setPlanEcho        logDebug
     | setPlanEnvironment Nil

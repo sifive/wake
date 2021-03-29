@@ -120,8 +120,7 @@ export def prependPlanPath value plan =
 
 # Set an environment variable in a Plan
 export def setPlanEnvVar name value plan =
-  def var = "{name}={value}"
-  editPlanEnvironment (var, _) plan
+  editPlanEnvironment ("{name}={value}", _) plan
 
 # Helper methods that maintain the invariant that: Share => Keep => Once
 export def editPlanOnce f =
@@ -169,13 +168,18 @@ export def getPlanHash plan =
 #   The prior Input files have the same hashes as files in the workspace
 #   The prior Input dirs observe the same set of Visible files
 
+# Create a labeled shell plan.
+export def makePlan label visible command =
+  makeShellPlan command visible
+  | setPlanLabel label
+
 # Set reasonable defaults for all Plan arguments
 def id x = x
-export def makePlan cmd visible =
+export def makeExecPlan cmd visible =
   Plan "" cmd visible environment "." "" logInfo logWarning logEcho Share False Nil (\_ True) defaultUsage id id
 
 export def makeShellPlan script visible =
-  makePlan (which "dash", "-c", script, Nil) visible
+  makeExecPlan (which "dash", "-c", script, Nil) visible
 
 def defaultUsage = Usage 0 0.0 1.0 0 0 0
 
@@ -598,7 +602,7 @@ target hashcode f =
 # If you miss declared visible inputs, your build will fail so you can fix it.
 # If you declare too many visible inputs, cmd execution/replay will wait for unnecessary files.
 export def job cmd visible =
-  makePlan cmd visible
+  makeExecPlan cmd visible
   | runJob
 
 export def shellJob script visible =

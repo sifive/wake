@@ -19,7 +19,7 @@ from wake import _
 # Require re2c >= 1.0 for flag support
 def re2cOk Unit =
   def ver =
-    makePlan (which "re2c", "--version", Nil) Nil
+    makeExecPlan (which "re2c", "--version", Nil) Nil
     | setPlanStdout logNever
     | setPlanStderr logNever
     | runJob
@@ -36,7 +36,7 @@ def re2cReal file =
   def cpp = replace `\.re$` ".cpp" file.getPathName
   def cmdline = which "re2c", "-8", "--tags", "--no-generation-date", "--input-encoding", "utf8", file.getPathName, "-o", cpp, Nil
   def result =
-    makePlan cmdline (file, Nil)
+    makeExecPlan cmdline (file, Nil)
     | setPlanLabel "re2c {cpp}"
     | runJob
     | getJobOutput

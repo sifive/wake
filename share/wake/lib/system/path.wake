@@ -76,7 +76,7 @@ def mkdirRunner =
   makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
 
 def mkdirImp inputs mode path =
-  makePlan ("<mkdir>", "-m", "0{strbase 8 mode}", path, Nil) inputs
+  makeExecPlan ("<mkdir>", "-m", "0{strbase 8 mode}", path, Nil) inputs
   | setPlanKeep        False
   | setPlanEnvironment Nil
   | runJobWith mkdirRunner
@@ -107,7 +107,7 @@ target writeImp inputs mode path content =
           Fail f = Fail (makeError f)
           Pass path = Pass (editRunnerOutputOutputs (path, _) output)
     makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
-  makePlan ("<write>", str mode, path, Nil) inputs
+  makeExecPlan ("<write>", str mode, path, Nil) inputs
   | setPlanOnce        False
   | setPlanEnvironment Nil
   | runJobWith writeRunner

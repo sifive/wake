@@ -36,7 +36,7 @@ target pkgConfigImp args =
     Some p = "PKG_CONFIG_PATH={p}", list
     None   = list
   def result =
-    makePlan cmdline Nil
+    makeExecPlan cmdline Nil
     | setPlanLocalOnly True
     | setPlanStdout logNever
     | setPlanStderr logDebug

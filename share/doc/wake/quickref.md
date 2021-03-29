@@ -211,7 +211,8 @@ programming language for running jobs.
 
 ```
 global def planit =
-  makePlan ('touch','foo',Nil) Nil
+  "touch foo"
+  | makePlan "create file" Nil
 
 global def runit _ =
   planit
