@@ -104,7 +104,7 @@ static bool validate_mount(
 		return false;
 	}
 
-	if ((op != "bind" && op != "squashfs") && source.length() != 0) {
+	if ((op != "bind" && op != "squashfs") && !source.empty()) {
 		std::cerr << "mount: " << op << " can not have 'source' option" << std::endl;
 		return false;
 	}
@@ -172,7 +172,7 @@ static bool equal_dev_ids(dev_t a, dev_t b) {
 	return major(a) == major(b) && minor(a) == minor(b);
 }
 
-static bool mount_squashfs(const std::string& source, const std::string& mountpoint) {
+static bool do_squashfuse_mount(const std::string& source, const std::string& mountpoint) {
 	pid_t pid = fork();
 	if (pid == 0) {
 		// kernel to send SIGKILL to squashfuse when fuse-wake terminates
@@ -205,9 +205,59 @@ static bool mount_squashfs(const std::string& source, const std::string& mountpo
 		else
 			usleep(10000 << i); // 10ms * 2^i
 	}
-
 	std::cerr << "squashfs mount missing: " << mountpoint << std::endl;
 	return false;
+}
+
+// Location in the parent namespace to base the new root on.
+const std::string root_mount_prefix = "/tmp/.wakebox-mount";
+
+// Path to place a squashfs mount before it's moved to the real mountpoint.
+// While this location will be mounted-over, it will be uncovered when we do the move.
+// Must not hide 'root_mount_prefix'.
+const std::string squashfs_staging_mount = "/mnt/";
+
+// Path within the toolchain squashfs describing where its temp
+// mount should be moved to
+const std::string mount_location_data = ".wakebox/mountpoint";
+
+static bool mount_squashfs(const std::string& source, const std::string& mountpoint) {
+	// If provided with an explicit mountpoint, just use it.
+	if (mountpoint != root_mount_prefix)
+		return do_squashfuse_mount(source, mountpoint);
+
+	// Mount the squashfs at a staging point so we have access to its contents.
+	if(!do_squashfuse_mount(source, squashfs_staging_mount))
+		return false;
+
+	// Read the file that specifies the correct mountpoint.
+	std::string contents;
+	std::ifstream mount_info(squashfs_staging_mount + mount_location_data);
+	if (mount_info.is_open())
+		std::getline(mount_info, contents);
+	mount_info.close();
+	if (contents.empty()) {
+		std::cerr <<
+			"squashfs: no destination provided and '.wakebox/mountpoint' did not contain a "
+			"mountpoint on first line."
+			<< std::endl;
+		return false;
+	}
+
+	// Make the new mountpoint, it's ok if it already exists.
+	std::string new_target = mountpoint + contents;
+	if (0 != mkdir(new_target.c_str(), 0770) && errno != EEXIST) {
+		std::cerr << "mkdir (" << new_target << "): " << strerror(errno) << std::endl;
+		return false;
+	}
+
+	// Move the staging mount to the correct mountpoint.
+	if (0 != mount(squashfs_staging_mount.c_str(), new_target.c_str(), "", MS_MOVE, 0UL)) {
+		std::cerr << "move mount (" << squashfs_staging_mount << ", " << new_target << "): "
+			<< strerror(errno) << std::endl;
+		return false;
+	}
+	return true;
 }
 
 static bool create_dir(const std::string& dest) {
@@ -239,10 +289,12 @@ bool do_mounts(const std::vector<mount_op>& mount_ops, const std::string& fuse_m
 {
 	std::string mount_prefix;
 	for (auto &x : mount_ops) {
-		if (x.destination == "/") {
+		// A squashfs without a known destination is only supported if we are to pivot_root later.
+		if (mount_prefix != root_mount_prefix &&
+			(x.destination == "/" || (x.type == "squashfs" && x.destination.empty()))) {
 			// All mount ops from here onward will have a prefixed destination.
 			// The prefix will be pivoted to after the final mount op.
-			mount_prefix = "/tmp/.wakebox-mount";
+			mount_prefix = root_mount_prefix;
 			// Re-use if it already exists.
 			if (0 != mkdir(mount_prefix.c_str(), 0777) && errno != EEXIST) {
 				std::cerr << "mkdir (" << mount_prefix << "): " << strerror(errno) << std::endl;
