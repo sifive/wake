@@ -114,6 +114,15 @@ export def setPlanOnce  v p = editPlanOnce  (\_ v) p
 export def setPlanKeep  v p = editPlanKeep  (\_ v) p
 export def setPlanShare v p = editPlanShare (\_ v) p
 
+# Prepend 'value' to the Plan's 'PATH' environment value
+export def prependPlanPath value plan =
+  editPlanEnvironment (addEnvironmentPath value) plan
+
+# Set an environment variable in a Plan
+export def setPlanEnvVar name value plan =
+  def var = "{name}={value}"
+  editPlanEnvironment (var, _) plan
+
 # Helper methods that maintain the invariant that: Share => Keep => Once
 export def editPlanOnce f =
   def helper = match _
