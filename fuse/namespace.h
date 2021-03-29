@@ -36,17 +36,18 @@ bool setup_user_namespaces(
 	int id_user,
 	int id_group,
 	bool isolate_network,
-	const std::string& hostname,
-	const std::string& domainname);
+	const std::string &hostname,
+	const std::string &domainname);
 
 bool do_mounts(
-	const std::vector<mount_op>& mount_ops,
-	const std::string& fuse_mount_path);
+	const std::vector<mount_op> &mount_ops,
+	const std::string &fuse_mount_path,
+	std::vector<std::string> &environments);
 
 bool get_workspace_dir(
-	const std::vector<mount_op>& mount_ops,
-	const std::string& host_workspace_dir,
-	std::string& out);
+	const std::vector<mount_op> &mount_ops,
+	const std::string &host_workspace_dir,
+	std::string &out);
 
 #endif
 

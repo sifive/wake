@@ -32,8 +32,27 @@
 #include <sys/sysmacros.h>
 #include <sys/wait.h>
 
+#include "fuse.h"
 #include "json5.h"
 #include "namespace.h"
+
+// Location in the parent namespace to base the new root on.
+static const std::string root_mount_prefix = "/tmp/.wakebox-mount";
+
+// Path to place a squashfs mount before it's moved to the real mountpoint.
+// While this location will be mounted-over, it will be uncovered when we do the move.
+// Must not hide 'root_mount_prefix'.
+static const std::string squashfs_staging_location = "/mnt";
+
+// Path within a squashfs mount containing where its temporary mount should be moved to.
+static const std::string mount_location_data = ".wakebox/mountpoint";
+
+// Path within a squashfs mount containing environment modification data.
+static const std::string mounted_environment_location = ".wakebox/environment";
+
+// Path within a squashfs mount containing json description of further required mounts.
+static const std::string helper_mounts_location = ".wakebox/mounts";
+
 
 static void write_file(const char *file, const char *content, int len)
 {
@@ -104,7 +123,7 @@ static bool validate_mount(
 		return false;
 	}
 
-	if ((op != "bind" && op != "squashfs") && source.length() != 0) {
+	if ((op != "bind" && op != "squashfs") && !source.empty()) {
 		std::cerr << "mount: " << op << " can not have 'source' option" << std::endl;
 		return false;
 	}
@@ -172,7 +191,7 @@ static bool equal_dev_ids(dev_t a, dev_t b) {
 	return major(a) == major(b) && minor(a) == minor(b);
 }
 
-static bool mount_squashfs(const std::string& source, const std::string& mountpoint) {
+static bool do_squashfuse_mount(const std::string &source, const std::string &mountpoint) {
 	pid_t pid = fork();
 	if (pid == 0) {
 		// kernel to send SIGKILL to squashfuse when fuse-wake terminates
@@ -210,6 +229,133 @@ static bool mount_squashfs(const std::string& source, const std::string& mountpo
 	return false;
 }
 
+static bool squashfs_helper_mounts(const std::string &squashfs_base_path, const std::string &mount_prefix) {
+	// Check if there is a helper mounts file to parse.
+	std::string path = squashfs_base_path + "/" + helper_mounts_location;
+	std::ifstream helper_mounts_stream(path);
+	if (!helper_mounts_stream)
+		// Lack of helper mounts is not an error.
+		return true;
+
+	const std::string json(
+		(std::istreambuf_iterator<char>(helper_mounts_stream)),
+		(std::istreambuf_iterator<char>()));
+	if (helper_mounts_stream.fail()) {
+		std::cerr << "read " << path << ": " << strerror(errno) << std::endl;
+		return false;
+	}
+
+	JAST jast;
+	if (!jast.parse(json, std::cerr, jast))
+		return false;
+
+	// While this json format looks similar to 'struct json_args' it is parsed separately
+	// so that they may evolve independently as these helper mounts will be embedded in
+	// the squashfs itself.
+	for (auto &x : jast.get("mount-ops").children) {
+		const std::string &type = x.second.get("type").value;
+		const std::string &source = x.second.get("source").value;
+		const std::string &destination = x.second.get("destination").value;
+
+		if (type != "bind" && type !="tmpfs") {
+			std::cerr << "Unexpected mount type '" << type << "' in " << path << std::endl;
+			return false;
+		}
+
+		const std::string target = mount_prefix + destination;
+		if (type == "bind" && !bind_mount(source, target, false))
+			return false;
+		if (type == "tmpfs" && !mount_tmpfs(target))
+			return false;
+	}
+	return true;
+}
+
+static bool move_squashfs_mount(
+	const std::string &mount_prefix,
+	const std::string &source,
+	std::string &mounted_at
+){
+	// Read the file that specifies the correct mountpoint.
+	std::string contents;
+	std::ifstream mount_info(squashfs_staging_location + "/" + mount_location_data);
+	if (mount_info.is_open())
+		std::getline(mount_info, contents);
+	mount_info.close();
+	if (contents.empty()) {
+		std::cerr << "squashfs (" << source << "): no destination provided and "
+			" '.wakebox/mountpoint' did not contain a mountpoint on first line."
+			<< std::endl;
+		return false;
+	}
+
+	// Make the new mountpoint, it's ok if it already exists.
+	std::string new_target = mount_prefix + contents;
+	if (0 != mkdir(new_target.c_str(), 0770) && errno != EEXIST) {
+		std::cerr << "mkdir (" << new_target << "): " << strerror(errno) << std::endl;
+		return false;
+	}
+
+	// Move the staging mount to the correct mountpoint.
+	if (0 != mount(squashfs_staging_location.c_str(), new_target.c_str(), "", MS_MOVE, 0UL)) {
+		std::cerr << "move mount (" << squashfs_staging_location << ", " << new_target << "): "
+			<< strerror(errno) << std::endl;
+		return false;
+	}
+	mounted_at = new_target;
+	return true;
+}
+
+// Collect any squashfs-provided environment modifications.
+// They should be sh-compatible files that can be sourced.
+static void add_squashfs_environment(
+	const std::string &mount_prefix,
+	const std::string &squashfs_mountpoint,
+	std::vector<std::string>& environments
+) {
+	auto s = squashfs_mountpoint + "/" + mounted_environment_location;
+	std::ifstream env_file(s);
+	if (env_file) {
+		std::string without_prefix = squashfs_mountpoint.substr(mount_prefix.length());
+		environments.push_back(without_prefix + "/" + mounted_environment_location);
+	}
+}
+
+static bool squashfs_mount(
+	const std::string &source,
+	const std::string &mount_prefix,
+	const std::string &dest_from_json,
+	const std::string &dest_with_prefix,
+	std::vector<std::string> &environments
+){
+	std::string mounted_at = dest_with_prefix;
+
+	// If we have a destination use it directly. otherwise use a staging mount and move it.
+	if (!dest_from_json.empty()) {
+		if (!do_squashfuse_mount(source, dest_with_prefix)) {
+			return false;
+		}
+	} else {
+		if (!do_squashfuse_mount(source, squashfs_staging_location)) {
+			return false;
+		}
+
+		// mutates 'mounted_at'
+		if (!move_squashfs_mount(mount_prefix, squashfs_staging_location, mounted_at)) {
+			return false;
+		}
+	}
+
+	// The squashfs can specify additional mounts, for example: /proc -> /proc
+	if (!squashfs_helper_mounts(mounted_at, mount_prefix))
+		return false;
+
+	// The squashfs can provide environment modifications
+	add_squashfs_environment(mount_prefix, mounted_at, environments);
+
+	return true;
+}
+
 static bool create_dir(const std::string& dest) {
 	if (0 == mkdir(dest.c_str(), 0777))
 		return true;
@@ -235,21 +381,24 @@ static bool create_file(const std::string& dest) {
 // The input/caller responsibility to ensure that the mountpoint exists,
 // that the platform supports the mount type/options, and to correctly order
 // the layered mounts.
-bool do_mounts(const std::vector<mount_op>& mount_ops, const std::string& fuse_mount_path)
+bool do_mounts(
+	const std::vector<mount_op> &mount_ops,
+	const std::string &fuse_mount_path,
+	std::vector<std::string> &environments)
 {
 	std::string mount_prefix;
 	for (auto &x : mount_ops) {
 		if (x.destination == "/") {
 			// All mount ops from here onward will have a prefixed destination.
 			// The prefix will be pivoted to after the final mount op.
-			mount_prefix = "/tmp/.wakebox-mount";
+			mount_prefix = root_mount_prefix;
 			// Re-use if it already exists.
 			if (0 != mkdir(mount_prefix.c_str(), 0777) && errno != EEXIST) {
 				std::cerr << "mkdir (" << mount_prefix << "): " << strerror(errno) << std::endl;
 				return false;
 			}
 		}
-		const std::string& target = mount_prefix + x.destination;
+		const std::string target = mount_prefix + x.destination;
 
 		if (!validate_mount(x.type, x.source))
 			return false;
@@ -263,13 +412,14 @@ bool do_mounts(const std::vector<mount_op>& mount_ops, const std::string& fuse_m
 		if (x.type == "tmpfs" && !mount_tmpfs(target))
 			return false;
 
-		if (x.type == "squashfs" && !mount_squashfs(x.source, target))
-			return false;
-
 		if (x.type == "create-dir" && !create_dir(target))
 			return false;
 
 		if (x.type == "create-file" && !create_file(target))
+			return false;
+
+		if (x.type == "squashfs" &&
+			!squashfs_mount(x.source, mount_prefix, x.destination, target, environments))
 			return false;
 	}
 

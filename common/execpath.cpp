@@ -71,6 +71,15 @@ std::string find_path(const char *const * env) {
   return ".:/bin:/usr/bin";
 }
 
+std::string find_path(const std::vector<std::string> &env) {
+  for (auto &s : env) {
+    if (!s.compare(0, 5, "PATH=")) {
+      return s.substr(5);
+    }
+  }
+  return ".:/bin:/usr/bin";
+}
+
 std::string get_cwd() {
   std::vector<char> buf;
   buf.resize(1024, '\0');

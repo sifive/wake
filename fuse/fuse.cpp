@@ -34,6 +34,7 @@
 #include "execpath.h"
 #include "membytes.h"
 #include "namespace.h"
+#include "shell.h"
 
 bool json_as_struct(const std::string& json, json_args& result) {
 	JAST jast;
@@ -85,8 +86,7 @@ static int execve_wrapper(const std::vector<std::string>& command, const std::ve
 		env.push_back(e.c_str());
 	env.push_back(0);
 
-	std::string command_path = find_in_path(cmd_args[0], find_path(env.data()));
-	execve(command_path.c_str(),
+	execve(command[0].c_str(),
 		const_cast<char * const *>(cmd_args.data()),
 		const_cast<char * const *>(env.data()));
 	return errno;
@@ -165,6 +165,8 @@ int run_in_fuse(const fuse_args& args, std::string& result_json) {
 
 	pid_t pid = fork();
 	if (pid == 0) {
+
+		std::vector<std::string> command = args.command;
 #ifdef __linux__
 		if (!setup_user_namespaces(
 			args.userid,
@@ -174,7 +176,8 @@ int run_in_fuse(const fuse_args& args, std::string& result_json) {
 			args.domainname))
 			exit(1);
 
-		if (!do_mounts(args.mount_ops, rpath))
+		std::vector<std::string> envs_from_mounts;
+		if (!do_mounts(args.mount_ops, rpath, envs_from_mounts))
 			exit(1);
 
 		std::string dir;
@@ -183,10 +186,30 @@ int run_in_fuse(const fuse_args& args, std::string& result_json) {
 			exit(1);
 		}
 		dir = dir + "/" + args.directory;
+
+		if (envs_from_mounts.size() > 0) {
+			// 'source' the environments provided by any mounts before running command.
+			// The shell will search the PATH for the executable location.
+			command = {"/bin/sh", "-c"};
+			std::stringstream cmd_ss;
+			for (auto& e : envs_from_mounts)
+				cmd_ss << ". " << shell_escape(e) << " && ";
+
+			cmd_ss << "exec";
+			for (auto& s : args.command)
+				cmd_ss << " " << shell_escape(s);
+			command.push_back(cmd_ss.str());
+
+		} else {
+			// Search the PATH for the executable location.
+			command[0] = find_in_path(command[0], find_path(args.environment));
+		}
 #else
+		// Search the PATH for the executable location.
+		command[0] = find_in_path(command[0], find_path(args.environment));
+
 		std::string dir = rpath + "/" + args.directory;
 #endif
-
 		if (chdir(dir.c_str()) != 0) {
 			std::cerr << "chdir " << dir << ": " << strerror(errno) << std::endl;
 			exit(1);
@@ -207,8 +230,8 @@ int run_in_fuse(const fuse_args& args, std::string& result_json) {
 			}
 		}
 
-		int err = execve_wrapper(args.command, args.environment);
-		std::cerr << "execve " << args.command[0] << ": " << strerror(err) << std::endl;
+		int err = execve_wrapper(command, args.environment);
+		std::cerr << "execve " << command[0] << ": " << strerror(err) << std::endl;
 		exit(1);
 	}
 
