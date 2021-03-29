@@ -19,6 +19,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <fcntl.h>
 #include <unistd.h>
@@ -27,6 +28,7 @@
 #include "fuse.h"
 #include "gopt.h"
 #include "gopt-arg.h"
+#include "shell.h"
 
 void print_help() {
 	std::cout <<
@@ -35,6 +37,9 @@ void print_help() {
 		"    -p --params FILE         Json file specifying input parameters\n"
 		"    -o --output-stats FILE   Json file written to with output results\n"
 		"    -i --allow-interactive   Ignore params json file's stdin value\n"
+		"    -s --force-shell         Run shell instead of command from params.\n"
+		"                             Implies --allow-interactive.\n"
+		"                             Use 'eval $WAKEBOX_CMD' to run the command from params.\n"
 		"    -h --help                Print usage\n";
 }
 
@@ -44,6 +49,7 @@ int main(int argc, char *argv[])
 		{'p', "params",       GOPT_ARGUMENT_REQUIRED},
 		{'o', "output-stats", GOPT_ARGUMENT_REQUIRED},
 		{'i', "interactive",  GOPT_ARGUMENT_FORBIDDEN},
+		{'s', "force-shell",  GOPT_ARGUMENT_FORBIDDEN},
 		{'h', "help",         GOPT_ARGUMENT_FORBIDDEN},
 		{0,   0,              GOPT_LAST }
 	};
@@ -53,6 +59,7 @@ int main(int argc, char *argv[])
 
 	bool has_output = arg(options, "output-stats")->count > 0;
 	bool use_stdin_file = arg(options, "interactive")->count == 0;
+	bool use_shell = arg(options, "force-shell")->count > 0;
 
 	const char* params  = arg(options, "params" )->argument;
 	const char* result_path = arg(options, "output-stats")->argument;
@@ -81,8 +88,20 @@ int main(int argc, char *argv[])
 	args.working_dir = get_cwd();
 	args.use_stdin_file = use_stdin_file;
 
-	std::string result;
+	if (use_shell) {
+		std::stringstream ss;
+		ss << "WAKEBOX_CMD=";
+		for (auto &s : args.command)
+			ss << shell_escape(s) << " ";
+		std::string escaped = ss.str();
+		args.environment.push_back(escaped.substr(0, escaped.length()-1));
 
+		args.use_stdin_file = false;
+		args.command = {"/bin/sh"};
+		std::cerr << "To execute the original command:\n\teval $WAKEBOX_CMD" << std::endl;
+	}
+
+	std::string result;
 	if (!has_output)
 		return run_in_fuse(args, result);
 
