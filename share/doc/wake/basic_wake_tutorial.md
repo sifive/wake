@@ -227,6 +227,10 @@ def dtrunc fullstring =
 def incfirst fullstring chrstr = explode fullstring | tail | prepend chrstr | cat
 ```
 
+* `Pair` carry 2 fields which is `First` and `Second`. The datatype of the `First` and `Second` can be anything and datatype is determined while we are creating a `Pair`
+
+* `getPairFirst` and `getPairSecond` are the 2 helper functions that are used to access the first and second data within a Pair. It has other helper functions such as `setPairFirst` , `setPairSecond` , `editPairFirst` and `editPairSecond`.
+
 * Function reorder takes a string , split the string and then reverses the splitted string and then concantenates both (Ex: hangover -> overhang)
 ```
 def reorder fullstring = 
