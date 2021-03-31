@@ -21,7 +21,6 @@ This tutorial will teach you the basics of Wake language. After completeing this
 7. For more information on wake library click [here](https://sifive.github.io/wake/).
 
 ### wake `Hello World`
-* If you want to display a string you can do that using the below function by writing the string to be displayed inside "" and call the function `abc`.
 
 Copy the below function into a `.wake` file you created in step 4
 ```
@@ -39,13 +38,13 @@ This will call the function `abc` and print `Hello World`.
 A function should be defined using the keyword `def`. Simple function definition takes the form
 `def <function name> <parameter list> = <expression>`
 
-We cannot specify explicitly the return type and type of the parameters. Usually when the function body is of multi-line the return value is specified by the last line in the function.
+We cannot specify explicitly the return type and type of the parameters. When the function body is of multi-line the return value is specified by the last line in the function.
 
 Functions can be defined with the keyword `global` which makes the function to be accessed outside the file where it is being defined.
 
 We can arbitrarily deeply put `def` inside another `def`. The internal `def` is bound to the function itself and cannot be accesible outside the function.
 
-Note: The only thing you can define functions are using `def` keyword. In wake we deal everything with functions.
+Note: The only thing you can define are functions using `def` keyword. In wake we do everything with functions.
 
 #### Few operators that work on Integer data type
 * `+` Addition Operator
@@ -64,32 +63,32 @@ Note: The only thing you can define functions are using `def` keyword. In wake w
 * `/.` Division Operator
 * `^.` Exponent Operator
 
-* Below function  double takes an argment x and gives the output by multiplying the x by 2
+* Below function  double takes an argment x and gives the output by multiplying the x by 2.
 ```
 def double x = 2*x
 ```
 
-* Below function triple takes an argument x and gives the output by multiplying the x by 3
+* Below function triple takes an argument x and gives the output by multiplying the x by 3.
 ```
 def triple x = 3*x
 ```
 
-* Function inc increments the values by 1 and returns the value
+* Function inc increments the values by 1 and returns the value.
 ```
 def inc x = x+1
 ```
 
-* Function adda takes an argument of type string and concatenates it with b and gives the output. `{ }` is the string interpolation operator
+* Function adda takes an argument of type string and concatenates it with b and gives the output. `{ }` is the string interpolation operator.
 ```
 def adda s = "{s}b"
 ```
 
-* Function times4 takes an argument x and applies the function double twice on x
+* You can use parenthesis to nest function calls. Function times4 takes an argument x and applies the function double twice on x.
 ```
 def times4 x = double (double x)
 ```
 
-* Adds 2 integer values and gives out the result
+* Adds 2 integer values and gives out the result.
 ```
 def sumadd x y = x+y 
 ```
@@ -107,12 +106,12 @@ The lambda operator `\` is an alternative way to define the parameters of a func
 def aveI = \x\y (x+y)/2
 ```
 
-* Function aveR(averageOfReal) takes 2 arguments of type double and divides the result by 2
+* Function aveR(averageOfReal) takes 2 arguments of type double and divides the result by 2.
 ```
 def aveR = \x\y (x +. y) /. 2.0
 ```
 
-* Function aveM(Modulus) adds 2 values and provides the remainder 
+* Function aveM(Modulus) adds 2 values and provides the remainder.
 ```
 def aveM = \x\y (x+y) % 2
 ```
@@ -142,14 +141,14 @@ wake -x 'strlen "abcde"'
 * `flatten` converts the list of list into a list.
 * `mapFlat` applies a function to each element in the list and builds a new list from the resulting elements.
 * `filter`  applies a function and builds a new list from it.
-* `zip` takes 2 lists and converts them to list of Pairs
+* `zip` takes 2 lists and converts them to list of Pairs.
 
-* Function duplicate concantenates or copies a given string twice
+* Function duplicate concantenates or copies a given string twice.
 ```
 def duplicate s  ="{s}{s}"
 ```
 #### Miscellaneous Built-In Functions 
-* integerToUnicode is a `wake built-in function` which takes the ASCII input and provides its equivalent character
+* integerToUnicode is a `wake built-in function` which takes the ASCII input and provides its equivalent character.
 ```
 wake -x 'integerToUnicode 99'
 ```
@@ -162,12 +161,12 @@ wake -x 'unicodeToInteger "a"'
 ### List
 A List is a sequence of items of same type. Empty list returns `Nil`. `head` returns the first element in the list. `tail` returns the rest of the list without the `head`.
 
-* Example creates a list of given elements
+* Example creates a list of given elements.
 ```
 def listcreate xx = xx,xx,xx,Nil
 ```
  
-* Example shows how to prepend the list of integers with the given value
+* Example shows how to prepend the list of integers with the given value.
 ```
 def d = 1,2,3,Nil
 def listprepend data1 = prepend data1 d
@@ -185,8 +184,8 @@ wake -x '(1,2,3,Nil) ++ (4,5,6,Nil)'
 `wake` does not allow you to specify the types of parameters or return values. All types are inferred.
 
 * Here:
-** the parameter `c` has to be string since function `strlen` has been applied to it
-** `b` has to be integer as it is being added to the output of `strlen c` 
+** the parameter `c` has to be string since function `strlen` has been applied to it.
+** `b` has to be integer as it is being added to the output of `strlen c`.
 ** `a` is a list of integers because it prepends the output of `(b + strlen c)`.
 
 ```
@@ -222,7 +221,7 @@ def dtrunc fullstring =
   outputstr
 ```
 
-* Function incfirst takes a string and a character and replaces the first character of the string with the given character
+* Function incfirst takes a string and a character and replaces the first character of the string with the given character.
 ```
 def incfirst fullstring chrstr = explode fullstring | tail | prepend chrstr | cat
 ```
@@ -231,7 +230,7 @@ def incfirst fullstring chrstr = explode fullstring | tail | prepend chrstr | ca
 
 * `getPairFirst` and `getPairSecond` are the 2 helper functions that are used to access the first and second data within a Pair. It has other helper functions such as `setPairFirst` , `setPairSecond` , `editPairFirst` and `editPairSecond`.
 
-* Function reorder takes a string , split the string and then reverses the splitted string and then concantenates both (Ex: hangover -> overhang)
+* Function reorder takes a string , split the string and then reverses the splitted string and then concantenates both (Ex: hangover -> overhang).
 ```
 def reorder fullstring = 
   def Pair firststr laststr = 
