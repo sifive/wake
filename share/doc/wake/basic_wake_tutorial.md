@@ -12,7 +12,7 @@ This tutorial will teach you the basics of Wake language. After completeing this
 
 4. Create a file with `.wake` extension and copy the functions mentioned in this tutorial and run using `wake` command in the terminal as mentioned in Step 5.  
 
-5. Run command for wake: `wake -vx '<function_name> <parameter_if_any>'`. Ex: `wake -x 'double 2'`.
+5. Run command for wake: `wake -vx '<function_name> <parameter_if_any>'`. Ex: `wake -vx 'double 2'`.
    
    `v` stands for verbosity and `x` stands for execute the expression.
 
@@ -40,7 +40,7 @@ A function should be defined using the keyword `def`. Simple function definition
 
 We cannot specify explicitly the return type and type of the parameters. When the function body is of multi-line the return value is specified by the last line in the function.
 
-Functions can be defined with the keyword `global` which makes the function to be accessed outside the file where it is being defined.
+Functions can be defined with the keyword `global` which makes the function accessible from other .wake files other than the one where it is defined.
 
 We can arbitrarily deeply put `def` inside another `def`. The internal `def` is bound to the function itself and cannot be accesible outside the function.
 
@@ -76,11 +76,6 @@ def triple x = 3*x
 * Function inc increments the values by 1 and returns the value.
 ```
 def inc x = x+1
-```
-
-* Function adda takes an argument of type string and concatenates it with b and gives the output. `{ }` is the string interpolation operator.
-```
-def adda s = "{s}b"
 ```
 
 * You can use parenthesis to nest function calls. Function times4 takes an argument x and applies the function double twice on x.
@@ -128,6 +123,16 @@ Few of the commonly used built-in functions in this tutorial is given below
 wake -x 'strlen "abcde"'
 ```
 
+* Function addb takes an argument of type string and concatenates it with b and gives the output. `{ }` is the string interpolator operator.
+```
+def addb s = "{s}b"
+```
+
+* Function duplicate concantenates or copies a given string twice.
+```
+def duplicate s  ="{s}{s}"
+```
+
 #### Operation on List
 * `take` takes first `n` elements in the list.
 * `drop` drops first `n` elements in the list.
@@ -143,10 +148,6 @@ wake -x 'strlen "abcde"'
 * `filter`  applies a function and builds a new list from it.
 * `zip` takes 2 lists and converts them to list of Pairs.
 
-* Function duplicate concantenates or copies a given string twice.
-```
-def duplicate s  ="{s}{s}"
-```
 #### Miscellaneous Built-In Functions 
 * integerToUnicode is a `wake built-in function` which takes the ASCII input and provides its equivalent character.
 ```
@@ -179,6 +180,11 @@ wake -x '(1,2,3,Nil) ++ (4,5,6,Nil)'
 ```
 ### Option
 `Option` is a data type in wake. It will either return `Some x` which is a value `x` or `None` which means nothing.
+
+### Pair
+* `Pair` carry 2 fields which is `First` and `Second`. The datatype of the `First` and `Second` can be anything and datatype is determined while we are creating a `Pair`
+
+* `getPairFirst` and `getPairSecond` are the 2 helper functions that are used to access the first and second data within a Pair. It has other helper functions such as `setPairFirst` , `setPairSecond` , `editPairFirst` and `editPairSecond`.
 
 ### Type Inference
 `wake` does not allow you to specify the types of parameters or return values. All types are inferred.
@@ -225,10 +231,6 @@ def dtrunc fullstring =
 ```
 def incfirst fullstring chrstr = explode fullstring | tail | prepend chrstr | cat
 ```
-
-* `Pair` carry 2 fields which is `First` and `Second`. The datatype of the `First` and `Second` can be anything and datatype is determined while we are creating a `Pair`
-
-* `getPairFirst` and `getPairSecond` are the 2 helper functions that are used to access the first and second data within a Pair. It has other helper functions such as `setPairFirst` , `setPairSecond` , `editPairFirst` and `editPairSecond`.
 
 * Function reorder takes a string , split the string and then reverses the splitted string and then concantenates both (Ex: hangover -> overhang).
 ```
@@ -296,7 +298,7 @@ wake -x 'cat((tail (explode "seat")) ++(take 1(explode "seat")))'
 ```
 
 ### Tuple
-A tuple is collection of items of different types. `get`,`set` and `edit` are the three inbuilt methods that can be used with the tuples.
+A tuple is collection of items of different types.
 * Below example shows the declaration of a tuple. 
 ```
 tuple Collection =
@@ -305,12 +307,14 @@ tuple Collection =
   global StringValue : String
 ```
 
+`get`,`set` and `edit` are the three inbuilt methods that can be used with any Tuple.
+
 `set<tuple name><field Name>` 
 `set` operation sets(writes) value to the tuple field
 `get<tuple name><field Name>` 
-`get` operation gets(reads) value to the tuple field
+`get` operation gets(reads) value of the tuple field
 `edit<tuple name><field Name>` 
-`edit` operation moidfies value to the tuple field
+`edit` operation moidifies value to the tuple field
 
 ### Higher Order function
 A function which does one of the following is a higher order function
