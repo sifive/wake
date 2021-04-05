@@ -61,6 +61,10 @@ struct JAST {
 
   // Add a child to a JObject
   JAST &add(std::string &&key, SymbolJSON kind, std::string &&value);
+  JAST &add(std::string &&key, int value) { return add(std::move(key), JSON_INTEGER, std::to_string(value)); }
+  JAST &add(std::string &&key, long value) { return add(std::move(key), JSON_INTEGER, std::to_string(value)); }
+  JAST &add(std::string &&key, long long value) { return add(std::move(key), JSON_INTEGER, std::to_string(value)); }
+  JAST &add(std::string &&key, double value) { return add(std::move(key), JSON_DOUBLE, std::to_string(value)); }
   JAST &add(std::string &&key, std::string &&value) { return add(std::move(key), JSON_STR, std::move(value)); }
   JAST &add(std::string &&key, SymbolJSON kind)     { return add(std::move(key), kind,     std::string());    }
   // Add a child to a JArray

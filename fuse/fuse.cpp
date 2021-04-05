@@ -235,38 +235,31 @@ int run_in_fuse(const fuse_args& args, std::string& result_json) {
 	(void)!write(livefd, &stop, 1); // the ! convinces older gcc that it's ok to ignore the write
 	(void)fsync(livefd);
 
-	JAST jast;
+	JAST from_daemon;
 	std::stringstream ss;
-	if (!JAST::parse(opath.c_str(), ss, jast)) {
+	if (!JAST::parse(opath.c_str(), ss, from_daemon)) {
 		// stderr is closed, so report the error on the only output we have
 		result_json = ss.str();
 		return 1;
 	}
 
-	ss << "{\"usage\":{\"status\":" << status
-	  << ",\"runtime\":" << (stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0)
-	  << ",\"cputime\":" << (rusage.ru_utime.tv_sec + rusage.ru_stime.tv_sec + (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0)
-	  << ",\"membytes\":" << MEMBYTES(rusage)
-	  << ",\"inbytes\":" << jast.get("ibytes").value
-	  << ",\"outbytes\":" << jast.get("obytes").value
-	  << "},\"inputs\":[";
+	JAST result_jast(JSON_OBJECT);
+	auto& usage = result_jast.add("usage", JSON_OBJECT);
+	usage.add("status", status);
+	usage.add("membytes", MEMBYTES(rusage));
+	usage.add("inbytes", std::stoll(from_daemon.get("ibytes").value));
+	usage.add("outbytes", std::stoll(from_daemon.get("obytes").value));
+	usage.add("runtime", stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0);
+	usage.add("cputime",
+		rusage.ru_utime.tv_sec + rusage.ru_stime.tv_sec +
+		(rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0);
 
-	bool first = true;
-	for (auto &x : jast.get("inputs").children) {
-		ss << (first?"":",") << "\"" << json_escape(x.second.value) << "\"";
-		first = false;
-	}
+	result_jast.add("inputs", JSON_ARRAY).children = std::move(from_daemon.get("inputs").children);
+	result_jast.add("outputs", JSON_ARRAY).children = std::move(from_daemon.get("outputs").children);
 
-	ss << "],\"outputs\":[";
+	std::stringstream result_ss;
+	result_ss << result_jast;
+	result_json = result_ss.str();
 
-	first = true;
-	for (auto &x : jast.get("outputs").children) {
-		ss << (first?"":",") << "\"" << json_escape(x.second.value) << "\"";
-		first = false;
-	}
-
-	ss << "]}" << std::endl;
-	result_json = ss.str();
-
-	return ss.fail() ? 1 : 0;
+	return result_ss.fail() ? 1 : 0;
 }
