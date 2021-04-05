@@ -17,11 +17,11 @@ package build_wake
 from wake import _
 
 def buildWakeBox (Pair cpplib clib) =
-  def jsonLib = common cpplib
+  def commonLib = common cpplib
   def goptLib = gopt clib
-  def libs = (jsonLib, goptLib, Nil) | flattenSysLibs
-  def headers = sources "fuse" `.*\.h` ++ goptLib.getSysLibHeaders ++ jsonLib.getSysLibHeaders
-  def compile = compileC cpplib ("-Ifuse", goptLib.getSysLibCFlags ++ jsonLib.getSysLibCFlags) headers
+  def libs = (commonLib, goptLib, Nil) | flattenSysLibs
+  def headers = sources "fuse" `.*\.h` ++ goptLib.getSysLibHeaders ++ commonLib.getSysLibHeaders
+  def compile = compileC cpplib ("-Ifuse", goptLib.getSysLibCFlags ++ commonLib.getSysLibCFlags) headers
   def cppFiles = sources "wakebox" `.*\.cpp`
   def objFiles = goptLib.getSysLibObjects ++ map compile cppFiles ++ (buildFuseLibObjs cpplib)
   linkO cpplib libs.getSysLibLFlags objFiles "bin/wakebox"
