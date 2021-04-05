@@ -21,7 +21,7 @@ def buildAs Unit = match (subscribe releaseAs)
   version, Nil = Pass version
   _ =
     def cmdline = which "git", "describe", "--tags", "--dirty", Nil
-    makePlan cmdline Nil
+    makeExecPlan cmdline Nil
     | setPlanKeep False
     | setPlanLocalOnly True
     | setPlanStdout logNever
@@ -40,7 +40,7 @@ def buildOn Unit = match (subscribe releaseOn)
   date, Nil = Pass date
   _ =
     def cmdline = which "git", "show", "-s", "--format=%ci", "HEAD", Nil
-    makePlan cmdline Nil
+    makeExecPlan cmdline Nil
     | setPlanKeep False
     | setPlanLocalOnly True
     | setPlanStdout logNever

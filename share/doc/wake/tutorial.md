@@ -324,7 +324,8 @@ of a comment, `# ...`, reminding us of the default permissions used.
 
     cat >> tutorial.wake <<'EOF'
     def hax _ =
-      makePlan (which "env", Nil) Nil
+      "env"
+      | makePlan "print environment" Nil
       | setPlanEnvironment ("HAX=peanut", "FOO=bar", Nil)
       | runJob
       | getJobStdout
