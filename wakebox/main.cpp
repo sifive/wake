@@ -88,6 +88,11 @@ int main(int argc, char *argv[])
 	args.working_dir = get_cwd();
 	args.use_stdin_file = use_stdin_file;
 
+	if (args.command.empty() || args.command[0].empty()) {
+		std::cerr << "No command was provided." << std::endl;
+		return 1;
+	}
+
 	if (use_shell) {
 		std::stringstream ss;
 		ss << "WAKEBOX_CMD=";
