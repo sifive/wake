@@ -191,10 +191,14 @@ std::string Database::open(bool wait, bool memory) {
     "  content text,"
     "  unique(job_id, uri) on conflict replace);";
 
+  bool waiting = false;
   while (true) {
     char *fail;
     ret = sqlite3_exec(imp->db, schema_sql, 0, 0, &fail);
     if (ret == SQLITE_OK) {
+      if (waiting) {
+        std::cerr << std::endl;
+      }
       // Use an empty entropy table as a proxy for a new database (it gets filled automatically)
       const char *get_version = "select (select count(row_id) from entropy), (select max(version) from schema);";
       const char *set_version = "insert or ignore into schema(version) values(" SCHEMA_VERSION ");";
@@ -211,10 +215,18 @@ std::string Database::open(bool wait, bool memory) {
     sqlite3_free(fail);
 
     if (!wait || ret != SQLITE_BUSY) {
+      if (waiting) {
+        std::cerr << std::endl;
+      }
       close();
       return out;
     } else {
-      std::cerr << "Database wake.db is busy; waiting 1 second ..." << std::endl;
+      if (waiting) {
+        std::cerr << ".";
+      } else {
+        waiting = true;
+        std::cerr << "Database wake.db is busy; waiting .";
+      }
       sleep(1);
     }
   }
