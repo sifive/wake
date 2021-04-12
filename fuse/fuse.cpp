@@ -182,10 +182,13 @@ int run_in_fuse(const fuse_args& args, std::string& result_json) {
 
 		std::string dir;
 		if (!get_workspace_dir(args.mount_ops, args.working_dir, dir)) {
-			std::cerr << "'workspace' mount entry is missing from input" << std::endl;
-			exit(1);
+			//std::cerr << "'workspace' mount entry is missing from input" << std::endl;
+			//exit(1);
 		}
-		dir = dir + "/" + args.directory;
+		if (!dir.empty())
+			dir = dir + "/" + args.directory;
+		else
+			dir = "/" + args.working_dir; // TODO this should work without --bind-home
 
 		if (envs_from_mounts.size() > 0) {
 			// 'source' the environments provided by any mounts before running command.
@@ -195,7 +198,7 @@ int run_in_fuse(const fuse_args& args, std::string& result_json) {
 			for (auto& e : envs_from_mounts)
 				cmd_ss << ". " << shell_escape(e) << " && ";
 
-			cmd_ss << "exec";
+			cmd_ss << "exec ";
 			for (auto& s : args.command)
 				cmd_ss << " " << shell_escape(s);
 			command.push_back(cmd_ss.str());
