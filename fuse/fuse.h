@@ -48,6 +48,6 @@ struct fuse_args : public json_args {
 
 bool json_as_struct(const std::string& json, json_args& result);
 
-int run_in_fuse(const fuse_args& args, std::string& result_json);
+int run_in_fuse(fuse_args& args, std::string& result_json);
 
 #endif

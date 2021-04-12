@@ -16,8 +16,8 @@ jobs:
 
             - name: "Install deps"
               run: |
-                brew install re2
                 brew install --cask osxfuse
+                brew install re2 || brew install re2 --head
 
             - name: "Build wake"
               run: make all -j3
