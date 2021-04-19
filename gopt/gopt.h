@@ -34,6 +34,14 @@ struct option
   /* input/output: */
   unsigned int  flags;
 
+  /* input/output: array of char* allocated by caller, each char* filled by gopt.
+     Required for GOPT_REPEATABLE_VALUE, unused otherwise. */
+  char        **arguments;
+
+  /* input,
+     Required for GOPT_REPEATABLE_VALUE, unused otherwise */
+  unsigned int  max_args;
+
   /* output: */
   unsigned int  count;
   char         *argument;
@@ -50,6 +58,8 @@ struct option
 #define GOPT_SEEN_LONG_WITHOUT  0x040u /* long form of option was present without an option-argument in argv */
 #define GOPT_SEEN_LONG_WITH     0x080u /* long form of option was present with an option-argument in argv */
 #define GOPT_LAST               0x100u /* this is the last element of the array */
+#define GOPT_REPEATABLE_VALUE   (0x200u | GOPT_REPEATABLE) /* option may be specified with a value more than once */
+#define GOPT_BUFFER_FULL        0x400u /* not enough buffer space was given to GOPT_REPEATABLE_VALUE option */
 
 int gopt (char **argv, struct option *options);
 /*

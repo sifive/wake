@@ -53,6 +53,12 @@ void gopt_errors (const char *argv0, const struct option *options)
 
   for (i = 0; i < bad_option_index; i++)
   {
+    if (options[i].flags & GOPT_BUFFER_FULL)
+    {
+      fprintf (stderr, "%s: not enough memory allocated for parsing options: --%s\n", argv0, options[i].long_name);
+      exit (EX_USAGE);
+    }
+
     if ((options[i].flags & GOPT_SEEN_SHORT_WITHOUT) && (options[i].flags & GOPT_ARGUMENT_REQUIRED))
     {
       fprintf (stderr, "%s: option -%c requires an option-argument\n", argv0, options[i].short_name);
