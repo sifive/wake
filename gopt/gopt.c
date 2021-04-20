@@ -76,27 +76,45 @@ static unsigned int short_option_get_index (char c, const struct option *options
   return i;
 }
 
+void add_argument_value(struct option options[], int option_index, char* value) {
+  int arg_index = options[option_index].count - 1;
+
+  if (options[option_index].flags & GOPT_REPEATABLE_VALUE) {
+    if (arg_index < options[option_index].max_args) {
+      options[option_index].arguments[arg_index] = value;
+    } else {
+      options[option_index].flags |= GOPT_BUFFER_FULL;
+    }
+  } else {
+    options[option_index].argument = value;
+  }
+}
+
 int gopt (char **argv, struct option *options)
 {
   unsigned int operand_count = 1;
   unsigned int doubledash    = 0;
   unsigned int expecting     = 0;
   unsigned int option_index  = 0;
-  unsigned int i, j;
+  unsigned int i, j; // i is the current token, j is a character index in the token.
 
+  // Initial output-only values in option array.
   for (i = 0; !(options[i].flags & GOPT_LAST); i++)
   {
     options[i].argument = NULL;
     options[i].count    = 0;
   }
 
+  // End of option array marker.
   options[i].short_name = 0;
   options[i].long_name  = NULL;
   options[i].argument   = NULL;
   options[i].count      = 0;
 
+  // Ignore the 'process name' argument in position 0.
   for (i = 1; argv[i]; i++)
   {
+    // If a '--' was seen earlier, stop parsing arguments.
     if (doubledash)
     {
       argv[operand_count] = argv[i];
@@ -108,8 +126,8 @@ int gopt (char **argv, struct option *options)
     {
       if ((argv[i][0] != '-') || !argv[i][1] || !(options[option_index].flags & GOPT_ARGUMENT_NO_HYPHEN))
       {
-        options[option_index].flags    |= expecting;
-        options[option_index].argument  = argv[i];
+        options[option_index].flags |= expecting;
+        add_argument_value(options, option_index, argv[i]);
         expecting = 0;
         continue;
       }
@@ -172,8 +190,9 @@ int gopt (char **argv, struct option *options)
 
           if (argv[i][j+1])
           {
-            options[option_index].argument  = &argv[i][j+1];
-            options[option_index].flags    |= GOPT_SEEN_SHORT_WITH;
+            char* arg_value = &argv[i][j+1];
+            add_argument_value(options, option_index, arg_value);
+            options[option_index].flags |= GOPT_SEEN_SHORT_WITH;
           }
           else
           {
@@ -191,8 +210,9 @@ int gopt (char **argv, struct option *options)
 
         else if (argv[i][j+1])
         {
-          options[option_index].argument  = &argv[i][j+1];
-          options[option_index].flags    |= GOPT_SEEN_SHORT_WITH;
+          char* arg_value = &argv[i][j+1];
+          add_argument_value(options, option_index, arg_value);
+          options[option_index].flags |= GOPT_SEEN_SHORT_WITH;
           break;
         }
 
