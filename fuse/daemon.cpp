@@ -127,7 +127,18 @@ void Job::dump() {
 	s << "],\"outputs\":[";
 
 	first = true;
+	const std::string prefix = ".fuse_hidden";
 	for (auto &x : files_wrote) {
+		// files prefixed with .fuse_hidden are implementation details of libfuse
+		// and should not be treated as outputs.
+		// see: https://github.com/libfuse/libfuse/blob/fuse-3.10.3/include/fuse.h#L161-L177
+		size_t start = 0;
+		size_t lastslash = x.rfind("/");
+		if (lastslash != std::string::npos)
+			start = lastslash + 1;
+		if (x.compare(start, prefix.length(), prefix) == 0)
+			continue;
+
 		s << (first?"":",") << "\"" << json_escape(x) << "\"";
 		first = false;
 	}
