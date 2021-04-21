@@ -255,6 +255,11 @@ int run_in_fuse(fuse_args &args, std::string &result_json) {
 		}
 		dir = dir + "/" + args.directory;
 
+		if (chdir(dir.c_str()) != 0) {
+			std::cerr << "chdir " << dir << ": " << strerror(errno) << std::endl;
+			exit(1);
+		}
+
 		if (envs_from_mounts.size() > 0) {
 			// 'source' the environments provided by any mounts before running command.
 			// The shell will search the PATH for the executable location.
@@ -273,16 +278,14 @@ int run_in_fuse(fuse_args &args, std::string &result_json) {
 			command[0] = find_in_path(command[0], find_path(args.environment));
 		}
 #else
-		// Search the PATH for the executable location.
-		command[0] = find_in_path(command[0], find_path(args.environment));
-
 		std::string dir = daemon.mount_subdir + "/" + args.directory;
-#endif
 		if (chdir(dir.c_str()) != 0) {
 			std::cerr << "chdir " << dir << ": " << strerror(errno) << std::endl;
 			exit(1);
 		}
-
+		// Search the PATH for the executable location.
+		command[0] = find_in_path(command[0], find_path(args.environment));
+#endif
 		if (args.use_stdin_file) {
 			std::string stdin = args.stdin_file;
 			if (stdin.empty()) stdin = "/dev/null";
