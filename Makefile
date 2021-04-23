@@ -52,7 +52,7 @@ bin/wake:	src/symbol.o $(COMMON)				\
 		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c gopt/gopt-arg.c)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
-lib/wake/fuse-wake:	fuse/client.cpp fuse/fuse.cpp fuse/namespace.cpp $(COMMON)
+lib/wake/fuse-wake:	fuse/client.cpp fuse/fuse.cpp fuse/namespace.cpp fuse/daemon_client.cpp $(COMMON)
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $^ -o $@ $(LDFLAGS)
 
 lib/wake/fuse-waked:	fuse/daemon.cpp $(COMMON)

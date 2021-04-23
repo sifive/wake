@@ -23,6 +23,33 @@
 #include <vector>
 #include "namespace.h"
 
+struct daemon_client {
+	// Path to the fuse-waked daemon executable.
+	const std::string executable;
+	// Location that the fuse filesystem is mounted.
+	const std::string mount_path;
+	// Subdir in the fuse filesystem mount that will be used by this fuse-wake's job.
+	const std::string mount_subdir;
+	// Path that the fuse daemon will write result metadata to.
+	const std::string output_path;
+	// File that exists when the daemon is running/active.
+	const std::string is_running_path;
+	// File held open by each child of fuse-wake. When all children close it,
+	// the daemon releases the resources for that job.
+	const std::string subdir_live_file;
+	// JSON input file to the fuse daemon, listing which files should be visible.
+	const std::string visibles_path;
+
+	daemon_client(const std::string &base_dir);
+
+	bool connect(std::vector<std::string> &visible);
+	bool disconnect(std::string &result);
+
+protected:
+	// file descriptor for opened 'subdir_live_file'
+	int live_fd;
+};
+
 struct json_args {
 	std::vector<std::string> command;
 	std::vector<std::string> environment;
@@ -42,8 +69,11 @@ struct json_args {
 
 struct fuse_args : public json_args {
 	std::string working_dir;
-	std::string daemon_path;
 	bool use_stdin_file;
+	daemon_client daemon;
+
+	fuse_args(const std::string &cwd, bool use_stdin_file)
+		: working_dir(cwd), use_stdin_file(use_stdin_file), daemon(cwd) {}
 };
 
 bool json_as_struct(const std::string& json, json_args& result);

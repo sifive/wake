@@ -80,13 +80,9 @@ int main(int argc, char *argv[])
 	}
 	ifs.close();
 
-	fuse_args args;
-	if (!json_as_struct(json, args)) {
+	fuse_args args(get_cwd(), use_stdin_file);
+	if (!json_as_struct(json, args))
 		return 1;
-	}
-	args.daemon_path = find_execpath() + "/../lib/wake/fuse-waked";
-	args.working_dir = get_cwd();
-	args.use_stdin_file = use_stdin_file;
 
 	if (args.command.empty() || args.command[0].empty()) {
 		std::cerr << "No command was provided." << std::endl;

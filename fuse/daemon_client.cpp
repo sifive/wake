@@ -1,0 +1,110 @@
+/* Wake FUSE launcher to capture inputs/outputs
+ *
+ * Copyright 2019 SiFive, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You should have received a copy of LICENSE.Apache2 along with
+ * this software. If not, you may obtain a copy at
+ *
+ *    https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+
+#include "fuse.h"
+#include "json5.h"
+#include "execpath.h"
+
+daemon_client::daemon_client(const std::string &base_dir)
+   :	executable(find_execpath() + "/fuse-waked"),
+	mount_path(base_dir + "/.fuse"),
+	mount_subdir(mount_path + "/" + std::to_string(getpid())),
+	output_path(mount_path + "/.o." + std::to_string(getpid())),
+	is_running_path(mount_path + "/.f.fuse-waked"),
+	subdir_live_file(mount_path + "/.l." + std::to_string(getpid())),
+	visibles_path(mount_path + "/.i." + std::to_string(getpid()))
+{ }
+
+// The arg 'visible' is destroyed/moved in the interest of performance with large visible lists.
+bool daemon_client::connect(std::vector<std::string> &visible) {
+	int ffd = -1;
+	useconds_t wait = 10000; /* 10ms */
+	for (int retry = 0; (ffd = open(is_running_path.c_str(), O_RDONLY)) == -1 && retry < 12; ++retry) {
+		pid_t pid = fork();
+		if (pid == 0) {
+			const char *env[2] = { "PATH=/usr/bin:/bin:/usr/sbin:/sbin", 0 };
+			execle(executable.c_str(), "fuse-waked", mount_path.c_str(), nullptr, env);
+			std::cerr << "execl " << executable << ": " << strerror(errno) << std::endl;
+			exit(1);
+		}
+		usleep(wait);
+		wait <<= 1;
+
+		int status;
+		do waitpid(pid, &status, 0);
+		while (WIFSTOPPED(status));
+	}
+
+	if (ffd == -1) {
+		std::cerr << "Could not contact FUSE daemon" << std::endl;
+		return false;
+	}
+
+	// This stays open (keeping subdir_live_file live) until we terminate
+	// Note: O_CLOEXEC is NOT set; thus, children keep subdir_live_file live as well
+	live_fd = open(subdir_live_file.c_str(), O_CREAT|O_RDWR|O_EXCL, 0644);
+	if (live_fd == -1) {
+		std::cerr << "open " << subdir_live_file << ": " << strerror(errno) << std::endl;
+		return false;
+	}
+
+	// We can safely release the global handle now that we hold a live_fd
+	(void)close(ffd);
+
+	// The fuse-waked process takes an input file containing visible files, json formatted.
+	JAST for_daemon(JSON_OBJECT);
+	auto &vis = for_daemon.add("visible", JSON_ARRAY);
+	for (auto &s : visible)
+		vis.add(std::move(s));
+
+	std::ofstream ijson(visibles_path);
+	ijson << for_daemon;
+	if (ijson.fail()) {
+		std::cerr << "write " << visibles_path << ": " << strerror(errno) << std::endl;
+		return false;
+	}
+	ijson.close();
+	return true;
+}
+
+bool daemon_client::disconnect(std::string &result) {
+	// Cause the daemon_output_path to be generated (this write will fail)
+	(void)!write(live_fd, "x", 1); // the ! convinces older gcc that it's ok to ignore the write
+	(void)fsync(live_fd);
+
+	// Read the output file
+	std::ifstream ifs(output_path);
+	result.assign(
+		(std::istreambuf_iterator<char>(ifs)),
+		(std::istreambuf_iterator<char>()));
+	if (ifs.fail()) {
+		std::cerr << "read " << output_path << ": " << strerror(errno) << std::endl;
+		return false;
+	}
+	ifs.close();
+	return true;
+}
