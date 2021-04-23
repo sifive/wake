@@ -44,11 +44,6 @@ bool do_mounts(
 	const std::string &fuse_mount_path,
 	std::vector<std::string> &environments);
 
-bool get_workspace_dir(
-	const std::vector<mount_op> &mount_ops,
-	const std::string &host_workspace_dir,
-	std::string &out);
-
 #endif
 
 #endif

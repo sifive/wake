@@ -36,7 +36,13 @@ export def install = match _
   _ = Fail "no directory specified (try: install /opt/local)".makeError
 
 # Build all wake targets
-def targets = buildWake, buildWakeBox, buildFuse, buildFuseDaemon, buildShim, buildPreload, buildPrelib, buildBSP, Nil
+def targets =
+  def allPlatforms = buildWake, buildFuse, buildFuseDaemon, buildShim, buildPreload, buildPrelib, buildBSP, Nil
+  def linuxOnly = buildWakeBox, Nil
+  match sysname
+    "Linux" = allPlatforms ++ linuxOnly
+    _       = allPlatforms
+
 def all variant = map (_ variant) targets | findFailFn getPathResult
 
 # Install wake into a target location

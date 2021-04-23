@@ -192,6 +192,12 @@ static bool equal_dev_ids(dev_t a, dev_t b) {
 }
 
 static bool do_squashfuse_mount(const std::string &source, const std::string &mountpoint) {
+	// The squashfuse executable doesn't give a clear error message when the file is missing.
+	if (access(source.c_str(), R_OK|F_OK) != 0) {
+		std::cerr << "squashfs mount ('" << source << "'): " << strerror(errno) << std::endl;
+		return false;
+	}
+
 	pid_t pid = fork();
 	if (pid == 0) {
 		// kernel to send SIGKILL to squashfuse when fuse-wake terminates
@@ -225,7 +231,7 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
 			usleep(10000 << i); // 10ms * 2^i
 	}
 
-	std::cerr << "squashfs mount missing: " << mountpoint << std::endl;
+	std::cerr << "squashfs mount failed: " << source << std::endl;
 	return false;
 }
 

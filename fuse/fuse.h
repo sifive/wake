@@ -68,7 +68,8 @@ struct json_args {
 };
 
 struct fuse_args : public json_args {
-	std::string working_dir;
+	const std::string working_dir; // the original directory that this process was invoked from
+	std::string command_running_dir; // current working dir of the command when it executes
 	bool use_stdin_file;
 	daemon_client daemon;
 
@@ -78,6 +79,6 @@ struct fuse_args : public json_args {
 
 bool json_as_struct(const std::string& json, json_args& result);
 
-int run_in_fuse(fuse_args& args, std::string& result_json);
+bool run_in_fuse(fuse_args& args, int &retcode, std::string& result_json);
 
 #endif
