@@ -36,35 +36,6 @@
 #include "namespace.h"
 #include "shell.h"
 
-struct daemon_locations {
-	// Path to the fuse-waked daemon executable.
-	std::string executable;
-	// Location that the fuse filesystem is mounted.
-	std::string mount_path;
-	// Subdir in the fuse filesystem mount that will be used by this fuse-wake's job.
-	std::string mount_subdir;
-	// Path that the fuse daemon will write result metadata to.
-	std::string output_path;
-	// File that exists when the daemon is running/active.
-	std::string is_running_path;
-	// File held open by each child of fuse-wake. When all children close it,
-	// the daemon releases the resources for that job.
-	std::string subdir_live_file;
-	// JSON input file to the fuse daemon, listing which files should be visible.
-	std::string visibles_path;
-
-	daemon_locations(const std::string &exec_path, const std::string &working_dir) {
-		const std::string pid = std::to_string(getpid());
-		executable       = exec_path;
-		mount_path       = working_dir + "/.fuse";
-		mount_subdir     = mount_path + "/" + pid;
-		output_path      = mount_path + "/.o." + pid ;
-		is_running_path  = mount_path + "/.f.fuse-waked";
-		subdir_live_file = mount_path + "/.l." + pid ;
-		visibles_path    = mount_path + "/.i." + pid ;
-	}
-};
-
 bool json_as_struct(const std::string &json, json_args &result) {
 	JAST jast;
 	if (!JAST::parse(json, std::cerr, jast))
@@ -121,75 +92,19 @@ static int execve_wrapper(const std::vector<std::string> &command, const std::ve
 	return errno;
 }
 
-// The arg 'visible' is destroyed/moved in the interest of performance with large visible lists.
-bool contact_daemon(const struct daemon_locations &daemon, int &livefd, std::vector<std::string> &visible){
-	int ffd = -1;
-	useconds_t wait = 10000; /* 10ms */
-	for (int retry = 0; (ffd = open(daemon.is_running_path.c_str(), O_RDONLY)) == -1 && retry < 12; ++retry) {
-		pid_t pid = fork();
-		if (pid == 0) {
-			const char *env[2] = { "PATH=/usr/bin:/bin:/usr/sbin:/sbin", 0 };
-			execle(daemon.executable.c_str(), "fuse-waked", daemon.mount_path.c_str(), nullptr, env);
-			std::cerr << "execl " << daemon.executable << ": " << strerror(errno) << std::endl;
-			exit(1);
-		}
-		usleep(wait);
-		wait <<= 1;
-
-		int status;
-		do waitpid(pid, &status, 0);
-		while (WIFSTOPPED(status));
-	}
-
-	if (ffd == -1) {
-		std::cerr << "Could not contact FUSE daemon" << std::endl;
-		return false;
-	}
-
-	// This stays open (keeping subdir_live_file live) until we terminate
-	// Note: O_CLOEXEC is NOT set; thus, children keep subdir_live_file live as well
-	livefd = open(daemon.subdir_live_file.c_str(), O_CREAT|O_RDWR|O_EXCL, 0644);
-	if (livefd == -1) {
-		std::cerr << "open " << daemon.subdir_live_file << ": " << strerror(errno) << std::endl;
-		return false;
-	}
-
-	// We can safely release the global handle now that we hold a livefd
-	(void)close(ffd);
-
-	// The fuse-waked process takes an input file containing visible files, json formatted.
-	JAST for_daemon(JSON_OBJECT);
-	auto &vis = for_daemon.add("visible", JSON_ARRAY);
-	for (auto &s : visible)
-		vis.add(std::move(s));
-
-	std::ofstream ijson(daemon.visibles_path);
-	ijson << for_daemon;
-	if (ijson.fail()) {
-		std::cerr << "write " << daemon.visibles_path << ": " << strerror(errno) << std::endl;
-		return false;
-	}
-	ijson.close();
-	return true;
-}
 
 bool collect_result_metadata(
+	const std::string daemon_output,
 	const struct timeval &start,
 	const struct timeval &stop,
-	const std::string &daemon_output_path,
 	const pid_t pid,
-	const int livefd,
 	const int status,
 	const struct rusage &rusage,
 	std::string &result_json
 ){
-	// Cause the daemon_output_path to be generated (this write will fail)
-	(void)!write(livefd, "x", 1); // the ! convinces older gcc that it's ok to ignore the write
-	(void)fsync(livefd);
-
 	JAST from_daemon;
 	std::stringstream ss;
-	if (!JAST::parse(daemon_output_path.c_str(), ss, from_daemon)) {
+	if (!JAST::parse(daemon_output, ss, from_daemon)) {
 		// stderr is closed, so report the error on the only output we have
 		result_json = ss.str();
 		return false;
@@ -222,10 +137,7 @@ int run_in_fuse(fuse_args &args, std::string &result_json) {
 		return 1;
 	}
 
-	const daemon_locations daemon(args.daemon_path, args.working_dir);
-
-	int livefd;
-	if (!contact_daemon(daemon, livefd, args.visible))
+	if (!args.daemon.connect(args.visible))
 		return 1;
 
 	struct timeval start;
@@ -245,7 +157,7 @@ int run_in_fuse(fuse_args &args, std::string &result_json) {
 			exit(1);
 
 		std::vector<std::string> envs_from_mounts;
-		if (!do_mounts(args.mount_ops, daemon.mount_subdir, envs_from_mounts))
+		if (!do_mounts(args.mount_ops, args.daemon.mount_subdir, envs_from_mounts))
 			exit(1);
 
 		std::string dir;
@@ -278,7 +190,7 @@ int run_in_fuse(fuse_args &args, std::string &result_json) {
 			command[0] = find_in_path(command[0], find_path(args.environment));
 		}
 #else
-		std::string dir = daemon.mount_subdir + "/" + args.directory;
+		std::string dir = args.daemon.mount_subdir + "/" + args.directory;
 		if (chdir(dir.c_str()) != 0) {
 			std::cerr << "chdir " << dir << ": " << strerror(errno) << std::endl;
 			exit(1);
@@ -325,5 +237,8 @@ int run_in_fuse(fuse_args &args, std::string &result_json) {
 	struct timeval stop;
 	gettimeofday(&stop, 0);
 
-	return collect_result_metadata(start, stop, daemon.output_path, pid, livefd, status, rusage, result_json);
+	std::string output;
+	args.daemon.disconnect(output);
+
+	return collect_result_metadata(output, start, stop, pid, status, rusage, result_json);
 }

@@ -8,6 +8,7 @@
 /src/symbol.cpp
 /common/jlexer.cpp
 /bin/wake*
+/bin/fuse-*
 /src/version.h
 /lib/wake/bsp-wake
 /lib/wake/bsp-wake.*

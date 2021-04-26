@@ -54,13 +54,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	fuse_args args;
-	if (!json_as_struct(json, args)) {
+	fuse_args args(get_cwd(), true);
+	if (!json_as_struct(json, args))
 		return 1;
-	}
-	args.daemon_path = find_execpath() + "/fuse-waked";
-	args.working_dir = get_cwd();
-	args.use_stdin_file = true;
 
 	std::string result;
 	// Run the command contained in the json with the fuse daemon filtering
