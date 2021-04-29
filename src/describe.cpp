@@ -44,6 +44,7 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug, b
     if (!job.label.empty())
       std::cout << " (" << job.label << ")";
     std::cout << ":" << std::endl
+      << "  Label: " << job.label << std::endl
       << "  Command-line:";
     for (auto &arg : job.commandline) std::cout << " " << shell_escape(arg);
     std::cout
