@@ -128,17 +128,17 @@ bool collect_result_metadata(
 	result_ss << result_jast;
 	result_json = result_ss.str();
 
-	return result_ss.fail();
+	return !result_ss.fail();
 }
 
-int run_in_fuse(fuse_args &args, std::string &result_json) {
+bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
 	if (0 != chdir(args.working_dir.c_str())) {
 		std::cerr << "chdir " << args.working_dir << ": " << strerror(errno) << std::endl;
-		return 1;
+		return false;
 	}
 
 	if (!args.daemon.connect(args.visible))
-		return 1;
+		return false;
 
 	struct timeval start;
 	gettimeofday(&start, 0);
@@ -147,6 +147,7 @@ int run_in_fuse(fuse_args &args, std::string &result_json) {
 	if (pid == 0) {
 
 		std::vector<std::string> command = args.command;
+		std::vector<std::string> envs_from_mounts;
 #ifdef __linux__
 		if (!setup_user_namespaces(
 			args.userid,
@@ -156,23 +157,19 @@ int run_in_fuse(fuse_args &args, std::string &result_json) {
 			args.domainname))
 			exit(1);
 
-		std::vector<std::string> envs_from_mounts;
 		if (!do_mounts(args.mount_ops, args.daemon.mount_subdir, envs_from_mounts))
 			exit(1);
+#endif
 
-		std::string dir;
-		if (!get_workspace_dir(args.mount_ops, args.working_dir, dir)) {
-			std::cerr << "'workspace' mount entry is missing from input" << std::endl;
-			exit(1);
-		}
-		dir = dir + "/" + args.directory;
-
-		if (chdir(dir.c_str()) != 0) {
-			std::cerr << "chdir " << dir << ": " << strerror(errno) << std::endl;
+		if (chdir(args.command_running_dir.c_str()) != 0) {
+			std::cerr << "chdir " << args.command_running_dir << ": " << strerror(errno) << std::endl;
 			exit(1);
 		}
 
-		if (envs_from_mounts.size() > 0) {
+		if (envs_from_mounts.empty()) {
+			// Search the PATH for the executable location.
+			command[0] = find_in_path(command[0], find_path(args.environment));
+		} else {
 			// 'source' the environments provided by any mounts before running command.
 			// The shell will search the PATH for the executable location.
 			command = {"/bin/sh", "-c"};
@@ -184,20 +181,8 @@ int run_in_fuse(fuse_args &args, std::string &result_json) {
 			for (auto& s : args.command)
 				cmd_ss << " " << shell_escape(s);
 			command.push_back(cmd_ss.str());
+		}
 
-		} else {
-			// Search the PATH for the executable location.
-			command[0] = find_in_path(command[0], find_path(args.environment));
-		}
-#else
-		std::string dir = args.daemon.mount_subdir + "/" + args.directory;
-		if (chdir(dir.c_str()) != 0) {
-			std::cerr << "chdir " << dir << ": " << strerror(errno) << std::endl;
-			exit(1);
-		}
-		// Search the PATH for the executable location.
-		command[0] = find_in_path(command[0], find_path(args.environment));
-#endif
 		if (args.use_stdin_file) {
 			std::string stdin = args.stdin_file;
 			if (stdin.empty()) stdin = "/dev/null";
@@ -223,7 +208,6 @@ int run_in_fuse(fuse_args &args, std::string &result_json) {
 	(void)close(STDOUT_FILENO);
 	(void)close(STDERR_FILENO);
 
-	int status;
 	struct rusage rusage;
 	do wait4(pid, &status, 0, &rusage);
 	while (WIFSTOPPED(status));
