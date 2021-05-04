@@ -1,0 +1,91 @@
+# Copyright 2019 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package v1_wake
+
+# Type from the wake compiler itself
+from wake export type binary =>
+from wake export type String Integer Double RegExp
+# Array Job
+
+# Syntax
+from wake export def binary . |
+# Not standard: $ ∘ flip
+
+# Tuples
+from wake export type Unit
+from wake export def  Unit
+from wake export type binary ;
+from wake export def  binary ;
+# Should these be standard?:
+# → Triple Pair _0 _1 ...
+
+# Core Boolean functionality
+from wake export type Boolean
+from wake export def True False
+from wake export def binary && ||
+from wake export def unary !
+
+# Core Order functionality
+from wake export type Order
+from wake export def LT EQ GT
+
+# Core Option functionality
+from wake export type Option
+from wake export def getOrElse getOrFail None Some
+# Probably these are not necessary (use require and/or match instead)
+# isSome isNone getOrElseFn omap omapPartial ofilter findSome findSomeFn findNone findNoneFn getOrFailFn getOrPass getOrPassFn
+
+# Core Result functionality
+from wake export type Result Error
+from wake export def getErrorCause getErrorStack setErrorCause setErrorStack editErrorCause editErrorStack
+from wake export def Fail makeError panic Pass stack
+# isPass isFail getPass getFail getWhenFail rmap rmapPass rmapFail findFail findFailFn findPass findPassFn
+
+# Core list functionality
+from wake export type List
+from wake export def binary ++ ,
+from wake export def filter foldl foldr len map mapFlat mapPartial Nil reverse scanl scanr sortBy
+# Should any of these be standard?:
+# empty flatten head tail splitAt take drop at splitUntil takeUntil dropUntil find exists forall splitBy transpose distinctBy distinctRunBy cmp tab seq zip unzip
+
+# Debug facility
+from wake export def format print println tap
+# LogLevel EchoTarget logError logWarn logNormal logVerbose logDebug logNever consumerFn tapLevel tapWarn tapNormal tagVerbose tapDebug
+# printLevel printlnLevel
+
+# RegExp
+from wake export def extract matches quote replace tokenize
+# regExpCat stringToRegExp globToRegExp regExpToString
+
+# String
+from wake export def cat catWith version
+from wake export def binary <=>* <* >* >=* <=* ==* !=*
+# strbase str intbase int !!! need these; not sure about name
+# <=>~ <~ >~ >=~ <=~ ==~ !=~
+# <=>^ <^ >^ >=^ <=^ ==^ !=^
+# byteToInteger explode integerToByte integerToUnicode strlen scmp scmpCanonical scmpIdentifier scmpLowercase
+# unicodeCanonical unicodeIdentifier unicodeLowercase unicodeToInteger
+
+# Integer
+from wake export def unary + -
+from wake export def binary + - * / % ^
+from wake export def binary <=> < > >= <= == !=
+# ~ << >> abs and gcd icmp lcm min max or powm prod root sqrt sum xor ∏ ∑
+
+# Double - not included in v1
+# JSON   - not included in v1
+# Tree   - not included in v1
+# Vector - not included in v1
