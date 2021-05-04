@@ -102,7 +102,7 @@ std::unique_ptr<Term> RGet::clone(TargetScope &scope, size_t id) const {
 }
 
 void RDes::format(std::ostream &os, TermFormat &format) const {
-  os << "Des(";
+  os << "Des:" << sum->name << "(";
   format_args(os, format);
   os << ")\n";
 }
@@ -214,6 +214,8 @@ std::unique_ptr<Term> Term::optimize(std::unique_ptr<Term> term, Runtime &runtim
   term = Term::pass_usage (std::move(term));
   term = Term::pass_sweep (std::move(term));
   term = Term::pass_inline(std::move(term), 20, runtime);
+  term = Term::pass_cases (std::move(term));
+  term = Term::pass_decon (std::move(term));
   term = Term::pass_purity(std::move(term), PRIM_EFFECT,  SSA_EFFECT);
   term = Term::pass_purity(std::move(term), PRIM_ORDERED, SSA_ORDERED);
   term = Term::pass_usage (std::move(term));
