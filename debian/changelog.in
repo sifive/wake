@@ -2,6 +2,12 @@ wake (@VERSION@-1) unstable; urgency=medium
 
   * Auto-generated release package.
 
+ -- Wesley W. Terpstra <terpstra@debian.org>  Tue, 04 May 2021 16:54:22 -0700
+
+wake (0.20.1-1) unstable; urgency=medium
+
+  * Auto-generated release package.
+
  -- Wesley W. Terpstra <terpstra@debian.org>  Thu, 18 Feb 2021 22:57:55 -0700
 
 wake (0.20.0-1) unstable; urgency=medium
