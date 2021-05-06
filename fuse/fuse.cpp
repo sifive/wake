@@ -95,9 +95,9 @@ static int execve_wrapper(const std::vector<std::string> &command, const std::ve
 
 bool collect_result_metadata(
 	const std::string daemon_output,
+	std::vector<std::string> inputs_from_mounts,
 	const struct timeval &start,
 	const struct timeval &stop,
-	const pid_t pid,
 	const int status,
 	const struct rusage &rusage,
 	std::string &result_json
@@ -121,8 +121,10 @@ bool collect_result_metadata(
 		rusage.ru_utime.tv_sec + rusage.ru_stime.tv_sec +
 		(rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0);
 
-	result_jast.add("inputs", JSON_ARRAY).children = std::move(from_daemon.get("inputs").children);
 	result_jast.add("outputs", JSON_ARRAY).children = std::move(from_daemon.get("outputs").children);
+	result_jast.add("inputs", JSON_ARRAY).children = std::move(from_daemon.get("inputs").children);
+	for (auto &input : inputs_from_mounts)
+		result_jast.get("inputs").add(std::move(input));
 
 	std::stringstream result_ss;
 	result_ss << result_jast;
@@ -143,10 +145,17 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
 	struct timeval start;
 	gettimeofday(&start, 0);
 
+	// Additional files that should be tracked as 'inputs' in the result metadata.
+	std::vector<std::string> inputs_from_mounts;
+	for (mount_op &op : args.mount_ops)
+		if (op.type == "squashfs")
+			inputs_from_mounts.push_back(op.source);
+
 	pid_t pid = fork();
 	if (pid == 0) {
 
 		std::vector<std::string> command = args.command;
+		// Changes to the environment requested by a mountpoint.
 		std::vector<std::string> envs_from_mounts;
 #ifdef __linux__
 		if (!setup_user_namespaces(
@@ -224,5 +233,5 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
 	std::string output;
 	args.daemon.disconnect(output);
 
-	return collect_result_metadata(output, start, stop, pid, status, rusage, result_json);
+	return collect_result_metadata(output, inputs_from_mounts, start, stop, status, rusage, result_json);
 }
