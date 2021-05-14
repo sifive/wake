@@ -714,12 +714,26 @@ static int wakefuse_symlink(const char *from, const char *to)
 
 static void move_members(std::set<std::string> &from, std::set<std::string> &to, const std::string &dir, const std::string &dest)
 {
+	// Find half-open range [i, e) that includes all strings matching `{dir}/.*`
 	auto i = from.upper_bound(dir + "/");
-	auto e = from.lower_bound(dir + "0");
-	while (i != e) {
-		auto kill = i++;
-		to.insert(dest + kill->substr(dir.size()));
-		from.erase(kill);
+	auto e = from.lower_bound(dir + "0"); // '0' = '/' + 1
+
+	if (i != e) {
+		// If the range is non-empty, make it inclusive; [i, e]
+		// This is necessary, because it would otherwise be possible
+		// for the insert call to put something between 'i' and 'e'.
+		// For example, if dir="foo" and from={"foo/aaa", "zoo"},
+		// then i=>"foo/aaa" and e=>"zoo". Renaming "foo" to "bar"
+		// would cause us to insert "bar/aaa", which is in [i, e).
+		// By changing to an inclusive range, e=>"foo/aaa" also.
+
+		--e;
+		bool last;
+		do {
+			last = i == e; // Record this now, because we erase i
+			to.insert(dest + i->substr(dir.size()));
+			from.erase(i++); // increment i and then erase the old i
+		} while (!last);
 	}
 }
 
