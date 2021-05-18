@@ -42,7 +42,7 @@ void print_help() {
 	"    -b --bind DIR1:DIR2      Place the directory (or file) at DIR1 within the command's view  \n"
 	"                             of the filesystem at location DIR2.                              \n"
 	"                             May be specified multiple times.                                 \n"
-	"    -x                       Shorthand for '--bind $PWD:/tmp/workspace'                       \n"
+	"    -x                       Shorthand for '--bind $PWD:$PWD'                                 \n"
 	"    COMMAND                  The command to run.                                              \n"
 	"                                                                                              \n"
 	"Batch options                                                                                 \n"
@@ -271,8 +271,9 @@ int main(int argc, char *argv[])
 			bind_ops.push_back({"bind", source, destination});
 		}
 		if (arg(options, "bind-cwd")->count > 0) {
-			bind_ops.push_back({"create-dir", "", "/tmp/workspace"});
-			bind_ops.push_back({"bind", get_cwd(), "/tmp/workspace"});
+			std::string cwd = get_cwd();
+			bind_ops.push_back({"create-dir", "", cwd});
+			bind_ops.push_back({"bind", cwd, cwd});
 		}
 
 		std::vector<std::string> positional_params;
