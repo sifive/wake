@@ -31,7 +31,7 @@ export def claimFileAsPathIn outputDirectory existingFile desiredName =
   else
     def desiredWorkspacePath = simplify "{outputDirectory.getPathName}/{desiredName}"
     def visible = outputDirectory, Nil
-    def cmdline = which "ln", "-f", existingFile, desiredWorkspacePath, Nil
+    def cmdline = which "cp", existingFile, desiredWorkspacePath, Nil
     makeExecPlan cmdline visible
     | setPlanLocalOnly   True
     | setPlanPersistence Once
