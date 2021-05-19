@@ -1497,19 +1497,27 @@ static Expr *parse_block_body(Lexer &lex) {
     }
   }
 
+  std::unique_ptr<Expr> body;
   if (lex.next.type == REQUIRE) {
-    map->body = std::unique_ptr<Expr>(parse_require(lex));
+    body = std::unique_ptr<Expr>(parse_require(lex));
   } else {
-    map->body = std::unique_ptr<Expr>(relabel_anon(parse_binary(0, lex, true)));
+    body = std::unique_ptr<Expr>(relabel_anon(parse_binary(0, lex, true)));
   }
 
-  map->location.end = map->body->location.end;
-  map->flags |= FLAG_AST;
+  if (map->defs.empty() && map->imports.empty()) {
+    delete map;
+    return body.release();
+  } else {
+    map->body = std::move(body);
 
-  map->location.start.bytes -= (map->location.start.column-1);
-  map->location.start.column = 1;
+    map->location.end = map->body->location.end;
+    map->flags |= FLAG_AST;
 
-  return map;
+    map->location.start.bytes -= (map->location.start.column-1);
+    map->location.start.column = 1;
+
+    return map;
+  }
 }
 
 static Expr *parse_block(Lexer &lex, bool multiline) {
