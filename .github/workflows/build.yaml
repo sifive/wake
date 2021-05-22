@@ -21,3 +21,6 @@ jobs:
 
             - name: "Build wake"
               run: make all -j3
+
+            - name: "Test wake"
+              run: make test
