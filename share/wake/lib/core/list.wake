@@ -226,3 +226,28 @@ export def unzip = match _
   Pair a b, t =
     def Pair u v = unzip t
     Pair (a, u) (b, v)
+
+# Group a list by some comparison function.
+# Elements which compare equal are placed into the same bucket.
+# Buckets preserve the order of the original list.
+# The buckets appear in the sort-order specified by cmp.
+# Examples:
+#
+#   def cmp a b = a%3 < b%3
+#   def list = seq 10
+#   groupBy cmp list
+#   ---
+#   (0,3,6,9,Nil), (1,4,7,Nil), (2,5,8,Nil), Nil
+#
+#   def cmp a b = a/3 > b/3
+#   def list = seq 10
+#   groupBy cmp list
+#   ---
+#   (9,Nil), (6,7,8,Nil), (3,4,5,Nil), (0,1,2,Nil), Nil
+#
+export def groupBy cmp list =
+  def sorted = sortBy cmp list
+  def combo elem acc = match acc
+    (head, rest), tail if ! cmp elem head = (elem, head, rest), tail
+    _ = (elem, Nil), acc
+  foldr combo Nil sorted
