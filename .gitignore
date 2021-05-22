@@ -4,6 +4,7 @@ manifest.wake
 /.build
 /.fuse
 /.fuse.log
+/**/wake.db
 /wake.db
 /wake.spec
 /src/symbol.cpp
