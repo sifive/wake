@@ -15,7 +15,7 @@
 
 package wake
 
-tuple Usage = # Unknown quantities are 0
+export tuple Usage = # Unknown quantities are 0
   export Status:   Integer
   export Runtime:  Double
   export CPUtime:  Double
@@ -27,7 +27,7 @@ export def getUsageThreads (Usage _ run cpu _ _ _) =
   if run ==. 0.0 then cpu else cpu /. run
 
 # RunnerInput is a subset of the fields supplied in the execution Plan
-tuple RunnerInput =
+export tuple RunnerInput =
   export Label:       String
   export Command:     List String
   export Visible:     List Path
@@ -38,7 +38,7 @@ tuple RunnerInput =
   export Prefix:      String        # a unique prefix for this job
   export Record:      Usage         # previous resource usage
 
-tuple RunnerOutput =
+export tuple RunnerOutput =
   export Inputs:  List String
   export Outputs: List String
   export Usage:   Usage
