@@ -25,7 +25,7 @@ WAKE_ENV := WAKE_PATH=$(shell dirname $(shell which $(firstword $(CC))))
 
 # If FUSE is unavalable during wake build, allow a linux-specific work-around
 ifeq ($(USE_FUSE_WAKE),0)
-EXTRA := lib/wake/libpreload-wake.so lib/wake/preload-wake
+EXTRA := lib/wake/libpreload-wake.so bin/preload-wake
 endif
 
 all:		wake.db
@@ -35,7 +35,7 @@ clean:
 	rm -f bin/* lib/wake/* */*.o common/jlexer.cpp src/symbol.cpp src/version.h wake.db
 	touch bin/stamp lib/wake/stamp build/wake/stamp
 
-wake.db:	bin/wake lib/wake/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EXTRA)
+wake.db:	bin/wake bin/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EXTRA)
 	test -f $@ || ./bin/wake --init .
 
 install:	all
@@ -52,7 +52,7 @@ bin/wake:	src/symbol.o $(COMMON)				\
 		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c gopt/gopt-arg.c)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
-lib/wake/fuse-wake:	fuse/client.cpp fuse/fuse.cpp fuse/namespace.cpp fuse/daemon_client.cpp $(COMMON)
+bin/fuse-wake:	fuse/client.cpp fuse/fuse.cpp fuse/namespace.cpp fuse/daemon_client.cpp $(COMMON)
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $^ -o $@ $(LDFLAGS)
 
 lib/wake/fuse-waked:	fuse/daemon.cpp $(COMMON)
@@ -61,7 +61,7 @@ lib/wake/fuse-waked:	fuse/daemon.cpp $(COMMON)
 lib/wake/shim-wake:	$(patsubst %.c,%.o,$(wildcard shim/*.c))
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-lib/wake/preload-wake:	preload/wrap.cpp $(COMMON)
+bin/preload-wake:	preload/wrap.cpp $(COMMON)
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) -DEXT=so -DENV=LD_PRELOAD -o $@ $^ $(LDFLAGS)
 
 lib/wake/libpreload-wake.so:	preload/open.c

@@ -21,8 +21,7 @@ def buildFuse (Pair variant _) =
   def headers = json.getSysLibHeaders ++ sources "fuse" `.*\.h`
   def client = compileC variant json.getSysLibCFlags headers (source "fuse/client.cpp")
   def objFiles = client, buildFuseLibObjs variant
-  linkO variant json.getSysLibLFlags objFiles "lib/wake/fuse-wake"
-  | installAs "bin/fuse-wake"
+  linkO variant json.getSysLibLFlags objFiles "bin/fuse-wake"
 
 def buildFuseLibObjs variant =
   def json = common variant
@@ -39,4 +38,3 @@ def buildFuseDaemon (Pair variant _) =
   def cppFiles = source "{here}/daemon.cpp", Nil
   def objFiles = map compile cppFiles ++ deps.getSysLibObjects
   linkO variant deps.getSysLibLFlags objFiles "lib/wake/fuse-waked"
-  | installAs "bin/fuse-waked"

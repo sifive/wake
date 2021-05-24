@@ -33,7 +33,7 @@ mkdir -p %{buildroot}/var/cache/wake
 /usr/bin/wake
 /usr/bin/wakebox
 /usr/bin/fuse-wake
-/usr/bin/fuse-waked
+/usr/bin/preload-wake
 /usr/lib/wake
 /usr/share/wake
 /usr/build/wake
