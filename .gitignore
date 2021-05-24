@@ -1,3 +1,4 @@
+manifest.wake
 *.o
 /.vscode
 /.build

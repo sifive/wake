@@ -81,8 +81,10 @@ def tarball Unit =
   def spec = setVersion "wake.spec"
   # Identify those sources files to include in the tarball
   def srcs =
-    sources "." `([^.][^/]*/)*[^.][^/]*` # ignore .foo/ files srcs
+    sources "." `.*`
     | filter (! matches `(debian/|wake.spec).*` _.getPathName) # omit packaging files
+    | filter (! matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName) # omit CI files
+    | filter (! matches `(.*/)*\.gitignore` _.getPathName) # omit git files
   def pub =
     srcs
     | map (_.getPathName.format)
