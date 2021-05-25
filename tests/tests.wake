@@ -16,6 +16,12 @@
 package test_wake
 from wake import _
 
+# The wake unit tests can be run on either the wake that invokes them or the
+# wake that was built by the rest of the build system.  This topic is used
+# by the wake build rules to declare how to build the wake-under-test.
+#
+# build.wake publishes to this topic so that 'make test' tests the built wake.
+# If tests/ is used externally, the topic is empty and the invoking wake is tested instead.
 export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
 
 def wakeToTest Unit = match (subscribe wakeTestBinary)
