@@ -41,6 +41,9 @@ wake.db:	bin/wake bin/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EXTRA)
 install:	all
 	$(WAKE_ENV) ./bin/wake install $(DESTDIR)
 
+test:		wake.db
+	$(WAKE_ENV) ./bin/wake --in test_wake runTests
+
 tarball:	wake.db
 	$(WAKE_ENV) ./bin/wake build tarball
 

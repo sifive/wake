@@ -1,0 +1,149 @@
+# Copyright 2019 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package test_wake
+from wake import _
+
+# The wake unit tests can be run on either the wake that invokes them or the
+# wake that was built by the rest of the build system.  This topic is used
+# by the wake build rules to declare how to build the wake-under-test.
+#
+# build.wake publishes to this topic so that 'make test' tests the built wake.
+# If tests/ is used externally, the topic is empty and the invoking wake is tested instead.
+export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
+
+def wakeToTest Unit = match (subscribe wakeTestBinary)
+    fn, Nil = fn Unit
+    Nil = Pass (Pair "{wakePath}/wake" Nil)
+    _ = Fail (makeError "Two wake binaries declared for testing!")
+
+export def runTests cmdline =
+    require Pass filter = match cmdline
+        Nil      = Pass `.*`
+        arg, Nil = stringToRegExp arg | rmapFail (Fail _.makeError)
+        _        = Fail (makeError "Too many arguments to runTests")
+
+    require Pass (Pair wakeBin _) =
+        wakeToTest Unit
+
+    def tests =
+        sources here `${filter}/(pass|fail)\.sh`
+
+    def prepareReport test =
+        def folder = replace `^${quote here}/` "" test.getPathName
+        def category = replace `/.*$` "" folder
+        def testName = replace `^[^/]*/` "" folder | replace `/(pass|fail)\.sh$` ""
+        def result = runTest test
+        Triple category testName result
+
+    def results =
+        map prepareReport tests
+
+    def formatCategory list =
+        require Triple category _ _, _ = list else "impossible"
+        def reportFailed = match _
+            Triple _ name (Fail (Error cause _)) = Some "    - {name}: {cause}"
+            _ = None
+        def failures = mapPartial reportFailed list
+        def text =
+            def failed = len failures
+            def total = len list
+            def pass = total - failed
+            "  - {category}: {str pass}/{str total} tests pass",
+            failures
+        catWith "\n" text
+
+    def report =
+        results
+        | groupBy (_.getTripleFirst <* _.getTripleFirst)
+        | map formatCategory
+        | catWith "\n"
+
+    def _ = printlnLevel logWarning "{wakeBin} unit testing results:\n{report}\n---"
+
+    require Pass _ = findFailFn getTripleThird results
+
+    Pass "All {len tests | str} tests completed successfully."
+
+def runTest testScript =
+    def shouldPass =
+        testScript
+        | getPathName
+        | matches `.*/pass\.sh`
+
+    def testDirectory =
+        testScript
+        | getPathName
+        | replace `/[^/]*$` ""
+
+    def testName =
+        testDirectory
+        | replace `^${quote here}/` ""
+
+    def readFile list = match list
+        file, Nil =
+            require Pass content = read file
+            Pass (Some content)
+        Nil = Pass None
+        _   = Fail (makeError "Too many files ({format list}).")
+
+    require Pass expectedStdout =
+        sources testDirectory `stdout`
+        | readFile
+
+    require Pass expectedStderr =
+        sources testDirectory `stderr`
+        | readFile
+
+    def visibleFiles =
+        sources testDirectory `.*`
+
+    def inTestDir path =
+        relative testDirectory path
+
+    require Pass (Pair wakeBin wakeVisible) =
+        wakeToTest Unit
+
+    def testJob =
+        makeExecPlan (testScript.getPathName.inTestDir, wakeBin.inTestDir, Nil) (visibleFiles ++ wakeVisible)
+        | setPlanDirectory testDirectory
+        | setPlanLabel "testing: {testName}"
+        | setPlanStdout logNever
+        | setPlanStderr logNever
+        | runJob
+
+    require Pass jobStdout =
+        testJob.getJobStdout
+
+    require Pass jobStderr =
+        testJob.getJobStderr
+
+    require Pass _ = match expectedStderr
+        Some x if x ==* jobStderr = Pass Unit
+        None = Pass Unit
+        Some _ = Fail (makeError "Unexpected standard error '{replace `\n.*` "" jobStderr}'")
+
+    require Pass _ = match expectedStdout
+        Some x if x ==* jobStdout = Pass Unit
+        None = Pass Unit
+        _ = Fail (makeError "Unexpected standard output '{replace `\n.*` "" jobStdout}'")
+
+    match shouldPass testJob.isJobOk
+        True  True  = Pass Unit
+        False False = Pass Unit
+        True  False =
+            Fail (makeError "Test failed ({format testJob.getJobStatus}) with '{replace `\n.*` "" jobStderr}'")
+        False True  =
+            Fail (makeError "Test should not have passed with '{replace `\n.*` "" jobStderr}'")

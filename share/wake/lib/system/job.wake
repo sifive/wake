@@ -405,7 +405,7 @@ export def getJobStatus job = match (getJobReport job)
 # - "isolate/workspace": makes the build appear run in /var/cache/wake
 #    ... if /var/cache/wake does not exist, a directory 'build/wake' is
 #        used relative to where wake has been installed
-def wakePath = prim "execpath" # location of the wake executable
+export def wakePath = prim "execpath" # location of the wake executable
 export def fuseRunner =
   def fuse = "{wakePath}/fuse-wake"
   def score plan =

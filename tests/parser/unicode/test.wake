@@ -1,0 +1,13 @@
+def testBool _ =
+  require True  = "\u0073\u0323\u0307" ==* "\u1e69"
+  require True  = "ṩ" ==* "ṩ"
+  require True  = "ṩ{"-"}ṩ" ==* "ṩ-ṩ"
+  require False = 'ṩ' ==* 'ṩ'
+  True
+
+def test x =
+    if testBool x then
+        Pass Unit
+    else
+        Fail (makeError "normalization bad")
+

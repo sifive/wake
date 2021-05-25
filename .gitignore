@@ -1,8 +1,10 @@
+manifest.wake
 *.o
 /.vscode
 /.build
 /.fuse
 /.fuse.log
+/**/wake.db
 /wake.db
 /wake.spec
 /src/symbol.cpp
