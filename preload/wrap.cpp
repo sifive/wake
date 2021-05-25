@@ -275,7 +275,7 @@ int main(int argc, const char **argv) {
 
   // Prepare the subcommand inputs
   std::vector<char *> arg, env;
-  std::string preload = STR(ENV) "=" + find_execpath() + "/libpreload-wake." STR(EXT);
+  std::string preload = STR(ENV) "=" + find_execpath() + "/../lib/wake/libpreload-wake." STR(EXT);
   env.push_back(const_cast<char*>(preload.c_str()));
 
   for (auto &x : jast.get("command").children)

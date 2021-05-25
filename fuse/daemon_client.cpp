@@ -30,7 +30,7 @@
 #include "execpath.h"
 
 daemon_client::daemon_client(const std::string &base_dir)
-   :	executable(find_execpath() + "/fuse-waked"),
+   :	executable(find_execpath() + "/../lib/wake/fuse-waked"),
 	mount_path(base_dir + "/.fuse"),
 	mount_subdir(mount_path + "/" + std::to_string(getpid())),
 	output_path(mount_path + "/.o." + std::to_string(getpid())),

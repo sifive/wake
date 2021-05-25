@@ -407,14 +407,14 @@ export def getJobStatus job = match (getJobReport job)
 #        used relative to where wake has been installed
 def wakePath = prim "execpath" # location of the wake executable
 export def fuseRunner =
-  def fuse = "{wakePath}/../lib/wake/fuse-wake"
+  def fuse = "{wakePath}/fuse-wake"
   def score plan =
     if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
   makeJSONRunnerPlan fuse score
   | makeJSONRunner
 
 export def preloadRunner =
-  def preload = "{wakePath}/../lib/wake/preload-wake"
+  def preload = "{wakePath}/preload-wake"
   def score plan =
     if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
   makeJSONRunnerPlan preload score

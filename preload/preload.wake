@@ -37,7 +37,7 @@ def buildPreload (Pair variant _) =
   def cppFiles = sources here `.*\.cpp`
   def cppFlags = "-DEXT={libext}", "-DENV={loadenv}", json.getSysLibCFlags
   def ofiles = map (compileC variant cppFlags headers) cppFiles
-  linkO variant Nil (ofiles ++ json.getSysLibObjects) "lib/wake/preload-wake"
+  linkO variant Nil (ofiles ++ json.getSysLibObjects) "bin/preload-wake"
 
 def buildPrelib (Pair _ variant) =
   def cfiles = sources here `.*\.c`
