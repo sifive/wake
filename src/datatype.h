@@ -19,6 +19,7 @@
 #define DATA_TYPE_H
 
 #include "location.h"
+#include "optional.h"
 #include <vector>
 #include <string>
 #include <map>
@@ -30,6 +31,7 @@ struct AST {
   Location token, region;
   std::string name;
   std::string tag;
+  optional<AST> type;
   std::vector<AST> args;
 
   AST(const Location &token_, std::string &&name_, std::vector<AST> &&args_) :

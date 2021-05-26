@@ -735,9 +735,9 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
         break;
       }
       case COLON: {
+        op_type op = op_precedence(lex.id().c_str());
+        if (op.p < p) return lhs;
         if (state.type) {
-          op_type op = op_precedence(lex.id().c_str());
-          if (op.p < p) return lhs;
           Location tagloc = lhs.region;
           lex.consume();
           if (!lhs.args.empty() || Lexer::isOperator(lhs.name.c_str())) {
@@ -749,9 +749,14 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
           lhs = parse_ast(op.p + op.l, lex, state);
           lhs.tag = std::move(tag);
           lhs.region.start = tagloc.start;
-          break;
+        } else {
+          lex.consume();
+          state.type = true;
+          lhs.type = optional<AST>(new AST(parse_ast(op.p + op.l, lex, state)));
+          state.type = false;
+          lhs.region.end = lhs.type->region.end;
         }
-        // fall-through to default
+        break;
       }
       default: {
         return lhs;
