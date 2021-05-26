@@ -299,8 +299,14 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (Lexer::isUpper(ast.name.c_str()) || Lexer::isOperator(ast.name.c_str())) {
         Match *match = new Match(region);
         match->patterns.emplace_back(std::move(ast), rhs, nullptr);
-        match->args.emplace_back(new VarRef(region, "_ xx"));
+        match->args.emplace_back(new VarRef(ast.region, "_ xx"));
         out = new Lambda(region, "_ xx", match);
+      } else if (ast.type) {
+        DefMap *dm = new DefMap(region);
+        dm->body = std::unique_ptr<Expr>(rhs);
+        dm->defs.insert(std::make_pair(ast.name, DefValue(ast.region, std::unique_ptr<Expr>(
+          new Ascribe(LOCATION, std::move(*ast.type), new VarRef(LOCATION, "_ typed"), ast.region)))));
+        out = new Lambda(region, "_ typed", dm);
       } else {
         out = new Lambda(region, ast.name, rhs);
         out->token = ast.token;
