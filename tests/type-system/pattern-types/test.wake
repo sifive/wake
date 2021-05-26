@@ -1,0 +1,17 @@
+def map2 (fn: a => b): List a => List b = match _
+  Nil = Nil
+  x:a, r:List a = fn x, map2 fn r #fn a : b, map2 fn r : List b
+
+def Pair (x: Integer) (y: String) = Pair 9 " "
+
+def wtf = \(s: String) (
+  require Some (x: Integer) = int s
+  Some (str (x+1))
+)
+
+export def test _ =
+  seq x
+  | map2 (_+1)
+  | map2 str
+  | mapPartial wtf
+  | catWith y
