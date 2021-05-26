@@ -134,6 +134,9 @@ static int relabel_descend(Expr *expr, int index) {
       for (auto &v : match->args)
         index = relabel_descend(v.get(), index);
       return index;
+    } else if (expr->type == &Ascribe::type) {
+      Ascribe *ascribe = static_cast<Ascribe*>(expr);
+      return relabel_descend(ascribe->body.get(), index);
     }
   }
   // noop for DefMap, Literal, Prim
