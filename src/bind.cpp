@@ -309,6 +309,7 @@ static std::string rebind_publish(ResolveBinding *binding, const Location &locat
 struct PatternTree {
   Location location; // location of argument
   std::shared_ptr<Sum> sum; // nullptr if unexpanded
+  optional<AST> type; // nullptr if untyped
   int cons;
   int var; // -1 if unbound/_
   std::vector<PatternTree> children;
@@ -417,6 +418,11 @@ static Expr *build_identity(const Location &l, PatternTree &tree) {
   }
 }
 
+static std::unique_ptr<Expr> ascribe(std::unique_ptr<Expr> expr, const Location &l, optional<AST>&& type) {
+  if (!type) return expr;
+  return std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(std::move(*type)), expr.release(), l));
+}
+
 // invariants: !patterns.empty(); patterns have detail >= patterns[0]
 // post-condition: patterns unchanged (internal mutation is reversed)
 static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vector<PatternRef> &patterns) {
@@ -454,6 +460,12 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
       int args = cons.ast.args.size();
       int var = prototype.index;
       prototype.index += args;
+      // These bare Gets create a dependency on case function's first argument.
+      // While this is nominally the same as the destructor's argument, writing
+      // the function this way prevents lifting the Get out of the case.
+      std::vector<std::unique_ptr<Expr> > gets;
+      for (int i = 0; i < args; ++i)
+        gets.emplace_back(new Get(LOCATION, sum, &cons, i));
       for (auto p = patterns.begin(); p != patterns.end(); ++p) {
         PatternTree *t = get_expansion(&p->tree, expand);
         if (!t->sum) {
@@ -472,6 +484,12 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
             << "." << std::endl;
           return nullptr;
         } else if (t->sum && t->cons == (int)c) {
+          // Put any supplied type constraints on the object
+          assert (args == (int)t->children.size());
+          for (int i = 0; i < args; ++i) {
+            PatternTree &arg = t->children[i];
+            gets[i] = ascribe(std::move(gets[i]), arg.location, std::move(arg.type));
+          }
           bucket.emplace_back(std::move(*p));
           p->index = -2;
         }
@@ -480,14 +498,11 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
       rmap->body = expand_patterns(fnname, bucket);
       if (!rmap->body) return nullptr;
       for (size_t i = args; i > 0; --i) {
-        // This bare Get causes it to depend on the case function's first argument.
-        // While this is nominally the same as the destructor's argument, writing
-        // the function this way prevents lifting the Get out of the case.
         auto out = rmap->defs.insert(std::make_pair("_ a" + std::to_string(--var),
-          DefValue(LOCATION, std::unique_ptr<Expr>(new Get(LOCATION, sum, &cons, i-1)))));
+          DefValue(LOCATION, std::move(gets[i-1]))));
         assert (out.second);
       }
-      Lambda *lam = new Lambda(rmap->body->location, "_", rmap.release());
+      Lambda *lam = new Lambda(rmap->body->location, "_ tuple_case", rmap.release());
       lam->fnname = fnname;
       des->cases.emplace_back(lam);
       for (auto p = patterns.rbegin(); p != patterns.rend(); ++p) {
@@ -551,6 +566,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
 
 static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, AST &ast, std::shared_ptr<Sum> multiarg) {
   PatternTree out(ast.region);
+  out.type = std::move(ast.type);
   if (ast.name == "_") {
     // no-op; unbound
   } else if (!ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
@@ -612,6 +628,8 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
   std::vector<PatternTree> children;
   for (auto &a : match->args) {
     children.emplace_back(a->location, index);
+    for (auto &p : match->patterns)
+      a = ascribe(std::move(a), p.pattern.region, std::move(p.pattern.type));
     auto out = map->defs.insert(std::make_pair("_ a" + std::to_string(index), DefValue(LOCATION, std::move(a))));
     assert (out.second);
     multiarg->members.front().ast.args.emplace_back(AST(LOCATION));
@@ -1009,16 +1027,17 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
           AST signature(t.second.type.region, "List@wake", std::move(args));
 
           // Insert Ascribe requirements on all publishes
+          Location l = def.expr->location;
           Expr *next = nullptr;
           for (Expr *iter = def.expr.get(); iter->type == &App::type; iter = next) {
             App *app1 = static_cast<App*>(iter);
             App *app2 = static_cast<App*>(app1->fn.get());
-            app2->val = std::unique_ptr<Expr>(new Ascribe(def.expr->location, AST(signature), app2->val.release()));
+            app2->val = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), app2->val.release(), l));
             next = app1->val.get();
           }
 
           // If the topic is empty, still force the type
-          if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(def.expr->location, AST(signature), def.expr.release()));
+          if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), def.expr.release(), l));
         }
       }
     }
@@ -1316,7 +1335,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     std::map<std::string, TypeVar*> ids;
     bool b = explore(asc->body.get(), pmap, binding);
     bool ts = asc->signature.unify(asc->typeVar, ids);
-    AscErrorMessage ascm(&asc->body->location, &asc->signature.region);
+    AscErrorMessage ascm(&asc->body_location, &asc->signature.region);
     bool tb = asc->body->typeVar.unify(asc->typeVar, &ascm);
     return b && tb && ts;
   } else if (expr->type == &Prim::type) {

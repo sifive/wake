@@ -155,10 +155,11 @@ struct Subscribe : public Expr {
 struct Ascribe : public Expr {
   AST signature;
   std::unique_ptr<Expr> body;
+  Location body_location;
 
   static const TypeDescriptor type;
-  Ascribe(const Location &location_, AST &&signature_, Expr *body_)
-   : Expr(&type, location_), signature(std::move(signature_)), body(body_) { }
+  Ascribe(const Location &location_, AST &&signature_, Expr *body_, const Location &body_location_)
+   : Expr(&type, location_), signature(std::move(signature_)), body(body_), body_location(body_location_) { }
 
   void format(std::ostream &os, int depth) const override;
 };

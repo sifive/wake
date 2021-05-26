@@ -428,7 +428,7 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
         if (check_constructors(signature)) lex.fail = true;
         Location location = lhs->location;
         location.end = signature.region.end;
-        lhs = new Ascribe(location, std::move(signature), lhs);
+        lhs = new Ascribe(location, std::move(signature), lhs, lhs->location);
         break;
       }
       case MATCH:
