@@ -176,7 +176,7 @@ top:
       Sm_larrow | Sm_rarrow      { return op_type(6, 1);  }
       Sm_earrow                  { return op_type(5, 0);  }
       Sm_quant                   { return op_type(4, 0);  }
-      ":"                        { return op_type(3, 1);  }
+      ":"                        { return op_type(3, 0);  }
       ","                        { return op_type(2, 0);  }
       ";"                        { return op_type(1, 0);  }
       [i\\]                      { return op_type(0, 0);  } // IF and LAMBDA
