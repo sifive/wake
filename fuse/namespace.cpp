@@ -263,7 +263,7 @@ static bool squashfs_helper_mounts(const std::string &squashfs_base_path, const 
 		const std::string &source = x.second.get("source").value;
 		const std::string &destination = x.second.get("destination").value;
 
-		if (type != "bind" && type !="tmpfs") {
+		if (type != "bind" && type != "tmpfs" && type != "create-dir") {
 			std::cerr << "Unexpected mount type '" << type << "' in " << path << std::endl;
 			return false;
 		}
