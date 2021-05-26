@@ -477,8 +477,16 @@ static void extract_def(std::vector<Definition> &out, long index, AST &&ast, Exp
   out.emplace_back(key, ast.token, body);
   for (auto &m : ast.args) {
     AST pattern(m.token, std::string(ast.name));
+    pattern.type = std::move(ast.type);
     std::string mname("_" + m.name);
-    for (auto &n : ast.args) pattern.args.push_back(AST(m.token, &n == &m ? mname : "_"));
+    for (auto &n : ast.args) {
+      pattern.args.push_back(AST(m.token, "_"));
+      if (&n == &m) {
+        AST &back = pattern.args.back();
+        back.name = mname;
+        back.type = std::move(m.type);
+      }
+    }
     Match *match = new Match(m.token);
     match->args.emplace_back(new VarRef(body->location, key));
     match->patterns.emplace_back(std::move(pattern), new VarRef(m.token, mname), nullptr);
@@ -754,7 +762,6 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
           state.type = true;
           lhs.type = optional<AST>(new AST(parse_ast(op.p + op.l, lex, state)));
           state.type = false;
-          lhs.region.end = lhs.type->region.end;
         }
         break;
       }
