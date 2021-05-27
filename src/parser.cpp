@@ -473,17 +473,17 @@ struct Definition {
   Location location;
   std::unique_ptr<Expr> body;
   std::vector<ScopedTypeVar> typeVars;
-  Definition(std::string &&name_, const Location &location_, Expr *body_, std::vector<ScopedTypeVar> &&typeVars_)
-   : name(std::move(name_)), location(location_), body(body_), typeVars(std::move(typeVars_)) { }
+  Definition(const std::string &name_, const Location &location_, Expr *body_, std::vector<ScopedTypeVar> &&typeVars_)
+   : name(name_), location(location_), body(body_), typeVars(std::move(typeVars_)) { }
   Definition(const std::string &name_, const Location &location_, Expr *body_)
-   : name(std::move(name_)), location(location_), body(body_) { }
+   : name(name_), location(location_), body(body_) { }
 };
 
-static void extract_def(std::vector<Definition> &out, long index, AST &&ast, Expr *body) {
+static void extract_def(std::vector<Definition> &out, long index, AST &&ast, const std::vector<ScopedTypeVar> &typeVars, Expr *body) {
   std::string key = "_ extract " + std::to_string(++index);
-  out.emplace_back(key, ast.token, body);
+  out.emplace_back(key, ast.token, body, std::vector<ScopedTypeVar>(typeVars));
   for (auto &m : ast.args) {
-    AST pattern(m.token, std::string(ast.name));
+    AST pattern(ast.region, std::string(ast.name));
     pattern.type = std::move(ast.type);
     std::string mname("_" + m.name);
     for (auto &n : ast.args) {
@@ -498,9 +498,9 @@ static void extract_def(std::vector<Definition> &out, long index, AST &&ast, Exp
     match->args.emplace_back(new VarRef(body->location, key));
     match->patterns.emplace_back(std::move(pattern), new VarRef(m.token, mname), nullptr);
     if (Lexer::isUpper(m.name.c_str()) || Lexer::isOperator(m.name.c_str())) {
-      extract_def(out, index, std::move(m), match);
+      extract_def(out, index, std::move(m), typeVars, match);
     } else {
-      out.emplace_back(m.name, m.token, match);
+      out.emplace_back(m.name, m.token, match, std::vector<ScopedTypeVar>(typeVars));
     }
   }
 }
@@ -541,16 +541,16 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
   Expr *body = parse_block(lex, false);
   if (expect(EOL, lex)) lex.consume();
 
-  std::vector<Definition> out;
-  if (extract) {
-    ast.name = std::move(name);
-    extract_def(out, index, std::move(ast), body);
-    return out;
-  }
-
   // Record type variables introduced by the def before we rip the ascription appart
   std::vector<ScopedTypeVar> typeVars;
   ast.typeVars(typeVars);
+
+  std::vector<Definition> out;
+  if (extract) {
+    ast.name = std::move(name);
+    extract_def(out, index, std::move(ast), typeVars, body);
+    return out;
+  }
 
   // do we need a pattern match? lower / wildcard are ok
   bool pattern = false;
@@ -630,7 +630,7 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
     }
   }
 
-  out.emplace_back(std::move(name), ast.token, body, std::move(typeVars));
+  out.emplace_back(name, ast.token, body, std::move(typeVars));
   return out;
 }
 
