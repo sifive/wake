@@ -35,6 +35,7 @@
 #include "fuse.h"
 #include "json5.h"
 #include "namespace.h"
+#include "mkdir_parents.h"
 
 // Location in the parent namespace to base the new root on.
 static const std::string root_mount_prefix = "/tmp/.wakebox-mount";
@@ -295,11 +296,12 @@ static bool move_squashfs_mount(
 		return false;
 	}
 
-	// Make the new mountpoint, it's ok if it already exists.
+	// Make the new mountpoint and any parent directories, it's ok if it already exists.
 	std::string new_target = mount_prefix + contents;
-	if (0 != mkdir(new_target.c_str(), 0770) && errno != EEXIST) {
-		std::cerr << "mkdir (" << new_target << "): " << strerror(errno) << std::endl;
-		return false;
+	int err = mkdir_with_parents(new_target, 0777);
+	if (0 != err) {
+		std::cerr << "mkdir_with_parents ('" << new_target << "'):" << strerror(err) << std::endl;
+		return errno;
 	}
 
 	// Move the staging mount to the correct mountpoint.
@@ -363,11 +365,12 @@ static bool squashfs_mount(
 }
 
 static bool create_dir(const std::string& dest) {
-	if (0 == mkdir(dest.c_str(), 0777))
-		return true;
-
-	std::cerr << "mkdir (" << dest << "): " << strerror(errno) << std::endl;
-	return false;
+	int ret = mkdir_with_parents(dest, 0777);
+	if (0 != ret) {
+		std::cerr << "mkdir_with_parents (" << dest << "): " << strerror(ret) << std::endl;
+		return false;
+	}
+	return true;
 }
 
 static bool create_file(const std::string& dest) {
