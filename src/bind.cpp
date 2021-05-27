@@ -395,7 +395,7 @@ static Expr *fill_pattern(Expr *expr, const PatternTree &a, const PatternTree &b
   if (b.var >= 0) {
     expr = new App(expr->location,
       expr,
-      new VarRef(expr->location, "_ a" + std::to_string(a.var)));
+      new VarRef(b.location, "_ a" + std::to_string(a.var)));
   } else {
     for (size_t i = 0; i < a.children.size(); ++i)
       expr = fill_pattern(expr, a.children[i], b.children[i]);

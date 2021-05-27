@@ -1,0 +1,30 @@
+Type error; function 'f8' (test.wake:61:[9-10]) expected argument of type:
+    Unit
+  but was supplied argument '8' (test.wake:61:12) of type:
+    Integer
+Introduced type variable 'a' (test.wake:3:16) is not free; it has type:
+    Unit
+Type error; expression test.wake:[10-11]:[35-13] of type:
+    Unit => Unit
+  does not match explicit type ascription at test.wake:10:[16-31] of:
+    String => String
+Introduced type variables 'a' (test.wake:14:16) and 'b' (test.wake:14:21) are actually the same.
+Introduced type variable 'a' (test.wake:19:16) is not free; it has type:
+    Integer
+Type error; expression test.wake:[27-29]:[36-11] of type:
+    Integer => Boolean
+  does not match explicit type ascription at test.wake:27:[16-32] of:
+    String => Boolean
+Type error; function 'True' (test.wake:36:[15-18]) expected argument of type:
+    Integer
+  but was supplied argument '0' (test.wake:36:3) of type:
+    String
+Pattern for case 'Pair' expected type:
+    Pair (Pair Integer String) Boolean
+  but the argument 'x' (test.wake:43:62) has type:
+    Pair (Pair String String) Boolean
+Type error; expression '(_: Double)' (test.wake:53:[14-24]) of type:
+    String
+  does not match explicit type ascription at test.wake:53:[18-23] of:
+    Double
+>>> Aborting without execution <<<
