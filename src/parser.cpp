@@ -472,8 +472,9 @@ struct Definition {
   std::string name;
   Location location;
   std::unique_ptr<Expr> body;
-  Definition(std::string &&name_, const Location &location_, Expr *body_)
-   : name(std::move(name_)), location(location_), body(body_) { }
+  std::vector<ScopedTypeVar> typeVars;
+  Definition(std::string &&name_, const Location &location_, Expr *body_, std::vector<ScopedTypeVar> &&typeVars_)
+   : name(std::move(name_)), location(location_), body(body_), typeVars(std::move(typeVars_)) { }
   Definition(const std::string &name_, const Location &location_, Expr *body_)
    : name(std::move(name_)), location(location_), body(body_) { }
 };
@@ -546,6 +547,10 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
     extract_def(out, index, std::move(ast), body);
     return out;
   }
+
+  // Record type variables introduced by the def before we rip the ascription appart
+  std::vector<ScopedTypeVar> typeVars;
+  ast.typeVars(typeVars);
 
   // do we need a pattern match? lower / wildcard are ok
   bool pattern = false;
@@ -625,7 +630,7 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
     }
   }
 
-  out.emplace_back(std::move(name), ast.token, body);
+  out.emplace_back(std::move(name), ast.token, body, std::move(typeVars));
   return out;
 }
 
@@ -651,7 +656,8 @@ static void bind_def(Lexer &lex, DefMap &map, Definition &&def, Symbols *exports
     def.name = "_" + std::to_string(map.defs.size()) + " _";
 
   Location l = def.body->location;
-  auto out = map.defs.insert(std::make_pair(std::move(def.name), DefValue(def.location, std::move(def.body))));
+  auto out = map.defs.insert(std::make_pair(std::move(def.name), DefValue(
+    def.location, std::move(def.body), std::move(def.typeVars))));
 
   if (!out.second) {
     std::cerr << "Duplicate definition "
@@ -973,9 +979,9 @@ static void parse_topic(Lexer &lex, Package &package, Symbols *exports, Symbols 
   if (check_constructors(def)) lex.fail = true;
 
   // Confirm there are no open type variables
+  TypeMap ids;
   TypeVar x;
   x.setDOB();
-  std::map<std::string, TypeVar*> ids;
   if (!def.unify(x, ids)) lex.fail = true;
 
   if (expect(EOL, lex)) lex.consume();

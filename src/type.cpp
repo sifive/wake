@@ -45,6 +45,27 @@ TypeVar::Imp::~Imp() {
   if (nargs) delete [] cargs;
 }
 
+bool TypeVar::isFree() const {
+  return imp->isFree() && var_dob == imp->free_dob;
+}
+
+bool TypeVar::operator < (const TypeVar &b) const {
+  if (imp->free_dob < b.imp->free_dob) {
+    return true;
+  } else if (imp->free_dob > b.imp->free_dob) {
+    return false;
+  } else if (reinterpret_cast<uintptr_t>(static_cast<const void*>(imp.get()))
+           < reinterpret_cast<uintptr_t>(static_cast<const void*>(b.imp.get()))) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool TypeVar::operator == (const TypeVar &b) const {
+  return imp.get() == b.imp.get();
+}
+
 void TypeVar::setDOB() {
   if (!var_dob) {
     assert (imp->isFree());

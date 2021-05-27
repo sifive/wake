@@ -27,6 +27,15 @@
 #include <memory>
 
 struct TypeVar;
+typedef std::map<std::string, TypeVar*> TypeMap;
+
+struct ScopedTypeVar {
+  std::string name;
+  Location location;
+  ScopedTypeVar(const std::string &name_, const Location &location_)
+   : name(name_), location(location_) { }
+};
+
 struct AST {
   Location token, region;
   std::string name;
@@ -41,7 +50,10 @@ struct AST {
   AST(const Location &token_) :
     token(token_), region(token_) { }
 
-  bool unify(TypeVar &out, const std::map<std::string, TypeVar*> &ids);
+  bool unify(TypeVar &out, const TypeMap &ids);
+  void lowerVars(std::vector<ScopedTypeVar> &out) const;
+  void typeVars(std::vector<ScopedTypeVar> &out) const;
+
   operator bool() const { return !name.empty(); }
 };
 
