@@ -122,3 +122,9 @@ export def write path content =
   def spath = simplify path
   def parent = simplify "{spath}/.."
   writeImp (mkdir parent, Nil) 0664 spath content
+
+# Unary operator $ turns a Path into a String
+# Useful in string interpolation:
+#   def mypath = source "somefile.cpp"
+#   println "my file is: {$mypath}"
+export def $(p: Path) : String = p.getPathName
