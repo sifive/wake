@@ -134,6 +134,9 @@ static int relabel_descend(Expr *expr, int index) {
       for (auto &v : match->args)
         index = relabel_descend(v.get(), index);
       return index;
+    } else if (expr->type == &Ascribe::type) {
+      Ascribe *ascribe = static_cast<Ascribe*>(expr);
+      return relabel_descend(ascribe->body.get(), index);
     }
   }
   // noop for DefMap, Literal, Prim
@@ -296,8 +299,14 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       if (Lexer::isUpper(ast.name.c_str()) || Lexer::isOperator(ast.name.c_str())) {
         Match *match = new Match(region);
         match->patterns.emplace_back(std::move(ast), rhs, nullptr);
-        match->args.emplace_back(new VarRef(region, "_ xx"));
+        match->args.emplace_back(new VarRef(ast.region, "_ xx"));
         out = new Lambda(region, "_ xx", match);
+      } else if (ast.type) {
+        DefMap *dm = new DefMap(region);
+        dm->body = std::unique_ptr<Expr>(rhs);
+        dm->defs.insert(std::make_pair(ast.name, DefValue(ast.region, std::unique_ptr<Expr>(
+          new Ascribe(LOCATION, std::move(*ast.type), new VarRef(LOCATION, "_ typed"), ast.region)))));
+        out = new Lambda(region, "_ typed", dm);
       } else {
         out = new Lambda(region, ast.name, rhs);
         out->token = ast.token;
@@ -425,7 +434,7 @@ static Expr *parse_binary(int p, Lexer &lex, bool multiline) {
         if (check_constructors(signature)) lex.fail = true;
         Location location = lhs->location;
         location.end = signature.region.end;
-        lhs = new Ascribe(location, std::move(signature), lhs);
+        lhs = new Ascribe(location, std::move(signature), lhs, lhs->location);
         break;
       }
       case MATCH:
@@ -463,26 +472,35 @@ struct Definition {
   std::string name;
   Location location;
   std::unique_ptr<Expr> body;
-  Definition(std::string &&name_, const Location &location_, Expr *body_)
-   : name(std::move(name_)), location(location_), body(body_) { }
+  std::vector<ScopedTypeVar> typeVars;
+  Definition(const std::string &name_, const Location &location_, Expr *body_, std::vector<ScopedTypeVar> &&typeVars_)
+   : name(name_), location(location_), body(body_), typeVars(std::move(typeVars_)) { }
   Definition(const std::string &name_, const Location &location_, Expr *body_)
-   : name(std::move(name_)), location(location_), body(body_) { }
+   : name(name_), location(location_), body(body_) { }
 };
 
-static void extract_def(std::vector<Definition> &out, long index, AST &&ast, Expr *body) {
+static void extract_def(std::vector<Definition> &out, long index, AST &&ast, const std::vector<ScopedTypeVar> &typeVars, Expr *body) {
   std::string key = "_ extract " + std::to_string(++index);
-  out.emplace_back(key, ast.token, body);
+  out.emplace_back(key, ast.token, body, std::vector<ScopedTypeVar>(typeVars));
   for (auto &m : ast.args) {
-    AST pattern(m.token, std::string(ast.name));
+    AST pattern(ast.region, std::string(ast.name));
+    pattern.type = std::move(ast.type);
     std::string mname("_" + m.name);
-    for (auto &n : ast.args) pattern.args.push_back(AST(m.token, &n == &m ? mname : "_"));
+    for (auto &n : ast.args) {
+      pattern.args.push_back(AST(m.token, "_"));
+      if (&n == &m) {
+        AST &back = pattern.args.back();
+        back.name = mname;
+        back.type = std::move(m.type);
+      }
+    }
     Match *match = new Match(m.token);
     match->args.emplace_back(new VarRef(body->location, key));
     match->patterns.emplace_back(std::move(pattern), new VarRef(m.token, mname), nullptr);
     if (Lexer::isUpper(m.name.c_str()) || Lexer::isOperator(m.name.c_str())) {
-      extract_def(out, index, std::move(m), match);
+      extract_def(out, index, std::move(m), typeVars, match);
     } else {
-      out.emplace_back(m.name, m.token, match);
+      out.emplace_back(m.name, m.token, match, std::vector<ScopedTypeVar>(typeVars));
     }
   }
 }
@@ -523,24 +541,27 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
   Expr *body = parse_block(lex, false);
   if (expect(EOL, lex)) lex.consume();
 
+  // Record type variables introduced by the def before we rip the ascription appart
+  std::vector<ScopedTypeVar> typeVars;
+  ast.typeVars(typeVars);
+
   std::vector<Definition> out;
   if (extract) {
     ast.name = std::move(name);
-    extract_def(out, index, std::move(ast), body);
+    extract_def(out, index, std::move(ast), typeVars, body);
     return out;
   }
 
   // do we need a pattern match? lower / wildcard are ok
   bool pattern = false;
+  bool typed = ast.type;
   for (auto &x : ast.args) {
     pattern |= Lexer::isOperator(x.name.c_str()) || Lexer::isUpper(x.name.c_str());
+    typed |= x.type;
   }
 
   std::vector<std::pair<std::string, Location> > args;
-  if (!pattern) {
-    // no pattern; simple lambdas for the arguments
-    for (auto &x : ast.args) args.emplace_back(x.name, x.token);
-  } else {
+  if (pattern) {
     // bind the arguments to anonymous lambdas and push the whole thing into a pattern
     size_t nargs = ast.args.size();
     Match *match = new Match(fn);
@@ -554,6 +575,28 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
       match->args.emplace_back(new VarRef(fn, "_ " + std::to_string(i)));
     }
     body = match;
+  } else if (typed) {
+    DefMap *dm = new DefMap(fn);
+    if (ast.type) {
+      dm->body = std::unique_ptr<Expr>(
+        new Ascribe(LOCATION, std::move(*ast.type), body, body->location));
+    } else {
+      dm->body = std::unique_ptr<Expr>(body);
+    }
+    for (size_t i = 0; i < ast.args.size(); ++i) {
+      AST &arg = ast.args[i];
+      if (arg.type) {
+        args.emplace_back("_ " + std::to_string(i), LOCATION);
+        dm->defs.insert(std::make_pair(arg.name, DefValue(arg.region, std::unique_ptr<Expr>(
+          new Ascribe(LOCATION, std::move(*arg.type), new VarRef(LOCATION, "_ " + std::to_string(i)), arg.token)))));
+      } else {
+        args.emplace_back(arg.name, arg.token);
+      }
+    }
+    body = dm;
+  } else {
+    // no pattern; simple lambdas for the arguments
+    for (auto &x : ast.args) args.emplace_back(x.name, x.token);
   }
 
   if (target) {
@@ -587,7 +630,7 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
     }
   }
 
-  out.emplace_back(std::move(name), ast.token, body);
+  out.emplace_back(name, ast.token, body, std::move(typeVars));
   return out;
 }
 
@@ -613,7 +656,8 @@ static void bind_def(Lexer &lex, DefMap &map, Definition &&def, Symbols *exports
     def.name = "_" + std::to_string(map.defs.size()) + " _";
 
   Location l = def.body->location;
-  auto out = map.defs.insert(std::make_pair(std::move(def.name), DefValue(def.location, std::move(def.body))));
+  auto out = map.defs.insert(std::make_pair(std::move(def.name), DefValue(
+    def.location, std::move(def.body), std::move(def.typeVars))));
 
   if (!out.second) {
     std::cerr << "Duplicate definition "
@@ -732,9 +776,9 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
         break;
       }
       case COLON: {
+        op_type op = op_precedence(lex.id().c_str());
+        if (op.p < p) return lhs;
         if (state.type) {
-          op_type op = op_precedence(lex.id().c_str());
-          if (op.p < p) return lhs;
           Location tagloc = lhs.region;
           lex.consume();
           if (!lhs.args.empty() || Lexer::isOperator(lhs.name.c_str())) {
@@ -746,9 +790,13 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
           lhs = parse_ast(op.p + op.l, lex, state);
           lhs.tag = std::move(tag);
           lhs.region.start = tagloc.start;
-          break;
+        } else {
+          lex.consume();
+          state.type = true;
+          lhs.type = optional<AST>(new AST(parse_ast(op.p + op.l, lex, state)));
+          state.type = false;
         }
-        // fall-through to default
+        break;
       }
       default: {
         return lhs;
@@ -931,9 +979,9 @@ static void parse_topic(Lexer &lex, Package &package, Symbols *exports, Symbols 
   if (check_constructors(def)) lex.fail = true;
 
   // Confirm there are no open type variables
+  TypeMap ids;
   TypeVar x;
   x.setDOB();
-  std::map<std::string, TypeVar*> ids;
   if (!def.unify(x, ids)) lex.fail = true;
 
   if (expect(EOL, lex)) lex.consume();

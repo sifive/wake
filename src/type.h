@@ -87,6 +87,8 @@ public:
   const char *getName() const;
   const char *getTag(int i) const;
 
+  bool isFree() const;
+
   void setDOB();
   void setDOB(const TypeVar &other);
   void setTag(int i, const char *tag);
@@ -96,6 +98,10 @@ public:
   //  Deprecated:
   bool unify(TypeVar &other,  const Location *l = 0) { LegacyErrorMessage m(l); return unify(other, &m); }
   bool unify(TypeVar &&other, const Location *l = 0) { LegacyErrorMessage m(l); return unify(other, &m); }
+
+  // Sort type vars by age and DSU-identity
+  bool operator <  (const TypeVar &b) const;
+  bool operator == (const TypeVar &b) const;
 
   void clone(TypeVar &into) const;
   void format(std::ostream &os, const TypeVar &top) const; // use top's dob

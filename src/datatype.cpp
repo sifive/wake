@@ -33,7 +33,7 @@ void Sum::addConstructor(AST &&ast) {
   cons.index = members.size()-1;
 }
 
-bool AST::unify(TypeVar &out, const std::map<std::string, TypeVar*> &ids) {
+bool AST::unify(TypeVar &out, const TypeMap &ids) {
   if (Lexer::isLower(name.c_str())) {
     auto it = ids.find(name);
     if (it == ids.end()) {
@@ -54,6 +54,17 @@ bool AST::unify(TypeVar &out, const std::map<std::string, TypeVar*> &ids) {
     }
     return ok && childok;
   }
+}
+
+void AST::lowerVars(std::vector<ScopedTypeVar> &out) const {
+  if (!name.empty() && Lexer::isLower(name.c_str()))
+    out.emplace_back(name, token);
+  for (auto &arg: args) arg.lowerVars(out);
+}
+
+void AST::typeVars(std::vector<ScopedTypeVar> &out) const {
+  if (type) type->lowerVars(out);
+  for (auto &arg: args) arg.typeVars(out);
 }
 
 std::ostream & operator << (std::ostream &os, const AST &ast) {

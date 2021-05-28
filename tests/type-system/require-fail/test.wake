@@ -1,0 +1,22 @@
+def test _ =
+  # Unbound type variable at 'a' (test.wake:4:43)
+  # Unbound type variable at 'a' (test.wake:4:20)
+  require Pass (_: a) = Fail "xx": Result a String
+  # Pattern for case 'Some' expected type:
+  #     Option Integer
+  #   but the argument 'Some "zz"' (test.wake:9:[31-39]) has type:
+  #     Option String
+  require Some (_: Integer) = Some "zz"
+  # Pattern for case 'binary ,' expected type:
+  #     List String
+  #   but the argument 'seq 10' (test.wake:14:[31-36]) has type:
+  #     List Integer
+  require _: String, _, Nil = seq 10
+  # Type error; expression '_' (test.wake:19:22) of type:
+  #     List String
+  #   does not match explicit type ascription at test.wake:19:[25-36] of:
+  #     List Integer
+  require _: String, _: List Integer = seq 10
+  # The required pattern at test.wake:[21-22]:[3-14] can never fail; use def instead.
+  require _: Integer = 98
+  Pass "hello"

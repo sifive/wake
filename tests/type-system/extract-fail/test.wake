@@ -1,0 +1,36 @@
+# Pattern for case 'Pair' expected type:
+#     Pair Integer String
+#   but the argument 'Pair 44 1' (test.wake:5:[59-67]) has type:
+#     Pair Integer Integer
+def Pair (_: Integer) (_: String)                       = Pair 44 1
+# Type error; expression 'Pair (_: Integer) (_: String)' (test.wake:10:[5-33]) of type:
+#     Pair Integer Integer
+#   does not match explicit type ascription at test.wake:10:[36-54] of:
+#     Pair Integer String
+def Pair (_: Integer) (_: String): Pair Integer String  = Pair 44 1
+# Pattern for case 'Pair' expected type:
+#     Pair Integer String
+#   but the argument 'Pair 44 1' (test.wake:15:[59-67]) has type:
+#     Pair Integer Integer
+def Pair (_: Integer) (_: String): Pair Integer Integer = Pair 44 1
+# Type error; expression 'Pair (_: Integer) (_: String)' (test.wake:20:[5-33]) of type:
+#     Pair Integer String
+#   does not match explicit type ascription at test.wake:20:[36-55] of:
+#     Pair Integer Integer
+def Pair (_: Integer) (_: String): Pair Integer Integer = Pair 44 "as"
+# Type error; expression 'Pair _ _' (test.wake:25:[5-12]) of type:
+#     Pair Integer Integer
+#   does not match explicit type ascription at test.wake:25:[36-54] of:
+#     Pair Integer String
+def Pair _ _:                      Pair Integer String  = Pair 44 1
+
+def id x = x
+# Introduced type variables 'a' (test.wake:29:14) and 'b' (test.wake:29:19) are actually the same.
+def Pair (_: a => b) (_: b => b) = Pair (id: a => b) (id: b => b)
+# Introduced type variable 'a' (test.wake:32:14) is not free; it has type:
+#     Integer
+def Pair (_: a => a) (_: b => b) = Pair (id: Integer => Integer) (id: b => b)
+# Introduced type variables 'b' (test.wake:34:20) and 'c' (test.wake:34:42) are actually the same.
+def Pair (_: (a => b) => (List a => List c)) _ = Pair map 99
+
+export def test _ = Pass 0

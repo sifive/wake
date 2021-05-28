@@ -37,9 +37,12 @@ struct ResolveDef {
   std::string name;
   Location location;
   std::unique_ptr<Expr> expr;
+  std::vector<ScopedTypeVar> typeVars;
   std::set<int> edges; // edges: things this name uses
   int index, lowlink, onstack; // Tarjan SCC variables
   int uses;
+  ResolveDef(const std::string &name_, const Location &location_, std::unique_ptr<Expr>&& expr_, std::vector<ScopedTypeVar> &&typeVars_)
+   : name(name_), location(location_), expr(std::move(expr_)), typeVars(std::move(typeVars_)), uses(0) { }
   ResolveDef(const std::string &name_, const Location &location_, std::unique_ptr<Expr>&& expr_)
    : name(name_), location(location_), expr(std::move(expr_)), uses(0) { }
 };
@@ -85,6 +88,7 @@ static void SCC(SCCState &state, unsigned vi) {
       auto out = state.binding->order.insert(std::make_pair(w.name, DefBinding::OrderValue(w.location, state.binding->fun.size() + state.binding->val.size())));
       assert (out.second);
       state.binding->fun.emplace_back(static_cast<Lambda*>(w.expr.release()));
+      state.binding->funVars.emplace_back(std::move(w.typeVars));
       state.binding->scc.push_back(scc_id);
     } while (wi != vi);
   }
@@ -236,6 +240,7 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
         auto out = bind->order.insert(std::make_pair(defs[j].name, DefBinding::OrderValue(defs[j].location, bind->val.size())));
         assert (out.second);
         bind->val.emplace_back(std::move(defs[j].expr));
+        bind->valVars.emplace_back(std::move(defs[j].typeVars));
         defs[j].index = 0;
       } else {
         defs[j].index = -1;
@@ -309,6 +314,7 @@ static std::string rebind_publish(ResolveBinding *binding, const Location &locat
 struct PatternTree {
   Location location; // location of argument
   std::shared_ptr<Sum> sum; // nullptr if unexpanded
+  optional<AST> type; // nullptr if untyped
   int cons;
   int var; // -1 if unbound/_
   std::vector<PatternTree> children;
@@ -389,7 +395,7 @@ static Expr *fill_pattern(Expr *expr, const PatternTree &a, const PatternTree &b
   if (b.var >= 0) {
     expr = new App(expr->location,
       expr,
-      new VarRef(expr->location, "_ a" + std::to_string(a.var)));
+      new VarRef(b.location, "_ a" + std::to_string(a.var)));
   } else {
     for (size_t i = 0; i < a.children.size(); ++i)
       expr = fill_pattern(expr, a.children[i], b.children[i]);
@@ -415,6 +421,11 @@ static Expr *build_identity(const Location &l, PatternTree &tree) {
   } else {
     return new VarRef(l, "_ a" + std::to_string(tree.var));
   }
+}
+
+static std::unique_ptr<Expr> ascribe(std::unique_ptr<Expr> expr, const Location &l, optional<AST>&& type) {
+  if (!type) return expr;
+  return std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(std::move(*type)), expr.release(), l));
 }
 
 // invariants: !patterns.empty(); patterns have detail >= patterns[0]
@@ -454,6 +465,12 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
       int args = cons.ast.args.size();
       int var = prototype.index;
       prototype.index += args;
+      // These bare Gets create a dependency on case function's first argument.
+      // While this is nominally the same as the destructor's argument, writing
+      // the function this way prevents lifting the Get out of the case.
+      std::vector<std::unique_ptr<Expr> > gets;
+      for (int i = 0; i < args; ++i)
+        gets.emplace_back(new Get(LOCATION, sum, &cons, i));
       for (auto p = patterns.begin(); p != patterns.end(); ++p) {
         PatternTree *t = get_expansion(&p->tree, expand);
         if (!t->sum) {
@@ -472,6 +489,12 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
             << "." << std::endl;
           return nullptr;
         } else if (t->sum && t->cons == (int)c) {
+          // Put any supplied type constraints on the object
+          assert (args == (int)t->children.size());
+          for (int i = 0; i < args; ++i) {
+            PatternTree &arg = t->children[i];
+            gets[i] = ascribe(std::move(gets[i]), arg.location, std::move(arg.type));
+          }
           bucket.emplace_back(std::move(*p));
           p->index = -2;
         }
@@ -480,14 +503,11 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
       rmap->body = expand_patterns(fnname, bucket);
       if (!rmap->body) return nullptr;
       for (size_t i = args; i > 0; --i) {
-        // This bare Get causes it to depend on the case function's first argument.
-        // While this is nominally the same as the destructor's argument, writing
-        // the function this way prevents lifting the Get out of the case.
         auto out = rmap->defs.insert(std::make_pair("_ a" + std::to_string(--var),
-          DefValue(LOCATION, std::unique_ptr<Expr>(new Get(LOCATION, sum, &cons, i-1)))));
+          DefValue(LOCATION, std::move(gets[i-1]))));
         assert (out.second);
       }
-      Lambda *lam = new Lambda(rmap->body->location, "_", rmap.release());
+      Lambda *lam = new Lambda(rmap->body->location, "_ tuple_case", rmap.release());
       lam->fnname = fnname;
       des->cases.emplace_back(lam);
       for (auto p = patterns.rbegin(); p != patterns.rend(); ++p) {
@@ -551,6 +571,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
 
 static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, AST &ast, std::shared_ptr<Sum> multiarg) {
   PatternTree out(ast.region);
+  out.type = std::move(ast.type);
   if (ast.name == "_") {
     // no-op; unbound
   } else if (!ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
@@ -612,6 +633,8 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
   std::vector<PatternTree> children;
   for (auto &a : match->args) {
     children.emplace_back(a->location, index);
+    for (auto &p : match->patterns)
+      a = ascribe(std::move(a), p.pattern.region, std::move(p.pattern.type));
     auto out = map->defs.insert(std::make_pair("_ a" + std::to_string(index), DefValue(LOCATION, std::move(a))));
     assert (out.second);
     multiarg->members.front().ast.args.emplace_back(AST(LOCATION));
@@ -871,7 +894,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     dbinding.symbols = process_import(top, def->imports, def->location);
     for (auto &i : def->defs) {
       dbinding.index[i.first] = dbinding.defs.size();
-      dbinding.defs.emplace_back(i.first, i.second.location, std::move(i.second.body));
+      dbinding.defs.emplace_back(i.first, i.second.location, std::move(i.second.body), std::move(i.second.typeVars));
     }
     for (auto &i : dbinding.defs) {
       i.expr = fracture(top, false, addanon(name, anon) + "." + trim(i.name), std::move(i.expr), &dbinding);
@@ -940,7 +963,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       for (auto &f : p.second->files) {
         for (auto &d : f.content->defs) {
           gbinding.index[d.first] = gbinding.defs.size();
-          gbinding.defs.emplace_back(d.first, d.second.location, std::move(d.second.body));
+          gbinding.defs.emplace_back(d.first, d.second.location, std::move(d.second.body), std::move(d.second.typeVars));
         }
         for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
           auto name = "publish " + it->first + " " + std::to_string(++publish);
@@ -1009,16 +1032,17 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
           AST signature(t.second.type.region, "List@wake", std::move(args));
 
           // Insert Ascribe requirements on all publishes
+          Location l = def.expr->location;
           Expr *next = nullptr;
           for (Expr *iter = def.expr.get(); iter->type == &App::type; iter = next) {
             App *app1 = static_cast<App*>(iter);
             App *app2 = static_cast<App*>(app1->fn.get());
-            app2->val = std::unique_ptr<Expr>(new Ascribe(def.expr->location, AST(signature), app2->val.release()));
+            app2->val = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), app2->val.release(), l));
             next = app1->val.get();
           }
 
           // If the topic is empty, still force the type
-          if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(def.expr->location, AST(signature), def.expr.release()));
+          if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), def.expr.release(), l));
         }
       }
     }
@@ -1200,7 +1224,68 @@ struct MatchTypeVarErrorMessage : public TypeErrorMessage  {
   void formatB(std::ostream &os) const { os << "but the argument " << arg->text() << " has type"; }
 };
 
-static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
+struct ExploreState {
+  const PrimMap &pmap;
+  TypeMap typeVars;
+  ExploreState(const PrimMap &pmap_) : pmap(pmap_) { }
+};
+
+struct OpenTypeVar : public ScopedTypeVar {
+  TypeVar var;
+  OpenTypeVar(const ScopedTypeVar &scoped) : ScopedTypeVar(scoped) { }
+  bool operator < (const OpenTypeVar &o) const { return var < o.var; }
+};
+
+struct TypeScope {
+  TypeScope(ExploreState &state_, const std::vector<ScopedTypeVar> &typeVars, const TypeVar &dob);
+  ~TypeScope();
+
+  ExploreState &state;
+  std::vector<OpenTypeVar> vars;
+};
+
+TypeScope::TypeScope(ExploreState &state_, const std::vector<ScopedTypeVar> &typeVars, const TypeVar &dob)
+ : state(state_)
+{
+  // reserve to keep pointers into array legal
+  vars.reserve(typeVars.size());
+  for (auto &var : typeVars) {
+    auto out = state.typeVars.insert(std::make_pair(var.name, nullptr));
+    if (!out.second) continue;
+    vars.emplace_back(var);
+    vars.back().var.setDOB(dob);
+    out.first->second = &vars.back().var;
+  }
+}
+
+TypeScope::~TypeScope() {
+  for (auto &var : vars)
+    state.typeVars.erase(var.name);
+
+  std::sort(vars.begin(), vars.end());
+  for (size_t i = 0; i < vars.size(); ++i) {
+    OpenTypeVar &var = vars[i];
+    if (!var.var.isFree()) {
+      std::cerr
+        << "Introduced type variable " << var.location.text()
+        << " is not free; it has type:" << std::endl
+        << "    ";
+      var.var.format(std::cerr, var.var);
+      std::cerr << std::endl;
+      continue;
+    }
+    if (i == 0) continue;
+    OpenTypeVar &prior = vars[i-1];
+    if (prior.var == var.var) {
+      std::cerr
+        << "Introduced type variables " << prior.location.text()
+        << " and " << var.location.text()
+        << " are actually the same." << std::endl;
+    }
+  }
+}
+
+static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
   if (!expr) return false; // failed fracture
   expr->typeVar.setDOB();
   if (expr->type == &VarRef::type) {
@@ -1226,8 +1311,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
   } else if (expr->type == &App::type) {
     App *app = static_cast<App*>(expr);
     binding->open = false;
-    bool f = explore(app->fn .get(), pmap, binding);
-    bool a = explore(app->val.get(), pmap, binding);
+    bool f = explore(app->fn .get(), state, binding);
+    bool a = explore(app->val.get(), state, binding);
     FnErrorMessage fnm(&app->fn->location);
     bool t = f && app->fn->typeVar.unify(TypeVar(FN, 2), &fnm);
     ArgErrorMessage argm(&app->fn->location, &app->val->location, t?app->fn->typeVar.getTag(0):0);
@@ -1240,7 +1325,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     if (t && lambda->name != "_" && lambda->name.find(' ') == std::string::npos)
       lambda->typeVar.setTag(0, lambda->name.c_str());
     NameBinding bind(binding, lambda);
-    bool out = explore(lambda->body.get(), pmap, &bind);
+    bool out = explore(lambda->body.get(), state, &bind);
     RecErrorMessage recm(&lambda->body->location);
     bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &recm);
     return out && t && tr;
@@ -1249,17 +1334,21 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     binding->open = false;
     NameBinding bind(binding, def);
     bool ok = true;
-    for (auto &i : def->val)
-      ok = explore(i.get(), pmap, binding) && ok;
+    for (unsigned i = 0; i < def->val.size(); ++i) {
+      def->val[i]->typeVar.setDOB();
+      TypeScope scope(state, def->valVars[i], def->val[i]->typeVar);
+      ok = explore(def->val[i].get(), state, binding) && ok;
+    }
     for (unsigned i = 0; i < def->fun.size(); ++i) {
       def->fun[i]->typeVar.setDOB();
       for (unsigned j = i+1; j < def->fun.size() && i == def->scc[j]; ++j)
         if (def->fun[j]) def->fun[j]->typeVar.setDOB(def->fun[i]->typeVar);
+      TypeScope scope(state, def->funVars[i], def->fun[i]->typeVar);
       bind.generalized = def->val.size() + def->scc[i];
-      ok = explore(def->fun[i].get(), pmap, &bind) && ok;
+      ok = explore(def->fun[i].get(), state, &bind) && ok;
     }
     bind.generalized = def->val.size() + def->fun.size();
-    ok = explore(def->body.get(), pmap, &bind) && ok;
+    ok = explore(def->body.get(), state, &bind) && ok;
     ok = ok && def->typeVar.unify(def->body->typeVar, &def->location) && ok;
     return ok;
   } else if (expr->type == &Literal::type) {
@@ -1269,7 +1358,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     Construct *cons = static_cast<Construct*>(expr);
     bool ok = cons->typeVar.unify(
       TypeVar(cons->sum->name.c_str(), cons->sum->args.size()));
-    std::map<std::string, TypeVar*> ids;
+    TypeMap ids;
     for (size_t i = 0; i < cons->sum->args.size(); ++i)
       ids[cons->sum->args[i]] = &cons->typeVar[i];
     if (binding->lambda) {
@@ -1291,7 +1380,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     return ok;
   } else if (expr->type == &Destruct::type) {
     Destruct *des = static_cast<Destruct*>(expr);
-    bool ok = explore(des->arg.get(), pmap, binding);
+    bool ok = explore(des->arg.get(), state, binding);
     if (ok) {
       MatchArgErrorMessage ma(&des->arg->location);
       ok = des->arg->typeVar.unify(
@@ -1299,7 +1388,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
         &ma);
       for (size_t i = 0; i < des->cases.size(); ++i) {
         Lambda *lam = static_cast<Lambda*>(des->cases[i].get());
-        bool c = explore(lam, pmap, binding);
+        bool c = explore(lam, state, binding);
         if (!c) { ok = false; continue; }
         MatchResultErrorMessage mr(&lam->location,
           des->sum->members[0].ast.name,
@@ -1313,10 +1402,9 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     return ok;
   } else if (expr->type == &Ascribe::type) {
     Ascribe *asc = static_cast<Ascribe*>(expr);
-    std::map<std::string, TypeVar*> ids;
-    bool b = explore(asc->body.get(), pmap, binding);
-    bool ts = asc->signature.unify(asc->typeVar, ids);
-    AscErrorMessage ascm(&asc->body->location, &asc->signature.region);
+    bool b = explore(asc->body.get(), state, binding);
+    bool ts = asc->signature.unify(asc->typeVar, state.typeVars);
+    AscErrorMessage ascm(&asc->body_location, &asc->signature.region);
     bool tb = asc->body->typeVar.unify(asc->typeVar, &ascm);
     return b && tb && ts;
   } else if (expr->type == &Prim::type) {
@@ -1326,8 +1414,8 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
       args.push_back(&iter->lambda->typeVar[0]);
     std::reverse(args.begin(), args.end());
     prim->args = args.size();
-    PrimMap::const_iterator i = pmap.find(prim->name);
-    if (i == pmap.end()) {
+    PrimMap::const_iterator i = state.pmap.find(prim->name);
+    if (i == state.pmap.end()) {
       std::cerr << "Primitive reference "
         << prim->name << " is unbound at "
         << prim->location.file() << std::endl;
@@ -1348,7 +1436,7 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
     TypeVar &typ = binding->lambda->typeVar[0];
     bool ok = typ.unify(
       TypeVar(get->sum->name.c_str(), get->sum->args.size()));
-    std::map<std::string, TypeVar*> ids;
+    TypeMap ids;
     for (size_t i = 0; i < get->sum->args.size(); ++i)
       ids[get->sum->args[i]] = &typ[i];
     ok = get->cons->ast.args[get->index].unify(get->typeVar, ids) && ok;
@@ -1361,9 +1449,10 @@ static bool explore(Expr *expr, const PrimMap &pmap, NameBinding *binding) {
 
 std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap) {
   NameBinding bottom;
+  ExploreState state(pmap);
   Top &topr = *top;
   std::unique_ptr<Expr> out = fracture(topr, false, "", std::move(top), 0);
-  if (out && !explore(out.get(), pmap, &bottom)) out.reset();
+  if (out && !explore(out.get(), state, &bottom)) out.reset();
   return out;
 }
 

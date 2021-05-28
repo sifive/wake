@@ -155,10 +155,11 @@ struct Subscribe : public Expr {
 struct Ascribe : public Expr {
   AST signature;
   std::unique_ptr<Expr> body;
+  Location body_location;
 
   static const TypeDescriptor type;
-  Ascribe(const Location &location_, AST &&signature_, Expr *body_)
-   : Expr(&type, location_), signature(std::move(signature_)), body(body_) { }
+  Ascribe(const Location &location_, AST &&signature_, Expr *body_, const Location &body_location_)
+   : Expr(&type, location_), signature(std::move(signature_)), body(body_), body_location(body_location_) { }
 
   void format(std::ostream &os, int depth) const override;
 };
@@ -166,8 +167,11 @@ struct Ascribe : public Expr {
 struct DefValue {
   Location location;
   std::unique_ptr<Expr> body;
+  std::vector<ScopedTypeVar> typeVars;
   DefValue(const Location &location_, std::unique_ptr<Expr> &&body_)
    : location(location_), body(std::move(body_)) { }
+  DefValue(const Location &location_, std::unique_ptr<Expr> &&body_, std::vector<ScopedTypeVar> &&typeVars_)
+   : location(location_), body(std::move(body_)), typeVars(std::move(typeVars_)) { }
 };
 
 #define SYM_LEAF 1 // qualified = a definition
@@ -269,19 +273,20 @@ struct DefBinding : public Expr {
   };
   typedef std::vector<std::unique_ptr<Expr> > Values;
   typedef std::vector<std::unique_ptr<Lambda> > Functions;
+  typedef std::vector<std::vector<ScopedTypeVar> > TypeVars;
   typedef std::map<std::string, OrderValue> Order;
 
   std::unique_ptr<Expr> body;
   Values val;     // access prior binding
   Functions fun;  // access current binding
-  Order order; // values, then functions
+  Order order;    // values, then functions
+  TypeVars valVars;
+  TypeVars funVars;
   std::vector<unsigned> scc; // SCC id per function
 
   static const TypeDescriptor type;
   DefBinding(const Location &location_, std::unique_ptr<Expr> body_)
    : Expr(&type, location_), body(std::move(body_)) { }
-  DefBinding(const DefBinding &def)
-   : Expr(def), body(), val(), fun(), order(def.order), scc(def.scc) { }
 
   void format(std::ostream &os, int depth) const override;
 };
