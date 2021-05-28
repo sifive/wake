@@ -82,8 +82,9 @@ static Expr *parse_block(Lexer &lex, bool multiline);
 struct ASTState {
   bool type;  // control ':' reduction
   bool match; // allow literals
+  bool topParen;
   std::vector<Expr*> guard;
-  ASTState(bool type_, bool match_) : type(type_), match(match_) { }
+  ASTState(bool type_, bool match_) : type(type_), match(match_), topParen(false) { }
 };
 
 static AST parse_unary_ast(int p, Lexer &lex, ASTState &state);
@@ -507,7 +508,6 @@ static void extract_def(std::vector<Definition> &out, long index, AST &&ast, con
 
 static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bool publish) {
   lex.consume();
-  bool openParen = lex.next.type == POPEN;
 
   ASTState state(false, false);
   AST ast = parse_ast(0, lex, state);
@@ -516,7 +516,7 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
   ast.name.clear();
   if (check_constructors(ast)) lex.fail = true;
 
-  bool extract = Lexer::isUpper(name.c_str()) || (openParen && Lexer::isOperator(name.c_str()));
+  bool extract = Lexer::isUpper(name.c_str()) || (state.topParen && Lexer::isOperator(name.c_str()));
   if (extract && (target || publish)) {
     std::cerr << "Upper-case identifier cannot be used as a target/publish name at "
       << ast.token.text() << std::endl;
@@ -697,6 +697,7 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
       args.emplace_back(std::move(rhs));
       auto out = AST(token, std::move(name), std::move(args));
       out.region.end = out.args.back().region.end;
+      state.topParen = false;
       return out;
     }
     // Terminals
@@ -717,6 +718,7 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
       region.end = lex.next.location.end;
       if (expect(PCLOSE, lex)) lex.consume();
       out.region = region;
+      state.topParen = true;
       return out;
     }
     case LITERAL: {
@@ -758,6 +760,7 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
         args.emplace_back(std::move(rhs));
         lhs = AST(token, std::move(name), std::move(args));
         lhs.region = region;
+        state.topParen = false;
         break;
       }
       case LITERAL:
@@ -773,6 +776,7 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
           lex.fail = true;
         }
         lhs.args.emplace_back(std::move(rhs));
+        state.topParen = false;
         break;
       }
       case COLON: {
