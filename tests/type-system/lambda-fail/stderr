@@ -1,0 +1,14 @@
+Type error; function '"{x}"' (test.wake:5:[24-28]) expected argument of type:
+    String
+  but was supplied argument 'x' (test.wake:5:26) of type:
+    Integer
+Pattern for case 'Pair' expected type:
+    Pair Integer String
+  but the argument test.wake:10:[11-61] has type:
+    Pair String String
+Type error; function '"{x}-{y}"' (test.wake:15:[63-71]) expected argument 'x' of type:
+    String
+  but was supplied argument '(x: Integer)' (test.wake:15:[17-28]) of type:
+    Integer
+Unbound type variable at 'a' (test.wake:17:15)
+>>> Aborting without execution <<<

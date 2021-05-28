@@ -1,0 +1,11 @@
+def f0 = \(x: Integer) (x+1): Integer
+def f1 = \(Pair (x: Integer) (y: String): Pair Integer String) "{str x}-{y}"
+def f2: a => a = \(x:a) (x:a)
+
+export def test _ =
+    def _ =
+        f0 66
+        | (Pair _ "zz")
+        | f1
+        | f2
+    Pass 0
