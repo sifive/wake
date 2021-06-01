@@ -65,6 +65,9 @@ struct json_args {
 	int groupid;
 
 	std::vector<mount_op> mount_ops;
+
+	json_args() : isolate_network(false), userid(0), groupid(0) {}
+
 };
 
 struct fuse_args : public json_args {

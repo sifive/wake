@@ -91,6 +91,8 @@ const std::string command_running_dir(
 	return host_workspace_dir + "/" + subdir;
 }
 
+// Interactive mode does not provide userid control at this time.
+// Allows networking by default, no user control yet.
 int run_interactive(
 	const std::string &rootfs,
 	const std::vector<std::string> &toolchains,
@@ -99,10 +101,6 @@ int run_interactive(
 ){
 	struct fuse_args fa(get_cwd(), false);
 	fa.command = command;
-
-	// Interactive mode does not provide userid control at this time.
-	fa.userid = 0;
-	fa.groupid = 0;
 
 	if (!rootfs.empty())
 		fa.mount_ops.push_back({"squashfs", rootfs, "/", false});
