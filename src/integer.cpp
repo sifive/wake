@@ -136,13 +136,13 @@ static PRIMFN(prim_str) {
     base = mpz_get_si(arg0);
     ok &= base <= 62 && base >= -36 && base != 0 && base != 1 && base != -1;
   }
-  char buffer[mpz_sizeinbase(arg1, base) + 2];
   if (ok) {
+    char buffer[mpz_sizeinbase(arg1, base) + 2];
     mpz_get_str(buffer, base, arg1);
+    RETURN(String::alloc(runtime.heap, buffer));
   } else {
-    buffer[0] = 0;
+    RETURN(String::alloc(runtime.heap, ""));
   }
-  RETURN(String::alloc(runtime.heap, buffer));
 }
 
 static PRIMTYPE(type_int) {
