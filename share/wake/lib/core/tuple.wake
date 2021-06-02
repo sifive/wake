@@ -20,17 +20,17 @@ export data Unit = Unit
 
 # Creates a ``Pair``, a tuple containing two elements.
 export tuple Pair a b =
-  export First:  a
-  export Second: b
+    export First:  a
+    export Second: b
 
 # Defines an arrow operator as an alternate way to initialize a ``Pair``.
 export def x → y = Pair x y
 
 # Creates a ``Triple``, a tuple containing three elements.
 export tuple Triple a b c =
-  export First:  a
-  export Second: b
-  export Third:  c
+    export First:  a
+    export Second: b
+    export Third:  c
 
 # Variable length Tuples (terminate with Unit if you want ._x accessors)
 # aka: a List with fixed length and heterogeneous element types

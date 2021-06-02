@@ -15,185 +15,454 @@
 
 package wake
 
-# double operations
+# The Double type is an IEEE 754 64-bit precision number.
+# Any wake literal which include a decimal point or an exponent is parsed into a Double.
 
 # Unary absolute value operator for a Double.
-export def dabs x = prim "dabs"
+# dabs (+. 2.5) = 2.5
+# dabs (-. 2.5) = 2.5
+export def dabs (x: Double): Double =
+    (\_ prim "dabs") x
 
 # Unary negative sign for a Double.
-export def   -. x = prim "dneg"
+# -. (-. 2.5) =  2.5
+# -. (+. 2.5) = -2.5
+export def   -. (x: Double): Double =
+    (\_ prim "dneg") x
 
 # Unary positive sign for a Double.
-export def   +. x = x : Double
+# +. 2.5 = 2.5
+export def +. (x: Double) =
+    x
 
-# Binary addition operator for Doubles.
-export def x +. y = prim "dadd"
+# Binary addition operator for Double values.
+# 1.1 +. 2.0 = 3.1
+# 0.1 +. 0.5 = 0.6
+export def (x: Double) +. (y: Double): Double =
+    (\_\_ prim "dadd") x y
 
-# Binary subtraction operator for Doubles.
-export def x -. y = prim "dsub"
+# Binary subtraction operator for Double values.
+# 4.0 -. 2.2 = 1.8
+# 1.1 -. 2.0 = -. 0.9
+export def (x: Double) -. (y: Double): Double =
+    (\_\_ prim "dsub") x y
 
-# Binary multiplication operator for Doubles.
-export def x *. y = prim "dmul"
+# Binary multiplication operator for Double values.
+# 2.0 *. 3.3 = 6.6
+# 2.0 *. 4.1 = 8.2
+export def (x: Double) *. (y: Double): Double =
+    (\_\_ prim "dmul") x y
 
-# Binary division operator for Doubles.
-export def x /. y = prim "ddiv"
+# Binary division operator for Double valuess.
+# 4.0 /. 2.0 = 2.0
+# 5.0 /. 2.0 = 2.5
+export def (x: Double) /. (y: Double): Double =
+    (\_\_ prim "ddiv") x y
 
-# Binary exponentiation operator for Doubles.
-export def x ^. y = prim "dpow"
+# Binary exponentiation operator for Double values.
+# 2.0 ^. 3.0 = 8.0
+# 0.5 ^. 2.0 = 0.25
+export def (x: Double) ^. (y: Double): Double =
+    (\_\_ prim "dpow") x y
 
-# Computes x*y + z.
-export def dfma x y z = prim "dfma" # x*y + z
+# Computes x*y + z with rounding only at the end.
+# The fused-multiply-add operation is useful in numeric algorithms.
+# It is necessary in order compute values with full precision.
+# dfma 2.0 3.0 1.0 = 7.0
+# dfma 1.0 1.0 1.0 = 3.0
+export def dfma (x: Double) (y: Double) (z: Double): Double =
+    (\_\_\_ prim "dfma") x y z
 
-# Creates a function that computes the nth root.
-export def droot n =
-  def n1 = 1.0 /. n
-  _ ^. n1
+# Computes the n-th root.
+# droot 2.0 9.0  = 3.0
+# droot 3.0 27.0 = 3.0
+# droot 3.0 (-. 27.0) = nan
+export def droot (n: Double): Double => Double =
+    def n1 = 1.0 /. n
+    _ ^. n1
 
 # Unary operator for square root.
-export def dsqrt = droot 2.0
-
-def root3 = droot 3.0
-
-def root4 = droot 4.0
+# dsqrt 4.0 = 2.0
+# dsqrt 9.0 = 3.0
+# dsqrt (-. 9.0) = nan
+export def dsqrt: Double => Double =
+    droot 2.0
 
 # Unary operator for square root, using the unicode character.
-export def √ x = dsqrt x
+export def √ (x: Double): Double =
+    dsqrt x
 
 # Unary operator for cube root.
-export def ∛ x = root3 x
+export def ∛ (x: Double): Double =
+    root3 x
+
+def root3 =
+    droot 3.0
 
 # Unary operator for fourth root.
-export def ∜ x = root4 x
+export def ∜ (x: Double): Double =
+    root4 x
 
-export def dcmp x y =
-  def imp x y = prim "dcmp"
-  imp x y | head
+def root4 =
+    droot 4.0
 
-# Comparison of two Doubles => Option Order
-# None if either are NaN
-export def x <=>. y = dcmp x y
+# Compare two Double values.
+# NaN values cannot be compared, so return None
+# nan <=>. 4.5 = None
+# 4.5 <=>. nan = None
+# nan <=>. nan = None
+# 4.5 <=>. 4.5 = Some EQ
+# 4.5 <=>. 5.0 = Some LT
+# 4.0 <=>. 4.5 = Some GT
+export def dcmp (x: Double) (y: Double): Option Order =
+    def imp x y = prim "dcmp"
+    imp x y | head
+
+# Comparison of two Doubles.
+# NaN values cannot be compared, so return None
+# nan <=>. 4.5 = None
+# 4.5 <=>. nan = None
+# nan <=>. nan = None
+# 4.5 <=>. 4.5 = Some EQ
+# 4.5 <=>. 5.0 = Some LT
+# 4.0 <=>. 4.5 = Some GT
+export def (x: Double) <=>. (y: Double): Option Order =
+    dcmp x y
 
 # IEEE 754 requires comparisons with NaN to return False (except for !=)
-def dhelper x y fn = x <=>. y | omap fn | getOrElse False
+def dhelper x y fn =
+    match (x <=>. y)
+        Some x = fn x
+        None   = False
 
 # Binary Less-Than Operator.
-export def x <.  y = dhelper x y isLT
+# IEEE 754 requires comparison with NaN to return False
+# nan <. nan = False
+# nan <. 1.0 = False
+# 1.0 <. nan = False
+# 1.0 <. 1.0 = False
+# 1.0 <. 0.0 = False
+# 1.0 <. 2.0 = True
+export def (x: Double) <. (y: Double): Boolean =
+    dhelper x y isLT
 
 # Binary Greater-Than Operator.
-export def x >.  y = dhelper x y isGT
+# IEEE 754 requires comparison with NaN to return False
+# nan >. nan = False
+# nan >. 1.0 = False
+# 1.0 >. nan = False
+# 1.0 >. 1.0 = False
+# 1.0 >. 0.0 = True
+# 1.0 >. 2.0 = False
+export def (x: Double) >. (y: Double): Boolean =
+    dhelper x y isGT
 
 # Binary Greater-Or-Equal Operator.
-export def x >=. y = dhelper x y isGE
+# IEEE 754 requires comparison with NaN to return False
+# nan >=. nan = False
+# nan >=. 1.0 = False
+# 1.0 >=. nan = False
+# 1.0 >=. 1.0 = True
+# 1.0 >=. 0.0 = True
+# 1.0 >=. 2.0 = False
+export def (x: Double) >=. (y: Double): Boolean =
+    dhelper x y isGE
 
 # Binary Less-Or-Equal Operator.
-export def x <=. y = dhelper x y isLE
+# IEEE 754 requires comparison with NaN to return False
+# nan <=. nan = False
+# nan <=. 1.0 = False
+# 1.0 <=. nan = False
+# 1.0 <=. 1.0 = True
+# 1.0 <=. 0.0 = False
+# 1.0 <=. 2.0 = True
+export def (x: Double) <=. (y: Double): Boolean =
+    dhelper x y isLE
 
 # Binary Equal-To Operator.
-export def x ==. y = dhelper x y isEQ
+# IEEE 754 requires comparison with NaN to return False
+# nan ==. nan = False
+# nan ==. 1.0 = False
+# 1.0 ==. nan = False
+# 1.0 ==. 1.0 = True
+# 1.0 ==. 0.0 = False
+# 1.0 ==. 2.0 = False
+export def (x: Double) ==. (y: Double): Boolean =
+    dhelper x y isEQ
 
 # Binary Not-Equal Operator.
-export def x !=. y = x <=>. y | omap isNE | getOrElse True
+# IEEE 754 requires comparison with NaN to return True
+# nan !=. nan = True
+# nan !=. 1.0 = True
+# 1.0 !=. nan = True
+# 1.0 !=. 1.0 = False
+# 1.0 !=. 0.0 = True
+# 1.0 !=. 2.0 = True
+export def (x: Double) !=. (y: Double): Boolean =
+    !(x ==. y)
 
-# Computes the minimum of two Doubles.
-export def dmin x y = if x <. y then x else y
+# Computes the minimum of two Double values.
+# If either is nan, the result is nan.
+# dmin nan nan = nan
+# dmin nan 1.0 = nan
+# dmin 1.0 nan = nan
+# dmin 1.0 3.0 = 1.0
+# dmin 3.0 1.0 = 1.0
+export def dmin (x: Double) (y: Double): Double =
+    match (x <=>. y)
+        None    = nan
+        Some LT = x
+        _       = y
 
 # Computes the maximum of two Doubles.
-export def dmax x y = if x <. y then y else x
+# If either is nan, the result is nan
+# dmax nan nan = nan
+# dmax nan 1.0 = nan
+# dmax 1.0 nan = nan
+# dmax 1.0 3.0 = 3.0
+# dmax 3.0 1.0 = 3.0
+export def dmax (x: Double) (y: Double): Double =
+    match (x <=>. y)
+        None    = nan
+        Some LT = y
+        _       = x
 
-# Product of a series of Doubles.
-export def dprod = foldl (_*._) 1.0
-export def ∏. l = dprod l
+# Product of a List of Doubles.
+# dprod (3.0, 3.0, 1.0, Nil) = 9.0
+# dprod Nil = 1.0
+export def dprod: List Double => Double =
+    foldl (_*._) 1.0
 
-# Sum of a series of Doubles.
-export def dsum = foldl (_+._) 0.0
-export def ∑. l = dsum l
+export def ∏. (l: List Double): Double =
+    dprod l
 
+# Sum of a List of Doubles.
+# dsum (3.0, 3.0, 1.0, Nil) = 7.0
+# dsum Nil = 0.0
+export def dsum: List Double => Double =
+    foldl (_+._) 0.0
+
+export def ∑. (l: List Double): Double =
+    dsum l
+
+# Format to use when rendering a Double as a String
+# See dformat for more details.
 export data DoubleFormat =
-  DoubleFixed
-  DoubleScientific
-  DoubleHex
-  DoubleDefault
+    DoubleFixed
+    DoubleScientific
+    DoubleHex
+    DoubleDefault
 
-export def dformat x =
-  def imp f p x = prim "dstr"
-  def f = match x
-    DoubleFixed      = 0
-    DoubleScientific = 1
-    DoubleHex        = 2
-    DoubleDefault    = 3
-  imp f
+# Format a Double as a String; for digits=3:
+#    DoubleFixed       1000.000   1.000       # exactly 3 digits after the decimal
+#    DoubleScientific  1.000e+03  1.000e+00   # exactly 3 digits after the decimal
+#    DoubleHex         0x1.f40p+9 0x1.000p+0  # exactly 3 digits after the decimal
+#    DoubleDefault     1e+03      1e0         # at 3 digits of precision
+export def dformat (format: DoubleFormat): (digits: Integer) => Double => String =
+    def imp f p x = prim "dstr"
+    def f = match format
+        DoubleFixed      = 0
+        DoubleScientific = 1
+        DoubleHex        = 2
+        DoubleDefault    = 3
+    imp f
 
-export def double s =
-  def p s = prim "ddbl"
-  p s | head
+# Convert a String into a Double
+# Can parse any Double formatted by dformat.
+# If the value could not be processed; returns None
+# double "1.0" = Some 1e0
+# double "xyz" = None
+export def double (doubleInString: String): Option Double =
+    (\_ prim "ddbl") doubleInString | head
 
-export def dhex = dformat DoubleHex 20
-export def dstr = dformat DoubleDefault 17
+# Format a Double losslessly in hex
+# dhex pi = "0x1.921fb54442d180p+1"
+export def dhex: Double => String =
+    dformat DoubleHex 13
 
-export def dint x = double (str x)
+# Format a Double losslessly in decimal
+# dstr pi = "3.1415926535897931"
+export def dstr: Double => String =
+    dformat DoubleDefault 17
+
+# Convert an Integer into a Double
+# If the Integer is too large, return None
+# dint 55 = Some 55e0
+# dint (1 << 2000) = None
+export def dint (x: Integer): Option Double =
+    double (str x)
 
 # Conversion methods
 export data DoubleClass =
-  DoubleInfinite
-  DoubleNaN
-  DoubleSubNormal
-  DoubleNormal
+    DoubleInfinite
+    DoubleNaN
+    DoubleSubNormal
+    DoubleNormal
 
-export def dclass x =
-  def imp x = prim "dclass"
-  match (imp x)
-    1 = DoubleInfinite
-    2 = DoubleNaN
-    4 = DoubleSubNormal
-    _ = DoubleNormal
+# Categorize a Double based on the type of number
+# dclass inf = DoubleInfinite
+# dclass nan = DoubleNaN
+# dclass 1.0 = DoubleNormal
+# dclass 1.0e-322 = DoubleSubNormal
+export def dclass (x: Double): DoubleClass =
+    def imp x = prim "dclass"
+    match (imp x)
+        1 = DoubleInfinite
+        2 = DoubleNaN
+        4 = DoubleSubNormal
+        _ = DoubleNormal
 
-export def dfrexp x   = prim "dfrexp"
-export def dldexp f e = prim "dldexp"
-export def dmodf  x   = prim "dmodf"
+# Split 'x' into (Pair sig exp), such that:
+#   x = sig * 2^exp
+#   0.5 <= sig < 1.0
+#
+# dfrexp 1.0 = Pair 0.5  1
+# dfrexp 2.0 = Pair 0.5  2
+# dfrexp 4.0 = Pair 0.5  3
+# dfrexp 3.0 = Pair 0.75 2
+export def dfrexp (x: Double): Pair Double Integer =
+    (\_ prim "dfrexp") x
 
+# Reverse the effects of dfrexp
+#
+# dldexp 0.5  1 = 1.0
+# dldexp 0.5  2 = 2.0
+# dldexp 0.5  3 = 4.0
+# dldexp 0.75 2 = 3.0
+export def dldexp (fraction: Double) (exponent: Integer): Double =
+    (\_ \_ prim "dldexp") fraction exponent
+
+# Split 'x' into (Pair int fraction), such that:
+#   x = int + fraction
+#   -1 < fraction < 1
+#   sign(fraction) = sign(x)
+#
+# dmodf 5.0 = Pair 5 0.0
+# dmodf 5.1 = Pair 5 0.1
+# dmodf (-.5.1) = Pair -5 -0.1
+export def dmodf (x: Double): Pair Integer Double =
+    (\_ prim "dmodf") x
+
+# !!! remove this
 export def idouble x = match (dmodf x)
- Pair x 0.0 = Some x
- _ = None
+    Pair x 0.0 = Some x
+    _ = None
 
 # Handy numerical functions
 
 # Calculates the cosine of a Double.
-export def dcos    x = prim "dcos"
+# dcos nan       =   nan
+# dcos 0.0       =   1.0
+# dcos (pi/.2.0) =   0.0
+# dcos pi        = -.1.0
+export def dcos (radians: Double): Double =
+    (\_ prim "dcos") radians
 
 # Calculates the sine of a Double.
-export def dsin    x = prim "dsin"
+# dsin nan       = nan
+# dsin 0.0       = 0.0
+# dsin (pi/.2.0) = 1.0
+# dins pi        = 0.0
+export def dsin (radians: Double): Double =
+    (\_ prim "dsin") radians
 
 # Calculates the tangent of a Double.
-export def dtan    x = prim "dtan"
+# dtan (-.pi/.2.0) = -inf
+# dtan 0.0         =  0.0
+# dtan (  pi/.2.0) = +inf
+export def dtan (radians: Double): Double =
+    (\_ prim "dtan") radians
 
 # Calculates the inverse cosine of a Double.
-export def dacos   x = prim "dacos"
+# dacos (-.1.0) = pi
+# dacos 0.0     = pi /. 2.0
+# dacos 1.0     = 0.0
+# dacos 2.0     = nan
+export def dacos (x: Double): Double =
+    (\_ prim "dacos") x
 
 # Calculates the inverse sine of a Double.
-export def dasin   x = prim "dasin"
-
-# Calculates e^x.
-export def dexp    x = prim "dexp"
-
-# Calculates the natural logarithm of x.
-export def dlog    x = prim "dlog"
-export def dexpm1  x = prim "dexpm1"
-export def dlog1p  x = prim "dlog1p"
-export def derf    x = prim "derf"
-export def derfc   x = prim "derfc"
-export def dtgamma x = prim "dtgamma"
-export def dlgamma x = prim "dlgamma"
+# dasin (-.1.0) = -.(pi/2.0)
+# dasin 0.0     = 0.0
+# dasin 1.0     = pi/2.0
+export def dasin (x: Double): Double =
+    (\_ prim "dasin") x
 
 # Calculates the inverse tangent of y/x, giving the angle of the point(x, y) in the coordinate plane. 
-export def datan x y = prim "datan"
+# The advantage of 2-argument datan over 1-argument datan is it is defined even where x is 0.
+# datan (-. 1.0) (-. 1.0) = pi * -0.75
+# datan (-. 1.0)     0.0  = pi * -0.50
+# datan (-. 1.0)     1.0  = pi * -0.25
+# datan     0.0      1.0  = pi *  0.00
+# datan     1.0      1.0  = pi *  0.25
+# datan     1.0      0.0  = pi *  0.50
+# datan     1.0  (-. 1.0) = pi *  0.75
+# datan     0.0  (-. 1.0) = pi *  1.00
+export def datan (x: Double) (y: Double): Double =
+    (\_\_ prim "datan") x y
+
+# Calculates e^x.
+# dexp 0.0 = 1.0
+# dexp 1.0 = 2.71828
+# dexp (-.inf) = 0.0
+export def dexp (x: Double): Double =
+    (\_ prim "dexp") x
+
+# Calculates the natural logarithm of x.
+# dlog (dexp x) = x
+# dlog (-. 1.0) = nan
+export def dlog (x: Double): Double =
+    (\_ prim "dlog") x
+
+# Calculates e^.x -. 1.0
+# Useful for values of 'x' close to 0.0
+# dexpm1 (-.0.2) = -.0.18
+# dexpm1 0.0     = 0.0
+# dexpm1 0.2     = 0.22
+export def dexpm1 (x: Double): Double =
+    (\_ prim "dexpm1") x
+
+# Calculates dlog (1.0 +. x)
+# dlog1p (dexpm1 x) = x
+# Useful for values of 'x' close to 0.0
+# dlog1p (-.0.2) = -.0.22
+# dlog1p 0.0     = 0.0
+# dlog1p 0.2     = 0.18
+export def dlog1p  (x: Double): Double =
+    (\_ prim "dlog1p") x
+
+# Calculate the 'error function'.
+# 2/sqrt(pi) Integral_{0..x} e^(-t^2) dt
+# This function is handy for statistics
+export def derf (x: Double): Double =
+    (\_ prim "derf") x
+
+# Calculate the complementary 'error function' (1-erf).
+# 2/sqrt(pi) Integral_{0..x} e^(-t^2) dt
+# This function is handy for statistics
+export def derfc (x: Double): Double =
+    (\_ prim "derfc") x
+
+# Compute the gamma function; Integral_{0..inf} t^{x-1} e^t dt
+# This is an everywhere-defined factorial method; dtgamma (x+1) = x!
+export def dtgamma (x: Double): Double =
+    (\_ prim "dtgamma") x
+
+# Compute the logarithm of the gamma function
+# This is useful to approximate statistics like (n choose m)
+export def dlgamma (x: Double): Double =
+    (\_ prim "dlgamma") x
 
 # Useful constants
 
 # Not a Number
-export def nan = 0.0 /. 0.0
+export def nan: Double =
+    0.0 /. 0.0
 
-# Infinity
-export def inf = 1.0 /. 0.0
+# Positive Infinity
+export def inf: Double =
+    1.0 /. 0.0
 
-# Pi 
-export def pi  = dacos 0.0 *. 2.0
+# pi = 3.1415926535897931
+export def pi: Double =
+    dacos 0.0 *. 2.0

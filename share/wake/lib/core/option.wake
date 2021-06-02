@@ -17,100 +17,201 @@ package wake
 
 # The ``Option`` datatype.  Either holds a valid entry with value ``a`` (``Some``), or nothing (``None``).
 export data Option a =
-  Some a
-  None
+    Some a
+    None
 
-# Returns ``True`` if the ``Option`` contains a value, or ``False`` if it is empty.
-export def isSome = match _
-  Some _ = True
-  None   = False
+# isSome: Report if an Option has a value.
+# If you find yourself using the function, consider using a match instead.
+#
+#   isSome (Some 451) = True
+#   isSome (Some "x") = True
+#   isSome None       = False
+export def isSome: Option a => Boolean = match _
+    Some _ = True
+    None   = False
 
-# Returns ``True`` if the ``Option`` is empty, ``False`` otherwise.
-export def isNone = ! isSome _
+# isSome: Report if an Option has no value.
+# If you find yourself using the function, consider using a match instead.
+#
+#   isSome (Some 451) = False
+#   isSome (Some "x") = False
+#   isSome None       = True
+export def isNone: Option a => Boolean = match _
+    Some _ = True
+    None   = False
 
-# Returns the ``Option``'s value if it is exists, or ``b`` if the ``Option`` is empty.
-export def getOrElse b = match _
-  Some a = a
-  None   = b
- 
-# Inteded use: ``int "x" | orElse (int "z") | getOrElse 4``
-# In this case, returns ``x`` if it exists, otherwise ``z``.  Returns ``None`` if both are empty.
-export def orElse alt = match _
-  Some a = Some a
-  None   = alt
+# getOrElse: extract the value from an Option, with a supplied default if None.
+# The default value expression is evaluated whether or not the Option is None.
+#
+#   int "not-an-integer"     # Option Integer
+#   | getOrElse 5            # Integer
+#   ---
+#   5
+export def getOrElse (default: a): Option a => a = match _
+    Some x = x
+    None   = default
 
-# Returns the Option's value if Some, otherwise returns the result of fn
-# (fn: Unit => a) => Option a => a
-export def getOrElseFn fn = match _
-  Some a = a
-  None   = fn Unit
+# getOrElse: extract the value from an Option, with a supplied default function if None.
+# The default value function is evaluated only when the Option is None.
+#
+#   int "567"
+#   | getOrElseFn (\Unit firstFactorOf 8947289472892423423423423235325)
+#   ---
+#   567
+export def getOrElseFn (fn: Unit => a): Option a => a = match _
+    Some a = a
+    None   = fn Unit
 
-# Either returns an Option containing result of invoking f on the Option's value if it exists, or None if the Option is empty.
-export def omap f = match _
-  Some a = Some (f a)
-  None   = None
+# orElse: combine two Options, using the first value found, if any.
+#
+#   int "not-an-integer"
+#   | orElse (int "343")
+#   | orElse (int "asd")
+#   ---
+#   Some 343
+export def orElse (alternate: Option a): Option a => Option a = match _
+    Some a = Some a
+    None   = alternate
 
-# Either returns the result of invoking f on the Option's value if it exists, or None if the Option is empty.
-# Unlike omap, it does not return an Option, but just the value itself, unless it is None.
-export def omapPartial f = match _
-  Some a = f a
-  None   = None
+# omap: apply function `f` to the optional contents
+# If you find yourself using the function with getOrElse, consider using a match instead.
+#
+#   omap (_+1) (Some 4) = Some 5
+#   omap (_+1) None     = None
+export def omap (f: a => b): Option a => Option b = match _
+    Some a = Some (f a)
+    None   = None
 
-# Either returns the original Option if its value satisfies the function f, otherwise it returns None.
-export def ofilter f = match _
-  Some a if f a = Some a
-  _ = None
+# omapPartial: apply partial function 'f' to the optional contents
+# A partial function returns Option; only Some cases result in a value.
+#
+#   def isOdd x = x&1 == 1
+#   def divideEven = match _
+#     x if isOdd x = None
+#     x = Some (x / 2)
+#
+#   omapPartial divideEven None     = None
+#   omapPartial divideEven (Some 8) = Some 4
+#   omapPartial divideEven (Some 7) = None
+export def omapPartial (f: a => Option b): Option a => Option b = match _
+    Some a = f a
+    None   = None
 
-# Finds the first Some in a List of Option or returns None if List is all None
-# List (Option a) => Option a
-export def findSome = findSomeFn (_)
+# ofilter: remove the contents of an option when `f` returns False.
+#
+#   def isEven x = x&x == 0
+#   ofilter isEven None     = None
+#   ofilter isEven (Some 7) = None
+#   ofilter isEven (Some 8) = Some 8
+export def ofilter (f: a => Boolean): Option a => Option a = match _
+    Some a if f a = Some a
+    _ = None
 
-# Applies a function that returns Option to each element of a List
-#   returning the first Some or a None
-# (fn: a => Option b) => List a => Option b
-export def findSomeFn fn =
-  def helper = match _
-    Nil = None
-    h, t = match (fn h)
-      Some x = Some x
-      None = helper t
-  helper
+# findSome: return the first Some in a List or else None
+#
+#   findSome (Some 456, None, Some 123, Nil) = Some 456
+#   findSome (None, None, Nil) = None
+export def findSome: List (Option a) => Option a =
+    findSomeFn (_)
 
-# If a List of Options is all Some, returns Some of the elements, otherwise None
-# List (Option a) => Option (List a)
-export def findNone = findNoneFn (_)
+# findSomeFn: return the first Some output by 'fn' on a List or else None
+# Once a Some is found, fn is not evaluated on further elements.
+# This means that fn is applied to the List mostly sequentially.
+# If more parallelism is desired, use 'map fn | findSome' instead.
+#
+#   findSomeFn int ("abc", "456", "zz", "123", Nil) = Some 456
+#   findSomeFn int ("abc", "_56", "zz", "_23", Nil) = None
+export def findSomeFn (fn: a => Option b): List a => Option b =
+    def loop = match _
+        Nil = None
+        h, t =
+            require None = fn h
+            loop t
+    loop
 
-# Applies a function that returns Option to each element of a List
-#   returning None if any result is None, otherwise aggregates the Somes into a List
-# (fn: a => Option b) => List a => Option (List b)
-export def findNoneFn fn =
-  def helper = match _
-    Nil = Some Nil
-    h, t = match (fn h)
-      None = None
-      Some x = match (helper t)
-        Some t = Some (x, t)
-        None   = None
-  helper
+# findNone: if all List elements are Some return the contents else None
+#
+#   findNone (Some 456, Some 123, Nil) = Some (456, 123, Nil)
+#   findNone (Some 456, None, Some 123, Nil) = None
+export def findNone: List (Option a) => Option (List a) =
+    findNoneFn (_)
+
+# findNoneFn: if fn returns Some for all List elements, return the outputs else None
+# Once a None is found, fn is not evaluated on further elements.
+# This means that fn is applied to the List mostly sequentially.
+# If more parallelism is desired, use 'map fn | findNone' instead.
+#
+#   findNoneFn int ("456", "123", Nil) = Some (456, 123, Nil)
+#   findNoneFn int ("_56", "123", Nil) = None
+export def findNoneFn (fn: a => Option b): List a => Option (List b) =
+    def loop = match _
+        Nil = Some Nil
+        h, t =
+            require Some x = fn h
+            require Some t = loop t
+            Some (x, t)
+    loop
 
 # Promote Option to Result:
 
-# Converts Some to Pass or Fail
-# (f: a) => Option b => Result b a
-export def getOrFail f = getOrFailFn (\_ f)
+# getOrFail: Convert Some to Pass and None to a Fail with the supplied value.
+# The fail expression is evaluated even when the Option is None.
+#
+#   int "not-an-integer"
+#   | getOrFail "some error"
+#   ---
+#   Fail "some error"
+#
+#   int "81234"
+#   | getOrFail "some error"
+#   ---
+#   Pass 81234
+export def getOrFail (failVal: fail): Option pass => Result pass fail =
+    getOrFailFn (\_ failVal)
 
-# Converts Some to Pass or Fail of output of fn
-# (fn: Unit => a) => Option b => Result b a
-export def getOrFailFn fn = match _
-  Some a = Pass a
-  None   = Fail (fn Unit)
+# getOrFailFn: Convert Some to Pass and None to a Fail with the function output.
+# The fail function is evaluated only when the Option is None.
+#
+#   int "not-an-integer"
+#   | getOrFailFn (\Unit "some error")
+#   ---
+#   Fail "some error"
+#
+#   int "81234"
+#   | getOrFailFn (\Unit "some error")
+#   ---
+#   Pass 81234
+export def getOrFailFn (failFn: Unit => fail): Option pass => Result pass fail = match _
+    Some a = Pass a
+    None   = Fail (failFn Unit)
 
-# Converts Some to Fail or Pass
-# (p: a) => Option b => Result a b
-export def getOrPass p = getOrPassFn (\_ p)
+# getOrPass: Convert Some to Fail and None to a Pass with the supplied value.
+# The fail expression is evaluated even when the Option is None.
+#
+#   int "not-an-integer"
+#   | getOrPass "some error"
+#   ---
+#   Pass "some error"
+#
+#   int "81234"
+#   | getOrPass "some error"
+#   ---
+#   Fail 81234
+export def getOrPass (passVal: pass): Option fail => Result pass fail =
+    getOrPassFn (\_ passVal)
 
-# Converts Some to Fail or Pass of output of fn
-# (fn: Unit => a) => Option b => Result a b
-export def getOrPassFn fn = match _
-  None   = Pass (fn Unit)
-  Some f = Fail f
+# getOrPassFn: Convert Some to Fail and None to a Pass with the function output.
+# The pass function is evaluated only when the Option is None.
+#
+#   int "not-an-integer"
+#   | getOrFailFn (\Unit "some error")
+#   ---
+#   Pass "some error"
+#
+#   int "81234"
+#   | getOrFailFn (\Unit "some error")
+#   ---
+#   Fail 81234
+export def getOrPassFn (passFn: Unit => pass): Option fail => Result pass fail = match _
+    None   = Pass (passFn Unit)
+    Some f = Fail f
