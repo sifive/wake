@@ -7,7 +7,7 @@ import subprocess
 def file_loc_to_sig_dict():
     environment = os.environ
     subprocess.run(["wake", "--init", "."])
-    file_contents = subprocess.run(["wake", "-g"], stdout=subprocess.PIPE, env=environment).stdout
+    file_contents = subprocess.run(["wake", "-e", "--in", "wake"], stdout=subprocess.PIPE, env=environment).stdout
     features_list = file_contents.decode("utf-8").split('\n')
     loc_to_feature_dict = {}
     for feature in features_list:
@@ -37,7 +37,7 @@ def wake_rst_text_improved(filename):
     sig_comment_types = []
     for i in range(len(line_list)):
         line = line_list[i]
-        if line[0:6] == "global":
+        if line[0:6] == "export":
             equals_sign = None
             if ' = ' in line:
                 equals_sign = line.index(' = ')
