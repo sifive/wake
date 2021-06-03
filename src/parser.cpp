@@ -585,12 +585,10 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
     }
     for (size_t i = 0; i < ast.args.size(); ++i) {
       AST &arg = ast.args[i];
+      args.emplace_back(arg.name, arg.token);
       if (arg.type) {
-        args.emplace_back("_ " + std::to_string(i), LOCATION);
-        dm->defs.insert(std::make_pair(arg.name, DefValue(arg.region, std::unique_ptr<Expr>(
-          new Ascribe(LOCATION, std::move(*arg.type), new VarRef(LOCATION, "_ " + std::to_string(i)), arg.token)))));
-      } else {
-        args.emplace_back(arg.name, arg.token);
+        dm->defs.insert(std::make_pair("_type " + arg.name, DefValue(arg.region, std::unique_ptr<Expr>(
+          new Ascribe(LOCATION, std::move(*arg.type), new VarRef(LOCATION, arg.name), arg.token)))));
       }
     }
     body = dm;
