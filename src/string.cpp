@@ -550,7 +550,11 @@ static PRIMFN(prim_bin2str) {
   long x = ok ? mpz_get_si(arg0) : 0;
   ok = ok && x >= 0 && x < 256;
   char c[2] = { static_cast<char>(x), 0 };
-  RETURN(String::alloc(runtime.heap, ok ? c : ""));
+  if (ok) {
+    RETURN(String::alloc(runtime.heap, c, 1));
+  } else {
+    RETURN(String::alloc(runtime.heap, ""));
+  }
 }
 
 static PRIMTYPE(type_str2code) {
