@@ -554,12 +554,13 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
 
   // do we need a pattern match? lower / wildcard are ok
   bool pattern = false;
-  bool typed = ast.type;
+  bool typed = false;
   for (auto &x : ast.args) {
     pattern |= Lexer::isOperator(x.name.c_str()) || Lexer::isUpper(x.name.c_str());
     typed |= x.type;
   }
 
+  optional<AST> type = std::move(ast.type);
   std::vector<std::pair<std::string, Location> > args;
   if (pattern) {
     // bind the arguments to anonymous lambdas and push the whole thing into a pattern
@@ -577,12 +578,7 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
     body = match;
   } else if (typed) {
     DefMap *dm = new DefMap(fn);
-    if (ast.type) {
-      dm->body = std::unique_ptr<Expr>(
-        new Ascribe(LOCATION, std::move(*ast.type), body, body->location));
-    } else {
-      dm->body = std::unique_ptr<Expr>(body);
-    }
+    dm->body = std::unique_ptr<Expr>(body);
     for (size_t i = 0; i < ast.args.size(); ++i) {
       AST &arg = ast.args[i];
       args.emplace_back(arg.name, arg.token);
@@ -596,6 +592,9 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
     // no pattern; simple lambdas for the arguments
     for (auto &x : ast.args) args.emplace_back(x.name, x.token);
   }
+
+  if (type)
+    body = new Ascribe(LOCATION, std::move(*type), body, body->location);
 
   if (target) {
     if (tohash == 0) {
