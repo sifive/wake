@@ -471,6 +471,7 @@ export def makeJSONRunner plan =
         def pmkdir m p = prim "mkdir"
         def pwrite m p d = prim "write"
         def json = JObject (
+          "label"       → JString label,
           "command"     → command     | map JString | JArray,
           "environment" → environment | map JString | JArray,
           "visible"     → visible | map (_.getPathName.JString) | JArray,
