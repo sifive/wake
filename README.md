@@ -141,6 +141,7 @@ Documentation for wake can be found in [share/doc/wake](share/doc/wake).
    of wake syntax in cheat-sheet form.
  - The [Annotated Source Code](https://sifive.github.io/wake/) of wake can
    be useful when trying to understand the standard library.
+ - The sphinx-generated [reference manual](https://sifive.github.io/wake/contents.html)
 
 [release-badge]: https://img.shields.io/github/tag/sifive/wake.svg?label=release
 [release]: https://github.com/sifive/wake/releases/latest
