@@ -512,7 +512,11 @@ export def makeJSONRunner plan =
     Pair (Pass (RunnerOutput _ _ (Usage x _ _ _ _ _))) inFile if x != 0 =
       Fail (makeError "Non-zero exit status ({str x}) for JSON runner {script} on {inFile}")
     Pair (Pass _) inFile =
-      def unlink f = prim "unlink"
+      def unlink f =
+        def fn _ = prim "unlink"
+        match (getenv "FUSE_WAKE_KEEP_IO_FILES")
+          Some "1" = Unit
+          _        = fn f
       def outFile = replace `\.in\.json$` ".out.json" inFile
       def json = parseJSONFile (Path outFile)
       def _ = unlink inFile
