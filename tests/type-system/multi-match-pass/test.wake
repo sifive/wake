@@ -1,0 +1,21 @@
+# This should type-check
+def f0 = match _ _
+  (x: Integer) (True:  Boolean) = x+1
+  (x: Integer) (False: Boolean) = x+0
+
+# So should this
+def f1 (Pair (x: Integer) (y: Integer): Pair Integer Integer) (Pair (a: Integer) (b: Integer): Pair Integer Integer): Integer =
+  x+y+a+b
+
+export def test _ =
+    require True =
+        12 == f0 11 True
+    else
+        Fail "f0 bad"
+
+    require True =
+        10 == f1 (Pair 1 2) (Pair 3 4)
+    else
+        Fail "f1 bad"
+
+    Pass "ok"

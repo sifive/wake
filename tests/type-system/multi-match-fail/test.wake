@@ -1,0 +1,45 @@
+#Type error; expression '(_: String)' (test.wake:11:[3-13]) of type:
+#    Integer
+#  does not match explicit type ascription at test.wake:11:[7-12] of:
+#    String
+#Type error; function 'x+1' (test.wake:10:[35-37]) expected argument 'x' of type:
+#    Integer
+#  but was supplied argument '(x: Integer)' (test.wake:10:[3-14]) of type:
+#    String
+export def f0 = match _ _
+  (x: Integer) (True:  Boolean) = x+1
+  (_: String)  (False: Boolean) = 0
+#Type error; case analysis of '_' (test.wake:16:25) with type:
+#    String
+#  does not match the pattern requirement of type:
+#    Boolean
+export def f1 = match _ _
+  (x: Integer) (True:  String) = x+1
+  (x: Integer) (False: String) = x+0
+#Type error; function 'x+1' (test.wake:24:[34-36]) expected argument 'x' of type:
+#    Integer
+#  but was supplied argument '(x: String)' (test.wake:24:[3-13]) of type:
+#    String
+export def f2 = match _ _
+  (x: String) (True:  Boolean) = x+1
+  (_: String) (False: Boolean) = 0
+#Type error; expression test.wake:30:[12-123] of type:
+#    Integer
+#  does not match explicit type ascription at test.wake:30:[126-131] of:
+#    String
+export def f3 (Pair (x: Integer) (y: Integer): Pair Integer Integer) (Pair (a: Integer) (b: Integer): Pair Integer Integer): String =
+  x+y+a+b
+#Pattern for case 'Pair' expected type:
+#    Pair Integer Integer
+#  but the argument test.wake:36:[12-122] has type:
+#    Pair Integer String
+export def f4 (Pair (x: Integer) (y: Integer): Pair Integer Integer) (Pair (a: Integer) (b: Integer): Pair Integer String): Integer =
+  x+y+a+b
+#Type error; function 'x+y+a+b' (test.wake:43:[3-9]) expected argument 'b' of type:
+#    Integer
+#  but was supplied argument '(b: String)' (test.wake:42:[89-99]) of type:
+#    String
+export def f5 (Pair (x: Integer) (y: Integer): Pair Integer Integer) (Pair (a: Integer) (b: String): Pair Integer Integer): Integer =
+  x+y+a+b
+
+def test _ = Pass 0

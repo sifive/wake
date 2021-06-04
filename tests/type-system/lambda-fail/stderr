@@ -11,4 +11,16 @@ Type error; function '"{x}-{y}"' (test.wake:15:[63-71]) expected argument 'x' of
   but was supplied argument '(x: Integer)' (test.wake:15:[17-28]) of type:
     Integer
 Unbound type variable at 'a' (test.wake:17:15)
+Type error; expression 'f4 (Pair x y)' (test.wake:22:[5-17]) of type:
+    Integer
+  does not match explicit type ascription at test.wake:22:[20-25] of:
+    String
+Type error; function 'x + y' (test.wake:27:[73-77]) expected argument 'y' of type:
+    Integer
+  but was supplied argument '(y: String)' (test.wake:27:[27-37]) of type:
+    String
+Pattern for case 'Pair' expected type:
+    Pair Integer Integer
+  but the argument test.wake:32:[5-60] has type:
+    Pair Integer String
 >>> Aborting without execution <<<

@@ -1,0 +1,29 @@
+Type error; expression '(_: String)' (test.wake:11:[3-13]) of type:
+    Integer
+  does not match explicit type ascription at test.wake:11:[7-12] of:
+    String
+Type error; function 'x+1' (test.wake:10:[35-37]) expected argument 'x' of type:
+    Integer
+  but was supplied argument '(x: Integer)' (test.wake:10:[3-14]) of type:
+    String
+Type error; case analysis of '_' (test.wake:16:25) with type:
+    String
+  does not match the pattern requirement of type:
+    Boolean
+Type error; function 'x+1' (test.wake:24:[34-36]) expected argument 'x' of type:
+    Integer
+  but was supplied argument '(x: String)' (test.wake:24:[3-13]) of type:
+    String
+Type error; expression test.wake:30:[12-123] of type:
+    Integer
+  does not match explicit type ascription at test.wake:30:[126-131] of:
+    String
+Pattern for case 'Pair' expected type:
+    Pair Integer Integer
+  but the argument test.wake:36:[12-122] has type:
+    Pair Integer String
+Type error; function 'x+y+a+b' (test.wake:43:[3-9]) expected argument 'b' of type:
+    Integer
+  but was supplied argument '(b: String)' (test.wake:42:[89-99]) of type:
+    String
+>>> Aborting without execution <<<

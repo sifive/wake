@@ -580,7 +580,9 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
     expr = std::unique_ptr<Expr>(lambda);
     out.var = 0; // bound
   } else {
-    for (ResolveBinding *iter = binding; iter; iter = iter->parent) {
+    if (ast.name.empty()) {
+      out.sum = multiarg;
+    } else for (ResolveBinding *iter = binding; iter; iter = iter->parent) {
       iter->qualify_def(ast.name);
       auto it = iter->index.find(ast.name);
       if (it != iter->index.end()) {
@@ -596,7 +598,6 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
         }
       }
     }
-    if (ast.name.empty()) out.sum = multiarg;
     if (!out.sum) {
       std::cerr << "Constructor " << ast.name
         << " in pattern match not found at " << ast.token.file()
@@ -616,7 +617,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       out.var = 0;
     } else {
       for (auto a = ast.args.rbegin(); a != ast.args.rend(); ++a)
-        out.children.push_back(cons_lookup(binding, expr, *a, 0));
+        out.children.push_back(cons_lookup(binding, expr, *a, nullptr));
       std::reverse(out.children.begin(), out.children.end());
     }
   }
@@ -626,22 +627,9 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
 static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBinding *binding, std::unique_ptr<Match> match) {
   std::unique_ptr<DefMap> map(new DefMap(LOCATION));
   std::vector<PatternRef> patterns;
-  std::shared_ptr<Sum> multiarg = std::make_shared<Sum>(AST(LOCATION));
-  multiarg->members.emplace_back(AST(LOCATION));
 
-  int index = 0;
-  std::vector<PatternTree> children;
-  for (auto &a : match->args) {
-    children.emplace_back(a->location, index);
-    for (auto &p : match->patterns)
-      a = ascribe(std::move(a), p.pattern.region, std::move(p.pattern.type));
-    auto out = map->defs.insert(std::make_pair("_ a" + std::to_string(index), DefValue(LOCATION, std::move(a))));
-    assert (out.second);
-    multiarg->members.front().ast.args.emplace_back(AST(LOCATION));
-    ++index;
-  }
-
-  patterns.emplace_back(map->defs.begin()->second.body->location);
+  patterns.reserve(match->patterns.size() + 1);
+  patterns.emplace_back(match->args.front()->location);
   PatternRef &prototype = patterns.front();
   prototype.uses = 1;
   prototype.index = match->args.size();
@@ -655,11 +643,29 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
     assert (out.second);
   }
 
-  if (prototype.index == 1) {
-    prototype.tree = std::move(children.front());
+  std::shared_ptr<Sum> multiarg;
+  if (match->args.size() == 1) {
+    std::unique_ptr<Expr> arg = std::move(match->args.front());
+    prototype.tree.location = arg->location;
+    prototype.tree.var = 0;
+    for (auto &p : match->patterns)
+      arg = ascribe(std::move(arg), p.pattern.region, std::move(p.pattern.type));
+    auto out = map->defs.insert(std::make_pair("_ a0", DefValue(LOCATION, std::move(arg))));
+    assert (out.second);
   } else {
-    prototype.tree.children = std::move(children);
-    prototype.tree.sum = multiarg;
+    prototype.tree.sum = multiarg = std::make_shared<Sum>(AST(LOCATION));
+    multiarg->members.emplace_back(AST(LOCATION));
+    size_t i = 0;
+    for (auto &a : match->args) {
+      prototype.tree.children.emplace_back(a->location, i);
+      for (auto &p : match->patterns)
+        if (i < p.pattern.args.size())
+          a = ascribe(std::move(a), p.pattern.args[i].region, std::move(p.pattern.args[i].type));
+      auto out = map->defs.insert(std::make_pair("_ a" + std::to_string(i), DefValue(LOCATION, std::move(a))));
+      assert (out.second);
+      multiarg->members.front().ast.args.emplace_back(AST(LOCATION));
+      ++i;
+    }
   }
 
   int f = 0;
