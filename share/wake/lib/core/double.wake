@@ -343,11 +343,6 @@ export def dldexp (fraction: Double) (exponent: Integer): Double =
 export def dmodf (x: Double): Pair Integer Double =
     (\_ prim "dmodf") x
 
-# !!! remove this
-export def idouble x = match (dmodf x)
-    Pair x 0.0 = Some x
-    _ = None
-
 # Handy numerical functions
 
 # Calculates the cosine of a Double.
