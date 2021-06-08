@@ -101,33 +101,24 @@ export def intbase (base: Integer) (stringToParse: String): Option Integer =
 #   str 10   =  "10"
 #   str 0xff = "256"
 export def str: Integer => String =
-    require Some fn =
-        strbase 10
-    else
-        unreachable "strbase: base 10 is legal"
-    fn
+    def p n integerToFormat = prim "str"
+    p 10
 
 # strHex: format an Integer to a String in hexadecimal notation.
 #
 #   strHex 10   =  "a"
 #   strHex 0xff = "ff"
 export def strHex: Integer => String =
-    require Some fn =
-        strbase 16
-    else
-        unreachable "strbase: base 16 is legal"
-    fn
+    def p n integerToFormat = prim "str"
+    p 16
 
 # strOctal: format an Integer to a String in octal notation.
 #
 #   strOctal 10   =  "12"
 #   strOctal 0xff = "377"
 export def strOctal: Integer => String =
-    require Some fn =
-        strbase 8
-    else
-        unreachable "strbase: base 8 is legal"
-    fn
+    def p n integerToFormat = prim "str"
+    p 8
 
 # int: convert a String into an Integer with the usual prefixes.
 #
