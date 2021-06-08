@@ -72,7 +72,7 @@ def mkdirRunner: Runner =
         Fail f = Pair (Fail f) (Pair "" "")
         Pass input = match input.getRunnerInputCommand
             _, _, mode, dir, Nil = Pair (Pass input) (Pair mode dir)
-            _ = panic "mkdirRunner: invalid command-line"
+            _ = unreachable "mkdirImp violated command-line contract"
     def post = match _
         Pair (Fail f) _ = Fail f
         Pair (Pass output) (Pair smode dir) =
@@ -100,7 +100,7 @@ export def mkdir (path: String): Path =
     def root = match _
         "", x, t = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 "/{x}") t
         x, t     = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 x) t
-        Nil      = panic "impossible"
+        Nil      = unreachable "tokenize never returns an empty list"
     path | simplify | tokenize `/` | root
 
 target writeImp inputs mode path content =

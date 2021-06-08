@@ -54,4 +54,37 @@ export def wait (f: a => b) (x: a): b =
     def imp x = prim "true"
     match (imp x)
         True  = f x
-        False = panic "unreachable"
+        False = unreachable "true returned false"
+
+# unreachable: tell the wake interpreter that something is impossible.
+# >>>>>> THIS FUNCTION IS NOT INTENDED TO STOP A BUILD! <<<<<<<<
+# >>>>>>>>>>>>> To report Errors use a Result <<<<<<<<<<<<<<<<<<
+#
+# # An example of a legitimate use of unreachable:
+# def hasUniqueMinimum list =
+#   match (sortBy (_<_) list)
+#     Nil     = False
+#     x, Nil  = True
+#     x, y, _ = match (x <=> y)
+#       LT = True
+#       EQ = False
+#       GT = unreachable "Sorted list is not sorted"
+#
+# # Here is an example of why you should never use unreachable for error reporting:
+# # The optimizer can legally remove unreachables (they are by definition unreachable).
+# # Furthermore, the optimizer can even eliminate code that coexists with a unreachable.
+# def myFun x =
+#   def _ = unreachable "stop the program"
+#   42 + x
+#
+# $ wake --no-optimize -x 'myFun 33'
+# PANIC: stop the program
+# $ wake -x 'myFun 33'
+# 75
+#
+# ... but a future version of wake might return 0 or 20 or "hello world"!
+# If you tell the interpreter the body of myFun is unreachable, myFun is undefined.
+export def unreachable (str: String): a =
+    def f x = prim "panic"
+    f str
+

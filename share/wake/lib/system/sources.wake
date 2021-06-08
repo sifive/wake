@@ -54,11 +54,11 @@ export def source (file: String): Path =
     match (sources dirname basename.quote)
         Nil = makeBadPath "{file}: not a source file".makeError
         x, Nil = x
-        _ = panic "unreachable: multiple sources match the same regexp"
+        _ = unreachable "a quoted RegExp can never match more than one distinct String"
 
 # Find sources files
 export def sources (dir: String) (filterRegexp: RegExp): List Path =
     def scan dir regexp = prim "sources"
     match got_sources
         True  = scan dir filterRegexp | map raw_source
-        False = panic "unreachable"
+        False = unreachable "add_sources always returns True"
