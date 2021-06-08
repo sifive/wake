@@ -538,7 +538,7 @@ export def vsortBy (lessThanFn: a => a => Boolean): Vector a => Vector a =
     def mergeStep (Pair a b) (Pair ai bi) =
         def doit x a b = Pair (Pair (ai+a) (bi+b)) x
         match (vat ai a) (vat bi b)
-            None     None     = panic "merged beyond vector limits"
+            None     None     = unreachable "merged beyond vector limits"
             (Some x) None     = doit x 1 0
             None     (Some y) = doit y 0 1
             (Some x) (Some y) = match (lessThanFn y x)

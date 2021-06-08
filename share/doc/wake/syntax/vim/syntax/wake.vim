@@ -21,7 +21,7 @@ syn keyword wakeKeyword if then else here global type topic subscribe match requ
 
 syn keyword wakeOperatorModifier binary unary
 syn keyword wakeInclude package export import from
-syn keyword wakeException panic
+syn keyword wakeException unreachable
 
 " definitions
 " TODO How can we handle `def x + y` = syntax?

@@ -16,7 +16,6 @@
 package wake
 
 # Regular expressions
-# Note: all uses of panic in this file denote unreachable code
 
 # Create RegExp that only matches str, by escaping special characters.
 # quote "a.b" = `a\.b`
@@ -25,7 +24,7 @@ export def quote (str: String): RegExp =
     def res str = prim "quote"
     match (res str).stringToRegExp
         Pass x = x
-        Fail reason = panic "quote primitive bug: {reason}"
+        Fail reason = unreachable "quote primitive bug: {reason}"
 
 # Concatenate a list of regular expressions.
 # The resulting regular expression must match the elements sequentially.
@@ -35,7 +34,7 @@ export def regExpCat (l: List RegExp): RegExp =
     def res = l | map regExpToString | cat | stringToRegExp
     match res
         Pass regex  = regex
-        Fail reason = panic "regexp parser bug post concatenation: {reason}"
+        Fail reason = unreachable "regexp parser bug post concatenation: {reason}"
 
 # Convert a String into a Regular expression.
 # If the string is an illegal RegExp, returns Fail.
@@ -59,7 +58,7 @@ export def globToRegExp (glob: String): RegExp =
     def glob2regexp glob = prim "glob2regexp"
     match (glob2regexp glob).stringToRegExp
         Pass x = x
-        Fail reason = panic "glob primitive bug: {reason}"
+        Fail reason = unreachable "glob primitive bug: {reason}"
 
 # Convert a regular expression into a String.
 # stringToRegExp (regExpToString x) = Pass x

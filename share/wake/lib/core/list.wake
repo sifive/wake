@@ -161,7 +161,7 @@ export def scanr (combiningFn: element => accumulator => accumulator): accumulat
         element, rest =
             def tail = loop accumulator rest
             require acc, _ = tail
-            else panic "scanr never returns an empty list"
+            else unreachable "scanr never returns an empty list"
             combiningFn element acc, tail
     loop
 
