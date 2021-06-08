@@ -32,7 +32,7 @@ def wakeToTest Unit = match (subscribe wakeTestBinary)
 export def runTests cmdline =
     require Pass filter = match cmdline
         Nil      = Pass `.*`
-        arg, Nil = stringToRegExp arg | rmapFail (Fail _.makeError)
+        arg, Nil = stringToRegExp arg
         _        = Fail (makeError "Too many arguments to runTests")
 
     require Pass (Pair wakeBin _) =
