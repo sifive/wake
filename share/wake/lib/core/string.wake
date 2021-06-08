@@ -17,115 +17,278 @@ package wake
 
 # String methods
 
-export def strlen string = prim "strlen"
+# strlen: report the number of bytes a String consumes in UTF-8 representation.
+# >>>>>>>>>>>>> THIS IS NOT THE NUMBER OF CHARACTERS IN A STRING <<<<<<<<<<<<<<
+# This information can be relevant when reading / writing Strings to disk.
+# To manipulate Strings, such as extract-ing a substring, use regular expressions.
+export def strlen (string: String): Integer =
+    def p s = prim "strlen"
+    p string
 
-export def cat listString = prim "lcat"
+# cat: concatenate a List of Strings into a String.
+# If you have a finite list of terms, consider using String interpolation.
+#
+#   cat ("hello", " ", "world", Nil) = "hello world"
+#   cat (x, ":", y, ":", z, Nil) = "{x}:{y}:{z}"
+export def cat (strings: List String): String =
+    def p l = prim "lcat"
+    p strings
 
-export def catWith separator strings =
-  if strings.empty then "" else
-    def inserted = foldr (separator, _, _) Nil strings
-    cat inserted.tail
+# catWith: concatenate a List of Strings with a separator.
+#
+#   seq 10
+#   | map str
+#   | catWith ":"
+#   ---
+#   "0:1:2:3:4:5:6:7:8:9"
+export def catWith (separator: String) (strings: List String): String =
+    strings
+    | foldr (separator, _, _) Nil
+    | tail
+    | cat
 
-# String => List String of codepoints
-export def explode str = prim "explode"
+# explode: split a String up into Unicode code points
+# This is rarely useful; consider using a RegExp instead.
+#
+#   explode "hello" = "h", "e", "l", "l", "o", Nil
+#   explode "süß"   = "s", "ü", "ß", Nil
+export def explode (string: String): List String =
+    def p s = prim "explode"
+    p string
 
-# String <=> Integer type conversion
-export def strbase base n = prim "str" # int -> string
-export def intbase base s =
-  def p b s = prim "int" # string -> int
-  p base s | head
-export def str n = strbase 10 n
-export def int s = intbase 0 s
+# strbase: convert an Integer into a String using a given base.
+#
+# For 2 <= base <= 36, the characters used for the encoding are:
+#   0123456789abcdefghijklmnopqrstuvwxyz
+#   ^^^^^^^^^^^^^^^^ = base 16
+#   ^^^^^^^^^^ = base 10
+# For 37 <= base <= 62, the characters used for the encoding are:
+#   0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
+# For -36 <=x <= -2, the characters used for the encoding are:
+#   0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ
+# For any other (invalid) base, the String "" is returned.
+#
+# strbase   10    500 =  "500"
+# strbase   16  65535 = "ffff"
+# strbase (-15) 65535 = "FFFF"
+export def strbase (base: Integer) (n: Integer): String =
+    def p n s = prim "str"
+    p base n
 
-# String <=> Integer Unicode conversion
-export def integerToUnicode i = prim "code2str"
-export def unicodeToInteger s = prim "str2code"
+# intbase: convert a String into an Option Integer using a given base.
+#
+# For base == 0, the string is checked for these prefixes:
+#   "0b" or "0B" -- base= 2 processing for everything after the prefix
+#   "0x" or "0X" -- base=16 processing for everything after the prefix
+#   "0"          -- base= 8 processing for everything after the prefix
+#   otherwise, process the String as base=10
+# For 2  <= base <= 36, upper- and lower-case characters are treated identically.
+# For 37 <= base <= 62, upper-case letters represent 10..35 while lower-case letters represent 36..61.
+#
+# For any other base (or an illegal input String), None is returned.
+export def intbase (base: Integer) (stringToParse: String): Option Integer =
+    def p b s = prim "int"
+    p base stringToParse | head
 
-# String <=> Integer Binary conversion (Warning: may create invalid Unicode)
-export def integerToByte i = prim "bin2str"
-export def byteToInteger s = prim "str2bin"
+# str: format an Integer to a String in decimal notation.
+#
+#   str 10   =  "10"
+#   str 0xff = "256"
+export def str (integerToFormat: Integer): String =
+    strbase 10 integerToFormat
+
+# int: convert a String into an Integer with the usual prefixes.
+#
+# The base used for the conversion depends on the prefix:
+#   "0b" or "0B" -- base= 2 processing for everything after the prefix
+#   "0x" or "0X" -- base=16 processing for everything after the prefix
+#   "0"          -- base= 8 processing for everything after the prefix
+#   otherwise, process the String as base=10
+#
+# int "0x10" = Some 16
+# int "10"   = Some 10
+# int "0b10" = Some 2
+# int "0y10" = None
+export def int (stringToParse: String): Option Integer =
+    intbase 0 stringToParse
+
+# integerToUnicode: convert an Integer into a Unicode codepoint.
+# For Integers <= 127, this is the ASCII character set.
+# For Integers < 0, returns "".
+#
+#   integerToUnicode (-2) = ""
+#   integerToUnicode 48 = "0"
+#   integerToUnicode 65 = "A"
+#   integerToUnicode 97 = "a"
+#   integerToUnicode 231 = "ç"
+#   integerToUnicode 0x1f600 = "😀"
+#   integerToUnicode 0 = "\x00"
+export def integerToUnicode (codepoint: Integer): String =
+    def p x = prim "code2str"
+    p codepoint
+
+# unicodeToInteger: convert the first codepoint in a String to an Integer.
+# 
+#   unicodeToInteger "A" = 65
+#   unicodeToInteger "a" = 97
+#   unicodeToInteger "0123" = 48
+#   unicodeToInteger "😀!" = 128512
+#   unicodeToInteger "" = 0
+#   unicodeToInteger "\0a" = 0
+export def unicodeToInteger (firstCharacterToConvert: String): Integer =
+    def p x = prim "str2code"
+    p firstCharacterToConvert
+
+# integerToByte: convert an Integer into a String using raw binary. 
+# WARNING: For 128 <= byte <= 255, this function creates invalid UTF-8 / Unicode.
+# Instead of calling this function, you probably meant to call integerToUnicode.
+# For byte < 0 or byte > 255, returns "".
+#
+#   integerToByte 0 = "\x00"
+#   integerToByte 65 = "A"
+#   integerToByte 97 = "A"
+#   integerToByte 256 = ""
+#   integerToByte 231 = (an illegal UTF-8 String which includes a byte with value 0xe7)
+#
+# It is possible to create legal UTF-8 from illegal String fragments; eg:
+#   "{integerToByte 0xc3}{integerToByte 0xa7}" = "ç"
+export def integerToByte (byte: Integer): String =
+    def p b = prim "bin2str"
+    p byte
+
+# byteToInteger: convert the first byte of a UTF-8-encoded String into an Integer.
+# Instead of calling this function, you probably meant to call unicodeToInteger.
+#
+#   byteToInteger "" = 0
+#   byteToInteger "\x00" = 0
+#   byteToInteger "A" = 65
+#   byteToInteger (integerToByte 231) = 231
+export def byteToInteger (firstByteToConvert: String): Integer =
+    def p s = prim "str2bin"
+    p firstByteToConvert
 
 # Version of wake
-export def version = prim "version"
+export def version: String =
+    prim "version"
 
-# Unicode normalization methods
-export def unicodeCanonical  x = prim "sNFC"
-export def unicodeIdentifier x = prim "sNFKC"
-export def unicodeLowercase  x = prim "scaseNFKC"
+# unicodeCanonical: eliminate combining characters; C+◌̧ => Ç
+export def unicodeCanonical (str: String): String =
+    def p s = prim "sNFC"
+    p str
 
-# Sort a list of strings
-export def sortStrings list = sortBy (_ <~ _) list
+# unicodeIdentifier: eliminate rendering distinctions; ¼i⁹ => 1/4i9
+export def unicodeIdentifier (str: String): String =
+    def p s = prim "sNFKC"
+    p str
+
+# unicodeLowercase: eliminate case distinctions; C => c
+export def unicodeLowercase (str: String): String =
+    def p s = prim "scaseNFKC"
+    p str
+
+# sortStrings: sort a list of strings as a human would judge them.
+export def sortStrings (list: List String): List String =
+    sortBy (_ <~ _) list
 
 # Unicode NFC string comparison Ç == C+◌̧
-export def scmpCanonical x y = scmp (unicodeCanonical x) (unicodeCanonical y)
+export def scmpCanonical (x: String) (y: String): Order =
+    scmp (unicodeCanonical x) (unicodeCanonical y)
+
 # Unicode NFKC string comparison (¼i⁹ = 1/4i9)
-export def scmpIdentifier x y = scmp (unicodeIdentifier x) (unicodeIdentifier y)
+export def scmpIdentifier (x: String) (y: String): Order =
+    scmp (unicodeIdentifier x) (unicodeIdentifier y)
+
 # Unicode case insensitive NFKC comparison
-export def scmpLowercase x y = scmp (unicodeLowercase x) (unicodeLowercase y)
+export def scmpLowercase (x: String) (y: String): Order =
+    scmp (unicodeLowercase x) (unicodeLowercase y)
+
 # Raw binary string comparison; no normalization performed
-export def scmp x y = prim "scmp"
+export def scmp (x: String) (y: String): Order =
+    def p x y = prim "scmp"
+    p x y
 
 # NFKC order (fancy format removed) -- secure default
-# This is the string order you should probably be using
-export def x <=>~y = scmpIdentifier x y
+# This is the string order you should use to compare human inputs
+export def (x: String) <=>~ (y: String): Order =
+    scmpIdentifier x y
 
-# Returns True if x is less than y.
-export def x <~  y = isLT (x <=>~ y)
+# Returns True if x is less than y, as a human would judge it.
+export def (x: String) <~ (y: String): Boolean =
+    isLT (x <=>~ y)
 
-# Returns True if x is greater than y.
-export def x >~  y = isGT (x <=>~ y)
+# Returns True if x is greater than y, as a human would judge it.
+export def (x: String) >~ (y: String): Boolean =
+    isGT (x <=>~ y)
 
-# Returns True if x is greater than or equal to y.
-export def x >=~ y = isGE (x <=>~ y)
+# Returns True if x is greater than or equal to y, as a human would judge it.
+export def (x: String) >=~ (y: String): Boolean =
+    isGE (x <=>~ y)
 
-# Returns True if x is less than or equal to y.
-export def x <=~ y = isLE (x <=>~ y)
+# Returns True if x is less than or equal to y, as a human would judge it.
+export def (x: String) <=~ (y: String): Boolean =
+    isLE (x <=>~ y)
 
-# Returns True if x is equal to y.
-export def x ==~ y = isEQ (x <=>~ y)
+# Returns True if x is equal to y, as a human would judge it.
+export def (x: String) ==~ (y: String): Boolean =
+    isEQ (x <=>~ y)
 
-# Returns True if x is not equal to y.
-export def x !=~ y = isNE (x <=>~ y)
+# Returns True if x is not equal to y, as a human would judge it.
+export def (x: String) !=~ (y: String): Boolean =
+    isNE (x <=>~ y)
 
 # Case insensitive order (^ = capitals ignored)
-export def x <=>^y = scmpLowercase x y
+export def (x: String) <=>^ (y: String): Order =
+    scmpLowercase x y
 
 # Returns True if x is less than y, ignoring case.
-export def x <^  y = isLT (x <=>^ y)
+export def (x: String) <^ (y: String): Boolean =
+    isLT (x <=>^ y)
 
 # Returns True if x is greater than y, ignoring case.
-export def x >^  y = isGT (x <=>^ y)
+export def (x: String) >^ (y: String): Boolean =
+    isGT (x <=>^ y)
 
 # Returns True if x is greater than or equal to y, ignoring case.
-export def x >=^ y = isGE (x <=>^ y)
+export def (x: String) >=^ (y: String): Boolean =
+    isGE (x <=>^ y)
 
 # Returns True if x is less than or equal to y, ignoring case.
-export def x <=^ y = isLE (x <=>^ y)
+export def (x: String) <=^ (y: String): Boolean =
+    isLE (x <=>^ y)
 
 # Returns True if x is equal to y, ignoring case.
-export def x ==^ y = isEQ (x <=>^ y)
+export def (x: String) ==^ (y: String): Boolean =
+    isEQ (x <=>^ y)
 
 # Returns True if x is not equal to y, ignoring case.
-export def x !=^ y = isNE (x <=>^ y)
+export def (x: String) !=^ (y: String): Boolean =
+    isNE (x <=>^ y)
 
 # Raw binary string order
 # Only use this for non-textual data
-export def x <=>*y = scmp x y
+export def (x: String) <=>* (y: String): Order =
+    scmp x y
 
-# Returns True if x is less than y, in raw binary representation.
-export def x <*  y = isLT (x <=>* y)
+# Returns True if x is less than y, in UTF-8 representation.
+export def (x: String) <* (y: String): Boolean =
+    isLT (x <=>* y)
 
-# Returns True if x is greater than y, in raw binary representation.
-export def x >*  y = isGT (x <=>* y)
+# Returns True if x is greater than y, in UTF-8 representation.
+export def (x: String) >* (y: String): Boolean =
+    isGT (x <=>* y)
 
-# Returns True if x is greater than or equal to y, in raw binary representation.
-export def x >=* y = isGE (x <=>* y)
+# Returns True if x is greater than or equal to y, in UTF-8 representation.
+export def (x: String) >=* (y: String): Boolean =
+    isGE (x <=>* y)
 
-# Returns True if x is less than or equal to y, in raw binary representation.
-export def x <=* y = isLE (x <=>* y)
+# Returns True if x is less than or equal to y, in UTF-8 representation.
+export def (x: String) <=* (y: String): Boolean =
+    isLE (x <=>* y)
 
-# Returns True if x is equal to y, in raw binary representation.
-export def x ==* y = isEQ (x <=>* y)
+# Returns True if x is equal to y, in UTF-8 representation.
+export def (x: String) ==* (y: String): Boolean =
+    isEQ (x <=>* y)
 
-# Returns True if x is not equal to y, in raw binary representation.
-export def x !=* y = isNE (x <=>* y)
+# Returns True if x is not equal to y, in UTF-8 representation.
+export def (x: String) !=* (y: String): Boolean =
+    isNE (x <=>* y)

@@ -16,13 +16,28 @@
 package wake
 
 # Boolean type has two values: True and False.
+# This type must exist in package wake for if/then/else syntax to work.
 export data Boolean =
-  True
-  False
+    True
+    False
 
-# Unary operator for NOT.
-export def !x     = if x then False else True
-# Binary operator for AND.
+# Unary operator for Boolean NOT.
+# !True  = False
+# !False = True
+export def !x = if x then False else True
+
+# Binary operator for Boolean AND.
+# BEWARE: unlike other languages, in wake, expression 'y' is evaluated even if 'x' is True
+# True  && True  = True
+# False && True  = False
+# True  && False = False
+# False && False = False
 export def x && y = if x then y else False
-# Binary operator for OR.
+
+# Binary operator for Boolean OR.
+# BEWARD: unlike other languages, in wake, expression 'y' is evaluated even if 'x' is False
+# True  || True  = True
+# False || True  = True
+# True  || False = True
+# False || False = False
 export def x || y = if x then True else y

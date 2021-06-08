@@ -21,36 +21,60 @@ package wake
 # ``EQ`` = Equal
 # ``GT`` = Greater Than
 export data Order =
-  LT
-  EQ
-  GT
+    LT
+    EQ
+    GT
 
-# Returns ``True`` if less than, otherwise ``False``.
-export def isLT = match _
-  LT = True
-  _  = False
+# Is less-than: convert Order to Boolean
+# def a < b = a <=> b | isLT
+# isLT LT = True
+# isLT EQ = False
+# isLT GT = False
+export def isLT: Order => Boolean = match _
+    LT = True
+    _  = False
 
-# Returns ``True`` if equal, otherwise ``False``.
-export def isEQ = match _
-  EQ = True
-  _  = False
+# Is equal: convert Order Boolean
+# def a == b = a <=> b | isEQ
+# isEQ LT = False
+# isEQ EQ = True
+# isEQ GT = False
+export def isEQ: Order => Boolean = match _
+    EQ = True
+    _  = False
 
-# Returns ``True`` if greater than, otherwise ``False``.
-export def isGT = match _
-  GT = True
-  _  = False
+# Is greater-than: convert Order to Boolean
+# def a > b = a <=> b | isGT
+# isGT LT = False
+# isGT EQ = False
+# isGT GT = True
+export def isGT: Order => Boolean = match _
+    GT = True
+    _  = False
 
-# Returns ``True`` if less or equal, otherwise ``False``.
-export def isLE = match _
-  GT = False
-  _  = True
+# Is less-than-or-equal: convert Order to Boolean
+# def a <= b = a <=> b | isLE
+# isLE LT = True
+# isLE EQ = True
+# isLE GT = False
+export def isLE: Order => Boolean = match _
+    GT = False
+    _  = True
 
-# Returns ``True`` if not equal, otherwise ``False``.
-export def isNE = match _
-  EQ = False
-  _  = True
+# Is not-equal: convert Order to Boolean
+# def a != b = a <=> b | isNE
+# isEQ LT = True
+# isEQ EQ = False
+# isEQ GT = True
+export def isNE: Order => Boolean = match _
+    EQ = False
+    _  = True
 
-# Returs ``True`` if greater or equal, otherwise ``False``.
-export def isGE = match _
-  LT = False
-  _  = True
+# Is greater-than-or-equal: convert Order to Boolean
+# def a >= b = a <=> b | isGE
+# isGE LT = False
+# isGE EQ = True
+# isGE GT = True
+export def isGE: Order => Boolean = match _
+    LT = False
+    _  = True

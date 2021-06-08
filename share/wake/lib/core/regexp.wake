@@ -16,43 +16,76 @@
 package wake
 
 # Regular expressions
+# Note: all uses of panic in this file denote unreachable code
 
-# Turns a String into a properly quoted Regular Expression
-# quote: (str: String) => RegExp
-export def quote str =
-  def res str = prim "quote"
-  match (res str).stringToRegExp
-    Pass x = x
-    Fail _ = panic "Quoted String is invalid Regular Expression"
+# Create RegExp that only matches str, by escaping special characters.
+# quote "a.b" = `a\.b`
+# quote "hello[world]" = `hello\[world\]`
+export def quote (str: String): RegExp =
+    def res str = prim "quote"
+    match (res str).stringToRegExp
+        Pass x = x
+        Fail reason = panic "quote primitive bug: {reason}"
 
-export def regExpCat l =
-  def res = l | map regExpToString | cat | stringToRegExp
-  match res
-    Pass regex = regex
-    Fail _     = panic "Regexp concatenation failed!"
+# Concatenate a list of regular expressions.
+# The resulting regular expression must match the elements sequentially.
+# For simple expressions, use built-in RegExp interpolation `${x}${y}${z}`.
+# regExpCast (`abc`, `def`, Nil) = `abcdef`
+export def regExpCat (l: List RegExp): RegExp =
+    def res = l | map regExpToString | cat | stringToRegExp
+    match res
+        Pass regex  = regex
+        Fail reason = panic "regexp parser bug post concatenation: {reason}"
 
-# (str: String) => Result RegExp String
-export def stringToRegExp str = prim "re2"
+# Convert a String into a Regular expression.
+# If the string is an illegal RegExp, returns Fail.
+# stringToRegExp "abc" = Pass `abc`
+# stringToRegExp "a("  = Fail (Error "missing ): a(" _)
+export def stringToRegExp (str: String): Result RegExp String =
+    def p s = prim "re2"
+    match (p str)
+        Pass r = Pass r
+        Fail e = Fail e
 
-# (glob: String) => RegExp
-# All input strings should be legal
-export def globToRegExp glob =
-  def glob2regexp glob = prim "glob2regexp"
-  match (stringToRegExp (glob2regexp glob))
-    Pass x = x
-    Fail reason = panic "Failed to convert glob: {reason}"
+# Convert a String glob-style expression into a RegExp.
+# A glob expression has:
+#   ?    matches any single non-/ character
+#   *    matches 0 or more non-/ characters
+#   /**  matches any path after the /
+#   **/  matches any path leading up to the /
+#   [ab] matches either a or b
+#   \*   matches a *
+export def globToRegExp (glob: String): RegExp =
+    def glob2regexp glob = prim "glob2regexp"
+    match (glob2regexp glob).stringToRegExp
+        Pass x = x
+        Fail reason = panic "glob primitive bug: {reason}"
 
-export def regExpToString regexp = prim "re2str"
+# Convert a regular expression into a String.
+# stringToRegExp (regExpToString x) = Pass x
+# regExpToString `abc` = "abc"
+# regExpToString `.*`  = ".*"
+export def regExpToString (regExp: RegExp): String =
+    (\_ prim "re2str") regExp
 
-# matches: (testRegexp: String) => (str: String) => Boolean
-export def matches testRegexp str = prim "match"
+# Test if a regular expression matches an entire String.
+# matches `a*` "ba" = False
+# matches `a*` "aa" = True
+export def matches (testRegExp: RegExp) (str: String): Boolean =
+    (\_\_ prim "match") testRegExp str
 
-# extract: (parensRegexp: String) => (str: String) => List String
-# returns Nil on no match
-export def extract parensRegexp str = prim "extract"
+# Extract fields out of a String using a parenthetical regular expression.
+# extract `(.*)-(.*)` "hello-world-hello" = ("hello", "world-hello", Nil)
+# extract `(.*)-(.*)` "helloworldhello" = Nil
+export def extract (parensRegexp: RegExp) (str: String): List String =
+    (\_\_ prim "extract") parensRegexp str
 
-# replace: (locatorRegexp: String) => (replacement: String) => (str: String) => String
-export def replace locatorRegexp replacement str = prim "replace"
+# Replace all occurances of locatorRegExp in str with replacement.
+# replace `:` " " "a:b:c" = "a b c"
+export def replace (locatorRegExp: RegExp) (replacement: String) (str: String): String =
+    (\_\_\_ prim "replace") locatorRegExp replacement str
 
-# tokenize: (seperatorRegexp: String) => (str: String) => List String
-export def tokenize seperatorRegexp str = prim "tokenize"
+# Remove all occurances of seperatorRegExp from str, creating a List of String fragments.
+# tokenize `:` "hello:there:friend" = ("hello", "there", "friend", Nil)
+export def tokenize (seperatorRegExp: RegExp) (str: String): List String =
+    (\_\_ prim "tokenize") seperatorRegExp str

@@ -15,352 +15,749 @@
 
 package wake
 
-# Defines a new ``Vector``.
+# The Vector type in wake is a collection of contiguous elements.
+# Compared to List, it supports efficient random-access and subsequence operations.
+# Unlike List, it is harder to accumulate a Vector from individual elements.
+# Many Vector methods are structured to exploit multiple cores.
 data Vector a = Vector (Array a) Integer Integer
 
-# Converts a ``List`` to a ``Vector``.
-export def listToVector l =
-  def llen = len l
-  def vnew n = prim "vnew"
-  # take out as an arg so vnew does not generalize
-  def bind out =
-    def vset o i v = prim "vset"
-    def doit i v =
-      def _ = vset out i v
-      i+1
-    def _ = foldl doit 0 l
-    out
-  Vector (bind (vnew llen)) 0 llen
+# How much of a vector to process on a single core
+def vectorChunkSize = 256
 
-# Converts a ``Tree`` to a ``Vector``.
-export def treeToVector t =
-  def len = tlen t
-  def vnew n = prim "vnew"
-  # take out as an arg so vnew does not generalize
-  def bind out =
-    def vset o i v = prim "vset"
+# listToVector: converts a ``List`` to a ``Vector``.
+#
+#   listToVector (seq 5) = [0, 1, 2, 3, 4]
+#   listToVector Nil = []
+export def listToVector: List a => Vector a =
+    def step (Pair i out) v =
+        def _ = vset out i v
+        Pair (i+1) out
+    def loop =
+        foldl step
+    def top l =
+        def llen = len l
+        def out: Array a = vnew llen
+        def _ = loop (Pair 0 out) l
+        Vector out 0 llen
+    top
+
+# treeToVector: converts a ``Tree`` to a ``Vector``.
+export def treeToVector (t: Tree a): Vector a =
+    def len = tlen t
+    def out: Array a = vnew len
     def f i x = vset out i x
     def _ = tappi f t
-    out
-  Vector (bind (vnew len)) 0 len
+    Vector out 0 len
 
-# Returns ``True`` if the ``Vector`` has no entries, otherwise ``False``.
-export def vempty (Vector _ s e) = s == e
+# vectorToList: convert a ``Vector`` to a ``List``
+#
+#   vectorToList [3, 5, 1] = (3, 5, 1, Nil)
+#   vectorToList [] = Nil
+export def vectorToList: Vector a => List a =
+    vfoldr (_,_) Nil
 
-# Returns the length of the ``Vector``.
-export def vlen (Vector _ s e) = e - s
+# vempty: returns ``True`` if the ``Vector`` has no entries, otherwise ``False``.
+#
+#   vempty (vseq 4) = False
+#   vempty (vseq 0) = True
+export def vempty (Vector _ s e): Boolean =
+    s == e
 
-# Converts a ``List`` to a ``Vector``.
-export def vectorToList = vfoldr (_,_) Nil
+# vlen: returns the length of the ``Vector``.
+#
+#   vlen (vseq x) = x
+#   vlen [] = 0
+#   vlen [0, 5] = 2
+export def vlen (Vector _ s e): Integer =
+    e - s
 
-# Splits the ``Vector`` into two vectors, at the point ``i``.  
-# The ``i``th entry will end up in the second ``Vector``, provided that ``0 <= i < vlen(v)``.
-export def vsplitAt i (Vector v s e) =
-  def x = min e (s + max 0 i)
-  Pair (Vector v s x) (Vector v x e)
+# vsplitAt: given an index, cut a Vector into elements before and after the index
+#
+#   vsplitAt 4 (vseq 8) = Pair [0, 1, 2, 3] [4, 5, 6, 7]
+#   vsplitAt 0 (vseq 8) = Pair [] [0, 1, 2, 3, 4, 5, 6, 7]
+#   vsplitAt 8 (vseq 8) = Pair [0, 1, 2, 3, 4, 5, 6, 7] []
+export def vsplitAt (index: Integer) (Vector v s e: Vector a): Pair (Vector a) (Vector a) =
+    def x = min e (s + max 0 index)
+    Pair (Vector v s x) (Vector v x e)
 
-# Returns the first ``i`` elements of the ``Vector``.
-export def vtake i v = vsplitAt i v | getPairFirst
+# vtake: keep only the first `length` elements
+#
+#   vtake 2 (vseq 100) = [0, 1]
+#   vtake 0 (vseq 100) = []
+#   vtake 2 (vseq 0)   = []
+export def vtake (length: Integer) (v: Vector a): Vector a =
+    vsplitAt length v | getPairFirst
 
-# Removes the first ``i`` elements of the ``Vector``.
-export def vdrop i v = vsplitAt i v | getPairSecond
+# vdrop: remove elements up to ``index`` from the ``Vector``
+#
+#   vdrop 4 (vseq 6) = [4, 5]
+#   vdrop 6 (vseq 6) = []
+#   vdrop 0 (vseq 3) = [0, 1, 2]
+export def vdrop (index: Integer) (v: Vector a): Vector a =
+    vsplitAt index v | getPairSecond
 
-# Returns an ``Option``, containing either the ``i``th element of the vector, or ``None`` if ``i`` is out of range.
-export def vat i (Vector v s e) =
-  def get v i = prim "vget"
-  def j = i+s
-  if i >= 0 && j < e then Some (get v j) else None
+# vat: Returns an ``Option``, containing either the ``i``th element of the vector, or ``None`` if ``i`` is out of range.
+#
+#   vat 4 (vseq 8) = Some 4
+#   vat 4 (vseq 4) = None
+#   vat (-1) (vseq 4) = None
+export def vat (index: Integer) (Vector v s e: Vector a): Option a =
+    def j = index+s
+    if index >= 0 && j < e then
+        Some (vget v j)
+    else
+        None
 
-def vat_ i (Vector v s _) =
-  def get v i = prim "vget"
-  get v (s+i)
+# vmap: create a new Vector by applying a function f to each element of a Vector.
+#
+#   vmap str    (vseq 5) = ["0", "1", "2", "3", "4"]
+#   vmap (_+10) (vseq 5) = [10, 11, 12, 13, 14]
+export def vmap (f: a => b): Vector a => Vector b =
+    def step v i =
+        f (vat_ i v)
+    def loop =
+        vtab2 step
+    def top v =
+        loop v (vlen v)
+    top
 
-# Calls a function on every entry of a ``Vector``.
-export def vmap f v = vtab (\i f (vat_ i v)) (vlen v)
-export def vseq n = vtab (_) n
-export def vzip a b = vtab (\i Pair (vat_ i a) (vat_ i b)) (min (vlen a) (vlen b))
-export def vunzip v =
-  Pair
-  (vtab (vat_ _ v | getPairFirst)  (vlen v))
-  (vtab (vat_ _ v | getPairSecond) (vlen v))
-export def vreverse v =
-  def n = vlen v
-  def n1 = n-1
-  vtab (\i vat_ (n1-i) v) n
+# vtab: create a Vector of specified size in parallel by calling `f` on the index to generate.
+#
+#   vtab (_+100) 5 = [100, 101, 102, 103, 104]
+export def vtab (f: Integer => a): Integer => Vector a =
+    vtab2 (\_ f) Unit
 
-export def vfoldl f a v =
-  def len = vlen v
-  def helper a i =
-    if i == len
-    then a
-    else helper (f a (vat_ i v)) (i+1)
-  helper a 0
+def vtab2 (f: c => Integer => a): c => Integer => Vector a =
+    def step (Pair c out) i =
+        vset out i (f c i)
+    def loop =
+        vappi2 step
+    def top c length =
+        def n = max 0 length
+        def out: Array a = vnew n
+        def _ = loop (Pair c out) n
+        Vector out 0 n
+    top
 
-export def vfoldr f a v =
-  def helper a i =
-    if i == -1
-    then a
-    else helper (f (vat_ i v) a) (i-1)
-  helper a (vlen v - 1)
+# vseq: create a Vector of specified length with value ascending from 0.
+# For x <  y: vat x (vseq y) = Some x
+# For x >= y: vat x (vseq y) = None
+#
+#   vseq 10 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+#   vseq (-1) = []
+export def vseq: Integer => Vector Integer =
+    vtab (_)
 
-export def vfoldmap f a g v =
-  def len = vlen v
-  def helper a s e =
-    def mid = (e + s) >> 1
-    def mid1 = mid + 1
-    def b = g (vat_ mid v)
-    def l = if mid  == s then a else helper a s mid
-    def r = if mid1 == e then b else helper b mid1 e
-    f l r
-  if len == 0 then a else helper a 0 len
+# vzip: take two Vectors and turn them into a List of Vectors
+# The shortest length of the two input vectors sets the output length.
+#
+#   vzip [4, 7, 8] ["a", "b"] = [Pair 4 "a", Pair 7 "b"]
+export def vzip: Vector a => Vector b => Vector (Pair a b) =
+    def step (Pair a b) i =
+        Pair (vat_ i a) (vat_ i b)
+    def loop =
+        vtab2 step
+    def top a b =
+        def len = min (vlen a) (vlen b)
+        loop (Pair a b) len
+    top
 
-export def vfold f a v = vfoldmap f a (_) v
+# vunzip: turn a Vector of Pairs into a Pair of Vectors
+#
+#   unzip [Pair 4 "a", Pair 7 "b"] = Pair [4, 7] ["a", "b"]
+export def vunzip: Vector (Pair a b) => Pair (Vector a) (Vector b) =
+    def getA =
+        vmap getPairFirst
+    def getB =
+        vmap getPairSecond
+    def top v =
+        Pair (getA v) (getB v)
+    top
 
-export def vfind f v =
-  def len = vlen v
-  def helper i =
-    if i == len then None else
-      def x = vat_ i v
-      if f x then Some (Pair x i) else helper (i+1)
-  helper 0
+# vreverse: reverse the order of elements in a Vector
+#
+#   vreverse (vseq 5) = [4, 3, 2, 1, 0]
+#   vreverse Nil = []
+export def vreverse: Vector a => Vector a =
+    def step (Pair n1 v) i =
+        vat_ (n1-i) v
+    def loop =
+        vtab2 step
+    def top v =
+        def n = vlen v
+        def n1 = n-1
+        loop (Pair n1 v) n
+    top
 
-export def vsplitUntil f v =
-  match (vfind f v)
-    None = match v
-      (Vector z _ _) = Pair v (Vector z 0 0)
-    Some (Pair _ i) = vsplitAt i v
+# vfoldl: combine the elements of a Vector front-to-back into a single value.
+# An accumulator is updated from its initial value by combiningFn for each element.
+#
+# In C++ syntax, `vfoldl <combiningFn> <accumulateInitalValue> <Vector>` does:
+#   auto accumulator = <accumulateInitalValue>;
+#   for (element : <Vector>) accumulator = combiningFn(accumulator, element);
+#   return accumulator;
+#
+# Examples:
+#   vfoldl f x [a, b, c] = f (f (f x a) b) c
+#   vfoldl (_+_) 0 (vseq 6) = 15
+export def vfoldl (combiningFn: accum => element => accum): accum => Vector element => accum =
+    def loop accumulator v s e =
+        if s == e then
+            accumulator
+        else
+            def element = vget v s
+            loop (combiningFn accumulator element) v (s+1) e
+    def top a (Vector v s e) =
+        loop a v s e
+    top
 
-export def vtakeUntil f t = vsplitUntil f t | getPairFirst
-export def vdropUntil f t = vsplitUntil f t | getPairSecond
+# vfoldr: combine the elements of a Vector back-to-front into a single value.
+# An accumulator is updated from its initial value by combiningFn for each element.
+#
+#   vfoldr f x [a, b, c] = f a (f b (f c x))
+export def vfoldr (combiningFn: element => accumulator => accumulator): accumulator => Vector element => accumulator =
+    def loop accumulator a s e =
+        if s == e then
+            accumulator
+        else
+            def e1 = e - 1
+            def element = vget a e1
+            loop (combiningFn element accumulator) a s e1
+    def top a (Vector v s e) =
+        loop a v s e
+    top
 
-# Returns True if there exists an x where f x = True
-export def vexists f t = match (vfind f t)
-  Some _ = True
-  None   = False
+# vmapReduce: combine the elements of a Vector in parallel
+# Unlike vfold[lr], takes a map function, because reduceFn operates on the same type.
+# reduceFn must be an associative operator; ie: f x (f y z) = f (f x y) z
+# Both the mapFn and reduceFn are called exactly once for each element of the input Vector.
+#
+#   vmapReduce str ("{_}{_}") ">" (vseq 10) = ">0123456789"
+export def vmapReduce (mapFn: element => accum) (reduceFn: accum => accum => accum): accum => Vector element => accum =
+    def step a e =
+        reduceFn a (mapFn e)
+    def inner =
+        vfoldl step
+    def top a (Vector v s e) =
+        vampReduceOuter inner mapFn reduceFn a v s e
+    top
 
-export def vforall f t = !vexists (!f _) t
+# recursive so won't inline:
+def vampReduceOuter inner mapFn reduceFn a v s e =
+    if e - s < vectorChunkSize then
+        inner a (Vector v s e)
+    else
+        def mid = (e + s) >> 1
+        def mid1 = mid + 1
+        def m = mapFn (vget v mid)
+        def l = vampReduceOuter inner mapFn reduceFn a v s mid
+        def r = vampReduceOuter inner mapFn reduceFn m v mid1 e
+        reduceFn l r
 
-export def vsplitBy f v =
-  def len = vlen v
-  def vnew n = prim "vnew"
-  def select = vmap f v
-  def index = vscanmap (_+_) 0 (\x (if x then 1 else 0)) select
-  def ntake = vat_ len index
-  def ndrop = len - ntake
-  def bind take drop =
-    def vset o i v = prim "vset"
+# vfind: find the location of the first element accepted by `acceptFn`
+# Returns: `Pair value index`, such that `value` is `at index`
+# Once `acceptFn` returns True, `acceptFn` is not evaulated on further elements.
+# This means that `acceptFn` is applied to the Vector mostly sequentially.
+# If more parallelism is desired, use 'vmap f | vfind (_)'.
+#
+#   def v = vseq 10 | vmap (_+10)
+#   vfind (_%4==0) v = Some (Pair 12 2)
+#   vfind (_%4==4) v = None
+export def vfind (acceptFn: a => Boolean): Vector a => Option (Pair a Integer) =
+    def out m a s e =
+        if m == e then
+            None
+        else
+            Some (Pair (vget a m) (m-s))
+    findRaw acceptFn out
+
+# vsplitUntil: cut the Vector at the point `stopFn` is first True
+# Once `stopFn` returns True, `stopFn` is not evaulated on further elements.
+# This means that `stopFn` is applied to the List mostly sequentially.
+# If more parallelism is desired, use 'vmap f | vfind (_)' and vsplitAt.
+#
+#   vsplitUntil (_>=4) (vseq 8) = Pair [0, 1, 2, 3] [4, 5, 6, 7]
+#   vsplitUntil (_>=0) (vseq 8) = Pair [] [0, 1, 2, 3, 4, 5, 6, 7]
+#   vsplitUntil (_>=8) (vseq 8) = Pair [0, 1, 2, 3, 4, 5, 6, 7] []
+export def vsplitUntil (stopFn: a => Boolean):  Vector a => Pair (Vector a) (Vector a) =
+    def out m a s e =
+        Pair (Vector a s m) (Vector a m e)
+    findRaw stopFn out
+
+# vtakeUntil: take the longest prefix of a list where `stopFn` is False
+# Once `stopFn` returns True, `stopFn` is not evaulated on further elements.
+# This means that `stopFn` is applied to the List mostly sequentially.
+# If more parallelism is desired, use 'vmap f | vfind (_)' and vtake.
+#
+#   vtakeUntil (_>=4) (vseq 8) = [0, 1, 2, 3]
+#   vtakeUntil (_>=0) (vseq 8) = []
+#   vtakeUntil (_>=8) (vseq 8) = [0, 1, 2, 3, 4, 5, 6, 7]
+export def vtakeUntil (stopFn: a => Boolean): Vector a => Vector a =
+    def out m a s _ =
+        Vector a s m
+    findRaw stopFn out
+
+# dropUntil: discard elements from the list until 'stopFn' returns True
+# Once `stopFn` returns True, `stopFn` is not evaulated on further elements.
+# This means that `stopFn` is applied to the List mostly sequentially.
+# If more parallelism is desired, use 'vmap f | vfind (_)' and vdrop.
+#
+#   vdropUntil (_>=4) (vseq 8) = [4, 5, 6, 7]
+#   vdropUntil (_>=0) (vseq 8) = [0, 1, 2, 3, 4, 5, 6, 7]
+#   vdropUntil (_>=8) (vseq 8) = []
+export def vdropUntil (stopFn: a => Boolean): Vector a => Vector a =
+    def out m a _ e =
+        Vector a m e
+    findRaw stopFn out
+
+# vexists: does `acceptFn` return True for any element in the vector?
+# Once `acceptFn` returns True, `acceptFn` is not evaulated on further elements.
+# This means that `acceptFn` is applied to the Vector mostly sequentially.
+# If more parallelism is desired, use 'vmap f | vexists (_)'.
+export def vexists (acceptFn: a => Boolean): Vector a => Boolean =
+    def out m _ _ e =
+        m != e
+    findRaw acceptFn out
+
+# vforall: does `acceptFn` return True for all element in the vector?
+# Once `acceptFn` returns False, `acceptFn` is not evaulated on further elements.
+# This means that `acceptFn` is applied to the Vector mostly sequentially.
+# If more parallelism is desired, use 'vmap f | vforall (_)'.
+export def vforall (acceptFn: a => Boolean): Vector a => Boolean =
+    def out m _ _ e =
+        m == e
+    findRaw (!acceptFn _) out
+
+def findRaw stopFn outFn =
+    def loop a s e =
+        if s == e then
+            e
+        else if stopFn (vget a s) then
+            s
+        else
+            loop a (s+1) e
+    def top (Vector a s e) =
+        def m = loop a s e
+        outFn m a s e
+    top
+
+# vsplitBy: partition a Vector into those elements with `f` True and False
+#
+#   def isEven x = x%2 == 0
+#   vsplitBy isEven (vseq 6) = Pair [0, 2, 4] [1, 3, 5]
+export def vsplitBy (f: a => Boolean): Vector a => Pair (Vector a) (Vector a) =
+    def selFn =
+        vmap f
+    def top v =
+        vsplitByTop (selFn v) v
+    top
+
+#def boolCount = vmapScan (\x (if x then 1 else 0)) (_+_) 0
+def boolCount =
+    def step a x =
+        a + (if x then 1 else 0)
+    vscanl step 0
+
+# whenever it becomes possible to specify this, disable inlining:
+def vsplitByTop (select: Vector Boolean) (Vector v s e: Vector a): Pair (Vector a) (Vector a) =
+    def Vector selectArray _ _ = select
+    def Vector index _ _ = boolCount select
+    def len = e - s
+    def ntake = vget index len
+    def ndrop = len - ntake
+    def take: Array a = vnew ntake
+    def drop: Array a = vnew ndrop
     def exec i =
-      def t = vat_ i select
-      def o = vat_ i index
-      def x = vat_ i v
-      if t then vset take o x else vset drop (i-o) x
+        def t = vget selectArray i
+        def o = vget index i
+        def x = vget v (s+i)
+        if t then vset take o x else vset drop (i-o) x
     def _ = vappi exec len
     Pair (Vector take 0 ntake) (Vector drop 0 ndrop)
-  bind (vnew ntake) (vnew ndrop)
 
-export def vfilter f v = vsplitBy f v | getPairFirst
+# vfilter: keep only those elements in the List where `f` evaluates to True
+#
+#   def isEven x = x%2 == 0
+#   vfilter isEven (vseq 10) = [0, 2, 4, 6, 8]
+export def vfilter (f: a => Boolean): Vector a => Vector a =
+    def selFn =
+        vmap f
+    def top v =
+        vfilterTop (selFn v) v
+    top
 
-export def vunfoldl f a n =
-  def vnew n = prim "vnew"
-  def bind out =
-    def vset o i v = prim "vset"
-    def helper a i =
-      if i == n then Unit else match (f a)
-        Pair a x =
-          def _ = vset out i x
-          helper a (i+1)
-    def _ = helper a 0
-    Vector out 0 n
-  bind (vnew (max 0 n))
+# whenever it becomes possible to specify this, disable inlining:
+def vfilterTop (select: Vector Boolean) (Vector v s e: Vector a): Vector a =
+    def Vector selectArray _ _ = select
+    def Vector index _ _ = boolCount select
+    def len = e - s
+    def ntake = vget index len
+    def take: Array a = vnew ntake
+    def exec i =
+        def t = vget selectArray i
+        def o = vget index i
+        def x = vget v (s+i)
+        if t then vset take o x else Unit
+    def _ = vappi exec len
+    Vector take 0 ntake
 
-export def vscanl f a v =
-  def len = vlen v
-  def vnew n = prim "vnew"
-  def bind out =
-    def vset o i v = prim "vset"
-    def helper a i =
-      def _ = vset out i a
-      if i == len
-      then Unit
-      else helper (f a (vat_ i v)) (i+1)
-    def _ = helper a 0
-    Vector out 0 (len+1)
-  bind (vnew (len+1))
+# vunfoldl: create a Vector from a generator function.
+# The generatingFn is called repeatedly
+#
+#   vunfoldl (\x Pair (x+1) (str x)) 3 5 = ["3", "4", "5", "6", "7"]
+export def vunfoldl (generatingFn: accum => Pair accum element): accum => Integer => Vector b =
+    vunfoldl2 (\_ generatingFn) Unit
 
-export def vscanr f a v =
-  def len = vlen v
-  def vnew n = prim "vnew"
-  def bind out =
-    def vset o i v = prim "vset"
-    def helper a i =
-      def _ = vset out i a
-      def i1 = i - 1
-      if i == 0
-      then Unit
-      else helper (f (vat_ i1 v) a) i1
-    def _ = helper a len
-    Vector out 0 (len+1)
-  bind (vnew (len+1))
+def vunfoldl2 (generatingFn: fixed => accum => Pair accum element): fixed => accum => Integer => Vector b =
+    def loop f a v i e =
+        if i == e then
+            Unit
+        else
+            def Pair an x = generatingFn f a
+            def _ = vset v i x
+            loop f an v (i+1) e
+    def top f a n =
+        def m = max 0 n
+        def out = vnew m
+        def _ = loop f a out 0 m
+        Vector out 0 m
+    top
 
-# vscan = O(n), log n deep prefix-sum
-# f called exactly once per input
-export def vscanmap f a g v =
-  def len = vlen v + 1
-  def vnew n = prim "vnew"
-  def vset o i v = prim "vset"
-  def gather out =
-    def helper s e =
-      if e - s == 1
-      then if s == -1 then a else g (vat_ s v)
-      else
-        def mid = (e+s) >> 1
-        def lo = helper s mid
-        def hi = helper mid e
-        def _ = vset out mid lo
-        f lo hi
+# vscanl: create a new Vector from an accumulator run over the elements front-to-back.
+# The last element of the produced Vector is equivalent to the result of vfoldl.
+#
+# Examples:
+#   vscanl (_+_) 100 (vseq 6) = [100, 100, 101, 103, 106, 110, 115]
+#                                                              ^^^- 100+0+1+2+3+4+5
+#                                               ^^^- 100+0+1+2
+#                                     ^^^- 100+0
+#                                ^^^- 100
+export def vscanl (f: a => b => a): a => Vector b => Vector a =
+    def loop a o i v s e =
+        def _ = vset o i a
+        if s == e then
+            Unit
+        else
+            loop (f a (vget v s)) o (i+1) v (s+1) e
+    def top a (Vector v s e) =
+        def len = e-s
+        def out: Array a = vnew (len+1)
+        def _ = loop a out 0 v s e
+        Vector out 0 (len+1)
+    top
+
+# vscanr: create a new Vector from an accumulator run over the elements back-to-front.
+# The first element of the produced List is equivalent to the result of a foldr.
+#
+# Examples:
+#   vscanr (_+_) 100 (vseq 6) = 115, 115, 114, 112, 109, 105, 100, Nil
+#                                                             ^^^- 100
+#                                                        ^^^- 5+100
+#                                    ^^^- 1+2+3+4+5+100
+#                               ^^^- 0+1+2+3+4+5+100
+export def vscanr (f: b => a => a): a => Vector b => Vector a =
+    def loop a o i v s e =
+        def _ = vset o i a
+        if s == e then
+            Unit
+        else
+            loop (f (vget v (e-1)) a) o (i-1) v s (e-1)
+    def top a (Vector v s e) =
+        def len = e-s
+        def out: Array a = vnew (len+1)
+        def _ = loop a out len v s e
+        Vector out 0 (len+1)
+    top
+
+# vmapScan: a parallel version of vscanl.
+# Unlike vscanl, takes a map function, because combineFn operates on the same type.
+# combineFn must be an associative operator; ie: f x (f y z) = f (f x y) z.
+# The mapFn is called exactly once for each element of the input Vector.
+# The combineFn may be called up to twice per input.
+export def vmapScan (mapFn: element => accum) (combineFn: accum => accum => accum) (acc: accum) (v: Vector element): Vector accum =
+    def len = vlen v + 1
+    def fanin: Array a = vnew len
+    def gather s e =
+        if e - s != 1 then
+            def mid = (e+s) >> 1
+            def lo = gather s mid
+            def hi = gather mid e
+            def _ = vset fanin mid lo
+            combineFn lo hi
+        else if s != -1 then
+            mapFn (vat_ s v)
+        else
+            acc
     def bitrev x =
-      if x == 0 then Unit else
-        def lowbit = and x (-x)
-        def bottom = xor x lowbit
-        def _ = vset out (x-1) (helper (bottom-1) (x-1))
-        bitrev bottom
+        if x == 0 then
+            Unit
+        else
+            def lowbit = and x (-x)
+            def bottom = xor x lowbit
+            def _ = bitrev bottom
+            vset fanin (x-1) (gather (bottom-1) (x-1))
     def _ = bitrev len
-    Vector out 0 len
-  def temp = gather (vnew len)
-  def scatter out =
-    def helper a s e =
-      if e - s == 1 then vset out s a else
-        def mid = (e+s) >> 1
-        def _ = helper a s mid
-        if mid >= len then Unit else
-          def v = vat_ mid temp
-          helper (f a v) mid e
+    def fanout: Array a = vnew len
+    def scatter a s e =
+        if e - s == 1 then
+            vset fanout s a
+        else
+            def mid = (e+s) >> 1
+            def _ = scatter a s mid
+            if mid >= len then
+                Unit
+            else
+                def v = vget fanin mid
+                scatter (combineFn a v) mid e
     def double x =
-      if x >= len then Unit else
-        def e = (x<<1) + 1
-        def _ = helper (vat_ x temp) x e
-        double e
+        if x >= len then
+            Unit
+        else
+            def e = (x<<1) + 1
+            def _ = scatter (vget fanin x) x e
+            double e
     def _ = double 0
-    Vector out 0 len
-  scatter (vnew len)
-export def vscan f a v = vscanmap f a (_) v
+    Vector fanout 0 len
 
-# Merge-sort, if sorted then O(n) else O(nlogn)
-export def vsortBy lt v =
-  def nondesc i = # 1 if v(i) > v(i+1)
-    def vi = vat_ i v
-    def vi1 = vat_ (i+1) v
-    if lt vi1 vi then 1 else 0
-  def runs = vscan (_+_) 0 (vtab nondesc (vlen v - 1))
-  # 0000111112345
-  #         ^^^^^ strictly descending run
-  #     ^^^^^ non-descending runs
-  def merge a b =
-    def helper (Pair ai bi) =
-      def doit x a b = Pair (Pair (ai+a) (bi+b)) x
-      match (vat ai a) (vat bi b)
-        None     None     = panic "impossible"
-        (Some x) None     = doit x 1 0
-        None     (Some y) = doit y 0 1
-        (Some x) (Some y) = match (lt y x)
-          True  = doit y 0 1
-          False = doit x 1 0 # x <= y prefers x for stable sort
-    vunfoldl helper (Pair 0 0) (vlen a + vlen b)
-  def helper v r =
+export def vscan (f: a => a => a): a => Vector a => Vector a =
+    vmapScan (_) f
+
+# vsortBy: sort the input vector so that it is ascending wrt. lessThanFn
+# Runtime when almost-sorted is O(n), otherwise O(nlogn)
+# This is a stable sort; two equal values will retain their relative order.
+#
+#   vtab vseq 10 | vflatten | vsortBy (_<_) =
+#     [0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 3 3 3 3 3 3 4 4 4 4 4 5 5 5 5 6 6 6 7 7 8]
+export def vsortBy (lessThanFn: a => a => Boolean): Vector a => Vector a =
+    def runStep v i = # 1 if v(i) > v(i+1)
+        def vi = vat_ i v
+        def vi1 = vat_ (i+1) v
+        if lessThanFn vi1 vi then 1 else 0
+    def runLoop =
+        vtab2 runStep
+    def mergeStep (Pair a b) (Pair ai bi) =
+        def doit x a b = Pair (Pair (ai+a) (bi+b)) x
+        match (vat ai a) (vat bi b)
+            None     None     = panic "merged beyond vector limits"
+            (Some x) None     = doit x 1 0
+            None     (Some y) = doit y 0 1
+            (Some x) (Some y) = match (lessThanFn y x)
+                True  = doit y 0 1
+                False = doit x 1 0 # x <= y prefers x for stable sort
+    def mergeLoop =
+        vunfoldl2 mergeStep
+    def top v =
+        runLoop v (vlen v - 1)
+        | prefixSum
+        | mergeSort mergeLoop v
+    top
+
+def mergeSort mergeLoop v runs =
+    # runs: 0000111112345
+    #               ^^^^^ strictly descending run
+    #           ^^^^^ non-descending runs
     def len = vlen v
     def mid = len >> 1
-    if mid == 0 then v else
-      def len1 = len-1
-      def lo = vat_ 0 r
-      def hi = vat_ len1 r
-      if lo == hi then v else
-      if lo + len1 == hi then vreverse v else
-      match (vsplitAt mid v) (vsplitAt mid r)
-        (Pair l r) (Pair rl rr) = merge (helper l rl) (helper r rr)
-  helper v runs
+    if mid == 0 then
+        # vector of one element
+        v
+    else
+        def len1 = len - 1
+        def lo = vat_ 0 runs
+        def hi = vat_ len1 runs
+        if lo == hi then
+            # vector is non-descending; leave it unmodified
+            v
+        else if lo + len1 == hi then
+            # vector is strictly descending; reverse it
+            vreverse v
+        else
+            # vector is unsorted; divide and conquer
+            def Pair vl vr = vsplitAt mid v
+            def Pair rl rr = vsplitAt mid runs
+            def lo = mergeSort mergeLoop vl rl
+            def hi = mergeSort mergeLoop vr rr
+            mergeLoop (Pair lo hi) (Pair 0 0) len
 
-export def vdistinctBy cmp v =
-  def gen (Pair tree i) =
-    def x = vat_ i v
-    def i1 = i + 1
-    if x ∈ tree
-    then Pair (Pair tree i1) None
-    else Pair (Pair (tinsert x tree) i1) (Some x)
-  vmapPartial (_) (vunfoldl gen (Pair (tnew cmp) 0) (vlen v))
+#def prefixSum = vscan (_+_) 0
+def prefixSum = vscanl (_+_) 0
 
-export def vdistinctRunBy eq v =
-  def keep i =
-    def vi = vat_ i v
-    if i == 0 then Some vi else
-      def vi1 = vat_ (i-1) v
-      if eq vi1 vi then None else Some vi
-  vmapPartial (_) (vtab keep (vlen v))
+# vdistinctBy: keep only the first occurrence of a value
+# The order of non-duplicated elements is retained.
+#
+#   vdistinctBy (_<=>_) [1, 2, 1, 3, 4, 3] = [1, 2, 3, 4]
+export def vdistinctBy (cmp: a => a => Order): Vector a => Vector a =
+    def step (Triple v tree i) =
+        def x = vat_ i v
+        def i1 = i + 1
+        if x ∈ tree then
+            Pair (Triple v tree i1) None
+        else
+            Pair (Triple v (tinsert x tree) i1) (Some x)
+    def loop =
+        vunfoldl step
+    def top v =
+        def state = Triple v (tnew cmp) 0
+        vlen v
+        | loop state
+        | vmapPartialTop
+    top
 
-export def vcmp f l r =
-  def len = min (vlen l) (vlen r)
-  def helper i =
-    if i == len then
-      icmp (vlen l) (vlen r)
-    else match (f (vat_ i l) (vat_ i r))
-      EQ = helper (i+1)
-      x  = x
-  helper 0
+# vdistinctRunBy: keep only the first occurrence in a run of equal values
+#
+#  vdistinctRunBy (_==_) [1, 1, 2, 1, 3, 3] = [1, 2, 1, 3]
+export def vdistinctRunBy (eq: a => a => Boolean): Vector a => Vector a =
+    def step v i =
+        def vi = vat_ i v
+        if i == 0 then
+            Some vi
+        else if eq (vat_ (i-1) v) vi then
+            None
+        else
+            Some vi
+    def loop =
+        vtab2 step
+    def top v =
+        vlen v
+        | loop v
+        | vmapPartialTop
+    top
 
-export def vtranspose v =
-  def outer i = vmapPartial (vat i _) v
-  vtab outer (vfoldmap max 0 vlen v)
+# vcmp: compare two Vectors using an Order comparator
+#
+#   vcmp (_<=>_) (vseq 5)  (vseq 5)  = EQ
+#   vcmp (_<=>_) (vseq 5)  (vseq 4)  = GT
+#   vcmp (_<=>_) [0] [1] = LT
+export def vcmp (compareFn: a => b => Order): Vector a => Vector b => Order =
+    def loop la ls ra rs i e lcmp =
+        if i == e then
+            lcmp
+        else
+            def a = vget la (ls+i)
+            def b = vget ra (rs+i)
+            require EQ = compareFn a b
+            loop la ls ra rs (i+1) e lcmp
+    def top (Vector la ls le) (Vector ra rs re) =
+        def ll = le-ls
+        def rl = re-rs
+        def lcmp = icmp ll rl
+        def e = if isLT lcmp then ll else rl
+        loop la ls ra rs 0 e lcmp
+    top
 
-export def vflatten vo =
-  def leno = vlen vo
-  def offset = vscanmap (_+_) 0 vlen vo
-  def flat = vat_ leno offset
-  def vnew n = prim "vnew"
-  def bind out =
-    def vset o i v = prim "vset"
-    def outer o =
-      def vi   = vat_ o vo
-      def base = vat_ o offset
-      def leni = vlen vi
-      def inner i = vset out (base+i) (vat_ i vi)
-      vappi inner leni
-    def _ = vappi outer leno
-    Vector out 0 flat
-  bind (vnew flat)
+# vtranspose: flip the 1st and 2nd indexes in a Vector of Vectors
+# vtranspose is only it's own inverse when the lists have non-increasing length
+#
+#   vtranspose [[1, 2, 3], [4, 5, 6]]
+#   ---
+#   [[1, 4], [2, 5], [3, 6]]
+#
+#   vtranspose (vmap vseq (vseq 5))
+#   ---
+#   [[0, 0, 0, 0], [1, 1, 1], [2, 2], [3]]
+export def vtranspose: Vector (Vector a) => Vector (Vector a) =
+    def inner v i =
+        vmapPartial2 (vat i _) v
+    def outer =
+        vtab2 inner
+    def olen =
+        vmapReduce vlen max 0
+    def top v =
+        outer v (olen v)
+    top
 
-# Simple parallel construction
-export def vtab f n =
-  def vnew n = prim "vnew"
-  def m = max 0 n
-  def bind out =
-    def vset o i v = prim "vset"
-    def _ = vappi (\i vset out i (f i)) m
-    Vector out 0 m
-  bind (vnew m)
+# vflatten: concatenate a List of Lists into a simple List
+#
+#   vflatten [[1, 2], [3], [4, 5]]
+#   = [1, 2, 3, 4, 5]
+export def vflatten: Vector (Vector a) => Vector a =
+    #def offsetFn = vmapScan vlen (_+_) 0
+    def offsetFn =
+        vscanl (_ + vlen _) 0
+    def step (Triple out offset vo) o =
+        def vi   = vat_ o vo
+        def base = vat_ o offset
+        def leni = vlen vi
+        def inner i = vset out (base+i) (vat_ i vi)
+        vappi inner leni
+    def loop =
+        vappi2 step
+    def top vo =
+        def leno = vlen vo
+        def offset = offsetFn vo
+        def flat = vat_ leno offset
+        def out: Array a = vnew flat
+        def _ = loop (Triple out offset vo) leno
+        Vector out 0 flat
+    top
 
-# f will be called more than once per element
-def vmapPartial f v =
-  def intSome x = match (f x)
-    Some _ = 1
-    None   = 0
-  def dest = vscanmap (_+_) 0 intSome v
-  def leni = vlen v
-  def leno = vat_ leni dest
-  def vnew n = prim "vnew"
-  def bind out =
-    def vset o i v = prim "vset"
-    def exec i = match (f (vat_ i v))
-      Some x = vset out (vat_ i dest) x
-      None   = Unit
-    def _ = vappi exec leni
-    Vector out 0 leno
-  bind (vnew leno)
+# vmapPartial: create a new Vector by applying a partial funciton to each element of a Vector.
+# Partial functions can return None, in which case the result is not included in the output.
+#
+#   vmapPartial int ["3", "x", "44"] = [3, 44]
+export def vmapPartial (f: a => Option b): Vector a => Vector b =
+    def fn =
+        vmap f
+    def top v =
+        fn v
+        | vmapPartialTop
+    top
 
-def vappi f n =
-  def helper s e =
-    def mid = (s + e) >> 1
-    def mid1 = mid + 1
-    def _ = f mid
-    def _ = if mid  == s then Unit else helper s mid
-    def _ = if mid1 == e then Unit else helper mid1 e
-    Unit
-  if n <= 0 then Unit else helper 0 n
+def vmapPartialTop = vmapPartial2 (_)
+
+# vmapPartial2: create a new Vector by applying a partial function up to twice to each element of a Vector.
+# If `f` is very fast, vmapPartial2 is more efficient as it avoids walking the vector twice.
+#
+#   vmapPartial2 int ["3", "x", "44"] = [3, 44]
+export def vmapPartial2 (f: a => Option b): Vector a => Vector b =
+    def intSome x = match (f x)
+        Some _ = 1
+        None   = 0
+    #def destFn = vmapScan intSome (_+_) 0
+    def destFn =
+        vscanl (_ + intSome _) 0
+    def step (Triple v dest out) i = match (f (vat_ i v))
+        Some x = vset out (vat_ i dest) x
+        None   = Unit
+    def loop =
+        vappi2 step
+    def top v =
+        def dest = destFn v
+        def leni = vlen v
+        def leno = vat_ leni dest
+        def out: Array b = vnew leno
+        def _ = loop (Triple v dest out) leni
+        Vector out 0 leno
+    top
+
+def vappi (f: Integer => Unit): Integer => Unit =
+    vappi2 (\_ f) Unit
+
+def vappi2 (f: a => Integer => Unit): a => Integer => Unit =
+    def innerFn a s e =
+        if s == e then
+            Unit
+        else
+            def _ = f a s
+            innerFn a (s+1) e
+    vappiOuter innerFn 0
+
+# put recursion at top to inhibit inlining
+def vappiOuter (innerFn: a => Integer => Integer => Unit) (s: Integer) (a: a) (e: Integer): Unit =
+    if e - s < vectorChunkSize then
+        innerFn a s e
+    else
+        def m = (s + e) >> 1
+        def _ = vappiOuter innerFn s a m
+        def _ = vappiOuter innerFn m a e
+        Unit
+
+# Caller MUST ascribe result to a bound type variable
+# Otherwise, the resultant Vector can be used at multiple types
+def vnew n = prim "vnew"
+# Caller MUST call vset exactly once one every element
+# Otherwise, the runtime can deadlock
+def vset o i v = prim "vset"
+# Out-of-bounds access kills the wake runtime
+def vget v i = prim "vget"
+def vat_ i (Vector v s _) = vget v (s+i)
