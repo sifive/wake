@@ -15,7 +15,8 @@
 
 package wake
 
+# On MacOS and FreeBSD, many important system binaries are not in /usr/bin
 publish path = match sysname
-  "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
-  "FreeBSD" = "/usr/local/bin", Nil
-  _        = Nil
+    "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
+    "FreeBSD" = "/usr/local/bin", Nil
+    _        = Nil

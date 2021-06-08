@@ -18,41 +18,41 @@ package wake
 # This API makes it possible to include a non-source file into a wake build.
 # Generally, one should obtain Paths from sources or as the output of Jobs.
 # This API is useful for things like a comannd-line-supplied input file.
-export def claimFileAsPath existingFile desiredWorkspacePath =
-  def fileName = replace `.*/` "" desiredWorkspacePath
-  def dirName = extract `(.*)/.*` desiredWorkspacePath | head | getOrElse "."
-  claimFileAsPathIn (mkdir dirName) existingFile fileName
+export def claimFileAsPath (existingFile: String) (desiredWorkspacePath: String): Path =
+    def fileName = replace `.*/` "" desiredWorkspacePath
+    def dirName = extract `(.*)/.*` desiredWorkspacePath | head | getOrElse "."
+    claimFileAsPathIn (mkdir dirName) existingFile fileName
 
-export def claimFileAsPathIn outputDirectory existingFile desiredName =
-  def get_modtime file = prim "get_modtime"
-  def time = get_modtime existingFile
-  if time == -1
-  then makeBadPath (makeError "{existingFile}: claimed file does not exist")
-  else
-    def desiredWorkspacePath = simplify "{outputDirectory.getPathName}/{desiredName}"
-    def visible = outputDirectory, Nil
-    def cmdline = which "cp", existingFile, desiredWorkspacePath, Nil
-    makeExecPlan cmdline visible
-    | setPlanLocalOnly   True
-    | setPlanPersistence Once
-    | setPlanFnOutputs   (\_ desiredWorkspacePath, Nil)
-    | runJobWith localRunner
-    | getJobOutput
+export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (desiredName: String): Path =
+    def get_modtime file = prim "get_modtime"
+    def time = get_modtime existingFile
+    if time == -1 then
+        makeBadPath (makeError "{existingFile}: claimed file does not exist")
+    else
+        def desiredWorkspacePath = simplify "{outputDirectory.getPathName}/{desiredName}"
+        def visible = outputDirectory, Nil
+        def cmdline = which "cp", existingFile, desiredWorkspacePath, Nil
+        makeExecPlan cmdline visible
+        | setPlanLocalOnly   True
+        | setPlanPersistence Once
+        | setPlanFnOutputs   (\_ desiredWorkspacePath, Nil)
+        | runJobWith localRunner
+        | getJobOutput
 
 target tarExe Unit =
-  def gnutar = which "gnutar"
-  if gnutar ==* "gnutar" then which "tar" else gnutar
+    def gnutar = which "gnutar"
+    if gnutar ==* "gnutar" then which "tar" else gnutar
 
 def targz output paths =
-  def cmd =
-    # Intentionally record mtime in ns (posix) => needed for incremental builds
-    tarExe Unit, "--numeric-owner", "--owner=0", "--group=0", "--format=posix", "-czf",
-    output, map getPathName paths | sortBy (_<*_)
-  makeExecPlan cmd paths
-  | setPlanLocalOnly True
-  | setPlanFnOutputs (\_ output, Nil)
-  | runJobWith       localRunner
-  | getJobOutput
+    def cmd =
+        # Intentionally record mtime in ns (posix) => needed for incremental builds
+        tarExe Unit, "--numeric-owner", "--owner=0", "--group=0", "--format=posix", "-czf",
+        output, map getPathName paths | sortBy (_<*_)
+    makeExecPlan cmd paths
+    | setPlanLocalOnly True
+    | setPlanFnOutputs (\_ output, Nil)
+    | runJobWith       localRunner
+    | getJobOutput
 
 # This API allows a Job to access those outputs from its last invocation
 # which are accepted by reusedOutputFilterFn. To use this method, you must
@@ -60,32 +60,33 @@ def targz output paths =
 # previous outputs were made available or not. Also, for incremental jobs,
 # all visible files are considered as inputs, since the job might not read
 # all inputs on each run, based on (for example) timestamps.
-export def runIncrementalJob stateFileLabel reusedOutputFilterFn plan =
-  def code = plan | getPlanHash | strbase 62
-  def pre  = "{stateFileLabel}-pre-{code}.tar.gz"
-  def post = "{stateFileLabel}-post-{code}.tar.gz"
-  def escape s = prim "shell_str"
-  def preTar = claimFileAsPath post pre
-  def untar = "! test -f {escape pre} || tar -xzf {escape pre}\n"
-  def stateFiles = match preTar.getPathError
-    None   = preTar, Nil
-    Some _ = Nil
-  def cd =
-    if plan.getPlanDirectory ==* "."
-    then ""
-    else "cd {plan.getPlanDirectory}\n"
-  def orig = plan.getPlanCommand | map escape | catWith " "
-  def script = "{untar}{cd}{orig}"
-  def job =
-    plan
-    | setPlanDirectory "."
-    | setPlanCommand   (which "dash", "-ec", script, Nil)
-    | editPlanVisible  (stateFiles ++ _)
-    | setPlanFnInputs  (\_ plan.getPlanVisible | map getPathName)
-    | runJob
-  def _postTar = # ignored, but executed
+export def runIncrementalJob (stateFileLabel: String) (reusedOutputFilterFn: Path => Boolean) (plan: Plan): Job =
+    def code = plan | getPlanHash | strbase 62
+    def pre  = "{stateFileLabel}-pre-{code}.tar.gz"
+    def post = "{stateFileLabel}-post-{code}.tar.gz"
+    def escape s = prim "shell_str"
+    def preTar = claimFileAsPath post pre
+    def untar = "! test -f {escape pre} || tar -xzf {escape pre}\n"
+    def stateFiles = match preTar.getPathError
+        None   = preTar, Nil
+        Some _ = Nil
+    def cd =
+        if plan.getPlanDirectory ==* "." then
+            ""
+        else
+            "cd {plan.getPlanDirectory}\n"
+    def orig = plan.getPlanCommand | map escape | catWith " "
+    def script = "{untar}{cd}{orig}"
+    def job =
+        plan
+        | setPlanDirectory "."
+        | setPlanCommand   (which "dash", "-ec", script, Nil)
+        | editPlanVisible  (stateFiles ++ _)
+        | setPlanFnInputs  (\_ plan.getPlanVisible | map getPathName)
+        | runJob
+    def _postTar = # ignored, but executed
+        job
+        | getJobOutputs
+        | filter reusedOutputFilterFn
+        | targz post
     job
-    | getJobOutputs
-    | filter reusedOutputFilterFn
-    | targz post
-  job

@@ -15,41 +15,50 @@
 
 package wake
 
-# Private implementation of global sources
+# The source topic is used to inform wake about source files.
+# Normally, wake obtains this information from git.
+# However, in a distribution tarball this information is not available.
+# In that situation, provide a manifest.wake which publishes to this topic.
+# Anything published to this topic will be returned by calls to `sources`.
 export topic source: String
+
+# Private implementation of global sources
 def add_sources str = prim "add_sources"
 def got_sources = add_sources (subscribe source | map simplify | implode)
 
 # Find files
-# WARNING! Use of this method can make a build unreproducible
-# Depending on when the method is invoked, the results may vary
-export def files dir regexp = prim "files"
+# WARNING! Use of this method can make a build unreproducible.
+# Depending on when the method is invoked, the results may vary!
+# This method is ntended to be used by the outputFn of LocalOnly Jobs.
+export def files (dir: String) (regexp: RegExp): List String =
+    def p d r = prim "files"
+    p dir regexp
 
 def raw_source file =
-  def get_modtime file = prim "get_modtime"
-  def time = get_modtime file
-  if time == -1
-  then makeBadPath (makeError "{file}: source does not exist")
-  else
-    makeExecPlan ("<source>", str time, file, Nil) Nil
-    | setPlanShare       False
-    | setPlanEcho        logDebug
-    | setPlanEnvironment Nil
-    | setPlanFnOutputs   (file, _)
-    | runJobWith virtualRunner
-    | getJobOutput
+    def get_modtime file = prim "get_modtime"
+    def time = get_modtime file
+    if time == -1 then
+        makeBadPath (makeError "{file}: source does not exist")
+    else
+        makeExecPlan ("<source>", str time, file, Nil) Nil
+        | setPlanShare       False
+        | setPlanEcho        logDebug
+        | setPlanEnvironment Nil
+        | setPlanFnOutputs   (file, _)
+        | runJobWith virtualRunner
+        | getJobOutput
 
-export def source file =
-  def basename = replace `^.*/` '' file
-  def dirname = simplify "{file}/.."
-  match (sources dirname basename.quote)
-    Nil = makeBadPath "{file}: not a source file".makeError
-    x, Nil = x
-    _ = panic "unreachable: multiple sources match the same regexp"
+export def source (file: String): Path =
+    def basename = replace `^.*/` '' file
+    def dirname = simplify "{file}/.."
+    match (sources dirname basename.quote)
+        Nil = makeBadPath "{file}: not a source file".makeError
+        x, Nil = x
+        _ = panic "unreachable: multiple sources match the same regexp"
 
 # Find sources files
-export def sources dir filterRegexp =
-  def scan dir regexp = prim "sources"
-  match got_sources
-    True  = scan dir filterRegexp | map raw_source
-    False = panic "unreachable"
+export def sources (dir: String) (filterRegexp: RegExp): List Path =
+    def scan dir regexp = prim "sources"
+    match got_sources
+        True  = scan dir filterRegexp | map raw_source
+        False = panic "unreachable"

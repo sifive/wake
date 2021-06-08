@@ -16,109 +16,118 @@
 package wake
 
 # Read the file contents of a Path
-export def read path =
-  def imp p = prim "read"
-  match (getPathResult path)
-    Pass f = match (imp f.getPathName)
-      Pass body = Pass body
-      Fail f = Fail (makeError f)
-    Fail e = Fail e
+export def read (path: Path): Result String Error =
+    def imp p = prim "read"
+    require Pass f = getPathResult path
+    match (imp f.getPathName)
+        Pass body = Pass body
+        Fail f = Fail (makeError f)
 
 # Simplify away the ..s and .s in a String
-export def simplify path = prim "simplify"
+export def simplify (path: String): String =
+    def p s = prim "simplify"
+    p path
 
 # Concatenate two paths
 #  join "foo"  "bar"    => "foo/bar"
 #  join "foo"  "/bar "  => "/bar"
 #  join "/foo" "bar"    => "/foo/bar"
 #  join "foo"  "../bar" => "bar"
-export def in dir path =
-  if matches `/.*` path then path else simplify "{dir}/{path}"
+export def in (dir: String) (path: String): String =
+    if matches `/.*` path then
+        path
+    else
+        simplify "{dir}/{path}"
 
 # Reframe path into a form accesible relative to dir
 # For example:
 #  relative "bin" "bin/usr" => "usr"
 #  relative "bin" "bin"     => "."
 #  relative "bin" "hax"     => "../hax"
-export def relative dir path = prim "relative"
+export def relative (dir: String) (path: String): String =
+    def p d p = prim "relative"
+    p dir path
 
 # Locate an executable in the search path
-export target whichIn path exec =
-  def imp path exec = prim "search_path"
-  imp path exec
+export target whichIn (path: String) (exec: String): String =
+    def imp path exec = prim "search_path"
+    imp path exec
 
-export def which exec = whichIn path exec
+export def which (exec: String): String =
+    whichIn path exec
 
 # Absolute path to the workspace root.
 # All paths in wake are relative to the workspace root; you probably just want "."
 # The absolute path should rarely be used because it breaks build relocatability
-export def workspace = prim "workspace"
+export def workspace: String =
+    prim "workspace"
 
 # The directory within which wake was invoked (relative to the workspace root)
-export def cwd = prim "cwd"
+export def cwd: String =
+    prim "cwd"
 
-def mkdirRunner =
-  def imp m p = prim "mkdir"
-  def pre = match _
-    Fail f = Pair (Fail f) (Pair "" "")
-    Pass input = match input.getRunnerInputCommand
-      _, _, mode, dir, Nil = Pair (Pass input) (Pair mode dir)
-      _ = panic "mkdirRunner: invalid command-line"
-  def post = match _
-    Pair (Fail f) _ = Fail f
-    Pair (Pass output) (Pair smode dir) =
-      def mode = int smode | getOrElse 0x200
-      if mode < 0 || mode > 0x1ff
-      then Fail (makeError "mkdir {dir}: Invalid mode ({smode})")
-      else match (imp mode dir)
-        Fail f = Fail (makeError f)
-        Pass path = Pass (editRunnerOutputOutputs (path, _) output)
-  makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
+def mkdirRunner: Runner =
+    def imp m p = prim "mkdir"
+    def pre = match _
+        Fail f = Pair (Fail f) (Pair "" "")
+        Pass input = match input.getRunnerInputCommand
+            _, _, mode, dir, Nil = Pair (Pass input) (Pair mode dir)
+            _ = panic "mkdirRunner: invalid command-line"
+    def post = match _
+        Pair (Fail f) _ = Fail f
+        Pair (Pass output) (Pair smode dir) =
+            def mode = int smode | getOrElse 0x200
+            if mode < 0 || mode > 0x1ff then
+                Fail (makeError "mkdir {dir}: Invalid mode ({smode})")
+            else match (imp mode dir)
+                Fail f = Fail (makeError f)
+                Pass path = Pass (editRunnerOutputOutputs (path, _) output)
+    makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
 
 def mkdirImp inputs mode path =
-  makeExecPlan ("<mkdir>", "-m", "0{strbase 8 mode}", path, Nil) inputs
-  | setPlanKeep        False
-  | setPlanEnvironment Nil
-  | runJobWith mkdirRunner
-  | getJobOutput
+    makeExecPlan ("<mkdir>", "-m", "0{strbase 8 mode}", path, Nil) inputs
+    | setPlanKeep        False
+    | setPlanEnvironment Nil
+    | runJobWith mkdirRunner
+    | getJobOutput
 
 # Create a directory in the parent
-export def mkdirIn parent mode name =
-  mkdirImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify
+export def mkdirIn (parent: Path) (mode: Integer) (name: String): Path =
+    mkdirImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify
 
 # Make all every element in the directory path with mode 0775
-export def mkdir path =
-  def root = match _
-    "", x, t = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 "/{x}") t
-    x, t     = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 x) t
-    Nil      = panic "impossible"
-  path | simplify | tokenize `/` | root
+export def mkdir (path: String): Path =
+    def root = match _
+        "", x, t = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 "/{x}") t
+        x, t     = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 x) t
+        Nil      = panic "impossible"
+    path | simplify | tokenize `/` | root
 
 target writeImp inputs mode path content =
-  def writeRunner =
-    def imp m p c = prim "write"
-    def pre input = Pair input Unit
-    def post = match _
-      Pair (Fail f) _ = Fail f
-      Pair (Pass output) Unit =
-        if mode < 0 || mode > 0x1ff
-        then Fail (makeError "write {path}: Invalid mode ({strbase 8 mode})")
-        else match (imp mode path content)
-          Fail f = Fail (makeError f)
-          Pass path = Pass (editRunnerOutputOutputs (path, _) output)
-    makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
-  makeExecPlan ("<write>", str mode, path, Nil) inputs
-  | setPlanOnce        False
-  | setPlanEnvironment Nil
-  | runJobWith writeRunner
-  | getJobOutput
+    def writeRunner =
+        def imp m p c = prim "write"
+        def pre input = Pair input Unit
+        def post = match _
+            Pair (Fail f) _ = Fail f
+            Pair (Pass output) Unit =
+                if mode < 0 || mode > 0x1ff then
+                    Fail (makeError "write {path}: Invalid mode ({strbase 8 mode})")
+                else match (imp mode path content)
+                    Fail f = Fail (makeError f)
+                    Pass path = Pass (editRunnerOutputOutputs (path, _) output)
+        makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
+    makeExecPlan ("<write>", str mode, path, Nil) inputs
+    | setPlanOnce        False
+    | setPlanEnvironment Nil
+    | runJobWith writeRunner
+    | getJobOutput
 
 # Create a file with the given mode in the specified directory
-export def writeIn parent mode name content =
-  writeImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify content
+export def writeIn (parent: Path) (mode: Integer) (name: String) (content: String): Path =
+    writeImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify content
 
 # Create all directories and the named file
-export def write path content =
-  def spath = simplify path
-  def parent = simplify "{spath}/.."
-  writeImp (mkdir parent, Nil) 0664 spath content
+export def write (path: String) (content: String): Path =
+    def spath = simplify path
+    def parent = simplify "{spath}/.."
+    writeImp (mkdir parent, Nil) 0664 spath content
