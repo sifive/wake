@@ -52,17 +52,17 @@ static PRIMFN(prim_stack) {
   RETURN(claim_list(runtime.heap, objs.size(), objs.data()));
 }
 
-static PRIMTYPE(type_panic) {
+static PRIMTYPE(type_unreachable) {
   return args.size() == 1 &&
     args[0]->unify(String::typeVar);
   (void)out; // leave prim free
 }
 
-static PRIMFN(prim_panic) {
+static PRIMFN(prim_unreachable) {
   EXPECT(1);
   STRING(arg0, 0);
   std::stringstream str;
-  str << "PANIC: " << arg0->c_str() << std::endl;
+  str << "REACHED UNREACHABLE CODE: " << arg0->c_str() << std::endl;
   status_write(STREAM_ERROR, str.str());
   require_fail("", 1, runtime, scope);
 }
@@ -90,8 +90,8 @@ static PRIMFN(prim_true) {
 
 void prim_register_exception(PrimMap &pmap) {
   // These should not be evaluated in const prop, but can be removed
-  prim_register(pmap, "stack",    prim_stack, type_stack, PRIM_ORDERED);
-  prim_register(pmap, "panic",    prim_panic, type_panic, PRIM_ORDERED);
-  prim_register(pmap, "use",      prim_id,    type_id,    PRIM_IMPURE);
-  prim_register(pmap, "true",     prim_true,  type_true,  PRIM_PURE);
+  prim_register(pmap, "stack",       prim_stack,       type_stack,       PRIM_ORDERED);
+  prim_register(pmap, "unreachable", prim_unreachable, type_unreachable, PRIM_ORDERED);
+  prim_register(pmap, "use",         prim_id,          type_id,          PRIM_IMPURE);
+  prim_register(pmap, "true",        prim_true,        type_true,        PRIM_PURE);
 }
