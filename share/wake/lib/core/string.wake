@@ -71,9 +71,15 @@ export def explode (string: String): List String =
 # strbase   10    500 =  "500"
 # strbase   16  65535 = "ffff"
 # strbase (-15) 65535 = "FFFF"
-export def strbase (base: Integer) (n: Integer): String =
-    def p n s = prim "str"
-    p base n
+export def strbase (base: Integer): Option (Integer => String) =
+    def ok =
+        (  2 <= base && base <= 62) ||
+        (-36 <= base && base <= -2)
+    if ok then
+        def p n integerToFormat = prim "str"
+        Some (p base)
+    else
+        None
 
 # intbase: convert a String into an Option Integer using a given base.
 #
@@ -94,8 +100,34 @@ export def intbase (base: Integer) (stringToParse: String): Option Integer =
 #
 #   str 10   =  "10"
 #   str 0xff = "256"
-export def str (integerToFormat: Integer): String =
-    strbase 10 integerToFormat
+export def str: Integer => String =
+    require Some fn =
+        strbase 10
+    else
+        unreachable "strbase: base 10 is legal"
+    fn
+
+# strHex: format an Integer to a String in hexadecimal notation.
+#
+#   strHex 10   =  "a"
+#   strHex 0xff = "ff"
+export def strHex: Integer => String =
+    require Some fn =
+        strbase 16
+    else
+        unreachable "strbase: base 16 is legal"
+    fn
+
+# strOctal: format an Integer to a String in octal notation.
+#
+#   strOctal 10   =  "12"
+#   strOctal 0xff = "377"
+export def strOctal: Integer => String =
+    require Some fn =
+        strbase 8
+    else
+        unreachable "strbase: base 8 is legal"
+    fn
 
 # int: convert a String into an Integer with the usual prefixes.
 #

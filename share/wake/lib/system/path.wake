@@ -85,7 +85,7 @@ def mkdirRunner: Runner =
     makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
 
 def mkdirImp inputs mode path =
-    makeExecPlan ("<mkdir>", "-m", "0{strbase 8 mode}", path, Nil) inputs
+    makeExecPlan ("<mkdir>", "-m", "0{strOctal mode}", path, Nil) inputs
     | setPlanKeep        False
     | setPlanEnvironment Nil
     | runJobWith mkdirRunner
@@ -111,7 +111,7 @@ target writeImp inputs mode path content =
             Pair (Fail f) _ = Fail f
             Pair (Pass output) Unit =
                 if mode < 0 || mode > 0x1ff then
-                    Fail (makeError "write {path}: Invalid mode ({strbase 8 mode})")
+                    Fail (makeError "write {path}: Invalid mode ({strOctal mode})")
                 else match (imp mode path content)
                     Fail f = Fail (makeError f)
                     Pass path = Pass (editRunnerOutputOutputs (path, _) output)

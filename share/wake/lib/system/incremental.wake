@@ -61,7 +61,7 @@ def targz output paths =
 # all visible files are considered as inputs, since the job might not read
 # all inputs on each run, based on (for example) timestamps.
 export def runIncrementalJob (stateFileLabel: String) (reusedOutputFilterFn: Path => Boolean) (plan: Plan): Job =
-    def code = plan | getPlanHash | strbase 62
+    def code = plan | getPlanHash | strHex
     def pre  = "{stateFileLabel}-pre-{code}.tar.gz"
     def post = "{stateFileLabel}-post-{code}.tar.gz"
     def escape s = prim "shell_str"
