@@ -24,7 +24,7 @@ export def quote (str: String): RegExp =
     def res str = prim "quote"
     match (res str).stringToRegExp
         Pass x = x
-        Fail reason = unreachable "quote primitive bug: {reason}"
+        Fail error = unreachable "quote primitive bug: {error.getErrorCause}"
 
 # Concatenate a list of regular expressions.
 # The resulting regular expression must match the elements sequentially.
@@ -34,17 +34,17 @@ export def regExpCat (l: List RegExp): RegExp =
     def res = l | map regExpToString | cat | stringToRegExp
     match res
         Pass regex  = regex
-        Fail reason = unreachable "regexp parser bug post concatenation: {reason}"
+        Fail error = unreachable "regexp parser bug post concatenation: {error.getErrorCause}"
 
 # Convert a String into a Regular expression.
 # If the string is an illegal RegExp, returns Fail.
 # stringToRegExp "abc" = Pass `abc`
 # stringToRegExp "a("  = Fail (Error "missing ): a(" _)
-export def stringToRegExp (str: String): Result RegExp String =
+export def stringToRegExp (str: String): Result RegExp Error =
     def p s = prim "re2"
     match (p str)
         Pass r = Pass r
-        Fail e = Fail e
+        Fail e = failWithError e
 
 # Convert a String glob-style expression into a RegExp.
 # A glob expression has:
@@ -58,7 +58,7 @@ export def globToRegExp (glob: String): RegExp =
     def glob2regexp glob = prim "glob2regexp"
     match (glob2regexp glob).stringToRegExp
         Pass x = x
-        Fail reason = unreachable "glob primitive bug: {reason}"
+        Fail error = unreachable "glob primitive bug: {error.getErrorCause}"
 
 # Convert a regular expression into a String.
 # stringToRegExp (regExpToString x) = Pass x
