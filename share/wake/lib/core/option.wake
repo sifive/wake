@@ -85,10 +85,11 @@ export def omap (f: a => b): Option a => Option b = match _
 # omapPartial: apply partial function 'f' to the optional contents
 # A partial function returns Option; only Some cases result in a value.
 #
-#   def isOdd x = x&1 == 1
-#   def divideEven = match _
-#     x if isOdd x = None
-#     x = Some (x / 2)
+#   def divideEven x =
+#       if x&1 == 1 then
+#           None
+#       else
+#           Some (x / 2)
 #
 #   omapPartial divideEven None     = None
 #   omapPartial divideEven (Some 8) = Some 4
@@ -99,7 +100,8 @@ export def omapPartial (f: a => Option b): Option a => Option b = match _
 
 # ofilter: remove the contents of an option when `f` returns False.
 #
-#   def isEven x = x&x == 0
+#   def isEven x =
+#       x&x == 0
 #   ofilter isEven None     = None
 #   ofilter isEven (Some 7) = None
 #   ofilter isEven (Some 8) = Some 8

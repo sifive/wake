@@ -157,7 +157,7 @@ export def findPassFn (fn: a => Result pass b): List a => Result pass (List b) =
 
 # panic: tell the wake interpreter that something is impossible.
 # >>>>>> THIS FUNCTION IS NOT INTENDED TO STOP A BUILD! <<<<<<<<
-# >>>>>>>>>>>>> To report rrrors use a Result <<<<<<<<<<<<<<<<<<
+# >>>>>>>>>>>>> To report Errors use a Result <<<<<<<<<<<<<<<<<<
 #
 # # An example of a legitimate use of panic:
 # def hasUniqueMinimum list =

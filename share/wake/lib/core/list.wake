@@ -88,7 +88,7 @@ export def mapFlat (f: a => List b): (List a => List b) =
         h, t = f h ++ loop t
     loop
 
-# mapPartial: create a new List by applying a partial funciton to each element of a List.
+# mapPartial: create a new List by applying a partial function to each element of a List.
 # Partial functions can return None, in which case the result is not included in the output.
 #
 #   mapPartial int ("3", "x", "44", Nil) = 3, 44, Nil
