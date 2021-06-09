@@ -18,44 +18,48 @@ from wake import _
 
 # Require re2c >= 1.0 for flag support
 def re2cOk Unit =
-  def ver =
-    makeExecPlan (which "re2c", "--version", Nil) Nil
-    | setPlanStdout logNever
-    | setPlanStderr logNever
-    | runJob
-    | getJobStdout
-    | getWhenFail ""
-    | extract `re2c ([0-9.]+)\n`
-    | map (tokenize `\.` _)
-    | flatten
-    | map int
-  require Some x, Some y, Some z, _ = ver else False
-  x > 1 || (x == 1 && (y > 2 || (y == 2 && z >= 1)))
+    require Some x, Some y, Some z, _ =
+        makeExecPlan (which "re2c", "--version", Nil) Nil
+        | setPlanStdout logNever
+        | setPlanStderr logNever
+        | runJob
+        | getJobStdout
+        | getWhenFail ""
+        | extract `re2c ([0-9.]+)\n`
+        | map (tokenize `\.` _)
+        | flatten
+        | map int
+    else
+        False
+    x > 1 || (x == 1 && (y > 2 || (y == 2 && z >= 1)))
 
 def re2cReal file =
-  def cpp = replace `\.re$` ".cpp" file.getPathName
-  def cmdline = which "re2c", "-8", "--tags", "--no-generation-date", "--input-encoding", "utf8", file.getPathName, "-o", cpp, Nil
-  def result =
-    makeExecPlan cmdline (file, Nil)
-    | setPlanLabel "re2c {cpp}"
-    | runJob
-    | getJobOutput
-  def compress = which "gzip", "-nk9", result.getPathName, Nil
-  def zip = job compress (result, Nil)
-  match zip.getJobStatus
-    Exited 0 = result
-    Aborted e = makeBadPath e
-    z = makeBadPath (makeError "Non-zero exit status ({format z}) for '{zip.getJobDescription}'")
+    def cpp = replace `\.re$` ".cpp" file.getPathName
+    def cmdline = which "re2c", "-8", "--tags", "--no-generation-date", "--input-encoding", "utf8", file.getPathName, "-o", cpp, Nil
+    def result =
+        makeExecPlan cmdline (file, Nil)
+        | setPlanLabel "re2c {cpp}"
+        | runJob
+        | getJobOutput
+    def compress = which "gzip", "-nk9", result.getPathName, Nil
+    def zip = job compress (result, Nil)
+    match zip.getJobStatus
+        Exited 0 = result
+        Aborted e = makeBadPath e
+        z = makeBadPath (makeError "Non-zero exit status ({format z}) for '{zip.getJobDescription}'")
 
 def re2cFake file =
-  def cpp = replace `\.re$` ".cpp" file.getPathName
-  def zip = source "{cpp}.gz"
-  def script = "%
-    set -e
-    gzip -dc "%{zip.getPathName}" > "%{cpp}.tmp"
-    mv "%{cpp}.tmp" "%{cpp}"
-    %"
-  shellJob script (zip, Nil) | getJobOutput
+    def cpp = replace `\.re$` ".cpp" file.getPathName
+    def zip = source "{cpp}.gz"
+    def script = "%
+        set -e
+        gzip -dc "%{zip.getPathName}" > "%{cpp}.tmp"
+        mv "%{cpp}.tmp" "%{cpp}"
+        %"
+    shellJob script (zip, Nil) | getJobOutput
 
 def re2c file =
-  if re2cOk Unit then re2cReal file else re2cFake file
+    if re2cOk Unit then
+        re2cReal file
+    else
+        re2cFake file

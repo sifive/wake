@@ -18,7 +18,7 @@ from wake import _
 from gcc_wake import _
 
 def buildShim (Pair _ variant) =
-  def compile = compileC variant Nil (sources here `.*\.h`)
-  def cppFiles = sources here `.*\.c`
-  def objFiles = map compile cppFiles
-  linkO variant Nil objFiles "lib/wake/shim-wake"
+    def compile = compileC variant Nil (sources here `.*\.h`)
+    def cppFiles = sources here `.*\.c`
+    def objFiles = map compile cppFiles
+    linkO variant Nil objFiles "lib/wake/shim-wake"

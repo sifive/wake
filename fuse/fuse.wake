@@ -18,24 +18,24 @@ from wake import _
 from gcc_wake import _
 
 def buildFuse (Pair variant _) =
-  def json = common variant
-  def headers = json.getSysLibHeaders ++ sources "fuse" `.*\.h`
-  def client = compileC variant json.getSysLibCFlags headers (source "fuse/client.cpp")
-  def objFiles = client, buildFuseLibObjs variant
-  linkO variant json.getSysLibLFlags objFiles "bin/fuse-wake"
+    def json = common variant
+    def headers = json.getSysLibHeaders ++ sources "fuse" `.*\.h`
+    def client = compileC variant json.getSysLibCFlags headers (source "fuse/client.cpp")
+    def objFiles = client, buildFuseLibObjs variant
+    linkO variant json.getSysLibLFlags objFiles "bin/fuse-wake"
 
 def buildFuseLibObjs variant =
-  def json = common variant
-  def headers = json.getSysLibHeaders ++ sources "fuse" `.*\.h`
-  def cppFiles = sources "fuse" `(fuse|namespace|daemon_client).cpp`
-  def compile = compileC variant json.getSysLibCFlags headers
-  map compile cppFiles ++ json.getSysLibObjects
+    def json = common variant
+    def headers = json.getSysLibHeaders ++ sources "fuse" `.*\.h`
+    def cppFiles = sources "fuse" `(fuse|namespace|daemon_client).cpp`
+    def compile = compileC variant json.getSysLibCFlags headers
+    map compile cppFiles ++ json.getSysLibObjects
 
 def buildFuseDaemon (Pair variant _) =
-  def json = common variant
-  def fuse = pkgConfig "fuse" | getOrElse (makeSysLib "")
-  def deps = flattenSysLibs (json, fuse, Nil)
-  def compile = compileC variant deps.getSysLibCFlags deps.getSysLibHeaders
-  def cppFiles = source "{here}/daemon.cpp", Nil
-  def objFiles = map compile cppFiles ++ deps.getSysLibObjects
-  linkO variant deps.getSysLibLFlags objFiles "lib/wake/fuse-waked"
+    def json = common variant
+    def fuse = pkgConfig "fuse" | getOrElse (makeSysLib "")
+    def deps = flattenSysLibs (json, fuse, Nil)
+    def compile = compileC variant deps.getSysLibCFlags deps.getSysLibHeaders
+    def cppFiles = source "{here}/daemon.cpp", Nil
+    def objFiles = map compile cppFiles ++ deps.getSysLibObjects
+    linkO variant deps.getSysLibLFlags objFiles "lib/wake/fuse-waked"

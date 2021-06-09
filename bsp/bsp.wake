@@ -18,8 +18,8 @@ from wake import _
 from gcc_wake import _
 
 def buildBSP (Pair variant _) =
-  def json = common variant
-  def compile = compileC variant json.getSysLibCFlags (version_h Unit, json.getSysLibHeaders)
-  def cppFiles = source "{here}/bsp.cpp", Nil
-  def objFiles = map compile cppFiles ++ json.getSysLibObjects
-  linkO variant json.getSysLibLFlags objFiles "lib/wake/bsp-wake"
+    def json = common variant
+    def compile = compileC variant json.getSysLibCFlags (version_h Unit, json.getSysLibHeaders)
+    def cppFiles = source "{here}/bsp.cpp", Nil
+    def objFiles = map compile cppFiles ++ json.getSysLibObjects
+    linkO variant json.getSysLibLFlags objFiles "lib/wake/bsp-wake"
