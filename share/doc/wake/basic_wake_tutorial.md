@@ -4,9 +4,9 @@ This tutorial will teach you the basics of Wake language. After completeing this
 
 ### Invoking wake
 
-1. Create a folder inside `/scratch` directory. `mkdir /scratch/<your_name>/wake_tutorial`.
+1. Create a folder inside `/home` directory. `mkdir /home/<your_name>/wake_tutorial`.
 
-2. `cd` into the directory. `cd /scratch/<your_name>/wake_tutorial`.
+2. `cd` into the directory. `cd /home/<your_name>/wake_tutorial`.
 
 3. Create a wake database: `wake --init .`.After this you will see a `wake.db` file created inside the folder.
 
@@ -316,6 +316,13 @@ tuple Collection =
 `edit<tuple name><field Name>` 
 `edit` operation moidifies value to the tuple field
 
+```
+def collection = Collection 1 0.3 "example"
+def myCollectionStringValue = collection | getCollectionStringValue
+def myCollectionDoubleValue = collection | setCollectionDoubleValue 0.6
+def myCollectionIntValue    = collection | editCollectionIntValue (\x x+1)
+```
+
 ### Higher Order function
 A function which does one of the following is a higher order function
 1. Takes one or more functions as argument
@@ -475,7 +482,7 @@ def listto n = listfrom n | reverse
 
 * listodd 7 = (7,5,3,1,Nil)
 ```
-def listodd n = if(n<0) then Nil else if(n%2 ==1) then n,listodd (n-2) else n
+def listodd n = if(n<0) then Nil else if(n%2 ==1) then n,listodd (n-2) else Nil
 ```
 
 * sumenes 8 = 8+6+4+2+0 = 20
