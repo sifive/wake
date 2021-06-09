@@ -15,6 +15,7 @@
 
 package build_wake
 from wake import _
+from gcc_wake import _
 
 def loadenv = match sysname
   "Darwin" = "DYLD_INSERT_LIBRARIES"

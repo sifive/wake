@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package wake
+package gcc_wake
 
 def c11Flags      = ("-std=c++11", Nil)
 def c99Flags      = ("-std=c99", Nil)
@@ -25,25 +25,29 @@ def staticCFlags =  ("-Wall", "-O2", "-flto", Nil)
 def staticLFlags  = ("-flto", "-static", "-s", Nil)
 
 def doCompileC variant gcc flags headers cfile =
-  def obj = replace `\.c(pp)?$` ".{variant}.o" cfile.getPathName
-  def cmdline = gcc, distinctBy scmp flags ++ ("-c", cfile.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
-  makeExecPlan cmdline (cfile, headers)
-  | setPlanLabel "compile {replace `^.*/` '' gcc} {obj}"
-  | runJob
-  | getJobOutput
+    def obj = replace `\.c(pp)?$` ".{variant}.o" cfile.getPathName
+    def cmdline =
+        gcc, distinctBy scmp flags ++
+        ("-c", cfile.getPathName, "-frandom-seed={obj}", "-o", obj, Nil)
+    makeExecPlan cmdline (cfile, headers)
+    | setPlanLabel "compile {replace `^.*/` '' gcc} {obj}"
+    | runJob
+    | getJobOutput
 
 def doLinkO variant linker flags objects targ =
-  def cmdline = (linker, "-o", "{targ}.{variant}", map getPathName objects) ++ distinctBy scmp flags
-  makeExecPlan cmdline (mkdir "{targ}/..", objects)
-  | setPlanLabel "link {replace `^.*/` '' linker} {targ}"
-  | runJob
-  | getJobOutput
+    def cmdline =
+        (linker, "-o", "{targ}.{variant}", map getPathName objects) ++
+        distinctBy scmp flags
+    makeExecPlan cmdline (mkdir "{targ}/..", objects)
+    | setPlanLabel "link {replace `^.*/` '' linker} {targ}"
+    | runJob
+    | getJobOutput
 
 def makeCompileC variant gcc flags =
-  Pair variant (\extraFlags doCompileC variant gcc (flags ++ extraFlags)), Nil
+    Pair variant (\extraFlags doCompileC variant gcc (flags ++ extraFlags)), Nil
 
 def makeLinkO variant linker flags =
-  Pair variant (\extraFlags doLinkO variant linker (flags ++ extraFlags)), Nil
+    Pair variant (\extraFlags doLinkO variant linker (flags ++ extraFlags)), Nil
 
 export topic compileC: Pair String ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Path)
 publish compileC = makeCompileC "native-c99-debug"     (which "cc")  (c99Flags ++ debugCFlags)
@@ -62,11 +66,11 @@ publish linkO = makeLinkO "native-cpp11-release" (which "c++") (releaseLFlags)
 publish linkO = makeLinkO "native-cpp11-static"  (which "c++") (staticLFlags)
 
 def pickVariant variant variants =
-  match (find (variant ==* _.getPairFirst) variants)
-    Some (Pair x _) = x.getPairSecond
-    None =
-      def ok = catWith " " (map getPairFirst variants)
-      \_\_\_ makeBadPath (makeError "No variant matches {variant}; options: {ok}")
+    match (find (variant ==* _.getPairFirst) variants)
+        Some (Pair x _) = x.getPairSecond
+        None =
+            def ok = catWith " " (map getPairFirst variants)
+            \_\_\_ makeBadPath (makeError "No variant matches {variant}; options: {ok}")
 
 export def compileC variant = pickVariant variant (subscribe compileC)
 export def linkO    variant = pickVariant variant (subscribe linkO)

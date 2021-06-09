@@ -15,6 +15,7 @@
 
 package build_wake
 from wake import _
+from gcc_wake import _
 
 # Prefer to use system utf8proc if available
 def utf8proc variant = match (pkgConfig "utf8proc")
