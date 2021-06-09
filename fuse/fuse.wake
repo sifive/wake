@@ -15,6 +15,7 @@
 
 package build_wake
 from wake import _
+from gcc_wake import _
 
 def buildFuse (Pair variant _) =
   def json = common variant

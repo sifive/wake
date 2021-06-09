@@ -15,6 +15,7 @@
 
 package build_wake
 from wake import _
+from gcc_wake import _
 
 def version_h Unit =
   match (buildAs Unit)
