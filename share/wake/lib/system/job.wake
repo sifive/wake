@@ -412,6 +412,7 @@ export def fuseRunner =
   def score plan =
     if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
   makeJSONRunnerPlan fuse score
+  | editJSONRunnerPlanExtraEnv (editEnvironment "DEBUG_FUSE_WAKE" (\_ getenv "DEBUG_FUSE_WAKE"))
   | makeJSONRunner
 
 export def preloadRunner =
@@ -438,11 +439,13 @@ export def defaultRunner = match sysname
 # A plan describing how to construct a JSONRunner
 # RawScript: the path to the script to run jobs with
 # ExtraArgs: extra arguments to pass to ``RawScript``
+# ExtraEnv: environment variables to pass to the script
 # Score: runJob chooses the runner with the largest score for a Plan
 # Estimate: predict local usage based on prior recorded usage
 tuple JSONRunnerPlan =
   export RawScript: String
   export ExtraArgs: List String
+  export ExtraEnv: List String
   export Score: Plan => Result Double String
   export Estimate: Usage => Usage
 
@@ -450,13 +453,14 @@ tuple JSONRunnerPlan =
 # rawScript: String; the path to the script to run jobs with
 # score: Plan => Double; runJob chooses the runner with the largest score for a Plan
 export def makeJSONRunnerPlan rawScript score =
-  JSONRunnerPlan rawScript Nil score (_)
+  JSONRunnerPlan rawScript Nil Nil score (_)
 
 # Make a Runner that runs a named script to run jobs
 # plan: JSONRunnerPlan; a tuple containing the arguments for this function
 export def makeJSONRunner plan =
   def rawScript = plan.getJSONRunnerPlanRawScript
   def extraArgs = plan.getJSONRunnerPlanExtraArgs
+  def extraEnv = plan.getJSONRunnerPlanExtraEnv
   def score = plan.getJSONRunnerPlanScore
   def estimate = plan.getJSONRunnerPlanEstimate
 
@@ -506,7 +510,7 @@ export def makeJSONRunner plan =
             Pass inFile =
               def outFile = "{build}/{prefix}.out.json"
               def cmd = script, inFile, outFile, extraArgs
-              def proxy = RunnerInput label cmd Nil environment "." "" Nil prefix (estimate record)
+              def proxy = RunnerInput label cmd Nil (extraEnv ++ environment) "." "" Nil prefix (estimate record)
               Pair (Pass proxy) inFile
   def post = match _
     Pair (Fail f) _ = Fail f
