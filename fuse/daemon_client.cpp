@@ -46,7 +46,8 @@ bool daemon_client::connect(std::vector<std::string> &visible) {
 	for (int retry = 0; (ffd = open(is_running_path.c_str(), O_RDONLY)) == -1 && retry < 12; ++retry) {
 		pid_t pid = fork();
 		if (pid == 0) {
-			const char *env[2] = { "PATH=/usr/bin:/bin:/usr/sbin:/sbin", 0 };
+			const char *env[3] = { "PATH=/usr/bin:/bin:/usr/sbin:/sbin", 0, 0 };
+			if (getenv("DEBUG_FUSE_WAKE")) env[1] = "DEBUG_FUSE_WAKE=1";
 			execle(executable.c_str(), "fuse-waked", mount_path.c_str(), nullptr, env);
 			std::cerr << "execl " << executable << ": " << strerror(errno) << std::endl;
 			exit(1);

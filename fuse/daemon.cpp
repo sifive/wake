@@ -60,8 +60,8 @@
 #define ENOATTR ENODATA
 #endif
 
-//#define TRACE(x) do { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } while (0)
-#define TRACE(x) (void)x
+bool enable_trace = false;
+#define TRACE(x) do { if (enable_trace) { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } } while (0)
 
 // We ensure STDIN is /dev/null, so this is a safe sentinel value for open files
 #define BAD_FD STDIN_FILENO
@@ -1417,6 +1417,10 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "flock %s.log: %s\n", path.c_str(), strerror(errno));
 		}
 		goto term;
+	}
+
+	if (getenv("DEBUG_FUSE_WAKE")) {
+		enable_trace = true;
 	}
 
 	umask(0);
