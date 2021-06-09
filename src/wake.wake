@@ -18,23 +18,24 @@ from wake import _
 from gcc_wake import _
 
 def version_h Unit =
-  match (buildAs Unit)
-    Fail f = makeBadPath f
-    Pass ver = write "{here}/version.h" "#define VERSION {ver}\n"
+    match (buildAs Unit)
+        Fail f = makeBadPath f
+        Pass ver = write "{here}/version.h" "#define VERSION {ver}\n"
 
 def pkg name = match (pkgConfig name)
-  Some x = x
-  None   = makeSysLib "" | editSysLibLFlags ("-l{name}", _)
+    Some x = x
+    None   = makeSysLib "" | editSysLibLFlags ("-l{name}", _)
 
-def ncurses Unit = pkgConfig "ncurses tinfo" | getOrElseFn (\Unit pkg "ncurses")
+def ncurses Unit =
+    pkgConfig "ncurses tinfo" | getOrElseFn (\Unit pkg "ncurses")
 
 def buildWake (Pair variant clib) =
-  def internalDeps = common variant, map (_ clib) (utf8proc, gopt, Nil)
-  def externalDeps = ncurses Unit, map pkg ("sqlite3", "gmp", "re2", Nil)
-  def deps = internalDeps ++ externalDeps | flattenSysLibs
-  def reFiles = sources here `.*\.re`
-  def headerFiles = version_h Unit, deps.getSysLibHeaders ++ sources here `.*\.h`
-  def cppFiles = map re2c reFiles ++ sources here `.*\.cpp`
-  def compile = compileC variant deps.getSysLibCFlags headerFiles
-  def objFiles = map compile cppFiles ++ deps.getSysLibObjects
-  linkO variant deps.getSysLibLFlags objFiles "bin/wake"
+    def internalDeps = common variant, map (_ clib) (utf8proc, gopt, Nil)
+    def externalDeps = ncurses Unit, map pkg ("sqlite3", "gmp", "re2", Nil)
+    def deps = internalDeps ++ externalDeps | flattenSysLibs
+    def reFiles = sources here `.*\.re`
+    def headerFiles = version_h Unit, deps.getSysLibHeaders ++ sources here `.*\.h`
+    def cppFiles = map re2c reFiles ++ sources here `.*\.cpp`
+    def compile = compileC variant deps.getSysLibCFlags headerFiles
+    def objFiles = map compile cppFiles ++ deps.getSysLibObjects
+    linkO variant deps.getSysLibLFlags objFiles "bin/wake"

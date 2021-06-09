@@ -18,8 +18,8 @@ from wake import _
 from gcc_wake import _
 
 def gopt variant =
-  def cflags = "-I{here}", Nil
-  def headers = sources here `.*\.h`
-  def compile x = compileC variant cflags headers (source "{here}/{x}")
-  def objects = ("gopt.c", "gopt-errors.c", "gopt-arg.c", Nil) | map compile
-  SysLib "10.0" headers objects cflags Nil
+    def cflags = "-I{here}", Nil
+    def headers = sources here `.*\.h`
+    def compile x = compileC variant cflags headers (source "{here}/{x}")
+    def objects = ("gopt.c", "gopt-errors.c", "gopt-arg.c", Nil) | map compile
+    SysLib "10.0" headers objects cflags Nil
