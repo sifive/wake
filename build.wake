@@ -146,20 +146,7 @@ from test_wake import topic wakeTestBinary
 publish wakeTestBinary = defaultWake, Nil
 
 def defaultWake Unit =
-    require Pass variant =
-        toVariant "default"
-
     require Pass wakeVisible =
-        all variant # build wake to test
+        doInstall "tmp" "default"
 
-    def wakeShare =
-        sources "share" `.*`
-
-    require Some wakeBin =
-        wakeVisible
-        | filter (matches `bin/wake.*` _.getPathName)
-        | head
-    else
-        Fail (makeError "Wake compilation did not produce an executable to test!")
-
-    Pass (Pair wakeBin.getPathName (wakeVisible ++ wakeShare))
+    Pass (Pair "tmp/bin/wake" wakeVisible)

@@ -24,7 +24,7 @@ manifest.wake
 /lib/wake/shim-wake
 /lib/wake/shim-wake.*
 /lib/wake/libpreload-wake.*
-/install
+/tmp
 *.swp
 *.swo
 *.swn
