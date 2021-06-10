@@ -21,7 +21,6 @@
 #include <cstdint>
 
 // Return the modification timestamp in nanoseconds since 1970.
-// This function may have reduced precision on some hosts.
 // On error, returns -1 and sets errno.
 int64_t getmtime_ns(const char *file);
 

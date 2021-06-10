@@ -31,10 +31,12 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
+
 #include "json5.h"
 #include "execpath.h"
 #include "unlink.h"
 #include "rusage.h"
+#include "mtime.h"
 
 #define STR2(x) #x
 #define STR(x) STR2(x)
@@ -166,11 +168,11 @@ static void scan_shadow_tree(sset &exist, const std::string &path) {
   scan_shadow_tree(exist, "", dirfd);
 }
 
-#ifdef __APPLE__
-#define st_mtim st_mtimespec
-#endif
-
 static void compute_inout(const sset &exist, const sset &guards, const sset &visible, const struct timeval &start, svec &inputs, svec &outputs) {
+  int64_t start_ns =
+   start.tv_sec  * INT64_C(1000000000) +
+   start.tv_usec * INT64_C(1000);
+
   // First, compute exist - guards
   svec emg;
   auto e = exist.begin(), g = guards.begin();
@@ -194,14 +196,12 @@ static void compute_inout(const sset &exist, const sset &guards, const sset &vis
       std::cerr << "Visible file was deleted: " << *v << std::endl;
       exit(1);
     } else if (m->back() != '/') {
-      struct stat sbuf;
-      if (stat(m->c_str(), &sbuf) != 0) {
+      int64_t mtime_ns = getmtime_ns(m->c_str());
+      if (mtime_ns == -1) {
         std::cerr << "stat " << *m << ": " << strerror(errno) << std::endl;
         exit(1);
       }
-      if (sbuf.st_mtim.tv_sec > start.tv_sec ||
-          (sbuf.st_mtim.tv_sec == start.tv_sec &&
-           sbuf.st_mtim.tv_nsec > start.tv_usec*1000)) {
+      if (mtime_ns > start_ns) {
         outputs.emplace_back(std::move(*m));
       } else if (exist.find(makeGuard(*m)) == exist.end()) {
         inputs.emplace_back(std::move(*m));

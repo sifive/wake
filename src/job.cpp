@@ -25,6 +25,7 @@
 #include "status.h"
 #include "shell.h"
 #include "rusage.h"
+#include "mtime.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -1478,25 +1479,12 @@ static PRIMTYPE(type_add_hash) {
     out->unify(String::typeVar);
 }
 
-#ifdef __APPLE__
-#define st_mtim st_mtimespec
-#endif
-
-static long stat_mod_ns(const char *file) {
-  struct stat sbuf;
-  if (stat(file, &sbuf) != 0) return -1;
-  long modified = sbuf.st_mtim.tv_sec;
-  modified *= 1000000000L;
-  modified += sbuf.st_mtim.tv_nsec;
-  return modified;
-}
-
 static PRIMFN(prim_add_hash) {
   JobTable *jobtable = static_cast<JobTable*>(data);
   EXPECT(2);
   STRING(file, 0);
   STRING(hash, 1);
-  jobtable->imp->db->add_hash(file->as_str(), hash->as_str(), stat_mod_ns(file->c_str()));
+  jobtable->imp->db->add_hash(file->as_str(), hash->as_str(), getmtime_ns(file->c_str()));
   RETURN(args[0]);
 }
 
@@ -1510,7 +1498,7 @@ static PRIMFN(prim_get_hash) {
   JobTable *jobtable = static_cast<JobTable*>(data);
   EXPECT(1);
   STRING(file, 0);
-  std::string hash = jobtable->imp->db->get_hash(file->as_str(), stat_mod_ns(file->c_str()));
+  std::string hash = jobtable->imp->db->get_hash(file->as_str(), getmtime_ns(file->c_str()));
   RETURN(String::alloc(runtime.heap, hash));
 }
 
@@ -1523,7 +1511,7 @@ static PRIMTYPE(type_get_modtime) {
 static PRIMFN(prim_get_modtime) {
   EXPECT(1);
   STRING(file, 0);
-  MPZ out(stat_mod_ns(file->c_str()));
+  MPZ out(getmtime_ns(file->c_str()));
   RETURN(Integer::alloc(runtime.heap, out));
 }
 

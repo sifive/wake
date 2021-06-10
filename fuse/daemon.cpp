@@ -56,15 +56,6 @@
 #include "sfinae.h"
 #include "unlink.h"
 
-#ifdef __APPLE__
-#define st_mtim st_mtimespec
-#define st_ctim st_ctimespec
-#endif
-
-#ifndef ENOATTR
-#define ENOATTR ENODATA
-#endif
-
 bool enable_trace = false;
 #define TRACE(x) do { if (enable_trace) { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } } while (0)
 
