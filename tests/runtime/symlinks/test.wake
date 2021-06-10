@@ -1,0 +1,47 @@
+export def datFile Unit =
+    write "datFile" "hello world"
+
+export def goodLink Unit =
+    makeExecPlan ("ln", "-s", "datFile", "goodLink", Nil) (datFile Unit, Nil)
+    | runJob
+    | getJobOutput
+
+export def badLink Unit =
+    makeExecPlan ("ln", "-s", "badFile", "badLink", Nil) Nil
+    | runJob
+    | getJobOutput
+    | getPathResult
+
+export def shouldWork Unit =
+    makeExecPlan ("cat", "goodLink", Nil) (goodLink Unit, datFile Unit, Nil)
+    | editPlanEnvironment (setEnvironment "TEST" "1")
+    | runJob
+    | getJobInputs
+    | findFailFn getPathResult
+
+export def shouldFail1 Unit =
+    makeExecPlan ("cat", "goodLink", Nil) (goodLink Unit, Nil)
+    | editPlanEnvironment (setEnvironment "TEST" "2")
+    | runJob
+    | getJobInputs
+    | findFailFn getPathResult
+
+export def shouldFail2 Unit =
+    makeExecPlan ("cat", "goodLink", Nil) (datFile Unit, Nil)
+    | editPlanEnvironment (setEnvironment "TEST" "3")
+    | runJob
+    | getJobInputs
+    | findFailFn getPathResult
+
+export def test _ =
+    require Pass link = badLink Unit
+    require True = getPathHash link !=* "BadHash"
+    else failWithError "cannot hash a dangling symlink"
+    require Pass what = shouldWork Unit
+    require Fail _ = shouldFail1 Unit else failWithError "fail1 passed!"
+    require Fail _ = shouldFail2 Unit else failWithError "fail2 passed!"
+    require a, b, Nil = what
+    else failWithError "did not detect both inputs ({format what})"
+    require True = getPathHash a !=* getPathHash b
+    else failWithError "identical hashes should not be identical"
+    Pass 0
