@@ -613,19 +613,20 @@ int main(int argc, char **argv) {
     pass = false;
   } else {
     HeapObject *v = runtime.output.get();
-    if (verbose) {
-      std::cout << command << ": ";
-      type.format(std::cout, type);
-      std::cout << " = ";
-    }
-    if (!quiet) {
-      HeapObject::format(std::cout, v, debug, verbose?0:-1);
-      std::cout << std::endl;
-    }
     if (!v) {
       pass = false;
     } else if (Record *r = dynamic_cast<Record*>(v)) {
       if (r->cons->ast.name == "Fail") pass = false;
+    }
+    std::ostream &os = pass?(std::cout):(std::cerr);
+    if (verbose) {
+      os << command << ": ";
+      type.format(os, type);
+      os << " = ";
+    }
+    if (!quiet || !pass) {
+      HeapObject::format(os, v, debug, verbose?0:-1);
+      os << std::endl;
     }
   }
 
