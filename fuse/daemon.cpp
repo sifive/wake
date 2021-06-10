@@ -18,10 +18,15 @@
  * limitations under the License.
  */
 
+#define _XOPEN_SOURCE 700
 #define FUSE_USE_VERSION 26
 
-#ifdef linux
-#define _XOPEN_SOURCE 700
+/* Unfortunately, OS/X so far only implements issue 6.
+ * O_NOFOLLOW was added by issue 7.
+ * O_DIRECTORY was added by issue 7.
+ */
+#if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY)
+#define _DARWIN_C_SOURCE 1
 #endif
 
 #define MAX_JSON (128*1024*1024)

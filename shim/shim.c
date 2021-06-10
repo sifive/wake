@@ -17,6 +17,13 @@
 
 #define _XOPEN_SOURCE 700
 
+/* Unfortunately, OS/X so far only implements issue 6.
+ * O_NOFOLLOW was added by issue 7.
+ */
+#if !defined(O_NOFOLLOW)
+#define _DARWIN_C_SOURCE 1
+#endif
+
 /* Wake vfork exec shim */
 #include <sys/stat.h>
 #include <fcntl.h>
