@@ -21,14 +21,6 @@
 #define _XOPEN_SOURCE 700
 #define FUSE_USE_VERSION 26
 
-/* Unfortunately, OS/X so far only implements issue 6.
- * O_NOFOLLOW was added by issue 7.
- * O_DIRECTORY was added by issue 7.
- */
-#if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY)
-#define _DARWIN_C_SOURCE 1
-#endif
-
 #define MAX_JSON (128*1024*1024)
 
 #include <fuse.h>
@@ -51,10 +43,12 @@
 #include <map>
 #include <string>
 #include <sstream>
+
 #include "json5.h"
 #include "execpath.h"
 #include "sfinae.h"
 #include "unlink.h"
+#include "nofollow.h"
 
 bool enable_trace = false;
 #define TRACE(x) do { if (enable_trace) { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } } while (0)

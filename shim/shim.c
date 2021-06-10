@@ -17,13 +17,6 @@
 
 #define _XOPEN_SOURCE 700
 
-/* Unfortunately, OS/X so far only implements issue 6.
- * O_NOFOLLOW was added by issue 7.
- */
-#if !defined(O_NOFOLLOW)
-#define _DARWIN_C_SOURCE 1
-#endif
-
 /* Wake vfork exec shim */
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -34,6 +27,7 @@
 #include <errno.h>
 
 #include "blake2.h"
+#include "nofollow.h"
 
 // Can increase to 64 if needed
 #define HASH_BYTES 32

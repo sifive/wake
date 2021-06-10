@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-#include "unlink.h"
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -23,6 +22,9 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <errno.h>
+
+#include "unlink.h"
+#include "nofollow.h"
 
 int deep_unlink(int parentfd, const char *path) {
 	// Set the directory read-write-execute for removing contents.
