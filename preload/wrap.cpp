@@ -34,7 +34,7 @@
 #include "json5.h"
 #include "execpath.h"
 #include "unlink.h"
-#include "membytes.h"
+#include "rusage.h"
 
 #define STR2(x) #x
 #define STR(x) STR2(x)
@@ -316,8 +316,7 @@ int main(int argc, const char **argv) {
   }
 
   int status;
-  struct rusage rusage;
-  do wait4(pid, &status, 0, &rusage);
+  do waitpid(pid, &status, 0);
   while (WIFSTOPPED(status));
 
   if (WIFEXITED(status)) {
@@ -325,6 +324,9 @@ int main(int argc, const char **argv) {
   } else {
     status = -WTERMSIG(status);
   }
+
+  // We only ever wait for one child, so this is that child's usage
+  RUsage usage = getRUsageChildren();
 
   struct timeval stop;
   gettimeofday(&stop, 0);
@@ -346,10 +348,10 @@ int main(int argc, const char **argv) {
   bool first;
   out << "{\"usage\":{\"status\":" << status
     << ",\"runtime\":" << (stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0)
-    << ",\"cputime\":" << (rusage.ru_utime.tv_sec + rusage.ru_stime.tv_sec + (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0)
-    << ",\"membytes\":" << MEMBYTES(rusage)
-    << ",\"inbytes\":" << rusage.ru_inblock * UINT64_C(512)
-    << ",\"outbytes\":" << rusage.ru_oublock * UINT64_C(512)
+    << ",\"cputime\":" << (usage.utime + usage.stime)
+    << ",\"membytes\":" << usage.membytes
+    << ",\"inbytes\":" << usage.ibytes
+    << ",\"outbytes\":" << usage.obytes
     << "},\"inputs\":[";
 
   first = true; 

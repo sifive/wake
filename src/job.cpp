@@ -24,7 +24,7 @@
 #include "execpath.h"
 #include "status.h"
 #include "shell.h"
-#include "membytes.h"
+#include "rusage.h"
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -275,6 +275,7 @@ struct JobTable::detail {
   bool check;
   bool batch;
   struct timeval wall;
+  RUsage childrenUsage;
 
   CriticalJob critJob(double nexttime) const;
 };
@@ -812,9 +813,8 @@ bool JobTable::wait(Runtime &runtime) {
 
     int status;
     pid_t pid;
-    struct rusage rusage;
     child_ready = false;
-    while ((pid = wait4(-1, &status, WNOHANG, &rusage)) > 0) {
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
       if (WIFSTOPPED(status)) continue;
 
       ++done;
@@ -825,6 +825,10 @@ bool JobTable::wait(Runtime &runtime) {
         code = -WTERMSIG(status);
       }
 
+      RUsage totalUsage = getRUsageChildren();
+      RUsage childUsage = totalUsage - imp->childrenUsage;
+      imp->childrenUsage = totalUsage;
+
       for (auto &i : imp->running) {
         if (i.pid == pid) {
           i.pid = 0;
@@ -833,11 +837,10 @@ bool JobTable::wait(Runtime &runtime) {
           i.job->reality.found    = true;
           i.job->reality.status   = code;
           i.job->reality.runtime  = i.runtime(now);
-          i.job->reality.cputime  = (rusage.ru_utime.tv_sec  + rusage.ru_stime.tv_sec) +
-                                    (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0;
-          i.job->reality.membytes = MEMBYTES(rusage);
-          i.job->reality.ibytes   = rusage.ru_inblock * UINT64_C(512);
-          i.job->reality.obytes   = rusage.ru_oublock * UINT64_C(512);
+          i.job->reality.cputime  = childUsage.utime + childUsage.stime;
+          i.job->reality.membytes = childUsage.membytes;
+          i.job->reality.ibytes   = childUsage.ibytes;
+          i.job->reality.obytes   = childUsage.obytes;
           runtime.heap.guarantee(WJob::reserve());
           runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
 
