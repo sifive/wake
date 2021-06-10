@@ -31,9 +31,9 @@ int deep_unlink(int parentfd, const char *path) {
 	(void)ignore;
 
 	// Capture a persistent handle to the directory
-	int dirfd = openat(parentfd, path, O_RDONLY|O_DIRECTORY);
+	int dirfd = openat(parentfd, path, O_RDONLY|O_DIRECTORY|O_NOFOLLOW);
 	if (dirfd == -1) {
-		if (errno == ENOTDIR) {
+		if (errno == ENOTDIR || errno == ELOOP) {
 			// The directory became a file between readdir and openat.
 			// This should not count as failure unless we can't remove it.
 			if (unlinkat(parentfd, path, 0)) {
