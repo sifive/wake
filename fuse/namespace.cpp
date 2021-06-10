@@ -15,6 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #ifdef __linux__
 
 #include <algorithm>
@@ -495,4 +500,5 @@ bool setup_user_namespaces(
 
 	return true;
 }
+
 #endif

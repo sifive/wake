@@ -18,6 +18,7 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
 #define _XOPEN_SOURCE 700
 #define FUSE_USE_VERSION 26
 

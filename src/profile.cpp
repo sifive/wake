@@ -15,6 +15,10 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include "profile.h"
 #include "json5.h"
 #include "execpath.h"

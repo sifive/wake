@@ -17,6 +17,7 @@
 
 // Open Group Base Specifications Issue 7
 #define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
 
 #ifdef __APPLE__
 #include <mach/mach_host.h>

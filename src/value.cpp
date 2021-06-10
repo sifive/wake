@@ -15,6 +15,10 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include "value.h"
 #include "type.h"
 #include "expr.h"
