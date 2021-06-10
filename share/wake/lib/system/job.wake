@@ -603,6 +603,10 @@ target hashcode f =
       True (x, Nil) = x
       _ _ = "BadHash"
 
+export def getPathHash = match _
+  Path    x = hashcode x
+  BadPath _ = "BadHash"
+
 # Whenever possible, use 'job' if:
 #   cmd can run under FUSE
 #   cmd guarantees to produce the same outputs given the same inputs

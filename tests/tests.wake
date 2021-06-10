@@ -117,9 +117,10 @@ def runTest testScript =
         wakeToTest Unit
 
     def testJob =
-        makeExecPlan (testScript.getPathName.inTestDir, wakeBin.inTestDir, Nil) (visibleFiles ++ wakeVisible)
+        makeExecPlan ("./{testScript.getPathName.inTestDir}", wakeBin.inTestDir, Nil) (visibleFiles ++ wakeVisible)
         | setPlanDirectory testDirectory
         | setPlanLabel "testing: {testName}"
+        | setPlanLocalOnly True # On OS/X you cannot mount fuse within fuse
         | setPlanStdout logNever
         | setPlanStderr logNever
         | runJob

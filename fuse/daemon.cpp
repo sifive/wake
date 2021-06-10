@@ -18,10 +18,15 @@
  * limitations under the License.
  */
 
+#define _XOPEN_SOURCE 700
 #define FUSE_USE_VERSION 26
 
-#ifdef linux
-#define _XOPEN_SOURCE 700
+/* Unfortunately, OS/X so far only implements issue 6.
+ * O_NOFOLLOW was added by issue 7.
+ * O_DIRECTORY was added by issue 7.
+ */
+#if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY)
+#define _DARWIN_C_SOURCE 1
 #endif
 
 #define MAX_JSON (128*1024*1024)
@@ -1388,6 +1393,7 @@ int main(int argc, char *argv[])
 	sigset_t block;
 	struct sigaction sa;
 	struct fuse_args args;
+	struct flock fl;
 	pid_t pid;
 	int log, null;
 	bool madedir;
@@ -1410,15 +1416,6 @@ int main(int argc, char *argv[])
 		goto term;
 	}
 
-	if (flock(log, LOCK_EX|LOCK_NB) != 0) {
-		if (errno == EWOULDBLOCK) {
-			status = 0; // another daemon is already running
-		} else {
-			fprintf(stderr, "flock %s.log: %s\n", path.c_str(), strerror(errno));
-		}
-		goto term;
-	}
-
 	if (getenv("DEBUG_FUSE_WAKE")) {
 		enable_trace = true;
 	}
@@ -1437,6 +1434,7 @@ int main(int argc, char *argv[])
 		goto rmroot;
 	}
 
+	// Become a daemon
 	pid = fork();
 	if (pid == -1) {
 		perror("fork");
@@ -1457,6 +1455,22 @@ int main(int argc, char *argv[])
 		goto rmroot;
 	} else if (pid != 0) {
 		status = 0;
+		goto term;
+	}
+
+	// Open the logfile and use as lock on it to ensure we retain ownership
+	// This has to happen after fork (which would drop the lock)
+	memset(&fl, 0, sizeof(fl));
+	fl.l_type = F_WRLCK;
+	fl.l_whence = SEEK_SET;
+	fl.l_start = 0;
+	fl.l_len = 0; // 0=largest possible
+	if (fcntl(log, F_SETLK, &fl) != 0) {
+		if (errno == EAGAIN || errno == EACCES) {
+			status = 0; // another daemon is already running
+		} else {
+			fprintf(stderr, "flock %s.log: %s\n", path.c_str(), strerror(errno));
+		}
 		goto term;
 	}
 
@@ -1518,7 +1532,7 @@ int main(int argc, char *argv[])
 
 	if (log != STDOUT_FILENO) dup2(log, STDOUT_FILENO);
 	if (log != STDERR_FILENO) dup2(log, STDERR_FILENO);
-	if (log != STDOUT_FILENO && log != STDERR_FILENO) close(log);
+	// NOTE: We CANNOT close log, as that would release our lock
 
 	if (null != STDIN_FILENO) {
 		dup2(null, STDIN_FILENO);

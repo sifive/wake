@@ -15,6 +15,15 @@
  * limitations under the License.
  */
 
+#define _XOPEN_SOURCE 700
+
+/* Unfortunately, OS/X so far only implements issue 6.
+ * O_NOFOLLOW was added by issue 7.
+ */
+#if !defined(O_NOFOLLOW)
+#define _DARWIN_C_SOURCE 1
+#endif
+
 /* Wake vfork exec shim */
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -36,26 +45,40 @@ static int do_hash_dir() {
   return 0;
 }
 
-static int do_hash(const char *file) {
-  struct stat stat;
-  int fd, got;
-  uint8_t hash[HASH_BYTES], buffer[8192];
+static int do_hash_link(const char *link) {
   blake2b_state S;
+  uint8_t hash[HASH_BYTES];
+  size_t len = 8192;
+  char *buffer = malloc(len);
 
-  fd = open(file, O_RDONLY);
-  if (fd == -1) {
-    if (errno == EISDIR) return do_hash_dir();
-    fprintf(stderr, "hash_open: %s: %s\n", file, strerror(errno));
-    return 1;
+  ssize_t out;
+  while (len == (out = readlink(link, buffer, len))) {
+    len += len;
+    buffer = realloc(buffer, len);
   }
 
-  if (fstat(fd, &stat) != 0) {
-    if (errno == EISDIR) return do_hash_dir();
-    fprintf(stderr, "hash_fstat: %s: %s\n", file, strerror(errno));
-    return 1;
+  if (out == -1) {
+     fprintf(stderr, "shim hash readlink(%s): %s\n", link, strerror(errno));
+     free(buffer);
+     return 1;
   }
 
-  if (S_ISDIR(stat.st_mode)) return do_hash_dir();
+  blake2b_init(&S, sizeof(hash));
+  blake2b_update(&S, (uint8_t*)buffer, out);
+  blake2b_final(&S, &hash[0], sizeof(hash));
+  free(buffer);
+
+  for (int i = 0; i < (int)sizeof(hash); ++i)
+    printf("%02x", hash[i]);
+  printf("\n");
+
+  return 0;
+}
+
+static int do_hash_file(const char *file, int fd) {
+  blake2b_state S;
+  uint8_t hash[HASH_BYTES], buffer[8192];
+  ssize_t got;
 
   blake2b_init(&S, sizeof(hash));
   while ((got = read(fd, &buffer[0], sizeof(buffer))) > 0)
@@ -63,7 +86,7 @@ static int do_hash(const char *file) {
   blake2b_final(&S, &hash[0], sizeof(hash));
 
   if (got < 0) {
-    fprintf(stderr, "hash_read: %s: %s\n", file, strerror(errno));
+    fprintf(stderr, "shim hash read(%s): %s\n", file, strerror(errno));
     return 1;
   }
 
@@ -72,6 +95,30 @@ static int do_hash(const char *file) {
   printf("\n");
 
   return 0;
+}
+
+static int do_hash(const char *file) {
+  struct stat stat;
+  int fd;
+
+  fd = open(file, O_RDONLY|O_NOFOLLOW);
+  if (fd == -1) {
+    if (errno == EISDIR) return do_hash_dir();
+    if (errno == ELOOP) return do_hash_link(file);
+    fprintf(stderr, "shim hash open(%s): %s\n", file, strerror(errno));
+    return 1;
+  }
+
+  if (fstat(fd, &stat) != 0) {
+    if (errno == EISDIR) return do_hash_dir();
+    fprintf(stderr, "shim hash fstat(%s): %s\n", file, strerror(errno));
+    return 1;
+  }
+
+  if (S_ISDIR(stat.st_mode)) return do_hash_dir();
+  if (S_ISLNK(stat.st_mode)) return do_hash_link(file);
+
+  return do_hash_file(file, fd);
 }
 
 int main(int argc, char **argv) {

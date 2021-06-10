@@ -22,6 +22,7 @@
 #include "utf8.h"
 #include "gc.h"
 #include "shell.h"
+#include "unlink.h"
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -31,6 +32,7 @@
 #include <string.h>
 #include <utf8proc.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 static PRIMTYPE(type_vcat) {
   bool ok = out->unify(String::typeVar);
@@ -238,6 +240,7 @@ static PRIMFN(prim_write) {
   REQUIRE(mpz_cmp_si(mode, 0x1ff) <= 0);
   long mask = mpz_get_si(mode);
 
+  deep_unlink(AT_FDCWD, path->c_str());
   std::ofstream t(path->c_str(), std::ios_base::trunc);
   if (!t.fail()) {
     t.write(body->c_str(), body->size());
