@@ -36,7 +36,6 @@ mkdir -p %{buildroot}/var/cache/wake
 /usr/bin/preload-wake
 /usr/lib/wake
 /usr/share/wake
-/usr/build/wake
 %dir /var/cache/wake
 %doc /usr/share/doc/wake
 

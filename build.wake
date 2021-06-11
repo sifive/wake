@@ -49,7 +49,7 @@ def all variant =
 # Install wake into a target location
 def doInstall dest kind =
     require Pass variant = toVariant kind
-    def datfiles = source "{here}/build/wake/stamp", sources "{here}/share" `.*`
+    def datfiles = sources "{here}/share" `.*`
     def binfilesResult = all variant
     def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
     def datinstall = map (installIn dest ".") datfiles
