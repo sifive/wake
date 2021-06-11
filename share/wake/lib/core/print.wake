@@ -49,20 +49,33 @@ export data Colour =
     Cyan
     White
 
+export data Intensity =
+    Dim
+    Bright
+
 # makeLogLevel: define a new log level
 export def makeLogLevel (name: String) (colour: Option Colour): LogLevel =
+    makeLogLevel2 name colour None
+
+export def makeLogLevel2 (name: String) (colour: Option Colour) (intensity: Option Intensity): LogLevel =
     def set name code = prim "colour"
-    def code = match colour
-        None         = 9
-        Some Black   = 0
-        Some Red     = 1
-        Some Green   = 2
-        Some Yellow  = 3
-        Some Blue    = 4
-        Some Magenta = 5
-        Some Cyan    = 6
-        Some White   = 7
-    def _ = set name code
+    def colourCode = match colour
+        None   = 0
+        Some c = 8 + match c
+            Black   = 0
+            Red     = 1
+            Green   = 2
+            Yellow  = 3
+            Blue    = 4
+            Magenta = 5
+            Cyan    = 6
+            White   = 7
+    def intensityCode = match intensity
+        None   = 0
+        Some i = 16 * match i
+            Dim    = 1
+            Bright = 2
+    def _ = set name (colourCode+intensityCode)
     LogLevel name
 
 # The standard logging levels used in wake
@@ -75,13 +88,17 @@ export def logError: LogLevel =
 export def logWarning: LogLevel =
     makeLogLevel "warning" (Some Yellow)
 
+# logReport: logged to stdout unless run with -q
+export def logReport: LogLevel =
+    makeLogLevel "report" (Some Magenta)
+
 # logEcho: logged to stdout when run with -v
 export def logEcho: LogLevel =
     makeLogLevel "echo" None
 
 # logInfo: logged to stdout when run with -v
 export def logInfo: LogLevel =
-    makeLogLevel "info" None
+    makeLogLevel2 "info" None (Some Dim)
 
 # logDebug: logged to stdout on debug
 export def logDebug: LogLevel =
@@ -124,11 +141,11 @@ export def printlnLevel (level: LogLevel): String => Unit =
 #   # Print a diagnostic visible when run with -v
 #   def Unit = print "hello world\n"
 export def print: String => Unit =
-    printLevel logInfo
+    printLevel logReport
 
 # println: print a colourless String with a newline, visible when run with -v.
 #
 #   # Print a happy face visible when run with -v
 #   def Unit = println "{integerToUnicode 0x1f600}"
 export def println: String => Unit =
-    printlnLevel logInfo
+    printlnLevel logReport

@@ -276,6 +276,7 @@ struct JobTable::detail {
   double active, limit; // CPUs
   uint64_t phys_active, phys_limit; // memory
   long max_children; // hard cap on jobs allowed
+  bool debug;
   bool verbose;
   bool quiet;
   bool check;
@@ -322,7 +323,8 @@ bool JobTable::exit_now() {
   return exit_asap;
 }
 
-JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool check, bool batch) : imp(new JobTable::detail) {
+JobTable::JobTable(Database *db, double percent, bool debug, bool verbose, bool quiet, bool check, bool batch) : imp(new JobTable::detail) {
+  imp->debug = debug;
   imp->verbose = verbose;
   imp->quiet = quiet;
   imp->check = check;
@@ -621,7 +623,7 @@ static void launch(JobTable *jobtable) {
     if (*i.job->dir != ".") s << "cd " << i.job->dir->c_str() << "; ";
     s << pretty;
     if (!i.job->stdin_file->empty()) s << " < " << shell_escape(i.job->stdin_file->c_str());
-    if (indirect && jobtable->imp->verbose) {
+    if (indirect && jobtable->imp->debug) {
       s << " # launched by: ";
       if (task.dir != ".") s << "cd " << task.dir << "; ";
       s << pretty_cmd(task.cmdline);

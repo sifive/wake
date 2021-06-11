@@ -481,11 +481,11 @@ int main(int argc, char **argv) {
   if (notype) return ok?0:1;
 
   /* Setup logging streams */
-  if (debug   && !fd1) fd1 = "debug,info,echo,warning,error";
-  if (verbose && !fd1) fd1 = "info,echo,warning,error";
+  if (debug   && !fd1) fd1 = "debug,info,echo,report,warning,error";
+  if (verbose && !fd1) fd1 = "info,echo,report,warning,error";
   if (quiet   && !fd1) fd1 = "error";
-  if (!tty    && !fd1) fd1 = "info,echo,warning,error";
-  if (!fd1) fd1 = "warning,error";
+  if (!tty    && !fd1) fd1 = "info,echo,report,warning,error";
+  if (!fd1) fd1 = "report,warning,error";
   if (!fd2) fd2 = "error";
 
   status_set_bulk_fd(1, fd1);
@@ -495,7 +495,7 @@ int main(int argc, char **argv) {
   status_set_bulk_fd(5, fd5);
 
   /* Primitives */
-  JobTable jobtable(&db, percent, verbose, quiet, check, !tty);
+  JobTable jobtable(&db, percent, debug, verbose, quiet, check, !tty);
   StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(wake_cwd), cmdline);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 
