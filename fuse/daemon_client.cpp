@@ -46,7 +46,7 @@ daemon_client::daemon_client(const std::string &base_dir)
 // The arg 'visible' is destroyed/moved in the interest of performance with large visible lists.
 bool daemon_client::connect(std::vector<std::string> &visible) {
 	int ffd = -1;
-	useconds_t wait = 10000; /* 10ms */
+	int wait_ms = 10;
 	for (int retry = 0; (ffd = open(is_running_path.c_str(), O_RDONLY)) == -1 && retry < 12; ++retry) {
 		pid_t pid = fork();
 		if (pid == 0) {
@@ -56,8 +56,13 @@ bool daemon_client::connect(std::vector<std::string> &visible) {
 			std::cerr << "execl " << executable << ": " << strerror(errno) << std::endl;
 			exit(1);
 		}
-		usleep(wait);
-		wait <<= 1;
+
+		struct timespec delay;
+		delay.tv_sec = wait_ms / 1000;
+		delay.tv_nsec = (wait_ms % 1000) * INT64_C(1000000);
+		nanosleep(&delay, nullptr);
+
+		wait_ms <<= 1;
 
 		int status;
 		do waitpid(pid, &status, 0);

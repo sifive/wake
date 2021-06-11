@@ -231,10 +231,15 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
 			return false;
 		}
 
-		if (!equal_dev_ids(before.st_dev, after.st_dev) || (before.st_ino != after.st_ino))
+		if (!equal_dev_ids(before.st_dev, after.st_dev) || (before.st_ino != after.st_ino)) {
 			return true;
-		else
-			usleep(10000 << i); // 10ms * 2^i
+		} else {
+			int ms = 10 << i; // 10ms * 2^i
+			struct timespec delay;
+			delay.tv_sec = ms / 1000;
+			delay.tv_nsec = (ms % 1000) * INT64_C(1000000);
+			nanosleep(&delay, nullptr);
+		}
 	}
 
 	std::cerr << "squashfs mount failed: " << source << std::endl;
