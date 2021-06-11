@@ -100,7 +100,7 @@ static int do_hash(const char *file) {
   fd = open(file, O_RDONLY|O_NOFOLLOW);
   if (fd == -1) {
     if (errno == EISDIR) return do_hash_dir();
-    if (errno == ELOOP) return do_hash_link(file);
+    if (errno == ELOOP || errno == EMLINK) return do_hash_link(file);
     fprintf(stderr, "shim hash open(%s): %s\n", file, strerror(errno));
     return 1;
   }
