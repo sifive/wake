@@ -73,6 +73,9 @@ void JSONRender::explore(Expr *expr) {
       eset.insert(foo);
     }
     explore(lambda->body.get());
+  } else if (expr->type == &Ascribe::type) {
+    Ascribe *ascribe = static_cast<Ascribe*>(expr);
+    explore(ascribe->body.get());
   } else if (expr->type == &DefBinding::type) {
     DefBinding *defbinding = static_cast<DefBinding*>(expr);
     for (auto &i : defbinding->val) explore(i.get());

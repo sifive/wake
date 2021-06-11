@@ -1565,8 +1565,6 @@ static Expr *parse_block_body(Lexer &lex) {
     map->body = std::move(body);
 
     map->location.end = map->body->location.end;
-    map->flags |= FLAG_AST;
-
     map->location.start.bytes -= (map->location.start.column-1);
     map->location.start.column = 1;
 
