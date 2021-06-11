@@ -52,6 +52,7 @@
 #include "rusage.h"
 #include "mtime.h"
 #include "physmem.h"
+#include "sigwinch.h"
 
 // How many times to SIGTERM a process before SIGKILL
 #define TERM_ATTEMPTS 6
@@ -371,7 +372,7 @@ JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool 
 
   // These are handled in status.cpp
   sigaddset(&imp->block, SIGALRM);
-  sigaddset(&imp->block, SIGWINCH);
+  sigaddset(&imp->block, wake_SIGWINCH);
 
   // Determine the available file descriptor limits
   struct rlimit limit;

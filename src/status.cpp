@@ -19,8 +19,6 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "status.h"
-#include "job.h"
 #include <sstream>
 #include <unordered_map>
 #include <limits>
@@ -37,6 +35,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+
+#include "status.h"
+#include "job.h"
+#include "sigwinch.h"
 
 // How often is the status updated (should be a multiple of 2 for budget=0)
 #define REFRESH_HZ 6
@@ -306,8 +308,8 @@ void status_init()
     // watch for resize events
     sa.sa_handler = handle_SIGWINCH;
     sa.sa_flags = SA_RESTART; // interrupting pselect() is not critical for this
-    sigaction(SIGWINCH, &sa, 0);
-    handle_SIGWINCH(SIGWINCH);
+    sigaction(wake_SIGWINCH, &sa, 0);
+    handle_SIGWINCH(wake_SIGWINCH);
 
     // Setup a SIGALRM timer to trigger status redraw
     struct itimerval timer;
