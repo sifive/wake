@@ -481,23 +481,6 @@ static int wakefuse_mknod(const char *path, mode_t mode, dev_t rdev)
 #else
 		res = mkfifoat(context.rootfd, key.second.c_str(), mode);
 #endif
-#ifdef __FreeBSD__
-	} else if (S_ISSOCK(mode)) {
-		struct sockaddr_un su;
-		if (key.second.size() >= sizeof(su.sun_path))
-			return -ENAMETOOLONG;
-
-		int fd = socket(AF_UNIX, SOCK_STREAM, 0);
-		if (fd >= 0) {
-			su.sun_family = AF_UNIX;
-			strncpy(su.sun_path, key.second.c_str(), sizeof(su.sun_path));
-			res = bindat(context.rootfd, fd, (struct sockaddr*)&su, sizeof(su));
-			if (res == 0)
-				res = close(fd);
-		} else {
-			res = -1;
-		}
-#endif
 	} else {
 #ifdef __APPLE__
 		res = mknod(key.second.c_str(), mode, rdev);
