@@ -75,6 +75,16 @@ const char *term_colour(int code)
   return out;
 }
 
+const char *term_intensity(int code)
+{
+  static char dim_lit[] = "dim";
+  static char bold_lit[] = "bold";
+  if (!sgr0) return "";
+  if (code == 1) return tigetstr(dim_lit);
+  if (code == 2) return tigetstr(bold_lit);
+  return "";
+}
+
 const char *term_normal()
 {
   return sgr0?sgr0:"";
@@ -360,8 +370,12 @@ void status_write(const char *name, const char *data, int len)
   StreamSettings s = settings[name];
   if (s.fd != -1) {
     status_clear();
-    if (s.colour != TERM_DEFAULT)
-      write_all_str(s.fd, term_colour(s.colour));
+    if (s.colour != TERM_DEFAULT) {
+      int colour = s.colour % 8;
+      int intensity = s.colour / 16;
+      if (colour != TERM_DEFAULT) write_all_str(s.fd, term_colour(colour));
+      if (intensity != TERM_DEFAULT) write_all_str(s.fd, term_intensity(intensity));
+    }
     write_all(s.fd, data, len);
     if (s.colour != TERM_DEFAULT)
       write_all_str(s.fd, term_normal());
