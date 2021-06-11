@@ -54,6 +54,7 @@
 #include "mtime.h"
 #include "physmem.h"
 #include "sigwinch.h"
+#include "spawn.h"
 
 // How many times to SIGTERM a process before SIGKILL
 #define TERM_ATTEMPTS 6
@@ -601,11 +602,7 @@ static void launch(JobTable *jobtable) {
     sigemptyset(&set);
     sigaddset(&set, SIGCHLD);
     sigprocmask(SIG_UNBLOCK, &set, 0);
-    pid_t pid = vfork();
-    if (pid == 0) {
-      execve(cmdline[0], cmdline, environ);
-      _exit(127);
-    }
+    pid_t pid = wake_spawn(cmdline[0], cmdline, environ);
     sigprocmask(SIG_BLOCK, &set, 0);
 
     delete [] cmdline;
