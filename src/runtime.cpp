@@ -15,6 +15,14 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <assert.h>
+#include <sys/time.h>
+#include <signal.h>
+
 #include "runtime.h"
 #include "tuple.h"
 #include "ssa.h"
@@ -22,9 +30,6 @@
 #include "status.h"
 #include "job.h"
 #include "profile.h"
-#include <cassert>
-#include <sys/time.h>
-#include <signal.h>
 
 #define PROFILE_HZ 1000
 

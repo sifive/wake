@@ -15,10 +15,15 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <iostream>
+
 #include "datatype.h"
 #include "expr.h"
 #include "symbol.h"
-#include <iostream>
 
 Constructor Constructor::array(AST(LOCATION, "Array"));
 

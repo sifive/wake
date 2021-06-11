@@ -13,7 +13,7 @@ FUSE_CFLAGS  :=	$(shell pkg-config --silence-errors --cflags fuse)
 CORE_CFLAGS  := $(shell pkg-config --silence-errors --cflags sqlite3)	\
 		$(shell pkg-config --silence-errors --cflags gmp-6)	\
 		$(shell pkg-config --silence-errors --cflags re2)	\
-		$(shell pkg-config --silence-errors --cflags ncurses)
+		$(shell pkg-config --silence-errors --cflags-only-I ncurses)
 FUSE_LDFLAGS := $(shell pkg-config --silence-errors --libs fuse    || echo -lfuse)
 CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsqlite3)	\
 		$(shell pkg-config --silence-errors --libs gmp-6   || echo -lgmp)	\
@@ -33,7 +33,7 @@ all:		wake.db
 
 clean:
 	rm -f bin/* lib/wake/* */*.o common/jlexer.cpp src/symbol.cpp src/version.h wake.db
-	touch bin/stamp lib/wake/stamp build/wake/stamp
+	touch bin/stamp lib/wake/stamp
 
 wake.db:	bin/wake bin/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EXTRA)
 	test -f $@ || ./bin/wake --init .

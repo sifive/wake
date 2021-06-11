@@ -15,13 +15,12 @@
  * limitations under the License.
  */
 
-#include "symbol.h"
-#include "value.h"
-#include "expr.h"
-#include "parser.h"
-#include "utf8.h"
-#include "lexint.h"
-#include "gc.h"
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <utf8proc.h>
+
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -30,7 +29,14 @@
 #include <string>
 #include <vector>
 #include <iostream>
-#include <utf8proc.h>
+
+#include "symbol.h"
+#include "value.h"
+#include "expr.h"
+#include "parser.h"
+#include "utf8.h"
+#include "lexint.h"
+#include "gc.h"
 
 const char *symbolTable[] = {
   "ERROR", "ID", "OPERATOR", "LITERAL", "DEF", "VAL", "GLOBAL", "PUBLISH", "SUBSCRIBE", "PRIM", "LAMBDA",

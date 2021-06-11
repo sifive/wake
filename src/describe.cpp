@@ -15,16 +15,22 @@
  * limitations under the License.
  */
 
-#include "describe.h"
-#include "database.h"
-#include "shell.h"
-#include "execpath.h"
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <re2/re2.h>
+#include <assert.h>
+
 #include <iostream>
 #include <string>
 #include <deque>
 #include <unordered_map>
-#include <re2/re2.h>
-#include <assert.h>
+
+#include "describe.h"
+#include "database.h"
+#include "shell.h"
+#include "execpath.h"
 
 #define SHORT_HASH 8
 

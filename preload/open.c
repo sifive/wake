@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 
+// We need access to all the odd-ball functions here
 #define _GNU_SOURCE
+
 #include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>

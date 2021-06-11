@@ -15,11 +15,16 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <string.h>
+
 #include "location.h"
 #include "lexint.h"
 #include "utf8.h"
 #include "json5.h"
-#include <string.h>
 
 /*!re2c
   re2c:flags:tags = 1;

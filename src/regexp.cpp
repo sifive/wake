@@ -15,11 +15,16 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <string>
+
 #include "prim.h"
 #include "value.h"
 #include "type.h"
 #include "sfinae.h"
-#include <string>
 
 static re2::StringPiece sp(String *s) {
   return re2::StringPiece(s->c_str(), s->size());

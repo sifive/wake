@@ -1,5 +1,8 @@
-/*
+/* Add OS/X definitions missing from Open Group Base Specifications Issue 7
+ *
  * Copyright 2019 SiFive, Inc.
+ * Copyright 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
+ * Copyright 2011       Sebastian Pipping <sebastian@pipping.org>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,27 +18,10 @@
  * limitations under the License.
  */
 
-// Open Group Base Specifications Issue 7
-#define _XOPEN_SOURCE 700
-#define _POSIX_C_SOURCE 200809L
+#if !defined(O_NOFOLLOW) && defined(__APPLE__)
+#define O_NOFOLLOW 0x0100
+#endif
 
-#include "lexint.h"
-
-uint32_t lex_oct(const unsigned char *s, const unsigned char *e)
-{
-  uint32_t u = 0;
-  for (++s; s < e; ++s) u = u*8 + *s - '0';
-  return u;
-}
-
-uint32_t lex_hex(const unsigned char *s, const unsigned char *e)
-{
-  uint32_t u = 0;
-  for (s += 2; s < e; ++s) {
-    unsigned char c = *s;
-    if      (c < 'A') { u = u*16 + c - '0' +  0; continue; }
-    else if (c < 'a') { u = u*16 + c - 'A' + 10; continue; }
-    else              { u = u*16 + c - 'a' + 10; continue; }
-  }
-  return u;
-}
+#if !defined(O_DIRECTORY) && defined(__APPLE__)
+#define O_DIRECTORY 0x100000
+#endif

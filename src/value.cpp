@@ -15,6 +15,15 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <string.h>
+#include <assert.h>
+
+#include <sstream>
+
 #include "value.h"
 #include "type.h"
 #include "expr.h"
@@ -24,9 +33,6 @@
 #include "status.h"
 #include "sfinae.h"
 #include "tuple.h"
-#include <sstream>
-#include <string.h>
-#include <assert.h>
 
 void FormatState::resume() {
   stack.emplace_back(current.value, current.precedence, current.state+1);

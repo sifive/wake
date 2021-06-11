@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-#include <iostream>
-#include <string>
-#include <map>
-#include <sstream>
-#include <fstream>
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/select.h>
@@ -28,6 +27,12 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string.h>
+
+#include <iostream>
+#include <string>
+#include <map>
+#include <sstream>
+#include <fstream>
 
 #include "json5.h"
 #include "execpath.h"

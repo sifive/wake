@@ -15,10 +15,15 @@
  * limitations under the License.
  */
 
-#include "expr.h"
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include <cassert>
 #include <sstream>
 #include <iostream>
+
+#include "expr.h"
 
 Expr::~Expr() { }
 const TypeDescriptor Prim      ::type("Prim");

@@ -15,8 +15,13 @@
  * limitations under the License.
  */
 
-#include "location.h"
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include <fstream>
+
+#include "location.h"
 
 std::ostream & operator << (std::ostream &os, FileLocation location) {
   const Location *l = location.l;

@@ -15,9 +15,14 @@
  * limitations under the License.
  */
 
-#include "json5.h"
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include <string.h>
 #include <errno.h>
+
+#include "json5.h"
 
 static bool expect(SymbolJSON type, JLexer &jlex, std::ostream& errs) {
   if (jlex.next.type != type) {

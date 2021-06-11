@@ -19,23 +19,31 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "lexint.h"
+#ifdef __APPLE__
+#include <mach/mach_host.h>
+#include <mach/mach_init.h>
+#endif
 
-uint32_t lex_oct(const unsigned char *s, const unsigned char *e)
-{
-  uint32_t u = 0;
-  for (++s; s < e; ++s) u = u*8 + *s - '0';
-  return u;
-}
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-uint32_t lex_hex(const unsigned char *s, const unsigned char *e)
-{
-  uint32_t u = 0;
-  for (s += 2; s < e; ++s) {
-    unsigned char c = *s;
-    if      (c < 'A') { u = u*16 + c - '0' +  0; continue; }
-    else if (c < 'a') { u = u*16 + c - 'A' + 10; continue; }
-    else              { u = u*16 + c - 'a' + 10; continue; }
+#include "physmem.h"
+
+uint64_t get_physical_memory() {
+  uint64_t out;
+#ifdef __APPLE__
+  struct host_basic_info hostinfo;
+  mach_msg_type_number_t count = HOST_BASIC_INFO_COUNT;
+  int result = host_info(mach_host_self(), HOST_BASIC_INFO,  reinterpret_cast<host_info_t>(&hostinfo), &count);
+  if (result != KERN_SUCCESS || count != HOST_BASIC_INFO_COUNT) {
+    fprintf(stderr, "host_info failed\n");
+    exit(1);
   }
-  return u;
+  out = static_cast<uint64_t>(hostinfo.max_mem);
+#else
+  out = sysconf(_SC_PHYS_PAGES);
+  out *= sysconf(_SC_PAGESIZE);
+#endif
+  return out;
 }

@@ -15,16 +15,10 @@
  * limitations under the License.
  */
 
-#include "job.h"
-#include "prim.h"
-#include "type.h"
-#include "value.h"
-#include "database.h"
-#include "location.h"
-#include "execpath.h"
-#include "status.h"
-#include "shell.h"
-#include "membytes.h"
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -37,6 +31,7 @@
 #include <fcntl.h>
 #include <math.h>
 #include <limits.h>
+
 #include <sstream>
 #include <iostream>
 #include <list>
@@ -45,10 +40,21 @@
 #include <algorithm>
 #include <limits>
 #include <thread>
-#ifdef __APPLE__
-#include <mach/mach_host.h>
-#include <mach/mach_init.h>
-#endif
+
+#include "job.h"
+#include "prim.h"
+#include "type.h"
+#include "value.h"
+#include "database.h"
+#include "location.h"
+#include "execpath.h"
+#include "status.h"
+#include "shell.h"
+#include "rusage.h"
+#include "mtime.h"
+#include "physmem.h"
+#include "sigwinch.h"
+#include "spawn.h"
 
 // How many times to SIGTERM a process before SIGKILL
 #define TERM_ATTEMPTS 6
@@ -275,6 +281,7 @@ struct JobTable::detail {
   bool check;
   bool batch;
   struct timeval wall;
+  RUsage childrenUsage;
 
   CriticalJob critJob(double nexttime) const;
 };
@@ -324,21 +331,7 @@ JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool 
   imp->active = 0;
   imp->limit = std::thread::hardware_concurrency() * percent;
   imp->phys_active = 0;
-
-#ifdef __APPLE__
-  struct host_basic_info hostinfo;
-  mach_msg_type_number_t count = HOST_BASIC_INFO_COUNT;
-  int result = host_info(mach_host_self(), HOST_BASIC_INFO,  reinterpret_cast<host_info_t>(&hostinfo), &count);
-  if (result != KERN_SUCCESS || count != HOST_BASIC_INFO_COUNT) {
-    fprintf(stderr, "host_info failed\n");
-    exit(1);
-  }
-  imp->phys_limit = static_cast<uint64_t>(hostinfo.max_mem);
-#else
-  imp->phys_limit = sysconf(_SC_PHYS_PAGES);
-  imp->phys_limit *= sysconf(_SC_PAGESIZE);
-#endif
-  imp->phys_limit *= percent;
+  imp->phys_limit = get_physical_memory() * percent;
 
   sigemptyset(&imp->block);
 
@@ -381,7 +374,7 @@ JobTable::JobTable(Database *db, double percent, bool verbose, bool quiet, bool 
 
   // These are handled in status.cpp
   sigaddset(&imp->block, SIGALRM);
-  sigaddset(&imp->block, SIGWINCH);
+  sigaddset(&imp->block, wake_SIGWINCH);
 
   // Determine the available file descriptor limits
   struct rlimit limit;
@@ -609,11 +602,7 @@ static void launch(JobTable *jobtable) {
     sigemptyset(&set);
     sigaddset(&set, SIGCHLD);
     sigprocmask(SIG_UNBLOCK, &set, 0);
-    pid_t pid = vfork();
-    if (pid == 0) {
-      execve(cmdline[0], cmdline, environ);
-      _exit(127);
-    }
+    pid_t pid = wake_spawn(cmdline[0], cmdline, environ);
     sigprocmask(SIG_BLOCK, &set, 0);
 
     delete [] cmdline;
@@ -812,9 +801,8 @@ bool JobTable::wait(Runtime &runtime) {
 
     int status;
     pid_t pid;
-    struct rusage rusage;
     child_ready = false;
-    while ((pid = wait4(-1, &status, WNOHANG, &rusage)) > 0) {
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
       if (WIFSTOPPED(status)) continue;
 
       ++done;
@@ -825,6 +813,10 @@ bool JobTable::wait(Runtime &runtime) {
         code = -WTERMSIG(status);
       }
 
+      RUsage totalUsage = getRUsageChildren();
+      RUsage childUsage = totalUsage - imp->childrenUsage;
+      imp->childrenUsage = totalUsage;
+
       for (auto &i : imp->running) {
         if (i.pid == pid) {
           i.pid = 0;
@@ -833,11 +825,10 @@ bool JobTable::wait(Runtime &runtime) {
           i.job->reality.found    = true;
           i.job->reality.status   = code;
           i.job->reality.runtime  = i.runtime(now);
-          i.job->reality.cputime  = (rusage.ru_utime.tv_sec  + rusage.ru_stime.tv_sec) +
-                                    (rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0;
-          i.job->reality.membytes = MEMBYTES(rusage);
-          i.job->reality.ibytes   = rusage.ru_inblock * UINT64_C(512);
-          i.job->reality.obytes   = rusage.ru_oublock * UINT64_C(512);
+          i.job->reality.cputime  = childUsage.utime + childUsage.stime;
+          i.job->reality.membytes = childUsage.membytes;
+          i.job->reality.ibytes   = childUsage.ibytes;
+          i.job->reality.obytes   = childUsage.obytes;
           runtime.heap.guarantee(WJob::reserve());
           runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
 
@@ -1475,25 +1466,12 @@ static PRIMTYPE(type_add_hash) {
     out->unify(String::typeVar);
 }
 
-#ifdef __APPLE__
-#define st_mtim st_mtimespec
-#endif
-
-static long stat_mod_ns(const char *file) {
-  struct stat sbuf;
-  if (stat(file, &sbuf) != 0) return -1;
-  long modified = sbuf.st_mtim.tv_sec;
-  modified *= 1000000000L;
-  modified += sbuf.st_mtim.tv_nsec;
-  return modified;
-}
-
 static PRIMFN(prim_add_hash) {
   JobTable *jobtable = static_cast<JobTable*>(data);
   EXPECT(2);
   STRING(file, 0);
   STRING(hash, 1);
-  jobtable->imp->db->add_hash(file->as_str(), hash->as_str(), stat_mod_ns(file->c_str()));
+  jobtable->imp->db->add_hash(file->as_str(), hash->as_str(), getmtime_ns(file->c_str()));
   RETURN(args[0]);
 }
 
@@ -1507,7 +1485,7 @@ static PRIMFN(prim_get_hash) {
   JobTable *jobtable = static_cast<JobTable*>(data);
   EXPECT(1);
   STRING(file, 0);
-  std::string hash = jobtable->imp->db->get_hash(file->as_str(), stat_mod_ns(file->c_str()));
+  std::string hash = jobtable->imp->db->get_hash(file->as_str(), getmtime_ns(file->c_str()));
   RETURN(String::alloc(runtime.heap, hash));
 }
 
@@ -1520,7 +1498,7 @@ static PRIMTYPE(type_get_modtime) {
 static PRIMFN(prim_get_modtime) {
   EXPECT(1);
   STRING(file, 0);
-  MPZ out(stat_mod_ns(file->c_str()));
+  MPZ out(getmtime_ns(file->c_str()));
   RETURN(Integer::alloc(runtime.heap, out));
 }
 

@@ -15,23 +15,10 @@
  * limitations under the License.
  */
 
-#ifndef MEMBYTES_H
-#define MEMBYTES_H
+#ifndef SIGWINCH_H
+#define SIGWINCH_H
 
-#if   defined(__APPLE__)
-#define MEMBYTES(ru)	(ru.ru_maxrss)
-#elif defined(__FreeBSD__)
-#define MEMBYTES(ru)    (ru.ru_maxrss*1024)
-#elif defined(__linux__)
-#define MEMBYTES(ru)    (ru.ru_maxrss*1024)
-#elif defined(__NetBSD__)
-#define MEMBYTES(ru)    (ru.ru_maxrss*1024)
-#elif defined(__OpenBSD__)
-#define MEMBYTES(ru)    (ru.ru_maxrss*1024)
-#elif defined(__sun)
-#define MEMBYTES(ru)    (ru.ru_maxrss*getpagesize())
-#else
-#error Missing definition to access maxrss on this platform
-#endif
+// SIGWINCH is sadly not defined in any standard as yet.
+extern int wake_SIGWINCH;
 
 #endif

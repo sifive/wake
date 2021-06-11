@@ -15,10 +15,15 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <gmp.h>
+
 #include "prim.h"
 #include "type.h"
 #include "value.h"
-#include <gmp.h>
 
 #define UNOP(name, fn)				\
 static PRIMFN(prim_##name) {			\

@@ -15,6 +15,22 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <sys/stat.h>
+#include <sys/utsname.h>
+#include <errno.h>
+#include <string.h>
+#include <utf8proc.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include <sstream>
+#include <fstream>
+#include <iostream>
+
 #include "prim.h"
 #include "value.h"
 #include "type.h"
@@ -23,16 +39,6 @@
 #include "gc.h"
 #include "shell.h"
 #include "unlink.h"
-#include <sstream>
-#include <fstream>
-#include <iostream>
-#include <sys/stat.h>
-#include <sys/utsname.h>
-#include <errno.h>
-#include <string.h>
-#include <utf8proc.h>
-#include <unistd.h>
-#include <fcntl.h>
 
 static PRIMTYPE(type_vcat) {
   bool ok = out->unify(String::typeVar);

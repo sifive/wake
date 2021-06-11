@@ -15,14 +15,19 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <cstring>
+#include <iostream>
+#include <cassert>
+
 #include "type.h"
 #include "location.h"
 #include "symbol.h"
 #include "expr.h"
 #include "status.h"
-#include <cstring>
-#include <iostream>
-#include <cassert>
 
 static int globalClock = 0;
 static int globalEpoch = 1; // before a tagging pass, globalEpoch > TypeVar.epoch for all TypeVars

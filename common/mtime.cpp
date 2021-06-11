@@ -19,23 +19,20 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "lexint.h"
+// OS/X only makes st_mtimespec available as an extension
+#define _DARWIN_C_SOURCE 1
 
-uint32_t lex_oct(const unsigned char *s, const unsigned char *e)
-{
-  uint32_t u = 0;
-  for (++s; s < e; ++s) u = u*8 + *s - '0';
-  return u;
-}
+#include <sys/stat.h>
 
-uint32_t lex_hex(const unsigned char *s, const unsigned char *e)
-{
-  uint32_t u = 0;
-  for (s += 2; s < e; ++s) {
-    unsigned char c = *s;
-    if      (c < 'A') { u = u*16 + c - '0' +  0; continue; }
-    else if (c < 'a') { u = u*16 + c - 'A' + 10; continue; }
-    else              { u = u*16 + c - 'a' + 10; continue; }
-  }
-  return u;
+#include "mtime.h"
+
+#ifdef __APPLE__
+#define st_mtim st_mtimespec
+#endif
+
+int64_t getmtime_ns(const char *file) {
+  struct stat sbuf;
+  int ret = stat(file, &sbuf);
+  if (ret == -1) return -1;
+  return sbuf.st_mtim.tv_nsec*INT64_C(1000000000) + sbuf.st_mtim.tv_sec;
 }

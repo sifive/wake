@@ -15,10 +15,15 @@
  * limitations under the License.
  */
 
-#include "ssa.h"
-#include "prim.h"
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include <algorithm>
 #include <unordered_map>
+
+#include "ssa.h"
+#include "prim.h"
 
 namespace std {
   template <> struct hash<Hash> {

@@ -15,14 +15,9 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
 #define _XOPEN_SOURCE 700
-
-/* Unfortunately, OS/X so far only implements issue 6.
- * O_NOFOLLOW was added by issue 7.
- */
-#if !defined(O_NOFOLLOW)
-#define _DARWIN_C_SOURCE 1
-#endif
+#define _POSIX_C_SOURCE 200809L
 
 /* Wake vfork exec shim */
 #include <sys/stat.h>
@@ -34,6 +29,7 @@
 #include <errno.h>
 
 #include "blake2.h"
+#include "nofollow.h"
 
 // Can increase to 64 if needed
 #define HASH_BYTES 32
@@ -104,7 +100,7 @@ static int do_hash(const char *file) {
   fd = open(file, O_RDONLY|O_NOFOLLOW);
   if (fd == -1) {
     if (errno == EISDIR) return do_hash_dir();
-    if (errno == ELOOP) return do_hash_link(file);
+    if (errno == ELOOP || errno == EMLINK) return do_hash_link(file);
     fprintf(stderr, "shim hash open(%s): %s\n", file, strerror(errno));
     return 1;
   }

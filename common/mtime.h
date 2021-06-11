@@ -15,27 +15,13 @@
  * limitations under the License.
  */
 
-// Open Group Base Specifications Issue 7
-#define _XOPEN_SOURCE 700
-#define _POSIX_C_SOURCE 200809L
+#ifndef MTIME_H
+#define MTIME_H
 
-#include "lexint.h"
+#include <cstdint>
 
-uint32_t lex_oct(const unsigned char *s, const unsigned char *e)
-{
-  uint32_t u = 0;
-  for (++s; s < e; ++s) u = u*8 + *s - '0';
-  return u;
-}
+// Return the modification timestamp in nanoseconds since 1970.
+// On error, returns -1 and sets errno.
+int64_t getmtime_ns(const char *file);
 
-uint32_t lex_hex(const unsigned char *s, const unsigned char *e)
-{
-  uint32_t u = 0;
-  for (s += 2; s < e; ++s) {
-    unsigned char c = *s;
-    if      (c < 'A') { u = u*16 + c - '0' +  0; continue; }
-    else if (c < 'a') { u = u*16 + c - 'A' + 10; continue; }
-    else              { u = u*16 + c - 'a' + 10; continue; }
-  }
-  return u;
-}
+#endif

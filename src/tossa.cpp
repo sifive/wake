@@ -15,10 +15,15 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <algorithm>
+#include <cassert>
+
 #include "ssa.h"
 #include "expr.h"
-#include <algorithm>
-#include <assert.h>
 
 struct TermStack {
   Expr  *expr;

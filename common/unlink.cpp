@@ -15,7 +15,10 @@
  * limitations under the License.
  */
 
-#include "unlink.h"
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -23,6 +26,9 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <errno.h>
+
+#include "unlink.h"
+#include "nofollow.h"
 
 int deep_unlink(int parentfd, const char *path) {
 	// Set the directory read-write-execute for removing contents.
@@ -33,7 +39,7 @@ int deep_unlink(int parentfd, const char *path) {
 	// Capture a persistent handle to the directory
 	int dirfd = openat(parentfd, path, O_RDONLY|O_DIRECTORY|O_NOFOLLOW);
 	if (dirfd == -1) {
-		if (errno == ENOTDIR || errno == ELOOP) {
+		if (errno == ENOTDIR || errno == ELOOP || errno == EMLINK) {
 			// The directory became a file between readdir and openat.
 			// This should not count as failure unless we can't remove it.
 			if (unlinkat(parentfd, path, 0)) {

@@ -15,27 +15,19 @@
  * limitations under the License.
  */
 
-// Open Group Base Specifications Issue 7
-#define _XOPEN_SOURCE 700
-#define _POSIX_C_SOURCE 200809L
+// vfork is a deprecated API in POSIX, but is defined in BSD
+#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 
-#include "lexint.h"
+#include <unistd.h>
 
-uint32_t lex_oct(const unsigned char *s, const unsigned char *e)
-{
-  uint32_t u = 0;
-  for (++s; s < e; ++s) u = u*8 + *s - '0';
-  return u;
-}
+#include "spawn.h"
 
-uint32_t lex_hex(const unsigned char *s, const unsigned char *e)
-{
-  uint32_t u = 0;
-  for (s += 2; s < e; ++s) {
-    unsigned char c = *s;
-    if      (c < 'A') { u = u*16 + c - '0' +  0; continue; }
-    else if (c < 'a') { u = u*16 + c - 'A' + 10; continue; }
-    else              { u = u*16 + c - 'a' + 10; continue; }
+pid_t wake_spawn(const char *cmd, char **cmdline, char **environ) {
+  pid_t pid = vfork();
+  if (pid == 0) {
+    execve(cmdline[0], cmdline, environ);
+    _exit(127);
   }
-  return u;
+  return pid;
 }

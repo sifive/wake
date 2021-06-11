@@ -18,18 +18,9 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
 #define _XOPEN_SOURCE 700
 #define FUSE_USE_VERSION 26
-
-/* Unfortunately, OS/X so far only implements issue 6.
- * O_NOFOLLOW was added by issue 7.
- * O_DIRECTORY was added by issue 7.
- */
-#if !defined(O_NOFOLLOW) || !defined(O_DIRECTORY)
-#define _DARWIN_C_SOURCE 1
-#endif
-
-#define MAX_JSON (128*1024*1024)
 
 #include <fuse.h>
 #include <stdio.h>
@@ -43,7 +34,6 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
-#include <sys/file.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 
@@ -51,19 +41,14 @@
 #include <map>
 #include <string>
 #include <sstream>
+
 #include "json5.h"
 #include "execpath.h"
-#include "sfinae.h"
 #include "unlink.h"
+#include "utimens.h"
+#include "nofollow.h"
 
-#ifdef __APPLE__
-#define st_mtim st_mtimespec
-#define st_ctim st_ctimespec
-#endif
-
-#ifndef ENOATTR
-#define ENOATTR ENODATA
-#endif
+#define MAX_JSON (128*1024*1024)
 
 bool enable_trace = false;
 #define TRACE(x) do { if (enable_trace) { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } } while (0)
@@ -495,23 +480,6 @@ static int wakefuse_mknod(const char *path, mode_t mode, dev_t rdev)
 		res = mkfifo(key.second.c_str(), mode);
 #else
 		res = mkfifoat(context.rootfd, key.second.c_str(), mode);
-#endif
-#ifdef __FreeBSD__
-	} else if (S_ISSOCK(mode)) {
-		struct sockaddr_un su;
-		if (key.second.size() >= sizeof(su.sun_path))
-			return -ENAMETOOLONG;
-
-		int fd = socket(AF_UNIX, SOCK_STREAM, 0);
-		if (fd >= 0) {
-			su.sun_family = AF_UNIX;
-			strncpy(su.sun_path, key.second.c_str(), sizeof(su.sun_path));
-			res = bindat(context.rootfd, fd, (struct sockaddr*)&su, sizeof(su));
-			if (res == 0)
-				res = close(fd);
-		} else {
-			res = -1;
-		}
 #endif
 	} else {
 #ifdef __APPLE__
@@ -974,37 +942,6 @@ static int wakefuse_truncate(const char *path, off_t size)
 	}
 }
 
-template <typename T>
-struct has_utimensat {
-	typedef char no;
-	static struct timespec ts[2];
-	template <typename C>
-	static auto test(C c) -> decltype(utimensat(c, "", ts, 0));
-	template <typename>
-	static no test(...);
-	static const bool value = sizeof(test<int>(0)) != sizeof(no);
-};
-
-template <typename T>
-static typename enable_if<has_utimensat<T>::value, int>::type
-maybe_utimensat(T dirfd, const char *path, const struct timespec timens[2]) {
-	return utimensat(dirfd, path, timens, AT_SYMLINK_NOFOLLOW);
-}
-
-template <typename T>
-static typename enable_if<!has_utimensat<T>::value, int>::type
-maybe_utimensat(T dirfd, const char *path, const struct timespec timens[2]) {
-	int fd = openat(dirfd, path, O_RDONLY | O_NOFOLLOW);
-	struct timeval times[2];
-	times[0].tv_sec = timens[0].tv_sec;
-	times[1].tv_sec = timens[1].tv_sec;
-	times[0].tv_usec = timens[0].tv_nsec / 1000;
-	times[1].tv_usec = timens[1].tv_nsec / 1000;
-	int out = futimes(fd, times);
-	close(fd);
-	return out;
-}
-
 static int wakefuse_utimens(const char *path, const struct timespec ts[2])
 {
 	TRACE(path);
@@ -1029,7 +966,7 @@ static int wakefuse_utimens(const char *path, const struct timespec ts[2])
 	if (!it->second.is_writeable(key.second))
 		return -EACCES;
 
-	int res = maybe_utimensat(context.rootfd, key.second.c_str(), ts);
+	int res = wake_utimensat(context.rootfd, key.second.c_str(), ts);
 	if (res == -1)
 		return -errno;
 

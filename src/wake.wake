@@ -27,7 +27,9 @@ def pkg name = match (pkgConfig name)
     None   = makeSysLib "" | editSysLibLFlags ("-l{name}", _)
 
 def ncurses Unit =
-    pkgConfig "ncurses tinfo" | getOrElseFn (\Unit pkg "ncurses")
+    pkgConfig "ncurses tinfo"
+    | getOrElseFn (\Unit pkg "ncurses")
+    | editSysLibCFlags (filter (matches `-I.*` _)) # remove feature test manipulation
 
 def buildWake (Pair variant clib) =
     def internalDeps = common variant, map (_ clib) (utf8proc, gopt, Nil)

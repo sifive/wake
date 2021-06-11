@@ -15,8 +15,13 @@
  * limitations under the License.
  */
 
-#include "utf8.h"
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include <string>
+
+#include "utf8.h"
 
 enum
 {

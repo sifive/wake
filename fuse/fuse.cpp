@@ -16,6 +16,10 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -25,6 +29,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -32,7 +37,7 @@
 #include "fuse.h"
 #include "json5.h"
 #include "execpath.h"
-#include "membytes.h"
+#include "rusage.h"
 #include "namespace.h"
 #include "shell.h"
 
@@ -93,15 +98,15 @@ static int execve_wrapper(const std::vector<std::string> &command, const std::ve
 }
 
 
-bool collect_result_metadata(
+static bool collect_result_metadata(
 	const std::string daemon_output,
 	const struct timeval &start,
 	const struct timeval &stop,
 	const pid_t pid,
 	const int status,
-	const struct rusage &rusage,
-	std::string &result_json
-){
+	const RUsage &rusage,
+	std::string &result_json)
+{
 	JAST from_daemon;
 	std::stringstream ss;
 	if (!JAST::parse(daemon_output, ss, from_daemon)) {
@@ -113,13 +118,11 @@ bool collect_result_metadata(
 	JAST result_jast(JSON_OBJECT);
 	auto& usage = result_jast.add("usage", JSON_OBJECT);
 	usage.add("status", status);
-	usage.add("membytes", MEMBYTES(rusage));
+	usage.add("membytes", static_cast<long long>(rusage.membytes));
 	usage.add("inbytes", std::stoll(from_daemon.get("ibytes").value));
 	usage.add("outbytes", std::stoll(from_daemon.get("obytes").value));
 	usage.add("runtime", stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0);
-	usage.add("cputime",
-		rusage.ru_utime.tv_sec + rusage.ru_stime.tv_sec +
-		(rusage.ru_utime.tv_usec + rusage.ru_stime.tv_usec)/1000000.0);
+	usage.add("cputime", rusage.utime + rusage.stime);
 
 	result_jast.add("inputs", JSON_ARRAY).children = std::move(from_daemon.get("inputs").children);
 	result_jast.add("outputs", JSON_ARRAY).children = std::move(from_daemon.get("outputs").children);
@@ -208,8 +211,7 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
 	(void)close(STDOUT_FILENO);
 	(void)close(STDERR_FILENO);
 
-	struct rusage rusage;
-	do wait4(pid, &status, 0, &rusage);
+	do waitpid(pid, &status, 0);
 	while (WIFSTOPPED(status));
 
 	if (WIFEXITED(status)) {
@@ -218,11 +220,14 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
 		status = -WTERMSIG(status);
 	}
 
+	// We only ever wait for one child, so this is that child's usage
+	RUsage usage = getRUsageChildren();
+
 	struct timeval stop;
 	gettimeofday(&stop, 0);
 
 	std::string output;
 	args.daemon.disconnect(output);
 
-	return collect_result_metadata(output, start, stop, pid, status, rusage, result_json);
+	return collect_result_metadata(output, start, stop, pid, status, usage, result_json);
 }

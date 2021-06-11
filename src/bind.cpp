@@ -15,11 +15,10 @@
  * limitations under the License.
  */
 
-#include "bind.h"
-#include "expr.h"
-#include "prim.h"
-#include "symbol.h"
-#include "parser.h"
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include <iostream>
 #include <vector>
 #include <map>
@@ -28,6 +27,12 @@
 #include <list>
 #include <cassert>
 #include <algorithm>
+
+#include "bind.h"
+#include "expr.h"
+#include "prim.h"
+#include "symbol.h"
+#include "parser.h"
 
 typedef std::map<std::string, int> NameIndex;
 

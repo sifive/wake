@@ -15,11 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #ifdef __linux__
 
-#include <algorithm>
-#include <fstream>
-#include <iostream>
 #include <errno.h>
 #include <fcntl.h>
 #include <sched.h>
@@ -31,6 +33,10 @@
 #include <sys/syscall.h>
 #include <sys/sysmacros.h>
 #include <sys/wait.h>
+
+#include <algorithm>
+#include <fstream>
+#include <iostream>
 
 #include "fuse.h"
 #include "json5.h"
@@ -226,10 +232,15 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
 			return false;
 		}
 
-		if (!equal_dev_ids(before.st_dev, after.st_dev) || (before.st_ino != after.st_ino))
+		if (!equal_dev_ids(before.st_dev, after.st_dev) || (before.st_ino != after.st_ino)) {
 			return true;
-		else
-			usleep(10000 << i); // 10ms * 2^i
+		} else {
+			int ms = 10 << i; // 10ms * 2^i
+			struct timespec delay;
+			delay.tv_sec = ms / 1000;
+			delay.tv_nsec = (ms % 1000) * INT64_C(1000000);
+			nanosleep(&delay, nullptr);
+		}
 	}
 
 	std::cerr << "squashfs mount failed: " << source << std::endl;
@@ -495,4 +506,5 @@ bool setup_user_namespaces(
 
 	return true;
 }
+
 #endif

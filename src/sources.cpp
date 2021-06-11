@@ -15,13 +15,9 @@
  * limitations under the License.
  */
 
-#include "sources.h"
-#include "prim.h"
-#include "primfn.h"
-#include "type.h"
-#include "value.h"
-#include "execpath.h"
-#include "datatype.h"
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
 
 #include <re2/re2.h>
 #include <sys/types.h>
@@ -33,11 +29,20 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
+
 #include <cstring>
 #include <sstream>
 #include <fstream>
 #include <iostream>
 #include <algorithm>
+
+#include "sources.h"
+#include "prim.h"
+#include "primfn.h"
+#include "type.h"
+#include "value.h"
+#include "execpath.h"
+#include "datatype.h"
 
 bool make_workspace(const std::string &dir) {
   if (chdir(dir.c_str()) != 0) return false;

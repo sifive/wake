@@ -15,6 +15,17 @@
  * limitations under the License.
  */
 
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <cstdlib>
+#include <sstream>
+#include <iosfwd>
+#include <unordered_map>
+#include <bitset>
+#include <cassert>
+
 #include "prim.h"
 #include "value.h"
 #include "ssa.h"
@@ -23,12 +34,6 @@
 #include "location.h"
 #include "parser.h"
 #include "status.h"
-#include <cstdlib>
-#include <sstream>
-#include <iosfwd>
-#include <unordered_map>
-#include <bitset>
-#include <cassert>
 
 void require_fail(const char *message, unsigned size, Runtime &runtime, const Scope *scope) {
   std::stringstream ss;

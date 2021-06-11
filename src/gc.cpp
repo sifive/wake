@@ -15,16 +15,22 @@
  * limitations under the License.
  */
 
-#include "gc.h"
-#include "status.h"
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+
 #include <sstream>
 #include <iomanip>
 #include <map>
 #include <vector>
 #include <algorithm>
+
+#include "gc.h"
+#include "status.h"
 
 #define INITIAL_HEAP_SIZE 1024
 
