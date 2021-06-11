@@ -891,7 +891,6 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     std::unique_ptr<Match> m(static_cast<Match*>(expr.release()));
     auto out = rebind_match(name, binding, std::move(m));
     if (!out) return out;
-    out->flags |= FLAG_AST;
     return fracture(top, anon, name, std::move(out), binding);
   } else if (expr->type == &Destruct::type) {
     Destruct *app = static_cast<Destruct*>(expr.get());
