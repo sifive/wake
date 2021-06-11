@@ -19,6 +19,9 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <sstream>
+#include <unordered_map>
+
 #include "prim.h"
 #include "datatype.h"
 #include "type.h"
@@ -27,8 +30,6 @@
 #include "type.h"
 #include "status.h"
 #include "expr.h"
-#include <sstream>
-#include <unordered_map>
 
 struct TargetValue {
   Hash subhash;

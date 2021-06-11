@@ -24,6 +24,7 @@
 
 #include <sys/resource.h>
 #include <assert.h>
+
 #include "rusage.h"
 
 RUsage::RUsage() : utime(0), stime(0), ibytes(0), obytes(0), membytes(0) { }

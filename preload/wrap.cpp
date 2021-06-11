@@ -20,12 +20,6 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <algorithm>
-#include <string>
-#include <set>
-#include <vector>
-#include <iostream>
-#include <fstream>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/time.h>
@@ -35,6 +29,13 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
+
+#include <algorithm>
+#include <string>
+#include <set>
+#include <vector>
+#include <iostream>
+#include <fstream>
 
 #include "json5.h"
 #include "execpath.h"

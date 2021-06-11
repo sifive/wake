@@ -20,14 +20,15 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdio.h>
 
 #include "execpath.h"
 #include "fuse.h"

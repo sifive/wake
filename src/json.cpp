@@ -19,14 +19,16 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <assert.h>
+
+#include <limits>
+#include <sstream>
+
 #include "json5.h"
 #include "prim.h"
 #include "expr.h"
 #include "value.h"
 #include "parser.h"
-#include <limits>
-#include <sstream>
-#include <assert.h>
 
 typedef std::numeric_limits<double> dlimits;
 static double nan() { return dlimits::quiet_NaN(); }

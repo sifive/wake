@@ -19,10 +19,11 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "tuple.h"
-#include "ssa.h"
 #include <sstream>
 #include <unordered_map>
+
+#include "tuple.h"
+#include "ssa.h"
 
 void Promise::awaken(Runtime &runtime, HeapObject *obj) {
 #ifdef DEBUG_GC

@@ -23,6 +23,7 @@
 #define _DARWIN_C_SOURCE 1
 
 #include <sys/stat.h>
+
 #include "mtime.h"
 
 #ifdef __APPLE__

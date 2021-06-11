@@ -19,14 +19,16 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "execpath.h"
-#include "whereami.h"
 #include <unistd.h>
 #include <errno.h>
+#include <string.h>
+
 #include <memory>
 #include <vector>
 #include <iostream>
-#include <string.h>
+
+#include "execpath.h"
+#include "whereami.h"
 
 std::string find_execpath() {
   static std::string exepath;

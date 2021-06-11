@@ -19,9 +19,11 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "shell.h"
-#include <sstream>
 #include <string.h>
+
+#include <sstream>
+
+#include "shell.h"
 
 // There are more special than non-special characters with the shell.
 static bool not_special(char c) {

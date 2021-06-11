@@ -19,14 +19,16 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <stdlib.h>
+
+#include <sstream>
+
 #include "prim.h"
 #include "value.h"
 #include "type.h"
 #include "status.h"
 #include "location.h"
 #include "expr.h"
-#include <stdlib.h>
-#include <sstream>
 
 static PRIMTYPE(type_stack) {
   TypeVar list;

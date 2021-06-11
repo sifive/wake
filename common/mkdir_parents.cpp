@@ -19,11 +19,12 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
+
+#include <string>
 
 // Creates a directory and any missing parent directories.
 // Does not error on directory already existing.

@@ -19,10 +19,11 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "expr.h"
 #include <cassert>
 #include <sstream>
 #include <iostream>
+
+#include "expr.h"
 
 Expr::~Expr() { }
 const TypeDescriptor Prim      ::type("Prim");

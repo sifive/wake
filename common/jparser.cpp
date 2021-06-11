@@ -19,9 +19,10 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "json5.h"
 #include <string.h>
 #include <errno.h>
+
+#include "json5.h"
 
 static bool expect(SymbolJSON type, JLexer &jlex, std::ostream& errs) {
   if (jlex.next.type != type) {

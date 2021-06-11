@@ -19,10 +19,6 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <sstream>
-#include <unordered_map>
-#include <limits>
-#include <iomanip>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <signal.h>
@@ -35,6 +31,11 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+
+#include <sstream>
+#include <unordered_map>
+#include <limits>
+#include <iomanip>
 
 #include "status.h"
 #include "job.h"

@@ -19,11 +19,6 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "bind.h"
-#include "expr.h"
-#include "prim.h"
-#include "symbol.h"
-#include "parser.h"
 #include <iostream>
 #include <vector>
 #include <map>
@@ -32,6 +27,12 @@
 #include <list>
 #include <cassert>
 #include <algorithm>
+
+#include "bind.h"
+#include "expr.h"
+#include "prim.h"
+#include "symbol.h"
+#include "parser.h"
 
 typedef std::map<std::string, int> NameIndex;
 

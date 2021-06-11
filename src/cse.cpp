@@ -19,10 +19,11 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "ssa.h"
-#include "prim.h"
 #include <algorithm>
 #include <unordered_map>
+
+#include "ssa.h"
+#include "prim.h"
 
 namespace std {
   template <> struct hash<Hash> {

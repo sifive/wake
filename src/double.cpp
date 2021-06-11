@@ -19,13 +19,15 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "prim.h"
-#include "type.h"
-#include "value.h"
+#include <gmp.h>
+
 #include <cmath>
 #include <ctgmath>
 #include <cstdlib>
-#include <gmp.h>
+
+#include "prim.h"
+#include "type.h"
+#include "value.h"
 
 static PRIMTYPE(type_unop) {
   return args.size() == 1 &&

@@ -22,9 +22,6 @@
 
 #ifdef __linux__
 
-#include <algorithm>
-#include <fstream>
-#include <iostream>
 #include <errno.h>
 #include <fcntl.h>
 #include <sched.h>
@@ -36,6 +33,10 @@
 #include <sys/syscall.h>
 #include <sys/sysmacros.h>
 #include <sys/wait.h>
+
+#include <algorithm>
+#include <fstream>
+#include <iostream>
 
 #include "fuse.h"
 #include "json5.h"

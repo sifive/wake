@@ -19,14 +19,16 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <assert.h>
+
+#include <set>
+#include <vector>
+#include <fstream>
+
 #include "markup.h"
 #include "expr.h"
 #include "execpath.h"
 #include "json5.h"
-#include <set>
-#include <vector>
-#include <fstream>
-#include <assert.h>
 
 struct ParanOrder {
   bool operator () (Expr *a, Expr *b) const {

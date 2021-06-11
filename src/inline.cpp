@@ -19,10 +19,12 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <assert.h>
+
+#include <unordered_map>
+
 #include "ssa.h"
 #include "runtime.h"
-#include <unordered_map>
-#include <assert.h>
 
 struct DeepHash {
   Runtime *runtime;

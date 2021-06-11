@@ -19,15 +19,17 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "database.h"
-#include "status.h"
+#include <sqlite3.h>
+#include <unistd.h>
+#include <string.h>
+
 #include <unordered_set>
 #include <iostream>
 #include <sstream>
 #include <set>
-#include <sqlite3.h>
-#include <unistd.h>
-#include <string.h>
+
+#include "database.h"
+#include "status.h"
 
 // Increment every time the database schema changes
 #define SCHEMA_VERSION "1"

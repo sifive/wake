@@ -22,8 +22,6 @@
 #define _XOPEN_SOURCE 700
 #define FUSE_USE_VERSION 26
 
-#define MAX_JSON (128*1024*1024)
-
 #include <fuse.h>
 #include <stdio.h>
 #include <string.h>
@@ -49,6 +47,8 @@
 #include "unlink.h"
 #include "utimens.h"
 #include "nofollow.h"
+
+#define MAX_JSON (128*1024*1024)
 
 bool enable_trace = false;
 #define TRACE(x) do { if (enable_trace) { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } } while (0)

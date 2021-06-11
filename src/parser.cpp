@@ -19,14 +19,15 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <iostream>
+#include <sstream>
+#include <set>
+
 #include "parser.h"
 #include "expr.h"
 #include "symbol.h"
 #include "value.h"
 #include "location.h"
-#include <iostream>
-#include <sstream>
-#include <set>
 
 //#define TRACE(x) do { fprintf(stderr, "%s\n", x); } while (0)
 #define TRACE(x) do { } while (0)

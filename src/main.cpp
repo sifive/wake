@@ -19,19 +19,14 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#ifndef VERSION
-#include "version.h"
-#endif
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-#define VERSION_STR TOSTRING(VERSION)
+#include <inttypes.h>
+#include <stdlib.h>
 
 #include <iostream>
 #include <sstream>
 #include <random>
 #include <set>
-#include <inttypes.h>
-#include <stdlib.h>
+
 #include "parser.h"
 #include "bind.h"
 #include "symbol.h"
@@ -49,6 +44,13 @@
 #include "describe.h"
 #include "profile.h"
 #include "ssa.h"
+
+#ifndef VERSION
+#include "version.h"
+#endif
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define VERSION_STR TOSTRING(VERSION)
 
 void print_help(const char *argv0) {
   std::cout << std::endl

@@ -19,13 +19,14 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <cassert>
+
 #include "prim.h"
 #include "datatype.h"
 #include "type.h"
 #include "value.h"
 #include "expr.h"
 #include "type.h"
-#include <cassert>
 
 static const TypeVar arrayT("Array@builtin", 1);
 
