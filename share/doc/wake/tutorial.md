@@ -615,7 +615,7 @@ You should see something like:
     $ wake deniedRead
     Fail (Error "read denied.txt: Permission denied" Nil)
     $ wake badRead
-    Fail (Error "nonexisting.txt: source does not exist" Nil)
+    Fail (Error "nonexisting.txt: not a source file" Nil)
 
 Similarly to how we can `match` on `Options`, we can `match` on `Results`
 
@@ -647,7 +647,7 @@ but we immediately called `read` on the returned `Path`. Try just `source`:
 
     wake -x 'source "nonexisting.txt"'
 
-You should get `BadPath (Error "nonexisting.txt: source does not exist" Nil)`.
+You should get `BadPath (Error "nonexisting.txt: not a source file" Nil)`.
 Similarly to how `Result` can be either a `Pass` or a `Fail`,
 a `Path` can be either a `Path` or a `BadPath`.
 While this is technically redundant since `Result` could accomplish the same functionality,
@@ -671,14 +671,14 @@ propagate the failure.
 
 Since the `source` will return a `BadPath`, the job will propagate the failure:
 
-    BadPath (Error "file.c: source does not exist" Nil), Nil
+    BadPath (Error "file.c: not a source file" Nil), Nil
 
 This means that when passing the outputs from one job to another,
 you don't have to worry about jobs failing, wake will handle it for you!
 
 You may have noticed that the `BadPath` above contains a type called `Error`.
 `Error` is a type that contains a `String` "cause", and a `List` of `Strings` stack trace.
-You'll notice the cause is `"file.c: source does not exist"`, but the stack is just `Nil`.
+You'll notice the cause is `"file.c: not a source file"`, but the stack is just `Nil`.
 Wake does not actually maintain a call stack like traditional languages,
 so by default `Errors` will contain an empty `List` for the stack.
 If you run wake with `-d` (or `--debug`), it will simulate a stack:

@@ -38,7 +38,7 @@ def raw_source file =
     def get_modtime file = prim "get_modtime"
     def time = get_modtime file
     if time == -1 then
-        makeBadPath (makeError "{file}: source does not exist")
+        makeBadPath (makeError "{file}: source does not exist. Did you delete it or move it without telling git?")
     else
         makeExecPlan ("<source>", str time, file, Nil) Nil
         | setPlanShare       False
