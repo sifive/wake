@@ -37,7 +37,7 @@ export def install = match _
 
 # Build all wake targets
 def targets =
-    def allPlatforms = buildWake, buildFuse, buildFuseDaemon, buildShim, buildPreload, buildPrelib, buildBSP, Nil
+    def allPlatforms = buildWake, buildFuse, buildFuseDaemon, buildShim, buildPreload, buildPrelib, buildBSP, buildLSP, Nil
     def linuxOnly = buildWakeBox, Nil
     match sysname
         "Linux" = allPlatforms ++ linuxOnly
