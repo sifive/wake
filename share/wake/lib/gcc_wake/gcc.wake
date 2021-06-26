@@ -35,13 +35,20 @@ def doCompileC variant gcc flags headers cfile =
     | getJobOutput
 
 def doLinkO variant linker flags objects targ =
+    def output = "{targ}.{variant}"
     def cmdline =
-        (linker, "-o", "{targ}.{variant}", map getPathName objects) ++
+        (linker, "-o", output, map getPathName objects) ++
         distinctBy scmp flags
-    makeExecPlan cmdline (mkdir "{targ}/..", objects)
-    | setPlanLabel "link {replace `^.*/` '' linker} {targ}"
-    | runJob
-    | getJobOutput
+    def outputPaths =
+        makeExecPlan cmdline (mkdir "{targ}/..", objects)
+        | setPlanLabel "link {replace `^.*/` '' linker} {targ}"
+        | runJob
+        | getJobOutputs
+        | filter (matches output.quote _.getPathName)
+    match outputPaths
+        Nil = makeBadPath (makeError "Expected linker output not found")
+        x, Nil = x
+        _ = unreachable "two Paths cannot be identical"
 
 export def makeCompileC variant gcc flags =
     Pair variant (\extraFlags doCompileC variant gcc (flags ++ extraFlags)), Nil
