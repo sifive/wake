@@ -291,8 +291,8 @@ int main(int argc, const char **argv) {
   env.push_back(0);
 
   std::string dir = root + "/" + jast.get("directory").value;
-  std::string stdin = jast.get("stdin").value;
-  if (stdin.empty()) stdin = "/dev/null";
+  std::string stdin_file = jast.get("stdin").value;
+  if (stdin_file.empty()) stdin_file = "/dev/null";
 
   struct timeval start;
   gettimeofday(&start, 0);
@@ -303,9 +303,9 @@ int main(int argc, const char **argv) {
       std::cerr << "chdir " << dir << ": " << strerror(errno) << std::endl;
       exit(1);
     }
-    int fd = open(stdin.c_str(), O_RDONLY);
+    int fd = open(stdin_file.c_str(), O_RDONLY);
     if (fd == -1) {
-      std::cerr << "open " << stdin << ":" << strerror(errno) << std::endl;
+      std::cerr << "open " << stdin_file << ":" << strerror(errno) << std::endl;
       exit(1);
     }
     if (fd != 0) {

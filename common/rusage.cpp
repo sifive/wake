@@ -51,6 +51,8 @@ RUsage RUsage::operator - (const RUsage &other) const {
 #define MEMBYTES(ru)    (ru.ru_maxrss*1024)
 #elif defined(__sun)
 #define MEMBYTES(ru)    (ru.ru_maxrss*getpagesize())
+#elif defined(__EMSCRIPTEN__)
+#define MEMBYTES(ru)	0
 #else
 #error Missing definition to access maxrss on this platform
 #endif
