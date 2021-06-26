@@ -21,6 +21,25 @@ jobs:
             - tests
             - scripts/sphinx/build/html
 
+  wasm:
+    machine:
+      image: ubuntu-1604:202007-01
+#      docker_layer_caching: true # paywalled feature: retain docker build results between runs
+#    resource_class: large
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/wasm -t wake-wasm .
+      - run: |
+          tar xJf /tmp/workspace/wake_*.tar.xz && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm make -C wake-* all && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /build/$(ls -d wake-*) wake-wasm ./bin/wake wasm && \
+          install -D -t release/wasm wake-*/lib/wake/*.wasm*
+      - persist_to_workspace:
+          root: .
+          paths:
+            - release/wasm
+
   alpine:
     machine:
       image: ubuntu-1604:202007-01
@@ -224,6 +243,9 @@ workflows:
   build:
     jobs:
       - tarball
+      - wasm:
+          requires:
+            - tarball
       - alpine:
           requires:
             - tarball
@@ -250,6 +272,7 @@ workflows:
             - tarball
       - release:
           requires:
+            - wasm
             - alpine
             - debian_testing # Newest everything
             - debian_wheezy  # Oldest supported compiler
