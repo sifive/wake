@@ -187,12 +187,12 @@ bool run_in_fuse(fuse_args &args, int &status, std::string &result_json) {
 		}
 
 		if (args.use_stdin_file) {
-			std::string stdin = args.stdin_file;
-			if (stdin.empty()) stdin = "/dev/null";
+			std::string stdin_file = args.stdin_file;
+			if (stdin_file.empty()) stdin_file = "/dev/null";
 
-			int fd = open(stdin.c_str(), O_RDONLY);
+			int fd = open(stdin_file.c_str(), O_RDONLY);
 			if (fd == -1) {
-				std::cerr << "open " << stdin << ":" << strerror(errno) << std::endl;
+				std::cerr << "open " << stdin_file << ":" << strerror(errno) << std::endl;
 				exit(1);
 			}
 			if (fd != STDIN_FILENO) {
