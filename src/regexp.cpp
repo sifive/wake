@@ -260,17 +260,6 @@ static PRIMFN(prim_rcat) {
 
   int offset = has_set_dot_nl<RE2::Options>::value ? 0 : 4;
 
-  size_t size = 0;
-  for (size_t i = 0; i < nargs; ++i) {
-    if (i % 2 == 0) {
-      STRING(s, i);
-      size += s->size();
-    } else {
-      REGEXP(r, i);
-      size += r->exp->pattern().size() - offset;
-    }
-  }
-
   std::string out;
   for (size_t i = 0; i < nargs; ++i) {
     if (i % 2 == 0) {
