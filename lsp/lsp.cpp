@@ -34,11 +34,8 @@
 #include <sstream>
 #include <fstream>
 
-// Begin log
-std::ofstream logfile;
-
-#include "json5.h"
-#include "execpath.h"
+#include "../common/json5.h"    // why did it stop seeing these?
+#include "../common/execpath.h" // why did it stop seeing these?
 
 #ifndef VERSION
 #include "../src/version.h"
@@ -55,9 +52,9 @@ std::ofstream logfile;
 static const char contentLength[] = "Content-Length: ";
 
 // Defined by JSON RPC
-static const char *ParseError           = "-32700";
+static const char *ParseError = "-32700";
 //static const char *InvalidRequest       = "-32600";
-static const char *MethodNotFound       = "-32601";
+static const char *MethodNotFound = "-32601";
 //static const char *InvalidParams        = "-32602";
 //static const char *InternalError        = "-32603";
 //static const char *serverErrorStart     = "-32099";
@@ -65,7 +62,8 @@ static const char *MethodNotFound       = "-32601";
 //static const char *ServerNotInitialized = "-32002";
 //static const char *UnknownErrorCode     = "-32001";
 
-static void sendMessage(const JAST &message) {
+static void sendMessage(const JAST &message)
+{
   std::stringstream str;
   str << message;
   str.seekg(0, std::ios::end);
@@ -76,6 +74,8 @@ static void sendMessage(const JAST &message) {
 
 int main(int argc, const char **argv)
 {
+  // Begin log
+  std::ofstream logfile;
   logfile.open("log.txt", std::ios_base::app); // append instead of overwriting
   logfile << std::endl
           << "Log start:" << std::endl;
