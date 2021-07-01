@@ -41,10 +41,14 @@ def empp =
     else
         None
 
-publish compileC = emccFn (makeCompileC "wasm-c99-release"   _ (c99Flags ++ releaseCFlags))
-publish compileC = emppFn (makeCompileC "wasm-cpp11-release" _ (c11Flags ++ releaseCFlags))
-publish linkO = emccFn (makeLinkO "wasm-c99-release"   _ (releaseLFlags))
-publish linkO = emppFn (makeLinkO "wasm-cpp11-release" _ (releaseLFlags))
+def emscriptenCFlags = Nil
+def emscriptenLFlags =
+  "-s", "NODERAWFS=1", Nil
+
+publish compileC = emccFn (makeCompileC "wasm-c99-release"   _ (emscriptenCFlags ++ c99Flags ++ releaseCFlags))
+publish compileC = emppFn (makeCompileC "wasm-cpp11-release" _ (emscriptenCFlags ++ c11Flags ++ releaseCFlags))
+publish linkO = emccFn (makeLinkO "wasm-c99-release"   _ (emscriptenLFlags ++ releaseLFlags))
+publish linkO = emppFn (makeLinkO "wasm-cpp11-release" _ (emscriptenLFlags ++ releaseLFlags))
 
 export def wasm _ =
     require Pass variant = toVariant "wasm"

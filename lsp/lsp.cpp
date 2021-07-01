@@ -34,9 +34,6 @@
 #include <sstream>
 #include <fstream>
 
-// Begin log
-std::ofstream logfile;
-
 #include "json5.h"
 #include "execpath.h"
 
@@ -56,14 +53,17 @@ static const char contentLength[] = "Content-Length: ";
 
 // Defined by JSON RPC
 static const char *ParseError           = "-32700";
-//static const char *InvalidRequest       = "-32600";
+static const char *InvalidRequest       = "-32600";
 static const char *MethodNotFound       = "-32601";
 //static const char *InvalidParams        = "-32602";
 //static const char *InternalError        = "-32603";
 //static const char *serverErrorStart     = "-32099";
 //static const char *serverErrorEnd       = "-32000";
-//static const char *ServerNotInitialized = "-32002";
+static const char *ServerNotInitialized = "-32002";
 //static const char *UnknownErrorCode     = "-32001";
+
+bool isInitialized = false;
+bool isShutDown = false;
 
 static void sendMessage(const JAST &message) {
   std::stringstream str;
@@ -74,19 +74,31 @@ static void sendMessage(const JAST &message) {
   std::cout << str.rdbuf();
 }
 
-int main(int argc, const char **argv)
-{
+JAST initialize(JAST params) {
+  JAST capabilities(JSON_OBJECT);
+  JAST serverInfo(JSON_OBJECT);
+  serverInfo.add("name", "lsp wake server");
+
+  JAST initializeResult(JSON_OBJECT);
+  initializeResult.children.emplace_back("capabilities", capabilities);
+  initializeResult.children.emplace_back("serverInfo", serverInfo);
+
+  isInitialized = true;
+  return initializeResult;
+}
+
+int main(int argc, const char **argv) {
+  // Begin log
+  std::ofstream logfile;
   logfile.open("log.txt", std::ios_base::app); // append instead of overwriting
   logfile << std::endl
           << "Log start:" << std::endl;
 
   // Process requests until something goes wrong
-  while (true)
-  {
+  while (true) {
     size_t json_size = 0;
     // Read header lines until an empty line
-    while (true)
-    {
+    while (true) {
       std::string line;
       std::getline(std::cin, line);
       // Trim trailing CR, if any
@@ -124,26 +136,41 @@ int main(int argc, const char **argv)
     // Parse that content as JSON
     JAST request;
     std::stringstream parseErrors;
-    if (!JAST::parse(content, parseErrors, request))
-    {
+    if (!JAST::parse(content, parseErrors, request)) {
       response.add("id", JSON_NULLVAL);
       JAST &error = response.add("error", JSON_OBJECT);
       error.add("code", JSON_INTEGER, ParseError);
       error.add("message", parseErrors.str());
-    }
-    else
-    {
+    } else {
       // What command?
       const std::string &method = request.get("method").value;
       const JAST &id = request.get("id");
-      //const JAST &params = request.get("params");
+      const JAST &params = request.get("params");
 
       // Echo back the request's id
       response.children.emplace_back("id", id);
 
-      JAST &error = response.add("error", JSON_OBJECT);
-      error.add("code", JSON_INTEGER, MethodNotFound);
-      error.add("message", "Method '" + method + "' is not implemented.");
+      if (isShutDown && (method != "exit")) {
+        JAST &error = response.add("error", JSON_OBJECT);
+        error.add("code", JSON_INTEGER, InvalidRequest);
+        error.add("message", "Received a request other than 'exit' after a shutdown request.");
+      } else if (method == "initialize") {
+        response.children.emplace_back("result", initialize(params));
+      } else if (!isInitialized) {
+        JAST &error = response.add("error", JSON_OBJECT);
+        error.add("code", JSON_INTEGER, ServerNotInitialized);
+        error.add("message", "Must request initialize first");
+      } else if (method == "shutdown") {
+        JAST empty(JSON_OBJECT);
+        response.children.emplace_back("result", empty);
+        isShutDown = true;
+      } else if (method == "exit") {
+        return isShutDown?0:1;
+      } else {
+        JAST &error = response.add("error", JSON_OBJECT);
+        error.add("code", JSON_INTEGER, MethodNotFound);
+        error.add("message", "Method '" + method + "' is not implemented.");
+      }
     }
 
     sendMessage(response);
