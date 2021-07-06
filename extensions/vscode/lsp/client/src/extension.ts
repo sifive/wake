@@ -17,7 +17,7 @@ import {
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
-	const serverModule = context.asAbsolutePath(path.join('/server/out/server.js'));
+	const serverModule = context.asAbsolutePath('/../../../lib/wake/lsp-wake.wasm-cpp11-release');
 
 	// The debug options for the server
 	// --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging
@@ -28,11 +28,11 @@ export function activate(context: ExtensionContext) {
 	let serverOptions: ServerOptions = {
 		run: {
 			module: serverModule,
-			transport: TransportKind.ipc
+			transport: TransportKind.stdio
 		},
 		debug: {
 			module: serverModule,
-			transport: TransportKind.ipc,
+			transport: TransportKind.stdio,
 			options: debugOptions
 		}
 	};
