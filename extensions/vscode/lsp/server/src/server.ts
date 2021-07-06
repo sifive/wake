@@ -21,6 +21,40 @@ import {
 	TextDocument
 } from 'vscode-languageserver-textdocument';
 
+import fs = require('fs');
+
+
+// Accessing the wasm module
+const bytes = fs.readFileSync(__dirname + '/../../../../../lib/wake/lsp-wake.wasm');
+const wasmModule = new WebAssembly.Module(bytes);
+var importObject = {
+	env: {
+		__cxa_allocate_exception() { },
+		__cxa_throw() { },
+		__cxa_atexit() { },
+		__sys_open() { },
+		__sys_fcntl64() { },
+		__sys_ioctl() { },
+		strftime_l() { },
+		abort() { },
+		emscripten_resize_heap() { },
+		emscripten_memcpy_big() { },
+		setTempRet0() { }
+	},
+	wasi_snapshot_preview1: {
+		fd_close() { },
+		fd_write() { },
+		fd_read() { },
+		environ_sizes_get() { },
+		environ_get() { },
+		fd_seek() { }
+	}
+};
+const wasmInstance = new WebAssembly.Instance(wasmModule, importObject);
+const importedFunction = wasmInstance.exports.add_one as CallableFunction;
+
+
+
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
 const connection = createConnection(ProposedFeatures.all);
@@ -33,6 +67,7 @@ let hasWorkspaceFolderCapability = false;
 let hasDiagnosticRelatedInformationCapability = false;
 
 connection.onInitialize((params: InitializeParams) => {
+
 	const capabilities = params.capabilities;
 
 	// Does the client support the `workspace/configuration` request?
@@ -163,14 +198,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 						uri: textDocument.uri,
 						range: Object.assign({}, diagnostic.range)
 					},
-					message: 'Spelling matters'
-				},
-				{
-					location: {
-						uri: textDocument.uri,
-						range: Object.assign({}, diagnostic.range)
-					},
-					message: 'Particularly for names'
+					message: 'Result of calling imported function: ' + String(importedFunction(555))
 				}
 			];
 		}
