@@ -34,12 +34,14 @@
 #include <sstream>
 #include <fstream>
 
-#include "../common/json5.h"    // why did it stop seeing these?
-#include "../common/execpath.h" // why did it stop seeing these?
+#include <json5.h>
+#include <execpath.h>
 
 #ifndef VERSION
 #include "../src/version.h"
 #endif
+
+#include <emscripten/emscripten.h>
 
 // Number of pipes to the wake subprocess
 #define PIPES 5
@@ -72,11 +74,19 @@ static void sendMessage(const JAST &message)
   std::cout << str.rdbuf();
 }
 
+extern "C"
+{
+  EMSCRIPTEN_KEEPALIVE int add_one(int n)
+  {
+    return n + 1;
+  }
+}
+
 int main(int argc, const char **argv)
 {
   // Begin log
   std::ofstream logfile;
-  logfile.open("log.txt", std::ios_base::app); // append instead of overwriting
+  logfile.open("/home/elena/log.txt", std::ios_base::app); // append instead of overwriting
   logfile << std::endl
           << "Log start:" << std::endl;
 
