@@ -7,7 +7,6 @@ import * as path from 'path';
 import { workspace, ExtensionContext } from 'vscode';
 
 import {
-	CompletionResolveRequest,
 	LanguageClient,
 	LanguageClientOptions,
 	ServerOptions,
@@ -15,25 +14,10 @@ import {
 } from 'vscode-languageclient/node';
 
 
-//declare const WebAssembly: any
-import fs = require('fs');
-const bytes = fs.readFileSync(__dirname + '/../../../../../lib/wake/lsp-wake.wasm');
-(async () => {
-	// Instantiate the Wasm module with an implicit compilation step.
-	const { instance, module } = await WebAssembly.instantiate(bytes);
-	console.log(module);
-
-
-})();
-
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
-	// The server is implemented in node
-	//'/../../../lib/wake/lsp-wake-2.js'
-	let serverModule = context.asAbsolutePath(
-		'/server/out/server.js'
-	);
+	const serverModule = context.asAbsolutePath(path.join('/server/out/server.js'));
 
 	// The debug options for the server
 	// --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging
@@ -42,7 +26,10 @@ export function activate(context: ExtensionContext) {
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
 	let serverOptions: ServerOptions = {
-		run: { module: serverModule, transport: TransportKind.ipc },
+		run: {
+			module: serverModule,
+			transport: TransportKind.ipc
+		},
 		debug: {
 			module: serverModule,
 			transport: TransportKind.ipc,
