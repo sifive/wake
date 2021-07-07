@@ -22,10 +22,10 @@ export tuple SysLib =
     export CFlags:  List String
     export LFlags:  List String
 
-export def makeSysLib version =
+export def makeSysLib (version: String): SysLib =
     SysLib version Nil Nil Nil Nil
 
-export def flattenSysLibs packages =
+export def flattenSysLibs (packages: List SysLib): SysLib =
     def headers = map getSysLibHeaders packages | flatten
     def objects = map getSysLibObjects packages | flatten
     def cflags  = map getSysLibCFlags  packages | flatten
@@ -57,7 +57,7 @@ target pkgConfigImp args =
     else
         None
 
-export def pkgConfig pkg =
+export def pkgConfig (pkg: String): Option SysLib =
     def pkgs = tokenize ` ` pkg
     require Some (version, _) =
         pkgConfigImp ("--short-errors", "--modversion", pkgs)

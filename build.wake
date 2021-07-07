@@ -45,7 +45,10 @@ def targets =
         _       = allPlatforms
 
 def all variant =
-    map (_ variant) targets | findFailFn getPathResult
+    require Pass x =
+        map (_ variant) targets
+        | findFail
+    Pass (flatten x)
 
 # Install wake into a target location
 def doInstall dest kind =

@@ -34,19 +34,29 @@ def re2cOk Unit =
     x > 1 || (x == 1 && (y > 2 || (y == 2 && z >= 1)))
 
 def re2cReal file =
-    def cpp = replace `\.re$` ".cpp" file.getPathName
-    def cmdline = which "re2c", "-8", "--tags", "--no-generation-date", "--input-encoding", "utf8", file.getPathName, "-o", cpp, Nil
-    def result =
+    def cpp =
+        replace `\.re$` ".cpp" file.getPathName
+
+    def cmdline =
+        which "re2c", "-8", "--tags", "--no-generation-date", "--input-encoding", "utf8", file.getPathName, "-o", cpp, Nil
+
+    require Pass result =
         makeExecPlan cmdline (file, Nil)
         | setPlanLabel "re2c {cpp}"
         | runJob
         | getJobOutput
-    def compress = which "gzip", "-nk9", result.getPathName, Nil
-    def zip = job compress (result, Nil)
+        | getPathResult
+
+    def compress =
+        which "gzip", "-nk9", result.getPathName, Nil
+
+    def zip =
+        job compress (result, Nil)
+
     match zip.getJobStatus
-        Exited 0 = result
-        Aborted e = makeBadPath e
-        z = makeBadPath (makeError "Non-zero exit status ({format z}) for '{zip.getJobDescription}'")
+        Exited 0 = Pass result
+        Aborted e = Fail e
+        z = failWithError "Non-zero exit status ({format z}) for '{zip.getJobDescription}'"
 
 def re2cFake file =
     def cpp = replace `\.re$` ".cpp" file.getPathName
@@ -56,9 +66,11 @@ def re2cFake file =
         gzip -dc "%{zip.getPathName}" > "%{cpp}.tmp"
         mv "%{cpp}.tmp" "%{cpp}"
         %"
-    shellJob script (zip, Nil) | getJobOutput
+    shellJob script (zip, Nil)
+    | getJobOutput
+    | getPathResult
 
-def re2c file =
+def re2c (file: Path): Result Path Error =
     if re2cOk Unit then
         re2cReal file
     else

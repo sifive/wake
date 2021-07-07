@@ -50,4 +50,5 @@ export def wasm _ =
     require Pass variant = toVariant "wasm"
     def working = buildFuse, buildShim, buildPreload, buildBSP, buildLSP, Nil
     # not_working = buildWake (needs gmp+re2+sqlite3), buildFuseDaemon (needs fuse), buildPrelib (no shared libs)
-    map (_ variant) working | findFailFn getPathResult
+    require Pass objs = map (_ variant) working | findFail
+    Pass objs.flatten

@@ -32,17 +32,34 @@ def liblflags = match sysname
     "Darwin" = "-dynamiclib", Nil
     _ = "-shared", "-ldl", Nil
 
-def buildPreload (Pair variant _) =
-    def json = common variant
-    def headers = json.getSysLibHeaders ++ sources here `.*\.h`
-    def cppFiles = sources here `.*\.cpp`
-    def cppFlags = "-DEXT={libext}", "-DENV={loadenv}", json.getSysLibCFlags
-    def ofiles = map (compileC variant cppFlags headers) cppFiles
-    linkO variant Nil (ofiles ++ json.getSysLibObjects) "bin/preload-wake"
+def buildPreload (Pair variant _): Result (List Path) Error =
+    require Pass json =
+        common variant
 
-def buildPrelib (Pair _ variant) =
-    def cfiles = sources here `.*\.c`
-    def ofiles = map (compileC variant libcflags Nil) cfiles
-    linkO variant liblflags ofiles "lib/wake/libpreload-wake.{libext}"
+    def headers =
+        json.getSysLibHeaders ++
+        sources here `.*\.h`
+
+    def cppFiles =
+        sources here `.*\.cpp`
+
+    def cppFlags =
+        "-DEXT={libext}", "-DENV={loadenv}", json.getSysLibCFlags
+
+    require Pass ofiles =
+        map (compileC variant cppFlags headers) cppFiles
+        | findFail
+
+    linkO variant Nil (ofiles.flatten ++ json.getSysLibObjects) "bin/preload-wake"
+
+def buildPrelib (Pair _ variant): Result (List Path) Error =
+    def cfiles =
+        sources here `.*\.c`
+
+    require Pass ofiles =
+         map (compileC variant libcflags Nil) cfiles
+         | findFail
+
+    linkO variant liblflags ofiles.flatten "lib/wake/libpreload-wake.{libext}"
 
 # publish runner = makeJSONRunner "preload/wrap" (\_ Pass 2.0) (\_ None), Nil

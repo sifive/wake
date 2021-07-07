@@ -32,12 +32,40 @@ def ncurses Unit =
     | editSysLibCFlags (filter (matches `-I.*` _)) # remove feature test manipulation
 
 def buildWake (Pair variant clib) =
-    def internalDeps = common variant, map (_ clib) (utf8proc, gopt, Nil)
-    def externalDeps = ncurses Unit, map pkg ("sqlite3", "gmp", "re2", Nil)
-    def deps = internalDeps ++ externalDeps | flattenSysLibs
-    def reFiles = sources here `.*\.re`
-    def headerFiles = version_h Unit, deps.getSysLibHeaders ++ sources here `.*\.h`
-    def cppFiles = map re2c reFiles ++ sources here `.*\.cpp`
-    def compile = compileC variant deps.getSysLibCFlags headerFiles
-    def objFiles = map compile cppFiles ++ deps.getSysLibObjects
-    linkO variant deps.getSysLibLFlags objFiles "bin/wake"
+    def externalDeps =
+        ncurses Unit, map pkg ("sqlite3", "gmp", "re2", Nil)
+
+    def reFileResults =
+        map re2c (sources here `.*\.re`)
+
+    def internalDepResults =
+        common variant, map (_ clib) (utf8proc, gopt, Nil)
+
+    require Pass internalDeps = findFail internalDepResults
+    require Pass reFiles = findFail reFileResults
+
+    def deps =
+        internalDeps ++ externalDeps
+        | flattenSysLibs
+
+    def headerFiles =
+        version_h Unit,
+        deps.getSysLibHeaders ++
+        sources here `.*\.h`
+
+    def cppFiles =
+        reFiles ++
+        sources here `.*\.cpp`
+
+    def compile =
+        compileC variant deps.getSysLibCFlags headerFiles
+
+    require Pass objFiles =
+        map compile cppFiles
+        | findFail
+
+    def allObjs =
+        objFiles.flatten ++
+        deps.getSysLibObjects
+
+    linkO variant deps.getSysLibLFlags allObjs "bin/wake"
