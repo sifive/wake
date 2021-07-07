@@ -16,7 +16,7 @@ import {
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
-	const serverModule = context.asAbsolutePath('/../../../lib/wake/lsp-wake.wasm-cpp11-release');
+	const serverModule = context.asAbsolutePath('/lsp-wake.wasm-cpp11-release');
 
 	// The debug options for the server
 	// --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging
