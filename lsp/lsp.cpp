@@ -52,9 +52,9 @@
 static const char contentLength[] = "Content-Length: ";
 
 // Defined by JSON RPC
-static const char *ParseError = "-32700";
+static const char *ParseError             = "-32700";
 //static const char *InvalidRequest       = "-32600";
-static const char *MethodNotFound = "-32601";
+static const char *MethodNotFound         = "-32601";
 //static const char *InvalidParams        = "-32602";
 //static const char *InternalError        = "-32603";
 //static const char *serverErrorStart     = "-32099";
@@ -62,8 +62,7 @@ static const char *MethodNotFound = "-32601";
 //static const char *ServerNotInitialized = "-32002";
 //static const char *UnknownErrorCode     = "-32001";
 
-static void sendMessage(const JAST &message)
-{
+static void sendMessage(const JAST &message) {
   std::stringstream str;
   str << message;
   str.seekg(0, std::ios::end);
@@ -72,8 +71,7 @@ static void sendMessage(const JAST &message)
   std::cout << str.rdbuf();
 }
 
-int main(int argc, const char **argv)
-{
+int main(int argc, const char **argv) {
   // Begin log
   std::ofstream logfile;
   logfile.open("log.txt", std::ios_base::app); // append instead of overwriting
@@ -81,12 +79,10 @@ int main(int argc, const char **argv)
           << "Log start:" << std::endl;
 
   // Process requests until something goes wrong
-  while (true)
-  {
+  while (true) {
     size_t json_size = 0;
     // Read header lines until an empty line
-    while (true)
-    {
+    while (true) {
       std::string line;
       std::getline(std::cin, line);
       // Trim trailing CR, if any
@@ -124,15 +120,13 @@ int main(int argc, const char **argv)
     // Parse that content as JSON
     JAST request;
     std::stringstream parseErrors;
-    if (!JAST::parse(content, parseErrors, request))
-    {
+    if (!JAST::parse(content, parseErrors, request)) {
       response.add("id", JSON_NULLVAL);
       JAST &error = response.add("error", JSON_OBJECT);
       error.add("code", JSON_INTEGER, ParseError);
       error.add("message", parseErrors.str());
     }
-    else
-    {
+    else {
       // What command?
       const std::string &method = request.get("method").value;
       const JAST &id = request.get("id");
