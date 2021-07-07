@@ -1,12 +1,12 @@
 {
-	"name": "lsp-sample",
-	"description": "A language server example",
-	"author": "test author",
+	"name": "lsp-wake",
+	"description": "A language server for wake",
+	"author": "SiFive",
 	"license": "MIT",
 	"version": "1.0.0",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Microsoft/vscode-extension-samples"
+		"url": "https://github.com/sifive/wake"
 	},
 	"publisher": "sifive",
 	"categories": [],
@@ -43,7 +43,18 @@
 					"description": "Traces the communication between VS Code and the language server."
 				}
 			}
-		}
+		},
+		"languages": [{
+            "id": "wake",
+            "aliases": ["wake", "wake"],
+            "extensions": [".wake"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "wake",
+            "scopeName": "source.wake",
+            "path": "./syntaxes/wake.tmLanguage.json"
+        }]
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
