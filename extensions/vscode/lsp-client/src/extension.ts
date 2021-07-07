@@ -18,22 +18,11 @@ let client: LanguageClient;
 export function activate(context: ExtensionContext) {
 	const serverModule = context.asAbsolutePath('/lsp-wake.wasm-cpp11-release');
 
-	// The debug options for the server
-	// --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging
-	let debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
-
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
 	let serverOptions: ServerOptions = {
-		run: {
-			module: serverModule,
-			transport: TransportKind.stdio
-		},
-		debug: {
-			module: serverModule,
-			transport: TransportKind.stdio,
-			options: debugOptions
-		}
+		module: serverModule,
+		transport: TransportKind.stdio
 	};
 
 	// Options to control the language client
@@ -42,7 +31,7 @@ export function activate(context: ExtensionContext) {
 		documentSelector: [{ language: 'wake', pattern: '**/*.wake' }],
 		synchronize: {
 			// Notify the server about file changes to '.clientrc files contained in the workspace
-			fileEvents: workspace.createFileSystemWatcher('**/.clientrc')
+			fileEvents: workspace.createFileSystemWatcher('**/*.wake')
 		}
 	};
 

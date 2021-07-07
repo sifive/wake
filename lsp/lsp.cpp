@@ -34,8 +34,8 @@
 #include <sstream>
 #include <fstream>
 
-#include <json5.h>
-#include <execpath.h>
+#include "json5.h"
+#include "execpath.h"
 
 #ifndef VERSION
 #include "../src/version.h"
@@ -141,8 +141,7 @@ int main(int argc, const char **argv) {
       JAST &error = response.add("error", JSON_OBJECT);
       error.add("code", JSON_INTEGER, ParseError);
       error.add("message", parseErrors.str());
-    }
-    else {
+    } else {
       // What command?
       const std::string &method = request.get("method").value;
       const JAST &id = request.get("id");
@@ -155,25 +154,19 @@ int main(int argc, const char **argv) {
         JAST &error = response.add("error", JSON_OBJECT);
         error.add("code", JSON_INTEGER, InvalidRequest);
         error.add("message", "Received a request other than 'exit' after a shutdown request.");
-      }
-      else if (method == "initialize") {
+      } else if (method == "initialize") {
         response.children.emplace_back("result", initialize(params));
-      }
-      else if (!isInitialized) {
+      } else if (!isInitialized) {
         JAST &error = response.add("error", JSON_OBJECT);
         error.add("code", JSON_INTEGER, ServerNotInitialized);
         error.add("message", "Must request initialize first");
-      }
-      else if (method == "shutdown") {
+      } else if (method == "shutdown") {
         JAST empty(JSON_OBJECT);
         response.children.emplace_back("result", empty);
         isShutDown = true;
-      }
-      else if (method == "exit") {
-        if (isShutDown) return 0;
-        else return 1;
-      }
-      else {
+      } else if (method == "exit") {
+        return isShutDown?0:1;
+      } else {
         JAST &error = response.add("error", JSON_OBJECT);
         error.add("code", JSON_INTEGER, MethodNotFound);
         error.add("message", "Method '" + method + "' is not implemented.");
