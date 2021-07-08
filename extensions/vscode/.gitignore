@@ -1,3 +1,4 @@
 node_modules/
 .vscode/
 lsp-client/out/
+package-lock.json

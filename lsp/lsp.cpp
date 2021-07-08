@@ -161,8 +161,7 @@ int main(int argc, const char **argv) {
         error.add("code", JSON_INTEGER, ServerNotInitialized);
         error.add("message", "Must request initialize first");
       } else if (method == "shutdown") {
-        JAST empty(JSON_OBJECT);
-        response.children.emplace_back("result", empty);
+        response.children.emplace_back("result", JSON_NULLVAL);
         isShutDown = true;
       } else if (method == "exit") {
         return isShutDown?0:1;
