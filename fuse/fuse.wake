@@ -17,25 +17,63 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def buildFuse (Pair variant _) =
-    def json = common variant
-    def headers = json.getSysLibHeaders ++ sources "fuse" `.*\.h`
-    def client = compileC variant json.getSysLibCFlags headers (source "fuse/client.cpp")
-    def objFiles = client, buildFuseLibObjs variant
-    linkO variant json.getSysLibLFlags objFiles "bin/fuse-wake"
+def buildFuse (Pair (variant: String) _): Result (List Path) Error =
+    def libobjsResult =
+        buildFuseLibObjs variant
 
-def buildFuseLibObjs variant =
-    def json = common variant
-    def headers = json.getSysLibHeaders ++ sources "fuse" `.*\.h`
-    def cppFiles = sources "fuse" `(fuse|namespace|daemon_client).cpp`
-    def compile = compileC variant json.getSysLibCFlags headers
-    map compile cppFiles ++ json.getSysLibObjects
+    require Pass json =
+        common variant
 
-def buildFuseDaemon (Pair variant _) =
-    def json = common variant
-    def fuse = pkgConfig "fuse" | getOrElse (makeSysLib "")
-    def deps = flattenSysLibs (json, fuse, Nil)
-    def compile = compileC variant deps.getSysLibCFlags deps.getSysLibHeaders
-    def cppFiles = source "{here}/daemon.cpp", Nil
-    def objFiles = map compile cppFiles ++ deps.getSysLibObjects
+    def headers =
+        json.getSysLibHeaders ++
+        sources "fuse" `.*\.h`
+
+    require Pass client =
+        compileC variant json.getSysLibCFlags headers (source "fuse/client.cpp")
+
+    require Pass libobjs =
+        libobjsResult
+
+    linkO variant json.getSysLibLFlags (client ++ libobjs) "bin/fuse-wake"
+
+def buildFuseLibObjs (variant: String): Result (List Path) Error =
+    require Pass json =
+        common variant
+
+    def headers =
+        json.getSysLibHeaders ++
+        sources "fuse" `.*\.h`
+
+    def cppFiles =
+        sources "fuse" `(fuse|namespace|daemon_client).cpp`
+
+    def compile =
+        compileC variant json.getSysLibCFlags headers
+
+    require Pass objs =
+        map compile cppFiles
+        | findFail
+
+    Pass (objs.flatten ++ json.getSysLibObjects)
+
+def buildFuseDaemon (Pair (variant: String) _): Result (List Path) Error =
+    def fuseOption =
+        pkgConfig "fuse"
+
+    require Pass json =
+        common variant
+
+    require Some fuse =
+        fuseOption
+    else
+        failWithError "fuse library not installed"
+
+    def deps =
+        flattenSysLibs (json, fuse, Nil)
+
+    require Pass daemon =
+        compileC variant deps.getSysLibCFlags deps.getSysLibHeaders (source "{here}/daemon.cpp")
+
+    def objFiles = daemon ++ deps.getSysLibObjects
+
     linkO variant deps.getSysLibLFlags objFiles "lib/wake/fuse-waked"

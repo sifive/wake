@@ -17,10 +17,22 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def buildShim (Pair cxx variant) =
-    def nofollow = common cxx
-    def headers = nofollow.getSysLibHeaders ++ sources here `.*\.h`
-    def compile = compileC variant nofollow.getSysLibCFlags headers
-    def cppFiles = sources here `.*\.c`
-    def objFiles = map compile cppFiles
-    linkO variant Nil objFiles "lib/wake/shim-wake"
+def buildShim (Pair cxx variant): Result (List Path) Error =
+    require Pass nofollow =
+        common cxx
+
+    def headers =
+        nofollow.getSysLibHeaders ++
+        sources here `.*\.h`
+
+    def compile =
+        compileC variant nofollow.getSysLibCFlags headers
+
+    def cppFiles =
+        sources here `.*\.c`
+
+    require Pass objFiles =
+        map compile cppFiles
+        | findFail
+
+    linkO variant Nil objFiles.flatten "lib/wake/shim-wake"

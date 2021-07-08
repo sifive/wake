@@ -19,6 +19,8 @@ manifest.wake
 /src/version.h
 /lib/wake/bsp-wake
 /lib/wake/bsp-wake.*
+/lib/wake/lsp-wake
+/lib/wake/lsp-wake.*
 /lib/wake/fuse-waked
 /lib/wake/fuse-waked.*
 /lib/wake/shim-wake

@@ -17,11 +17,25 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def common variant =
-    def cflags = "-I{here}", Nil
-    def headers = sources here `.*\.h`
-    def reFiles = sources here `.*\.re`
-    def cppFiles = map re2c reFiles ++ sources here `.*\.cpp`
-    def compile = compileC variant cflags headers
-    def objects = map compile cppFiles
-    SysLib "0.0" headers objects cflags Nil
+def common (variant: String): Result SysLib Error =
+    def cflags =
+        "-I{here}", Nil
+
+    def headers =
+        sources here `.*\.h`
+
+    def compile =
+        compileC variant cflags headers
+
+    def re2obj re =
+        require Pass cpp = re2c re
+        compile cpp
+
+    def objResults =
+        map re2obj  (sources here `.*\.re`) ++
+        map compile (sources here `.*\.cpp`)
+
+    require Pass objects =
+        findFail objResults
+
+    Pass (SysLib "0.0" headers objects.flatten cflags Nil)

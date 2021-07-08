@@ -17,9 +17,22 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def buildLSP (Pair variant _) =
-    def json = common variant
-    def compile = compileC variant json.getSysLibCFlags (version_h Unit, json.getSysLibHeaders)
-    def cppFiles = source "{here}/lsp.cpp", Nil
-    def objFiles = map compile cppFiles ++ json.getSysLibObjects
-    linkO variant json.getSysLibLFlags objFiles "lib/wake/lsp-wake"
+def buildLSP (Pair variant _): Result (List Path) Error =
+    require Pass json =
+        common variant
+
+    def compile =
+        compileC variant json.getSysLibCFlags (version_h Unit, json.getSysLibHeaders)
+
+    def cppFiles =
+        source "{here}/lsp.cpp", Nil
+
+    require Pass objFiles =
+        map compile cppFiles
+        | findFail
+
+    def allObjs =
+        objFiles.flatten ++
+        json.getSysLibObjects
+
+    linkO variant json.getSysLibLFlags allObjs "lib/wake/lsp-wake"

@@ -18,12 +18,41 @@ from wake import _
 from gcc_wake import _
 
 def buildWakeBox (Pair cpplib clib) =
-    def commonLib = common cpplib
-    def goptLib = gopt clib
-    def libs = (commonLib, goptLib, Nil) | flattenSysLibs
-    def headers = sources "fuse" `.*\.h` ++ goptLib.getSysLibHeaders ++ commonLib.getSysLibHeaders
-    def compile = compileC cpplib ("-Ifuse", goptLib.getSysLibCFlags ++ commonLib.getSysLibCFlags) headers
-    def cppFiles = sources "wakebox" `.*\.cpp`
-    def objFiles = goptLib.getSysLibObjects ++ map compile cppFiles ++ (buildFuseLibObjs cpplib)
+    def commonLibResult =
+        common cpplib
+
+    def fuseLibResult =
+        buildFuseLibObjs cpplib
+
+    def goptLibResult =
+        gopt clib
+
+    require Pass commonLib = commonLibResult
+    require Pass goptLib = goptLibResult
+    require Pass fuseLib = fuseLibResult
+
+    def libs =
+        (commonLib, goptLib, Nil)
+        | flattenSysLibs
+
+    def headers =
+        sources "fuse" `.*\.h` ++
+        goptLib.getSysLibHeaders ++
+        commonLib.getSysLibHeaders
+
+    def compile =
+        compileC cpplib ("-Ifuse", goptLib.getSysLibCFlags ++ commonLib.getSysLibCFlags) headers
+
+    def cppFiles =
+        sources "wakebox" `.*\.cpp`
+
+    require Pass objs =
+        map compile cppFiles
+        | findFail
+
+    def objFiles =
+        fuseLib ++
+        goptLib.getSysLibObjects ++
+        objs.flatten
+
     linkO cpplib libs.getSysLibLFlags objFiles "bin/wakebox"
-    | installAs "bin/wakebox"
