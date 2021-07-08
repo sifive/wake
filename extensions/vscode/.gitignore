@@ -1,3 +1,5 @@
-node_modules/
 .vscode/
+node_modules/
 lsp-client/out/
+lsp-server/
+wake-*.vsix

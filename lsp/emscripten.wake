@@ -60,17 +60,3 @@ publish linkO =
     emccFn (makeLinkO "wasm-c99-release"   _ (emscriptenLFlags ++ releaseLFlags))
 publish linkO =
     emppFn (makeLinkO "wasm-cpp11-release" _ (emscriptenLFlags ++ releaseLFlags))
-
-export def wasm _ =
-    require Pass variant =
-        toVariant "wasm"
-
-    def working =
-        buildFuse, buildShim, buildPreload, buildBSP, buildLSP, Nil
-
-    # not_working = buildWake (needs gmp+re2+sqlite3), buildFuseDaemon (needs fuse), buildPrelib (no shared libs)
-    require Pass objs =
-        map (_ variant) working
-        | findFail
-
-    Pass objs.flatten

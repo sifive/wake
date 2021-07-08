@@ -6,7 +6,7 @@ This is the source code for a Visual Studio extension, enabling type checking an
 
 Provides syntax highlighting for *.wake files:
 
-\!\[Wake Syntax Highlighting\]\(images/example.png\)
+![Wake Syntax Highlighting](images/example.png)
 
 ## Requirements
 

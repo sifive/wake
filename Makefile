@@ -47,6 +47,9 @@ test:		wake.db
 tarball:	wake.db
 	$(WAKE_ENV) ./bin/wake build tarball
 
+vscode:		wake.db
+	$(WAKE_ENV) ./bin/wake vscode
+
 static:	wake.db
 	$(WAKE_ENV) ./bin/wake static
 

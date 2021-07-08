@@ -71,7 +71,7 @@
     ],
     "license": "Apache-2.0",
     "main": "./lsp-client/out/extension",
-    "name": "lsp-wake",
+    "name": "wake",
     "publisher": "sifive",
     "repository": {
         "type": "git",
@@ -82,5 +82,5 @@
         "vscode:prepublish": "npm run compile",
         "watch": "tsc -b -w"
     },
-    "version": "1.0.0"
+    "version": "0.1.0"
 }

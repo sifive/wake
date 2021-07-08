@@ -21,7 +21,7 @@ jobs:
             - tests
             - scripts/sphinx/build/html
 
-  wasm:
+  vscode:
     machine:
       image: ubuntu-1604:202007-01
 #      docker_layer_caching: true # paywalled feature: retain docker build results between runs
@@ -32,13 +32,12 @@ jobs:
       - run: docker build -f /tmp/workspace/.circleci/dockerfiles/wasm -t wake-wasm .
       - run: |
           tar xJf /tmp/workspace/wake_*.tar.xz && \
-          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm make -C wake-* all && \
-          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /build/$(ls -d wake-*) wake-wasm ./bin/wake wasm && \
-          install -D -t release/wasm wake-*/lib/wake/*.wasm*
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm make -C wake-* vscode && \
+          install -D -t release/vscode wake-*/extensions/vscode/wake-*.vsix
       - persist_to_workspace:
           root: .
           paths:
-            - release/wasm
+            - release/vscode
 
   alpine:
     machine:
@@ -243,7 +242,7 @@ workflows:
   build:
     jobs:
       - tarball
-      - wasm:
+      - vscode:
           requires:
             - tarball
       - alpine:
@@ -272,7 +271,7 @@ workflows:
             - tarball
       - release:
           requires:
-            - wasm
+            - vscode
             - alpine
             - debian_testing # Newest everything
             - debian_wheezy  # Oldest supported compiler

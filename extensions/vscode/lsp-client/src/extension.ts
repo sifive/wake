@@ -16,7 +16,7 @@ import {
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
-	const serverModule = context.asAbsolutePath('/lsp-wake.wasm-cpp11-release');
+	const serverModule = context.asAbsolutePath('/lsp-server/lsp-wake.js');
 
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
