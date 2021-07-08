@@ -22,8 +22,12 @@ def emccFn fn = match emcc
     Some x = fn x
 
 def emcc =
-    require Some path = getenv "PATH"
-    def emcc = whichIn path "emcc"
+    require Some path =
+        getenv "PATH"
+
+    def emcc =
+        whichIn path "emcc"
+
     if matches `/.*` emcc then
         Some emcc
     else
@@ -41,18 +45,32 @@ def empp =
     else
         None
 
-def emscriptenCFlags = Nil
+def emscriptenCFlags =
+    Nil
 def emscriptenLFlags =
-  "-s", "NODERAWFS=1", Nil
+    "-s", "NODERAWFS=1", Nil
 
-publish compileC = emccFn (makeCompileC "wasm-c99-release"   _ (emscriptenCFlags ++ c99Flags ++ releaseCFlags))
-publish compileC = emppFn (makeCompileC "wasm-cpp11-release" _ (emscriptenCFlags ++ c11Flags ++ releaseCFlags))
-publish linkO = emccFn (makeLinkO "wasm-c99-release"   _ (emscriptenLFlags ++ releaseLFlags))
-publish linkO = emppFn (makeLinkO "wasm-cpp11-release" _ (emscriptenLFlags ++ releaseLFlags))
+publish compileC =
+    emccFn (makeCompileC "wasm-c99-release"   _ (emscriptenCFlags ++ c99Flags ++ releaseCFlags))
+
+publish compileC =
+    emppFn (makeCompileC "wasm-cpp11-release" _ (emscriptenCFlags ++ c11Flags ++ releaseCFlags))
+
+publish linkO =
+    emccFn (makeLinkO "wasm-c99-release"   _ (emscriptenLFlags ++ releaseLFlags))
+publish linkO =
+    emppFn (makeLinkO "wasm-cpp11-release" _ (emscriptenLFlags ++ releaseLFlags))
 
 export def wasm _ =
-    require Pass variant = toVariant "wasm"
-    def working = buildFuse, buildShim, buildPreload, buildBSP, buildLSP, Nil
+    require Pass variant =
+        toVariant "wasm"
+
+    def working =
+        buildFuse, buildShim, buildPreload, buildBSP, buildLSP, Nil
+
     # not_working = buildWake (needs gmp+re2+sqlite3), buildFuseDaemon (needs fuse), buildPrelib (no shared libs)
-    require Pass objs = map (_ variant) working | findFail
+    require Pass objs =
+        map (_ variant) working
+        | findFail
+
     Pass objs.flatten
