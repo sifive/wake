@@ -1,77 +1,86 @@
 {
-	"name": "lsp-wake",
-	"description": "A language server for wake",
-	"author": "SiFive",
-	"license": "Apache-2.0",
-	"version": "1.0.0",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/sifive/wake"
-	},
-	"publisher": "sifive",
-	"categories": [],
-	"keywords": [
-		"multi-root ready"
-	],
-	"engines": {
-		"vscode": "^1.52.0"
-	},
-	"activationEvents": [
-		"onLanguage:plaintext"
-	],
-	"main": "./lsp-client/out/extension",
-	"contributes": {
-		"configuration": {
-			"type": "object",
-			"title": "Wake server configuration",
-			"properties": {
-				"wakeLanguageServer.maxNumberOfProblems": {
-					"scope": "resource",
-					"type": "number",
-					"default": 100,
-					"description": "Controls the maximum number of problems produced by the server."
-				},
-				"wakeLanguageServer.trace.server": {
-					"scope": "window",
-					"type": "string",
-					"enum": [
-						"off",
-						"messages",
-						"verbose"
-					],
-					"default": "off",
-					"description": "Traces the communication between VS Code and the language server."
-				}
-			}
-		},
-		"languages": [{
-            "id": "wake",
-            "aliases": ["wake", "wake"],
-            "extensions": [".wake"],
-            "configuration": "./language-configuration.json"
-        }],
-        "grammars": [{
-            "language": "wake",
-            "scopeName": "source.wake",
-            "path": "./syntaxes/wake.tmLanguage.json"
-        }]
-	},
-	"scripts": {
-		"vscode:prepublish": "npm run compile",
-		"compile": "tsc -b",
-		"watch": "tsc -b -w"
-	},
-	"devDependencies": {
-		"@types/mocha": "^8.2.2",
-		"@types/node": "^15.14.0",
-		"@typescript-eslint/eslint-plugin": "^4.23.0",
-		"@typescript-eslint/parser": "^4.23.0",
-		"eslint": "^7.26.0",
-		"mocha": "^8.3.2",
-		"typescript": "^4.3.2",
-		"@types/vscode": "^1.52.0"
-	},
-	"dependencies": {
-		"vscode-languageclient": "^7.0.0"
-	}
+    "activationEvents": [
+        "onLanguage:plaintext"
+    ],
+    "author": "SiFive",
+    "categories": [],
+    "contributes": {
+        "configuration": {
+            "properties": {
+                "wakeLanguageServer.maxNumberOfProblems": {
+                    "default": 100,
+                    "description": "Controls the maximum number of problems produced by the server.",
+                    "scope": "resource",
+                    "type": "number"
+                },
+                "wakeLanguageServer.trace.server": {
+                    "default": "off",
+                    "description": "Traces the communication between VS Code and the language server.",
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
+                    "scope": "window",
+                    "type": "string"
+                }
+            },
+            "title": "Wake server configuration",
+            "type": "object"
+        },
+        "grammars": [
+            {
+                "language": "wake",
+                "path": "./syntaxes/wake.tmLanguage.json",
+                "scopeName": "source.wake"
+            }
+        ],
+        "languages": [
+            {
+                "aliases": [
+                    "wake",
+                    "wake"
+                ],
+                "configuration": "./language-configuration.json",
+                "extensions": [
+                    ".wake"
+                ],
+                "id": "wake"
+            }
+        ]
+    },
+    "dependencies": {
+        "vscode-languageclient": "^7.0.0"
+    },
+    "description": "A language server for wake",
+    "devDependencies": {
+        "@types/mocha": "^8.2.2",
+        "@types/node": "^15.14.0",
+        "@types/vscode": "^1.52.0",
+        "@typescript-eslint/eslint-plugin": "^4.23.0",
+        "@typescript-eslint/parser": "^4.23.0",
+        "eslint": "^7.26.0",
+        "mocha": "^8.3.2",
+        "typescript": "^4.3.2"
+    },
+    "engines": {
+        "vscode": "^1.52.0"
+    },
+    "keywords": [
+        "multi-root ready"
+    ],
+    "license": "Apache-2.0",
+    "main": "./lsp-client/out/extension",
+    "name": "lsp-wake",
+    "publisher": "sifive",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/sifive/wake"
+    },
+    "scripts": {
+        "compile": "tsc -b",
+        "vscode:prepublish": "npm run compile",
+        "watch": "tsc -b -w"
+    },
+    "version": "1.0.0"
 }

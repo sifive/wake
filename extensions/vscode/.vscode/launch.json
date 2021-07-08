@@ -1,24 +1,29 @@
-// A launch configuration that compiles the extension and then opens it inside a new window
 {
-	"version": "0.2.0",
-	"configurations": [
-		{
-			"type": "extensionHost",
-			"request": "launch",
-			"name": "Launch Client",
-			"runtimeExecutable": "${execPath}",
-			"args": ["--extensionDevelopmentPath=${workspaceRoot}"],
-			"outFiles": ["${workspaceRoot}/lsp-client/out/**/*.js"],
-			"preLaunchTask": {
-				"type": "npm",
-				"script": "watch"
-			}
-		}
-	],
-	"compounds": [
-		{
-			"name": "Client",
-			"configurations": ["Launch Client"]
-		}
-	]
+    "compounds": [
+        {
+            "configurations": [
+                "Launch Client"
+            ],
+            "name": "Client"
+        }
+    ],
+    "configurations": [
+        {
+            "args": [
+                "--extensionDevelopmentPath=${workspaceRoot}"
+            ],
+            "name": "Launch Client",
+            "outFiles": [
+                "${workspaceRoot}/lsp-client/out/**/*.js"
+            ],
+            "preLaunchTask": {
+                "script": "watch",
+                "type": "npm"
+            },
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "type": "extensionHost"
+        }
+    ],
+    "version": "0.2.0"
 }
