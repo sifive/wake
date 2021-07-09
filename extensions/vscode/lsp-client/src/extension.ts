@@ -18,8 +18,7 @@ let client: LanguageClient;
 export function activate(context: ExtensionContext) {
 	const serverModule = context.asAbsolutePath('/lsp-server/lsp-wake.js');
 
-	// If the extension is launched in debug mode then the debug server options are used
-	// Otherwise the run options are used
+	// // Options to control the language server
 	let serverOptions: ServerOptions = {
 		module: serverModule,
 		transport: TransportKind.stdio
@@ -30,7 +29,7 @@ export function activate(context: ExtensionContext) {
 		// Register the server for .wake files
 		documentSelector: [{ language: 'wake', pattern: '**/*.wake' }],
 		synchronize: {
-			// Notify the server about file changes to '.clientrc files contained in the workspace
+			// Notify the server about file changes to '.wake files contained in the workspace
 			fileEvents: workspace.createFileSystemWatcher('**/*.wake')
 		}
 	};

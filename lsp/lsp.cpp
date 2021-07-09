@@ -33,9 +33,19 @@
 #include <map>
 #include <sstream>
 #include <fstream>
+#include <chrono>
+#include <ctime>  
 
 #include "json5.h"
 #include "execpath.h"
+
+/*
+#include "/home/elena/wake/src/symbol.h"
+#include "/home/elena/wake/src/runtime.h"
+#include "/home/elena/wake/src/parser.h"
+#include "/home/elena/wake/src/expr.h"
+*/
+
 
 #ifndef VERSION
 #include "../src/version.h"
@@ -87,12 +97,53 @@ JAST initialize(JAST params) {
   return initializeResult;
 }
 
+/*
+char* file_data =
+"# limitations under the License."
+""
+"package build_wake"
+"from wake import _"
+"from gcc_wake import _"
+""
+"def common variant ="
+"    def cflags = \"-I{here}\", Nil"
+"    def headers = sources here `.*\\.h`"
+"    def reFiles = sources here `.*\\.re`"
+"    def cppFiles = map re2c reFiles ++ sources here `.*\\.cpp`"
+"    def compile = compileC variant cflags headers"
+"    def objects = map compile cppFiles"
+"    SysLib \"0.0\" headers objects cflags Nil";
+*/
+void validateWakeFile(JAST params) {
+  /*
+  std::unique_ptr<Top> top(new Top);
+  Runtime runtime(nullptr, 0, 4.0, 0);
+  Lexer lex(runtime.heap, file_data);
+  auto package = parse_top(*top, lex);
+  std::ofstream lexLog;
+  lexLog.open("lex_log.txt", std::ios_base::app); // append instead of overwriting
+  lexLog << std::endl
+          << std::string(package) << std::endl;
+  */
+  std::string filePath = params.get("uri").value;
+  std::ifstream wakefile(filePath);
+  std::stringstream buffer;
+  buffer << wakefile.rdbuf();
+
+  std::ofstream changedFilesReader;
+  changedFilesReader.open("changed_files_contents.txt", std::ios_base::app); // append instead of overwriting
+  changedFilesReader << filePath << std::endl
+          << buffer.str() << std::endl << std::endl;
+}
+
+
 int main(int argc, const char **argv) {
   // Begin log
-  std::ofstream logfile;
-  logfile.open("log.txt", std::ios_base::app); // append instead of overwriting
-  logfile << std::endl
-          << "Log start:" << std::endl;
+  std::ofstream clientLog;
+  clientLog.open("requests_log.txt", std::ios_base::app); // append instead of overwriting
+  std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+  clientLog << std::endl
+          << "Log start: " << ctime(&currentTime) << std::endl;
 
   // Process requests until something goes wrong
   while (true) {
@@ -127,7 +178,7 @@ int main(int argc, const char **argv) {
     std::cin.read(&content[0], json_size);
 
     // Log the request
-    logfile << content << std::endl;
+    clientLog << content << std::endl;
 
     // Begin to formulate our response
     JAST response(JSON_OBJECT);
@@ -161,11 +212,17 @@ int main(int argc, const char **argv) {
         error.add("code", JSON_INTEGER, ServerNotInitialized);
         error.add("message", "Must request initialize first");
       } else if (method == "shutdown") {
-        JAST empty(JSON_OBJECT);
-        response.children.emplace_back("result", empty);
+        response.children.emplace_back("result", JSON_NULLVAL);
         isShutDown = true;
       } else if (method == "exit") {
         return isShutDown?0:1;
+      } else if (method == "workspace/didChangeWatchedFiles") {
+        JAST files = params.get("changes");
+        for (auto child: files.children) {
+          clientLog << child.second << std::endl;
+          validateWakeFile(child.second);
+        }
+        // response.children.emplace_back("result", validateWakeFile(params));        
       } else {
         JAST &error = response.add("error", JSON_OBJECT);
         error.add("code", JSON_INTEGER, MethodNotFound);
