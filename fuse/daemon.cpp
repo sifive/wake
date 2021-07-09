@@ -50,9 +50,6 @@
 
 #define MAX_JSON (128*1024*1024)
 
-bool enable_trace = false;
-#define TRACE(x) do { if (enable_trace) { fprintf(stderr, "%s: %s\n", __FUNCTION__, x); fflush(stderr); } } while (0)
-
 // We ensure STDIN is /dev/null, so this is a safe sentinel value for open files
 #define BAD_FD STDIN_FILENO
 
@@ -245,10 +242,19 @@ static void schedule_exit()
 	setitimer(ITIMER_REAL, &retry, 0);
 }
 
+static const char *trace_out(int code)
+{
+	static char buf[20];
+	if (code < 0) {
+		return strerror(-code);
+	} else {
+		snprintf(&buf[0], sizeof(buf), "%d", code);
+		return &buf[0];
+	}
+}
+
 static int wakefuse_getattr(const char *path, struct stat *stbuf)
 {
-	TRACE(path);
-
 	if (auto s = is_special(path)) {
 		int res = fstat(context.rootfd, stbuf);
 		if (res == -1) res = -errno;
@@ -305,10 +311,15 @@ static int wakefuse_getattr(const char *path, struct stat *stbuf)
 	return res;
 }
 
+static int wakefuse_getattr_trace(const char *path, struct stat *stbuf)
+{
+	int out = wakefuse_getattr(path, stbuf);
+	fprintf(stderr, "getattr(%s) = %s\n", path, trace_out(out));
+	return out;
+}
+
 static int wakefuse_access(const char *path, int mask)
 {
-	TRACE(path);
-
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
 			case 'o':
@@ -338,10 +349,15 @@ static int wakefuse_access(const char *path, int mask)
 	return 0;
 }
 
+static int wakefuse_access_trace(const char *path, int mask)
+{
+	int out = wakefuse_access(path, mask);
+	fprintf(stderr, "access(%s, %d) = %s\n", path, mask, trace_out(out));
+	return out;
+}
+
 static int wakefuse_readlink(const char *path, char *buf, size_t size)
 {
-	TRACE(path);
-
 	if (is_special(path))
 		return -EINVAL;
 
@@ -368,13 +384,17 @@ static int wakefuse_readlink(const char *path, char *buf, size_t size)
 	return 0;
 }
 
-static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-		       off_t offset, struct fuse_file_info *fi)
+static int wakefuse_readlink_trace(const char *path, char *buf, size_t size)
+{
+	int out = wakefuse_readlink(path, buf, size);
+	fprintf(stderr, "readlink(%s, %lu) = %s\n", path, (unsigned long)size, trace_out(out));
+	return out;
+}
+
+static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
 	(void) offset;
 	(void) fi;
-
-	TRACE(path);
 
 	if (is_special(path))
 		return -ENOTDIR;
@@ -440,10 +460,15 @@ static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return 0;
 }
 
+static int wakefuse_readdir_trace(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
+{
+	int out = wakefuse_readdir(path, buf, filler, offset, fi);
+	fprintf(stderr, "readdir(%s, %lld) = %s\n", path, (long long)offset, trace_out(out));
+	return out;
+}
+
 static int wakefuse_mknod(const char *path, mode_t mode, dev_t rdev)
 {
-	TRACE(path);
-
 	if (is_special(path))
 		return -EEXIST;
 
@@ -496,10 +521,15 @@ static int wakefuse_mknod(const char *path, mode_t mode, dev_t rdev)
 	return 0;
 }
 
+static int wakefuse_mknod_trace(const char *path, mode_t mode, dev_t rdev)
+{
+	int out = wakefuse_mknod(path, mode, rdev);
+	fprintf(stderr, "mknod(%s, 0%o, 0x%lx) = %s\n", path, mode, (unsigned long)rdev, trace_out(out));
+	return out;
+}
+
 static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-	TRACE(path);
-
 	if (is_special(path))
 		return -EEXIST;
 
@@ -547,10 +577,15 @@ static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info 
 	return 0;
 }
 
+static int wakefuse_create_trace(const char *path, mode_t mode, struct fuse_file_info *fi)
+{
+	int out = wakefuse_create(path, mode, fi);
+	fprintf(stderr, "create(%s, 0%o) = %s\n", path, mode, trace_out(out));
+	return out;
+}
+
 static int wakefuse_mkdir(const char *path, mode_t mode)
 {
-	TRACE(path);
-
 	if (is_special(path))
 		return -EEXIST;
 
@@ -583,10 +618,15 @@ static int wakefuse_mkdir(const char *path, mode_t mode)
 	return 0;
 }
 
+static int wakefuse_mkdir_trace(const char *path, mode_t mode)
+{
+	int out = wakefuse_mkdir(path, mode);
+	fprintf(stderr, "mkdir(%s, 0%o) = %s\n", path, mode, trace_out(out));
+	return out;
+}
+
 static int wakefuse_unlink(const char *path)
 {
-	TRACE(path);
-
 	if (is_special(path))
 		return -EACCES;
 
@@ -616,10 +656,15 @@ static int wakefuse_unlink(const char *path)
 	return 0;
 }
 
+static int wakefuse_unlink_trace(const char *path)
+{
+	int out = wakefuse_unlink(path);
+	fprintf(stderr, "unlink(%s) = %s\n", path, trace_out(out));
+	return out;
+}
+
 static int wakefuse_rmdir(const char *path)
 {
-	TRACE(path);
-
 	if (is_special(path))
 		return -ENOTDIR;
 
@@ -649,10 +694,15 @@ static int wakefuse_rmdir(const char *path)
 	return 0;
 }
 
+static int wakefuse_rmdir_trace(const char *path)
+{
+	int out = wakefuse_rmdir(path);
+	fprintf(stderr, "rmdir(%s) = %s\n", path, trace_out(out));
+	return out;
+}
+
 static int wakefuse_symlink(const char *from, const char *to)
 {
-	TRACE(to);
-
 	if (is_special(to))
 		return -EEXIST;
 
@@ -685,6 +735,13 @@ static int wakefuse_symlink(const char *from, const char *to)
 	return 0;
 }
 
+static int wakefuse_symlink_trace(const char *from, const char *to)
+{
+	int out = wakefuse_symlink(from, to);
+	fprintf(stderr, "symlink(%s, %s) = %s\n", from, to, trace_out(out));
+	return out;
+}
+
 static void move_members(std::set<std::string> &from, std::set<std::string> &to, const std::string &dir, const std::string &dest)
 {
 	// Find half-open range [i, e) that includes all strings matching `{dir}/.*`
@@ -712,8 +769,6 @@ static void move_members(std::set<std::string> &from, std::set<std::string> &to,
 
 static int wakefuse_rename(const char *from, const char *to)
 {
-	TRACE(from);
-
 	if (is_special(to))
 		return -EACCES;
 
@@ -772,10 +827,15 @@ static int wakefuse_rename(const char *from, const char *to)
 	return 0;
 }
 
+static int wakefuse_rename_trace(const char *from, const char *to)
+{
+	int out = wakefuse_rename(from, to);
+	fprintf(stderr, "rename(%s, %s) = %s\n", from, to, trace_out(out));
+	return out;
+}
+
 static int wakefuse_link(const char *from, const char *to)
 {
-	TRACE(from);
-
 	if (is_special(to))
 		return -EEXIST;
 
@@ -824,10 +884,15 @@ static int wakefuse_link(const char *from, const char *to)
 	return 0;
 }
 
+static int wakefuse_link_trace(const char *from, const char *to)
+{
+	int out = wakefuse_link(from, to);
+	fprintf(stderr, "link(%s, %s) = %s\n", from, to, trace_out(out));
+	return out;
+}
+
 static int wakefuse_chmod(const char *path, mode_t mode)
 {
-	TRACE(path);
-
 	if (is_special(path))
 		return -EACCES;
 
@@ -860,10 +925,15 @@ static int wakefuse_chmod(const char *path, mode_t mode)
 	return 0;
 }
 
+static int wakefuse_chmod_trace(const char *path, mode_t mode)
+{
+	int out = wakefuse_chmod(path, mode);
+	fprintf(stderr, "chmod(%s, 0%o) = %s\n", path, mode, trace_out(out));
+	return out;
+}
+
 static int wakefuse_chown(const char *path, uid_t uid, gid_t gid)
 {
-	TRACE(path);
-
 	if (is_special(path))
 		return -EACCES;
 
@@ -891,10 +961,15 @@ static int wakefuse_chown(const char *path, uid_t uid, gid_t gid)
 	return 0;
 }
 
+static int wakefuse_chown_trace(const char *path, uid_t uid, gid_t gid)
+{
+	int out = wakefuse_chown(path, uid, gid);
+	fprintf(stderr, "chown(%s, %d, %d) = %s\n", path, uid, gid, trace_out(out));
+	return out;
+}
+
 static int wakefuse_truncate(const char *path, off_t size)
 {
-	TRACE(path);
-
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
 			case 'i':
@@ -942,10 +1017,15 @@ static int wakefuse_truncate(const char *path, off_t size)
 	}
 }
 
+static int wakefuse_truncate_trace(const char *path, off_t size)
+{
+	int out = wakefuse_truncate(path, size);
+	fprintf(stderr, "truncate(%s, %lld) = %s\n", path, (long long)size, trace_out(out));
+	return out;
+}
+
 static int wakefuse_utimens(const char *path, const struct timespec ts[2])
 {
-	TRACE(path);
-
 	if (is_special(path))
 		return -EACCES;
 
@@ -974,10 +1054,16 @@ static int wakefuse_utimens(const char *path, const struct timespec ts[2])
 	return 0;
 }
 
+static int wakefuse_utimens_trace(const char *path, const struct timespec ts[2])
+{
+	int out = wakefuse_utimens(path, ts);
+	fprintf(stderr, "utimens(%s, %ld.%09ld, %ld.%09ld) = %s\n",
+		path, (long)ts[0].tv_sec, (long)ts[0].tv_nsec, (long)ts[1].tv_sec, (long)ts[1].tv_nsec, trace_out(out));
+	return out;
+}
+
 static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 {
-	TRACE(path);
-
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
 			case 'i': ++s.job->second.json_in_uses; break;
@@ -1023,6 +1109,13 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
+static int wakefuse_open_trace(const char *path, struct fuse_file_info *fi)
+{
+	int out = wakefuse_open(path, fi);
+	fprintf(stderr, "open(%s) = %s\n", path, trace_out(out));
+	return out;
+}
+
 static int read_str(const std::string &str, char *buf, size_t size, off_t offset)
 {
 	if (offset >= (ssize_t)str.size()) {
@@ -1034,11 +1127,8 @@ static int read_str(const std::string &str, char *buf, size_t size, off_t offset
 	}
 }
 
-static int wakefuse_read(const char *path, char *buf, size_t size, off_t offset,
-		    struct fuse_file_info *fi)
+static int wakefuse_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-	TRACE(path);
-
 	if (fi->fh != BAD_FD) {
 		auto key = split_key(path);
 		auto it = context.jobs.find(key.first);
@@ -1065,6 +1155,14 @@ static int wakefuse_read(const char *path, char *buf, size_t size, off_t offset,
 	return -EIO;
 }
 
+static int wakefuse_read_trace(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+{
+	int out = wakefuse_read(path, buf, size, offset, fi);
+	fprintf(stderr, "read(%s, %lu, %lld) = %s\n",
+		path, (unsigned long)size, (long long)offset, trace_out(out));
+	return out;
+}
+
 static int write_str(std::string &str, const char *buf, size_t size, off_t offset)
 {
 	if (offset >= MAX_JSON) {
@@ -1078,11 +1176,8 @@ static int write_str(std::string &str, const char *buf, size_t size, off_t offse
 	}
 }
 
-static int wakefuse_write(const char *path, const char *buf, size_t size,
-		     off_t offset, struct fuse_file_info *fi)
+static int wakefuse_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-	TRACE(path);
-
 	if (fi->fh != BAD_FD) {
 		auto key = split_key(path);
 		auto it = context.jobs.find(key.first);
@@ -1111,10 +1206,16 @@ static int wakefuse_write(const char *path, const char *buf, size_t size,
 	return -EIO;
 }
 
+static int wakefuse_write_trace(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+{
+	int out = wakefuse_write(path, buf, size, offset, fi);
+	fprintf(stderr, "write(%s, %lu, %lld) = %s\n",
+		path, (unsigned long)size, (long long)offset, trace_out(out));
+	return out;
+}
+
 static int wakefuse_statfs(const char *path, struct statvfs *stbuf)
 {
-	TRACE(path);
-
 	int fd;
 	auto key = split_key(path);
 	if (key.first.empty() || is_special(path)) {
@@ -1145,10 +1246,15 @@ static int wakefuse_statfs(const char *path, struct statvfs *stbuf)
 	}
 }
 
+static int wakefuse_statfs_trace(const char *path, struct statvfs *stbuf)
+{
+	int out = wakefuse_statfs(path, stbuf);
+	fprintf(stderr, "statfs(%s) = %s\n", path, trace_out(out));
+	return out;
+}
+
 static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 {
-	TRACE(path);
-
 	if (fi->fh != BAD_FD) {
 		int res = close(fi->fh);
 		if (res == -1)
@@ -1172,12 +1278,16 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
-static int wakefuse_fsync(const char *path, int isdatasync,
-		     struct fuse_file_info *fi)
+static int wakefuse_release_trace(const char *path, struct fuse_file_info *fi)
+{
+	int out = wakefuse_release(path, fi);
+	fprintf(stderr, "release(%s) = %s\n", path, trace_out(out));
+	return out;
+}
+
+static int wakefuse_fsync(const char *path, int isdatasync, struct fuse_file_info *fi)
 {
 	int res;
-
-	TRACE(path);
 
 	if (fi->fh == BAD_FD)
 		return 0;
@@ -1197,13 +1307,17 @@ static int wakefuse_fsync(const char *path, int isdatasync,
 	return 0;
 }
 
+static int wakefuse_fsync_trace(const char *path, int isdatasync, struct fuse_file_info *fi)
+{
+	int out = wakefuse_fsync(path, isdatasync, fi);
+	fprintf(stderr, "fsync(%s, %d) = %s\n", path, isdatasync, trace_out(out));
+	return out;
+}
+
 #ifdef HAVE_FALLOCATE
-static int wakefuse_fallocate(const char *path, int mode,
-			off_t offset, off_t length, struct fuse_file_info *fi)
+static int wakefuse_fallocate(const char *path, int mode, off_t offset, off_t length, struct fuse_file_info *fi)
 {
 	(void) fi;
-
-	TRACE(path);
 
 	if (mode)
 		return -EOPNOTSUPP;
@@ -1241,6 +1355,14 @@ static int wakefuse_fallocate(const char *path, int mode,
 		(void)close(fd);
 		return 0;
 	}
+}
+
+static int wakefuse_fallocate_trace(const char *path, int mode, off_t offset, off_t length, struct fuse_file_info *fi)
+{
+	int out = wakefuse_fallocate(path, mode, offset, length, fi);
+	fprintf(stderr, "fallocate(%s, 0%o, %lld, %lld) = %s\n",
+		path, mode, (long long)offset, (long long)length, trace_out(out));
+	return out;
 }
 #endif
 
@@ -1298,29 +1420,32 @@ static void handle_exit(int sig)
 
 int main(int argc, char *argv[])
 {
+	bool enable_trace = getenv("DEBUG_FUSE_WAKE");
+
 	wakefuse_ops.init		= wakefuse_init;
-	wakefuse_ops.getattr		= wakefuse_getattr;
-	wakefuse_ops.access		= wakefuse_access;
-	wakefuse_ops.readlink		= wakefuse_readlink;
-	wakefuse_ops.readdir		= wakefuse_readdir;
-	wakefuse_ops.mknod		= wakefuse_mknod;
-	wakefuse_ops.create		= wakefuse_create;
-	wakefuse_ops.mkdir		= wakefuse_mkdir;
-	wakefuse_ops.symlink		= wakefuse_symlink;
-	wakefuse_ops.unlink		= wakefuse_unlink;
-	wakefuse_ops.rmdir		= wakefuse_rmdir;
-	wakefuse_ops.rename		= wakefuse_rename;
-	wakefuse_ops.link		= wakefuse_link;
-	wakefuse_ops.chmod		= wakefuse_chmod;
-	wakefuse_ops.chown		= wakefuse_chown;
-	wakefuse_ops.truncate		= wakefuse_truncate;
-	wakefuse_ops.utimens		= wakefuse_utimens;
-	wakefuse_ops.open		= wakefuse_open;
-	wakefuse_ops.read		= wakefuse_read;
-	wakefuse_ops.write		= wakefuse_write;
-	wakefuse_ops.statfs		= wakefuse_statfs;
-	wakefuse_ops.release		= wakefuse_release;
-	wakefuse_ops.fsync		= wakefuse_fsync;
+	wakefuse_ops.getattr		= enable_trace ? wakefuse_getattr_trace  : wakefuse_getattr;
+	wakefuse_ops.access		= enable_trace ? wakefuse_access_trace   : wakefuse_access;
+	wakefuse_ops.readlink		= enable_trace ? wakefuse_readlink_trace : wakefuse_readlink;
+	wakefuse_ops.readdir		= enable_trace ? wakefuse_readdir_trace  : wakefuse_readdir;
+	wakefuse_ops.mknod		= enable_trace ? wakefuse_mknod_trace    : wakefuse_mknod;
+	wakefuse_ops.create		= enable_trace ? wakefuse_create_trace   : wakefuse_create;
+	wakefuse_ops.mkdir		= enable_trace ? wakefuse_mkdir_trace    : wakefuse_mkdir;
+	wakefuse_ops.symlink		= enable_trace ? wakefuse_symlink_trace  : wakefuse_symlink;
+	wakefuse_ops.unlink		= enable_trace ? wakefuse_unlink_trace   : wakefuse_unlink;
+	wakefuse_ops.rmdir		= enable_trace ? wakefuse_rmdir_trace    : wakefuse_rmdir;
+	wakefuse_ops.rename		= enable_trace ? wakefuse_rename_trace   : wakefuse_rename;
+	wakefuse_ops.link		= enable_trace ? wakefuse_link_trace     : wakefuse_link;
+	wakefuse_ops.chmod		= enable_trace ? wakefuse_chmod_trace    : wakefuse_chmod;
+	wakefuse_ops.chown		= enable_trace ? wakefuse_chown_trace    : wakefuse_chown;
+	wakefuse_ops.truncate		= enable_trace ? wakefuse_truncate_trace : wakefuse_truncate;
+	wakefuse_ops.utimens		= enable_trace ? wakefuse_utimens_trace  : wakefuse_utimens;
+	wakefuse_ops.open		= enable_trace ? wakefuse_open_trace     : wakefuse_open;
+	wakefuse_ops.read		= enable_trace ? wakefuse_read_trace     : wakefuse_read;
+	wakefuse_ops.write		= enable_trace ? wakefuse_write_trace    : wakefuse_write;
+	wakefuse_ops.statfs		= enable_trace ? wakefuse_statfs_trace   : wakefuse_statfs;
+	wakefuse_ops.release		= enable_trace ? wakefuse_release_trace  : wakefuse_release;
+	wakefuse_ops.fsync		= enable_trace ? wakefuse_fsync_trace    : wakefuse_fsync;
+
 	// xattr were removed because they are not hashed!
 #ifdef HAVE_FALLOCATE
 	wakefuse_ops.fallocate		= wakefuse_fallocate;
@@ -1351,10 +1476,6 @@ int main(int argc, char *argv[])
 	if (log == -1) {
 		fprintf(stderr, "open %s.log: %s\n", path.c_str(), strerror(errno));
 		goto term;
-	}
-
-	if (getenv("DEBUG_FUSE_WAKE")) {
-		enable_trace = true;
 	}
 
 	umask(0);
