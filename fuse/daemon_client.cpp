@@ -61,7 +61,11 @@ bool daemon_client::connect(std::vector<std::string> &visible) {
 		struct timespec delay;
 		delay.tv_sec = wait_ms / 1000;
 		delay.tv_nsec = (wait_ms % 1000) * INT64_C(1000000);
-		nanosleep(&delay, nullptr);
+
+		// Sleep the full amount (even if signals like SIGWINCH arrive)
+		int ok;
+		do { ok = nanosleep(&delay, &delay); }
+		while (ok == -1 && errno == EINTR);
 
 		wait_ms <<= 1;
 
