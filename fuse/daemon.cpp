@@ -56,6 +56,9 @@ bool enable_trace = false;
 // We ensure STDIN is /dev/null, so this is a safe sentinel value for open files
 #define BAD_FD STDIN_FILENO
 
+// How long to wait for a new client to connect before the daemon exits
+static int min_timeout;
+
 struct Job {
 	std::set<std::string> files_visible;
 	std::set<std::string> files_read;
@@ -241,7 +244,7 @@ static void schedule_exit()
 {
 	struct itimerval retry;
 	memset(&retry, 0, sizeof(retry));
-	retry.it_value.tv_sec = 2 << exit_attempts;
+	retry.it_value.tv_sec = min_timeout << exit_attempts;
 	setitimer(ITIMER_REAL, &retry, 0);
 }
 
@@ -1335,11 +1338,15 @@ int main(int argc, char *argv[])
 	int log, null;
 	bool madedir;
 
-	if (argc != 2) {
-		fprintf(stderr, "Syntax: fuse-waked <mount-point>\n");
+	if (argc != 3) {
+		fprintf(stderr, "Syntax: fuse-waked <mount-point> <min-timeout-seconds>\n");
 		goto term;
 	}
 	path = argv[1];
+
+	min_timeout = atol(argv[2]);
+	if (min_timeout < 1) min_timeout = 1;
+	if (min_timeout > 240) min_timeout = 240;
 
 	null = open("/dev/null", O_RDONLY);
 	if (null == -1) {
