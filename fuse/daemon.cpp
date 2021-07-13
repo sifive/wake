@@ -1532,6 +1532,10 @@ int main(int argc, char *argv[])
 	fl.l_len = 0; // 0=largest possible
 	if (fcntl(log, F_SETLK, &fl) != 0) {
 		if (errno == EAGAIN || errno == EACCES) {
+			if (enable_trace) {
+				fprintf(stderr, "fcntl(%s.log): %s -- assuming another daemon exists\n",
+					path.c_str(), strerror(errno));
+			}
 			status = 0; // another daemon is already running
 		} else {
 			fprintf(stderr, "flock %s.log: %s\n", path.c_str(), strerror(errno));
