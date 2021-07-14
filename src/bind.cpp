@@ -31,7 +31,7 @@
 #include "bind.h"
 #include "expr.h"
 #include "prim.h"
-#include "symbol.h"
+#include "frontend/symbol.h"
 #include "parser.h"
 
 typedef std::map<std::string, int> NameIndex;

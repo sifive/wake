@@ -25,7 +25,7 @@
 
 #include "type.h"
 #include "location.h"
-#include "symbol.h"
+#include "frontend/symbol.h"
 #include "expr.h"
 #include "status.h"
 

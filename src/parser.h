@@ -18,7 +18,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "symbol.h"
+#include "frontend/symbol.h"
 
 struct Top;
 struct Expr;
