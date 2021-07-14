@@ -57,7 +57,12 @@ bool enable_trace = false;
 #define BAD_FD STDIN_FILENO
 
 // How long to wait for a new client to connect before the daemon exits
-static int min_timeout;
+static int linger_timeout;
+
+// How to retry umount while quitting
+// (2^8-1)*100ms = 25.5s worst-case quit time
+#define QUIT_RETRY_MS		100
+#define QUIT_RETRY_ATTEMPTS	8
 
 struct Job {
 	std::set<std::string> files_visible;
@@ -244,7 +249,17 @@ static void schedule_exit()
 {
 	struct itimerval retry;
 	memset(&retry, 0, sizeof(retry));
-	retry.it_value.tv_sec = min_timeout << exit_attempts;
+	if (exit_attempts == 0) {
+		// Wait a while for new clients before the daemon exits.
+		// In particular, wait longer than the client waits to reach us.
+		retry.it_value.tv_sec = linger_timeout;
+	} else {
+		// When trying to quit, be aggressive to get out of the way.
+		// A new daemon might need us gone so it can start.
+		long retry_ms = QUIT_RETRY_MS << (exit_attempts-1);
+		retry.it_value.tv_sec = retry_ms / 1000;
+		retry.it_value.tv_usec = (retry_ms % 1000) * 1000;
+	}
 	setitimer(ITIMER_REAL, &retry, 0);
 }
 
@@ -1168,7 +1183,7 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 		}
 		if ('f' != s.kind && s.job->second.should_erase())
 			context.jobs.erase(s.job);
-		if (context.jobs.empty() && 0 == context.uses)
+		if (context.should_exit())
 			schedule_exit();
 	}
 
@@ -1283,10 +1298,12 @@ static void handle_exit(int sig)
 		int status;
 		do waitpid(pid, &status, 0);
 		while (WIFSTOPPED(status));
+		// Attempts numbered counting from 1:
+		fprintf(stderr, "Unable to umount on attempt %d\n", exit_attempts);
 	}
 
-	if (exit_attempts == 3) {
-		fprintf(stderr, "Unable to cleanly exit after 4 unmount attempts\n");
+	if (exit_attempts == QUIT_RETRY_ATTEMPTS) {
+		fprintf(stderr, "Too many umount attempts; unable to exit cleanly. Leaving a broken mount point behind.\n");
 		exit(1);
 	} else if ((pid = fork()) == 0) {
 		// We need to fork before fuse_unmount, in order to be able to try more than once.
@@ -1344,9 +1361,9 @@ int main(int argc, char *argv[])
 	}
 	path = argv[1];
 
-	min_timeout = atol(argv[2]);
-	if (min_timeout < 1) min_timeout = 1;
-	if (min_timeout > 240) min_timeout = 240;
+	linger_timeout = atol(argv[2]);
+	if (linger_timeout < 1) linger_timeout = 1;
+	if (linger_timeout > 240) linger_timeout = 240;
 
 	null = open("/dev/null", O_RDONLY);
 	if (null == -1) {
