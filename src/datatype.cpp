@@ -23,7 +23,7 @@
 
 #include "datatype.h"
 #include "expr.h"
-#include "symbol.h"
+#include "frontend/symbol.h"
 
 Constructor Constructor::array(AST(LOCATION, "Array"));
 

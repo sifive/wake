@@ -29,7 +29,7 @@
 
 #include "parser.h"
 #include "bind.h"
-#include "symbol.h"
+#include "frontend/symbol.h"
 #include "value.h"
 #include "expr.h"
 #include "job.h"

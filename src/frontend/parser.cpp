@@ -25,7 +25,7 @@
 
 #include "parser.h"
 #include "expr.h"
-#include "symbol.h"
+#include "frontend/symbol.h"
 #include "value.h"
 #include "location.h"
 

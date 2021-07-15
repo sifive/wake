@@ -29,7 +29,7 @@
 #include "expr.h"
 #include "ssa.h"
 #include "hash.h"
-#include "symbol.h"
+#include "frontend/symbol.h"
 #include "status.h"
 #include "sfinae.h"
 #include "tuple.h"
