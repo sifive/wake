@@ -1405,7 +1405,13 @@ static void handle_exit(int sig)
 	// In that case, we need to uphold the promise of cancel_exit
 	if (sig == SIGALRM && 0 == exit_attempts && !context.should_exit()) return;
 
+	// We only start the exit sequence once for SIG{INT,QUIT,TERM}
+	if (sig != SIGALRM && 0 != exit_attempts) return;
+
+	static struct timeval start;
 	static pid_t pid = -1;
+	struct timeval now;
+
 	// Unfortunately, fuse_unmount can fail if the filesystem is still in use.
 	// Yes, this can even happen on linux with MNT_DETACH / lazy umount.
 	// Worse, fuse_unmount closes descriptors and frees memory, so can only be called once.
@@ -1415,13 +1421,24 @@ static void handle_exit(int sig)
 	// If this succeeds, fuse_loop will terminate anyway.
 	// In case it fails, we setup an itimer to keep trying to unmount.
 
+	if (exit_attempts == 0) {
+		// Record when the exit sequence began
+		gettimeofday(&start, nullptr);
+	}
+
 	// Reap prior attempts
 	if (pid != -1) {
 		int status;
 		do waitpid(pid, &status, 0);
 		while (WIFSTOPPED(status));
+		pid = -1;
+
 		// Attempts numbered counting from 1:
-		fprintf(stderr, "Unable to umount on attempt %d\n", exit_attempts);
+		gettimeofday(&now, nullptr);
+		double waited =
+			(now.tv_sec  - start.tv_sec) +
+			(now.tv_usec - start.tv_usec)/1000000.0;
+		fprintf(stderr, "Unable to umount on attempt %d, %.1fs after we started to shutdown\n", exit_attempts, waited);
 	}
 
 	if (exit_attempts == QUIT_RETRY_ATTEMPTS) {
