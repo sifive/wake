@@ -1081,6 +1081,77 @@ static int wakefuse_utimens_trace(const char *path, const struct timespec ts[2])
 	return out;
 }
 
+static int wakefuse_opendir(const char *path, struct fuse_file_info *fi)
+{
+	if (is_special(path))
+		return -ENOTDIR;
+
+	auto key = split_key(path);
+	if (key.first.empty()) {
+		++context.uses;
+		return 0;
+	}
+
+	auto it = context.jobs.find(key.first);
+	if (it == context.jobs.end())
+		return -ENOENT;
+
+	int dfd;
+	if (key.second == ".") {
+		dfd = dup(context.rootfd);
+	} else if (!it->second.is_readable(key.second)) {
+		return -ENOENT;
+	} else {
+		dfd = openat(context.rootfd, key.second.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY);
+	}
+
+	if (dfd == -1)
+		return -errno;
+
+	fi->fh = dfd;
+	++it->second.uses;
+	return 0;
+}
+
+static int wakefuse_opendir_trace(const char *path, struct fuse_file_info *fi)
+{
+	int out = wakefuse_opendir(path, fi);
+	fprintf(stderr, "opendir(%s) = %s\n", path, trace_out(out));
+	return out;
+}
+
+static int wakefuse_releasedir(const char *path, struct fuse_file_info *fi)
+{
+	auto key = split_key(path);
+	if (key.first.empty()) {
+		--context.uses;
+		return 0;
+	}
+
+	auto it = context.jobs.find(key.first);
+	if (it == context.jobs.end())
+		return -ENOENT;
+
+	--it->second.uses;
+	if (-1 == close(fi->fh))
+		return -errno;
+
+	if (it->second.should_erase())
+		context.jobs.erase(it);
+
+	if (context.should_exit())
+		schedule_exit();
+
+	return 0;
+}
+
+static int wakefuse_releasedir_trace(const char *path, struct fuse_file_info *fi)
+{
+	int out = wakefuse_releasedir(path, fi);
+	fprintf(stderr, "releasedir(%s) = %s\n", path, trace_out(out));
+	return out;
+}
+
 static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 {
 	if (auto s = is_special(path)) {
@@ -1496,6 +1567,8 @@ int main(int argc, char *argv[])
 	wakefuse_ops.statfs		= enable_trace ? wakefuse_statfs_trace   : wakefuse_statfs;
 	wakefuse_ops.release		= enable_trace ? wakefuse_release_trace  : wakefuse_release;
 	wakefuse_ops.fsync		= enable_trace ? wakefuse_fsync_trace    : wakefuse_fsync;
+	wakefuse_ops.opendir		= enable_trace ? wakefuse_opendir_trace  : wakefuse_opendir;
+	wakefuse_ops.releasedir		= enable_trace ? wakefuse_releasedir_trace : wakefuse_releasedir;
 
 	// xattr were removed because they are not hashed!
 #ifdef HAVE_FALLOCATE
