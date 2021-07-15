@@ -23,10 +23,10 @@
 #include <sstream>
 #include <set>
 
-#include "parser.h"
-#include "expr.h"
+#include "frontend/parser.h"
+#include "frontend/expr.h"
 #include "frontend/symbol.h"
-#include "value.h"
+#include "runtime/value.h"
 #include "location.h"
 
 //#define TRACE(x) do { fprintf(stderr, "%s\n", x); } while (0)
