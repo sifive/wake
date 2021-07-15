@@ -1,4 +1,4 @@
-/* Wake Build Server Protocol implementation
+/* Wake Language Server Protocol implementation
  *
  * Copyright 2020 SiFive, Inc.
  *
@@ -38,13 +38,12 @@
 
 #include "json5.h"
 #include "execpath.h"
+#include "parser.h"
+#include "symbol.h"
+#include "runtime.h"
+#include "expr.h"
+#include "sources.h"
 
-/*
-#include "/home/elena/wake/src/symbol.h"
-#include "/home/elena/wake/src/runtime.h"
-#include "/home/elena/wake/src/parser.h"
-#include "/home/elena/wake/src/expr.h"
-*/
 
 
 #ifndef VERSION
@@ -73,6 +72,7 @@ static const char *ServerNotInitialized = "-32002";
 //static const char *UnknownErrorCode     = "-32001";
 
 bool isInitialized = false;
+int rootUriLength = -1;
 bool isShutDown = false;
 
 static void sendMessage(const JAST &message) {
@@ -86,6 +86,8 @@ static void sendMessage(const JAST &message) {
 
 JAST initialize(JAST params) {
   JAST capabilities(JSON_OBJECT);
+  capabilities.add("textDocumentSync", 1);
+
   JAST serverInfo(JSON_OBJECT);
   serverInfo.add("name", "lsp wake server");
 
@@ -94,56 +96,39 @@ JAST initialize(JAST params) {
   initializeResult.children.emplace_back("serverInfo", serverInfo);
 
   isInitialized = true;
+  rootUriLength = params.get("rootUri").value.length();
+  
   return initializeResult;
 }
 
-/*
-char* file_data =
-"# limitations under the License."
-""
-"package build_wake"
-"from wake import _"
-"from gcc_wake import _"
-""
-"def common variant ="
-"    def cflags = \"-I{here}\", Nil"
-"    def headers = sources here `.*\\.h`"
-"    def reFiles = sources here `.*\\.re`"
-"    def cppFiles = map re2c reFiles ++ sources here `.*\\.cpp`"
-"    def compile = compileC variant cflags headers"
-"    def objects = map compile cppFiles"
-"    SysLib \"0.0\" headers objects cflags Nil";
-*/
-void validateWakeFile(JAST params) {
-  /*
+void validateWakeFileOnSave(JAST params, Runtime &runtime) {
+  std::string fileUri = params.get("uri").value;
+  std::string filePath = fileUri.substr(rootUriLength + 1, std::string::npos);
+  
   std::unique_ptr<Top> top(new Top);
-  Runtime runtime(nullptr, 0, 4.0, 0);
-  Lexer lex(runtime.heap, file_data);
+  Lexer lex(runtime.heap, filePath.c_str());
   auto package = parse_top(*top, lex);
-  std::ofstream lexLog;
-  lexLog.open("lex_log.txt", std::ios_base::app); // append instead of overwriting
-  lexLog << std::endl
-          << std::string(package) << std::endl;
-  */
-  std::string filePath = params.get("uri").value;
-  std::ifstream wakefile(filePath);
-  std::stringstream buffer;
-  buffer << wakefile.rdbuf();
+}
 
-  std::ofstream changedFilesReader;
-  changedFilesReader.open("changed_files_contents.txt", std::ios_base::app); // append instead of overwriting
-  changedFilesReader << filePath << std::endl
-          << buffer.str() << std::endl << std::endl;
+void validateWakeFile(JAST params, Runtime &runtime) {
+  std::string fileUri = params.get("textDocument").get("uri").value;
+  std::string filePath = fileUri.substr(rootUriLength + 1, std::string::npos);
+
+  std::unique_ptr<Top> top(new Top);
+  Lexer lex(runtime.heap, filePath.c_str());
+  auto package = parse_top(*top, lex);
 }
 
 
 int main(int argc, const char **argv) {
+  Runtime runtime(nullptr, 0, 4.0, 0);
+
   // Begin log
   std::ofstream clientLog;
   clientLog.open("requests_log.txt", std::ios_base::app); // append instead of overwriting
   std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
   clientLog << std::endl
-          << "Log start: " << ctime(&currentTime) << std::endl;
+          << "Log start: " << ctime(&currentTime);
 
   // Process requests until something goes wrong
   while (true) {
@@ -219,10 +204,11 @@ int main(int argc, const char **argv) {
       } else if (method == "workspace/didChangeWatchedFiles") {
         JAST files = params.get("changes");
         for (auto child: files.children) {
-          clientLog << child.second << std::endl;
-          validateWakeFile(child.second);
+          validateWakeFileOnSave(child.second, runtime);
         }
-        // response.children.emplace_back("result", validateWakeFile(params));        
+        // response.children.emplace_back("result", validateWakeFileOnSave(params));        
+      } else if (method == "textDocument/didChange") {
+        validateWakeFile(params, runtime);
       } else {
         JAST &error = response.add("error", JSON_OBJECT);
         error.add("code", JSON_INTEGER, MethodNotFound);
@@ -233,3 +219,4 @@ int main(int argc, const char **argv) {
     sendMessage(response);
   }
 }
+
