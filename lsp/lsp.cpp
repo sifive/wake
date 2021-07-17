@@ -35,15 +35,17 @@
 #include <fstream>
 #include <chrono>
 #include <ctime>  
+#include <functional>
 
 #include "json5.h"
 #include "execpath.h"
-#include "parser.h"
-#include "symbol.h"
-#include "runtime.h"
-#include "expr.h"
-#include "sources.h"
-
+#include "location.h"
+#include "frontend/parser.h"
+#include "frontend/symbol.h"
+#include "runtime/runtime.h"
+#include "frontend/expr.h"
+#include "runtime/sources.h"
+#include "frontend/diagnostic.h"
 
 
 #ifndef VERSION
@@ -71,8 +73,10 @@ static const char *MethodNotFound       = "-32601";
 static const char *ServerNotInitialized = "-32002";
 //static const char *UnknownErrorCode     = "-32001";
 
+std::vector<Diagnostic> diagnostics;
+Runtime runtime(nullptr, 0, 4.0, 0);
 bool isInitialized = false;
-int rootUriLength = -1;
+std::string rootUri = "";
 bool isShutDown = false;
 
 static void sendMessage(const JAST &message) {
@@ -82,46 +86,158 @@ static void sendMessage(const JAST &message) {
   std::cout << contentLength << str.tellg() << "\r\n\r\n";
   str.seekg(0, std::ios::beg);
   std::cout << str.rdbuf();
+
+  std::cerr << message << std::endl;
 }
 
-JAST initialize(JAST params) {
-  JAST capabilities(JSON_OBJECT);
+JAST createMessage() {
+  JAST message(JSON_OBJECT);
+  message.add("jsonrpc", "2.0");
+  return message;
+}
+
+JAST createResponseMessage() {
+  JAST message = createMessage();
+  message.add("id", JSON_NULLVAL);
+  return message;
+}
+
+JAST createResponseMessage(JAST receivedMessage) {
+  JAST message = createMessage();
+  message.children.emplace_back("id", receivedMessage.get("id"));
+  return message;
+}
+
+void sendErrorMessage(const char *code, std::string message) {
+  JAST errorMessage = createResponseMessage();
+  JAST &error = errorMessage.add("error", JSON_OBJECT);
+  error.add("code", JSON_INTEGER, code);
+  error.add("message", message.c_str());
+  sendMessage(errorMessage);
+}
+
+void sendErrorMessage(JAST receivedMessage, const char *code, std::string message) {
+  JAST errorMessage = createResponseMessage(receivedMessage);
+  JAST &error = errorMessage.add("error", JSON_OBJECT);
+  error.add("code", JSON_INTEGER, code);
+  error.add("message", message.c_str());
+  sendMessage(errorMessage);
+}
+
+
+JAST createInitializeResult(JAST receivedMessage) {
+  JAST message = createResponseMessage(receivedMessage);
+  JAST &result = message.add("result", JSON_OBJECT);
+
+  JAST &capabilities = result.add("capabilities", JSON_OBJECT);
   capabilities.add("textDocumentSync", 1);
 
-  JAST serverInfo(JSON_OBJECT);
+  JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
   serverInfo.add("name", "lsp wake server");
 
-  JAST initializeResult(JSON_OBJECT);
-  initializeResult.children.emplace_back("capabilities", capabilities);
-  initializeResult.children.emplace_back("serverInfo", serverInfo);
+  return message;
+}
 
+void initialize(JAST receivedMessage) {
+  JAST message = createInitializeResult(receivedMessage);
   isInitialized = true;
-  rootUriLength = params.get("rootUri").value.length();
-  
-  return initializeResult;
+  rootUri = receivedMessage.get("params").get("rootUri").value;
+  sendMessage(message);
 }
 
-void validateWakeFileOnSave(JAST params, Runtime &runtime) {
-  std::string fileUri = params.get("uri").value;
-  std::string filePath = fileUri.substr(rootUriLength + 1, std::string::npos);
+void initialized(JAST _) {
+
+}
+
+JAST createDiagnosticRange(Diagnostic diagnostic) {
+  JAST start(JSON_OBJECT);
+  start.add("line", diagnostic.getLocation().start.row);
+  start.add("character", diagnostic.getLocation().start.column);
+
+  JAST end(JSON_OBJECT);
+  end.add("line", diagnostic.getLocation().end.row);
+  end.add("character", diagnostic.getLocation().end.column);
+
+  JAST range(JSON_OBJECT);
+  range.children.emplace_back("start", start);
+  range.children.emplace_back("end", end);
+
+  return range;
+}
+
+JAST createDiagnostic(Diagnostic diagnostic) {
+  JAST diagnosticJSON(JSON_OBJECT);
   
+  diagnosticJSON.children.emplace_back("range", createDiagnosticRange(diagnostic));
+  diagnosticJSON.add("severity", diagnostic.getSeverity());
+  diagnosticJSON.add("source", "wake");
+  diagnosticJSON.add("message", diagnostic.getMessage());
+
+  return diagnosticJSON;
+}
+
+JAST createDiagnosticMessage() {
+  JAST message = createMessage();
+  message.add("method", "textDocument/publishDiagnostics");
+  return message;
+}
+
+void diagnoseFileByUri(std::string fileUri) {
+  std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
+
   std::unique_ptr<Top> top(new Top);
   Lexer lex(runtime.heap, filePath.c_str());
-  auto package = parse_top(*top, lex);
+  parse_top(*top, lex);
+
+  JAST diagnosticsArray(JSON_ARRAY);    
+  for (Diagnostic diagnostic: diagnostics) {
+    diagnosticsArray.children.emplace_back("1", createDiagnostic(diagnostic)); // 1?
+  }
+  JAST message = createDiagnosticMessage();
+  JAST &params = message.add("params", JSON_OBJECT);
+  params.add("uri", fileUri.c_str());
+  params.children.emplace_back("diagnostics", diagnosticsArray);
+  diagnostics.clear();
+  sendMessage(message);  
 }
 
-void validateWakeFile(JAST params, Runtime &runtime) {
-  std::string fileUri = params.get("textDocument").get("uri").value;
-  std::string filePath = fileUri.substr(rootUriLength + 1, std::string::npos);
-
-  std::unique_ptr<Top> top(new Top);
-  Lexer lex(runtime.heap, filePath.c_str());
-  auto package = parse_top(*top, lex);
+void diagnoseFile(JAST receivedMessage) {
+  std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+  diagnoseFileByUri(fileUri);
 }
 
+void diagnoseFiles(JAST receivedMessage) {
+  JAST files = receivedMessage.get("params").get("changes");
+  for (auto child: files.children) {
+    std::string fileUri = child.second.get("uri").value;
+    diagnoseFileByUri(fileUri);
+  }       
+}
+
+void shutdown(JAST receivedMessage) {
+  JAST message = createResponseMessage(receivedMessage);
+  message.add("result", JSON_NULLVAL);
+  isShutDown = true;
+  sendMessage(message);
+}
+
+void serverExit(JAST _) {
+  exit(isShutDown ? 0 : 1);
+}
+
+std::map<std::string, std::function<void(JAST)>> methodToFunction = {
+  {"initialize", initialize},
+  {"initialized", initialized},
+  {"textDocument/didOpen", diagnoseFile},
+  {"textDocument/didChange", diagnoseFile},
+  {"textDocument/didSave", diagnoseFile},
+  {"workspace/didChangeWatchedFiles", diagnoseFiles},
+  {"shutdown", shutdown},
+  {"exit", serverExit}
+};
 
 int main(int argc, const char **argv) {
-  Runtime runtime(nullptr, 0, 4.0, 0);
+ 
 
   // Begin log
   std::ofstream clientLog;
@@ -165,58 +281,27 @@ int main(int argc, const char **argv) {
     // Log the request
     clientLog << content << std::endl;
 
-    // Begin to formulate our response
-    JAST response(JSON_OBJECT);
-    response.add("jsonrpc", "2.0");
-
     // Parse that content as JSON
     JAST request;
     std::stringstream parseErrors;
     if (!JAST::parse(content, parseErrors, request)) {
-      response.add("id", JSON_NULLVAL);
-      JAST &error = response.add("error", JSON_OBJECT);
-      error.add("code", JSON_INTEGER, ParseError);
-      error.add("message", parseErrors.str());
+      sendErrorMessage(ParseError, parseErrors.str());
     } else {
-      // What command?
       const std::string &method = request.get("method").value;
-      const JAST &id = request.get("id");
-      const JAST &params = request.get("params");
 
-      // Echo back the request's id
-      response.children.emplace_back("id", id);
-
-      if (isShutDown && (method != "exit")) {
-        JAST &error = response.add("error", JSON_OBJECT);
-        error.add("code", JSON_INTEGER, InvalidRequest);
-        error.add("message", "Received a request other than 'exit' after a shutdown request.");
-      } else if (method == "initialize") {
-        response.children.emplace_back("result", initialize(params));
-      } else if (!isInitialized) {
-        JAST &error = response.add("error", JSON_OBJECT);
-        error.add("code", JSON_INTEGER, ServerNotInitialized);
-        error.add("message", "Must request initialize first");
-      } else if (method == "shutdown") {
-        response.children.emplace_back("result", JSON_NULLVAL);
-        isShutDown = true;
-      } else if (method == "exit") {
-        return isShutDown?0:1;
-      } else if (method == "workspace/didChangeWatchedFiles") {
-        JAST files = params.get("changes");
-        for (auto child: files.children) {
-          validateWakeFileOnSave(child.second, runtime);
+      if (!isInitialized && (method != "initialize")) {
+        sendErrorMessage(request, ServerNotInitialized, "Must request initialize first");
+      } else if (isShutDown && (method != "exit")) {
+        sendErrorMessage(request, InvalidRequest, "Received a request other than 'exit' after a shutdown request.");
+      }
+      else {
+        auto function_pointer = methodToFunction.find(method);
+        if (function_pointer != methodToFunction.end()) {
+          (*function_pointer).second(request);
+        } else {
+          sendErrorMessage(request, MethodNotFound, "Method '" + method + "' is not implemented.");
         }
-        // response.children.emplace_back("result", validateWakeFileOnSave(params));        
-      } else if (method == "textDocument/didChange") {
-        validateWakeFile(params, runtime);
-      } else {
-        JAST &error = response.add("error", JSON_OBJECT);
-        error.add("code", JSON_INTEGER, MethodNotFound);
-        error.add("message", "Method '" + method + "' is not implemented.");
       }
     }
-
-    sendMessage(response);
   }
 }
-

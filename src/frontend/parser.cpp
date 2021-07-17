@@ -27,16 +27,22 @@
 #include "frontend/expr.h"
 #include "frontend/symbol.h"
 #include "runtime/value.h"
+#include "frontend/diagnostic.h"
 #include "location.h"
 
 //#define TRACE(x) do { fprintf(stderr, "%s\n", x); } while (0)
 #define TRACE(x) do { } while (0)
 
+extern std::vector<Diagnostic> diagnostics;
+
 bool expect(SymbolType type, Lexer &lex) {
   if (lex.next.type != type) {
-    std::cerr << "Was expecting a "
-      << symbolTable[type] << ", but got a "
-      << symbolTable[lex.next.type] << " at "
+    std::string message = std::string("Was expecting a ")
+      + symbolTable[type] + ", but got a "
+      + symbolTable[lex.next.type];
+    Diagnostic diagnostic(lex.next.location, S_ERROR, message);
+    diagnostics.push_back(diagnostic);
+    std::cerr << message << " at "
       << lex.next.location.text() << std::endl;
     lex.fail = true;
     return false;
@@ -402,8 +408,11 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       return out;
     }
     default: {
-      std::cerr << "Was expecting an (OPERATOR/LAMBDA/ID/LITERAL/PRIM/POPEN), got a "
-        << symbolTable[lex.next.type] << " at "
+      std::string message = std::string("Was expecting an (OPERATOR/LAMBDA/ID/LITERAL/PRIM/POPEN), got a ")
+        + symbolTable[lex.next.type];
+      Diagnostic diagnostic(lex.next.location, S_ERROR, message);
+      diagnostics.push_back(diagnostic);
+      std::cerr << message << " at "
         << lex.next.location.text() << std::endl;
       lex.fail = true;
       return new Literal(LOCATION, String::literal(lex.heap, "bad unary"), &String::typeVar);
