@@ -1,3 +1,4 @@
+  
 /* Wake Language Server Protocol implementation
  *
  * Copyright 2020 SiFive, Inc.
@@ -38,13 +39,6 @@
 
 #include "json5.h"
 #include "execpath.h"
-#include "parser.h"
-#include "symbol.h"
-#include "runtime.h"
-#include "expr.h"
-#include "sources.h"
-
-
 
 #ifndef VERSION
 #include "../src/version.h"
@@ -101,28 +95,7 @@ JAST initialize(JAST params) {
   return initializeResult;
 }
 
-void validateWakeFileOnSave(JAST params, Runtime &runtime) {
-  std::string fileUri = params.get("uri").value;
-  std::string filePath = fileUri.substr(rootUriLength + 1, std::string::npos);
-  
-  std::unique_ptr<Top> top(new Top);
-  Lexer lex(runtime.heap, filePath.c_str());
-  auto package = parse_top(*top, lex);
-}
-
-void validateWakeFile(JAST params, Runtime &runtime) {
-  std::string fileUri = params.get("textDocument").get("uri").value;
-  std::string filePath = fileUri.substr(rootUriLength + 1, std::string::npos);
-
-  std::unique_ptr<Top> top(new Top);
-  Lexer lex(runtime.heap, filePath.c_str());
-  auto package = parse_top(*top, lex);
-}
-
-
 int main(int argc, const char **argv) {
-  Runtime runtime(nullptr, 0, 4.0, 0);
-
   // Begin log
   std::ofstream clientLog;
   clientLog.open("requests_log.txt", std::ios_base::app); // append instead of overwriting
@@ -201,14 +174,6 @@ int main(int argc, const char **argv) {
         isShutDown = true;
       } else if (method == "exit") {
         return isShutDown?0:1;
-      } else if (method == "workspace/didChangeWatchedFiles") {
-        JAST files = params.get("changes");
-        for (auto child: files.children) {
-          validateWakeFileOnSave(child.second, runtime);
-        }
-        // response.children.emplace_back("result", validateWakeFileOnSave(params));        
-      } else if (method == "textDocument/didChange") {
-        validateWakeFile(params, runtime);
       } else {
         JAST &error = response.add("error", JSON_OBJECT);
         error.add("code", JSON_INTEGER, MethodNotFound);
@@ -219,4 +184,3 @@ int main(int argc, const char **argv) {
     sendMessage(response);
   }
 }
-
