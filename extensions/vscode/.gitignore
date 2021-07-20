@@ -3,4 +3,3 @@ node_modules/
 lsp-client/out/
 lsp-server/
 wake-*.vsix
-package-lock.json

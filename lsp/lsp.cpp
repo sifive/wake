@@ -1,5 +1,4 @@
-  
-/* Wake Language Server Protocol implementation
+/* Wake Build Server Protocol implementation
  *
  * Copyright 2020 SiFive, Inc.
  *
@@ -34,8 +33,6 @@
 #include <map>
 #include <sstream>
 #include <fstream>
-#include <chrono>
-#include <ctime>  
 
 #include "json5.h"
 #include "execpath.h"
@@ -66,7 +63,6 @@ static const char *ServerNotInitialized = "-32002";
 //static const char *UnknownErrorCode     = "-32001";
 
 bool isInitialized = false;
-int rootUriLength = -1;
 bool isShutDown = false;
 
 static void sendMessage(const JAST &message) {
@@ -80,8 +76,6 @@ static void sendMessage(const JAST &message) {
 
 JAST initialize(JAST params) {
   JAST capabilities(JSON_OBJECT);
-  capabilities.add("textDocumentSync", 1);
-
   JAST serverInfo(JSON_OBJECT);
   serverInfo.add("name", "lsp wake server");
 
@@ -90,18 +84,15 @@ JAST initialize(JAST params) {
   initializeResult.children.emplace_back("serverInfo", serverInfo);
 
   isInitialized = true;
-  rootUriLength = params.get("rootUri").value.length();
-  
   return initializeResult;
 }
 
 int main(int argc, const char **argv) {
   // Begin log
-  std::ofstream clientLog;
-  clientLog.open("requests_log.txt", std::ios_base::app); // append instead of overwriting
-  std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-  clientLog << std::endl
-          << "Log start: " << ctime(&currentTime);
+  std::ofstream logfile;
+  logfile.open("log.txt", std::ios_base::app); // append instead of overwriting
+  logfile << std::endl
+          << "Log start:" << std::endl;
 
   // Process requests until something goes wrong
   while (true) {
@@ -136,7 +127,7 @@ int main(int argc, const char **argv) {
     std::cin.read(&content[0], json_size);
 
     // Log the request
-    clientLog << content << std::endl;
+    logfile << content << std::endl;
 
     // Begin to formulate our response
     JAST response(JSON_OBJECT);
@@ -170,7 +161,8 @@ int main(int argc, const char **argv) {
         error.add("code", JSON_INTEGER, ServerNotInitialized);
         error.add("message", "Must request initialize first");
       } else if (method == "shutdown") {
-        response.children.emplace_back("result", JSON_NULLVAL);
+        JAST empty(JSON_OBJECT);
+        response.children.emplace_back("result", empty);
         isShutDown = true;
       } else if (method == "exit") {
         return isShutDown?0:1;
