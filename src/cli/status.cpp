@@ -144,6 +144,12 @@ static void status_redraw(bool idle)
   int rows3 = rows/3;
   int overall = status_state.remain > 0 ? 1 : 0;
   if (tty && rows3 >= 2+overall && cols > 16) for (auto &x : status_state.jobs) {
+
+    // Silence wake-internal messages like '<hash>'
+    std::string msg_prefix = "'<";
+    if (x.cmdline.compare(0, msg_prefix.size(), msg_prefix) == 0)
+        continue;
+
     double runtime =
       (now.tv_sec  - x.launch.tv_sec) +
       (now.tv_usec - x.launch.tv_usec) / 1000000.0;
