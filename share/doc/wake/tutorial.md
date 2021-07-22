@@ -642,7 +642,7 @@ Or perhaps more clearly using `|`:
 Besides `Option` and `Result`, there is a 3rd important piece to handling failure: `BadPath`.
 Recall that `Path` is the type used to represent paths on the file system.
 The function `source` takes a `String` and returns a `Path` for a file under version control.
-But what if the file doesn't exist? Previously, we called `source` on a non-existant file,
+But what if the file doesn't exist? Previously, we called `source` on a non-existent file,
 but we immediately called `read` on the returned `Path`. Try just `source`:
 
     wake -x 'source "nonexisting.txt"'
