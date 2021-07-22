@@ -7,5 +7,5 @@ In broad strokes:
   Unicode data	LICENSE.UNICODE		utf8proc/utf8proc_data.c
   gopt		LICENSE.TFL		gopt/
   whereami	LICENSE.WTFPL		common/whereami*
-  SipHash	LICENSE.CC0		src/siphash.cpp
+  SipHash	LICENSE.CC0		common/siphash.cpp
   BLAKE2	LICENSE.CC0		shim/blake2*
