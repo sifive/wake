@@ -8,7 +8,7 @@ CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
 LDFLAGS	:=
 DESTDIR ?= /usr/local
 
-LOCAL_CFLAGS :=	-Iutf8proc -Igopt -Icommon
+LOCAL_CFLAGS :=	-Iutf8proc -Igopt -Icommon -Isrc
 FUSE_CFLAGS  :=	$(shell pkg-config --silence-errors --cflags fuse)
 CORE_CFLAGS  := $(shell pkg-config --silence-errors --cflags sqlite3)	\
 		$(shell pkg-config --silence-errors --cflags gmp-6)	\
@@ -54,7 +54,7 @@ static:	wake.db
 	$(WAKE_ENV) ./bin/wake static
 
 bin/wake:	src/frontend/symbol.o $(COMMON)				\
-		$(patsubst %.cpp,%.o,$(wildcard src/*.cpp))	\
+		$(patsubst %.cpp,%.o,$(wildcard src/*/*.cpp))	\
 		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c gopt/gopt-arg.c)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
