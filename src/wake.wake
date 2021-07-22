@@ -58,7 +58,7 @@ def buildWake (Pair variant clib) =
         sources here `.*\.cpp`
 
     def compile =
-        compileC variant deps.getSysLibCFlags headerFiles
+        compileC variant ("-I{here}", deps.getSysLibCFlags) headerFiles
 
     require Pass objFiles =
         map compile cppFiles
