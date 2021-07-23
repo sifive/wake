@@ -171,7 +171,7 @@ void ingest(ParseInfo pi) {
 }
 
 Location TokenInfo::location(FileContent &fcontent) const {
-    return Location(fcontent.filename.c_str(), fcontent.coordinates(start), fcontent.coordinates(end));
+    return Location(fcontent.filename.c_str(), fcontent.coordinates(start), fcontent.coordinates(end!=start?end-1:end));
 }
 
 std::ostream & operator << (std::ostream &os, TokenInfo tinfo) {
@@ -318,7 +318,7 @@ class ConsoleReporter : public Reporter {
 };
 
 void ConsoleReporter::report(int severity, Location location, const std::string &message) {
-  std::cerr << location << ":" << message << std::endl;
+  std::cerr << location << ": " << message << std::endl;
 }
 
 int main(int argc, const char **argv) {

@@ -7,6 +7,7 @@
 %token_prefix TOKEN_
 %token_type {TokenInfo}
 %extra_argument {ParseInfo pinfo}
+%stack_size {0}
 
 // The lexer also produces these (unused by parser):
 %token WS COMMENT P_BOPEN P_BCLOSE P_SOPEN P_SCLOSE.
@@ -58,11 +59,10 @@ flags ::= KW_EXPORT.
 flags ::= .
 
 topdef ::= flags KW_TOPIC ID P_COLON type NL.
-topdef ::= KW_PUBLISH ID P_EQUALS block.
+topdef ::= KW_PUBLISH ID P_EQUALS block NL.
 
-topdef ::= data.
-data ::= flags KW_DATA type P_EQUALS type NL.
-data ::= flags KW_DATA type P_EQUALS INDENT data_elts DEDENT.
+topdef ::= flags KW_DATA type P_EQUALS type NL.
+topdef ::= flags KW_DATA type P_EQUALS INDENT data_elts DEDENT.
 
 data_elts ::= data_elts NL type.
 data_elts ::= type.
@@ -75,8 +75,9 @@ tuple_elts ::= tuple_elts NL tuple_elt.
 
 tuple_elt ::= flags type.
 
-topdef ::= flags KW_DEF pattern P_EQUALS block.
-topdef ::= flags KW_TARGET pattern P_EQUALS block. // !!! slash
+topdef ::= flags KW_DEF pattern P_EQUALS block NL.
+topdef ::= flags KW_TARGET pattern P_EQUALS block NL.
+topdef ::= flags KW_TARGET pattern P_BSLASH pattern_terms P_EQUALS block NL.
 
 dnl Left-associative prEfix-heavy; 1 + + 4 + + 5 = (1 + (+4)) + (+5)
 define(`LE',
@@ -125,7 +126,7 @@ expression_term ::= expression_term OP_DOT expression_nodot.
 expression_term ::= expression_nodot.
 
 expression_nodot ::= ID.
-expression_nodot ::= P_POPEN block_opt P_PCLOSE.
+expression_nodot ::= P_POPEN block P_PCLOSE.
 
 expression_nodot ::= P_HOLE.
 expression_nodot ::= STR_RAW.
@@ -148,41 +149,48 @@ expression_binary_app ::= expression_term.
 
 expression_binary_app ::= KW_SUBSCRIBE ID.
 expression_binary_app ::= KW_PRIM STR_SINGLE.
-expression_binary_app ::= expression_match.
+expression_binary_app ::= KW_MATCH expression_term INDENT match1_cases DEDENT.
+expression_binary_app ::= KW_MATCH match_terms INDENT matchx_cases DEDENT.
 
-expression_match ::= KW_MATCH expression_term INDENT match_cases DEDENT.
-//expression_match ::= KW_MATCH match_terms INDENT DEDENT.
-//match_terms ::= expression_term expression_term. !!!
-//match_terms ::= match_terms expression_term.
+match1_cases ::= match1_cases NL match1_case.
+match1_cases ::= match1_case.
+match1_case ::= pattern guard P_EQUALS block.
 
-match_cases ::= match_cases NL match_case.
-match_cases ::= match_case.
-match_case ::= pattern guard P_EQUALS expression.
-match_case ::= pattern guard P_EQUALS INDENT blockdefs expression DEDENT.
+match_terms ::= expression_term expression_term.
+match_terms ::= match_terms expression_term.
+
+matchx_cases ::= matchx_cases NL matchx_case.
+matchx_cases ::= matchx_case.
+matchx_case ::= pattern_terms guard P_EQUALS block.
+
+pattern_terms ::= pattern_terms pattern_term.
+pattern_terms ::= pattern_term.
+
 guard ::= .
 guard ::= KW_IF expression.
 
 expression ::= expression_binary_comma.
 expression ::= P_BSLASH pattern_term expression.
-expression ::= KW_IF block_opt KW_THEN block_opt KW_ELSE block_opt.
+expression ::= KW_IF block KW_THEN block KW_ELSE block.
 
 pattern ::= expression.
 type ::= expression.
 pattern_term ::= expression_term.
 
-block_opt ::= expression.
-block_opt ::= INDENT blockdefs expression DEDENT.
+block ::= expression.
+block ::= INDENT blockdefs body DEDENT.
 
-block ::= expression NL.
-block ::= INDENT blockdefs expression DEDENT.
+body ::= expression.
+body ::= KW_REQUIRE pattern P_EQUALS block NL                  blockdefs body.
+body ::= KW_REQUIRE pattern P_EQUALS block NL KW_ELSE block NL blockdefs body.
+body ::= KW_REQUIRE pattern P_EQUALS block    KW_ELSE block NL blockdefs body.
 
 blockdefs ::= .
 blockdefs ::= blockdefs blockdef.
+
 blockdef ::= KW_FROM ID KW_IMPORT P_HOLE NL.
 blockdef ::= KW_FROM ID KW_IMPORT kind arity idopeqs NL.
-blockdef ::= KW_REQUIRE pattern P_EQUALS block.
-blockdef ::= KW_REQUIRE pattern P_EQUALS block_opt KW_ELSE block.
-blockdef ::= KW_DEF pattern P_EQUALS block.
+blockdef ::= KW_DEF pattern P_EQUALS block NL.
 
 %code {
 bool ParseShifts(void *p, int yymajor) {
