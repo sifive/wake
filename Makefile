@@ -1,12 +1,19 @@
-parser:		parser.o
-	gcc -Wall -O2 -o $@ $^
+parser:		parser.o lexer.o syntax.o file.o location.o
+	g++ -Wall -O2 -o $@ $^
 
-parser.y:	parser.y.m4
+%.y:		%.y.m4
 	m4 $< > $@.out
 	mv $@.out $@
 
-parser.c:	parser.y
+%.h %.cpp:		%.y
 	lemon $<
+	mv $*.c $*.cpp
 
-parser.o:	parser.c
-	gcc -Wall -O2 -o $@ $<
+%.o:		%.cpp parser.h lexer.h
+	g++ -std=c++11 -Wall -O2 -o $@ -c $<
+
+lexer.cpp:	lexer.re
+	re2c --no-generation-date --input-encoding utf8 $< > $@.tmp
+	mv $@.tmp $@
+
+.SUFFIXES:

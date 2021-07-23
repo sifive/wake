@@ -1,6 +1,7 @@
 parser.y
 parser.h
-parser.c
+parser.cpp
 parser.out
-parser.o
+lexer.cpp
+*.o
 parser
