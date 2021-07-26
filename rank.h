@@ -15,27 +15,25 @@
  * limitations under the License.
  */
 
-#ifndef LEXER_H
-#define LEXER_H
+#ifndef RANK_H
+#define RANK_H
 
 #include <stdint.h>
+#include <vector>
 
-// This special token is not created by lemon
-#define TOKEN_EOF 0
+class RankMap {
+public:
+    // set must only be used on an ascending sequence
+    void set(uint32_t x);
 
-struct Token {
-    int id;             // Values defined in parser.h
-    const uint8_t *end; // Points just past the end of the Token
-    bool ok;            // false: syntactically invalid Token
+    bool get(uint32_t x) const;
 
-    Token(int id_, const uint8_t *end_, bool ok_ = true)
-    : id(id_), end(end_), ok(ok_) { }
-    Token() { }
+    uint32_t rank(uint32_t offset) const;
+    uint32_t next(uint32_t offset) const;
+
+private:
+    std::vector<uint64_t> bitmap;
+    std::vector<uint32_t> sums;
 };
-
-Token lex_wake(const uint8_t *s, const uint8_t *e);
-Token lex_dstr(const uint8_t *s, const uint8_t *e);
-Token lex_rstr(const uint8_t *s, const uint8_t *e);
-Token lex_printable(const uint8_t *s, const uint8_t *e);
 
 #endif

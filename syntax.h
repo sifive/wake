@@ -18,32 +18,19 @@
 #ifndef SYNTAX_H
 #define SYNTAX_H
 
-#include <string>
-#include <ostream>
-#include <stdint.h>
 #include <stdio.h>
-
-#include "location.h"
 
 class FileContent;
 class Reporter;
-
-struct TokenInfo {
-    const uint8_t *start;
-    const uint8_t *end;
-
-    size_t size() const { return end - start; }
-    Location location(FileContent &fcontent) const;
-};
-
-std::ostream & operator << (std::ostream &os, TokenInfo token);
+class CSTBuilder;
 
 struct ParseInfo {
     FileContent *fcontent;
+    CSTBuilder *cst;
     Reporter *reporter;
 
-    ParseInfo(FileContent *fcontent_, Reporter *reporter_)
-     : fcontent(fcontent_), reporter(reporter_) { }
+    ParseInfo(FileContent *fcontent_, CSTBuilder *cst_, Reporter *reporter_)
+     : fcontent(fcontent_), cst(cst_), reporter(reporter_) { }
 };
 
 const char *symbolExample(int symbol);
@@ -53,5 +40,6 @@ void ParseFree(void *p, void (*freeProc)(void*));
 void Parse(void *p, int yymajor, struct TokenInfo yyminor, ParseInfo pi);
 void ParseTrace(FILE *TraceFILE, char *zTracePrompt);
 bool ParseShifts(void *p, int yymajor);
+void parseWake(ParseInfo pi);
 
 #endif

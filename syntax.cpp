@@ -17,7 +17,6 @@
 
 #include <vector>
 #include <string>
-#include <iostream>
 #include <iomanip>
 #include <sstream>
 
@@ -26,12 +25,13 @@
 #include "syntax.h"
 #include "file.h"
 #include "reporter.h"
+#include "cst.h"
 
 #define STATE_IDLE	0
 #define STATE_NL	1
 #define STATE_NL_WS	2
 
-void ingest(ParseInfo pi) {
+void parseWake(ParseInfo pi) {
     struct TokenInfo tinfo, tindent;
 
     std::vector<int> indent_stack;
@@ -42,7 +42,7 @@ void ingest(ParseInfo pi) {
     int state = STATE_IDLE;
 
     void *parser = ParseAlloc(malloc);
-    //ParseTrace(stderr, "");
+    // ParseTrace(stderr, "");
 
     token.end = pi.fcontent->start;
     do {
@@ -65,7 +65,10 @@ void ingest(ParseInfo pi) {
             token = lex_wake(token.end, pi.fcontent->end);
         }
 
+        // Record this token in the CST
         tinfo.end = token.end;
+        pi.cst->addToken(token.id, tinfo);
+
         if (!token.ok) {
             // Complain about illegal token
             std::stringstream ss;
@@ -166,83 +169,6 @@ void ingest(ParseInfo pi) {
     } while (token.id != TOKEN_EOF);
 
     ParseFree(parser, free);
-
-    //return globals.treeRoot;
-}
-
-Location TokenInfo::location(FileContent &fcontent) const {
-    return Location(fcontent.filename.c_str(), fcontent.coordinates(start), fcontent.coordinates(end!=start?end-1:end));
-}
-
-std::ostream & operator << (std::ostream &os, TokenInfo tinfo) {
-    Token token, next;
-
-    os << "'";
-
-    long codepoints = 0;
-    for (token.end = tinfo.start; token.end < tinfo.end; token = lex_printable(token.end, tinfo.end))
-        ++codepoints;
-
-    // At most 10 chars at start and 10 chars at end
-    long skip_start = (codepoints > 20) ? 9 : codepoints;
-    long skip_end   = (codepoints > 20) ? codepoints-9 : codepoints;
-
-    long codepoint = 0;
-    for (token.end = tinfo.start; token.end < tinfo.end; token = next) {
-        next = lex_printable(token.end, tinfo.end);
-        if (codepoint < skip_start || codepoint >= skip_end) {
-            if (next.ok) {
-                os.write(reinterpret_cast<const char*>(token.end), next.end - token.end);
-            } else {
-                int code;
-                switch (next.end - token.end) {
-                case 1:
-                    code = token.end[0];
-                    break;
-                case 2:
-                    code =
-                        ((int)token.end[0] & 0x1f) << 6 |
-                        ((int)token.end[1] & 0x3f) << 0 ;
-                    break;
-                case 3:
-                    code =
-                        ((int)token.end[0] & 0x0f) << 12 |
-                        ((int)token.end[1] & 0x3f) <<  6 |
-                        ((int)token.end[2] & 0x3f) <<  0 ;
-                    break;
-                default:
-                    code =
-                        ((int)token.end[0] & 0x07) << 18 |
-                        ((int)token.end[1] & 0x3f) << 12 |
-                        ((int)token.end[2] & 0x3f) <<  6 |
-                        ((int)token.end[3] & 0x3f) <<  0 ;
-                    break;
-                }
-                if (code > 0xffff) {
-                    os << "\\U" << std::hex << std::setw(8) << std::setfill('0') << code;
-                } else if (code > 0xff) {
-                    os << "\\u" << std::hex << std::setw(4) << std::setfill('0') << code;
-                } else switch (code) {
-                    case '\a': os << "\\a"; break;
-                    case '\b': os << "\\b"; break;
-                    case '\f': os << "\\f"; break;
-                    case '\n': os << "\\n"; break;
-                    case '\r': os << "\\r"; break;
-                    case '\t': os << "\\t"; break;
-                    case '\v': os << "\\v"; break;
-                    default:
-                        os << "\\x" << std::hex << std::setw(2) << std::setfill('0') << code;
-                }
-            }
-        } else if (codepoint == skip_start) {
-            os << "..";
-        }
-        ++codepoint;
-    }
-
-    os << "'";
-
-    return os;
 }
 
 const char *symbolExample(int symbol) {
@@ -311,19 +237,4 @@ const char *symbolExample(int symbol) {
     case TOKEN_KW_REQUIRE:   return "require";
     default:                 return "???";
     }
-}
-
-class ConsoleReporter : public Reporter {
-  void report(int severity, Location location, const std::string &message);
-};
-
-void ConsoleReporter::report(int severity, Location location, const std::string &message) {
-  std::cerr << location << ": " << message << std::endl;
-}
-
-int main(int argc, const char **argv) {
-    ConsoleReporter reporter;
-    ExternalFile file(reporter, argv[1]);
-    ingest(ParseInfo(&file, &reporter));
-    return 0;
 }

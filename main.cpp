@@ -15,27 +15,28 @@
  * limitations under the License.
  */
 
-#ifndef LEXER_H
-#define LEXER_H
+#include <iostream>
 
-#include <stdint.h>
+#include "lexer.h"
+#include "parser.h"
+#include "syntax.h"
+#include "file.h"
+#include "reporter.h"
+#include "cst.h"
 
-// This special token is not created by lemon
-#define TOKEN_EOF 0
-
-struct Token {
-    int id;             // Values defined in parser.h
-    const uint8_t *end; // Points just past the end of the Token
-    bool ok;            // false: syntactically invalid Token
-
-    Token(int id_, const uint8_t *end_, bool ok_ = true)
-    : id(id_), end(end_), ok(ok_) { }
-    Token() { }
+class ConsoleReporter : public Reporter {
+  void report(int severity, Location location, const std::string &message);
 };
 
-Token lex_wake(const uint8_t *s, const uint8_t *e);
-Token lex_dstr(const uint8_t *s, const uint8_t *e);
-Token lex_rstr(const uint8_t *s, const uint8_t *e);
-Token lex_printable(const uint8_t *s, const uint8_t *e);
+void ConsoleReporter::report(int severity, Location location, const std::string &message) {
+  std::cerr << location << ": " << message << std::endl;
+}
 
-#endif
+int main(int argc, const char **argv) {
+    ConsoleReporter reporter;
+    ExternalFile file(reporter, argv[1]);
+    CSTBuilder builder(file);
+    parseWake(ParseInfo(&file, &builder, &reporter));
+    CST cst(std::move(builder));
+    return 0;
+}

@@ -1,106 +1,107 @@
 %include {#include <string.h>}
 %include {#include "syntax.h"}
 %include {#include "reporter.h"}
+%include {#include "cst.h"}
 %include {#include <vector>}
 %include {#include <sstream>}
 
 %token_prefix TOKEN_
 %token_type {TokenInfo}
+%default_type {size_t}
 %extra_argument {ParseInfo pinfo}
 %stack_size {0}
 
 // The lexer also produces these (unused by parser):
 %token WS COMMENT P_BOPEN P_BCLOSE P_SOPEN P_SCLOSE.
 
-start ::= top.
+start ::= top(T). { pinfo.cst->addNode(CST_TOP, T); }
 
-top ::= top topdef.
-top ::= .
+top(R) ::= top(T) topdef. { R = T+1; }
+top(R) ::= .              { R = 0; }
 
-topdef ::= KW_PACKAGE ID NL.
-topdef ::= KW_FROM ID KW_IMPORT P_HOLE NL.
-topdef ::= KW_FROM ID KW_EXPORT P_HOLE NL.
-topdef ::= KW_FROM ID KW_IMPORT kind arity idopeqs NL.
-topdef ::= KW_FROM ID KW_EXPORT kind arity idopeqs NL.
+topdef ::= KW_PACKAGE(b) ID NL(e).                                     { pinfo.cst->addNode(CST_PACKAGE, b, 0, e); }
+topdef ::= KW_FROM(b) ID KW_IMPORT P_HOLE NL(e).                       { pinfo.cst->addNode(CST_IMPORT,  b, 0, e); }
+topdef ::= KW_FROM(b) ID KW_IMPORT kind(K) arity(A) idopeqs(I) NL(e).  { pinfo.cst->addNode(CST_IMPORT,  b, K+A+I, e); }
+topdef ::= KW_FROM(b) ID KW_EXPORT kind(K) arity(A) idopeqs(I) NL(e).  { pinfo.cst->addNode(CST_EXPORT,  b, K+A+I, e); }
 
-kind ::= KW_DEF.
-kind ::= KW_TYPE.
-kind ::= KW_TOPIC.
-kind ::= .
+kind(R) ::= KW_DEF(k).   { R = 1; pinfo.cst->addNode(CST_KIND, k, 0, k); }
+kind(R) ::= KW_TYPE(k).  { R = 1; pinfo.cst->addNode(CST_KIND, k, 0, k); }
+kind(R) ::= KW_TOPIC(k). { R = 1; pinfo.cst->addNode(CST_KIND, k, 0, k); }
+kind(R) ::= .            { R = 0; }
 
-arity ::= KW_UNARY.
-arity ::= KW_BINARY.
-arity ::= .
+arity(R) ::= KW_UNARY(k).  { R = 1; pinfo.cst->addNode(CST_ARITY, k, 0, k); }
+arity(R) ::= KW_BINARY(k). { R = 1; pinfo.cst->addNode(CST_ARITY, k, 0, k); }
+arity(R) ::= .             { R = 0; }
 
-idopeqs ::= idopeqs idopeq.
-idopeqs ::= idopeq.
+idopeqs(R) ::= idopeqs(I) idopeq. { R = I+1; }
+idopeqs(R) ::= idopeq.            { R = 1;   }
 
-idopeq ::= idop P_EQUALS idop.
-idopeq ::= idop.
+idopeq ::= idop P_EQUALS idop. { pinfo.cst->addNode(CST_IDEQ, 2); }
+idopeq ::= idop.               { pinfo.cst->addNode(CST_IDEQ, 1); }
 
-idop ::= ID.
-idop ::= OP_DOT.
-idop ::= OP_QUANT.
-idop ::= OP_EXP.
-idop ::= OP_MULDIV.
-idop ::= OP_ADDSUB.
-idop ::= OP_COMPARE.
-idop ::= OP_INEQUAL.
-idop ::= OP_AND.
-idop ::= OP_OR.
-idop ::= OP_DOLLAR.
-idop ::= OP_LRARROW.
-idop ::= OP_EQARROW.
-idop ::= OP_COMMA.
+idop ::= ID(k).         { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_DOT(k).     { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_QUANT(k).   { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_EXP(k).     { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_MULDIV(k).  { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_ADDSUB(k).  { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_COMPARE(k). { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_INEQUAL(k). { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_AND(k).     { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_OR(k).      { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_DOLLAR(k).  { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_LRARROW(k). { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_EQARROW(k). { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_COMMA(k).   { pinfo.cst->addNode(CST_ID, k, 0, k); }
 
-flags ::= KW_GLOBAL KW_EXPORT.
-flags ::= KW_GLOBAL.
-flags ::= KW_EXPORT.
-flags ::= .
+global(R) ::= .             { R = 0; }
+global(R) ::= KW_GLOBAL(k). { R = 1; pinfo.cst->addNode(CST_FLAG_GLOBAL, k, 0, k); }
+export(R) ::= .             { R = 0; }
+export(R) ::= KW_EXPORT(k). { R = 1; pinfo.cst->addNode(CST_FLAG_EXPORT, k, 0, k); }
 
-topdef ::= flags KW_TOPIC ID P_COLON type NL.
-topdef ::= KW_PUBLISH ID P_EQUALS block NL.
+topdef ::= global(G) export(E) KW_TOPIC(b) ID P_COLON type NL(e). { pinfo.cst->addNode(CST_TOPIC, b, G+E+1, e); }
 
-topdef ::= flags KW_DATA type P_EQUALS type NL.
-topdef ::= flags KW_DATA type P_EQUALS INDENT data_elts DEDENT.
+topdef ::= KW_PUBLISH(b) ID P_EQUALS block_opt NL(e). { pinfo.cst->addNode(CST_PUBLISH, b, 1, e); }
 
-data_elts ::= data_elts NL type.
-data_elts ::= type.
+topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS type NL(e).                       { pinfo.cst->addNode(CST_DATA, b, G+E+1, e); }
+topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS INDENT data_elts(D) DEDENT NL(e). { pinfo.cst->addNode(CST_DATA, b, G+E+D, e); }
 
-topdef ::= tuple.
-tuple ::= flags KW_TUPLE type P_EQUALS INDENT tuple_elts DEDENT.
+data_elts(R) ::= data_elts(E) NL type. { R = E+1; }
+data_elts(R) ::= type.                 { R = 1;   }
 
-tuple_elts ::= tuple_elt.
-tuple_elts ::= tuple_elts NL tuple_elt.
+topdef ::= global(G) export(E) KW_TUPLE(b) type P_EQUALS INDENT tuple_elts(T) DEDENT NL(e). { pinfo.cst->addNode(CST_TUPLE, b, G+E+1+T, e); }
 
-tuple_elt ::= flags type.
+tuple_elts(R) ::= tuple_elt.                  { R = 1; }
+tuple_elts(R) ::= tuple_elts NL tuple_elt(E). { R = E+1; }
 
-topdef ::= flags KW_DEF pattern P_EQUALS block NL.
-topdef ::= flags KW_TARGET pattern P_EQUALS block NL.
-topdef ::= flags KW_TARGET pattern P_BSLASH pattern_terms P_EQUALS block NL.
+tuple_elt ::= global(G) export(E) type. { pinfo.cst->addNode(CST_TUPLE_ELT, G+E+1); }
+
+topdef ::= global(G) export(E) KW_DEF(b)    pattern P_EQUALS block_opt NL(e). { pinfo.cst->addNode(CST_DEF,    b, G+E+2, e); }
+topdef ::= global(G) export(E) KW_TARGET(b) pattern P_EQUALS block_opt NL(e). { pinfo.cst->addNode(CST_TARGET, b, G+E+2, e); }
+topdef ::= global(G) export(E) KW_TARGET(b) pattern P_BSLASH pattern_terms(T) P_EQUALS block_opt NL(e). { pinfo.cst->addNode(CST_TARGET, b, G+E+1+T+1, e); }
 
 dnl Left-associative prEfix-heavy; 1 + + 4 + + 5 = (1 + (+4)) + (+5)
 define(`LE',
-$1_binary_$3 ::= $1_binary_$3 $2 $1_unary_$3.
+$1_binary_$3 ::= $1_binary_$3 $2 $1_unary_$3. { pinfo.cst->addNode(CST_BINARY, 2); }
 $1_binary_$3 ::= $1_unary_$3.
-$1_unary_$3 ::= $2 $1_unary_$3.
+$1_unary_$3 ::= $2 $1_unary_$3.               { pinfo.cst->addNode(CST_UNARY,  1); }
 $1_unary_$3 ::= $1_binary_$4.
 )
 
 dnl Right-associative, prEfix-heavy; 1 $ $ 4 $ $ 5 = 1 $ (($4) $ ($5))
 define(`RE',
-$1_binary_$3 ::= $1_unary_$3 $2 $1_binary_$3.
+$1_binary_$3 ::= $1_unary_$3 $2 $1_binary_$3. { pinfo.cst->addNode(CST_BINARY, 2); }
 $1_binary_$3 ::= $1_unary_$3.
-$1_unary_$3 ::= $2 $1_unary_$3.
+$1_unary_$3 ::= $2 $1_unary_$3.               { pinfo.cst->addNode(CST_UNARY,  1); }
 $1_unary_$3 ::= $1_binary_$4.
 )
 
 dnl Right-associative pOstfix-heavy; 1 , , 4 , , 5 = (1,) , ((4,) , 5)
 define(`RO',
-$1_binary_$3 ::= $1_unary_$3 $2 $1_binary_$3.
+$1_binary_$3 ::= $1_unary_$3 $2 $1_binary_$3. { pinfo.cst->addNode(CST_BINARY, 2); }
 $1_binary_$3 ::= $1_unary_$3.
 $1_unary_$3 ::= $1_binary_$4.
-$1_unary_$3 ::= $1_unary_$3 $2.
+$1_unary_$3 ::= $1_unary_$3 $2.               { pinfo.cst->addNode(CST_UNARY,  1); }
 )
 
 dnl All operators
@@ -122,75 +123,88 @@ RO($1, OP_COMMA,   comma,   eqarrow)     dnl x , , y , , z       (x,), ((y,), z)
 
 OPCHAIN(expression)
 
-expression_term ::= expression_term OP_DOT expression_nodot.
+expression_term ::= expression_term OP_DOT expression_nodot. { pinfo.cst->addNode(CST_BINARY, 2); }
 expression_term ::= expression_nodot.
 
-expression_nodot ::= ID.
-expression_nodot ::= P_POPEN block P_PCLOSE.
+expression_nodot ::= ID(i).                            { pinfo.cst->addNode(CST_ID,    i, 0, i); }
+expression_nodot ::= P_POPEN(b) block_opt P_PCLOSE(e). { pinfo.cst->addNode(CST_PAREN, b, 1, e); }
 
-expression_nodot ::= P_HOLE.
-expression_nodot ::= STR_RAW.
-expression_nodot ::= STR_SINGLE.
-expression_nodot ::= STR_OPEN interpolated_string STR_CLOSE.
-interpolated_string ::= expression.
-interpolated_string ::= interpolated_string STR_MID expression.
+expression_nodot ::= P_HOLE(h).     { pinfo.cst->addNode(CST_HOLE,    h, 0, h); }
+expression_nodot ::= STR_RAW(s).    { pinfo.cst->addNode(CST_LITERAL, s, 0, s); }
+expression_nodot ::= STR_SINGLE(s). { pinfo.cst->addNode(CST_LITERAL, s, 0, s); }
+expression_nodot ::= str_open interpolated_string(N) str_close. { pinfo.cst->addNode(CST_INTERPOLATE, 2+N); }
 
-expression_nodot ::= REG_SINGLE.
-expression_nodot ::= REG_OPEN interpolated_regexp REG_CLOSE.
-interpolated_regexp ::= expression.
-interpolated_regexp ::= interpolated_regexp REG_MID expression.
+interpolated_string(R) ::= expression. { R = 1; }
+interpolated_string(R) ::= interpolated_string(O) str_mid expression. { R = O+2; }
 
-expression_nodot ::= DOUBLE.
-expression_nodot ::= INTEGER.
-expression_nodot ::= KW_HERE.
+str_mid   ::= STR_MID(s).   { pinfo.cst->addNode(CST_LITERAL, s, 0, s); }
+str_open  ::= STR_OPEN(s).  { pinfo.cst->addNode(CST_LITERAL, s, 0, s); }
+str_close ::= STR_CLOSE(s). { pinfo.cst->addNode(CST_LITERAL, s, 0, s); }
 
-expression_binary_app ::= expression_binary_app expression_term.
+expression_nodot ::= REG_SINGLE(r). { pinfo.cst->addNode(CST_LITERAL, r, 0, r); }
+expression_nodot ::= reg_open interpolated_regexp(N) reg_close. { pinfo.cst->addNode(CST_INTERPOLATE, 2+N); }
+
+interpolated_regexp(R) ::= expression. { R = 1; }
+interpolated_regexp(R) ::= interpolated_regexp(O) reg_mid expression. { R = O+2; }
+
+reg_mid   ::= REG_MID(r).   { pinfo.cst->addNode(CST_LITERAL, r, 0, r); }
+reg_open  ::= REG_OPEN(r).  { pinfo.cst->addNode(CST_LITERAL, r, 0, r); }
+reg_close ::= REG_CLOSE(r). { pinfo.cst->addNode(CST_LITERAL, r, 0, r); }
+
+expression_nodot ::= DOUBLE(d).  { pinfo.cst->addNode(CST_LITERAL, d, 0, d); }
+expression_nodot ::= INTEGER(i). { pinfo.cst->addNode(CST_LITERAL, i, 0, i); }
+expression_nodot ::= KW_HERE(h). { pinfo.cst->addNode(CST_LITERAL, h, 0, h); }
+
+expression_binary_app ::= expression_binary_app expression_term. { pinfo.cst->addNode(CST_APP, 2); }
 expression_binary_app ::= expression_term.
 
-expression_binary_app ::= KW_SUBSCRIBE ID.
-expression_binary_app ::= KW_PRIM STR_SINGLE.
-expression_binary_app ::= KW_MATCH expression_term INDENT match1_cases DEDENT.
-expression_binary_app ::= KW_MATCH match_terms INDENT matchx_cases DEDENT.
+expression_binary_app ::= KW_SUBSCRIBE(b) ID(e).    { pinfo.cst->addNode(CST_SUBSCRIBE, b, 0, e); }
+expression_binary_app ::= KW_PRIM(b) STR_SINGLE(e). { pinfo.cst->addNode(CST_PRIM,      b, 0, e); }
 
-match1_cases ::= match1_cases NL match1_case.
-match1_cases ::= match1_case.
-match1_case ::= pattern guard P_EQUALS block.
+expression_binary_app ::= KW_MATCH(b) expression_term INDENT match1_cases(C) DEDENT(e). { pinfo.cst->addNode(CST_MATCH, b, 1+C, e); }
+expression_binary_app ::= KW_MATCH(b) match_terms(T)  INDENT matchx_cases(C) DEDENT(e). { pinfo.cst->addNode(CST_MATCH, b, T+C, e); }
 
-match_terms ::= expression_term expression_term.
-match_terms ::= match_terms expression_term.
+match1_cases(R) ::= match1_cases(C) NL match1_case.  { R = C+1; }
+match1_cases(R) ::= match1_case.                     { R = 1;   }
+match1_case ::= pattern guard(G) P_EQUALS block_opt. { pinfo.cst->addNode(CST_CASE, 2+G); }
 
-matchx_cases ::= matchx_cases NL matchx_case.
-matchx_cases ::= matchx_case.
-matchx_case ::= pattern_terms guard P_EQUALS block.
+match_terms(R) ::= expression_term expression_term. { R = 2; }
+match_terms(R) ::= match_terms(T) expression_term.  { R = 1+T; }
 
-pattern_terms ::= pattern_terms pattern_term.
-pattern_terms ::= pattern_term.
+matchx_cases(R) ::= matchx_cases(C) NL matchx_case.           { R = C+1; }
+matchx_cases(R) ::= matchx_case.                              { R = 1; }
+matchx_case ::= pattern_terms(T) guard(G) P_EQUALS block_opt. { pinfo.cst->addNode(CST_CASE, T+G+1); }
 
-guard ::= .
-guard ::= KW_IF expression.
+pattern_terms(R) ::= pattern_terms(T) pattern_term. { R = 1+T; }
+pattern_terms(R) ::= pattern_term.                  { R = 1; }
+
+guard(R) ::= .                    { R = 0; }
+guard(R) ::= KW_IF(b) expression. { R = 1; pinfo.cst->addNode(CST_GUARD, b, 1); }
 
 expression ::= expression_binary_comma.
-expression ::= P_BSLASH pattern_term expression.
-expression ::= KW_IF block KW_THEN block KW_ELSE block.
+expression ::= P_BSLASH(b) pattern_term expression.                    { pinfo.cst->addNode(CST_LAMBDA, b, 2); }
+expression ::= KW_IF(b) block_opt KW_THEN block_opt KW_ELSE block_opt. { pinfo.cst->addNode(CST_IF,     b, 3); }
 
 pattern ::= expression.
 type ::= expression.
 pattern_term ::= expression_term.
 
-block ::= expression.
-block ::= INDENT blockdefs body DEDENT.
+block_opt ::= expression.
+block_opt ::= INDENT(b) block DEDENT(e). { pinfo.cst->addNode(CST_PAREN, b, 1, e); }
+block ::= blockdefs(N) body.             { pinfo.cst->addNode(CST_BLOCK, N+1); }
+block ::= body.
 
 body ::= expression.
-body ::= KW_REQUIRE pattern P_EQUALS block NL                  blockdefs body.
-body ::= KW_REQUIRE pattern P_EQUALS block NL KW_ELSE block NL blockdefs body.
-body ::= KW_REQUIRE pattern P_EQUALS block    KW_ELSE block NL blockdefs body.
+body ::= KW_REQUIRE(b) pattern P_EQUALS block_opt NL                      block. { pinfo.cst->addNode(CST_REQUIRE, b, 2); }
+body ::= KW_REQUIRE(b) pattern P_EQUALS block_opt NL KW_ELSE block_opt NL block. { pinfo.cst->addNode(CST_REQUIRE, b, 3); }
+body ::= KW_REQUIRE(b) pattern P_EQUALS block_opt    KW_ELSE block_opt NL block. { pinfo.cst->addNode(CST_REQUIRE, b, 3); }
 
-blockdefs ::= .
-blockdefs ::= blockdefs blockdef.
+blockdefs(R) ::= blockdef.              { R = 1;   }
+blockdefs(R) ::= blockdefs(D) blockdef. { R = 1+D; }
 
-blockdef ::= KW_FROM ID KW_IMPORT P_HOLE NL.
-blockdef ::= KW_FROM ID KW_IMPORT kind arity idopeqs NL.
-blockdef ::= KW_DEF pattern P_EQUALS block NL.
+blockdef ::= KW_DEF(b) pattern P_EQUALS block_opt NL(e).                { pinfo.cst->addNode(CST_DEF,    b, 2, e); }
+blockdef ::= KW_FROM(b) ID KW_IMPORT P_HOLE NL(e).                      { pinfo.cst->addNode(CST_IMPORT, b, 0, e); }
+blockdef ::= KW_FROM(b) ID KW_IMPORT kind(K) arity(A) idopeqs(I) NL(e). { pinfo.cst->addNode(CST_IMPORT, b, K+A+I, e); }
 
 %code {
 bool ParseShifts(void *p, int yymajor) {

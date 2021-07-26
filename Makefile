@@ -1,4 +1,4 @@
-parser:		parser.o lexer.o syntax.o file.o location.o
+parser:		parser.o lexer.o syntax.o file.o location.o main.o cst.o main.o rank.o
 	g++ -Wall -O2 -o $@ $^
 
 %.y:		%.y.m4
