@@ -35,12 +35,8 @@
 
 extern DiagnosticReporter *reporter;
 void reportError(Location location, std::string message) {
-<<<<<<< HEAD
-  reporter->report(location, S_ERROR, message);
-=======
   Diagnostic diagnostic(location, S_ERROR, message);
   reporter->report(diagnostic);
->>>>>>> 887b70f... parser.cpp: stop printing error messages to cerr
 }
 
 bool expect(SymbolType type, Lexer &lex) {
