@@ -320,6 +320,21 @@ export def runJob (p: Plan): Job = match p
         def _ = wait (\_ badfinish job error) (badlaunch job error)
         job
 
+
+# Get result for job with the list of output files/dirs.
+export def getJobResultOutputs (job: Job) : Result (List Path) Error =
+  map getPathResult job.getJobOutputs
+  | findFail
+
+
+# Get result for job with exacally one output Path.
+export def getJobResultOutput (job: Job) : Result Path Error =
+  match job.getJobOutputs
+    path, Nil = path.getPathResult
+    _ = failWithError "Job must have exacally one output path: {job.getJobDescription}'"
+
+
+# SString => String => Job => Job
 # Set the value of a tag on a Job
 # This is useful for post-build reflection into the database
 export def setJobTag (key: String) (value: String) (job: Job): Job =
