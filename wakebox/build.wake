@@ -17,42 +17,46 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def buildWakeBox (Pair cpplib clib) =
-    def commonLibResult =
+def buildWakeBox (Pair (cpplib: String) (clib: String)) : Result (List Path) Error =
+    require Pass (commonLib: SysLib) =
         common cpplib
 
-    def fuseLibResult =
-        buildFuseLibObjs cpplib
-
-    def goptLibResult =
+    require Pass (goptLib: SysLib) =
         gopt clib
 
-    require Pass commonLib = commonLibResult
-    require Pass goptLib = goptLibResult
-    require Pass fuseLib = fuseLibResult
+    require Pass (fuseLib: List Path) =
+        buildFuseLibObjs cpplib
 
-    def libs =
+    def libs : SysLib =
         (commonLib, goptLib, Nil)
         | flattenSysLibs
 
-    def headers =
+    def headers : List Path =
         sources "fuse" `.*\.h` ++
         goptLib.getSysLibHeaders ++
         commonLib.getSysLibHeaders
 
-    def compile =
-        compileC cpplib ("-Ifuse", goptLib.getSysLibCFlags ++ commonLib.getSysLibCFlags) headers
+    def compile (in: Path) : Result (List Path) Error =
+        compileC cpplib ("-Ifuse", goptLib.getSysLibCFlags ++ commonLib.getSysLibCFlags) headers in
 
-    def cppFiles =
+    def cppFiles : List Path =
         sources "wakebox" `.*\.cpp`
 
     require Pass objs =
         map compile cppFiles
         | findFail
 
-    def objFiles =
+    def objFiles : List Path =
         fuseLib ++
         goptLib.getSysLibObjects ++
         objs.flatten
 
-    linkO cpplib libs.getSysLibLFlags objFiles "bin/wakebox"
+    require Pass paths =
+        linkO cpplib libs.getSysLibLFlags objFiles "bin/wakebox"
+
+    require Pass _ =
+        match paths
+            bin, Nil = installAs "bin/wakebox" bin | getPathResult
+            _        = Fail "missing wakebox executable".makeError
+
+    Pass paths
