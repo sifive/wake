@@ -37,23 +37,27 @@ void CSTBuilder::addToken(uint8_t id, TokenInfo token) {
 }
 
 void CSTBuilder::addNode(uint8_t id, uint32_t children) {
-    int size = 1;
-    for (uint32_t i = children; i; --i)
-        size += content.nodes.end()[-size].size;
-
-    uint32_t b = content.nodes.end()[-size].begin;
+    uint32_t b = 0;
     uint32_t e = content.nodes.back().end;
+
+    int size = 1;
+    for (uint32_t i = children; i; --i) {
+        if (i == 1) b = content.nodes.end()[-size].begin;
+        size += content.nodes.end()[-size].size;
+    }
 
     content.nodes.emplace_back(id, size, b, e);
 }
 
 void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children) {
-    int size = 1;
-    for (uint32_t i = children; i; --i)
-        size += content.nodes.end()[-size].size;
-
-    uint32_t b = content.nodes.end()[-size].begin;
+    uint32_t b = 0;
     uint32_t e = content.nodes.back().end;
+
+    int size = 1;
+    for (uint32_t i = children; i; --i) {
+        if (i == 1) b = content.nodes.end()[-size].begin;
+        size += content.nodes.end()[-size].size;
+    }
 
     uint32_t b2 = begin.start - content.file->start;
     if (b2 < b) b = b2;
@@ -62,12 +66,14 @@ void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children) {
 }
 
 void CSTBuilder::addNode(uint8_t id, uint32_t children, TokenInfo end) {
-    int size = 1;
-    for (uint32_t i = children; i; --i)
-        size += content.nodes.end()[-size].size;
-
-    uint32_t b = content.nodes.end()[-size].begin;
+    uint32_t b = 0;
     uint32_t e = content.nodes.back().end;
+
+    int size = 1;
+    for (uint32_t i = children; i; --i) {
+        if (i == 1) b = content.nodes.end()[-size].begin;
+        size += content.nodes.end()[-size].size;
+    }
 
     uint32_t e2 = end.end - content.file->start;
     if (e2 > e) e = e2;
@@ -76,15 +82,18 @@ void CSTBuilder::addNode(uint8_t id, uint32_t children, TokenInfo end) {
 }
 
 void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children, TokenInfo end) {
+    uint32_t b2 = 0;
+
     int size = 1;
-    for (uint32_t i = children; i; --i)
+    for (uint32_t i = children; i; --i) {
+        if (i == 1) b2 = content.nodes.end()[-size].begin;
         size += content.nodes.end()[-size].size;
+    }
 
     uint32_t b = begin.start - content.file->start;
     uint32_t e = end.end - content.file->start;
 
     if (children) {
-        uint32_t b2 = content.nodes.end()[-size].begin;
         uint32_t e2 = content.nodes.back().end;
         if (b2 < b) b = b2;
         if (e2 > e) e = e2;
@@ -100,7 +109,6 @@ struct NodeRange {
      : parent(parent_), first_child(first_child_) { }
 };
 
-#include <iostream>
 CST::CST(CSTBuilder &&builder) {
     content.file = builder.content.file;
     content.token_starts = std::move(builder.content.token_starts);
@@ -113,8 +121,6 @@ CST::CST(CSTBuilder &&builder) {
     while (!stack.empty()) {
         uint32_t node = stack.back();
         stack.pop_back();
-
-        //std::cerr << node << " - " << builder.content.nodes[node-1].id << std::endl;
 
         uint32_t lim = node - builder.content.nodes[node-1].size;
         for (uint32_t child = node-1; child != lim; child -= builder.content.nodes[child-1].size)
@@ -267,4 +273,3 @@ std::ostream & operator << (std::ostream &os, TokenInfo tinfo) {
 
     return os;
 }
-

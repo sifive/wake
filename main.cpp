@@ -25,11 +25,18 @@
 #include "cst.h"
 
 class ConsoleReporter : public Reporter {
-  void report(int severity, Location location, const std::string &message);
+    void report(int severity, Location location, const std::string &message);
 };
 
 void ConsoleReporter::report(int severity, Location location, const std::string &message) {
-  std::cerr << location << ": " << message << std::endl;
+    std::cerr << location << ": " << message << std::endl;
+}
+
+void explore(const CSTElement &p, int depth) {
+    for (CSTElement x = p.firstChild(); !x.empty(); x.nextSibling()) {
+        std::cout << std::string(depth, ' ') << symbolExample(x.id()) << ": " << x.content() << std::endl;
+        explore(x, depth+4);
+    }
 }
 
 int main(int argc, const char **argv) {
@@ -38,5 +45,10 @@ int main(int argc, const char **argv) {
     CSTBuilder builder(file);
     parseWake(ParseInfo(&file, &builder, &reporter));
     CST cst(std::move(builder));
+    for (CSTElement x = cst.root(); !x.empty(); x.nextSibling()) {
+      std::cout << symbolExample(x.id()) << ": " << x.content() << std::endl;
+      explore(x, 4);
+    }
+    std::cout << "---" << std::endl;
     return 0;
 }

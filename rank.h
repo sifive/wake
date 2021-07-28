@@ -21,11 +21,13 @@
 #include <stdint.h>
 #include <vector>
 
+typedef uint8_t  level1 __attribute__ ((vector_size (64)));
+typedef uint32_t level2 __attribute__ ((vector_size (16)));
+
 class RankMap {
 public:
-    // set must only be used on an ascending sequence
+    // set must only be used on a strictly ascending sequence
     void set(uint32_t x);
-
     bool get(uint32_t x) const;
 
     uint32_t rank(uint32_t offset) const;

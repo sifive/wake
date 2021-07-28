@@ -63,8 +63,8 @@ topdef ::= global(G) export(E) KW_TOPIC(b) ID P_COLON type NL(e). { pinfo.cst->a
 
 topdef ::= KW_PUBLISH(b) ID P_EQUALS block_opt NL(e). { pinfo.cst->addNode(CST_PUBLISH, b, 1, e); }
 
-topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS type NL(e).                       { pinfo.cst->addNode(CST_DATA, b, G+E+1, e); }
-topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS INDENT data_elts(D) DEDENT NL(e). { pinfo.cst->addNode(CST_DATA, b, G+E+D, e); }
+topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS type NL(e).                       { pinfo.cst->addNode(CST_DATA, b, G+E+2,   e); }
+topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS INDENT data_elts(D) DEDENT NL(e). { pinfo.cst->addNode(CST_DATA, b, G+E+1+D, e); }
 
 data_elts(R) ::= data_elts(E) NL type. { R = E+1; }
 data_elts(R) ::= type.                 { R = 1;   }
@@ -161,8 +161,8 @@ expression_binary_app ::= expression_term.
 expression_binary_app ::= KW_SUBSCRIBE(b) ID(e).    { pinfo.cst->addNode(CST_SUBSCRIBE, b, 0, e); }
 expression_binary_app ::= KW_PRIM(b) STR_SINGLE(e). { pinfo.cst->addNode(CST_PRIM,      b, 0, e); }
 
-expression_binary_app ::= KW_MATCH(b) expression_term INDENT match1_cases(C) DEDENT(e). { pinfo.cst->addNode(CST_MATCH, b, 1+C, e); }
-expression_binary_app ::= KW_MATCH(b) match_terms(T)  INDENT matchx_cases(C) DEDENT(e). { pinfo.cst->addNode(CST_MATCH, b, T+C, e); }
+expression_binary_app ::= KW_MATCH(b) expression_term INDENT match1_cases(C) DEDENT. { pinfo.cst->addNode(CST_MATCH, b, 1+C); }
+expression_binary_app ::= KW_MATCH(b) match_terms(T)  INDENT matchx_cases(C) DEDENT. { pinfo.cst->addNode(CST_MATCH, b, T+C); }
 
 match1_cases(R) ::= match1_cases(C) NL match1_case.  { R = C+1; }
 match1_cases(R) ::= match1_case.                     { R = 1;   }
@@ -190,14 +190,14 @@ type ::= expression.
 pattern_term ::= expression_term.
 
 block_opt ::= expression.
-block_opt ::= INDENT(b) block DEDENT(e). { pinfo.cst->addNode(CST_PAREN, b, 1, e); }
+block_opt ::= INDENT block DEDENT.
 block ::= blockdefs(N) body.             { pinfo.cst->addNode(CST_BLOCK, N+1); }
 block ::= body.
 
 body ::= expression.
-body ::= KW_REQUIRE(b) pattern P_EQUALS block_opt NL                      block. { pinfo.cst->addNode(CST_REQUIRE, b, 2); }
-body ::= KW_REQUIRE(b) pattern P_EQUALS block_opt NL KW_ELSE block_opt NL block. { pinfo.cst->addNode(CST_REQUIRE, b, 3); }
-body ::= KW_REQUIRE(b) pattern P_EQUALS block_opt    KW_ELSE block_opt NL block. { pinfo.cst->addNode(CST_REQUIRE, b, 3); }
+body ::= KW_REQUIRE(b) pattern P_EQUALS block_opt NL                      block. { pinfo.cst->addNode(CST_REQUIRE, b, 3); }
+body ::= KW_REQUIRE(b) pattern P_EQUALS block_opt NL KW_ELSE block_opt NL block. { pinfo.cst->addNode(CST_REQUIRE, b, 4); }
+body ::= KW_REQUIRE(b) pattern P_EQUALS block_opt    KW_ELSE block_opt NL block. { pinfo.cst->addNode(CST_REQUIRE, b, 4); }
 
 blockdefs(R) ::= blockdef.              { R = 1;   }
 blockdefs(R) ::= blockdefs(D) blockdef. { R = 1+D; }

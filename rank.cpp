@@ -20,12 +20,12 @@
 void RankMap::set(uint32_t x) {
     size_t off = x/64;
     size_t bit = x%64;
+
     if (off >= bitmap.size()) {
         bitmap.resize(off+1, 0);
         sums.resize(off+1, sums.empty()?0:sums.back());
-    } else if (get(x)) {
-        return;
     }
+
     bitmap[off] |= UINT64_C(1) << bit;
     ++sums[off];
 }
@@ -41,7 +41,7 @@ uint32_t RankMap::rank(uint32_t offset) const {
     size_t off = offset/64;
     size_t bit = offset%64;
     uint64_t mask = UINT64_C(0xffffffffffffffff) << bit;
-    return (off?sums[off-1]:0) + __builtin_popcount(~mask & bitmap[off]);
+    return (off?sums[off-1]:0) + __builtin_popcountll(~mask & bitmap[off]);
 }
 
 uint32_t RankMap::next(uint32_t offset) const {
