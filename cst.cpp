@@ -23,7 +23,7 @@
 #include "lexer.h"
 
 CSTBuilder::CSTBuilder(const FileContent &fcontent) {
-    content.file = &fcontent;
+    file = &fcontent;
 }
 
 CSTNode::CSTNode(uint8_t id_, uint32_t size_, uint32_t begin_, uint32_t end_)
@@ -32,53 +32,53 @@ CSTNode::CSTNode(uint8_t id_, uint32_t size_, uint32_t begin_, uint32_t end_)
 }
 
 void CSTBuilder::addToken(uint8_t id, TokenInfo token) {
-    content.token_ids.push_back(id);
-    content.token_starts.set(token.start - content.file->start);
+    token_ids.push_back(id);
+    token_starts.set(token.start - file->start);
 }
 
 void CSTBuilder::addNode(uint8_t id, uint32_t children) {
     uint32_t b = 0;
-    uint32_t e = content.nodes.back().end;
+    uint32_t e = nodes.back().end;
 
     int size = 1;
     for (uint32_t i = children; i; --i) {
-        if (i == 1) b = content.nodes.end()[-size].begin;
-        size += content.nodes.end()[-size].size;
+        if (i == 1) b = nodes.end()[-size].begin;
+        size += nodes.end()[-size].size;
     }
 
-    content.nodes.emplace_back(id, size, b, e);
+    nodes.emplace_back(id, size, b, e);
 }
 
 void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children) {
     uint32_t b = 0;
-    uint32_t e = content.nodes.back().end;
+    uint32_t e = nodes.back().end;
 
     int size = 1;
     for (uint32_t i = children; i; --i) {
-        if (i == 1) b = content.nodes.end()[-size].begin;
-        size += content.nodes.end()[-size].size;
+        if (i == 1) b = nodes.end()[-size].begin;
+        size += nodes.end()[-size].size;
     }
 
-    uint32_t b2 = begin.start - content.file->start;
+    uint32_t b2 = begin.start - file->start;
     if (b2 < b) b = b2;
 
-    content.nodes.emplace_back(id, size, b, e);
+    nodes.emplace_back(id, size, b, e);
 }
 
 void CSTBuilder::addNode(uint8_t id, uint32_t children, TokenInfo end) {
     uint32_t b = 0;
-    uint32_t e = content.nodes.back().end;
+    uint32_t e = nodes.back().end;
 
     int size = 1;
     for (uint32_t i = children; i; --i) {
-        if (i == 1) b = content.nodes.end()[-size].begin;
-        size += content.nodes.end()[-size].size;
+        if (i == 1) b = nodes.end()[-size].begin;
+        size += nodes.end()[-size].size;
     }
 
-    uint32_t e2 = end.end - content.file->start;
+    uint32_t e2 = end.end - file->start;
     if (e2 > e) e = e2;
 
-    content.nodes.emplace_back(id, size, b, e);
+    nodes.emplace_back(id, size, b, e);
 }
 
 void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children, TokenInfo end) {
@@ -86,20 +86,20 @@ void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children, TokenIn
 
     int size = 1;
     for (uint32_t i = children; i; --i) {
-        if (i == 1) b2 = content.nodes.end()[-size].begin;
-        size += content.nodes.end()[-size].size;
+        if (i == 1) b2 = nodes.end()[-size].begin;
+        size += nodes.end()[-size].size;
     }
 
-    uint32_t b = begin.start - content.file->start;
-    uint32_t e = end.end - content.file->start;
+    uint32_t b = begin.start - file->start;
+    uint32_t e = end.end - file->start;
 
     if (children) {
-        uint32_t e2 = content.nodes.back().end;
+        uint32_t e2 = nodes.back().end;
         if (b2 < b) b = b2;
         if (e2 > e) e = e2;
     }
 
-    content.nodes.emplace_back(id, size, b, e);
+    nodes.emplace_back(id, size, b, e);
 }
 
 struct NodeRange {
@@ -109,36 +109,36 @@ struct NodeRange {
      : parent(parent_), first_child(first_child_) { }
 };
 
-CST::CST(CSTBuilder &&builder) {
-    content.file = builder.content.file;
-    content.token_starts = std::move(builder.content.token_starts);
-    content.token_ids = std::move(builder.content.token_ids);
+CST::CST(CSTBuilder &&builder)
+ : token_starts(builder.token_starts) {
+    file = builder.file;
+    token_ids = std::move(builder.token_ids);
 
     std::vector<uint32_t> stack;
-    if (!builder.content.nodes.empty())
-        stack.emplace_back(builder.content.nodes.size());
+    if (!builder.nodes.empty())
+        stack.emplace_back(builder.nodes.size());
 
     while (!stack.empty()) {
         uint32_t node = stack.back();
         stack.pop_back();
 
-        uint32_t lim = node - builder.content.nodes[node-1].size;
-        for (uint32_t child = node-1; child != lim; child -= builder.content.nodes[child-1].size)
+        uint32_t lim = node - builder.nodes[node-1].size;
+        for (uint32_t child = node-1; child != lim; child -= builder.nodes[child-1].size)
             stack.push_back(child);
 
-        content.nodes.emplace_back(builder.content.nodes[node-1]);
+        nodes.emplace_back(builder.nodes[node-1]);
     }
 
-    builder.content.nodes.clear();
+    builder.nodes.clear();
 }
 
 CSTElement CST::root() const {
     CSTElement out;
     out.cst = this;
     out.node = 0;
-    out.limit = content.nodes.size();
+    out.limit = nodes.size();
     out.token = 0;
-    out.end = content.file->end - content.file->start;
+    out.end = file->end - file->start;
     return out;
 }
 
@@ -147,39 +147,39 @@ bool CSTElement::empty() const {
 }
 
 bool CSTElement::isNode() const {
-    return node != limit && token == cst->content.nodes[node].begin;
+    return node != limit && token == cst->nodes[node].begin;
 }
 
 uint8_t CSTElement::id() const {
     if (isNode()) {
-        return cst->content.nodes[node].id;
+        return cst->nodes[node].id;
     } else {
-        uint32_t rank = cst->content.token_starts.rank(token);
-        return cst->content.token_ids[rank];
+        uint32_t rank = cst->token_starts.rank1(token);
+        return cst->token_ids[rank];
     }
 }
 
 TokenInfo CSTElement::content() const {
     TokenInfo out;
-    const uint8_t *start = cst->content.file->start;
+    const uint8_t *start = cst->file->start;
     if (isNode()) {
-        CSTNode n = cst->content.nodes[node];
+        CSTNode n = cst->nodes[node];
         out.start = start + n.begin;
         out.end   = start + n.end;
     } else {
         out.start = start + token;
-        out.end   = start + cst->content.token_starts.next(token);
+        out.end   = start + cst->token_starts.next1(token+1);
     }
     return out;
 }
 
 void CSTElement::nextSibling() {
     if (isNode()) {
-        CSTNode n = cst->content.nodes[node];
+        CSTNode n = cst->nodes[node];
         node += n.size;
         token = n.end;
     } else {
-        token = cst->content.token_starts.next(token);
+        token = cst->token_starts.next1(token+1);
     }
 }
 
@@ -187,7 +187,7 @@ CSTElement CSTElement::firstChild() const {
     CSTElement out;
     out.cst = cst;
     if (isNode()) {
-        CSTNode n = cst->content.nodes[node];
+        CSTNode n = cst->nodes[node];
         out.node  = node+1;
         out.limit = node + n.size;
         out.token = n.begin;

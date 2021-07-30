@@ -16,6 +16,7 @@
  */
 
 #include <iostream>
+#include <sys/time.h>
 
 #include "lexer.h"
 #include "parser.h"

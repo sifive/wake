@@ -84,13 +84,6 @@ struct CSTNode {
     CSTNode(uint8_t id_, uint32_t size_, uint32_t begin_, uint32_t end_);
 };
 
-struct CSTContent {
-    const FileContent *file;
-    RankMap token_starts; // need: a way to find next/prev offset
-    std::vector<uint8_t> token_ids;
-    std::vector<CSTNode> nodes;
-};
-
 class CSTBuilder {
 public:
     CSTBuilder(const FileContent &fcontent);
@@ -103,7 +96,10 @@ public:
     void addNode(uint8_t id, TokenInfo begin, uint32_t childen, TokenInfo end);
 
 private:
-    CSTContent content;
+    const FileContent *file;
+    std::vector<uint8_t> token_ids;
+    std::vector<CSTNode> nodes;
+    RankBuilder token_starts;
 
 friend class CST;
 };
@@ -114,7 +110,10 @@ public:
     CSTElement root() const;
 
 private:
-    CSTContent content;
+    RankSelect1Map token_starts;
+    const FileContent *file;
+    std::vector<uint8_t> token_ids;
+    std::vector<CSTNode> nodes;
 
 friend class CSTElement;
 };
