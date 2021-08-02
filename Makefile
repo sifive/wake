@@ -1,5 +1,7 @@
+CFLAGS = -std=c++11 -fpermissive -march=haswell -mtune=haswell -Wall -O2
+
 parser:		parser.o lexer.o syntax.o file.o location.o main.o cst.o main.o rank.o
-	g++ -Wall -O2 -o $@ $^
+	g++ $(CFLAGS) -o $@ $^
 
 %.y:		%.y.m4
 	m4 $< > $@.out
@@ -10,7 +12,7 @@ parser:		parser.o lexer.o syntax.o file.o location.o main.o cst.o main.o rank.o
 	mv $*.c $*.cpp
 
 %.o:		%.cpp parser.h lexer.h
-	g++ -std=c++11 -march=haswell -mtune=haswell -Wall -O2 -o $@ -c $<
+	g++ $(CFLAGS) -o $@ -c $<
 
 lexer.cpp:	lexer.re
 	re2c --no-generation-date --input-encoding utf8 $< > $@.tmp

@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+#include <assert.h>
+
 #include "rank.h"
 
 void RankBuilder::set(uint32_t x) {
@@ -194,7 +196,7 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
 #endif
 
     rank1 -= (&level2[0].v[0])[l1_off];
-    RankLevel1 l1 = level1[l1_off];
+    const RankLevel1 *l1 = &level1[l1_off];
 
     // Add in the L0 offset from L1 position
     uint32_t l0_off = l1_off*32;
@@ -209,30 +211,30 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
     };
 
     uint32_t l1le =
-        __builtin_ctzll(~zext32(__builtin_ia32_pmovmskb256(l1.a[0] <= l1_filter))) +
-        __builtin_ctzll(~zext32(__builtin_ia32_pmovmskb256(l1.a[1] <= l1_filter)));
+        __builtin_ctzll(~zext32(__builtin_ia32_pmovmskb256(l1->a[0] <= l1_filter))) +
+        __builtin_ctzll(~zext32(__builtin_ia32_pmovmskb256(l1->a[1] <= l1_filter)));
 
     // Divide by 2 because we extracted 2x 1s per comparison and -1 for useless 0 entry
     l0_off += (l1le/2) - 1;
 #else
-    assert (l1.v[0] <= rank1);
+    assert (l1->v[0] <= rank1);
     for (size_t i = 1; i < 32; ++i)
-        l0_off += l1.v[i] <= rank1;
+        l0_off += l1->v[i] <= rank1;
 #endif
 
     rank1 -= (&level1[0].v[0])[l0_off];
-    RankLevel0 l0 = level0[l0_off];
+    const RankLevel0 *l0 = &level0[l0_off];
 
     uint32_t count = 0;
     int num = 0;
     uint32_t outsum = 0;
     for (size_t i = 0; i < 7; ++i) {
-        count += __builtin_popcountll(l0.v[i]);
+        count += __builtin_popcountll(l0->v[i]);
         if (count <= rank1) {
             num = i+1;
             outsum = count;
         }
     }
 
-    return l0_off*512 + 64*num + select(l0.v[num], rank1 - outsum);
+    return l0_off*512 + 64*num + select(l0->v[num], rank1 - outsum);
 }

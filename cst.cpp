@@ -38,7 +38,7 @@ void CSTBuilder::addToken(uint8_t id, TokenInfo token) {
 
 void CSTBuilder::addNode(uint8_t id, uint32_t children) {
     uint32_t b = 0;
-    uint32_t e = nodes.back().end;
+    uint32_t e = nodes.empty()?0:nodes.back().end;
 
     int size = 1;
     for (uint32_t i = children; i; --i) {
@@ -51,7 +51,7 @@ void CSTBuilder::addNode(uint8_t id, uint32_t children) {
 
 void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children) {
     uint32_t b = 0;
-    uint32_t e = nodes.back().end;
+    uint32_t e = nodes.empty()?0:nodes.back().end;
 
     int size = 1;
     for (uint32_t i = children; i; --i) {
@@ -67,7 +67,7 @@ void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children) {
 
 void CSTBuilder::addNode(uint8_t id, uint32_t children, TokenInfo end) {
     uint32_t b = 0;
-    uint32_t e = nodes.back().end;
+    uint32_t e = nodes.empty()?0:nodes.back().end;
 
     int size = 1;
     for (uint32_t i = children; i; --i) {
