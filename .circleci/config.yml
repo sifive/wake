@@ -243,9 +243,6 @@ workflows:
   build:
     jobs:
       - tarball
-      - vscode:
-          requires:
-            - tarball
       - alpine:
           requires:
             - tarball
@@ -272,7 +269,6 @@ workflows:
             - tarball
       - release:
           requires:
-            - vscode
             - alpine
             - debian_testing # Newest everything
             - debian_wheezy  # Oldest supported compiler

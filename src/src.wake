@@ -1,0 +1,68 @@
+# Copyright 2019 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package build_wake
+from wake import _
+from gcc_wake import _
+
+def src (variant: String): Result SysLib Error =
+    def externalDeps =
+        Nil
+
+    def internalDepResults =
+        common variant, map (_ "native-c99-release") (utf8proc, Nil)
+
+    require Pass internalDeps = findFail internalDepResults
+
+    def deps =
+        internalDeps ++ externalDeps
+        | flattenSysLibs
+
+    def cflags =
+        "-I{here}", deps.getSysLibCFlags
+
+    def headers =
+        map source ("src/dsu.h", "src/hash.h", "src/optional.h", "src/primfn.h", Nil) ++
+        map source ("src/cli/profile.h", "src/cli/status.h", Nil) ++
+        sources here `frontend/.*\.h` ++
+        sources here `optimizer/.*\.h` ++
+        sources here `runtime/.*\.h` ++
+        sources here `types/.*\.h` ++
+        deps.getSysLibHeaders
+        
+
+    def compile =
+        compileC variant cflags headers
+
+    def re2obj re =
+        require Pass cpp = re2c re
+        compile cpp
+
+    def objResults =
+        map re2obj  (sources here `.*\.re`) ++
+        map compile (map source ("src/cli/profile.cpp", "src/cli/status.cpp", Nil)) ++
+        map compile (sources here `frontend/.*\.cpp`) ++
+        map compile (sources here `optimizer/.*\.cpp`) ++
+        map compile (sources here `runtime/.*\.cpp`) ++
+        map compile (sources here `types/.*\.cpp`)
+
+    require Pass foundObjects =
+        findFail objResults
+
+    def objects =
+        foundObjects.flatten ++
+        deps.getSysLibObjects
+
+    Pass (SysLib "0.0" headers objects cflags Nil)

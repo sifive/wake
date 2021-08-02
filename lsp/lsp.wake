@@ -18,11 +18,27 @@ from wake import _
 from gcc_wake import _
 
 def buildLSP (Pair variant _): Result (List Path) Error =
-    require Pass json =
-        common variant
+    def externalDeps =
+        ncurses Unit, map pkg ("sqlite3", "gmp", "re2", Nil)
+
+    def internalDepResults =
+        src variant, Nil
+
+    require Pass internalDeps = findFail internalDepResults
+
+    def deps =
+        internalDeps ++ externalDeps
+        | flattenSysLibs
+
+    def cflags =
+        deps.getSysLibCFlags
+
+    def headers =
+        version_h Unit,
+        deps.getSysLibHeaders
 
     def compile =
-        compileC variant json.getSysLibCFlags (version_h Unit, json.getSysLibHeaders)
+        compileC variant cflags headers
 
     def cppFiles =
         source "{here}/lsp.cpp", Nil
@@ -33,9 +49,9 @@ def buildLSP (Pair variant _): Result (List Path) Error =
 
     def allObjs =
         objFiles.flatten ++
-        json.getSysLibObjects
+        deps.getSysLibObjects
 
-    linkO variant json.getSysLibLFlags allObjs "lib/wake/lsp-wake"
+    linkO variant (deps.getSysLibLFlags) allObjs "lib/wake/lsp-wake"
 
 export def vscode _ =
     def dir =

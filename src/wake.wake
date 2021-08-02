@@ -35,14 +35,10 @@ def buildWake (Pair variant clib) =
     def externalDeps =
         ncurses Unit, map pkg ("sqlite3", "gmp", "re2", Nil)
 
-    def reFileResults =
-        map re2c (sources here `.*\.re`)
-
     def internalDepResults =
-        common variant, map (_ clib) (utf8proc, gopt, Nil)
+        src variant, map (_ clib) (gopt, Nil)
 
     require Pass internalDeps = findFail internalDepResults
-    require Pass reFiles = findFail reFileResults
 
     def deps =
         internalDeps ++ externalDeps
@@ -51,11 +47,10 @@ def buildWake (Pair variant clib) =
     def headerFiles =
         version_h Unit,
         deps.getSysLibHeaders ++
-        sources here `.*\.h`
+        map source ("src/cli/describe.h", "src/cli/markup.h", Nil)
 
     def cppFiles =
-        reFiles ++
-        sources here `.*\.cpp`
+        map source ("src/cli/describe.cpp", "src/cli/markup.cpp", "src/cli/main.cpp", Nil)
 
     def compile =
         compileC variant ("-I{here}", deps.getSysLibCFlags) headerFiles
