@@ -24,6 +24,9 @@ class Diagnostic {
 class DiagnosticReporter {
   public:
     virtual void report(Diagnostic diagnostic) = 0;
+    void report(Location location, Severity severity, std::string message) {
+      report(Diagnostic(location, severity, std::move(message)));
+    }
 };
 
 #endif

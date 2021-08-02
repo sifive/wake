@@ -35,8 +35,7 @@
 
 extern DiagnosticReporter *reporter;
 void reportError(Location location, std::string message) {
-  Diagnostic diagnostic(location, S_ERROR, message);
-  reporter->report(diagnostic);
+  reporter->report(location, S_ERROR, message);
 }
 
 bool expect(SymbolType type, Lexer &lex) {
