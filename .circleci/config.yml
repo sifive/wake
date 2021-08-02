@@ -272,7 +272,6 @@ workflows:
             - tarball
       - release:
           requires:
-            - vscode
             - alpine
             - debian_testing # Newest everything
             - debian_wheezy  # Oldest supported compiler
