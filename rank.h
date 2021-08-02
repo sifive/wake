@@ -19,33 +19,34 @@
 #define RANK_H
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <vector>
 
-typedef long long rs_u64x8  __attribute__ ((vector_size (64)));
 typedef long long rs_u64x4  __attribute__ ((vector_size (32)));
-typedef short     rs_u16x16 __attribute__ ((vector_size (32)));
 typedef int       rs_u32x8  __attribute__ ((vector_size (32)));
+typedef short     rs_u16x16 __attribute__ ((vector_size (32)));
+typedef char      rs_u8x32  __attribute__ ((vector_size (32)));
 
-struct RankLevel0 {
+struct alignas(64) RankLevel0 {
     union {
-        rs_u64x8 a;
+        rs_u8x32 a[2];
         uint64_t v[8];
     };
-} __attribute__ ((aligned (64)));
+};
 
-struct RankLevel1 {
+struct alignas(64) RankLevel1 {
     union {
         rs_u16x16 a[2];
         uint16_t  v[32];
     };
-} __attribute__ ((aligned (64)));
+};
 
-struct RankLevel2 {
+struct alignas(64) RankLevel2 {
     union {
         rs_u32x8 a[2];
         uint32_t v[16];
     };
-} __attribute__ ((aligned (64)));
+};
 
 class RankBuilder {
 public:
@@ -57,6 +58,27 @@ protected:
 
 friend class RankMap;
 friend class RankSelect1Map;
+};
+
+template <class T>
+class AlignedAlloc {
+public:
+    typedef T value_type;
+    typedef T *pointer;
+    typedef T &reference;
+    typedef const T *const_pointer;
+    typedef const T &const_reference;
+    typedef size_t size_type;
+    typedef ptrdiff_t difference_type;
+    template <class U> struct rebind { typedef AlignedAlloc<U> other; };
+
+    pointer address(reference x) const noexcept { return &x; }
+    const_pointer address(const_reference x) const noexcept { return &x; }
+    pointer allocate(size_type n, const void *hint = nullptr) {
+      return reinterpret_cast<pointer>(aligned_alloc(alignof(T), sizeof(T)*n));
+    }
+    void deallocate(pointer p, size_type n) { free(p); }
+    size_type max_size() const noexcept { return -1; }
 };
 
 class RankMap {
@@ -73,9 +95,9 @@ public:
     uint32_t rank0(uint32_t offset) const { return offset - rank1(offset); }
 
 protected:
-    std::vector<RankLevel0> level0; // raw bit vector
-    std::vector<RankLevel1> level1; // level1[x].v[i] = popcount 512*[32*x, 32*x+i)
-    std::vector<RankLevel2> level2; // level2[x].v[i] = popcount [0, 512*32*(16*x+i))
+    std::vector<RankLevel0, AlignedAlloc<RankLevel0>> level0; // raw bit vector
+    std::vector<RankLevel1, AlignedAlloc<RankLevel1>> level1; // level1[x].v[i] = popcount 512*[32*x, 32*x+i)
+    std::vector<RankLevel2, AlignedAlloc<RankLevel2>> level2; // level2[x].v[i] = popcount [0, 512*32*(16*x+i))
 };
 
 class RankSelect1Map : public RankMap {

@@ -35,7 +35,6 @@ bool RankBuilder::get(uint32_t x) const {
     if (off >= bitmap.size()) return false;
     return (bitmap[off] >> bit) & 1;
 }
-#include <iostream>
 
 RankMap::RankMap(const RankBuilder &builder) {
     // In order to not exceed array bounds while computing rank1, we need the vector to end with a 0
@@ -90,6 +89,42 @@ bool RankMap::get(uint32_t x) const {
     return ((&level0[0].v[0])[x/64] >> (x%64)) & 1;
 }
 
+#ifdef __AVX2__
+static inline rs_u64x4 vpop(rs_u8x32 x) {
+// -mavx512vpopcntdq -mavx512vl
+#if defined(__AVX512VPOPCNTDQ__) && defined(__AVX512VL__)
+    return __builtin_ia32_vpopcountq_v4di((rs_u64x4)x);
+#else
+    rs_u8x32 table = {
+    //   0  1  2  3  4  5  6  7
+         0, 1, 1, 2, 1, 2, 2, 3,
+    //   8  9  a  b  c  d  e  f
+         1, 2, 2, 3, 2, 3, 3, 4,
+    // repeated for high lane:
+         0, 1, 1, 2, 1, 2, 2, 3,
+         1, 2, 2, 3, 2, 3, 3, 4
+    };
+    rs_u8x32 mask = {
+         15, 15, 15, 15,    15, 15, 15, 15,
+         15, 15, 15, 15,    15, 15, 15, 15,
+         15, 15, 15, 15,    15, 15, 15, 15,
+         15, 15, 15, 15,    15, 15, 15, 15
+    };
+    rs_u8x32 zero = {
+         0, 0, 0, 0,    0, 0, 0, 0,
+         0, 0, 0, 0,    0, 0, 0, 0,
+         0, 0, 0, 0,    0, 0, 0, 0,
+         0, 0, 0, 0,    0, 0, 0, 0
+    };
+    rs_u8x32 shr4 = (rs_u8x32)__builtin_ia32_psrlwi256((rs_u16x16)x, 4) & mask;
+    rs_u8x32 pop8 =
+        __builtin_ia32_pshufb256(table, x & mask) +
+        __builtin_ia32_pshufb256(table, shr4);
+    return (rs_u64x4)__builtin_ia32_psadbw256(pop8, zero);
+#endif
+}
+#endif
+
 typedef long long rs64x8 __attribute__ ((vector_size (64)));
 uint32_t RankMap::rank1(uint32_t offset) const {
     size_t lim = level0.size()*512;
@@ -106,10 +141,21 @@ uint32_t RankMap::rank1(uint32_t offset) const {
         (&level1[0].v[0])[i1] +
         __builtin_popcountll(~mask & (&level0[0].v[0])[i0]);
 
-    // clang can even vectorize the middle of this loop! (vpopcntq on icelake+)
-    const uint64_t *l0 = &level0[i1].v[0];
+    const RankLevel0 *l0 = &level0[i1];
+
+#ifdef __AVX2__
+    int sel = i0%8;
+    rs_u64x4 sel4 = { sel, sel, sel, sel };
+    rs_u64x4 idx0 = { 0, 1, 2, 3 };
+    rs_u64x4 idx1 = { 4, 5, 6, 7 };
+    rs_u64x4 sum4 = vpop(l0->a[0] & (rs_u8x32)(idx0 < sel4)) + vpop(l0->a[1] & (rs_u8x32)(idx1 < sel4));
+    rs_u64x4 sum2 = __builtin_ia32_psrldqi256(sum4, 64) + sum4;
+    out += sum2[0] + sum2[2];
+    return out;
+#else
     for (size_t i = 0; i < 8; ++i)
-        out += __builtin_popcountll(l0[i]) * (i < i0%8);
+        out += __builtin_popcountll(l0->v[i]) * (i < i0%8);
+#endif
 
     return out;
 }
