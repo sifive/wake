@@ -243,9 +243,6 @@ workflows:
   build:
     jobs:
       - tarball
-      - vscode:
-          requires:
-            - tarball
       - alpine:
           requires:
             - tarball
