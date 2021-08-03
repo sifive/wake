@@ -145,9 +145,9 @@ uint32_t RankMap::rank1(uint32_t offset) const {
 
 #ifdef __AVX2__
     int sel = i0%8;
-    rs_u64x4 sel4 = { sel, sel, sel, sel };
-    rs_u64x4 idx0 = { 0, 1, 2, 3 };
-    rs_u64x4 idx1 = { 4, 5, 6, 7 };
+    rs_u32x8 sel4 = { sel, sel, sel, sel, sel, sel, sel, sel };
+    rs_u32x8 idx0 = { 0, 0, 1, 1, 2, 2, 3, 3 };
+    rs_u32x8 idx1 = { 4, 4, 5, 5, 6, 6, 7, 7 };
     rs_u64x4 sum4 = vpop(l0->a[0] & (rs_u8x32)(idx0 < sel4)) + vpop(l0->a[1] & (rs_u8x32)(idx1 < sel4));
     rs_u64x4 sum2 = __builtin_ia32_psrldqi256(sum4, 64) + sum4;
     out += sum2[0] + sum2[2];
@@ -271,6 +271,36 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
     rank1 -= (&level1[0].v[0])[l0_off];
     const RankLevel0 *l0 = &level0[l0_off];
 
+#ifdef __AVX2__
+    rs_u32x8 idx  = { 0, 4, 1, 5, 2, 6, 3, 7 };
+    short l0_cutoff = static_cast<short>(rank1);
+    rs_u16x16 l0_filter = {
+        l0_cutoff, l0_cutoff, l0_cutoff, l0_cutoff,
+        l0_cutoff, l0_cutoff, l0_cutoff, l0_cutoff,
+        l0_cutoff, l0_cutoff, l0_cutoff, l0_cutoff,
+        l0_cutoff, l0_cutoff, l0_cutoff, l0_cutoff
+    };
+
+    rs_u64x4 elt0 = vpop(l0->a[0]); // { e0, e1, e2, e3 }
+    rs_u64x4 elt1 = vpop(l0->a[1]); // { e4, e5, e6, e7 }
+
+    // pack1 = { e0, -, e1, -, e4, -, e5, -, e2, -, e3, -, e6, -, e7, - }
+    rs_u16x16 pack1 = __builtin_ia32_packusdw256((rs_u32x8)elt0, (rs_u32x8)elt1);
+    // pack2 = { e0, e1, e4, e5, e0, e1, e4, e5, e2, e3, e6, e7, e2, e3, e6, e7 }
+    rs_u16x16 pack2 = __builtin_ia32_packusdw256((rs_u32x8)pack1, (rs_u32x8)pack1);
+    // { e0, e1, e4, e5, e2, e3, e6, e7, e0, e1, e2, e3, e4, e5, e6, e7 }
+    rs_u16x16 pack3 = (rs_u16x16)__builtin_ia32_permvarsi256((rs_u32x8)pack2, idx);
+    // Prefix-sum
+    rs_u16x16 sum1 = pack3;
+    rs_u16x16 sum2 = sum1 + (rs_u16x16)__builtin_ia32_pslldqi256((rs_u64x4)sum1, 16);
+    rs_u16x16 sum4 = sum2 + (rs_u16x16)__builtin_ia32_pslldqi256((rs_u64x4)sum2, 32);
+    rs_u16x16 sum8 = sum4 + (rs_u16x16)__builtin_ia32_pslldqi256((rs_u64x4)sum4, 64);
+    // Guaranteed to have a sum8[15] > cutoff, since we know the term is contained in the block
+    rs_u16x16 pick0 = (rs_u16x16)__builtin_ia32_pslldqi256((rs_u64x4)sum8, 16);
+    // Low-order zeroes (cases where sum8 <= l0_filter) are doubled by 8-bit sampling (ie: /2)
+    int num = __builtin_ctz(__builtin_ia32_pmovmskb256(sum8 > l0_filter))/2;
+    uint32_t outsum = pick0[num];
+#else
     uint32_t count = 0;
     int num = 0;
     uint32_t outsum = 0;
@@ -281,6 +311,7 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
             outsum = count;
         }
     }
+#endif
 
     return l0_off*512 + 64*num + select(l0->v[num], rank1 - outsum);
 }
