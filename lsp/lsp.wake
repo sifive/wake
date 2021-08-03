@@ -22,7 +22,7 @@ def buildLSP (Pair variant _): Result (List Path) Error =
         ncurses Unit, map pkg ("sqlite3", "gmp", "re2", Nil)
 
     def internalDepResults =
-        src variant, Nil
+        runtime variant, Nil
 
     require Pass internalDeps = findFail internalDepResults
 

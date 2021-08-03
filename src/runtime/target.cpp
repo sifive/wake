@@ -28,7 +28,7 @@
 #include "runtime/value.h"
 #include "runtime/tuple.h"
 #include "types/type.h"
-#include "cli/status.h"
+#include "runtime/status.h"
 #include "frontend/expr.h"
 
 struct TargetValue {

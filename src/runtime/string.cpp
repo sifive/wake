@@ -34,7 +34,7 @@
 #include "runtime/prim.h"
 #include "runtime/value.h"
 #include "types/type.h"
-#include "cli/status.h"
+#include "runtime/status.h"
 #include "utf8.h"
 #include "runtime/gc.h"
 #include "shell.h"

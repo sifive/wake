@@ -48,7 +48,7 @@
 #include "runtime/database.h"
 #include "location.h"
 #include "execpath.h"
-#include "cli/status.h"
+#include "runtime/status.h"
 #include "shell.h"
 #include "rusage.h"
 #include "mtime.h"

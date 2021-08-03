@@ -33,7 +33,7 @@
 #include "runtime/tuple.h"
 #include "location.h"
 #include "frontend/parser.h"
-#include "cli/status.h"
+#include "runtime/status.h"
 
 void require_fail(const char *message, unsigned size, Runtime &runtime, const Scope *scope) {
   std::stringstream ss;

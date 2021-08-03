@@ -30,7 +30,7 @@
 #include "optimizer/ssa.h"
 #include "hash.h"
 #include "frontend/symbol.h"
-#include "cli/status.h"
+#include "runtime/status.h"
 #include "sfinae.h"
 #include "runtime/tuple.h"
 

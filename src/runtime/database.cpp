@@ -29,7 +29,7 @@
 #include <set>
 
 #include "runtime/database.h"
-#include "cli/status.h"
+#include "runtime/status.h"
 
 // Increment every time the database schema changes
 #define SCHEMA_VERSION "1"
