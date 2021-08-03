@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include <immintrin.h>
 #include <assert.h>
 
 #include "rank.h"
@@ -92,8 +93,8 @@ bool RankMap::get(uint32_t x) const {
 #ifdef __AVX2__
 static inline rs_u64x4 vpop(rs_u8x32 x) {
 // -mavx512vpopcntdq -mavx512vl
-#if defined(__AVX512VPOPCNTDQ__) && defined(__AVX512VL__)
-    return __builtin_ia32_vpopcountq_v4di((rs_u64x4)x);
+#if defined(__AVX512VPOPCNTDQ__)
+    return _mm256_popcnt_epi64((rs_u64x4)x);
 #else
     rs_u8x32 table = {
     //   0  1  2  3  4  5  6  7
@@ -116,16 +117,15 @@ static inline rs_u64x4 vpop(rs_u8x32 x) {
          0, 0, 0, 0,    0, 0, 0, 0,
          0, 0, 0, 0,    0, 0, 0, 0
     };
-    rs_u8x32 shr4 = (rs_u8x32)__builtin_ia32_psrlwi256((rs_u16x16)x, 4) & mask;
+    rs_u8x32 shr4 = (rs_u8x32)_mm256_srli_epi16((rs_u16x16)x, 4) & mask;
     rs_u8x32 pop8 =
-        __builtin_ia32_pshufb256(table, x & mask) +
-        __builtin_ia32_pshufb256(table, shr4);
-    return (rs_u64x4)__builtin_ia32_psadbw256(pop8, zero);
+        _mm256_shuffle_epi8(table, x & mask) +
+        _mm256_shuffle_epi8(table, shr4);
+    return (rs_u64x4)_mm256_sad_epu8(pop8, zero);
 #endif
 }
 #endif
 
-typedef long long rs64x8 __attribute__ ((vector_size (64)));
 uint32_t RankMap::rank1(uint32_t offset) const {
     size_t lim = level0.size()*512;
     if (offset >= lim) offset = lim-1;
@@ -149,7 +149,7 @@ uint32_t RankMap::rank1(uint32_t offset) const {
     rs_u32x8 idx0 = { 0, 0, 1, 1, 2, 2, 3, 3 };
     rs_u32x8 idx1 = { 4, 4, 5, 5, 6, 6, 7, 7 };
     rs_u64x4 sum4 = vpop(l0->a[0] & (rs_u8x32)(idx0 < sel4)) + vpop(l0->a[1] & (rs_u8x32)(idx1 < sel4));
-    rs_u64x4 sum2 = __builtin_ia32_psrldqi256(sum4, 64) + sum4;
+    rs_u64x4 sum2 = _mm256_bsrli_epi128(sum4, 8) + sum4;
     out += sum2[0] + sum2[2];
     return out;
 #else
@@ -229,8 +229,8 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
     };
 
     l1_off +=
-        __builtin_ctz(~__builtin_ia32_movmskps256((&level2[0].a[0])[hl2_off+0] <= l2_filter)) +
-        __builtin_ctz(~__builtin_ia32_movmskps256((&level2[0].a[0])[hl2_off+1] <= l2_filter));
+        __builtin_ctz(~_mm256_movemask_ps((&level2[0].a[0])[hl2_off+0] <= l2_filter)) +
+        __builtin_ctz(~_mm256_movemask_ps((&level2[0].a[0])[hl2_off+1] <= l2_filter));
 
     // -1 is for the 0th entry which always compares true
     --l1_off;
@@ -257,8 +257,8 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
     };
 
     uint32_t l1le =
-        __builtin_ctzll(~zext32(__builtin_ia32_pmovmskb256(l1->a[0] <= l1_filter))) +
-        __builtin_ctzll(~zext32(__builtin_ia32_pmovmskb256(l1->a[1] <= l1_filter)));
+        __builtin_ctzll(~zext32(_mm256_movemask_epi8(l1->a[0] <= l1_filter))) +
+        __builtin_ctzll(~zext32(_mm256_movemask_epi8(l1->a[1] <= l1_filter)));
 
     // Divide by 2 because we extracted 2x 1s per comparison and -1 for useless 0 entry
     l0_off += (l1le/2) - 1;
@@ -285,20 +285,20 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
     rs_u64x4 elt1 = vpop(l0->a[1]); // { e4, e5, e6, e7 }
 
     // pack1 = { e0, -, e1, -, e4, -, e5, -, e2, -, e3, -, e6, -, e7, - }
-    rs_u16x16 pack1 = __builtin_ia32_packusdw256((rs_u32x8)elt0, (rs_u32x8)elt1);
+    rs_u16x16 pack1 = _mm256_packus_epi32((rs_u32x8)elt0, (rs_u32x8)elt1);
     // pack2 = { e0, e1, e4, e5, e0, e1, e4, e5, e2, e3, e6, e7, e2, e3, e6, e7 }
-    rs_u16x16 pack2 = __builtin_ia32_packusdw256((rs_u32x8)pack1, (rs_u32x8)pack1);
+    rs_u16x16 pack2 = _mm256_packus_epi32((rs_u32x8)pack1, (rs_u32x8)pack1);
     // { e0, e1, e4, e5, e2, e3, e6, e7, e0, e1, e2, e3, e4, e5, e6, e7 }
-    rs_u16x16 pack3 = (rs_u16x16)__builtin_ia32_permvarsi256((rs_u32x8)pack2, idx);
+    rs_u16x16 pack3 = (rs_u16x16)_mm256_permutevar8x32_epi32((rs_u32x8)pack2, idx);
     // Prefix-sum
     rs_u16x16 sum1 = pack3;
-    rs_u16x16 sum2 = sum1 + (rs_u16x16)__builtin_ia32_pslldqi256((rs_u64x4)sum1, 16);
-    rs_u16x16 sum4 = sum2 + (rs_u16x16)__builtin_ia32_pslldqi256((rs_u64x4)sum2, 32);
-    rs_u16x16 sum8 = sum4 + (rs_u16x16)__builtin_ia32_pslldqi256((rs_u64x4)sum4, 64);
+    rs_u16x16 sum2 = sum1 + (rs_u16x16)_mm256_bslli_epi128((rs_u64x4)sum1, 2);
+    rs_u16x16 sum4 = sum2 + (rs_u16x16)_mm256_bslli_epi128((rs_u64x4)sum2, 4);
+    rs_u16x16 sum8 = sum4 + (rs_u16x16)_mm256_bslli_epi128((rs_u64x4)sum4, 8);
     // Guaranteed to have a sum8[15] > cutoff, since we know the term is contained in the block
-    rs_u16x16 pick0 = (rs_u16x16)__builtin_ia32_pslldqi256((rs_u64x4)sum8, 16);
+    rs_u16x16 pick0 = (rs_u16x16)_mm256_bslli_epi128((rs_u64x4)sum8, 2);
     // Low-order zeroes (cases where sum8 <= l0_filter) are doubled by 8-bit sampling (ie: /2)
-    int num = __builtin_ctz(__builtin_ia32_pmovmskb256(sum8 > l0_filter))/2;
+    int num = __builtin_ctz(_mm256_movemask_epi8(sum8 > l0_filter))/2;
     uint32_t outsum = pick0[num];
 #else
     uint32_t count = 0;
