@@ -24,7 +24,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "cli/profile.h"
+#include "runtime/profile.h"
 #include "json5.h"
 #include "execpath.h"
 

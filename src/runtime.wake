@@ -17,14 +17,15 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def src (variant: String): Result SysLib Error =
+def runtime (variant: String): Result SysLib Error =
     def externalDeps =
-        Nil
+        ncurses Unit, map pkg ("sqlite3", "gmp", "re2", Nil)
 
     def internalDepResults =
         common variant, map (_ "native-c99-release") (utf8proc, Nil)
 
-    require Pass internalDeps = findFail internalDepResults
+    require Pass internalDeps =
+        findFail internalDepResults
 
     def deps =
         internalDeps ++ externalDeps
@@ -34,15 +35,13 @@ def src (variant: String): Result SysLib Error =
         "-I{here}", deps.getSysLibCFlags
 
     def headers =
-        map source ("src/dsu.h", "src/hash.h", "src/optional.h", "src/primfn.h", Nil) ++
-        map source ("src/cli/profile.h", "src/cli/status.h", Nil) ++
+        sources here `[^/]*\.h` ++
         sources here `frontend/.*\.h` ++
         sources here `optimizer/.*\.h` ++
         sources here `runtime/.*\.h` ++
         sources here `types/.*\.h` ++
         deps.getSysLibHeaders
         
-
     def compile =
         compileC variant cflags headers
 
@@ -50,13 +49,15 @@ def src (variant: String): Result SysLib Error =
         require Pass cpp = re2c re
         compile cpp
 
+    def cppSources =
+        sources here `frontend/.*\.cpp` ++
+        sources here `optimizer/.*\.cpp` ++
+        sources here `runtime/.*\.cpp` ++
+        sources here `types/.*\.cpp`
+
     def objResults =
-        map re2obj  (sources here `.*\.re`) ++
-        map compile (map source ("src/cli/profile.cpp", "src/cli/status.cpp", Nil)) ++
-        map compile (sources here `frontend/.*\.cpp`) ++
-        map compile (sources here `optimizer/.*\.cpp`) ++
-        map compile (sources here `runtime/.*\.cpp`) ++
-        map compile (sources here `types/.*\.cpp`)
+        re2obj (source "{here}/frontend/symbol.re"),
+        map compile cppSources
 
     require Pass foundObjects =
         findFail objResults
@@ -65,4 +66,4 @@ def src (variant: String): Result SysLib Error =
         foundObjects.flatten ++
         deps.getSysLibObjects
 
-    Pass (SysLib "0.0" headers objects cflags Nil)
+    Pass (SysLib "0.0" headers objects cflags deps.getSysLibLFlags)

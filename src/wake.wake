@@ -32,17 +32,14 @@ def ncurses Unit =
     | editSysLibCFlags (filter (matches `-I.*` _)) # remove feature test manipulation
 
 def buildWake (Pair variant clib) =
-    def externalDeps =
-        ncurses Unit, map pkg ("sqlite3", "gmp", "re2", Nil)
-
     def internalDepResults =
-        src variant, map (_ clib) (gopt, Nil)
+        runtime variant, map (_ clib) (gopt, Nil)
 
-    require Pass internalDeps = findFail internalDepResults
+    require Pass internalDeps =
+        findFail internalDepResults
 
     def deps =
-        internalDeps ++ externalDeps
-        | flattenSysLibs
+        flattenSysLibs internalDeps
 
     def headerFiles =
         version_h Unit,

@@ -27,7 +27,7 @@
 #include "location.h"
 #include "frontend/symbol.h"
 #include "frontend/expr.h"
-#include "cli/status.h"
+#include "runtime/status.h"
 
 static int globalClock = 0;
 static int globalEpoch = 1; // before a tagging pass, globalEpoch > TypeVar.epoch for all TypeVars

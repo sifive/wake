@@ -30,7 +30,7 @@
 #include <algorithm>
 
 #include "runtime/gc.h"
-#include "cli/status.h"
+#include "runtime/status.h"
 
 #define INITIAL_HEAP_SIZE 1024
 

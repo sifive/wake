@@ -26,7 +26,7 @@
 #include "runtime/prim.h"
 #include "runtime/value.h"
 #include "types/type.h"
-#include "cli/status.h"
+#include "runtime/status.h"
 #include "location.h"
 #include "frontend/expr.h"
 

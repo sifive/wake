@@ -27,9 +27,9 @@
 #include "runtime/tuple.h"
 #include "optimizer/ssa.h"
 #include "runtime/value.h"
-#include "cli/status.h"
+#include "runtime/status.h"
 #include "runtime/job.h"
-#include "cli/profile.h"
+#include "runtime/profile.h"
 
 #define PROFILE_HZ 1000
 

@@ -37,7 +37,7 @@
 #include <limits>
 #include <iomanip>
 
-#include "cli/status.h"
+#include "runtime/status.h"
 #include "runtime/job.h"
 #include "sigwinch.h"
 

@@ -35,14 +35,14 @@
 #include "runtime/job.h"
 #include "runtime/sources.h"
 #include "runtime/database.h"
-#include "cli/status.h"
+#include "runtime/status.h"
 #include "gopt.h"
 #include "gopt-arg.h"
 #include "runtime/runtime.h"
 #include "shell.h"
 #include "cli/markup.h"
 #include "cli/describe.h"
-#include "cli/profile.h"
+#include "runtime/profile.h"
 #include "optimizer/ssa.h"
 
 #ifndef VERSION
