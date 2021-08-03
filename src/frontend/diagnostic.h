@@ -13,12 +13,12 @@ class Diagnostic {
 
     Location getLocation() const { return location; }
     Severity getSeverity() const { return severity; }
-    std::string getMessage() const { return message; }  
+    std::string getMessage() const { return message; }
 
   private:
     const Location location;
     const Severity severity;
-    const std::string message;   
+    const std::string message;
 };
 
 class DiagnosticReporter {
