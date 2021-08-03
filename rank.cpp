@@ -20,6 +20,19 @@
 
 #include "rank.h"
 
+#define W_SIZE   64
+#define L0_SIZE  512	// number of bits spanned by an L0 block
+#define L1_SIZE  16384	// number of bits spanned by an L1 block
+#define L0_COUNT 8	// number of entries in an L0 block
+#define L1_COUNT 32	// number of entries in an L1 block
+#define L2_COUNT 16	// number of entries in an L2 block
+#define L12_COUNT (L1_COUNT*L2_COUNT)
+
+#define SAMPLE_RATE 1024 // sampling rate
+
+#define DIV_UP(x, y) (((x)+(y)-1)/(y))
+#define MOD_UP(x, y) (((x)+(y)-1)%(y))
+
 void RankBuilder::set(uint32_t x) {
     size_t off = x/64;
     size_t bit = x%64;
@@ -39,55 +52,55 @@ bool RankBuilder::get(uint32_t x) const {
 
 RankMap::RankMap(const RankBuilder &builder) {
     // In order to not exceed array bounds while computing rank1, we need the vector to end with a 0
-    if (builder.bitmap.back() >> 63)
+    if ((builder.bitmap.back() >> (W_SIZE-1)) != 0)
         builder.bitmap.push_back(0);
 
-    // round builder up to 64-byte alignment
-    size_t len = (builder.bitmap.size()+7) / 8;
-    builder.bitmap.resize(len*8, 0);
+    // Round builder up to L0-block alignment
+    size_t len = DIV_UP(builder.bitmap.size(), L0_COUNT);
+    builder.bitmap.resize(len*L0_COUNT, 0);
 
     level0.resize(len);
-    level1.resize((len+31)/32);
-    level2.resize((len+511)/512);
+    level1.resize(DIV_UP(len, L1_COUNT));
+    level2.resize(DIV_UP(len, L12_COUNT));
 
-    uint32_t sum = 0, sum16 = 0;
-    for (uint32_t i = 0; i < len; ++i) {
-        if (i%32 == 0) {
-            sum += sum16;
-            sum16 = 0;
-            level2[i/512].v[(i%512)/32] = sum;
+    size_t sum2 = 0, sum1 = 0;
+    for (size_t i = 0; i < len; ++i) {
+        if (i%L1_COUNT == 0) {
+            sum2 += sum1;
+            sum1 = 0;
+            level2[i/L12_COUNT].v[(i%L12_COUNT)/L1_COUNT] = sum2;
         }
-        level1[i/32].v[i%32] = sum16;
-        for (uint32_t j = 0; j < 8; ++j) {
-            uint64_t x = builder.bitmap[i*8+j];
+        level1[i/L1_COUNT].v[i%L1_COUNT] = sum1;
+        for (size_t j = 0; j < L0_COUNT; ++j) {
+            size_t x = builder.bitmap[i*L0_COUNT+j];
             level0[i].v[j] = x;
-            sum16 += __builtin_popcountll(x);
+            sum1 += __builtin_popcountll(x);
         }
     }
 
     // Fill the tail of the last level-1 block
-    if (len%32 != 0) {
-        for (size_t i = len%32; i < 32; ++i)
-            level1.back().v[i] = sum16;
+    if (len%L1_COUNT != 0) {
+        for (size_t i = len%L1_COUNT; i < L1_COUNT; ++i)
+            level1.back().v[i] = sum1;
     }
 
     // Fill the tail of the last level-2 block
-    sum += sum16;
-    if (len%512 != 0) {
-        size_t i = ((len-1)%512)/32;
-        for (++i; i < 16; ++i)
-            level2.back().v[i] = sum;
+    sum2 += sum1;
+    if (len%L12_COUNT != 0) {
+        size_t i = ((len-1)%L12_COUNT)/L1_COUNT;
+        for (++i; i < L2_COUNT; ++i)
+            level2.back().v[i] = sum2;
     }
 
     // Add an extra L2 block for strided select1 access
     level2.resize(level2.size()+1);
-    for (size_t i = 0; i < 16; ++i)
-        level2.back().v[i] = sum;
+    for (size_t i = 0; i < L2_COUNT; ++i)
+        level2.back().v[i] = sum2;
 }
 
 bool RankMap::get(uint32_t x) const {
-    if (x/512 >= level0.size()) return false;
-    return ((&level0[0].v[0])[x/64] >> (x%64)) & 1;
+    if (x/L0_SIZE >= level0.size()) return false;
+    return ((&level0[0].v[0])[x/W_SIZE] >> (x%W_SIZE)) & 1;
 }
 
 #ifdef __AVX2__
@@ -127,16 +140,16 @@ static inline rs_u64x4 vpop(rs_u8x32 x) {
 #endif
 
 uint32_t RankMap::rank1(uint32_t offset) const {
-    size_t lim = level0.size()*512;
+    size_t lim = level0.size()*L0_SIZE;
     if (offset >= lim) offset = lim-1;
 
-    size_t i2 = offset/16384;
-    size_t i1 = offset/512;
-    size_t i0 = offset/64;
-    size_t bit = offset%64;
+    size_t i2 = offset/L1_SIZE;
+    size_t i1 = offset/L0_SIZE;
+    size_t i0 = offset/W_SIZE;
+    size_t bit = offset%W_SIZE;
 
     uint64_t mask = UINT64_C(0xffffffffffffffff) << bit;
-    uint32_t out =
+    auto out =
         (&level2[0].v[0])[i2] +
         (&level1[0].v[0])[i1] +
         __builtin_popcountll(~mask & (&level0[0].v[0])[i0]);
@@ -153,8 +166,8 @@ uint32_t RankMap::rank1(uint32_t offset) const {
     out += sum2[0] + sum2[2];
     return out;
 #else
-    for (size_t i = 0; i < 8; ++i)
-        out += __builtin_popcountll(l0->v[i]) * (i < i0%8);
+    for (size_t i = 0; i < L0_COUNT; ++i)
+        out += __builtin_popcountll(l0->v[i]) * (i < i0%L0_COUNT);
 #endif
 
     return out;
@@ -165,23 +178,17 @@ RankSelect1Map::RankSelect1Map(const RankBuilder &builder)
 {
     sample1.push_back(0);
 
-    uint32_t sum = 0;
+    size_t sum = 0;
     for (size_t i = 0; i < builder.bitmap.size(); ++i) {
-        uint64_t x = builder.bitmap[i];
-        uint32_t pop = __builtin_popcountll(x);
-        if ((sum+1023)%1024 + pop >= 1024)
-            sample1.push_back(i/8/32/8);
+        auto x = builder.bitmap[i];
+        auto pop = __builtin_popcountll(x);
+        if (pop + MOD_UP(sum,SAMPLE_RATE) >= SAMPLE_RATE)
+            sample1.push_back(i/L0_COUNT/L1_COUNT/(L2_COUNT/2));
         sum += pop;
     }
 
     num1s = sum;
 }
-
-#ifdef __AVX2__
-static inline uint64_t zext32(int x) {
-    return static_cast<uint64_t>(static_cast<uint32_t>(x));
-}
-#endif
 
 // Return the offset of the n-th 1-bit (counting from n=0)
 static int select(uint64_t mask, int n) {
@@ -214,12 +221,12 @@ static int select(uint64_t mask, int n) {
 uint32_t RankSelect1Map::select1(uint32_t rank1) const {
     assert (rank1 < num1s);
 
-    uint32_t sample = rank1/1024;
+    uint32_t sample = rank1/SAMPLE_RATE;
     uint32_t hl2_off = sample1[sample]; // L2 half-block containing (sample*1024)-th bit
     assert (sample >= sample1.size() || sample1[sample+1] <= hl2_off+1); // !!! fixme
 
     // Add in the L1 offset from L2 position
-    uint32_t l1_off = hl2_off*8;
+    uint32_t l1_off = hl2_off*(L2_COUNT/2);
 
 #ifdef __AVX2__
     int l2_cutoff = static_cast<int>(rank1);
@@ -228,16 +235,17 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
         l2_cutoff, l2_cutoff, l2_cutoff, l2_cutoff
     };
 
-    l1_off +=
-        __builtin_ctz(~_mm256_movemask_ps((&level2[0].a[0])[hl2_off+0] <= l2_filter)) +
-        __builtin_ctz(~_mm256_movemask_ps((&level2[0].a[0])[hl2_off+1] <= l2_filter));
+    // It's critical that __builtin_ctz(0) = tzcnt(0) = 32
+    uint32_t l2le =
+        __builtin_ctz(_mm256_movemask_epi8((&level2[0].a[0])[hl2_off+0] > l2_filter)) +
+        __builtin_ctz(_mm256_movemask_epi8((&level2[0].a[0])[hl2_off+1] > l2_filter));
 
     // -1 is for the 0th entry which always compares true
-    --l1_off;
+    l1_off += (l2le/4) - 1;
 #else
-    const uint32_t *l2_base = &(&level2[0].v[0])[l1_off];
+    auto l2_base = &(&level2[0].v[0])[l1_off];
     assert (l2_base[0] <= rank1);
-    for (size_t i = 1; i < 16; ++i) // each L2 entry = one L1 block
+    for (size_t i = 1; i < L2_COUNT; ++i) // each L2 entry = one L1 block
         l1_off += l2_base[i] <= rank1;
 #endif
 
@@ -245,7 +253,7 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
     const RankLevel1 *l1 = &level1[l1_off];
 
     // Add in the L0 offset from L1 position
-    uint32_t l0_off = l1_off*32;
+    uint32_t l0_off = l1_off*L1_COUNT;
 
 #ifdef __AVX2__
     short l1_cutoff = static_cast<short>(rank1);
@@ -257,14 +265,14 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
     };
 
     uint32_t l1le =
-        __builtin_ctzll(~zext32(_mm256_movemask_epi8(l1->a[0] <= l1_filter))) +
-        __builtin_ctzll(~zext32(_mm256_movemask_epi8(l1->a[1] <= l1_filter)));
+        __builtin_ctz(_mm256_movemask_epi8(l1->a[0] > l1_filter)) +
+        __builtin_ctz(_mm256_movemask_epi8(l1->a[1] > l1_filter));
 
     // Divide by 2 because we extracted 2x 1s per comparison and -1 for useless 0 entry
     l0_off += (l1le/2) - 1;
 #else
     assert (l1->v[0] <= rank1);
-    for (size_t i = 1; i < 32; ++i)
+    for (size_t i = 1; i < L1_COUNT; ++i)
         l0_off += l1->v[i] <= rank1;
 #endif
 
@@ -304,7 +312,7 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
     uint32_t count = 0;
     int num = 0;
     uint32_t outsum = 0;
-    for (size_t i = 0; i < 7; ++i) {
+    for (size_t i = 0; i < L0_COUNT-1; ++i) {
         count += __builtin_popcountll(l0->v[i]);
         if (count <= rank1) {
             num = i+1;
@@ -313,5 +321,5 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
     }
 #endif
 
-    return l0_off*512 + 64*num + select(l0->v[num], rank1 - outsum);
+    return l0_off*L0_SIZE + W_SIZE*num + select(l0->v[num], rank1 - outsum);
 }
