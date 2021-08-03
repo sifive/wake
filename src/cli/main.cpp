@@ -44,6 +44,7 @@
 #include "cli/describe.h"
 #include "runtime/profile.h"
 #include "optimizer/ssa.h"
+#include "frontend/diagnostic.h"
 
 #ifndef VERSION
 #include "version.h"
@@ -95,7 +96,18 @@ void print_help(const char *argv0) {
     // debug-db, no-optimize, stop-after-* are secret undocumented options
 }
 
+DiagnosticReporter *reporter;
+class TerminalReporter : public DiagnosticReporter {
+  public:
+    void report(Diagnostic diagnostic) {
+      std::cerr << diagnostic.getMessage() << std::endl;
+    }
+};
+
 int main(int argc, char **argv) {
+  TerminalReporter terminalReporter;
+  reporter = &terminalReporter;
+
   struct option options[] {
     { 'p', "percent",               GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 'c', "check",                 GOPT_ARGUMENT_FORBIDDEN },

@@ -26,18 +26,27 @@
 #include "frontend/parser.h"
 #include "frontend/expr.h"
 #include "frontend/symbol.h"
+#include "frontend/diagnostic.h"
 #include "runtime/value.h"
 #include "location.h"
 
 //#define TRACE(x) do { fprintf(stderr, "%s\n", x); } while (0)
 #define TRACE(x) do { } while (0)
 
+extern DiagnosticReporter *reporter;
+void reportError(Location location, std::string message) {
+  Diagnostic diagnostic(location, S_ERROR, message);
+  reporter->report(diagnostic);
+}
+
 bool expect(SymbolType type, Lexer &lex) {
   if (lex.next.type != type) {
-    std::cerr << "Was expecting a "
+    std::ostringstream message;
+    message << "Was expecting a "
       << symbolTable[type] << ", but got a "
       << symbolTable[lex.next.type] << " at "
       << lex.next.location.text() << std::endl;
+    reportError(lex.next.location, message.str());
     lex.fail = true;
     return false;
   }
@@ -46,9 +55,11 @@ bool expect(SymbolType type, Lexer &lex) {
 
 static std::pair<std::string, Location> get_arg_loc(Lexer &lex) {
   if (lex.next.type != ID) {
-    std::cerr << "Was expecting an ID argument, but got a "
+    std::ostringstream message;
+    message << "Was expecting an ID argument, but got a "
       << symbolTable[lex.next.type] << " at "
       << lex.next.location.text() << std::endl;
+    reportError(lex.next.location, message.str());
     lex.fail = true;
   }
 
@@ -65,14 +76,18 @@ static bool expectString(Lexer &lex) {
       if (typeid(*obj) == typeid(String)) {
         return true;
       } else {
-        std::cerr << "Was expecting a String, but got a different literal at "
+        std::ostringstream message;
+        message << "Was expecting a String, but got a different literal at "
           << lex.next.location.text() << std::endl;
+        reportError(lex.next.location, message.str());
         lex.fail = true;
         return false;
       }
     } else {
-      std::cerr << "Was expecting a String, but got an interpolated string at "
+      std::ostringstream message;
+      message << "Was expecting a String, but got an interpolated string at "
         << lex.next.location.text() << std::endl;
+      reportError(lex.next.location, message.str());
       lex.fail = true;
       return false;
     }
@@ -100,14 +115,16 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state) {
 
 static bool check_constructors(const AST &ast) {
   if (!ast.args.empty() && ast.name == "_") {
-    std::cerr
+    std::ostringstream message;
+    message
       << "Wildcard cannot be used as a constructor at " << ast.token.text()
       << std::endl;
     return true;
   }
 
   if (!ast.args.empty() && !ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
-    std::cerr
+    std::ostringstream message;
+    message
       << "Lower-case identifier cannot be used as a constructor at "
       << ast.token.text()
       << std::endl;
@@ -157,9 +174,11 @@ static Expr *relabel_anon(Expr *out) {
 }
 
 static void precedence_error(Lexer &lex) {
-  std::cerr << "Lower precedence unary operator "
+  std::ostringstream message;
+  message << "Lower precedence unary operator "
     << lex.id() << " must use ()s at "
     << lex.next.location.file() << std::endl;
+  reportError(lex.next.location, message.str());
   lex.fail = true;
 }
 static Expr *add_literal_guards(Expr *guard, const ASTState &state) {
@@ -217,7 +236,9 @@ static Expr *parse_match(int p, Lexer &lex) {
         repeat = false;
         break;
       default:
-        std::cerr << "Unexpected end of match definition at " << lex.next.location.text() << std::endl;
+        std::ostringstream message;
+        message << "Unexpected end of match definition at " << lex.next.location.text() << std::endl;
+        reportError(lex.next.location, message.str());
         lex.fail = true;
         repeat = false;
         break;
@@ -259,7 +280,9 @@ static Expr *parse_match(int p, Lexer &lex) {
         lex.consume();
         break;
       default:
-        std::cerr << "Unexpected end of match definition at " << lex.next.location.text() << std::endl;
+        std::ostringstream message;
+        message << "Unexpected end of match definition at " << lex.next.location.text() << std::endl;
+        reportError(lex.next.location, message.str());
         lex.fail = true;
         repeat = false;
         break;
@@ -402,9 +425,11 @@ static Expr *parse_unary(int p, Lexer &lex, bool multiline) {
       return out;
     }
     default: {
-      std::cerr << "Was expecting an (OPERATOR/LAMBDA/ID/LITERAL/PRIM/POPEN), got a "
+      std::ostringstream message;
+      message << "Was expecting an (OPERATOR/LAMBDA/ID/LITERAL/PRIM/POPEN), got a "
         << symbolTable[lex.next.type] << " at "
         << lex.next.location.text() << std::endl;
+      reportError(lex.next.location, message.str());
       lex.fail = true;
       return new Literal(LOCATION, String::literal(lex.heap, "bad unary"), &String::typeVar);
     }
@@ -523,8 +548,10 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
 
   bool extract = Lexer::isUpper(name.c_str()) || (state.topParen && Lexer::isOperator(name.c_str()));
   if (extract && (target || publish)) {
-    std::cerr << "Upper-case identifier cannot be used as a target/publish name at "
+    std::ostringstream message;
+    message << "Upper-case identifier cannot be used as a target/publish name at "
       << ast.token.text() << std::endl;
+    reportError(ast.token, message.str());
     lex.fail = true;
     extract = false;
   }
@@ -603,8 +630,10 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
 
   if (target) {
     if (tohash == 0) {
-      std::cerr << "Target definition must have at least one hashed argument "
+      std::ostringstream message;
+      message << "Target definition must have at least one hashed argument "
         << fn.text() << std::endl;
+      reportError(fn, message.str());
       lex.fail = true;
     }
     Location bl = body->location;
@@ -622,7 +651,9 @@ static std::vector<Definition> parse_def(Lexer &lex, long index, bool target, bo
   }
 
   if (publish && !args.empty()) {
-    std::cerr << "Publish definition may not be a function " << fn.text() << std::endl;
+    std::ostringstream message;
+    message << "Publish definition may not be a function " << fn.text() << std::endl;
+    reportError(fn, message.str());
     lex.fail = true;
   } else {
     for (auto i = args.rbegin(); i != args.rend(); ++i) {
@@ -706,8 +737,10 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
     case ID: {
       AST out(lex.next.location, lex.id());
       if (out.name == "_" && state.type) {
-        std::cerr << "Type signatures may not include _ at "
+        std::ostringstream message;
+        message << "Type signatures may not include _ at "
           << lex.next.location.file() << std::endl;
+        reportError(lex.next.location, message.str());
         lex.fail = true;
       }
       lex.consume();
@@ -733,9 +766,11 @@ static AST parse_unary_ast(int p, Lexer &lex, ASTState &state) {
       // fall through to default
     }
     default: {
-      std::cerr << "Was expecting an (OPERATOR/ID/POPEN), got a "
+      std::ostringstream message;
+      message << "Was expecting an (OPERATOR/ID/POPEN), got a "
         << symbolTable[lex.next.type] << " at "
         << lex.next.location.text() << std::endl;
+      reportError(lex.next.location, message.str());
       lex.consume();
       lex.fail = true;
       return AST(lex.next.location);
@@ -773,8 +808,10 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
         AST rhs = parse_ast(op.p + op.l, lex, state);
         lhs.region.end = rhs.region.end;
         if (Lexer::isOperator(lhs.name.c_str())) {
-          std::cerr << "Cannot supply additional constructor arguments to " << lhs.name
+          std::ostringstream message;
+          message << "Cannot supply additional constructor arguments to " << lhs.name
             << " at " << lhs.region.text() << std::endl;
+          reportError(lhs.region, message.str());
           lex.fail = true;
         }
         lhs.args.emplace_back(std::move(rhs));
@@ -788,8 +825,10 @@ static AST parse_ast(int p, Lexer &lex, ASTState &state, AST &&lhs_) {
           Location tagloc = lhs.region;
           lex.consume();
           if (!lhs.args.empty() || Lexer::isOperator(lhs.name.c_str())) {
-            std::cerr << "Left-hand-side of COLON must be a simple lower-case identifier, not "
+            std::ostringstream message;
+            message << "Left-hand-side of COLON must be a simple lower-case identifier, not "
               << lhs.name << " at " << lhs.region.file() << std::endl;
+            reportError(lhs.region, message.str());
             lex.fail = true;
           }
           std::string tag = std::move(lhs.name);
@@ -826,8 +865,10 @@ bool sums_ok() {
     if (Boolean->members.size() != 2 ||
         Boolean->members[0].ast.args.size() != 0 ||
         Boolean->members[1].ast.args.size() != 0) {
-      std::cerr << "Special constructor Boolean not defined correctly at "
+      std::ostringstream message;
+      message << "Special constructor Boolean not defined correctly at "
         << Boolean->region.file() << "." << std::endl;
+      reportError(Boolean->region, message.str());
       ok = false;
     }
   } else {
@@ -840,8 +881,10 @@ bool sums_ok() {
         Order->members[0].ast.args.size() != 0 ||
         Order->members[1].ast.args.size() != 0 ||
         Order->members[2].ast.args.size() != 0) {
-      std::cerr << "Special constructor Order not defined correctly at "
+      std::ostringstream message;
+      message << "Special constructor Order not defined correctly at "
         << Order->region.file() << "." << std::endl;
+      reportError(Order->region, message.str());
       ok = false;
     }
   } else {
@@ -853,8 +896,10 @@ bool sums_ok() {
     if (List->members.size() != 2 ||
         List->members[0].ast.args.size() != 0 ||
         List->members[1].ast.args.size() != 2) {
-      std::cerr << "Special constructor List not defined correctly at "
+      std::ostringstream message;
+      message << "Special constructor List not defined correctly at "
         << List->region.file() << "." << std::endl;
+      reportError(List->region, message.str());
       ok = false;
     }
   } else {
@@ -865,8 +910,10 @@ bool sums_ok() {
   if (Unit) {
     if (Unit->members.size() != 1 ||
         Unit->members[0].ast.args.size() != 0) {
-      std::cerr << "Special constructor Unit not defined correctly at "
+      std::ostringstream message;
+      message << "Special constructor Unit not defined correctly at "
         << Unit->region.file() << "." << std::endl;
+      reportError(Unit->region, message.str());
       ok = false;
     }
   } else {
@@ -877,8 +924,10 @@ bool sums_ok() {
   if (Pair) {
     if (Pair->members.size() != 1 ||
         Pair->members[0].ast.args.size() != 2) {
-      std::cerr << "Special constructor Pair not defined correctly at "
+      std::ostringstream message;
+      message << "Special constructor Pair not defined correctly at "
         << Pair->region.file() << "." << std::endl;
+      reportError(Pair->region, message.str());
       ok = false;
     }
   } else {
@@ -890,8 +939,10 @@ bool sums_ok() {
     if (Result->members.size() != 2 ||
         Result->members[0].ast.args.size() != 1 ||
         Result->members[1].ast.args.size() != 1) {
-      std::cerr << "Special constructor Result not defined correctly at "
+      std::ostringstream message;
+      message << "Special constructor Result not defined correctly at "
         << Result->region.file() << "." << std::endl;
+      reportError(Result->region, message.str());
       ok = false;
     }
   } else {
@@ -908,8 +959,10 @@ bool sums_ok() {
         JValue->members[4].ast.args.size() != 0 ||
         JValue->members[5].ast.args.size() != 1 ||
         JValue->members[6].ast.args.size() != 1) {
-      std::cerr << "Special constructor JValue not defined correctly at "
+      std::ostringstream message;
+      message << "Special constructor JValue not defined correctly at "
         << JValue->region.file() << "." << std::endl;
+      reportError(JValue->region, message.str());
       ok = false;
     }
   } else {
@@ -929,24 +982,30 @@ static AST parse_type_def(Lexer &lex) {
   if (!def) return def;
 
   if (def.name == "_" || Lexer::isLower(def.name.c_str())) {
-    std::cerr << "Type name must be upper-case or operator, not "
+    std::ostringstream message;
+    message << "Type name must be upper-case or operator, not "
       << def.name << " at "
       << def.token.file() << std::endl;
+    reportError(def.token, message.str());
     lex.fail = true;
   }
 
   std::set<std::string> args;
   for (auto &x : def.args) {
     if (!Lexer::isLower(x.name.c_str())) {
-      std::cerr << "Type argument must be lower-case, not "
+      std::ostringstream message;
+      message << "Type argument must be lower-case, not "
         << x.name << " at "
         << x.token.file() << std::endl;
+      reportError(x.token, message.str());
       lex.fail = true;
     }
     if (!args.insert(x.name).second) {
-      std::cerr << "Type argument "
+      std::ostringstream message;
+      message << "Type argument "
         << x.name << " occurs more than once at "
         << x.token.file() << std::endl;
+      reportError(x.token, message.str());
       lex.fail = true;
     }
   }
@@ -972,9 +1031,11 @@ static void parse_topic(Lexer &lex, Package &package, Symbols *exports, Symbols 
 
   auto id = get_arg_loc(lex);
   if (!Lexer::isLower(id.first.c_str())) {
-    std::cerr << "Topic identifier '" << id.first
+    std::ostringstream message;
+    message << "Topic identifier '" << id.first
       << "' is not lower-case at "
       << id.second.file() << std::endl;
+    reportError(id.second, message.str());
     lex.fail = true;
   }
 
@@ -1011,9 +1072,11 @@ static void parse_tuple(Lexer &lex, Package &package, Symbols *exports, Symbols 
   if (!def) return;
 
   if (Lexer::isOperator(def.name.c_str())) {
-    std::cerr << "Tuple name must not be operator, was "
+    std::ostringstream message;
+    message << "Tuple name must not be operator, was "
       << def.name << " at "
       << def.token.file() << std::endl;
+    reportError(def.token, message.str());
     lex.fail = true;
     return;
   }
@@ -1058,7 +1121,8 @@ static void parse_tuple(Lexer &lex, Package &package, Symbols *exports, Symbols 
         break;
       }
       default: {
-        std::cerr
+        std::ostringstream message;
+        message
           << "Unexpected end of tuple definition at "
           << lex.next.location.text() << std::endl;
         lex.fail = true;
@@ -1153,16 +1217,20 @@ static void parse_data_elt(Lexer &lex, Sum &sum) {
   if (cons) {
     if (check_constructors(cons)) lex.fail = true;
     if (!cons.tag.empty()) {
-      std::cerr << "Constructor "
+      std::ostringstream message;
+      message << "Constructor "
         << cons.name << " should not be tagged with "
         << cons.tag << " at "
         << cons.region.file() << std::endl;
+      reportError(cons.region, message.str());
       lex.fail = true;
     }
     if (cons.name == "_" || Lexer::isLower(cons.name.c_str())) {
-      std::cerr << "Constructor name must be upper-case or operator, not "
+      std::ostringstream message;
+      message << "Constructor name must be upper-case or operator, not "
         << cons.name << " at "
         << cons.token.file() << std::endl;
+      reportError(cons.token, message.str());
       lex.fail = true;
     }
     sum.addConstructor(std::move(cons));
@@ -1194,7 +1262,8 @@ static void parse_data(Lexer &lex, Package &package, Symbols *exports, Symbols *
           break;
         }
         default: {
-          std::cerr
+          std::ostringstream message;
+          message
             << "Unexpected end of data definition at "
             << lex.next.location.text() << std::endl;
           lex.fail = true;
@@ -1281,10 +1350,12 @@ static void parse_import(const std::string &pkgname, DefMap &map, Lexer &lex) {
         source = lex.id() + "@" + pkgname;
         lex.consume();
       } else {
-        std::cerr << "Was expecting an "
+        std::ostringstream message;
+        message << "Was expecting an "
           << symbolTable[idop] << ", got an "
           << symbolTable[lex.next.type] << " at "
           << lex.next.location.text() << std::endl;
+        reportError(lex.next.location, message.str());
         lex.fail = true;
       }
     } else {
@@ -1292,8 +1363,10 @@ static void parse_import(const std::string &pkgname, DefMap &map, Lexer &lex) {
     }
 
     if (name == "_" || source.substr(0,2) == "_@") {
-      std::cerr << "Import of _ must immediately follow the import keyword at "
+      std::ostringstream message;
+      message << "Import of _ must immediately follow the import keyword at "
         << location.text() << std::endl;
+      reportError(location, message.str());
       lex.fail = true;
       continue;
     }
@@ -1350,9 +1423,11 @@ static void parse_export(const std::string &pkgname, Package &package, Lexer &le
       exports = nullptr;
       local = nullptr;
       kind = nullptr;
-      std::cerr << "Was expecting a DEF/TYPE/TOPIC, got a "
+      std::ostringstream message;
+      message << "Was expecting a DEF/TYPE/TOPIC, got a "
         << symbolTable[lex.next.type] << " at "
         << lex.next.location.text() << std::endl;
+      reportError(lex.next.location, message.str());
       lex.fail = true;
       break;
   }
@@ -1385,10 +1460,12 @@ static void parse_export(const std::string &pkgname, Package &package, Lexer &le
         location.end = lex.next.location.end;
         lex.consume();
       } else {
-        std::cerr << "Was expecting an "
+        std::ostringstream message;
+        message << "Was expecting an "
           << symbolTable[idop] << ", got an "
           << symbolTable[lex.next.type] << " at "
           << lex.next.location.text() << std::endl;
+        reportError(lex.next.location, message.str());
         lex.fail = true;
         continue;
       }
@@ -1397,8 +1474,10 @@ static void parse_export(const std::string &pkgname, Package &package, Lexer &le
     }
 
     if (name == "_" || source.substr(0,2) == "_@") {
-      std::cerr << "Cannot re-export _ from another package at "
+      std::ostringstream message;
+      message << "Cannot re-export _ from another package at "
         << location.text() << std::endl;
+      reportError(location, message.str());
       lex.fail = true;
       continue;
     }
@@ -1411,8 +1490,10 @@ static void parse_export(const std::string &pkgname, Package &package, Lexer &le
         name = "binary " + name;
         source = "binary " + source;
       } else {
-        std::cerr << "Cannot re-export an operator without specifying unary/binary at "
+        std::ostringstream message;
+        message << "Cannot re-export an operator without specifying unary/binary at "
           << location.text() << std::endl;
+        reportError(location, message.str());
         lex.fail = true;
         continue;
       }
@@ -1458,9 +1539,11 @@ static void parse_from_importexport(Package &package, Lexer &lex) {
       parse_export(id.first, package, lex);
       break;
     default:
-      std::cerr << "Was expecting an IMPORT/EXPORT, got a "
+      std::ostringstream message;
+      message << "Was expecting an IMPORT/EXPORT, got a "
         << symbolTable[lex.next.type] << " at "
         << lex.next.location.text() << std::endl;
+      reportError(lex.next.location, message.str());
       lex.fail = true;
   }
 }
@@ -1600,23 +1683,29 @@ static void parse_package(Package &package, Lexer &lex) {
   } else if (package.name.empty()) {
     package.name = id.first;
   } else {
-    std::cerr << "Package name redefined at " << id.second.text()
+    std::ostringstream message;
+    message << "Package name redefined at " << id.second.text()
       << " from '" << package.name << "'" << std::endl;
+    reportError(id.second, message.str());
     lex.fail = true;
   }
 }
 
 static void no_tags(Lexer &lex, bool exportb, bool globalb) {
   if (exportb) {
-    std::cerr << "Cannot prefix "
+    std::ostringstream message;
+    message << "Cannot prefix "
       << symbolTable[lex.next.type] << " with 'export' at "
       << lex.next.location.text() << std::endl;
+    reportError(lex.next.location, message.str());
     lex.fail = true;
   }
   if (globalb) {
-    std::cerr << "Cannot prefix "
+    std::ostringstream message;
+    message << "Cannot prefix "
       << symbolTable[lex.next.type] << " with 'global' at "
       << lex.next.location.text() << std::endl;
+    reportError(lex.next.location, message.str());
     lex.fail = true;
   }
 }
