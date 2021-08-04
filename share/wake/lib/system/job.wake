@@ -327,7 +327,7 @@ export def getJobResultOutputs (job: Job) : Result (List Path) Error =
   | findFail
 
 
-# Get result for job with exacally one output Path.
+# Get result for job with exactly one output Path.
 export def getJobResultOutput (job: Job) : Result Path Error =
   match job.getJobOutputs
     path, Nil = path.getPathResult
