@@ -21,17 +21,17 @@
 #include "rank.h"
 
 #define W_SIZE   64
-#define L0_SIZE  512	// number of bits spanned by an L0 block
-#define L1_SIZE  16384	// number of bits spanned by an L1 block
 #define L0_COUNT 8	// number of entries in an L0 block
 #define L1_COUNT 32	// number of entries in an L1 block
 #define L2_COUNT 16	// number of entries in an L2 block
 #define L12_COUNT (L1_COUNT*L2_COUNT)
+#define L0_SIZE  (W_SIZE *L0_COUNT)	// number of bits spanned by an L0 block
+#define L1_SIZE  (L0_SIZE*L1_COUNT)	// number of bits spanned by an L1 block
+#define L2_SIZE  (L1_SIZE*L2_COUNT)	// number of bits spanned by an L2 block
 
 #define SAMPLE_RATE 1024 // sampling rate
 
 #define DIV_UP(x, y) (((x)+(y)-1)/(y))
-#define MOD_UP(x, y) (((x)+(y)-1)%(y))
 
 void RankBuilder::set(uint32_t x) {
     size_t off = x/64;
@@ -52,7 +52,7 @@ bool RankBuilder::get(uint32_t x) const {
 
 RankMap::RankMap(const RankBuilder &builder) {
     // In order to not exceed array bounds while computing rank1, we need the vector to end with a 0
-    if ((builder.bitmap.back() >> (W_SIZE-1)) != 0)
+    if (builder.bitmap.empty() || (builder.bitmap.back() >> (W_SIZE-1)) != 0)
         builder.bitmap.push_back(0);
 
     // Round builder up to L0-block alignment
@@ -110,25 +110,25 @@ static inline rs_u64x4 vpop(rs_u8x32 x) {
     return _mm256_popcnt_epi64((__m256i)x);
 #else
     rs_u8x32 table = {
-    //   0  1  2  3  4  5  6  7
-         0, 1, 1, 2, 1, 2, 2, 3,
-    //   8  9  a  b  c  d  e  f
-         1, 2, 2, 3, 2, 3, 3, 4,
+    //  0  1  2  3  4  5  6  7
+        0, 1, 1, 2, 1, 2, 2, 3,
+    //  8  9  a  b  c  d  e  f
+        1, 2, 2, 3, 2, 3, 3, 4,
     // repeated for high lane:
-         0, 1, 1, 2, 1, 2, 2, 3,
-         1, 2, 2, 3, 2, 3, 3, 4
+        0, 1, 1, 2, 1, 2, 2, 3,
+        1, 2, 2, 3, 2, 3, 3, 4
     };
     rs_u8x32 mask = {
-         15, 15, 15, 15,    15, 15, 15, 15,
-         15, 15, 15, 15,    15, 15, 15, 15,
-         15, 15, 15, 15,    15, 15, 15, 15,
-         15, 15, 15, 15,    15, 15, 15, 15
+        15, 15, 15, 15,    15, 15, 15, 15,
+        15, 15, 15, 15,    15, 15, 15, 15,
+        15, 15, 15, 15,    15, 15, 15, 15,
+        15, 15, 15, 15,    15, 15, 15, 15
     };
     rs_u8x32 zero = {
-         0, 0, 0, 0,    0, 0, 0, 0,
-         0, 0, 0, 0,    0, 0, 0, 0,
-         0, 0, 0, 0,    0, 0, 0, 0,
-         0, 0, 0, 0,    0, 0, 0, 0
+        0, 0, 0, 0,    0, 0, 0, 0,
+        0, 0, 0, 0,    0, 0, 0, 0,
+        0, 0, 0, 0,    0, 0, 0, 0,
+        0, 0, 0, 0,    0, 0, 0, 0
     };
     rs_u8x32 shr4 = (rs_u8x32)_mm256_srli_epi16((__m256i)x, 4) & mask;
     rs_u8x32 pop8 =
@@ -182,12 +182,46 @@ RankSelect1Map::RankSelect1Map(const RankBuilder &builder)
     for (size_t i = 0; i < builder.bitmap.size(); ++i) {
         auto x = builder.bitmap[i];
         auto pop = __builtin_popcountll(x);
-        if (pop + MOD_UP(sum,SAMPLE_RATE) >= SAMPLE_RATE)
-            sample1.push_back(i/L0_COUNT/L1_COUNT/(L2_COUNT/2));
+        if (pop + (sum % SAMPLE_RATE) >= SAMPLE_RATE) {
+            auto hl2 = i/L0_COUNT/L1_COUNT/(L2_COUNT/2);
+            sample1.push_back(hl2);
+        }
         sum += pop;
     }
 
+    sample1.push_back(builder.bitmap.size() / L0_COUNT/L1_COUNT/(L2_COUNT/2));
+
     num1s = sum;
+
+    for (size_t i = 1; i < sample1.size(); ++i) {
+        if (sample1[i] - sample1[i-1] <= 1) continue;
+
+        // We need to fill in the positions of [(i-1)*SAMPLE_RATE, i*SAMPLE_RATE).
+        size_t lo_rank = (i-1)*SAMPLE_RATE;
+        size_t hi_rank = i*SAMPLE_RATE;
+        if (hi_rank >= num1s) hi_rank = num1s;
+
+        // There is a gap in the sampling here. Prepare the table:
+        auto &table = sparse1[i-1];
+        table.reserve(SAMPLE_RATE);
+
+        // Find the offset from which to start scanning.
+        size_t offset = lo_rank==0?0:(select1(lo_rank-1)+1);
+        while (lo_rank != hi_rank) {
+            size_t index = offset / W_SIZE;
+            uint64_t mask = UINT64_C(0xffffffffffffffff) << (offset % W_SIZE);
+            uint64_t word = builder.bitmap[index] & mask;
+            uint64_t bit = word & -word;
+            if (bit) {
+                offset = __builtin_ctzll(bit) + index*W_SIZE;
+                table.push_back(offset);
+                ++offset;
+                ++lo_rank;
+            } else {
+                offset = (index+1) * W_SIZE;
+            }
+        }
+    }
 }
 
 // Return the offset of the n-th 1-bit (counting from n=0)
@@ -223,7 +257,13 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
 
     uint32_t sample = rank1/SAMPLE_RATE;
     uint32_t hl2_off = sample1[sample]; // L2 half-block containing (sample*1024)-th bit
-    assert (sample >= sample1.size() || sample1[sample+1] <= hl2_off+1); // !!! fixme
+
+    if (sample1[sample+1] > hl2_off+1) {
+        // We would need to search more than 2x half-L2 blocks! That's not constant time. Use a table.
+        return sparse1.find(sample)->second[rank1-sample*SAMPLE_RATE];
+    }
+
+    // We now know that rank1 is in L2[hl2_off, hl2_off+1], so search both halves.
 
     // Add in the L1 offset from L2 position
     uint32_t l1_off = hl2_off*(L2_COUNT/2);
@@ -323,3 +363,76 @@ uint32_t RankSelect1Map::select1(uint32_t rank1) const {
 
     return l0_off*L0_SIZE + W_SIZE*num + select(l0->v[num], rank1 - outsum);
 }
+
+#ifdef TEST_RANK
+
+#include <iostream>
+#include <sys/time.h>
+
+int main(int argc, const char **argv) {
+    bool debug = argc>1;
+    int seed = debug?atol(argv[1])-1:(time(0)*12312411241241);
+
+    for (int i = 0; i < 10000000; ++i) {
+        srandom(++seed);
+        size_t size = random() % (L2_SIZE * 10);
+        int prob = random() % 1000;
+
+        std::cout << "Random seed " << seed << " size:" << size << " prob:" << ((prob+1)/1000.0) << std::flush;
+
+        RankBuilder b;
+        for (size_t j = 0; j < size; ++j)
+            if (random() % 1000 <= prob)
+                b.set(j);
+
+        RankSelect1Map dut(b);
+        std::cout << " sparsity:" << dut.stats() << std::flush;
+
+        size_t num1s = 0;
+        for (size_t j = 0; j < size*2; ++j) {
+            if (dut.rank1(j) != num1s) {
+                std::cerr << "DUT rank(" << j << ") = " << dut.rank1(j) << " != " << num1s << std::endl;
+                return 1;
+            }
+
+            if (b.get(j)) {
+                if (debug) std::cout << num1s << " => " << j << std::endl;
+                ++num1s;
+                if (!dut.get(j)) {
+                    std::cerr << "DUT is missing: " << j << std::endl;
+                    return 1;
+                }
+            } else {
+                if (dut.get(j)) {
+                    std::cerr << "DUT spuriously contains: " << j << std::endl;
+                    return 1;
+                }
+            }
+        }
+
+        if (num1s != dut.ones()) {
+            std::cerr << "DUT specifies num1s = " << dut.ones() << " != " << num1s << std::endl;
+            return 1;
+        }
+
+        struct timeval start, stop;
+        gettimeofday(&start, 0);
+        for (size_t j = 0; j < num1s; ++j) {
+            if (debug) std::cout << j << " -> " << dut.select1(j) << std::endl;
+            if (!b.get(dut.select1(j))) {
+                std::cerr << "DUT select1(" << j << ") = " << dut.select1(j) << " which is false" << std::endl;
+                return 1;
+            }
+        }
+        gettimeofday(&stop, 0);
+
+        double s =
+            (stop.tv_sec  - start.tv_sec) +
+            (stop.tv_usec - start.tv_usec)/1000000.0;
+        std::cout << " select1:" << (s/num1s*1e9) << "ns" << std::endl;
+    }
+
+    return 0;
+}
+
+#endif

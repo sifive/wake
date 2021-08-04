@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <vector>
+#include <unordered_map>
 
 typedef long long rs_u64x4  __attribute__ ((vector_size (32)));
 typedef int       rs_u32x8  __attribute__ ((vector_size (32)));
@@ -117,9 +118,14 @@ public:
     //   next1(offset) = select1(rank1(offset))
     uint32_t next1(uint32_t offset) const { return select1(rank1(offset)); }
 
+#ifdef TEST_RANK
+    int stats() const { return sparse1.size(); }
+#endif
+
 protected:
     uint32_t num1s;
-    std::vector<uint16_t> sample1; // Every 1024-st 0 bit
+    std::vector<uint16_t> sample1;
+    std::unordered_map<uint32_t, std::vector<uint32_t>> sparse1;
 };
 
 class RankSelect01Map : public RankSelect1Map {
@@ -130,6 +136,7 @@ public:
 
 protected:
     std::vector<uint16_t> sample0;
+    std::unordered_map<uint32_t, std::vector<uint32_t>> sparse0;
 };
 
 #endif
