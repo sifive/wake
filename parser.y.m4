@@ -10,6 +10,7 @@
 %default_type {size_t}
 %extra_argument {ParseInfo pinfo}
 %stack_size {0}
+%default_destructor { (void)pinfo; }
 
 // The lexer also produces these (unused by parser):
 %token WS COMMENT P_BOPEN P_BCLOSE P_SOPEN P_SCLOSE.
@@ -19,10 +20,12 @@ start ::= top(T). { pinfo.cst->addNode(CST_TOP, T); }
 top(R) ::= top(T) topdef. { R = T+1; }
 top(R) ::= .              { R = 0; }
 
-topdef ::= KW_PACKAGE(b) ID NL(e).                                     { pinfo.cst->addNode(CST_PACKAGE, b, 0, e); }
-topdef ::= KW_FROM(b) ID KW_IMPORT P_HOLE NL(e).                       { pinfo.cst->addNode(CST_IMPORT,  b, 0, e); }
-topdef ::= KW_FROM(b) ID KW_IMPORT kind(K) arity(A) idopeqs(I) NL(e).  { pinfo.cst->addNode(CST_IMPORT,  b, K+A+I, e); }
-topdef ::= KW_FROM(b) ID KW_EXPORT kind(K) arity(A) idopeqs(I) NL(e).  { pinfo.cst->addNode(CST_EXPORT,  b, K+A+I, e); }
+id ::= ID(k). { pinfo.cst->addNode(CST_ID, k, 0, k); }
+
+topdef ::= KW_PACKAGE(b) id NL(e).                                     { pinfo.cst->addNode(CST_PACKAGE, b, 1, e); }
+topdef ::= KW_FROM(b) id KW_IMPORT P_HOLE NL(e).                       { pinfo.cst->addNode(CST_IMPORT,  b, 1, e); }
+topdef ::= KW_FROM(b) id KW_IMPORT kind(K) arity(A) idopeqs(I) NL(e).  { pinfo.cst->addNode(CST_IMPORT,  b, 1+K+A+I, e); }
+topdef ::= KW_FROM(b) id KW_EXPORT kind(K) arity(A) idopeqs(I) NL(e).  { pinfo.cst->addNode(CST_EXPORT,  b, 1+K+A+I, e); }
 
 kind(R) ::= KW_DEF(k).   { R = 1; pinfo.cst->addNode(CST_KIND, k, 0, k); }
 kind(R) ::= KW_TYPE(k).  { R = 1; pinfo.cst->addNode(CST_KIND, k, 0, k); }
@@ -40,28 +43,28 @@ idopeq ::= idop P_EQUALS idop. { pinfo.cst->addNode(CST_IDEQ, 2); }
 idopeq ::= idop.               { pinfo.cst->addNode(CST_IDEQ, 1); }
 
 idop ::= ID(k).         { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_DOT(k).     { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_QUANT(k).   { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_EXP(k).     { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_MULDIV(k).  { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_ADDSUB(k).  { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_COMPARE(k). { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_INEQUAL(k). { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_AND(k).     { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_OR(k).      { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_DOLLAR(k).  { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_LRARROW(k). { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_EQARROW(k). { pinfo.cst->addNode(CST_ID, k, 0, k); }
-idop ::= OP_COMMA(k).   { pinfo.cst->addNode(CST_ID, k, 0, k); }
+idop ::= OP_DOT(k).     { pinfo.cst->addNode(CST_OP, k, 0, k); }
+idop ::= OP_QUANT(k).   { pinfo.cst->addNode(CST_OP, k, 0, k); }
+idop ::= OP_EXP(k).     { pinfo.cst->addNode(CST_OP, k, 0, k); }
+idop ::= OP_MULDIV(k).  { pinfo.cst->addNode(CST_OP, k, 0, k); }
+idop ::= OP_ADDSUB(k).  { pinfo.cst->addNode(CST_OP, k, 0, k); }
+idop ::= OP_COMPARE(k). { pinfo.cst->addNode(CST_OP, k, 0, k); }
+idop ::= OP_INEQUAL(k). { pinfo.cst->addNode(CST_OP, k, 0, k); }
+idop ::= OP_AND(k).     { pinfo.cst->addNode(CST_OP, k, 0, k); }
+idop ::= OP_OR(k).      { pinfo.cst->addNode(CST_OP, k, 0, k); }
+idop ::= OP_DOLLAR(k).  { pinfo.cst->addNode(CST_OP, k, 0, k); }
+idop ::= OP_LRARROW(k). { pinfo.cst->addNode(CST_OP, k, 0, k); }
+idop ::= OP_EQARROW(k). { pinfo.cst->addNode(CST_OP, k, 0, k); }
+idop ::= OP_COMMA(k).   { pinfo.cst->addNode(CST_OP, k, 0, k); }
 
 global(R) ::= .             { R = 0; }
 global(R) ::= KW_GLOBAL(k). { R = 1; pinfo.cst->addNode(CST_FLAG_GLOBAL, k, 0, k); }
 export(R) ::= .             { R = 0; }
 export(R) ::= KW_EXPORT(k). { R = 1; pinfo.cst->addNode(CST_FLAG_EXPORT, k, 0, k); }
 
-topdef ::= global(G) export(E) KW_TOPIC(b) ID P_COLON type NL(e). { pinfo.cst->addNode(CST_TOPIC, b, G+E+1, e); }
+topdef ::= global(G) export(E) KW_TOPIC(b) id P_COLON type NL(e). { pinfo.cst->addNode(CST_TOPIC, b, G+E+2, e); }
 
-topdef ::= KW_PUBLISH(b) ID P_EQUALS block_opt NL(e). { pinfo.cst->addNode(CST_PUBLISH, b, 1, e); }
+topdef ::= KW_PUBLISH(b) id P_EQUALS block_opt NL(e). { pinfo.cst->addNode(CST_PUBLISH, b, 2, e); }
 
 topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS type NL(e).                       { pinfo.cst->addNode(CST_DATA, b, G+E+2,   e); }
 topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS INDENT data_elts(D) DEDENT NL(e). { pinfo.cst->addNode(CST_DATA, b, G+E+1+D, e); }
@@ -82,26 +85,29 @@ topdef ::= global(G) export(E) KW_TARGET(b) pattern P_BSLASH pattern_terms(T) P_
 
 dnl Left-associative prEfix-heavy; 1 + + 4 + + 5 = (1 + (+4)) + (+5)
 define(`LE',
-$1_binary_$3 ::= $1_binary_$3 $2 $1_unary_$3. { pinfo.cst->addNode(CST_BINARY, 2); }
+$1_op_$3 ::= $2(k).                                 { pinfo.cst->addNode(CST_OP, k, 0, k); }
+$1_binary_$3 ::= $1_binary_$3 $1_op_$3 $1_unary_$3. { pinfo.cst->addNode(CST_BINARY, 3); }
 $1_binary_$3 ::= $1_unary_$3.
-$1_unary_$3 ::= $2 $1_unary_$3.               { pinfo.cst->addNode(CST_UNARY,  1); }
+$1_unary_$3 ::= $1_op_$3 $1_unary_$3.               { pinfo.cst->addNode(CST_UNARY,  2); }
 $1_unary_$3 ::= $1_binary_$4.
 )
 
 dnl Right-associative, prEfix-heavy; 1 $ $ 4 $ $ 5 = 1 $ (($4) $ ($5))
 define(`RE',
-$1_binary_$3 ::= $1_unary_$3 $2 $1_binary_$3. { pinfo.cst->addNode(CST_BINARY, 2); }
+$1_op_$3 ::= $2(k).                                 { pinfo.cst->addNode(CST_OP, k, 0, k); }
+$1_binary_$3 ::= $1_unary_$3 $1_op_$3 $1_binary_$3. { pinfo.cst->addNode(CST_BINARY, 3); }
 $1_binary_$3 ::= $1_unary_$3.
-$1_unary_$3 ::= $2 $1_unary_$3.               { pinfo.cst->addNode(CST_UNARY,  1); }
+$1_unary_$3 ::= $1_op_$3 $1_unary_$3.               { pinfo.cst->addNode(CST_UNARY,  2); }
 $1_unary_$3 ::= $1_binary_$4.
 )
 
 dnl Right-associative pOstfix-heavy; 1 , , 4 , , 5 = (1,) , ((4,) , 5)
 define(`RO',
-$1_binary_$3 ::= $1_unary_$3 $2 $1_binary_$3. { pinfo.cst->addNode(CST_BINARY, 2); }
+$1_op_$3 ::= $2(k).                                 { pinfo.cst->addNode(CST_OP, k, 0, k); }
+$1_binary_$3 ::= $1_unary_$3 $1_op_$3 $1_binary_$3. { pinfo.cst->addNode(CST_BINARY, 3); }
 $1_binary_$3 ::= $1_unary_$3.
 $1_unary_$3 ::= $1_binary_$4.
-$1_unary_$3 ::= $1_unary_$3 $2.               { pinfo.cst->addNode(CST_UNARY,  1); }
+$1_unary_$3 ::= $1_unary_$3 $1_op_$3.               { pinfo.cst->addNode(CST_UNARY,  2); }
 )
 
 dnl All operators
@@ -158,8 +164,10 @@ expression_nodot ::= KW_HERE(h). { pinfo.cst->addNode(CST_LITERAL, h, 0, h); }
 expression_binary_app ::= expression_binary_app expression_term. { pinfo.cst->addNode(CST_APP, 2); }
 expression_binary_app ::= expression_term.
 
-expression_binary_app ::= KW_SUBSCRIBE(b) ID(e).    { pinfo.cst->addNode(CST_SUBSCRIBE, b, 0, e); }
-expression_binary_app ::= KW_PRIM(b) STR_SINGLE(e). { pinfo.cst->addNode(CST_PRIM,      b, 0, e); }
+expression_binary_app ::= KW_SUBSCRIBE(b) id.      { pinfo.cst->addNode(CST_SUBSCRIBE, b, 1); }
+expression_binary_app ::= KW_PRIM(b) prim_literal. { pinfo.cst->addNode(CST_PRIM,      b, 1); }
+
+prim_literal ::= STR_SINGLE(s). { pinfo.cst->addNode(CST_LITERAL, s, 0, s); }
 
 expression_binary_app ::= KW_MATCH(b) expression_term INDENT match1_cases(C) DEDENT. { pinfo.cst->addNode(CST_MATCH, b, 1+C); }
 expression_binary_app ::= KW_MATCH(b) match_terms(T)  INDENT matchx_cases(C) DEDENT. { pinfo.cst->addNode(CST_MATCH, b, T+C); }
@@ -203,8 +211,8 @@ blockdefs(R) ::= blockdef.              { R = 1;   }
 blockdefs(R) ::= blockdefs(D) blockdef. { R = 1+D; }
 
 blockdef ::= KW_DEF(b) pattern P_EQUALS block_opt NL(e).                { pinfo.cst->addNode(CST_DEF,    b, 2, e); }
-blockdef ::= KW_FROM(b) ID KW_IMPORT P_HOLE NL(e).                      { pinfo.cst->addNode(CST_IMPORT, b, 0, e); }
-blockdef ::= KW_FROM(b) ID KW_IMPORT kind(K) arity(A) idopeqs(I) NL(e). { pinfo.cst->addNode(CST_IMPORT, b, K+A+I, e); }
+blockdef ::= KW_FROM(b) id KW_IMPORT P_HOLE NL(e).                      { pinfo.cst->addNode(CST_IMPORT, b, 1, e); }
+blockdef ::= KW_FROM(b) id KW_IMPORT kind(K) arity(A) idopeqs(I) NL(e). { pinfo.cst->addNode(CST_IMPORT, b, 1+K+A+I, e); }
 
 %code {
 bool ParseShifts(void *p, int yymajor) {

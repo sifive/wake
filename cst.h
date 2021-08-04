@@ -46,18 +46,19 @@
 #define CST_LAMBDA	146
 #define CST_LITERAL	147
 #define CST_MATCH	148
-#define CST_PACKAGE	149
-#define CST_PAREN	150
-#define CST_PRIM	151
-#define CST_PUBLISH	152
-#define CST_REQUIRE	153
-#define CST_SUBSCRIBE	154
-#define CST_TARGET	155
-#define CST_TOP		156
-#define CST_TOPIC	157
-#define CST_TUPLE	158
-#define CST_TUPLE_ELT	159
-#define CST_UNARY	160
+#define CST_OP		149
+#define CST_PACKAGE	150
+#define CST_PAREN	151
+#define CST_PRIM	152
+#define CST_PUBLISH	153
+#define CST_REQUIRE	154
+#define CST_SUBSCRIBE	155
+#define CST_TARGET	156
+#define CST_TOP		157
+#define CST_TOPIC	158
+#define CST_TUPLE	159
+#define CST_TUPLE_ELT	160
+#define CST_UNARY	161
 
 class FileContent;
 class CSTElement;

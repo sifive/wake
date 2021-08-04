@@ -257,6 +257,7 @@ const char *symbolExample(int symbol) {
     case CST_LAMBDA:         return "lambda";
     case CST_LITERAL:        return "literal";
     case CST_MATCH:          return "match";
+    case CST_OP:             return "operator";
     case CST_PACKAGE:        return "package";
     case CST_PAREN:          return "paren";
     case CST_PRIM:           return "prim";
