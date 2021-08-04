@@ -53,14 +53,6 @@
 #define TOSTRING(x) STRINGIFY(x)
 #define VERSION_STR TOSTRING(VERSION)
 
-class TerminalReporter : public DiagnosticReporter {
-  public:
-    void report(Diagnostic diagnostic) {
-      std::cerr << diagnostic.getMessage() << std::endl;
-    }
-};
-DiagnosticReporter *reporter = new TerminalReporter();
-
 void print_help(const char *argv0) {
   std::cout << std::endl
     << "Usage: " << argv0 << " [OPTIONS] [target] [target options ...]" << std::endl
