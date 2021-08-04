@@ -88,9 +88,9 @@ class LSP {
     std::string rootUri = "";
     bool isInitialized = false;
     bool isShutDown = false;
-    std::map<std::string, std::string> changedFiles;
     Runtime runtime;
     LSPReporter &reporter;
+    std::map<std::string, std::string> changedFiles;
     std::map<std::string, LspMethod> methodToFunction = {
       {"initialize", &LSP::initialize},
       {"initialized", &LSP::initialized},
@@ -104,6 +104,66 @@ class LSP {
     };   
 
     LSP(LSPReporter &_reporter) : runtime(nullptr, 0, 4.0, 0), reporter(_reporter) {}
+
+    void processRequests() {
+      // Begin log
+      std::ofstream clientLog;
+      clientLog.open("requests_log.txt", std::ios_base::app); // append instead of overwriting
+      std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+      clientLog << std::endl
+              << "Log start: " << ctime(&currentTime);
+
+      while (true) {
+        size_t json_size = 0;
+        // Read header lines until an empty line
+        while (true) {
+          std::string line;
+          std::getline(std::cin, line);
+          // Trim trailing CR, if any
+          if (!line.empty() && line.back() == '\r')
+            line.resize(line.size() - 1);
+          // EOF? exit LSP
+          if (std::cin.eof())
+            exit(0);
+          // Failure reading? Fail with non-zero exit status
+          if (!std::cin)
+            exit(1);
+          // Empty line? stop
+          if (line.empty())
+            break;
+          // Capture the json_size
+          if (line.compare(0, sizeof(contentLength) - 1, &contentLength[0]) == 0)
+            json_size = std::stoul(line.substr(sizeof(contentLength) - 1));
+        }
+
+        // Content-Length was unset?
+        if (json_size == 0)
+          exit(1);
+
+        // Retrieve the content
+        std::string content(json_size, ' ');
+        std::cin.read(&content[0], json_size);
+
+        // Log the request
+        clientLog << content << std::endl;
+
+        // Parse that content as JSON
+        JAST request;
+        std::stringstream parseErrors;
+        if (!JAST::parse(content, parseErrors, request)) {
+          sendErrorMessage(ParseError, parseErrors.str());
+        } else {
+          const std::string &method = request.get("method").value;
+          if (!isInitialized && (method != "initialize")) {
+            sendErrorMessage(request, ServerNotInitialized, "Must request initialize first");
+          } else if (isShutDown && (method != "exit")) {
+            sendErrorMessage(request, InvalidRequest, "Received a request other than 'exit' after a shutdown request.");
+          } else {
+            callMethod(method, request);
+          }
+        }
+      }
+    }
 
     void callMethod(std::string method, JAST request) {
       auto functionPointer = methodToFunction.find(method);
@@ -287,65 +347,7 @@ LSPReporter *lspReporter = new LSPReporter();
 DiagnosticReporter *reporter = lspReporter;
 
 int main(int argc, const char **argv) {
-  // Begin log
-  std::ofstream clientLog;
-  clientLog.open("requests_log.txt", std::ios_base::app); // append instead of overwriting
-  std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-  clientLog << std::endl
-          << "Log start: " << ctime(&currentTime);
-
   LSP lsp(*lspReporter);
   // Process requests until something goes wrong
-  while (true) {
-    size_t json_size = 0;
-    // Read header lines until an empty line
-    while (true) {
-      std::string line;
-      std::getline(std::cin, line);
-      // Trim trailing CR, if any
-      if (!line.empty() && line.back() == '\r')
-        line.resize(line.size() - 1);
-      // EOF? exit BSP
-      if (std::cin.eof())
-        return 0;
-      // Failure reading? Fail with non-zero exit status
-      if (!std::cin)
-        return 1;
-      // Empty line? stop
-      if (line.empty())
-        break;
-      // Capture the json_size
-      if (line.compare(0, sizeof(contentLength) - 1, &contentLength[0]) == 0)
-        json_size = std::stoul(line.substr(sizeof(contentLength) - 1));
-    }
-
-    // Content-Length was unset?
-    if (json_size == 0)
-      return 1;
-
-    // Retrieve the content
-    std::string content(json_size, ' ');
-    std::cin.read(&content[0], json_size);
-
-    // Log the request
-    clientLog << content << std::endl;
-
-    // Parse that content as JSON
-    JAST request;
-    std::stringstream parseErrors;
-    if (!JAST::parse(content, parseErrors, request)) {
-      lsp.sendErrorMessage(ParseError, parseErrors.str());
-    } else {
-      const std::string &method = request.get("method").value;
-
-      if (!lsp.isInitialized && (method != "initialize")) {
-        lsp.sendErrorMessage(request, ServerNotInitialized, "Must request initialize first");
-      } else if (lsp.isShutDown && (method != "exit")) {
-        lsp.sendErrorMessage(request, InvalidRequest, "Received a request other than 'exit' after a shutdown request.");
-      }
-      else {
-        lsp.callMethod(method, request);
-      }
-    }
-  }
+  lsp.processRequests();  
 }
