@@ -73,13 +73,8 @@ static const char *MethodNotFound       = "-32601";
 static const char *ServerNotInitialized = "-32002";
 //static const char *UnknownErrorCode     = "-32001";
 
-class LSPReporter : public DiagnosticReporter {
-  public:
-    std::vector<Diagnostic> diagnostics;
-    void report(Diagnostic diagnostic) {
-      diagnostics.push_back(diagnostic);
-    }
-};
+
+DiagnosticReporter *reporter;
 
 class LSP {
   public:
@@ -89,8 +84,8 @@ class LSP {
     bool isInitialized = false;
     bool isShutDown = false;
     Runtime runtime;
-    LSPReporter &reporter;
     std::map<std::string, std::string> changedFiles;
+    std::vector<Diagnostic> diagnostics;
     std::map<std::string, LspMethod> methodToFunction = {
       {"initialize", &LSP::initialize},
       {"initialized", &LSP::initialized},
@@ -103,7 +98,7 @@ class LSP {
       {"exit", &LSP::serverExit}
     };   
 
-    LSP(LSPReporter &_reporter) : runtime(nullptr, 0, 4.0, 0), reporter(_reporter) {}
+    LSP() : runtime(nullptr, 0, 4.0, 0) {}
 
     void processRequests() {
       // Begin log
@@ -168,7 +163,7 @@ class LSP {
     void callMethod(std::string method, JAST request) {
       auto functionPointer = methodToFunction.find(method);
       if (functionPointer != methodToFunction.end()) {
-          ((*this).*(functionPointer->second))(request);
+          (this->*(functionPointer->second))(request);
       } else {
         sendErrorMessage(request, MethodNotFound, "Method '" + method + "' is not implemented.");
       }
@@ -181,7 +176,6 @@ class LSP {
       std::cout << contentLength << str.tellg() << "\r\n\r\n";
       str.seekg(0, std::ios::beg);
       std::cout << str.rdbuf();
-      std::cerr << message << std::endl;
     }
 
     static JAST createMessage() {
@@ -217,7 +211,6 @@ class LSP {
       error.add("message", message.c_str());
       sendMessage(errorMessage);
     }
-
 
     static JAST createInitializeResult(JAST receivedMessage) {
       JAST message = createResponseMessage(receivedMessage);
@@ -274,7 +267,20 @@ class LSP {
       return message;
     }
 
+    class LSPReporter : public DiagnosticReporter {
+      private:
+        std::vector<Diagnostic> &diagnostics;
+      public:
+        LSPReporter(std::vector<Diagnostic> &_diagnostics) : diagnostics(_diagnostics) {}
+        void report(Diagnostic diagnostic) {
+          diagnostics.push_back(diagnostic);
+        }
+    };
+
     void diagnoseFile(std::string fileUri) {
+      LSPReporter lspReporter(diagnostics);
+      reporter = &lspReporter;
+
       std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
       std::unique_ptr<Top> top(new Top);
 
@@ -288,14 +294,14 @@ class LSP {
       }
 
       JAST diagnosticsArray(JSON_ARRAY);    
-      for (Diagnostic diagnostic: reporter.diagnostics) {
+      for (Diagnostic diagnostic: diagnostics) {
         diagnosticsArray.children.emplace_back("", createDiagnostic(diagnostic)); // add .add for JSON_OBJECT to JSON_ARRAY
       }
       JAST message = createDiagnosticMessage();
       JAST &params = message.add("params", JSON_OBJECT);
       params.add("uri", fileUri.c_str());
       params.children.emplace_back("diagnostics", diagnosticsArray);
-      reporter.diagnostics.clear();
+      diagnostics.clear();
       sendMessage(message);  
     }
 
@@ -343,11 +349,9 @@ class LSP {
     }    
 };
 
-LSPReporter *lspReporter = new LSPReporter();
-DiagnosticReporter *reporter = lspReporter;
 
 int main(int argc, const char **argv) {
-  LSP lsp(*lspReporter);
-  // Process requests until something goes wrong
-  lsp.processRequests();  
+  LSP lsp;
+  // Process requests until something goes wrong 
+  lsp.processRequests();
 }
