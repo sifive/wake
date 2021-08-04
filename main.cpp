@@ -33,10 +33,17 @@ void ConsoleReporter::report(int severity, Location location, const std::string 
     std::cerr << location << ": " << message << std::endl;
 }
 
-void explore(const CSTElement &p, int depth) {
-    for (CSTElement x = p.firstChild(); !x.empty(); x.nextSibling()) {
+void exploreNode(const CSTElement &p, int depth) {
+    for (CSTElement x = p.firstChildNode(); !x.empty(); x.nextSiblingNode()) {
         std::cout << std::string(depth, ' ') << symbolExample(x.id()) << ": " << x.content() << std::endl;
-        explore(x, depth+4);
+        exploreNode(x, depth+4);
+    }
+}
+
+void exploreElement(const CSTElement &p, int depth) {
+    for (CSTElement x = p.firstChildElement(); !x.empty(); x.nextSiblingElement()) {
+        std::cout << std::string(depth, ' ') << symbolExample(x.id()) << ": " << x.content() << std::endl;
+        exploreElement(x, depth+4);
     }
 }
 
@@ -46,10 +53,7 @@ int main(int argc, const char **argv) {
     CSTBuilder builder(file);
     parseWake(ParseInfo(&file, &builder, &reporter));
     CST cst(std::move(builder));
-    for (CSTElement x = cst.root(); !x.empty(); x.nextSibling()) {
-      std::cout << symbolExample(x.id()) << ": " << x.content() << std::endl;
-      explore(x, 4);
-    }
+    exploreNode(cst.root(), 0);
     std::cout << "---" << std::endl;
     return 0;
 }

@@ -126,8 +126,11 @@ public:
     uint8_t id() const;
     TokenInfo content() const;
 
-    void nextSibling();
-    CSTElement firstChild() const;
+    void nextSiblingElement();
+    void nextSiblingNode();
+
+    CSTElement firstChildElement() const;
+    CSTElement firstChildNode() const;
 
 private:
     const CST *cst;

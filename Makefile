@@ -1,4 +1,4 @@
-CFLAGS = -std=c++11 -fpermissive -march=haswell -mtune=haswell -Wall -O2
+CFLAGS = -std=c++17 -fpermissive -march=haswell -mtune=haswell -Wall -O2
 
 parser:		parser.o lexer.o syntax.o file.o location.o main.o cst.o main.o rank.o
 	g++ $(CFLAGS) -o $@ $^

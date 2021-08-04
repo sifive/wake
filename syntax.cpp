@@ -91,8 +91,10 @@ void parseWake(ParseInfo pi) {
                 // Enter indent processing state machine
                 pi.fcontent->newline(token.end);
                 nl = token;
-                tindent = tinfo;
                 state = STATE_NL;
+                // We only record+report the token info for the FIRST newline.
+                // Thus, blocks own their same-line comments, but not comments on the next line.
+                tindent = tinfo;
                 continue;
             } else {
                 break;
@@ -109,18 +111,17 @@ void parseWake(ParseInfo pi) {
             // no break here; fall through in the no whitespace case
         case STATE_NL_WS:
             switch (token.id) {
+            case TOKEN_COMMENT:
+                // We just processed a comment-only line. Do not adjust indentation level!
+                // Discard the comment and treat like an empty line when we hit the next NL.
+                continue;
+
             case TOKEN_NL:
                 // We just processed a completely empty line. Do not adjust indentation level!
                 // Discard prior NL WS? sequence, and restart indentation processing at this NL.
                 pi.fcontent->newline(token.end);
                 nl = token;
                 state = STATE_NL;
-                continue;
-
-            case TOKEN_COMMENT:
-                // We just processed a comment-only line. Do not adjust indentation level!
-                // Discard the entire NL WS? COMMENT sequence; following NL token restarts this FSM.
-                state = STATE_IDLE;
                 continue;
 
             default:

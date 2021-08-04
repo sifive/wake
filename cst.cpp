@@ -129,6 +129,11 @@ CST::CST(CSTBuilder &&builder)
         nodes.emplace_back(builder.nodes[node-1]);
     }
 
+    if (!nodes.empty()) {
+        nodes.front().begin = 0;
+        nodes.back().end = file->end - file->start;
+    }
+
     builder.nodes.clear();
 }
 
@@ -173,7 +178,7 @@ TokenInfo CSTElement::content() const {
     return out;
 }
 
-void CSTElement::nextSibling() {
+void CSTElement::nextSiblingElement() {
     if (isNode()) {
         CSTNode n = cst->nodes[node];
         node += n.size;
@@ -183,7 +188,24 @@ void CSTElement::nextSibling() {
     }
 }
 
-CSTElement CSTElement::firstChild() const {
+void CSTElement::nextSiblingNode() {
+    if (isNode()) {
+        node += cst->nodes[node].size;
+        if (node == limit) {
+            token = end;
+        } else {
+            token = cst->nodes[node].begin;
+        }
+    } else {
+        if (node == limit) {
+            token = end;
+        } else {
+            token = cst->nodes[node].begin;
+        }
+    }
+}
+
+CSTElement CSTElement::firstChildElement() const {
     CSTElement out;
     out.cst = cst;
     if (isNode()) {
@@ -192,6 +214,27 @@ CSTElement CSTElement::firstChild() const {
         out.limit = node + n.size;
         out.token = n.begin;
         out.end   = n.end;
+    } else {
+        // tokens have no children
+        out.node = out.limit = out.token = out.end = 0;
+    }
+    return out;
+}
+
+CSTElement CSTElement::firstChildNode() const {
+    CSTElement out;
+    out.cst = cst;
+    if (isNode()) {
+        CSTNode n = cst->nodes[node];
+        if (n.size == 1) {
+            // no child nodes
+            out.node = out.limit = out.token = out.end = 0;
+        } else {
+            out.node  = node+1;
+            out.limit = node + n.size;
+            out.token = cst->nodes[node+1].begin;
+            out.end   = n.end;
+        }
     } else {
         // tokens have no children
         out.node = out.limit = out.token = out.end = 0;
