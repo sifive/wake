@@ -73,265 +73,285 @@ static const char *MethodNotFound       = "-32601";
 static const char *ServerNotInitialized = "-32002";
 //static const char *UnknownErrorCode     = "-32001";
 
-std::vector<Diagnostic> diagnostics;
-Runtime runtime(nullptr, 0, 4.0, 0);
-bool isInitialized = false;
-std::string rootUri = "";
-bool isShutDown = false;
-std::map<std::string, std::string> changedFiles;
 
-static void sendMessage(const JAST &message) {
-  std::stringstream str;
-  str << message;
-  str.seekg(0, std::ios::end);
-  std::cout << contentLength << str.tellg() << "\r\n\r\n";
-  str.seekg(0, std::ios::beg);
-  std::cout << str.rdbuf();
-}
+DiagnosticReporter *reporter;
 
-JAST createMessage() {
-  JAST message(JSON_OBJECT);
-  message.add("jsonrpc", "2.0");
-  return message;
-}
-
-JAST createResponseMessage() {
-  JAST message = createMessage();
-  message.add("id", JSON_NULLVAL);
-  return message;
-}
-
-JAST createResponseMessage(JAST receivedMessage) {
-  JAST message = createMessage();
-  message.children.emplace_back("id", receivedMessage.get("id"));
-  return message;
-}
-
-void sendErrorMessage(const char *code, std::string message) {
-  JAST errorMessage = createResponseMessage();
-  JAST &error = errorMessage.add("error", JSON_OBJECT);
-  error.add("code", JSON_INTEGER, code);
-  error.add("message", message.c_str());
-  sendMessage(errorMessage);
-}
-
-void sendErrorMessage(JAST receivedMessage, const char *code, std::string message) {
-  JAST errorMessage = createResponseMessage(receivedMessage);
-  JAST &error = errorMessage.add("error", JSON_OBJECT);
-  error.add("code", JSON_INTEGER, code);
-  error.add("message", message.c_str());
-  sendMessage(errorMessage);
-}
-
-
-JAST createInitializeResult(JAST receivedMessage) {
-  JAST message = createResponseMessage(receivedMessage);
-  JAST &result = message.add("result", JSON_OBJECT);
-
-  JAST &capabilities = result.add("capabilities", JSON_OBJECT);
-  capabilities.add("textDocumentSync", 1);
-
-  JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
-  serverInfo.add("name", "lsp wake server");
-
-  return message;
-}
-
-void initialize(JAST receivedMessage) {
-  JAST message = createInitializeResult(receivedMessage);
-  isInitialized = true;
-  rootUri = receivedMessage.get("params").get("rootUri").value;
-  sendMessage(message);
-}
-
-void initialized(JAST _) { }
-
-JAST createDiagnosticRange(Diagnostic diagnostic) {
-  JAST range(JSON_OBJECT);
-
-  JAST &start = range.add("start", JSON_OBJECT);
-  start.add("line", std::max(0, diagnostic.getLocation().start.row - 1));
-  start.add("character", std::max(0, diagnostic.getLocation().start.column - 1));
-
-  JAST &end = range.add("end", JSON_OBJECT);
-  end.add("line", std::max(0, diagnostic.getLocation().end.row));
-  end.add("character", std::max(0, diagnostic.getLocation().end.column)); // It can be -1
-
-  return range;
-}
-
-JAST createDiagnostic(Diagnostic diagnostic) {
-  JAST diagnosticJSON(JSON_OBJECT);
-  
-  diagnosticJSON.children.emplace_back("range", createDiagnosticRange(diagnostic));
-  diagnosticJSON.add("severity", diagnostic.getSeverity());
-  diagnosticJSON.add("source", "wake");
-  JAST range = createDiagnosticRange(diagnostic);
-
-  diagnosticJSON.add("message", diagnostic.getMessage());
-
-  return diagnosticJSON;
-}
-
-JAST createDiagnosticMessage() {
-  JAST message = createMessage();
-  message.add("method", "textDocument/publishDiagnostics");
-  return message;
-}
-
-void diagnoseFile(std::string fileUri) {
-  std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
-  std::unique_ptr<Top> top(new Top);
-
-  auto fileChangesPointer = changedFiles.find(fileUri);
-  if (fileChangesPointer != changedFiles.end()) {
-    Lexer lex(runtime.heap, (*fileChangesPointer).second, filePath.c_str());
-    parse_top(*top, lex);
-  } else {
-    Lexer lex(runtime.heap, filePath.c_str());
-    parse_top(*top, lex);
-  }
-
-  JAST diagnosticsArray(JSON_ARRAY);    
-  for (Diagnostic diagnostic: diagnostics) {
-    diagnosticsArray.children.emplace_back("", createDiagnostic(diagnostic)); // add .add for JSON_OBJECT to JSON_ARRAY
-  }
-  JAST message = createDiagnosticMessage();
-  JAST &params = message.add("params", JSON_OBJECT);
-  params.add("uri", fileUri.c_str());
-  params.children.emplace_back("diagnostics", diagnosticsArray);
-  diagnostics.clear();
-  sendMessage(message);  
-}
-
-void didOpen(JAST receivedMessage) {
-  std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-  diagnoseFile(fileUri);
-}
-
-void didChange(JAST receivedMessage) {
-  std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-  std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
-  changedFiles[fileUri] = fileContent;
-  diagnoseFile(fileUri);
-}
-
-void didSave(JAST receivedMessage) {
-  std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-  changedFiles.erase(fileUri);
-  diagnoseFile(fileUri);
-}
-
-void didClose(JAST receivedMessage) {
-  std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-  changedFiles.erase(fileUri);
-}
-
-void didChangeWatchedFiles(JAST receivedMessage) {
-  JAST files = receivedMessage.get("params").get("changes");
-  for (auto child: files.children) {
-    std::string fileUri = child.second.get("uri").value;
-    changedFiles.erase(fileUri);
-    diagnoseFile(fileUri);
-  }       
-}
-
-void shutdown(JAST receivedMessage) {
-  JAST message = createResponseMessage(receivedMessage);
-  message.add("result", JSON_NULLVAL);
-  isShutDown = true;
-  sendMessage(message);
-}
-
-void serverExit(JAST _) {
-  exit(isShutDown ?0:1);
-}
-
-std::map<std::string, std::function<void(JAST)>> methodToFunction = {
-  {"initialize", initialize},
-  {"initialized", initialized},
-  {"textDocument/didOpen", didOpen},
-  {"textDocument/didChange", didChange},
-  {"textDocument/didSave", didSave},
-  {"textDocument/didClose", didClose},
-  {"workspace/didChangeWatchedFiles", didChangeWatchedFiles},
-  {"shutdown", shutdown},
-  {"exit", serverExit}
-};
-
-class LSPReporter : public DiagnosticReporter {
+class LSP {
   public:
-    void report(Diagnostic diagnostic) {
-      diagnostics.push_back(diagnostic);
-    }
-};
+    typedef void (LSP::*LspMethod)(JAST);
 
-DiagnosticReporter *reporter = new LSPReporter();
+    std::string rootUri = "";
+    bool isInitialized = false;
+    bool isShutDown = false;
+    Runtime runtime;
+    std::map<std::string, std::string> changedFiles;
+    std::vector<Diagnostic> diagnostics;
+    std::map<std::string, LspMethod> methodToFunction = {
+      {"initialize", &LSP::initialize},
+      {"initialized", &LSP::initialized},
+      {"textDocument/didOpen", &LSP::didOpen},
+      {"textDocument/didChange", &LSP::didChange},
+      {"textDocument/didSave", &LSP::didSave},
+      {"textDocument/didClose", &LSP::didClose},
+      {"workspace/didChangeWatchedFiles", &LSP::didChangeWatchedFiles},
+      {"shutdown", &LSP::shutdown},
+      {"exit", &LSP::serverExit}
+    };   
 
-int main(int argc, const char **argv) {
-  // Begin log
-  std::ofstream clientLog;
-  clientLog.open("requests_log.txt", std::ios_base::app); // append instead of overwriting
-  std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-  clientLog << std::endl
-          << "Log start: " << ctime(&currentTime);
+    LSP() : runtime(nullptr, 0, 4.0, 0) {}
 
-  // Process requests until something goes wrong
-  while (true) {
-    size_t json_size = 0;
-    // Read header lines until an empty line
-    while (true) {
-      std::string line;
-      std::getline(std::cin, line);
-      // Trim trailing CR, if any
-      if (!line.empty() && line.back() == '\r')
-        line.resize(line.size() - 1);
-      // EOF? exit BSP
-      if (std::cin.eof())
-        return 0;
-      // Failure reading? Fail with non-zero exit status
-      if (!std::cin)
-        return 1;
-      // Empty line? stop
-      if (line.empty())
-        break;
-      // Capture the json_size
-      if (line.compare(0, sizeof(contentLength) - 1, &contentLength[0]) == 0)
-        json_size = std::stoul(line.substr(sizeof(contentLength) - 1));
-    }
+    void processRequests() {
+      // Begin log
+      std::ofstream clientLog;
+      clientLog.open("requests_log.txt", std::ios_base::app); // append instead of overwriting
+      std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+      clientLog << std::endl
+              << "Log start: " << ctime(&currentTime);
 
-    // Content-Length was unset?
-    if (json_size == 0)
-      return 1;
+      while (true) {
+        size_t json_size = 0;
+        // Read header lines until an empty line
+        while (true) {
+          std::string line;
+          std::getline(std::cin, line);
+          // Trim trailing CR, if any
+          if (!line.empty() && line.back() == '\r')
+            line.resize(line.size() - 1);
+          // EOF? exit LSP
+          if (std::cin.eof())
+            exit(0);
+          // Failure reading? Fail with non-zero exit status
+          if (!std::cin)
+            exit(1);
+          // Empty line? stop
+          if (line.empty())
+            break;
+          // Capture the json_size
+          if (line.compare(0, sizeof(contentLength) - 1, &contentLength[0]) == 0)
+            json_size = std::stoul(line.substr(sizeof(contentLength) - 1));
+        }
 
-    // Retrieve the content
-    std::string content(json_size, ' ');
-    std::cin.read(&content[0], json_size);
+        // Content-Length was unset?
+        if (json_size == 0)
+          exit(1);
 
-    // Log the request
-    clientLog << content << std::endl;
+        // Retrieve the content
+        std::string content(json_size, ' ');
+        std::cin.read(&content[0], json_size);
 
-    // Parse that content as JSON
-    JAST request;
-    std::stringstream parseErrors;
-    if (!JAST::parse(content, parseErrors, request)) {
-      sendErrorMessage(ParseError, parseErrors.str());
-    } else {
-      const std::string &method = request.get("method").value;
+        // Log the request
+        clientLog << content << std::endl;
 
-      if (!isInitialized && (method != "initialize")) {
-        sendErrorMessage(request, ServerNotInitialized, "Must request initialize first");
-      } else if (isShutDown && (method != "exit")) {
-        sendErrorMessage(request, InvalidRequest, "Received a request other than 'exit' after a shutdown request.");
-      }
-      else {
-        auto functionPointer = methodToFunction.find(method);
-        if (functionPointer != methodToFunction.end()) {
-          (*functionPointer).second(request);
+        // Parse that content as JSON
+        JAST request;
+        std::stringstream parseErrors;
+        if (!JAST::parse(content, parseErrors, request)) {
+          sendErrorMessage(ParseError, parseErrors.str());
         } else {
-          sendErrorMessage(request, MethodNotFound, "Method '" + method + "' is not implemented.");
+          const std::string &method = request.get("method").value;
+          if (!isInitialized && (method != "initialize")) {
+            sendErrorMessage(request, ServerNotInitialized, "Must request initialize first");
+          } else if (isShutDown && (method != "exit")) {
+            sendErrorMessage(request, InvalidRequest, "Received a request other than 'exit' after a shutdown request.");
+          } else {
+            callMethod(method, request);
+          }
         }
       }
     }
-  }
+
+    void callMethod(std::string method, JAST request) {
+      auto functionPointer = methodToFunction.find(method);
+      if (functionPointer != methodToFunction.end()) {
+          (this->*(functionPointer->second))(request);
+      } else {
+        sendErrorMessage(request, MethodNotFound, "Method '" + method + "' is not implemented.");
+      }
+    } 
+
+    static void sendMessage(const JAST &message) {
+      std::stringstream str;
+      str << message;
+      str.seekg(0, std::ios::end);
+      std::cout << contentLength << str.tellg() << "\r\n\r\n";
+      str.seekg(0, std::ios::beg);
+      std::cout << str.rdbuf();
+    }
+
+    static JAST createMessage() {
+      JAST message(JSON_OBJECT);
+      message.add("jsonrpc", "2.0");
+      return message;
+    }
+
+    static JAST createResponseMessage() {
+      JAST message = createMessage();
+      message.add("id", JSON_NULLVAL);
+      return message;
+    }
+
+    static JAST createResponseMessage(JAST receivedMessage) {
+      JAST message = createMessage();
+      message.children.emplace_back("id", receivedMessage.get("id"));
+      return message;
+    }
+
+    static void sendErrorMessage(const char *code, std::string message) {
+      JAST errorMessage = createResponseMessage();
+      JAST &error = errorMessage.add("error", JSON_OBJECT);
+      error.add("code", JSON_INTEGER, code);
+      error.add("message", message.c_str());
+      sendMessage(errorMessage);
+    }
+
+    static void sendErrorMessage(JAST receivedMessage, const char *code, std::string message) {
+      JAST errorMessage = createResponseMessage(receivedMessage);
+      JAST &error = errorMessage.add("error", JSON_OBJECT);
+      error.add("code", JSON_INTEGER, code);
+      error.add("message", message.c_str());
+      sendMessage(errorMessage);
+    }
+
+    static JAST createInitializeResult(JAST receivedMessage) {
+      JAST message = createResponseMessage(receivedMessage);
+      JAST &result = message.add("result", JSON_OBJECT);
+
+      JAST &capabilities = result.add("capabilities", JSON_OBJECT);
+      capabilities.add("textDocumentSync", 1);
+
+      JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
+      serverInfo.add("name", "lsp wake server");
+
+      return message;
+    }
+
+    void initialize(JAST receivedMessage) {
+      JAST message = createInitializeResult(receivedMessage);
+      isInitialized = true;
+      rootUri = receivedMessage.get("params").get("rootUri").value;
+      sendMessage(message);
+    }
+
+    void initialized(JAST _) { }
+
+    JAST createDiagnosticRange(Diagnostic diagnostic) {
+      JAST range(JSON_OBJECT);
+
+      JAST &start = range.add("start", JSON_OBJECT);
+      start.add("line", std::max(0, diagnostic.getLocation().start.row - 1));
+      start.add("character", std::max(0, diagnostic.getLocation().start.column - 1));
+
+      JAST &end = range.add("end", JSON_OBJECT);
+      end.add("line", std::max(0, diagnostic.getLocation().end.row));
+      end.add("character", std::max(0, diagnostic.getLocation().end.column)); // It can be -1
+
+      return range;
+    }
+
+    JAST createDiagnostic(Diagnostic diagnostic) {
+      JAST diagnosticJSON(JSON_OBJECT);
+      
+      diagnosticJSON.children.emplace_back("range", createDiagnosticRange(diagnostic));
+      diagnosticJSON.add("severity", diagnostic.getSeverity());
+      diagnosticJSON.add("source", "wake");
+      JAST range = createDiagnosticRange(diagnostic);
+
+      diagnosticJSON.add("message", diagnostic.getMessage());
+
+      return diagnosticJSON;
+    }
+
+    JAST createDiagnosticMessage() {
+      JAST message = createMessage();
+      message.add("method", "textDocument/publishDiagnostics");
+      return message;
+    }
+
+    class LSPReporter : public DiagnosticReporter {
+      private:
+        std::vector<Diagnostic> &diagnostics;
+      public:
+        LSPReporter(std::vector<Diagnostic> &_diagnostics) : diagnostics(_diagnostics) {}
+        void report(Diagnostic diagnostic) {
+          diagnostics.push_back(diagnostic);
+        }
+    };
+
+    void diagnoseFile(std::string fileUri) {
+      LSPReporter lspReporter(diagnostics);
+      reporter = &lspReporter;
+
+      std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
+      std::unique_ptr<Top> top(new Top);
+
+      auto fileChangesPointer = changedFiles.find(fileUri);
+      if (fileChangesPointer != changedFiles.end()) {
+        Lexer lex(runtime.heap, (*fileChangesPointer).second, filePath.c_str());
+        parse_top(*top, lex);
+      } else {
+        Lexer lex(runtime.heap, filePath.c_str());
+        parse_top(*top, lex);
+      }
+
+      JAST diagnosticsArray(JSON_ARRAY);    
+      for (Diagnostic diagnostic: diagnostics) {
+        diagnosticsArray.children.emplace_back("", createDiagnostic(diagnostic)); // add .add for JSON_OBJECT to JSON_ARRAY
+      }
+      JAST message = createDiagnosticMessage();
+      JAST &params = message.add("params", JSON_OBJECT);
+      params.add("uri", fileUri.c_str());
+      params.children.emplace_back("diagnostics", diagnosticsArray);
+      diagnostics.clear();
+      sendMessage(message);  
+    }
+
+    void didOpen(JAST receivedMessage) {
+      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+      diagnoseFile(fileUri);
+    }
+
+    void didChange(JAST receivedMessage) {
+      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+      std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
+      changedFiles[fileUri] = fileContent;
+      diagnoseFile(fileUri);
+    }
+
+    void didSave(JAST receivedMessage) {
+      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+      changedFiles.erase(fileUri);
+      diagnoseFile(fileUri);
+    }
+
+    void didClose(JAST receivedMessage) {
+      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+      changedFiles.erase(fileUri);
+    }
+
+    void didChangeWatchedFiles(JAST receivedMessage) {
+      JAST files = receivedMessage.get("params").get("changes");
+      for (auto child: files.children) {
+        std::string fileUri = child.second.get("uri").value;
+        changedFiles.erase(fileUri);
+        diagnoseFile(fileUri);
+      }       
+    }
+
+    void shutdown(JAST receivedMessage) {
+      JAST message = createResponseMessage(receivedMessage);
+      message.add("result", JSON_NULLVAL);
+      isShutDown = true;
+      sendMessage(message);
+    }
+
+    void serverExit(JAST _) {
+      exit(isShutDown ?0:1);
+    }    
+};
+
+
+int main(int argc, const char **argv) {
+  LSP lsp;
+  // Process requests until something goes wrong 
+  lsp.processRequests();
 }
