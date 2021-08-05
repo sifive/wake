@@ -46,6 +46,7 @@
 #include "frontend/expr.h"
 #include "runtime/sources.h"
 #include "frontend/diagnostic.h"
+#include "types/bind.h"
 
 
 #ifndef VERSION
@@ -154,7 +155,7 @@ class LSP {
           } else if (isShutDown && (method != "exit")) {
             sendErrorMessage(request, InvalidRequest, "Received a request other than 'exit' after a shutdown request.");
           } else {
-            callMethod(method, request);
+            callMethod(method, request);           
           }
         }
       }
@@ -230,8 +231,14 @@ class LSP {
       isInitialized = true;
       rootUri = receivedMessage.get("params").get("rootUri").value;
       sendMessage(message);
-    }
 
+      bool enumok = true;
+      auto wakefiles = find_all_wakefiles(enumok, true, true);
+      for (auto file : wakefiles) {
+        diagnoseFile(rootUri + '/' + file);
+      }
+    }
+    
     void initialized(JAST _) { }
 
     JAST createDiagnosticRange(Diagnostic diagnostic) {
@@ -285,13 +292,18 @@ class LSP {
       std::unique_ptr<Top> top(new Top);
 
       auto fileChangesPointer = changedFiles.find(fileUri);
+      const char *package;
       if (fileChangesPointer != changedFiles.end()) {
         Lexer lex(runtime.heap, (*fileChangesPointer).second, filePath.c_str());
-        parse_top(*top, lex);
+        package = parse_top(*top, lex);
       } else {
         Lexer lex(runtime.heap, filePath.c_str());
-        parse_top(*top, lex);
+        package = parse_top(*top, lex);
       }
+      top->def_package = package;
+      top->body = std::unique_ptr<Expr>(new VarRef(LOCATION, "Nil@wake"));
+      PrimMap pmap = prim_register_all(nullptr, nullptr);
+      std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
 
       JAST diagnosticsArray(JSON_ARRAY);    
       for (Diagnostic diagnostic: diagnostics) {
