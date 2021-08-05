@@ -23,10 +23,25 @@ class Diagnostic {
 
 class DiagnosticReporter {
   public:
-    virtual void report(Diagnostic diagnostic) = 0;
+    void reportError(Location location, std::string message) {
+      report(location, S_ERROR, message);
+    }
+    void reportWarning(Location location, std::string message) {
+      report(location, S_WARNING, message);
+    }
+    void reportInfo(Location location, std::string message) {
+      report(location, S_INFORMATION, message);
+    }
+    void reportHint(Location location, std::string message) {
+      report(location, S_HINT, message);
+    }
+
+  private: 
     void report(Location location, Severity severity, std::string message) {
       report(Diagnostic(location, severity, std::move(message)));
     }
+
+    virtual void report(Diagnostic diagnostic) = 0;    
 };
 
 #endif

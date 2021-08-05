@@ -270,11 +270,11 @@ class LSP {
     class LSPReporter : public DiagnosticReporter {
       private:
         std::vector<Diagnostic> &diagnostics;
-      public:
-        LSPReporter(std::vector<Diagnostic> &_diagnostics) : diagnostics(_diagnostics) {}
         void report(Diagnostic diagnostic) {
           diagnostics.push_back(diagnostic);
         }
+      public:
+        LSPReporter(std::vector<Diagnostic> &_diagnostics) : diagnostics(_diagnostics) {}        
     };
 
     void diagnoseFile(std::string fileUri) {

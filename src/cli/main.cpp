@@ -98,7 +98,7 @@ void print_help(const char *argv0) {
 
 DiagnosticReporter *reporter;
 class TerminalReporter : public DiagnosticReporter {
-  public:
+  private:
     void report(Diagnostic diagnostic) {
       std::cerr << diagnostic.getMessage() << std::endl;
     }
