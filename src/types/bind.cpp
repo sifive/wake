@@ -1215,6 +1215,7 @@ struct FnErrorMessage : public TypeErrorMessage  {
   FnErrorMessage(const Location *lf_) : lf(lf_) { }
   void formatA(std::ostream &os) const { os << "Type error; expression " << lf->text() << " has type"; }
   void formatB(std::ostream &os) const { os << "but is used as a function and must have function type"; }
+  virtual Location getMainLocation() const { return *lf; }
 };
 
 struct ArgErrorMessage : public TypeErrorMessage {
@@ -1227,6 +1228,7 @@ struct ArgErrorMessage : public TypeErrorMessage {
     os << " of type";
   }
   void formatB(std::ostream &os) const { os << "but was supplied argument " << la->text() << " of type"; }
+  virtual Location getMainLocation() const { return *la; }
 };
 
 struct AscErrorMessage : public TypeErrorMessage {
@@ -1234,6 +1236,7 @@ struct AscErrorMessage : public TypeErrorMessage {
   AscErrorMessage(const Location *body_, const Location *type_) : body(body_), type(type_) { }
   void formatA(std::ostream &os) const { os << "Type error; expression " << body->text() << " of type"; }
   void formatB(std::ostream &os) const { os << "does not match explicit type ascription at " << type->file() << " of"; }
+  virtual Location getMainLocation() const { return *body; }
 };
 
 struct RecErrorMessage : public TypeErrorMessage  {
@@ -1241,6 +1244,7 @@ struct RecErrorMessage : public TypeErrorMessage  {
   RecErrorMessage(const Location *lf_) : lf(lf_) { }
   void formatA(std::ostream &os) const { os << "Type error; recursive use of " << lf->text() << " requires return type"; }
   void formatB(std::ostream &os) const { os << "but the function body actually returns type"; }
+  virtual Location getMainLocation() const { return *lf; }
 };
 
 struct MatchArgErrorMessage : public TypeErrorMessage  {
@@ -1248,6 +1252,7 @@ struct MatchArgErrorMessage : public TypeErrorMessage  {
   MatchArgErrorMessage(const Location *arg_) : arg(arg_) { }
   void formatA(std::ostream &os) const { os << "Type error; case analysis of " << arg->text() << " with type"; }
   void formatB(std::ostream &os) const { os << "does not match the pattern requirement of type"; }
+  virtual Location getMainLocation() const { return *arg; }
 };
 
 struct MatchResultErrorMessage : public TypeErrorMessage  {
@@ -1258,6 +1263,7 @@ struct MatchResultErrorMessage : public TypeErrorMessage  {
    : result(result_), case0(case0_), casen(casen_) { }
   void formatA(std::ostream &os) const { os << "Type error; case '" << casen << "' returns expression " << result->text() << " of type"; }
   void formatB(std::ostream &os) const { os << "which does not match case '" << case0 << "' which returned type"; }
+  virtual Location getMainLocation() const { return *result; }
 };
 
 struct MatchTypeVarErrorMessage : public TypeErrorMessage  {
@@ -1266,6 +1272,7 @@ struct MatchTypeVarErrorMessage : public TypeErrorMessage  {
   MatchTypeVarErrorMessage(const Location *arg_, const std::string &casen_) : arg(arg_), casen(casen_) { }
   void formatA(std::ostream &os) const { os << "Pattern for case '" << casen << "' expected type"; }
   void formatB(std::ostream &os) const { os << "but the argument " << arg->text() << " has type"; }
+  virtual Location getMainLocation() const { return *arg; }
 };
 
 struct ExploreState {

@@ -231,12 +231,8 @@ class LSP {
       isInitialized = true;
       rootUri = receivedMessage.get("params").get("rootUri").value;
       sendMessage(message);
-
-      bool enumok = true;
-      auto wakefiles = find_all_wakefiles(enumok, true, true);
-      for (auto file : wakefiles) {
-        diagnoseFile(rootUri + '/' + file);
-      }
+      
+      diagnoseProject();
     }
     
     void initialized(JAST _) { }
@@ -284,26 +280,20 @@ class LSP {
         LSPReporter(std::vector<Diagnostic> &_diagnostics) : diagnostics(_diagnostics) {}        
     };
 
-    void diagnoseFile(std::string fileUri) {
+    void diagnoseFile(std::string fileUri, Top &top) {
       LSPReporter lspReporter(diagnostics);
       reporter = &lspReporter;
 
       std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
-      std::unique_ptr<Top> top(new Top);
-
+      
       auto fileChangesPointer = changedFiles.find(fileUri);
-      const char *package;
       if (fileChangesPointer != changedFiles.end()) {
         Lexer lex(runtime.heap, (*fileChangesPointer).second, filePath.c_str());
-        package = parse_top(*top, lex);
+        parse_top(top, lex);
       } else {
         Lexer lex(runtime.heap, filePath.c_str());
-        package = parse_top(*top, lex);
+        parse_top(top, lex);
       }
-      top->def_package = package;
-      top->body = std::unique_ptr<Expr>(new VarRef(LOCATION, "Nil@wake"));
-      PrimMap pmap = prim_register_all(nullptr, nullptr);
-      std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
 
       JAST diagnosticsArray(JSON_ARRAY);    
       for (Diagnostic diagnostic: diagnostics) {
@@ -317,22 +307,41 @@ class LSP {
       sendMessage(message);  
     }
 
+    void diagnoseProject() {
+      std::unique_ptr<Top> top(new Top);
+      bool enumok = true;
+      auto wakefiles = find_all_wakefiles(enumok, true, false);
+      for (auto file : wakefiles) {
+        //std::cerr << file << std::endl;
+        diagnoseFile(rootUri + '/' + file, *top);
+      }
+      LSPReporter lspReporter(diagnostics);
+      reporter = &lspReporter;
+
+      top->def_package = "nothing";
+      top->body = std::unique_ptr<Expr>(new VarRef(LOCATION, "Nil@wake"));
+      PrimMap pmap = prim_register_all(nullptr, nullptr);
+      std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
+      
+      diagnostics.clear();
+    }
+
     void didOpen(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      diagnoseFile(fileUri);
+      diagnoseProject();
     }
 
     void didChange(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
       changedFiles[fileUri] = fileContent;
-      diagnoseFile(fileUri);
+      diagnoseProject();
     }
 
     void didSave(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       changedFiles.erase(fileUri);
-      diagnoseFile(fileUri);
+      diagnoseProject();
     }
 
     void didClose(JAST receivedMessage) {
@@ -345,7 +354,7 @@ class LSP {
       for (auto child: files.children) {
         std::string fileUri = child.second.get("uri").value;
         changedFiles.erase(fileUri);
-        diagnoseFile(fileUri);
+        diagnoseProject();
       }       
     }
 

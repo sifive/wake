@@ -20,13 +20,15 @@
 
 #include "dsu.h"
 #include <ostream>
-struct Location;
+#include "location.h"
+//struct Location;
 
 #define FN "binary =>@builtin"
 
 struct TypeErrorMessage {
   virtual void formatA(std::ostream &os) const = 0;
   virtual void formatB(std::ostream &os) const = 0;
+  virtual Location getMainLocation() const = 0;
 };
 
 struct LegacyErrorMessage : public TypeErrorMessage {
@@ -34,6 +36,7 @@ struct LegacyErrorMessage : public TypeErrorMessage {
   LegacyErrorMessage(const Location *l_) : l(l_) { }
   void formatA(std::ostream &os) const;
   void formatB(std::ostream &os) const;
+  virtual Location getMainLocation() const { return *l; }
 };
 
 struct TypeChild;

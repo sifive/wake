@@ -21,6 +21,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <sstream>
 #include <cassert>
 
 #include "types/type.h"
@@ -28,6 +29,7 @@
 #include "frontend/symbol.h"
 #include "frontend/expr.h"
 #include "runtime/status.h"
+#include "frontend/diagnostic.h"
 
 static int globalClock = 0;
 static int globalEpoch = 1; // before a tagging pass, globalEpoch > TypeVar.epoch for all TypeVars
@@ -189,10 +191,12 @@ bool TypeVar::tryUnify(TypeVar &other) {
   return ok;
 }
 
+extern DiagnosticReporter *reporter;
+
 bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {
   bool ok = tryUnify(other);
   if (!ok) {
-    std::ostream &os = std::cerr;
+    std::ostringstream os;
     message->formatA(os);
     os << ":" << std::endl << "    ";
     globalEpoch += do_format(os, 0, *this, "", &other, 0, 0);
@@ -201,6 +205,7 @@ bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {
     os << ":" << std::endl << "    ";
     globalEpoch += do_format(os, 0, other, "", this, 0, 0);
     os << std::endl;
+    reporter->reportError(message->getMainLocation(), os.str());
   }
   return ok;
 }
