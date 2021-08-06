@@ -60,6 +60,8 @@
 #define CST_TUPLE_ELT	160
 #define CST_UNARY	161
 
+#define CST_ERROR	255
+
 class FileContent;
 class CSTElement;
 class CSTIterator;
@@ -95,6 +97,8 @@ public:
     void addNode(uint8_t id, TokenInfo begin, uint32_t children);
     void addNode(uint8_t id, uint32_t children, TokenInfo end);
     void addNode(uint8_t id, TokenInfo begin, uint32_t childen, TokenInfo end);
+
+    TokenInfo lastNode() const;
 
 private:
     const FileContent *file;

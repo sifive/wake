@@ -270,6 +270,7 @@ const char *symbolExample(int symbol) {
     case CST_TUPLE:          return "tuple";
     case CST_TUPLE_ELT:      return "element";
     case CST_UNARY:          return "unary";
+    case CST_ERROR:          return "error";
     default:                 return "???";
     }
 }

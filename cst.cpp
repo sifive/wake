@@ -102,6 +102,13 @@ void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children, TokenIn
     nodes.emplace_back(id, size, b, e);
 }
 
+TokenInfo CSTBuilder::lastNode() const {
+    TokenInfo out;
+    out.start = file->start + nodes.back().begin;
+    out.end   = file->start + nodes.back().end;
+    return out;
+}
+
 struct NodeRange {
     uint32_t parent;
     uint32_t first_child;
