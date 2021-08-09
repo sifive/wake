@@ -155,11 +155,11 @@ CSTElement CST::root() const {
 }
 
 bool CSTElement::empty() const {
-    return node == limit && token == end;
+    return node == limit && token >= end;
 }
 
 bool CSTElement::isNode() const {
-    return node != limit && token == cst->nodes[node].begin;
+    return node != limit && token >= cst->nodes[node].begin;
 }
 
 uint8_t CSTElement::id() const {

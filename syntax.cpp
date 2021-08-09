@@ -129,24 +129,33 @@ void parseWake(ParseInfo pi) {
                 state = STATE_IDLE;
                 std::string newdent(reinterpret_cast<const char*>(nl.end), ws.end-nl.end);
 
-                // Pop indent scope until indent is a prefix of newdent
-                while (newdent.compare(0, indent.size(), indent) != 0) {
-                    Parse(parser, TOKEN_DEDENT, tnl, pi);
-                    indent.resize(indent_stack.back());
-                    indent_stack.pop_back();
-                }
+                if (newdent.compare(0, indent.size(), indent) != 0) {
+                    // Pop indent scope until indent is a prefix of newdent
+                    do {
+                        Parse(parser, TOKEN_DEDENT, tnl, pi);
+                        indent.resize(indent_stack.back());
+                        indent_stack.pop_back();
+                    } while (newdent.compare(0, indent.size(), indent) != 0);
 
-                // If newdent is longer, insert an INDENT token.
-                if (newdent.size() > indent.size()) {
+                    if (newdent.size() > indent.size()) {
+                        std::stringstream ss;
+                        Location l = tinfo.location(*pi.fcontent);
+                        ss << "syntax error; whitespace on line " << l.end.row << " neither indents the previous line nor matches a prior indentation level";
+                        pi.reporter->report(REPORT_ERROR, tinfo.location(*pi.fcontent), ss.str());
+                        // Treat this as the new indentation.
+                        std::swap(indent, newdent);
+                    }
+                } else if (newdent.size() > indent.size()) {
+                    // If newdent is longer, insert an INDENT token.
                     Parse(parser, TOKEN_INDENT, tnl, pi);
                     indent_stack.push_back(indent.size());
                     std::swap(indent, newdent);
                 }
 
-                // Newlines are whitespace (and thus a pain to parse in LR(1)).
-                // However, some constructs in wake are terminated by a newline.
-                // Check if the parser can shift a newline. If so, provide it.
                 if (ParseShifts(parser, TOKEN_NL)) {
+                    // Newlines are whitespace (and thus a pain to parse in LR(1)).
+                    // However, some constructs in wake are terminated by a newline.
+                    // Check if the parser can shift a newline. If so, provide it.
                     Parse(parser, TOKEN_NL, tnl, pi);
                 }
 

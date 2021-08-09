@@ -14,24 +14,31 @@
 %stack_size {0}
 %default_destructor { (void)pinfo; }
 
-// These are to disambiguate syntactically invalid subscribe/prim
-%right ID STR_SINGLE.
+// These are to disambiguate syntactically invalid subscribe/prim/if-then-else
+%right ID STR_SINGLE KW_IF KW_THEN KW_ELSE P_BSLASH NL.
 
 // The lexer also produces these (unused by parser):
 %token WS COMMENT P_BOPEN P_BCLOSE P_SOPEN P_SCLOSE.
 
 %include {
-#define fault(sstream, ...)                                                            \
+#define add(t, ...) pinfo.cst->addNode((t), __VA_ARGS__)
+#define add_next(t) pinfo.cst->addNode((t), yyLookaheadToken, 0, yyLookaheadToken);
+
+#define error(sstream, token)                                                          \
   do {                                                                                 \
-    pinfo.cst->addNode(CST_ERROR, __VA_ARGS__);                                        \
     std::stringstream sstr;                                                            \
     sstr << "syntax error; " << sstream;                                               \
-    Location l = pinfo.cst->lastNode().location(*pinfo.fcontent);                      \
+    Location l = token.location(*pinfo.fcontent);                                      \
     pinfo.reporter->report(REPORT_ERROR, l, sstr.str());                               \
   } while (0)
-#define fault_next(sstream) fault(sstream, yyLookaheadToken, 0, yyLookaheadToken)
 
-#define add(t, ...)         pinfo.cst->addNode((t), __VA_ARGS__)
+#define fault(sstream, ...)                                                            \
+  do {                                                                                 \
+    add(CST_ERROR, __VA_ARGS__);                                                       \
+    error(sstream, pinfo.cst->lastNode());                                             \
+  } while (0)
+
+#define fault_next(sstream) fault(sstream, yyLookaheadToken, 0, yyLookaheadToken)
 }
 
 start ::= top(T). { add(CST_TOP, T); }
@@ -101,8 +108,8 @@ topdef ::= KW_PUBLISH(b) id P_EQUALS block_opt NL(e). { add(CST_PUBLISH, b, 2, e
 topdef ::= global(G) export(E) KW_DATA(b) NL(e).               { fault("keyword 'data' must be followed by a type expression", b, G+E, e); }
 topdef ::= global(G) export(E) KW_DATA(b) type NL(e).          { fault("data types must be followed by an '= constructor-cases*'", b, G+E+1, e); }
 topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS NL(e). { fault("data types must be followed by an '= constructor-cases*'", b, G+E+1, e); }
-topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS INDENT DEDENT NL(e). { fault("data types must be followed by an '= constructor-cases*'", b, G+E+1, e); }
-topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS INDENT data_elts(D) DEDENT NL(e). { add(CST_DATA, b, G+E+1+D, e); }
+topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS INDENT DEDENT(e). { fault("data types must be followed by an '= constructor-cases*'", b, G+E+1, e); }
+topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS INDENT data_elts(D) DEDENT(e). { add(CST_DATA, b, G+E+1+D, e); }
 topdef ::= global(G) export(E) KW_DATA(b) type P_EQUALS type NL(e).                       { add(CST_DATA, b, G+E+2,   e); }
 
 data_elts(R) ::= type.                  { R = 1;   }
@@ -112,8 +119,8 @@ data_elts(R) ::= data_elts(E) NL.       { R = E;   } // happens when the last co
 topdef ::= global(G) export(E) KW_TUPLE(b) NL(e).               { fault("keyword 'tuple' must be followed by a type expression", b, G+E, e); }
 topdef ::= global(G) export(E) KW_TUPLE(b) type NL(e).          { fault("tuple types definitions must be followed by an '='", b, 1+G+E, e); }
 topdef ::= global(G) export(E) KW_TUPLE(b) type P_EQUALS NL(e). { fault("tuple type definitions must be followed by indented element definitions", b, 1+G+E, e); }
-topdef ::= global(G) export(E) KW_TUPLE(b) type P_EQUALS INDENT DEDENT NL(e). { fault("tuple type definitions must be followed by indented element definitions", b, 1+G+E, e); }
-topdef ::= global(G) export(E) KW_TUPLE(b) type P_EQUALS INDENT tuple_elts(T) DEDENT NL(e). { add(CST_TUPLE, b, G+E+1+T, e); }
+topdef ::= global(G) export(E) KW_TUPLE(b) type P_EQUALS INDENT DEDENT(e). { fault("tuple type definitions must be followed by indented element definitions", b, 1+G+E, e); }
+topdef ::= global(G) export(E) KW_TUPLE(b) type P_EQUALS INDENT tuple_elts(T) DEDENT(e). { add(CST_TUPLE, b, G+E+1+T, e); }
 
 tuple_elts(R) ::= tuple_elt.                  { R = 1;   }
 tuple_elts(R) ::= tuple_elts(E) NL tuple_elt. { R = E+1; }
@@ -122,9 +129,9 @@ tuple_elts(R) ::= tuple_elts(E) NL.           { R = E;   }
 
 tuple_elt ::= global(G) export(E) type. { add(CST_TUPLE_ELT, G+E+1); }
 
-topdef ::= global(G) export(E) KW_DEF(b) NL(e).                  { fault("keyword 'def' must be followed by a pattern", b, G+E,   e); }
-topdef ::= global(G) export(E) KW_DEF(b) pattern NL(e).          { fault("definitions must be followed by an '= expression'", b, G+E+1, e); }
-topdef ::= global(G) export(E) KW_DEF(b) pattern P_EQUALS NL(e). { fault("definitions must be followed by an '= expression'", b, G+E+1, e); }
+topdef ::= global(G) export(E) KW_DEF(b) NL(e).                  { error("keyword 'def' must be followed by a pattern", e); add(CST_ERROR, b, G+E, e); }
+topdef ::= global(G) export(E) KW_DEF(b) pattern NL(e).          { error("definitions must be followed by an '= expression'", e); add(CST_ERROR, e, 0, e); add(CST_DEF, b, G+E+2, e); }
+topdef ::= global(G) export(E) KW_DEF(b) pattern P_EQUALS NL(e). { error("definitions must be followed by an '= expression'", e); add(CST_ERROR, e, 0, e); add(CST_DEF, b, G+E+2, e); }
 topdef ::= global(G) export(E) KW_DEF(b) pattern P_EQUALS block_opt NL(e). { add(CST_DEF, b, G+E+2, e); }
 
 topdef ::= global(G) export(E) KW_TARGET(b) NL(e).                  { fault("keyword 'target' must be followed by a pattern", b, G+E,   e); }
@@ -237,8 +244,8 @@ match1_case ::= pattern guard(G) P_EQUALS block_opt. { add(CST_CASE, 2+G); }
 match_terms(R) ::= expression_term expression_term. { R = 2; }
 match_terms(R) ::= match_terms(T) expression_term.  { R = 1+T; }
 
-matchx_cases(R) ::= matchx_cases(C) NL matchx_case.           { R = C+1; }
-matchx_cases(R) ::= matchx_case.                              { R = 1; }
+matchx_cases(R) ::= matchx_cases(C) NL matchx_case. { R = C+1; }
+matchx_cases(R) ::= matchx_case.                    { R = 1; }
 matchx_case ::= pattern_terms(T) guard(G) P_EQUALS block_opt. { add(CST_CASE, T+G+1); }
 
 pattern_terms(R) ::= pattern_terms(T) pattern_term. { R = 1+T; }
@@ -249,54 +256,60 @@ guard(R) ::= KW_IF(b) expression. { R = 1; add(CST_GUARD, b, 1); }
 
 expression ::= expression_binary_comma.
 
-//!!!
-expression ::= P_BSLASH(b) pattern_term expression.                    { add(CST_LAMBDA, b, 2); }
-//!!!
-expression ::= KW_IF(b) block_opt KW_THEN block_opt KW_ELSE block_opt. { add(CST_IF,     b, 3); }
+expression ::= P_BSLASH(b) pattern_term expression. { add(CST_LAMBDA, b, 2); }
+expression ::= P_BSLASH(b) pattern_term. { error("anonymous function is missing expression body", yyLookaheadToken); add_next(CST_ERROR); add(CST_LAMBDA, b, 2); }
+expression ::= P_BSLASH(b). { error("anonymous function is missing function argument name", yyLookaheadToken); add(CST_ERROR, b, 0, b); }
+
+expression ::= KW_IF(b) block_opt then else. { add(CST_IF, b, 3); }
+expression ::= KW_IF(b) then else. { error("keyword 'if' must be followed by an expression", b); add(CST_ERROR, b, 0, b); add(CST_IF, 3); }
+
+then ::= . [NL] { error("if-then-else statement is missing keyword 'then'", yyLookaheadToken); add_next(CST_ERROR); }
+then ::= KW_THEN(t). { error("keyword 'then' must be followed by an expression", yyLookaheadToken); add(CST_ERROR, t, 0, t); }
+then ::= KW_THEN block_opt.
+
+else ::= . [NL] { error("if-then-else statement is missing keyword 'else'", yyLookaheadToken); add_next(CST_ERROR); }
+else ::= KW_ELSE(e). { error("keyword 'else' must be followed by an expression", yyLookaheadToken); add(CST_ERROR, e, 0, e); }
+else ::= KW_ELSE block_opt.
 
 pattern ::= expression.
 type ::= expression.
 pattern_term ::= expression_term.
 
 block_opt ::= expression.
+block_opt ::= INDENT body DEDENT.
+block_opt ::= INDENT(b) blockdefs(N) body DEDENT(e). { add(CST_BLOCK, b.atEnd(), N+1, e.atStart()); }
 
-block_opt ::= INDENT                 body DEDENT.
-block_opt ::= INDENT(b) blockdefs(N) body DEDENT(e). { add(CST_BLOCK, b.atEnd(), N+1, e); }
-block_opt ::= INDENT                      DEDENT(e). { fault("definition body expression is missing", e, 0, e); }
-block_opt ::= INDENT(b) blockdefs(N)      DEDENT(e). { fault("definition body expression is missing", e, 0, e); add(CST_BLOCK, b.atEnd(), N+1, e); }
-
+body ::= . { error("previous definition is missing expression body", yyLookaheadToken); add_next(CST_ERROR); }
 body ::= expression.
-body ::= KW_REQUIRE(b) require NL else.                         { fault_next("definition body is missing"); add(CST_REQUIRE, b, 4); }
-body ::= KW_REQUIRE(b) require    else.                         { fault_next("definition body is missing"); add(CST_REQUIRE, b, 4); }
-body ::= KW_REQUIRE(b) require.                                 { fault_next("definition body is missing"); add(CST_REQUIRE, b, 3); }
-body ::= KW_REQUIRE(b) require NL else NL(m) blockdefs(N).      { fault_next("definition body is missing"); add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 4); }
-body ::= KW_REQUIRE(b) require    else NL(m) blockdefs(N).      { fault_next("definition body is missing"); add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 4); }
-body ::= KW_REQUIRE(b) require         NL(m) blockdefs(N).      { fault_next("definition body is missing"); add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 3); }
-body ::= KW_REQUIRE(b) require NL else NL                 body. { add(CST_REQUIRE, b, 4); }
-body ::= KW_REQUIRE(b) require    else NL                 body. { add(CST_REQUIRE, b, 4); }
+
+body ::= KW_REQUIRE(b) require reqelse NL                 body. { add(CST_REQUIRE, b, 4); }
 body ::= KW_REQUIRE(b) require         NL                 body. { add(CST_REQUIRE, b, 3); }
-body ::= KW_REQUIRE(b) require NL else NL(m) blockdefs(N) body. { add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 4); }
-body ::= KW_REQUIRE(b) require    else NL(m) blockdefs(N) body. { add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 4); }
+body ::= KW_REQUIRE(b) require reqelse NL(m) blockdefs(N) body. { add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 4); }
 body ::= KW_REQUIRE(b) require         NL(m) blockdefs(N) body. { add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 3); }
 
-require ::= pattern.          { fault_next("require statements must be followed by an '= expression'"); }
-require ::= pattern P_EQUALS. { fault_next("require statements must be followed by an '= expression'"); }
+require ::= .                 { error("keyword 'require' must be followed by a pattern", yyLookaheadToken); add_next(CST_ERROR); add_next(CST_ERROR); }
+require ::= pattern.          { error("require statements must be followed by an '= expression'", yyLookaheadToken); add_next(CST_ERROR); }
+require ::= pattern P_EQUALS. { error("require statements must be followed by an '= expression'", yyLookaheadToken); add_next(CST_ERROR); }
 require ::= pattern P_EQUALS block_opt.
 
-else ::= KW_ELSE(b). { fault("requirement 'else' clause must be folloed by an expression", b, 0, b); }
-else ::= KW_ELSE block_opt.
+// Even though NL is legal to discard everywhere, we need to explicitly allow it here.
+// Otherwise, the NL might be taken to be the end of require, prohibiting else.
+reqelse ::= NL KW_ELSE(e). { error("keyword 'else' must be followed by an expression", yyLookaheadToken); add(CST_ERROR, e, 0, e); }
+reqelse ::=    KW_ELSE(e). { error("keyword 'else' must be followed by an expression", yyLookaheadToken); add(CST_ERROR, e, 0, e); }
+reqelse ::= NL KW_ELSE block_opt.
+reqelse ::=    KW_ELSE block_opt.
 
 blockdefs(R) ::= blockdef.              { R = 1;   }
 blockdefs(R) ::= blockdefs(D) blockdef. { R = 1+D; }
 
-blockdef ::= KW_DEF(b) NL(e).                  { fault("keyword 'def' must be followed by a pattern", b, 0, e); }
-blockdef ::= KW_DEF(b) pattern NL(e).          { fault("definitions must be followed by an '= expression'", b, 1, e); }
-blockdef ::= KW_DEF(b) pattern P_EQUALS NL(e). { fault("definitions must be followed by an '= expression'", b, 1, e); }
-blockdef ::= KW_DEF(b) pattern P_EQUALS block_opt NL(e).                { add(CST_DEF,    b, 2, e); }
+blockdef ::= KW_DEF(b) NL(e).                  { error("keyword 'def' must be followed by a pattern", e); add(CST_ERROR, b, 0, e); }
+blockdef ::= KW_DEF(b) pattern NL(e).          { error("definitions must be followed by an '= expression'", e); add(CST_ERROR, e, 0, e); add(CST_DEF, b, 2); }
+blockdef ::= KW_DEF(b) pattern P_EQUALS NL(e). { error("definitions must be followed by an '= expression'", e);                          add(CST_DEF, b, 2); }
+blockdef ::= KW_DEF(b) pattern P_EQUALS block_opt NL(e). { add(CST_DEF, b, 2, e); }
 
-blockdef ::= KW_FROM(b) NL(e).                               { fault("keyword 'from' must be followed by a package name", b, 0, e); }
-blockdef ::= KW_FROM(b) id NL(e).                            { fault("keyword 'from' must be followed by a package name and 'import'", b, 1, e); }
-blockdef ::= KW_FROM(b) id KW_IMPORT kind(K) arity(A) NL(e). { fault("package import must be followed by a list of identifiers or operators", b, 1+K+A, e); }
+blockdef ::= KW_FROM(b) NL(e).                               { error("keyword 'from' must be followed by a package name", e);                     add(CST_ERROR,  b, 0,     e); }
+blockdef ::= KW_FROM(b) id NL(e).                            { error("keyword 'from' must be followed by a package name and 'import'", e);        add(CST_IMPORT, b, 1,     e); }
+blockdef ::= KW_FROM(b) id KW_IMPORT kind(K) arity(A) NL(e). { error("package import must be followed by a list of identifiers or operators", e); add(CST_IMPORT, b, 1+K+A, e); }
 blockdef ::= KW_FROM(b) id KW_IMPORT P_HOLE NL(e).                      { add(CST_IMPORT, b, 1, e); }
 blockdef ::= KW_FROM(b) id KW_IMPORT kind(K) arity(A) idopeqs(I) NL(e). { add(CST_IMPORT, b, 1+K+A+I, e); }
 
