@@ -29,6 +29,7 @@
     Location l = pinfo.cst->lastNode().location(*pinfo.fcontent);                      \
     pinfo.reporter->report(REPORT_ERROR, l, sstr.str());                               \
   } while (0)
+#define fault_next(sstream) fault(sstream, yyLookaheadToken, 0, yyLookaheadToken)
 
 #define add(t, ...)         pinfo.cst->addNode((t), __VA_ARGS__)
 }
@@ -116,6 +117,7 @@ topdef ::= global(G) export(E) KW_TUPLE(b) type P_EQUALS INDENT tuple_elts(T) DE
 
 tuple_elts(R) ::= tuple_elt.                  { R = 1;   }
 tuple_elts(R) ::= tuple_elts(E) NL tuple_elt. { R = E+1; }
+tuple_elts(R) ::= tuple_elts(E) NL.           { R = E;   }
 // If the last tuple element starts with something illegal, it breaks the following line. :-(
 
 tuple_elt ::= global(G) export(E) type. { add(CST_TUPLE_ELT, G+E+1); }
@@ -257,18 +259,32 @@ type ::= expression.
 pattern_term ::= expression_term.
 
 block_opt ::= expression.
-block_opt ::= INDENT block DEDENT.
-block_opt ::= INDENT(b) DEDENT(e). { fault("illegal block expression", b, 0, e); }
-block_opt ::= INDENT(b) blockdefs(N) DEDENT(e). { fault("illegal block expression", b, N, e); }
 
-block ::= blockdefs(N) body. { add(CST_BLOCK, N+1); }
-block ::= body.
+block_opt ::= INDENT                 body DEDENT.
+block_opt ::= INDENT(b) blockdefs(N) body DEDENT(e). { add(CST_BLOCK, b.atEnd(), N+1, e); }
+block_opt ::= INDENT                      DEDENT(e). { fault("definition body expression is missing", e, 0, e); }
+block_opt ::= INDENT(b) blockdefs(N)      DEDENT(e). { fault("definition body expression is missing", e, 0, e); add(CST_BLOCK, b.atEnd(), N+1, e); }
 
 body ::= expression.
+body ::= KW_REQUIRE(b) require NL else.                         { fault_next("definition body is missing"); add(CST_REQUIRE, b, 4); }
+body ::= KW_REQUIRE(b) require    else.                         { fault_next("definition body is missing"); add(CST_REQUIRE, b, 4); }
+body ::= KW_REQUIRE(b) require.                                 { fault_next("definition body is missing"); add(CST_REQUIRE, b, 3); }
+body ::= KW_REQUIRE(b) require NL else NL(m) blockdefs(N).      { fault_next("definition body is missing"); add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 4); }
+body ::= KW_REQUIRE(b) require    else NL(m) blockdefs(N).      { fault_next("definition body is missing"); add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 4); }
+body ::= KW_REQUIRE(b) require         NL(m) blockdefs(N).      { fault_next("definition body is missing"); add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 3); }
+body ::= KW_REQUIRE(b) require NL else NL                 body. { add(CST_REQUIRE, b, 4); }
+body ::= KW_REQUIRE(b) require    else NL                 body. { add(CST_REQUIRE, b, 4); }
+body ::= KW_REQUIRE(b) require         NL                 body. { add(CST_REQUIRE, b, 3); }
+body ::= KW_REQUIRE(b) require NL else NL(m) blockdefs(N) body. { add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 4); }
+body ::= KW_REQUIRE(b) require    else NL(m) blockdefs(N) body. { add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 4); }
+body ::= KW_REQUIRE(b) require         NL(m) blockdefs(N) body. { add(CST_BLOCK, m.atEnd(), N+1); add(CST_REQUIRE, b, 3); }
 
-body ::= KW_REQUIRE(b) pattern P_EQUALS block_opt NL                      block. { add(CST_REQUIRE, b, 3); }
-body ::= KW_REQUIRE(b) pattern P_EQUALS block_opt NL KW_ELSE block_opt NL block. { add(CST_REQUIRE, b, 4); }
-body ::= KW_REQUIRE(b) pattern P_EQUALS block_opt    KW_ELSE block_opt NL block. { add(CST_REQUIRE, b, 4); }
+require ::= pattern.          { fault_next("require statements must be followed by an '= expression'"); }
+require ::= pattern P_EQUALS. { fault_next("require statements must be followed by an '= expression'"); }
+require ::= pattern P_EQUALS block_opt.
+
+else ::= KW_ELSE(b). { fault("requirement 'else' clause must be folloed by an expression", b, 0, b); }
+else ::= KW_ELSE block_opt.
 
 blockdefs(R) ::= blockdef.              { R = 1;   }
 blockdefs(R) ::= blockdefs(D) blockdef. { R = 1+D; }

@@ -53,7 +53,7 @@ int main(int argc, const char **argv) {
     CSTBuilder builder(file);
     parseWake(ParseInfo(&file, &builder, &reporter));
     CST cst(std::move(builder));
-    exploreNode(cst.root(), 0);
+    exploreElement(cst.root(), 0);
     std::cout << "---" << std::endl;
     return 0;
 }

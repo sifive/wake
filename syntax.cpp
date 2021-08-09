@@ -32,7 +32,7 @@
 #define STATE_NL_WS	2
 
 void parseWake(ParseInfo pi) {
-    struct TokenInfo tinfo, tindent;
+    TokenInfo tinfo, tnl;
 
     std::vector<int> indent_stack;
     std::string indent;
@@ -94,7 +94,7 @@ void parseWake(ParseInfo pi) {
                 state = STATE_NL;
                 // We only record+report the token info for the FIRST newline.
                 // Thus, blocks own their same-line comments, but not comments on the next line.
-                tindent = tinfo;
+                tnl = tinfo;
                 continue;
             } else {
                 break;
@@ -131,14 +131,14 @@ void parseWake(ParseInfo pi) {
 
                 // Pop indent scope until indent is a prefix of newdent
                 while (newdent.compare(0, indent.size(), indent) != 0) {
-                    Parse(parser, TOKEN_DEDENT, tindent, pi);
+                    Parse(parser, TOKEN_DEDENT, tnl, pi);
                     indent.resize(indent_stack.back());
                     indent_stack.pop_back();
                 }
 
                 // If newdent is longer, insert an INDENT token.
                 if (newdent.size() > indent.size()) {
-                    Parse(parser, TOKEN_INDENT, tindent, pi);
+                    Parse(parser, TOKEN_INDENT, tnl, pi);
                     indent_stack.push_back(indent.size());
                     std::swap(indent, newdent);
                 }
@@ -147,7 +147,7 @@ void parseWake(ParseInfo pi) {
                 // However, some constructs in wake are terminated by a newline.
                 // Check if the parser can shift a newline. If so, provide it.
                 if (ParseShifts(parser, TOKEN_NL)) {
-                    Parse(parser, TOKEN_NL, tindent, pi);
+                    Parse(parser, TOKEN_NL, tnl, pi);
                 }
 
                 // Fall through to normal handling of the token.
