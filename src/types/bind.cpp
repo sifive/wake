@@ -121,10 +121,13 @@ struct ResolveBinding {
       if (it != sym->defs.end()) {
         if (override && it->second.qualified != override->qualified) {
           ++warnings;
-          std::cerr << "(warning) Ambiguous import of definition '" << name
+          std::ostringstream message;
+          message << "(warning) Ambiguous import of definition '" << name
             << "' from <" << override->location.file()
             << "> and <" << it->second.location.file()
             << ">" << std::endl;
+          reporter->reportWarning(override->location, message.str());
+          reporter->reportWarning(it->second.location, message.str());
         }
         override = &it->second;
       }
@@ -139,10 +142,13 @@ struct ResolveBinding {
       if (it != sym->topics.end()) {
         if (override && it->second.qualified != override->qualified) {
           ++warnings;
-          std::cerr << "(warning) Ambiguous import of topic '" << name
+          std::ostringstream message;
+          message <<  "(warning) Ambiguous import of topic '" << name
             << "' from <" << override->location.file()
             << "> and <" << it->second.location.file()
             << ">" << std::endl;
+          reporter->reportWarning(override->location, message.str());
+          reporter->reportWarning(it->second.location, message.str());
         }
         override = &it->second;
       }
@@ -158,10 +164,13 @@ struct ResolveBinding {
       if (it != sym->types.end()) {
         if (override && it->second.qualified != override->qualified) {
           ++warnings;
-          std::cerr << "(warning) Ambiguous import of type '" << name
+          std::ostringstream message;
+          message  << "(warning) Ambiguous import of type '" << name
             << "' from <" << override->location.file()
             << "> and <" << it->second.location.file()
             << ">" << std::endl;
+          reporter->reportWarning(override->location, message.str());
+          reporter->reportWarning(it->second.location, message.str());
         }
         override = &it->second;
       }
@@ -218,12 +227,18 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
         j = p[j];
       }
       // j is now inside the cycle
-      std::cerr << "Value definition cycle detected including:" << std::endl;
+      std::ostringstream message;
+      message << "Value definition cycle detected including:" << std::endl;
+      std::vector<Location*> errorLocations;
       int i = j;
       do {
-        std::cerr << "  " << defs[i].name << " at " << defs[i].expr->location.file() << std::endl;
+        message << "  " << defs[i].name << " at " << defs[i].expr->location.file() << std::endl;
+        errorLocations.push_back(&(defs[i].expr->location));
         i = p[i];
       } while (i != j);
+      for (Location *location: errorLocations) {
+        reporter->reportError(*location, message.str());
+      }
       return nullptr;
     }
     int w = def.expr->type == &Lambda::type ? 0 : 1;
@@ -1330,10 +1345,13 @@ TypeScope::~TypeScope() {
     if (i == 0) continue;
     OpenTypeVar &prior = vars[i-1];
     if (prior.var == var.var) {
-      std::cerr
+      std::ostringstream message;
+      message
         << "Introduced type variables " << prior.location.text()
         << " and " << var.location.text()
         << " are actually the same." << std::endl;
+      reporter->reportError(prior.location, message.str());
+      reporter->reportError(var.location, message.str());
     }
   }
 }

@@ -689,10 +689,13 @@ static void bind_def(Lexer &lex, DefMap &map, Definition &&def, Symbols *exports
     def.location, std::move(def.body), std::move(def.typeVars))));
 
   if (!out.second) {
-    std::cerr << "Duplicate definition "
+    std::ostringstream message;
+    message << "Duplicate definition "
       << out.first->first << " at "
       << out.first->second.body->location.text() << " and "
       << l.text() << std::endl;
+    reporter->reportError(out.first->second.body->location, message.str());
+    reporter->reportError(l, message.str());
     lex.fail = true;
   }
 }
@@ -703,10 +706,13 @@ static void bind_type(Lexer &lex, Package &package, const std::string &name, con
 
   auto it = package.package.types.insert(std::make_pair(name, SymbolSource(location, SYM_LEAF)));
   if (!it.second) {
-    std::cerr << "Duplicate type "
+    std::ostringstream message;
+    message << "Duplicate type "
       << it.first->first << " at "
       << it.first->second.location.text() << " and "
       << location.text() << std::endl;
+    reporter->reportError(it.first->second.location, message.str());
+    reporter->reportError(location, message.str());
     lex.fail = true;
   }
 }
@@ -1051,8 +1057,10 @@ static void parse_topic(Lexer &lex, Package &package, Symbols *exports, Symbols 
 
   auto it = file.topics.insert(std::make_pair(id.first, Topic(id.second, std::move(def))));
   if (!it.second) {
-    std::cerr << "Duplicate topic " << id.first
+    std::ostringstream message;
+    message << "Duplicate topic " << id.first
       << " at " << id.second.file() << std::endl;
+    reporter->reportError(id.second, message.str());
     lex.fail = true;
   }
 
@@ -1382,10 +1390,13 @@ static void parse_import(const std::string &pkgname, DefMap &map, Lexer &lex) {
 
     auto it = target->insert(std::make_pair(std::move(name), SymbolSource(location, source)));
     if (!it.second) {
-      std::cerr << "Duplicate imported "
+      std::ostringstream message;
+      message << "Duplicate imported "
         << kind << " '" << it.first->first << "' at "
         << it.first->second.location.text() << " and "
         << location.text() << std::endl;
+      reporter->reportError(it.first->second.location, message.str());
+      reporter->reportError(location, message.str());
       lex.fail = true;
     }
   }
@@ -1502,11 +1513,14 @@ static void parse_export(const std::string &pkgname, Package &package, Lexer &le
 
     auto it = local->insert(std::make_pair(name, SymbolSource(location, source)));
     if (!it.second) {
-      std::cerr << "Duplicate file-local "
+      std::ostringstream message;
+      message << "Duplicate file-local "
         << kind << " '"
         << name << "' at "
         << it.first->second.location.text() << " and "
         << location.text() << std::endl;
+      reporter->reportError(it.first->second.location, message.str());
+      reporter->reportError(location, message.str());
       lex.fail = true;
     }
   }
@@ -1817,10 +1831,13 @@ const char *parse_top(Top &top, Lexer &lex) {
         it.first->second.flags |= SYM_LEAF;
         package->exports.defs.find(def.first)->second.flags |= SYM_LEAF;
       } else {
-        std::cerr << "Duplicate file-local definition "
+        std::ostringstream message;
+        message << "Duplicate file-local definition "
           << def.first << " at "
           << it.first->second.location.text() << " and "
           << def.second.location.text() << std::endl;
+        reporter->reportError(it.first->second.location, message.str());
+        reporter->reportError(def.second.location, message.str());
         lex.fail = true;
       }
     }
@@ -1837,10 +1854,13 @@ const char *parse_top(Top &top, Lexer &lex) {
         it.first->second.flags |= SYM_LEAF;
         package->exports.topics.find(topic.first)->second.flags |= SYM_LEAF;
       } else {
-        std::cerr << "Duplicate file-local topic "
+        std::ostringstream message;
+        message << "Duplicate file-local topic "
           << topic.first << " at "
           << it.first->second.location.text() << " and "
           << topic.second.location.text() << std::endl;
+        reporter->reportError(it.first->second.location, message.str());
+        reporter->reportError(topic.second.location, message.str());
         lex.fail = true;
       }
     }
@@ -1856,10 +1876,13 @@ const char *parse_top(Top &top, Lexer &lex) {
         it.first->second.flags |= SYM_LEAF;
         package->exports.types.find(type.first)->second.flags |= SYM_LEAF;
       } else {
-        std::cerr << "Duplicate file-local type "
+        std::ostringstream message;
+        message << "Duplicate file-local type "
           << type.first << " at "
           << it.first->second.location.text() << " and "
           << type.second.location.text() << std::endl;
+        reporter->reportError(it.first->second.location, message.str());
+        reporter->reportError(type.second.location, message.str());
         lex.fail = true;
       }
     }
