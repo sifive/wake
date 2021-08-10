@@ -14,6 +14,7 @@ class Diagnostic {
     Location getLocation() const { return location; }
     Severity getSeverity() const { return severity; }
     std::string getMessage() const { return message; }
+    std::string getFilename() const { return getLocation().filename; }
 
   private:
     const Location location;

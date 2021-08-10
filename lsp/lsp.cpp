@@ -86,7 +86,7 @@ class LSP {
     bool isShutDown = false;
     Runtime runtime;
     std::map<std::string, std::string> changedFiles;
-    std::vector<Diagnostic> diagnostics;
+    std::map<std::string, std::vector<Diagnostic>> diagnostics;
     std::map<std::string, LspMethod> methodToFunction = {
       {"initialize", &LSP::initialize},
       {"initialized", &LSP::initialized},
@@ -272,20 +272,32 @@ class LSP {
 
     class LSPReporter : public DiagnosticReporter {
       private:
-        std::vector<Diagnostic> &diagnostics;
+        std::map<std::string, std::vector<Diagnostic>> &diagnostics;
         void report(Diagnostic diagnostic) {
-          diagnostics.push_back(diagnostic);
+          diagnostics[diagnostic.getFilename()].push_back(diagnostic);
         }
       public:
-        LSPReporter(std::vector<Diagnostic> &_diagnostics) : diagnostics(_diagnostics) {}        
+        LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics) : diagnostics(_diagnostics) {}
     };
 
-    void diagnoseFile(std::string fileUri, Top &top) {
+    void  reportFileDiagnostics(const std::string &filePath, const std::vector<Diagnostic> &fileDiagnostics) {
+      JAST diagnosticsArray(JSON_ARRAY);
+      for (Diagnostic diagnostic: fileDiagnostics) {
+        diagnosticsArray.children.emplace_back("", createDiagnostic(diagnostic)); // add .add for JSON_OBJECT to JSON_ARRAY
+      }
+      JAST message = createDiagnosticMessage();
+      JAST &params = message.add("params", JSON_OBJECT);
+      std::string fileUri = rootUri + '/' + filePath;
+      params.add("uri", fileUri.c_str());
+      params.children.emplace_back("diagnostics", diagnosticsArray);
+      sendMessage(message);
+    }
+
+    void runSyntaxChecker(const std::string &filePath, Top &top) {
       LSPReporter lspReporter(diagnostics);
       reporter = &lspReporter;
 
-      std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
-      
+      std::string fileUri = rootUri + '/' + filePath;
       auto fileChangesPointer = changedFiles.find(fileUri);
       if (fileChangesPointer != changedFiles.end()) {
         Lexer lex(runtime.heap, (*fileChangesPointer).second, filePath.c_str());
@@ -294,26 +306,18 @@ class LSP {
         Lexer lex(runtime.heap, filePath.c_str());
         parse_top(top, lex);
       }
-
-      JAST diagnosticsArray(JSON_ARRAY);    
-      for (Diagnostic diagnostic: diagnostics) {
-        diagnosticsArray.children.emplace_back("", createDiagnostic(diagnostic)); // add .add for JSON_OBJECT to JSON_ARRAY
-      }
-      JAST message = createDiagnosticMessage();
-      JAST &params = message.add("params", JSON_OBJECT);
-      params.add("uri", fileUri.c_str());
-      params.children.emplace_back("diagnostics", diagnosticsArray);
-      diagnostics.clear();
-      sendMessage(message);  
     }
 
     void diagnoseProject() {
       std::unique_ptr<Top> top(new Top);
       bool enumok = true;
       auto wakefiles = find_all_wakefiles(enumok, true, false);
-      for (auto file : wakefiles) {
-        //std::cerr << file << std::endl;
-        diagnoseFile(rootUri + '/' + file, *top);
+
+      std::vector<std::string> filenames; // needed to keep file names alive for bind_refs()
+      filenames.reserve(wakefiles.size());
+      for (const std::string &filePath : wakefiles) {
+        filenames.push_back(filePath);
+        runSyntaxChecker(filenames.back(), *top);
       }
       LSPReporter lspReporter(diagnostics);
       reporter = &lspReporter;
@@ -322,7 +326,11 @@ class LSP {
       top->body = std::unique_ptr<Expr>(new VarRef(LOCATION, "Nil@wake"));
       PrimMap pmap = prim_register_all(nullptr, nullptr);
       std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
-      
+
+      for (const std::string &filePath : wakefiles) {
+        auto fileDiagnostics = diagnostics[filePath];
+        reportFileDiagnostics(filePath, fileDiagnostics);
+      }
       diagnostics.clear();
     }
 
