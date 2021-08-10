@@ -51,7 +51,7 @@ def buildLSP (Pair variant _): Result (List Path) Error =
         objFiles.flatten ++
         deps.getSysLibObjects
 
-    linkO variant (deps.getSysLibLFlags) allObjs "lib/wake/lsp-wake"
+    linkO variant (deps.getSysLibLFlags) allObjs "bin/lsp-wake"
 
 export def vscode _ =
     def dir =

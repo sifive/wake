@@ -16,10 +16,10 @@ let client: LanguageClient;
 export function activate() {
 	let serverOptions: ServerOptions = {
 		run: {
-			command: __dirname + "/../../../../lib/wake/lsp-wake.native-cpp11-release"
+			command: __dirname + "/../../../../bin/lsp-wake.native-cpp11-release"
 		},
 		debug: {
-			command: __dirname + "/../../../../lib/wake/lsp-wake.native-cpp11-debug"
+			command: __dirname + "/../../../../bin/lsp-wake.native-cpp11-debug"
 		}
 	};
 
