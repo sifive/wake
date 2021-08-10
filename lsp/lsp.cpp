@@ -20,13 +20,8 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <fcntl.h>
-#include <unistd.h>
 #include <sys/select.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <string.h>
+#include <cstring>
 
 #include <iostream>
 #include <string>
@@ -36,9 +31,9 @@
 #include <chrono>
 #include <ctime>  
 #include <functional>
+#include <utility>
 
 #include "json5.h"
-#include "execpath.h"
 #include "location.h"
 #include "frontend/parser.h"
 #include "frontend/symbol.h"
@@ -79,26 +74,6 @@ DiagnosticReporter *reporter;
 
 class LSP {
   public:
-    typedef void (LSP::*LspMethod)(JAST);
-
-    std::string rootUri = "";
-    bool isInitialized = false;
-    bool isShutDown = false;
-    Runtime runtime;
-    std::map<std::string, std::string> changedFiles;
-    std::map<std::string, std::vector<Diagnostic>> diagnostics;
-    std::map<std::string, LspMethod> methodToFunction = {
-      {"initialize", &LSP::initialize},
-      {"initialized", &LSP::initialized},
-      {"textDocument/didOpen", &LSP::didOpen},
-      {"textDocument/didChange", &LSP::didChange},
-      {"textDocument/didSave", &LSP::didSave},
-      {"textDocument/didClose", &LSP::didClose},
-      {"workspace/didChangeWatchedFiles", &LSP::didChangeWatchedFiles},
-      {"shutdown", &LSP::shutdown},
-      {"exit", &LSP::serverExit}
-    };   
-
     LSP() : runtime(nullptr, 0, 4.0, 0) {}
 
     void processRequests() {
@@ -107,7 +82,7 @@ class LSP {
       clientLog.open("requests_log.txt", std::ios_base::app); // append instead of overwriting
       std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
       clientLog << std::endl
-              << "Log start: " << ctime(&currentTime);
+      << "Log start: " << ctime(&currentTime);
 
       while (true) {
         size_t json_size = 0;
@@ -155,13 +130,34 @@ class LSP {
           } else if (isShutDown && (method != "exit")) {
             sendErrorMessage(request, InvalidRequest, "Received a request other than 'exit' after a shutdown request.");
           } else {
-            callMethod(method, request);           
+            callMethod(method, request);
           }
         }
       }
     }
 
-    void callMethod(std::string method, JAST request) {
+  private:
+    typedef void (LSP::*LspMethod)(JAST);
+
+    std::string rootUri = "";
+    bool isInitialized = false;
+    bool isShutDown = false;
+    Runtime runtime;
+    std::map<std::string, std::string> changedFiles;
+    std::map<std::string, std::vector<Diagnostic>> diagnostics;
+    std::map<std::string, LspMethod> methodToFunction = {
+      {"initialize", &LSP::initialize},
+      {"initialized", &LSP::initialized},
+      {"textDocument/didOpen", &LSP::didOpen},
+      {"textDocument/didChange", &LSP::didChange},
+      {"textDocument/didSave", &LSP::didSave},
+      {"textDocument/didClose", &LSP::didClose},
+      {"workspace/didChangeWatchedFiles", &LSP::didChangeWatchedFiles},
+      {"shutdown", &LSP::shutdown},
+      {"exit", &LSP::serverExit}
+    };
+
+    void callMethod(const std::string &method, const JAST &request) {
       auto functionPointer = methodToFunction.find(method);
       if (functionPointer != methodToFunction.end()) {
           (this->*(functionPointer->second))(request);
@@ -197,7 +193,7 @@ class LSP {
       return message;
     }
 
-    static void sendErrorMessage(const char *code, std::string message) {
+    static void sendErrorMessage(const char *code, const std::string &message) {
       JAST errorMessage = createResponseMessage();
       JAST &error = errorMessage.add("error", JSON_OBJECT);
       error.add("code", JSON_INTEGER, code);
@@ -205,7 +201,7 @@ class LSP {
       sendMessage(errorMessage);
     }
 
-    static void sendErrorMessage(JAST receivedMessage, const char *code, std::string message) {
+    static void sendErrorMessage(const JAST &receivedMessage, const char *code, const std::string &message) {
       JAST errorMessage = createResponseMessage(receivedMessage);
       JAST &error = errorMessage.add("error", JSON_OBJECT);
       error.add("code", JSON_INTEGER, code);
@@ -213,7 +209,7 @@ class LSP {
       sendMessage(errorMessage);
     }
 
-    static JAST createInitializeResult(JAST receivedMessage) {
+    static JAST createInitializeResult(const JAST &receivedMessage) {
       JAST message = createResponseMessage(receivedMessage);
       JAST &result = message.add("result", JSON_OBJECT);
 
@@ -237,7 +233,7 @@ class LSP {
     
     void initialized(JAST _) { }
 
-    JAST createDiagnosticRange(Diagnostic diagnostic) {
+    static JAST createDiagnosticRange(const Diagnostic &diagnostic) {
       JAST range(JSON_OBJECT);
 
       JAST &start = range.add("start", JSON_OBJECT);
@@ -251,7 +247,7 @@ class LSP {
       return range;
     }
 
-    JAST createDiagnostic(Diagnostic diagnostic) {
+    static JAST createDiagnostic(const Diagnostic &diagnostic) {
       JAST diagnosticJSON(JSON_OBJECT);
       
       diagnosticJSON.children.emplace_back("range", createDiagnosticRange(diagnostic));
@@ -264,7 +260,7 @@ class LSP {
       return diagnosticJSON;
     }
 
-    JAST createDiagnosticMessage() {
+    static JAST createDiagnosticMessage() {
       JAST message = createMessage();
       message.add("method", "textDocument/publishDiagnostics");
       return message;
@@ -273,16 +269,16 @@ class LSP {
     class LSPReporter : public DiagnosticReporter {
       private:
         std::map<std::string, std::vector<Diagnostic>> &diagnostics;
-        void report(Diagnostic diagnostic) {
+        void report(Diagnostic diagnostic) override {
           diagnostics[diagnostic.getFilename()].push_back(diagnostic);
         }
       public:
-        LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics) : diagnostics(_diagnostics) {}
+        explicit LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics) : diagnostics(_diagnostics) {}
     };
 
-    void  reportFileDiagnostics(const std::string &filePath, const std::vector<Diagnostic> &fileDiagnostics) {
+    void reportFileDiagnostics(const std::string &filePath, const std::vector<Diagnostic> &fileDiagnostics) const {
       JAST diagnosticsArray(JSON_ARRAY);
-      for (Diagnostic diagnostic: fileDiagnostics) {
+      for (const Diagnostic &diagnostic: fileDiagnostics) {
         diagnosticsArray.children.emplace_back("", createDiagnostic(diagnostic)); // add .add for JSON_OBJECT to JSON_ARRAY
       }
       JAST message = createDiagnosticMessage();
@@ -367,7 +363,7 @@ class LSP {
     }
 
     void shutdown(JAST receivedMessage) {
-      JAST message = createResponseMessage(receivedMessage);
+      JAST message = createResponseMessage(std::move(receivedMessage));
       message.add("result", JSON_NULLVAL);
       isShutDown = true;
       sendMessage(message);
@@ -379,7 +375,7 @@ class LSP {
 };
 
 
-int main(int argc, const char **argv) {
+int main() {
   LSP lsp;
   // Process requests until something goes wrong 
   lsp.processRequests();
