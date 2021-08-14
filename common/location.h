@@ -59,7 +59,7 @@ struct FileLocation {
 std::ostream & operator << (std::ostream &os, FileLocation location);
 
 struct Location {
-  const char *filename;
+  std::string filename;
   Coordinates start, end;
 
   Location(const char *filename_, Coordinates start_, Coordinates end_)

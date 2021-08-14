@@ -145,6 +145,8 @@ class LSP {
     Runtime runtime;
     std::map<std::string, std::string> changedFiles;
     std::map<std::string, std::vector<Diagnostic>> diagnostics;
+    std::vector<std::pair<Location, Location>> uses;
+    std::vector<std::pair<std::string, Location>> definitions;
     std::map<std::string, LspMethod> methodToFunction = {
       {"initialize", &LSP::initialize},
       {"initialized", &LSP::initialized},
@@ -154,7 +156,8 @@ class LSP {
       {"textDocument/didClose", &LSP::didClose},
       {"workspace/didChangeWatchedFiles", &LSP::didChangeWatchedFiles},
       {"shutdown", &LSP::shutdown},
-      {"exit", &LSP::serverExit}
+      {"exit", &LSP::serverExit},
+      {"textDocument/definition", &LSP::goToDefinition}
     };
 
     void callMethod(const std::string &method, const JAST &request) {
@@ -164,7 +167,7 @@ class LSP {
       } else {
         sendErrorMessage(request, MethodNotFound, "Method '" + method + "' is not implemented.");
       }
-    } 
+    }
 
     static void sendMessage(const JAST &message) {
       std::stringstream str;
@@ -215,6 +218,7 @@ class LSP {
 
       JAST &capabilities = result.add("capabilities", JSON_OBJECT);
       capabilities.add("textDocumentSync", 1);
+      capabilities.add("definitionProvider", true);
 
       JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
       serverInfo.add("name", "lsp wake server");
@@ -227,10 +231,10 @@ class LSP {
       isInitialized = true;
       rootUri = receivedMessage.get("params").get("rootUri").value;
       sendMessage(message);
-      
+
       diagnoseProject();
     }
-    
+
     void initialized(JAST _) { }
 
     static JAST createDiagnosticRange(const Diagnostic &diagnostic) {
@@ -247,9 +251,23 @@ class LSP {
       return range;
     }
 
+    static JAST createLocationRange(const Location &location) {
+      JAST range(JSON_OBJECT);
+
+      JAST &start = range.add("start", JSON_OBJECT);
+      start.add("line", std::max(0, location.start.row - 1));
+      start.add("character", std::max(0, location.start.column - 1));
+
+      JAST &end = range.add("end", JSON_OBJECT);
+      end.add("line", std::max(0, location.end.row - 1));
+      end.add("character", std::max(0, location.end.column)); // It can be -1
+
+      return range;
+    }
+
     static JAST createDiagnostic(const Diagnostic &diagnostic) {
       JAST diagnosticJSON(JSON_OBJECT);
-      
+
       diagnosticJSON.children.emplace_back("range", createDiagnosticRange(diagnostic));
       diagnosticJSON.add("severity", diagnostic.getSeverity());
       diagnosticJSON.add("source", "wake");
@@ -305,6 +323,8 @@ class LSP {
     }
 
     void diagnoseProject() {
+      uses.clear();
+      definitions.clear();
       std::unique_ptr<Top> top(new Top);
       bool enumok = true;
       auto wakefiles = find_all_wakefiles(enumok, true, false);
@@ -328,6 +348,48 @@ class LSP {
         reportFileDiagnostics(filePath, fileDiagnostics);
       }
       diagnostics.clear();
+
+      if (root != NULL) {
+        explore(root.get());
+      }
+    }
+
+    void explore(Expr *expr) {
+      if (expr->type == &VarRef::type) {
+        VarRef *ref = static_cast<VarRef*>(expr);
+        if (ref->location.start.bytes >= 0 && ref->target.start.bytes >= 0) {
+          uses.push_back({ref->location /* use location */, ref->target /* definition location */});
+        }
+      } else if (expr->type == &App::type) {
+        App *app = static_cast<App*>(expr);
+        explore(app->val.get());
+        explore(app->fn.get());
+      } else if (expr->type == &Lambda::type) {
+        Lambda *lambda = static_cast<Lambda*>(expr);
+        if (lambda->token.start.bytes >= 0) {
+          definitions.push_back({lambda->name /* name */, lambda->token /* location */});
+        }
+        explore(lambda->body.get());
+      } else if (expr->type == &Ascribe::type) {
+        Ascribe *ascribe = static_cast<Ascribe*>(expr);
+        explore(ascribe->body.get());
+      } else if (expr->type == &DefBinding::type) {
+        DefBinding *defbinding = static_cast<DefBinding*>(expr);
+        for (auto &i : defbinding->val) explore(i.get());
+        for (auto &i : defbinding->fun) explore(i.get());
+        for (auto &i : defbinding->order) {
+          if (i.second.location.start.bytes >= 0) {
+            if (i.first.compare(0, 6, "topic ") == 0) {
+              // noop
+            } else if (i.first.compare(0, 8, "publish ") != 0) {
+              // noop
+            } else {
+              definitions.push_back({i.first /* name */, i.second.location /* location */});
+            }
+          }
+        }
+        explore(defbinding->body.get());
+      }
     }
 
     void didOpen(JAST receivedMessage) {
@@ -340,6 +402,40 @@ class LSP {
       std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
       changedFiles[fileUri] = fileContent;
       diagnoseProject();
+    }
+
+    void reportDefinitionLocation(JAST receivedMessage, Location definitionLocation) {
+      JAST message = createResponseMessage(receivedMessage);
+      JAST &result = message.add("result", JSON_OBJECT);
+
+      std::string fileUri = rootUri + '/' + definitionLocation.filename;
+      result.add("uri", fileUri.c_str());
+      result.children.emplace_back("range", createLocationRange(definitionLocation));
+
+      sendMessage(message);
+    }
+
+    void reportNoDefinition(JAST receivedMessage) {
+      JAST message = createResponseMessage(receivedMessage);
+      JAST result = message.add("result", JSON_NULLVAL);
+      sendMessage(message);
+    }
+
+    void goToDefinition(JAST receivedMessage) {
+      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+      std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
+
+      int row = stoi(receivedMessage.get("params").get("position").get("line").value) + 1;
+      int column = stoi(receivedMessage.get("params").get("position").get("character").value) + 1;
+      Location locationToDefine(filePath.c_str(), Coordinates(row, column), Coordinates(row, column));
+
+      for (std::pair<Location, Location> use: uses) {
+        if (use.first.contains(locationToDefine)) {
+          reportDefinitionLocation(receivedMessage, use.second);
+          return;
+        }
+      }
+      reportNoDefinition(receivedMessage);
     }
 
     void didSave(JAST receivedMessage) {
@@ -359,7 +455,7 @@ class LSP {
         std::string fileUri = child.second.get("uri").value;
         changedFiles.erase(fileUri);
         diagnoseProject();
-      }       
+      }
     }
 
     void shutdown(JAST receivedMessage) {
