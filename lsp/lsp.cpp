@@ -29,7 +29,7 @@
 #include <sstream>
 #include <fstream>
 #include <chrono>
-#include <ctime>  
+#include <ctime>
 #include <functional>
 #include <utility>
 
@@ -73,7 +73,7 @@ static const char *ServerNotInitialized = "-32002";
 DiagnosticReporter *reporter;
 
 class LSP {
-  public:
+public:
     LSP() : runtime(nullptr, 0, 4.0, 0) {}
 
     void processRequests() {
@@ -82,7 +82,7 @@ class LSP {
       clientLog.open("requests_log.txt", std::ios_base::app); // append instead of overwriting
       std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
       clientLog << std::endl
-      << "Log start: " << ctime(&currentTime);
+        << "Log start: " << ctime(&currentTime);
 
       while (true) {
         size_t json_size = 0;
@@ -136,7 +136,7 @@ class LSP {
       }
     }
 
-  private:
+private:
     typedef void (LSP::*LspMethod)(JAST);
 
     std::string rootUri = "";
@@ -148,22 +148,22 @@ class LSP {
     std::vector<std::pair<Location, Location>> uses;
     std::vector<std::pair<std::string, Location>> definitions;
     std::map<std::string, LspMethod> methodToFunction = {
-      {"initialize", &LSP::initialize},
-      {"initialized", &LSP::initialized},
-      {"textDocument/didOpen", &LSP::didOpen},
-      {"textDocument/didChange", &LSP::didChange},
-      {"textDocument/didSave", &LSP::didSave},
-      {"textDocument/didClose", &LSP::didClose},
+      {"initialize",                      &LSP::initialize},
+      {"initialized",                     &LSP::initialized},
+      {"textDocument/didOpen",            &LSP::didOpen},
+      {"textDocument/didChange",          &LSP::didChange},
+      {"textDocument/didSave",            &LSP::didSave},
+      {"textDocument/didClose",           &LSP::didClose},
       {"workspace/didChangeWatchedFiles", &LSP::didChangeWatchedFiles},
-      {"shutdown", &LSP::shutdown},
-      {"exit", &LSP::serverExit},
-      {"textDocument/definition", &LSP::goToDefinition}
+      {"shutdown",                        &LSP::shutdown},
+      {"exit",                            &LSP::serverExit},
+      {"textDocument/definition",         &LSP::goToDefinition}
     };
 
     void callMethod(const std::string &method, const JAST &request) {
       auto functionPointer = methodToFunction.find(method);
       if (functionPointer != methodToFunction.end()) {
-          (this->*(functionPointer->second))(request);
+        (this->*(functionPointer->second))(request);
       } else {
         sendErrorMessage(request, MethodNotFound, "Method '" + method + "' is not implemented.");
       }
@@ -237,21 +237,7 @@ class LSP {
 
     void initialized(JAST _) { }
 
-    static JAST createDiagnosticRange(const Diagnostic &diagnostic) {
-      JAST range(JSON_OBJECT);
-
-      JAST &start = range.add("start", JSON_OBJECT);
-      start.add("line", std::max(0, diagnostic.getLocation().start.row - 1));
-      start.add("character", std::max(0, diagnostic.getLocation().start.column - 1));
-
-      JAST &end = range.add("end", JSON_OBJECT);
-      end.add("line", std::max(0, diagnostic.getLocation().end.row));
-      end.add("character", std::max(0, diagnostic.getLocation().end.column)); // It can be -1
-
-      return range;
-    }
-
-    static JAST createLocationRange(const Location &location) {
+    static JAST createRangeFromLocation(const Location &location) {
       JAST range(JSON_OBJECT);
 
       JAST &start = range.add("start", JSON_OBJECT);
@@ -268,10 +254,9 @@ class LSP {
     static JAST createDiagnostic(const Diagnostic &diagnostic) {
       JAST diagnosticJSON(JSON_OBJECT);
 
-      diagnosticJSON.children.emplace_back("range", createDiagnosticRange(diagnostic));
+      diagnosticJSON.children.emplace_back("range", createRangeFromLocation(diagnostic.getLocation()));
       diagnosticJSON.add("severity", diagnostic.getSeverity());
       diagnosticJSON.add("source", "wake");
-      JAST range = createDiagnosticRange(diagnostic);
 
       diagnosticJSON.add("message", diagnostic.getMessage());
 
@@ -285,13 +270,16 @@ class LSP {
     }
 
     class LSPReporter : public DiagnosticReporter {
-      private:
+    private:
         std::map<std::string, std::vector<Diagnostic>> &diagnostics;
+
         void report(Diagnostic diagnostic) override {
           diagnostics[diagnostic.getFilename()].push_back(diagnostic);
         }
-      public:
-        explicit LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics) : diagnostics(_diagnostics) {}
+
+    public:
+        explicit LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics) : diagnostics(
+                _diagnostics) {}
     };
 
     void reportFileDiagnostics(const std::string &filePath, const std::vector<Diagnostic> &fileDiagnostics) const {
@@ -349,7 +337,7 @@ class LSP {
       }
       diagnostics.clear();
 
-      if (root != NULL) {
+      if (root != nullptr) {
         explore(root.get());
       }
     }
@@ -358,7 +346,7 @@ class LSP {
       if (expr->type == &VarRef::type) {
         VarRef *ref = static_cast<VarRef*>(expr);
         if (ref->location.start.bytes >= 0 && ref->target.start.bytes >= 0) {
-          uses.push_back({ref->location /* use location */, ref->target /* definition location */});
+          uses.emplace_back(ref->location /* use location */, ref->target /* definition location */);
         }
       } else if (expr->type == &App::type) {
         App *app = static_cast<App*>(expr);
@@ -367,7 +355,7 @@ class LSP {
       } else if (expr->type == &Lambda::type) {
         Lambda *lambda = static_cast<Lambda*>(expr);
         if (lambda->token.start.bytes >= 0) {
-          definitions.push_back({lambda->name /* name */, lambda->token /* location */});
+          definitions.emplace_back(lambda->name /* name */, lambda->token /* location */);
         }
         explore(lambda->body.get());
       } else if (expr->type == &Ascribe::type) {
@@ -384,7 +372,7 @@ class LSP {
             } else if (i.first.compare(0, 8, "publish ") != 0) {
               // noop
             } else {
-              definitions.push_back({i.first /* name */, i.second.location /* location */});
+              definitions.emplace_back(i.first /* name */, i.second.location /* location */);
             }
           }
         }
@@ -404,19 +392,19 @@ class LSP {
       diagnoseProject();
     }
 
-    void reportDefinitionLocation(JAST receivedMessage, Location definitionLocation) {
-      JAST message = createResponseMessage(receivedMessage);
+    void reportDefinitionLocation(JAST receivedMessage, const Location &definitionLocation) {
+      JAST message = createResponseMessage(std::move(receivedMessage));
       JAST &result = message.add("result", JSON_OBJECT);
 
       std::string fileUri = rootUri + '/' + definitionLocation.filename;
       result.add("uri", fileUri.c_str());
-      result.children.emplace_back("range", createLocationRange(definitionLocation));
+      result.children.emplace_back("range", createRangeFromLocation(definitionLocation));
 
       sendMessage(message);
     }
 
-    void reportNoDefinition(JAST receivedMessage) {
-      JAST message = createResponseMessage(receivedMessage);
+    static void reportNoDefinition(JAST receivedMessage) {
+      JAST message = createResponseMessage(std::move(receivedMessage));
       JAST result = message.add("result", JSON_NULLVAL);
       sendMessage(message);
     }
@@ -429,7 +417,7 @@ class LSP {
       int column = stoi(receivedMessage.get("params").get("position").get("character").value) + 1;
       Location locationToDefine(filePath.c_str(), Coordinates(row, column), Coordinates(row, column));
 
-      for (std::pair<Location, Location> use: uses) {
+      for (const std::pair<Location, Location>& use: uses) {
         if (use.first.contains(locationToDefine)) {
           reportDefinitionLocation(receivedMessage, use.second);
           return;
@@ -466,8 +454,8 @@ class LSP {
     }
 
     void serverExit(JAST _) {
-      exit(isShutDown ?0:1);
-    }    
+      exit(isShutDown ? 0 : 1);
+    }
 };
 
 
