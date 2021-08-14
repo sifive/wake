@@ -380,18 +380,6 @@ private:
       }
     }
 
-    void didOpen(JAST receivedMessage) {
-      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      diagnoseProject();
-    }
-
-    void didChange(JAST receivedMessage) {
-      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
-      changedFiles[fileUri] = fileContent;
-      diagnoseProject();
-    }
-
     void reportDefinitionLocation(JAST receivedMessage, const Location &definitionLocation) {
       JAST message = createResponseMessage(std::move(receivedMessage));
       JAST &result = message.add("result", JSON_OBJECT);
@@ -426,6 +414,18 @@ private:
       reportNoDefinition(receivedMessage);
     }
 
+    void didOpen(JAST receivedMessage) {
+      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+      diagnoseProject();
+    }
+
+    void didChange(JAST receivedMessage) {
+      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+      std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
+      changedFiles[fileUri] = fileContent;
+      diagnoseProject();
+    }
+
     void didSave(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       changedFiles.erase(fileUri);
@@ -442,8 +442,8 @@ private:
       for (auto child: files.children) {
         std::string fileUri = child.second.get("uri").value;
         changedFiles.erase(fileUri);
-        diagnoseProject();
       }
+      diagnoseProject();
     }
 
     void shutdown(JAST receivedMessage) {
