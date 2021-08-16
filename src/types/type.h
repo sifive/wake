@@ -18,10 +18,10 @@
 #ifndef TYPE_H
 #define TYPE_H
 
-#include "dsu.h"
 #include <ostream>
+
+#include "dsu.h"
 #include "location.h"
-//struct Location;
 
 #define FN "binary =>@builtin"
 
