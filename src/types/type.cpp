@@ -202,7 +202,6 @@ bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {
     message->formatB(os);
     os << ":" << std::endl << "    ";
     globalEpoch += do_format(os, 0, other, "", this, 0, 0);
-    os << std::endl;
     reporter->reportError(message->getMainLocation(), os.str());
   }
   return ok;

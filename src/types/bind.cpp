@@ -123,7 +123,7 @@ struct ResolveBinding {
           message << "(warning) Ambiguous import of definition '" << name
             << "' from <" << override->location.file()
             << "> and <" << it->second.location.file()
-            << ">" << std::endl;
+            << ">";
           reporter->reportWarning(override->location, message.str());
           reporter->reportWarning(it->second.location, message.str());
         }
@@ -144,7 +144,7 @@ struct ResolveBinding {
           message <<  "(warning) Ambiguous import of topic '" << name
             << "' from <" << override->location.file()
             << "> and <" << it->second.location.file()
-            << ">" << std::endl;
+            << ">";
           reporter->reportWarning(override->location, message.str());
           reporter->reportWarning(it->second.location, message.str());
         }
@@ -166,7 +166,7 @@ struct ResolveBinding {
           message  << "(warning) Ambiguous import of type '" << name
             << "' from <" << override->location.file()
             << "> and <" << it->second.location.file()
-            << ">" << std::endl;
+            << ">";
           reporter->reportWarning(override->location, message.str());
           reporter->reportWarning(it->second.location, message.str());
         }
@@ -227,15 +227,15 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
       // j is now inside the cycle
       std::ostringstream message;
       message << "Value definition cycle detected including:" << std::endl;
-      std::vector<Location*> errorLocations;
+      std::vector<Location> errorLocations;
       int i = j;
       do {
-        message << "  " << defs[i].name << " at " << defs[i].expr->location.file() << std::endl;
-        errorLocations.push_back(&(defs[i].expr->location));
+        message << std::endl << "  " << defs[i].name << " at " << defs[i].expr->location.file();
+        errorLocations.push_back(defs[i].expr->location);
         i = p[i];
       } while (i != j);
-      for (Location *location: errorLocations) {
-        reporter->reportError(*location, message.str());
+      for (Location location: errorLocations) {
+        reporter->reportError(location, message.str());
       }
       return nullptr;
     }
@@ -314,7 +314,7 @@ static VarRef *rebind_subscribe(ResolveBinding *binding, const Location &locatio
     std::ostringstream message;
     message << "Subscribe of '" << name
       << "' is to a non-existent topic at "
-      << location.file() << std::endl;
+      << location.file();
     reporter->reportError(location, message.str());
     return nullptr;
   }
@@ -331,7 +331,7 @@ static std::string rebind_publish(ResolveBinding *binding, const Location &locat
     std::ostringstream message;
     message << "Publish to '" << name
       << "' is to a non-existent topic at "
-      << location.file() << std::endl;
+      << location.file();
     reporter->reportError(location, message.str());
   }
   return name;
@@ -469,7 +469,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
     } else {
       std::ostringstream message;
       message << "Non-exhaustive match at " << location.file()
-        << "; missing: " << prototype.tree << std::endl;
+        << "; missing: " << prototype.tree;
       reporter->reportError(location, message.str());
       return nullptr;
     }
@@ -515,7 +515,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
           message << "Constructor " << t->sum->members[t->cons].ast.name
             << " is not a member of " << sum->name
             << " but is used in pattern at " << p->location.file()
-            << "." << std::endl;
+            << ".";
           reporter->reportError(p->location, message.str());
           return nullptr;
         } else if (t->sum && t->cons == (int)c) {
@@ -632,7 +632,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       std::ostringstream message;
       message << "Constructor " << ast.name
         << " in pattern match not found at " << ast.token.file()
-        << "." << std::endl;
+        << ".";
       reporter->reportError(ast.token, message.str());
       out.var = 0;
     } else if (out.sum->members[out.cons].ast.args.size() != ast.args.size()) {
@@ -645,7 +645,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       message << " in pattern match has " << ast.args.size()
         << " parameters, but must have " << out.sum->members[out.cons].ast.args.size()
         << " at " << ast.region.text()
-        << "." << std::endl;
+        << ".";
       reporter->reportError(ast.region, message.str());
       out.sum = 0;
       out.var = 0;
@@ -732,14 +732,14 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
   for (auto &p : patterns) {
     if (!p.uses) {
       std::ostringstream message;
-      message << "Pattern unreachable in match at " << p.location.text() << std::endl;
+      message << "Pattern unreachable in match at " << p.location.text();
       reporter->reportError(p.location, message.str());
       return nullptr;
     }
   }
   if (match->refutable && patterns.front().uses <= 1) {
     std::ostringstream message;
-    message << "The required pattern at " << match->location.file() << " can never fail; use def instead." << std::endl;
+    message << "The required pattern at " << match->location.file() << " can never fail; use def instead.";
     reporter->reportError(match->location, message.str());
     return nullptr;
   }
@@ -767,7 +767,7 @@ struct SymMover {
       std::ostringstream message;
       message << "(warning) Import of " << kind << " '" << def
         << "' is from non-existent package '" << pkg
-        << "' at " << sym.second.location.text() << std::endl;
+        << "' at " << sym.second.location.text();
       reporter->reportWarning(sym.second.location, message.str());
     } else {
       warn = true;
@@ -781,7 +781,7 @@ struct SymMover {
       std::ostringstream message;
       message << "(warning) Import of " << kind << " '" << def
         << "' from package '" << package->name
-        << "' is not exported at " << sym.second.location.text() << std::endl;
+        << "' is not exported at " << sym.second.location.text();
       reporter->reportWarning(sym.second.location, message.str());
     }
   }
@@ -850,7 +850,7 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location
       ++warnings;
       std::ostringstream message;
       message << "(warning) Full import from non-existent package '" << p
-        << "' at " << location.text() << std::endl;
+        << "' at " << location.text();
       reporter->reportWarning(location, message.str());
     } else {
       out.push_back(&it->second->exports);
@@ -872,7 +872,7 @@ static bool qualify_type(ResolveBinding *binding, std::string &name, const Locat
     std::ostringstream message;
     message << "Type signature '" << name
       << "' refers to a non-existent type "
-      << location.file() << std::endl;
+      << location.file();
     reporter->reportError(location, message.str());
     return false;
   }
@@ -926,7 +926,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       message
         << "(warning) Unused function argument '" << lambda->name
         << "' at <" << lambda->token.file()
-        << ">; consider renaming to _" << lambda->name << std::endl;
+        << ">; consider renaming to _" << lambda->name;
       reporter->reportWarning(lambda->token, message.str());
     }
     return expr;
@@ -962,7 +962,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
         message
           << "(warning) Unused local definition of '" << i.name
           << "' at <" << i.location.file()
-          << ">; consider removing or renaming to _" << i.name << std::endl;
+          << ">; consider removing or renaming to _" << i.name;
         reporter->reportWarning(i.location, message.str());
       }
     }
@@ -1150,7 +1150,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
         message
           << "(warning) Unused top-level definition of '" << name
           << "' at <" << def.location.file()
-          << ">; consider removing or renaming to _" <<  name << std::endl;
+          << ">; consider removing or renaming to _" <<  name;
         reporter->reportWarning(def.location, message.str());
       }
     }
@@ -1336,7 +1336,6 @@ TypeScope::~TypeScope() {
         << " is not free; it has type:" << std::endl
         << "    ";
       var.var.format(message, var.var);
-      message << std::endl;
       reporter->reportError(var.location, message.str());
       continue;
     }
@@ -1347,7 +1346,7 @@ TypeScope::~TypeScope() {
       message
         << "Introduced type variables " << prior.location.text()
         << " and " << var.location.text()
-        << " are actually the same." << std::endl;
+        << " are actually the same.";
       reporter->reportError(prior.location, message.str());
       reporter->reportError(var.location, message.str());
     }
@@ -1363,7 +1362,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     if ((pos = binding->find(ref->name)).index == -1) {
       std::ostringstream message;
       message << "Variable reference '" << ref->name << "' is unbound at "
-        << ref->location.file() << std::endl;
+        << ref->location.file();
       reporter->reportError(ref->location, message.str());
       return false;
     }
@@ -1490,7 +1489,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
       std::ostringstream message;
       message << "Primitive reference "
         << prim->name << " is unbound at "
-        << prim->location.file() << std::endl;
+        << prim->location.file();
       reporter->reportError(prim->location, message.str());
       return false;
     } else {
@@ -1502,7 +1501,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
         std::ostringstream message;
         message << "Primitive reference "
           << prim->name << " has wrong type signature at "
-          << prim->location.file() << std::endl;
+          << prim->location.file();
         reporter->reportError(prim->location, message.str());
       }
       return ok;
@@ -1556,7 +1555,7 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
       message << "Re-export of '" << def
         << "', imported from '" << pkg
         << "', has cyclic definition at "
-        << sym.location.text() << std::endl;
+        << sym.location.text();
       reporter->reportError(sym.location, message.str());
     }
     return false;
@@ -1568,7 +1567,7 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
       std::ostringstream message;
       message << "Re-export of '" << def
         << "' is from non-existent package '" << pkg
-        << "' at " << sym.location.text() << std::endl;
+        << "' at " << sym.location.text();
       reporter->reportError(sym.location, message.str());
     }
     return false;
@@ -1580,7 +1579,7 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
         std::ostringstream message;
         message << "Re-export of '" << def
           << "' is not exported from '" << pkg
-          << "' at " << sym.location.text() << std::endl;
+          << "' at " << sym.location.text();
         reporter->reportError(sym.location, message.str());
       }
       return false;
