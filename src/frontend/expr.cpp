@@ -21,9 +21,9 @@
 
 #include <cassert>
 #include <sstream>
-#include <iostream>
 
 #include "frontend/expr.h"
+#include "frontend/diagnostic.h"
 
 Expr::~Expr() { }
 const TypeDescriptor Prim      ::type("Prim");
@@ -137,12 +137,15 @@ static bool smap_join(Symbols::SymbolMap &dest, const Symbols::SymbolMap &src, c
     if (!it.second) {
       ok = false;
       if (scope) {
-        std::cerr << "Duplicate "
+        std::stringstream message;
+        message << "Duplicate "
           << scope << " "
           << kind << " '"
           << sym.first << "' at "
           << it.first->second.location.text() << " and "
-          << sym.second.location.text() << std::endl;
+          << sym.second.location.text();
+        reporter->reportError(it.first->second.location, message.str());
+        reporter->reportError(sym.second.location, message.str());
       }
     }
   }

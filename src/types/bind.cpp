@@ -38,8 +38,6 @@
 
 typedef std::map<std::string, int> NameIndex;
 
-extern DiagnosticReporter *reporter;
-
 int warnings = 0;
 
 struct ResolveDef {

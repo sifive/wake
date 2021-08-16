@@ -33,8 +33,6 @@
 //#define TRACE(x) do { fprintf(stderr, "%s\n", x); } while (0)
 #define TRACE(x) do { } while (0)
 
-extern DiagnosticReporter *reporter;
-
 bool expect(SymbolType type, Lexer &lex) {
   if (lex.next.type != type) {
     std::ostringstream message;

@@ -19,9 +19,10 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <iostream>
+#include <sstream>
 
 #include "types/datatype.h"
+#include "frontend/diagnostic.h"
 #include "frontend/expr.h"
 #include "frontend/symbol.h"
 
@@ -42,7 +43,9 @@ bool AST::unify(TypeVar &out, const TypeMap &ids) {
   if (Lexer::isLower(name.c_str())) {
     auto it = ids.find(name);
     if (it == ids.end()) {
-      std::cerr << "Unbound type variable at " << token.text() << std::endl;
+      std::stringstream message;
+      message << "Unbound type variable at " << token.text();
+      reporter->reportError(token, message.str());
       return false;
     } else {
       return out.unify(*it->second, &region);

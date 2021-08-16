@@ -45,4 +45,6 @@ class DiagnosticReporter {
     virtual void report(Diagnostic diagnostic) = 0;    
 };
 
+extern DiagnosticReporter *reporter;
+
 #endif

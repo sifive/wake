@@ -191,8 +191,6 @@ bool TypeVar::tryUnify(TypeVar &other) {
   return ok;
 }
 
-extern DiagnosticReporter *reporter;
-
 bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {
   bool ok = tryUnify(other);
   if (!ok) {
