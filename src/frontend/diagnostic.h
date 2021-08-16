@@ -2,7 +2,6 @@
 #define DIAGNOSTIC_H
 
 #include <location.h>
-#include <iostream>
 
 enum Severity { S_ERROR = 1, S_WARNING, S_INFORMATION, S_HINT };
 
