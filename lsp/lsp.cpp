@@ -143,10 +143,11 @@ private:
     bool isInitialized = false;
     bool isShutDown = false;
     Runtime runtime;
+    std::vector<std::string> allFiles;
     std::map<std::string, std::string> changedFiles;
-    std::map<std::string, std::vector<Diagnostic>> diagnostics;
     std::vector<std::pair<Location, Location>> uses;
     std::vector<std::pair<std::string, Location>> definitions;
+
     std::map<std::string, LspMethod> methodToFunction = {
       {"initialize",                      &LSP::initialize},
       {"initialized",                     &LSP::initialized},
@@ -296,11 +297,7 @@ private:
     }
 
     void runSyntaxChecker(const std::string &filePath, Top &top) {
-      LSPReporter lspReporter(diagnostics);
-      reporter = &lspReporter;
-
-      std::string fileUri = rootUri + '/' + filePath;
-      auto fileChangesPointer = changedFiles.find(fileUri);
+      auto fileChangesPointer = changedFiles.find(rootUri + '/' + filePath);
       if (fileChangesPointer != changedFiles.end()) {
         Lexer lex(runtime.heap, (*fileChangesPointer).second, filePath.c_str());
         parse_top(top, lex);
@@ -313,33 +310,29 @@ private:
     void diagnoseProject() {
       uses.clear();
       definitions.clear();
-      std::unique_ptr<Top> top(new Top);
-      bool enumok = true;
-      auto wakefiles = find_all_wakefiles(enumok, true, false);
 
-      std::vector<std::string> filenames; // needed to keep file names alive for bind_refs()
-      filenames.reserve(wakefiles.size());
-      for (const std::string &filePath : wakefiles) {
-        filenames.push_back(filePath);
-        runSyntaxChecker(filenames.back(), *top);
-      }
+      bool enumok = true;
+      allFiles = find_all_wakefiles(enumok, true, false);
+
+      std::map<std::string, std::vector<Diagnostic>> diagnostics;
       LSPReporter lspReporter(diagnostics);
       reporter = &lspReporter;
 
+      std::unique_ptr<Top> top(new Top);
       top->def_package = "nothing";
       top->body = std::unique_ptr<Expr>(new VarRef(LOCATION, "Nil@wake"));
+
+      for (auto &file: allFiles)
+        runSyntaxChecker(file, *top);
+
       PrimMap pmap = prim_register_all(nullptr, nullptr);
       std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
 
-      for (const std::string &filePath : wakefiles) {
-        auto fileDiagnostics = diagnostics[filePath];
-        reportFileDiagnostics(filePath, fileDiagnostics);
-      }
-      diagnostics.clear();
+      for (auto &file: allFiles)
+        reportFileDiagnostics(file, diagnostics[file]);
 
-      if (root != nullptr) {
+      if (root != nullptr)
         explore(root.get());
-      }
     }
 
     void explore(Expr *expr) {
@@ -397,13 +390,21 @@ private:
       sendMessage(message);
     }
 
+    const char *findURI(const std::string &fileURI) {
+      const char *filePtr = nullptr;
+      for (auto &file: allFiles) {
+        if (fileURI.compare(rootUri.length() + 1, std::string::npos, file) == 0)
+          filePtr = file.c_str();
+      }
+      return filePtr;
+    }
+
     void goToDefinition(JAST receivedMessage) {
-      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
+      std::string fileURI = receivedMessage.get("params").get("textDocument").get("uri").value;
 
       int row = stoi(receivedMessage.get("params").get("position").get("line").value) + 1;
       int column = stoi(receivedMessage.get("params").get("position").get("character").value) + 1;
-      Location locationToDefine(filePath.c_str(), Coordinates(row, column), Coordinates(row, column));
+      Location locationToDefine(findURI(fileURI), Coordinates(row, column), Coordinates(row, column));
 
       for (const std::pair<Location, Location>& use: uses) {
         if (use.first.contains(locationToDefine)) {

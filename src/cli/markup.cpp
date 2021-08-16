@@ -32,7 +32,7 @@
 
 struct ParanOrder {
   bool operator () (Expr *a, Expr *b) const {
-    int cmp = strcmp(a->location.filename.c_str(), b->location.filename.c_str());
+    int cmp = strcmp(a->location.filename, b->location.filename);
     if (cmp < 0) return true;
     if (cmp > 0) return false;
     if (a->location.start < b->location.start) return true;
@@ -160,7 +160,7 @@ void JSONRender::render(Expr *root) {
   os << "{\"type\":\"Workspace\",\"body\":[";
   bool comma = false;
   while (it != eset.end()) {
-    const char *filename = (*it)->location.filename.c_str();
+    const char *filename = (*it)->location.filename;
     std::ifstream ifs(filename);
     std::string content(
       (std::istreambuf_iterator<char>(ifs)),
