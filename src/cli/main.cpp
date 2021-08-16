@@ -99,8 +99,13 @@ void print_help(const char *argv0) {
 DiagnosticReporter *reporter;
 class TerminalReporter : public DiagnosticReporter {
   private:
+    std::string last;
+
     void report(Diagnostic diagnostic) {
-      std::cerr << diagnostic.getMessage() << std::endl;
+      if (last != diagnostic.getMessage()) {
+         last = diagnostic.getMessage();
+         std::cerr << diagnostic.getMessage() << std::endl;
+      }
     }
 };
 
