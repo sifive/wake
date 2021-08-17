@@ -521,5 +521,8 @@ int main(int argc, const char **argv) {
     LSP lsp(stdLib);
     // Process requests until something goes wrong
     lsp.processRequests();
+  } else {
+    std::cerr << "Path to the wake standard library is invalid. Server will not be initialized." << std::endl;
+    return 1;
   }
 }
