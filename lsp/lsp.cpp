@@ -162,7 +162,8 @@ private:
       {"shutdown",                        &LSP::shutdown},
       {"exit",                            &LSP::serverExit},
       {"textDocument/definition",         &LSP::goToDefinition},
-      {"textDocument/references",         &LSP::findReferences}
+      {"textDocument/references",         &LSP::findReferences},
+      {"textDocument/documentHighlight",  &LSP::highlightOccurrences}
     };
 
     void callMethod(const std::string &method, const JAST &request) {
@@ -225,6 +226,7 @@ private:
       capabilities.add("textDocumentSync", 1);
       capabilities.add("definitionProvider", true);
       capabilities.add("referencesProvider", true);
+      capabilities.add("documentHighlightProvider", true);
 
       JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
       serverInfo.add("name", "lsp wake server");
@@ -463,6 +465,50 @@ private:
         references.push_back(definitionLocation);
       }
       reportReferences(receivedMessage, references);
+    }
+
+    static JAST createDocumentHighlightJSON(Location location) {
+      JAST documentHighlightJSON(JSON_OBJECT);
+      documentHighlightJSON.children.emplace_back("range", createRangeFromLocation(location));
+      return documentHighlightJSON;
+    }
+
+    static void reportHighlights(JAST receivedMessage, const std::vector<Location> &occurrences) {
+      JAST message = createResponseMessage(std::move(receivedMessage));
+      if (occurrences.empty()) {
+        JAST result = message.add("result", JSON_NULLVAL);
+        sendMessage(message);
+        return;
+      }
+
+      JAST &result = message.add("result", JSON_ARRAY);
+      for (const Location &location: occurrences) {
+        result.children.emplace_back("", createDocumentHighlightJSON(location));
+      }
+      sendMessage(message);
+    }
+
+    void highlightOccurrences(JAST receivedMessage) {
+      Location symbolLocation = getLocationFromJSON(receivedMessage);
+      Location definitionLocation = symbolLocation;
+
+      for (const std::pair<Location, Location> &use: uses) {
+        if (use.first.contains(symbolLocation)) {
+          definitionLocation = use.second;
+          break;
+        }
+      }
+      std::vector<Location> occurrences;
+      for (const std::pair<Location, Location> &use: uses) {
+        if (use.first.filename == symbolLocation.filename && use.second.contains(definitionLocation)) {
+          definitionLocation = use.second;
+          occurrences.push_back(use.first);
+        }
+      }
+      if (definitionLocation.filename == symbolLocation.filename) {
+        occurrences.push_back(definitionLocation);
+      }
+      reportHighlights(receivedMessage, occurrences);
     }
 
     void didOpen(JAST receivedMessage) {
