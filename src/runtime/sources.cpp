@@ -556,13 +556,12 @@ static void filter_wakefiles(std::vector<std::string> &wakefiles, bool verbose) 
   }
 }
 
-std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose) {
+std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose, const std::string &abs_libdir) {
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
   RE2 exp("(?s).*[^/]\\.wake", options);
 
-  std::string abs_libdir = find_execpath() + "/../share/wake/lib";
   std::string rel_libdir = make_relative(get_cwd(), make_canonical(abs_libdir));
 
   std::vector<std::string> acc;

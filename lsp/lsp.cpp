@@ -32,6 +32,7 @@
 #include <ctime>
 #include <functional>
 #include <utility>
+#include <unistd.h>
 
 #include "json5.h"
 #include "location.h"
@@ -42,6 +43,7 @@
 #include "runtime/sources.h"
 #include "frontend/diagnostic.h"
 #include "types/bind.h"
+#include "execpath.h"
 
 
 #ifndef VERSION
@@ -74,7 +76,7 @@ DiagnosticReporter *reporter;
 
 class LSP {
 public:
-    LSP() : runtime(nullptr, 0, 4.0, 0) {}
+    explicit LSP(std::string _stdLib) : stdLib(std::move(_stdLib)), runtime(nullptr, 0, 4.0, 0) {}
 
     void processRequests() {
       // Begin log
@@ -142,6 +144,7 @@ private:
     std::string rootUri = "";
     bool isInitialized = false;
     bool isShutDown = false;
+    std::string stdLib;
     Runtime runtime;
     std::vector<std::string> allFiles;
     std::map<std::string, std::string> changedFiles;
@@ -312,7 +315,7 @@ private:
       definitions.clear();
 
       bool enumok = true;
-      allFiles = find_all_wakefiles(enumok, true, false);
+      allFiles = find_all_wakefiles(enumok, true, false, stdLib);
 
       std::map<std::string, std::vector<Diagnostic>> diagnostics;
       LSPReporter lspReporter(diagnostics);
@@ -460,8 +463,16 @@ private:
 };
 
 
-int main() {
-  LSP lsp;
-  // Process requests until something goes wrong 
-  lsp.processRequests();
+int main(int argc, const char **argv) {
+  std::string stdLib;
+  if (argc == 2) {
+    stdLib = argv[1];
+  } else {
+    stdLib = find_execpath() + "/../../share/wake/lib";
+  }
+  if (access((stdLib + "/core/boolean.wake").c_str(), F_OK) != -1) {
+    LSP lsp(stdLib);
+    // Process requests until something goes wrong
+    lsp.processRequests();
+  }
 }
