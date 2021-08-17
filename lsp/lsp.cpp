@@ -161,7 +161,8 @@ private:
       {"workspace/didChangeWatchedFiles", &LSP::didChangeWatchedFiles},
       {"shutdown",                        &LSP::shutdown},
       {"exit",                            &LSP::serverExit},
-      {"textDocument/definition",         &LSP::goToDefinition}
+      {"textDocument/definition",         &LSP::goToDefinition},
+      {"textDocument/references",         &LSP::findReferences}
     };
 
     void callMethod(const std::string &method, const JAST &request) {
@@ -223,6 +224,7 @@ private:
       JAST &capabilities = result.add("capabilities", JSON_OBJECT);
       capabilities.add("textDocumentSync", 1);
       capabilities.add("definitionProvider", true);
+      capabilities.add("referencesProvider", true);
 
       JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
       serverInfo.add("name", "lsp wake server");
@@ -376,14 +378,17 @@ private:
       }
     }
 
+    JAST createLocationJSON(Location location) {
+      JAST locationJSON(JSON_OBJECT);
+      std::string fileUri = rootUri + '/' + location.filename;
+      locationJSON.add("uri", fileUri.c_str());
+      locationJSON.children.emplace_back("range", createRangeFromLocation(location));
+      return locationJSON;
+    }
+
     void reportDefinitionLocation(JAST receivedMessage, const Location &definitionLocation) {
       JAST message = createResponseMessage(std::move(receivedMessage));
-      JAST &result = message.add("result", JSON_OBJECT);
-
-      std::string fileUri = rootUri + '/' + definitionLocation.filename;
-      result.add("uri", fileUri.c_str());
-      result.children.emplace_back("range", createRangeFromLocation(definitionLocation));
-
+      message.children.emplace_back("result", createLocationJSON(definitionLocation));
       sendMessage(message);
     }
 
@@ -402,20 +407,62 @@ private:
       return filePtr;
     }
 
-    void goToDefinition(JAST receivedMessage) {
+    Location getLocationFromJSON(JAST receivedMessage) {
       std::string fileURI = receivedMessage.get("params").get("textDocument").get("uri").value;
+      std::string filePath = fileURI.substr(rootUri.length() + 1, std::string::npos);
 
-      int row = stoi(receivedMessage.get("params").get("position").get("line").value) + 1;
-      int column = stoi(receivedMessage.get("params").get("position").get("character").value) + 1;
-      Location locationToDefine(findURI(fileURI), Coordinates(row, column), Coordinates(row, column));
+      int row = stoi(receivedMessage.get("params").get("position").get("line").value);
+      int column = stoi(receivedMessage.get("params").get("position").get("character").value);
+      return{findURI(fileURI), Coordinates(row + 1, column + 1), Coordinates(row + 1, column)};
+    }
 
-      for (const std::pair<Location, Location>& use: uses) {
+    void goToDefinition(JAST receivedMessage) {
+      Location locationToDefine = getLocationFromJSON(receivedMessage);
+      for (const std::pair<Location, Location> &use: uses) {
         if (use.first.contains(locationToDefine)) {
           reportDefinitionLocation(receivedMessage, use.second);
           return;
         }
       }
       reportNoDefinition(receivedMessage);
+    }
+
+    void reportReferences(JAST receivedMessage, const std::vector<Location> &references) {
+      JAST message = createResponseMessage(std::move(receivedMessage));
+      if (references.empty()) {
+        JAST result = message.add("result", JSON_NULLVAL);
+        sendMessage(message);
+        return;
+      }
+
+      JAST &result = message.add("result", JSON_ARRAY);
+      for (const Location &location: references) {
+        result.children.emplace_back("", createLocationJSON(location));
+      }
+      sendMessage(message);
+    }
+
+    void findReferences(JAST receivedMessage) {
+      Location symbolLocation = getLocationFromJSON(receivedMessage);
+      Location definitionLocation = symbolLocation;
+
+      for (const std::pair<Location, Location> &use: uses) {
+        if (use.first.contains(symbolLocation)) {
+          definitionLocation = use.second;
+          break;
+        }
+      }
+      std::vector<Location> references;
+      for (const std::pair<Location, Location> &use: uses) {
+        if (use.second.contains(definitionLocation)) {
+          definitionLocation = use.second;
+          references.push_back(use.first);
+        }
+      }
+      if (receivedMessage.get("params").get("context").get("includeDeclaration").value == "true") {
+        references.push_back(definitionLocation);
+      }
+      reportReferences(receivedMessage, references);
     }
 
     void didOpen(JAST receivedMessage) {
