@@ -20,13 +20,8 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <fcntl.h>
-#include <unistd.h>
 #include <sys/select.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <string.h>
+#include <cstring>
 
 #include <iostream>
 #include <string>
@@ -34,11 +29,12 @@
 #include <sstream>
 #include <fstream>
 #include <chrono>
-#include <ctime>  
+#include <ctime>
 #include <functional>
+#include <utility>
+#include <unistd.h>
 
 #include "json5.h"
-#include "execpath.h"
 #include "location.h"
 #include "frontend/parser.h"
 #include "frontend/symbol.h"
@@ -46,6 +42,8 @@
 #include "frontend/expr.h"
 #include "runtime/sources.h"
 #include "frontend/diagnostic.h"
+#include "types/bind.h"
+#include "execpath.h"
 
 
 #ifndef VERSION
@@ -77,28 +75,8 @@ static const char *ServerNotInitialized = "-32002";
 DiagnosticReporter *reporter;
 
 class LSP {
-  public:
-    typedef void (LSP::*LspMethod)(JAST);
-
-    std::string rootUri = "";
-    bool isInitialized = false;
-    bool isShutDown = false;
-    Runtime runtime;
-    std::map<std::string, std::string> changedFiles;
-    std::vector<Diagnostic> diagnostics;
-    std::map<std::string, LspMethod> methodToFunction = {
-      {"initialize", &LSP::initialize},
-      {"initialized", &LSP::initialized},
-      {"textDocument/didOpen", &LSP::didOpen},
-      {"textDocument/didChange", &LSP::didChange},
-      {"textDocument/didSave", &LSP::didSave},
-      {"textDocument/didClose", &LSP::didClose},
-      {"workspace/didChangeWatchedFiles", &LSP::didChangeWatchedFiles},
-      {"shutdown", &LSP::shutdown},
-      {"exit", &LSP::serverExit}
-    };   
-
-    LSP() : runtime(nullptr, 0, 4.0, 0) {}
+public:
+    explicit LSP(std::string _stdLib) : stdLib(std::move(_stdLib)), runtime(nullptr, 0, 4.0, 0) {}
 
     void processRequests() {
       // Begin log
@@ -106,7 +84,7 @@ class LSP {
       clientLog.open("requests_log.txt", std::ios_base::app); // append instead of overwriting
       std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
       clientLog << std::endl
-              << "Log start: " << ctime(&currentTime);
+        << "Log start: " << ctime(&currentTime);
 
       while (true) {
         size_t json_size = 0;
@@ -160,14 +138,40 @@ class LSP {
       }
     }
 
-    void callMethod(std::string method, JAST request) {
+private:
+    typedef void (LSP::*LspMethod)(JAST);
+
+    std::string rootUri = "";
+    bool isInitialized = false;
+    bool isShutDown = false;
+    std::string stdLib;
+    Runtime runtime;
+    std::vector<std::string> allFiles;
+    std::map<std::string, std::string> changedFiles;
+    std::vector<std::pair<Location, Location>> uses;
+    std::vector<std::pair<std::string, Location>> definitions;
+
+    std::map<std::string, LspMethod> methodToFunction = {
+      {"initialize",                      &LSP::initialize},
+      {"initialized",                     &LSP::initialized},
+      {"textDocument/didOpen",            &LSP::didOpen},
+      {"textDocument/didChange",          &LSP::didChange},
+      {"textDocument/didSave",            &LSP::didSave},
+      {"textDocument/didClose",           &LSP::didClose},
+      {"workspace/didChangeWatchedFiles", &LSP::didChangeWatchedFiles},
+      {"shutdown",                        &LSP::shutdown},
+      {"exit",                            &LSP::serverExit},
+      {"textDocument/definition",         &LSP::goToDefinition}
+    };
+
+    void callMethod(const std::string &method, const JAST &request) {
       auto functionPointer = methodToFunction.find(method);
       if (functionPointer != methodToFunction.end()) {
-          (this->*(functionPointer->second))(request);
+        (this->*(functionPointer->second))(request);
       } else {
         sendErrorMessage(request, MethodNotFound, "Method '" + method + "' is not implemented.");
       }
-    } 
+    }
 
     static void sendMessage(const JAST &message) {
       std::stringstream str;
@@ -196,7 +200,7 @@ class LSP {
       return message;
     }
 
-    static void sendErrorMessage(const char *code, std::string message) {
+    static void sendErrorMessage(const char *code, const std::string &message) {
       JAST errorMessage = createResponseMessage();
       JAST &error = errorMessage.add("error", JSON_OBJECT);
       error.add("code", JSON_INTEGER, code);
@@ -204,7 +208,7 @@ class LSP {
       sendMessage(errorMessage);
     }
 
-    static void sendErrorMessage(JAST receivedMessage, const char *code, std::string message) {
+    static void sendErrorMessage(const JAST &receivedMessage, const char *code, const std::string &message) {
       JAST errorMessage = createResponseMessage(receivedMessage);
       JAST &error = errorMessage.add("error", JSON_OBJECT);
       error.add("code", JSON_INTEGER, code);
@@ -212,12 +216,13 @@ class LSP {
       sendMessage(errorMessage);
     }
 
-    static JAST createInitializeResult(JAST receivedMessage) {
+    static JAST createInitializeResult(const JAST &receivedMessage) {
       JAST message = createResponseMessage(receivedMessage);
       JAST &result = message.add("result", JSON_OBJECT);
 
       JAST &capabilities = result.add("capabilities", JSON_OBJECT);
       capabilities.add("textDocumentSync", 1);
+      capabilities.add("definitionProvider", true);
 
       JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
       serverInfo.add("name", "lsp wake server");
@@ -230,97 +235,205 @@ class LSP {
       isInitialized = true;
       rootUri = receivedMessage.get("params").get("rootUri").value;
       sendMessage(message);
+
+      diagnoseProject();
     }
 
     void initialized(JAST _) { }
 
-    JAST createDiagnosticRange(Diagnostic diagnostic) {
+    static JAST createRangeFromLocation(const Location &location) {
       JAST range(JSON_OBJECT);
 
       JAST &start = range.add("start", JSON_OBJECT);
-      start.add("line", std::max(0, diagnostic.getLocation().start.row - 1));
-      start.add("character", std::max(0, diagnostic.getLocation().start.column - 1));
+      start.add("line", std::max(0, location.start.row - 1));
+      start.add("character", std::max(0, location.start.column - 1));
 
       JAST &end = range.add("end", JSON_OBJECT);
-      end.add("line", std::max(0, diagnostic.getLocation().end.row));
-      end.add("character", std::max(0, diagnostic.getLocation().end.column)); // It can be -1
+      end.add("line", std::max(0, location.end.row - 1));
+      end.add("character", std::max(0, location.end.column)); // It can be -1
 
       return range;
     }
 
-    JAST createDiagnostic(Diagnostic diagnostic) {
+    static JAST createDiagnostic(const Diagnostic &diagnostic) {
       JAST diagnosticJSON(JSON_OBJECT);
-      
-      diagnosticJSON.children.emplace_back("range", createDiagnosticRange(diagnostic));
+
+      diagnosticJSON.children.emplace_back("range", createRangeFromLocation(diagnostic.getLocation()));
       diagnosticJSON.add("severity", diagnostic.getSeverity());
       diagnosticJSON.add("source", "wake");
-      JAST range = createDiagnosticRange(diagnostic);
 
       diagnosticJSON.add("message", diagnostic.getMessage());
 
       return diagnosticJSON;
     }
 
-    JAST createDiagnosticMessage() {
+    static JAST createDiagnosticMessage() {
       JAST message = createMessage();
       message.add("method", "textDocument/publishDiagnostics");
       return message;
     }
 
     class LSPReporter : public DiagnosticReporter {
-      private:
-        std::vector<Diagnostic> &diagnostics;
-      public:
-        LSPReporter(std::vector<Diagnostic> &_diagnostics) : diagnostics(_diagnostics) {}
-        void report(Diagnostic diagnostic) {
-          diagnostics.push_back(diagnostic);
+    private:
+        std::map<std::string, std::vector<Diagnostic>> &diagnostics;
+
+        void report(Diagnostic diagnostic) override {
+          diagnostics[diagnostic.getFilename()].push_back(diagnostic);
         }
+
+    public:
+        explicit LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics) : diagnostics(
+                _diagnostics) {}
     };
 
-    void diagnoseFile(std::string fileUri) {
-      LSPReporter lspReporter(diagnostics);
-      reporter = &lspReporter;
-
-      std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
-      std::unique_ptr<Top> top(new Top);
-
-      auto fileChangesPointer = changedFiles.find(fileUri);
-      if (fileChangesPointer != changedFiles.end()) {
-        Lexer lex(runtime.heap, (*fileChangesPointer).second, filePath.c_str());
-        parse_top(*top, lex);
-      } else {
-        Lexer lex(runtime.heap, filePath.c_str());
-        parse_top(*top, lex);
-      }
-
-      JAST diagnosticsArray(JSON_ARRAY);    
-      for (Diagnostic diagnostic: diagnostics) {
+    void reportFileDiagnostics(const std::string &filePath, const std::vector<Diagnostic> &fileDiagnostics) const {
+      JAST diagnosticsArray(JSON_ARRAY);
+      for (const Diagnostic &diagnostic: fileDiagnostics) {
         diagnosticsArray.children.emplace_back("", createDiagnostic(diagnostic)); // add .add for JSON_OBJECT to JSON_ARRAY
       }
       JAST message = createDiagnosticMessage();
       JAST &params = message.add("params", JSON_OBJECT);
+      std::string fileUri = rootUri + '/' + filePath;
       params.add("uri", fileUri.c_str());
       params.children.emplace_back("diagnostics", diagnosticsArray);
-      diagnostics.clear();
-      sendMessage(message);  
+      sendMessage(message);
+    }
+
+    void runSyntaxChecker(const std::string &filePath, Top &top) {
+      auto fileChangesPointer = changedFiles.find(rootUri + '/' + filePath);
+      if (fileChangesPointer != changedFiles.end()) {
+        Lexer lex(runtime.heap, (*fileChangesPointer).second, filePath.c_str());
+        parse_top(top, lex);
+      } else {
+        Lexer lex(runtime.heap, filePath.c_str());
+        parse_top(top, lex);
+      }
+    }
+
+    void diagnoseProject() {
+      uses.clear();
+      definitions.clear();
+
+      bool enumok = true;
+      allFiles = find_all_wakefiles(enumok, true, false, stdLib);
+
+      std::map<std::string, std::vector<Diagnostic>> diagnostics;
+      LSPReporter lspReporter(diagnostics);
+      reporter = &lspReporter;
+
+      std::unique_ptr<Top> top(new Top);
+      top->def_package = "nothing";
+      top->body = std::unique_ptr<Expr>(new VarRef(LOCATION, "Nil@wake"));
+
+      for (auto &file: allFiles)
+        runSyntaxChecker(file, *top);
+
+      PrimMap pmap = prim_register_all(nullptr, nullptr);
+      std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
+
+      for (auto &file: allFiles)
+        reportFileDiagnostics(file, diagnostics[file]);
+
+      if (root != nullptr)
+        explore(root.get());
+    }
+
+    void explore(Expr *expr) {
+      if (expr->type == &VarRef::type) {
+        VarRef *ref = static_cast<VarRef*>(expr);
+        if (ref->location.start.bytes >= 0 && ref->target.start.bytes >= 0) {
+          uses.emplace_back(ref->location /* use location */, ref->target /* definition location */);
+        }
+      } else if (expr->type == &App::type) {
+        App *app = static_cast<App*>(expr);
+        explore(app->val.get());
+        explore(app->fn.get());
+      } else if (expr->type == &Lambda::type) {
+        Lambda *lambda = static_cast<Lambda*>(expr);
+        if (lambda->token.start.bytes >= 0) {
+          definitions.emplace_back(lambda->name /* name */, lambda->token /* location */);
+        }
+        explore(lambda->body.get());
+      } else if (expr->type == &Ascribe::type) {
+        Ascribe *ascribe = static_cast<Ascribe*>(expr);
+        explore(ascribe->body.get());
+      } else if (expr->type == &DefBinding::type) {
+        DefBinding *defbinding = static_cast<DefBinding*>(expr);
+        for (auto &i : defbinding->val) explore(i.get());
+        for (auto &i : defbinding->fun) explore(i.get());
+        for (auto &i : defbinding->order) {
+          if (i.second.location.start.bytes >= 0) {
+            if (i.first.compare(0, 6, "topic ") == 0) {
+              // noop
+            } else if (i.first.compare(0, 8, "publish ") != 0) {
+              // noop
+            } else {
+              definitions.emplace_back(i.first /* name */, i.second.location /* location */);
+            }
+          }
+        }
+        explore(defbinding->body.get());
+      }
+    }
+
+    void reportDefinitionLocation(JAST receivedMessage, const Location &definitionLocation) {
+      JAST message = createResponseMessage(std::move(receivedMessage));
+      JAST &result = message.add("result", JSON_OBJECT);
+
+      std::string fileUri = rootUri + '/' + definitionLocation.filename;
+      result.add("uri", fileUri.c_str());
+      result.children.emplace_back("range", createRangeFromLocation(definitionLocation));
+
+      sendMessage(message);
+    }
+
+    static void reportNoDefinition(JAST receivedMessage) {
+      JAST message = createResponseMessage(std::move(receivedMessage));
+      JAST result = message.add("result", JSON_NULLVAL);
+      sendMessage(message);
+    }
+
+    const char *findURI(const std::string &fileURI) {
+      const char *filePtr = nullptr;
+      for (auto &file: allFiles) {
+        if (fileURI.compare(rootUri.length() + 1, std::string::npos, file) == 0)
+          filePtr = file.c_str();
+      }
+      return filePtr;
+    }
+
+    void goToDefinition(JAST receivedMessage) {
+      std::string fileURI = receivedMessage.get("params").get("textDocument").get("uri").value;
+
+      int row = stoi(receivedMessage.get("params").get("position").get("line").value) + 1;
+      int column = stoi(receivedMessage.get("params").get("position").get("character").value) + 1;
+      Location locationToDefine(findURI(fileURI), Coordinates(row, column), Coordinates(row, column));
+
+      for (const std::pair<Location, Location>& use: uses) {
+        if (use.first.contains(locationToDefine)) {
+          reportDefinitionLocation(receivedMessage, use.second);
+          return;
+        }
+      }
+      reportNoDefinition(receivedMessage);
     }
 
     void didOpen(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      diagnoseFile(fileUri);
+      diagnoseProject();
     }
 
     void didChange(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
       changedFiles[fileUri] = fileContent;
-      diagnoseFile(fileUri);
+      diagnoseProject();
     }
 
     void didSave(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       changedFiles.erase(fileUri);
-      diagnoseFile(fileUri);
+      diagnoseProject();
     }
 
     void didClose(JAST receivedMessage) {
@@ -333,25 +446,33 @@ class LSP {
       for (auto child: files.children) {
         std::string fileUri = child.second.get("uri").value;
         changedFiles.erase(fileUri);
-        diagnoseFile(fileUri);
-      }       
+      }
+      diagnoseProject();
     }
 
     void shutdown(JAST receivedMessage) {
-      JAST message = createResponseMessage(receivedMessage);
+      JAST message = createResponseMessage(std::move(receivedMessage));
       message.add("result", JSON_NULLVAL);
       isShutDown = true;
       sendMessage(message);
     }
 
     void serverExit(JAST _) {
-      exit(isShutDown ?0:1);
-    }    
+      exit(isShutDown ? 0 : 1);
+    }
 };
 
 
 int main(int argc, const char **argv) {
-  LSP lsp;
-  // Process requests until something goes wrong 
-  lsp.processRequests();
+  std::string stdLib;
+  if (argc == 2) {
+    stdLib = argv[1];
+  } else {
+    stdLib = find_execpath() + "/../../share/wake/lib";
+  }
+  if (access((stdLib + "/core/boolean.wake").c_str(), F_OK) != -1) {
+    LSP lsp(stdLib);
+    // Process requests until something goes wrong
+    lsp.processRequests();
+  }
 }

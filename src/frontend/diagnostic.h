@@ -2,7 +2,6 @@
 #define DIAGNOSTIC_H
 
 #include <location.h>
-#include <iostream>
 
 enum Severity { S_ERROR = 1, S_WARNING, S_INFORMATION, S_HINT };
 
@@ -14,6 +13,7 @@ class Diagnostic {
     Location getLocation() const { return location; }
     Severity getSeverity() const { return severity; }
     std::string getMessage() const { return message; }
+    std::string getFilename() const { return getLocation().filename; }
 
   private:
     const Location location;
@@ -23,10 +23,27 @@ class Diagnostic {
 
 class DiagnosticReporter {
   public:
-    virtual void report(Diagnostic diagnostic) = 0;
+    void reportError(Location location, std::string message) {
+      report(location, S_ERROR, message);
+    }
+    void reportWarning(Location location, std::string message) {
+      report(location, S_WARNING, message);
+    }
+    void reportInfo(Location location, std::string message) {
+      report(location, S_INFORMATION, message);
+    }
+    void reportHint(Location location, std::string message) {
+      report(location, S_HINT, message);
+    }
+
+  private: 
     void report(Location location, Severity severity, std::string message) {
       report(Diagnostic(location, severity, std::move(message)));
     }
+
+    virtual void report(Diagnostic diagnostic) = 0;    
 };
+
+extern DiagnosticReporter *reporter;
 
 #endif

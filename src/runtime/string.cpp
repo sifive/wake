@@ -29,7 +29,6 @@
 
 #include <sstream>
 #include <fstream>
-#include <iostream>
 
 #include "runtime/prim.h"
 #include "runtime/value.h"

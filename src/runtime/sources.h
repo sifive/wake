@@ -27,7 +27,7 @@ bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &sr
 bool make_workspace(const std::string &dir);
 std::string make_canonical(const std::string &x);
 
-std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose);
+std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose, const std::string &abs_libdir);
 bool find_all_sources(Runtime &runtime, bool workspace);
 
 #endif

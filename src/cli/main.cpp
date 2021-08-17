@@ -45,6 +45,7 @@
 #include "runtime/profile.h"
 #include "optimizer/ssa.h"
 #include "frontend/diagnostic.h"
+#include "execpath.h"
 
 #ifndef VERSION
 #include "version.h"
@@ -98,9 +99,14 @@ void print_help(const char *argv0) {
 
 DiagnosticReporter *reporter;
 class TerminalReporter : public DiagnosticReporter {
-  public:
+  private:
+    std::string last;
+
     void report(Diagnostic diagnostic) {
-      std::cerr << diagnostic.getMessage() << std::endl;
+      if (last != diagnostic.getMessage()) {
+         last = diagnostic.getMessage();
+         std::cerr << diagnostic.getMessage() << std::endl;
+      }
     }
 };
 
@@ -343,7 +349,8 @@ int main(int argc, char **argv) {
   if (noparse) return 0;
 
   bool enumok = true;
-  auto wakefiles = find_all_wakefiles(enumok, workspace, verbose);
+  std::string abs_libdir = find_execpath() + "/../share/wake/lib";
+  auto wakefiles = find_all_wakefiles(enumok, workspace, verbose, abs_libdir);
   if (!enumok) {
     if (verbose) std::cerr << "Workspace wake file enumeration failed" << std::endl;
     // Try to run the build anyway; if wake files are missing, it will fail later
