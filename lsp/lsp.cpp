@@ -341,17 +341,12 @@ private:
 
       if (root != nullptr)
         explore(root.get());
-
-      std::ofstream types;
-      types.open("requests_log.txt", std::ios_base::app);
-      for (auto &def: definitions)
-        types << std::get<1>(def).file() << ":" << std::get<0>(def) << " - " << std::get<2>(def) << std::endl;
     }
 
     void explore(Expr *expr) {
       if (expr->type == &VarRef::type) {
         VarRef *ref = static_cast<VarRef*>(expr);
-        if (ref->location.start.bytes >= 0 && ref->target.start.bytes >= 0) {
+        if (ref->location.start.bytes >= 0 && ref->target.start.bytes >= 0 && (ref->flags & FLAG_AST) != 0) {
           uses.emplace_back(ref->location /* use location */, ref->target /* definition location */);
         }
       } else if (expr->type == &App::type) {
@@ -363,7 +358,8 @@ private:
         if (lambda->token.start.bytes >= 0) {
           std::stringstream ss;
           ss << lambda->typeVar[0];
-          definitions.emplace_back(lambda->name /* name */, lambda->token /* location */, ss.str());
+          if (lambda->name.find(' ') == std::string::npos)
+            definitions.emplace_back(lambda->name /* name */, lambda->token /* location */, ss.str());
         }
         explore(lambda->body.get());
       } else if (expr->type == &Ascribe::type) {
@@ -375,22 +371,18 @@ private:
         for (auto &i : defbinding->fun) explore(i.get());
         for (auto &i : defbinding->order) {
           if (i.second.location.start.bytes >= 0) {
-            if (i.first.compare(0, 6, "topic ") == 0) {
-              // noop
-            } else if (i.first.compare(0, 8, "publish ") != 0) {
-              // noop
+            std::stringstream ss;
+            size_t idx = i.second.index;
+            if (idx < defbinding->val.size()) {
+              ss << defbinding->val[idx]->typeVar;
             } else {
-              //
-              std::stringstream ss;
-              size_t idx = i.second.index;
-              if (idx < defbinding->val.size()) {
-                ss << defbinding->val[idx]->typeVar;
-              } else {
-                idx -= defbinding->val.size();
-                ss << defbinding->fun[idx]->typeVar;
-              }
-              definitions.emplace_back(i.first /* name */, i.second.location /* location */, ss.str());
+              idx -= defbinding->val.size();
+              ss << defbinding->fun[idx]->typeVar;
             }
+            if (i.first.find(' ') == std::string::npos ||
+                i.first.compare(0, 7, "binary ") == 0 ||
+                i.first.compare(0, 6, "unary ") == 0)
+              definitions.emplace_back(i.first /* name */, i.second.location /* location */, ss.str());
           }
         }
         explore(defbinding->body.get());
