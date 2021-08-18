@@ -15,17 +15,15 @@
  * limitations under the License.
  */
 
-#ifndef SOURCES_H
-#define SOURCES_H
+#ifndef WAKEFILES_H
+#define WAKEFILES_H
 
-#include <vector>
-#include <string>
+#include <re2/re2.h>
 
-struct Runtime;
-
-bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &src_dir);
-bool make_workspace(const std::string &dir);
-
-bool find_all_sources(Runtime &runtime, bool workspace);
+bool push_files(std::vector<std::string> &out, const std::string &path, const RE2& re, size_t skip);
+std::string make_canonical(const std::string &x);
+std::string make_relative(std::string &&dir, std::string &&path);
+std::string glob2regexp(const std::string &glob);
+std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose, const std::string &abs_libdir);
 
 #endif

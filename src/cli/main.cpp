@@ -46,6 +46,7 @@
 #include "optimizer/ssa.h"
 #include "frontend/diagnostic.h"
 #include "execpath.h"
+#include "frontend/wakefiles.h"
 
 #ifndef VERSION
 #include "version.h"

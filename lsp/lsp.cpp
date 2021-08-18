@@ -44,6 +44,7 @@
 #include "frontend/diagnostic.h"
 #include "types/bind.h"
 #include "execpath.h"
+#include "frontend/wakefiles.h"
 
 
 #ifndef VERSION
