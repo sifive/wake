@@ -150,7 +150,7 @@ private:
     std::vector<std::string> allFiles;
     std::map<std::string, std::string> changedFiles;
     std::vector<std::pair<Location, Location>> uses;
-    std::vector<std::pair<std::string, Location>> definitions;
+    std::vector<std::tuple<std::string, Location, std::string>> definitions;
 
     std::map<std::string, LspMethod> methodToFunction = {
       {"initialize",                      &LSP::initialize},
@@ -341,6 +341,11 @@ private:
 
       if (root != nullptr)
         explore(root.get());
+
+      std::ofstream types;
+      types.open("requests_log.txt", std::ios_base::app);
+      for (auto &def: definitions)
+        types << std::get<1>(def).file() << ":" << std::get<0>(def) << " - " << std::get<2>(def) << std::endl;
     }
 
     void explore(Expr *expr) {
@@ -356,7 +361,9 @@ private:
       } else if (expr->type == &Lambda::type) {
         Lambda *lambda = static_cast<Lambda*>(expr);
         if (lambda->token.start.bytes >= 0) {
-          definitions.emplace_back(lambda->name /* name */, lambda->token /* location */);
+          std::stringstream ss;
+          ss << lambda->typeVar[0];
+          definitions.emplace_back(lambda->name /* name */, lambda->token /* location */, ss.str());
         }
         explore(lambda->body.get());
       } else if (expr->type == &Ascribe::type) {
@@ -373,7 +380,16 @@ private:
             } else if (i.first.compare(0, 8, "publish ") != 0) {
               // noop
             } else {
-              definitions.emplace_back(i.first /* name */, i.second.location /* location */);
+              //
+              std::stringstream ss;
+              size_t idx = i.second.index;
+              if (idx < defbinding->val.size()) {
+                ss << defbinding->val[idx]->typeVar;
+              } else {
+                idx -= defbinding->val.size();
+                ss << defbinding->fun[idx]->typeVar;
+              }
+              definitions.emplace_back(i.first /* name */, i.second.location /* location */, ss.str());
             }
           }
         }
