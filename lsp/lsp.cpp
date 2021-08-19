@@ -150,8 +150,15 @@ private:
     std::vector<std::string> allFiles;
     std::map<std::string, std::string> changedFiles;
     std::vector<std::pair<Location, Location>> uses;
-    std::vector<std::tuple<std::string, Location, std::string>> definitions;
-
+    struct Definition {
+        std::string name;
+        Location location;
+        std::string type;
+        Definition(std::string _name, Location _location, std::string _type) : name(std::move(_name)),
+                                                                               location(_location),
+                                                                               type(std::move(_type)) {}
+    };
+    std::vector<Definition> definitions;
     std::map<std::string, LspMethod> methodToFunction = {
       {"initialize",                      &LSP::initialize},
       {"initialized",                     &LSP::initialized},
@@ -164,7 +171,8 @@ private:
       {"exit",                            &LSP::serverExit},
       {"textDocument/definition",         &LSP::goToDefinition},
       {"textDocument/references",         &LSP::findReferences},
-      {"textDocument/documentHighlight",  &LSP::highlightOccurrences}
+      {"textDocument/documentHighlight",  &LSP::highlightOccurrences},
+      {"textDocument/hover",              &LSP::hover}
     };
 
     void callMethod(const std::string &method, const JAST &request) {
@@ -228,6 +236,7 @@ private:
       capabilities.add("definitionProvider", true);
       capabilities.add("referencesProvider", true);
       capabilities.add("documentHighlightProvider", true);
+      capabilities.add("hoverProvider", true);
 
       JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
       serverInfo.add("name", "lsp wake server");
@@ -359,7 +368,7 @@ private:
           std::stringstream ss;
           ss << lambda->typeVar[0];
           if (lambda->name.find(' ') == std::string::npos)
-            definitions.emplace_back(lambda->name /* name */, lambda->token /* location */, ss.str());
+            definitions.emplace_back(lambda->name /* name */, lambda->token /* location */, ss.str() /* type */);
         }
         explore(lambda->body.get());
       } else if (expr->type == &Ascribe::type) {
@@ -382,7 +391,7 @@ private:
             if (i.first.find(' ') == std::string::npos ||
                 i.first.compare(0, 7, "binary ") == 0 ||
                 i.first.compare(0, 6, "unary ") == 0)
-              definitions.emplace_back(i.first /* name */, i.second.location /* location */, ss.str());
+              definitions.emplace_back(i.first /* name */, i.second.location /* location */, ss.str() /* type */);
           }
         }
         explore(defbinding->body.get());
@@ -518,6 +527,41 @@ private:
         occurrences.push_back(definitionLocation);
       }
       reportHighlights(receivedMessage, occurrences);
+    }
+
+    static void reportHoverInfo(JAST receivedMessage, const std::vector<Definition> &hoverInfoPieces) {
+      JAST message = createResponseMessage(std::move(receivedMessage));
+      if (hoverInfoPieces.empty()) {
+        JAST result = message.add("result", JSON_NULLVAL);
+        sendMessage(message);
+        return;
+      }
+
+      JAST &result = message.add("result", JSON_OBJECT);
+      JAST &contents = result.add("contents", JSON_ARRAY);
+      for (const Definition& def: hoverInfoPieces) {
+        contents.add((def.name + ": " + def.type).c_str());
+      }
+      sendMessage(message);
+    }
+
+    void hover(JAST receivedMessage) {
+      Location symbolLocation = getLocationFromJSON(receivedMessage);
+      Location definitionLocation = symbolLocation;
+
+      for (const std::pair<Location, Location> &use: uses) {
+        if (use.first.contains(symbolLocation)) {
+          definitionLocation = use.second;
+          break;
+        }
+      }
+      std::vector<Definition> hoverInfoPieces;
+      for (Definition &def: definitions) {
+        if (def.location.contains(definitionLocation)) {
+          hoverInfoPieces.push_back(def);
+        }
+      }
+      reportHoverInfo(receivedMessage, hoverInfoPieces);
     }
 
     void didOpen(JAST receivedMessage) {
