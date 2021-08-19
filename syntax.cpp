@@ -132,6 +132,9 @@ void parseWake(ParseInfo pi) {
                 if (newdent.compare(0, indent.size(), indent) != 0) {
                     // Pop indent scope until indent is a prefix of newdent
                     do {
+                        // During error recovery, if we cannot accept a DEDENT, push an NL first.
+                        if (!ParseShifts(parser, TOKEN_DEDENT))
+                            Parse(parser, TOKEN_NL, tnl, pi);
                         Parse(parser, TOKEN_DEDENT, tnl, pi);
                         indent.resize(indent_stack.back());
                         indent_stack.pop_back();
@@ -147,15 +150,20 @@ void parseWake(ParseInfo pi) {
                     }
                 } else if (newdent.size() > indent.size()) {
                     // If newdent is longer, insert an INDENT token.
+                    // During error recovery, if we cannot accept an INDENT, push an NL first.
+                    if (!ParseShifts(parser, TOKEN_INDENT))
+                        Parse(parser, TOKEN_NL, tnl, pi);
                     Parse(parser, TOKEN_INDENT, tnl, pi);
                     indent_stack.push_back(indent.size());
                     std::swap(indent, newdent);
                 }
 
-                if (ParseShifts(parser, TOKEN_NL)) {
+                if (ParseShifts(parser, TOKEN_NL) || !ParseShifts(parser, token.id)) {
                     // Newlines are whitespace (and thus a pain to parse in LR(1)).
                     // However, some constructs in wake are terminated by a newline.
                     // Check if the parser can shift a newline. If so, provide it.
+                    // If the next token is not legal in this location, force the NL.
+                    // This helps, because the NL often ends an erroneous statement.
                     Parse(parser, TOKEN_NL, tnl, pi);
                 }
 

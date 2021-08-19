@@ -107,12 +107,13 @@ public:
 
     void addToken(uint8_t id, TokenInfo token);
 
+    void addNode(uint8_t id, TokenInfo begin);
     void addNode(uint8_t id, uint32_t children);
     void addNode(uint8_t id, TokenInfo begin, uint32_t children);
     void addNode(uint8_t id, uint32_t children, TokenInfo end);
     void addNode(uint8_t id, TokenInfo begin, uint32_t childen, TokenInfo end);
 
-    TokenInfo lastNode() const;
+    void delNodes(size_t num);
 
 private:
     const FileContent *file;

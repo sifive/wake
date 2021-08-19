@@ -36,6 +36,12 @@ void CSTBuilder::addToken(uint8_t id, TokenInfo token) {
     token_starts.set(token.start - file->start);
 }
 
+void CSTBuilder::addNode(uint8_t id, TokenInfo begin) {
+    uint32_t b = begin.start - file->start;
+    uint32_t e = begin.end   - file->start;
+    nodes.emplace_back(id, 1, b, e);
+}
+
 void CSTBuilder::addNode(uint8_t id, uint32_t children) {
     uint32_t b = 0;
     uint32_t e = nodes.empty()?0:nodes.back().end;
@@ -102,11 +108,10 @@ void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children, TokenIn
     nodes.emplace_back(id, size, b, e);
 }
 
-TokenInfo CSTBuilder::lastNode() const {
-    TokenInfo out;
-    out.start = file->start + nodes.back().begin;
-    out.end   = file->start + nodes.back().end;
-    return out;
+void CSTBuilder::delNodes(size_t num) {
+    int size = 1;
+    while (num--) size += nodes.end()[-size].size;
+    nodes.erase(nodes.end()-size+1, nodes.end());
 }
 
 struct NodeRange {
