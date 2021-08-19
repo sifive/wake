@@ -149,7 +149,12 @@ private:
     Runtime runtime;
     std::vector<std::string> allFiles;
     std::map<std::string, std::string> changedFiles;
-    std::vector<std::pair<Location, Location>> uses;
+    struct Use {
+        Location use;
+        Location def;
+        Use(Location _use, Location _def) : use(_use), def(_def) {}
+    };
+    std::vector<Use> uses;
     struct Definition {
         std::string name;
         Location location;
@@ -438,9 +443,9 @@ private:
 
     void goToDefinition(JAST receivedMessage) {
       Location locationToDefine = getLocationFromJSON(receivedMessage);
-      for (const std::pair<Location, Location> &use: uses) {
-        if (use.first.contains(locationToDefine)) {
-          reportDefinitionLocation(receivedMessage, use.second);
+      for (const Use &use: uses) {
+        if (use.use.contains(locationToDefine)) {
+          reportDefinitionLocation(receivedMessage, use.def);
           return;
         }
       }
@@ -466,17 +471,17 @@ private:
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
 
-      for (const std::pair<Location, Location> &use: uses) {
-        if (use.first.contains(symbolLocation)) {
-          definitionLocation = use.second;
+      for (const Use &use: uses) {
+        if (use.use.contains(symbolLocation)) {
+          definitionLocation = use.def;
           break;
         }
       }
       std::vector<Location> references;
-      for (const std::pair<Location, Location> &use: uses) {
-        if (use.second.contains(definitionLocation)) {
-          definitionLocation = use.second;
-          references.push_back(use.first);
+      for (const Use &use: uses) {
+        if (use.def.contains(definitionLocation)) {
+          definitionLocation = use.def;
+          references.push_back(use.use);
         }
       }
       if (receivedMessage.get("params").get("context").get("includeDeclaration").value == "true") {
@@ -510,17 +515,17 @@ private:
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
 
-      for (const std::pair<Location, Location> &use: uses) {
-        if (use.first.contains(symbolLocation)) {
-          definitionLocation = use.second;
+      for (const Use &use: uses) {
+        if (use.use.contains(symbolLocation)) {
+          definitionLocation = use.def;
           break;
         }
       }
       std::vector<Location> occurrences;
-      for (const std::pair<Location, Location> &use: uses) {
-        if (use.first.filename == symbolLocation.filename && use.second.contains(definitionLocation)) {
-          definitionLocation = use.second;
-          occurrences.push_back(use.first);
+      for (const Use &use: uses) {
+        if (use.use.filename == symbolLocation.filename && use.def.contains(definitionLocation)) {
+          definitionLocation = use.def;
+          occurrences.push_back(use.use);
         }
       }
       if (definitionLocation.filename == symbolLocation.filename) {
@@ -549,9 +554,9 @@ private:
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
 
-      for (const std::pair<Location, Location> &use: uses) {
-        if (use.first.contains(symbolLocation)) {
-          definitionLocation = use.second;
+      for (const Use &use: uses) {
+        if (use.use.contains(symbolLocation)) {
+          definitionLocation = use.def;
           break;
         }
       }
