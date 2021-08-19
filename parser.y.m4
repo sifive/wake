@@ -216,18 +216,38 @@ expression_nodot(R) ::= STR_SINGLE(s). { R = 1; add(CST_LITERAL, s); }
 
 expression_nodot(R) ::= str_open(A) interpolated_string(I) str_close(B). { R = 1; add(CST_INTERPOLATE, A+I+B); }
 
-interpolated_string(R) ::= block_opt(B). { R = B; }
-interpolated_string(R) ::= interpolated_string(O) str_mid(M) block_opt(B). { R = O+M+B; }
+interpolated_string(R) ::= expression(B). { R = B; }
+interpolated_string(R) ::= interpolated_string(O) str_mid(M) expression(B). { R = O+M+B; }
 
 str_mid(R)   ::= STR_MID(s).   { R = 1; add(CST_LITERAL, s); }
 str_open(R)  ::= STR_OPEN(s).  { R = 1; add(CST_LITERAL, s); }
 str_close(R) ::= STR_CLOSE(s). { R = 1; add(CST_LITERAL, s); }
 
+expression_nodot(R) ::= MSTR_SINGLE(s). { R = 1; add(CST_LITERAL, s); }
+expression_nodot(R) ::= mstr_open(A) interpolated_mstring(I) mstr_close(B). { R = 1; add(CST_INTERPOLATE, A+I+B); }
+
+interpolated_mstring(R) ::= expression(B). { R = B; }
+interpolated_mstring(R) ::= interpolated_mstring(O) mstr_mid(M) expression(B). { R = O+M+B; }
+
+mstr_mid(R)   ::= MSTR_MID(s).   { R = 1; add(CST_LITERAL, s); }
+mstr_open(R)  ::= MSTR_OPEN(s).  { R = 1; add(CST_LITERAL, s); }
+mstr_close(R) ::= MSTR_CLOSE(s). { R = 1; add(CST_LITERAL, s); }
+
+expression_nodot(R) ::= LSTR_SINGLE(s). { R = 1; add(CST_LITERAL, s); }
+expression_nodot(R) ::= lstr_open(A) interpolated_lstring(I) lstr_close(B). { R = 1; add(CST_INTERPOLATE, A+I+B); }
+
+interpolated_lstring(R) ::= expression(B). { R = B; }
+interpolated_lstring(R) ::= interpolated_lstring(O) lstr_mid(M) expression(B). { R = O+M+B; }
+
+lstr_mid(R)   ::= LSTR_MID(s).   { R = 1; add(CST_LITERAL, s); }
+lstr_open(R)  ::= LSTR_OPEN(s).  { R = 1; add(CST_LITERAL, s); }
+lstr_close(R) ::= LSTR_CLOSE(s). { R = 1; add(CST_LITERAL, s); }
+
 expression_nodot(R) ::= REG_SINGLE(r). { R = 1; add(CST_LITERAL, r); }
 expression_nodot(R) ::= reg_open(A) interpolated_regexp(I) reg_close(B). { R = 1; add(CST_INTERPOLATE, A+I+B); }
 
-interpolated_regexp(R) ::= block_opt(B). { R = B; }
-interpolated_regexp(R) ::= interpolated_regexp(O) reg_mid(M) block_opt(B). { R = O+M+B; }
+interpolated_regexp(R) ::= expression(B). { R = B; }
+interpolated_regexp(R) ::= interpolated_regexp(O) reg_mid(M) expression(B). { R = O+M+B; }
 
 reg_mid(R)   ::= REG_MID(r).   { R = 1; add(CST_LITERAL, r); }
 reg_open(R)  ::= REG_OPEN(r).  { R = 1; add(CST_LITERAL, r); }
@@ -242,7 +262,7 @@ expression_binary_app(R) ::= expression_term(A). { R = A; }
 
 expression_binary_app(R) ::= KW_SUBSCRIBE(b) id(I). { R = 1; add(CST_SUBSCRIBE, b, I); }
 
-expression_binary_app(R) ::= KW_PRIM(b) prim_literal(L). [STR_SINGLE] { R = 1; add(CST_PRIM, b, L); }
+expression_binary_app(R) ::= KW_PRIM(b) prim_literal(L). { R = 1; add(CST_PRIM, b, L); }
 
 prim_literal(R) ::= STR_SINGLE(s). { R = 1; add(CST_LITERAL, s); }
 

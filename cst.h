@@ -72,20 +72,6 @@ struct TokenInfo {
 
     size_t size() const { return end - start; }
     Location location(FileContent &fcontent) const;
-
-    TokenInfo atEnd() const {
-        TokenInfo out;
-        out.start = end;
-        out.end   = end;
-        return out;
-    }
-
-    TokenInfo atStart() const {
-        TokenInfo out;
-        out.start = start;
-        out.end   = start;
-        return out;
-    }
 };
 
 std::ostream & operator << (std::ostream &os, TokenInfo token);

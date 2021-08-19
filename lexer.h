@@ -36,6 +36,8 @@ struct Token {
 Token lex_wake(const uint8_t *s, const uint8_t *e);
 Token lex_dstr(const uint8_t *s, const uint8_t *e);
 Token lex_rstr(const uint8_t *s, const uint8_t *e);
+Token lex_mstr(const uint8_t *s, const uint8_t *e);
+Token lex_lstr(const uint8_t *s, const uint8_t *e);
 Token lex_printable(const uint8_t *s, const uint8_t *e);
 
 #endif

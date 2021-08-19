@@ -58,6 +58,10 @@ void parseWake(ParseInfo pi) {
                 token = lex_dstr(token.end, pi.fcontent->end);
             } else if (ParseShifts(parser, TOKEN_REG_CLOSE)) {
                 token = lex_rstr(token.end, pi.fcontent->end);
+            } else if (ParseShifts(parser, TOKEN_MSTR_CLOSE)) {
+                token = lex_mstr(token.end, pi.fcontent->end);
+            } else if (ParseShifts(parser, TOKEN_LSTR_CLOSE)) {
+                token = lex_lstr(token.end, pi.fcontent->end);
             } else {
                 token = lex_wake(token.end, pi.fcontent->end);
             }
@@ -242,6 +246,14 @@ const char *symbolExample(int symbol) {
     case TOKEN_REG_OPEN:     return "`regexp${";
     case TOKEN_REG_CLOSE:    return "}regexp`";
     case TOKEN_REG_MID:      return "}regexp{";
+    case TOKEN_MSTR_SINGLE:  return "\"\"\"string\"\"\"";
+    case TOKEN_MSTR_OPEN:    return "\"\"\"string%{";
+    case TOKEN_MSTR_CLOSE:   return "}string\"\"\"";
+    case TOKEN_MSTR_MID:     return "}string{";
+    case TOKEN_LSTR_SINGLE:  return "\"%string%\"";
+    case TOKEN_LSTR_OPEN:    return "\"%string%{";
+    case TOKEN_LSTR_CLOSE:   return "}string%\"";
+    case TOKEN_LSTR_MID:     return "}string{";
     case TOKEN_DOUBLE:       return "3.1415";
     case TOKEN_INTEGER:      return "42";
     case TOKEN_KW_HERE:      return "here";
