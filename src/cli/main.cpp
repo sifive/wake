@@ -519,8 +519,9 @@ int main(int argc, char **argv) {
   StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(wake_cwd), cmdline);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 
-  std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
-  if (!root) ok = false;
+  bool isTreeBuilt = true;
+  std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
+  if (!isTreeBuilt) ok = false;
   ok = ok && sums_ok();
 
   if (!ok || (fwarning && warnings)) {

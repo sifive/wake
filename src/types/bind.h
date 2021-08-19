@@ -26,7 +26,7 @@ struct Expr;
 
 // Eliminate DefMap + Top + Subscribe expressions
 extern int warnings;
-std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap);
+std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap, bool &isTreeBuilt);
 bool flatten_exports(Top &top);
 
 #endif

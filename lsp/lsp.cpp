@@ -348,7 +348,8 @@ private:
         runSyntaxChecker(file, *top);
 
       PrimMap pmap = prim_register_all(nullptr, nullptr);
-      std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
+      bool isTreeBuilt = true;
+      std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
 
       for (auto &file: allFiles)
         reportFileDiagnostics(file, diagnostics[file]);
