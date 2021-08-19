@@ -449,6 +449,12 @@ private:
           return;
         }
       }
+      for (const Definition &def: definitions) {
+        if (def.location.contains(locationToDefine)) {
+          reportDefinitionLocation(receivedMessage, def.location);
+          return;
+        }
+      }
       reportNoDefinition(receivedMessage);
     }
 
@@ -470,22 +476,35 @@ private:
     void findReferences(JAST receivedMessage) {
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
+      bool isDefinitionFound = false;
 
       for (const Use &use: uses) {
         if (use.use.contains(symbolLocation)) {
           definitionLocation = use.def;
+          isDefinitionFound = true;
           break;
         }
       }
-      std::vector<Location> references;
-      for (const Use &use: uses) {
-        if (use.def.contains(definitionLocation)) {
-          definitionLocation = use.def;
-          references.push_back(use.use);
+      if (!isDefinitionFound) {
+        for (const Definition &def: definitions) {
+          if (def.location.contains(symbolLocation)) {
+            definitionLocation = def.location;
+            isDefinitionFound = true;
+            break;
+          }
         }
       }
-      if (receivedMessage.get("params").get("context").get("includeDeclaration").value == "true") {
-        references.push_back(definitionLocation);
+      std::vector<Location> references;
+      if (isDefinitionFound) {
+        for (const Use &use: uses) {
+          if (use.def.contains(definitionLocation)) {
+            references.push_back(use.use);
+          }
+        }
+
+        if (receivedMessage.get("params").get("context").get("includeDeclaration").value == "true") {
+          references.push_back(definitionLocation);
+        }
       }
       reportReferences(receivedMessage, references);
     }
@@ -514,22 +533,34 @@ private:
     void highlightOccurrences(JAST receivedMessage) {
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
+      bool isDefinitionFound = false;
 
       for (const Use &use: uses) {
         if (use.use.contains(symbolLocation)) {
           definitionLocation = use.def;
+          isDefinitionFound = true;
           break;
         }
       }
-      std::vector<Location> occurrences;
-      for (const Use &use: uses) {
-        if (use.use.filename == symbolLocation.filename && use.def.contains(definitionLocation)) {
-          definitionLocation = use.def;
-          occurrences.push_back(use.use);
+      if (!isDefinitionFound) {
+        for (const Definition &def: definitions) {
+          if (def.location.contains(symbolLocation)) {
+            definitionLocation = def.location;
+            isDefinitionFound = true;
+            break;
+          }
         }
       }
-      if (definitionLocation.filename == symbolLocation.filename) {
-        occurrences.push_back(definitionLocation);
+      std::vector<Location> occurrences;
+      if (isDefinitionFound) {
+        for (const Use &use: uses) {
+          if (use.use.filename == symbolLocation.filename && use.def.contains(definitionLocation)) {
+            occurrences.push_back(use.use);
+          }
+        }
+        if (definitionLocation.filename == symbolLocation.filename) {
+          occurrences.push_back(definitionLocation);
+        }
       }
       reportHighlights(receivedMessage, occurrences);
     }
