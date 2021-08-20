@@ -465,12 +465,6 @@ private:
 
     void reportReferences(JAST receivedMessage, const std::vector<Location> &references) {
       JAST message = createResponseMessage(std::move(receivedMessage));
-      if (references.empty()) {
-        JAST result = message.add("result", JSON_NULLVAL);
-        sendMessage(message);
-        return;
-      }
-
       JAST &result = message.add("result", JSON_ARRAY);
       for (const Location &location: references) {
         result.children.emplace_back("", createLocationJSON(location));
@@ -522,12 +516,6 @@ private:
 
     static void reportHighlights(JAST receivedMessage, const std::vector<Location> &occurrences) {
       JAST message = createResponseMessage(std::move(receivedMessage));
-      if (occurrences.empty()) {
-        JAST result = message.add("result", JSON_NULLVAL);
-        sendMessage(message);
-        return;
-      }
-
       JAST &result = message.add("result", JSON_ARRAY);
       for (const Location &location: occurrences) {
         result.children.emplace_back("", createDocumentHighlightJSON(location));
@@ -572,16 +560,14 @@ private:
 
     static void reportHoverInfo(JAST receivedMessage, const std::vector<Definition> &hoverInfoPieces) {
       JAST message = createResponseMessage(std::move(receivedMessage));
-      if (hoverInfoPieces.empty()) {
-        JAST result = message.add("result", JSON_NULLVAL);
-        sendMessage(message);
-        return;
-      }
-
       JAST &result = message.add("result", JSON_OBJECT);
-      JAST &contents = result.add("contents", JSON_ARRAY);
+
+      JAST contents(JSON_ARRAY);
       for (const Definition& def: hoverInfoPieces) {
         contents.add((def.name + ": " + def.type).c_str());
+      }
+      if (!contents.children.empty()) {
+        result.children.emplace_back("contents", contents);
       }
       sendMessage(message);
     }
