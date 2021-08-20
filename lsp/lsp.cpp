@@ -177,7 +177,9 @@ private:
       {"textDocument/definition",         &LSP::goToDefinition},
       {"textDocument/references",         &LSP::findReferences},
       {"textDocument/documentHighlight",  &LSP::highlightOccurrences},
-      {"textDocument/hover",              &LSP::hover}
+      {"textDocument/hover",              &LSP::hover},
+      {"textDocument/documentSymbol",     &LSP::documentSymbol},
+      {"workspace/symbol",                &LSP::workspaceSymbol}
     };
 
     void callMethod(const std::string &method, const JAST &request) {
@@ -242,6 +244,8 @@ private:
       capabilities.add("referencesProvider", true);
       capabilities.add("documentHighlightProvider", true);
       capabilities.add("hoverProvider", true);
+      capabilities.add("documentSymbolProvider", true);
+      capabilities.add("workspaceSymbolProvider", true);
 
       JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
       serverInfo.add("name", "lsp wake server");
@@ -599,6 +603,38 @@ private:
         }
       }
       reportHoverInfo(receivedMessage, hoverInfoPieces);
+    }
+
+    void appendSymbolToJSON(const Definition& def, JAST &json) {
+      JAST &symbol = json.add("", JSON_OBJECT);
+      symbol.add("name", def.name.c_str());
+      symbol.add("kind", 13); // Variable
+      symbol.children.emplace_back("location", createLocationJSON(def.location));
+    }
+
+    void documentSymbol(JAST receivedMessage) {
+      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+      std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
+      JAST message = createResponseMessage(std::move(receivedMessage));
+      JAST &result = message.add("result", JSON_ARRAY);
+      for (const Definition &def: definitions) {
+        if (def.location.filename == filePath) {
+          appendSymbolToJSON(def, result);
+        }
+      }
+      sendMessage(message);
+    }
+
+    void workspaceSymbol(JAST receivedMessage) {
+      std::string query = receivedMessage.get("params").get("query").value;
+      JAST message = createResponseMessage(std::move(receivedMessage));
+      JAST &result = message.add("result", JSON_ARRAY);
+      for (const Definition &def: definitions) {
+        if (def.name.find(query) != std::string::npos) {
+          appendSymbolToJSON(def, result);
+        }
+      }
+      sendMessage(message);
     }
 
     void didOpen(JAST receivedMessage) {
