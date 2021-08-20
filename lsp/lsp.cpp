@@ -65,7 +65,7 @@ static const char contentLength[] = "Content-Length: ";
 static const char *ParseError           = "-32700";
 static const char *InvalidRequest       = "-32600";
 static const char *MethodNotFound       = "-32601";
-//static const char *InvalidParams        = "-32602";
+static const char *InvalidParams        = "-32602";
 //static const char *InternalError        = "-32603";
 //static const char *serverErrorStart     = "-32099";
 //static const char *serverErrorEnd       = "-32000";
@@ -175,11 +175,12 @@ private:
       {"shutdown",                        &LSP::shutdown},
       {"exit",                            &LSP::serverExit},
       {"textDocument/definition",         &LSP::goToDefinition},
-      {"textDocument/references",         &LSP::findReferences},
+      {"textDocument/references",         &LSP::findReportReferences},
       {"textDocument/documentHighlight",  &LSP::highlightOccurrences},
       {"textDocument/hover",              &LSP::hover},
       {"textDocument/documentSymbol",     &LSP::documentSymbol},
-      {"workspace/symbol",                &LSP::workspaceSymbol}
+      {"workspace/symbol",                &LSP::workspaceSymbol},
+      {"textDocument/rename",             &LSP::rename}
     };
 
     void callMethod(const std::string &method, const JAST &request) {
@@ -246,6 +247,7 @@ private:
       capabilities.add("hoverProvider", true);
       capabilities.add("documentSymbolProvider", true);
       capabilities.add("workspaceSymbolProvider", true);
+      capabilities.add("renameProvider", true);
 
       JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
       serverInfo.add("name", "lsp wake server");
@@ -463,6 +465,32 @@ private:
       reportNoDefinition(receivedMessage);
     }
 
+    void findReferences(Location &definitionLocation, bool &isDefinitionFound, std::vector<Location> &references) {
+      for (const Use &use: uses) {
+        if (use.use.contains(definitionLocation)) {
+          definitionLocation = use.def;
+          isDefinitionFound = true;
+          break;
+        }
+      }
+      if (!isDefinitionFound) {
+        for (const Definition &def: definitions) {
+          if (def.location.contains(definitionLocation)) {
+            definitionLocation = def.location;
+            isDefinitionFound = true;
+            break;
+          }
+        }
+      }
+      if (isDefinitionFound) {
+        for (const Use &use: uses) {
+          if (use.def.contains(definitionLocation)) {
+            references.push_back(use.use);
+          }
+        }
+      }
+    }
+
     void reportReferences(JAST receivedMessage, const std::vector<Location> &references) {
       JAST message = createResponseMessage(std::move(receivedMessage));
       JAST &result = message.add("result", JSON_ARRAY);
@@ -472,38 +500,13 @@ private:
       sendMessage(message);
     }
 
-    void findReferences(JAST receivedMessage) {
-      Location symbolLocation = getLocationFromJSON(receivedMessage);
-      Location definitionLocation = symbolLocation;
+    void findReportReferences(JAST receivedMessage) {
+      Location definitionLocation = getLocationFromJSON(receivedMessage);
       bool isDefinitionFound = false;
-
-      for (const Use &use: uses) {
-        if (use.use.contains(symbolLocation)) {
-          definitionLocation = use.def;
-          isDefinitionFound = true;
-          break;
-        }
-      }
-      if (!isDefinitionFound) {
-        for (const Definition &def: definitions) {
-          if (def.location.contains(symbolLocation)) {
-            definitionLocation = def.location;
-            isDefinitionFound = true;
-            break;
-          }
-        }
-      }
       std::vector<Location> references;
-      if (isDefinitionFound) {
-        for (const Use &use: uses) {
-          if (use.def.contains(definitionLocation)) {
-            references.push_back(use.use);
-          }
-        }
-
-        if (receivedMessage.get("params").get("context").get("includeDeclaration").value == "true") {
-          references.push_back(definitionLocation);
-        }
+      findReferences(definitionLocation, isDefinitionFound, references);
+      if (isDefinitionFound && receivedMessage.get("params").get("context").get("includeDeclaration").value == "true") {
+        references.push_back(definitionLocation);
       }
       reportReferences(receivedMessage, references);
     }
@@ -621,6 +624,49 @@ private:
         }
       }
       sendMessage(message);
+    }
+
+    void reportWorkspaceEdits(JAST receivedMessage, const std::vector<Location> &references, const std::string &newName) {
+      JAST message = createResponseMessage(std::move(receivedMessage));
+      JAST &result = message.add("result", JSON_OBJECT);
+
+      std::map<std::string, JAST> filesEdits;
+      for (Location ref: references) {
+        JAST edit(JSON_OBJECT);
+        edit.children.emplace_back("range", createRangeFromLocation(ref));
+        edit.add("newText", newName.c_str());
+
+        std::string fileUri = rootUri + '/' + ref.filename;
+        if (filesEdits.find(fileUri) == filesEdits.end()) {
+          filesEdits[fileUri] = JAST(JSON_ARRAY);
+        }
+        filesEdits[fileUri].children.emplace_back("", edit);
+      }
+
+      if (!filesEdits.empty()) {
+        JAST &changes = result.add("changes", JSON_OBJECT);
+        for (const auto &fileEdits: filesEdits) {
+          changes.children.emplace_back(fileEdits.first, fileEdits.second);
+        }
+      }
+      sendMessage(message);
+    }
+
+    void rename(JAST receivedMessage) {
+      std::string newName = receivedMessage.get("params").get("newName").value;
+      if (newName.find(' ') != std::string::npos || (newName[0] >= '0' && newName[0] <= '9')) {
+        sendErrorMessage(receivedMessage, InvalidParams, "The given name is invalid.");
+        return;
+      }
+
+      Location definitionLocation = getLocationFromJSON(receivedMessage);
+      bool isDefinitionFound = false;
+      std::vector<Location> references;
+      findReferences(definitionLocation, isDefinitionFound, references);
+      if (isDefinitionFound) {
+        references.push_back(definitionLocation);
+      }
+      reportWorkspaceEdits(receivedMessage, references, newName);
     }
 
     void didOpen(JAST receivedMessage) {
