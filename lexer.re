@@ -78,7 +78,7 @@
 Token lex_wake(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
-	// Detect end-of-input
+        // Detect end-of-input
         $ { return Token(TOKEN_EOF, s); }
 
         // Comments
@@ -171,10 +171,8 @@ Token lex_wake(const uint8_t *s, const uint8_t *e) {
         [`]([$]*[\\]notnl|rchar|[$]+dchar)*[$]*[`] { return Token(TOKEN_REG_SINGLE, s); }
         [`]([$]*[\\]notnl|rchar|[$]+dchar)*[$]+[{] { return Token(TOKEN_REG_OPEN,   s); }
 
-        // Multiline strings !!! count newlines
-        '"""' ([^"%]|[%]*["]{1,2}[^"%]|[%]+[^"%{])*[%]*       { return Token(TOKEN_MSTR_SINGLE, s, false); }
-        '"""' ([^"%]|[%]*["]{1,2}[^"%]|[%]+[^"%{])*[%]* '"""' { return Token(TOKEN_MSTR_SINGLE, s); }
-        '"""' ([^"%]|[%]*["]{1,2}[^"%]|[%]+[^"%{])*[%]+ [{]   { return Token(TOKEN_MSTR_OPEN,   s); }
+        // Multiline string start
+        '"""' notnl* { return Token(TOKEN_MSTR_BEGIN, s); }
 
         // Legacy multiline strings
         '"%' ([^%]|[%]+[^"%{])*[%]*      { return Token(TOKEN_LSTR_SINGLE, s, false); }
@@ -202,7 +200,7 @@ Token lex_dstr(const uint8_t *s, const uint8_t *e) {
         [^]([\\]notnl|schar)*[{]   { return Token(TOKEN_STR_MID,   s); }
 
         * { return Token(TOKEN_STR_CLOSE, s, false); }
-	$ { return Token(TOKEN_STR_CLOSE, s, false); }
+        $ { return Token(TOKEN_STR_CLOSE, s, false); }
      */
 }
 
@@ -214,20 +212,39 @@ Token lex_rstr(const uint8_t *s, const uint8_t *e) {
         [^]([$]*[\\]notnl|rchar|[$]+dchar)*[$]+[{] { return Token(TOKEN_REG_MID,   s); }
 
         * { return Token(TOKEN_REG_CLOSE, s, false); }
-	$ { return Token(TOKEN_REG_CLOSE, s, false); }
+        $ { return Token(TOKEN_REG_CLOSE, s, false); }
      */
 }
 
-Token lex_mstr(const uint8_t *s, const uint8_t *e) {
+Token lex_mstr_continue(const uint8_t *s, const uint8_t *e) {
+    const uint8_t *m;
+    /*!re2c
+        nl    { return Token(TOKEN_NL,       s); }
+        lws+  { return Token(TOKEN_WS,       s); }
+        '"""' { return Token(TOKEN_MSTR_END, s); }
+
+        // Multiline strings
+        pchar = notnl \ [%];
+        mchar = notnl \ [%{];
+        fchar = pchar \ lws;
+
+         (fchar|[%]+mchar)(pchar|[%]+mchar)*  [%]*     { return Token(TOKEN_MSTR_CONTINUE, s); }
+        ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]+ [{] { return Token(TOKEN_MSTR_PAUSE,    s); }
+
+        * { return Token(TOKEN_MSTR_END, s, false); }
+        $ { return Token(TOKEN_MSTR_END, s, false); }
+     */
+}
+
+Token lex_mstr_resume(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
         // Multiline strings
-        [^]([^"%]|[%]*["]{1,2}[^"%]|[%]+[^"%{])*[%]*       { return Token(TOKEN_MSTR_CLOSE, s, false); }
-        [^]([^"%]|[%]*["]{1,2}[^"%]|[%]+[^"%{])*[%]* '"""' { return Token(TOKEN_MSTR_CLOSE, s); }
-        [^]([^"%]|[%]*["]{1,2}[^"%]|[%]+[^"%{])*[%]+ [{]   { return Token(TOKEN_MSTR_MID,   s); }
+        [^](pchar|[%]+mchar)*[%]*       { return Token(TOKEN_MSTR_RESUME, s); }
+        [^](pchar|[%]+mchar)*[%]+ [{]   { return Token(TOKEN_MSTR_MID,    s); }
 
-        * { return Token(TOKEN_MSTR_CLOSE, s, false); }
-	$ { return Token(TOKEN_MSTR_CLOSE, s, false); }
+        * { return Token(TOKEN_MSTR_RESUME, s, false); }
+        $ { return Token(TOKEN_MSTR_RESUME, s, false); }
      */
 }
 
@@ -239,8 +256,8 @@ Token lex_lstr(const uint8_t *s, const uint8_t *e) {
         [^]([^%]|[%]+[^"%{])*[%]* '%"' { return Token(TOKEN_LSTR_CLOSE, s); }
         [^]([^%]|[%]+[^"%{])*[%]+ [{]  { return Token(TOKEN_LSTR_MID,   s); }
 
-        * { return Token(TOKEN_MSTR_CLOSE, s, false); }
-	$ { return Token(TOKEN_MSTR_CLOSE, s, false); }
+        * { return Token(TOKEN_LSTR_CLOSE, s, false); }
+        $ { return Token(TOKEN_LSTR_CLOSE, s, false); }
      */
 }
 

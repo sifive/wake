@@ -223,15 +223,21 @@ str_mid(R)   ::= STR_MID(s).   { R = 1; add(CST_LITERAL, s); }
 str_open(R)  ::= STR_OPEN(s).  { R = 1; add(CST_LITERAL, s); }
 str_close(R) ::= STR_CLOSE(s). { R = 1; add(CST_LITERAL, s); }
 
-expression_nodot(R) ::= MSTR_SINGLE(s). { R = 1; add(CST_LITERAL, s); }
+expression_nodot(R) ::= mstr_single(S). { R = S; }
 expression_nodot(R) ::= mstr_open(A) interpolated_mstring(I) mstr_close(B). { R = 1; add(CST_INTERPOLATE, A+I+B); }
 
 interpolated_mstring(R) ::= expression(B). { R = B; }
 interpolated_mstring(R) ::= interpolated_mstring(O) mstr_mid(M) expression(B). { R = O+M+B; }
 
-mstr_mid(R)   ::= MSTR_MID(s).   { R = 1; add(CST_LITERAL, s); }
-mstr_open(R)  ::= MSTR_OPEN(s).  { R = 1; add(CST_LITERAL, s); }
-mstr_close(R) ::= MSTR_CLOSE(s). { R = 1; add(CST_LITERAL, s); }
+mstr_cont(R)  ::= .                        { R = 0; }
+mstr_cont(R)  ::= mstr_cont MSTR_CONTINUE. { R = 0; }
+mstr_cont(R)  ::= mstr_cont NL.            { R = 0; }
+
+mstr_single(R) ::= MSTR_BEGIN(b)  mstr_cont MSTR_END(e).   { R = 1; add(CST_LITERAL, b, 0, e); }
+mstr_open(R)   ::= MSTR_BEGIN(b)  mstr_cont MSTR_PAUSE(e). { R = 1; add(CST_LITERAL, b, 0, e); }
+mstr_mid(R)    ::= MSTR_MID(b).                            { R = 1; add(CST_LITERAL, b);       }
+mstr_mid(R)    ::= MSTR_RESUME(b) mstr_cont MSTR_PAUSE(e). { R = 1; add(CST_LITERAL, b, 0, e); }
+mstr_close(R)  ::= MSTR_RESUME(b) mstr_cont MSTR_END(e).   { R = 1; add(CST_LITERAL, b, 0, e); }
 
 expression_nodot(R) ::= LSTR_SINGLE(s). { R = 1; add(CST_LITERAL, s); }
 expression_nodot(R) ::= lstr_open(A) interpolated_lstring(I) lstr_close(B). { R = 1; add(CST_INTERPOLATE, A+I+B); }

@@ -40,6 +40,7 @@ void parseWake(ParseInfo pi) {
     // Processing whitespace needs some state
     Token token, nl, ws;
     int state = STATE_IDLE;
+    bool in_multiline_string = false;
 
     void *parser = ParseAlloc(malloc);
     // ParseTrace(stderr, "");
@@ -50,16 +51,23 @@ void parseWake(ParseInfo pi) {
 
         // Grab the next token from the input file.
 
-        // A '}' might signal resuming either a String, a RegExp, or an {} expression.
-        // This sort of parser-context aware lexing is supported by fancier parser generators.
-        // However, it's easy enough to do here by peeking into lemon's state.
-        if (*token.end == '}') {
+        // Check to see if we're still inside a multiline string
+        if (in_multiline_string)
+            in_multiline_string = ParseShifts(parser, TOKEN_MSTR_CONTINUE);
+
+        if (in_multiline_string) {
+            // Proceed lexing in multiline string context
+            token = lex_mstr_continue(token.end, pi.fcontent->end);
+        } else if (*token.end == '}') {
+            // A '}' might signal resuming either a String, a RegExp, or an {} expression.
+            // This sort of parser-context aware lexing is supported by fancier parser generators.
+            // However, it's easy enough to do here by peeking into lemon's state.
             if (ParseShifts(parser, TOKEN_STR_CLOSE)) {
                 token = lex_dstr(token.end, pi.fcontent->end);
             } else if (ParseShifts(parser, TOKEN_REG_CLOSE)) {
                 token = lex_rstr(token.end, pi.fcontent->end);
-            } else if (ParseShifts(parser, TOKEN_MSTR_CLOSE)) {
-                token = lex_mstr(token.end, pi.fcontent->end);
+            } else if (ParseShifts(parser, TOKEN_MSTR_RESUME)) {
+                token = lex_mstr_resume(token.end, pi.fcontent->end);
             } else if (ParseShifts(parser, TOKEN_LSTR_CLOSE)) {
                 token = lex_lstr(token.end, pi.fcontent->end);
             } else {
@@ -84,14 +92,18 @@ void parseWake(ParseInfo pi) {
                 // Whitespace wastes the lookahead token, making the grammar LR(2).
                 continue;
             } else if (token.id == TOKEN_NL) {
-                // Enter indent processing state machine
                 pi.fcontent->newline(token.end);
-                nl = token;
-                state = STATE_NL;
-                // We only record+report the token info for the FIRST newline.
-                // Thus, blocks own their same-line comments, but not comments on the next line.
-                tnl = tinfo;
-                continue;
+                if (in_multiline_string) {
+                    break;
+                } else {
+                    // Enter indent processing state machine
+                    nl = token;
+                    state = STATE_NL;
+                    // We only record+report the token info for the FIRST newline.
+                    // Thus, blocks own their same-line comments, but not comments on the next line.
+                    tnl = tinfo;
+                    continue;
+                }
             } else {
                 break;
             }
@@ -184,6 +196,10 @@ void parseWake(ParseInfo pi) {
             }
         }
 
+        if (token.id == TOKEN_MSTR_BEGIN || token.id == TOKEN_MSTR_RESUME) {
+            in_multiline_string = true;
+        }
+
         if (!token.ok && ParseShifts(parser, token.id)) {
             // Complain about illegal token
             std::stringstream ss;
@@ -251,10 +267,12 @@ const char *symbolExample(int symbol) {
     case TOKEN_REG_OPEN:     return "`regexp${";
     case TOKEN_REG_CLOSE:    return "}regexp`";
     case TOKEN_REG_MID:      return "}regexp{";
-    case TOKEN_MSTR_SINGLE:  return "\"\"\"string\"\"\"";
-    case TOKEN_MSTR_OPEN:    return "\"\"\"string%{";
-    case TOKEN_MSTR_CLOSE:   return "}string\"\"\"";
-    case TOKEN_MSTR_MID:     return "}string{";
+    case TOKEN_MSTR_BEGIN:   return "\"\"\"";
+    case TOKEN_MSTR_END:     return "\"\"\"";
+    case TOKEN_MSTR_CONTINUE:return "string\\n";
+    case TOKEN_MSTR_PAUSE:   return "string%{";
+    case TOKEN_MSTR_RESUME:  return "}string\\n";
+    case TOKEN_MSTR_MID:     return "}string%{";
     case TOKEN_LSTR_SINGLE:  return "\"%string%\"";
     case TOKEN_LSTR_OPEN:    return "\"%string%{";
     case TOKEN_LSTR_CLOSE:   return "}string%\"";
