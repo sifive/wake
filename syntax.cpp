@@ -73,14 +73,6 @@ void parseWake(ParseInfo pi) {
         tinfo.end = token.end;
         pi.cst->addToken(token.id, tinfo);
 
-        if (!token.ok) {
-            // Complain about illegal token
-            std::stringstream ss;
-            ss << "syntax error; found illegal token " << tinfo
-               << ", but handling it like:\n    " << symbolExample(token.id);
-            pi.reporter->report(REPORT_ERROR, tinfo.location(*pi.fcontent), ss.str());
-        }
-
         // Whitespace-induced lexical scope is inherently not context-free.
         // We need to post-process these NL WS sequences for a CFG parser generator.
         // The basic scheme is to inject INDENT/DEDENT tokens at the first WS after a NL.
@@ -182,12 +174,22 @@ void parseWake(ParseInfo pi) {
 
         if (token.id == TOKEN_EOF) {
             while (!indent_stack.empty()) {
+                if (!ParseShifts(parser, TOKEN_DEDENT))
+                    Parse(parser, TOKEN_NL, tinfo, pi);
                 Parse(parser, TOKEN_DEDENT, tinfo, pi);
                 indent_stack.pop_back();
             }
             if (ParseShifts(parser, TOKEN_NL)) {
                 Parse(parser, TOKEN_NL, tinfo, pi);
             }
+        }
+
+        if (!token.ok && ParseShifts(parser, token.id)) {
+            // Complain about illegal token
+            std::stringstream ss;
+            ss << "syntax error; found illegal token " << tinfo
+               << ", but handling it like:\n    " << symbolExample(token.id);
+            pi.reporter->report(REPORT_ERROR, tinfo.location(*pi.fcontent), ss.str());
         }
 
         Parse(parser, token.id, tinfo, pi);
