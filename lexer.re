@@ -158,6 +158,12 @@ Token lex_wake(const uint8_t *s, const uint8_t *e) {
         [']nchar*    { return Token(TOKEN_STR_RAW, s, false); }
         [']nchar*['] { return Token(TOKEN_STR_RAW, s); }
 
+        // Multiline string start
+        '"""' notnl* { return Token(TOKEN_MSTR_BEGIN, s); }
+
+        // Legacy multiline strings
+        '"%' notnl* { return Token(TOKEN_LSTR_BEGIN, s); }
+
         // Interpolated string literals (escapes will be processed later)
         schar = notnl \ [\\"{];
         ["]([\\]notnl|schar)*[\\]? { return Token(TOKEN_STR_SINGLE, s, false); }
@@ -170,14 +176,6 @@ Token lex_wake(const uint8_t *s, const uint8_t *e) {
         [`]([$]*[\\]notnl|rchar|[$]+dchar)*[$\\]*  { return Token(TOKEN_REG_SINGLE, s, false); }
         [`]([$]*[\\]notnl|rchar|[$]+dchar)*[$]*[`] { return Token(TOKEN_REG_SINGLE, s); }
         [`]([$]*[\\]notnl|rchar|[$]+dchar)*[$]+[{] { return Token(TOKEN_REG_OPEN,   s); }
-
-        // Multiline string start
-        '"""' notnl* { return Token(TOKEN_MSTR_BEGIN, s); }
-
-        // Legacy multiline strings
-        '"%' ([^%]|[%]+[^"%{])*[%]*      { return Token(TOKEN_LSTR_SINGLE, s, false); }
-        '"%' ([^%]|[%]+[^"%{])*[%]* '%"' { return Token(TOKEN_LSTR_SINGLE, s); }
-        '"%' ([^%]|[%]+[^"%{])*[%]+ [{]  { return Token(TOKEN_LSTR_OPEN,   s); }
 
         // Identifiers
         l(n|l)* { return Token(TOKEN_ID, s); }
@@ -223,7 +221,6 @@ Token lex_mstr_continue(const uint8_t *s, const uint8_t *e) {
         lws+  { return Token(TOKEN_WS,       s); }
         '"""' { return Token(TOKEN_MSTR_END, s); }
 
-        // Multiline strings
         pchar = notnl \ [%];
         mchar = notnl \ [%{];
         fchar = pchar \ lws;
@@ -239,7 +236,6 @@ Token lex_mstr_continue(const uint8_t *s, const uint8_t *e) {
 Token lex_mstr_resume(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
-        // Multiline strings
         [^](pchar|[%]+mchar)*[%]*       { return Token(TOKEN_MSTR_RESUME, s); }
         [^](pchar|[%]+mchar)*[%]+ [{]   { return Token(TOKEN_MSTR_MID,    s); }
 
@@ -248,16 +244,29 @@ Token lex_mstr_resume(const uint8_t *s, const uint8_t *e) {
      */
 }
 
-Token lex_lstr(const uint8_t *s, const uint8_t *e) {
+Token lex_lstr_continue(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
-        // Legacy multiline strings
-        [^]([^%]|[%]+[^"%{])*[%]*      { return Token(TOKEN_LSTR_CLOSE, s, false); }
-        [^]([^%]|[%]+[^"%{])*[%]* '%"' { return Token(TOKEN_LSTR_CLOSE, s); }
-        [^]([^%]|[%]+[^"%{])*[%]+ [{]  { return Token(TOKEN_LSTR_MID,   s); }
+        nl    { return Token(TOKEN_NL,       s); }
+        lws+  { return Token(TOKEN_WS,       s); }
+        '%"'  { return Token(TOKEN_LSTR_END, s); }
 
-        * { return Token(TOKEN_LSTR_CLOSE, s, false); }
-        $ { return Token(TOKEN_LSTR_CLOSE, s, false); }
+         (fchar|[%]+mchar)(pchar|[%]+mchar)*  [%]*     { return Token(TOKEN_LSTR_CONTINUE, s); }
+        ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]+ [{] { return Token(TOKEN_LSTR_PAUSE,    s); }
+
+        * { return Token(TOKEN_LSTR_END, s, false); }
+        $ { return Token(TOKEN_LSTR_END, s, false); }
+     */
+}
+
+Token lex_lstr_resume(const uint8_t *s, const uint8_t *e) {
+    const uint8_t *m;
+    /*!re2c
+        [^](pchar|[%]+mchar)*[%]*       { return Token(TOKEN_LSTR_RESUME, s); }
+        [^](pchar|[%]+mchar)*[%]+ [{]   { return Token(TOKEN_LSTR_MID,    s); }
+
+        * { return Token(TOKEN_LSTR_RESUME, s, false); }
+        $ { return Token(TOKEN_LSTR_RESUME, s, false); }
      */
 }
 

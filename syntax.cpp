@@ -41,6 +41,7 @@ void parseWake(ParseInfo pi) {
     Token token, nl, ws;
     int state = STATE_IDLE;
     bool in_multiline_string = false;
+    bool in_legacy_string = false;
 
     void *parser = ParseAlloc(malloc);
     // ParseTrace(stderr, "");
@@ -54,10 +55,15 @@ void parseWake(ParseInfo pi) {
         // Check to see if we're still inside a multiline string
         if (in_multiline_string)
             in_multiline_string = ParseShifts(parser, TOKEN_MSTR_CONTINUE);
+        if (in_legacy_string)
+            in_legacy_string = ParseShifts(parser, TOKEN_LSTR_CONTINUE);
 
         if (in_multiline_string) {
             // Proceed lexing in multiline string context
             token = lex_mstr_continue(token.end, pi.fcontent->end);
+        } else if (in_legacy_string) {
+            // Proceed lexing in legacy multiline string context
+            token = lex_lstr_continue(token.end, pi.fcontent->end);
         } else if (*token.end == '}') {
             // A '}' might signal resuming either a String, a RegExp, or an {} expression.
             // This sort of parser-context aware lexing is supported by fancier parser generators.
@@ -68,8 +74,8 @@ void parseWake(ParseInfo pi) {
                 token = lex_rstr(token.end, pi.fcontent->end);
             } else if (ParseShifts(parser, TOKEN_MSTR_RESUME)) {
                 token = lex_mstr_resume(token.end, pi.fcontent->end);
-            } else if (ParseShifts(parser, TOKEN_LSTR_CLOSE)) {
-                token = lex_lstr(token.end, pi.fcontent->end);
+            } else if (ParseShifts(parser, TOKEN_LSTR_RESUME)) {
+                token = lex_lstr_resume(token.end, pi.fcontent->end);
             } else {
                 token = lex_wake(token.end, pi.fcontent->end);
             }
@@ -93,7 +99,7 @@ void parseWake(ParseInfo pi) {
                 continue;
             } else if (token.id == TOKEN_NL) {
                 pi.fcontent->newline(token.end);
-                if (in_multiline_string) {
+                if (in_multiline_string || in_legacy_string) {
                     break;
                 } else {
                     // Enter indent processing state machine
@@ -200,6 +206,10 @@ void parseWake(ParseInfo pi) {
             in_multiline_string = true;
         }
 
+        if (token.id == TOKEN_LSTR_BEGIN || token.id == TOKEN_LSTR_RESUME) {
+            in_legacy_string = true;
+        }
+
         if (!token.ok && ParseShifts(parser, token.id)) {
             // Complain about illegal token
             std::stringstream ss;
@@ -273,10 +283,12 @@ const char *symbolExample(int symbol) {
     case TOKEN_MSTR_PAUSE:   return "string%{";
     case TOKEN_MSTR_RESUME:  return "}string\\n";
     case TOKEN_MSTR_MID:     return "}string%{";
-    case TOKEN_LSTR_SINGLE:  return "\"%string%\"";
-    case TOKEN_LSTR_OPEN:    return "\"%string%{";
-    case TOKEN_LSTR_CLOSE:   return "}string%\"";
-    case TOKEN_LSTR_MID:     return "}string{";
+    case TOKEN_LSTR_BEGIN:   return "\"%";
+    case TOKEN_LSTR_END:     return "%\"";
+    case TOKEN_LSTR_CONTINUE:return "string\\n";
+    case TOKEN_LSTR_PAUSE:   return "string%{";
+    case TOKEN_LSTR_RESUME:  return "}string\\n";
+    case TOKEN_LSTR_MID:     return "}string%{";
     case TOKEN_DOUBLE:       return "3.1415";
     case TOKEN_INTEGER:      return "42";
     case TOKEN_KW_HERE:      return "here";
