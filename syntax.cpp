@@ -147,12 +147,15 @@ void parseWake(ParseInfo pi) {
                     if (newdent.size() > indent.size()) {
                         std::stringstream ss;
                         Location l = tinfo.location(*pi.fcontent);
+                        TokenInfo tws;
+                        tws.start = nl.end;
+                        tws.end = ws.end;
                         ss << "syntax error; whitespace on line " << l.end.row << " neither indents the previous line nor matches a prior indentation level";
-                        pi.reporter->report(REPORT_ERROR, tinfo.location(*pi.fcontent), ss.str());
-                        // Treat this as the new indentation.
-                        std::swap(indent, newdent);
+                        pi.reporter->report(REPORT_ERROR, tws.location(*pi.fcontent), ss.str());
                     }
-                } else if (newdent.size() > indent.size()) {
+                }
+
+                if (newdent.size() > indent.size()) {
                     // If newdent is longer, insert an INDENT token.
                     // During error recovery, if we cannot accept an INDENT, push an NL first.
                     if (!ParseShifts(parser, TOKEN_INDENT))
