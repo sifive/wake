@@ -197,7 +197,7 @@ Token lex_dstr(const uint8_t *s, const uint8_t *e) {
         [^]([\\]notnl|schar)*["]   { return Token(TOKEN_STR_CLOSE, s); }
         [^]([\\]notnl|schar)*[{]   { return Token(TOKEN_STR_MID,   s); }
 
-        * { return Token(TOKEN_STR_CLOSE, s, false); }
+        * { return Token(TOKEN_WS,        s, false); }
         $ { return Token(TOKEN_STR_CLOSE, s, false); }
      */
 }
@@ -209,7 +209,7 @@ Token lex_rstr(const uint8_t *s, const uint8_t *e) {
         [^]([$]*[\\]notnl|rchar|[$]+dchar)*[$]*[`] { return Token(TOKEN_REG_CLOSE, s); }
         [^]([$]*[\\]notnl|rchar|[$]+dchar)*[$]+[{] { return Token(TOKEN_REG_MID,   s); }
 
-        * { return Token(TOKEN_REG_CLOSE, s, false); }
+        * { return Token(TOKEN_WS,        s, false); }
         $ { return Token(TOKEN_REG_CLOSE, s, false); }
      */
 }
@@ -223,12 +223,15 @@ Token lex_mstr_continue(const uint8_t *s, const uint8_t *e) {
 
         pchar = notnl \ [%];
         mchar = notnl \ [%{];
-        fchar = pchar \ lws;
+        qchar = notnl \ [%"];
+        fchar = notnl \ lws \ [%"];
 
-         (fchar|[%]+mchar)(pchar|[%]+mchar)*  [%]*     { return Token(TOKEN_MSTR_CONTINUE, s); }
-        ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]+ [{] { return Token(TOKEN_MSTR_PAUSE,    s); }
+        ["]{1,2}((qchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]*     |
+                ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]*     { return Token(TOKEN_MSTR_CONTINUE, s); }
+        ["]{1,2}((qchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]+ [{] |
+                ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]+ [{] { return Token(TOKEN_MSTR_PAUSE,    s); }
 
-        * { return Token(TOKEN_MSTR_END, s, false); }
+        * { return Token(TOKEN_WS,       s, false); }
         $ { return Token(TOKEN_MSTR_END, s, false); }
      */
 }
@@ -239,7 +242,7 @@ Token lex_mstr_resume(const uint8_t *s, const uint8_t *e) {
         [^](pchar|[%]+mchar)*[%]*       { return Token(TOKEN_MSTR_RESUME, s); }
         [^](pchar|[%]+mchar)*[%]+ [{]   { return Token(TOKEN_MSTR_MID,    s); }
 
-        * { return Token(TOKEN_MSTR_RESUME, s, false); }
+        * { return Token(TOKEN_WS,          s, false); }
         $ { return Token(TOKEN_MSTR_RESUME, s, false); }
      */
 }
@@ -254,7 +257,7 @@ Token lex_lstr_continue(const uint8_t *s, const uint8_t *e) {
          (fchar|[%]+mchar)(pchar|[%]+mchar)*  [%]*     { return Token(TOKEN_LSTR_CONTINUE, s); }
         ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]+ [{] { return Token(TOKEN_LSTR_PAUSE,    s); }
 
-        * { return Token(TOKEN_LSTR_END, s, false); }
+        * { return Token(TOKEN_WS,       s, false); }
         $ { return Token(TOKEN_LSTR_END, s, false); }
      */
 }
@@ -265,7 +268,7 @@ Token lex_lstr_resume(const uint8_t *s, const uint8_t *e) {
         [^](pchar|[%]+mchar)*[%]*       { return Token(TOKEN_LSTR_RESUME, s); }
         [^](pchar|[%]+mchar)*[%]+ [{]   { return Token(TOKEN_LSTR_MID,    s); }
 
-        * { return Token(TOKEN_LSTR_RESUME, s, false); }
+        * { return Token(TOKEN_WS,          s, false); }
         $ { return Token(TOKEN_LSTR_RESUME, s, false); }
      */
 }
