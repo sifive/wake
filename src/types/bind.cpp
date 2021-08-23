@@ -32,7 +32,7 @@
 #include "frontend/expr.h"
 #include "runtime/prim.h"
 #include "frontend/symbol.h"
-#include "frontend/parser.h"
+#include "frontend/sums.h"
 #include "frontend/diagnostic.h"
 
 typedef std::map<std::string, int> NameIndex;

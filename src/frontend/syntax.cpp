@@ -24,12 +24,12 @@
 #include <iomanip>
 #include <sstream>
 
-#include "lexer.h"
-#include "parser.h"
-#include "syntax.h"
-#include "file.h"
-#include "reporter.h"
-#include "cst.h"
+#include "frontend/lexer.h"
+#include "frontend/parser.h"
+#include "frontend/syntax.h"
+#include "frontend/file.h"
+#include "frontend/diagnostic.h"
+#include "frontend/cst.h"
 
 #define STATE_IDLE	0
 #define STATE_NL	1
@@ -165,7 +165,7 @@ void parseWake(ParseInfo pi) {
                         tws.start = nl.end;
                         tws.end = ws.end;
                         ss << "syntax error; whitespace on line " << l.end.row << " neither indents the previous line nor matches a prior indentation level";
-                        pi.reporter->report(REPORT_ERROR, tws.location(*pi.fcontent), ss.str());
+                        pi.reporter->reportError(tws.location(*pi.fcontent), ss.str());
                     }
                 }
 
@@ -219,7 +219,7 @@ void parseWake(ParseInfo pi) {
             std::stringstream ss;
             ss << "syntax error; found illegal token " << tinfo
                << ", but handling it like:\n    " << symbolExample(token.id);
-            pi.reporter->report(REPORT_ERROR, tinfo.location(*pi.fcontent), ss.str());
+            pi.reporter->reportError(tinfo.location(*pi.fcontent), ss.str());
         }
 
         Parse(parser, token.id, tinfo, pi);

@@ -21,15 +21,15 @@
 #include <stdio.h>
 
 class FileContent;
-class Reporter;
+class DiagnosticReporter;
 class CSTBuilder;
 
 struct ParseInfo {
     FileContent *fcontent;
     CSTBuilder *cst;
-    Reporter *reporter;
+    DiagnosticReporter *reporter;
 
-    ParseInfo(FileContent *fcontent_, CSTBuilder *cst_, Reporter *reporter_)
+    ParseInfo(FileContent *fcontent_, CSTBuilder *cst_, DiagnosticReporter *reporter_)
      : fcontent(fcontent_), cst(cst_), reporter(reporter_) { }
 };
 

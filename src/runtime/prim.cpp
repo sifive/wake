@@ -32,7 +32,7 @@
 #include "frontend/expr.h"
 #include "runtime/tuple.h"
 #include "location.h"
-#include "frontend/parser.h"
+#include "frontend/sums.h"
 #include "runtime/status.h"
 
 void require_fail(const char *message, unsigned size, Runtime &runtime, const Scope *scope) {

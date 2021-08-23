@@ -21,10 +21,10 @@
 
 #include <iomanip>
 
-#include "cst.h"
-#include "file.h"
-#include "syntax.h"
-#include "lexer.h"
+#include "frontend/cst.h"
+#include "frontend/file.h"
+#include "frontend/syntax.h"
+#include "frontend/lexer.h"
 
 CSTBuilder::CSTBuilder(const FileContent &fcontent) {
     file = &fcontent;

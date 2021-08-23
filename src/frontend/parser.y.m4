@@ -34,10 +34,10 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <string.h>
-#include "syntax.h"
-#include "reporter.h"
-#include "cst.h"
-#include "file.h"
+#include "frontend/syntax.h"
+#include "frontend/diagnostic.h"
+#include "frontend/cst.h"
+#include "frontend/file.h"
 #include <vector>
 #include <sstream>
 #include <iostream>
@@ -50,7 +50,7 @@
     std::stringstream sstr;                                                            \
     sstr << "syntax error; " << sstream;                                               \
     Location l = token.location(*pinfo.fcontent);                                      \
-    pinfo.reporter->report(REPORT_ERROR, l, sstr.str());                               \
+    pinfo.reporter->reportError(l, sstr.str());                                        \
   } while (0)
 }
 
@@ -450,12 +450,12 @@ bool ParseShifts(void *p, int yymajor) {
   } else {
     ss << "which is inappropriate here";
   }
-  pinfo.reporter->report(REPORT_ERROR, yyminor.location(*pinfo.fcontent), ss.str());
+  pinfo.reporter->reportError(yyminor.location(*pinfo.fcontent), ss.str());
 }
 
 %parse_failure {
   TokenInfo ti;
   ti.start = pinfo.fcontent->start;
   ti.end = pinfo.fcontent->end;
-  pinfo.reporter->report(REPORT_ERROR, ti.location(*pinfo.fcontent), "Parser was unable to proceed");
+  pinfo.reporter->reportError(ti.location(*pinfo.fcontent), "Parser was unable to proceed");
 }

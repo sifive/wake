@@ -22,8 +22,8 @@
 #include <cstdio>
 #include <cstdint>
 
-#include "lexer.h"
-#include "parser.h"
+#include "frontend/lexer.h"
+#include "frontend/parser.h"
 
 /*!include:re2c "unicode_categories.re" */
 

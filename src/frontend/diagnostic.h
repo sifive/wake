@@ -18,7 +18,7 @@
 #ifndef DIAGNOSTIC_H
 #define DIAGNOSTIC_H
 
-#include <location.h>
+#include "location.h"
 
 enum Severity { S_ERROR = 1, S_WARNING, S_INFORMATION, S_HINT };
 

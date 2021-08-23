@@ -15,9 +15,7 @@
  * limitations under the License.
  */
 
-// Open Group Base Specifications Issue 7
-#define _XOPEN_SOURCE 700
-#define _POSIX_C_SOURCE 200809L
+#define _DEFAULT_SOURCE // MAP_ANON is not in POSIX yet
 
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -27,8 +25,8 @@
 #include <errno.h>
 #include <algorithm>
 
-#include "file.h"
-#include "reporter.h"
+#include "frontend/file.h"
+#include "frontend/diagnostic.h"
 
 static uint8_t null[1] = { 0 };
 
@@ -60,21 +58,21 @@ StringFile::StringFile(const char *filename_, std::string &&content_)
     end = start + content.size();
 }
 
-ExternalFile::ExternalFile(Reporter &reporter, const char *filename_)
+ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
  : FileContent(filename_)
 {
     Location l(filename.c_str());
 
     int fd = open(filename.c_str(), O_RDONLY);
     if (fd == -1) {
-        reporter.report(REPORT_ERROR, l, std::string("open failed; ") + strerror(errno));
+        reporter.reportError(l, std::string("open failed; ") + strerror(errno));
         end = start = &null[0];
         return;
     }
 
     struct stat s;
     if (fstat(fd, &s) == -1) {
-        reporter.report(REPORT_ERROR, l, std::string("fstat failed; ") + strerror(errno));
+        reporter.reportError(l, std::string("fstat failed; ") + strerror(errno));
         close(fd);
         end = start = &null[0];
         return;
@@ -90,7 +88,7 @@ ExternalFile::ExternalFile(Reporter &reporter, const char *filename_)
     // Map +1 over the length (for null ptr)
     void *map = mmap(nullptr, s.st_size+1, PROT_READ, MAP_PRIVATE, fd, 0);
     if (map == MAP_FAILED) {
-        reporter.report(REPORT_ERROR, l, std::string("mmap failed; ") + strerror(errno));
+        reporter.reportError(l, std::string("mmap failed; ") + strerror(errno));
         close(fd);
         end = start = &null[0];
         return;
@@ -108,7 +106,7 @@ ExternalFile::ExternalFile(Reporter &reporter, const char *filename_)
 
     std::string buf(reinterpret_cast<const char*>(map) + tail_start, tail_len-1);
     if (mmap(reinterpret_cast<uint8_t*>(map) + tail_start, pagesize, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANON, -1, 0) == MAP_FAILED) {
-        reporter.report(REPORT_ERROR, l, std::string("mmap anon failed; ") + strerror(errno));
+        reporter.reportError(l, std::string("mmap anon failed; ") + strerror(errno));
         munmap(map, s.st_size+1);
         end = start = &null[0];
         return;

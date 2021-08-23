@@ -28,7 +28,7 @@
 #include "runtime/prim.h"
 #include "frontend/expr.h"
 #include "runtime/value.h"
-#include "frontend/parser.h"
+#include "frontend/sums.h"
 
 typedef std::numeric_limits<double> dlimits;
 static double nan() { return dlimits::quiet_NaN(); }

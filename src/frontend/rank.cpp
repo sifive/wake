@@ -22,7 +22,7 @@
 #include <immintrin.h>
 #include <assert.h>
 
-#include "rank.h"
+#include "frontend/rank.h"
 
 #define W_SIZE   64
 #define L0_COUNT 8	// number of entries in an L0 block

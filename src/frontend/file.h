@@ -23,7 +23,7 @@
 #include <stdint.h>
 
 #include "location.h"
-class Reporter;
+class DiagnosticReporter;
 
 class FileContent {
 public:
@@ -50,7 +50,7 @@ private:
 
 class ExternalFile : public FileContent {
 public:
-    ExternalFile(Reporter &reporter, const char *filename_);
+    ExternalFile(DiagnosticReporter &reporter, const char *filename_);
     ExternalFile(ExternalFile &&o);
     ~ExternalFile();
     ExternalFile &operator = (ExternalFile &&o);

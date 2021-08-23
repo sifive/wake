@@ -61,6 +61,10 @@ friend class RankMap;
 friend class RankSelect1Map;
 };
 
+extern "C" {
+extern void *my_aligned_alloc(size_t alignment, size_t size);
+};
+
 template <class T>
 class AlignedAlloc {
 public:
@@ -76,7 +80,7 @@ public:
     pointer address(reference x) const noexcept { return &x; }
     const_pointer address(const_reference x) const noexcept { return &x; }
     pointer allocate(size_type n, const void *hint = nullptr) {
-      return reinterpret_cast<pointer>(aligned_alloc(alignof(T), sizeof(T)*n));
+      return reinterpret_cast<pointer>(my_aligned_alloc(alignof(T), sizeof(T)*n));
     }
     void deallocate(pointer p, size_type n) { free(p); }
     size_type max_size() const noexcept { return -1; }
