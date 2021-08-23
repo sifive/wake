@@ -17,7 +17,10 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def buildFuse (Pair (variant: String) _): Result (List Path) Error =
+def buildFuse variant: Result (List Path) Error =
+    def Pair cppVariant _ =
+        variant
+
     def libobjsResult =
         buildFuseLibObjs variant
 
@@ -29,14 +32,17 @@ def buildFuse (Pair (variant: String) _): Result (List Path) Error =
         sources "fuse" `.*\.h`
 
     require Pass client =
-        compileC variant json.getSysLibCFlags headers (source "fuse/client.cpp")
+        compileC cppVariant json.getSysLibCFlags headers (source "fuse/client.cpp")
 
     require Pass libobjs =
         libobjsResult
 
-    linkO variant json.getSysLibLFlags (client ++ libobjs) "bin/fuse-wake"
+    linkO cppVariant json.getSysLibLFlags (client ++ libobjs) "bin/fuse-wake"
 
-def buildFuseLibObjs (variant: String): Result (List Path) Error =
+def buildFuseLibObjs variant: Result (List Path) Error =
+    def Pair cppVariant _ =
+        variant
+
     require Pass json =
         common variant
 
@@ -48,7 +54,7 @@ def buildFuseLibObjs (variant: String): Result (List Path) Error =
         sources "fuse" `(fuse|namespace|daemon_client).cpp`
 
     def compile =
-        compileC variant json.getSysLibCFlags headers
+        compileC cppVariant json.getSysLibCFlags headers
 
     require Pass objs =
         map compile cppFiles
@@ -56,7 +62,10 @@ def buildFuseLibObjs (variant: String): Result (List Path) Error =
 
     Pass (objs.flatten ++ json.getSysLibObjects)
 
-def buildFuseDaemon (Pair (variant: String) _): Result (List Path) Error =
+def buildFuseDaemon variant: Result (List Path) Error =
+    def Pair cppVariant _ =
+        variant
+
     def fuseOption =
         pkgConfig "fuse"
 
@@ -72,8 +81,8 @@ def buildFuseDaemon (Pair (variant: String) _): Result (List Path) Error =
         flattenSysLibs (json, fuse, Nil)
 
     require Pass daemon =
-        compileC variant deps.getSysLibCFlags deps.getSysLibHeaders (source "{here}/daemon.cpp")
+        compileC cppVariant deps.getSysLibCFlags deps.getSysLibHeaders (source "{here}/daemon.cpp")
 
     def objFiles = daemon ++ deps.getSysLibObjects
 
-    linkO variant deps.getSysLibLFlags objFiles "lib/wake/fuse-waked"
+    linkO cppVariant deps.getSysLibLFlags objFiles "lib/wake/fuse-waked"

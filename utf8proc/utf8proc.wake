@@ -21,6 +21,9 @@ from gcc_wake import _
 def utf8proc variant = match (pkgConfig "utf8proc")
     Some x = Pass x
     None   =
+        def Pair _ cVariant =
+            variant
+
         def cflags =
             "-I{here}", Nil
 
@@ -29,6 +32,6 @@ def utf8proc variant = match (pkgConfig "utf8proc")
             sources here `.*\.h`
 
         require Pass objs =
-            compileC variant cflags headers (source "{here}/utf8proc.c")
+            compileC cVariant cflags headers (source "{here}/utf8proc.c")
 
         Pass (SysLib "2.2.0" headers objs cflags Nil)

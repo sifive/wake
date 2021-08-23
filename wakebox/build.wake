@@ -17,15 +17,18 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def buildWakeBox (Pair cpplib clib) =
+def buildWakeBox variant =
+    def Pair cppVariant _ =
+        variant
+
     def commonLibResult =
-        common cpplib
+        common variant
 
     def fuseLibResult =
-        buildFuseLibObjs cpplib
+        buildFuseLibObjs variant
 
     def goptLibResult =
-        gopt clib
+        gopt variant
 
     require Pass commonLib = commonLibResult
     require Pass goptLib = goptLibResult
@@ -41,7 +44,7 @@ def buildWakeBox (Pair cpplib clib) =
         commonLib.getSysLibHeaders
 
     def compile =
-        compileC cpplib ("-Ifuse", goptLib.getSysLibCFlags ++ commonLib.getSysLibCFlags) headers
+        compileC cppVariant ("-Ifuse", goptLib.getSysLibCFlags ++ commonLib.getSysLibCFlags) headers
 
     def cppFiles =
         sources "wakebox" `.*\.cpp`
@@ -55,4 +58,4 @@ def buildWakeBox (Pair cpplib clib) =
         goptLib.getSysLibObjects ++
         objs.flatten
 
-    linkO cpplib libs.getSysLibLFlags objFiles "bin/wakebox"
+    linkO cppVariant libs.getSysLibLFlags objFiles "bin/wakebox"
