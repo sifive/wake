@@ -155,13 +155,15 @@ private:
         Use(Location _use, Location _def) : use(_use), def(_def) {}
     };
     std::vector<Use> uses;
+    enum SymbolKind { KIND_FUNCTION = 12, KIND_VARIABLE = 13, KIND_STRING = 15, KIND_NUMBER = 16, KIND_BOOLEAN = 17,
+      KIND_ARRAY = 18, KIND_ENUM_MEMBER = 22, KIND_OPERATOR = 25 };
     struct Definition {
         std::string name;
         Location location;
         std::string type;
-        Definition(std::string _name, Location _location, std::string _type) : name(std::move(_name)),
-                                                                               location(_location),
-                                                                               type(std::move(_type)) {}
+        SymbolKind symbolKind;
+        Definition(std::string _name, Location _location, std::string _type, SymbolKind _symbolKind) :
+          name(std::move(_name)), location(_location), type(std::move(_type)), symbolKind(_symbolKind) {}
     };
     std::vector<Definition> definitions;
     std::map<std::string, LspMethod> methodToFunction = {
@@ -364,6 +366,10 @@ private:
         explore(root.get());
     }
 
+    SymbolKind getSymbolKind() {
+
+    }
+
     void explore(Expr *expr) {
       if (expr->type == &VarRef::type) {
         VarRef *ref = static_cast<VarRef*>(expr);
@@ -375,12 +381,27 @@ private:
         explore(app->val.get());
         explore(app->fn.get());
       } else if (expr->type == &Lambda::type) {
+        SymbolKind symbolKind = KIND_BOOLEAN;
         Lambda *lambda = static_cast<Lambda*>(expr);
+        if (Lexer::isLower(lambda->name.c_str())) {
+          if (strcmp(lambda->typeVar.getName(), "binary =>@builtin") == 0) {
+            symbolKind = KIND_FUNCTION;
+          } else {
+            symbolKind = KIND_VARIABLE;
+          }
+        } else if (Lexer::isOperator(lambda->name.c_str())) {
+          symbolKind = KIND_OPERATOR;
+        } else if (Lexer::isUpper(lambda->name.c_str())) {
+          symbolKind = KIND_ENUM_MEMBER;
+        }
         if (lambda->token.start.bytes >= 0) {
           std::stringstream ss;
           ss << lambda->typeVar[0];
-          if (lambda->name.find(' ') == std::string::npos)
-            definitions.emplace_back(lambda->name /* name */, lambda->token /* location */, ss.str() /* type */);
+          if (lambda->name.find(' ') == std::string::npos) {
+            definitions.emplace_back(lambda->name /* name */, lambda->token /* location */, ss.str() /* type */, symbolKind);
+            //std::cerr << "bababa" << std::endl;
+            std::cerr << "----\n" << lambda->typeVar.getName() << "\n" << expr->type->name << "\n" << lambda->name << std::endl;
+          }
         }
         explore(lambda->body.get());
       } else if (expr->type == &Ascribe::type) {
@@ -392,18 +413,45 @@ private:
         for (auto &i : defbinding->fun) explore(i.get());
         for (auto &i : defbinding->order) {
           if (i.second.location.start.bytes >= 0) {
+            SymbolKind symbolKind = KIND_BOOLEAN;
             std::stringstream ss;
             size_t idx = i.second.index;
             if (idx < defbinding->val.size()) {
+              if (Lexer::isLower(i.first.c_str())) {
+                if (strcmp(defbinding->val[idx]->typeVar.getName(), "binary =>@builtin") == 0) {
+                  symbolKind = KIND_FUNCTION;
+                } else {
+                  symbolKind = KIND_VARIABLE;
+                }
+              } else if (Lexer::isOperator(i.first.c_str())) {
+                symbolKind = KIND_OPERATOR;
+              } else if (Lexer::isUpper(i.first.c_str())) {
+                symbolKind = KIND_ENUM_MEMBER;
+              }
               ss << defbinding->val[idx]->typeVar;
+              std::cerr << "----\n" << defbinding->val[idx]->typeVar.getName() << "\n";
             } else {
               idx -= defbinding->val.size();
+              if (Lexer::isLower(i.first.c_str())) {
+                if (strcmp(defbinding->fun[idx]->typeVar.getName(), "binary =>@builtin") == 0) {
+                  symbolKind = KIND_FUNCTION;
+                } else {
+                  symbolKind = KIND_VARIABLE;
+                }
+              } else if (Lexer::isOperator(i.first.c_str())) {
+                symbolKind = KIND_OPERATOR;
+              } else if (Lexer::isUpper(i.first.c_str())) {
+                symbolKind = KIND_ENUM_MEMBER;
+              }
               ss << defbinding->fun[idx]->typeVar;
+              std::cerr << "----\n" << defbinding->fun[idx]->typeVar.getName() << "\n";
             }
             if (i.first.find(' ') == std::string::npos ||
                 i.first.compare(0, 7, "binary ") == 0 ||
-                i.first.compare(0, 6, "unary ") == 0)
-              definitions.emplace_back(i.first /* name */, i.second.location /* location */, ss.str() /* type */);
+                i.first.compare(0, 6, "unary ") == 0) {
+              definitions.emplace_back(i.first /* name */, i.second.location /* location */, ss.str() /* type */, symbolKind);
+              std::cerr << expr->type->name << "\n" << i.first << std::endl;
+            }
           }
         }
         explore(defbinding->body.get());
@@ -596,8 +644,8 @@ private:
 
     void appendSymbolToJSON(const Definition& def, JAST &json) {
       JAST &symbol = json.add("", JSON_OBJECT);
-      symbol.add("name", def.name.c_str());
-      symbol.add("kind", 13); // Variable
+      symbol.add("name", def.name + ": " + def.type);
+      symbol.add("kind", def.symbolKind);
       symbol.children.emplace_back("location", createLocationJSON(def.location));
     }
 
