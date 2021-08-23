@@ -2,7 +2,7 @@
 
 VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/^[^']*'\([^']*\)'.*/\1/p" manifest.wake; else git describe --tags --dirty; fi)
 
-CC	:= cc -std=c99
+CC	:= cc -std=c11
 CXX	:= c++ -std=c++11
 CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
 LDFLAGS	:=
@@ -20,7 +20,7 @@ CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsql
 		$(shell pkg-config --silence-errors --libs re2     || echo -lre2)	\
 		$(shell pkg-config --silence-errors --libs ncurses tinfo || pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
-COMMON := common/jlexer.o $(patsubst %.cpp,%.o,$(wildcard common/*.cpp))
+COMMON := common/jlexer.o $(patsubst %.cpp,%.o,$(wildcard common/*.cpp)) $(patsubst %.c,%.o,$(wildcard common/*.c))
 WAKE_ENV := WAKE_PATH=$(shell dirname $(shell which $(firstword $(CC))))
 
 # If FUSE is unavalable during wake build, allow a linux-specific work-around

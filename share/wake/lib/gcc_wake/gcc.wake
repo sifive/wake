@@ -15,8 +15,8 @@
 
 package gcc_wake
 
-export def c11Flags      = ("-std=c++11", Nil)
-export def c99Flags      = ("-std=c99", Nil)
+export def cpp11Flags    = ("-std=c++11", Nil)
+export def c11Flags      = ("-std=c11", Nil)
 export def debugCFlags   = ("-Wall", "-Wextra", "-O0", "-g", "-pg", Nil)
 export def debugLFlags   = ("-g", "-pg", Nil)
 export def releaseCFlags = ("-Wall", "-O2", "-flto", Nil)
@@ -52,17 +52,17 @@ export def makeLinkO variant linker flags =
     Pair variant (\extraFlags doLinkO variant linker (flags ++ extraFlags)), Nil
 
 export topic compileC: Pair String ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Result (List Path) Error)
-publish compileC = makeCompileC "native-c99-debug"     (which "cc")  (c99Flags ++ debugCFlags)
-publish compileC = makeCompileC "native-c99-release"   (which "cc")  (c99Flags ++ releaseCFlags)
-publish compileC = makeCompileC "native-c99-static"    (which "cc")  (c99Flags ++ staticCFlags)
-publish compileC = makeCompileC "native-cpp11-debug"   (which "c++") (c11Flags ++ debugCFlags)
-publish compileC = makeCompileC "native-cpp11-release" (which "c++") (c11Flags ++ releaseCFlags)
-publish compileC = makeCompileC "native-cpp11-static"  (which "c++") (c11Flags ++ staticCFlags)
+publish compileC = makeCompileC "native-c11-debug"     (which "cc")  (c11Flags ++ debugCFlags)
+publish compileC = makeCompileC "native-c11-release"   (which "cc")  (c11Flags ++ releaseCFlags)
+publish compileC = makeCompileC "native-c11-static"    (which "cc")  (c11Flags ++ staticCFlags)
+publish compileC = makeCompileC "native-cpp11-debug"   (which "c++") (cpp11Flags ++ debugCFlags)
+publish compileC = makeCompileC "native-cpp11-release" (which "c++") (cpp11Flags ++ releaseCFlags)
+publish compileC = makeCompileC "native-cpp11-static"  (which "c++") (cpp11Flags ++ staticCFlags)
 
 export topic linkO: Pair String ((extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error)
-publish linkO = makeLinkO "native-c99-debug"     (which "cc") (debugLFlags)
-publish linkO = makeLinkO "native-c99-release"   (which "cc") (releaseLFlags)
-publish linkO = makeLinkO "native-c99-static"    (which "cc") (staticLFlags)
+publish linkO = makeLinkO "native-c11-debug"     (which "cc") (debugLFlags)
+publish linkO = makeLinkO "native-c11-release"   (which "cc") (releaseLFlags)
+publish linkO = makeLinkO "native-c11-static"    (which "cc") (staticLFlags)
 publish linkO = makeLinkO "native-cpp11-debug"   (which "c++") (debugLFlags)
 publish linkO = makeLinkO "native-cpp11-release" (which "c++") (releaseLFlags)
 publish linkO = makeLinkO "native-cpp11-static"  (which "c++") (staticLFlags)
