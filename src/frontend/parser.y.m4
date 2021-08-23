@@ -1,11 +1,19 @@
-%include {#include <string.h>}
-%include {#include "syntax.h"}
-%include {#include "reporter.h"}
-%include {#include "cst.h"}
-%include {#include "file.h"}
-%include {#include <vector>}
-%include {#include <sstream>}
-%include {#include <iostream>}
+/*
+ * Copyright 2019 SiFive, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You should have received a copy of LICENSE.Apache2 along with
+ * this software. If not, you may obtain a copy at
+ *
+ *    https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 %stack_size {0}
 %extra_argument {ParseInfo pinfo}
@@ -21,6 +29,19 @@
 %token WS COMMENT P_BOPEN P_BCLOSE P_SOPEN P_SCLOSE.
 
 %include {
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+
+#include <string.h>
+#include "syntax.h"
+#include "reporter.h"
+#include "cst.h"
+#include "file.h"
+#include <vector>
+#include <sstream>
+#include <iostream>
+
 #define add(t, ...) pinfo.cst->addNode((t), __VA_ARGS__)
 #define pop(x) pinfo.cst->delNodes(x)
 
