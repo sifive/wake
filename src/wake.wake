@@ -31,9 +31,12 @@ def ncurses Unit =
     | getOrElseFn (\Unit pkg "ncurses")
     | editSysLibCFlags (filter (matches `-I.*` _)) # remove feature test manipulation
 
-def buildWake (Pair variant clib) =
+def buildWake variant =
+    def Pair cppVariant _ =
+        variant
+
     def internalDepResults =
-        runtime variant, map (_ clib) (gopt, Nil)
+        map (_ variant) (runtime, gopt, Nil)
 
     require Pass internalDeps =
         findFail internalDepResults
@@ -50,7 +53,7 @@ def buildWake (Pair variant clib) =
         map source ("src/cli/describe.cpp", "src/cli/markup.cpp", "src/cli/main.cpp", Nil)
 
     def compile =
-        compileC variant ("-I{here}", deps.getSysLibCFlags) headerFiles
+        compileC cppVariant ("-I{here}", deps.getSysLibCFlags) headerFiles
 
     require Pass objFiles =
         map compile cppFiles
@@ -60,4 +63,4 @@ def buildWake (Pair variant clib) =
         objFiles.flatten ++
         deps.getSysLibObjects
 
-    linkO variant deps.getSysLibLFlags allObjs "bin/wake"
+    linkO cppVariant deps.getSysLibLFlags allObjs "bin/wake"

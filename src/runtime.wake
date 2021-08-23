@@ -17,12 +17,15 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def runtime (variant: String): Result SysLib Error =
+def runtime variant: Result SysLib Error =
+    def Pair cppVariant _ =
+        variant
+
     def externalDeps =
         ncurses Unit, map pkg ("sqlite3", "gmp", "re2", Nil)
 
     def internalDepResults =
-        common variant, map (_ "native-c99-release") (utf8proc, Nil)
+        map (_ variant) (common, utf8proc, Nil)
 
     require Pass internalDeps =
         findFail internalDepResults
@@ -43,7 +46,7 @@ def runtime (variant: String): Result SysLib Error =
         deps.getSysLibHeaders
         
     def compile =
-        compileC variant cflags headers
+        compileC cppVariant cflags headers
 
     def re2obj re =
         require Pass cpp = re2c re

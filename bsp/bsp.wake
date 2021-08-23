@@ -17,10 +17,28 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def buildBSP (Pair (variant: String) _): Result (List Path) Error =
-    require Pass json = common variant
-    def compile = compileC variant json.getSysLibCFlags (version_h Unit, json.getSysLibHeaders)
-    def cppFiles = source "{here}/bsp.cpp", Nil
-    require Pass objects = map compile cppFiles | findFail
-    def objFiles = objects.flatten ++ json.getSysLibObjects
-    linkO variant json.getSysLibLFlags objFiles "lib/wake/bsp-wake"
+def buildBSP variant: Result (List Path) Error =
+    require Pass json =
+        common variant
+
+    def Pair cppVariant _ =
+        variant
+
+    def headers =
+        version_h Unit,
+        json.getSysLibHeaders
+
+    def compileCPP =
+        compileC cppVariant json.getSysLibCFlags headers
+
+    def cppFiles =
+        source "{here}/bsp.cpp", Nil
+
+    require Pass objects =
+        map compileCPP cppFiles
+        | findFail
+
+    def objFiles =
+        objects.flatten ++ json.getSysLibObjects
+
+    linkO cppVariant json.getSysLibLFlags objFiles "lib/wake/bsp-wake"
