@@ -32,7 +32,10 @@ def liblflags = match sysname
     "Darwin" = "-dynamiclib", Nil
     _ = "-shared", "-ldl", Nil
 
-def buildPreload (Pair variant _): Result (List Path) Error =
+def buildPreload variant: Result (List Path) Error =
+    def Pair cppVariant _ =
+        variant
+
     require Pass json =
         common variant
 
@@ -47,19 +50,22 @@ def buildPreload (Pair variant _): Result (List Path) Error =
         "-DEXT={libext}", "-DENV={loadenv}", json.getSysLibCFlags
 
     require Pass ofiles =
-        map (compileC variant cppFlags headers) cppFiles
+        map (compileC cppVariant cppFlags headers) cppFiles
         | findFail
 
-    linkO variant Nil (ofiles.flatten ++ json.getSysLibObjects) "bin/preload-wake"
+    linkO cppVariant Nil (ofiles.flatten ++ json.getSysLibObjects) "bin/preload-wake"
 
-def buildPrelib (Pair _ variant): Result (List Path) Error =
+def buildPrelib variant: Result (List Path) Error =
+    def Pair _ cVariant =
+        variant
+
     def cfiles =
         sources here `.*\.c`
 
     require Pass ofiles =
-         map (compileC variant libcflags Nil) cfiles
+         map (compileC cVariant libcflags Nil) cfiles
          | findFail
 
-    linkO variant liblflags ofiles.flatten "lib/wake/libpreload-wake.{libext}"
+    linkO cVariant liblflags ofiles.flatten "lib/wake/libpreload-wake.{libext}"
 
 # publish runner = makeJSONRunner "preload/wrap" (\_ Pass 2.0) (\_ None), Nil

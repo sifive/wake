@@ -17,7 +17,10 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def gopt (variant: String): Result SysLib Error =
+def gopt variant: Result SysLib Error =
+    def Pair _ cVariant =
+        variant
+
     def cflags =
         "-I{here}", Nil
 
@@ -25,7 +28,7 @@ def gopt (variant: String): Result SysLib Error =
         sources here `.*\.h`
 
     def compile x =
-        compileC variant cflags headers (source "{here}/{x}")
+        compileC cVariant cflags headers (source "{here}/{x}")
 
     def sourceFiles =
         "gopt.c", "gopt-errors.c", "gopt-arg.c", Nil
