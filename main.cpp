@@ -49,11 +49,13 @@ void exploreElement(const CSTElement &p, int depth) {
 
 int main(int argc, const char **argv) {
     ConsoleReporter reporter;
-    ExternalFile file(reporter, argv[1]);
-    CSTBuilder builder(file);
-    parseWake(ParseInfo(&file, &builder, &reporter));
-    CST cst(std::move(builder));
-    exploreElement(cst.root(), 0);
-    std::cout << "---" << std::endl;
+    for (int i = 1; i < argc; ++i) {
+        ExternalFile file(reporter, argv[i]);
+        CSTBuilder builder(file);
+        parseWake(ParseInfo(&file, &builder, &reporter));
+        CST cst(std::move(builder));
+        exploreElement(cst.root(), 0);
+        std::cout << "---" << std::endl;
+    }
     return 0;
 }
