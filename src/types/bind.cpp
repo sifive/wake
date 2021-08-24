@@ -31,7 +31,7 @@
 #include "types/bind.h"
 #include "frontend/expr.h"
 #include "runtime/prim.h"
-#include "frontend/symbol.h"
+#include "frontend/lexer.h"
 #include "frontend/sums.h"
 #include "frontend/diagnostic.h"
 
@@ -603,7 +603,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
   out.type = std::move(ast.type);
   if (ast.name == "_") {
     // no-op; unbound
-  } else if (!ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
+  } else if (!ast.name.empty() && lex_kind(ast.name) == LOWER) {
     Lambda *lambda = new Lambda(expr->location, ast.name, expr.release());
     if (ast.name.compare(0, 3, "_ k") != 0) lambda->token = ast.token;
     expr = std::unique_ptr<Expr>(lambda);
@@ -879,7 +879,7 @@ static bool qualify_type(ResolveBinding *binding, std::string &name, const Locat
 
 static bool qualify_type(ResolveBinding *binding, AST &type) {
   // Type variables do not get qualified
-  if (Lexer::isLower(type.name.c_str())) return true;
+  if (lex_kind(type.name) == LOWER) return true;
   bool ok = qualify_type(binding, type.name, type.token);
   for (auto &x : type.args)
     if (!qualify_type(binding, x))

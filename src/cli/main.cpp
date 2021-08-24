@@ -29,7 +29,6 @@
 
 #include "frontend/parser.h"
 #include "types/bind.h"
-#include "frontend/symbol.h"
 #include "runtime/value.h"
 #include "frontend/expr.h"
 #include "runtime/job.h"
@@ -47,6 +46,17 @@
 #include "frontend/diagnostic.h"
 #include "execpath.h"
 #include "frontend/wakefiles.h"
+#include "frontend/sums.h"
+#include "frontend/file.h"
+#include "frontend/cst.h"
+#include "frontend/syntax.h"
+
+void exploreElement(const CSTElement &p, int depth) {
+    for (CSTElement x = p.firstChildElement(); !x.empty(); x.nextSiblingElement()) {
+        std::cout << std::string(depth, ' ') << symbolExample(x.id()) << ": " << x.content() << std::endl;
+        exploreElement(x, depth+4);
+    }
+}
 
 #ifndef VERSION
 #include "version.h"
@@ -100,10 +110,15 @@ void print_help(const char *argv0) {
 
 DiagnosticReporter *reporter;
 class TerminalReporter : public DiagnosticReporter {
+  public:
+    TerminalReporter() : ok(true) { }
+    bool ok;
+
   private:
     std::string last;
 
     void report(Diagnostic diagnostic) {
+      if (diagnostic.getSeverity() == S_ERROR) ok = false;
       if (last != diagnostic.getMessage()) {
          last = diagnostic.getMessage();
          std::cerr << diagnostic.getMessage() << std::endl;
@@ -388,9 +403,17 @@ int main(int argc, char **argv) {
   for (auto &i : wakefiles) {
     if (verbose && debug)
       std::cerr << "Parsing " << i << std::endl;
-    Lexer lex(runtime.heap, i.c_str());
+
+    ExternalFile file(terminalReporter, i.c_str());
+    CSTBuilder builder(file);
+    parseWake(ParseInfo(&file, &builder, &terminalReporter));
+    CST cst(std::move(builder));
+    exploreElement(cst.root(), 0);
+    // toDST(*top, cst);
+
+#if 0
     auto package = parse_top(*top, lex);
-    if (lex.fail) ok = false;
+
     // Does this file inform our choice of a default package?
     size_t slash = i.find_last_of('/');
     std::string dir(i, 0, slash==std::string::npos?0:(slash+1)); // "" | .+/
@@ -412,6 +435,7 @@ int main(int argc, char **argv) {
         }
       }
     }
+#endif
   }
 
   if (in) {
@@ -476,11 +500,14 @@ int main(int argc, char **argv) {
   char *none = nullptr;
   char **cmdline = &none;
   if (exec) {
+/* !!!
     command = exec;
     Lexer lex(runtime.heap, command, "<execute-argument>");
     top->body = std::unique_ptr<Expr>(parse_command(lex));
     if (lex.fail) ok = false;
+*/
   } else if (argc > 1) {
+/* !!!
     command = argv[1];
     cmdline = argv+2;
     Lexer lex(runtime.heap, command, "<target-argument>");
@@ -491,6 +518,7 @@ int main(int argc, char **argv) {
       top->body = std::unique_ptr<Expr>(new Prim(LOCATION, "cmdline"));
       ok = false;
     }
+*/
   } else {
     top->body = std::unique_ptr<Expr>(new VarRef(LOCATION, "Nil@wake"));
   }

@@ -24,6 +24,9 @@
 
 #include "frontend/lexer.h"
 #include "frontend/parser.h"
+#include "utf8proc.h"
+#include "lexint.h"
+#include "utf8.h"
 
 /*!include:re2c "unicode_categories.re" */
 
@@ -33,7 +36,6 @@
     re2c:define:YYCURSOR = s;
     re2c:define:YYLIMIT = e;
     re2c:define:YYMARKER = m;
-    re2c:define:YYCTXMARKER = c;
     re2c:flags:8 = 1;
     re2c:yyfill:enable = 0;
     re2c:eof = 0;
@@ -279,5 +281,133 @@ Token lex_printable(const uint8_t *s, const uint8_t *e) {
         L|M|N|P|S|Zs { return Token(0, s, true);  }
         $            { return Token(0, s, true);  }
         *            { return Token(0, s, false); }
+     */
+}
+
+IdKind lex_kind(const uint8_t *s, const uint8_t *e) {
+    const uint8_t *m;
+    /*!re2c
+        "unary "       { return OPERATOR; }
+        "binary "      { return OPERATOR; }
+        (Lm|M)*(Lt|Lu) { return UPPER; }
+        *              { return LOWER; }
+        $              { return LOWER; }
+     */
+}
+
+static ssize_t unicode_escape(const unsigned char *s, const unsigned char *e, char **out, bool compat) {
+    utf8proc_uint8_t *dst;
+    ssize_t len;
+
+    utf8proc_option_t oCanon = static_cast<utf8proc_option_t>(
+        UTF8PROC_COMPOSE   |
+        UTF8PROC_IGNORE    |
+        UTF8PROC_LUMP      |
+        UTF8PROC_REJECTNA);
+
+    utf8proc_option_t oCompat = static_cast<utf8proc_option_t>(
+        UTF8PROC_COMPAT    |
+        oCanon);
+
+    len = utf8proc_map(
+        reinterpret_cast<const utf8proc_uint8_t*>(s),
+        e - s,
+        &dst,
+        compat?oCompat:oCanon);
+
+    *out = reinterpret_cast<char*>(dst);
+    return len;
+}
+
+static std::string unicode_escape_canon(std::string &&str) {
+    char *cleaned;
+    const unsigned char *data = reinterpret_cast<const unsigned char *>(str.data());
+    ssize_t len = unicode_escape(data, data + str.size(), &cleaned, false);
+    if (len < 0) return std::move(str);
+    std::string out(cleaned, len);
+    free(cleaned);
+    return out;
+}
+
+std::string relex_id(const uint8_t *s, const uint8_t *e) {
+    std::string out;
+    char *dst;
+    ssize_t len;
+
+    len = unicode_escape(s, e, &dst, true); // compat
+    if (len >= 0) {
+        out.assign(dst, dst+len);
+        free(dst);
+    } else {
+        out.assign(s, e);
+    }
+
+    return out;
+}
+
+std::string relex_string(const uint8_t *s, const uint8_t *e) {
+    std::string out;
+    ++s; --e; // Remove the ""    "{    }"   }{
+
+    while (true) {
+        const uint8_t *m;
+	const uint8_t *h = s;
+        /*!re2c
+            * { return out; }
+            $ { return out; }
+
+            "\\a"                { out.push_back('\a'); continue; }
+            "\\b"                { out.push_back('\b'); continue; }
+            "\\f"                { out.push_back('\f'); continue; }
+            "\\n"                { out.push_back('\n'); continue; }
+            "\\r"                { out.push_back('\r'); continue; }
+            "\\t"                { out.push_back('\t'); continue; }
+            "\\v"                { out.push_back('\v'); continue; }
+            "\\" (lws|[{}\\'"?]) { out.append(h+1, s); continue; }
+            "\\"  [0-7]{1,3}     { push_utf8(out, lex_oct(h, s)); continue; }
+            "\\x" [0-9a-fA-F]{2} { push_utf8(out, lex_hex(h, s)); continue; }
+            "\\u" [0-9a-fA-F]{4} { /* !!! ok &= */ push_utf8(out, lex_hex(h, s)); continue; }
+            "\\U" [0-9a-fA-F]{8} { /* !!! ok &= */ push_utf8(out, lex_hex(h, s)); continue; }
+
+            [^]                  { out.append(h, s); continue;  }
+         */
+    }
+
+    return unicode_escape_canon(std::move(out));
+}
+
+std::string relex_regexp(uint8_t id, const uint8_t *s, const uint8_t *e) {
+    switch (id) {
+    case TOKEN_REG_SINGLE: ++s; --e;    break; // skip ``
+    case TOKEN_REG_MID:    ++s; e -= 2; break; // skip `${
+    case TOKEN_REG_OPEN:   ++s; e -= 2; break; // skip }${
+    case TOKEN_REG_CLOSE:  ++s; --e;    break; // skpi }`
+    }
+
+    return relex_id(s, e);
+}
+
+op_type op_precedence(const uint8_t *s, const uint8_t *e) {
+    const uint8_t *m;
+
+    /*!re2c
+        o_dot     { return op_type(15, 1); }
+        l         { return op_type(14, 1); }
+        o_quant   { return op_type(13, 1); }
+        o_exp     { return op_type(12, 0); }
+        o_muldiv  { return op_type(11, 1); }
+        o_addsub  { return op_type(10, 1); }
+        o_compare { return op_type( 9, 1); }
+        o_inequal { return op_type( 8, 0); }
+        o_and     { return op_type( 7, 1); }
+        o_or      { return op_type( 6, 1); }
+        ":"       { return op_type( 5, 0); }
+        o_dollar  { return op_type( 4, 0); }
+        o_lrarrow { return op_type( 3, 1); }
+        o_eqarrow { return op_type( 2, 1); }
+        o_comma   { return op_type( 1, 0); }
+
+        *         { return op_type(-1, -1); }
+        $         { return op_type(-1, -1); }
      */
 }

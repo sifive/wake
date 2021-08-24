@@ -7,7 +7,7 @@ manifest.wake
 /**/wake.db
 /wake.db
 /wake.spec
-/src/frontend/symbol.cpp
+/src/frontend/lexer.cpp
 /common/jlexer.cpp
 /bin/wake*
 /bin/fuse-wake

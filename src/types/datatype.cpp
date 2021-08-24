@@ -24,7 +24,7 @@
 #include "types/datatype.h"
 #include "frontend/diagnostic.h"
 #include "frontend/expr.h"
-#include "frontend/symbol.h"
+#include "frontend/lexer.h"
 
 Constructor Constructor::array(AST(LOCATION, "Array"));
 
@@ -40,7 +40,7 @@ void Sum::addConstructor(AST &&ast) {
 }
 
 bool AST::unify(TypeVar &out, const TypeMap &ids) {
-  if (Lexer::isLower(name.c_str())) {
+  if (lex_kind(name) == LOWER) {
     auto it = ids.find(name);
     if (it == ids.end()) {
       std::stringstream message;
@@ -65,7 +65,7 @@ bool AST::unify(TypeVar &out, const TypeMap &ids) {
 }
 
 void AST::lowerVars(std::vector<ScopedTypeVar> &out) const {
-  if (!name.empty() && Lexer::isLower(name.c_str()))
+  if (!name.empty() && lex_kind(name) == LOWER)
     out.emplace_back(name, token);
   for (auto &arg: args) arg.lowerVars(out);
 }

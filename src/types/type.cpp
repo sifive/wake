@@ -25,8 +25,8 @@
 
 #include "types/type.h"
 #include "location.h"
-#include "frontend/symbol.h"
 #include "frontend/expr.h"
+#include "frontend/lexer.h"
 #include "runtime/status.h"
 #include "frontend/diagnostic.h"
 
