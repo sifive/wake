@@ -194,6 +194,11 @@ TokenInfo CSTElement::content() const {
     return out;
 }
 
+Location CSTElement::location() const {
+    TokenInfo x = content();
+    return x.location(*cst->file);
+}
+
 void CSTElement::nextSiblingElement() {
     if (isNode()) {
         CSTNode n = cst->nodes[node];
@@ -258,7 +263,7 @@ CSTElement CSTElement::firstChildNode() const {
     return out;
 }
 
-Location TokenInfo::location(FileContent &fcontent) const {
+Location TokenInfo::location(const FileContent &fcontent) const {
     return Location(fcontent.filename.c_str(), fcontent.coordinates(start), fcontent.coordinates(end!=start?end-1:end));
 }
 

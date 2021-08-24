@@ -71,7 +71,7 @@ struct TokenInfo {
     const uint8_t *end;
 
     size_t size() const { return end - start; }
-    Location location(FileContent &fcontent) const;
+    Location location(const FileContent &fcontent) const;
 };
 
 std::ostream & operator << (std::ostream &os, TokenInfo token);
@@ -131,6 +131,7 @@ public:
 
     uint8_t id() const;
     TokenInfo content() const;
+    Location location() const;
 
     void nextSiblingElement();
     void nextSiblingNode();
@@ -145,5 +146,8 @@ private:
 
 friend class CST;
 };
+
+struct Top;
+const char *dst_top(CSTElement root, Top &top);
 
 #endif

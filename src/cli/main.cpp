@@ -51,13 +51,6 @@
 #include "frontend/cst.h"
 #include "frontend/syntax.h"
 
-void exploreElement(const CSTElement &p, int depth) {
-    for (CSTElement x = p.firstChildElement(); !x.empty(); x.nextSiblingElement()) {
-        std::cout << std::string(depth, ' ') << symbolExample(x.id()) << ": " << x.content() << std::endl;
-        exploreElement(x, depth+4);
-    }
-}
-
 #ifndef VERSION
 #include "version.h"
 #endif
@@ -121,7 +114,7 @@ class TerminalReporter : public DiagnosticReporter {
       if (diagnostic.getSeverity() == S_ERROR) ok = false;
       if (last != diagnostic.getMessage()) {
          last = diagnostic.getMessage();
-         std::cerr << diagnostic.getMessage() << std::endl;
+         std::cerr << diagnostic.getLocation().file() << ": " << diagnostic.getMessage() << std::endl;
       }
     }
 };
@@ -408,11 +401,7 @@ int main(int argc, char **argv) {
     CSTBuilder builder(file);
     parseWake(ParseInfo(&file, &builder, &terminalReporter));
     CST cst(std::move(builder));
-    exploreElement(cst.root(), 0);
-    // toDST(*top, cst);
-
-#if 0
-    auto package = parse_top(*top, lex);
+    auto package = dst_top(cst.root(), *top);
 
     // Does this file inform our choice of a default package?
     size_t slash = i.find_last_of('/');
@@ -435,8 +424,9 @@ int main(int argc, char **argv) {
         }
       }
     }
-#endif
   }
+
+  return 0; // !!!
 
   if (in) {
     auto it = top->packages.find(in);

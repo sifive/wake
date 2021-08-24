@@ -142,7 +142,7 @@ export def static _ =
         which "tar", "--mtime={time}", "--transform=s@^tmp/@wake-{release}/@",
         "--owner=0", "--group=0", "--numeric-owner", "-cJf",
         "wake-static_{release}.tar.xz", map getPathName files | sortBy (_<*_)
-    job cmd files data
+    job cmd files
     | getJobOutput
     | getPathResult
 

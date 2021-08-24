@@ -160,11 +160,10 @@ void parseWake(ParseInfo pi) {
 
                     if (newdent.size() > indent.size()) {
                         std::stringstream ss;
-                        Location l = tinfo.location(*pi.fcontent);
                         TokenInfo tws;
                         tws.start = nl.end;
                         tws.end = ws.end;
-                        ss << "syntax error; whitespace on line " << l.end.row << " neither indents the previous line nor matches a prior indentation level";
+                        ss << "syntax error; whitespace neither indents the previous line nor matches a prior indentation level";
                         pi.reporter->reportError(tws.location(*pi.fcontent), ss.str());
                     }
                 }
@@ -218,7 +217,7 @@ void parseWake(ParseInfo pi) {
             // Complain about illegal token
             std::stringstream ss;
             ss << "syntax error; found illegal token " << tinfo
-               << ", but handling it like:\n    " << symbolExample(token.id);
+               << ", but handling it like '" << symbolExample(token.id) << "'";
             pi.reporter->reportError(tinfo.location(*pi.fcontent), ss.str());
         }
 

@@ -34,6 +34,16 @@ std::shared_ptr<Sum> Pair;
 std::shared_ptr<Sum> Result;
 std::shared_ptr<Sum> JValue;
 
+void check_special(const std::shared_ptr<Sum> &sump) {
+  if (sump->name == "Boolean") Boolean = sump;
+  if (sump->name == "Order")   Order = sump;
+  if (sump->name == "List")    List = sump;
+  if (sump->name == "Unit")    Unit = sump;
+  if (sump->name == "Pair")    Pair = sump;
+  if (sump->name == "Result")  Result = sump;
+  if (sump->name == "JValue")  JValue = sump;
+}
+
 bool sums_ok() {
   bool ok = true;
 
