@@ -162,8 +162,10 @@ private:
         Location location;
         std::string type;
         SymbolKind symbolKind;
-        Definition(std::string _name, Location _location, std::string _type, SymbolKind _symbolKind) :
-          name(std::move(_name)), location(_location), type(std::move(_type)), symbolKind(_symbolKind) {}
+        bool isGlobal;
+        Definition(std::string _name, Location _location, std::string _type, SymbolKind _symbolKind, bool _isGlobal) :
+          name(std::move(_name)), location(_location), type(std::move(_type)), symbolKind(_symbolKind),
+          isGlobal(_isGlobal) {}
     };
     std::vector<Definition> definitions;
     std::map<std::string, LspMethod> methodToFunction = {
@@ -363,7 +365,7 @@ private:
         reportFileDiagnostics(file, diagnostics[file]);
 
       if (root != nullptr)
-        explore(root.get());
+        explore(root.get(), true);
     }
 
     static SymbolKind getSymbolKind(const char *name, const std::string& type) {
@@ -396,7 +398,7 @@ private:
       return KIND_VARIABLE;
     }
 
-    void explore(Expr *expr) {
+    void explore(Expr *expr, bool isGlobal) {
       if (expr->type == &VarRef::type) {
         VarRef *ref = static_cast<VarRef*>(expr);
         if (ref->location.start.bytes >= 0 && ref->target.start.bytes >= 0 && (ref->flags & FLAG_AST) != 0) {
@@ -404,8 +406,8 @@ private:
         }
       } else if (expr->type == &App::type) {
         App *app = static_cast<App*>(expr);
-        explore(app->val.get());
-        explore(app->fn.get());
+        explore(app->val.get(), false);
+        explore(app->fn.get(), false);
       } else if (expr->type == &Lambda::type) {
         Lambda *lambda = static_cast<Lambda*>(expr);
         if (lambda->token.start.bytes >= 0) {
@@ -413,17 +415,17 @@ private:
           ss << lambda->typeVar[0];
           if (lambda->name.find(' ') == std::string::npos) {
             definitions.emplace_back(lambda->name /* name */, lambda->token /* location */, ss.str() /* type */,
-                                     getSymbolKind(lambda->name.c_str(), lambda->typeVar[0].getName()));
+                                     getSymbolKind(lambda->name.c_str(), lambda->typeVar[0].getName()), isGlobal);
           }
         }
-        explore(lambda->body.get());
+        explore(lambda->body.get(), false);
       } else if (expr->type == &Ascribe::type) {
         Ascribe *ascribe = static_cast<Ascribe*>(expr);
-        explore(ascribe->body.get());
+        explore(ascribe->body.get(), false);
       } else if (expr->type == &DefBinding::type) {
         DefBinding *defbinding = static_cast<DefBinding*>(expr);
-        for (auto &i : defbinding->val) explore(i.get());
-        for (auto &i : defbinding->fun) explore(i.get());
+        for (auto &i : defbinding->val) explore(i.get(), false);
+        for (auto &i : defbinding->fun) explore(i.get(), false);
         for (auto &i : defbinding->order) {
           if (i.second.location.start.bytes >= 0) {
             std::stringstream ss;
@@ -438,13 +440,14 @@ private:
               symbolKind = getSymbolKind(i.first.c_str(), defbinding->fun[idx]->typeVar.getName());
             }
             if (i.first.find(' ') == std::string::npos ||
-                i.first.compare(0, 7, "binary ") == 0 ||
-                i.first.compare(0, 6, "unary ") == 0) {
-              definitions.emplace_back(i.first /* name */, i.second.location /* location */, ss.str() /* type */, symbolKind);
+            i.first.compare(0, 7, "binary ") == 0 ||
+            i.first.compare(0, 6, "unary ") == 0) {
+              definitions.emplace_back(i.first /* name */, i.second.location /* location */, ss.str() /* type */,
+                                       symbolKind, isGlobal);
             }
           }
         }
-        explore(defbinding->body.get());
+        explore(defbinding->body.get(), isGlobal);
       }
     }
 
@@ -645,7 +648,7 @@ private:
       JAST message = createResponseMessage(std::move(receivedMessage));
       JAST &result = message.add("result", JSON_ARRAY);
       for (const Definition &def: definitions) {
-        if (def.location.filename == filePath) {
+        if (def.isGlobal && def.location.filename == filePath) {
           appendSymbolToJSON(def, result);
         }
       }
@@ -657,7 +660,7 @@ private:
       JAST message = createResponseMessage(std::move(receivedMessage));
       JAST &result = message.add("result", JSON_ARRAY);
       for (const Definition &def: definitions) {
-        if (def.name.find(query) != std::string::npos) {
+        if (def.isGlobal && def.name.find(query) != std::string::npos) {
           appendSymbolToJSON(def, result);
         }
       }
