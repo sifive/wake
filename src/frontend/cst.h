@@ -66,7 +66,7 @@
 
 class FileContent;
 class CSTElement;
-class CSTIterator;
+class DiagnosticReporter;
 
 struct TokenInfo {
     const uint8_t *start;
@@ -116,9 +116,13 @@ friend class CST;
 class CST {
 public:
     CST(CSTBuilder &&builder);
+    CST(FileContent &fcontent, DiagnosticReporter &reporter) : CST(build(fcontent, reporter)) { }
+
     CSTElement root() const;
 
 private:
+    static CSTBuilder build(FileContent &fcontent, DiagnosticReporter &reporter);
+
     RankSelect1Map token_starts;
     const FileContent *file;
     std::vector<uint8_t> token_ids;
@@ -149,8 +153,5 @@ private:
 
 friend class CST;
 };
-
-struct Top;
-const char *dst_top(CSTElement root, Top &top);
 
 #endif

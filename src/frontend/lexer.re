@@ -401,10 +401,10 @@ op_type op_precedence(const uint8_t *s, const uint8_t *e) {
         o_inequal { return op_type( 8, 0); }
         o_and     { return op_type( 7, 1); }
         o_or      { return op_type( 6, 1); }
-        ":"       { return op_type( 5, 0); }
-        o_dollar  { return op_type( 4, 0); }
+        o_dollar  { return op_type( 5, 0); }
+        ":"       { return op_type( 4, 0); }
         o_lrarrow { return op_type( 3, 1); }
-        o_eqarrow { return op_type( 2, 1); }
+        o_eqarrow { return op_type( 2, 0); }
         o_comma   { return op_type( 1, 0); }
 
         *         { return op_type(-1, -1); }

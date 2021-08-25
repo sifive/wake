@@ -32,6 +32,8 @@
 #include "frontend/diagnostic.h"
 #include "frontend/sums.h"
 #include "frontend/syntax.h"
+#include "frontend/todst.h"
+#include "frontend/file.h"
 #include "types/data.h"
 #include "location.h"
 
@@ -43,11 +45,11 @@ static std::string getIdentifier(CSTElement element) {
 
 /*
 
-static AST parse_type_def(Lexer &lex) {
+static AST dst_type_def(Lexer &lex) {
   lex.consume();
 
   ASTState state(false, false);
-  AST def = parse_ast(0, lex, state);
+  AST def = dst_ast(0, lex, state);
   if (check_constructors(def)) lex.fail = true;
   if (!def) return def;
 
@@ -88,7 +90,7 @@ static AST parse_type_def(Lexer &lex) {
 
 */
 
-static void parse_package(CSTElement topdef, Package &package) {
+static void dst_package(CSTElement topdef, Package &package) {
   CSTElement child = topdef.firstChildNode();
   std::string id = getIdentifier(child);
 
@@ -106,7 +108,7 @@ struct ImportArity {
   bool binary;
 };
 
-static ImportArity parse_arity(CSTElement &child) {
+static ImportArity dst_arity(CSTElement &child) {
   ImportArity out;
   out.unary  = false;
   out.binary = false;
@@ -132,7 +134,7 @@ static void prefix_op(ImportArity ia, std::string &name) {
   }
 }
 
-static void parse_import(CSTElement topdef, DefMap &map) {
+static void dst_import(CSTElement topdef, DefMap &map) {
   CSTElement child = topdef.firstChildNode();
 
   std::string pkgname = getIdentifier(child);
@@ -150,7 +152,7 @@ static void parse_import(CSTElement topdef, DefMap &map) {
     child.nextSiblingNode();
   }
 
-  ImportArity ia = parse_arity(child);
+  ImportArity ia = dst_arity(child);
 
   // Special case for wildcard import
   if (child.empty()) {
@@ -187,7 +189,7 @@ static void parse_import(CSTElement topdef, DefMap &map) {
   }
 }
 
-static void parse_export(CSTElement topdef, Package &package) {
+static void dst_export(CSTElement topdef, Package &package) {
   CSTElement child = topdef.firstChildNode();
 
   std::string pkgname = getIdentifier(child);
@@ -214,7 +216,7 @@ static void parse_export(CSTElement topdef, Package &package) {
     return;
   }
 
-  ImportArity ia = parse_arity(child);
+  ImportArity ia = dst_arity(child);
   for (; !child.empty(); child.nextSiblingNode()) {
     CSTElement ideq = child.firstChildNode();
 
@@ -252,7 +254,7 @@ struct TopFlags {
   bool globalf;
 };
 
-static TopFlags parse_flags(CSTElement &child) {
+static TopFlags dst_flags(CSTElement &child) {
   TopFlags out;
 
   if (child.id() == CST_FLAG_GLOBAL) {
@@ -272,16 +274,16 @@ static TopFlags parse_flags(CSTElement &child) {
   return out;
 }
 
-static AST parse_type(CSTElement root) {
+static AST dst_type(CSTElement root) {
   switch (root.id()) {
     case CST_BINARY: {
       CSTElement child = root.firstChildNode();
-      AST lhs = parse_type(child);
+      AST lhs = dst_type(child);
       child.nextSiblingNode();
       std::string op = "binary " + getIdentifier(child);
       Location location = child.location();
       child.nextSiblingNode();
-      AST rhs = parse_type(child);
+      AST rhs = dst_type(child);
       if (op == "binary :") {
         if (!lhs.args.empty() || lex_kind(lhs.name) == OPERATOR) {
           ERROR(lhs.region, "tag-name for a type must be a simple lower-case identifier, not " << root.firstChildNode().content());
@@ -304,14 +306,14 @@ static AST parse_type(CSTElement root) {
       CSTElement child = root.firstChildNode();
       std::vector<AST> args;
       if (child.id() != CST_OP) {
-        args.emplace_back(parse_type(child));
+        args.emplace_back(dst_type(child));
         child.nextSiblingNode();
       }
       std::string op = "unary " + getIdentifier(child);
       Location location = child.location();
       child.nextSiblingNode();
       if (args.empty()) {
-        args.emplace_back(parse_type(child));
+        args.emplace_back(dst_type(child));
         child.nextSiblingNode();
       }
       AST out(location, std::move(op), std::move(args));
@@ -322,15 +324,15 @@ static AST parse_type(CSTElement root) {
       return AST(root.location(), getIdentifier(root));
     }
     case CST_PAREN: {
-      AST out = parse_type(root.firstChildNode());
+      AST out = dst_type(root.firstChildNode());
       out.region = root.location();
       return out;
     }
     case CST_APP: {
       CSTElement child = root.firstChildNode();
-      AST lhs = parse_type(child);
+      AST lhs = dst_type(child);
       child.nextSiblingNode();
-      AST rhs = parse_type(child);
+      AST rhs = dst_type(child);
       switch (lex_kind(lhs.name)) {
       case LOWER:    ERROR(lhs.token,  "lower-case identifier '" << lhs.name << "' cannot be used as a type constructor"); break;
       case OPERATOR: ERROR(rhs.region, "excess type argument " << child.content() << " supplied to '" << lhs.name << "'"); break;
@@ -347,9 +349,9 @@ static AST parse_type(CSTElement root) {
   }
 }
 
-static void parse_topic(CSTElement topdef, Package &package, Symbols *globals) {
+static void dst_topic(CSTElement topdef, Package &package, Symbols *globals) {
   CSTElement child = topdef.firstChildNode();
-  TopFlags flags = parse_flags(child);
+  TopFlags flags = dst_flags(child);
 
   std::string id = getIdentifier(child);
   Location location = child.location();
@@ -360,7 +362,7 @@ static void parse_topic(CSTElement topdef, Package &package, Symbols *globals) {
   child.nextSiblingNode();
 
   File &file = package.files.back();
-  AST def = parse_type(child);
+  AST def = dst_type(child);
 
   // Confirm there are no open type variables
   TypeMap ids;
@@ -425,16 +427,16 @@ static void bind_type(Package &package, const std::string &name, const Location 
   if (!it.second) ERROR(location, "type '" << it.first->first << "' was previously defined at " << it.first->second.location.file());
 }
 
-static void parse_data(CSTElement topdef, Package &package, Symbols *globals) {
+static void dst_data(CSTElement topdef, Package &package, Symbols *globals) {
   CSTElement child = topdef.firstChildNode();
-  TopFlags flags = parse_flags(child);
+  TopFlags flags = dst_flags(child);
 
-  auto sump = std::make_shared<Sum>(parse_type(child)); // !!! check parse_type_def coverage
+  auto sump = std::make_shared<Sum>(dst_type(child)); // !!! check dst_type_def coverage
   if (sump->args.empty() && lex_kind(sump->name) == LOWER) ERROR(child.location(), "data type '" << sump->name << "' must be upper-case or operator");
   child.nextSiblingNode();
 
   for (; !child.empty(); child.nextSiblingNode()) {
-    AST cons = parse_type(child);
+    AST cons = dst_type(child);
     if (!cons.tag.empty()) ERROR(cons.region, "constructor '" << cons.name << "' should not be tagged with " << cons.tag);
     if (cons.args.empty() && lex_kind(cons.name) == LOWER) ERROR(cons.token, "constructor '" << cons.name << "' must be upper-case or operator");
     sump->addConstructor(std::move(cons));
@@ -455,13 +457,13 @@ static void parse_data(CSTElement topdef, Package &package, Symbols *globals) {
   if (package.name == "wake") check_special(sump);
 }
 
-static void parse_tuple(CSTElement topdef, Package &package, Symbols *globals) {
+static void dst_tuple(CSTElement topdef, Package &package, Symbols *globals) {
   CSTElement child = topdef.firstChildNode();
-  TopFlags flags = parse_flags(child); // export/global constructor?
+  TopFlags flags = dst_flags(child); // export/global constructor?
   bool exportt = flags.exportf; // we export the type if any member is exported
   bool globalt = flags.globalf;
 
-  auto sump = std::make_shared<Sum>(parse_type(child)); // !!! check parse_type_def coverage
+  auto sump = std::make_shared<Sum>(dst_type(child)); // !!! check dst_type_def coverage
   if (lex_kind(sump->name) != UPPER) ERROR(child.location(), "tuple type '" << sump->name << "' must be upper-case");
   child.nextSiblingNode();
 
@@ -473,8 +475,8 @@ static void parse_tuple(CSTElement topdef, Package &package, Symbols *globals) {
 
   for (; !child.empty(); child.nextSiblingNode()) {
     CSTElement elt = child.firstChildNode();
-    members.emplace_back(parse_flags(elt));
-    tuple.args.emplace_back(parse_type(elt));
+    members.emplace_back(dst_flags(elt));
+    tuple.args.emplace_back(dst_type(elt));
   }
 
   sump->addConstructor(std::move(tuple));
@@ -559,20 +561,20 @@ static void parse_tuple(CSTElement topdef, Package &package, Symbols *globals) {
   if (package.name == "wake") check_special(sump);
 }
 
-static AST parse_pattern(CSTElement root, std::vector<CSTElement> *guard) {
+static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
   switch (root.id()) {
     case CST_BINARY: {
       CSTElement child = root.firstChildNode();
-      AST lhs = parse_pattern(child, guard);
+      AST lhs = dst_pattern(child, guard);
       child.nextSiblingNode();
       std::string op = "binary " + getIdentifier(child);
       Location location = child.location();
       child.nextSiblingNode();
       if (op == "binary :") {
-        lhs.type = optional<AST>(new AST(parse_type(child)));
+        lhs.type = optional<AST>(new AST(dst_type(child)));
         return lhs;
       } else {
-        AST rhs = parse_pattern(child, guard);
+        AST rhs = dst_pattern(child, guard);
         std::vector<AST> args;
         args.emplace_back(std::move(lhs));
         args.emplace_back(std::move(rhs));
@@ -585,14 +587,14 @@ static AST parse_pattern(CSTElement root, std::vector<CSTElement> *guard) {
       CSTElement child = root.firstChildNode();
       std::vector<AST> args;
       if (child.id() != CST_OP) {
-        args.emplace_back(parse_pattern(child, guard));
+        args.emplace_back(dst_pattern(child, guard));
         child.nextSiblingNode();
       }
       std::string op = "unary " + getIdentifier(child);
       Location location = child.location();
       child.nextSiblingNode();
       if (args.empty()) {
-        args.emplace_back(parse_pattern(child, guard));
+        args.emplace_back(dst_pattern(child, guard));
         child.nextSiblingNode();
       }
       AST out(location, std::move(op), std::move(args));
@@ -603,15 +605,15 @@ static AST parse_pattern(CSTElement root, std::vector<CSTElement> *guard) {
       return AST(root.location(), getIdentifier(root));
     }
     case CST_PAREN: {
-      AST out = parse_pattern(root.firstChildNode(), guard);
+      AST out = dst_pattern(root.firstChildNode(), guard);
       out.region = root.location();
       return out;
     }
     case CST_APP: {
       CSTElement child = root.firstChildNode();
-      AST lhs = parse_pattern(child, guard);
+      AST lhs = dst_pattern(child, guard);
       child.nextSiblingNode();
-      AST rhs = parse_pattern(child, guard);
+      AST rhs = dst_pattern(child, guard);
       switch (lex_kind(lhs.name)) {
       //!!!case LOWER:    ERROR(lhs.token,  "lower-case identifier '" << lhs.name << "' cannot be used as a pattern destructor"); break;
       case OPERATOR: ERROR(rhs.region, "excess argument " << child.content() << " supplied to '" << lhs.name << "'"); break;
@@ -640,8 +642,6 @@ static AST parse_pattern(CSTElement root, std::vector<CSTElement> *guard) {
       return AST(root.location(), "_");
   }
 }
-
-static Expr *parse_expr(CSTElement expr);
 
 static int relabel_descend(Expr *expr, int index) {
   if (!expr) return index;
@@ -707,17 +707,17 @@ static void extract_def(std::vector<Definition> &out, long index, AST &&ast, con
   }
 }
 
-static void parse_def(CSTElement def, DefMap &map, Package *package, Symbols *globals) {
+static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *globals) {
   bool target  = def.id() == CST_TARGET;
   bool publish = def.id() == CST_PUBLISH;
 
   CSTElement child = def.firstChildNode();
-  TopFlags flags = parse_flags(child);
+  TopFlags flags = dst_flags(child);
 
   Symbols *exports = flags.exportf ? &package->exports : nullptr;
   if (!flags.globalf) globals = nullptr;
 
-  AST ast = parse_pattern(child, nullptr);
+  AST ast = dst_pattern(child, nullptr);
   std::string name = std::move(ast.name);
   ast.name.clear();
 
@@ -733,7 +733,7 @@ static void parse_def(CSTElement def, DefMap &map, Package *package, Symbols *gl
   size_t tohash = ast.args.size();
   if (target && child.id() == CST_TARGET_ARGS) {
     for (CSTElement sub = child.firstChildNode(); !sub.empty(); sub.nextSiblingNode()) {
-      ast.args.emplace_back(parse_pattern(sub, nullptr));
+      ast.args.emplace_back(dst_pattern(sub, nullptr));
     }
     ast.region.end = ast.args.back().region.end;
     child.nextSiblingNode();
@@ -741,7 +741,7 @@ static void parse_def(CSTElement def, DefMap &map, Package *package, Symbols *gl
 
   Location fn = ast.region;
 
-  Expr *body = relabel_anon(parse_expr(child));
+  Expr *body = relabel_anon(dst_expr(child));
 
   // Record type variables introduced by the def before we rip the ascription appart
   std::vector<ScopedTypeVar> typeVars;
@@ -844,7 +844,7 @@ static void parse_def(CSTElement def, DefMap &map, Package *package, Symbols *gl
   }
 }
 
-static Literal *parse_literal(CSTElement lit, std::string::size_type wsLen = std::string::npos) {
+static Literal *dst_literal(CSTElement lit, std::string::size_type wsLen = std::string::npos) {
   CSTElement child = lit.firstChildElement();
   uint8_t id = child.id();
   switch (id) {
@@ -916,7 +916,7 @@ static Literal *parse_literal(CSTElement lit, std::string::size_type wsLen = std
 static Expr *add_literal_guards(Expr *guard, std::vector<CSTElement> literals) {
   for (size_t i = 0; i < literals.size(); ++i) {
     CSTElement literal = literals[i];
-    Literal* lit = parse_literal(literal);
+    Literal* lit = dst_literal(literal);
 
     const char *comparison;
     if (lit->litType == &Data::typeString) {
@@ -946,13 +946,13 @@ static Expr *add_literal_guards(Expr *guard, std::vector<CSTElement> literals) {
   return guard;
 }
 
-static Expr *parse_match(CSTElement match) {
+static Expr *dst_match(CSTElement match) {
   Location location = match.location();
   Match *out = new Match(location);
 
   CSTElement child;
   for (child = match.firstChildNode(); !child.empty() && child.id() != CST_CASE; child.nextSiblingNode()) {
-    auto rhs = parse_expr(child);
+    auto rhs = dst_expr(child);
     out->args.emplace_back(rhs);
   }
 
@@ -963,55 +963,55 @@ static Expr *parse_match(CSTElement match) {
     std::vector<CSTElement> guards;
     std::vector<AST> args;
     for (casee = child.firstChildNode(); casee.id() != CST_GUARD; casee.nextSiblingNode()) {
-      args.emplace_back(parse_pattern(casee, &guards));
+      args.emplace_back(dst_pattern(casee, &guards));
     }
 
     AST pattern = args.size()==1 ? std::move(args[0]) : AST(child.location(), "", std::move(args));
 
     CSTElement guarde = casee.firstChildNode();
-    Expr *guard = guarde.empty() ? nullptr : relabel_anon(parse_expr(guarde));
+    Expr *guard = guarde.empty() ? nullptr : relabel_anon(dst_expr(guarde));
     casee.nextSiblingNode();
 
     guard = add_literal_guards(guard, guards);
 
-    Expr *expr = relabel_anon(parse_expr(casee));
+    Expr *expr = relabel_anon(dst_expr(casee));
     out->patterns.emplace_back(std::move(pattern), expr, guard);
   }
 
   return out;
 }
 
-static Expr *parse_block(CSTElement block) {
+static Expr *dst_block(CSTElement block) {
   DefMap *map = new DefMap(block.location());
 
   std::unique_ptr<Expr> body;
   for (CSTElement child = block.firstChildNode(); !child.empty(); child.nextSiblingNode()) {
     switch (child.id()) {
-      case CST_IMPORT: parse_import(child, *map); break;
-      case CST_DEF:    parse_def(child, *map, nullptr, nullptr); break;
-      default:         map->body = std::unique_ptr<Expr>(relabel_anon(parse_expr(child))); break;
+      case CST_IMPORT: dst_import(child, *map); break;
+      case CST_DEF:    dst_def(child, *map, nullptr, nullptr); break;
+      default:         map->body = std::unique_ptr<Expr>(relabel_anon(dst_expr(child))); break;
     }
   }
 
   return map;
 }
 
-static Expr *parse_require(CSTElement require) {
+static Expr *dst_require(CSTElement require) {
   CSTElement child = require.firstChildNode();
 
-  AST ast = parse_pattern(child, nullptr);
+  AST ast = dst_pattern(child, nullptr);
   child.nextSiblingNode();
 
-  Expr *rhs = relabel_anon(parse_expr(child));
+  Expr *rhs = relabel_anon(dst_expr(child));
   child.nextSiblingNode();
 
   Expr *otherwise = nullptr;
   if (child.id() == CST_REQ_ELSE) {
-    otherwise = relabel_anon(parse_expr(child));
+    otherwise = relabel_anon(dst_expr(child));
     child.nextSiblingNode();
   }
 
-  Expr *block = relabel_anon(parse_expr(child));
+  Expr *block = relabel_anon(dst_expr(child));
 
   Match *out = new Match(require.location(), true);
   out->args.emplace_back(rhs);
@@ -1022,21 +1022,21 @@ static Expr *parse_require(CSTElement require) {
   return out;
 }
 
-static Expr *parse_expr(CSTElement expr) {
+Expr *dst_expr(CSTElement expr) {
   switch (expr.id()) {
     case CST_BINARY: {
       CSTElement child = expr.firstChildNode();
-      Expr *lhs = parse_expr(child);
+      Expr *lhs = dst_expr(child);
       child.nextSiblingNode();
       std::string opStr = getIdentifier(child);
       if (opStr == ":") {
-        AST signature = parse_type(child);
+        AST signature = dst_type(child);
         return new Ascribe(expr.location(), std::move(signature), lhs, lhs->location);
       } else {
         Expr *op = new VarRef(child.location(), "binary " + opStr);
         op->flags |= FLAG_AST;
         child.nextSiblingNode();
-        Expr *rhs = parse_expr(child);
+        Expr *rhs = dst_expr(child);
         Location l = expr.location();
         App *out = new App(l, new App(l, op, lhs), rhs);
         out->flags |= FLAG_AST;
@@ -1047,13 +1047,13 @@ static Expr *parse_expr(CSTElement expr) {
       CSTElement child = expr.firstChildNode();
       Expr *body = nullptr;
       if (child.id() != CST_OP) {
-        body = parse_expr(child);
+        body = dst_expr(child);
         child.nextSiblingNode();
       }
       Expr *op = new VarRef(child.location(), "unary " + getIdentifier(child));
       op->flags |= FLAG_AST;
       child.nextSiblingNode();
-      if (!body) body = parse_expr(child);
+      if (!body) body = dst_expr(child);
       App *out = new App(expr.location(), op, body);
       out->flags |= FLAG_AST;
       return out;
@@ -1064,13 +1064,13 @@ static Expr *parse_expr(CSTElement expr) {
       return out;
     }
     case CST_PAREN: {
-      return relabel_anon(parse_expr(expr.firstChildNode()));
+      return relabel_anon(dst_expr(expr.firstChildNode()));
     }
     case CST_APP: {
       CSTElement child = expr.firstChildNode();
-      Expr *lhs = parse_expr(child);
+      Expr *lhs = dst_expr(child);
       child.nextSiblingNode();
-      Expr *rhs = parse_expr(child);
+      Expr *rhs = dst_expr(child);
       App *out = new App(expr.location(), lhs, rhs);
       lhs->flags |= FLAG_AST;
       return out;
@@ -1093,11 +1093,11 @@ static Expr *parse_expr(CSTElement expr) {
     }
     case CST_IF: {
       CSTElement child = expr.firstChildNode();
-      Expr *condE = parse_expr(child);
+      Expr *condE = dst_expr(child);
       child.nextSiblingNode();
-      Expr *thenE = parse_expr(child);
+      Expr *thenE = dst_expr(child);
       child.nextSiblingNode();
-      Expr *elseE = parse_expr(child);
+      Expr *elseE = dst_expr(child);
       Location l = expr.location();
       Match *out = new Match(l);
       out->args.emplace_back(condE);
@@ -1108,9 +1108,9 @@ static Expr *parse_expr(CSTElement expr) {
     }
     case CST_LAMBDA: {
       CSTElement child = expr.firstChildNode();
-      AST ast = parse_pattern(child, nullptr);
+      AST ast = dst_pattern(child, nullptr);
       child.nextSiblingNode();
-      Expr *body = parse_expr(child);
+      Expr *body = dst_expr(child);
       Lambda *out;
       Location l = expr.location();
       if (lex_kind(ast.name) != LOWER) {
@@ -1131,10 +1131,10 @@ static Expr *parse_expr(CSTElement expr) {
       out->flags |= FLAG_AST;
       return out;
     }
-    case CST_MATCH:       return parse_match(expr);
-    case CST_LITERAL:     return parse_literal(expr);
-    case CST_BLOCK:       return parse_block(expr);
-    case CST_REQUIRE:     return parse_require(expr);
+    case CST_MATCH:       return dst_match(expr);
+    case CST_LITERAL:     return dst_literal(expr);
+    case CST_BLOCK:       return dst_block(expr);
+    case CST_REQUIRE:     return dst_require(expr);
     case CST_INTERPOLATE: // !!!
     default:
       ERROR(expr.location(), "unexpected expression: " << expr.content());
@@ -1157,16 +1157,16 @@ const char *dst_top(CSTElement root, Top &top) {
 
   for (CSTElement topdef = root.firstChildNode(); !topdef.empty(); topdef.nextSiblingNode()) {
     switch (topdef.id()) {
-    case CST_PACKAGE: parse_package(topdef, *package); break;
-    case CST_IMPORT:  parse_import (topdef, map);      break;
-    case CST_EXPORT:  parse_export (topdef, *package); break;
-    case CST_TOPIC:   parse_topic  (topdef, *package, &globals); break;
-    case CST_DATA:    parse_data   (topdef, *package, &globals); break;
-    case CST_TUPLE:   parse_tuple  (topdef, *package, &globals); break;
+    case CST_PACKAGE: dst_package(topdef, *package); break;
+    case CST_IMPORT:  dst_import (topdef, map);      break;
+    case CST_EXPORT:  dst_export (topdef, *package); break;
+    case CST_TOPIC:   dst_topic  (topdef, *package, &globals); break;
+    case CST_DATA:    dst_data   (topdef, *package, &globals); break;
+    case CST_TUPLE:   dst_tuple  (topdef, *package, &globals); break;
     case CST_DEF:
     case CST_PUBLISH:
     case CST_TARGET:
-      parse_def(topdef, *package->files.back().content, package.get(), &globals);
+      dst_def(topdef, *package->files.back().content, package.get(), &globals);
       break;
     }
   }
@@ -1245,4 +1245,13 @@ const char *dst_top(CSTElement root, Top &top) {
   }
 
   return it.first->second->name.c_str();
+}
+
+Expr *dst_expr(const std::string &expr, DiagnosticReporter &reporter) {
+  StringFile fcontent("<command-line>", "def _ = " + expr);
+  CST cst(fcontent, reporter);
+  CSTElement topdef = cst.root().firstChildNode();
+  CSTElement defcontent = topdef.firstChildNode();
+  defcontent.nextSiblingNode(); // skip pattern
+  return dst_expr(defcontent);
 }

@@ -51,6 +51,7 @@
 #include "frontend/file.h"
 #include "frontend/cst.h"
 #include "frontend/syntax.h"
+#include "frontend/todst.h"
 
 #ifndef VERSION
 #include "version.h"
@@ -399,9 +400,7 @@ int main(int argc, char **argv) {
       std::cerr << "Parsing " << i << std::endl;
 
     ExternalFile file(terminalReporter, i.c_str());
-    CSTBuilder builder(file);
-    parseWake(ParseInfo(&file, &builder, &terminalReporter));
-    CST cst(std::move(builder));
+    CST cst(file, terminalReporter);
     auto package = dst_top(cst.root(), *top);
 
     // Does this file inform our choice of a default package?
@@ -485,30 +484,15 @@ int main(int argc, char **argv) {
     }
   }
 
-  return 0; // !!!
   std::string command;
   char *none = nullptr;
   char **cmdline = &none;
   if (exec) {
-/* !!!
-    command = exec;
-    Lexer lex(runtime.heap, command, "<execute-argument>");
-    top->body = std::unique_ptr<Expr>(parse_command(lex));
-    if (lex.fail) ok = false;
-*/
+    top->body = std::unique_ptr<Expr>(dst_expr(exec, terminalReporter));
   } else if (argc > 1) {
-/* !!!
     command = argv[1];
     cmdline = argv+2;
-    Lexer lex(runtime.heap, command, "<target-argument>");
-    std::unique_ptr<Expr> var(parse_command(lex));
-    if (var) {
-      top->body = std::unique_ptr<Expr>(new App(LOCATION, var.release(), new Prim(LOCATION, "cmdline")));
-    } else {
-      top->body = std::unique_ptr<Expr>(new Prim(LOCATION, "cmdline"));
-      ok = false;
-    }
-*/
+    top->body = std::unique_ptr<Expr>(new App(LOCATION, dst_expr(command, terminalReporter), new Prim(LOCATION, "cmdline")));
   } else {
     top->body = std::unique_ptr<Expr>(new VarRef(LOCATION, "Nil@wake"));
   }

@@ -125,6 +125,12 @@ struct NodeRange {
      : parent(parent_), first_child(first_child_) { }
 };
 
+CSTBuilder CST::build(FileContent &fcontent, DiagnosticReporter &reporter) {
+    CSTBuilder builder(fcontent);
+    parseWake(ParseInfo(&fcontent, &builder, &reporter));
+    return builder;
+}
+
 CST::CST(CSTBuilder &&builder)
  : token_starts(builder.token_starts) {
     file = builder.file;
