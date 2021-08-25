@@ -24,6 +24,7 @@
 #include <set>
 #include <algorithm>
 #include <assert.h>
+#include <re2/re2.h>
 
 #include "frontend/parser.h"
 #include "frontend/expr.h"
@@ -861,12 +862,19 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsLen = std::
       TokenInfo ti = child.content();
       return new Literal(child.location(), relex_string(ti.start, ti.end), &Data::typeString);
     }
-    case TOKEN_REG_SINGLE:
+    case TOKEN_REG_SINGLE: {
+      TokenInfo ti = child.content();
+      std::string str = relex_regexp(id, ti.start, ti.end);
+      re2::RE2 check(str);
+      if (!check.ok()) ERROR(child.location(), "illegal regular expression: " << check.error());
+      return new Literal(child.location(), std::move(str), &Data::typeRegExp);
+    }
     case TOKEN_REG_MID:
     case TOKEN_REG_OPEN:
     case TOKEN_REG_CLOSE: {
       TokenInfo ti = child.content();
-      return new Literal(child.location(), relex_regexp(id, ti.start, ti.end), &Data::typeRegExp);
+      // rcat expects String tokens, not RegExp
+      return new Literal(child.location(), relex_regexp(id, ti.start, ti.end), &Data::typeString);
     }
     case TOKEN_DOUBLE: {
       std::string x = child.content().str();
@@ -911,6 +919,35 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsLen = std::
       return new Literal(lit.location(), "bad-literal", &Data::typeString);
     }
   }
+}
+
+static Expr *dst_interpolate(CSTElement intp) {
+  bool regexp = intp.firstChildNode().firstChildElement().id() == TOKEN_REG_OPEN;
+  std::vector<Expr*> args;
+  std::string total;
+
+  for (CSTElement i = intp.firstChildNode(); !i.empty(); i.nextSiblingNode()) {
+    if (args.size() % 2 == 0) {
+      Literal *lit = dst_literal(i);
+      if (regexp) total.append(lit->value);
+      args.push_back(lit);
+    } else {
+      args.push_back(dst_expr(i));
+    }
+  }
+
+  Location full = intp.location();
+  Expr *cat = new Prim(full, regexp?"rcat":"vcat");
+  for (size_t i = 0; i < args.size(); ++i) cat = new Lambda(full, "_", cat, i?"":" ");
+  for (auto arg : args) cat = new App(full, cat, arg);
+
+  if (regexp) {
+    re2::RE2 check(total);
+    if (!check.ok()) ERROR(full, "illegal regular expression: " << check.error());
+  }
+
+  cat->flags |= FLAG_AST;
+  return cat;
 }
 
 static Expr *add_literal_guards(Expr *guard, std::vector<CSTElement> literals) {
@@ -1133,9 +1170,9 @@ Expr *dst_expr(CSTElement expr) {
     }
     case CST_MATCH:       return dst_match(expr);
     case CST_LITERAL:     return dst_literal(expr);
+    case CST_INTERPOLATE: return dst_interpolate(expr);
     case CST_BLOCK:       return dst_block(expr);
     case CST_REQUIRE:     return dst_require(expr);
-    case CST_INTERPOLATE: // !!!
     default:
       ERROR(expr.location(), "unexpected expression: " << expr.content());
     case CST_ERROR: {
