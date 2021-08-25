@@ -29,6 +29,7 @@
 
 #include "frontend/parser.h"
 #include "types/bind.h"
+#include "types/data.h"
 #include "runtime/value.h"
 #include "frontend/expr.h"
 #include "runtime/job.h"
@@ -599,7 +600,7 @@ int main(int argc, char **argv) {
             TypeVar list;
             Data::typeList.clone(list);
             fn1[0].unify(list);
-            list[0].unify(String::typeVar);
+            list[0].unify(Data::typeString);
             if (!clone.tryUnify(fn1)) continue;   // must accept List String
             if (clone[1].tryUnify(fn2)) continue; // and not return a function
             std::cout << "  " << g.first << std::endl;
@@ -614,7 +615,7 @@ int main(int argc, char **argv) {
   }
 
   // Convert AST to optimized SSA
-  std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root));
+  std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root), runtime);
   if (optim) ssa = Term::optimize(std::move(ssa), runtime);
 
   // Upon request, dump out the SSA

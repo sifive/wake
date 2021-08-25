@@ -112,11 +112,11 @@ struct VarRef : public Expr {
 };
 
 struct Literal : public Expr {
-  std::shared_ptr<RootPointer<Value> > value;
+  std::string value;
   TypeVar *litType;
 
   static const TypeDescriptor type;
-  Literal(const Location &location_, RootPointer<Value> &&value_, TypeVar *litType_);
+  Literal(const Location &location_, std::string &&value_, TypeVar *litType_);
 
   void format(std::ostream &os, int depth) const override;
 };

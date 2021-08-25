@@ -20,6 +20,7 @@
 
 #include <vector>
 #include <ostream>
+#include <string>
 #include <stdint.h>
 
 #include "rank.h"
@@ -72,6 +73,7 @@ struct TokenInfo {
 
     size_t size() const { return end - start; }
     Location location(const FileContent &fcontent) const;
+    std::string str() const;
 };
 
 std::ostream & operator << (std::ostream &os, TokenInfo token);

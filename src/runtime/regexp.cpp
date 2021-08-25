@@ -24,6 +24,7 @@
 #include "runtime/prim.h"
 #include "runtime/value.h"
 #include "types/type.h"
+#include "types/data.h"
 #include "sfinae.h"
 
 static re2::StringPiece sp(String *s) {
@@ -32,8 +33,8 @@ static re2::StringPiece sp(String *s) {
 
 static PRIMTYPE(type_rcmp) {
   return args.size() == 2 &&
-    args[0]->unify(RegExp::typeVar) &&
-    args[1]->unify(RegExp::typeVar) &&
+    args[0]->unify(Data::typeRegExp) &&
+    args[1]->unify(Data::typeRegExp) &&
     out->unify(Data::typeOrder);
 }
 
@@ -47,10 +48,10 @@ static PRIMFN(prim_rcmp) {
 static PRIMTYPE(type_re2) {
   TypeVar result;
   Data::typeResult.clone(result);
-  result[0].unify(RegExp::typeVar);
-  result[1].unify(String::typeVar);
+  result[0].unify(Data::typeRegExp);
+  result[1].unify(Data::typeString);
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeString) &&
     out->unify(result);
 }
 
@@ -73,8 +74,8 @@ static PRIMFN(prim_re2) {
 
 static PRIMTYPE(type_re2str) {
   return args.size() == 1 &&
-    args[0]->unify(RegExp::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeRegExp) &&
+    out->unify(Data::typeString);
 }
 
 TEST_MEMBER(set_dot_nl);
@@ -91,8 +92,8 @@ static PRIMFN(prim_re2str) {
 
 static PRIMTYPE(type_quote) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeString) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_quote) {
@@ -119,8 +120,8 @@ const char re2_bug[] = "The re2 library is too old (< 2016-09) to be used on inp
 
 static PRIMTYPE(type_match) {
   return args.size() == 2 &&
-    args[0]->unify(RegExp::typeVar) &&
-    args[1]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeRegExp) &&
+    args[1]->unify(Data::typeString) &&
     out->unify(Data::typeBoolean);
 }
 
@@ -138,10 +139,10 @@ static PRIMFN(prim_match) {
 static PRIMTYPE(type_extract) {
   TypeVar list;
   Data::typeList.clone(list);
-  list[0].unify(String::typeVar);
+  list[0].unify(Data::typeString);
   return args.size() == 2 &&
-    args[0]->unify(RegExp::typeVar) &&
-    args[1]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeRegExp) &&
+    args[1]->unify(Data::typeString) &&
     out->unify(list);
 }
 
@@ -175,10 +176,10 @@ static PRIMFN(prim_extract) {
 
 static PRIMTYPE(type_replace) {
   return args.size() == 3 &&
-    args[0]->unify(RegExp::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    args[2]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeRegExp) &&
+    args[1]->unify(Data::typeString) &&
+    args[2]->unify(Data::typeString) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_replace) {
@@ -198,10 +199,10 @@ static PRIMFN(prim_replace) {
 static PRIMTYPE(type_tokenize) {
   TypeVar list;
   Data::typeList.clone(list);
-  list[0].unify(String::typeVar);
+  list[0].unify(Data::typeString);
   return args.size() == 2 &&
-    args[0]->unify(RegExp::typeVar) &&
-    args[1]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeRegExp) &&
+    args[1]->unify(Data::typeString) &&
     out->unify(list);
 }
 
@@ -242,12 +243,12 @@ static PRIMFN(prim_tokenize) {
 }
 
 static PRIMTYPE(type_rcat) {
-  bool ok = out->unify(RegExp::typeVar);
+  bool ok = out->unify(Data::typeRegExp);
   for (size_t i = 0; i < args.size(); ++i) {
     if (i % 2 == 0) {
-      ok &= args[i]->unify(String::typeVar);
+      ok &= args[i]->unify(Data::typeString);
     } else {
-      ok &= args[i]->unify(RegExp::typeVar);
+      ok &= args[i]->unify(Data::typeRegExp);
     }
   }
   return ok;

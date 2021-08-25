@@ -27,12 +27,13 @@
 
 #include "runtime/prim.h"
 #include "types/type.h"
+#include "types/data.h"
 #include "runtime/value.h"
 
 static PRIMTYPE(type_unop) {
   return args.size() == 1 &&
-    args[0]->unify(Double::typeVar) &&
-    out->unify(Double::typeVar);
+    args[0]->unify(Data::typeDouble) &&
+    out->unify(Data::typeDouble);
 }
 
 #define UNOP(name, fn)				\
@@ -62,9 +63,9 @@ UNOP(lgamma,std::lgamma)
 
 static PRIMTYPE(type_binop) {
   return args.size() == 2 &&
-    args[0]->unify(Double::typeVar) &&
-    args[1]->unify(Double::typeVar) &&
-    out->unify(Double::typeVar);
+    args[0]->unify(Data::typeDouble) &&
+    args[1]->unify(Data::typeDouble) &&
+    out->unify(Data::typeDouble);
 }
 
 #define BINOP(name, fn)				\
@@ -90,10 +91,10 @@ BINOP(atan, std::atan2)
 
 static PRIMTYPE(type_fma) {
   return args.size() == 3 &&
-    args[0]->unify(Double::typeVar) &&
-    args[1]->unify(Double::typeVar) &&
-    args[2]->unify(Double::typeVar) &&
-    out->unify(Double::typeVar);
+    args[0]->unify(Data::typeDouble) &&
+    args[1]->unify(Data::typeDouble) &&
+    args[2]->unify(Data::typeDouble) &&
+    out->unify(Data::typeDouble);
 }
 
 static PRIMFN(prim_fma) {
@@ -107,10 +108,10 @@ static PRIMFN(prim_fma) {
 
 static PRIMTYPE(type_str) {
   return args.size() == 3 &&
-    args[0]->unify(Integer::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
-    args[2]->unify(Double::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeInteger) &&
+    args[1]->unify(Data::typeInteger) &&
+    args[2]->unify(Data::typeDouble) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_str) {
@@ -138,9 +139,9 @@ static PRIMFN(prim_str) {
 static PRIMTYPE(type_dbl) {
   TypeVar list;
   Data::typeList.clone(list);
-  list[0].unify(Double::typeVar);
+  list[0].unify(Data::typeDouble);
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeString) &&
     out->unify(list);
 }
 
@@ -164,8 +165,8 @@ static PRIMTYPE(type_cmp) {
   Data::typeList.clone(list);
   list[0].unify(Data::typeOrder);
   return args.size() == 2 &&
-    args[0]->unify(Double::typeVar) &&
-    args[1]->unify(Double::typeVar) &&
+    args[0]->unify(Data::typeDouble) &&
+    args[1]->unify(Data::typeDouble) &&
     out->unify(list);
 }
 
@@ -186,8 +187,8 @@ static PRIMFN(prim_cmp) {
 
 static PRIMTYPE(type_cmp_nan_lt) {
   return args.size() == 2 &&
-    args[0]->unify(Double::typeVar) &&
-    args[1]->unify(Double::typeVar) &&
+    args[0]->unify(Data::typeDouble) &&
+    args[1]->unify(Data::typeDouble) &&
     out->unify(Data::typeOrder);
 }
 
@@ -216,8 +217,8 @@ static PRIMFN(prim_cmp_nan_lt) {
 
 static PRIMTYPE(type_class) {
   return args.size() == 1 &&
-    args[0]->unify(Double::typeVar) &&
-    out->unify(Integer::typeVar);
+    args[0]->unify(Data::typeDouble) &&
+    out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_class) {
@@ -237,10 +238,10 @@ static PRIMFN(prim_class) {
 static PRIMTYPE(type_frexp) {
   TypeVar pair;
   Data::typePair.clone(pair);
-  pair[0].unify(Double::typeVar);
-  pair[1].unify(Integer::typeVar);
+  pair[0].unify(Data::typeDouble);
+  pair[1].unify(Data::typeInteger);
   return args.size() == 1 &&
-    args[0]->unify(Double::typeVar) &&
+    args[0]->unify(Data::typeDouble) &&
     out->unify(pair);
 }
 
@@ -264,9 +265,9 @@ static PRIMFN(prim_frexp) {
 
 static PRIMTYPE(type_ldexp) {
   return args.size() == 2 &&
-    args[0]->unify(Double::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
-    out->unify(Double::typeVar);
+    args[0]->unify(Data::typeDouble) &&
+    args[1]->unify(Data::typeInteger) &&
+    out->unify(Data::typeDouble);
 }
 
 static PRIMFN(prim_ldexp) {
@@ -287,10 +288,10 @@ static PRIMFN(prim_ldexp) {
 static PRIMTYPE(type_modf) {
   TypeVar pair;
   Data::typePair.clone(pair);
-  pair[0].unify(Integer::typeVar);
-  pair[1].unify(Double::typeVar);
+  pair[0].unify(Data::typeInteger);
+  pair[1].unify(Data::typeDouble);
   return args.size() == 1 &&
-    args[0]->unify(Double::typeVar) &&
+    args[0]->unify(Data::typeDouble) &&
     out->unify(pair);
 }
 

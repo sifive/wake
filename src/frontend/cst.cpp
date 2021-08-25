@@ -267,6 +267,10 @@ Location TokenInfo::location(const FileContent &fcontent) const {
     return Location(fcontent.filename.c_str(), fcontent.coordinates(start), fcontent.coordinates(end!=start?end-1:end));
 }
 
+std::string TokenInfo::str() const {
+    return std::string(reinterpret_cast<const char*>(start), end-start);
+}
+
 std::ostream & operator << (std::ostream &os, TokenInfo tinfo) {
     Token token, next;
 

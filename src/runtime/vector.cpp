@@ -27,6 +27,7 @@
 #include "runtime/value.h"
 #include "frontend/expr.h"
 #include "types/type.h"
+#include "types/data.h"
 
 static const TypeVar arrayT("Array@builtin", 1);
 
@@ -34,7 +35,7 @@ static PRIMTYPE(type_vnew) {
   TypeVar vec;
   arrayT.clone(vec);
   return args.size() == 1 &&
-    args[0]->unify(Integer::typeVar) &&
+    args[0]->unify(Data::typeInteger) &&
     out->unify(vec);
 }
 
@@ -50,7 +51,7 @@ static PRIMTYPE(type_vget) {
   arrayT.clone(vec);
   return args.size() == 2 &&
     args[0]->unify(vec) &&
-    args[1]->unify(Integer::typeVar) &&
+    args[1]->unify(Data::typeInteger) &&
     out->unify(vec[0]);
 }
 
@@ -75,7 +76,7 @@ static PRIMTYPE(type_vset) {
   arrayT.clone(vec);
   return args.size() == 3 &&
     args[0]->unify(vec) &&
-    args[1]->unify(Integer::typeVar) &&
+    args[1]->unify(Data::typeInteger) &&
     args[2]->unify(vec[0]) &&
     out->unify(Data::typeUnit);
 }

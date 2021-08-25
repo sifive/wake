@@ -64,8 +64,6 @@ std::string HeapObject::to_str() const {
   return str.str();
 }
 
-TypeVar String::typeVar("String@builtin", 0);
-
 String::String(size_t length_) : length(length_) { }
 
 String::String(const String &s) : length(s.length) {
@@ -174,8 +172,6 @@ Hash String::shallow_hash() const {
   return Hash(c_str(), length) ^ TYPE_STRING;
 }
 
-TypeVar Integer::typeVar("Integer@builtin", 0);
-
 Integer::Integer(int length_) : length(length_) { }
 
 Integer::Integer(const Integer &i) : length(i.length) {
@@ -216,8 +212,6 @@ Hash Integer::shallow_hash() const {
   return Hash(data(), abs(length)*sizeof(mp_limb_t)) ^ TYPE_INTEGER;
 }
 
-TypeVar Double::typeVar("Double@builtin", 0);
-
 RootPointer<Double> Double::literal(Heap &h, const char *str) {
   h.guarantee(reserve());
   Double *out = claim(h, str);
@@ -256,8 +250,6 @@ std::string Double::str(int format, int precision) const {
   }
   return s.str();
 }
-
-TypeVar RegExp::typeVar("RegExp@builtin", 0);
 
 // Unfortunately, re2 does not define a VERSION macro.
 TEST_MEMBER(set_dot_nl);
@@ -404,12 +396,3 @@ void Scope::format(std::ostream &os, FormatState &state) const {
     if (next) state.child(next.get(), APP_PRECEDENCE+1);
   }
 }
-
-TypeVar Data::typeBoolean("Boolean@wake", 0);
-TypeVar Data::typeOrder("Order@wake", 0);
-TypeVar Data::typeUnit("Unit@wake", 0);
-TypeVar Data::typeJValue("JValue@wake", 0);
-TypeVar Data::typeError("Error@wake", 0);
-const TypeVar Data::typeList("List@wake", 1);
-const TypeVar Data::typePair("Pair@wake", 2);
-const TypeVar Data::typeResult("Result@wake", 2);

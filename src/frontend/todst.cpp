@@ -29,7 +29,7 @@
 #include "frontend/lexer.h"
 #include "frontend/diagnostic.h"
 #include "frontend/sums.h"
-#include "runtime/value.h"
+#include "types/data.h"
 #include "location.h"
 
 #define ERROR(loc, stream)                   \
@@ -48,9 +48,6 @@ static std::string getIdentifier(CSTElement element) {
 /*
 
     case HERE: {
-      std::string name(lex.next.location.filename);
-      std::string::size_type cut = name.find_last_of('/');
-      if (cut == std::string::npos) name = "."; else name.resize(cut);
       Expr *out = new Literal(lex.next.location, String::literal(lex.heap, name), &String::typeVar);
       out->flags |= FLAG_AST;
       lex.consume();
@@ -915,13 +912,11 @@ static void parse_def(CSTElement def, DefMap &map, Symbols *exports, Symbols *gl
       auto &def = defs.front();
       std::stringstream s;
       s << def.body->location.file();
-/* !!! literal
       Location l = LOCATION;
       bind_def(map, Definition("table " + name, l,
           new App(l, new Lambda(l, "_", new Prim(l, "tnew"), " "),
-          new Literal(l, String::literal(lex.heap, s.str()), &String::typeVar))),
+          new Literal(l, s.str(), &Data::typeString))),
         nullptr, nullptr);
-*/
     }
   }
 
@@ -1043,6 +1038,64 @@ static Expr *parse_match(int p, Lexer &lex) {
 }
 */
 
+static Expr *parse_literal(CSTElement lit, std::string::size_type wsLen) {
+  CSTElement child = lit.firstChildElement();
+  switch (child.id()) {
+    case TOKEN_STR_RAW: {
+      TokenInfo ti = child.content();
+      ++ti.start;
+      --ti.end;
+//      return new Literal(lit.location(), ti.str(), &Data::typeString);
+      break;
+    }
+    case TOKEN_STR_SINGLE:
+    case TOKEN_STR_MID:
+    case TOKEN_STR_OPEN:
+    case TOKEN_STR_CLOSE:
+//      relex_string
+      break;
+    case TOKEN_REG_SINGLE:
+    case TOKEN_REG_MID:
+    case TOKEN_REG_OPEN:
+    case TOKEN_REG_CLOSE:
+//      relex_regexp
+      break;
+    case TOKEN_DOUBLE:
+//      content() // remove _
+      break;
+    case TOKEN_INTEGER:
+//      content() // remove _
+      break;
+    case TOKEN_KW_HERE:
+      std::string name(lit.location().filename);
+      std::string::size_type cut = name.find_last_of('/');
+      if (cut == std::string::npos) name = "."; else name.resize(cut);
+      break;
+/*
+    // TOKEN_WS <- strip common prefix
+    // TOKEN_NL <- discard [BEGIN, LWS, (warn on CONTINUE/PAUSE), first NL]; discard [WS, END]
+    // !!! BEGIN WS?NL? END is possible
+    // !!! what about empty lines (LWS NL); count those LWS towards common prefix? no, but include NL.
+    case TOKEN_LSTR_BEGIN:
+    //
+    case TOKEN_LSTR_END: // NL WS
+    case TOKEN_LSTR_CONTINUE:
+    case TOKEN_LSTR_PAUSE:
+    //
+    case TOKEN_LSTR_MID:
+    case TOKEN_LSTR_RESUME:
+      break;
+    case TOKEN_MSTR_BEGIN:
+    case TOKEN_MSTR_END:
+    case TOKEN_MSTR_PAUSE:
+    case TOKEN_MSTR_MID:
+    case TOKEN_MSTR_RESUME:
+    case TOKEN_MSTR_CONTINUE:
+      break;
+*/
+  }
+}
+
 static Expr *parse_expr(CSTElement expr) {
   switch (expr.id()) {
     case CST_BINARY: {
@@ -1152,7 +1205,9 @@ static Expr *parse_expr(CSTElement expr) {
       out->flags |= FLAG_AST;
       return out;
     }
-    case CST_LITERAL: // !!!
+    case CST_LITERAL: {
+      return parse_literal(expr, std::string::npos);
+    }
     case CST_INTERPOLATE: // !!!
     case CST_MATCH: // !!!
     case CST_BLOCK: // !!!

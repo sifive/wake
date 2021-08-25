@@ -23,6 +23,7 @@
 
 #include "runtime/prim.h"
 #include "types/type.h"
+#include "types/data.h"
 #include "runtime/value.h"
 
 #define UNOP(name, fn)				\
@@ -106,10 +107,10 @@ BINOP_SI0(root, mpz_root)
 
 static PRIMTYPE(type_powm) {
   return args.size() == 3 &&
-    args[0]->unify(Integer::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
-    args[2]->unify(Integer::typeVar) &&
-    out->unify(Integer::typeVar);
+    args[0]->unify(Data::typeInteger) &&
+    args[1]->unify(Data::typeInteger) &&
+    args[2]->unify(Data::typeInteger) &&
+    out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_powm) {
@@ -126,9 +127,9 @@ static PRIMFN(prim_powm) {
 
 static PRIMTYPE(type_str) {
   return args.size() == 2 &&
-    args[0]->unify(Integer::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeInteger) &&
+    args[1]->unify(Data::typeInteger) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_str) {
@@ -153,10 +154,10 @@ static PRIMFN(prim_str) {
 static PRIMTYPE(type_int) {
   TypeVar list;
   Data::typeList.clone(list);
-  list[0].unify(Integer::typeVar);
+  list[0].unify(Data::typeInteger);
   return args.size() == 2 &&
-    args[0]->unify(Integer::typeVar) &&
-    args[1]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeInteger) &&
+    args[1]->unify(Data::typeString) &&
     out->unify(list);
 }
 
@@ -185,21 +186,21 @@ static PRIMFN(prim_int) {
 
 static PRIMTYPE(type_unop) {
   return args.size() == 1 &&
-    args[0]->unify(Integer::typeVar) &&
-    out->unify(Integer::typeVar);
+    args[0]->unify(Data::typeInteger) &&
+    out->unify(Data::typeInteger);
 }
 
 static PRIMTYPE(type_binop) {
   return args.size() == 2 &&
-    args[0]->unify(Integer::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
-    out->unify(Integer::typeVar);
+    args[0]->unify(Data::typeInteger) &&
+    args[1]->unify(Data::typeInteger) &&
+    out->unify(Data::typeInteger);
 }
 
 static PRIMTYPE(type_icmp) {
   return args.size() == 2 &&
-    args[0]->unify(Integer::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
+    args[0]->unify(Data::typeInteger) &&
+    args[1]->unify(Data::typeInteger) &&
     out->unify(Data::typeOrder);
 }
 

@@ -29,6 +29,7 @@
 #include "frontend/expr.h"
 #include "runtime/value.h"
 #include "frontend/sums.h"
+#include "types/data.h"
 
 typedef std::numeric_limits<double> dlimits;
 static double nan() { return dlimits::quiet_NaN(); }
@@ -106,9 +107,9 @@ static PRIMTYPE(type_json) {
   TypeVar result;
   Data::typeResult.clone(result);
   result[0].unify(Data::typeJValue);
-  result[1].unify(String::typeVar);
+  result[1].unify(Data::typeString);
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeString) &&
     out->unify(result);
 }
 
@@ -148,8 +149,8 @@ static PRIMFN(prim_json_body) {
 
 static PRIMTYPE(type_jstr) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeString) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_json_str) {
