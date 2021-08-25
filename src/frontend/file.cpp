@@ -61,9 +61,9 @@ StringFile::StringFile(const char *filename_, std::string &&content_)
 ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
  : FileContent(filename_)
 {
-    Location l(filename.c_str());
+    Location l(filename);
 
-    int fd = open(filename.c_str(), O_RDONLY);
+    int fd = open(filename, O_RDONLY);
     if (fd == -1) {
         reporter.reportError(l, std::string("open failed; ") + strerror(errno));
         end = start = &null[0];
@@ -117,7 +117,7 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
 }
 
 ExternalFile::ExternalFile(ExternalFile &&o)
- : FileContent(o.filename.c_str()) {
+ : FileContent(o.filename) {
     start = o.start;
     end = o.end;
     o.end = o.start = &null[0];
@@ -129,7 +129,7 @@ ExternalFile::~ExternalFile() {
 }
 
 ExternalFile &ExternalFile::operator = (ExternalFile &&o) {
-    filename = std::move(o.filename);
+    filename = o.filename;
     start = o.start;
     end = o.end;
     o.end = o.start = &null[0];

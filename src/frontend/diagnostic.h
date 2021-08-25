@@ -18,6 +18,8 @@
 #ifndef DIAGNOSTIC_H
 #define DIAGNOSTIC_H
 
+#include <sstream>
+
 #include "location.h"
 
 enum Severity { S_ERROR = 1, S_WARNING, S_INFORMATION, S_HINT };
@@ -62,5 +64,12 @@ class DiagnosticReporter {
 };
 
 extern DiagnosticReporter *reporter;
+
+#define ERROR(loc, stream)                   \
+  do {                                       \
+    std::stringstream sstr;                  \
+    sstr << stream;                          \
+    reporter->reportError(loc, sstr.str());  \
+  } while (0)                                \
 
 #endif

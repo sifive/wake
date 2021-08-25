@@ -29,7 +29,7 @@ class FileContent {
 public:
     FileContent(const char *filename_);
 
-    std::string filename;
+    const char *filename;
     const uint8_t *start;
     const uint8_t *end;
 

@@ -22,6 +22,8 @@
 #include <iostream>
 #include <sstream>
 #include <set>
+#include <algorithm>
+#include <assert.h>
 
 #include "frontend/parser.h"
 #include "frontend/expr.h"
@@ -29,15 +31,9 @@
 #include "frontend/lexer.h"
 #include "frontend/diagnostic.h"
 #include "frontend/sums.h"
+#include "frontend/syntax.h"
 #include "types/data.h"
 #include "location.h"
-
-#define ERROR(loc, stream)                   \
-  do {                                       \
-    std::stringstream sstr;                  \
-    sstr << stream;                          \
-    reporter->reportError(loc, sstr.str());  \
-  } while (0)                                \
 
 static std::string getIdentifier(CSTElement element) {
   assert (element.id() == CST_ID || element.id() == CST_OP);
@@ -461,7 +457,9 @@ static void parse_data(CSTElement topdef, Package &package, Symbols *globals) {
 
 static void parse_tuple(CSTElement topdef, Package &package, Symbols *globals) {
   CSTElement child = topdef.firstChildNode();
-  TopFlags flags = parse_flags(child);
+  TopFlags flags = parse_flags(child); // export/global constructor?
+  bool exportt = flags.exportf; // we export the type if any member is exported
+  bool globalt = flags.globalf;
 
   auto sump = std::make_shared<Sum>(parse_type(child)); // !!! check parse_type_def coverage
   if (lex_kind(sump->name) != UPPER) ERROR(child.location(), "tuple type '" << sump->name << "' must be upper-case");
@@ -489,18 +487,16 @@ static void parse_tuple(CSTElement topdef, Package &package, Symbols *globals) {
   DefMap &map = *package.files.back().content;
 
   Symbols *exports = &package.exports;
-  bind_type(package, sump->name, sump->token, flags.exportf?exports:nullptr, flags.globalf?globals:nullptr);
-  bind_def(map, Definition(c.ast.name, c.ast.token, construct), flags.exportf?exports:nullptr, flags.globalf?globals:nullptr);
-
-  if (package.name == "wake") check_special(sump);
 
   // Create get/set/edit helper methods
-  size_t outer = 0;
   for (size_t i = 0; i < members.size(); ++i) {
-    std::string &mname = c.ast.args[i].tag;
-    Location memberToken = c.ast.args[i].region;
     bool globalb = members[i].globalf;
     bool exportb = members[i].exportf;
+    if (globalb) globalt = true;
+    if (exportb) exportt = true;
+
+    std::string &mname = c.ast.args[i].tag;
+    Location memberToken = c.ast.args[i].region;
     if (lex_kind(mname) != UPPER) continue;
 
     // Implement get methods
@@ -514,7 +510,7 @@ static void parse_tuple(CSTElement topdef, Package &package, Symbols *globals) {
     editmap->body = std::unique_ptr<Expr>(new Construct(memberToken, sump, &c));
     for (size_t inner = 0; inner < members.size(); ++inner) {
       Expr *select = new Get(memberToken, sump, &c, inner);
-      if (inner == outer)
+      if (inner == i)
         select =
           new App(memberToken,
             new VarRef(memberToken, "fn" + mname),
@@ -543,7 +539,7 @@ static void parse_tuple(CSTElement topdef, Package &package, Symbols *globals) {
       std::string name = "_ a" + std::string(4 - x.size(), '0') + x;
       setmap->defs.insert(std::make_pair(name,
         DefValue(memberToken, std::unique_ptr<Expr>(
-          (inner == outer)
+          (inner == i)
           ? static_cast<Expr*>(new VarRef(memberToken, mname))
           : static_cast<Expr*>(new Get(memberToken, sump, &c, inner))))));
     }
@@ -555,9 +551,12 @@ static void parse_tuple(CSTElement topdef, Package &package, Symbols *globals) {
 
     setfn->flags |= FLAG_SYNTHETIC;
     bind_def(map, Definition(set, memberToken, setfn), exportb?exports:nullptr, globalb?globals:nullptr);
-
-    ++outer;
   }
+
+  bind_type(package, sump->name, sump->token, exportt?exports:nullptr, globalt?globals:nullptr);
+  bind_def(map, Definition(c.ast.name, c.ast.token, construct), flags.exportf?exports:nullptr, flags.globalf?globals:nullptr);
+
+  if (package.name == "wake") check_special(sump);
 }
 
 static AST parse_pattern(CSTElement root, std::vector<CSTElement> *guard) {
@@ -627,9 +626,8 @@ static AST parse_pattern(CSTElement root, std::vector<CSTElement> *guard) {
     }
     case CST_LITERAL: {
       if (guard) {
-        CSTElement literal = root.firstChildElement();
-        AST out(literal.location(), "_ k" + std::to_string(guard->size()));
-        guard->emplace_back(literal);
+        AST out(root.location(), "_ k" + std::to_string(guard->size()));
+        guard->emplace_back(root);
         return out;
       } else {
         ERROR(root.location(), "def/lambda patterns forbid " << root.content() << "; use a match");
@@ -646,6 +644,7 @@ static AST parse_pattern(CSTElement root, std::vector<CSTElement> *guard) {
 static Expr *parse_expr(CSTElement expr);
 
 static int relabel_descend(Expr *expr, int index) {
+  if (!expr) return index;
   if (!(expr->flags & FLAG_TOUCHED)) {
     expr->flags |= FLAG_TOUCHED;
     if (expr->type == &VarRef::type) {
@@ -708,13 +707,14 @@ static void extract_def(std::vector<Definition> &out, long index, AST &&ast, con
   }
 }
 
-static void parse_def(CSTElement def, DefMap &map, Symbols *exports, Symbols *globals) {
+static void parse_def(CSTElement def, DefMap &map, Package *package, Symbols *globals) {
   bool target  = def.id() == CST_TARGET;
   bool publish = def.id() == CST_PUBLISH;
 
   CSTElement child = def.firstChildNode();
   TopFlags flags = parse_flags(child);
-  if (!flags.exportf) exports = nullptr;
+
+  Symbols *exports = flags.exportf ? &package->exports : nullptr;
   if (!flags.globalf) globals = nullptr;
 
   AST ast = parse_pattern(child, nullptr);
@@ -837,8 +837,11 @@ static void parse_def(CSTElement def, DefMap &map, Symbols *exports, Symbols *gl
     }
   }
 
-  for (auto &def : defs)
-    bind_def(map, std::move(def), exports, globals);
+  if (publish) {
+    for (auto &def : defs) package->files.back().pubs.emplace_back(def.name, DefValue(def.location, std::move(def.body)));
+  } else {
+    for (auto &def : defs) bind_def(map, std::move(def), exports, globals);
+  }
 }
 
 static Literal *parse_literal(CSTElement lit, std::string::size_type wsLen = std::string::npos) {
@@ -903,6 +906,10 @@ static Literal *parse_literal(CSTElement lit, std::string::size_type wsLen = std
     case TOKEN_MSTR_CONTINUE:
       break;
 */
+    default: {
+      ERROR(lit.location(), "unsupported literal " << symbolExample(id) << " = " << lit.content());
+      return new Literal(lit.location(), "bad-literal", &Data::typeString);
+    }
   }
 }
 
@@ -962,12 +969,12 @@ static Expr *parse_match(CSTElement match) {
     AST pattern = args.size()==1 ? std::move(args[0]) : AST(child.location(), "", std::move(args));
 
     CSTElement guarde = casee.firstChildNode();
-    Expr *guard = guarde.empty() ? nullptr : parse_expr(guarde);
+    Expr *guard = guarde.empty() ? nullptr : relabel_anon(parse_expr(guarde));
     casee.nextSiblingNode();
 
     guard = add_literal_guards(guard, guards);
 
-    Expr *expr = parse_expr(casee);
+    Expr *expr = relabel_anon(parse_expr(casee));
     out->patterns.emplace_back(std::move(pattern), expr, guard);
   }
 
@@ -995,16 +1002,16 @@ static Expr *parse_require(CSTElement require) {
   AST ast = parse_pattern(child, nullptr);
   child.nextSiblingNode();
 
-  Expr *rhs = parse_expr(child);
+  Expr *rhs = relabel_anon(parse_expr(child));
   child.nextSiblingNode();
 
   Expr *otherwise = nullptr;
   if (child.id() == CST_REQ_ELSE) {
-    otherwise = parse_expr(child);
+    otherwise = relabel_anon(parse_expr(child));
     child.nextSiblingNode();
   }
 
-  Expr *block = parse_expr(child);
+  Expr *block = relabel_anon(parse_expr(child));
 
   Match *out = new Match(require.location(), true);
   out->args.emplace_back(rhs);
@@ -1159,7 +1166,7 @@ const char *dst_top(CSTElement root, Top &top) {
     case CST_DEF:
     case CST_PUBLISH:
     case CST_TARGET:
-      parse_def(topdef, *package->files.back().content, &package->exports, &globals);
+      parse_def(topdef, *package->files.back().content, package.get(), &globals);
       break;
     }
   }

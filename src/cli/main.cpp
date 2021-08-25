@@ -427,8 +427,6 @@ int main(int argc, char **argv) {
     }
   }
 
-  return 0; // !!!
-
   if (in) {
     auto it = top->packages.find(in);
     if (it == top->packages.end()) {
@@ -487,6 +485,7 @@ int main(int argc, char **argv) {
     }
   }
 
+  return 0; // !!!
   std::string command;
   char *none = nullptr;
   char **cmdline = &none;

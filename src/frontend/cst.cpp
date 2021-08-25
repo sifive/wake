@@ -264,7 +264,7 @@ CSTElement CSTElement::firstChildNode() const {
 }
 
 Location TokenInfo::location(const FileContent &fcontent) const {
-    return Location(fcontent.filename.c_str(), fcontent.coordinates(start), fcontent.coordinates(end!=start?end-1:end));
+    return Location(fcontent.filename, fcontent.coordinates(start), fcontent.coordinates(end!=start?end-1:end));
 }
 
 std::string TokenInfo::str() const {
