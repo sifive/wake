@@ -409,6 +409,7 @@ private:
       for (auto &file: allFiles)
         runSyntaxChecker(file, *top);
 
+      flatten_exports(*top);
       PrimMap pmap = prim_register_all(nullptr, nullptr);
       bool isTreeBuilt = true;
       std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
