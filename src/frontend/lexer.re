@@ -384,7 +384,7 @@ std::string relex_regexp(uint8_t id, const uint8_t *s, const uint8_t *e) {
     case TOKEN_REG_CLOSE:  ++s; --e;    break; // skpi }`
     }
 
-    return relex_id(s, e);
+    return relex_id(s, e); // !!! unicode_escape_canon
 }
 
 op_type op_precedence(const uint8_t *s, const uint8_t *e) {

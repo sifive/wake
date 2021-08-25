@@ -53,14 +53,15 @@
 #define CST_PRIM	152
 #define CST_PUBLISH	153
 #define CST_REQUIRE	154
-#define CST_SUBSCRIBE	155
-#define CST_TARGET	156
-#define CST_TOP		157
-#define CST_TOPIC	158
-#define CST_TUPLE	159
-#define CST_TUPLE_ELT	160
-#define CST_UNARY	161
-
+#define CST_REQ_ELSE	155
+#define CST_SUBSCRIBE	156
+#define CST_TARGET	157
+#define CST_TARGET_ARGS	158
+#define CST_TOP		159
+#define CST_TOPIC	160
+#define CST_TUPLE	161
+#define CST_TUPLE_ELT	162
+#define CST_UNARY	163
 #define CST_ERROR	255
 
 class FileContent;

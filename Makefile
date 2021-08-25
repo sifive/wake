@@ -32,7 +32,7 @@ all:		wake.db
 	$(WAKE_ENV) ./bin/wake build default
 
 clean:
-	rm -f bin/* lib/wake/* */*.o common/jlexer.cpp src/frontend/lexer.cpp src/version.h wake.db
+	rm -f bin/* lib/wake/* */*.o common/jlexer.cpp src/frontend/lexer.cpp src/frontend/parser.cpp src/version.h wake.db
 	touch bin/stamp lib/wake/stamp
 
 wake.db:	bin/wake bin/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EXTRA)
@@ -53,8 +53,8 @@ vscode:		wake.db
 static:	wake.db
 	$(WAKE_ENV) ./bin/wake static
 
-bin/wake:	src/frontend/lexer.o $(COMMON)				\
-		$(patsubst %.cpp,%.o,$(wildcard src/*/*.cpp))	\
+bin/wake:	src/frontend/lexer.o src/frontend/parser.o $(COMMON)	\
+		$(patsubst %.cpp,%.o,$(wildcard src/*/*.cpp))		\
 		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c gopt/gopt-arg.c)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
@@ -84,4 +84,4 @@ lib/wake/libpreload-wake.so:	preload/open.c
 	gzip -dc $^ > $@.tmp
 	mv -f $@.tmp $@
 
-.PRECIOUS:	src/frontend/lexer.cpp common/jlexer.cpp
+.PRECIOUS:	src/frontend/lexer.cpp src/frontend/parser.cpp common/jlexer.cpp

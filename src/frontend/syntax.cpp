@@ -330,8 +330,10 @@ const char *symbolExample(int symbol) {
     case CST_PRIM:           return "prim";
     case CST_PUBLISH:        return "publish";
     case CST_REQUIRE:        return "require";
+    case CST_REQ_ELSE:       return "require-else";
     case CST_SUBSCRIBE:      return "subscribe";
     case CST_TARGET:         return "target";
+    case CST_TARGET_ARGS:    return "target-args";
     case CST_TOP:            return "top";
     case CST_TOPIC:          return "topic";
     case CST_TUPLE:          return "tuple";

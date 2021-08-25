@@ -47,14 +47,6 @@ static std::string getIdentifier(CSTElement element) {
 
 /*
 
-    case HERE: {
-      Expr *out = new Literal(lex.next.location, String::literal(lex.heap, name), &String::typeVar);
-      out->flags |= FLAG_AST;
-      lex.consume();
-      return out;
-    }
-}
-
 static AST parse_type_def(Lexer &lex) {
   lex.consume();
 
@@ -97,80 +89,6 @@ static AST parse_type_def(Lexer &lex) {
   return def;
 }
 
-static Expr *parse_require(Lexer &lex) {
-  Location l = lex.next.location;
-  lex.consume();
-
-  ASTState state(false, true);
-  AST ast = parse_ast(0, lex, state);
-  auto guard = add_literal_guards(nullptr, state);
-
-  expect(EQUALS, lex);
-  lex.consume();
-
-  Expr *rhs = parse_block(lex, false);
-  bool eol = lex.next.type == EOL;
-  if (eol) lex.consume();
-
-  Expr *otherwise = nullptr;
-  if (lex.next.type == ELSE) {
-    lex.consume();
-    otherwise = parse_block(lex, false);
-    if (expect(EOL, lex)) lex.consume();
-  } else if (!eol) {
-    expect(EOL, lex);
-  }
-
-  Expr *block = parse_block_body(lex);
-
-  Match *out = new Match(l, true);
-  out->args.emplace_back(rhs);
-  out->patterns.emplace_back(std::move(ast), block, guard);
-  out->location.end = block->location.end;
-  out->otherwise = std::unique_ptr<Expr>(otherwise);
-
-  return out;
-}
-
-static Expr *parse_block_body(Lexer &lex) {
-  DefMap *map = new DefMap(lex.next.location);
-
-  bool repeat = true;
-  while (repeat) {
-    switch (lex.next.type) {
-      case FROM:
-      case TARGET:
-      case DEF: {
-        parse_decl(lex, *map, nullptr, nullptr);
-        break;
-      }
-      default: {
-        repeat = false;
-        break;
-      }
-    }
-  }
-
-  std::unique_ptr<Expr> body;
-  if (lex.next.type == REQUIRE) {
-    body = std::unique_ptr<Expr>(parse_require(lex));
-  } else {
-    body = std::unique_ptr<Expr>(relabel_anon(parse_binary(0, lex, true)));
-  }
-
-  if (map->defs.empty() && map->imports.empty()) {
-    delete map;
-    return body.release();
-  } else {
-    map->body = std::move(body);
-
-    map->location.end = map->body->location.end;
-    map->location.start.bytes -= (map->location.start.column-1);
-    map->location.start.column = 1;
-
-    return map;
-  }
-}
 
 */
 
@@ -218,10 +136,9 @@ static void prefix_op(ImportArity ia, std::string &name) {
   }
 }
 
-static void parse_import(CSTElement topdef, Package &package) {
+static void parse_import(CSTElement topdef, DefMap &map) {
   CSTElement child = topdef.firstChildNode();
 
-  DefMap &map = *package.files.back().content;
   std::string pkgname = getIdentifier(child);
   child.nextSiblingNode();
 
@@ -814,7 +731,7 @@ static void parse_def(CSTElement def, DefMap &map, Symbols *exports, Symbols *gl
   child.nextSiblingNode();
 
   size_t tohash = ast.args.size();
-  if (target && child.id() == CST_GUARD) {
+  if (target && child.id() == CST_TARGET_ARGS) {
     for (CSTElement sub = child.firstChildNode(); !sub.empty(); sub.nextSiblingNode()) {
       ast.args.emplace_back(parse_pattern(sub, nullptr));
     }
@@ -924,153 +841,46 @@ static void parse_def(CSTElement def, DefMap &map, Symbols *exports, Symbols *gl
     bind_def(map, std::move(def), exports, globals);
 }
 
-/*
-static Expr *add_literal_guards(Expr *guard, const ASTState &state) {
-  for (size_t i = 0; i < state.guard.size(); ++i) {
-    Expr* e = state.guard[i];
-    std::string comparison("scmp");
-    if (e->type == &Literal::type) {
-      Literal *lit = static_cast<Literal*>(e);
-      HeapObject *obj = lit->value->get();
-      if (typeid(*obj) == typeid(Integer)) comparison = "icmp";
-      if (typeid(*obj) == typeid(Double)) comparison = "dcmp_nan_lt";
-      if (typeid(*obj) == typeid(RegExp)) comparison = "rcmp";
-    }
-    if (!guard) guard = new VarRef(e->location, "True@wake");
-
-    Match *match = new Match(e->location);
-    match->args.emplace_back(new App(e->location, new App(e->location,
-        new Lambda(e->location, "_", new Lambda(e->location, "_", new Prim(e->location, comparison), " ")),
-        e), new VarRef(e->location, "_ k" + std::to_string(i))));
-    match->patterns.emplace_back(AST(e->location, "LT@wake"), new VarRef(e->location, "False@wake"), nullptr);
-    match->patterns.emplace_back(AST(e->location, "GT@wake"), new VarRef(e->location, "False@wake"), nullptr);
-    match->patterns.emplace_back(AST(e->location, "EQ@wake"), guard, nullptr);
-    guard = match;
-  }
-  return guard;
-}
-
-static Expr *parse_match(int p, Lexer &lex) {
-  Location location = lex.next.location;
-  op_type op = op_precedence("m");
-  if (op.p < p) precedence_error(lex);
-  lex.consume();
-
-  Match *out = new Match(location);
-  bool repeat;
-
-  repeat = true;
-  while (repeat) {
-    auto rhs = parse_binary(op.p + op.l, lex, false);
-    out->args.emplace_back(rhs);
-
-    switch (lex.next.type) {
-      case OPERATOR:
-      case MATCH:
-      case LAMBDA:
-      case ID:
-      case LITERAL:
-      case PRIM:
-      case HERE:
-      case SUBSCRIBE:
-      case POPEN:
-        break;
-      case INDENT:
-        lex.consume();
-        repeat = false;
-        break;
-      default:
-        std::ostringstream message;
-        message << "Unexpected end of match definition at " << lex.next.location.text();
-        reporter->reportError(lex.next.location, message.str());
-        lex.fail = true;
-        repeat = false;
-        break;
-    }
-  }
-
-  if (expect(EOL, lex)) lex.consume();
-
-  // Process the patterns
-  bool multiarg = out->args.size() > 1;
-  repeat = true;
-  while (repeat) {
-    ASTState state(false, true);
-    AST ast = multiarg
-      ? parse_ast(APP_PRECEDENCE, lex, state, AST(lex.next.location))
-      : parse_ast(0, lex, state);
-    if (check_constructors(ast)) lex.fail = true;
-
-    Expr *guard = nullptr;
-    if (lex.next.type == IF) {
-      lex.consume();
-      bool eateol = lex.next.type == INDENT;
-      guard = parse_block(lex, false);
-      if (eateol && expect(EOL, lex)) lex.consume();
-    }
-
-    guard = add_literal_guards(guard, state);
-
-    if (expect(EQUALS, lex)) lex.consume();
-    Expr *expr = parse_block(lex, false);
-    out->patterns.emplace_back(std::move(ast), expr, guard);
-
-    switch (lex.next.type) {
-      case DEDENT:
-        repeat = false;
-        lex.consume();
-        break;
-      case EOL:
-        lex.consume();
-        break;
-      default:
-        std::ostringstream message;
-        message << "Unexpected end of match definition at " << lex.next.location.text();
-        reporter->reportError(lex.next.location, message.str());
-        lex.fail = true;
-        repeat = false;
-        break;
-    }
-  }
-
-  out->location.end = out->patterns.back().expr->location.end;
-  return out;
-}
-*/
-
-static Expr *parse_literal(CSTElement lit, std::string::size_type wsLen) {
+static Literal *parse_literal(CSTElement lit, std::string::size_type wsLen = std::string::npos) {
   CSTElement child = lit.firstChildElement();
-  switch (child.id()) {
+  uint8_t id = child.id();
+  switch (id) {
     case TOKEN_STR_RAW: {
       TokenInfo ti = child.content();
       ++ti.start;
       --ti.end;
-//      return new Literal(lit.location(), ti.str(), &Data::typeString);
-      break;
+      return new Literal(child.location(), ti.str(), &Data::typeString);
     }
     case TOKEN_STR_SINGLE:
     case TOKEN_STR_MID:
     case TOKEN_STR_OPEN:
-    case TOKEN_STR_CLOSE:
-//      relex_string
-      break;
+    case TOKEN_STR_CLOSE: {
+      TokenInfo ti = child.content();
+      return new Literal(child.location(), relex_string(ti.start, ti.end), &Data::typeString);
+    }
     case TOKEN_REG_SINGLE:
     case TOKEN_REG_MID:
     case TOKEN_REG_OPEN:
-    case TOKEN_REG_CLOSE:
-//      relex_regexp
-      break;
-    case TOKEN_DOUBLE:
-//      content() // remove _
-      break;
-    case TOKEN_INTEGER:
-//      content() // remove _
-      break;
-    case TOKEN_KW_HERE:
+    case TOKEN_REG_CLOSE: {
+      TokenInfo ti = child.content();
+      return new Literal(child.location(), relex_regexp(id, ti.start, ti.end), &Data::typeRegExp);
+    }
+    case TOKEN_DOUBLE: {
+      std::string x = child.content().str();
+      x.resize(std::remove(x.begin(), x.end(), '_') - x.begin());
+      return new Literal(child.location(), std::move(x), &Data::typeDouble);
+    }
+    case TOKEN_INTEGER: {
+      std::string x = child.content().str();
+      x.resize(std::remove(x.begin(), x.end(), '_') - x.begin());
+      return new Literal(child.location(), std::move(x), &Data::typeInteger);
+    }
+    case TOKEN_KW_HERE: {
       std::string name(lit.location().filename);
       std::string::size_type cut = name.find_last_of('/');
       if (cut == std::string::npos) name = "."; else name.resize(cut);
-      break;
+      return new Literal(lit.location(), std::move(name), &Data::typeString);
+    }
 /*
     // TOKEN_WS <- strip common prefix
     // TOKEN_NL <- discard [BEGIN, LWS, (warn on CONTINUE/PAUSE), first NL]; discard [WS, END]
@@ -1094,6 +904,115 @@ static Expr *parse_literal(CSTElement lit, std::string::size_type wsLen) {
       break;
 */
   }
+}
+
+static Expr *add_literal_guards(Expr *guard, std::vector<CSTElement> literals) {
+  for (size_t i = 0; i < literals.size(); ++i) {
+    CSTElement literal = literals[i];
+    Literal* lit = parse_literal(literal);
+
+    const char *comparison;
+    if (lit->litType == &Data::typeString) {
+      comparison = "scmp";
+    } else if (lit->litType == &Data::typeInteger) {
+      comparison = "icmp";
+    } else if (lit->litType == &Data::typeRegExp) {
+      comparison = "rcmp";
+    } else if (lit->litType == &Data::typeDouble) {
+      comparison = "dcmp_nan_lt";
+    } else {
+      comparison = nullptr;
+      assert(0);
+    }
+
+    if (!guard) guard = new VarRef(lit->location, "True@wake");
+
+    Match *match = new Match(lit->location);
+    match->args.emplace_back(new App(lit->location, new App(lit->location,
+        new Lambda(lit->location, "_", new Lambda(lit->location, "_", new Prim(lit->location, comparison), " ")),
+        lit), new VarRef(lit->location, "_ k" + std::to_string(i))));
+    match->patterns.emplace_back(AST(lit->location, "LT@wake"), new VarRef(lit->location, "False@wake"), nullptr);
+    match->patterns.emplace_back(AST(lit->location, "GT@wake"), new VarRef(lit->location, "False@wake"), nullptr);
+    match->patterns.emplace_back(AST(lit->location, "EQ@wake"), guard, nullptr);
+    guard = match;
+  }
+  return guard;
+}
+
+static Expr *parse_match(CSTElement match) {
+  Location location = match.location();
+  Match *out = new Match(location);
+
+  CSTElement child;
+  for (child = match.firstChildNode(); !child.empty() && child.id() != CST_CASE; child.nextSiblingNode()) {
+    auto rhs = parse_expr(child);
+    out->args.emplace_back(rhs);
+  }
+
+  // Process the patterns
+  for (; !child.empty(); child.nextSiblingNode()) {
+    CSTElement casee;
+
+    std::vector<CSTElement> guards;
+    std::vector<AST> args;
+    for (casee = child.firstChildNode(); casee.id() != CST_GUARD; casee.nextSiblingNode()) {
+      args.emplace_back(parse_pattern(casee, &guards));
+    }
+
+    AST pattern = args.size()==1 ? std::move(args[0]) : AST(child.location(), "", std::move(args));
+
+    CSTElement guarde = casee.firstChildNode();
+    Expr *guard = guarde.empty() ? nullptr : parse_expr(guarde);
+    casee.nextSiblingNode();
+
+    guard = add_literal_guards(guard, guards);
+
+    Expr *expr = parse_expr(casee);
+    out->patterns.emplace_back(std::move(pattern), expr, guard);
+  }
+
+  return out;
+}
+
+static Expr *parse_block(CSTElement block) {
+  DefMap *map = new DefMap(block.location());
+
+  std::unique_ptr<Expr> body;
+  for (CSTElement child = block.firstChildNode(); !child.empty(); child.nextSiblingNode()) {
+    switch (child.id()) {
+      case CST_IMPORT: parse_import(child, *map); break;
+      case CST_DEF:    parse_def(child, *map, nullptr, nullptr); break;
+      default:         map->body = std::unique_ptr<Expr>(relabel_anon(parse_expr(child))); break;
+    }
+  }
+
+  return map;
+}
+
+static Expr *parse_require(CSTElement require) {
+  CSTElement child = require.firstChildNode();
+
+  AST ast = parse_pattern(child, nullptr);
+  child.nextSiblingNode();
+
+  Expr *rhs = parse_expr(child);
+  child.nextSiblingNode();
+
+  Expr *otherwise = nullptr;
+  if (child.id() == CST_REQ_ELSE) {
+    otherwise = parse_expr(child);
+    child.nextSiblingNode();
+  }
+
+  Expr *block = parse_expr(child);
+
+  Match *out = new Match(require.location(), true);
+  out->args.emplace_back(rhs);
+  out->patterns.emplace_back(std::move(ast), block, nullptr);
+  out->location.end = block->location.end;
+  out->otherwise = std::unique_ptr<Expr>(otherwise);
+
+  return out;
 }
 
 static Expr *parse_expr(CSTElement expr) {
@@ -1205,16 +1124,19 @@ static Expr *parse_expr(CSTElement expr) {
       out->flags |= FLAG_AST;
       return out;
     }
-    case CST_LITERAL: {
-      return parse_literal(expr, std::string::npos);
-    }
+    case CST_MATCH:       return parse_match(expr);
+    case CST_LITERAL:     return parse_literal(expr);
+    case CST_BLOCK:       return parse_block(expr);
+    case CST_REQUIRE:     return parse_require(expr);
     case CST_INTERPOLATE: // !!!
-    case CST_MATCH: // !!!
-    case CST_BLOCK: // !!!
     default:
       ERROR(expr.location(), "unexpected expression: " << expr.content());
-    case CST_ERROR:
-      return nullptr;
+    case CST_ERROR: {
+      Location l = expr.location();
+      return new App(l,
+        new Lambda(l, "_", new Prim(l, "unreachable")),
+        new Literal(l, "bad-expression", &Data::typeString));
+    }
   }
 }
 
@@ -1229,7 +1151,7 @@ const char *dst_top(CSTElement root, Top &top) {
   for (CSTElement topdef = root.firstChildNode(); !topdef.empty(); topdef.nextSiblingNode()) {
     switch (topdef.id()) {
     case CST_PACKAGE: parse_package(topdef, *package); break;
-    case CST_IMPORT:  parse_import (topdef, *package); break;
+    case CST_IMPORT:  parse_import (topdef, map);      break;
     case CST_EXPORT:  parse_export (topdef, *package); break;
     case CST_TOPIC:   parse_topic  (topdef, *package, &globals); break;
     case CST_DATA:    parse_data   (topdef, *package, &globals); break;

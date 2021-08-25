@@ -173,8 +173,10 @@ topdef(R) ::= global(G) export(E) KW_TARGET(b) target_pattern(P)                
 topdef(R) ::= global(G) export(E) KW_TARGET(b) target_pattern(P) P_EQUALS              NL(e). { R = 1; add(CST_ERROR, e); add(CST_TARGET, b, G+E+P+1, e); fail("targets must be followed by an '= expression'", e); }
 topdef(R) ::= global(G) export(E) KW_TARGET(b) target_pattern(P) P_EQUALS block_opt(B) NL(e). { R = 1; add(CST_TARGET, b, G+E+P+B, e); }
 
-target_pattern(R) ::= pattern(P).                           { R = P;   }
-target_pattern(R) ::= pattern(P) P_BSLASH pattern_terms(T). { R = P+T; }
+target_pattern(R) ::= pattern(P).                          { R = P;   }
+target_pattern(R) ::= pattern(P) P_BSLASH target_args(G). { R = P+G; }
+
+target_args(R) ::= pattern_terms(T). { R = 1; add(CST_TARGET_ARGS, T); }
 
 dnl Left-associative prEfix-heavy; 1 + + 4 + + 5 = (1 + (+4)) + (+5)
 define(`LE',
@@ -304,20 +306,20 @@ expression_binary_app(R) ::= KW_MATCH(b) match_terms(T)     INDENT matchx_cases(
 
 match1_cases(R) ::= match1_cases(C) NL match1_case(B). { R = C+B; }
 match1_cases(R) ::= match1_case(B).                    { R = B;   }
-match1_case(R) ::= pattern(P) guard(G) P_EQUALS block_opt(B). { R = 1; add(CST_CASE, P+G+B); }
+match1_case(R) ::= pattern(P) guard(G) block_opt(B).   { R = 1; add(CST_CASE, P+G+B); }
 
 match_terms(R) ::= expression_term(E) expression_term(F). { R = E+F; }
 match_terms(R) ::= match_terms(T) expression_term(E).     { R = T+E; }
 
 matchx_cases(R) ::= matchx_cases(C) NL matchx_case(B). { R = C+B; }
 matchx_cases(R) ::= matchx_case(B).                    { R = B; }
-matchx_case(R) ::= pattern_terms(T) guard(G) P_EQUALS block_opt(B). { R = 1; add(CST_CASE, T+G+B); }
+matchx_case(R) ::= pattern_terms(T) guard(G) block_opt(B). { R = 1; add(CST_CASE, T+G+B); }
 
 pattern_terms(R) ::= pattern_terms(T) pattern_term(B). { R = T+B; }
 pattern_terms(R) ::= pattern_term(B).                  { R = B; }
 
-guard(R) ::= .                       { R = 0; }
-guard(R) ::= KW_IF(b) expression(E). { R = 1; add(CST_GUARD, b, E); }
+guard(R) ::=                        P_EQUALS(e). { R = 1; add(CST_GUARD, e); }
+guard(R) ::= KW_IF(b) expression(E) P_EQUALS(e). { R = 1; add(CST_GUARD, b, E, e); }
 
 expression(R) ::= expression_binary_comma(B). { R = B; }
 
@@ -352,8 +354,8 @@ reqbody(R) ::= P_EQUALS block_opt(B). { R = B; }
 
 // Even though NL is legal to discard everywhere, we need to explicitly allow it here.
 // Otherwise, the NL might be taken to be the end of require, prohibiting else.
-reqelse(R) ::= NL KW_ELSE reqelsebody(B). { R = B; }
-reqelse(R) ::=    KW_ELSE reqelsebody(B). { R = B; }
+reqelse(R) ::= NL KW_ELSE reqelsebody(B). { R = 1; add(CST_REQ_ELSE, B); }
+reqelse(R) ::=    KW_ELSE reqelsebody(B). { R = 1; add(CST_REQ_ELSE, B); }
 reqelse(R) ::= NL.                        { R = 0; }
 
 reqelsebody(R) ::=              NL(e). { R = 1; add(CST_ERROR, e); fail("keyword 'else' must be followed by an expression", e); }
