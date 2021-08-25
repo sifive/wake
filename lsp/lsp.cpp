@@ -132,7 +132,7 @@ public:
             sendErrorMessage(request, ServerNotInitialized, "Must request initialize first");
           } else if (isShutDown && (method != "exit")) {
             sendErrorMessage(request, InvalidRequest, "Received a request other than 'exit' after a shutdown request.");
-          } else {
+          } else if (!method.empty()) {
             callMethod(method, request);
           }
         }
@@ -144,6 +144,8 @@ private:
 
     std::string rootUri = "";
     bool isInitialized = false;
+    bool isCrashed = false;
+    std::string crashedFlagFilename = "is_lsp_wake_server_started";
     bool isShutDown = false;
     std::string stdLib;
     Runtime runtime;
@@ -168,7 +170,7 @@ private:
           isGlobal(_isGlobal) {}
     };
     std::vector<Definition> definitions;
-    std::map<std::string, LspMethod> methodToFunction = {
+    std::map<std::string, LspMethod> essentialMethods = {
       {"initialize",                      &LSP::initialize},
       {"initialized",                     &LSP::initialized},
       {"textDocument/didOpen",            &LSP::didOpen},
@@ -177,7 +179,9 @@ private:
       {"textDocument/didClose",           &LSP::didClose},
       {"workspace/didChangeWatchedFiles", &LSP::didChangeWatchedFiles},
       {"shutdown",                        &LSP::shutdown},
-      {"exit",                            &LSP::serverExit},
+      {"exit",                            &LSP::serverExit}
+    };
+    std::map<std::string, LspMethod> additionalMethods = {
       {"textDocument/definition",         &LSP::goToDefinition},
       {"textDocument/references",         &LSP::findReportReferences},
       {"textDocument/documentHighlight",  &LSP::highlightOccurrences},
@@ -188,11 +192,16 @@ private:
     };
 
     void callMethod(const std::string &method, const JAST &request) {
-      auto functionPointer = methodToFunction.find(method);
-      if (functionPointer != methodToFunction.end()) {
+      auto functionPointer = essentialMethods.find(method);
+      if (functionPointer != essentialMethods.end()) {
         (this->*(functionPointer->second))(request);
       } else {
-        sendErrorMessage(request, MethodNotFound, "Method '" + method + "' is not implemented.");
+        functionPointer = additionalMethods.find(method);
+        if (functionPointer != additionalMethods.end()) {
+          (this->*(functionPointer->second))(request);
+        } else {
+          sendErrorMessage(request, MethodNotFound, "Method '" + method + "' is not implemented.");
+        }
       }
     }
 
@@ -213,7 +222,13 @@ private:
 
     static JAST createResponseMessage() {
       JAST message = createMessage();
-      message.add("id", JSON_NULLVAL);
+      message.add("id", 0);
+      return message;
+    }
+
+    static JAST createRequestMessage() {
+      JAST message = createMessage();
+      message.add("id", 0);
       return message;
     }
 
@@ -239,7 +254,7 @@ private:
       sendMessage(errorMessage);
     }
 
-    static JAST createInitializeResult(const JAST &receivedMessage) {
+    static JAST createInitializeResultDefault(const JAST &receivedMessage) {
       JAST message = createResponseMessage(receivedMessage);
       JAST &result = message.add("result", JSON_OBJECT);
 
@@ -259,16 +274,53 @@ private:
       return message;
     }
 
+    JAST createInitializeResultCrashed(const JAST &receivedMessage) {
+      JAST message = createResponseMessage(receivedMessage);
+      JAST &result = message.add("result", JSON_OBJECT);
+
+      JAST &capabilities = result.add("capabilities", JSON_OBJECT);
+      capabilities.add("textDocumentSync", 1);
+
+      JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
+      serverInfo.add("name", "lsp wake server");
+
+      isCrashed = true;
+      return message;
+    }
+
     void initialize(JAST receivedMessage) {
-      JAST message = createInitializeResult(receivedMessage);
+      JAST message(JSON_OBJECT);
+      if (access(crashedFlagFilename.c_str(), F_OK) != -1) {
+        message = createInitializeResultCrashed(receivedMessage);
+      } else {
+        message = createInitializeResultDefault(receivedMessage);
+        std::ofstream isServerStarted;
+        isServerStarted.open(crashedFlagFilename);
+      }
+
       isInitialized = true;
       rootUri = receivedMessage.get("params").get("rootUri").value;
       sendMessage(message);
 
-      diagnoseProject();
+      if (!isCrashed)
+        diagnoseProject();
     }
 
     void initialized(JAST _) { }
+
+    void registerCapabilities() {
+      JAST message = createRequestMessage();
+      message.add("method", "client/registerCapability");
+      JAST &registrationParams = message.add("params", JSON_OBJECT);
+      JAST &registrations = registrationParams.add("registrations", JSON_ARRAY);
+
+      for (const auto &method: additionalMethods) {
+        JAST &registration = registrations.add("", JSON_OBJECT);
+        registration.add("id", method.first.c_str());
+        registration.add("method", method.first.c_str());
+      }
+      sendMessage(message);
+    }
 
     static JAST createRangeFromLocation(const Location &location) {
       JAST range(JSON_OBJECT);
@@ -710,22 +762,29 @@ private:
       reportWorkspaceEdits(receivedMessage, references, newName);
     }
 
-    void didOpen(JAST receivedMessage) {
-      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      diagnoseProject();
+    void didOpen(JAST _) {
+      if (!isCrashed)
+        diagnoseProject();
     }
 
     void didChange(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
       changedFiles[fileUri] = fileContent;
-      diagnoseProject();
+      if (!isCrashed)
+        diagnoseProject();
     }
 
     void didSave(JAST receivedMessage) {
+      if (isCrashed) {
+        registerCapabilities();
+        isCrashed = false;
+      }
+
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       changedFiles.erase(fileUri);
-      diagnoseProject();
+      if (!isCrashed)
+        diagnoseProject();
     }
 
     void didClose(JAST receivedMessage) {
@@ -739,7 +798,8 @@ private:
         std::string fileUri = child.second.get("uri").value;
         changedFiles.erase(fileUri);
       }
-      diagnoseProject();
+      if (!isCrashed)
+        diagnoseProject();
     }
 
     void shutdown(JAST receivedMessage) {
@@ -747,6 +807,7 @@ private:
       message.add("result", JSON_NULLVAL);
       isShutDown = true;
       sendMessage(message);
+      std::remove(crashedFlagFilename.c_str());
     }
 
     void serverExit(JAST _) {

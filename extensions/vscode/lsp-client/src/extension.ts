@@ -6,6 +6,7 @@
 import { workspace } from 'vscode';
 
 import {
+	integer,
 	LanguageClient,
 	LanguageClientOptions,
 	ServerOptions
@@ -40,6 +41,7 @@ export function activate() {
 		serverOptions,
 		clientOptions
 	);
+	client.clientOptions.errorHandler = client.createDefaultErrorHandler(integer.MAX_VALUE);
 
 	// Start the client. This will also launch the server
 	client.start();
