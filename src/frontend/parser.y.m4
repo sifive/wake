@@ -35,6 +35,7 @@
 
 #include <vector>
 #include <sstream>
+#include <string.h>
 
 #include "frontend/syntax.h"
 #include "frontend/diagnostic.h"
