@@ -1057,7 +1057,8 @@ static Expr *dst_block(CSTElement block) {
 static Expr *dst_require(CSTElement require) {
   CSTElement child = require.firstChildNode();
 
-  AST ast = dst_pattern(child, nullptr);
+  std::vector<CSTElement> guards;
+  AST ast = dst_pattern(child, &guards);
   child.nextSiblingNode();
 
   Expr *rhs = relabel_anon(dst_expr(child));
@@ -1073,7 +1074,7 @@ static Expr *dst_require(CSTElement require) {
 
   Match *out = new Match(require.location(), true);
   out->args.emplace_back(rhs);
-  out->patterns.emplace_back(std::move(ast), block, nullptr);
+  out->patterns.emplace_back(std::move(ast), block, add_literal_guards(nullptr, guards));
   out->location.end = block->location.end;
   out->otherwise = std::unique_ptr<Expr>(otherwise);
 
