@@ -17,6 +17,24 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
+def parserLemon variant =
+    require Pass parser_y =
+        m4 (source "{here}/frontend/parser.y.m4")
+
+    lemon variant parser_y
+
+def parser variant =
+    require Fail _ =
+        parserLemon variant
+
+    require Pass parser_c =
+        gunzip (source "{here}/frontend/parser.cpp.gz")
+
+    require Pass parser_h =
+        gunzip (source "{here}/frontend/parser.h.gz")
+
+    Pass (Pair parser_c parser_h)
+
 def runtime variant: Result SysLib Error =
     def Pair cppVariant _ =
         variant
@@ -37,11 +55,8 @@ def runtime variant: Result SysLib Error =
     def cflags =
         "-I{here}", deps.getSysLibCFlags
 
-    require Pass parser_y =
-        m4 (source "{here}/frontend/parser.y.m4")
-
     require Pass (Pair parser_c parser_h) =
-        lemon variant parser_y
+        parser variant
 
     def headers =
         parser_h,

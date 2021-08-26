@@ -61,10 +61,14 @@ def re2cReal file =
 def re2cFake file =
     def cpp = replace `\.re$` ".cpp" file.getPathName
     def zip = source "{cpp}.gz"
+    gunzip zip
+
+def gunzip zip =
+    def out = replace `\.gz$` "" zip.getPathName
     def script = "%
         set -e
-        gzip -dc "%{zip.getPathName}" > "%{cpp}.tmp"
-        mv "%{cpp}.tmp" "%{cpp}"
+        gzip -dc "%{zip.getPathName}" > "%{out}.tmp"
+        mv "%{out}.tmp" "%{out}"
         %"
     shellJob script (zip, Nil)
     | getJobOutput
