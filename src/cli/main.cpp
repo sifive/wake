@@ -494,7 +494,8 @@ int main(int argc, char **argv) {
   char *none = nullptr;
   char **cmdline = &none;
   if (exec) {
-    top->body = std::unique_ptr<Expr>(dst_expr(exec, terminalReporter));
+    command = exec;
+    top->body = std::unique_ptr<Expr>(dst_expr(command, terminalReporter));
   } else if (argc > 1) {
     command = argv[1];
     cmdline = argv+2;
