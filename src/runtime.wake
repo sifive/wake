@@ -37,7 +37,14 @@ def runtime variant: Result SysLib Error =
     def cflags =
         "-I{here}", deps.getSysLibCFlags
 
+    require Pass parser_y =
+        m4 (source "{here}/frontend/parser.y.m4")
+
+    require Pass (Pair parser_c parser_h) =
+        lemon variant parser_y
+
     def headers =
+        parser_h,
         sources here `[^/]*\.h` ++
         sources here `frontend/.*\.h` ++
         sources here `optimizer/.*\.h` ++
@@ -53,13 +60,14 @@ def runtime variant: Result SysLib Error =
         compile cpp
 
     def cppSources =
+        parser_c,
         sources here `frontend/.*\.cpp` ++
         sources here `optimizer/.*\.cpp` ++
         sources here `runtime/.*\.cpp` ++
         sources here `types/.*\.cpp`
 
     def objResults =
-        re2obj (source "{here}/frontend/symbol.re"),
+        re2obj (source "{here}/frontend/lexer.re"),
         map compile cppSources
 
     require Pass foundObjects =

@@ -1,0 +1,85 @@
+# Copyright 2019 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package build_wake
+from wake import _
+from gcc_wake import _
+
+def buildLemon variant: Result (List Path) Error =
+    def Pair _ cVariant =
+        variant
+
+    require Pass objs =
+        compileC cVariant Nil Nil (source "{here}/lemon.c")
+
+    linkO cVariant Nil objs "lemon/lemon"
+
+def m4 (file: Path): Result Path Error =
+    def output =
+        replace `\.m4$` "" file.getPathName
+
+    def run =
+        job (which "m4", file.getPathName, Nil) (file, Nil)
+
+    require Pass stdout =
+        run.getJobStdout
+
+    Pass (write output stdout)
+
+def lemon variant (file: Path): Result (Pair Path Path) Error =
+    require Pass lemon =
+        buildLemon variant
+
+    require Some tool =
+        head lemon
+    else
+        failWithError "lemon compilation produced no output"
+
+    def template =
+        source "{here}/lempar.c"
+
+    def cmdline =
+        tool.getPathName, "-T{template.getPathName}", file.getPathName, Nil
+
+    require Pass result =
+        makeExecPlan cmdline (file, template, lemon)
+        | setPlanLabel "lemon {file.getPathName}"
+        | runJob
+        | getJobOutputs
+        | findFailFn getPathResult
+
+    require Some (Pair cfile _) =
+        find (matches `.*\.c` _.getPathName) result
+    else
+        failWithError "lemon produced no C file"
+
+    require Some (Pair hfile _) =
+        find (matches `.*\.h` _.getPathName) result
+    else
+        failWithError "lemon produced no H file"
+
+    def cppfile =
+        installAs (replace `\.c$` ".cpp" cfile.getPathName) cfile
+
+    def compress =
+        which "gzip", "-nk9", cppfile.getPathName, hfile.getPathName, Nil
+
+    def zip =
+        job compress (cppfile, result)
+
+    match zip.getJobStatus
+        Exited 0 = Pass (Pair cppfile hfile)
+        Aborted e = Fail e
+        z = failWithError "Non-zero exit status ({format z}) for '{zip.getJobDescription}'"

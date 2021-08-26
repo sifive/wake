@@ -8,6 +8,11 @@ manifest.wake
 /wake.db
 /wake.spec
 /src/frontend/lexer.cpp
+/src/frontend/parser.y
+/src/frontend/parser.c
+/src/frontend/parser.h
+/src/frontend/parser.out
+/src/frontend/parser.cpp
 /common/jlexer.cpp
 /bin/wake*
 /bin/fuse-wake
@@ -26,6 +31,7 @@ manifest.wake
 /lib/wake/shim-wake
 /lib/wake/shim-wake.*
 /lib/wake/libpreload-wake.*
+/lemon/lemon.*
 /tmp
 *.swp
 *.swo

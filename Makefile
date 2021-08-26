@@ -73,7 +73,7 @@ bin/preload-wake:	preload/wrap.cpp $(COMMON)
 lib/wake/libpreload-wake.so:	preload/open.c
 	$(CC) $(CFLAGS) -fpic -shared -o $@ $^ $(LFDLAGS) -ldl
 
-%.o:	%.cpp	$(filter-out src/version.h,$(wildcard */*.h))
+%.o:	%.cpp	$(filter-out src/version.h,$(wildcard */*.h) $(wildcard */*/*.h) src/frontend/parser.h)
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(CORE_CFLAGS) -o $@ -c $<
 
 %.o:	%.c	$(filter-out src/version.h,$(wildcard */*.h))
@@ -84,4 +84,9 @@ lib/wake/libpreload-wake.so:	preload/open.c
 	gzip -dc $^ > $@.tmp
 	mv -f $@.tmp $@
 
-.PRECIOUS:	src/frontend/lexer.cpp src/frontend/parser.cpp common/jlexer.cpp
+%.h:	%.h.gz
+	gzip -dc $^ > $@.tmp
+	mv -f $@.tmp $@
+
+.PRECIOUS:	src/frontend/lexer.cpp src/frontend/parser.cpp src/frontend/parser.h common/jlexer.cpp
+.SUFFIXES:
