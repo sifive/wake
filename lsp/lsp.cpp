@@ -36,23 +36,19 @@
 
 #include "json5.h"
 #include "location.h"
-#include "frontend/parser.h"
-#include "frontend/symbol.h"
-#include "runtime/runtime.h"
-#include "frontend/expr.h"
-#include "runtime/sources.h"
-#include "frontend/diagnostic.h"
-#include "types/bind.h"
 #include "execpath.h"
+#include "frontend/parser.h"
+#include "frontend/cst.h"
+#include "frontend/file.h"
+#include "frontend/todst.h"
+#include "frontend/expr.h"
+#include "frontend/diagnostic.h"
 #include "frontend/wakefiles.h"
-
+#include "types/bind.h"
 
 #ifndef VERSION
 #include "../src/version.h"
 #endif
-
-// Number of pipes to the wake subprocess
-#define PIPES 5
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -77,7 +73,7 @@ DiagnosticReporter *reporter;
 
 class LSP {
 public:
-    explicit LSP(std::string _stdLib) : stdLib(std::move(_stdLib)), runtime(nullptr, 0, 4.0, 0) {}
+    explicit LSP(std::string _stdLib) : stdLib(std::move(_stdLib)) {}
 
     void processRequests() {
       // Begin log
@@ -146,7 +142,6 @@ private:
     bool isInitialized = false;
     bool isShutDown = false;
     std::string stdLib;
-    Runtime runtime;
     std::vector<std::string> allFiles;
     std::map<std::string, std::string> changedFiles;
     std::vector<std::pair<Location, Location>> uses;
@@ -307,11 +302,13 @@ private:
     void runSyntaxChecker(const std::string &filePath, Top &top) {
       auto fileChangesPointer = changedFiles.find(rootUri + '/' + filePath);
       if (fileChangesPointer != changedFiles.end()) {
-        Lexer lex(runtime.heap, (*fileChangesPointer).second, filePath.c_str());
-        parse_top(top, lex);
+        StringFile file(filePath.c_str(), std::string(fileChangesPointer->second));
+        CST cst(file, *reporter);
+        dst_top(cst.root(), top);
       } else {
-        Lexer lex(runtime.heap, filePath.c_str());
-        parse_top(top, lex);
+        ExternalFile file(*reporter, filePath.c_str());
+        CST cst(file, *reporter);
+        dst_top(cst.root(), top);
       }
     }
 
@@ -333,7 +330,7 @@ private:
       for (auto &file: allFiles)
         runSyntaxChecker(file, *top);
 
-      PrimMap pmap = prim_register_all(nullptr, nullptr);
+      PrimMap pmap;
       std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
 
       for (auto &file: allFiles)

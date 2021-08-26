@@ -1477,6 +1477,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     bool tb = asc->body->typeVar.unify(asc->typeVar, &ascm);
     return b && tb && ts;
   } else if (expr->type == &Prim::type) {
+    if (state.pmap.empty()) return true;
     Prim *prim = static_cast<Prim*>(expr);
     std::vector<TypeVar*> args;
     for (NameBinding *iter = binding; iter && iter->open && iter->lambda; iter = iter->next)
