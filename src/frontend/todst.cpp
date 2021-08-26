@@ -848,6 +848,7 @@ static void mstr_add(std::ostream &os, CSTElement token, std::string::size_type 
   while (!token.empty()) {
     TokenInfo ti = token.content();
     switch (token.id()) {
+      // !!! relex / normalize
       case TOKEN_LSTR_END:
       case TOKEN_MSTR_END:    break;
       case TOKEN_LSTR_RESUME:
@@ -1087,6 +1088,7 @@ Expr *dst_expr(CSTElement expr) {
       child.nextSiblingNode();
       std::string opStr = getIdentifier(child);
       if (opStr == ":") {
+        child.nextSiblingNode();
         AST signature = dst_type(child);
         return new Ascribe(expr.location(), std::move(signature), lhs, lhs->location);
       } else {
