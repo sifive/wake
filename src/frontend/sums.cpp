@@ -20,7 +20,6 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <sstream>
-#include <iostream>
 
 #include "frontend/sums.h"
 #include "frontend/diagnostic.h"
@@ -44,22 +43,15 @@ void check_special(const std::shared_ptr<Sum> &sump) {
   if (sump->name == "JValue")  JValue = sump;
 }
 
-bool sums_ok() {
-  bool ok = true;
-
+void sums_ok() {
   if (Boolean) {
     if (Boolean->members.size() != 2 ||
         Boolean->members[0].ast.args.size() != 0 ||
         Boolean->members[1].ast.args.size() != 0) {
-      std::ostringstream message;
-      message << "Special constructor Boolean not defined correctly at "
-        << Boolean->region.file() << ".";
-      reporter->reportError(Boolean->region, message.str());
-      ok = false;
+      ERROR(Boolean->region, "special constructor Boolean not defined correctly");
     }
   } else {
-    std::cerr << "Required data type Boolean@wake not defined." << std::endl;
-    ok = false;
+    ERROR(LOCATION, "required data type Boolean@wake not defined");
   }
 
   if (Order) {
@@ -67,15 +59,10 @@ bool sums_ok() {
         Order->members[0].ast.args.size() != 0 ||
         Order->members[1].ast.args.size() != 0 ||
         Order->members[2].ast.args.size() != 0) {
-      std::ostringstream message;
-      message << "Special constructor Order not defined correctly at "
-        << Order->region.file() << ".";
-      reporter->reportError(Order->region, message.str());
-      ok = false;
+      ERROR(Order->region, "special constructor Order not defined correctly");
     }
   } else {
-    std::cerr << "Required data type Order@wake not defined." << std::endl;
-    ok = false;
+    ERROR(LOCATION, "required data type Order@wake not defined");
   }
 
   if (List) {
@@ -83,57 +70,38 @@ bool sums_ok() {
         List->members[0].ast.args.size() != 0 ||
         List->members[1].ast.args.size() != 2) {
       std::ostringstream message;
-      message << "Special constructor List not defined correctly at "
-        << List->region.file() << ".";
-      reporter->reportError(List->region, message.str());
-      ok = false;
+      ERROR(List->region, "special constructor List not defined correctly");
     }
   } else {
-    std::cerr << "Required data type List@wake not defined." << std::endl;
-    ok = false;
+    ERROR(LOCATION, "required data type List@wake not defined");
   }
 
   if (Unit) {
     if (Unit->members.size() != 1 ||
         Unit->members[0].ast.args.size() != 0) {
-      std::ostringstream message;
-      message << "Special constructor Unit not defined correctly at "
-        << Unit->region.file() << ".";
-      reporter->reportError(Unit->region, message.str());
-      ok = false;
+      ERROR(Unit->region, "special constructor Unit not defined correctly");
     }
   } else {
-    std::cerr << "Required data type Unit@wake not defined." << std::endl;
-    ok = false;
+    ERROR(LOCATION, "required data type Unit@wake not defined");
   }
 
   if (Pair) {
     if (Pair->members.size() != 1 ||
         Pair->members[0].ast.args.size() != 2) {
-      std::ostringstream message;
-      message << "Special constructor Pair not defined correctly at "
-        << Pair->region.file() << ".";
-      reporter->reportError(Pair->region, message.str());
-      ok = false;
+      ERROR(Pair->region, "special constructor Pair not defined correctly");
     }
   } else {
-    std::cerr << "Required data type Pair@wake not defined." << std::endl;
-    ok = false;
+    ERROR(LOCATION, "required data type Pair@wake not defined");
   }
 
   if (Result) {
     if (Result->members.size() != 2 ||
         Result->members[0].ast.args.size() != 1 ||
         Result->members[1].ast.args.size() != 1) {
-      std::ostringstream message;
-      message << "Special constructor Result not defined correctly at "
-        << Result->region.file() << ".";
-      reporter->reportError(Result->region, message.str());
-      ok = false;
+      ERROR(Result->region, "special constructor Result not defined correctly");
     }
   } else {
-    std::cerr << "Required data type Result@wake not defined." << std::endl;
-    ok = false;
+    ERROR(LOCATION, "required data type Result@wake not defined");
   }
 
   if (JValue) {
@@ -145,17 +113,10 @@ bool sums_ok() {
         JValue->members[4].ast.args.size() != 0 ||
         JValue->members[5].ast.args.size() != 1 ||
         JValue->members[6].ast.args.size() != 1) {
-      std::ostringstream message;
-      message << "Special constructor JValue not defined correctly at "
-        << JValue->region.file() << ".";
-      reporter->reportError(JValue->region, message.str());
-      ok = false;
+      ERROR(JValue->region, "special constructor JValue not defined correctly");
     }
   } else {
-    std::cerr << "Required data type JValue@wake not defined." << std::endl;
-    ok = false;
+    ERROR(LOCATION, "required data type JValue@wake not defined");
   }
-
-  return ok;
 }
 

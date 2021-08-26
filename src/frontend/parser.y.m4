@@ -33,14 +33,13 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <string.h>
+#include <vector>
+#include <sstream>
+
 #include "frontend/syntax.h"
 #include "frontend/diagnostic.h"
 #include "frontend/cst.h"
 #include "frontend/file.h"
-#include <vector>
-#include <sstream>
-#include <iostream>
 
 #define add(t, ...) pinfo.cst->addNode((t), __VA_ARGS__)
 #define pop(x) pinfo.cst->delNodes(x)

@@ -22,7 +22,7 @@
 
 struct Sum;
 void check_special(const std::shared_ptr<Sum> &sump);
-bool sums_ok();
+void sums_ok();
 
 // These types must be defined by prim.wake
 struct Sum;

@@ -19,7 +19,6 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <iostream>
 #include <sstream>
 #include <set>
 #include <algorithm>

@@ -440,6 +440,7 @@ int main(int argc, char **argv) {
   // No wake files in the path from workspace to the current directory
   if (!top->def_package) top->def_package = "nothing";
   std::string export_package = top->def_package;
+
   if (!flatten_exports(*top)) ok = false;
 
   std::vector<std::pair<std::string, std::string> > defs;
@@ -500,7 +501,7 @@ int main(int argc, char **argv) {
   TypeVar type = top->body->typeVar;
 
   if (parse) std::cout << top.get();
-  if (notype) return ok?0:1;
+  if (notype) return (ok && terminalReporter.ok)?0:1;
 
   /* Setup logging streams */
   if (debug   && !fd1) fd1 = "debug,info,echo,report,warning,error";
@@ -523,9 +524,10 @@ int main(int argc, char **argv) {
 
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
   if (!root) ok = false;
-  ok = ok && sums_ok();
 
-  if (!ok || (fwarning && warnings)) {
+  sums_ok();
+
+  if (!ok || !terminalReporter.ok || (fwarning && warnings)) {
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }

@@ -43,9 +43,7 @@ bool AST::unify(TypeVar &out, const TypeMap &ids) {
   if (lex_kind(name) == LOWER) {
     auto it = ids.find(name);
     if (it == ids.end()) {
-      std::stringstream message;
-      message << "Unbound type variable at " << token.text();
-      reporter->reportError(token, message.str());
+      ERROR(token, "unbound type variable");
       return false;
     } else {
       return out.unify(*it->second, &region);
