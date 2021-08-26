@@ -145,7 +145,7 @@ private:
     std::string rootUri = "";
     bool isInitialized = false;
     bool isCrashed = false;
-    std::string crashedFlagFilename = "is_lsp_wake_server_started";
+    std::string crashedFlagFilename = ".lsp-wake.lock";
     bool isShutDown = false;
     std::string stdLib;
     Runtime runtime;
