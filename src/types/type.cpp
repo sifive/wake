@@ -174,7 +174,7 @@ bool TypeVar::do_unify(TypeVar &other) {
 }
 
 void LegacyErrorMessage::formatA(std::ostream &os) const {
-  os << "Type error; unable to unify";
+  os << "type error; unable to unify";
   if (l) os << " " << l->text() << " of";
   os << " type";
 }
