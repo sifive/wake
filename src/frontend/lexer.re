@@ -299,7 +299,7 @@ IdKind lex_kind(const uint8_t *s, const uint8_t *e) {
      */
 }
 
-static ssize_t unicode_escape(const unsigned char *s, const unsigned char *e, char **out, bool compat) {
+static ssize_t unicode_escape(const uint8_t *s, const uint8_t *e, char **out, bool compat) {
     utf8proc_uint8_t *dst;
     ssize_t len;
 
@@ -323,42 +323,43 @@ static ssize_t unicode_escape(const unsigned char *s, const unsigned char *e, ch
     return len;
 }
 
-static std::string unicode_escape_canon(std::string &&str) {
+static std::string unicode_escape(const uint8_t *s, const uint8_t *e, bool compat = false) {
     char *cleaned;
-    const unsigned char *data = reinterpret_cast<const unsigned char *>(str.data());
-    ssize_t len = unicode_escape(data, data + str.size(), &cleaned, false);
-    if (len < 0) return std::move(str);
-    std::string out(cleaned, len);
-    free(cleaned);
-    return out;
+    ssize_t len = unicode_escape(s, e, &cleaned, compat);
+    if (len < 0) {
+        return std::string(reinterpret_cast<const char*>(s), e-s);
+    } else {
+        std::string out(cleaned, len);
+        free(cleaned);
+        return out;
+    }
+}
+
+static std::string unicode_escape(const std::string &str, bool compat = false) {
+    const uint8_t *data = reinterpret_cast<const uint8_t*>(str.data());
+    return unicode_escape(data, data + str.size(), compat);
 }
 
 std::string relex_id(const uint8_t *s, const uint8_t *e) {
-    std::string out;
-    char *dst;
-    ssize_t len;
+    return unicode_escape(s, e, true);
+}
 
-    len = unicode_escape(s, e, &dst, true); // compat
-    if (len >= 0) {
-        out.assign(dst, dst+len);
-        free(dst);
-    } else {
-        out.assign(s, e);
-    }
-
-    return out;
+std::string relex_mstring(const uint8_t *s, const uint8_t *e) {
+    return unicode_escape(s, e);
 }
 
 std::string relex_string(const uint8_t *s, const uint8_t *e) {
     std::string out;
+    out.reserve(e-s);
+
     ++s; --e; // Remove the ""    "{    }"   }{
 
     while (true) {
         const uint8_t *m;
 	const uint8_t *h = s;
         /*!re2c
-            * { return out; }
-            $ { return out; }
+            * { break; }
+            $ { break; }
 
             "\\a"                { out.push_back('\a'); continue; }
             "\\b"                { out.push_back('\b'); continue; }
@@ -370,14 +371,14 @@ std::string relex_string(const uint8_t *s, const uint8_t *e) {
             "\\" (lws|[{}\\'"?]) { out.append(h+1, s); continue; }
             "\\"  [0-7]{1,3}     { push_utf8(out, lex_oct(h, s)); continue; }
             "\\x" [0-9a-fA-F]{2} { push_utf8(out, lex_hex(h, s)); continue; }
-            "\\u" [0-9a-fA-F]{4} { /* !!! ok &= */ push_utf8(out, lex_hex(h, s)); continue; }
-            "\\U" [0-9a-fA-F]{8} { /* !!! ok &= */ push_utf8(out, lex_hex(h, s)); continue; }
+            "\\u" [0-9a-fA-F]{4} { if (!push_utf8(out, lex_hex(h, s))) out.append(h, s); continue; }
+            "\\U" [0-9a-fA-F]{8} { if (!push_utf8(out, lex_hex(h, s))) out.append(h, s); continue; }
 
             [^]                  { out.append(h, s); continue;  }
          */
     }
 
-    return unicode_escape_canon(std::move(out));
+    return unicode_escape(out);
 }
 
 std::string relex_regexp(uint8_t id, const uint8_t *s, const uint8_t *e) {
@@ -388,7 +389,7 @@ std::string relex_regexp(uint8_t id, const uint8_t *s, const uint8_t *e) {
     case TOKEN_REG_CLOSE:  ++s; --e;    break; // skpi }`
     }
 
-    return relex_id(s, e); // !!! unicode_escape_canon
+    return unicode_escape(s, e);
 }
 
 op_type op_precedence(const uint8_t *s, const uint8_t *e) {

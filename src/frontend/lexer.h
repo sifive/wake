@@ -53,6 +53,7 @@ inline IdKind lex_kind(const std::string &s) {
 
 std::string relex_id(const uint8_t *s, const uint8_t *e);
 std::string relex_string(const uint8_t *s, const uint8_t *e);
+std::string relex_mstring(const uint8_t *s, const uint8_t *e);
 std::string relex_regexp(uint8_t id, const uint8_t *s, const uint8_t *e);
 
 struct op_type {

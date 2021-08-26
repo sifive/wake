@@ -848,18 +848,17 @@ static void mstr_add(std::ostream &os, CSTElement token, std::string::size_type 
   while (!token.empty()) {
     TokenInfo ti = token.content();
     switch (token.id()) {
-      // !!! relex / normalize
       case TOKEN_LSTR_END:
       case TOKEN_MSTR_END:    break;
       case TOKEN_LSTR_RESUME:
-      case TOKEN_MSTR_RESUME: os.write(reinterpret_cast<const char*>(ti.start) + 1,     ti.end-ti.start - 1);     break;
-      case TOKEN_WS:          os.write(reinterpret_cast<const char*>(ti.start) + wsCut, ti.end-ti.start - wsCut); break;
+      case TOKEN_MSTR_RESUME: os << relex_mstring(ti.start + 1,     ti.end);     break;
+      case TOKEN_WS:          os << relex_mstring(ti.start + wsCut, ti.end);     break;
       case TOKEN_LSTR_PAUSE:
-      case TOKEN_MSTR_PAUSE:  os.write(reinterpret_cast<const char*>(ti.start),         ti.end-ti.start - 2);     break;
+      case TOKEN_MSTR_PAUSE:  os << relex_mstring(ti.start,         ti.end - 2); break;
       case TOKEN_NL:
       case TOKEN_MSTR_CONTINUE:
       case TOKEN_LSTR_CONTINUE:
-      default:                os.write(reinterpret_cast<const char*>(ti.start),         ti.end-ti.start);         break;
+      default:                os << relex_mstring(ti.start,         ti.end);     break;
     }
     token.nextSiblingElement();
   }
@@ -924,9 +923,7 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut = 0) {
     case TOKEN_LSTR_MID:
     case TOKEN_MSTR_MID: {
       TokenInfo ti = child.content();
-      ++ti.start;
-      ti.end -= 2;
-      return new Literal(child.location(), ti.str(), &Data::typeString);
+      return new Literal(child.location(), relex_mstring(ti.start+1, ti.end-2), &Data::typeString);
     }
     case TOKEN_LSTR_RESUME:
     case TOKEN_MSTR_RESUME: {
