@@ -864,7 +864,71 @@ static void mstr_add(std::ostream &os, CSTElement token, std::string::size_type 
   }
 }
 
-static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut = 0) {
+struct MultiLineStringIndentationFSM {
+  std::string prefix;
+  bool priorWS;
+  bool noPrefix;
+
+  MultiLineStringIndentationFSM() : priorWS(false), noPrefix(true) {}
+  void accept(CSTElement lit);
+
+  static std::string::size_type analyze(CSTElement lit);
+};
+
+std::string::size_type MultiLineStringIndentationFSM::analyze(CSTElement lit) {
+  MultiLineStringIndentationFSM fsm;
+  fsm.accept(lit);
+  return fsm.prefix.size();
+}
+
+void MultiLineStringIndentationFSM::accept(CSTElement lit) {
+  for (CSTElement child = lit.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    switch (child.id()) {
+      case TOKEN_WS: {
+        std::string ws = child.content().str();
+        if (noPrefix) {
+          prefix = std::move(ws);
+        } else {
+          // Find the longest common prefix
+          size_t e = std::min(ws.size(), prefix.size());
+          size_t i;
+          for (i = 0; i < e; ++i)
+             if (ws[i] != prefix[i])
+               break;
+          prefix.resize(i);
+        }
+        priorWS = true;
+        noPrefix = false;
+        break;
+      }
+
+      case TOKEN_LSTR_CONTINUE:
+      case TOKEN_MSTR_CONTINUE:
+      case TOKEN_LSTR_PAUSE:
+      case TOKEN_MSTR_PAUSE:
+        if (!priorWS) prefix.clear();
+        noPrefix = false;
+        break;
+
+      case TOKEN_NL:
+        priorWS = false;
+        break;
+
+      case TOKEN_LSTR_BEGIN:
+      case TOKEN_MSTR_BEGIN:
+      case TOKEN_LSTR_MID:
+      case TOKEN_MSTR_MID:
+      case TOKEN_LSTR_END:
+      case TOKEN_MSTR_END:
+      case TOKEN_LSTR_RESUME:
+      case TOKEN_MSTR_RESUME:
+      default:
+        break;
+    }
+  }
+}
+
+static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
   CSTElement child = lit.firstChildElement();
   uint8_t id = child.id();
   switch (id) {
@@ -913,7 +977,7 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut = 0) {
     }
     case TOKEN_LSTR_BEGIN:
     case TOKEN_MSTR_BEGIN: {
-      // TOKEN_MSTR_BEGIN (WS? MSTR_CONTINUE? NL)* (MSTR_END | MSTR_PAUSE)
+      // TOKEN_MSTR_BEGIN NL (WS? MSTR_CONTINUE? NL)* (MSTR_END | WS? MSTR_PAUSE)
       std::stringstream ss;
       child.nextSiblingElement(); // skip BEGIN
       child.nextSiblingElement(); // skip NL
@@ -927,7 +991,7 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut = 0) {
     }
     case TOKEN_LSTR_RESUME:
     case TOKEN_MSTR_RESUME: {
-      // TOKEN_MSTR_RESUME (WS? MSTR_CONTINUE? NL)* (MSTR_END | MSTR_PAUSE)
+      // TOKEN_MSTR_RESUME (WS? MSTR_CONTINUE? NL)* (MSTR_END | WS? MSTR_PAUSE)
       std::stringstream ss;
       mstr_add(ss, child, wsCut);
       return new Literal(lit.location(), ss.str(), &Data::typeString);
@@ -944,9 +1008,14 @@ static Expr *dst_interpolate(CSTElement intp) {
   std::vector<Expr*> args;
   std::string total;
 
+  MultiLineStringIndentationFSM fsm;
+  for (CSTElement i = intp.firstChildNode(); !i.empty(); i.nextSiblingNode()) {
+    if (args.size() % 2 == 0) fsm.accept(i);
+  }
+
   for (CSTElement i = intp.firstChildNode(); !i.empty(); i.nextSiblingNode()) {
     if (args.size() % 2 == 0) {
-      Literal *lit = dst_literal(i);
+      Literal *lit = dst_literal(i, fsm.prefix.size());
       if (regexp) total.append(lit->value);
       args.push_back(lit);
     } else {
@@ -971,7 +1040,7 @@ static Expr *dst_interpolate(CSTElement intp) {
 static Expr *add_literal_guards(Expr *guard, std::vector<CSTElement> literals) {
   for (size_t i = 0; i < literals.size(); ++i) {
     CSTElement literal = literals[i];
-    Literal* lit = dst_literal(literal);
+    Literal* lit = dst_literal(literal, 0);
 
     const char *comparison;
     if (lit->litType == &Data::typeString) {
@@ -1189,7 +1258,7 @@ Expr *dst_expr(CSTElement expr) {
       return out;
     }
     case CST_MATCH:       return dst_match(expr);
-    case CST_LITERAL:     return dst_literal(expr);
+    case CST_LITERAL:     return dst_literal(expr, MultiLineStringIndentationFSM::analyze(expr));
     case CST_INTERPOLATE: return dst_interpolate(expr);
     case CST_BLOCK:       return dst_block(expr);
     case CST_REQUIRE:     return dst_require(expr);
