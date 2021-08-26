@@ -161,10 +161,12 @@ Token lex_wake(const uint8_t *s, const uint8_t *e) {
         [']nchar*['] { return Token(TOKEN_STR_RAW, s); }
 
         // Multiline string start
-        '"""' notnl* { return Token(TOKEN_MSTR_BEGIN, s); }
+        '"""' lws*   { return Token(TOKEN_MSTR_BEGIN, s); }
+        '"""' notnl* { return Token(TOKEN_MSTR_BEGIN, s, false); }
 
         // Legacy multiline strings
-        '"%' notnl* { return Token(TOKEN_LSTR_BEGIN, s); }
+        '"%' lws*   { return Token(TOKEN_LSTR_BEGIN, s); }
+        '"%' notnl* { return Token(TOKEN_LSTR_BEGIN, s, false); }
 
         // Interpolated string literals (escapes will be processed later)
         schar = notnl \ [\\"{];
@@ -219,9 +221,10 @@ Token lex_rstr(const uint8_t *s, const uint8_t *e) {
 Token lex_mstr_continue(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
-        nl    { return Token(TOKEN_NL,       s); }
-        lws+  { return Token(TOKEN_WS,       s); }
-        '"""' { return Token(TOKEN_MSTR_END, s); }
+        nl         { return Token(TOKEN_NL,       s); }
+        lws+       { return Token(TOKEN_WS,       s); }
+        '"""'      { return Token(TOKEN_MSTR_END, s); }
+        lws+ '"""' { return Token(TOKEN_MSTR_END, s); }
 
         pchar = notnl \ [%];
         mchar = notnl \ [%{];
@@ -252,9 +255,10 @@ Token lex_mstr_resume(const uint8_t *s, const uint8_t *e) {
 Token lex_lstr_continue(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
-        nl    { return Token(TOKEN_NL,       s); }
-        lws+  { return Token(TOKEN_WS,       s); }
-        '%"'  { return Token(TOKEN_LSTR_END, s); }
+        nl         { return Token(TOKEN_NL,       s); }
+        lws+       { return Token(TOKEN_WS,       s); }
+        '%"'       { return Token(TOKEN_LSTR_END, s); }
+        lws+ '%"'  { return Token(TOKEN_LSTR_END, s); }
 
          (fchar|[%]+mchar)(pchar|[%]+mchar)*  [%]*     { return Token(TOKEN_LSTR_CONTINUE, s); }
         ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]+ [{] { return Token(TOKEN_LSTR_PAUSE,    s); }

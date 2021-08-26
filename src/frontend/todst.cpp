@@ -845,7 +845,27 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
   }
 }
 
-static Literal *dst_literal(CSTElement lit, std::string::size_type wsLen = std::string::npos) {
+static void mstr_add(std::ostream &os, CSTElement token, std::string::size_type wsCut) {
+  while (!token.empty()) {
+    TokenInfo ti = token.content();
+    switch (token.id()) {
+      case TOKEN_LSTR_END:
+      case TOKEN_MSTR_END:    break;
+      case TOKEN_LSTR_RESUME:
+      case TOKEN_MSTR_RESUME: os.write(reinterpret_cast<const char*>(ti.start) + 1,     ti.end-ti.start - 1);     break;
+      case TOKEN_WS:          os.write(reinterpret_cast<const char*>(ti.start) + wsCut, ti.end-ti.start - wsCut); break;
+      case TOKEN_LSTR_PAUSE:
+      case TOKEN_MSTR_PAUSE:  os.write(reinterpret_cast<const char*>(ti.start),         ti.end-ti.start - 2);     break;
+      case TOKEN_NL:
+      case TOKEN_MSTR_CONTINUE:
+      case TOKEN_LSTR_CONTINUE:
+      default:                os.write(reinterpret_cast<const char*>(ti.start),         ti.end-ti.start);         break;
+    }
+    token.nextSiblingElement();
+  }
+}
+
+static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut = 0) {
   CSTElement child = lit.firstChildElement();
   uint8_t id = child.id();
   switch (id) {
@@ -892,28 +912,29 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsLen = std::
       if (cut == std::string::npos) name = "."; else name.resize(cut);
       return new Literal(lit.location(), std::move(name), &Data::typeString);
     }
-/*
-    // TOKEN_WS <- strip common prefix
-    // TOKEN_NL <- discard [BEGIN, LWS, (warn on CONTINUE/PAUSE), first NL]; discard [WS, END]
-    // !!! BEGIN WS?NL? END is possible
-    // !!! what about empty lines (LWS NL); count those LWS towards common prefix? no, but include NL.
     case TOKEN_LSTR_BEGIN:
-    //
-    case TOKEN_LSTR_END: // NL WS
-    case TOKEN_LSTR_CONTINUE:
-    case TOKEN_LSTR_PAUSE:
-    //
+    case TOKEN_MSTR_BEGIN: {
+      // TOKEN_MSTR_BEGIN (WS? MSTR_CONTINUE? NL)* (MSTR_END | MSTR_PAUSE)
+      std::stringstream ss;
+      child.nextSiblingElement(); // skip BEGIN
+      child.nextSiblingElement(); // skip NL
+      mstr_add(ss, child, wsCut);
+      return new Literal(lit.location(), ss.str(), &Data::typeString);
+    }
     case TOKEN_LSTR_MID:
+    case TOKEN_MSTR_MID: {
+      TokenInfo ti = child.content();
+      ++ti.start;
+      ti.end -= 2;
+      return new Literal(child.location(), ti.str(), &Data::typeString);
+    }
     case TOKEN_LSTR_RESUME:
-      break;
-    case TOKEN_MSTR_BEGIN:
-    case TOKEN_MSTR_END:
-    case TOKEN_MSTR_PAUSE:
-    case TOKEN_MSTR_MID:
-    case TOKEN_MSTR_RESUME:
-    case TOKEN_MSTR_CONTINUE:
-      break;
-*/
+    case TOKEN_MSTR_RESUME: {
+      // TOKEN_MSTR_RESUME (WS? MSTR_CONTINUE? NL)* (MSTR_END | MSTR_PAUSE)
+      std::stringstream ss;
+      mstr_add(ss, child, wsCut);
+      return new Literal(lit.location(), ss.str(), &Data::typeString);
+    }
     default: {
       ERROR(lit.location(), "unsupported literal " << symbolExample(id) << " = " << lit.content());
       return new Literal(lit.location(), "bad-literal", &Data::typeString);
@@ -1044,7 +1065,7 @@ static Expr *dst_require(CSTElement require) {
 
   Expr *otherwise = nullptr;
   if (child.id() == CST_REQ_ELSE) {
-    otherwise = relabel_anon(dst_expr(child));
+    otherwise = relabel_anon(dst_expr(child.firstChildNode()));
     child.nextSiblingNode();
   }
 
