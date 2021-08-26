@@ -61,7 +61,7 @@ static const char contentLength[] = "Content-Length: ";
 static const char *ParseError           = "-32700";
 static const char *InvalidRequest       = "-32600";
 static const char *MethodNotFound       = "-32601";
-//static const char *InvalidParams        = "-32602";
+static const char *InvalidParams        = "-32602";
 //static const char *InternalError        = "-32603";
 //static const char *serverErrorStart     = "-32099";
 //static const char *serverErrorEnd       = "-32000";
@@ -144,9 +144,25 @@ private:
     std::string stdLib;
     std::vector<std::string> allFiles;
     std::map<std::string, std::string> changedFiles;
-    std::vector<std::pair<Location, Location>> uses;
-    std::vector<std::pair<std::string, Location>> definitions;
-
+    struct Use {
+        Location use;
+        Location def;
+        Use(Location _use, Location _def) : use(_use), def(_def) {}
+    };
+    std::vector<Use> uses;
+    enum SymbolKind { KIND_FUNCTION = 12, KIND_VARIABLE = 13, KIND_STRING = 15, KIND_NUMBER = 16, KIND_BOOLEAN = 17,
+      KIND_ARRAY = 18, KIND_ENUM_MEMBER = 22, KIND_OPERATOR = 25 };
+    struct Definition {
+        std::string name;
+        Location location;
+        std::string type;
+        SymbolKind symbolKind;
+        bool isGlobal;
+        Definition(std::string _name, Location _location, std::string _type, SymbolKind _symbolKind, bool _isGlobal) :
+          name(std::move(_name)), location(_location), type(std::move(_type)), symbolKind(_symbolKind),
+          isGlobal(_isGlobal) {}
+    };
+    std::vector<Definition> definitions;
     std::map<std::string, LspMethod> methodToFunction = {
       {"initialize",                      &LSP::initialize},
       {"initialized",                     &LSP::initialized},
@@ -158,8 +174,12 @@ private:
       {"shutdown",                        &LSP::shutdown},
       {"exit",                            &LSP::serverExit},
       {"textDocument/definition",         &LSP::goToDefinition},
-      {"textDocument/references",         &LSP::findReferences},
-      {"textDocument/documentHighlight",  &LSP::highlightOccurrences}
+      {"textDocument/references",         &LSP::findReportReferences},
+      {"textDocument/documentHighlight",  &LSP::highlightOccurrences},
+      {"textDocument/hover",              &LSP::hover},
+      {"textDocument/documentSymbol",     &LSP::documentSymbol},
+      {"workspace/symbol",                &LSP::workspaceSymbol},
+      {"textDocument/rename",             &LSP::rename}
     };
 
     void callMethod(const std::string &method, const JAST &request) {
@@ -223,6 +243,10 @@ private:
       capabilities.add("definitionProvider", true);
       capabilities.add("referencesProvider", true);
       capabilities.add("documentHighlightProvider", true);
+      capabilities.add("hoverProvider", true);
+      capabilities.add("documentSymbolProvider", true);
+      capabilities.add("workspaceSymbolProvider", true);
+      capabilities.add("renameProvider", true);
 
       JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
       serverInfo.add("name", "lsp wake server");
@@ -331,50 +355,96 @@ private:
         runSyntaxChecker(file, *top);
 
       PrimMap pmap;
-      std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap);
+      bool isTreeBuilt = true;
+      std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
 
       for (auto &file: allFiles)
         reportFileDiagnostics(file, diagnostics[file]);
 
       if (root != nullptr)
-        explore(root.get());
+        explore(root.get(), true);
     }
 
-    void explore(Expr *expr) {
+    static SymbolKind getSymbolKind(const char *name, const std::string& type) {
+      if (Lexer::isLower(name)) {
+        if (type.compare(0, std::string ::npos, "binary =>@builtin") == 0) {
+          return KIND_FUNCTION;
+        }
+        if (type.compare(0, std::string ::npos, "String@builtin") == 0 ||
+          type.compare(0, std::string ::npos, "RegExp@builtin") == 0) {
+          return KIND_STRING;
+        }
+        if (type.compare(0, std::string ::npos, "Integer@builtin") == 0 ||
+        type.compare(0, std::string ::npos, "Double@builtin") == 0) {
+          return KIND_NUMBER;
+        }
+        if (type.compare(0, std::string ::npos, "Boolean@wake") == 0) {
+          return KIND_BOOLEAN;
+        }
+        if (type.compare(0, 11, "Vector@wake") == 0) {
+          return KIND_ARRAY;
+        }
+        return KIND_VARIABLE;
+      }
+      if (Lexer::isOperator(name)) {
+        return KIND_OPERATOR;
+      }
+      if (Lexer::isUpper(name)) {
+        return KIND_ENUM_MEMBER;
+      }
+      return KIND_VARIABLE;
+    }
+
+    void explore(Expr *expr, bool isGlobal) {
       if (expr->type == &VarRef::type) {
         VarRef *ref = static_cast<VarRef*>(expr);
-        if (ref->location.start.bytes >= 0 && ref->target.start.bytes >= 0) {
+        if (ref->location.start.bytes >= 0 && ref->target.start.bytes >= 0 && (ref->flags & FLAG_AST) != 0) {
           uses.emplace_back(ref->location /* use location */, ref->target /* definition location */);
         }
       } else if (expr->type == &App::type) {
         App *app = static_cast<App*>(expr);
-        explore(app->val.get());
-        explore(app->fn.get());
+        explore(app->val.get(), false);
+        explore(app->fn.get(), false);
       } else if (expr->type == &Lambda::type) {
         Lambda *lambda = static_cast<Lambda*>(expr);
         if (lambda->token.start.bytes >= 0) {
-          definitions.emplace_back(lambda->name /* name */, lambda->token /* location */);
+          std::stringstream ss;
+          ss << lambda->typeVar[0];
+          if (lambda->name.find(' ') == std::string::npos) {
+            definitions.emplace_back(lambda->name /* name */, lambda->token /* location */, ss.str() /* type */,
+                                     getSymbolKind(lambda->name.c_str(), lambda->typeVar[0].getName()), isGlobal);
+          }
         }
-        explore(lambda->body.get());
+        explore(lambda->body.get(), false);
       } else if (expr->type == &Ascribe::type) {
         Ascribe *ascribe = static_cast<Ascribe*>(expr);
-        explore(ascribe->body.get());
+        explore(ascribe->body.get(), false);
       } else if (expr->type == &DefBinding::type) {
         DefBinding *defbinding = static_cast<DefBinding*>(expr);
-        for (auto &i : defbinding->val) explore(i.get());
-        for (auto &i : defbinding->fun) explore(i.get());
+        for (auto &i : defbinding->val) explore(i.get(), false);
+        for (auto &i : defbinding->fun) explore(i.get(), false);
         for (auto &i : defbinding->order) {
           if (i.second.location.start.bytes >= 0) {
-            if (i.first.compare(0, 6, "topic ") == 0) {
-              // noop
-            } else if (i.first.compare(0, 8, "publish ") != 0) {
-              // noop
+            std::stringstream ss;
+            SymbolKind symbolKind;
+            size_t idx = i.second.index;
+            if (idx < defbinding->val.size()) {
+              ss << defbinding->val[idx]->typeVar;
+              symbolKind = getSymbolKind(i.first.c_str(), defbinding->val[idx]->typeVar.getName());
             } else {
-              definitions.emplace_back(i.first /* name */, i.second.location /* location */);
+              idx -= defbinding->val.size();
+              ss << defbinding->fun[idx]->typeVar;
+              symbolKind = getSymbolKind(i.first.c_str(), defbinding->fun[idx]->typeVar.getName());
+            }
+            if (i.first.find(' ') == std::string::npos ||
+            i.first.compare(0, 7, "binary ") == 0 ||
+            i.first.compare(0, 6, "unary ") == 0) {
+              definitions.emplace_back(i.first /* name */, i.second.location /* location */, ss.str() /* type */,
+                                       symbolKind, isGlobal);
             }
           }
         }
-        explore(defbinding->body.get());
+        explore(defbinding->body.get(), isGlobal);
       }
     }
 
@@ -418,23 +488,49 @@ private:
 
     void goToDefinition(JAST receivedMessage) {
       Location locationToDefine = getLocationFromJSON(receivedMessage);
-      for (const std::pair<Location, Location> &use: uses) {
-        if (use.first.contains(locationToDefine)) {
-          reportDefinitionLocation(receivedMessage, use.second);
+      for (const Use &use: uses) {
+        if (use.use.contains(locationToDefine)) {
+          reportDefinitionLocation(receivedMessage, use.def);
+          return;
+        }
+      }
+      for (const Definition &def: definitions) {
+        if (def.location.contains(locationToDefine)) {
+          reportDefinitionLocation(receivedMessage, def.location);
           return;
         }
       }
       reportNoDefinition(receivedMessage);
     }
 
+    void findReferences(Location &definitionLocation, bool &isDefinitionFound, std::vector<Location> &references) {
+      for (const Use &use: uses) {
+        if (use.use.contains(definitionLocation)) {
+          definitionLocation = use.def;
+          isDefinitionFound = true;
+          break;
+        }
+      }
+      if (!isDefinitionFound) {
+        for (const Definition &def: definitions) {
+          if (def.location.contains(definitionLocation)) {
+            definitionLocation = def.location;
+            isDefinitionFound = true;
+            break;
+          }
+        }
+      }
+      if (isDefinitionFound) {
+        for (const Use &use: uses) {
+          if (use.def.contains(definitionLocation)) {
+            references.push_back(use.use);
+          }
+        }
+      }
+    }
+
     void reportReferences(JAST receivedMessage, const std::vector<Location> &references) {
       JAST message = createResponseMessage(std::move(receivedMessage));
-      if (references.empty()) {
-        JAST result = message.add("result", JSON_NULLVAL);
-        sendMessage(message);
-        return;
-      }
-
       JAST &result = message.add("result", JSON_ARRAY);
       for (const Location &location: references) {
         result.children.emplace_back("", createLocationJSON(location));
@@ -442,24 +538,12 @@ private:
       sendMessage(message);
     }
 
-    void findReferences(JAST receivedMessage) {
-      Location symbolLocation = getLocationFromJSON(receivedMessage);
-      Location definitionLocation = symbolLocation;
-
-      for (const std::pair<Location, Location> &use: uses) {
-        if (use.first.contains(symbolLocation)) {
-          definitionLocation = use.second;
-          break;
-        }
-      }
+    void findReportReferences(JAST receivedMessage) {
+      Location definitionLocation = getLocationFromJSON(receivedMessage);
+      bool isDefinitionFound = false;
       std::vector<Location> references;
-      for (const std::pair<Location, Location> &use: uses) {
-        if (use.second.contains(definitionLocation)) {
-          definitionLocation = use.second;
-          references.push_back(use.first);
-        }
-      }
-      if (receivedMessage.get("params").get("context").get("includeDeclaration").value == "true") {
+      findReferences(definitionLocation, isDefinitionFound, references);
+      if (isDefinitionFound && receivedMessage.get("params").get("context").get("includeDeclaration").value == "true") {
         references.push_back(definitionLocation);
       }
       reportReferences(receivedMessage, references);
@@ -473,12 +557,6 @@ private:
 
     static void reportHighlights(JAST receivedMessage, const std::vector<Location> &occurrences) {
       JAST message = createResponseMessage(std::move(receivedMessage));
-      if (occurrences.empty()) {
-        JAST result = message.add("result", JSON_NULLVAL);
-        sendMessage(message);
-        return;
-      }
-
       JAST &result = message.add("result", JSON_ARRAY);
       for (const Location &location: occurrences) {
         result.children.emplace_back("", createDocumentHighlightJSON(location));
@@ -489,24 +567,144 @@ private:
     void highlightOccurrences(JAST receivedMessage) {
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
+      bool isDefinitionFound = false;
 
-      for (const std::pair<Location, Location> &use: uses) {
-        if (use.first.contains(symbolLocation)) {
-          definitionLocation = use.second;
+      for (const Use &use: uses) {
+        if (use.use.contains(symbolLocation)) {
+          definitionLocation = use.def;
+          isDefinitionFound = true;
           break;
         }
       }
-      std::vector<Location> occurrences;
-      for (const std::pair<Location, Location> &use: uses) {
-        if (use.first.filename == symbolLocation.filename && use.second.contains(definitionLocation)) {
-          definitionLocation = use.second;
-          occurrences.push_back(use.first);
+      if (!isDefinitionFound) {
+        for (const Definition &def: definitions) {
+          if (def.location.contains(symbolLocation)) {
+            definitionLocation = def.location;
+            isDefinitionFound = true;
+            break;
+          }
         }
       }
-      if (definitionLocation.filename == symbolLocation.filename) {
-        occurrences.push_back(definitionLocation);
+      std::vector<Location> occurrences;
+      if (isDefinitionFound) {
+        for (const Use &use: uses) {
+          if (use.use.filename == symbolLocation.filename && use.def.contains(definitionLocation)) {
+            occurrences.push_back(use.use);
+          }
+        }
+        if (definitionLocation.filename == symbolLocation.filename) {
+          occurrences.push_back(definitionLocation);
+        }
       }
       reportHighlights(receivedMessage, occurrences);
+    }
+
+    static void reportHoverInfo(JAST receivedMessage, const std::vector<Definition> &hoverInfoPieces) {
+      JAST message = createResponseMessage(std::move(receivedMessage));
+      JAST &result = message.add("result", JSON_OBJECT);
+
+      JAST contents(JSON_ARRAY);
+      for (const Definition& def: hoverInfoPieces) {
+        contents.add((def.name + ": " + def.type).c_str());
+      }
+      if (!contents.children.empty()) {
+        result.children.emplace_back("contents", contents);
+      }
+      sendMessage(message);
+    }
+
+    void hover(JAST receivedMessage) {
+      Location symbolLocation = getLocationFromJSON(receivedMessage);
+      Location definitionLocation = symbolLocation;
+
+      for (const Use &use: uses) {
+        if (use.use.contains(symbolLocation)) {
+          definitionLocation = use.def;
+          break;
+        }
+      }
+      std::vector<Definition> hoverInfoPieces;
+      for (Definition &def: definitions) {
+        if (def.location.contains(definitionLocation)) {
+          hoverInfoPieces.push_back(def);
+        }
+      }
+      reportHoverInfo(receivedMessage, hoverInfoPieces);
+    }
+
+    void appendSymbolToJSON(const Definition& def, JAST &json) {
+      JAST &symbol = json.add("", JSON_OBJECT);
+      symbol.add("name", def.name + ": " + def.type);
+      symbol.add("kind", def.symbolKind);
+      symbol.children.emplace_back("location", createLocationJSON(def.location));
+    }
+
+    void documentSymbol(JAST receivedMessage) {
+      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+      std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
+      JAST message = createResponseMessage(std::move(receivedMessage));
+      JAST &result = message.add("result", JSON_ARRAY);
+      for (const Definition &def: definitions) {
+        if (def.isGlobal && def.location.filename == filePath) {
+          appendSymbolToJSON(def, result);
+        }
+      }
+      sendMessage(message);
+    }
+
+    void workspaceSymbol(JAST receivedMessage) {
+      std::string query = receivedMessage.get("params").get("query").value;
+      JAST message = createResponseMessage(std::move(receivedMessage));
+      JAST &result = message.add("result", JSON_ARRAY);
+      for (const Definition &def: definitions) {
+        if (def.isGlobal && def.name.find(query) != std::string::npos) {
+          appendSymbolToJSON(def, result);
+        }
+      }
+      sendMessage(message);
+    }
+
+    void reportWorkspaceEdits(JAST receivedMessage, const std::vector<Location> &references, const std::string &newName) {
+      JAST message = createResponseMessage(std::move(receivedMessage));
+      JAST &result = message.add("result", JSON_OBJECT);
+
+      std::map<std::string, JAST> filesEdits;
+      for (Location ref: references) {
+        JAST edit(JSON_OBJECT);
+        edit.children.emplace_back("range", createRangeFromLocation(ref));
+        edit.add("newText", newName.c_str());
+
+        std::string fileUri = rootUri + '/' + ref.filename;
+        if (filesEdits.find(fileUri) == filesEdits.end()) {
+          filesEdits[fileUri] = JAST(JSON_ARRAY);
+        }
+        filesEdits[fileUri].children.emplace_back("", edit);
+      }
+
+      if (!filesEdits.empty()) {
+        JAST &changes = result.add("changes", JSON_OBJECT);
+        for (const auto &fileEdits: filesEdits) {
+          changes.children.emplace_back(fileEdits.first, fileEdits.second);
+        }
+      }
+      sendMessage(message);
+    }
+
+    void rename(JAST receivedMessage) {
+      std::string newName = receivedMessage.get("params").get("newName").value;
+      if (newName.find(' ') != std::string::npos || (newName[0] >= '0' && newName[0] <= '9')) {
+        sendErrorMessage(receivedMessage, InvalidParams, "The given name is invalid.");
+        return;
+      }
+
+      Location definitionLocation = getLocationFromJSON(receivedMessage);
+      bool isDefinitionFound = false;
+      std::vector<Location> references;
+      findReferences(definitionLocation, isDefinitionFound, references);
+      if (isDefinitionFound) {
+        references.push_back(definitionLocation);
+      }
+      reportWorkspaceEdits(receivedMessage, references, newName);
     }
 
     void didOpen(JAST receivedMessage) {

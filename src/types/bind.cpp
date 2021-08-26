@@ -1467,12 +1467,12 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
   }
 }
 
-std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap) {
+std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap, bool &isTreeBuilt) {
   NameBinding bottom;
   ExploreState state(pmap);
   Top &topr = *top;
   std::unique_ptr<Expr> out = fracture(topr, false, "", std::move(top), 0);
-  if (out && !explore(out.get(), state, &bottom)) out.reset();
+  if (out && !explore(out.get(), state, &bottom)) isTreeBuilt = false;
   return out;
 }
 
