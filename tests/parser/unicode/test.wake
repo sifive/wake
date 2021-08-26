@@ -3,6 +3,12 @@ def testBool _ =
   require True  = "ṩ" ==* "ṩ"
   require True  = "ṩ{"-"}ṩ" ==* "ṩ-ṩ"
   require False = 'ṩ' ==* 'ṩ'
+  def xṩ = 44
+  def _ = xṩ
+  require False = "xϓ" ==* "xΎ"
+  require False = unicodeIdentifier "xϓ" ==* "xΎ"
+  def xϓ = 33
+  def _ = xΎ
   True
 
 def test x =
