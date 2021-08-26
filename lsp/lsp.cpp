@@ -170,6 +170,7 @@ private:
           isGlobal(_isGlobal) {}
     };
     std::vector<Definition> definitions;
+    std::vector<Definition> packages;
     std::map<std::string, LspMethod> essentialMethods = {
       {"initialize",                      &LSP::initialize},
       {"initialized",                     &LSP::initialized},
@@ -394,6 +395,7 @@ private:
     void diagnoseProject() {
       uses.clear();
       definitions.clear();
+      packages.clear();
 
       bool enumok = true;
       allFiles = find_all_wakefiles(enumok, true, false, stdLib);
@@ -413,7 +415,7 @@ private:
       for (auto &p : top->packages) {
         for (auto &f: p.second->files) {
           Location &l = f.content->location;
-          definitions.emplace_back(Definition(p.first, l, "Package", KIND_PACKAGE, true));
+          packages.emplace_back(Definition(p.first, l, "Package", KIND_PACKAGE, true));
         }
       }
 
@@ -712,6 +714,11 @@ private:
           appendSymbolToJSON(def, result);
         }
       }
+      for (const Definition &p: packages) {
+        if (p.location.filename == filePath) {
+          appendSymbolToJSON(p, result);
+        }
+      }
       sendMessage(message);
     }
 
@@ -722,6 +729,11 @@ private:
       for (const Definition &def: definitions) {
         if (def.isGlobal && def.name.find(query) != std::string::npos) {
           appendSymbolToJSON(def, result);
+        }
+      }
+      for (const Definition &p: packages) {
+        if (p.name.find(query) != std::string::npos) {
+          appendSymbolToJSON(p, result);
         }
       }
       sendMessage(message);
