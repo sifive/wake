@@ -106,17 +106,22 @@ void print_help(const char *argv0) {
 DiagnosticReporter *reporter;
 class TerminalReporter : public DiagnosticReporter {
   public:
-    TerminalReporter() : ok(true) { }
-    bool ok;
+    TerminalReporter() : errors(false), warnings(false) { }
+    bool errors;
+    bool warnings;
 
   private:
     std::string last;
 
     void report(Diagnostic diagnostic) {
-      if (diagnostic.getSeverity() == S_ERROR) ok = false;
+      if (diagnostic.getSeverity() == S_ERROR) errors = true;
+      if (diagnostic.getSeverity() == S_WARNING) warnings = true;
+
       if (last != diagnostic.getMessage()) {
          last = diagnostic.getMessage();
-         std::cerr << diagnostic.getLocation().file() << ": " << diagnostic.getMessage() << std::endl;
+         std::cerr << diagnostic.getLocation().file() << ": ";
+         if (diagnostic.getSeverity() == S_WARNING) std::cerr << "(warning) ";
+         std::cerr << diagnostic.getMessage() << std::endl;
       }
     }
 };
@@ -501,7 +506,7 @@ int main(int argc, char **argv) {
   TypeVar type = top->body->typeVar;
 
   if (parse) std::cout << top.get();
-  if (notype) return (ok && terminalReporter.ok)?0:1;
+  if (notype) return (ok && !terminalReporter.errors)?0:1;
 
   /* Setup logging streams */
   if (debug   && !fd1) fd1 = "debug,info,echo,report,warning,error";
@@ -527,7 +532,7 @@ int main(int argc, char **argv) {
 
   sums_ok();
 
-  if (!ok || !terminalReporter.ok || (fwarning && warnings)) {
+  if (!ok || terminalReporter.errors || (fwarning && terminalReporter.warnings)) {
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }

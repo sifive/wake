@@ -37,8 +37,6 @@
 
 typedef std::map<std::string, int> NameIndex;
 
-int warnings = 0;
-
 struct ResolveDef {
   std::string name;
   Location location;
@@ -117,9 +115,8 @@ struct ResolveBinding {
       auto it = sym->defs.find(name);
       if (it != sym->defs.end()) {
         if (override && it->second.qualified != override->qualified) {
-          ++warnings;
           std::ostringstream message;
-          message << "(warning) Ambiguous import of definition '" << name
+          message << "ambiguous import of definition '" << name
             << "' from <" << override->location.file()
             << "> and <" << it->second.location.file()
             << ">";
@@ -138,9 +135,8 @@ struct ResolveBinding {
       auto it = sym->topics.find(name);
       if (it != sym->topics.end()) {
         if (override && it->second.qualified != override->qualified) {
-          ++warnings;
           std::ostringstream message;
-          message <<  "(warning) Ambiguous import of topic '" << name
+          message <<  "ambiguous import of topic '" << name
             << "' from <" << override->location.file()
             << "> and <" << it->second.location.file()
             << ">";
@@ -160,9 +156,8 @@ struct ResolveBinding {
       auto it = sym->types.find(name);
       if (it != sym->types.end()) {
         if (override && it->second.qualified != override->qualified) {
-          ++warnings;
           std::ostringstream message;
-          message  << "(warning) Ambiguous import of type '" << name
+          message  << "ambiguous import of type '" << name
             << "' from <" << override->location.file()
             << "> and <" << it->second.location.file()
             << ">";
@@ -499,7 +494,6 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
           bucket.emplace_back(std::move(*p));
           p->index = -1;
         } else if (t->sum != sum) {
-          std::ostringstream message;
           ERROR(p->location,
             "constructor '" << t->sum->members[t->cons].ast.name
             << "' is used in a pattern matching '" << sum->name
@@ -740,11 +734,9 @@ struct SymMover {
     if (it == top.packages.end()) {
       warn = false;
       package = nullptr;
-      ++warnings;
       std::ostringstream message;
-      message << "(warning) Import of " << kind << " '" << def
-        << "' is from non-existent package '" << pkg
-        << "' at " << sym.second.location.text();
+      message << "import of " << kind << " '" << def
+        << "' from non-existent package '" << pkg << "'";
       reporter->reportWarning(sym.second.location, message.str());
     } else {
       warn = true;
@@ -754,11 +746,8 @@ struct SymMover {
 
   ~SymMover() {
     if (warn) {
-      ++warnings;
       std::ostringstream message;
-      message << "(warning) Import of " << kind << " '" << def
-        << "' from package '" << package->name
-        << "' is not exported at " << sym.second.location.text();
+      message << kind << " '" << def << "' is not exported by package '" << package->name << "'";
       reporter->reportWarning(sym.second.location, message.str());
     }
   }
@@ -824,10 +813,8 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location
   for (auto &p : imports.import_all) {
     auto it = top.packages.find(p);
     if (it == top.packages.end()) {
-      ++warnings;
       std::ostringstream message;
-      message << "(warning) Full import from non-existent package '" << p
-        << "' at " << location.text();
+      message << "full import from non-existent package '" << p << "'";
       reporter->reportWarning(location, message.str());
     } else {
       out.push_back(&it->second->exports);
@@ -894,12 +881,10 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       lambda->body = fracture(top, false, lambda->fnname, std::move(lambda->body), &lbinding);
     }
     if (lbinding.defs.back().uses == 0 && !lambda->name.empty() && lambda->name[0] != '_') {
-      ++warnings;
       std::ostringstream message;
       message
-        << "(warning) Unused function argument '" << lambda->name
-        << "' at <" << lambda->token.file()
-        << ">; consider renaming to _" << lambda->name;
+        << "unused function argument '" << lambda->name
+        << "'; consider renaming to _" << lambda->name;
       reporter->reportWarning(lambda->token, message.str());
     }
     return expr;
@@ -930,12 +915,10 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(def->body), &dbinding);
     for (auto &i : dbinding.defs) {
       if (i.uses == 0 && !i.name.empty() && i.name[0] != '_') {
-        ++warnings;
         std::ostringstream message;
         message
-          << "(warning) Unused local definition of '" << i.name
-          << "' at <" << i.location.file()
-          << ">; consider removing or renaming to _" << i.name;
+          << "unused local definition of '" << i.name
+          << "'; consider removing or renaming to _" << i.name;
         reporter->reportWarning(i.location, message.str());
       }
     }
@@ -1118,12 +1101,10 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
         size_t at = def.name.find_first_of('@');
         std::string name = def.name.substr(0, at);
-        ++warnings;
         std::ostringstream message;
         message
-          << "(warning) Unused top-level definition of '" << name
-          << "' at <" << def.location.file()
-          << ">; consider removing or renaming to _" <<  name;
+          << "unused top-level definition of '" << name
+          << "'; consider removing or renaming to _" <<  name;
         reporter->reportWarning(def.location, message.str());
       }
     }
@@ -1465,7 +1446,6 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
       prim->data = i->second.data;
       bool ok = i->second.type(args, &prim->typeVar);
       if (!ok) {
-        std::ostringstream message;
         ERROR(prim->location, "primitive '" << prim->name << "' is used with the wrong number of arguments");
       }
       return ok;
@@ -1525,7 +1505,6 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
   auto ip = con.top.packages.find(pkg);
   if (ip == con.top.packages.end()) {
     if (con.warn) {
-      std::ostringstream message;
       ERROR(sym.location,
         "export of " << con.kind << " '" << def
         << "' from non-existent package '" << pkg << "'");
@@ -1537,7 +1516,7 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
     if (ie == map.end()) {
       if (con.warn) {
         ERROR(sym.location,
-          con.kind << " '" << def << "' is not exported by '" << pkg << "'");
+          con.kind << " '" << def << "' is not exported by package '" << pkg << "'");
       }
       return false;
     }
