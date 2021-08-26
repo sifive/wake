@@ -74,7 +74,6 @@ public:
     typedef const T *const_pointer;
     typedef const T &const_reference;
     typedef size_t size_type;
-    typedef ptrdiff_t difference_type;
     template <class U> struct rebind { typedef AlignedAlloc<U> other; };
 
     pointer address(reference x) const noexcept { return &x; }
