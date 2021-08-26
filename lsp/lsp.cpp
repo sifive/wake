@@ -43,6 +43,7 @@
 #include "frontend/todst.h"
 #include "frontend/expr.h"
 #include "frontend/diagnostic.h"
+#include "frontend/lexer.h"
 #include "frontend/wakefiles.h"
 #include "types/bind.h"
 
@@ -366,33 +367,32 @@ private:
     }
 
     static SymbolKind getSymbolKind(const char *name, const std::string& type) {
-      if (Lexer::isLower(name)) {
-        if (type.compare(0, std::string ::npos, "binary =>@builtin") == 0) {
+      switch (lex_kind(name)) {
+      case OPERATOR:
+        return KIND_OPERATOR;
+      case UPPER:
+        return KIND_ENUM_MEMBER;
+      case LOWER:
+      default:
+        if (type.compare("binary =>@builtin") == 0) {
           return KIND_FUNCTION;
         }
-        if (type.compare(0, std::string ::npos, "String@builtin") == 0 ||
-          type.compare(0, std::string ::npos, "RegExp@builtin") == 0) {
+        if (type.compare("String@builtin") == 0 ||
+           type.compare("RegExp@builtin") == 0) {
           return KIND_STRING;
         }
-        if (type.compare(0, std::string ::npos, "Integer@builtin") == 0 ||
-        type.compare(0, std::string ::npos, "Double@builtin") == 0) {
+        if (type.compare("Integer@builtin") == 0 ||
+            type.compare("Double@builtin") == 0) {
           return KIND_NUMBER;
         }
-        if (type.compare(0, std::string ::npos, "Boolean@wake") == 0) {
+        if (type.compare("Boolean@wake") == 0) {
           return KIND_BOOLEAN;
         }
-        if (type.compare(0, 11, "Vector@wake") == 0) {
+        if (type.compare(0, 12, "Vector@wake ") == 0) {
           return KIND_ARRAY;
         }
         return KIND_VARIABLE;
       }
-      if (Lexer::isOperator(name)) {
-        return KIND_OPERATOR;
-      }
-      if (Lexer::isUpper(name)) {
-        return KIND_ENUM_MEMBER;
-      }
-      return KIND_VARIABLE;
     }
 
     void explore(Expr *expr, bool isGlobal) {
