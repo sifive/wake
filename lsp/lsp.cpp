@@ -157,8 +157,8 @@ private:
         Use(Location _use, Location _def) : use(_use), def(_def) {}
     };
     std::vector<Use> uses;
-    enum SymbolKind { KIND_FUNCTION = 12, KIND_VARIABLE = 13, KIND_STRING = 15, KIND_NUMBER = 16, KIND_BOOLEAN = 17,
-      KIND_ARRAY = 18, KIND_ENUM_MEMBER = 22, KIND_OPERATOR = 25 };
+    enum SymbolKind { KIND_PACKAGE = 4, KIND_FUNCTION = 12, KIND_VARIABLE = 13, KIND_STRING = 15, KIND_NUMBER = 16,
+      KIND_BOOLEAN = 17, KIND_ARRAY = 18, KIND_ENUM_MEMBER = 22, KIND_OPERATOR = 25 };
     struct Definition {
         std::string name;
         Location location;
@@ -408,8 +408,15 @@ private:
 
       for (auto &file: allFiles)
         runSyntaxChecker(file, *top);
-
       flatten_exports(*top);
+
+      for (auto &p : top->packages) {
+        for (auto &f: p.second->files) {
+          Location &l = f.content->location;
+          definitions.emplace_back(Definition(p.first, l, "Package", KIND_PACKAGE, true));
+        }
+      }
+
       PrimMap pmap = prim_register_all(nullptr, nullptr);
       bool isTreeBuilt = true;
       std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
