@@ -47,6 +47,9 @@ void parseWake(ParseInfo pi) {
     bool in_multiline_string = false;
     bool in_legacy_string = false;
 
+    // Silence a warning on older compilers
+    nl.end = ws.end = nullptr;
+
     void *parser = ParseAlloc(malloc);
     // ParseTrace(stderr, "");
 
