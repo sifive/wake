@@ -845,22 +845,26 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
 }
 
 static void mstr_add(std::ostream &os, CSTElement token, std::string::size_type wsCut) {
+  uint8_t nid = token.id();
   while (!token.empty()) {
     TokenInfo ti = token.content();
-    switch (token.id()) {
+    token.nextSiblingElement();
+    uint8_t id = nid;
+    nid = token.id();
+
+    switch (id) {
       case TOKEN_LSTR_END:
-      case TOKEN_MSTR_END:    break;
+      case TOKEN_MSTR_END:       break;
       case TOKEN_LSTR_RESUME:
-      case TOKEN_MSTR_RESUME: os << relex_mstring(ti.start + 1,     ti.end);     break;
-      case TOKEN_WS:          os << relex_mstring(ti.start + wsCut, ti.end);     break;
+      case TOKEN_MSTR_RESUME:    os << relex_mstring(ti.start + 1,     ti.end);      break;
+      case TOKEN_WS:             os << relex_mstring(ti.start + wsCut, ti.end);      break;
       case TOKEN_LSTR_PAUSE:
-      case TOKEN_MSTR_PAUSE:  os << relex_mstring(ti.start,         ti.end - 2); break;
-      case TOKEN_NL:
+      case TOKEN_MSTR_PAUSE:     os << relex_mstring(ti.start,         ti.end - 2);  break;
+      case TOKEN_NL:             if (nid == TOKEN_LSTR_END || nid == TOKEN_MSTR_END) break;
       case TOKEN_MSTR_CONTINUE:
       case TOKEN_LSTR_CONTINUE:
-      default:                os << relex_mstring(ti.start,         ti.end);     break;
+      default:                   os << relex_mstring(ti.start,         ti.end);      break;
     }
-    token.nextSiblingElement();
   }
 }
 
@@ -977,7 +981,7 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
     }
     case TOKEN_LSTR_BEGIN:
     case TOKEN_MSTR_BEGIN: {
-      // TOKEN_MSTR_BEGIN NL (WS? MSTR_CONTINUE? NL)* (MSTR_END | WS? MSTR_PAUSE)
+      // TOKEN_MSTR_BEGIN NL (WS? MSTR_CONTINUE? NL)* (NL MSTR_END | WS? MSTR_PAUSE)
       std::stringstream ss;
       child.nextSiblingElement(); // skip BEGIN
       child.nextSiblingElement(); // skip NL
@@ -991,7 +995,7 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
     }
     case TOKEN_LSTR_RESUME:
     case TOKEN_MSTR_RESUME: {
-      // TOKEN_MSTR_RESUME (WS? MSTR_CONTINUE? NL)* (MSTR_END | WS? MSTR_PAUSE)
+      // TOKEN_MSTR_RESUME (WS? MSTR_CONTINUE? NL)* (NL MSTR_END | WS? MSTR_PAUSE)
       std::stringstream ss;
       mstr_add(ss, child, wsCut);
       return new Literal(lit.location(), ss.str(), &Data::typeString);
