@@ -1219,11 +1219,11 @@ Expr *dst_expr(CSTElement expr) {
     }
     case CST_IF: {
       CSTElement child = expr.firstChildNode();
-      Expr *condE = dst_expr(child);
+      Expr *condE = relabel_anon(dst_expr(child));
       child.nextSiblingNode();
-      Expr *thenE = dst_expr(child);
+      Expr *thenE = relabel_anon(dst_expr(child));
       child.nextSiblingNode();
-      Expr *elseE = dst_expr(child);
+      Expr *elseE = relabel_anon(dst_expr(child));
       Location l = expr.location();
       Match *out = new Match(l);
       out->args.emplace_back(condE);
