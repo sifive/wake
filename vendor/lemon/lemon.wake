@@ -24,7 +24,7 @@ def buildLemon variant: Result (List Path) Error =
     require Pass objs =
         compileC cVariant Nil Nil (source "{here}/lemon.c")
 
-    linkO cVariant Nil objs "lemon/lemon"
+    linkO cVariant Nil objs "{here}/lemon"
 
 def m4 (file: Path): Result Path Error =
     def output =

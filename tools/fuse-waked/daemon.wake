@@ -17,51 +17,6 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def buildFuse variant: Result (List Path) Error =
-    def Pair cppVariant _ =
-        variant
-
-    def libobjsResult =
-        buildFuseLibObjs variant
-
-    require Pass json =
-        common variant
-
-    def headers =
-        json.getSysLibHeaders ++
-        sources "fuse" `.*\.h`
-
-    require Pass client =
-        compileC cppVariant json.getSysLibCFlags headers (source "fuse/client.cpp")
-
-    require Pass libobjs =
-        libobjsResult
-
-    linkO cppVariant json.getSysLibLFlags (client ++ libobjs) "bin/fuse-wake"
-
-def buildFuseLibObjs variant: Result (List Path) Error =
-    def Pair cppVariant _ =
-        variant
-
-    require Pass json =
-        common variant
-
-    def headers =
-        json.getSysLibHeaders ++
-        sources "fuse" `.*\.h`
-
-    def cppFiles =
-        sources "fuse" `(fuse|namespace|daemon_client).cpp`
-
-    def compile =
-        compileC cppVariant json.getSysLibCFlags headers
-
-    require Pass objs =
-        map compile cppFiles
-        | findFail
-
-    Pass (objs.flatten ++ json.getSysLibObjects)
-
 def buildFuseDaemon variant: Result (List Path) Error =
     def Pair cppVariant _ =
         variant
