@@ -1,7 +1,26 @@
+/*
+ * Copyright 2019 SiFive, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You should have received a copy of LICENSE.Apache2 along with
+ * this software. If not, you may obtain a copy at
+ *
+ *    https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef DIAGNOSTIC_H
 #define DIAGNOSTIC_H
 
-#include <location.h>
+#include <sstream>
+
+#include "location.h"
 
 enum Severity { S_ERROR = 1, S_WARNING, S_INFORMATION, S_HINT };
 
@@ -45,5 +64,12 @@ class DiagnosticReporter {
 };
 
 extern DiagnosticReporter *reporter;
+
+#define ERROR(loc, stream)                   \
+  do {                                       \
+    std::stringstream sstr;                  \
+    sstr << stream;                          \
+    reporter->reportError(loc, sstr.str());  \
+  } while (0)                                \
 
 #endif

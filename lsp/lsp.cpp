@@ -36,23 +36,20 @@
 
 #include "json5.h"
 #include "location.h"
-#include "frontend/parser.h"
-#include "frontend/symbol.h"
-#include "runtime/runtime.h"
-#include "frontend/expr.h"
-#include "runtime/sources.h"
-#include "frontend/diagnostic.h"
-#include "types/bind.h"
 #include "execpath.h"
+#include "frontend/parser.h"
+#include "frontend/cst.h"
+#include "frontend/file.h"
+#include "frontend/todst.h"
+#include "frontend/expr.h"
+#include "frontend/diagnostic.h"
+#include "frontend/lexer.h"
 #include "frontend/wakefiles.h"
-
+#include "types/bind.h"
 
 #ifndef VERSION
 #include "../src/version.h"
 #endif
-
-// Number of pipes to the wake subprocess
-#define PIPES 5
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -77,7 +74,7 @@ DiagnosticReporter *reporter;
 
 class LSP {
 public:
-    explicit LSP(std::string _stdLib) : stdLib(std::move(_stdLib)), runtime(nullptr, 0, 4.0, 0) {}
+    explicit LSP(std::string _stdLib) : stdLib(std::move(_stdLib)) {}
 
     void processRequests() {
       // Begin log
@@ -146,7 +143,6 @@ private:
     bool isInitialized = false;
     bool isShutDown = false;
     std::string stdLib;
-    Runtime runtime;
     std::vector<std::string> allFiles;
     std::map<std::string, std::string> changedFiles;
     struct Use {
@@ -331,11 +327,13 @@ private:
     void runSyntaxChecker(const std::string &filePath, Top &top) {
       auto fileChangesPointer = changedFiles.find(rootUri + '/' + filePath);
       if (fileChangesPointer != changedFiles.end()) {
-        Lexer lex(runtime.heap, (*fileChangesPointer).second, filePath.c_str());
-        parse_top(top, lex);
+        StringFile file(filePath.c_str(), std::string(fileChangesPointer->second));
+        CST cst(file, *reporter);
+        dst_top(cst.root(), top);
       } else {
-        Lexer lex(runtime.heap, filePath.c_str());
-        parse_top(top, lex);
+        ExternalFile file(*reporter, filePath.c_str());
+        CST cst(file, *reporter);
+        dst_top(cst.root(), top);
       }
     }
 
@@ -357,7 +355,7 @@ private:
       for (auto &file: allFiles)
         runSyntaxChecker(file, *top);
 
-      PrimMap pmap = prim_register_all(nullptr, nullptr);
+      PrimMap pmap;
       bool isTreeBuilt = true;
       std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
 
@@ -369,33 +367,32 @@ private:
     }
 
     static SymbolKind getSymbolKind(const char *name, const std::string& type) {
-      if (Lexer::isLower(name)) {
-        if (type.compare(0, std::string ::npos, "binary =>@builtin") == 0) {
+      switch (lex_kind(name)) {
+      case OPERATOR:
+        return KIND_OPERATOR;
+      case UPPER:
+        return KIND_ENUM_MEMBER;
+      case LOWER:
+      default:
+        if (type.compare("binary =>@builtin") == 0) {
           return KIND_FUNCTION;
         }
-        if (type.compare(0, std::string ::npos, "String@builtin") == 0 ||
-          type.compare(0, std::string ::npos, "RegExp@builtin") == 0) {
+        if (type.compare("String@builtin") == 0 ||
+           type.compare("RegExp@builtin") == 0) {
           return KIND_STRING;
         }
-        if (type.compare(0, std::string ::npos, "Integer@builtin") == 0 ||
-        type.compare(0, std::string ::npos, "Double@builtin") == 0) {
+        if (type.compare("Integer@builtin") == 0 ||
+            type.compare("Double@builtin") == 0) {
           return KIND_NUMBER;
         }
-        if (type.compare(0, std::string ::npos, "Boolean@wake") == 0) {
+        if (type.compare("Boolean@wake") == 0) {
           return KIND_BOOLEAN;
         }
-        if (type.compare(0, 11, "Vector@wake") == 0) {
+        if (type.compare(0, 12, "Vector@wake ") == 0) {
           return KIND_ARRAY;
         }
         return KIND_VARIABLE;
       }
-      if (Lexer::isOperator(name)) {
-        return KIND_OPERATOR;
-      }
-      if (Lexer::isUpper(name)) {
-        return KIND_ENUM_MEMBER;
-      }
-      return KIND_VARIABLE;
     }
 
     void explore(Expr *expr, bool isGlobal) {

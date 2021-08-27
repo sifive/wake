@@ -31,13 +31,11 @@
 #include "types/bind.h"
 #include "frontend/expr.h"
 #include "runtime/prim.h"
-#include "frontend/symbol.h"
-#include "frontend/parser.h"
+#include "frontend/lexer.h"
+#include "frontend/sums.h"
 #include "frontend/diagnostic.h"
 
 typedef std::map<std::string, int> NameIndex;
-
-int warnings = 0;
 
 struct ResolveDef {
   std::string name;
@@ -117,9 +115,8 @@ struct ResolveBinding {
       auto it = sym->defs.find(name);
       if (it != sym->defs.end()) {
         if (override && it->second.qualified != override->qualified) {
-          ++warnings;
           std::ostringstream message;
-          message << "(warning) Ambiguous import of definition '" << name
+          message << "ambiguous import of definition '" << name
             << "' from <" << override->location.file()
             << "> and <" << it->second.location.file()
             << ">";
@@ -138,9 +135,8 @@ struct ResolveBinding {
       auto it = sym->topics.find(name);
       if (it != sym->topics.end()) {
         if (override && it->second.qualified != override->qualified) {
-          ++warnings;
           std::ostringstream message;
-          message <<  "(warning) Ambiguous import of topic '" << name
+          message <<  "ambiguous import of topic '" << name
             << "' from <" << override->location.file()
             << "> and <" << it->second.location.file()
             << ">";
@@ -160,9 +156,8 @@ struct ResolveBinding {
       auto it = sym->types.find(name);
       if (it != sym->types.end()) {
         if (override && it->second.qualified != override->qualified) {
-          ++warnings;
           std::ostringstream message;
-          message  << "(warning) Ambiguous import of type '" << name
+          message  << "ambiguous import of type '" << name
             << "' from <" << override->location.file()
             << "> and <" << it->second.location.file()
             << ">";
@@ -225,7 +220,7 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
       }
       // j is now inside the cycle
       std::ostringstream message;
-      message << "Value definition cycle detected including:" << std::endl;
+      message << "value definition cycle detected including:" << std::endl;
       std::vector<Location> errorLocations;
       int i = j;
       do {
@@ -310,11 +305,7 @@ static VarRef *rebind_subscribe(ResolveBinding *binding, const Location &locatio
     if (iter->qualify_topic(name)) break;
   }
   if (!iter) {
-    std::ostringstream message;
-    message << "Subscribe of '" << name
-      << "' is to a non-existent topic at "
-      << location.file();
-    reporter->reportError(location, message.str());
+    ERROR(location, "subscribe to non-existent topic '" << name << "'");
     return nullptr;
   }
   return new VarRef(location, "topic " + name);
@@ -327,11 +318,7 @@ static std::string rebind_publish(ResolveBinding *binding, const Location &locat
     if (iter->qualify_topic(name)) break;
   }
   if (!iter) {
-    std::ostringstream message;
-    message << "Publish to '" << name
-      << "' is to a non-existent topic at "
-      << location.file();
-    reporter->reportError(location, message.str());
+    ERROR(location, "publish to non-existent topic '" << name << "'");
   }
   return name;
 }
@@ -466,10 +453,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
       ++prototype.uses;
       return std::unique_ptr<Expr>(new App(LOCATION, new VarRef(LOCATION, "_ else"), new VarRef(LOCATION, "_ a0")));
     } else {
-      std::ostringstream message;
-      message << "Non-exhaustive match at " << location.file()
-        << "; missing: " << prototype.tree;
-      reporter->reportError(location, message.str());
+      ERROR(location, "non-exhaustive match; missing: " << prototype.tree);
       return nullptr;
     }
   }
@@ -510,12 +494,10 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
           bucket.emplace_back(std::move(*p));
           p->index = -1;
         } else if (t->sum != sum) {
-          std::ostringstream message;
-          message << "Constructor " << t->sum->members[t->cons].ast.name
-            << " is not a member of " << sum->name
-            << " but is used in pattern at " << p->location.file()
-            << ".";
-          reporter->reportError(p->location, message.str());
+          ERROR(p->location,
+            "constructor '" << t->sum->members[t->cons].ast.name
+            << "' is used in a pattern matching '" << sum->name
+            << "', but is not a member of this type");
           return nullptr;
         } else if (t->sum && t->cons == (int)c) {
           // Put any supplied type constraints on the object
@@ -603,7 +585,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
   out.type = std::move(ast.type);
   if (ast.name == "_") {
     // no-op; unbound
-  } else if (!ast.name.empty() && Lexer::isLower(ast.name.c_str())) {
+  } else if (!ast.name.empty() && lex_kind(ast.name) == LOWER) {
     Lambda *lambda = new Lambda(expr->location, ast.name, expr.release());
     if (ast.name.compare(0, 3, "_ k") != 0) lambda->token = ast.token;
     expr = std::unique_ptr<Expr>(lambda);
@@ -628,23 +610,17 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       }
     }
     if (!out.sum) {
-      std::ostringstream message;
-      message << "Constructor " << ast.name
-        << " in pattern match not found at " << ast.token.file()
-        << ".";
-      reporter->reportError(ast.token, message.str());
+      ERROR(ast.token, "constructor '" << ast.name << "' is not defined");
       out.var = 0;
     } else if (out.sum->members[out.cons].ast.args.size() != ast.args.size()) {
       std::ostringstream message;
       if (ast.name.empty()) {
-        message << "Case";
+        message << "case";
       } else {
-        message << "Constructor " << ast.name;
+        message << "constructor '" << ast.name << "'";
       }
-      message << " in pattern match has " << ast.args.size()
-        << " parameters, but must have " << out.sum->members[out.cons].ast.args.size()
-        << " at " << ast.region.text()
-        << ".";
+      message << " is used with " << ast.args.size()
+        << " parameters, but must have " << out.sum->members[out.cons].ast.args.size();
       reporter->reportError(ast.region, message.str());
       out.sum = 0;
       out.var = 0;
@@ -730,16 +706,12 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
   if (!map->body) return nullptr;
   for (auto &p : patterns) {
     if (!p.uses) {
-      std::ostringstream message;
-      message << "Pattern unreachable in match at " << p.location.text();
-      reporter->reportError(p.location, message.str());
+      ERROR(p.location, "pattern is impossible to match");
       return nullptr;
     }
   }
   if (match->refutable && patterns.front().uses <= 1) {
-    std::ostringstream message;
-    message << "The required pattern at " << match->location.file() << " can never fail; use def instead.";
-    reporter->reportError(match->location, message.str());
+    ERROR(match->location, "the required pattern can never fail; use a def instead");
     return nullptr;
   }
   map->location = map->body->location;
@@ -762,11 +734,9 @@ struct SymMover {
     if (it == top.packages.end()) {
       warn = false;
       package = nullptr;
-      ++warnings;
       std::ostringstream message;
-      message << "(warning) Import of " << kind << " '" << def
-        << "' is from non-existent package '" << pkg
-        << "' at " << sym.second.location.text();
+      message << "import of " << kind << " '" << def
+        << "' from non-existent package '" << pkg << "'";
       reporter->reportWarning(sym.second.location, message.str());
     } else {
       warn = true;
@@ -776,11 +746,8 @@ struct SymMover {
 
   ~SymMover() {
     if (warn) {
-      ++warnings;
       std::ostringstream message;
-      message << "(warning) Import of " << kind << " '" << def
-        << "' from package '" << package->name
-        << "' is not exported at " << sym.second.location.text();
+      message << kind << " '" << def << "' is not exported by package '" << package->name << "'";
       reporter->reportWarning(sym.second.location, message.str());
     }
   }
@@ -846,10 +813,8 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location
   for (auto &p : imports.import_all) {
     auto it = top.packages.find(p);
     if (it == top.packages.end()) {
-      ++warnings;
       std::ostringstream message;
-      message << "(warning) Full import from non-existent package '" << p
-        << "' at " << location.text();
+      message << "full import from non-existent package '" << p << "'";
       reporter->reportWarning(location, message.str());
     } else {
       out.push_back(&it->second->exports);
@@ -868,18 +833,14 @@ static bool qualify_type(ResolveBinding *binding, std::string &name, const Locat
   if (iter) {
     return true;
   } else {
-    std::ostringstream message;
-    message << "Type signature '" << name
-      << "' refers to a non-existent type "
-      << location.file();
-    reporter->reportError(location, message.str());
+    ERROR(location, "reference to undefined type '" << name << "'");
     return false;
   }
 }
 
 static bool qualify_type(ResolveBinding *binding, AST &type) {
   // Type variables do not get qualified
-  if (Lexer::isLower(type.name.c_str())) return true;
+  if (lex_kind(type.name) == LOWER) return true;
   bool ok = qualify_type(binding, type.name, type.token);
   for (auto &x : type.args)
     if (!qualify_type(binding, x))
@@ -920,12 +881,10 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       lambda->body = fracture(top, false, lambda->fnname, std::move(lambda->body), &lbinding);
     }
     if (lbinding.defs.back().uses == 0 && !lambda->name.empty() && lambda->name[0] != '_') {
-      ++warnings;
       std::ostringstream message;
       message
-        << "(warning) Unused function argument '" << lambda->name
-        << "' at <" << lambda->token.file()
-        << ">; consider renaming to _" << lambda->name;
+        << "unused function argument '" << lambda->name
+        << "'; consider renaming to _" << lambda->name;
       reporter->reportWarning(lambda->token, message.str());
     }
     return expr;
@@ -956,12 +915,10 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(def->body), &dbinding);
     for (auto &i : dbinding.defs) {
       if (i.uses == 0 && !i.name.empty() && i.name[0] != '_') {
-        ++warnings;
         std::ostringstream message;
         message
-          << "(warning) Unused local definition of '" << i.name
-          << "' at <" << i.location.file()
-          << ">; consider removing or renaming to _" << i.name;
+          << "unused local definition of '" << i.name
+          << "'; consider removing or renaming to _" << i.name;
         reporter->reportWarning(i.location, message.str());
       }
     }
@@ -1144,12 +1101,10 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
         size_t at = def.name.find_first_of('@');
         std::string name = def.name.substr(0, at);
-        ++warnings;
         std::ostringstream message;
         message
-          << "(warning) Unused top-level definition of '" << name
-          << "' at <" << def.location.file()
-          << ">; consider removing or renaming to _" <<  name;
+          << "unused top-level definition of '" << name
+          << "'; consider removing or renaming to _" <<  name;
         reporter->reportWarning(def.location, message.str());
       }
     }
@@ -1225,7 +1180,7 @@ struct NameBinding {
 struct FnErrorMessage : public TypeErrorMessage  {
   const Location *lf;
   FnErrorMessage(const Location *lf_) : lf(lf_) { }
-  void formatA(std::ostream &os) const { os << "Type error; expression " << lf->text() << " has type"; }
+  void formatA(std::ostream &os) const { os << "type error; expression " << lf->text() << " has type"; }
   void formatB(std::ostream &os) const { os << "but is used as a function and must have function type"; }
   virtual Location getMainLocation() const { return *lf; }
 };
@@ -1235,7 +1190,7 @@ struct ArgErrorMessage : public TypeErrorMessage {
   const char *arg;
   ArgErrorMessage(const Location *lf_, const Location *la_, const char *arg_) : lf(lf_), la(la_), arg(arg_) { }
   void formatA(std::ostream &os) const {
-    os << "Type error; function " << lf->text() << " expected argument";
+    os << "type error; function " << lf->text() << " expected argument";
     if (arg && arg[0] && !strchr(arg, ' ') && strcmp(arg, "_")) os << " '" << arg << "'";
     os << " of type";
   }
@@ -1246,7 +1201,7 @@ struct ArgErrorMessage : public TypeErrorMessage {
 struct AscErrorMessage : public TypeErrorMessage {
   const Location *body, *type;
   AscErrorMessage(const Location *body_, const Location *type_) : body(body_), type(type_) { }
-  void formatA(std::ostream &os) const { os << "Type error; expression " << body->text() << " of type"; }
+  void formatA(std::ostream &os) const { os << "type error; expression " << body->text() << " of type"; }
   void formatB(std::ostream &os) const { os << "does not match explicit type ascription at " << type->file() << " of"; }
   virtual Location getMainLocation() const { return *body; }
 };
@@ -1254,7 +1209,7 @@ struct AscErrorMessage : public TypeErrorMessage {
 struct RecErrorMessage : public TypeErrorMessage  {
   const Location *lf;
   RecErrorMessage(const Location *lf_) : lf(lf_) { }
-  void formatA(std::ostream &os) const { os << "Type error; recursive use of " << lf->text() << " requires return type"; }
+  void formatA(std::ostream &os) const { os << "type error; recursive use of " << lf->text() << " requires return type"; }
   void formatB(std::ostream &os) const { os << "but the function body actually returns type"; }
   virtual Location getMainLocation() const { return *lf; }
 };
@@ -1262,7 +1217,7 @@ struct RecErrorMessage : public TypeErrorMessage  {
 struct MatchArgErrorMessage : public TypeErrorMessage  {
   const Location *arg;
   MatchArgErrorMessage(const Location *arg_) : arg(arg_) { }
-  void formatA(std::ostream &os) const { os << "Type error; case analysis of " << arg->text() << " with type"; }
+  void formatA(std::ostream &os) const { os << "type error; case analysis of " << arg->text() << " with type"; }
   void formatB(std::ostream &os) const { os << "does not match the pattern requirement of type"; }
   virtual Location getMainLocation() const { return *arg; }
 };
@@ -1273,7 +1228,7 @@ struct MatchResultErrorMessage : public TypeErrorMessage  {
   const std::string &casen;
   MatchResultErrorMessage(const Location *result_, const std::string &case0_, const std::string &casen_)
    : result(result_), case0(case0_), casen(casen_) { }
-  void formatA(std::ostream &os) const { os << "Type error; case '" << casen << "' returns expression " << result->text() << " of type"; }
+  void formatA(std::ostream &os) const { os << "type error; case '" << casen << "' returns expression " << result->text() << " of type"; }
   void formatB(std::ostream &os) const { os << "which does not match case '" << case0 << "' which returned type"; }
   virtual Location getMainLocation() const { return *result; }
 };
@@ -1282,7 +1237,7 @@ struct MatchTypeVarErrorMessage : public TypeErrorMessage  {
   const Location *arg;
   const std::string &casen;
   MatchTypeVarErrorMessage(const Location *arg_, const std::string &casen_) : arg(arg_), casen(casen_) { }
-  void formatA(std::ostream &os) const { os << "Pattern for case '" << casen << "' expected type"; }
+  void formatA(std::ostream &os) const { os << "type error; pattern for case '" << casen << "' expected type"; }
   void formatB(std::ostream &os) const { os << "but the argument " << arg->text() << " has type"; }
   virtual Location getMainLocation() const { return *arg; }
 };
@@ -1331,8 +1286,8 @@ TypeScope::~TypeScope() {
     if (!var.var.isFree()) {
       std::ostringstream message;
       message
-        << "Introduced type variable " << var.location.text()
-        << " is not free; it has type:" << std::endl
+        << "introduced type variable '" << var.name
+        << "' is not free; it has type:" << std::endl
         << "    ";
       var.var.format(message, var.var);
       reporter->reportError(var.location, message.str());
@@ -1343,9 +1298,9 @@ TypeScope::~TypeScope() {
     if (prior.var == var.var) {
       std::ostringstream message;
       message
-        << "Introduced type variables " << prior.location.text()
-        << " and " << var.location.text()
-        << " are actually the same.";
+        << "introduced free type variables '" << prior.name
+        << "' and '" << var.name
+        << "' are actually the same";
       reporter->reportError(prior.location, message.str());
       reporter->reportError(var.location, message.str());
     }
@@ -1359,10 +1314,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     VarRef *ref = static_cast<VarRef*>(expr);
     NameRef pos;
     if ((pos = binding->find(ref->name)).index == -1) {
-      std::ostringstream message;
-      message << "Variable reference '" << ref->name << "' is unbound at "
-        << ref->location.file();
-      reporter->reportError(ref->location, message.str());
+      ERROR(ref->location, "reference to undefined variable '" << ref->name << "'");
       return false;
     }
     ref->index = pos.index;
@@ -1477,6 +1429,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     bool tb = asc->body->typeVar.unify(asc->typeVar, &ascm);
     return b && tb && ts;
   } else if (expr->type == &Prim::type) {
+    if (state.pmap.empty()) return true;
     Prim *prim = static_cast<Prim*>(expr);
     std::vector<TypeVar*> args;
     for (NameBinding *iter = binding; iter && iter->open && iter->lambda; iter = iter->next)
@@ -1485,11 +1438,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     prim->args = args.size();
     PrimMap::const_iterator i = state.pmap.find(prim->name);
     if (i == state.pmap.end()) {
-      std::ostringstream message;
-      message << "Primitive reference "
-        << prim->name << " is unbound at "
-        << prim->location.file();
-      reporter->reportError(prim->location, message.str());
+      ERROR(prim->location, "reference to unimplemented primitive '" << prim->name << "'");
       return false;
     } else {
       prim->pflags = i->second.flags;
@@ -1497,11 +1446,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
       prim->data = i->second.data;
       bool ok = i->second.type(args, &prim->typeVar);
       if (!ok) {
-        std::ostringstream message;
-        message << "Primitive reference "
-          << prim->name << " has wrong type signature at "
-          << prim->location.file();
-        reporter->reportError(prim->location, message.str());
+        ERROR(prim->location, "primitive '" << prim->name << "' is used with the wrong number of arguments");
       }
       return ok;
     }
@@ -1550,12 +1495,9 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
 
   if ((sym.flags & SYM_GRAY) != 0) {
     if (con.warn) {
-      std::ostringstream message;
-      message << "Re-export of '" << def
-        << "', imported from '" << pkg
-        << "', has cyclic definition at "
-        << sym.location.text();
-      reporter->reportError(sym.location, message.str());
+      ERROR(sym.location,
+        "export of " << con.kind << " '" << def
+        << "' from '" << pkg << "' has cyclic definition");
     }
     return false;
   }
@@ -1563,11 +1505,9 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
   auto ip = con.top.packages.find(pkg);
   if (ip == con.top.packages.end()) {
     if (con.warn) {
-      std::ostringstream message;
-      message << "Re-export of '" << def
-        << "' is from non-existent package '" << pkg
-        << "' at " << sym.location.text();
-      reporter->reportError(sym.location, message.str());
+      ERROR(sym.location,
+        "export of " << con.kind << " '" << def
+        << "' from non-existent package '" << pkg << "'");
     }
     return false;
   } else {
@@ -1575,11 +1515,8 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
     auto ie = map.find(def);
     if (ie == map.end()) {
       if (con.warn) {
-        std::ostringstream message;
-        message << "Re-export of '" << def
-          << "' is not exported from '" << pkg
-          << "' at " << sym.location.text();
-        reporter->reportError(sym.location, message.str());
+        ERROR(sym.location,
+          con.kind << " '" << def << "' is not exported by package '" << pkg << "'");
       }
       return false;
     }

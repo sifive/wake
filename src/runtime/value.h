@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <re2/re2.h>
 
-#define APP_PRECEDENCE 21
+#define APP_PRECEDENCE 14
 
 // typeid().hash_code() changes between runs
 #define TYPE_STRING	1
@@ -68,7 +68,6 @@ struct FormatState {
 struct String final : public GCObject<String, Value> {
   typedef GCObject<String, Value> Parent;
 
-  static TypeVar typeVar;
   size_t length;
 
   String(size_t length_);
@@ -125,7 +124,6 @@ struct MPZ {
 struct Integer final : public GCObject<Integer, Value> {
   typedef GCObject<Integer, Value> Parent;
 
-  static TypeVar typeVar;
   int length; // abs(length) = number of mp_limb_t in object
 
   Integer(int length_);
@@ -161,7 +159,6 @@ struct Integer final : public GCObject<Integer, Value> {
 struct Double final : public GCObject<Double, Value> {
   typedef std::numeric_limits< double > limits;
 
-  static TypeVar typeVar;
   double value;
 
   Double(double value_ = 0) : value(value_) { }
@@ -178,7 +175,6 @@ struct Double final : public GCObject<Double, Value> {
 struct RegExp final : public GCObject<RegExp, DestroyableObject> {
   typedef GCObject<RegExp, DestroyableObject> Parent;
 
-  static TypeVar typeVar;
   std::shared_ptr<RE2> exp;
 
   RegExp(Heap &h, const re2::StringPiece &regexp, const RE2::Options &opts);
@@ -213,17 +209,5 @@ template <>
 inline HeapStep Closure::recurse<HeapStep, &HeapPointerBase::explore>(HeapStep step) {
   return explore_escape(step);
 }
-
-struct Data {
-  static TypeVar typeBoolean;
-  static TypeVar typeOrder;
-  static TypeVar typeUnit;
-  static TypeVar typeJValue;
-  static TypeVar typeError;
-  // these are const to prevent unify() on them; use clone
-  static const TypeVar typeList;
-  static const TypeVar typePair;
-  static const TypeVar typeResult;
-};
 
 #endif

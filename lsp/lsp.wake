@@ -76,8 +76,11 @@ export def vscode _ =
     else
         failWithError "Did not find empscripten javascript output; got: {format files}"
 
-    def wasmFile = installAs "{dir}/lsp-server/lsp-wake.wasm" wasm
-    def jsFile   = installAs "{dir}/lsp-server/lsp-wake.js" js
+    def wasmFile =
+        installAs "{dir}/lsp-server/lsp-wake.wasm" wasm
+
+    def jsFile =
+        installAs "{dir}/lsp-server/lsp-wake.js" js
 
     def npmFiles =
         sources dir `package(|-lock)\.json`

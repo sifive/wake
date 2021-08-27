@@ -44,6 +44,7 @@
 #include "runtime/job.h"
 #include "runtime/prim.h"
 #include "types/type.h"
+#include "types/data.h"
 #include "runtime/value.h"
 #include "runtime/database.h"
 #include "location.h"
@@ -107,7 +108,6 @@ struct Job final : public GCObject<Job, Value> {
   HeapPointer<Continuation> q_outputs; // waken once job finished (inputs+outputs+report available)
   HeapPointer<Continuation> q_report;  // waken once job finished (inputs+outputs+report available)
 
-  static TypeVar typeVar;
   Job(Database *db_, String *label_, String *dir_, String *stdin_file_, String *environ, String *cmdline_, bool keep, const char *echo, const char *stream_out, const char *stream_err);
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
@@ -170,8 +170,6 @@ void Job::format(std::ostream &os, FormatState &state) const {
   os << "Job " << job;
   if (APP_PRECEDENCE < state.p()) os << ")";
 }
-
-TypeVar Job::typeVar("Job@builtin", 0);
 
 uint64_t Job::memory() const {
   if (predict.membytes == 0) {
@@ -908,7 +906,7 @@ static void parse_usage(Usage *usage, Value **args, Runtime &runtime, Scope *sco
 
 static PRIMTYPE(type_job_fail) {
   return args.size() == 2 &&
-    args[0]->unify(Job::typeVar) &&
+    args[0]->unify(Data::typeJob) &&
     args[1]->unify(Data::typeError) &&
     out->unify(Data::typeUnit);
 }
@@ -962,17 +960,17 @@ static PRIMFN(prim_job_fail_finish) {
 
 static PRIMTYPE(type_job_launch) {
   return args.size() == 11 &&
-    args[0]->unify(Job::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    args[2]->unify(String::typeVar) &&
-    args[3]->unify(String::typeVar) &&
-    args[4]->unify(String::typeVar) &&
-    args[5]->unify(Integer::typeVar) &&
-    args[6]->unify(Double::typeVar) &&
-    args[7]->unify(Double::typeVar) &&
-    args[8]->unify(Integer::typeVar) &&
-    args[9]->unify(Integer::typeVar) &&
-    args[10]->unify(Integer::typeVar) &&
+    args[0]->unify(Data::typeJob) &&
+    args[1]->unify(Data::typeString) &&
+    args[2]->unify(Data::typeString) &&
+    args[3]->unify(Data::typeString) &&
+    args[4]->unify(Data::typeString) &&
+    args[5]->unify(Data::typeInteger) &&
+    args[6]->unify(Data::typeDouble) &&
+    args[7]->unify(Data::typeDouble) &&
+    args[8]->unify(Data::typeInteger) &&
+    args[9]->unify(Data::typeInteger) &&
+    args[10]->unify(Data::typeInteger) &&
     out->unify(Data::typeUnit);
 }
 
@@ -1017,15 +1015,15 @@ static PRIMFN(prim_job_launch) {
 
 static PRIMTYPE(type_job_virtual) {
   return args.size() == 9 &&
-    args[0]->unify(Job::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    args[2]->unify(String::typeVar) &&
-    args[3]->unify(Integer::typeVar) &&
-    args[4]->unify(Double::typeVar) &&
-    args[5]->unify(Double::typeVar) &&
-    args[6]->unify(Integer::typeVar) &&
-    args[7]->unify(Integer::typeVar) &&
-    args[8]->unify(Integer::typeVar) &&
+    args[0]->unify(Data::typeJob) &&
+    args[1]->unify(Data::typeString) &&
+    args[2]->unify(Data::typeString) &&
+    args[3]->unify(Data::typeInteger) &&
+    args[4]->unify(Data::typeDouble) &&
+    args[5]->unify(Data::typeDouble) &&
+    args[6]->unify(Data::typeInteger) &&
+    args[7]->unify(Data::typeInteger) &&
+    args[8]->unify(Data::typeInteger) &&
     out->unify(Data::typeUnit);
 }
 
@@ -1075,18 +1073,18 @@ static PRIMFN(prim_job_virtual) {
 
 static PRIMTYPE(type_job_create) {
   return args.size() == 11 &&
-    args[0]->unify(String::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    args[2]->unify(String::typeVar) &&
-    args[3]->unify(String::typeVar) &&
-    args[4]->unify(String::typeVar) &&
-    args[5]->unify(Integer::typeVar) &&
-    args[6]->unify(String::typeVar) &&
-    args[7]->unify(Integer::typeVar) &&
-    args[8]->unify(String::typeVar) &&
-    args[9]->unify(String::typeVar) &&
-    args[10]->unify(String::typeVar) &&
-    out->unify(Job::typeVar);
+    args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeString) &&
+    args[2]->unify(Data::typeString) &&
+    args[3]->unify(Data::typeString) &&
+    args[4]->unify(Data::typeString) &&
+    args[5]->unify(Data::typeInteger) &&
+    args[6]->unify(Data::typeString) &&
+    args[7]->unify(Data::typeInteger) &&
+    args[8]->unify(Data::typeString) &&
+    args[9]->unify(Data::typeString) &&
+    args[10]->unify(Data::typeString) &&
+    out->unify(Data::typeJob);
 }
 
 static PRIMFN(prim_job_create) {
@@ -1168,19 +1166,19 @@ static PRIMTYPE(type_job_cache) {
   Data::typeList.clone(plist);
   Data::typeList.clone(jlist);
   Data::typePair.clone(pair);
-  spair[0].unify(String::typeVar);
-  spair[1].unify(String::typeVar);
+  spair[0].unify(Data::typeString);
+  spair[1].unify(Data::typeString);
   plist[0].unify(spair);
-  jlist[0].unify(Job::typeVar);
+  jlist[0].unify(Data::typeJob);
   pair[0].unify(jlist);
   pair[1].unify(plist);
   return args.size() == 6 &&
-    args[0]->unify(String::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    args[2]->unify(String::typeVar) &&
-    args[3]->unify(String::typeVar) &&
-    args[4]->unify(Integer::typeVar) &&
-    args[5]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeString) &&
+    args[2]->unify(Data::typeString) &&
+    args[3]->unify(Data::typeString) &&
+    args[4]->unify(Data::typeInteger) &&
+    args[5]->unify(Data::typeString) &&
     out->unify(pair);
 }
 
@@ -1287,11 +1285,11 @@ static Value *claim_usage(Heap &h, const Usage &usage) {
 static PRIMTYPE(type_job_output) {
   TypeVar result;
   Data::typeResult.clone(result);
-  result[0].unify(String::typeVar);
+  result[0].unify(Data::typeString);
   result[1].unify(Data::typeError);
   return args.size() == 2 &&
-    args[0]->unify(Job::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
+    args[0]->unify(Data::typeJob) &&
+    args[1]->unify(Data::typeInteger) &&
     out->unify(result);
 }
 
@@ -1319,8 +1317,8 @@ static PRIMFN(prim_job_output) {
 
 static PRIMTYPE(type_job_kill) {
   return args.size() == 2 &&
-    args[0]->unify(Job::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
+    args[0]->unify(Data::typeJob) &&
+    args[1]->unify(Data::typeInteger) &&
     out->unify(Data::typeUnit);
 }
 
@@ -1346,15 +1344,15 @@ static PRIMTYPE(type_job_tree) {
   Data::typeList.clone(list);
   Data::typePair.clone(pair);
   list[0].unify(pair);
-  pair[0].unify(String::typeVar);
-  pair[1].unify(String::typeVar);
+  pair[0].unify(Data::typeString);
+  pair[1].unify(Data::typeString);
   TypeVar result;
   Data::typeResult.clone(result);
   result[0].unify(list);
   result[1].unify(Data::typeError);
   return args.size() == 2 &&
-    args[0]->unify(Job::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
+    args[0]->unify(Data::typeJob) &&
+    args[1]->unify(Data::typeInteger) &&
     out->unify(result);
 }
 
@@ -1382,8 +1380,8 @@ static PRIMFN(prim_job_tree) {
 
 static PRIMTYPE(type_job_id) {
   return args.size() == 1 &&
-    args[0]->unify(Job::typeVar) &&
-    out->unify(Integer::typeVar);
+    args[0]->unify(Data::typeJob) &&
+    out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_job_id) {
@@ -1395,8 +1393,8 @@ static PRIMFN(prim_job_id) {
 
 static PRIMTYPE(type_job_desc) {
   return args.size() == 1 &&
-    args[0]->unify(Job::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeJob) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_job_desc) {
@@ -1407,15 +1405,15 @@ static PRIMFN(prim_job_desc) {
 
 static PRIMTYPE(type_job_finish) {
   return args.size() == 9 &&
-    args[0]->unify(Job::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    args[2]->unify(String::typeVar) &&
-    args[3]->unify(Integer::typeVar) &&
-    args[4]->unify(Double::typeVar) &&
-    args[5]->unify(Double::typeVar) &&
-    args[6]->unify(Integer::typeVar) &&
-    args[7]->unify(Integer::typeVar) &&
-    args[8]->unify(Integer::typeVar) &&
+    args[0]->unify(Data::typeJob) &&
+    args[1]->unify(Data::typeString) &&
+    args[2]->unify(Data::typeString) &&
+    args[3]->unify(Data::typeInteger) &&
+    args[4]->unify(Data::typeDouble) &&
+    args[5]->unify(Data::typeDouble) &&
+    args[6]->unify(Data::typeInteger) &&
+    args[7]->unify(Data::typeInteger) &&
+    args[8]->unify(Data::typeInteger) &&
     out->unify(Data::typeUnit);
 }
 
@@ -1444,9 +1442,9 @@ static PRIMFN(prim_job_finish) {
 
 static PRIMTYPE(type_job_tag) {
   return args.size() == 3 &&
-    args[0]->unify(Job::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    args[2]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeJob) &&
+    args[1]->unify(Data::typeString) &&
+    args[2]->unify(Data::typeString) &&
     out->unify(Data::typeUnit);
 }
 
@@ -1463,9 +1461,9 @@ static PRIMFN(prim_job_tag) {
 
 static PRIMTYPE(type_add_hash) {
   return args.size() == 2 &&
-    args[0]->unify(String::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeString) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_add_hash) {
@@ -1479,8 +1477,8 @@ static PRIMFN(prim_add_hash) {
 
 static PRIMTYPE(type_get_hash) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeString) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_get_hash) {
@@ -1493,8 +1491,8 @@ static PRIMFN(prim_get_hash) {
 
 static PRIMTYPE(type_get_modtime) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
-    out->unify(Integer::typeVar);
+    args[0]->unify(Data::typeString) &&
+    out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_get_modtime) {
@@ -1506,9 +1504,9 @@ static PRIMFN(prim_get_modtime) {
 
 static PRIMTYPE(type_search_path) {
   return args.size() == 2 &&
-    args[0]->unify(String::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeString) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_search_path) {
@@ -1532,14 +1530,14 @@ static void usage_type(TypeVar &pair) {
   Data::typePair.clone(pair11);
   pair[0].unify(pair0);
   pair[1].unify(pair1);
-  pair0[0].unify(Integer::typeVar);
-  pair0[1].unify(Double::typeVar);
+  pair0[0].unify(Data::typeInteger);
+  pair0[1].unify(Data::typeDouble);
   pair1[0].unify(pair10);
-  pair10[0].unify(Double::typeVar);
-  pair10[1].unify(Integer::typeVar);
+  pair10[0].unify(Data::typeDouble);
+  pair10[1].unify(Data::typeInteger);
   pair1[1].unify(pair11);
-  pair11[0].unify(Integer::typeVar);
-  pair11[1].unify(Integer::typeVar);
+  pair11[0].unify(Data::typeInteger);
+  pair11[1].unify(Data::typeInteger);
 }
 
 static PRIMTYPE(type_job_reality) {
@@ -1550,7 +1548,7 @@ static PRIMTYPE(type_job_reality) {
   result[0].unify(pair);
   result[1].unify(Data::typeError);
   return args.size() == 1 &&
-    args[0]->unify(Job::typeVar) &&
+    args[0]->unify(Data::typeJob) &&
     out->unify(result);
 }
 
@@ -1574,7 +1572,7 @@ static PRIMTYPE(type_job_report) {
   result[0].unify(pair);
   result[1].unify(Data::typeError);
   return args.size() == 1 &&
-    args[0]->unify(Job::typeVar) &&
+    args[0]->unify(Data::typeJob) &&
     out->unify(result);
 }
 
@@ -1597,7 +1595,7 @@ static PRIMTYPE(type_job_record) {
   usage_type(pair);
   list[0].unify(pair);
   return args.size() == 1 &&
-    args[0]->unify(Job::typeVar) &&
+    args[0]->unify(Data::typeJob) &&
     out->unify(list);
 }
 
@@ -1618,8 +1616,8 @@ static PRIMFN(prim_job_record) {
 
 static PRIMTYPE(type_access) {
   return args.size() == 2 &&
-    args[0]->unify(String::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
+    args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeInteger) &&
     out->unify(Data::typeBoolean);
 }
 

@@ -33,6 +33,7 @@
 #include "runtime/prim.h"
 #include "runtime/value.h"
 #include "types/type.h"
+#include "types/data.h"
 #include "runtime/status.h"
 #include "utf8.h"
 #include "runtime/gc.h"
@@ -40,8 +41,8 @@
 #include "unlink.h"
 
 static PRIMTYPE(type_vcat) {
-  bool ok = out->unify(String::typeVar);
-  for (auto x : args) ok &= x->unify(String::typeVar);
+  bool ok = out->unify(Data::typeString);
+  for (auto x : args) ok &= x->unify(Data::typeString);
   return ok;
 }
 
@@ -69,8 +70,8 @@ static PRIMFN(prim_vcat) {
 
 static PRIMTYPE(type_strlen) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
-    out->unify(Integer::typeVar);
+    args[0]->unify(Data::typeString) &&
+    out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_strlen) {
@@ -83,10 +84,10 @@ static PRIMFN(prim_strlen) {
 static PRIMTYPE(type_lcat) {
   TypeVar list;
   Data::typeList.clone(list);
-  list[0].unify(String::typeVar);
+  list[0].unify(Data::typeString);
   return args.size() == 1 &&
     args[0]->unify(list) &&
-    out->unify(String::typeVar);
+    out->unify(Data::typeString);
 }
 
 struct CCat final : public GCObject<CCat, Continuation> {
@@ -148,9 +149,9 @@ static PRIMFN(prim_lcat) {
 static PRIMTYPE(type_explode) {
   TypeVar list;
   Data::typeList.clone(list);
-  list[0].unify(String::typeVar);
+  list[0].unify(Data::typeString);
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeString) &&
     out->unify(list);
 }
 
@@ -178,10 +179,10 @@ static PRIMFN(prim_explode) {
 static PRIMTYPE(type_read) {
   TypeVar result;
   Data::typeResult.clone(result);
-  result[0].unify(String::typeVar);
-  result[1].unify(String::typeVar);
+  result[0].unify(Data::typeString);
+  result[1].unify(Data::typeString);
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeString) &&
     out->unify(result);
 }
 
@@ -221,12 +222,12 @@ static PRIMFN(prim_read) {
 static PRIMTYPE(type_write) {
   TypeVar result;
   Data::typeResult.clone(result);
-  result[0].unify(String::typeVar);
-  result[1].unify(String::typeVar);
+  result[0].unify(Data::typeString);
+  result[1].unify(Data::typeString);
   return args.size() == 3 &&
-    args[0]->unify(Integer::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    args[2]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeInteger) &&
+    args[1]->unify(Data::typeString) &&
+    args[2]->unify(Data::typeString) &&
     out->unify(result);
 }
 
@@ -267,7 +268,7 @@ static PRIMFN(prim_write) {
 
 static PRIMTYPE(type_unlink) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeString) &&
     out->unify(Data::typeUnit);
 }
 
@@ -287,9 +288,9 @@ static PRIMFN(prim_unlink) {
 static PRIMTYPE(type_getenv) {
   TypeVar list;
   Data::typeList.clone(list);
-  list[0].unify(String::typeVar);
+  list[0].unify(Data::typeString);
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeString) &&
     out->unify(list);
 }
 
@@ -311,11 +312,11 @@ static PRIMFN(prim_getenv) {
 static PRIMTYPE(type_mkdir) {
   TypeVar result;
   Data::typeResult.clone(result);
-  result[0].unify(String::typeVar);
-  result[1].unify(String::typeVar);
+  result[0].unify(Data::typeString);
+  result[1].unify(Data::typeString);
   return args.size() == 2 &&
-    args[0]->unify(Integer::typeVar) &&
-    args[1]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeInteger) &&
+    args[1]->unify(Data::typeString) &&
     out->unify(result);
 }
 
@@ -349,7 +350,7 @@ static PRIMFN(prim_mkdir) {
 static PRIMTYPE(type_format) {
   return args.size() == 1 &&
     // don't unify args[0] => allow any
-    out->unify(String::typeVar);
+    out->unify(Data::typeString);
 }
 
 struct CFormat final : public GCObject<CFormat, Continuation> {
@@ -385,8 +386,8 @@ static PRIMFN(prim_format) {
 
 static PRIMTYPE(type_colour) {
   return args.size() == 2 &&
-    args[0]->unify(String::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
+    args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeInteger) &&
     out->unify(Data::typeUnit);
 }
 
@@ -401,8 +402,8 @@ static PRIMFN(prim_colour) {
 
 static PRIMTYPE(type_print) {
   return args.size() == 2 &&
-    args[0]->unify(String::typeVar) &&
-    args[1]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeString) &&
     out->unify(Data::typeUnit);
 }
 
@@ -417,7 +418,7 @@ static PRIMFN(prim_print) {
 
 static PRIMTYPE(type_version) {
   return args.size() == 0 &&
-    out->unify(String::typeVar);
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_version) {
@@ -428,7 +429,7 @@ static PRIMFN(prim_version) {
 
 static PRIMTYPE(type_level) {
   return args.size() == 0 &&
-    out->unify(Integer::typeVar);
+    out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_level) {
@@ -454,8 +455,8 @@ static PRIMFN(prim_level) {
 
 static PRIMTYPE(type_scmp) {
   return args.size() == 2 &&
-    args[0]->unify(String::typeVar) &&
-    args[1]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeString) &&
     out->unify(Data::typeOrder);
 }
 
@@ -468,8 +469,8 @@ static PRIMFN(prim_scmp) {
 
 static PRIMTYPE(type_normalize) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeString) &&
+    out->unify(Data::typeString);
 }
 
 struct UTF8Out {
@@ -536,8 +537,8 @@ static PRIMFN(prim_scaseNFKC) {
 
 static PRIMTYPE(type_code2str) {
   return args.size() == 1 &&
-    args[0]->unify(Integer::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeInteger) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_code2str) {
@@ -567,8 +568,8 @@ static PRIMFN(prim_bin2str) {
 
 static PRIMTYPE(type_str2code) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
-    out->unify(Integer::typeVar);
+    args[0]->unify(Data::typeString) &&
+    out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_str2code) {
@@ -589,7 +590,7 @@ static PRIMFN(prim_str2bin) {
 
 static PRIMTYPE(type_cwd) {
   return args.size() == 0 &&
-    out->unify(String::typeVar);
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_cwd) {
@@ -601,7 +602,7 @@ static PRIMFN(prim_cwd) {
 static PRIMTYPE(type_cmdline) {
   TypeVar list;
   Data::typeList.clone(list);
-  list[0].unify(String::typeVar);
+  list[0].unify(Data::typeString);
   return args.size() == 0 &&
     out->unify(list);
 }
@@ -627,8 +628,8 @@ static PRIMFN(prim_cmdline) {
 static PRIMTYPE(type_uname) {
   TypeVar pair;
   Data::typePair.clone(pair);
-  pair[0].unify(String::typeVar);
-  pair[1].unify(String::typeVar);
+  pair[0].unify(Data::typeString);
+  pair[1].unify(Data::typeString);
   return args.size() == 0 &&
     out->unify(pair);
 }
@@ -653,8 +654,8 @@ static PRIMFN(prim_uname) {
 
 static PRIMTYPE(type_shell_str) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeString) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_shell_str) {

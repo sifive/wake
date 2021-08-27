@@ -26,6 +26,7 @@
 #include "runtime/prim.h"
 #include "runtime/value.h"
 #include "types/type.h"
+#include "types/data.h"
 #include "runtime/status.h"
 #include "location.h"
 #include "frontend/expr.h"
@@ -33,7 +34,7 @@
 static PRIMTYPE(type_stack) {
   TypeVar list;
   Data::typeList.clone(list);
-  list[0].unify(String::typeVar);
+  list[0].unify(Data::typeString);
   return args.size() == 1 &&
     args[0]->unify(Data::typeUnit) &&
     out->unify(list);
@@ -60,7 +61,7 @@ static PRIMFN(prim_stack) {
 
 static PRIMTYPE(type_unreachable) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar);
+    args[0]->unify(Data::typeString);
   (void)out; // leave prim free
 }
 

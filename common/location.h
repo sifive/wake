@@ -62,6 +62,8 @@ struct Location {
   const char *filename;
   Coordinates start, end;
 
+  Location(const char *filename_)
+    : filename(filename_) { }
   Location(const char *filename_, Coordinates start_, Coordinates end_)
     : filename(filename_), start(start_), end(end_) { }
 

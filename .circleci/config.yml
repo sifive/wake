@@ -60,7 +60,7 @@ jobs:
           paths:
             - release/alpine
 
-  debian_wheezy:
+  debian_jessie:
     machine:
       image: ubuntu-1604:202007-01
 #      docker_layer_caching: true
@@ -68,19 +68,19 @@ jobs:
     steps:
       - attach_workspace:
           at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/debian-wheezy -t wake-debian-wheezy .
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/debian-jessie -t wake-debian-jessie .
       - run: |
           x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
           tar xJf wake_*.orig.tar.xz && \
           cp -a /tmp/workspace/debian wake-* && \
           cp -a /tmp/workspace/tests . && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-wheezy debuild -us -uc && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-debian-wheezy /bin/sh -c "dpkg -i *.deb && cd tests && wake runTests" && \
-          install -D -t release/debian_wheezy *.deb *.gz *.xz *.changes *.dsc
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-jessie debuild -us -uc && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-debian-jessie /bin/sh -c "dpkg -i *.deb && cd tests && wake runTests" && \
+          install -D -t release/debian_jessie *.deb *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
           paths:
-            - release/debian_wheezy
+            - release/debian_jessie
 
   debian_testing:
     machine:
@@ -249,7 +249,7 @@ workflows:
       - debian_testing:
           requires:
             - tarball
-      - debian_wheezy:
+      - debian_jessie:
           requires:
             - tarball
       - centos_7_6:
@@ -271,7 +271,7 @@ workflows:
           requires:
             - alpine
             - debian_testing # Newest everything
-            - debian_wheezy  # Oldest supported compiler
+            - debian_jessie  # Oldest supported compiler
             - centos_7_6
             - centos_8_3
             - ubuntu_14_04   # LTS

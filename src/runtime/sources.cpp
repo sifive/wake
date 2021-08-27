@@ -40,6 +40,7 @@
 #include "runtime/prim.h"
 #include "primfn.h"
 #include "types/type.h"
+#include "types/data.h"
 #include "runtime/value.h"
 #include "execpath.h"
 #include "types/datatype.h"
@@ -288,10 +289,10 @@ bool find_all_sources(Runtime &runtime, bool workspace) {
 static PRIMTYPE(type_sources) {
   TypeVar list;
   Data::typeList.clone(list);
-  list[0].unify(String::typeVar);
+  list[0].unify(Data::typeString);
   return args.size() == 2 &&
-    args[0]->unify(String::typeVar) &&
-    args[1]->unify(RegExp::typeVar) &&
+    args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeRegExp) &&
     out->unify(list);
 }
 
@@ -354,7 +355,7 @@ static PRIMFN(prim_files) {
 
 static PRIMTYPE(type_add_sources) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
+    args[0]->unify(Data::typeString) &&
     out->unify(Data::typeBoolean);
 }
 
@@ -416,8 +417,8 @@ static PRIMFN(prim_add_sources) {
 
 static PRIMTYPE(type_simplify) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeString) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_simplify) {
@@ -429,9 +430,9 @@ static PRIMFN(prim_simplify) {
 
 static PRIMTYPE(type_relative) {
   return args.size() == 2 &&
-    args[0]->unify(String::typeVar) &&
-    args[1]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeString) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_relative) {
@@ -446,7 +447,7 @@ static PRIMFN(prim_relative) {
 
 static PRIMTYPE(type_execpath) {
   return args.size() == 0 &&
-    out->unify(String::typeVar);
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_execpath) {
@@ -456,7 +457,7 @@ static PRIMFN(prim_execpath) {
 
 static PRIMTYPE(type_workspace) {
   return args.size() == 0 &&
-    out->unify(String::typeVar);
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_workspace) {
@@ -466,7 +467,7 @@ static PRIMFN(prim_workspace) {
 
 static PRIMTYPE(type_pid) {
   return args.size() == 0 &&
-    out->unify(Integer::typeVar);
+    out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_pid) {
@@ -477,8 +478,8 @@ static PRIMFN(prim_pid) {
 
 static PRIMTYPE(type_glob2regexp) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
-    out->unify(String::typeVar);
+    args[0]->unify(Data::typeString) &&
+    out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_glob2regexp) {

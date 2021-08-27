@@ -2,7 +2,7 @@
 
 VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/^[^']*'\([^']*\)'.*/\1/p" manifest.wake; else git describe --tags --dirty; fi)
 
-CC	:= cc -std=c99
+CC	:= cc -std=c11
 CXX	:= c++ -std=c++11
 CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
 LDFLAGS	:=
@@ -20,7 +20,7 @@ CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsql
 		$(shell pkg-config --silence-errors --libs re2     || echo -lre2)	\
 		$(shell pkg-config --silence-errors --libs ncurses tinfo || pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
-COMMON := common/jlexer.o $(patsubst %.cpp,%.o,$(wildcard common/*.cpp))
+COMMON := common/jlexer.o $(patsubst %.cpp,%.o,$(wildcard common/*.cpp)) $(patsubst %.c,%.o,$(wildcard common/*.c))
 WAKE_ENV := WAKE_PATH=$(shell dirname $(shell which $(firstword $(CC))))
 
 # If FUSE is unavalable during wake build, allow a linux-specific work-around
@@ -32,7 +32,7 @@ all:		wake.db
 	$(WAKE_ENV) ./bin/wake build default
 
 clean:
-	rm -f bin/* lib/wake/* */*.o common/jlexer.cpp src/frontend/symbol.cpp src/version.h wake.db
+	rm -f bin/* lib/wake/* */*.o common/jlexer.cpp src/frontend/lexer.cpp src/frontend/parser.cpp src/version.h wake.db
 	touch bin/stamp lib/wake/stamp
 
 wake.db:	bin/wake bin/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EXTRA)
@@ -53,8 +53,8 @@ vscode:		wake.db
 static:	wake.db
 	$(WAKE_ENV) ./bin/wake static
 
-bin/wake:	src/frontend/symbol.o $(COMMON)				\
-		$(patsubst %.cpp,%.o,$(wildcard src/*/*.cpp))	\
+bin/wake:	src/frontend/lexer.o src/frontend/parser.o $(COMMON)	\
+		$(patsubst %.cpp,%.o,$(wildcard src/*/*.cpp))		\
 		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c gopt/gopt-arg.c)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
@@ -73,7 +73,7 @@ bin/preload-wake:	preload/wrap.cpp $(COMMON)
 lib/wake/libpreload-wake.so:	preload/open.c
 	$(CC) $(CFLAGS) -fpic -shared -o $@ $^ $(LFDLAGS) -ldl
 
-%.o:	%.cpp	$(filter-out src/version.h,$(wildcard */*.h))
+%.o:	%.cpp	$(filter-out src/version.h,$(wildcard */*.h) $(wildcard */*/*.h) src/frontend/parser.h)
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(CORE_CFLAGS) -o $@ -c $<
 
 %.o:	%.c	$(filter-out src/version.h,$(wildcard */*.h))
@@ -84,4 +84,9 @@ lib/wake/libpreload-wake.so:	preload/open.c
 	gzip -dc $^ > $@.tmp
 	mv -f $@.tmp $@
 
-.PRECIOUS:	src/frontend/symbol.cpp common/jlexer.cpp
+%.h:	%.h.gz
+	gzip -dc $^ > $@.tmp
+	mv -f $@.tmp $@
+
+.PRECIOUS:	src/frontend/lexer.cpp src/frontend/parser.cpp src/frontend/parser.h common/jlexer.cpp
+.SUFFIXES:

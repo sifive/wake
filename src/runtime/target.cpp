@@ -25,9 +25,9 @@
 #include "runtime/prim.h"
 #include "types/datatype.h"
 #include "types/type.h"
+#include "types/data.h"
 #include "runtime/value.h"
 #include "runtime/tuple.h"
-#include "types/type.h"
 #include "runtime/status.h"
 #include "frontend/expr.h"
 
@@ -51,7 +51,6 @@ struct Target final : public GCObject<Target, DestroyableObject> {
   HeapPointer<String> location;
   std::unordered_map<Hash, TargetValue, HashHasher> table;
 
-  static TypeVar typeVar;
   Target(Heap &h, String *location_) : Parent(h), location(location_) { }
   Target(Target &&target) = default;
   ~Target();
@@ -68,9 +67,6 @@ bool Target::report_future_targets = true;
 void dont_report_future_targets() {
   Target::report_future_targets = false;
 }
-
-// This type is NOT exported; it should be invisible to users
-TypeVar Target::typeVar("Target@builtin", 0);
 
 template <typename T, T (HeapPointerBase::*memberfn)(T x)>
 T Target::recurse(T arg) {
@@ -110,7 +106,7 @@ Hash Target::shallow_hash() const {
 #define TARGET(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Target)); } while(0); Target *arg = static_cast<Target*>(args[i]);
 
 static PRIMTYPE(type_hash) {
-  return out->unify(Integer::typeVar);
+  return out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_hash) {
@@ -122,8 +118,8 @@ static PRIMFN(prim_hash) {
 
 static PRIMTYPE(type_tnew) {
   return args.size() == 1 &&
-    args[0]->unify(String::typeVar) &&
-    out->unify(Target::typeVar);
+    args[0]->unify(Data::typeString) &&
+    out->unify(Data::typeTarget);
 }
 
 static PRIMFN(prim_tnew) {
@@ -134,11 +130,11 @@ static PRIMFN(prim_tnew) {
 
 static PRIMTYPE(type_tget) {
   return args.size() == 4 &&
-    args[0]->unify(Target::typeVar) &&
-    args[1]->unify(Integer::typeVar) &&
-    args[2]->unify(Integer::typeVar) &&
+    args[0]->unify(Data::typeTarget) &&
+    args[1]->unify(Data::typeInteger) &&
+    args[2]->unify(Data::typeInteger) &&
     args[3]->unify(TypeVar(FN, 2)) &&
-    (*args[3])[0].unify(Integer::typeVar) &&
+    (*args[3])[0].unify(Data::typeInteger) &&
     out->unify((*args[3])[1]);
 }
 

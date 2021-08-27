@@ -38,8 +38,12 @@ def emppFn fn = match empp
     Some x = fn x
 
 def empp =
-    require Some path = getenv "PATH"
-    def empp = whichIn path "em++"
+    require Some path =
+        getenv "PATH"
+
+    def empp =
+        whichIn path "em++"
+
     if matches `/.*` empp then
         Some empp
     else
@@ -47,16 +51,18 @@ def empp =
 
 def emscriptenCFlags =
     Nil
+
 def emscriptenLFlags =
     "-s", "NODERAWFS=1", Nil
 
 publish compileC =
-    emccFn (makeCompileC "wasm-c99-release"   _ (emscriptenCFlags ++ c99Flags ++ releaseCFlags))
+    emccFn (makeCompileC "wasm-c11-release"   _ (emscriptenCFlags ++ c11Flags ++ releaseCFlags))
 
 publish compileC =
-    emppFn (makeCompileC "wasm-cpp11-release" _ (emscriptenCFlags ++ c11Flags ++ releaseCFlags))
+    emppFn (makeCompileC "wasm-cpp11-release" _ (emscriptenCFlags ++ cpp11Flags ++ releaseCFlags))
 
 publish linkO =
-    emccFn (makeLinkO "wasm-c99-release"   _ (emscriptenLFlags ++ releaseLFlags))
+    emccFn (makeLinkO "wasm-c11-release"   _ (emscriptenLFlags ++ releaseLFlags))
+
 publish linkO =
     emppFn (makeLinkO "wasm-cpp11-release" _ (emscriptenLFlags ++ releaseLFlags))

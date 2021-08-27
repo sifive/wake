@@ -15,19 +15,14 @@
  * limitations under the License.
  */
 
-#ifndef PARSER_H
-#define PARSER_H
+#ifndef SUMS_H
+#define SUMS_H
 
-#include "frontend/symbol.h"
+#include <memory>
 
-struct Top;
-struct Expr;
-
-bool expect(SymbolType type, Lexer &lex);
-const char *parse_top(Top &top, Lexer &lex);
-Expr *parse_command(Lexer &lex);
-Expr *parse_expr(Lexer &lex);
-bool sums_ok();
+struct Sum;
+void check_special(const std::shared_ptr<Sum> &sump);
+void sums_ok();
 
 // These types must be defined by prim.wake
 struct Sum;

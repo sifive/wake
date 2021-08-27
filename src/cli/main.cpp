@@ -29,7 +29,7 @@
 
 #include "frontend/parser.h"
 #include "types/bind.h"
-#include "frontend/symbol.h"
+#include "types/data.h"
 #include "runtime/value.h"
 #include "frontend/expr.h"
 #include "runtime/job.h"
@@ -47,6 +47,11 @@
 #include "frontend/diagnostic.h"
 #include "execpath.h"
 #include "frontend/wakefiles.h"
+#include "frontend/sums.h"
+#include "frontend/file.h"
+#include "frontend/cst.h"
+#include "frontend/syntax.h"
+#include "frontend/todst.h"
 
 #ifndef VERSION
 #include "version.h"
@@ -100,12 +105,22 @@ void print_help(const char *argv0) {
 
 DiagnosticReporter *reporter;
 class TerminalReporter : public DiagnosticReporter {
+  public:
+    TerminalReporter() : errors(false), warnings(false) { }
+    bool errors;
+    bool warnings;
+
   private:
     std::string last;
 
     void report(Diagnostic diagnostic) {
+      if (diagnostic.getSeverity() == S_ERROR) errors = true;
+      if (diagnostic.getSeverity() == S_WARNING) warnings = true;
+
       if (last != diagnostic.getMessage()) {
          last = diagnostic.getMessage();
+         std::cerr << diagnostic.getLocation().file() << ": ";
+         if (diagnostic.getSeverity() == S_WARNING) std::cerr << "(warning) ";
          std::cerr << diagnostic.getMessage() << std::endl;
       }
     }
@@ -388,9 +403,11 @@ int main(int argc, char **argv) {
   for (auto &i : wakefiles) {
     if (verbose && debug)
       std::cerr << "Parsing " << i << std::endl;
-    Lexer lex(runtime.heap, i.c_str());
-    auto package = parse_top(*top, lex);
-    if (lex.fail) ok = false;
+
+    ExternalFile file(terminalReporter, i.c_str());
+    CST cst(file, terminalReporter);
+    auto package = dst_top(cst.root(), *top);
+
     // Does this file inform our choice of a default package?
     size_t slash = i.find_last_of('/');
     std::string dir(i, 0, slash==std::string::npos?0:(slash+1)); // "" | .+/
@@ -428,6 +445,7 @@ int main(int argc, char **argv) {
   // No wake files in the path from workspace to the current directory
   if (!top->def_package) top->def_package = "nothing";
   std::string export_package = top->def_package;
+
   if (!flatten_exports(*top)) ok = false;
 
   std::vector<std::pair<std::string, std::string> > defs;
@@ -477,20 +495,11 @@ int main(int argc, char **argv) {
   char **cmdline = &none;
   if (exec) {
     command = exec;
-    Lexer lex(runtime.heap, command, "<execute-argument>");
-    top->body = std::unique_ptr<Expr>(parse_command(lex));
-    if (lex.fail) ok = false;
+    top->body = std::unique_ptr<Expr>(dst_expr(command, terminalReporter));
   } else if (argc > 1) {
     command = argv[1];
     cmdline = argv+2;
-    Lexer lex(runtime.heap, command, "<target-argument>");
-    std::unique_ptr<Expr> var(parse_command(lex));
-    if (var) {
-      top->body = std::unique_ptr<Expr>(new App(LOCATION, var.release(), new Prim(LOCATION, "cmdline")));
-    } else {
-      top->body = std::unique_ptr<Expr>(new Prim(LOCATION, "cmdline"));
-      ok = false;
-    }
+    top->body = std::unique_ptr<Expr>(new App(LOCATION, dst_expr(command, terminalReporter), new Prim(LOCATION, "cmdline")));
   } else {
     top->body = std::unique_ptr<Expr>(new VarRef(LOCATION, "Nil@wake"));
   }
@@ -498,7 +507,7 @@ int main(int argc, char **argv) {
   TypeVar type = top->body->typeVar;
 
   if (parse) std::cout << top.get();
-  if (notype) return ok?0:1;
+  if (notype) return (ok && !terminalReporter.errors)?0:1;
 
   /* Setup logging streams */
   if (debug   && !fd1) fd1 = "debug,info,echo,report,warning,error";
@@ -522,9 +531,10 @@ int main(int argc, char **argv) {
   bool isTreeBuilt = true;
   std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
   if (!isTreeBuilt) ok = false;
-  ok = ok && sums_ok();
 
-  if (!ok || (fwarning && warnings)) {
+  sums_ok();
+
+  if (!ok || terminalReporter.errors || (fwarning && terminalReporter.warnings)) {
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }
@@ -582,7 +592,7 @@ int main(int argc, char **argv) {
             TypeVar list;
             Data::typeList.clone(list);
             fn1[0].unify(list);
-            list[0].unify(String::typeVar);
+            list[0].unify(Data::typeString);
             if (!clone.tryUnify(fn1)) continue;   // must accept List String
             if (clone[1].tryUnify(fn2)) continue; // and not return a function
             std::cout << "  " << g.first << std::endl;
@@ -597,7 +607,7 @@ int main(int argc, char **argv) {
   }
 
   // Convert AST to optimized SSA
-  std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root));
+  std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root), runtime);
   if (optim) ssa = Term::optimize(std::move(ssa), runtime);
 
   // Upon request, dump out the SSA

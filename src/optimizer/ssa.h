@@ -90,7 +90,7 @@ struct Term {
   static std::unique_ptr<Term> pass_cse   (std::unique_ptr<Term> term, Runtime &runtime);
 
   // Create SSA from AST
-  static std::unique_ptr<Term> fromExpr(std::unique_ptr<Expr> expr);
+  static std::unique_ptr<Term> fromExpr(std::unique_ptr<Expr> expr, Runtime &runtime);
   // The overall optimization strategy
   static std::unique_ptr<Term> optimize(std::unique_ptr<Term> term, Runtime &runtime);
   // Convert Redux argument references to Scope indexes
