@@ -76,7 +76,7 @@ jobs:
           cp -a /tmp/workspace/tests . && \
           docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-jessie debuild -us -uc && \
           docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-debian-jessie /bin/sh -c "dpkg -i *.deb && cd tests && wake runTests" && \
-          install -D -t release/debian_jessie *.deb *.gz *.xz *.changes *.dsc
+          install -D -t release/debian_jessie *.deb *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
           paths:
