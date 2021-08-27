@@ -22,8 +22,8 @@
 #include <algorithm>
 #include <cassert>
 
-#include "optimizer/ssa.h"
-#include "frontend/expr.h"
+#include "ssa.h"
+#include "dst/expr.h"
 #include "types/data.h"
 #include "runtime/value.h"
 #include "runtime/runtime.h"

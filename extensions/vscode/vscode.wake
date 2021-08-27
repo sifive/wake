@@ -1,0 +1,73 @@
+# Copyright 2019 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package build_wake
+from wake import _
+
+export def vscode _ =
+    def dir =
+        "extensions/vscode"
+
+    require Pass variant =
+        toVariant "wasm"
+
+    require Pass files =
+        buildLSP variant
+
+    require wasm, Nil =
+        filter (matches `.*\.wasm` _.getPathName) files
+    else
+        failWithError "Did not find empscripten wasm output file; got: {format files}"
+
+    require js, Nil =
+        filter (matches `.*\.wasm-.*` _.getPathName) files
+    else
+        failWithError "Did not find empscripten javascript output; got: {format files}"
+
+    def wasmFile =
+        installAs "{dir}/lsp-server/lsp-wake.wasm" wasm
+
+    def jsFile =
+        installAs "{dir}/lsp-server/lsp-wake.js" js
+
+    def npmFiles =
+        sources dir `package(|-lock)\.json`
+
+    require Pass nodeModules =
+        makeExecPlan (which "npm", "install", Nil) npmFiles
+        | setPlanDirectory dir
+        | runJob
+        | getJobOutputs
+        | findFailFn getPathResult
+
+    def vsceFiles =
+        wasmFile,
+        jsFile,
+        sources dir `.*` ++
+        nodeModules
+
+    require Pass outputs =
+        makeExecPlan (which "npx", "vsce", "package", Nil) vsceFiles
+        | setPlanDirectory dir
+        | runJob
+        | getJobOutputs
+        | findFailFn getPathResult
+
+    require vsix, Nil =
+        filter (matches `.*\.vsix` _.getPathName) outputs
+    else
+        failWithError "vsce failed to produce vsix output; got: {format files}"
+
+    Pass vsix

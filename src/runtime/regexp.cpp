@@ -21,11 +21,11 @@
 
 #include <string>
 
-#include "runtime/prim.h"
-#include "runtime/value.h"
+#include "util/sfinae.h"
 #include "types/type.h"
 #include "types/data.h"
-#include "sfinae.h"
+#include "prim.h"
+#include "value.h"
 
 static re2::StringPiece sp(String *s) {
   return re2::StringPiece(s->c_str(), s->size());

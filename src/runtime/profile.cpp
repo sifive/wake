@@ -24,9 +24,9 @@
 #include <string.h>
 #include <errno.h>
 
-#include "runtime/profile.h"
-#include "json5.h"
-#include "execpath.h"
+#include "util/execpath.h"
+#include "json/json5.h"
+#include "profile.h"
 
 static unsigned dump_tree(std::ostream &os, const std::string &name, const Profile *node) {
   unsigned value = node->count;

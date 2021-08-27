@@ -18,11 +18,13 @@
 #ifndef SSA_H
 #define SSA_H
 
-#include "primfn.h"
-#include "runtime/gc.h"
-#include "location.h"
+#include "util/hash.h"
+#include "util/location.h"
 #include "types/datatype.h"
-#include "hash.h"
+#include "dst/primfn.h"
+
+#include "runtime/gc.h"
+
 #include <vector>
 #include <memory>
 #include <ostream>

@@ -19,7 +19,7 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "types/data.h"
+#include "data.h"
 
 TypeVar Data::typeString("String@builtin", 0);
 TypeVar Data::typeInteger("Integer@builtin", 0);

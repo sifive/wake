@@ -25,7 +25,7 @@
 #ifdef DEBUG_GC
 #include <cassert>
 #endif
-#include "hash.h"
+#include "util/hash.h"
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 8)
 #define alignas(x)

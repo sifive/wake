@@ -19,8 +19,8 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "optimizer/ssa.h"
-#include "hash.h"
+#include "util/hash.h"
+#include "ssa.h"
 #include "runtime/runtime.h"
 
 // typeid hash_code is not stable between invocations

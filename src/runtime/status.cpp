@@ -37,9 +37,10 @@
 #include <limits>
 #include <iomanip>
 
-#include "runtime/status.h"
-#include "runtime/job.h"
-#include "sigwinch.h"
+#include "compat/sigwinch.h"
+#include "util/colour.h"
+#include "status.h"
+#include "job.h"
 
 // How often is the status updated (should be a multiple of 2 for budget=0)
 #define REFRESH_HZ 6

@@ -29,8 +29,8 @@
 #include <vector>
 #include <algorithm>
 
-#include "runtime/gc.h"
-#include "runtime/status.h"
+#include "gc.h"
+#include "status.h"
 
 #define INITIAL_HEAP_SIZE 1024
 

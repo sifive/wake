@@ -28,8 +28,8 @@
 #include <sstream>
 #include <set>
 
-#include "runtime/database.h"
-#include "runtime/status.h"
+#include "database.h"
+#include "status.h"
 
 // Increment every time the database schema changes
 #define SCHEMA_VERSION "1"

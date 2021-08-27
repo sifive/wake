@@ -22,8 +22,8 @@
 #include <sstream>
 #include <unordered_map>
 
-#include "runtime/tuple.h"
 #include "optimizer/ssa.h"
+#include "tuple.h"
 
 void Promise::awaken(Runtime &runtime, HeapObject *obj) {
 #ifdef DEBUG_GC

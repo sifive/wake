@@ -25,10 +25,10 @@
 #include <ctgmath>
 #include <cstdlib>
 
-#include "runtime/prim.h"
 #include "types/type.h"
 #include "types/data.h"
-#include "runtime/value.h"
+#include "prim.h"
+#include "value.h"
 
 static PRIMTYPE(type_unop) {
   return args.size() == 1 &&

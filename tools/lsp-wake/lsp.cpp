@@ -34,18 +34,17 @@
 #include <utility>
 #include <unistd.h>
 
-#include "json5.h"
-#include "location.h"
-#include "execpath.h"
-#include "frontend/parser.h"
-#include "frontend/cst.h"
-#include "frontend/file.h"
-#include "frontend/todst.h"
-#include "frontend/expr.h"
-#include "frontend/diagnostic.h"
-#include "frontend/lexer.h"
-#include "frontend/wakefiles.h"
-#include "types/bind.h"
+#include "util/location.h"
+#include "util/execpath.h"
+#include "util/file.h"
+#include "util/diagnostic.h"
+#include "json/json5.h"
+#include "parser/cst.h"
+#include "parser/wakefiles.h"
+#include "parser/lexer.h"
+#include "dst/bind.h"
+#include "dst/todst.h"
+#include "dst/expr.h"
 
 #ifndef VERSION
 #include "../src/version.h"
@@ -69,8 +68,10 @@ static const char *InvalidParams        = "-32602";
 static const char *ServerNotInitialized = "-32002";
 //static const char *UnknownErrorCode     = "-32001";
 
-
 DiagnosticReporter *reporter;
+
+const char *term_colour(int code) { return ""; }
+const char *term_normal()         { return ""; }
 
 class LSP {
 public:

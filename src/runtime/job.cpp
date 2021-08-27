@@ -41,21 +41,21 @@
 #include <limits>
 #include <thread>
 
-#include "runtime/job.h"
-#include "runtime/prim.h"
+#include "compat/rusage.h"
+#include "compat/mtime.h"
+#include "compat/physmem.h"
+#include "compat/sigwinch.h"
+#include "compat/spawn.h"
 #include "types/type.h"
 #include "types/data.h"
-#include "runtime/value.h"
-#include "runtime/database.h"
-#include "location.h"
-#include "execpath.h"
-#include "runtime/status.h"
-#include "shell.h"
-#include "rusage.h"
-#include "mtime.h"
-#include "physmem.h"
-#include "sigwinch.h"
-#include "spawn.h"
+#include "util/location.h"
+#include "util/shell.h"
+#include "util/execpath.h"
+#include "status.h"
+#include "value.h"
+#include "database.h"
+#include "job.h"
+#include "prim.h"
 
 // How many times to SIGTERM a process before SIGKILL
 #define TERM_ATTEMPTS 6

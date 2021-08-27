@@ -28,8 +28,8 @@
 #include <string.h>
 #include <errno.h>
 
-#include "blake2.h"
-#include "nofollow.h"
+#include "blake2/blake2.h"
+#include "compat/nofollow.h"
 
 // Can increase to 64 if needed
 #define HASH_BYTES 32

@@ -17,25 +17,5 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def buildShim variant: Result (List Path) Error =
-    def Pair _ cVariant =
-        variant
-
-    require Pass nofollow =
-        common variant
-
-    def headers =
-        nofollow.getSysLibHeaders ++
-        sources here `.*\.h`
-
-    def compile =
-        compileC cVariant nofollow.getSysLibCFlags headers
-
-    def cppFiles =
-        sources here `.*\.c`
-
-    require Pass objFiles =
-        map compile cppFiles
-        | findFail
-
-    linkO cVariant Nil objFiles.flatten "lib/wake/shim-wake"
+target buildShim variant: Result (List Path) Error =
+    tool here variant "lib/wake/shim-wake" (blake2, compat, Nil)

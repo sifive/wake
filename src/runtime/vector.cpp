@@ -21,13 +21,11 @@
 
 #include <cassert>
 
-#include "runtime/prim.h"
 #include "types/datatype.h"
 #include "types/type.h"
-#include "runtime/value.h"
-#include "frontend/expr.h"
-#include "types/type.h"
 #include "types/data.h"
+#include "value.h"
+#include "prim.h"
 
 static const TypeVar arrayT("Array@builtin", 1);
 

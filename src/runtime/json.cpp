@@ -24,12 +24,12 @@
 #include <limits>
 #include <sstream>
 
-#include "json5.h"
-#include "runtime/prim.h"
-#include "frontend/expr.h"
-#include "runtime/value.h"
-#include "frontend/sums.h"
+#include "json/json5.h"
+#include "types/sums.h"
 #include "types/data.h"
+#include "types/datatype.h"
+#include "prim.h"
+#include "value.h"
 
 typedef std::numeric_limits<double> dlimits;
 static double nan() { return dlimits::quiet_NaN(); }

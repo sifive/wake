@@ -15,26 +15,6 @@
 
 package build_wake
 from wake import _
-from gcc_wake import _
 
-def gopt variant: Result SysLib Error =
-    def Pair _ cVariant =
-        variant
-
-    def cflags =
-        "-I{here}", Nil
-
-    def headers =
-        sources here `.*\.h`
-
-    def compile x =
-        compileC cVariant cflags headers (source "{here}/{x}")
-
-    def sourceFiles =
-        "gopt.c", "gopt-errors.c", "gopt-arg.c", Nil
-
-    require Pass objects =
-        map compile sourceFiles
-        | findFail
-
-    Pass (SysLib "10.0" headers objects.flatten cflags Nil)
+target gopt variant =
+    vendor here variant "10.0" `.*\.h` `gopt(|-errors|-arg).c`

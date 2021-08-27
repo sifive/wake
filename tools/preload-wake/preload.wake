@@ -37,7 +37,7 @@ def buildPreload variant: Result (List Path) Error =
         variant
 
     require Pass json =
-        common variant
+        json variant
 
     def headers =
         json.getSysLibHeaders ++

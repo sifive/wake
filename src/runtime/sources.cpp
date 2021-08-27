@@ -36,15 +36,14 @@
 #include <iostream>
 #include <algorithm>
 
-#include "runtime/sources.h"
-#include "runtime/prim.h"
-#include "primfn.h"
+#include "util/execpath.h"
+#include "types/datatype.h"
 #include "types/type.h"
 #include "types/data.h"
-#include "runtime/value.h"
-#include "execpath.h"
-#include "types/datatype.h"
-#include "frontend/wakefiles.h"
+#include "parser/wakefiles.h"
+#include "sources.h"
+#include "prim.h"
+#include "value.h"
 
 bool make_workspace(const std::string &dir) {
   if (chdir(dir.c_str()) != 0) return false;

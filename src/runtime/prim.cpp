@@ -26,14 +26,14 @@
 #include <bitset>
 #include <cassert>
 
-#include "runtime/prim.h"
-#include "runtime/value.h"
+#include "util/location.h"
+#include "types/sums.h"
+#include "types/datatype.h"
 #include "optimizer/ssa.h"
-#include "frontend/expr.h"
-#include "runtime/tuple.h"
-#include "location.h"
-#include "frontend/sums.h"
-#include "runtime/status.h"
+#include "prim.h"
+#include "value.h"
+#include "tuple.h"
+#include "status.h"
 
 void require_fail(const char *message, unsigned size, Runtime &runtime, const Scope *scope) {
   std::stringstream ss;

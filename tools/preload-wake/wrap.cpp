@@ -37,11 +37,11 @@
 #include <iostream>
 #include <fstream>
 
-#include "json5.h"
-#include "execpath.h"
-#include "unlink.h"
-#include "rusage.h"
-#include "mtime.h"
+#include "compat/rusage.h"
+#include "compat/mtime.h"
+#include "util/execpath.h"
+#include "util/unlink.h"
+#include "json/json5.h"
 
 #define STR2(x) #x
 #define STR(x) STR2(x)

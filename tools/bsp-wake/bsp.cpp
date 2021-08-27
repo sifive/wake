@@ -34,11 +34,11 @@
 #include <sstream>
 #include <fstream>
 
-#include "json5.h"
-#include "execpath.h"
+#include "util/execpath.h"
+#include "json/json5.h"
 
 #ifndef VERSION
-#include "../src/version.h"
+#include "version.h"
 #endif
 
 // Number of pipes to the wake subprocess

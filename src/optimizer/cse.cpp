@@ -22,8 +22,8 @@
 #include <algorithm>
 #include <unordered_map>
 
-#include "optimizer/ssa.h"
-#include "runtime/prim.h"
+#include "ssa.h"
+#include "runtime/runtime.h"
 
 namespace std {
   template <> struct hash<Hash> {

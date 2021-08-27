@@ -18,8 +18,9 @@
 #ifndef TUPLE_H
 #define TUPLE_H
 
-#include "runtime/runtime.h"
 #include <vector>
+
+#include "runtime.h"
 
 struct Location;
 struct Constructor;
