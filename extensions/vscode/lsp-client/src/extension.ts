@@ -3,25 +3,27 @@
  * Licensed under the MIT License. See License.txt in the project root for license information.
  * ------------------------------------------------------------------------------------------ */
 
-import { workspace } from 'vscode';
+import { workspace, ExtensionContext } from 'vscode';
 
 import {
 	integer,
 	LanguageClient,
 	LanguageClientOptions,
-	ServerOptions
+	ServerOptions,
+	TransportKind
 } from 'vscode-languageclient/node';
+
 
 let client: LanguageClient;
 
-export function activate() {
+export function activate(context: ExtensionContext) {
+	const serverModule = context.asAbsolutePath('/lsp-server/lsp-wake.js');
+
+	// If the extension is launched in debug mode then the debug server options are used
+	// Otherwise the run options are used
 	let serverOptions: ServerOptions = {
-		run: {
-			command: __dirname + "/../../../../lib/wake/lsp-wake.native-cpp11-release"
-		},
-		debug: {
-			command: __dirname + "/../../../../lib/wake/lsp-wake.native-cpp11-debug"
-		}
+		module: serverModule,
+		transport: TransportKind.stdio
 	};
 
 	// Options to control the language client
@@ -29,7 +31,7 @@ export function activate() {
 		// Register the server for .wake files
 		documentSelector: [{ language: 'wake', pattern: '**/*.wake' }],
 		synchronize: {
-			// Notify the server about file changes to '.wake files contained in the workspace
+			// Notify the server about file changes to '.clientrc files contained in the workspace
 			fileEvents: workspace.createFileSystemWatcher('**/*.wake')
 		}
 	};
