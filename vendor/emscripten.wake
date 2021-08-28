@@ -49,11 +49,23 @@ def empp =
     else
         None
 
+def emmake =
+    require Some path =
+        getenv "PATH"
+
+    def emmake =
+        whichIn path "emmake"
+
+    if matches `/.*` emmake then
+        Some emmake
+    else
+        None
+
 def emscriptenCFlags =
     Nil
 
 def emscriptenLFlags =
-    "-s", "NODERAWFS=1", Nil
+    "-s", "NODERAWFS=1", "-s", "ALLOW_MEMORY_GROWTH=1", Nil
 
 publish compileC =
     emccFn (makeCompileC "wasm-c11-release"   _ (emscriptenCFlags ++ c11Flags ++ releaseCFlags))

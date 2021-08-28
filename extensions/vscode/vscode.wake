@@ -17,9 +17,6 @@ package build_wake
 from wake import _
 
 export def vscode _ =
-    def dir =
-        "extensions/vscode"
-
     require Pass variant =
         toVariant "wasm"
 
@@ -37,30 +34,35 @@ export def vscode _ =
         failWithError "Did not find empscripten javascript output; got: {format files}"
 
     def wasmFile =
-        installAs "{dir}/lsp-server/lsp-wake.wasm" wasm
+        installAs "{here}/lsp-server/lsp-wake.wasm" wasm
 
     def jsFile =
-        installAs "{dir}/lsp-server/lsp-wake.js" js
+        installAs "{here}/lsp-server/lsp-wake.js" js
 
     def npmFiles =
-        sources dir `package(|-lock)\.json`
+        sources here `package(|-lock)\.json`
 
     require Pass nodeModules =
         makeExecPlan (which "npm", "install", Nil) npmFiles
-        | setPlanDirectory dir
+        | setPlanDirectory here
         | runJob
         | getJobOutputs
         | findFailFn getPathResult
 
+    def stdlib =
+        sources "share/wake/lib" `.*`
+        | map (installIn here ".")
+
     def vsceFiles =
         wasmFile,
         jsFile,
-        sources dir `.*` ++
+        sources here `.*` ++
+        stdlib ++
         nodeModules
 
     require Pass outputs =
         makeExecPlan (which "npx", "vsce", "package", Nil) vsceFiles
-        | setPlanDirectory dir
+        | setPlanDirectory here
         | runJob
         | getJobOutputs
         | findFailFn getPathResult

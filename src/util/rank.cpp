@@ -76,7 +76,7 @@ RankMap::RankMap(const RankBuilder &builder) {
         }
         level1[i/L1_COUNT].v[i%L1_COUNT] = sum1;
         for (size_t j = 0; j < L0_COUNT; ++j) {
-            size_t x = builder.bitmap[i*L0_COUNT+j];
+            uint64_t x = builder.bitmap[i*L0_COUNT+j];
             level0[i].v[j] = x;
             sum1 += __builtin_popcountll(x);
         }
