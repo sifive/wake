@@ -267,6 +267,9 @@ workflows:
       - ubuntu_18_04:
           requires:
             - tarball
+      - vscode:
+          requires:
+            - tarball
       - release:
           requires:
             - alpine
@@ -277,6 +280,7 @@ workflows:
             - ubuntu_14_04   # LTS
             - ubuntu_16_04   # LTS
             - ubuntu_18_04   # LTS
+            - vscode
       - docs_deploy:
           requires:
             - release
