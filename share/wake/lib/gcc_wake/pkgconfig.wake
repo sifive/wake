@@ -27,11 +27,10 @@ export def makeSysLib (version: String): SysLib =
 
 export def flattenSysLibs (packages: List SysLib): SysLib =
     def onePath = distinctBy (_.getPathName <=>* _.getPathName)
-    def oneOpt  = distinctBy (_ <=>* _)
     def headers = mapFlat getSysLibHeaders packages | onePath
     def objects = mapFlat getSysLibObjects packages | onePath
-    def cflags  = mapFlat getSysLibCFlags  packages | oneOpt
-    def lflags  = mapFlat getSysLibLFlags  packages | oneOpt
+    def cflags  = mapFlat getSysLibCFlags  packages
+    def lflags  = mapFlat getSysLibLFlags  packages
     SysLib "" headers objects cflags lflags
 
 target pkgConfigImp args =
