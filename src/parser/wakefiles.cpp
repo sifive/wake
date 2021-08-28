@@ -40,7 +40,7 @@ bool push_files(std::vector<std::string> &out, const std::string &path, int dirf
   auto dir = fdopendir(dirfd);
   if (!dir) {
     close(dirfd);
-    fprintf(stderr, "Failed to fdopendirt %s: %s\n", path.c_str(), strerror(errno));
+    fprintf(stderr, "Failed to fdopendirat %s: %s\n", path.c_str(), strerror(errno));
     return true;
   }
 
@@ -97,10 +97,29 @@ bool push_files(std::vector<std::string> &out, const std::string &path, int dirf
 }
 
 bool push_files(std::vector<std::string> &out, const std::string &path, const RE2& re, size_t skip) {
+#ifdef __EMSCRIPTEN__
+  // https://github.com/emscripten-core/emscripten/issues/7487
+  std::string command = "find " + path + " -name \\*.wake > .vscode.wakefiles";
+  system(command.c_str());
+  std::ifstream ifs(".vscode.wakefiles");
+  while (!ifs.eof()) {
+    std::string line;
+    std::getline(ifs, line);
+    if (line.empty()) continue;
+    if (line.substr(0,2) == "./") {
+      out.push_back(line.substr(2));
+    } else {
+      out.push_back(line);
+    }
+  }
+  unlink(".vscode.wakefiles");
+  return false;
+#else
   int flags, dirfd = open(path.c_str(), O_RDONLY);
   if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1)
     fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
   return dirfd == -1 || push_files(out, path, dirfd, re, skip);
+#endif
 }
 
 // . => ., hax/ => hax, foo/.././bar.z => bar.z, foo/../../bar.z => ../bar.z
