@@ -49,6 +49,18 @@ def empp =
     else
         None
 
+def emmake =
+    require Some path =
+        getenv "PATH"
+
+    def emmake =
+        whichIn path "emmake"
+
+    if matches `/.*` emmake then
+        Some emmake
+    else
+        None
+
 def emscriptenCFlags =
     Nil
 

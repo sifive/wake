@@ -15,5 +15,52 @@
 
 package build_wake
 from wake import _
+from gcc_wake import _
 
-def re2 _ = Pass (pkg "re2")
+def re2 = match _
+  Pair "wasm-cpp11-release" _ = buildRE2WASM Unit
+  _ = Pass (pkg "re2")
+
+
+def buildRE2WASM Unit =
+    def version =
+        "2021-08-01"
+
+    require Some emmake =
+        emmake
+    else
+        failWithError "emmake is not available"
+
+    def emsdk =
+        replace `/[^/]*$` "" emmake
+
+    def job =
+        """
+            wget https://github.com/google/re2/archive/refs/tags/%{version}.tar.gz
+            tar xvzf %{version}.tar.gz
+            cd re2-%{version}
+            emmake make -j4 RE2_CXXFLAGS="-std=c++11 -I. -Wall" CXXFLAGS="-O2" obj/libre2.a
+        """
+        | makePlan "compiling re2" (source "{here}/re2.wake", Nil)
+        | editPlanEnvironment (addEnvironmentPath emsdk)
+        | setPlanDirectory here
+        | runJob
+
+    require Pass outputs =
+        job.getJobOutputs
+        | findFailFn getPathResult
+
+    def headers =
+        filter (matches `.*\.h` _.getPathName) outputs
+
+    def objects =
+        filter (matches `.*\.a` _.getPathName) outputs
+
+    def cflags =
+        "-I{here}/re2-{version}",
+        Nil
+
+    def lflags =
+        Nil
+
+    Pass (SysLib "1.0" headers objects cflags lflags)
