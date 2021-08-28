@@ -18,7 +18,6 @@
 #ifndef VALUE_H
 #define VALUE_H
 
-#include "runtime/gc.h"
 #include <string>
 #include <memory>
 #include <vector>
@@ -26,6 +25,8 @@
 #include <gmp.h>
 #include <stdlib.h>
 #include <re2/re2.h>
+
+#include "gc.h"
 
 #define APP_PRECEDENCE 14
 

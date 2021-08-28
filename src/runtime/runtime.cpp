@@ -23,13 +23,13 @@
 #include <sys/time.h>
 #include <signal.h>
 
-#include "runtime/runtime.h"
-#include "runtime/tuple.h"
 #include "optimizer/ssa.h"
-#include "runtime/value.h"
-#include "runtime/status.h"
-#include "runtime/job.h"
-#include "runtime/profile.h"
+#include "runtime.h"
+#include "tuple.h"
+#include "value.h"
+#include "status.h"
+#include "job.h"
+#include "profile.h"
 
 #define PROFILE_HZ 1000
 

@@ -26,10 +26,12 @@ export def makeSysLib (version: String): SysLib =
     SysLib version Nil Nil Nil Nil
 
 export def flattenSysLibs (packages: List SysLib): SysLib =
-    def headers = map getSysLibHeaders packages | flatten
-    def objects = map getSysLibObjects packages | flatten
-    def cflags  = map getSysLibCFlags  packages | flatten
-    def lflags  = map getSysLibLFlags  packages | flatten
+    def onePath = distinctBy (_.getPathName <=>* _.getPathName)
+    def oneOpt  = distinctBy (_ <=>* _)
+    def headers = mapFlat getSysLibHeaders packages | onePath
+    def objects = mapFlat getSysLibObjects packages | onePath
+    def cflags  = mapFlat getSysLibCFlags  packages | oneOpt
+    def lflags  = mapFlat getSysLibLFlags  packages | oneOpt
     SysLib "" headers objects cflags lflags
 
 target pkgConfigImp args =

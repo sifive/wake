@@ -20,8 +20,8 @@
 
 #include <ostream>
 
+#include "util/location.h"
 #include "dsu.h"
-#include "location.h"
 
 #define FN "binary =>@builtin"
 

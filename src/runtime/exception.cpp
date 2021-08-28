@@ -23,13 +23,11 @@
 
 #include <sstream>
 
-#include "runtime/prim.h"
-#include "runtime/value.h"
 #include "types/type.h"
 #include "types/data.h"
-#include "runtime/status.h"
-#include "location.h"
-#include "frontend/expr.h"
+#include "status.h"
+#include "prim.h"
+#include "value.h"
 
 static PRIMTYPE(type_stack) {
   TypeVar list;

@@ -8,7 +8,7 @@ CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
 LDFLAGS	:=
 DESTDIR ?= /usr/local
 
-LOCAL_CFLAGS :=	-Iutf8proc -Igopt -Icommon -Isrc
+LOCAL_CFLAGS :=	-Ivendor -Isrc
 FUSE_CFLAGS  :=	$(shell pkg-config --silence-errors --cflags fuse)
 CORE_CFLAGS  := $(shell pkg-config --silence-errors --cflags sqlite3)	\
 		$(shell pkg-config --silence-errors --cflags gmp-6)	\
@@ -20,13 +20,23 @@ CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsql
 		$(shell pkg-config --silence-errors --libs re2     || echo -lre2)	\
 		$(shell pkg-config --silence-errors --libs ncurses tinfo || pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
-COMMON := common/jlexer.o $(patsubst %.cpp,%.o,$(wildcard common/*.cpp)) $(patsubst %.c,%.o,$(wildcard common/*.c))
-WAKE_ENV := WAKE_PATH=$(shell dirname $(shell which $(firstword $(CC))))
+COMMON_DIRS := src/compat src/util src/json
+COMMON_C    := $(foreach dir,$(COMMON_DIRS),$(wildcard $(dir)/*.c)) \
+               vendor/whereami/whereami.c
+COMMON_CPP  := $(foreach dir,$(COMMON_DIRS),$(wildcard $(dir)/*.cpp))
+COMMON_OBJS := src/json/jlexer.o \
+               $(patsubst %.cpp,%.o,$(COMMON_CPP)) $(patsubst %.c,%.o,$(COMMON_C))
 
-# If FUSE is unavalable during wake build, allow a linux-specific work-around
-ifeq ($(USE_FUSE_WAKE),0)
-EXTRA := lib/wake/libpreload-wake.so bin/preload-wake
-endif
+WAKE_DIRS := $(COMMON_DIRS) src/dst src/optimizer src/parser src/runtime src/types tools/wake
+WAKE_C    := $(foreach dir,$(WAKE_DIRS),$(wildcard $(dir)/*.c)) \
+             vendor/blake2/blake2b-ref.c vendor/utf8proc/utf8proc.c \
+             vendor/siphash/siphash.c vendor/whereami/whereami.c \
+             vendor/gopt/gopt.c vendor/gopt/gopt-errors.c vendor/gopt/gopt-arg.c
+WAKE_CPP  := $(foreach dir,$(WAKE_DIRS),$(wildcard $(dir)/*.cpp))
+WAKE_OBJS := src/parser/lexer.o src/parser/parser.o src/json/jlexer.o \
+             $(patsubst %.cpp,%.o,$(WAKE_CPP)) $(patsubst %.c,%.o,$(WAKE_C))
+
+WAKE_ENV := WAKE_PATH=$(shell dirname $(shell which $(firstword $(CC))))
 
 all:		wake.db
 	$(WAKE_ENV) ./bin/wake build default
@@ -35,7 +45,7 @@ clean:
 	rm -f bin/* lib/wake/* */*.o common/jlexer.cpp src/frontend/lexer.cpp src/frontend/parser.cpp src/version.h wake.db
 	touch bin/stamp lib/wake/stamp
 
-wake.db:	bin/wake bin/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake $(EXTRA)
+wake.db:	bin/wake bin/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake
 	test -f $@ || ./bin/wake --init .
 
 install:	all
@@ -53,27 +63,19 @@ vscode:		wake.db
 static:	wake.db
 	$(WAKE_ENV) ./bin/wake static
 
-bin/wake:	src/frontend/lexer.o src/frontend/parser.o $(COMMON)	\
-		$(patsubst %.cpp,%.o,$(wildcard src/*/*.cpp))		\
-		$(patsubst %.c,%.o,utf8proc/utf8proc.c gopt/gopt.c gopt/gopt-errors.c gopt/gopt-arg.c)
+bin/wake:	$(WAKE_OBJS)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
-bin/fuse-wake:	fuse/client.cpp fuse/fuse.cpp fuse/namespace.cpp fuse/daemon_client.cpp $(COMMON)
+bin/fuse-wake:		tools/fuse-wake/fuse-wake.cpp src/wakefs/*.cpp $(COMMON_OBJS)
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $^ -o $@ $(LDFLAGS)
 
-lib/wake/fuse-waked:	fuse/daemon.cpp $(COMMON)
+lib/wake/fuse-waked:	tools/fuse-waked/fuse-waked.cpp $(COMMON_OBJS)
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(FUSE_CFLAGS) $^ -o $@ $(LDFLAGS) $(FUSE_LDFLAGS)
 
-lib/wake/shim-wake:	$(patsubst %.c,%.o,$(wildcard shim/*.c))
+lib/wake/shim-wake:	tools/shim-wake/shim.o vendor/blake2/blake2b-ref.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-bin/preload-wake:	preload/wrap.cpp $(COMMON)
-	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) -DEXT=so -DENV=LD_PRELOAD -o $@ $^ $(LDFLAGS)
-
-lib/wake/libpreload-wake.so:	preload/open.c
-	$(CC) $(CFLAGS) -fpic -shared -o $@ $^ $(LFDLAGS) -ldl
-
-%.o:	%.cpp	$(filter-out src/version.h,$(wildcard */*.h) $(wildcard */*/*.h) src/frontend/parser.h)
+%.o:	%.cpp	$(wildcard */*/*.h) src/parser/parser.h
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(CORE_CFLAGS) -o $@ -c $<
 
 %.o:	%.c	$(filter-out src/version.h,$(wildcard */*.h))
@@ -88,5 +90,5 @@ lib/wake/libpreload-wake.so:	preload/open.c
 	gzip -dc $^ > $@.tmp
 	mv -f $@.tmp $@
 
-.PRECIOUS:	src/frontend/lexer.cpp src/frontend/parser.cpp src/frontend/parser.h common/jlexer.cpp
+.PRECIOUS:	src/parser/lexer.cpp src/parser/parser.cpp src/parser/parser.h src/json/jlexer.cpp
 .SUFFIXES:

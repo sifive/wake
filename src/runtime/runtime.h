@@ -18,7 +18,7 @@
 #ifndef RUNTIME_H
 #define RUNTIME_H
 
-#include "runtime/gc.h"
+#include "gc.h"
 
 struct RFun;
 struct Closure;

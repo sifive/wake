@@ -23,7 +23,7 @@
 
 #include <unordered_map>
 
-#include "optimizer/ssa.h"
+#include "ssa.h"
 #include "runtime/runtime.h"
 
 struct DeepHash {

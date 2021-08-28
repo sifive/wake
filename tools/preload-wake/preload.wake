@@ -1,0 +1,71 @@
+# Copyright 2019 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package build_wake
+from wake import _
+from gcc_wake import _
+
+def loadenv = match sysname
+    "Darwin" = "DYLD_INSERT_LIBRARIES"
+    _ = "LD_PRELOAD"
+
+def libext = match sysname
+    "Darwin" = "dylib"
+    _ = "so"
+
+def libcflags = match sysname
+    _ = "-fpic", Nil
+
+def liblflags = match sysname
+    "Darwin" = "-dynamiclib", Nil
+    _ = "-shared", "-ldl", Nil
+
+def buildPreload variant: Result (List Path) Error =
+    def Pair cppVariant _ =
+        variant
+
+    require Pass json =
+        json variant
+
+    def headers =
+        json.getSysLibHeaders ++
+        sources here `.*\.h`
+
+    def cppFiles =
+        sources here `.*\.cpp`
+
+    def cppFlags =
+        "-DEXT={libext}", "-DENV={loadenv}", json.getSysLibCFlags
+
+    require Pass ofiles =
+        map (compileC cppVariant cppFlags headers) cppFiles
+        | findFail
+
+    linkO cppVariant Nil (ofiles.flatten ++ json.getSysLibObjects) "bin/preload-wake"
+
+def buildPrelib variant: Result (List Path) Error =
+    def Pair _ cVariant =
+        variant
+
+    def cfiles =
+        sources here `.*\.c`
+
+    require Pass ofiles =
+         map (compileC cVariant libcflags Nil) cfiles
+         | findFail
+
+    linkO cVariant liblflags ofiles.flatten "lib/wake/libpreload-wake.{libext}"
+
+# publish runner = makeJSONRunner "preload/wrap" (\_ Pass 2.0) (\_ None), Nil

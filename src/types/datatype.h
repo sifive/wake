@@ -18,13 +18,14 @@
 #ifndef DATA_TYPE_H
 #define DATA_TYPE_H
 
-#include "location.h"
-#include "optional.h"
 #include <vector>
 #include <string>
 #include <map>
 #include <ostream>
 #include <memory>
+
+#include "util/location.h"
+#include "util/optional.h"
 
 struct TypeVar;
 typedef std::map<std::string, TypeVar*> TypeMap;

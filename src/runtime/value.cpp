@@ -24,15 +24,14 @@
 
 #include <sstream>
 
-#include "runtime/value.h"
+#include "util/hash.h"
+#include "util/sfinae.h"
+#include "util/colour.h"
 #include "types/type.h"
-#include "frontend/expr.h"
-#include "frontend/lexer.h"
+#include "parser/lexer.h"
 #include "optimizer/ssa.h"
-#include "hash.h"
-#include "runtime/status.h"
-#include "sfinae.h"
-#include "runtime/tuple.h"
+#include "value.h"
+#include "tuple.h"
 
 void FormatState::resume() {
   stack.emplace_back(current.value, current.precedence, current.state+1);

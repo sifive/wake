@@ -19,14 +19,15 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <fstream>
-#include <iostream>
 #include <string.h>
 #include <errno.h>
 
-#include "runtime/profile.h"
-#include "json5.h"
-#include "execpath.h"
+#include <fstream>
+#include <iostream>
+
+#include "util/execpath.h"
+#include "json/json5.h"
+#include "profile.h"
 
 static unsigned dump_tree(std::ostream &os, const std::string &name, const Profile *node) {
   unsigned value = node->count;

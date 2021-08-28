@@ -21,10 +21,10 @@
 
 #include <gmp.h>
 
-#include "runtime/prim.h"
 #include "types/type.h"
 #include "types/data.h"
-#include "runtime/value.h"
+#include "prim.h"
+#include "value.h"
 
 #define UNOP(name, fn)				\
 static PRIMFN(prim_##name) {			\

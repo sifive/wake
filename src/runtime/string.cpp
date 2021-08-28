@@ -23,22 +23,22 @@
 #include <sys/utsname.h>
 #include <errno.h>
 #include <string.h>
-#include <utf8proc.h>
 #include <unistd.h>
 #include <fcntl.h>
 
 #include <sstream>
 #include <fstream>
 
-#include "runtime/prim.h"
-#include "runtime/value.h"
+#include "utf8proc/utf8proc.h"
+#include "util/shell.h"
+#include "util/unlink.h"
+#include "json/utf8.h"
 #include "types/type.h"
 #include "types/data.h"
-#include "runtime/status.h"
-#include "utf8.h"
-#include "runtime/gc.h"
-#include "shell.h"
-#include "unlink.h"
+#include "prim.h"
+#include "value.h"
+#include "status.h"
+#include "gc.h"
 
 static PRIMTYPE(type_vcat) {
   bool ok = out->unify(Data::typeString);

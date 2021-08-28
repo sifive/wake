@@ -18,7 +18,7 @@
 #ifndef DATA_H
 #define DATA_H
 
-#include "types/type.h"
+#include "type.h"
 
 struct Data {
   // compiler builtins

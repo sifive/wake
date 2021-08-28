@@ -21,10 +21,10 @@
 
 #include <sstream>
 
-#include "types/datatype.h"
-#include "frontend/diagnostic.h"
-#include "frontend/expr.h"
-#include "frontend/lexer.h"
+#include "util/diagnostic.h"
+#include "parser/lexer.h"
+#include "datatype.h"
+#include "type.h"
 
 Constructor Constructor::array(AST(LOCATION, "Array"));
 

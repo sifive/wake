@@ -23,12 +23,11 @@
 #include <sstream>
 #include <cassert>
 
-#include "types/type.h"
-#include "location.h"
-#include "frontend/expr.h"
-#include "frontend/lexer.h"
-#include "runtime/status.h"
-#include "frontend/diagnostic.h"
+#include "util/location.h"
+#include "util/diagnostic.h"
+#include "util/colour.h"
+#include "parser/lexer.h"
+#include "type.h"
 
 static int globalClock = 0;
 static int globalEpoch = 1; // before a tagging pass, globalEpoch > TypeVar.epoch for all TypeVars

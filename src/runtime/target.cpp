@@ -22,14 +22,13 @@
 #include <sstream>
 #include <unordered_map>
 
-#include "runtime/prim.h"
 #include "types/datatype.h"
 #include "types/type.h"
 #include "types/data.h"
-#include "runtime/value.h"
-#include "runtime/tuple.h"
-#include "runtime/status.h"
-#include "frontend/expr.h"
+#include "value.h"
+#include "tuple.h"
+#include "status.h"
+#include "prim.h"
 
 struct TargetValue {
   Hash subhash;

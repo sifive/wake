@@ -19,7 +19,7 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "optimizer/ssa.h"
+#include "ssa.h"
 
 struct PassSweep {
   TermStream stream;

@@ -18,11 +18,12 @@
 #ifndef PRIM_H
 #define PRIM_H
 
-#include "primfn.h"
-#include "runtime/tuple.h"
 #include <map>
 #include <string>
 #include <vector>
+
+#include "dst/primfn.h"
+#include "tuple.h"
 
 struct String;
 struct Integer;
@@ -86,71 +87,6 @@ Work *claim_hash(Heap &h, Value *value, Continuation *continuation);
 
 void dont_report_future_targets();
 
-/* The evaluation order of wake makes two guarantees:
- *   [1] Exactly the effects of straight-line execution are produced.
- *   [2] If value A is needed to evaluate B, A happens before B.
- *
- * This means that the order of effects is only defined if one depends
- * on the value produced by the other. However, there is some subtlety;
- * some effects depend on effects by virtue of being invoked or not.
- *
- * def a = <some-effect>
- * def b = a + 1
- * def c = <some-effect-producing-function-whose-effect-dependings-its-1st-argument> b
- * Clearly, 'c' depends on 'a' and will run after it.
- *
- * def a = <some-effect>
- * def c = if a then <some-effect> else Nil
- * In this case, while the second effect does not directly depend on 'a',
- * it's invocation depends on 'a'; therefore, it will run after it.
- *
- * def a = <some-file-producing-effect>
- * def c = if a then <enumerate-files> else Nil
- * In this case, while 'c' has no effects, the enumeration step must be
- * evaluated after 'a'; therefore, the new files will be detected.
- */
-
-/* Function only depends on it's arguments and has no effects.
- * Allow: all optimizations
- */
-#define PRIM_PURE	0
-
-/* Observes location in the happens-before stream (beyond it's arguments).
- * May not be moved earlier in the dependency tree (ie: up the AST).
- * Enumerating files or the stack are examples in this category.
- * Allow:   deadcode elimination (DE), lowering to uses (LTU), Inlining
- * Forbid:  loop invariant lifting (LVL), common sub-expression elimination (CSE)
- * Unclear: duplicating
- */
-#define PRIM_ORDERED	1
-
-/* Produces something visible outside wake.
- * Number of invocations must remain unchanged.
- * Implies PRIM_ORDERED (use PRIM_IMPURE when setting)
- * Allow:  Inlining
- * Forbid: LVL, CSE, DE, LTU
- */
-#define PRIM_EFFECT	2
-
-#define PRIM_IMPURE	(PRIM_EFFECT|PRIM_ORDERED)
-
-/* This primitive has a function argument which it will invoke.
- * The status of the primitive depends on that argument.
- */
-#define PRIM_FNARG	4
-
-/* Register primitive functions */
-struct PrimDesc {
-  PrimFn   fn;
-  PrimType type;
-  int      flags;
-  void    *data;
-
-  PrimDesc(PrimFn fn_, PrimType type_, int flags_, void *data_ = 0)
-   : fn(fn_), type(type_), flags(flags_), data(data_) { }
-};
-
-typedef std::map<std::string, PrimDesc> PrimMap;
 struct JobTable;
 
 struct StringInfo {
