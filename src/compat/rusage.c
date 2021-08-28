@@ -27,15 +27,13 @@
 
 #include "rusage.h"
 
-RUsage::RUsage() : utime(0), stime(0), ibytes(0), obytes(0), membytes(0) { }
-
-RUsage RUsage::operator - (const RUsage &other) const {
-  RUsage out;
-  out.utime    = utime    - other.utime;
-  out.stime    = stime    - other.stime;
-  out.ibytes   = ibytes   - other.ibytes;
-  out.obytes   = obytes   - other.obytes;
-  out.membytes = membytes - other.membytes;
+struct RUsage rusage_sub(struct RUsage x, struct RUsage y) {
+  struct RUsage out;
+  out.utime    = x.utime    - y.utime;
+  out.stime    = x.stime    - y.stime;
+  out.ibytes   = x.ibytes   - y.ibytes;
+  out.obytes   = x.obytes   - y.obytes;
+  out.membytes = x.membytes - y.membytes;
   return out;
 }
 
@@ -57,8 +55,8 @@ RUsage RUsage::operator - (const RUsage &other) const {
 #error Missing definition to access maxrss on this platform
 #endif
 
-RUsage getRUsageChildren() {
-  RUsage out;
+struct RUsage getRUsageChildren() {
+  struct RUsage out;
   struct rusage usage;
 
   // Can not fail (who and pointer are vaild)

@@ -18,8 +18,16 @@
 #ifndef UTIMENS_H
 #define UTIMENS_H
 
-#include <cstdint>
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int wake_utimensat(int dirfd, const char *path, const struct timespec ts[2]);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

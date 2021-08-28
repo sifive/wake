@@ -18,8 +18,16 @@
 #ifndef PHYSMEM_H
 #define PHYSMEM_H
 
-#include <cstdint>
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 uint64_t get_physical_memory();
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

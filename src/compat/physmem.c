@@ -35,12 +35,12 @@ uint64_t get_physical_memory() {
 #ifdef __APPLE__
   struct host_basic_info hostinfo;
   mach_msg_type_number_t count = HOST_BASIC_INFO_COUNT;
-  int result = host_info(mach_host_self(), HOST_BASIC_INFO,  reinterpret_cast<host_info_t>(&hostinfo), &count);
+  int result = host_info(mach_host_self(), HOST_BASIC_INFO, (host_info_t)(&hostinfo), &count);
   if (result != KERN_SUCCESS || count != HOST_BASIC_INFO_COUNT) {
     fprintf(stderr, "host_info failed\n");
     exit(1);
   }
-  out = static_cast<uint64_t>(hostinfo.max_mem);
+  out = (uint64_t)(hostinfo.max_mem);
 #else
   out = sysconf(_SC_PHYS_PAGES);
   out *= sysconf(_SC_PAGESIZE);

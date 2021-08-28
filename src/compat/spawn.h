@@ -18,6 +18,14 @@
 #ifndef SPAWN_H
 #define SPAWN_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 pid_t wake_spawn(const char *cmd, char **cmdline, char **environ);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

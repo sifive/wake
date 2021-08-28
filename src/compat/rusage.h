@@ -18,7 +18,7 @@
 #ifndef RUSAGE_H
 #define RUSAGE_H
 
-#include <cstdint>
+#include <stdint.h>
 
 struct RUsage {
   double utime;    // Time spent running userspace in seconds
@@ -26,14 +26,21 @@ struct RUsage {
   uint64_t ibytes;   // read from disk
   uint64_t obytes;   // written to disk
   uint64_t membytes; // maximum resident set size
-
-  RUsage(); // initialize with 0
-  RUsage operator - (const RUsage &other) const;
 };
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern struct RUsage rusage_sub(struct RUsage x, struct RUsage y);
 
 // Resources used by all waited-for child processes.
 // This includes grandchildren if their parents waited for them.
 // This values reported only change after a call wait*()
-RUsage getRUsageChildren();
+extern struct RUsage getRUsageChildren();
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

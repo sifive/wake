@@ -18,7 +18,15 @@
 #ifndef SIGWINCH_H
 #define SIGWINCH_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // SIGWINCH is sadly not defined in any standard as yet.
 extern int wake_SIGWINCH;
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

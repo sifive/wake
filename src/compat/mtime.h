@@ -18,10 +18,18 @@
 #ifndef MTIME_H
 #define MTIME_H
 
-#include <cstdint>
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Return the modification timestamp in nanoseconds since 1970.
 // On error, returns -1 and sets errno.
-int64_t getmtime_ns(const char *file);
+extern int64_t getmtime_ns(const char *file);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif
