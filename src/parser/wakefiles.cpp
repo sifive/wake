@@ -64,7 +64,7 @@ bool push_files(std::vector<std::string> &out, const std::string &path, int dirf
 #ifdef DT_DIR
     }
 #endif
-std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
+    std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
     if (recurse) {
       if (name == ".build" || name == ".fuse" || name == ".git") continue;
       int fd = openat(dirfd, f->d_name, O_RDONLY);
@@ -349,7 +349,7 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
   std::string rel_libdir = make_relative(get_cwd(), make_canonical(abs_libdir));
 
   std::vector<std::string> acc;
-  if (access("share/wake/lib/core/boolean.wake", R_OK) != 0)
+  if (!workspace || access("share/wake/lib/core/boolean.wake", R_OK) != 0)
     if (push_files(acc, rel_libdir, exp, 0)) ok = false;
   if (workspace && push_files(acc, ".", exp, 0)) ok = false;
 
