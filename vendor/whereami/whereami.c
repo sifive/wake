@@ -1,6 +1,12 @@
 // (‑●‑●)> released under the WTFPL v2 license, by Gregory Pakosz (@gpakosz)
 // https://github.com/gpakosz/whereami
 
+#ifdef __linux__
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 // in case you want to #include "whereami.c" in a larger compilation unit
 #if !defined(WHEREAMI_H)
 #include "whereami.h"

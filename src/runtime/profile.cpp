@@ -19,10 +19,11 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <fstream>
-#include <iostream>
 #include <string.h>
 #include <errno.h>
+
+#include <fstream>
+#include <iostream>
 
 #include "util/execpath.h"
 #include "json/json5.h"

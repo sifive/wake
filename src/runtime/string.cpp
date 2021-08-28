@@ -23,13 +23,13 @@
 #include <sys/utsname.h>
 #include <errno.h>
 #include <string.h>
-#include <utf8proc.h>
 #include <unistd.h>
 #include <fcntl.h>
 
 #include <sstream>
 #include <fstream>
 
+#include "utf8proc/utf8proc.h"
 #include "util/shell.h"
 #include "util/unlink.h"
 #include "json/utf8.h"

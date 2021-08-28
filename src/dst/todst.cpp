@@ -19,11 +19,12 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <assert.h>
+#include <re2/re2.h>
+
 #include <sstream>
 #include <set>
 #include <algorithm>
-#include <assert.h>
-#include <re2/re2.h>
 
 #include "util/location.h"
 #include "util/diagnostic.h"
