@@ -836,17 +836,18 @@ private:
 
 int main(int argc, const char **argv) {
   std::string stdLib;
-  if (argc == 2) {
+  if (argc >= 2) {
     stdLib = argv[1];
   } else {
     stdLib = find_execpath() + "/../../share/wake/lib";
   }
+
   if (access((stdLib + "/core/boolean.wake").c_str(), F_OK) != -1) {
     LSP lsp(stdLib);
     // Process requests until something goes wrong
     lsp.processRequests();
   } else {
-    std::cerr << "Path to the wake standard library is invalid. Server will not be initialized." << std::endl;
+    std::cerr << "Path to the wake standard library (" << stdLib << ") is invalid. Server will not be initialized." << std::endl;
     return 1;
   }
 }

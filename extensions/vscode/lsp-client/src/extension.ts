@@ -23,7 +23,8 @@ export function activate(context: ExtensionContext) {
 	// Otherwise the run options are used
 	let serverOptions: ServerOptions = {
 		module: serverModule,
-		transport: TransportKind.stdio
+		transport: TransportKind.stdio,
+		args: [context.asAbsolutePath('/share/wake/lib')]
 	};
 
 	// Options to control the language client
