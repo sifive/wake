@@ -62,19 +62,19 @@ def emmake =
         None
 
 def emscriptenCFlags =
-    Nil
+    "-Wall", "-O2", Nil
 
 def emscriptenLFlags =
     "-s", "NODERAWFS=1", "-s", "ALLOW_MEMORY_GROWTH=1", Nil
 
 publish compileC =
-    emccFn (makeCompileC "wasm-c11-release"   _ (emscriptenCFlags ++ c11Flags ++ releaseCFlags))
+    emccFn (makeCompileC "wasm-c11-release"   _ (c11Flags ++ emscriptenCFlags))
 
 publish compileC =
-    emppFn (makeCompileC "wasm-cpp11-release" _ (emscriptenCFlags ++ cpp11Flags ++ releaseCFlags))
+    emppFn (makeCompileC "wasm-cpp11-release" _ (cpp11Flags ++ emscriptenCFlags))
 
 publish linkO =
-    emccFn (makeLinkO "wasm-c11-release"   _ (emscriptenLFlags ++ releaseLFlags))
+    emccFn (makeLinkO "wasm-c11-release"   _ emscriptenLFlags)
 
 publish linkO =
-    emppFn (makeLinkO "wasm-cpp11-release" _ (emscriptenLFlags ++ releaseLFlags))
+    emppFn (makeLinkO "wasm-cpp11-release" _ emscriptenLFlags)

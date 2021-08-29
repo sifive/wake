@@ -1,0 +1,31 @@
+--- util/mutex.h.orig	2021-08-29 10:01:58.819148565 -0700
++++ util/mutex.h	2021-08-29 10:02:29.611102870 -0700
+@@ -26,7 +26,9 @@
+ #endif
+ #endif
+ 
+-#if defined(MUTEX_IS_WIN32_SRWLOCK)
++#if defined(NO_THREADS)
++typedef char MutexType;
++#elif defined(MUTEX_IS_WIN32_SRWLOCK)
+ typedef SRWLOCK MutexType;
+ #elif defined(MUTEX_IS_PTHREAD_RWLOCK)
+ #include <pthread.h>
+@@ -64,7 +66,16 @@
+   Mutex& operator=(const Mutex&) = delete;
+ };
+ 
+-#if defined(MUTEX_IS_WIN32_SRWLOCK)
++#if defined(NO_THREADS)
++
++Mutex::Mutex()             { }
++Mutex::~Mutex()            { }
++void Mutex::Lock()         { }
++void Mutex::Unlock()       { }
++void Mutex::ReaderLock()   { }
++void Mutex::ReaderUnlock() { }
++
++#elif defined(MUTEX_IS_WIN32_SRWLOCK)
+ 
+ Mutex::Mutex()             { InitializeSRWLock(&mutex_); }
+ Mutex::~Mutex()            { }

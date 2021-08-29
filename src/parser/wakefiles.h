@@ -18,9 +18,9 @@
 #ifndef WAKEFILES_H
 #define WAKEFILES_H
 
-#include <re2/re2.h>
+namespace re2 { class RE2; };
 
-bool push_files(std::vector<std::string> &out, const std::string &path, const RE2& re, size_t skip);
+bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2& re, size_t skip);
 std::string make_canonical(const std::string &x);
 std::string make_relative(std::string &&dir, std::string &&path);
 std::string glob2regexp(const std::string &glob);

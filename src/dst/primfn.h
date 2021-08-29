@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <vector>
+#include <map>
 
 struct Scope;
 struct Value;

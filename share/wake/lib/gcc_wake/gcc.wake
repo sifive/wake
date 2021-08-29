@@ -60,12 +60,12 @@ publish compileC = makeCompileC "native-cpp11-release" (which "c++") (cpp11Flags
 publish compileC = makeCompileC "native-cpp11-static"  (which "c++") (cpp11Flags ++ staticCFlags)
 
 export topic linkO: Pair String ((extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error)
-publish linkO = makeLinkO "native-c11-debug"     (which "cc") (debugLFlags)
-publish linkO = makeLinkO "native-c11-release"   (which "cc") (releaseLFlags)
-publish linkO = makeLinkO "native-c11-static"    (which "cc") (staticLFlags)
-publish linkO = makeLinkO "native-cpp11-debug"   (which "c++") (debugLFlags)
-publish linkO = makeLinkO "native-cpp11-release" (which "c++") (releaseLFlags)
-publish linkO = makeLinkO "native-cpp11-static"  (which "c++") (staticLFlags)
+publish linkO = makeLinkO "native-c11-debug"     (which "cc") (c11Flags ++ debugLFlags)
+publish linkO = makeLinkO "native-c11-release"   (which "cc") (c11Flags ++ releaseLFlags)
+publish linkO = makeLinkO "native-c11-static"    (which "cc") (c11Flags ++ staticLFlags)
+publish linkO = makeLinkO "native-cpp11-debug"   (which "c++") (cpp11Flags ++ debugLFlags)
+publish linkO = makeLinkO "native-cpp11-release" (which "c++") (cpp11Flags ++ releaseLFlags)
+publish linkO = makeLinkO "native-cpp11-static"  (which "c++") (cpp11Flags ++ staticLFlags)
 
 def pickVariant variant variants =
     match (find (variant ==* _.getPairFirst) variants)
