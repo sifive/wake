@@ -21,6 +21,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include <re2/re2.h>
 
 #include <sstream>
 
@@ -265,25 +266,24 @@ maybe_set_dot_nl(T &x) {
   // noop
 }
 
-// This monstrous method is the only way I could find to
-// portably call methods on a temporary without a copy.
-// (older re2 did not have copy-construction for Options)
-static const RE2::Options &defops(RE2::Options &&options) {
-  options.set_log_errors(false);
-  options.set_one_line(true);
-  maybe_set_dot_nl(options);
-  return options;
+struct MyOpts : public RE2::Options {
+  MyOpts();
+};
+
+MyOpts::MyOpts() {
+  set_log_errors(false);
+  set_one_line(true);
+  maybe_set_dot_nl(*this);
 }
 
-RegExp::RegExp(Heap &h, const re2::StringPiece &regexp, const RE2::Options &opts)
+static MyOpts opts;
+
+RegExp::RegExp(Heap &h, const re2::StringPiece &regexp)
  : Parent(h), exp(std::make_shared<RE2>(
      has_set_dot_nl<RE2::Options>::value
      ? re2::StringPiece(regexp)
      : re2::StringPiece("(?s)" + regexp.as_string()),
      opts)) { }
-
-RegExp::RegExp(Heap &h, const re2::StringPiece &regexp)
- : RegExp(h, regexp, defops(RE2::Options())) { }
 
 void RegExp::format(std::ostream &os, FormatState &state) const {
   if (APP_PRECEDENCE < state.p()) os << "(";

@@ -24,9 +24,13 @@
 #include <limits>
 #include <gmp.h>
 #include <stdlib.h>
-#include <re2/re2.h>
 
 #include "gc.h"
+
+namespace re2 {
+  class RE2;
+  class StringPiece;
+}
 
 #define APP_PRECEDENCE 14
 
@@ -176,9 +180,8 @@ struct Double final : public GCObject<Double, Value> {
 struct RegExp final : public GCObject<RegExp, DestroyableObject> {
   typedef GCObject<RegExp, DestroyableObject> Parent;
 
-  std::shared_ptr<RE2> exp;
+  std::shared_ptr<re2::RE2> exp;
 
-  RegExp(Heap &h, const re2::StringPiece &regexp, const RE2::Options &opts);
   RegExp(Heap &h, const re2::StringPiece &regexp);
 
   void format(std::ostream &os, FormatState &state) const override;
