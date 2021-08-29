@@ -78,13 +78,6 @@ public:
     explicit LSP(std::string _stdLib) : stdLib(std::move(_stdLib)) {}
 
     void processRequests() {
-      // Begin log
-      std::ofstream clientLog;
-      clientLog.open("requests_log.txt", std::ios_base::app); // append instead of overwriting
-      std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-      clientLog << std::endl
-        << "Log start: " << ctime(&currentTime);
-
       while (true) {
         size_t json_size = 0;
         // Read header lines until an empty line
@@ -115,9 +108,6 @@ public:
         // Retrieve the content
         std::string content(json_size, ' ');
         std::cin.read(&content[0], json_size);
-
-        // Log the request
-        clientLog << content << std::endl;
 
         // Parse that content as JSON
         JAST request;
