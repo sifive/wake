@@ -34,14 +34,18 @@ def buildRE2WASM Unit =
     def emsdk =
         replace `/[^/]*$` "" emmake
 
+    def patch =
+        source "{here}/re2.patch"
+
     def job =
         """
             wget https://github.com/google/re2/archive/refs/tags/%{version}.tar.gz
             tar xvzf %{version}.tar.gz
             cd re2-%{version}
-            emmake make -j4 RE2_CXXFLAGS="-std=c++11 -I. -Wall" CXXFLAGS="-O2" obj/libre2.a
+            patch -p0 < ../%{relative here patch.getPathName}
+            emmake make -j4 RE2_CXXFLAGS="-std=c++11 -I. -Wall -DNO_THREADS" CXXFLAGS="-O2 -flto" obj/libre2.a
         """
-        | makePlan "compiling re2" (source "{here}/re2.wake", Nil)
+        | makePlan "compiling re2" (patch, Nil)
         | editPlanEnvironment (addEnvironmentPath emsdk)
         | setPlanDirectory here
         | runJob
@@ -54,7 +58,7 @@ def buildRE2WASM Unit =
         filter (matches `.*\.h` _.getPathName) outputs
 
     def objects =
-        filter (matches `.*\.a` _.getPathName) outputs
+        filter (matches `.*\.o` _.getPathName) outputs
 
     def cflags =
         "-I{here}/re2-{version}",
