@@ -43,7 +43,7 @@ def buildRE2WASM Unit =
             tar xvzf %{version}.tar.gz
             cd re2-%{version}
             patch -p0 < ../%{relative here patch.getPathName}
-            emmake make -j4 RE2_CXXFLAGS="-std=c++11 -I. -Wall -DNO_THREADS" CXXFLAGS="-O2 -flto" obj/libre2.a
+            emmake make -j4 RE2_CXXFLAGS="-std=c++11 -I. -Wall -DNO_THREADS" CXXFLAGS="-O2" obj/libre2.a
         """
         | makePlan "compiling re2" (patch, Nil)
         | editPlanEnvironment (addEnvironmentPath emsdk)
