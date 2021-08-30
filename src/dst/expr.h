@@ -239,29 +239,25 @@ struct File {
   Topics topics;
 };
 
-struct Package : public Expr {
+struct Package {
   std::string name;
   std::vector<File> files;
   Symbols package;
   Symbols exports; // subset of package; used to fill imports
 
-  static const TypeDescriptor type;
-  Package() : Expr(&type, LOCATION) { }
-
-  void format(std::ostream &os, int depth) const override;
+  void format(std::ostream &os, int depth) const;
 };
 
-struct Top : public Expr {
+struct Top {
   typedef std::map<std::string, std::unique_ptr<Package> > Packages;
   Packages packages;
   Symbols globals;
   const char *def_package;
   std::unique_ptr<Expr> body;
 
-  static const TypeDescriptor type;
   Top();
 
-  void format(std::ostream &os, int depth) const override;
+  void format(std::ostream &os, int depth) const;
 };
 
 // Created by transforming DefMap+Package+Top

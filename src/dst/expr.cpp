@@ -40,13 +40,11 @@ const TypeDescriptor Subscribe ::type("Subscribe");
 const TypeDescriptor Ascribe   ::type("Ascribe");
 const TypeDescriptor Match     ::type("Match");
 const TypeDescriptor DefMap    ::type("DefMap");
-const TypeDescriptor Package   ::type("Package");
-const TypeDescriptor Top       ::type("Top");
 // these are just useful for dumping json ast
 const TypeDescriptor VarDef    ::type("VarDef");
 const TypeDescriptor VarArg    ::type("VarArg");
 
-Top::Top() : Expr(&type, LOCATION), packages(), globals(), def_package(nullptr) {
+Top::Top() : packages(), globals(), def_package(nullptr) {
   Package *builtin = new Package();
   packages.insert(std::make_pair("builtin", std::unique_ptr<Package>(builtin)));
 
@@ -185,7 +183,7 @@ void DefMap::format(std::ostream &os, int depth) const {
 }
 
 void Package::format(std::ostream &os, int depth) const {
-  os << pad(depth) << "Package " << name << " @ " << location.file() << std::endl;
+  os << pad(depth) << "Package " << name << std::endl;
   exports.format("export", os, depth+2);
   for (auto &i : files) {
     i.content->format(os, depth+2);

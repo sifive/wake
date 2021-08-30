@@ -963,159 +963,161 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
          iter = iter->parent)
       ++iter->defs[0].uses;
     return expr;
-  } else if (expr->type == &Top::type) {
-    ResolveBinding gbinding(nullptr);   // global mapping + qualified defines
-    ResolveBinding pbinding(&gbinding); // package mapping
-    ResolveBinding ibinding(&pbinding); // file import mapping
-    ResolveBinding dbinding(&ibinding); // file local mapping
-    size_t publish = 0;
-    bool fail = false;
-    for (auto &p : top.packages) {
-      for (auto &f : p.second->files) {
-        for (auto &d : f.content->defs) {
-          gbinding.index[d.first] = gbinding.defs.size();
-          gbinding.defs.emplace_back(d.first, d.second.location, std::move(d.second.body), std::move(d.second.typeVars));
-        }
-        for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
-          auto name = "publish " + it->first + " " + std::to_string(++publish);
-          gbinding.index[name] = gbinding.defs.size();
-          gbinding.defs.emplace_back(name, it->second.location, std::move(it->second.body));
-        }
-      }
-    }
-    for (auto &p : top.packages) {
-      for (auto &f : p.second->files) {
-        for (auto &t : f.topics) {
-          auto name = "topic " + t.first + "@" + p.first;
-          gbinding.index[name] = gbinding.defs.size();
-          gbinding.defs.emplace_back(name, t.second.location,
-            std::unique_ptr<Expr>(new VarRef(t.second.location, "Nil@wake")));
-        }
-      }
-    }
-    gbinding.symbols.push_back(&top.globals);
-    for (auto &p : top.packages) {
-      pbinding.symbols.clear();
-      pbinding.symbols.push_back(&p.second->package);
-      for (auto &f : p.second->files) {
-        ibinding.symbols = process_import(top, f.content->imports, f.content->location);
-        dbinding.symbols.clear();
-        dbinding.symbols.push_back(&f.local);
-        for (size_t i = 0; i < f.content->defs.size(); ++i) {
-          ResolveDef &def = gbinding.defs[gbinding.current_index];
-          def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &dbinding);
-          ++gbinding.current_index;
-        }
-        for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
-          ResolveDef &def = gbinding.defs[gbinding.current_index];
-          auto qualified = rebind_publish(&dbinding, def.location, it->first);
-          size_t at = qualified.find('@');
-          if (at != std::string::npos) {
-            def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &dbinding);
-            ResolveDef &topicdef = gbinding.defs[gbinding.index.find("topic " + qualified)->second];
-            Location &l = topicdef.expr->location;
-            topicdef.expr = std::unique_ptr<Expr>(new App(l, new App(l,
-              new VarRef(l, "binary ++@wake"),
-              new VarRef(def.expr->location, def.name)),
-              topicdef.expr.release()));
-          } else {
-            fail = true;
-          }
-          ++gbinding.current_index;
-        }
-        for (auto &t : f.topics) {
-          if (!qualify_type(&dbinding, t.second.type))
-            fail = true;
-        }
-      }
-    }
-
-    for (auto &p : top.packages) {
-      for (auto &f : p.second->files) {
-        for (auto &t : f.topics) {
-          ResolveDef &def = gbinding.defs[gbinding.current_index];
-          def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &gbinding);
-          ++gbinding.current_index;
-
-          // Form the type required for publishes
-          std::vector<AST> args;
-          args.emplace_back(t.second.type); // qualified by prior pass
-          AST signature(t.second.type.region, "List@wake", std::move(args));
-
-          // Insert Ascribe requirements on all publishes
-          Location l = def.expr->location;
-          Expr *next = nullptr;
-          for (Expr *iter = def.expr.get(); iter->type == &App::type; iter = next) {
-            App *app1 = static_cast<App*>(iter);
-            App *app2 = static_cast<App*>(app1->fn.get());
-            app2->val = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), app2->val.release(), l));
-            next = app1->val.get();
-          }
-
-          // If the topic is empty, still force the type
-          if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), def.expr.release(), l));
-        }
-      }
-    }
-
-    Package &defp = *top.packages[top.def_package];
-    gbinding.current_index = -1;
-    pbinding.symbols.clear();
-    ibinding.symbols.clear();
-    dbinding.symbols.clear();
-    dbinding.symbols.push_back(&defp.package);
-    std::set<std::string> imports;
-    for (auto &file : defp.files)
-      for (auto &bulk : file.content->imports.import_all)
-        imports.insert(bulk);
-    for (auto &imp : imports) {
-      auto it = top.packages.find(imp);
-      if (it != top.packages.end())
-        ibinding.symbols.push_back(&it->second->exports);
-    }
-
-    std::unique_ptr<Expr> body = fracture(top, true, name, std::move(top.body), &dbinding);
-
-    // Mark exports and globals as uses
-    for (auto &g: top.globals.defs) {
-      auto it = gbinding.index.find(g.second.qualified);
-      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
-    }
-    for (auto &g: top.globals.topics) {
-      auto it = gbinding.index.find("topic " + g.second.qualified);
-      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
-    }
-    for (auto &p : top.packages) {
-      for (auto &e : p.second->exports.defs) {
-        auto it = gbinding.index.find(e.second.qualified);
-        if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
-      }
-      for (auto &e : p.second->exports.topics) {
-        auto it = gbinding.index.find("topic " + e.second.qualified);
-        if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
-      }
-    }
-
-    // Report unused definitions
-    for (auto &def : gbinding.defs) {
-      if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
-        size_t at = def.name.find_first_of('@');
-        std::string name = def.name.substr(0, at);
-        std::ostringstream message;
-        message
-          << "unused top-level definition of '" << name
-          << "'; consider removing or renaming to _" <<  name;
-        reporter->reportWarning(def.location, message.str());
-      }
-    }
-
-    auto out = fracture_binding(top.location, gbinding.defs, std::move(body));
-    if (fail) out.reset();
-    return out;
   } else {
     // Literal/Get
     return expr;
   }
+}
+
+static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
+  ResolveBinding gbinding(nullptr);   // global mapping + qualified defines
+  ResolveBinding pbinding(&gbinding); // package mapping
+  ResolveBinding ibinding(&pbinding); // file import mapping
+  ResolveBinding dbinding(&ibinding); // file local mapping
+  size_t publish = 0;
+  bool fail = false;
+  for (auto &p : top->packages) {
+    for (auto &f : p.second->files) {
+      for (auto &d : f.content->defs) {
+        gbinding.index[d.first] = gbinding.defs.size();
+        gbinding.defs.emplace_back(d.first, d.second.location, std::move(d.second.body), std::move(d.second.typeVars));
+      }
+      for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
+        auto name = "publish " + it->first + " " + std::to_string(++publish);
+        gbinding.index[name] = gbinding.defs.size();
+        gbinding.defs.emplace_back(name, it->second.location, std::move(it->second.body));
+      }
+    }
+  }
+  for (auto &p : top->packages) {
+    for (auto &f : p.second->files) {
+      for (auto &t : f.topics) {
+        auto name = "topic " + t.first + "@" + p.first;
+        gbinding.index[name] = gbinding.defs.size();
+        gbinding.defs.emplace_back(name, t.second.location,
+          std::unique_ptr<Expr>(new VarRef(t.second.location, "Nil@wake")));
+      }
+    }
+  }
+  gbinding.symbols.push_back(&top->globals);
+  for (auto &p : top->packages) {
+    pbinding.symbols.clear();
+    pbinding.symbols.push_back(&p.second->package);
+    for (auto &f : p.second->files) {
+      ibinding.symbols = process_import(*top, f.content->imports, f.content->location);
+      dbinding.symbols.clear();
+      dbinding.symbols.push_back(&f.local);
+      for (size_t i = 0; i < f.content->defs.size(); ++i) {
+        ResolveDef &def = gbinding.defs[gbinding.current_index];
+        def.expr = fracture(*top, false, trim(def.name), std::move(def.expr), &dbinding);
+        ++gbinding.current_index;
+      }
+      for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
+        ResolveDef &def = gbinding.defs[gbinding.current_index];
+        auto qualified = rebind_publish(&dbinding, def.location, it->first);
+        size_t at = qualified.find('@');
+        if (at != std::string::npos) {
+          def.expr = fracture(*top, false, trim(def.name), std::move(def.expr), &dbinding);
+          ResolveDef &topicdef = gbinding.defs[gbinding.index.find("topic " + qualified)->second];
+          Location &l = topicdef.expr->location;
+          topicdef.expr = std::unique_ptr<Expr>(new App(l, new App(l,
+            new VarRef(l, "binary ++@wake"),
+            new VarRef(def.expr->location, def.name)),
+            topicdef.expr.release()));
+        } else {
+          fail = true;
+        }
+        ++gbinding.current_index;
+      }
+      for (auto &t : f.topics) {
+        if (!qualify_type(&dbinding, t.second.type))
+          fail = true;
+      }
+    }
+  }
+
+  for (auto &p : top->packages) {
+    for (auto &f : p.second->files) {
+      for (auto &t : f.topics) {
+        ResolveDef &def = gbinding.defs[gbinding.current_index];
+        def.expr = fracture(*top, false, trim(def.name), std::move(def.expr), &gbinding);
+        ++gbinding.current_index;
+
+        // Form the type required for publishes
+        std::vector<AST> args;
+        args.emplace_back(t.second.type); // qualified by prior pass
+        AST signature(t.second.type.region, "List@wake", std::move(args));
+
+        // Insert Ascribe requirements on all publishes
+        Location l = def.expr->location;
+        Expr *next = nullptr;
+        for (Expr *iter = def.expr.get(); iter->type == &App::type; iter = next) {
+          App *app1 = static_cast<App*>(iter);
+          App *app2 = static_cast<App*>(app1->fn.get());
+          app2->val = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), app2->val.release(), l));
+          next = app1->val.get();
+        }
+
+        // If the topic is empty, still force the type
+        if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), def.expr.release(), l));
+      }
+    }
+  }
+
+  Package &defp = *top->packages[top->def_package];
+  gbinding.current_index = -1;
+  pbinding.symbols.clear();
+  ibinding.symbols.clear();
+  dbinding.symbols.clear();
+  dbinding.symbols.push_back(&defp.package);
+  std::set<std::string> imports;
+  for (auto &file : defp.files)
+    for (auto &bulk : file.content->imports.import_all)
+      imports.insert(bulk);
+  for (auto &imp : imports) {
+    auto it = top->packages.find(imp);
+    if (it != top->packages.end())
+      ibinding.symbols.push_back(&it->second->exports);
+  }
+
+  std::unique_ptr<Expr> body = fracture(*top, true, "", std::move(top->body), &dbinding);
+
+  // Mark exports and globals as uses
+  for (auto &g: top->globals.defs) {
+    auto it = gbinding.index.find(g.second.qualified);
+    if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+  }
+  for (auto &g: top->globals.topics) {
+    auto it = gbinding.index.find("topic " + g.second.qualified);
+    if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+  }
+  for (auto &p : top->packages) {
+    for (auto &e : p.second->exports.defs) {
+      auto it = gbinding.index.find(e.second.qualified);
+      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+    }
+    for (auto &e : p.second->exports.topics) {
+      auto it = gbinding.index.find("topic " + e.second.qualified);
+      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+    }
+  }
+
+  // Report unused definitions
+  for (auto &def : gbinding.defs) {
+    if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
+      size_t at = def.name.find_first_of('@');
+      std::string name = def.name.substr(0, at);
+      std::ostringstream message;
+      message
+        << "unused top-level definition of '" << name
+        << "'; consider removing or renaming to _" <<  name;
+      reporter->reportWarning(def.location, message.str());
+    }
+  }
+
+  auto out = fracture_binding(body->location, gbinding.defs, std::move(body));
+  if (fail) out.reset();
+  return out;
 }
 
 struct NameRef {
@@ -1468,10 +1470,9 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
 }
 
 std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap, bool &isTreeBuilt) {
+  std::unique_ptr<Expr> out = fracture(std::move(top));
   NameBinding bottom;
   ExploreState state(pmap);
-  Top &topr = *top;
-  std::unique_ptr<Expr> out = fracture(topr, false, "", std::move(top), 0);
   if (out && !explore(out.get(), state, &bottom)) isTreeBuilt = false;
   return out;
 }
