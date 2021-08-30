@@ -36,7 +36,7 @@ FileContent::FileContent(const char *filename_)
     newlines.push_back(0);
 }
 
-void FileContent::newline(const uint8_t *first_column)
+void FileContent::addNewline(const uint8_t *first_column)
 {
     newlines.push_back(first_column - start);
 }

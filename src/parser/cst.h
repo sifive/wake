@@ -25,6 +25,8 @@
 
 #include "util/rank.h"
 #include "util/location.h"
+#include "util/segment.h"
+#include "util/fragment.h"
 
 #define CST_APP		128
 #define CST_ARITY	129
@@ -67,15 +69,6 @@
 class FileContent;
 class CSTElement;
 class DiagnosticReporter;
-
-struct StringSegment {
-    const uint8_t *start;
-    const uint8_t *end;
-
-    size_t size() const { return end - start; }
-    Location location(const FileContent &fcontent) const;
-    std::string str() const;
-};
 
 std::ostream & operator << (std::ostream &os, StringSegment token);
 
@@ -137,8 +130,9 @@ public:
     bool isNode() const;
 
     uint8_t id() const;
-    StringSegment content() const;
-    Location location() const;
+    FileFragment fragment() const;
+    StringSegment content() const { return fragment().segment(); }
+    Location location() const { return fragment().location(); }
 
     void nextSiblingElement();
     void nextSiblingNode();

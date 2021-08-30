@@ -186,23 +186,18 @@ uint8_t CSTElement::id() const {
     }
 }
 
-StringSegment CSTElement::content() const {
-    StringSegment out;
-    const uint8_t *start = cst->file->start;
+FileFragment CSTElement::fragment() const {
+    uint32_t start, end;
     if (isNode()) {
         CSTNode n = cst->nodes[node];
-        out.start = start + n.begin;
-        out.end   = start + n.end;
+        start = n.begin;
+        end   = n.end;
     } else {
-        out.start = start + token;
-        out.end   = start + cst->token_starts.next1(token+1);
+        start = token;
+        end   = cst->token_starts.next1(token+1);
     }
-    return out;
-}
 
-Location CSTElement::location() const {
-    StringSegment x = content();
-    return x.location(*cst->file);
+    return FileFragment(cst->file, start, end);
 }
 
 void CSTElement::nextSiblingElement() {
@@ -267,14 +262,6 @@ CSTElement CSTElement::firstChildNode() const {
         out.node = out.limit = out.token = out.end = 0;
     }
     return out;
-}
-
-Location StringSegment::location(const FileContent &fcontent) const {
-    return Location(fcontent.filename, fcontent.coordinates(start), fcontent.coordinates(end!=start?end-1:end));
-}
-
-std::string StringSegment::str() const {
-    return std::string(reinterpret_cast<const char*>(start), end-start);
 }
 
 std::ostream & operator << (std::ostream &os, StringSegment tinfo) {

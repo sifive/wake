@@ -49,7 +49,7 @@
   do {                                                                                 \
     std::stringstream sstr;                                                            \
     sstr << "syntax error; " << sstream;                                               \
-    Location l = token.location(*pinfo.fcontent);                                      \
+    Location l = FileFragment(pinfo.fcontent, token).location();                       \
     pinfo.reporter->reportError(l, sstr.str());                                        \
   } while (0)
 }
@@ -452,12 +452,12 @@ bool ParseShifts(void *p, int yymajor) {
   } else {
     ss << "which is inappropriate here";
   }
-  pinfo.reporter->reportError(yyminor.location(*pinfo.fcontent), ss.str());
+  pinfo.reporter->reportError(FileFragment(pinfo.fcontent, yyminor).location(), ss.str());
 }
 
 %parse_failure {
   StringSegment ti;
   ti.start = pinfo.fcontent->start;
   ti.end = pinfo.fcontent->end;
-  pinfo.reporter->reportError(ti.location(*pinfo.fcontent), "Parser was unable to proceed");
+  pinfo.reporter->reportError(FileFragment(pinfo.fcontent, ti).location(), "Parser was unable to proceed");
 }

@@ -26,6 +26,7 @@
 
 #include "util/file.h"
 #include "util/diagnostic.h"
+#include "util/segment.h"
 #include "lexer.h"
 #include "parser.h"
 #include "syntax.h"
@@ -105,7 +106,7 @@ void parseWake(ParseInfo pi) {
                 // Whitespace wastes the lookahead token, making the grammar LR(2).
                 continue;
             } else if (token.id == TOKEN_NL) {
-                pi.fcontent->newline(token.end);
+                pi.fcontent->addNewline(token.end);
                 if (in_multiline_string || in_legacy_string) {
                     break;
                 } else {
@@ -140,7 +141,7 @@ void parseWake(ParseInfo pi) {
             case TOKEN_NL:
                 // We just processed a completely empty line. Do not adjust indentation level!
                 // Discard prior NL WS? sequence, and restart indentation processing at this NL.
-                pi.fcontent->newline(token.end);
+                pi.fcontent->addNewline(token.end);
                 nl = token;
                 state = STATE_NL;
                 continue;
@@ -167,7 +168,7 @@ void parseWake(ParseInfo pi) {
                         tws.start = nl.end;
                         tws.end = ws.end;
                         ss << "syntax error; whitespace neither indents the previous line nor matches a prior indentation level";
-                        pi.reporter->reportError(tws.location(*pi.fcontent), ss.str());
+                        pi.reporter->reportError(FileFragment(pi.fcontent, tws).location(), ss.str());
                     }
                 }
 
@@ -221,7 +222,7 @@ void parseWake(ParseInfo pi) {
             std::stringstream ss;
             ss << "syntax error; found illegal token " << tinfo
                << ", but handling it like '" << symbolExample(token.id) << "'";
-            pi.reporter->reportError(tinfo.location(*pi.fcontent), ss.str());
+            pi.reporter->reportError(FileFragment(pi.fcontent, tinfo).location(), ss.str());
         }
 
         Parse(parser, token.id, tinfo, pi);

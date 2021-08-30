@@ -34,7 +34,7 @@ public:
     const uint8_t *end;
 
     Coordinates coordinates(const uint8_t *position) const;
-    void newline(const uint8_t *first_column);
+    void addNewline(const uint8_t *first_column);
 
 private:
     std::vector<size_t> newlines;
