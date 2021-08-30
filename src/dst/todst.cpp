@@ -40,7 +40,7 @@
 
 static std::string getIdentifier(CSTElement element) {
   assert (element.id() == CST_ID || element.id() == CST_OP);
-  TokenInfo ti = element.firstChildElement().content();
+  StringSegment ti = element.firstChildElement().content();
   return relex_id(ti.start, ti.end);
 }
 
@@ -848,7 +848,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
 static void mstr_add(std::ostream &os, CSTElement token, std::string::size_type wsCut) {
   uint8_t nid = token.id();
   while (!token.empty()) {
-    TokenInfo ti = token.content();
+    StringSegment ti = token.content();
     token.nextSiblingElement();
     uint8_t id = nid;
     nid = token.id();
@@ -938,7 +938,7 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
   uint8_t id = child.id();
   switch (id) {
     case TOKEN_STR_RAW: {
-      TokenInfo ti = child.content();
+      StringSegment ti = child.content();
       ++ti.start;
       --ti.end;
       return new Literal(child.location(), ti.str(), &Data::typeString);
@@ -947,11 +947,11 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
     case TOKEN_STR_MID:
     case TOKEN_STR_OPEN:
     case TOKEN_STR_CLOSE: {
-      TokenInfo ti = child.content();
+      StringSegment ti = child.content();
       return new Literal(child.location(), relex_string(ti.start, ti.end), &Data::typeString);
     }
     case TOKEN_REG_SINGLE: {
-      TokenInfo ti = child.content();
+      StringSegment ti = child.content();
       std::string str = relex_regexp(id, ti.start, ti.end);
       re2::RE2 check(str);
       if (!check.ok()) ERROR(child.location(), "illegal regular expression: " << check.error());
@@ -960,7 +960,7 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
     case TOKEN_REG_MID:
     case TOKEN_REG_OPEN:
     case TOKEN_REG_CLOSE: {
-      TokenInfo ti = child.content();
+      StringSegment ti = child.content();
       // rcat expects String tokens, not RegExp
       return new Literal(child.location(), relex_regexp(id, ti.start, ti.end), &Data::typeString);
     }
@@ -991,7 +991,7 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
     }
     case TOKEN_LSTR_MID:
     case TOKEN_MSTR_MID: {
-      TokenInfo ti = child.content();
+      StringSegment ti = child.content();
       return new Literal(child.location(), relex_mstring(ti.start+1, ti.end-2), &Data::typeString);
     }
     case TOKEN_LSTR_RESUME:
@@ -1217,7 +1217,7 @@ Expr *dst_expr(CSTElement expr) {
       return out;
     }
     case CST_PRIM: {
-      TokenInfo content = expr.firstChildNode().firstChildElement().content();
+      StringSegment content = expr.firstChildNode().firstChildElement().content();
       Prim *out = new Prim(expr.location(), relex_string(content.start, content.end));
       out->flags |= FLAG_AST;
       return out;

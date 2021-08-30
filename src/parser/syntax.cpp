@@ -36,7 +36,7 @@
 #define STATE_NL_WS	2
 
 void parseWake(ParseInfo pi) {
-    TokenInfo tinfo, tnl;
+    StringSegment tinfo, tnl;
 
     std::vector<int> indent_stack;
     std::string indent;
@@ -163,7 +163,7 @@ void parseWake(ParseInfo pi) {
 
                     if (newdent.size() > indent.size()) {
                         std::stringstream ss;
-                        TokenInfo tws;
+                        StringSegment tws;
                         tws.start = nl.end;
                         tws.end = ws.end;
                         ss << "syntax error; whitespace neither indents the previous line nor matches a prior indentation level";

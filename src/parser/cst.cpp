@@ -35,12 +35,12 @@ CSTNode::CSTNode(uint8_t id_, uint32_t size_, uint32_t begin_, uint32_t end_)
 {
 }
 
-void CSTBuilder::addToken(uint8_t id, TokenInfo token) {
+void CSTBuilder::addToken(uint8_t id, StringSegment token) {
     token_ids.push_back(id);
     token_starts.set(token.start - file->start);
 }
 
-void CSTBuilder::addNode(uint8_t id, TokenInfo begin) {
+void CSTBuilder::addNode(uint8_t id, StringSegment begin) {
     uint32_t b = begin.start - file->start;
     uint32_t e = begin.end   - file->start;
     nodes.emplace_back(id, 1, b, e);
@@ -59,7 +59,7 @@ void CSTBuilder::addNode(uint8_t id, uint32_t children) {
     nodes.emplace_back(id, size, b, e);
 }
 
-void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children) {
+void CSTBuilder::addNode(uint8_t id, StringSegment begin, uint32_t children) {
     uint32_t b = 0;
     uint32_t e = nodes.empty()?0:nodes.back().end;
 
@@ -75,7 +75,7 @@ void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children) {
     nodes.emplace_back(id, size, b, e);
 }
 
-void CSTBuilder::addNode(uint8_t id, uint32_t children, TokenInfo end) {
+void CSTBuilder::addNode(uint8_t id, uint32_t children, StringSegment end) {
     uint32_t b = 0;
     uint32_t e = nodes.empty()?0:nodes.back().end;
 
@@ -91,7 +91,7 @@ void CSTBuilder::addNode(uint8_t id, uint32_t children, TokenInfo end) {
     nodes.emplace_back(id, size, b, e);
 }
 
-void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children, TokenInfo end) {
+void CSTBuilder::addNode(uint8_t id, StringSegment begin, uint32_t children, StringSegment end) {
     uint32_t b2 = 0;
 
     int size = 1;
@@ -186,8 +186,8 @@ uint8_t CSTElement::id() const {
     }
 }
 
-TokenInfo CSTElement::content() const {
-    TokenInfo out;
+StringSegment CSTElement::content() const {
+    StringSegment out;
     const uint8_t *start = cst->file->start;
     if (isNode()) {
         CSTNode n = cst->nodes[node];
@@ -201,7 +201,7 @@ TokenInfo CSTElement::content() const {
 }
 
 Location CSTElement::location() const {
-    TokenInfo x = content();
+    StringSegment x = content();
     return x.location(*cst->file);
 }
 
@@ -269,15 +269,15 @@ CSTElement CSTElement::firstChildNode() const {
     return out;
 }
 
-Location TokenInfo::location(const FileContent &fcontent) const {
+Location StringSegment::location(const FileContent &fcontent) const {
     return Location(fcontent.filename, fcontent.coordinates(start), fcontent.coordinates(end!=start?end-1:end));
 }
 
-std::string TokenInfo::str() const {
+std::string StringSegment::str() const {
     return std::string(reinterpret_cast<const char*>(start), end-start);
 }
 
-std::ostream & operator << (std::ostream &os, TokenInfo tinfo) {
+std::ostream & operator << (std::ostream &os, StringSegment tinfo) {
     LexerOutput token, next;
 
     os << "'";

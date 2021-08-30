@@ -37,7 +37,7 @@ const char *symbolExample(int symbol);
 
 void *ParseAlloc(void *(*mallocProc)(size_t));
 void ParseFree(void *p, void (*freeProc)(void*));
-void Parse(void *p, int yymajor, struct TokenInfo yyminor, ParseInfo pi);
+void Parse(void *p, int yymajor, struct StringSegment yyminor, ParseInfo pi);
 void ParseTrace(FILE *TraceFILE, char *zTracePrompt);
 bool ParseShifts(void *p, int yymajor);
 void parseWake(ParseInfo pi);

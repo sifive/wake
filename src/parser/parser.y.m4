@@ -19,7 +19,7 @@
 %extra_argument {ParseInfo pinfo}
 
 %token_prefix TOKEN_
-%token_type {TokenInfo}
+%token_type {StringSegment}
 
 %default_type {size_t}
 %default_destructor { pop($$); }
@@ -456,7 +456,7 @@ bool ParseShifts(void *p, int yymajor) {
 }
 
 %parse_failure {
-  TokenInfo ti;
+  StringSegment ti;
   ti.start = pinfo.fcontent->start;
   ti.end = pinfo.fcontent->end;
   pinfo.reporter->reportError(ti.location(*pinfo.fcontent), "Parser was unable to proceed");
