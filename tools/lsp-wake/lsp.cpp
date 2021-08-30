@@ -33,6 +33,7 @@
 #include <functional>
 #include <utility>
 #include <unistd.h>
+#include <algorithm>
 
 #include "util/location.h"
 #include "util/execpath.h"
@@ -42,6 +43,7 @@
 #include "parser/cst.h"
 #include "parser/wakefiles.h"
 #include "parser/lexer.h"
+#include "parser/parser.h"
 #include "dst/bind.h"
 #include "dst/todst.h"
 #include "dst/expr.h"
@@ -153,12 +155,19 @@ private:
         std::string type;
         SymbolKind symbolKind;
         bool isGlobal;
+        std::string documentation;
+
         Definition(std::string _name, Location _location, std::string _type, SymbolKind _symbolKind, bool _isGlobal) :
           name(std::move(_name)), location(_location), type(std::move(_type)), symbolKind(_symbolKind),
           isGlobal(_isGlobal) {}
+
+        bool operator < (const Definition &def) const {
+          return location < def.location;
+        }
     };
     std::vector<Definition> definitions;
     std::vector<Definition> packages;
+    std::vector<std::pair<Location, std::string>> comments;
     std::map<std::string, LspMethod> essentialMethods = {
       {"initialize",                      &LSP::initialize},
       {"initialized",                     &LSP::initialized},
@@ -369,10 +378,66 @@ private:
       sendMessage(message);
     }
 
+    static std::string sanitizeComment(std::string comment) {
+      std::size_t comment_from = 0;
+      for (std::size_t i = 0; i + 1 < comment.size(); ++i) {
+        if (comment[i] == '\n' && comment[i + 1] == '\n') comment_from = i + 2;
+      }
+      if (comment_from < comment.size()) {
+        comment = comment.substr(comment_from);
+      }
+
+      std::vector <size_t> commentHashtagIndices;
+      if (!comment.empty() && comment[0] == '#')
+        commentHashtagIndices.push_back(0);
+      for (std::size_t i = 0; i + 1 < comment.size(); ++i) {
+        if (comment[i] == '\n' && comment[i + 1] == '#')
+          commentHashtagIndices.push_back(i + 1);
+      }
+      for (std::size_t i = 0; i < commentHashtagIndices.size(); ++i) {
+        comment.erase(commentHashtagIndices[i] - i, 1);
+      }
+      if (!comment.empty() && comment[0] == '\n')
+        comment.erase(0, 1);
+      return comment;
+    }
+
+    void fillDefinitionDocumentationFields() {
+      auto definitions_iterator = definitions.begin();
+      auto comments_iterator = comments.begin();
+
+      std::string comment;
+      Location lastCommentLocation("");
+
+      while (definitions_iterator != definitions.end() && comments_iterator != comments.end()) {
+        if (definitions_iterator->location < comments_iterator->first) {
+          if (std::strcmp(lastCommentLocation.filename, definitions_iterator->location.filename) != 0) {
+            comment = "";
+          }
+          comment = sanitizeComment(comment);
+          definitions_iterator->documentation = comment;
+          comment = "";
+          ++definitions_iterator;
+        } else {
+          if (std::strcmp(lastCommentLocation.filename, comments_iterator->first.filename) != 0) {
+            comment = "";
+          }
+          comment += comments_iterator->second;
+          lastCommentLocation = comments_iterator->first;
+          ++comments_iterator;
+        }
+      }
+
+      if (definitions_iterator != definitions.end()) {
+        definitions_iterator->documentation = comment;
+      }
+    }
+
     void diagnoseProject() {
       uses.clear();
       definitions.clear();
       packages.clear();
+      comments.clear();
 
       bool enumok = true;
       auto allFiles = find_all_wakefiles(enumok, true, false, stdLib);
@@ -397,7 +462,14 @@ private:
           newFiles[file] = std::move(it->second);
         }
         CST cst(*fcontent, lspReporter);
+        CSTElement root = cst.root();
         dst_top(cst.root(), *top);
+
+        for (CSTElement topdef = root.firstChildElement(); !topdef.empty(); topdef.nextSiblingElement()) {
+          if (topdef.id() == TOKEN_COMMENT || topdef.id() == TOKEN_NL) {
+            comments.emplace_back(topdef.location(), topdef.segment().str());
+          }
+        }
       }
       files = std::move(newFiles);
       flatten_exports(*top);
@@ -417,6 +489,9 @@ private:
 
       if (root != nullptr)
         explore(root.get(), true);
+
+      std::sort(definitions.begin(), definitions.end());
+      fillDefinitionDocumentationFields();
     }
 
     static SymbolKind getSymbolKind(const char *name, const std::string& type) {
@@ -666,12 +741,15 @@ private:
       JAST message = createResponseMessage(std::move(receivedMessage));
       JAST &result = message.add("result", JSON_OBJECT);
 
-      JAST contents(JSON_ARRAY);
+      std::string value;
       for (const Definition& def: hoverInfoPieces) {
-        contents.add((def.name + ": " + def.type).c_str());
+        value += "**" + def.name + ": " + def.type + "**\n\n";
+        value += def.documentation + "\n\n";
       }
-      if (!contents.children.empty()) {
-        result.children.emplace_back("contents", contents);
+      if (!value.empty()) {
+        JAST &contents = result.add("contents",JSON_OBJECT);
+        contents.add("kind", "markdown");
+        contents.add("value", value.c_str());
       }
       sendMessage(message);
     }
