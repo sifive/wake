@@ -42,7 +42,7 @@ void parseWake(ParseInfo pi) {
     std::string indent;
 
     // Processing whitespace needs some state
-    Token token, nl, ws;
+    LexerOutput token, nl, ws;
     int state = STATE_IDLE;
     bool in_multiline_string = false;
     bool in_legacy_string = false;

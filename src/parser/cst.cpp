@@ -278,7 +278,7 @@ std::string TokenInfo::str() const {
 }
 
 std::ostream & operator << (std::ostream &os, TokenInfo tinfo) {
-    Token token, next;
+    LexerOutput token, next;
 
     os << "'";
 

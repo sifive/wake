@@ -25,24 +25,24 @@
 #define TOKEN_EOF 0
 
 class DiagnosticReporter;
-struct Token {
+struct LexerOutput {
     int id;             // Values defined in parser.h
     const uint8_t *end; // Points just past the end of the Token
     bool ok;            // false: syntactically invalid Token
 
-    Token(int id_, const uint8_t *end_, bool ok_ = true)
+    LexerOutput(int id_, const uint8_t *end_, bool ok_ = true)
     : id(id_), end(end_), ok(ok_) { }
-    Token() { }
+    LexerOutput() { }
 };
 
-Token lex_wake(const uint8_t *s, const uint8_t *e);
-Token lex_dstr(const uint8_t *s, const uint8_t *e);
-Token lex_rstr(const uint8_t *s, const uint8_t *e);
-Token lex_mstr_resume(const uint8_t *s, const uint8_t *e);
-Token lex_mstr_continue(const uint8_t *s, const uint8_t *e);
-Token lex_lstr_resume(const uint8_t *s, const uint8_t *e);
-Token lex_lstr_continue(const uint8_t *s, const uint8_t *e);
-Token lex_printable(const uint8_t *s, const uint8_t *e);
+LexerOutput lex_wake(const uint8_t *s, const uint8_t *e);
+LexerOutput lex_dstr(const uint8_t *s, const uint8_t *e);
+LexerOutput lex_rstr(const uint8_t *s, const uint8_t *e);
+LexerOutput lex_mstr_resume(const uint8_t *s, const uint8_t *e);
+LexerOutput lex_mstr_continue(const uint8_t *s, const uint8_t *e);
+LexerOutput lex_lstr_resume(const uint8_t *s, const uint8_t *e);
+LexerOutput lex_lstr_continue(const uint8_t *s, const uint8_t *e);
+LexerOutput lex_printable(const uint8_t *s, const uint8_t *e);
 
 enum IdKind { LOWER, UPPER, OPERATOR };
 IdKind lex_kind(const uint8_t *s, const uint8_t *e);
