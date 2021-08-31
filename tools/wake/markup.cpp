@@ -32,12 +32,14 @@
 
 struct ParanOrder {
   bool operator () (Expr *a, Expr *b) const {
-    int cmp = strcmp(a->location.filename, b->location.filename);
+    FileFragment fa = a->fragment;
+    FileFragment fb = b->fragment;
+    int cmp = strcmp(fa.filename(), fb.filename());
     if (cmp < 0) return true;
     if (cmp > 0) return false;
-    if (a->location.start < b->location.start) return true;
-    if (a->location.start > b->location.start) return false;
-    return a->location.end > b->location.end;
+    if (fa.startByte() < fb.startByte()) return true;
+    if (fa.startByte() > fb.startByte()) return false;
+    return fa.endByte() > fb.endByte();
   }
 };
 
@@ -56,7 +58,7 @@ struct JSONRender {
 };
 
 void JSONRender::explore(Expr *expr) {
-  if (expr->location.start.bytes >= 0 && (expr->flags & FLAG_AST) != 0)
+  if (!expr->fragment.empty() && (expr->flags & FLAG_AST) != 0)
     eset.insert(expr);
 
   if (expr->type == &App::type) {
@@ -65,7 +67,7 @@ void JSONRender::explore(Expr *expr) {
     explore(app->fn.get());
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr);
-    if (lambda->token.start.bytes >= 0) {
+    if (!lambda->token.empty()) {
       auto foo = new VarArg(lambda->token);
       foo->typeVar.setDOB(lambda->typeVar[0]);
       lambda->typeVar[0].unify(foo->typeVar);
@@ -81,7 +83,7 @@ void JSONRender::explore(Expr *expr) {
     for (auto &i : defbinding->val) explore(i.get());
     for (auto &i : defbinding->fun) explore(i.get());
     for (auto &i : defbinding->order) {
-      if (i.second.location.start.bytes >= 0) {
+      if (!i.second.fragment.empty()) {
         int val = i.second.index;
         int fun = val - defbinding->val.size();
         Expr *expr = (fun >= 0) ? defbinding->fun[fun].get() : defbinding->val[val].get();
@@ -93,7 +95,7 @@ void JSONRender::explore(Expr *expr) {
             Ascribe *asc = static_cast<Ascribe*>(app2->val.get());
             VarRef *pub = static_cast<VarRef*>(asc->body.get());
             auto ref = new VarRef(pub->target, i.first);
-            ref->target = i.second.location;
+            ref->target = i.second.fragment;
             ref->typeVar.setDOB(expr->typeVar);
             expr->typeVar.unify(ref->typeVar);
             eset.insert(ref);
@@ -101,7 +103,7 @@ void JSONRender::explore(Expr *expr) {
           }
         }
         if (i.first.compare(0, 8, "publish ") != 0) {
-          auto def = new VarDef(i.second.location);
+          auto def = new VarDef(i.second.fragment);
           def->typeVar.setDOB(expr->typeVar);
           expr->typeVar.unify(def->typeVar);
           defs.emplace_back(def);
@@ -114,12 +116,12 @@ void JSONRender::explore(Expr *expr) {
 }
 
 void JSONRender::dump() {
-  Location self = (*it)->location;
+  FileFragment self = (*it)->fragment;
 
   os
     << "{\"type\":\"" << (*it)->type->name
-    << "\",\"range\":[" << self.start.bytes
-    << "," << (self.end.bytes+1)
+    << "\",\"range\":[" << self.startByte()
+    << "," << self.endByte()
     << "],\"sourceType\":\"";
   (*it)->typeVar.format(os, (*it)->typeVar);
   os << "\"";
@@ -127,23 +129,21 @@ void JSONRender::dump() {
 
   if ((*it)->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(*it);
-    Location &target = ref->target;
-    if (target.start.bytes >= 0) {
-      os
-        << ",\"target\":{\"filename\":\"" << json_escape(target.filename)
-        << "\",\"range\":[" << target.start.bytes
-        << "," << (target.end.bytes+1)
-        << "]}";
-    }
+    FileFragment &target = ref->target;
+    os
+      << ",\"target\":{\"filename\":\"" << json_escape(target.filename())
+      << "\",\"range\":[" << target.startByte()
+      << "," << target.endByte()
+      << "]}";
   }
 
   ++it;
 
   bool body = false;
   while (it != eset.end()) {
-    Location child = (*it)->location;
-    if (child.filename != self.filename) break;
-    if (child.start > self.end) break;
+    FileFragment child = (*it)->fragment;
+    if (child.filename() != self.filename()) break;
+    if (child.startByte() > self.endByte()) break;
     if (body) os << ","; else os << ",\"body\":[";
     body = true;
     dump();
@@ -160,7 +160,7 @@ void JSONRender::render(Expr *root) {
   os << "{\"type\":\"Workspace\",\"body\":[";
   bool comma = false;
   while (it != eset.end()) {
-    const char *filename = (*it)->location.filename;
+    const char *filename = (*it)->fragment.filename();
     std::ifstream ifs(filename);
     std::string content(
       (std::istreambuf_iterator<char>(ifs)),
@@ -173,7 +173,7 @@ void JSONRender::render(Expr *root) {
       << "],\"source\":\"" << json_escape(content)
       << "\",\"body\":[";
     bool comma = false;
-    while (it != eset.end() && (*it)->location.filename == filename) {
+    while (it != eset.end() && (*it)->fragment.filename() == filename) {
       if (comma) os << ",";
       comma = true;
       dump();

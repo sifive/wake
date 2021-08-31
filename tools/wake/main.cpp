@@ -62,6 +62,8 @@
 #define TOSTRING(x) STRINGIFY(x)
 #define VERSION_STR TOSTRING(VERSION)
 
+static CPPFile cppFile(__FILE__);
+
 void print_help(const char *argv0) {
   std::cout << std::endl
     << "Usage: " << argv0 << " [OPTIONS] [target] [target options ...]" << std::endl
@@ -121,7 +123,7 @@ class TerminalReporter : public DiagnosticReporter {
 
       if (last != diagnostic.getMessage()) {
          last = diagnostic.getMessage();
-         std::cerr << diagnostic.getLocation().file() << ": ";
+         std::cerr << diagnostic.getLocation() << ": ";
          if (diagnostic.getSeverity() == S_WARNING) std::cerr << "(warning) ";
          std::cerr << diagnostic.getMessage() << std::endl;
       }
@@ -368,7 +370,7 @@ int main(int argc, char **argv) {
 
   bool enumok = true;
   std::string abs_libdir = find_execpath() + "/../share/wake/lib";
-  auto wakefiles = find_all_wakefiles(enumok, workspace, verbose, abs_libdir);
+  auto wakefilenames = find_all_wakefiles(enumok, workspace, verbose, abs_libdir);
   if (!enumok) {
     if (verbose) std::cerr << "Workspace wake file enumeration failed" << std::endl;
     // Try to run the build anyway; if wake files are missing, it will fail later
@@ -402,11 +404,14 @@ int main(int argc, char **argv) {
   bool ok = true;
   Scope::debug = debug;
   std::unique_ptr<Top> top(new Top);
-  for (auto &i : wakefiles) {
+  std::vector<ExternalFile> wakefiles;
+  wakefiles.reserve(wakefilenames.size());
+  for (auto &i : wakefilenames) {
     if (verbose && debug)
       std::cerr << "Parsing " << i << std::endl;
 
-    ExternalFile file(terminalReporter, i.c_str());
+    wakefiles.emplace_back(terminalReporter, i.c_str());
+    FileContent &file = wakefiles.back();
     CST cst(file, terminalReporter);
     auto package = dst_top(cst.root(), *top);
 
@@ -492,18 +497,26 @@ int main(int argc, char **argv) {
     }
   }
 
-  std::string command;
   char *none = nullptr;
   char **cmdline = &none;
+  std::string command;
+
   if (exec) {
     command = exec;
-    top->body = std::unique_ptr<Expr>(dst_expr(command, terminalReporter));
   } else if (argc > 1) {
     command = argv[1];
     cmdline = argv+2;
-    top->body = std::unique_ptr<Expr>(new App(LOCATION, dst_expr(command, terminalReporter), new Prim(LOCATION, "cmdline")));
+  }
+
+  ExprParser cmdExpr(command);
+  if (exec) {
+    top->body = cmdExpr.expr(terminalReporter);
+  } else if (argc > 1) {
+    top->body = std::unique_ptr<Expr>(new App(FRAGMENT_CPP_LINE,
+      cmdExpr.expr(terminalReporter).release(),
+      new Prim(FRAGMENT_CPP_LINE, "cmdline")));
   } else {
-    top->body = std::unique_ptr<Expr>(new VarRef(LOCATION, "Nil@wake"));
+    top->body = std::unique_ptr<Expr>(new VarRef(FRAGMENT_CPP_LINE, "Nil@wake"));
   }
 
   TypeVar type = top->body->typeVar;
@@ -601,7 +614,7 @@ int main(int argc, char **argv) {
           } else {
             std::cout << g.first << ": ";
             v->typeVar.format(std::cout, v->typeVar);
-            std::cout << " = <" << v->location.file() << ">" << std::endl;
+            std::cout << " = <" << v->fragment.location() << ">" << std::endl;
           }
         }
       }
