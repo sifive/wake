@@ -264,6 +264,9 @@ CSTElement CSTElement::firstChildNode() const {
     return out;
 }
 
+#define MAX_SNIPPET 30
+#define MAX_SNIPPET_HALF ((MAX_SNIPPET/2)-1)
+
 std::ostream & operator << (std::ostream &os, StringSegment tinfo) {
     LexerOutput token, next;
 
@@ -274,8 +277,8 @@ std::ostream & operator << (std::ostream &os, StringSegment tinfo) {
         ++codepoints;
 
     // At most 10 chars at start and 10 chars at end
-    long skip_start = (codepoints > 20) ? 9 : codepoints;
-    long skip_end   = (codepoints > 20) ? codepoints-9 : codepoints;
+    long skip_start = (codepoints > MAX_SNIPPET) ?            MAX_SNIPPET_HALF : codepoints;
+    long skip_end   = (codepoints > MAX_SNIPPET) ? codepoints-MAX_SNIPPET_HALF : codepoints;
 
     long codepoint = 0;
     for (token.end = tinfo.start; token.end < tinfo.end; token = next) {

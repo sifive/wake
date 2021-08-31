@@ -1169,68 +1169,55 @@ struct NameBinding {
 };
 
 struct FnErrorMessage : public TypeErrorMessage  {
-  const FileFragment *lf;
-  FnErrorMessage(const FileFragment *lf_) : lf(lf_) { }
-  void formatA(std::ostream &os) const { os << "type error; expression " << lf->segment() << " has type"; }
+  FnErrorMessage(const FileFragment *f_) : TypeErrorMessage(f_) { }
+  void formatA(std::ostream &os) const { os << "type error; expression " << f->segment() << " has type"; }
   void formatB(std::ostream &os) const { os << "but is used as a function and must have function type"; }
-  virtual FileFragment getMainFileFragment() const { return *lf; }
 };
 
 struct ArgErrorMessage : public TypeErrorMessage {
-  const FileFragment *lf, *la;
+  const FileFragment *fn;
   const char *arg;
-  ArgErrorMessage(const FileFragment *lf_, const FileFragment *la_, const char *arg_) : lf(lf_), la(la_), arg(arg_) { }
+  ArgErrorMessage(const FileFragment *fn_, const FileFragment *a_, const char *arg_) : TypeErrorMessage(a_), fn(fn_), arg(arg_) { }
   void formatA(std::ostream &os) const {
-    os << "type error; function " << lf->segment() << " expected argument";
+    os << "type error; function " << fn->segment() << " expected argument";
     if (arg && arg[0] && !strchr(arg, ' ') && strcmp(arg, "_")) os << " '" << arg << "'";
     os << " of type";
   }
-  void formatB(std::ostream &os) const { os << "but was supplied argument " << la->segment() << " of type"; }
-  virtual FileFragment getMainFileFragment() const { return *la; }
+  void formatB(std::ostream &os) const { os << "but was supplied argument " << f->segment() << " of type"; }
 };
 
 struct AscErrorMessage : public TypeErrorMessage {
-  const FileFragment *body, *type;
-  AscErrorMessage(const FileFragment *body_, const FileFragment *type_) : body(body_), type(type_) { }
-  void formatA(std::ostream &os) const { os << "type error; expression " << body->segment() << " of type"; }
+  AscErrorMessage(const FileFragment *f_) : TypeErrorMessage(f_) { }
+  void formatA(std::ostream &os) const { os << "type error; expression " << f->segment() << " of type"; }
   void formatB(std::ostream &os) const { os << "does not match explicit type ascription of"; }
-  virtual FileFragment getMainFileFragment() const { return *body; }
 };
 
 struct RecErrorMessage : public TypeErrorMessage  {
-  const FileFragment *lf;
-  RecErrorMessage(const FileFragment *lf_) : lf(lf_) { }
-  void formatA(std::ostream &os) const { os << "type error; recursive use of " << lf->segment() << " requires return type"; }
+  RecErrorMessage(const FileFragment *f_) : TypeErrorMessage(f_) { }
+  void formatA(std::ostream &os) const { os << "type error; recursive use of " << f->segment() << " requires return type"; }
   void formatB(std::ostream &os) const { os << "but the function body actually returns type"; }
-  virtual FileFragment getMainFileFragment() const { return *lf; }
 };
 
 struct MatchArgErrorMessage : public TypeErrorMessage  {
-  const FileFragment *arg;
-  MatchArgErrorMessage(const FileFragment *arg_) : arg(arg_) { }
-  void formatA(std::ostream &os) const { os << "type error; case analysis of " << arg->segment() << " with type"; }
+  MatchArgErrorMessage(const FileFragment *f_) : TypeErrorMessage(f_) { }
+  void formatA(std::ostream &os) const { os << "type error; case analysis of " << f->segment() << " with type"; }
   void formatB(std::ostream &os) const { os << "does not match the pattern requirement of type"; }
-  virtual FileFragment getMainFileFragment() const { return *arg; }
 };
 
 struct MatchResultErrorMessage : public TypeErrorMessage  {
-  const FileFragment *result;
   const std::string &case0;
   const std::string &casen;
-  MatchResultErrorMessage(const FileFragment *result_, const std::string &case0_, const std::string &casen_)
-   : result(result_), case0(case0_), casen(casen_) { }
-  void formatA(std::ostream &os) const { os << "type error; case '" << casen << "' returns expression " << result->segment() << " of type"; }
+  MatchResultErrorMessage(const FileFragment *f_, const std::string &case0_, const std::string &casen_)
+   : TypeErrorMessage(f_), case0(case0_), casen(casen_) { }
+  void formatA(std::ostream &os) const { os << "type error; case '" << casen << "' returns expression " << f->segment() << " of type"; }
   void formatB(std::ostream &os) const { os << "which does not match case '" << case0 << "' which returned type"; }
-  virtual FileFragment getMainFileFragment() const { return *result; }
 };
 
 struct MatchTypeVarErrorMessage : public TypeErrorMessage  {
-  const FileFragment *arg;
   const std::string &casen;
-  MatchTypeVarErrorMessage(const FileFragment *arg_, const std::string &casen_) : arg(arg_), casen(casen_) { }
+  MatchTypeVarErrorMessage(const FileFragment *f_, const std::string &casen_) : TypeErrorMessage(f_), casen(casen_) { }
   void formatA(std::ostream &os) const { os << "type error; pattern for case '" << casen << "' expected type"; }
-  void formatB(std::ostream &os) const { os << "but the argument " << arg->segment() << " has type"; }
-  virtual FileFragment getMainFileFragment() const { return *arg; }
+  void formatB(std::ostream &os) const { os << "but the argument " << f->segment() << " has type"; }
 };
 
 struct ExploreState {
@@ -1416,7 +1403,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     Ascribe *asc = static_cast<Ascribe*>(expr);
     bool b = explore(asc->body.get(), state, binding);
     bool ts = asc->signature.unify(asc->typeVar, state.typeVars);
-    AscErrorMessage ascm(&asc->body_fragment, &asc->signature.region);
+    AscErrorMessage ascm(&asc->body_fragment);
     bool tb = asc->body->typeVar.unify(asc->typeVar, &ascm);
     return b && tb && ts;
   } else if (expr->type == &Prim::type) {

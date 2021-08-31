@@ -26,17 +26,16 @@
 #define FN "binary =>@builtin"
 
 struct TypeErrorMessage {
+  TypeErrorMessage(const FileFragment *f_) : f(f_) { }
+  const FileFragment *f;
   virtual void formatA(std::ostream &os) const = 0;
   virtual void formatB(std::ostream &os) const = 0;
-  virtual FileFragment getMainFileFragment() const = 0;
 };
 
 struct LegacyErrorMessage : public TypeErrorMessage {
-  const FileFragment *l;
-  LegacyErrorMessage(const FileFragment *l_) : l(l_) { }
+  LegacyErrorMessage(const FileFragment *f_) : TypeErrorMessage(f_) { }
   void formatA(std::ostream &os) const;
   void formatB(std::ostream &os) const;
-  virtual FileFragment getMainFileFragment() const { return *l; }
 };
 
 struct TypeChild;
