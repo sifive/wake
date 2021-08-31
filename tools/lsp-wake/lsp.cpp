@@ -54,6 +54,8 @@
 #define TOSTRING(x) STRINGIFY(x)
 #define VERSION_STR TOSTRING(VERSION)
 
+static CPPFile cppFile(__FILE__);
+
 // Header used in JSON-RPC
 static const char contentLength[] = "Content-Length: ";
 
@@ -136,8 +138,7 @@ private:
     std::string crashedFlagFilename = ".lsp-wake.lock";
     bool isShutDown = false;
     std::string stdLib;
-    std::vector<std::string> allFiles;
-    std::map<std::string, std::string> changedFiles;
+    std::map<std::string, std::unique_ptr<FileContent>> files;
     struct Use {
         Location use;
         Location def;
@@ -368,26 +369,13 @@ private:
       sendMessage(message);
     }
 
-    void runSyntaxChecker(const std::string &filePath, Top &top) {
-      auto fileChangesPointer = changedFiles.find(rootUri + '/' + filePath);
-      if (fileChangesPointer != changedFiles.end()) {
-        StringFile file(filePath.c_str(), std::string(fileChangesPointer->second));
-        CST cst(file, *reporter);
-        dst_top(cst.root(), top);
-      } else {
-        ExternalFile file(*reporter, filePath.c_str());
-        CST cst(file, *reporter);
-        dst_top(cst.root(), top);
-      }
-    }
-
     void diagnoseProject() {
       uses.clear();
       definitions.clear();
       packages.clear();
 
       bool enumok = true;
-      allFiles = find_all_wakefiles(enumok, true, false, stdLib);
+      auto allFiles = find_all_wakefiles(enumok, true, false, stdLib);
 
       std::map<std::string, std::vector<Diagnostic>> diagnostics;
       LSPReporter lspReporter(diagnostics);
@@ -395,16 +383,28 @@ private:
 
       std::unique_ptr<Top> top(new Top);
       top->def_package = "nothing";
-      top->body = std::unique_ptr<Expr>(new VarRef(LOCATION, "Nil@wake"));
+      top->body = std::unique_ptr<Expr>(new VarRef(FRAGMENT_CPP_LINE, "Nil@wake"));
 
-      for (auto &file: allFiles)
-        runSyntaxChecker(file, *top);
+      std::map<std::string, std::unique_ptr<FileContent>> newFiles;
+      for (auto &file: allFiles) {
+        auto it = files.find(file);
+        FileContent *fcontent;
+        if (it == files.end()) {
+          fcontent = new ExternalFile(lspReporter, file.c_str());
+          newFiles[file] = std::unique_ptr<FileContent>(fcontent);
+        } else {
+          fcontent = it->second.get();
+          newFiles[file] = std::move(it->second);
+        }
+        CST cst(*fcontent, lspReporter);
+        dst_top(cst.root(), *top);
+      }
+      files = std::move(newFiles);
       flatten_exports(*top);
 
       for (auto &p : top->packages) {
         for (auto &f: p.second->files) {
-          Location &l = f.content->location;
-          packages.emplace_back(Definition(p.first, l, "Package", KIND_PACKAGE, true));
+          packages.emplace_back(Definition(p.first, f.content->fragment.location(), "Package", KIND_PACKAGE, true));
         }
       }
 
@@ -451,8 +451,10 @@ private:
     void explore(Expr *expr, bool isGlobal) {
       if (expr->type == &VarRef::type) {
         VarRef *ref = static_cast<VarRef*>(expr);
-        if (ref->location.start.bytes >= 0 && ref->target.start.bytes >= 0 && (ref->flags & FLAG_AST) != 0) {
-          uses.emplace_back(ref->location /* use location */, ref->target /* definition location */);
+        if (!ref->fragment.empty() && !ref->target.empty() && (ref->flags & FLAG_AST) != 0) {
+          uses.emplace_back(
+            /* use location */        ref->fragment.location(),
+            /* definition location */ ref->target.location());
         }
       } else if (expr->type == &App::type) {
         App *app = static_cast<App*>(expr);
@@ -460,12 +462,16 @@ private:
         explore(app->fn.get(), false);
       } else if (expr->type == &Lambda::type) {
         Lambda *lambda = static_cast<Lambda*>(expr);
-        if (lambda->token.start.bytes >= 0) {
+        if (!lambda->token.empty()) {
           std::stringstream ss;
           ss << lambda->typeVar[0];
           if (lambda->name.find(' ') == std::string::npos) {
-            definitions.emplace_back(lambda->name /* name */, lambda->token /* location */, ss.str() /* type */,
-                                     getSymbolKind(lambda->name.c_str(), lambda->typeVar[0].getName()), isGlobal);
+            definitions.emplace_back(
+              /* name */     lambda->name,
+              /* location */ lambda->token.location(),
+              /* type */     ss.str(),
+              /* kind */     getSymbolKind(lambda->name.c_str(), lambda->typeVar[0].getName()),
+              /* global */   isGlobal);
           }
         }
         explore(lambda->body.get(), false);
@@ -477,7 +483,7 @@ private:
         for (auto &i : defbinding->val) explore(i.get(), false);
         for (auto &i : defbinding->fun) explore(i.get(), false);
         for (auto &i : defbinding->order) {
-          if (i.second.location.start.bytes >= 0) {
+          if (!i.second.fragment.empty()) {
             std::stringstream ss;
             SymbolKind symbolKind;
             size_t idx = i.second.index;
@@ -492,8 +498,12 @@ private:
             if (i.first.find(' ') == std::string::npos ||
             i.first.compare(0, 7, "binary ") == 0 ||
             i.first.compare(0, 6, "unary ") == 0) {
-              definitions.emplace_back(i.first /* name */, i.second.location /* location */, ss.str() /* type */,
-                                       symbolKind, isGlobal);
+              definitions.emplace_back(
+                /* name */     i.first,
+                /* location */ i.second.fragment.location(),
+                /* type */     ss.str(),
+                /* kind */     symbolKind,
+                /* global */   isGlobal);
             }
           }
         }
@@ -523,9 +533,9 @@ private:
 
     const char *findURI(const std::string &fileURI) {
       const char *filePtr = nullptr;
-      for (auto &file: allFiles) {
-        if (fileURI.compare(rootUri.length() + 1, std::string::npos, file) == 0)
-          filePtr = file.c_str();
+      for (auto &file: files) {
+        if (fileURI.compare(rootUri.length() + 1, std::string::npos, file.second->filename()) == 0)
+          filePtr = file.second->filename();
       }
       return filePtr;
     }
@@ -775,10 +785,19 @@ private:
         diagnoseProject();
     }
 
+    std::string stripRootUri(const std::string &fileUri) {
+      if (fileUri.size() < rootUri.size()+1) return "";
+      if (fileUri.compare(0, rootUri.size(), rootUri) != 0) return "";
+      if (fileUri[rootUri.size()] != '/') return "";
+      return fileUri.substr(rootUri.size()+1);
+    }
+
     void didChange(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
-      changedFiles[fileUri] = fileContent;
+      std::string fileName = stripRootUri(fileUri);
+      if (fileName.empty()) return;
+      files[fileName] = std::unique_ptr<FileContent>(new StringFile(fileName.c_str(), std::move(fileContent)));
       if (!isCrashed)
         diagnoseProject();
     }
@@ -790,21 +809,22 @@ private:
       }
 
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      changedFiles.erase(fileUri);
+      files.erase(stripRootUri(fileUri));
+
       if (!isCrashed)
         diagnoseProject();
     }
 
     void didClose(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      changedFiles.erase(fileUri);
+      files.erase(stripRootUri(fileUri));
     }
 
     void didChangeWatchedFiles(JAST receivedMessage) {
-      JAST files = receivedMessage.get("params").get("changes");
-      for (auto child: files.children) {
+      JAST jfiles = receivedMessage.get("params").get("changes");
+      for (auto child: jfiles.children) {
         std::string fileUri = child.second.get("uri").value;
-        changedFiles.erase(fileUri);
+        files.erase(stripRootUri(fileUri));
       }
       if (!isCrashed)
         diagnoseProject();
