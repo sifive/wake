@@ -279,7 +279,7 @@ std::vector<std::string> Scope::stack_trace(bool indent_compress) const {
     std::stringstream ss;
     for (const Scope *i = this; i; i = s->parent.get()) {
       s = i->stack();
-      ss << s->fun->label << ": " << s->fun->location.file();
+      ss << s->fun->label << ": " << s->fun->location;
       auto x = ss.str();
       ss.str(std::string());
       if (out.empty() || out.back() != x)

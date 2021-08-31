@@ -48,7 +48,7 @@ void sums_ok() {
     if (Boolean->members.size() != 2 ||
         Boolean->members[0].ast.args.size() != 0 ||
         Boolean->members[1].ast.args.size() != 0) {
-      ERROR(Boolean->region, "special constructor Boolean not defined correctly");
+      ERROR(Boolean->region.location(), "special constructor Boolean not defined correctly");
     }
   } else {
     ERROR(LOCATION, "required data type Boolean@wake not defined");
@@ -59,7 +59,7 @@ void sums_ok() {
         Order->members[0].ast.args.size() != 0 ||
         Order->members[1].ast.args.size() != 0 ||
         Order->members[2].ast.args.size() != 0) {
-      ERROR(Order->region, "special constructor Order not defined correctly");
+      ERROR(Order->region.location(), "special constructor Order not defined correctly");
     }
   } else {
     ERROR(LOCATION, "required data type Order@wake not defined");
@@ -70,7 +70,7 @@ void sums_ok() {
         List->members[0].ast.args.size() != 0 ||
         List->members[1].ast.args.size() != 2) {
       std::ostringstream message;
-      ERROR(List->region, "special constructor List not defined correctly");
+      ERROR(List->region.location(), "special constructor List not defined correctly");
     }
   } else {
     ERROR(LOCATION, "required data type List@wake not defined");
@@ -79,7 +79,7 @@ void sums_ok() {
   if (Unit) {
     if (Unit->members.size() != 1 ||
         Unit->members[0].ast.args.size() != 0) {
-      ERROR(Unit->region, "special constructor Unit not defined correctly");
+      ERROR(Unit->region.location(), "special constructor Unit not defined correctly");
     }
   } else {
     ERROR(LOCATION, "required data type Unit@wake not defined");
@@ -88,7 +88,7 @@ void sums_ok() {
   if (Pair) {
     if (Pair->members.size() != 1 ||
         Pair->members[0].ast.args.size() != 2) {
-      ERROR(Pair->region, "special constructor Pair not defined correctly");
+      ERROR(Pair->region.location(), "special constructor Pair not defined correctly");
     }
   } else {
     ERROR(LOCATION, "required data type Pair@wake not defined");
@@ -98,7 +98,7 @@ void sums_ok() {
     if (Result->members.size() != 2 ||
         Result->members[0].ast.args.size() != 1 ||
         Result->members[1].ast.args.size() != 1) {
-      ERROR(Result->region, "special constructor Result not defined correctly");
+      ERROR(Result->region.location(), "special constructor Result not defined correctly");
     }
   } else {
     ERROR(LOCATION, "required data type Result@wake not defined");
@@ -113,7 +113,7 @@ void sums_ok() {
         JValue->members[4].ast.args.size() != 0 ||
         JValue->members[5].ast.args.size() != 1 ||
         JValue->members[6].ast.args.size() != 1) {
-      ERROR(JValue->region, "special constructor JValue not defined correctly");
+      ERROR(JValue->region.location(), "special constructor JValue not defined correctly");
     }
   } else {
     ERROR(LOCATION, "required data type JValue@wake not defined");

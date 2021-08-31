@@ -25,6 +25,8 @@
 
 #include "util/rank.h"
 #include "util/location.h"
+#include "util/segment.h"
+#include "util/fragment.h"
 
 #define CST_APP		128
 #define CST_ARITY	129
@@ -68,17 +70,6 @@ class FileContent;
 class CSTElement;
 class DiagnosticReporter;
 
-struct TokenInfo {
-    const uint8_t *start;
-    const uint8_t *end;
-
-    size_t size() const { return end - start; }
-    Location location(const FileContent &fcontent) const;
-    std::string str() const;
-};
-
-std::ostream & operator << (std::ostream &os, TokenInfo token);
-
 struct CSTNode {
     // CST_* Identifier
     unsigned id   : 8;
@@ -94,13 +85,13 @@ class CSTBuilder {
 public:
     CSTBuilder(const FileContent &fcontent);
 
-    void addToken(uint8_t id, TokenInfo token);
+    void addToken(uint8_t id, StringSegment token);
 
-    void addNode(uint8_t id, TokenInfo begin);
+    void addNode(uint8_t id, StringSegment begin);
     void addNode(uint8_t id, uint32_t children);
-    void addNode(uint8_t id, TokenInfo begin, uint32_t children);
-    void addNode(uint8_t id, uint32_t children, TokenInfo end);
-    void addNode(uint8_t id, TokenInfo begin, uint32_t childen, TokenInfo end);
+    void addNode(uint8_t id, StringSegment begin, uint32_t children);
+    void addNode(uint8_t id, uint32_t children, StringSegment end);
+    void addNode(uint8_t id, StringSegment begin, uint32_t childen, StringSegment end);
 
     void delNodes(size_t num);
 
@@ -137,8 +128,9 @@ public:
     bool isNode() const;
 
     uint8_t id() const;
-    TokenInfo content() const;
-    Location location() const;
+    FileFragment fragment() const;
+    StringSegment content() const { return fragment().segment(); }
+    Location location() const { return fragment().location(); }
 
     void nextSiblingElement();
     void nextSiblingNode();

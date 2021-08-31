@@ -79,7 +79,7 @@ static void doit(ToSSACommon common, TermStack *stack, Expr *expr) {
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr);
     size_t flags = (lambda->flags & FLAG_RECURSIVE) ? SSA_RECURSIVE : 0;
-    RFun *fun = new RFun(lambda->body->location, lambda->fnname.empty() ? "anon" : lambda->fnname.c_str(), flags);
+    RFun *fun = new RFun(lambda->body->fragment.location(), lambda->fnname.empty() ? "anon" : lambda->fnname.c_str(), flags);
     lambda->meta = common.scope.append(fun);
     size_t cp = common.scope.append(new RArg(lambda->name.c_str()));
     doit(common, &frame, lambda->body.get());
@@ -98,7 +98,7 @@ static void doit(ToSSACommon common, TermStack *stack, Expr *expr) {
         size_t mid = common.scope.append(mutual);
         size_t mcp = common.scope.append(new RArg("_"));
         for (j = i; j < def->fun.size() && scc == def->scc[j]; ++j) {
-          RFun *proxy = new RFun(def->fun[j]->body->location, "proxy", 0);
+          RFun *proxy = new RFun(def->fun[j]->body->fragment.location(), "proxy", 0);
           def->fun[j]->meta = common.scope.append(proxy);
           size_t x = common.scope.append(new RArg("_"));
           size_t a = common.scope.append(new RApp(mid, mid));

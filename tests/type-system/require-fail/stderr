@@ -1,16 +1,16 @@
 test.wake:[21-22]:[3-14]: the required pattern can never fail; use a def instead
 test.wake:4:43: unbound type variable 'a'
-test.wake:19:22: type error; expression '_' (test.wake:19:22) of type:
+test.wake:19:22: type error; expression '_' of type:
     List String
-  does not match explicit type ascription at test.wake:19:[25-36] of:
+  does not match explicit type ascription of:
     List Integer
 test.wake:14:[31-36]: type error; pattern for case 'binary ,' expected type:
     List String
-  but the argument 'seq 10' (test.wake:14:[31-36]) has type:
+  but the argument 'seq 10' has type:
     List Integer
 test.wake:9:[31-39]: type error; pattern for case 'Some' expected type:
     Option Integer
-  but the argument 'Some "zz"' (test.wake:9:[31-39]) has type:
+  but the argument 'Some "zz"' has type:
     Option String
 test.wake:4:20: unbound type variable 'a'
 >>> Aborting without execution <<<

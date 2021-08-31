@@ -77,69 +77,69 @@
     //Sm_norm   = [؆؇⁒℘⅁⅂⅃⅄⅋∊∍∗∽∾⊝⋴⋷⋼⋾⟂⟋⟍⟘⟙⟝⟞⦀⦂⧵⧸⧹⨟⨾⫞⫟⫠];
  */
 
-Token lex_wake(const uint8_t *s, const uint8_t *e) {
+LexerOutput lex_wake(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
         // Detect end-of-input
-        $ { return Token(TOKEN_EOF, s); }
+        $ { return LexerOutput(TOKEN_EOF, s); }
 
         // Comments
-        "#" notnl* { return Token(TOKEN_COMMENT, s); }
+        "#" notnl* { return LexerOutput(TOKEN_COMMENT, s); }
 
         // Legal whitespace
-        nl   { return Token(TOKEN_NL, s); }
-        lws+ { return Token(TOKEN_WS, s); }
+        nl   { return LexerOutput(TOKEN_NL, s); }
+        lws+ { return LexerOutput(TOKEN_WS, s); }
 
         // All keywords
-        "def"       { return Token(TOKEN_KW_DEF,       s); }
-        "tuple"     { return Token(TOKEN_KW_TUPLE,     s); }
-        "data"      { return Token(TOKEN_KW_DATA,      s); }
-        "global"    { return Token(TOKEN_KW_GLOBAL,    s); }
-        "target"    { return Token(TOKEN_KW_TARGET,    s); }
-        "publish"   { return Token(TOKEN_KW_PUBLISH,   s); }
-        "subscribe" { return Token(TOKEN_KW_SUBSCRIBE, s); }
-        "prim"      { return Token(TOKEN_KW_PRIM,      s); }
-        "if"        { return Token(TOKEN_KW_IF,        s); }
-        "then"      { return Token(TOKEN_KW_THEN,      s); }
-        "else"      { return Token(TOKEN_KW_ELSE,      s); }
-        "here"      { return Token(TOKEN_KW_HERE,      s); }
-        "match"     { return Token(TOKEN_KW_MATCH,     s); }
-        "require"   { return Token(TOKEN_KW_REQUIRE,   s); }
-        "package"   { return Token(TOKEN_KW_PACKAGE,   s); }
-        "import"    { return Token(TOKEN_KW_IMPORT,    s); }
-        "export"    { return Token(TOKEN_KW_EXPORT,    s); }
-        "from"      { return Token(TOKEN_KW_FROM,      s); }
-        "type"      { return Token(TOKEN_KW_TYPE,      s); }
-        "topic"     { return Token(TOKEN_KW_TOPIC,     s); }
-        "unary"     { return Token(TOKEN_KW_UNARY,     s); }
-        "binary"    { return Token(TOKEN_KW_BINARY,    s); }
+        "def"       { return LexerOutput(TOKEN_KW_DEF,       s); }
+        "tuple"     { return LexerOutput(TOKEN_KW_TUPLE,     s); }
+        "data"      { return LexerOutput(TOKEN_KW_DATA,      s); }
+        "global"    { return LexerOutput(TOKEN_KW_GLOBAL,    s); }
+        "target"    { return LexerOutput(TOKEN_KW_TARGET,    s); }
+        "publish"   { return LexerOutput(TOKEN_KW_PUBLISH,   s); }
+        "subscribe" { return LexerOutput(TOKEN_KW_SUBSCRIBE, s); }
+        "prim"      { return LexerOutput(TOKEN_KW_PRIM,      s); }
+        "if"        { return LexerOutput(TOKEN_KW_IF,        s); }
+        "then"      { return LexerOutput(TOKEN_KW_THEN,      s); }
+        "else"      { return LexerOutput(TOKEN_KW_ELSE,      s); }
+        "here"      { return LexerOutput(TOKEN_KW_HERE,      s); }
+        "match"     { return LexerOutput(TOKEN_KW_MATCH,     s); }
+        "require"   { return LexerOutput(TOKEN_KW_REQUIRE,   s); }
+        "package"   { return LexerOutput(TOKEN_KW_PACKAGE,   s); }
+        "import"    { return LexerOutput(TOKEN_KW_IMPORT,    s); }
+        "export"    { return LexerOutput(TOKEN_KW_EXPORT,    s); }
+        "from"      { return LexerOutput(TOKEN_KW_FROM,      s); }
+        "type"      { return LexerOutput(TOKEN_KW_TYPE,      s); }
+        "topic"     { return LexerOutput(TOKEN_KW_TOPIC,     s); }
+        "unary"     { return LexerOutput(TOKEN_KW_UNARY,     s); }
+        "binary"    { return LexerOutput(TOKEN_KW_BINARY,    s); }
 
         // All special punctuation
-        "\\" { return Token(TOKEN_P_BSLASH, s); }
-        "="  { return Token(TOKEN_P_EQUALS, s); }
-        ":"  { return Token(TOKEN_P_COLON,  s); }
-        "("  { return Token(TOKEN_P_POPEN,  s); }
-        ")"  { return Token(TOKEN_P_PCLOSE, s); }
-        "{"  { return Token(TOKEN_P_BOPEN,  s); }
-        "}"  { return Token(TOKEN_P_BCLOSE, s); }
-        "["  { return Token(TOKEN_P_SOPEN,  s); }
-        "]"  { return Token(TOKEN_P_SCLOSE, s); }
-        "_"  { return Token(TOKEN_P_HOLE,   s); }
+        "\\" { return LexerOutput(TOKEN_P_BSLASH, s); }
+        "="  { return LexerOutput(TOKEN_P_EQUALS, s); }
+        ":"  { return LexerOutput(TOKEN_P_COLON,  s); }
+        "("  { return LexerOutput(TOKEN_P_POPEN,  s); }
+        ")"  { return LexerOutput(TOKEN_P_PCLOSE, s); }
+        "{"  { return LexerOutput(TOKEN_P_BOPEN,  s); }
+        "}"  { return LexerOutput(TOKEN_P_BCLOSE, s); }
+        "["  { return LexerOutput(TOKEN_P_SOPEN,  s); }
+        "]"  { return LexerOutput(TOKEN_P_SCLOSE, s); }
+        "_"  { return LexerOutput(TOKEN_P_HOLE,   s); }
 
         // Operators
-        o_dot     o* { return Token(TOKEN_OP_DOT,     s); }
-        o_quant   o* { return Token(TOKEN_OP_QUANT,   s); }
-        o_exp     o* { return Token(TOKEN_OP_EXP,     s); }
-        o_muldiv  o* { return Token(TOKEN_OP_MULDIV,  s); }
-        o_addsub  o* { return Token(TOKEN_OP_ADDSUB,  s); }
-        o_compare o* { return Token(TOKEN_OP_COMPARE, s); }
-        o_inequal o* { return Token(TOKEN_OP_INEQUAL, s); }
-        o_and     o* { return Token(TOKEN_OP_AND,     s); }
-        o_or      o* { return Token(TOKEN_OP_OR,      s); }
-        o_dollar  o* { return Token(TOKEN_OP_DOLLAR,  s); }
-        o_lrarrow o* { return Token(TOKEN_OP_LRARROW, s); }
-        o_eqarrow o* { return Token(TOKEN_OP_EQARROW, s); }
-        o_comma   o* { return Token(TOKEN_OP_COMMA,   s); }
+        o_dot     o* { return LexerOutput(TOKEN_OP_DOT,     s); }
+        o_quant   o* { return LexerOutput(TOKEN_OP_QUANT,   s); }
+        o_exp     o* { return LexerOutput(TOKEN_OP_EXP,     s); }
+        o_muldiv  o* { return LexerOutput(TOKEN_OP_MULDIV,  s); }
+        o_addsub  o* { return LexerOutput(TOKEN_OP_ADDSUB,  s); }
+        o_compare o* { return LexerOutput(TOKEN_OP_COMPARE, s); }
+        o_inequal o* { return LexerOutput(TOKEN_OP_INEQUAL, s); }
+        o_and     o* { return LexerOutput(TOKEN_OP_AND,     s); }
+        o_or      o* { return LexerOutput(TOKEN_OP_OR,      s); }
+        o_dollar  o* { return LexerOutput(TOKEN_OP_DOLLAR,  s); }
+        o_lrarrow o* { return LexerOutput(TOKEN_OP_LRARROW, s); }
+        o_eqarrow o* { return LexerOutput(TOKEN_OP_EQARROW, s); }
+        o_comma   o* { return LexerOutput(TOKEN_OP_COMMA,   s); }
 
         // Double literals
         dec = [1-9][0-9_]*;
@@ -147,84 +147,84 @@ Token lex_wake(const uint8_t *s, const uint8_t *e) {
         double10e = (dec|"0") [eE] [+-]? [0-9_]+;
         double16  = "0x" [0-9a-fA-F_]+ "." [0-9a-fA-F_]+ ([pP] [+-]? [0-9a-fA-F_]+)?;
         double16e = "0x" [0-9a-fA-F_]+ [pP] [+-]? [0-9a-fA-F_]+;
-        (double10 | double10e | double16 | double16e) { return Token(TOKEN_DOUBLE, s); }
+        (double10 | double10e | double16 | double16e) { return LexerOutput(TOKEN_DOUBLE, s); }
 
         // Integer literals
         oct = '0'  [0-7_]*;
         hex = '0x' [0-9a-fA-F_]+;
         bin = '0b' [01_]+;
-        (dec | oct | hex | bin) { return Token(TOKEN_INTEGER, s); }
+        (dec | oct | hex | bin) { return LexerOutput(TOKEN_INTEGER, s); }
 
         // Raw string literals
         nchar = notnl \ ['];
-        [']nchar*    { return Token(TOKEN_STR_RAW, s, false); }
-        [']nchar*['] { return Token(TOKEN_STR_RAW, s); }
+        [']nchar*    { return LexerOutput(TOKEN_STR_RAW, s, false); }
+        [']nchar*['] { return LexerOutput(TOKEN_STR_RAW, s); }
 
         // Multiline string start
-        '"""' lws*   { return Token(TOKEN_MSTR_BEGIN, s); }
-        '"""' notnl* { return Token(TOKEN_MSTR_BEGIN, s, false); }
+        '"""' lws*   { return LexerOutput(TOKEN_MSTR_BEGIN, s); }
+        '"""' notnl* { return LexerOutput(TOKEN_MSTR_BEGIN, s, false); }
 
         // Legacy multiline strings
-        '"%' lws*   { return Token(TOKEN_LSTR_BEGIN, s); }
-        '"%' notnl* { return Token(TOKEN_LSTR_BEGIN, s, false); }
+        '"%' lws*   { return LexerOutput(TOKEN_LSTR_BEGIN, s); }
+        '"%' notnl* { return LexerOutput(TOKEN_LSTR_BEGIN, s, false); }
 
         // Interpolated string literals (escapes will be processed later)
         schar = notnl \ [\\"{];
-        ["]([\\]notnl|schar)*[\\]? { return Token(TOKEN_STR_SINGLE, s, false); }
-        ["]([\\]notnl|schar)*["]   { return Token(TOKEN_STR_SINGLE, s); }
-        ["]([\\]notnl|schar)*[{]   { return Token(TOKEN_STR_OPEN,   s); }
+        ["]([\\]notnl|schar)*[\\]? { return LexerOutput(TOKEN_STR_SINGLE, s, false); }
+        ["]([\\]notnl|schar)*["]   { return LexerOutput(TOKEN_STR_SINGLE, s); }
+        ["]([\\]notnl|schar)*[{]   { return LexerOutput(TOKEN_STR_OPEN,   s); }
 
         // Regular expression literals (legality will be checked later)
         rchar = notnl \ [\\`$];
         dchar = notnl \ [\\`${];
-        [`]([$]*[\\]notnl|rchar|[$]+dchar)*[$\\]*  { return Token(TOKEN_REG_SINGLE, s, false); }
-        [`]([$]*[\\]notnl|rchar|[$]+dchar)*[$]*[`] { return Token(TOKEN_REG_SINGLE, s); }
-        [`]([$]*[\\]notnl|rchar|[$]+dchar)*[$]+[{] { return Token(TOKEN_REG_OPEN,   s); }
+        [`]([$]*[\\]notnl|rchar|[$]+dchar)*[$\\]*  { return LexerOutput(TOKEN_REG_SINGLE, s, false); }
+        [`]([$]*[\\]notnl|rchar|[$]+dchar)*[$]*[`] { return LexerOutput(TOKEN_REG_SINGLE, s); }
+        [`]([$]*[\\]notnl|rchar|[$]+dchar)*[$]+[{] { return LexerOutput(TOKEN_REG_OPEN,   s); }
 
         // Identifiers
-        l(n|l)* { return Token(TOKEN_ID, s); }
+        l(n|l)* { return LexerOutput(TOKEN_ID, s); }
 
         // Make forward lexing progress using illegal tokens:
-        n(n|l)* { return Token(TOKEN_INTEGER,   s, false); }
-        (r|o)+  { return Token(TOKEN_OP_DOLLAR, s, false); }
-        w       { return Token(TOKEN_WS,        s, false); }
-        *       { return Token(TOKEN_WS,        s, false); }
+        n(n|l)* { return LexerOutput(TOKEN_INTEGER,   s, false); }
+        (r|o)+  { return LexerOutput(TOKEN_OP_DOLLAR, s, false); }
+        w       { return LexerOutput(TOKEN_WS,        s, false); }
+        *       { return LexerOutput(TOKEN_WS,        s, false); }
 
         [^]     { #error Should be unreachable; lexer makes forward progress on all unicode symbols }
      */
 }
 
-Token lex_dstr(const uint8_t *s, const uint8_t *e) {
+LexerOutput lex_dstr(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
-        [^]([\\]notnl|schar)*[\\]? { return Token(TOKEN_STR_CLOSE, s, false); }
-        [^]([\\]notnl|schar)*["]   { return Token(TOKEN_STR_CLOSE, s); }
-        [^]([\\]notnl|schar)*[{]   { return Token(TOKEN_STR_MID,   s); }
+        [^]([\\]notnl|schar)*[\\]? { return LexerOutput(TOKEN_STR_CLOSE, s, false); }
+        [^]([\\]notnl|schar)*["]   { return LexerOutput(TOKEN_STR_CLOSE, s); }
+        [^]([\\]notnl|schar)*[{]   { return LexerOutput(TOKEN_STR_MID,   s); }
 
-        * { return Token(TOKEN_WS,        s, false); }
-        $ { return Token(TOKEN_STR_CLOSE, s, false); }
+        * { return LexerOutput(TOKEN_WS,        s, false); }
+        $ { return LexerOutput(TOKEN_STR_CLOSE, s, false); }
      */
 }
 
-Token lex_rstr(const uint8_t *s, const uint8_t *e) {
+LexerOutput lex_rstr(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
-        [^]([$]*[\\]notnl|rchar|[$]+dchar)*[$\\]*  { return Token(TOKEN_REG_CLOSE, s, false); }
-        [^]([$]*[\\]notnl|rchar|[$]+dchar)*[$]*[`] { return Token(TOKEN_REG_CLOSE, s); }
-        [^]([$]*[\\]notnl|rchar|[$]+dchar)*[$]+[{] { return Token(TOKEN_REG_MID,   s); }
+        [^]([$]*[\\]notnl|rchar|[$]+dchar)*[$\\]*  { return LexerOutput(TOKEN_REG_CLOSE, s, false); }
+        [^]([$]*[\\]notnl|rchar|[$]+dchar)*[$]*[`] { return LexerOutput(TOKEN_REG_CLOSE, s); }
+        [^]([$]*[\\]notnl|rchar|[$]+dchar)*[$]+[{] { return LexerOutput(TOKEN_REG_MID,   s); }
 
-        * { return Token(TOKEN_WS,        s, false); }
-        $ { return Token(TOKEN_REG_CLOSE, s, false); }
+        * { return LexerOutput(TOKEN_WS,        s, false); }
+        $ { return LexerOutput(TOKEN_REG_CLOSE, s, false); }
      */
 }
 
-Token lex_mstr_continue(const uint8_t *s, const uint8_t *e) {
+LexerOutput lex_mstr_continue(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
-        nl         { return Token(TOKEN_NL,       s); }
-        lws+       { return Token(TOKEN_WS,       s); }
-        '"""'      { return Token(TOKEN_MSTR_END, s); }
-        lws+ '"""' { return Token(TOKEN_MSTR_END, s); }
+        nl         { return LexerOutput(TOKEN_NL,       s); }
+        lws+       { return LexerOutput(TOKEN_WS,       s); }
+        '"""'      { return LexerOutput(TOKEN_MSTR_END, s); }
+        lws+ '"""' { return LexerOutput(TOKEN_MSTR_END, s); }
 
         pchar = notnl \ [%];
         mchar = notnl \ [%{];
@@ -232,59 +232,59 @@ Token lex_mstr_continue(const uint8_t *s, const uint8_t *e) {
         fchar = notnl \ lws \ [%"];
 
         ["]{1,2}((qchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]*     |
-                ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]*     { return Token(TOKEN_MSTR_CONTINUE, s); }
+                ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]*     { return LexerOutput(TOKEN_MSTR_CONTINUE, s); }
         ["]{1,2}((qchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]+ [{] |
-                ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]+ [{] { return Token(TOKEN_MSTR_PAUSE,    s); }
+                ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]+ [{] { return LexerOutput(TOKEN_MSTR_PAUSE,    s); }
 
-        * { return Token(TOKEN_WS,       s, false); }
-        $ { return Token(TOKEN_MSTR_END, s, false); }
+        * { return LexerOutput(TOKEN_WS,       s, false); }
+        $ { return LexerOutput(TOKEN_MSTR_END, s, false); }
      */
 }
 
-Token lex_mstr_resume(const uint8_t *s, const uint8_t *e) {
+LexerOutput lex_mstr_resume(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
-        [^](pchar|[%]+mchar)*[%]*       { return Token(TOKEN_MSTR_RESUME, s); }
-        [^](pchar|[%]+mchar)*[%]+ [{]   { return Token(TOKEN_MSTR_MID,    s); }
+        [^](pchar|[%]+mchar)*[%]*       { return LexerOutput(TOKEN_MSTR_RESUME, s); }
+        [^](pchar|[%]+mchar)*[%]+ [{]   { return LexerOutput(TOKEN_MSTR_MID,    s); }
 
-        * { return Token(TOKEN_WS,          s, false); }
-        $ { return Token(TOKEN_MSTR_RESUME, s, false); }
+        * { return LexerOutput(TOKEN_WS,          s, false); }
+        $ { return LexerOutput(TOKEN_MSTR_RESUME, s, false); }
      */
 }
 
-Token lex_lstr_continue(const uint8_t *s, const uint8_t *e) {
+LexerOutput lex_lstr_continue(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
-        nl         { return Token(TOKEN_NL,       s); }
-        lws+       { return Token(TOKEN_WS,       s); }
-        '%"'       { return Token(TOKEN_LSTR_END, s); }
-        lws+ '%"'  { return Token(TOKEN_LSTR_END, s); }
+        nl         { return LexerOutput(TOKEN_NL,       s); }
+        lws+       { return LexerOutput(TOKEN_WS,       s); }
+        '%"'       { return LexerOutput(TOKEN_LSTR_END, s); }
+        lws+ '%"'  { return LexerOutput(TOKEN_LSTR_END, s); }
 
-         (fchar|[%]+mchar)(pchar|[%]+mchar)*  [%]*     { return Token(TOKEN_LSTR_CONTINUE, s); }
-        ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]+ [{] { return Token(TOKEN_LSTR_PAUSE,    s); }
+         (fchar|[%]+mchar)(pchar|[%]+mchar)*  [%]*     { return LexerOutput(TOKEN_LSTR_CONTINUE, s); }
+        ((fchar|[%]+mchar)(pchar|[%]+mchar)*)?[%]+ [{] { return LexerOutput(TOKEN_LSTR_PAUSE,    s); }
 
-        * { return Token(TOKEN_WS,       s, false); }
-        $ { return Token(TOKEN_LSTR_END, s, false); }
+        * { return LexerOutput(TOKEN_WS,       s, false); }
+        $ { return LexerOutput(TOKEN_LSTR_END, s, false); }
      */
 }
 
-Token lex_lstr_resume(const uint8_t *s, const uint8_t *e) {
+LexerOutput lex_lstr_resume(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
-        [^](pchar|[%]+mchar)*[%]*       { return Token(TOKEN_LSTR_RESUME, s); }
-        [^](pchar|[%]+mchar)*[%]+ [{]   { return Token(TOKEN_LSTR_MID,    s); }
+        [^](pchar|[%]+mchar)*[%]*       { return LexerOutput(TOKEN_LSTR_RESUME, s); }
+        [^](pchar|[%]+mchar)*[%]+ [{]   { return LexerOutput(TOKEN_LSTR_MID,    s); }
 
-        * { return Token(TOKEN_WS,          s, false); }
-        $ { return Token(TOKEN_LSTR_RESUME, s, false); }
+        * { return LexerOutput(TOKEN_WS,          s, false); }
+        $ { return LexerOutput(TOKEN_LSTR_RESUME, s, false); }
      */
 }
 
-Token lex_printable(const uint8_t *s, const uint8_t *e) {
+LexerOutput lex_printable(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
     /*!re2c
-        L|M|N|P|S|Zs { return Token(0, s, true);  }
-        $            { return Token(0, s, true);  }
-        *            { return Token(0, s, false); }
+        L|M|N|P|S|Zs { return LexerOutput(0, s, true);  }
+        $            { return LexerOutput(0, s, true);  }
+        *            { return LexerOutput(0, s, false); }
      */
 }
 

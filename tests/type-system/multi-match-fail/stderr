@@ -1,29 +1,29 @@
-test.wake:11:[3-13]: type error; expression '(_: String)' (test.wake:11:[3-13]) of type:
+test.wake:11:[3-13]: type error; expression '(_: String)' of type:
     Integer
-  does not match explicit type ascription at test.wake:11:[7-12] of:
+  does not match explicit type ascription of:
     String
-test.wake:10:[3-14]: type error; function 'x+1' (test.wake:10:[35-37]) expected argument 'x' of type:
+test.wake:10:[3-14]: type error; function 'x+1' expected argument 'x' of type:
     Integer
-  but was supplied argument '(x: Integer)' (test.wake:10:[3-14]) of type:
+  but was supplied argument '(x: Integer)' of type:
     String
-test.wake:16:25: type error; case analysis of '_' (test.wake:16:25) with type:
+test.wake:16:25: type error; case analysis of '_' with type:
     String
   does not match the pattern requirement of type:
     Boolean
-test.wake:24:[3-13]: type error; function 'x+1' (test.wake:24:[34-36]) expected argument 'x' of type:
+test.wake:24:[3-13]: type error; function 'x+1' expected argument 'x' of type:
     Integer
-  but was supplied argument '(x: String)' (test.wake:24:[3-13]) of type:
+  but was supplied argument '(x: String)' of type:
     String
-test.wake:30:[12-123]: type error; expression test.wake:30:[12-123] of type:
+test.wake:30:[12-123]: type error; expression 'f3 (Pair (x: I..teger Integer)' of type:
     Integer
-  does not match explicit type ascription at test.wake:30:[126-131] of:
+  does not match explicit type ascription of:
     String
 test.wake:36:[12-122]: type error; pattern for case 'Pair' expected type:
     Pair Integer Integer
-  but the argument test.wake:36:[12-122] has type:
+  but the argument 'f4 (Pair (x: I..nteger String)' has type:
     Pair Integer String
-test.wake:42:[89-99]: type error; function 'x+y+a+b' (test.wake:43:[3-9]) expected argument 'b' of type:
+test.wake:42:[89-99]: type error; function 'x+y+a+b' expected argument 'b' of type:
     Integer
-  but was supplied argument '(b: String)' (test.wake:42:[89-99]) of type:
+  but was supplied argument '(b: String)' of type:
     String
 >>> Aborting without execution <<<

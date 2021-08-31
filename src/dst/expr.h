@@ -18,7 +18,7 @@
 #ifndef EXPR_H
 #define EXPR_H
 
-#include "util/location.h"
+#include "util/fragment.h"
 #include "util/hash.h"
 #include "types/type.h"
 #include "types/datatype.h"
@@ -40,15 +40,17 @@ struct Continuation;
 #define FLAG_RECURSIVE 0x04 // recursive function
 #define FLAG_SYNTHETIC 0x08 // sugar-generated function
 
+extern CPPFile expr_h;
+
 /* Expression AST */
 struct Expr {
   const TypeDescriptor *type;
-  Location location;
+  FileFragment fragment;
   TypeVar typeVar;
   uintptr_t meta;
   long flags;
 
-  Expr(const TypeDescriptor *type_, const Location &location_, long flags_ = 0) : type(type_), location(location_), meta(0), flags(flags_) { }
+  Expr(const TypeDescriptor *type_, const FileFragment &fragment_, long flags_ = 0) : type(type_), fragment(fragment_), meta(0), flags(flags_) { }
   virtual ~Expr();
 
   void set(long flag, long value /* 0 or 1 */) { flags = (flags & ~flag) | (-value & flag); }
@@ -67,7 +69,7 @@ struct Prim : public Expr {
   void *data;
 
   static const TypeDescriptor type;
-  Prim(const Location &location_, const std::string &name_) : Expr(&type, location_), name(name_), args(0), pflags(0) { }
+  Prim(const FileFragment &fragment_, const std::string &name_) : Expr(&type, fragment_), name(name_), args(0), pflags(0) { }
 
   void format(std::ostream &os, int depth) const override;
 };
@@ -77,8 +79,8 @@ struct App : public Expr {
   std::unique_ptr<Expr> val;
 
   static const TypeDescriptor type;
-  App(const Location &location_, Expr *fn_, Expr *val_)
-   : Expr(&type, location_), fn(fn_), val(val_) { }
+  App(const FileFragment &fragment_, Expr *fn_, Expr *val_)
+   : Expr(&type, fragment_), fn(fn_), val(val_) { }
   App(const App &app)
    : Expr(app), fn(), val() { }
 
@@ -88,11 +90,11 @@ struct App : public Expr {
 struct Lambda : public Expr {
   std::string name, fnname;
   std::unique_ptr<Expr> body;
-  Location token;
+  FileFragment token;
 
   static const TypeDescriptor type;
-  Lambda(const Location &location_, const std::string &name_, Expr *body_, const char *fnname_ = "")
-   : Expr(&type, location_), name(name_), fnname(fnname_), body(body_), token(LOCATION) { }
+  Lambda(const FileFragment &fragment_, const std::string &name_, Expr *body_, const char *fnname_ = "")
+   : Expr(&type, fragment_), name(name_), fnname(fnname_), body(body_), token(FileFragment(&expr_h, __LINE__, __LINE__)) { }
   Lambda(const Lambda &lambda)
    : Expr(lambda), name(lambda.name), fnname(lambda.fnname), body(), token(lambda.token) { }
 
@@ -103,11 +105,11 @@ struct VarRef : public Expr {
   std::string name;
   int index;
   Lambda *lambda;
-  Location target;
+  FileFragment target;
 
   static const TypeDescriptor type;
-  VarRef(const Location &location_, const std::string &name_, int index_ = 0)
-   : Expr(&type, location_), name(name_), index(index_), lambda(nullptr), target(LOCATION) { }
+  VarRef(const FileFragment &fragment_, const std::string &name_, int index_ = 0)
+   : Expr(&type, fragment_), name(name_), index(index_), lambda(nullptr), target(FileFragment(&expr_h, __LINE__, __LINE__)) { }
 
   void format(std::ostream &os, int depth) const override;
 };
@@ -117,7 +119,7 @@ struct Literal : public Expr {
   TypeVar *litType;
 
   static const TypeDescriptor type;
-  Literal(const Location &location_, std::string &&value_, TypeVar *litType_);
+  Literal(const FileFragment &fragment_, std::string &&value_, TypeVar *litType_);
 
   void format(std::ostream &os, int depth) const override;
 };
@@ -137,8 +139,8 @@ struct Match : public Expr {
   std::unique_ptr<Expr> otherwise;
 
   static const TypeDescriptor type;
-  Match(const Location &location_, bool refutable_ = false)
-   : Expr(&type, location_), refutable(refutable_) { }
+  Match(const FileFragment &fragment_, bool refutable_ = false)
+   : Expr(&type, fragment_), refutable(refutable_) { }
 
   void format(std::ostream &os, int depth) const override;
 };
@@ -147,8 +149,8 @@ struct Subscribe : public Expr {
   std::string name;
 
   static const TypeDescriptor type;
-  Subscribe(const Location &location_, const std::string &name_)
-   : Expr(&type, location_), name(name_) { }
+  Subscribe(const FileFragment &fragment_, const std::string &name_)
+   : Expr(&type, fragment_), name(name_) { }
 
   void format(std::ostream &os, int depth) const override;
 };
@@ -156,23 +158,23 @@ struct Subscribe : public Expr {
 struct Ascribe : public Expr {
   AST signature;
   std::unique_ptr<Expr> body;
-  Location body_location;
+  FileFragment body_fragment;
 
   static const TypeDescriptor type;
-  Ascribe(const Location &location_, AST &&signature_, Expr *body_, const Location &body_location_)
-   : Expr(&type, location_), signature(std::move(signature_)), body(body_), body_location(body_location_) { }
+  Ascribe(const FileFragment &fragment_, AST &&signature_, Expr *body_, const FileFragment &body_fragment_)
+   : Expr(&type, fragment_), signature(std::move(signature_)), body(body_), body_fragment(body_fragment_) { }
 
   void format(std::ostream &os, int depth) const override;
 };
 
 struct DefValue {
-  Location location;
+  FileFragment fragment;
   std::unique_ptr<Expr> body;
   std::vector<ScopedTypeVar> typeVars;
-  DefValue(const Location &location_, std::unique_ptr<Expr> &&body_)
-   : location(location_), body(std::move(body_)) { }
-  DefValue(const Location &location_, std::unique_ptr<Expr> &&body_, std::vector<ScopedTypeVar> &&typeVars_)
-   : location(location_), body(std::move(body_)), typeVars(std::move(typeVars_)) { }
+  DefValue(const FileFragment &fragment_, std::unique_ptr<Expr> &&body_)
+   : fragment(fragment_), body(std::move(body_)) { }
+  DefValue(const FileFragment &fragment_, std::unique_ptr<Expr> &&body_, std::vector<ScopedTypeVar> &&typeVars_)
+   : fragment(fragment_), body(std::move(body_)), typeVars(std::move(typeVars_)) { }
 };
 
 #define SYM_LEAF 1 // qualified = a definition
@@ -216,18 +218,18 @@ struct DefMap : public Expr {
   std::unique_ptr<Expr> body;
 
   static const TypeDescriptor type;
-  DefMap(const Location &location_, Defs &&defs_, Expr *body_)
-   : Expr(&type, location_), defs(std::move(defs_)), body(body_) { }
-  DefMap(const Location &location_)
-   : Expr(&type, location_), defs(), body(nullptr) { }
+  DefMap(const FileFragment &fragment_, Defs &&defs_, Expr *body_)
+   : Expr(&type, fragment_), defs(std::move(defs_)), body(body_) { }
+  DefMap(const FileFragment &fragment_)
+   : Expr(&type, fragment_), defs(), body(nullptr) { }
 
   void format(std::ostream &os, int depth) const override;
 };
 
 struct Topic {
-  Location location;
+  FileFragment fragment;
   AST type;
-  Topic(const Location &location_, AST &&type_) : location(location_), type(std::move(type_)) { }
+  Topic(const FileFragment &fragment_, AST &&type_) : fragment(fragment_), type(std::move(type_)) { }
 };
 
 struct File {
@@ -239,38 +241,34 @@ struct File {
   Topics topics;
 };
 
-struct Package : public Expr {
+struct Package {
   std::string name;
   std::vector<File> files;
   Symbols package;
   Symbols exports; // subset of package; used to fill imports
 
-  static const TypeDescriptor type;
-  Package() : Expr(&type, LOCATION) { }
-
-  void format(std::ostream &os, int depth) const override;
+  void format(std::ostream &os, int depth) const;
 };
 
-struct Top : public Expr {
+struct Top {
   typedef std::map<std::string, std::unique_ptr<Package> > Packages;
   Packages packages;
   Symbols globals;
   const char *def_package;
   std::unique_ptr<Expr> body;
 
-  static const TypeDescriptor type;
   Top();
 
-  void format(std::ostream &os, int depth) const override;
+  void format(std::ostream &os, int depth) const;
 };
 
 // Created by transforming DefMap+Package+Top
 struct DefBinding : public Expr {
   struct OrderValue {
-    Location location;
+    FileFragment fragment;
     int index;
-    OrderValue(const Location &location_, int index_)
-     : location(location_), index(index_) { }
+    OrderValue(const FileFragment &fragment_, int index_)
+     : fragment(fragment_), index(index_) { }
   };
   typedef std::vector<std::unique_ptr<Expr> > Values;
   typedef std::vector<std::unique_ptr<Lambda> > Functions;
@@ -286,8 +284,8 @@ struct DefBinding : public Expr {
   std::vector<unsigned> scc; // SCC id per function
 
   static const TypeDescriptor type;
-  DefBinding(const Location &location_, std::unique_ptr<Expr> body_)
-   : Expr(&type, location_), body(std::move(body_)) { }
+  DefBinding(const FileFragment &fragment_, std::unique_ptr<Expr> body_)
+   : Expr(&type, fragment_), body(std::move(body_)) { }
 
   void format(std::ostream &os, int depth) const override;
 };
@@ -300,8 +298,8 @@ struct Get : public Expr {
   size_t index;
 
   static const TypeDescriptor type;
-  Get(const Location &location_, const std::shared_ptr<Sum> &sum_, Constructor *cons_, size_t index_)
-   : Expr(&type, location_), sum(sum_), cons(cons_), index(index_) { }
+  Get(const FileFragment &fragment_, const std::shared_ptr<Sum> &sum_, Constructor *cons_, size_t index_)
+   : Expr(&type, fragment_), sum(sum_), cons(cons_), index(index_) { }
 
   void format(std::ostream &os, int depth) const override;
 };
@@ -311,8 +309,8 @@ struct Construct : public Expr {
   Constructor *cons;
 
   static const TypeDescriptor type;
-  Construct(const Location &location_, const std::shared_ptr<Sum> &sum_, Constructor *cons_)
-   : Expr(&type, location_), sum(sum_), cons(cons_) { }
+  Construct(const FileFragment &fragment_, const std::shared_ptr<Sum> &sum_, Constructor *cons_)
+   : Expr(&type, fragment_), sum(sum_), cons(cons_) { }
 
   void format(std::ostream &os, int depth) const override;
 };
@@ -323,8 +321,8 @@ struct Destruct : public Expr {
   DefBinding::Values cases;
 
   static const TypeDescriptor type;
-  Destruct(const Location &location_, const std::shared_ptr<Sum> &sum_, Expr *arg_)
-   : Expr(&type, location_), sum(sum_), arg(arg_) { }
+  Destruct(const FileFragment &fragment_, const std::shared_ptr<Sum> &sum_, Expr *arg_)
+   : Expr(&type, fragment_), sum(sum_), arg(arg_) { }
 
   void format(std::ostream &os, int depth) const override;
 };
@@ -332,14 +330,14 @@ struct Destruct : public Expr {
 // A dummy expression never actually used in the AST
 struct VarDef : public Expr {
   static const TypeDescriptor type;
-  VarDef(const Location &location_) : Expr(&type, location_) { }
+  VarDef(const FileFragment &fragment_) : Expr(&type, fragment_) { }
   void format(std::ostream &os, int depth) const override;
 };
 
 // A dummy expression never actually used in the AST
 struct VarArg : public Expr {
   static const TypeDescriptor type;
-  VarArg(const Location &location_) : Expr(&type, location_) { }
+  VarArg(const FileFragment &fragment_) : Expr(&type, fragment_) { }
   void format(std::ostream &os, int depth) const override;
 };
 

@@ -35,14 +35,14 @@ CSTNode::CSTNode(uint8_t id_, uint32_t size_, uint32_t begin_, uint32_t end_)
 {
 }
 
-void CSTBuilder::addToken(uint8_t id, TokenInfo token) {
+void CSTBuilder::addToken(uint8_t id, StringSegment token) {
     token_ids.push_back(id);
-    token_starts.set(token.start - file->start);
+    token_starts.set(token.start - file->segment().start);
 }
 
-void CSTBuilder::addNode(uint8_t id, TokenInfo begin) {
-    uint32_t b = begin.start - file->start;
-    uint32_t e = begin.end   - file->start;
+void CSTBuilder::addNode(uint8_t id, StringSegment begin) {
+    uint32_t b = begin.start - file->segment().start;
+    uint32_t e = begin.end   - file->segment().start;
     nodes.emplace_back(id, 1, b, e);
 }
 
@@ -59,7 +59,7 @@ void CSTBuilder::addNode(uint8_t id, uint32_t children) {
     nodes.emplace_back(id, size, b, e);
 }
 
-void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children) {
+void CSTBuilder::addNode(uint8_t id, StringSegment begin, uint32_t children) {
     uint32_t b = 0;
     uint32_t e = nodes.empty()?0:nodes.back().end;
 
@@ -69,13 +69,13 @@ void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children) {
         size += nodes.end()[-size].size;
     }
 
-    uint32_t b2 = begin.start - file->start;
+    uint32_t b2 = begin.start - file->segment().start;
     if (b2 < b) b = b2;
 
     nodes.emplace_back(id, size, b, e);
 }
 
-void CSTBuilder::addNode(uint8_t id, uint32_t children, TokenInfo end) {
+void CSTBuilder::addNode(uint8_t id, uint32_t children, StringSegment end) {
     uint32_t b = 0;
     uint32_t e = nodes.empty()?0:nodes.back().end;
 
@@ -85,13 +85,13 @@ void CSTBuilder::addNode(uint8_t id, uint32_t children, TokenInfo end) {
         size += nodes.end()[-size].size;
     }
 
-    uint32_t e2 = end.end - file->start;
+    uint32_t e2 = end.end - file->segment().start;
     if (e2 > e) e = e2;
 
     nodes.emplace_back(id, size, b, e);
 }
 
-void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children, TokenInfo end) {
+void CSTBuilder::addNode(uint8_t id, StringSegment begin, uint32_t children, StringSegment end) {
     uint32_t b2 = 0;
 
     int size = 1;
@@ -100,8 +100,8 @@ void CSTBuilder::addNode(uint8_t id, TokenInfo begin, uint32_t children, TokenIn
         size += nodes.end()[-size].size;
     }
 
-    uint32_t b = begin.start - file->start;
-    uint32_t e = end.end - file->start;
+    uint32_t b = begin.start - file->segment().start;
+    uint32_t e = end.end - file->segment().start;
 
     if (children) {
         uint32_t e2 = nodes.back().end;
@@ -153,7 +153,7 @@ CST::CST(CSTBuilder &&builder)
 
     if (!nodes.empty()) {
         nodes.front().begin = 0;
-        nodes.back().end = file->end - file->start;
+        nodes.back().end = file->segment().size();
     }
 
     builder.nodes.clear();
@@ -165,7 +165,7 @@ CSTElement CST::root() const {
     out.node = 0;
     out.limit = nodes.size();
     out.token = 0;
-    out.end = file->end - file->start;
+    out.end = file->segment().size();
     return out;
 }
 
@@ -186,23 +186,18 @@ uint8_t CSTElement::id() const {
     }
 }
 
-TokenInfo CSTElement::content() const {
-    TokenInfo out;
-    const uint8_t *start = cst->file->start;
+FileFragment CSTElement::fragment() const {
+    uint32_t start, end;
     if (isNode()) {
         CSTNode n = cst->nodes[node];
-        out.start = start + n.begin;
-        out.end   = start + n.end;
+        start = n.begin;
+        end   = n.end;
     } else {
-        out.start = start + token;
-        out.end   = start + cst->token_starts.next1(token+1);
+        start = token;
+        end   = cst->token_starts.next1(token+1);
     }
-    return out;
-}
 
-Location CSTElement::location() const {
-    TokenInfo x = content();
-    return x.location(*cst->file);
+    return FileFragment(cst->file, start, end);
 }
 
 void CSTElement::nextSiblingElement() {
@@ -269,16 +264,11 @@ CSTElement CSTElement::firstChildNode() const {
     return out;
 }
 
-Location TokenInfo::location(const FileContent &fcontent) const {
-    return Location(fcontent.filename, fcontent.coordinates(start), fcontent.coordinates(end!=start?end-1:end));
-}
+#define MAX_SNIPPET 30
+#define MAX_SNIPPET_HALF ((MAX_SNIPPET/2)-1)
 
-std::string TokenInfo::str() const {
-    return std::string(reinterpret_cast<const char*>(start), end-start);
-}
-
-std::ostream & operator << (std::ostream &os, TokenInfo tinfo) {
-    Token token, next;
+std::ostream & operator << (std::ostream &os, StringSegment tinfo) {
+    LexerOutput token, next;
 
     os << "'";
 
@@ -287,8 +277,8 @@ std::ostream & operator << (std::ostream &os, TokenInfo tinfo) {
         ++codepoints;
 
     // At most 10 chars at start and 10 chars at end
-    long skip_start = (codepoints > 20) ? 9 : codepoints;
-    long skip_end   = (codepoints > 20) ? codepoints-9 : codepoints;
+    long skip_start = (codepoints > MAX_SNIPPET) ?            MAX_SNIPPET_HALF : codepoints;
+    long skip_end   = (codepoints > MAX_SNIPPET) ? codepoints-MAX_SNIPPET_HALF : codepoints;
 
     long codepoint = 0;
     for (token.end = tinfo.start; token.end < tinfo.end; token = next) {

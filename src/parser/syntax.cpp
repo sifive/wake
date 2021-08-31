@@ -26,6 +26,7 @@
 
 #include "util/file.h"
 #include "util/diagnostic.h"
+#include "util/segment.h"
 #include "lexer.h"
 #include "parser.h"
 #include "syntax.h"
@@ -36,13 +37,13 @@
 #define STATE_NL_WS	2
 
 void parseWake(ParseInfo pi) {
-    TokenInfo tinfo, tnl;
+    StringSegment tinfo, tnl;
 
     std::vector<int> indent_stack;
     std::string indent;
 
     // Processing whitespace needs some state
-    Token token, nl, ws;
+    LexerOutput token, nl, ws;
     int state = STATE_IDLE;
     bool in_multiline_string = false;
     bool in_legacy_string = false;
@@ -53,7 +54,7 @@ void parseWake(ParseInfo pi) {
     void *parser = ParseAlloc(malloc);
     // ParseTrace(stderr, "");
 
-    token.end = pi.fcontent->start;
+    token.end = pi.fcontent->segment().start;
     do {
         tinfo.start = token.end;
 
@@ -67,27 +68,27 @@ void parseWake(ParseInfo pi) {
 
         if (in_multiline_string) {
             // Proceed lexing in multiline string context
-            token = lex_mstr_continue(token.end, pi.fcontent->end);
+            token = lex_mstr_continue(token.end, pi.fcontent->segment().end);
         } else if (in_legacy_string) {
             // Proceed lexing in legacy multiline string context
-            token = lex_lstr_continue(token.end, pi.fcontent->end);
+            token = lex_lstr_continue(token.end, pi.fcontent->segment().end);
         } else if (*token.end == '}') {
             // A '}' might signal resuming either a String, a RegExp, or an {} expression.
             // This sort of parser-context aware lexing is supported by fancier parser generators.
             // However, it's easy enough to do here by peeking into lemon's state.
             if (ParseShifts(parser, TOKEN_STR_CLOSE)) {
-                token = lex_dstr(token.end, pi.fcontent->end);
+                token = lex_dstr(token.end, pi.fcontent->segment().end);
             } else if (ParseShifts(parser, TOKEN_REG_CLOSE)) {
-                token = lex_rstr(token.end, pi.fcontent->end);
+                token = lex_rstr(token.end, pi.fcontent->segment().end);
             } else if (ParseShifts(parser, TOKEN_MSTR_RESUME)) {
-                token = lex_mstr_resume(token.end, pi.fcontent->end);
+                token = lex_mstr_resume(token.end, pi.fcontent->segment().end);
             } else if (ParseShifts(parser, TOKEN_LSTR_RESUME)) {
-                token = lex_lstr_resume(token.end, pi.fcontent->end);
+                token = lex_lstr_resume(token.end, pi.fcontent->segment().end);
             } else {
-                token = lex_wake(token.end, pi.fcontent->end);
+                token = lex_wake(token.end, pi.fcontent->segment().end);
             }
         } else {
-            token = lex_wake(token.end, pi.fcontent->end);
+            token = lex_wake(token.end, pi.fcontent->segment().end);
         }
 
         // Record this token in the CST
@@ -105,7 +106,7 @@ void parseWake(ParseInfo pi) {
                 // Whitespace wastes the lookahead token, making the grammar LR(2).
                 continue;
             } else if (token.id == TOKEN_NL) {
-                pi.fcontent->newline(token.end);
+                pi.fcontent->addNewline(token.end);
                 if (in_multiline_string || in_legacy_string) {
                     break;
                 } else {
@@ -140,7 +141,7 @@ void parseWake(ParseInfo pi) {
             case TOKEN_NL:
                 // We just processed a completely empty line. Do not adjust indentation level!
                 // Discard prior NL WS? sequence, and restart indentation processing at this NL.
-                pi.fcontent->newline(token.end);
+                pi.fcontent->addNewline(token.end);
                 nl = token;
                 state = STATE_NL;
                 continue;
@@ -163,11 +164,11 @@ void parseWake(ParseInfo pi) {
 
                     if (newdent.size() > indent.size()) {
                         std::stringstream ss;
-                        TokenInfo tws;
+                        StringSegment tws;
                         tws.start = nl.end;
                         tws.end = ws.end;
                         ss << "syntax error; whitespace neither indents the previous line nor matches a prior indentation level";
-                        pi.reporter->reportError(tws.location(*pi.fcontent), ss.str());
+                        pi.reporter->reportError(FileFragment(pi.fcontent, tws).location(), ss.str());
                     }
                 }
 
@@ -221,7 +222,7 @@ void parseWake(ParseInfo pi) {
             std::stringstream ss;
             ss << "syntax error; found illegal token " << tinfo
                << ", but handling it like '" << symbolExample(token.id) << "'";
-            pi.reporter->reportError(tinfo.location(*pi.fcontent), ss.str());
+            pi.reporter->reportError(FileFragment(pi.fcontent, tinfo).location(), ss.str());
         }
 
         Parse(parser, token.id, tinfo, pi);

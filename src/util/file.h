@@ -23,20 +23,23 @@
 #include <stdint.h>
 
 #include "location.h"
+#include "segment.h"
+
 class DiagnosticReporter;
 
 class FileContent {
 public:
     FileContent(const char *filename_);
 
-    const char *filename;
-    const uint8_t *start;
-    const uint8_t *end;
-
     Coordinates coordinates(const uint8_t *position) const;
-    void newline(const uint8_t *first_column);
+    void addNewline(const uint8_t *first_column);
 
-private:
+    StringSegment segment() const { return ss; }
+    const char *filename() const { return fname.c_str(); }
+
+protected:
+    StringSegment ss;
+    std::string fname;
     std::vector<size_t> newlines;
 };
 
@@ -58,6 +61,11 @@ public:
     // copy construction is forbidden
     ExternalFile(const ExternalFile &) = delete;
     ExternalFile &operator = (const ExternalFile &) = delete;
+};
+
+class CPPFile : public FileContent {
+public:
+    CPPFile(const char *filename);
 };
 
 #endif

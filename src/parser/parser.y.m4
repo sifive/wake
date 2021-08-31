@@ -19,7 +19,7 @@
 %extra_argument {ParseInfo pinfo}
 
 %token_prefix TOKEN_
-%token_type {TokenInfo}
+%token_type {StringSegment}
 
 %default_type {size_t}
 %default_destructor { pop($$); }
@@ -39,6 +39,7 @@
 
 #include "util/file.h"
 #include "util/diagnostic.h"
+#include "lexer.h"
 #include "syntax.h"
 #include "cst.h"
 
@@ -49,7 +50,7 @@
   do {                                                                                 \
     std::stringstream sstr;                                                            \
     sstr << "syntax error; " << sstream;                                               \
-    Location l = token.location(*pinfo.fcontent);                                      \
+    Location l = FileFragment(pinfo.fcontent, token).location();                       \
     pinfo.reporter->reportError(l, sstr.str());                                        \
   } while (0)
 }
@@ -452,12 +453,10 @@ bool ParseShifts(void *p, int yymajor) {
   } else {
     ss << "which is inappropriate here";
   }
-  pinfo.reporter->reportError(yyminor.location(*pinfo.fcontent), ss.str());
+  pinfo.reporter->reportError(FileFragment(pinfo.fcontent, yyminor).location(), ss.str());
 }
 
 %parse_failure {
-  TokenInfo ti;
-  ti.start = pinfo.fcontent->start;
-  ti.end = pinfo.fcontent->end;
-  pinfo.reporter->reportError(ti.location(*pinfo.fcontent), "Parser was unable to proceed");
+  StringSegment ti = pinfo.fcontent->segment();
+  pinfo.reporter->reportError(FileFragment(pinfo.fcontent, ti).location(), "Parser was unable to proceed");
 }

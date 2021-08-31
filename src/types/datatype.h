@@ -24,7 +24,7 @@
 #include <ostream>
 #include <memory>
 
-#include "util/location.h"
+#include "util/fragment.h"
 #include "util/optional.h"
 
 struct TypeVar;
@@ -32,23 +32,23 @@ typedef std::map<std::string, TypeVar*> TypeMap;
 
 struct ScopedTypeVar {
   std::string name;
-  Location location;
-  ScopedTypeVar(const std::string &name_, const Location &location_)
-   : name(name_), location(location_) { }
+  FileFragment fragment;
+  ScopedTypeVar(const std::string &name_, const FileFragment &fragment_)
+   : name(name_), fragment(fragment_) { }
 };
 
 struct AST {
-  Location token, region;
+  FileFragment token, region;
   std::string name;
   std::string tag;
   optional<AST> type;
   std::vector<AST> args;
 
-  AST(const Location &token_, std::string &&name_, std::vector<AST> &&args_) :
+  AST(const FileFragment &token_, std::string &&name_, std::vector<AST> &&args_) :
     token(token_), region(token_), name(std::move(name_)), args(std::move(args_)) { }
-  AST(const Location &token_, std::string &&name_) :
+  AST(const FileFragment &token_, std::string &&name_) :
     token(token_), region(token_), name(std::move(name_)) { }
-  AST(const Location &token_) :
+  AST(const FileFragment &token_) :
     token(token_), region(token_) { }
 
   bool unify(TypeVar &out, const TypeMap &ids);
@@ -73,7 +73,7 @@ struct Constructor {
 
 struct Sum {
   std::string name;
-  Location token, region;
+  FileFragment token, region;
   std::vector<std::string> args;
   std::vector<Constructor> members;
   bool scoped;

@@ -15,20 +15,17 @@
  * limitations under the License.
  */
 
-// Open Group Base Specifications Issue 7
-#define _XOPEN_SOURCE 700
-#define _POSIX_C_SOURCE 200809L
+#ifndef SEGMENT_H
+#define SEGMENT_H
 
-#include <fstream>
+#include <string>
 
-#include "location.h"
+struct StringSegment {
+    const uint8_t *start;
+    const uint8_t *end;
 
-std::ostream & operator << (std::ostream &os, const Location& location) {
-  os << location.filename << ":";
-  if (location.start.row == location.end.row) os << location.start.row;
-  else os << "[" << location.start.row << "-" << location.end.row << "]";
-  os << ":";
-  if (location.start.column == location.end.column) os << location.start.column;
-  else os << "[" << location.start.column << "-" << location.end.column << "]";
-  return os;
-}
+    size_t size() const { return end - start; }
+    std::string str() const { return std::string(reinterpret_cast<const char*>(start), end-start); }
+};
+
+#endif

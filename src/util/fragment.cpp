@@ -15,20 +15,12 @@
  * limitations under the License.
  */
 
-// Open Group Base Specifications Issue 7
-#define _XOPEN_SOURCE 700
-#define _POSIX_C_SOURCE 200809L
+#include "fragment.h"
 
-#include <fstream>
-
-#include "location.h"
-
-std::ostream & operator << (std::ostream &os, const Location& location) {
-  os << location.filename << ":";
-  if (location.start.row == location.end.row) os << location.start.row;
-  else os << "[" << location.start.row << "-" << location.end.row << "]";
-  os << ":";
-  if (location.start.column == location.end.column) os << location.start.column;
-  else os << "[" << location.start.column << "-" << location.end.column << "]";
-  return os;
+Location FileFragment::location() const {
+    uint32_t end1 = end!=start?end-1:end;
+    return Location(
+        content->filename(),
+        content->coordinates(content->segment().start + start),
+        content->coordinates(content->segment().start + end1));
 }

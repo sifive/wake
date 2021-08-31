@@ -29,26 +29,29 @@
 #include <algorithm>
 
 #include "util/diagnostic.h"
+#include "util/fragment.h"
 #include "parser/lexer.h"
 #include "types/sums.h"
 #include "expr.h"
 #include "bind.h"
 #include "primfn.h"
 
+static CPPFile cppFile(__FILE__);
+
 typedef std::map<std::string, int> NameIndex;
 
 struct ResolveDef {
   std::string name;
-  Location location;
+  FileFragment fragment;
   std::unique_ptr<Expr> expr;
   std::vector<ScopedTypeVar> typeVars;
   std::set<int> edges; // edges: things this name uses
   int index, lowlink, onstack; // Tarjan SCC variables
   int uses;
-  ResolveDef(const std::string &name_, const Location &location_, std::unique_ptr<Expr>&& expr_, std::vector<ScopedTypeVar> &&typeVars_)
-   : name(name_), location(location_), expr(std::move(expr_)), typeVars(std::move(typeVars_)), uses(0) { }
-  ResolveDef(const std::string &name_, const Location &location_, std::unique_ptr<Expr>&& expr_)
-   : name(name_), location(location_), expr(std::move(expr_)), uses(0) { }
+  ResolveDef(const std::string &name_, const FileFragment &fragment_, std::unique_ptr<Expr>&& expr_, std::vector<ScopedTypeVar> &&typeVars_)
+   : name(name_), fragment(fragment_), expr(std::move(expr_)), typeVars(std::move(typeVars_)), uses(0) { }
+  ResolveDef(const std::string &name_, const FileFragment &fragment_, std::unique_ptr<Expr>&& expr_)
+   : name(name_), fragment(fragment_), expr(std::move(expr_)), uses(0) { }
 };
 
 struct SCCState {
@@ -89,7 +92,7 @@ static void SCC(SCCState &state, unsigned vi) {
       ResolveDef &w = (*state.defs)[wi];
       state.S.pop_back();
       w.onstack = 0;
-      auto out = state.binding->order.insert(std::make_pair(w.name, DefBinding::OrderValue(w.location, state.binding->fun.size() + state.binding->val.size())));
+      auto out = state.binding->order.insert(std::make_pair(w.name, DefBinding::OrderValue(w.fragment, state.binding->fun.size() + state.binding->val.size())));
       assert (out.second);
       state.binding->fun.emplace_back(static_cast<Lambda*>(w.expr.release()));
       state.binding->funVars.emplace_back(std::move(w.typeVars));
@@ -109,19 +112,16 @@ struct ResolveBinding {
   ResolveBinding(ResolveBinding *parent_)
    : parent(parent_), current_index(0), depth(parent_?parent_->depth+1:0) { }
 
-  void qualify_def(std::string &name) {
+  void qualify_def(std::string &name, const Location &location) {
     SymbolSource *override = nullptr;
     for (auto sym : symbols) {
       auto it = sym->defs.find(name);
       if (it != sym->defs.end()) {
         if (override && it->second.qualified != override->qualified) {
-          std::ostringstream message;
-          message << "ambiguous import of definition '" << name
-            << "' from <" << override->location.file()
-            << "> and <" << it->second.location.file()
-            << ">";
-          reporter->reportWarning(override->location, message.str());
-          reporter->reportWarning(it->second.location, message.str());
+          WARNING(location,
+            "reference '" << name
+            << "' is ambiguous; definition imported from both " << it->second.location
+            << " and " << override->location);
         }
         override = &it->second;
       }
@@ -129,19 +129,16 @@ struct ResolveBinding {
     if (override) name = override->qualified;
   }
 
-  bool qualify_topic(std::string &name) {
+  bool qualify_topic(std::string &name, const Location &location) {
     SymbolSource *override = nullptr;
     for (auto sym : symbols) {
       auto it = sym->topics.find(name);
       if (it != sym->topics.end()) {
         if (override && it->second.qualified != override->qualified) {
-          std::ostringstream message;
-          message <<  "ambiguous import of topic '" << name
-            << "' from <" << override->location.file()
-            << "> and <" << it->second.location.file()
-            << ">";
-          reporter->reportWarning(override->location, message.str());
-          reporter->reportWarning(it->second.location, message.str());
+          WARNING(location,
+            "reference '" << name
+            << "' is ambiguous; topic imported from both " << it->second.location
+            << " and " << override->location);
         }
         override = &it->second;
       }
@@ -150,19 +147,16 @@ struct ResolveBinding {
     return override;
   }
 
-  bool qualify_type(std::string &name) {
+  bool qualify_type(std::string &name, const Location &location) {
     SymbolSource *override = nullptr;
     for (auto sym : symbols) {
       auto it = sym->types.find(name);
       if (it != sym->types.end()) {
         if (override && it->second.qualified != override->qualified) {
-          std::ostringstream message;
-          message  << "ambiguous import of type '" << name
-            << "' from <" << override->location.file()
-            << "> and <" << it->second.location.file()
-            << ">";
-          reporter->reportWarning(override->location, message.str());
-          reporter->reportWarning(it->second.location, message.str());
+          WARNING(location,
+            "refernce '" << name
+            << "' is ambiguous; type imported from both " << it->second.location
+            << " and " << override->location);
         }
         override = &it->second;
       }
@@ -192,7 +186,7 @@ static std::string trim(const std::string &x) {
   return keep ? x : x.substr(space+1);
 }
 
-static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vector<ResolveDef> &defs, std::unique_ptr<Expr> body) {
+static std::unique_ptr<Expr> fracture_binding(const FileFragment &fragment, std::vector<ResolveDef> &defs, std::unique_ptr<Expr> body) {
   // Bellman-Ford algorithm, run for longest path
   // if f uses [yg], then d[f] must be <= d[yg]
   // if x uses [yg], then d[x] must be <= d[yg]+1
@@ -221,15 +215,15 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
       // j is now inside the cycle
       std::ostringstream message;
       message << "value definition cycle detected including:" << std::endl;
-      std::vector<Location> errorLocations;
+      std::vector<FileFragment> errorFileFragments;
       int i = j;
       do {
-        message << std::endl << "  " << defs[i].name << " at " << defs[i].expr->location.file();
-        errorLocations.push_back(defs[i].expr->location);
+        message << std::endl << "  " << defs[i].name << " at " << defs[i].expr->fragment.location();
+        errorFileFragments.push_back(defs[i].expr->fragment);
         i = p[i];
       } while (i != j);
-      for (Location location: errorLocations) {
-        reporter->reportError(location, message.str());
+      for (FileFragment fragment: errorFileFragments) {
+        reporter->reportError(fragment.location(), message.str());
       }
       return nullptr;
     }
@@ -250,10 +244,10 @@ static std::unique_ptr<Expr> fracture_binding(const Location &location, std::vec
   std::unique_ptr<Expr> out(std::move(body));
   for (int i = 0; i < (int)defs.size(); ++i) {
     if (levels[i].empty()) continue;
-    std::unique_ptr<DefBinding> bind(new DefBinding(location, std::move(out)));
+    std::unique_ptr<DefBinding> bind(new DefBinding(fragment, std::move(out)));
     for (auto j : levels[i]) {
       if (defs[j].expr->type != &Lambda::type) {
-        auto out = bind->order.insert(std::make_pair(defs[j].name, DefBinding::OrderValue(defs[j].location, bind->val.size())));
+        auto out = bind->order.insert(std::make_pair(defs[j].name, DefBinding::OrderValue(defs[j].fragment, bind->val.size())));
         assert (out.second);
         bind->val.emplace_back(std::move(defs[j].expr));
         bind->valVars.emplace_back(std::move(defs[j].typeVars));
@@ -290,47 +284,47 @@ static bool reference_map(ResolveBinding *binding, const std::string &name) {
   }
 }
 
-static bool rebind_ref(ResolveBinding *binding, std::string &name) {
+static bool rebind_ref(ResolveBinding *binding, std::string &name, const Location &location) {
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
-    iter->qualify_def(name);
+    iter->qualify_def(name, location);
     if (reference_map(iter, name)) return true;
   }
   return false;
 }
 
-static VarRef *rebind_subscribe(ResolveBinding *binding, const Location &location, std::string &name) {
+static VarRef *rebind_subscribe(ResolveBinding *binding, const FileFragment &fragment, std::string &name) {
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
-    if (iter->qualify_topic(name)) break;
+    if (iter->qualify_topic(name, fragment.location())) break;
   }
   if (!iter) {
-    ERROR(location, "subscribe to non-existent topic '" << name << "'");
+    ERROR(fragment.location(), "subscribe to non-existent topic '" << name << "'");
     return nullptr;
   }
-  return new VarRef(location, "topic " + name);
+  return new VarRef(fragment, "topic " + name);
 }
 
-static std::string rebind_publish(ResolveBinding *binding, const Location &location, const std::string &key) {
+static std::string rebind_publish(ResolveBinding *binding, const FileFragment &fragment, const std::string &key) {
   std::string name(key);
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
-    if (iter->qualify_topic(name)) break;
+    if (iter->qualify_topic(name, fragment.location())) break;
   }
   if (!iter) {
-    ERROR(location, "publish to non-existent topic '" << name << "'");
+    ERROR(fragment.location(), "publish to non-existent topic '" << name << "'");
   }
   return name;
 }
 
 struct PatternTree {
-  Location location; // location of argument
+  FileFragment fragment; // fragment of argument
   std::shared_ptr<Sum> sum; // nullptr if unexpanded
   optional<AST> type; // nullptr if untyped
   int cons;
   int var; // -1 if unbound/_
   std::vector<PatternTree> children;
-  PatternTree(const Location &location_ = LOCATION, int var_ = -1) : location(location_), sum(0), cons(0), var(var_) { }
+  PatternTree(const FileFragment &fragment_ = FRAGMENT_CPP_LINE, int var_ = -1) : fragment(fragment_), sum(0), cons(0), var(var_) { }
   void format(std::ostream &os, int p) const;
 };
 
@@ -376,8 +370,8 @@ void PatternTree::format(std::ostream &os, int p) const
 enum Refutable { TOTAL, IDENTITY, OTHERWISE };
 
 struct PatternRef {
-  Location location; // patterns (right-hand-side), prototype (first arg)
-  Location guard_location;
+  FileFragment fragment; // patterns (right-hand-side), prototype (first arg)
+  FileFragment guard_fragment;
   PatternTree tree;
   int index; // for prototype: next var name, for patterns: function index
   int uses;
@@ -386,7 +380,7 @@ struct PatternRef {
     Refutable refutable; // for prototype
   };
 
-  PatternRef(const Location &location_) : location(location_), guard_location(LOCATION), uses(0) { }
+  PatternRef(const FileFragment &fragment_) : fragment(fragment_), guard_fragment(FRAGMENT_CPP_LINE), uses(0) { }
   PatternRef(PatternRef &&other) = default;
   PatternRef & operator = (PatternRef &&other) = default;
 };
@@ -405,9 +399,9 @@ static std::shared_ptr<Sum> find_mismatch(std::vector<int> &path, const PatternT
 
 static Expr *fill_pattern(Expr *expr, const PatternTree &a, const PatternTree &b) {
   if (b.var >= 0) {
-    expr = new App(expr->location,
+    expr = new App(expr->fragment,
       expr,
-      new VarRef(b.location, "_ a" + std::to_string(a.var)));
+      new VarRef(b.fragment, "_ a" + std::to_string(a.var)));
   } else {
     for (size_t i = 0; i < a.children.size(); ++i)
       expr = fill_pattern(expr, a.children[i], b.children[i]);
@@ -420,7 +414,7 @@ static PatternTree *get_expansion(PatternTree *t, const std::vector<int> &path) 
   return t;
 }
 
-static Expr *build_identity(const Location &l, PatternTree &tree) {
+static Expr *build_identity(const FileFragment &l, PatternTree &tree) {
   if (tree.sum) {
     Constructor &cons = tree.sum->members[tree.cons];
     Expr *out = new Construct(l, tree.sum, &cons);
@@ -435,25 +429,26 @@ static Expr *build_identity(const Location &l, PatternTree &tree) {
   }
 }
 
-static std::unique_ptr<Expr> ascribe(std::unique_ptr<Expr> expr, const Location &l, optional<AST>&& type) {
+static std::unique_ptr<Expr> ascribe(std::unique_ptr<Expr> expr, const FileFragment &l, optional<AST>&& type) {
   if (!type) return expr;
-  return std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(std::move(*type)), expr.release(), l));
+  return std::unique_ptr<Expr>(new Ascribe(FRAGMENT_CPP_LINE, AST(std::move(*type)), expr.release(), l));
 }
 
 // invariants: !patterns.empty(); patterns have detail >= patterns[0]
 // post-condition: patterns unchanged (internal mutation is reversed)
 static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vector<PatternRef> &patterns) {
   PatternRef &prototype = patterns[0];
-  Location &location = prototype.location;
+  FileFragment fragment = prototype.fragment;
   if (patterns.size() == 1) {
     if (prototype.refutable == IDENTITY) {
       ++prototype.uses;
-      return std::unique_ptr<Expr>(build_identity(location, prototype.tree));
+      return std::unique_ptr<Expr>(build_identity(prototype.fragment, prototype.tree));
     } else if (prototype.refutable == OTHERWISE) {
       ++prototype.uses;
-      return std::unique_ptr<Expr>(new App(LOCATION, new VarRef(LOCATION, "_ else"), new VarRef(LOCATION, "_ a0")));
+      FileFragment line = FRAGMENT_CPP_LINE;
+      return std::unique_ptr<Expr>(new App(line, new VarRef(line, "_ else"), new VarRef(line, "_ a0")));
     } else {
-      ERROR(location, "non-exhaustive match; missing: " << prototype.tree);
+      ERROR(fragment.location(), "non-exhaustive match; missing: " << prototype.tree);
       return nullptr;
     }
   }
@@ -461,14 +456,14 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
   std::shared_ptr<Sum> sum = find_mismatch(expand, prototype.tree, patterns[1].tree);
   if (sum) {
     PatternTree *prototype_token = get_expansion(&prototype.tree, expand);
-    Location *argument;
-    if (prototype_token->location.start.bytes == -1) {
-      argument = &get_expansion(&patterns[1].tree, expand)->location;
+    FileFragment *argument;
+    if (prototype_token->fragment.empty()) {
+      argument = &get_expansion(&patterns[1].tree, expand)->fragment;
     } else {
-      argument = &prototype_token->location;
+      argument = &prototype_token->fragment;
     }
     std::unique_ptr<Destruct> des(
-      new Destruct(location, sum,
+      new Destruct(fragment, sum,
         new VarRef(*argument, "_ a" + std::to_string(prototype_token->var))));
     for (size_t c = 0; c < sum->members.size(); ++c) {
       Constructor &cons = sum->members[c];
@@ -481,7 +476,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
       // the function this way prevents lifting the Get out of the case.
       std::vector<std::unique_ptr<Expr> > gets;
       for (int i = 0; i < args; ++i)
-        gets.emplace_back(new Get(LOCATION, sum, &cons, i));
+        gets.emplace_back(new Get(FRAGMENT_CPP_LINE, sum, &cons, i));
       for (auto p = patterns.begin(); p != patterns.end(); ++p) {
         PatternTree *t = get_expansion(&p->tree, expand);
         if (!t->sum) {
@@ -494,7 +489,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
           bucket.emplace_back(std::move(*p));
           p->index = -1;
         } else if (t->sum != sum) {
-          ERROR(p->location,
+          ERROR(p->fragment.location(),
             "constructor '" << t->sum->members[t->cons].ast.name
             << "' is used in a pattern matching '" << sum->name
             << "', but is not a member of this type");
@@ -504,21 +499,21 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
           assert (args == (int)t->children.size());
           for (int i = 0; i < args; ++i) {
             PatternTree &arg = t->children[i];
-            gets[i] = ascribe(std::move(gets[i]), arg.location, std::move(arg.type));
+            gets[i] = ascribe(std::move(gets[i]), arg.fragment, std::move(arg.type));
           }
           bucket.emplace_back(std::move(*p));
           p->index = -2;
         }
       }
-      std::unique_ptr<DefMap> rmap(new DefMap(location));
+      std::unique_ptr<DefMap> rmap(new DefMap(fragment));
       rmap->body = expand_patterns(fnname, bucket);
       if (!rmap->body) return nullptr;
       for (size_t i = args; i > 0; --i) {
         auto out = rmap->defs.insert(std::make_pair("_ a" + std::to_string(--var),
-          DefValue(LOCATION, std::move(gets[i-1]))));
+          DefValue(FRAGMENT_CPP_LINE, std::move(gets[i-1]))));
         assert (out.second);
       }
-      Lambda *lam = new Lambda(rmap->body->location, "_ tuple_case", rmap.release());
+      Lambda *lam = new Lambda(rmap->body->fragment, "_ tuple_case", rmap.release());
       lam->fnname = fnname;
       des->cases.emplace_back(lam);
       for (auto p = patterns.rbegin(); p != patterns.rend(); ++p) {
@@ -534,46 +529,46 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
         }
       }
     }
-    des->location = des->cases.front()->location;
+    des->fragment = des->cases.front()->fragment;
     return std::unique_ptr<Expr>(des.release());
   } else {
     PatternRef &p = patterns[1];
     ++p.uses;
     if (!p.guard) {
       return std::unique_ptr<Expr>(
-        new App(p.location,
+        new App(p.fragment,
           fill_pattern(
-            new VarRef(p.location, "_ f" + std::to_string(p.index)),
+            new VarRef(p.fragment, "_ f" + std::to_string(p.index)),
             prototype.tree, p.tree),
-          new VarRef(p.location, "Unit@wake")));
+          new VarRef(p.fragment, "Unit@wake")));
     } else {
       PatternRef save(std::move(patterns[1]));
       patterns.erase(patterns.begin()+1);
       std::unique_ptr<Expr> guard_false(expand_patterns(fnname, patterns));
       patterns.emplace(patterns.begin()+1, std::move(save));
       if (!guard_false) return nullptr;
-      std::unique_ptr<DefMap> fmap(new DefMap(LOCATION));
-      fmap->defs.insert(std::make_pair("_ guardpair", DefValue(LOCATION, std::unique_ptr<Expr>(
+      std::unique_ptr<DefMap> fmap(new DefMap(FRAGMENT_CPP_LINE));
+      fmap->defs.insert(std::make_pair("_ guardpair", DefValue(FRAGMENT_CPP_LINE, std::unique_ptr<Expr>(
         fill_pattern(
-          new VarRef(p.location, "_ f" + std::to_string(p.index)),
+          new VarRef(p.fragment, "_ f" + std::to_string(p.index)),
           prototype.tree, p.tree)))));
-      fmap->defs.insert(std::make_pair("_ rhs", DefValue(LOCATION, std::unique_ptr<Expr>(
-        new App(LOCATION,
-          new VarRef(LOCATION, "getPairFirst@wake"),
-          new VarRef(LOCATION, "_ guardpair"))))));
-      fmap->defs.insert(std::make_pair("_ guard", DefValue(LOCATION, std::unique_ptr<Expr>(
-        new App(LOCATION,
-          new VarRef(LOCATION, "getPairSecond@wake"),
-          new VarRef(LOCATION, "_ guardpair"))))));
-      std::unique_ptr<Expr> guard_true(new App(LOCATION,
-        new VarRef(LOCATION, "_ rhs"),
-        new VarRef(LOCATION, "Unit@wake")));
-      std::unique_ptr<Destruct> des(new Destruct(location, Boolean, new App(LOCATION,
-        new VarRef(LOCATION, "_ guard"),
-        new VarRef(LOCATION, "Unit@wake"))));
-      des->cases.emplace_back(new Lambda(guard_true->location, "_", guard_true.release()));
-      des->cases.emplace_back(new Lambda(guard_false->location, "_", guard_false.release()));
-      des->location = des->cases.front()->location;
+      fmap->defs.insert(std::make_pair("_ rhs", DefValue(FRAGMENT_CPP_LINE, std::unique_ptr<Expr>(
+        new App(FRAGMENT_CPP_LINE,
+          new VarRef(FRAGMENT_CPP_LINE, "getPairFirst@wake"),
+          new VarRef(FRAGMENT_CPP_LINE, "_ guardpair"))))));
+      fmap->defs.insert(std::make_pair("_ guard", DefValue(FRAGMENT_CPP_LINE, std::unique_ptr<Expr>(
+        new App(FRAGMENT_CPP_LINE,
+          new VarRef(FRAGMENT_CPP_LINE, "getPairSecond@wake"),
+          new VarRef(FRAGMENT_CPP_LINE, "_ guardpair"))))));
+      std::unique_ptr<Expr> guard_true(new App(FRAGMENT_CPP_LINE,
+        new VarRef(FRAGMENT_CPP_LINE, "_ rhs"),
+        new VarRef(FRAGMENT_CPP_LINE, "Unit@wake")));
+      std::unique_ptr<Destruct> des(new Destruct(fragment, Boolean, new App(FRAGMENT_CPP_LINE,
+        new VarRef(FRAGMENT_CPP_LINE, "_ guard"),
+        new VarRef(FRAGMENT_CPP_LINE, "Unit@wake"))));
+      des->cases.emplace_back(new Lambda(guard_true->fragment, "_", guard_true.release()));
+      des->cases.emplace_back(new Lambda(guard_false->fragment, "_", guard_false.release()));
+      des->fragment = des->cases.front()->fragment;
       fmap->body = std::move(des);
       return std::unique_ptr<Expr>(std::move(fmap));
     }
@@ -586,7 +581,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
   if (ast.name == "_") {
     // no-op; unbound
   } else if (!ast.name.empty() && lex_kind(ast.name) == LOWER) {
-    Lambda *lambda = new Lambda(expr->location, ast.name, expr.release());
+    Lambda *lambda = new Lambda(expr->fragment, ast.name, expr.release());
     if (ast.name.compare(0, 3, "_ k") != 0) lambda->token = ast.token;
     expr = std::unique_ptr<Expr>(lambda);
     out.var = 0; // bound
@@ -594,7 +589,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
     if (ast.name.empty()) {
       out.sum = multiarg;
     } else for (ResolveBinding *iter = binding; iter; iter = iter->parent) {
-      iter->qualify_def(ast.name);
+      iter->qualify_def(ast.name, ast.token.location());
       auto it = iter->index.find(ast.name);
       if (it != iter->index.end()) {
         Expr *cons = iter->defs[it->second].expr.get();
@@ -610,7 +605,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       }
     }
     if (!out.sum) {
-      ERROR(ast.token, "constructor '" << ast.name << "' is not defined");
+      ERROR(ast.token.location(), "constructor '" << ast.name << "' is not defined");
       out.var = 0;
     } else if (out.sum->members[out.cons].ast.args.size() != ast.args.size()) {
       std::ostringstream message;
@@ -621,7 +616,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       }
       message << " is used with " << ast.args.size()
         << " parameters, but must have " << out.sum->members[out.cons].ast.args.size();
-      reporter->reportError(ast.region, message.str());
+      reporter->reportError(ast.region.location(), message.str());
       out.sum = 0;
       out.var = 0;
     } else {
@@ -634,45 +629,45 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
 }
 
 static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBinding *binding, std::unique_ptr<Match> match) {
-  std::unique_ptr<DefMap> map(new DefMap(LOCATION));
+  std::unique_ptr<DefMap> map(new DefMap(FRAGMENT_CPP_LINE));
   std::vector<PatternRef> patterns;
 
   patterns.reserve(match->patterns.size() + 1);
-  patterns.emplace_back(match->args.front()->location);
+  patterns.emplace_back(match->args.front()->fragment);
   PatternRef &prototype = patterns.front();
   prototype.uses = 1;
   prototype.index = match->args.size();
   prototype.refutable = match->refutable ? IDENTITY : TOTAL;
 
   if (match->otherwise) {
-    prototype.location = match->otherwise->location;
+    prototype.fragment = match->otherwise->fragment;
     prototype.refutable = OTHERWISE;
-    auto out = map->defs.insert(std::make_pair("_ else", DefValue(LOCATION, std::unique_ptr<Expr>(
-      new Lambda(LOCATION, "_", match->otherwise.release())))));
+    auto out = map->defs.insert(std::make_pair("_ else", DefValue(FRAGMENT_CPP_LINE, std::unique_ptr<Expr>(
+      new Lambda(FRAGMENT_CPP_LINE, "_", match->otherwise.release())))));
     assert (out.second);
   }
 
   std::shared_ptr<Sum> multiarg;
   if (match->args.size() == 1) {
     std::unique_ptr<Expr> arg = std::move(match->args.front());
-    prototype.tree.location = arg->location;
+    prototype.tree.fragment = arg->fragment;
     prototype.tree.var = 0;
     for (auto &p : match->patterns)
       arg = ascribe(std::move(arg), p.pattern.region, std::move(p.pattern.type));
-    auto out = map->defs.insert(std::make_pair("_ a0", DefValue(LOCATION, std::move(arg))));
+    auto out = map->defs.insert(std::make_pair("_ a0", DefValue(FRAGMENT_CPP_LINE, std::move(arg))));
     assert (out.second);
   } else {
-    prototype.tree.sum = multiarg = std::make_shared<Sum>(AST(LOCATION));
-    multiarg->members.emplace_back(AST(LOCATION));
+    prototype.tree.sum = multiarg = std::make_shared<Sum>(AST(FRAGMENT_CPP_LINE));
+    multiarg->members.emplace_back(AST(FRAGMENT_CPP_LINE));
     size_t i = 0;
     for (auto &a : match->args) {
-      prototype.tree.children.emplace_back(a->location, i);
+      prototype.tree.children.emplace_back(a->fragment, i);
       for (auto &p : match->patterns)
         if (i < p.pattern.args.size())
           a = ascribe(std::move(a), p.pattern.args[i].region, std::move(p.pattern.args[i].type));
-      auto out = map->defs.insert(std::make_pair("_ a" + std::to_string(i), DefValue(LOCATION, std::move(a))));
+      auto out = map->defs.insert(std::make_pair("_ a" + std::to_string(i), DefValue(FRAGMENT_CPP_LINE, std::move(a))));
       assert (out.second);
-      multiarg->members.front().ast.args.emplace_back(AST(LOCATION));
+      multiarg->members.front().ast.args.emplace_back(AST(FRAGMENT_CPP_LINE));
       ++i;
     }
   }
@@ -680,23 +675,23 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
   int f = 0;
   bool ok = true;
   for (auto &p : match->patterns) {
-    patterns.emplace_back(p.expr->location);
+    patterns.emplace_back(p.expr->fragment);
     patterns.back().index = f;
     patterns.back().guard = static_cast<bool>(p.guard);
     std::unique_ptr<Expr> expr;
     if (true) {
       std::string cname = match->patterns.size() == 1 ? fnname : fnname + ".case"  + std::to_string(f);
-      expr = std::unique_ptr<Expr>(new Lambda(p.expr->location, "_", p.expr.release(), cname.c_str()));
+      expr = std::unique_ptr<Expr>(new Lambda(p.expr->fragment, "_", p.expr.release(), cname.c_str()));
     }
     if (p.guard) {
-      patterns.back().guard_location = p.guard->location;
+      patterns.back().guard_fragment = p.guard->fragment;
       std::string gname = match->patterns.size() == 1 ? fnname : fnname + ".guard"  + std::to_string(f);
-      expr = std::unique_ptr<Expr>(new App(LOCATION,
-        new App(LOCATION, new VarRef(LOCATION, "Pair@wake"), expr.release()),
-        new Lambda(p.guard->location, "_", p.guard.release(), gname.c_str())));
+      expr = std::unique_ptr<Expr>(new App(FRAGMENT_CPP_LINE,
+        new App(FRAGMENT_CPP_LINE, new VarRef(FRAGMENT_CPP_LINE, "Pair@wake"), expr.release()),
+        new Lambda(p.guard->fragment, "_", p.guard.release(), gname.c_str())));
     }
     patterns.back().tree = cons_lookup(binding, expr, p.pattern, multiarg);
-    auto out = map->defs.insert(std::make_pair("_ f" + std::to_string(f), DefValue(LOCATION, std::move(expr))));
+    auto out = map->defs.insert(std::make_pair("_ f" + std::to_string(f), DefValue(FRAGMENT_CPP_LINE, std::move(expr))));
     assert (out.second);
     ok &= !patterns.front().tree.sum || patterns.back().tree.sum;
     ++f;
@@ -706,15 +701,15 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
   if (!map->body) return nullptr;
   for (auto &p : patterns) {
     if (!p.uses) {
-      ERROR(p.location, "pattern is impossible to match");
+      ERROR(p.fragment.location(), "pattern is impossible to match");
       return nullptr;
     }
   }
   if (match->refutable && patterns.front().uses <= 1) {
-    ERROR(match->location, "the required pattern can never fail; use a def instead");
+    ERROR(match->fragment.location(), "the required pattern can never fail; use a def instead");
     return nullptr;
   }
-  map->location = map->body->location;
+  map->fragment = map->body->fragment;
   return std::unique_ptr<Expr>(map.release());
 }
 
@@ -782,7 +777,7 @@ struct SymMover {
   void topics(Symbols::SymbolMap &topics) { if (package) consider(package->exports.topics, topics); }
 };
 
-static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location &location) {
+static std::vector<Symbols*> process_import(Top &top, Imports &imports, FileFragment &fragment) {
   Symbols::SymbolMap mixed(std::move(imports.mixed));
   for (auto &d : mixed) {
     SymMover mover(top, d, "symbol");
@@ -813,9 +808,8 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location
   for (auto &p : imports.import_all) {
     auto it = top.packages.find(p);
     if (it == top.packages.end()) {
-      std::ostringstream message;
-      message << "full import from non-existent package '" << p << "'";
-      reporter->reportWarning(location, message.str());
+      WARNING(fragment.location(),
+        "full import from non-existent package '" << p << "'");
     } else {
       out.push_back(&it->second->exports);
     }
@@ -824,16 +818,16 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, Location
   return out;
 }
 
-static bool qualify_type(ResolveBinding *binding, std::string &name, const Location &location) {
+static bool qualify_type(ResolveBinding *binding, std::string &name, const FileFragment &fragment) {
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
-    if (iter->qualify_type(name)) break;
+    if (iter->qualify_type(name, fragment.location())) break;
   }
 
   if (iter) {
     return true;
   } else {
-    ERROR(location, "reference to undefined type '" << name << "'");
+    ERROR(fragment.location(), "reference to undefined type '" << name << "'");
     return false;
   }
 }
@@ -852,11 +846,11 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
   if (expr->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(expr.get());
     // don't fail if unbound; leave that for the second pass
-    rebind_ref(binding, ref->name);
+    rebind_ref(binding, ref->name, ref->fragment.location());
     return expr;
   } else if (expr->type == &Subscribe::type) {
     Subscribe *sub = static_cast<Subscribe*>(expr.get());
-    VarRef *out = rebind_subscribe(binding, sub->location, sub->name);
+    VarRef *out = rebind_subscribe(binding, sub->fragment, sub->name);
     if (!out) return nullptr;
     out->flags |= FLAG_AST;
     return fracture(top, true, name, std::unique_ptr<Expr>(out), binding);
@@ -869,7 +863,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     Lambda *lambda = static_cast<Lambda*>(expr.get());
     ResolveBinding lbinding(binding);
     lbinding.index[lambda->name] = 0;
-    lbinding.defs.emplace_back(lambda->name, LOCATION, nullptr);
+    lbinding.defs.emplace_back(lambda->name, FRAGMENT_CPP_LINE, nullptr);
     if (lambda->body->type == &Lambda::type) {
       lambda->body = fracture(top, anon, name, std::move(lambda->body), &lbinding);
     } else {
@@ -881,11 +875,9 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
       lambda->body = fracture(top, false, lambda->fnname, std::move(lambda->body), &lbinding);
     }
     if (lbinding.defs.back().uses == 0 && !lambda->name.empty() && lambda->name[0] != '_') {
-      std::ostringstream message;
-      message
-        << "unused function argument '" << lambda->name
-        << "'; consider renaming to _" << lambda->name;
-      reporter->reportWarning(lambda->token, message.str());
+      WARNING(lambda->token.location(),
+        "unused function argument '" << lambda->name
+        << "'; consider renaming to _" << lambda->name);
     }
     return expr;
   } else if (expr->type == &Match::type) {
@@ -902,10 +894,10 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
   } else if (expr->type == &DefMap::type) {
     DefMap *def = static_cast<DefMap*>(expr.get());
     ResolveBinding dbinding(binding);
-    dbinding.symbols = process_import(top, def->imports, def->location);
+    dbinding.symbols = process_import(top, def->imports, def->fragment);
     for (auto &i : def->defs) {
       dbinding.index[i.first] = dbinding.defs.size();
-      dbinding.defs.emplace_back(i.first, i.second.location, std::move(i.second.body), std::move(i.second.typeVars));
+      dbinding.defs.emplace_back(i.first, i.second.fragment, std::move(i.second.body), std::move(i.second.typeVars));
     }
     for (auto &i : dbinding.defs) {
       i.expr = fracture(top, false, addanon(name, anon) + "." + trim(i.name), std::move(i.expr), &dbinding);
@@ -915,14 +907,12 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     std::unique_ptr<Expr> body = fracture(top, true, name, std::move(def->body), &dbinding);
     for (auto &i : dbinding.defs) {
       if (i.uses == 0 && !i.name.empty() && i.name[0] != '_') {
-        std::ostringstream message;
-        message
-          << "unused local definition of '" << i.name
-          << "'; consider removing or renaming to _" << i.name;
-        reporter->reportWarning(i.location, message.str());
+        WARNING(i.fragment.location(),
+          "unused local definition of '" << i.name
+          << "'; consider removing or renaming to _" << i.name);
       }
     }
-    auto out = fracture_binding(def->location, dbinding.defs, std::move(body));
+    auto out = fracture_binding(def->fragment, dbinding.defs, std::move(body));
     if (out && (def->flags & FLAG_AST) != 0)
       out->flags |= FLAG_AST;
     return out;
@@ -963,168 +953,169 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
          iter = iter->parent)
       ++iter->defs[0].uses;
     return expr;
-  } else if (expr->type == &Top::type) {
-    ResolveBinding gbinding(nullptr);   // global mapping + qualified defines
-    ResolveBinding pbinding(&gbinding); // package mapping
-    ResolveBinding ibinding(&pbinding); // file import mapping
-    ResolveBinding dbinding(&ibinding); // file local mapping
-    size_t publish = 0;
-    bool fail = false;
-    for (auto &p : top.packages) {
-      for (auto &f : p.second->files) {
-        for (auto &d : f.content->defs) {
-          gbinding.index[d.first] = gbinding.defs.size();
-          gbinding.defs.emplace_back(d.first, d.second.location, std::move(d.second.body), std::move(d.second.typeVars));
-        }
-        for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
-          auto name = "publish " + it->first + " " + std::to_string(++publish);
-          gbinding.index[name] = gbinding.defs.size();
-          gbinding.defs.emplace_back(name, it->second.location, std::move(it->second.body));
-        }
-      }
-    }
-    for (auto &p : top.packages) {
-      for (auto &f : p.second->files) {
-        for (auto &t : f.topics) {
-          auto name = "topic " + t.first + "@" + p.first;
-          gbinding.index[name] = gbinding.defs.size();
-          gbinding.defs.emplace_back(name, t.second.location,
-            std::unique_ptr<Expr>(new VarRef(t.second.location, "Nil@wake")));
-        }
-      }
-    }
-    gbinding.symbols.push_back(&top.globals);
-    for (auto &p : top.packages) {
-      pbinding.symbols.clear();
-      pbinding.symbols.push_back(&p.second->package);
-      for (auto &f : p.second->files) {
-        ibinding.symbols = process_import(top, f.content->imports, f.content->location);
-        dbinding.symbols.clear();
-        dbinding.symbols.push_back(&f.local);
-        for (size_t i = 0; i < f.content->defs.size(); ++i) {
-          ResolveDef &def = gbinding.defs[gbinding.current_index];
-          def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &dbinding);
-          ++gbinding.current_index;
-        }
-        for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
-          ResolveDef &def = gbinding.defs[gbinding.current_index];
-          auto qualified = rebind_publish(&dbinding, def.location, it->first);
-          size_t at = qualified.find('@');
-          if (at != std::string::npos) {
-            def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &dbinding);
-            ResolveDef &topicdef = gbinding.defs[gbinding.index.find("topic " + qualified)->second];
-            Location &l = topicdef.expr->location;
-            topicdef.expr = std::unique_ptr<Expr>(new App(l, new App(l,
-              new VarRef(l, "binary ++@wake"),
-              new VarRef(def.expr->location, def.name)),
-              topicdef.expr.release()));
-          } else {
-            fail = true;
-          }
-          ++gbinding.current_index;
-        }
-        for (auto &t : f.topics) {
-          if (!qualify_type(&dbinding, t.second.type))
-            fail = true;
-        }
-      }
-    }
-
-    for (auto &p : top.packages) {
-      for (auto &f : p.second->files) {
-        for (auto &t : f.topics) {
-          ResolveDef &def = gbinding.defs[gbinding.current_index];
-          def.expr = fracture(top, false, trim(def.name), std::move(def.expr), &gbinding);
-          ++gbinding.current_index;
-
-          // Form the type required for publishes
-          std::vector<AST> args;
-          args.emplace_back(t.second.type); // qualified by prior pass
-          AST signature(t.second.type.region, "List@wake", std::move(args));
-
-          // Insert Ascribe requirements on all publishes
-          Location l = def.expr->location;
-          Expr *next = nullptr;
-          for (Expr *iter = def.expr.get(); iter->type == &App::type; iter = next) {
-            App *app1 = static_cast<App*>(iter);
-            App *app2 = static_cast<App*>(app1->fn.get());
-            app2->val = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), app2->val.release(), l));
-            next = app1->val.get();
-          }
-
-          // If the topic is empty, still force the type
-          if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(LOCATION, AST(signature), def.expr.release(), l));
-        }
-      }
-    }
-
-    Package &defp = *top.packages[top.def_package];
-    gbinding.current_index = -1;
-    pbinding.symbols.clear();
-    ibinding.symbols.clear();
-    dbinding.symbols.clear();
-    dbinding.symbols.push_back(&defp.package);
-    std::set<std::string> imports;
-    for (auto &file : defp.files)
-      for (auto &bulk : file.content->imports.import_all)
-        imports.insert(bulk);
-    for (auto &imp : imports) {
-      auto it = top.packages.find(imp);
-      if (it != top.packages.end())
-        ibinding.symbols.push_back(&it->second->exports);
-    }
-
-    std::unique_ptr<Expr> body = fracture(top, true, name, std::move(top.body), &dbinding);
-
-    // Mark exports and globals as uses
-    for (auto &g: top.globals.defs) {
-      auto it = gbinding.index.find(g.second.qualified);
-      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
-    }
-    for (auto &g: top.globals.topics) {
-      auto it = gbinding.index.find("topic " + g.second.qualified);
-      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
-    }
-    for (auto &p : top.packages) {
-      for (auto &e : p.second->exports.defs) {
-        auto it = gbinding.index.find(e.second.qualified);
-        if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
-      }
-      for (auto &e : p.second->exports.topics) {
-        auto it = gbinding.index.find("topic " + e.second.qualified);
-        if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
-      }
-    }
-
-    // Report unused definitions
-    for (auto &def : gbinding.defs) {
-      if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
-        size_t at = def.name.find_first_of('@');
-        std::string name = def.name.substr(0, at);
-        std::ostringstream message;
-        message
-          << "unused top-level definition of '" << name
-          << "'; consider removing or renaming to _" <<  name;
-        reporter->reportWarning(def.location, message.str());
-      }
-    }
-
-    auto out = fracture_binding(top.location, gbinding.defs, std::move(body));
-    if (fail) out.reset();
-    return out;
   } else {
     // Literal/Get
     return expr;
   }
 }
 
+static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
+  ResolveBinding gbinding(nullptr);   // global mapping + qualified defines
+  ResolveBinding pbinding(&gbinding); // package mapping
+  ResolveBinding ibinding(&pbinding); // file import mapping
+  ResolveBinding dbinding(&ibinding); // file local mapping
+  size_t publish = 0;
+  bool fail = false;
+  for (auto &p : top->packages) {
+    for (auto &f : p.second->files) {
+      for (auto &d : f.content->defs) {
+        gbinding.index[d.first] = gbinding.defs.size();
+        gbinding.defs.emplace_back(d.first, d.second.fragment, std::move(d.second.body), std::move(d.second.typeVars));
+      }
+      for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
+        auto name = "publish " + it->first + " " + std::to_string(++publish);
+        gbinding.index[name] = gbinding.defs.size();
+        gbinding.defs.emplace_back(name, it->second.fragment, std::move(it->second.body));
+      }
+    }
+  }
+  for (auto &p : top->packages) {
+    for (auto &f : p.second->files) {
+      for (auto &t : f.topics) {
+        auto name = "topic " + t.first + "@" + p.first;
+        gbinding.index[name] = gbinding.defs.size();
+        gbinding.defs.emplace_back(name, t.second.fragment,
+          std::unique_ptr<Expr>(new VarRef(t.second.fragment, "Nil@wake")));
+      }
+    }
+  }
+  gbinding.symbols.push_back(&top->globals);
+  for (auto &p : top->packages) {
+    pbinding.symbols.clear();
+    pbinding.symbols.push_back(&p.second->package);
+    for (auto &f : p.second->files) {
+      ibinding.symbols = process_import(*top, f.content->imports, f.content->fragment);
+      dbinding.symbols.clear();
+      dbinding.symbols.push_back(&f.local);
+      for (size_t i = 0; i < f.content->defs.size(); ++i) {
+        ResolveDef &def = gbinding.defs[gbinding.current_index];
+        def.expr = fracture(*top, false, trim(def.name), std::move(def.expr), &dbinding);
+        ++gbinding.current_index;
+      }
+      for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
+        ResolveDef &def = gbinding.defs[gbinding.current_index];
+        auto qualified = rebind_publish(&dbinding, def.fragment, it->first);
+        size_t at = qualified.find('@');
+        if (at != std::string::npos) {
+          def.expr = fracture(*top, false, trim(def.name), std::move(def.expr), &dbinding);
+          ResolveDef &topicdef = gbinding.defs[gbinding.index.find("topic " + qualified)->second];
+          FileFragment &l = topicdef.expr->fragment;
+          topicdef.expr = std::unique_ptr<Expr>(new App(l, new App(l,
+            new VarRef(l, "binary ++@wake"),
+            new VarRef(def.expr->fragment, def.name)),
+            topicdef.expr.release()));
+        } else {
+          fail = true;
+        }
+        ++gbinding.current_index;
+      }
+      for (auto &t : f.topics) {
+        if (!qualify_type(&dbinding, t.second.type))
+          fail = true;
+      }
+    }
+  }
+
+  for (auto &p : top->packages) {
+    for (auto &f : p.second->files) {
+      for (auto &t : f.topics) {
+        ResolveDef &def = gbinding.defs[gbinding.current_index];
+        def.expr = fracture(*top, false, trim(def.name), std::move(def.expr), &gbinding);
+        ++gbinding.current_index;
+
+        // Form the type required for publishes
+        std::vector<AST> args;
+        args.emplace_back(t.second.type); // qualified by prior pass
+        AST signature(t.second.type.region, "List@wake", std::move(args));
+
+        // Insert Ascribe requirements on all publishes
+        FileFragment l = def.expr->fragment;
+        Expr *next = nullptr;
+        for (Expr *iter = def.expr.get(); iter->type == &App::type; iter = next) {
+          App *app1 = static_cast<App*>(iter);
+          App *app2 = static_cast<App*>(app1->fn.get());
+          app2->val = std::unique_ptr<Expr>(new Ascribe(FRAGMENT_CPP_LINE, AST(signature), app2->val.release(), l));
+          next = app1->val.get();
+        }
+
+        // If the topic is empty, still force the type
+        if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(FRAGMENT_CPP_LINE, AST(signature), def.expr.release(), l));
+      }
+    }
+  }
+
+  Package &defp = *top->packages[top->def_package];
+  gbinding.current_index = -1;
+  pbinding.symbols.clear();
+  ibinding.symbols.clear();
+  dbinding.symbols.clear();
+  dbinding.symbols.push_back(&defp.package);
+  std::set<std::string> imports;
+  for (auto &file : defp.files)
+    for (auto &bulk : file.content->imports.import_all)
+      imports.insert(bulk);
+  for (auto &imp : imports) {
+    auto it = top->packages.find(imp);
+    if (it != top->packages.end())
+      ibinding.symbols.push_back(&it->second->exports);
+  }
+
+  std::unique_ptr<Expr> body = fracture(*top, true, "", std::move(top->body), &dbinding);
+
+  // Mark exports and globals as uses
+  for (auto &g: top->globals.defs) {
+    auto it = gbinding.index.find(g.second.qualified);
+    if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+  }
+  for (auto &g: top->globals.topics) {
+    auto it = gbinding.index.find("topic " + g.second.qualified);
+    if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+  }
+  for (auto &p : top->packages) {
+    for (auto &e : p.second->exports.defs) {
+      auto it = gbinding.index.find(e.second.qualified);
+      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+    }
+    for (auto &e : p.second->exports.topics) {
+      auto it = gbinding.index.find("topic " + e.second.qualified);
+      if (it != gbinding.index.end()) ++gbinding.defs[it->second].uses;
+    }
+  }
+
+  // Report unused definitions
+  for (auto &def : gbinding.defs) {
+    if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
+      size_t at = def.name.find_first_of('@');
+      std::string name = def.name.substr(0, at);
+      WARNING(def.fragment.location(),
+        "unused top-level definition of '" << name
+        << "'; consider removing or renaming to _" <<  name);
+    }
+  }
+
+  FileFragment fragment = body->fragment;
+  auto out = fracture_binding(fragment, gbinding.defs, std::move(body));
+  if (fail) out.reset();
+  return out;
+}
+
 struct NameRef {
   int index;
   int def;
-  Location target;
+  FileFragment target;
   Lambda *lambda;
   TypeVar *var;
-  NameRef() : index(-1), def(0), target(LOCATION), lambda(nullptr), var(nullptr) { }
+  NameRef() : index(-1), def(0), target(FRAGMENT_CPP_LINE), lambda(nullptr), var(nullptr) { }
 };
 
 struct NameBinding {
@@ -1149,7 +1140,7 @@ struct NameBinding {
     } else if (binding && (i = binding->order.find(x)) != binding->order.end()) {
       int idx = i->second.index;
       out.def = idx < generalized;
-      out.target = i->second.location;
+      out.target = i->second.fragment;
       if (idx < (int)binding->val.size()) {
         auto x = binding->val[idx].get();
         out.index = idx;
@@ -1178,68 +1169,55 @@ struct NameBinding {
 };
 
 struct FnErrorMessage : public TypeErrorMessage  {
-  const Location *lf;
-  FnErrorMessage(const Location *lf_) : lf(lf_) { }
-  void formatA(std::ostream &os) const { os << "type error; expression " << lf->text() << " has type"; }
+  FnErrorMessage(const FileFragment *f_) : TypeErrorMessage(f_) { }
+  void formatA(std::ostream &os) const { os << "type error; expression " << f->segment() << " has type"; }
   void formatB(std::ostream &os) const { os << "but is used as a function and must have function type"; }
-  virtual Location getMainLocation() const { return *lf; }
 };
 
 struct ArgErrorMessage : public TypeErrorMessage {
-  const Location *lf, *la;
+  const FileFragment *fn;
   const char *arg;
-  ArgErrorMessage(const Location *lf_, const Location *la_, const char *arg_) : lf(lf_), la(la_), arg(arg_) { }
+  ArgErrorMessage(const FileFragment *fn_, const FileFragment *a_, const char *arg_) : TypeErrorMessage(a_), fn(fn_), arg(arg_) { }
   void formatA(std::ostream &os) const {
-    os << "type error; function " << lf->text() << " expected argument";
+    os << "type error; function " << fn->segment() << " expected argument";
     if (arg && arg[0] && !strchr(arg, ' ') && strcmp(arg, "_")) os << " '" << arg << "'";
     os << " of type";
   }
-  void formatB(std::ostream &os) const { os << "but was supplied argument " << la->text() << " of type"; }
-  virtual Location getMainLocation() const { return *la; }
+  void formatB(std::ostream &os) const { os << "but was supplied argument " << f->segment() << " of type"; }
 };
 
 struct AscErrorMessage : public TypeErrorMessage {
-  const Location *body, *type;
-  AscErrorMessage(const Location *body_, const Location *type_) : body(body_), type(type_) { }
-  void formatA(std::ostream &os) const { os << "type error; expression " << body->text() << " of type"; }
-  void formatB(std::ostream &os) const { os << "does not match explicit type ascription at " << type->file() << " of"; }
-  virtual Location getMainLocation() const { return *body; }
+  AscErrorMessage(const FileFragment *f_) : TypeErrorMessage(f_) { }
+  void formatA(std::ostream &os) const { os << "type error; expression " << f->segment() << " of type"; }
+  void formatB(std::ostream &os) const { os << "does not match explicit type ascription of"; }
 };
 
 struct RecErrorMessage : public TypeErrorMessage  {
-  const Location *lf;
-  RecErrorMessage(const Location *lf_) : lf(lf_) { }
-  void formatA(std::ostream &os) const { os << "type error; recursive use of " << lf->text() << " requires return type"; }
+  RecErrorMessage(const FileFragment *f_) : TypeErrorMessage(f_) { }
+  void formatA(std::ostream &os) const { os << "type error; recursive use of " << f->segment() << " requires return type"; }
   void formatB(std::ostream &os) const { os << "but the function body actually returns type"; }
-  virtual Location getMainLocation() const { return *lf; }
 };
 
 struct MatchArgErrorMessage : public TypeErrorMessage  {
-  const Location *arg;
-  MatchArgErrorMessage(const Location *arg_) : arg(arg_) { }
-  void formatA(std::ostream &os) const { os << "type error; case analysis of " << arg->text() << " with type"; }
+  MatchArgErrorMessage(const FileFragment *f_) : TypeErrorMessage(f_) { }
+  void formatA(std::ostream &os) const { os << "type error; case analysis of " << f->segment() << " with type"; }
   void formatB(std::ostream &os) const { os << "does not match the pattern requirement of type"; }
-  virtual Location getMainLocation() const { return *arg; }
 };
 
 struct MatchResultErrorMessage : public TypeErrorMessage  {
-  const Location *result;
   const std::string &case0;
   const std::string &casen;
-  MatchResultErrorMessage(const Location *result_, const std::string &case0_, const std::string &casen_)
-   : result(result_), case0(case0_), casen(casen_) { }
-  void formatA(std::ostream &os) const { os << "type error; case '" << casen << "' returns expression " << result->text() << " of type"; }
+  MatchResultErrorMessage(const FileFragment *f_, const std::string &case0_, const std::string &casen_)
+   : TypeErrorMessage(f_), case0(case0_), casen(casen_) { }
+  void formatA(std::ostream &os) const { os << "type error; case '" << casen << "' returns expression " << f->segment() << " of type"; }
   void formatB(std::ostream &os) const { os << "which does not match case '" << case0 << "' which returned type"; }
-  virtual Location getMainLocation() const { return *result; }
 };
 
 struct MatchTypeVarErrorMessage : public TypeErrorMessage  {
-  const Location *arg;
   const std::string &casen;
-  MatchTypeVarErrorMessage(const Location *arg_, const std::string &casen_) : arg(arg_), casen(casen_) { }
+  MatchTypeVarErrorMessage(const FileFragment *f_, const std::string &casen_) : TypeErrorMessage(f_), casen(casen_) { }
   void formatA(std::ostream &os) const { os << "type error; pattern for case '" << casen << "' expected type"; }
-  void formatB(std::ostream &os) const { os << "but the argument " << arg->text() << " has type"; }
-  virtual Location getMainLocation() const { return *arg; }
+  void formatB(std::ostream &os) const { os << "but the argument " << f->segment() << " has type"; }
 };
 
 struct ExploreState {
@@ -1290,7 +1268,7 @@ TypeScope::~TypeScope() {
         << "' is not free; it has type:" << std::endl
         << "    ";
       var.var.format(message, var.var);
-      reporter->reportError(var.location, message.str());
+      reporter->reportError(var.fragment.location(), message.str());
       continue;
     }
     if (i == 0) continue;
@@ -1301,8 +1279,8 @@ TypeScope::~TypeScope() {
         << "introduced free type variables '" << prior.name
         << "' and '" << var.name
         << "' are actually the same";
-      reporter->reportError(prior.location, message.str());
-      reporter->reportError(var.location, message.str());
+      reporter->reportError(prior.fragment.location(), message.str());
+      reporter->reportError(var.fragment.location(), message.str());
     }
   }
 }
@@ -1314,7 +1292,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     VarRef *ref = static_cast<VarRef*>(expr);
     NameRef pos;
     if ((pos = binding->find(ref->name)).index == -1) {
-      ERROR(ref->location, "reference to undefined variable '" << ref->name << "'");
+      ERROR(ref->fragment.location(), "reference to undefined variable '" << ref->name << "'");
       return false;
     }
     ref->index = pos.index;
@@ -1324,30 +1302,30 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     if (pos.def) {
       TypeVar temp;
       pos.var->clone(temp);
-      return ref->typeVar.unify(temp, &ref->location);
+      return ref->typeVar.unify(temp, &ref->fragment);
     } else {
       if (pos.lambda) ref->flags |= FLAG_RECURSIVE;
-      return ref->typeVar.unify(*pos.var, &ref->location);
+      return ref->typeVar.unify(*pos.var, &ref->fragment);
     }
   } else if (expr->type == &App::type) {
     App *app = static_cast<App*>(expr);
     binding->open = false;
     bool f = explore(app->fn .get(), state, binding);
     bool a = explore(app->val.get(), state, binding);
-    FnErrorMessage fnm(&app->fn->location);
+    FnErrorMessage fnm(&app->fn->fragment);
     bool t = f && app->fn->typeVar.unify(TypeVar(FN, 2), &fnm);
-    ArgErrorMessage argm(&app->fn->location, &app->val->location, t?app->fn->typeVar.getTag(0):0);
+    ArgErrorMessage argm(&app->fn->fragment, &app->val->fragment, t?app->fn->typeVar.getTag(0):0);
     bool ta = t && a && app->fn->typeVar[0].unify(app->val->typeVar, &argm);
-    bool tr = t && app->fn->typeVar[1].unify(app->typeVar, &app->location);
+    bool tr = t && app->fn->typeVar[1].unify(app->typeVar, &app->fragment);
     return f && a && t && ta && tr;
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr);
-    bool t = lambda->typeVar.unify(TypeVar(FN, 2), &lambda->location);
+    bool t = lambda->typeVar.unify(TypeVar(FN, 2), &lambda->fragment);
     if (t && lambda->name != "_" && lambda->name.find(' ') == std::string::npos)
       lambda->typeVar.setTag(0, lambda->name.c_str());
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), state, &bind);
-    RecErrorMessage recm(&lambda->body->location);
+    RecErrorMessage recm(&lambda->body->fragment);
     bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &recm);
     return out && t && tr;
   } else if (expr->type == &DefBinding::type) {
@@ -1370,11 +1348,11 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     }
     bind.generalized = def->val.size() + def->fun.size();
     ok = explore(def->body.get(), state, &bind) && ok;
-    ok = ok && def->typeVar.unify(def->body->typeVar, &def->location) && ok;
+    ok = ok && def->typeVar.unify(def->body->typeVar, &def->fragment) && ok;
     return ok;
   } else if (expr->type == &Literal::type) {
     Literal *lit = static_cast<Literal*>(expr);
-    return lit->typeVar.unify(*lit->litType, &lit->location);
+    return lit->typeVar.unify(*lit->litType, &lit->fragment);
   } else if (expr->type == &Construct::type) {
     Construct *cons = static_cast<Construct*>(expr);
     bool ok = cons->typeVar.unify(
@@ -1403,7 +1381,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     Destruct *des = static_cast<Destruct*>(expr);
     bool ok = explore(des->arg.get(), state, binding);
     if (ok) {
-      MatchArgErrorMessage ma(&des->arg->location);
+      MatchArgErrorMessage ma(&des->arg->fragment);
       ok = des->arg->typeVar.unify(
         TypeVar(des->sum->name.c_str(), des->sum->args.size()),
         &ma);
@@ -1411,11 +1389,11 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
         Lambda *lam = static_cast<Lambda*>(des->cases[i].get());
         bool c = explore(lam, state, binding);
         if (!c) { ok = false; continue; }
-        MatchResultErrorMessage mr(&lam->location,
+        MatchResultErrorMessage mr(&lam->fragment,
           des->sum->members[0].ast.name,
           des->sum->members[i].ast.name);
         ok = ok && lam->typeVar[1].unify(des->typeVar, &mr);
-        MatchTypeVarErrorMessage tv(&des->arg->location,
+        MatchTypeVarErrorMessage tv(&des->arg->fragment,
           des->sum->members[i].ast.name);
         ok = ok && lam->typeVar[0].unify(des->arg->typeVar, &tv);
       }
@@ -1425,7 +1403,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     Ascribe *asc = static_cast<Ascribe*>(expr);
     bool b = explore(asc->body.get(), state, binding);
     bool ts = asc->signature.unify(asc->typeVar, state.typeVars);
-    AscErrorMessage ascm(&asc->body_location, &asc->signature.region);
+    AscErrorMessage ascm(&asc->body_fragment);
     bool tb = asc->body->typeVar.unify(asc->typeVar, &ascm);
     return b && tb && ts;
   } else if (expr->type == &Prim::type) {
@@ -1438,7 +1416,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     prim->args = args.size();
     PrimMap::const_iterator i = state.pmap.find(prim->name);
     if (i == state.pmap.end()) {
-      ERROR(prim->location, "reference to unimplemented primitive '" << prim->name << "'");
+      ERROR(prim->fragment.location(), "reference to unimplemented primitive '" << prim->name << "'");
       return false;
     } else {
       prim->pflags = i->second.flags;
@@ -1446,7 +1424,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
       prim->data = i->second.data;
       bool ok = i->second.type(args, &prim->typeVar);
       if (!ok) {
-        ERROR(prim->location, "primitive '" << prim->name << "' is used with the wrong number of arguments");
+        ERROR(prim->fragment.location(), "primitive '" << prim->name << "' is used with the wrong number of arguments");
       }
       return ok;
     }
@@ -1468,10 +1446,9 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
 }
 
 std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap, bool &isTreeBuilt) {
+  std::unique_ptr<Expr> out = fracture(std::move(top));
   NameBinding bottom;
   ExploreState state(pmap);
-  Top &topr = *top;
-  std::unique_ptr<Expr> out = fracture(topr, false, "", std::move(top), 0);
   if (out && !explore(out.get(), state, &bottom)) isTreeBuilt = false;
   return out;
 }

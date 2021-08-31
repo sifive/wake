@@ -26,7 +26,7 @@
 #include <set>
 #include <algorithm>
 
-#include "util/location.h"
+#include "util/fragment.h"
 #include "util/diagnostic.h"
 #include "util/file.h"
 #include "parser/parser.h"
@@ -38,9 +38,13 @@
 #include "expr.h"
 #include "todst.h"
 
+static CPPFile cppFile(__FILE__);
+
+static Expr *dst_expr(CSTElement expr);
+
 static std::string getIdentifier(CSTElement element) {
   assert (element.id() == CST_ID || element.id() == CST_OP);
-  TokenInfo ti = element.firstChildElement().content();
+  StringSegment ti = element.firstChildElement().content();
   return relex_id(ti.start, ti.end);
 }
 
@@ -96,11 +100,11 @@ static void dst_package(CSTElement topdef, Package &package) {
   std::string id = getIdentifier(child);
 
   if (id == "builtin") {
-    ERROR(child.location(), "package name 'builtin' is illegal.");
+    ERROR(child.fragment().location(), "package name 'builtin' is illegal.");
   } else if (package.name.empty()) {
     package.name = id;
   } else {
-    ERROR(topdef.location(), "package name redefined from '" << package.name << "' to '" << id << "'");
+    ERROR(topdef.fragment().location(), "package name redefined from '" << package.name << "' to '" << id << "'");
   }
 }
 
@@ -179,14 +183,14 @@ static void dst_import(CSTElement topdef, DefMap &map) {
       name = getIdentifier(ideq);
       source = name + "@" + pkgname;
 
-      ERROR(child.location(), "keyword 'binary' or 'unary' required when changing symbol type for " << child.content());
+      ERROR(child.fragment().location(), "keyword 'binary' or 'unary' required when changing symbol type for " << child.content());
     }
 
     if (idop1 == CST_OP) prefix_op(ia, name);
     if (idop2 == CST_OP) prefix_op(ia, source);
 
-    auto it = target->insert(std::make_pair(std::move(name), SymbolSource(child.location(), source)));
-    if (!it.second) ERROR(child.location(), kind << " '" << it.first->first << "' was previously imported at " << it.first->second.location.file());
+    auto it = target->insert(std::make_pair(std::move(name), SymbolSource(child.fragment().location(), source)));
+    if (!it.second) ERROR(child.fragment().location(), kind << " '" << it.first->first << "' was previously imported at " << it.first->second.location);
   }
 }
 
@@ -213,7 +217,7 @@ static void dst_export(CSTElement topdef, Package &package) {
   }
 
   if (!kind) {
-    ERROR(child.location(), "from ... export must be followed by 'def', 'type', or 'topic'");
+    ERROR(child.fragment().location(), "from ... export must be followed by 'def', 'type', or 'topic'");
     return;
   }
 
@@ -235,18 +239,18 @@ static void dst_export(CSTElement topdef, Package &package) {
     }
 
     if ((idop1 == CST_OP || idop2 == CST_OP) && !(ia.unary || ia.binary)) {
-      ERROR(child.location(), "export of " << child.content() << " must specify 'unary' or 'binary'");
+      ERROR(child.fragment().location(), "export of " << child.content() << " must specify 'unary' or 'binary'");
       continue;
     }
 
     if (idop1 == CST_OP) prefix_op(ia, name);
     if (idop2 == CST_OP) prefix_op(ia, source);
 
-    exports->insert(std::make_pair(name, SymbolSource(child.location(), source)));
+    exports->insert(std::make_pair(name, SymbolSource(child.fragment().location(), source)));
     // duplciates will be detected as file-local
 
-    auto it = local->insert(std::make_pair(name, SymbolSource(child.location(), source)));
-    if (!it.second) ERROR(child.location(), kind << " '" << name << "' was previously defined at " << it.first->second.location.file());
+    auto it = local->insert(std::make_pair(name, SymbolSource(child.fragment().location(), source)));
+    if (!it.second) ERROR(child.fragment().location(), kind << " '" << name << "' was previously defined at " << it.first->second.location);
   }
 }
 
@@ -282,24 +286,24 @@ static AST dst_type(CSTElement root) {
       AST lhs = dst_type(child);
       child.nextSiblingNode();
       std::string op = "binary " + getIdentifier(child);
-      Location location = child.location();
+      auto fragment = child.fragment();
       child.nextSiblingNode();
       AST rhs = dst_type(child);
       if (op == "binary :") {
         if (!lhs.args.empty() || lex_kind(lhs.name) == OPERATOR) {
-          ERROR(lhs.region, "tag-name for a type must be a simple lower-case identifier, not " << root.firstChildNode().content());
+          ERROR(lhs.region.location(), "tag-name for a type must be a simple lower-case identifier, not " << root.firstChildNode().content());
           return rhs;
         } else {
           rhs.tag = std::move(lhs.name);
-          rhs.region = root.location();
+          rhs.region = root.fragment();
           return rhs;
         }
       } else {
         std::vector<AST> args;
         args.emplace_back(std::move(lhs));
         args.emplace_back(std::move(rhs));
-        AST out(location, std::move(op), std::move(args));
-        out.region = root.location();
+        AST out(fragment, std::move(op), std::move(args));
+        out.region = root.fragment();
         return out;
       }
     }
@@ -311,22 +315,22 @@ static AST dst_type(CSTElement root) {
         child.nextSiblingNode();
       }
       std::string op = "unary " + getIdentifier(child);
-      Location location = child.location();
+      auto fragment = child.fragment();
       child.nextSiblingNode();
       if (args.empty()) {
         args.emplace_back(dst_type(child));
         child.nextSiblingNode();
       }
-      AST out(location, std::move(op), std::move(args));
-      out.region = root.location();
+      AST out(fragment, std::move(op), std::move(args));
+      out.region = root.fragment();
       return out;
     }
     case CST_ID: {
-      return AST(root.location(), getIdentifier(root));
+      return AST(root.fragment(), getIdentifier(root));
     }
     case CST_PAREN: {
       AST out = dst_type(root.firstChildNode());
-      out.region = root.location();
+      out.region = root.fragment();
       return out;
     }
     case CST_APP: {
@@ -335,18 +339,18 @@ static AST dst_type(CSTElement root) {
       child.nextSiblingNode();
       AST rhs = dst_type(child);
       switch (lex_kind(lhs.name)) {
-      case LOWER:    ERROR(lhs.token,  "lower-case identifier '" << lhs.name << "' cannot be used as a type constructor"); break;
-      case OPERATOR: ERROR(rhs.region, "excess type argument " << child.content() << " supplied to '" << lhs.name << "'"); break;
+      case LOWER:    ERROR(lhs.token.location(),  "lower-case identifier '" << lhs.name << "' cannot be used as a type constructor"); break;
+      case OPERATOR: ERROR(rhs.region.location(), "excess type argument " << child.content() << " supplied to '" << lhs.name << "'"); break;
       default: break;
       }
       lhs.args.emplace_back(std::move(rhs)); 
-      lhs.region = root.location();
+      lhs.region = root.fragment();
       return lhs;
     }
     default:
-      ERROR(root.location(), "type signatures forbid " << root.content());
+      ERROR(root.fragment().location(), "type signatures forbid " << root.content());
     case CST_ERROR:
-      return AST(root.location(), "BadType");
+      return AST(root.fragment(), "BadType");
   }
 }
 
@@ -355,9 +359,9 @@ static void dst_topic(CSTElement topdef, Package &package, Symbols *globals) {
   TopFlags flags = dst_flags(child);
 
   std::string id = getIdentifier(child);
-  Location location = child.location();
+  auto fragment = child.fragment();
   if (lex_kind(id) != LOWER) {
-    ERROR(child.location(), "topic identifier '" << id << "' is not lower-case");
+    ERROR(child.fragment().location(), "topic identifier '" << id << "' is not lower-case");
     return;
   }
   child.nextSiblingNode();
@@ -371,38 +375,38 @@ static void dst_topic(CSTElement topdef, Package &package, Symbols *globals) {
   x.setDOB();
   def.unify(x, ids);
 
-  auto it = file.topics.insert(std::make_pair(id, Topic(location, std::move(def))));
+  auto it = file.topics.insert(std::make_pair(id, Topic(fragment, std::move(def))));
   if (!it.second) {
-    ERROR(location, "topic '" << id << "' was previously defined at " << it.first->second.location.file());
+    ERROR(fragment.location(), "topic '" << id << "' was previously defined at " << it.first->second.fragment.location());
     return;
   }
 
-  if (flags.exportf) package.exports.topics.insert(std::make_pair(id, SymbolSource(location, SYM_LEAF)));
-  if (flags.globalf) globals->topics.insert(std::make_pair(id, SymbolSource(location, SYM_LEAF)));
+  if (flags.exportf) package.exports.topics.insert(std::make_pair(id, SymbolSource(fragment.location(), SYM_LEAF)));
+  if (flags.globalf) globals->topics.insert(std::make_pair(id, SymbolSource(fragment.location(), SYM_LEAF)));
 }
 
 struct Definition {
   std::string name;
-  Location location;
+  FileFragment fragment;
   std::unique_ptr<Expr> body;
   std::vector<ScopedTypeVar> typeVars;
-  Definition(const std::string &name_, const Location &location_, Expr *body_, std::vector<ScopedTypeVar> &&typeVars_)
-   : name(name_), location(location_), body(body_), typeVars(std::move(typeVars_)) { }
-  Definition(const std::string &name_, const Location &location_, Expr *body_)
-   : name(name_), location(location_), body(body_) { }
+  Definition(const std::string &name_, const FileFragment &fragment_, Expr *body_, std::vector<ScopedTypeVar> &&typeVars_)
+   : name(name_), fragment(fragment_), body(body_), typeVars(std::move(typeVars_)) { }
+  Definition(const std::string &name_, const FileFragment &fragment_, Expr *body_)
+   : name(name_), fragment(fragment_), body(body_) { }
 };
 
 static void bind_global(const Definition &def, Symbols *globals) {
   if (!globals || def.name == "_") return;
 
-  globals->defs.insert(std::make_pair(def.name, SymbolSource(def.location, SYM_LEAF)));
+  globals->defs.insert(std::make_pair(def.name, SymbolSource(def.fragment.location(), SYM_LEAF)));
   // Duplicate globals will be detected as file-local conflicts
 }
 
 static void bind_export(const Definition &def, Symbols *exports) {
   if (!exports || def.name == "_") return;
 
-  exports->defs.insert(std::make_pair(def.name, SymbolSource(def.location, SYM_LEAF)));
+  exports->defs.insert(std::make_pair(def.name, SymbolSource(def.fragment.location(), SYM_LEAF)));
   // Duplicate exports will be detected as file-local conflicts
 }
 
@@ -413,19 +417,19 @@ static void bind_def(DefMap &map, Definition &&def, Symbols *exports, Symbols *g
   if (def.name == "_")
     def.name = "_" + std::to_string(map.defs.size()) + " _";
 
-  Location l = def.body->location;
+  Location l = def.body->fragment.location();
   auto out = map.defs.insert(std::make_pair(std::move(def.name), DefValue(
-    def.location, std::move(def.body), std::move(def.typeVars))));
+    def.fragment, std::move(def.body), std::move(def.typeVars))));
 
-  if (!out.second) ERROR(l, "definition '" << out.first->first << "' was previously defined at " << out.first->second.body->location.file());
+  if (!out.second) ERROR(l, "definition '" << out.first->first << "' was previously defined at " << out.first->second.body->fragment.location());
 }
 
-static void bind_type(Package &package, const std::string &name, const Location &location, Symbols *exports, Symbols *globals) {
-  if (globals) globals->types.insert(std::make_pair(name, SymbolSource(location, SYM_LEAF)));
-  if (exports) exports->types.insert(std::make_pair(name, SymbolSource(location, SYM_LEAF)));
+static void bind_type(Package &package, const std::string &name, const FileFragment &fragment, Symbols *exports, Symbols *globals) {
+  if (globals) globals->types.insert(std::make_pair(name, SymbolSource(fragment.location(), SYM_LEAF)));
+  if (exports) exports->types.insert(std::make_pair(name, SymbolSource(fragment.location(), SYM_LEAF)));
 
-  auto it = package.package.types.insert(std::make_pair(name, SymbolSource(location, SYM_LEAF)));
-  if (!it.second) ERROR(location, "type '" << it.first->first << "' was previously defined at " << it.first->second.location.file());
+  auto it = package.package.types.insert(std::make_pair(name, SymbolSource(fragment.location(), SYM_LEAF)));
+  if (!it.second) ERROR(fragment.location(), "type '" << it.first->first << "' was previously defined at " << it.first->second.location);
 }
 
 static void dst_data(CSTElement topdef, Package &package, Symbols *globals) {
@@ -433,13 +437,13 @@ static void dst_data(CSTElement topdef, Package &package, Symbols *globals) {
   TopFlags flags = dst_flags(child);
 
   auto sump = std::make_shared<Sum>(dst_type(child)); // !!! check dst_type_def coverage
-  if (sump->args.empty() && lex_kind(sump->name) == LOWER) ERROR(child.location(), "data type '" << sump->name << "' must be upper-case or operator");
+  if (sump->args.empty() && lex_kind(sump->name) == LOWER) ERROR(child.fragment().location(), "data type '" << sump->name << "' must be upper-case or operator");
   child.nextSiblingNode();
 
   for (; !child.empty(); child.nextSiblingNode()) {
     AST cons = dst_type(child);
-    if (!cons.tag.empty()) ERROR(cons.region, "constructor '" << cons.name << "' should not be tagged with " << cons.tag);
-    if (cons.args.empty() && lex_kind(cons.name) == LOWER) ERROR(cons.token, "constructor '" << cons.name << "' must be upper-case or operator");
+    if (!cons.tag.empty()) ERROR(cons.region.location(), "constructor '" << cons.name << "' should not be tagged with " << cons.tag);
+    if (cons.args.empty() && lex_kind(cons.name) == LOWER) ERROR(cons.token.location(), "constructor '" << cons.name << "' must be upper-case or operator");
     sump->addConstructor(std::move(cons));
   }
 
@@ -465,7 +469,7 @@ static void dst_tuple(CSTElement topdef, Package &package, Symbols *globals) {
   bool globalt = flags.globalf;
 
   auto sump = std::make_shared<Sum>(dst_type(child)); // !!! check dst_type_def coverage
-  if (lex_kind(sump->name) != UPPER) ERROR(child.location(), "tuple type '" << sump->name << "' must be upper-case");
+  if (lex_kind(sump->name) != UPPER) ERROR(child.fragment().location(), "tuple type '" << sump->name << "' must be upper-case");
   child.nextSiblingNode();
 
   std::string name = sump->name;
@@ -499,7 +503,7 @@ static void dst_tuple(CSTElement topdef, Package &package, Symbols *globals) {
     if (exportb) exportt = true;
 
     std::string &mname = c.ast.args[i].tag;
-    Location memberToken = c.ast.args[i].region;
+    FileFragment memberToken = c.ast.args[i].region;
     if (lex_kind(mname) != UPPER) continue;
 
     // Implement get methods
@@ -569,7 +573,7 @@ static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
       AST lhs = dst_pattern(child, guard);
       child.nextSiblingNode();
       std::string op = "binary " + getIdentifier(child);
-      Location location = child.location();
+      FileFragment fragment = child.fragment();
       child.nextSiblingNode();
       if (op == "binary :") {
         lhs.type = optional<AST>(new AST(dst_type(child)));
@@ -579,8 +583,8 @@ static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
         std::vector<AST> args;
         args.emplace_back(std::move(lhs));
         args.emplace_back(std::move(rhs));
-        AST out(location, std::move(op), std::move(args));
-        out.region = root.location();
+        AST out(fragment, std::move(op), std::move(args));
+        out.region = root.fragment();
         return out;
       }
     }
@@ -592,22 +596,22 @@ static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
         child.nextSiblingNode();
       }
       std::string op = "unary " + getIdentifier(child);
-      Location location = child.location();
+      FileFragment fragment = child.fragment();
       child.nextSiblingNode();
       if (args.empty()) {
         args.emplace_back(dst_pattern(child, guard));
         child.nextSiblingNode();
       }
-      AST out(location, std::move(op), std::move(args));
-      out.region = root.location();
+      AST out(fragment, std::move(op), std::move(args));
+      out.region = root.fragment();
       return out;
     }
     case CST_ID: {
-      return AST(root.location(), getIdentifier(root));
+      return AST(root.fragment(), getIdentifier(root));
     }
     case CST_PAREN: {
       AST out = dst_pattern(root.firstChildNode(), guard);
-      out.region = root.location();
+      out.region = root.fragment();
       return out;
     }
     case CST_APP: {
@@ -616,31 +620,31 @@ static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
       child.nextSiblingNode();
       AST rhs = dst_pattern(child, guard);
       switch (lex_kind(lhs.name)) {
-      //!!!case LOWER:    ERROR(lhs.token,  "lower-case identifier '" << lhs.name << "' cannot be used as a pattern destructor"); break;
-      case OPERATOR: ERROR(rhs.region, "excess argument " << child.content() << " supplied to '" << lhs.name << "'"); break;
+      //!!!case LOWER:    ERROR(lhs.token.location(),  "lower-case identifier '" << lhs.name << "' cannot be used as a pattern destructor"); break;
+      case OPERATOR: ERROR(rhs.region.location(), "excess argument " << child.content() << " supplied to '" << lhs.name << "'"); break;
       default: break;
       }
       lhs.args.emplace_back(std::move(rhs)); 
-      lhs.region = root.location();
+      lhs.region = root.fragment();
       return lhs;
     }
     case CST_HOLE: {
-      return AST(root.location(), "_");
+      return AST(root.fragment(), "_");
     }
     case CST_LITERAL: {
       if (guard) {
-        AST out(root.location(), "_ k" + std::to_string(guard->size()));
+        AST out(root.fragment(), "_ k" + std::to_string(guard->size()));
         guard->emplace_back(root);
         return out;
       } else {
-        ERROR(root.location(), "def/lambda patterns forbid " << root.content() << "; use a match");
-        return AST(root.location(), "_");
+        ERROR(root.fragment().location(), "def/lambda patterns forbid " << root.content() << "; use a match");
+        return AST(root.fragment(), "_");
       }
     }
     default:
-      ERROR(root.location(), "patterns forbid " << root.content());
+      ERROR(root.fragment().location(), "patterns forbid " << root.content());
     case CST_ERROR:
-      return AST(root.location(), "_");
+      return AST(root.fragment(), "_");
   }
 }
 
@@ -678,7 +682,7 @@ static int relabel_descend(Expr *expr, int index) {
 static Expr *relabel_anon(Expr *out) {
   int args = relabel_descend(out, 0);
   for (int index = args; index >= 1; --index)
-    out = new Lambda(out->location, "_ " + std::to_string(index), out);
+    out = new Lambda(out->fragment, "_ " + std::to_string(index), out);
   return out;
 }
 
@@ -698,7 +702,7 @@ static void extract_def(std::vector<Definition> &out, long index, AST &&ast, con
       }
     }
     Match *match = new Match(m.token);
-    match->args.emplace_back(new VarRef(body->location, key));
+    match->args.emplace_back(new VarRef(body->fragment, key));
     match->patterns.emplace_back(std::move(pattern), new VarRef(m.token, mname), nullptr);
     if (lex_kind(m.name) != LOWER) {
       extract_def(out, index, std::move(m), typeVars, match);
@@ -725,7 +729,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
   uint8_t kind = lex_kind(name);
   bool extract = kind == UPPER || (child.id() == CST_PAREN && kind == OPERATOR);
   if (extract && (target || publish)) {
-    ERROR(ast.token, "upper-case identifier '" << name << "' cannot be used as a target/publish name");
+    ERROR(ast.token.location(), "upper-case identifier '" << name << "' cannot be used as a target/publish name");
     return;
   }
 
@@ -736,11 +740,10 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
     for (CSTElement sub = child.firstChildNode(); !sub.empty(); sub.nextSiblingNode()) {
       ast.args.emplace_back(dst_pattern(sub, nullptr));
     }
-    ast.region.end = ast.args.back().region.end;
     child.nextSiblingNode();
   }
 
-  Location fn = ast.region;
+  FileFragment fn = ast.region;
 
   Expr *body = relabel_anon(dst_expr(child));
 
@@ -763,7 +766,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
     }
 
     optional<AST> type = std::move(ast.type);
-    std::vector<std::pair<std::string, Location> > args;
+    std::vector<std::pair<std::string, FileFragment> > args;
     if (pattern) {
       // bind the arguments to anonymous lambdas and push the whole thing into a pattern
       size_t nargs = ast.args.size();
@@ -774,7 +777,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
         match->patterns.emplace_back(std::move(ast.args.front()), body, nullptr);
       }
       for (size_t i = 0; i < nargs; ++i) {
-        args.emplace_back("_ " + std::to_string(i), LOCATION);
+        args.emplace_back("_ " + std::to_string(i), FRAGMENT_CPP_LINE);
         match->args.emplace_back(new VarRef(fn, "_ " + std::to_string(i)));
       }
       body = match;
@@ -786,7 +789,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
         args.emplace_back(arg.name, arg.token);
         if (arg.type) {
           dm->defs.insert(std::make_pair("_type " + arg.name, DefValue(arg.region, std::unique_ptr<Expr>(
-            new Ascribe(LOCATION, std::move(*arg.type), new VarRef(LOCATION, arg.name), arg.token)))));
+            new Ascribe(FRAGMENT_CPP_LINE, std::move(*arg.type), new VarRef(FRAGMENT_CPP_LINE, arg.name), arg.token)))));
         }
       }
       body = dm;
@@ -796,11 +799,11 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
     }
 
     if (type)
-      body = new Ascribe(LOCATION, std::move(*type), body, body->location);
+      body = new Ascribe(FRAGMENT_CPP_LINE, std::move(*type), body, body->fragment);
 
     if (target) {
-      if (tohash == 0) ERROR(fn, "target definition of '" << name << "' must have at least one hashed argument");
-      Location bl = body->location;
+      if (tohash == 0) ERROR(fn.location(), "target definition of '" << name << "' must have at least one hashed argument");
+      FileFragment bl = body->fragment;
       Expr *hash = new Prim(bl, "hash");
       for (size_t i = 0; i < tohash; ++i) hash = new Lambda(bl, "_", hash, " ");
       for (size_t i = 0; i < tohash; ++i) hash = new App(bl, hash, new VarRef(bl, args[i].first));
@@ -815,7 +818,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
     }
 
     if (publish && !args.empty()) {
-      ERROR(fn, "publish definition of '" << name << "' may not be a function");
+      ERROR(fn.location(), "publish definition of '" << name << "' may not be a function");
     } else {
       for (auto i = args.rbegin(); i != args.rend(); ++i) {
         Lambda *lambda = new Lambda(fn, i->first, body);
@@ -829,8 +832,8 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
     if (target) {
       auto &def = defs.front();
       std::stringstream s;
-      s << def.body->location.file();
-      Location l = LOCATION;
+      s << def.body->fragment.location();
+      FileFragment l = FRAGMENT_CPP_LINE;
       bind_def(map, Definition("table " + name, l,
           new App(l, new Lambda(l, "_", new Prim(l, "tnew"), " "),
           new Literal(l, s.str(), &Data::typeString))),
@@ -839,7 +842,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
   }
 
   if (publish) {
-    for (auto &def : defs) package->files.back().pubs.emplace_back(def.name, DefValue(def.location, std::move(def.body)));
+    for (auto &def : defs) package->files.back().pubs.emplace_back(def.name, DefValue(def.fragment, std::move(def.body)));
   } else {
     for (auto &def : defs) bind_def(map, std::move(def), exports, globals);
   }
@@ -848,7 +851,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
 static void mstr_add(std::ostream &os, CSTElement token, std::string::size_type wsCut) {
   uint8_t nid = token.id();
   while (!token.empty()) {
-    TokenInfo ti = token.content();
+    StringSegment ti = token.content();
     token.nextSiblingElement();
     uint8_t id = nid;
     nid = token.id();
@@ -938,47 +941,47 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
   uint8_t id = child.id();
   switch (id) {
     case TOKEN_STR_RAW: {
-      TokenInfo ti = child.content();
+      StringSegment ti = child.content();
       ++ti.start;
       --ti.end;
-      return new Literal(child.location(), ti.str(), &Data::typeString);
+      return new Literal(child.fragment(), ti.str(), &Data::typeString);
     }
     case TOKEN_STR_SINGLE:
     case TOKEN_STR_MID:
     case TOKEN_STR_OPEN:
     case TOKEN_STR_CLOSE: {
-      TokenInfo ti = child.content();
-      return new Literal(child.location(), relex_string(ti.start, ti.end), &Data::typeString);
+      StringSegment ti = child.content();
+      return new Literal(child.fragment(), relex_string(ti.start, ti.end), &Data::typeString);
     }
     case TOKEN_REG_SINGLE: {
-      TokenInfo ti = child.content();
+      StringSegment ti = child.content();
       std::string str = relex_regexp(id, ti.start, ti.end);
       re2::RE2 check(str);
-      if (!check.ok()) ERROR(child.location(), "illegal regular expression: " << check.error());
-      return new Literal(child.location(), std::move(str), &Data::typeRegExp);
+      if (!check.ok()) ERROR(child.fragment().location(), "illegal regular expression: " << check.error());
+      return new Literal(child.fragment(), std::move(str), &Data::typeRegExp);
     }
     case TOKEN_REG_MID:
     case TOKEN_REG_OPEN:
     case TOKEN_REG_CLOSE: {
-      TokenInfo ti = child.content();
+      StringSegment ti = child.content();
       // rcat expects String tokens, not RegExp
-      return new Literal(child.location(), relex_regexp(id, ti.start, ti.end), &Data::typeString);
+      return new Literal(child.fragment(), relex_regexp(id, ti.start, ti.end), &Data::typeString);
     }
     case TOKEN_DOUBLE: {
       std::string x = child.content().str();
       x.resize(std::remove(x.begin(), x.end(), '_') - x.begin());
-      return new Literal(child.location(), std::move(x), &Data::typeDouble);
+      return new Literal(child.fragment(), std::move(x), &Data::typeDouble);
     }
     case TOKEN_INTEGER: {
       std::string x = child.content().str();
       x.resize(std::remove(x.begin(), x.end(), '_') - x.begin());
-      return new Literal(child.location(), std::move(x), &Data::typeInteger);
+      return new Literal(child.fragment(), std::move(x), &Data::typeInteger);
     }
     case TOKEN_KW_HERE: {
-      std::string name(lit.location().filename);
+      std::string name(lit.fragment().location().filename);
       std::string::size_type cut = name.find_last_of('/');
       if (cut == std::string::npos) name = "."; else name.resize(cut);
-      return new Literal(lit.location(), std::move(name), &Data::typeString);
+      return new Literal(lit.fragment(), std::move(name), &Data::typeString);
     }
     case TOKEN_LSTR_BEGIN:
     case TOKEN_MSTR_BEGIN: {
@@ -987,23 +990,23 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
       child.nextSiblingElement(); // skip BEGIN
       child.nextSiblingElement(); // skip NL
       mstr_add(ss, child, wsCut);
-      return new Literal(lit.location(), ss.str(), &Data::typeString);
+      return new Literal(lit.fragment(), ss.str(), &Data::typeString);
     }
     case TOKEN_LSTR_MID:
     case TOKEN_MSTR_MID: {
-      TokenInfo ti = child.content();
-      return new Literal(child.location(), relex_mstring(ti.start+1, ti.end-2), &Data::typeString);
+      StringSegment ti = child.content();
+      return new Literal(child.fragment(), relex_mstring(ti.start+1, ti.end-2), &Data::typeString);
     }
     case TOKEN_LSTR_RESUME:
     case TOKEN_MSTR_RESUME: {
       // TOKEN_MSTR_RESUME (WS? MSTR_CONTINUE? NL)* (NL MSTR_END | WS? MSTR_PAUSE)
       std::stringstream ss;
       mstr_add(ss, child, wsCut);
-      return new Literal(lit.location(), ss.str(), &Data::typeString);
+      return new Literal(lit.fragment(), ss.str(), &Data::typeString);
     }
     default: {
-      ERROR(lit.location(), "unsupported literal " << symbolExample(id) << " = " << lit.content());
-      return new Literal(lit.location(), "bad-literal", &Data::typeString);
+      ERROR(lit.fragment().location(), "unsupported literal " << symbolExample(id) << " = " << lit.content());
+      return new Literal(lit.fragment(), "bad-literal", &Data::typeString);
     }
   }
 }
@@ -1028,14 +1031,14 @@ static Expr *dst_interpolate(CSTElement intp) {
     }
   }
 
-  Location full = intp.location();
+  FileFragment full = intp.fragment();
   Expr *cat = new Prim(full, regexp?"rcat":"vcat");
   for (size_t i = 0; i < args.size(); ++i) cat = new Lambda(full, "_", cat, i?"":" ");
   for (auto arg : args) cat = new App(full, cat, arg);
 
   if (regexp) {
     re2::RE2 check(total);
-    if (!check.ok()) ERROR(full, "illegal regular expression: " << check.error());
+    if (!check.ok()) ERROR(full.location(), "illegal regular expression: " << check.error());
   }
 
   cat->flags |= FLAG_AST;
@@ -1061,23 +1064,23 @@ static Expr *add_literal_guards(Expr *guard, std::vector<CSTElement> literals) {
       assert(0);
     }
 
-    if (!guard) guard = new VarRef(lit->location, "True@wake");
+    if (!guard) guard = new VarRef(lit->fragment, "True@wake");
 
-    Match *match = new Match(lit->location);
-    match->args.emplace_back(new App(lit->location, new App(lit->location,
-        new Lambda(lit->location, "_", new Lambda(lit->location, "_", new Prim(lit->location, comparison), " ")),
-        lit), new VarRef(lit->location, "_ k" + std::to_string(i))));
-    match->patterns.emplace_back(AST(lit->location, "LT@wake"), new VarRef(lit->location, "False@wake"), nullptr);
-    match->patterns.emplace_back(AST(lit->location, "GT@wake"), new VarRef(lit->location, "False@wake"), nullptr);
-    match->patterns.emplace_back(AST(lit->location, "EQ@wake"), guard, nullptr);
+    Match *match = new Match(lit->fragment);
+    match->args.emplace_back(new App(lit->fragment, new App(lit->fragment,
+        new Lambda(lit->fragment, "_", new Lambda(lit->fragment, "_", new Prim(lit->fragment, comparison), " ")),
+        lit), new VarRef(lit->fragment, "_ k" + std::to_string(i))));
+    match->patterns.emplace_back(AST(lit->fragment, "LT@wake"), new VarRef(lit->fragment, "False@wake"), nullptr);
+    match->patterns.emplace_back(AST(lit->fragment, "GT@wake"), new VarRef(lit->fragment, "False@wake"), nullptr);
+    match->patterns.emplace_back(AST(lit->fragment, "EQ@wake"), guard, nullptr);
     guard = match;
   }
   return guard;
 }
 
 static Expr *dst_match(CSTElement match) {
-  Location location = match.location();
-  Match *out = new Match(location);
+  FileFragment fragment = match.fragment();
+  Match *out = new Match(fragment);
 
   CSTElement child;
   for (child = match.firstChildNode(); !child.empty() && child.id() != CST_CASE; child.nextSiblingNode()) {
@@ -1095,7 +1098,7 @@ static Expr *dst_match(CSTElement match) {
       args.emplace_back(dst_pattern(casee, &guards));
     }
 
-    AST pattern = args.size()==1 ? std::move(args[0]) : AST(child.location(), "", std::move(args));
+    AST pattern = args.size()==1 ? std::move(args[0]) : AST(child.fragment(), "", std::move(args));
 
     CSTElement guarde = casee.firstChildNode();
     Expr *guard = guarde.empty() ? nullptr : relabel_anon(dst_expr(guarde));
@@ -1111,7 +1114,7 @@ static Expr *dst_match(CSTElement match) {
 }
 
 static Expr *dst_block(CSTElement block) {
-  DefMap *map = new DefMap(block.location());
+  DefMap *map = new DefMap(block.fragment());
 
   std::unique_ptr<Expr> body;
   for (CSTElement child = block.firstChildNode(); !child.empty(); child.nextSiblingNode()) {
@@ -1143,16 +1146,15 @@ static Expr *dst_require(CSTElement require) {
 
   Expr *block = relabel_anon(dst_expr(child));
 
-  Match *out = new Match(require.location(), true);
+  Match *out = new Match(require.fragment(), true);
   out->args.emplace_back(rhs);
   out->patterns.emplace_back(std::move(ast), block, add_literal_guards(nullptr, guards));
-  out->location.end = block->location.end;
   out->otherwise = std::unique_ptr<Expr>(otherwise);
 
   return out;
 }
 
-Expr *dst_expr(CSTElement expr) {
+static Expr *dst_expr(CSTElement expr) {
   switch (expr.id()) {
     case CST_BINARY: {
       CSTElement child = expr.firstChildNode();
@@ -1162,13 +1164,13 @@ Expr *dst_expr(CSTElement expr) {
       if (opStr == ":") {
         child.nextSiblingNode();
         AST signature = dst_type(child);
-        return new Ascribe(expr.location(), std::move(signature), lhs, lhs->location);
+        return new Ascribe(expr.fragment(), std::move(signature), lhs, lhs->fragment);
       } else {
-        Expr *op = new VarRef(child.location(), "binary " + opStr);
+        Expr *op = new VarRef(child.fragment(), "binary " + opStr);
         op->flags |= FLAG_AST;
         child.nextSiblingNode();
         Expr *rhs = dst_expr(child);
-        Location l = expr.location();
+        FileFragment l = expr.fragment();
         App *out = new App(l, new App(l, op, lhs), rhs);
         out->flags |= FLAG_AST;
         return out;
@@ -1181,16 +1183,16 @@ Expr *dst_expr(CSTElement expr) {
         body = dst_expr(child);
         child.nextSiblingNode();
       }
-      Expr *op = new VarRef(child.location(), "unary " + getIdentifier(child));
+      Expr *op = new VarRef(child.fragment(), "unary " + getIdentifier(child));
       op->flags |= FLAG_AST;
       child.nextSiblingNode();
       if (!body) body = dst_expr(child);
-      App *out = new App(expr.location(), op, body);
+      App *out = new App(expr.fragment(), op, body);
       out->flags |= FLAG_AST;
       return out;
     }
     case CST_ID: {
-      VarRef *out = new VarRef(expr.location(), getIdentifier(expr));
+      VarRef *out = new VarRef(expr.fragment(), getIdentifier(expr));
       out->flags |= FLAG_AST;
       return out;
     }
@@ -1202,23 +1204,23 @@ Expr *dst_expr(CSTElement expr) {
       Expr *lhs = dst_expr(child);
       child.nextSiblingNode();
       Expr *rhs = dst_expr(child);
-      App *out = new App(expr.location(), lhs, rhs);
+      App *out = new App(expr.fragment(), lhs, rhs);
       lhs->flags |= FLAG_AST;
       return out;
     }
     case CST_HOLE: {
-      VarRef *out = new VarRef(expr.location(), "_");
+      VarRef *out = new VarRef(expr.fragment(), "_");
       out->flags |= FLAG_AST;
       return out;
     }
     case CST_SUBSCRIBE: {
-      Subscribe *out = new Subscribe(expr.location(), getIdentifier(expr.firstChildNode()));
+      Subscribe *out = new Subscribe(expr.fragment(), getIdentifier(expr.firstChildNode()));
       out->flags |= FLAG_AST;
       return out;
     }
     case CST_PRIM: {
-      TokenInfo content = expr.firstChildNode().firstChildElement().content();
-      Prim *out = new Prim(expr.location(), relex_string(content.start, content.end));
+      StringSegment content = expr.firstChildNode().firstChildElement().content();
+      Prim *out = new Prim(expr.fragment(), relex_string(content.start, content.end));
       out->flags |= FLAG_AST;
       return out;
     }
@@ -1229,7 +1231,7 @@ Expr *dst_expr(CSTElement expr) {
       Expr *thenE = relabel_anon(dst_expr(child));
       child.nextSiblingNode();
       Expr *elseE = relabel_anon(dst_expr(child));
-      Location l = expr.location();
+      FileFragment l = expr.fragment();
       Match *out = new Match(l);
       out->args.emplace_back(condE);
       out->patterns.emplace_back(AST(l, "True@wake"),  thenE, nullptr);
@@ -1243,7 +1245,7 @@ Expr *dst_expr(CSTElement expr) {
       child.nextSiblingNode();
       Expr *body = dst_expr(child);
       Lambda *out;
-      Location l = expr.location();
+      FileFragment l = expr.fragment();
       if (lex_kind(ast.name) != LOWER) {
         Match *match = new Match(l);
         match->patterns.emplace_back(std::move(ast), body, nullptr);
@@ -1253,7 +1255,7 @@ Expr *dst_expr(CSTElement expr) {
         DefMap *dm = new DefMap(l);
         dm->body = std::unique_ptr<Expr>(body);
         dm->defs.insert(std::make_pair(ast.name, DefValue(ast.region, std::unique_ptr<Expr>(
-          new Ascribe(LOCATION, std::move(*ast.type), new VarRef(LOCATION, "_ typed"), ast.region)))));
+          new Ascribe(FRAGMENT_CPP_LINE, std::move(*ast.type), new VarRef(FRAGMENT_CPP_LINE, "_ typed"), ast.region)))));
         out = new Lambda(l, "_ typed", dm);
       } else {
         out = new Lambda(l, ast.name, body);
@@ -1268,9 +1270,9 @@ Expr *dst_expr(CSTElement expr) {
     case CST_BLOCK:       return dst_block(expr);
     case CST_REQUIRE:     return dst_require(expr);
     default:
-      ERROR(expr.location(), "unexpected expression: " << expr.content());
+      ERROR(expr.fragment().location(), "unexpected expression: " << expr.content());
     case CST_ERROR: {
-      Location l = expr.location();
+      FileFragment l = expr.fragment();
       return new App(l,
         new Lambda(l, "_", new Prim(l, "unreachable")),
         new Literal(l, "bad-expression", &Data::typeString));
@@ -1282,7 +1284,7 @@ const char *dst_top(CSTElement root, Top &top) {
   std::unique_ptr<Package> package(new Package);
   package->files.resize(1);
   File &file = package->files.back();
-  file.content = std::unique_ptr<DefMap>(new DefMap(root.location()));
+  file.content = std::unique_ptr<DefMap>(new DefMap(root.fragment()));
   DefMap &map = *file.content;
   Symbols globals;
 
@@ -1308,7 +1310,7 @@ const char *dst_top(CSTElement root, Top &top) {
 
   // Set a default package name
   if (package->name.empty()) {
-    package->name = file.content->location.filename;
+    package->name = file.content->fragment.location().filename;
   }
 
   package->exports.setpkg(package->name);
@@ -1321,14 +1323,14 @@ const char *dst_top(CSTElement root, Top &top) {
   map.defs.clear();
   for (auto &def : defs) {
     auto name = def.first + "@" + package->name;
-    auto it = file.local.defs.insert(std::make_pair(def.first, SymbolSource(def.second.location, name, SYM_LEAF)));
+    auto it = file.local.defs.insert(std::make_pair(def.first, SymbolSource(def.second.fragment.location(), name, SYM_LEAF)));
     if (!it.second) {
       if (it.first->second.qualified == name) {
-        it.first->second.location = def.second.location;
+        it.first->second.location = def.second.fragment.location();
         it.first->second.flags |= SYM_LEAF;
         package->exports.defs.find(def.first)->second.flags |= SYM_LEAF;
       } else {
-        ERROR(def.second.location, "definition '" << def.first << "' was previously defined at " << it.first->second.location.file());
+        ERROR(def.second.fragment.location(), "definition '" << def.first << "' was previously defined at " << it.first->second.location);
       }
     }
     map.defs.insert(std::make_pair(std::move(name), std::move(def.second)));
@@ -1337,14 +1339,14 @@ const char *dst_top(CSTElement root, Top &top) {
   // localize all topics
   for (auto &topic : file.topics) {
     auto name = topic.first + "@" + package->name;
-    auto it = file.local.topics.insert(std::make_pair(topic.first, SymbolSource(topic.second.location, name, SYM_LEAF)));
+    auto it = file.local.topics.insert(std::make_pair(topic.first, SymbolSource(topic.second.fragment.location(), name, SYM_LEAF)));
     if (!it.second) {
       if (it.first->second.qualified == name) {
-        it.first->second.location = topic.second.location;
+        it.first->second.location = topic.second.fragment.location();
         it.first->second.flags |= SYM_LEAF;
         package->exports.topics.find(topic.first)->second.flags |= SYM_LEAF;
       } else {
-        ERROR(topic.second.location, "topic '" << topic.first << "' was previously defined at " << it.first->second.location.file());
+        ERROR(topic.second.fragment.location(), "topic '" << topic.first << "' was previously defined at " << it.first->second.location);
       }
     }
   }
@@ -1359,7 +1361,7 @@ const char *dst_top(CSTElement root, Top &top) {
         it.first->second.flags |= SYM_LEAF;
         package->exports.types.find(type.first)->second.flags |= SYM_LEAF;
       } else {
-        ERROR(type.second.location, "type '" << type.first << "' was previously defined at " << it.first->second.location.file());
+        ERROR(type.second.location, "type '" << type.first << "' was previously defined at " << it.first->second.location);
       }
     }
   }
@@ -1378,11 +1380,14 @@ const char *dst_top(CSTElement root, Top &top) {
   return it.first->second->name.c_str();
 }
 
-Expr *dst_expr(const std::string &expr, DiagnosticReporter &reporter) {
-  StringFile fcontent("<command-line>", "def _ = " + expr);
-  CST cst(fcontent, reporter);
+
+ExprParser::ExprParser(const std::string &content)
+ : file("<command-line>", "def _ = " + content) { }
+
+std::unique_ptr<Expr> ExprParser::expr(DiagnosticReporter &reporter) {
+  CST cst(file, reporter);
   CSTElement topdef = cst.root().firstChildNode();
   CSTElement defcontent = topdef.firstChildNode();
   defcontent.nextSiblingNode(); // skip pattern
-  return dst_expr(defcontent);
+  return std::unique_ptr<Expr>(dst_expr(defcontent));
 }
