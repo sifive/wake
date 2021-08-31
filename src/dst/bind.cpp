@@ -969,8 +969,12 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
   for (auto &p : top->packages) {
     for (auto &f : p.second->files) {
       for (auto &d : f.content->defs) {
-        gbinding.index[d.first] = gbinding.defs.size();
-        gbinding.defs.emplace_back(d.first, d.second.fragment, std::move(d.second.body), std::move(d.second.typeVars));
+        auto it = gbinding.index.insert(std::make_pair(d.first, gbinding.defs.size()));
+        if (it.second) {
+          gbinding.defs.emplace_back(d.first, d.second.fragment, std::move(d.second.body), std::move(d.second.typeVars));
+        } else {
+          // discard duplicate symbol; we already reported an error in package-local join
+        }
       }
       for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
         auto name = "publish " + it->first + " " + std::to_string(++publish);
@@ -983,9 +987,13 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
     for (auto &f : p.second->files) {
       for (auto &t : f.topics) {
         auto name = "topic " + t.first + "@" + p.first;
-        gbinding.index[name] = gbinding.defs.size();
-        gbinding.defs.emplace_back(name, t.second.fragment,
-          std::unique_ptr<Expr>(new VarRef(t.second.fragment, "Nil@wake")));
+        auto it = gbinding.index.insert(std::make_pair(name, gbinding.defs.size()));
+        if (it.second) {
+          gbinding.defs.emplace_back(name, t.second.fragment,
+            std::unique_ptr<Expr>(new VarRef(t.second.fragment, "Nil@wake")));
+        } else {
+          // discard duplicate topic; we already reported an error in package-local join
+        }
       }
     }
   }
@@ -997,10 +1005,13 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
       ibinding.symbols = process_import(*top, f.content->imports, f.content->fragment);
       dbinding.symbols.clear();
       dbinding.symbols.push_back(&f.local);
-      for (size_t i = 0; i < f.content->defs.size(); ++i) {
-        ResolveDef &def = gbinding.defs[gbinding.current_index];
-        def.expr = fracture(*top, false, trim(def.name), std::move(def.expr), &dbinding);
-        ++gbinding.current_index;
+      for (auto &d : f.content->defs) {
+        // Only process if not a duplicate skipped in earlier loop
+        if (gbinding.index[d.first] == gbinding.current_index) {
+          ResolveDef &def = gbinding.defs[gbinding.current_index];
+          def.expr = fracture(*top, false, trim(def.name), std::move(def.expr), &dbinding);
+          ++gbinding.current_index;
+        }
       }
       for (auto it = f.pubs.rbegin(); it != f.pubs.rend(); ++it) {
         ResolveDef &def = gbinding.defs[gbinding.current_index];
@@ -1029,27 +1040,31 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
   for (auto &p : top->packages) {
     for (auto &f : p.second->files) {
       for (auto &t : f.topics) {
-        ResolveDef &def = gbinding.defs[gbinding.current_index];
-        def.expr = fracture(*top, false, trim(def.name), std::move(def.expr), &gbinding);
-        ++gbinding.current_index;
+        auto name = "topic " + t.first + "@" + p.first;
+        // Only process if not a duplicate skipped in earlier loop
+        if (gbinding.index[name] == gbinding.current_index) {
+          ResolveDef &def = gbinding.defs[gbinding.current_index];
+          def.expr = fracture(*top, false, trim(def.name), std::move(def.expr), &gbinding);
+          ++gbinding.current_index;
 
-        // Form the type required for publishes
-        std::vector<AST> args;
-        args.emplace_back(t.second.type); // qualified by prior pass
-        AST signature(t.second.type.region, "List@wake", std::move(args));
+          // Form the type required for publishes
+          std::vector<AST> args;
+          args.emplace_back(t.second.type); // qualified by prior pass
+          AST signature(t.second.type.region, "List@wake", std::move(args));
 
-        // Insert Ascribe requirements on all publishes
-        FileFragment l = def.expr->fragment;
-        Expr *next = nullptr;
-        for (Expr *iter = def.expr.get(); iter->type == &App::type; iter = next) {
-          App *app1 = static_cast<App*>(iter);
-          App *app2 = static_cast<App*>(app1->fn.get());
-          app2->val = std::unique_ptr<Expr>(new Ascribe(FRAGMENT_CPP_LINE, AST(signature), app2->val.release(), l));
-          next = app1->val.get();
+          // Insert Ascribe requirements on all publishes
+          FileFragment l = def.expr->fragment;
+          Expr *next = nullptr;
+          for (Expr *iter = def.expr.get(); iter->type == &App::type; iter = next) {
+            App *app1 = static_cast<App*>(iter);
+            App *app2 = static_cast<App*>(app1->fn.get());
+            app2->val = std::unique_ptr<Expr>(new Ascribe(FRAGMENT_CPP_LINE, AST(signature), app2->val.release(), l));
+            next = app1->val.get();
+          }
+
+          // If the topic is empty, still force the type
+          if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(FRAGMENT_CPP_LINE, AST(signature), def.expr.release(), l));
         }
-
-        // If the topic is empty, still force the type
-        if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(FRAGMENT_CPP_LINE, AST(signature), def.expr.release(), l));
       }
     }
   }
