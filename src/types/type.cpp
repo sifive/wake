@@ -23,7 +23,7 @@
 #include <sstream>
 #include <cassert>
 
-#include "util/location.h"
+#include "util/fragment.h"
 #include "util/diagnostic.h"
 #include "util/colour.h"
 #include "parser/lexer.h"
@@ -174,7 +174,7 @@ bool TypeVar::do_unify(TypeVar &other) {
 
 void LegacyErrorMessage::formatA(std::ostream &os) const {
   os << "type error; unable to unify";
-  if (l) os << " " << l->text() << " of";
+  if (l) os << " " << l->segment() << " of";
   os << " type";
 }
 
@@ -200,7 +200,7 @@ bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {
     message->formatB(os);
     os << ":" << std::endl << "    ";
     globalEpoch += do_format(os, 0, other, "", this, 0, 0);
-    reporter->reportError(message->getMainLocation(), os.str());
+    reporter->reportError(message->getMainFileFragment().location(), os.str());
   }
   return ok;
 }

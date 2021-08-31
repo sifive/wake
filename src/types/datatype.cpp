@@ -22,11 +22,14 @@
 #include <sstream>
 
 #include "util/diagnostic.h"
+#include "util/fragment.h"
 #include "parser/lexer.h"
 #include "datatype.h"
 #include "type.h"
 
-Constructor Constructor::array(AST(LOCATION, "Array"));
+static CPPFile cppFile(__FILE__);
+
+Constructor Constructor::array(AST(FRAGMENT_CPP_LINE, "Array"));
 
 Sum::Sum(AST &&ast) : name(std::move(ast.name)), token(ast.token), region(ast.region), scoped(false) {
   for (auto &x : ast.args)
@@ -43,7 +46,7 @@ bool AST::unify(TypeVar &out, const TypeMap &ids) {
   if (lex_kind(name) == LOWER) {
     auto it = ids.find(name);
     if (it == ids.end()) {
-      ERROR(token, "unbound type variable '" << name << "'");
+      ERROR(token.location(), "unbound type variable '" << name << "'");
       return false;
     } else {
       return out.unify(*it->second, &region);

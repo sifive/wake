@@ -305,7 +305,7 @@ RootPointer<RegExp> RegExp::literal(Heap &h, const std::string &value) {
 }
 
 void Closure::format(std::ostream &os, FormatState &state) const {
-  os << "<" << fun->location.file() << ">";
+  os << "<" << fun->location << ">";
 }
 
 Hash Closure::shallow_hash() const {

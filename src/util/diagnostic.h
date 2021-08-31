@@ -65,11 +65,18 @@ class DiagnosticReporter {
 
 extern DiagnosticReporter *reporter;
 
-#define ERROR(loc, stream)                   \
-  do {                                       \
-    std::stringstream sstr;                  \
-    sstr << stream;                          \
-    reporter->reportError(loc, sstr.str());  \
-  } while (0)                                \
+#define ERROR(loc, stream)                    \
+  do {                                        \
+    std::stringstream sstr;                   \
+    sstr << stream;                           \
+    reporter->reportError(loc, sstr.str());   \
+  } while (0)                                 \
+
+#define WARNING(loc, stream)                  \
+  do {                                        \
+    std::stringstream sstr;                   \
+    sstr << stream;                           \
+    reporter->reportWarning(loc, sstr.str()); \
+  } while (0)                                 \
 
 #endif

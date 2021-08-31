@@ -153,7 +153,7 @@ size_t RFun::args() const {
 void RFun::format(std::ostream &os, TermFormat &format) const {
   format.depth += 2;
   size_t index = 0;
-  os << "Fun(" << location.file() << "):" << std::endl;
+  os << "Fun(" << location << "):" << std::endl;
   if (!escapes.empty()) {
     os << pad(format.depth) << "escapes:";
     for (auto x : escapes)

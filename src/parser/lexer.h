@@ -21,6 +21,8 @@
 #include <stdint.h>
 #include <string>
 
+#include "util/segment.h"
+
 // This special token is not created by lemon
 #define TOKEN_EOF 0
 
@@ -67,5 +69,7 @@ inline op_type op_precedence(const std::string &s) {
     const uint8_t *x = reinterpret_cast<const uint8_t*>(s.c_str());
     return op_precedence(x, x+s.size());
 }
+
+std::ostream & operator << (std::ostream &os, StringSegment token);
 
 #endif

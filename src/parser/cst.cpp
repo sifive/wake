@@ -37,12 +37,12 @@ CSTNode::CSTNode(uint8_t id_, uint32_t size_, uint32_t begin_, uint32_t end_)
 
 void CSTBuilder::addToken(uint8_t id, StringSegment token) {
     token_ids.push_back(id);
-    token_starts.set(token.start - file->start);
+    token_starts.set(token.start - file->segment().start);
 }
 
 void CSTBuilder::addNode(uint8_t id, StringSegment begin) {
-    uint32_t b = begin.start - file->start;
-    uint32_t e = begin.end   - file->start;
+    uint32_t b = begin.start - file->segment().start;
+    uint32_t e = begin.end   - file->segment().start;
     nodes.emplace_back(id, 1, b, e);
 }
 
@@ -69,7 +69,7 @@ void CSTBuilder::addNode(uint8_t id, StringSegment begin, uint32_t children) {
         size += nodes.end()[-size].size;
     }
 
-    uint32_t b2 = begin.start - file->start;
+    uint32_t b2 = begin.start - file->segment().start;
     if (b2 < b) b = b2;
 
     nodes.emplace_back(id, size, b, e);
@@ -85,7 +85,7 @@ void CSTBuilder::addNode(uint8_t id, uint32_t children, StringSegment end) {
         size += nodes.end()[-size].size;
     }
 
-    uint32_t e2 = end.end - file->start;
+    uint32_t e2 = end.end - file->segment().start;
     if (e2 > e) e = e2;
 
     nodes.emplace_back(id, size, b, e);
@@ -100,8 +100,8 @@ void CSTBuilder::addNode(uint8_t id, StringSegment begin, uint32_t children, Str
         size += nodes.end()[-size].size;
     }
 
-    uint32_t b = begin.start - file->start;
-    uint32_t e = end.end - file->start;
+    uint32_t b = begin.start - file->segment().start;
+    uint32_t e = end.end - file->segment().start;
 
     if (children) {
         uint32_t e2 = nodes.back().end;
@@ -153,7 +153,7 @@ CST::CST(CSTBuilder &&builder)
 
     if (!nodes.empty()) {
         nodes.front().begin = 0;
-        nodes.back().end = file->end - file->start;
+        nodes.back().end = file->segment().size();
     }
 
     builder.nodes.clear();
@@ -165,7 +165,7 @@ CSTElement CST::root() const {
     out.node = 0;
     out.limit = nodes.size();
     out.token = 0;
-    out.end = file->end - file->start;
+    out.end = file->segment().size();
     return out;
 }
 

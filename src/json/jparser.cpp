@@ -30,7 +30,7 @@ static bool expect(SymbolJSON type, JLexer &jlex, std::ostream& errs) {
       errs << "Was expecting a "
         << jsymbolTable[type] << ", but got a "
         << jsymbolTable[jlex.next.type] << " at "
-        << jlex.next.location.text();
+        << jlex.next.location;
     jlex.fail = true;
     return false;
   }
@@ -73,7 +73,7 @@ static JAST parse_jarray(JLexer &jlex, std::ostream& errs) {
         if (!jlex.fail)
           errs << "Was expecting COMMA/SCLOSE, got a "
             << jsymbolTable[jlex.next.type]
-            << " at " << jlex.next.location.text();
+            << " at " << jlex.next.location;
         jlex.fail = true;
         repeat = false;
         break;
@@ -120,7 +120,7 @@ static JAST parse_jobject(JLexer &jlex, std::ostream& errs) {
         if (!jlex.fail)
           errs << "Was expecting ID/STR, got a "
             << jsymbolTable[jlex.next.type]
-            << " at " << jlex.next.location.text();
+            << " at " << jlex.next.location;
         jlex.fail = true;
         repeat = false;
         break;
@@ -146,7 +146,7 @@ static JAST parse_jobject(JLexer &jlex, std::ostream& errs) {
         if (!jlex.fail)
           errs << "Was expecting COMMA/BCLOSE, got a "
             << jsymbolTable[jlex.next.type]
-            << " at " << jlex.next.location.text();
+            << " at " << jlex.next.location;
         jlex.fail = true;
         repeat = false;
         break;
@@ -192,7 +192,7 @@ static JAST parse_jvalue(JLexer &jlex, std::ostream& errs) {
       if (!jlex.fail)
         errs << "Unexpected symbol "
           << jsymbolTable[jlex.next.type]
-          << " at " << jlex.next.location.text();
+          << " at " << jlex.next.location;
       jlex.fail = true;
       return JAST(JSON_ERROR);
     }

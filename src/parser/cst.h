@@ -70,8 +70,6 @@ class FileContent;
 class CSTElement;
 class DiagnosticReporter;
 
-std::ostream & operator << (std::ostream &os, StringSegment token);
-
 struct CSTNode {
     // CST_* Identifier
     unsigned id   : 8;

@@ -20,7 +20,7 @@
 Location FileFragment::location() const {
     uint32_t end1 = end!=start?end-1:end;
     return Location(
-        content->filename,
-        content->coordinates(content->start + start),
-        content->coordinates(content->start + end1));
+        content->filename(),
+        content->coordinates(content->segment().start + start),
+        content->coordinates(content->segment().start + end1));
 }

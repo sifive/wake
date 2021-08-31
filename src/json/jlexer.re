@@ -64,7 +64,7 @@ struct jinput_t {
 
   int __attribute__ ((noinline)) fill();
 
-  Coordinates coord() const { return Coordinates(row, 1 + cur - sol, offset + cur - &buf[0]); }
+  Coordinates coord() const { return Coordinates(row, 1 + cur - sol); }
 };
 
 #define SYM_LOCATION Location(in.filename, start, in.coord()-1)

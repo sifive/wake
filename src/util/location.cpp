@@ -23,41 +23,12 @@
 
 #include "location.h"
 
-std::ostream & operator << (std::ostream &os, FileLocation location) {
-  const Location *l = location.l;
-  os << l->filename << ":";
-  if (l->start.row == l->end.row) os << l->start.row;
-  else os << "[" << l->start.row << "-" << l->end.row << "]";
+std::ostream & operator << (std::ostream &os, const Location& location) {
+  os << location.filename << ":";
+  if (location.start.row == location.end.row) os << location.start.row;
+  else os << "[" << location.start.row << "-" << location.end.row << "]";
   os << ":";
-  if (l->start.column == l->end.column) os << l->start.column;
-  else os << "[" << l->start.column << "-" << l->end.column << "]";
-  return os;
-}
-
-std::ostream & operator << (std::ostream &os, TextLocation location) {
-  const Location *l = location.l;
-  char buf[40];
-  size_t get;
-
-  if (l->start.bytes >= 0 &&
-      l->filename[0] != '<' &&
-      l->start.row == l->end.row &&
-      l->end.column >= l->start.column &&
-      (get = l->end.column - l->start.column + 1) < sizeof(buf)) {
-    std::ifstream ifs(l->filename);
-    ifs.seekg(l->start.bytes);
-    ifs.read(&buf[0], get);
-    if (ifs) {
-      buf[get] = 0;
-    } else {
-      buf[0] = 0;
-    }
-  } else {
-    buf[0] = 0;
-  }
-
-  if (buf[0]) os << "'" << buf << "' (";
-  os << l->file();
-  if (buf[0]) os << ")";
+  if (location.start.column == location.end.column) os << location.start.column;
+  else os << "[" << location.start.column << "-" << location.end.column << "]";
   return os;
 }

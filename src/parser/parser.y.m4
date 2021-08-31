@@ -39,6 +39,7 @@
 
 #include "util/file.h"
 #include "util/diagnostic.h"
+#include "lexer.h"
 #include "syntax.h"
 #include "cst.h"
 
@@ -456,8 +457,6 @@ bool ParseShifts(void *p, int yymajor) {
 }
 
 %parse_failure {
-  StringSegment ti;
-  ti.start = pinfo.fcontent->start;
-  ti.end = pinfo.fcontent->end;
+  StringSegment ti = pinfo.fcontent->segment();
   pinfo.reporter->reportError(FileFragment(pinfo.fcontent, ti).location(), "Parser was unable to proceed");
 }

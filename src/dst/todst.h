@@ -24,7 +24,12 @@ struct Expr;
 struct Top;
 
 const char *dst_top(CSTElement root, Top &top);
-Expr *dst_expr(CSTElement expr);
-Expr *dst_expr(const std::string &expr, DiagnosticReporter &reporter);
+
+struct ExprParser {
+  StringFile file;
+
+  ExprParser(const std::string &content);
+  std::unique_ptr<Expr> expr(DiagnosticReporter &reporter);
+};
 
 #endif

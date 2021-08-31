@@ -20,7 +20,7 @@
 
 #include <ostream>
 
-#include "util/location.h"
+#include "util/fragment.h"
 #include "dsu.h"
 
 #define FN "binary =>@builtin"
@@ -28,15 +28,15 @@
 struct TypeErrorMessage {
   virtual void formatA(std::ostream &os) const = 0;
   virtual void formatB(std::ostream &os) const = 0;
-  virtual Location getMainLocation() const = 0;
+  virtual FileFragment getMainFileFragment() const = 0;
 };
 
 struct LegacyErrorMessage : public TypeErrorMessage {
-  const Location *l;
-  LegacyErrorMessage(const Location *l_) : l(l_) { }
+  const FileFragment *l;
+  LegacyErrorMessage(const FileFragment *l_) : l(l_) { }
   void formatA(std::ostream &os) const;
   void formatB(std::ostream &os) const;
-  virtual Location getMainLocation() const { return *l; }
+  virtual FileFragment getMainFileFragment() const { return *l; }
 };
 
 struct TypeChild;
@@ -99,8 +99,8 @@ public:
   bool unify(TypeVar &&other, const TypeErrorMessage *message) { return unify(other, message); }
   bool tryUnify(TypeVar &other); // no error printed on failed
   //  Deprecated:
-  bool unify(TypeVar &other,  const Location *l = 0) { LegacyErrorMessage m(l); return unify(other, &m); }
-  bool unify(TypeVar &&other, const Location *l = 0) { LegacyErrorMessage m(l); return unify(other, &m); }
+  bool unify(TypeVar &other,  const FileFragment *l = 0) { LegacyErrorMessage m(l); return unify(other, &m); }
+  bool unify(TypeVar &&other, const FileFragment *l = 0) { LegacyErrorMessage m(l); return unify(other, &m); }
 
   // Sort type vars by age and DSU-identity
   bool operator <  (const TypeVar &b) const;

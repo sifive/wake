@@ -31,42 +31,46 @@
 static uint8_t null[1] = { 0 };
 
 FileContent::FileContent(const char *filename_)
- : filename(filename_)
+ : fname(filename_)
 {
     newlines.push_back(0);
 }
 
 void FileContent::addNewline(const uint8_t *first_column)
 {
-    newlines.push_back(first_column - start);
+    newlines.push_back(first_column - ss.start);
 }
 
 Coordinates FileContent::coordinates(const uint8_t *position) const
 {
-    size_t offset = position - start;
-    auto it = std::upper_bound(newlines.begin(), newlines.end(), offset);
-    --it; // always works, because newlines includes 0
-    size_t row = 1 + (it - newlines.begin());
-    size_t col = 1 + (offset - *it);
-    return Coordinates(row, col, offset);
+    size_t offset = position - ss.start;
+    if (newlines.empty()) {
+        return Coordinates(offset, 1);
+    } else {
+        auto it = std::upper_bound(newlines.begin(), newlines.end(), offset);
+        --it; // always works, because newlines includes 0
+        size_t row = 1 + (it - newlines.begin());
+        size_t col = 1 + (offset - *it);
+        return Coordinates(row, col);
+    }
 }
 
 StringFile::StringFile(const char *filename_, std::string &&content_)
  : FileContent(filename_), content(std::move(content_))
 {
-    start = reinterpret_cast<const uint8_t*>(content.c_str());
-    end = start + content.size();
+    ss.start = reinterpret_cast<const uint8_t*>(content.c_str());
+    ss.end = ss.start + content.size();
 }
 
 ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
  : FileContent(filename_)
 {
-    Location l(filename);
+    Location l(filename());
 
-    int fd = open(filename, O_RDONLY);
+    int fd = open(filename(), O_RDONLY);
     if (fd == -1) {
         reporter.reportError(l, std::string("open failed; ") + strerror(errno));
-        end = start = &null[0];
+        ss.end = ss.start = &null[0];
         return;
     }
 
@@ -74,14 +78,14 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
     if (fstat(fd, &s) == -1) {
         reporter.reportError(l, std::string("fstat failed; ") + strerror(errno));
         close(fd);
-        end = start = &null[0];
+        ss.end = ss.start = &null[0];
         return;
     }
 
     // There is no need for a mapping if the file is empty.
     if (s.st_size == 0) {
         close(fd);
-        end = start = &null[0];
+        ss.end = ss.start = &null[0];
         return;
     }
 
@@ -90,14 +94,14 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
     if (map == MAP_FAILED) {
         reporter.reportError(l, std::string("mmap failed; ") + strerror(errno));
         close(fd);
-        end = start = &null[0];
+        ss.end = ss.start = &null[0];
         return;
     }
 
     // Now that the content is mapped, we don't need the file descriptor
     close(fd);
-    start = reinterpret_cast<const uint8_t*>(map);
-    end = start + s.st_size;
+    ss.start = reinterpret_cast<const uint8_t*>(map);
+    ss.end = ss.start + s.st_size;
 
     // We need to remap the tail of the file to ensure null termination
     long pagesize = sysconf(_SC_PAGESIZE);
@@ -108,7 +112,7 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
     if (mmap(reinterpret_cast<uint8_t*>(map) + tail_start, pagesize, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANON, -1, 0) == MAP_FAILED) {
         reporter.reportError(l, std::string("mmap anon failed; ") + strerror(errno));
         munmap(map, s.st_size+1);
-        end = start = &null[0];
+        ss.end = ss.start = &null[0];
         return;
     }
 
@@ -117,21 +121,25 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
 }
 
 ExternalFile::ExternalFile(ExternalFile &&o)
- : FileContent(o.filename) {
-    start = o.start;
-    end = o.end;
-    o.end = o.start = &null[0];
+ : FileContent(o.filename()) {
+    ss = o.ss;
+    o.ss.end = o.ss.start = &null[0];
 }
 
 ExternalFile::~ExternalFile() {
-    if (start != end)
-        munmap(const_cast<void*>(reinterpret_cast<const void*>(start)), (end - start) + 1);
+    if (ss.start != ss.end)
+        munmap(const_cast<void*>(reinterpret_cast<const void*>(ss.start)), ss.size() + 1);
 }
 
 ExternalFile &ExternalFile::operator = (ExternalFile &&o) {
-    filename = o.filename;
-    start = o.start;
-    end = o.end;
-    o.end = o.start = &null[0];
+    fname = std::move(o.fname);
+    ss = o.ss;
+    o.ss.end = o.ss.start = &null[0];
     return *this;
+}
+
+CPPFile::CPPFile(const char *filename)
+ : FileContent(filename)
+{
+    newlines.clear();
 }
