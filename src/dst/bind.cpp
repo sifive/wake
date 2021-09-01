@@ -213,18 +213,14 @@ static std::unique_ptr<Expr> fracture_binding(const FileFragment &fragment, std:
         j = p[j];
       }
       // j is now inside the cycle
-      std::ostringstream message;
-      message << "value definition cycle detected including:" << std::endl;
-      std::vector<FileFragment> errorFileFragments;
       int i = j;
       do {
-        message << std::endl << "  " << defs[i].name << " at " << defs[i].expr->fragment.location();
-        errorFileFragments.push_back(defs[i].expr->fragment);
+        ERROR(defs[p[i]].expr->fragment.location(),
+          "definition of '" << defs[p[i]].name
+          << "' references '" << defs[i].name
+          << "' forming an illegal cyclic value");
         i = p[i];
       } while (i != j);
-      for (FileFragment fragment: errorFileFragments) {
-        reporter->reportError(fragment.location(), message.str());
-      }
       return nullptr;
     }
     int w = def.expr->type == &Lambda::type ? 0 : 1;
@@ -729,10 +725,9 @@ struct SymMover {
     if (it == top.packages.end()) {
       warn = false;
       package = nullptr;
-      std::ostringstream message;
-      message << "import of " << kind << " '" << def
-        << "' from non-existent package '" << pkg << "'";
-      reporter->reportWarning(sym.second.location, message.str());
+      WARNING(sym.second.location,
+        "import of " << kind << " '" << def
+        << "' from non-existent package '" << pkg << "'");
     } else {
       warn = true;
       package = it->second.get();
@@ -741,9 +736,8 @@ struct SymMover {
 
   ~SymMover() {
     if (warn) {
-      std::ostringstream message;
-      message << kind << " '" << def << "' is not exported by package '" << package->name << "'";
-      reporter->reportWarning(sym.second.location, message.str());
+      WARNING(sym.second.location,
+        kind << " '" << def << "' is not exported by package '" << package->name << "'");
     }
   }
 
