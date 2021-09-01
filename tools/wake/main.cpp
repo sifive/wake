@@ -521,7 +521,7 @@ int main(int argc, char **argv) {
 
   TypeVar type = top->body->typeVar;
 
-  if (parse) std::cout << top.get();
+  if (parse) top->format(std::cout, 0);
   if (notype) return (ok && !terminalReporter.errors)?0:1;
 
   /* Setup logging streams */
