@@ -19,6 +19,7 @@
 #define LOCATION_H
 
 #include <ostream>
+#include <cstring>
 
 struct Coordinates {
   int row, column;
@@ -52,6 +53,11 @@ struct Location {
 
   bool contains(const Location &loc) const {
     return filename == loc.filename && start <= loc.start && loc.end <= end;
+  }
+
+  bool operator < (const Location &l) const {
+    if (filename == l.filename) { return start < l.start; }
+    return strcmp(filename, l.filename) < 0;
   }
 };
 
