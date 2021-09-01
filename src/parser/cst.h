@@ -129,7 +129,7 @@ public:
 
     uint8_t id() const;
     FileFragment fragment() const;
-    StringSegment content() const { return fragment().segment(); }
+    StringSegment segment() const { return fragment().segment(); }
     Location location() const { return fragment().location(); }
 
     void nextSiblingElement();
@@ -147,3 +147,4 @@ friend class CST;
 };
 
 #endif
+
