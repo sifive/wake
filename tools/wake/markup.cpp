@@ -129,12 +129,14 @@ void JSONRender::dump() {
 
   if ((*it)->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(*it);
-    FileFragment &target = ref->target;
-    os
-      << ",\"target\":{\"filename\":\"" << json_escape(target.filename())
-      << "\",\"range\":[" << target.startByte()
-      << "," << target.endByte()
-      << "]}";
+    FileFragment target = ref->target;
+    if (!target.empty()) {
+      os
+        << ",\"target\":{\"filename\":\"" << json_escape(target.filename())
+        << "\",\"range\":[" << target.startByte()
+        << "," << target.endByte()
+        << "]}";
+    }
   }
 
   ++it;
@@ -143,7 +145,7 @@ void JSONRender::dump() {
   while (it != eset.end()) {
     FileFragment child = (*it)->fragment;
     if (child.filename() != self.filename()) break;
-    if (child.startByte() > self.endByte()) break;
+    if (child.startByte() >= self.endByte()) break;
     if (body) os << ","; else os << ",\"body\":[";
     body = true;
     dump();
@@ -161,16 +163,13 @@ void JSONRender::render(Expr *root) {
   bool comma = false;
   while (it != eset.end()) {
     const char *filename = (*it)->fragment.filename();
-    std::ifstream ifs(filename);
-    std::string content(
-      (std::istreambuf_iterator<char>(ifs)),
-      (std::istreambuf_iterator<char>()));
+    StringSegment content = (*it)->fragment.fcontent()->segment();
     if (comma) os << ",";
     comma = true;
     os
       << "{\"type\":\"Program\",\"filename\":\"" << json_escape(filename)
       << "\",\"range\":[0," << content.size()
-      << "],\"source\":\"" << json_escape(content)
+      << "],\"source\":\"" << json_escape(content.str())
       << "\",\"body\":[";
     bool comma = false;
     while (it != eset.end() && (*it)->fragment.filename() == filename) {
