@@ -44,7 +44,7 @@ static Expr *dst_expr(CSTElement expr);
 
 static std::string getIdentifier(CSTElement element) {
   assert (element.id() == CST_ID || element.id() == CST_OP);
-  StringSegment ti = element.firstChildElement().content();
+  StringSegment ti = element.firstChildElement().segment();
   return relex_id(ti.start, ti.end);
 }
 
@@ -183,7 +183,7 @@ static void dst_import(CSTElement topdef, DefMap &map) {
       name = getIdentifier(ideq);
       source = name + "@" + pkgname;
 
-      ERROR(child.fragment().location(), "keyword 'binary' or 'unary' required when changing symbol type for " << child.content());
+      ERROR(child.fragment().location(), "keyword 'binary' or 'unary' required when changing symbol type for " << child.segment());
     }
 
     if (idop1 == CST_OP) prefix_op(ia, name);
@@ -239,7 +239,7 @@ static void dst_export(CSTElement topdef, Package &package) {
     }
 
     if ((idop1 == CST_OP || idop2 == CST_OP) && !(ia.unary || ia.binary)) {
-      ERROR(child.fragment().location(), "export of " << child.content() << " must specify 'unary' or 'binary'");
+      ERROR(child.fragment().location(), "export of " << child.segment() << " must specify 'unary' or 'binary'");
       continue;
     }
 
@@ -291,7 +291,7 @@ static AST dst_type(CSTElement root) {
       AST rhs = dst_type(child);
       if (op == "binary :") {
         if (!lhs.args.empty() || lex_kind(lhs.name) == OPERATOR) {
-          ERROR(lhs.region.location(), "tag-name for a type must be a simple lower-case identifier, not " << root.firstChildNode().content());
+          ERROR(lhs.region.location(), "tag-name for a type must be a simple lower-case identifier, not " << root.firstChildNode().segment());
           return rhs;
         } else {
           rhs.tag = std::move(lhs.name);
@@ -340,7 +340,7 @@ static AST dst_type(CSTElement root) {
       AST rhs = dst_type(child);
       switch (lex_kind(lhs.name)) {
       case LOWER:    ERROR(lhs.token.location(),  "lower-case identifier '" << lhs.name << "' cannot be used as a type constructor"); break;
-      case OPERATOR: ERROR(rhs.region.location(), "excess type argument " << child.content() << " supplied to '" << lhs.name << "'"); break;
+      case OPERATOR: ERROR(rhs.region.location(), "excess type argument " << child.segment() << " supplied to '" << lhs.name << "'"); break;
       default: break;
       }
       lhs.args.emplace_back(std::move(rhs)); 
@@ -348,7 +348,7 @@ static AST dst_type(CSTElement root) {
       return lhs;
     }
     default:
-      ERROR(root.fragment().location(), "type signatures forbid " << root.content());
+      ERROR(root.fragment().location(), "type signatures forbid " << root.segment());
     case CST_ERROR:
       return AST(root.fragment(), "BadType");
   }
@@ -621,7 +621,7 @@ static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
       AST rhs = dst_pattern(child, guard);
       switch (lex_kind(lhs.name)) {
       //!!!case LOWER:    ERROR(lhs.token.location(),  "lower-case identifier '" << lhs.name << "' cannot be used as a pattern destructor"); break;
-      case OPERATOR: ERROR(rhs.region.location(), "excess argument " << child.content() << " supplied to '" << lhs.name << "'"); break;
+      case OPERATOR: ERROR(rhs.region.location(), "excess argument " << child.segment() << " supplied to '" << lhs.name << "'"); break;
       default: break;
       }
       lhs.args.emplace_back(std::move(rhs)); 
@@ -637,12 +637,12 @@ static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
         guard->emplace_back(root);
         return out;
       } else {
-        ERROR(root.fragment().location(), "def/lambda patterns forbid " << root.content() << "; use a match");
+        ERROR(root.fragment().location(), "def/lambda patterns forbid " << root.segment() << "; use a match");
         return AST(root.fragment(), "_");
       }
     }
     default:
-      ERROR(root.fragment().location(), "patterns forbid " << root.content());
+      ERROR(root.fragment().location(), "patterns forbid " << root.segment());
     case CST_ERROR:
       return AST(root.fragment(), "_");
   }
@@ -851,7 +851,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
 static void mstr_add(std::ostream &os, CSTElement token, std::string::size_type wsCut) {
   uint8_t nid = token.id();
   while (!token.empty()) {
-    StringSegment ti = token.content();
+    StringSegment ti = token.segment();
     token.nextSiblingElement();
     uint8_t id = nid;
     nid = token.id();
@@ -893,7 +893,7 @@ void MultiLineStringIndentationFSM::accept(CSTElement lit) {
   for (CSTElement child = lit.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
     switch (child.id()) {
       case TOKEN_WS: {
-        std::string ws = child.content().str();
+        std::string ws = child.segment().str();
         if (noPrefix) {
           prefix = std::move(ws);
         } else {
@@ -941,7 +941,7 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
   uint8_t id = child.id();
   switch (id) {
     case TOKEN_STR_RAW: {
-      StringSegment ti = child.content();
+      StringSegment ti = child.segment();
       ++ti.start;
       --ti.end;
       return new Literal(child.fragment(), ti.str(), &Data::typeString);
@@ -950,11 +950,11 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
     case TOKEN_STR_MID:
     case TOKEN_STR_OPEN:
     case TOKEN_STR_CLOSE: {
-      StringSegment ti = child.content();
-      return new Literal(child.fragment(), relex_string(ti.start, ti.end), &Data::typeString);
+      FileFragment fragment = child.fragment();
+      return new Literal(fragment, relex_string(fragment), &Data::typeString);
     }
     case TOKEN_REG_SINGLE: {
-      StringSegment ti = child.content();
+      StringSegment ti = child.segment();
       std::string str = relex_regexp(id, ti.start, ti.end);
       re2::RE2 check(str);
       if (!check.ok()) ERROR(child.fragment().location(), "illegal regular expression: " << check.error());
@@ -963,17 +963,17 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
     case TOKEN_REG_MID:
     case TOKEN_REG_OPEN:
     case TOKEN_REG_CLOSE: {
-      StringSegment ti = child.content();
+      StringSegment ti = child.segment();
       // rcat expects String tokens, not RegExp
       return new Literal(child.fragment(), relex_regexp(id, ti.start, ti.end), &Data::typeString);
     }
     case TOKEN_DOUBLE: {
-      std::string x = child.content().str();
+      std::string x = child.segment().str();
       x.resize(std::remove(x.begin(), x.end(), '_') - x.begin());
       return new Literal(child.fragment(), std::move(x), &Data::typeDouble);
     }
     case TOKEN_INTEGER: {
-      std::string x = child.content().str();
+      std::string x = child.segment().str();
       x.resize(std::remove(x.begin(), x.end(), '_') - x.begin());
       return new Literal(child.fragment(), std::move(x), &Data::typeInteger);
     }
@@ -994,7 +994,7 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
     }
     case TOKEN_LSTR_MID:
     case TOKEN_MSTR_MID: {
-      StringSegment ti = child.content();
+      StringSegment ti = child.segment();
       return new Literal(child.fragment(), relex_mstring(ti.start+1, ti.end-2), &Data::typeString);
     }
     case TOKEN_LSTR_RESUME:
@@ -1005,7 +1005,7 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
       return new Literal(lit.fragment(), ss.str(), &Data::typeString);
     }
     default: {
-      ERROR(lit.fragment().location(), "unsupported literal " << symbolExample(id) << " = " << lit.content());
+      ERROR(lit.fragment().location(), "unsupported literal " << symbolExample(id) << " = " << lit.segment());
       return new Literal(lit.fragment(), "bad-literal", &Data::typeString);
     }
   }
@@ -1219,8 +1219,8 @@ static Expr *dst_expr(CSTElement expr) {
       return out;
     }
     case CST_PRIM: {
-      StringSegment content = expr.firstChildNode().firstChildElement().content();
-      Prim *out = new Prim(expr.fragment(), relex_string(content.start, content.end));
+      FileFragment fragment = expr.firstChildNode().firstChildElement().fragment();
+      Prim *out = new Prim(expr.fragment(), relex_string(fragment));
       out->flags |= FLAG_AST;
       return out;
     }
@@ -1270,7 +1270,7 @@ static Expr *dst_expr(CSTElement expr) {
     case CST_BLOCK:       return dst_block(expr);
     case CST_REQUIRE:     return dst_require(expr);
     default:
-      ERROR(expr.fragment().location(), "unexpected expression: " << expr.content());
+      ERROR(expr.fragment().location(), "unexpected expression: " << expr.segment());
     case CST_ERROR: {
       FileFragment l = expr.fragment();
       return new App(l,

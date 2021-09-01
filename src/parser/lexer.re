@@ -23,6 +23,7 @@
 #include <cstdint>
 
 #include "utf8proc/utf8proc.h"
+#include "util/diagnostic.h"
 #include "json/lexint.h"
 #include "json/utf8.h"
 #include "lexer.h"
@@ -348,9 +349,12 @@ std::string relex_mstring(const uint8_t *s, const uint8_t *e) {
     return unicode_escape(s, e);
 }
 
-std::string relex_string(const uint8_t *s, const uint8_t *e) {
+std::string relex_string(FileFragment fragment) {
+    StringSegment segment = fragment.segment();
+    const uint8_t *s = segment.start;
+    const uint8_t *e = segment.end;
     std::string out;
-    out.reserve(e-s);
+    out.reserve(segment.size());
 
     ++s; --e; // Remove the ""    "{    }"   }{
 
@@ -371,11 +375,17 @@ std::string relex_string(const uint8_t *s, const uint8_t *e) {
             "\\" (lws|[{}\\'"?]) { out.append(h+1, s); continue; }
             "\\"  [0-7]{1,3}     { push_utf8(out, lex_oct(h, s)); continue; }
             "\\x" [0-9a-fA-F]{2} { push_utf8(out, lex_hex(h, s)); continue; }
-            "\\u" [0-9a-fA-F]{4} { if (!push_utf8(out, lex_hex(h, s))) out.append(h, s); continue; }
-            "\\U" [0-9a-fA-F]{8} { if (!push_utf8(out, lex_hex(h, s))) out.append(h, s); continue; }
+            "\\u" [0-9a-fA-F]{4} { if (!push_utf8(out, lex_hex(h, s))) goto bad_escape; continue; }
+            "\\U" [0-9a-fA-F]{8} { if (!push_utf8(out, lex_hex(h, s))) goto bad_escape; continue; }
+            "\\".                { goto bad_escape; }
 
             [^]                  { out.append(h, s); continue;  }
          */
+
+bad_escape:
+        FileFragment escape(fragment.fcontent(), StringSegment { h, s });
+        ERROR(escape.location(), "invalid string escape " << escape.segment());
+        out.append(h, s);
     }
 
     return unicode_escape(out);
