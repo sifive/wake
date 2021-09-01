@@ -1205,7 +1205,7 @@ static Expr *dst_expr(CSTElement expr) {
       child.nextSiblingNode();
       Expr *rhs = dst_expr(child);
       App *out = new App(expr.fragment(), lhs, rhs);
-      lhs->flags |= FLAG_AST;
+      out->flags |= FLAG_AST;
       return out;
     }
     case CST_HOLE: {
