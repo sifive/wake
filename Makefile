@@ -75,7 +75,7 @@ lib/wake/fuse-waked:	tools/fuse-waked/fuse-waked.cpp $(COMMON_OBJS)
 lib/wake/shim-wake:	tools/shim-wake/shim.o vendor/blake2/blake2b-ref.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-%.o:	%.cpp	$(wildcard */*/*.h) src/parser/parser.h
+%.o:	%.cpp	$(filter-out src/parser/parser.h,$(wildcard */*/*.h)) | src/parser/parser.h
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(CORE_CFLAGS) -o $@ -c $<
 
 %.o:	%.c	$(filter-out src/version.h,$(wildcard */*.h))
