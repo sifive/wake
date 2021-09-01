@@ -950,8 +950,8 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
     case TOKEN_STR_MID:
     case TOKEN_STR_OPEN:
     case TOKEN_STR_CLOSE: {
-      StringSegment ti = child.segment();
-      return new Literal(child.fragment(), relex_string(ti.start, ti.end), &Data::typeString);
+      FileFragment fragment = child.fragment();
+      return new Literal(fragment, relex_string(fragment), &Data::typeString);
     }
     case TOKEN_REG_SINGLE: {
       StringSegment ti = child.segment();
@@ -1219,8 +1219,8 @@ static Expr *dst_expr(CSTElement expr) {
       return out;
     }
     case CST_PRIM: {
-      StringSegment content = expr.firstChildNode().firstChildElement().segment();
-      Prim *out = new Prim(expr.fragment(), relex_string(content.start, content.end));
+      FileFragment fragment = expr.firstChildNode().firstChildElement().fragment();
+      Prim *out = new Prim(expr.fragment(), relex_string(fragment));
       out->flags |= FLAG_AST;
       return out;
     }
