@@ -34,6 +34,7 @@ public:
     FileContent &operator = (FileContent &&o);
 
     Coordinates coordinates(const uint8_t *position) const;
+    void clearNewLines();
     void addNewline(const uint8_t *first_column);
 
     StringSegment segment() const { return ss; }

@@ -35,20 +35,27 @@ static uint8_t null[1] = { 0 };
 FileContent::FileContent(const char *filename_)
  : fname(filename_)
 {
-    newlines.push_back(0);
 }
 
 FileContent::FileContent(FileContent &&o)
- : ss(o.ss), fname(std::move(o.fname)), newlines(std::move(o.newlines)) {
+ : ss(o.ss), fname(std::move(o.fname)), newlines(std::move(o.newlines))
+{
     o.ss.end = o.ss.start = &null[0];
 }
 
-FileContent &FileContent::operator = (FileContent &&o) {
+FileContent &FileContent::operator = (FileContent &&o)
+{
     ss = o.ss;
     fname = std::move(o.fname);
     newlines = std::move(o.newlines);
     o.ss.end = o.ss.start = &null[0];
     return *this;
+}
+
+void FileContent::clearNewLines()
+{
+    newlines.clear();
+    newlines.push_back(0);
 }
 
 void FileContent::addNewline(const uint8_t *first_column)
@@ -170,5 +177,4 @@ ExternalFile::~ExternalFile() {
 CPPFile::CPPFile(const char *filename)
  : FileContent(filename)
 {
-    newlines.clear();
 }
