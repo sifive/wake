@@ -21,7 +21,8 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <sys/select.h>
-#include <cstring>
+#include <unistd.h>
+#include <string.h>
 
 #include <iostream>
 #include <string>
@@ -56,6 +57,49 @@
 #define TOSTRING(x) STRINGIFY(x)
 #define VERSION_STR TOSTRING(VERSION)
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+
+EM_ASYNC_JS(char *, nodejs_getstdin, (), {
+  var buffer = "";
+
+  let eof = await new Promise(resolve => {
+    let timeout = setTimeout(() => {
+      complete(false);
+    }, 1000);
+    function gotData(input) {
+      buffer = input;
+      complete(false);
+    }
+    function gotEnd() {
+      complete(true);
+    }
+    function complete(out) {
+      clearTimeout(timeout);
+      process.stdin.pause();
+      process.stdin.removeListener('end',   gotEnd);
+      process.stdin.removeListener('error', gotEnd);
+      process.stdin.removeListener('data',  gotData);
+      resolve(out);
+    }
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('end',   gotEnd);
+    process.stdin.on('error', gotEnd);
+    process.stdin.on('data',  gotData);
+    process.stdin.resume();
+  });
+
+  if (eof) {
+    return 0;
+  } else {
+    let lengthBytes = lengthBytesUTF8(buffer)+1;
+    let stringOnWasmHeap = _malloc(lengthBytes);
+    stringToUTF8(buffer, stringOnWasmHeap, lengthBytes);
+    return stringOnWasmHeap;
+  }
+});
+#endif
+
 static CPPFile cppFile(__FILE__);
 
 // Header used in JSON-RPC
@@ -82,21 +126,17 @@ public:
     explicit LSP(std::string _stdLib) : stdLib(std::move(_stdLib)) {}
 
     void processRequests() {
+      std::string buffer;
+
       while (true) {
         size_t json_size = 0;
         // Read header lines until an empty line
         while (true) {
-          std::string line;
-          std::getline(std::cin, line);
+          // Grab a line, terminated by a not-included '\n'
+          std::string line = getLine(buffer);
           // Trim trailing CR, if any
           if (!line.empty() && line.back() == '\r')
             line.resize(line.size() - 1);
-          // EOF? exit LSP
-          if (std::cin.eof())
-            exit(0);
-          // Failure reading? Fail with non-zero exit status
-          if (!std::cin)
-            exit(1);
           // Empty line? stop
           if (line.empty())
             break;
@@ -110,8 +150,7 @@ public:
           exit(1);
 
         // Retrieve the content
-        std::string content(json_size, ' ');
-        std::cin.read(&content[0], json_size);
+        std::string content = getBlob(buffer, json_size);
 
         // Parse that content as JSON
         JAST request;
@@ -189,6 +228,96 @@ private:
       {"textDocument/rename",             &LSP::rename}
     };
 
+    std::string getLine(std::string &buffer) {
+      size_t len = 0, off = buffer.find('\n');
+      while (off == std::string::npos) {
+        std::string got = getStdin();
+        len = buffer.size();
+        off = got.find('\n');
+        buffer.append(got);
+      }
+
+      off += len;
+      std::string out(buffer, 0, off); // excluding '\n'
+      buffer.erase(0, off+1); // including '\n'
+      return out;
+    }
+
+    std::string getBlob(std::string &buffer, size_t length) {
+      while (buffer.size() < length)
+        buffer.append(getStdin());
+
+      std::string out(buffer, 0, length);
+      buffer.erase(0, length);
+      return out;
+    }
+
+    std::string getStdin() {
+      while (true) {
+#ifdef __EMSCRIPTEN__
+        char *buf = nodejs_getstdin();
+        if (!buf) {
+          std::cerr << "Client did not shutdown cleanly" << std::endl;
+          exit(1);
+        }
+
+        std::string out(buf, strlen(buf));
+        free(buf);
+
+        if (out.empty()) {
+          poll();
+          continue;
+        }
+
+        return out;
+#else
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(STDIN_FILENO, &rfds);
+
+        struct timeval tv;
+        tv.tv_sec = 1;
+        tv.tv_usec = 0;
+
+        int ret = select(STDIN_FILENO+1, &rfds, nullptr, nullptr, &tv);
+        if (ret == -1) {
+          perror("select(stdin)");
+          exit(1);
+        }
+
+        // Timeout expired?
+        if (ret == 0) {
+          poll();
+          continue;
+        }
+
+        char buf[4096];
+        int got = read(STDIN_FILENO, &buf[0], sizeof(buf));
+        if (got == -1) {
+          perror("read(stdin)");
+          exit(1);
+        }
+
+        // End-of-file reached?
+        if (got == 0) {
+          std::cerr << "Client did not shutdown cleanly" << std::endl;
+          exit(1);
+        }
+
+        return std::string(&buf[0], got);
+#endif
+      }
+    }
+
+    void poll() {
+#ifdef __EMSCRIPTEN__
+      int usage = EM_ASM_INT({ return HEAPU8.length; });
+      std::cerr << "One second expired; using " << usage << " bytes of memory" << std::endl;
+#else
+      std::cerr << "One second expired" << std::endl;
+#endif
+    }
+
     void callMethod(const std::string &method, const JAST &request) {
       auto functionPointer = essentialMethods.find(method);
       if (functionPointer != essentialMethods.end()) {
@@ -207,9 +336,10 @@ private:
       std::stringstream str;
       str << message;
       str.seekg(0, std::ios::end);
-      std::cout << contentLength << str.tellg() << "\r\n\r\n";
+      size_t length = str.tellg();
       str.seekg(0, std::ios::beg);
-      std::cout << str.rdbuf();
+      std::cout << contentLength << (length+2) << "\r\n\r\n";
+      std::cout << str.rdbuf() << "\r\n" << std::flush;
     }
 
     static JAST createMessage() {
@@ -929,6 +1059,17 @@ int main(int argc, const char **argv) {
   } else {
     stdLib = find_execpath() + "/../../share/wake/lib";
   }
+
+#ifdef __EMSCRIPTEN__
+  EM_ASM({
+    FS.mkdir('/workspace');
+    FS.mkdir('/stdlib');
+    FS.mount(NODEFS, { root: '.' }, '/workspace');
+    FS.mount(NODEFS, { root: UTF8ToString($0) }, '/stdlib');
+  }, stdLib.c_str());
+  chdir("/workspace");
+  stdLib = "/stdlib";
+#endif
 
   if (access((stdLib + "/core/boolean.wake").c_str(), F_OK) != -1) {
     LSP lsp(stdLib);
