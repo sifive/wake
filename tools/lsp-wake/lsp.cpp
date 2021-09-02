@@ -1061,14 +1061,19 @@ int main(int argc, const char **argv) {
   }
 
 #ifdef __EMSCRIPTEN__
-  EM_ASM({
-    FS.mkdir('/workspace');
-    FS.mkdir('/stdlib');
-    FS.mount(NODEFS, { root: '.' }, '/workspace');
-    FS.mount(NODEFS, { root: UTF8ToString($0) }, '/stdlib');
-  }, stdLib.c_str());
-  chdir("/workspace");
-  stdLib = "/stdlib";
+  char *cwd = (char*)EM_ASM_INT({
+    FS.mkdir('/root');
+    FS.mount(NODEFS, { root: '/' }, '/root');
+    let cwd = process.cwd();
+    let lengthBytes = lengthBytesUTF8(cwd)+1;
+    let stringOnWasmHeap = _malloc(lengthBytes);
+    stringToUTF8(cwd, stringOnWasmHeap, lengthBytes);
+    return stringOnWasmHeap;
+  });
+  if (0 != chdir("/root")) std::cerr << "Could not enter root filesystem" << std::endl;
+  if (0 != chdir(cwd+1)) std::cerr << "Could not re-enter current-working directory " << cwd << std::endl;
+  free(cwd);
+  stdLib = "/root" + stdLib;
 #endif
 
   if (access((stdLib + "/core/boolean.wake").c_str(), F_OK) != -1) {
