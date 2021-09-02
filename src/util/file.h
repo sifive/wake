@@ -30,12 +30,19 @@ class DiagnosticReporter;
 class FileContent {
 public:
     FileContent(const char *filename_);
+    FileContent(FileContent &&o);
+    FileContent &operator = (FileContent &&o);
 
     Coordinates coordinates(const uint8_t *position) const;
+    void clearNewLines();
     void addNewline(const uint8_t *first_column);
 
     StringSegment segment() const { return ss; }
     const char *filename() const { return fname.c_str(); }
+
+    // copy construction is forbidden
+    FileContent(const FileContent &) = delete;
+    FileContent &operator = (const FileContent &) = delete;
 
 protected:
     StringSegment ss;
@@ -46,6 +53,8 @@ protected:
 class StringFile : public FileContent {
 public:
     StringFile(const char *filename_, std::string &&content_);
+    StringFile(StringFile &&o) = default;
+    StringFile &operator = (StringFile &&o) = default;
 
 private:
     std::string content;
@@ -54,13 +63,10 @@ private:
 class ExternalFile : public FileContent {
 public:
     ExternalFile(DiagnosticReporter &reporter, const char *filename_);
-    ExternalFile(ExternalFile &&o);
     ~ExternalFile();
-    ExternalFile &operator = (ExternalFile &&o);
 
-    // copy construction is forbidden
-    ExternalFile(const ExternalFile &) = delete;
-    ExternalFile &operator = (const ExternalFile &) = delete;
+    ExternalFile(ExternalFile &&o) = default;
+    ExternalFile &operator = (ExternalFile &&o) = default;
 };
 
 class CPPFile : public FileContent {

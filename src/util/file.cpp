@@ -23,7 +23,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+
 #include <algorithm>
+#include <fstream>
 
 #include "file.h"
 #include "diagnostic.h"
@@ -33,6 +35,26 @@ static uint8_t null[1] = { 0 };
 FileContent::FileContent(const char *filename_)
  : fname(filename_)
 {
+}
+
+FileContent::FileContent(FileContent &&o)
+ : ss(o.ss), fname(std::move(o.fname)), newlines(std::move(o.newlines))
+{
+    o.ss.end = o.ss.start = &null[0];
+}
+
+FileContent &FileContent::operator = (FileContent &&o)
+{
+    ss = o.ss;
+    fname = std::move(o.fname);
+    newlines = std::move(o.newlines);
+    o.ss.end = o.ss.start = &null[0];
+    return *this;
+}
+
+void FileContent::clearNewLines()
+{
+    newlines.clear();
     newlines.push_back(0);
 }
 
@@ -67,6 +89,26 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
 {
     Location l(filename());
 
+#ifdef __EMSCRIPTEN__
+    // mmap with specified address is broken...
+    std::ifstream ifs(filename());
+    if (!ifs) {
+        reporter.reportError(l, std::string("open failed; ") + strerror(errno));
+        ss.end = ss.start = &null[0];
+        return;
+    }
+
+    ifs.seekg(0, std::ios::end);
+    size_t length = ifs.tellg();
+    ifs.seekg(0, std::ios::beg);
+
+    uint8_t *base = new uint8_t[length+1];
+    ifs.read(reinterpret_cast<char*>(base), length);
+
+    base[length] = 0;
+    ss.start = base;
+    ss.end = base + length;
+#else
     int fd = open(filename(), O_RDONLY);
     if (fd == -1) {
         reporter.reportError(l, std::string("open failed; ") + strerror(errno));
@@ -109,7 +151,8 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
     size_t tail_start = (s.st_size+1) - tail_len;
 
     std::string buf(reinterpret_cast<const char*>(map) + tail_start, tail_len-1);
-    if (mmap(reinterpret_cast<uint8_t*>(map) + tail_start, pagesize, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANON, -1, 0) == MAP_FAILED) {
+    void *out = mmap(reinterpret_cast<uint8_t*>(map) + tail_start, pagesize, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANON, -1, 0);
+    if (out == MAP_FAILED || ((char*)out - (char*)map) != tail_start) {
         reporter.reportError(l, std::string("mmap anon failed; ") + strerror(errno));
         munmap(map, s.st_size+1);
         ss.end = ss.start = &null[0];
@@ -118,28 +161,20 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
 
     // Fill in the last page
     memcpy(reinterpret_cast<uint8_t*>(map) + tail_start, buf.c_str(), tail_len);
-}
-
-ExternalFile::ExternalFile(ExternalFile &&o)
- : FileContent(o.filename()) {
-    ss = o.ss;
-    o.ss.end = o.ss.start = &null[0];
+#endif
 }
 
 ExternalFile::~ExternalFile() {
+#ifdef __EMSCRIPTEN__
+    if (ss.start != ss.end)
+        delete [] ss.start;
+#else
     if (ss.start != ss.end)
         munmap(const_cast<void*>(reinterpret_cast<const void*>(ss.start)), ss.size() + 1);
-}
-
-ExternalFile &ExternalFile::operator = (ExternalFile &&o) {
-    fname = std::move(o.fname);
-    ss = o.ss;
-    o.ss.end = o.ss.start = &null[0];
-    return *this;
+#endif
 }
 
 CPPFile::CPPFile(const char *filename)
  : FileContent(filename)
 {
-    newlines.clear();
 }
