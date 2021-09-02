@@ -21,6 +21,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <sys/select.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -176,6 +177,7 @@ private:
     std::string rootUri = "";
     bool isInitialized = false;
     bool isCrashed = false;
+    bool needsUpdate = false;
     std::string crashedFlagFilename = ".lsp-wake.lock";
     bool isShutDown = false;
     std::string stdLib;
@@ -309,12 +311,28 @@ private:
       }
     }
 
+    void refresh() {
+      if (needsUpdate && !isCrashed) {
+#ifdef __EMSCRIPTEN__
+        struct timeval start, stop;
+        gettimeofday(&start, 0);
+#endif
+        diagnoseProject();
+#ifdef __EMSCRIPTEN__
+        gettimeofday(&stop, 0);
+        double delay =
+          (stop.tv_sec  - start.tv_sec) +
+          (stop.tv_usec - start.tv_usec)/1000000.0;
+        std::cerr << "Refreshed project in " << delay << " seconds" << std::endl;
+#endif
+      }
+    }
+
     void poll() {
+      refresh();
 #ifdef __EMSCRIPTEN__
       int usage = EM_ASM_INT({ return HEAPU8.length; });
       std::cerr << "One second expired; using " << usage << " bytes of memory" << std::endl;
-#else
-      std::cerr << "One second expired" << std::endl;
 #endif
     }
 
@@ -430,8 +448,7 @@ private:
       rootUri = receivedMessage.get("params").get("rootUri").value;
       sendMessage(message);
 
-      if (!isCrashed)
-        diagnoseProject();
+      needsUpdate = true;
     }
 
     void initialized(JAST _) { }
@@ -622,6 +639,8 @@ private:
 
       std::sort(definitions.begin(), definitions.end());
       fillDefinitionDocumentationFields();
+
+      needsUpdate = false;
     }
 
     static SymbolKind getSymbolKind(const char *name, const std::string& type) {
@@ -755,6 +774,7 @@ private:
     }
 
     void goToDefinition(JAST receivedMessage) {
+      refresh();
       Location locationToDefine = getLocationFromJSON(receivedMessage);
       for (const Use &use: uses) {
         if (use.use.contains(locationToDefine)) {
@@ -807,6 +827,7 @@ private:
     }
 
     void findReportReferences(JAST receivedMessage) {
+      refresh();
       Location definitionLocation = getLocationFromJSON(receivedMessage);
       bool isDefinitionFound = false;
       std::vector<Location> references;
@@ -833,6 +854,7 @@ private:
     }
 
     void highlightOccurrences(JAST receivedMessage) {
+      refresh();
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
       bool isDefinitionFound = false;
@@ -885,6 +907,7 @@ private:
     }
 
     void hover(JAST receivedMessage) {
+      refresh();
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
 
@@ -911,6 +934,7 @@ private:
     }
 
     void documentSymbol(JAST receivedMessage) {
+      refresh();
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
       JAST message = createResponseMessage(std::move(receivedMessage));
@@ -929,6 +953,7 @@ private:
     }
 
     void workspaceSymbol(JAST receivedMessage) {
+      refresh();
       std::string query = receivedMessage.get("params").get("query").value;
       JAST message = createResponseMessage(std::move(receivedMessage));
       JAST &result = message.add("result", JSON_ARRAY);
@@ -972,6 +997,7 @@ private:
     }
 
     void rename(JAST receivedMessage) {
+      refresh();
       std::string newName = receivedMessage.get("params").get("newName").value;
       if (newName.find(' ') != std::string::npos || (newName[0] >= '0' && newName[0] <= '9')) {
         sendErrorMessage(receivedMessage, InvalidParams, "The given name is invalid.");
@@ -989,8 +1015,7 @@ private:
     }
 
     void didOpen(JAST _) {
-      if (!isCrashed)
-        diagnoseProject();
+      needsUpdate = true;
     }
 
     std::string stripRootUri(const std::string &fileUri) {
@@ -1006,8 +1031,7 @@ private:
       std::string fileName = stripRootUri(fileUri);
       if (fileName.empty()) return;
       files[fileName] = std::unique_ptr<FileContent>(new StringFile(fileName.c_str(), std::move(fileContent)));
-      if (!isCrashed)
-        diagnoseProject();
+      needsUpdate = true;
     }
 
     void didSave(JAST receivedMessage) {
@@ -1019,13 +1043,13 @@ private:
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       files.erase(stripRootUri(fileUri));
 
-      if (!isCrashed)
-        diagnoseProject();
+      needsUpdate = true;
     }
 
     void didClose(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       files.erase(stripRootUri(fileUri));
+      needsUpdate = true;
     }
 
     void didChangeWatchedFiles(JAST receivedMessage) {
@@ -1034,8 +1058,7 @@ private:
         std::string fileUri = child.second.get("uri").value;
         files.erase(stripRootUri(fileUri));
       }
-      if (!isCrashed)
-        diagnoseProject();
+      needsUpdate = true;
     }
 
     void shutdown(JAST receivedMessage) {
