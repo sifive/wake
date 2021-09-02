@@ -668,11 +668,31 @@ int WAI_PREFIX(getModulePath)(char* out, int capacity, int* dirname_length)
 
 #elif defined(__EMSCRIPTEN__)
 
+#include <emscripten/emscripten.h>
+#include <string.h>
+
 WAI_NOINLINE
 WAI_FUNCSPEC
 int WAI_PREFIX(getExecutablePath)(char* out, int capacity, int* dirname_length)
 {
-  return -1;
+  char *path = (char*)EM_ASM_INT({
+    const path = require('path');
+    buffer = path.dirname(__filename);
+    let lengthBytes = lengthBytesUTF8(buffer)+1;
+    let stringOnWasmHeap = _malloc(lengthBytes);
+    stringToUTF8(buffer, stringOnWasmHeap, lengthBytes);
+    return stringOnWasmHeap;
+  });
+  int length = strlen(path);
+  if (dirname_length) *dirname_length = length;
+  if (length > capacity) {
+    free(path);
+    return length;
+  } else {
+    memcpy(out, path, length+1);
+    free(path);
+    return length;
+  }
 }
 
 #else
