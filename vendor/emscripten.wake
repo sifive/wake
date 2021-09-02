@@ -62,10 +62,17 @@ def emmake =
         None
 
 def emscriptenCFlags =
-    "-Wall", "-O2", Nil
+    "-Wall", "-O3", Nil
 
 def emscriptenLFlags =
-    "-s", "NODERAWFS=1", "-s", "ALLOW_MEMORY_GROWTH=1", Nil
+    "-O3",
+    "-lnodefs.js",
+    "-s", "ALLOW_MEMORY_GROWTH",
+    "-s", "EXIT_RUNTIME",
+    "-s", "ASYNCIFY",
+    "-s", "ASYNCIFY_IGNORE_INDIRECT",
+    "-s", 'ASYNCIFY_IMPORTS=["nodejs_getstdin"]',
+    Nil
 
 publish compileC =
     emccFn (makeCompileC "wasm-c11-release"   _ (c11Flags ++ emscriptenCFlags))
