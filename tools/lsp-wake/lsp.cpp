@@ -178,6 +178,7 @@ private:
     bool isInitialized = false;
     bool isCrashed = false;
     bool needsUpdate = false;
+    int ignoredCount = 0;
     std::string crashedFlagFilename = ".lsp-wake.lock";
     bool isShutDown = false;
     std::string stdLib;
@@ -312,6 +313,7 @@ private:
     }
 
     void refresh(const std::string &why) {
+      ignoredCount = 0;
       if (needsUpdate && !isCrashed) {
 #ifdef __EMSCRIPTEN__
         struct timeval start, stop;
@@ -847,9 +849,15 @@ private:
     }
 
     void highlightOccurrences(JAST receivedMessage) {
+      if (needsUpdate) {
+        if (++ignoredCount > 2) {
+          refresh("highlight");
+        } else {
 #ifdef __EMSCRIPTEN__
-      if (needsUpdate) std::cerr << "Opting not to refresh code for highlight request" << std::endl;
+          std::cerr << "Opting not to refresh code for highlight request" << std::endl;
 #endif
+        }
+      }
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
       bool isDefinitionFound = false;
@@ -902,9 +910,15 @@ private:
     }
 
     void hover(JAST receivedMessage) {
+      if (needsUpdate) {
+        if (++ignoredCount > 2) {
+          refresh("hover");
+        } else {
 #ifdef __EMSCRIPTEN__
-      if (needsUpdate) std::cerr << "Opting not to refresh code for hover request" << std::endl;
+          std::cerr << "Opting not to refresh code for hover request" << std::endl;
 #endif
+        }
+      }
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
 
@@ -931,9 +945,15 @@ private:
     }
 
     void documentSymbol(JAST receivedMessage) {
+      if (needsUpdate) {
+        if (++ignoredCount > 2) {
+          refresh("document-symbol");
+        } else {
 #ifdef __EMSCRIPTEN__
-      if (needsUpdate) std::cerr << "Opting not to refresh code for document-symbol request" << std::endl;
+          std::cerr << "Opting not to refresh code for document-symbol request" << std::endl;
 #endif
+        }
+      }
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
       JAST message = createResponseMessage(std::move(receivedMessage));
@@ -1014,7 +1034,7 @@ private:
     }
 
     void didOpen(JAST _) {
-      needsUpdate = true;
+      // no refresh should be needed
     }
 
     std::string stripRootUri(const std::string &fileUri) {
@@ -1031,6 +1051,7 @@ private:
       if (fileName.empty()) return;
       changedFiles[fileName] = std::unique_ptr<StringFile>(new StringFile(fileName.c_str(), std::move(fileContent)));
       needsUpdate = true;
+      ignoredCount = 0;
     }
 
     void didSave(JAST receivedMessage) {
@@ -1042,22 +1063,30 @@ private:
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       changedFiles.erase(stripRootUri(fileUri));
 
+      // Might have replaced a file modified on disk
       needsUpdate = true;
+      refresh("file-save");
     }
 
     void didClose(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      changedFiles.erase(stripRootUri(fileUri));
-      needsUpdate = true;
+      if (changedFiles.erase(stripRootUri(fileUri)) > 0) {
+        needsUpdate = true;
+        refresh("modified-file-closed");
+      }
     }
 
     void didChangeWatchedFiles(JAST receivedMessage) {
       JAST jfiles = receivedMessage.get("params").get("changes");
+      size_t changed = 0;
       for (auto child: jfiles.children) {
         std::string fileUri = child.second.get("uri").value;
-        changedFiles.erase(stripRootUri(fileUri));
+        changed += changedFiles.erase(stripRootUri(fileUri));
       }
-      needsUpdate = true;
+      if (changed) {
+        needsUpdate = true;
+        refresh("watch-list-updated");
+      }
     }
 
     void shutdown(JAST receivedMessage) {
