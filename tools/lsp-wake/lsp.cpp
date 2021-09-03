@@ -67,7 +67,7 @@ EM_ASYNC_JS(char *, nodejs_getstdin, (), {
   let eof = await new Promise(resolve => {
     let timeout = setTimeout(() => {
       complete(false);
-    }, 1000);
+    }, 2000);
     function gotData(input) {
       buffer = input;
       complete(false);
@@ -178,18 +178,11 @@ private:
     bool isInitialized = false;
     bool isCrashed = false;
     bool needsUpdate = false;
+    int ignoredCount = 0;
     std::string crashedFlagFilename = ".lsp-wake.lock";
     bool isShutDown = false;
     std::string stdLib;
-    struct FileInfo {
-      std::unique_ptr<FileContent> file;
-      bool modified;
-      FileInfo() : modified(false) { }
-      FileInfo(std::unique_ptr<FileContent> &&file_, bool modified_) : file(std::move(file_)), modified(modified_) { }
-      FileInfo(FileInfo &&other) = default;
-      FileInfo &operator = (FileInfo &&other) = default;
-    };
-    std::map<std::string, FileInfo> files;
+    std::map<std::string, std::unique_ptr<StringFile>> changedFiles;
     struct Use {
         Location use;
         Location def;
@@ -286,7 +279,7 @@ private:
         FD_SET(STDIN_FILENO, &rfds);
 
         struct timeval tv;
-        tv.tv_sec = 1;
+        tv.tv_sec = 2;
         tv.tv_usec = 0;
 
         int ret = select(STDIN_FILENO+1, &rfds, nullptr, nullptr, &tv);
@@ -320,6 +313,7 @@ private:
     }
 
     void refresh(const std::string &why) {
+      ignoredCount = 0;
       if (needsUpdate && !isCrashed) {
 #ifdef __EMSCRIPTEN__
         struct timeval start, stop;
@@ -340,7 +334,7 @@ private:
       refresh("timeout");
 #ifdef __EMSCRIPTEN__
       int usage = EM_ASM_INT({ return HEAPU8.length; });
-      std::cerr << "One second expired; using " << usage << " bytes of memory" << std::endl;
+      std::cerr << "Two second heart-beat; using " << usage << " bytes of memory" << std::endl;
 #endif
     }
 
@@ -457,6 +451,7 @@ private:
       sendMessage(message);
 
       needsUpdate = true;
+      refresh("initialize");
     }
 
     void initialized(JAST _) { }
@@ -566,7 +561,7 @@ private:
 
       while (definitions_iterator != definitions.end() && comments_iterator != comments.end()) {
         if (definitions_iterator->location < comments_iterator->first) {
-          if (std::strcmp(lastCommentLocation.filename, definitions_iterator->location.filename) != 0) {
+          if (lastCommentLocation.filename != definitions_iterator->location.filename) {
             comment = "";
           }
           comment = sanitizeComment(comment);
@@ -574,7 +569,7 @@ private:
           comment = "";
           ++definitions_iterator;
         } else {
-          if (std::strcmp(lastCommentLocation.filename, comments_iterator->first.filename) != 0) {
+          if (lastCommentLocation.filename != comments_iterator->first.filename) {
             comment = "";
           }
           comment += comments_iterator->second;
@@ -605,29 +600,29 @@ private:
       top->def_package = "nothing";
       top->body = std::unique_ptr<Expr>(new VarRef(FRAGMENT_CPP_LINE, "Nil@wake"));
 
-      std::map<std::string, FileInfo> newFiles;
-      for (auto &file: allFiles) {
-        auto it = files.find(file);
-        FileContent *fcontent;
-        if (it == files.end() || !it->second.modified) {
-          // Re-read files that are not modified in the editor, because who knows what someone did in a terminal
-          fcontent = new ExternalFile(lspReporter, file.c_str());
-          newFiles[file] = FileInfo(std::unique_ptr<FileContent>(fcontent), false);
-        } else {
-          fcontent = it->second.file.get();
-          newFiles[file] = std::move(it->second);
-        }
-        CST cst(*fcontent, lspReporter);
-        CSTElement root = cst.root();
-        dst_top(cst.root(), *top);
+      std::vector<ExternalFile> externalFiles;
+      externalFiles.reserve(allFiles.size());
 
-        for (CSTElement topdef = root.firstChildElement(); !topdef.empty(); topdef.nextSiblingElement()) {
+      for (auto &filename: allFiles) {
+        auto it = changedFiles.find(filename);
+        FileContent *fcontent;
+        if (it == changedFiles.end()) {
+          // Re-read files that are not modified in the editor, because who knows what someone did in a terminal
+          externalFiles.emplace_back(lspReporter, filename.c_str());
+          fcontent = &externalFiles.back();
+        } else {
+          fcontent = it->second.get();
+        }
+
+        CST cst(*fcontent, lspReporter);
+        dst_top(cst.root(), *top);
+        for (CSTElement topdef = cst.root().firstChildElement(); !topdef.empty(); topdef.nextSiblingElement()) {
           if (topdef.id() == TOKEN_COMMENT || topdef.id() == TOKEN_NL) {
             comments.emplace_back(topdef.location(), topdef.segment().str());
           }
         }
       }
-      files = std::move(newFiles);
+
       flatten_exports(*top);
 
       for (auto &p : top->packages) {
@@ -764,22 +759,13 @@ private:
       sendMessage(message);
     }
 
-    const char *findURI(const std::string &fileURI) {
-      const char *filePtr = nullptr;
-      for (auto &file: files) {
-        if (fileURI.compare(rootUri.length() + 1, std::string::npos, file.second.file->filename()) == 0)
-          filePtr = file.second.file->filename();
-      }
-      return filePtr;
-    }
-
     Location getLocationFromJSON(JAST receivedMessage) {
       std::string fileURI = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string filePath = fileURI.substr(rootUri.length() + 1, std::string::npos);
 
       int row = stoi(receivedMessage.get("params").get("position").get("line").value);
       int column = stoi(receivedMessage.get("params").get("position").get("character").value);
-      return{findURI(fileURI), Coordinates(row + 1, column + 1), Coordinates(row + 1, column)};
+      return Location(stripRootUri(fileURI).c_str(), Coordinates(row + 1, column + 1), Coordinates(row + 1, column));
     }
 
     void goToDefinition(JAST receivedMessage) {
@@ -863,7 +849,15 @@ private:
     }
 
     void highlightOccurrences(JAST receivedMessage) {
-      refresh("highlight");
+      if (needsUpdate) {
+        if (++ignoredCount > 2) {
+          refresh("highlight");
+        } else {
+#ifdef __EMSCRIPTEN__
+          std::cerr << "Opting not to refresh code for highlight request" << std::endl;
+#endif
+        }
+      }
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
       bool isDefinitionFound = false;
@@ -916,7 +910,15 @@ private:
     }
 
     void hover(JAST receivedMessage) {
-      refresh("hover");
+      if (needsUpdate) {
+        if (++ignoredCount > 2) {
+          refresh("hover");
+        } else {
+#ifdef __EMSCRIPTEN__
+          std::cerr << "Opting not to refresh code for hover request" << std::endl;
+#endif
+        }
+      }
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
 
@@ -943,7 +945,15 @@ private:
     }
 
     void documentSymbol(JAST receivedMessage) {
-      refresh("document-symbol");
+      if (needsUpdate) {
+        if (++ignoredCount > 2) {
+          refresh("document-symbol");
+        } else {
+#ifdef __EMSCRIPTEN__
+          std::cerr << "Opting not to refresh code for document-symbol request" << std::endl;
+#endif
+        }
+      }
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
       JAST message = createResponseMessage(std::move(receivedMessage));
@@ -1024,7 +1034,7 @@ private:
     }
 
     void didOpen(JAST _) {
-      needsUpdate = true;
+      // no refresh should be needed
     }
 
     std::string stripRootUri(const std::string &fileUri) {
@@ -1039,8 +1049,9 @@ private:
       std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
       std::string fileName = stripRootUri(fileUri);
       if (fileName.empty()) return;
-      files[fileName] = FileInfo(std::unique_ptr<FileContent>(new StringFile(fileName.c_str(), std::move(fileContent))), true);
+      changedFiles[fileName] = std::unique_ptr<StringFile>(new StringFile(fileName.c_str(), std::move(fileContent)));
       needsUpdate = true;
+      ignoredCount = 0;
     }
 
     void didSave(JAST receivedMessage) {
@@ -1050,24 +1061,32 @@ private:
       }
 
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      files.erase(stripRootUri(fileUri));
+      changedFiles.erase(stripRootUri(fileUri));
 
+      // Might have replaced a file modified on disk
       needsUpdate = true;
+      refresh("file-save");
     }
 
     void didClose(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      files.erase(stripRootUri(fileUri));
-      needsUpdate = true;
+      if (changedFiles.erase(stripRootUri(fileUri)) > 0) {
+        needsUpdate = true;
+        refresh("modified-file-closed");
+      }
     }
 
     void didChangeWatchedFiles(JAST receivedMessage) {
       JAST jfiles = receivedMessage.get("params").get("changes");
+      size_t changed = 0;
       for (auto child: jfiles.children) {
         std::string fileUri = child.second.get("uri").value;
-        files.erase(stripRootUri(fileUri));
+        changed += changedFiles.erase(stripRootUri(fileUri));
       }
-      needsUpdate = true;
+      if (changed) {
+        needsUpdate = true;
+        refresh("watch-list-updated");
+      }
     }
 
     void shutdown(JAST receivedMessage) {

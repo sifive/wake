@@ -112,16 +112,16 @@ struct ResolveBinding {
   ResolveBinding(ResolveBinding *parent_)
    : parent(parent_), current_index(0), depth(parent_?parent_->depth+1:0) { }
 
-  void qualify_def(std::string &name, const Location &location) {
+  void qualify_def(std::string &name, const FileFragment &fragment) {
     SymbolSource *override = nullptr;
     for (auto sym : symbols) {
       auto it = sym->defs.find(name);
       if (it != sym->defs.end()) {
         if (override && it->second.qualified != override->qualified) {
-          WARNING(location,
+          WARNING(fragment.location(),
             "reference '" << name
-            << "' is ambiguous; definition imported from both " << it->second.location
-            << " and " << override->location);
+            << "' is ambiguous; definition imported from both " << it->second.fragment.location()
+            << " and " << override->fragment.location());
         }
         override = &it->second;
       }
@@ -129,16 +129,16 @@ struct ResolveBinding {
     if (override) name = override->qualified;
   }
 
-  bool qualify_topic(std::string &name, const Location &location) {
+  bool qualify_topic(std::string &name, const FileFragment &fragment) {
     SymbolSource *override = nullptr;
     for (auto sym : symbols) {
       auto it = sym->topics.find(name);
       if (it != sym->topics.end()) {
         if (override && it->second.qualified != override->qualified) {
-          WARNING(location,
+          WARNING(fragment.location(),
             "reference '" << name
-            << "' is ambiguous; topic imported from both " << it->second.location
-            << " and " << override->location);
+            << "' is ambiguous; topic imported from both " << it->second.fragment.location()
+            << " and " << override->fragment.location());
         }
         override = &it->second;
       }
@@ -147,16 +147,16 @@ struct ResolveBinding {
     return override;
   }
 
-  bool qualify_type(std::string &name, const Location &location) {
+  bool qualify_type(std::string &name, const FileFragment &fragment) {
     SymbolSource *override = nullptr;
     for (auto sym : symbols) {
       auto it = sym->types.find(name);
       if (it != sym->types.end()) {
         if (override && it->second.qualified != override->qualified) {
-          WARNING(location,
+          WARNING(fragment.location(),
             "refernce '" << name
-            << "' is ambiguous; type imported from both " << it->second.location
-            << " and " << override->location);
+            << "' is ambiguous; type imported from both " << it->second.fragment.location()
+            << " and " << override->fragment.location());
         }
         override = &it->second;
       }
@@ -280,10 +280,10 @@ static bool reference_map(ResolveBinding *binding, const std::string &name) {
   }
 }
 
-static bool rebind_ref(ResolveBinding *binding, std::string &name, const Location &location) {
+static bool rebind_ref(ResolveBinding *binding, std::string &name, const FileFragment &fragment) {
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
-    iter->qualify_def(name, location);
+    iter->qualify_def(name, fragment);
     if (reference_map(iter, name)) return true;
   }
   return false;
@@ -292,7 +292,7 @@ static bool rebind_ref(ResolveBinding *binding, std::string &name, const Locatio
 static VarRef *rebind_subscribe(ResolveBinding *binding, const FileFragment &fragment, std::string &name) {
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
-    if (iter->qualify_topic(name, fragment.location())) break;
+    if (iter->qualify_topic(name, fragment)) break;
   }
   if (!iter) {
     ERROR(fragment.location(), "subscribe to non-existent topic '" << name << "'");
@@ -305,7 +305,7 @@ static std::string rebind_publish(ResolveBinding *binding, const FileFragment &f
   std::string name(key);
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
-    if (iter->qualify_topic(name, fragment.location())) break;
+    if (iter->qualify_topic(name, fragment)) break;
   }
   if (!iter) {
     ERROR(fragment.location(), "publish to non-existent topic '" << name << "'");
@@ -585,7 +585,7 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
     if (ast.name.empty()) {
       out.sum = multiarg;
     } else for (ResolveBinding *iter = binding; iter; iter = iter->parent) {
-      iter->qualify_def(ast.name, ast.token.location());
+      iter->qualify_def(ast.name, ast.token);
       auto it = iter->index.find(ast.name);
       if (it != iter->index.end()) {
         Expr *cons = iter->defs[it->second].expr.get();
@@ -725,7 +725,7 @@ struct SymMover {
     if (it == top.packages.end()) {
       warn = false;
       package = nullptr;
-      WARNING(sym.second.location,
+      WARNING(sym.second.fragment.location(),
         "import of " << kind << " '" << def
         << "' from non-existent package '" << pkg << "'");
     } else {
@@ -736,7 +736,7 @@ struct SymMover {
 
   ~SymMover() {
     if (warn) {
-      WARNING(sym.second.location,
+      WARNING(sym.second.fragment.location(),
         kind << " '" << def << "' is not exported by package '" << package->name << "'");
     }
   }
@@ -815,7 +815,7 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, FileFrag
 static bool qualify_type(ResolveBinding *binding, std::string &name, const FileFragment &fragment) {
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
-    if (iter->qualify_type(name, fragment.location())) break;
+    if (iter->qualify_type(name, fragment)) break;
   }
 
   if (iter) {
@@ -840,7 +840,7 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
   if (expr->type == &VarRef::type) {
     VarRef *ref = static_cast<VarRef*>(expr.get());
     // don't fail if unbound; leave that for the second pass
-    rebind_ref(binding, ref->name, ref->fragment.location());
+    rebind_ref(binding, ref->name, ref->fragment);
     return expr;
   } else if (expr->type == &Subscribe::type) {
     Subscribe *sub = static_cast<Subscribe*>(expr.get());
@@ -1481,7 +1481,7 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
 
   if ((sym.flags & SYM_GRAY) != 0) {
     if (con.warn) {
-      ERROR(sym.location,
+      ERROR(sym.fragment.location(),
         "export of " << con.kind << " '" << def
         << "' from '" << pkg << "' has cyclic definition");
     }
@@ -1491,7 +1491,7 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
   auto ip = con.top.packages.find(pkg);
   if (ip == con.top.packages.end()) {
     if (con.warn) {
-      ERROR(sym.location,
+      ERROR(sym.fragment.location(),
         "export of " << con.kind << " '" << def
         << "' from non-existent package '" << pkg << "'");
     }
@@ -1501,7 +1501,7 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
     auto ie = map.find(def);
     if (ie == map.end()) {
       if (con.warn) {
-        ERROR(sym.location,
+        ERROR(sym.fragment.location(),
           con.kind << " '" << def << "' is not exported by package '" << pkg << "'");
       }
       return false;

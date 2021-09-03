@@ -132,7 +132,7 @@ static std::string pad(int depth) {
   return std::string(depth, ' ');
 }
 
-RFun::RFun(const RFun &o, TargetScope &scope, size_t id) : Term(o), location(o.location), output(o.output) {
+RFun::RFun(const RFun &o, TargetScope &scope, size_t id) : Term(o), fragment(o.fragment), output(o.output) {
   terms.reserve(o.terms.size());
   for (auto &x : o.terms)
     terms.emplace_back(x->clone(scope, id));
@@ -153,7 +153,7 @@ size_t RFun::args() const {
 void RFun::format(std::ostream &os, TermFormat &format) const {
   format.depth += 2;
   size_t index = 0;
-  os << "Fun(" << location << "):" << std::endl;
+  os << "Fun(" << fragment.location() << "):" << std::endl;
   if (!escapes.empty()) {
     os << pad(format.depth) << "escapes:";
     for (auto x : escapes)
