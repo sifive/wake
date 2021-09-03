@@ -449,6 +449,7 @@ private:
       sendMessage(message);
 
       needsUpdate = true;
+      refresh("initialize");
     }
 
     void initialized(JAST _) { }
@@ -846,7 +847,9 @@ private:
     }
 
     void highlightOccurrences(JAST receivedMessage) {
-      refresh("highlight");
+#ifdef __EMSCRIPTEN__
+      if (needsUpdate) std::cerr << "Opting not to refresh code for highlight request" << std::endl;
+#endif
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
       bool isDefinitionFound = false;
@@ -899,7 +902,9 @@ private:
     }
 
     void hover(JAST receivedMessage) {
-      refresh("hover");
+#ifdef __EMSCRIPTEN__
+      if (needsUpdate) std::cerr << "Opting not to refresh code for hover request" << std::endl;
+#endif
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
 
@@ -926,7 +931,9 @@ private:
     }
 
     void documentSymbol(JAST receivedMessage) {
-      refresh("document-symbol");
+#ifdef __EMSCRIPTEN__
+      if (needsUpdate) std::cerr << "Opting not to refresh code for document-symbol request" << std::endl;
+#endif
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
       JAST message = createResponseMessage(std::move(receivedMessage));
