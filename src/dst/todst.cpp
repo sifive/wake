@@ -48,53 +48,6 @@ static std::string getIdentifier(CSTElement element) {
   return relex_id(ti.start, ti.end);
 }
 
-/*
-
-static AST dst_type_def(Lexer &lex) {
-  lex.consume();
-
-  ASTState state(false, false);
-  AST def = dst_ast(0, lex, state);
-  if (check_constructors(def)) lex.fail = true;
-  if (!def) return def;
-
-  if (def.name == "_" || Lexer::isLower(def.name.c_str())) {
-    std::ostringstream message;
-    message << "Type name must be upper-case or operator, not "
-      << def.name << " at "
-      << def.token.file();
-    reporter->reportError(def.token, message.str());
-    lex.fail = true;
-  }
-
-  std::set<std::string> args;
-  for (auto &x : def.args) {
-    if (!Lexer::isLower(x.name.c_str())) {
-      std::ostringstream message;
-      message << "Type argument must be lower-case, not "
-        << x.name << " at "
-        << x.token.file();
-      reporter->reportError(x.token, message.str());
-      lex.fail = true;
-    }
-    if (!args.insert(x.name).second) {
-      std::ostringstream message;
-      message << "Type argument "
-        << x.name << " occurs more than once at "
-        << x.token.file();
-      reporter->reportError(x.token, message.str());
-      lex.fail = true;
-    }
-  }
-
-  if (expect(EQUALS, lex)) lex.consume();
-
-  return def;
-}
-
-
-*/
-
 static void dst_package(CSTElement topdef, Package &package) {
   CSTElement child = topdef.firstChildNode();
   std::string id = getIdentifier(child);
@@ -454,7 +407,7 @@ static void dst_data(CSTElement topdef, Package &package, Symbols *globals) {
   CSTElement child = topdef.firstChildNode();
   TopFlags flags = dst_flags(child);
 
-  auto sump = std::make_shared<Sum>(dst_type(child)); // !!! check dst_type_def coverage
+  auto sump = std::make_shared<Sum>(dst_type(child));
   if (sump->args.empty() && lex_kind(sump->name) == LOWER) ERROR(child.fragment().location(), "data type '" << sump->name << "' must be upper-case or operator");
   child.nextSiblingNode();
 
@@ -486,7 +439,7 @@ static void dst_tuple(CSTElement topdef, Package &package, Symbols *globals) {
   bool exportt = flags.exportf; // we export the type if any member is exported
   bool globalt = flags.globalf;
 
-  auto sump = std::make_shared<Sum>(dst_type(child)); // !!! check dst_type_def coverage
+  auto sump = std::make_shared<Sum>(dst_type(child));
   if (lex_kind(sump->name) != UPPER) ERROR(child.fragment().location(), "tuple type '" << sump->name << "' must be upper-case");
   child.nextSiblingNode();
 
