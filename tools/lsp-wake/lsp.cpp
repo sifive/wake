@@ -181,7 +181,15 @@ private:
     std::string crashedFlagFilename = ".lsp-wake.lock";
     bool isShutDown = false;
     std::string stdLib;
-    std::map<std::string, std::unique_ptr<FileContent>> files;
+    struct FileInfo {
+      std::unique_ptr<FileContent> file;
+      bool modified;
+      FileInfo() : modified(false) { }
+      FileInfo(std::unique_ptr<FileContent> &&file_, bool modified_) : file(std::move(file_)), modified(modified_) { }
+      FileInfo(FileInfo &&other) = default;
+      FileInfo &operator = (FileInfo &&other) = default;
+    };
+    std::map<std::string, FileInfo> files;
     struct Use {
         Location use;
         Location def;
@@ -597,15 +605,16 @@ private:
       top->def_package = "nothing";
       top->body = std::unique_ptr<Expr>(new VarRef(FRAGMENT_CPP_LINE, "Nil@wake"));
 
-      std::map<std::string, std::unique_ptr<FileContent>> newFiles;
+      std::map<std::string, FileInfo> newFiles;
       for (auto &file: allFiles) {
         auto it = files.find(file);
         FileContent *fcontent;
-        if (it == files.end()) {
+        if (it == files.end() || !it->second.modified) {
+          // Re-read files that are not modified in the editor, because who knows what someone did in a terminal
           fcontent = new ExternalFile(lspReporter, file.c_str());
-          newFiles[file] = std::unique_ptr<FileContent>(fcontent);
+          newFiles[file] = FileInfo(std::unique_ptr<FileContent>(fcontent), false);
         } else {
-          fcontent = it->second.get();
+          fcontent = it->second.file.get();
           newFiles[file] = std::move(it->second);
         }
         CST cst(*fcontent, lspReporter);
@@ -758,8 +767,8 @@ private:
     const char *findURI(const std::string &fileURI) {
       const char *filePtr = nullptr;
       for (auto &file: files) {
-        if (fileURI.compare(rootUri.length() + 1, std::string::npos, file.second->filename()) == 0)
-          filePtr = file.second->filename();
+        if (fileURI.compare(rootUri.length() + 1, std::string::npos, file.second.file->filename()) == 0)
+          filePtr = file.second.file->filename();
       }
       return filePtr;
     }
@@ -1030,7 +1039,7 @@ private:
       std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
       std::string fileName = stripRootUri(fileUri);
       if (fileName.empty()) return;
-      files[fileName] = std::unique_ptr<FileContent>(new StringFile(fileName.c_str(), std::move(fileContent)));
+      files[fileName] = FileInfo(std::unique_ptr<FileContent>(new StringFile(fileName.c_str(), std::move(fileContent))), true);
       needsUpdate = true;
     }
 
