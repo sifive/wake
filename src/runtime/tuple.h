@@ -22,7 +22,6 @@
 
 #include "runtime.h"
 
-struct Location;
 struct Constructor;
 
 struct alignas(PadObject) Promise {

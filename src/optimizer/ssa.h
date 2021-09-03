@@ -251,15 +251,15 @@ struct RCon final : public Redux {
 };
 
 struct RFun final : public Term {
-  Location location;
+  FileFragment fragment;
   Hash hash; // unique function identifier
   size_t output; // output can refer to a non-member Term
   std::vector<std::unique_ptr<Term> > terms;
   std::vector<size_t> escapes;
 
   RFun(const RFun &o, TargetScope &scope, size_t id);
-  RFun(const Location &location_, const char *label_, size_t flags_, size_t output_ = Term::invalid)
-   : Term(label_, flags_), location(location_), output(output_) { }
+  RFun(const FileFragment &fragment_, const char *label_, size_t flags_, size_t output_ = Term::invalid)
+   : Term(label_, flags_), fragment(fragment_), output(output_) { }
 
   void update(const SourceMap &map);
   size_t args() const;

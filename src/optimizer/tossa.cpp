@@ -28,6 +28,8 @@
 #include "runtime/value.h"
 #include "runtime/runtime.h"
 
+static CPPFile cppFile(__FILE__);
+
 struct TermStack {
   Expr  *expr;
   TermStack *next;
@@ -79,7 +81,7 @@ static void doit(ToSSACommon common, TermStack *stack, Expr *expr) {
   } else if (expr->type == &Lambda::type) {
     Lambda *lambda = static_cast<Lambda*>(expr);
     size_t flags = (lambda->flags & FLAG_RECURSIVE) ? SSA_RECURSIVE : 0;
-    RFun *fun = new RFun(lambda->body->fragment.location(), lambda->fnname.empty() ? "anon" : lambda->fnname.c_str(), flags);
+    RFun *fun = new RFun(lambda->body->fragment, lambda->fnname.empty() ? "anon" : lambda->fnname.c_str(), flags);
     lambda->meta = common.scope.append(fun);
     size_t cp = common.scope.append(new RArg(lambda->name.c_str()));
     doit(common, &frame, lambda->body.get());
@@ -94,11 +96,11 @@ static void doit(ToSSACommon common, TermStack *stack, Expr *expr) {
       if (j == i+1) {
         doit(common, &frame, def->fun[i].get());
       } else {
-        RFun *mutual = new RFun(LOCATION, "mutual", SSA_RECURSIVE);
+        RFun *mutual = new RFun(FRAGMENT_CPP_LINE, "mutual", SSA_RECURSIVE);
         size_t mid = common.scope.append(mutual);
         size_t mcp = common.scope.append(new RArg("_"));
         for (j = i; j < def->fun.size() && scc == def->scc[j]; ++j) {
-          RFun *proxy = new RFun(def->fun[j]->body->fragment.location(), "proxy", 0);
+          RFun *proxy = new RFun(def->fun[j]->body->fragment, "proxy", 0);
           def->fun[j]->meta = common.scope.append(proxy);
           size_t x = common.scope.append(new RArg("_"));
           size_t a = common.scope.append(new RApp(mid, mid));
@@ -180,7 +182,7 @@ static void doit(ToSSACommon common, TermStack *stack, Expr *expr) {
 std::unique_ptr<Term> Term::fromExpr(std::unique_ptr<Expr> expr, Runtime &runtime) {
   TargetScope scope;
   ToSSACommon common(runtime, scope);
-  RFun *out = new RFun(LOCATION, "top", 0);
+  RFun *out = new RFun(FRAGMENT_CPP_LINE, "top", 0);
   size_t cp = scope.append(out);
   scope.append(new RArg("_"));
   doit(common, nullptr, expr.get());
