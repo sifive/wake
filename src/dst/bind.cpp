@@ -820,6 +820,8 @@ static bool qualify_type(ResolveBinding *binding, std::string &name, const FileF
 
   if (iter) {
     return true;
+  } else if (name == "BadType") {
+    return false;
   } else {
     ERROR(fragment.location(), "reference to undefined type '" << name << "'");
     return false;
