@@ -566,7 +566,7 @@ private:
 
       while (definitions_iterator != definitions.end() && comments_iterator != comments.end()) {
         if (definitions_iterator->location < comments_iterator->first) {
-          if (std::strcmp(lastCommentLocation.filename, definitions_iterator->location.filename) != 0) {
+          if (lastCommentLocation.filename != definitions_iterator->location.filename) {
             comment = "";
           }
           comment = sanitizeComment(comment);
@@ -574,7 +574,7 @@ private:
           comment = "";
           ++definitions_iterator;
         } else {
-          if (std::strcmp(lastCommentLocation.filename, comments_iterator->first.filename) != 0) {
+          if (lastCommentLocation.filename != comments_iterator->first.filename) {
             comment = "";
           }
           comment += comments_iterator->second;
