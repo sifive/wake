@@ -181,17 +181,17 @@ struct DefValue {
 #define SYM_GRAY 2 // currently exploring this symbol
 
 struct SymbolSource {
-  Location location;
+  FileFragment fragment;
   std::string qualified; // from@package
   long flags;
 
-  SymbolSource(const Location &location_, long flags_ = 0)
-   : location(location_), qualified(), flags(flags_) { }
-  SymbolSource(const Location &location_, const std::string &qualified_, long flags_ = 0)
-   : location(location_), qualified(qualified_), flags(flags_) { }
+  SymbolSource(const FileFragment &fragment_, long flags_ = 0)
+   : fragment(fragment_), qualified(), flags(flags_) { }
+  SymbolSource(const FileFragment &fragment_, const std::string &qualified_, long flags_ = 0)
+   : fragment(fragment_), qualified(qualified_), flags(flags_) { }
 
   SymbolSource clone(const std::string &qualified) const {
-    return SymbolSource(location, qualified, flags);
+    return SymbolSource(fragment, qualified, flags);
   }
 };
 

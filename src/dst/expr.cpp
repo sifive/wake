@@ -26,6 +26,7 @@
 #include "expr.h"
 
 CPPFile expr_h("src/dst/expr.h");
+static CPPFile cppFile(__FILE__);
 
 Expr::~Expr() { }
 const TypeDescriptor Prim      ::type("Prim");
@@ -51,16 +52,16 @@ Top::Top() : packages(), globals(), def_package(nullptr) {
   packages.insert(std::make_pair("builtin", std::unique_ptr<Package>(builtin)));
 
   // These types can be constructed by literals, so must always be in scope!
-  builtin->package.types.insert(std::make_pair("String",   SymbolSource(LOCATION, "String@builtin",   SYM_LEAF)));
-  builtin->package.types.insert(std::make_pair("Integer",  SymbolSource(LOCATION, "Integer@builtin",  SYM_LEAF)));
-  builtin->package.types.insert(std::make_pair("Double",   SymbolSource(LOCATION, "Double@builtin",   SYM_LEAF)));
-  builtin->package.types.insert(std::make_pair("RegExp",   SymbolSource(LOCATION, "RegExp@builtin",   SYM_LEAF)));
-  builtin->package.types.insert(std::make_pair("binary =>",SymbolSource(LOCATION, "binary =>@builtin",SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("String",   SymbolSource(FRAGMENT_CPP_LINE, "String@builtin",   SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("Integer",  SymbolSource(FRAGMENT_CPP_LINE, "Integer@builtin",  SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("Double",   SymbolSource(FRAGMENT_CPP_LINE, "Double@builtin",   SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("RegExp",   SymbolSource(FRAGMENT_CPP_LINE, "RegExp@builtin",   SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("binary =>",SymbolSource(FRAGMENT_CPP_LINE, "binary =>@builtin",SYM_LEAF)));
   globals = builtin->package;
 
   // These types come from the runtime.
-  builtin->package.types.insert(std::make_pair("Array",    SymbolSource(LOCATION, "Array@builtin",    SYM_LEAF)));
-  builtin->package.types.insert(std::make_pair("Job",      SymbolSource(LOCATION, "Job@builtin",      SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("Array",    SymbolSource(FRAGMENT_CPP_LINE, "Array@builtin",    SYM_LEAF)));
+  builtin->package.types.insert(std::make_pair("Job",      SymbolSource(FRAGMENT_CPP_LINE, "Job@builtin",      SYM_LEAF)));
   builtin->exports = builtin->package;
 }
 
@@ -137,16 +138,16 @@ static bool smap_join(Symbols::SymbolMap &dest, const Symbols::SymbolMap &src, c
     if (!it.second) {
       ok = false;
       if (scope) {
-        ERROR(sym.second.location,
+        ERROR(sym.second.fragment.location(),
           scope << " "
           << kind << " '"
           << sym.first << "' also defined at "
-          << it.first->second.location);
-        ERROR(it.first->second.location,
+          << it.first->second.fragment.location());
+        ERROR(it.first->second.fragment.location(),
           scope << " "
           << kind << " '"
           << sym.first << "' also defined at "
-          << sym.second.location);
+          << sym.second.fragment.location());
       }
     }
   }

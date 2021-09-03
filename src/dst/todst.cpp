@@ -189,8 +189,12 @@ static void dst_import(CSTElement topdef, DefMap &map) {
     if (idop1 == CST_OP) prefix_op(ia, name);
     if (idop2 == CST_OP) prefix_op(ia, source);
 
-    auto it = target->insert(std::make_pair(std::move(name), SymbolSource(child.fragment().location(), source)));
-    if (!it.second) ERROR(child.fragment().location(), kind << " '" << it.first->first << "' was previously imported at " << it.first->second.location);
+    auto it = target->insert(std::make_pair(std::move(name), SymbolSource(child.fragment(), source)));
+    if (!it.second) {
+      ERROR(child.fragment().location(),
+        kind << " '" << it.first->first
+        << "' was previously imported at " << it.first->second.fragment.location());
+    }
   }
 }
 
@@ -246,11 +250,15 @@ static void dst_export(CSTElement topdef, Package &package) {
     if (idop1 == CST_OP) prefix_op(ia, name);
     if (idop2 == CST_OP) prefix_op(ia, source);
 
-    exports->insert(std::make_pair(name, SymbolSource(child.fragment().location(), source)));
+    exports->insert(std::make_pair(name, SymbolSource(child.fragment(), source)));
     // duplciates will be detected as file-local
 
-    auto it = local->insert(std::make_pair(name, SymbolSource(child.fragment().location(), source)));
-    if (!it.second) ERROR(child.fragment().location(), kind << " '" << name << "' was previously defined at " << it.first->second.location);
+    auto it = local->insert(std::make_pair(name, SymbolSource(child.fragment(), source)));
+    if (!it.second) {
+      ERROR(child.fragment().location(),
+        kind << " '" << name
+        << "' was previously defined at " << it.first->second.fragment.location());
+    }
   }
 }
 
@@ -377,12 +385,14 @@ static void dst_topic(CSTElement topdef, Package &package, Symbols *globals) {
 
   auto it = file.topics.insert(std::make_pair(id, Topic(fragment, std::move(def))));
   if (!it.second) {
-    ERROR(fragment.location(), "topic '" << id << "' was previously defined at " << it.first->second.fragment.location());
+    ERROR(fragment.location(),
+      "topic '" << id
+      << "' was previously defined at " << it.first->second.fragment.location());
     return;
   }
 
-  if (flags.exportf) package.exports.topics.insert(std::make_pair(id, SymbolSource(fragment.location(), SYM_LEAF)));
-  if (flags.globalf) globals->topics.insert(std::make_pair(id, SymbolSource(fragment.location(), SYM_LEAF)));
+  if (flags.exportf) package.exports.topics.insert(std::make_pair(id, SymbolSource(fragment, SYM_LEAF)));
+  if (flags.globalf) globals->topics.insert(std::make_pair(id, SymbolSource(fragment, SYM_LEAF)));
 }
 
 struct Definition {
@@ -399,14 +409,14 @@ struct Definition {
 static void bind_global(const Definition &def, Symbols *globals) {
   if (!globals || def.name == "_") return;
 
-  globals->defs.insert(std::make_pair(def.name, SymbolSource(def.fragment.location(), SYM_LEAF)));
+  globals->defs.insert(std::make_pair(def.name, SymbolSource(def.fragment, SYM_LEAF)));
   // Duplicate globals will be detected as file-local conflicts
 }
 
 static void bind_export(const Definition &def, Symbols *exports) {
   if (!exports || def.name == "_") return;
 
-  exports->defs.insert(std::make_pair(def.name, SymbolSource(def.fragment.location(), SYM_LEAF)));
+  exports->defs.insert(std::make_pair(def.name, SymbolSource(def.fragment, SYM_LEAF)));
   // Duplicate exports will be detected as file-local conflicts
 }
 
@@ -421,15 +431,23 @@ static void bind_def(DefMap &map, Definition &&def, Symbols *exports, Symbols *g
   auto out = map.defs.insert(std::make_pair(std::move(def.name), DefValue(
     def.fragment, std::move(def.body), std::move(def.typeVars))));
 
-  if (!out.second) ERROR(l, "definition '" << out.first->first << "' was previously defined at " << out.first->second.body->fragment.location());
+  if (!out.second) {
+    ERROR(l,
+      "definition '" << out.first->first
+      << "' was previously defined at " << out.first->second.body->fragment.location());
+  }
 }
 
 static void bind_type(Package &package, const std::string &name, const FileFragment &fragment, Symbols *exports, Symbols *globals) {
-  if (globals) globals->types.insert(std::make_pair(name, SymbolSource(fragment.location(), SYM_LEAF)));
-  if (exports) exports->types.insert(std::make_pair(name, SymbolSource(fragment.location(), SYM_LEAF)));
+  if (globals) globals->types.insert(std::make_pair(name, SymbolSource(fragment, SYM_LEAF)));
+  if (exports) exports->types.insert(std::make_pair(name, SymbolSource(fragment, SYM_LEAF)));
 
-  auto it = package.package.types.insert(std::make_pair(name, SymbolSource(fragment.location(), SYM_LEAF)));
-  if (!it.second) ERROR(fragment.location(), "type '" << it.first->first << "' was previously defined at " << it.first->second.location);
+  auto it = package.package.types.insert(std::make_pair(name, SymbolSource(fragment, SYM_LEAF)));
+  if (!it.second) {
+    ERROR(fragment.location(),
+      "type '" << it.first->first
+      << "' was previously defined at " << it.first->second.fragment.location());
+  }
 }
 
 static void dst_data(CSTElement topdef, Package &package, Symbols *globals) {
@@ -1323,14 +1341,16 @@ const char *dst_top(CSTElement root, Top &top) {
   map.defs.clear();
   for (auto &def : defs) {
     auto name = def.first + "@" + package->name;
-    auto it = file.local.defs.insert(std::make_pair(def.first, SymbolSource(def.second.fragment.location(), name, SYM_LEAF)));
+    auto it = file.local.defs.insert(std::make_pair(def.first, SymbolSource(def.second.fragment, name, SYM_LEAF)));
     if (!it.second) {
       if (it.first->second.qualified == name) {
-        it.first->second.location = def.second.fragment.location();
+        it.first->second.fragment = def.second.fragment;
         it.first->second.flags |= SYM_LEAF;
         package->exports.defs.find(def.first)->second.flags |= SYM_LEAF;
       } else {
-        ERROR(def.second.fragment.location(), "definition '" << def.first << "' was previously defined at " << it.first->second.location);
+        ERROR(def.second.fragment.location(),
+          "definition '" << def.first
+          << "' was previously defined at " << it.first->second.fragment.location());
       }
     }
     map.defs.insert(std::make_pair(std::move(name), std::move(def.second)));
@@ -1339,14 +1359,16 @@ const char *dst_top(CSTElement root, Top &top) {
   // localize all topics
   for (auto &topic : file.topics) {
     auto name = topic.first + "@" + package->name;
-    auto it = file.local.topics.insert(std::make_pair(topic.first, SymbolSource(topic.second.fragment.location(), name, SYM_LEAF)));
+    auto it = file.local.topics.insert(std::make_pair(topic.first, SymbolSource(topic.second.fragment, name, SYM_LEAF)));
     if (!it.second) {
       if (it.first->second.qualified == name) {
-        it.first->second.location = topic.second.fragment.location();
+        it.first->second.fragment = topic.second.fragment;
         it.first->second.flags |= SYM_LEAF;
         package->exports.topics.find(topic.first)->second.flags |= SYM_LEAF;
       } else {
-        ERROR(topic.second.fragment.location(), "topic '" << topic.first << "' was previously defined at " << it.first->second.location);
+        ERROR(topic.second.fragment.location(),
+          "topic '" << topic.first
+          << "' was previously defined at " << it.first->second.fragment.location());
       }
     }
   }
@@ -1354,14 +1376,16 @@ const char *dst_top(CSTElement root, Top &top) {
   // localize all types
   for (auto &type : package->package.types) {
     auto name = type.first + "@" + package->name;
-    auto it = file.local.types.insert(std::make_pair(type.first, SymbolSource(type.second.location, name, SYM_LEAF)));
+    auto it = file.local.types.insert(std::make_pair(type.first, SymbolSource(type.second.fragment, name, SYM_LEAF)));
     if (!it.second) {
       if (it.first->second.qualified == name) {
-        it.first->second.location = type.second.location;
+        it.first->second.fragment = type.second.fragment;
         it.first->second.flags |= SYM_LEAF;
         package->exports.types.find(type.first)->second.flags |= SYM_LEAF;
       } else {
-        ERROR(type.second.location, "type '" << type.first << "' was previously defined at " << it.first->second.location);
+        ERROR(type.second.fragment.location(),
+          "type '" << type.first
+          << "' was previously defined at " << it.first->second.fragment.location());
       }
     }
   }

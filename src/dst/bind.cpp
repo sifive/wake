@@ -120,8 +120,8 @@ struct ResolveBinding {
         if (override && it->second.qualified != override->qualified) {
           WARNING(location,
             "reference '" << name
-            << "' is ambiguous; definition imported from both " << it->second.location
-            << " and " << override->location);
+            << "' is ambiguous; definition imported from both " << it->second.fragment.location()
+            << " and " << override->fragment.location());
         }
         override = &it->second;
       }
@@ -137,8 +137,8 @@ struct ResolveBinding {
         if (override && it->second.qualified != override->qualified) {
           WARNING(location,
             "reference '" << name
-            << "' is ambiguous; topic imported from both " << it->second.location
-            << " and " << override->location);
+            << "' is ambiguous; topic imported from both " << it->second.fragment.location()
+            << " and " << override->fragment.location());
         }
         override = &it->second;
       }
@@ -155,8 +155,8 @@ struct ResolveBinding {
         if (override && it->second.qualified != override->qualified) {
           WARNING(location,
             "refernce '" << name
-            << "' is ambiguous; type imported from both " << it->second.location
-            << " and " << override->location);
+            << "' is ambiguous; type imported from both " << it->second.fragment.location()
+            << " and " << override->fragment.location());
         }
         override = &it->second;
       }
@@ -725,7 +725,7 @@ struct SymMover {
     if (it == top.packages.end()) {
       warn = false;
       package = nullptr;
-      WARNING(sym.second.location,
+      WARNING(sym.second.fragment.location(),
         "import of " << kind << " '" << def
         << "' from non-existent package '" << pkg << "'");
     } else {
@@ -736,7 +736,7 @@ struct SymMover {
 
   ~SymMover() {
     if (warn) {
-      WARNING(sym.second.location,
+      WARNING(sym.second.fragment.location(),
         kind << " '" << def << "' is not exported by package '" << package->name << "'");
     }
   }
@@ -1481,7 +1481,7 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
 
   if ((sym.flags & SYM_GRAY) != 0) {
     if (con.warn) {
-      ERROR(sym.location,
+      ERROR(sym.fragment.location(),
         "export of " << con.kind << " '" << def
         << "' from '" << pkg << "' has cyclic definition");
     }
@@ -1491,7 +1491,7 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
   auto ip = con.top.packages.find(pkg);
   if (ip == con.top.packages.end()) {
     if (con.warn) {
-      ERROR(sym.location,
+      ERROR(sym.fragment.location(),
         "export of " << con.kind << " '" << def
         << "' from non-existent package '" << pkg << "'");
     }
@@ -1501,7 +1501,7 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
     auto ie = map.find(def);
     if (ie == map.end()) {
       if (con.warn) {
-        ERROR(sym.location,
+        ERROR(sym.fragment.location(),
           con.kind << " '" << def << "' is not exported by package '" << pkg << "'");
       }
       return false;
