@@ -21,6 +21,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <sys/select.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -176,10 +177,19 @@ private:
     std::string rootUri = "";
     bool isInitialized = false;
     bool isCrashed = false;
+    bool needsUpdate = false;
     std::string crashedFlagFilename = ".lsp-wake.lock";
     bool isShutDown = false;
     std::string stdLib;
-    std::map<std::string, std::unique_ptr<FileContent>> files;
+    struct FileInfo {
+      std::unique_ptr<FileContent> file;
+      bool modified;
+      FileInfo() : modified(false) { }
+      FileInfo(std::unique_ptr<FileContent> &&file_, bool modified_) : file(std::move(file_)), modified(modified_) { }
+      FileInfo(FileInfo &&other) = default;
+      FileInfo &operator = (FileInfo &&other) = default;
+    };
+    std::map<std::string, FileInfo> files;
     struct Use {
         Location use;
         Location def;
@@ -309,12 +319,28 @@ private:
       }
     }
 
+    void refresh(const std::string &why) {
+      if (needsUpdate && !isCrashed) {
+#ifdef __EMSCRIPTEN__
+        struct timeval start, stop;
+        gettimeofday(&start, 0);
+#endif
+        diagnoseProject();
+#ifdef __EMSCRIPTEN__
+        gettimeofday(&stop, 0);
+        double delay =
+          (stop.tv_sec  - start.tv_sec) +
+          (stop.tv_usec - start.tv_usec)/1000000.0;
+        std::cerr << "Refreshed project in " << delay << " seconds (due to " << why << ")" << std::endl;
+#endif
+      }
+    }
+
     void poll() {
+      refresh("timeout");
 #ifdef __EMSCRIPTEN__
       int usage = EM_ASM_INT({ return HEAPU8.length; });
       std::cerr << "One second expired; using " << usage << " bytes of memory" << std::endl;
-#else
-      std::cerr << "One second expired" << std::endl;
 #endif
     }
 
@@ -430,8 +456,7 @@ private:
       rootUri = receivedMessage.get("params").get("rootUri").value;
       sendMessage(message);
 
-      if (!isCrashed)
-        diagnoseProject();
+      needsUpdate = true;
     }
 
     void initialized(JAST _) { }
@@ -580,15 +605,16 @@ private:
       top->def_package = "nothing";
       top->body = std::unique_ptr<Expr>(new VarRef(FRAGMENT_CPP_LINE, "Nil@wake"));
 
-      std::map<std::string, std::unique_ptr<FileContent>> newFiles;
+      std::map<std::string, FileInfo> newFiles;
       for (auto &file: allFiles) {
         auto it = files.find(file);
         FileContent *fcontent;
-        if (it == files.end()) {
+        if (it == files.end() || !it->second.modified) {
+          // Re-read files that are not modified in the editor, because who knows what someone did in a terminal
           fcontent = new ExternalFile(lspReporter, file.c_str());
-          newFiles[file] = std::unique_ptr<FileContent>(fcontent);
+          newFiles[file] = FileInfo(std::unique_ptr<FileContent>(fcontent), false);
         } else {
-          fcontent = it->second.get();
+          fcontent = it->second.file.get();
           newFiles[file] = std::move(it->second);
         }
         CST cst(*fcontent, lspReporter);
@@ -622,6 +648,8 @@ private:
 
       std::sort(definitions.begin(), definitions.end());
       fillDefinitionDocumentationFields();
+
+      needsUpdate = false;
     }
 
     static SymbolKind getSymbolKind(const char *name, const std::string& type) {
@@ -739,8 +767,8 @@ private:
     const char *findURI(const std::string &fileURI) {
       const char *filePtr = nullptr;
       for (auto &file: files) {
-        if (fileURI.compare(rootUri.length() + 1, std::string::npos, file.second->filename()) == 0)
-          filePtr = file.second->filename();
+        if (fileURI.compare(rootUri.length() + 1, std::string::npos, file.second.file->filename()) == 0)
+          filePtr = file.second.file->filename();
       }
       return filePtr;
     }
@@ -755,6 +783,7 @@ private:
     }
 
     void goToDefinition(JAST receivedMessage) {
+      refresh("goto-definition");
       Location locationToDefine = getLocationFromJSON(receivedMessage);
       for (const Use &use: uses) {
         if (use.use.contains(locationToDefine)) {
@@ -807,6 +836,7 @@ private:
     }
 
     void findReportReferences(JAST receivedMessage) {
+      refresh("report-references");
       Location definitionLocation = getLocationFromJSON(receivedMessage);
       bool isDefinitionFound = false;
       std::vector<Location> references;
@@ -833,6 +863,7 @@ private:
     }
 
     void highlightOccurrences(JAST receivedMessage) {
+      refresh("highlight");
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
       bool isDefinitionFound = false;
@@ -885,6 +916,7 @@ private:
     }
 
     void hover(JAST receivedMessage) {
+      refresh("hover");
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
 
@@ -911,6 +943,7 @@ private:
     }
 
     void documentSymbol(JAST receivedMessage) {
+      refresh("document-symbol");
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
       JAST message = createResponseMessage(std::move(receivedMessage));
@@ -929,6 +962,7 @@ private:
     }
 
     void workspaceSymbol(JAST receivedMessage) {
+      refresh("workspace-symbol");
       std::string query = receivedMessage.get("params").get("query").value;
       JAST message = createResponseMessage(std::move(receivedMessage));
       JAST &result = message.add("result", JSON_ARRAY);
@@ -972,6 +1006,7 @@ private:
     }
 
     void rename(JAST receivedMessage) {
+      refresh("rename-symbol");
       std::string newName = receivedMessage.get("params").get("newName").value;
       if (newName.find(' ') != std::string::npos || (newName[0] >= '0' && newName[0] <= '9')) {
         sendErrorMessage(receivedMessage, InvalidParams, "The given name is invalid.");
@@ -989,8 +1024,7 @@ private:
     }
 
     void didOpen(JAST _) {
-      if (!isCrashed)
-        diagnoseProject();
+      needsUpdate = true;
     }
 
     std::string stripRootUri(const std::string &fileUri) {
@@ -1005,9 +1039,8 @@ private:
       std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
       std::string fileName = stripRootUri(fileUri);
       if (fileName.empty()) return;
-      files[fileName] = std::unique_ptr<FileContent>(new StringFile(fileName.c_str(), std::move(fileContent)));
-      if (!isCrashed)
-        diagnoseProject();
+      files[fileName] = FileInfo(std::unique_ptr<FileContent>(new StringFile(fileName.c_str(), std::move(fileContent))), true);
+      needsUpdate = true;
     }
 
     void didSave(JAST receivedMessage) {
@@ -1019,13 +1052,13 @@ private:
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       files.erase(stripRootUri(fileUri));
 
-      if (!isCrashed)
-        diagnoseProject();
+      needsUpdate = true;
     }
 
     void didClose(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       files.erase(stripRootUri(fileUri));
+      needsUpdate = true;
     }
 
     void didChangeWatchedFiles(JAST receivedMessage) {
@@ -1034,8 +1067,7 @@ private:
         std::string fileUri = child.second.get("uri").value;
         files.erase(stripRootUri(fileUri));
       }
-      if (!isCrashed)
-        diagnoseProject();
+      needsUpdate = true;
     }
 
     void shutdown(JAST receivedMessage) {

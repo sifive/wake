@@ -36,7 +36,51 @@
 #include "util/execpath.h"
 #include "wakefiles.h"
 
-bool push_files(std::vector<std::string> &out, const std::string &path, int dirfd, const RE2 &re, size_t skip) {
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+
+EM_JS(char *, nodejs_getfiles, (const char *dir), {
+  const Path = require("path");
+  const FS   = require("fs");
+  let files  = [];
+
+  function walkTree(dir) {
+      FS.readdirSync(dir, {withFileTypes: true}).forEach(dirent => {
+          const absolute = Path.join(dir, dirent.name);
+          if (dirent.isDirectory()) {
+            if (dirent.name != ".build" && dirent.name != ".fuse" && dirent.name != ".git")
+              walkTree(absolute);
+          } else {
+            files.push(absolute);
+          }
+      });
+  }
+
+  walkTree(UTF8ToString(dir));
+  const sep = String.fromCharCode(0);
+  const out = files.join(sep) + sep;
+
+  const lengthBytes = lengthBytesUTF8(out)+1;
+  const stringOnWasmHeap = _malloc(lengthBytes);
+  stringToUTF8(out, stringOnWasmHeap, lengthBytes);
+  return stringOnWasmHeap;
+});
+
+bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2& re, size_t skip) {
+  char *files = nodejs_getfiles(path.c_str());
+  for (char *file = files; *file; file += strlen(file)+1) {
+    re2::StringPiece p(file + skip, strlen(file) - skip);
+    if (RE2::FullMatch(p, re)) {
+      out.emplace_back(file);
+    }
+  }
+  free(files);
+  return true;
+}
+
+#else
+
+static bool push_files(std::vector<std::string> &out, const std::string &path, int dirfd, const RE2 &re, size_t skip) {
   auto dir = fdopendir(dirfd);
   if (!dir) {
     close(dirfd);
@@ -50,7 +94,7 @@ bool push_files(std::vector<std::string> &out, const std::string &path, int dirf
     if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
     bool recurse;
     struct stat sbuf;
-#if defined(DT_DIR) && !defined(__EMSCRIPTEN__)
+#if defined(DT_DIR)
     if (f->d_type != DT_UNKNOWN) {
       recurse = f->d_type == DT_DIR;
     } else {
@@ -62,7 +106,7 @@ bool push_files(std::vector<std::string> &out, const std::string &path, int dirf
       } else {
         recurse = S_ISDIR(sbuf.st_mode);
       }
-#if defined(DT_DIR) && !defined(__EMSCRIPTEN__)
+#if defined(DT_DIR)
     }
 #endif
     std::string name(path == "." ? f->d_name : (path + "/" + f->d_name));
@@ -102,6 +146,7 @@ bool push_files(std::vector<std::string> &out, const std::string &path, const RE
     fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
   return dirfd == -1 || push_files(out, path, dirfd, re, skip);
 }
+#endif
 
 // . => ., hax/ => hax, foo/.././bar.z => bar.z, foo/../../bar.z => ../bar.z
 std::string make_canonical(const std::string &x) {

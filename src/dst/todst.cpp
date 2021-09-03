@@ -692,7 +692,7 @@ static void extract_def(std::vector<Definition> &out, long index, AST &&ast, con
   for (auto &m : ast.args) {
     AST pattern(ast.region, std::string(ast.name));
     pattern.type = std::move(ast.type);
-    std::string mname("_" + m.name);
+    std::string mname("_ " + m.name);
     for (auto &n : ast.args) {
       pattern.args.push_back(AST(m.token, "_"));
       if (&n == &m) {
