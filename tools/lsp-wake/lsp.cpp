@@ -67,7 +67,7 @@ EM_ASYNC_JS(char *, nodejs_getstdin, (), {
   let eof = await new Promise(resolve => {
     let timeout = setTimeout(() => {
       complete(false);
-    }, 1000);
+    }, 2000);
     function gotData(input) {
       buffer = input;
       complete(false);
@@ -278,7 +278,7 @@ private:
         FD_SET(STDIN_FILENO, &rfds);
 
         struct timeval tv;
-        tv.tv_sec = 1;
+        tv.tv_sec = 2;
         tv.tv_usec = 0;
 
         int ret = select(STDIN_FILENO+1, &rfds, nullptr, nullptr, &tv);
@@ -332,7 +332,7 @@ private:
       refresh("timeout");
 #ifdef __EMSCRIPTEN__
       int usage = EM_ASM_INT({ return HEAPU8.length; });
-      std::cerr << "One second expired; using " << usage << " bytes of memory" << std::endl;
+      std::cerr << "Two second heart-beat; using " << usage << " bytes of memory" << std::endl;
 #endif
     }
 
