@@ -181,15 +181,7 @@ private:
     std::string crashedFlagFilename = ".lsp-wake.lock";
     bool isShutDown = false;
     std::string stdLib;
-    struct FileInfo {
-      std::unique_ptr<FileContent> file;
-      bool modified;
-      FileInfo() : modified(false) { }
-      FileInfo(std::unique_ptr<FileContent> &&file_, bool modified_) : file(std::move(file_)), modified(modified_) { }
-      FileInfo(FileInfo &&other) = default;
-      FileInfo &operator = (FileInfo &&other) = default;
-    };
-    std::map<std::string, FileInfo> files;
+    std::map<std::string, std::unique_ptr<StringFile>> changedFiles;
     struct Use {
         Location use;
         Location def;
@@ -605,29 +597,29 @@ private:
       top->def_package = "nothing";
       top->body = std::unique_ptr<Expr>(new VarRef(FRAGMENT_CPP_LINE, "Nil@wake"));
 
-      std::map<std::string, FileInfo> newFiles;
-      for (auto &file: allFiles) {
-        auto it = files.find(file);
-        FileContent *fcontent;
-        if (it == files.end() || !it->second.modified) {
-          // Re-read files that are not modified in the editor, because who knows what someone did in a terminal
-          fcontent = new ExternalFile(lspReporter, file.c_str());
-          newFiles[file] = FileInfo(std::unique_ptr<FileContent>(fcontent), false);
-        } else {
-          fcontent = it->second.file.get();
-          newFiles[file] = std::move(it->second);
-        }
-        CST cst(*fcontent, lspReporter);
-        CSTElement root = cst.root();
-        dst_top(cst.root(), *top);
+      std::vector<ExternalFile> externalFiles;
+      externalFiles.reserve(allFiles.size());
 
-        for (CSTElement topdef = root.firstChildElement(); !topdef.empty(); topdef.nextSiblingElement()) {
+      for (auto &filename: allFiles) {
+        auto it = changedFiles.find(filename);
+        FileContent *fcontent;
+        if (it == changedFiles.end()) {
+          // Re-read files that are not modified in the editor, because who knows what someone did in a terminal
+          externalFiles.emplace_back(lspReporter, filename.c_str());
+          fcontent = &externalFiles.back();
+        } else {
+          fcontent = it->second.get();
+        }
+
+        CST cst(*fcontent, lspReporter);
+        dst_top(cst.root(), *top);
+        for (CSTElement topdef = cst.root().firstChildElement(); !topdef.empty(); topdef.nextSiblingElement()) {
           if (topdef.id() == TOKEN_COMMENT || topdef.id() == TOKEN_NL) {
             comments.emplace_back(topdef.location(), topdef.segment().str());
           }
         }
       }
-      files = std::move(newFiles);
+
       flatten_exports(*top);
 
       for (auto &p : top->packages) {
@@ -764,22 +756,13 @@ private:
       sendMessage(message);
     }
 
-    const char *findURI(const std::string &fileURI) {
-      const char *filePtr = nullptr;
-      for (auto &file: files) {
-        if (fileURI.compare(rootUri.length() + 1, std::string::npos, file.second.file->filename()) == 0)
-          filePtr = file.second.file->filename();
-      }
-      return filePtr;
-    }
-
     Location getLocationFromJSON(JAST receivedMessage) {
       std::string fileURI = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string filePath = fileURI.substr(rootUri.length() + 1, std::string::npos);
 
       int row = stoi(receivedMessage.get("params").get("position").get("line").value);
       int column = stoi(receivedMessage.get("params").get("position").get("character").value);
-      return{findURI(fileURI), Coordinates(row + 1, column + 1), Coordinates(row + 1, column)};
+      return Location(stripRootUri(fileURI).c_str(), Coordinates(row + 1, column + 1), Coordinates(row + 1, column));
     }
 
     void goToDefinition(JAST receivedMessage) {
@@ -1039,7 +1022,7 @@ private:
       std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
       std::string fileName = stripRootUri(fileUri);
       if (fileName.empty()) return;
-      files[fileName] = FileInfo(std::unique_ptr<FileContent>(new StringFile(fileName.c_str(), std::move(fileContent))), true);
+      changedFiles[fileName] = std::unique_ptr<StringFile>(new StringFile(fileName.c_str(), std::move(fileContent)));
       needsUpdate = true;
     }
 
@@ -1050,14 +1033,14 @@ private:
       }
 
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      files.erase(stripRootUri(fileUri));
+      changedFiles.erase(stripRootUri(fileUri));
 
       needsUpdate = true;
     }
 
     void didClose(JAST receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      files.erase(stripRootUri(fileUri));
+      changedFiles.erase(stripRootUri(fileUri));
       needsUpdate = true;
     }
 
@@ -1065,7 +1048,7 @@ private:
       JAST jfiles = receivedMessage.get("params").get("changes");
       for (auto child: jfiles.children) {
         std::string fileUri = child.second.get("uri").value;
-        files.erase(stripRootUri(fileUri));
+        changedFiles.erase(stripRootUri(fileUri));
       }
       needsUpdate = true;
     }
