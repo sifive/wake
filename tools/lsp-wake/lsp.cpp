@@ -319,7 +319,7 @@ private:
       }
     }
 
-    void refresh() {
+    void refresh(const std::string &why) {
       if (needsUpdate && !isCrashed) {
 #ifdef __EMSCRIPTEN__
         struct timeval start, stop;
@@ -331,13 +331,13 @@ private:
         double delay =
           (stop.tv_sec  - start.tv_sec) +
           (stop.tv_usec - start.tv_usec)/1000000.0;
-        std::cerr << "Refreshed project in " << delay << " seconds" << std::endl;
+        std::cerr << "Refreshed project in " << delay << " seconds (due to " << why << ")" << std::endl;
 #endif
       }
     }
 
     void poll() {
-      refresh();
+      refresh("timeout");
 #ifdef __EMSCRIPTEN__
       int usage = EM_ASM_INT({ return HEAPU8.length; });
       std::cerr << "One second expired; using " << usage << " bytes of memory" << std::endl;
@@ -783,7 +783,7 @@ private:
     }
 
     void goToDefinition(JAST receivedMessage) {
-      refresh();
+      refresh("goto-definition");
       Location locationToDefine = getLocationFromJSON(receivedMessage);
       for (const Use &use: uses) {
         if (use.use.contains(locationToDefine)) {
@@ -836,7 +836,7 @@ private:
     }
 
     void findReportReferences(JAST receivedMessage) {
-      refresh();
+      refresh("report-references");
       Location definitionLocation = getLocationFromJSON(receivedMessage);
       bool isDefinitionFound = false;
       std::vector<Location> references;
@@ -863,7 +863,7 @@ private:
     }
 
     void highlightOccurrences(JAST receivedMessage) {
-      refresh();
+      refresh("highlight");
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
       bool isDefinitionFound = false;
@@ -916,7 +916,7 @@ private:
     }
 
     void hover(JAST receivedMessage) {
-      refresh();
+      refresh("hover");
       Location symbolLocation = getLocationFromJSON(receivedMessage);
       Location definitionLocation = symbolLocation;
 
@@ -943,7 +943,7 @@ private:
     }
 
     void documentSymbol(JAST receivedMessage) {
-      refresh();
+      refresh("document-symbol");
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
       JAST message = createResponseMessage(std::move(receivedMessage));
@@ -962,7 +962,7 @@ private:
     }
 
     void workspaceSymbol(JAST receivedMessage) {
-      refresh();
+      refresh("workspace-symbol");
       std::string query = receivedMessage.get("params").get("query").value;
       JAST message = createResponseMessage(std::move(receivedMessage));
       JAST &result = message.add("result", JSON_ARRAY);
@@ -1006,7 +1006,7 @@ private:
     }
 
     void rename(JAST receivedMessage) {
-      refresh();
+      refresh("rename-symbol");
       std::string newName = receivedMessage.get("params").get("newName").value;
       if (newName.find(' ') != std::string::npos || (newName[0] >= '0' && newName[0] <= '9')) {
         sendErrorMessage(receivedMessage, InvalidParams, "The given name is invalid.");
