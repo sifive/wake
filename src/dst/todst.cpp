@@ -596,7 +596,7 @@ static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
       child.nextSiblingNode();
       AST rhs = dst_pattern(child, guard);
       switch (lex_kind(lhs.name)) {
-      //!!!case LOWER:    ERROR(lhs.token.location(),  "lower-case identifier '" << lhs.name << "' cannot be used as a pattern destructor"); break;
+      case LOWER:    ERROR(lhs.token.location(),  "lower-case identifier '" << lhs.name << "' cannot be used as a pattern destructor"); break;
       case OPERATOR: ERROR(rhs.region.location(), "excess argument " << child.segment() << " supplied to '" << lhs.name << "'"); break;
       default: break;
       }
@@ -621,6 +621,35 @@ static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
       ERROR(root.fragment().location(), "patterns forbid " << root.segment());
     case CST_ERROR:
       return AST(root.fragment(), "_");
+  }
+}
+
+static AST dst_def_pattern(CSTElement root) {
+  switch (root.id()) {
+    case CST_COLON: {
+      CSTElement child = root.firstChildNode();
+      AST lhs = dst_def_pattern(child);
+      child.nextSiblingNode();
+      lhs.type = optional<AST>(new AST(dst_type(child)));
+      return lhs;
+    }
+    case CST_APP: {
+      CSTElement child = root.firstChildNode();
+      AST lhs = dst_def_pattern(child);
+      child.nextSiblingNode();
+      AST rhs = dst_pattern(child, nullptr);
+      if (lex_kind(lhs.name) == OPERATOR) {
+        ERROR(rhs.region.location(),
+          "excess argument " << child.segment()
+          << " supplied to '" << lhs.name << "'");
+      }
+      lhs.args.emplace_back(std::move(rhs));
+      lhs.region = root.fragment();
+      return lhs;
+    }
+    default: {
+      return dst_pattern(root, nullptr);
+    }
   }
 }
 
@@ -698,7 +727,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
   Symbols *exports = flags.exportf ? &package->exports : nullptr;
   if (!flags.globalf) globals = nullptr;
 
-  AST ast = dst_pattern(child, nullptr);
+  AST ast = dst_def_pattern(child);
   std::string name = std::move(ast.name);
   ast.name.clear();
 
