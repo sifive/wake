@@ -242,6 +242,20 @@ static TopFlags dst_flags(CSTElement &child) {
 
 static AST dst_type(CSTElement root) {
   switch (root.id()) {
+    case CST_COLON: {
+      CSTElement child = root.firstChildNode();
+      AST lhs = dst_type(child);
+      child.nextSiblingNode();
+      AST rhs = dst_type(child);
+      if (!lhs.args.empty() || lex_kind(lhs.name) == OPERATOR) {
+        ERROR(lhs.region.location(), "tag-name for a type must be a simple lower-case identifier, not " << root.firstChildNode().segment());
+        return rhs;
+      } else {
+        rhs.tag = std::move(lhs.name);
+        rhs.region = root.fragment();
+        return rhs;
+      }
+    }
     case CST_BINARY: {
       CSTElement child = root.firstChildNode();
       AST lhs = dst_type(child);
@@ -250,23 +264,12 @@ static AST dst_type(CSTElement root) {
       auto fragment = child.fragment();
       child.nextSiblingNode();
       AST rhs = dst_type(child);
-      if (op == "binary :") {
-        if (!lhs.args.empty() || lex_kind(lhs.name) == OPERATOR) {
-          ERROR(lhs.region.location(), "tag-name for a type must be a simple lower-case identifier, not " << root.firstChildNode().segment());
-          return rhs;
-        } else {
-          rhs.tag = std::move(lhs.name);
-          rhs.region = root.fragment();
-          return rhs;
-        }
-      } else {
-        std::vector<AST> args;
-        args.emplace_back(std::move(lhs));
-        args.emplace_back(std::move(rhs));
-        AST out(fragment, std::move(op), std::move(args));
-        out.region = root.fragment();
-        return out;
-      }
+      std::vector<AST> args;
+      args.emplace_back(std::move(lhs));
+      args.emplace_back(std::move(rhs));
+      AST out(fragment, std::move(op), std::move(args));
+      out.region = root.fragment();
+      return out;
     }
     case CST_UNARY: {
       CSTElement child = root.firstChildNode();
@@ -539,6 +542,13 @@ static void dst_tuple(CSTElement topdef, Package &package, Symbols *globals) {
 
 static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
   switch (root.id()) {
+    case CST_COLON: {
+      CSTElement child = root.firstChildNode();
+      AST lhs = dst_pattern(child, guard);
+      child.nextSiblingNode();
+      lhs.type = optional<AST>(new AST(dst_type(child)));
+      return lhs;
+    }
     case CST_BINARY: {
       CSTElement child = root.firstChildNode();
       AST lhs = dst_pattern(child, guard);
@@ -546,18 +556,13 @@ static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
       std::string op = "binary " + getIdentifier(child);
       FileFragment fragment = child.fragment();
       child.nextSiblingNode();
-      if (op == "binary :") {
-        lhs.type = optional<AST>(new AST(dst_type(child)));
-        return lhs;
-      } else {
-        AST rhs = dst_pattern(child, guard);
-        std::vector<AST> args;
-        args.emplace_back(std::move(lhs));
-        args.emplace_back(std::move(rhs));
-        AST out(fragment, std::move(op), std::move(args));
-        out.region = root.fragment();
-        return out;
-      }
+      AST rhs = dst_pattern(child, guard);
+      std::vector<AST> args;
+      args.emplace_back(std::move(lhs));
+      args.emplace_back(std::move(rhs));
+      AST out(fragment, std::move(op), std::move(args));
+      out.region = root.fragment();
+      return out;
     }
     case CST_UNARY: {
       CSTElement child = root.firstChildNode();
@@ -1127,25 +1132,26 @@ static Expr *dst_require(CSTElement require) {
 
 static Expr *dst_expr(CSTElement expr) {
   switch (expr.id()) {
+    case CST_COLON: {
+      CSTElement child = expr.firstChildNode();
+      Expr *lhs = dst_expr(child);
+      child.nextSiblingNode();
+      AST signature = dst_type(child);
+      return new Ascribe(expr.fragment(), std::move(signature), lhs, lhs->fragment);
+    }
     case CST_BINARY: {
       CSTElement child = expr.firstChildNode();
       Expr *lhs = dst_expr(child);
       child.nextSiblingNode();
       std::string opStr = getIdentifier(child);
-      if (opStr == ":") {
-        child.nextSiblingNode();
-        AST signature = dst_type(child);
-        return new Ascribe(expr.fragment(), std::move(signature), lhs, lhs->fragment);
-      } else {
-        Expr *op = new VarRef(child.fragment(), "binary " + opStr);
-        op->flags |= FLAG_AST;
-        child.nextSiblingNode();
-        Expr *rhs = dst_expr(child);
-        FileFragment l = expr.fragment();
-        App *out = new App(l, new App(l, op, lhs), rhs);
-        out->flags |= FLAG_AST;
-        return out;
-      }
+      Expr *op = new VarRef(child.fragment(), "binary " + opStr);
+      op->flags |= FLAG_AST;
+      child.nextSiblingNode();
+      Expr *rhs = dst_expr(child);
+      FileFragment l = expr.fragment();
+      App *out = new App(l, new App(l, op, lhs), rhs);
+      out->flags |= FLAG_AST;
+      return out;
     }
     case CST_UNARY: {
       CSTElement child = expr.firstChildNode();

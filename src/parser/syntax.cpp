@@ -315,6 +315,7 @@ const char *symbolExample(int symbol) {
     case CST_BINARY:         return "binary-op";
     case CST_BLOCK:          return "block";
     case CST_CASE:           return "case";
+    case CST_COLON:          return "binary-:";
     case CST_DATA:           return "data";
     case CST_DEF:            return "def";
     case CST_EXPORT:         return "export";
