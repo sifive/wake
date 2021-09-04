@@ -247,8 +247,8 @@ static AST dst_type(CSTElement root) {
       AST lhs = dst_type(child);
       child.nextSiblingNode();
       AST rhs = dst_type(child);
-      if (!lhs.args.empty() || lex_kind(lhs.name) == OPERATOR) {
-        ERROR(lhs.region.location(), "tag-name for a type must be a simple lower-case identifier, not " << root.firstChildNode().segment());
+      if (!lhs.args.empty() || !lhs.tag.empty() || lex_kind(lhs.name) == OPERATOR) {
+        ERROR(lhs.region.location(), "tag-name for a type must be a simple identifier, not " << root.firstChildNode().segment());
         return rhs;
       } else if (rhs.tag.empty()) {
         rhs.tag = std::move(lhs.name);
@@ -549,7 +549,11 @@ static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
       CSTElement child = root.firstChildNode();
       AST lhs = dst_pattern(child, guard);
       child.nextSiblingNode();
-      lhs.type = optional<AST>(new AST(dst_type(child)));
+      if (lhs.type) {
+        ERROR(child.location(), "pattern " << lhs.region.segment() << " already has a type");
+      } else {
+        lhs.type = optional<AST>(new AST(dst_type(child)));
+      }
       return lhs;
     }
     case CST_BINARY: {
@@ -633,7 +637,11 @@ static AST dst_def_pattern(CSTElement root) {
       CSTElement child = root.firstChildNode();
       AST lhs = dst_def_pattern(child);
       child.nextSiblingNode();
-      lhs.type = optional<AST>(new AST(dst_type(child)));
+      if (lhs.type) {
+        ERROR(child.location(), "pattern " << lhs.region.segment() << " already has a type");
+      } else {
+        lhs.type = optional<AST>(new AST(dst_type(child)));
+      }
       return lhs;
     }
     case CST_APP: {
@@ -1168,8 +1176,13 @@ static Expr *dst_expr(CSTElement expr) {
       CSTElement child = expr.firstChildNode();
       Expr *lhs = dst_expr(child);
       child.nextSiblingNode();
-      AST signature = dst_type(child);
-      return new Ascribe(expr.fragment(), std::move(signature), lhs, lhs->fragment);
+      if (lhs->type == &Ascribe::type) {
+        ERROR(child.fragment().location(), "expression " << lhs->fragment.segment() << " already has a type");
+        return lhs;
+      } else {
+        AST signature = dst_type(child);
+        return new Ascribe(expr.fragment(), std::move(signature), lhs, lhs->fragment);
+      }
     }
     case CST_BINARY: {
       CSTElement child = expr.firstChildNode();
