@@ -152,7 +152,7 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
 
     std::string buf(reinterpret_cast<const char*>(map) + tail_start, tail_len-1);
     void *out = mmap(reinterpret_cast<uint8_t*>(map) + tail_start, pagesize, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANON, -1, 0);
-    if (out == MAP_FAILED || ((char*)out - (char*)map) != tail_start) {
+    if (out == MAP_FAILED || ((char*)out - (char*)map) != static_cast<ssize_t>(tail_start)) {
         reporter.reportError(l, std::string("mmap anon failed; ") + strerror(errno));
         munmap(map, s.st_size+1);
         ss.end = ss.start = &null[0];

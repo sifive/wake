@@ -32,8 +32,20 @@ static CPPFile cppFile(__FILE__);
 Constructor Constructor::array(AST(FRAGMENT_CPP_LINE, "Array"));
 
 Sum::Sum(AST &&ast) : name(std::move(ast.name)), token(ast.token), region(ast.region), scoped(false) {
-  for (auto &x : ast.args)
+  std::map<std::string, FileFragment> dups;
+
+  for (auto &x : ast.args) {
+    if (lex_kind(x.name) != LOWER) {
+      ERROR(x.token.location(), "type argument '" << x.name << "' must be lower-case");
+    }
+    auto insert = dups.insert(std::make_pair(x.name, x.token));
+    if (!insert.second) {
+      ERROR(x.token.location(),
+        "type argument '" << x.name
+        << "' already defined at " << insert.first->second.location());
+    }
     args.push_back(std::move(x.name));
+  }
 }
 
 void Sum::addConstructor(AST &&ast) {

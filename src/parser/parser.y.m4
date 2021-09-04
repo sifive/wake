@@ -217,7 +217,8 @@ RE($1, OP_INEQUAL, inequal, compare)     dnl x => !y => !z       x => ((!y) => (
 LE($1, OP_AND,     and,     inequal)     dnl x & & y & & z       (x & (&y)) & (&z)
 LE($1, OP_OR,      or,      and)         dnl x | | y | | z       (x | (|y)) | (|z)
 RE($1, OP_DOLLAR,  dollar,  or)          dnl x $ $ y $ $ z       x $ (($y) $ ($z))
-RO($1, P_COLON,    colon,   dollar)      dnl x : : y : : z       (x:): ((y:): z)
+$1_binary_colon(R) ::= $1_binary_dollar(A) P_COLON $1_binary_colon(B). { R = 1; add(CST_COLON, A+B); }
+$1_binary_colon(R) ::= $1_binary_dollar(U).                            { R = U; }
 LE($1, OP_LRARROW, lrarrow, colon)       dnl as compare
 RE($1, OP_EQARROW, eqarrow, lrarrow)     dnl as inequal
 RO($1, OP_COMMA,   comma,   eqarrow)     dnl x , , y , , z       (x,), ((y,), z)

@@ -589,14 +589,12 @@ static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &e
       auto it = iter->index.find(ast.name);
       if (it != iter->index.end()) {
         Expr *cons = iter->defs[it->second].expr.get();
-        if (cons) {
-          while (cons->type == &Lambda::type)
-            cons = static_cast<Lambda*>(cons)->body.get();
-          if (cons->type == &Construct::type) {
-            Construct *c = static_cast<Construct*>(cons);
-            out.sum = c->sum;
-            out.cons = c->cons->index;
-          }
+        while (cons && cons->type == &Lambda::type)
+          cons = static_cast<Lambda*>(cons)->body.get();
+        if (cons && cons->type == &Construct::type) {
+          Construct *c = static_cast<Construct*>(cons);
+          out.sum = c->sum;
+          out.cons = c->cons->index;
         }
       }
     }
@@ -820,6 +818,8 @@ static bool qualify_type(ResolveBinding *binding, std::string &name, const FileF
 
   if (iter) {
     return true;
+  } else if (name == "BadType") {
+    return false;
   } else {
     ERROR(fragment.location(), "reference to undefined type '" << name << "'");
     return false;
@@ -1103,7 +1103,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
 
   // Report unused definitions
   for (auto &def : gbinding.defs) {
-    if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
+    if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && def.expr && !(def.expr->flags & FLAG_SYNTHETIC)) {
       size_t at = def.name.find_first_of('@');
       std::string name = def.name.substr(0, at);
       WARNING(def.fragment.location(),
