@@ -413,13 +413,15 @@ static void dst_data(CSTElement topdef, Package &package, Symbols *globals) {
   CSTElement child = topdef.firstChildNode();
   TopFlags flags = dst_flags(child);
 
-  auto sump = std::make_shared<Sum>(dst_type(child));
+  AST type = dst_type(child);
+  if (!type.tag.empty()) ERROR(child.fragment().location(), "data type '" << type.name << "' should not be tagged with '" << type.tag << "'");
+  auto sump = std::make_shared<Sum>(std::move(type));
   if (sump->args.empty() && lex_kind(sump->name) == LOWER) ERROR(child.fragment().location(), "data type '" << sump->name << "' must be upper-case or operator");
   child.nextSiblingNode();
 
   for (; !child.empty(); child.nextSiblingNode()) {
     AST cons = dst_type(child);
-    if (!cons.tag.empty()) ERROR(cons.region.location(), "constructor '" << cons.name << "' should not be tagged with " << cons.tag);
+    if (!cons.tag.empty()) ERROR(cons.region.location(), "constructor '" << cons.name << "' should not be tagged with '" << cons.tag << "'");
     if (cons.args.empty() && lex_kind(cons.name) == LOWER) ERROR(cons.token.location(), "constructor '" << cons.name << "' must be upper-case or operator");
     sump->addConstructor(std::move(cons));
   }
@@ -445,7 +447,9 @@ static void dst_tuple(CSTElement topdef, Package &package, Symbols *globals) {
   bool exportt = flags.exportf; // we export the type if any member is exported
   bool globalt = flags.globalf;
 
-  auto sump = std::make_shared<Sum>(dst_type(child));
+  AST type = dst_type(child);
+  if (!type.tag.empty()) ERROR(child.fragment().location(), "tuple type '" << type.name << "' should not be tagged with '" << type.tag << "'");
+  auto sump = std::make_shared<Sum>(std::move(type));
   if (lex_kind(sump->name) != UPPER) ERROR(child.fragment().location(), "tuple type '" << sump->name << "' must be upper-case");
   child.nextSiblingNode();
 
