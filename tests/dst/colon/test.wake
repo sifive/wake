@@ -1,0 +1,15 @@
+#test.wake:2:[21-32]: tag-name for a type must be a simple identifier, not '(x: Integer)'
+export def foo = 4: (x: Integer): Integer
+#test.wake:4:21: type 'Integer: Integer' already has a tag-name
+export def bar = 4: x: Integer: Integer
+
+#test.wake:7:[30-36]: pattern '(z: Integer)' already has a type
+export def fn ((z: Integer): Integer) = z
+#test.wake:9:[26-32]: pattern '(y: Integer)' already has a type
+export def (y: Integer): Integer = 4
+
+#test.wake:12:[32-39]: expression '4: Integer' already has a type
+export def baz = (4: Integer): Integer
+
+export def test _ =
+  Pass "fail"
