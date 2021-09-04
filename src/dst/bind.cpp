@@ -1103,7 +1103,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
 
   // Report unused definitions
   for (auto &def : gbinding.defs) {
-    if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && !(def.expr->flags & FLAG_SYNTHETIC)) {
+    if (def.uses == 0 && !def.name.empty() && def.name[0] != '_' && def.expr && !(def.expr->flags & FLAG_SYNTHETIC)) {
       size_t at = def.name.find_first_of('@');
       std::string name = def.name.substr(0, at);
       WARNING(def.fragment.location(),
