@@ -250,9 +250,12 @@ static AST dst_type(CSTElement root) {
       if (!lhs.args.empty() || lex_kind(lhs.name) == OPERATOR) {
         ERROR(lhs.region.location(), "tag-name for a type must be a simple lower-case identifier, not " << root.firstChildNode().segment());
         return rhs;
-      } else {
+      } else if (rhs.tag.empty()) {
         rhs.tag = std::move(lhs.name);
         rhs.region = root.fragment();
+        return rhs;
+      } else {
+        ERROR(lhs.region.location(), "type " << rhs.region.segment() << " already has a tag-name");
         return rhs;
       }
     }
