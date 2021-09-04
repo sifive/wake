@@ -1,0 +1,9 @@
+package foo
+
+#test3.wake:4:[5-8]: package-local definition 'pkg1' also defined at test.wake:25:[12-15]
+def pkg1 = "34"
+#test3.wake:7:[6-9]: package-local type 'Pkg1' also defined at test.wake:26:[13-16]
+#test3.wake:7:[13-16]: package-local definition 'Pkg1' also defined at test.wake:26:[20-23]
+data Pkg1 = Pkg1
+#test3.wake:9:[7-10]: package-local topic 'pkg1' also defined at test.wake:27:[14-17]
+topic pkg1: Integer

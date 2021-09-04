@@ -1,0 +1,51 @@
+#test.wake:1:[9-15]: package name 'builtin' is illegal.
+package builtin
+#legal
+package foo
+#test.wake:3:[1-12]: package name redefined from 'foo' to 'bar'
+package bar
+
+#test.wake:5:[18-26]: keyword 'binary' or 'unary' required when changing symbol type for '++ = Pair'
+from wake import ++ = Pair
+#test.wake:6:[18-24]: keyword 'binary' or 'unary' required when changing symbol type for 'fun = +'
+from wake import fun = +
+
+from wake import _
+#test.wake:9:[22-24]: symbol 'map' was previously imported at test.wake:9:[18-20]
+from wake import map map
+
+#test.wake:11:[18-21]: from ... export must be followed by 'def', 'type', or 'topic'
+from wake export Pair
+#test.wake:12:22: export of '+' must specify 'unary' or 'binary'
+from wake export def +
+
+export def bug1 = 5
+#test.wake:15:[18-25]: from ... export must be followed by 'def', 'type', or 'topic'
+from wake export bug1=map
+
+from wake export bug2=map
+def bug2 = 5
+
+# same file def conflicts
+export def bug3 = "what"
+#test.wake:22:[12-13]: definition 'bug3' was previously defined at test.wake:21:[12-17]
+def bug3 = 34
+
+#test.wake:25:[12-15]: package-local definition 'pkg1' also defined at test3.wake:3:[5-8]
+export def pkg1 = 34
+#test.wake:26:[13-16]: package-local type 'Pkg1' also defined at test3.wake:4:[6-9]
+#test.wake:26:[20-23]: package-local definition 'Pkg1' also defined at test3.wake:4:[13-16]
+export data Pkg1 = Pkg1
+#test.wake:27:[14-17]: package-local topic 'pkg1' also defined at test3.wake:5:[7-10]
+export topic pkg1: String
+
+#test.wake:30:[12-16]: global definition 'glob1' also defined at test2.wake:3:[12-16]
+global def glob1 = 34
+#test.wake:31:[13-17]: global type 'Glob1' also defined at test2.wake:4:[13-17]
+#test.wake:31:[21-25]: global definition 'Glob1' also defined at test2.wake:4:[21-25]
+global data Glob1 = Glob1
+#test.wake:32:[14-18]: global topic 'glob1' also defined at test2.wake:5:[14-18]
+global topic glob1: String
+
+export def test _ =
+  Pass "Fail"
