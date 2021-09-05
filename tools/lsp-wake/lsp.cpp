@@ -124,7 +124,9 @@ const char *term_normal()         { return ""; }
 
 class LSP {
 public:
+    LSP() {}
     explicit LSP(std::string _stdLib) : stdLib(std::move(_stdLib)) {}
+    explicit LSP(bool _isSTDLibValid, std::string _stdLib) : isSTDLibValid(_isSTDLibValid), stdLib(std::move(_stdLib)) {}
 
     void processRequests() {
       std::string buffer;
@@ -171,9 +173,25 @@ public:
       }
     }
 
+    void notifyAboutInvalidSTDLib() {
+      JAST message = createMessage();
+      message.add("method", "window/showMessage");
+      JAST &showMessageParams = message.add("params", JSON_OBJECT);
+      showMessageParams.add("type", 1); // Error
+      std::string messageText =
+      "The path to the wake standard library (" + stdLib + ") is invalid. " +
+      "Wake language features will not be provided. " +
+      "Please change the path in the extension settings and reload the window by: " +
+      "  1. Opening the command palette (Ctrl + Shift + P); " +
+      "  2. Typing \"> Reload Window\" and executing (Enter);";
+      showMessageParams.add("message", messageText.c_str());
+      sendMessage(message);
+    }
+
 private:
     typedef void (LSP::*LspMethod)(JAST);
 
+    bool isSTDLibValid = true;
     std::string rootUri = "";
     bool isInitialized = false;
     bool isCrashed = false;
@@ -436,9 +454,21 @@ private:
       return message;
     }
 
+    JAST createInitializeResultInvalidSTDLib(const JAST &receivedMessage) {
+      JAST message = createResponseMessage(receivedMessage);
+      JAST &result = message.add("result", JSON_OBJECT);
+      result.add("capabilities", JSON_OBJECT);
+      JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
+      serverInfo.add("name", "lsp wake server");
+      return message;
+    }
+
     void initialize(JAST receivedMessage) {
       JAST message(JSON_OBJECT);
-      if (access(crashedFlagFilename.c_str(), F_OK) != -1) {
+      if (!isSTDLibValid) {
+        notifyAboutInvalidSTDLib();
+        message = createInitializeResultInvalidSTDLib(receivedMessage);
+      } else if (access(crashedFlagFilename.c_str(), F_OK) != -1) {
         message = createInitializeResultCrashed(receivedMessage);
       } else {
         message = createInitializeResultDefault(receivedMessage);
@@ -450,8 +480,10 @@ private:
       rootUri = receivedMessage.get("params").get("rootUri").value;
       sendMessage(message);
 
-      needsUpdate = true;
-      refresh("initialize");
+      if (isSTDLibValid) {
+        needsUpdate = true;
+        refresh("initialize");
+      }
     }
 
     void initialized(JAST _) { }
@@ -1127,12 +1159,12 @@ int main(int argc, const char **argv) {
   stdLib = "/root" + stdLib;
 #endif
 
+  LSP lsp;
   if (access((stdLib + "/core/boolean.wake").c_str(), F_OK) != -1) {
-    LSP lsp(stdLib);
-    // Process requests until something goes wrong
-    lsp.processRequests();
+    lsp = LSP(stdLib);
   } else {
-    std::cerr << "Path to the wake standard library (" << stdLib << ") is invalid. Server will not be initialized." << std::endl;
-    return 1;
+    lsp = LSP(false, stdLib);
   }
+  // Process requests until something goes wrong
+  lsp.processRequests();
 }

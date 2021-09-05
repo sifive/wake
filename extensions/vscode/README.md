@@ -1,6 +1,9 @@
-# wake-syntax README
+# Wake extension for Visual Studio Code
 
-This is the source code for a Visual Studio extension, enabling type checking and syntax highlighting of the Wake language.
+A Visual Studio Code extension with support for the Wake build tool and language, including features such as syntax highlighting, error-checking, and code navigation.
+
+## Wake versions
+The extension comes with the latest wake version. But if you want to use a different one, you can specify the path to the desired wake standard library in extension settings.
 
 ## Features
 
