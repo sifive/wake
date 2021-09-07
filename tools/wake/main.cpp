@@ -426,7 +426,7 @@ int main(int argc, char **argv) {
         warned_conflict = false;
       } else if (dirlen == longest_src_dir) {
         if (top->def_package != package && !warned_conflict) {
-          std::cerr << "Directory " << dir
+          std::cerr << "Directory " << (dir.empty()?".":dir.c_str())
             << " has wakefiles with both package '" << top->def_package
             << "' and '" << package
             << "'. This prevents default package selection;"

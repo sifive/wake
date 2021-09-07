@@ -1,0 +1,9 @@
+package foo2
+
+#test2.wake:4:[12-16]: global definition 'glob1' also defined at test.wake:30:[12-16]
+global def glob1 = "asd"
+#test2.wake:7:[13-17]: global type 'Glob1' also defined at test.wake:31:[13-17]
+#test2.wake:7:[21-25]: global definition 'Glob1' also defined at test.wake:31:[21-25]
+global data Glob1 = Glob1
+#test2.wake:9:[14-18]: global topic 'glob1' also defined at test.wake:32:[14-18]
+global topic glob1: Integer

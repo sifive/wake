@@ -1,0 +1,21 @@
+test.wake:2:17: type argument 'X' must be lower-case
+test.wake:5:21: type argument 'a' already defined at test.wake:5:17
+test.wake:24:19: type argument 'X' must be lower-case
+test.wake:28:23: type argument 'a' already defined at test.wake:28:19
+test.wake:40:[13-15]: data type 'foo' must be upper-case or operator
+test.wake:42:[13-15]: type 'Foo' was previously defined at test.wake:2:[13-15]
+test.wake:45:[13-21]: data type 'Bing' should not be tagged with 'x'
+test.wake:49:[3-11]: constructor 'Rabbit' should not be tagged with 'a'
+test.wake:51:[3-7]: constructor 'lower' must be upper-case or operator
+test.wake:53:[24-29]: excess type argument 'String' supplied to 'binary ==>'
+test.wake:56:[14-20]: tuple type 'binary +++' must be upper-case
+test.wake:60:[14-24]: tuple type 'Banger' should not be tagged with 'z'
+test.wake:21:[18-23]: type error; function '+' expected argument 'x' of type:
+    Integer
+  but was supplied argument 'foo_ok' of type:
+    List a
+test.wake:12:32: unbound type variable 'a'
+test.wake:33:20: unbound type variable 'b'
+test.wake:9:13: unbound type variable 'z'
+test.wake:33:20: unbound type variable 'b'
+>>> Aborting without execution <<<

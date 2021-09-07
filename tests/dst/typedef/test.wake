@@ -1,0 +1,61 @@
+#test.wake:2:17: type argument 'X' must be lower-case
+export data Foo X = Foo
+
+#test.wake:5:21: type argument 'a' already defined at test.wake:3:17
+export data Bar a b a = Bar
+
+#test.wake:9:13: unbound type variable 'z'
+export data Baz a =
+  Fun (List z) # !!! why does 'b' not work?
+
+#test.wake:12:32: unbound type variable 'a'
+export def foo_bad = Nil: List a
+
+# legal
+export def foo_ok: List a = Nil
+
+#test.wake:21:[18-23]: type error; function '+' expected argument 'x' of type:
+#    Integer
+#  but was supplied argument 'foo_ok' of type:
+#    List a
+export def baz = foo_ok + 3 # confirm foo_ok worked with another error
+
+#test.wake:24:19: type argument 'X' must be lower-case
+export tuple FooT X =
+  export Fun: Integer
+
+#test.wake:28:23: type argument 'a' already defined at test.wake:26:19
+export tuple BarT a b a =
+  export Fun: Integer
+
+#test.wake:33:20: unbound type variable 'b'
+export tuple BazT a =
+  export Fun: List b
+
+def test _ =
+  def _ = Fun
+  Pass "hello"
+
+#test.wake:40:[6-8]: data type 'foo' must be upper-case or operator
+export data foo = FooBar
+#test.wake:42:[6-8]: type 'Foo' was previously defined at test.wake:2:[13-15]
+export data Foo = Baz
+
+#test.wake:45:[13-20]: data type 'Bing' should not be tagged with 'x'
+export data (x: Bing) = Bang
+
+export data Funny =
+  #test.wake:49:[3-11]: constructor 'Rabbit' should not be tagged with 'a'
+  a: Rabbit
+  #test.wake:51:[3-7]: constructor 'lower' must be upper-case or operator
+  lower
+  #test.wake:53:[24-29]: excess type argument 'String' supplied to 'binary =>='
+  (Integer ==> String) String
+
+#test.wake:56:[14-20]: tuple type 'binary +++' must be upper-case
+export tuple a +++ b =
+  Bingo: Pair a b
+
+#test.wake:60:[14-22]: tuple type 'Banger' should not be tagged with 'z'
+export tuple (z: Banger) =
+  export X: Integer

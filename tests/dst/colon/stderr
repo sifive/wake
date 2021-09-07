@@ -1,0 +1,6 @@
+test.wake:2:[21-32]: tag-name for a type must be a simple identifier, not '(x: Integer)'
+test.wake:4:21: type 'Integer: Integer' already has a tag-name
+test.wake:7:[30-36]: pattern '(z: Integer)' already has a type
+test.wake:9:[26-32]: pattern '(y: Integer)' already has a type
+test.wake:12:[32-38]: expression '4: Integer' already has a type
+>>> Aborting without execution <<<
