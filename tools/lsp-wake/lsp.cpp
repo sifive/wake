@@ -46,6 +46,7 @@
 #include "parser/wakefiles.h"
 #include "parser/lexer.h"
 #include "parser/parser.h"
+#include "types/internal.h"
 #include "dst/bind.h"
 #include "dst/todst.h"
 #include "dst/expr.h"
@@ -663,7 +664,7 @@ private:
         }
       }
 
-      PrimMap pmap;
+      PrimMap pmap = prim_register_internal();
       bool isTreeBuilt = true;
       std::unique_ptr<Expr> root = bind_refs(std::move(top), pmap, isTreeBuilt);
 
