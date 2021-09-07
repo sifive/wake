@@ -21,7 +21,7 @@
 #include "util/hash.h"
 #include "util/location.h"
 #include "types/datatype.h"
-#include "dst/primfn.h"
+#include "types/primfn.h"
 
 #include "runtime/gc.h"
 

@@ -35,16 +35,11 @@
 #include "json/utf8.h"
 #include "types/type.h"
 #include "types/data.h"
+#include "types/internal.h"
 #include "prim.h"
 #include "value.h"
 #include "status.h"
 #include "gc.h"
-
-static PRIMTYPE(type_vcat) {
-  bool ok = out->unify(Data::typeString);
-  for (auto x : args) ok &= x->unify(Data::typeString);
-  return ok;
-}
 
 static PRIMFN(prim_vcat) {
   (void)data;
@@ -451,13 +446,6 @@ static PRIMFN(prim_level) {
 
   MPZ out(x);
   RETURN(Integer::alloc(runtime.heap, out));
-}
-
-static PRIMTYPE(type_scmp) {
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeString) &&
-    args[1]->unify(Data::typeString) &&
-    out->unify(Data::typeOrder);
 }
 
 static PRIMFN(prim_scmp) {

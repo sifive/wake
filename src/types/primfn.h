@@ -97,5 +97,6 @@ struct PrimDesc {
 };
 
 typedef std::map<std::string, PrimDesc> PrimMap;
+void prim_register(PrimMap &pmap, const char *key, PrimFn fn, PrimType type, int flags, void *data = 0);
 
 #endif

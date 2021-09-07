@@ -32,9 +32,9 @@
 #include "util/fragment.h"
 #include "parser/lexer.h"
 #include "types/sums.h"
+#include "types/primfn.h"
 #include "expr.h"
 #include "bind.h"
-#include "primfn.h"
 
 static CPPFile cppFile(__FILE__);
 
