@@ -27,6 +27,7 @@
 
 #include "types/type.h"
 #include "types/data.h"
+#include "types/internal.h"
 #include "prim.h"
 #include "value.h"
 
@@ -183,13 +184,6 @@ static PRIMFN(prim_cmp) {
     Value *out = alloc_order(runtime.heap, x);
     RETURN(claim_list(runtime.heap, 1, &out));
   }
-}
-
-static PRIMTYPE(type_cmp_nan_lt) {
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeDouble) &&
-    args[1]->unify(Data::typeDouble) &&
-    out->unify(Data::typeOrder);
 }
 
 static PRIMFN(prim_cmp_nan_lt) {

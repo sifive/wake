@@ -32,9 +32,9 @@
 #include "util/fragment.h"
 #include "parser/lexer.h"
 #include "types/sums.h"
+#include "types/primfn.h"
 #include "expr.h"
 #include "bind.h"
-#include "primfn.h"
 
 static CPPFile cppFile(__FILE__);
 
@@ -1416,7 +1416,6 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     bool tb = asc->body->typeVar.unify(asc->typeVar, &ascm);
     return b && tb && ts;
   } else if (expr->type == &Prim::type) {
-    if (state.pmap.empty()) return true;
     Prim *prim = static_cast<Prim*>(expr);
     std::vector<TypeVar*> args;
     for (NameBinding *iter = binding; iter && iter->open && iter->lambda; iter = iter->next)
@@ -1424,10 +1423,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     std::reverse(args.begin(), args.end());
     prim->args = args.size();
     PrimMap::const_iterator i = state.pmap.find(prim->name);
-    if (i == state.pmap.end()) {
-      ERROR(prim->fragment.location(), "reference to unimplemented primitive '" << prim->name << "'");
-      return false;
-    } else {
+    if (i != state.pmap.end()) {
       prim->pflags = i->second.flags;
       prim->fn   = i->second.fn;
       prim->data = i->second.data;
@@ -1436,6 +1432,11 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
         ERROR(prim->fragment.location(), "primitive '" << prim->name << "' is used with the wrong number of arguments");
       }
       return ok;
+    } else if (state.pmap.size() > 10) {
+      ERROR(prim->fragment.location(), "reference to unimplemented primitive '" << prim->name << "'");
+      return false;
+    } else {
+      return true;
     }
   } else if (expr->type == &Get::type) {
     Get *get = static_cast<Get*>(expr);

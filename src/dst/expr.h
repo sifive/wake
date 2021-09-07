@@ -22,7 +22,7 @@
 #include "util/hash.h"
 #include "types/type.h"
 #include "types/datatype.h"
-#include "primfn.h"
+#include "types/primfn.h"
 
 #include <memory>
 #include <string>

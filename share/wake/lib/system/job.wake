@@ -151,7 +151,7 @@ export def editPlanShare f =
   editPlanPersistence helper
 
 # Get a unique hash-code for the job
-export def getPlanHash plan =
+export def getPlanHash (plan: Plan): Integer =
   def signature cmd env dir stdin = prim "hash"
   def Plan _ cmd _ env dir stdin _ _ _ _ _ _ _ _ _ _ = plan
   signature cmd env dir stdin
@@ -185,7 +185,7 @@ def defaultUsage = Usage 0 0.0 1.0 0 0 0
 
 # This runner does not detect inputs/outputs on it's own
 # You must use Fn{Inputs,Outputs} to fill in this information
-export def localRunner =
+export def localRunner: Runner =
   def launch job dir stdin env cmd status runtime cputime membytes ibytes obytes = prim "job_launch"
   def badlaunch job error = prim "job_fail_launch"
   def doit job = match _
@@ -206,7 +206,7 @@ export def localRunner =
     if plan.getPlanLocalOnly then Pass 1.0 else Fail "cannot detect outputs"
   Runner "local" score doit
 
-export def virtualRunner =
+export def virtualRunner: Runner =
   def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
   def badlaunch job error = prim "job_fail_launch"
   def doit job = match _
@@ -228,7 +228,7 @@ export def virtualRunner =
 def pid = prim "pid"
 
 def implode l = cat (foldr (_, "\0", _) Nil l)
-def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo stdout stderr label =
+def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo stdout stderr label: Job =
   def create label dir stdin env cmd signature visible keep echo stdout stderr = prim "job_create"
   def finish job inputs outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
   def badfinish job error = prim "job_fail_finish"
@@ -320,10 +320,9 @@ export def runJob p = match p
         def _ = wait (\_ badfinish job error) (badlaunch job error)
         job
 
-# SString => String => Job => Job
 # Set the value of a tag on a Job
 # This is useful for post-build reflection into the database
-export def setJobTag key value job =
+export def setJobTag (key: String) (value: String) (job: Job): Job =
   def p job key value = prim "job_tag"
   def _ = p job key value
   job
@@ -331,21 +330,21 @@ export def setJobTag key value job =
 def toUsage (Pair (Pair status runtime) (Pair (Pair cputime membytes) (Pair ibytes obytes))) =
   Usage status runtime cputime membytes ibytes obytes
 
-def getJobReality job =
+def getJobReality (job: Job): Result Usage Error =
   def raw job = prim "job_reality"
   raw job | rmap toUsage
 
-def waitJobMerged f job =
+def waitJobMerged (f: Unit => a) (job: Job): a =
   def raw job = prim "job_reality"
   wait (\_ f Unit) (raw job)
 
 # Actual usage of a finished job
-export def getJobReport job =
+export def getJobReport (job: Job): Result Usage Error =
   def raw job = prim "job_report"
   raw job | rmap toUsage
 
 # From database, available the moment a Job exists
-export def getJobRecord job =
+export def getJobRecord (job: Job): Option Usage =
   def raw job = prim "job_record"
   raw job | at 0 | omap toUsage
 
@@ -364,16 +363,20 @@ def guardPath job = match _
 def mapPath = match _
   Fail e = BadPath e, Nil
   Pass l = map treeOk l
-export def killJob job signal = prim "job_kill" # send signal to job
-export def getJobStdout  job = stdio job 1
-export def getJobStderr  job = stdio job 2
-export def getJobInputs  job = tree job 1 | guardPath job
-export def getJobOutputs job = tree job 2 | guardPath job
-export def getJobFailedInputs  job = tree job 1 | mapPath
-export def getJobFailedOutputs job = tree job 2 | mapPath
-export def getJobId job = prim "job_id"
-export def getJobDescription job = prim "job_desc"
-export def getJobOutput job = match (tree job 2)
+
+export def killJob (job: Job) (signal: Integer): Unit =
+  (\j\s prim "job_kill") job signal # send signal to job
+export def getJobStdout  (job: Job): Result String Error = stdio job 1
+export def getJobStderr  (job: Job): Result String Error = stdio job 2
+export def getJobInputs  (job: Job): List Path = tree job 1 | guardPath job
+export def getJobOutputs (job: Job): List Path = tree job 2 | guardPath job
+export def getJobFailedInputs  (job: Job): List Path = tree job 1 | mapPath
+export def getJobFailedOutputs (job: Job): List Path = tree job 2 | mapPath
+export def getJobId (job: Job): Integer =
+  (\j prim "job_id") job
+export def getJobDescription (job: Job): String =
+  (\j prim "job_desc") job
+export def getJobOutput (job: Job): Path = match (tree job 2)
   Fail e = BadPath e
   Pass l if job.isJobOk = match l
     (Pair f _), Nil = Path f
@@ -381,7 +384,7 @@ export def getJobOutput job = match (tree job 2)
     _      = makeBadPath (makeError "More than one output found from '{job.getJobDescription}'")
   _ = makeBadPath (makeError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'")
 
-export def isJobOk job = match (getJobReport job)
+export def isJobOk (job: Job): Boolean = match (getJobReport job)
   Fail _ = False
   Pass u = u.getUsageStatus == 0
 
@@ -390,7 +393,7 @@ export data Status =
   Signaled Integer
   Aborted  Error
 
-export def getJobStatus job = match (getJobReport job)
+export def getJobStatus (job: Job): Status = match (getJobReport job)
   Fail f = Aborted f
   Pass u =
     def status = u.getUsageStatus
@@ -406,8 +409,8 @@ export def getJobStatus job = match (getJobReport job)
 # - "isolate/workspace": makes the build appear run in /var/cache/wake
 #    ... if /var/cache/wake does not exist, a directory 'build/wake' is
 #        used relative to where wake has been installed
-export def wakePath = prim "execpath" # location of the wake executable
-export def fuseRunner =
+export def wakePath: String = prim "execpath" # location of the wake executable
+export def fuseRunner: Runner =
   def fuse = "{wakePath}/fuse-wake"
   def score plan =
     if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
@@ -415,7 +418,7 @@ export def fuseRunner =
   | editJSONRunnerPlanExtraEnv (editEnvironment "DEBUG_FUSE_WAKE" (\_ getenv "DEBUG_FUSE_WAKE"))
   | makeJSONRunner
 
-export def preloadRunner =
+export def preloadRunner: Runner =
   def preload = "{wakePath}/preload-wake"
   def score plan =
     if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
@@ -425,9 +428,10 @@ export def preloadRunner =
 export def rOK = 0
 export def wOK = 1
 export def xOK = 2
-export def access file mode = prim "access"
+export def access (file: String) (mode: Integer): Boolean =
+  (\f\m prim "access") file mode
 
-export def defaultRunner = match sysname
+export def defaultRunner: Runner = match sysname
   "Darwin" = fuseRunner
   _ = match (getenv "USE_FUSE_WAKE")
     Some "0" = preloadRunner
@@ -451,13 +455,13 @@ tuple JSONRunnerPlan =
 
 # make a ``JSONRunnerPlan`` with ``Nil`` and ``(_)`` as defaults for ``ExtraArgs`` and ``Estimate`` respectively
 # rawScript: String; the path to the script to run jobs with
-# score: Plan => Double; runJob chooses the runner with the largest score for a Plan
-export def makeJSONRunnerPlan rawScript score =
+# score: runJob chooses the runner with the largest score for a Plan
+export def makeJSONRunnerPlan (rawScript: String) (score: Plan => Result Double String): JSONRunnerPlan =
   JSONRunnerPlan rawScript Nil Nil score (_)
 
 # Make a Runner that runs a named script to run jobs
 # plan: JSONRunnerPlan; a tuple containing the arguments for this function
-export def makeJSONRunner plan =
+export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
   def rawScript = plan.getJSONRunnerPlanRawScript
   def extraArgs = plan.getJSONRunnerPlanExtraArgs
   def extraEnv = plan.getJSONRunnerPlanExtraEnv
@@ -554,41 +558,41 @@ data Path =
   Path    (name: String)
   BadPath (error: Error)
 
-export def getPathResult path = match path
+export def getPathResult (path: Path): Result Path Error = match path
   BadPath e = Fail e
   _         = Pass path
 
-export def getPathError path = match path
+export def getPathError (path: Path): Option Error = match path
   Path _    = None
   BadPath e = Some e
 
-export def getPathName path = match path
+export def getPathName (path: Path): String = match path
   Path name = name
   BadPath _ = "BADPATH"
 
-export def getPathChild path = match path
+export def getPathChild (path: Path): String = match path
   Path name = replace `^.*/` '' name
   BadPath _ = "BADPATH"
 
-export def getPathParent path = match path
+export def getPathParent (path: Path): Path = match path
   Path name = Path (simplify "{name}/..")
   BadPath e = BadPath e
 
-export def isPathDir = match _
+export def isPathDir: Path => Boolean = match _
   BadPath _ = False
   Path str = matches `0+` (hashcode str)
 
-export def sortPaths paths =
+export def sortPaths (paths: List Path): List Path =
   def fn a b = a.getPathName <~ b.getPathName
   sortBy fn paths
 
-def addhash f =
+def addhash (f: String): String =
   def p = simplify f
   def add f h = prim "add_hash"
   add p (hashcode p)
 
 def hashUsage = defaultUsage | setUsageCPUtime 0.1
-target hashcode f =
+target hashcode (f: String): String =
   def get f = prim "get_hash"
   def reuse = get f
   if reuse !=* "" then reuse else
@@ -603,7 +607,7 @@ target hashcode f =
       True (x, Nil) = x
       _ _ = "BadHash"
 
-export def getPathHash = match _
+export def getPathHash: Path => String = match _
   Path    x = hashcode x
   BadPath _ = "BadHash"
 
@@ -615,10 +619,10 @@ export def getPathHash = match _
 # job only allows cmd access to 'visible', to prevent undeclared dependencies.
 # If you miss declared visible inputs, your build will fail so you can fix it.
 # If you declare too many visible inputs, cmd execution/replay will wait for unnecessary files.
-export def job cmd visible =
+export def job (cmd: List String) (visible: List Path): Job =
   makeExecPlan cmd visible
   | runJob
 
-export def shellJob script visible =
+export def shellJob (script: String) (visible: List Path): Job =
   makeShellPlan script visible
   | runJob

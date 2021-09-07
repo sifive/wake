@@ -199,10 +199,6 @@ Work *claim_hash(Heap &h, Value *value, Continuation *continuation) {
   return CHash::claim(h, value, continuation);
 }
 
-void prim_register(PrimMap &pmap, const char *key, PrimFn fn, PrimType type, int flags, void *data) {
-  pmap.insert(std::make_pair(key, PrimDesc(fn, type, flags, data)));
-}
-
 PrimMap prim_register_all(StringInfo *info, JobTable *jobtable) {
   PrimMap pmap;
   prim_register_string(pmap, info);

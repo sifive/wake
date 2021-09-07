@@ -15,18 +15,18 @@
  * limitations under the License.
  */
 
-#ifndef BIND_H
-#define BIND_H
+#ifndef INTERNAL_TYPES
+#define INTERNAL_TYPES
 
-#include <memory>
+#include "primfn.h"
 
-#include "types/primfn.h"
+PRIMTYPE(type_rcat);
+PRIMTYPE(type_vcat);
+PRIMTYPE(type_scmp);
+PRIMTYPE(type_icmp);
+PRIMTYPE(type_cmp_nan_lt);
+PRIMTYPE(type_tget);
 
-struct Top;
-struct Expr;
-
-// Eliminate DefMap + Top + Subscribe expressions
-std::unique_ptr<Expr> bind_refs(std::unique_ptr<Top> top, const PrimMap &pmap, bool &isTreeBuilt);
-bool flatten_exports(Top &top);
+PrimMap prim_register_internal();
 
 #endif

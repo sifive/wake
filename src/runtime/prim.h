@@ -22,7 +22,7 @@
 #include <string>
 #include <vector>
 
-#include "dst/primfn.h"
+#include "types/primfn.h"
 #include "tuple.h"
 
 struct String;
@@ -100,7 +100,6 @@ struct StringInfo {
    : verbose(v), debug(d), quiet(q), version(version_), wake_cwd(wake_cwd_), cmdline(cmdline_) { }
 };
 
-void prim_register(PrimMap &pmap, const char *key, PrimFn fn, PrimType type, int flags, void *data = 0);
 void prim_register_string(PrimMap &pmap, StringInfo *info);
 void prim_register_vector(PrimMap &pmap);
 void prim_register_integer(PrimMap &pmap);

@@ -23,6 +23,7 @@
 
 #include "types/type.h"
 #include "types/data.h"
+#include "types/internal.h"
 #include "prim.h"
 #include "value.h"
 
@@ -195,13 +196,6 @@ static PRIMTYPE(type_binop) {
     args[0]->unify(Data::typeInteger) &&
     args[1]->unify(Data::typeInteger) &&
     out->unify(Data::typeInteger);
-}
-
-static PRIMTYPE(type_icmp) {
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeInteger) &&
-    args[1]->unify(Data::typeInteger) &&
-    out->unify(Data::typeOrder);
 }
 
 static PRIMFN(prim_icmp) {

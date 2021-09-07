@@ -25,6 +25,7 @@
 #include "types/datatype.h"
 #include "types/type.h"
 #include "types/data.h"
+#include "types/internal.h"
 #include "value.h"
 #include "tuple.h"
 #include "status.h"
@@ -125,16 +126,6 @@ static PRIMFN(prim_tnew) {
   EXPECT(1);
   STRING(location, 0);
   RETURN(Target::alloc(runtime.heap, runtime.heap, location));
-}
-
-static PRIMTYPE(type_tget) {
-  return args.size() == 4 &&
-    args[0]->unify(Data::typeTarget) &&
-    args[1]->unify(Data::typeInteger) &&
-    args[2]->unify(Data::typeInteger) &&
-    args[3]->unify(TypeVar(FN, 2)) &&
-    (*args[3])[0].unify(Data::typeInteger) &&
-    out->unify((*args[3])[1]);
 }
 
 struct CTarget final : public GCObject<CTarget, Continuation> {
