@@ -1334,7 +1334,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
       lambda->typeVar.setTag(0, lambda->name.c_str());
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), state, &bind);
-    RecErrorMessage recm(&lambda->body->fragment);
+    RecErrorMessage recm(lambda->body ? &lambda->body->fragment : &lambda->fragment);
     bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &recm);
     return out && t && tr;
   } else if (expr->type == &DefBinding::type) {
@@ -1413,7 +1413,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     bool b = explore(asc->body.get(), state, binding);
     bool ts = asc->signature.unify(asc->typeVar, state.typeVars);
     AscErrorMessage ascm(&asc->body_fragment);
-    bool tb = asc->body->typeVar.unify(asc->typeVar, &ascm);
+    bool tb = asc->body && asc->body->typeVar.unify(asc->typeVar, &ascm);
     return b && tb && ts;
   } else if (expr->type == &Prim::type) {
     Prim *prim = static_cast<Prim*>(expr);
