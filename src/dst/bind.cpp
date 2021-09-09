@@ -1334,7 +1334,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
       lambda->typeVar.setTag(0, lambda->name.c_str());
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), state, &bind);
-    RecErrorMessage recm(&lambda->body->fragment);
+    RecErrorMessage recm(lambda->body ? &lambda->body->fragment : &lambda->fragment);
     bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &recm);
     return out && t && tr;
   } else if (expr->type == &DefBinding::type) {
