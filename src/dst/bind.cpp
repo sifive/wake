@@ -1413,7 +1413,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     bool b = explore(asc->body.get(), state, binding);
     bool ts = asc->signature.unify(asc->typeVar, state.typeVars);
     AscErrorMessage ascm(&asc->body_fragment);
-    bool tb = asc->body->typeVar.unify(asc->typeVar, &ascm);
+    bool tb = asc->body && asc->body->typeVar.unify(asc->typeVar, &ascm);
     return b && tb && ts;
   } else if (expr->type == &Prim::type) {
     Prim *prim = static_cast<Prim*>(expr);
