@@ -154,7 +154,26 @@ export def x // y =
       foldr flatten tail l
   JArray (helper Nil x)
 
+# Compare two JSON values for equality, as a human would judge them.
+# This includes comparing `JObject`s without regard to the internal order of
+# their keys.
 export def x ==/ y = match x y
+    (JObject a) (JObject b) =
+        def sortJObjectKeys dict =
+            def cmpKeys (Pair k1 _) (Pair k2 _) =
+                #TODO: Ensure a predictable order even when keys are equal.
+                k1 <~ k2
+            sortBy cmpKeys dict
+        def normalizeOrder =
+            JObject _.sortJObjectKeys
+        structurallyEqual (normalizeOrder a) (normalizeOrder b)
+    _ _ =
+        structurallyEqual x y
+
+# Compare two JSON values for equality according to their digital representation.
+# Note that this most significantly compares `JObject`s according to the order
+# in which their keys are stored.
+export def structurallyEqual (x: JValue) (y: JValue): Boolean = match x y
   (JString  a) (JString  b) = a ==~ b
   (JInteger a) (JInteger b) = a ==  b
   (JDouble  a) (JDouble  b) = a ==. b
@@ -162,10 +181,128 @@ export def x ==/ y = match x y
   JNull        JNull        = True
   (JObject  a) (JObject  b) =
     def helper (Pair (Pair k c) (Pair l d)) = k ==~ l && c ==/ d
-    if a.len != b.len then False else zip a b | forall helper
+    if a.len != b.len then
+      False
+    else
+      zip a b
+      | forall helper
   (JArray   a) (JArray   b) =
     def helper (Pair c d) = c ==/ d
     if a.len != b.len then False else zip a b | forall helper
   (JArray a) _ = exists (_ ==/ y) a
   _ (JArray b) = exists (_ ==/ x) b
   _ _ = False
+
+# Simplify a JSON value according to the rules given.
+# For example, Wake's implementation of JSON is slightly more lenient than the
+# base standards, so if maximum compatibility is desired in situations where
+# some other implementation may be parsing generated output,
+# `normalizeJSONBasic` may be used to target that least common denominator.
+export def normalizeJSON (fmt: JSONNormalize): JValue => Result JValue Error = match _
+    JString a =
+        getJSONNormalizeString fmt a
+        | rmap JString
+    JInteger a =
+        getJSONNormalizeInteger fmt a
+        | rmap JInteger
+    JDouble a =
+        getJSONNormalizeDouble fmt a
+        | rmap JDouble
+    JBoolean a =
+        getJSONNormalizeBoolean fmt a
+        | rmap JBoolean
+    JNull =
+        Pass JNull
+    JObject a =
+        getJSONNormalizeObject fmt a
+        | rmap JObject
+    JArray a =
+        getJSONNormalizeArray fmt a
+        | rmap JArray
+
+# The rules by which `normalizeJSON` will simplify JSON values.
+# If any particular function is unable to operate on every input value (e.g. a
+# `JObject` contains duplicate keys of types which cannot be combined), that
+# rule may return a `Fail` which halts the broader processing.
+export tuple JSONNormalize =
+    String: String => Result String Error
+    Integer: Integer => Result Integer Error
+    Double: Double => Result Double Error
+    Boolean: Boolean => Result Boolean Error
+    Object: List (Pair String JValue) => Result (List (Pair String JValue)) Error
+    Array: List JValue => Result (List JValue) Error
+
+# A basic normalization ruleset which returns inputs unchanged.
+export def normalizeJSONDefault: JSONNormalize =
+    JSONNormalize Pass Pass Pass Pass Pass Pass
+
+# Target the minimum JSON language described by the specifications.
+export def normalizeJSONBasic: JSONNormalize =
+    def nfkcKeys =
+        map (_ | editPairFirst unicodeIdentifier)
+    normalizeJSONDefault
+    | setJSONNormalizeString (Pass _.unicodeCanonical)
+    | setJSONNormalizeDouble filterNonDigitJDouble
+    | setJSONNormalizeObject (deduplicateJObjectKeys _.nfkcKeys)
+
+# Fail on any `Double` values which can't be represented numerically.
+# Both JSON specifications describe their double values as allowing decimal or
+# exponential forms, but don't implement the full IEEE standard.
+def filterNonDigitJDouble (n: Double): Result Double Error = match n.dclass
+    DoubleInfinite =
+        failWithError "For compatibility, JSON doubles should not be infinite."
+    DoubleNaN =
+        failWithError "For compatibility, JSON doubles should not be NaN values."
+    _ =
+        Pass n
+
+# Attempt to simplify any `JObject`s which contain multiple instances of a key.
+# While both specifications explicitly allow such duplicate keys, neither
+# requires implementations to do so or describes the behaviour by which they
+# should be handled; therefore, implementations differ in how they handle
+# duplicate keys -- if they do so at all -- and a generator aiming for
+# compatibility shouldn't output objects with duplicate keys.
+#
+# In particular, this function will pass if all instances of the same key also
+# have the same value, or otherwise will combine the values of `JArray` or
+# `JObject` values if all instances of the key have the same type.  It fails if
+# a key is associated with multiple values of different types or different
+# values of a type which cannot be combined.
+def deduplicateJObjectKeys (dict: List (Pair String JValue)): Result (List (Pair String JValue)) Error =
+    def cmpKeysOnly (Pair k1 _) (Pair k2 _) =
+        k1 <~ k2
+    def simplifyKeyGroups = match _
+        Nil =
+            failWithError "groupBy invariant reached in deduplicateJObjectKeys"
+        (Pair key value), ps =
+            (value, map getPairSecond ps)
+            | rfoldr simplifyValues JNull
+            | rmap (Pair key)
+    def simplifyValues: JValue => JValue => Result JValue Error = match _ _
+        val JNull =
+            Pass val
+        JNull acc =
+            Pass acc
+        (JString val) (JString acc) if val ==~ acc =
+            Pass (JString acc)
+        (JInteger val) (JInteger acc) if val == acc =
+            Pass (JInteger acc)
+        (JDouble val) (JDouble acc) if val ==. acc =
+            Pass (JDouble acc)
+        (JBoolean val) (JBoolean acc) if (val && acc) || (!val && !acc) =
+            Pass (JBoolean acc)
+        (JArray val) (JArray acc) =
+            def pairEqual (Pair v1 v2) =
+                v1 ==/ v2
+            if len val == len acc && forall pairEqual (zip val acc) then
+                Pass (JArray acc)
+            else
+                Pass (JArray (val ++ acc))
+        (JObject val) (JObject acc) =
+            val ++ acc
+            | deduplicateJObjectKeys
+            | rmap JObject
+        _ _ =
+            failWithError "For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type may be combined."
+    groupBy cmpKeysOnly dict
+    | findFailFn simplifyKeyGroups
