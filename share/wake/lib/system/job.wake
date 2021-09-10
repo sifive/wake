@@ -60,7 +60,7 @@ tuple Runner =
 # param (Runner _ _ run): base runner that the current runner is built on top of
 #   i.e. localRISCVRunner is built on localRunner.
 
-export def makeRunner name score pre post (Runner _ _ run) =
+export def makeRunner (name: String) (score: Plan => Result Double String) (pre: Result RunnerInput Error => Pair (Result RunnerInput Error) a) (post: Pair (Result RunnerOutput Error) a => Result RunnerOutput Error) (Runner _ _ run: Runner): Runner =
   def doit job preInput = match (pre preInput)
     Pair runInput state =
       def runOutput = run job runInput
@@ -106,13 +106,19 @@ def isShare: Persistence => Boolean = match _
   _     = False
 
 # Convenience accessor methods
-export def getPlanOnce  p = isOnce  (getPlanPersistence p)
-export def getPlanKeep  p = isKeep  (getPlanPersistence p)
-export def getPlanShare p = isShare (getPlanPersistence p)
+export def getPlanOnce (p: Plan): Boolean =
+  isOnce (getPlanPersistence p)
+export def getPlanKeep (p: Plan): Boolean =
+  isKeep (getPlanPersistence p)
+export def getPlanShare (p: Plan): Boolean =
+  isShare (getPlanPersistence p)
 
-export def setPlanOnce  v p = editPlanOnce  (\_ v) p
-export def setPlanKeep  v p = editPlanKeep  (\_ v) p
-export def setPlanShare v p = editPlanShare (\_ v) p
+export def setPlanOnce (v: Boolean) (p: Plan): Plan =
+  editPlanOnce (\_ v) p
+export def setPlanKeep (v: Boolean) (p: Plan): Plan =
+  editPlanKeep (\_ v) p
+export def setPlanShare (v: Boolean) (p: Plan): Plan =
+  editPlanShare (\_ v) p
 
 # Prepend 'value' to the Plan's 'PATH' environment value
 export def prependPlanPath (value: String) (plan: Plan): Plan =
@@ -282,7 +288,7 @@ def runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run (L
   then runOnce   cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run echo stdout stderr label
   else runAlways cmd env dir stdin res usage finputs foutputs vis (isKeep pers) run echo stdout stderr label
 
-export def runJobWith (Runner _ _ run) (Plan label cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs) =
+export def runJobWith (Runner _ _ run: Runner) (Plan label cmd vis env dir stdin stdout stderr echo pers _ res _ usage finputs foutputs: Plan): Job =
   runJobImp label cmd env dir stdin res usage finputs foutputs vis pers run echo stdout stderr
 
 data RunnerOption =
@@ -367,12 +373,18 @@ def mapPath = match _
 
 export def killJob (job: Job) (signal: Integer): Unit =
   (\j\s prim "job_kill") job signal # send signal to job
-export def getJobStdout  (job: Job): Result String Error = stdio job 1
-export def getJobStderr  (job: Job): Result String Error = stdio job 2
-export def getJobInputs  (job: Job): List Path = tree job 1 | guardPath job
-export def getJobOutputs (job: Job): List Path = tree job 2 | guardPath job
-export def getJobFailedInputs  (job: Job): List Path = tree job 1 | mapPath
-export def getJobFailedOutputs (job: Job): List Path = tree job 2 | mapPath
+export def getJobStdout (job: Job): Result String Error =
+  stdio job 1
+export def getJobStderr (job: Job): Result String Error =
+  stdio job 2
+export def getJobInputs (job: Job): List Path =
+  tree job 1 | guardPath job
+export def getJobOutputs (job: Job): List Path =
+  tree job 2 | guardPath job
+export def getJobFailedInputs (job: Job): List Path =
+  tree job 1 | mapPath
+export def getJobFailedOutputs (job: Job): List Path =
+  tree job 2 | mapPath
 export def getJobId (job: Job): Integer =
   (\j prim "job_id") job
 export def getJobDescription (job: Job): String =

@@ -65,7 +65,8 @@ export def parseJSONFile (path: Path): Result JValue Error =
       Fail f = Fail (makeError f)
     Fail f = Fail f
 
-export def jsonEscape str = prim "json_str"
+export def jsonEscape (str: String): String =
+  prim "json_str"
 
 tuple JSONFormat =
   export String:  String  => String
@@ -108,19 +109,27 @@ export def defaultJSONFormat: JSONFormat =
       _              = dstr d
   JSONFormat jsonEscape str formatDouble 0
 
-export def prettyJSONFormat = defaultJSONFormat | setJSONFormatIndent 2
+export def prettyJSONFormat: JSONFormat =
+  defaultJSONFormat
+  | setJSONFormatIndent 2
 
-export def customFormatJSON fmt body = doFormat fmt body | cat
-export def formatJSON = customFormatJSON defaultJSONFormat
-export def prettyJSON = customFormatJSON prettyJSONFormat
+export def customFormatJSON (fmt: JSONFormat) (body: JValue): String =
+  doFormat fmt body
+  | cat
+export def formatJSON: JValue => String =
+  customFormatJSON defaultJSONFormat
+export def prettyJSON: JValue => String =
+  customFormatJSON prettyJSONFormat
 
-export def root /| filterFn = jfilter filterFn root
-export def jfilter filterFn root = match root
+export def (root: JValue) /| (filterFn: JValue => Boolean): JValue =
+  jfilter filterFn root
+export def jfilter (filterFn: JValue => Boolean) (root: JValue): JValue = match root
   JArray l = JArray (filter filterFn l)
   _ = if filterFn root then JArray (root, Nil) else JArray Nil
 
-export def root /../ filterFn = jfind filterFn root
-export def jfind filterFn root =
+export def (root: JValue) /../ (filterFn: JValue => Boolean): JValue =
+  jfind filterFn root
+export def jfind (filterFn: JValue => Boolean) (root: JValue): JValue =
   def helper node acc = match node
     JArray l =
       def tail = foldr helper acc l
@@ -132,12 +141,13 @@ export def jfind filterFn root =
       if filterFn node then node, acc else acc
   helper root Nil | JArray
 
-export def jempty root = empty (jlist root)
-export def jlist root = match root
+export def jempty (root: JValue): Boolean =
+  empty (jlist root)
+export def jlist (root: JValue): List JValue = match root
   JArray x = x
   _ = root, Nil
 
-export def x // y =
+export def (x: JValue) // (y: RegExp): JValue =
   def helper tail = match _
     JString  _ = tail
     JInteger _ = tail
@@ -154,7 +164,7 @@ export def x // y =
       foldr flatten tail l
   JArray (helper Nil x)
 
-export def x ==/ y = match x y
+export def (x: JValue) ==/ (y: JValue): Boolean = match x y
   (JString  a) (JString  b) = a ==~ b
   (JInteger a) (JInteger b) = a ==  b
   (JDouble  a) (JDouble  b) = a ==. b

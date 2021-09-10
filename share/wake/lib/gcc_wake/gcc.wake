@@ -15,16 +15,24 @@
 
 package gcc_wake
 
-export def cpp11Flags    = ("-std=c++11", Nil)
-export def c11Flags      = ("-std=c11", Nil)
-export def debugCFlags   = ("-Wall", "-Wextra", "-O0", "-g", "-pg", Nil)
-export def debugLFlags   = ("-g", "-pg", Nil)
-export def releaseCFlags = ("-Wall", "-O2", Nil)
-export def releaseLFlags = (Nil)
-export def staticCFlags =  ("-Wall", "-O2", "-flto", Nil)
-export def staticLFlags  = ("-flto", "-static", "-s", Nil)
+export def cpp11Flags: List String =
+    "-std=c++11", Nil
+export def c11Flags: List String =
+    "-std=c11", Nil
+export def debugCFlags: List String =
+    "-Wall", "-Wextra", "-O0", "-g", "-pg", Nil
+export def debugLFlags: List String =
+    "-g", "-pg", Nil
+export def releaseCFlags: List String =
+    "-Wall", "-O2", Nil
+export def releaseLFlags: List String =
+    Nil
+export def staticCFlags: List String =
+    "-Wall", "-O2", "-flto", Nil
+export def staticLFlags: List String =
+    "-flto", "-static", "-s", Nil
 
-def doCompileC variant gcc flags headers cfile =
+def doCompileC (variant: String) (gcc: String) (flags: List String) (headers: List Path) (cfile: Path): Result (List Path) Error =
     def obj = replace `\.c(pp)?$` ".{variant}.o" cfile.getPathName
     def cmdline =
         gcc, flags ++
@@ -35,7 +43,7 @@ def doCompileC variant gcc flags headers cfile =
     | getJobOutputs
     | findFailFn getPathResult
 
-def doLinkO variant linker flags objects targ =
+def doLinkO (variant: String) (linker: String) (flags: List String) (objects: List Path) (targ: String): Result (List Path) Error =
     def cmdline =
         (linker, "-o", "{targ}.{variant}", map getPathName objects) ++
         flags
@@ -45,10 +53,10 @@ def doLinkO variant linker flags objects targ =
     | getJobOutputs
     | findFailFn getPathResult
 
-export def makeCompileC variant gcc flags =
+export def makeCompileC (variant: String) (gcc: String) (flags: List String): List (Pair String (List String => List Path => Path => Result (List Path) Error)) =
     Pair variant (\extraFlags doCompileC variant gcc (flags ++ extraFlags)), Nil
 
-export def makeLinkO variant linker flags =
+export def makeLinkO (variant: String) (linker: String) (flags: List String): List (Pair String (List String => List Path => String => Result (List Path) Error)) =
     Pair variant (\extraFlags doLinkO variant linker (flags ++ extraFlags)), Nil
 
 export topic compileC: Pair String ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Result (List Path) Error)
@@ -77,5 +85,5 @@ def pickVariant variant variants =
 export def compileC (variant: String): (extraFlags: List String) => (headers: List Path) => (cfile: Path) => Result (List Path) Error =
     pickVariant variant (subscribe compileC)
 
-export def linkO    (variant: String): (extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error =
+export def linkO (variant: String): (extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error =
     pickVariant variant (subscribe linkO)

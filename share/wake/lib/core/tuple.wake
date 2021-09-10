@@ -43,13 +43,13 @@ export tuple Triple a b c =
 export data a; b = a; b
 
 # Handy accessor methods
-export def _0 (x; _) = x
-export def _1 (_; x; _) = x
-export def _2 (_; _; x; _) = x
-export def _3 (_; _; _; x; _) = x
-export def _4 (_; _; _; _; x; _) = x
-export def _5 (_; _; _; _; _; x; _) = x
-export def _6 (_; _; _; _; _; _; x; _) = x
-export def _7 (_; _; _; _; _; _; _; x; _) = x
-export def _8 (_; _; _; _; _; _; _; _; x; _) = x
-export def _9 (_; _; _; _; _; _; _; _; _; x; _) = x
+export def _0 ((x: a); _): a = x
+export def _1 (_; (x: b); _): b = x
+export def _2 (_; _; (x: c); _): c = x
+export def _3 (_; _; _; (x: d); _): d = x
+export def _4 (_; _; _; _; (x: e); _): e = x
+export def _5 (_; _; _; _; _; (x: f); _): f = x
+export def _6 (_; _; _; _; _; _; (x: g); _): g = x
+export def _7 (_; _; _; _; _; _; _; (x: h); _): h = x
+export def _8 (_; _; _; _; _; _; _; _; (x: i); _): i = x
+export def _9 (_; _; _; _; _; _; _; _; _; (x: j); _): j = x

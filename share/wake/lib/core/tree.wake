@@ -31,17 +31,22 @@ def ratioQ = 3
 def ratioD = 2
 
 # Create a new Tree, sorted by cmp.
-export def tnew cmp = Tree cmp Tip
+export def tnew (cmp: a => a => Order): Tree a =
+  Tree cmp Tip
 
+# Convert a List to a Tree, removing any duplicate values.
+export def listToTree (cmp: a => a => Order) (list: List a): Tree a =
+  vectorToTree cmp (listToVector list)
 # Convert a List to a Tree.
-export def listToTree cmp list = vectorToTree cmp (listToVector list)
-export def listToTreeMulti cmp list = vectorToTreeMulti cmp (listToVector list)
-
-export def vectorToTreeMulti cmp v =
-  Tree cmp (build (vsortBy (cmp _ _ | isLT) v))
+export def listToTreeMulti (cmp: a => a => Order) (list: List a): Tree a =
+  vectorToTreeMulti cmp (listToVector list)
 
 # Convert a Vector to a Tree.
-export def vectorToTree cmp v =
+export def vectorToTreeMulti (cmp: a => a => Order) (v: Vector a): Tree a =
+  Tree cmp (build (vsortBy (cmp _ _ | isLT) v))
+
+# Convert a Vector to a Tree, removing any duplicate values.
+export def vectorToTree (cmp: a => a => Order) (v: Vector a): Tree a =
   Tree cmp (build (vdistinctRunBy (cmp _ _ | isEQ) (vsortBy (cmp _ _ | isLT) v)))
 
 def build v = match (vlen v)
@@ -95,25 +100,31 @@ export def tinsertMulti (y: a) (Tree cmp root: Tree a): Tree a =
   Tree cmp (helper root)
 
 # Returns True if a is a subset of b, otherwise False.
-export def a ⊆ b = tsubset a b
+export def (a: Tree a) ⊆ (b: Tree a): Boolean =
+  tsubset a b
 
 # Returns True if a is a superset of b, otherwise False.
-export def a ⊇ b = tsubset b a
+export def (a: Tree a) ⊇ (b: Tree a): Boolean =
+  tsubset b a
 
 # Returns True if a is NOT a superset of b, otherwise False.
-export def a ⊉ b = ! a ⊇ b
+export def (a: Tree a) ⊉ (b: Tree a): Boolean =
+  ! a ⊇ b
 
 # Returns True if a is NOT a subset of b, otherwise False.
-export def a ⊈ b = ! a ⊆ b
+export def (a: Tree a) ⊈ (b: Tree a): Boolean =
+  ! a ⊆ b
 
 # Returns True if a is a proper subset of b, otherwise False.
-export def a ⊊ b = a ⊆ b && b ⊈ a # strict
+export def (a: Tree a) ⊊ (b: Tree a): Boolean =
+  a ⊆ b && b ⊈ a # strict
 
 # Returns True if a is a proper superset of b, otherwise False.
-export def a ⊋ b = a ⊇ b && b ⊉ a # strict
+export def (a: Tree a) ⊋ (b: Tree a): Boolean =
+  a ⊇ b && b ⊉ a # strict
 
 # Returns True if every element of a is also in b, otherwise false.
-export def tsubset (Tree _ aroot) (Tree cmp broot) =
+export def tsubset (Tree _ aroot: Tree a) (Tree cmp broot: Tree a): Boolean =
   def helper a b = match a b
     Tip _ = True
     _ Tip = False
@@ -134,32 +145,34 @@ def delete cmp y t =
   helper t
 
 # Folds from left to right.
-export def tfoldl f a (Tree _ root) =
+export def tfoldl (f: b => a => b) (acc: b) (Tree _ root: Tree a): b =
   def helper a = match _
     Tip         = a
     Bin _ l x r = helper (f (helper a l) x) r
-  helper a root
+  helper acc root
 
 # Folds from right to left.
-export def tfoldr f a (Tree _ root) =
+export def tfoldr (f: a => b => b) (acc: b) (Tree _ root: Tree a): b =
   def helper a = match _
     Tip         = a
     Bin _ l x r = helper (f x (helper a r)) l
-  helper a root
+  helper acc root
 
 # Fold in parallel; assumes f is an associative operator and has type: a => a => a
-export def tfoldmap f a g (Tree _ root) =
-  def helper a = match _
-    Tip = g a
-    Bin _ l x r = f (helper a l) (helper x r)
-  helper a root
+export def tfoldmap (f: b => b => b) (acc: a) (g: a => b) (Tree _ root: Tree a): b =
+  def helper acc = match _
+    Tip = g acc
+    Bin _ l x r = f (helper acc l) (helper x r)
+  helper acc root
 
-export def tfold f a t = tfoldmap f a (_) t
+export def tfold (f: a => a => a) (a: a) (t: Tree a): a =
+  tfoldmap f a (_) t
 
 # Converts a Tree to a List.
-export def treeToList = tfoldr (_,_) Nil
+export def treeToList: Tree a => List a =
+  tfoldr (_,_) Nil
 
-export def tappi f (Tree _ root) =
+export def tappi (f: Integer => a => b) (Tree _ root: Tree a): Unit =
   def helper i = match _
     Tip = Unit
     Bin _ l x r =
@@ -196,11 +209,13 @@ export def tsplitAt (i: Integer) (Tree cmp root: Tree a): Pair (Tree a) (Tree a)
   match (helper i root)
     Pair l r = Pair (Tree cmp l) (Tree cmp r)
 
-export def ttake i t = tsplitAt i t | getPairFirst
-export def tdrop i t = tsplitAt i t | getPairSecond
+export def ttake (i: Integer) (t: Tree a): Tree a =
+  tsplitAt i t | getPairFirst
+export def tdrop (i: Integer) (t: Tree a): Tree a =
+  tsplitAt i t | getPairSecond
 
-# Lowest rank element where f x = True  => Option (Pair x rank)
-export def tfind f (Tree _ root) =
+# Lowest rank element where f x == True, along with that rank.
+export def tfind (f: a => Boolean) (Tree _ root: Tree a): Option (Pair a Integer) =
   def helper = match _
     Tip         = None
     Bin s l x r = match (helper l) (f x) (helper r)
@@ -210,24 +225,27 @@ export def tfind f (Tree _ root) =
       _        _    _       = None
   helper root
 
-export def tsplitUntil f t =
+export def tsplitUntil (f: a => Boolean) (t: Tree a): Pair (Tree a) (Tree a) =
   match (tfind f t)
     None = match t
       (Tree cmp _) = Pair t (Tree cmp Tip)
     Some (Pair _ i) = tsplitAt i t
 
-export def ttakeUntil f t = tsplitUntil f t | getPairFirst
-export def tdropUntil f t = tsplitUntil f t | getPairSecond
+export def ttakeUntil (f: a => Boolean) (t: Tree a): Tree a =
+  tsplitUntil f t | getPairFirst
+export def tdropUntil (f: a => Boolean) (t: Tree a): Tree a =
+  tsplitUntil f t | getPairSecond
 
 # Returns True if there exists an x in t where f x = True
-export def texists f t = match (tfind f t)
+export def texists (f: a => Boolean) (t: Tree a): Boolean = match (tfind f t)
   Some _ = True
   None   = False
 
-export def tforall f t = ! texists (! f _) t
+export def tforall (f: a => Boolean) (t: Tree a): Boolean =
+  ! texists (! f _) t
 
 # Split tree into those elements <, =, and > y
-export def tsplit y (Tree cmp root) =
+export def tsplit (y: a) (Tree cmp root: Tree a): Triple (Tree a) (Tree a) (Tree a) =
   match (split y cmp root)
     Triple l e g = Triple (Tree cmp l) (Tree cmp e) (Tree cmp g)
 
@@ -355,9 +373,8 @@ def upper f root =
     Bin s l x r = if f x then someL z i l else someR x (i+s) r
   none root
 
-# Extract all elements from the tree which are equal to y
-# => Pair (matches: List x) (rank: Integer)
-export def tequal y (Tree cmp root) =
+# Extract all elements from the tree which are equal to y, along with their highest rank.
+export def tequal (y: a) (Tree cmp root: Tree a): Pair (List a) Integer=
   def helperR i out = match _ # i = size including self
     Tip         = Pair out i
     Bin s l x r = match (cmp x y)
@@ -373,16 +390,20 @@ export def tequal y (Tree cmp root) =
   helperL 0 Nil root
 
 # Returns True if x is an element of y, False otherwise.
-export def x ∈ y = tcontains x y
+export def (x: a) ∈ (y: Tree a): Boolean =
+  tcontains x y
 
 # Returns True if x is NOT an element of y, False otherwise.
-export def x ∉ y = ! x ∈ y
+export def (x: a) ∉ (y: Tree a): Boolean =
+  ! x ∈ y
 
 # Returns True if x contains y, False otherwise.
-export def x ∋ y = y ∈ x
+export def (x: Tree a) ∋ (y: a): Boolean =
+  y ∈ x
 
 # Returns True if x does NOT contain y, False otherwise.
-export def x ∌ y = y ∉ x
+export def (x: Tree a) ∌ (y: a): Boolean =
+  y ∉ x
 
 export def tcontains (y: a) (t: Tree a): Boolean =
   match t (tupperLE y t)
@@ -399,8 +420,9 @@ export def tdistinctBy (cmp: a => a => Order) (t: Tree a): Tree a = match t
 export def tdistinctRunBy (f: a => a => Boolean) (t: Tree a): Tree a = match t
   Tree cmp _ = Tree cmp (build (vdistinctRunBy f (treeToVector t)))
 
-# Returns the union of trees a and b, keeps only values from a if they are equal to values in b.
-export def a ∪ b = tunion a b
+# Returns the union of trees a and b, preferencing values from a if any are in both trees
+export def (a: Tree a) ∪ (b: Tree a): Tree a =
+  tunion a b
 
 # Returns the union of two trees, given their roots.
 export def tunion (Tree _ aroot: Tree a) (Tree cmp broot: Tree a): Tree a =
@@ -414,8 +436,9 @@ def union cmp aroot broot =
   helper aroot broot
 
 # Union of two trees, keeping equal values of a before equal values of b
-export def a ⊎ b = tunionMulti a b
-export def tunionMulti (Tree _ aroot) (Tree cmp broot) =
+export def (a: Tree a) ⊎ (b: Tree a): Tree a =
+  tunionMulti a b
+export def tunionMulti (Tree _ aroot: Tree a) (Tree cmp broot: Tree a): Tree a =
   Tree cmp (unionMulti cmp aroot broot)
 
 def unionMulti cmp aroot broot =
@@ -442,8 +465,9 @@ export def tsubtract (Tree _ aroot: Tree a) (Tree cmp broot: Tree a): Tree a =
   Tree cmp (helper aroot broot)
 
 # Returns a tree containing all elements of A which are also in B.
-export def a ∩ b = tintersect a b
-export def tintersect (Tree _ aroot) (Tree cmp broot) =
+export def (a: Tree a) ∩ (b: Tree a): Tree a =
+  tintersect a b
+export def tintersect (Tree _ aroot: Tree a) (Tree cmp broot: Tree a): Tree a =
   def helper a b = match a b
     Tip _ = Tip
     _ Tip = Tip

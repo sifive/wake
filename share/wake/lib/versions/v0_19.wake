@@ -19,11 +19,16 @@ export def tapLevel (level: LogLevel) (formatFn: a => String) (value: a): a =
     def _ = printlnLevel level (formatFn value)
     value
 
-export def tapError   = tapLevel logError
-export def tapWarn    = tapLevel logWarn
-export def tapNormal  = tapLevel logNormal
-export def tapVerbose = tapLevel logVerbose
-export def tapDebug   = tapLevel logDebug
+export def tapError: (a => String) => a => a =
+    tapLevel logError
+export def tapWarn: (a => String) => a => a =
+    tapLevel logWarn
+export def tapNormal: (a => String) => a => a =
+    tapLevel logNormal
+export def tapVerbose: (a => String) => a => a =
+    tapLevel logVerbose
+export def tapDebug: (a => String) => a => a =
+    tapLevel logDebug
 
 export def installIn (x: String) (y: Path): Path =
     from wake import installIn
@@ -32,9 +37,12 @@ export def installIn (x: String) (y: Path): Path =
 export def makePlan: List String => List Path => Plan =
     makeExecPlan
 
-export def vfoldmap f a g v = vmapReduce g f a v
-export def vfold f a v = vmapReduce (_) f a v
-export def vscanmap f a g v = vmapScan g f a v
+export def vfoldmap (f: accum => accum => accum) (a: accum) (g: element => accum) (v: Vector element): accum =
+    vmapReduce g f a v
+export def vfold (f: a => a => a) (a: a) (v: Vector a): a =
+    vmapReduce (_) f a v
+export def vscanmap (f: b => b => b) (a: b) (g: a => b) (v: Vector a): Vector b =
+    vmapScan g f a v
 
 export def idouble (x: Double): Option Integer = match (dmodf x)
     Pair x 0.0 = Some x
