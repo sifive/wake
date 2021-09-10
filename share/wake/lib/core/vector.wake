@@ -406,10 +406,10 @@ def vfilterTop (select: Vector Boolean) (Vector v s e: Vector a): Vector a =
 # The generatingFn is called repeatedly
 #
 #   vunfoldl (\x Pair (x+1) (str x)) 3 5 = ["3", "4", "5", "6", "7"]
-export def vunfoldl (generatingFn: accum => Pair accum element): accum => Integer => Vector b =
+export def vunfoldl (generatingFn: accum => Pair accum element): accum => Integer => Vector element =
     vunfoldl2 (\_ generatingFn) Unit
 
-def vunfoldl2 (generatingFn: fixed => accum => Pair accum element): fixed => accum => Integer => Vector b =
+def vunfoldl2 (generatingFn: fixed => accum => Pair accum element): fixed => accum => Integer => Vector element =
     def loop f a v i e =
         if i == e then
             Unit
@@ -419,7 +419,7 @@ def vunfoldl2 (generatingFn: fixed => accum => Pair accum element): fixed => acc
             loop f an v (i+1) e
     def top f a n =
         def m = max 0 n
-        def out = vnew m
+        def out: Array element = vnew m
         def _ = loop f a out 0 m
         Vector out 0 m
     top
@@ -477,7 +477,7 @@ export def vscanr (f: b => a => a): a => Vector b => Vector a =
 # The combineFn may be called up to twice per input.
 export def vmapScan (mapFn: element => accum) (combineFn: accum => accum => accum) (acc: accum) (v: Vector element): Vector accum =
     def len = vlen v + 1
-    def fanin: Array a = vnew len
+    def fanin: Array accum = vnew len
     def gather s e =
         if e - s != 1 then
             def mid = (e+s) >> 1
@@ -498,7 +498,7 @@ export def vmapScan (mapFn: element => accum) (combineFn: accum => accum => accu
             def _ = bitrev bottom
             vset fanin (x-1) (gather (bottom-1) (x-1))
     def _ = bitrev len
-    def fanout: Array a = vnew len
+    def fanout: Array accum = vnew len
     def scatter a s e =
         if e - s == 1 then
             vset fanout s a
