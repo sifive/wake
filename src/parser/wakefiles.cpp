@@ -33,6 +33,7 @@
 #include <fstream>
 #include <algorithm>
 
+#include "compat/readable.h"
 #include "util/execpath.h"
 #include "wakefiles.h"
 
@@ -395,7 +396,7 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
   std::string rel_libdir = make_relative(get_cwd(), make_canonical(abs_libdir));
 
   std::vector<std::string> acc;
-  if (!workspace || access("share/wake/lib/core/boolean.wake", R_OK) != 0)
+  if (!workspace || !is_readable("share/wake/lib/core/boolean.wake"))
     if (push_files(acc, rel_libdir, exp, 0)) ok = false;
   if (workspace && push_files(acc, ".", exp, 0)) ok = false;
 

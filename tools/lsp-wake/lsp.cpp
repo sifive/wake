@@ -29,6 +29,7 @@
 #include <utility>
 #include <algorithm>
 
+#include "compat/readable.h"
 #include "util/location.h"
 #include "util/execpath.h"
 #include "util/diagnostic.h"
@@ -348,7 +349,7 @@ private:
       if (!isSTDLibValid) {
         notifyAboutInvalidSTDLib();
         message = JSONConverter::createInitializeResultInvalidSTDLib(receivedMessage);
-      } else if (access(crashedFlagFilename.c_str(), F_OK) != -1) {
+      } else if (is_readable(crashedFlagFilename.c_str())) {
         message = JSONConverter::createInitializeResultCrashed(receivedMessage);
         isCrashed = true;
       } else {
@@ -593,7 +594,7 @@ int main(int argc, const char **argv) {
 #endif
 
   LSPServer lsp;
-  if (access((stdLib + "/core/boolean.wake").c_str(), F_OK) != -1) {
+  if (is_readable((stdLib + "/core/boolean.wake").c_str())) {
     lsp = LSPServer(stdLib);
   } else {
     lsp = LSPServer(false, stdLib);
