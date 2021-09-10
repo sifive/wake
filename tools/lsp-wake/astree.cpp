@@ -53,7 +53,7 @@ void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &proce
   auto allFiles = find_all_wakefiles(enumok, true, false, stdLib);
 
   std::map<std::string, std::vector<Diagnostic>> diagnostics;
-  LSPReporter lspReporter(diagnostics);
+  LSPReporter lspReporter(diagnostics, allFiles);
   reporter = &lspReporter;
 
   std::unique_ptr<Top> top(new Top);
@@ -387,5 +387,10 @@ void ASTree::LSPReporter::report(Diagnostic diagnostic) {
   diagnostics[diagnostic.getFilename()].push_back(diagnostic);
 }
 
-ASTree::LSPReporter::LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics)  : diagnostics(
-  _diagnostics) {}
+ASTree::LSPReporter::LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics, const std::vector<std::string> &allFiles)  : diagnostics(
+  _diagnostics) {
+  // create an empty diagnostics vector for each file
+  for (const std::string &fileName: allFiles) {
+    diagnostics[fileName];
+  }
+}

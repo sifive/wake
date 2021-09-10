@@ -79,7 +79,7 @@ private:
 
         void report(Diagnostic diagnostic) override;
     public:
-        explicit LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics);
+        explicit LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics, const std::vector<std::string> &allFiles);
     };
 
     void explore(Expr *expr, bool isGlobal);
