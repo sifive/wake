@@ -20,6 +20,7 @@ package wake
 # Unlike List, it is harder to accumulate a Vector from individual elements.
 # Many Vector methods are structured to exploit multiple cores.
 data Vector a = Vector (Array a) Integer Integer
+from wake export type Vector
 
 # How much of a vector to process on a single core
 def vectorChunkSize = 256
