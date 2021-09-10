@@ -48,6 +48,7 @@
 #define VERSION_STR TOSTRING(VERSION)
 
 #ifdef __EMSCRIPTEN__
+#define CERR_DEBUG
 #include <emscripten/emscripten.h>
 
 EM_ASYNC_JS(char *, nodejs_getstdin, (), {
@@ -296,12 +297,12 @@ private:
     void refresh(const std::string &why) {
       ignoredCount = 0;
       if (needsUpdate && !isCrashed) {
-#ifdef __EMSCRIPTEN__
+#ifdef CERR_DEBUG
         struct timeval start, stop;
         gettimeofday(&start, 0);
 #endif
         diagnoseProject();
-#ifdef __EMSCRIPTEN__
+#ifdef CERR_DEBUG
         gettimeofday(&stop, 0);
         double delay =
           (stop.tv_sec  - start.tv_sec) +
@@ -313,10 +314,6 @@ private:
 
     void poll() {
       refresh("timeout");
-#ifdef __EMSCRIPTEN__
-      int usage = EM_ASM_INT({ return HEAPU8.length; });
-      std::cerr << "Two second heart-beat; using " << usage << " bytes of memory" << std::endl;
-#endif
     }
 
     void callMethod(const std::string &method, const JAST &request) {
@@ -421,7 +418,7 @@ private:
         if (++ignoredCount > 2) {
           refresh("highlight");
         } else {
-#ifdef __EMSCRIPTEN__
+#ifdef CERR_DEBUG
           std::cerr << "Opting not to refresh code for highlight request" << std::endl;
 #endif
         }
@@ -437,7 +434,7 @@ private:
         if (++ignoredCount > 2) {
           refresh("hover");
         } else {
-#ifdef __EMSCRIPTEN__
+#ifdef CERR_DEBUG
           std::cerr << "Opting not to refresh code for hover request" << std::endl;
 #endif
         }
@@ -453,7 +450,7 @@ private:
         if (++ignoredCount > 2) {
           refresh("document-symbol");
         } else {
-#ifdef __EMSCRIPTEN__
+#ifdef CERR_DEBUG
           std::cerr << "Opting not to refresh code for document-symbol request" << std::endl;
 #endif
         }
@@ -576,22 +573,6 @@ int main(int argc, const char **argv) {
   } else {
     stdLib = find_execpath() + "/../../share/wake/lib";
   }
-
-  #ifdef __EMSCRIPTEN__
-  char *cwd = (char*)EM_ASM_INT({
-    FS.mkdir('/root');
-    FS.mount(NODEFS, { root: '/' }, '/root');
-    let cwd = process.cwd();
-    let lengthBytes = lengthBytesUTF8(cwd)+1;
-    let stringOnWasmHeap = _malloc(lengthBytes);
-    stringToUTF8(cwd, stringOnWasmHeap, lengthBytes);
-    return stringOnWasmHeap;
-  });
-  if (0 != chdir("/root")) std::cerr << "Could not enter root filesystem" << std::endl;
-  if (0 != chdir(cwd+1)) std::cerr << "Could not re-enter current-working directory " << cwd << std::endl;
-  free(cwd);
-  stdLib = "/root" + stdLib;
-#endif
 
   LSPServer lsp;
   if (is_readable((stdLib + "/core/boolean.wake").c_str())) {

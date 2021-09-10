@@ -96,6 +96,7 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
     int32_t length;
     uint8_t *base = (uint8_t*)EM_ASM_INT({
       try {
+        const fs = require('fs');
         const fileBuffer = fs.readFileSync(UTF8ToString($1));
         const wasmPointer = Module._malloc(fileBuffer.length+1);
         fileBuffer.copy(Module.HEAPU8, wasmPointer);
