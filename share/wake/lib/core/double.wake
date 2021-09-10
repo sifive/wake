@@ -27,12 +27,12 @@ export def dabs (x: Double): Double =
 # Unary negative sign for a Double.
 # -. (-. 2.5) =  2.5
 # -. (+. 2.5) = -2.5
-export def   -. (x: Double): Double =
+export def -. (x: Double): Double =
     (\_ prim "dneg") x
 
 # Unary positive sign for a Double.
 # +. 2.5 = 2.5
-export def +. (x: Double) =
+export def +. (x: Double): Double =
     x
 
 # Binary addition operator for Double values.

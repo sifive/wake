@@ -146,7 +146,7 @@ export def lcm (x: Integer) (y: Integer): Integer =
 # Computes (x^y) % m.
 # powm 2 7 5 = 4
 # powm 3 2 2 = 1
-export def powm (x: Integer) (y: Integer) (m: Integer) =
+export def powm (x: Integer) (y: Integer) (m: Integer): Integer =
     (\_\_\_ prim "powm") x y m
 
 # Compare two Integers for Order

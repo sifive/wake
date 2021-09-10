@@ -24,14 +24,14 @@ def toVariant = match _
     "wasm"    = Pass (Pair "wasm-cpp11-release"   "wasm-c11-release")
     s = Fail "Unknown build target ({s})".makeError
 
-export def build = match _
+export def build: List String => Result String Error = match _
     "tarball", Nil = tarball Unit | rmap (\_ "TARBALL")
     kind, Nil =
         require Pass variant = toVariant kind
         all variant | rmap (\_ "BUILD")
     _ = Fail "no target specified (try: build default/debug/tarball)".makeError
 
-export def install = match _
+export def install: List String => Result String Error = match _
     dest, kind, Nil = doInstall (in cwd dest) kind | rmap (\_ "INSTALL")
     dest, Nil = doInstall (in cwd dest) "default" | rmap (\_ "INSTALL")
     _ = Fail "no directory specified (try: install /opt/local)".makeError
@@ -131,7 +131,7 @@ def tarball Unit =
         | getJobOutput
     findFailFn getPathResult (tarball, changelog, Nil)
 
-export def static _ =
+export def static _: Result Path Error =
     def filesResult = doInstall "tmp" "static"
     def releaseResult = buildAs Unit
     def timeResult = buildOn Unit

@@ -61,7 +61,7 @@ export def vectorToList: Vector a => List a =
 #
 #   vempty (vseq 4) = False
 #   vempty (vseq 0) = True
-export def vempty (Vector _ s e): Boolean =
+export def vempty (Vector _ s e: Vector a): Boolean =
     s == e
 
 # vlen: returns the length of the ``Vector``.
@@ -69,7 +69,7 @@ export def vempty (Vector _ s e): Boolean =
 #   vlen (vseq x) = x
 #   vlen [] = 0
 #   vlen [0, 5] = 2
-export def vlen (Vector _ s e): Integer =
+export def vlen (Vector _ s e: Vector a): Integer =
     e - s
 
 # vsplitAt: given an index, cut a Vector into elements before and after the index

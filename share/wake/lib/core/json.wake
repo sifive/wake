@@ -25,39 +25,39 @@ export data JValue =
   JObject  (List (Pair String JValue))
   JArray   (List JValue)
 
-export def getJString = match _
+export def getJString: JValue => Option String = match _
   JString x               = Some x
   JArray (JString x, Nil) = Some x
   _                       = None
-export def getJInteger = match _
+export def getJInteger: JValue => Option Integer = match _
   JInteger x               = Some x
   JArray (JInteger x, Nil) = Some x
   _                        = None
-export def getJDouble = match _
+export def getJDouble: JValue => Option Double = match _
   JDouble x               = Some x
   JInteger x              = dint x
   JArray (JDouble x, Nil) = Some x
   JArray (JInteger x, Nil)= dint x
   _                       = None
-export def getJBoolean = match _
+export def getJBoolean: JValue => Option Boolean = match _
   JBoolean x               = Some x
   JArray (JBoolean x, Nil) = Some x
   _                        = None
-export def getJObject = match _
+export def getJObject: JValue => Option (List (Pair String JValue)) = match _
   JObject x               = Some x
   JArray (JObject x, Nil) = Some x
   _                       = None
-export def getJArray = match _
+export def getJArray: JValue => Option (List JValue) = match _
   JArray x = Some x
   _        = None
 
-export def parseJSONBody body =
+export def parseJSONBody (body: String): Result JValue Error =
   def imp b = prim "json_body"
   match (imp body)
     Pass jvalue = Pass jvalue
     Fail cause = Fail (makeError cause)
 
-export def parseJSONFile path =
+export def parseJSONFile (path: Path): Result JValue Error =
   def imp f = prim "json_file"
   match (getPathResult path)
     Pass f = match (imp f.getPathName)
@@ -73,7 +73,7 @@ tuple JSONFormat =
   export Double:  Double  => String
   export Indent:  Integer
 
-def doFormat fmt lhs =
+def doFormat (fmt: JSONFormat) (lhs: JValue): List String =
   def indent = fmt.getJSONFormatIndent
   def space = if indent > 0 then " " else ""
   def indention = tab (\_ ' ') indent | cat
@@ -99,7 +99,7 @@ def doFormat fmt lhs =
         else "\{{tabbeder}", foldr helper ("{tabbed}\}", rhs) list | tail
   rec Nil (if indent > 0 then Some "" else None) lhs
 
-export def defaultJSONFormat =
+export def defaultJSONFormat: JSONFormat =
   def formatDouble d =
     match (dclass d)
       DoubleInfinite if d <. 0e0 = "-1e9999"

@@ -42,7 +42,7 @@ export data List a =
 #   empty (seq 0)  = True
 #   empty (1, Nil) = False
 #   empty (seq 9)  = False
-export def empty = match _
+export def empty: List a => Boolean = match _
     Nil = True
     _   = False
 
@@ -71,7 +71,7 @@ export def tail: List a => List a = match _
 #
 #   map str    (seq 5) = "0", "1", "2", "3", "4", Nil
 #   map (_+10) (seq 5) = 10, 11, 12, 13, 14, Nil
-export def map (f: a => b): (List a => List b) =
+export def map (f: a => b): List a => List b =
     def loop = match _
         Nil  = Nil
         h, t = f h, loop t
@@ -82,7 +82,7 @@ export def map (f: a => b): (List a => List b) =
 #   def twice x = x, x, Nil
 #   mapFlat twice (seq 3) = 0, 0, 1, 1, 2, 2, Nil
 #   mapFlat seq (seq 5) = 0, 0, 1, 0, 1, 2, 0, 1, 2, 3, Nil
-export def mapFlat (f: a => List b): (List a => List b) =
+export def mapFlat (f: a => List b): List a => List b =
     def loop = match _
         Nil  = Nil
         h, t = f h ++ loop t
@@ -92,7 +92,7 @@ export def mapFlat (f: a => List b): (List a => List b) =
 # Partial functions can return None, in which case the result is not included in the output.
 #
 #   mapPartial int ("3", "x", "44", Nil) = 3, 44, Nil
-export def mapPartial (f: a => Option b): (List a => List b) =
+export def mapPartial (f: a => Option b): List a => List b =
     def loop = match _
         Nil  = Nil
         h, t =
@@ -277,7 +277,7 @@ export def at (i: Integer) (l: List a): Option a =
 #   splitUntil (_>=4) (seq 8) = Pair (0, 1, 2, 3, Nil) (4, 5, 6, 7, Nil)
 #   splitUntil (_>=0) (seq 8) = Pair Nil (0, 1, 2, 3, 4, 5, 6, 7, Nil)
 #   splitUntil (_>=8) (seq 8) = Pair (0, 1, 2, 3, 4, 5, 6, 7, Nil) Nil
-export def splitUntil (stopFn: a => Boolean): (List a => Pair (List a) (List a)) =
+export def splitUntil (stopFn: a => Boolean): List a => Pair (List a) (List a) =
     def loop l = match l
         Nil  = Pair Nil Nil
         h, t =
@@ -296,7 +296,7 @@ export def splitUntil (stopFn: a => Boolean): (List a => Pair (List a) (List a))
 #   takeUntil (_>=4) (seq 8) = 0, 1, 2, 3, Nil
 #   takeUntil (_>=0) (seq 8) = Nil
 #   takeUntil (_>=8) (seq 8) = 0, 1, 2, 3, 4, 5, 6, 7, Nil
-export def takeUntil (f: a => Boolean): (List a => List a) =
+export def takeUntil (f: a => Boolean): List a => List a =
     def loop = match _
         Nil         = Nil
         h, _ if f h = Nil
@@ -311,7 +311,7 @@ export def takeUntil (f: a => Boolean): (List a => List a) =
 #   dropUntil (_>=4) (seq 8) = 4, 5, 6, 7, Nil
 #   dropUntil (_>=0) (seq 8) = 0, 1, 2, 3, 4, 5, 6, 7, Nil
 #   dropUntil (_>=8) (seq 8) = Nil
-export def dropUntil (f: a => Boolean): (List a => List a) =
+export def dropUntil (f: a => Boolean): List a => List a =
     def loop l = match l
         Nil         = Nil
         h, _ if f h = l
@@ -327,7 +327,7 @@ export def dropUntil (f: a => Boolean): (List a => List a) =
 #   def l = seq 10 | map (_+10)
 #   find (_%4==0) l = Some (Pair 12 2)
 #   find (_%4==4) l = None
-export def find (f: a => Boolean): (List a => Option (Pair a Integer)) =
+export def find (f: a => Boolean): List a => Option (Pair a Integer) =
     def loop i = match _
         Nil         = None
         h, _ if f h = Some (Pair h i)
@@ -338,7 +338,7 @@ export def find (f: a => Boolean): (List a => Option (Pair a Integer)) =
 # Once `f` returns True, `f` is not evaulated on further elements.
 # This means that `f` is applied to the List mostly sequentially.
 # If more parallelism is desired, use 'map f | exists (_)'.
-export def exists (f: a => Boolean): (List a => Boolean) =
+export def exists (f: a => Boolean): List a => Boolean =
     find f _ | isSome
 
 # forall: does `f` return True for all elements in the list?
@@ -353,7 +353,7 @@ export def forall (f: a => Boolean): List a => Boolean =
 #
 #   def isEven x = x%2 == 0
 #   splitBy isEven (seq 6) = Pair (0, 2, 4, Nil) (1, 3, 5, Nil)
-export def splitBy (f: a => Boolean): (List a => Pair (List a) (List a)) =
+export def splitBy (f: a => Boolean): List a => Pair (List a) (List a) =
     def loop = match _
         Nil  = Pair Nil Nil
         h, t =
@@ -369,7 +369,7 @@ export def splitBy (f: a => Boolean): (List a => Pair (List a) (List a)) =
 #
 #   def isEven x = x%2 == 0
 #   filter isEven (seq 10) = 0, 2, 4, 6, 8, Nil
-export def filter (f: a => Boolean): (List a => List a) =
+export def filter (f: a => Boolean): List a => List a =
     def loop = match _
         Nil  = Nil
         h, t =
@@ -426,7 +426,7 @@ export def sortBy (lessThanFn: a => a => Boolean): List a => List a =
 # The order of non-duplicated elements is retained.
 #
 #   distinctBy (_<=>_) (1, 2, 1, 3, 4, 3, Nil) = 1, 2, 3, 4, Nil
-export def distinctBy (cmp: a => a => Order): (List a => List a) =
+export def distinctBy (cmp: a => a => Order): List a => List a =
     def loop tree = match _
         Nil = Nil
         x, tail =
@@ -441,7 +441,7 @@ export def distinctBy (cmp: a => a => Order): (List a => List a) =
 # distinctRunBy: keep only the first occurrence in a run of equal values
 #
 #  distinctRunBy (_==_) (1, 1, 2, 1, 3, 3, Nil) = 1, 2, 1, 3, Nil
-export def distinctRunBy (eqFn: a => a => Boolean): (List a => List a) =
+export def distinctRunBy (eqFn: a => a => Boolean): List a => List a =
     def loop l =
         require x, y, t = l
         if eqFn x y then
@@ -455,7 +455,7 @@ export def distinctRunBy (eqFn: a => a => Boolean): (List a => List a) =
 #   cmp (_<=>_) (seq 5)  (seq 5)  = EQ
 #   cmp (_<=>_) (seq 5)  (seq 4)  = GT
 #   cmp (_<=>_) (0, Nil) (1, Nil) = LT
-export def cmp (f: a => b => Order): (List a => List b => Order) =
+export def cmp (f: a => b => Order): List a => List b => Order =
     def loop = match _ _
         Nil Nil = EQ
         Nil _   = LT
@@ -468,7 +468,7 @@ export def cmp (f: a => b => Order): (List a => List b => Order) =
 # tab: create a list of specified size by calling `f` on the index to generate.
 #
 #   tab (_+100) 5 = 100, 101, 102, 103, 104, Nil
-export def tab (f: Integer => a): (Integer => List a) =
+export def tab (f: Integer => a): Integer => List a =
     def loop a n =
         if n <= 0 then
             a

@@ -54,18 +54,19 @@ def build v = match (vlen v)
     Bin len (build l) (vat_ mid v) (build r)
 
 # Returns the total length of the Tree.
-export def tlen (Tree _ root) = size root
+export def tlen (Tree _ root: Tree a): Integer =
+  size root
 def size = match _
   Tip         = 0
   Bin s _ _ _ = s
 
 # Returns True if the Tree is empty, False otherwise.
-export def tempty (Tree _ root) = match root
+export def tempty (Tree _ root: Tree a): Boolean = match root
   Tip = True
   _   = False
 
-# Insert y into the tree only if no other keys = y
-export def tinsert y (Tree cmp root) =
+# Insert y into the tree only if no other keys == y
+export def tinsert (y: a) (Tree cmp root: Tree a): Tree a =
   def helper t = match t
     Tip         = Bin 1 Tip y Tip
     Bin _ l x r = match (cmp x y)
@@ -74,8 +75,8 @@ export def tinsert y (Tree cmp root) =
       LT = balanceR l x (helper r)
   Tree cmp (helper root)
 
-# Insert y into the tree, removing any existing keys = y
-export def tinsertReplace y (Tree cmp root) =
+# Insert y into the tree, removing any existing keys == y
+export def tinsertReplace (y: a) (Tree cmp root: Tree a): Tree a =
   def helper t = match t
     Tip         = Bin 1 Tip y Tip
     Bin _ l x r = match (cmp x y)
@@ -85,7 +86,7 @@ export def tinsertReplace y (Tree cmp root) =
   Tree cmp (helper root)
 
 # Insert y into the tree at the lowest rank of keys = y
-export def tinsertMulti y (Tree cmp root) =
+export def tinsertMulti (y: a) (Tree cmp root: Tree a): Tree a =
   def helper = match _
     Tip         = Bin 1 Tip y Tip
     Bin _ l x r = match (cmp x y)
@@ -121,7 +122,7 @@ export def tsubset (Tree _ aroot) (Tree cmp broot) =
   helper aroot broot
 
 # Deletes all keys that are equal to y.
-export def tdelete y (Tree cmp root) =
+export def tdelete (y: a) (Tree cmp root: Tree a): Tree a =
   Tree cmp (delete cmp y root)
 def delete cmp y t =
   def helper = match _
@@ -170,7 +171,7 @@ export def tappi f (Tree _ root) =
   helper 0 root
 
 # Extract the i-th ranked element
-export def tat i (Tree _ root) =
+export def tat (i: Integer) (Tree _ root: Tree a): Option a =
   def helper i = match _
     Tip = None
     Bin _ l x r =
@@ -182,7 +183,7 @@ export def tat i (Tree _ root) =
   helper i root
 
 # Split elements ranked [0,i) and [i,inf) into two trees
-export def tsplitAt i (Tree cmp root) =
+export def tsplitAt (i: Integer) (Tree cmp root: Tree a): Pair (Tree a) (Tree a) =
   def helper i = match _
     Tip = Pair Tip Tip
     Bin _ l x r =
@@ -257,7 +258,7 @@ def split y cmp root =
   helper root
 
 # Split tree into those elements where f x = True and those where f x = False
-export def tsplitBy f (Tree cmp root) =
+export def tsplitBy (f: a => Boolean) (Tree cmp root: Tree a): Pair (Tree a) (Tree a) =
   def helper t = match t
     Tip = Pair Tip Tip
     Bin _ l x r = match (helper l) (helper r)
@@ -269,7 +270,7 @@ export def tsplitBy f (Tree cmp root) =
     Pair t f = Pair (Tree cmp t) (Tree cmp f)
 
 # Remove all elements x such that f x = False.
-export def tfilter f (Tree cmp root) =
+export def tfilter (f: a => Boolean) (Tree cmp root: Tree a): Tree a =
   def helper t = match t
     Tip = Tip
     Bin _ l x r =
@@ -279,7 +280,7 @@ export def tfilter f (Tree cmp root) =
   Tree cmp (helper root)
 
 # Return the smallest element in the tree.
-export def tmin (Tree _ root) = min_ root
+export def tmin (Tree _ root: Tree a): Option a = min_ root
 def min_ root =
   def none = match _
     Tip         = None
@@ -290,7 +291,7 @@ def min_ root =
   none root
 
 # Return the largest element in the tree.
-export def tmax (Tree _ root) = max_ root
+export def tmax (Tree _ root: Tree a): Option a = max_ root
 def max_ root =
   def none = match _
     Tip         = None
@@ -300,15 +301,15 @@ def max_ root =
     Bin _ _ y r = some y r
   none root
 
-# Lowest rank element with x >= y.
-export def tlowerGE y (Tree cmp root) =
+# Lowest rank element with x >= y, along with that rank.
+export def tlowerGE (y: a) (Tree cmp root: Tree a): Option (Pair a Integer) =
   def f x = match (cmp x y)
     LT = False
     _  = True
   lower f root
 
-# Lowest rank element with x > y.
-export def tlowerGT y (Tree cmp root) =
+# Lowest rank element with x > y, along with that rank.
+export def tlowerGT (y: a) (Tree cmp root: Tree a): Option (Pair a Integer) =
   def f x = match (cmp x y)
     GT = True
     _  = False
@@ -327,15 +328,15 @@ def lower f root =
     Bin s l x r = if f x then someL x i l else someR z (i+s) r
   none root
 
-# Highest rank element with x < y
-export def tupperLT y (Tree cmp root) =
+# Highest rank element with x < y, along with that rank.
+export def tupperLT (y: a) (Tree cmp root: Tree a): Option (Pair a Integer) =
   def f x = match (cmp x y)
     LT = False
     _  = True
   upper f root
 
-# Highest rank element with x <= y
-export def tupperLE y (Tree cmp root) =
+# Highest rank element with x <= y, along with that rank.
+export def tupperLE (y: a) (Tree cmp root: Tree a): Option (Pair a Integer) =
   def f x = match (cmp x y)
     GT = True
     _  = False
@@ -383,7 +384,7 @@ export def x ∋ y = y ∈ x
 # Returns True if x does NOT contain y, False otherwise.
 export def x ∌ y = y ∉ x
 
-export def tcontains y t =
+export def tcontains (y: a) (t: Tree a): Boolean =
   match t (tupperLE y t)
     (Tree _   _) None              = False
     (Tree cmp _) (Some (Pair x _)) = match (cmp x y)
@@ -391,18 +392,18 @@ export def tcontains y t =
       _  = False
 
 # Eliminate duplicates, as identified by cmp
-export def tdistinctBy cmp t = match t
+export def tdistinctBy (cmp: a => a => Order) (t: Tree a): Tree a = match t
   Tree tcmp _ = listToTree tcmp (distinctBy cmp (treeToList t))
 
 # Eliminate duplicates, as identified by f
-export def tdistinctRunBy f t = match t
+export def tdistinctRunBy (f: a => a => Boolean) (t: Tree a): Tree a = match t
   Tree cmp _ = Tree cmp (build (vdistinctRunBy f (treeToVector t)))
 
 # Returns the union of trees a and b, keeps only values from a if they are equal to values in b.
 export def a ∪ b = tunion a b
 
 # Returns the union of two trees, given their roots.
-export def tunion (Tree _ aroot) (Tree cmp broot) =
+export def tunion (Tree _ aroot: Tree a) (Tree cmp broot: Tree a): Tree a =
   Tree cmp (union cmp aroot broot)
 def union cmp aroot broot =
   def helper a b = match a b
@@ -432,7 +433,7 @@ def unionMulti cmp aroot broot =
   helper aroot broot
 
 # Returns the set difference of A and B, that is, a tree containing all elements of A which are not in B.
-export def tsubtract (Tree _ aroot) (Tree cmp broot) =
+export def tsubtract (Tree _ aroot: Tree a) (Tree cmp broot: Tree a): Tree a =
   def helper a b = match a b
     Tip _ = Tip
     _ Tip = a
@@ -457,7 +458,7 @@ export def tintersect (Tree _ aroot) (Tree cmp broot) =
   Tree cmp (helper aroot broot)
 
 # Pretty print the tree shape for debug
-#export def tshape (Tree _ root) =
+#export def tshape (Tree _ root: Tree a): String =
 #  def row x =
 #    def helper i = match _
 #      Tip = Nil
