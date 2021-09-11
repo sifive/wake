@@ -35,6 +35,8 @@
 
 #include "compat/readable.h"
 #include "util/execpath.h"
+#include "util/diagnostic.h"
+#include "util/file.h"
 #include "wakefiles.h"
 
 #ifdef __EMSCRIPTEN__
@@ -321,9 +323,17 @@ std::string glob2regexp(const std::string &glob) {
   return exp;
 }
 
+class DiagnosticIgnorer : public DiagnosticReporter {
+  void report(Diagnostic diagnostic) { }
+};
+
 static void process_ignorefile(const std::string &path, std::vector<WakeFilter> &filters) {
-  std::ifstream in(path + ".wakeignore");
-  if (!in.is_open()) return;
+  DiagnosticIgnorer ignorer;
+  std::string wakeignore = path + ".wakeignore";
+  ExternalFile file(ignorer, wakeignore.c_str());
+  StringSegment segment = file.segment();
+  std::stringstream in;
+  in.write(reinterpret_cast<const char*>(segment.start), segment.size());
 
   RE2::Options options;
   options.set_log_errors(false);
