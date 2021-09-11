@@ -23,9 +23,5 @@
 #include "aligned_alloc.h"
 
 void *my_aligned_alloc(size_t alignment, size_t size) {
-#ifdef __EMSCRIPTEN__
-    return malloc(size);
-#else
     return aligned_alloc(alignment, size); // This is a C11 feature
-#endif
 }
