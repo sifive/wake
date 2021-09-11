@@ -71,12 +71,7 @@ struct HeapObject {
 
   // this overload causes non-placement 'new' to become illegal (which we want)
   void *operator new(size_t size, void *free) { return free; }
-}
-#ifdef __EMSCRIPTEN__
-// Emscripten needs some help getting our GC alignment right.
-__attribute__ ((aligned (8)))
-#endif
-;
+};
 
 inline std::ostream & operator << (std::ostream &os, const HeapObject *value) {
   HeapObject::format(os, value);
