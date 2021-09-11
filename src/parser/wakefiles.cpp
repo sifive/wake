@@ -40,7 +40,7 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 
-EM_JS(char *, nodejs_getfiles, (const char *dir), {
+EM_JS(char *, nodejs_getfiles, (const char *dir, int *ok), {
   const Path = require("path");
   const FS   = require("fs");
   let files  = [];
@@ -57,26 +57,43 @@ EM_JS(char *, nodejs_getfiles, (const char *dir), {
       });
   }
 
-  walkTree(UTF8ToString(dir));
-  const sep = String.fromCharCode(0);
-  const out = files.join(sep) + sep;
+  try {
+    walkTree(UTF8ToString(dir));
+    const sep = String.fromCharCode(0);
+    const out = files.join(sep) + sep;
 
-  const lengthBytes = lengthBytesUTF8(out)+1;
-  const stringOnWasmHeap = _malloc(lengthBytes);
-  stringToUTF8(out, stringOnWasmHeap, lengthBytes);
-  return stringOnWasmHeap;
+    const lengthBytes = lengthBytesUTF8(out)+1;
+    const stringOnWasmHeap = _malloc(lengthBytes);
+    stringToUTF8(out, stringOnWasmHeap, lengthBytes);
+    setValue(ok, 1, "i32");
+    return stringOnWasmHeap;
+  } catch (err) {
+    const lengthBytes = lengthBytesUTF8(err.message)+1;
+    const stringOnWasmHeap = _malloc(lengthBytes);
+    stringToUTF8(err.message, stringOnWasmHeap, lengthBytes);
+    setValue(ok, 0, "i32");
+    return stringOnWasmHeap;
+  }
 });
 
 bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2& re, size_t skip) {
-  char *files = nodejs_getfiles(path.c_str());
-  for (char *file = files; *file; file += strlen(file)+1) {
-    re2::StringPiece p(file + skip, strlen(file) - skip);
-    if (RE2::FullMatch(p, re)) {
-      out.emplace_back(file);
+  int ok;
+  char *files = nodejs_getfiles(path.c_str(), &ok);
+  if (ok) {
+    for (char *file = files; *file; file += strlen(file)+1) {
+      re2::StringPiece p(file + skip, strlen(file) - skip);
+      if (RE2::FullMatch(p, re)) {
+        out.emplace_back(file);
+      }
     }
+    free(files);
+    return false;
+  } else {
+    fputs(files, stderr);
+    fputs("\n", stderr);
+    free(files);
+    return true;
   }
-  free(files);
-  return true;
 }
 
 #else
