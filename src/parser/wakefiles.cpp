@@ -358,17 +358,19 @@ static void process_ignorefile(const std::string &path, std::vector<WakeFilter> 
   }
 }
 
-static void filter_wakefiles(std::vector<std::string> &wakefiles, bool verbose) {
-  std::string curdir; // Either "" or ".+/"
-  std::vector<WakeFilter> filters;
+static void filter_wakefiles(std::vector<std::string> &wakefiles, const std::string &basedir, bool verbose) {
+  std::string curdir = basedir; // Either "" or ".+/"
+  if (curdir == ".") {
+    curdir.clear();
+  } else if (!curdir.empty() && curdir.back() != '/') {
+    curdir.push_back('/');
+  }
 
+  std::vector<WakeFilter> filters;
   process_ignorefile(curdir, filters);
 
   for (auto p = wakefiles.begin(); p != wakefiles.end(); /**/) {
     std::string &wakefile = *p;
-
-    // Wake standard library cannot be excluded
-    if (wakefile.compare(0, 3, "../") == 0) { ++p; continue; }
 
     // Unwind curdir
     while (!curdir.empty() && wakefile.compare(0, curdir.size(), curdir) != 0) {
@@ -414,25 +416,31 @@ static void filter_wakefiles(std::vector<std::string> &wakefiles, bool verbose) 
   }
 }
 
-std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose, const std::string &abs_libdir) {
+std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose, const std::string &libdir, const std::string &workdir) {
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
   RE2 exp("(?s).*[^/]\\.wake", options);
 
-  std::string rel_libdir = make_relative(get_cwd(), make_canonical(abs_libdir));
+  std::vector<std::string> libfiles, workfiles;
 
-  std::vector<std::string> acc;
-  if (!workspace || !is_readable("share/wake/lib/core/boolean.wake"))
-    if (push_files(acc, rel_libdir, exp, 0)) ok = false;
-  if (workspace && push_files(acc, ".", exp, 0)) ok = false;
+  std::string boolean = workdir + "/share/wake/lib/core/boolean.wake";
+  if (!workspace || !is_readable(boolean.c_str())) {
+    if (push_files(libfiles, libdir, exp, 0)) ok = false;
+    std::sort(libfiles.begin(), libfiles.end());
+    filter_wakefiles(libfiles, libdir, verbose);
+  }
 
-  // make the output distinct
-  std::sort(acc.begin(), acc.end());
-  auto it = std::unique(acc.begin(), acc.end());
-  acc.resize(std::distance(acc.begin(), it));
+  if (workspace) {
+    if (push_files(workfiles, workdir, exp, 0)) ok = false;
+    std::sort(workfiles.begin(), workfiles.end());
+    filter_wakefiles(workfiles, workdir, verbose);
+  }
 
-  filter_wakefiles(acc, verbose);
+  libfiles.insert(
+    libfiles.end(),
+    std::make_move_iterator(workfiles.begin()),
+    std::make_move_iterator(workfiles.end()));
 
-  return acc;
+  return libfiles;
 }
