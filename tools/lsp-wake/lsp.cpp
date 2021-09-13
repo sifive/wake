@@ -556,7 +556,7 @@ private:
 int main(int argc, const char **argv) {
   std::string stdLib;
   if (argc >= 2) {
-    stdLib = argv[1];
+    stdLib = make_canonical(argv[1]);
   } else {
     stdLib = make_canonical(find_execpath() + "/../../share/wake/lib");
   }

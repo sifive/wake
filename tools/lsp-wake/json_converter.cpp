@@ -17,6 +17,7 @@
 
 #include <map>
 
+#include "compat/windows.h"
 #include "symbol_definition.h"
 #include "json_converter.h"
 #include "json/json5.h"
@@ -47,8 +48,17 @@ namespace JSONConverter {
           ++i;
         }
       }
+
       if (out.compare(0, 7, "file://") == 0) {
-        out.erase(out.begin(), out.begin()+7);
+        // skip over optional hostname
+        auto root = out.find_first_of('/', 7);
+        if (root == std::string::npos) {
+          root = 7;
+        } else if (is_windows()) {
+          // strip leading '/' on windows
+          ++root;
+        }
+        out.erase(out.begin(), out.begin()+root);
       }
 
       return out;
@@ -85,10 +95,12 @@ namespace JSONConverter {
         normal('.');
         normal('~');
         normal('/'); // This is non-standard, but necessary
-        normal(':'); // This is non-standard, but necessary for windows
+        if (is_windows()) normal(':'); // Do not escape volume names
       }
 
       std::string out = "file://";
+      if (is_windows()) out.push_back('/'); // filePath starts with drive letter, not '/'
+
       for (char c : filePath)
         out.append(encodeTable[static_cast<int>(static_cast<unsigned char>(c))]);
 

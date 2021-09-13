@@ -34,6 +34,7 @@
 #include <algorithm>
 
 #include "compat/readable.h"
+#include "compat/windows.h"
 #include "util/execpath.h"
 #include "util/diagnostic.h"
 #include "util/file.h"
@@ -43,7 +44,7 @@
 #include <emscripten/emscripten.h>
 
 EM_JS(char *, nodejs_getfiles, (const char *dir, int *ok), {
-  const Path = require("path");
+  const Path = require("path").posix;
   const FS   = require("fs");
   let files  = [];
 
@@ -182,7 +183,11 @@ std::string make_canonical(const std::string &x) {
   bool repeat;
   bool pop = false;
   do {
-    scan = x.find_first_of('/', tok);
+    if (is_windows()) {
+      scan = x.find_first_of("\\/", tok);
+    } else {
+      scan = x.find_first_of('/', tok);
+    }
     repeat = scan != std::string::npos;
     std::string token(x, tok, repeat?(scan-tok):scan);
     tok = scan+1;
