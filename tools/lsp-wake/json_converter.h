@@ -24,7 +24,8 @@
 #include "symbol_definition.h"
 
 namespace JSONConverter {
-    std::string stripRootUri(const std::string &fileUri, const std::string& rootUri);
+    std::string decodePath(const std::string &fileUri);
+    std::string encodePath(const std::string &filePath);
 
     JAST createMessage();
 
@@ -36,7 +37,7 @@ namespace JSONConverter {
 
     JAST createRequestMessage();
 
-    Location getLocationFromJSON(JAST receivedMessage, const std::string& rootUri);
+    Location getLocationFromJSON(JAST receivedMessage);
 
     JAST createInitializeResultDefault(const JAST &receivedMessage);
 
@@ -44,19 +45,19 @@ namespace JSONConverter {
 
     JAST createInitializeResultInvalidSTDLib(const JAST &receivedMessage);
 
-    JAST fileDiagnosticsToJSON(const std::string &filePath, const std::vector<Diagnostic> &fileDiagnostics, const std::string& rootUri);
+    JAST fileDiagnosticsToJSON(const std::string &filePath, const std::vector<Diagnostic> &fileDiagnostics);
 
-    JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation, const std::string& rootUri);
+    JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation);
 
-    JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references, const std::string& rootUri);
+    JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references);
 
     JAST highlightsToJSON(JAST receivedMessage, const std::vector<Location> &occurrences);
 
     JAST hoverInfoToJSON(JAST receivedMessage, const std::vector<SymbolDefinition> &hoverInfoPieces);
 
-    void appendSymbolToJSON(const SymbolDefinition& def, JAST &json, const std::string& rootUri);
+    void appendSymbolToJSON(const SymbolDefinition& def, JAST &json);
 
-    JAST workspaceEditsToJSON(JAST receivedMessage, const std::vector<Location> &references, const std::string &newName, const std::string& rootUri);
+    JAST workspaceEditsToJSON(JAST receivedMessage, const std::vector<Location> &references, const std::string &newName);
 }
 
 #endif

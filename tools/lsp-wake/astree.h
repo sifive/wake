@@ -35,7 +35,7 @@ public:
 
     ASTree();
 
-    explicit ASTree(std::string _stdLib);
+    explicit ASTree(std::string _absLibDir);
 
     typedef std::pair<const std::string, std::vector<Diagnostic>> FileDiagnostics;
 
@@ -53,7 +53,9 @@ public:
 
     std::vector<SymbolDefinition> workspaceSymbol(const std::string &query);
 
-    std::string stdLib;
+    std::string absLibDir;
+    std::string absWorkDir;
+
 private:
     struct SymbolUsage {
         Location usage;

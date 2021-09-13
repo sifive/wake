@@ -22,11 +22,12 @@
 #include "json/json5.h"
 
 namespace JSONConverter {
-    std::string stripRootUri(const std::string &fileUri, const std::string &rootUri) {
-      if (fileUri.size() < rootUri.size()+1) return "";
-      if (fileUri.compare(0, rootUri.size(), rootUri) != 0) return "";
-      if (fileUri[rootUri.size()] != '/') return "";
-      return fileUri.substr(rootUri.size()+1);
+    std::string decodePath(const std::string &fileUri) {
+      return fileUri.substr(7); // file:///bar -> /bar
+    }
+
+    std::string encodePath(const std::string &fileUri) {
+      return "file://" + fileUri;
     }
 
     JAST createMessage() {
@@ -74,9 +75,9 @@ namespace JSONConverter {
           return message;
         }
 
-        JAST createLocationJSON(const Location &location, const std::string &rootUri) {
+        JAST createLocationJSON(const Location &location) {
           JAST locationJSON(JSON_OBJECT);
-          std::string fileUri = rootUri + '/' + location.filename;
+          std::string fileUri = encodePath(location.filename);
           locationJSON.add("uri", fileUri.c_str());
           locationJSON.children.emplace_back("range", createRangeFromLocation(location));
           return locationJSON;
@@ -117,12 +118,12 @@ namespace JSONConverter {
       return message;
     }
 
-    Location getLocationFromJSON(JAST receivedMessage, const std::string &rootUri) {
+    Location getLocationFromJSON(JAST receivedMessage) {
       std::string fileURI = receivedMessage.get("params").get("textDocument").get("uri").value;
 
       int row = stoi(receivedMessage.get("params").get("position").get("line").value);
       int column = stoi(receivedMessage.get("params").get("position").get("character").value);
-      return {stripRootUri(fileURI, rootUri).c_str(), Coordinates(row + 1, column + 1), Coordinates(row + 1, column)};
+      return {decodePath(fileURI).c_str(), Coordinates(row + 1, column + 1), Coordinates(row + 1, column)};
     }
 
     JAST createInitializeResultDefault(const JAST &receivedMessage) {
@@ -167,33 +168,32 @@ namespace JSONConverter {
       return message;
     }
 
-    JAST fileDiagnosticsToJSON(const std::string &filePath, const std::vector<Diagnostic> &fileDiagnostics, const std::string &rootUri) {
+    JAST fileDiagnosticsToJSON(const std::string &filePath, const std::vector<Diagnostic> &fileDiagnostics) {
       JAST diagnosticsArray(JSON_ARRAY);
       for (const Diagnostic &diagnostic: fileDiagnostics) {
         diagnosticsArray.children.emplace_back("", createDiagnostic(diagnostic)); // add .add for JSON_OBJECT to JSON_ARRAY
       }
       JAST message = createDiagnosticMessage();
       JAST &params = message.add("params", JSON_OBJECT);
-      std::string fileUri = rootUri + '/' + filePath;
-      params.add("uri", fileUri.c_str());
+      params.add("uri", encodePath(filePath));
       params.children.emplace_back("diagnostics", diagnosticsArray);
       return message;
     }
 
-    JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation, const std::string &rootUri) {
+    JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation) {
       JAST message = createResponseMessage(std::move(receivedMessage));
       JAST &result = message.add("result", JSON_OBJECT);
       if (!definitionLocation.filename.empty()) {
-        result = createLocationJSON(definitionLocation, rootUri);
+        result = createLocationJSON(definitionLocation);
       }
       return message;
     }
 
-    JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references, const std::string &rootUri) {
+    JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references) {
       JAST message = createResponseMessage(std::move(receivedMessage));
       JAST &result = message.add("result", JSON_ARRAY);
       for (const Location &location: references) {
-        result.children.emplace_back("", createLocationJSON(location, rootUri));
+        result.children.emplace_back("", createLocationJSON(location));
       }
       return message;
     }
@@ -224,14 +224,14 @@ namespace JSONConverter {
       return message;
     }
 
-    void appendSymbolToJSON(const SymbolDefinition& def, JAST &json, const std::string &rootUri) {
+    void appendSymbolToJSON(const SymbolDefinition& def, JAST &json) {
       JAST &symbol = json.add("", JSON_OBJECT);
       symbol.add("name", def.name + ": " + def.type);
       symbol.add("kind", def.symbolKind);
-      symbol.children.emplace_back("location", createLocationJSON(def.location, rootUri));
+      symbol.children.emplace_back("location", createLocationJSON(def.location));
     }
 
-    JAST workspaceEditsToJSON(JAST receivedMessage, const std::vector<Location> &references, const std::string &newName, const std::string &rootUri) {
+    JAST workspaceEditsToJSON(JAST receivedMessage, const std::vector<Location> &references, const std::string &newName) {
       JAST message = createResponseMessage(std::move(receivedMessage));
       JAST &result = message.add("result", JSON_OBJECT);
 
@@ -241,7 +241,7 @@ namespace JSONConverter {
         edit.children.emplace_back("range", createRangeFromLocation(ref));
         edit.add("newText", newName.c_str());
 
-        std::string fileUri = rootUri + '/' + ref.filename;
+        std::string fileUri = encodePath(ref.filename);
         if (filesEdits.find(fileUri) == filesEdits.end()) {
           filesEdits[fileUri] = JAST(JSON_ARRAY);
         }

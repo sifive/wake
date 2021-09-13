@@ -39,9 +39,9 @@
 
 static CPPFile cppFile(__FILE__);
 
-ASTree::ASTree(): stdLib() {}
+ASTree::ASTree() {}
 
-ASTree::ASTree(std::string _stdLib) : stdLib(std::move(_stdLib)) {}
+ASTree::ASTree(std::string _absLibDir) : absLibDir(std::move(_absLibDir)) {}
 
 void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &processFileDiagnostics) {
   usages.clear();
@@ -50,7 +50,7 @@ void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &proce
   comments.clear();
 
   bool enumok = true;
-  auto allFiles = find_all_wakefiles(enumok, true, false, stdLib, ".");
+  auto allFiles = find_all_wakefiles(enumok, true, false, absLibDir, absWorkDir);
 
   std::map<std::string, std::vector<Diagnostic>> diagnostics;
   LSPReporter lspReporter(diagnostics, allFiles);

@@ -35,6 +35,7 @@
 #include "util/diagnostic.h"
 #include "json/json5.h"
 #include "parser/parser.h"
+#include "parser/wakefiles.h"
 #include "types/internal.h"
 #include "json_converter.h"
 #include "astree.h"
@@ -171,7 +172,7 @@ public:
       JAST &showMessageParams = message.add("params", JSON_OBJECT);
       showMessageParams.add("type", 1); // Error
       std::string messageText =
-        "The path to the wake standard library (" + astree.stdLib + ") is invalid. " +
+        "The path to the wake standard library (" + astree.absLibDir + ") is invalid. " +
         "Wake language features will not be provided. " +
         "Please change the path in the extension settings and reload the window by: " +
         "  1. Opening the command palette (Ctrl + Shift + P); " +
@@ -184,7 +185,6 @@ private:
     typedef void (LSPServer::*LspMethod)(const JAST &);
 
     bool isSTDLibValid = true;
-    std::string rootUri;
     bool isInitialized = false;
     bool needsUpdate = false;
     int ignoredCount = 0;
@@ -356,7 +356,7 @@ private:
       }
 
       isInitialized = true;
-      rootUri = receivedMessage.get("params").get("rootUri").value;
+      astree.absWorkDir = JSONConverter::decodePath(receivedMessage.get("params").get("rootUri").value);
       sendMessage(message);
 
       if (isSTDLibValid) {
@@ -382,9 +382,8 @@ private:
     }
 
     void diagnoseProject() {
-      astree.diagnoseProject([this](ASTree::FileDiagnostics &fileDiagnostics) {
-        JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(fileDiagnostics.first, fileDiagnostics.second,
-                                                                        rootUri);
+      astree.diagnoseProject([](ASTree::FileDiagnostics &fileDiagnostics) {
+        JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(fileDiagnostics.first, fileDiagnostics.second);
         sendMessage(fileDiagnosticsJSON);
       });
       needsUpdate = false;
@@ -392,15 +391,15 @@ private:
 
     void goToDefinition(const JAST &receivedMessage) {
       refresh("goto-definition");
-      Location locationToDefine = JSONConverter::getLocationFromJSON(receivedMessage, rootUri);
+      Location locationToDefine = JSONConverter::getLocationFromJSON(receivedMessage);
       Location definitionLocation = astree.findDefinitionLocation(locationToDefine);
-      JAST definitionLocationJSON = JSONConverter::definitionLocationToJSON(receivedMessage, definitionLocation, rootUri);
+      JAST definitionLocationJSON = JSONConverter::definitionLocationToJSON(receivedMessage, definitionLocation);
       sendMessage(definitionLocationJSON);
     }
 
     void findReportReferences(const JAST &receivedMessage) {
       refresh("report-references");
-      Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage, rootUri);
+      Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage);
       bool isDefinitionFound = false;
       std::vector<Location> references;
 
@@ -409,7 +408,7 @@ private:
         references.push_back(definitionLocation);
       }
 
-      JAST referencesJSON = JSONConverter::referencesToJSON(receivedMessage, references, rootUri);
+      JAST referencesJSON = JSONConverter::referencesToJSON(receivedMessage, references);
       sendMessage(referencesJSON);
     }
 
@@ -423,7 +422,7 @@ private:
 #endif
         }
       }
-      Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage, rootUri);
+      Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage);
       std::vector<Location> occurrences = astree.findOccurrences(symbolLocation);
       JAST highlightsJSON = JSONConverter::highlightsToJSON(receivedMessage, occurrences);
       sendMessage(highlightsJSON);
@@ -439,7 +438,7 @@ private:
 #endif
         }
       }
-      Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage, rootUri);
+      Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage);
       std::vector<SymbolDefinition> hoverInfoPieces = astree.findHoverInfo(symbolLocation);
       JAST hoverInfoJSON = JSONConverter::hoverInfoToJSON(receivedMessage, hoverInfoPieces);
       sendMessage(hoverInfoJSON);
@@ -459,11 +458,11 @@ private:
       JAST &result = message.add("result", JSON_ARRAY);
 
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
+      std::string filePath = JSONConverter::decodePath(fileUri);
 
       std::vector<SymbolDefinition> symbols = astree.documentSymbol(filePath);
       for (const SymbolDefinition &symbol: symbols) {
-        JSONConverter::appendSymbolToJSON(symbol, result, rootUri);
+        JSONConverter::appendSymbolToJSON(symbol, result);
       }
       sendMessage(message);
     }
@@ -476,7 +475,7 @@ private:
       std::string query = receivedMessage.get("params").get("query").value;
       std::vector<SymbolDefinition> symbols = astree.workspaceSymbol(query);
       for (const SymbolDefinition &symbol: symbols) {
-        JSONConverter::appendSymbolToJSON(symbol, result, rootUri);
+        JSONConverter::appendSymbolToJSON(symbol, result);
       }
       sendMessage(message);
     }
@@ -490,14 +489,14 @@ private:
         return;
       }
 
-      Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage, rootUri);
+      Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage);
       bool isDefinitionFound = false;
       std::vector<Location> references;
       astree.findReferences(definitionLocation, isDefinitionFound, references);
       if (isDefinitionFound) {
         references.push_back(definitionLocation);
       }
-      JAST workspaceEditsJSON = JSONConverter::workspaceEditsToJSON(receivedMessage, references, newName, rootUri);
+      JAST workspaceEditsJSON = JSONConverter::workspaceEditsToJSON(receivedMessage, references, newName);
       sendMessage(workspaceEditsJSON);
     }
 
@@ -508,10 +507,7 @@ private:
     void didChange(const JAST &receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
-      std::string fileName = JSONConverter::stripRootUri(fileUri, rootUri);
-      if (fileName.empty()) {
-        return;
-      }
+      std::string fileName = JSONConverter::decodePath(fileUri);
       astree.changedFiles[fileName] = std::unique_ptr<StringFile>(new StringFile(fileName.c_str(), std::move(fileContent)));
       needsUpdate = true;
       ignoredCount = 0;
@@ -524,7 +520,7 @@ private:
       }
 
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      astree.changedFiles.erase(JSONConverter::stripRootUri(fileUri, rootUri));
+      astree.changedFiles.erase(JSONConverter::decodePath(fileUri));
 
       // Might have replaced a file modified on disk
       needsUpdate = true;
@@ -533,7 +529,7 @@ private:
 
     void didClose(const JAST &receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      if (astree.changedFiles.erase(JSONConverter::stripRootUri(fileUri, rootUri)) > 0) {
+      if (astree.changedFiles.erase(JSONConverter::decodePath(fileUri)) > 0) {
         needsUpdate = true;
         refresh("modified-file-closed");
       }
@@ -544,7 +540,7 @@ private:
       size_t changed = 0;
       for (auto child: jfiles.children) {
         std::string fileUri = child.second.get("uri").value;
-        changed += astree.changedFiles.erase(JSONConverter::stripRootUri(fileUri, rootUri));
+        changed += astree.changedFiles.erase(JSONConverter::decodePath(fileUri));
       }
       if (changed) {
         needsUpdate = true;
@@ -571,7 +567,7 @@ int main(int argc, const char **argv) {
   if (argc >= 2) {
     stdLib = argv[1];
   } else {
-    stdLib = find_execpath() + "/../../share/wake/lib";
+    stdLib = make_canonical(find_execpath() + "/../../share/wake/lib");
   }
 
   LSPServer lsp;
