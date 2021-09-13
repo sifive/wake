@@ -240,7 +240,9 @@ private:
 #ifdef __EMSCRIPTEN__
         char *buf = nodejs_getstdin();
         if (!buf) {
+#ifdef CERR_DEBUG
           std::cerr << "Client did not shutdown cleanly" << std::endl;
+#endif
           exit(1);
         }
 
@@ -283,7 +285,9 @@ private:
 
         // End-of-file reached?
         if (got == 0) {
+#ifdef CERR_DEBUG
           std::cerr << "Client did not shutdown cleanly" << std::endl;
+#endif
           exit(1);
         }
 
