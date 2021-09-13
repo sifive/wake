@@ -15,7 +15,7 @@ from gcc_wake export type SysLib
 from gcc_wake export def SysLib compileC editSysLibCFlags editSysLibHeaders editSysLibLFlags editSysLibObjects editSysLibVerison flattenSysLibs getSysLibCFlags getSysLibHeaders getSysLibLFlags getSysLibObjects getSysLibVerison linkO makeSysLib pkgConfig setSysLibCFlags setSysLibHeaders setSysLibLFlags setSysLibObjects setSysLibVerison
 from gcc_wake export topic compileC linkO
 
-export def tapLevel level formatFn value =
+export def tapLevel (level: LogLevel) (formatFn: a => String) (value: a): a =
     def _ = printlnLevel level (formatFn value)
     value
 
@@ -25,29 +25,31 @@ export def tapNormal  = tapLevel logNormal
 export def tapVerbose = tapLevel logVerbose
 export def tapDebug   = tapLevel logDebug
 
-export def installIn x y =
+export def installIn (x: String) (y: Path): Path =
     from wake import installIn
     installIn x "." y
 
-export def makePlan = makeExecPlan
+export def makePlan: List String => List Path => Plan =
+    makeExecPlan
 
 export def vfoldmap f a g v = vmapReduce g f a v
 export def vfold f a v = vmapReduce (_) f a v
 export def vscanmap f a g v = vmapScan g f a v
 
-export def idouble x = match (dmodf x)
+export def idouble (x: Double): Option Integer = match (dmodf x)
     Pair x 0.0 = Some x
     _ = None
 
-export def panic = unreachable
+export def panic: String => a =
+    unreachable
 
-export def stringToRegExp s =
+export def stringToRegExp (s: String): Result RegExp String =
     from wake import def real=stringToRegExp
     match (real s)
         Pass ok = Pass ok
         Fail error = Fail error.getErrorCause
 
-export def strbase n x =
+export def strbase (n: Integer) (x: Integer): String =
     from wake import def real=strbase
     match (real n)
         Some f = f x

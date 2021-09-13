@@ -23,7 +23,7 @@ export tuple Usage = # Unknown quantities are 0
   export InBytes:  Integer
   export OutBytes: Integer
 
-export def getUsageThreads (Usage _ run cpu _ _ _) =
+export def getUsageThreads (Usage _ run cpu _ _ _: Usage): Double =
   if run ==. 0.0 then cpu else cpu /. run
 
 # RunnerInput is a subset of the fields supplied in the execution Plan
@@ -94,14 +94,14 @@ tuple Plan =
   export FnInputs:     (List String => List String) # Modify the Runner's reported inputs  (files read)
   export FnOutputs:    (List String => List String) # Modify the Runner's reported outputs (files created)
 
-def isOnce = match _
+def isOnce: Persistence => Boolean = match _
   ReRun = False
   _     = True
-def isKeep = match _
+def isKeep: Persistence => Boolean = match _
   ReRun = False
   Once  = False
   _     = True
-def isShare = match _
+def isShare: Persistence => Boolean = match _
   Share = True
   _     = False
 
@@ -115,15 +115,15 @@ export def setPlanKeep  v p = editPlanKeep  (\_ v) p
 export def setPlanShare v p = editPlanShare (\_ v) p
 
 # Prepend 'value' to the Plan's 'PATH' environment value
-export def prependPlanPath value plan =
+export def prependPlanPath (value: String) (plan: Plan): Plan =
   editPlanEnvironment (addEnvironmentPath value) plan
 
 # Set an environment variable in a Plan
-export def setPlanEnvVar name value plan =
+export def setPlanEnvVar (name: String) (value: String) (plan: Plan): Plan =
   editPlanEnvironment ("{name}={value}", _) plan
 
 # Helper methods that maintain the invariant that: Share => Keep => Once
-export def editPlanOnce f =
+export def editPlanOnce (f: Boolean => Boolean): Plan => Plan =
   def helper = match _
     ReRun if   f False = Once
     Once  if ! f True  = ReRun
@@ -132,7 +132,7 @@ export def editPlanOnce f =
     x                  = x
   editPlanPersistence helper
 
-export def editPlanKeep f =
+export def editPlanKeep (f: Boolean => Boolean): Plan => Plan =
   def helper = match _
     ReRun if   f False = Keep
     Once  if   f False = Keep
@@ -141,7 +141,7 @@ export def editPlanKeep f =
     x                  = x
   editPlanPersistence helper
 
-export def editPlanShare f =
+export def editPlanShare (f: Boolean => Boolean): Plan => Plan =
   def helper = match _
     ReRun if   f False = Share
     Once  if   f False = Share
@@ -169,16 +169,16 @@ export def getPlanHash (plan: Plan): Integer =
 #   The prior Input dirs observe the same set of Visible files
 
 # Create a labeled shell plan.
-export def makePlan label visible command =
+export def makePlan (label: String) (visible: List Path) (command: String): Plan =
   makeShellPlan command visible
   | setPlanLabel label
 
 # Set reasonable defaults for all Plan arguments
 def id x = x
-export def makeExecPlan cmd visible =
+export def makeExecPlan (cmd: List String) (visible: List Path): Plan =
   Plan "" cmd visible environment "." "" logInfo logWarning logEcho Share False Nil (\_ True) defaultUsage id id
 
-export def makeShellPlan script visible =
+export def makeShellPlan (script: String) (visible: List Path): Plan =
   makeExecPlan (which "dash", "-c", script, Nil) visible
 
 def defaultUsage = Usage 0 0.0 1.0 0 0 0
@@ -290,7 +290,7 @@ data RunnerOption =
   Reject (why: String)
 
 # Run the job!
-export def runJob p = match p
+export def runJob (p: Plan): Job = match p
   Plan label cmd vis env dir stdin stdout stderr echo pers _lo res rf usage finputs foutputs =
     # Transform the 'List Runner' into 'List RunnerOption'
     def qualify runner = match runner
@@ -348,7 +348,8 @@ export def getJobRecord (job: Job): Option Usage =
   def raw job = prim "job_record"
   raw job | at 0 | omap toUsage
 
-export def makeBadPath error = BadPath error
+export def makeBadPath (error: Error): Path =
+  BadPath error
 
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
@@ -425,9 +426,9 @@ export def preloadRunner: Runner =
   makeJSONRunnerPlan preload score
   | makeJSONRunner
 
-export def rOK = 0
-export def wOK = 1
-export def xOK = 2
+export def rOK: Integer = 0
+export def wOK: Integer = 1
+export def xOK: Integer = 2
 export def access (file: String) (mode: Integer): Boolean =
   (\f\m prim "access") file mode
 

@@ -16,7 +16,7 @@
 package build_wake
 from wake import _
 
-export def vscode _ =
+export def vscode _: Result Path Error =
     require Pass variant =
         toVariant "wasm"
 
