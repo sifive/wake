@@ -359,9 +359,7 @@ std::string ASTree::sanitizeComment(std::string comment) {
   for (std::size_t i = 0; i + 1 < comment.size(); ++i) {
     if (comment[i] == '\n' && comment[i + 1] == '\n') comment_from = i + 2;
   }
-  if (comment_from < comment.size()) {
-    comment = comment.substr(comment_from);
-  }
+  comment = comment.substr(comment_from);
 
   std::vector <size_t> commentHashtagIndices;
   if (!comment.empty() && comment[0] == '#')
