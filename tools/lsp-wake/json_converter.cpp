@@ -146,19 +146,6 @@ namespace JSONConverter {
       return message;
     }
 
-    JAST createInitializeResultCrashed(const JAST &receivedMessage) {
-      JAST message = createResponseMessage(receivedMessage);
-      JAST &result = message.add("result", JSON_OBJECT);
-
-      JAST &capabilities = result.add("capabilities", JSON_OBJECT);
-      capabilities.add("textDocumentSync", 1);
-
-      JAST &serverInfo = result.add("serverInfo", JSON_OBJECT);
-      serverInfo.add("name", "lsp wake server");
-
-      return message;
-    }
-
     JAST createInitializeResultInvalidSTDLib(const JAST &receivedMessage) {
       JAST message = createResponseMessage(receivedMessage);
       JAST &result = message.add("result", JSON_OBJECT);

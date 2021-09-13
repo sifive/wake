@@ -41,8 +41,6 @@ namespace JSONConverter {
 
     JAST createInitializeResultDefault(const JAST &receivedMessage);
 
-    JAST createInitializeResultCrashed(const JAST &receivedMessage);
-
     JAST createInitializeResultInvalidSTDLib(const JAST &receivedMessage);
 
     JAST fileDiagnosticsToJSON(const std::string &filePath, const std::vector<Diagnostic> &fileDiagnostics);

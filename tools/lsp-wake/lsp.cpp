@@ -188,8 +188,6 @@ private:
     bool isInitialized = false;
     bool needsUpdate = false;
     int ignoredCount = 0;
-    bool isCrashed = false;
-    std::string crashedFlagFilename = ".lsp-wake.lock";
     bool isShutDown = false;
     ASTree astree;
     std::map<std::string, LspMethod> essentialMethods = {
@@ -296,7 +294,7 @@ private:
 
     void refresh(const std::string &why) {
       ignoredCount = 0;
-      if (needsUpdate && !isCrashed) {
+      if (needsUpdate) {
 #ifdef CERR_DEBUG
         struct timeval start, stop;
         gettimeofday(&start, 0);
@@ -346,13 +344,8 @@ private:
       if (!isSTDLibValid) {
         notifyAboutInvalidSTDLib();
         message = JSONConverter::createInitializeResultInvalidSTDLib(receivedMessage);
-      } else if (is_readable(crashedFlagFilename.c_str())) {
-        message = JSONConverter::createInitializeResultCrashed(receivedMessage);
-        isCrashed = true;
       } else {
         message = JSONConverter::createInitializeResultDefault(receivedMessage);
-        std::ofstream isServerStarted;
-        isServerStarted.open(crashedFlagFilename);
       }
 
       isInitialized = true;
@@ -514,11 +507,6 @@ private:
     }
 
     void didSave(const JAST &receivedMessage) {
-      if (isCrashed) {
-        registerCapabilities();
-        isCrashed = false;
-      }
-
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       astree.changedFiles.erase(JSONConverter::decodePath(fileUri));
 
@@ -553,7 +541,6 @@ private:
       message.add("result", JSON_NULLVAL);
       isShutDown = true;
       sendMessage(message);
-      std::remove(crashedFlagFilename.c_str());
     }
 
     void serverExit(const JAST &_) {
