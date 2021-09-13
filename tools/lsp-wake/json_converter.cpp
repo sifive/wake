@@ -22,12 +22,77 @@
 #include "json/json5.h"
 
 namespace JSONConverter {
-    std::string decodePath(const std::string &fileUri) {
-      return fileUri.substr(7); // file:///bar -> /bar
+    static int parse_hex(char c) {
+      if (c >= '0' && c <= '9') {
+        return c - '0';
+      } else if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+      } else if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10;
+      } else {
+        return -1;
+      }
     }
 
-    std::string encodePath(const std::string &fileUri) {
-      return "file://" + fileUri;
+    std::string decodePath(const std::string &fileUri) {
+      std::string out;
+      auto i = fileUri.begin(), e = fileUri.end();
+      while (i != e) {
+        int lo, hi;
+        if (i[0] == '%' && (e-i) >= 3 && (hi = parse_hex(i[1])) != -1 && (lo = parse_hex(i[2])) != -1) {
+          out.push_back(hi << 4 | lo);
+          i += 3;
+        } else {
+          out.push_back(*i);
+          ++i;
+        }
+      }
+      if (out.compare(0, 7, "file://") == 0) {
+        out.erase(out.begin(), out.begin()+7);
+      }
+
+      return out;
+    }
+
+    static char encodeTable[256][4];
+
+    static char encode_hex(int x) {
+      if (x < 10) {
+        return '0' + x;
+      } else {
+        return 'A' + (x - 10);
+      }
+    }
+
+    static void normal(int x) {
+      encodeTable[x][0] = x;
+      encodeTable[x][1] = 0;
+    }
+
+    std::string encodePath(const std::string &filePath) {
+      if (!encodeTable[0][0]) {
+        for (int i = 0; i < 256; ++i) {
+          encodeTable[i][0] = '%';
+          encodeTable[i][1] = encode_hex(i >> 4);
+          encodeTable[i][2] = encode_hex(i & 15);
+          encodeTable[i][3] = 0;
+        }
+        for (int i = 'a'; i <= 'z'; ++i) normal(i);
+        for (int i = 'A'; i <= 'Z'; ++i) normal(i);
+        for (int i = '0'; i <= '9'; ++i) normal(i);
+        normal('-');
+        normal('_');
+        normal('.');
+        normal('~');
+        normal('/'); // This is non-standard, but necessary
+        normal(':'); // This is non-standard, but necessary for windows
+      }
+
+      std::string out = "file://";
+      for (char c : filePath)
+        out.append(encodeTable[static_cast<int>(static_cast<unsigned char>(c))]);
+
+      return out;
     }
 
     JAST createMessage() {
