@@ -1063,20 +1063,26 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
     }
   }
 
-  Package &defp = *top->packages[top->def_package];
+  Package *defp = nullptr;
+  auto defit = top->packages.find(top->def_package);
+  if (defit != top->packages.end())
+    defp = defit->second.get();
+
   gbinding.current_index = -1;
   pbinding.symbols.clear();
   ibinding.symbols.clear();
   dbinding.symbols.clear();
-  dbinding.symbols.push_back(&defp.package);
-  std::set<std::string> imports;
-  for (auto &file : defp.files)
-    for (auto &bulk : file.content->imports.import_all)
-      imports.insert(bulk);
-  for (auto &imp : imports) {
-    auto it = top->packages.find(imp);
-    if (it != top->packages.end())
-      ibinding.symbols.push_back(&it->second->exports);
+  if (defp) {
+    dbinding.symbols.push_back(&defp->package);
+    std::set<std::string> imports;
+    for (auto &file : defp->files)
+      for (auto &bulk : file.content->imports.import_all)
+        imports.insert(bulk);
+    for (auto &imp : imports) {
+      auto it = top->packages.find(imp);
+      if (it != top->packages.end())
+        ibinding.symbols.push_back(&it->second->exports);
+    }
   }
 
   std::unique_ptr<Expr> body = fracture(*top, true, "", std::move(top->body), &dbinding);
