@@ -21,6 +21,7 @@
 
 #include <inttypes.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <iostream>
 #include <sstream>
@@ -154,6 +155,7 @@ int main(int argc, char **argv) {
     { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
     { 'l', "last",                  GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "lsp",                   GOPT_ARGUMENT_FORBIDDEN },
     { 'f', "failed",                GOPT_ARGUMENT_FORBIDDEN },
     { 's', "script",                GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "init",                  GOPT_ARGUMENT_REQUIRED  },
@@ -194,6 +196,7 @@ int main(int argc, char **argv) {
   bool input   = arg(options, "input"   )->count;
   bool output  = arg(options, "output"  )->count;
   bool last    = arg(options, "last"    )->count;
+  bool lsp     = arg(options, "lsp"     )->count;
   bool failed  = arg(options, "failed"  )->count;
   bool script  = arg(options, "script"  )->count;
   bool version = arg(options, "version" )->count;
@@ -234,6 +237,13 @@ int main(int argc, char **argv) {
   if (version) {
     std::cout << "wake " << VERSION_STR << std::endl;
     return 0;
+  }
+
+  if (lsp) {
+    std::string lsp = make_canonical(find_execpath() + "/../lib/wake/lsp-wake");
+    execl(lsp.c_str(), "lsp-wake", nullptr);
+    std::cerr << "exec(" << lsp << "): " << strerror(errno) << std::endl;
+    return 1;
   }
 
   if (quiet && verbose) {
