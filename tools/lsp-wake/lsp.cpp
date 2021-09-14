@@ -531,28 +531,22 @@ private:
     void didChangeWatchedFiles(const JAST &receivedMessage) {
       JAST jfiles = receivedMessage.get("params").get("changes");
       for (auto child: jfiles.children) {
-        std::string fileUri = child.second.get("uri").value;
-        std::string filePath = JSONConverter::decodePath(fileUri);
+        std::string filePath = JSONConverter::decodePath(child.second.get("uri").value);
+        // Newly created, modified on disk, or deleted? => File should be re-read from disk.
         astree.changedFiles.erase(filePath);
 
-        int eventType = stoi(child.second.get("type").value);
-        switch (eventType) {
-          case 1: // The file got created
-            needsUpdate = true;
-            break;
-          case 2: // The file got changed
-            break;
-          case 3: // The file got deleted
-            // Clean its diagnostics
-            std::vector<Diagnostic> emptyDiagnostics;
-            JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(filePath, emptyDiagnostics);
-            sendMessage(fileDiagnosticsJSON);
-
-            needsUpdate = true;
+        if (stoi(child.second.get("type").value) == 3) {
+          // The file was deleted => clear any stale diagnostics
+          std::vector<Diagnostic> emptyDiagnostics;
+          JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(filePath, emptyDiagnostics);
+          sendMessage(fileDiagnosticsJSON);
         }
       }
 
-      refresh("files-created-or-deleted");
+      if (!jfiles.children.empty()) {
+        needsUpdate = true;
+        refresh("files-created-or-deleted");
+      }
     }
 
     void shutdown(const JAST &receivedMessage) {
