@@ -64,7 +64,11 @@ export def vscode _: Result Path Error =
     def vsceFiles =
         wasmFile,
         jsFile,
-        sources here `.*` ++
+        sources here `[^/]*` ++
+        sources here `images/.*` ++
+        sources here `lsp-client/.*` ++
+        sources here `lsp-server/.*` ++
+        sources here `syntaxes/.*` ++
         stdlib ++
         nodeModules
 
