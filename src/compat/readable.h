@@ -15,13 +15,20 @@
  * limitations under the License.
  */
 
-#define _DEFAULT_SOURCE
-#define _ISOC11_SOURCE
+#ifndef READABLE_H
+#define READABLE_H
 
-#include <stdlib.h>
+#include <stdint.h>
 
-#include "aligned_alloc.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-void *my_aligned_alloc(size_t alignment, size_t size) {
-    return aligned_alloc(alignment, size); // This is a C11 feature
-}
+// Return if the file is not readable (1) or not (0).
+int is_readable(const char *filename);
+
+#ifdef __cplusplus
+};
+#endif
+
+#endif

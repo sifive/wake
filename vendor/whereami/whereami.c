@@ -677,9 +677,9 @@ int WAI_PREFIX(getExecutablePath)(char* out, int capacity, int* dirname_length)
 {
   char *path = (char*)EM_ASM_INT({
     const path = require('path');
-    buffer = path.dirname(__filename);
-    let lengthBytes = lengthBytesUTF8(buffer)+1;
-    let stringOnWasmHeap = _malloc(lengthBytes);
+    const buffer = path.dirname(__filename);
+    const lengthBytes = lengthBytesUTF8(buffer)+1;
+    const stringOnWasmHeap = _malloc(lengthBytes);
     stringToUTF8(buffer, stringOnWasmHeap, lengthBytes);
     return stringOnWasmHeap;
   });

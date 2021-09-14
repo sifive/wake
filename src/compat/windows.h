@@ -15,13 +15,17 @@
  * limitations under the License.
  */
 
-#define _DEFAULT_SOURCE
-#define _ISOC11_SOURCE
+#ifndef WINDOWS_H
+#define WINDOWS_H
 
-#include <stdlib.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#include "aligned_alloc.h"
+extern int is_windows();
 
-void *my_aligned_alloc(size_t alignment, size_t size) {
-    return aligned_alloc(alignment, size); // This is a C11 feature
-}
+#ifdef __cplusplus
+};
+#endif
+
+#endif

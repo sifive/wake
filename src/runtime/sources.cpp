@@ -57,6 +57,45 @@ bool make_workspace(const std::string &dir) {
   return true;
 }
 
+// dir + path must be canonical
+static std::string make_relative(std::string &&dir, std::string &&path) {
+  if ((!path.empty() && path[0] == '/') !=
+  (!dir .empty() && dir [0] == '/')) {
+    return std::move(path);
+  }
+
+  if (dir == ".") dir = "";
+  else if (dir != "/") dir += '/';
+  path += '/';
+
+  size_t skip = 0, end = std::min(path.size(), dir.size());
+  for (size_t i = 0; i < end; ++i) {
+    if (dir[i] != path[i])
+      break;
+    if (dir[i] == '/') skip = i+1;
+  }
+
+  std::stringstream str;
+  for (size_t i = skip; i < dir.size(); ++i)
+    if (dir[i] == '/')
+      str << "../";
+
+  std::string x;
+  std::string last(path, skip, path.size()-skip-1);
+  if (last.empty() || last == ".") {
+    // remove trailing '/'
+    x = str.str();
+    if (x.empty()) x = ".";
+    else x.resize(x.size()-1);
+  } else {
+    str << last;
+    x = str.str();
+  }
+
+  if (x.empty()) return ".";
+  return x;
+}
+
 bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &src_dir) {
   wake_cwd = get_cwd();
 

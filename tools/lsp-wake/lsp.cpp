@@ -29,11 +29,13 @@
 #include <utility>
 #include <algorithm>
 
+#include "compat/readable.h"
 #include "util/location.h"
 #include "util/execpath.h"
 #include "util/diagnostic.h"
 #include "json/json5.h"
 #include "parser/parser.h"
+#include "parser/wakefiles.h"
 #include "types/internal.h"
 #include "json_converter.h"
 #include "astree.h"
@@ -47,6 +49,7 @@
 #define VERSION_STR TOSTRING(VERSION)
 
 #ifdef __EMSCRIPTEN__
+#define CERR_DEBUG
 #include <emscripten/emscripten.h>
 
 EM_ASYNC_JS(char *, nodejs_getstdin, (), {
@@ -169,7 +172,7 @@ public:
       JAST &showMessageParams = message.add("params", JSON_OBJECT);
       showMessageParams.add("type", 1); // Error
       std::string messageText =
-        "The path to the wake standard library (" + astree.stdLib + ") is invalid. " +
+        "The path to the wake standard library (" + astree.absLibDir + ") is invalid. " +
         "Wake language features will not be provided. " +
         "Please change the path in the extension settings and reload the window by: " +
         "  1. Opening the command palette (Ctrl + Shift + P); " +
@@ -182,12 +185,9 @@ private:
     typedef void (LSPServer::*LspMethod)(const JAST &);
 
     bool isSTDLibValid = true;
-    std::string rootUri;
     bool isInitialized = false;
     bool needsUpdate = false;
     int ignoredCount = 0;
-    bool isCrashed = false;
-    std::string crashedFlagFilename = ".lsp-wake.lock";
     bool isShutDown = false;
     ASTree astree;
     std::map<std::string, LspMethod> essentialMethods = {
@@ -240,7 +240,9 @@ private:
 #ifdef __EMSCRIPTEN__
         char *buf = nodejs_getstdin();
         if (!buf) {
+#ifdef CERR_DEBUG
           std::cerr << "Client did not shutdown cleanly" << std::endl;
+#endif
           exit(1);
         }
 
@@ -283,7 +285,9 @@ private:
 
         // End-of-file reached?
         if (got == 0) {
+#ifdef CERR_DEBUG
           std::cerr << "Client did not shutdown cleanly" << std::endl;
+#endif
           exit(1);
         }
 
@@ -294,13 +298,13 @@ private:
 
     void refresh(const std::string &why) {
       ignoredCount = 0;
-      if (needsUpdate && !isCrashed) {
-#ifdef __EMSCRIPTEN__
+      if (needsUpdate) {
+#ifdef CERR_DEBUG
         struct timeval start, stop;
         gettimeofday(&start, 0);
 #endif
         diagnoseProject();
-#ifdef __EMSCRIPTEN__
+#ifdef CERR_DEBUG
         gettimeofday(&stop, 0);
         double delay =
           (stop.tv_sec  - start.tv_sec) +
@@ -312,10 +316,6 @@ private:
 
     void poll() {
       refresh("timeout");
-#ifdef __EMSCRIPTEN__
-      int usage = EM_ASM_INT({ return HEAPU8.length; });
-      std::cerr << "Two second heart-beat; using " << usage << " bytes of memory" << std::endl;
-#endif
     }
 
     void callMethod(const std::string &method, const JAST &request) {
@@ -348,17 +348,12 @@ private:
       if (!isSTDLibValid) {
         notifyAboutInvalidSTDLib();
         message = JSONConverter::createInitializeResultInvalidSTDLib(receivedMessage);
-      } else if (access(crashedFlagFilename.c_str(), F_OK) != -1) {
-        message = JSONConverter::createInitializeResultCrashed(receivedMessage);
-        isCrashed = true;
       } else {
         message = JSONConverter::createInitializeResultDefault(receivedMessage);
-        std::ofstream isServerStarted;
-        isServerStarted.open(crashedFlagFilename);
       }
 
       isInitialized = true;
-      rootUri = receivedMessage.get("params").get("rootUri").value;
+      astree.absWorkDir = JSONConverter::decodePath(receivedMessage.get("params").get("rootUri").value);
       sendMessage(message);
 
       if (isSTDLibValid) {
@@ -384,9 +379,8 @@ private:
     }
 
     void diagnoseProject() {
-      astree.diagnoseProject([this](ASTree::FileDiagnostics &fileDiagnostics) {
-        JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(fileDiagnostics.first, fileDiagnostics.second,
-                                                                        rootUri);
+      astree.diagnoseProject([](ASTree::FileDiagnostics &fileDiagnostics) {
+        JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(fileDiagnostics.first, fileDiagnostics.second);
         sendMessage(fileDiagnosticsJSON);
       });
       needsUpdate = false;
@@ -394,15 +388,15 @@ private:
 
     void goToDefinition(const JAST &receivedMessage) {
       refresh("goto-definition");
-      Location locationToDefine = JSONConverter::getLocationFromJSON(receivedMessage, rootUri);
+      Location locationToDefine = JSONConverter::getLocationFromJSON(receivedMessage);
       Location definitionLocation = astree.findDefinitionLocation(locationToDefine);
-      JAST definitionLocationJSON = JSONConverter::definitionLocationToJSON(receivedMessage, definitionLocation, rootUri);
+      JAST definitionLocationJSON = JSONConverter::definitionLocationToJSON(receivedMessage, definitionLocation);
       sendMessage(definitionLocationJSON);
     }
 
     void findReportReferences(const JAST &receivedMessage) {
       refresh("report-references");
-      Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage, rootUri);
+      Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage);
       bool isDefinitionFound = false;
       std::vector<Location> references;
 
@@ -411,7 +405,7 @@ private:
         references.push_back(definitionLocation);
       }
 
-      JAST referencesJSON = JSONConverter::referencesToJSON(receivedMessage, references, rootUri);
+      JAST referencesJSON = JSONConverter::referencesToJSON(receivedMessage, references);
       sendMessage(referencesJSON);
     }
 
@@ -420,12 +414,12 @@ private:
         if (++ignoredCount > 2) {
           refresh("highlight");
         } else {
-#ifdef __EMSCRIPTEN__
+#ifdef CERR_DEBUG
           std::cerr << "Opting not to refresh code for highlight request" << std::endl;
 #endif
         }
       }
-      Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage, rootUri);
+      Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage);
       std::vector<Location> occurrences = astree.findOccurrences(symbolLocation);
       JAST highlightsJSON = JSONConverter::highlightsToJSON(receivedMessage, occurrences);
       sendMessage(highlightsJSON);
@@ -436,12 +430,12 @@ private:
         if (++ignoredCount > 2) {
           refresh("hover");
         } else {
-#ifdef __EMSCRIPTEN__
+#ifdef CERR_DEBUG
           std::cerr << "Opting not to refresh code for hover request" << std::endl;
 #endif
         }
       }
-      Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage, rootUri);
+      Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage);
       std::vector<SymbolDefinition> hoverInfoPieces = astree.findHoverInfo(symbolLocation);
       JAST hoverInfoJSON = JSONConverter::hoverInfoToJSON(receivedMessage, hoverInfoPieces);
       sendMessage(hoverInfoJSON);
@@ -452,7 +446,7 @@ private:
         if (++ignoredCount > 2) {
           refresh("document-symbol");
         } else {
-#ifdef __EMSCRIPTEN__
+#ifdef CERR_DEBUG
           std::cerr << "Opting not to refresh code for document-symbol request" << std::endl;
 #endif
         }
@@ -461,11 +455,11 @@ private:
       JAST &result = message.add("result", JSON_ARRAY);
 
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      std::string filePath = fileUri.substr(rootUri.length() + 1, std::string::npos);
+      std::string filePath = JSONConverter::decodePath(fileUri);
 
       std::vector<SymbolDefinition> symbols = astree.documentSymbol(filePath);
       for (const SymbolDefinition &symbol: symbols) {
-        JSONConverter::appendSymbolToJSON(symbol, result, rootUri);
+        JSONConverter::appendSymbolToJSON(symbol, result);
       }
       sendMessage(message);
     }
@@ -478,7 +472,7 @@ private:
       std::string query = receivedMessage.get("params").get("query").value;
       std::vector<SymbolDefinition> symbols = astree.workspaceSymbol(query);
       for (const SymbolDefinition &symbol: symbols) {
-        JSONConverter::appendSymbolToJSON(symbol, result, rootUri);
+        JSONConverter::appendSymbolToJSON(symbol, result);
       }
       sendMessage(message);
     }
@@ -492,14 +486,14 @@ private:
         return;
       }
 
-      Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage, rootUri);
+      Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage);
       bool isDefinitionFound = false;
       std::vector<Location> references;
       astree.findReferences(definitionLocation, isDefinitionFound, references);
       if (isDefinitionFound) {
         references.push_back(definitionLocation);
       }
-      JAST workspaceEditsJSON = JSONConverter::workspaceEditsToJSON(receivedMessage, references, newName, rootUri);
+      JAST workspaceEditsJSON = JSONConverter::workspaceEditsToJSON(receivedMessage, references, newName);
       sendMessage(workspaceEditsJSON);
     }
 
@@ -510,23 +504,15 @@ private:
     void didChange(const JAST &receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
-      std::string fileName = JSONConverter::stripRootUri(fileUri, rootUri);
-      if (fileName.empty()) {
-        return;
-      }
+      std::string fileName = JSONConverter::decodePath(fileUri);
       astree.changedFiles[fileName] = std::unique_ptr<StringFile>(new StringFile(fileName.c_str(), std::move(fileContent)));
       needsUpdate = true;
       ignoredCount = 0;
     }
 
     void didSave(const JAST &receivedMessage) {
-      if (isCrashed) {
-        registerCapabilities();
-        isCrashed = false;
-      }
-
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      astree.changedFiles.erase(JSONConverter::stripRootUri(fileUri, rootUri));
+      astree.changedFiles.erase(JSONConverter::decodePath(fileUri));
 
       // Might have replaced a file modified on disk
       needsUpdate = true;
@@ -535,7 +521,7 @@ private:
 
     void didClose(const JAST &receivedMessage) {
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      if (astree.changedFiles.erase(JSONConverter::stripRootUri(fileUri, rootUri)) > 0) {
+      if (astree.changedFiles.erase(JSONConverter::decodePath(fileUri)) > 0) {
         needsUpdate = true;
         refresh("modified-file-closed");
       }
@@ -546,7 +532,7 @@ private:
       size_t changed = 0;
       for (auto child: jfiles.children) {
         std::string fileUri = child.second.get("uri").value;
-        changed += astree.changedFiles.erase(JSONConverter::stripRootUri(fileUri, rootUri));
+        changed += astree.changedFiles.erase(JSONConverter::decodePath(fileUri));
       }
       if (changed) {
         needsUpdate = true;
@@ -559,7 +545,6 @@ private:
       message.add("result", JSON_NULLVAL);
       isShutDown = true;
       sendMessage(message);
-      std::remove(crashedFlagFilename.c_str());
     }
 
     void serverExit(const JAST &_) {
@@ -571,29 +556,13 @@ private:
 int main(int argc, const char **argv) {
   std::string stdLib;
   if (argc >= 2) {
-    stdLib = argv[1];
+    stdLib = make_canonical(argv[1]);
   } else {
-    stdLib = find_execpath() + "/../../share/wake/lib";
+    stdLib = make_canonical(find_execpath() + "/../../share/wake/lib");
   }
 
-  #ifdef __EMSCRIPTEN__
-  char *cwd = (char*)EM_ASM_INT({
-    FS.mkdir('/root');
-    FS.mount(NODEFS, { root: '/' }, '/root');
-    let cwd = process.cwd();
-    let lengthBytes = lengthBytesUTF8(cwd)+1;
-    let stringOnWasmHeap = _malloc(lengthBytes);
-    stringToUTF8(cwd, stringOnWasmHeap, lengthBytes);
-    return stringOnWasmHeap;
-  });
-  if (0 != chdir("/root")) std::cerr << "Could not enter root filesystem" << std::endl;
-  if (0 != chdir(cwd+1)) std::cerr << "Could not re-enter current-working directory " << cwd << std::endl;
-  free(cwd);
-  stdLib = "/root" + stdLib;
-#endif
-
   LSPServer lsp;
-  if (access((stdLib + "/core/boolean.wake").c_str(), F_OK) != -1) {
+  if (is_readable((stdLib + "/core/boolean.wake").c_str())) {
     lsp = LSPServer(stdLib);
   } else {
     lsp = LSPServer(false, stdLib);

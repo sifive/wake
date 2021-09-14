@@ -15,13 +15,25 @@
  * limitations under the License.
  */
 
-#define _DEFAULT_SOURCE
-#define _ISOC11_SOURCE
+#if defined(_WIN32)
 
-#include <stdlib.h>
+int is_windows() { return 1; }
 
-#include "aligned_alloc.h"
+#elif defined(__EMSCRIPTEN__)
+#include <emscripten/emscripten.h>
 
-void *my_aligned_alloc(size_t alignment, size_t size) {
-    return aligned_alloc(alignment, size); // This is a C11 feature
+int is_windows() {
+  return EM_ASM_INT({
+    if (process.platform == 'win32') {
+      return 1;
+    } else {
+      return 0;
+    }
+  });
 }
+
+#else
+
+int is_windows() { return 0; }
+
+#endif

@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdlib.h>
 #include <errno.h>
 
 #include <algorithm>
@@ -84,31 +85,56 @@ StringFile::StringFile(const char *filename_, std::string &&content_)
     ss.end = ss.start + content.size();
 }
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+
 ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
  : FileContent(filename_)
 {
     Location l(filename());
 
-#ifdef __EMSCRIPTEN__
-    // mmap with specified address is broken...
-    std::ifstream ifs(filename());
-    if (!ifs) {
-        reporter.reportError(l, std::string("open failed; ") + strerror(errno));
-        ss.end = ss.start = &null[0];
-        return;
+    int32_t length;
+    uint8_t *base = (uint8_t*)EM_ASM_INT({
+      try {
+        const fs = require('fs');
+        const fileBuffer = fs.readFileSync(UTF8ToString($1));
+        const wasmPointer = Module._malloc(fileBuffer.length+1);
+        fileBuffer.copy(Module.HEAPU8, wasmPointer);
+        setValue($0, fileBuffer.length, "i32");
+        return wasmPointer;
+      } catch (err) {
+        const lengthBytes = lengthBytesUTF8(err.message)+1;
+        const stringOnWasmHeap = _malloc(lengthBytes);
+        stringToUTF8(err.message, stringOnWasmHeap, lengthBytes);
+        setValue($0, -1, "i32");
+        return stringOnWasmHeap;
+      }
+    }, &length, filename());
+
+    if (length == -1) {
+      reporter.reportError(l, std::string("readFileSync failed; ") + reinterpret_cast<char*>(base));
+      free(base);
+      ss.end = ss.start = &null[0];
+      return;
     }
-
-    ifs.seekg(0, std::ios::end);
-    size_t length = ifs.tellg();
-    ifs.seekg(0, std::ios::beg);
-
-    uint8_t *base = new uint8_t[length+1];
-    ifs.read(reinterpret_cast<char*>(base), length);
 
     base[length] = 0;
     ss.start = base;
     ss.end = base + length;
+}
+
+ExternalFile::~ExternalFile() {
+    if (ss.start != ss.end)
+        free((void*)ss.start);
+}
+
 #else
+
+ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
+ : FileContent(filename_)
+{
+    Location l(filename());
+
     int fd = open(filename(), O_RDONLY);
     if (fd == -1) {
         reporter.reportError(l, std::string("open failed; ") + strerror(errno));
@@ -161,18 +187,14 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
 
     // Fill in the last page
     memcpy(reinterpret_cast<uint8_t*>(map) + tail_start, buf.c_str(), tail_len);
-#endif
 }
 
 ExternalFile::~ExternalFile() {
-#ifdef __EMSCRIPTEN__
-    if (ss.start != ss.end)
-        delete [] ss.start;
-#else
     if (ss.start != ss.end)
         munmap(const_cast<void*>(reinterpret_cast<const void*>(ss.start)), ss.size() + 1);
-#endif
 }
+
+#endif
 
 CPPFile::CPPFile(const char *filename)
  : FileContent(filename)

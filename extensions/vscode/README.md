@@ -38,7 +38,7 @@ A Visual Studio Code extension with support for the Wake build tool and language
 
 ## Requirements
 
- A Linux or macOS machine
+ A Linux, Windows, or MacOS machine.
 
 ## Wake versions
 

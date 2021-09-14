@@ -15,13 +15,36 @@
  * limitations under the License.
  */
 
-#define _DEFAULT_SOURCE
-#define _ISOC11_SOURCE
+// Open Group Base Specifications Issue 7
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
 
-#include <stdlib.h>
+#include "readable.h"
 
-#include "aligned_alloc.h"
+#ifdef __EMSCRIPTEN__
 
-void *my_aligned_alloc(size_t alignment, size_t size) {
-    return aligned_alloc(alignment, size); // This is a C11 feature
+#include <emscripten/emscripten.h>
+
+int is_readable(const char *filename) {
+  int out = EM_ASM_INT({
+    try {
+      const fs = require('fs');
+      fs.accessSync(UTF8ToString($0), fs.constants.R_OK);
+      return 1;
+    } catch (err) {
+      return 0;
+    }
+  }, filename);
+
+  return out;
 }
+
+#else
+
+#include <unistd.h>
+
+int is_readable(const char *filename) {
+  return access(filename, R_OK) == 0;
+}
+
+#endif

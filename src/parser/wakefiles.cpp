@@ -33,14 +33,18 @@
 #include <fstream>
 #include <algorithm>
 
+#include "compat/readable.h"
+#include "compat/windows.h"
 #include "util/execpath.h"
+#include "util/diagnostic.h"
+#include "util/file.h"
 #include "wakefiles.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 
-EM_JS(char *, nodejs_getfiles, (const char *dir), {
-  const Path = require("path");
+EM_JS(char *, nodejs_getfiles, (const char *dir, int *ok), {
+  const Path = require("path").posix;
   const FS   = require("fs");
   let files  = [];
 
@@ -56,26 +60,43 @@ EM_JS(char *, nodejs_getfiles, (const char *dir), {
       });
   }
 
-  walkTree(UTF8ToString(dir));
-  const sep = String.fromCharCode(0);
-  const out = files.join(sep) + sep;
+  try {
+    walkTree(UTF8ToString(dir));
+    const sep = String.fromCharCode(0);
+    const out = files.join(sep) + sep;
 
-  const lengthBytes = lengthBytesUTF8(out)+1;
-  const stringOnWasmHeap = _malloc(lengthBytes);
-  stringToUTF8(out, stringOnWasmHeap, lengthBytes);
-  return stringOnWasmHeap;
+    const lengthBytes = lengthBytesUTF8(out)+1;
+    const stringOnWasmHeap = _malloc(lengthBytes);
+    stringToUTF8(out, stringOnWasmHeap, lengthBytes);
+    setValue(ok, 1, "i32");
+    return stringOnWasmHeap;
+  } catch (err) {
+    const lengthBytes = lengthBytesUTF8(err.message)+1;
+    const stringOnWasmHeap = _malloc(lengthBytes);
+    stringToUTF8(err.message, stringOnWasmHeap, lengthBytes);
+    setValue(ok, 0, "i32");
+    return stringOnWasmHeap;
+  }
 });
 
 bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2& re, size_t skip) {
-  char *files = nodejs_getfiles(path.c_str());
-  for (char *file = files; *file; file += strlen(file)+1) {
-    re2::StringPiece p(file + skip, strlen(file) - skip);
-    if (RE2::FullMatch(p, re)) {
-      out.emplace_back(file);
+  int ok;
+  char *files = nodejs_getfiles(path.c_str(), &ok);
+  if (ok) {
+    for (char *file = files; *file; file += strlen(file)+1) {
+      re2::StringPiece p(file + skip, strlen(file) - skip);
+      if (RE2::FullMatch(p, re)) {
+        out.emplace_back(file);
+      }
     }
+    free(files);
+    return false;
+  } else {
+    fputs(files, stderr);
+    fputs("\n", stderr);
+    free(files);
+    return true;
   }
-  free(files);
-  return true;
 }
 
 #else
@@ -162,7 +183,11 @@ std::string make_canonical(const std::string &x) {
   bool repeat;
   bool pop = false;
   do {
-    scan = x.find_first_of('/', tok);
+    if (is_windows()) {
+      scan = x.find_first_of("\\/", tok);
+    } else {
+      scan = x.find_first_of('/', tok);
+    }
     repeat = scan != std::string::npos;
     std::string token(x, tok, repeat?(scan-tok):scan);
     tok = scan+1;
@@ -196,45 +221,6 @@ std::string make_canonical(const std::string &x) {
       str << "/" << *i;
     return str.str();
   }
-}
-
-// dir + path must be canonical
-std::string make_relative(std::string &&dir, std::string &&path) {
-  if ((!path.empty() && path[0] == '/') !=
-  (!dir .empty() && dir [0] == '/')) {
-    return std::move(path);
-  }
-
-  if (dir == ".") dir = "";
-  else if (dir != "/") dir += '/';
-  path += '/';
-
-  size_t skip = 0, end = std::min(path.size(), dir.size());
-  for (size_t i = 0; i < end; ++i) {
-    if (dir[i] != path[i])
-      break;
-    if (dir[i] == '/') skip = i+1;
-  }
-
-  std::stringstream str;
-  for (size_t i = skip; i < dir.size(); ++i)
-    if (dir[i] == '/')
-      str << "../";
-
-  std::string x;
-  std::string last(path, skip, path.size()-skip-1);
-  if (last.empty() || last == ".") {
-    // remove trailing '/'
-    x = str.str();
-    if (x.empty()) x = ".";
-    else x.resize(x.size()-1);
-  } else {
-    str << last;
-    x = str.str();
-  }
-
-  if (x.empty()) return ".";
-  return x;
 }
 
 struct WakeFilter {
@@ -303,9 +289,17 @@ std::string glob2regexp(const std::string &glob) {
   return exp;
 }
 
+class DiagnosticIgnorer : public DiagnosticReporter {
+  void report(Diagnostic diagnostic) { }
+};
+
 static void process_ignorefile(const std::string &path, std::vector<WakeFilter> &filters) {
-  std::ifstream in(path + ".wakeignore");
-  if (!in.is_open()) return;
+  DiagnosticIgnorer ignorer;
+  std::string wakeignore = path + ".wakeignore";
+  ExternalFile file(ignorer, wakeignore.c_str());
+  StringSegment segment = file.segment();
+  std::stringstream in;
+  in.write(reinterpret_cast<const char*>(segment.start), segment.size());
 
   RE2::Options options;
   options.set_log_errors(false);
@@ -330,17 +324,19 @@ static void process_ignorefile(const std::string &path, std::vector<WakeFilter> 
   }
 }
 
-static void filter_wakefiles(std::vector<std::string> &wakefiles, bool verbose) {
-  std::string curdir; // Either "" or ".+/"
-  std::vector<WakeFilter> filters;
+static void filter_wakefiles(std::vector<std::string> &wakefiles, const std::string &basedir, bool verbose) {
+  std::string curdir = basedir; // Either "" or ".+/"
+  if (curdir == ".") {
+    curdir.clear();
+  } else if (!curdir.empty() && curdir.back() != '/') {
+    curdir.push_back('/');
+  }
 
+  std::vector<WakeFilter> filters;
   process_ignorefile(curdir, filters);
 
   for (auto p = wakefiles.begin(); p != wakefiles.end(); /**/) {
     std::string &wakefile = *p;
-
-    // Wake standard library cannot be excluded
-    if (wakefile.compare(0, 3, "../") == 0) { ++p; continue; }
 
     // Unwind curdir
     while (!curdir.empty() && wakefile.compare(0, curdir.size(), curdir) != 0) {
@@ -386,25 +382,31 @@ static void filter_wakefiles(std::vector<std::string> &wakefiles, bool verbose) 
   }
 }
 
-std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose, const std::string &abs_libdir) {
+std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose, const std::string &libdir, const std::string &workdir) {
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
   RE2 exp("(?s).*[^/]\\.wake", options);
 
-  std::string rel_libdir = make_relative(get_cwd(), make_canonical(abs_libdir));
+  std::vector<std::string> libfiles, workfiles;
 
-  std::vector<std::string> acc;
-  if (!workspace || access("share/wake/lib/core/boolean.wake", R_OK) != 0)
-    if (push_files(acc, rel_libdir, exp, 0)) ok = false;
-  if (workspace && push_files(acc, ".", exp, 0)) ok = false;
+  std::string boolean = workdir + "/share/wake/lib/core/boolean.wake";
+  if (!workspace || !is_readable(boolean.c_str())) {
+    if (push_files(libfiles, libdir, exp, 0)) ok = false;
+    std::sort(libfiles.begin(), libfiles.end());
+    filter_wakefiles(libfiles, libdir, verbose);
+  }
 
-  // make the output distinct
-  std::sort(acc.begin(), acc.end());
-  auto it = std::unique(acc.begin(), acc.end());
-  acc.resize(std::distance(acc.begin(), it));
+  if (workspace) {
+    if (push_files(workfiles, workdir, exp, 0)) ok = false;
+    std::sort(workfiles.begin(), workfiles.end());
+    filter_wakefiles(workfiles, workdir, verbose);
+  }
 
-  filter_wakefiles(acc, verbose);
+  libfiles.insert(
+    libfiles.end(),
+    std::make_move_iterator(workfiles.begin()),
+    std::make_move_iterator(workfiles.end()));
 
-  return acc;
+  return libfiles;
 }
