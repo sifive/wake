@@ -246,7 +246,7 @@ void ASTree::explore(Expr *expr, bool isGlobal) {
     if (!lambda->token.empty()) {
       std::stringstream ss;
       ss << lambda->typeVar[0];
-      if (lambda->name.find(' ') == std::string::npos) {
+      if (lambda->name.find(' ') >= lambda->name.find('@')) {
         definitions.emplace_back(
           /* name */     lambda->name,
           /* location */ lambda->token.location(),
@@ -276,7 +276,7 @@ void ASTree::explore(Expr *expr, bool isGlobal) {
           ss << defbinding->fun[idx]->typeVar;
           symbolKind = getSymbolKind(i.first.c_str(), defbinding->fun[idx]->typeVar.getName());
         }
-        if (i.first.find(' ') == std::string::npos ||
+        if (i.first.find(' ') >= i.first.find('@') ||
         i.first.compare(0, 7, "binary ") == 0 ||
         i.first.compare(0, 6, "unary ") == 0) {
           definitions.emplace_back(
