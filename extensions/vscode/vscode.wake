@@ -16,6 +16,14 @@
 package build_wake
 from wake import _
 
+def installRO path =
+  def dest = "{here}/{path.getPathName}"
+  def inputs = mkdir "{dest}/..", path, Nil
+  "install -m 444 {path.getPathName} {dest}"
+  | makePlan "install: {dest}" inputs
+  | runJob
+  | getJobOutput
+
 export def vscode _: Result Path Error =
     require Pass variant =
         toVariant "wasm"
@@ -51,7 +59,7 @@ export def vscode _: Result Path Error =
 
     def stdlib =
         sources "share/wake/lib" `.*`
-        | map (installIn here ".")
+        | map installRO
 
     def vsceFiles =
         wasmFile,
