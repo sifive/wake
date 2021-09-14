@@ -523,7 +523,8 @@ private:
       std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
       if (astree.changedFiles.erase(JSONConverter::decodePath(fileUri)) > 0) {
         needsUpdate = true;
-        refresh("modified-file-closed");
+        // If a user hits 'undo' on a symbol rename, you can get hundreds of sequential didClose invocations
+        // Calling refresh here would cause the extension to 'hang' for a very long time.
       }
     }
 
