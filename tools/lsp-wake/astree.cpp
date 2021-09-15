@@ -230,6 +230,7 @@ std::vector<SymbolDefinition> ASTree::workspaceSymbol(const std::string &query) 
 }
 
 void ASTree::explore(Expr *expr, bool isGlobal) {
+  if (!expr) return;
   if (expr->type == &VarRef::type) {
     VarRef *ref = dynamic_cast<VarRef*>(expr);
     if (!ref->fragment.empty() && !ref->target.empty() && (ref->flags & FLAG_AST) != 0) {
