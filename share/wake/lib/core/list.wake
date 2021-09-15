@@ -67,14 +67,25 @@ export def tail: List a => List a = match _
     Nil  = Nil
     _, t = t
 
-# map: create a new List by applying a function f to each element of a List.
+# Create a new List by applying the function `mapFn` to each element of `list`.
+# The `map` function (along with `foldl`) is generally how one implements loops in wake.
+# This function (like most in wake) runs `mapFn` in parallel.
 #
-#   map str    (seq 5) = "0", "1", "2", "3", "4", Nil
-#   map (_+10) (seq 5) = 10, 11, 12, 13, 14, Nil
-export def map (f: a => b): List a => List b =
-    def loop = match _
+# Parameters:
+#  - `mapFn`: The function to apply to each element
+#  - `list`: The List of elements to feed to `mapFn`
+#
+# Guarantees:
+#  - The resultant List has the same length as `list`
+#
+# ```
+# map str     (3, 9, Nil) = "3", "9", Nil
+# map (_+100) (3, 9, Nil) = 103, 109, Nil
+# ```
+export def map (mapFn: a => b): List a => List b =
+    def loop list = match list
         Nil  = Nil
-        h, t = f h, loop t
+        h, t = mapFn h, loop t
     loop
 
 # mapFlat: create a new List by applying a function f to each element and concatenating the output.
@@ -349,17 +360,29 @@ export def forall (f: a => Boolean): List a => Boolean =
     def not = ! f _
     ! exists not _
 
-# splitBy: partition a List into those elements with `f` True and False
+# Partition one `list` into two Lists based on the output of `acceptFn`.
+# Every element of `list` appears in exactly one of the output Lists.
+# Two elements in an output List retain the order they had in `list`.
 #
-#   def isEven x = x%2 == 0
-#   splitBy isEven (seq 6) = Pair (0, 2, 4, Nil) (1, 3, 5, Nil)
-export def splitBy (f: a => Boolean): List a => Pair (List a) (List a) =
-    def loop = match _
+# Parameters:
+#  - `acceptFn`: The Boolean function which categorizes each element
+#  - `list`: The List of elements to be categorized by `True` / `False`
+#
+# Returns `Pair true false`, where:
+#  - `true`:  List of elements from `list` for which `acceptFn` returned `True`
+#  - `false`: List of elements from `list` for which `acceptFn` returned `False`
+#
+# ```
+# def isEven x = x%2 == 0
+# splitBy isEven (0, 1, 3, 5, 6, Nil) = Pair (0, 6, Nil) (1, 3, 5, Nil)
+# ```
+export def splitBy (acceptFn: a => Boolean): List a => Pair (true: List a) (false: List a) =
+    def loop list = match list
         Nil  = Pair Nil Nil
         h, t =
             # don't wait on f to process tail:
             def Pair u v = loop t
-            if f h then
+            if acceptFn h then
                 Pair (h, u) v
             else
                 Pair u (h, v)
