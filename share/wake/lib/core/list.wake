@@ -74,14 +74,13 @@ export def tail: List a => List a = match _
 # Parameters:
 #  - *mapFn*: The function to apply to each element
 #  - *list*: The List of elements to feed to *mapFn*
-#  - returns: A new List with the outputs of *mapFn*
 #
 # Guarantees:
 #  - The resultant List has the same length as *list*
 #
 # ```
-# map str    (seq 5) = "0", "1", "2", "3", "4", Nil
-# map (_+10) (seq 5) = 10, 11, 12, 13, 14, Nil
+# map str     (3, 9, Nil) = "3", "9", Nil
+# map (_+100) (3, 9, Nil) = 103, 109, Nil
 # ```
 export def map (mapFn: a => b): List a => List b =
     def loop list = match list
