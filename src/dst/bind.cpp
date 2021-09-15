@@ -1327,6 +1327,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     binding->open = false;
     bool f = explore(app->fn .get(), state, binding);
     bool a = explore(app->val.get(), state, binding);
+    // Even if fn is nullptr, this is just an offset calculation, not a dereference
     FnErrorMessage fnm(&app->fn->fragment);
     bool t = f && app->fn->typeVar.unify(TypeVar(FN, 2), &fnm);
     ArgErrorMessage argm(&app->fn->fragment, &app->val->fragment, t?app->fn->typeVar.getTag(0):0);
@@ -1340,7 +1341,8 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
       lambda->typeVar.setTag(0, lambda->name.c_str());
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), state, &bind);
-    RecErrorMessage recm(lambda->body ? &lambda->body->fragment : &lambda->fragment);
+    // Even if body is nullptr, this is just an offset calculation, not a dereference
+    RecErrorMessage recm(&lambda->body->fragment);
     bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &recm);
     return out && t && tr;
   } else if (expr->type == &DefBinding::type) {
@@ -1349,11 +1351,13 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     NameBinding bind(binding, def);
     bool ok = true;
     for (unsigned i = 0; i < def->val.size(); ++i) {
+      if (!def->val[i]) { ok = false; continue; }
       def->val[i]->typeVar.setDOB();
       TypeScope scope(state, def->valVars[i], def->val[i]->typeVar);
       ok = explore(def->val[i].get(), state, binding) && ok;
     }
     for (unsigned i = 0; i < def->fun.size(); ++i) {
+      if (!def->fun[i]) { ok = false; continue; }
       def->fun[i]->typeVar.setDOB();
       for (unsigned j = i+1; j < def->fun.size() && i == def->scc[j]; ++j)
         if (def->fun[j]) def->fun[j]->typeVar.setDOB(def->fun[i]->typeVar);
@@ -1363,7 +1367,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     }
     bind.generalized = def->val.size() + def->fun.size();
     ok = explore(def->body.get(), state, &bind) && ok;
-    ok = ok && def->typeVar.unify(def->body->typeVar, &def->fragment) && ok;
+    ok = ok && def->typeVar.unify(def->body->typeVar, &def->fragment);
     return ok;
   } else if (expr->type == &Literal::type) {
     Literal *lit = static_cast<Literal*>(expr);

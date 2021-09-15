@@ -265,28 +265,31 @@ void ASTree::explore(Expr *expr, bool isGlobal) {
     for (auto &i : defbinding->val) explore(i.get(), false);
     for (auto &i : defbinding->fun) explore(i.get(), false);
     for (auto &i : defbinding->order) {
-      if (!i.second.fragment.empty()) {
-        std::stringstream ss;
-        SymbolKind symbolKind;
-        size_t idx = i.second.index;
-        if (idx < defbinding->val.size()) {
-          ss << defbinding->val[idx]->typeVar;
-          symbolKind = getSymbolKind(i.first.c_str(), defbinding->val[idx]->typeVar.getName());
-        } else {
-          idx -= defbinding->val.size();
-          ss << defbinding->fun[idx]->typeVar;
-          symbolKind = getSymbolKind(i.first.c_str(), defbinding->fun[idx]->typeVar.getName());
-        }
-        if (i.first.find(' ') >= i.first.find('@') ||
-        i.first.compare(0, 7, "binary ") == 0 ||
-        i.first.compare(0, 6, "unary ") == 0) {
-          definitions.emplace_back(
-            /* name */     i.first,
-            /* location */ i.second.fragment.location(),
-            /* type */     ss.str(),
-            /* kind */     symbolKind,
-            /* global */   isGlobal);
-        }
+      if (i.second.fragment.empty()) continue;
+      std::stringstream ss;
+      SymbolKind symbolKind;
+      size_t idx = i.second.index;
+      if (idx < defbinding->val.size()) {
+        Expr *child = defbinding->val[idx].get();
+        if (!child) continue;
+        ss << child->typeVar;
+        symbolKind = getSymbolKind(i.first.c_str(), child->typeVar.getName());
+      } else {
+        idx -= defbinding->val.size();
+        Expr *child = defbinding->fun[idx].get();
+        if (!child) continue;
+        ss << child->typeVar;
+        symbolKind = getSymbolKind(i.first.c_str(), child->typeVar.getName());
+      }
+      if (i.first.find(' ') >= i.first.find('@') ||
+          i.first.compare(0, 7, "binary ") == 0 ||
+          i.first.compare(0, 6, "unary ") == 0) {
+        definitions.emplace_back(
+          /* name */     i.first,
+          /* location */ i.second.fragment.location(),
+          /* type */     ss.str(),
+          /* kind */     symbolKind,
+          /* global */   isGlobal);
       }
     }
     explore(defbinding->body.get(), isGlobal);
