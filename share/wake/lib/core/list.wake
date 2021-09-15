@@ -67,14 +67,26 @@ export def tail: List a => List a = match _
     Nil  = Nil
     _, t = t
 
-# map: create a new List by applying a function f to each element of a List.
+# Create a new List by applying the function *mapFn* to each element of *list*.
+# The *map* function (along with *foldl*) is generally how one implements loops in wake.
+# This function (like most in wake) runs *mapFn* in parallel.
 #
-#   map str    (seq 5) = "0", "1", "2", "3", "4", Nil
-#   map (_+10) (seq 5) = 10, 11, 12, 13, 14, Nil
-export def map (f: a => b): List a => List b =
-    def loop = match _
+# Parameters:
+#  - *mapFn*: The function to apply to each element
+#  - *list*: The List of elements to feed to *mapFn*
+#  - returns: A new List with the outputs of *mapFn*
+#
+# Guarantees:
+#  - The resultant List has the same length as *list*
+#
+# ```
+# map str    (seq 5) = "0", "1", "2", "3", "4", Nil
+# map (_+10) (seq 5) = 10, 11, 12, 13, 14, Nil
+# ```
+export def map (mapFn: a => b): List a => List b =
+    def loop list = match list
         Nil  = Nil
-        h, t = f h, loop t
+        h, t = mapFn h, loop t
     loop
 
 # mapFlat: create a new List by applying a function f to each element and concatenating the output.
