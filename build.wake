@@ -18,31 +18,50 @@ from wake import _
 
 # Useful build variants (arguments to all)
 def toVariant = match _
-    "default" = Pass (Pair "native-cpp11-release" "native-c11-release")
-    "static"  = Pass (Pair "native-cpp11-static"  "native-c11-static")
-    "debug"   = Pass (Pair "native-cpp11-debug"   "native-c11-debug")
-    "wasm"    = Pass (Pair "wasm-cpp11-release"   "wasm-c11-release")
-    s = Fail "Unknown build target ({s})".makeError
+    "default" =
+        Pass (Pair "native-cpp11-release" "native-c11-release")
+    "static"  =
+        Pass (Pair "native-cpp11-static"  "native-c11-static")
+    "debug"   =
+        Pass (Pair "native-cpp11-debug"   "native-c11-debug")
+    "wasm"    =
+        Pass (Pair "wasm-cpp11-release"   "wasm-c11-release")
+    s =
+        Fail "Unknown build target ({s})".makeError
 
 export def build: List String => Result String Error = match _
-    "tarball", Nil = tarball Unit | rmap (\_ "TARBALL")
+    "tarball", _ =
+        tarball Unit
+        | rmap (\_ "TARBALL")
     kind, Nil =
-        require Pass variant = toVariant kind
-        all variant | rmap (\_ "BUILD")
-    _ = Fail "no target specified (try: build default/debug/tarball)".makeError
+        require Pass variant =
+            toVariant kind
+        all variant
+        | rmap (\_ "BUILD")
+    _ =
+        Fail "no target specified (try: build default/debug/tarball)".makeError
 
 export def install: List String => Result String Error = match _
-    dest, kind, Nil = doInstall (in cwd dest) kind | rmap (\_ "INSTALL")
-    dest, Nil = doInstall (in cwd dest) "default" | rmap (\_ "INSTALL")
-    _ = Fail "no directory specified (try: install /opt/local)".makeError
+    dest, kind, _ =
+        doInstall (in cwd dest) kind
+        | rmap (\_ "INSTALL")
+    dest, Nil =
+        doInstall (in cwd dest) "default"
+        | rmap (\_ "INSTALL")
+    _ =
+        Fail "no directory specified (try: install /opt/local)".makeError
 
 # Build all wake targets
 def targets =
-    def allPlatforms = buildWake, buildFuse, buildFuseDaemon, buildShim, buildPreload, buildPrelib, buildBSP, buildLSP, Nil
-    def linuxOnly = buildWakeBox, Nil
+    def allPlatforms =
+        buildWake, buildFuse, buildFuseDaemon, buildShim, buildPreload, buildPrelib, buildBSP, buildLSP, Nil
+    def linuxOnly =
+        buildWakeBox, Nil
     match sysname
-        "Linux" = allPlatforms ++ linuxOnly
-        _       = allPlatforms
+        "Linux" =
+            allPlatforms ++ linuxOnly
+        _ =
+            allPlatforms
 
 def all variant =
     require Pass x =
@@ -52,41 +71,54 @@ def all variant =
 
 # Install wake into a target location
 def doInstall dest kind =
-    require Pass variant = toVariant kind
-    def datfiles = sources "{here}/share" `.*`
-    def binfilesResult = all variant
-    def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
-    def datinstall = map (installIn dest ".") datfiles
-    def readme = installIn "{dest}/share/doc/wake" "." (source "README.md")
-    require Pass binfiles = binfilesResult
-    def bininstall = map releaseBin binfiles
-    def outputs = readme, bininstall ++ datinstall
+    require Pass variant =
+        toVariant kind
+    def datfiles =
+        sources "{here}/share" `.*`
+    def binfilesResult =
+        all variant
+    def releaseBin exe =
+        installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
+    def datinstall =
+        map (installIn dest ".") datfiles
+    def readme =
+        installIn "{dest}/share/doc/wake" "." (source "README.md")
+    require Pass binfiles =
+        binfilesResult
+    def bininstall =
+        map releaseBin binfiles
+    def outputs =
+        readme, bininstall ++ datinstall
     findFailFn getPathResult outputs
 
 # Create a release tarball
 def tarball Unit =
-    def releaseResult = buildAs Unit
-    def timeResult = buildOn Unit
-    require Pass release = releaseResult
-    require Pass time = timeResult
+    require Pass release =
+        buildAs Unit
+    require Pass time =
+        buildOn Unit
     # Create debian + RedHat package files
     def setVersion file =
-        def in = source "{file}.in"
+        def in =
+            source "{file}.in"
         def script = "%
             set -e
             sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
             mv "%{file}.tmp" "%{file}"
             %"
         shellJob script (in, Nil) | getJobOutput
-    def changelog = setVersion "debian/changelog"
-    def spec = setVersion "wake.spec"
+    def changelog =
+        setVersion "debian/changelog"
+    def spec =
+        setVersion "wake.spec"
     # Identify those sources files to include in the tarball
     def srcs =
         sources "." `.*`
         | filter (! matches `(debian/|wake.spec).*` _.getPathName) # omit packaging files
         | filter (! matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName) # omit CI files
         | filter (! matches `(.*/)*\.gitignore` _.getPathName) # omit git files
-    def Pair testPaths wakePaths = splitBy (matches `tests/.*` _.getPathName) srcs
+    def Pair testPaths wakePaths =
+        splitBy (matches `tests/.*` _.getPathName) srcs
     def wakeSourcesString =
         wakePaths
         | map (_.getPathName.format)
@@ -116,14 +148,23 @@ def tarball Unit =
           %{testSourcesString}Nil
         %"
     # Create a manifest which describes the release and source files
-    def manifest = write "manifest.wake" manifestStr
-    def testManifest = write "tests/manifest.wake" testsManifestStr
+    def manifest =
+        write "manifest.wake" manifestStr
+    def testManifest =
+        write "tests/manifest.wake" testsManifestStr
     # Execute tar to create a tarball of manifest + sources
     def tarball =
         def cmd =
-            def gnutar = which "gnutar"
-            def tar = if gnutar ==* "gnutar" then which "tar" else gnutar
-            def files = map getPathName (manifest, testManifest, spec, srcs) | sortBy (_<*_)
+            def gnutar =
+                which "gnutar"
+            def tar =
+                if gnutar ==* "gnutar" then
+                    which "tar"
+                else
+                    gnutar
+            def files =
+                map getPathName (manifest, testManifest, spec, srcs)
+                | sortBy (_<*_)
             tar, "--mtime={time}", "--transform=s@^@wake-{release}/@",
             "--owner=0", "--group=0", "--numeric-owner", "-cJf",
             "wake_{release}.tar.xz", files
@@ -132,22 +173,29 @@ def tarball Unit =
     findFailFn getPathResult (tarball, changelog, Nil)
 
 export def static _: Result Path Error =
-    def filesResult = doInstall "tmp" "static"
-    def releaseResult = buildAs Unit
-    def timeResult = buildOn Unit
-    require Pass release = releaseResult
-    require Pass time = timeResult
-    require Pass files = filesResult
+    require Pass files =
+        doInstall "tmp" "static"
+    require Pass release =
+        buildAs Unit
+    require Pass time =
+        buildOn Unit
     def cmd =
-        which "tar", "--mtime={time}", "--transform=s@^tmp/@wake-{release}/@",
-        "--owner=0", "--group=0", "--numeric-owner", "-cJf",
-        "wake-static_{release}.tar.xz", map getPathName files | sortBy (_<*_)
+        which "tar",
+        "--mtime={time}",
+        "--transform=s@^tmp/@wake-{release}/@",
+        "--owner=0",
+        "--group=0",
+        "--numeric-owner",
+        "-cJf",
+        "wake-static_{release}.tar.xz",
+        map getPathName files | sortBy (_<*_)
     job cmd files
     | getJobOutput
     | getPathResult
 
 from test_wake import topic wakeTestBinary
-publish wakeTestBinary = defaultWake, Nil
+publish wakeTestBinary =
+    defaultWake, Nil
 
 def defaultWake Unit =
     require Pass wakeVisible =
