@@ -934,12 +934,12 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     return expr;
   } else if (expr->type == &Ascribe::type) {
     Ascribe *asc = static_cast<Ascribe*>(expr.get());
+    asc->body = fracture(top, true, name, std::move(asc->body), binding);
     if (qualify_type(binding, asc->signature)) {
-      asc->body = fracture(top, true, name, std::move(asc->body), binding);
+      return expr;
     } else {
-      expr.reset();
+      return std::move(asc->body);
     }
-    return expr;
   } else if (expr->type == &Prim::type) {
     // Use all the arguments
     for (ResolveBinding *iter = binding;
