@@ -324,7 +324,7 @@ static void process_ignorefile(const std::string &path, std::vector<WakeFilter> 
   }
 }
 
-static void filter_wakefiles(std::vector<std::string> &wakefiles, const std::string &basedir, bool verbose) {
+static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wakefiles, const std::string &basedir, bool verbose) {
   std::string curdir = basedir; // Either "" or ".+/"
   if (curdir == ".") {
     curdir.clear();
@@ -333,11 +333,12 @@ static void filter_wakefiles(std::vector<std::string> &wakefiles, const std::str
   }
 
   std::vector<WakeFilter> filters;
+  std::vector<std::string> output;
+  output.reserve(wakefiles.size());
+
   process_ignorefile(curdir, filters);
 
-  for (auto p = wakefiles.begin(); p != wakefiles.end(); /**/) {
-    std::string &wakefile = *p;
-
+  for (auto &wakefile : wakefiles) {
     // Unwind curdir
     while (!curdir.empty() && wakefile.compare(0, curdir.size(), curdir) != 0) {
       size_t slash = curdir.find_last_of('/', curdir.size()-2);
@@ -375,11 +376,12 @@ static void filter_wakefiles(std::vector<std::string> &wakefiles, const std::str
         fprintf(stderr, "Skipping %s due to %s.wakeignore\n",
                 wakefile.c_str(), wakefile.substr(0, prefix).c_str());
       }
-      p = wakefiles.erase(p);
     } else {
-      ++p;
+      output.emplace_back(std::move(wakefile));
     }
   }
+
+  return output;
 }
 
 std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose, const std::string &libdir, const std::string &workdir) {
@@ -394,19 +396,28 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
   if (!workspace || !is_readable(boolean.c_str())) {
     if (push_files(libfiles, libdir, exp, 0)) ok = false;
     std::sort(libfiles.begin(), libfiles.end());
-    filter_wakefiles(libfiles, libdir, verbose);
+    libfiles = filter_wakefiles(std::move(libfiles), libdir, verbose);
   }
 
   if (workspace) {
     if (push_files(workfiles, workdir, exp, 0)) ok = false;
     std::sort(workfiles.begin(), workfiles.end());
-    filter_wakefiles(workfiles, workdir, verbose);
+    workfiles = filter_wakefiles(std::move(workfiles), workdir, verbose);
   }
 
-  libfiles.insert(
-    libfiles.end(),
+  // Combine the two sorted vectors into one sorted vector
+  std::vector<std::string> output;
+  output.reserve(libfiles.size() + workfiles.size());
+  std::merge(
+    std::make_move_iterator(libfiles.begin()),
+    std::make_move_iterator(libfiles.end()),
     std::make_move_iterator(workfiles.begin()),
-    std::make_move_iterator(workfiles.end()));
+    std::make_move_iterator(workfiles.end()),
+    std::back_inserter(output));
 
-  return libfiles;
+  // Eliminate any files present in both vectors
+  auto it = std::unique(output.begin(), output.end());
+  output.resize(std::distance(output.begin(), it));
+
+  return output;
 }
