@@ -403,10 +403,18 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
     filter_wakefiles(workfiles, workdir, verbose);
   }
 
-  libfiles.insert(
-    libfiles.end(),
+  // Combine the two sorted vectors into one sorted vector
+  std::vector<std::string> output;
+  std::merge(
+    std::make_move_iterator(libfiles.begin()),
+    std::make_move_iterator(libfiles.end()),
     std::make_move_iterator(workfiles.begin()),
-    std::make_move_iterator(workfiles.end()));
+    std::make_move_iterator(workfiles.end()),
+    std::back_inserter(output));
 
-  return libfiles;
+  // Eliminate any files present in both vectors
+  auto it = std::unique(output.begin(), output.end());
+  output.resize(std::distance(output.begin(), it));
+
+  return output;
 }
