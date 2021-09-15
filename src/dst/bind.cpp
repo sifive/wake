@@ -192,13 +192,12 @@ static std::unique_ptr<Expr> fracture_binding(const FileFragment &fragment, std:
   // if x uses [yg], then d[x] must be <= d[yg]+1
   // if we ever find a d[_] > n, there is an illegal loop
 
+retry:
   std::vector<int> d(defs.size(), 0), p(defs.size(), -1);
   std::queue<RelaxedVertex> q;
 
-  for (int i = 0; i < (int)defs.size(); ++i) {
-    if (!defs[i].expr) return nullptr;
+  for (int i = 0; i < (int)defs.size(); ++i)
     q.push(RelaxedVertex(i, 0));
-  }
 
   while (!q.empty()) {
     RelaxedVertex rv = q.front();
@@ -208,22 +207,23 @@ static std::unique_ptr<Expr> fracture_binding(const FileFragment &fragment, std:
     ResolveDef &def = defs[rv.v];
     if (drv >= (int)defs.size()) {
       int j = rv.v;
-      for (int i = 0; i < (int)defs.size(); ++i) {
-        d[i] = 0;
+      for (int i = 0; i < (int)defs.size(); ++i)
         j = p[j];
-      }
       // j is now inside the cycle
       int i = j;
       do {
-        ERROR(defs[p[i]].expr->fragment.location(),
+        ERROR(defs[p[i]].fragment.location(),
           "definition of '" << defs[p[i]].name
           << "' references '" << defs[i].name
           << "' forming an illegal cyclic value");
+        // Wipe-out the cyclic expressions
+        defs[i].edges.clear();
+        defs[i].expr.reset();
         i = p[i];
       } while (i != j);
-      return nullptr;
+      goto retry;
     }
-    int w = def.expr->type == &Lambda::type ? 0 : 1;
+    int w = (!def.expr || def.expr->type == &Lambda::type) ? 0 : 1;
     for (auto i : def.edges) {
       if (drv + w > d[i]) {
         d[i] = drv + w;
@@ -242,7 +242,7 @@ static std::unique_ptr<Expr> fracture_binding(const FileFragment &fragment, std:
     if (levels[i].empty()) continue;
     std::unique_ptr<DefBinding> bind(new DefBinding(fragment, std::move(out)));
     for (auto j : levels[i]) {
-      if (defs[j].expr->type != &Lambda::type) {
+      if (defs[j].expr && defs[j].expr->type != &Lambda::type) {
         auto out = bind->order.insert(std::make_pair(defs[j].name, DefBinding::OrderValue(defs[j].fragment, bind->val.size())));
         assert (out.second);
         bind->val.emplace_back(std::move(defs[j].expr));
@@ -260,7 +260,7 @@ static std::unique_ptr<Expr> fracture_binding(const FileFragment &fragment, std:
     state.level = i;
     state.index = 0;
     for (auto j : levels[i])
-      if (defs[j].index == -1 && defs[j].expr->type == &Lambda::type)
+      if (defs[j].index == -1 && (!defs[j].expr || defs[j].expr->type == &Lambda::type))
         SCC(state, j);
     out = std::move(bind);
   }
@@ -1327,6 +1327,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     binding->open = false;
     bool f = explore(app->fn .get(), state, binding);
     bool a = explore(app->val.get(), state, binding);
+    // Even if fn is nullptr, this is just an offset calculation, not a dereference
     FnErrorMessage fnm(&app->fn->fragment);
     bool t = f && app->fn->typeVar.unify(TypeVar(FN, 2), &fnm);
     ArgErrorMessage argm(&app->fn->fragment, &app->val->fragment, t?app->fn->typeVar.getTag(0):0);
@@ -1340,7 +1341,8 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
       lambda->typeVar.setTag(0, lambda->name.c_str());
     NameBinding bind(binding, lambda);
     bool out = explore(lambda->body.get(), state, &bind);
-    RecErrorMessage recm(lambda->body ? &lambda->body->fragment : &lambda->fragment);
+    // Even if body is nullptr, this is just an offset calculation, not a dereference
+    RecErrorMessage recm(&lambda->body->fragment);
     bool tr = t && out && lambda->typeVar[1].unify(lambda->body->typeVar, &recm);
     return out && t && tr;
   } else if (expr->type == &DefBinding::type) {
@@ -1349,11 +1351,13 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     NameBinding bind(binding, def);
     bool ok = true;
     for (unsigned i = 0; i < def->val.size(); ++i) {
+      if (!def->val[i]) { ok = false; continue; }
       def->val[i]->typeVar.setDOB();
       TypeScope scope(state, def->valVars[i], def->val[i]->typeVar);
       ok = explore(def->val[i].get(), state, binding) && ok;
     }
     for (unsigned i = 0; i < def->fun.size(); ++i) {
+      if (!def->fun[i]) { ok = false; continue; }
       def->fun[i]->typeVar.setDOB();
       for (unsigned j = i+1; j < def->fun.size() && i == def->scc[j]; ++j)
         if (def->fun[j]) def->fun[j]->typeVar.setDOB(def->fun[i]->typeVar);
@@ -1363,7 +1367,7 @@ static bool explore(Expr *expr, ExploreState &state, NameBinding *binding) {
     }
     bind.generalized = def->val.size() + def->fun.size();
     ok = explore(def->body.get(), state, &bind) && ok;
-    ok = ok && def->typeVar.unify(def->body->typeVar, &def->fragment) && ok;
+    ok = ok && def->typeVar.unify(def->body->typeVar, &def->fragment);
     return ok;
   } else if (expr->type == &Literal::type) {
     Literal *lit = static_cast<Literal*>(expr);
