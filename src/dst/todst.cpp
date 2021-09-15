@@ -819,7 +819,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
     }
 
     if (type)
-      body = new Ascribe(FRAGMENT_CPP_LINE, std::move(*type), body, body->fragment);
+      body = new Ascribe(body->fragment, std::move(*type), body, body->fragment);
 
     if (target) {
       if (tohash == 0) ERROR(fn.location(), "target definition of '" << name << "' must have at least one hashed argument");
