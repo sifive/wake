@@ -320,6 +320,17 @@ export def runJob (p: Plan): Job = match p
         def _ = wait (\_ badfinish job error) (badlaunch job error)
         job
 
+
+# Get result for job with the list of output files/dirs.
+export def getJobResultOutputs (job: Job): Result (List Path) Error =
+    findFailFn getPathResult job.getJobOutputs
+
+# Get result for job with exactly one output Path.
+export def getJobResultOutput (job: Job): Result Path Error =
+    job.getJobOutput
+    | getPathResult
+
+
 # Set the value of a tag on a Job
 # This is useful for post-build reflection into the database
 export def setJobTag (key: String) (value: String) (job: Job): Job =
