@@ -323,9 +323,7 @@ export def runJob (p: Plan): Job = match p
 
 # Get result for job with the list of output files/dirs.
 export def getJobResultOutputs (job: Job): Result (List Path) Error =
-    map getPathResult job.getJobOutputs
-    | findFail
-
+    findFailFn getPathResult job.getJobOutputs
 
 # Get result for job with exactly one output Path.
 export def getJobResultOutput (job: Job): Result Path Error =
