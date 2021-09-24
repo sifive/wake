@@ -89,18 +89,33 @@ def mkdirImp inputs mode path =
     | setPlanKeep        False
     | setPlanEnvironment Nil
     | runJobWith mkdirRunner
-    | getJobOutput
+    | getJobResultOutput
 
 # Create a directory in the parent
 export def mkdirIn (parent: Path) (mode: Integer) (name: String): Path =
+    mkdirResultIn parent mode name
+    | pathResultShim
+
+export def mkdirResultIn (parent: Path) (mode: Integer) (name: String): Result Path Error =
     mkdirImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify
 
 # Make all every element in the directory path with mode 0775
 export def mkdir (path: String): Path =
+    mkdirResult path
+    | pathResultShim
+
+export def mkdirResult (path: String): Result Path Error =
     def root = match _
-        "", x, t = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 "/{x}") t
-        x, t     = foldl (mkdirIn _ 0775 _) (mkdirImp Nil 0775 x) t
-        Nil      = unreachable "tokenize never returns an empty list"
+        "", x, t =
+            require Pass dir =
+                mkdirImp Nil 0775 "/{x}"
+            rfoldl (mkdirResultIn _ 0775 _) dir t
+        x, t =
+            require Pass dir =
+                mkdirImp Nil 0775 x
+            rfoldl (mkdirResultIn _ 0775 _) dir t
+        Nil =
+            unreachable "tokenize never returns an empty list"
     path | simplify | tokenize `/` | root
 
 target writeImp inputs mode path content =
@@ -120,14 +135,36 @@ target writeImp inputs mode path content =
     | setPlanOnce        False
     | setPlanEnvironment Nil
     | runJobWith writeRunner
-    | getJobOutput
+    | getJobResultOutput
 
 # Create a file with the given mode in the specified directory
 export def writeIn (parent: Path) (mode: Integer) (name: String) (content: String): Path =
+    writeResultIn parent mode name content
+    | pathResultShim
+
+export def writeResultIn (parent: Path) (mode: Integer) (name: String) (content: String): Result Path Error =
     writeImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify content
 
 # Create all directories and the named file
 export def write (path: String) (content: String): Path =
+    writeResult path content
+    | pathResultShim
+
+export def writeResult (path: String) (content: String): Result Path Error =
     def spath = simplify path
-    def parent = simplify "{spath}/.."
-    writeImp (mkdir parent, Nil) 0664 spath content
+    require Pass parent =
+        simplify "{spath}/.."
+        | mkdirResult
+    writeImp (parent, Nil) 0664 spath content
+
+def pathResultShim (path: Result Path Error): Path =
+    match path
+        Fail e = makeBadPath e
+        Pass p = p
+
+def pathListResultShim (paths: Result (List Path) Error): List Path =
+    require Pass result =
+        paths
+    else
+        Nil
+    result

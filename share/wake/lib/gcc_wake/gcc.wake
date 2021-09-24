@@ -32,18 +32,18 @@ def doCompileC variant gcc flags headers cfile =
     makeExecPlan cmdline (cfile, headers)
     | setPlanLabel "compile {replace `^.*/` '' gcc} {obj}"
     | runJob
-    | getJobOutputs
-    | findFailFn getPathResult
+    | getJobResultOutputs
 
 def doLinkO variant linker flags objects targ =
     def cmdline =
         (linker, "-o", "{targ}.{variant}", map getPathName objects) ++
         flags
-    makeExecPlan cmdline (mkdir "{targ}/..", objects)
+    require Pass parent =
+        mkdirResult "{targ}/.."
+    makeExecPlan cmdline (parent, objects)
     | setPlanLabel "link {replace `^.*/` '' linker} {targ}"
     | runJob
-    | getJobOutputs
-    | findFailFn getPathResult
+    | getJobResultOutputs
 
 export def makeCompileC variant gcc flags =
     Pair variant (\extraFlags doCompileC variant gcc (flags ++ extraFlags)), Nil

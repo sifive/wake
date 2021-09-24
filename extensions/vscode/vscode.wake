@@ -17,12 +17,15 @@ package build_wake
 from wake import _
 
 def installRO path =
-  def dest = "{here}/{path.getPathName}"
-  def inputs = mkdir "{dest}/..", path, Nil
-  "install -m 444 {path.getPathName} {dest}"
-  | makePlan "install: {dest}" inputs
-  | runJob
-  | getJobOutput
+    def dest = "{here}/{path.getPathName}"
+    require Pass parent =
+        mkdirResult "{dest}/.."
+    def inputs =
+        parent, path, Nil
+    "install -m 444 {path.getPathName} {dest}"
+    | makePlan "install: {dest}" inputs
+    | runJob
+    | getJobResultOutput
 
 export def vscode _: Result Path Error =
     require Pass variant =
@@ -41,11 +44,11 @@ export def vscode _: Result Path Error =
     else
         failWithError "Did not find empscripten javascript output; got: {format files}"
 
-    def wasmFile =
-        installAs "{here}/lsp-server/lsp-wake.wasm" wasm
+    require Pass wasmFile =
+        installResultAs "{here}/lsp-server/lsp-wake.wasm" wasm
 
-    def jsFile =
-        installAs "{here}/lsp-server/lsp-wake.js" js
+    require Pass jsFile =
+        installResultAs "{here}/lsp-server/lsp-wake.js" js
 
     def npmFiles =
         sources here `package(|-lock)\.json`
@@ -54,12 +57,11 @@ export def vscode _: Result Path Error =
         makeExecPlan (which "npm", "install", Nil) npmFiles
         | setPlanDirectory here
         | runJob
-        | getJobOutputs
-        | findFailFn getPathResult
+        | getJobResultOutputs
 
-    def stdlib =
+    require Pass stdlib =
         sources "share/wake/lib" `.*`
-        | map installRO
+        | findFailFn installRO
 
     def vsceFiles =
         wasmFile,
@@ -76,8 +78,7 @@ export def vscode _: Result Path Error =
         makeExecPlan (which "npx", "vsce", "package", Nil) vsceFiles
         | setPlanDirectory here
         | runJob
-        | getJobOutputs
-        | findFailFn getPathResult
+        | getJobResultOutputs
 
     require vsix, Nil =
         filter (matches `.*\.vsix` _.getPathName) outputs

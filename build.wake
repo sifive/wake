@@ -52,14 +52,22 @@ def all variant =
 
 # Install wake into a target location
 def doInstall dest kind =
-    require Pass variant = toVariant kind
-    def datfiles = sources "{here}/share" `.*`
-    def binfilesResult = all variant
-    def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
-    def datinstall = map (installIn dest ".") datfiles
-    def readme = installIn "{dest}/share/doc/wake" "." (source "README.md")
-    require Pass binfiles = binfilesResult
-    def bininstall = map releaseBin binfiles
+    def datfiles =
+        sources "{here}/share" `.*`
+    def releaseBin exe =
+        installResultAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
+    require Pass variant =
+        toVariant kind
+    require Pass datinstall =
+        findFailFn (installResultIn dest ".") datfiles
+    require Pass readme =
+        require Pass path =
+            sourceResult "README.md"
+        installResultIn "{dest}/share/doc/wake" "." path
+    require Pass binfiles =
+        all variant
+    require Pass bininstall =
+        findFailFn releaseBin binfiles
     def outputs = readme, bininstall ++ datinstall
     findFailFn getPathResult outputs
 
@@ -71,15 +79,19 @@ def tarball Unit =
     require Pass time = timeResult
     # Create debian + RedHat package files
     def setVersion file =
-        def in = source "{file}.in"
+        require Pass in =
+            sourceResult "{file}.in"
         def script = "%
             set -e
             sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
             mv "%{file}.tmp" "%{file}"
             %"
-        shellJob script (in, Nil) | getJobOutput
-    def changelog = setVersion "debian/changelog"
-    def spec = setVersion "wake.spec"
+        shellJob script (in, Nil)
+        | getJobResultOutput
+    require Pass changelog =
+        setVersion "debian/changelog"
+    require Pass spec =
+        setVersion "wake.spec"
     # Identify those sources files to include in the tarball
     def srcs =
         sources "." `.*`
@@ -116,10 +128,12 @@ def tarball Unit =
           %{testSourcesString}Nil
         %"
     # Create a manifest which describes the release and source files
-    def manifest = write "manifest.wake" manifestStr
-    def testManifest = write "tests/manifest.wake" testsManifestStr
+    require Pass manifest =
+        writeResult "manifest.wake" manifestStr
+    require Pass testManifest =
+        writeResult "tests/manifest.wake" testsManifestStr
     # Execute tar to create a tarball of manifest + sources
-    def tarball =
+    require Pass tarball =
         def cmd =
             def gnutar = which "gnutar"
             def tar = if gnutar ==* "gnutar" then which "tar" else gnutar
@@ -128,8 +142,8 @@ def tarball Unit =
             "--owner=0", "--group=0", "--numeric-owner", "-cJf",
             "wake_{release}.tar.xz", files
         job cmd (manifest, testManifest, spec, srcs)
-        | getJobOutput
-    findFailFn getPathResult (tarball, changelog, Nil)
+        | getJobResultOutput
+    Pass (tarball, changelog, Nil)
 
 export def static _: Result Path Error =
     def filesResult = doInstall "tmp" "static"
@@ -143,8 +157,7 @@ export def static _: Result Path Error =
         "--owner=0", "--group=0", "--numeric-owner", "-cJf",
         "wake-static_{release}.tar.xz", map getPathName files | sortBy (_<*_)
     job cmd files
-    | getJobOutput
-    | getPathResult
+    | getJobResultOutput
 
 from test_wake import topic wakeTestBinary
 publish wakeTestBinary = defaultWake, Nil

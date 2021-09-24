@@ -1,37 +1,43 @@
 export def datFile Unit =
-    write "datFile" "hello world"
+    writeResult "datFile" "hello world"
 
 export def goodLink Unit =
-    makeExecPlan ("ln", "-s", "datFile", "goodLink", Nil) (datFile Unit, Nil)
+    require Pass dat =
+        datFile Unit
+    makeExecPlan ("ln", "-s", "datFile", "goodLink", Nil) (dat, Nil)
     | runJob
-    | getJobOutput
+    | getJobResultOutput
 
 export def badLink Unit =
     makeExecPlan ("ln", "-s", "badFile", "badLink", Nil) Nil
     | runJob
-    | getJobOutput
-    | getPathResult
+    | getJobResultOutput
 
 export def shouldWork Unit =
-    makeExecPlan ("cat", "goodLink", Nil) (goodLink Unit, datFile Unit, Nil)
+    require Pass link =
+        goodLink Unit
+    require Pass dat =
+        datFile Unit
+    makeExecPlan ("cat", "goodLink", Nil) (link, dat, Nil)
     | editPlanEnvironment (setEnvironment "TEST" "1")
     | runJob
-    | getJobInputs
-    | findFailFn getPathResult
+    | getJobResultInputs
 
 export def shouldFail1 Unit =
-    makeExecPlan ("cat", "goodLink", Nil) (goodLink Unit, Nil)
+    require Pass link =
+        goodLink Unit
+    makeExecPlan ("cat", "goodLink", Nil) (link, Nil)
     | editPlanEnvironment (setEnvironment "TEST" "2")
     | runJob
-    | getJobInputs
-    | findFailFn getPathResult
+    | getJobResultInputs
 
 export def shouldFail2 Unit =
-    makeExecPlan ("cat", "goodLink", Nil) (datFile Unit, Nil)
+    require Pass dat =
+        datFile Unit
+    makeExecPlan ("cat", "goodLink", Nil) (dat, Nil)
     | editPlanEnvironment (setEnvironment "TEST" "3")
     | runJob
-    | getJobInputs
-    | findFailFn getPathResult
+    | getJobResultInputs
 
 export def test _ =
     require Pass link = badLink Unit

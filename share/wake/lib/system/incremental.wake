@@ -19,15 +19,25 @@ package wake
 # Generally, one should obtain Paths from sources or as the output of Jobs.
 # This API is useful for things like a comannd-line-supplied input file.
 export def claimFileAsPath (existingFile: String) (desiredWorkspacePath: String): Path =
+    claimFileResultAsPath existingFile desiredWorkspacePath
+    | pathResultShim
+
+export def claimFileResultAsPath (existingFile: String) (desiredWorkspacePath: String): Result Path Error =
     def fileName = replace `.*/` "" desiredWorkspacePath
-    def dirName = extract `(.*)/.*` desiredWorkspacePath | head | getOrElse "."
-    claimFileAsPathIn (mkdir dirName) existingFile fileName
+    require Pass dir =
+        extract `(.*)/.*` desiredWorkspacePath | head | getOrElse "."
+        | mkdirResult
+    claimFileResultAsPathIn dir existingFile fileName
 
 export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (desiredName: String): Path =
+    claimFileResultAsPathIn outputDirectory existingFile desiredName
+    | pathResultShim
+
+export def claimFileResultAsPathIn (outputDirectory: Path) (existingFile: String) (desiredName: String): Result Path Error =
     def get_modtime file = prim "get_modtime"
     def time = get_modtime existingFile
     if time == -1 then
-        makeBadPath (makeError "{existingFile}: claimed file does not exist")
+        failWithError "{existingFile}: claimed file does not exist"
     else
         def desiredWorkspacePath = simplify "{outputDirectory.getPathName}/{desiredName}"
         def visible = outputDirectory, Nil
@@ -37,7 +47,7 @@ export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (des
         | setPlanPersistence Once
         | setPlanFnOutputs   (\_ desiredWorkspacePath, Nil)
         | runJobWith localRunner
-        | getJobOutput
+        | getJobResultOutput
 
 target tarExe Unit =
     def gnutar = which "gnutar"
@@ -52,7 +62,7 @@ def targz output paths =
     | setPlanLocalOnly True
     | setPlanFnOutputs (\_ output, Nil)
     | runJobWith       localRunner
-    | getJobOutput
+    | getJobResultOutput
 
 # This API allows a Job to access those outputs from its last invocation
 # which are accepted by reusedOutputFilterFn. To use this method, you must
@@ -61,15 +71,23 @@ def targz output paths =
 # all visible files are considered as inputs, since the job might not read
 # all inputs on each run, based on (for example) timestamps.
 export def runIncrementalJob (stateFileLabel: String) (reusedOutputFilterFn: Path => Boolean) (plan: Plan): Job =
+    match (runIncrementalJobResult stateFileLabel reusedOutputFilterFn plan)
+        # This `unreachable` is *not* used correctly
+        Fail e = unreachable "{format e}"
+        Pass job = job
+
+export def runIncrementalJobResult (stateFileLabel: String) (reusedOutputFilterFn: Path => Boolean) (plan: Plan): Result Job Error =
     def code = plan | getPlanHash | strHex
     def pre  = "{stateFileLabel}-pre-{code}.tar.gz"
     def post = "{stateFileLabel}-post-{code}.tar.gz"
     def escape s = prim "shell_str"
-    def preTar = claimFileAsPath post pre
     def untar = "! test -f {escape pre} || tar -xzf {escape pre}\n"
-    def stateFiles = match preTar.getPathError
-        None   = preTar, Nil
-        Some _ = Nil
+    def stateFiles =
+        require Pass preTar =
+            claimFileResultAsPath post pre
+        else
+            Nil
+        preTar, Nil
     def cd =
         if plan.getPlanDirectory ==* "." then
             ""
@@ -85,8 +103,9 @@ export def runIncrementalJob (stateFileLabel: String) (reusedOutputFilterFn: Pat
         | setPlanFnInputs  (\_ plan.getPlanVisible | map getPathName)
         | runJob
     def _postTar = # ignored, but executed
-        job
-        | getJobOutputs
+        require Pass outputs =
+            job.getJobResultOutputs
+        outputs
         | filter reusedOutputFilterFn
         | targz post
-    job
+    Pass job
