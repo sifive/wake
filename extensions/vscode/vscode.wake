@@ -34,7 +34,7 @@ export def vscode _: Result Path Error =
     require wasm, Nil =
         filter (matches `.*\.wasm` _.getPathName) files
     else
-        failWithError "Did not find empscripten wasm output file; got: {format files}"
+        "Did not find empscripten wasm output file; got: {format files}"
 
     require js, Nil =
         filter (matches `.*\.wasm-.*` _.getPathName) files
