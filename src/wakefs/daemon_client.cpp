@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 
 #include <iostream>
@@ -36,7 +37,7 @@
 
 daemon_client::daemon_client(const std::string &base_dir)
    :	executable(find_execpath() + "/../lib/wake/fuse-waked"),
-	mount_path(base_dir + "/.fuse"),
+	mount_path(base_dir + "/.fuse/daemon-" + std::to_string(getpid())),
 	mount_subdir(mount_path + "/" + std::to_string(getpid())),
 	output_path(mount_path + "/.o." + std::to_string(getpid())),
 	is_running_path(mount_path + "/.f.fuse-waked"),
@@ -46,6 +47,11 @@ daemon_client::daemon_client(const std::string &base_dir)
 
 // The arg 'visible' is destroyed/moved in the interest of performance with large visible lists.
 bool daemon_client::connect(std::vector<std::string> &visible) {
+	if (0 != mkdir(".fuse" , 0777) && errno != EEXIST) {
+		std::cerr << "mkdir (" << mount_path << "): " << strerror(errno) << std::endl;
+		return false;
+	}
+
 	int ffd = -1;
 	int wait_ms = 10;
 	for (int retry = 0; (ffd = open(is_running_path.c_str(), O_RDONLY)) == -1 && retry < 12; ++retry) {
