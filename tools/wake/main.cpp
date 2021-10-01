@@ -330,7 +330,7 @@ int main(int argc, char **argv) {
   if (nodb) return 0;
 
   Database db(debugdb);
-  std::string fail = db.open(wait, !workspace);
+  std::string fail = db.open(wait, !workspace, tty);
   if (!fail.empty()) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;
     return 1;

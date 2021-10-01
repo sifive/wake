@@ -123,7 +123,7 @@ static int schema_cb(void *data, int columns, char **values, char **labels) {
   return -1;
 }
 
-std::string Database::open(bool wait, bool memory) {
+std::string Database::open(bool wait, bool memory, bool tty) {
   if (imp->db) return "";
   // Increment the SCHEMA_VERSION every time the below string changes.
   const char *schema_sql =
@@ -242,11 +242,13 @@ std::string Database::open(bool wait, bool memory) {
       }
       return out;
     } else {
-      if (waiting) {
-        std::cerr << ".";
-      } else {
-        waiting = true;
-        std::cerr << "Database wake.db is busy; waiting .";
+      if (tty) {
+        if (waiting) {
+          std::cerr << ".";
+        } else {
+          waiting = true;
+          std::cerr << "Database wake.db is busy; waiting .";
+        }
       }
       sleep(1);
     }

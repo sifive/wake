@@ -80,7 +80,7 @@ struct Database {
   Database(bool debugdb);
   ~Database();
 
-  std::string open(bool wait, bool memory);
+  std::string open(bool wait, bool memory, bool tty);
   void close();
 
   void entropy(uint64_t *key, int words);
