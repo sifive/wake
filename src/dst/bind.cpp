@@ -441,7 +441,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
       return std::unique_ptr<Expr>(build_identity(prototype.fragment, prototype.tree));
     } else if (prototype.refutable == OTHERWISE) {
       ++prototype.uses;
-      FileFragment line = FRAGMENT_CPP_LINE;
+      FileFragment line = prototype.fragment;
       return std::unique_ptr<Expr>(new App(line, new VarRef(line, "_ else"), new VarRef(line, "_ a0")));
     } else {
       ERROR(fragment.location(), "non-exhaustive match; missing: " << prototype.tree);
