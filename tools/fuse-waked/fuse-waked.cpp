@@ -591,7 +591,6 @@ static int wakefuse_create(const char *path, mode_t mode, struct fuse_file_info 
 		return -errno;
 
 	fi->fh = fd;
-	++it->second.uses;
 	it->second.files_wrote.insert(std::move(key.second));
 	return 0;
 }
@@ -1196,7 +1195,6 @@ static int wakefuse_open(const char *path, struct fuse_file_info *fi)
 		return -errno;
 
 	fi->fh = fd;
-	++it->second.uses;
 	return 0;
 }
 
@@ -1346,7 +1344,11 @@ static int wakefuse_statfs_trace(const char *path, struct statvfs *stbuf)
 
 static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 {
-	int out = 0;
+	if (fi->fh != BAD_FD) {
+		int res = close(fi->fh);
+		if (res == -1)
+			return -errno;
+	}
 
 	if (auto s = is_special(path)) {
 		switch (s.kind) {
@@ -1358,27 +1360,11 @@ static int wakefuse_release(const char *path, struct fuse_file_info *fi)
 		}
 		if ('f' != s.kind && s.job->second.should_erase())
 			context.jobs.erase(s.job);
-	} else {
-		auto key = split_key(path);
-		if (key.first.empty())
-			return -EINVAL; // open is for files only
-
-		auto it = context.jobs.find(key.first);
-		if (it == context.jobs.end())
-			return -ENOENT;
-
-		--it->second.uses;
-		if (it->second.should_erase())
-			context.jobs.erase(it);
-
-		if (-1 == close(fi->fh))
-			out = -errno;
+		if (context.should_exit())
+			schedule_exit();
 	}
 
-	if (context.should_exit())
-		schedule_exit();
-
-	return out;
+	return 0;
 }
 
 static int wakefuse_release_trace(const char *path, struct fuse_file_info *fi)
