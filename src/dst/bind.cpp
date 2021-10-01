@@ -669,6 +669,10 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
   int f = 0;
   bool ok = true;
   for (auto &p : match->patterns) {
+    if (p.pattern.args.empty() && multiarg) {
+      ERROR(p.pattern.region.location(), "multi-argument match requires a multi-argument pattern");
+      continue;
+    }
     patterns.emplace_back(p.expr->fragment);
     patterns.back().index = f;
     patterns.back().guard = static_cast<bool>(p.guard);
