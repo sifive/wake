@@ -7,8 +7,8 @@ jobs:
     steps:
       - checkout
       - run: sudo apt-get update && sudo apt-get install -y build-essential libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx
-      - run: make test
       - run: make tarball
+      - run: make test
       - run: mkdir www && ./bin/wake --no-workspace --html > www/index.html
       - run: PATH=$(pwd)/bin:$PATH PYTHONPATH=$(pwd)/scripts python3 scripts/wake2rst.py
       - persist_to_workspace:
