@@ -31,7 +31,9 @@ def m4 (file: Path): Result Path Error =
         replace `\.m4$` "" file.getPathName
 
     def run =
-        job (which "m4", file.getPathName, Nil) (file, Nil)
+        makeExecPlan (which "m4", file.getPathName, Nil) (file, Nil)
+        | setPlanStdout logNever
+        | runJob
 
     require Pass stdout =
         run.getJobStdout
