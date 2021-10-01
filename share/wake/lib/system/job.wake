@@ -360,17 +360,13 @@ def treeOk (Pair f h) = match h
         failWithError "Could not hash {f}"
     _ =
         Pass (Path f)
-def guardPath job pairs =
-    require Pass paths =
-        pairs
-    if job.isJobOk then
-        findFailFn treeOk paths
-    else
-        failWithError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'"
-def mapPath pairs =
-    require Pass paths =
-        pairs
-    findFailFn treeOk paths
+def guardPath job = match _
+    Fail e                = BadPath e, Nil
+    Pass l if job.isJobOk = map (treeOk _ | pathResultShim) l
+    _                     = makeBadPath (makeError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'"), Nil
+def mapPath = match _
+  Fail e = BadPath e, Nil
+  Pass l = map (treeOk _ | pathResultShim) l
 
 export def killJob (job: Job) (signal: Integer): Unit =
     (\j\s prim "job_kill") job signal # send signal to job
@@ -379,34 +375,34 @@ export def getJobStdout (job: Job): Result String Error =
 export def getJobStderr (job: Job): Result String Error =
     stdio job 2
 
-export def getJobInputs: (job: Job) => List Path =
-    getJobResultInputs _
-    | pathListResultShim
-export def getJobResultInputs (job: Job): Result (List Path) Error =
+export def getJobInputs (job: Job): List Path =
     tree job 1
     | guardPath job
+export def getJobResultInputs (job: Job): Result (List Path) Error =
+    getJobInputs job
+    | findFailFn getPathResult
 
-export def getJobOutputs: (job: Job) => List Path =
-    getJobResultOutputs _
-    | pathListResultShim
+export def getJobOutputs (job: Job): List Path =
+    tree job 2
+    | guardPath job
 # Get result for job with the list of output files/dirs.
 export def getJobResultOutputs (job: Job): Result (List Path) Error =
-    tree job 2
-    | guardPath job
+    getJobOutputs job
+    | findFailFn getPathResult
 
-export def getJobFailedInputs: (job: Job) => List Path =
-    getJobResultFailedInputs _
-    | pathListResultShim
-export def getJobResultFailedInputs (job: Job): Result (List Path) Error =
+export def getJobFailedInputs (job: Job): List Path =
     tree job 1
     | mapPath
+export def getJobResultFailedInputs (job: Job): Result (List Path) Error =
+    getJobFailedInputs job
+    | findFailFn getPathResult
 
-export def getJobFailedOutputs: (job: Job) => List Path =
-    getJobResultFailedOutputs _
-    | pathListResultShim
-export def getJobResultFailedOutputs (job: Job): Result (List Path) Error =
+export def getJobFailedOutputs (job: Job): List Path =
     tree job 2
     | mapPath
+export def getJobResultFailedOutputs (job: Job): Result (List Path) Error =
+    getJobFailedOutputs job
+    | findFailFn getPathResult
 
 export def getJobId (job: Job): Integer =
   (\j prim "job_id") job

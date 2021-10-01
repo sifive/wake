@@ -161,10 +161,3 @@ def pathResultShim (path: Result Path Error): Path =
     match path
         Fail e = makeBadPath e
         Pass p = p
-
-def pathListResultShim (paths: Result (List Path) Error): List Path =
-    require Pass result =
-        paths
-    else
-        Nil
-    result

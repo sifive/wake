@@ -62,14 +62,21 @@ export def sourceResult (file: String): Result Path Error =
 
 # Find sources files
 export def sources (dir: String) (filterRegexp: RegExp): List Path =
-    sourcesResult dir filterRegexp
-    | pathListResultShim
+    def scan dir regexp =
+        prim "sources"
+    match got_sources
+        True =
+            scan dir filterRegexp
+            | map (raw_source _ | pathResultShim)
+        False =
+            unreachable "add_sources always returns True"
 
 export def sourcesResult (dir: String) (filterRegexp: RegExp): Result (List Path) Error =
-    def scan dir regexp = prim "sources"
+    def scan dir regexp =
+        prim "sources"
     match got_sources
         True =
             scan dir filterRegexp
             | findFailFn raw_source
         False =
-            unreachable "add_sources always returns True"
+            failWithError "add_sources always returns True"
