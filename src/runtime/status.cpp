@@ -280,7 +280,7 @@ static void handle_SIGWINCH(int sig)
   resize_detected = true;
 }
 
-void term_init(bool tty_)
+bool term_init(bool tty_)
 {
   tty = tty_;
 
@@ -315,6 +315,8 @@ void term_init(bool tty_)
     sgr0 = tigetstr(sgr0_lit); // optional
     if (sgr0 == (char*)-1) sgr0 = 0;
   }
+
+  return tty;
 }
 
 void status_init()
