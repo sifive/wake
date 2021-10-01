@@ -1412,6 +1412,13 @@ static void handle_exit(int sig)
 	static pid_t pid = -1;
 	struct timeval now;
 
+	// Ensure that future SIGALRM will interrupt the main loop's blocking read
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = handle_exit;
+	sa.sa_flags = 0; // not SA_RESTART
+	sigaction(SIGALRM, &sa, 0);
+
 	// Unfortunately, fuse_unmount can fail if the filesystem is still in use.
 	// Yes, this can even happen on linux with MNT_DETACH / lazy umount.
 	// Worse, fuse_unmount closes descriptors and frees memory, so can only be called once.
