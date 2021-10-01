@@ -89,6 +89,17 @@ struct Database::detail {
      delete_stats(0), revtop_order(0), setcrit_path(0), tag_job(0), get_tags(0), get_all_tags(0), get_edges(0) { }
 };
 
+static void close_db(Database::detail *imp) {
+  if (imp->db) {
+    int ret = sqlite3_close(imp->db);
+    if (ret != SQLITE_OK) {
+      std::cerr << "Could not close wake.db: " << sqlite3_errmsg(imp->db) << std::endl;
+      return;
+    }
+  }
+  imp->db = 0;
+}
+
 Database::Database(bool debugdb) : imp(new detail(debugdb)) { }
 Database::~Database() { close(); }
 
@@ -114,22 +125,6 @@ static int schema_cb(void *data, int columns, char **values, char **labels) {
 
 std::string Database::open(bool wait, bool memory) {
   if (imp->db) return "";
-  int ret;
-
-  ret = sqlite3_open_v2(memory?":memory:":"wake.db", &imp->db, SQLITE_OPEN_READWRITE, 0);
-  if (ret != SQLITE_OK) {
-    if (!imp->db) return "sqlite3_open: out of memory";
-    std::string out = sqlite3_errmsg(imp->db);
-    close();
-    return out;
-  }
-
-#if SQLITE_VERSION_NUMBER >= 3007011
-  if (sqlite3_db_readonly(imp->db, 0)) {
-    return "read-only";
-  }
-#endif
-
   // Increment the SCHEMA_VERSION every time the below string changes.
   const char *schema_sql =
     "pragma auto_vacuum=incremental;"
@@ -137,11 +132,12 @@ std::string Database::open(bool wait, bool memory) {
     "pragma synchronous=0;"
     "pragma locking_mode=exclusive;"
     "pragma foreign_keys=on;"
-    "create table if not exists schema("
-    "  version integer primary key);"
     "create table if not exists entropy("
     "  row_id integer primary key autoincrement,"
     "  seed   integer not null);"
+    "update entropy set seed=0 where 0;" // "write" to acquire exclusive lock
+    "create table if not exists schema("
+    "  version integer primary key);"
     "create table if not exists runs("
     "  run_id integer primary key autoincrement,"
     "  time   text    not null default current_timestamp);"
@@ -198,7 +194,23 @@ std::string Database::open(bool wait, bool memory) {
     "  unique(job_id, uri) on conflict replace);";
 
   bool waiting = false;
+  int ret;
+
   while (true) {
+    ret = sqlite3_open_v2(memory?":memory:":"wake.db", &imp->db, SQLITE_OPEN_READWRITE, 0);
+    if (ret != SQLITE_OK) {
+      if (!imp->db) return "sqlite3_open: out of memory";
+      std::string out = sqlite3_errmsg(imp->db);
+      close_db(imp.get());
+      return out;
+    }
+
+#if SQLITE_VERSION_NUMBER >= 3007011
+    if (sqlite3_db_readonly(imp->db, 0)) {
+      return "read-only";
+    }
+#endif
+
     char *fail;
     ret = sqlite3_exec(imp->db, schema_sql, 0, 0, &fail);
     if (ret == SQLITE_OK) {
@@ -213,9 +225,13 @@ std::string Database::open(bool wait, bool memory) {
         sqlite3_exec(imp->db, set_version, 0, 0, 0);
         break;
       } else {
+        close_db(imp.get());
         return "produced by an incompatible verison of wake; remove it.";
       }
     }
+
+    // We must close the DB so that we don't hold it shared, preventing an eventual exclusive winner.
+    close_db(imp.get());
 
     std::string out = fail;
     sqlite3_free(fail);
@@ -224,7 +240,6 @@ std::string Database::open(bool wait, bool memory) {
       if (waiting) {
         std::cerr << std::endl;
       }
-      close();
       return out;
     } else {
       if (waiting) {
@@ -441,14 +456,7 @@ void Database::close() {
   FINALIZE(get_all_tags);
   FINALIZE(get_edges);
 
-  if (imp->db) {
-    int ret = sqlite3_close(imp->db);
-    if (ret != SQLITE_OK) {
-      std::cerr << "Could not close wake.db: " << sqlite3_errmsg(imp->db) << std::endl;
-      return;
-    }
-  }
-  imp->db = 0;
+  close_db(imp.get());
 }
 
 static void finish_stmt(const char *why, sqlite3_stmt *stmt, bool debug) {
