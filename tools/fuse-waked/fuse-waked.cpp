@@ -1519,6 +1519,12 @@ int main(int argc, char *argv[])
 		goto term;
 	}
 
+	if (log != STDOUT_FILENO) {
+		dup2(log, STDOUT_FILENO);
+		close(log);
+		log = STDOUT_FILENO;
+	}
+
 	umask(0);
 
 	context.rootfd = open(".", O_RDONLY);
@@ -1633,9 +1639,7 @@ int main(int argc, char *argv[])
 	fflush(stdout);
 	fflush(stderr);
 
-	if (log != STDOUT_FILENO) dup2(log, STDOUT_FILENO);
-	if (log != STDERR_FILENO) dup2(log, STDERR_FILENO);
-	// NOTE: We CANNOT close log, as that would release our lock
+	dup2(log, STDERR_FILENO);
 
 	if (null != STDIN_FILENO) {
 		dup2(null, STDIN_FILENO);
