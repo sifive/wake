@@ -538,7 +538,7 @@ int main(int argc, char **argv) {
   if (debug   && !fd1) fd1 = "debug,info,echo,report,warning,error";
   if (verbose && !fd1) fd1 = "info,echo,report,warning,error";
   if (quiet   && !fd1) fd1 = "error";
-  if (!tty    && !fd1) fd1 = "info,echo,report,warning,error";
+  if (!tty    && !fd1) fd1 = "echo,report,warning,error";
   if (!fd1) fd1 = "report,warning,error";
   if (!fd2) fd2 = "error";
 
