@@ -1410,6 +1410,7 @@ static void handle_exit(int sig)
 
 	static struct timeval start;
 	static pid_t pid = -1;
+	static bool linger = false;
 	struct timeval now;
 
 	// Unfortunately, fuse_unmount can fail if the filesystem is still in use.
@@ -1428,26 +1429,61 @@ static void handle_exit(int sig)
 
 	// Reap prior attempts
 	if (pid != -1) {
-		int status;
-		do waitpid(pid, &status, 0);
-		while (WIFSTOPPED(status));
+		int status = 0;
+		do {
+			int ret = waitpid(pid, &status, 0);
+			if (ret == -1) {
+				if (errno == EINTR) {
+					continue;
+				} else {
+					fprintf(stderr, "waitpid(%d): %s\n", pid, strerror(errno));
+					break;
+				}
+			}
+		} while (WIFSTOPPED(status));
 		pid = -1;
 
-		// Attempts numbered counting from 1:
-		gettimeofday(&now, nullptr);
-		double waited =
-			(now.tv_sec  - start.tv_sec) +
-			(now.tv_usec - start.tv_usec)/1000000.0;
-		fprintf(stderr, "Unable to umount on attempt %d, %.1fs after we started to shutdown\n", exit_attempts, waited);
+		if (WIFEXITED(status) && WEXITSTATUS(status) == 42) {
+			linger = true;
+		} else {
+			// Attempts numbered counting from 1:
+			gettimeofday(&now, nullptr);
+			double waited =
+				(now.tv_sec  - start.tv_sec) +
+				(now.tv_usec - start.tv_usec)/1000000.0;
+			fprintf(stderr, "Unable to umount on attempt %d, %.1fs after we started to shutdown\n", exit_attempts, waited);
+		}
 	}
 
-	if (exit_attempts == QUIT_RETRY_ATTEMPTS) {
+	if (linger) {
+		// The filesystem was successfully unmounted
+		fprintf(stderr, "Successful file-system umount, with lingering child processes\n");
+		// Release our lock so that a new daemon can start in our place
+		struct flock fl;
+		memset(&fl, 0, sizeof(fl));
+		fl.l_type = F_UNLCK;
+		fl.l_whence = SEEK_SET;
+		fl.l_start = 0;
+		fl.l_len = 0; // 0=largest possible
+		int log = STDOUT_FILENO;
+		if (fcntl(log, F_SETLK, &fl) != 0) {
+			fprintf(stderr, "fcntl(unlock): %s\n", strerror(errno));
+		}
+		// Return to fuse_loop and wait for the kernel to indicate we're finally detached.
+	} else if (exit_attempts == QUIT_RETRY_ATTEMPTS) {
 		fprintf(stderr, "Too many umount attempts; unable to exit cleanly. Leaving a broken mount point behind.\n");
 		exit(1);
 	} else if ((pid = fork()) == 0) {
 		// We need to fork before fuse_unmount, in order to be able to try more than once.
 		fuse_unmount(path.c_str(), fc);
-		exit(0);
+		std::string marker = path + "/.f.fuse-waked";
+		if (access(marker.c_str(), F_OK) == 0) {
+			// umount did not disconnect the mount
+			exit(1);
+		} else {
+			// report that the mount WAS disconnected
+			exit(42);
+		}
 	} else {
 		// By incrementing exit_attempts, we ensure cancel_exit never stops the next scheduled attempt
 		++exit_attempts;
@@ -1578,7 +1614,7 @@ int main(int argc, char *argv[])
 			}
 			status = 0; // another daemon is already running
 		} else {
-			fprintf(stderr, "flock %s.log: %s\n", path.c_str(), strerror(errno));
+			fprintf(stderr, "fcntl(%s.log): %s\n", path.c_str(), strerror(errno));
 		}
 		goto term;
 	}
