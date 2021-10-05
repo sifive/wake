@@ -19,15 +19,34 @@
 #define JOB_H
 
 #include <memory>
+#include <string>
 
 struct Database;
 struct Runtime;
+
+struct ResourceBudget {
+  double percentage;
+  uint64_t fixed;
+
+  static const char *parse(const char *str, ResourceBudget &output);
+
+  ResourceBudget() : percentage(0), fixed(0) { }
+  ResourceBudget(double percentage_) : percentage(percentage_), fixed(0) { }
+
+  uint64_t get(uint64_t max_available) const {
+    if (fixed) {
+      return fixed;
+    } else {
+      return max_available * percentage;
+    }
+  }
+};
 
 struct JobTable {
   struct detail;
   std::unique_ptr<detail> imp;
 
-  JobTable(Database *db, double percent, bool debug, bool verbose, bool quiet, bool check, bool batch);
+  JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool debug, bool verbose, bool quiet, bool check, bool batch);
   ~JobTable();
 
   // Wait for a job to complete; false -> no more active jobs
