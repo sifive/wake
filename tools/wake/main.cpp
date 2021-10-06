@@ -213,9 +213,9 @@ int main(int argc, char **argv) {
   bool optim   =!arg(options, "no-optimize")->count;
   bool exports = arg(options, "exports")->count;
 
-  const char *percents= arg(options, "percent")->argument;
-  const char *jobs    = arg(options, "jobs")->argument;
-  const char *memorys = arg(options, "memory")->argument;
+  const char *percent_str = arg(options, "percent")->argument;
+  const char *jobs_str    = arg(options, "jobs")->argument;
+  const char *memory_str  = arg(options, "memory")->argument;
   const char *heapf   = arg(options, "heap-factor")->argument;
   const char *profile = arg(options, "profile")->argument;
   const char *init    = arg(options, "init")->argument;
@@ -275,41 +275,41 @@ int main(int argc, char **argv) {
 
   double percent = 0.9;
 
-  if (!percents) {
-    percents = getenv("WAKE_PERCENT");
+  if (!percent_str) {
+    percent_str = getenv("WAKE_PERCENT");
   }
 
-  if (percents) {
+  if (percent_str) {
     char *tail;
-    percent = strtod(percents, &tail);
+    percent = strtod(percent_str, &tail);
     percent /= 100.0;
     if (*tail || percent < 0.01 || percent > 0.99) {
-      std::cerr << "Cannot run with " << percents << "%  (must be >= 0.01 and <= 0.99)!" << std::endl;
+      std::cerr << "Cannot run with " << percent_str << "%  (must be >= 0.01 and <= 0.99)!" << std::endl;
       return 1;
     }
   }
 
-  ResourceBudget memory(percent);
-  ResourceBudget cpu(percent);
+  ResourceBudget memory_budget(percent);
+  ResourceBudget cpu_budget(percent);
 
-  if (!memorys) {
-    memorys = getenv("WAKE_MEMORY");
+  if (!memory_str) {
+    memory_str = getenv("WAKE_MEMORY");
   }
 
-  if (memorys) {
-    if (auto error = ResourceBudget::parse(memorys, memory)) {
-      std::cerr << "Option '-m" << memorys << "' is illegal; " << error << std::endl;
+  if (memory_str) {
+    if (auto error = ResourceBudget::parse(memory_str, memory_budget)) {
+      std::cerr << "Option '-m" << memory_str << "' is illegal; " << error << std::endl;
       return 1;
     }
   }
 
-  if (!jobs) {
-    jobs = getenv("WAKE_JOBS");
+  if (!jobs_str) {
+    jobs_str = getenv("WAKE_JOBS");
   }
 
-  if (jobs) {
-    if (auto error = ResourceBudget::parse(jobs, cpu)) {
-      std::cerr << "Option '-j" << jobs << "' is illegal; " << error << std::endl;
+  if (jobs_str) {
+    if (auto error = ResourceBudget::parse(jobs_str, cpu_budget)) {
+      std::cerr << "Option '-j" << jobs_str << "' is illegal; " << error << std::endl;
       return 1;
     }
   }
@@ -580,7 +580,7 @@ int main(int argc, char **argv) {
   status_set_bulk_fd(5, fd5);
 
   /* Primitives */
-  JobTable jobtable(&db, memory, cpu, debug, verbose, quiet, check, !tty);
+  JobTable jobtable(&db, memory_budget, cpu_budget, debug, verbose, quiet, check, !tty);
   StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(wake_cwd), cmdline);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 

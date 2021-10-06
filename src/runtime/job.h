@@ -24,14 +24,9 @@
 struct Database;
 struct Runtime;
 
-struct ResourceBudget {
-  double percentage;
-  uint64_t fixed;
-
-  static const char *parse(const char *str, ResourceBudget &output);
-
-  ResourceBudget() : percentage(0), fixed(0) { }
-  ResourceBudget(double percentage_) : percentage(percentage_), fixed(0) { }
+class ResourceBudget {
+public:
+  ResourceBudget(double percentage_ = 0) : percentage(percentage_), fixed(0) { }
 
   uint64_t get(uint64_t max_available) const {
     if (fixed) {
@@ -40,6 +35,14 @@ struct ResourceBudget {
       return max_available * percentage;
     }
   }
+
+  // returns: nullptr on success; else a string describing the problem
+  static const char *parse(const char *str, ResourceBudget &output);
+
+private:
+  // At least one must be 0 (= invalid)
+  double percentage;
+  uint64_t fixed;
 };
 
 struct JobTable {
