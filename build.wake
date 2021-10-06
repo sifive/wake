@@ -63,6 +63,16 @@ def doInstall dest kind =
     def outputs = readme, bininstall ++ datinstall
     findFailFn getPathResult outputs
 
+# Replace @VERSION@ with 'release'
+def setVersion release file =
+    def in = source "{file}.in"
+    def script = "%
+        set -e
+        sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
+        mv "%{file}.tmp" "%{file}"
+        %"
+    shellJob script (in, Nil) | getJobOutput
+
 # Create a release tarball
 def tarball Unit =
     def releaseResult = buildAs Unit
@@ -70,16 +80,8 @@ def tarball Unit =
     require Pass release = releaseResult
     require Pass time = timeResult
     # Create debian + RedHat package files
-    def setVersion file =
-        def in = source "{file}.in"
-        def script = "%
-            set -e
-            sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
-            mv "%{file}.tmp" "%{file}"
-            %"
-        shellJob script (in, Nil) | getJobOutput
-    def changelog = setVersion "debian/changelog"
-    def spec = setVersion "wake.spec"
+    def changelog = setVersion release "debian/changelog"
+    def spec = setVersion release "wake.spec"
     # Identify those sources files to include in the tarball
     def srcs =
         sources "." `.*`

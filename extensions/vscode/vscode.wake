@@ -47,11 +47,19 @@ export def vscode _: Result Path Error =
     def jsFile =
         installAs "{here}/lsp-server/lsp-wake.js" js
 
-    def npmFiles =
-        sources here `package(|-lock)\.json`
+    require Pass packageLockJSON =
+        source "{here}/package-lock.json"
+        | getPathResult
+
+    require Pass release =
+        buildAs Unit
+
+    require Pass packageJSON =
+        setVersion (replace `~` "-" release) "{here}/package.json"
+        | getPathResult
 
     require Pass nodeModules =
-        makeExecPlan (which "npm", "install", Nil) npmFiles
+        makeExecPlan (which "npm", "install", Nil) (packageJSON, packageLockJSON, Nil)
         | setPlanDirectory here
         | runJob
         | getJobOutputs
@@ -64,6 +72,7 @@ export def vscode _: Result Path Error =
     def vsceFiles =
         wasmFile,
         jsFile,
+        packageJSON,
         sources here `[^/]*` ++
         sources here `images/.*` ++
         sources here `lsp-client/.*` ++
