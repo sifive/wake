@@ -802,10 +802,10 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, FileFrag
 
   std::vector<Symbols*> out;
   for (auto &p : imports.import_all) {
-    auto it = top.packages.find(p);
+    auto it = top.packages.find(p.first);
     if (it == top.packages.end()) {
-      WARNING(fragment.location(),
-        "full import from non-existent package '" << p << "'");
+      WARNING(p.second.location(),
+        "full import from non-existent package '" << p.first << "'");
     } else {
       out.push_back(&it->second->exports);
     }
@@ -1081,7 +1081,7 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
     std::set<std::string> imports;
     for (auto &file : defp->files)
       for (auto &bulk : file.content->imports.import_all)
-        imports.insert(bulk);
+        imports.insert(bulk.first);
     for (auto &imp : imports) {
       auto it = top->packages.find(imp);
       if (it != top->packages.end())

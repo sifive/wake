@@ -114,7 +114,7 @@ static void dst_import(CSTElement topdef, DefMap &map) {
 
   // Special case for wildcard import
   if (child.empty()) {
-    map.imports.import_all.emplace_back(pkgname);
+    map.imports.import_all.emplace_back(pkgname, topdef.fragment());
     return;
   }
 
@@ -1332,7 +1332,7 @@ const char *dst_top(CSTElement root, Top &top) {
 
   // Set a default import
   if (file.content->imports.empty())
-    file.content->imports.import_all.push_back("wake");
+    file.content->imports.import_all.emplace_back("wake", file.content->fragment);
 
   // Set a default package name
   if (package->name.empty()) {
