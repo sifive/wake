@@ -364,6 +364,26 @@ bool JobTable::exit_now() {
   return exit_asap;
 }
 
+static int get_concurrency() {
+#ifdef __linux
+  int cpus = sysconf(_SC_NPROCESSORS_CONF);
+
+  cpu_set_t *cpuset = CPU_ALLOC(cpus);
+  size_t size = CPU_ALLOC_SIZE(cpus);
+  int ret = sched_getaffinity(0, size, cpuset);
+  int avail = CPU_COUNT_S(size, cpuset);
+  CPU_FREE(cpuset);
+
+  if (ret == 0 && avail > 0 && avail <= cpus) {
+    return avail;
+  } else {
+    return cpus;
+  }
+#else
+  return std::thread::hardware_concurrency();
+#endif
+}
+
 JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool debug, bool verbose, bool quiet, bool check, bool batch) : imp(new JobTable::detail) {
   imp->debug = debug;
   imp->verbose = verbose;
@@ -372,7 +392,7 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   imp->batch = batch;
   imp->db = db;
   imp->active = 0;
-  imp->limit = cpu.get(std::thread::hardware_concurrency());
+  imp->limit = cpu.get(get_concurrency());
   imp->phys_active = 0;
   imp->phys_limit = memory.get(get_physical_memory());
   memset(&imp->childrenUsage, 0, sizeof(struct RUsage));
