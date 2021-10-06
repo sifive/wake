@@ -47,6 +47,11 @@ def re2cReal file =
         | getJobOutput
         | getPathResult
 
+    require Some "1" =
+        getenv "UPGRADE_GENERATED"
+    else
+        Pass result
+
     def compress =
         which "gzip", "-nk9", result.getPathName, Nil
 
