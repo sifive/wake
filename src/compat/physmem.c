@@ -44,6 +44,16 @@ uint64_t get_physical_memory() {
 #else
   out = sysconf(_SC_PHYS_PAGES);
   out *= sysconf(_SC_PAGESIZE);
+#ifdef __linux
+  FILE *cgroup_limit = fopen("/sys/fs/cgroup/memory/memory.limit_in_bytes", "r");
+  if (cgroup_limit) {
+    unsigned long long limit;
+    if (fscanf(cgroup_limit, "%llu", &limit) == 1 && limit > 0 && limit < out) {
+      out = limit;
+    }
+    fclose(cgroup_limit);
+  }
+#endif
 #endif
   return out;
 }

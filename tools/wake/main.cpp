@@ -71,7 +71,8 @@ void print_help(const char *argv0) {
     << "Usage in script: #! /usr/bin/env wake [OPTIONS] -:target" << std::endl
     << std::endl
     << "  Flags affecting build execution:" << std::endl
-    << "    -p PERCENT       Schedule local jobs for <= PERCENT of system (default 90)"  << std::endl
+    << "    --jobs=N   -jN   Schedule local jobs for N cores or N% of CPU (default 90%)" << std::endl
+    << "    --memory=M -mM   Schedule local jobs for M bytes or M% of RAM (default 90%)" << std::endl
     << "    --check    -c    Rerun all jobs and confirm their output is reproducible"    << std::endl
     << "    --verbose  -v    Report hash progress and result expression types"           << std::endl
     << "    --debug    -d    Report stack frame information for exceptions and closures" << std::endl
@@ -137,6 +138,8 @@ int main(int argc, char **argv) {
 
   struct option options[] {
     { 'p', "percent",               GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
+    { 'j', "jobs",                  GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
+    { 'm', "memory",                GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
     { 'c', "check",                 GOPT_ARGUMENT_FORBIDDEN },
     { 'v', "verbose",               GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
     { 'd', "debug",                 GOPT_ARGUMENT_FORBIDDEN },
@@ -210,7 +213,9 @@ int main(int argc, char **argv) {
   bool optim   =!arg(options, "no-optimize")->count;
   bool exports = arg(options, "exports")->count;
 
-  const char *percents= arg(options, "percent")->argument;
+  const char *percent_str = arg(options, "percent")->argument;
+  const char *jobs_str    = arg(options, "jobs")->argument;
+  const char *memory_str  = arg(options, "memory")->argument;
   const char *heapf   = arg(options, "heap-factor")->argument;
   const char *profile = arg(options, "profile")->argument;
   const char *init    = arg(options, "init")->argument;
@@ -268,17 +273,43 @@ int main(int argc, char **argv) {
 
   tty = term_init(tty);
 
-  if (!percents) {
-    percents = getenv("WAKE_PERCENT");
+  double percent = 0.9;
+
+  if (!percent_str) {
+    percent_str = getenv("WAKE_PERCENT");
   }
 
-  double percent = 0.9;
-  if (percents) {
+  if (percent_str) {
     char *tail;
-    percent = strtod(percents, &tail);
+    percent = strtod(percent_str, &tail);
     percent /= 100.0;
     if (*tail || percent < 0.01 || percent > 0.99) {
-      std::cerr << "Cannot run with " << percents << "%  (must be >= 0.01 and <= 0.99)!" << std::endl;
+      std::cerr << "Cannot run with " << percent_str << "%  (must be >= 0.01 and <= 0.99)!" << std::endl;
+      return 1;
+    }
+  }
+
+  ResourceBudget memory_budget(percent);
+  ResourceBudget cpu_budget(percent);
+
+  if (!memory_str) {
+    memory_str = getenv("WAKE_MEMORY");
+  }
+
+  if (memory_str) {
+    if (auto error = ResourceBudget::parse(memory_str, memory_budget)) {
+      std::cerr << "Option '-m" << memory_str << "' is illegal; " << error << std::endl;
+      return 1;
+    }
+  }
+
+  if (!jobs_str) {
+    jobs_str = getenv("WAKE_JOBS");
+  }
+
+  if (jobs_str) {
+    if (auto error = ResourceBudget::parse(jobs_str, cpu_budget)) {
+      std::cerr << "Option '-j" << jobs_str << "' is illegal; " << error << std::endl;
       return 1;
     }
   }
@@ -549,7 +580,7 @@ int main(int argc, char **argv) {
   status_set_bulk_fd(5, fd5);
 
   /* Primitives */
-  JobTable jobtable(&db, percent, debug, verbose, quiet, check, !tty);
+  JobTable jobtable(&db, memory_budget, cpu_budget, debug, verbose, quiet, check, !tty);
   StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(wake_cwd), cmdline);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 

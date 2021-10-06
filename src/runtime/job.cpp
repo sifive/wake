@@ -31,6 +31,7 @@
 #include <fcntl.h>
 #include <math.h>
 #include <limits.h>
+#include <stdlib.h>
 
 #include <sstream>
 #include <iostream>
@@ -304,6 +305,48 @@ CriticalJob JobTable::detail::critJob(double nexttime) const {
   return out;
 }
 
+const char *ResourceBudget::parse(const char *str, ResourceBudget &output) {
+  char *dtail;
+  double percentage = strtod(str, &dtail);
+
+  if (dtail[0] == '%' && dtail[1] == 0) {
+    if (percentage < 1) {
+      return "percentage must be >= 1%";
+    } else {
+      output.percentage = percentage / 100.0;
+      output.fixed = 0;
+      return nullptr;
+    }
+  }
+
+  char *ltail;
+  long long val = strtoll(str, &ltail, 0);
+
+  if (val <= 0) {
+    return "value must be > 0";
+  }
+
+  output.percentage = 0;
+  output.fixed = val;
+
+  if (ltail[0] == 0) return nullptr;
+  output.fixed *= 1024;
+  if (ltail[0] == 'k' && ltail[1] == 0) return nullptr;
+  output.fixed *= 1024;
+  if (ltail[0] == 'M' && ltail[1] == 0) return nullptr;
+  output.fixed *= 1024;
+  if (ltail[0] == 'G' && ltail[1] == 0) return nullptr;
+  output.fixed *= 1024;
+  if (ltail[0] == 'T' && ltail[1] == 0) return nullptr;
+
+  // Error reporting
+  if (ltail == dtail) {
+    return "integer value must be followed by nothing or one of [kMGT]";
+  } else {
+    return "percentage value must be followed by a '%'";
+  }
+}
+
 static volatile bool child_ready = false;
 static volatile bool exit_asap = false;
 
@@ -321,7 +364,27 @@ bool JobTable::exit_now() {
   return exit_asap;
 }
 
-JobTable::JobTable(Database *db, double percent, bool debug, bool verbose, bool quiet, bool check, bool batch) : imp(new JobTable::detail) {
+static int get_concurrency() {
+#ifdef __linux
+  int cpus = sysconf(_SC_NPROCESSORS_CONF);
+
+  cpu_set_t *cpuset = CPU_ALLOC(cpus);
+  size_t size = CPU_ALLOC_SIZE(cpus);
+  int ret = sched_getaffinity(0, size, cpuset);
+  int avail = CPU_COUNT_S(size, cpuset);
+  CPU_FREE(cpuset);
+
+  if (ret == 0 && avail > 0 && avail <= cpus) {
+    return avail;
+  } else {
+    return cpus;
+  }
+#else
+  return std::thread::hardware_concurrency();
+#endif
+}
+
+JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool debug, bool verbose, bool quiet, bool check, bool batch) : imp(new JobTable::detail) {
   imp->debug = debug;
   imp->verbose = verbose;
   imp->quiet = quiet;
@@ -329,9 +392,9 @@ JobTable::JobTable(Database *db, double percent, bool debug, bool verbose, bool 
   imp->batch = batch;
   imp->db = db;
   imp->active = 0;
-  imp->limit = std::thread::hardware_concurrency() * percent;
+  imp->limit = cpu.get(get_concurrency());
   imp->phys_active = 0;
-  imp->phys_limit = get_physical_memory() * percent;
+  imp->phys_limit = memory.get(get_physical_memory());
   memset(&imp->childrenUsage, 0, sizeof(struct RUsage));
 
   sigemptyset(&imp->block);
