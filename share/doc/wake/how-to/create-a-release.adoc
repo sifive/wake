@@ -67,8 +67,8 @@ $ git push origin release-0.15.3
 
 12. Assuming everything has passed, merge the pull request.
 
-13. Take the artifacts from the CI build and upload them to the GitHub release.
-    Note that you will need to manually rename the artifacts to add in the distribution version's prefix.
-    E.g. For the Ubuntu 16.04 build artifact, you should rename it from `wake_0.15.3-1_amd64.deb` to `ubuntu-16-04-wake_0.15.3-1_amd64.deb`.
+13. Take the artifacts from the CI build and upload them to the GitHub release and MS marketplace.
+    The scripts/fetch utility can help download and rename the packages.
+    The update link is here: https://marketplace.visualstudio.com/manage/publishers/sifive
 
 14. Finally, update the release on GitHub with the release information.
