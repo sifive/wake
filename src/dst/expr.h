@@ -207,7 +207,7 @@ struct Symbols {
 
 struct Imports : public Symbols {
   SymbolMap mixed;
-  std::vector<std::string> import_all;
+  std::vector<std::pair<std::string, FileFragment>> import_all;
   bool empty() const { return import_all.empty() && mixed.empty() && defs.empty() && types.empty() && topics.empty(); }
 };
 
