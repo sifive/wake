@@ -1475,7 +1475,11 @@ static void handle_exit(int sig)
 		exit(1);
 	} else if ((pid = fork()) == 0) {
 		// We need to fork before fuse_unmount, in order to be able to try more than once.
+#ifdef __APPLE__
+		unmount(path.c_str(), MNT_FORCE);
+#else
 		fuse_unmount(path.c_str(), fc);
+#endif
 		std::string marker = path + "/.f.fuse-waked";
 		if (access(marker.c_str(), F_OK) == 0) {
 			// umount did not disconnect the mount
