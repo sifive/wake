@@ -78,6 +78,11 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
     def cppfile =
         installAs (replace `\.c$` ".cpp" cfile.getPathName) cfile
 
+    require Some "1" =
+        getenv "UPGRADE_GENERATED"
+    else
+        Pass (Pair cppfile hfile)
+
     def compress =
         which "gzip", "-nk9", cppfile.getPathName, hfile.getPathName, Nil
 
