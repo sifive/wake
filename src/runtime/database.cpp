@@ -173,6 +173,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "  endtime     text    not null default '',"
     "  keep        integer not null default 0);"       // 0=false, 1=true
     "create index if not exists job on jobs(directory, commandline, environment, stdin, signature, keep, job_id, stat_id);"
+    "create index if not exists jobstats on jobs(stat_id);"
     "create table if not exists filetree("
     "  tree_id  integer primary key autoincrement,"
     "  access   integer not null," // 0=visible, 1=input, 2=output
