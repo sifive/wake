@@ -307,6 +307,7 @@ CriticalJob JobTable::detail::critJob(double nexttime) const {
 
 static bool nice_end(const char *s) {
   if (s[0] == 0) return true;
+  if (s[0] == 'B' && s[1] == 0) return true;
   if (s[0] == 'i' && s[1] == 'B' && s[2] == 0) return true;
   return false;
 }
@@ -327,23 +328,18 @@ const char *ResourceBudget::parse(const char *str, ResourceBudget &output) {
 
   char *ltail;
   long long val = strtoll(str, &ltail, 0);
+  bool overflow = val == LLONG_MAX && errno == ERANGE;
+  uint64_t limit = UINT64_MAX/1024;
 
   if (val <= 0) {
     return "value must be > 0";
   }
 
-  const char *toobig = "value exceeds 64-bits";
-  if (val == LLONG_MAX && errno == ERANGE) {
-    return toobig;
-  }
-
   output.percentage = 0;
   output.fixed = val;
 
-  uint64_t limit = UINT64_MAX/1024;
-  bool overflow = false;
-
-  if (ltail[0] == 0) return nullptr;
+  const char *toobig = "value exceeds 64-bits";
+  if (nice_end(ltail)) return overflow?toobig:nullptr;
 
   overflow |= output.fixed > limit;
   output.fixed *= 1024;
