@@ -7,7 +7,7 @@ url="$1"
 version="$2"
 
 curl -L -o wake_${version}.tar.xz                    ${url}/wake_${version}.tar.xz
-curl -L -o wake-${version}.vsix                      ${url}/wake-${version}.vsix
+curl -L -o wake-${version}.vsix                      ${url}/vscode/wake-${version}.vsix
 curl -L -o wake-static_${version}.tar.xz             ${url}/alpine/wake-static_${version}.tar.xz
 curl -L -o centos-7-6-wake-${version}-1.x86_64.rpm   ${url}/centos_7_6/wake-${version}-1.x86_64.rpm
 curl -L -o centos-8-3-wake-${version}-1.x86_64.rpm   ${url}/centos_8_3/wake-${version}-1.x86_64.rpm
