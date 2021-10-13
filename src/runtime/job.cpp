@@ -305,6 +305,13 @@ CriticalJob JobTable::detail::critJob(double nexttime) const {
   return out;
 }
 
+static bool nice_end(const char *s) {
+  if (s[0] == 0) return true;
+  if (s[0] == 'B' && s[1] == 0) return true;
+  if (s[0] == 'i' && s[1] == 'B' && s[2] == 0) return true;
+  return false;
+}
+
 const char *ResourceBudget::parse(const char *str, ResourceBudget &output) {
   char *dtail;
   double percentage = strtod(str, &dtail);
@@ -321,6 +328,8 @@ const char *ResourceBudget::parse(const char *str, ResourceBudget &output) {
 
   char *ltail;
   long long val = strtoll(str, &ltail, 0);
+  bool overflow = val == LLONG_MAX && errno == ERANGE;
+  uint64_t limit = UINT64_MAX/1024;
 
   if (val <= 0) {
     return "value must be > 0";
@@ -329,22 +338,52 @@ const char *ResourceBudget::parse(const char *str, ResourceBudget &output) {
   output.percentage = 0;
   output.fixed = val;
 
-  if (ltail[0] == 0) return nullptr;
+  const char *toobig = "value exceeds 64-bits";
+  if (nice_end(ltail)) return overflow?toobig:nullptr;
+
+  overflow |= output.fixed > limit;
   output.fixed *= 1024;
-  if (ltail[0] == 'k' && ltail[1] == 0) return nullptr;
+  if (ltail[0] == 'k' && nice_end(ltail+1)) return overflow?toobig:nullptr;
+
+  overflow |= output.fixed > limit;
   output.fixed *= 1024;
-  if (ltail[0] == 'M' && ltail[1] == 0) return nullptr;
+  if (ltail[0] == 'M' && nice_end(ltail+1)) return overflow?toobig:nullptr;
+
+  overflow |= output.fixed > limit;
   output.fixed *= 1024;
-  if (ltail[0] == 'G' && ltail[1] == 0) return nullptr;
+  if (ltail[0] == 'G' && nice_end(ltail+1)) return overflow?toobig:nullptr;
+
+  overflow |= output.fixed > limit;
   output.fixed *= 1024;
-  if (ltail[0] == 'T' && ltail[1] == 0) return nullptr;
+  if (ltail[0] == 'T' && nice_end(ltail+1)) return overflow?toobig:nullptr;
+
+  overflow |= output.fixed > limit;
+  output.fixed *= 1024;
+  if (ltail[0] == 'P' && nice_end(ltail+1)) return overflow?toobig:nullptr;
+
+  overflow |= output.fixed > limit;
+  output.fixed *= 1024;
+  if (ltail[0] == 'E' && nice_end(ltail+1)) return overflow?toobig:nullptr;
 
   // Error reporting
   if (ltail == dtail) {
-    return "integer value must be followed by nothing or one of [kMGT]";
+    return "integer value must be followed by nothing or one of [kMGTPE]";
   } else {
     return "percentage value must be followed by a '%'";
   }
+}
+
+std::string ResourceBudget::format(uint64_t x) {
+  int suffix = 0;
+  int up = 0;
+  static const char *SI[] = {"B", "kiB", "MiB", "GiB", "TiB", "PiB", "EiB" };
+  while (x >= 10000-up) {
+    ++suffix;
+    up = (x % 1024) >= 512;
+    x /= 1024;
+  }
+  x += up;
+  return std::to_string(x) + SI[suffix];
 }
 
 static volatile bool child_ready = false;
@@ -396,6 +435,11 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   imp->phys_active = 0;
   imp->phys_limit = memory.get(get_physical_memory());
   memset(&imp->childrenUsage, 0, sizeof(struct RUsage));
+
+  std::stringstream s;
+  s << "wake: targeting utilization for " << imp->limit << " threads and " << ResourceBudget::format(imp->phys_limit) << " of memory." << std::endl;
+  std::string out = s.str();
+  status_write("echo", out.data(), out.size());
 
   sigemptyset(&imp->block);
 

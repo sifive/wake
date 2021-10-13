@@ -38,6 +38,11 @@ public:
 
   // returns: nullptr on success; else a string describing the problem
   static const char *parse(const char *str, ResourceBudget &output);
+  // Format an integer with 'kiB', 'MiB', 'GiB', etc as appropriate.
+  // The values are rounded to nearest when reduced.
+  // Guarantee is that the output string will have at most 4 digits.
+  // If the number is >= 10, the output will have at least 2 digits.
+  static std::string format(uint64_t x);
 
 private:
   // At least one must be 0 (= invalid)
