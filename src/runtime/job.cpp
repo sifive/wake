@@ -305,6 +305,12 @@ CriticalJob JobTable::detail::critJob(double nexttime) const {
   return out;
 }
 
+static bool nice_end(const char *s) {
+  if (s[0] == 0) return true;
+  if (s[0] == 'i' && s[1] == 'B' && s[2] == 0) return true;
+  return false;
+}
+
 const char *ResourceBudget::parse(const char *str, ResourceBudget &output) {
   char *dtail;
   double percentage = strtod(str, &dtail);
@@ -326,25 +332,59 @@ const char *ResourceBudget::parse(const char *str, ResourceBudget &output) {
     return "value must be > 0";
   }
 
+  const char *toobig = "value exceeds 64-bits";
+  if (val == LLONG_MAX && errno == ERANGE) {
+    return toobig;
+  }
+
   output.percentage = 0;
   output.fixed = val;
 
+  uint64_t limit = UINT64_MAX/1024;
+  bool overflow = false;
+
   if (ltail[0] == 0) return nullptr;
+
+  overflow |= output.fixed > limit;
   output.fixed *= 1024;
-  if (ltail[0] == 'k' && ltail[1] == 0) return nullptr;
+  if (ltail[0] == 'k' && nice_end(ltail+1)) return overflow?toobig:nullptr;
+
+  overflow |= output.fixed > limit;
   output.fixed *= 1024;
-  if (ltail[0] == 'M' && ltail[1] == 0) return nullptr;
+  if (ltail[0] == 'M' && nice_end(ltail+1)) return overflow?toobig:nullptr;
+
+  overflow |= output.fixed > limit;
   output.fixed *= 1024;
-  if (ltail[0] == 'G' && ltail[1] == 0) return nullptr;
+  if (ltail[0] == 'G' && nice_end(ltail+1)) return overflow?toobig:nullptr;
+
+  overflow |= output.fixed > limit;
   output.fixed *= 1024;
-  if (ltail[0] == 'T' && ltail[1] == 0) return nullptr;
+  if (ltail[0] == 'T' && nice_end(ltail+1)) return overflow?toobig:nullptr;
+
+  overflow |= output.fixed > limit;
+  output.fixed *= 1024;
+  if (ltail[0] == 'P' && nice_end(ltail+1)) return overflow?toobig:nullptr;
+
+  overflow |= output.fixed > limit;
+  output.fixed *= 1024;
+  if (ltail[0] == 'E' && nice_end(ltail+1)) return overflow?toobig:nullptr;
 
   // Error reporting
   if (ltail == dtail) {
-    return "integer value must be followed by nothing or one of [kMGT]";
+    return "integer value must be followed by nothing or one of [kMGTPE]";
   } else {
     return "percentage value must be followed by a '%'";
   }
+}
+
+std::string ResourceBudget::format(uint64_t x) {
+  int suffix = 0;
+  static const char *SI[] = {"B", "kiB", "MiB", "GiB", "TiB", "PiB", "EiB" };
+  while (x >= 10000) {
+    ++suffix;
+    x = (x+512)/1024;
+  }
+  return std::to_string(x) + SI[suffix];
 }
 
 static volatile bool child_ready = false;
@@ -398,7 +438,7 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   memset(&imp->childrenUsage, 0, sizeof(struct RUsage));
 
   std::stringstream s;
-  s << "wake: targeting utilization for " << imp->limit << " threads and " << imp->phys_limit << " bytes of memory." << std::endl;
+  s << "wake: targeting utilization for " << imp->limit << " threads and " << ResourceBudget::format(imp->phys_limit) << " of memory." << std::endl;
   std::string out = s.str();
   status_write("echo", out.data(), out.size());
 
