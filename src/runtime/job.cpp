@@ -379,11 +379,14 @@ const char *ResourceBudget::parse(const char *str, ResourceBudget &output) {
 
 std::string ResourceBudget::format(uint64_t x) {
   int suffix = 0;
+  int up = 0;
   static const char *SI[] = {"B", "kiB", "MiB", "GiB", "TiB", "PiB", "EiB" };
-  while (x >= 10000) {
+  while (x >= 10000-up) {
     ++suffix;
-    x = (x+512)/1024;
+    up = (x % 1024) >= 512;
+    x /= 1024;
   }
+  x += up;
   return std::to_string(x) + SI[suffix];
 }
 
