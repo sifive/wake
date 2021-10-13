@@ -397,6 +397,11 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   imp->phys_limit = memory.get(get_physical_memory());
   memset(&imp->childrenUsage, 0, sizeof(struct RUsage));
 
+  std::stringstream s;
+  s << "wake: targeting utilization for " << imp->limit << " threads and " << imp->phys_limit << " bytes of memory." << std::endl;
+  std::string out = s.str();
+  status_write("echo", out.data(), out.size());
+
   sigemptyset(&imp->block);
 
   struct sigaction sa;
