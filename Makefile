@@ -42,7 +42,7 @@ all:		wake.db
 	$(WAKE_ENV) ./bin/wake build default
 
 clean:
-	rm -f bin/* lib/wake/* */*.o common/jlexer.cpp src/frontend/lexer.cpp src/frontend/parser.cpp src/version.h wake.db
+	rm -f bin/* lib/wake/* */*.o */*/*.o src/json/jlexer.cpp src/parser/lexer.cpp src/parser/parser.cpp src/parser/parser.h src/version.h wake.db
 	touch bin/stamp lib/wake/stamp
 
 wake.db:	bin/wake bin/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake
