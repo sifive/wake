@@ -94,32 +94,71 @@ export def tinsertMulti (y: a) (Tree cmp root: Tree a): Tree a =
       _  = balanceR l x (helper r)
   Tree cmp (helper root)
 
-# Returns True if a is a subset of b, otherwise False.
-export def a ⊆ b = tsubset a b
+# Test if `a` is a subset of `b` (every element of `a` is also in `b`).
+# Note that the comparison function of `b` is used to determine element
+# equality, if the two differ. See `tsubset` for a prefix form of the function.
+export def (a: Tree x) ⊆ (b: Tree x): Boolean =
+    tsubset a b
 
-# Returns True if a is a superset of b, otherwise False.
-export def a ⊇ b = tsubset b a
+# Test if `a` is a superset of `b` (`a` contains every element of `b`).
+# Note that the comparison function of `b` is used to determine element
+# equality, if the two differ.
+export def (a: Tree x) ⊇ (b: Tree x): Boolean =
+    def Tree _ aroot =
+        a
+    def Tree cmp broot =
+        b
+    tsubsetCmp broot aroot cmp
 
-# Returns True if a is NOT a superset of b, otherwise False.
-export def a ⊉ b = ! a ⊇ b
+# Test if `a` is *not* a superset of `b` (`a` is missing some element of `b`).
+# Note that the comparison function of `b` is used to determine element
+# equality, if the two differ.
+export def (a: Tree x) ⊉ (b: Tree x): Boolean =
+    ! a ⊇ b
 
-# Returns True if a is NOT a subset of b, otherwise False.
-export def a ⊈ b = ! a ⊆ b
+# Test if `a` is *not* a subset of `b` (some element of `a` does not exist in `b`).
+# Note that the comparison function of `b` is used to determine element
+# equality, if the two differ.
+export def (a: Tree x) ⊈ (b: Tree x): Boolean =
+    ! a ⊆ b
 
-# Returns True if a is a proper subset of b, otherwise False.
-export def a ⊊ b = a ⊆ b && b ⊈ a # strict
+# Test if `a` is a proper subset of `b`.
+# (Not only is every element of `a` is also in `b`, but the two sets aren't equal.)
+# Note that the comparison function of `b` is used to determine element
+# equality, if the two differ.
+export def (a: Tree x) ⊊ (b: Tree x): Boolean =
+    a ⊆ b && a ⊉ b
 
-# Returns True if a is a proper superset of b, otherwise False.
-export def a ⊋ b = a ⊇ b && b ⊉ a # strict
+# Test if `a` is a proper superset of `b`.
+# (Not only does `a` contain every element `b`, but the two sets aren't equal.)
+# Note that the comparison function of `b` is used to determine element
+# equality, if the two differ.
+export def (a: Tree x) ⊋ (b: Tree x): Boolean =
+    a ⊇ b && a ⊈ b
 
-# Returns True if every element of a is also in b, otherwise false.
-export def tsubset (Tree _ aroot) (Tree cmp broot) =
-  def helper a b = match a b
-    Tip _ = True
-    _ Tip = False
-    _ (Bin _ bl bx br) = match (split bx cmp a)
-      Triple al _ ag = helper al bl && helper ag br
-  helper aroot broot
+# Test if `a` is a subset of `b` (every element of `a` is also in `b`).
+# Note that the comparison function of `b` is used to determine element
+# equality, if the two differ.
+export def tsubset (a: Tree x) (b: Tree x): Boolean =
+    def Tree _ aroot =
+        a
+    def Tree cmp broot =
+        b
+    tsubsetCmp aroot broot cmp
+
+# Test if `aroot` is a subset of `broot` using an explicit comparison function.
+# If the two trees are based on different comparison functions, `a ⊆ b` might
+# not always imply `b ⊇ a`; that would usually be a bug, but this explicit
+# syntax is introduced to ensure that that behaviour is at least consistent.
+def tsubsetCmp (aroot: TreeNode x) (broot: TreeNode x) (cmp: x => x => Order): Boolean =
+    def helper a b = match a b
+        Tip _   = True
+        _   Tip = False
+        _ (Bin _ bl bx br) =
+            def Triple al _ ag =
+                split bx cmp a
+            helper al bl && helper ag br
+    helper aroot broot
 
 # Deletes all keys that are equal to y.
 export def tdelete (y: a) (Tree cmp root: Tree a): Tree a =
