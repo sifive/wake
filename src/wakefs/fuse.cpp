@@ -42,6 +42,10 @@
 #include "fuse.h"
 #include "namespace.h"
 
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX 255
+#endif
+
 bool json_as_struct(const std::string &json, json_args &result) {
 	JAST jast;
 	if (!JAST::parse(json, std::cerr, jast))
