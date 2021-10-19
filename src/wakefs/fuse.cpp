@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <limits.h>
 #include <signal.h>
 #include <string.h>
 #include <sys/time.h>
@@ -40,6 +41,10 @@
 #include "json/json5.h"
 #include "fuse.h"
 #include "namespace.h"
+
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX 255
+#endif
 
 bool json_as_struct(const std::string &json, json_args &result) {
 	JAST jast;
@@ -126,6 +131,10 @@ static bool collect_result_metadata(
 
 	result_jast.add("inputs", JSON_ARRAY).children = std::move(from_daemon.get("inputs").children);
 	result_jast.add("outputs", JSON_ARRAY).children = std::move(from_daemon.get("outputs").children);
+
+	char hostname[HOST_NAME_MAX+1];
+	if (0 == gethostname(hostname, sizeof(hostname)))
+		result_jast.add("run-host", hostname);
 
 	std::stringstream result_ss;
 	result_ss << result_jast;
