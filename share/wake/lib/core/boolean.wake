@@ -15,41 +15,85 @@
 
 package wake
 
-# Boolean type has two values: True and False.
-# This type must exist in package wake for if/then/else syntax to work.
+# This Boolean type must exist in package wake for if/then/else syntax to work.
+
+# The Boolean type has two values: True or False.
 export data Boolean =
     True
     False
 
 # Unary operator for Boolean NOT.
+#
+# ```
 # !True  = False
 # !False = True
+# ```
 export def !(x: Boolean): Boolean =
     if x then
         False
     else
         True
 
-# Binary operator for Boolean AND.
-# BEWARE: unlike other languages, in wake, expression 'y' is evaluated even if 'x' is False
+# Binary operator for Boolean AND; `x && y`.
+# Both `x` and `y` must be True to return True.
+#
+# ## BEWARE: unlike other languages, in wake, expression 'y' is evaluated even if 'x' is False ##
+#
+# ```
 # True  && True  = True
 # False && True  = False
 # True  && False = False
 # False && False = False
+# ```
 export def (x: Boolean) && (y: Boolean): Boolean =
     if x then
         y
     else
         False
 
-# Binary operator for Boolean OR.
-# BEWARE: unlike other languages, in wake, expression 'y' is evaluated even if 'x' is True
+# Binary operator for Boolean OR; `x || y`.
+# Either `x` or `y` must be True to return True.
+#
+# ## BEWARE: unlike other languages, in wake, expression 'y' is evaluated even if 'x' is True ##
+#
+# ```
 # True  || True  = True
 # False || True  = True
 # True  || False = True
 # False || False = False
+# ```
 export def (x: Boolean) || (y: Boolean): Boolean =
     if x then
         True
     else
         y
+
+# Binary operator for Boolean XOR/EOR; `eor x y`.
+# When `x` and `y` differ, returns True.
+#
+# ```
+# eor True  True  = False
+# eor False True  = True
+# eor True  False = True
+# eor False False = False
+# ```
+export def eor (x: Boolean) (y: Boolean): Boolean =
+    if x then
+        !y
+    else
+        y
+
+# Binary operator for Boolean XNOR/ENOR; `enor x y`.
+# When `x` and `y` are equal, returns True.
+#
+# ```
+# enor True  True  = True
+# enor False True  = False
+# enor True  False = False
+# enor False False = True
+# ```
+export def enor (x: Boolean) (y: Boolean): Boolean =
+    if x then
+        y
+    else
+        !y
