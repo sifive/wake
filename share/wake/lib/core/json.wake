@@ -102,8 +102,8 @@ def doFormat (fmt: JSONFormat) (lhs: JValue): List String =
 export def defaultJSONFormat: JSONFormat =
   def formatDouble d =
     match (dclass d)
-      DoubleInfinite if d <. 0e0 = "-1e9999"
-      DoubleInfinite = "1e9999"
+      DoubleInfinite if d <. 0e0 = "-Infinity"
+      DoubleInfinite = "Infinity"
       DoubleNaN      = "NaN"
       _              = dstr d
   JSONFormat jsonEscape str formatDouble 0
@@ -180,42 +180,51 @@ export def x ==/ y = match x y
 # or `JObject` *before* the enclosing container. This means that if some
 # normalization fails anywhere in the JSON tree the entire call will fail, even
 # if the specific branch causing the failure would later have been pruned.
-export def normalizeJSONWith (fmt: JSONNormalize): (json: JValue) => Result JValue Error = match _
-    JString a =
-        getJSONNormalizeString fmt a
-        | rmap JString
-    JInteger a =
-        getJSONNormalizeInteger fmt a
-        | rmap JInteger
-    JDouble a =
-        getJSONNormalizeDouble fmt a
-        | rmap JDouble
-    JBoolean a =
-        getJSONNormalizeBoolean fmt a
-        | rmap JBoolean
-    JNull =
-        Pass JNull
-    JObject a =
-        def normalizeJObjectValue entry =
-            def Pair key value =
-                entry
-            normalizeJSONWith fmt value
-            | rmap (Pair key)
-        def normalized =
-            map normalizeJObjectValue a
-        require Pass children =
-            findFail normalized
-        children
-        | getJSONNormalizeObject fmt
-        | rmap JObject
-    JArray a =
-        def normalized =
-            map (normalizeJSONWith fmt) a
-        require Pass children =
-          findFail normalized
-        children
-        | getJSONNormalizeArray fmt
-        | rmap JArray
+export def normalizeJSONWith (fmt: JSONNormalize) (json: JValue): Result JValue Error =
+    def normalizeJSON (path: String) = match _
+        JString a =
+            getJSONNormalizeString fmt a
+            | rmap JString
+            | addErrorContext path
+        JInteger a =
+            getJSONNormalizeInteger fmt a
+            | rmap JInteger
+            | addErrorContext path
+        JDouble a =
+            getJSONNormalizeDouble fmt a
+            | rmap JDouble
+            | addErrorContext path
+        JBoolean a =
+            getJSONNormalizeBoolean fmt a
+            | rmap JBoolean
+            | addErrorContext path
+        JNull =
+            Pass JNull
+        JObject a =
+            def normalizeJObjectValue entry =
+                def Pair key value =
+                    entry
+                normalizeJSON "{path}/{key}" value
+                | rmap (Pair key)
+            def normalized =
+                map normalizeJObjectValue a
+            require Pass children =
+                findFail normalized
+            children
+            | getJSONNormalizeObject fmt
+            | rmap JObject
+            | addErrorContext path
+        JArray a =
+            def normalized =
+                zip (seq a.len) a
+                | map (\(Pair i x) normalizeJSON "{path}/[{format i}]" x)
+            require Pass children =
+                findFail normalized
+            children
+            | getJSONNormalizeArray fmt
+            | rmap JArray
+            | addErrorContext path
+    normalizeJSON "" json
 
 # The rules by which `normalizeJSONWith` will simplify JSON values.
 # If any particular function is unable to operate on every input value (e.g. a
