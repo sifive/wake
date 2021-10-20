@@ -107,6 +107,44 @@ export def rmapFail (fn: a => Result pass b): Result pass a => Result pass b = m
     Pass a = Pass a
     Fail f = fn f
 
+# Try to combine the elements of a `List` front-to-back, where each step might fail.
+# If any update step fails, the error value of the first such failure is
+# returned and no further values are processed.
+#
+# Parameters:
+#  - `combiningFn`: How to attempt to meld each element into the accumulator.
+#  - `acc`: The initial value of the accumulator; if `list` is empty, this is
+#    returned unchanged as the `Pass` value.
+#  - `list`: The elements which should be combined.
+export def rfoldl (combiningFn: accumulator => element => Result accumulator error): (acc: accumulator) => (list: List element) => Result accumulator error =
+    def loop acc = match _
+        Nil =
+            Pass acc
+        element, rest =
+            require Pass result =
+                combiningFn acc element
+            loop result rest
+    loop
+
+# Try to combine the elements of a `List` front-to-back, where each step might fail.
+# If any update step fails, the error value of the first such failure is
+# returned and no further values are processed.
+#
+# Parameters:
+#  - `combiningFn`: How to attempt to meld each element into the accumulator.
+#  - `acc`: The initial value of the accumulator; if `list` is empty, this is
+#    returned unchanged as the `Pass` value.
+#  - `list`: The elements which should be combined.
+export def rfoldr (combiningFn: element => accumulator => Result accumulator error): (acc: accumulator) => (list: List element) => Result accumulator error =
+    def loop acc = match _
+        Nil =
+            Pass acc
+        element, rest =
+            require Pass result =
+                loop acc rest
+            combiningFn element result
+    loop
+
 # findFail: if all the List elements are Pass return the contents else the first Fail
 #
 #   findFail (Pass 456, Pass 123, Nil) = Pass (456, 123, Nil)

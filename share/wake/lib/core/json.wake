@@ -169,3 +169,134 @@ export def x ==/ y = match x y
   (JArray a) _ = exists (_ ==/ y) a
   _ (JArray b) = exists (_ ==/ x) b
   _ _ = False
+
+# Simplify a JSON structure according to the rules given.
+# For example, Wake's implementation of JSON is more lenient than the base
+# standards, so if maximum compatibility is desired in situations where some
+# other implementation may be parsing generated output, `normalizeJSONCompat`
+# may be used to target that lowest common denominator.
+#
+# Note that the relevant normalization is applied to each member of a `JArray`
+# or `JObject` *before* the enclosing container. This means that if some
+# normalization fails anywhere in the JSON tree the entire call will fail, even
+# if the specific branch causing the failure would later have been pruned.
+export def normalizeJSONWith (fmt: JSONNormalize): (json: JValue) => Result JValue Error = match _
+    JString a =
+        getJSONNormalizeString fmt a
+        | rmap JString
+    JInteger a =
+        getJSONNormalizeInteger fmt a
+        | rmap JInteger
+    JDouble a =
+        getJSONNormalizeDouble fmt a
+        | rmap JDouble
+    JBoolean a =
+        getJSONNormalizeBoolean fmt a
+        | rmap JBoolean
+    JNull =
+        Pass JNull
+    JObject a =
+        def normalizeJObjectValue entry =
+            def Pair key value =
+                entry
+            normalizeJSONWith fmt value
+            | rmap (Pair key)
+        def normalized =
+            map normalizeJObjectValue a
+        require Pass children =
+            findFail normalized
+        children
+        | getJSONNormalizeObject fmt
+        | rmap JObject
+    JArray a =
+        def normalized =
+            map (normalizeJSONWith fmt) a
+        require Pass children =
+          findFail normalized
+        children
+        | getJSONNormalizeArray fmt
+        | rmap JArray
+
+# The rules by which `normalizeJSONWith` will simplify JSON values.
+# If any particular function is unable to operate on every input value (e.g. a
+# `JObject` contains duplicate keys of types which cannot be combined), that
+# rule may return a `Fail` which halts the broader processing.
+export tuple JSONNormalize =
+    String: String => Result String Error
+    Integer: Integer => Result Integer Error
+    Double: Double => Result Double Error
+    Boolean: Boolean => Result Boolean Error
+    Object: List (Pair String JValue) => Result (List (Pair String JValue)) Error
+    Array: List JValue => Result (List JValue) Error
+
+# A basic normalization ruleset which returns inputs unchanged.
+export def normalizeJSONIdentity: JSONNormalize =
+    JSONNormalize Pass Pass Pass Pass Pass Pass
+
+# Target the minimum JSON language described by the specifications.
+export def normalizeJSONCompat: JSONNormalize =
+    def nfkcKeys =
+        map (editPairFirst unicodeIdentifier)
+    normalizeJSONIdentity
+    | setJSONNormalizeString (Pass _.unicodeCanonical)
+    | setJSONNormalizeDouble filterNonDigitJDouble
+    | setJSONNormalizeObject (deduplicateJObjectKeys _.nfkcKeys)
+
+# Fail on any `Double` values which can't be represented numerically.
+# Published JSON specifications describe their double values as allowing decimal
+# or exponential forms, but don't implement the full IEEE standard.
+def filterNonDigitJDouble (n: Double): Result Double Error = match n.dclass
+    DoubleInfinite =
+        failWithError "For compatibility, JSON doubles should not be infinite."
+    DoubleNaN =
+        failWithError "For compatibility, JSON doubles should not be NaN values."
+    _ =
+        Pass n
+
+# Attempt to simplify any `JObject`s which contain multiple instances of a key.
+# While the published specifications explicitly allow such duplicate keys, none
+# *require* implementations to accept them nor describes the behaviour by which
+# they should be handled; therefore, implementations differ in how they handle
+# duplicate keys -- if they do so at all -- and a generator aiming for
+# compatibility shouldn't output objects with duplicate keys.
+#
+# In particular, this function will concatenate the members of two `JArray`
+# values, treat `JNull` as a wildcard placeholder, and otherwise return the
+# original value if both instances are equal. It fails if a key is associated
+# with multiple values of different types or with different values of a type
+# which cannot be combined.
+def deduplicateJObjectKeys (dict: List (Pair String JValue)): Result (List (Pair String JValue)) Error =
+    def cmpKeysOnly (Pair k1 _) (Pair k2 _) =
+        k1 <* k2
+    def simplifyKeyGroups = match _
+        Nil =
+            # `simplifyKeyGroups` is only ever mapped over the output of
+            # `groupBy`, which is always a list of *non-empty* lists.
+            failWithError "groupBy invariant reached in deduplicateJObjectKeys"
+        (Pair key value), ps =
+            (value, map getPairSecond ps)
+            | rfoldr (simplifyValues key) JNull
+            | rmap (Pair key)
+    def simplifyValues key: JValue => JValue => Result JValue Error = match _ _
+        val JNull =
+            Pass val
+        JNull acc =
+            Pass acc
+        (JString val) (JString acc) if val ==* acc =
+            Pass (JString acc)
+        (JInteger val) (JInteger acc) if val == acc =
+            Pass (JInteger acc)
+        (JDouble val) (JDouble acc) if val ==. acc =
+            Pass (JDouble acc)
+        (JBoolean val) (JBoolean acc) if enor val acc =
+            Pass (JBoolean acc)
+        (JArray val) (JArray acc) =
+            Pass (JArray (val ++ acc))
+        (JObject val) (JObject acc) =
+            val ++ acc
+            | deduplicateJObjectKeys
+            | rmap JObject
+        a b =
+            failWithError "For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type may be combined to a single value. The incompatible values of '{key}' are:\n    {formatJSON a}\n  and\n    {formatJSON b})."
+    groupBy cmpKeysOnly dict
+    | findFailFn simplifyKeyGroups
