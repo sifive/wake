@@ -25,6 +25,7 @@ export tuple Pair a b =
 
 # Defines an arrow operator as an alternate way to initialize a ``Pair``.
 from wake export def binary → = Pair
+from wake export def binary :-> = Pair
 
 # Creates a ``Triple``, a tuple containing three elements.
 export tuple Triple a b c =
