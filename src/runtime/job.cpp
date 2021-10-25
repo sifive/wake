@@ -32,6 +32,7 @@
 #include <math.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include <sstream>
 #include <iostream>
@@ -436,6 +437,9 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   imp->phys_limit = memory.get(get_physical_memory());
   memset(&imp->childrenUsage, 0, sizeof(struct RUsage));
 
+  // Double-check that ::parse() did not do something crazy.
+  assert (imp->limit > 0);
+
   std::stringstream s;
   s << "wake: targeting utilization for " << imp->limit << " threads and " << ResourceBudget::format(imp->phys_limit) << " of memory." << std::endl;
   std::string out = s.str();
@@ -493,6 +497,7 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
 
   // Calculate the maximum number of children to ever run
   imp->max_children = imp->limit * 100; // based on minimum 1% CPU utilization in Job::threads
+  if (imp->max_children < 1) imp->max_children = 1;
   if (imp->max_children > MAX_CHILDREN) imp->max_children = MAX_CHILDREN; // wake hard cap
 
   long sys_child_max = sysconf(_SC_CHILD_MAX);
