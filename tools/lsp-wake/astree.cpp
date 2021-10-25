@@ -337,8 +337,11 @@ void ASTree::fillDefinitionDocumentationFields() {
       if (lastCommentLocation.filename != definitions_iterator->location.filename) {
         comment = "";
       }
-      definitions_iterator->documentation = sanitizeComment(comment);
-      comment = "";
+      // documentation is provided for globally defined symbols
+      if (definitions_iterator->isGlobal) {
+        definitions_iterator->documentation = sanitizeComment(comment);
+        comment = "";
+      }
       ++definitions_iterator;
     } else {
       if (lastCommentLocation.filename != comments_iterator->location.filename) {
@@ -350,11 +353,15 @@ void ASTree::fillDefinitionDocumentationFields() {
     }
   }
 
-  if (definitions_iterator != definitions.end()) {
+  while (definitions_iterator != definitions.end()) {
     if (!comment.empty() && lastCommentLocation.filename != comments.back().location.filename) {
-      comment = "";
+      break;
     }
-    definitions_iterator->documentation = sanitizeComment(comment);
+    if (definitions_iterator->isGlobal) {
+      definitions_iterator->documentation = sanitizeComment(comment);
+      break;
+    }
+    ++definitions_iterator;
   }
 }
 
