@@ -28,7 +28,7 @@ class ResourceBudget {
 public:
   ResourceBudget(double percentage_ = 0) : percentage(percentage_), fixed(0) { }
 
-  uint64_t get(uint64_t max_available) const {
+  double get(uint64_t max_available) const {
     if (fixed) {
       return fixed;
     } else {
