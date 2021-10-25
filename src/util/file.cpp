@@ -64,6 +64,14 @@ void FileContent::addNewline(const uint8_t *first_column)
     newlines.push_back(first_column - ss.start);
 }
 
+static int utf8_tokens(const uint8_t *s, const uint8_t *e) {
+    int out = e - s;
+    // Don't count any 10xx xxxx characters
+    for (; s != e; ++s)
+      out -= (*s >> 6 == 2);
+    return out;
+}
+
 Coordinates FileContent::coordinates(const uint8_t *position) const
 {
     size_t offset = position - ss.start;
@@ -73,7 +81,7 @@ Coordinates FileContent::coordinates(const uint8_t *position) const
         auto it = std::upper_bound(newlines.begin(), newlines.end(), offset);
         --it; // always works, because newlines includes 0
         size_t row = 1 + (it - newlines.begin());
-        size_t col = 1 + (offset - *it);
+        size_t col = 1 + utf8_tokens(ss.start + *it, position);
         return Coordinates(row, col);
     }
 }
