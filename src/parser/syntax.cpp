@@ -265,11 +265,10 @@ const char *symbolExample(int symbol) {
     case TOKEN_OP_AND:       return "&";
     case TOKEN_OP_OR:        return "|";
     case TOKEN_OP_DOLLAR:    return "$";
-    case TOKEN_OP_LRARROW:   return "left-arrow";
-    case TOKEN_OP_EQARROW:   return "equal-arrow";
+    case TOKEN_OP_ASSIGN:    return ":=";
     case TOKEN_OP_COMMA:     return ",;";
     case TOKEN_KW_GLOBAL:    return "global";
-    case TOKEN_P_COLON:      return ":";
+    case TOKEN_P_ASCRIBE:    return ":";
     case TOKEN_KW_PUBLISH:   return "publish";
     case TOKEN_KW_DATA:      return "data";
     case TOKEN_INDENT:       return "increased-indentation";
@@ -315,7 +314,7 @@ const char *symbolExample(int symbol) {
     case CST_BINARY:         return "binary-op";
     case CST_BLOCK:          return "block";
     case CST_CASE:           return "case";
-    case CST_COLON:          return "binary-:";
+    case CST_ASCRIBE:        return "binary-:";
     case CST_DATA:           return "data";
     case CST_DEF:            return "def";
     case CST_EXPORT:         return "export";

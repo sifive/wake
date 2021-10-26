@@ -242,7 +242,7 @@ static TopFlags dst_flags(CSTElement &child) {
 
 static AST dst_type(CSTElement root) {
   switch (root.id()) {
-    case CST_COLON: {
+    case CST_ASCRIBE: {
       CSTElement child = root.firstChildNode();
       AST lhs = dst_type(child);
       child.nextSiblingNode();
@@ -549,7 +549,7 @@ static void dst_tuple(CSTElement topdef, Package &package, Symbols *globals) {
 
 static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
   switch (root.id()) {
-    case CST_COLON: {
+    case CST_ASCRIBE: {
       CSTElement child = root.firstChildNode();
       AST lhs = dst_pattern(child, guard);
       child.nextSiblingNode();
@@ -637,7 +637,7 @@ static AST dst_pattern(CSTElement root, std::vector<CSTElement> *guard) {
 
 static AST dst_def_pattern(CSTElement root) {
   switch (root.id()) {
-    case CST_COLON: {
+    case CST_ASCRIBE: {
       CSTElement child = root.firstChildNode();
       AST lhs = dst_def_pattern(child);
       child.nextSiblingNode();
@@ -1176,7 +1176,7 @@ static Expr *dst_require(CSTElement require) {
 
 static Expr *dst_expr(CSTElement expr) {
   switch (expr.id()) {
-    case CST_COLON: {
+    case CST_ASCRIBE: {
       CSTElement child = expr.firstChildNode();
       Expr *lhs = dst_expr(child);
       child.nextSiblingNode();

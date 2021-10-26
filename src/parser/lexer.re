@@ -54,17 +54,16 @@
 
     // Partition (legal) 'o' into precedence classes:
     o_dot     = [.];
+    o_quant   = [√∛∜∏⋂⨀⨂⨅⨉∐∑∫∮∱∲∳⋃⨁⨃⨄⨆⨊⨋⨍⨎⨏⨐⨑⨒⨓⨔⨕⨖⨗⨘⨙⨚⨛⨜⫿⋀⋁∀∁∃∄∎∴∵∷];
     o_exp     = [\^];
     o_muldiv  = [*/%×∙∩≀⊓⊗⊙⊛⊠⊡⋄⋅⋇⋈⋉⋊⋋⋌⋒⟐⟕⟖⟗⟡⦁⦻⦿⧆⧑⧒⧓⧔⧕⧢⨝⨯⨰⨱⨲⨳⨴⨵⨶⨷⨻⨼⨽⩀⩃⩄⩋⩍⩎÷⊘⟌⦸⦼⧶⧷⨸⫻⫽∘⊚⋆⦾⧇];
     o_addsub  = [-+~¬±∓∔∪∸∸∹∺∻≂⊌⊍⊎⊔⊕⊖⊞⊟⊹⊻⋓⧺⧻⧾⧿⨢⨣⨤⨥⨦⨧⨨⨩⨪⨫⨬⨭⨮⨹⨺⨿⩁⩂⩅⩊⩌⩏⩐⩪⩫⫬⫭⫾];
     o_compare = [∈∉∋∌∝∟∠∡∢∥∦≬⊾⊿⋔⋲⋳⋵⋶⋸⋹⋺⋻⋽⋿⍼⟊⟒⦛⦜⦝⦞⦟⦠⦡⦢⦣⦤⦥⦦⦧⦨⦩⦪⦫⦬⦭⦮⦯⦶⦷⦹⦺⩤⩥⫙⫚⫛⫝̸⫝⫡⫮⫲⫳⫴⫵⫶⫼<≤≦≨≪≮≰≲≴≶≸≺≼≾⊀⊂⊄⊆⊈⊊⊏⊑⊰⊲⊴⊷⋐⋖⋘⋚⋜⋞⋠⋢⋤⋦⋨⋪⋬⟃⟈⧀⧏⧡⩹⩻⩽⩿⪁⪃⪅⪇⪉⪋⪍⪏⪑⪓⪕⪗⪙⪛⪝⪟⪡⪣⪦⪨⪪⪬⪯⪱⪳⪵⪷⪹⪻⪽⪿⫁⫃⫅⫇⫉⫋⫍⫏⫑⫓⫕⫷⫹>≥≧≩≫≯≱≳≵≷≹≻≽≿⊁⊃⊅⊇⊉⊋⊐⊒⊱⊳⊵⊶⋑⋗⋙⋛⋝⋟⋡⋣⋥⋧⋩⋫⋭⟄⟉⧁⧐⩺⩼⩾⪀⪂⪄⪆⪈⪊⪌⪎⪐⪒⪔⪖⪘⪚⪜⪞⪠⪢⪧⪩⪫⪭⪰⪲⪴⪶⪸⪺⪼⪾⫀⫂⫄⫆⫈⫊⫌⫎⫐⫒⫔⫖⫸⫺];
-    o_inequal = [:!=≃≄≅≆≇≈≉≊≋≌≍≎≏≐≑≒≓≔≕≖≗≘≙≚≛≜≝≞≟≠≡≢≣≭⊜⋍⋕⧂⧃⧎⧣⧤⧥⧦⧧⩆⩇⩈⩉⩙⩦⩧⩨⩩⩬⩭⩮⩯⩰⩱⩲⩳⩷⩸⪤⪥⪮⫗⫘];
+    o_inequal = [!=≃≄≅≆≇≈≉≊≋≌≍≎≏≐≑≒≓≔≕≖≗≘≙≚≛≜≝≞≟≠≡≢≣≭⊜⋍⋕⧂⧃⧎⧣⧤⧥⧦⧧⩆⩇⩈⩉⩙⩦⩧⩨⩩⩬⩭⩮⩯⩰⩱⩲⩳⩷⩸⪤⪥⪮⫗⫘];
     o_and     = [&∧⊼⋏⟎⟑⨇⩑⩓⩕⩘⩚⩜⩞⩞⩟⩟⩠⩠];
     o_or      = [||∨⊽⋎⟇⟏⨈⩒⩔⩖⩗⩛⩝⩡⩢⩣];
     o_dollar  = Sc | [$♯];
-    o_lrarrow = [←↑↚⇷⇺⇽⊣⊥⟣⟥⟰⟲⟵⟸⟻⟽⤂⤆⤉⤊⤌⤎⤒⤙⤛⤝⤟⤣⤦⤧⤪⤱⤲⤴⤶⤺⤽⤾⥀⥃⥄⥆⥉⥒⥔⥖⥘⥚⥜⥞⥠⥢⥣⥪⥫⥳⥶⥷⥺⥻⥼⥾⫣⫤⫥⫨⫫⬰⬱⬲⬳⬴⬵⬶⬷⬸⬹⬺⬻⬼⬽⬾⬿⭀⭁⭂⭉⭊⭋→↓↛↠↣↦⇏⇒⇴⇶⇸⇻⇾⊢⊤⊦⊧⊨⊩⊪⊫⊬⊭⊮⊯⊺⟢⟤⟱⟳⟴⟶⟹⟼⟾⟿⤀⤁⤃⤅⤇⤈⤋⤍⤏⤐⤑⤓⤔⤕⤖⤗⤘⤚⤜⤞⤠⤤⤥⤨⤩⤭⤮⤯⤰⤳⤵⤷⤸⤹⤻⤼⤿⥁⥂⥅⥇⥓⥕⥗⥙⥛⥝⥟⥡⥤⥥⥬⥭⥰⥱⥲⥴⥵⥸⥹⥽⥿⧴⫢⫦⫧⫪⭃⭄⭇⭈⭌];
-    o_eqarrow = [↔↮⇎⇔⇵⇹⇼⇿⟚⟛⟠⟷⟺⤄⤡⤢⤫⤬⥈⥊⥋⥌⥍⥎⥏⥐⥑⥦⥧⥨⥩⥮⥯⫩];
-    o_quant   = [√∛∜∏⋂⨀⨂⨅⨉∐∑∫∮∱∲∳⋃⨁⨃⨄⨆⨊⨋⨍⨎⨏⨐⨑⨒⨓⨔⨕⨖⨗⨘⨙⨚⨛⨜⫿⋀⋁∀∁∃∄∎∴∵∷];
+    o_assign  = [:←↑↚⇷⇺⇽⊣⊥⟣⟥⟰⟲⟵⟸⟻⟽⤂⤆⤉⤊⤌⤎⤒⤙⤛⤝⤟⤣⤦⤧⤪⤱⤲⤴⤶⤺⤽⤾⥀⥃⥄⥆⥉⥒⥔⥖⥘⥚⥜⥞⥠⥢⥣⥪⥫⥳⥶⥷⥺⥻⥼⥾⫣⫤⫥⫨⫫⬰⬱⬲⬳⬴⬵⬶⬷⬸⬹⬺⬻⬼⬽⬾⬿⭀⭁⭂⭉⭊⭋→↓↛↠↣↦⇏⇒⇴⇶⇸⇻⇾⊢⊤⊦⊧⊨⊩⊪⊫⊬⊭⊮⊯⊺⟢⟤⟱⟳⟴⟶⟹⟼⟾⟿⤀⤁⤃⤅⤇⤈⤋⤍⤏⤐⤑⤓⤔⤕⤖⤗⤘⤚⤜⤞⤠⤤⤥⤨⤩⤭⤮⤯⤰⤳⤵⤷⤸⤹⤻⤼⤿⥁⥂⥅⥇⥓⥕⥗⥙⥛⥝⥟⥡⥤⥥⥬⥭⥰⥱⥲⥴⥵⥸⥹⥽⥿⧴⫢⫦⫧⫪⭃⭄⭇⭈⭌↔↮⇎⇔⇵⇹⇼⇿⟚⟛⟠⟷⟺⤄⤡⤢⤫⤬⥈⥊⥋⥌⥍⥎⥏⥐⥑⥦⥧⥨⥩⥮⥯⫩];
     o_comma   = [,;];
 
     // Legal whitespace categories
@@ -118,7 +117,7 @@ LexerOutput lex_wake(const uint8_t *s, const uint8_t *e) {
         // All special punctuation
         "\\" { return LexerOutput(TOKEN_P_BSLASH, s); }
         "="  { return LexerOutput(TOKEN_P_EQUALS, s); }
-        ":"  { return LexerOutput(TOKEN_P_COLON,  s); }
+        ":"  { return LexerOutput(TOKEN_P_ASCRIBE,s); }
         "("  { return LexerOutput(TOKEN_P_POPEN,  s); }
         ")"  { return LexerOutput(TOKEN_P_PCLOSE, s); }
         "{"  { return LexerOutput(TOKEN_P_BOPEN,  s); }
@@ -138,8 +137,7 @@ LexerOutput lex_wake(const uint8_t *s, const uint8_t *e) {
         o_and     o* { return LexerOutput(TOKEN_OP_AND,     s); }
         o_or      o* { return LexerOutput(TOKEN_OP_OR,      s); }
         o_dollar  o* { return LexerOutput(TOKEN_OP_DOLLAR,  s); }
-        o_lrarrow o* { return LexerOutput(TOKEN_OP_LRARROW, s); }
-        o_eqarrow o* { return LexerOutput(TOKEN_OP_EQARROW, s); }
+        o_assign  o* { return LexerOutput(TOKEN_OP_ASSIGN,  s); }
         o_comma   o* { return LexerOutput(TOKEN_OP_COMMA,   s); }
 
         // Double literals
@@ -406,20 +404,19 @@ op_type op_precedence(const uint8_t *s, const uint8_t *e) {
     const uint8_t *m;
 
     /*!re2c
-        o_dot     { return op_type(15, 1); }
-        l         { return op_type(14, 1); }
-        o_quant   { return op_type(13, 1); }
-        o_exp     { return op_type(12, 0); }
-        o_muldiv  { return op_type(11, 1); }
-        o_addsub  { return op_type(10, 1); }
-        o_compare { return op_type( 9, 1); }
-        o_inequal { return op_type( 8, 0); }
-        o_and     { return op_type( 7, 1); }
-        o_or      { return op_type( 6, 1); }
-        o_dollar  { return op_type( 5, 0); }
-        ":"       { return op_type( 4, 0); }
-        o_lrarrow { return op_type( 3, 1); }
-        o_eqarrow { return op_type( 2, 0); }
+        o_dot     { return op_type(14, 1); }
+        l         { return op_type(13, 1); }
+        o_quant   { return op_type(12, 1); }
+        o_exp     { return op_type(11, 0); }
+        o_muldiv  { return op_type(10, 1); }
+        o_addsub  { return op_type( 9, 1); }
+        o_compare { return op_type( 8, 1); }
+        o_inequal { return op_type( 7, 0); }
+        o_and     { return op_type( 6, 1); }
+        o_or      { return op_type( 5, 1); }
+        o_dollar  { return op_type( 4, 0); }
+        ":"       { return op_type( 3, 0); }
+        o_assign  { return op_type( 2, 0); }
         o_comma   { return op_type( 1, 0); }
 
         *         { return op_type(-1, -1); }
