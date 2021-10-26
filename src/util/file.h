@@ -33,7 +33,9 @@ public:
     FileContent(FileContent &&o);
     FileContent &operator = (FileContent &&o);
 
+    // position points to any byte of the codepoint
     Coordinates coordinates(const uint8_t *position) const;
+
     void clearNewLines();
     void addNewline(const uint8_t *first_column);
 
