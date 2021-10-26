@@ -159,7 +159,7 @@ function render(root) {
 
 function program(node) {
   let h2 = document.createElement('h2');
-  h2.innerHTML = node.filename || '---';
+  h2.appendChild(document.createTextNode(node.filename || '---'));
   let pre = document.createElement('pre');
   pre.appendChild(render(node));
   let res = document.createElement('div');

@@ -332,7 +332,7 @@ int main(int argc, char **argv) {
   }
 
   // Arguments are forbidden with these options
-  bool noargs = init || last || failed || html || global || exports || api || exec;
+  bool noargs = init || job || last || failed || tagdag || html || global || exports || api || exec;
   bool targets = argc == 1 && !noargs;
 
   bool nodb = init;
@@ -566,10 +566,11 @@ int main(int argc, char **argv) {
   if (notype) return (ok && !terminalReporter.errors)?0:1;
 
   /* Setup logging streams */
-  if (debug   && !fd1) fd1 = "debug,info,echo,report,warning,error";
-  if (verbose && !fd1) fd1 = "info,echo,report,warning,error";
-  if (quiet   && !fd1) fd1 = "error";
-  if (!tty    && !fd1) fd1 = "echo,report,warning,error";
+  if (noexecute && !fd1) fd1 = "error";
+  if (debug     && !fd1) fd1 = "debug,info,echo,report,warning,error";
+  if (verbose   && !fd1) fd1 = "info,echo,report,warning,error";
+  if (quiet     && !fd1) fd1 = "error";
+  if (!tty      && !fd1) fd1 = "echo,report,warning,error";
   if (!fd1) fd1 = "report,warning,error";
   if (!fd2) fd2 = "error";
 
@@ -596,7 +597,7 @@ int main(int argc, char **argv) {
   }
 
   if (tcheck) std::cout << root.get();
-  if (html) markup_html(std::cout, root.get());
+  if (html) markup_html(libdir, std::cout, root.get());
 
   if (api) {
     std::vector<std::string> mixed(types.begin(), types.end());
