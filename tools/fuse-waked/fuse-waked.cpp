@@ -1536,6 +1536,7 @@ int main(int argc, char *argv[])
 	pid_t pid;
 	int log, null;
 	bool madedir;
+	struct rlimit rlim;
 
 	if (argc != 3) {
 		fprintf(stderr, "Syntax: fuse-waked <mount-point> <min-timeout-seconds>\n");
@@ -1576,6 +1577,23 @@ int main(int argc, char *argv[])
 	madedir = mkdir(path.c_str(), 0775) == 0;
 	if (!madedir && errno != EEXIST) {
 		fprintf(stderr, "mkdir %s: %s\n", path.c_str(), strerror(errno));
+		goto rmroot;
+	}
+
+	if (getrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+		fprintf(stderr, "getrlimit(RLIMIT_NOFILE): %s\n", strerror(errno));
+		goto rmroot;
+	}
+
+	rlim.rlim_cur = rlim.rlim_max;
+#ifdef __APPLE__
+	// Work around OS/X's misreporting of rlim_max ulimited
+	if (rlim.rlim_cur > 20480)
+		rlim.rlim_cur = 20480;
+#endif
+
+	if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+		fprintf(stderr, "setrlimit(RLIMIT_NOFILE, cur=max): %s\n", strerror(errno));
 		goto rmroot;
 	}
 
