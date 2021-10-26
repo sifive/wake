@@ -81,7 +81,9 @@ Coordinates FileContent::coordinates(const uint8_t *position) const
         auto it = std::upper_bound(newlines.begin(), newlines.end(), offset);
         --it; // always works, because newlines includes 0
         size_t row = 1 + (it - newlines.begin());
-        size_t col = 1 + utf8_tokens(ss.start + *it, position);
+        // If position points to the first byte of a codepoint, position+1 increases col to include it
+        // If position points to any other byte of a codepoint, position+1 includes an ignored '10xx xxxx'
+        size_t col = utf8_tokens(ss.start + *it, position+1);
         return Coordinates(row, col);
     }
 }

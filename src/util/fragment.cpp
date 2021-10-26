@@ -18,6 +18,7 @@
 #include "fragment.h"
 
 Location FileFragment::location() const {
+    // end-1 puts end1 on a byte within the last included codepoint
     uint32_t end1 = end!=start?end-1:end;
     return Location(
         content->filename(),
