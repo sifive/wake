@@ -30,10 +30,10 @@
 
 #define CST_APP		128
 #define CST_ARITY	129
-#define CST_BINARY	130
-#define CST_BLOCK	131
-#define CST_CASE	132
-#define CST_COLON	133
+#define CST_ASCRIBE	130
+#define CST_BINARY	131
+#define CST_BLOCK	132
+#define CST_CASE	133
 #define CST_DATA	134
 #define CST_DEF		135
 #define CST_EXPORT	136

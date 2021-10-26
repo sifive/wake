@@ -109,8 +109,7 @@ idop(R) ::= OP_INEQUAL(k). { R = 1; add(CST_OP, k); }
 idop(R) ::= OP_AND(k).     { R = 1; add(CST_OP, k); }
 idop(R) ::= OP_OR(k).      { R = 1; add(CST_OP, k); }
 idop(R) ::= OP_DOLLAR(k).  { R = 1; add(CST_OP, k); }
-idop(R) ::= OP_LRARROW(k). { R = 1; add(CST_OP, k); }
-idop(R) ::= OP_EQARROW(k). { R = 1; add(CST_OP, k); }
+idop(R) ::= OP_ASSIGN(k).  { R = 1; add(CST_OP, k); }
 idop(R) ::= OP_COMMA(k).   { R = 1; add(CST_OP, k); }
 
 global(R) ::= .             { R = 0; }
@@ -118,12 +117,12 @@ global(R) ::= KW_GLOBAL(k). { R = 1; add(CST_FLAG_GLOBAL, k); }
 export(R) ::= .             { R = 0; }
 export(R) ::= KW_EXPORT(k). { R = 1; add(CST_FLAG_EXPORT, k); }
  
-topdef(R) ::= global(G) export(E) KW_TOPIC                           NL(e). { R = 0; pop(G+E); fail("keyword 'topic' must be followed by a topic name", e); }
-topdef(R) ::= global(G) export(E) KW_TOPIC                     error NL.    { R = 0; pop(G+E); }
-topdef(R) ::= global(G) export(E) KW_TOPIC(b) id(I)                  NL(e). { R = 1; add(CST_ERROR, e); add(CST_TOPIC, b, G+E+I+1, e); fail("topics must be followed by an ': type'", e); }
-topdef(R) ::= global(G) export(E) KW_TOPIC(b) id(I)            error NL(e). { R = 1; add(CST_ERROR, e); add(CST_TOPIC, b, G+E+I+1, e); }
-topdef(R) ::= global(G) export(E) KW_TOPIC(b) id(I) P_COLON          NL(e). { R = 1; add(CST_ERROR, e); add(CST_TOPIC, b, G+E+I+1, e); fail("topics must be followed by an ': type'", e); }
-topdef(R) ::= global(G) export(E) KW_TOPIC(b) id(I) P_COLON type(T)  NL(e). { R = 1;                    add(CST_TOPIC, b, G+E+I+T, e); }
+topdef(R) ::= global(G) export(E) KW_TOPIC                             NL(e). { R = 0; pop(G+E); fail("keyword 'topic' must be followed by a topic name", e); }
+topdef(R) ::= global(G) export(E) KW_TOPIC                       error NL.    { R = 0; pop(G+E); }
+topdef(R) ::= global(G) export(E) KW_TOPIC(b) id(I)                    NL(e). { R = 1; add(CST_ERROR, e); add(CST_TOPIC, b, G+E+I+1, e); fail("topics must be followed by an ': type'", e); }
+topdef(R) ::= global(G) export(E) KW_TOPIC(b) id(I)              error NL(e). { R = 1; add(CST_ERROR, e); add(CST_TOPIC, b, G+E+I+1, e); }
+topdef(R) ::= global(G) export(E) KW_TOPIC(b) id(I) P_ASCRIBE          NL(e). { R = 1; add(CST_ERROR, e); add(CST_TOPIC, b, G+E+I+1, e); fail("topics must be followed by an ': type'", e); }
+topdef(R) ::= global(G) export(E) KW_TOPIC(b) id(I) P_ASCRIBE type(T)  NL(e). { R = 1;                    add(CST_TOPIC, b, G+E+I+T, e); }
 
 topdef(R) ::= KW_PUBLISH                                NL(e). { R = 0; fail("keyword 'publish' must be followed by a topic name", e); }
 topdef(R) ::= KW_PUBLISH                          error NL.    { R = 0; }
@@ -217,11 +216,10 @@ RE($1, OP_INEQUAL, inequal, compare)     dnl x => !y => !z       x => ((!y) => (
 LE($1, OP_AND,     and,     inequal)     dnl x & & y & & z       (x & (&y)) & (&z)
 LE($1, OP_OR,      or,      and)         dnl x | | y | | z       (x | (|y)) | (|z)
 RE($1, OP_DOLLAR,  dollar,  or)          dnl x $ $ y $ $ z       x $ (($y) $ ($z))
-$1_binary_colon(R) ::= $1_binary_dollar(A) P_COLON $1_binary_colon(B). { R = 1; add(CST_COLON, A+B); }
-$1_binary_colon(R) ::= $1_binary_dollar(U).                            { R = U; }
-LE($1, OP_LRARROW, lrarrow, colon)       dnl as compare
-RE($1, OP_EQARROW, eqarrow, lrarrow)     dnl as inequal
-RO($1, OP_COMMA,   comma,   eqarrow)     dnl x , , y , , z       (x,), ((y,), z)
+$1_binary_ascribe(R) ::= $1_binary_dollar(A) P_ASCRIBE $1_binary_ascribe(B). { R = 1; add(CST_ASCRIBE, A+B); }
+$1_binary_ascribe(R) ::= $1_binary_dollar(U).                                { R = U; }
+LE($1, OP_ASSIGN,  assign,  ascribe)     dnl x := :y := :z       x := ((:y) := (:z))
+RO($1, OP_COMMA,   comma,   assign)      dnl x , , y , , z       (x,), ((y,), z)
 )
 
 OPCHAIN(expression)
