@@ -58,14 +58,10 @@
         "vscode-languageclient": "^7.0.0"
     },
     "devDependencies": {
-        "@types/mocha": "^8.2.2",
-        "@types/node": "^15.14.0",
+        "@types/node": "^15.14.9",
         "@types/vscode": "^1.52.0",
-        "@typescript-eslint/eslint-plugin": "^4.23.0",
-        "@typescript-eslint/parser": "^4.23.0",
-        "eslint": "^7.26.0",
-        "mocha": "^8.3.2",
-        "typescript": "^4.3.2"
+        "eslint": "^7.32.0",
+        "typescript": "^4.4.4"
     },
     "license": "Apache-2.0",
     "main": "./lsp-client/out/extension",
@@ -91,7 +87,7 @@
     },
     "bugs": {
         "url": "https://github.com/sifive/wake/issues"
-      },
+    },
     "scripts": {
         "compile": "tsc -b",
         "vscode:prepublish": "npm run compile",
