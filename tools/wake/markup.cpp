@@ -45,17 +45,28 @@ struct ParanOrder {
 
 struct JSONRender {
   typedef std::set<Expr*, ParanOrder> ESet;
+  std::string libdir;
   std::vector<std::unique_ptr<Expr> > defs;
   std::ostream &os;
   ESet eset;
   ESet::iterator it;
 
-  JSONRender(std::ostream &os_) : os(os_) { }
+  JSONRender(const std::string &libdir_, std::ostream &os_) : libdir(libdir_), os(os_) { }
 
+  std::string filename(const FileFragment &frag) const;
   void explore(Expr *expr);
   void dump();
   void render(Expr *root);
 };
+
+std::string JSONRender::filename(const FileFragment &frag) const {
+  const char *filename = frag.filename();
+  if (libdir.compare(0, libdir.size(), filename, libdir.size()) == 0 && filename[libdir.size()] == '/') {
+    return json_escape(std::string("<stdlib>") + (filename + libdir.size()));
+  } else {
+    return json_escape(frag.filename());
+  }
+}
 
 void JSONRender::explore(Expr *expr) {
   if (!expr->fragment.empty() && (expr->flags & FLAG_AST) != 0)
@@ -132,7 +143,7 @@ void JSONRender::dump() {
     FileFragment target = ref->target;
     if (!target.empty()) {
       os
-        << ",\"target\":{\"filename\":\"" << json_escape(target.filename())
+        << ",\"target\":{\"filename\":\"" << filename(target)
         << "\",\"range\":[" << target.startByte()
         << "," << target.endByte()
         << "]}";
@@ -162,17 +173,17 @@ void JSONRender::render(Expr *root) {
   os << "{\"type\":\"Workspace\",\"body\":[";
   bool comma = false;
   while (it != eset.end()) {
-    const char *filename = (*it)->fragment.filename();
-    StringSegment content = (*it)->fragment.fcontent()->segment();
+    FileFragment fragment = (*it)->fragment;
+    StringSegment content = fragment.fcontent()->segment();
     if (comma) os << ",";
     comma = true;
     os
-      << "{\"type\":\"Program\",\"filename\":\"" << json_escape(filename)
+      << "{\"type\":\"Program\",\"filename\":\"" << filename(fragment)
       << "\",\"range\":[0," << content.size()
       << "],\"source\":\"" << json_escape(content.str())
       << "\",\"body\":[";
     bool comma = false;
-    while (it != eset.end() && (*it)->fragment.filename() == filename) {
+    while (it != eset.end() && (*it)->fragment.filename() == fragment.filename()) {
       if (comma) os << ",";
       comma = true;
       dump();
@@ -181,11 +192,12 @@ void JSONRender::render(Expr *root) {
   }
   os << "]}";
 }
-void markup_json(std::ostream &os, Expr *root) {
-  JSONRender(os).render(root);
+
+void markup_json(const std::string &libdir, std::ostream &os, Expr *root) {
+  JSONRender(libdir, os).render(root);
 }
 
-void markup_html(std::ostream &os, Expr *root) {
+void markup_html(const std::string &libdir, std::ostream &os, Expr *root) {
   std::ifstream style(find_execpath() + "/../share/wake/html/style.css");
   std::ifstream utf8(find_execpath() + "/../share/wake/html/utf8.js");
   std::ifstream main(find_execpath() + "/../share/wake/html/main.js");
@@ -200,7 +212,7 @@ void markup_html(std::ostream &os, Expr *root) {
   os << main.rdbuf();
   os << "</script>" << std::endl;
   os << "<script type=\"wake\">";
-  JSONRender(os).render(root);
+  JSONRender(libdir, os).render(root);
   os << "</script>" << std::endl;
 }
 

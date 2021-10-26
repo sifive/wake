@@ -597,7 +597,7 @@ int main(int argc, char **argv) {
   }
 
   if (tcheck) std::cout << root.get();
-  if (html) markup_html(std::cout, root.get());
+  if (html) markup_html(libdir, std::cout, root.get());
 
   if (api) {
     std::vector<std::string> mixed(types.begin(), types.end());
