@@ -21,6 +21,8 @@
 
 #include <string.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include <fstream>
 #include <iostream>
@@ -54,6 +56,7 @@ void Profile::report(const char *file, const std::string &command) const {
   if (file) {
     std::ofstream f(file, std::ios_base::trunc);
     if (!f.fail()) {
+      chmod(file, 0644);
       f << "<meta charset=\"UTF-8\">" << std::endl;
       f << "<style type=\"application/json\" id=\"dataset\">";
       dump_tree(f, command + ": command-line", this);
