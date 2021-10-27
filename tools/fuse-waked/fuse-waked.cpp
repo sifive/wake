@@ -625,10 +625,20 @@ static int wakefuse_mkdir(const char *path, mode_t mode)
 	if (it->second.is_visible(key.second))
 		return -EEXIST;
 
-	if (!it->second.is_writeable(key.second))
-		(void)deep_unlink(context.rootfd, key.second.c_str());
+	bool create_new = !it->second.is_writeable(key.second);
+	if (create_new) {
+		// Remove any file or link that might be in the way
+		int res = unlinkat(context.rootfd, key.second.c_str(), 0);
+		if (res == -1 && errno != EPERM && errno != ENOENT && errno != EISDIR)
+			return -errno;
+	}
 
 	int res = mkdirat(context.rootfd, key.second.c_str(), mode);
+
+	// If a directory already exists, change permissions and claim it
+	if (create_new && res == -1 && (errno == EEXIST || errno == EISDIR))
+		res = fchmodat(context.rootfd, key.second.c_str(), mode, 0);
+
 	if (res == -1)
 		return -errno;
 
