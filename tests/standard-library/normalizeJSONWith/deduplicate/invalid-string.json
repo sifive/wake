@@ -1,0 +1,8 @@
+{
+    "wrap": [
+        {
+            "string": "test 1",
+            "string": "test 2"
+        }
+    ]
+}

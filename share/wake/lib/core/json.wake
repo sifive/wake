@@ -170,6 +170,9 @@ export def x ==/ y = match x y
   _ (JArray b) = exists (_ ==/ x) b
   _ _ = False
 
+export def normalizeJSON: (json: JValue) => Result JValue Error =
+    normalizeJSONWith normalizeJSONCompat
+
 # Simplify a JSON structure according to the rules given.
 # For example, Wake's implementation of JSON is more lenient than the base
 # standards, so if maximum compatibility is desired in situations where some
@@ -181,50 +184,61 @@ export def x ==/ y = match x y
 # normalization fails anywhere in the JSON tree the entire call will fail, even
 # if the specific branch causing the failure would later have been pruned.
 export def normalizeJSONWith (fmt: JSONNormalize) (json: JValue): Result JValue Error =
-    def normalizeJSON (path: String) = match _
+    def normalized = match json
         JString a =
             getJSONNormalizeString fmt a
             | rmap JString
-            | addErrorContext path
         JInteger a =
             getJSONNormalizeInteger fmt a
             | rmap JInteger
-            | addErrorContext path
         JDouble a =
             getJSONNormalizeDouble fmt a
             | rmap JDouble
-            | addErrorContext path
         JBoolean a =
             getJSONNormalizeBoolean fmt a
             | rmap JBoolean
-            | addErrorContext path
         JNull =
             Pass JNull
         JObject a =
             def normalizeJObjectValue entry =
                 def Pair key value =
                     entry
-                normalizeJSON "{path}/{key}" value
-                | rmap (Pair key)
-            def normalized =
+                def normalized =
+                    normalizeJSONWith fmt value
+                match normalized
+                    (Pass norm)  = Pass (Pair key norm)
+                    (Fail error) = addJSONErrorPath key error
+            def normalizedList =
                 map normalizeJObjectValue a
             require Pass children =
-                findFail normalized
+                findFail normalizedList
             children
             | getJSONNormalizeObject fmt
             | rmap JObject
-            | addErrorContext path
         JArray a =
-            def normalized =
+            def recurseArray (Pair i x) =
+                normalizeJSONWith fmt x
+                | rmapFail (addJSONErrorPath "[{str i}]")
+            require Pass normalized =
                 zip (seq a.len) a
-                | map (\(Pair i x) normalizeJSON "{path}/[{format i}]" x)
-            require Pass children =
-                findFail normalized
-            children
+                | findFailFn recurseArray
+            normalized
             | getJSONNormalizeArray fmt
             | rmap JArray
-            | addErrorContext path
-    normalizeJSON "" json
+    normalized
+    | rmapFail (addJSONErrorPath "")
+
+def addJSONErrorPath node error =
+    def prependNode cause =
+        if matches `/:.*` cause then
+            replace `^/` "/{node}" cause
+        else if matches `/.*` cause && strlen node == 0 then
+            cause
+        else
+            "/{node}{cause}"
+    error
+    | editErrorCause prependNode
+    | Fail
 
 # The rules by which `normalizeJSONWith` will simplify JSON values.
 # If any particular function is unable to operate on every input value (e.g. a
@@ -256,9 +270,9 @@ export def normalizeJSONCompat: JSONNormalize =
 # or exponential forms, but don't implement the full IEEE standard.
 def filterNonDigitJDouble (n: Double): Result Double Error = match n.dclass
     DoubleInfinite =
-        failWithError "For compatibility, JSON doubles should not be infinite."
+        failWithError ": For compatibility, JSON doubles should not be infinite."
     DoubleNaN =
-        failWithError "For compatibility, JSON doubles should not be NaN values."
+        failWithError ": For compatibility, JSON doubles should not be NaN values."
     _ =
         Pass n
 
@@ -305,7 +319,8 @@ def deduplicateJObjectKeys (dict: List (Pair String JValue)): Result (List (Pair
             val ++ acc
             | deduplicateJObjectKeys
             | rmap JObject
+            | rmapFail (addJSONErrorPath key)
         a b =
-            failWithError "For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type may be combined to a single value. The incompatible values of '{key}' are:\n    {formatJSON a}\n  and\n    {formatJSON b})."
+            failWithError ": For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type may be combined to a single value. The incompatible values of '{key}' are:\n    {formatJSON a}\n  and\n    {formatJSON b}"
     groupBy cmpKeysOnly dict
     | findFailFn simplifyKeyGroups

@@ -1,0 +1,28 @@
+package test_wake_json
+
+from wake import _
+
+export def jsonTest (normalization: JSONNormalize) (inputs: List String): Result Unit Error =
+    findFailFn (test normalization) inputs
+    | rmap (\_ Unit)
+
+def test (normalization: JSONNormalize) (input: String): Result Unit Error =
+    require Pass inputPath =
+        # There doesn't seem to be an easy way to get `source` to recognize the
+        # input file, so claim it instead.
+        claimFileAsPath input "build/claimed-json/{input}"
+        | getPathResult
+    require Pass json =
+        parseJSONFile inputPath
+    def normalizedResult =
+        normalizeJSONWith normalization json
+    match normalizedResult
+        Pass normalized =
+            normalized
+            | formatJSON
+            | println
+            | Pass
+        Fail err =
+            err.getErrorCause
+            | printlnLevel logError
+            | Pass

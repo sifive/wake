@@ -23,4 +23,5 @@ ln -s whatever goodLink
 "${1:-wake}" -v test
 "${1:-wake}" -v test
 
+rm -f datFile badLink goodLink .fuse.log
 echo "Symlinks work!"
