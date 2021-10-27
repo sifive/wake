@@ -131,3 +131,37 @@ export def write (path: String) (content: String): Path =
     def spath = simplify path
     def parent = simplify "{spath}/.."
     writeImp (mkdir parent, Nil) 0644 spath content
+
+# Remove any leading directories from `file`.
+#
+# Parameters:
+#  - `file`: The filename to simplify
+#
+# Guarantees:
+#  - The resulting String contains no '/'s
+#
+# ```
+# basename "abc/def"  = "def"
+# basename "/foo/bar" = "bar"
+# basename "/foo"     = "foo"
+# basename "foo-bar"  = "foo-bar"
+# ```
+export def basename (file: String): String =
+    replace `^.*/` '' file
+
+# Extract the directory name from `file`.
+#
+# Parameters:
+#  - `file`: The filename to simplify
+#
+# Guarantees:
+#  - The resulting String is non-empty
+#
+# ```
+# dirname "foo/bar"  = "foo"
+# dirname "bar"      = "."
+# dirname "/bar"     = "/"
+# dirname "/foo/bar" = /foo"
+# ```
+export def dirname (file: String): String =
+    simplify "{file}/.."

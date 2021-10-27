@@ -49,9 +49,9 @@ def raw_source file =
         | getJobOutput
 
 export def source (file: String): Path =
-    def basename = replace `^.*/` '' file
-    def dirname = simplify "{file}/.."
-    match (sources dirname basename.quote)
+    def base = basename file
+    def dir = dirname file
+    match (sources dir base.quote)
         Nil = makeBadPath "{file}: not a source file".makeError
         x, Nil = x
         _ = unreachable "a quoted RegExp can never match more than one distinct String"
