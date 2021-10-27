@@ -170,6 +170,15 @@ export def x ==/ y = match x y
   _ (JArray b) = exists (_ ==/ x) b
   _ _ = False
 
+# Simplify a JSON structure for broad compatibility as defined by the specs.
+# While doing so is unnecessary where Wake is always used to consume any
+# generated file, in environments where output may be passed to a different tool
+# (especially when that tool is not known at the time of generation, e.g., in a
+# web service) this can be helpful to prevent failures and/or undefined behavior
+# in the downstream clients.
+#
+# This is equivalent to calling `normalizeJSONWith` using the rules defined by
+# `normalizeJSONCompat`.
 export def normalizeJSON: (json: JValue) => Result JValue Error =
     normalizeJSONWith normalizeJSONCompat
 
@@ -177,7 +186,8 @@ export def normalizeJSON: (json: JValue) => Result JValue Error =
 # For example, Wake's implementation of JSON is more lenient than the base
 # standards, so if maximum compatibility is desired in situations where some
 # other implementation may be parsing generated output, `normalizeJSONCompat`
-# may be used to target that lowest common denominator.
+# may be used to target that lowest common denominator (see `normalizeJSON` for
+# that particular case).
 #
 # Note that the relevant normalization is applied to each member of a `JArray`
 # or `JObject` *before* the enclosing container. This means that if some
@@ -228,14 +238,25 @@ export def normalizeJSONWith (fmt: JSONNormalize) (json: JValue): Result JValue 
     normalized
     | rmapFail (addJSONErrorPath "")
 
-def addJSONErrorPath node error =
+# Prepend the given path segment to an error message, to be called by `rmapFail`.
+# This is meant to be called bottom-up, with the inner-most object/array passing
+# the key/index followed by its parent, etc.
+#
+# Parameters:
+#  - `node`: The path segment to prepend, without any leading or trailing
+#     separator. The root node should pass the empty string `""`.
+#  - `error`: The report which should be annotated with path info.
+def addJSONErrorPath (node: String) (error: Error): Result a Error =
     def prependNode cause =
         if matches `/:.*` cause then
             replace `^/` "/{node}" cause
-        else if matches `/.*` cause && strlen node == 0 then
-            cause
-        else
+        else if matches `/.*` cause then
+            if strlen node == 0 then
+                cause
+            else
             "/{node}{cause}"
+        else
+            "/{node}: {cause}"
     error
     | editErrorCause prependNode
     | Fail
@@ -270,9 +291,9 @@ export def normalizeJSONCompat: JSONNormalize =
 # or exponential forms, but don't implement the full IEEE standard.
 def filterNonDigitJDouble (n: Double): Result Double Error = match n.dclass
     DoubleInfinite =
-        failWithError ": For compatibility, JSON doubles should not be infinite."
+        failWithError "For compatibility, JSON doubles should not be infinite."
     DoubleNaN =
-        failWithError ": For compatibility, JSON doubles should not be NaN values."
+        failWithError "For compatibility, JSON doubles should not be NaN values."
     _ =
         Pass n
 
@@ -381,13 +402,13 @@ def deduplicateJObjectKeys (dict: List (Pair String JValue)): Result (List (Pair
                 | JArray
                 | Pass
             _ _ _ _ _ _ _ =
-                failWithError ": For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, values of different types may not be combined. The incompatible values are: {formatExamples values}"
+                failWithError "For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, values of different types may not be combined. The incompatible values are: {formatExamples values}"
     def requireEqual eqFn wrapFn values =
         def eqOrFail x y =
             if eqFn x y then
                 Pass x
             else
-                failWithError ": For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type can combine multiple different values. The incompatible values are: {map wrapFn values | formatExamples}"
+                failWithError "For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type can combine multiple different values. The incompatible values are: {map wrapFn values | formatExamples}"
         match values
             v1, v2, vs =
                 rfoldl eqOrFail v1 (v2, vs)
