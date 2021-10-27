@@ -519,9 +519,9 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
           ),
           Nil
         )
-        match (pmkdir 0775 ".build")
+        match (pmkdir 0755 ".build")
           Fail f = Pair (Fail (makeError f)) ""
-          Pass build = match (pwrite 0664 "{build}/{prefix}.in.json" (prettyJSON json))
+          Pass build = match (pwrite 0644 "{build}/{prefix}.in.json" (prettyJSON json))
             Fail f = Pair (Fail (makeError f)) ""
             Pass inFile =
               def outFile = "{build}/{prefix}.out.json"
