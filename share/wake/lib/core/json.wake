@@ -291,36 +291,114 @@ def filterNonDigitJDouble (n: Double): Result Double Error = match n.dclass
 def deduplicateJObjectKeys (dict: List (Pair String JValue)): Result (List (Pair String JValue)) Error =
     def cmpKeysOnly (Pair k1 _) (Pair k2 _) =
         k1 <* k2
-    def simplifyKeyGroups = match _
-        Nil =
-            # `simplifyKeyGroups` is only ever mapped over the output of
-            # `groupBy`, which is always a list of *non-empty* lists.
-            failWithError "groupBy invariant reached in deduplicateJObjectKeys"
-        (Pair key value), ps =
-            (value, map getPairSecond ps)
-            | rfoldr (simplifyValues key) JNull
-            | rmap (Pair key)
-    def simplifyValues key: JValue => JValue => Result JValue Error = match _ _
-        val JNull =
-            Pass val
-        JNull acc =
-            Pass acc
-        (JString val) (JString acc) if val ==* acc =
-            Pass (JString acc)
-        (JInteger val) (JInteger acc) if val == acc =
-            Pass (JInteger acc)
-        (JDouble val) (JDouble acc) if val ==. acc =
-            Pass (JDouble acc)
-        (JBoolean val) (JBoolean acc) if enor val acc =
-            Pass (JBoolean acc)
-        (JArray val) (JArray acc) =
-            Pass (JArray (val ++ acc))
-        (JObject val) (JObject acc) =
-            val ++ acc
-            | deduplicateJObjectKeys
-            | rmap JObject
-            | rmapFail (addJSONErrorPath key)
-        a b =
-            failWithError ": For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type may be combined to a single value. The incompatible values of '{key}' are:\n    {formatJSON a}\n  and\n    {formatJSON b}"
+    def simplifyKeyGroup (pairs: List (Pair String JValue)): Result (Pair String JValue) Error =
+        match pairs
+            Nil =
+                # `simplifyKeyGroups` is only ever mapped over the output of
+                # `groupBy`, which is always a list of *non-empty* lists.
+                unreachable "groupBy invariant reached in deduplicateJObjectKeys simplification"
+            (Pair key value), ps =
+                def simplified =
+                    (value, map getPairSecond ps: List JValue)
+                    | simplifyValues
+                match simplified
+                    (Pass value) = Pass (Pair key value)
+                    (Fail error) = addJSONErrorPath key error
+    def simplifyValues (values: List JValue): Result JValue Error =
+        match values
+            v, Nil = Pass v
+            _      = simplifyValueList values
+    # This function assumes `values` is never an empty list.
+    def simplifyValueList (values: List JValue): Result JValue Error =
+        def (nullTest; stringTest; intTest; doubleTest; boolTest; objectTest; arrayTest) =
+            # We filter out `JNull` values for most types as being a "wildcard"
+            # value, but if *everything* is a `JNull` we do want to return that.
+            def isNull = match _
+                JNull = True
+                _     = False
+            def allNull =
+                forall isNull values
+            def nonNullValues =
+                filter (! _.isNull) values
+            # The `getJ*` functions also return `Some` for single-element arrays
+            # of the proper type, but we don't want that fallback when merging.
+            def anyArray =
+                exists (_.getJArray | isSome) values
+            match allNull anyArray
+                True _ =
+                    Some values; None; None; None; None; None; None
+                _ True =
+                    def arrays =
+                        def getJArrayOrNull = match _
+                            JNull = Some (JNull, Nil)
+                            json  = getJArray json
+                        findNoneFn getJArrayOrNull values
+                    None; None; None; None; None; None; arrays
+                _ _ =
+                    # If *all* values are of the same type, get those values.
+                    def strings =
+                        findNoneFn getJString nonNullValues
+                    def ints =
+                        findNoneFn getJInteger nonNullValues
+                    def doubles =
+                        # `getJDouble` will convert any `JInteger` values.
+                        def isDouble = match _
+                            JDouble _ = True
+                            _ = False
+                        if forall isDouble nonNullValues then
+                            findNoneFn getJDouble nonNullValues
+                        else
+                            None
+                    def bools =
+                        findNoneFn getJBoolean nonNullValues
+                    def objects =
+                        findNoneFn getJObject nonNullValues
+                    None; strings; ints; doubles; bools; objects; None
+        match nullTest stringTest intTest doubleTest boolTest objectTest arrayTest
+            (Some _) None None None None None None =
+                Pass JNull
+            _ (Some strings) None None None None None =
+                requireEqual (_==*_) JString strings
+            _ None (Some ints) None None None None =
+                requireEqual (_==_) JInteger ints
+            _ None None (Some doubles) None None None =
+                requireEqual (_==._) JDouble doubles
+            _ None None None (Some bools) None None =
+                requireEqual enor JBoolean bools
+            _ None None None None (Some objects) None =
+                # If multiple keys all point to a `JObject`, there's a chance
+                # keys are shared between those objects (even if not within the
+                # objects individually) and so they need to be deduplicated
+                # further.  This unfortunately bumps the total normalization
+                # complexity to O(n^2), but that worst-case complexity should
+                # very rarely be hit (note that any key with a single occurance
+                # is returned unchanged by `simplifyValues`).
+                flatten objects
+                | deduplicateJObjectKeys
+                | rmap JObject
+            _ None None None None None (Some arrays) =
+                flatten arrays
+                | JArray
+                | Pass
+            _ _ _ _ _ _ _ =
+                failWithError ": For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, values of different types may not be combined. The incompatible values are: {formatExamples values}"
+    def requireEqual eqFn wrapFn values =
+        def eqOrFail x y =
+            if eqFn x y then
+                Pass x
+            else
+                failWithError ": For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type can combine multiple different values. The incompatible values are: {map wrapFn values | formatExamples}"
+        match values
+            v1, v2, vs =
+                rfoldl eqOrFail v1 (v2, vs)
+                | rmap wrapFn
+            v, Nil =
+                Pass (wrapFn v)
+            _ =
+                unreachable "groupBy invariant reached in deduplicateJObject keys equality check"
+    def formatExamples examples =
+        map formatJSON examples
+        | catWith ", "
+        | ("[{_}]")
     groupBy cmpKeysOnly dict
-    | findFailFn simplifyKeyGroups
+    | findFailFn simplifyKeyGroup
