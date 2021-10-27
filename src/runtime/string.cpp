@@ -329,7 +329,32 @@ static PRIMFN(prim_mkdir) {
   REQUIRE(mpz_cmp_si(mode, 0x1ff) <= 0);
   long mask = mpz_get_si(mode);
 
-  if (mkdir(path->c_str(), mask) != 0 && errno != EEXIST && errno != EISDIR) {
+  // Remove any file or link that might be in the way
+  if (unlink(path->c_str()) != 0 && errno != EPERM && errno != ENOENT && errno != EISDIR) {
+    std::stringstream str;
+    str << "mkdir(unlink) " << path->c_str() << ": " << strerror(errno);
+    std::string s = str.str();
+
+    size_t len = std::min(s.size(), max_error);
+    String *out = String::claim(runtime.heap, s.c_str(), len);
+    RETURN(claim_result(runtime.heap, false, out));
+  }
+
+  if (mkdir(path->c_str(), mask) == 0) {
+    RETURN(claim_result(runtime.heap, true, args[1]));
+  } else if (errno == EEXIST || errno == EISDIR) {
+    if (chmod(path->c_str(), mask) == 0) {
+      RETURN(claim_result(runtime.heap, true, args[1]));
+    } else {
+      std::stringstream str;
+      str << "mkdir(chmod) " << path->c_str() << ": " << strerror(errno);
+      std::string s = str.str();
+
+      size_t len = std::min(s.size(), max_error);
+      String *out = String::claim(runtime.heap, s.c_str(), len);
+      RETURN(claim_result(runtime.heap, false, out));
+    }
+  } else {
     std::stringstream str;
     str << "mkdir " << path->c_str() << ": " << strerror(errno);
     std::string s = str.str();
@@ -337,8 +362,6 @@ static PRIMFN(prim_mkdir) {
     size_t len = std::min(s.size(), max_error);
     String *out = String::claim(runtime.heap, s.c_str(), len);
     RETURN(claim_result(runtime.heap, false, out));
-  } else {
-    RETURN(claim_result(runtime.heap, true, args[1]));
   }
 }
 
