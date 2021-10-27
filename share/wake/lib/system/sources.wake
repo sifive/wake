@@ -48,12 +48,6 @@ def raw_source file =
         | runJobWith virtualRunner
         | getJobOutput
 
-export def basename (file: String): String =
-    replace `^.*/` '' file
-
-export def dirname (file: String): String =
-    simplify "{file}/.."
-
 export def source (file: String): Path =
     def base = basename file
     def dir = dirname file
