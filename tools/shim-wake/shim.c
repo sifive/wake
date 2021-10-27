@@ -123,6 +123,10 @@ int main(int argc, char **argv) {
 
   if (argc < 6) return 1;
 
+  // Spawn all wake child processes with a reproducible default umask.
+  // The main wake process has umask(0), but children should not use this.
+  umask(S_IWGRP | S_IWOTH);
+
   dir = argv[4];
   if ((dir[0] != '.' || dir[1] != 0) && chdir(dir)) {
     fprintf(stderr, "chdir: %s: %s\n", dir, strerror(errno));

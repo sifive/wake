@@ -445,6 +445,11 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   std::string out = s.str();
   status_write("echo", out.data(), out.size());
 
+  // Wake creates files + dirs with explicit permissions.
+  // We do not want the umask to interfere.
+  // However, we must be careful to restore this for children.
+  umask(0);
+
   sigemptyset(&imp->block);
 
   struct sigaction sa;
