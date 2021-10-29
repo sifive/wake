@@ -558,7 +558,10 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
             | field "membytes" (usage // `membytes` | getJInteger)
             | field "inbytes"  (usage // `inbytes`  | getJInteger)
             | field "outbytes" (usage // `outbytes` | getJInteger)
-          def getK exp = content // exp | getJArray | getOrElse Nil | mapPartial getJString
+          def getK exp =
+            content // exp
+            | getJArrayOrElse Nil
+            | mapPartial getJString
           match usageResult
             Fail f = Fail (makeError f)
             Pass usage = Pass (RunnerOutput (getK `inputs`) (getK `outputs`) usage)

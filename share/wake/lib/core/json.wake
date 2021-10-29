@@ -25,31 +25,90 @@ export data JValue =
   JObject  (List (Pair String JValue))
   JArray   (List JValue)
 
-export def getJString: JValue => Option String = match _
-  JString x               = Some x
-  JArray (JString x, Nil) = Some x
-  _                       = None
-export def getJInteger: JValue => Option Integer = match _
-  JInteger x               = Some x
-  JArray (JInteger x, Nil) = Some x
-  _                        = None
-export def getJDouble: JValue => Option Double = match _
-  JDouble x               = Some x
-  JInteger x              = dint x
-  JArray (JDouble x, Nil) = Some x
-  JArray (JInteger x, Nil)= dint x
-  _                       = None
-export def getJBoolean: JValue => Option Boolean = match _
-  JBoolean x               = Some x
-  JArray (JBoolean x, Nil) = Some x
-  _                        = None
-export def getJObject: JValue => Option (List (Pair String JValue)) = match _
-  JObject x               = Some x
-  JArray (JObject x, Nil) = Some x
-  _                       = None
-export def getJArray: JValue => Option (List JValue) = match _
-  JArray x = Some x
-  _        = None
+# Attempt to retrieve the value of a textual JSON structure.
+# This succeeds if passed a `JString` or a `JArray` containing only a single
+# `JString`, and returns `None` otherwise.
+export def getJString: (json: JValue) => Option String = match _
+    JString x               = Some x
+    JArray (JString x, Nil) = Some x
+    _                       = None
+# Retrieve the value of a JSON text, or a fallback if the type is incompatible.
+# This returns the represented value if passed a `JString` or a `JArray`
+# containing only a single `JString`, and returns `default` otherwise.
+export def getJStringOrElse (default: String) (json: JValue): String =
+    getJString json
+    | getOrElse default
+
+# Attempt to retrieve the value of an integer JSON structure.
+# This succeeds if passed a `JInteger` or a `JArray` containing only a single
+# `JInteger`, and returns `None` otherwise.
+export def getJInteger: (json: JValue) => Option Integer = match _
+    JInteger x               = Some x
+    JArray (JInteger x, Nil) = Some x
+    _                        = None
+# Retrieve the value of a JSON integer, or a fallback if the type is incompatible.
+# This returns the represented value if passed a `JInteger` or a `JArray`
+# containing only a single `JInteger`, and returns `default` otherwise.
+export def getJIntegerOrElse (default: Integer) (json: JValue): Integer =
+    getJInteger json
+    | getOrElse default
+
+# Attempt to retrieve the value of a numeric JSON structure.
+# This succeeds if passed a `JDouble`, `JInteger`, or a `JArray` containing only
+# a single value of either type, and returns `None` otherwise.
+export def getJDouble: (json: JValue) => Option Double = match _
+    JDouble x               = Some x
+    JInteger x              = dint x
+    JArray (JDouble x, Nil) = Some x
+    JArray (JInteger x, Nil)= dint x
+    _                       = None
+# Retrieve the value of a JSON integer, or a fallback if the type is incompatible.
+# This returns the represented value if passed a `JDouble`, `JInteger`, or a
+# `JArray` containing only a single value of either type, and returns `default`
+# otherwise.
+export def getJDoubleOrElse (default: Double) (json: JValue): Double =
+    getJDouble json
+    | getOrElse default
+
+# Attempt to retrieve the value of a boolean JSON structure.
+# This succeeds if passed a `JBoolean` or a `JArray` containing only a single
+# `JBoolean`, and returns `None` otherwise.
+export def getJBoolean: (json: JValue) => Option Boolean = match _
+    JBoolean x               = Some x
+    JArray (JBoolean x, Nil) = Some x
+    _                        = None
+# Retrieve the value of a JSON boolean, or a fallback if the type is incompatible.
+# This returns the represented value if passed a `JBoolean` or a `JArray`
+# containing only a single `JBoolean`, and returns `default` otherwise.
+export def getJBooleanOrElse (default: Boolean) (json: JValue): Boolean =
+    getJBoolean json
+    | getOrElse default
+
+# Attempt to retrieve the key/value pair contents of a JSON object.
+# This succeeds if passed a `JObject` or a `JArray` containing only a single
+# `JObject`, and returns `None` otherwise.
+export def getJObject: (json: JValue) => Option (List (Pair String JValue)) = match _
+    JObject x               = Some x
+    JArray (JObject x, Nil) = Some x
+    _                       = None
+# Retrieve the contents of a JSON object, or a fallback if the type is incompatible.
+# This returns the component key/value pairs if passed a `JObject` or a `JArray`
+# containing only a single `JObject`, and returns `default` otherwise.
+export def getJObjectOrElse (default: List (Pair String JValue)) (json: JValue): List (Pair String JValue) =
+    getJObject json
+    | getOrElse default
+
+# Attempt to retrieve the contents of a JSON array.
+# This only succeeds if passed a `JArray`, and returns `None` otherwise.
+export def getJArray: (json: JValue) => Option (List JValue) = match _
+    JArray x = Some x
+    _        = None
+# Retrieve the contents of a JSON array, or a fallback if the type is incompatible.
+# This returns the contained values if passed a `JArray`, and returns `default`
+# otherwise.
+export def getJArrayOrElse (default: List JValue) (json: JValue): List JValue =
+    getJArray json
+    | getOrElse default
 
 export def parseJSONBody (body: String): Result JValue Error =
   def imp b = prim "json_body"
