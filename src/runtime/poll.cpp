@@ -18,6 +18,9 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <poll.h>
+
+#include <algorithm>
 
 #include "poll.h"
 
@@ -90,6 +93,7 @@ int Poll::max_fds() const {
 #ifdef USE_PPOLL
 
 struct Poll::detail {
+  std::vector<struct pollfd> pfds;
 };
 
 Poll::Poll() : imp(new Poll::detail) {
@@ -99,18 +103,50 @@ Poll::~Poll() {
 }
 
 void Poll::add(int fd) {
+  imp->pfds.resize(imp->pfds.size() + 1);
+  imp->pfds.back().fd = fd;
+  imp->pfds.back().events = POLLIN;
 }
 
 void Poll::remove(int fd) {
+  size_t i = 0, len = imp->pfds.size();
+  struct pollfd *pfds = &imp->pfds[0];
+  while (i < len) {
+    if (pfds[i].fd == fd) {
+      pfds[i].fd = pfds[len-1].fd;
+      --len;
+    } else {
+      ++i;
+    }
+  }
+  imp->pfds.resize(len);
 }
 
 void Poll::clear() {
+  imp->pfds.clear();
 }
 
 std::vector<int> Poll::wait(struct timespec *timeout, sigset_t *saved) {
+  int retval = ppoll(&imp->pfds[0], imp->pfds.size(), timeout, saved);
+  if (retval == -1 && errno != EINTR) {
+    perror("ppoll");
+    exit(1);
+  }
+
+  std::vector<int> ready;
+  if (retval > 0) {
+    for (auto &pfd : imp->pfds) {
+      if ((pfd.revents & (POLLIN|POLLHUP)) != 0) {
+        ready.push_back(pfd.fd);
+      }
+    }
+  }
+
+  return ready;
 }
 
 int Poll::max_fds() const {
+  return 1024;
 }
 
 #endif

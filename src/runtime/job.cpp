@@ -277,7 +277,7 @@ struct CriticalJob {
 // Implementation details for a JobTable
 struct JobTable::detail {
   Poll poll;
-  int num_running;
+  long num_running;
   std::map<pid_t, std::shared_ptr<JobEntry> > pidmap;
   std::map<int, std::shared_ptr<JobEntry> > pipes;
   std::vector<std::unique_ptr<Task> > pending;
@@ -687,7 +687,7 @@ static void launch(JobTable *jobtable) {
   //   - even if a job uses more memory than the system has, eventually attempt it anyway (progress)
   auto &heap = jobtable->imp->pending;
   while (!heap.empty()
-      && jobtable->imp->num_running < (size_t)jobtable->imp->max_children
+      && jobtable->imp->num_running < jobtable->imp->max_children
       && jobtable->imp->active < jobtable->imp->limit
       && (jobtable->imp->phys_active == 0 || jobtable->imp->phys_active + heap.front()->job->memory() < jobtable->imp->phys_limit)) {
     Task &task = *heap.front();
