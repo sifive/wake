@@ -54,6 +54,7 @@
 #include "util/location.h"
 #include "util/shell.h"
 #include "util/execpath.h"
+#include "poll.h"
 #include "status.h"
 #include "value.h"
 #include "database.h"
@@ -275,11 +276,12 @@ struct CriticalJob {
 
 // Implementation details for a JobTable
 struct JobTable::detail {
+  Poll poll;
   int num_running;
   std::map<pid_t, std::shared_ptr<JobEntry> > pidmap;
   std::map<int, std::shared_ptr<JobEntry> > pipes;
   std::vector<std::unique_ptr<Task> > pending;
-  sigset_t block; // signals that can race with pselect()
+  sigset_t block; // signals that can race with poll.wait()
   Database *db;
   double active, limit; // CPUs
   uint64_t phys_active, phys_limit; // memory
@@ -472,11 +474,11 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   sigaction(SIGUSR1, &sa, 0);
   sigaction(SIGUSR2, &sa, 0);
 
-  // SIGCHLD interrupts pselect()
+  // SIGCHLD interrupts poll.wait()
   sa.sa_handler = handle_SIGCHLD;
   sa.sa_flags = SA_NOCLDSTOP;
-  // no SA_RESTART, because we need to interrupt pselect() portably
-  // to protect other syscalls, we keep SIGCHLD blocked except in pselect()
+  // no SA_RESTART, because we need to interrupt poll.wait() portably
+  // to protect other syscalls, we keep SIGCHLD blocked except in poll.wait()
   sigaddset(&imp->block, SIGCHLD);
   sigprocmask(SIG_BLOCK, &imp->block, 0);
   sigaction(SIGCHLD, &sa, 0);
@@ -491,7 +493,7 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   sigaction(SIGXCPU, &sa, 0);
   sigaction(SIGXFSZ, &sa, 0);
 
-  // Add to the set of signals we need to interrupt pselect()
+  // Add to the set of signals we need to interrupt poll.wait()
   sigaddset(&imp->block, SIGHUP);
   sigaddset(&imp->block, SIGINT);
   sigaddset(&imp->block, SIGQUIT);
@@ -584,6 +586,9 @@ JobTable::~JobTable() {
   memset(&timer, 0, sizeof(timer));
   setitimer(ITIMER_REAL, &timer, 0);
 
+  // We don't care about file descriptors any more
+  imp->poll.clear();
+
   // SIGTERM strategy is to double the gap between termination attempts every retry
   struct timeval limit;
   limit.tv_sec  = TERM_BASE_GAP_MS / 1000;
@@ -600,7 +605,7 @@ JobTable::~JobTable() {
     struct timespec timeout;
     gettimeofday(&start, 0);
     for (now = start; !imp->pidmap.empty() && (remain = mytimersub(limit, mytimersub(now, start))).tv_sec >= 0; gettimeofday(&now, 0)) {
-      // Block racey signals between here and pselect()
+      // Block racey signals between here and poll.wait()
       sigset_t saved;
       sigprocmask(SIG_BLOCK, &imp->block, &saved);
       sigdelset(&saved, SIGCHLD);
@@ -610,7 +615,7 @@ JobTable::~JobTable() {
       timeout.tv_nsec = remain.tv_usec * 1000;
 
       // Sleep until timeout or a signal arrives
-      if (!child_ready) pselect(0, 0, 0, 0, &timeout, &saved);
+      if (!child_ready) imp->poll.wait(&timeout, &saved);
 
       // Restore signals
       child_ready = false;
@@ -700,8 +705,8 @@ static void launch(JobTable *jobtable) {
     int flags;
     if ((flags = fcntl(pipe_stdout[0], F_GETFD, 0)) != -1) fcntl(pipe_stdout[0], F_SETFD, flags | FD_CLOEXEC);
     if ((flags = fcntl(pipe_stderr[0], F_GETFD, 0)) != -1) fcntl(pipe_stderr[0], F_SETFD, flags | FD_CLOEXEC);
-    entry->pipe_stdout = pipe_stdout[0];
-    entry->pipe_stderr = pipe_stderr[0];
+    jobtable->imp->poll.add(entry->pipe_stdout = pipe_stdout[0]);
+    jobtable->imp->poll.add(entry->pipe_stderr = pipe_stderr[0]);
     jobtable->imp->pipes[pipe_stdout[0]] = entry;
     jobtable->imp->pipes[pipe_stderr[0]] = entry;
     gettimeofday(&entry->start, 0);
@@ -796,15 +801,6 @@ bool JobTable::wait(Runtime &runtime) {
 
   bool compute = false;
   while (!exit_now() && imp->num_running) {
-    fd_set set;
-    int nfds = 0;
-
-    FD_ZERO(&set);
-    for (auto &i : imp->pipes) {
-      if (i.first >= nfds) nfds = i.first + 1;
-      FD_SET(i.first, &set);
-    }
-
     // Block all signals we expect to interrupt pselect
     sigset_t saved;
     sigprocmask(SIG_BLOCK, &imp->block, &saved);
@@ -831,30 +827,16 @@ bool JobTable::wait(Runtime &runtime) {
     status_refresh(true);
 
     // Wait for a status change, with signals atomically unblocked in pselect
-    int retval = pselect(nfds, &set, 0, 0, timeout, &saved);
+    std::vector<int> ready_fds = imp->poll.wait(timeout, &saved);
 
     // Restore signal mask
     sigaddset(&saved, SIGCHLD);
     sigprocmask(SIG_SETMASK, &saved, 0);
 
-    if (retval == -1 && errno != EINTR) {
-      perror("pselect");
-      exit(1);
-    }
-
     struct timeval now;
     gettimeofday(&now, 0);
 
     int done = 0;
-
-    std::vector<int> ready_fds;
-    if (retval > 0) {
-      for (auto &i : imp->pipes) {
-        if (FD_ISSET(i.first, &set)) {
-          ready_fds.push_back(i.first);
-        }
-      }
-    }
 
     for (auto fd : ready_fds) {
       std::shared_ptr<JobEntry> entry = imp->pipes[fd];
@@ -862,6 +844,7 @@ bool JobTable::wait(Runtime &runtime) {
         int got = read(fd, buffer, sizeof(buffer));
         if (got == 0 || (got < 0 && errno != EINTR)) {
           imp->pipes.erase(fd);
+          imp->poll.remove(fd);
           close(fd);
           entry->pipe_stdout = -1;
           entry->status->wait_stdout = false;
@@ -890,6 +873,7 @@ bool JobTable::wait(Runtime &runtime) {
         int got = read(fd, buffer, sizeof(buffer));
         if (got == 0 || (got < 0 && errno != EINTR)) {
           imp->pipes.erase(fd);
+          imp->poll.remove(fd);
           close(fd);
           entry->pipe_stderr = -1;
           entry->status->wait_stderr = false;
