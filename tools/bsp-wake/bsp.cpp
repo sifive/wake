@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string.h>
+#include <poll.h>
 
 #include <iostream>
 #include <string>
@@ -211,24 +212,27 @@ void ExecuteWakeProcess::execute() {
   char block[4096];
 
   while (true) {
-    fd_set rfds;
-    FD_ZERO(&rfds);
+    struct pollfd pfds[PIPES];
     int nfds = 0;
 
     for (int i = 0; i < PIPES; ++i) {
       if (pipefds[i][0] == -1) continue;
-      FD_SET(pipefds[i][0], &rfds);
-      if (pipefds[i][0] >= nfds) nfds = pipefds[i][0]+1;
+      pfds[nfds].fd = pipefds[i][0];
+      pfds[nfds].events = POLLIN;
+      ++nfds;
     }
 
     if (nfds == 0) break;
-    int ret = select(nfds, &rfds, 0, 0, 0);
-    if (ret <= 0) { errorPrefix("select"); break; }
+    int ret = poll(&pfds[0], nfds, -1);
+    if (ret <= 0) { errorPrefix("poll"); break; }
 
     ssize_t got;
+    nfds = 0;
     for (int i = 0; i < PIPES; ++i) {
       if (pipefds[i][0] == -1) continue;
-      if (!FD_ISSET(pipefds[i][0], &rfds)) continue;
+      bool ready = (pfds[nfds].revents & (POLLHUP|POLLIN)) != 0;
+      ++nfds;
+      if (!ready) continue;
       got = read(pipefds[i][0], &block[0], sizeof(block));
 
       if (got > 0) {
