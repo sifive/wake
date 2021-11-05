@@ -839,11 +839,15 @@ bool JobTable::wait(Runtime &runtime) {
     int done = 0;
 
     for (auto fd : ready_fds) {
-      std::shared_ptr<JobEntry> entry = imp->pipes[fd];
+      auto it = imp->pipes.find(fd);
+      assert (it != imp->pipes.end()); // ready_fds <= poll_fds == pipes.keys()
+      std::shared_ptr<JobEntry> entry = it->second;
+      assert (entry);
+
       if (entry->pipe_stdout == fd) {
         int got = read(fd, buffer, sizeof(buffer));
         if (got == 0 || (got < 0 && errno != EINTR)) {
-          imp->pipes.erase(fd);
+          imp->pipes.erase(it);
           imp->poll.remove(fd);
           close(fd);
           entry->pipe_stdout = -1;
@@ -872,7 +876,7 @@ bool JobTable::wait(Runtime &runtime) {
       if (entry->pipe_stderr == fd) {
         int got = read(fd, buffer, sizeof(buffer));
         if (got == 0 || (got < 0 && errno != EINTR)) {
-          imp->pipes.erase(fd);
+          imp->pipes.erase(it);
           imp->poll.remove(fd);
           close(fd);
           entry->pipe_stderr = -1;
@@ -918,8 +922,14 @@ bool JobTable::wait(Runtime &runtime) {
       RUsage childUsage = rusage_sub(totalUsage, imp->childrenUsage);
       imp->childrenUsage = totalUsage;
 
-      std::shared_ptr<JobEntry> entry = imp->pidmap[pid];
-      imp->pidmap.erase(pid);
+      // It is possible that this is not our child
+      auto it = imp->pidmap.find(pid);
+      if (it == imp->pidmap.end()) continue;
+
+      std::shared_ptr<JobEntry> entry = it->second;
+      imp->pidmap.erase(it);
+      assert (entry);
+
       entry->pid = 0;
       entry->status->merged = true;
       entry->job->state |= STATE_MERGED;
