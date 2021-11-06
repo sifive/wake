@@ -1,0 +1,12 @@
+[
+    {
+        "key": {
+            "firstSubkey": 1
+        }
+    },
+    {
+        "key": {
+            "secondSubkey": 2
+        }
+    }
+]

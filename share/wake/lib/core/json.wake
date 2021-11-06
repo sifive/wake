@@ -102,8 +102,8 @@ def doFormat (fmt: JSONFormat) (lhs: JValue): List String =
 export def defaultJSONFormat: JSONFormat =
   def formatDouble d =
     match (dclass d)
-      DoubleInfinite if d <. 0e0 = "-1e9999"
-      DoubleInfinite = "1e9999"
+      DoubleInfinite if d <. 0e0 = "-Infinity"
+      DoubleInfinite = "Infinity"
       DoubleNaN      = "NaN"
       _              = dstr d
   JSONFormat jsonEscape str formatDouble 0
@@ -169,3 +169,371 @@ export def x ==/ y = match x y
   (JArray a) _ = exists (_ ==/ y) a
   _ (JArray b) = exists (_ ==/ x) b
   _ _ = False
+
+# Simplify a JSON structure for broad compatibility as defined by the specs.
+# While doing so is unnecessary where Wake is always used to consume any
+# generated file, in environments where output may be passed to a different tool
+# (especially when that tool is not known at the time of generation, e.g., in a
+# web service) this can be helpful to prevent failures and/or undefined behavior
+# in the downstream clients.
+#
+# This is equivalent to calling `normalizeJSONWith` using the rules defined by
+# `normalizeJSONCompat`.
+export def normalizeJSON: (json: JValue) => Result JValue Error =
+    normalizeJSONWith normalizeJSONCompat
+
+# Simplify a JSON structure according to the rules given.
+# For example, Wake's implementation of JSON is more lenient than the base
+# standards, so if maximum compatibility is desired in situations where some
+# other implementation may be parsing generated output, `normalizeJSONCompat`
+# may be used to target that lowest common denominator (see `normalizeJSON` for
+# that particular case).
+#
+# Note that the relevant normalization is applied to each member of a `JArray`
+# or `JObject` *before* the enclosing container. This means that if some
+# normalization fails anywhere in the JSON tree the entire call will fail, even
+# if the specific branch causing the failure would later have been pruned.
+export def normalizeJSONWith (fmt: JSONNormalize) (json: JValue): Result JValue Error =
+    def normalized = match json
+        JString a =
+            getJSONNormalizeString fmt a
+            | rmap JString
+        JInteger a =
+            getJSONNormalizeInteger fmt a
+            | rmap JInteger
+        JDouble a =
+            getJSONNormalizeDouble fmt a
+            | rmap JDouble
+        JBoolean a =
+            getJSONNormalizeBoolean fmt a
+            | rmap JBoolean
+        JNull =
+            Pass JNull
+        JObject a =
+            def normalizeJObjectValue entry =
+                def Pair key value =
+                    entry
+                def normalized =
+                    normalizeJSONWith fmt value
+                match normalized
+                    (Pass norm)  = Pass (Pair key norm)
+                    (Fail error) = addJSONErrorPath key error
+            def normalizedList =
+                map normalizeJObjectValue a
+            require Pass children =
+                findFail normalizedList
+            children
+            | getJSONNormalizeObject fmt
+            | rmap JObject
+        JArray a =
+            def recurseArray (Pair i x) =
+                normalizeJSONWith fmt x
+                | rmapFail (addJSONErrorPath "[{str i}]")
+            require Pass normalized =
+                zip (seq a.len) a
+                | findFailFn recurseArray
+            normalized
+            | getJSONNormalizeArray fmt
+            | rmap JArray
+    normalized
+    | rmapFail (addJSONErrorPath "")
+
+# Attempt to merge several JSON structures, while resolving any duplicate keys.
+# In particular, this function will concatenate the members of two `JArray`
+# values, treat `JNull` as a wildcard placeholder, and otherwise return the
+# original value if both instances are equal. It fails if the same location in
+# the object tree is associated with multiple values of different types or with
+# different values of a type which cannot be combined. Returns a `JNull` value
+# if passed an empty list.
+export def mergeJSON (jsons: List JValue): Result JValue Error =
+    def removeDummyFromError error =
+        def removeKeyFromError cause =
+            if matches `/key:.*` cause then
+                replace `^/key:` "/:" cause
+            else if matches `/key.*` cause then
+                replace `^/key` "" cause
+            else
+                cause
+        error
+        | editErrorCause removeKeyFromError
+        | Fail
+    require Pass joinedList =
+        # Create a dummy key to take advantage of object key deduplication infrastructure.
+        map (Pair "key") jsons
+        | deduplicateJObjectKeys (mergeValueList False)
+        | rmapFail removeDummyFromError
+    require joinedValue, _ =
+        joinedList
+        | map getPairSecond
+    else
+        Pass JNull
+    Pass joinedValue
+
+# Use the value of the key appearing last in the list, but recurse into `JObject`s.
+# Essentially, allows overwriting any key in the object tree by specifying a new
+# value at the same place in a later tree. Returns `JNull` if given an empty list.
+#
+# If some location has *both* `JObject` values and values of other types, any
+# `JObject` values before the last non-`JObject` value will be dropped:
+#
+# ```
+# ("\{\"key\":\{\"firstSubkey\":1\}\}", "\{\"key\":\{\"secondSubkey\":2\}\}", Nil)
+# | findFailFn parseJSONBody
+# | rmapPass lastValueInList
+# | rmap formatJSON
+# Pass "\{\"key\":\{\"firstSubkey\":1,\"secondSubkey\":2\}\}"
+# ```
+#
+# ```
+# ("\{\"firstKey\":1\}", "2", "\{\"secondKey\":3\}", Nil)
+# | findFailFn parseJSONBody
+# | rmapPass lastValueInList
+# | rmap formatJSON
+# Pass "\{\"secondKey\":3\}"
+# ```
+export def overrideJSON (jsons: List JValue): JValue =
+    def joinedList =
+        map (Pair "key") jsons
+        | deduplicateJObjectKeys lastValueInList
+        | getPass
+        | getOrElseFn (\_ unreachable "lastValueInList invariant reached in overrideJSON")
+    require joinedValue, _ =
+        joinedList
+        | map getPairSecond
+    else
+        JNull
+    joinedValue
+
+# Prepend the given path segment to an error message, to be called by `rmapFail`.
+# This is meant to be called bottom-up, with the inner-most object/array passing
+# the key/index followed by its parent, etc.
+#
+# Parameters:
+#  - `node`: The path segment to prepend, without any leading or trailing
+#     separator. The root node should pass the empty string `""`.
+#  - `error`: The report which should be annotated with path info.
+def addJSONErrorPath (node: String) (error: Error): Result a Error =
+    def prependNode cause =
+        if matches `/:.*` cause then
+            replace `^/` "/{node}" cause
+        else if matches `/.*` cause then
+            if strlen node == 0 then
+                cause
+            else
+            "/{node}{cause}"
+        else
+            "/{node}: {cause}"
+    error
+    | editErrorCause prependNode
+    | Fail
+
+# The rules by which `normalizeJSONWith` will simplify JSON values.
+# If any particular function is unable to operate on every input value (e.g. a
+# `JObject` contains duplicate keys of types which cannot be combined), that
+# rule may return a `Fail` which halts the broader processing.
+export tuple JSONNormalize =
+    String: String => Result String Error
+    Integer: Integer => Result Integer Error
+    Double: Double => Result Double Error
+    Boolean: Boolean => Result Boolean Error
+    Object: List (Pair String JValue) => Result (List (Pair String JValue)) Error
+    Array: List JValue => Result (List JValue) Error
+
+# A basic normalization ruleset which returns inputs unchanged.
+export def normalizeJSONIdentity: JSONNormalize =
+    JSONNormalize Pass Pass Pass Pass Pass Pass
+
+# Target the minimum JSON language described by the specifications.
+export def normalizeJSONCompat: JSONNormalize =
+    def nfkcKeys =
+        map (editPairFirst unicodeIdentifier)
+    normalizeJSONIdentity
+    | setJSONNormalizeString (Pass _.unicodeCanonical)
+    | setJSONNormalizeDouble filterNonDigitJDouble
+    | setJSONNormalizeObject (deduplicateJObjectKeys (mergeValueList True) _.nfkcKeys)
+
+# Fail on any `Double` values which can't be represented numerically.
+# Published JSON specifications describe their double values as allowing decimal
+# or exponential forms, but don't implement the full IEEE standard.
+def filterNonDigitJDouble (n: Double): Result Double Error = match n.dclass
+    DoubleInfinite =
+        failWithError "For compatibility, JSON doubles should not be infinite."
+    DoubleNaN =
+        failWithError "For compatibility, JSON doubles should not be NaN values."
+    _ =
+        Pass n
+
+# Attempt to simplify any `JObject`s which contain multiple instances of a key.
+# While the published specifications explicitly allow such duplicate keys, none
+# *require* implementations to accept them nor describes the behaviour by which
+# they should be handled; therefore, implementations differ in how they handle
+# duplicate keys -- if they do so at all -- and a generator aiming for
+# compatibility shouldn't output objects with duplicate keys.
+#
+# In particular, this function will concatenate the members of two `JArray`
+# values, treat `JNull` as a wildcard placeholder, and otherwise return the
+# original value if both instances are equal. It fails if a key is associated
+# with multiple values of different types or with different values of a type
+# which cannot be combined.
+#
+# Parameters:
+#  - `simplifyValueList`: The function used to reduce multiple occurances of an
+#    object key to a single value. This may safely assume that it is never
+#    passed an empty list.
+#  - `dict`: The original key-value pairs from which any duplicate keys should
+#    be removed.
+def deduplicateJObjectKeys (simplifyValueList: List JValue => Result JValue Error) (dict: List (Pair String JValue)): Result (List (Pair String JValue)) Error =
+    def cmpKeysOnly (Pair k1 _) (Pair k2 _) =
+        k1 <* k2
+    def simplifyKeyGroup (pairs: List (Pair String JValue)): Result (Pair String JValue) Error =
+        match pairs
+            Nil =
+                # `simplifyKeyGroups` is only ever mapped over the output of
+                # `groupBy`, which is always a list of *non-empty* lists.
+                unreachable "groupBy invariant reached in deduplicateJObjectKeys"
+            (Pair key value), ps =
+                def simplified =
+                    (value, map getPairSecond ps: List JValue)
+                    | simplifyValues
+                match simplified
+                    (Pass value) = Pass (Pair key value)
+                    (Fail error) = addJSONErrorPath key error
+    def simplifyValues (values: List JValue): Result JValue Error =
+        match values
+            v, Nil = Pass v
+            _      = simplifyValueList values
+    groupBy cmpKeysOnly dict
+    | findFailFn simplifyKeyGroup
+
+# Attempt to determine equality across simple values, concatenate `JArray`s, and
+# recurse into `JObject`s.
+def mergeValueList (describeCompat: Boolean) (values: List JValue): Result JValue Error =
+    # This function is used both in normalization (which benefits from showing
+    # the user why something was rejected) and merging (where the user should
+    # already know it might fail); this conditionally prints a descriptive
+    # message depending on that environment.
+    def compatibilityMessage upper lower error =
+        if describeCompat then
+            ("For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, ", lower, error, Nil)
+            | cat
+        else
+            (upper, error, Nil)
+            | cat
+    def requireEqual eqFn wrapFn values =
+        def eqOrFail x y =
+            if eqFn x y then
+                Pass x
+            else
+                compatibilityMessage "N" "n" "ot every type can combine multiple different values. The incompatible values are: {map wrapFn values | formatExamples}"
+                | failWithError
+        match values
+            v1, v2, vs =
+                rfoldl eqOrFail v1 (v2, vs)
+                | rmap wrapFn
+            v, Nil =
+                Pass (wrapFn v)
+            _ =
+                unreachable "groupBy invariant reached in mergeValueList"
+    def formatExamples examples =
+        map formatJSON examples
+        | catWith ", "
+        | ("[{_}]")
+    def (nullTest; stringTest; intTest; doubleTest; boolTest; objectTest; arrayTest) =
+        # We filter out `JNull` values for most types as being a "wildcard"
+        # value, but if *everything* is a `JNull` we do want to return that.
+        def isNull = match _
+            JNull = True
+            _     = False
+        def allNull =
+            forall isNull values
+        def nonNullValues =
+            filter (! _.isNull) values
+        # The `getJ*` functions also return `Some` for single-element arrays
+        # of the proper type, but we don't want that fallback when merging.
+        def anyArray =
+            exists (_.getJArray | isSome) values
+        match allNull anyArray
+            True _ =
+                Some values; None; None; None; None; None; None
+            _ True =
+                def arrays =
+                    def getJArrayOrNull = match _
+                        JNull = Some (JNull, Nil)
+                        json  = getJArray json
+                    findNoneFn getJArrayOrNull values
+                None; None; None; None; None; None; arrays
+            _ _ =
+                # If *all* values are of the same type, get those values.
+                def strings =
+                    findNoneFn getJString nonNullValues
+                def ints =
+                    findNoneFn getJInteger nonNullValues
+                def doubles =
+                    # `getJDouble` will convert any `JInteger` values.
+                    def isDouble = match _
+                        JDouble _ = True
+                        _ = False
+                    if forall isDouble nonNullValues then
+                        findNoneFn getJDouble nonNullValues
+                    else
+                        None
+                def bools =
+                    findNoneFn getJBoolean nonNullValues
+                def objects =
+                    findNoneFn getJObject nonNullValues
+                None; strings; ints; doubles; bools; objects; None
+    match nullTest stringTest intTest doubleTest boolTest objectTest arrayTest
+        (Some _) None None None None None None =
+            Pass JNull
+        _ (Some strings) None None None None None =
+            requireEqual (_==*_) JString strings
+        _ None (Some ints) None None None None =
+            requireEqual (_==_) JInteger ints
+        _ None None (Some doubles) None None None =
+            requireEqual (_==._) JDouble doubles
+        _ None None None (Some bools) None None =
+            requireEqual enor JBoolean bools
+        _ None None None None (Some objects) None =
+            # If multiple keys all point to a `JObject`, there's a chance
+            # keys are shared between those objects (even if not within the
+            # objects individually) and so they need to be deduplicated
+            # further.  This unfortunately bumps the total normalization
+            # complexity to O(n^2), but that worst-case complexity should
+            # very rarely be hit (note that any key with a single occurance
+            # is returned unchanged by `simplifyValues`).
+            flatten objects
+            | deduplicateJObjectKeys (mergeValueList describeCompat)
+            | rmap JObject
+        _ None None None None None (Some arrays) =
+            flatten arrays
+            | JArray
+            | Pass
+        _ _ _ _ _ _ _ =
+            compatibilityMessage "V" "v" "alues of different types may not be combined. The incompatible values are: {formatExamples values}"
+            | failWithError
+
+# Use the value of the key appearing last in the list, but recurse into `JObject`s.
+# Essentially, allows overwriting any key in the object tree by specifying a new
+# value at the same place in a later tree. Will always always succeed, returning
+# `Pass JNull` if given an empty list.
+#
+# See `overrideJSON` for examples of usage.
+export def lastValueInList (values: List JValue): Result JValue Error =
+    def revValues =
+        reverse values
+    def isNotObject = match _
+        JObject _ = False
+        _         = True
+    match (takeUntil isNotObject revValues)
+        Nil =
+            revValues
+            | head
+            | getOrElse JNull
+            | Pass
+        objs =
+            # Return to original order after taking from `revValues`.
+            reverse objs
+            | mapPartial getJObject
+            | flatten
+            | deduplicateJObjectKeys lastValueInList
+            | rmap JObject

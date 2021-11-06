@@ -1,0 +1,2 @@
+/[0]: For compatibility, JSON doubles should not be infinite.
+/double: For compatibility, JSON doubles should not be NaN values.

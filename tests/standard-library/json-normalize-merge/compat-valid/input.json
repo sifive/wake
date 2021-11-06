@@ -1,0 +1,11 @@
+{
+    "object": {
+        "string": "test",
+        "double": 2.9979e8,
+        "int": 3
+    },
+    "array": [
+        "x",
+        null
+    ]
+}

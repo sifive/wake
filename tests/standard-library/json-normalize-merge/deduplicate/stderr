@@ -1,0 +1,5 @@
+/boolean: For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type can combine multiple different values. The incompatible values are: [true, false]
+/[0]/double: For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type can combine multiple different values. The incompatible values are: [299790000e0, 3.1415899999999999]
+/wrap/int: For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type can combine multiple different values. The incompatible values are: [1, 2]
+/wrap/[0]/string: For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type can combine multiple different values. The incompatible values are: ["test 1", "test 2"]
+/object/int: For compatibility, JSON objects should not have duplicate keys. While we try to recover from this where possible, not every type can combine multiple different values. The incompatible values are: [1, 2]

@@ -1,0 +1,16 @@
+{
+    "object": {
+        "string": "test",
+        "double": null,
+        "int": 3,
+        "boolean": true,
+        "array": ["x"]
+    },
+    "object": {
+        "string": "test",
+        "double": 2.9979e8,
+        "int": null,
+        "null": null,
+        "array": [null]
+    }
+}

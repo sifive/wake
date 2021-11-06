@@ -134,12 +134,12 @@ def runTest (testScript: Path): Result Unit Error =
     require Pass _ = match expectedStderr
         Some x if x ==* jobStderr = Pass Unit
         None = Pass Unit
-        Some _ = Fail (makeError "Unexpected standard error '{replace `\n.*` "" jobStderr}'")
+        Some _ = Fail (makeError "Unexpected standard error '{replace `\n` "\\\\n" jobStderr}'")
 
     require Pass _ = match expectedStdout
         Some x if x ==* jobStdout = Pass Unit
         None = Pass Unit
-        _ = Fail (makeError "Unexpected standard output '{replace `\n.*` "" jobStdout}'")
+        _ = Fail (makeError "Unexpected standard output '{replace `\n` "\\\\n" jobStdout}'")
 
     match shouldPass testJob.isJobOk
         True  True  = Pass Unit
