@@ -24,10 +24,94 @@
 
 #include "poll.h"
 
-#ifdef __APPLE__
+#if defined(__linux__)
+#define USE_EPOLL 1
+#elif defined(__APPLE__)
 #define USE_PSELECT 1
 #else
 #define USE_PPOLL 1
+#endif
+
+#ifdef USE_EPOLL
+#include <sys/epoll.h>
+#define EVENTS 512
+
+struct Poll::detail {
+  int pfd;
+};
+
+Poll::Poll() : imp(new Poll::detail) {
+  imp->pfd = epoll_create1(EPOLL_CLOEXEC);
+  if (imp->pfd == -1) {
+    perror("epoll_create1");
+    exit(1);
+  }
+}
+
+Poll::~Poll() {
+  close(imp->pfd);
+}
+
+void Poll::add(int fd) {
+  struct epoll_event ev;
+  ev.events = POLLIN;
+  ev.data.fd = fd;
+
+  if (epoll_ctl(imp->pfd, EPOLL_CTL_ADD, fd, &ev) == -1) {
+    perror("epoll_ctl(EPOLL_CTL_ADD)");
+    exit(1);
+  }
+}
+
+void Poll::remove(int fd) {
+  struct epoll_event ev;
+  ev.events = POLLIN;
+  ev.data.fd = fd;
+
+  if (epoll_ctl(imp->pfd, EPOLL_CTL_DEL, fd, &ev) == -1) {
+    perror("epoll_ctl(EPOLL_CTL_DEL)");
+    exit(1);
+  }
+}
+
+void Poll::clear() {
+  close(imp->pfd);
+  imp->pfd = epoll_create1(EPOLL_CLOEXEC);
+  if (imp->pfd == -1) {
+    perror("epoll_create1");
+    exit(1);
+  }
+}
+
+std::vector<int> Poll::wait(struct timespec *timeout, sigset_t *saved) {
+  struct epoll_event events[EVENTS];
+  int ptimeout;
+
+  if (timeout) {
+    ptimeout = timeout->tv_sec * 1000 + (timeout->tv_nsec + 999999) / 1000000;
+  } else {
+    ptimeout = -1;
+  }
+
+  int nfds = epoll_pwait(imp->pfd, &events[0], EVENTS, ptimeout, saved);
+  if (nfds == -1 && errno != EINTR) {
+    perror("epoll_pwait");
+    exit(1);
+  }
+
+  std::vector<int> ready;
+  if (nfds > 0) {
+    for (int i = 0; i < nfds; ++i)
+      ready.push_back(events[i].data.fd);
+  }
+
+  return ready;
+}
+
+int Poll::max_fds() const {
+  return 1024;
+}
+
 #endif
 
 #ifdef USE_PSELECT
