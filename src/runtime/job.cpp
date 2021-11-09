@@ -97,6 +97,7 @@ struct Job final : public GCObject<Job, Value> {
   HeapPointer<Value> bad_launch;
   HeapPointer<Value> bad_finish;
   double pathtime;
+  struct timespec start, stop;
   Usage record;  // retrieved from DB (user-facing usage)
   Usage predict; // prediction of Runners given record (used by scheduler)
   Usage reality; // actual measured local usage
@@ -253,18 +254,17 @@ struct JobEntry {
   std::string stdout_buf;
   std::string stderr_buf;
   std::string echo_line;
-  struct timeval start;
   std::list<Status>::iterator status;
 
   JobEntry(JobTable::detail *imp_, RootPointer<Job> &&job_)
    : imp(imp_), job(std::move(job_)), pid(0), pipe_stdout(-1), pipe_stderr(-1) { }
   ~JobEntry();
 
-  double runtime(struct timeval now);
+  double runtime(struct timespec now);
 };
 
-double JobEntry::runtime(struct timeval now) {
-  return now.tv_sec - start.tv_sec + (now.tv_usec - start.tv_usec)/1000000.0;
+double JobEntry::runtime(struct timespec now) {
+  return now.tv_sec - job->start.tv_sec + (now.tv_nsec - job->start.tv_nsec)/1000000000.0;
 }
 
 struct CriticalJob {
@@ -289,7 +289,7 @@ struct JobTable::detail {
   bool quiet;
   bool check;
   bool batch;
-  struct timeval wall;
+  struct timespec wall;
   RUsage childrenUsage;
 
   CriticalJob critJob(double nexttime) const;
@@ -540,23 +540,23 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   // std::cerr << "max children " << imp->max_children << "/" << sys_child_max << std::endl;
 }
 
-static struct timeval mytimersub(struct timeval a, struct timeval b) {
-  struct timeval out;
+static struct timespec mytimersub(struct timespec a, struct timespec b) {
+  struct timespec out;
   out.tv_sec = a.tv_sec - b.tv_sec;
-  out.tv_usec = a.tv_usec - b.tv_usec;
-  if (out.tv_usec < 0) {
+  out.tv_nsec = a.tv_nsec - b.tv_nsec;
+  if (out.tv_nsec < 0) {
     --out.tv_sec;
-    out.tv_usec += 1000000;
+    out.tv_nsec += 1000000000;
   }
   return out;
 }
 
-static struct timeval mytimerdouble(struct timeval a) {
+static struct timespec mytimerdouble(struct timespec a) {
   a.tv_sec <<= 1;
-  a.tv_usec <<= 1;
-  if (a.tv_usec > 1000000) {
+  a.tv_nsec <<= 1;
+  if (a.tv_nsec > 1000000000) {
     ++a.tv_sec;
-    a.tv_usec -= 1000000;
+    a.tv_nsec -= 1000000000;
   }
   return a;
 }
@@ -571,9 +571,9 @@ JobTable::~JobTable() {
   imp->poll.clear();
 
   // SIGTERM strategy is to double the gap between termination attempts every retry
-  struct timeval limit;
+  struct timespec limit;
   limit.tv_sec  = TERM_BASE_GAP_MS / 1000;
-  limit.tv_usec = (TERM_BASE_GAP_MS % 1000) * 1000;
+  limit.tv_nsec = (TERM_BASE_GAP_MS % 1000) * 1000000;
 
   // Try to kill children gently first, once every second
   for (int retry = 0; !imp->pidmap.empty() && retry < TERM_ATTEMPTS; ++retry, limit = mytimerdouble(limit)) {
@@ -582,10 +582,9 @@ JobTable::~JobTable() {
       kill(i.first, SIGTERM);
 
     // Reap children for one second; exit early if none remain
-    struct timeval start, now, remain;
-    struct timespec timeout;
-    gettimeofday(&start, 0);
-    for (now = start; !imp->pidmap.empty() && (remain = mytimersub(limit, mytimersub(now, start))).tv_sec >= 0; gettimeofday(&now, 0)) {
+    struct timespec start, now, remain, timeout;
+    clock_gettime(CLOCK_REALTIME, &start);
+    for (now = start; !imp->pidmap.empty() && (remain = mytimersub(limit, mytimersub(now, start))).tv_sec >= 0; clock_gettime(CLOCK_REALTIME, &now)) {
       // Block racey signals between here and poll.wait()
       sigset_t saved;
       sigprocmask(SIG_BLOCK, &imp->block, &saved);
@@ -593,7 +592,7 @@ JobTable::~JobTable() {
 
       // Continue waiting for the full second
       timeout.tv_sec = 0;
-      timeout.tv_nsec = remain.tv_usec * 1000;
+      timeout.tv_nsec = remain.tv_nsec;
 
       // Sleep until timeout or a signal arrives
       if (!child_ready) imp->poll.wait(&timeout, &saved);
@@ -690,7 +689,7 @@ static void launch(JobTable *jobtable) {
     jobtable->imp->poll.add(entry->pipe_stderr = pipe_stderr[0]);
     jobtable->imp->pipes[pipe_stdout[0]] = entry;
     jobtable->imp->pipes[pipe_stderr[0]] = entry;
-    gettimeofday(&entry->start, 0);
+    clock_gettime(CLOCK_REALTIME, &entry->job->start);
     std::stringstream prelude;
     prelude << find_execpath() << "/../lib/wake/shim-wake" << '\0'
       << (task.stdin_file.empty() ? "/dev/null" : task.stdin_file.c_str()) << '\0'
@@ -721,7 +720,7 @@ static void launch(JobTable *jobtable) {
     std::string pretty = pretty_cmd(entry->job->cmdline->as_str());
     std::string clone(entry->job->label->empty() ? pretty : entry->job->label->as_str());
     for (auto &c : clone) if (c == '\n') c = ' ';
-    entry->status = status_state.jobs.emplace(status_state.jobs.end(), clone, predict, entry->start);
+    entry->status = status_state.jobs.emplace(status_state.jobs.end(), clone, predict, entry->job->start);
     std::stringstream s;
     if (*entry->job->dir != ".") s << "cd " << entry->job->dir->c_str() << "; ";
     s << pretty;
@@ -814,8 +813,8 @@ bool JobTable::wait(Runtime &runtime) {
     sigaddset(&saved, SIGCHLD);
     sigprocmask(SIG_SETMASK, &saved, 0);
 
-    struct timeval now;
-    gettimeofday(&now, 0);
+    struct timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
 
     int done = 0;
 
@@ -914,6 +913,7 @@ bool JobTable::wait(Runtime &runtime) {
       entry->pid = 0;
       entry->status->merged = true;
       entry->job->state |= STATE_MERGED;
+      entry->job->stop = now;
       entry->job->reality.found    = true;
       entry->job->reality.status   = code;
       entry->job->reality.runtime  = entry->runtime(now);
@@ -939,7 +939,7 @@ bool JobTable::wait(Runtime &runtime) {
     }
 
     // In case the expected next critical job is never scheduled, fall back to the next
-    double dwall = (now.tv_sec - imp->wall.tv_sec) + (now.tv_usec - imp->wall.tv_usec) / 1000000.0;
+    double dwall = (now.tv_sec - imp->wall.tv_sec) + (now.tv_nsec - imp->wall.tv_nsec) / 1000000000.0;
     if (status_state.current == 0 && dwall*5 > status_state.remain) {
       auto crit = imp->critJob(0);
       if (crit.runtime != 0) {
@@ -961,6 +961,9 @@ bool JobTable::wait(Runtime &runtime) {
 Job::Job(Database *db_, String *label_, String *dir_, String *stdin_file_, String *environ, String *cmdline_, bool keep_, const char *echo_, const char *stream_out_, const char *stream_err_)
   : db(db_), label(label_), cmdline(cmdline_), stdin_file(stdin_file_), dir(dir_), state(0), code(), pid(0), job(-1), keep(keep_), echo(echo_), stream_out(stream_out_), stream_err(stream_err_)
 {
+  start.tv_sec = stop.tv_sec = 0;
+  start.tv_nsec = stop.tv_nsec = 0;
+
   std::vector<uint64_t> codes;
   Hash(dir->c_str(), dir->size()).push(codes);
   Hash(stdin_file->c_str(), stdin_file->size()).push(codes);
@@ -1126,6 +1129,9 @@ static PRIMFN(prim_job_virtual) {
   parse_usage(&job->predict, args+3, runtime, scope);
   job->predict.found = true;
   job->reality = job->predict;
+
+  clock_gettime(CLOCK_REALTIME, &job->start);
+  job->stop = job->start;
 
   if (!stdout_payload->empty())
     job->db->save_output(job->job, 1, stdout_payload->c_str(), stdout_payload->size(), 0);
@@ -1327,7 +1333,7 @@ static PRIMFN(prim_job_cache) {
       status_state.total = crit.pathtime + (status_state.total - status_state.remain);
       status_state.remain = crit.pathtime;
       status_state.current = crit.runtime;
-      if (crit.runtime == 0) gettimeofday(&jobtable->imp->wall, 0);
+      if (crit.runtime == 0) clock_gettime(CLOCK_REALTIME, &jobtable->imp->wall);
     }
   } else {
     joblist = claim_list(runtime.heap, 0, nullptr);
@@ -1504,6 +1510,10 @@ static PRIMTYPE(type_job_finish) {
     out->unify(Data::typeUnit);
 }
 
+static int64_t int64_ns(struct timespec tv) {
+  return static_cast<int64_t>(tv.tv_sec) * 1000000000 + tv.tv_nsec;
+}
+
 static PRIMFN(prim_job_finish) {
   EXPECT(9);
   JOB(job, 0);
@@ -1520,7 +1530,15 @@ static PRIMFN(prim_job_finish) {
   job->report.found = true;
 
   bool keep = !job->bad_launch && !job->bad_finish && job->keep && job->report.status == 0;
-  job->db->finish_job(job->job, inputs->as_str(), outputs->as_str(), job->code.data[0], keep, job->report);
+  job->db->finish_job(
+    job->job,
+    inputs->as_str(),
+    outputs->as_str(),
+    int64_ns(job->start),
+    int64_ns(job->stop),
+    job->code.data[0],
+    keep,
+    job->report);
   job->state |= STATE_FINISHED;
 
   runtime.schedule(WJob::claim(runtime.heap, job));
