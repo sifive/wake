@@ -44,6 +44,12 @@ static void indent(const std::string& tab, const std::string& body) {
   std::cout << std::endl;
 }
 
+static std::string describe_hash(const std::string &hash, bool verbose, bool stale) {
+  if (stale) return "<out-of-date>";
+  if (verbose) return hash;
+  return hash.substr(0, SHORT_HASH);
+}
+
 static void describe_human(const std::vector<JobReflection> &jobs, bool debug, bool verbose) {
   for (auto &job : jobs) {
     std::cout << "Job " << job.job;
@@ -70,16 +76,16 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug, b
     if (verbose) {
       std::cout << "Visible:" << std::endl;
       for (auto &in : job.visible)
-        std::cout << "  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
+        std::cout << "  " << describe_hash(in.hash, verbose, job.stale)
                   << " " << in.path << std::endl;
     }
     std::cout << "Inputs:" << std::endl;
     for (auto &in : job.inputs)
-      std::cout << "  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
+      std::cout << "  " << describe_hash(in.hash, verbose, job.stale)
                 << " " << in.path << std::endl;
     std::cout << "Outputs:" << std::endl;
     for (auto &out : job.outputs)
-      std::cout << "  " << out.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
+      std::cout << "  " << describe_hash(out.hash, verbose, false)
                 << " " << out.path << std::endl;
     if (debug) {
       std::cout << "Stack:";
@@ -134,17 +140,17 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
     if (verbose) {
       std::cout << "# Visible:" << std::endl;
       for (auto &in : job.visible)
-        std::cout << "#  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
+        std::cout << "#  " << describe_hash(in.hash, verbose, job.stale)
                   << " " << in.path << std::endl;
     }
     std::cout
       << "# Inputs:" << std::endl;
     for (auto &in : job.inputs)
-      std::cout << "#  " << in.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
+      std::cout << "#  " << describe_hash(in.hash, verbose, job.stale)
                 << " " << in.path << std::endl;
     std::cout << "# Outputs:" << std::endl;
     for (auto &out : job.outputs)
-      std::cout << "#  " << out.hash.substr(0, verbose?std::string::npos:SHORT_HASH)
+      std::cout << "#  " << describe_hash(out.hash, verbose, false)
                 << " " << out.path << std::endl;
     if (debug) {
       std::cout << "# Stack:";
