@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <poll.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include <algorithm>
 
@@ -109,7 +111,19 @@ std::vector<int> Poll::wait(struct timespec *timeout, sigset_t *saved) {
 }
 
 int Poll::max_fds() const {
-  return 1024;
+  struct rlimit nfd;
+  if (getrlimit(RLIMIT_NOFILE, &nfd) == -1) {
+    perror("getrlimit(RLIMIT_NOFILE)");
+    exit(1);
+  }
+  if (nfd.rlim_cur != nfd.rlim_max) {
+    nfd.rlim_cur = nfd.rlim_max;
+    if (setrlimit(RLIMIT_NOFILE, &nfd) == -1) {
+      perror("setrlimit(RLIMIT_NOFILE)");
+      exit(1);
+    }
+  }
+  return nfd.rlim_max;
 }
 
 #endif
@@ -169,7 +183,22 @@ std::vector<int> Poll::wait(struct timespec *timeout, sigset_t *saved) {
 }
 
 int Poll::max_fds() const {
-  return 1024;
+  struct rlimit nfd;
+  if (getrlimit(RLIMIT_NOFILE, &nfd) == -1) {
+    perror("getrlimit(RLIMIT_NOFILE)");
+    exit(1);
+  }
+  rlim_t set = FD_SETSIZE;
+  if (set > nfd.rlim_max && nfd.rlim_max != RLIM_INFINITY)
+    set = nfd.rlim_max;
+  if (nfd.rlim_cur != set) {
+    nfd.rlim_cur = set;
+    if (setrlimit(RLIMIT_NOFILE, &nfd) == -1) {
+      perror("setrlimit(RLIMIT_NOFILE)");
+      exit(1);
+    }
+  }
+  return set;
 }
 
 #endif
@@ -230,7 +259,19 @@ std::vector<int> Poll::wait(struct timespec *timeout, sigset_t *saved) {
 }
 
 int Poll::max_fds() const {
-  return 1024;
+  struct rlimit nfd;
+  if (getrlimit(RLIMIT_NOFILE, &nfd) == -1) {
+    perror("getrlimit(RLIMIT_NOFILE)");
+    exit(1);
+  }
+  if (nfd.rlim_cur != nfd.rlim_max) {
+    nfd.rlim_cur = nfd.rlim_max;
+    if (setrlimit(RLIMIT_NOFILE, &nfd) == -1) {
+      perror("setrlimit(RLIMIT_NOFILE)");
+      exit(1);
+    }
+  }
+  return nfd.rlim_max;
 }
 
 #endif
