@@ -32,7 +32,7 @@
 #include "status.h"
 
 // Increment every time the database schema changes
-#define SCHEMA_VERSION "2"
+#define SCHEMA_VERSION "3"
 
 #define VISIBLE 0
 #define INPUT 1
@@ -170,7 +170,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "  signature   integer not null," // hash(FnInputs, FnOutputs, Resources, Keep)
     "  stack       blob    not null,"
     "  stat_id     integer references stats(stat_id)," // null if unmerged
-    "  endtime     text    not null default '',"
+    "  starttime   integer not null default 0,"
+    "  endtime     integer not null default 0,"
     "  keep        integer not null default 0,"
     "  stale       integer not null default 0);"       // 0=false, 1=true
     "create index if not exists job on jobs(directory, commandline, environment, stdin, signature, keep, job_id, stat_id);"
@@ -295,7 +296,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "insert into stats(hashcode, status, runtime, cputime, membytes, ibytes, obytes)"
     " values(?, ?, ?, ?, ?, ?, ?)";
   const char *sql_link_stats =
-    "update jobs set stat_id=?, endtime=current_timestamp, keep=? where job_id=?";
+    "update jobs set stat_id=?, starttime=?, endtime=?, keep=? where job_id=?";
   const char *sql_detect_overlap =
     "select f.path from filetree t1, filetree t2, files f"
     " where t1.job_id=?1 and t1.access=2 and t2.file_id=t1.file_id and t2.access=2 and t2.job_id<>?1 and f.file_id=t1.file_id";
@@ -314,19 +315,19 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "  where j1.job_id=?2 and j1.directory=j2.directory and j1.commandline=j2.commandline"
     "  and j1.environment=j2.environment and j1.stdin=j2.stdin and j2.job_id<>?2)";
   const char *sql_find_job =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from  jobs j left join stats s on j.stat_id=s.stat_id"
     " where j.job_id=?";
   const char *sql_find_owner =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id"
     " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id order by j.job_id";
   const char *sql_find_last =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from jobs j left join stats s on j.stat_id=s.stat_id"
     " where j.run_id==(select max(run_id) from jobs) and substr(cast(commandline as text),1,1) <> '<' order by j.job_id";
   const char *sql_find_failed =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from jobs j left join stats s on j.stat_id=s.stat_id"
     " where s.status<>0 order by j.job_id";
   const char *sql_fetch_hash =
@@ -790,7 +791,7 @@ void Database::insert_job(
   end_txn();
 }
 
-void Database::finish_job(long job, const std::string &inputs, const std::string &outputs, uint64_t hashcode, bool keep, Usage reality) {
+void Database::finish_job(long job, const std::string &inputs, const std::string &outputs, int64_t starttime, int64_t endtime, uint64_t hashcode, bool keep, Usage reality) {
   const char *why = "Could not save job inputs and outputs";
   begin_txn();
   bind_integer(why, imp->add_stats, 1, hashcode);
@@ -802,8 +803,10 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   bind_integer(why, imp->add_stats, 7, reality.obytes);
   single_step (why, imp->add_stats, imp->debugdb);
   bind_integer(why, imp->link_stats, 1, sqlite3_last_insert_rowid(imp->db));
-  bind_integer(why, imp->link_stats, 2, keep?1:0);
-  bind_integer(why, imp->link_stats, 3, job);
+  bind_integer(why, imp->link_stats, 2, starttime);
+  bind_integer(why, imp->link_stats, 3, endtime);
+  bind_integer(why, imp->link_stats, 4, keep?1:0);
+  bind_integer(why, imp->link_stats, 5, job);
   single_step (why, imp->link_stats, imp->debugdb);
   // Grab the visible set
   std::set<std::string> visible;
@@ -970,6 +973,21 @@ static std::vector<std::string> chop_null(const std::string &str) {
   return out;
 }
 
+static std::string format_time(int64_t ns) {
+  char buf[100];
+  struct tm tm;
+  time_t time = ns / 1000000000;
+  long subs = ns % 1000000000;
+  if (subs < 0) {
+    --time;
+    subs += 1000000000;
+  }
+  localtime_r(&time, &tm);
+  strftime(buf, sizeof(buf)-10, "%Y-%m-%d %H:%M:%S.", &tm);
+  snprintf(&buf[strlen(buf)], 10, "%09lu", subs);
+  return buf;
+}
+
 static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
   const char *why = "Could not describe job";
   JobReflection desc;
@@ -981,14 +999,15 @@ static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
   desc.environment    = chop_null(rip_column(query, 4));
   desc.stack          = rip_column(query, 5);
   desc.stdin_file     = rip_column(query, 6);
-  desc.time           = rip_column(query, 7);
-  desc.stale          = sqlite3_column_int64 (query, 8) != 0;
-  desc.usage.status   = sqlite3_column_int64 (query, 9);
-  desc.usage.runtime  = sqlite3_column_double(query, 10);
-  desc.usage.cputime  = sqlite3_column_double(query, 11);
-  desc.usage.membytes = sqlite3_column_int64 (query, 12);
-  desc.usage.ibytes   = sqlite3_column_int64 (query, 13);
-  desc.usage.obytes   = sqlite3_column_int64 (query, 14);
+  desc.starttime      = format_time(sqlite3_column_int64(query, 7));
+  desc.endtime        = format_time(sqlite3_column_int64(query, 8));
+  desc.stale          = sqlite3_column_int64 (query, 9) != 0;
+  desc.usage.status   = sqlite3_column_int64 (query, 10);
+  desc.usage.runtime  = sqlite3_column_double(query, 11);
+  desc.usage.cputime  = sqlite3_column_double(query, 12);
+  desc.usage.membytes = sqlite3_column_int64 (query, 13);
+  desc.usage.ibytes   = sqlite3_column_int64 (query, 14);
+  desc.usage.obytes   = sqlite3_column_int64 (query, 15);
   if (desc.stdin_file.empty()) desc.stdin_file = "/dev/null";
   if (verbose) {
     desc.stdout_payload = db->get_output(desc.job, 1);

@@ -58,7 +58,8 @@ struct JobReflection {
   std::vector<std::string> environment;
   std::string stack;
   std::string stdin_file;
-  std::string time;
+  std::string starttime;
+  std::string endtime;
   std::string stdout_payload;
   std::string stderr_payload;
   Usage usage;
@@ -121,6 +122,8 @@ struct Database {
     long job,
     const std::string &inputs,  // null separated
     const std::string &outputs, // null separated
+    int64_t starttime,
+    int64_t endtime,
     uint64_t hashcode,
     bool keep,
     Usage reality);

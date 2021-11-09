@@ -128,8 +128,8 @@ static int ilog10(int x)
 static void status_redraw(bool idle)
 {
   std::stringstream os;
-  struct timeval now;
-  gettimeofday(&now, 0);
+  struct timespec now;
+  clock_gettime(CLOCK_REALTIME, &now);
 
   refresh_needed = false;
   if (resize_detected) {
@@ -153,7 +153,7 @@ static void status_redraw(bool idle)
 
     double runtime =
       (now.tv_sec  - x.launch.tv_sec) +
-      (now.tv_usec - x.launch.tv_usec) / 1000000.0;
+      (now.tv_nsec - x.launch.tv_nsec) / 1000000000.0;
 
     if (x.budget < MIN_DRAW_TIME && runtime < MIN_DRAW_TIME) {
       --total;
