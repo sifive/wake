@@ -327,7 +327,7 @@ void status_init()
 
     // watch for resize events
     sa.sa_handler = handle_SIGWINCH;
-    sa.sa_flags = SA_RESTART; // interrupting pselect() is not critical for this
+    sa.sa_flags = SA_RESTART; // we don't interrupt the main loop for this
     sigaction(wake_SIGWINCH, &sa, 0);
     handle_SIGWINCH(wake_SIGWINCH);
 

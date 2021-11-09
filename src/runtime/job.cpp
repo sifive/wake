@@ -37,6 +37,7 @@
 #include <sstream>
 #include <iostream>
 #include <list>
+#include <map>
 #include <vector>
 #include <cstring>
 #include <algorithm>
@@ -53,6 +54,7 @@
 #include "util/location.h"
 #include "util/shell.h"
 #include "util/execpath.h"
+#include "poll.h"
 #include "status.h"
 #include "value.h"
 #include "database.h"
@@ -65,8 +67,6 @@
 #define TERM_BASE_GAP_MS 100
 // The most file descriptors used by wake for itself (database/stdio/etc)
 #define MAX_SELF_FDS	24
-// The most children wake will ever allow to run at once
-#define MAX_CHILDREN	500
 // The default memory to provision for jobs (2MB)
 #define DEFAULT_PHYS_USAGE	(2*1024*1024)
 
@@ -245,6 +245,7 @@ static bool operator < (const std::unique_ptr<Task> &x, const std::unique_ptr<Ta
 
 // A JobEntry is a forked job with pid|stdout|stderr incomplete
 struct JobEntry {
+  JobTable::detail *imp;
   RootPointer<Job> job; // if unset, available for reuse
   pid_t pid;       //  0 if merged
   int pipe_stdout; // -1 if closed
@@ -254,7 +255,11 @@ struct JobEntry {
   std::string echo_line;
   struct timeval start;
   std::list<Status>::iterator status;
-  JobEntry(RootPointer<Job> &&job_) : job(std::move(job_)), pid(0), pipe_stdout(-1), pipe_stderr(-1) { }
+
+  JobEntry(JobTable::detail *imp_, RootPointer<Job> &&job_)
+   : imp(imp_), job(std::move(job_)), pid(0), pipe_stdout(-1), pipe_stderr(-1) { }
+  ~JobEntry();
+
   double runtime(struct timeval now);
 };
 
@@ -269,9 +274,12 @@ struct CriticalJob {
 
 // Implementation details for a JobTable
 struct JobTable::detail {
-  std::list<JobEntry> running;
+  Poll poll;
+  long num_running;
+  std::map<pid_t, std::shared_ptr<JobEntry> > pidmap;
+  std::map<int, std::shared_ptr<JobEntry> > pipes;
   std::vector<std::unique_ptr<Task> > pending;
-  sigset_t block; // signals that can race with pselect()
+  sigset_t block; // signals that can race with poll.wait()
   Database *db;
   double active, limit; // CPUs
   uint64_t phys_active, phys_limit; // memory
@@ -291,10 +299,11 @@ CriticalJob JobTable::detail::critJob(double nexttime) const {
   CriticalJob out;
   out.pathtime = nexttime;
   out.runtime = 0;
-  for (auto &j : running) {
-    if (j.pid && j.job->pathtime > out.pathtime) {
-      out.pathtime = j.job->pathtime;
-      out.runtime = j.job->record.runtime;
+  for (auto &pm : pidmap) {
+    Job *job = pm.second->job.get();
+    if (job->pathtime > out.pathtime) {
+      out.pathtime = job->pathtime;
+      out.runtime = job->record.runtime;
     }
   }
   for (auto &j : pending) {
@@ -425,6 +434,7 @@ static int get_concurrency() {
 }
 
 JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool debug, bool verbose, bool quiet, bool check, bool batch) : imp(new JobTable::detail) {
+  imp->num_running = 0;
   imp->debug = debug;
   imp->verbose = verbose;
   imp->quiet = quiet;
@@ -462,11 +472,11 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   sigaction(SIGUSR1, &sa, 0);
   sigaction(SIGUSR2, &sa, 0);
 
-  // SIGCHLD interrupts pselect()
+  // SIGCHLD interrupts poll.wait()
   sa.sa_handler = handle_SIGCHLD;
   sa.sa_flags = SA_NOCLDSTOP;
-  // no SA_RESTART, because we need to interrupt pselect() portably
-  // to protect other syscalls, we keep SIGCHLD blocked except in pselect()
+  // no SA_RESTART, because we need to interrupt poll.wait() portably
+  // to protect other syscalls, we keep SIGCHLD blocked except in poll.wait()
   sigaddset(&imp->block, SIGCHLD);
   sigprocmask(SIG_BLOCK, &imp->block, 0);
   sigaction(SIGCHLD, &sa, 0);
@@ -481,7 +491,7 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   sigaction(SIGXCPU, &sa, 0);
   sigaction(SIGXFSZ, &sa, 0);
 
-  // Add to the set of signals we need to interrupt pselect()
+  // Add to the set of signals we need to interrupt poll.wait()
   sigaddset(&imp->block, SIGHUP);
   sigaddset(&imp->block, SIGINT);
   sigaddset(&imp->block, SIGQUIT);
@@ -493,58 +503,41 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   sigaddset(&imp->block, SIGALRM);
   sigaddset(&imp->block, wake_SIGWINCH);
 
-  // Determine the available file descriptor limits
-  struct rlimit limit;
-  if (getrlimit(RLIMIT_NOFILE, &limit) != 0) {
-    perror("getrlimit(RLIMIT_NOFILE)");
-    exit(1);
-  }
+  // Calculate the maximum number of children we will run
 
-  // Calculate the maximum number of children to ever run
-  imp->max_children = imp->limit * 100; // based on minimum 1% CPU utilization in Job::threads
-  if (imp->max_children < 1) imp->max_children = 1;
-  if (imp->max_children > MAX_CHILDREN) imp->max_children = MAX_CHILDREN; // wake hard cap
+  // We need enough cores (Job::threads has minimum 1% usage)
+  imp->max_children = imp->limit * 100;
 
+  // We need enough process identifiers
   long sys_child_max = sysconf(_SC_CHILD_MAX);
   if (sys_child_max != -1) {
-    if (imp->max_children > sys_child_max/2) imp->max_children = sys_child_max/2;
+    if (imp->max_children > sys_child_max/2)
+      imp->max_children = sys_child_max/2;
   } else {
 #ifdef CHILD_MAX
-    if (imp->max_children > CHILD_MAX/2) imp->max_children = CHILD_MAX/2;   // limits.h
+    if (imp->max_children > CHILD_MAX/2)
+      imp->max_children = CHILD_MAX/2;
 #endif
   }
 
-#ifndef OPEN_MAX
-#define OPEN_MAX 99999
-#endif
-
-  // We want 2 descriptors (stdout+stderr) per job.
-  rlim_t requested = imp->max_children * 2 + MAX_SELF_FDS;
-  rlim_t maximum = (limit.rlim_max == RLIM_INFINITY) ? OPEN_MAX : limit.rlim_max;
-  if (maximum > FD_SETSIZE) maximum = FD_SETSIZE;
-
-  if (maximum < requested) {
-    requested = maximum;
-    std::cerr << "wake wanted a limit of " << imp->max_children;
-    imp->max_children = (maximum - MAX_SELF_FDS) / 2;
-    std::cerr << " children, but only got " << imp->max_children
-      << ", because only " << maximum
-      << " file descriptors are available." << std::endl;
-  }
-
-/*
-  std::cerr << "max children " << imp->max_children << "/" << sys_child_max
-    << " and " << requested << "/" << maximum << std::endl;
-*/
-
-  // Don't decrease limit for child processes
-  if (requested > limit.rlim_cur) {
-    limit.rlim_cur = requested;
-    if (setrlimit(RLIMIT_NOFILE, &limit) != 0) {
-      perror("setrlimit(RLIMIT_NOFILE)");
-      exit(1);
+  // We need enough file descriptors for pipes
+  int maxfd = imp->poll.max_fds();
+  if (imp->max_children > (maxfd - MAX_SELF_FDS) / 2) {
+    if (maxfd < 1024) {
+      std::cerr
+        << "wake wanted a limit of " << imp->max_children
+        << " children, but only got " << (maxfd - MAX_SELF_FDS)/2
+        << ", because only " << maxfd
+        << " file descriptors are available." << std::endl;
     }
+    imp->max_children = (maxfd - MAX_SELF_FDS) / 2;
   }
+
+  // We need at least one child to make forward progress
+  if (imp->max_children < 1)
+    imp->max_children = 1;
+
+  // std::cerr << "max children " << imp->max_children << "/" << sys_child_max << std::endl;
 }
 
 static struct timeval mytimersub(struct timeval a, struct timeval b) {
@@ -574,29 +567,26 @@ JobTable::~JobTable() {
   memset(&timer, 0, sizeof(timer));
   setitimer(ITIMER_REAL, &timer, 0);
 
+  // We don't care about file descriptors any more
+  imp->poll.clear();
+
   // SIGTERM strategy is to double the gap between termination attempts every retry
   struct timeval limit;
   limit.tv_sec  = TERM_BASE_GAP_MS / 1000;
   limit.tv_usec = (TERM_BASE_GAP_MS % 1000) * 1000;
 
   // Try to kill children gently first, once every second
-  bool children = true;
-  for (int retry = 0; children && retry < TERM_ATTEMPTS; ++retry, limit = mytimerdouble(limit)) {
-    children = false;
-
+  for (int retry = 0; !imp->pidmap.empty() && retry < TERM_ATTEMPTS; ++retry, limit = mytimerdouble(limit)) {
     // Send every child SIGTERM
-    for (auto &i : imp->running) {
-      if (i.pid == 0) continue;
-      children = true;
-      kill(i.pid, SIGTERM);
-    }
+    for (auto &i : imp->pidmap)
+      kill(i.first, SIGTERM);
 
     // Reap children for one second; exit early if none remain
     struct timeval start, now, remain;
     struct timespec timeout;
     gettimeofday(&start, 0);
-    for (now = start; children && (remain = mytimersub(limit, mytimersub(now, start))).tv_sec >= 0; gettimeofday(&now, 0)) {
-      // Block racey signals between here and pselect()
+    for (now = start; !imp->pidmap.empty() && (remain = mytimersub(limit, mytimersub(now, start))).tv_sec >= 0; gettimeofday(&now, 0)) {
+      // Block racey signals between here and poll.wait()
       sigset_t saved;
       sigprocmask(SIG_BLOCK, &imp->block, &saved);
       sigdelset(&saved, SIGCHLD);
@@ -606,7 +596,7 @@ JobTable::~JobTable() {
       timeout.tv_nsec = remain.tv_usec * 1000;
 
       // Sleep until timeout or a signal arrives
-      if (!child_ready) pselect(0, 0, 0, 0, &timeout, &saved);
+      if (!child_ready) imp->poll.wait(&timeout, &saved);
 
       // Restore signals
       child_ready = false;
@@ -617,23 +607,17 @@ JobTable::~JobTable() {
       int status;
       while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
         if (WIFSTOPPED(status)) continue;
-
-        children = false;
-        for (auto &i : imp->running) {
-          if (i.pid == pid) i.pid = 0;
-          if (i.pid != 0) children = true;
-        }
+        imp->pidmap.erase(pid);
       }
     }
   }
 
   // Force children to die
-  for (auto &i : imp->running) {
-    if (i.pid == 0) continue;
+  for (auto &i : imp->pidmap) {
     std::stringstream s;
-    s << "Force killing " << i.pid << " after " << TERM_ATTEMPTS << " attempts with SIGTERM" << std::endl;
+    s << "Force killing " << i.first << " after " << TERM_ATTEMPTS << " attempts with SIGTERM" << std::endl;
     status_write(STREAM_ERROR, s.str());
-    kill(i.pid, SIGKILL);
+    kill(i.first, SIGKILL);
   }
 }
 
@@ -684,15 +668,14 @@ static void launch(JobTable *jobtable) {
   //   - even if a job uses more memory than the system has, eventually attempt it anyway (progress)
   auto &heap = jobtable->imp->pending;
   while (!heap.empty()
-      && jobtable->imp->running.size() < (size_t)jobtable->imp->max_children
+      && jobtable->imp->num_running < jobtable->imp->max_children
       && jobtable->imp->active < jobtable->imp->limit
       && (jobtable->imp->phys_active == 0 || jobtable->imp->phys_active + heap.front()->job->memory() < jobtable->imp->phys_limit)) {
     Task &task = *heap.front();
     jobtable->imp->active += task.job->threads();
     jobtable->imp->phys_active += task.job->memory();
 
-    jobtable->imp->running.emplace_back(std::move(task.job));
-    JobEntry &i = jobtable->imp->running.back();
+    std::shared_ptr<JobEntry> entry = std::make_shared<JobEntry>(jobtable->imp.get(), std::move(task.job));
 
     int pipe_stdout[2];
     int pipe_stderr[2];
@@ -703,9 +686,11 @@ static void launch(JobTable *jobtable) {
     int flags;
     if ((flags = fcntl(pipe_stdout[0], F_GETFD, 0)) != -1) fcntl(pipe_stdout[0], F_SETFD, flags | FD_CLOEXEC);
     if ((flags = fcntl(pipe_stderr[0], F_GETFD, 0)) != -1) fcntl(pipe_stderr[0], F_SETFD, flags | FD_CLOEXEC);
-    i.pipe_stdout = pipe_stdout[0];
-    i.pipe_stderr = pipe_stderr[0];
-    gettimeofday(&i.start, 0);
+    jobtable->imp->poll.add(entry->pipe_stdout = pipe_stdout[0]);
+    jobtable->imp->poll.add(entry->pipe_stderr = pipe_stderr[0]);
+    jobtable->imp->pipes[pipe_stdout[0]] = entry;
+    jobtable->imp->pipes[pipe_stderr[0]] = entry;
+    gettimeofday(&entry->start, 0);
     std::stringstream prelude;
     prelude << find_execpath() << "/../lib/wake/shim-wake" << '\0'
       << (task.stdin_file.empty() ? "/dev/null" : task.stdin_file.c_str()) << '\0'
@@ -725,20 +710,22 @@ static void launch(JobTable *jobtable) {
 
     delete [] cmdline;
     delete [] environ;
-    i.job->pid = i.pid = pid;
-    i.job->state |= STATE_FORKED;
+    ++jobtable->imp->num_running;
+    jobtable->imp->pidmap[pid] = entry;
+    entry->job->pid = entry->pid = pid;
+    entry->job->state |= STATE_FORKED;
     close(pipe_stdout[1]);
     close(pipe_stderr[1]);
-    bool indirect = *i.job->cmdline != task.cmdline;
-    double predict = i.job->predict.status == 0 ? i.job->predict.runtime : 0;
-    std::string pretty = pretty_cmd(i.job->cmdline->as_str());
-    std::string clone(i.job->label->empty() ? pretty : i.job->label->as_str());
+    bool indirect = *entry->job->cmdline != task.cmdline;
+    double predict = entry->job->predict.status == 0 ? entry->job->predict.runtime : 0;
+    std::string pretty = pretty_cmd(entry->job->cmdline->as_str());
+    std::string clone(entry->job->label->empty() ? pretty : entry->job->label->as_str());
     for (auto &c : clone) if (c == '\n') c = ' ';
-    i.status = status_state.jobs.emplace(status_state.jobs.end(), clone, predict, i.start);
+    entry->status = status_state.jobs.emplace(status_state.jobs.end(), clone, predict, entry->start);
     std::stringstream s;
-    if (*i.job->dir != ".") s << "cd " << i.job->dir->c_str() << "; ";
+    if (*entry->job->dir != ".") s << "cd " << entry->job->dir->c_str() << "; ";
     s << pretty;
-    if (!i.job->stdin_file->empty()) s << " < " << shell_escape(i.job->stdin_file->c_str());
+    if (!entry->job->stdin_file->empty()) s << " < " << shell_escape(entry->job->stdin_file->c_str());
     if (indirect && jobtable->imp->debug) {
       s << " # launched by: ";
       if (task.dir != ".") s << "cd " << task.dir << "; ";
@@ -748,14 +735,14 @@ static void launch(JobTable *jobtable) {
     s << std::endl;
     std::string out = s.str();
     if (jobtable->imp->batch) {
-      i.echo_line = std::move(out);
+      entry->echo_line = std::move(out);
     } else {
-      status_write(i.job->echo.c_str(), out.data(), out.size());
+      status_write(entry->job->echo.c_str(), out.data(), out.size());
     }
 
 #if 0
     std::stringstream s;
-    s << "Scheduled " << i.job->threads()
+    s << "Scheduled " << entry->job->threads()
       << " for a total of " << jobtable->imp->active
       << " utilized cores and " << jobtable->imp->running.size()
       << " running tasks." << std::endl;
@@ -763,36 +750,28 @@ static void launch(JobTable *jobtable) {
     status_write(2, out.data(), out.size());
 #endif
 
-    // i.job->stdin_file.clear();
-    // i.job->cmdline.clear();
+    // entry->job->stdin_file.clear();
+    // entry->job->cmdline.clear();
 
     std::pop_heap(heap.begin(), heap.end());
     heap.resize(heap.size()-1);
   }
 }
 
-struct CompletedJobEntry {
-  JobTable *jobtable;
-  CompletedJobEntry(JobTable *jobtable_) : jobtable(jobtable_) { }
-
-  bool operator () (const JobEntry &i) {
-    if (i.pid == 0 && i.pipe_stdout == -1 && i.pipe_stderr == -1) {
-      status_state.jobs.erase(i.status);
-      jobtable->imp->active -= i.job->threads();
-      jobtable->imp->phys_active -= i.job->memory();
-      if (jobtable->imp->batch) {
-        if (!i.echo_line.empty())
-          status_write(i.job->echo.c_str(), i.echo_line.c_str(), i.echo_line.size());
-        jobtable->imp->db->replay_output(
-          i.job->job,
-          i.job->stream_out.c_str(),
-          i.job->stream_err.c_str());
-      }
-      return true;
-    }
-    return false;
+JobEntry::~JobEntry() {
+  status_state.jobs.erase(status);
+  --imp->num_running;
+  imp->active -= job->threads();
+  imp->phys_active -= job->memory();
+  if (imp->batch) {
+    if (!echo_line.empty())
+      status_write(job->echo.c_str(), echo_line.c_str(), echo_line.size());
+    imp->db->replay_output(
+      job->job,
+      job->stream_out.c_str(),
+      job->stream_err.c_str());
   }
-};
+}
 
 bool JobTable::wait(Runtime &runtime) {
   char buffer[4096];
@@ -802,22 +781,7 @@ bool JobTable::wait(Runtime &runtime) {
   launch(this);
 
   bool compute = false;
-  while (!exit_now() && !imp->running.empty()) {
-    fd_set set;
-    int nfds = 0;
-
-    FD_ZERO(&set);
-    for (auto &i : imp->running) {
-      if (i.pipe_stdout != -1) {
-        if (i.pipe_stdout >= nfds) nfds = i.pipe_stdout + 1;
-        FD_SET(i.pipe_stdout, &set);
-      }
-      if (i.pipe_stderr != -1) {
-        if (i.pipe_stderr >= nfds) nfds = i.pipe_stderr + 1;
-        FD_SET(i.pipe_stderr, &set);
-      }
-    }
-
+  while (!exit_now() && imp->num_running) {
     // Block all signals we expect to interrupt pselect
     sigset_t saved;
     sigprocmask(SIG_BLOCK, &imp->block, &saved);
@@ -844,73 +808,77 @@ bool JobTable::wait(Runtime &runtime) {
     status_refresh(true);
 
     // Wait for a status change, with signals atomically unblocked in pselect
-    int retval = pselect(nfds, &set, 0, 0, timeout, &saved);
+    std::vector<int> ready_fds = imp->poll.wait(timeout, &saved);
 
     // Restore signal mask
     sigaddset(&saved, SIGCHLD);
     sigprocmask(SIG_SETMASK, &saved, 0);
-
-    if (retval == -1 && errno != EINTR) {
-      perror("pselect");
-      exit(1);
-    }
 
     struct timeval now;
     gettimeofday(&now, 0);
 
     int done = 0;
 
-    if (retval > 0) for (auto &i : imp->running) {
-      if (i.pipe_stdout != -1 && FD_ISSET(i.pipe_stdout, &set)) {
-        int got = read(i.pipe_stdout, buffer, sizeof(buffer));
+    for (auto fd : ready_fds) {
+      auto it = imp->pipes.find(fd);
+      assert (it != imp->pipes.end()); // ready_fds <= poll_fds == pipes.keys()
+      std::shared_ptr<JobEntry> entry = it->second;
+      assert (entry);
+
+      if (entry->pipe_stdout == fd) {
+        int got = read(fd, buffer, sizeof(buffer));
         if (got == 0 || (got < 0 && errno != EINTR)) {
-          close(i.pipe_stdout);
-          i.pipe_stdout = -1;
-          i.status->wait_stdout = false;
-          i.job->state |= STATE_STDOUT;
+          imp->pipes.erase(it);
+          imp->poll.remove(fd);
+          close(fd);
+          entry->pipe_stdout = -1;
+          entry->status->wait_stdout = false;
+          entry->job->state |= STATE_STDOUT;
           runtime.heap.guarantee(WJob::reserve());
-          runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
+          runtime.schedule(WJob::claim(runtime.heap, entry->job.get()));
           ++done;
-          if (!imp->batch && !i.stdout_buf.empty()) {
-            if (i.stdout_buf.back() != '\n') i.stdout_buf.push_back('\n');
-            status_write(i.job->stream_out.c_str(), i.stdout_buf.data(), i.stdout_buf.size());
-            i.stdout_buf.clear();
+          if (!imp->batch && !entry->stdout_buf.empty()) {
+            if (entry->stdout_buf.back() != '\n') entry->stdout_buf.push_back('\n');
+            status_write(entry->job->stream_out.c_str(), entry->stdout_buf.data(), entry->stdout_buf.size());
+            entry->stdout_buf.clear();
           }
         } else {
-          i.job->db->save_output(i.job->job, 1, buffer, got, i.runtime(now));
+          entry->job->db->save_output(entry->job->job, 1, buffer, got, entry->runtime(now));
           if (!imp->batch) {
-            i.stdout_buf.append(buffer, got);
-            size_t dump = i.stdout_buf.rfind('\n');
+            entry->stdout_buf.append(buffer, got);
+            size_t dump = entry->stdout_buf.rfind('\n');
             if (dump != std::string::npos) {
-              status_write(i.job->stream_out.c_str(), i.stdout_buf.data(), dump+1);
-              i.stdout_buf.erase(0, dump+1);
+              status_write(entry->job->stream_out.c_str(), entry->stdout_buf.data(), dump+1);
+              entry->stdout_buf.erase(0, dump+1);
             }
           }
         }
       }
-      if (i.pipe_stderr != -1 && FD_ISSET(i.pipe_stderr, &set)) {
-        int got = read(i.pipe_stderr, buffer, sizeof(buffer));
+      if (entry->pipe_stderr == fd) {
+        int got = read(fd, buffer, sizeof(buffer));
         if (got == 0 || (got < 0 && errno != EINTR)) {
-          close(i.pipe_stderr);
-          i.pipe_stderr = -1;
-          i.status->wait_stderr = false;
-          i.job->state |= STATE_STDERR;
+          imp->pipes.erase(it);
+          imp->poll.remove(fd);
+          close(fd);
+          entry->pipe_stderr = -1;
+          entry->status->wait_stderr = false;
+          entry->job->state |= STATE_STDERR;
           runtime.heap.guarantee(WJob::reserve());
-          runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
+          runtime.schedule(WJob::claim(runtime.heap, entry->job.get()));
           ++done;
-          if (!imp->batch && !i.stderr_buf.empty()) {
-            if (i.stderr_buf.back() != '\n') i.stderr_buf.push_back('\n');
-            status_write(i.job->stream_err.c_str(), i.stderr_buf.data(), i.stderr_buf.size());
-            i.stderr_buf.clear();
+          if (!imp->batch && !entry->stderr_buf.empty()) {
+            if (entry->stderr_buf.back() != '\n') entry->stderr_buf.push_back('\n');
+            status_write(entry->job->stream_err.c_str(), entry->stderr_buf.data(), entry->stderr_buf.size());
+            entry->stderr_buf.clear();
           }
         } else {
-          i.job->db->save_output(i.job->job, 2, buffer, got, i.runtime(now));
+          entry->job->db->save_output(entry->job->job, 2, buffer, got, entry->runtime(now));
           if (!imp->batch) {
-            i.stderr_buf.append(buffer, got);
-            size_t dump = i.stderr_buf.rfind('\n');
+            entry->stderr_buf.append(buffer, got);
+            size_t dump = entry->stderr_buf.rfind('\n');
             if (dump != std::string::npos) {
-              status_write(i.job->stream_err.c_str(), i.stderr_buf.data(), dump+1);
-              i.stderr_buf.erase(0, dump+1);
+              status_write(entry->job->stream_err.c_str(), entry->stderr_buf.data(), dump+1);
+              entry->stderr_buf.erase(0, dump+1);
             }
           }
         }
@@ -935,34 +903,38 @@ bool JobTable::wait(Runtime &runtime) {
       RUsage childUsage = rusage_sub(totalUsage, imp->childrenUsage);
       imp->childrenUsage = totalUsage;
 
-      for (auto &i : imp->running) {
-        if (i.pid == pid) {
-          i.pid = 0;
-          i.status->merged = true;
-          i.job->state |= STATE_MERGED;
-          i.job->reality.found    = true;
-          i.job->reality.status   = code;
-          i.job->reality.runtime  = i.runtime(now);
-          i.job->reality.cputime  = childUsage.utime + childUsage.stime;
-          i.job->reality.membytes = childUsage.membytes;
-          i.job->reality.ibytes   = childUsage.ibytes;
-          i.job->reality.obytes   = childUsage.obytes;
-          runtime.heap.guarantee(WJob::reserve());
-          runtime.schedule(WJob::claim(runtime.heap, i.job.get()));
+      // It is possible that this is not our child
+      auto it = imp->pidmap.find(pid);
+      if (it == imp->pidmap.end()) continue;
 
-          // If this was the job on the critical path, adjust remain
-          if (i.job->pathtime == status_state.remain) {
-            auto crit = imp->critJob(ALMOST_ONE * (i.job->pathtime - i.job->record.runtime));
+      std::shared_ptr<JobEntry> entry = it->second;
+      imp->pidmap.erase(it);
+      assert (entry);
+
+      entry->pid = 0;
+      entry->status->merged = true;
+      entry->job->state |= STATE_MERGED;
+      entry->job->reality.found    = true;
+      entry->job->reality.status   = code;
+      entry->job->reality.runtime  = entry->runtime(now);
+      entry->job->reality.cputime  = childUsage.utime + childUsage.stime;
+      entry->job->reality.membytes = childUsage.membytes;
+      entry->job->reality.ibytes   = childUsage.ibytes;
+      entry->job->reality.obytes   = childUsage.obytes;
+      runtime.heap.guarantee(WJob::reserve());
+      runtime.schedule(WJob::claim(runtime.heap, entry->job.get()));
+
+      // If this was the job on the critical path, adjust remain
+      if (entry->job->pathtime == status_state.remain) {
+        auto crit = imp->critJob(ALMOST_ONE * (entry->job->pathtime - entry->job->record.runtime));
 #ifdef DEBUG_PROGRESS
-            std::cerr << "RUN DONE CRIT: "
-              << status_state.remain << " => " << crit.pathtime << "  /  "
-              << status_state.total << std::endl;
+        std::cerr << "RUN DONE CRIT: "
+          << status_state.remain << " => " << crit.pathtime << "  /  "
+          << status_state.total << std::endl;
 #endif
-            status_state.remain = crit.pathtime;
-            status_state.current = crit.runtime;
-            if (crit.runtime == 0) imp->wall = now;
-          }
-        }
+        status_state.remain = crit.pathtime;
+        status_state.current = crit.runtime;
+        if (crit.runtime == 0) imp->wall = now;
       }
     }
 
@@ -976,9 +948,6 @@ bool JobTable::wait(Runtime &runtime) {
         status_state.current = crit.runtime;
       }
     }
-
-    CompletedJobEntry pred(this);
-    imp->running.remove_if(pred);
 
     if (done > 0) {
       compute = true;

@@ -22,6 +22,8 @@
 
 #include <sys/time.h>
 #include <unistd.h>
+#include <poll.h>
+
 #include <iostream>
 #include <string>
 #include <map>
@@ -250,29 +252,25 @@ private:
         free(buf);
 
         if (out.empty()) {
-          poll();
+          timeout();
           continue;
         }
 
         return out;
 #else
-        fd_set rfds;
-        FD_ZERO(&rfds);
-        FD_SET(STDIN_FILENO, &rfds);
+        struct pollfd pfds;
+        pfds.fd = STDIN_FILENO;
+        pfds.events = POLLIN;
 
-        struct timeval tv;
-        tv.tv_sec = 2;
-        tv.tv_usec = 0;
-
-        int ret = select(STDIN_FILENO+1, &rfds, nullptr, nullptr, &tv);
+        int ret = poll(&pfds, 1, 2000);
         if (ret == -1) {
-          perror("select(stdin)");
+          perror("poll(stdin)");
           exit(1);
         }
 
         // Timeout expired?
         if (ret == 0) {
-          poll();
+          timeout();
           continue;
         }
 
@@ -314,7 +312,7 @@ private:
       }
     }
 
-    void poll() {
+    void timeout() {
       refresh("timeout");
     }
 

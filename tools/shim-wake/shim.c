@@ -21,6 +21,9 @@
 
 /* Wake vfork exec shim */
 #include <sys/stat.h>
+#include <sys/resource.h>
+#include <sys/time.h>
+#include <sys/select.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -119,6 +122,7 @@ static int do_hash(const char *file) {
 
 int main(int argc, char **argv) {
   int stdin_fd, stdout_fd, stderr_fd;
+  struct rlimit nfd;
   const char *dir;
 
   if (argc < 6) return 1;
@@ -126,6 +130,20 @@ int main(int argc, char **argv) {
   // Spawn all wake child processes with a reproducible default umask.
   // The main wake process has umask(0), but children should not use this.
   umask(S_IWGRP | S_IWOTH);
+
+  // Put a safety net down for child process that might use select()
+  if (getrlimit(RLIMIT_NOFILE, &nfd) == -1) {
+    perror("getrlimit(RLIMIT_NOFILE)");
+    return 127;
+  }
+
+  if (nfd.rlim_cur == RLIM_INFINITY || nfd.rlim_cur > FD_SETSIZE) {
+    nfd.rlim_cur = FD_SETSIZE;
+    if (setrlimit(RLIMIT_NOFILE, &nfd) == -1) {
+      perror("getrlimit(RLIMIT_NOFILE)");
+      return 127;
+    }
+  }
 
   dir = argv[4];
   if ((dir[0] != '.' || dir[1] != 0) && chdir(dir)) {
