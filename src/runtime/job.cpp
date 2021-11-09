@@ -67,8 +67,6 @@
 #define TERM_BASE_GAP_MS 100
 // The most file descriptors used by wake for itself (database/stdio/etc)
 #define MAX_SELF_FDS	24
-// The most children wake will ever allow to run at once
-#define MAX_CHILDREN	500
 // The default memory to provision for jobs (2MB)
 #define DEFAULT_PHYS_USAGE	(2*1024*1024)
 
@@ -505,58 +503,41 @@ JobTable::JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool
   sigaddset(&imp->block, SIGALRM);
   sigaddset(&imp->block, wake_SIGWINCH);
 
-  // Determine the available file descriptor limits
-  struct rlimit limit;
-  if (getrlimit(RLIMIT_NOFILE, &limit) != 0) {
-    perror("getrlimit(RLIMIT_NOFILE)");
-    exit(1);
-  }
+  // Calculate the maximum number of children we will run
 
-  // Calculate the maximum number of children to ever run
-  imp->max_children = imp->limit * 100; // based on minimum 1% CPU utilization in Job::threads
-  if (imp->max_children < 1) imp->max_children = 1;
-  if (imp->max_children > MAX_CHILDREN) imp->max_children = MAX_CHILDREN; // wake hard cap
+  // We need enough cores (Job::threads has minimum 1% usage)
+  imp->max_children = imp->limit * 100;
 
+  // We need enough process identifiers
   long sys_child_max = sysconf(_SC_CHILD_MAX);
   if (sys_child_max != -1) {
-    if (imp->max_children > sys_child_max/2) imp->max_children = sys_child_max/2;
+    if (imp->max_children > sys_child_max/2)
+      imp->max_children = sys_child_max/2;
   } else {
 #ifdef CHILD_MAX
-    if (imp->max_children > CHILD_MAX/2) imp->max_children = CHILD_MAX/2;   // limits.h
+    if (imp->max_children > CHILD_MAX/2)
+      imp->max_children = CHILD_MAX/2;
 #endif
   }
 
-#ifndef OPEN_MAX
-#define OPEN_MAX 99999
-#endif
-
-  // We want 2 descriptors (stdout+stderr) per job.
-  rlim_t requested = imp->max_children * 2 + MAX_SELF_FDS;
-  rlim_t maximum = (limit.rlim_max == RLIM_INFINITY) ? OPEN_MAX : limit.rlim_max;
-  if (maximum > FD_SETSIZE) maximum = FD_SETSIZE;
-
-  if (maximum < requested) {
-    requested = maximum;
-    std::cerr << "wake wanted a limit of " << imp->max_children;
-    imp->max_children = (maximum - MAX_SELF_FDS) / 2;
-    std::cerr << " children, but only got " << imp->max_children
-      << ", because only " << maximum
-      << " file descriptors are available." << std::endl;
-  }
-
-/*
-  std::cerr << "max children " << imp->max_children << "/" << sys_child_max
-    << " and " << requested << "/" << maximum << std::endl;
-*/
-
-  // Don't decrease limit for child processes
-  if (requested > limit.rlim_cur) {
-    limit.rlim_cur = requested;
-    if (setrlimit(RLIMIT_NOFILE, &limit) != 0) {
-      perror("setrlimit(RLIMIT_NOFILE)");
-      exit(1);
+  // We need enough file descriptors for pipes
+  int maxfd = imp->poll.max_fds();
+  if (imp->max_children > (maxfd - MAX_SELF_FDS) / 2) {
+    if (maxfd < 1024) {
+      std::cerr
+        << "wake wanted a limit of " << imp->max_children
+        << " children, but only got " << (maxfd - MAX_SELF_FDS)/2
+        << ", because only " << maxfd
+        << " file descriptors are available." << std::endl;
     }
+    imp->max_children = (maxfd - MAX_SELF_FDS) / 2;
   }
+
+  // We need at least one child to make forward progress
+  if (imp->max_children < 1)
+    imp->max_children = 1;
+
+  // std::cerr << "max children " << imp->max_children << "/" << sys_child_max << std::endl;
 }
 
 static struct timeval mytimersub(struct timeval a, struct timeval b) {
