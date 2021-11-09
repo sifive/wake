@@ -51,6 +51,7 @@ struct JobTag {
 
 struct JobReflection {
   long job;
+  bool stale;
   std::string label;
   std::string directory;
   std::vector<std::string> commandline;

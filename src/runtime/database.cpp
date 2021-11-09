@@ -32,7 +32,7 @@
 #include "status.h"
 
 // Increment every time the database schema changes
-#define SCHEMA_VERSION "1"
+#define SCHEMA_VERSION "2"
 
 #define VISIBLE 0
 #define INPUT 1
@@ -171,7 +171,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "  stack       blob    not null,"
     "  stat_id     integer references stats(stat_id)," // null if unmerged
     "  endtime     text    not null default '',"
-    "  keep        integer not null default 0);"       // 0=false, 1=true
+    "  keep        integer not null default 0,"
+    "  stale       integer not null default 0);"       // 0=false, 1=true
     "create index if not exists job on jobs(directory, commandline, environment, stdin, signature, keep, job_id, stat_id);"
     "create index if not exists jobstats on jobs(stat_id);"
     "create table if not exists filetree("
@@ -276,7 +277,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "insert into log(job_id, descriptor, seconds, output)"
     " values(?, ?, ?, ?)";
   const char *sql_wipe_file =
-    "delete from jobs where job_id in"
+    "update jobs set stale=1 where job_id in"
     " (select t.job_id from files f, filetree t"
     "  where f.path=? and f.hash<>? and t.file_id=f.file_id and t.access=1)";
   const char *sql_insert_file =
@@ -304,7 +305,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "  where t1.job_id=?2 and t1.access=2 and t2.file_id=t1.file_id and t2.access=2 and t2.job_id<>?2)";
   const char *sql_find_prior =
     "select job_id, stat_id from jobs where "
-    "directory=? and commandline=? and environment=? and stdin=? and signature=? and keep=1";
+    "directory=? and commandline=? and environment=? and stdin=? and signature=? and keep=1 and stale=0";
   const char *sql_update_prior =
     "update jobs set use_id=? where job_id=?";
   const char *sql_delete_prior =
@@ -313,19 +314,19 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "  where j1.job_id=?2 and j1.directory=j2.directory and j1.commandline=j2.commandline"
     "  and j1.environment=j2.environment and j1.stdin=j2.stdin and j2.job_id<>?2)";
   const char *sql_find_job =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from  jobs j left join stats s on j.stat_id=s.stat_id"
     " where j.job_id=?";
   const char *sql_find_owner =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id"
     " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id order by j.job_id";
   const char *sql_find_last =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from jobs j left join stats s on j.stat_id=s.stat_id"
     " where j.run_id==(select max(run_id) from jobs) and substr(cast(commandline as text),1,1) <> '<' order by j.job_id";
   const char *sql_find_failed =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from jobs j left join stats s on j.stat_id=s.stat_id"
     " where s.status<>0 order by j.job_id";
   const char *sql_fetch_hash =
@@ -981,12 +982,13 @@ static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
   desc.stack          = rip_column(query, 5);
   desc.stdin_file     = rip_column(query, 6);
   desc.time           = rip_column(query, 7);
-  desc.usage.status   = sqlite3_column_int64 (query, 8);
-  desc.usage.runtime  = sqlite3_column_double(query, 9);
-  desc.usage.cputime  = sqlite3_column_double(query, 10);
-  desc.usage.membytes = sqlite3_column_int64 (query, 11);
-  desc.usage.ibytes   = sqlite3_column_int64 (query, 12);
-  desc.usage.obytes   = sqlite3_column_int64 (query, 13);
+  desc.stale          = sqlite3_column_int64 (query, 8) != 0;
+  desc.usage.status   = sqlite3_column_int64 (query, 9);
+  desc.usage.runtime  = sqlite3_column_double(query, 10);
+  desc.usage.cputime  = sqlite3_column_double(query, 11);
+  desc.usage.membytes = sqlite3_column_int64 (query, 12);
+  desc.usage.ibytes   = sqlite3_column_int64 (query, 13);
+  desc.usage.obytes   = sqlite3_column_int64 (query, 14);
   if (desc.stdin_file.empty()) desc.stdin_file = "/dev/null";
   if (verbose) {
     desc.stdout_payload = db->get_output(desc.job, 1);
