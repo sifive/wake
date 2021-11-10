@@ -22,6 +22,7 @@
 #include <sqlite3.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 
 #include <unordered_set>
 #include <iostream>
@@ -32,7 +33,7 @@
 #include "status.h"
 
 // Increment every time the database schema changes
-#define SCHEMA_VERSION "3"
+#define SCHEMA_VERSION "5"
 
 #define VISIBLE 0
 #define INPUT 1
@@ -44,6 +45,7 @@ struct Database::detail {
   sqlite3 *db;
   sqlite3_stmt *get_entropy;
   sqlite3_stmt *set_entropy;
+  sqlite3_stmt *add_run;
   sqlite3_stmt *begin_txn;
   sqlite3_stmt *commit_txn;
   sqlite3_stmt *predict_job;
@@ -81,7 +83,7 @@ struct Database::detail {
 
   long run_id;
   detail(bool debugdb_)
-   : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), begin_txn(0),
+   : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), add_run(0), begin_txn(0),
      commit_txn(0), predict_job(0), stats_job(0), insert_job(0), insert_tree(0), insert_log(0),
      wipe_file(0), insert_file(0), update_file(0), get_log(0), replay_log(0), get_tree(0), add_stats(0),
      link_stats(0), detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0),
@@ -139,8 +141,9 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "create table if not exists schema("
     "  version integer primary key);"
     "create table if not exists runs("
-    "  run_id integer primary key autoincrement,"
-    "  time   text    not null default current_timestamp);"
+    "  run_id  integer primary key autoincrement,"
+    "  time    integer not null,"
+    "  cmdline text    not null);"
     "create table if not exists files("
     "  file_id  integer primary key,"
     "  path     text    not null,"
@@ -260,6 +263,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   // prepare statements
   const char *sql_get_entropy = "select seed from entropy order by row_id";
   const char *sql_set_entropy = "insert into entropy(seed) values(?)";
+  const char *sql_add_run = "insert into runs(time, cmdline) values(?, ?)";
   const char *sql_begin_txn = "begin transaction";
   const char *sql_commit_txn = "commit transaction";
   const char *sql_predict_job =
@@ -315,20 +319,20 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "  where j1.job_id=?2 and j1.directory=j2.directory and j1.commandline=j2.commandline"
     "  and j1.environment=j2.environment and j1.stdin=j2.stdin and j2.job_id<>?2)";
   const char *sql_find_job =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
-    " from  jobs j left join stats s on j.stat_id=s.stat_id"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from  jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
     " where j.job_id=?";
   const char *sql_find_owner =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
-    " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
     " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id order by j.job_id";
   const char *sql_find_last =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
-    " from jobs j left join stats s on j.stat_id=s.stat_id"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
     " where j.run_id==(select max(run_id) from jobs) and substr(cast(commandline as text),1,1) <> '<' order by j.job_id";
   const char *sql_find_failed =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
-    " from jobs j left join stats s on j.stat_id=s.stat_id"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
     " where s.status<>0 order by j.job_id";
   const char *sql_fetch_hash =
     "select hash from files where path=? and modified=?";
@@ -372,6 +376,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
 
   PREPARE(sql_get_entropy,    get_entropy);
   PREPARE(sql_set_entropy,    set_entropy);
+  PREPARE(sql_add_run,        add_run);
   PREPARE(sql_begin_txn,      begin_txn);
   PREPARE(sql_commit_txn,     commit_txn);
   PREPARE(sql_predict_job,    predict_job);
@@ -426,6 +431,7 @@ void Database::close() {
 
   FINALIZE(get_entropy);
   FINALIZE(set_entropy);
+  FINALIZE(add_run);
   FINALIZE(begin_txn);
   FINALIZE(commit_txn);
   FINALIZE(predict_job);
@@ -587,14 +593,15 @@ void Database::entropy(uint64_t *key, int words) {
   end_txn();
 }
 
-void Database::prepare() {
-  std::vector<std::string> out;
-  const char *sql = "insert into runs(run_id) values(null);";
-  int ret = sqlite3_exec(imp->db, sql, 0, 0, 0);
-  if (ret != SQLITE_OK) {
-    std::cerr << "Could not insert run: " << sqlite3_errmsg(imp->db) << std::endl;
-    exit(1);
-  }
+void Database::prepare(const std::string &cmdline) {
+  struct timespec now;
+  clock_gettime(CLOCK_REALTIME, &now);
+  int64_t ts = static_cast<int64_t>(now.tv_sec) * 1000000000 + now.tv_nsec;
+
+  const char *why = "Could not insert run";
+  bind_integer(why, imp->add_run, 1, ts);
+  bind_string (why, imp->add_run, 2, cmdline);
+  single_step (why, imp->add_run, imp->debugdb);
   imp->run_id = sqlite3_last_insert_rowid(imp->db);
 }
 
@@ -1002,12 +1009,14 @@ static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
   desc.starttime      = format_time(sqlite3_column_int64(query, 7));
   desc.endtime        = format_time(sqlite3_column_int64(query, 8));
   desc.stale          = sqlite3_column_int64 (query, 9) != 0;
-  desc.usage.status   = sqlite3_column_int64 (query, 10);
-  desc.usage.runtime  = sqlite3_column_double(query, 11);
-  desc.usage.cputime  = sqlite3_column_double(query, 12);
-  desc.usage.membytes = sqlite3_column_int64 (query, 13);
-  desc.usage.ibytes   = sqlite3_column_int64 (query, 14);
-  desc.usage.obytes   = sqlite3_column_int64 (query, 15);
+  desc.wake_start     = format_time(sqlite3_column_int64(query, 10));
+  desc.wake_cmdline   = rip_column(query, 11);
+  desc.usage.status   = sqlite3_column_int64 (query, 12);
+  desc.usage.runtime  = sqlite3_column_double(query, 13);
+  desc.usage.cputime  = sqlite3_column_double(query, 14);
+  desc.usage.membytes = sqlite3_column_int64 (query, 15);
+  desc.usage.ibytes   = sqlite3_column_int64 (query, 16);
+  desc.usage.obytes   = sqlite3_column_int64 (query, 17);
   if (desc.stdin_file.empty()) desc.stdin_file = "/dev/null";
   if (verbose) {
     desc.stdout_payload = db->get_output(desc.job, 1);

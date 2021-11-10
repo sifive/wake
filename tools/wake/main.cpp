@@ -184,6 +184,10 @@ int main(int argc, char **argv) {
     { ':', "shebang",               GOPT_ARGUMENT_REQUIRED  },
     { 0,   0,                       GOPT_LAST}};
 
+  std::string original_command_line = shell_escape(argv[0]);
+  for (int i = 1; i < argc; ++i)
+    original_command_line += " " + shell_escape(argv[i]);
+
   argc = gopt(argv, options);
   gopt_errors(argv[0], options);
 
@@ -679,7 +683,7 @@ int main(int argc, char **argv) {
   // Exit without execution for these arguments
   if (noexecute) return 0;
 
-  db.prepare();
+  db.prepare(original_command_line);
   runtime.init(static_cast<RFun*>(ssa.get()));
 
   // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)

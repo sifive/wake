@@ -60,6 +60,8 @@ struct JobReflection {
   std::string stdin_file;
   std::string starttime;
   std::string endtime;
+  std::string wake_start;
+  std::string wake_cmdline;
   std::string stdout_payload;
   std::string stderr_payload;
   Usage usage;
@@ -87,7 +89,7 @@ struct Database {
 
   void entropy(uint64_t *key, int words);
 
-  void prepare(); // prepare for job execution
+  void prepare(const std::string &cmdline); // prepare for job execution
   void clean(); // finished execution; sweep stale jobs
 
   void begin_txn();
