@@ -318,20 +318,20 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "  where j1.job_id=?2 and j1.directory=j2.directory and j1.commandline=j2.commandline"
     "  and j1.environment=j2.environment and j1.stdin=j2.stdin and j2.job_id<>?2)";
   const char *sql_find_job =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
-    " from  jobs j left join stats s on j.stat_id=s.stat_id"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from  jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
     " where j.job_id=?";
   const char *sql_find_owner =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
-    " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from files f, filetree t, jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
     " where f.path=? and t.file_id=f.file_id and t.access=? and j.job_id=t.job_id order by j.job_id";
   const char *sql_find_last =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
-    " from jobs j left join stats s on j.stat_id=s.stat_id"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
     " where j.run_id==(select max(run_id) from jobs) and substr(cast(commandline as text),1,1) <> '<' order by j.job_id";
   const char *sql_find_failed =
-    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
-    " from jobs j left join stats s on j.stat_id=s.stat_id"
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
     " where s.status<>0 order by j.job_id";
   const char *sql_fetch_hash =
     "select hash from files where path=? and modified=?";
@@ -1003,12 +1003,14 @@ static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
   desc.starttime      = format_time(sqlite3_column_int64(query, 7));
   desc.endtime        = format_time(sqlite3_column_int64(query, 8));
   desc.stale          = sqlite3_column_int64 (query, 9) != 0;
-  desc.usage.status   = sqlite3_column_int64 (query, 10);
-  desc.usage.runtime  = sqlite3_column_double(query, 11);
-  desc.usage.cputime  = sqlite3_column_double(query, 12);
-  desc.usage.membytes = sqlite3_column_int64 (query, 13);
-  desc.usage.ibytes   = sqlite3_column_int64 (query, 14);
-  desc.usage.obytes   = sqlite3_column_int64 (query, 15);
+  desc.wake_start     = rip_column(query, 10);
+  desc.wake_cmdline   = rip_column(query, 11);
+  desc.usage.status   = sqlite3_column_int64 (query, 12);
+  desc.usage.runtime  = sqlite3_column_double(query, 13);
+  desc.usage.cputime  = sqlite3_column_double(query, 14);
+  desc.usage.membytes = sqlite3_column_int64 (query, 15);
+  desc.usage.ibytes   = sqlite3_column_int64 (query, 16);
+  desc.usage.obytes   = sqlite3_column_int64 (query, 17);
   if (desc.stdin_file.empty()) desc.stdin_file = "/dev/null";
   if (verbose) {
     desc.stdout_payload = db->get_output(desc.job, 1);
