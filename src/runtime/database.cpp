@@ -32,7 +32,7 @@
 #include "status.h"
 
 // Increment every time the database schema changes
-#define SCHEMA_VERSION "3"
+#define SCHEMA_VERSION "4"
 
 #define VISIBLE 0
 #define INPUT 1
@@ -44,6 +44,7 @@ struct Database::detail {
   sqlite3 *db;
   sqlite3_stmt *get_entropy;
   sqlite3_stmt *set_entropy;
+  sqlite3_stmt *add_run;
   sqlite3_stmt *begin_txn;
   sqlite3_stmt *commit_txn;
   sqlite3_stmt *predict_job;
@@ -81,7 +82,7 @@ struct Database::detail {
 
   long run_id;
   detail(bool debugdb_)
-   : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), begin_txn(0),
+   : debugdb(debugdb_), db(0), get_entropy(0), set_entropy(0), add_run(0), begin_txn(0),
      commit_txn(0), predict_job(0), stats_job(0), insert_job(0), insert_tree(0), insert_log(0),
      wipe_file(0), insert_file(0), update_file(0), get_log(0), replay_log(0), get_tree(0), add_stats(0),
      link_stats(0), detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0),
@@ -139,8 +140,9 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "create table if not exists schema("
     "  version integer primary key);"
     "create table if not exists runs("
-    "  run_id integer primary key autoincrement,"
-    "  time   text    not null default current_timestamp);"
+    "  run_id  integer primary key autoincrement,"
+    "  time    text    not null default current_timestamp,"
+    "  cmdline text    not null);"
     "create table if not exists files("
     "  file_id  integer primary key,"
     "  path     text    not null,"
@@ -260,6 +262,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   // prepare statements
   const char *sql_get_entropy = "select seed from entropy order by row_id";
   const char *sql_set_entropy = "insert into entropy(seed) values(?)";
+  const char *sql_add_run = "insert into runs(cmdline) values(?)";
   const char *sql_begin_txn = "begin transaction";
   const char *sql_commit_txn = "commit transaction";
   const char *sql_predict_job =
@@ -372,6 +375,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
 
   PREPARE(sql_get_entropy,    get_entropy);
   PREPARE(sql_set_entropy,    set_entropy);
+  PREPARE(sql_add_run,        add_run);
   PREPARE(sql_begin_txn,      begin_txn);
   PREPARE(sql_commit_txn,     commit_txn);
   PREPARE(sql_predict_job,    predict_job);
@@ -426,6 +430,7 @@ void Database::close() {
 
   FINALIZE(get_entropy);
   FINALIZE(set_entropy);
+  FINALIZE(add_run);
   FINALIZE(begin_txn);
   FINALIZE(commit_txn);
   FINALIZE(predict_job);
@@ -587,14 +592,10 @@ void Database::entropy(uint64_t *key, int words) {
   end_txn();
 }
 
-void Database::prepare() {
-  std::vector<std::string> out;
-  const char *sql = "insert into runs(run_id) values(null);";
-  int ret = sqlite3_exec(imp->db, sql, 0, 0, 0);
-  if (ret != SQLITE_OK) {
-    std::cerr << "Could not insert run: " << sqlite3_errmsg(imp->db) << std::endl;
-    exit(1);
-  }
+void Database::prepare(const std::string &cmdline) {
+  const char *why = "Could not insert run";
+  bind_string(why, imp->add_run, 1, cmdline);
+  single_step(why, imp->add_run, imp->debugdb);
   imp->run_id = sqlite3_last_insert_rowid(imp->db);
 }
 
