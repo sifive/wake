@@ -22,6 +22,7 @@
 #include <sqlite3.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 
 #include <unordered_set>
 #include <iostream>
@@ -32,7 +33,7 @@
 #include "status.h"
 
 // Increment every time the database schema changes
-#define SCHEMA_VERSION "4"
+#define SCHEMA_VERSION "5"
 
 #define VISIBLE 0
 #define INPUT 1
@@ -141,7 +142,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "  version integer primary key);"
     "create table if not exists runs("
     "  run_id  integer primary key autoincrement,"
-    "  time    text    not null default current_timestamp,"
+    "  time    integer not null,"
     "  cmdline text    not null);"
     "create table if not exists files("
     "  file_id  integer primary key,"
@@ -262,7 +263,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   // prepare statements
   const char *sql_get_entropy = "select seed from entropy order by row_id";
   const char *sql_set_entropy = "insert into entropy(seed) values(?)";
-  const char *sql_add_run = "insert into runs(cmdline) values(?)";
+  const char *sql_add_run = "insert into runs(time, cmdline) values(?, ?)";
   const char *sql_begin_txn = "begin transaction";
   const char *sql_commit_txn = "commit transaction";
   const char *sql_predict_job =
@@ -593,9 +594,14 @@ void Database::entropy(uint64_t *key, int words) {
 }
 
 void Database::prepare(const std::string &cmdline) {
+  struct timespec now;
+  clock_gettime(CLOCK_REALTIME, &now);
+  int64_t ts = static_cast<int64_t>(now.tv_sec) * 1000000000 + now.tv_nsec;
+
   const char *why = "Could not insert run";
-  bind_string(why, imp->add_run, 1, cmdline);
-  single_step(why, imp->add_run, imp->debugdb);
+  bind_integer(why, imp->add_run, 1, ts);
+  bind_string (why, imp->add_run, 2, cmdline);
+  single_step (why, imp->add_run, imp->debugdb);
   imp->run_id = sqlite3_last_insert_rowid(imp->db);
 }
 
@@ -1003,7 +1009,7 @@ static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
   desc.starttime      = format_time(sqlite3_column_int64(query, 7));
   desc.endtime        = format_time(sqlite3_column_int64(query, 8));
   desc.stale          = sqlite3_column_int64 (query, 9) != 0;
-  desc.wake_start     = rip_column(query, 10);
+  desc.wake_start     = format_time(sqlite3_column_int64(query, 10));
   desc.wake_cmdline   = rip_column(query, 11);
   desc.usage.status   = sqlite3_column_int64 (query, 12);
   desc.usage.runtime  = sqlite3_column_double(query, 13);
