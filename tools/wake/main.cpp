@@ -364,6 +364,13 @@ int main(int argc, char **argv) {
 
   if (nodb) return 0;
 
+  // check that the .wakeroot is compatible with the wake version
+  std::string version_check = check_version(workspace, VERSION_STR);
+  if (!version_check.empty()) {
+    std::cerr << ".wakeroot: " << version_check << std::endl;
+    return 1;
+  }
+
   Database db(debugdb);
   std::string fail = db.open(wait, !workspace, tty);
   if (!fail.empty()) {
