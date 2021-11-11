@@ -856,14 +856,20 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
     defs.emplace_back(name, ast.token, body, std::move(typeVars));
 
     if (target) {
-      auto &def = defs.front();
-      std::stringstream s;
-      s << def.body->fragment.location();
       FileFragment l = FRAGMENT_CPP_LINE;
-      bind_def(map, Definition("table " + name, l,
-          new App(l, new Lambda(l, "_", new Prim(l, "tnew"), " "),
-          new Literal(l, s.str(), &Data::typeString))),
-        nullptr, nullptr);
+
+      Expr *table = new Prim(l, "tnew");
+      for (size_t i = 0; i <= args.size(); ++i)
+        table = new Lambda(l, "_", table, " ");
+
+      std::stringstream s;
+      s << defs.front().body->fragment.location();
+      table = new App(l, table, new Literal(l, s.str(), &Data::typeString));
+
+      for (size_t i = 0; i < args.size(); ++i)
+        table = new App(l, table, new Literal(l, std::string(args[i].first), &Data::typeString));
+
+      bind_def(map, Definition("table " + name, l, table), nullptr, nullptr);
     }
   }
 

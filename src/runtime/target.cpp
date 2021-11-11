@@ -50,6 +50,7 @@ struct Target final : public GCObject<Target, DestroyableObject> {
 
   HeapPointer<String> location;
   std::unordered_map<Hash, TargetValue, HashHasher> table;
+  std::vector<HeapPointer<String> > argnames;
 
   Target(Heap &h, String *location_) : Parent(h), location(location_) { }
   Target(Target &&target) = default;
@@ -72,6 +73,8 @@ template <typename T, T (HeapPointerBase::*memberfn)(T x)>
 T Target::recurse(T arg) {
   arg = Parent::recurse<T, memberfn>(arg);
   arg = (location.*memberfn)(arg);
+  for (auto &x : argnames)
+    arg = (x.*memberfn)(arg);
   for (auto &x : table)
     arg = x.second.promise.recurse<T, memberfn>(arg);
   return arg;
@@ -117,15 +120,23 @@ static PRIMFN(prim_hash) {
 }
 
 static PRIMTYPE(type_tnew) {
-  return args.size() == 1 &&
+  bool ok = true;
+  for (size_t i = 1; i < args.size(); ++i)
+    ok = ok && args[i]->unify(Data::typeString);
+  return ok && args.size() >= 1 &&
     args[0]->unify(Data::typeString) &&
     out->unify(Data::typeTarget);
 }
 
 static PRIMFN(prim_tnew) {
-  EXPECT(1);
+  REQUIRE(nargs >= 1);
   STRING(location, 0);
-  RETURN(Target::alloc(runtime.heap, runtime.heap, location));
+  Target *t = Target::alloc(runtime.heap, runtime.heap, location);
+  for (size_t i = 1; i < nargs; ++i) {
+    STRING(argn, i);
+    t->argnames.emplace_back(argn);
+  }
+  RETURN(t);
 }
 
 struct CTarget final : public GCObject<CTarget, Continuation> {
