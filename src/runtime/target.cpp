@@ -49,10 +49,11 @@ struct Target final : public GCObject<Target, DestroyableObject> {
   typedef GCObject<Target, DestroyableObject> Parent;
 
   HeapPointer<String> location;
+  long keyargs;
   std::unordered_map<Hash, TargetValue, HashHasher> table;
   std::vector<HeapPointer<String> > argnames;
 
-  Target(Heap &h, String *location_) : Parent(h), location(location_) { }
+  Target(Heap &h, String *location_, long keyargs_) : Parent(h), location(location_), keyargs(keyargs_) { }
   Target(Target &&target) = default;
   ~Target();
 
@@ -121,21 +122,28 @@ static PRIMFN(prim_hash) {
 
 static PRIMTYPE(type_tnew) {
   bool ok = true;
-  for (size_t i = 1; i < args.size(); ++i)
+  for (size_t i = 2; i < args.size(); ++i)
     ok = ok && args[i]->unify(Data::typeString);
-  return ok && args.size() >= 1 &&
+  return ok && args.size() >= 2 &&
     args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeInteger) &&
     out->unify(Data::typeTarget);
 }
 
 static PRIMFN(prim_tnew) {
-  REQUIRE(nargs >= 1);
+  REQUIRE(nargs >= 2);
   STRING(location, 0);
-  Target *t = Target::alloc(runtime.heap, runtime.heap, location);
-  for (size_t i = 1; i < nargs; ++i) {
+  INTEGER_MPZ(keyargs, 1);
+
+  REQUIRE(mpz_cmp_si(keyargs, 0) >= 0);
+  REQUIRE(mpz_cmp_si(keyargs, 1000) <= 0);
+
+  Target *t = Target::alloc(runtime.heap, runtime.heap, location, mpz_get_si(keyargs));
+  for (size_t i = 2; i < nargs; ++i) {
     STRING(argn, i);
     t->argnames.emplace_back(argn);
   }
+
   RETURN(t);
 }
 

@@ -859,12 +859,13 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
       FileFragment l = FRAGMENT_CPP_LINE;
 
       Expr *table = new Prim(l, "tnew");
-      for (size_t i = 0; i <= args.size(); ++i)
+      for (size_t i = 0; i < args.size()+2; ++i)
         table = new Lambda(l, "_", table, " ");
 
       std::stringstream s;
       s << defs.front().body->fragment.location();
       table = new App(l, table, new Literal(l, s.str(), &Data::typeString));
+      table = new App(l, table, new Literal(l, std::to_string(tohash), &Data::typeInteger));
 
       for (size_t i = 0; i < args.size(); ++i)
         table = new App(l, table, new Literal(l, std::string(args[i].first), &Data::typeString));
