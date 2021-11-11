@@ -365,9 +365,9 @@ int main(int argc, char **argv) {
   if (nodb) return 0;
 
   // check that the .wakeroot is compatible with the wake version
-  std::string version_check = check_version(workspace);
+  std::string version_check = check_version(workspace, VERSION_STR);
   if (!version_check.empty()) {
-    std::cerr << version_check << std::endl;
+    std::cerr << ".wakeroot: " << version_check << std::endl;
     return 1;
   }
 

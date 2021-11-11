@@ -155,8 +155,68 @@ bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &sr
   return true;
 }
 
-std::string check_version(bool workspace) {
+static const char *num(const char *s, int &outref) {
+  if (*s >= '0' && *s <= '9') {
+    int out;
+    for (out = 0; *s >= '0' && *s <= '9'; ++s)
+      out = (out*10) + (*s - '0');
+    outref = out;
+  } else {
+    outref = -1;
+  }
+  return s;
+}
+
+static std::string parse_numbers(const char *s, int &major, int &minor, int &patch) {
+  major = minor = patch = 0;
+
+  s = num(s, major);
+  if (major < 0) return "major version is not a number";
+  if (*s == 0) return "";
+  if (*s != '.') return "major version not followed by a '.'";
+
+  s = num(s+1, minor);
+  if (minor < 0) return "minor version is not a number";
+  if (*s == 0) return "";
+  if (*s != '.') return "minor version not followed by a '.'";
+
+  s = num(s+1, patch);
+  if (patch < 0) return "patch version is not a number";
+  if (*s == 0 || *s == '~' || *s =='-') return "";
+  return "excess text after the patch version number";
+}
+
+std::string check_version(bool workspace, const char *wake_version) {
   if (!workspace) return "";
+
+  std::ifstream ifs(".wakeroot");
+  if (!ifs) return "";
+
+  std::string repo_version;
+  std::getline(ifs, repo_version);
+  if (repo_version.empty()) return "";
+
+  int wake_major, wake_minor, wake_patch;
+  int repo_major, repo_minor, repo_patch;
+  auto repo = parse_numbers(repo_version.c_str(), repo_major, repo_minor, repo_patch);
+  auto wake = parse_numbers(wake_version+1,       wake_major, wake_minor, wake_patch);
+
+  if (!repo.empty()) return repo + " (" + repo_version + ")";
+  if (!wake.empty()) return wake + " (" + wake_version + ")";
+
+  if (repo_major != wake_major)
+    return "repository requires wake v"
+      + std::to_string(repo_major) + ".x.y, but this is wake "
+      + wake_version;
+
+  if (repo_minor > wake_minor || (repo_minor == wake_minor && repo_patch > wake_patch))
+    return "repository requires wake >= v"
+      + std::to_string(repo_major) + "."
+      + std::to_string(repo_minor) + "."
+      + std::to_string(repo_patch) + ", but this is wake "
+      + wake_version;
+
+  return ""; // ok!
 }
 
 static std::string slurp(int dirfd, const char * const * argv, bool &fail) {

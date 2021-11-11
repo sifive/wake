@@ -26,7 +26,7 @@ struct Runtime;
 bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &src_dir);
 bool make_workspace(const std::string &dir);
 
-std::string check_version(bool workspace);
+std::string check_version(bool workspace, const char *wake_version);
 bool find_all_sources(Runtime &runtime, bool workspace);
 
 #endif
