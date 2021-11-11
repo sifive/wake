@@ -67,7 +67,7 @@ export def getenv (key: String): Option String =
     head (p key)
 
 def test key = replace `=.*` "" _ ==* key
-def value pair = replace `[^=]*=` "" pair
+def value pair = replace `^[^=]*=` "" pair
 
 # Retrieve the value for 'key' from a KEY=VALUE environment list
 export def getEnvironment (key: String) (environment: List String): Option String =
