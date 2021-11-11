@@ -155,6 +155,10 @@ bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &sr
   return true;
 }
 
+std::string check_version(bool workspace) {
+  if (!workspace) return "";
+}
+
 static std::string slurp(int dirfd, const char * const * argv, bool &fail) {
   std::stringstream str;
   char buf[4096];
