@@ -709,6 +709,12 @@ static Expr *relabel_anon(Expr *out) {
 static void extract_def(std::vector<Definition> &out, long index, AST &&ast, const std::vector<ScopedTypeVar> &typeVars, Expr *body) {
   std::string key = "_ extract " + std::to_string(++index);
   out.emplace_back(key, ast.token, body, std::vector<ScopedTypeVar>(typeVars));
+  if (ast.args.empty()) {
+    Match *match = new Match(ast.token);
+    match->args.emplace_back(new VarRef(body->fragment, key));
+    match->patterns.emplace_back(AST(ast.region, std::string(ast.name)), new VarRef(body->fragment, key), nullptr);
+    out.emplace_back("_ discard " + std::to_string(index), ast.token, match, std::vector<ScopedTypeVar>(typeVars));
+  }
   for (auto &m : ast.args) {
     AST pattern(ast.region, std::string(ast.name));
     pattern.type = std::move(ast.type);
