@@ -473,6 +473,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
       std::vector<std::unique_ptr<Expr> > gets;
       for (int i = 0; i < args; ++i)
         gets.emplace_back(new Get(FRAGMENT_CPP_LINE, sum, &cons, i));
+      des->uses.resize(des->uses.size()+1);
       for (auto p = patterns.begin(); p != patterns.end(); ++p) {
         PatternTree *t = get_expansion(&p->tree, expand);
         if (!t->sum) {
@@ -491,6 +492,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
             << "', but is not a member of this type");
           return nullptr;
         } else if (t->sum && t->cons == (int)c) {
+          des->uses.back().emplace_back(t->fragment);
           // Put any supplied type constraints on the object
           assert (args == (int)t->children.size());
           for (int i = 0; i < args; ++i) {

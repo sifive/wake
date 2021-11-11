@@ -319,6 +319,7 @@ struct Destruct : public Expr {
   std::shared_ptr<Sum> sum;
   std::unique_ptr<Expr> arg;
   DefBinding::Values cases;
+  std::vector<std::vector<FileFragment> > uses;
 
   static const TypeDescriptor type;
   Destruct(const FileFragment &fragment_, const std::shared_ptr<Sum> &sum_, Expr *arg_)
