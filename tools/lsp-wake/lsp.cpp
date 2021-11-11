@@ -42,14 +42,6 @@
 #include "json_converter.h"
 #include "astree.h"
 
-#ifndef VERSION
-#include "../src/version.h"
-#endif
-
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-#define VERSION_STR TOSTRING(VERSION)
-
 #ifdef __EMSCRIPTEN__
 #define CERR_DEBUG
 #include <emscripten/emscripten.h>
