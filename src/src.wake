@@ -35,19 +35,25 @@ def src (dir: String) (variant: Pair String String) (internal: List (Pair String
     def externalLib =
         flattenSysLibs externalLibs
 
-    def ym4s =
+    require Pass ym4s =
         sources here `.*\.y\.m4`
 
     require Pass parsers =
         map (parserGen variant) ym4s
         | findFail
 
+    require Pass versionHeader =
+        version_h Unit
+    require Pass sourceHeaders =
+        sources srcDir `.*\.h`
+    require Pass vendorHeaders =
+        sources vendorDir `.*\.h`
     def headers =
-        version_h Unit,
+        versionHeader,
         map getPairSecond parsers ++
         externalLib.getSysLibHeaders ++
-        sources srcDir `.*\.h` ++
-        sources vendorDir `.*\.h`
+        sourceHeaders ++
+        vendorHeaders
 
     def cflags =
         "-I{srcDir}",
@@ -68,10 +74,16 @@ def src (dir: String) (variant: Pair String String) (internal: List (Pair String
         map getPairFirst parsers
         | filter (matches `^${dir.quote}/.*` _.getPathName)
 
+    require Pass reObjects =
+        sources dir `.*\.re`
+    require Pass cObjects =
+        sources dir `.*\.c`
+    require Pass cppObjects =
+        sources dir `.*\.cpp`
     def objectResults =
-        map re2obj     (sources dir `.*\.re`) ++
-        map cCompile   (sources dir `.*\.c`) ++
-        map cppCompile (cppExtra ++ sources dir `.*\.cpp`)
+        map re2obj     reObjects ++
+        map cCompile   cObjects ++
+        map cppCompile (cppExtra ++ cppObjects)
 
     require Pass objects =
         findFail objectResults
@@ -89,9 +101,9 @@ def src (dir: String) (variant: Pair String String) (internal: List (Pair String
     Pass (SysLib "0.0" headers allObjects cflags externalLib.getSysLibLFlags)
 
 def version_h Unit =
-    match (buildAs Unit)
-        Fail f = makeBadPath f
-        Pass ver = write "{here}/version.h" "#define VERSION {ver}\n"
+    require Pass ver =
+        buildAs Unit
+    write "{here}/version.h" "#define VERSION {ver}\n"
 
 def parserLemon variant ym4 =
     require Pass parser_y =
@@ -106,10 +118,14 @@ def parserGen variant ym4 =
     def basename =
         replace `\.y\.m4$` "" ym4.getPathName
 
-    require Pass parser_c =
-        gunzip (source "{basename}.cpp.gz")
+    require Pass sourcesGZip =
+        source "{basename}.cpp.gz"
+    require Pass headersGZip =
+        source "{basename}.h.gz"
 
+    require Pass parser_c =
+        gunzip sourcesGZip
     require Pass parser_h =
-        gunzip (source "{basename}.h.gz")
+        gunzip headersGZip
 
     Pass (Pair parser_c parser_h)

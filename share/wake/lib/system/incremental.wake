@@ -18,16 +18,22 @@ package wake
 # This API makes it possible to include a non-source file into a wake build.
 # Generally, one should obtain Paths from sources or as the output of Jobs.
 # This API is useful for things like a comannd-line-supplied input file.
-export def claimFileAsPath (existingFile: String) (desiredWorkspacePath: String): Path =
+export def claimFileAsPath (existingFile: String) (desiredWorkspacePath: String): Result Path Error =
     def fileName = replace `.*/` "" desiredWorkspacePath
-    def dirName = extract `(.*)/.*` desiredWorkspacePath | head | getOrElse "."
-    claimFileAsPathIn (mkdir dirName) existingFile fileName
+    require Pass destDir =
+        extract `(.*)/.*` desiredWorkspacePath
+        | head
+        | getOrElse "."
+        | mkdir
+    claimFileAsPathIn destDir existingFile fileName
 
-export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (desiredName: String): Path =
+export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (desiredName: String): Result Path Error =
+    require Pass _ =
+        getPathResult outputDirectory
     def get_modtime file = prim "get_modtime"
     def time = get_modtime existingFile
     if time == -1 then
-        makeBadPath (makeError "{existingFile}: claimed file does not exist")
+        failWithError "{existingFile}: claimed file does not exist"
     else
         def desiredWorkspacePath = simplify "{outputDirectory.getPathName}/{desiredName}"
         def visible = outputDirectory, Nil
@@ -65,11 +71,12 @@ export def runIncrementalJob (stateFileLabel: String) (reusedOutputFilterFn: Pat
     def pre  = "{stateFileLabel}-pre-{code}.tar.gz"
     def post = "{stateFileLabel}-post-{code}.tar.gz"
     def escape s = prim "shell_str"
-    def preTar = claimFileAsPath post pre
+    def preTarResult =
+        claimFileAsPath post pre
     def untar = "! test -f {escape pre} || tar -xzf {escape pre}\n"
-    def stateFiles = match preTar.getPathError
-        None   = preTar, Nil
-        Some _ = Nil
+    def stateFiles = match preTarResult
+        Pass preTar = preTar, Nil
+        Fail _      = Nil
     def cd =
         if plan.getPlanDirectory ==* "." then
             ""
@@ -85,8 +92,9 @@ export def runIncrementalJob (stateFileLabel: String) (reusedOutputFilterFn: Pat
         | setPlanFnInputs  (\_ plan.getPlanVisible | map getPathName)
         | runJob
     def _postTar = # ignored, but executed
-        job
-        | getJobOutputs
+        require Pass outputs =
+            job.getJobOutputs
+        outputs
         | filter reusedOutputFilterFn
         | targz post
     job

@@ -45,7 +45,6 @@ def re2cReal file =
         | setPlanLabel "re2c {cpp}"
         | runJob
         | getJobOutput
-        | getPathResult
 
     require Some "1" =
         getenv "UPGRADE_GENERATED"
@@ -65,7 +64,8 @@ def re2cReal file =
 
 def re2cFake file =
     def cpp = replace `\.re$` ".cpp" file.getPathName
-    def zip = source "{cpp}.gz"
+    require Pass zip =
+        source "{cpp}.gz"
     gunzip zip
 
 def gunzip zip =
@@ -77,7 +77,6 @@ def gunzip zip =
         %"
     shellJob script (zip, Nil)
     | getJobOutput
-    | getPathResult
 
 def re2c (file: Path): Result Path Error =
     if re2cOk Unit then

@@ -29,16 +29,22 @@ def tool (dir: String) (variant: Pair String String) (output: String) (deps: Lis
     def lib =
         flattenSysLibs libs
 
+    require Pass headerPaths =
+        sources here `.*\.h`
     def headers =
         lib.getSysLibHeaders ++
-        sources dir `.*\.h`
+        headerPaths
 
     def cflags =
         lib.getSysLibCFlags
 
+    require Pass cSources =
+        sources dir `.*\.c`
+    require Pass cppSources =
+        sources dir `.*\.cpp`
     def objectResults =
-        map (compileC cVariant   cflags headers) (sources dir `.*\.c`) ++
-        map (compileC cppVariant cflags headers) (sources dir `.*\.cpp`)
+        map (compileC cVariant   cflags headers) cSources ++
+        map (compileC cppVariant cflags headers) cppSources
 
     require Pass objects =
         findFail objectResults
@@ -47,7 +53,13 @@ def tool (dir: String) (variant: Pair String String) (output: String) (deps: Lis
         lib.getSysLibObjects ++
         objects.flatten
 
+    require Pass cppSources =
+        sources dir `.*\.cpp`
+
     def linkKind =
-        if empty (sources dir `.*\.cpp`) then cVariant else cppVariant
+        if empty cppSources then
+            cVariant
+        else
+            cppVariant
 
     linkO linkKind lib.getSysLibLFlags allObjects output

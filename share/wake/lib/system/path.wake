@@ -18,8 +18,9 @@ package wake
 # Read the file contents of a Path
 export def read (path: Path): Result String Error =
     def imp p = prim "read"
-    require Pass f = getPathResult path
-    match (imp f.getPathName)
+    require Pass _ =
+        getPathResult path
+    match (imp path.getPathName)
         Pass body = Pass body
         Fail f = Fail (makeError f)
 
@@ -85,6 +86,8 @@ def mkdirRunner: Runner =
     makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
 
 def mkdirImp inputs mode path =
+    require Pass _ =
+        findFailFn getPathResult inputs
     makeExecPlan ("<mkdir>", "-m", "0{strOctal mode}", path, Nil) inputs
     | setPlanKeep        False
     | setPlanEnvironment Nil
@@ -92,18 +95,28 @@ def mkdirImp inputs mode path =
     | getJobOutput
 
 # Create a directory in the parent
-export def mkdirIn (parent: Path) (mode: Integer) (name: String): Path =
+export def mkdirIn (parent: Path) (mode: Integer) (name: String): Result Path Error =
     mkdirImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify
 
 # Make all every element in the directory path with mode 0755
-export def mkdir (path: String): Path =
+export def mkdir (path: String): Result Path Error =
     def root = match _
-        "", x, t = foldl (mkdirIn _ 0755 _) (mkdirImp Nil 0755 "/{x}") t
-        x, t     = foldl (mkdirIn _ 0755 _) (mkdirImp Nil 0755 x) t
+        "", x, t = Pair (mkdirImp Nil 0755 "/{x}") t
+        x, t     = Pair (mkdirImp Nil 0755 x) t
         Nil      = unreachable "tokenize never returns an empty list"
-    path | simplify | tokenize `/` | root
+    def mkdirRecursive (Pair rootResult pathTail) =
+        require Pass root =
+            rootResult
+        rfoldl (mkdirIn _ 0755 _) root pathTail
+    path
+    | simplify
+    | tokenize `/`
+    | root
+    | mkdirRecursive
 
 target writeImp inputs mode path content =
+    require Pass _ =
+        findFailFn getPathResult inputs
     def writeRunner =
         def imp m p c = prim "write"
         def pre input = Pair input Unit
@@ -123,14 +136,16 @@ target writeImp inputs mode path content =
     | getJobOutput
 
 # Create a file with the given mode in the specified directory
-export def writeIn (parent: Path) (mode: Integer) (name: String) (content: String): Path =
+export def writeIn (parent: Path) (mode: Integer) (name: String) (content: String): Result Path Error =
     writeImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify content
 
 # Create all directories and the named file
-export def write (path: String) (content: String): Path =
+export def write (path: String) (content: String): Result Path Error =
     def spath = simplify path
-    def parent = simplify "{spath}/.."
-    writeImp (mkdir parent, Nil) 0644 spath content
+    require Pass parent =
+        simplify "{spath}/.."
+        | mkdir
+    writeImp (parent, Nil) 0644 spath content
 
 # Remove any leading directories from `file`.
 #

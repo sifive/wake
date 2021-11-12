@@ -17,12 +17,17 @@ package build_wake
 from wake import _
 
 def installRO path =
-  def dest = "{here}/{path.getPathName}"
-  def inputs = mkdir "{dest}/..", path, Nil
-  "install -m 444 {path.getPathName} {dest}"
-  | makePlan "install: {dest}" inputs
-  | runJob
-  | getJobOutput
+    def dest =
+        "{here}/{path.getPathName}"
+    require Pass destDir =
+        simplify "{dest}/.."
+        | mkdir
+    def inputs =
+        destDir, path, Nil
+    "install -m 444 {path.getPathName} {dest}"
+    | makePlan "install: {dest}" inputs
+    | runJob
+    | getJobOutput
 
 export def vscode _: Result Path Error =
     require Pass variant =
@@ -41,43 +46,52 @@ export def vscode _: Result Path Error =
     else
         failWithError "Did not find empscripten javascript output; got: {format files}"
 
-    def wasmFile =
+    require Pass wasmFile =
         installAs "{here}/lsp-server/lsp-wake.wasm" wasm
 
-    def jsFile =
+    require Pass jsFile =
         installAs "{here}/lsp-server/lsp-wake.js" js
 
     require Pass packageLockJSON =
         source "{here}/package-lock.json"
-        | getPathResult
 
     require Pass release =
         buildAs Unit
 
     require Pass packageJSON =
         setVersion (replace `~` "-" release) "{here}/package.json"
-        | getPathResult
 
     require Pass nodeModules =
         makeExecPlan (which "npm", "install", Nil) (packageJSON, packageLockJSON, Nil)
         | setPlanDirectory here
         | runJob
         | getJobOutputs
-        | findFailFn getPathResult
 
-    def stdlib =
+    require Pass stdlibSources =
         sources "share/wake/lib" `.*`
-        | map installRO
+    require Pass stdlib =
+        stdlibSources
+        | findFailFn installRO
 
+    require Pass currentDirSources =
+        sources here `[^/]*`
+    require Pass imagesSources =
+        sources here `images/.*`
+    require Pass clientSources =
+        sources here `lsp-client/.*`
+    require Pass serverSources =
+        sources here `lsp-server/.*`
+    require Pass syntaxSources =
+        sources here `syntaxes/.*`
     def vsceFiles =
         wasmFile,
         jsFile,
         packageJSON,
-        sources here `[^/]*` ++
-        sources here `images/.*` ++
-        sources here `lsp-client/.*` ++
-        sources here `lsp-server/.*` ++
-        sources here `syntaxes/.*` ++
+        currentDirSources ++
+        imagesSources ++
+        clientSources ++
+        serverSources ++
+        syntaxSources ++
         stdlib ++
         nodeModules
 
@@ -86,7 +100,6 @@ export def vscode _: Result Path Error =
         | setPlanDirectory here
         | runJob
         | getJobOutputs
-        | findFailFn getPathResult
 
     require vsix, Nil =
         filter (matches `.*\.vsix` _.getPathName) outputs
