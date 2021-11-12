@@ -602,12 +602,13 @@ int main(int argc, char **argv) {
 
   sums_ok();
 
+  if (tcheck) std::cout << root.get();
+
   if (!ok || terminalReporter.errors || (fwarning && terminalReporter.warnings)) {
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }
 
-  if (tcheck) std::cout << root.get();
   if (html) markup_html(libdir, std::cout, root.get());
 
   if (api) {
