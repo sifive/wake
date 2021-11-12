@@ -75,7 +75,7 @@ template <typename T, T (HeapPointerBase::*memberfn)(T x)>
 T Target::recurse(T arg) {
   arg = Parent::recurse<T, memberfn>(arg);
   arg = (location.*memberfn)(arg);
-  for (auto &x : argnames)
+  for (HeapPointerBase &x : argnames)
     arg = (x.*memberfn)(arg);
   for (auto &x : table)
     arg = x.second.promise.recurse<T, memberfn>(arg);
