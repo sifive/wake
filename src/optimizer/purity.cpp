@@ -61,7 +61,7 @@ void RPrim::pass_purity(PassPurity &p) {
   meta = (pflags & p.pflag) == 0;
   // Special-case for tget (purity depends on purity of fn arg)
   if ((pflags & PRIM_FNARG))
-    meta = p.scope[args[3]]->meta >> 1;
+    meta = p.scope[args[1]]->meta >> 1;
   set(p.sflag, !(meta & 1));
 }
 

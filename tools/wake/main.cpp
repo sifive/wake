@@ -168,7 +168,6 @@ int main(int argc, char **argv) {
     { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
     { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "debug-target",          GOPT_ARGUMENT_REQUIRED  },
     { 0,   "stop-after-parse",      GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-ssa",        GOPT_ARGUMENT_FORBIDDEN },
@@ -223,7 +222,6 @@ int main(int argc, char **argv) {
   const char *heapf   = arg(options, "heap-factor")->argument;
   const char *profile = arg(options, "profile")->argument;
   const char *init    = arg(options, "init")->argument;
-  const char *hash    = arg(options, "debug-target")->argument;
   const char *chdir   = arg(options, "chdir")->argument;
   const char *in      = arg(options, "in")->argument;
   const char *exec    = arg(options, "exec")->argument;
@@ -429,18 +427,8 @@ int main(int argc, char **argv) {
     // The unreadable location might be irrelevant to the build
   }
 
-  uint64_t target_hash = 0;
-  if (hash) {
-    char *tail;
-    target_hash = strtoull(hash, &tail, 0);
-    if (*tail) {
-      std::cerr << "Cannot run with debug-target=" << hash << "  (must be a number)!" << std::endl;
-      return 1;
-    }
-  }
-
   Profile tree;
-  Runtime runtime(profile ? &tree : nullptr, profileh, heap_factor, target_hash);
+  Runtime runtime(profile ? &tree : nullptr, profileh, heap_factor);
   bool sources = find_all_sources(runtime, workspace);
   if (!sources) {
     if (verbose) std::cerr << "Source file enumeration failed" << std::endl;

@@ -830,17 +830,20 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
     if (target) {
       if (tohash == 0) ERROR(fn.location(), "target definition of '" << name << "' must have at least one hashed argument");
       FileFragment bl = body->fragment;
-      Expr *hash = new Prim(bl, "hash");
-      for (size_t i = 0; i < tohash; ++i) hash = new Lambda(bl, "_", hash, " ");
-      for (size_t i = 0; i < tohash; ++i) hash = new App(bl, hash, new VarRef(bl, args[i].first));
-      Expr *subhash = new Prim(bl, "hash");
-      for (size_t i = tohash; i < args.size(); ++i) subhash = new Lambda(bl, "_", subhash, " ");
-      for (size_t i = tohash; i < args.size(); ++i) subhash = new App(bl, subhash, new VarRef(bl, args[i].first));
-      Lambda *gen = new Lambda(bl, "_", body, " ");
-      Lambda *tget = new Lambda(bl, "_fn", new Prim(bl, "tget"), " ");
-      body = new App(bl, new App(bl, new App(bl, new App(bl,
-        new Lambda(bl, "_target", new Lambda(bl, "_hash", new Lambda(bl, "_subhash", tget))),
-        new VarRef(bl, "table " + name)), hash), subhash), gen);
+
+      Expr *tget = new Prim(bl, "tget");
+      for (size_t i = 0; i < args.size(); ++i)
+        tget = new Lambda(bl, "_", tget, " ");
+
+      tget = new App(bl, new App(bl,
+        new Lambda(bl, "_ target", new Lambda(bl, "_ body", tget)),
+        new VarRef(bl, "table " + name)),
+        new Lambda(bl, "_", body, " "));
+
+      for (size_t i = 0; i < args.size(); ++i)
+        tget = new App(bl, tget, new VarRef(bl, args[i].first));
+
+      body = tget;
     }
 
     if (publish && !args.empty()) {
@@ -856,14 +859,21 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
     defs.emplace_back(name, ast.token, body, std::move(typeVars));
 
     if (target) {
-      auto &def = defs.front();
-      std::stringstream s;
-      s << def.body->fragment.location();
       FileFragment l = FRAGMENT_CPP_LINE;
-      bind_def(map, Definition("table " + name, l,
-          new App(l, new Lambda(l, "_", new Prim(l, "tnew"), " "),
-          new Literal(l, s.str(), &Data::typeString))),
-        nullptr, nullptr);
+
+      Expr *table = new Prim(l, "tnew");
+      for (size_t i = 0; i < args.size()+2; ++i)
+        table = new Lambda(l, "_", table, " ");
+
+      std::stringstream s;
+      s << "'" << name << "' <" << defs.front().body->fragment.location() << ">";
+      table = new App(l, table, new Literal(l, s.str(), &Data::typeString));
+      table = new App(l, table, new Literal(l, std::to_string(tohash), &Data::typeInteger));
+
+      for (size_t i = 0; i < args.size(); ++i)
+        table = new App(l, table, new Literal(l, std::string(args[i].first), &Data::typeString));
+
+      bind_def(map, Definition("table " + name, l, table), nullptr, nullptr);
     }
   }
 

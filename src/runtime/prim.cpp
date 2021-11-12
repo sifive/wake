@@ -179,14 +179,6 @@ void CHash::execute(Runtime &runtime) {
     next = nullptr; // reschedule
     hash.broken->await(runtime, this);
   } else {
-    Hash &h = hash.code;
-    mpz_import(out.value, sizeof(h.data)/sizeof(h.data[0]), 1, sizeof(h.data[0]), 0, 0, &h.data[0]);
-    if (runtime.debug_hash && h.data[0] == runtime.debug_hash) {
-      runtime.debug_hash = 0;
-      std::stringstream ss;
-      ss << "Debug-target hash input was: " << obj.get() << std::endl;
-      status_write(STREAM_ERROR, ss.str());
-    }
     cont->resume(runtime, Integer::claim(runtime.heap, out));
   }
 }

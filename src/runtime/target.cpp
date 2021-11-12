@@ -33,10 +33,11 @@
 
 struct TargetValue {
   Hash subhash;
+  std::vector<Hash> subhashes;
   Promise promise;
 
   TargetValue() { }
-  TargetValue(const Hash &subhash_) : subhash(subhash_) { }
+  TargetValue(Hash subhash_, std::vector<Hash> &subhashes_) : subhash(subhash_), subhashes(subhashes_) { }
 };
 
 struct HashHasher {
@@ -49,9 +50,11 @@ struct Target final : public GCObject<Target, DestroyableObject> {
   typedef GCObject<Target, DestroyableObject> Parent;
 
   HeapPointer<String> location;
+  long keyargs;
   std::unordered_map<Hash, TargetValue, HashHasher> table;
+  std::vector<HeapPointer<String> > argnames;
 
-  Target(Heap &h, String *location_) : Parent(h), location(location_) { }
+  Target(Heap &h, String *location_, long keyargs_) : Parent(h), location(location_), keyargs(keyargs_) { }
   Target(Target &&target) = default;
   ~Target();
 
@@ -72,6 +75,8 @@ template <typename T, T (HeapPointerBase::*memberfn)(T x)>
 T Target::recurse(T arg) {
   arg = Parent::recurse<T, memberfn>(arg);
   arg = (location.*memberfn)(arg);
+  for (auto &x : argnames)
+    arg = (x.*memberfn)(arg);
   for (auto &x : table)
     arg = x.second.promise.recurse<T, memberfn>(arg);
   return arg;
@@ -117,22 +122,37 @@ static PRIMFN(prim_hash) {
 }
 
 static PRIMTYPE(type_tnew) {
-  return args.size() == 1 &&
+  bool ok = true;
+  for (size_t i = 2; i < args.size(); ++i)
+    ok = ok && args[i]->unify(Data::typeString);
+  return ok && args.size() >= 2 &&
     args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeInteger) &&
     out->unify(Data::typeTarget);
 }
 
 static PRIMFN(prim_tnew) {
-  EXPECT(1);
+  REQUIRE(nargs >= 2);
   STRING(location, 0);
-  RETURN(Target::alloc(runtime.heap, runtime.heap, location));
+  INTEGER_MPZ(keyargs, 1);
+
+  REQUIRE(mpz_cmp_si(keyargs, 0) >= 0);
+  REQUIRE(mpz_cmp_si(keyargs, 1000) <= 0);
+
+  Target *t = Target::alloc(runtime.heap, runtime.heap, location, mpz_get_si(keyargs));
+  for (size_t i = 2; i < nargs; ++i) {
+    STRING(argn, i);
+    t->argnames.emplace_back(argn);
+  }
+
+  RETURN(t);
 }
 
-struct CTarget final : public GCObject<CTarget, Continuation> {
+struct CTargetFill final : public GCObject<CTargetFill, Continuation> {
   HeapPointer<Target> target;
   Hash hash;
 
-  CTarget(Target *target_, Hash hash_)
+  CTargetFill(Target *target_, Hash hash_)
    : target(target_), hash(hash_) { }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
@@ -145,46 +165,100 @@ struct CTarget final : public GCObject<CTarget, Continuation> {
   void execute(Runtime &runtime) override;
 };
 
-void CTarget::execute(Runtime &runtime) {
+void CTargetFill::execute(Runtime &runtime) {
   target->table[hash].promise.fulfill(runtime, value.get());
 }
 
-static PRIMFN(prim_tget) {
-  EXPECT(4);
-  TARGET(target, 0);
-  INTEGER_MPZ(key, 1);
-  INTEGER_MPZ(subkey, 2);
-  CLOSURE(body, 3);
+struct CTargetArgs final : public GCObject<CTargetArgs, Continuation> {
+  HeapPointer<Target> target;
+  HeapPointer<Closure> body;
+  HeapPointer<Value> list;
+  HeapPointer<Scope> caller;
+  HeapPointer<Continuation> cont;
 
-  runtime.heap.reserve(Tuple::fulfiller_pads + Runtime::reserve_apply(body->fun) + CTarget::reserve());
-  Continuation *continuation = scope->claim_fulfiller(runtime, output);
+  CTargetArgs(Target *target_, Closure *body_, Value *list_, Scope *caller_, Continuation *cont_)
+   : target(target_), body(body_), list(list_), caller(caller_), cont(cont_) { }
 
-  Hash hash;
-  REQUIRE(mpz_sizeinbase(key, 2) <= 8*sizeof(hash.data));
-  mpz_export(&hash.data[0], 0, 1, sizeof(hash.data[0]), 0, 0, key);
+  template <typename T, T (HeapPointerBase::*memberfn)(T x)>
+  T recurse(T arg) {
+    arg = Continuation::recurse<T, memberfn>(arg);
+    arg = (target.*memberfn)(arg);
+    arg = (body.*memberfn)(arg);
+    arg = (list.*memberfn)(arg);
+    arg = (caller.*memberfn)(arg);
+    arg = (cont.*memberfn)(arg);
+    return arg;
+  }
 
-  Hash subhash;
-  REQUIRE(mpz_sizeinbase(subkey, 2) <= 8*sizeof(subhash.data));
-  mpz_export(&subhash.data[0], 0, 1, sizeof(subhash.data[0]), 0, 0, subkey);
+  void execute(Runtime &runtime) override;
+};
 
-  auto ref = target->table.insert(std::make_pair(hash, TargetValue(subhash)));
-  ref.first->second.promise.await(runtime, continuation);
+void CTargetArgs::execute(Runtime &runtime) {
+  // value = hash(list) ... which we will ignore
+
+  runtime.heap.reserve(Runtime::reserve_apply(body->fun) + CTargetFill::reserve());
+
+  long i = 0;
+  std::vector<uint64_t> hashes, subhashes;
+  std::vector<Hash> subhashesp;
+
+  for (Record *item = static_cast<Record*>(list.get()); item->size() == 2; item = item->at(1)->coerce<Record>()) {
+    Hash h = item->at(0)->coerce<Value>()->deep_hash(runtime.heap);
+    if (++i <= target->keyargs) {
+      h.push(hashes);
+    } else {
+      h.push(subhashes);
+      subhashesp.push_back(h);
+    }
+  }
+
+  Hash hash(hashes), subhash(subhashes);
+
+  auto ref = target->table.insert(std::make_pair(hash, TargetValue(subhash, subhashesp)));
+  ref.first->second.promise.await(runtime, cont.get());
 
   if (!(ref.first->second.subhash == subhash)) {
     std::stringstream ss;
-    ss << "ERROR: Target subkey mismatch for " << target->location->c_str() << std::endl;
-    for (auto &x : scope->stack_trace())
+    ss << "Target " << target->location->c_str() << " was called with inconsistent auxiliary arguments" << std::endl;
+    for (auto &x : caller->stack_trace())
       ss << "  from " << x << std::endl;
-    ss << "To debug, rerun your wake command with these additional options:" << std::endl;
-    ss << "  --debug-target=" << hash.data[0] << " to see the unique target arguments (before the '\\')" << std::endl;
-    ss << "  --debug-target=" << ref.first->second.subhash.data[0] << " to see the first invocation's extra arguments" << std::endl;
-    ss << "  --debug-target=" << subhash.data[0] << " to see the second invocation's extra arguments" << std::endl;
-    status_write(STREAM_ERROR, ss.str());
-    runtime.abort = true;
+
+    long arg = 0;
+    ss << "  It was passed these identical primary key arguments:" << std::endl;
+    for (Record *item = static_cast<Record*>(list.get()); item->size() == 2; item = item->at(1)->coerce<Record>()) {
+      if (arg >= target->keyargs && !(subhashesp[arg-target->keyargs] == ref.first->second.subhashes[arg-target->keyargs]))
+        ss << "    (INCONSISTENT) ";
+      else
+        ss << "    ";
+      ss << target->argnames[arg]->c_str() << " = " << item->at(0)->coerce<Value>() << std::endl;
+      if (++arg == target->keyargs)
+        ss << "  It was passed these auxiliary arguments (after the '\\') which should also be identical:" << std::endl;
+    }
+    status_write(STREAM_WARNING, ss.str());
   }
 
   if (ref.second)
-    runtime.claim_apply(body, args[1], CTarget::claim(runtime.heap, target, hash), scope);
+    runtime.claim_apply(body.get(), target.get(),
+      CTargetFill::claim(runtime.heap, target.get(), hash), caller.get());
+}
+
+static PRIMFN(prim_tget) {
+  REQUIRE(nargs >= 2);
+  TARGET(target, 0);
+  CLOSURE(body, 1);
+  REQUIRE(nargs == target->argnames.size() + 2);
+
+  runtime.heap.reserve(
+    Tuple::fulfiller_pads
+    + reserve_list(target->argnames.size())
+    + reserve_hash()
+    + CTargetArgs::reserve());
+
+  Continuation *cont = scope->claim_fulfiller(runtime, output);
+  Value *list = claim_list(runtime.heap, target->argnames.size(), args+2);
+
+  runtime.schedule(claim_hash(runtime.heap, list,
+    CTargetArgs::claim(runtime.heap, target, body, list, scope, cont)));
 }
 
 void prim_register_target(PrimMap &pmap) {
