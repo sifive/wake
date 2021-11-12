@@ -21,8 +21,10 @@ def buildLemon variant: Result (List Path) Error =
     def Pair _ cVariant =
         variant
 
+    require Pass lemonSource =
+        source "{here}/lemon.c"
     require Pass objs =
-        compileC cVariant Nil Nil (source "{here}/lemon.c")
+        compileC cVariant Nil Nil lemonSource
 
     linkO cVariant Nil objs "{here}/lemon"
 
@@ -39,7 +41,7 @@ def m4 (file: Path): Result Path Error =
         run.getJobStdout
 
     match run.getJobStatus
-        Exited 0 = Pass (write output stdout)
+        Exited 0 = write output stdout
         Aborted e = Fail e
         z = failWithError "Non-zero exit status ({format z}) for '{run.getJobDescription}'"
 
@@ -52,7 +54,7 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
     else
         failWithError "lemon compilation produced no output"
 
-    def template =
+    require Pass template =
         source "{here}/lempar.c"
 
     def cmdline =
@@ -63,7 +65,6 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
         | setPlanLabel "lemon {file.getPathName}"
         | runJob
         | getJobOutputs
-        | findFailFn getPathResult
 
     require Some (Pair cfile _) =
         find (matches `.*\.c` _.getPathName) result
@@ -75,7 +76,7 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
     else
         failWithError "lemon produced no H file"
 
-    def cppfile =
+    require Pass cppfile =
         installAs (replace `\.c$` ".cpp" cfile.getPathName) cfile
 
     require Some "1" =

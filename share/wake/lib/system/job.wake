@@ -321,16 +321,6 @@ export def runJob (p: Plan): Job = match p
         job
 
 
-# Get result for job with the list of output files/dirs.
-export def getJobResultOutputs (job: Job): Result (List Path) Error =
-    findFailFn getPathResult job.getJobOutputs
-
-# Get result for job with exactly one output Path.
-export def getJobResultOutput (job: Job): Result Path Error =
-    job.getJobOutput
-    | getPathResult
-
-
 # Set the value of a tag on a Job
 # This is useful for post-build reflection into the database
 export def setJobTag (key: String) (value: String) (job: Job): Job =
@@ -365,36 +355,53 @@ export def makeBadPath (error: Error): Path =
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
 def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
-def treeOk (Pair f h) = match h
-  "BadHash" = BadPath (makeError "Could not hash {f}")
-  _ = Path f
+def treeOk file =
+    def Pair f h =
+        file
+    match h
+        "BadHash" = failWithError "Could not hash {f}"
+        _         = Pass (Path f)
 def guardPath job = match _
-  Fail e = BadPath e, Nil
-  Pass l if job.isJobOk = map treeOk l
-  _ = makeBadPath (makeError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'"), Nil
+    Fail e =
+        Fail e
+    Pass l if job.isJobOk =
+        findFailFn treeOk l
+    _ =
+        failWithError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'"
 def mapPath = match _
-  Fail e = BadPath e, Nil
-  Pass l = map treeOk l
+    Fail e = Fail e
+    Pass l = findFailFn treeOk l
 
 export def killJob (job: Job) (signal: Integer): Unit =
   (\j\s prim "job_kill") job signal # send signal to job
 export def getJobStdout  (job: Job): Result String Error = stdio job 1
 export def getJobStderr  (job: Job): Result String Error = stdio job 2
-export def getJobInputs  (job: Job): List Path = tree job 1 | guardPath job
-export def getJobOutputs (job: Job): List Path = tree job 2 | guardPath job
-export def getJobFailedInputs  (job: Job): List Path = tree job 1 | mapPath
-export def getJobFailedOutputs (job: Job): List Path = tree job 2 | mapPath
+export def getJobInputs (job: Job): Result (List Path) Error =
+    tree job 1
+    | guardPath job
+export def getJobOutputs (job: Job): Result (List Path) Error =
+    tree job 2
+    | guardPath job
+export def getJobFailedInputs (job: Job): Result (List Path) Error =
+    tree job 1
+    | mapPath
+export def getJobFailedOutputs (job: Job): Result (List Path) Error =
+    tree job 2
+    | mapPath
 export def getJobId (job: Job): Integer =
   (\j prim "job_id") job
 export def getJobDescription (job: Job): String =
   (\j prim "job_desc") job
-export def getJobOutput (job: Job): Path = match (tree job 2)
-  Fail e = BadPath e
-  Pass l if job.isJobOk = match l
-    (Pair f _), Nil = Path f
-    Nil    = makeBadPath (makeError "No outputs available from '{job.getJobDescription}'")
-    _      = makeBadPath (makeError "More than one output found from '{job.getJobDescription}'")
-  _ = makeBadPath (makeError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'")
+export def getJobOutput (job: Job): Result Path Error =
+    require Pass outputs =
+        getJobOutputs job
+    match outputs
+        Nil =
+            failWithError "No outputs available from '{job.getJobDescription}'"
+        (singleOutput, Nil) =
+            Pass singleOutput
+        _ =
+            failWithError "More than one output found from '{job.getJobDescription}'"
 
 export def isJobOk (job: Job): Boolean = match (getJobReport job)
   Fail _ = False

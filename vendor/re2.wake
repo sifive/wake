@@ -34,7 +34,7 @@ def buildRE2WASM Unit =
     def emsdk =
         replace `/[^/]*$` "" emmake
 
-    def patch =
+    require Pass patch =
         source "{here}/re2.patch"
 
     def job =
@@ -52,7 +52,6 @@ def buildRE2WASM Unit =
 
     require Pass outputs =
         job.getJobOutputs
-        | findFailFn getPathResult
 
     def headers =
         filter (matches `.*\.h` _.getPathName) outputs

@@ -24,10 +24,10 @@ def vendor (dir: String) (variant: Pair String String) (version: String) (header
     def Pair _ cVariant =
         variant
 
-    def headerPaths =
+    require Pass headerPaths =
         sources dir headers
 
-    def sourcePaths =
+    require Pass sourcePaths =
         sources dir files
 
     def compile =

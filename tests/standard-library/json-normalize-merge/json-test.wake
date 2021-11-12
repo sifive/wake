@@ -20,7 +20,6 @@ def test (preprocessFn: JValue => a) (testFn: a => Result JValue Error) (input: 
         # There doesn't seem to be an easy way to get `source` to recognize the
         # input file, so claim it instead.
         claimFileAsPath input "build/claimed-json/{input}"
-        | getPathResult
     require Pass json =
         parseJSONFile inputPath
     def testResult =

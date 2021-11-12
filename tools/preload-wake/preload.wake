@@ -39,11 +39,13 @@ def buildPreload variant: Result (List Path) Error =
     require Pass json =
         json variant
 
+    require Pass headerPaths =
+        sources here `.*\.h`
     def headers =
         json.getSysLibHeaders ++
-        sources here `.*\.h`
+        headerPaths
 
-    def cppFiles =
+    require Pass cppFiles =
         sources here `.*\.cpp`
 
     def cppFlags =
@@ -59,7 +61,7 @@ def buildPrelib variant: Result (List Path) Error =
     def Pair _ cVariant =
         variant
 
-    def cfiles =
+    require Pass cfiles =
         sources here `.*\.c`
 
     require Pass ofiles =

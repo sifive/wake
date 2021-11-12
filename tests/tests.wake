@@ -38,7 +38,7 @@ export def runTests (cmdline: List String): Result String Error =
     require Pass (Pair wakeBin _) =
         wakeToTest Unit
 
-    def tests =
+    require Pass tests =
         sources here `${filter}/(pass|fail)\.sh`
 
     def prepareReport test =
@@ -93,21 +93,23 @@ def runTest (testScript: Path): Result Unit Error =
         | replace `^${quote here}/` ""
 
     def readFile list = match list
-        file, Nil =
+        Some file =
             require Pass content = read file
             Pass (Some content)
-        Nil = Pass None
-        _   = Fail (makeError "Too many files ({format list}).")
+        None =
+            Pass None
 
     require Pass expectedStdout =
-        sources testDirectory `stdout`
+        source "{testDirectory}/stdout"
+        | getPass
         | readFile
 
     require Pass expectedStderr =
-        sources testDirectory `stderr`
+        source "{testDirectory}/stderr"
+        | getPass
         | readFile
 
-    def visibleFiles =
+    require Pass visibleFiles =
         sources testDirectory `.*`
 
     def inTestDir path =

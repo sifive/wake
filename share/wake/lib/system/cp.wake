@@ -16,19 +16,24 @@
 package wake
 
 # installAs: copy a file to a specified destination
-export def installAs (dest: String) (file: Path): Path = match file.getPathResult
-    Fail e = makeBadPath e
-    Pass _ =
-        def sdest = simplify dest
-        def cmd = which "cp", file.getPathName, sdest, Nil
-        def inputs = mkdir "{dest}/..", file, Nil
-        def foutputs _ = sdest, Nil
-        makeExecPlan cmd inputs
-        | setPlanEnvironment Nil
-        | setPlanLocalOnly True
-        | setPlanFnOutputs foutputs
-        | runJob
-        | getJobOutput
+export def installAs (dest: String) (file: Path): Result Path Error =
+    def sdest =
+        simplify dest
+    def cmd =
+        which "cp", file.getPathName, sdest, Nil
+    require Pass destDir =
+        simplify "{dest}/.."
+        | mkdir
+    def inputs =
+        destDir, file, Nil
+    def foutputs _ =
+        sdest, Nil
+    makeExecPlan cmd inputs
+    | setPlanEnvironment Nil
+    | setPlanLocalOnly True
+    | setPlanFnOutputs foutputs
+    | runJob
+    | getJobOutput
 
 # Copy a file from one directory subtree to another
 # installIn "/to" "from"  "from/subdir/file"  => "/to/subdir/file"
@@ -40,12 +45,13 @@ export def installAs (dest: String) (file: Path): Path = match file.getPathResul
 # installIn "/to" "/from" "/subdir/file"
 # installIn "/to" "from"  "/from/subdir/file"
 # installIn "/to" "/from" "from/subdir/file"
-export def installIn (toRoot: String) (fromRoot: String) (sourcePath: Path): Path =
-    require Path sourceStr = sourcePath
+export def installIn (toRoot: String) (fromRoot: String) (sourcePath: Path): Result Path Error =
+    def sourceStr =
+        sourcePath.getPathName
     def rel = relative fromRoot sourceStr
     def isAbs = matches `/.*`
     def uneq a b = (a && !b) || (!a && b)
     if matches `[.][.]/.*` rel || uneq fromRoot.isAbs sourceStr.isAbs then
-        makeBadPath (makeError "{sourceStr} is not contained in {fromRoot}")
+        failWithError "{sourceStr} is not contained in {fromRoot}"
     else
         installAs (in toRoot rel) sourcePath
