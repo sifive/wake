@@ -46,13 +46,12 @@ struct Profile;
 struct Runtime {
   bool abort;
   Profile *profile;
-  uint64_t debug_hash;
   Heap heap;
   RootPointer<Work> stack;
   RootPointer<HeapObject> output;
   RootPointer<Record> sources; // Vector String
 
-  Runtime(Profile *profile_, int profile_heap, double heap_factor, uint64_t debug_hash_);
+  Runtime(Profile *profile_, int profile_heap, double heap_factor);
   ~Runtime();
   void run();
 
