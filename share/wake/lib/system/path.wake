@@ -18,6 +18,8 @@ package wake
 # Read the file contents of a Path
 export def read (path: Path): Result String Error =
     def imp p = prim "read"
+    require Pass _ =
+        getPathResult path
     match (imp path.getPathName)
         Pass body = Pass body
         Fail f = Fail (makeError f)
@@ -84,6 +86,8 @@ def mkdirRunner: Runner =
     makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
 
 def mkdirImp inputs mode path =
+    require Pass _ =
+        findFailFn getPathResult inputs
     makeExecPlan ("<mkdir>", "-m", "0{strOctal mode}", path, Nil) inputs
     | setPlanKeep        False
     | setPlanEnvironment Nil
@@ -111,6 +115,8 @@ export def mkdir (path: String): Result Path Error =
     | mkdirRecursive
 
 target writeImp inputs mode path content =
+    require Pass _ =
+        findFailFn getPathResult inputs
     def writeRunner =
         def imp m p c = prim "write"
         def pre input = Pair input Unit

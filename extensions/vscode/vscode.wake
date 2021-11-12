@@ -73,22 +73,25 @@ export def vscode _: Result Path Error =
         stdlibSources
         | findFailFn installRO
 
-    require Pass sourcePaths =
-        def sourceRegexes =
-            `[^/]*`,
-            `images/.*`,
-            `lsp-client/.*`,
-            `lsp-server/.*`,
-            `syntaxes/.*`,
-            Nil
-        sourceRegexes
-        | findFailFn (sources here)
-        | rmap flatten
+    require Pass currentDirSources =
+        sources here `[^/]*`
+    require Pass imagesSources =
+        sources here `images/.*`
+    require Pass clientSources =
+        sources here `lsp-client/.*`
+    require Pass serverSources =
+        sources here `lsp-server/.*`
+    require Pass syntaxSources =
+        sources here `syntaxes/.*`
     def vsceFiles =
         wasmFile,
         jsFile,
         packageJSON,
-        sourcePaths ++
+        currentDirSources ++
+        imagesSources ++
+        clientSources ++
+        serverSources ++
+        syntaxSources ++
         stdlib ++
         nodeModules
 

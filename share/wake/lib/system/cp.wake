@@ -17,6 +17,8 @@ package wake
 
 # installAs: copy a file to a specified destination
 export def installAs (dest: String) (file: Path): Result Path Error =
+    require Pass _ =
+        getPathResult file
     def sdest =
         simplify dest
     def cmd =

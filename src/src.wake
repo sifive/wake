@@ -44,19 +44,16 @@ def src (dir: String) (variant: Pair String String) (internal: List (Pair String
 
     require Pass versionHeader =
         version_h Unit
-    require Pass headerPaths =
-        def searchDirs =
-            srcDir,
-            vendorDir,
-            Nil
-        searchDirs
-        | findFailFn (sources _ `.*\.h`)
-        | rmap flatten
+    require Pass sourceHeaders =
+        sources srcDir `.*\.h`
+    require Pass vendorHeaders =
+        sources vendorDir `.*\.h`
     def headers =
         versionHeader,
         map getPairSecond parsers ++
         externalLib.getSysLibHeaders ++
-        headerPaths
+        sourceHeaders ++
+        vendorHeaders
 
     def cflags =
         "-I{srcDir}",
