@@ -866,7 +866,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
         table = new Lambda(l, "_", table, " ");
 
       std::stringstream s;
-      s << defs.front().body->fragment.location();
+      s << "'" << name << "' <" << defs.front().body->fragment.location() << ">";
       table = new App(l, table, new Literal(l, s.str(), &Data::typeString));
       table = new App(l, table, new Literal(l, std::to_string(tohash), &Data::typeInteger));
 

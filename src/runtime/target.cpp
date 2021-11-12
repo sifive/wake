@@ -216,15 +216,18 @@ void CTargetArgs::execute(Runtime &runtime) {
 
   if (!(ref.first->second.subhash == subhash)) {
     std::stringstream ss;
-    ss << "ERROR: Target subkey mismatch for " << target->location->c_str() << std::endl;
+    ss << "Target " << target->location->c_str() << " was called with inconsistent auxiliary arguments" << std::endl;
     for (auto &x : caller->stack_trace())
       ss << "  from " << x << std::endl;
-    ss << "To debug, rerun your wake command with these additional options:" << std::endl;
-    ss << "  --debug-target=" << hash.data[0] << " to see the unique target arguments (before the '\\')" << std::endl;
-    ss << "  --debug-target=" << ref.first->second.subhash.data[0] << " to see the first invocation's extra arguments" << std::endl;
-    ss << "  --debug-target=" << subhash.data[0] << " to see the second invocation's extra arguments" << std::endl;
-    status_write(STREAM_ERROR, ss.str());
-    runtime.abort = true;
+
+    long arg = 0;
+    ss << "  It was passed these identical primary key arguments:" << std::endl;
+    for (Record *item = static_cast<Record*>(list.get()); item->size() == 2; item = item->at(1)->coerce<Record>()) {
+      ss << "    " << target->argnames[arg]->c_str() << " = " << item->at(0)->coerce<Value>() << std::endl;
+      if (++arg == target->keyargs)
+        ss << "  It was passed these auxiliary arguments (after the '\\') which should also be identical:" << std::endl;
+    }
+    status_write(STREAM_WARNING, ss.str());
   }
 
   if (ref.second)
