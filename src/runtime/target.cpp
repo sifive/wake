@@ -33,10 +33,11 @@
 
 struct TargetValue {
   Hash subhash;
+  std::vector<Hash> subhashes;
   Promise promise;
 
   TargetValue() { }
-  TargetValue(const Hash &subhash_) : subhash(subhash_) { }
+  TargetValue(Hash subhash_, std::vector<Hash> &subhashes_) : subhash(subhash_), subhashes(subhashes_) { }
 };
 
 struct HashHasher {
@@ -199,6 +200,7 @@ void CTargetArgs::execute(Runtime &runtime) {
 
   long i = 0;
   std::vector<uint64_t> hashes, subhashes;
+  std::vector<Hash> subhashesp;
 
   for (Record *item = static_cast<Record*>(list.get()); item->size() == 2; item = item->at(1)->coerce<Record>()) {
     Hash h = item->at(0)->coerce<Value>()->deep_hash(runtime.heap);
@@ -206,12 +208,13 @@ void CTargetArgs::execute(Runtime &runtime) {
       h.push(hashes);
     } else {
       h.push(subhashes);
+      subhashesp.push_back(h);
     }
   }
 
   Hash hash(hashes), subhash(subhashes);
 
-  auto ref = target->table.insert(std::make_pair(hash, TargetValue(subhash)));
+  auto ref = target->table.insert(std::make_pair(hash, TargetValue(subhash, subhashesp)));
   ref.first->second.promise.await(runtime, cont.get());
 
   if (!(ref.first->second.subhash == subhash)) {
@@ -223,7 +226,11 @@ void CTargetArgs::execute(Runtime &runtime) {
     long arg = 0;
     ss << "  It was passed these identical primary key arguments:" << std::endl;
     for (Record *item = static_cast<Record*>(list.get()); item->size() == 2; item = item->at(1)->coerce<Record>()) {
-      ss << "    " << target->argnames[arg]->c_str() << " = " << item->at(0)->coerce<Value>() << std::endl;
+      if (arg >= target->keyargs && !(subhashesp[arg-target->keyargs] == ref.first->second.subhashes[arg-target->keyargs]))
+        ss << "    (INCONSISTENT) ";
+      else
+        ss << "    ";
+      ss << target->argnames[arg]->c_str() << " = " << item->at(0)->coerce<Value>() << std::endl;
       if (++arg == target->keyargs)
         ss << "  It was passed these auxiliary arguments (after the '\\') which should also be identical:" << std::endl;
     }
