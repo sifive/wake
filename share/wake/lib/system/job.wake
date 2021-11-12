@@ -349,9 +349,6 @@ export def getJobRecord (job: Job): Option Usage =
   def raw job = prim "job_record"
   raw job | at 0 | omap toUsage
 
-export def makeBadPath (error: Error): Path =
-  BadPath error
-
 # Control a running/finished Job
 def stdio job fd  = prim "job_output" # 1=stdout, 2=stderr; blocks till closed
 def tree  job typ = prim "job_tree"   # 0=visible, 1=input, 2=output; blocks till finished
@@ -572,10 +569,8 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
   makeRunner "json-{script}" score pre post localRunner
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
-from wake export type Path # Path constructor stays private!
-data Path =
-  Path    (name: String)
-  BadPath (error: Error)
+from internals_wake export type Path
+from internals_wake import def Path BadPath # Path constructor stays private!
 
 export def getPathResult (path: Path): Result Path Error = match path
   BadPath e = Fail e
