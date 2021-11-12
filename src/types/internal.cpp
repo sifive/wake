@@ -64,13 +64,11 @@ PRIMTYPE(type_cmp_nan_lt) {
 }
 
 PRIMTYPE(type_tget) {
-  return args.size() == 4 &&
+  return args.size() >= 2 &&
     args[0]->unify(Data::typeTarget) &&
-    args[1]->unify(Data::typeInteger) &&
-    args[2]->unify(Data::typeInteger) &&
-    args[3]->unify(TypeVar(FN, 2)) &&
-    (*args[3])[0].unify(Data::typeInteger) &&
-    out->unify((*args[3])[1]);
+    args[1]->unify(TypeVar(FN, 2)) &&
+    (*args[1])[0].unify(Data::typeTarget) &&
+    out->unify((*args[1])[1]);
 }
 
 void prim_register(PrimMap &pmap, const char *key, PrimFn fn, PrimType type, int flags, void *data) {
