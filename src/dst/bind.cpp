@@ -1045,23 +1045,25 @@ static std::unique_ptr<Expr> fracture(std::unique_ptr<Top> top) {
           def.expr = fracture(*top, false, trim(def.name), std::move(def.expr), &gbinding);
           ++gbinding.current_index;
 
+          FileFragment topic = def.expr->fragment;
+
           // Form the type required for publishes
           std::vector<AST> args;
           args.emplace_back(t.second.type); // qualified by prior pass
           AST signature(t.second.type.region, "List@wake", std::move(args));
 
           // Insert Ascribe requirements on all publishes
-          FileFragment l = def.expr->fragment;
           Expr *next = nullptr;
           for (Expr *iter = def.expr.get(); iter->type == &App::type; iter = next) {
             App *app1 = static_cast<App*>(iter);
             App *app2 = static_cast<App*>(app1->fn.get());
-            app2->val = std::unique_ptr<Expr>(new Ascribe(FRAGMENT_CPP_LINE, AST(signature), app2->val.release(), l));
+            FileFragment publish = app2->val->fragment;
+            app2->val = std::unique_ptr<Expr>(new Ascribe(FRAGMENT_CPP_LINE, AST(signature), app2->val.release(), publish));
             next = app1->val.get();
           }
 
           // If the topic is empty, still force the type
-          if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(FRAGMENT_CPP_LINE, AST(signature), def.expr.release(), l));
+          if (!next) def.expr = std::unique_ptr<Expr>(new Ascribe(FRAGMENT_CPP_LINE, AST(signature), def.expr.release(), topic));
         }
       }
     }
