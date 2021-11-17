@@ -1514,7 +1514,7 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
     }
     return false;
   } else {
-    auto map = con.member(ip->second->exports);
+    auto &map = con.member(ip->second->exports);
     auto ie = map.find(def);
     if (ie == map.end()) {
       if (con.warn) {
