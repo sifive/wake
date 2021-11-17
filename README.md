@@ -108,28 +108,29 @@ Give FUSE permission to run as stated in the instructions and you should be good
     cd wake
     git tag                 # See what versions exist
     #git checkout master    # Use development branch (e.g. recent bug fix)
-    #git checkout v0.9      # Check out a specific version, like v0.9
+    #git checkout v0.24     # Check out a specific version, like v0.24
     make
-    ./bin/wake 'install "'$HOME'/stuff"' # or wherever
+    ./bin/wake install $HOME/stuff # or wherever
 
 External dependencies:
- - c++ 11		>= 4.7	GPLv3		https://www.gnu.org/software/gcc/
- - dash			>= 0.5	BSD 3-clause	http://gondor.apana.org.au/~herbert/dash/
- - sqlite3-dev		>= 3.6	public domain	https://www.sqlite.org/
- - libgmp-dev		>= 4.3	LGPL v3		https://gmplib.org
- - libfuse-dev		>= 2.8	LGPL v2.1	https://github.com/libfuse/libfuse
- - libre2-dev		>= 2013	BSD 3-clause	https://github.com/google/re2
- - libncurses5-dev	>= 5.7	MIT		https://www.gnu.org/software/ncurses/
+ - c++ 11               >= 4.7  GPLv3           https://www.gnu.org/software/gcc/
+ - dash                 >= 0.5  BSD 3-clause    http://gondor.apana.org.au/~herbert/dash/
+ - sqlite3-dev          >= 3.6  public domain   https://www.sqlite.org/
+ - libgmp-dev           >= 4.3  LGPL v3         https://gmplib.org
+ - libfuse-dev          >= 2.8  LGPL v2.1       https://github.com/libfuse/libfuse
+ - libre2-dev           >= 2013 BSD 3-clause    https://github.com/google/re2
+ - libncurses5-dev      >= 5.7  MIT             https://www.gnu.org/software/ncurses/
 
 Optional dependencies:
- - re2c			>= 1.0	public domain	http://re2c.org
- - utf8proc		>= 2.0	MIT 		https://juliastrings.github.io/utf8proc/
+ - re2c                 >= 1.0  public domain   http://re2c.org
+ - utf8proc             >= 2.0  MIT             https://juliastrings.github.io/utf8proc/
 
 Internal dependencies:
- - gopt			TFL		http://www.purposeful.co.uk/software/gopt/
- - SipHash		public domain	https://github.com/veorq/SipHash
- - BLAKE2		public domain	https://github.com/BLAKE2/libb2
- - whereami		WTFPLV2		https://github.com/gpakosz/whereami
+ - lemon                2021-09 public domain   https://www.sqlite.org/lemon.html
+ - gopt                 10.0    TFL             http://www.purposeful.co.uk/software/gopt/
+ - SipHash              2017-02 CC0             https://github.com/veorq/SipHash
+ - BLAKE2               2018-07 CC0             https://github.com/BLAKE2/libb2
+ - whereami             2018-09 WTFPLV2         https://github.com/gpakosz/whereami
 
 # Documentation
 
