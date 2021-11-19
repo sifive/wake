@@ -293,6 +293,25 @@ void ASTree::explore(Expr *expr, bool isGlobal) {
       }
     }
     explore(defbinding->body.get(), isGlobal);
+  } else if (expr->type == &Destruct::type) {
+    Destruct *destruct = dynamic_cast<Destruct*>(expr);
+    std::shared_ptr<Sum> sum = destruct->sum;
+
+    for (size_t i = 0; i < sum->members.size(); i++) {
+      FileFragment token = sum->members[i].ast.token;
+      if (!token.empty()) {
+        Location definitionLocation = token.location();
+        for (FileFragment use: destruct->uses[i]) {
+          usages.emplace_back(
+            use.location(),
+            definitionLocation
+            );
+        }
+      }
+    }
+
+    explore(destruct->arg.get(), false);
+    for (auto &c : destruct->cases) explore(c.get(), false);
   }
 }
 
