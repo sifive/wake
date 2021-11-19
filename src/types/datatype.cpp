@@ -54,6 +54,17 @@ void Sum::addConstructor(AST &&ast) {
   cons.index = members.size()-1;
 }
 
+AST::AST(const FileFragment &token_, std::string &&name_, std::vector<AST> &&args_)
+  : token(token_), region(token_), definition(FRAGMENT_CPP_LINE), name(std::move(name_)), args(std::move(args_)) {
+}
+
+AST::AST(const FileFragment &token_, std::string &&name_)
+  : token(token_), region(token_), definition(FRAGMENT_CPP_LINE), name(std::move(name_)) {
+}
+AST::AST(const FileFragment &token_)
+  : token(token_), region(token_), definition(FRAGMENT_CPP_LINE) {
+}
+
 bool AST::unify(TypeVar &out, const TypeMap &ids) {
   if (lex_kind(name) == LOWER) {
     auto it = ids.find(name);
