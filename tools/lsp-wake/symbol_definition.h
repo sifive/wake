@@ -23,8 +23,18 @@
 #include <string>
 #include <utility>
 
-enum SymbolKind { KIND_PACKAGE = 4, KIND_FUNCTION = 12, KIND_VARIABLE = 13, KIND_STRING = 15, KIND_NUMBER = 16,
-  KIND_BOOLEAN = 17, KIND_ARRAY = 18, KIND_ENUM_MEMBER = 22, KIND_OPERATOR = 25 };
+enum SymbolKind {
+  KIND_PACKAGE     = 4,
+  KIND_CLASS       = 5,
+  KIND_FUNCTION    = 12,
+  KIND_VARIABLE    = 13,
+  KIND_STRING      = 15,
+  KIND_NUMBER      = 16,
+  KIND_BOOLEAN     = 17,
+  KIND_ARRAY       = 18,
+  KIND_ENUM_MEMBER = 22,
+  KIND_OPERATOR    = 25
+};
 
 struct SymbolDefinition {
     std::string name;
