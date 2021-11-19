@@ -21,6 +21,7 @@
 
 #include <iostream>
 #include <map>
+#include <set>
 #include <vector>
 #include <functional>
 
@@ -70,6 +71,7 @@ private:
         Location location;
     };
 
+    std::set<Location> types;
     std::vector<SymbolDefinition> definitions;
     std::vector<SymbolUsage> usages;
     std::vector<SymbolDefinition> packages;
@@ -85,6 +87,7 @@ private:
     };
 
     void explore(Expr *expr, bool isGlobal);
+    void explore_type(const AST &ast);
 
     static SymbolKind getSymbolKind(const char *name, const std::string& type);
 
