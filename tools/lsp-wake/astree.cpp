@@ -309,6 +309,9 @@ void ASTree::explore(Expr *expr, bool isGlobal) {
         }
       }
     }
+
+    explore(destruct->arg.get(), false);
+    for (auto &c : destruct->cases) explore(c.get(), false);
   }
 }
 
