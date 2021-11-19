@@ -314,13 +314,14 @@ static std::string rebind_publish(ResolveBinding *binding, const FileFragment &f
 }
 
 struct PatternTree {
-  FileFragment fragment; // fragment of argument
+  FileFragment token, region;
   std::shared_ptr<Sum> sum; // nullptr if unexpanded
   optional<AST> type; // nullptr if untyped
   int cons;
   int var; // -1 if unbound/_
   std::vector<PatternTree> children;
-  PatternTree(const FileFragment &fragment_ = FRAGMENT_CPP_LINE, int var_ = -1) : fragment(fragment_), sum(0), cons(0), var(var_) { }
+  PatternTree(const FileFragment &token_ = FRAGMENT_CPP_LINE, const FileFragment &region_ = FRAGMENT_CPP_LINE, int var_ = -1) :
+  token(token_), region(region_), sum(0), cons(0), var(var_) { }
   void format(std::ostream &os, int p) const;
 };
 
@@ -397,7 +398,7 @@ static Expr *fill_pattern(Expr *expr, const PatternTree &a, const PatternTree &b
   if (b.var >= 0) {
     expr = new App(expr->fragment,
       expr,
-      new VarRef(b.fragment, "_ a" + std::to_string(a.var)));
+      new VarRef(b.region, "_ a" + std::to_string(a.var)));
   } else {
     for (size_t i = 0; i < a.children.size(); ++i)
       expr = fill_pattern(expr, a.children[i], b.children[i]);
@@ -453,10 +454,10 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
   if (sum) {
     PatternTree *prototype_token = get_expansion(&prototype.tree, expand);
     FileFragment *argument;
-    if (prototype_token->fragment.empty()) {
-      argument = &get_expansion(&patterns[1].tree, expand)->fragment;
+    if (prototype_token->region.empty()) {
+      argument = &get_expansion(&patterns[1].tree, expand)->region;
     } else {
-      argument = &prototype_token->fragment;
+      argument = &prototype_token->region;
     }
     std::unique_ptr<Destruct> des(
       new Destruct(fragment, sum,
@@ -492,12 +493,12 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
             << "', but is not a member of this type");
           return nullptr;
         } else if (t->sum && t->cons == (int)c) {
-          des->uses.back().emplace_back(t->fragment);
+          des->uses.back().emplace_back(t->token);
           // Put any supplied type constraints on the object
           assert (args == (int)t->children.size());
           for (int i = 0; i < args; ++i) {
             PatternTree &arg = t->children[i];
-            gets[i] = ascribe(std::move(gets[i]), arg.fragment, std::move(arg.type));
+            gets[i] = ascribe(std::move(gets[i]), arg.region, std::move(arg.type));
           }
           bucket.emplace_back(std::move(*p));
           p->index = -2;
@@ -575,7 +576,7 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
 }
 
 static PatternTree cons_lookup(ResolveBinding *binding, std::unique_ptr<Expr> &expr, AST &ast, std::shared_ptr<Sum> multiarg) {
-  PatternTree out(ast.region);
+  PatternTree out(ast.token, ast.region);
   out.type = std::move(ast.type);
   if (ast.name == "_") {
     // no-op; unbound
@@ -647,7 +648,7 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
   std::shared_ptr<Sum> multiarg;
   if (match->args.size() == 1) {
     std::unique_ptr<Expr> arg = std::move(match->args.front());
-    prototype.tree.fragment = arg->fragment;
+    prototype.tree.region = arg->fragment;
     prototype.tree.var = 0;
     for (auto &p : match->patterns)
       arg = ascribe(std::move(arg), p.pattern.region, std::move(p.pattern.type));
@@ -658,7 +659,7 @@ static std::unique_ptr<Expr> rebind_match(const std::string &fnname, ResolveBind
     multiarg->members.emplace_back(AST(FRAGMENT_CPP_LINE));
     size_t i = 0;
     for (auto &a : match->args) {
-      prototype.tree.children.emplace_back(a->fragment, i);
+      prototype.tree.children.emplace_back(a->fragment, a->fragment, i);
       for (auto &p : match->patterns)
         if (i < p.pattern.args.size())
           a = ascribe(std::move(a), p.pattern.args[i].region, std::move(p.pattern.args[i].type));
