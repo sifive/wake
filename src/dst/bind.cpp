@@ -147,13 +147,13 @@ struct ResolveBinding {
     return override;
   }
 
-  bool qualify_type(std::string &name, const FileFragment &fragment) {
+  bool qualify_type(std::string &name, const FileFragment &use, FileFragment &def) {
     SymbolSource *override = nullptr;
     for (auto sym : symbols) {
       auto it = sym->types.find(name);
       if (it != sym->types.end()) {
         if (override && it->second.qualified != override->qualified) {
-          WARNING(fragment.location(),
+          WARNING(use.location(),
             "refernce '" << name
             << "' is ambiguous; type imported from both " << it->second.fragment.location()
             << " and " << override->fragment.location());
@@ -161,7 +161,10 @@ struct ResolveBinding {
         override = &it->second;
       }
     }
-    if (override) name = override->qualified;
+    if (override) {
+      name = override->qualified;
+      def = override->fragment;
+    }
     return override;
   }
 };
@@ -818,10 +821,10 @@ static std::vector<Symbols*> process_import(Top &top, Imports &imports, FileFrag
   return out;
 }
 
-static bool qualify_type(ResolveBinding *binding, std::string &name, const FileFragment &fragment) {
+static bool qualify_type(ResolveBinding *binding, std::string &name, const FileFragment &use, FileFragment &def) {
   ResolveBinding *iter;
   for (iter = binding; iter; iter = iter->parent) {
-    if (iter->qualify_type(name, fragment)) break;
+    if (iter->qualify_type(name, use, def)) break;
   }
 
   if (iter) {
@@ -829,7 +832,7 @@ static bool qualify_type(ResolveBinding *binding, std::string &name, const FileF
   } else if (name == "BadType") {
     return false;
   } else {
-    ERROR(fragment.location(), "reference to undefined type '" << name << "'");
+    ERROR(use.location(), "reference to undefined type '" << name << "'");
     return false;
   }
 }
@@ -837,7 +840,7 @@ static bool qualify_type(ResolveBinding *binding, std::string &name, const FileF
 static bool qualify_type(ResolveBinding *binding, AST &type) {
   // Type variables do not get qualified
   if (lex_kind(type.name) == LOWER) return true;
-  bool ok = qualify_type(binding, type.name, type.token);
+  bool ok = qualify_type(binding, type.name, type.token, type.definition);
   for (auto &x : type.args)
     if (!qualify_type(binding, x))
       ok = false;
@@ -923,7 +926,8 @@ static std::unique_ptr<Expr> fracture(Top &top, bool anon, const std::string &na
     bool ok = true;
     if (!con->sum->scoped) {
       con->sum->scoped = true;
-      if (!qualify_type(binding, con->sum->name, con->sum->token))
+      FileFragment ignored(FRAGMENT_CPP_LINE);
+      if (!qualify_type(binding, con->sum->name, con->sum->token, ignored))
         ok = false;
     }
     if (!con->cons->scoped) {
