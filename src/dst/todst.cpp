@@ -1280,11 +1280,10 @@ static Expr *dst_expr(CSTElement expr) {
       Expr *thenE = relabel_anon(dst_expr(child));
       child.nextSiblingNode();
       Expr *elseE = relabel_anon(dst_expr(child));
-      FileFragment l = expr.fragment();
-      Match *out = new Match(l);
+      Match *out = new Match(expr.fragment());
       out->args.emplace_back(condE);
-      out->patterns.emplace_back(AST(l, "True@wake"),  thenE, nullptr);
-      out->patterns.emplace_back(AST(l, "False@wake"), elseE, nullptr);
+      out->patterns.emplace_back(AST(FRAGMENT_CPP_LINE, "True@wake"),  thenE, nullptr);
+      out->patterns.emplace_back(AST(FRAGMENT_CPP_LINE, "False@wake"), elseE, nullptr);
       out->flags |= FLAG_AST;
       return out;
     }
