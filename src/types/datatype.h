@@ -38,18 +38,15 @@ struct ScopedTypeVar {
 };
 
 struct AST {
-  FileFragment token, region;
+  FileFragment token, region, definition;
   std::string name;
   std::string tag;
   optional<AST> type;
   std::vector<AST> args;
 
-  AST(const FileFragment &token_, std::string &&name_, std::vector<AST> &&args_) :
-    token(token_), region(token_), name(std::move(name_)), args(std::move(args_)) { }
-  AST(const FileFragment &token_, std::string &&name_) :
-    token(token_), region(token_), name(std::move(name_)) { }
-  AST(const FileFragment &token_) :
-    token(token_), region(token_) { }
+  AST(const FileFragment &token_, std::string &&name_, std::vector<AST> &&args_);
+  AST(const FileFragment &token_, std::string &&name_);
+  AST(const FileFragment &token_);
 
   bool unify(TypeVar &out, const TypeMap &ids);
   void lowerVars(std::vector<ScopedTypeVar> &out) const;

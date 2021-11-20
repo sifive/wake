@@ -46,6 +46,7 @@ ASTree::ASTree(std::string _absLibDir) : absLibDir(std::move(_absLibDir)) {}
 void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &processFileDiagnostics) {
   usages.clear();
   definitions.clear();
+  types.clear();
   packages.clear();
   comments.clear();
 
@@ -259,6 +260,7 @@ void ASTree::explore(Expr *expr, bool isGlobal) {
     explore(lambda->body.get(), false);
   } else if (expr->type == &Ascribe::type) {
     Ascribe *ascribe = dynamic_cast<Ascribe*>(expr);
+    explore_type(ascribe->signature);
     explore(ascribe->body.get(), false);
   } else if (expr->type == &DefBinding::type) {
     DefBinding *defbinding = dynamic_cast<DefBinding*>(expr);
@@ -312,6 +314,35 @@ void ASTree::explore(Expr *expr, bool isGlobal) {
 
     explore(destruct->arg.get(), false);
     for (auto &c : destruct->cases) explore(c.get(), false);
+  } else if (expr->type == &Construct::type) {
+    Construct *construct = dynamic_cast<Construct*>(expr);
+    if (construct->sum->scoped) {
+      construct->sum->scoped = false;
+      for (auto &mem : construct->sum->members) {
+        explore_type(mem.ast);
+      }
+    }
+  }
+}
+
+void ASTree::explore_type(const AST &ast) {
+  for (auto &x : ast.args)
+    explore_type(x);
+
+  if (lex_kind(ast.name) == LOWER) return;
+  if (ast.definition.empty()) return;
+
+  usages.emplace_back(
+    ast.token.location(),
+    ast.definition.location());
+
+  if (types.insert(ast.definition.location()).second) {
+    definitions.emplace_back(
+      /* name */     ast.name,
+      /* location */ ast.definition.location(),
+      /* type */     "type",
+      /* kind */     KIND_CLASS,
+      /* global */   true);
   }
 }
 

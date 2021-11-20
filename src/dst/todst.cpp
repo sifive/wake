@@ -484,7 +484,12 @@ static void dst_tuple(CSTElement topdef, Package &package, Symbols *globals) {
     if (exportb) exportt = true;
 
     std::string &mname = c.ast.args[i].tag;
-    FileFragment memberToken = c.ast.args[i].region;
+    FileFragment memberRegion = c.ast.args[i].region;
+    FileFragment memberToken(
+      memberRegion.fcontent(),
+      memberRegion.startByte(),
+      memberRegion.startByte() + mname.size());
+
     if (lex_kind(mname) != UPPER) continue;
 
     // Implement get methods
