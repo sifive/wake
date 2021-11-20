@@ -16,6 +16,70 @@
 package wake
 
 # Put builtin types also into the wake namespace
+
+# The expresion `a => b` denotes a function which takes
+# an input of type `a` to an output of type `b`.
+#
+# The operator `=>` is a builtin of the wake language itself,
+# created automatically by constructs like `def f x = ...`.
+# This definition exports this type into the wake package.
 from builtin export type binary =>
-from builtin export type String Integer Double RegExp
-from builtin export type Array Job
+
+# The String type is a builtin of the wake language itself.
+#
+# This type is automatically constructed by string literals
+# like, `"example"`. A typical wake String is UTF-8 encoded,
+# though any sequence of 8-bit octets is possible.
+#
+# However, legal UTF-8 is required for `""`-literals, which
+# are also NFC normalized by the parser.
+from builtin export type String
+
+# The Integer type is a builtin of the wake language itself.
+#
+# This type is automatically constructed by integer literals
+# like, `123_456`. The wake Integer allows arbitrarily large
+# Integers, up to the maximum available system memory. Thus,
+# you need never be concerned about Integer overflow, just
+# memory exhaustion.
+#
+# Literals may use hex `0xaB`, binary `0b1101`, or octal `0123`
+# notation, with an `_` legal to separate groups of digits.
+from builtin export type Integer
+
+# The Double type is a builtin of the wake language intself.
+#
+# This type is automatically constructed by double literals
+# like, `3.1415`. The wake Double is an IEEE 754 64-bit double.
+# All standard IEEE 754 operators are supported, using a `.`
+# suffix on the operator; e.g., `3.1415 +. 1.0`.
+#
+# Literals must include either `.`, `e`, or `p`. For example,
+# `3.0` and `3e0` are `Double`s, while `3` is an `Integer`.
+# Similarly, `0x12.2` and `0x12p2` are `Double`s, while `0x12`
+# is an `Integer`.
+from builtin export type Double
+
+# The RegExp type is a builtin of the wake language itself.
+#
+# This type is automatically constructed by RegExp literals
+# like, `ab*c`. The wake parser validates that the expression
+# forms a legal regular expression.
+#
+# See <https://github.com/google/re2/wiki/Syntax> for the
+# details of the regular expression syntax supported by wake.
+from builtin export type RegExp
+
+# The Job type is a builtin of the wake language itself.
+#
+# A Job object is an opaque handle into the wake runtime.
+# A Job refers both to a child process launched by wake
+# and a job() entry in the sqlite3 `wake.db`.
+#
+# Jobs are created via the `runJob` API.
+from builtin export type Job
+
+# The Array type is an implementation detail.
+#
+# Use the Vector type. This type should not be exported.
+from builtin export type Array
