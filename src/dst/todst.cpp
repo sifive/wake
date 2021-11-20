@@ -717,11 +717,13 @@ static void extract_def(std::vector<Definition> &out, long index, AST &&ast, con
   if (ast.args.empty()) {
     Match *match = new Match(ast.token);
     match->args.emplace_back(new VarRef(body->fragment, key));
-    match->patterns.emplace_back(AST(ast.region, std::string(ast.name)), new VarRef(body->fragment, key), nullptr);
+    match->patterns.emplace_back(AST(ast.token, std::string(ast.name)), new VarRef(body->fragment, key), nullptr);
+    match->patterns.back().pattern.region = ast.region;
     out.emplace_back("_ discard " + std::to_string(index), ast.token, match, std::vector<ScopedTypeVar>(typeVars));
   }
   for (auto &m : ast.args) {
-    AST pattern(ast.region, std::string(ast.name));
+    AST pattern(ast.token, std::string(ast.name));
+    pattern.region = ast.region;
     pattern.type = std::move(ast.type);
     std::string mname("_ " + m.name);
     for (auto &n : ast.args) {
