@@ -163,7 +163,7 @@ struct ResolveBinding {
     }
     if (override) {
       name = override->qualified;
-      def = override->fragment;
+      def = override->origin;
     }
     return override;
   }
@@ -1536,6 +1536,8 @@ static bool contract(const Contractor &con, SymbolSource &sym) {
     sym.flags &= ~SYM_GRAY;
     sym.flags |= SYM_LEAF;
     sym.qualified = ie->second.qualified;
+    if (!ie->second.origin.empty()) // builtin types have empty origin => keep export/import location
+      sym.origin = ie->second.origin;
     return ok;
   }
 }
