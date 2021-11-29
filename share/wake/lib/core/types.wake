@@ -78,8 +78,3 @@ from builtin export type RegExp
 #
 # Jobs are created via the `runJob` API.
 from builtin export type Job
-
-# The Array type is an implementation detail.
-#
-# Use the Vector type. This type should not be exported.
-from builtin export type Array
