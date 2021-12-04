@@ -53,6 +53,12 @@ publish path = match (getenv "WAKE_PATH")
 publish path = "/usr/bin", Nil
 publish path = "/bin", Nil
 
+# On MacOS and FreeBSD, many important system binaries are not in /usr/bin
+publish path = match sysname
+    "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
+    "FreeBSD" = "/usr/local/bin", Nil
+    _        = Nil
+
 # A topic used to globally add variables to the default environment of Plans
 export topic environment: String
 

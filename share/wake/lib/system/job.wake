@@ -568,62 +568,7 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
             Pass usage = Pass (RunnerOutput (getK `inputs`) (getK `outputs`) usage)
   makeRunner "json-{script}" score pre post localRunner
 
-# Paths differ from Strings in that they have been hashed; their content is frozen
-from internals_wake export type Path
 from internals_wake import def Path BadPath # Path constructor stays private!
-
-export def getPathResult (path: Path): Result Path Error = match path
-  BadPath e = Fail e
-  _         = Pass path
-
-export def getPathError (path: Path): Option Error = match path
-  Path _    = None
-  BadPath e = Some e
-
-export def getPathName (path: Path): String = match path
-  Path name = name
-  BadPath _ = "BADPATH"
-
-export def getPathChild (path: Path): String = match path
-  Path name = replace `^.*/` '' name
-  BadPath _ = "BADPATH"
-
-export def getPathParent (path: Path): Path = match path
-  Path name = Path (simplify "{name}/..")
-  BadPath e = BadPath e
-
-export def isPathDir: Path => Boolean = match _
-  BadPath _ = False
-  Path str = matches `0+` (hashcode str)
-
-export def sortPaths (paths: List Path): List Path =
-  def fn a b = a.getPathName <~ b.getPathName
-  sortBy fn paths
-
-def addhash (f: String): String =
-  def p = simplify f
-  def add f h = prim "add_hash"
-  add p (hashcode p)
-
-def hashUsage = defaultUsage | setUsageCPUtime 0.1
-target hashcode (f: String): String =
-  def get f = prim "get_hash"
-  def reuse = get f
-  if reuse !=* "" then reuse else
-    def hashPlan cmd  =
-      Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun True Nil (\_ True) hashUsage id id
-    def job = hashPlan ("<hash>", f, Nil) | runJobWith localRunner
-    def hash =
-      job.getJobStdout
-      | getWhenFail ""
-      | extract `(.{64}).*`
-    match job.isJobOk hash
-      True (x, Nil) = x
-      _ _ = "BadHash"
-
-export def getPathHash: Path => String = match _
-  Path    x = hashcode x
-  BadPath _ = "BadHash"
 
 # Whenever possible, use 'job' if:
 #   cmd can run under FUSE
