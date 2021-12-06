@@ -43,6 +43,15 @@ ASTree::ASTree() {}
 
 ASTree::ASTree(std::string _absLibDir) : absLibDir(std::move(_absLibDir)) {}
 
+void ASTree::recordComments(CSTElement def) {
+  if (def.id() == TOKEN_COMMENT || def.id() == TOKEN_NL) {
+    comments.emplace_back(def.segment().str(), def.location());
+  }
+  for (CSTElement innerdef = def.firstChildElement(); !innerdef.empty();  innerdef.nextSiblingElement()) {
+    recordComments(innerdef);
+  }
+}
+
 void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &processFileDiagnostics) {
   usages.clear();
   definitions.clear();
@@ -77,11 +86,7 @@ void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &proce
 
     CST cst(*fcontent, lspReporter);
     dst_top(cst.root(), *top);
-    for (CSTElement topdef = cst.root().firstChildElement(); !topdef.empty(); topdef.nextSiblingElement()) {
-      if (topdef.id() == TOKEN_COMMENT || topdef.id() == TOKEN_NL) {
-        comments.emplace_back(topdef.segment().str(), topdef.location());
-      }
-    }
+    recordComments(cst.root());
   }
   flatten_exports(*top);
 

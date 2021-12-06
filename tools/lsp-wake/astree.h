@@ -24,6 +24,7 @@
 #include <set>
 #include <vector>
 #include <functional>
+#include <parser/cst.h>
 
 #include "dst/expr.h"
 #include "util/diagnostic.h"
@@ -90,6 +91,8 @@ private:
     void explore_type(const AST &ast);
 
     static SymbolKind getSymbolKind(const char *name, const std::string& type);
+
+    void recordComments(CSTElement def);
 
     void fillDefinitionDocumentationFields();
 
