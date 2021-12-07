@@ -1376,7 +1376,9 @@ const char *dst_top(CSTElement root, Top &top) {
       if (it.first->second.qualified == name) {
         it.first->second.fragment = def.second.fragment;
         it.first->second.flags |= SYM_LEAF;
-        package->exports.defs.find(def.first)->second.flags |= SYM_LEAF;
+        auto jt = package->exports.defs.find(def.first);
+        jt->second.flags |= SYM_LEAF;
+        it.first->second.origin = jt->second.origin = def.second.fragment;
       } else {
         ERROR(def.second.fragment.location(),
           "definition '" << def.first
@@ -1394,7 +1396,9 @@ const char *dst_top(CSTElement root, Top &top) {
       if (it.first->second.qualified == name) {
         it.first->second.fragment = topic.second.fragment;
         it.first->second.flags |= SYM_LEAF;
-        package->exports.topics.find(topic.first)->second.flags |= SYM_LEAF;
+        auto jt = package->exports.topics.find(topic.first);
+        jt->second.flags |= SYM_LEAF;
+        it.first->second.origin = jt->second.origin = topic.second.fragment;
       } else {
         ERROR(topic.second.fragment.location(),
           "topic '" << topic.first
@@ -1411,7 +1415,9 @@ const char *dst_top(CSTElement root, Top &top) {
       if (it.first->second.qualified == name) {
         it.first->second.fragment = type.second.fragment;
         it.first->second.flags |= SYM_LEAF;
-        package->exports.types.find(type.first)->second.flags |= SYM_LEAF;
+        auto jt = package->exports.types.find(type.first);
+        jt->second.flags |= SYM_LEAF;
+        it.first->second.origin = jt->second.origin = type.second.fragment;
       } else {
         ERROR(type.second.fragment.location(),
           "type '" << type.first
