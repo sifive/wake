@@ -756,20 +756,20 @@ struct SymMover {
       if (unary != from.end()) {
         to.insert(std::make_pair(
           "unary " + sym.first.substr(3),
-          sym.second.clone(unary->second.qualified)));
+          sym.second.qualify(unary->second)));
         warn = false;
       }
       auto binary = from.find("binary " + def.substr(3));
       if (binary != from.end()) {
         to.insert(std::make_pair(
           "binary " + sym.first.substr(3),
-          sym.second.clone(binary->second.qualified)));
+          sym.second.qualify(binary->second)));
         warn = false;
       }
     } else {
       auto it = from.find(def);
       if (it != from.end()) {
-        to.insert(std::make_pair(sym.first, sym.second.clone(it->second.qualified)));
+        to.insert(std::make_pair(sym.first, sym.second.qualify(it->second)));
         warn = false;
       }
     }

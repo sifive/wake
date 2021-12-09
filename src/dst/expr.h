@@ -189,9 +189,11 @@ struct SymbolSource {
    : fragment(fragment_), origin(fragment_), qualified(), flags(flags_) { }
   SymbolSource(const FileFragment &fragment_, const std::string &qualified_, long flags_ = 0)
    : fragment(fragment_), origin(fragment_), qualified(qualified_), flags(flags_) { }
+  SymbolSource(const FileFragment &fragment_, const FileFragment &origin_, const std::string &qualified_, long flags_ = 0)
+   : fragment(fragment_), origin(origin_), qualified(qualified_), flags(flags_) { }
 
-  SymbolSource clone(const std::string &qualified) const {
-    return SymbolSource(fragment, qualified, flags);
+  SymbolSource qualify(const SymbolSource &source) const {
+    return SymbolSource(fragment, source.origin, source.qualified, flags);
   }
 };
 

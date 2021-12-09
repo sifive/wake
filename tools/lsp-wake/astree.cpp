@@ -318,6 +318,16 @@ void ASTree::explore(Expr *expr, bool isGlobal) {
     Construct *construct = dynamic_cast<Construct*>(expr);
     if (construct->sum->scoped) {
       construct->sum->scoped = false;
+
+      if (types.insert(construct->sum->token.location()).second) {
+        definitions.emplace_back(
+          /* name */     construct->sum->name,
+          /* location */ construct->sum->token.location(),
+          /* type */     "type",
+          /* kind */     KIND_CLASS,
+          /* global */   true);
+      }
+
       for (auto &mem : construct->sum->members) {
         explore_type(mem.ast);
       }
