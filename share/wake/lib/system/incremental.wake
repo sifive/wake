@@ -15,36 +15,6 @@
 
 package wake
 
-# This API makes it possible to include a non-source file into a wake build.
-# Generally, one should obtain Paths from sources or as the output of Jobs.
-# This API is useful for things like a comannd-line-supplied input file.
-export def claimFileAsPath (existingFile: String) (desiredWorkspacePath: String): Result Path Error =
-    def fileName = replace `.*/` "" desiredWorkspacePath
-    require Pass destDir =
-        extract `(.*)/.*` desiredWorkspacePath
-        | head
-        | getOrElse "."
-        | mkdir
-    claimFileAsPathIn destDir existingFile fileName
-
-export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (desiredName: String): Result Path Error =
-    require Pass _ =
-        getPathResult outputDirectory
-    def get_modtime file = prim "get_modtime"
-    def time = get_modtime existingFile
-    if time == -1 then
-        failWithError "{existingFile}: claimed file does not exist"
-    else
-        def desiredWorkspacePath = simplify "{outputDirectory.getPathName}/{desiredName}"
-        def visible = outputDirectory, Nil
-        def cmdline = which "cp", existingFile, desiredWorkspacePath, Nil
-        makeExecPlan cmdline visible
-        | setPlanLocalOnly   True
-        | setPlanPersistence Once
-        | setPlanFnOutputs   (\_ desiredWorkspacePath, Nil)
-        | runJobWith localRunner
-        | getJobOutput
-
 target tarExe Unit =
     def gnutar = which "gnutar"
     if gnutar ==* "gnutar" then which "tar" else gnutar

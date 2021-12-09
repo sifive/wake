@@ -15,19 +15,14 @@
 
 package wake
 
-# Read the file contents of a Path
-export def read (path: Path): Result String Error =
-    def imp p = prim "read"
-    require Pass _ =
-        getPathResult path
-    match (imp path.getPathName)
-        Pass body = Pass body
-        Fail f = Fail (makeError f)
-
 # Simplify away the ..s and .s in a String
 export def simplify (path: String): String =
     def p s = prim "simplify"
     p path
+
+export def sortPaths (paths: List Path): List Path =
+  def fn a b = a.getPathName <~ b.getPathName
+  sortBy fn paths
 
 # Concatenate two paths
 #  join "foo"  "bar"    => "foo/bar"
@@ -67,86 +62,6 @@ export def workspace: String =
 export def cwd: String =
     prim "cwd"
 
-def mkdirRunner: Runner =
-    def imp m p = prim "mkdir"
-    def pre = match _
-        Fail f = Pair (Fail f) (Pair "" "")
-        Pass input = match input.getRunnerInputCommand
-            _, _, mode, dir, Nil = Pair (Pass input) (Pair mode dir)
-            _ = unreachable "mkdirImp violated command-line contract"
-    def post = match _
-        Pair (Fail f) _ = Fail f
-        Pair (Pass output) (Pair smode dir) =
-            def mode = int smode | getOrElse 0x200
-            if mode < 0 || mode > 0x1ff then
-                Fail (makeError "mkdir {dir}: Invalid mode ({smode})")
-            else match (imp mode dir)
-                Fail f = Fail (makeError f)
-                Pass path = Pass (editRunnerOutputOutputs (path, _) output)
-    makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
-
-def mkdirImp inputs mode path =
-    require Pass _ =
-        findFailFn getPathResult inputs
-    makeExecPlan ("<mkdir>", "-m", "0{strOctal mode}", path, Nil) inputs
-    | setPlanKeep        False
-    | setPlanEnvironment Nil
-    | runJobWith mkdirRunner
-    | getJobOutput
-
-# Create a directory in the parent
-export def mkdirIn (parent: Path) (mode: Integer) (name: String): Result Path Error =
-    mkdirImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify
-
-# Make all every element in the directory path with mode 0755
-export def mkdir (path: String): Result Path Error =
-    def root = match _
-        "", x, t = Pair (mkdirImp Nil 0755 "/{x}") t
-        x, t     = Pair (mkdirImp Nil 0755 x) t
-        Nil      = unreachable "tokenize never returns an empty list"
-    def mkdirRecursive (Pair rootResult pathTail) =
-        require Pass root =
-            rootResult
-        rfoldl (mkdirIn _ 0755 _) root pathTail
-    path
-    | simplify
-    | tokenize `/`
-    | root
-    | mkdirRecursive
-
-target writeImp inputs mode path content =
-    require Pass _ =
-        findFailFn getPathResult inputs
-    def writeRunner =
-        def imp m p c = prim "write"
-        def pre input = Pair input Unit
-        def post = match _
-            Pair (Fail f) _ = Fail f
-            Pair (Pass output) Unit =
-                if mode < 0 || mode > 0x1ff then
-                    Fail (makeError "write {path}: Invalid mode ({strOctal mode})")
-                else match (imp mode path content)
-                    Fail f = Fail (makeError f)
-                    Pass path = Pass (editRunnerOutputOutputs (path, _) output)
-        makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
-    makeExecPlan ("<write>", str mode, path, Nil) inputs
-    | setPlanOnce        False
-    | setPlanEnvironment Nil
-    | runJobWith writeRunner
-    | getJobOutput
-
-# Create a file with the given mode in the specified directory
-export def writeIn (parent: Path) (mode: Integer) (name: String) (content: String): Result Path Error =
-    writeImp (parent, Nil) mode "{parent.getPathName}/{name}".simplify content
-
-# Create all directories and the named file
-export def write (path: String) (content: String): Result Path Error =
-    def spath = simplify path
-    require Pass parent =
-        simplify "{spath}/.."
-        | mkdir
-    writeImp (parent, Nil) 0644 spath content
-
 # Remove any leading directories from `file`.
 #
 # Parameters:
@@ -180,3 +95,56 @@ export def basename (file: String): String =
 # ```
 export def dirname (file: String): String =
     simplify "{file}/.."
+
+export def isPathDir: Path => Boolean = match _
+  BadPath _ = False
+  Path str = matches `0+` (hashcode str)
+
+# Paths differ from Strings in that they have been hashed; their content is frozen
+from internals_wake export type Path
+from internals_wake import def Path BadPath # Path constructor stays private!
+
+export def getPathResult (path: Path): Result Path Error = match path
+  BadPath e = Fail e
+  _         = Pass path
+
+export def getPathError (path: Path): Option Error = match path
+  Path _    = None
+  BadPath e = Some e
+
+export def getPathName (path: Path): String = match path
+  Path name = name
+  BadPath _ = "BADPATH"
+
+export def getPathChild (path: Path): String = match path
+  Path name = replace `^.*/` '' name
+  BadPath _ = "BADPATH"
+
+export def getPathParent (path: Path): Path = match path
+  Path name = Path (simplify "{name}/..")
+  BadPath e = BadPath e
+
+def addhash (f: String): String =
+  def p = simplify f
+  def add f h = prim "add_hash"
+  add p (hashcode p)
+
+def hashUsage = defaultUsage | setUsageCPUtime 0.1
+target hashcode (f: String): String =
+  def get f = prim "get_hash"
+  def reuse = get f
+  if reuse !=* "" then reuse else
+    def hashPlan cmd  =
+      Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun True Nil (\_ True) hashUsage id id
+    def job = hashPlan ("<hash>", f, Nil) | runJobWith localRunner
+    def hash =
+      job.getJobStdout
+      | getWhenFail ""
+      | extract `(.{64}).*`
+    match job.isJobOk hash
+      True (x, Nil) = x
+      _ _ = "BadHash"
+
+export def getPathHash: Path => String = match _
+  Path    x = hashcode x
+  BadPath _ = "BadHash"
