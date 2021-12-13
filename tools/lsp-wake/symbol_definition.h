@@ -52,13 +52,9 @@ struct SymbolDefinition {
     isGlobal(_isGlobal) {}
 
     bool operator < (const SymbolDefinition &def) const {
-      if (!(this->location < def.location) && !(def.location < this->location)) {
-        if (this->name == def.name) {
-          return this->type < def.type;
-        }
-        return this->name < def.name;
-      }
-      return location < def.location;
+      if (location != def.location) return location < def.location;
+      if (name != def.name) return name < def.name;
+      return type < def.type;
     }
 };
 

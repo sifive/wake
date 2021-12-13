@@ -501,9 +501,7 @@ void ASTree::emplaceComment(std::vector<std::pair<std::string, int>> &comment, c
 ASTree::SymbolUsage::SymbolUsage(Location _usage, Location _definition) : usage(std::move(_usage)), definition(std::move(_definition)) {}
 
 ASTree::Comment::Comment(std::string _comment_text, Location _location, int _level)
-: comment_text(std::move(_comment_text)), location(std::move(_location)) {
-  level = _level;
-}
+: comment_text(std::move(_comment_text)), location(std::move(_location)), level(_level) {}
 
 void ASTree::LSPReporter::report(Diagnostic diagnostic) {
   diagnostics[diagnostic.getFilename()].push_back(diagnostic);
