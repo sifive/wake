@@ -43,6 +43,15 @@ ASTree::ASTree() {}
 
 ASTree::ASTree(std::string _absLibDir) : absLibDir(std::move(_absLibDir)) {}
 
+void ASTree::recordComments(CSTElement def, int level) {
+  if (def.id() == TOKEN_COMMENT || def.id() == TOKEN_NL) {
+    comments.emplace_back(def.segment().str(), def.location(), level);
+  }
+  for (CSTElement innerdef = def.firstChildElement(); !innerdef.empty();  innerdef.nextSiblingElement()) {
+    recordComments(innerdef, level + 1);
+  }
+}
+
 void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &processFileDiagnostics) {
   usages.clear();
   definitions.clear();
@@ -77,11 +86,7 @@ void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &proce
 
     CST cst(*fcontent, lspReporter);
     dst_top(cst.root(), *top);
-    for (CSTElement topdef = cst.root().firstChildElement(); !topdef.empty(); topdef.nextSiblingElement()) {
-      if (topdef.id() == TOKEN_COMMENT || topdef.id() == TOKEN_NL) {
-        comments.emplace_back(topdef.segment().str(), topdef.location());
-      }
-    }
+    recordComments(cst.root(), 0);
   }
   flatten_exports(*top);
 
@@ -385,29 +390,60 @@ SymbolKind ASTree::getSymbolKind(const char *name, const std::string &type) {
   }
 }
 
+void ASTree::recordSameLocationDefinition(std::vector<SymbolDefinition>::iterator &definitions_iterator) {
+  auto previousDefinition = definitions_iterator - 1;
+  if (previousDefinition->introduces.empty()) {
+    previousDefinition->introduces.emplace_back(previousDefinition->name, previousDefinition->type);
+    if (previousDefinition->name.find("edit") == 0 && definitions_iterator->name.find("get") == 0) {
+      previousDefinition->name = previousDefinition->name.substr(4);
+      previousDefinition->type = definitions_iterator->type.substr(definitions_iterator->type.find("=> ") + 3);
+
+      previousDefinition->introduces.emplace_back(definitions_iterator->name, definitions_iterator->type);
+    } else {
+      previousDefinition->type = definitions_iterator->type;
+    }
+  } else {
+    previousDefinition->introduces.emplace_back(definitions_iterator->name, definitions_iterator->type);
+  }
+  definitions_iterator = definitions.erase(definitions_iterator);
+}
+
 void ASTree::fillDefinitionDocumentationFields() {
   auto definitions_iterator = definitions.begin();
   auto comments_iterator = comments.begin();
 
-  std::string comment;
+  std::vector<std::pair<std::string, int>> comment;
   Location lastCommentLocation("");
+  Location lastDefinitionLocation("");
 
   while (definitions_iterator != definitions.end() && comments_iterator != comments.end()) {
     if (definitions_iterator->location < comments_iterator->location) {
+      bool wasElementErased = false;
       if (lastCommentLocation.filename != definitions_iterator->location.filename) {
-        comment = "";
+        comment.clear();
       }
       // documentation is provided for globally defined symbols
       if (definitions_iterator->isGlobal) {
-        definitions_iterator->documentation = sanitizeComment(comment);
-        comment = "";
+        if (lastDefinitionLocation == definitions_iterator->location) {
+          recordSameLocationDefinition(definitions_iterator);
+          wasElementErased = true;
+        } else {
+          definitions_iterator->documentation = sanitizeComment(comment.back().first);
+          definitions_iterator->outerDocumentation = composeOuterComment(comment);
+          lastDefinitionLocation = definitions_iterator->location;
+        }
       }
-      ++definitions_iterator;
+      if (!wasElementErased) {
+        ++definitions_iterator;
+      }
     } else {
       if (lastCommentLocation.filename != comments_iterator->location.filename) {
-        comment = "";
+        comment.clear();
       }
-      comment += comments_iterator->comment_text;
+      while (!comment.empty() && comment.back().second > comments_iterator->level) {
+        comment.pop_back();
+      }
+      emplaceComment(comment, comments_iterator->comment_text, comments_iterator->level);
       lastCommentLocation = comments_iterator->location;
       ++comments_iterator;
     }
@@ -417,11 +453,20 @@ void ASTree::fillDefinitionDocumentationFields() {
     if (!comment.empty() && lastCommentLocation.filename != comments.back().location.filename) {
       break;
     }
+    bool wasElementErased = false;
     if (definitions_iterator->isGlobal) {
-      definitions_iterator->documentation = sanitizeComment(comment);
-      break;
+      if (lastDefinitionLocation == definitions_iterator->location) {
+        recordSameLocationDefinition(definitions_iterator);
+        wasElementErased = true;
+      } else {
+        definitions_iterator->documentation = sanitizeComment(comment.back().first);
+        definitions_iterator->outerDocumentation = composeOuterComment(comment);
+        lastDefinitionLocation = definitions_iterator->location;
+      }
     }
-    ++definitions_iterator;
+    if (!wasElementErased) {
+      ++definitions_iterator;
+    }
   }
 }
 
@@ -447,10 +492,26 @@ std::string ASTree::sanitizeComment(std::string comment) {
   return comment;
 }
 
+std::string ASTree::composeOuterComment(std::vector<std::pair<std::string, int>> comment) {
+  std::string composed;
+  for (int i = (int) comment.size() - 2; i >= 0; i--) {
+    comment[i].first = sanitizeComment(comment[i].first);
+    composed += comment[i].first + "\n";
+  }
+  return composed;
+}
+
+void ASTree::emplaceComment(std::vector<std::pair<std::string, int>> &comment, const std::string &text, int level) {
+  if (comment.empty() || comment.back().second < level) {
+    comment.emplace_back(text, level);
+  }
+  comment.back().first += text;
+}
+
 ASTree::SymbolUsage::SymbolUsage(Location _usage, Location _definition) : usage(std::move(_usage)), definition(std::move(_definition)) {}
 
-ASTree::Comment::Comment(std::string _comment_text, Location _location)
-: comment_text(std::move(_comment_text)), location(std::move(_location)) {}
+ASTree::Comment::Comment(std::string _comment_text, Location _location, int _level)
+: comment_text(std::move(_comment_text)), location(std::move(_location)), level(_level) {}
 
 void ASTree::LSPReporter::report(Diagnostic diagnostic) {
   diagnostics[diagnostic.getFilename()].push_back(diagnostic);

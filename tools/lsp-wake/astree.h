@@ -24,6 +24,7 @@
 #include <set>
 #include <vector>
 #include <functional>
+#include <parser/cst.h>
 
 #include "dst/expr.h"
 #include "util/diagnostic.h"
@@ -65,10 +66,11 @@ private:
     };
 
     struct Comment {
-        Comment(std::string _comment_text, Location _location);
+        Comment(std::string _comment_text, Location _location, int level);
 
         std::string comment_text;
         Location location;
+        int level; // level of nestedness in the tree
     };
 
     std::set<Location> types;
@@ -91,8 +93,16 @@ private:
 
     static SymbolKind getSymbolKind(const char *name, const std::string& type);
 
+    void recordComments(CSTElement def, int level);
+
     void fillDefinitionDocumentationFields();
 
     static std::string sanitizeComment(std::string comment);
+
+    static std::string composeOuterComment(std::vector<std::pair<std::string, int>> comment);
+
+    static void emplaceComment(std::vector<std::pair<std::string, int>> &comment, const std::string &text, int level);
+
+    void recordSameLocationDefinition(std::vector<SymbolDefinition>::iterator &definitions_iterator);
 };
 #endif

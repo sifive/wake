@@ -55,8 +55,17 @@ struct Location {
   }
 
   bool operator < (const Location &l) const {
-    if (filename == l.filename) { return start < l.start; }
-    return filename < l.filename;
+    if (filename != l.filename) return filename < l.filename;
+    if (start != l.start) return start < l.start;
+    return end < l.end;
+  }
+
+  bool operator == (const Location &l) const {
+    return this->contains(l) && l.contains(*this);
+  }
+
+  bool operator != (const Location &l) const {
+    return !(*this == l);
   }
 };
 
