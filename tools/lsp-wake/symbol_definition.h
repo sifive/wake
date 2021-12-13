@@ -22,6 +22,7 @@
 
 #include <string>
 #include <utility>
+#include <vector>
 
 enum SymbolKind {
   KIND_PACKAGE     = 4,
@@ -43,12 +44,20 @@ struct SymbolDefinition {
     SymbolKind symbolKind;
     bool isGlobal;
     std::string documentation;
+    std::string outerDocumentation;
+    std::vector<std::pair<std::string, std::string>> introduces;
 
     SymbolDefinition(std::string _name, Location _location, std::string _type, SymbolKind _symbolKind, bool _isGlobal) :
     name(std::move(_name)), location(std::move(_location)), type(std::move(_type)), symbolKind(_symbolKind),
     isGlobal(_isGlobal) {}
 
     bool operator < (const SymbolDefinition &def) const {
+      if (!(this->location < def.location) && !(def.location < this->location)) {
+        if (this->name == def.name) {
+          return this->type < def.type;
+        }
+        return this->name < def.name;
+      }
       return location < def.location;
     }
 };

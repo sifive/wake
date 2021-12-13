@@ -99,8 +99,10 @@ private:
 
     static std::string sanitizeComment(std::string comment);
 
-    static std::string composeComment(std::vector<std::pair<std::string, int>> comment);
+    static std::string composeOuterComment(std::vector<std::pair<std::string, int>> comment);
 
     static void emplaceComment(std::vector<std::pair<std::string, int>> &comment, const std::string &text, int level);
+
+    void recordSameLocationDefinition(std::vector<SymbolDefinition>::iterator &definitions_iterator);
 };
 #endif

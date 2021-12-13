@@ -380,23 +380,52 @@ SymbolKind ASTree::getSymbolKind(const char *name, const std::string &type) {
   }
 }
 
+void ASTree::recordSameLocationDefinition(std::vector<SymbolDefinition>::iterator &definitions_iterator) {
+  auto previousDefinition = definitions_iterator - 1;
+  if (previousDefinition->introduces.empty()) {
+    previousDefinition->introduces.emplace_back(previousDefinition->name, previousDefinition->type);
+    if (previousDefinition->name.find("edit") == 0 && definitions_iterator->name.find("get") == 0) {
+      previousDefinition->name = previousDefinition->name.substr(4);
+      previousDefinition->type = definitions_iterator->type.substr(definitions_iterator->type.find("=> ") + 3);
+
+      previousDefinition->introduces.emplace_back(definitions_iterator->name, definitions_iterator->type);
+    } else {
+      previousDefinition->type = definitions_iterator->type;
+    }
+  } else {
+    previousDefinition->introduces.emplace_back(definitions_iterator->name, definitions_iterator->type);
+  }
+  definitions_iterator = definitions.erase(definitions_iterator);
+}
+
 void ASTree::fillDefinitionDocumentationFields() {
   auto definitions_iterator = definitions.begin();
   auto comments_iterator = comments.begin();
 
   std::vector<std::pair<std::string, int>> comment;
   Location lastCommentLocation("");
+  Location lastDefinitionLocation("");
 
   while (definitions_iterator != definitions.end() && comments_iterator != comments.end()) {
     if (definitions_iterator->location < comments_iterator->location) {
+      bool wasElementErased = false;
       if (lastCommentLocation.filename != definitions_iterator->location.filename) {
         comment.clear();
       }
       // documentation is provided for globally defined symbols
       if (definitions_iterator->isGlobal) {
-        definitions_iterator->documentation = composeComment(comment);
+        if (lastDefinitionLocation == definitions_iterator->location) {
+          recordSameLocationDefinition(definitions_iterator);
+          wasElementErased = true;
+        } else {
+          definitions_iterator->documentation = sanitizeComment(comment.back().first);
+          definitions_iterator->outerDocumentation = composeOuterComment(comment);
+          lastDefinitionLocation = definitions_iterator->location;
+        }
       }
-      ++definitions_iterator;
+      if (!wasElementErased) {
+        ++definitions_iterator;
+      }
     } else {
       if (lastCommentLocation.filename != comments_iterator->location.filename) {
         comment.clear();
@@ -414,10 +443,20 @@ void ASTree::fillDefinitionDocumentationFields() {
     if (!comment.empty() && lastCommentLocation.filename != comments.back().location.filename) {
       break;
     }
+    bool wasElementErased = false;
     if (definitions_iterator->isGlobal) {
-      definitions_iterator->documentation = composeComment(comment);
+      if (lastDefinitionLocation == definitions_iterator->location) {
+        recordSameLocationDefinition(definitions_iterator);
+        wasElementErased = true;
+      } else {
+        definitions_iterator->documentation = sanitizeComment(comment.back().first);
+        definitions_iterator->outerDocumentation = composeOuterComment(comment);
+        lastDefinitionLocation = definitions_iterator->location;
+      }
     }
-    ++definitions_iterator;
+    if (!wasElementErased) {
+      ++definitions_iterator;
+    }
   }
 }
 
@@ -443,9 +482,9 @@ std::string ASTree::sanitizeComment(std::string comment) {
   return comment;
 }
 
-std::string ASTree::composeComment(std::vector<std::pair<std::string, int>> comment) {
+std::string ASTree::composeOuterComment(std::vector<std::pair<std::string, int>> comment) {
   std::string composed;
-  for (int i = (int) comment.size() - 1; i >= 0; i--) {
+  for (int i = (int) comment.size() - 2; i >= 0; i--) {
     comment[i].first = sanitizeComment(comment[i].first);
     composed += comment[i].first + "\n";
   }
