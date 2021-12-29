@@ -33,7 +33,7 @@ package wake
 #   "0", "1", "2", Nil   # ok! This is a `List String`
 #   ```
 #
-# However, mixing types it *not* legal:
+# However, mixing types is *not* legal:
 #   ```
 #   0, "1", Nil          # bad! This will trigger a type-check failure.
 #   ```
@@ -131,7 +131,7 @@ export def mapFlat (mapFn: a => List b): List a => List b =
 #
 # Guarantees:
 #  - The resultant List is no longer than `list`
-# 
+#
 # Examples:
 #   ```
 #   mapPartial int ("3", "x", "44", Nil) = 3, 44, Nil
@@ -147,7 +147,7 @@ export def mapPartial (f: a => Option b): List a => List b =
                 None   = sub
     loop
 
-# Foldl: combine the elements of a List front-to-back into a single value.
+# Combine the elements of a List front-to-back into a single value.
 # An accumulator is updated from its initial value by combiningFn for each element.
 #
 # In C++ syntax, `foldl <combiningFn> <accumulateInitalValue> <List>` does:
@@ -192,7 +192,7 @@ export def foldl (combiningFn: accumulator => element => accumulator): accumulat
 #  - The first element of the resultant List will be `initialValue`
 #  - The last element of the resultant List will be equal to `foldl combiningFn initialValue list`
 #  - If `combiningFn` is a group operation, the difference between the resultants yields `list`
-# 
+#
 # Examples:
 #   ```
 #   scanl f z Nil = z
@@ -247,7 +247,7 @@ export def foldr (combiningFn: element => accumulator => accumulator): accumulat
 #
 # Examples:
 #   ```
-#   scanr 
+#   scanr
 #   scanr (_+_) 100 (seq 6) = 115, 115, 114, 112, 109, 105, 100, Nil
 #                                                           ^^^- 100
 #                                                      ^^^- 5+100
@@ -270,7 +270,7 @@ export def scanr (combiningFn: element => accumulator => accumulator): accumulat
 # Guarantees:
 #  - ++ is associtive
 #  - Nil is an identity of ++
-# 
+#
 # Examples:
 #   ```
 #   (1, 2, 3, Nil) ++ (8, 9, Nil) = (1, 2, 3, 8, 9, Nil)
@@ -287,7 +287,7 @@ def lcat = foldr (_,_)
 #  - reverse is its own inverse
 #  - The resultant List has the same length as `list`
 #  - The resultant List is a permutation of `list`
-# 
+#
 # Examples:
 #   ```
 #   reverse (seq 5) = 4, 3, 2, 1, 0, Nil
@@ -377,6 +377,7 @@ export def splitAt (index: Integer) (listToDivide: List a): Pair (List a) (List 
 #   take 2 (seq 100) = 0, 1, Nil
 #   take 0 (seq 100) = Nil
 #   take 2 Nil = Nil
+#   take (-2) (seq 100) = Nil
 #   ```
 export def take (length: Integer) (l: List a): List a =
     if length <= 0 then
@@ -481,7 +482,7 @@ export def dropUntil (f: a => Boolean): List a => List a =
 #
 # Examples:
 #   ```
-#   def l = (85, 4, 10, 3)
+#   def l = (85, 4, 10, 3, Nil)
 #   find (_==10) l = Some (Pair 10 3)
 #   find (_>9) l = Some (Pair 85 0)
 #   find (_<3) l = None
@@ -583,7 +584,7 @@ export def filter (f: a => Boolean): List a => List a =
 
 # Flip the 1st and 2nd indexes in a List of Lists
 # transpose is only it's own inverse when the lists have non-increasing length
-# 
+#
 # Examples:
 #   ```
 #   transpose ((1, 2, 3, Nil), (4, 5, 6, Nil), Nil) =
@@ -683,14 +684,14 @@ export def distinctRunBy (eqFn: a => a => Boolean): List a => List a =
     loop
 
 # Compare two lists using an Order comparator
-# * `EQ` is the result if the lists are exactly equal
+# * `EQ` is the result if the lists are exactly equal.
 # * `LT` is the result if the first elements that `f` does not return `EQ` for returns `LT`
-#   or if `l` is a prefix of `r`
+#   or if `l` is a prefix of `r`.
 # * `GT` is the result if the first elements that `f` does not return `EQ` for returns `GT`
-#   or if `r` is a prefix of `l`
+#   or if `r` is a prefix of `l`.
 #
-# This is also called a lexicographical ordering
-# 
+# This is also called a lexicographical ordering.
+#
 # Parameters:
 #  - `cmpFn`: The function by which elements of `l` and `r` are compared
 #  - `l`: The left list
