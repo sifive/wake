@@ -82,7 +82,7 @@ jobs:
           paths:
             - release/debian_jessie
 
-  debian_testing:
+  debian_bullseye:
     machine:
       image: ubuntu-1604:202007-01
 #      docker_layer_caching: true
@@ -90,19 +90,19 @@ jobs:
     steps:
       - attach_workspace:
           at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/debian-testing -t wake-debian-testing .
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/debian-bullseye -t wake-debian-bullseye .
       - run: |
           x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
           tar xJf wake_*.orig.tar.xz && \
           cp -a /tmp/workspace/debian wake-* && \
           cp -a /tmp/workspace/tests . && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-testing debuild -us -uc && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-debian-testing /bin/sh -c "dpkg -i *.deb && cd tests && wake runTests" && \
-          install -D -t release/debian_testing *.deb *.xz *.changes *.dsc
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-bullseye debuild -us -uc && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-debian-bullseye /bin/sh -c "dpkg -i *.deb && cd tests && wake runTests" && \
+          install -D -t release/debian_bullseye *.deb *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
           paths:
-            - release/debian_testing
+            - release/debian_bullseye
 
   centos_7_6:
     machine:
@@ -246,7 +246,7 @@ workflows:
       - alpine:
           requires:
             - tarball
-      - debian_testing:
+      - debian_bullseye:
           requires:
             - tarball
       - debian_jessie:
@@ -273,7 +273,7 @@ workflows:
       - release:
           requires:
             - alpine
-            - debian_testing # Newest everything
+            - debian_bullseye
             - debian_jessie  # Oldest supported compiler
             - centos_7_6
             - centos_8_3
