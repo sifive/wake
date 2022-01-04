@@ -802,3 +802,68 @@ export def groupBy (cmp: a => a => Boolean) (list: List a): List (List a) =
             (elem, head, rest), tail
         _ = (elem, Nil), acc
     foldr combo Nil sorted
+
+export def fromOption (x: Option a): List a =
+  getOrElse Nil $ omap (_, Nil) x
+
+export def allT: Traversal (List a) a =
+  Traversal (\x x) map
+
+export def atT (i: Integer): Traversal (List a) a =
+    def view = fromOption $ at i _
+
+    def edit f l =
+      require Pair first (x, follow) = splitAt i l else l
+      first ++ (f x, follow)
+
+    Traversal view edit
+
+export def headT: Traversal (List a) a = atT 0
+
+export def takeT (i: Integer): Traversal (List a) a =
+  def view = take i _
+  def edit f l =
+    def Pair first follow = splitAt i l
+    (map f first) ++ follow
+  Traversal view edit
+
+export def findFirstT (p: a => Boolean): Traversal (List a) a =
+    def view = take 1 $ filter p _
+
+    def edit f l =
+      require (x, xs) = l
+      if p x then
+        f x, xs
+      else
+        x, edit f xs
+
+    Traversal view edit
+
+export def findT (p: a => Boolean): Traversal (List a) a =
+    def editIf f x = if p x then f x else x
+    Traversal (filter p) (map $ editIf _)
+
+export def lookupT (eq: a => a => Boolean) (key: a): Traversal (List (Pair a b)) b =
+    findFirstT (eq key _.getPairFirst) |> pairSecondT
+
+export def viewOnlyT (msg: String) (item: a) (t: Traversal a b): Result b Error =
+    require x, Nil = viewT item t else failWithError msg
+    Pass x
+
+export def viewAllT (item: a) (t: Traversal a b): Result (List b) Error =
+    Pass $ viewT item t
+
+export def viewFirstT (msg: String) (item: a) (t: Traversal a b): Result b Error =
+    require x, _ = viewT item t else failWithError msg
+    Pass x
+
+export def mapOnlyT (msg: String) (t: Traversal a b) (item: a): Result b Error =
+    require x, Nil = viewT item t else failWithError msg
+    Pass x
+
+export def mapAllT (t: Traversal a b) (item: a): Result (List b) Error =
+    Pass $ viewT item t
+
+export def mapFirstT (msg: String) (t: Traversal a b) (item: a): Result b Error =
+    require x, _ = viewT item t else failWithError msg
+    Pass x

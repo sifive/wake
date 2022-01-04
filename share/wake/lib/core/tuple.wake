@@ -54,3 +54,30 @@ export def _6 (_; _; _; _; _; _; x; _) = x
 export def _7 (_; _; _; _; _; _; _; x; _) = x
 export def _8 (_; _; _; _; _; _; _; _; x; _) = x
 export def _9 (_; _; _; _; _; _; _; _; _; x; _) = x
+
+export def pairFirstT: Traversal (Pair a b) a = fromTupleField getPairFirst editPairFirst
+export def pairSecondT: Traversal (Pair a b) b = fromTupleField getPairSecond editPairSecond
+
+export def tripleFirstT: Traversal (Triple a b c) a = fromTupleField getTripleFirst editTripleFirst
+export def tripleSecondT: Traversal (Triple a b c) b = fromTupleField getTripleSecond editTripleSecond
+export def tripleThirdT: Traversal (Triple a b c) c = fromTupleField getTripleThird editTripleThird
+
+export def firstT: Traversal (a; b) a =
+  def view (x; _) = x, Nil
+  def edit f (x; y) = f x; y
+  Traversal view edit
+export def secondT: Traversal (a; b) b =
+  def view (_; y) = y, Nil
+  def edit f (x; y) = x; f y
+  Traversal view edit
+
+export def _0T = firstT
+export def _1T = secondT |> firstT
+export def _2T = secondT |> secondT |> firstT
+export def _3T = secondT |> secondT |> secondT |> firstT
+export def _4T = secondT |> secondT |> secondT |> secondT |> firstT
+export def _5T = secondT |> secondT |> secondT |> secondT |> secondT |> firstT
+export def _6T = secondT |> secondT |> secondT |> secondT |> secondT |> secondT |> firstT
+export def _7T = secondT |> secondT |> secondT |> secondT |> secondT |> secondT |> secondT |> firstT
+export def _8T = secondT |> secondT |> secondT |> secondT |> secondT |> secondT |> secondT |> secondT |> firstT
+export def _9T = secondT |> secondT |> secondT |> secondT |> secondT |> secondT |> secondT |> secondT |> secondT |> firstT

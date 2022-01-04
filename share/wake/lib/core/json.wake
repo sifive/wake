@@ -536,3 +536,120 @@ export def lastValueInList (values: List JValue): Result JValue Error =
             | flatten
             | deduplicateJObjectKeys lastValueInList
             | rmap JObject
+
+export def jString: Traversal JValue String =
+  def view j =
+    require (JString s) = j else Nil
+    s, Nil
+
+  def edit f j =
+    require (JString s) = j else j
+    JString (f s)
+
+  Traversal view edit
+
+export def jInteger: Traversal JValue Integer =
+  def view j =
+    require (JInteger ji) = j else Nil
+    ji, Nil
+
+  def edit f j =
+    require (JInteger ji) = j else j
+    JInteger (f ji)
+
+  Traversal view edit
+
+export def jBoolean: Traversal JValue Boolean =
+  def view j =
+    require (JBoolean jb) = j else Nil
+    jb, Nil
+
+  def edit f j =
+    require (JBoolean jb) = j else j
+    JBoolean (f jb)
+
+  Traversal view edit
+
+export def jDouble: Traversal JValue Double =
+  def view = match _
+    JDouble x  = x, Nil
+    JInteger x = fromOption $ dint x
+    _          = Nil
+
+  def edit f s = match s
+    JDouble x  = JDouble (f x)
+    JInteger x =
+      require Some dx = dint x else s
+      JDouble (f dx)
+    _          = s
+
+  Traversal view edit
+
+export def jNull: Traversal JValue Unit =
+  def view j =
+    require JNull = j else Nil
+    Unit, Nil
+
+  def edit _ j =
+    require JNull = j else j
+    JNull
+
+  Traversal view edit
+
+export def jObject: Traversal JValue (List (Pair String JValue)) =
+  def view j =
+    require (JObject jo) = j else Nil
+    jo, Nil
+
+  def edit f j =
+    require (JObject jo) = j else j
+    JObject (f jo)
+
+  Traversal view edit
+
+export def jArray: Traversal JValue (List JValue) =
+  def view j =
+    require (JArray ja) = j else Nil
+    ja, Nil
+
+  def edit f j =
+    require (JArray jl) = j else j
+    JArray (f jl)
+
+  Traversal view edit
+
+export def jSingelton: Traversal JValue JValue =
+  def view j =
+    require (JArray (j2, Nil)) = j else Nil
+    j2, Nil
+
+  def edit f j =
+    require (JArray (j2, Nil)) = j else j
+    JArray (f j2, Nil)
+
+  Traversal view edit
+
+export def jAll: Traversal JValue JValue = jArray |> allT
+
+export def jAt: (i: Integer) => Traversal JValue JValue = jArray |> atT _
+
+export def jField: (field: String) => Traversal JValue JValue = jObject |> lookupT (_==~_) _
+
+export def jFieldMatch (field: RegExp): Traversal JValue JValue =
+  jObject |> findT (matches field _.getPairFirst) |> pairSecondT
+
+export def (j: Traversal a JValue) /> (field: String) = j |> jField field
+export def (j: Traversal a JValue) //> (field: RegExp) = j |> jFieldMatch field
+
+export def mapJArrayT (t: Traversal a JValue) (item: a): Result JValue Error =
+  Pass $ JArray (viewT item t)
+
+# This is a slightly complicated
+export def jObjectF (items: List (Pair String (a => Result JValue Error))) (input: a): Result JValue Error =
+  def pairF (Pair k f) = rmap (Pair k) (f input)
+  require Pass fields = findFail (map pairF items)
+  Pass $ JObject fields
+
+export def jObjectMap (items: List (Pair String (a => Result JValue Error))) (input: List a): Result (List JValue) Error =
+  require Pass l = findFail (map (jObjectF items) input)
+  Pass l

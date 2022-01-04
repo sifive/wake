@@ -1,0 +1,105 @@
+# Copyright 2021 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+package wake
+
+export tuple Traversal a b =
+  export View: a => List b # List b can be replaced with Vector b if we want
+  export Edit: (b => b) => a => a
+
+export def mapT (t: Traversal a b): a => List b = getTraversalView t
+
+export def viewT (s: a) (t: Traversal a b): List b =
+  getTraversalView t s
+
+export def editT (s: a) (f: b => b) (t: Traversal a b): a =
+  getTraversalEdit t f s
+
+export def setT (s: a) (x: b) (t: Traversal a b): a = editT s (\_ x) t
+
+export def (s: a) $> (t: Traversal a b): List b = viewT s t
+
+export def (t1: Traversal a b) |> (t2: Traversal b c): Traversal a c =
+  def Traversal v1 e1 = t1
+  def Traversal v2 e2 = t2
+  def view s = mapFlat v2 (v1 s)
+  def edit f s = e1 (\b e2 f b) s
+  Traversal view edit
+
+export def fromTupleField (get: a => b) (edit: (b => b) => a => a): Traversal a b =
+  def view = get _, Nil
+  Traversal view edit
+
+export def (t1: Traversal a b) ++> (t2: Traversal a b): Traversal a b =
+  def Traversal v1 e1 = t1
+  def Traversal v2 e2 = t2
+  def view s = (v1 s) ++ (v2 s)
+  def edit f = e2 f $ e1 f _
+  Traversal view edit
+
+export def convert (toC: b => c) (fromC: c => b) (t: Traversal a b): Traversal a c =
+  def Traversal v e = t
+  def edit f = e (fromC $ f $ toC _)
+  Traversal (map toC $ v _) edit
+
+export def emptyT: Traversal a b = Traversal (\_ Nil) (\_\x x)
+
+export def selfT: Traversal a a = Traversal (_, Nil) (_$_)
+
+# Ported from the jq tutorial
+export def example1 j = j $> selfT
+export def example2 j = j $> jAt 0
+
+# Simplify github json first commit
+export def example3 (log: JValue): Result JValue Error =
+  require Pass latestCommit = viewOnlyT "expected at least one commit" log (jAt 0)
+  latestCommit | jObjectF (
+    "message" :-> mapOnlyT ".commit.message missing" $ selfT /> "commit" /> "message",
+    "name" :-> mapOnlyT ".commit.commiter.name missing" $ selfT /> "commit" /> "commiter" /> "name",
+    Nil
+  )
+
+# Simplify github json log
+export def example4 (log: JValue): Result JValue Error =
+  require Pass commits = (log $> jAll) | jObjectMap (
+    "message" :-> mapOnlyT ".commit.message missing" $ selfT /> "commit" /> "message",
+    "name" :-> mapOnlyT ".commit.commiter.name missing" $ selfT /> "commit" /> "commiter" /> "name",
+    Nil
+  )
+  Pass $ JArray commits
+
+# Simplify all commits but include parents
+export def example5 (log: JValue): Result JValue Error =
+  require Pass commits = (log $> jAll) | jObjectMap (
+    "message" :-> mapOnlyT ".commit.message missing" $ selfT /> "commit" /> "message",
+    "name" :-> mapOnlyT ".commit.commiter.name missing" $ selfT /> "commit" /> "commiter" /> "name",
+    "parents" :-> mapJArrayT (selfT /> "parents" |> jAll /> "html_url"),
+    Nil
+  )
+  Pass $ JArray commits
+
+# Convert a git log to a simplified wake tuple
+export tuple Commit =
+  Message: String
+  Name: String
+  Parents: List String
+
+export def example6 (log: JValue): Result (List Commit) Error =
+  def simple commit =
+    require Pass commitMessage = viewOnlyT ".commit.message missing" commit (selfT /> "commit" /> "message" |> jString)
+    require Pass commiterName = viewOnlyT ".commit.commiter.name missing" commit (selfT /> "commit" /> "commiter" /> "name" |> jString)
+    def parents = commit $> (selfT /> "parents" |> jAll /> "html_url" |> jString)
+    Pass $ Commit commitMessage commiterName parents
+
+  findFailFn simple (log $> jAll)
