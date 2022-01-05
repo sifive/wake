@@ -537,119 +537,161 @@ export def lastValueInList (values: List JValue): Result JValue Error =
             | deduplicateJObjectKeys lastValueInList
             | rmap JObject
 
-export def jString: Traversal JValue String =
-  def view j =
-    require (JString s) = j else Nil
-    s, Nil
+export def jString: JValue => List String =
+    def view j =
+        require (JString s) = j else Nil
+        s, Nil
+    view
 
-  def edit f j =
-    require (JString s) = j else j
-    JString (f s)
+export def jeString: (String => String) => JValue => JValue =
+    def edit f j =
+        require (JString s) = j else j
+        JString (f s)
 
-  Traversal view edit
+    edit
 
-export def jInteger: Traversal JValue Integer =
-  def view j =
-    require (JInteger ji) = j else Nil
-    ji, Nil
+export def jInteger: JValue => List Integer =
+    def view j =
+        require (JInteger ji) = j else Nil
+        ji, Nil
 
-  def edit f j =
-    require (JInteger ji) = j else j
-    JInteger (f ji)
+    view
 
-  Traversal view edit
+export def jeInteger: (Integer => Integer) => JValue => JValue =
+    def edit f j =
+        require (JInteger ji) = j else j
+        JInteger (f ji)
 
-export def jBoolean: Traversal JValue Boolean =
-  def view j =
-    require (JBoolean jb) = j else Nil
-    jb, Nil
+    edit
 
-  def edit f j =
-    require (JBoolean jb) = j else j
-    JBoolean (f jb)
+export def jBoolean: JValue => List Boolean =
+    def view j =
+        require (JBoolean jb) = j else Nil
+        jb, Nil
 
-  Traversal view edit
+    view
 
-export def jDouble: Traversal JValue Double =
-  def view = match _
-    JDouble x  = x, Nil
-    JInteger x = fromOption $ dint x
-    _          = Nil
+export def jeBoolean: (Boolean => Boolean) => JValue => JValue =
+    def edit f j =
+        require (JBoolean jb) = j else j
+        JBoolean (f jb)
 
-  def edit f s = match s
-    JDouble x  = JDouble (f x)
-    JInteger x =
-      require Some dx = dint x else s
-      JDouble (f dx)
-    _          = s
+    edit
 
-  Traversal view edit
+# Are these safe since 1.0 => JDouble 1.0 => to_json => from_json => JInteger 1?
+# Maybe jNumber is the only *safe* thing to use? On the other hand I'm worried
+# about only giving jNumber as an abstraction over jDouble...IDK yet.
+export def jDouble: JValue => List Double =
+    def view j =
+        require (JDouble jd) = j else Nil
+        jd, Nil
 
-export def jNull: Traversal JValue Unit =
-  def view j =
-    require JNull = j else Nil
-    Unit, Nil
+    view
 
-  def edit _ j =
-    require JNull = j else j
-    JNull
+export def jeDouble: (Double => Double) => JValue => JValue =
+    def edit f j =
+        require (JDouble jd) = j else j
+        JDouble (f jd)
 
-  Traversal view edit
+    edit
 
-export def jObject: Traversal JValue (List (Pair String JValue)) =
-  def view j =
-    require (JObject jo) = j else Nil
-    jo, Nil
+export def jNumber: JValue => List Double =
+    def view = match _
+        JDouble x  = x, Nil
+        JInteger x = fromOption $ dint x
+        _          = Nil
 
-  def edit f j =
-    require (JObject jo) = j else j
-    JObject (f jo)
+    view
 
-  Traversal view edit
+# This is odd because if you edit a JInteger with say +1 you still get a JDouble
+export def jeNumber: (Double => Double) => JValue => JValue =
+    def edit f s = match s
+        JDouble x  = JDouble (f x)
+        JInteger x =
+            require Some dx = dint x else s
+            JDouble (f dx)
+        _          = s
 
-export def jArray: Traversal JValue (List JValue) =
-  def view j =
-    require (JArray ja) = j else Nil
-    ja, Nil
+    edit
 
-  def edit f j =
-    require (JArray jl) = j else j
-    JArray (f jl)
+export def jNull: JValue => List Unit =
+    def view j =
+        require JNull = j else Nil
+        Unit, Nil
 
-  Traversal view edit
+    view
 
-export def jSingelton: Traversal JValue JValue =
-  def view j =
-    require (JArray (j2, Nil)) = j else Nil
-    j2, Nil
+export def jeNull: (Unit => Unit) => JValue => JValue =
+    def edit f j =
+        require JNull = j else j
+        def _ = f Unit # the edit function might be effectful
+        JNull
 
-  def edit f j =
-    require (JArray (j2, Nil)) = j else j
-    JArray (f j2, Nil)
+    edit
 
-  Traversal view edit
+export def jObject: JValue => List (List (Pair String JValue)) =
+    def view j =
+        require (JObject jo) = j else Nil
+        jo, Nil
 
-export def jAll: Traversal JValue JValue = jArray |> allT
+    view
 
-export def jAt: (i: Integer) => Traversal JValue JValue = jArray |> atT _
+export def jeObject: (List (Pair String JValue) => List (Pair String JValue)) => JValue => JValue =
+    def edit f j =
+        require (JObject jo) = j else j
+        JObject (f jo)
 
-export def jField: (field: String) => Traversal JValue JValue = jObject |> lookupT (_==~_) _
+    edit
 
-export def jFieldMatch (field: RegExp): Traversal JValue JValue =
-  jObject |> findT (matches field _.getPairFirst) |> pairSecondT
+export def jArray: JValue => List (List JValue) =
+    def view j =
+        require (JArray ja) = j else Nil
+        ja, Nil
 
-export def (j: Traversal a JValue) /> (field: String) = j |> jField field
-export def (j: Traversal a JValue) //> (field: RegExp) = j |> jFieldMatch field
+    view
 
-export def mapJArrayT (t: Traversal a JValue) (item: a): Result JValue Error =
-  Pass $ JArray (viewT item t)
+export def jeArray: (List JValue => List JValue) => JValue => JValue =
+    def edit f j =
+        require (JArray jl) = j else j
+        JArray (f jl)
 
-# This is a slightly complicated
-export def jObjectF (items: List (Pair String (a => Result JValue Error))) (input: a): Result JValue Error =
-  def pairF (Pair k f) = rmap (Pair k) (f input)
-  require Pass fields = findFail (map pairF items)
-  Pass $ JObject fields
+    edit
 
-export def jObjectMap (items: List (Pair String (a => Result JValue Error))) (input: List a): Result (List JValue) Error =
-  require Pass l = findFail (map (jObjectF items) input)
-  Pass l
+export def jSingelton: JValue => List JValue =
+    def view j =
+        require (JArray (j2, Nil)) = j else Nil
+        j2, Nil
+
+    view
+
+export def jeSingelton: (JValue => JValue) => JValue => JValue =
+    def edit f j =
+        require (JArray (j2, Nil)) = j else j
+        JArray (f j2, Nil)
+
+    edit
+
+export def jAll: JValue => List JValue = _ | jArray |> (_)
+export def jeAll: (JValue => JValue) => JValue => JValue = jeArray $ map $ _
+
+export def jAt (i: Integer): JValue => List JValue = _ | jArray |> atT i
+export def jeAt (i: Integer): (JValue => JValue) => JValue => JValue = jeArray $ atE i $ _
+
+export def jField (field: String): JValue => List JValue =
+    _ | jObject |> lookup (_==~_) field
+
+export def jeField (field: String): (JValue => JValue) => JValue => JValue =
+    jeObject $ lookupE (_==~_) field $ _
+
+# NOTE: Feels like we do need a way to map functions, `... | map f` doesn't work
+export def jFieldMatch (field: RegExp): JValue => List JValue =
+  _ | jObject |> filter (matches field _.getPairFirst) | map getPairSecond
+
+# However with Setter nothing is needed though we might consider |<- as an operator to mirror
+# the above
+export def jeFieldMatch (field: RegExp): (JValue => JValue) => JValue => JValue =
+  jeObject $ filterE (matches field _.getPairFirst) $ editPairSecond $ _
+
+# Per prior discussion we decided to ignore these
+#export def (j: a => List JValue) /> (field: String) = _ | j |> jField field
+#export def (j: a => List JValue) //> (field: RegExp) = _ | j |> jFieldMatch field
