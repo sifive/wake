@@ -131,6 +131,36 @@ export def mapFlat (mapFn: a => List b): (list: List a) => List b =
         h, t = mapFn h ++ loop t
     loop
 
+# Create a new List by applying a function f to each element and concatenating the output.
+# This operator does the same thing as mapFlat. You can think of it like '|' but where
+# the results are flattend afterwards. This lets you compose many functions on lists
+# in a sequence.
+#
+# Parameters:
+#  - `list`: The list of elements to feed to `mapFn`
+#  - `mapFn`: The function to apply to each element
+#
+# Examples:
+# ```
+#   def twice x = x, x, Nil
+#   seq 3 |> twice = 0, 0, 1, 1, 2, 2, Nil
+#   seq 3 |> twice |> twice = 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, Nil
+#   json | jAll |> jString | filter (_==~"Alice")
+# ```
+export def (list: List a) |> (mapFn: a => List b): List b = mapFlat mapFn list
+
+# Create a singelton List out of a single element. Can be used to kick off
+# chains of list operations using '|>' for a nicer syntax.
+#
+# Examples:
+# ```
+#   def twice = x, x, Nil
+#   |> 3 = 3, Nil
+#   |> 3 |> twice = 3, 3, Nil
+#   |> json |> jAll |> jString | filter (_==~"Alice")
+# ```
+export def |> (x: a): List a = x, Nil
+
 # Create a new List by applying a partial function to each element of a List.
 # Partial functions can return None, in which case the result is not included in the output.
 #
@@ -806,66 +836,20 @@ export def groupBy (cmp: a => a => Boolean) (list: List a): List (List a) =
         _ = (elem, Nil), acc
     foldr combo Nil sorted
 
-export def fromOption (x: Option a): List a =
-    getOrElse Nil $ omap (_, Nil) x
+export def optionToList: Option a => List a = match _
+    Some x = x, Nil
+    None = Nil
 
-# TODO: replace at with atT
-export def atT (i: Integer) (list: List a): List a =
-    at i list | fromOption
+export def editFilter (selectFn: a => Boolean) (editFn: a => a): List a => List a =
+    def editIf x = if selectFn x then editFn x else x
+    map editIf
 
-export def atE (i: Integer): (a => a) => List a => List a =
-    def edit f l =
-      require Pair first (x, follow) = splitAt i l else l
-      first ++ (f x, follow)
-    edit
+export def lookup (selectFn: a => Boolean): List (Pair a b) => List b =
+  def select (Pair key value) = if selectFn key then Some value else None
+  mapPartial select
 
-export def headT: (List a) => (List a) = atT 0
-
-export def headE: (a => a) => List a => List a = atE 0
-
-export def takeE (i: Integer): (a => a) => List a => List a =
-  def edit f l =
-    def Pair first follow = splitAt i l
-    (map f first) ++ follow
-  edit
-
-# NOTE: This is an easier-to-use version of `find`
-# Do we care to keep it?
-export def findFirst (p: a => Boolean): List a => List a =
-    find p _ | fromOption | map getPairFirst
-
-export def findFirstE (p: a => Boolean): (a => a) => List a => List a =
-    def edit f l =
-      require (x, xs) = l
-      if p x then
-        f x, xs
-      else
-        x, edit f xs
-
-    edit
-
-export def filterE (p: a => Boolean): (a => a) => List a => List a =
-    def editIf f x = if p x then f x else x
-    map $ editIf _
-
-export def lookup (eq: a => a => Boolean) (key: a): (List (Pair a b)) => List b =
-    _ | findFirst (eq key _.getPairFirst) | map getPairSecond
-
-export def lookupE (eq: a => a => Boolean) (key: a): (b => b) => List (Pair a b) => List (Pair a b) =
-    findFirstE (eq key _.getPairFirst) $ editPairSecond $ _
-
-# The following all need better names
-# TODO: Are these needed now?
-export def viewOnly (msg: String) (item: a) (t: a => List b): Result b Error =
-    require x, Nil = t item else failWithError msg
-    Pass x
-
-export def viewAll (item: a) (t: a => List b): Result (List b) Error =
-    Pass $ t item
-
-export def viewFirst (msg: String) (item: a) (t: a => List b): Result b Error =
-    require x, _ = t item else failWithError msg
-    Pass x
+export def editLookup (selectFn: a => Boolean) (editFn: b => b): List (Pair a b) => List (Pair a b) =
+  editFilter (selectFn _.getPairFirst) $ editPairSecond $ editFn
 
 # TODO: Do we want Option versions of these?
 export def expectOne (msg: String) (item: List a): Result a Error = match item

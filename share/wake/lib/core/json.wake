@@ -537,161 +537,105 @@ export def lastValueInList (values: List JValue): Result JValue Error =
             | deduplicateJObjectKeys lastValueInList
             | rmap JObject
 
-export def jString: JValue => List String =
-    def view j =
-        require (JString s) = j else Nil
-        s, Nil
-    view
+export def jString: JValue => List String = match _
+    JString s = |> s
+    _         = Nil
 
-export def jeString: (String => String) => JValue => JValue =
-    def edit f j =
-        require (JString s) = j else j
-        JString (f s)
+export def editJString (f: String => String): JValue => JValue = match _
+    JString s = JString (f s)
+    x         = x
 
-    edit
+export def jInteger: JValue => List Integer = match _
+    JInteger i = |> i
+    _          = Nil
 
-export def jInteger: JValue => List Integer =
-    def view j =
-        require (JInteger ji) = j else Nil
-        ji, Nil
+export def editJInteger (f: Integer => Integer): JValue => JValue = match _
+    JInteger i = JInteger (f i)
+    x          = x
 
-    view
+export def jBoolean: JValue => List Boolean = match _
+    JBoolean b = |> b
+    _          = Nil
 
-export def jeInteger: (Integer => Integer) => JValue => JValue =
-    def edit f j =
-        require (JInteger ji) = j else j
-        JInteger (f ji)
+export def editJBoolean (f: Boolean => Boolean): JValue => JValue = match _
+    JBoolean b = JBoolean (f b)
+    x          = x
 
-    edit
+export def jDouble: JValue => List Double = match _
+    JDouble d = |> d
+    _         = Nil
 
-export def jBoolean: JValue => List Boolean =
-    def view j =
-        require (JBoolean jb) = j else Nil
-        jb, Nil
+export def editJDouble (f: Double => Double): JValue => JValue = match _
+    JDouble d = JDouble (f d)
+    x         = x
 
-    view
+export def jNumber: JValue => List Double = match _
+    JDouble x  = |> x
+    JInteger x = |> x | mapPartial dint
+    _          = Nil
 
-export def jeBoolean: (Boolean => Boolean) => JValue => JValue =
-    def edit f j =
-        require (JBoolean jb) = j else j
-        JBoolean (f jb)
+export def editJNumber (f: Double => Double): JValue => JValue = match _
+    JDouble x  = JDouble (f x)
+    JInteger x = match (dint x)
+        Some dx = JDouble (f dx)
+        None    = JInteger x
+    x          = x
 
-    edit
+export def jNull: JValue => List Unit = match _
+    JNull = |> Unit
+    _     = Nil
 
-# Are these safe since 1.0 => JDouble 1.0 => to_json => from_json => JInteger 1?
-# Maybe jNumber is the only *safe* thing to use? On the other hand I'm worried
-# about only giving jNumber as an abstraction over jDouble...IDK yet.
-export def jDouble: JValue => List Double =
-    def view j =
-        require (JDouble jd) = j else Nil
-        jd, Nil
-
-    view
-
-export def jeDouble: (Double => Double) => JValue => JValue =
-    def edit f j =
-        require (JDouble jd) = j else j
-        JDouble (f jd)
-
-    edit
-
-export def jNumber: JValue => List Double =
-    def view = match _
-        JDouble x  = x, Nil
-        JInteger x = fromOption $ dint x
-        _          = Nil
-
-    view
-
-# This is odd because if you edit a JInteger with say +1 you still get a JDouble
-export def jeNumber: (Double => Double) => JValue => JValue =
-    def edit f s = match s
-        JDouble x  = JDouble (f x)
-        JInteger x =
-            require Some dx = dint x else s
-            JDouble (f dx)
-        _          = s
-
-    edit
-
-export def jNull: JValue => List Unit =
-    def view j =
-        require JNull = j else Nil
-        Unit, Nil
-
-    view
-
-export def jeNull: (Unit => Unit) => JValue => JValue =
-    def edit f j =
-        require JNull = j else j
-        def _ = f Unit # the edit function might be effectful
+export def editJNull (f: Unit => Unit): JValue => JValue = match _
+    JNull =
+        def _ = f Unit
         JNull
+    x     = x
 
+export def jObject: JValue => List (List (Pair String JValue)) = match _
+    JObject obj = |> obj
+    _           = Nil
+
+export def editJObject (f: List (Pair String JValue) => List (Pair String JValue)): JValue => JValue = match _
+    JObject obj = JObject (f obj)
+    x           = x
+
+export def jArray: JValue => List (List JValue) = match _
+    JArray arr = |> arr
+    _          = Nil
+
+export def editJArray (f: List JValue => List JValue): JValue => JValue = match _
+    JArray arr = JArray (f arr)
+    x          = x
+
+export def jFlatten: JValue => List JValue = _ | jArray |> (_)
+
+export def editJFlatten: (JValue => JValue) => JValue => JValue = editJArray $ map $ _
+
+export def jAt (i: Integer): JValue => List JValue =
+    jFlatten _ | at i | optionToList
+
+def atE (i: Integer): (a => a) => List a => List a =
+    def edit f l =
+      require Pair first (x, follow) = splitAt i l else l
+      first ++ (f x, follow)
     edit
 
-export def jObject: JValue => List (List (Pair String JValue)) =
-    def view j =
-        require (JObject jo) = j else Nil
-        jo, Nil
+export def editJAt (i: Integer): (JValue => JValue) => JValue => JValue =
+    editJArray $ atE i $ _
 
-    view
+export def jField (field: String): JValue => List JValue = match _
+    JObject pairs = lookup (_==~field) pairs
+    _             = Nil
 
-export def jeObject: (List (Pair String JValue) => List (Pair String JValue)) => JValue => JValue =
-    def edit f j =
-        require (JObject jo) = j else j
-        JObject (f jo)
+export def editJField (field: String): (JValue => JValue) => JValue => JValue =
+    editJObject $ editLookup (_==~field) $ _
 
-    edit
+export def jFieldMatch (field: RegExp): JValue => List JValue = match _
+    JObject pairs = lookup (matches field) pairs
+    _             = Nil
 
-export def jArray: JValue => List (List JValue) =
-    def view j =
-        require (JArray ja) = j else Nil
-        ja, Nil
-
-    view
-
-export def jeArray: (List JValue => List JValue) => JValue => JValue =
-    def edit f j =
-        require (JArray jl) = j else j
-        JArray (f jl)
-
-    edit
-
-export def jSingelton: JValue => List JValue =
-    def view j =
-        require (JArray (j2, Nil)) = j else Nil
-        j2, Nil
-
-    view
-
-export def jeSingelton: (JValue => JValue) => JValue => JValue =
-    def edit f j =
-        require (JArray (j2, Nil)) = j else j
-        JArray (f j2, Nil)
-
-    edit
-
-export def jAll: JValue => List JValue = _ | jArray |> (_)
-export def jeAll: (JValue => JValue) => JValue => JValue = jeArray $ map $ _
-
-export def jAt (i: Integer): JValue => List JValue = _ | jArray |> atT i
-export def jeAt (i: Integer): (JValue => JValue) => JValue => JValue = jeArray $ atE i $ _
-
-export def jField (field: String): JValue => List JValue =
-    _ | jObject |> lookup (_==~_) field
-
-export def jeField (field: String): (JValue => JValue) => JValue => JValue =
-    jeObject $ lookupE (_==~_) field $ _
-
-# NOTE: Feels like we do need a way to map functions, `... | map f` doesn't work
-export def jFieldMatch (field: RegExp): JValue => List JValue =
-  _ | jObject |> filter (matches field _.getPairFirst) | map getPairSecond
-
-# However with Setter nothing is needed though we might consider |<- as an operator to mirror
-# the above
 export def jeFieldMatch (field: RegExp): (JValue => JValue) => JValue => JValue =
-  jeObject $ filterE (matches field _.getPairFirst) $ editPairSecond $ _
+    editJObject $ editFilter (matches field _.getPairFirst) $ editPairSecond $ _
 
-# Per prior discussion we decided to ignore these
-#export def (j: a => List JValue) /> (field: String) = _ | j |> jField field
-#export def (j: a => List JValue) //> (field: RegExp) = _ | j |> jFieldMatch field
+export def jExists (v: JValue): List JValue => Boolean = exists (_==/v) _
+export def jForall (v: JValue): List JValue => Boolean = forall (_==/v) _

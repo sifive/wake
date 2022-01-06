@@ -14,33 +14,6 @@
 # limitations under the License.
 package wake
 
-export def (l: List a) |> (t: a => List b): List b = mapFlat t l
-
-# TODO: How do we feel about `x | f |> g` vs `|> x |> f |> g`?
-export def |> (x: a): List a = x, Nil
-
-# NOTE: These are not part of an offline discussion but I think they're a
-#       useful concept. They're a kind of horizontial composition rather
-#       than vertical. You can use them to do things like set/get a value
-#       in a fallback like way. We can drop these. getJString made me
-#       think we might want something like this for some unknown reason
-#
-# Example:
-#     def getJString j =
-#         |> j
-#         |> jString ++> (_ | jArray |> jString)
-#
-#     # The edit version is a lot more tricky to use
-#     def editJString f =
-#         jeString ++< (jeArray $ jeString $ _) $ f
-export def (t1: a => List b) ++> (t2: a => List b): a => List b =
-    def view s = (t1 s) ++ (t2 s)
-    view
-
-export def (e1: (a => b) => s => s) ++< (e2: (a => b) => s => s): (a => b) => s => s =
-    def edit f s = e1 f s | e2 f
-    edit
-
 # Ported from the jq tutorial
 export def example1 (j: JValue): Result JValue Error = Pass j
 export def example2 (j: JValue): Result JValue Error =
@@ -82,7 +55,7 @@ export def example4 (log: JValue): Result JValue Error =
 
     # This is a bit complicated IMO but not too bad
     log
-    | jAll
+    | jFlatten
     | findFailFn simpleCommit
     | rmap JArray
 
@@ -99,22 +72,22 @@ export def example5 (log: JValue): Result JValue Error =
             | jField "commit" |> jField "name"
             | expectOne ".commit.name missing"
 
-        def parents = commit | jField "parents" |> jAll |> jField "html_url" | JArray
+        def parents = commit | jField "parents" |> jFlatten |> jField "html_url" | JArray
 
         JObject ("message" :-> message, "name" :-> name, "parents" :-> parents, Nil)
         | Pass
 
     # This is a bit complicated IMO but not too bad
     log
-    | jAll
+    | jFlatten
     | findFailFn simpleCommit
     | rmap JArray
 
 # Convert a git log to a simplified wake tuple
 export tuple Commit =
-  Message: String
-  Name: String
-  Parents: List String
+    Message: String
+    Name: String
+    Parents: List String
 
 # Simplify github json log
 export def example6 (log: JValue): Result (List Commit) Error =
@@ -131,15 +104,20 @@ export def example6 (log: JValue): Result (List Commit) Error =
             |> jString
             | expectOne ".commit.name missing or not a string"
 
-        def parents = commit | jField "parents" |> jAll |> jField "html_url" |> jString
+        def parents = commit | jField "parents" |> jFlatten |> jField "html_url" |> jString
 
         Commit message name parents
         | Pass
 
     # This is a bit complicated IMO but not too bad
-    log
-    | jAll
+    |> log
+    |> jFlatten
     | findFailFn simpleCommit
+
+export def example7 (json: JValue): List JValue =
+    |> json
+    |> jField "instances"
+    |  filter (_ | jField "instance_name" | jExists "testIndicator".JString)
 
 # It turns out, edit functions compose with `$` in the order you want
 # which is somehow surprising and obvious at the same time. Who knew?
@@ -150,7 +128,7 @@ export def exampleEdit2: Triple (Pair a Integer) b c => Triple (Pair a Integer) 
     editTripleFirst $ editPairSecond $ (_+4)
 
 export def exampleEdit3: JValue => JValue =
-    jeField "hello"
-    $ jeField "bar"
-    $ jeString
+    editJField "hello"
+    $ editJField "bar"
+    $ editJString
     $ ("zzz{_}zzz")
