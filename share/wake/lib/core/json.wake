@@ -607,7 +607,9 @@ export def editJArray (f: List JValue => List JValue): JValue => JValue = match 
     JArray arr = JArray (f arr)
     x          = x
 
-export def jFlatten: JValue => List JValue = _ | jArray |> (_)
+export def jFlatten: JValue => List JValue = match _
+  JArray a = a
+  _ = Nil
 
 export def editJFlatten: (JValue => JValue) => JValue => JValue = editJArray $ map $ _
 
