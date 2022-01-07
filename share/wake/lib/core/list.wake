@@ -150,16 +150,16 @@ export def mapFlat (mapFn: a => List b): (list: List a) => List b =
 export def (list: List a) |> (mapFn: a => List b): List b = mapFlat mapFn list
 
 # Create a singelton List out of a single element. Can be used to kick off
-# chains of list operations using '|>' for a nicer syntax.
+# chains of list operations using '|>'
 #
 # Examples:
 # ```
 #   def twice = x, x, Nil
-#   |> 3 = 3, Nil
-#   |> 3 |> twice = 3, 3, Nil
-#   |> json |> jAll |> jString | filter (_==~"Alice")
+#   single 3 = 3, Nil
+#   single 3 |> twice = 3, 3, Nil
+#   single json |> jAll |> jString | filter (_==~"Alice")
 # ```
-export def |> (x: a): List a = x, Nil
+export def single (x: a): List a = x, Nil
 
 # Create a new List by applying a partial function to each element of a List.
 # Partial functions can return None, in which case the result is not included in the output.
@@ -436,7 +436,6 @@ export def drop (num: Integer) (l: List a): List a =
         Nil = Nil
         _, t = drop (num-1) t
 
-# NOTE: This would change to List a => List a if we forgo atT
 # Extract the i-th element if it exists or else None
 #
 # Examples:
@@ -450,6 +449,12 @@ export def at (i: Integer) (l: List a): Option a =
         None
     else
         head (drop i l)
+
+def editAt (i: Integer): (a => a) => List a => List a =
+    def edit f l =
+      require Pair first (x, follow) = splitAt i l else l
+      first ++ (f x, follow)
+    edit
 
 # Cut the List at the point `f` is first True
 # Once `stopFn` returns True, `stopFn` is not evaulated on further elements.
@@ -617,6 +622,10 @@ export def filter (f: a => Boolean): List a => List a =
             else
                 sub
     loop
+
+export def editFilter (selectFn: a => Boolean) (editFn: a => a): List a => List a =
+    def editIf x = if selectFn x then editFn x else x
+    map editIf
 
 # Flip the 1st and 2nd indexes in a List of Lists
 # transpose is only it's own inverse when the lists have non-increasing length
@@ -836,14 +845,6 @@ export def groupBy (cmp: a => a => Boolean) (list: List a): List (List a) =
         _ = (elem, Nil), acc
     foldr combo Nil sorted
 
-export def optionToList: Option a => List a = match _
-    Some x = x, Nil
-    None = Nil
-
-export def editFilter (selectFn: a => Boolean) (editFn: a => a): List a => List a =
-    def editIf x = if selectFn x then editFn x else x
-    map editIf
-
 export def lookup (selectFn: a => Boolean): List (Pair a b) => List b =
   def select (Pair key value) = if selectFn key then Some value else None
   mapPartial select
@@ -851,14 +852,12 @@ export def lookup (selectFn: a => Boolean): List (Pair a b) => List b =
 export def editLookup (selectFn: a => Boolean) (editFn: b => b): List (Pair a b) => List (Pair a b) =
   editFilter (selectFn _.getPairFirst) $ editPairSecond $ editFn
 
-# TODO: Do we want Option versions of these?
-export def expectOne (msg: String) (item: List a): Result a Error = match item
-    x, Nil = Pass x
+export def expectOne (msg: String): (list: List a) => Result a Error = match _
+    item, Nil = Pass item
     _      = failWithError msg
 
-# NOTE: People could just use Pass in this case honestly but `expectMany` matches the other two cases
 export def expectMany (item: List a): Result (List a) Error = Pass item
 
-export def expectFirst (msg: String) (item: List a): Result a Error = match item
-    x, _ = Pass x
+export def expectFirst (msg: String): (list: List a) => Result a Error = match _
+    item, _ = Pass item
     _      = failWithError msg

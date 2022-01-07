@@ -538,7 +538,7 @@ export def lastValueInList (values: List JValue): Result JValue Error =
             | rmap JObject
 
 export def jString: JValue => List String = match _
-    JString s = |> s
+    JString s = single s
     _         = Nil
 
 export def editJString (f: String => String): JValue => JValue = match _
@@ -546,7 +546,7 @@ export def editJString (f: String => String): JValue => JValue = match _
     x         = x
 
 export def jInteger: JValue => List Integer = match _
-    JInteger i = |> i
+    JInteger i = single i
     _          = Nil
 
 export def editJInteger (f: Integer => Integer): JValue => JValue = match _
@@ -554,7 +554,7 @@ export def editJInteger (f: Integer => Integer): JValue => JValue = match _
     x          = x
 
 export def jBoolean: JValue => List Boolean = match _
-    JBoolean b = |> b
+    JBoolean b = single b
     _          = Nil
 
 export def editJBoolean (f: Boolean => Boolean): JValue => JValue = match _
@@ -562,7 +562,7 @@ export def editJBoolean (f: Boolean => Boolean): JValue => JValue = match _
     x          = x
 
 export def jDouble: JValue => List Double = match _
-    JDouble d = |> d
+    JDouble d = single d
     _         = Nil
 
 export def editJDouble (f: Double => Double): JValue => JValue = match _
@@ -570,8 +570,8 @@ export def editJDouble (f: Double => Double): JValue => JValue = match _
     x         = x
 
 export def jNumber: JValue => List Double = match _
-    JDouble x  = |> x
-    JInteger x = |> x | mapPartial dint
+    JDouble x  = single x
+    JInteger x = single x | mapPartial dint
     _          = Nil
 
 export def editJNumber (f: Double => Double): JValue => JValue = match _
@@ -582,17 +582,17 @@ export def editJNumber (f: Double => Double): JValue => JValue = match _
     x          = x
 
 export def jNull: JValue => List Unit = match _
-    JNull = |> Unit
+    JNull = single Unit
     _     = Nil
 
 export def editJNull (f: Unit => Unit): JValue => JValue = match _
     JNull =
-        def _ = f Unit
+        def _ = f Unit # f could have an effect so we can't eliminate it
         JNull
     x     = x
 
 export def jObject: JValue => List (List (Pair String JValue)) = match _
-    JObject obj = |> obj
+    JObject obj = single obj
     _           = Nil
 
 export def editJObject (f: List (Pair String JValue) => List (Pair String JValue)): JValue => JValue = match _
@@ -600,7 +600,7 @@ export def editJObject (f: List (Pair String JValue) => List (Pair String JValue
     x           = x
 
 export def jArray: JValue => List (List JValue) = match _
-    JArray arr = |> arr
+    JArray arr = single arr
     _          = Nil
 
 export def editJArray (f: List JValue => List JValue): JValue => JValue = match _
@@ -616,14 +616,8 @@ export def editJFlatten: (JValue => JValue) => JValue => JValue = editJArray $ m
 export def jAt (i: Integer): JValue => List JValue =
     jFlatten _ | at i | optionToList
 
-def atE (i: Integer): (a => a) => List a => List a =
-    def edit f l =
-      require Pair first (x, follow) = splitAt i l else l
-      first ++ (f x, follow)
-    edit
-
 export def editJAt (i: Integer): (JValue => JValue) => JValue => JValue =
-    editJArray $ atE i $ _
+    editJArray $ editAt i $ _
 
 export def jField (field: String): JValue => List JValue = match _
     JObject pairs = lookup (_==~field) pairs
@@ -637,7 +631,8 @@ export def jFieldMatch (field: RegExp): JValue => List JValue = match _
     _             = Nil
 
 export def jeFieldMatch (field: RegExp): (JValue => JValue) => JValue => JValue =
-    editJObject $ editFilter (matches field _.getPairFirst) $ editPairSecond $ _
+    editJObject $ editLookup (matches field _) $ _
 
 export def jExists (v: JValue): List JValue => Boolean = exists (_==/v) _
+
 export def jForall (v: JValue): List JValue => Boolean = forall (_==/v) _

@@ -22,64 +22,91 @@ export def example2 (j: JValue): Result JValue Error =
 # Simplify github json first commit
 export def example3 (log: JValue): Result JValue Error =
     require Pass commit =
-        log
-        | jAt 0
+        single log
+        |> jAt 0
         | expectOne "expected at least one commit"
 
     require Pass message =
-        commit
-        | jField "commit" |> jField "message"
+        single commit
+        |> jField "commit"
+        |> jField "message"
         | expectOne ".commit.message missing"
 
     require Pass name =
-        commit
-        | jField "commit" |> jField "name"
+        single commit
+        |> jField "commit"
+        |> jField "name"
         | expectOne ".commit.name missing"
 
-    JObject ("message" :-> message, "name" :-> name, Nil) | Pass
+    def output = JObject (
+        "message" :-> message,
+        "name" :-> name,
+        Nil
+    )
 
-# Simplify github json log
+    Pass output
+
+# Simplify full github json log
 export def example4 (log: JValue): Result JValue Error =
     def simpleCommit commit =
         require Pass message =
-            commit
-            | jField "commit" |> jField "message"
+            single commit
+            |> jField "commit"
+            |> jField "message"
             | expectOne ".commit.message missing"
 
         require Pass name =
-            commit
-            | jField "commit" |> jField "name"
+            single commit
+            |> jField "commit"
+            |> jField "name"
             | expectOne ".commit.name missing"
 
-        JObject ("message" :-> message, "name" :-> name, Nil) | Pass
+        def output = JObject (
+            "message" :-> message,
+            "name" :-> name,
+            Nil
+        )
 
-    # This is a bit complicated IMO but not too bad
-    log
-    | jFlatten
+        Pass output
+
+    single log
+    |> jFlatten
     | findFailFn simpleCommit
     | rmap JArray
 
-# Simplify github json log
+# Simplify full github json log but keep parent urls
 export def example5 (log: JValue): Result JValue Error =
     def simpleCommit commit =
         require Pass message =
-            commit
-            | jField "commit" |> jField "message"
+            single commit
+            |> jField "commit"
+            |> jField "message"
             | expectOne ".commit.message missing"
 
         require Pass name =
-            commit
-            | jField "commit" |> jField "name"
+            single commit
+            |> jField "commit"
+            |> jField "name"
             | expectOne ".commit.name missing"
 
-        def parents = commit | jField "parents" |> jFlatten |> jField "html_url" | JArray
+        def parents =
+            single commit
+            |> jField "parents"
+            |> jFlatten
+            |> jField "html_url"
+            | JArray
 
-        JObject ("message" :-> message, "name" :-> name, "parents" :-> parents, Nil)
-        | Pass
+        def output = JObject (
+            "message" :-> message,
+            "name" :-> name,
+            "parents" :-> parents,
+            Nil
+        )
 
-    # This is a bit complicated IMO but not too bad
-    log
-    | jFlatten
+        Pass output
+
+    single log
+    |> jFlatten
     | findFailFn simpleCommit
     | rmap JArray
 
@@ -93,29 +120,37 @@ export tuple Commit =
 export def example6 (log: JValue): Result (List Commit) Error =
     def simpleCommit commit =
         require Pass message =
-            commit
-            | jField "commit" |> jField "message"
+            single commit
+            |> jField "commit"
+            |> jField "message"
             |> jString
             | expectOne ".commit.message was missing or not a string"
 
         require Pass name =
-            commit
-            | jField "commit" |> jField "name"
+            single commit
+            |> jField "commit"
+            |> jField "name"
             |> jString
             | expectOne ".commit.name missing or not a string"
 
-        def parents = commit | jField "parents" |> jFlatten |> jField "html_url" |> jString
+        def parents =
+            single commit
+            |> jField "parents"
+            |> jFlatten
+            |> jField "html_url"
+            |> jString
 
-        Commit message name parents
-        | Pass
+        def output = Commit message name parents
+
+        Pass output
 
     # This is a bit complicated IMO but not too bad
-    |> log
+    single log
     |> jFlatten
     | findFailFn simpleCommit
 
 export def example7 (json: JValue): List JValue =
-    |> json
+    single json
     |> jField "instances"
     |  filter (_ | jField "instance_name" | jExists "testIndicator".JString)
 

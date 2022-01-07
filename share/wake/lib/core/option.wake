@@ -217,3 +217,7 @@ export def getOrPass (passVal: pass): Option fail => Result pass fail =
 export def getOrPassFn (passFn: Unit => pass): Option fail => Result pass fail = match _
     None   = Pass (passFn Unit)
     Some f = Fail f
+
+export def optionToList: Option a => List a = match _
+    Some x = x, Nil
+    None = Nil
