@@ -96,33 +96,21 @@ export def basename (file: String): String =
 export def dirname (file: String): String =
     simplify "{file}/.."
 
-export def isPathDir: Path => Boolean = match _
-  BadPath _ = False
-  Path str = matches `0+` (hashcode str)
+export def isPathDir (path: Path): Boolean =
+    getPathHash path
+    | matches `0+`
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
-from internals_wake export type Path
-from internals_wake import def Path BadPath # Path constructor stays private!
+data Path =
+    Path (name: String)
+from wake export type Path
 
-export def getPathResult (path: Path): Result Path Error = match path
-  BadPath e = Fail e
-  _         = Pass path
+export def getPathName (path: Path): String =
+    def Path name = path
+    name
 
-export def getPathError (path: Path): Option Error = match path
-  Path _    = None
-  BadPath e = Some e
-
-export def getPathName (path: Path): String = match path
-  Path name = name
-  BadPath _ = "BADPATH"
-
-export def getPathChild (path: Path): String = match path
-  Path name = replace `^.*/` '' name
-  BadPath _ = "BADPATH"
-
-export def getPathParent (path: Path): Path = match path
-  Path name = Path (simplify "{name}/..")
-  BadPath e = BadPath e
+export def getPathParent (path: Path): Path =
+    Path (simplify "{getPathName path}/..")
 
 def addhash (f: String): String =
   def p = simplify f
@@ -145,6 +133,6 @@ target hashcode (f: String): String =
       True (x, Nil) = x
       _ _ = "BadHash"
 
-export def getPathHash: Path => String = match _
-  Path    x = hashcode x
-  BadPath _ = "BadHash"
+export def getPathHash (path: Path): String =
+    getPathName path
+    | hashcode

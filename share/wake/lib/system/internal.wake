@@ -1,5 +1,0 @@
-package internals_wake
-
-export data Path =
-    Path    (name: String)
-    BadPath (error: Error)

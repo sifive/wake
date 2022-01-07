@@ -18,15 +18,11 @@ package wake
 # Read the file contents of a Path
 export def read (path: Path): Result String Error =
     def imp p = prim "read"
-    require Pass _ =
-        getPathResult path
     match (imp path.getPathName)
         Pass body = Pass body
         Fail f = Fail (makeError f)
 
 target writeImp inputs mode path content =
-    require Pass _ =
-        findFailFn getPathResult inputs
     def writeRunner =
         def imp m p c = prim "write"
         def pre input = Pair input Unit
@@ -59,8 +55,6 @@ export def writeIn (parent: Path) (mode: Integer) (name: String) (content: Strin
 
 # installAs: copy a file to a specified destination
 export def installAs (dest: String) (file: Path): Result Path Error =
-    require Pass _ =
-        getPathResult file
     def sdest =
         simplify dest
     def cmd =
@@ -119,8 +113,6 @@ def mkdirRunner: Runner =
     makeRunner "mkdir" (\_ Pass 0.0) pre post virtualRunner
 
 def mkdirImp inputs mode path =
-    require Pass _ =
-        findFailFn getPathResult inputs
     makeExecPlan ("<mkdir>", "-m", "0{strOctal mode}", path, Nil) inputs
     | setPlanKeep        False
     | setPlanEnvironment Nil
