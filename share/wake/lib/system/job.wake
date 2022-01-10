@@ -192,11 +192,7 @@ export def localRunner: Runner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput _ cmd vis env dir stdin _ _ predict) = match (findSomeFn getPathError vis)
-      Some e =
-        def _ = badlaunch job e
-        Fail e
-      None =
+    Pass (RunnerInput _ cmd vis env dir stdin _ _ predict) =
         def Usage status runtime cputime mem in out = predict
         def _ = launch job dir stdin env.implode cmd.implode status runtime cputime mem in out
         match (getJobReality job)
@@ -213,11 +209,7 @@ export def virtualRunner: Runner =
     Fail e =
       def _ = badlaunch job e
       Fail e
-    Pass (RunnerInput _ _ vis _ _ _ _ _ predict) = match (findSomeFn getPathError vis)
-      Some e =
-        def _ = badlaunch job e
-        Fail e
-      None =
+    Pass (RunnerInput _ _ vis _ _ _ _ _ predict) =
         def Usage status runtime cputime mem in out = predict
         def _ = virtual job "" "" status runtime cputime mem in out # sets predict+reality
         match (getJobReality job)
@@ -236,10 +228,9 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
   def signature cmd res fni fno keep = prim "hash"
   def hash = signature cmd res finputs foutputs keep
   def build Unit =
-    def getPathOpt = match _
-      Path name = Some name
-      BadPath _ = None
-    def job = create label dir stdin env.implode cmd.implode hash (mapPartial getPathOpt vis).implode (if keep then 1 else 0) echo stdout stderr
+    def visStrings =
+      map getPathName vis
+    def job = create label dir stdin env.implode cmd.implode hash visStrings.implode (if keep then 1 else 0) echo stdout stderr
     def prefix = "{str pid}.{str (getJobId job)}"
     def usage = getJobRecord job | getOrElse uusage
     def output = run job (Pass (RunnerInput label cmd vis env dir stdin res prefix usage))
@@ -489,9 +480,7 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
   def pre = match _
     Fail f = Pair (Fail f) ""
     _ if ! ok = Pair (Fail (makeError "Runner {script} is not executable")) ""
-    Pass (RunnerInput label command visible environment directory stdin res prefix record) = match (findSomeFn getPathError visible)
-      Some e = Pair (Fail e) ""
-      None =
+    Pass (RunnerInput label command visible environment directory stdin res prefix record) =
         def Usage status runtime cputime membytes inbytes outbytes = record
         def pmkdir m p = prim "mkdir"
         def pwrite m p d = prim "write"
@@ -567,8 +556,6 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
             Fail f = Fail (makeError f)
             Pass usage = Pass (RunnerOutput (getK `inputs`) (getK `outputs`) usage)
   makeRunner "json-{script}" score pre post localRunner
-
-from internals_wake import def Path BadPath # Path constructor stays private!
 
 # Whenever possible, use 'job' if:
 #   cmd can run under FUSE

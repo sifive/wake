@@ -81,8 +81,6 @@ export def claimFileAsPath (existingFile: String) (desiredWorkspacePath: String)
     claimFileAsPathIn destDir existingFile fileName
 
 export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (desiredName: String): Result Path Error =
-    require Pass _ =
-        getPathResult outputDirectory
     def get_modtime file = prim "get_modtime"
     def time = get_modtime existingFile
     if time == -1 then

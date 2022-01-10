@@ -60,8 +60,6 @@ export def parseJSONBody (body: String): Result JValue Error =
 export def parseJSONFile (path: Path): Result JValue Error =
     def imp f =
         prim "json_file"
-    require Pass _ =
-        getPathResult path
     match (imp path.getPathName)
         Pass body = Pass body
         Fail f = Fail (makeError f)
