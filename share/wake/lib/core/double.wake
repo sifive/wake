@@ -286,11 +286,12 @@ export def dstr: Double => String =
     dformat DoubleDefault 17
 
 # Convert an Integer into a Double
-# If the Integer is too large, return None
-# dint 55 = Some 55e0
-# dint (1 << 2000) = None
-export def dint (x: Integer): Option Double =
-    double (str x)
+# dint 55 = 55e0
+# dint (1 << 2000) = inf
+export def dint (x: Integer): Double =
+    match (double (str x))
+      Some x = x
+      None = unreachable "parsing a large integer should return +/- inf"
 
 # Conversion methods
 export data DoubleClass =
