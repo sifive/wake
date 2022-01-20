@@ -290,8 +290,8 @@ export def dstr: Double => String =
 # dint (1 << 2000) = inf
 export def dint (x: Integer): Double =
     match (double (str x))
-      Some x = x
-      None = unreachable "parsing a large integer should return +/- inf"
+        Some x = x
+        None = unreachable "parsing a large integer should return +/- inf"
 
 # Conversion methods
 export data DoubleClass =

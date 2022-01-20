@@ -7,8 +7,8 @@ from wake export def binary != !=* !=. !=^ !=~ $ % && * *. + ++ +. , - -. . / /.
 from wake export topic environment path runner source
 
 export def dint (x: Integer): Option Double =
-  from wake import imp=dint
-  Some (imp x)
+    from wake import imp=dint
+    Some (imp x)
 
 export def getPathResult: Path => Result Path Error =
     Pass
