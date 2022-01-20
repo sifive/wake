@@ -14,6 +14,10 @@
 # limitations under the License.
 package wake
 
+def expectOne s = match _
+    x, Nil = Pass x
+    _      = failWithError s
+
 # Ported from the jq tutorial
 export def example1 (j: JValue): Result JValue Error = Pass j
 export def example2 (j: JValue): Result JValue Error =

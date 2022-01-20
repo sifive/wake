@@ -561,9 +561,9 @@ export def jString: JValue => List String = match _
 #
 # Examples:
 # ```
-#   editJString ("{_}man") (JString "bat") = "batman", Nil
+#   editJString ("{_}man") (JString "bat") = JString "batman"
 #   editJString ("{_}man") (JInteger 10) = JInteger 10
-#   (editJField "name" $ editJString ("I'm {_}")) batman
+#   (editJField "name" $ editJString ("I'm {_}")) batman = JObject ("name" :-> JString "I'm batman", Nil)
 #   def rename (newName: String): (person: JValue) => JValue = editJField "name" $ editJString (\_ newName)
 # ```
 export def editJString (editFn: String => String): (input: JValue) => JValue = match _
@@ -573,20 +573,34 @@ export def editJString (editFn: String => String): (input: JValue) => JValue = m
 # If the input is an integer, returns a singelton list
 # containing that integer. This can be used to extract
 # an integer from a JValue or in list operation chains
-# as a safe JValue to Integer conversion.
+# as a safe JValue to Integer conversion. This works
+# even if the underlying value is represented as a
+# Double as long as the double has no fractional part.
 #
 # Examples:
 # ```
 #   jInteger (JInteger 10) = 10, Nil
+#   jInteger (JDouble 10.0) = 10, Nil
 #   jInteger (JString "foo") = Nil
+#   jInteger (JDouble 3.14) = Nil
 #   single json |> jField "age" |> jInteger = 28, Nil
 #   single json |> jField "name" |> jInteger = Nil
 # ```
 export def jInteger: JValue => List Integer = match _
     JInteger i = single i
+    JDouble d =
+        def Pair whole frac = dmodf d
+        if (dabs frac) ==. 0.0 then
+            whole, Nil
+        else
+            Nil
     _          = Nil
 
-# If `input` is a JInteger, updates the integer using `editFn`.
+# If `input` is a JInteger, editJInteger updates the integer
+# using `editFn`. If `input` is a JDouble and the double has
+# no fractional part, the double is first converted to an
+# integer and then updated as an integer. The result is
+# a JInteger in both cases.
 #
 # Parameters:
 #   - `editFn`: The function to update an integer with
@@ -595,12 +609,20 @@ export def jInteger: JValue => List Integer = match _
 # Examples:
 # ```
 #   editJInteger (_+1) (JInteger 10) = JInteger 11
+#   editJInteger (_+1) (JDouble 10.0) = JInteger 11
 #   editJInteger (_+1) (JString "Bob") = JString "Bob"
+#   editJInteger (_+1) (JDouble 3.14) = JDouble 3.14
 #   (editJField "daysSinceAccident" $ editJInteger (\_ 0)) statistics
 #   def birthday: (person: JValue) => JValue = editJField "age" $ editJInteger (_+1)
 # ```
 export def editJInteger (f: Integer => Integer): JValue => JValue = match _
     JInteger i = JInteger (f i)
+    JDouble d =
+        def Pair whole frac = dmodf d
+        if (dabs frac) ==. 0.0 then
+            JInteger (f whole)
+        else
+            JDouble d
     x          = x
 
 # If the input is a boolean, returns a singelton list
@@ -636,23 +658,39 @@ export def editJBoolean (f: Boolean => Boolean): JValue => JValue = match _
     JBoolean b = JBoolean (f b)
     x          = x
 
-# If the input is a JDouble, returns a singelton list
-# containing that double. This can be used to extract
-# a double from a JValue or in list operation chains
-# as a safe JValue to Double conversion.
+# If the input is a number, returns a singelton list
+# containing that number as a double. This can be used
+# to extract a number from a JValue or in list operation
+# chains as a safe JValue to number conversion.
+#
+# This works with both JDouble and JInteger. An integer
+# will be converted to a double, becoming -inf or inf if
+# no smaller double exists to aproximate the integer.
+#
 #
 # Examples:
 # ```
 #   jDouble (JDouble 3.14) = 3.14, Nil
-#   jDouble (JInteger 10) = Nil
+#   jDouble (JInteger 10) = 10.0, Nil
+#   jDouble (JInteger (1 << 2000)) = inf, Nil
 #   single json |> jField "height" |> jDouble = 1.75, Nil
 #   single json |> jField "name" |> jDouble = Nil
 # ```
 export def jDouble: JValue => List Double = match _
-    JDouble d = single d
+    JDouble d  = single d
+    JInteger i =
+        dint i
+        | getOrElse (if i < 0 then -.inf else inf)
+        | single
     _         = Nil
 
 # If `input` is a JDouble, updates the double using `editFn`.
+# If `input` is a JInteger then it converts the integer to a
+# double before applying `editFn`. The resulting JValue will
+# be a JDouble in either case. Integers outside of the range
+# of a Double will be converted to negative infinity or
+# infinity depending on their sign prior to being passed to
+# `editFn`.
 #
 # Parameters:
 #   - `editFn`: The function to update a double with
@@ -660,85 +698,89 @@ export def jDouble: JValue => List Double = match _
 #
 # Examples:
 # ```
-#   editJDouble (_+.1.0) (JDouble 10.0) = JDouble 11.0
+#   editJDouble (_+.3.14) (JDouble 2.71) = JDouble 5.85
+#   editJDouble (_+.1.0) (JInteger 10) = JDouble 11.0
 #   editJDouble (_+.1.0) (JString "Bob") = JString "Bob"
+#   editJDouble (_+.1.0) (JInteger (1 << 2000)) = JDouble inf
+#   editJDouble (_+.1.0)
 #   (editJField "tallestBuilding" $ editJDouble (\_ 1000.0)) statistics
 #   def grow: (person: JValue) => JValue = editJField "height" $ editJDouble (_+.0.02)
 # ```
 export def editJDouble (f: Double => Double): JValue => JValue = match _
     JDouble d = JDouble (f d)
-    x         = x
+    JInteger i =
+        dint i
+        | getOrElse (if i < 0 then -.inf else inf)
+        | f
+        | JDouble
+    x = x
 
-# If the input is a number, returns a singelton list
-# containing that number as a double. This can be used
-# to extract a number from a JValue or in list operation
-# chains as a safe JValue to number conversion.
-#
-# This works with both JDouble and JInteger. An integer
-# will be converted to a double if possible. If the
-# conversion is not possible because the integer is
-# out of range jNumber will return just Nil
-#
-# Examples:
-# ```
-#   jNumber (JDouble 3.14) = 3.14, Nil
-#   jNumber (JInteger 10) = 10.0, Nil
-#   jNumber (JString "Mal") = Nil
-#   jNumber (JInteger (factorial 100)) = Nil
-#   single json |> jField "height" |> jNumber = 1.75, Nil
-#   single json |> jField "age" |> jNumber = 28.0, Nil
-#   single json |> jField "name" |> jNumber = Nil
-# ```
-export def jNumber: JValue => List Double = match _
-    JDouble x  = single x
-    JInteger x = single x | mapPartial dint
-    _          = Nil
-
-# If `input` is a number, updates the number using `editFn`.
-# This will edit both JDouble and JInteger. The JInteger will
-# be converted to a JDouble if the conversion from Integer
-# to Double succeeds. If the conversion from Integer to
-# double does not succeed the integer remains unedited.
-#
-# Parameters:
-#   - `editFn`: The function to update a number with
-#   - `input`: The JValue to be modified
+# Returns an singelton list containing Unit if
+# the input is JNull and an empty list otherwise.
+# This should not be used as a way to test for JNull
+# but instead when composing with operations on JValue.
+# If you need to test if a JValue is Null use `value ==/ JNull`
+# instead.
 #
 # Examples:
 # ```
-#   editJNumber (_+.1.0) (JDouble 10.0) = JDouble 11.0
-#   editJNumber (_+.1.0) (JInteger 10) = JDouble 11.0
-#   editJNumber (_+.1.0) (JString "Bob") = JString "Bob"
-#   editJNumber (_+.1.0) (JInteger (factorial 100)) = JInteger (factorial 100)
-#   def newTallest: (stats: JValue) => JValue = editJField "tallestBuilding" $ editJNumber (\_ 1000.0)
-#   def grow: (person: JValue) => JValue = editJField "height" $ editJNumber (_+.0.02)
+#   single JNull |> jNull = Unit, Nil
+#   single (JInteger 0) | jNull = Nil
+#   single plans |> jField "emergencyPlan" |> jNull | map (\_ "Break Glass")
+#   single sales |> jField "total" |> (\t jInteger t ++ jNull t | map (\_ 0))
 # ```
-export def editJNumber (f: Double => Double): JValue => JValue = match _
-    JDouble x  = JDouble (f x)
-    JInteger x = match (dint x)
-        Some dx = JDouble (f dx)
-        None    = JInteger x
-    x          = x
-
-
 export def jNull: JValue => List Unit = match _
     JNull = single Unit
     _     = Nil
 
-export def editJNull (f: Unit => Unit): JValue => JValue = match _
+# Performs an effect given by `effect` if the input is
+# a JNull.
+#
+# Examples:
+# ```
+#   editJNull (\_ print "Hello, World!\n") JNull        # Prints Hello World
+#   editJNull (\_ print "Hello, World!\n") (JInteger 0) # Does nothing
+# ```
+export def editJNull (effect: Unit => Unit): JValue => JValue = match _
     JNull =
-        def _ = f Unit # f could have an effect so we can't eliminate it
+        def _ = effect Unit # f could have an effect so we can't eliminate it
         JNull
     x     = x
 
+# Returns a singelton list containing the list of key-value
+# pairs from a JObject. If the input is not a JObject, Nil
+# is returned instead. Consider using jField or jFieldMatch
+# instead of this if possible.
+#
+# Examples:
+# ```
+#   single (JObject ("foo" :-> JNull, Nil)) |> jObject | flatten = "foo" :-> JNull, Nil
+#   single (JInteger 0) |> jObject | flatten = Nil
+# ```
 export def jObject: JValue => List (List (Pair String JValue)) = match _
     JObject obj = single obj
     _           = Nil
 
-export def editJObject (f: List (Pair String JValue) => List (Pair String JValue)): JValue => JValue = match _
-    JObject obj = JObject (f obj)
+# If `input` is a JObject, updates the list of key-value pairs with `editFn`.
+# Consider using editJField or editJFieldMatch instead of this if possible.
+#
+# Examples:
+# ```
+#   def birthday = editJObject $ editLookup (_==~"age") $ (_+1)
+# ```
+export def editJObject (editFn: List (Pair String JValue) => List (Pair String JValue)): (input: JValue) => JValue = match _
+    JObject obj = JObject (editFn obj)
     x           = x
 
+# If `input` is a JArray, returns a singelton list containing that JArray.
+# If `input` is anything else Nil is returned. Consider using jFlatten
+# instead of this if possible.
+#
+# Examples:
+# ```
+#   single (JArray (JNull, JString "foo", JInteger 10, Nil)) |> jArray | flatten = JNull, JString "foo", JInteger 10
+#   single (JArray l) |> jArray = l, Nil
+# ```
 export def jArray: JValue => List (List JValue) = match _
     JArray arr = single arr
     _          = Nil
@@ -747,18 +789,45 @@ export def editJArray (f: List JValue => List JValue): JValue => JValue = match 
     JArray arr = JArray (f arr)
     x          = x
 
-export def jFlatten: JValue => List JValue = match _
+# If `input` is a JArray, returns the list it contains. If `input` is
+# anything else Nil is returned.
+#
+# Examples:
+# ```
+#   single (JArray (JNull, JString "foo", JInteger 10, Nil)) |> jArray | flatten = JNull, JString "foo", JInteger 10
+#   single (JArray l) |> jArray = l, Nil
+# ```
+export def jFlatten: (input: JValue) => List JValue = match _
   JArray a = a
   _ = Nil
 
 export def editJFlatten: (JValue => JValue) => JValue => JValue = editJArray $ map $ _
 
+# If `input` is a JArray with length less than `i`,
+# returns a singelton list containting the i-th element.
+# Otherwise Nil is returned.
+#
+# Example:
+# ```
+#   single (map JInteger (3, 687, 41, 13, 45, Nil) | JArray) |> jAt 2 = JInteger 41, Nil
+#   single (JInteger 10) |> jAt 2 = Nil
+# ```
 export def jAt (i: Integer): JValue => List JValue =
     jFlatten _ | at i | optionToList
 
 export def editJAt (i: Integer): (JValue => JValue) => JValue => JValue =
     editJArray $ editAt i $ _
 
+# If `input` is a JObject returns a list containting
+# the values mapped to by `field`. If `input` is not
+# a JObject, Nil is returned.
+#
+# Example:
+# ```
+#   single person |> jField "name" = JString "Alice", Nil
+#   single person |> jField "age" = JInteger 28, Nil
+#   single (JInteger 10) |> jAt 2 = Nil
+# ```
 export def jField (field: String): JValue => List JValue = match _
     JObject pairs = lookup (_==~field) pairs
     _             = Nil
@@ -766,13 +835,39 @@ export def jField (field: String): JValue => List JValue = match _
 export def editJField (field: String): (JValue => JValue) => JValue => JValue =
     editJObject $ editLookup (_==~field) $ _
 
-export def jFieldMatch (field: RegExp): JValue => List JValue = match _
+# If `input` is a JObject with keys equal to `field`,
+# returns a list containting the values mapped to by that
+# field. If `input` is not a JObject, Nil is returned.
+#
+# Example:
+# ```
+#   single person |> jField "name" = JString "Alice", Nil
+#   single person |> jField "age" = JInteger 28, Nil
+#   single (JInteger 10) |> jAt 2 = Nil
+# ```
+export def jFieldMatch (field: RegExp): (input: JValue) => List JValue = match _
     JObject pairs = lookup (matches field) pairs
     _             = Nil
 
-export def jeFieldMatch (field: RegExp): (JValue => JValue) => JValue => JValue =
+export def editJFieldMatch (field: RegExp): (JValue => JValue) => JValue => JValue =
     editJObject $ editLookup (matches field _) $ _
 
-export def jExists (v: JValue): List JValue => Boolean = exists (_==/v) _
+# Returns True if `input` has a JValue equal to `v`.
+#
+# Examples:
+# ```
+#   jExists (JInteger 42) (JInteger 42, JString "cheese", JNull, Nil) = True
+#   jExists (JString "Alice") (JInteger 42, JString "cheese", JNull, Nil) = False
+#   jExists v Nil = False
+# ```
+export def jExists (v: JValue): (input: List JValue) => Boolean = exists (_==/v) _
 
-export def jForall (v: JValue): List JValue => Boolean = forall (_==/v) _
+# Returns True if `input` is a list containing all values equal to `v`.
+#
+# Examples:
+# ```
+#   jForall (JInteger 42) (JInteger 42, JInteger 42, Nil) = True
+#   jForall (JInteger 42) (JInteger 42, JString "Alice", Nil) = False
+#   jForall v Nil = True
+# ```
+export def jForall (v: JValue): (input: List JValue) => Boolean = forall (_==/v) _

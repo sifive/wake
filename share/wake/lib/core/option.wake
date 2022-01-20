@@ -218,6 +218,13 @@ export def getOrPassFn (passFn: Unit => pass): Option fail => Result pass fail =
     None   = Pass (passFn Unit)
     Some f = Fail f
 
+# Converts an Option to a List.
+#
+# Examples:
+# ```
+#   optionToList None = Nil
+#   optionToList (Some 10) = 10, Nil
+# ```
 export def optionToList: Option a => List a = match _
     Some x = x, Nil
     None = Nil
