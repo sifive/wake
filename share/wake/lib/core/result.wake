@@ -227,3 +227,9 @@ export def addErrorContext (prefix: String): Result a Error => Result a Error = 
 #   else failWithError "Could not parse {str} as an Integer"
 export def failWithError (cause: String): Result a Error =
     Fail (makeError cause)
+
+export def editIf (selectFn: a => Boolean) (editFn: a => Result a Error) (input: a): Result a Error =
+    if selectFn input then editFn input else Pass input
+
+export def makePass (editFn: a => b): a => Result b Error =
+    _ | editFn | Pass

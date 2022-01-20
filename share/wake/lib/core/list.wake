@@ -450,6 +450,7 @@ export def at (i: Integer) (l: List a): Option a =
     else
         head (drop i l)
 
+# TODO: Fix docs
 # Given a list, edit the i-th element.
 #
 # Parameters:
@@ -465,10 +466,12 @@ export def at (i: Integer) (l: List a): Option a =
 #   editAt 10 (_+1000) l = 85, 4, 15, Nil
 #   editAt (-1) (_+1000) l = 85, 4, 15, Nil
 # ```
-export def editAt (i: Integer): (editFn: a => a) => (list: List a) => List a =
-    def edit f l =
-      require Pair first (x, follow) = splitAt i l else l
-      first ++ (f x, follow)
+export def editAt (i: Integer): (editFn: a => Result a Error) => (list: List a) => Result (List a) Error =
+    def edit f l = match (splitAt i l)
+        Pair first (x, follow) =
+            require Pass ex = f x
+            Pass (first ++ (ex, follow))
+        _ = failWithError "editAt was out of bounds"
     edit
 
 # Cut the List at the point `f` is first True
@@ -651,6 +654,9 @@ export def filter (f: a => Boolean): List a => List a =
 export def editFilter (selectFn: a => Boolean) (editFn: a => a): List a => List a =
     def editIf x = if selectFn x then editFn x else x
     map editIf
+
+export def editFilterFindFail (selectFn: a => Boolean) (editFn: a => Result a Error): List a => Result (List a) Error =
+    map (editIf selectFn editFn) _ | findFail
 
 # Flip the 1st and 2nd indexes in a List of Lists
 # transpose is only it's own inverse when the lists have non-increasing length
@@ -892,6 +898,7 @@ export def lookup (selectFn: a => Boolean): (list: List (Pair a b)) => List b =
   def select (Pair key value) = if selectFn key then Some value else None
   mapPartial select
 
+# TODO: Fix docs
 # Given a list of pairs, edit all right elements such that
 # their left element matches a selection function. This
 # can be used to eidts values in a dictionary for instance.
@@ -912,3 +919,9 @@ export def lookup (selectFn: a => Boolean): (list: List (Pair a b)) => List b =
 # ```
 export def editLookup (selectFn: a => Boolean) (editFn: b => b): (list: List (Pair a b)) => List (Pair a b) =
   editFilter (selectFn _.getPairFirst) $ editPairSecond $ editFn
+
+export def editLookupFindFail (selectFn: a => Boolean) (editFn: b => Result b Error): (list: List (Pair a b)) => Result (List (Pair a b)) Error =
+  def editPairSecondFindFail (Pair x y) =
+      require Pass ey = editFn y
+      Pass (Pair x ey)
+  editFilterFindFail (selectFn _.getPairFirst) $ editPairSecondFindFail

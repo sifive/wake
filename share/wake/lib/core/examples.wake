@@ -166,8 +166,9 @@ export def exampleEdit1: Pair Integer b => Pair Integer b =
 export def exampleEdit2: Triple (Pair a Integer) b c => Triple (Pair a Integer) b c =
     editTripleFirst $ editPairSecond $ (_+4)
 
-export def exampleEdit3: JValue => JValue =
+export def exampleEdit3: JValue => Result JValue Error =
     editJField "hello"
     $ editJField "bar"
     $ editJString
+    $ makePass
     $ ("zzz{_}zzz")
