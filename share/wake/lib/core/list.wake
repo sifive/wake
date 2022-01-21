@@ -147,7 +147,10 @@ export def mapFlat (mapFn: a => List b): (list: List a) => List b =
 #   seq 3 |> twice |> twice = 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, Nil
 #   json | jAll |> jString | filter (_==~"Alice")
 # ```
-export def (list: List a) |> (mapFn: a => List b): List b = mapFlat mapFn list
+export def (list: Result (List a) Error) |> (mapFn: a => Result (List b) Error): Result (List b) Error =
+    require Pass lst = list
+    require Pass lists = map mapFn lst | findFail
+    flatten lists | Pass
 
 # Create a singelton List out of a single element. Can be used to kick off
 # chains of list operations using '|>'
@@ -471,7 +474,7 @@ export def editAt (i: Integer): (editFn: a => Result a Error) => (list: List a) 
         Pair first (x, follow) =
             require Pass ex = f x
             Pass (first ++ (ex, follow))
-        _ = failWithError "editAt was out of bounds"
+        _ = failWithError "[{str i}]: out of bounds"
     edit
 
 # Cut the List at the point `f` is first True
@@ -655,8 +658,20 @@ export def editFilter (selectFn: a => Boolean) (editFn: a => a): List a => List 
     def editIf x = if selectFn x then editFn x else x
     map editIf
 
+def editFilterFindFailCount (selectFn: a => Boolean) (editFn: a => Result a Error): List a => Pair Integer (Result (List a) Error) = match _
+    Nil  = Pair 0 (Pass Nil)
+    h, t =
+        def Pair count tailResult = editFilterFindFailCount selectFn editFn t
+        require Pass et = tailResult else Pair count tailResult
+        if selectFn h then
+            match (editFn h)
+                Pass eh = Pair (count + 1) (Pass (eh, et))
+                Fail err = Pair count (Fail err)
+        else
+            Pair count (Pass (h, et))
+
 export def editFilterFindFail (selectFn: a => Boolean) (editFn: a => Result a Error): List a => Result (List a) Error =
-    map (editIf selectFn editFn) _ | findFail
+    editFilterFindFailCount selectFn editFn _ | getPairSecond
 
 # Flip the 1st and 2nd indexes in a List of Lists
 # transpose is only it's own inverse when the lists have non-increasing length
@@ -920,8 +935,15 @@ export def lookup (selectFn: a => Boolean): (list: List (Pair a b)) => List b =
 export def editLookup (selectFn: a => Boolean) (editFn: b => b): (list: List (Pair a b)) => List (Pair a b) =
   editFilter (selectFn _.getPairFirst) $ editPairSecond $ editFn
 
-export def editLookupFindFail (selectFn: a => Boolean) (editFn: b => Result b Error): (list: List (Pair a b)) => Result (List (Pair a b)) Error =
+# This isn't used in editJField anymore...do we really still want this?
+export def editLookupFindFail (selectFn: a => Boolean) (editFn: b => Result b Error) (list: List (Pair a b)): Result (List (Pair a b)) Error =
   def editPairSecondFindFail (Pair x y) =
       require Pass ey = editFn y
       Pass (Pair x ey)
-  editFilterFindFail (selectFn _.getPairFirst) $ editPairSecondFindFail
+
+  def Pair count result = editFilterFindFailCount (selectFn _.getPairFirst) editPairSecondFindFail list
+  if count <= 0 then
+      failWithError "no matches found"
+  else
+      require Pass elist = result
+      Pass elist

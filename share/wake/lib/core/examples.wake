@@ -14,33 +14,37 @@
 # limitations under the License.
 package wake
 
-def expectOne s = match _
-    x, Nil = Pass x
-    _      = failWithError s
+def expectOne (msg: String) (result: Result (List a) Error): Result a Error = match result
+    Fail err      = addErrorContext msg (Fail err)
+    Pass (x, Nil)  = Pass x
+    Pass otherwise = failWithError "{msg}: expected 1, got {len otherwise | str}"
 
 # Ported from the jq tutorial
 export def example1 (j: JValue): Result JValue Error = Pass j
 export def example2 (j: JValue): Result JValue Error =
-    j | jAt 0 | expectOne "j was empty"
+    j | jAt 0 | expectOne ""
 
 # Simplify github json first commit
 export def example3 (log: JValue): Result JValue Error =
     require Pass commit =
         single log
+        | Pass
         |> jAt 0
-        | expectOne "expected at least one commit"
+        | expectOne "Head of log not found"
 
     require Pass message =
         single commit
+        | Pass
         |> jField "commit"
         |> jField "message"
-        | expectOne ".commit.message missing"
+        | expectOne "commit message not found"
 
     require Pass name =
         single commit
+        | Pass
         |> jField "commit"
         |> jField "name"
-        | expectOne ".commit.name missing"
+        | expectOne "commit author not found"
 
     def output = JObject (
         "message" :-> message,
@@ -55,12 +59,14 @@ export def example4 (log: JValue): Result JValue Error =
     def simpleCommit commit =
         require Pass message =
             single commit
+            | Pass
             |> jField "commit"
             |> jField "message"
             | expectOne ".commit.message missing"
 
         require Pass name =
             single commit
+            | Pass
             |> jField "commit"
             |> jField "name"
             | expectOne ".commit.name missing"
@@ -74,8 +80,9 @@ export def example4 (log: JValue): Result JValue Error =
         Pass output
 
     single log
+    | Pass
     |> jFlatten
-    | findFailFn simpleCommit
+    |: findFailFn simpleCommit
     | rmap JArray
 
 # Simplify full github json log but keep parent urls
@@ -83,22 +90,25 @@ export def example5 (log: JValue): Result JValue Error =
     def simpleCommit commit =
         require Pass message =
             single commit
+            | Pass
             |> jField "commit"
             |> jField "message"
             | expectOne ".commit.message missing"
 
         require Pass name =
             single commit
+            | Pass
             |> jField "commit"
             |> jField "name"
             | expectOne ".commit.name missing"
 
-        def parents =
+        require Pass parents =
             single commit
+            | Pass
             |> jField "parents"
             |> jFlatten
             |> jField "html_url"
-            | JArray
+            |: makePass JArray
 
         def output = JObject (
             "message" :-> message,
@@ -110,8 +120,9 @@ export def example5 (log: JValue): Result JValue Error =
         Pass output
 
     single log
+    | Pass
     |> jFlatten
-    | findFailFn simpleCommit
+    |: findFailFn simpleCommit
     | rmap JArray
 
 # Convert a git log to a simplified wake tuple
@@ -125,6 +136,7 @@ export def example6 (log: JValue): Result (List Commit) Error =
     def simpleCommit commit =
         require Pass message =
             single commit
+            | Pass
             |> jField "commit"
             |> jField "message"
             |> jString
@@ -132,13 +144,15 @@ export def example6 (log: JValue): Result (List Commit) Error =
 
         require Pass name =
             single commit
+            | Pass
             |> jField "commit"
             |> jField "name"
             |> jString
             | expectOne ".commit.name missing or not a string"
 
-        def parents =
+        require Pass parents =
             single commit
+            | Pass
             |> jField "parents"
             |> jFlatten
             |> jField "html_url"
@@ -150,13 +164,16 @@ export def example6 (log: JValue): Result (List Commit) Error =
 
     # This is a bit complicated IMO but not too bad
     single log
+    | Pass
     |> jFlatten
-    | findFailFn simpleCommit
+    |: findFailFn simpleCommit
 
-export def example7 (json: JValue): List JValue =
+# This is terrible, no one is going to do this
+export def example7 (json: JValue): Result (List JValue) Error =
     single json
+    | Pass
     |> jField "instances"
-    |  filter (_ | jField "instance_name" | jExists "testIndicator".JString)
+    |: (filter (_ | jField "instance_name" |: (jExists "testIndicator".JString | makePass) | getWhenFail False) | makePass)
 
 # It turns out, edit functions compose with `$` in the order you want
 # which is somehow surprising and obvious at the same time. Who knew?

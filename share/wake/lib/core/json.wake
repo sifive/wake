@@ -163,7 +163,6 @@ export def x // y =
 #   JInteger 10 ==/ JInteger 10 = True
 #   JInteger 11 ==/ JInteger 10 = False
 #   JInteger 10 ==/ JString "foo" = False
-#   JDouble 10.0 ==/ JInteger 10 = False
 #   JNull ==/ JNull = True
 #   JArray (JString "foo", Nil) ==/ JArray (JString "foo", Nil) = True
 #   JArray Nil ==/ JArray Nil = True
@@ -177,7 +176,7 @@ export def x ==/ y = match x y
   (JDouble  a) (JDouble  b) = a ==. b
   (JInteger a) (JDouble b)  =
     def Pair whole frac = dmodf b
-    if (dabs frac) ==. 0.0 then whole == a else False
+    if frac ==. 0.0 then whole == a else False
   (JDouble a) (JInteger b) = JInteger b ==/ JDouble a
   (JBoolean a) (JBoolean b) = if a then b else !b
   JNull        JNull        = True
@@ -187,8 +186,6 @@ export def x ==/ y = match x y
   (JArray   a) (JArray   b) =
     def helper (Pair c d) = c ==/ d
     if a.len != b.len then False else zip a b | forall helper
-  #(JArray a) _ = exists (_ ==/ y) a
-  #_ (JArray b) = exists (_ ==/ x) b
   _ _ = False
 
 # Simplify a JSON structure for broad compatibility as defined by the specs.
@@ -559,6 +556,7 @@ export def lastValueInList (values: List JValue): Result JValue Error =
             | deduplicateJObjectKeys lastValueInList
             | rmap JObject
 
+# TODO: Update documentation
 # If the input is a string, returns a singelton list
 # containing that string. This can be used to extract
 # a string from a JValue or in list operation chains
@@ -571,9 +569,9 @@ export def lastValueInList (values: List JValue): Result JValue Error =
 #   single json |> jField "name" |> jString = "Alice", Nil
 #   single json |> jField "age" |> jString = Nil
 # ```
-export def jString: JValue => List String = match _
-    JString s = single s
-    _         = Nil
+export def jString: JValue => Result (List String) Error = match _
+    JString s = single s | Pass
+    _         = failWithError "not a string"
 
 # TODO: Fix this doc
 # If `input` is a JString, updates the string using `editFn`.
@@ -593,8 +591,9 @@ export def editJString (editFn: String => Result String Error): (input: JValue) 
     JString s =
         require Pass es = editFn s
         Pass (JString es)
-    _         = failWithError "attempt to use editJString on non-JString"
+    _         = failWithError "not a string"
 
+# TODO: Update documentation
 # If the input is an integer, returns a singelton list
 # containing that integer. This can be used to extract
 # an integer from a JValue or in list operation chains
@@ -611,15 +610,12 @@ export def editJString (editFn: String => Result String Error): (input: JValue) 
 #   single json |> jField "age" |> jInteger = 28, Nil
 #   single json |> jField "name" |> jInteger = Nil
 # ```
-export def jInteger: JValue => List Integer = match _
-    JInteger i = single i
+export def jInteger: JValue => Result (List Integer) Error = match _
+    JInteger i = single i | Pass
     JDouble d =
         def Pair whole frac = dmodf d
-        if (dabs frac) ==. 0.0 then
-            whole, Nil
-        else
-            Nil
-    _          = Nil
+        if frac ==. 0.0 then single whole | Pass else failWithError "not an integer"
+    _          = failWithError "not an integer"
 
 # TODO: Fix this doc
 # If `input` is a JInteger, editJInteger updates the integer
@@ -647,12 +643,12 @@ export def editJInteger (f: Integer => Result Integer Error): JValue => Result J
         Pass (JInteger ei)
     JDouble d =
         def Pair whole frac = dmodf d
-        if (dabs frac) ==. 0.0 then
+        if frac ==. 0.0 then
             require Pass ei = f whole
             Pass (JInteger ei)
         else
-            failWithError "attempt to use editJInteger on non-integer JDouble"
-    _          = failWithError "attempt to use editJInteger on non-integer"
+            failWithError "not an integer"
+    _          = failWithError "not an integer"
 
 # TODO: Update this documentation
 # If the input is a boolean, returns a singelton list
@@ -667,10 +663,11 @@ export def editJInteger (f: Integer => Result Integer Error): JValue => Result J
 #   single json |> jField "frysWithThat" |> jBoolean = True, Nil
 #   single json |> jField "name" |> jBoolean = Nil
 # ```
-export def jBoolean: JValue => List Boolean = match _
-    JBoolean b = single b
-    _          = Nil
+export def jBoolean: JValue => Result (List Boolean) Error = match _
+    JBoolean b = single b | Pass
+    _          = failWithError "not a boolean"
 
+# TODO: Update documentation
 # If `input` is a JBoolean, updates the boolean using `editFn`.
 #
 # Parameters:
@@ -688,8 +685,9 @@ export def editJBoolean (f: Boolean => Result Boolean Error): JValue => Result J
     JBoolean b =
         require Pass eb = f b
         Pass (JBoolean eb)
-    _          = failWithError "attempt to use editJBoolean on non-JBoolean"
+    _          = failWithError "not a boolean"
 
+# TODO: Update documentation
 # If the input is a number, returns a singelton list
 # containing that number as a double. This can be used
 # to extract a number from a JValue or in list operation
@@ -708,13 +706,14 @@ export def editJBoolean (f: Boolean => Result Boolean Error): JValue => Result J
 #   single json |> jField "height" |> jDouble = 1.75, Nil
 #   single json |> jField "name" |> jDouble = Nil
 # ```
-export def jDouble: JValue => List Double = match _
-    JDouble d  = single d
+export def jDouble: JValue => Result (List Double) Error = match _
+    JDouble d  = single d | Pass
     JInteger i =
         dint i
         | getOrElse (if i < 0 then -.inf else inf)
         | single
-    _         = Nil
+        | Pass
+    _         = failWithError "not a number"
 
 # TODO: Update documentation
 # If `input` is a JDouble, updates the double using `editFn`.
@@ -749,7 +748,7 @@ export def editJDouble (f: Double => Result Double Error): JValue => Result JVal
             | getOrElse (if i < 0 then -.inf else inf)
             | f
         Pass (JDouble ed)
-    _ = failWithError "attempt to use editJDouble on non-numerical JValue"
+    _ = failWithError "not a number"
 
 # Returns an singelton list containing Unit if
 # the input is JNull and an empty list otherwise.
@@ -765,9 +764,9 @@ export def editJDouble (f: Double => Result Double Error): JValue => Result JVal
 #   single plans |> jField "emergencyPlan" |> jNull | map (\_ "Break Glass")
 #   single sales |> jField "total" |> (\t jInteger t ++ jNull t | map (\_ 0))
 # ```
-export def jNull: JValue => List Unit = match _
-    JNull = single Unit
-    _     = Nil
+export def jNull: JValue => Result (List Unit) Error = match _
+    JNull = single Unit | Pass
+    _     = failWithError "not null"
 
 # TODO: Fix docs
 # Performs an effect given by `effect` if the input is
@@ -782,7 +781,7 @@ export def editJNull (effect: Unit => Result Unit Error): JValue => Result JValu
     JNull =
         require Pass _ = effect Unit # f could have an effect so we can't eliminate it
         Pass JNull
-    _     = failWithError "attempt to use editJNull on non-JNull"
+    _     = failWithError "not null"
 
 # Returns a singelton list containing the list of key-value
 # pairs from a JObject. If the input is not a JObject, Nil
@@ -794,9 +793,9 @@ export def editJNull (effect: Unit => Result Unit Error): JValue => Result JValu
 #   single (JObject ("foo" :-> JNull, Nil)) |> jObject | flatten = "foo" :-> JNull, Nil
 #   single (JInteger 0) |> jObject | flatten = Nil
 # ```
-export def jObject: JValue => List (List (Pair String JValue)) = match _
-    JObject obj = single obj
-    _           = Nil
+export def jObject: JValue => Result (List (List (Pair String JValue))) Error = match _
+    JObject obj = single obj | Pass
+    _           = failWithError "not an object"
 
 # TODO: fix docs
 # If `input` is a JObject, updates the list of key-value pairs with `editFn`.
@@ -810,7 +809,7 @@ export def editJObject (editFn: List (Pair String JValue) => Result (List (Pair 
     JObject obj =
         require Pass eobj = editFn obj
         Pass (JObject eobj)
-    _           = failWithError "attempt to use editJObject on non-JObject"
+    _           = failWithError "not an object"
 
 # If `input` is a JArray, returns a singelton list containing that JArray.
 # If `input` is anything else Nil is returned. Consider using jFlatten
@@ -821,15 +820,15 @@ export def editJObject (editFn: List (Pair String JValue) => Result (List (Pair 
 #   single (JArray (JNull, JString "foo", JInteger 10, Nil)) |> jArray | flatten = JNull, JString "foo", JInteger 10
 #   single (JArray l) |> jArray = l, Nil
 # ```
-export def jArray: JValue => List (List JValue) = match _
-    JArray arr = single arr
-    _          = Nil
+export def jArray: JValue => Result (List (List JValue)) Error = match _
+    JArray arr = single arr | Pass
+    _          = failWithError "not an array"
 
 export def editJArray (f: List JValue => Result (List JValue) Error): JValue => Result JValue Error = match _
     JArray arr =
         require Pass earr = f arr
         Pass (JArray earr)
-    _          = failWithError "attempt to use editJArray on non-JArray"
+    _          = failWithError "not an array"
 
 # If `input` is a JArray, returns the list it contains. If `input` is
 # anything else Nil is returned.
@@ -839,9 +838,9 @@ export def editJArray (f: List JValue => Result (List JValue) Error): JValue => 
 #   single (JArray (JNull, JString "foo", JInteger 10, Nil)) |> jArray | flatten = JNull, JString "foo", JInteger 10
 #   single (JArray l) |> jArray = l, Nil
 # ```
-export def jFlatten: (input: JValue) => List JValue = match _
-  JArray a = a
-  _ = Nil
+export def jFlatten: (input: JValue) => Result (List JValue) Error = match _
+  JArray a = Pass a
+  _        = failWithError "not an array"
 
 export def editJFlatten: (JValue => Result JValue Error) => JValue => Result JValue Error =
     editJArray $ findFailFn $ _
@@ -855,11 +854,19 @@ export def editJFlatten: (JValue => Result JValue Error) => JValue => Result JVa
 #   single (map JInteger (3, 687, 41, 13, 45, Nil) | JArray) |> jAt 2 = JInteger 41, Nil
 #   single (JInteger 10) |> jAt 2 = Nil
 # ```
-export def jAt (i: Integer): JValue => List JValue =
-    jFlatten _ | at i | optionToList
+export def jAt (i: Integer) (arr: JValue): Result (List JValue) Error =
+    require Pass opt = jFlatten arr |: (at i | makePass)
+    require Some value = opt else failWithError "[{str i}]: out of bounds"
+    single value | Pass
 
-export def editJAt (i: Integer): (JValue => Result JValue Error) => JValue => Result JValue Error =
-    editJArray $ editAt i $ _
+def addJsonErrorContext (prefix: String): Result a Error => Result a Error = match _
+    Pass x = Pass x
+    Fail (Error cause stack) = Fail (Error "{prefix}/{cause}" stack)
+
+export def editJAt (i: Integer) (editFn: JValue => Result JValue Error): (input: JValue) => Result JValue Error =
+    def helper element =
+        addJsonErrorContext "[{str i}]" (editFn element)
+    editJArray $ editAt i $ helper
 
 # If `input` is a JObject returns a list containting
 # the values mapped to by `field`. If `input` is not
@@ -871,12 +878,24 @@ export def editJAt (i: Integer): (JValue => Result JValue Error) => JValue => Re
 #   single person |> jField "age" = JInteger 28, Nil
 #   single (JInteger 10) |> jAt 2 = Nil
 # ```
-export def jField (field: String): JValue => List JValue = match _
-    JObject pairs = lookup (_==~field) pairs
-    _             = Nil
+export def jField (field: String): JValue => Result (List JValue) Error = match _
+    JObject pairs =
+        match (lookup (_==~field) pairs)
+            Nil    = failWithError "key \"{field}\" not found"
+            values = Pass values
+    _             = failWithError "not an object"
 
-export def editJField (field: String): (JValue => Result JValue Error) => JValue => Result JValue Error =
-    editJObject $ editLookupFindFail (_==~field) $ _
+export def editJField (field: String) (editFn: JValue => Result JValue Error) (input: JValue): Result JValue Error =
+    require JObject obj = input else failWithError "not an object"
+    def editPairSecondFindFail (Pair x y) =
+        require Pass ey = editFn y
+        Pass (Pair x ey)
+    def Pair count result = editFilterFindFailCount (field ==~ _.getPairFirst) editPairSecondFindFail obj
+    if count == 0 then
+        failWithError "key {field} not found"
+    else
+        require Pass eobj = result
+        JObject eobj | Pass
 
 # If `input` is a JObject with keys equal to `field`,
 # returns a list containting the values mapped to by that
@@ -888,12 +907,39 @@ export def editJField (field: String): (JValue => Result JValue Error) => JValue
 #   single person |> jField "age" = JInteger 28, Nil
 #   single (JInteger 10) |> jAt 2 = Nil
 # ```
-export def jFieldMatch (field: RegExp): (input: JValue) => List JValue = match _
-    JObject pairs = lookup (matches field) pairs
-    _             = Nil
+export def jFieldMatch (field: RegExp): (input: JValue) => Result (List JValue) Error = match _
+    JObject pairs = match (lookup (matches field) pairs)
+        Nil    = failWithError "no keys matching `{regExpToString field}` found"
+        values = Pass values
+    _             = failWithError "not an object"
 
 export def editJFieldMatch (field: RegExp): (JValue => Result JValue Error) => JValue => Result JValue Error =
     editJObject $ editLookupFindFail (matches field _) $ _
+
+export def jDescendants (root: JValue): List JValue =
+  def helper node acc = match node
+    JArray l =
+      foldr helper (node, acc) l
+    JObject l =
+      foldr (helper _.getPairSecond _) (node, acc) l
+    _ =
+      node, acc
+  helper root Nil
+
+export def editJDescendants (editFn: JValue => Result JValue Error) (root: JValue): Result JValue Error =
+  def helper node = match node
+    JArray l =
+      require Pass l2 = map helper l | findFail
+      editFn (JArray l2)
+    JObject l =
+      def sub (k :-> v) =
+        require Pass v2 = helper v
+        Pass (k :-> v2)
+      require Pass l2 = map sub l | findFail
+      editFn (JObject l2)
+    _ =
+      editFn node
+  helper root
 
 # Returns True if `input` has a JValue equal to `v`.
 #
