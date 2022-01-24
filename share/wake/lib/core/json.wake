@@ -949,7 +949,7 @@ export def editJDescendants (editFn: JValue => Result JValue Error) (root: JValu
 #   jExists (JString "Alice") (JInteger 42, JString "cheese", JNull, Nil) = False
 #   jExists v Nil = False
 # ```
-export def jExists (v: JValue): (input: List JValue) => Boolean = exists (_==/v) _
+export def jExists (v: JValue): (input: List JValue) => Result Boolean Error = exists (_==/v) _ | Pass
 
 # Returns True if `input` is a list containing all values equal to `v`.
 #
@@ -959,4 +959,6 @@ export def jExists (v: JValue): (input: List JValue) => Boolean = exists (_==/v)
 #   jForall (JInteger 42) (JInteger 42, JString "Alice", Nil) = False
 #   jForall v Nil = True
 # ```
-export def jForall (v: JValue): (input: List JValue) => Boolean = forall (_==/v) _
+export def jForall (v: JValue): (input: List JValue) => Result Boolean Error = forall (_==/v) _ | Pass
+
+def jq x = Pass (x, Nil)

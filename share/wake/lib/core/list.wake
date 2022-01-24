@@ -947,3 +947,7 @@ export def editLookupFindFail (selectFn: a => Boolean) (editFn: b => Result b Er
   else
       require Pass elist = result
       Pass elist
+
+def getIf (selectFn: a => Result Boolean Error) (input: a): Result (List a) Error =
+    require Pass isSelected = selectFn input
+    if isSelected then Pass (input, Nil) else Pass Nil

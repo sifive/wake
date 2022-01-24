@@ -27,21 +27,18 @@ export def example2 (j: JValue): Result JValue Error =
 # Simplify github json first commit
 export def example3 (log: JValue): Result JValue Error =
     require Pass commit =
-        single log
-        | Pass
+        jq log
         |> jAt 0
         | expectOne "Head of log not found"
 
     require Pass message =
-        single commit
-        | Pass
+        jq commit
         |> jField "commit"
         |> jField "message"
         | expectOne "commit message not found"
 
     require Pass name =
-        single commit
-        | Pass
+        jq commit
         |> jField "commit"
         |> jField "name"
         | expectOne "commit author not found"
@@ -58,15 +55,13 @@ export def example3 (log: JValue): Result JValue Error =
 export def example4 (log: JValue): Result JValue Error =
     def simpleCommit commit =
         require Pass message =
-            single commit
-            | Pass
+            jq commit
             |> jField "commit"
             |> jField "message"
             | expectOne ".commit.message missing"
 
         require Pass name =
-            single commit
-            | Pass
+            jq commit
             |> jField "commit"
             |> jField "name"
             | expectOne ".commit.name missing"
@@ -79,18 +74,15 @@ export def example4 (log: JValue): Result JValue Error =
 
         Pass output
 
-    single log
-    | Pass
-    |> jFlatten
-    |: findFailFn simpleCommit
-    | rmap JArray
+    require Pass orig = jq log |> jFlatten
+    require Pass simplified = findFailFn simpleCommit orig
+    Pass (JArray simplified)
 
 # Simplify full github json log but keep parent urls
 export def example5 (log: JValue): Result JValue Error =
     def simpleCommit commit =
         require Pass message =
-            single commit
-            | Pass
+            jq commit
             |> jField "commit"
             |> jField "message"
             | expectOne ".commit.message missing"
@@ -108,19 +100,17 @@ export def example5 (log: JValue): Result JValue Error =
             |> jField "parents"
             |> jFlatten
             |> jField "html_url"
-            |: makePass JArray
 
         def output = JObject (
             "message" :-> message,
             "name" :-> name,
-            "parents" :-> parents,
+            "parents" :-> JArray parents,
             Nil
         )
 
         Pass output
 
-    single log
-    | Pass
+    jq log
     |> jFlatten
     |: findFailFn simpleCommit
     | rmap JArray
@@ -135,24 +125,21 @@ export tuple Commit =
 export def example6 (log: JValue): Result (List Commit) Error =
     def simpleCommit commit =
         require Pass message =
-            single commit
-            | Pass
+            jq commit
             |> jField "commit"
             |> jField "message"
             |> jString
-            | expectOne ".commit.message was missing or not a string"
+            | expectOne "Commit message not found"
 
         require Pass name =
-            single commit
-            | Pass
+            jq commit
             |> jField "commit"
             |> jField "name"
             |> jString
-            | expectOne ".commit.name missing or not a string"
+            | expectOne "Commit author not found"
 
         require Pass parents =
-            single commit
-            | Pass
+            jq commit
             |> jField "parents"
             |> jFlatten
             |> jField "html_url"
@@ -163,17 +150,15 @@ export def example6 (log: JValue): Result (List Commit) Error =
         Pass output
 
     # This is a bit complicated IMO but not too bad
-    single log
-    | Pass
+    jq log
     |> jFlatten
     |: findFailFn simpleCommit
 
 # This is terrible, no one is going to do this
 export def example7 (json: JValue): Result (List JValue) Error =
-    single json
-    | Pass
+    jq json
     |> jField "instances"
-    |: (filter (_ | jField "instance_name" |: (jExists "testIndicator".JString | makePass) | getWhenFail False) | makePass)
+    |> getIf (jq _ |> jField "instance_name" |: jExists "testIndicator".JString)
 
 # It turns out, edit functions compose with `$` in the order you want
 # which is somehow surprising and obvious at the same time. Who knew?
