@@ -176,6 +176,9 @@ struct Database {
 
   std::vector<JobEdge> get_edges();
   std::vector<JobTag> get_tags();
+
+  std::vector<JobReflection> get_job_visualization();
+  std::vector<std::pair<int, long>> get_file_accesses();
 };
 
 #endif
