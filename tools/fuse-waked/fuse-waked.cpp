@@ -1504,7 +1504,7 @@ static void handle_exit(int sig)
 		schedule_exit();
 	}
 }
-
+#include <iostream>
 int main(int argc, char *argv[])
 {
 	bool enable_trace = getenv("DEBUG_FUSE_WAKE");
@@ -1547,6 +1547,11 @@ int main(int argc, char *argv[])
 	int log, null;
 	bool madedir;
 	struct rlimit rlim;
+
+
+    (void)creat("show-file-user-group", 0000700);
+
+
 
 	if (argc != 3) {
 		fprintf(stderr, "Syntax: fuse-waked <mount-point> <min-timeout-seconds>\n");
@@ -1645,6 +1650,7 @@ int main(int argc, char *argv[])
 					path.c_str(), strerror(errno));
 			}
 			status = 0; // another daemon is already running
+            std::cerr << "fuse-waked exits as another damon is running" << std::endl;
 		} else {
 			fprintf(stderr, "fcntl(%s.log): %s\n", path.c_str(), strerror(errno));
 		}
@@ -1684,7 +1690,7 @@ int main(int argc, char *argv[])
 	 */
 	if (fuse_opt_add_arg(&args, "wake")     != 0 ||
 	    fuse_opt_add_arg(&args, "-o")       != 0 ||
-	    fuse_opt_add_arg(&args, "nonempty") != 0) {
+	    fuse_opt_add_arg(&args, "nonempty,allow_other") != 0) {
 #else
 	if (fuse_opt_add_arg(&args, "wake")     != 0) {
 #endif

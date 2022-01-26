@@ -49,6 +49,7 @@ bool daemon_client::connect(std::vector<std::string> &visible) {
 	int ffd = -1;
 	int wait_ms = 10;
 	for (int retry = 0; (ffd = open(is_running_path.c_str(), O_RDONLY)) == -1 && retry < 12; ++retry) {
+        std::cerr << "daemon-client: " << is_running_path << " " << strerror(errno) << std::endl;
 		struct timespec delay;
 		delay.tv_sec = wait_ms / 1000;
 		delay.tv_nsec = (wait_ms % 1000) * INT64_C(1000000);
@@ -58,11 +59,13 @@ bool daemon_client::connect(std::vector<std::string> &visible) {
 			// The daemon should wait at least 4x as long to exit as we wait for it to start.
 			int exit_delay = 4 * delay.tv_sec;
 			if (exit_delay < 2) exit_delay = 2;
-			std::string delayStr = std::to_string(exit_delay);
+            std::string delayStr = std::to_string(exit_delay);
 			const char *env[3] = { "PATH=/usr/bin:/bin:/usr/sbin:/sbin", 0, 0 };
 			if (getenv("DEBUG_FUSE_WAKE")) env[1] = "DEBUG_FUSE_WAKE=1";
-			execle(executable.c_str(), "fuse-waked", mount_path.c_str(), delayStr.c_str(), nullptr, env);
-			std::cerr << "execl " << executable << ": " << strerror(errno) << std::endl;
+            std::string daemon_cmd = executable + " " + mount_path + " " + delayStr;
+			execle("/usr/bin/sg", "-", "matthewc", "-c", daemon_cmd.c_str(), nullptr, env);
+            //execle(executable.c_str(), "fuse-waked", mount_path.c_str(), delayStr.c_str(), nullptr, env);
+            //std::cerr << "execl " << executable << ": " << strerror(errno) << std::endl;
 			exit(1);
 		}
 
