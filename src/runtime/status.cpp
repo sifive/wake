@@ -64,16 +64,22 @@ static const char *sgr0;
 static int used = 0;
 static int ticks = 0;
 
+static bool missing_termfn(const char *s) {
+  return !s || s == (const char *)-1;
+}
+
+static const char *wrap_termfn(const char *s) {
+  if (missing_termfn(s)) return "";
+  return s;
+}
+
 const char *term_colour(int code)
 {
   static char setaf_lit[] = "setaf";
-  char *out;
   if (!sgr0) return "";
-  out = tigetstr(setaf_lit);
-  if (!out || out == (char*)-1) return "";
-  out = tparm(out, code);
-  if (!out || out == (char*)-1) return "";
-  return out;
+  char *format = tigetstr(setaf_lit);
+  if (missing_termfn(format)) return "";
+  return wrap_termfn(tparm(format, code));
 }
 
 const char *term_intensity(int code)
@@ -81,8 +87,8 @@ const char *term_intensity(int code)
   static char dim_lit[] = "dim";
   static char bold_lit[] = "bold";
   if (!sgr0) return "";
-  if (code == 1) return tigetstr(dim_lit);
-  if (code == 2) return tigetstr(bold_lit);
+  if (code == 1) return wrap_termfn(tigetstr(dim_lit));
+  if (code == 2) return wrap_termfn(tigetstr(bold_lit));
   return "";
 }
 
@@ -308,12 +314,12 @@ bool term_init(bool tty_)
     ed   = tigetstr(ed_lit);     // erase to bottom of display
     rows = tigetnum(lines_lit);
     cols = tigetnum(cols_lit);
-    if (!cuu1 || cuu1 == (char*)-1) tty = false;
-    if (!cr || cr == (char*)-1) tty = false;
-    if (!ed || ed == (char*)-1) tty = false;
+    if (missing_termfn(cuu1)) tty = false;
+    if (missing_termfn(cr)) tty = false;
+    if (missing_termfn(ed)) tty = false;
     if (cols < 0 || rows < 0) tty = false;
     sgr0 = tigetstr(sgr0_lit); // optional
-    if (sgr0 == (char*)-1) sgr0 = 0;
+    if (missing_termfn(sgr0)) sgr0 = nullptr;
   }
 
   return tty;
