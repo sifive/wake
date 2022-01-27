@@ -643,6 +643,7 @@ export def filter (f: a => Boolean): List a => List a =
                 sub
     loop
 
+# TODO: Make this use Result?
 # Applys `editFn` to every member of the List that satisfies
 # `selectFn`.
 #

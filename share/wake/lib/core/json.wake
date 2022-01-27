@@ -569,8 +569,10 @@ export def lastValueInList (values: List JValue): Result JValue Error =
 #   single json |> jField "name" |> jString = "Alice", Nil
 #   single json |> jField "age" |> jString = Nil
 # ```
-export def jString: JValue => Result (List String) Error = match _
-    JString s = single s | Pass
+export def jString (getFn: String => Result a Error): JValue => Result a Error = match _
+    JString s =
+        require Pass out = getFn s
+        Pass out
     _         = failWithError "not a string"
 
 # TODO: Fix this doc
@@ -610,11 +612,16 @@ export def editJString (editFn: String => Result String Error): (input: JValue) 
 #   single json |> jField "age" |> jInteger = 28, Nil
 #   single json |> jField "name" |> jInteger = Nil
 # ```
-export def jInteger: JValue => Result (List Integer) Error = match _
-    JInteger i = single i | Pass
+export def jInteger (getFn: Integer => Result a Error): JValue => Result a Error = match _
+    JInteger i =
+        require Pass out = getFn i
+        Pass out
     JDouble d =
         def Pair whole frac = dmodf d
-        if frac ==. 0.0 then single whole | Pass else failWithError "not an integer"
+        if frac ==. 0.0 then
+            require Pass out = getFn whole
+            Pass out
+        else failWithError "not an integer"
     _          = failWithError "not an integer"
 
 # TODO: Fix this doc
@@ -663,8 +670,10 @@ export def editJInteger (f: Integer => Result Integer Error): JValue => Result J
 #   single json |> jField "frysWithThat" |> jBoolean = True, Nil
 #   single json |> jField "name" |> jBoolean = Nil
 # ```
-export def jBoolean: JValue => Result (List Boolean) Error = match _
-    JBoolean b = single b | Pass
+export def jBoolean (getFn: Boolean => Result a Error): JValue => Result a Error = match _
+    JBoolean b =
+        require Pass out = getFn b
+        Pass out
     _          = failWithError "not a boolean"
 
 # TODO: Update documentation
@@ -706,8 +715,10 @@ export def editJBoolean (f: Boolean => Result Boolean Error): JValue => Result J
 #   single json |> jField "height" |> jDouble = 1.75, Nil
 #   single json |> jField "name" |> jDouble = Nil
 # ```
-export def jDouble: JValue => Result (List Double) Error = match _
-    JDouble d  = single d | Pass
+export def jDouble (getFn: Double => Result a Error): JValue => Result a Error = match _
+    JDouble d  =
+        require Pass out = getFn d
+        Pass out
     JInteger i =
         dint i
         | getOrElse (if i < 0 then -.inf else inf)
@@ -960,5 +971,3 @@ export def jExists (v: JValue): (input: List JValue) => Result Boolean Error = e
 #   jForall v Nil = True
 # ```
 export def jForall (v: JValue): (input: List JValue) => Result Boolean Error = forall (_==/v) _ | Pass
-
-def jq x = Pass (x, Nil)
