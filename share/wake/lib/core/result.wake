@@ -233,7 +233,3 @@ export def editIf (selectFn: a => Boolean) (editFn: a => Result a Error) (input:
 
 export def makePass (editFn: a => b): a => Result b Error =
     _ | editFn | Pass
-
-export def (x: Result a b) |: (f: a => Result c b): Result c b =
-    require Pass input = x
-    f input

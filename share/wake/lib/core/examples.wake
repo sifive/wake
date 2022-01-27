@@ -14,34 +14,37 @@
 # limitations under the License.
 package wake
 
-def expectOne (msg: String) (result: Result (List a) Error): Result a Error = match result
-    Fail err      = addErrorContext msg (Fail err)
-    Pass (x, Nil)  = Pass x
-    Pass otherwise = failWithError "{msg}: expected 1, got {len otherwise | str}"
+#def expectOne (msg: String) (result: Result (List a) Error): Result a Error = match result
+#    Fail err      = addErrorContext msg (Fail err)
+#    Pass (x, Nil)  = Pass x
+#    Pass otherwise = failWithError "{msg}: expected 1, got {len otherwise | str}"
 
 # Ported from the jq tutorial
 export def example1 (j: JValue): Result JValue Error = Pass j
-export def example2 (j: JValue): Result JValue Error =
-    j | jAt 0 | expectOne ""
+export def example2: JValue => Result JValue Error =
+    jAt 0 $ Pass
+
+def x :| f = f x
+def singlePass x = single x | Pass
 
 # Simplify github json first commit
 export def example3 (log: JValue): Result JValue Error =
-    require Pass commit =
-        jq log
-        |> jAt 0
-        | expectOne "Head of log not found"
+    # Fine
+    require Pass commit = jAt 0 Pass log
 
+    # I didn't find a nice way to use jField or jField2.
+    # We lack sufficent support for getters on Lists to use those
     require Pass message =
-        jq commit
-        |> jField "commit"
-        |> jField "message"
-        | expectOne "commit message not found"
+        commit
+        :| jField3 "commit"
+        $  jField3 "message"
+        $  Pass
 
     require Pass name =
-        jq commit
-        |> jField "commit"
-        |> jField "name"
-        | expectOne "commit author not found"
+        commit
+        :| jField3 "commit"
+        $  jField3 "name"
+        $  Pass
 
     def output = JObject (
         "message" :-> message,
@@ -54,17 +57,18 @@ export def example3 (log: JValue): Result JValue Error =
 # Simplify full github json log
 export def example4 (log: JValue): Result JValue Error =
     def simpleCommit commit =
+        # These look preety awesome to me except for the :| operator
         require Pass message =
-            jq commit
-            |> jField "commit"
-            |> jField "message"
-            | expectOne ".commit.message missing"
+           commit
+           :| jField3 "commit"
+           $  jField3 "message"
+           $  Pass
 
         require Pass name =
-            jq commit
-            |> jField "commit"
-            |> jField "name"
-            | expectOne ".commit.name missing"
+            commit
+            :| jField3 "commit"
+            $  jField3 "name"
+            $  Pass
 
         def output = JObject (
             "message" :-> message,
@@ -74,7 +78,7 @@ export def example4 (log: JValue): Result JValue Error =
 
         Pass output
 
-    require Pass orig = jq log |> jFlatten
+    require Pass orig = jMap Pass log
     require Pass simplified = findFailFn simpleCommit orig
     Pass (JArray simplified)
 
@@ -82,24 +86,25 @@ export def example4 (log: JValue): Result JValue Error =
 export def example5 (log: JValue): Result JValue Error =
     def simpleCommit commit =
         require Pass message =
-            jq commit
-            |> jField "commit"
-            |> jField "message"
-            | expectOne ".commit.message missing"
+           commit
+           :| jField3 "commit"
+           $  jField3 "message"
+           $  Pass
 
         require Pass name =
-            single commit
-            | Pass
-            |> jField "commit"
-            |> jField "name"
-            | expectOne ".commit.name missing"
+            commit
+            :| jField3 "commit"
+            $  jField3 "name"
+            $  Pass
 
+        # I'm honestly kinda baffled at how clean this looks...but omg
+        # don't make a mistake lol, the types are a nightmare.
         require Pass parents =
-            single commit
-            | Pass
-            |> jField "parents"
-            |> jFlatten
-            |> jField "html_url"
+            commit
+            :| jField3 "parents"
+            $  jMap
+            $  jField3 "html_url"
+            $  Pass
 
         def output = JObject (
             "message" :-> message,
@@ -110,10 +115,9 @@ export def example5 (log: JValue): Result JValue Error =
 
         Pass output
 
-    jq log
-    |> jFlatten
-    |: findFailFn simpleCommit
-    | rmap JArray
+    require Pass orig = jMap Pass log
+    require Pass simplified = findFailFn simpleCommit orig
+    Pass (JArray simplified)
 
 # Convert a git log to a simplified wake tuple
 export tuple Commit =
@@ -125,40 +129,40 @@ export tuple Commit =
 export def example6 (log: JValue): Result (List Commit) Error =
     def simpleCommit commit =
         require Pass message =
-            jq commit
-            |> jField "commit"
-            |> jField "message"
-            |> jString
-            | expectOne "Commit message not found"
+           commit
+           :| jField3 "commit"
+           $  jField3 "message"
+           $  jString
+           $  Pass
 
         require Pass name =
-            jq commit
-            |> jField "commit"
-            |> jField "name"
-            |> jString
-            | expectOne "Commit author not found"
+            commit
+            :| jField3 "commit"
+            $  jField3 "name"
+            $  jString
+            $  Pass
 
         require Pass parents =
-            jq commit
-            |> jField "parents"
-            |> jFlatten
-            |> jField "html_url"
-            |> jString
+            commit
+            :| jField3 "parents"
+            $  jMap
+            $  jField3 "html_url"
+            $  jString
+            $  Pass
 
         def output = Commit message name parents
 
         Pass output
 
-    # This is a bit complicated IMO but not too bad
-    jq log
-    |> jFlatten
-    |: findFailFn simpleCommit
+    jMap simpleCommit log
 
 # This is terrible, no one is going to do this
 export def example7 (json: JValue): Result (List JValue) Error =
-    jq json
-    |> jField "instances"
-    |> getIf (jq _ |> jField "instance_name" |: jExists "testIndicator".JString)
+    json
+    :| jField3 "instances"
+    $  jFlatten
+    $  getIf (jField3 "instance_name" $ jExists "testIndicator".JString) Nil
+    $  singlePass
 
 # It turns out, edit functions compose with `$` in the order you want
 # which is somehow surprising and obvious at the same time. Who knew?
