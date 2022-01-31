@@ -233,3 +233,6 @@ export def editIf (selectFn: a => Boolean) (editFn: a => Result a Error) (input:
 
 export def makePass (editFn: a => b): a => Result b Error =
     _ | editFn | Pass
+
+export def getSinglePass = getSingle $ Pass
+

@@ -845,7 +845,7 @@ export def jMap (getFn: JValue => Result a Error): (input: JValue) => Result (Li
 
 export def jFlatten (getFn: JValue => Result (List a) Error): (input: JValue) => Result (List a) Error =
   # TOOD: The error should tell you where the failure occured
-  jArray $ getFlatten $ getFn
+  jArray $ getFlat $ getFn
 
 # TODO: Add docs
 export def editJFlatten: (JValue => Result JValue Error) => JValue => Result JValue Error =
@@ -885,21 +885,7 @@ export def editJAt (i: Integer) (editFn: JValue => Result JValue Error): (input:
 #   single person |> jField "age" = JInteger 28, Nil
 #   single (JInteger 10) |> jAt 2 = Nil
 # ```
-export def jField (field: String) (getFn: JValue => Result a Error): JValue => Result (List a) Error = match _
-    JObject pairs =
-        match (lookup (_==~field) pairs)
-            Nil    = failWithError "key \"{field}\" not found"
-            values = map getFn values | findFail
-    _             = failWithError "not an object"
-
-export def jField2 (field: String) (getFn: JValue => Result (List a) Error): JValue => Result (List a) Error = match _
-    JObject pairs =
-        match (lookup (_==~field) pairs)
-            Nil    = failWithError "key \"{field}\" not found"
-            values = map getFn values | findFail | rmap flatten
-    _             = failWithError "not an object"
-
-export def jField3 (field: String) (getFn: JValue => Result a Error): JValue => Result a Error = match _
+export def jField (field: String) (getFn: JValue => Result a Error): JValue => Result a Error = match _
     JObject pairs =
         match (lookup (_==~field) pairs)
             Nil    = failWithError "key \"{field}\" not found"
@@ -930,10 +916,10 @@ export def editJField (field: String) (editFn: JValue => Result JValue Error) (i
 #   single person |> jField "age" = JInteger 28, Nil
 #   single (JInteger 10) |> jAt 2 = Nil
 # ```
-export def jFieldMatch (field: RegExp) (getFn: JValue => Result a Error): (input: JValue) => Result (List a) Error = match _
+export def jFieldMatch (field: RegExp) (getFn: JValue => Result (List a) Error): (input: JValue) => Result (List a) Error = match _
     JObject pairs = match (lookup (matches field) pairs)
         Nil    = failWithError "no keys matching `{regExpToString field}` found"
-        values = map getFn values | findFail
+        values = map getFn values | findFail | rmap flatten
     _             = failWithError "not an object"
 
 export def editJFieldMatch (field: RegExp): (JValue => Result JValue Error) => JValue => Result JValue Error =

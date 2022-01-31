@@ -20,7 +20,7 @@ package wake
 # Flip function and argument order.
 # fn obj.getXYZ = fn (getXYZ obj)
 export def (argument: a) . (memberFn: a => b): b =
-    memberFn argument 
+    memberFn argument
 
 # Flip function and argument order.
 # seq 10 | map str | catWith " " = catWith " " (map str (seq 10))
@@ -31,6 +31,9 @@ export def (argument: a) | (pipeFn: a => b): b =
 # catWith " " $ map str $ seq 10 = catWith " " (map str (seq 10))
 export def (dollarFn: a => b) $ (argument: a): b =
     dollarFn argument
+
+export def (getFn: a => b) =: (toGet: a): b =
+    getFn toGet
 
 # The ring operator is used to denote the composition of functions.
 # (f ∘ g) x = f (g x)

@@ -22,10 +22,7 @@ package wake
 # Ported from the jq tutorial
 export def example1 (j: JValue): Result JValue Error = Pass j
 export def example2: JValue => Result JValue Error =
-    jAt 0 $ Pass
-
-def x :| f = f x
-def singlePass x = single x | Pass
+    jAt 0 =: Pass
 
 # Simplify github json first commit
 export def example3 (log: JValue): Result JValue Error =
@@ -36,15 +33,22 @@ export def example3 (log: JValue): Result JValue Error =
     # We lack sufficent support for getters on Lists to use those
     require Pass message =
         commit
-        :| jField3 "commit"
-        $  jField3 "message"
-        $  Pass
+        |  jFieldMatch `commit`
+        =: jFieldMatch `message`
+        =: getSinglePass
+
+    require message, other = message else failWithError "Expected at least one commit message"
+    require Nil = other else failWithError "Did not expect mulltiple messages in commit"
 
     require Pass name =
         commit
-        :| jField3 "commit"
-        $  jField3 "name"
-        $  Pass
+        |  jFieldMatch `commit`
+        =: jFieldMatch `author`
+        =: jFieldMatch `name`
+        =: getSinglePass
+
+    require name, other = name else failWithError "Expected at least one commit name"
+    require Nil = other else failWithError "Did not expect multiple commit names"
 
     def output = JObject (
         "message" :-> message,
@@ -60,15 +64,15 @@ export def example4 (log: JValue): Result JValue Error =
         # These look preety awesome to me except for the :| operator
         require Pass message =
            commit
-           :| jField3 "commit"
-           $  jField3 "message"
-           $  Pass
+           |  jField "commit"
+           =: jField "message"
+           =: Pass
 
         require Pass name =
             commit
-            :| jField3 "commit"
-            $  jField3 "name"
-            $  Pass
+            |  jField "commit"
+            =: jField "name"
+            =: Pass
 
         def output = JObject (
             "message" :-> message,
@@ -87,24 +91,24 @@ export def example5 (log: JValue): Result JValue Error =
     def simpleCommit commit =
         require Pass message =
            commit
-           :| jField3 "commit"
-           $  jField3 "message"
-           $  Pass
+           |  jField "commit"
+           =: jField "message"
+           =: Pass
 
         require Pass name =
             commit
-            :| jField3 "commit"
-            $  jField3 "name"
-            $  Pass
+            |  jField "commit"
+            =: jField "name"
+            =: Pass
 
         # I'm honestly kinda baffled at how clean this looks...but omg
         # don't make a mistake lol, the types are a nightmare.
         require Pass parents =
             commit
-            :| jField3 "parents"
-            $  jMap
-            $  jField3 "html_url"
-            $  Pass
+            |  jField "parents"
+            =: jMap
+            =: jField "html_url"
+            =: Pass
 
         def output = JObject (
             "message" :-> message,
@@ -130,25 +134,25 @@ export def example6 (log: JValue): Result (List Commit) Error =
     def simpleCommit commit =
         require Pass message =
            commit
-           :| jField3 "commit"
-           $  jField3 "message"
-           $  jString
-           $  Pass
+           |  jField "commit"
+           =: jField "message"
+           =: jString
+           =: Pass
 
         require Pass name =
             commit
-            :| jField3 "commit"
-            $  jField3 "name"
-            $  jString
-            $  Pass
+            |  jField "commit"
+            =: jField "name"
+            =: jString
+            =: Pass
 
         require Pass parents =
             commit
-            :| jField3 "parents"
-            $  jMap
-            $  jField3 "html_url"
-            $  jString
-            $  Pass
+            |  jField "parents"
+            =: jMap
+            =: jField "html_url"
+            =: jString
+            =: Pass
 
         def output = Commit message name parents
 
@@ -159,22 +163,20 @@ export def example6 (log: JValue): Result (List Commit) Error =
 # This is terrible, no one is going to do this
 export def example7 (json: JValue): Result (List JValue) Error =
     json
-    :| jField3 "instances"
-    $  jFlatten
-    $  getIf (jField3 "instance_name" $ jExists "testIndicator".JString) Nil
-    $  singlePass
+    |  jField "instances"
+    =: jFlatten
+    =: getIf (jField "instance_name" =: jExists "testIndicator".JString) Nil
+    =: getSinglePass
 
-# It turns out, edit functions compose with `$` in the order you want
-# which is somehow surprising and obvious at the same time. Who knew?
 export def exampleEdit1: Pair Integer b => Pair Integer b =
-    editPairFirst $ (_+4)
+    editPairFirst =: (_+4)
 
 export def exampleEdit2: Triple (Pair a Integer) b c => Triple (Pair a Integer) b c =
-    editTripleFirst $ editPairSecond $ (_+4)
+    editTripleFirst =: editPairSecond =: (_+4)
 
 export def exampleEdit3: JValue => Result JValue Error =
     editJField "hello"
-    $ editJField "bar"
-    $ editJString
-    $ makePass
-    $ ("zzz{_}zzz")
+    =: editJField "bar"
+    =: editJString
+    =: makePass
+    =: ("zzz{_}zzz")

@@ -949,10 +949,16 @@ export def editLookupFindFail (selectFn: a => Boolean) (editFn: b => Result b Er
       require Pass elist = result
       Pass elist
 
-export def getFlatten (getFn: a => Result (List b) Error) (input: List a): Result (List b) Error =
+export def getFlat (getFn: a => Result (List b) Error) (input: List a): Result (List b) Error =
    require Pass partialList = map getFn input | findFail
    partialList | flatten | Pass
 
 export def getIf (selectFn: a => Result Boolean Error) (elseValue: b) (getFn: a => Result b Error) (input: a): Result b Error =
     require Pass shouldSelect = selectFn input
     if shouldSelect then getFn input else Pass elseValue
+
+export def getFlatten (getFn: a => Result (List (List b)) Error): (input: a) => Result (List b) Error =
+    getFn _ | rmap flatten
+
+export def getSingle (getFn: a => Result b Error): (input: a) => Result (List b) Error =
+    getFn _ | rmap single
