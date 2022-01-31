@@ -168,11 +168,11 @@ export def example7 (json: JValue): Result (List JValue) Error =
     =: getFilter (jField "instance_name" =: jExists "testIndicator".JString)
     =: getSinglePass
 
-export def exampleEdit1: Pair Integer b => Pair Integer b =
-    editPairFirst =: (_+4)
+export def exampleEdit1 (toEdit: Pair Integer b): Pair Integer b =
+    toEdit | editPairFirst =: (_+4)
 
-export def exampleEdit2: Triple (Pair a Integer) b c => Triple (Pair a Integer) b c =
-    editTripleFirst =: editPairSecond =: (_+4)
+export def exampleEdit2 (toEdit: Triple (Pair a Integer) b c): Triple (Pair a Integer) b c =
+    toEdit | editTripleFirst =: editPairSecond =: (_+4)
 
 export def exampleEdit3: JValue => Result JValue Error =
     editJField "hello"
