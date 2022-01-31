@@ -165,7 +165,7 @@ export def example7 (json: JValue): Result (List JValue) Error =
     json
     |  jField "instances"
     =: jFlatten
-    =: getIf (jField "instance_name" =: jExists "testIndicator".JString) Nil
+    =: getFilter (jField "instance_name" =: jExists "testIndicator".JString)
     =: getSinglePass
 
 export def exampleEdit1: Pair Integer b => Pair Integer b =
