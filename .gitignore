@@ -1,7 +1,8 @@
 manifest.wake
 *.o
 /.build
-/.fuse*
+/.fuse
+/.fuse.log
 /.vscode/*.log
 /**/wake.db
 /wake.db

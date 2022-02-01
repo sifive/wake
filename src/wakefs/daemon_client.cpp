@@ -31,20 +31,12 @@
 #include <sstream>
 
 #include "util/execpath.h"
-#include "util/mkdir_parents.h"
 #include "json/json5.h"
 #include "fuse.h"
 
-// The user-id and group-id are used so that fuse daemons with different uid:gid pairs
-// running within the same build can co-exist without trying to share. The kernel
-// prevents cross-user sharing when the 'allow_other' fuse mount option is not used.
-const std::string mount_path_id(const std::string& base_dir) {
-    return base_dir + "/.fuse/" + std::to_string(getuid()) + "." + std::to_string(getgid());
-}
-
 daemon_client::daemon_client(const std::string &base_dir)
    :	executable(find_execpath() + "/../lib/wake/fuse-waked"),
-	mount_path(mount_path_id(base_dir)),
+	mount_path(base_dir + "/.fuse"),
 	mount_subdir(mount_path + "/" + std::to_string(getpid())),
 	output_path(mount_path + "/.o." + std::to_string(getpid())),
 	is_running_path(mount_path + "/.f.fuse-waked"),
@@ -54,12 +46,6 @@ daemon_client::daemon_client(const std::string &base_dir)
 
 // The arg 'visible' is destroyed/moved in the interest of performance with large visible lists.
 bool daemon_client::connect(std::vector<std::string> &visible) {
-	int err = mkdir_with_parents(mount_path, 0775);
-	if (0 != err) {
-		std::cerr << "mkdir_with_parents ('" << mount_path << "'):" << strerror(err) << std::endl;
-		return false;
-	}
-
 	int ffd = -1;
 	int wait_ms = 10;
 	for (int retry = 0; (ffd = open(is_running_path.c_str(), O_RDONLY)) == -1 && retry < 12; ++retry) {
