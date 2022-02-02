@@ -124,23 +124,23 @@ jobs:
           paths:
             - release/centos_7_6
 
-  centos_8_3:
+  rocky_8:
     machine:
       image: ubuntu-1604:202007-01
     steps:
       - attach_workspace:
           at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/centos-8.3 -t wake-centos-8.3 .
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/rocky-8 -t wake-rocky-8 .
       - run: |
           cp /tmp/workspace/wake_*.tar.xz . && \
           cp -a /tmp/workspace/tests . && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-centos-8.3 rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-centos-8.3 /bin/sh -c "rpm -i x86_64/*.rpm && cd tests && wake runTests" && \
-          install -D -t release/centos_8_3 x86_64/*.rpm
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-rocky-8 rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-rocky-8 /bin/sh -c "rpm -i x86_64/*.rpm && cd tests && wake runTests" && \
+          install -D -t release/rocky_8 x86_64/*.rpm
       - persist_to_workspace:
           root: .
           paths:
-            - release/centos_8_3
+            - release/rocky_8
 
   ubuntu_14_04:
     machine:
@@ -255,7 +255,7 @@ workflows:
       - centos_7_6:
           requires:
             - tarball
-      - centos_8_3:
+      - rocky_8:
           requires:
             - tarball
       - ubuntu_14_04:
@@ -276,7 +276,7 @@ workflows:
             - debian_bullseye
             - debian_jessie  # Oldest supported compiler
             - centos_7_6
-            - centos_8_3
+            - rocky_8
             - ubuntu_14_04   # LTS
             - ubuntu_16_04   # LTS
             - ubuntu_18_04   # LTS
