@@ -214,7 +214,7 @@ void write_html(std::ostream &os) {
           "</html>\n";
 }
 
-void create_build_visualization(Database &db) {
+void create_build_visualization(Database &db, std::string output_file) {
     std::vector<JobReflection> jobs = db.get_job_visualization();
     std::map<long, JobNode> job_map;
     for (JobReflection &job: jobs) {
@@ -237,6 +237,6 @@ void create_build_visualization(Database &db) {
     write_critical_arrows(critical_path, std::cout);
     write_all_arrows(job_map, critical_path.size(), std::cout);
 
-    freopen((find_execpath() + "/../share/wake/html/build_visualization.html").c_str(), "w", stdout);
+    freopen((find_execpath() + "/" + output_file).c_str(), "w", stdout);
     write_html(std::cout);
 }

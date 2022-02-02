@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
     { 'g', "globals",               GOPT_ARGUMENT_FORBIDDEN },
     { 'e', "exports",               GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "build-visualization",   GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "build-visualization",   GOPT_ARGUMENT_REQUIRED },
     { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-parse",      GOPT_ARGUMENT_FORBIDDEN },
@@ -238,6 +238,7 @@ int main(int argc, char **argv) {
   const char *fd3     = arg(options, "fd:3")->argument;
   const char *fd4     = arg(options, "fd:4")->argument;
   const char *fd5     = arg(options, "fd:5")->argument;
+  const char *build_vis_file = arg(options, "build-visualization")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -389,7 +390,7 @@ int main(int argc, char **argv) {
   }
 
     if (build_vis) {
-        create_build_visualization(db);
+        create_build_visualization(db, build_vis_file);
         return 0;
     }
 
