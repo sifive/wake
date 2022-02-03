@@ -2,6 +2,12 @@ wake (@VERSION@-1) unstable; urgency=medium
 
   * Auto-generated release package.
 
+ -- Matthew Conolly <matthew.conolly@sifive.com>  Wed, 02 Feb 2022 16:32:50 -0800
+
+wake (0.25.0-1) unstable; urgency=medium
+
+  * Auto-generated release package.
+
  -- Sam May <sam.may@sifive.com>  Thu, 20 Jan 2022 12:59:56 -0800
 
 wake (0.24.0-1) unstable; urgency=medium
