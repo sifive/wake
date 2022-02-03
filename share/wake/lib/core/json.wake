@@ -35,9 +35,9 @@ export def getJInteger: JValue => Option Integer = match _
   _                        = None
 export def getJDouble: JValue => Option Double = match _
   JDouble x               = Some x
-  JInteger x              = dint x
+  JInteger x              = Some (dint x)
   JArray (JDouble x, Nil) = Some x
-  JArray (JInteger x, Nil)= dint x
+  JArray (JInteger x, Nil)= Some (dint x)
   _                       = None
 export def getJBoolean: JValue => Option Boolean = match _
   JBoolean x               = Some x

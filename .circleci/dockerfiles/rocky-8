@@ -1,4 +1,4 @@
-FROM centos:8.3.2011
+FROM rockylinux/rockylinux:8
 
 RUN echo fastestmirror=1 >> /etc/dnf/dnf.conf
 RUN dnf clean all
