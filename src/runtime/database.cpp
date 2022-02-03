@@ -371,10 +371,10 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   const char *sql_get_job_visualization =
     "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from  jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
-    " where instr(j.commandline, '<source>') <= 0"
-    " and instr(j.commandline, '<mkdir>') <= 0"
-    " and instr(j.commandline, '<write>') <= 0"
-    " and instr(j.commandline, '<hash>') <= 0";
+    " where substr(cast(j.commandline as varchar), 1, 8) != '<source>'"
+    " and substr(cast(j.commandline as varchar), 1, 7) != '<mkdir>'"
+    " and substr(cast(j.commandline as varchar), 1, 7) != '<write>'"
+    " and substr(cast(j.commandline as varchar), 1, 6) != '<hash>'";
   const char *sql_get_file_access =
     "select access, job_id"
     " from filetree"
@@ -1015,6 +1015,10 @@ static std::string format_time(int64_t ns) {
   return buf;
 }
 
+std::string Time::asString() const {
+    return format_time(t);
+}
+
 static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
   const char *why = "Could not describe job";
   JobReflection desc;
@@ -1026,8 +1030,8 @@ static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
   desc.environment    = chop_null(rip_column(query, 4));
   desc.stack          = rip_column(query, 5);
   desc.stdin_file     = rip_column(query, 6);
-  desc.starttime      = format_time(sqlite3_column_int64(query, 7));
-  desc.endtime        = format_time(sqlite3_column_int64(query, 8));
+  desc.starttime      = Time(sqlite3_column_int64(query, 7));
+  desc.endtime        = Time(sqlite3_column_int64(query, 8));
   desc.stale          = sqlite3_column_int64 (query, 9) != 0;
   desc.wake_start     = format_time(sqlite3_column_int64(query, 10));
   desc.wake_cmdline   = rip_column(query, 11);
@@ -1090,38 +1094,18 @@ static std::vector<JobReflection> find_all(Database *db, sqlite3_stmt *query, bo
   return out;
 }
 
-static std::vector<JobReflection> get_all_jobs_visualization(Database *db, sqlite3_stmt *query) {
-    const char *why = "Could not get job visualization";
-    std::vector<JobReflection> out;
-
-    db->begin_txn();
-    while (sqlite3_step(query) == SQLITE_ROW) {
-        JobReflection reflection = find_one(db, query, true);
-        reflection.starttime = std::to_string(sqlite3_column_int64(query, 7));
-        reflection.endtime = std::to_string(sqlite3_column_int64(query, 8));
-        out.emplace_back(std::move(reflection));
-    }
-    finish_stmt(why, query, db->imp->debugdb);
-    db->end_txn();
-
-    return out;
-}
-
-static std::pair<int, long> get_one_file_access(Database *db, sqlite3_stmt *query) {
-    std::pair<int, long> access;
-    // grab flat values
-    access.first = sqlite3_column_int(query, 0);
-    access.second = sqlite3_column_int64(query, 1);
-    return access;
-}
-
 static std::vector<std::pair<int, long>> get_all_file_accesses(Database *db, sqlite3_stmt *query) {
     const char *why = "Could not get file access";
     std::vector<std::pair<int, long>> out;
 
     db->begin_txn();
-    while (sqlite3_step(query) == SQLITE_ROW)
-        out.emplace_back(get_one_file_access(db, query));
+    while (sqlite3_step(query) == SQLITE_ROW) {
+        std::pair<int, long> access;
+        // grab flat values
+        access.first = sqlite3_column_int(query, 0);
+        access.second = sqlite3_column_int64(query, 1);
+        out.emplace_back(access);
+    }
     finish_stmt(why, query, db->imp->debugdb);
     db->end_txn();
 
@@ -1174,7 +1158,7 @@ std::vector<JobTag> Database::get_tags() {
 }
 
 std::vector<JobReflection> Database::get_job_visualization() {
-    return get_all_jobs_visualization(this, imp->get_job_visualization);
+    return find_all(this, imp->get_job_visualization, true);
 }
 
 std::vector<std::pair<int, long>> Database::get_file_accesses() {

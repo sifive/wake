@@ -49,6 +49,14 @@ struct JobTag {
    : job(job_), uri(std::move(uri_)), content(std::move(content_)) { }
 };
 
+struct Time {
+    int64_t t;
+    Time() :t(0) {}
+    explicit Time(int64_t _t) : t(_t) {}
+    int64_t asInt64() const {return t;}
+    std::string asString() const;
+};
+
 struct JobReflection {
   long job;
   bool stale;
@@ -58,8 +66,8 @@ struct JobReflection {
   std::vector<std::string> environment;
   std::string stack;
   std::string stdin_file;
-  std::string starttime;
-  std::string endtime;
+  Time starttime;
+  Time endtime;
   std::string wake_start;
   std::string wake_cmdline;
   std::string stdout_payload;

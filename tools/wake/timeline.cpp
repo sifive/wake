@@ -39,8 +39,10 @@ struct JobNode {
     bool transitive_reduction_visited = false;
 
     explicit JobNode(JobReflection &_job) : job(_job) {
-        starttime = std::stoll(_job.starttime.substr(0, _job.starttime.length() - 6));
-        endtime = std::stoll(_job.endtime.substr(0, _job.endtime.length() - 6));
+        std::string start_str = std::to_string(_job.starttime.asInt64());
+        std::string end_str = std::to_string(_job.endtime.asInt64());
+        starttime = std::stoll(start_str.substr(0, start_str.length() - 6));
+        endtime = std::stoll(end_str.substr(0, end_str.length() - 6));
     }
 };
 
