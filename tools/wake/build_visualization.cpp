@@ -195,18 +195,22 @@ void write_all_arrows(std::map<long, JobNode> &job_map, size_t critical_path_siz
     os << "];\n\n";
 }
 
-void write_html(std::ostream &os) {
+void write_html(std::ostream &os, std::map<long, JobNode> &job_map, std::vector<long> &critical_path) {
     std::ifstream html_template(find_execpath() + "/../share/wake/html/vis_template.html");
-    std::ifstream data(find_execpath() + "/../share/wake/html/vis_data.js");
     std::ifstream arrow(find_execpath() + "/../share/wake/html/vis_arrow.js");
     std::ifstream main(find_execpath() + "/../share/wake/html/vis_main.js");
     os << html_template.rdbuf();
+
     os << "<script type=\"text/javascript\">" << std::endl;
-    os << data.rdbuf();
+    write_jobs(job_map, os);
+    write_critical_arrows(critical_path, os);
+    write_all_arrows(job_map, critical_path.size(), os);
     os << "</script>" << std::endl;
+
     os << "<script type=\"text/javascript\">" << std::endl;
     os << arrow.rdbuf();
     os << "</script>" << std::endl;
+
     os << "<script type=\"module\">" << std::endl;
     os << main.rdbuf();
     os << "</script>\n"
@@ -214,7 +218,7 @@ void write_html(std::ostream &os) {
           "</html>\n";
 }
 
-void create_build_visualization(Database &db, std::string output_file) {
+void create_timeline(Database &db) {
     std::vector<JobReflection> jobs = db.get_job_visualization();
     std::map<long, JobNode> job_map;
     for (JobReflection &job: jobs) {
@@ -232,11 +236,5 @@ void create_build_visualization(Database &db, std::string output_file) {
     std::vector<long> critical_path;
     find_critical_path(job_map, critical_path);
 
-    freopen((find_execpath() + "/../share/wake/html/vis_data.js").c_str(), "w", stdout);
-    write_jobs(job_map, std::cout);
-    write_critical_arrows(critical_path, std::cout);
-    write_all_arrows(job_map, critical_path.size(), std::cout);
-
-    freopen((find_execpath() + "/" + output_file).c_str(), "w", stdout);
-    write_html(std::cout);
+    write_html(std::cout, job_map, critical_path);
 }

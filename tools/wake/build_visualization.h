@@ -19,6 +19,6 @@
 
 #include "runtime/database.h"
 
-void create_build_visualization(Database &db, std::string);
+void create_timeline(Database &db);
 
 #endif
