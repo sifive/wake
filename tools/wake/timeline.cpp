@@ -1,4 +1,4 @@
-/* Copyright 2019 SiFive, Inc.
+/* Copyright 2022 SiFive, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 #include <map>
 #include <fstream>
 
-#include "build_visualization.h"
+#include "timeline.h"
 #include "runtime/database.h"
 #include "util/execpath.h"
 
@@ -196,9 +196,9 @@ void write_all_arrows(std::map<long, JobNode> &job_map, size_t critical_path_siz
 }
 
 void write_html(std::ostream &os, std::map<long, JobNode> &job_map, std::vector<long> &critical_path) {
-    std::ifstream html_template(find_execpath() + "/../share/wake/html/vis_template.html");
-    std::ifstream arrow(find_execpath() + "/../share/wake/html/vis_arrow.js");
-    std::ifstream main(find_execpath() + "/../share/wake/html/vis_main.js");
+    std::ifstream html_template(find_execpath() + "/../share/wake/html/timeline_template.html");
+    std::ifstream arrow(find_execpath() + "/../share/wake/html/timeline_arrow.js");
+    std::ifstream main(find_execpath() + "/../share/wake/html/timeline_main.js");
     os << html_template.rdbuf();
 
     os << "<script type=\"text/javascript\">" << std::endl;

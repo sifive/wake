@@ -1,4 +1,4 @@
-/* Copyright 2019 SiFive, Inc.
+/* Copyright 2022 SiFive, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef WAKE_BUILD_VISUALIZATION_H
-#define WAKE_BUILD_VISUALIZATION_H
+#ifndef WAKE_TIMELINE_H
+#define WAKE_TIMELINE_H
 
 #include "runtime/database.h"
 

@@ -55,7 +55,7 @@
 #include "runtime/prim.h"
 #include "markup.h"
 #include "describe.h"
-#include "build_visualization.h"
+#include "timeline.h"
 
 #ifndef VERSION
 #include "version.h"
