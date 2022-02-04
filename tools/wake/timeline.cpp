@@ -25,22 +25,27 @@
 
 struct JobNode {
     JobReflection &job;
-    long parent_id = -1;
+    int64_t starttime;
+    int64_t endtime;
+
     std::vector<long> dependencies;
 
-    long long starttime;
-    long long endtime;
+    // Hypothetical times are the times the jobs would have started and ended if:
+    // every job without dependencies started at 0;
+    // every job with dependencies started as soon as its last dependency ended.
+    // The critical path therefore ends with the job with the greatest hypothetical endtime.
+    int64_t hypothetical_starttime = 0;
+    int64_t hypothetical_endtime = -1;
 
-    long long hypothetical_starttime = 0;
-    long long hypothetical_endtime = -1;
+    long parent_id = -1; // last dependency (has the greatest hypothetical endtime)
 
     bool top_sort_visited = false;
     bool is_on_critical_path = false;
     bool transitive_reduction_visited = false;
 
     explicit JobNode(JobReflection &_job) : job(_job) {
-        std::string start_str = std::to_string(_job.starttime.asInt64());
-        std::string end_str = std::to_string(_job.endtime.asInt64());
+        std::string start_str = std::to_string(_job.starttime.as_int64());
+        std::string end_str = std::to_string(_job.endtime.as_int64());
         starttime = std::stoll(start_str.substr(0, start_str.length() - 6));
         endtime = std::stoll(end_str.substr(0, end_str.length() - 6));
     }
@@ -69,17 +74,17 @@ void top_sort(std::map<long, JobNode> &job_map, std::vector<long> &top_sorted_jo
     }
 }
 
-long fill_one_dependency(std::pair<int, long> access, long dependency, std::map<long, JobNode> &job_map) {
-    if (access.first == 2) {
-        return access.second;
+long fill_one_dependency(FileAccess access, long dependency, std::map<long, JobNode> &job_map) {
+    if (access.type == 2) { // The job that output a file is a dependency of jobs that see the file.
+        return access.job; // return new dependency
     }
-    if (job_map.find(access.second) != job_map.end()) {
-        job_map.at(access.second).dependencies.emplace_back(dependency);
+    if (job_map.find(access.job) != job_map.end()) {
+        job_map.at(access.job).dependencies.emplace_back(dependency);
     }
-    return dependency;
+    return dependency; // return the same dependency
 }
 
-void fill_all_dependencies(const std::vector<std::pair<int, long>> &accesses, std::map<long, JobNode> &job_map) {
+void fill_all_dependencies(const std::vector<FileAccess> &accesses, std::map<long, JobNode> &job_map) {
     long dependency = -1;
     for (auto access: accesses) {
         dependency = fill_one_dependency(access, dependency, job_map);
@@ -92,6 +97,7 @@ void assign_parents(std::map<long, JobNode> &job_map, std::vector<long> &top_sor
         for (long dependency_id: job_node.dependencies) {
             JobNode dependency = job_map.at(dependency_id);
             if (dependency.hypothetical_endtime >= job_node.hypothetical_starttime) {
+                // A job hypothetically starts as soon as its dependency with the greatest hypothetical endtime ends.
                 job_node.hypothetical_starttime = dependency.hypothetical_endtime;
                 job_node.parent_id = dependency_id;
             }
@@ -120,7 +126,7 @@ void find_critical_path(std::map<long, JobNode> &job_map, std::vector<long> &cri
 
 void dfs_transitive_reduction(long job_id, std::map<long, JobNode> &job_map, std::vector<int> &ancestors) {
     JobNode &job = job_map.at(job_id);
-    job_map.at(job_id).top_sort_visited = true;
+    job_map.at(job_id).transitive_reduction_visited = true;
     ancestors.emplace_back(job_id);
 
     for (long child_id: job.dependencies) {
@@ -128,9 +134,10 @@ void dfs_transitive_reduction(long job_id, std::map<long, JobNode> &job_map, std
         for (long grandchild_id: child.dependencies) {
             for (int ancestor_id: ancestors) {
                 JobNode ancestor = job_map.at(ancestor_id);
-                if (std::find(ancestor.dependencies.begin(), ancestor.dependencies.end(), grandchild_id) !=
-                    ancestor.dependencies.end()) {
-                    std::remove(ancestor.dependencies.begin(), ancestor.dependencies.end(), grandchild_id);
+                auto grandchild_ptr = std::find(ancestor.dependencies.begin(), ancestor.dependencies.end(),
+                                                grandchild_id);
+                if (grandchild_ptr != ancestor.dependencies.end()) {
+                    ancestor.dependencies.erase(grandchild_ptr);
                 }
             }
         }
@@ -148,7 +155,7 @@ void transitive_reduction(std::map<long, JobNode> &job_map) {
     }
 }
 
-void write_jobs(std::map<long, JobNode> &job_map, std::ostream &os) {
+void write_jobs(const std::map<long, JobNode> &job_map, std::ostream &os) {
     os << "const jobs = new vis.DataSet([\n";
     for (const auto &job_pair: job_map) {
         JobReflection &job = job_pair.second.job;
@@ -174,7 +181,7 @@ void write_jobs(std::map<long, JobNode> &job_map, std::ostream &os) {
     os << "]);\n\n";
 }
 
-void write_critical_arrows(std::vector<long> &critical_path, std::ostream &os) {
+void write_critical_arrows(const std::vector<long> &critical_path, std::ostream &os) {
     os << "const critical_path_arrows = [\n";
     for (size_t i = 0; i < critical_path.size() - 1; i++) {
         os << "{ id: " << i << ", id_item_1: " << critical_path[i] << ", id_item_2: " << critical_path[i + 1]
@@ -183,7 +190,7 @@ void write_critical_arrows(std::vector<long> &critical_path, std::ostream &os) {
     os << "];\n\n";
 }
 
-void write_all_arrows(std::map<long, JobNode> &job_map, size_t critical_path_size, std::ostream &os) {
+void write_all_arrows(const std::map<long, JobNode> &job_map, size_t critical_path_size, std::ostream &os) {
     os << "const all_arrows = [\n";
     size_t id = critical_path_size;
     for (const auto &job_pair: job_map) {
@@ -197,7 +204,7 @@ void write_all_arrows(std::map<long, JobNode> &job_map, size_t critical_path_siz
     os << "];\n\n";
 }
 
-void write_html(std::ostream &os, std::map<long, JobNode> &job_map, std::vector<long> &critical_path) {
+void write_html(const std::map<long, JobNode> &job_map, const std::vector<long> &critical_path, std::ostream &os) {
     std::ifstream html_template(find_execpath() + "/../share/wake/html/timeline_template.html");
     std::ifstream arrow(find_execpath() + "/../share/wake/html/timeline_arrow.js");
     std::ifstream main(find_execpath() + "/../share/wake/html/timeline_main.js");
@@ -227,7 +234,7 @@ void create_timeline(Database &db) {
         job_map.insert({job.job, JobNode(job)});
     }
 
-    std::vector<std::pair<int, long>> accesses = db.get_file_accesses();
+    std::vector<FileAccess> accesses = db.get_file_accesses();
     fill_all_dependencies(accesses, job_map);
 
     std::vector<long> top_sorted_jobs;
@@ -238,5 +245,5 @@ void create_timeline(Database &db) {
     std::vector<long> critical_path;
     find_critical_path(job_map, critical_path);
 
-    write_html(std::cout, job_map, critical_path);
+    write_html(job_map, critical_path, std::cout);
 }

@@ -65,7 +65,7 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug, b
       std::cout << "    " << shell_escape(env) << std::endl;
     std::cout
       << "  Directory: " << job.directory << std::endl
-      << "  Built:     " << job.endtime.asString() << std::endl
+      << "  Built:     " << job.endtime.as_string() << std::endl
       << "  Runtime:   " << job.usage.runtime << std::endl
       << "  CPUtime:   " << job.usage.cputime << std::endl
       << "  Mem bytes: " << job.usage.membytes << std::endl
@@ -131,7 +131,7 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
     std::cout << "< " << shell_escape(job.stdin_file) << std::endl << std::endl;
     std::cout
       << "# When wake ran this command:" << std::endl
-      << "#   Built:     " << job.endtime.asString() << std::endl
+      << "#   Built:     " << job.endtime.as_string() << std::endl
       << "#   Runtime:   " << job.usage.runtime << std::endl
       << "#   CPUtime:   " << job.usage.cputime << std::endl
       << "#   Mem bytes: " << job.usage.membytes << std::endl

@@ -1015,7 +1015,7 @@ static std::string format_time(int64_t ns) {
   return buf;
 }
 
-std::string Time::asString() const {
+std::string Time::as_string() const {
     return format_time(t);
 }
 
@@ -1094,16 +1094,16 @@ static std::vector<JobReflection> find_all(Database *db, sqlite3_stmt *query, bo
   return out;
 }
 
-static std::vector<std::pair<int, long>> get_all_file_accesses(Database *db, sqlite3_stmt *query) {
+static std::vector<FileAccess> get_all_file_accesses(Database *db, sqlite3_stmt *query) {
     const char *why = "Could not get file access";
-    std::vector<std::pair<int, long>> out;
+    std::vector<FileAccess> out;
 
     db->begin_txn();
     while (sqlite3_step(query) == SQLITE_ROW) {
-        std::pair<int, long> access;
+        FileAccess access;
         // grab flat values
-        access.first = sqlite3_column_int(query, 0);
-        access.second = sqlite3_column_int64(query, 1);
+        access.type = sqlite3_column_int(query, 0);
+        access.job = sqlite3_column_int64(query, 1);
         out.emplace_back(access);
     }
     finish_stmt(why, query, db->imp->debugdb);
@@ -1161,6 +1161,6 @@ std::vector<JobReflection> Database::get_job_visualization() {
     return find_all(this, imp->get_job_visualization, true);
 }
 
-std::vector<std::pair<int, long>> Database::get_file_accesses() {
+std::vector<FileAccess> Database::get_file_accesses() {
     return get_all_file_accesses(this, imp->get_file_access);
 }

@@ -53,8 +53,8 @@ struct Time {
     int64_t t;
     Time() :t(0) {}
     explicit Time(int64_t _t) : t(_t) {}
-    int64_t asInt64() const {return t;}
-    std::string asString() const;
+    int64_t as_int64() const {return t;}
+    std::string as_string() const;
 };
 
 struct JobReflection {
@@ -83,6 +83,11 @@ struct JobEdge {
   long user;
   long used;
   JobEdge(long user_, long used_) : user(user_), used(used_) { }
+};
+
+struct FileAccess {
+    int type; // file access type from wake.db; 0=visible, 1=input, 2=output
+    long job; // id of the job which has the access
 };
 
 struct Database {
@@ -186,7 +191,7 @@ struct Database {
   std::vector<JobTag> get_tags();
 
   std::vector<JobReflection> get_job_visualization();
-  std::vector<std::pair<int, long>> get_file_accesses();
+  std::vector<FileAccess> get_file_accesses();
 };
 
 #endif

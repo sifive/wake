@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
   bool dumpssa = arg(options, "stop-after-ssa")->count;
   bool optim   =!arg(options, "no-optimize")->count;
   bool exports = arg(options, "exports")->count;
-  bool timeline =arg(options, "timeline")->count;
+  bool timeline= arg(options, "timeline")->count;
 
   const char *percent_str = arg(options, "percent")->argument;
   const char *jobs_str    = arg(options, "jobs")->argument;
