@@ -15,7 +15,7 @@
  */
 
 // DOM element where the Timeline will be attached
-let container = document.getElementById('timeline');
+const container = document.getElementById('timeline');
 
 const groups = new vis.DataSet([
     {id: 0, content: "Other Jobs", value: 0},
@@ -23,12 +23,12 @@ const groups = new vis.DataSet([
 ]);
 
 // Order by job length
-function customOrder(job_a, job_b) {
-    return (job_b.end - job_b.start) - (job_a.end - job_a.start);
+function customOrder(jobA, jobB) {
+    return (jobB.end - jobB.start) - (jobA.end - jobA.start);
 }
 
 // Configuration for the Timeline
-let options = {
+const options = {
     order: customOrder,
     stack: true,
     verticalScroll: true,
@@ -45,16 +45,20 @@ let options = {
 const jobs = JSON.parse(document.getElementById("jobs").textContent);
 
 // Create jobs Timeline
-let timeline = new vis.Timeline(container, jobs, options, groups);
+const timeline = new vis.Timeline(container, jobs, options, groups);
 
-const critical_path_arrows = JSON.parse(document.getElementById("critical_path_arrows").textContent);
-const all_arrows = JSON.parse(document.getElementById("all_arrows").textContent);
-let visible_arrows = [...critical_path_arrows];
+// An Arrow object has an id, id_item_1 (the id of a job), and id_item_2 (the id of that job's dependency).
+// All Arrows, however, point into the future, regardless of which job ended later.
 
-const arrowObject = new Arrow(timeline, visible_arrows);
+// criticalPathArrows describes the critical path ending with a job with no dependencies.
+const criticalPathArrows = JSON.parse(document.getElementById("criticalPathArrows").textContent);
+const allArrows = JSON.parse(document.getElementById("allArrows").textContent);
+const visibleArrows = [...criticalPathArrows];
+
+const arrowObject = new Arrow(timeline, visibleArrows);
 
 function addNodeArrows(node, added) {
-    for (const arrow of all_arrows) {
+    for (const arrow of allArrows) {
         if ((arrow.id_item_1 === node && !(added.includes(arrow.id_item_2))) ||
             (arrow.id_item_2 === node && !(added.includes(arrow.id_item_1)))) {
             arrowObject.addArrow(arrow);
@@ -63,16 +67,16 @@ function addNodeArrows(node, added) {
 }
 
 function onSelect(properties) {
-    while (visible_arrows.length > 0) {
-        arrowObject.removeArrow(visible_arrows[visible_arrows.length - 1].id);
+    while (visibleArrows.length > 0) {
+        arrowObject.removeArrow(visibleArrows[visibleArrows.length - 1].id);
     }
-    let added = [];
+    const added = [];
     for (const item of properties.items) {
         addNodeArrows(item, added);
         added.push(item);
     }
-    for (const arrow of critical_path_arrows) {
-        if (!(added.includes(arrow.id_item_1)) && !(added.includes(arrow.id_item_2))) {
+    for (const arrow of criticalPathArrows) {
+        if (!added.includes(arrow.id_item_1) && !added.includes(arrow.id_item_2)) {
             arrowObject.addArrow(arrow);
         }
     }

@@ -228,10 +228,10 @@ void write_html(const std::map<long, JobNode> &job_map, const std::vector<long> 
     os << R"(<script type="application/json" id="jobs">)" << std::endl;
     write_jobs(job_map, os);
     os << "</script>" << std::endl;
-    os << R"(<script type="application/json" id="critical_path_arrows">)" << std::endl;
+    os << R"(<script type="application/json" id="criticalPathArrows">)" << std::endl;
     write_critical_arrows(critical_path, os);
     os << "</script>" << std::endl;
-    os << R"(<script type="application/json" id="all_arrows">)" << std::endl;
+    os << R"(<script type="application/json" id="allArrows">)" << std::endl;
     write_all_arrows(job_map, critical_path.size(), os);
     os << "</script>" << std::endl;
 
