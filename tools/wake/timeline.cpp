@@ -18,10 +18,12 @@
 #include <algorithm>
 #include <map>
 #include <fstream>
+#include <sstream>
 
 #include "timeline.h"
 #include "runtime/database.h"
 #include "util/execpath.h"
+#include "json/json5.h"
 
 struct JobNode {
     JobReflection &job;
@@ -66,12 +68,14 @@ void dfs_top_sort(long job_id, std::map<long, JobNode> &job_map, std::vector<lon
     top_sorted_jobs.emplace_back(job_id);
 }
 
-void top_sort(std::map<long, JobNode> &job_map, std::vector<long> &top_sorted_jobs) {
+std::vector<long> top_sort(std::map<long, JobNode> &job_map) {
+    std::vector<long> top_sorted_jobs;
     for (const auto &job_pair: job_map) {
         if (!(job_pair.second.top_sort_visited)) {
             dfs_top_sort(job_pair.first, job_map, top_sorted_jobs);
         }
     }
+    return top_sorted_jobs;
 }
 
 long fill_one_dependency(FileAccess access, long dependency, std::map<long, JobNode> &job_map) {
@@ -156,52 +160,63 @@ void transitive_reduction(std::map<long, JobNode> &job_map) {
 }
 
 void write_jobs(const std::map<long, JobNode> &job_map, std::ostream &os) {
-    os << "const jobs = new vis.DataSet([\n";
-    for (const auto &job_pair: job_map) {
-        JobReflection &job = job_pair.second.job;
-        os << "        {id: " << job.job << ", group: " << (job_pair.second.is_on_critical_path ? 1 : 0)
-           << ", content: '" << (!(job.label.empty()) ? job.label : std::to_string(job.job))
-           << "', start: '" << job_pair.second.starttime
-           << "', end: '" << job_pair.second.endtime
-           << "', title: '" << job.job << "<br>"
-           << (!(job.label.empty()) ? job.label + "<br>" : "")
-           << "Command line:<br>";
+    JAST jobs(JSON_ARRAY);
+
+    for (auto &job_pair: job_map) {
+        const JobReflection &job = job_pair.second.job;
+        JAST &job_json = jobs.add("", JSON_OBJECT);
+
+        job_json.add("id", job.job);
+        job_json.add("group", job_pair.second.is_on_critical_path ? 1 : 0);
+        std::string label = job.label;
+        job_json.add("content", (!(job.label.empty()) ? label : std::to_string(job.job)));
+        job_json.add("start", job_pair.second.starttime);
+        job_json.add("end", job_pair.second.endtime);
+
+        std::stringstream title;
+        title << job.job << "<br>"
+              << (!(job.label.empty()) ? job.label + "<br>" : "")
+              << "Command line:<br>";
         for (std::string line: job.commandline) {
             line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
-            os << line << " ";
+            title << line << " ";
         }
         if (!(job.outputs.empty())) {
-            os << "<br>Output file:";
+            title << "<br>Output file:";
             for (const auto &output: job.outputs) {
-                os << "<br>" << output.path;
+                title << "<br>" << output.path;
             }
         }
-        os << "'},\n";
+        job_json.add("title", title.str());
     }
-    os << "]);\n\n";
+    os << jobs;
 }
 
 void write_critical_arrows(const std::vector<long> &critical_path, std::ostream &os) {
-    os << "const critical_path_arrows = [\n";
-    for (size_t i = 0; i < critical_path.size() - 1; i++) {
-        os << "{ id: " << i << ", id_item_1: " << critical_path[i] << ", id_item_2: " << critical_path[i + 1]
-                  << " },\n";
+    JAST arrows(JSON_ARRAY);
+    for (size_t i = 0; i + 1 < critical_path.size(); i++) {
+        JAST &arrow = arrows.add("", JSON_OBJECT);
+        arrow.add("id", (int) i);
+        arrow.add("id_item_1", critical_path[i]);
+        arrow.add("id_item_2", critical_path[i + 1]);
     }
-    os << "];\n\n";
+    os << arrows;
 }
 
 void write_all_arrows(const std::map<long, JobNode> &job_map, size_t critical_path_size, std::ostream &os) {
-    os << "const all_arrows = [\n";
+    JAST arrows(JSON_ARRAY);
     size_t id = critical_path_size;
-    for (const auto &job_pair: job_map) {
+    for (auto &job_pair: job_map) {
         JobNode job_node = job_pair.second;
         for (long dependency: job_node.dependencies) {
-            os << "{ id: " << id << ", id_item_1: " << job_node.job.job << ", id_item_2: " << dependency
-                      << " },\n";
+            JAST &arrow = arrows.add("", JSON_OBJECT);
+            arrow.add("id", (int) id);
+            arrow.add("id_item_1", job_node.job.job);
+            arrow.add("id_item_2", dependency);
             id++;
         }
     }
-    os << "];\n\n";
+    os << arrows;
 }
 
 void write_html(const std::map<long, JobNode> &job_map, const std::vector<long> &critical_path, std::ostream &os) {
@@ -210,17 +225,21 @@ void write_html(const std::map<long, JobNode> &job_map, const std::vector<long> 
     std::ifstream main(find_execpath() + "/../share/wake/html/timeline_main.js");
     os << html_template.rdbuf();
 
-    os << "<script type=\"text/javascript\">" << std::endl;
+    os << R"(<script type="application/json" id="jobs">)" << std::endl;
     write_jobs(job_map, os);
+    os << "</script>" << std::endl;
+    os << R"(<script type="application/json" id="critical_path_arrows">)" << std::endl;
     write_critical_arrows(critical_path, os);
+    os << "</script>" << std::endl;
+    os << R"(<script type="application/json" id="all_arrows">)" << std::endl;
     write_all_arrows(job_map, critical_path.size(), os);
     os << "</script>" << std::endl;
 
-    os << "<script type=\"text/javascript\">" << std::endl;
+    os << R"(<script type="text/javascript">)" << std::endl;
     os << arrow.rdbuf();
     os << "</script>" << std::endl;
 
-    os << "<script type=\"module\">" << std::endl;
+    os << R"(<script type="module">)" << std::endl;
     os << main.rdbuf();
     os << "</script>\n"
           "</body>\n"
@@ -237,8 +256,7 @@ void create_timeline(Database &db) {
     std::vector<FileAccess> accesses = db.get_file_accesses();
     fill_all_dependencies(accesses, job_map);
 
-    std::vector<long> top_sorted_jobs;
-    top_sort(job_map, top_sorted_jobs);
+    std::vector<long> top_sorted_jobs = top_sort(job_map);
     assign_parents(job_map, top_sorted_jobs);
     transitive_reduction(job_map);
 

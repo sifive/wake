@@ -23,8 +23,8 @@ const groups = new vis.DataSet([
 ]);
 
 // Order by job length
-function customOrder(jobs, accesses) {
-    return (accesses.end - accesses.start) - (jobs.end - jobs.start);
+function customOrder(job_a, job_b) {
+    return (job_b.end - job_b.start) - (job_a.end - job_a.start);
 }
 
 // Configuration for the Timeline
@@ -42,10 +42,15 @@ let options = {
     multiselect: true,
 };
 
+const jobs = JSON.parse(document.getElementById("jobs").textContent);
+
 // Create jobs Timeline
 let timeline = new vis.Timeline(container, jobs, options, groups);
 
+const critical_path_arrows = JSON.parse(document.getElementById("critical_path_arrows").textContent);
+const all_arrows = JSON.parse(document.getElementById("all_arrows").textContent);
 let visible_arrows = [...critical_path_arrows];
+
 const arrowObject = new Arrow(timeline, visible_arrows);
 
 function addNodeArrows(node, added) {
