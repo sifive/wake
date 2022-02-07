@@ -19,6 +19,7 @@
 #include <map>
 #include <fstream>
 #include <sstream>
+#include <set>
 
 #include "timeline.h"
 #include "runtime/database.h"
@@ -30,7 +31,7 @@ struct JobNode {
     int64_t starttime;
     int64_t endtime;
 
-    std::vector<long> dependencies;
+    std::set<long> dependencies;
 
     // Hypothetical times are the times the jobs would have started and ended if:
     // every job without dependencies started at 0;
@@ -56,14 +57,15 @@ struct JobNode {
 void dfs_top_sort(long job_id, std::map<long, JobNode> &job_map, std::vector<long> &top_sorted_jobs) {
     JobNode &job = job_map.at(job_id);
     job_map.at(job_id).top_sort_visited = true;
-    for (auto it = job.dependencies.begin(); it < job.dependencies.end(); it++) {
+    for (auto it = job.dependencies.begin(); it != job.dependencies.end(); ) {
         if (job_map.find(*it) == job_map.end()) {
-            job.dependencies.erase(it--);
+            it = job.dependencies.erase(it);
             continue;
         }
         if (!(job_map.at(*it).top_sort_visited)) {
             dfs_top_sort(*it, job_map, top_sorted_jobs);
         }
+        it++;
     }
     top_sorted_jobs.emplace_back(job_id);
 }
@@ -83,7 +85,7 @@ long fill_one_dependency(FileAccess access, long dependency, std::map<long, JobN
         return access.job; // return new dependency
     }
     if (job_map.find(access.job) != job_map.end()) {
-        job_map.at(access.job).dependencies.emplace_back(dependency);
+        job_map.at(access.job).dependencies.insert(dependency);
     }
     return dependency; // return the same dependency
 }
