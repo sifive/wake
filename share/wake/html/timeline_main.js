@@ -55,29 +55,25 @@ const criticalPathArrows = JSON.parse(document.getElementById("criticalPathArrow
 const allArrows = JSON.parse(document.getElementById("allArrows").textContent);
 const visibleArrows = [...criticalPathArrows];
 
-const arrowObject = new Arrow(timeline, visibleArrows);
-
-function addNodeArrows(node, added) {
-    for (const arrow of allArrows) {
-        if ((arrow.id_item_1 === node && !(added.includes(arrow.id_item_2))) ||
-            (arrow.id_item_2 === node && !(added.includes(arrow.id_item_1)))) {
-            arrowObject.addArrow(arrow);
-        }
-    }
-}
+const visibleArrowsObject = new Arrow(timeline, visibleArrows);
 
 function onSelect(properties) {
+    // Clear the visible arrows array
     while (visibleArrows.length > 0) {
-        arrowObject.removeArrow(visibleArrows[visibleArrows.length - 1].id);
+        visibleArrowsObject.removeArrow(visibleArrows[visibleArrows.length - 1].id);
     }
-    const added = [];
-    for (const item of properties.items) {
-        addNodeArrows(item, added);
-        added.push(item);
+    // Arrows incident to selected nodes will be visible
+    const selectedNodes = new Set(properties.items);
+    for (const arrow of allArrows) {
+        // If an arrow is incident to a selected node, make it visible
+        if (selectedNodes.has(arrow.id_item_1) || selectedNodes.has(arrow.id_item_2)) {
+            visibleArrowsObject.addArrow(arrow);
+        }
     }
     for (const arrow of criticalPathArrows) {
-        if (!added.includes(arrow.id_item_1) && !added.includes(arrow.id_item_2)) {
-            arrowObject.addArrow(arrow);
+        // If a critical path arrow has not yet been made visible, make it visible
+        if (!selectedNodes.has(arrow.id_item_1) && !selectedNodes.has(arrow.id_item_2)) {
+            visibleArrowsObject.addArrow(arrow);
         }
     }
 }
