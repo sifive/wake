@@ -647,11 +647,11 @@ void Database::clean() {
     std::cerr << "Could not recover space: " << fail << std::endl;
 }
 
-void Database::begin_txn() {
+void Database::begin_txn() const {
   single_step("Could not begin a transaction", imp->begin_txn, imp->debugdb);
 }
 
-void Database::end_txn() {
+void Database::end_txn() const {
   single_step("Could not commit a transaction", imp->commit_txn, imp->debugdb);
 }
 
@@ -927,7 +927,7 @@ void Database::save_output(long job, int descriptor, const char *buffer, int siz
   single_step (why, imp->insert_log, imp->debugdb);
 }
 
-std::string Database::get_output(long job, int descriptor) {
+std::string Database::get_output(long job, int descriptor) const {
   std::stringstream out;
   const char *why = "Could not read job output";
   bind_integer(why, imp->get_log, 1, job);
@@ -1019,7 +1019,7 @@ std::string Time::as_string() const {
     return format_time(t);
 }
 
-static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
+static JobReflection find_one(const Database *db, sqlite3_stmt *query, bool verbose) {
   const char *why = "Could not describe job";
   JobReflection desc;
   // grab flat values
@@ -1081,7 +1081,7 @@ static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
   return desc;
 }
 
-static std::vector<JobReflection> find_all(Database *db, sqlite3_stmt *query, bool verbose) {
+static std::vector<JobReflection> find_all(const Database *db, sqlite3_stmt *query, bool verbose) {
   const char *why = "Could not explain file";
   std::vector<JobReflection> out;
 
@@ -1094,7 +1094,7 @@ static std::vector<JobReflection> find_all(Database *db, sqlite3_stmt *query, bo
   return out;
 }
 
-static std::vector<FileAccess> get_all_file_accesses(Database *db, sqlite3_stmt *query) {
+static std::vector<FileAccess> get_all_file_accesses(const Database *db, sqlite3_stmt *query) {
     const char *why = "Could not get file access";
     std::vector<FileAccess> out;
 
@@ -1157,10 +1157,10 @@ std::vector<JobTag> Database::get_tags() {
   return out;
 }
 
-std::vector<JobReflection> Database::get_job_visualization() {
+std::vector<JobReflection> Database::get_job_visualization() const {
     return find_all(this, imp->get_job_visualization, true);
 }
 
-std::vector<FileAccess> Database::get_file_accesses() {
+std::vector<FileAccess> Database::get_file_accesses() const {
     return get_all_file_accesses(this, imp->get_file_access);
 }

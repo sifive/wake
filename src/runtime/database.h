@@ -105,8 +105,8 @@ struct Database {
   void prepare(const std::string &cmdline); // prepare for job execution
   void clean(); // finished execution; sweep stale jobs
 
-  void begin_txn();
-  void end_txn();
+  void begin_txn() const;
+  void end_txn() const;
 
   Usage reuse_job(
     const std::string &directory,
@@ -157,7 +157,7 @@ struct Database {
     double runtime);
   std::string get_output(
     long job,
-    int descriptor);
+    int descriptor) const;
   void replay_output(
     long job,
     const char *stdout,
@@ -190,8 +190,8 @@ struct Database {
   std::vector<JobEdge> get_edges();
   std::vector<JobTag> get_tags();
 
-  std::vector<JobReflection> get_job_visualization();
-  std::vector<FileAccess> get_file_accesses();
+  std::vector<JobReflection> get_job_visualization() const;
+  std::vector<FileAccess> get_file_accesses() const;
 };
 
 #endif
