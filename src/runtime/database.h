@@ -49,6 +49,14 @@ struct JobTag {
    : job(job_), uri(std::move(uri_)), content(std::move(content_)) { }
 };
 
+struct Time {
+    int64_t t;
+    Time() :t(0) {}
+    explicit Time(int64_t _t) : t(_t) {}
+    int64_t as_int64() const {return t;}
+    std::string as_string() const;
+};
+
 struct JobReflection {
   long job;
   bool stale;
@@ -58,8 +66,8 @@ struct JobReflection {
   std::vector<std::string> environment;
   std::string stack;
   std::string stdin_file;
-  std::string starttime;
-  std::string endtime;
+  Time starttime;
+  Time endtime;
   std::string wake_start;
   std::string wake_cmdline;
   std::string stdout_payload;
@@ -77,6 +85,11 @@ struct JobEdge {
   JobEdge(long user_, long used_) : user(user_), used(used_) { }
 };
 
+struct FileAccess {
+    int type; // file access type from wake.db; 0=visible, 1=input, 2=output
+    long job; // id of the job which has the access
+};
+
 struct Database {
   struct detail;
   std::unique_ptr<detail> imp;
@@ -92,8 +105,8 @@ struct Database {
   void prepare(const std::string &cmdline); // prepare for job execution
   void clean(); // finished execution; sweep stale jobs
 
-  void begin_txn();
-  void end_txn();
+  void begin_txn() const;
+  void end_txn() const;
 
   Usage reuse_job(
     const std::string &directory,
@@ -144,7 +157,7 @@ struct Database {
     double runtime);
   std::string get_output(
     long job,
-    int descriptor);
+    int descriptor) const;
   void replay_output(
     long job,
     const char *stdout,
@@ -176,6 +189,9 @@ struct Database {
 
   std::vector<JobEdge> get_edges();
   std::vector<JobTag> get_tags();
+
+  std::vector<JobReflection> get_job_visualization() const;
+  std::vector<FileAccess> get_file_accesses() const;
 };
 
 #endif

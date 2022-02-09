@@ -80,6 +80,8 @@ struct Database::detail {
   sqlite3_stmt *get_tags;
   sqlite3_stmt *get_all_tags;
   sqlite3_stmt *get_edges;
+  sqlite3_stmt *get_job_visualization;
+  sqlite3_stmt *get_file_access;
 
   long run_id;
   detail(bool debugdb_)
@@ -88,7 +90,8 @@ struct Database::detail {
      wipe_file(0), insert_file(0), update_file(0), get_log(0), replay_log(0), get_tree(0), add_stats(0),
      link_stats(0), detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0),
      find_job(0), find_owner(0), find_last(0), find_failed(0), fetch_hash(0), delete_jobs(0), delete_dups(0),
-     delete_stats(0), revtop_order(0), setcrit_path(0), tag_job(0), get_tags(0), get_all_tags(0), get_edges(0) { }
+     delete_stats(0), revtop_order(0), setcrit_path(0), tag_job(0), get_tags(0), get_all_tags(0), get_edges(0),
+     get_job_visualization(0), get_file_access(0) { }
 };
 
 static void close_db(Database::detail *imp) {
@@ -365,6 +368,19 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "select distinct user.job_id as user, used.job_id as used"
     "  from filetree user, filetree used"
     "   where user.access=1 and user.file_id=used.file_id and used.access=2";
+  const char *sql_get_job_visualization =
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
+    " from  jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
+    " where substr(cast(j.commandline as varchar), 1, 8) != '<source>'"
+    " and substr(cast(j.commandline as varchar), 1, 7) != '<mkdir>'"
+    " and substr(cast(j.commandline as varchar), 1, 7) != '<write>'"
+    " and substr(cast(j.commandline as varchar), 1, 6) != '<hash>'";
+  const char *sql_get_file_access =
+    "select access, job_id"
+    " from filetree"
+    " where access != 1"
+    " order by file_id, access desc, job_id";
+
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
@@ -411,6 +427,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_get_tags,       get_tags);
   PREPARE(sql_get_all_tags,   get_all_tags);
   PREPARE(sql_get_edges,      get_edges);
+  PREPARE(sql_get_job_visualization, get_job_visualization);
+  PREPARE(sql_get_file_access, get_file_access);
 
   return "";
 }
@@ -466,6 +484,8 @@ void Database::close() {
   FINALIZE(get_tags);
   FINALIZE(get_all_tags);
   FINALIZE(get_edges);
+  FINALIZE(get_job_visualization);
+  FINALIZE(get_file_access);
 
   close_db(imp.get());
 }
@@ -627,11 +647,11 @@ void Database::clean() {
     std::cerr << "Could not recover space: " << fail << std::endl;
 }
 
-void Database::begin_txn() {
+void Database::begin_txn() const {
   single_step("Could not begin a transaction", imp->begin_txn, imp->debugdb);
 }
 
-void Database::end_txn() {
+void Database::end_txn() const {
   single_step("Could not commit a transaction", imp->commit_txn, imp->debugdb);
 }
 
@@ -907,7 +927,7 @@ void Database::save_output(long job, int descriptor, const char *buffer, int siz
   single_step (why, imp->insert_log, imp->debugdb);
 }
 
-std::string Database::get_output(long job, int descriptor) {
+std::string Database::get_output(long job, int descriptor) const {
   std::stringstream out;
   const char *why = "Could not read job output";
   bind_integer(why, imp->get_log, 1, job);
@@ -995,7 +1015,11 @@ static std::string format_time(int64_t ns) {
   return buf;
 }
 
-static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
+std::string Time::as_string() const {
+    return format_time(t);
+}
+
+static JobReflection find_one(const Database *db, sqlite3_stmt *query, bool verbose) {
   const char *why = "Could not describe job";
   JobReflection desc;
   // grab flat values
@@ -1006,8 +1030,8 @@ static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
   desc.environment    = chop_null(rip_column(query, 4));
   desc.stack          = rip_column(query, 5);
   desc.stdin_file     = rip_column(query, 6);
-  desc.starttime      = format_time(sqlite3_column_int64(query, 7));
-  desc.endtime        = format_time(sqlite3_column_int64(query, 8));
+  desc.starttime      = Time(sqlite3_column_int64(query, 7));
+  desc.endtime        = Time(sqlite3_column_int64(query, 8));
   desc.stale          = sqlite3_column_int64 (query, 9) != 0;
   desc.wake_start     = format_time(sqlite3_column_int64(query, 10));
   desc.wake_cmdline   = rip_column(query, 11);
@@ -1057,7 +1081,7 @@ static JobReflection find_one(Database *db, sqlite3_stmt *query, bool verbose) {
   return desc;
 }
 
-static std::vector<JobReflection> find_all(Database *db, sqlite3_stmt *query, bool verbose) {
+static std::vector<JobReflection> find_all(const Database *db, sqlite3_stmt *query, bool verbose) {
   const char *why = "Could not explain file";
   std::vector<JobReflection> out;
 
@@ -1068,6 +1092,24 @@ static std::vector<JobReflection> find_all(Database *db, sqlite3_stmt *query, bo
   db->end_txn();
 
   return out;
+}
+
+static std::vector<FileAccess> get_all_file_accesses(const Database *db, sqlite3_stmt *query) {
+    const char *why = "Could not get file access";
+    std::vector<FileAccess> out;
+
+    db->begin_txn();
+    while (sqlite3_step(query) == SQLITE_ROW) {
+        FileAccess access;
+        // grab flat values
+        access.type = sqlite3_column_int(query, 0);
+        access.job = sqlite3_column_int64(query, 1);
+        out.emplace_back(access);
+    }
+    finish_stmt(why, query, db->imp->debugdb);
+    db->end_txn();
+
+    return out;
 }
 
 std::vector<JobReflection> Database::failed(bool verbose) {
@@ -1115,3 +1157,10 @@ std::vector<JobTag> Database::get_tags() {
   return out;
 }
 
+std::vector<JobReflection> Database::get_job_visualization() const {
+    return find_all(this, imp->get_job_visualization, true);
+}
+
+std::vector<FileAccess> Database::get_file_accesses() const {
+    return get_all_file_accesses(this, imp->get_file_access);
+}

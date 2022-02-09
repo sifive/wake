@@ -55,6 +55,7 @@
 #include "runtime/prim.h"
 #include "markup.h"
 #include "describe.h"
+#include "timeline.h"
 
 #ifndef VERSION
 #include "version.h"
@@ -166,6 +167,7 @@ int main(int argc, char **argv) {
     { 'g', "globals",               GOPT_ARGUMENT_FORBIDDEN },
     { 'e', "exports",               GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "timeline",              GOPT_ARGUMENT_FORBIDDEN },
     { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-parse",      GOPT_ARGUMENT_FORBIDDEN },
@@ -215,6 +217,7 @@ int main(int argc, char **argv) {
   bool dumpssa = arg(options, "stop-after-ssa")->count;
   bool optim   =!arg(options, "no-optimize")->count;
   bool exports = arg(options, "exports")->count;
+  bool timeline= arg(options, "timeline")->count;
 
   const char *percent_str = arg(options, "percent")->argument;
   const char *jobs_str    = arg(options, "jobs")->argument;
@@ -384,6 +387,11 @@ int main(int argc, char **argv) {
     sip_key[1] = dist(rd);
     db.entropy(&sip_key[0], 2);
   }
+
+    if (timeline) {
+        create_timeline(db);
+        return 0;
+    }
 
   if (job) {
     auto hits = db.explain(std::atol(job), verbose || tag);
