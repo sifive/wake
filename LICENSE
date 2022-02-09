@@ -2,7 +2,7 @@ This source repository includes software from various sources.
 Each file includes a header which describes the relevant license.
 
 In broad strokes:
-  wake          LICENSE.Apache2   everthing not in vendor/
+  wake          LICENSE.Apache2   everything not in vendor/
 
   BLAKE2        LICENSE.CC0       vendor/blake2/
   gopt          LICENSE.TFL       vendor/gopt/
