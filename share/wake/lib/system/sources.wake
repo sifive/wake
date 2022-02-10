@@ -84,7 +84,7 @@ export def claim (file: String): Result Path Error =
         def get_modtime file = prim "get_modtime"
         def time = get_modtime file
         if time == -1 then
-            failWithError "{file}: files does not exist. Maybe you haven't previouslly built this file?"
+            failWithError "{file}: files does not exist. Maybe you haven't previously built this file?"
         else
             # Its important that the command here is distinct from what `source` would use
             # so that claim and source do not overlap.
