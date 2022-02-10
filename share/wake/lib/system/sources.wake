@@ -79,20 +79,36 @@ export def source (file: String): Result Path Error =
 #   claim "build/my_flow/my_step/previous-output.txt" # Claims the file
 # ```
 export def claim (file: String): Result Path Error =
-    def claimRel relpath =
-        def isOutsideRoot = matches `\.\..*` relpath
-        if isOutsideRoot then
-            failWithError "claim cannot be used on files outside of wake's root. Consider using claimFileAsPath instead."
+    # Define the actual virtual job that produces the Path
+    def raw_claim file =
+        def get_modtime file = prim "get_modtime"
+        def time = get_modtime file
+        if time == -1 then
+            failWithError "{file}: files does not exist. Maybe you haven't previouslly built this file?"
         else
-            raw_source relpath
+            # Its important that the command here is distinct from what `source` would use
+            # so that claim and source do not overlap.
+            makeExecPlan ("<claim>", str time, file, Nil) Nil
+            | setPlanShare       False
+            | setPlanEcho        logDebug
+            | setPlanEnvironment Nil
+            | setPlanFnOutputs   (file, _)
+            | runJobWith virtualRunner
+            | getJobOutput
 
-    def simplePath = simplify file
-    def isAbs = matches `/.*` simplePath
-    require True = isAbs else claimRel simplePath
+    # Compute the relative path in simplist form
+    def isAbs = matches `/.*` file
+    def relPath = if isAbs then
+        relative workspace file
+    else
+        simplify file
 
-    relative workspace file
-    | simplify
-    | claimRel
+    # Fail if we're outside of wakeroot (relPath must be simplified)
+    def isOutsideRoot = matches `\.\..*/.*` relPath
+    if isOutsideRoot then
+        failWithError "claim cannot be used on files outside of wake's root. Consider using claimFileAsPath instead."
+    else
+        raw_claim relPath
 
 # Find sources files
 export def sources (dir: String) (filterRegexp: RegExp): Result (List Path) Error =
