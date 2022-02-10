@@ -66,7 +66,7 @@ export def source (file: String): Result Path Error =
 # all paths be produced by exactly one job, virtual or
 # otherwise.
 #
-# For source files please use `soruce`. For files outside
+# For source files please use `source`. For files outside
 # of wakeroot please use `claimFileAsPath` or `claimFileAsPathIn`.
 # `claim` is good for claiming files of previous builds that
 # are not being used again this build.
