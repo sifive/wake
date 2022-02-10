@@ -372,6 +372,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes"
     " from  jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id"
     " where substr(cast(j.commandline as varchar), 1, 8) != '<source>'"
+    " and substr(cast(j.commandline as varchar), 1, 7) != '<claim>'"
     " and substr(cast(j.commandline as varchar), 1, 7) != '<mkdir>'"
     " and substr(cast(j.commandline as varchar), 1, 7) != '<write>'"
     " and substr(cast(j.commandline as varchar), 1, 6) != '<hash>'";
