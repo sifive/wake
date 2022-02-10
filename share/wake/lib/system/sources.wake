@@ -58,6 +58,42 @@ export def source (file: String): Result Path Error =
         x, Nil = Pass x
         _      = unreachable "a quoted RegExp can never match more than one distinct String"
 
+# Allows claiming of a file so long as the file is within
+# wakeroot. Keep in mind that if another job produces this
+# file, claim will fail. Likewise if you claim a file then
+# any job that produces this file will fail. Claim should
+# be thought of as a "virtual" job and wake demands that
+# all paths be produced by exactly one job, virtual or
+# otherwise.
+#
+# For source files please use `soruce`. For files outside
+# of wakeroot please use `claimFileAsPath` or `claimFileAsPathIn`.
+# `claim` is good for claiming files of previous builds that
+# are not being used again this build.
+#
+# Parameters:
+#  - `file`: The string giving the path to the file to be claimed
+#
+# Example:
+# ```
+#   claim "build/my_flow/my_step/previous-output.txt" # Claims the file
+# ```
+export def claim (file: String): Result Path Error =
+    def claimRel relpath =
+        def isOutsideRoot = matches `\.\..*` relpath
+        if isOutsideRoot then
+            failWithError "claim cannot be used on files outside of wake's root. Consider using claimFileAsPath instead."
+        else
+            raw_source relpath
+
+    def simplePath = simplify file
+    def isAbs = matches `/.*` simplePath
+    require True = isAbs else claimRel simplePath
+
+    relative workspace file
+    | simplify
+    | claimRel
+
 # Find sources files
 export def sources (dir: String) (filterRegexp: RegExp): Result (List Path) Error =
     def scan dir regexp = prim "sources"
