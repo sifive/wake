@@ -105,10 +105,19 @@ export def claim (file: String): Result Path Error =
 
     # Fail if we're outside of wakeroot (relPath must be simplified)
     def isOutsideRoot = matches `\.\..*/.*` relPath
-    if isOutsideRoot then
-        failWithError "claim cannot be used on files outside of wake's root. Consider using claimFileAsPath instead."
-    else
-        raw_claim relPath
+    require False = isOutsideRoot
+    else failWithError "claim cannot be used on files outside of wake's root. Consider using claimFileAsPath instead."
+
+    # Now that our path is uniform check if it could have been fetched with `source`
+    def base = basename relPath
+    def dir = dirname relPath
+    def scan dir regexp = prim "sources"
+    def canBeSourced = exists (_==~relPath) (scan dir base.quote)
+    require False = canBeSourced
+    else failWithError "{file}: Is a source file, please use `source` or `sources` instead of `claim`"
+
+    # Finally if the file is inside of wakeroot and can't be sourced we're in the clear
+    raw_claim relPath
 
 # Find sources files
 export def sources (dir: String) (filterRegexp: RegExp): Result (List Path) Error =
