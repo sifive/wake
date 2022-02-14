@@ -59,17 +59,18 @@ export def source (file: String): Result Path Error =
         _      = unreachable "a quoted RegExp can never match more than one distinct String"
 
 # Allows claiming of a file so long as the file is within
-# wakeroot. Keep in mind that if another job produces this
-# file, claim will fail. Likewise if you claim a file then
-# any job that produces this file will fail. Claim should
-# be thought of as a "virtual" job and wake demands that
-# all paths be produced by exactly one job, virtual or
-# otherwise.
+# wake's workspace. Keep in mind that if another job
+# produced this file in the same run of wake, claim will
+# fail. Likewise if you claim a file then any job that
+# produces this file will fail. Claim should be thought
+# of as a "virtual" job and wake demands that all paths
+# be produced by exactly one job, virtual or otherwise.
 #
 # For source files please use `source`. For files outside
-# of wakeroot please use `claimFileAsPath` or `claimFileAsPathIn`.
-# `claim` is good for claiming files of previous builds that
-# are not being used again this build.
+# of wake's workspace please use `claimFileAsPath` or
+# `claimFileAsPathIn`. `claim` is good for claiming
+# artifacts of previous builds that should not be rebuilt
+# during this run.
 #
 # Parameters:
 #  - `file`: The string giving the path to the file to be claimed
@@ -84,7 +85,7 @@ export def claim (file: String): Result Path Error =
         def get_modtime file = prim "get_modtime"
         def time = get_modtime file
         if time == -1 then
-            failWithError "{file}: files does not exist. Maybe you haven't previously built this file?"
+            failWithError "{file}: file does not exist. Maybe you haven't previously built this file?"
         else
             # Its important that the command here is distinct from what `source` would use
             # so that claim and source do not overlap.
@@ -96,17 +97,17 @@ export def claim (file: String): Result Path Error =
             | runJobWith virtualRunner
             | getJobOutput
 
-    # Compute the relative path in simplist form
+    # Compute the relative path in simplest form
     def isAbs = matches `/.*` file
     def relPath = if isAbs then
         relative workspace file
     else
         simplify file
 
-    # Fail if we're outside of wakeroot (relPath must be simplified)
+    # Fail if we're outside of wake's workspace (relPath must be simplified)
     def isOutsideRoot = matches `\.\..*/.*` relPath
     require False = isOutsideRoot
-    else failWithError "claim cannot be used on files outside of wake's root. Consider using claimFileAsPath instead."
+    else failWithError "{file}: claim cannot be used on files outside of wake's workspace. Consider using claimFileAsPath instead."
 
     # Now that our path is uniform check if it could have been fetched with `source`
     def base = basename relPath
@@ -116,7 +117,7 @@ export def claim (file: String): Result Path Error =
     require False = canBeSourced
     else failWithError "{file}: Is a source file, please use `source` or `sources` instead of `claim`"
 
-    # Finally if the file is inside of wakeroot and can't be sourced we're in the clear
+    # Finally if the file is inside of wake's workspace and can't be sourced we're in the clear
     raw_claim relPath
 
 # Find sources files
