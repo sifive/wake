@@ -467,8 +467,14 @@ static int wakefuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		}
 		file += de->d_name;
 
-		if (!it->second.is_readable(file))
-			continue;
+		if (!it->second.is_readable(file)) {
+			// Allow '.' and '..' links in this directory.
+			// This directory was earlier checked as visible (for '.') and
+			// the parent of a readable directory should also be visible (for '..').
+			std::string name(de->d_name);
+			if (!(name == "." || name == ".."))
+				continue;
+		}
 
 		if (filler(buf, de->d_name, &st, 0))
 			break;
