@@ -68,7 +68,7 @@ struct JobReflection {
   std::string stdin_file;
   Time starttime;
   Time endtime;
-  std::string wake_start;
+  Time wake_start;
   std::string wake_cmdline;
   std::string stdout_payload;
   std::string stderr_payload;

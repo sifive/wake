@@ -74,7 +74,7 @@ static void describe_human(const std::vector<JobReflection> &jobs, bool debug, b
       << "  Status:    " << job.usage.status << std::endl
       << "  Stdin:     " << job.stdin_file << std::endl;
     if (verbose) {
-      std::cout << "  Wake run:  " << job.wake_start << " (" << job.wake_cmdline << ")" << std::endl;
+      std::cout << "  Wake run:  " << job.wake_start.as_string() << " (" << job.wake_cmdline << ")" << std::endl;
       std::cout << "Visible:" << std::endl;
       for (auto &in : job.visible)
         std::cout << "  " << describe_hash(in.hash, verbose, job.stale)
@@ -139,7 +139,7 @@ static void describe_shell(const std::vector<JobReflection> &jobs, bool debug, b
       << "#   Out bytes: " << job.usage.obytes << std::endl
       << "#   Status:    " << job.usage.status << std::endl;
     if (verbose) {
-      std::cout << "#  Wake run:  " << job.wake_start << " (" << job.wake_cmdline << ")" << std::endl;
+      std::cout << "#  Wake run:  " << job.wake_start.as_string() << " (" << job.wake_cmdline << ")" << std::endl;
       std::cout << "# Visible:" << std::endl;
       for (auto &in : job.visible)
         std::cout << "#  " << describe_hash(in.hash, verbose, job.stale)

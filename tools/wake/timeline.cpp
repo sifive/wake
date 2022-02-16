@@ -42,9 +42,7 @@ struct JobNode {
 
     long parent_id = -1; // last dependency (has the greatest hypothetical endtime)
 
-    bool top_sort_visited = false;
     bool is_on_critical_path = false;
-    bool transitive_reduction_visited = false;
 
     explicit JobNode(JobReflection &_job) : job(_job) {
         std::string start_str = std::to_string(_job.starttime.as_int64());
@@ -54,16 +52,16 @@ struct JobNode {
     }
 };
 
-void dfs_top_sort(long job_id, std::map<long, JobNode> &job_map, std::vector<long> &top_sorted_jobs) {
+void dfs_top_sort(long job_id, std::map<long, JobNode> &job_map, std::vector<long> &top_sorted_jobs, std::set<long> &visited) {
     JobNode &job = job_map.at(job_id);
-    job_map.at(job_id).top_sort_visited = true;
+    visited.insert(job_id);
     for (auto it = job.dependencies.begin(); it != job.dependencies.end(); ) {
         if (job_map.find(*it) == job_map.end()) {
             it = job.dependencies.erase(it);
             continue;
         }
-        if (!(job_map.at(*it).top_sort_visited)) {
-            dfs_top_sort(*it, job_map, top_sorted_jobs);
+        if (visited.find(*it) == visited.end()) { // if not visited
+            dfs_top_sort(*it, job_map, top_sorted_jobs, visited);
         }
         it++;
     }
@@ -72,9 +70,10 @@ void dfs_top_sort(long job_id, std::map<long, JobNode> &job_map, std::vector<lon
 
 std::vector<long> top_sort(std::map<long, JobNode> &job_map) {
     std::vector<long> top_sorted_jobs;
+    std::set<long> visited;
     for (const auto &job_pair: job_map) {
-        if (!(job_pair.second.top_sort_visited)) {
-            dfs_top_sort(job_pair.first, job_map, top_sorted_jobs);
+        if (visited.find(job_pair.first) == visited.end()) { // if not visited
+            dfs_top_sort(job_pair.first, job_map, top_sorted_jobs, visited);
         }
     }
     return top_sorted_jobs;
@@ -130,15 +129,17 @@ void find_critical_path(std::map<long, JobNode> &job_map, std::vector<long> &cri
     }
 }
 
-void dfs_transitive_reduction(long job_id, std::map<long, JobNode> &job_map, std::vector<int> &ancestors) {
+void dfs_transitive_reduction(long job_id, std::map<long, JobNode> &job_map, std::set<long> &ancestors, std::set<long> &visited) {
     JobNode &job = job_map.at(job_id);
-    job_map.at(job_id).transitive_reduction_visited = true;
-    ancestors.emplace_back(job_id);
+    if (visited.find(job_id) == visited.end()) { // if not visited
+        ancestors.insert(job_id); // nodes not yet visited have not been stripped of their unnecessary edges
+        visited.insert(job_id);
+    }
 
     for (long child_id: job.dependencies) {
         JobNode &child = job_map.at(child_id);
         for (long grandchild_id: child.dependencies) {
-            for (int ancestor_id: ancestors) {
+            for (long ancestor_id: ancestors) {
                 JobNode ancestor = job_map.at(ancestor_id);
                 auto grandchild_ptr = std::find(ancestor.dependencies.begin(), ancestor.dependencies.end(),
                                                 grandchild_id);
@@ -147,16 +148,16 @@ void dfs_transitive_reduction(long job_id, std::map<long, JobNode> &job_map, std
                 }
             }
         }
-        dfs_transitive_reduction(child_id, job_map, ancestors);
+        dfs_transitive_reduction(child_id, job_map, ancestors, visited);
     }
-    ancestors.pop_back();
+    ancestors.erase(job_id);
 }
 
 void transitive_reduction(std::map<long, JobNode> &job_map) {
-    std::vector<int> ancestors;
+    std::set<long> ancestors, visited;
     for (const auto &job_pair: job_map) {
-        if (!(job_pair.second.transitive_reduction_visited)) {
-            dfs_transitive_reduction(job_pair.first, job_map, ancestors);
+        if (visited.find(job_pair.first) == visited.end()) { // if not visited
+            dfs_transitive_reduction(job_pair.first, job_map, ancestors, visited);
         }
     }
 }

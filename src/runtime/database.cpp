@@ -1001,23 +1001,19 @@ static std::vector<std::string> chop_null(const std::string &str) {
   return out;
 }
 
-static std::string format_time(int64_t ns) {
-  char buf[100];
-  struct tm tm;
-  time_t time = ns / 1000000000;
-  long subs = ns % 1000000000;
-  if (subs < 0) {
-    --time;
-    subs += 1000000000;
-  }
-  localtime_r(&time, &tm);
-  strftime(buf, sizeof(buf)-10, "%Y-%m-%d %H:%M:%S.", &tm);
-  snprintf(&buf[strlen(buf)], 10, "%09lu", subs);
-  return buf;
-}
-
 std::string Time::as_string() const {
-    return format_time(t);
+    char buf[100];
+    struct tm tm;
+    time_t time = t / 1000000000;
+    long subs = t % 1000000000;
+    if (subs < 0) {
+        --time;
+        subs += 1000000000;
+    }
+    localtime_r(&time, &tm);
+    strftime(buf, sizeof(buf) - 10, "%Y-%m-%d %H:%M:%S.", &tm);
+    snprintf(&buf[strlen(buf)], 10, "%09lu", subs);
+    return buf;
 }
 
 static JobReflection find_one(const Database *db, sqlite3_stmt *query, bool verbose) {
@@ -1034,7 +1030,7 @@ static JobReflection find_one(const Database *db, sqlite3_stmt *query, bool verb
   desc.starttime      = Time(sqlite3_column_int64(query, 7));
   desc.endtime        = Time(sqlite3_column_int64(query, 8));
   desc.stale          = sqlite3_column_int64 (query, 9) != 0;
-  desc.wake_start     = format_time(sqlite3_column_int64(query, 10));
+  desc.wake_start     = Time(sqlite3_column_int64(query, 10));
   desc.wake_cmdline   = rip_column(query, 11);
   desc.usage.status   = sqlite3_column_int64 (query, 12);
   desc.usage.runtime  = sqlite3_column_double(query, 13);
