@@ -56,6 +56,15 @@ export def explode (string: String): List String =
     def p s = prim "explode"
     p string
 
+# truncate: return only the first N Unicode code points from a given string.
+#
+#   truncate 7 "hello world" = "hello w"
+export def truncate (num: Integer) (string: String) : String =
+    string
+    | explode
+    | take num
+    | cat
+
 # strbase: convert an Integer into a String using a given base.
 #
 # For 2 <= base <= 36, the characters used for the encoding are:
