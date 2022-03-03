@@ -189,6 +189,20 @@ void describe(const std::vector<JobReflection> &jobs, bool script, bool debug, b
   }
 }
 
+void describe_failed(const std::vector<JobOutput> &jobs) {
+  for (auto &job : jobs) {
+    std::cout << "#" << job.label << "(" << job.job << ")\n";
+    for (auto &cmd_part : job.commandline) {
+      std::cout << cmd_part << " "; // # TODO: don't output trailing space
+    }
+    std::cout << "\n";
+    for (auto &log_line : job.outputs) {
+      std::cout << log_line.first;
+    }
+    std::cout << "\n" << std::endl;
+  }
+}
+
 class BitVector {
 public:
   BitVector() : imp() { }

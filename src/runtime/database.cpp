@@ -28,6 +28,7 @@
 #include <iostream>
 #include <sstream>
 #include <set>
+#include <unordered_map>
 
 #include "database.h"
 #include "status.h"
@@ -82,6 +83,7 @@ struct Database::detail {
   sqlite3_stmt *get_edges;
   sqlite3_stmt *get_job_visualization;
   sqlite3_stmt *get_file_access;
+  sqlite3_stmt *find_failed_outputs;
 
   long run_id;
   detail(bool debugdb_)
@@ -91,7 +93,7 @@ struct Database::detail {
      link_stats(0), detect_overlap(0), delete_overlap(0), find_prior(0), update_prior(0), delete_prior(0),
      find_job(0), find_owner(0), find_last(0), find_failed(0), fetch_hash(0), delete_jobs(0), delete_dups(0),
      delete_stats(0), revtop_order(0), setcrit_path(0), tag_job(0), get_tags(0), get_all_tags(0), get_edges(0),
-     get_job_visualization(0), get_file_access(0) { }
+     get_job_visualization(0), get_file_access(0), find_failed_outputs(0) { }
 };
 
 static void close_db(Database::detail *imp) {
@@ -381,7 +383,11 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     " from filetree"
     " where access != 1"
     " order by file_id, access desc, job_id";
-
+  const char *sql_find_failed_outputs =
+    "select j.job_id, j.label, j.directory, j.commandline, j.environment, l.output, l.descriptor"
+    " from jobs j left join stats s on j.stat_id=s.stat_id join log l on j.job_id=l.job_id"
+    " where s.status <> 0"
+    " order by j.job_id, l.seconds";
 
 #define PREPARE(sql, member)										\
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);						\
@@ -430,6 +436,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_get_edges,      get_edges);
   PREPARE(sql_get_job_visualization, get_job_visualization);
   PREPARE(sql_get_file_access, get_file_access);
+  PREPARE(sql_find_failed_outputs, find_failed_outputs);
 
   return "";
 }
@@ -487,6 +494,7 @@ void Database::close() {
   FINALIZE(get_edges);
   FINALIZE(get_job_visualization);
   FINALIZE(get_file_access);
+  FINALIZE(find_failed_outputs);
 
   close_db(imp.get());
 }
@@ -1091,6 +1099,36 @@ static std::vector<JobReflection> find_all(const Database *db, sqlite3_stmt *que
   return out;
 }
 
+static std::vector<JobOutput> failed_job_outputs(const Database *db, sqlite3_stmt *query) {
+  const char *why = "Could not get failed job outputs";
+  std::unordered_map<int, JobOutput> jobs;
+
+  db->begin_txn();
+  while (sqlite3_step(query) == SQLITE_ROW) {
+    int job_id = sqlite3_column_int(query, 0);
+    JobOutput* job = nullptr;
+    if (!jobs.count(job_id)) {
+      job = &jobs[job_id];
+      job->label = rip_column(query, 1);
+      job->directory = rip_column(query, 2);
+      job->commandline = chop_null(rip_column(query, 3));
+      job->environment = chop_null(rip_column(query, 4));
+    } else {
+      job = &jobs[job_id];
+    }
+    job->outputs.emplace_back(rip_column(query, 5), sqlite3_column_int(query, 6));
+  }
+  finish_stmt(why, query, db->imp->debugdb);
+  db->end_txn();
+
+  std::vector<JobOutput> out;
+  for (auto& job : jobs) {
+    out.emplace_back(std::move(job.second));
+  }
+
+  return out;
+}
+
 static std::vector<FileAccess> get_all_file_accesses(const Database *db, sqlite3_stmt *query) {
     const char *why = "Could not get file access";
     std::vector<FileAccess> out;
@@ -1160,4 +1198,8 @@ std::vector<JobReflection> Database::get_job_visualization() const {
 
 std::vector<FileAccess> Database::get_file_accesses() const {
     return get_all_file_accesses(this, imp->get_file_access);
+}
+
+std::vector<JobOutput> Database::failed_output() const {
+  return failed_job_outputs(this, imp->find_failed_outputs);
 }

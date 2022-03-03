@@ -416,7 +416,11 @@ int main(int argc, char **argv) {
   }
 
   if (failed) {
-    describe(db.failed(verbose || tag), script, debug, verbose, tag);
+    if (verbose) {
+      describe(db.failed(verbose || tag), script, debug, verbose, tag);
+    } else {
+      describe_failed(db.failed_output());
+    }
   }
 
   if (tagdag) {
