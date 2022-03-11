@@ -4,7 +4,7 @@ VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/
 
 CC	:= cc -std=c11
 CXX	:= c++ -std=c++11
-CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
+CFLAGS	:= -target x86_64-apple-darwin-macho -Wall -O2 -DVERSION=$(VERSION)
 LDFLAGS	:=
 DESTDIR ?= /usr/local
 
@@ -12,12 +12,12 @@ LOCAL_CFLAGS :=	-Ivendor -Isrc
 FUSE_CFLAGS  :=	$(shell pkg-config --silence-errors --cflags fuse)
 CORE_CFLAGS  := $(shell pkg-config --silence-errors --cflags sqlite3)	\
 		$(shell pkg-config --silence-errors --cflags gmp-6)	\
-		$(shell pkg-config --silence-errors --cflags re2)	\
+		-pthread -I/usr/local/opt/re2/include/	\
 		$(shell pkg-config --silence-errors --cflags-only-I ncurses)
 FUSE_LDFLAGS := $(shell pkg-config --silence-errors --libs fuse    || echo -lfuse)
 CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsqlite3)	\
 		$(shell pkg-config --silence-errors --libs gmp-6   || echo -lgmp)	\
-		$(shell pkg-config --silence-errors --libs re2     || echo -lre2)	\
+		-L/usr/local/opt/homebrew/Cellar/re2/lib -pthread -lre2	\
 		$(shell pkg-config --silence-errors --libs ncurses tinfo || pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
 COMMON_DIRS := src/compat src/util src/json
