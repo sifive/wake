@@ -1,4 +1,4 @@
-/* Linux namespace and mount ops for fuse-wake
+/* Linux namespace and mount ops for wakebox
  *
  * Copyright 2019 SiFive, Inc.
  *
@@ -207,7 +207,7 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
 
 	pid_t pid = fork();
 	if (pid == 0) {
-		// kernel to send SIGKILL to squashfuse when fuse-wake terminates
+		// kernel to send SIGKILL to squashfuse when wakebox terminates
 		if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
 			std::cerr << "squashfuse prctl: " << strerror(errno) << std::endl;
 			exit(1);

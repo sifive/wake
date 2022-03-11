@@ -1,4 +1,4 @@
-/* Linux namespace and mount ops for fuse-wake
+/* Linux namespace and mount ops for wakebox
  *
  * Copyright 2019 SiFive, Inc.
  *

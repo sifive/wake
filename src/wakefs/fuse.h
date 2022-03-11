@@ -29,13 +29,13 @@ struct daemon_client {
 	const std::string executable;
 	// Location that the fuse filesystem is mounted.
 	const std::string mount_path;
-	// Subdir in the fuse filesystem mount that will be used by this fuse-wake's job.
+	// Subdir in the fuse filesystem mount that will be used by this wakebox's job.
 	const std::string mount_subdir;
 	// Path that the fuse daemon will write result metadata to.
 	const std::string output_path;
 	// File that exists when the daemon is running/active.
 	const std::string is_running_path;
-	// File held open by each child of fuse-wake. When all children close it,
+	// File held open by each child of wakebox. When all children close it,
 	// the daemon releases the resources for that job.
 	const std::string subdir_live_file;
 	// JSON input file to the fuse daemon, listing which files should be visible.
