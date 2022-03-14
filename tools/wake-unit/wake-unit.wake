@@ -14,8 +14,7 @@
 # limitations under the License.
 
 package build_wake
-
 from wake import _
 
-target runtime variant =
-    src here variant (optimizer, dst, types, json, util, Nil) (util, gmp, sqlite3, re2, ncurses, Nil)
+target buildWakeUnit variant =
+    tool here variant "bin/wake-unit" (ncurses, runtime, Nil)

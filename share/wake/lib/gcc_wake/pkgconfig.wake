@@ -54,6 +54,7 @@ target pkgConfigImp args =
         output
         | tokenize ` `
         | filter (_ !=* "")
+        | filter (_ !=* "\r")
         | Some
     else
         None

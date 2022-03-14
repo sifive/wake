@@ -29,6 +29,7 @@
 
 #include "util/shell.h"
 #include "util/execpath.h"
+#include "util/colour.h"
 #include "runtime/database.h"
 #include "describe.h"
 
@@ -190,14 +191,18 @@ void describe(const std::vector<JobReflection> &jobs, bool script, bool debug, b
 }
 
 void describe_failed(const std::vector<JobOutput> &jobs) {
+  TermInfoBuf tbuf(std::cout.rdbuf());
+  std::ostream out(&tbuf);
   for (auto &job : jobs) {
-    std::cout << "#" << job.label << "(" << job.job << ")\n";
+    std::cout << "\n# " << job.label << "(" << job.job << ")\n";
     for (auto &cmd_part : job.commandline) {
       std::cout << cmd_part << " "; // # TODO: don't output trailing space
     }
-    std::cout << "\n";
+    std::cout << ":\n\n";
+
+    // We have to use our speical stream for the output of the program
     for (auto &log_line : job.outputs) {
-      std::cout << log_line.first;
+      out << log_line.first;
     }
     std::cout << "\n" << std::endl;
   }
