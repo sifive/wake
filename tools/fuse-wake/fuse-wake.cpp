@@ -34,12 +34,12 @@
 
 int main(int argc, char *argv[])
 {
-	if (argc != 3) {
-		std::cerr << "Syntax: fuse-wake <input-json> <output-json>" << std::endl;
+	if (argc != 5) {
+		std::cerr << "Syntax: fuse-wake -p <input-json> -o <output-json>" << std::endl;
 		return 1;
 	}
-	const std::string input_path = argv[1];
-	const std::string result_path = argv[2];
+	const std::string input_path = argv[2];
+	const std::string result_path = argv[4];
 
 	// Read the input file
 	std::ifstream ifs(input_path);
