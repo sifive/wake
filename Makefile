@@ -2,6 +2,8 @@
 
 VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/^[^']*'\([^']*\)'.*/\1/p" manifest.wake; else git describe --tags --dirty; fi)
 
+SANDBOX := $(shell if [ `uname` = Linux ] ; then echo bin/wakebox; else echo bin/fuse-wake ; fi)
+
 CC	:= cc -std=c11
 CXX	:= c++ -std=c++11
 CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
@@ -45,7 +47,7 @@ clean:
 	rm -f bin/* lib/wake/* */*.o */*/*.o src/json/jlexer.cpp src/parser/lexer.cpp src/parser/parser.cpp src/parser/parser.h src/version.h wake.db
 	touch bin/stamp lib/wake/stamp
 
-wake.db:	bin/wake bin/fuse-wake lib/wake/fuse-waked lib/wake/shim-wake
+wake.db:	bin/wake lib/wake/fuse-waked lib/wake/shim-wake $(SANDBOX)
 	test -f $@ || ./bin/wake --init .
 
 install:	all
@@ -67,6 +69,9 @@ bin/wake:	$(WAKE_OBJS)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
 bin/fuse-wake:		tools/fuse-wake/fuse-wake.cpp src/wakefs/*.cpp $(COMMON_OBJS)
+	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $^ -o $@ $(LDFLAGS)
+
+bin/wakebox:		tools/wakebox/wakebox.cpp src/wakefs/*.cpp vendor/gopt/*.c $(COMMON_OBJS)
 	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $^ -o $@ $(LDFLAGS)
 
 lib/wake/fuse-waked:	tools/fuse-waked/fuse-waked.cpp $(COMMON_OBJS)

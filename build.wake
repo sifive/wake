@@ -38,11 +38,10 @@ export def install: List String => Result String Error = match _
 
 # Build all wake targets
 def targets =
-    def allPlatforms = buildWake, buildFuse, buildFuseDaemon, buildShim, buildPreload, buildPrelib, buildBSP, buildLSP, Nil
-    def linuxOnly = buildWakeBox, Nil
+    def allPlatforms = buildWake, buildFuseDaemon, buildShim, buildPreload, buildPrelib, buildBSP, buildLSP, Nil
     match sysname
-        "Linux" = allPlatforms ++ linuxOnly
-        _       = allPlatforms
+        "Linux" = buildWakeBox, allPlatforms
+        _       = buildFuse, allPlatforms
 
 def all variant =
     require Pass x =

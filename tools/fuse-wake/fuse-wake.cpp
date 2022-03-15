@@ -34,7 +34,7 @@
 
 int main(int argc, char *argv[])
 {
-	if (argc != 5) {
+	if (argc != 5 || 0 != strncmp(argv[1], "-p", 2) || 0 != strncmp(argv[3], "-o", 2)) {
 		std::cerr << "Syntax: fuse-wake -p <input-json> -o <output-json>" << std::endl;
 		return 1;
 	}
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 		(std::istreambuf_iterator<char>(ifs)),
 		(std::istreambuf_iterator<char>()));
 	if (ifs.fail()) {
-		std::cerr << "read " << argv[1] << ": " << strerror(errno) << std::endl;
+		std::cerr << "read " << input_path << ": " << strerror(errno) << std::endl;
 		return 1;
 	}
 	ifs.close();
@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
 	if (!run_in_fuse(args, retcode, result))
 		return 1;
 
-	// Write output as json to argv[2]
+	// Write output as json to result_path
 	ssize_t wrote = write(out_fd, result.c_str(), result.length());
 	if (wrote == -1)
 		return errno;
