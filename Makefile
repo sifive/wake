@@ -3,7 +3,7 @@
 VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/^[^']*'\([^']*\)'.*/\1/p" manifest.wake; else git describe --tags --dirty; fi)
 
 CC	:= cc -std=c11
-CXX	:= c++ -std=c++11
+CXX	:= c++ -std=c++14
 CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
 LDFLAGS	:=
 DESTDIR ?= /usr/local
@@ -17,7 +17,7 @@ CORE_CFLAGS  := $(shell pkg-config --silence-errors --cflags sqlite3)	\
 FUSE_LDFLAGS := $(shell pkg-config --silence-errors --libs fuse    || echo -lfuse)
 CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsqlite3)	\
 		$(shell pkg-config --silence-errors --libs gmp-6   || echo -lgmp)	\
-		$(shell pkg-config --silence-errors --libs re2     || echo -lre2)	\
+		$(shell pkg-config --silence-errors --libs re2     || echo -lre2) -std=c++14 \
 		$(shell pkg-config --silence-errors --libs ncurses tinfo || pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
 COMMON_DIRS := src/compat src/util src/json
