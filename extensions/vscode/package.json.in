@@ -82,7 +82,7 @@
     "license": "Apache-2.0",
     "main": "./lsp-client/out/extension",
     "name": "wake",
-    "version": "0.25.0-alpha.65+g6be2d6c-dirty",
+    "version": "@VERSION@",
     "publisher": "SiFive",
     "engines": {
         "vscode": "^1.52.0"
