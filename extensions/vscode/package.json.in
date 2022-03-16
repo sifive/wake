@@ -1,6 +1,9 @@
 {
     "activationEvents": [
-        "onLanguage:plaintext"
+        "onLanguage:plaintext",
+        "onCommand:timeline.create",
+		"onCommand:timeline.refresh",
+		"onWebviewPanel:timeline"
     ],
     "author": "SiFive",
     "contributes": {
@@ -52,7 +55,19 @@
                 ],
                 "id": "wake"
             }
-        ]
+        ],
+        "commands": [
+			{
+				"command": "timeline.create",
+				"title": "Create",
+				"category": "Timeline"
+			},
+			{
+				"command": "timeline.refresh",
+				"title": "Refresh",
+				"category": "Timeline"
+			}
+		]
     },
     "dependencies": {
         "vscode-languageclient": "^7.0.0"
@@ -61,12 +76,13 @@
         "@types/node": "^15.14.9",
         "@types/vscode": "^1.52.0",
         "eslint": "^7.32.0",
-        "typescript": "^4.4.4"
+        "typescript": "^4.4.4",
+        "sqlite3": "^5.0.2"
     },
     "license": "Apache-2.0",
     "main": "./lsp-client/out/extension",
     "name": "wake",
-    "version": "@VERSION@",
+    "version": "0.25.0-alpha.65+g6be2d6c-dirty",
     "publisher": "SiFive",
     "engines": {
         "vscode": "^1.52.0"

@@ -1,0 +1,838 @@
+<!doctype html>
+<!--
+ Copyright 2022 SiFive, Inc.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You should have received a copy of LICENSE.Apache2 along with
+ this software. If not, you may obtain a copy at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ -->
+<html>
+<head>
+    <title>Timeline</title>
+    <script type="text/javascript"
+            src="https://unpkg.com/vis-timeline@7.5.0/standalone/umd/vis-timeline-graph2d.min.js"></script>
+    <link href="https://unpkg.com/vis-timeline@7.5.0/styles/vis-timeline-graph2d.min.css" rel="stylesheet"
+          type="text/css"/>
+    <style>
+        #timeline {
+            border: 0 solid lightgray;
+            height: 100%;
+        }
+        #job_info {
+            margin-left: 10px;
+            overflow: scroll;
+            height: 100%;
+        }
+    </style>
+    <script src="https://unpkg.com/split.js/dist/split.min.js"></script>
+</head>
+<body>
+<div class="content">
+    <div id="timeline"></div>
+    <div id="job_info">
+        <b>job <br></b>
+        <div id="job"></div>
+        <b><br>stale <br></b>
+        <div id="stale"></div>
+        <div><br></div>
+        <details open>
+            <summary><b>label</b></summary>
+            <div id="label"></div>
+        </details>
+        <b><br>directory <br></b>
+        <div id="directory"></div>
+        <div><br></div>
+        <details open>
+            <summary><b>commandline</b></summary>
+            <div id="commandline"></div>
+        </details>
+        <div><br></div>
+        <details open>
+            <summary><b>environment</b></summary>
+            <div id="environment"></div>
+        </details>
+        <div><br></div>
+        <details open>
+            <summary><b>stack</b></summary>
+            <div id="stack"></div>
+        </details>
+        <b><br>stdin_file <br></b>
+        <div id="stdin_file"></div>
+        <b><br>starttime <br></b>
+        <div id="starttime"></div>
+        <b><br>endtime <br></b>
+        <div id="endtime"></div>
+        <b><br>wake_start <br></b>
+        <div id="wake_start"></div>
+        <b><br>wake_cmdline <br></b>
+        <div id="wake_cmdline"></div>
+        <div><br></div>
+        <details open>
+            <summary><b>stdout_payload</b></summary>
+            <div id="stdout_payload"></div>
+        </details>
+        <div><br></div>
+        <details open>
+            <summary><b>stderr_payload</b></summary>
+            <div id="stderr_payload"></div>
+        </details>
+        <b><br>usage <br></b>
+        <div id="usage"></div>
+        <div><br></div>
+        <details open>
+            <summary><b>visible</b></summary>
+            <div id="visible"></div>
+        </details>
+        <div><br></div>
+        <details open>
+            <summary><b>inputs</b></summary>
+            <div id="inputs"></div>
+        </details>
+        <div><br></div>
+        <details open>
+            <summary><b>outputs</b></summary>
+            <div id="outputs"></div>
+        </details>
+        <div><br></div>
+        <details open>
+            <summary><b>tags</b></summary>
+            <div id="tags"></div>
+        </details>
+    </div>
+</div>
+<script src="https://unpkg.com/split.js/dist/split.min.js"></script>
+<style>
+    .vis-tooltip {
+        white-space: normal;
+        max-width: 100%;
+        word-wrap: break-word;
+        padding: 5px;
+    }
+    body {
+        margin: 0;
+        height: 100vh;
+    }
+    .content {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        justify-items: center;
+        align-items: center;
+    }
+    .gutter {
+        cursor: s-resize;
+        height: 100%;
+        background: grey;
+    }
+</style>
+<script>
+    Split(["#timeline", "#job_info"], {
+        gutterSize: 5,
+        sizes: [80, 20],
+        minSize: 0
+    });
+</script>
+<script type="application/json" id="jobReflections">{0}</script>
+<script type="application/json" id="fileAccesses">{1}</script>
+<script type="text/javascript">
+    /**
+     * timeline-arrows
+     * https://github.com/javdome/timeline-arrows
+     *
+     * Class to easily draw lines to connect items in the vis Timeline module.
+     *
+     * @version 3.1.0
+     * @date    2021-04-06
+     *
+     * @copyright (c) Javi Domenech (javdome@gmail.com)
+     *
+     *
+     * @license
+     * timeline-arrows is dual licensed under both
+     *
+     *   1. The Apache 2.0 License
+     *      http://www.apache.org/licenses/LICENSE-2.0
+     *
+     *   and
+     *
+     *   2. The MIT License
+     *      http://opensource.org/licenses/MIT
+     *
+     * timeline-arrows may be distributed under either license.
+     */
+
+    class Arrow {
+
+        constructor(timeline, dependencies) {
+            this._svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            this._timeline = timeline;
+
+            this._arrowHead = document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "marker"
+            );
+            this._arrowHeadPath = document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "path"
+            );
+
+            this._dependency = dependencies;
+
+            this._dependencyPath = [];
+
+            this._initialize();
+        }
+
+        _initialize() {
+            //Configures the SVG layer and add it to timeline
+            this._svg.style.position = "absolute";
+            this._svg.style.top = "0px";
+            this._svg.style.height = "100%";
+            this._svg.style.width = "100%";
+            this._svg.style.display = "block";
+            this._svg.style.zIndex = "1"; // Should it be above or below? (1 for above, -1 for below)
+            this._svg.style.pointerEvents = "none"; // To click through, if we decide to put it above other elements.
+            this._timeline.dom.center.appendChild(this._svg);
+
+            //Configure the arrowHead
+            this._arrowHead.setAttribute("id", "arrowhead0");
+            this._arrowHead.setAttribute("viewBox", "-10 -5 10 10");
+            this._arrowHead.setAttribute("refX", "-7");
+            this._arrowHead.setAttribute("refY", "0");
+            this._arrowHead.setAttribute("markerUnits", "strokeWidth");
+            this._arrowHead.setAttribute("markerWidth", "3");
+            this._arrowHead.setAttribute("markerHeight", "3");
+            this._arrowHead.setAttribute("orient", "auto");
+            //Configure the path of the arrowHead (arrowHeadPath)
+            this._arrowHeadPath.setAttribute("d", "M 0 0 L -10 -5 L -7.5 0 L -10 5 z");
+            this._arrowHeadPath.style.fill = "#9c0000";
+            this._arrowHead.appendChild(this._arrowHeadPath);
+            this._svg.appendChild(this._arrowHead);
+            //Create paths for the started dependency array
+            for (let i = 0; i < this._dependency.length; i++) {
+                this._createPath();
+            }
+
+            //NOTE: We hijack the on "changed" event to draw the arrows.
+            this._timeline.on("changed", () => {
+                this._drawDependencies();
+            });
+
+        }
+
+        _createPath(){
+            //Add a new path to array dependencyPath and to svg
+            let somePath = document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "path"
+            );
+            somePath.setAttribute("d", "M 0 0");
+            somePath.style.stroke = "#9c0000";
+            somePath.style.strokeWidth = "3px";
+            somePath.style.fill = "none";
+            somePath.style.pointerEvents = "auto";
+            this._dependencyPath.push(somePath);
+            this._svg.appendChild(somePath);
+        }
+
+
+
+        _drawDependencies() {
+            //Create paths for the started dependency array
+            for (let i = 0; i < this._dependency.length; i++) {
+                this._drawArrows(this._dependency[i], i);
+            }
+        }
+
+        _drawArrows(dep, index) {
+            //Checks if both items exist
+            //if( (typeof this._timeline.itemsData._data[dep.id_item_1] !== "undefined") && (typeof this._timeline.itemsData._data[dep.id_item_2] !== "undefined") ) {
+            //debugger;
+            if( (this._timeline.itemsData.get(dep.id_item_1) !== null) && (this._timeline.itemsData.get(dep.id_item_2) !== null) ) {
+                var bothItemsExist = true;
+            } else {
+                var bothItemsExist = false;
+            }
+
+            //Checks if at least one item is visible in screen
+            var oneItemVisible = false; //Iniciamos a false
+            if (bothItemsExist) {
+                var visibleItems = this._timeline.getVisibleItems();
+                for (let k = 0; k < visibleItems.length ; k++) {
+                    if (dep.id_item_1 == visibleItems[k]) oneItemVisible = true;
+                    if (dep.id_item_2 == visibleItems[k]) oneItemVisible = true;
+                }
+
+                //Checks if the groups of items are both visible
+                var groupOf_1_isVisible = false; //Iniciamos a false
+                var groupOf_2_isVisible = false; //Iniciamos a false
+
+                let groupOf_1 = this._timeline.itemsData.get(dep.id_item_1).group; //let groupOf_1 = items.get(dep.id_item_1).group;
+
+                let groupOf_2 = this._timeline.itemsData.get(dep.id_item_2).group; //let groupOf_2 = items.get(dep.id_item_2).group;
+
+                if ( this._timeline.groupsData.get(groupOf_1) ) groupOf_1_isVisible = true;
+
+                if ( this._timeline.groupsData.get(groupOf_2) ) groupOf_2_isVisible = true;
+
+
+                // If groups are null then they are not visible.
+                if (groupOf_1 == null){
+                    var groupOf_1_isVisible = false;
+                }
+                if (groupOf_2 == null){
+                    var groupOf_2_isVisible = false;
+                }
+            }
+
+            if ( (groupOf_1_isVisible && groupOf_2_isVisible) && (oneItemVisible) && (bothItemsExist)) {
+                var item_1 = this._getItemPos(this._timeline.itemSet.items[dep.id_item_1]);
+                var item_2 = this._getItemPos(this._timeline.itemSet.items[dep.id_item_2]);
+                if (item_2.mid_x < item_1.mid_x) [item_1, item_2] = [item_2, item_1]; // As demo, we put an arrow between item 0 and item1, from the one that is more on left to the one more on right.
+                var curveLen = item_1.height * 2; // Length of straight Bezier segment out of the item.
+                item_2.left -= 10; // Space for the arrowhead.
+                this._dependencyPath[index].setAttribute("marker-end", "url(#arrowhead0)");
+                this._dependencyPath[index].setAttribute(
+                    "d",
+                    "M " +
+                    item_1.right +
+                    " " +
+                    item_1.mid_y +
+                    " C " +
+                    (item_1.right + curveLen) +
+                    " " +
+                    item_1.mid_y +
+                    " " +
+                    (item_2.left - curveLen) +
+                    " " +
+                    item_2.mid_y +
+                    " " +
+                    item_2.left +
+                    " " +
+                    item_2.mid_y
+                );
+                // Adding the title if property title has been added in the dependency
+                if (dep.hasOwnProperty("title")) {
+                    this._dependencyPath[index].innerHTML = "<title>" +dep.title +"</title>"
+                }
+            } else {
+                this._dependencyPath[index].setAttribute("marker-end", "");
+                this._dependencyPath[index].setAttribute("d", "M 0 0");
+            }
+
+        }
+
+        //Función que recibe in Item y devuelve la posición en pantalla del item.
+        _getItemPos (item) {
+            let left_x = item.left;
+            let top_y = item.parent.top + item.parent.height - item.top - item.height;
+            return {
+                left: left_x,
+                top: top_y,
+                right: left_x + item.width,
+                bottom: top_y + item.height,
+                mid_x: left_x + item.width / 2,
+                mid_y: top_y + item.height / 2,
+                width: item.width,
+                height: item.height
+            }
+        }
+
+
+        addArrow (dep) {
+            this._dependency.push(dep);
+            this._createPath();
+            this._timeline.redraw();
+        }
+
+        getArrow (id) {
+            for (let i = 0; i < this._dependency.length; i++) {
+                if (this._dependency[i].id == id) {
+                    return this._dependency[i];
+                }
+            }
+            return null;
+        }
+
+        //Función que recibe el id de una flecha y la elimina.
+        removeArrow(id) {
+            for (let i = 0; i < this._dependency.length; i++) {
+                if (this._dependency[i].id == id) var index = i;
+            }
+
+            //var list = document.getElementsByTagName("path"); //FALTA QUE ESTA SELECCION LA HAGA PARA EL DOM DEL TIMELINE INSTANCIADO!!!!
+            var list = document.querySelectorAll("#" +this._timeline.dom.container.id +" path");
+
+            this._dependency.splice(index, 1); //Elimino del array dependency
+            this._dependencyPath.splice(index, 1); //Elimino del array dependencyPath
+
+            list[index + 1].parentNode.removeChild(list[index + 1]); //Lo elimino del dom
+        }
+
+        //Función que recibe el id de un item y elimina la flecha.
+        removeArrowbyItemId(id) {
+            let listOfRemovedArrows = [];
+            for (let i = 0; i < this._dependency.length; i++) {
+                if ( (this._dependency[i].id_item_1 == id) || (this._dependency[i].id_item_2 == id) ) {
+                    listOfRemovedArrows.push(this._dependency[i].id);
+                    this.removeArrow(this._dependency[i].id);
+                    i--;
+                }
+            }
+            return listOfRemovedArrows;
+        }
+    }
+</script>
+</body>
+</html>
+
+<script type="module">
+    /* Copyright 2022 SiFive, Inc.
+     *
+     * Licensed under the Apache License, Version 2.0 (the "License");
+     * you may not use this file except in compliance with the License.
+     * You should have received a copy of LICENSE.Apache2 along with
+     * this software. If not, you may obtain a copy at
+     *
+     *    https://www.apache.org/licenses/LICENSE-2.0
+     *
+     * Unless required by applicable law or agreed to in writing, software
+     * distributed under the License is distributed on an "AS IS" BASIS,
+     * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     * See the License for the specific language governing permissions and
+     * limitations under the License.
+     */
+
+    // DOM element where the Timeline will be attached
+    const container = document.getElementById('timeline');
+
+    const groups = new vis.DataSet([
+        {id: 0, content: "", value: 0}
+    ]);
+
+    // Order by job length
+    function customOrder(jobA, jobB) {
+        return (jobB.end - jobB.start) - (jobA.end - jobA.start);
+    }
+
+    // Configuration for the Timeline
+    const options = {
+        order: customOrder,
+        stack: true,
+        verticalScroll: true,
+        zoomKey: "ctrlKey",
+        width: '100%',
+        maxHeight: '700px',
+        tooltip: {
+            followMouse: true,
+            overflowMethod: "cap",
+        },
+        multiselect: true,
+        margin: {
+            item: {horizontal: -1, vertical: 0}
+        }
+    };
+
+    const jobs = new vis.DataSet();
+
+    // Create jobs Timeline
+    const timeline = new vis.Timeline(container, jobs, options, groups);
+
+    let criticalPathArrows = [];
+    let allArrows = [];
+    const visibleArrows = [];
+
+    const arrowObject = new Arrow(timeline, visibleArrows);
+
+    let jobReflections = JSON.parse(document.getElementById("jobReflections").textContent);
+    let fileAccesses = JSON.parse(document.getElementById("fileAccesses").textContent);
+
+    function addNodeArrows(node, added) {
+        for (const arrow of allArrows) {
+            if ((arrow.id_item_1 === node && !(added.includes(arrow.id_item_2))) ||
+                (arrow.id_item_2 === node && !(added.includes(arrow.id_item_1)))) {
+                arrowObject.addArrow(arrow);
+            }
+        }
+    }
+
+    function clearVisibleArrows() {
+        while (visibleArrows.length > 0) {
+            arrowObject.removeArrow(visibleArrows[visibleArrows.length - 1].id);
+        }
+    }
+
+    let selectedJobsIds = [];
+
+    function onSelect(items) {
+        clearVisibleArrows();
+        const added = [];
+        selectedJobsIds = [];
+        for (const item of items) {
+            addNodeArrows(item, added);
+            added.push(item);
+            selectedJobsIds.push(item);
+        }
+        for (const arrow of criticalPathArrows) {
+            if (!added.includes(arrow.id_item_1) && !added.includes(arrow.id_item_2)) {
+                arrowObject.addArrow(arrow);
+            }
+        }
+    }
+
+    timeline.on('select', properties => onSelect(properties.items));
+
+    timeline.on('click', function (properties) {
+        if (properties.item == null) {
+            document.getElementById("job").innerHTML = "";
+            document.getElementById("stale").innerHTML = "";
+            document.getElementById("label").innerHTML = "";
+            document.getElementById("directory").innerHTML = "";
+            document.getElementById("commandline").innerHTML = "";
+            document.getElementById("environment").innerHTML = "";
+            document.getElementById("stack").innerHTML = "";
+            document.getElementById("stdin_file").innerHTML = "";
+            document.getElementById("starttime").innerHTML = "";
+            document.getElementById("endtime").innerHTML = "";
+            document.getElementById("wake_start").innerHTML = "";
+            document.getElementById("wake_cmdline").innerHTML = "";
+            document.getElementById("stdout_payload").innerHTML = "";
+            document.getElementById("stderr_payload").innerHTML = "";
+            document.getElementById("usage").innerHTML = "";
+            document.getElementById("visible").innerHTML = "";
+            document.getElementById("inputs").innerHTML = "";
+            document.getElementById("outputs").innerHTML = "";
+            document.getElementById("tags").innerHTML = "";
+            return;
+        }
+        let job = jobMap.get(parseInt(properties.item)).job;
+        document.getElementById("job").innerHTML =job.job;
+        document.getElementById("stale").innerHTML =job.stale ? "true" : "false";
+        document.getElementById("label").innerHTML = job.label;
+        document.getElementById("directory").innerHTML = job.directory;
+        document.getElementById("commandline").innerHTML = job.commandline;
+        document.getElementById("environment").innerHTML = job.environment;
+        document.getElementById("stack").innerHTML = job.stack;
+        document.getElementById("stdin_file").innerHTML = job.stdin_file;
+
+        const starttime = new Date(job.starttime / 1e6);
+        document.getElementById("starttime").innerHTML = starttime.toISOString();
+        const endtime = new Date(job.endtime / 1e6);
+        document.getElementById("endtime").innerHTML = endtime.toISOString();
+        const wake_start = new Date(job.wake_start / 1e6);
+        document.getElementById("wake_start").innerHTML = wake_start.toISOString();
+
+        document.getElementById("wake_cmdline").innerHTML = job.wake_cmdline;
+        document.getElementById("stdout_payload").innerHTML = job.stdout_payload;
+        document.getElementById("stderr_payload").innerHTML = job.stderr_payload;
+
+        document.getElementById("usage").innerHTML = job.usage;
+        document.getElementById("visible").innerHTML = job.visible;
+        document.getElementById("inputs").innerHTML = job.inputs;
+        document.getElementById("outputs").innerHTML = job.outputs;
+        document.getElementById("tags").innerHTML = job.tags;
+    });
+
+    function compareJobs(jobA, jobB) {
+        return (jobA.id === jobB.id &&
+            jobA.starttime === jobB.starttime &&
+            jobA.endtime === jobB.endtime);
+    }
+
+    class JobNode {
+        constructor(job) {
+            this.job = job;
+            this.starttime = parseInt(job.starttime.toString().slice(0, -6));
+            this.endtime = parseInt(job.endtime.toString().slice(0, -6));
+
+            this.dependencies = new Set();
+
+            this.hypotheticalStarttime = 0;
+            this.hypotheticalEndtime = -1;
+            this.parentID = -1;
+            this.isOnCriticalPath = false;
+        }
+    }
+
+    function fillOneDependency(access, dependency, jobMap) {
+        const job = access.job;
+        if (access.type === 2) {
+            return job;
+        }
+        if (jobMap.has(job)) {
+            jobMap.get(job).dependencies.add(dependency);
+        }
+        return dependency;
+    }
+
+    function fillAllDependencies(accesses, jobMap) {
+        let dependency = -1;
+        for (let access of accesses) {
+            dependency = fillOneDependency(access, dependency, jobMap);
+        }
+    }
+
+    function dfsTopSort(jobID, jobMap, topSortedJobs, visited) {
+        let job = jobMap.get(jobID);
+        visited.add(jobID);
+        for (let dependency of job.dependencies) {
+            if (!jobMap.has(dependency)) {
+                job.dependencies.delete(dependency);
+                continue;
+            }
+            if (!visited.has(dependency)) {
+                dfsTopSort(dependency, jobMap, topSortedJobs, visited);
+            }
+        }
+        topSortedJobs.push(jobID);
+    }
+
+    function topSort(jobMap) {
+        let topSortedJobs = [];
+        let visited = new Set();
+        for (const [jobID, _] of jobMap.entries()) {
+            if (!visited.has(jobID)) {
+                dfsTopSort(jobID, jobMap, topSortedJobs, visited);
+            }
+        }
+        return topSortedJobs;
+    }
+
+    function assignParents(jobMap, topSortedJobs) {
+        for (const jobID of topSortedJobs) {
+            let jobNode = jobMap.get(jobID);
+            for (const dependencyID of jobNode.dependencies) {
+                let dependency = jobMap.get(dependencyID);
+                if (dependency.hypotheticalEndtime >= jobNode.hypotheticalStarttime) {
+                    jobNode.hypotheticalStarttime = dependency.hypotheticalEndtime;
+                    jobNode.parentID = dependencyID;
+                }
+            }
+            jobNode.hypotheticalEndtime = jobNode.hypotheticalStarttime + (jobNode.endtime - jobNode.starttime);
+        }
+    }
+
+    function dfsTransitiveReduction(jobID, jobMap, ancestors, visited) {
+        let job = jobMap.get(jobID);
+        if (!visited.has(jobID)) {
+            ancestors.add(jobID);
+            visited.add(jobID);
+        }
+
+        for (let childID of job.dependencies) {
+            let child = jobMap.get(childID);
+            for (let grandchildID of child.dependencies) {
+                for (let ancestorID of ancestors) {
+                    let ancestor = jobMap.get(ancestorID);
+                    ancestor.dependencies.delete(grandchildID);
+                }
+            }
+            dfsTransitiveReduction(childID, jobMap, ancestors, visited);
+        }
+        ancestors.delete(jobID);
+    }
+
+    function transitiveReduction(jobMap) {
+        let ancestors = new Set();
+        let visited = new Set();
+        for (const [jobID, _] of jobMap.entries()) {
+            if (!visited.has(jobID)) {
+                dfsTransitiveReduction(jobID, jobMap, ancestors, visited);
+            }
+        }
+    }
+
+    function findCriticalPath(jobMap, criticalPath) {
+        let latestJobID = -1;
+        for (const [jobID, jobNode] of jobMap.entries()) {
+            if (latestJobID === -1 ||
+                jobMap.get(latestJobID).hypotheticalEndtime < jobNode.hypotheticalEndtime) {
+                latestJobID = jobID;
+            }
+        }
+        jobMap.get(latestJobID).isOnCriticalPath = true;
+        criticalPath.push(latestJobID);
+        while (jobMap.get(latestJobID).parentID !== -1) {
+            latestJobID = jobMap.get(latestJobID).parentID;
+            jobMap.get(latestJobID).isOnCriticalPath = true;
+            criticalPath.push(latestJobID);
+        }
+    }
+
+    function updateJobs(jobMap) {
+        var survivingJobs = new Set();
+
+        let minStarttime = -1;
+        let maxEndtime = -1;
+        let times = [];
+
+        for (const [jobID, jobNode] of jobMap.entries()) {
+            survivingJobs.add(jobID);
+            const oldJob = jobs.get(jobID);
+            if (oldJob != null && oldJob.starttime === jobNode.starttime) { // no need to update this job
+                continue;
+            }
+
+            const job = jobNode.job;
+            let newJob = {
+                id: jobID,
+                group: 0,
+                start: jobNode.starttime,
+                end: jobNode.endtime
+            }
+            let label = job.label;
+            newJob.content = (!(label === "") ? label : jobID.toString());
+
+            newJob.title = jobID + "<br>" + (!(label === "") ? label : "");
+            jobs.update(newJob);
+
+            if (minStarttime > jobNode.starttime || minStarttime === -1) {
+                minStarttime = jobNode.starttime;
+            }
+            if (maxEndtime < jobNode.endtime || maxEndtime === -1) {
+                maxEndtime = jobNode.endtime;
+            }
+            times.push([jobNode.starttime, jobNode.endtime]);
+        }
+        var length = maxEndtime - minStarttime;
+
+        times.sort(function(t1, t2) {
+            if (t1[0] !== t2[0]) {
+                return t1[0] > t2[0] ? 1 : -1;
+            }
+            return t1[1] > t2[1] ? 1 : -1;
+        });
+
+        let merged_times = [];
+        merged_times.push(times[0]);
+        for (const [start, end] of times) {
+            let [start1, end1] = merged_times[merged_times.length - 1];
+            if (start > start1) {
+                merged_times.push([start, end]);
+            } else {
+                if (end1 < end) {
+                    merged_times[merged_times.length - 1][1] = end;
+                }
+            }
+        }
+
+        timeline.range.options.hiddenDates = [];
+        for (let i = 0; i + 1 < merged_times.length; i++) {
+            let end1 = merged_times[i][1];
+            let start2 = merged_times[i + 1][0];
+            length -= (start2 - end1);
+        }
+        timeline.range.options.min = minStarttime - length * 0.1;
+        timeline.range.options.max = maxEndtime + length * 0.1;
+
+        for (let i = 0; i + 1 < merged_times.length; i++) {
+            let end1 = merged_times[i][1];
+            let start2 = merged_times[i + 1][0];
+            if (start2 - end1 > length * 0.1) {
+                timeline.range.options.hiddenDates.push({start: end1 + length * 0.05, end: start2 - length * 0.05});
+            }
+        }
+
+        jobs.forEach(function (job) { // get rid of deleted jobs
+            if (!survivingJobs.has(job.id)) {
+                jobs.remove(job.id);
+            }
+        })
+    }
+
+    function updateCriticalArrows(criticalPath) {
+        criticalPathArrows = [];
+        for (let i = 0; i + 1 < criticalPath.length; i++) {
+            criticalPathArrows.push({
+                id: i,
+                id_item_1: criticalPath[i],
+                id_item_2: criticalPath[i + 1]
+            });
+        }
+    }
+
+    function updateAllArrows(jobMap, criticalPathSize) {
+        allArrows = [];
+        let id = criticalPathSize;
+        for (const [jobID, jobNode] of jobMap.entries()) {
+            for (const dependency of jobNode.dependencies) {
+                allArrows.push({
+                    id: id,
+                    id_item_1: jobID,
+                    id_item_2: dependency
+                });
+                id++;
+            }
+        }
+    }
+
+    function updateData(jobMap, criticalPath) {
+
+        clearVisibleArrows();
+
+        let selectedJobsIdsSet = new Set(selectedJobsIds);
+        let selectedJobs = jobs.get().filter(job => selectedJobsIdsSet.has(job.id));
+
+        updateJobs(jobMap);
+        const newJobsMap = new Map();
+        for (const job of jobs.get()) {
+            newJobsMap.set(job.id, job);
+        }
+        let filteredSelectedJobsIds = selectedJobs.filter(function(selectedJob) {
+            const newJob = newJobsMap.get(selectedJob.id);
+            if (newJob === null) {
+                return 0;
+            }
+            return compareJobs(selectedJob, newJob);
+        }).map(job => job.id);
+        timeline.setSelection(filteredSelectedJobsIds);
+        onSelect(filteredSelectedJobsIds);
+
+        updateAllArrows(jobMap, criticalPath.length);
+        updateCriticalArrows(criticalPath);
+
+        for (const arrow of criticalPathArrows) {
+            arrowObject.addArrow(arrow);
+        }
+    }
+
+    let jobMap = new Map();
+
+    function processChanges(newJobReflections, newFileAccesses) {
+        jobMap.clear();
+
+        for (const job of newJobReflections) {
+            jobMap.set(job.job, new JobNode(job));
+        }
+
+        fillAllDependencies(newFileAccesses, jobMap);
+
+        let topSortedJobs = topSort(jobMap);
+        assignParents(jobMap, topSortedJobs);
+        transitiveReduction(jobMap);
+
+        let criticalPath = [];
+        findCriticalPath(jobMap, criticalPath);
+
+        updateData(jobMap, criticalPath);
+
+    }
+
+    window.addEventListener("message", event => {
+        const message = event.data;
+        const newJobReflections = message.jobReflections;
+        const newFileAccesses = message.fileAccesses;
+        processChanges(newJobReflections, newFileAccesses);
+    });
+
+    processChanges(jobReflections, fileAccesses);
+</script>

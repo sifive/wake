@@ -15,8 +15,6 @@
  */
 
 #include <iostream>
-#include <algorithm>
-#include <map>
 #include <fstream>
 #include <sstream>
 #include <set>
@@ -26,245 +24,106 @@
 #include "util/execpath.h"
 #include "json/json5.h"
 
-struct JobNode {
-    JobReflection &job;
-    int64_t starttime;
-    int64_t endtime;
+std::string create_job_reflections(const std::vector<JobReflection> &jobs) {
+    JAST jobs_json(JSON_ARRAY);
+    for (const JobReflection &jobReflection: jobs) {
+        JAST &job_json = jobs_json.add("", JSON_OBJECT);
+        job_json.add("job", jobReflection.job);
+        job_json.add("label", jobReflection.label.c_str());
+        job_json.add("stale", jobReflection.stale);
+        job_json.add("directory", jobReflection.directory.c_str());
 
-    std::set<long> dependencies;
-
-    // Hypothetical times are the times the jobs would have started and ended if:
-    // every job without dependencies started at 0;
-    // every job with dependencies started as soon as its last dependency ended.
-    // The critical path therefore ends with the job with the greatest hypothetical endtime.
-    int64_t hypothetical_starttime = 0;
-    int64_t hypothetical_endtime = -1;
-
-    long parent_id = -1; // last dependency (has the greatest hypothetical endtime)
-
-    bool is_on_critical_path = false;
-
-    explicit JobNode(JobReflection &_job) : job(_job) {
-        std::string start_str = std::to_string(_job.starttime.as_int64());
-        std::string end_str = std::to_string(_job.endtime.as_int64());
-        starttime = std::stoll(start_str.substr(0, start_str.length() - 6));
-        endtime = std::stoll(end_str.substr(0, end_str.length() - 6));
-    }
-};
-
-void dfs_top_sort(long job_id, std::map<long, JobNode> &job_map, std::vector<long> &top_sorted_jobs, std::set<long> &visited) {
-    JobNode &job = job_map.at(job_id);
-    visited.insert(job_id);
-    for (auto it = job.dependencies.begin(); it != job.dependencies.end(); ) {
-        if (job_map.find(*it) == job_map.end()) {
-            it = job.dependencies.erase(it);
-            continue;
+        std::stringstream commandline;
+        for (const std::string &line: jobReflection.commandline) {
+            commandline << line << " ";
         }
-        if (visited.find(*it) == visited.end()) { // if not visited
-            dfs_top_sort(*it, job_map, top_sorted_jobs, visited);
+        job_json.add("commandline", commandline.str());
+
+        std::stringstream environment;
+        for (const std::string &line: jobReflection.environment) {
+            environment << line << " ";
         }
-        it++;
-    }
-    top_sorted_jobs.emplace_back(job_id);
-}
+        job_json.add("environment", environment.str());
 
-std::vector<long> top_sort(std::map<long, JobNode> &job_map) {
-    std::vector<long> top_sorted_jobs;
-    std::set<long> visited;
-    for (const auto &job_pair: job_map) {
-        if (visited.find(job_pair.first) == visited.end()) { // if not visited
-            dfs_top_sort(job_pair.first, job_map, top_sorted_jobs, visited);
+        job_json.add("stack", jobReflection.stack.c_str());
+
+        job_json.add("stdin_file", jobReflection.stdin_file.c_str());
+
+        job_json.add("starttime", jobReflection.starttime.as_int64());
+        job_json.add("endtime", jobReflection.endtime.as_int64());
+        job_json.add("wake_start", jobReflection.wake_start.as_int64());
+
+        job_json.add("wake_cmdline", jobReflection.wake_cmdline.c_str());
+        job_json.add("stdout_payload", jobReflection.stdout_payload.c_str());
+        job_json.add("stderr_payload", jobReflection.stderr_payload.c_str());
+
+        std::stringstream usage;
+        usage << "status: " << jobReflection.usage.status << "<br>" <<
+              "runtime: " << jobReflection.usage.runtime << "<br>" <<
+              "cputime: " << jobReflection.usage.cputime << "<br>" <<
+              "membytes: " << std::to_string(jobReflection.usage.membytes) << "<br>" <<
+              "ibytes: " << std::to_string(jobReflection.usage.ibytes) << "<br>" <<
+              "obytes: " << std::to_string(jobReflection.usage.obytes);
+        job_json.add("usage", usage.str());
+
+        std::stringstream visible;
+        for (const auto &visible_file: jobReflection.visible) {
+            visible << visible_file.path << "<br>";
         }
-    }
-    return top_sorted_jobs;
-}
+        job_json.add("visible", visible.str());
 
-long fill_one_dependency(FileAccess access, long dependency, std::map<long, JobNode> &job_map) {
-    if (access.type == 2) { // The job that output a file is a dependency of jobs that see the file.
-        return access.job; // return new dependency
-    }
-    if (job_map.find(access.job) != job_map.end()) {
-        job_map.at(access.job).dependencies.insert(dependency);
-    }
-    return dependency; // return the same dependency
-}
-
-void fill_all_dependencies(const std::vector<FileAccess> &accesses, std::map<long, JobNode> &job_map) {
-    long dependency = -1;
-    for (auto access: accesses) {
-        dependency = fill_one_dependency(access, dependency, job_map);
-    }
-}
-
-void assign_parents(std::map<long, JobNode> &job_map, std::vector<long> &top_sorted_jobs) {
-    for (long job_id: top_sorted_jobs) {
-        JobNode &job_node = job_map.at(job_id);
-        for (long dependency_id: job_node.dependencies) {
-            JobNode dependency = job_map.at(dependency_id);
-            if (dependency.hypothetical_endtime >= job_node.hypothetical_starttime) {
-                // A job hypothetically starts as soon as its dependency with the greatest hypothetical endtime ends.
-                job_node.hypothetical_starttime = dependency.hypothetical_endtime;
-                job_node.parent_id = dependency_id;
-            }
+        std::stringstream inputs;
+        for (const auto &input: jobReflection.inputs) {
+            inputs << input.path << "<br>";
         }
+        job_json.add("inputs", inputs.str());
 
-        job_node.hypothetical_endtime = job_node.hypothetical_starttime + (job_node.endtime - job_node.starttime);
-    }
-}
-
-void find_critical_path(std::map<long, JobNode> &job_map, std::vector<long> &critical_path) {
-    long latest_job_id = -1;
-    for (const auto &job_pair: job_map) {
-        if (latest_job_id == -1 ||
-            job_map.at(latest_job_id).hypothetical_endtime < job_pair.second.hypothetical_endtime) {
-            latest_job_id = job_pair.second.job.job;
+        std::stringstream outputs;
+        for (const auto &output: jobReflection.outputs) {
+            outputs << output.path << "<br>";
         }
-    }
-    job_map.at(latest_job_id).is_on_critical_path = true;
-    critical_path.emplace_back(job_map.at(latest_job_id).job.job);
-    while (job_map.at(latest_job_id).parent_id != -1) {
-        latest_job_id = job_map.at(latest_job_id).parent_id;
-        job_map.at(latest_job_id).is_on_critical_path = true;
-        critical_path.emplace_back(job_map.at(latest_job_id).job.job);
-    }
-}
+        job_json.add("outputs", outputs.str());
 
-void dfs_transitive_reduction(long job_id, std::map<long, JobNode> &job_map, std::set<long> &ancestors, std::set<long> &visited) {
-    JobNode &job = job_map.at(job_id);
-    if (visited.find(job_id) == visited.end()) { // if not visited
-        ancestors.insert(job_id); // nodes not yet visited have not been stripped of their unnecessary edges
-        visited.insert(job_id);
-    }
-
-    for (long child_id: job.dependencies) {
-        JobNode &child = job_map.at(child_id);
-        for (long grandchild_id: child.dependencies) {
-            for (long ancestor_id: ancestors) {
-                JobNode ancestor = job_map.at(ancestor_id);
-                auto grandchild_ptr = std::find(ancestor.dependencies.begin(), ancestor.dependencies.end(),
-                                                grandchild_id);
-                if (grandchild_ptr != ancestor.dependencies.end()) {
-                    ancestor.dependencies.erase(grandchild_ptr);
-                }
-            }
+        std::stringstream tags;
+        for (const auto &tag: jobReflection.tags) {
+            tags << "{<br>" <<
+                 "job: " << tag.job << ",<br>" <<
+                 "uri: " << tag.uri << ",<br>" <<
+                 "content: " << tag.content << "<br>},";
         }
-        dfs_transitive_reduction(child_id, job_map, ancestors, visited);
+        job_json.add("tags", tags.str());
     }
-    ancestors.erase(job_id);
+    std::stringstream buffer;
+    buffer << jobs_json;
+    return buffer.str();
 }
 
-void transitive_reduction(std::map<long, JobNode> &job_map) {
-    std::set<long> ancestors, visited;
-    for (const auto &job_pair: job_map) {
-        if (visited.find(job_pair.first) == visited.end()) { // if not visited
-            dfs_transitive_reduction(job_pair.first, job_map, ancestors, visited);
-        }
+std::string create_file_accesses(std::vector<FileAccess> &accesses) {
+    JAST accesses_json(JSON_ARRAY);
+    for (const FileAccess &access: accesses) {
+        JAST &access_json = accesses_json.add("", JSON_OBJECT);
+        access_json.add("type", access.type);
+        access_json.add("job", access.job);
     }
+    std::stringstream buffer;
+    buffer << accesses_json;
+    return buffer.str();
 }
 
-void write_jobs(const std::map<long, JobNode> &job_map, std::ostream &os) {
-    JAST jobs(JSON_ARRAY);
-
-    for (auto &job_pair: job_map) {
-        const JobReflection &job = job_pair.second.job;
-        JAST &job_json = jobs.add("", JSON_OBJECT);
-
-        job_json.add("id", job.job);
-        job_json.add("group", job_pair.second.is_on_critical_path ? 1 : 0);
-        std::string label = job.label;
-        job_json.add("content", (!(job.label.empty()) ? label : std::to_string(job.job)));
-        job_json.add("start", job_pair.second.starttime);
-        job_json.add("end", job_pair.second.endtime);
-
-        std::stringstream title;
-        title << job.job << "<br>"
-              << (!(job.label.empty()) ? job.label + "<br>" : "")
-              << "Command line:<br>";
-        for (std::string line: job.commandline) {
-            line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
-            title << line << " ";
-        }
-        if (!(job.outputs.empty())) {
-            title << "<br>Output file:";
-            for (const auto &output: job.outputs) {
-                title << "<br>" << output.path;
-            }
-        }
-        job_json.add("title", title.str());
-    }
-    os << jobs;
-}
-
-void write_critical_arrows(const std::vector<long> &critical_path, std::ostream &os) {
-    JAST arrows(JSON_ARRAY);
-    for (size_t i = 0; i + 1 < critical_path.size(); i++) {
-        JAST &arrow = arrows.add("", JSON_OBJECT);
-        arrow.add("id", (int) i);
-        arrow.add("id_item_1", critical_path[i]);
-        arrow.add("id_item_2", critical_path[i + 1]);
-    }
-    os << arrows;
-}
-
-void write_all_arrows(const std::map<long, JobNode> &job_map, size_t critical_path_size, std::ostream &os) {
-    JAST arrows(JSON_ARRAY);
-    size_t id = critical_path_size;
-    for (auto &job_pair: job_map) {
-        JobNode job_node = job_pair.second;
-        for (long dependency: job_node.dependencies) {
-            JAST &arrow = arrows.add("", JSON_OBJECT);
-            arrow.add("id", (int) id);
-            arrow.add("id_item_1", job_node.job.job);
-            arrow.add("id_item_2", dependency);
-            id++;
-        }
-    }
-    os << arrows;
-}
-
-void write_html(const std::map<long, JobNode> &job_map, const std::vector<long> &critical_path, std::ostream &os) {
-    std::ifstream html_template(find_execpath() + "/../share/wake/html/timeline_template.html");
-    std::ifstream arrow(find_execpath() + "/../share/wake/html/timeline_arrow.js");
-    std::ifstream main(find_execpath() + "/../share/wake/html/timeline_main.js");
-    os << html_template.rdbuf();
-
-    os << R"(<script type="application/json" id="jobs">)" << std::endl;
-    write_jobs(job_map, os);
-    os << "</script>" << std::endl;
-    os << R"(<script type="application/json" id="criticalPathArrows">)" << std::endl;
-    write_critical_arrows(critical_path, os);
-    os << "</script>" << std::endl;
-    os << R"(<script type="application/json" id="allArrows">)" << std::endl;
-    write_all_arrows(job_map, critical_path.size(), os);
-    os << "</script>" << std::endl;
-
-    os << R"(<script type="text/javascript">)" << std::endl;
-    os << arrow.rdbuf();
-    os << "</script>" << std::endl;
-
-    os << R"(<script type="module">)" << std::endl;
-    os << main.rdbuf();
-    os << "</script>\n"
-          "</body>\n"
-          "</html>\n";
+void write_html(std::vector<JobReflection> &jobs, std::vector<FileAccess> &accesses, std::ostream &os) {
+    std::ifstream html_template(find_execpath() + "/../share/wake/html/timeline.html");
+    std::stringstream buffer;
+    buffer << html_template.rdbuf();
+    std::string output = buffer.str();
+    size_t pos = output.find("{0}");
+    output.replace(pos, 3, create_job_reflections(jobs));
+    pos = output.find("{1}");
+    output.replace(pos, 3, create_file_accesses(accesses));
+    os << output;
 }
 
 void create_timeline(Database &db) {
     std::vector<JobReflection> jobs = db.get_job_visualization();
-    std::map<long, JobNode> job_map;
-    for (JobReflection &job: jobs) {
-        job_map.insert({job.job, JobNode(job)});
-    }
-
     std::vector<FileAccess> accesses = db.get_file_accesses();
-    fill_all_dependencies(accesses, job_map);
-
-    std::vector<long> top_sorted_jobs = top_sort(job_map);
-    assign_parents(job_map, top_sorted_jobs);
-    transitive_reduction(job_map);
-
-    std::vector<long> critical_path;
-    find_critical_path(job_map, critical_path);
-
-    write_html(job_map, critical_path, std::cout);
+    write_html(jobs, accesses, std::cout);
 }
