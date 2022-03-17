@@ -14,8 +14,6 @@ manifest.wake
 /src/parser/parser.cpp
 /src/json/jlexer.cpp
 /bin/wake*
-/bin/fuse-wake
-/bin/fuse-wake.*
 /bin/preload-wake
 /bin/preload-wake.*
 /bin/wakebox

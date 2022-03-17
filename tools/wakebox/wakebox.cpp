@@ -36,6 +36,8 @@
 #include "util/execpath.h"
 #include "wakefs/fuse.h"
 
+
+#ifdef __linux__
 void print_help() {
 	std::cout <<
 	"Usage: wakebox [OPTIONS] [COMMAND...]                                                         \n"
@@ -52,7 +54,6 @@ void print_help() {
 	"                                                                                              \n"
 	"Batch options                                                                                 \n"
 	"    -p --params FILE         Json file specifying input parameters. Above interactive options \n"
-	// TODO allow --params to be used with the interactive options.
 	"                             will be ignored.                                                 \n"
 	"    -o --output-stats FILE   Json file written containing output results and return code.     \n"
 	"    -s --force-shell         Run shell instead of command from params file.                   \n"
@@ -299,3 +300,76 @@ int main(int argc, char *argv[])
 	print_help();
 	return 1;
 }
+
+#else /* non-linux below */
+
+void print_help() {
+	std::cout <<
+	"Usage: wakebox -p FILE -o FILE                                                   \n"
+	"                                                                                 \n"
+	"NOTE: Restricted functionality due to operating system limitations.              \n"
+	"                                                                                 \n"
+	"Batch options                                                                    \n"
+	"    -p FILE         Json file specifying input parameters.                       \n"
+	"    -o FILE         Json file written containing output results and return code. \n"
+	"                                                                                 \n"
+	"Other options                                                                    \n"
+	"    -h --help       Print usage                                                  \n";
+}
+
+int main(int argc, char *argv[])
+{
+    if (argc != 5 || 0 != strncmp(argv[1], "-p", 2) || 0 != strncmp(argv[3], "-o", 2)) {
+		print_help();
+		return 1;
+	}
+	const std::string input_path = argv[2];
+	const std::string result_path = argv[4];
+
+	// Read the input file
+	std::ifstream ifs(input_path);
+	const std::string json(
+		(std::istreambuf_iterator<char>(ifs)),
+		(std::istreambuf_iterator<char>()));
+	if (ifs.fail()) {
+		std::cerr << "read " << input_path << ": " << strerror(errno) << std::endl;
+		return 1;
+	}
+	ifs.close();
+
+	// Open the output file
+	int out_fd = open(result_path.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0664);
+	if (out_fd < 0) {
+		std::cerr << "open " << result_path << ": " << strerror(errno) << std::endl;
+		return 1;
+	}
+
+	fuse_args args(get_cwd(), true);
+	if (!json_as_struct(json, args))
+		return 1;
+
+	// On non-linux platform like MacOS, run_in_fuse is unable to re-map the fuse
+	// mountpoint over the top of the original workspace.
+	// It may expose the temporary fuse mountpoint as a component of absolute paths.
+	args.command_running_dir = args.daemon.mount_subdir + "/" + args.directory;
+
+	int retcode; // unused
+	std::string result;
+	// Run the command contained in the json with the fuse daemon filtering
+	// the filesystem view of the workspace dir.
+	// Stdin/out/err will be closed.
+	if (!run_in_fuse(args, retcode, result))
+		return 1;
+
+	// Write output as json to result_path
+	ssize_t wrote = write(out_fd, result.c_str(), result.length());
+	if (wrote == -1)
+		return errno;
+
+	if (0 != close(out_fd))
+		return errno;
+
+	return 0;
+}
+
+#endif
