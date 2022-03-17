@@ -80,7 +80,7 @@ void add_argument_value(struct option options[], int option_index, char* value) 
   int arg_index = options[option_index].count - 1;
 
   if (options[option_index].flags & GOPT_REPEATABLE_VALUE) {
-    if (arg_index < options[option_index].max_args) {
+    if (arg_index < (int)options[option_index].max_args) {
       options[option_index].arguments[arg_index] = value;
     } else {
       options[option_index].flags |= GOPT_BUFFER_FULL;
