@@ -24,6 +24,8 @@
 #include <sstream>
 #include <vector>
 #include <csetjmp>
+
+#include "json/json5.h"
 #include "util/colour.h"
 
 // Represents an error message to display to the user
@@ -69,26 +71,6 @@ private:
     return TestStream(&err.user_error, assert ? &return_jmp_buffer : nullptr);
   }
 
-  // TODO: Make this work with unicode
-  static std::string quote(std::string str) {
-    {
-      std::stringstream ss1;
-      ss1 << std::quoted(str);
-      str = ss1.str();
-    }
-    std::stringstream ss;
-    for (char c : str) {
-      if (c < ' ') {
-        ss << "\\0";
-        if (c < 8) ss << "0";
-        ss << std::oct << (int)c;
-      } else {
-        ss << c;
-      }
-    }
-    return ss.str();
-  }
-
 public:
   TestStream expect(bool assert, bool expected, bool cond, const char* cond_str, int line, const char* file) {
     if (cond == expected) return TestStream(nullptr, nullptr);
@@ -115,9 +97,9 @@ public:
     err.test_name = test_name;
     err.file = file;
     err.line = line;
-    err.predicate_error << "Expected:\n\t" << term_colour(TERM_MAGENTA) << quote(expected);
+    err.predicate_error << "Expected:\n\t" << term_colour(TERM_MAGENTA) << json_escape(expected);
     err.predicate_error << term_normal() << "\nBut got:\n\t";
-    err.predicate_error << term_colour(TERM_MAGENTA) << quote(actual);
+    err.predicate_error << term_colour(TERM_MAGENTA) << json_escape(actual);
     err.predicate_error << term_normal() << std::endl;
     return fail(err, assert);
   }
@@ -160,6 +142,6 @@ struct TestRegisterUnique {
 
 #define TEST(name)\
 namespace {struct Test__Unique__ ## name {};}\
-void Test__ ## name (TestLogger&);\
+static void Test__ ## name (TestLogger&);\
 template<> TestRegister TestRegisterUnique<Test__Unique__ ## name>::unique_register(#name, Test__ ## name);\
-void Test__ ## name (TestLogger& logger__)
+static void Test__ ## name (TestLogger& logger__)

@@ -42,13 +42,13 @@ int main(int argc, char** argv) {
   bool no_color = false;
   if (argc > 2) {
     std::cerr << "Too many arguments to be valid, --no-color is the only valid argument";
-    return -1;
+    return 1;
   }
   if (argc == 2) {
     if (strcmp(argv[1],"--no-color") == 0) no_color = true;
     else {
       std::cerr << "`" << argv[1] << "` is not a valid argument, --no-color is the only valid option";
-      return -1;
+      return 1;
     }
   }
   term_init(true);
@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
   if (failed_tests.size()) {
     if (!no_color) std::cerr << term_normal();
     std::cerr << "\n\nFAILURE" << std::endl;
-    return -1;
+    return 1;
   } else {
     if (!no_color) std::cout << term_normal();
     std::cout << "\n\nSUCCESS" << std::endl;
