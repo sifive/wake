@@ -157,7 +157,6 @@ export def static _: Result Path Error =
     | getJobOutput
 
 from test_wake import topic wakeTestBinary
-from test_wake import topic wakeUnitTestBinary
 publish wakeTestBinary = defaultWake, Nil
 
 def defaultWake Unit =
