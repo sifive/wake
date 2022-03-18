@@ -36,7 +36,7 @@ export def install: List String => Result String Error = match _
     dest, Nil = doInstall (in cwd dest) "default" | rmap (\_ "INSTALL")
     _ = Fail "no directory specified (try: install /opt/local)".makeError
 
-# Build all wake targets
+# Build all wake targetse
 def targets =
     buildWake, buildWakeBox, buildFuseDaemon, buildShim, buildBSP, buildLSP, Nil
 
@@ -157,10 +157,20 @@ export def static _: Result Path Error =
     | getJobOutput
 
 from test_wake import topic wakeTestBinary
+from test_wake import topic wakeUnitTestBinary
 publish wakeTestBinary = defaultWake, Nil
+publish wakeUnitTestBinary = defaultWakeUnit, Nil
 
 def defaultWake Unit =
     require Pass wakeVisible =
         doInstall "tmp" "default"
 
     Pass (Pair "tmp/bin/wake" wakeVisible)
+
+def defaultWakeUnit Unit =
+    require Pass variant = toVariant "default"
+    require Pass files =
+        all variant
+    require Some (Pair wakeUnit _) = find (matches `.*wake\-unit.*` _.getPathName) files
+    else failWithError "No wake-unit was found"
+    Pass (wakeUnit.getPathName)

@@ -1,3 +1,5 @@
 #! /bin/sh
 
-"${1:-wake-unit}"
+set -e
+
+TERM=xterm-256color script --return --quiet -c "$2 --no-color" /dev/null

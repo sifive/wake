@@ -23,11 +23,17 @@ from wake import _
 # build.wake publishes to this topic so that 'make test' tests the built wake.
 # If tests/ is used externally, the topic is empty and the invoking wake is tested instead.
 export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
+export topic wakeUnitTestBinary: Unit => Result String Error
 
 def wakeToTest Unit = match (subscribe wakeTestBinary)
     fn, Nil = fn Unit
     Nil = Pass (Pair "{wakePath}/wake" Nil)
     _ = Fail (makeError "Two wake binaries declared for testing!")
+
+def wakeUnitToTest Unit = match (subscribe wakeUnitTestBinary)
+    fn, Nil = fn Unit
+    Nil = failWithError "No wake-unit binary found"
+    _ = failWithError "Multiple wake-unit binaries declared for testing!"
 
 export def runTests (cmdline: List String): Result String Error =
     require Pass filter = match cmdline
@@ -118,8 +124,11 @@ def runTest (testScript: Path): Result Unit Error =
     require Pass (Pair wakeBin wakeVisible) =
         wakeToTest Unit
 
+    require Pass wakeUnitBin =
+        wakeUnitToTest Unit
+
     def testJob =
-        makeExecPlan ("./{testScript.getPathName.inTestDir}", wakeBin.inTestDir, Nil) (visibleFiles ++ wakeVisible)
+        makeExecPlan ("./{testScript.getPathName.inTestDir}", wakeBin.inTestDir, wakeUnitBin.inTestDir, Nil) (visibleFiles ++ wakeVisible)
         | setPlanDirectory testDirectory
         | setPlanLabel "testing: {testName}"
         | setPlanLocalOnly True # On OS/X you cannot mount fuse within fuse
@@ -129,9 +138,11 @@ def runTest (testScript: Path): Result Unit Error =
 
     require Pass jobStdout =
         testJob.getJobStdout
+        | rmap (replace `\r` "")
 
     require Pass jobStderr =
         testJob.getJobStderr
+        | rmap (replace `\r` "")
 
     require Pass _ = match expectedStderr
         Some x if x ==* jobStderr = Pass Unit

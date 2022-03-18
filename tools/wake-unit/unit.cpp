@@ -20,6 +20,7 @@
 #include "util/diagnostic.h"
 
 #include <set>
+#include <cstring>
 
 DiagnosticReporter *reporter;
 
@@ -37,7 +38,19 @@ TestRegister::TestRegister(const char* test_name, TestFunc test) {
   tests__.emplace_back(test_name, test);
 }
 
-int main() {
+int main(int argc, char** argv) {
+  bool no_color = false;
+  if (argc > 2) {
+    std::cerr << "Too many arguments to be valid, --no-color is the only valid argument";
+    return -1;
+  }
+  if (argc == 2) {
+    if (strcmp(argv[1],"--no-color") == 0) no_color = true;
+    else {
+      std::cerr << "`" << argv[1] << "` is not a valid argument, --no-color is the only valid option";
+      return -1;
+    }
+  }
   term_init(true);
   TestLogger logger;
   std::set<std::string> failed_tests;
@@ -59,9 +72,12 @@ int main() {
   }
 
   for (auto& err : logger.errors) {
-    std::cerr << term_intensity(2) << err.file << ":" << err.line << ": ";
-    std::cerr << term_colour(TERM_RED) << "error: ";
-    std::cerr << term_normal() << std::endl;
+    if (!no_color) std::cerr << term_intensity(2);
+    std::cerr << err.file << ":" << err.line << ": ";
+    if (!no_color) std::cerr << term_colour(TERM_RED);
+    std::cerr << "error: ";
+    if (!no_color) std::cerr << term_normal();
+    std::cerr << std::endl;
     std::string msg = err.user_error.str();
     if (msg.size() > 0) {
       std::cerr << msg << std::endl;
@@ -71,24 +87,28 @@ int main() {
   }
 
   if (failed_tests.size()) {
-    std::cerr << term_colour(TERM_RED) << "FAILED:" << std::endl;
+    if (!no_color) std::cerr << term_colour(TERM_RED);
+    std::cerr << "FAILED:" << std::endl;
     for (auto& test_name : failed_tests) {
-      std::cerr << "\t" << test_name << std::endl;
+      std::cerr << "  " << test_name << std::endl;
     }
   }
 
   if (passing_tests.size()) {
-    std::cerr << term_colour(TERM_GREEN) << "PASSED:" << std::endl;
+    if (!no_color) std::cout << term_colour(TERM_GREEN);
+    std::cout << "PASSED:" << std::endl;
     for (auto& test_name : passing_tests) {
-      std::cerr << "\t" << test_name << std::endl;
+      std::cout << "  " << test_name << std::endl;
     }
   }
 
   if (failed_tests.size()) {
-    std::cerr << term_normal() << "\n\nFAILURE" << std::endl;
+    if (!no_color) std::cerr << term_normal();
+    std::cerr << "\n\nFAILURE" << std::endl;
     return -1;
   } else {
-    std::cerr << term_normal() << "\n\nSUCCESS" << std::endl;
+    if (!no_color) std::cout << term_normal();
+    std::cout << "\n\nSUCCESS" << std::endl;
     return 0;
   }
 }
