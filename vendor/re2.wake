@@ -19,11 +19,7 @@ from gcc_wake import _
 
 def re2 = match _
   Pair "wasm-cpp11-release" _ = buildRE2WASM Unit
-  _ =
-    pkgConfig "re2"
-    | getOrElseFn (\Unit pkg "re2")
-    | editSysLibCFlags (filter (\x ! (matches `-std=.*` x))) # remove -std=c++11
-    | Pass
+  _ = Pass (pkg "re2")
 
 
 def buildRE2WASM Unit =

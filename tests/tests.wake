@@ -15,6 +15,7 @@
 
 package test_wake
 from wake import _
+from build_wake import buildWakeUnit
 
 # The wake unit tests can be run on either the wake that invokes them or the
 # wake that was built by the rest of the build system.  This topic is used
@@ -23,17 +24,16 @@ from wake import _
 # build.wake publishes to this topic so that 'make test' tests the built wake.
 # If tests/ is used externally, the topic is empty and the invoking wake is tested instead.
 export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
-export topic wakeUnitTestBinary: Unit => Result String Error
 
 def wakeToTest Unit = match (subscribe wakeTestBinary)
     fn, Nil = fn Unit
     Nil = Pass (Pair "{wakePath}/wake" Nil)
     _ = Fail (makeError "Two wake binaries declared for testing!")
 
-def wakeUnitToTest Unit = match (subscribe wakeUnitTestBinary)
-    fn, Nil = fn Unit
-    Nil = failWithError "No wake-unit binary found"
-    _ = failWithError "Multiple wake-unit binaries declared for testing!"
+def wakeUnitToTest Unit = match (buildWakeUnit (Pair "native-cpp11-release" "native-c11-release"))
+    Pass (path, Nil) = Pass path.getPathName
+    Pass Nil = failWithError "No wake-unit binary found"
+    _ = failWithError "Multiple wake-unit executables found"
 
 export def runTests (cmdline: List String): Result String Error =
     require Pass filter = match cmdline

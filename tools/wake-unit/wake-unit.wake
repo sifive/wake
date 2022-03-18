@@ -16,5 +16,5 @@
 package build_wake
 from wake import _
 
-target buildWakeUnit variant =
+export target buildWakeUnit variant =
     tool here variant "bin/wake-unit" (ncurses, runtime, Nil)

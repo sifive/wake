@@ -128,7 +128,6 @@ public:
 #define EXPECT_EQUAL(x, y) (logger__.expect_equal(false, (x), (y), #x, #y, __LINE__, __FILE__))
 #define ASSERT_EQUAL(x, y) (logger__.expect_equal(true, (x), (y), #x, #y, __LINE__, __FILE__))
 
-
 using TestFunc = void(*)(TestLogger&);
 
 struct TestRegister {
