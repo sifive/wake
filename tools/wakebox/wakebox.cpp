@@ -37,11 +37,8 @@
 #include "wakefs/fuse.h"
 
 
-#ifdef __linux__
 void print_help() {
-	std::cout <<
-	"Usage: wakebox [OPTIONS] [COMMAND...]                                                         \n"
-	"                                                                                              \n"
+	const std::string interactive =
 	"Interactive options                                                                           \n"
 	"    -r --rootfs FILE         Use a squashfs file as the command's view of the root filesystem.\n"
 	"    -t --toolchain FILE      Make a toolchain visible on the command's view of the filesystem.\n"
@@ -50,11 +47,11 @@ void print_help() {
 	"                             of the filesystem at location DIR2.                              \n"
 	"                             May be specified multiple times.                                 \n"
 	"    -x                       Shorthand for '--bind $PWD:$PWD'                                 \n"
-	"    COMMAND                  The command to run.                                              \n"
-	"                                                                                              \n"
+	"    COMMAND                  The command to run.                                              \n";
+
+	const std::string batch_and_help =
 	"Batch options                                                                                 \n"
-	"    -p --params FILE         Json file specifying input parameters. Above interactive options \n"
-	"                             will be ignored.                                                 \n"
+	"    -p --params FILE         Json file specifying input parameters.                           \n"
 	"    -o --output-stats FILE   Json file written containing output results and return code.     \n"
 	"    -s --force-shell         Run shell instead of command from params file.                   \n"
 	"                             Implies --allow-interactive.                                     \n"
@@ -64,37 +61,57 @@ void print_help() {
 	"                                                                                              \n"
 	"Other options                                                                                 \n"
 	"    -h --help                Print usage                                                      \n";
+
+#ifdef __linux__
+	std::cout
+		<< "Usage: wakebox [OPTIONS] [COMMAND...]\n\n"
+		<< interactive
+		<< "\n"
+		<< batch_and_help;
+#else
+	std::cout
+		<< "Usage: wakebox [OPTIONS]\n\n"
+		<< "NOTE: Reduced command line options due to operating system support.\n"
+		<< "      Mount options, uid/gid control and network isolation in the input parameters file\n"
+		<< "      will be ignored.\n\n"
+		<< batch_and_help;
+#endif
 }
 
 // Decide the default working directory for the new process.
 // Wakebox does not provide direct control of the command running dir at this time.
-const std::string command_running_dir(
-	const std::vector<mount_op>& mount_ops,
-	const std::string& host_workspace_dir,
-	const std::string& subdir)
+const std::string pick_running_dir(const struct fuse_args &fa)
 {
+#ifdef __linux__
 	// If we have a workspace mount, we want to default to that location.
-	for (auto &x : mount_ops) {
+	for (auto &x : fa.mount_ops) {
 		if (x.type == "workspace") {
 			if (x.destination[0] == '/')
-				return x.destination + "/" + subdir;
+				return x.destination + "/" + fa.directory;
 			else
 				// convert a workspace relative path into absolute path
-				return host_workspace_dir + "/" + x.destination + "/" + subdir;
+				return fa.working_dir + "/" + x.destination + "/" + fa.directory;
 		}
 	}
 	// If we're binding in the parent namespace's current working directory, use that.
-	for (auto &x : mount_ops)
-		if (x.type == "bind" && host_workspace_dir == x.source)
-			return x.destination + "/" + subdir;
+	for (auto &x : fa.mount_ops)
+		if (x.type == "bind" && fa.working_dir == x.source)
+			return x.destination + "/" + fa.directory;
 
 	// If we have a replacement rootfs, we know we atleast have "/".
-	for (auto &x : mount_ops)
+	for (auto &x : fa.mount_ops)
 		if (x.destination == "/")
-			return "/" + subdir;
+			return "/" + fa.directory;
 
 	// Try the current directory, which should exist if we have no replacement rootfs.
-	return host_workspace_dir + "/" + subdir;
+	return fa.working_dir + "/" + fa.directory;
+#else
+	// On non-linux platforms like MacOS, run_in_fuse is unable to re-map the fuse
+	// mountpoint over the top of the original workspace.
+	// It may expose the temporary fuse mountpoint as a component of absolute paths.
+	return fa.daemon.mount_subdir + "/" + fa.directory;
+#endif
+
 }
 
 // Interactive mode does not provide userid control at this time.
@@ -124,7 +141,7 @@ int run_interactive(
 	const char *term = std::getenv("TERM");
 	fa.environment.push_back(std::string("TERM=") + term);
 
-	fa.command_running_dir = command_running_dir(fa.mount_ops, fa.working_dir, "");
+	fa.command_running_dir = pick_running_dir(fa);
 
 	int retcode;
 	std::string result;
@@ -156,7 +173,7 @@ int run_batch(
 	fuse_args args(get_cwd(), use_stdin_file);
 	if (!json_as_struct(json, args))
 		return 1;
-	args.command_running_dir = command_running_dir(args.mount_ops, args.working_dir, args.directory);
+	args.command_running_dir = pick_running_dir(args);
 
 	if (args.command.empty() || args.command[0].empty()) {
 		std::cerr << "No command was provided." << std::endl;
@@ -218,11 +235,12 @@ int main(int argc, char *argv[])
 	std::vector<char*> binds(max_pairs, nullptr);
 
 	struct option options[] {
+#ifdef __linux__
 		{'r', "rootfs",    GOPT_ARGUMENT_REQUIRED},
 		{'t', "toolchain", GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, tools.data(), max_pairs},
 		{'b', "bind",      GOPT_ARGUMENT_REQUIRED | GOPT_REPEATABLE_VALUE, binds.data(), max_pairs},
 		{'x', "bind-cwd",  GOPT_ARGUMENT_FORBIDDEN},
-
+#endif
 		{'p', "params",          GOPT_ARGUMENT_REQUIRED},
 		{'o', "output-stats",    GOPT_ARGUMENT_REQUIRED},
 		{'s', "force-shell",     GOPT_ARGUMENT_FORBIDDEN},
@@ -300,76 +318,3 @@ int main(int argc, char *argv[])
 	print_help();
 	return 1;
 }
-
-#else /* non-linux below */
-
-void print_help() {
-	std::cout <<
-	"Usage: wakebox -p FILE -o FILE                                                   \n"
-	"                                                                                 \n"
-	"NOTE: Restricted functionality due to operating system limitations.              \n"
-	"                                                                                 \n"
-	"Batch options                                                                    \n"
-	"    -p FILE         Json file specifying input parameters.                       \n"
-	"    -o FILE         Json file written containing output results and return code. \n"
-	"                                                                                 \n"
-	"Other options                                                                    \n"
-	"    -h --help       Print usage                                                  \n";
-}
-
-int main(int argc, char *argv[])
-{
-    if (argc != 5 || 0 != strncmp(argv[1], "-p", 2) || 0 != strncmp(argv[3], "-o", 2)) {
-		print_help();
-		return 1;
-	}
-	const std::string input_path = argv[2];
-	const std::string result_path = argv[4];
-
-	// Read the input file
-	std::ifstream ifs(input_path);
-	const std::string json(
-		(std::istreambuf_iterator<char>(ifs)),
-		(std::istreambuf_iterator<char>()));
-	if (ifs.fail()) {
-		std::cerr << "read " << input_path << ": " << strerror(errno) << std::endl;
-		return 1;
-	}
-	ifs.close();
-
-	// Open the output file
-	int out_fd = open(result_path.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0664);
-	if (out_fd < 0) {
-		std::cerr << "open " << result_path << ": " << strerror(errno) << std::endl;
-		return 1;
-	}
-
-	fuse_args args(get_cwd(), true);
-	if (!json_as_struct(json, args))
-		return 1;
-
-	// On non-linux platform like MacOS, run_in_fuse is unable to re-map the fuse
-	// mountpoint over the top of the original workspace.
-	// It may expose the temporary fuse mountpoint as a component of absolute paths.
-	args.command_running_dir = args.daemon.mount_subdir + "/" + args.directory;
-
-	int retcode; // unused
-	std::string result;
-	// Run the command contained in the json with the fuse daemon filtering
-	// the filesystem view of the workspace dir.
-	// Stdin/out/err will be closed.
-	if (!run_in_fuse(args, retcode, result))
-		return 1;
-
-	// Write output as json to result_path
-	ssize_t wrote = write(out_fd, result.c_str(), result.length());
-	if (wrote == -1)
-		return errno;
-
-	if (0 != close(out_fd))
-		return errno;
-
-	return 0;
-}
-
-#endif
