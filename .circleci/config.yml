@@ -2,7 +2,7 @@ version: 2.1
 jobs:
   tarball:
     machine:
-      image: ubuntu-1604:202007-01
+      image: ubuntu-2004:202201-02
 #    resource_class: large # paywalled feature: 4 cores
     steps:
       - checkout
@@ -23,7 +23,7 @@ jobs:
 
   vscode:
     machine:
-      image: ubuntu-1604:202007-01
+      image: ubuntu-2004:202201-02
 #      docker_layer_caching: true # paywalled feature: retain docker build results between runs
 #    resource_class: large
     steps:
@@ -42,7 +42,7 @@ jobs:
 
   alpine:
     machine:
-      image: ubuntu-1604:202007-01
+      image: ubuntu-2004:202201-02
 #      docker_layer_caching: true # paywalled feature: retain docker build results between runs
 #    resource_class: large
     steps:
@@ -62,7 +62,7 @@ jobs:
 
   debian_jessie:
     machine:
-      image: ubuntu-1604:202007-01
+      image: ubuntu-2004:202201-02
 #      docker_layer_caching: true
 #    resource_class: large
     steps:
@@ -84,7 +84,7 @@ jobs:
 
   debian_bullseye:
     machine:
-      image: ubuntu-1604:202007-01
+      image: ubuntu-2004:202201-02
 #      docker_layer_caching: true
 #    resource_class: large
     steps:
@@ -106,7 +106,7 @@ jobs:
 
   centos_7_6:
     machine:
-      image: ubuntu-1604:202007-01
+      image: ubuntu-2004:202201-02
 #      docker_layer_caching: true
 #    resource_class: large
     steps:
@@ -126,7 +126,7 @@ jobs:
 
   rocky_8:
     machine:
-      image: ubuntu-1604:202007-01
+      image: ubuntu-2004:202201-02
     steps:
       - attach_workspace:
           at: /tmp/workspace
@@ -144,7 +144,7 @@ jobs:
 
   ubuntu_14_04:
     machine:
-      image: ubuntu-1604:202007-01
+      image: ubuntu-2004:202201-02
 #      docker_layer_caching: true
 #    resource_class: large
     steps:
@@ -166,7 +166,7 @@ jobs:
 
   ubuntu_16_04:
     machine:
-      image: ubuntu-1604:202007-01
+      image: ubuntu-2004:202201-02
 #      docker_layer_caching: true
 #    resource_class: large
     steps:
@@ -188,7 +188,7 @@ jobs:
 
   ubuntu_18_04:
     machine:
-      image: ubuntu-1604:202007-01
+      image: ubuntu-2004:202201-02
 #      docker_layer_caching: true
 #    resource_class: large
     steps:
