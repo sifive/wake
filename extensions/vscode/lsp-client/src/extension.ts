@@ -93,7 +93,7 @@ function getWebviewOptions(): vscode.WebviewOptions {
  */
 class TimelinePanel {
 	/**
-	 * Track the currently panel. Only allow a single panel to exist at a time.
+	 * Track the current panel. Only allow a single panel to exist at a time.
 	 */
 	public static currentPanel: TimelinePanel | undefined;
 
@@ -164,7 +164,7 @@ class TimelinePanel {
 	}
 
 	private _getDB() {
-		return new sqlite3.Database(__dirname + '/../../../../wake.db', (err) => {
+		return new sqlite3.Database(__dirname + '/../../../../wake.db', sqlite3.OPEN_READONLY, (err) => {
 			if (err) {
 				return console.error(err.message);
 			}
@@ -173,13 +173,14 @@ class TimelinePanel {
 
 	public refresh() {
 		let db = this._getDB();
-		this._queryDB(db, (json: JobReflection[], accessesJson: { type: number, job: number }[]) => {
+		this._queryDB(db, (jobsJson: JobReflection[], accessesJson: { type: number, job: number }[]) => {
 			let message = {
-				jobReflections: json,
+				jobReflections: jobsJson,
 				fileAccesses: accessesJson
 			}
-			// Send a message to the webview webview.
+			// Send a message to the webview.
 			this._panel.webview.postMessage(message);
+			db.close();
 		});
 	}
 
@@ -203,9 +204,10 @@ class TimelinePanel {
 		let db = this._getDB();
 		try {
 			let data = fs.readFileSync(__dirname + '/../../../../share/wake/html/timeline.html', { encoding: 'utf8' }).toString();
-			this._queryDB(db, (json: JobReflection[], accessesJson: { type: number, job: number }[]) => {
-				this._panel.webview.html = this._formatString(data, JSON.stringify(json), JSON.stringify(accessesJson));
-			});			
+			this._queryDB(db, (jobsJson: JobReflection[], accessesJson: { type: number, job: number }[]) => {
+				this._panel.webview.html = this._formatString(data, JSON.stringify(jobsJson), JSON.stringify(accessesJson));
+				db.close();
+			});
 		} catch (err) { }
 		return;
 	}
@@ -218,25 +220,81 @@ class TimelinePanel {
 	}
 
 	private _queryDB(db: sqlite3.Database, callback: Function) {
-		let json: JobReflection[] = [];
-			let accessesJson: { type: number, job: number }[] = [];
-			let sql = 
-			`select j.job_id, j.label, j.directory, j.commandline, j.environment, j.stack, j.stdin, j.starttime, j.endtime, j.stale, r.time, r.cmdline, s.status, s.runtime, s.cputime, s.membytes, s.ibytes, s.obytes
-			 from  jobs j left join stats s on j.stat_id=s.stat_id join runs r on j.run_id=r.run_id
-			 where substr(cast(j.commandline as varchar), 1, 8) != '<source>'
+		let jobsJson: JobReflection[] = [];
+		let accessesJson: { type: number, job: number }[] = [];
+		let jobsSql =
+			`select job_id,
+			label,
+			directory,
+			commandline,
+			environment,
+			stack,
+			stdin,
+			starttime,
+			endtime,
+			stale,
+			time,
+			cmdline,
+			status,
+			runtime,
+			cputime,
+			membytes,
+			ibytes,
+			obytes,
+			access,
+			group_concat(path, '<br>') as paths,
+			tags
+	 from (select j.job_id,
+				  j.label,
+				  j.directory,
+				  j.commandline,
+				  j.environment,
+				  j.stack,
+				  j.stdin,
+				  j.starttime,
+				  j.endtime,
+				  j.stale,
+				  r.time,
+				  r.cmdline,
+				  s.status,
+				  s.runtime,
+				  s.cputime,
+				  s.membytes,
+				  s.ibytes,
+				  s.obytes,
+				  ft.access,
+				  f.path,
+				  t.tags
+		   from jobs j
+					left join stats s on j.stat_id = s.stat_id
+					join runs r on j.run_id = r.run_id
+					cross join filetree ft on j.job_id = ft.job_id
+					left join files f on ft.file_id = f.file_id
+					left join (select j.job_id,
+									  group_concat(t.content, ',<br><br>') as tags
+							   from jobs j
+										left join tags t on j.job_id = t.job_id
+							   group by j.job_id) t on t.job_id = j.job_id
+		   where substr(cast(j.commandline as varchar), 1, 8) != '<source>'
 			 and substr(cast(j.commandline as varchar), 1, 7) != '<mkdir>'
 			 and substr(cast(j.commandline as varchar), 1, 7) != '<write>'
-			 and substr(cast(j.commandline as varchar), 1, 6) != '<hash>'`;
+			 and substr(cast(j.commandline as varchar), 1, 6) != '<hash>'
+		   order by j.job_id, f.path)
+	 group by job_id, label, directory, commandline, environment, stack, stdin, starttime, endtime, stale, time, cmdline,
+			  status, runtime, cputime, membytes, ibytes, obytes, access, tags`;
 
-			db.each(sql, (err, row) => {
-				const reflection: JobReflection = {
+		let lastCreatedID = -1;
+		db.each(jobsSql, (err, row) => {
+			if (row.job_id != lastCreatedID) {
+				lastCreatedID = row.job_id;
+				const jobReflection: JobReflection = {
 					job: row.job_id,
 					label: row.label,
 					stale: row.stale,
 					directory: row.directory,
 					commandline: row.commandline.toString().replaceAll('\0', ' '),
 					environment: row.environment.toString().replaceAll('\0', ' '),
-					stack: JSON.stringify(row.stack), //!
+					stack: row.stack.toString(),
 					stdin_file: row.stdin.length != 0 ? row.stdin : '/dev/null',
 					starttime: row.starttime,
 					endtime: row.endtime,
@@ -244,30 +302,39 @@ class TimelinePanel {
 					wake_cmdline: row.cmdline,
 					stdout_payload: row.stdout_payload,
 					stderr_payload: row.stderr_payload,
-					usage: 'status: ' + row.status + '<br>runtime: ' + row.runtime + '<br>cputime: ' + row.cputime + '<br>membytes: ' + row.membytes + 'br>ibytes: ' + row.ibytes + '<br>obytes: ' + row.obytes,
+					usage: 'status: ' + row.status + '<br>runtime: ' + row.runtime + '<br>cputime: ' + row.cputime + '<br>membytes: ' + row.membytes + '<br>ibytes: ' + row.ibytes + '<br>obytes: ' + row.obytes,
 					visible: '',
 					inputs: '',
 					outputs: '',
-					tags: ''
-				}
-				json.push(reflection);
-			}, (err, count) => {
-								let sql2 =
+					tags: row.tags
+				};
+				jobsJson.push(jobReflection);
+			}
+			const jobReflection = jobsJson[jobsJson.length - 1];
+			if (row.access == 0) {
+				jobReflection.visible = row.paths;
+			} else if (row.access == 1) {
+				jobReflection.inputs = row.paths;
+			} else {
+				jobReflection.outputs = row.paths;
+			}
+		}, (err, count) => {
+				let accessesSql =
 					`select access, job_id
-				from filetree
-				where access != 1
-				order by file_id, access desc, job_id`;
+                     from filetree
+                     where access != 1
+                     order by file_id, access desc, job_id`;
 
-				db.each(sql2, (err, row) => {
+				db.each(accessesSql, (err, row) => {
 					const fileAccess = {
 						type: row.access,
 						job: row.job_id
 					}
 					accessesJson.push(fileAccess);
-				},   (err, count) => {
-						callback(json, accessesJson);
+				}, (err, count) => {
+						callback(jobsJson, accessesJson);
 					});
-			});
+		});
 	}
 }
 

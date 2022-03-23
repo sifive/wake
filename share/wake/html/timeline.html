@@ -659,6 +659,9 @@
                 latestJobID = jobID;
             }
         }
+        if (latestJobID === -1) {
+            return;
+        }
         jobMap.get(latestJobID).isOnCriticalPath = true;
         criticalPath.push(latestJobID);
         while (jobMap.get(latestJobID).parentID !== -1) {
