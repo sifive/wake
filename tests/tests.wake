@@ -15,7 +15,6 @@
 
 package test_wake
 from wake import _
-from build_wake import buildWakeUnit
 
 # The wake unit tests can be run on either the wake that invokes them or the
 # wake that was built by the rest of the build system.  This topic is used
@@ -30,10 +29,7 @@ def wakeToTest Unit = match (subscribe wakeTestBinary)
     Nil = Pass (Pair "{wakePath}/wake" Nil)
     _ = Fail (makeError "Two wake binaries declared for testing!")
 
-def wakeUnitToTest Unit = match (buildWakeUnit (Pair "native-cpp11-release" "native-c11-release"))
-    Pass (path, Nil) = Pass path.getPathName
-    Pass Nil = failWithError "No wake-unit binary found"
-    _ = failWithError "Multiple wake-unit executables found"
+def wakeUnitToTest = "{wakePath}/wake-unit"
 
 export def runTests (cmdline: List String): Result String Error =
     require Pass filter = match cmdline
@@ -124,11 +120,8 @@ def runTest (testScript: Path): Result Unit Error =
     require Pass (Pair wakeBin wakeVisible) =
         wakeToTest Unit
 
-    require Pass wakeUnitBin =
-        wakeUnitToTest Unit
-
     def testJob =
-        makeExecPlan ("./{testScript.getPathName.inTestDir}", wakeBin.inTestDir, wakeUnitBin.inTestDir, Nil) (visibleFiles ++ wakeVisible)
+        makeExecPlan ("./{testScript.getPathName.inTestDir}", wakeBin.inTestDir, wakeUnitToTest.inTestDir, Nil) (visibleFiles ++ wakeVisible)
         | setPlanDirectory testDirectory
         | setPlanLabel "testing: {testName}"
         | setPlanLocalOnly True # On OS/X you cannot mount fuse within fuse
