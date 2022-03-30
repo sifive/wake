@@ -62,7 +62,9 @@ struct TestStream {
 
 // Public:
 struct TestLogger {
-  std::vector<ErrorMessage> errors;
+  // This has to be a unique_ptr because apparently some versions of libstdc++
+  // do not have a copy constructor for stringstream.
+  std::vector<std::unique_ptr<ErrorMessage>> errors;
   std::jmp_buf return_jmp_buffer;
   const char* test_name = nullptr;
 
@@ -76,47 +78,47 @@ public:
     if (cond == expected) return TestStream(nullptr, nullptr);
     auto expected_str = expected ? "true" : "false";
     auto actual_str = cond ? "true" : "false";
-    errors.emplace_back();
+    errors.emplace_back(new ErrorMessage);
     auto& err = errors.back();
-    err.test_name = test_name;
-    err.file = file;
-    err.line = line;
-    err.predicate_error << "Expected " << term_colour(TERM_MAGENTA) << "`" << cond_str << "`";
-    err.predicate_error << term_normal() << " to be ";
-    err.predicate_error << term_colour(TERM_MAGENTA) << expected_str;
-    err.predicate_error << term_normal() << ", but was found to be ";
-    err.predicate_error << term_colour(TERM_MAGENTA) << actual_str;
-    err.predicate_error << term_normal() << std::endl;
-    return fail(err, assert);
+    err->test_name = test_name;
+    err->file = file;
+    err->line = line;
+    err->predicate_error << "Expected " << term_colour(TERM_MAGENTA) << "`" << cond_str << "`";
+    err->predicate_error << term_normal() << " to be ";
+    err->predicate_error << term_colour(TERM_MAGENTA) << expected_str;
+    err->predicate_error << term_normal() << ", but was found to be ";
+    err->predicate_error << term_colour(TERM_MAGENTA) << actual_str;
+    err->predicate_error << term_normal() << std::endl;
+    return fail(*err, assert);
   }
 
   TestStream expect_equal(bool assert, std::string expected, std::string actual, const char* expected_str, const char* actual_str, int line, const char* file) {
     if (expected == actual) return TestStream(nullptr, nullptr);
-    errors.emplace_back();
+    errors.emplace_back(new ErrorMessage);
     auto& err = errors.back();
-    err.test_name = test_name;
-    err.file = file;
-    err.line = line;
-    err.predicate_error << "Expected:\n\t" << term_colour(TERM_MAGENTA) << json_escape(expected);
-    err.predicate_error << term_normal() << "\nBut got:\n\t";
-    err.predicate_error << term_colour(TERM_MAGENTA) << json_escape(actual);
-    err.predicate_error << term_normal() << std::endl;
-    return fail(err, assert);
+    err->test_name = test_name;
+    err->file = file;
+    err->line = line;
+    err->predicate_error << "Expected:\n\t" << term_colour(TERM_MAGENTA) << json_escape(expected);
+    err->predicate_error << term_normal() << "\nBut got:\n\t";
+    err->predicate_error << term_colour(TERM_MAGENTA) << json_escape(actual);
+    err->predicate_error << term_normal() << std::endl;
+    return fail(*err, assert);
   }
 
   template <class T>
   TestStream expect_equal(bool assert, T&& expected, T&& actual, const char* expected_str, const char* actual_str, int line, const char* file) {
     if (expected == actual) return TestStream(nullptr, nullptr);
-    errors.emplace_back();
+    errors.emplace_back(new ErrorMessage);
     auto& err = errors.back();
-    err.test_name = test_name;
-    err.file = file;
-    err.line = line;
-    err.predicate_error << "Expected " << term_colour(TERM_MAGENTA) << "`" << expected_str << "`";
-    err.predicate_error << term_normal() << " to be equal to `";
-    err.predicate_error << term_colour(TERM_MAGENTA) << actual_str;
-    err.predicate_error << "`" << term_normal() << ", but was found to differ";
-    return fail(err, assert);
+    err->test_name = test_name;
+    err->file = file;
+    err->line = line;
+    err->predicate_error << "Expected " << term_colour(TERM_MAGENTA) << "`" << expected_str << "`";
+    err->predicate_error << term_normal() << " to be equal to `";
+    err->predicate_error << term_colour(TERM_MAGENTA) << actual_str;
+    err->predicate_error << "`" << term_normal() << ", but was found to differ";
+    return fail(*err, assert);
   }
 };
 

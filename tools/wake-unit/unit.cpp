@@ -73,17 +73,17 @@ int main(int argc, char** argv) {
 
   for (auto& err : logger.errors) {
     if (!no_color) std::cerr << term_intensity(2);
-    std::cerr << err.file << ":" << err.line << ": ";
+    std::cerr << err->file << ":" << err->line << ": ";
     if (!no_color) std::cerr << term_colour(TERM_RED);
     std::cerr << "error: ";
     if (!no_color) std::cerr << term_normal();
     std::cerr << std::endl;
-    std::string msg = err.user_error.str();
+    std::string msg = err->user_error.str();
     if (msg.size() > 0) {
       std::cerr << msg << std::endl;
     }
-    std::cerr << err.predicate_error.str() << std::endl;
-    failed_tests.emplace(err.test_name);
+    std::cerr << err->predicate_error.str() << std::endl;
+    failed_tests.emplace(err->test_name);
   }
 
   if (failed_tests.size()) {
