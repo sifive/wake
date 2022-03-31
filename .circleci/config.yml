@@ -51,7 +51,6 @@ jobs:
       - run: docker build -f /tmp/workspace/.circleci/dockerfiles/alpine -t wake-alpine .
       - run: |
           tar xJf /tmp/workspace/wake_*.tar.xz && \
-          cp -a /tmp/workspace/tests . && \
           docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine make -C wake-* static && \
           docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c "tar xvJf wake-*/wake-static_* && wake-*/bin/wake --init . && wake-*/bin/wake --in test_wake runTests" && \
           install -D -t release/alpine wake-*/wake-static_*
