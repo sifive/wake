@@ -60,28 +60,6 @@ jobs:
           paths:
             - release/alpine
 
-  debian_jessie:
-    machine:
-      image: ubuntu-2004:202201-02
-#      docker_layer_caching: true
-#    resource_class: large
-    steps:
-      - attach_workspace:
-          at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/debian-jessie -t wake-debian-jessie .
-      - run: |
-          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
-          tar xJf wake_*.orig.tar.xz && \
-          cp -a /tmp/workspace/debian wake-* && \
-          cp -a /tmp/workspace/tests . && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-jessie debuild -us -uc && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-debian-jessie /bin/sh -c "dpkg -i *.deb && cd tests && wake runTests" && \
-          install -D -t release/debian_jessie *.deb *.xz *.changes *.dsc
-      - persist_to_workspace:
-          root: .
-          paths:
-            - release/debian_jessie
-
   debian_bullseye:
     machine:
       image: ubuntu-2004:202201-02
@@ -141,50 +119,6 @@ jobs:
           root: .
           paths:
             - release/rocky_8
-
-  ubuntu_14_04:
-    machine:
-      image: ubuntu-2004:202201-02
-#      docker_layer_caching: true
-#    resource_class: large
-    steps:
-      - attach_workspace:
-          at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/ubuntu-14.04 -t wake-ubuntu-14.04 .
-      - run: |
-          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
-          tar xJf wake_*.orig.tar.xz && \
-          cp -a /tmp/workspace/debian wake-* && \
-          cp -a /tmp/workspace/tests . && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-ubuntu-14.04 debuild -us -uc && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-ubuntu-14.04 /bin/sh -c "dpkg -i *.deb && cd tests && wake runTests" && \
-          install -D -t release/ubuntu_14_04 *.deb *.gz *.xz *.changes *.dsc
-      - persist_to_workspace:
-          root: .
-          paths:
-            - release/ubuntu_14_04
-
-  ubuntu_16_04:
-    machine:
-      image: ubuntu-2004:202201-02
-#      docker_layer_caching: true
-#    resource_class: large
-    steps:
-      - attach_workspace:
-          at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/ubuntu-16.04 -t wake-ubuntu-16.04 .
-      - run: |
-          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
-          tar xJf wake_*.orig.tar.xz && \
-          cp -a /tmp/workspace/debian wake-* && \
-          cp -a /tmp/workspace/tests . && \
-          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /build/$(ls -d wake-*) wake-ubuntu-16.04 debuild -us -uc && \
-          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-ubuntu-16.04 /bin/sh -c "dpkg -i *.deb && cd tests && wake runTests" && \
-          install -D -t release/ubuntu_16_04 *.deb *.xz *.changes *.dsc
-      - persist_to_workspace:
-          root: .
-          paths:
-            - release/ubuntu_16_04
 
   ubuntu_18_04:
     machine:
@@ -249,19 +183,10 @@ workflows:
       - debian_bullseye:
           requires:
             - tarball
-      - debian_jessie:
-          requires:
-            - tarball
       - centos_7_6:
           requires:
             - tarball
       - rocky_8:
-          requires:
-            - tarball
-      - ubuntu_14_04:
-          requires:
-            - tarball
-      - ubuntu_16_04:
           requires:
             - tarball
       - ubuntu_18_04:
@@ -274,11 +199,8 @@ workflows:
           requires:
             - alpine
             - debian_bullseye
-            - debian_jessie  # Oldest supported compiler
             - centos_7_6
             - rocky_8
-            - ubuntu_14_04   # LTS
-            - ubuntu_16_04   # LTS
             - ubuntu_18_04   # LTS
             - vscode
       - docs_deploy:
