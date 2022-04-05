@@ -425,27 +425,13 @@ export def fuseRunner: Runner =
   | editJSONRunnerPlanExtraEnv (editEnvironment "DEBUG_FUSE_WAKE" (\_ getenv "DEBUG_FUSE_WAKE"))
   | makeJSONRunner
 
-export def preloadRunner: Runner =
-  def preload = "{wakePath}/preload-wake"
-  def score plan =
-    if plan.getPlanLocalOnly then Fail "would hide workspace" else Pass 1.0
-  makeJSONRunnerPlan preload score
-  | makeJSONRunner
-
 export def rOK: Integer = 0
 export def wOK: Integer = 1
 export def xOK: Integer = 2
 export def access (file: String) (mode: Integer): Boolean =
   (\f\m prim "access") file mode
 
-export def defaultRunner: Runner = match sysname
-  "Darwin" = fuseRunner
-  _ = match (getenv "USE_FUSE_WAKE")
-    Some "0" = preloadRunner
-    Some _ = fuseRunner
-    None =
-      def fuse = access "/dev/fuse" wOK
-      if fuse then fuseRunner else preloadRunner
+export def defaultRunner: Runner = fuseRunner
 
 # A plan describing how to construct a JSONRunner
 # RawScript: the path to the script to run jobs with
