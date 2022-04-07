@@ -99,6 +99,7 @@ void print_help(const char *argv0) {
     << "    --verbose  -v    Report recorded standard output and error of matching jobs" << std::endl
     << "    --debug    -d    Report recorded stack frame of matching jobs"               << std::endl
     << "    --script   -s    Format reported jobs as an executable shell script"         << std::endl
+    << "    --timeline       Print the timeline of wake jobs as HTML"                    << std::endl
     << std::endl
     << "  Help functions:" << std::endl
     << "    --version        Print the version of wake on standard output"               << std::endl
