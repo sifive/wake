@@ -13,7 +13,5 @@ curl -L -o wake-static_${version}.tar.xz               ${url}/alpine/wake-static
 curl -L -o centos-7-6-wake-${version}-1.x86_64.rpm     ${url}/centos_7_6/wake-${version}-1.x86_64.rpm
 curl -L -o rocky_8-wake-${version}-1.x86_64.rpm        ${url}/rocky_8/wake-${version}-1.x86_64.rpm
 curl -L -o debian-bullseye-wake_${version}-1_amd64.deb ${url}/debian_bullseye/wake_${version}-1_amd64.deb
-curl -L -o debian-jessie-wake_${version}-1_amd64.deb   ${url}/debian_jessie/wake_${version}-1_amd64.deb
-curl -L -o ubuntu-14-04-wake_${version}-1_amd64.deb    ${url}/ubuntu_14_04/wake_${version}-1_amd64.deb
-curl -L -o ubuntu-16-04-wake_${version}-1_amd64.deb    ${url}/ubuntu_16_04/wake_${version}-1_amd64.deb
 curl -L -o ubuntu-18-04-wake_${version}-1_amd64.deb    ${url}/ubuntu_18_04/wake_${version}-1_amd64.deb
+curl -L -o ubuntu-22-04-wake_${version}-1_amd64.deb    ${url}/ubuntu_22_04/wake_${version}-1_amd64.deb

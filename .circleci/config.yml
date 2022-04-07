@@ -1,9 +1,11 @@
 version: 2.1
+
+# Update the 'scripts/fetch' script when adding/removing operating system build targets.
+
 jobs:
   tarball:
     machine:
       image: ubuntu-2004:202201-02
-#    resource_class: large # paywalled feature: 4 cores
     steps:
       - checkout
       - run: sudo apt-get update && sudo apt-get install -y build-essential libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx
@@ -24,8 +26,6 @@ jobs:
   vscode:
     machine:
       image: ubuntu-2004:202201-02
-#      docker_layer_caching: true # paywalled feature: retain docker build results between runs
-#    resource_class: large
     steps:
       - attach_workspace:
           at: /tmp/workspace
@@ -43,8 +43,6 @@ jobs:
   alpine:
     machine:
       image: ubuntu-2004:202201-02
-#      docker_layer_caching: true # paywalled feature: retain docker build results between runs
-#    resource_class: large
     steps:
       - attach_workspace:
           at: /tmp/workspace
@@ -63,8 +61,6 @@ jobs:
   debian_bullseye:
     machine:
       image: ubuntu-2004:202201-02
-#      docker_layer_caching: true
-#    resource_class: large
     steps:
       - attach_workspace:
           at: /tmp/workspace
@@ -85,8 +81,6 @@ jobs:
   centos_7_6:
     machine:
       image: ubuntu-2004:202201-02
-#      docker_layer_caching: true
-#    resource_class: large
     steps:
       - attach_workspace:
           at: /tmp/workspace
@@ -123,8 +117,6 @@ jobs:
   ubuntu_18_04:
     machine:
       image: ubuntu-2004:202201-02
-#      docker_layer_caching: true
-#    resource_class: large
     steps:
       - attach_workspace:
           at: /tmp/workspace
