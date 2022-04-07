@@ -68,7 +68,7 @@ $ git push origin release-0.15.3
 12. Assuming everything has passed, merge the pull request.
 
 13. Take the artifacts from the CI build and upload them to the GitHub release and MS marketplace.
-    The scripts/fetch utility can help download and rename the packages.
+    The `scripts/fetch` utility can help download and rename the packages.
     The update link is here: https://marketplace.visualstudio.com/manage/publishers/sifive
 
 14. Finally, update the release on GitHub with the release information.
