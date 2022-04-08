@@ -142,7 +142,9 @@ struct TestRegisterUnique {
 };
 
 #define TEST(name)\
-namespace {struct Test__Unique__ ## name {};}\
 static void Test__ ## name (TestLogger&);\
+namespace {\
+struct Test__Unique__ ## name {};\
 template<> TestRegister TestRegisterUnique<Test__Unique__ ## name>::unique_register(#name, Test__ ## name);\
+};\
 static void Test__ ## name (TestLogger& logger__)
