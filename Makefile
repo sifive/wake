@@ -54,6 +54,9 @@ install:	all
 test:		wake.db
 	$(WAKE_ENV) ./bin/wake --in test_wake runTests
 
+unittest:		wake.db
+	$(WAKE_ENV) ./bin/wake --in test_wake runUnitTests
+
 tarball:	wake.db
 	$(WAKE_ENV) ./bin/wake build tarball
 

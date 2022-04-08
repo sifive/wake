@@ -84,6 +84,77 @@ export def runTests (cmdline: List String): Result String Error =
 
     Pass "All {len tests | str} tests completed successfully."
 
+
+export def runUnitTests _: Result Unit Error =
+    def testDirectory = "{here}/wake-unit"
+    require Pass testScript =
+      source "{testDirectory}/unit-test.sh"
+
+    def testName =
+        testDirectory
+        | replace `^${quote here}/` ""
+
+    def readFile list = match list
+        Some file =
+            require Pass content = read file
+            Pass (Some content)
+        None =
+            Pass None
+
+    require Pass expectedStdout =
+        source "{testDirectory}/stdout"
+        | getPass
+        | readFile
+
+    require Pass expectedStderr =
+        source "{testDirectory}/stderr"
+        | getPass
+        | readFile
+
+    require Pass visibleFiles =
+        sources testDirectory `.*`
+
+    def inTestDir path =
+        relative testDirectory path
+
+    require Pass (Pair wakeBin wakeVisible) =
+        wakeToTest Unit
+
+    require Pass wakeUnitBin =
+        wakeUnitToTest Unit
+
+    def testJob =
+        makeExecPlan ("./{testScript.getPathName.inTestDir}", wakeBin.inTestDir, wakeUnitBin.inTestDir, Nil) (visibleFiles ++ wakeVisible)
+        | setPlanDirectory testDirectory
+        | setPlanLabel "testing: {testName}"
+        | setPlanLocalOnly True # On OS/X you cannot mount fuse within fuse
+        | setPlanStdout logNever
+        | setPlanStderr logNever
+        | runJob
+
+    require Pass jobStdout =
+        testJob.getJobStdout
+        | rmap (replace `\r` "")
+
+    require Pass jobStderr =
+        testJob.getJobStderr
+        | rmap (replace `\r` "")
+
+    require Pass _ = match expectedStderr
+        Some x if x ==* jobStderr = Pass Unit
+        None = Pass Unit
+        Some _ = Fail (makeError "Unexpected standard error '{replace `\n` "\\\\n" jobStderr}'")
+
+    require Pass _ = match expectedStdout
+        Some x if x ==* jobStdout = Pass Unit
+        None = Pass Unit
+        _ = Fail (makeError "Unexpected standard output '{replace `\n` "\\\\n" jobStdout}'")
+
+    match testJob.isJobOk
+        True  = Pass Unit
+        False =
+            Fail (makeError "Test failed ({format testJob.getJobStatus}) with '{replace `\n.*` "" jobStderr}'")
+
 def runTest (testScript: Path): Result Unit Error =
     def shouldPass =
         testScript

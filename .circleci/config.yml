@@ -9,7 +9,8 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y build-essential libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx
       - run: make tarball
       - run: make test
-      - run: mkdir www && /./bin/wake --no-workspace --html > www/index.html
+      - run: make unittest
+      - run: mkdir www && ./bin/wake --no-workspace --html > www/index.html
       - run: PATH=$(pwd)/bin:$PATH PYTHONPATH=$(pwd)/scripts python3 scripts/wake2rst.py
       - persist_to_workspace:
           root: .
@@ -51,35 +52,14 @@ jobs:
       - run: docker build -f /tmp/workspace/.circleci/dockerfiles/alpine -t wake-alpine .
       - run: |
           tar xJf /tmp/workspace/wake_*.tar.xz && \
-          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine make -C wake-* test && \
-          echo docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c "tar xvJf wake-*/wake-static_* && wake-*/bin/wake --init . && wake-*/bin/wake --in test_wake runTests" && \
+          cp -a /tmp/workspace/tests . && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine make -C wake-* static && \
+          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-alpine /bin/sh -c "tar xvJf wake-*/wake-static_* && cd tests && ../wake-*/bin/wake runTests" && \
           install -D -t release/alpine wake-*/wake-static_*
       - persist_to_workspace:
           root: .
           paths:
             - release/alpine
-
-  debian_jessie:
-    machine:
-      image: ubuntu-2004:202201-02
-#      docker_layer_caching: true
-#    resource_class: large
-    steps:
-      - attach_workspace:
-          at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/debian-jessie -t wake-debian-jessie .
-      - run: |
-          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
-          tar xJf wake_*.orig.tar.xz && \
-          cp -a /tmp/workspace/debian wake-* && \
-          cp -a /tmp/workspace/tests . && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-jessie debuild -us -uc && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-debian-jessie /bin/sh -c "dpkg -i *.deb && wake --init . && wake --in test_wake runTests" && \
-          install -D -t release/debian_jessie *.deb *.xz *.changes *.dsc
-      - persist_to_workspace:
-          root: .
-          paths:
-            - release/debian_jessie
 
   debian_bullseye:
     machine:
@@ -96,7 +76,7 @@ jobs:
           cp -a /tmp/workspace/debian wake-* && \
           cp -a /tmp/workspace/tests . && \
           docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-debian-bullseye debuild -us -uc && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-debian-bullseye /bin/sh -c "dpkg -i *.deb && wake --init . && wake --in test_wake runTests" && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-debian-bullseye /bin/sh -c "dpkg -i *.deb && cd tests && wake runTests" && \
           install -D -t release/debian_bullseye *.deb *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
@@ -116,7 +96,7 @@ jobs:
           cp /tmp/workspace/wake_*.tar.xz . && \
           cp -a /tmp/workspace/tests . && \
           docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-centos-7.6 rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-centos-7.6 /bin/sh -c "rpm -i x86_64/*.rpm && wake --init . && wake --in test_wake runTests" && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-centos-7.6 /bin/sh -c "rpm -i x86_64/*.rpm && cd tests && wake runTests" && \
           install -D -t release/centos_7_6 x86_64/*.rpm
       - persist_to_workspace:
           root: .
@@ -134,17 +114,14 @@ jobs:
           cp /tmp/workspace/wake_*.tar.xz . && \
           cp -a /tmp/workspace/tests . && \
           docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-rocky-8 rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-rocky-8 /bin/sh -c "rpm -i x86_64/*.rpm && wake --init . && wake --in test_wake runTests" && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-rocky-8 /bin/sh -c "rpm -i x86_64/*.rpm && cd tests && wake runTests" && \
           install -D -t release/rocky_8 x86_64/*.rpm
       - persist_to_workspace:
           root: .
           paths:
             - release/rocky_8
 
-<<<<<<< HEAD
   ubuntu_18_04:
-=======
-  ubuntu_14_04:
     machine:
       image: ubuntu-2004:202201-02
 #      docker_layer_caching: true
@@ -166,8 +143,7 @@ jobs:
           paths:
             - release/ubuntu_14_04
 
-  ubuntu_16_04:
->>>>>>> af14669... init wake rather than reusing wake.db
+  ubuntu_18_04:
     machine:
       image: ubuntu-2004:202201-02
 #      docker_layer_caching: true
@@ -181,15 +157,9 @@ jobs:
           tar xJf wake_*.orig.tar.xz && \
           cp -a /tmp/workspace/debian wake-* && \
           cp -a /tmp/workspace/tests . && \
-<<<<<<< HEAD
           docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-ubuntu-18.04 debuild -us -uc && \
           docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-ubuntu-18.04 /bin/sh -c "dpkg -i *.deb && cd tests && wake runTests" && \
           install -D -t release/ubuntu_18_04 *.deb *.xz *.changes *.dsc
-=======
-          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined -w /build/$(ls -d wake-*) wake-ubuntu-16.04 debuild -us -uc && \
-          docker run --rm --mount type=bind,source=$PWD,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-ubuntu-16.04 /bin/sh -c "dpkg -i *.deb && wake --init . && wake --in test_wake runTests" && \
-          install -D -t release/ubuntu_16_04 *.deb *.xz *.changes *.dsc
->>>>>>> af14669... init wake rather than reusing wake.db
       - persist_to_workspace:
           root: .
           paths:
@@ -207,15 +177,9 @@ jobs:
           tar xJf wake_*.orig.tar.xz && \
           cp -a /tmp/workspace/debian wake-* && \
           cp -a /tmp/workspace/tests . && \
-<<<<<<< HEAD
           docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-ubuntu-22.04 debuild -us -uc && \
           docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-ubuntu-22.04 /bin/sh -c "dpkg -i *.deb && cd tests && wake runTests" && \
           install -D -t release/ubuntu_22_04 *.deb *.xz *.changes *.dsc
-=======
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-ubuntu-18.04 debuild -us -uc && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-ubuntu-18.04 /bin/sh -c "dpkg -i *.deb && wake --init . && wake --in test_wake runTests" && \
-          install -D -t release/ubuntu_18_04 *.deb *.xz *.changes *.dsc
->>>>>>> af14669... init wake rather than reusing wake.db
       - persist_to_workspace:
           root: .
           paths:
