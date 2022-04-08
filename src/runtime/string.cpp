@@ -672,8 +672,70 @@ static PRIMFN(prim_shell_str) {
   RETURN(String::alloc(runtime.heap, shell_escape(str->c_str())));
 }
 
+static PRIMTYPE(type_substr) {
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(Data::typeString);
+  result[1].unify(Data::typeString);
+  return args.size() == 3 &&
+    args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeInteger) &&
+    args[2]->unify(Data::typeInteger) &&
+    out->unify(result);
+}
+
+// Create a 'Result String String' value on the heap.
+Value *allocate_result(Heap &h, bool is_pass, const std::string &msg) {
+    h.reserve(reserve_result() + String::reserve(msg.size()));
+    return claim_result(h, is_pass, String::claim(h, msg));
+}
+
+// This operates on utf8 runes rather than bytes, to match prim_explode.
+static PRIMFN(prim_substr) {
+  EXPECT(3);
+  STRING(input_str, 0);
+  INTEGER_MPZ(pos_arg, 1);
+  INTEGER_MPZ(len_arg, 2);
+
+  int start_pos = mpz_get_si(pos_arg);
+  int length = mpz_get_si(len_arg);
+  if (start_pos < 0 || length < 1) {
+    RETURN(allocate_result(runtime.heap, false, "substr: invalid position or length argument"));
+  }
+
+  std::string new_substr;
+  new_substr.reserve(length);
+
+  // number of variable width runes seen
+  int rune_count = 0;
+  // width of the rune
+  int rune_num_bytes = 0;
+
+  for (const char *ptr = input_str->c_str(); *ptr; ptr += rune_num_bytes) {
+    uint32_t rune;
+    rune_num_bytes = pop_utf8(&rune, ptr);
+    if (rune_num_bytes < 1) {
+      rune_num_bytes = 1;
+    }
+    if (rune_count >= start_pos) {
+      push_utf8(new_substr, rune);
+    }
+    rune_count++;
+    if (rune_count >= (start_pos + length)) {
+      break;
+    }
+  }
+
+  if (new_substr.empty()) {
+    RETURN(allocate_result(runtime.heap, false, "substr: invalid position argument"));
+  }
+
+  RETURN(allocate_result(runtime.heap, true, new_substr));
+}
+
 void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "strlen",   prim_strlen,   type_strlen,    PRIM_PURE);
+  prim_register(pmap, "substr",   prim_substr,   type_substr,    PRIM_PURE);
   prim_register(pmap, "vcat",     prim_vcat,     type_vcat,      PRIM_PURE);
   prim_register(pmap, "lcat",     prim_lcat,     type_lcat,      PRIM_PURE);
   prim_register(pmap, "explode",  prim_explode,  type_explode,   PRIM_PURE);

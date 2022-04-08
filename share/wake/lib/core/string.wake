@@ -56,6 +56,24 @@ export def explode (string: String): List String =
     def p s = prim "explode"
     p string
 
+# Return a subset of original string given a starting position and a length.
+# Similar to 'explode', this operates on Unicode code points rather than bytes.
+#
+# Examples:
+# ```
+#   substr "ABCDE" 0 1    = Pass "A"
+#   substr "ABCDE" 1 3    = Pass "BCD"
+#   substr "ABCDE" 1 30   = Pass "BCDE"
+#   substr "ABCDE" 50 3   = Fail (Error "substr: invalid position argument" Nil)
+#   substr "ABCDE" (-1) 3 = Fail (Error "substr: invalid position or length argument" Nil)
+#   substr "ABCDE" 1 0    = Fail (Error "substr: invalid position or length argument" Nil)
+# ```
+export def substr (string: String) (position: Integer) (length: Integer): Result String Error =
+    def fn in pos len = prim "substr"
+    match (fn string position length)
+        Pass s = Pass s
+        Fail s = failWithError s
+
 # strbase: convert an Integer into a String using a given base.
 #
 # For 2 <= base <= 36, the characters used for the encoding are:
