@@ -25,12 +25,16 @@ from build_wake import buildWakeUnit
 # If tests/ is used externally, the topic is empty and the invoking wake is tested instead.
 export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
 
+export topic wakeUnitTestBinary: (variant: Pair String String) => Result (List Path) Error
+
 def wakeToTest Unit = match (subscribe wakeTestBinary)
     fn, Nil = fn Unit
     Nil = Pass (Pair "{wakePath}/wake" Nil)
     _ = Fail (makeError "Two wake binaries declared for testing!")
 
 def wakeUnitToTest Unit =
+    require buildWakeUnit, Nil = subscribe wakeUnitTestBinary
+    else failWithError "wake-unit binary not found"
     require Pass result = buildWakeUnit (Pair "native-cpp11-release" "native-c11-release")
     require Some result = head result
     else failWithError "wake-unit binary not found"
