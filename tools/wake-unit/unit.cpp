@@ -30,12 +30,13 @@ struct Test {
   Test(const char* test_name_, TestFunc test_) : test_name(test_name_), test(test_) {}
 };
 
-// TODO: sequester this off to its own file and make it static
-// so that only TestRegister and the test runner can access it.
-std::vector<Test> tests__;
+// A global list of all the tests to run. Its kept static so that
+// nothing can interfear with it except things in this file, which
+// is only TestRegister and main itself.
+static std::vector<Test> tests;
 
 TestRegister::TestRegister(const char* test_name, TestFunc test) {
-  tests__.emplace_back(test_name, test);
+  tests.emplace_back(test_name, test);
 }
 
 int main(int argc, char** argv) {
@@ -55,7 +56,7 @@ int main(int argc, char** argv) {
   TestLogger logger;
   std::set<std::string> failed_tests;
   std::set<std::string> passing_tests;
-  for (auto& test : tests__) {
+  for (auto& test : tests) {
     // Set this logjump in case this test fails
     size_t num_errors = logger.errors.size();
     logger.test_name = test.test_name;
