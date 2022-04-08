@@ -129,28 +129,6 @@ jobs:
     steps:
       - attach_workspace:
           at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/ubuntu-14.04 -t wake-ubuntu-14.04 .
-      - run: |
-          x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
-          tar xJf wake_*.orig.tar.xz && \
-          cp -a /tmp/workspace/debian wake-* && \
-          cp -a /tmp/workspace/tests . && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-ubuntu-14.04 debuild -us -uc && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-ubuntu-14.04 /bin/sh -c "dpkg -i *.deb && wake --init . && wake --in test_wake runTests" && \
-          install -D -t release/ubuntu_14_04 *.deb *.gz *.xz *.changes *.dsc
-      - persist_to_workspace:
-          root: .
-          paths:
-            - release/ubuntu_14_04
-
-  ubuntu_18_04:
-    machine:
-      image: ubuntu-2004:202201-02
-#      docker_layer_caching: true
-#    resource_class: large
-    steps:
-      - attach_workspace:
-          at: /tmp/workspace
       - run: docker build -f /tmp/workspace/.circleci/dockerfiles/ubuntu-18.04 -t wake-ubuntu-18.04 .
       - run: |
           x=(/tmp/workspace/wake_*.tar.xz); y=${x%.tar.xz}; cp "$x" "${y##*/}.orig.tar.xz" && \
