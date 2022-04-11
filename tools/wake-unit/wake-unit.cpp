@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 SiFive, Inc.
+ * Copyright 2022 SiFive, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,26 +15,18 @@
  * limitations under the License.
  */
 
-#ifndef COLOUR_H
-#define COLOUR_H
+#include "unit.h"
 
-#define TERM_DEFAULT    0
+TEST(sanity_check1) {
+  EXPECT_EQUAL("foo", "foo");
+  ASSERT_EQUAL("bar", "bar");
+  EXPECT_EQUAL(10, 10);
+  ASSERT_EQUAL(11, 11);
+}
 
-#define TERM_BLACK      (8+0)
-#define TERM_RED        (8+1)
-#define TERM_GREEN      (8+2)
-#define TERM_YELLOW     (8+3)
-#define TERM_BLUE       (8+4)
-#define TERM_MAGENTA    (8+5)
-#define TERM_CYAN       (8+6)
-#define TERM_WHITE      (8+7)
-
-#define TERM_DIM        (16*1)
-#define TERM_BRIGHT     (16*2)
-
-bool term_init(bool tty_);
-const char *term_colour(int code);
-const char *term_intensity(int code);
-const char *term_normal();
-
-#endif
+TEST(sanity_check2) {
+  EXPECT_TRUE(true);
+  ASSERT_TRUE(true);
+  EXPECT_FALSE(false);
+  ASSERT_FALSE(false);
+}

@@ -24,10 +24,29 @@ from wake import _
 # If tests/ is used externally, the topic is empty and the invoking wake is tested instead.
 export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
 
+# We need to handle the fact that sometimes tests are invoked from within /tests
+# and sometimes they're invoked from outside of /tests. Additionally only when
+# we have access to build_wake in our test environment can we figure out how
+# to build the wake unit tests that we want to run. Since test_wake cannot depend
+# on build_wake we instead make a topic that build_wake can publish to. This topic
+# will be empty if your workspace starts in /tests but have the proper function
+# in it if you start from one directory out. This means we can just have this test
+# fail if it isn't run from the proper place. It's hacky but it works around
+# the way we test currently.
+export topic wakeUnitTestBinary: (variant: Pair String String) => Result (List Path) Error
+
 def wakeToTest Unit = match (subscribe wakeTestBinary)
     fn, Nil = fn Unit
     Nil = Pass (Pair "{wakePath}/wake" Nil)
     _ = Fail (makeError "Two wake binaries declared for testing!")
+
+def wakeUnitToTest Unit =
+    require buildWakeUnit, Nil = subscribe wakeUnitTestBinary
+    else failWithError "wake-unit binary not found"
+    require Pass wakeUnitLst = buildWakeUnit (Pair "native-cpp11-release" "native-c11-release")
+    require Some result = head wakeUnitLst
+    else failWithError "wake-unit binary not found"
+    Pass result
 
 export def runTests (cmdline: List String): Result String Error =
     require Pass filter = match cmdline
@@ -76,6 +95,74 @@ export def runTests (cmdline: List String): Result String Error =
     require Pass _ = findFailFn getTripleThird results
 
     Pass "All {len tests | str} tests completed successfully."
+
+export def runUnitTests _: Result Unit Error =
+    def testDirectory = "{here}/wake-unit"
+    require Pass testScript =
+      source "{testDirectory}/unit-test.sh"
+
+    def testName =
+        testDirectory
+        | replace `^${quote here}/` ""
+
+    def readFile list = match list
+        Some file =
+            require Pass content = read file
+            Pass (Some content)
+        None =
+            Pass None
+
+    require Pass expectedStdout =
+        source "{testDirectory}/stdout"
+        | getPass
+        | readFile
+
+    require Pass expectedStderr =
+        source "{testDirectory}/stderr"
+        | getPass
+        | readFile
+
+    require Pass visibleFiles =
+        sources testDirectory `.*`
+
+    def inTestDir path =
+        relative testDirectory path
+
+    require Pass wakeUnitBin =
+        wakeUnitToTest Unit
+
+    def testJob =
+        makeExecPlan ("./{testScript.getPathName.inTestDir}", wakeUnitBin.getPathName.inTestDir, Nil) (wakeUnitBin, visibleFiles)
+        | setPlanDirectory testDirectory
+        | setPlanLabel "testing: {testName}"
+        | setPlanStdout logNever
+        | setPlanStderr logNever
+        | runJob
+
+    def removeCarriageReturns = replace `\r` ""
+
+    require Pass jobStdout =
+        testJob.getJobStdout
+        | rmap removeCarriageReturns
+
+    require Pass jobStderr =
+        testJob.getJobStderr
+        | rmap removeCarriageReturns
+
+    require Pass _ = match expectedStderr
+        Some x if x ==* jobStderr = Pass Unit
+        None = Pass Unit
+        Some _ = Fail (makeError "Unexpected standard error '{replace `\n` "\\\\n" jobStderr}'")
+
+    require Pass _ = match expectedStdout
+        Some x if x ==* jobStdout = Pass Unit
+        None = Pass Unit
+        _ = Fail (makeError "Unexpected standard output '{replace `\n` "\\\\n" jobStdout}'")
+
+    match testJob.isJobOk
+        True  = Pass Unit
+        False =
+            Fail (makeError "Test failed ({format testJob.getJobStatus}) with '{replace `\n.*` "" jobStderr}'")
 
 def runTest (testScript: Path): Result Unit Error =
     def shouldPass =
@@ -129,9 +216,11 @@ def runTest (testScript: Path): Result Unit Error =
 
     require Pass jobStdout =
         testJob.getJobStdout
+        | rmap (replace `\r` "")
 
     require Pass jobStderr =
         testJob.getJobStderr
+        | rmap (replace `\r` "")
 
     require Pass _ = match expectedStderr
         Some x if x ==* jobStderr = Pass Unit

@@ -30,6 +30,7 @@
 
 #include "gopt/gopt.h"
 #include "gopt/gopt-arg.h"
+#include "util/colour.h"
 #include "util/file.h"
 #include "util/diagnostic.h"
 #include "util/execpath.h"

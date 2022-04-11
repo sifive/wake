@@ -62,6 +62,4 @@ void status_set_colour(const char *name, int colour);
 void status_set_fd(const char *name, int fd);
 void status_set_bulk_fd(int fd, const char *streams);
 
-bool term_init(bool tty);
-
 #endif
