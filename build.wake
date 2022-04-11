@@ -156,7 +156,8 @@ export def static _: Result Path Error =
     job cmd files
     | getJobOutput
 
-from test_wake import topic wakeTestBinary, wakeUnitTestBinary
+from test_wake import topic wakeTestBinary
+from test_wake import topic wakeUnitTestBinary
 publish wakeTestBinary = defaultWake, Nil
 publish wakeUnitTestBinary = buildWakeUnit, Nil
 

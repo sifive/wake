@@ -18,7 +18,6 @@ manifest.wake
 /bin/preload-wake.*
 /bin/wakebox
 /bin/wakebox.*
-/bin/fuse-wake*
 /src/version.h
 /lib/wake/bsp-wake
 /lib/wake/bsp-wake.*
