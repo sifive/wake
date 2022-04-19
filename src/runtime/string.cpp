@@ -673,64 +673,75 @@ static PRIMFN(prim_shell_str) {
 }
 
 static PRIMTYPE(type_substr) {
-  TypeVar result;
-  Data::typeResult.clone(result);
-  result[0].unify(Data::typeString);
-  result[1].unify(Data::typeString);
   return args.size() == 3 &&
     args[0]->unify(Data::typeString) &&
     args[1]->unify(Data::typeInteger) &&
     args[2]->unify(Data::typeInteger) &&
-    out->unify(result);
+    out->unify(Data::typeString);
 }
 
-// Create a 'Result String String' value on the heap.
-Value *allocate_result(Heap &h, bool is_pass, const std::string &msg) {
-    h.reserve(reserve_result() + String::reserve(msg.size()));
-    return claim_result(h, is_pass, String::claim(h, msg));
-}
-
-// This operates on utf8 runes rather than bytes, to match prim_explode.
+// This operates on utf8 codepoints
 static PRIMFN(prim_substr) {
   EXPECT(3);
   STRING(input_str, 0);
-  INTEGER_MPZ(pos_arg, 1);
-  INTEGER_MPZ(len_arg, 2);
+  INTEGER_MPZ(start_arg, 1);
+  INTEGER_MPZ(end_arg, 2);
 
-  int start_pos = mpz_get_si(pos_arg);
-  int length = mpz_get_si(len_arg);
-  if (start_pos < 0 || length < 1) {
-    RETURN(allocate_result(runtime.heap, false, "substr: invalid position or length argument"));
+  if (mpz_cmp(end_arg, start_arg) <= 0) {
+    // end <= start: empty string
+    RETURN(String::alloc(runtime.heap));
   }
 
-  std::string new_substr;
-  new_substr.reserve(length);
+  unsigned long start_rune;
+  if (mpz_cmp_ui(start_arg, 0) <= 0) {
+    start_rune = 0;
+  } else if (mpz_cmp_ui(start_arg, input_str->size()) >= 0) {
+    // start >= length: empty string
+    RETURN(String::alloc(runtime.heap));
+  } else {
+    start_rune = mpz_get_ui(start_arg);
+  }
 
-  // number of variable width runes seen
-  int rune_count = 0;
-  // width of the rune
-  int rune_num_bytes = 0;
+  unsigned long end_rune;
+  if (mpz_cmp_ui(end_arg, 0) <= 0) {
+    // end <= 0: empty string
+    RETURN(String::alloc(runtime.heap));
+  } else if (mpz_cmp_ui(end_arg, input_str->size()) >= 0) {
+    // end >= size: end = size
+    end_rune = input_str->size();
+  } else {
+    end_rune = mpz_get_ui(end_arg);
+  }
 
-  for (const char *ptr = input_str->c_str(); *ptr; ptr += rune_num_bytes) {
-    uint32_t rune;
-    rune_num_bytes = pop_utf8(&rune, ptr);
-    if (rune_num_bytes < 1) {
-      rune_num_bytes = 1;
-    }
-    if (rune_count >= start_pos) {
-      push_utf8(new_substr, rune);
-    }
-    rune_count++;
-    if (rune_count >= (start_pos + length)) {
+  // Pointers to use while examining the input string; b <= s <= e
+  const uint8_t *s = reinterpret_cast<uint8_t*>(input_str->c_str());
+  const uint8_t *e = s + input_str->size();
+  const uint8_t *p;
+
+  // Initializing these to size handles the case of too large indexes
+  unsigned long start_byte = input_str->size();
+  unsigned long end_byte   = start_byte;
+  unsigned long num_runes  = 0;
+
+  for (p = s; p < e; ++p) {
+    int is_rune_start = (*p >> 6) != 2;
+    if (num_runes == start_rune && is_rune_start) {
+      start_byte = static_cast<unsigned long>(p - s);
       break;
     }
+    num_runes += is_rune_start;
   }
 
-  if (new_substr.empty()) {
-    RETURN(allocate_result(runtime.heap, false, "substr: invalid position argument"));
+  for (; p < e; ++p) {
+    int is_rune_start = (*p >> 6) != 2;
+    if (num_runes == end_rune && is_rune_start) {
+      end_byte = static_cast<unsigned long>(p - s);
+      break;
+    }
+    num_runes += is_rune_start;
   }
 
-  RETURN(allocate_result(runtime.heap, true, new_substr));
+  RETURN(String::alloc(runtime.heap, input_str->c_str() + start_byte, end_byte - start_byte));
 }
 
 void prim_register_string(PrimMap &pmap, StringInfo *info) {

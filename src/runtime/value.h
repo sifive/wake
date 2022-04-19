@@ -103,10 +103,10 @@ struct String final : public GCObject<String, Value> {
   PadObject *objend() { return Parent::objend() + 1 + length/sizeof(PadObject); }
   static size_t reserve(size_t length) { return sizeof(String)/sizeof(PadObject) + 1 + length/sizeof(PadObject); }
 
-  static String *claim(Heap &h, size_t length);
+  static String *claim(Heap &h, size_t length = 0);
   static String *claim(Heap &h, const std::string &str);
   static String *claim(Heap &h, const char *str, size_t length);
-  static String *alloc(Heap &h, size_t length);
+  static String *alloc(Heap &h, size_t length = 0);
   static String *alloc(Heap &h, const std::string &str);
   static String *alloc(Heap &h, const char *str);
   static String *alloc(Heap &h, const char *str, size_t length);

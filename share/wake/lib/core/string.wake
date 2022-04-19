@@ -56,23 +56,26 @@ export def explode (string: String): List String =
     def p s = prim "explode"
     p string
 
-# Return a subset of original string given a starting position and a length.
-# Similar to 'explode', this operates on Unicode code points rather than bytes.
+# Extract a substring given a starting and ending codepoint position.
+# The `i`-th codepoint is included if and only if `start <= i < end`.
+# For the purposes of this function, a codepoint is defined as one
+# start byte followed by one or more non-start bytes, where a start
+# byte is any byte with high bits not equal to `10`.
+#
+# Warning: use of this function can divide a multi-codepoint character.
 #
 # Examples:
 # ```
-#   substr "ABCDE" 0 1    = Pass "A"
-#   substr "ABCDE" 1 3    = Pass "BCD"
-#   substr "ABCDE" 1 30   = Pass "BCDE"
-#   substr "ABCDE" 50 3   = Fail (Error "substr: invalid position argument" Nil)
-#   substr "ABCDE" (-1) 3 = Fail (Error "substr: invalid position or length argument" Nil)
-#   substr "ABCDE" 1 0    = Fail (Error "substr: invalid position or length argument" Nil)
+#   substr "ABCDE" 0 1    = "A"
+#   substr "ABCDE" 1 4    = "BCD"
+#   substr "ABCDE" 1 30   = "BCDE"
+#   substr "ABCDE" 50 3   = ""
+#   substr "ABCDE" (-1) 3 = "ABC"
+#   substr "ABCDE" 1 0    = ""
 # ```
-export def substr (string: String) (position: Integer) (length: Integer): Result String Error =
+export def substr (string: String) (start: Integer) (end: Integer): String =
     def fn in pos len = prim "substr"
-    match (fn string position length)
-        Pass s = Pass s
-        Fail s = failWithError s
+    fn string start end
 
 # strbase: convert an Integer into a String using a given base.
 #
