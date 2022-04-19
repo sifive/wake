@@ -680,6 +680,32 @@ static PRIMTYPE(type_substr) {
     out->unify(Data::typeString);
 }
 
+static const uint64_t *scan_utf8_till_x8(const uint64_t *s, const uint64_t *e, size_t *runes) {
+  size_t limit = *runes;
+  size_t sum = 0;
+  while (s < e) {
+    size_t num = num_utf8_starts(*s);
+    if (num + sum >= limit) break;
+    sum = num + sum;
+    ++s;
+  }
+  *runes = sum;
+  return s;
+}
+
+static const uint8_t *scan_utf8_till_x1(const uint8_t *s, const uint8_t *e, size_t *runes) {
+  size_t limit = *runes;
+  size_t sum = 0;
+  while (s < e) {
+    int is_rune_start = is_utf8_start(*s);
+    if (sum == limit && is_rune_start) break;
+    sum = is_rune_start + sum;
+    ++s;
+  }
+  *runes = sum;
+  return s;
+}
+
 // This operates on utf8 codepoints
 static PRIMFN(prim_substr) {
   EXPECT(3);
@@ -713,35 +739,31 @@ static PRIMFN(prim_substr) {
     end_rune = mpz_get_ui(end_arg);
   }
 
-  // Pointers to use while examining the input string; b <= s <= e
-  const uint8_t *s = reinterpret_cast<uint8_t*>(input_str->c_str());
-  const uint8_t *e = s + input_str->size();
-  const uint8_t *p;
+  // Pointers to use while examining the input string, byte-by-byte
+  const uint8_t *s1 = reinterpret_cast<const uint8_t*>(input_str->c_str());
+  const uint8_t *e1 = s1 + input_str->size();
 
-  // Initializing these to size handles the case of too large indexes
-  unsigned long start_byte = input_str->size();
-  unsigned long end_byte   = start_byte;
-  unsigned long num_runes  = 0;
+  // Pointers to use while examining the input string, word-by-word
+  const uint64_t *s8 = reinterpret_cast<const uint64_t*>(s1); // Heap objects are always >= 64-bit aligned
+  const uint64_t *e8 = s8 + (input_str->size() >> 3);
 
-  for (p = s; p < e; ++p) {
-    int is_rune_start = (*p >> 6) != 2;
-    if (num_runes == start_rune && is_rune_start) {
-      start_byte = static_cast<unsigned long>(p - s);
-      break;
-    }
-    num_runes += is_rune_start;
-  }
+  // Find the word containing our start rune
+  size_t runes1 = start_rune;
+  s8 = scan_utf8_till_x8(s8, e8, &runes1);
 
-  for (; p < e; ++p) {
-    int is_rune_start = (*p >> 6) != 2;
-    if (num_runes == end_rune && is_rune_start) {
-      end_byte = static_cast<unsigned long>(p - s);
-      break;
-    }
-    num_runes += is_rune_start;
-  }
+  // Find the byte containing our start rune
+  size_t runes2 = start_rune - runes1;
+  const uint8_t *start_byte = scan_utf8_till_x1(reinterpret_cast<const uint8_t*>(s8), e1, &runes2);
 
-  RETURN(String::alloc(runtime.heap, input_str->c_str() + start_byte, end_byte - start_byte));
+  // Find the word containing our end rune
+  size_t runes3 = end_rune - runes1;
+  s8 = scan_utf8_till_x8(s8, e8, &runes3);
+
+  // Find the byte containing our end rune
+  size_t runes4 = end_rune - runes3 - runes1;
+  const uint8_t *end_byte = scan_utf8_till_x1(reinterpret_cast<const uint8_t*>(s8), e1, &runes4);
+
+  RETURN(String::alloc(runtime.heap, reinterpret_cast<const char*>(start_byte), end_byte - start_byte));
 }
 
 void prim_register_string(PrimMap &pmap, StringInfo *info) {

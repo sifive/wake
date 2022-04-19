@@ -19,8 +19,18 @@
 #define UTF8_H
 
 #include <string>
+#include <stdint.h>
 
 bool push_utf8(std::string &result, uint32_t c);
 int pop_utf8(uint32_t *rune, const char *str);
+
+inline int is_utf8_start(uint8_t byte) {
+  return (byte >> 6) != 2;
+}
+
+inline unsigned num_utf8_starts(uint64_t bytes) {
+  uint64_t magic = UINT64_C(0x0101010101010101);
+  return static_cast<uint64_t>(((~(bytes >> 7) | (bytes >> 6)) & magic) * magic) >> 56;
+}
 
 #endif
