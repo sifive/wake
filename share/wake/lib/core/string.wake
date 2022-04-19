@@ -17,11 +17,11 @@ package wake
 
 # String methods
 
-# strlen: report the number of bytes a String consumes in UTF-8 representation.
+# bytelen: report the number of bytes a String consumes in UTF-8 representation.
 # >>>>>>>>>>>>> THIS IS NOT THE NUMBER OF CHARACTERS IN A STRING <<<<<<<<<<<<<<
 # This information can be relevant when reading / writing Strings to disk.
 # To manipulate Strings, such as extract-ing a substring, use regular expressions.
-export def strlen (string: String): Integer =
+export def bytelen (string: String): Integer =
     def p s = prim "strlen"
     p string
 

@@ -316,7 +316,7 @@ def addJSONErrorPath (node: String) (error: Error): Result a Error =
         if matches `/:.*` cause then
             replace `^/` "/{node}" cause
         else if matches `/.*` cause then
-            if strlen node == 0 then
+            if bytelen node == 0 then
                 cause
             else
             "/{node}{cause}"
