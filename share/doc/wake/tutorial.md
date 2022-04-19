@@ -85,12 +85,11 @@ $ wake -x 'increment 3'
 4
 ```
 
-Unlike C and the languages it inspired, wake's programming language is
-"functional" (like ML and Haskell) and follows conventions popular in that
-domain.  Most notably, functions in wake are applied to their arguments with
-simple spaces rather than parentheses, so `f x y` is read as "function `f` run
-on `x` and `y`"; in C that would be `f(x, y)`.  Looking at the example, `def
-increment i = ...` introduces a function `increment` which takes a single
+Wake uses a syntax more closely related to ML and other functional languages.
+Most notably, functions in wake are applied to their arguments with simple
+spaces rather than parentheses, so `f x y` is read as "function `f` run
+on `x` and `y`"; in C that would be `f(x, y)`.  Looking at the example,
+`def increment i = ...` introduces a function `increment` which takes a single
 argument `i`, while `increment 3` calls that function with `i` equal to `3`.
 
 ```console
@@ -101,10 +100,10 @@ increment: (i: Integer) => Integer = <tutorial.wake:5:[5-9]>
 Notice that we didn't have to specify anything for wake to know what types
 `increment` accepts and returns.  Wake is strongly-typed and will definitely
 complain if you try to pass a function the wrong type of object, but it is
-pretty good about guessing what things are.  It's often a good practice to
-explicitly list types anyway -- to both help when you're reading the code and to
-catch any mistakes that might slip in -- but for brevity most examples in this
-tutorial will skip the annotations.
+pretty good about guessing what things are (technically, using a Hindley-Milner
+type system).  It's often a good practice to explicitly list types anyway -- to
+both help when you're reading the code and to catch any mistakes that might slip
+in -- but for brevity most examples in this tutorial will skip the annotations.
 
 ```wake
 export def decrement (i: Integer): Integer =
@@ -126,22 +125,28 @@ $ wake -x 'countHex 20'
 "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f", "10", "11", "12", "13", Nil
 ```
 
+Note that `Nil` represents an empty list in wake, and any values are just built
+on top of it; `x, y, Nil` is a `List` comprised of the two objects `x` and `y`.
+
 In wake, the last line is always the value of the define.  As `countHex` is
-a function, you could say the last line is the return value.  All lines except
-the last line must define new variables; wake does not allow the imperative (C,
-Java, etc.) style of listing multiple statements or expressions in a single
-function.  Even so, a function with multiple definitions each generating some
-value to use in *other* definitions can be just as powerful.
+a function, you could say the last line is the return value.  Only one
+standalone expression -- that last one -- is allowed in any block; wake does not
+allow the imperative (C, Java, etc.) style of listing multiple statements or
+expressions in a single function, to be executed one after another.  Even so, by
+gathering the intermediate calculations into a series of `def` blocks, wake can
+be just as powerful.
 
-Beyond that, `seq` is a function which takes an `Integer` and generates a `List
-Integer` containing every number from zero to one below the argument (in other
-words, a `List` starting at zero whose length is determined by the argument).
-Wake uses linked lists rather than arrays for most things, which means that
-adding items to or taking items from the *start* of a `List` is very fast and we
-don't have to worry about running out of indices and having to copy memory, but
-also means that doing anything to the *end* of a `List` can be expensive.
+Beyond that, `seq` is a function which takes an `Integer` and generates a
+`List Integer` containing every number from zero to one below the argument (in
+other words, a `List` starting at zero whose length is determined by the
+argument).  Wake uses linked lists rather than arrays for most things, which
+means that adding items to or taking items from the *start* of a `List` is very
+fast and we don't have to worry about running out of indices and having to copy
+memory, but also means that doing anything to the *end* of a `List` can be
+expensive.
 
-Finally, `map` takes another function and applies it to every element in a list.
+Finally, `map` takes another function and applies it to every element in a list;
+in this case, `strHex` will render each number into a (hexadecimal) `String`.
 Functions are just another type of object in wake and can be passed around very
 easily, so many tasks which might typically be written as a loop are instead
 written using functions like `map`.
@@ -162,11 +167,17 @@ $ wake -x 'map (\x x^2) (seq 10)'
 
 The backslash syntax is an easy-to-type stand-in for the lambda symbol, λ.
 While we've not talked about it, the wake language implements a "typed lambda
-calculus". That's just a fancy way of saying you can pass functions to
-functions. This syntax for inline functions is wake's homage to its roots.
+calculus". This syntax for inline functions is wake's homage to its roots.
 
 Multiple arguments can be used by simply prefixing all of them with `\`, and you
-can pattern-match on any of them.
+can pattern-match on any of them; the following two functions are equivalent:
+
+```wake
+export def lambda x (Pair y z) =
+    x + y + z
+export def expression =
+    lambda 1 (Pair 2 3)
+```
 
 ```console
 $ wake -x '(\x \(Pair y z) x + y + z) 1 (Pair 2 3)'
@@ -186,10 +197,16 @@ $ wake -x 'seq 1000 | filter (_ % 55 == 0) | map str | catWith " "'
 "0 55 110 165 220 275 330 385 440 495 550 605 660 715 770 825 880 935 990"
 ```
 
-This hole-oriented syntax is not as powerful as lambda expressions, because
+This hole-based syntax is not as powerful as lambda expressions, because
 each argument can only be used once.  Furthermore, the functions are created
 at block boundaries, which include `()`s, which can limit their usefulness.
 Nevertheless, this syntax can be convenient.
+
+The last example also demonstrates the syntax `x | f 0 | g`. This should be read
+like the pipe operator in a shell script, feeding the value on the left into the
+final argument of the function on the right.  Ultimately, it will be evaluated
+as `g (f 0 x)`, but when chaining together multiple transformations to data, the
+pipe syntax becomes more readable.
 
 ## Data types and pattern matching
 
@@ -236,13 +253,14 @@ $ wake -x 'strAnimal (Cat "Fluffy")'
 The function `strAnimal` is an example of pattern matching. It consists of the
 keyword `match` followed by the value to pattern match. On the following lines
 we indent and provide one or more patterns.
-A pattern always starts with a type constructor followed by a
-number of values corresponding to the values in the constructor declaration.
-These values are followed by `=` and then an expression that is the result
-of when the pattern is matched. For example, in `Cat x = "a cat called {x}"`,
-the `x` is a new variable binding corresponding to `name` in the declaration,
-thus it is a `String`. After `=` we have a `String` that is the result whenever
-`strAnimal` is passed a `Cat`.
+
+In many ways, this is similar to a `switch` statement in other languages, but
+can be used with any type by giving a constructor along with new value names
+corresponding to each of its arguments.  In `match`, these values are followed
+by `=` and then an expression that is the result of when the pattern is matched.
+For example, in `Cat x = "a cat called {x}"`, the `x` is a new variable binding
+corresponding to `name` in the declaration, thus it is a `String`. After `=` we
+have a `String` that is the result whenever `strAnimal` is passed a `Cat`.
 
 Note that when matching, the patterns must exhaustively catch all possibilities.
 For example, it would be illegal to `match` but only provide a pattern for
@@ -318,11 +336,11 @@ export def greetCustomer customer =
     "Hello, {name}!"
 ```
 
-When a type is used for structural purposes rather than data, it's often better
-to not specify what type(s) some or all of its values have.  However, this
-abstraction isn't as simple as just leaving off the type annotation in the
+When a type is used for structural purposes rather than data itself, it's often
+better to not specify what type(s) some or all of its values have.  However,
+this abstraction isn't as simple as just leaving off the type annotation in the
 constructor; wake still needs to be explicitly told everything about the type.
-Instead, we can reference that as a "type variable" in the type name itself:
+Instead, we give a placeholder "type variable" after the type name:
 
 ```wake
 export data UnsortedTree value =
@@ -390,17 +408,17 @@ editModuleName: (fnName: String => String) => Module => Module = <tutorial.wake:
 With these, we can easily work with types collecting dozens of values, at least
 as far as the raw code goes.  It is important to note that all objects in wake
 are immutable -- the so-called `editModuleName` does not change the existing
-`Module`, but instead creates a new new object with all values but `Name` copied
+`Module`, but instead creates a new object with all values but `Name` copied
 from the original.  There is no way to pass-by-reference or by pointer which
 modifies objects in-place.
 
 ## Dealing with failure
 
-Given wake's functional-programming heritage, it's considered bad form to have
-any failures be represented by special values which could be confused with a
-success (e.g. null pointers) or brushing them off to a side channel (e.g.
-exception throw/catch).  Instead, they're explicitly marked in the type system
-through `data` types.
+Given wake's easily parametric -- and not inheritable -- types, it's generally
+considered bad form to have failures be represented by "magic" values which
+could be confused with a success (e.g. null pointers or empty strings) or
+brushing them off to a side channel (e.g. exception throw/catch).  Instead,
+they're explicitly marked in the type system through `data` types.
 
 ### Option
 
@@ -408,15 +426,15 @@ The simplest and most common way we deal with failure in wake is with the
 `Option` type:
 
 ```wake
-export def firstOrZeroWhenEmpty l = match (head l)
-    Some elt = elt
-    None     = 0
+export def firstOrZeroWhenEmpty list = match (head list)
+    Some first = first
+    None       = 0
 ```
 
 As in the above, we can use pattern matching on `Option` to deal with the
-possibility of `Some` or `None`. In this case, `myFunction` accepts a `List` of
-`Integers` and returns the first element of the list (its "head", as opposed to
-the longer "tail") or `0` if the list is empty.
+possibility of `Some` or `None`. In this case, `firstOrZeroWhenEmpty` accepts a
+`List` of `Integers` and returns the first element of the list (its "head", as
+opposed to the longer "tail" behind it) or `0` if the list is empty.
 
 ```console
 $ wake -vx firstOrZeroWhenEmpty
@@ -470,19 +488,20 @@ export def regexOrOnlyEmpty regexString =
         Fail _ = `^$`
 ```
 
-This will attempt to parse a regex from freeform input, and fall back on a regex
-representing an empty string if the parse failed for any reason.  Similarly to
-`getOrElse`, there is a function `getWhenFail` that will return the value in a
-`Pass` or a default in the case of `Fail`.  We can rewrite the above as simply:
+This will attempt to parse a regex from an unrestricted `String`, and fall back
+on a regex representing an empty string if the parse failed for any reason.
+Similarly to `getOrElse`, there is a function `getWhenFail` that will return the
+value in a `Pass` or a default in the case of `Fail`.  We can rewrite the above
+as simply:
 
 ```wake
-def regexOrOnlyEmpty regexString =
+export def regexOrOnlyEmpty2 regexString =
     getWhenFail `^$` (stringToRegExp regexString)
 ```
 
 You may have noticed that the `Results` above contain a type called `Error`.
 `Error` is a type that contains a `String` "cause", and a `List` of `Strings`
-stack trace.  You'll might also have noticed that the cause is `"no argument for
+stack trace.  You might also have noticed that the cause is `"no argument for
 repetition operator: *"`, but the stack is just `Nil`.  Wake does not actually
 maintain a call stack like traditional languages, so by default `Errors` will
 contain an empty `List` for the stack.  If you run wake with `-d` (or
@@ -523,12 +542,12 @@ To understand what's happening in this example, let's break down all the new
 methods being leveraged.
 
 As before, `def` introduces `infoH` as a new function with a single argument
-`_args`, which it ignores (the leading underscore silences a compiler warning).
-Making it a function like this even though it just discards the argument serves
-two purposes.  First, wake evaluates objects (without arguments) as soon as
-they're encountered but functions only when they're fully called, so if we were
-to write it `export def infoH =` then any time we did *anything* with wake it
-would write an `info.h` file.  The second we'll look at soon.
+`_args`, which it ignores (as before, the leading underscore silences a compiler
+warning).  Making it a function like this even though it just discards the
+argument serves two purposes.  First, wake evaluates objects (without arguments)
+as soon as they're encountered but functions only when they're fully called, so
+if we were to write it `export def infoH =` then any time we did *anything* with
+wake it would write an `info.h` file.  The second we'll look at soon.
 
 `which` is a function which searches wake's path for the named program.  On
 most systems, `which "uname" = "/bin/uname"`, but this may not always be the
@@ -564,7 +583,9 @@ The default operation of wake invokes the subcommand (in this case
 `infoH`) specified on the command-line, with any additional command-line
 arguments passed to that function.  This is the second reason for the `_args`:
 this form of invocation requires a function which can take a `List String`
-containing any following command-line arguments.
+containing any following command-line arguments.  In this case, it was `Nil`
+since nothing followed the `wake infoH`, but if we had written
+`wake infoH example` then `_args` would have been `"example", Nil`.
 
 Each executed job -- in other words, when wake calls out to an external program
 -- is recorded, and we can retrieve all the information about them as desired.
@@ -630,11 +651,6 @@ the `--last` output, which can often be easier to debug than needing to read the
 command line itself.  Other methods of making `Plan` objects -- such as
 `makeExecPlan` -- may or may not ask for a label, but one can always be added
 with `setPlanLabel`.
-
-This example also demonstrates the syntax `x | f 0 | g`. This should be
-read like the pipe operator in a shell script. Ultimately, it will be
-evaluated as `g (f 0 x)`, but when chaining together multiple
-transformations to data, the pipe syntax becomes more readable.
 
 Finally, `println` is very useful when debugging wake code. However,
 be forewarned that the execution order of wake is not sequential!
@@ -719,8 +735,9 @@ Job 17 (link c++ simple):
 ```
 
 Notice that wake does not rebuild the object file in this case (the job ID
-hasn't changed).  It checked that the hash of the input has not changed and
-concluded that the existing output would have been reproduced by gcc.
+in my output is still 17).  It checked that the hash of the input has not
+changed and concluded that the existing output would have been exactly
+reproduced by gcc.
 
 Now let's turn our attention back to the wake file:
 
@@ -756,9 +773,9 @@ you can still see it reflected in some basic Makefiles as well:
 ```makefile
 OBJ = main.o
 main: ${OBJ}
-	${CC} -o $@ ${OBJ}
+	gcc -o $@ ${OBJ}
 .cpp.o:
-	${CC} -c $<
+	gcc -c $<
 ```
 
 The `def variant = "native-cpp11-release"` line similarly refers to a predefined
@@ -779,10 +796,7 @@ it.  If `source` does indeed have trouble and returns a `Fail`, the `require`
 will stop the rest of `buildSimple` from being run and instead simply return
 that `Fail` at the top level; otherwise we assign the `Path` to `mainSrc`.
 
-Now that we have the source file, `buildSimple` invokes the compileC function
-which we imported earlier. In wake `f x y` is read as function `f` run on `x`
-and `y` (in C this would be `f(x, y)`). So, compileC is being run on four
-arguments.
+Now that we have the source file, `buildSimple` invokes the compileC function:
 
 ```console
 $ wake --in gcc_wake -vx compileC
@@ -798,8 +812,7 @@ something did."
 
 Indeed, we can see in our use of `compileC`, we passed a `String` for the
 first argument and `mainSrc` -- which is indeed a `Path` -- for the last
-argument.  The second and third arguments are `Lists`; `Nil` is the empty list
-and `(x, y, Nil)` is a list with two elements x and y.
+argument, while the second and third arguments are `Lists`.
 
 This returns a `Result (List Path) Error` pointing to the object file, which,
 through the same sequence as the source file, gets passed to `linkO` for
@@ -832,16 +845,16 @@ $ echo -e '#include "stdio.h"\nvoid helper() { printf("Built with wake\\n"); }' 
 $ git add help.cpp
 ```
 
-While most of of the changes are minor, the separation of `mainResult` and
+While most of the changes are minor, the separation of `mainResult` and
 `helpResult` into the two steps of `def` followed by `require` is the most
 obvious.  This may initially seem like it creates an unnecessary intermediate
 variable, but it is in fact very important for achieving the best performance.
 Namely, in order for `require` to define values or return early based on the
 exact constructor it's passed, it enforces a degree of serialization on the
-code.  By starting the computation in `def` blocks, we allow wake to compile
-`main.cpp` and `help.cpp` in parallel.  (The `require` unwrapping within
-`multipleResult` ensures they're both compiled before being linked, even though
-each `def` block can be started out of order.)
+code.  `def` doesn't have the same restriction, so by starting the computation
+in `def` blocks, we allow wake to compile `main.cpp` and `help.cpp` in parallel.
+(The `require` unwrapping within `multipleResult` ensures they're both compiled
+before being linked, even though each `def` block can be started out of order.)
 
 ```console
 $ wake buildMultiple
@@ -913,7 +926,7 @@ export def buildAll _ =
 ```
 
 Notice that we've defined `compile` to be `compileC` with every argument
-supplied EXCEPT the `Path` of the file to compile.
+supplied *except* the `Path` of the file to compile.
 This is known as "partial function evaluation" or "currying".
 Thus, `compile` is a function that takes a `Path` and returns a `Path`.
 We could equivalently express `compile` as:
@@ -960,6 +973,12 @@ files are added.
 
 ## Supplemental file visibility
 
+Recall that the third argument to `compileC` is a list of additional legal input
+files.  Wake forbids jobs from reading files in the workspace that are not
+declared inputs.  This means that if you include header files, they must be
+declared in the list of legal inputs passed to compileC or the compile
+will fail.
+
 ```wake
 export def buildHeaders _ =
     require Pass headers =
@@ -985,14 +1004,10 @@ $ wake buildHeaders
 Pass (Path "headers.native-cpp11-release", Nil)
 ```
 
-Recall that the third argument to `compileC` is a list of additional legal input
-files.  Wake forbids jobs from reading files in the workspace that are not
-declared inputs.  This means that if you include header files, they must be
-declared in the list of legal inputs passed to compileC or the compile
-will fail.  Indeed, we can see that failure if we try to run `buildSimple` or
+Indeed, we can see that failure if we try to run `buildSimple` or
 `buildMultiple` now that `main.cpp` depends on a header -- if you run into
-trouble with jobs missing files, check the "Visible" list rather than your local
-filesystem:
+trouble with jobs missing files, checking the "Visible" list will give you a
+better understanding than your local filesystem:
 
 ```console
 $ wake buildSimple
@@ -1019,7 +1034,8 @@ In `buildHeaders`, we've used the `sources` command to find all the header
 files in the same directory and pass them as legal inputs to gcc -- the
 keyword `here` expands to the directory of the `.wake` file.  The second
 argument to `sources` is a regular expression to select which files to
-return. We've used ``` `` ```s here which define regular expression literals with the [standard syntax](https://github.com/google/re2/wiki/Syntax).
+return. We've used ``` `` ```s here which define regular expression literals
+with the [standard syntax](https://github.com/google/re2/wiki/Syntax).
 In addition, the parser verifies that regular expression literals are legal.
 
 Note that "source files" are those files tracked by git. Wake will never
@@ -1073,6 +1089,10 @@ For this file, wake recorded that it only needed `help.cpp`, despite
 
 ## Publish/Subscribe
 
+Wake includes a publish/subscribe interface to support accumulating information
+between multiple files. `publish x = y` adds `y` to the `List` of things which
+will be returned by a `subscribe x` expression.
+
 ```wake
 topic animal: String
 publish animal =
@@ -1090,10 +1110,7 @@ $ wake -x 'animals'
 "Cat", "Dog", "Wolf, "Moose", Nil
 ```
 
-Wake includes a publish/subscribe interface to support accumulating
-information between multiple files. `publish x = y` adds `y` to the `List` of
-things which will be returned by a `subscribe x` expression. Note that
-`animal` is not a variable; it is a topic, which is in a different
+Note that `animal` is not a variable; it is a topic, which is in a different
 namespace than normal variables. Note also that `y` must be a `List`.
 
 For example, this API can be used to accumulate all the unit tests in the
@@ -1113,10 +1130,16 @@ is fairly straight-forward in wake:
 
 ```wake
 def curl url extension =
-    def file =
-        simplify "{here}/{replace `.*/` '' url}"
+    def outputFile =
+        # This construction is somewhat specific to GitHub's url scheme, which
+        # names release tarballs according to the tag version, but doesn't
+        # include the `.tar.gz` (or `.json`) extension.
+        "{here}/{basename url}.{extension}"
     def cmdline =
-        which "curl", "-o", "{file}.{extension}", url, Nil
+        which "curl",
+        "-o", outputFile,
+        url,
+        Nil
     def curl =
         job cmdline Nil
     curl.getJobOutput
@@ -1125,18 +1148,25 @@ export def downloadGithubRelease project =
     require (project, Nil) = projectList
     else failWithError "Exactly one project must be downloaded per call"
     def releasesResult =
+        # Query the GitHub microservice for a structured list of releases.
+        # Note that this is rate-limited, so you might want a different setup if
+        # including this as part of CI for a large project.
         curl "https://api.github.com/repos/{project}/releases" "json"
     def releaseTarballsResult =
         require Pass releases = releasesResult
         require Pass releasesData =
             parseJSONFile releases
-        query releasesData
-        $ jFlatten
-        $ jField "tarball_url"
-        $ jString
+        def releases =
+            # Search through the list of all releases to retrieve the values of
+            # the `tarball_url` field.  Don't spend too much time memorizing
+            # this particular JSON interface; it will be replaced soon.
+            releasesData // `tarball_url`
+            | getJArray
+            | getOrElse Nil
+        Pass (mapPartial getJString releases)
     def mostRecentUrlResult =
         require Pass releaseTarballs = releaseTarballsResult
-        # The returned JSON results are ordered newest-first
+        # The returned JSON results are ordered newest-first.
         head releaseTarballs
         | getOrFail "No GitHub releases found for {project}".makeError
     def mostRecentTarballResult =
