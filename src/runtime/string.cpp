@@ -672,14 +672,6 @@ static PRIMFN(prim_shell_str) {
   RETURN(String::alloc(runtime.heap, shell_escape(str->c_str())));
 }
 
-static PRIMTYPE(type_substr) {
-  return args.size() == 3 &&
-    args[0]->unify(Data::typeString) &&
-    args[1]->unify(Data::typeInteger) &&
-    args[2]->unify(Data::typeInteger) &&
-    out->unify(Data::typeString);
-}
-
 static const uint64_t *scan_utf8_till_x8(const uint64_t *s, const uint64_t *e, size_t *runes) {
   size_t limit = *runes;
   size_t sum = 0;
@@ -704,6 +696,14 @@ static const uint8_t *scan_utf8_till_x1(const uint8_t *s, const uint8_t *e, size
   }
   *runes = sum;
   return s;
+}
+
+static PRIMTYPE(type_substr) {
+  return args.size() == 3 &&
+    args[0]->unify(Data::typeString) &&
+    args[1]->unify(Data::typeInteger) &&
+    args[2]->unify(Data::typeInteger) &&
+    out->unify(Data::typeString);
 }
 
 // This operates on utf8 codepoints
@@ -766,9 +766,39 @@ static PRIMFN(prim_substr) {
   RETURN(String::alloc(runtime.heap, reinterpret_cast<const char*>(start_byte), end_byte - start_byte));
 }
 
+static PRIMTYPE(type_codelen) {
+  return args.size() == 1 &&
+    args[0]->unify(Data::typeString) &&
+    out->unify(Data::typeInteger);
+}
+
+// This operates on utf8 codepoints
+static PRIMFN(prim_codelen) {
+  EXPECT(1);
+  STRING(input_str, 0);
+
+  // Pointers to use while examining the input string, byte-by-byte
+  const uint8_t *s1 = reinterpret_cast<const uint8_t*>(input_str->c_str());
+  const uint8_t *e1 = s1 + input_str->size();
+
+  // Pointers to use while examining the input string, word-by-word
+  const uint64_t *s8 = reinterpret_cast<const uint64_t*>(s1); // Heap objects are always >= 64-bit aligned
+  const uint64_t *e8 = s8 + (input_str->size() >> 3);
+
+  size_t sum = 0;
+  while (s8 < e8) sum += num_utf8_starts(*s8++);
+
+  s1 = reinterpret_cast<const uint8_t*>(s8);
+  while (s1 < e1) sum += is_utf8_start(*s1++);
+
+  MPZ out(sum);
+  RETURN(Integer::alloc(runtime.heap, out));
+}
+
 void prim_register_string(PrimMap &pmap, StringInfo *info) {
   prim_register(pmap, "strlen",   prim_strlen,   type_strlen,    PRIM_PURE);
   prim_register(pmap, "substr",   prim_substr,   type_substr,    PRIM_PURE);
+  prim_register(pmap, "codelen",  prim_codelen,  type_codelen,   PRIM_PURE);
   prim_register(pmap, "vcat",     prim_vcat,     type_vcat,      PRIM_PURE);
   prim_register(pmap, "lcat",     prim_lcat,     type_lcat,      PRIM_PURE);
   prim_register(pmap, "explode",  prim_explode,  type_explode,   PRIM_PURE);

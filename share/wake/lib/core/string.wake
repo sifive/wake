@@ -77,6 +77,20 @@ export def substr (string: String) (start: Integer) (end: Integer): String =
     def fn in pos len = prim "substr"
     fn string start end
 
+# Number of codepoints in a String.
+# For the purposes of this function, a codepoint is defined as one
+# start byte followed by one or more non-start bytes, where a start
+# byte is any byte with high bits not equal to `10`.
+#
+# Examples:
+# ```
+#   codelen "ABCDE" = 5
+#   codelen ""      = 0
+# ```
+export def codelen (string: String): Integer =
+    def fn in = prim "codelen"
+    fn string
+
 # strbase: convert an Integer into a String using a given base.
 #
 # For 2 <= base <= 36, the characters used for the encoding are:
