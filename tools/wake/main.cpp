@@ -689,7 +689,7 @@ int main(int argc, char **argv) {
   // Exit without execution for these arguments
   if (noexecute) return 0;
 
-  db.prepare(original_command_line);
+  db.prepare(original_command_line, shell_escape(find_execpath_full()));
   runtime.init(static_cast<RFun*>(ssa.get()));
 
   // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)

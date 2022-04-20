@@ -41,6 +41,17 @@ std::string find_execpath() {
   return exepath;
 }
 
+std::string find_execpath_full() {
+    static std::string exepath;
+    if (exepath.empty()) {
+        int pathlen = wai_getExecutablePath(0, 0, 0) + 1;
+        std::unique_ptr<char[]> execbuf(new char[pathlen]);
+        wai_getExecutablePath(execbuf.get(), pathlen, 0);
+        exepath.assign(execbuf.get(), pathlen);
+    }
+    return exepath;
+}
+
 static bool check_exec(const char *tok, size_t len, const std::string &exec, std::string &out) {
   out.assign(tok, len);
   out += "/";
