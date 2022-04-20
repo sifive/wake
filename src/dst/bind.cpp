@@ -549,25 +549,25 @@ static std::unique_ptr<Expr> expand_patterns(const std::string &fnname, std::vec
       std::unique_ptr<Expr> guard_false(expand_patterns(fnname, patterns));
       patterns.emplace(patterns.begin()+1, std::move(save));
       if (!guard_false) return nullptr;
-      std::unique_ptr<DefMap> fmap(new DefMap(FRAGMENT_CPP_LINE));
-      fmap->defs.insert(std::make_pair("_ guardpair", DefValue(FRAGMENT_CPP_LINE, std::unique_ptr<Expr>(
+      std::unique_ptr<DefMap> fmap(new DefMap(p.fragment));
+      fmap->defs.insert(std::make_pair("_ guardpair", DefValue(p.fragment, std::unique_ptr<Expr>(
         fill_pattern(
           new VarRef(p.fragment, "_ f" + std::to_string(p.index)),
           prototype.tree, p.tree)))));
-      fmap->defs.insert(std::make_pair("_ rhs", DefValue(FRAGMENT_CPP_LINE, std::unique_ptr<Expr>(
-        new App(FRAGMENT_CPP_LINE,
-          new VarRef(FRAGMENT_CPP_LINE, "getPairFirst@wake"),
-          new VarRef(FRAGMENT_CPP_LINE, "_ guardpair"))))));
-      fmap->defs.insert(std::make_pair("_ guard", DefValue(FRAGMENT_CPP_LINE, std::unique_ptr<Expr>(
-        new App(FRAGMENT_CPP_LINE,
-          new VarRef(FRAGMENT_CPP_LINE, "getPairSecond@wake"),
-          new VarRef(FRAGMENT_CPP_LINE, "_ guardpair"))))));
-      std::unique_ptr<Expr> guard_true(new App(FRAGMENT_CPP_LINE,
-        new VarRef(FRAGMENT_CPP_LINE, "_ rhs"),
-        new VarRef(FRAGMENT_CPP_LINE, "Unit@wake")));
-      std::unique_ptr<Destruct> des(new Destruct(fragment, Boolean, new App(FRAGMENT_CPP_LINE,
-        new VarRef(FRAGMENT_CPP_LINE, "_ guard"),
-        new VarRef(FRAGMENT_CPP_LINE, "Unit@wake"))));
+      fmap->defs.insert(std::make_pair("_ rhs", DefValue(p.fragment, std::unique_ptr<Expr>(
+        new App(p.fragment,
+          new VarRef(p.fragment, "getPairFirst@wake"),
+          new VarRef(p.fragment, "_ guardpair"))))));
+      fmap->defs.insert(std::make_pair("_ guard", DefValue(p.fragment, std::unique_ptr<Expr>(
+        new App(p.fragment,
+          new VarRef(p.fragment, "getPairSecond@wake"),
+          new VarRef(p.fragment, "_ guardpair"))))));
+      std::unique_ptr<Expr> guard_true(new App(p.fragment,
+        new VarRef(p.fragment, "_ rhs"),
+        new VarRef(p.fragment, "Unit@wake")));
+      std::unique_ptr<Destruct> des(new Destruct(fragment, Boolean, new App(p.fragment,
+        new VarRef(p.fragment, "_ guard"),
+        new VarRef(p.fragment, "Unit@wake"))));
       des->cases.emplace_back(new Lambda(guard_true->fragment, "_", guard_true.release()));
       des->cases.emplace_back(new Lambda(guard_false->fragment, "_", guard_false.release()));
       des->fragment = des->cases.front()->fragment;
