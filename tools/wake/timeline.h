@@ -20,5 +20,7 @@
 #include "runtime/database.h"
 
 void create_timeline(Database &db);
+void create_job_reflections(Database &db);
+void create_file_accesses(Database &db);
 
 #endif

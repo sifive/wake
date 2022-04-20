@@ -124,3 +124,13 @@ void create_timeline(Database &db) {
     std::vector<FileAccess> accesses = db.get_file_accesses();
     write_html(jobs, accesses, std::cout);
 }
+
+void create_job_reflections(Database &db) {
+    std::vector<JobReflection> jobs = db.get_job_visualization();
+    std::cout << create_job_reflections(jobs);
+}
+
+void create_file_accesses(Database &db) {
+    std::vector<FileAccess> accesses = db.get_file_accesses();
+    std::cout << create_file_accesses(accesses);
+}

@@ -8,6 +8,7 @@ import * as vscode from 'vscode';
 import {integer, LanguageClient, LanguageClientOptions, ServerOptions, TransportKind} from 'vscode-languageclient/node';
 import fs = require('fs');
 import sqlite3 = require('sqlite3');
+const { spawn } = require('child_process');
 
 let client: LanguageClient;
 
@@ -171,19 +172,6 @@ class TimelinePanel {
 		});
 	}
 
-	public refresh() {
-		let db = this._getDB();
-		this._queryDB(db, (jobsJson: JobReflection[], accessesJson: { type: number, job: number }[]) => {
-			let message = {
-				jobReflections: jobsJson,
-				fileAccesses: accessesJson
-			}
-			// Send a message to the webview.
-			this._panel.webview.postMessage(message);
-			db.close();
-		});
-	}
-
 	public dispose() {
 		TimelinePanel.currentPanel = undefined;
 
@@ -200,8 +188,28 @@ class TimelinePanel {
 
 	private _update() {
 		this._panel.title = 'Timeline';
-
 		let db = this._getDB();
+		this._tryUpdatingViaWake(db);
+	}
+
+	private _tryUpdatingViaWake(db: sqlite3.Database) {
+		if (!this._successUsingWake) {
+			this._updateViaTypescript(db);
+			return;
+		}
+		try {
+			db.each(this._findWakeExecutableQuery, (err, row) => {
+				this._useWake(row.executable, "",
+					(stdout: string) => {
+						this._panel.webview.html = stdout;
+						db.close();
+					},
+					() => { this._updateViaTypescript(db); });
+			}, (err, count) => { });
+		} catch (err) { }
+	}
+
+	private _updateViaTypescript(db: sqlite3.Database) {
 		try {
 			let data = fs.readFileSync(__dirname + '/../../../../share/wake/html/timeline.html', { encoding: 'utf8' }).toString();
 			this._queryDB(db, (jobsJson: JobReflection[], accessesJson: { type: number, job: number }[]) => {
@@ -209,7 +217,88 @@ class TimelinePanel {
 				db.close();
 			});
 		} catch (err) { }
-		return;
+	}
+
+	public refresh() {
+		let db = this._getDB();
+		this._tryRefreshingViaWake(db);
+	}
+
+	private _tryRefreshingViaWake(db: sqlite3.Database) {
+		if (!this._successUsingWake) {
+			this._refreshViaTypescript(db);
+			return;
+		}
+		try {
+			db.each(this._findWakeExecutableQuery, (err, row) => {
+				this._useWake(row.executable, "job-reflections", (jobReflections: string) => {
+					this._useWake(row.executable, "file-accesses", (fileAccesses: string) => {
+						let message = {
+									jobReflections: jobReflections,
+									fileAccesses: fileAccesses
+								};
+						// Send a message to the webview.
+						this._panel.webview.postMessage(message);
+						db.close();
+					},
+					() => { this._refreshViaTypescript(db); })
+				},
+					() => { this._refreshViaTypescript(db); });
+			}, (err, count) => { });
+		} catch (err) { }
+	}
+
+	private _refreshViaTypescript(db: sqlite3.Database) {
+		this._queryDB(db, (jobsJson: JobReflection[], accessesJson: { type: number, job: number }[]) => {
+			let message = {
+				jobReflections: jobsJson,
+				fileAccesses: accessesJson
+			}
+			this._panel.webview.postMessage(message);
+			db.close();
+		});
+	}
+
+	private _findWakeExecutableQuery = `select executable from runs order by run_id desc limit 1`;
+
+	private _successUsingWake = true;
+
+	private _useWake(executable: string, option: string, callback: Function, backupCallback: Function) {
+		if (!this._successUsingWake) {
+			backupCallback();
+			return;
+		}
+
+		let process;
+		// spawn process in directory where the wake executable is and run it with --timeline
+		if (option === "") {
+			process = spawn(`${executable}`, [`--timeline`], { cwd: `${executable.substring(0, executable.lastIndexOf('/'))}` });
+		} else {
+			process = spawn(`${executable}`, [`--timeline`, `${option}`], { cwd: `${executable.substring(0, executable.lastIndexOf('/'))}` });
+		}
+
+		let stdout = "";
+		let stderr = "";
+
+		process.stdout.on('data', (data) => {
+			stdout += data.toString();
+		});
+
+		process.stderr.on('data', (data) => {
+			stderr += data.toString();
+		});
+
+		process.on('close', (code) => {
+			this._panel.webview.html = stdout;
+			/*if (code === 0) {
+				callback(stdout);
+			}
+			else {
+				vscode.window.showErrorMessage(`Cannot use wake executable, resorting to accessing wake.db from Node.js. This can be slow on large databases. stderr: ${stderr}`);
+				backupCallback();
+				this._successUsingWake = false;
+			}*/
+		});
 	}
 
 	private _formatString(s: string, ...args: string[]): string {
@@ -276,6 +365,7 @@ class TimelinePanel {
 										left join tags t on j.job_id = t.job_id
 							   group by j.job_id) t on t.job_id = j.job_id
 		   where substr(cast(j.commandline as varchar), 1, 8) != '<source>'
+		     and substr(cast(j.commandline as varchar), 1, 7) != '<claim>'
 			 and substr(cast(j.commandline as varchar), 1, 7) != '<mkdir>'
 			 and substr(cast(j.commandline as varchar), 1, 7) != '<write>'
 			 and substr(cast(j.commandline as varchar), 1, 6) != '<hash>'

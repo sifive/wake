@@ -41,27 +41,52 @@
     <div id="job_info">
         <b>job <br></b>
         <div id="job"></div>
-        <b><br>stale <br></b>
-        <div id="stale"></div>
         <div><br></div>
-        <details open>
+        <details>
             <summary><b>label</b></summary>
             <div id="label"></div>
         </details>
-        <b><br>directory <br></b>
-        <div id="directory"></div>
         <div><br></div>
         <details open>
             <summary><b>commandline</b></summary>
             <div id="commandline"></div>
         </details>
         <div><br></div>
+        <details>
+            <summary><b>visible</b></summary>
+            <div id="visible"></div>
+        </details>
+        <div><br></div>
+        <details>
+            <summary><b>inputs</b></summary>
+            <div id="inputs"></div>
+        </details>
+        <div><br></div>
         <details open>
+            <summary><b>outputs</b></summary>
+            <div id="outputs"></div>
+        </details>
+        <div><br></div>
+        <details open>
+            <summary><b>stdout_payload</b></summary>
+            <div id="stdout_payload"></div>
+        </details>
+        <div><br></div>
+        <details open>
+            <summary><b>stderr_payload</b></summary>
+            <div id="stderr_payload"></div>
+        </details>
+        <b><br>stale <br></b>
+        <div id="stale"></div>
+        <b><br>directory <br></b>
+        <div id="directory"></div>
+        <div><br></div>
+        <details>
             <summary><b>environment</b></summary>
             <div id="environment"></div>
         </details>
         <div><br></div>
-        <details open>
+        <details>
             <summary><b>stack</b></summary>
             <div id="stack"></div>
         </details>
@@ -75,35 +100,10 @@
         <div id="wake_start"></div>
         <b><br>wake_cmdline <br></b>
         <div id="wake_cmdline"></div>
-        <div><br></div>
-        <details open>
-            <summary><b>stdout_payload</b></summary>
-            <div id="stdout_payload"></div>
-        </details>
-        <div><br></div>
-        <details open>
-            <summary><b>stderr_payload</b></summary>
-            <div id="stderr_payload"></div>
-        </details>
         <b><br>usage <br></b>
         <div id="usage"></div>
         <div><br></div>
-        <details open>
-            <summary><b>visible</b></summary>
-            <div id="visible"></div>
-        </details>
-        <div><br></div>
-        <details open>
-            <summary><b>inputs</b></summary>
-            <div id="inputs"></div>
-        </details>
-        <div><br></div>
-        <details open>
-            <summary><b>outputs</b></summary>
-            <div id="outputs"></div>
-        </details>
-        <div><br></div>
-        <details open>
+        <details>
             <summary><b>tags</b></summary>
             <div id="tags"></div>
         </details>
@@ -447,7 +447,6 @@
     // Create jobs Timeline
     const timeline = new vis.Timeline(container, jobs, options, groups);
 
-    let criticalPathArrows = [];
     let allArrows = [];
     const visibleArrows = [];
 
@@ -482,11 +481,6 @@
             added.push(item);
             selectedJobsIds.push(item);
         }
-        for (const arrow of criticalPathArrows) {
-            if (!added.includes(arrow.id_item_1) && !added.includes(arrow.id_item_2)) {
-                arrowObject.addArrow(arrow);
-            }
-        }
     }
 
     timeline.on('select', properties => onSelect(properties.items));
@@ -515,7 +509,12 @@
             return;
         }
         let job = jobMap.get(parseInt(properties.item)).job;
-        document.getElementById("job").innerHTML =job.job;
+        document.getElementById("job").innerHTML =job.job
+        if (job.usage.charAt(8) === '0') {
+            document.getElementById("job").style.color = "green";
+        } else {
+            document.getElementById("job").style.color = "red";
+        }
         document.getElementById("stale").innerHTML =job.stale ? "true" : "false";
         document.getElementById("label").innerHTML = job.label;
         document.getElementById("directory").innerHTML = job.directory;
@@ -555,11 +554,7 @@
             this.endtime = parseInt(job.endtime.toString().slice(0, -6));
 
             this.dependencies = new Set();
-
-            this.hypotheticalStarttime = 0;
             this.hypotheticalEndtime = -1;
-            this.parentID = -1;
-            this.isOnCriticalPath = false;
         }
     }
 
@@ -614,7 +609,6 @@
                 let dependency = jobMap.get(dependencyID);
                 if (dependency.hypotheticalEndtime >= jobNode.hypotheticalStarttime) {
                     jobNode.hypotheticalStarttime = dependency.hypotheticalEndtime;
-                    jobNode.parentID = dependencyID;
                 }
             }
             jobNode.hypotheticalEndtime = jobNode.hypotheticalStarttime + (jobNode.endtime - jobNode.starttime);
@@ -648,26 +642,6 @@
             if (!visited.has(jobID)) {
                 dfsTransitiveReduction(jobID, jobMap, ancestors, visited);
             }
-        }
-    }
-
-    function findCriticalPath(jobMap, criticalPath) {
-        let latestJobID = -1;
-        for (const [jobID, jobNode] of jobMap.entries()) {
-            if (latestJobID === -1 ||
-                jobMap.get(latestJobID).hypotheticalEndtime < jobNode.hypotheticalEndtime) {
-                latestJobID = jobID;
-            }
-        }
-        if (latestJobID === -1) {
-            return;
-        }
-        jobMap.get(latestJobID).isOnCriticalPath = true;
-        criticalPath.push(latestJobID);
-        while (jobMap.get(latestJobID).parentID !== -1) {
-            latestJobID = jobMap.get(latestJobID).parentID;
-            jobMap.get(latestJobID).isOnCriticalPath = true;
-            criticalPath.push(latestJobID);
         }
     }
 
@@ -728,7 +702,6 @@
             }
         }
 
-        timeline.range.options.hiddenDates = [];
         for (let i = 0; i + 1 < merged_times.length; i++) {
             let end1 = merged_times[i][1];
             let start2 = merged_times[i + 1][0];
@@ -737,6 +710,7 @@
         timeline.range.options.min = minStarttime - length * 0.1;
         timeline.range.options.max = maxEndtime + length * 0.1;
 
+        timeline.range.options.hiddenDates = []; // update hidden dates
         for (let i = 0; i + 1 < merged_times.length; i++) {
             let end1 = merged_times[i][1];
             let start2 = merged_times[i + 1][0];
@@ -752,20 +726,9 @@
         })
     }
 
-    function updateCriticalArrows(criticalPath) {
-        criticalPathArrows = [];
-        for (let i = 0; i + 1 < criticalPath.length; i++) {
-            criticalPathArrows.push({
-                id: i,
-                id_item_1: criticalPath[i],
-                id_item_2: criticalPath[i + 1]
-            });
-        }
-    }
-
-    function updateAllArrows(jobMap, criticalPathSize) {
+    function updateAllArrows(jobMap) {
         allArrows = [];
-        let id = criticalPathSize;
+        let id = 0;
         for (const [jobID, jobNode] of jobMap.entries()) {
             for (const dependency of jobNode.dependencies) {
                 allArrows.push({
@@ -778,8 +741,7 @@
         }
     }
 
-    function updateData(jobMap, criticalPath) {
-
+    function updateData(jobMap) {
         clearVisibleArrows();
 
         let selectedJobsIdsSet = new Set(selectedJobsIds);
@@ -800,12 +762,7 @@
         timeline.setSelection(filteredSelectedJobsIds);
         onSelect(filteredSelectedJobsIds);
 
-        updateAllArrows(jobMap, criticalPath.length);
-        updateCriticalArrows(criticalPath);
-
-        for (const arrow of criticalPathArrows) {
-            arrowObject.addArrow(arrow);
-        }
+        updateAllArrows(jobMap);
     }
 
     let jobMap = new Map();
@@ -823,10 +780,7 @@
         assignParents(jobMap, topSortedJobs);
         transitiveReduction(jobMap);
 
-        let criticalPath = [];
-        findCriticalPath(jobMap, criticalPath);
-
-        updateData(jobMap, criticalPath);
+        updateData(jobMap);
 
     }
 
