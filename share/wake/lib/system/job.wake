@@ -504,7 +504,7 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
             Fail f = Pair (Fail (makeError f)) ""
             Pass inFile =
               def outFile = "{build}/{prefix}.out.json"
-              def cmd = script, "-p", inFile, "-o", outFile, extraArgs
+              def cmd = script, "-I", "-p", inFile, "-o", outFile, extraArgs
               def proxy = RunnerInput label cmd Nil (extraEnv ++ environment) "." "" Nil prefix (estimate record)
               Pair (Pass proxy) inFile
   def post = match _
