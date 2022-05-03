@@ -83,6 +83,9 @@ struct Database::detail {
   sqlite3_stmt *get_edges;
   sqlite3_stmt *get_job_visualization;
   sqlite3_stmt *get_file_access;
+  sqlite3_stmt *get_output_files;
+  sqlite3_stmt *remove_output_files;
+  sqlite3_stmt *remove_all_jobs;
 
   long run_id;
   detail(bool debugdb_)
@@ -433,6 +436,23 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       " from filetree"
       " where access != 1"
       " order by file_id, access desc, job_id";
+  const char *sql_get_output_files =
+    "select f.path"
+    " from filetree ft join files f on f.file_id=ft.file_id join jobs j on ft.job_id=j.job_id"
+    " where ft.access = 2"
+    " and substr(cast(j.commandline as varchar), 1, 8) != '<source>'"
+    " and substr(cast(j.commandline as varchar), 1, 7) != '<claim>'";
+  const char *sql_remove_output_files =
+    "delete from files"
+    " where file_id in ("
+    "   select f.file_id"
+    "   from filetree ft join files f on f.file_id=ft.file_id join jobs j on ft.job_id=j.job_id"
+    "   where ft.access = 2"
+    "   and substr(cast(j.commandline as varchar), 1, 8) != '<source>'"
+    "   and substr(cast(j.commandline as varchar), 1, 7) != '<claim>'"
+    " )";
+  const char *sql_remove_all_jobs =
+    "delete from jobs";
 
 #define PREPARE(sql, member)                                                                     \
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);                                   \
@@ -481,6 +501,9 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_get_edges, get_edges);
   PREPARE(sql_get_job_visualization, get_job_visualization);
   PREPARE(sql_get_file_access, get_file_access);
+  PREPARE(sql_get_output_files, get_output_files);
+  PREPARE(sql_remove_output_files, remove_output_files);
+  PREPARE(sql_remove_all_jobs, remove_all_jobs);
 
   return "";
 }
@@ -538,6 +561,9 @@ void Database::close() {
   FINALIZE(get_edges);
   FINALIZE(get_job_visualization);
   FINALIZE(get_file_access);
+  FINALIZE(get_output_files);
+  FINALIZE(remove_output_files);
+  FINALIZE(remove_all_jobs);
 
   close_db(imp.get());
 }
@@ -939,6 +965,16 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   if (fail) exit(1);
 }
 
+void Database::remove_outputs() {
+  const char *why = "Could not remove outputs";
+  single_step (why, imp->remove_output_files, imp->debugdb);
+}
+
+void Database::clear_jobs() {
+  const char *why = "Could not clear jobs";
+  single_step (why, imp->remove_all_jobs, imp->debugdb);
+}
+
 void Database::tag_job(long job, const std::string &uri, const std::string &content) {
   const char *why = "Could not tag a job";
   bind_integer(why, imp->tag_job, 1, job);
@@ -1117,6 +1153,20 @@ static std::vector<JobReflection> find_all(const Database *db, sqlite3_stmt *que
   db->end_txn();
 
   return out;
+}
+
+std::vector<std::string> Database::get_outputs() const {
+    const char *why = "Could not get outputs";
+    std::vector<std::string> out;
+
+    begin_txn();
+    while (sqlite3_step(imp->get_output_files) == SQLITE_ROW) {
+        out.emplace_back(rip_column(imp->get_output_files, 0));
+    }
+    finish_stmt(why, imp->get_output_files, imp->debugdb);
+    end_txn();
+
+    return out;
 }
 
 static std::vector<FileAccess> get_all_file_accesses(const Database *db, sqlite3_stmt *query) {

@@ -27,6 +27,7 @@
 #include <random>
 #include <set>
 #include <sstream>
+#include <algorithm>
 
 #include "describe.h"
 #include "dst/bind.h"
@@ -102,6 +103,8 @@ void print_help(const char *argv0) {
     << "    --debug    -d    Report recorded stack frame of matching jobs"               << std::endl
     << "    --script   -s    Format reported jobs as an executable shell script"         << std::endl
     << "    --timeline       Print the timeline of wake jobs as HTML"                    << std::endl
+    << "    --clean          Delete all job outputs"                                     << std::endl
+    << "    --list-outputs   List all job outputs"                                       << std::endl
     << std::endl
     << "  Help functions:" << std::endl
     << "    --version        Print the version of wake on standard output"               << std::endl
@@ -184,6 +187,8 @@ int main(int argc, char **argv) {
     {0, "export-api", GOPT_ARGUMENT_REQUIRED},
     {0, "stdout", GOPT_ARGUMENT_REQUIRED},
     {0, "stderr", GOPT_ARGUMENT_REQUIRED},
+    { 0,   "clean", GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "list-outputs", GOPT_ARGUMENT_FORBIDDEN },
     {0, "fd:3", GOPT_ARGUMENT_REQUIRED},
     {0, "fd:4", GOPT_ARGUMENT_REQUIRED},
     {0, "fd:5", GOPT_ARGUMENT_REQUIRED},
@@ -224,6 +229,8 @@ int main(int argc, char **argv) {
   bool optim = !arg(options, "no-optimize")->count;
   bool exports = arg(options, "exports")->count;
   bool timeline = arg(options, "timeline")->count;
+  bool clean = arg(options, "clean")->count;
+  bool list_outputs = arg(options, "list-outputs")->count;
 
   const char *percent_str = arg(options, "percent")->argument;
   const char *jobs_str = arg(options, "jobs")->argument;
@@ -386,6 +393,64 @@ int main(int argc, char **argv) {
   if (!fail.empty()) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;
     return 1;
+  }
+
+  // If the user asked to list all files we *would* clean.
+  // This is the same as asking for all output files.
+  if (list_outputs) {
+    // Find all the file we would need to delete.
+    auto files = db.get_outputs();
+
+    // print them all out
+    for (const auto& file : files) {
+      std::cout << file << std::endl;
+    }
+
+    return 0;
+  }
+
+  // If the user asked us to clean the local build, do so.
+  if (clean) {
+    // Find all the file we need to delete.
+    auto files = db.get_outputs();
+
+    // Clean up the database of unwanted info. Jobs must
+    // be cleared before outputs are removed to avoid foreign key
+    // constraint issues.
+    db.clear_jobs();
+    db.remove_outputs();
+
+    // Collect directories to be deleted
+    std::vector<std::string> dirs_to_remove;
+
+    // Delete all the files
+    for (const auto& file : files) {
+      if (unlink(file.c_str()) == -1) {
+        if (errno == EISDIR) {
+          dirs_to_remove.push_back(file);
+          continue;
+        }
+        if (errno == ENOENT) continue;
+        std::cerr << "error: unlink(" << file << "): " << strerror(errno) << std::endl;
+        return 1;
+      }
+    }
+
+    // Sort them so that child directories come before parent directories
+    std::sort(dirs_to_remove.begin(), dirs_to_remove.end(), [&](const std::string& a, const std::string& b) -> bool {
+      return a.size() > b.size();
+    });
+
+    // Now delete all empty directories
+    for (const auto& dir : dirs_to_remove) {
+      if (rmdir(dir.c_str()) == -1) {
+        if (errno == ENOTEMPTY) continue;
+        std::cerr << "error: rmdir(" << dir << "): " << strerror(errno) << std::endl;
+        return 1;
+      }
+    }
+
+    return 0;
   }
 
   // seed the keyed hash function

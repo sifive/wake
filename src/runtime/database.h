@@ -134,6 +134,9 @@ struct Database {
       long job, int descriptor, const char *buffer, int size, double runtime);
   std::string get_output(long job, int descriptor) const;
   void replay_output(long job, const char *stdout, const char *stderr);
+  std::vector<std::string> get_outputs() const;
+  void remove_outputs();
+  void clear_jobs();
 
   void add_hash(const std::string &file, const std::string &hash, long modified);
 

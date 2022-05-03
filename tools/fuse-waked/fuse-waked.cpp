@@ -20,7 +20,7 @@
 
 // Open Group Base Specifications Issue 7
 #define _XOPEN_SOURCE 700
-#define FUSE_USE_VERSION 26
+#define FUSE_USE_VERSION 39
 
 #include <dirent.h>
 #include <errno.h>
@@ -1440,6 +1440,7 @@ int main(int argc, char *argv[]) {
   if (rlim.rlim_cur > 20480) rlim.rlim_cur = 20480;
 #endif
 
+<<<<<<< HEAD
   if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
     fprintf(stderr, "setrlimit(RLIMIT_NOFILE, cur=max): %s\n", strerror(errno));
     goto rmroot;
@@ -1516,6 +1517,85 @@ int main(int argc, char *argv[]) {
   sigaction(SIGALRM, &sa, 0);
 
   args = FUSE_ARGS_INIT(0, NULL);
+=======
+	if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
+		fprintf(stderr, "setrlimit(RLIMIT_NOFILE, cur=max): %s\n", strerror(errno));
+		goto rmroot;
+	}
+
+	// Become a daemon
+	pid = fork();
+	if (pid == -1) {
+		perror("fork");
+		goto rmroot;
+	} else if (pid != 0) {
+		status = 0;
+		goto term;
+	}
+
+	if (setsid() == -1) {
+		perror("setsid");
+		goto rmroot;
+	}
+
+	pid = fork();
+	if (pid == -1) {
+		perror("fork2");
+		goto rmroot;
+	} else if (pid != 0) {
+		status = 0;
+		goto term;
+	}
+
+	// Open the logfile and use as lock on it to ensure we retain ownership
+	// This has to happen after fork (which would drop the lock)
+	memset(&fl, 0, sizeof(fl));
+	fl.l_type = F_WRLCK;
+	fl.l_whence = SEEK_SET;
+	fl.l_start = 0;
+	fl.l_len = 0; // 0=largest possible
+	if (fcntl(log, F_SETLK, &fl) != 0) {
+		if (errno == EAGAIN || errno == EACCES) {
+			if (enable_trace) {
+				fprintf(stderr, "fcntl(%s.log): %s -- assuming another daemon exists\n",
+					path.c_str(), strerror(errno));
+			}
+			status = 0; // another daemon is already running
+		} else {
+			fprintf(stderr, "fcntl(%s.log): %s\n", path.c_str(), strerror(errno));
+		}
+		goto term;
+	}
+
+	// block those signals where we wish to terminate cleanly
+	sigemptyset(&block);
+	sigaddset(&block, SIGINT);
+	sigaddset(&block, SIGQUIT);
+	sigaddset(&block, SIGTERM);
+	sigaddset(&block, SIGALRM);
+	sigprocmask(SIG_BLOCK, &block, &saved);
+
+	memset(&sa, 0, sizeof(sa));
+
+	// ignore these signals
+	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = SA_RESTART;
+	sigaction(SIGPIPE, &sa, 0);
+	sigaction(SIGUSR1, &sa, 0);
+	sigaction(SIGUSR2, &sa, 0);
+	sigaction(SIGHUP,  &sa, 0);
+
+	// hook these signals
+	sa.sa_handler = handle_exit;
+	sa.sa_flags = SA_RESTART;
+	sigaction(SIGINT,  &sa, 0);
+	sigaction(SIGQUIT, &sa, 0);
+	sigaction(SIGTERM, &sa, 0);
+	sigaction(SIGALRM, &sa, 0);
+
+	args = FUSE_ARGS_INIT(0, NULL);
+
+>>>>>>> 86ebc25... Add --clean and --list-outputs to help text
 #if FUSE_VERSION >= 24 && FUSE_VERSION < 30 && !defined(__APPLE__)
   /* Allow mounting on non-empty .fuse directories
    * This anti-feature was added in 2.4.0 and removed in 3.0.0.
