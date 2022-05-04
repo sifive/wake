@@ -137,7 +137,7 @@ jobs:
 
   ubuntu_22_04:
     machine:
-      image: ubuntu-2004:202201-02
+      image: "ubuntu-2004:202201-02"
     steps:
       - attach_workspace:
           at: /tmp/workspace
