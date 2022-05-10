@@ -52,13 +52,13 @@ install:	all
 	$(WAKE_ENV) ./bin/wake install $(DESTDIR)
 
 test:		wake.db
-	$(WAKE_ENV) ./bin/wake --in test_wake runTests
+	$(WAKE_ENV) gdb -batch -ex "run" -ex "bt" --args ./bin/wake --in test_wake runTests
 
 unittest:		wake.db
 	$(WAKE_ENV) ./bin/wake --in test_wake runUnitTests
 
 tarball:	wake.db
-	$(WAKE_ENV) ./bin/wake build tarball
+	$(WAKE_ENV) ./bin/wake build debug
 
 vscode:		wake.db
 	$(WAKE_ENV) ./bin/wake vscode
