@@ -262,7 +262,7 @@ static void status_redraw(bool idle)
     }
     ++used;
   } else if (tty && !idle) {
-    os << std::string(cols-2, ' ') << "/-\\|"[ticks] << std::endl;
+    os << std::string(std::max(cols-2, 0), ' ') << "/-\\|"[ticks] << std::endl;
     ticks = (ticks+spinner_update) & 3;
     ++used;
   }
