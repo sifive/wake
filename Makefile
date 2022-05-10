@@ -2,8 +2,8 @@
 
 VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/^[^']*'\([^']*\)'.*/\1/p" manifest.wake; else git describe --tags --dirty; fi)
 
-CC	:= cc -std=c11
-CXX	:= c++ -std=c++11
+CC	:= cc -std=c11 -g
+CXX	:= c++ -std=c++11 -g
 CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
 LDFLAGS	:=
 DESTDIR ?= /usr/local
@@ -58,7 +58,7 @@ unittest:		wake.db
 	$(WAKE_ENV) ./bin/wake --in test_wake runUnitTests
 
 tarball:	wake.db
-	$(WAKE_ENV) ./bin/wake build debug
+	$(WAKE_ENV) ./bin/wake build tarball
 
 vscode:		wake.db
 	$(WAKE_ENV) ./bin/wake vscode
