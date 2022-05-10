@@ -8,7 +8,7 @@ jobs:
       image: ubuntu-2004:202201-02
     steps:
       - checkout
-      - run: sudo apt-get update && sudo apt-get install -y build-essential libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx
+      - run: sudo apt-get update && sudo apt-get install -y build-essential fuse libfuse-dev libsqlite3-dev libgmp-dev libncurses5-dev pkg-config git g++ gcc libre2-dev python3-sphinx
       - run: make tarball
       - run: make test
       - run: make unittest
@@ -137,7 +137,7 @@ jobs:
 
   ubuntu_22_04:
     machine:
-      image: ubuntu-2004:202201-02
+      image: "ubuntu-2004:202201-02"
     steps:
       - attach_workspace:
           at: /tmp/workspace
