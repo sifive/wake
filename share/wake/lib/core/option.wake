@@ -30,7 +30,7 @@ export def isSome: Option a => Boolean = match _
     Some _ = True
     None   = False
 
-# isSome: Report if an Option has no value.
+# isNone: Report if an Option has no value.
 # If you find yourself using the function, consider using a match instead.
 #
 #   isNone (Some 451) = False
