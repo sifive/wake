@@ -30,15 +30,15 @@ export def isSome: Option a => Boolean = match _
     Some _ = True
     None   = False
 
-# isSome: Report if an Option has no value.
+# isNone: Report if an Option has no value.
 # If you find yourself using the function, consider using a match instead.
 #
-#   isSome (Some 451) = False
-#   isSome (Some "x") = False
-#   isSome None       = True
+#   isNone (Some 451) = False
+#   isNone (Some "x") = False
+#   isNone None       = True
 export def isNone: Option a => Boolean = match _
-    Some _ = True
-    None   = False
+    Some _ = False
+    None   = True
 
 # getOrElse: extract the value from an Option, with a supplied default if None.
 # The default value expression is evaluated whether or not the Option is None.
