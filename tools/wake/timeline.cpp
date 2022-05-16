@@ -86,7 +86,10 @@ std::string create_job_reflections(const std::vector<JobReflection> &jobs) {
 
         std::stringstream tags;
         for (const auto &tag: jobReflection.tags) {
-            tags << tag.content << ",<br><br>";
+            tags << "{<br>" <<
+                 "  job: " << tag.job << ",<br>" <<
+                 "  uri: " << tag.uri << ",<br>" <<
+                 "  content: " << tag.content << "<br>},<br>";
         }
         job_json.add("tags", tags.str());
     }
