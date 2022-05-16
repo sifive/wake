@@ -102,7 +102,7 @@ struct Database {
 
   void entropy(uint64_t *key, int words);
 
-  void prepare(const std::string &cmdline, const std::string &executable); // prepare for job execution
+  void prepare(const std::string &cmdline); // prepare for job execution
   void clean(); // finished execution; sweep stale jobs
 
   void begin_txn() const;

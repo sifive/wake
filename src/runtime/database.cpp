@@ -33,7 +33,7 @@
 #include "status.h"
 
 // Increment every time the database schema changes
-#define SCHEMA_VERSION "6"
+#define SCHEMA_VERSION "5"
 
 #define VISIBLE 0
 #define INPUT 1
@@ -144,10 +144,9 @@ std::string Database::open(bool wait, bool memory, bool tty) {
     "create table if not exists schema("
     "  version integer primary key);"
     "create table if not exists runs("
-    "  run_id     integer primary key autoincrement,"
-    "  time       integer not null,"
-    "  cmdline    text    not null,"
-    "  executable text    not null);"
+    "  run_id  integer primary key autoincrement,"
+    "  time    integer not null,"
+    "  cmdline text    not null);"
     "create table if not exists files("
     "  file_id  integer primary key,"
     "  path     text    not null,"
@@ -267,7 +266,7 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   // prepare statements
   const char *sql_get_entropy = "select seed from entropy order by row_id";
   const char *sql_set_entropy = "insert into entropy(seed) values(?)";
-  const char *sql_add_run = "insert into runs(time, cmdline, executable) values(?, ?, ?)";
+  const char *sql_add_run = "insert into runs(time, cmdline) values(?, ?)";
   const char *sql_begin_txn = "begin transaction";
   const char *sql_commit_txn = "commit transaction";
   const char *sql_predict_job =
@@ -615,7 +614,7 @@ void Database::entropy(uint64_t *key, int words) {
   end_txn();
 }
 
-void Database::prepare(const std::string &cmdline, const std::string &executable) {
+void Database::prepare(const std::string &cmdline) {
   struct timespec now;
   clock_gettime(CLOCK_REALTIME, &now);
   int64_t ts = static_cast<int64_t>(now.tv_sec) * 1000000000 + now.tv_nsec;
@@ -623,7 +622,6 @@ void Database::prepare(const std::string &cmdline, const std::string &executable
   const char *why = "Could not insert run";
   bind_integer(why, imp->add_run, 1, ts);
   bind_string (why, imp->add_run, 2, cmdline);
-  bind_string (why, imp->add_run, 3, executable);
   single_step (why, imp->add_run, imp->debugdb);
   imp->run_id = sqlite3_last_insert_rowid(imp->db);
 }
