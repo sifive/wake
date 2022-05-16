@@ -11,7 +11,7 @@
             "properties": {
                 "wakeLanguageServer.pathToWakeStandardLibrary": {
                     "default": "",
-                    "description": "The path to the wake standard library that will be used by the server. If left blank, the library that comes with the extension is used.",
+                    "description": "The path to the wake standard library that is used to provide diagnostics. If left blank, the library that comes with the extension is used.",
                     "scope": "window",
                     "type": "string"
                 },
@@ -29,6 +29,12 @@
                         "messages",
                         "verbose"
                     ],
+                    "scope": "window",
+                    "type": "string"
+                },
+                "wakeTimeline.pathToWakeBinary": {
+                    "default": "",
+                    "description": "The path to the wake binary that is used to create the timeline. If invalid, the timeline functionality is not provided.",
                     "scope": "window",
                     "type": "string"
                 }
@@ -76,8 +82,7 @@
         "@types/node": "^15.14.9",
         "@types/vscode": "^1.52.0",
         "eslint": "^7.32.0",
-        "typescript": "^4.4.4",
-        "sqlite3": "^5.0.2"
+        "typescript": "^4.4.4"
     },
     "license": "Apache-2.0",
     "main": "./lsp-client/out/extension",

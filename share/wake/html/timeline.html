@@ -754,7 +754,7 @@
         }
         let filteredSelectedJobsIds = selectedJobs.filter(function(selectedJob) {
             const newJob = newJobsMap.get(selectedJob.id);
-            if (newJob === null) {
+            if (newJob === null || newJob === undefined) {
                 return 0;
             }
             return compareJobs(selectedJob, newJob);
