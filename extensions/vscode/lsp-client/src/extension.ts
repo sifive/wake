@@ -4,13 +4,12 @@
  * ------------------------------------------------------------------------------------------ */
 
 import * as vscode from 'vscode';
-
-import {integer, LanguageClient, LanguageClientOptions, ServerOptions, TransportKind} from 'vscode-languageclient/node';
-const { spawn } = require('child_process');
+import { integer, LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
+import { spawn } from 'child_process';
 
 let client: LanguageClient;
 
-export function activate(context: vscode.ExtensionContext) {
+export function activate(context: vscode.ExtensionContext): void {
 	const serverModule = context.asAbsolutePath('/lsp-server/lsp-wake.js');
 
 	let stdLibPath: string = vscode.workspace.getConfiguration("wakeLanguageServer").get("pathToWakeStandardLibrary");
@@ -80,15 +79,13 @@ export function deactivate(): Thenable<void> | undefined {
 }
 
 
-let timelinePanel: vscode.WebviewPanel;
+let timelinePanel: vscode.WebviewPanel | null;
 const viewType = 'timeline';
 let wakeBinary: string;
 let disposables: vscode.Disposable[] = [];
 
-function createOrShowPanel() {
-	const column = vscode.window.activeTextEditor
-		? vscode.window.activeTextEditor.viewColumn
-		: undefined;
+function createOrShowPanel(): void {
+	const column = vscode.window.activeTextEditor?.viewColumn;
 
 	// If we already have a panel, show it.
 	if (timelinePanel) {
@@ -106,7 +103,7 @@ function createOrShowPanel() {
 	updatePanel(panel);
 }
 
-function updatePanel(panel: vscode.WebviewPanel) {
+function updatePanel(panel: vscode.WebviewPanel): void {
 	timelinePanel = panel;
 	wakeBinary = vscode.workspace.getConfiguration("wakeTimeline").get("pathToWakeBinary");
 
@@ -131,16 +128,15 @@ function updatePanel(panel: vscode.WebviewPanel) {
 	);
 }
 
-function setTimeline() {
+function setTimeline(): void {
 	timelinePanel.title = 'Timeline';
 	useWake("",
 		(stdout: string) => {
 			timelinePanel.webview.html = stdout;
 		});
-	return;
 }
 
-function refreshTimeline() {
+function refreshTimeline(): void {
 	useWake("job-reflections", (jobReflections: string) => {
 		useWake( "file-accesses", (fileAccesses: string) => {
 			let message = {
@@ -153,7 +149,7 @@ function refreshTimeline() {
 	});
 }
 
-function useWake(option: string, callback: Function) {
+function useWake(option: string, callback: Function): void {
 	if (wakeBinary == '') {
 		vscode.window.showErrorMessage(`Timeline: the path to wake binary is empty. Please provide a valid path in the extension's settings.`);
 		return;
@@ -198,16 +194,14 @@ function getWebviewOptions(): vscode.WebviewOptions {
 	};
 }
 
-function dispose() {
+function dispose(): void {
 	// Clean up our resources
 	timelinePanel.dispose();
 
-	while (disposables.length) {
-		const x = disposables.pop();
-		if (x) {
-			x.dispose();
-		}
+	for (const disposable of disposables) {
+		disposable.dispose();
 	}
+	disposables.length = 0;
 
-	timelinePanel = undefined;
+	timelinePanel = null;
 }
