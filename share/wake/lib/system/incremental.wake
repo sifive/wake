@@ -27,6 +27,7 @@ def targz output paths =
     makeExecPlan cmd paths
     | setPlanLocalOnly True
     | setPlanFnOutputs (\_ output, Nil)
+    | setPlanLabel "tar-gz: {output}"
     | runJobWith       localRunner
     | getJobOutput
 

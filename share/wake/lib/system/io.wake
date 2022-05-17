@@ -37,6 +37,7 @@ target writeImp inputs mode path content =
         makeRunner "write" (\_ Pass 0.0) pre post virtualRunner
     makeExecPlan ("<write>", str mode, path, Nil) inputs
     | setPlanOnce        False
+    | setPlanLabel "write: {path}"
     | setPlanEnvironment Nil
     | runJobWith writeRunner
     | getJobOutput
@@ -68,6 +69,7 @@ export def installAs (dest: String) (file: Path): Result Path Error =
         sdest, Nil
     makeExecPlan cmd inputs
     | setPlanEnvironment Nil
+    | setPlanLabel "installAs: {dest}"
     | setPlanLocalOnly True
     | setPlanFnOutputs foutputs
     | runJob
@@ -115,6 +117,7 @@ def mkdirRunner: Runner =
 def mkdirImp inputs mode path =
     makeExecPlan ("<mkdir>", "-m", "0{strOctal mode}", path, Nil) inputs
     | setPlanKeep        False
+    | setPlanLabel "mkdir: {path}"
     | setPlanEnvironment Nil
     | runJobWith mkdirRunner
     | getJobOutput

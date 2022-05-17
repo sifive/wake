@@ -44,6 +44,7 @@ def raw_source file =
         | setPlanShare       False
         | setPlanEcho        logDebug
         | setPlanEnvironment Nil
+        | setPlanLabel "source: {file}"
         | setPlanFnOutputs   (file, _)
         | runJobWith virtualRunner
         | getJobOutput
@@ -93,6 +94,7 @@ export def claim (file: String): Result Path Error =
             | setPlanShare       False
             | setPlanEcho        logDebug
             | setPlanEnvironment Nil
+            | setPlanLabel "claim: {file}"
             | setPlanFnOutputs   (file, _)
             | runJobWith virtualRunner
             | getJobOutput
@@ -155,5 +157,6 @@ export def claimFileAsPathIn (outputDirectory: Path) (existingFile: String) (des
         | setPlanLocalOnly   True
         | setPlanPersistence Once
         | setPlanFnOutputs   (\_ desiredWorkspacePath, Nil)
+        | setPlanLabel "claim-in: {existingFile}"
         | runJobWith localRunner
         | getJobOutput
