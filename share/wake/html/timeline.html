@@ -541,7 +541,7 @@
         document.getElementById("tags").innerHTML = job.tags;
     });
 
-    function compareJobs(jobA, jobB) {
+    function jobsEqual(jobA, jobB) {
         return (jobA.id === jobB.id &&
             jobA.starttime === jobB.starttime &&
             jobA.endtime === jobB.endtime);
@@ -646,7 +646,7 @@
     }
 
     function updateJobs(jobMap) {
-        var survivingJobs = new Set();
+        let survivingJobs = new Set();
 
         let minStarttime = -1;
         let maxEndtime = -1;
@@ -757,7 +757,7 @@
             if (newJob === null || newJob === undefined) {
                 return 0;
             }
-            return compareJobs(selectedJob, newJob);
+            return jobsEqual(selectedJob, newJob);
         }).map(job => job.id);
         timeline.setSelection(filteredSelectedJobsIds);
         onSelect(filteredSelectedJobsIds);

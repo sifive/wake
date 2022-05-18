@@ -17,14 +17,14 @@ export function activate(context: vscode.ExtensionContext): void {
 		stdLibPath = context.asAbsolutePath('/share/wake/lib');
 	}
 
-	let serverOptions: ServerOptions = {
+	const serverOptions: ServerOptions = {
 		module: serverModule,
 		transport: TransportKind.stdio,
 		args: [stdLibPath]
 	};
 
 	// Options to control the language client
-	let clientOptions: LanguageClientOptions = {
+	const clientOptions: LanguageClientOptions = {
 		// Register the server for .wake files
 		documentSelector: [{ language: 'wake', pattern: '**/*.wake' }],
 		synchronize: {
@@ -79,10 +79,10 @@ export function deactivate(): Thenable<void> | undefined {
 }
 
 
-let timelinePanel: vscode.WebviewPanel | null;
+let timelinePanel: vscode.WebviewPanel | null = null;
 const viewType = 'timeline';
-let wakeBinary: string;
-let disposables: vscode.Disposable[] = [];
+let wakeBinary: string = '';
+const disposables: vscode.Disposable[] = [];
 
 function createOrShowPanel(): void {
 	const column = vscode.window.activeTextEditor?.viewColumn;
@@ -94,7 +94,7 @@ function createOrShowPanel(): void {
 	}
 
 	// Otherwise, create a new panel.
-	let panel = vscode.window.createWebviewPanel(
+	const panel = vscode.window.createWebviewPanel(
 		viewType,
 		'Timeline',
 		column || vscode.ViewColumn.One,
@@ -113,6 +113,17 @@ function updatePanel(panel: vscode.WebviewPanel): void {
 	// Listen for when the panel is disposed
 	// This happens when the user closes the panel or when the panel is closed programmatically
 	timelinePanel.onDidDispose(() => dispose(), null, disposables);
+
+	// when timelinePanel is not visible, the updates from refresh() are lost => must update the html itself
+	timelinePanel.onDidChangeViewState(
+		e => {
+			if (timelinePanel.visible) {
+				setTimeline();
+			}
+		},
+		null,
+		disposables
+	);
 
 	// Handle messages from the webview
 	timelinePanel.webview.onDidReceiveMessage(
@@ -139,7 +150,7 @@ function setTimeline(): void {
 function refreshTimeline(): void {
 	useWake("job-reflections", (jobReflections: string) => {
 		useWake( "file-accesses", (fileAccesses: string) => {
-			let message = {
+			const message = {
 				jobReflections: JSON.parse(jobReflections),
 				fileAccesses: JSON.parse(fileAccesses)
 			};
@@ -149,18 +160,15 @@ function refreshTimeline(): void {
 	});
 }
 
-function useWake(option: string, callback: Function): void {
+function useWake(option: string, callback: (stdout: string) => void): void {
 	if (wakeBinary == '') {
 		vscode.window.showErrorMessage(`Timeline: the path to wake binary is empty. Please provide a valid path in the extension's settings.`);
 		return;
 	}
-	let process;
+
+	const extraArgs = option === "" ? [] : [option];
 	// spawn process in directory where the wake executable is and run it with --timeline
-	if (option === "") {
-		process = spawn(`${wakeBinary}`, [`--timeline`], { cwd: `${wakeBinary.substring(0, wakeBinary.lastIndexOf('/'))}` });
-	} else {
-		process = spawn(`${wakeBinary}`, [`--timeline`, `${option}`], { cwd: `${wakeBinary.substring(0, wakeBinary.lastIndexOf('/'))}` });
-	}
+	const process = spawn(wakeBinary, [`--timeline`, ...extraArgs], { cwd: `${wakeBinary.substring(0, wakeBinary.lastIndexOf('/'))}` });
 
 	let err = "";
 	let stdout = "";
