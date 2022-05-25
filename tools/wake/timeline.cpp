@@ -17,14 +17,13 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <set>
 
 #include "timeline.h"
 #include "runtime/database.h"
 #include "util/execpath.h"
 #include "json/json5.h"
 
-std::string create_job_reflections(const std::vector<JobReflection> &jobs) {
+void write_job_reflections(std::ostream &os, const std::vector<JobReflection> &jobs) {
     JAST jobs_json(JSON_ARRAY);
     for (const JobReflection &jobReflection: jobs) {
         JAST &job_json = jobs_json.add("", JSON_OBJECT);
@@ -93,47 +92,57 @@ std::string create_job_reflections(const std::vector<JobReflection> &jobs) {
         }
         job_json.add("tags", tags.str());
     }
-    std::stringstream buffer;
-    buffer << jobs_json;
-    return buffer.str();
+    os << jobs_json;
 }
 
-std::string create_file_accesses(std::vector<FileAccess> &accesses) {
+void write_file_accesses(std::ostream &os, const std::vector<FileAccess> &accesses) {
     JAST accesses_json(JSON_ARRAY);
     for (const FileAccess &access: accesses) {
         JAST &access_json = accesses_json.add("", JSON_OBJECT);
         access_json.add("type", access.type);
         access_json.add("job", access.job);
     }
-    std::stringstream buffer;
-    buffer << accesses_json;
-    return buffer.str();
+    os << accesses_json;
 }
 
-void write_html(std::vector<JobReflection> &jobs, std::vector<FileAccess> &accesses, std::ostream &os) {
-    std::ifstream html_template(find_execpath() + "/../share/wake/html/timeline.html");
-    std::stringstream buffer;
-    buffer << html_template.rdbuf();
-    std::string output = buffer.str();
-    size_t pos = output.find("{0}");
-    output.replace(pos, 3, create_job_reflections(jobs));
-    pos = output.find("{1}");
-    output.replace(pos, 3, create_file_accesses(accesses));
-    os << output;
+void write_timeline(std::ostream &os, const std::vector<JobReflection> &jobs, const std::vector<FileAccess> &accesses) {
+    std::ifstream html_template(find_execpath() + "/../share/wake/html/timeline_template.html");
+    std::ifstream arrow_library(find_execpath() + "/../share/wake/html/timeline_arrow_lib.js");
+    std::ifstream main(find_execpath() + "/../share/wake/html/timeline_main.js");
+
+    os << html_template.rdbuf();
+
+    os << R"(<script type="application/json" id="jobReflections">)" << std::endl;
+    write_job_reflections(os, jobs);
+    os << "</script>" << std::endl;
+
+    os << R"(<script type="application/json" id="fileAccesses">)" << std::endl;
+    write_file_accesses(os, accesses);
+    os << "</script>" << std::endl;
+
+    os << R"(<script type="text/javascript">)" << std::endl;
+    os << arrow_library.rdbuf();
+    os << "</script>" << std::endl;
+
+    os << R"(<script type="module">)" << std::endl;
+    os << main.rdbuf();
+    os << "</script>\n"
+          "</body>\n"
+          "</html>\n";
 }
 
-void create_timeline(Database &db) {
+void get_and_write_job_reflections(std::ostream &os, const Database &db) {
+    std::vector<JobReflection> jobs = db.get_job_visualization();
+    write_job_reflections(os, jobs);
+}
+
+void get_and_write_file_accesses(std::ostream &os, const Database &db) {
+    std::vector<FileAccess> accesses = db.get_file_accesses();
+    write_file_accesses(os, accesses);
+}
+
+void get_and_write_timeline(std::ostream &os, const Database &db) {
     std::vector<JobReflection> jobs = db.get_job_visualization();
     std::vector<FileAccess> accesses = db.get_file_accesses();
-    write_html(jobs, accesses, std::cout);
-}
-
-void create_job_reflections(Database &db) {
-    std::vector<JobReflection> jobs = db.get_job_visualization();
-    std::cout << create_job_reflections(jobs);
-}
-
-void create_file_accesses(Database &db) {
-    std::vector<FileAccess> accesses = db.get_file_accesses();
-    std::cout << create_file_accesses(accesses);
+    write_timeline(os, jobs, accesses);
 }

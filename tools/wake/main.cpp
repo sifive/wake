@@ -391,18 +391,18 @@ int main(int argc, char **argv) {
   }
 
   if (timeline) {
-     if (argc == 1) {
-        create_timeline(db);
-        return 0;
+    if (argc == 1) {
+      get_and_write_timeline(std::cout, db);
+      return 0;
     }
     char *timeline_str = argv[1];
     if (strcmp(timeline_str, "job-reflections") == 0) {
-        create_job_reflections(db);
-        return 0;
+      get_and_write_job_reflections(std::cout, db);
+      return 0;
     }
     if (strcmp(timeline_str, "file-accesses") == 0) {
-        create_file_accesses(db);
-        return 0;
+      get_and_write_file_accesses(std::cout, db);
+      return 0;
     }
     std::cerr << "Unrecognized option after --timeline" << std::endl;
     return 1;

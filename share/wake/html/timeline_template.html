@@ -1,0 +1,143 @@
+<!doctype html>
+<!--
+ Copyright 2022 SiFive, Inc.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You should have received a copy of LICENSE.Apache2 along with
+ this software. If not, you may obtain a copy at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ -->
+<html>
+<head>
+    <title>Timeline</title>
+    <script type="text/javascript"
+            src="https://unpkg.com/vis-timeline@7.5.0/standalone/umd/vis-timeline-graph2d.min.js"></script>
+    <link href="https://unpkg.com/vis-timeline@7.5.0/styles/vis-timeline-graph2d.min.css" rel="stylesheet"
+          type="text/css"/>
+    <style>
+        #timeline {
+            border: 0 solid lightgray;
+            height: 100%;
+        }
+        #job_info {
+            margin-left: 10px;
+            overflow: scroll;
+            height: 100%;
+        }
+    </style>
+    <script src="https://unpkg.com/split.js/dist/split.min.js"></script>
+</head>
+<body>
+<div class="content">
+    <div id="timeline"></div>
+    <div id="job_info">
+        <b>job <br></b>
+        <div id="job"></div>
+        <div><br></div>
+        <details>
+            <summary><b>label</b></summary>
+            <div id="label"></div>
+        </details>
+        <div><br></div>
+        <details open>
+            <summary><b>commandline</b></summary>
+            <div id="commandline"></div>
+        </details>
+        <div><br></div>
+        <details>
+            <summary><b>visible</b></summary>
+            <div id="visible"></div>
+        </details>
+        <div><br></div>
+        <details>
+            <summary><b>inputs</b></summary>
+            <div id="inputs"></div>
+        </details>
+        <div><br></div>
+        <details open>
+            <summary><b>outputs</b></summary>
+            <div id="outputs"></div>
+        </details>
+        <div><br></div>
+        <details open>
+            <summary><b>stdout_payload</b></summary>
+            <div id="stdout_payload"></div>
+        </details>
+        <div><br></div>
+        <details open>
+            <summary><b>stderr_payload</b></summary>
+            <div id="stderr_payload"></div>
+        </details>
+        <b><br>stale <br></b>
+        <div id="stale"></div>
+        <b><br>directory <br></b>
+        <div id="directory"></div>
+        <div><br></div>
+        <details>
+            <summary><b>environment</b></summary>
+            <div id="environment"></div>
+        </details>
+        <div><br></div>
+        <details>
+            <summary><b>stack</b></summary>
+            <div id="stack"></div>
+        </details>
+        <b><br>stdin_file <br></b>
+        <div id="stdin_file"></div>
+        <b><br>starttime <br></b>
+        <div id="starttime"></div>
+        <b><br>endtime <br></b>
+        <div id="endtime"></div>
+        <b><br>wake_start <br></b>
+        <div id="wake_start"></div>
+        <b><br>wake_cmdline <br></b>
+        <div id="wake_cmdline"></div>
+        <b><br>usage <br></b>
+        <div id="usage"></div>
+        <div><br></div>
+        <details>
+            <summary><b>tags</b></summary>
+            <div id="tags"></div>
+        </details>
+    </div>
+</div>
+<script src="https://unpkg.com/split.js/dist/split.min.js"></script>
+<style>
+    .vis-tooltip {
+        white-space: normal;
+        max-width: 100%;
+        word-wrap: break-word;
+        padding: 5px;
+    }
+    body {
+        margin: 0;
+        height: 100vh;
+    }
+    .content {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        justify-items: center;
+        align-items: center;
+    }
+    .gutter {
+        cursor: s-resize;
+        height: 100%;
+        background: grey;
+    }
+</style>
+<script>
+    Split(["#timeline", "#job_info"], {
+        gutterSize: 5,
+        sizes: [80, 20],
+        minSize: 0
+    });
+</script>
