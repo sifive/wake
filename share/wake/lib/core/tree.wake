@@ -186,12 +186,22 @@ export def tfoldr f a (Tree _ root) =
     Bin _ l x r = helper (f x (helper a r)) l
   helper a root
 
-# Fold in parallel; assumes f is an associative operator and has type: a => a => a
-export def tfoldmap f a g (Tree _ root) =
-  def helper a = match _
-    Tip = g a
-    Bin _ l x r = f (helper a l) (helper x r)
-  helper a root
+# Transform and collapse all values in a `Tree` in parallel.
+#
+# *Parameters:*
+#   * `combineFn`: A function which can combine multiple output values into one.
+#     This function should be parallel.
+#   * `base`: A "seed" value with which to start the fold.  This will be applied
+#     as the farthest-left value, before any values derived from `tree` itself.
+#   * `transformFn`: A function performing some work to be applied to every
+#     element in `tree` in parallel.
+#   * `tree`: The values from which the result should be derived.
+export def tfoldmap (combineFn: b => b => b) (base: b) (transformFn: a => b) (tree: Tree a): b =
+    def Tree _ root = tree
+    def helper a = match _
+        Tip = a
+        Bin _ l x r = combineFn (helper a l) (helper (transformFn x) r)
+    helper base root
 
 export def tfold f a t = tfoldmap f a (_) t
 
