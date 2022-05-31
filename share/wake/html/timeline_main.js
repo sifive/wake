@@ -14,48 +14,10 @@
  * limitations under the License.
  */
 
+//// HTML and DOM operations ////
+
 // DOM element where the Timeline will be attached
 const container = document.getElementById('timeline');
-
-const groups = new vis.DataSet([
-    {id: 0, content: "", value: 0}
-]);
-
-// Order by job length
-function customOrder(jobA, jobB) {
-    return (jobB.end - jobB.start) - (jobA.end - jobA.start);
-}
-
-// Configuration for the Timeline
-const options = {
-    order: customOrder,
-    stack: true,
-    verticalScroll: true,
-    zoomKey: "ctrlKey",
-    width: '100%',
-    maxHeight: '700px',
-    tooltip: {
-        followMouse: true,
-        overflowMethod: "cap",
-    },
-    multiselect: true,
-    margin: {
-        item: {horizontal: -1, vertical: 0}
-    }
-};
-
-const jobs = new vis.DataSet();
-
-// Create jobs Timeline
-const timeline = new vis.Timeline(container, jobs, options, groups);
-
-let allArrows = [];
-const visibleArrows = [];
-
-const arrowObject = new Arrow(timeline, visibleArrows);
-
-let jobReflections = JSON.parse(document.getElementById("jobReflections").textContent);
-let fileAccesses = JSON.parse(document.getElementById("fileAccesses").textContent);
 
 function addNodeArrows(node, added) {
     for (const arrow of allArrows) {
@@ -69,181 +31,6 @@ function addNodeArrows(node, added) {
 function clearVisibleArrows() {
     while (visibleArrows.length > 0) {
         arrowObject.removeArrow(visibleArrows[visibleArrows.length - 1].id);
-    }
-}
-
-let selectedJobsIds = [];
-
-function onSelect(items) {
-    clearVisibleArrows();
-    const added = [];
-    selectedJobsIds = [];
-    for (const item of items) {
-        addNodeArrows(item, added);
-        added.push(item);
-        selectedJobsIds.push(item);
-    }
-}
-
-timeline.on('select', properties => onSelect(properties.items));
-
-timeline.on('click', function (properties) {
-    if (properties.item == null) {
-        document.getElementById("job").innerHTML = "";
-        document.getElementById("stale").innerHTML = "";
-        document.getElementById("label").innerHTML = "";
-        document.getElementById("directory").innerHTML = "";
-        document.getElementById("commandline").innerHTML = "";
-        document.getElementById("environment").innerHTML = "";
-        document.getElementById("stack").innerHTML = "";
-        document.getElementById("stdin_file").innerHTML = "";
-        document.getElementById("starttime").innerHTML = "";
-        document.getElementById("endtime").innerHTML = "";
-        document.getElementById("wake_start").innerHTML = "";
-        document.getElementById("wake_cmdline").innerHTML = "";
-        document.getElementById("stdout_payload").innerHTML = "";
-        document.getElementById("stderr_payload").innerHTML = "";
-        document.getElementById("usage").innerHTML = "";
-        document.getElementById("visible").innerHTML = "";
-        document.getElementById("inputs").innerHTML = "";
-        document.getElementById("outputs").innerHTML = "";
-        document.getElementById("tags").innerHTML = "";
-        return;
-    }
-    let job = jobMap.get(parseInt(properties.item)).job;
-    document.getElementById("job").innerHTML =job.job
-    if (job.usage.charAt(8) === '0') {
-        document.getElementById("job").style.color = "green";
-    } else {
-        document.getElementById("job").style.color = "red";
-    }
-    document.getElementById("stale").innerHTML =job.stale ? "true" : "false";
-    document.getElementById("label").innerHTML = job.label;
-    document.getElementById("directory").innerHTML = job.directory;
-    document.getElementById("commandline").innerHTML = job.commandline;
-    document.getElementById("environment").innerHTML = job.environment;
-    document.getElementById("stack").innerHTML = job.stack;
-    document.getElementById("stdin_file").innerHTML = job.stdin_file;
-
-    const starttime = new Date(job.starttime / 1e6);
-    document.getElementById("starttime").innerHTML = starttime.toISOString();
-    const endtime = new Date(job.endtime / 1e6);
-    document.getElementById("endtime").innerHTML = endtime.toISOString();
-    const wake_start = new Date(job.wake_start / 1e6);
-    document.getElementById("wake_start").innerHTML = wake_start.toISOString();
-
-    document.getElementById("wake_cmdline").innerHTML = job.wake_cmdline;
-    document.getElementById("stdout_payload").innerHTML = job.stdout_payload;
-    document.getElementById("stderr_payload").innerHTML = job.stderr_payload;
-
-    document.getElementById("usage").innerHTML = job.usage;
-    document.getElementById("visible").innerHTML = job.visible;
-    document.getElementById("inputs").innerHTML = job.inputs;
-    document.getElementById("outputs").innerHTML = job.outputs;
-    document.getElementById("tags").innerHTML = job.tags;
-});
-
-function jobsEqual(jobA, jobB) {
-    return (jobA.id === jobB.id &&
-        jobA.starttime === jobB.starttime &&
-        jobA.endtime === jobB.endtime);
-}
-
-class JobNode {
-    constructor(job) {
-        this.job = job;
-        this.starttime = parseInt(job.starttime.toString().slice(0, -6));
-        this.endtime = parseInt(job.endtime.toString().slice(0, -6));
-
-        this.dependencies = new Set();
-        this.hypotheticalEndtime = -1;
-    }
-}
-
-function fillOneDependency(access, dependency, jobMap) {
-    const job = access.job;
-    if (access.type === 2) {
-        return job;
-    }
-    if (jobMap.has(job)) {
-        jobMap.get(job).dependencies.add(dependency);
-    }
-    return dependency;
-}
-
-function fillAllDependencies(accesses, jobMap) {
-    let dependency = -1;
-    for (let access of accesses) {
-        dependency = fillOneDependency(access, dependency, jobMap);
-    }
-}
-
-function dfsTopSort(jobID, jobMap, topSortedJobs, visited) {
-    let job = jobMap.get(jobID);
-    visited.add(jobID);
-    for (let dependency of job.dependencies) {
-        if (!jobMap.has(dependency)) {
-            job.dependencies.delete(dependency);
-            continue;
-        }
-        if (!visited.has(dependency)) {
-            dfsTopSort(dependency, jobMap, topSortedJobs, visited);
-        }
-    }
-    topSortedJobs.push(jobID);
-}
-
-function topSort(jobMap) {
-    let topSortedJobs = [];
-    let visited = new Set();
-    for (const [jobID, _] of jobMap.entries()) {
-        if (!visited.has(jobID)) {
-            dfsTopSort(jobID, jobMap, topSortedJobs, visited);
-        }
-    }
-    return topSortedJobs;
-}
-
-function assignParents(jobMap, topSortedJobs) {
-    for (const jobID of topSortedJobs) {
-        let jobNode = jobMap.get(jobID);
-        for (const dependencyID of jobNode.dependencies) {
-            let dependency = jobMap.get(dependencyID);
-            if (dependency.hypotheticalEndtime >= jobNode.hypotheticalStarttime) {
-                jobNode.hypotheticalStarttime = dependency.hypotheticalEndtime;
-            }
-        }
-        jobNode.hypotheticalEndtime = jobNode.hypotheticalStarttime + (jobNode.endtime - jobNode.starttime);
-    }
-}
-
-function dfsTransitiveReduction(jobID, jobMap, ancestors, visited) {
-    let job = jobMap.get(jobID);
-    if (!visited.has(jobID)) {
-        ancestors.add(jobID);
-        visited.add(jobID);
-    }
-
-    for (let childID of job.dependencies) {
-        let child = jobMap.get(childID);
-        for (let grandchildID of child.dependencies) {
-            for (let ancestorID of ancestors) {
-                let ancestor = jobMap.get(ancestorID);
-                ancestor.dependencies.delete(grandchildID);
-            }
-        }
-        dfsTransitiveReduction(childID, jobMap, ancestors, visited);
-    }
-    ancestors.delete(jobID);
-}
-
-function transitiveReduction(jobMap) {
-    let ancestors = new Set();
-    let visited = new Set();
-    for (const [jobID, _] of jobMap.entries()) {
-        if (!visited.has(jobID)) {
-            dfsTransitiveReduction(jobID, jobMap, ancestors, visited);
-        }
     }
 }
 
@@ -284,7 +71,7 @@ function updateJobs(jobMap) {
     }
     var length = maxEndtime - minStarttime;
 
-    times.sort(function(t1, t2) {
+    times.sort(function (t1, t2) {
         if (t1[0] !== t2[0]) {
             return t1[0] > t2[0] ? 1 : -1;
         }
@@ -343,31 +130,232 @@ function updateAllArrows(jobMap) {
     }
 }
 
-function updateData(jobMap) {
-    clearVisibleArrows();
 
-    let selectedJobsIdsSet = new Set(selectedJobsIds);
-    let selectedJobs = jobs.get().filter(job => selectedJobsIdsSet.has(job.id));
+//// Setting up the Timeline objects ////
 
-    updateJobs(jobMap);
-    const newJobsMap = new Map();
-    for (const job of jobs.get()) {
-        newJobsMap.set(job.id, job);
-    }
-    let filteredSelectedJobsIds = selectedJobs.filter(function(selectedJob) {
-        const newJob = newJobsMap.get(selectedJob.id);
-        if (newJob === null || newJob === undefined) {
-            return 0;
-        }
-        return jobsEqual(selectedJob, newJob);
-    }).map(job => job.id);
-    timeline.setSelection(filteredSelectedJobsIds);
-    onSelect(filteredSelectedJobsIds);
+const jobs = new vis.DataSet();
 
-    updateAllArrows(jobMap);
+// Order by job length
+function customOrder(jobA, jobB) {
+    return (jobB.end - jobB.start) - (jobA.end - jobA.start);
 }
 
-let jobMap = new Map();
+// Configuration for the Timeline
+const options = {
+    order: customOrder,
+    stack: true,
+    verticalScroll: true,
+    zoomKey: "ctrlKey",
+    width: '100%',
+    maxHeight: '700px',
+    tooltip: {
+        followMouse: true,
+        overflowMethod: "cap",
+    },
+    multiselect: true,
+    margin: {
+        item: {horizontal: -1, vertical: 0}
+    }
+};
+const groups = new vis.DataSet([
+    {id: 0, content: "", value: 0}
+]);
+
+// Create the Timeline
+const timeline = new vis.Timeline(container, jobs, options, groups);
+
+
+//// Graph construction  ////
+
+class JobNode {
+    constructor(job) {
+        this.job = job;
+        this.starttime = parseInt(job.starttime.toString().slice(0, -6));
+        this.endtime = parseInt(job.endtime.toString().slice(0, -6));
+
+        this.dependencies = new Set();
+        this.hypotheticalEndtime = -1;
+    }
+}
+
+function fillOneDependency(access, dependency, jobMap) {
+    const job = access.job;
+    if (access.type === 2) {
+        return job;
+    }
+    if (jobMap.has(job)) {
+        jobMap.get(job).dependencies.add(dependency);
+    }
+    return dependency;
+}
+
+function fillAllDependencies(accesses, jobMap) {
+    let dependency = -1;
+    for (let access of accesses) {
+        dependency = fillOneDependency(access, dependency, jobMap);
+    }
+}
+
+function assignParents(jobMap, topSortedJobs) {
+    for (const jobID of topSortedJobs) {
+        let jobNode = jobMap.get(jobID);
+        for (const dependencyID of jobNode.dependencies) {
+            let dependency = jobMap.get(dependencyID);
+            if (dependency.hypotheticalEndtime >= jobNode.hypotheticalStarttime) {
+                jobNode.hypotheticalStarttime = dependency.hypotheticalEndtime;
+            }
+        }
+        jobNode.hypotheticalEndtime = jobNode.hypotheticalStarttime + (jobNode.endtime - jobNode.starttime);
+    }
+}
+
+
+//// Graph processing ////
+
+function dfsTopSort(jobID, jobMap, topSortedJobs, visited) {
+    let job = jobMap.get(jobID);
+    visited.add(jobID);
+    for (let dependency of job.dependencies) {
+        if (!jobMap.has(dependency)) {
+            job.dependencies.delete(dependency);
+            continue;
+        }
+        if (!visited.has(dependency)) {
+            dfsTopSort(dependency, jobMap, topSortedJobs, visited);
+        }
+    }
+    topSortedJobs.push(jobID);
+}
+
+function topSort(jobMap) {
+    let topSortedJobs = [];
+    let visited = new Set();
+    for (const [jobID, _] of jobMap.entries()) {
+        if (!visited.has(jobID)) {
+            dfsTopSort(jobID, jobMap, topSortedJobs, visited);
+        }
+    }
+    return topSortedJobs;
+}
+
+function dfsTransitiveReduction(jobID, jobMap, ancestors, visited) {
+    let job = jobMap.get(jobID);
+    if (!visited.has(jobID)) {
+        ancestors.add(jobID);
+        visited.add(jobID);
+    }
+
+    for (let childID of job.dependencies) {
+        let child = jobMap.get(childID);
+        for (let grandchildID of child.dependencies) {
+            for (let ancestorID of ancestors) {
+                let ancestor = jobMap.get(ancestorID);
+                ancestor.dependencies.delete(grandchildID);
+            }
+        }
+        dfsTransitiveReduction(childID, jobMap, ancestors, visited);
+    }
+    ancestors.delete(jobID);
+}
+
+function transitiveReduction(jobMap) {
+    let ancestors = new Set();
+    let visited = new Set();
+    for (const [jobID, _] of jobMap.entries()) {
+        if (!visited.has(jobID)) {
+            dfsTransitiveReduction(jobID, jobMap, ancestors, visited);
+        }
+    }
+}
+
+
+//// Setting of initial state ////
+
+let selectedJobsIds = [];
+const jobMap = new Map();
+
+let allArrows = [];
+const visibleArrows = [];
+const arrowObject = new Arrow(timeline, visibleArrows);
+
+
+//// Processing user-initiated events ////
+
+function onSelect(items) {
+    clearVisibleArrows();
+    const added = [];
+    selectedJobsIds = [];
+    for (const item of items) {
+        addNodeArrows(item, added);
+        added.push(item);
+        selectedJobsIds.push(item);
+    }
+}
+
+timeline.on('select', properties => onSelect(properties.items));
+
+timeline.on('click', function (properties) {
+    if (properties.item == null) {
+        document.getElementById("job").innerHTML = "";
+        document.getElementById("stale").innerHTML = "";
+        document.getElementById("label").innerHTML = "";
+        document.getElementById("directory").innerHTML = "";
+        document.getElementById("commandline").innerHTML = "";
+        document.getElementById("environment").innerHTML = "";
+        document.getElementById("stack").innerHTML = "";
+        document.getElementById("stdin_file").innerHTML = "";
+        document.getElementById("starttime").innerHTML = "";
+        document.getElementById("endtime").innerHTML = "";
+        document.getElementById("wake_start").innerHTML = "";
+        document.getElementById("wake_cmdline").innerHTML = "";
+        document.getElementById("stdout_payload").innerHTML = "";
+        document.getElementById("stderr_payload").innerHTML = "";
+        document.getElementById("usage").innerHTML = "";
+        document.getElementById("visible").innerHTML = "";
+        document.getElementById("inputs").innerHTML = "";
+        document.getElementById("outputs").innerHTML = "";
+        document.getElementById("tags").innerHTML = "";
+        return;
+    }
+    let job = jobMap.get(parseInt(properties.item)).job;
+    document.getElementById("job").innerHTML = job.job
+    if (job.usage.charAt(8) === '0') {
+        document.getElementById("job").style.color = "green";
+    } else {
+        document.getElementById("job").style.color = "red";
+    }
+    document.getElementById("stale").innerHTML = job.stale ? "true" : "false";
+    document.getElementById("label").innerHTML = job.label;
+    document.getElementById("directory").innerHTML = job.directory;
+    document.getElementById("commandline").innerHTML = job.commandline;
+    document.getElementById("environment").innerHTML = job.environment;
+    document.getElementById("stack").innerHTML = job.stack;
+    document.getElementById("stdin_file").innerHTML = job.stdin_file;
+
+    const starttime = new Date(job.starttime / 1e6);
+    document.getElementById("starttime").innerHTML = starttime.toISOString();
+    const endtime = new Date(job.endtime / 1e6);
+    document.getElementById("endtime").innerHTML = endtime.toISOString();
+    const wake_start = new Date(job.wake_start / 1e6);
+    document.getElementById("wake_start").innerHTML = wake_start.toISOString();
+
+    document.getElementById("wake_cmdline").innerHTML = job.wake_cmdline;
+    document.getElementById("stdout_payload").innerHTML = job.stdout_payload;
+    document.getElementById("stderr_payload").innerHTML = job.stderr_payload;
+
+    document.getElementById("usage").innerHTML = job.usage;
+    document.getElementById("visible").innerHTML = job.visible;
+    document.getElementById("inputs").innerHTML = job.inputs;
+    document.getElementById("outputs").innerHTML = job.outputs;
+    document.getElementById("tags").innerHTML = job.tags;
+});
+
+window.addEventListener("message", event => {
+    const message = event.data;
+    const newJobReflections = message.jobReflections;
+    const newFileAccesses = message.fileAccesses;
+    processChanges(newJobReflections, newFileAccesses);
+});
 
 function processChanges(newJobReflections, newFileAccesses) {
     jobMap.clear();
@@ -386,11 +374,37 @@ function processChanges(newJobReflections, newFileAccesses) {
 
 }
 
-window.addEventListener("message", event => {
-    const message = event.data;
-    const newJobReflections = message.jobReflections;
-    const newFileAccesses = message.fileAccesses;
-    processChanges(newJobReflections, newFileAccesses);
-});
+function updateData(jobMap) {
+    clearVisibleArrows();
 
-processChanges(jobReflections, fileAccesses);
+    let selectedJobsIdsSet = new Set(selectedJobsIds);
+    let selectedJobs = jobs.get().filter(job => selectedJobsIdsSet.has(job.id));
+
+    updateJobs(jobMap);
+    const newJobsMap = new Map();
+    for (const job of jobs.get()) {
+        newJobsMap.set(job.id, job);
+    }
+    let filteredSelectedJobsIds = selectedJobs.filter(function (selectedJob) {
+        const newJob = newJobsMap.get(selectedJob.id);
+        if (newJob === null || newJob === undefined) {
+            return 0;
+        }
+        return jobsEqual(selectedJob, newJob);
+    }).map(job => job.id);
+    timeline.setSelection(filteredSelectedJobsIds);
+    onSelect(filteredSelectedJobsIds);
+
+    updateAllArrows(jobMap);
+}
+
+function jobsEqual(jobA, jobB) {
+    return (jobA.id === jobB.id &&
+        jobA.starttime === jobB.starttime &&
+        jobA.endtime === jobB.endtime);
+}
+
+
+// Process initial data
+processChanges(JSON.parse(document.getElementById("jobReflections").textContent),
+    JSON.parse(document.getElementById("fileAccesses").textContent));
