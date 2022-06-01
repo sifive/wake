@@ -1,6 +1,9 @@
 {
     "activationEvents": [
-        "onLanguage:plaintext"
+        "onLanguage:plaintext",
+        "onCommand:timeline.create",
+		"onCommand:timeline.refresh",
+		"onWebviewPanel:timeline"
     ],
     "author": "SiFive",
     "contributes": {
@@ -8,7 +11,7 @@
             "properties": {
                 "wakeLanguageServer.pathToWakeStandardLibrary": {
                     "default": "",
-                    "description": "The path to the wake standard library that will be used by the server. If left blank, the library that comes with the extension is used.",
+                    "description": "The path to the wake standard library that is used to provide diagnostics. If left blank, the library that comes with the extension is used.",
                     "scope": "window",
                     "type": "string"
                 },
@@ -26,6 +29,12 @@
                         "messages",
                         "verbose"
                     ],
+                    "scope": "window",
+                    "type": "string"
+                },
+                "wakeTimeline.pathToWakeBinary": {
+                    "default": "",
+                    "description": "The path to the wake binary that is used to create the timeline. If invalid, the timeline functionality is not provided.",
                     "scope": "window",
                     "type": "string"
                 }
@@ -52,7 +61,19 @@
                 ],
                 "id": "wake"
             }
-        ]
+        ],
+        "commands": [
+			{
+				"command": "timeline.create",
+				"title": "Create",
+				"category": "Timeline"
+			},
+			{
+				"command": "timeline.refresh",
+				"title": "Refresh",
+				"category": "Timeline"
+			}
+		]
     },
     "dependencies": {
         "vscode-languageclient": "^7.0.0"

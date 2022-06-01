@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
     { 'g', "globals",               GOPT_ARGUMENT_FORBIDDEN },
     { 'e', "exports",               GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "timeline",              GOPT_ARGUMENT_FORBIDDEN },
+    { 0,   "timeline",              GOPT_ARGUMENT_OPTIONAL  },
     { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
     { 0,   "stop-after-parse",      GOPT_ARGUMENT_FORBIDDEN },
@@ -390,10 +390,23 @@ int main(int argc, char **argv) {
     db.entropy(&sip_key[0], 2);
   }
 
-    if (timeline) {
-        create_timeline(db);
-        return 0;
+  if (timeline) {
+    if (argc == 1) {
+      get_and_write_timeline(std::cout, db);
+      return 0;
     }
+    char *timeline_str = argv[1];
+    if (strcmp(timeline_str, "job-reflections") == 0) {
+      get_and_write_job_reflections(std::cout, db);
+      return 0;
+    }
+    if (strcmp(timeline_str, "file-accesses") == 0) {
+      get_and_write_file_accesses(std::cout, db);
+      return 0;
+    }
+    std::cerr << "Unrecognized option after --timeline" << std::endl;
+    return 1;
+  }
 
   if (job) {
     auto hits = db.explain(std::atol(job), verbose || tag);

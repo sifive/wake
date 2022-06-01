@@ -19,6 +19,8 @@
 
 #include "runtime/database.h"
 
-void create_timeline(Database &db);
+void get_and_write_timeline(std::ostream &os, const Database &db);
+void get_and_write_job_reflections(std::ostream &os, const Database &db);
+void get_and_write_file_accesses(std::ostream &os, const Database &db);
 
 #endif
