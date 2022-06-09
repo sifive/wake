@@ -290,7 +290,22 @@ class Cache {
   Xoshiro256 rng;
 
   void init_sql() {
-    std::string cache_schema =
+    // We want to keep a sql file that has proper syntax highlighting
+    // around instead of embeding the schema. In order to acomplish this
+    // we use C++11 raw strings and the preprocessor. Unfortuently
+    // since starting a sql file with `R("` causes it to all highlight
+    // as a string we need to work around that. In sql `--` is a comment
+    // starter but in C++ its decrement. We take advantage of this by
+    // adding `--dummy, R("` to the start of the sql file which allows
+    // it to be valid and have no effect in both languages. Thus
+    // this dummy variable is needed at the importa site.
+    // clang-format off
+    int dummy = 0;
+    const char* cache_schema =
+        #include "schema.sql"
+    ;
+    // clang-format on
+    /*std::string cache_schema =
         "pragma auto_vacuum=incremental;"
         "pragma journal_mode=wal;"
         "pragma synchronous=0;"
@@ -346,7 +361,7 @@ class Cache {
         "  hash         text    not null,"
         "  job          job_id  not null references jobs(job_id) on delete "
         "cascade);"
-        "create index if not exists input_dir on input_dirs(path, hash);";
+        "create index if not exists input_dir on input_dirs(path, hash);";*/
 
     std::string db_path = dir + "/cache.db";
     if (sqlite3_open_v2(db_path.c_str(), &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
@@ -361,7 +376,7 @@ class Cache {
     }
 
     char *fail = nullptr;
-    if (sqlite3_exec(db, cache_schema.c_str(), nullptr, nullptr, &fail) != SQLITE_OK) {
+    if (sqlite3_exec(db, cache_schema, nullptr, nullptr, &fail) != SQLITE_OK) {
       log_fatal("error: failed init stmt: %s: %s", fail, sqlite3_errmsg(db));
     }
   }
