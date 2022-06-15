@@ -51,6 +51,12 @@ wake.db:	bin/wake bin/wakebox lib/wake/fuse-waked lib/wake/shim-wake
 install:	all
 	$(WAKE_ENV) ./bin/wake install $(DESTDIR)
 
+# This assumes clang is available on the PATH
+# try: module load clang/12.0.1.1
+formatAll:
+	clang-format -i --style=file $(shell find . -type f -name "*.h")
+	clang-format -i --style=file $(shell find . -type f -name "*.cpp")
+
 test:		wake.db
 	$(WAKE_ENV) ./bin/wake --in test_wake runTests
 
