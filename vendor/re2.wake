@@ -19,8 +19,11 @@ from gcc_wake import _
 
 def re2 = match _
   Pair "wasm-cpp14-release" _ = buildRE2WASM Unit
-  _ = Pass (pkg "re2")
-
+  _ =
+    pkgConfig "re2"
+    | getOrElseFn (\Unit pkg "re2")
+    | editSysLibCFlags (filter (\x ! (matches `-std=.*` x))) # remove feature test manipulation
+    | Pass
 
 def buildRE2WASM Unit =
     def version =
