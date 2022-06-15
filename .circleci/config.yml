@@ -178,9 +178,6 @@ workflows:
       - debian_bullseye:
           requires:
             - tarball
-      - centos_7_6:
-          requires:
-            - tarball
       - rocky_8:
           requires:
             - tarball
@@ -197,7 +194,6 @@ workflows:
           requires:
             - alpine
             - debian_bullseye
-            - centos_7_6     # RHEL7-compatible, oldest gcc
             - rocky_8        # RHEL8-compatible
             - ubuntu_18_04   # LTS
             - ubuntu_22_04   # LTS
