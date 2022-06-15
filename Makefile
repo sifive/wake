@@ -3,7 +3,7 @@
 VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/^[^']*'\([^']*\)'.*/\1/p" manifest.wake; else git describe --tags --dirty; fi)
 
 CC	:= cc -std=c11
-CXX	:= c++ -std=c++11
+CXX	:= c++ -std=c++14
 CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
 LDFLAGS	:=
 DESTDIR ?= /usr/local
