@@ -59,10 +59,17 @@ formatAll:
 
 # Formats all changed or staged files .h or .cpp files
 # It assumes clang is available on the PATH and will fail otherwise
-# TODO(ashley): A confusing/meaningless error is emitted when either diff doesn't return any files
 format:
-	clang-format -i --style=file $(shell git diff --name-only --cached | grep '.cpp\|.h')
-	clang-format -i --style=file $(shell git diff --name-only | grep '.cpp\|.h')
+# Conditionally run clang-format based on the staged and changed files
+# || true is added after each if expression since they resolve 
+	@CHANGED_FILES=$$(git diff --name-only | grep '.cpp\|.h') && \
+	if [ ! -z $$CHANGED_FILES ]; then \
+		clang-format -i --style=file $$CHANGED_FILES; \
+	fi || true && \
+	STAGED_FILES=$$(git diff --name-only --cached | grep '.cpp\|.h') && \
+	if [ ! -z $$STAGED_FILES ]; then \
+		clang-format -i --style=file $$STAGED_FILES; \
+	fi || true
 
 test:		wake.db
 	$(WAKE_ENV) ./bin/wake --in test_wake runTests
