@@ -51,10 +51,18 @@ wake.db:	bin/wake bin/wakebox lib/wake/fuse-waked lib/wake/shim-wake
 install:	all
 	$(WAKE_ENV) ./bin/wake install $(DESTDIR)
 
-# This assumes clang is available on the PATH
+# Formats all .h and .cpp file under the current directory
+# It assumes clang is available on the PATH and will fail otherwise
 formatAll:
 	clang-format -i --style=file $(shell find . -type f -name "*.h")
 	clang-format -i --style=file $(shell find . -type f -name "*.cpp")
+
+# Formats all changed or staged files .h or .cpp files
+# It assumes clang is available on the PATH and will fail otherwise
+# TODO(ashley): this doesn't actually work when either line returns back no files
+format:
+	clang-format -i --style=file $(shell git diff --name-only --cached | grep '.cpp\|.h')
+	clang-format -i --style=file $(shell git diff --name-only | grep '.cpp\|.h')
 
 test:		wake.db
 	$(WAKE_ENV) ./bin/wake --in test_wake runTests
