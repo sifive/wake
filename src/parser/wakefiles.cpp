@@ -44,21 +44,22 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 
+// clang-format off
 EM_JS(char *, nodejs_getfiles, (const char *dir, int *ok), {
   const Path = require("path").posix;
-  const FS = require("fs");
-  let files = [];
+  const FS   = require("fs");
+  let files  = [];
 
   function walkTree(dir) {
-    FS.readdirSync(dir, {withFileTypes : true}).forEach(dirent = > {
-      const absolute = Path.join(dir, dirent.name);
-      if (dirent.isDirectory()) {
-        if (dirent.name != ".build" && dirent.name != ".fuse" && dirent.name != ".git")
-          walkTree(absolute);
-      } else {
-        files.push(absolute);
-      }
-    });
+      FS.readdirSync(dir, {withFileTypes: true}).forEach(dirent => {
+          const absolute = Path.join(dir, dirent.name);
+          if (dirent.isDirectory()) {
+            if (dirent.name != ".build" && dirent.name != ".fuse" && dirent.name != ".git")
+              walkTree(absolute);
+          } else {
+            files.push(absolute);
+          }
+      });
   }
 
   try {
@@ -66,19 +67,20 @@ EM_JS(char *, nodejs_getfiles, (const char *dir, int *ok), {
     const sep = String.fromCharCode(0);
     const out = files.join(sep) + sep;
 
-    const lengthBytes = lengthBytesUTF8(out) + 1;
+    const lengthBytes = lengthBytesUTF8(out)+1;
     const stringOnWasmHeap = _malloc(lengthBytes);
     stringToUTF8(out, stringOnWasmHeap, lengthBytes);
     setValue(ok, 1, "i32");
     return stringOnWasmHeap;
   } catch (err) {
-    const lengthBytes = lengthBytesUTF8(err.message) + 1;
+    const lengthBytes = lengthBytesUTF8(err.message)+1;
     const stringOnWasmHeap = _malloc(lengthBytes);
     stringToUTF8(err.message, stringOnWasmHeap, lengthBytes);
     setValue(ok, 0, "i32");
     return stringOnWasmHeap;
   }
 });
+// clang-format on
 
 bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2 &re,
                 size_t skip) {

@@ -30,23 +30,23 @@ CPPFile expr_h("src/dst/expr.h");
 static CPPFile cppFile(__FILE__);
 
 Expr::~Expr() {}
-const TypeDescriptor Prim ::type("Prim");
-const TypeDescriptor App ::type("App");
-const TypeDescriptor Lambda ::type("Lambda");
-const TypeDescriptor VarRef ::type("VarRef");
-const TypeDescriptor Literal ::type("Literal");
+const TypeDescriptor Prim::type("Prim");
+const TypeDescriptor App::type("App");
+const TypeDescriptor Lambda::type("Lambda");
+const TypeDescriptor VarRef::type("VarRef");
+const TypeDescriptor Literal::type("Literal");
 const TypeDescriptor DefBinding::type("DefBinding");
-const TypeDescriptor Get ::type("Get");
-const TypeDescriptor Construct ::type("Construct");
-const TypeDescriptor Destruct ::type("Destruct");
+const TypeDescriptor Get::type("Get");
+const TypeDescriptor Construct::type("Construct");
+const TypeDescriptor Destruct::type("Destruct");
 // these are removed by bind
-const TypeDescriptor Subscribe ::type("Subscribe");
-const TypeDescriptor Ascribe ::type("Ascribe");
-const TypeDescriptor Match ::type("Match");
-const TypeDescriptor DefMap ::type("DefMap");
+const TypeDescriptor Subscribe::type("Subscribe");
+const TypeDescriptor Ascribe::type("Ascribe");
+const TypeDescriptor Match::type("Match");
+const TypeDescriptor DefMap::type("DefMap");
 // these are just useful for dumping json ast
-const TypeDescriptor VarDef ::type("VarDef");
-const TypeDescriptor VarArg ::type("VarArg");
+const TypeDescriptor VarDef::type("VarDef");
+const TypeDescriptor VarArg::type("VarArg");
 
 Top::Top() : packages(), globals(), def_package(nullptr) {
   Package *builtin = new Package();

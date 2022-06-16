@@ -68,58 +68,50 @@
 static CPPFile cppFile(__FILE__);
 
 void print_help(const char *argv0) {
-  std::cout
-      << std::endl
-      << "Usage: " << argv0 << " [OPTIONS] [target] [target options ...]" << std::endl
-      << "Usage in script: #! /usr/bin/env wake [OPTIONS] -:target" << std::endl
-      << std::endl
-      << "  Flags affecting build execution:" << std::endl
-      << "    --jobs=N   -jN   Schedule local jobs for N cores or N% of CPU (default 90%)"
-      << std::endl
-      << "    --memory=M -mM   Schedule local jobs for M bytes or M% of RAM (default 90%)"
-      << std::endl
-      << "    --check    -c    Rerun all jobs and confirm their output is reproducible" << std::endl
-      << "    --verbose  -v    Report hash progress and result expression types" << std::endl
-      << "    --debug    -d    Report stack frame information for exceptions and closures"
-      << std::endl
-      << "    --quiet    -q    Surpress report of launched jobs and final expressions" << std::endl
-      << "    --no-tty         Surpress interactive build progress interface" << std::endl
-      << "    --no-wait        Do not wait to obtain database lock; fail immediately" << std::endl
-      << "    --no-workspace   Do not open a database or scan for sources files" << std::endl
-      << "    --fatal-warnings Do not execute if there are any warnings" << std::endl
-      << "    --heap-factor X  Heap-size is X * live data after the last GC (default 4.0)"
-      << std::endl
-      << "    --profile-heap   Report memory consumption on every garbage collection" << std::endl
-      << "    --profile  FILE  Report runtime breakdown by stack trace to HTML/JSON file"
-      << std::endl
-      << "    --chdir -C PATH  Locate database and default package starting from PATH" << std::endl
-      << "    --in       PKG   Evaluate command-line in package PKG (default is chdir)" << std::endl
-      << "    --exec -x  EXPR  Execute expression EXPR instead of a target function" << std::endl
-      << std::endl
-      << "  Database commands:" << std::endl
-      << "    --init      DIR  Create or replace a wake.db in the specified directory" << std::endl
-      << "    --input  -i FILE Report recorded meta-data for jobs which read FILES" << std::endl
-      << "    --output -o FILE Report recorded meta-data for jobs which wrote FILES" << std::endl
-      << "    --job       JOB  Report recorded meta-data for the specified job id" << std::endl
-      << "    --last     -l    Report recorded meta-data for all jobs run by last build"
-      << std::endl
-      << "    --failed   -f    Report recorded meta-data for jobs which failed last build"
-      << std::endl
-      << "    --verbose  -v    Report recorded standard output and error of matching jobs"
-      << std::endl
-      << "    --debug    -d    Report recorded stack frame of matching jobs" << std::endl
-      << "    --script   -s    Format reported jobs as an executable shell script" << std::endl
-      << "    --timeline       Print the timeline of wake jobs as HTML" << std::endl
-      << std::endl
-      << "  Help functions:" << std::endl
-      << "    --version        Print the version of wake on standard output" << std::endl
-      << "    --html           Print all wake source files as cross-referenced HTML" << std::endl
-      << "    --globals -g     Print global symbols made available to all wake files" << std::endl
-      << "    --exports -e     Print symbols exported by the selected package (see --in)"
-      << std::endl
-      << "    --help    -h     Print this help message and exit" << std::endl
-      << std::endl;
-  // debug-db, no-optimize, stop-after-* are secret undocumented options
+  // clang-format off
+  std::cout << std::endl
+    << "Usage: " << argv0 << " [OPTIONS] [target] [target options ...]" << std::endl
+    << "Usage in script: #! /usr/bin/env wake [OPTIONS] -:target" << std::endl
+    << std::endl
+    << "  Flags affecting build execution:" << std::endl
+    << "    --jobs=N   -jN   Schedule local jobs for N cores or N% of CPU (default 90%)" << std::endl
+    << "    --memory=M -mM   Schedule local jobs for M bytes or M% of RAM (default 90%)" << std::endl
+    << "    --check    -c    Rerun all jobs and confirm their output is reproducible"    << std::endl
+    << "    --verbose  -v    Report hash progress and result expression types"           << std::endl
+    << "    --debug    -d    Report stack frame information for exceptions and closures" << std::endl
+    << "    --quiet    -q    Surpress report of launched jobs and final expressions"     << std::endl
+    << "    --no-tty         Surpress interactive build progress interface"              << std::endl
+    << "    --no-wait        Do not wait to obtain database lock; fail immediately"      << std::endl
+    << "    --no-workspace   Do not open a database or scan for sources files"           << std::endl
+    << "    --fatal-warnings Do not execute if there are any warnings"                   << std::endl
+    << "    --heap-factor X  Heap-size is X * live data after the last GC (default 4.0)" << std::endl
+    << "    --profile-heap   Report memory consumption on every garbage collection"      << std::endl
+    << "    --profile  FILE  Report runtime breakdown by stack trace to HTML/JSON file"  << std::endl
+    << "    --chdir -C PATH  Locate database and default package starting from PATH"     << std::endl
+    << "    --in       PKG   Evaluate command-line in package PKG (default is chdir)"    << std::endl
+    << "    --exec -x  EXPR  Execute expression EXPR instead of a target function"       << std::endl
+    << std::endl
+    << "  Database commands:" << std::endl
+    << "    --init      DIR  Create or replace a wake.db in the specified directory"     << std::endl
+    << "    --input  -i FILE Report recorded meta-data for jobs which read FILES"        << std::endl
+    << "    --output -o FILE Report recorded meta-data for jobs which wrote FILES"       << std::endl
+    << "    --job       JOB  Report recorded meta-data for the specified job id"         << std::endl
+    << "    --last     -l    Report recorded meta-data for all jobs run by last build"   << std::endl
+    << "    --failed   -f    Report recorded meta-data for jobs which failed last build" << std::endl
+    << "    --verbose  -v    Report recorded standard output and error of matching jobs" << std::endl
+    << "    --debug    -d    Report recorded stack frame of matching jobs"               << std::endl
+    << "    --script   -s    Format reported jobs as an executable shell script"         << std::endl
+    << "    --timeline       Print the timeline of wake jobs as HTML"                    << std::endl
+    << std::endl
+    << "  Help functions:" << std::endl
+    << "    --version        Print the version of wake on standard output"               << std::endl
+    << "    --html           Print all wake source files as cross-referenced HTML"       << std::endl
+    << "    --globals -g     Print global symbols made available to all wake files"      << std::endl
+    << "    --exports -e     Print symbols exported by the selected package (see --in)"  << std::endl
+    << "    --help    -h     Print this help message and exit"                           << std::endl
+    << std::endl;
+    // debug-db, no-optimize, stop-after-* are secret undocumented options
+  // clang-format on
 }
 
 DiagnosticReporter *reporter;
@@ -149,37 +141,56 @@ int main(int argc, char **argv) {
   TerminalReporter terminalReporter;
   reporter = &terminalReporter;
 
+  // clang-format off
   struct option options[] {
     {'p', "percent", GOPT_ARGUMENT_REQUIRED | GOPT_ARGUMENT_NO_HYPHEN},
-        {'j', "jobs", GOPT_ARGUMENT_REQUIRED | GOPT_ARGUMENT_NO_HYPHEN},
-        {'m', "memory", GOPT_ARGUMENT_REQUIRED | GOPT_ARGUMENT_NO_HYPHEN},
-        {'c', "check", GOPT_ARGUMENT_FORBIDDEN},
-        {'v', "verbose", GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE},
-        {'d', "debug", GOPT_ARGUMENT_FORBIDDEN}, {'q', "quiet", GOPT_ARGUMENT_FORBIDDEN},
-        {0, "no-wait", GOPT_ARGUMENT_FORBIDDEN}, {0, "no-workspace", GOPT_ARGUMENT_FORBIDDEN},
-        {0, "no-tty", GOPT_ARGUMENT_FORBIDDEN}, {0, "fatal-warnings", GOPT_ARGUMENT_FORBIDDEN},
-        {0, "heap-factor", GOPT_ARGUMENT_REQUIRED | GOPT_ARGUMENT_NO_HYPHEN},
-        {0, "profile-heap", GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE},
-        {0, "profile", GOPT_ARGUMENT_REQUIRED}, {'C', "chdir", GOPT_ARGUMENT_REQUIRED},
-        {0, "in", GOPT_ARGUMENT_REQUIRED}, {'x', "exec", GOPT_ARGUMENT_REQUIRED},
-        {0, "job", GOPT_ARGUMENT_REQUIRED}, {'i', "input", GOPT_ARGUMENT_FORBIDDEN},
-        {'o', "output", GOPT_ARGUMENT_FORBIDDEN}, {'l', "last", GOPT_ARGUMENT_FORBIDDEN},
-        {0, "lsp", GOPT_ARGUMENT_FORBIDDEN}, {'f', "failed", GOPT_ARGUMENT_FORBIDDEN},
-        {'s', "script", GOPT_ARGUMENT_FORBIDDEN}, {0, "init", GOPT_ARGUMENT_REQUIRED},
-        {0, "version", GOPT_ARGUMENT_FORBIDDEN}, {'g', "globals", GOPT_ARGUMENT_FORBIDDEN},
-        {'e', "exports", GOPT_ARGUMENT_FORBIDDEN}, {0, "html", GOPT_ARGUMENT_FORBIDDEN},
-        {0, "timeline", GOPT_ARGUMENT_OPTIONAL}, {'h', "help", GOPT_ARGUMENT_FORBIDDEN},
-        {0, "debug-db", GOPT_ARGUMENT_FORBIDDEN}, {0, "stop-after-parse", GOPT_ARGUMENT_FORBIDDEN},
-        {0, "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN},
-        {0, "stop-after-ssa", GOPT_ARGUMENT_FORBIDDEN}, {0, "no-optimize", GOPT_ARGUMENT_FORBIDDEN},
-        {0, "tag-dag", GOPT_ARGUMENT_REQUIRED}, {0, "tag", GOPT_ARGUMENT_REQUIRED},
-        {0, "export-api", GOPT_ARGUMENT_REQUIRED}, {0, "stdout", GOPT_ARGUMENT_REQUIRED},
-        {0, "stderr", GOPT_ARGUMENT_REQUIRED}, {0, "fd:3", GOPT_ARGUMENT_REQUIRED},
-        {0, "fd:4", GOPT_ARGUMENT_REQUIRED}, {0, "fd:5", GOPT_ARGUMENT_REQUIRED},
-        {':', "shebang", GOPT_ARGUMENT_REQUIRED}, {
-      0, 0, GOPT_LAST
-    }
+    {'j', "jobs", GOPT_ARGUMENT_REQUIRED | GOPT_ARGUMENT_NO_HYPHEN},
+    {'m', "memory", GOPT_ARGUMENT_REQUIRED | GOPT_ARGUMENT_NO_HYPHEN},
+    {'c', "check", GOPT_ARGUMENT_FORBIDDEN},
+    {'v', "verbose", GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE},
+    {'d', "debug", GOPT_ARGUMENT_FORBIDDEN},
+    {'q', "quiet", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "no-wait", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "no-workspace", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "no-tty", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "fatal-warnings", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "heap-factor", GOPT_ARGUMENT_REQUIRED | GOPT_ARGUMENT_NO_HYPHEN},
+    {0, "profile-heap", GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE},
+    {0, "profile", GOPT_ARGUMENT_REQUIRED},
+    {'C', "chdir", GOPT_ARGUMENT_REQUIRED},
+    {0, "in", GOPT_ARGUMENT_REQUIRED},
+    {'x', "exec", GOPT_ARGUMENT_REQUIRED},
+    {0, "job", GOPT_ARGUMENT_REQUIRED},
+    {'i', "input", GOPT_ARGUMENT_FORBIDDEN},
+    {'o', "output", GOPT_ARGUMENT_FORBIDDEN},
+    {'l', "last", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "lsp", GOPT_ARGUMENT_FORBIDDEN},
+    {'f', "failed", GOPT_ARGUMENT_FORBIDDEN},
+    {'s', "script", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "init", GOPT_ARGUMENT_REQUIRED},
+    {0, "version", GOPT_ARGUMENT_FORBIDDEN},
+    {'g', "globals", GOPT_ARGUMENT_FORBIDDEN},
+    {'e', "exports", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "html", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "timeline", GOPT_ARGUMENT_OPTIONAL},
+    {'h', "help", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "debug-db", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "stop-after-parse", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "stop-after-ssa", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "no-optimize", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "tag-dag", GOPT_ARGUMENT_REQUIRED},
+    {0, "tag", GOPT_ARGUMENT_REQUIRED},
+    {0, "export-api", GOPT_ARGUMENT_REQUIRED},
+    {0, "stdout", GOPT_ARGUMENT_REQUIRED},
+    {0, "stderr", GOPT_ARGUMENT_REQUIRED},
+    {0, "fd:3", GOPT_ARGUMENT_REQUIRED},
+    {0, "fd:4", GOPT_ARGUMENT_REQUIRED},
+    {0, "fd:5", GOPT_ARGUMENT_REQUIRED},
+    {':', "shebang", GOPT_ARGUMENT_REQUIRED},
+    {0, 0, GOPT_LAST}
   };
+  // clang-format on
 
   std::string original_command_line = shell_escape(argv[0]);
   for (int i = 1; i < argc; ++i) original_command_line += " " + shell_escape(argv[i]);

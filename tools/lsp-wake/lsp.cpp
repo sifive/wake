@@ -46,40 +46,47 @@
 #define CERR_DEBUG
 #include <emscripten/emscripten.h>
 
+// clang-format off
 EM_ASYNC_JS(char *, nodejs_getstdin, (), {
   var buffer = "";
 
-  let eof = await new Promise(resolve = > {
-    let timeout = setTimeout(() = > { complete(false); }, 2000);
+  let eof = await new Promise(resolve => {
+    let timeout = setTimeout(() => {
+      complete(false);
+    }, 2000);
     function gotData(input) {
       buffer = input;
       complete(false);
     }
-    function gotEnd() { complete(true); }
+    function gotEnd() {
+      complete(true);
+    }
     function complete(out) {
       clearTimeout(timeout);
       process.stdin.pause();
-      process.stdin.removeListener('end', gotEnd);
+      process.stdin.removeListener('end',   gotEnd);
       process.stdin.removeListener('error', gotEnd);
-      process.stdin.removeListener('data', gotData);
+      process.stdin.removeListener('data',  gotData);
       resolve(out);
     }
     process.stdin.setEncoding('utf8');
-    process.stdin.on('end', gotEnd);
+    process.stdin.on('end',   gotEnd);
     process.stdin.on('error', gotEnd);
-    process.stdin.on('data', gotData);
+    process.stdin.on('data',  gotData);
     process.stdin.resume();
   });
 
   if (eof) {
     return 0;
   } else {
-    let lengthBytes = lengthBytesUTF8(buffer) + 1;
+    let lengthBytes = lengthBytesUTF8(buffer)+1;
     let stringOnWasmHeap = _malloc(lengthBytes);
     stringToUTF8(buffer, stringOnWasmHeap, lengthBytes);
     return stringOnWasmHeap;
   }
 });
+// clang-format on
+
 #endif
 
 // Header used in JSON-RPC
