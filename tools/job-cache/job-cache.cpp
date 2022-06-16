@@ -26,7 +26,6 @@
 #include <sqlite3.h>
 
 #include <fcntl.h>
-#include <linux/fs.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -133,6 +132,20 @@ static void copy(int src_fd, int dst_fd) {
 
 // This function first attempts to reflink but if that isn't
 // supported by the filesystem it copies instead.
+#ifdef __APPLE__
+
+static void copy_or_reflink(const char *src, const char *dst) {
+  int src_fd = open_fd(src, O_RDONLY);
+  int dst_fd = open_fd(dst, O_WRONLY | O_CREAT, 0644);
+  copy(src_fd, dst_fd);
+  close_fd(dst_fd);
+  close_fd(src_fd);
+}
+
+#else
+
+#include <linux/fs.h>
+
 static void copy_or_reflink(const char *src, const char *dst) {
   int src_fd = open_fd(src, O_RDONLY);
   int dst_fd = open_fd(dst, O_WRONLY | O_CREAT, 0644);
@@ -145,6 +158,8 @@ static void copy_or_reflink(const char *src, const char *dst) {
   close_fd(dst_fd);
   close_fd(src_fd);
 }
+
+#endif
 
 // Use /dev/urandom to get a good seed
 static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
