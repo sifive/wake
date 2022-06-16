@@ -54,8 +54,7 @@ install:	all
 # Formats all .h and .cpp file under the current directory
 # It assumes clang is available on the PATH and will fail otherwise
 formatAll:
-	clang-format -i --style=file $(shell find . -type f -name "*.h")
-	clang-format -i --style=file $(shell find . -type f -name "*.cpp")
+	clang-format -i --style=file $(shell find . -type f \( -name "*.h" -o -name "*.cpp" \))
 
 # Formats all changed or staged files .h or .cpp files
 # It assumes clang is available on the PATH and will fail otherwise
