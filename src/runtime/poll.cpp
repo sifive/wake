@@ -15,16 +15,16 @@
  * limitations under the License.
  */
 
-#include <unistd.h>
-#include <stdio.h>
+#include "poll.h"
+
 #include <errno.h>
 #include <poll.h>
-#include <sys/time.h>
+#include <stdio.h>
 #include <sys/resource.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 #include <algorithm>
-
-#include "poll.h"
 
 #if defined(__linux__)
 #define USE_EPOLL 1
@@ -50,9 +50,7 @@ Poll::Poll() : imp(new Poll::detail) {
   }
 }
 
-Poll::~Poll() {
-  close(imp->pfd);
-}
+Poll::~Poll() { close(imp->pfd); }
 
 void Poll::add(int fd) {
   struct epoll_event ev;
@@ -103,8 +101,7 @@ std::vector<int> Poll::wait(struct timespec *timeout, sigset_t *saved) {
 
   std::vector<int> ready;
   if (nfds > 0) {
-    for (int i = 0; i < nfds; ++i)
-      ready.push_back(events[i].data.fd);
+    for (int i = 0; i < nfds; ++i) ready.push_back(events[i].data.fd);
   }
 
   return ready;
@@ -134,25 +131,17 @@ struct Poll::detail {
   std::vector<int> fds;
 };
 
-Poll::Poll() : imp(new Poll::detail) {
-}
+Poll::Poll() : imp(new Poll::detail) {}
 
-Poll::~Poll() {
-}
+Poll::~Poll() {}
 
-void Poll::add(int fd) {
-  imp->fds.push_back(fd);
-}
+void Poll::add(int fd) { imp->fds.push_back(fd); }
 
 void Poll::remove(int fd) {
-  imp->fds.resize(
-    std::remove(imp->fds.begin(), imp->fds.end(), fd)
-    - imp->fds.begin());
+  imp->fds.resize(std::remove(imp->fds.begin(), imp->fds.end(), fd) - imp->fds.begin());
 }
 
-void Poll::clear() {
-  imp->fds.clear();
-}
+void Poll::clear() { imp->fds.clear(); }
 
 std::vector<int> Poll::wait(struct timespec *timeout, sigset_t *saved) {
   fd_set set;
@@ -189,8 +178,7 @@ int Poll::max_fds() const {
     exit(1);
   }
   rlim_t set = FD_SETSIZE;
-  if (set > nfd.rlim_max && nfd.rlim_max != RLIM_INFINITY)
-    set = nfd.rlim_max;
+  if (set > nfd.rlim_max && nfd.rlim_max != RLIM_INFINITY) set = nfd.rlim_max;
   if (nfd.rlim_cur != set) {
     nfd.rlim_cur = set;
     if (setrlimit(RLIMIT_NOFILE, &nfd) == -1) {
@@ -209,11 +197,9 @@ struct Poll::detail {
   std::vector<struct pollfd> pfds;
 };
 
-Poll::Poll() : imp(new Poll::detail) {
-}
+Poll::Poll() : imp(new Poll::detail) {}
 
-Poll::~Poll() {
-}
+Poll::~Poll() {}
 
 void Poll::add(int fd) {
   imp->pfds.resize(imp->pfds.size() + 1);
@@ -226,7 +212,7 @@ void Poll::remove(int fd) {
   struct pollfd *pfds = &imp->pfds[0];
   while (i < len) {
     if (pfds[i].fd == fd) {
-      pfds[i].fd = pfds[len-1].fd;
+      pfds[i].fd = pfds[len - 1].fd;
       --len;
     } else {
       ++i;
@@ -235,9 +221,7 @@ void Poll::remove(int fd) {
   imp->pfds.resize(len);
 }
 
-void Poll::clear() {
-  imp->pfds.clear();
-}
+void Poll::clear() { imp->pfds.clear(); }
 
 std::vector<int> Poll::wait(struct timespec *timeout, sigset_t *saved) {
   int retval = ppoll(&imp->pfds[0], imp->pfds.size(), timeout, saved);
@@ -249,7 +233,7 @@ std::vector<int> Poll::wait(struct timespec *timeout, sigset_t *saved) {
   std::vector<int> ready;
   if (retval > 0) {
     for (auto &pfd : imp->pfds) {
-      if ((pfd.revents & (POLLIN|POLLHUP)) != 0) {
+      if ((pfd.revents & (POLLIN | POLLHUP)) != 0) {
         ready.push_back(pfd.fd);
       }
     }

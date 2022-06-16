@@ -19,11 +19,11 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include "shell.h"
+
 #include <string.h>
 
 #include <sstream>
-
-#include "shell.h"
 
 // There are more special than non-special characters with the shell.
 static bool not_special(char c) {
@@ -105,7 +105,7 @@ static bool not_special(char c) {
     case '^':
     case '=':
       return true;
-    default: 
+    default:
       return false;
   }
 }
@@ -113,16 +113,17 @@ static bool not_special(char c) {
 std::string shell_escape(const char *x) {
   // check if we need escaping at all
   const char *ok;
-  for (ok = x; not_special(*ok); ++ok) { }
+  for (ok = x; not_special(*ok); ++ok) {
+  }
   if (!*ok) return x;
 
   std::stringstream s;
   s << "'";
 
   while (const char *e = strchr(x, '\'')) {
-    s.write(x, e-x);
+    s.write(x, e - x);
     s << "'\\''";
-    x = e+1;
+    x = e + 1;
   }
 
   s << x << "'";

@@ -22,26 +22,39 @@ template <typename T>
 struct optional {
   ~optional() { reset(); }
 
-  optional(T *x = nullptr) : ptr(x) { }
+  optional(T *x = nullptr) : ptr(x) {}
   optional(optional<T> &&o) : ptr(o.ptr) { o.ptr = nullptr; }
-  optional(const optional<T> &o) : ptr(o.ptr ? new T(*o.ptr) : nullptr) { }
+  optional(const optional<T> &o) : ptr(o.ptr ? new T(*o.ptr) : nullptr) {}
 
-  void reset() { delete ptr; ptr = nullptr; }
-  T *release() { T *out = ptr; ptr = nullptr; return out; }
-
-  T& operator *  () const { return *ptr; }
-  T* operator -> () const { return ptr; }
-  operator bool  () const { return ptr; }
-
-  optional<T>& operator = (const optional<T> &o) { optional<T> tmp(o);            swap(*this, tmp); return *this; }
-  optional<T>& operator = (optional<T> &&o)      { optional<T> tmp(std::move(o)); swap(*this, tmp); return *this; }
-
-  friend void swap(optional<T> &a, optional<T> &b) {
-    std::swap(a.ptr, b.ptr);
+  void reset() {
+    delete ptr;
+    ptr = nullptr;
+  }
+  T *release() {
+    T *out = ptr;
+    ptr = nullptr;
+    return out;
   }
 
-private:
-  T* ptr;
+  T &operator*() const { return *ptr; }
+  T *operator->() const { return ptr; }
+  operator bool() const { return ptr; }
+
+  optional<T> &operator=(const optional<T> &o) {
+    optional<T> tmp(o);
+    swap(*this, tmp);
+    return *this;
+  }
+  optional<T> &operator=(optional<T> &&o) {
+    optional<T> tmp(std::move(o));
+    swap(*this, tmp);
+    return *this;
+  }
+
+  friend void swap(optional<T> &a, optional<T> &b) { std::swap(a.ptr, b.ptr); }
+
+ private:
+  T *ptr;
 };
 
 #endif

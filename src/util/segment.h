@@ -21,11 +21,13 @@
 #include <string>
 
 struct StringSegment {
-    const uint8_t *start;
-    const uint8_t *end;
+  const uint8_t *start;
+  const uint8_t *end;
 
-    size_t size() const { return end - start; }
-    std::string str() const { return std::string(reinterpret_cast<const char*>(start), end-start); }
+  size_t size() const { return end - start; }
+  std::string str() const {
+    return std::string(reinterpret_cast<const char *>(start), end - start);
+  }
 };
 
 #endif

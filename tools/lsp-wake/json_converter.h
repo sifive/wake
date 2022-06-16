@@ -18,44 +18,46 @@
 #ifndef JSON_CONVERTER_H
 #define JSON_CONVERTER_H
 
-#include "util/diagnostic.h"
 #include "json/json5.h"
-#include "util/location.h"
 #include "symbol_definition.h"
+#include "util/diagnostic.h"
+#include "util/location.h"
 
 namespace JSONConverter {
-    std::string decodePath(const std::string &fileUri);
-    std::string encodePath(const std::string &filePath);
+std::string decodePath(const std::string &fileUri);
+std::string encodePath(const std::string &filePath);
 
-    JAST createMessage();
+JAST createMessage();
 
-    JAST createErrorMessage(const char *code, const std::string &message);
+JAST createErrorMessage(const char *code, const std::string &message);
 
-    JAST createErrorMessage(const JAST &receivedMessage, const char *code, const std::string &message);
+JAST createErrorMessage(const JAST &receivedMessage, const char *code, const std::string &message);
 
-    JAST createResponseMessage(JAST receivedMessage);
+JAST createResponseMessage(JAST receivedMessage);
 
-    JAST createRequestMessage();
+JAST createRequestMessage();
 
-    Location getLocationFromJSON(JAST receivedMessage);
+Location getLocationFromJSON(JAST receivedMessage);
 
-    JAST createInitializeResultDefault(const JAST &receivedMessage);
+JAST createInitializeResultDefault(const JAST &receivedMessage);
 
-    JAST createInitializeResultInvalidSTDLib(const JAST &receivedMessage);
+JAST createInitializeResultInvalidSTDLib(const JAST &receivedMessage);
 
-    JAST fileDiagnosticsToJSON(const std::string &filePath, const std::vector<Diagnostic> &fileDiagnostics);
+JAST fileDiagnosticsToJSON(const std::string &filePath,
+                           const std::vector<Diagnostic> &fileDiagnostics);
 
-    JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation);
+JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation);
 
-    JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references);
+JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references);
 
-    JAST highlightsToJSON(JAST receivedMessage, const std::vector<Location> &occurrences);
+JAST highlightsToJSON(JAST receivedMessage, const std::vector<Location> &occurrences);
 
-    JAST hoverInfoToJSON(JAST receivedMessage, const std::vector<SymbolDefinition> &hoverInfoPieces);
+JAST hoverInfoToJSON(JAST receivedMessage, const std::vector<SymbolDefinition> &hoverInfoPieces);
 
-    void appendSymbolToJSON(const SymbolDefinition& def, JAST &json);
+void appendSymbolToJSON(const SymbolDefinition &def, JAST &json);
 
-    JAST workspaceEditsToJSON(JAST receivedMessage, const std::vector<Location> &references, const std::string &newName);
-}
+JAST workspaceEditsToJSON(JAST receivedMessage, const std::vector<Location> &references,
+                          const std::string &newName);
+}  // namespace JSONConverter
 
 #endif

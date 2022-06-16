@@ -20,8 +20,8 @@
 
 #include <sys/select.h>
 
-#include <vector>
 #include <memory>
+#include <vector>
 
 struct Poll {
   struct detail;

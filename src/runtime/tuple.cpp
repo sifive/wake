@@ -19,20 +19,21 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include "tuple.h"
+
 #include <sstream>
 #include <unordered_map>
 
 #include "optimizer/ssa.h"
-#include "tuple.h"
 
 void Promise::awaken(Runtime &runtime, HeapObject *obj) {
 #ifdef DEBUG_GC
   assert(category() == WORK);
 #endif
-  Continuation *c = static_cast<Continuation*>(value.get());
+  Continuation *c = static_cast<Continuation *>(value.get());
   while (c->next) {
     c->value = obj;
-    c = static_cast<Continuation*>(c->next.get());
+    c = static_cast<Continuation *>(c->next.get());
   }
   c->value = obj;
   c->next = runtime.stack;
@@ -43,7 +44,7 @@ struct FulFiller final : public GCObject<FulFiller, Continuation> {
   HeapPointer<Tuple> tuple;
   size_t i;
 
-  FulFiller(Tuple *tuple_, size_t i_) : tuple(tuple_), i(i_) { }
+  FulFiller(Tuple *tuple_, size_t i_) : tuple(tuple_), i(i_) {}
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -52,12 +53,10 @@ struct FulFiller final : public GCObject<FulFiller, Continuation> {
     return arg;
   }
 
-  void execute(Runtime &runtime) {
-    tuple->at(i)->fulfill(runtime, value.get());
-  }
+  void execute(Runtime &runtime) { tuple->at(i)->fulfill(runtime, value.get()); }
 };
 
-const size_t Tuple::fulfiller_pads = sizeof(FulFiller)/sizeof(PadObject);
+const size_t Tuple::fulfiller_pads = sizeof(FulFiller) / sizeof(PadObject);
 
 Continuation *Tuple::claim_fulfiller(Runtime &r, size_t i) {
   return new (r.heap.claim(Tuple::fulfiller_pads)) FulFiller(this, i);
@@ -69,8 +68,8 @@ struct TupleObject : public GCObject<T, B> {
   const Promise *at(size_t i) const final override;
   const char *type() const override;
 
-  template <typename ... ARGS>
-  TupleObject(size_t size, ARGS&&... args);
+  template <typename... ARGS>
+  TupleObject(size_t size, ARGS &&...args);
   TupleObject(const TupleObject &other);
 
   template <typename R, R (HeapPointerBase::*memberfn)(R x)>
@@ -79,69 +78,63 @@ struct TupleObject : public GCObject<T, B> {
 };
 
 template <typename T, typename B>
-Promise *TupleObject<T,B>::at(size_t i) {
-  return static_cast<Promise*>(GCObject<T,B>::data()) + i;
+Promise *TupleObject<T, B>::at(size_t i) {
+  return static_cast<Promise *>(GCObject<T, B>::data()) + i;
 }
 
 template <typename T, typename B>
-const Promise *TupleObject<T,B>::at(size_t i) const {
-  return static_cast<const Promise*>(GCObject<T,B>::data()) + i;
+const Promise *TupleObject<T, B>::at(size_t i) const {
+  return static_cast<const Promise *>(GCObject<T, B>::data()) + i;
 }
 
 template <typename T, typename B>
-const char *TupleObject<T,B>::type() const {
+const char *TupleObject<T, B>::type() const {
   return B::type();
 }
 
 template <typename T, typename B>
-template <typename ... ARGS>
-TupleObject<T,B>::TupleObject(size_t size, ARGS&&... args) : GCObject<T,B>(std::forward<ARGS>(args) ... ) {
-  for (size_t i = 0; i < size; ++i)
-    new (at(i)) Promise();
+template <typename... ARGS>
+TupleObject<T, B>::TupleObject(size_t size, ARGS &&...args)
+    : GCObject<T, B>(std::forward<ARGS>(args)...) {
+  for (size_t i = 0; i < size; ++i) new (at(i)) Promise();
 }
 
 template <typename T, typename B>
-TupleObject<T,B>::TupleObject(const TupleObject &b) : GCObject<T, B>(b) {
-  for (size_t i = 0; i < b.GCObject<T,B>::self()->size(); ++i)
-    new (at(i)) Promise(*b.at(i));
+TupleObject<T, B>::TupleObject(const TupleObject &b) : GCObject<T, B>(b) {
+  for (size_t i = 0; i < b.GCObject<T, B>::self()->size(); ++i) new (at(i)) Promise(*b.at(i));
 }
 
 template <typename T, typename B>
-PadObject *TupleObject<T,B>::objend() {
-  return GCObject<T,B>::objend() + GCObject<T,B>::self()->size() * (sizeof(Promise)/sizeof(PadObject));
+PadObject *TupleObject<T, B>::objend() {
+  return GCObject<T, B>::objend() +
+         GCObject<T, B>::self()->size() * (sizeof(Promise) / sizeof(PadObject));
 }
 
 template <typename T, typename B>
 template <typename R, R (HeapPointerBase::*memberfn)(R x)>
-R TupleObject<T,B>::recurse(R arg) {
-  arg = GCObject<T,B>::template recurse<R, memberfn>(arg);
-  for (size_t i = 0; i < GCObject<T,B>::self()->size(); ++i)
+R TupleObject<T, B>::recurse(R arg) {
+  arg = GCObject<T, B>::template recurse<R, memberfn>(arg);
+  for (size_t i = 0; i < GCObject<T, B>::self()->size(); ++i)
     arg = at(i)->template recurse<R, memberfn>(arg);
   return arg;
 }
 
-const char *Record::type() const {
-  return cons->ast.name.c_str();
-}
+const char *Record::type() const { return cons->ast.name.c_str(); }
 
 struct BigRecord final : public TupleObject<BigRecord, Record> {
   size_t tsize;
 
   BigRecord(Constructor *cons, size_t tsize_)
-   : TupleObject<BigRecord, Record>(tsize_, cons), tsize(tsize_) { }
+      : TupleObject<BigRecord, Record>(tsize_, cons), tsize(tsize_) {}
 
   size_t size() const override;
 };
 
-size_t BigRecord::size() const {
-  return tsize;
-}
-
+size_t BigRecord::size() const { return tsize; }
 
 template <size_t tsize>
 struct SmallRecord final : public TupleObject<SmallRecord<tsize>, Record> {
-  SmallRecord(Constructor *cons)
-   : TupleObject<SmallRecord<tsize>, Record>(tsize, cons) { }
+  SmallRecord(Constructor *cons) : TupleObject<SmallRecord<tsize>, Record>(tsize, cons) {}
 
   size_t size() const override;
 };
@@ -154,9 +147,10 @@ size_t SmallRecord<tsize>::size() const {
 size_t Record::reserve(size_t size) {
   bool big = size > 4;
   if (big) {
-    return sizeof(BigRecord)/sizeof(PadObject) + size * (sizeof(Promise)/sizeof(PadObject));
+    return sizeof(BigRecord) / sizeof(PadObject) + size * (sizeof(Promise) / sizeof(PadObject));
   } else {
-    return sizeof(SmallRecord<0>)/sizeof(PadObject) + size * (sizeof(Promise)/sizeof(PadObject));
+    return sizeof(SmallRecord<0>) / sizeof(PadObject) +
+           size * (sizeof(Promise) / sizeof(PadObject));
   }
 }
 
@@ -167,11 +161,16 @@ Record *Record::claim(Heap &h, Constructor *cons, size_t size) {
   } else {
     PadObject *dest = h.claim(reserve(size));
     switch (size) {
-      case 0:  return new (dest) SmallRecord<0>(cons);
-      case 1:  return new (dest) SmallRecord<1>(cons);
-      case 2:  return new (dest) SmallRecord<2>(cons);
-      case 3:  return new (dest) SmallRecord<3>(cons);
-      default: return new (dest) SmallRecord<4>(cons);
+      case 0:
+        return new (dest) SmallRecord<0>(cons);
+      case 1:
+        return new (dest) SmallRecord<1>(cons);
+      case 2:
+        return new (dest) SmallRecord<2>(cons);
+      case 3:
+        return new (dest) SmallRecord<3>(cons);
+      default:
+        return new (dest) SmallRecord<4>(cons);
     }
   }
 }
@@ -185,14 +184,12 @@ struct alignas(PadObject) ScopeStack {
   HeapPointer<Scope> parent;
   RFun *fun;
 
-  ScopeStack(Scope *parent_, RFun* fun_) : parent(parent_), fun(fun_) { }
+  ScopeStack(Scope *parent_, RFun *fun_) : parent(parent_), fun(fun_) {}
 };
 
 bool Scope::debug = false;
 
-const char *Scope::type() const {
-  return "ScopeTree";
-}
+const char *Scope::type() const { return "ScopeTree"; }
 
 void Scope::set_fun(RFun *fun) {
   if (debug) stack()->fun = fun;
@@ -201,13 +198,13 @@ void Scope::set_fun(RFun *fun) {
 struct Compressor {
   uint32_t value;
   uint16_t depth;
-  uint8_t erased; // 1 or 0
-  uint8_t pad; // 0
+  uint8_t erased;  // 1 or 0
+  uint8_t pad;     // 0
 
   Compressor(uint32_t value_, uint16_t depth_ = 0, bool erased_ = false)
-   : value(value_), depth(depth_), erased(erased_), pad(0) { }
+      : value(value_), depth(depth_), erased(erased_), pad(0) {}
 
-  bool operator == (Compressor o) const {
+  bool operator==(Compressor o) const {
     return value == o.value && depth == o.depth && erased == o.erased && pad == o.pad;
   }
 };
@@ -220,17 +217,17 @@ static std::vector<std::string> scompress(std::vector<std::string> &&raw, bool i
     run.emplace_back(map.insert(std::make_pair(raw[i], i)).first->second);
   map.clear();
   // Magic O(nlogn) stack compression algorithm
-  for (unsigned stride = 1; stride <= run.size()/2; ++stride) {
+  for (unsigned stride = 1; stride <= run.size() / 2; ++stride) {
     for (unsigned i = stride; i < run.size(); i += stride) {
-      if (run[i-stride] == run[i]) {
+      if (run[i - stride] == run[i]) {
         unsigned s = i, f = i;
-        while (s > stride && run[s-stride-1] == run[s-1]) --s;
-        while (f+1 < run.size() && run[f-stride+1] == run[f+1]) ++f;
-        while (run[s-stride].erased && s < f) ++s;
-        if (unsigned reps = (f+1-s)/stride) {
-          unsigned e = s + reps*stride;
+        while (s > stride && run[s - stride - 1] == run[s - 1]) --s;
+        while (f + 1 < run.size() && run[f - stride + 1] == run[f + 1]) ++f;
+        while (run[s - stride].erased && s < f) ++s;
+        if (unsigned reps = (f + 1 - s) / stride) {
+          unsigned e = s + reps * stride;
           unsigned prng = 0;
-          for (unsigned j = s-stride; j < s; ++j) {
+          for (unsigned j = s - stride; j < s; ++j) {
             ++run[j].depth;
             prng = prng * 0x3ba78125 ^ static_cast<unsigned char>(run[j].value);
           }
@@ -240,7 +237,7 @@ static std::vector<std::string> scompress(std::vector<std::string> &&raw, bool i
             run[j].depth++;
             run[j].erased = true;
           }
-          --run[e-1].depth;
+          --run[e - 1].depth;
         }
         i = f;
       }
@@ -253,19 +250,21 @@ static std::vector<std::string> scompress(std::vector<std::string> &&raw, bool i
   for (unsigned i = 0; i < run.size(); ++i) {
     Compressor c = run[i];
     if (c.erased) {
-      if (!stride) stride = i-depths.back();
+      if (!stride) stride = i - depths.back();
       if (c.depth < depths.size()) {
         if (indent_compress) {
-          unsigned repeat = ((i+1)-depths.back()) / stride;
-          pad.resize(depths.size()*2, ' ');
+          unsigned repeat = ((i + 1) - depths.back()) / stride;
+          pad.resize(depths.size() * 2, ' ');
           out.push_back(pad + "x " + std::to_string(repeat));
         }
         stride = 0;
         depths.pop_back();
       }
     } else {
-      if (indent_compress) pad.resize(c.depth*2, ' ');
-      while (c.depth > depths.size()) { depths.push_back(i); }
+      if (indent_compress) pad.resize(c.depth * 2, ' ');
+      while (c.depth > depths.size()) {
+        depths.push_back(i);
+      }
       out.push_back(pad + raw[c.value]);
     }
   }
@@ -282,8 +281,7 @@ std::vector<std::string> Scope::stack_trace(bool indent_compress) const {
       ss << s->fun->label << ": " << s->fun->fragment.location();
       auto x = ss.str();
       ss.str(std::string());
-      if (out.empty() || out.back() != x)
-        out.emplace_back(std::move(x));
+      if (out.empty() || out.back() != x) out.emplace_back(std::move(x));
     }
   }
   return scompress(std::move(out), indent_compress);
@@ -304,34 +302,36 @@ struct ScopeObject : public TupleObject<T, Scope> {
 
 template <typename T>
 const ScopeStack *ScopeObject<T>::stack() const {
-  return reinterpret_cast<const ScopeStack*>(TupleObject<T,Scope>::at(GCObject<T,Scope>::self()->size()));
+  return reinterpret_cast<const ScopeStack *>(
+      TupleObject<T, Scope>::at(GCObject<T, Scope>::self()->size()));
 }
 
 template <typename T>
 ScopeStack *ScopeObject<T>::stack() {
-  return reinterpret_cast<ScopeStack*>(TupleObject<T,Scope>::at(GCObject<T,Scope>::self()->size()));
+  return reinterpret_cast<ScopeStack *>(
+      TupleObject<T, Scope>::at(GCObject<T, Scope>::self()->size()));
 }
 
 template <typename T>
 PadObject *ScopeObject<T>::objend() {
   PadObject *end = TupleObject<T, Scope>::objend();
-  if (Scope::debug) end += (sizeof(ScopeStack)/sizeof(PadObject));
+  if (Scope::debug) end += (sizeof(ScopeStack) / sizeof(PadObject));
   return end;
 }
 
 template <typename T>
 ScopeObject<T>::ScopeObject(size_t size, Scope *next, Scope *parent, RFun *fun)
- : TupleObject<T, Scope>(size, next) {
+    : TupleObject<T, Scope>(size, next) {
   if (Scope::debug) {
     new (TupleObject<T, Scope>::at(size)) ScopeStack(parent, fun);
   }
 }
 
 template <typename T>
-ScopeObject<T>::ScopeObject(const ScopeObject &other)
- : TupleObject<T, Scope>(other) {
+ScopeObject<T>::ScopeObject(const ScopeObject &other) : TupleObject<T, Scope>(other) {
   if (Scope::debug) {
-    new (TupleObject<T, Scope>::at(other.GCObject<T,Scope>::self()->size())) ScopeStack(*other.stack());
+    new (TupleObject<T, Scope>::at(other.GCObject<T, Scope>::self()->size()))
+        ScopeStack(*other.stack());
   }
 }
 
@@ -339,7 +339,8 @@ template <typename T>
 template <typename R, R (HeapPointerBase::*memberfn)(R x)>
 R ScopeObject<T>::recurse(R arg) {
   arg = TupleObject<T, Scope>::template recurse<R, memberfn>(arg);
-  if (Scope::debug && typeid(memberfn) != typeid(&HeapPointerBase::explore)) arg = (stack()->parent.*memberfn)(arg);
+  if (Scope::debug && typeid(memberfn) != typeid(&HeapPointerBase::explore))
+    arg = (stack()->parent.*memberfn)(arg);
   return arg;
 }
 
@@ -347,19 +348,17 @@ struct BigScope final : public ScopeObject<BigScope> {
   size_t tsize;
 
   BigScope(size_t tsize_, Scope *next, Scope *parent, RFun *fun)
-   : ScopeObject<BigScope>(tsize_, next, parent, fun), tsize(tsize_) { }
+      : ScopeObject<BigScope>(tsize_, next, parent, fun), tsize(tsize_) {}
 
   size_t size() const override;
 };
 
-size_t BigScope::size() const {
-  return tsize;
-}
+size_t BigScope::size() const { return tsize; }
 
 template <size_t tsize>
 struct SmallScope final : public ScopeObject<SmallScope<tsize> > {
   SmallScope(Scope *next, Scope *parent, RFun *fun)
-   : ScopeObject<SmallScope<tsize> >(tsize, next, parent, fun) { }
+      : ScopeObject<SmallScope<tsize> >(tsize, next, parent, fun) {}
 
   size_t size() const override;
 };
@@ -371,11 +370,12 @@ size_t SmallScope<tsize>::size() const {
 
 size_t Scope::reserve(size_t size) {
   bool big = size > 4;
-  size_t add = size * (sizeof(Promise)/sizeof(PadObject)) + (debug?sizeof(ScopeStack)/sizeof(PadObject):0);
+  size_t add = size * (sizeof(Promise) / sizeof(PadObject)) +
+               (debug ? sizeof(ScopeStack) / sizeof(PadObject) : 0);
   if (big) {
-    return sizeof(BigScope)/sizeof(PadObject) + add;
+    return sizeof(BigScope) / sizeof(PadObject) + add;
   } else {
-    return sizeof(SmallScope<0>)/sizeof(PadObject) + add;
+    return sizeof(SmallScope<0>) / sizeof(PadObject) + add;
   }
 }
 
@@ -386,11 +386,16 @@ Scope *Scope::claim(Heap &h, size_t size, Scope *next, Scope *parent, RFun *fun)
   } else {
     PadObject *dest = h.claim(reserve(size));
     switch (size) {
-      case 0:  return new (dest) SmallScope<0>(next, parent, fun);
-      case 1:  return new (dest) SmallScope<1>(next, parent, fun);
-      case 2:  return new (dest) SmallScope<2>(next, parent, fun);
-      case 3:  return new (dest) SmallScope<3>(next, parent, fun);
-      default: return new (dest) SmallScope<4>(next, parent, fun);
+      case 0:
+        return new (dest) SmallScope<0>(next, parent, fun);
+      case 1:
+        return new (dest) SmallScope<1>(next, parent, fun);
+      case 2:
+        return new (dest) SmallScope<2>(next, parent, fun);
+      case 3:
+        return new (dest) SmallScope<3>(next, parent, fun);
+      default:
+        return new (dest) SmallScope<4>(next, parent, fun);
     }
   }
 }

@@ -22,51 +22,50 @@
 
 template <typename T>
 class DSU {
-public:
+ public:
   // Construct a new member in a new set
   DSU(T *payload_);
 
   DSU(DSU &&x) = default;
   DSU(const DSU &x) = default;
-  DSU &operator = (const DSU &x) = default;
-  DSU &operator = (DSU &&x) = default;
+  DSU &operator=(const DSU &x) = default;
+  DSU &operator=(DSU &&x) = default;
 
   // Access the payload of the set (common to all members)
   T *get();
-  const T* get() const;
+  const T *get() const;
 
-  T *operator ->() { return get(); }
-  const T* operator ->() const { return get(); }
+  T *operator->() { return get(); }
+  const T *operator->() const { return get(); }
 
   // Union the two sets (this affects all members)
   // Note: other's payload will be destroyed
   void union_consume(DSU &other) const;
 
-private:
+ private:
   struct Imp {
     std::unique_ptr<T> payload;
     std::shared_ptr<Imp> parent;
-    Imp(T *payload_) : payload(payload_) { }
+    Imp(T *payload_) : payload(payload_) {}
   };
   void compress() const;
   mutable std::shared_ptr<Imp> imp;
 };
 
 template <typename T>
-DSU<T>::DSU(T *payload_) : imp(std::make_shared<Imp>(payload_)) {
-}
+DSU<T>::DSU(T *payload_) : imp(std::make_shared<Imp>(payload_)) {}
 
 template <typename T>
 void DSU<T>::compress() const {
   if (std::shared_ptr<Imp> p = std::move(imp->parent)) {
     std::shared_ptr<Imp> x = std::move(imp);
     while (std::shared_ptr<Imp> pp = std::move(p->parent)) {
-      x->parent = pp;             // ++
-      x = std::move(p);           // --
-      p = std::move(pp);          //
+      x->parent = pp;     // ++
+      x = std::move(p);   // --
+      p = std::move(pp);  //
     }
-    x->parent = p;                // ++
-    imp = std::move(p);           //
+    x->parent = p;       // ++
+    imp = std::move(p);  //
   }
 }
 

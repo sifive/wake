@@ -20,11 +20,12 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "ssa.h"
+
 #include "runtime/value.h"
 
 const size_t Term::invalid;
 
-Term::~Term() { }
+Term::~Term() {}
 
 void Redux::update(const SourceMap &map) {
   for (auto &x : args) x = map[x];
@@ -44,9 +45,7 @@ void Redux::format_args(std::ostream &os, TermFormat &format) const {
   }
 }
 
-void RArg::format(std::ostream &os, TermFormat &format) const {
-  os << "<arg>\n";
-}
+void RArg::format(std::ostream &os, TermFormat &format) const { os << "<arg>\n"; }
 
 std::unique_ptr<Term> RArg::clone(TargetScope &scope, size_t id) const {
   return std::unique_ptr<Term>(new RArg(*this));
@@ -128,25 +127,20 @@ std::unique_ptr<Term> RCon::clone(TargetScope &scope, size_t id) const {
   return static_unique_pointer_cast<Term>(std::move(out));
 }
 
-static std::string pad(int depth) {
-  return std::string(depth, ' ');
-}
+static std::string pad(int depth) { return std::string(depth, ' '); }
 
-RFun::RFun(const RFun &o, TargetScope &scope, size_t id) : Term(o), fragment(o.fragment), output(o.output) {
+RFun::RFun(const RFun &o, TargetScope &scope, size_t id)
+    : Term(o), fragment(o.fragment), output(o.output) {
   terms.reserve(o.terms.size());
-  for (auto &x : o.terms)
-    terms.emplace_back(x->clone(scope, id));
+  for (auto &x : o.terms) terms.emplace_back(x->clone(scope, id));
   clear_singleton(scope, id, output);
 }
 
-void RFun::update(const SourceMap &map) {
-  output = map[output];
-}
+void RFun::update(const SourceMap &map) { output = map[output]; }
 
 size_t RFun::args() const {
   for (size_t out = 0; out < terms.size(); ++out)
-    if (terms[out]->id() != typeid(RArg))
-      return out;
+    if (terms[out]->id() != typeid(RArg)) return out;
   return terms.size();
 }
 
@@ -156,8 +150,7 @@ void RFun::format(std::ostream &os, TermFormat &format) const {
   os << "Fun(" << fragment.location() << "):" << std::endl;
   if (!escapes.empty()) {
     os << pad(format.depth) << "escapes:";
-    for (auto x : escapes)
-      os << " " << arg_depth(x) << ":" << arg_offset(x);
+    for (auto x : escapes) os << " " << arg_depth(x) << ":" << arg_offset(x);
     os << "\n";
   }
   if (format.scoped) {
@@ -178,15 +171,15 @@ void RFun::format(std::ostream &os, TermFormat &format) const {
     if (!x->label.empty()) os << " (" << x->label << ")";
     os << " [";
     if ((x->flags & SSA_RECURSIVE) != 0) {
-      os << "R"; // recursive
+      os << "R";  // recursive
       // only functions can be recursive => not E or O
     } else if ((x->flags & SSA_EFFECT) != 0) {
-      os << "E"; // effects
+      os << "E";  // effects
       // if effects are produced, must also be ordered
     } else if ((x->flags & SSA_ORDERED) != 0) {
-      os << "O"; // ordered
+      os << "O";  // ordered
     } else if ((x->flags & SSA_USED) == 0) {
-      os << "U"; // unused, and not an effect!
+      os << "U";  // unused, and not an effect!
     } else {
       // nothing interesting
       os << "-";
@@ -205,29 +198,28 @@ std::unique_ptr<Term> RFun::clone(TargetScope &scope, size_t id) const {
 std::vector<std::unique_ptr<Term> > TargetScope::unwind(size_t newend) {
   std::vector<std::unique_ptr<Term> > out;
   out.reserve(terms.size() - newend);
-  for (size_t i = newend; i < terms.size(); ++i)
-    out.emplace_back(std::move(terms[i]));
+  for (size_t i = newend; i < terms.size(); ++i) out.emplace_back(std::move(terms[i]));
   terms.resize(newend);
   return out;
 }
 
 std::unique_ptr<Term> Term::optimize(std::unique_ptr<Term> term, Runtime &runtime) {
-  term = Term::pass_purity(std::move(term), PRIM_EFFECT,  SSA_EFFECT);
+  term = Term::pass_purity(std::move(term), PRIM_EFFECT, SSA_EFFECT);
   term = Term::pass_purity(std::move(term), PRIM_ORDERED, SSA_ORDERED);
-  term = Term::pass_usage (std::move(term));
-  term = Term::pass_sweep (std::move(term));
+  term = Term::pass_usage(std::move(term));
+  term = Term::pass_sweep(std::move(term));
   term = Term::pass_inline(std::move(term), 20, runtime);
-  term = Term::pass_purity(std::move(term), PRIM_EFFECT,  SSA_EFFECT);
+  term = Term::pass_purity(std::move(term), PRIM_EFFECT, SSA_EFFECT);
   term = Term::pass_purity(std::move(term), PRIM_ORDERED, SSA_ORDERED);
-  term = Term::pass_usage (std::move(term));
-  term = Term::pass_sweep (std::move(term));
-  term = Term::pass_cse   (std::move(term), runtime);
-  term = Term::pass_usage (std::move(term));
+  term = Term::pass_usage(std::move(term));
+  term = Term::pass_sweep(std::move(term));
+  term = Term::pass_cse(std::move(term), runtime);
+  term = Term::pass_usage(std::move(term));
   term = Term::pass_inline(std::move(term), 50, runtime);
-  term = Term::pass_purity(std::move(term), PRIM_EFFECT,  SSA_EFFECT);
+  term = Term::pass_purity(std::move(term), PRIM_EFFECT, SSA_EFFECT);
   term = Term::pass_purity(std::move(term), PRIM_ORDERED, SSA_ORDERED);
-  term = Term::pass_usage (std::move(term));
-  term = Term::pass_sweep (std::move(term));
-  term = Term::pass_cse   (std::move(term), runtime);
+  term = Term::pass_usage(std::move(term));
+  term = Term::pass_sweep(std::move(term));
+  term = Term::pass_cse(std::move(term), runtime);
   return term;
 }

@@ -30,9 +30,7 @@ struct alignas(PadObject) Promise {
     return obj ? obj->category() : WORK;
   }
 
-  explicit operator bool() const {
-    return category() == VALUE;
-  }
+  explicit operator bool() const { return category() == VALUE; }
 
   void await(Runtime &runtime, Continuation *c) const {
 #ifdef DEBUG_GC
@@ -41,26 +39,26 @@ struct alignas(PadObject) Promise {
     if (*this) {
       c->resume(runtime, value.get());
     } else {
-      c->next = static_cast<Continuation*>(value.get());
+      c->next = static_cast<Continuation *>(value.get());
       value = c;
     }
   }
 
-  // Use only if the value is known to already be available 
+  // Use only if the value is known to already be available
   template <typename T>
   T *coerce() {
 #ifdef DEBUG_GC
-    assert (*this);
+    assert(*this);
 #endif
-    return static_cast<T*>(value.get());
+    return static_cast<T *>(value.get());
   }
 
   template <typename T>
   const T *coerce() const {
 #ifdef DEBUG_GC
-    assert (*this);
+    assert(*this);
 #endif
-    return static_cast<const T*>(value.get());
+    return static_cast<const T *>(value.get());
   }
 
   // Call once only!
@@ -76,19 +74,21 @@ struct alignas(PadObject) Promise {
   // Call only if the containing tuple was just constructed (no Continuations)
   void instant_fulfill(HeapObject *obj) {
 #ifdef DEBUG_GC
-     assert(!value);
-     assert(obj->category() == VALUE);
+    assert(!value);
+    assert(obj->category() == VALUE);
 #endif
-     value = obj;
+    value = obj;
   }
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
-  T recurse(T arg) { return (value.*memberfn)(arg); }
+  T recurse(T arg) {
+    return (value.*memberfn)(arg);
+  }
 
-private:
+ private:
   void awaken(Runtime &runtime, HeapObject *obj);
   mutable HeapPointer<HeapObject> value;
-friend struct Tuple;
+  friend struct Tuple;
 };
 
 template <>
@@ -122,14 +122,14 @@ struct Tuple : public Value {
 struct Record : public Tuple {
   Constructor *cons;
 
-  Record(Constructor *cons_) : cons(cons_) { }
+  Record(Constructor *cons_) : cons(cons_) {}
 
   const char *type() const override;
   void format(std::ostream &os, FormatState &state) const override;
   Hash shallow_hash() const override;
 
   static size_t reserve(size_t size);
-  static Record *claim(Heap &h, Constructor *cons, size_t size); // requires prior h.reserve
+  static Record *claim(Heap &h, Constructor *cons, size_t size);  // requires prior h.reserve
   static Record *alloc(Heap &h, Constructor *cons, size_t size);
 };
 
@@ -137,7 +137,7 @@ struct ScopeStack;
 struct Scope : public Tuple {
   HeapPointer<Scope> next;
 
-  Scope(Scope *next_) : next(next_) { }
+  Scope(Scope *next_) : next(next_) {}
 
   const char *type() const override;
   void format(std::ostream &os, FormatState &state) const override;
@@ -157,7 +157,8 @@ struct Scope : public Tuple {
   void set_fun(RFun *fun);
 
   static size_t reserve(size_t size);
-  static Scope *claim(Heap &h, size_t size, Scope *next, Scope *parent, RFun *fun); // requires prior h.reserve
+  static Scope *claim(Heap &h, size_t size, Scope *next, Scope *parent,
+                      RFun *fun);  // requires prior h.reserve
   static Scope *alloc(Heap &h, size_t size, Scope *next, Scope *parent, RFun *fun);
 };
 

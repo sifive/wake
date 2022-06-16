@@ -49,7 +49,7 @@ struct Runtime {
   Heap heap;
   RootPointer<Work> stack;
   RootPointer<HeapObject> output;
-  RootPointer<Record> sources; // Vector String
+  RootPointer<Record> sources;  // Vector String
 
   Runtime(Profile *profile_, int profile_heap, double heap_factor);
   ~Runtime();

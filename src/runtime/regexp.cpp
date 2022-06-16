@@ -19,24 +19,21 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <string>
 #include <re2/re2.h>
 
-#include "util/sfinae.h"
-#include "types/type.h"
-#include "types/data.h"
+#include <string>
+
 #include "prim.h"
+#include "types/data.h"
+#include "types/type.h"
+#include "util/sfinae.h"
 #include "value.h"
 
-static re2::StringPiece sp(String *s) {
-  return re2::StringPiece(s->c_str(), s->size());
-}
+static re2::StringPiece sp(String *s) { return re2::StringPiece(s->c_str(), s->size()); }
 
 static PRIMTYPE(type_rcmp) {
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeRegExp) &&
-    args[1]->unify(Data::typeRegExp) &&
-    out->unify(Data::typeOrder);
+  return args.size() == 2 && args[0]->unify(Data::typeRegExp) && args[1]->unify(Data::typeRegExp) &&
+         out->unify(Data::typeOrder);
 }
 
 static PRIMFN(prim_rcmp) {
@@ -51,9 +48,7 @@ static PRIMTYPE(type_re2) {
   Data::typeResult.clone(result);
   result[0].unify(Data::typeRegExp);
   result[1].unify(Data::typeString);
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(result);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(result);
 }
 
 static PRIMFN(prim_re2) {
@@ -74,9 +69,7 @@ static PRIMFN(prim_re2) {
 }
 
 static PRIMTYPE(type_re2str) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeRegExp) &&
-    out->unify(Data::typeString);
+  return args.size() == 1 && args[0]->unify(Data::typeRegExp) && out->unify(Data::typeString);
 }
 
 TEST_MEMBER(set_dot_nl);
@@ -85,16 +78,12 @@ static PRIMFN(prim_re2str) {
   EXPECT(1);
   REGEXP(arg0, 0);
   auto out =
-    has_set_dot_nl<RE2::Options>::value
-    ? arg0->exp->pattern()
-    : arg0->exp->pattern().substr(4);
+      has_set_dot_nl<RE2::Options>::value ? arg0->exp->pattern() : arg0->exp->pattern().substr(4);
   RETURN(String::alloc(runtime.heap, out));
 }
 
 static PRIMTYPE(type_quote) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(Data::typeString);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_quote) {
@@ -106,24 +95,24 @@ static PRIMFN(prim_quote) {
 static bool check_re2_bug(size_t size) {
   re2::StringPiece sp;
   bool has_bug = sizeof(sp.size()) != sizeof(size_t);
-  bool big = (size >> (sizeof(sp.size())*8-1)) != 0;
+  bool big = (size >> (sizeof(sp.size()) * 8 - 1)) != 0;
   return has_bug && big;
 }
 
-const char re2_bug[] = "The re2 library is too old (< 2016-09) to be used on inputs larger than 2GiB\n";
+const char re2_bug[] =
+    "The re2 library is too old (< 2016-09) to be used on inputs larger than 2GiB\n";
 
-#define RE2_BUG(str) do {						\
-  if (check_re2_bug(str->size())) {					\
-    require_fail(re2_bug, sizeof(re2_bug), runtime, scope);		\
-    return;								\
-  }									\
-} while (0)
+#define RE2_BUG(str)                                          \
+  do {                                                        \
+    if (check_re2_bug(str->size())) {                         \
+      require_fail(re2_bug, sizeof(re2_bug), runtime, scope); \
+      return;                                                 \
+    }                                                         \
+  } while (0)
 
 static PRIMTYPE(type_match) {
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeRegExp) &&
-    args[1]->unify(Data::typeString) &&
-    out->unify(Data::typeBoolean);
+  return args.size() == 2 && args[0]->unify(Data::typeRegExp) && args[1]->unify(Data::typeString) &&
+         out->unify(Data::typeBoolean);
 }
 
 static PRIMFN(prim_match) {
@@ -141,10 +130,8 @@ static PRIMTYPE(type_extract) {
   TypeVar list;
   Data::typeList.clone(list);
   list[0].unify(Data::typeString);
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeRegExp) &&
-    args[1]->unify(Data::typeString) &&
-    out->unify(list);
+  return args.size() == 2 && args[0]->unify(Data::typeRegExp) && args[1]->unify(Data::typeString) &&
+         out->unify(list);
 }
 
 static PRIMFN(prim_extract) {
@@ -154,19 +141,18 @@ static PRIMFN(prim_extract) {
   RE2_BUG(arg1);
 
   int matches = arg0->exp->NumberOfCapturingGroups();
-  std::vector<re2::StringPiece> submatch(matches+1);
+  std::vector<re2::StringPiece> submatch(matches + 1);
   re2::StringPiece input = sp(arg1);
 
-  if (arg0->exp->Match(input, 0, input.size(), RE2::ANCHOR_BOTH, &submatch[0], matches+1)) {
+  if (arg0->exp->Match(input, 0, input.size(), RE2::ANCHOR_BOTH, &submatch[0], matches + 1)) {
     size_t need = reserve_list(matches);
-    for (int i = 0; i < matches; ++i)
-      need += String::reserve(submatch[i+1].size());
+    for (int i = 0; i < matches; ++i) need += String::reserve(submatch[i + 1].size());
     runtime.heap.reserve(need);
     // NOTE: if there is not enough space, this routine will be re-entered.
     // This means submatches is recomputed with fresh/correct heap locations.
     Value *out[matches];
     for (int i = 0; i < matches; ++i) {
-      re2::StringPiece &p = submatch[i+1];
+      re2::StringPiece &p = submatch[i + 1];
       out[i] = String::claim(runtime.heap, p.data(), p.size());
     }
     RETURN(claim_list(runtime.heap, matches, out));
@@ -176,11 +162,8 @@ static PRIMFN(prim_extract) {
 }
 
 static PRIMTYPE(type_replace) {
-  return args.size() == 3 &&
-    args[0]->unify(Data::typeRegExp) &&
-    args[1]->unify(Data::typeString) &&
-    args[2]->unify(Data::typeString) &&
-    out->unify(Data::typeString);
+  return args.size() == 3 && args[0]->unify(Data::typeRegExp) && args[1]->unify(Data::typeString) &&
+         args[2]->unify(Data::typeString) && out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_replace) {
@@ -201,10 +184,8 @@ static PRIMTYPE(type_tokenize) {
   TypeVar list;
   Data::typeList.clone(list);
   list[0].unify(Data::typeString);
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeRegExp) &&
-    args[1]->unify(Data::typeString) &&
-    out->unify(list);
+  return args.size() == 2 && args[0]->unify(Data::typeRegExp) && args[1]->unify(Data::typeString) &&
+         out->unify(list);
 }
 
 static PRIMFN(prim_tokenize) {
@@ -265,10 +246,10 @@ static PRIMFN(prim_rcat) {
   std::string out;
   for (size_t i = 0; i < nargs; ++i) {
     if (i % 2 == 0) {
-      String *s = static_cast<String*>(args[i]);
+      String *s = static_cast<String *>(args[i]);
       out.append(s->c_str(), s->size());
     } else {
-      const std::string &pattern = static_cast<RegExp*>(args[i])->exp->pattern();
+      const std::string &pattern = static_cast<RegExp *>(args[i])->exp->pattern();
       out.append(pattern.c_str() + offset, pattern.size() - offset);
     }
   }
@@ -277,13 +258,13 @@ static PRIMFN(prim_rcat) {
 }
 
 void prim_register_regexp(PrimMap &pmap) {
-  prim_register(pmap, "rcmp",     prim_rcmp,     type_rcmp,     PRIM_PURE);
-  prim_register(pmap, "re2",      prim_re2,      type_re2,      PRIM_PURE);
-  prim_register(pmap, "re2str",   prim_re2str,   type_re2str,   PRIM_PURE);
-  prim_register(pmap, "quote",    prim_quote,    type_quote,    PRIM_PURE);
-  prim_register(pmap, "match",    prim_match,    type_match,    PRIM_PURE);
-  prim_register(pmap, "extract",  prim_extract,  type_extract,  PRIM_PURE);
-  prim_register(pmap, "replace",  prim_replace,  type_replace,  PRIM_PURE);
+  prim_register(pmap, "rcmp", prim_rcmp, type_rcmp, PRIM_PURE);
+  prim_register(pmap, "re2", prim_re2, type_re2, PRIM_PURE);
+  prim_register(pmap, "re2str", prim_re2str, type_re2str, PRIM_PURE);
+  prim_register(pmap, "quote", prim_quote, type_quote, PRIM_PURE);
+  prim_register(pmap, "match", prim_match, type_match, PRIM_PURE);
+  prim_register(pmap, "extract", prim_extract, type_extract, PRIM_PURE);
+  prim_register(pmap, "replace", prim_replace, type_replace, PRIM_PURE);
   prim_register(pmap, "tokenize", prim_tokenize, type_tokenize, PRIM_PURE);
-  prim_register(pmap, "rcat",     prim_rcat,     type_rcat,     PRIM_PURE);
+  prim_register(pmap, "rcat", prim_rcat, type_rcat, PRIM_PURE);
 }

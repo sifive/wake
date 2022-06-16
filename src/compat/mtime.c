@@ -22,9 +22,9 @@
 // OS/X only makes st_mtimespec available as an extension
 #define _DARWIN_C_SOURCE 1
 
-#include <sys/stat.h>
-
 #include "mtime.h"
+
+#include <sys/stat.h>
 
 #ifdef __APPLE__
 #define st_mtim st_mtimespec
@@ -34,5 +34,5 @@ int64_t getmtime_ns(const char *file) {
   struct stat sbuf;
   int ret = stat(file, &sbuf);
   if (ret == -1) return -1;
-  return sbuf.st_mtim.tv_nsec*INT64_C(1000000000) + sbuf.st_mtim.tv_sec;
+  return sbuf.st_mtim.tv_nsec * INT64_C(1000000000) + sbuf.st_mtim.tv_sec;
 }

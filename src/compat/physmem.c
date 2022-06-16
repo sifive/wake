@@ -24,9 +24,9 @@
 #include <mach/mach_init.h>
 #endif
 
-#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "physmem.h"
 

@@ -19,26 +19,23 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <string.h>
 #include <errno.h>
+#include <string.h>
 
 #include "json5.h"
 
-static bool expect(SymbolJSON type, JLexer &jlex, std::ostream& errs) {
+static bool expect(SymbolJSON type, JLexer &jlex, std::ostream &errs) {
   if (jlex.next.type != type) {
     if (!jlex.fail)
-      errs << "Was expecting a "
-        << jsymbolTable[type] << ", but got a "
-        << jsymbolTable[jlex.next.type] << " at "
-        << jlex.next.location;
+      errs << "Was expecting a " << jsymbolTable[type] << ", but got a "
+           << jsymbolTable[jlex.next.type] << " at " << jlex.next.location;
     jlex.fail = true;
     return false;
   }
   return true;
 }
 
-
-static JAST parse_jvalue(JLexer &jlex, std::ostream& errs);
+static JAST parse_jvalue(JLexer &jlex, std::ostream &errs);
 
 // JSON5Array:
 //   []
@@ -46,7 +43,7 @@ static JAST parse_jvalue(JLexer &jlex, std::ostream& errs);
 // JSON5ElementList:
 //   JSON5Value
 //   JSON5ElementList , JSON5Value
-static JAST parse_jarray(JLexer &jlex, std::ostream& errs) {
+static JAST parse_jarray(JLexer &jlex, std::ostream &errs) {
   jlex.consume();
 
   bool repeat = true;
@@ -71,9 +68,8 @@ static JAST parse_jarray(JLexer &jlex, std::ostream& errs) {
       }
       default: {
         if (!jlex.fail)
-          errs << "Was expecting COMMA/SCLOSE, got a "
-            << jsymbolTable[jlex.next.type]
-            << " at " << jlex.next.location;
+          errs << "Was expecting COMMA/SCLOSE, got a " << jsymbolTable[jlex.next.type] << " at "
+               << jlex.next.location;
         jlex.fail = true;
         repeat = false;
         break;
@@ -95,7 +91,7 @@ static JAST parse_jarray(JLexer &jlex, std::ostream& errs) {
 // JSON5MemberName:
 //   JSON5Identifier
 //   JSON5String
-static JAST parse_jobject(JLexer &jlex, std::ostream& errs) {
+static JAST parse_jobject(JLexer &jlex, std::ostream &errs) {
   jlex.consume();
 
   bool repeat = true;
@@ -118,9 +114,8 @@ static JAST parse_jobject(JLexer &jlex, std::ostream& errs) {
       }
       default: {
         if (!jlex.fail)
-          errs << "Was expecting ID/STR, got a "
-            << jsymbolTable[jlex.next.type]
-            << " at " << jlex.next.location;
+          errs << "Was expecting ID/STR, got a " << jsymbolTable[jlex.next.type] << " at "
+               << jlex.next.location;
         jlex.fail = true;
         repeat = false;
         break;
@@ -144,9 +139,8 @@ static JAST parse_jobject(JLexer &jlex, std::ostream& errs) {
       }
       default: {
         if (!jlex.fail)
-          errs << "Was expecting COMMA/BCLOSE, got a "
-            << jsymbolTable[jlex.next.type]
-            << " at " << jlex.next.location;
+          errs << "Was expecting COMMA/BCLOSE, got a " << jsymbolTable[jlex.next.type] << " at "
+               << jlex.next.location;
         jlex.fail = true;
         repeat = false;
         break;
@@ -164,9 +158,9 @@ static JAST parse_jobject(JLexer &jlex, std::ostream& errs) {
 //   JSON5Number
 //   JSON5Object
 //   JSON5Array
-static JAST parse_jvalue(JLexer &jlex, std::ostream& errs) {
+static JAST parse_jvalue(JLexer &jlex, std::ostream &errs) {
   switch (jlex.next.type) {
-    case JSON_NULLVAL: 
+    case JSON_NULLVAL:
     case JSON_TRUE:
     case JSON_FALSE:
     case JSON_NAN: {
@@ -190,9 +184,8 @@ static JAST parse_jvalue(JLexer &jlex, std::ostream& errs) {
     }
     default: {
       if (!jlex.fail)
-        errs << "Unexpected symbol "
-          << jsymbolTable[jlex.next.type]
-          << " at " << jlex.next.location;
+        errs << "Unexpected symbol " << jsymbolTable[jlex.next.type] << " at "
+             << jlex.next.location;
       jlex.fail = true;
       return JAST(JSON_ERROR);
     }
@@ -202,7 +195,7 @@ static JAST parse_jvalue(JLexer &jlex, std::ostream& errs) {
 // JSON5Text:
 //   JSON5Value
 
-bool JAST::parse(const char *file, std::ostream& errs, JAST &out) {
+bool JAST::parse(const char *file, std::ostream &errs, JAST &out) {
   JLexer jlex(file);
   if (jlex.fail) {
     errs << "Open " << file << ": " << strerror(errno);
@@ -214,14 +207,14 @@ bool JAST::parse(const char *file, std::ostream& errs, JAST &out) {
   }
 }
 
-bool JAST::parse(const std::string &body, std::ostream& errs, JAST &out) {
+bool JAST::parse(const std::string &body, std::ostream &errs, JAST &out) {
   JLexer jlex(body);
   out = parse_jvalue(jlex, errs);
   expect(JSON_END, jlex, errs);
   return !jlex.fail;
 }
 
-bool JAST::parse(const char *body, size_t len, std::ostream& errs, JAST &out) {
+bool JAST::parse(const char *body, size_t len, std::ostream &errs, JAST &out) {
   JLexer jlex(body, len);
   out = parse_jvalue(jlex, errs);
   expect(JSON_END, jlex, errs);

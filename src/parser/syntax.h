@@ -25,18 +25,18 @@ class DiagnosticReporter;
 class CSTBuilder;
 
 struct ParseInfo {
-    FileContent *fcontent;
-    CSTBuilder *cst;
-    DiagnosticReporter *reporter;
+  FileContent *fcontent;
+  CSTBuilder *cst;
+  DiagnosticReporter *reporter;
 
-    ParseInfo(FileContent *fcontent_, CSTBuilder *cst_, DiagnosticReporter *reporter_)
-     : fcontent(fcontent_), cst(cst_), reporter(reporter_) { }
+  ParseInfo(FileContent *fcontent_, CSTBuilder *cst_, DiagnosticReporter *reporter_)
+      : fcontent(fcontent_), cst(cst_), reporter(reporter_) {}
 };
 
 const char *symbolExample(int symbol);
 
 void *ParseAlloc(void *(*mallocProc)(size_t));
-void ParseFree(void *p, void (*freeProc)(void*));
+void ParseFree(void *p, void (*freeProc)(void *));
 void Parse(void *p, int yymajor, struct StringSegment yyminor, ParseInfo pi);
 void ParseTrace(FILE *TraceFILE, char *zTracePrompt);
 bool ParseShifts(void *p, int yymajor);

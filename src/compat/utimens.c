@@ -22,11 +22,11 @@
 // OS/X only makes utimensat available as an extension
 #define _DARWIN_C_SOURCE 1
 
-#include <sys/stat.h>
-#include <fcntl.h>
-
 #include "utimens.h"
 
+#include <fcntl.h>
+#include <sys/stat.h>
+
 int wake_utimensat(int dirfd, const char *path, const struct timespec ts[2]) {
-	return utimensat(dirfd, path, ts, AT_SYMLINK_NOFOLLOW);
+  return utimensat(dirfd, path, ts, AT_SYMLINK_NOFOLLOW);
 }

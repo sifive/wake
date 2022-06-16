@@ -18,9 +18,10 @@
 #ifndef FILE_H
 #define FILE_H
 
-#include <vector>
-#include <string>
 #include <stdint.h>
+
+#include <string>
+#include <vector>
 
 #include "location.h"
 #include "segment.h"
@@ -28,52 +29,52 @@
 class DiagnosticReporter;
 
 class FileContent {
-public:
-    FileContent(const char *filename_);
-    FileContent(FileContent &&o);
-    FileContent &operator = (FileContent &&o);
+ public:
+  FileContent(const char *filename_);
+  FileContent(FileContent &&o);
+  FileContent &operator=(FileContent &&o);
 
-    // position points to any byte of the codepoint
-    Coordinates coordinates(const uint8_t *position) const;
+  // position points to any byte of the codepoint
+  Coordinates coordinates(const uint8_t *position) const;
 
-    void clearNewLines();
-    void addNewline(const uint8_t *first_column);
+  void clearNewLines();
+  void addNewline(const uint8_t *first_column);
 
-    StringSegment segment() const { return ss; }
-    const char *filename() const { return fname.c_str(); }
+  StringSegment segment() const { return ss; }
+  const char *filename() const { return fname.c_str(); }
 
-    // copy construction is forbidden
-    FileContent(const FileContent &) = delete;
-    FileContent &operator = (const FileContent &) = delete;
+  // copy construction is forbidden
+  FileContent(const FileContent &) = delete;
+  FileContent &operator=(const FileContent &) = delete;
 
-protected:
-    StringSegment ss;
-    std::string fname;
-    std::vector<size_t> newlines;
+ protected:
+  StringSegment ss;
+  std::string fname;
+  std::vector<size_t> newlines;
 };
 
 class StringFile : public FileContent {
-public:
-    StringFile(const char *filename_, std::string &&content_);
-    StringFile(StringFile &&o) = default;
-    StringFile &operator = (StringFile &&o) = default;
+ public:
+  StringFile(const char *filename_, std::string &&content_);
+  StringFile(StringFile &&o) = default;
+  StringFile &operator=(StringFile &&o) = default;
 
-private:
-    std::string content;
+ private:
+  std::string content;
 };
 
 class ExternalFile : public FileContent {
-public:
-    ExternalFile(DiagnosticReporter &reporter, const char *filename_);
-    ~ExternalFile();
+ public:
+  ExternalFile(DiagnosticReporter &reporter, const char *filename_);
+  ~ExternalFile();
 
-    ExternalFile(ExternalFile &&o) = default;
-    ExternalFile &operator = (ExternalFile &&o) = default;
+  ExternalFile(ExternalFile &&o) = default;
+  ExternalFile &operator=(ExternalFile &&o) = default;
 };
 
 class CPPFile : public FileContent {
-public:
-    CPPFile(const char *filename);
+ public:
+  CPPFile(const char *filename);
 };
 
 #endif

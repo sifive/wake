@@ -19,17 +19,18 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <assert.h>
-#include <sys/time.h>
-#include <signal.h>
-
-#include "optimizer/ssa.h"
 #include "runtime.h"
+
+#include <assert.h>
+#include <signal.h>
+#include <sys/time.h>
+
+#include "job.h"
+#include "optimizer/ssa.h"
+#include "profile.h"
+#include "status.h"
 #include "tuple.h"
 #include "value.h"
-#include "status.h"
-#include "job.h"
-#include "profile.h"
 
 #define PROFILE_HZ 1000
 
@@ -40,23 +41,19 @@ static void handle_SIGPROF(int sig) {
 }
 
 Closure::Closure(RFun *fun_, size_t applied_, Scope *scope_)
- : fun(fun_), applied(applied_), scope(scope_) { }
+    : fun(fun_), applied(applied_), scope(scope_) {}
 
-void Work::format(std::ostream &os, FormatState &state) const {
-  os << "Work";
-}
+void Work::format(std::ostream &os, FormatState &state) const { os << "Work"; }
 
-Category Work::category() const {
-  return WORK;
-}
+Category Work::category() const { return WORK; }
 
 Runtime::Runtime(Profile *profile_, int profile_heap, double heap_factor)
- : abort(false),
-   profile(profile_),
-   heap(profile_heap, heap_factor),
-   stack(heap.root<Work>(nullptr)),
-   output(heap.root<HeapObject>(nullptr)),
-   sources(heap.root<HeapObject>(nullptr)) {
+    : abort(false),
+      profile(profile_),
+      heap(profile_heap, heap_factor),
+      stack(heap.root<Work>(nullptr)),
+      output(heap.root<HeapObject>(nullptr)),
+      sources(heap.root<HeapObject>(nullptr)) {
   if (profile) {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
@@ -64,7 +61,7 @@ Runtime::Runtime(Profile *profile_, int profile_heap, double heap_factor)
     // Setup a SIGPROF timer to trigger stack tracing
     struct itimerval timer;
     timer.it_value.tv_sec = 0;
-    timer.it_value.tv_usec = 1000000/PROFILE_HZ;
+    timer.it_value.tv_usec = 1000000 / PROFILE_HZ;
     timer.it_interval = timer.it_value;
 
     sa.sa_handler = handle_SIGPROF;
@@ -87,7 +84,7 @@ struct Interpret final : public GCObject<Interpret, Work> {
   HeapPointer<Continuation> cont;
 
   Interpret(RFun *fun_, Scope *scope_, Continuation *cont_)
-   : fun(fun_), index(0), scope(scope_), cont(cont_) { }
+      : fun(fun_), index(0), scope(scope_), cont(cont_) {}
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -104,10 +101,10 @@ struct InterpretContext {
   Runtime &runtime;
   Interpret *interpret;
   Scope *scope;
-  size_t output; // index into scope
-  Continuation *cont; // set for tail calls
+  size_t output;       // index into scope
+  Continuation *cont;  // set for tail calls
 
-  InterpretContext(Runtime &runtime_) : runtime(runtime_) { }
+  InterpretContext(Runtime &runtime_) : runtime(runtime_) {}
   static Promise *arg(Scope *scope, size_t arg);
 
   Promise *arg(size_t arg_) { return arg(scope, arg_); }
@@ -123,13 +120,13 @@ void Interpret::execute(Runtime &runtime) {
   context.cont = nullptr;
 
   size_t limit = fun->terms.size();
-  bool tail = fun->output == make_arg(0, limit-1) && fun->terms.back()->tailCallOk();
+  bool tail = fun->output == make_arg(0, limit - 1) && fun->terms.back()->tailCallOk();
   if (tail) --limit;
 
-  next = nullptr; // potentially reschedule
+  next = nullptr;  // potentially reschedule
   for (context.output = index; context.output < limit; context.output = index) {
     fun->terms[context.output]->interpret(context);
-    index = context.output+1;
+    index = context.output + 1;
     if (!context.interpret) return;
   }
 
@@ -167,8 +164,7 @@ void InterpretContext::finish(Promise *p) {
 }
 
 Promise *InterpretContext::arg(Scope *it, size_t arg) {
-  for (size_t depth = arg_depth(arg); depth > 0; --depth)
-    it = it->next.get();
+  for (size_t depth = arg_depth(arg); depth > 0; --depth) it = it->next.get();
   return it->at(arg_offset(arg));
 }
 
@@ -181,25 +177,17 @@ void RArg::interpret(InterpretContext &context) {
   // No-Op; filled in by App during Scope construction
 }
 
-bool RLit::tailCallOk() const {
-  return true;
-}
+bool RLit::tailCallOk() const { return true; }
 
-void RLit::interpret(InterpretContext &context) {
-  context.finish(value->get());
-}
+void RLit::interpret(InterpretContext &context) { context.finish(value->get()); }
 
-bool RFun::tailCallOk() const {
-  return !get(SSA_RECURSIVE);
-}
+bool RFun::tailCallOk() const { return !get(SSA_RECURSIVE); }
 
 void RFun::interpret(InterpretContext &context) {
   context.finish(Closure::alloc(context.runtime.heap, this, 0, context.scope));
 }
 
-bool RCon::tailCallOk() const {
-  return true;
-}
+bool RCon::tailCallOk() const { return true; }
 
 void RCon::interpret(InterpretContext &context) {
   size_t size = args.size();
@@ -214,8 +202,7 @@ struct CGet final : public GCObject<CGet, Continuation> {
   HeapPointer<Continuation> cont;
   size_t index;
 
-  CGet(Continuation *cont_, size_t index_)
-   : cont(cont_), index(index_) { }
+  CGet(Continuation *cont_, size_t index_) : cont(cont_), index(index_) {}
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -225,14 +212,12 @@ struct CGet final : public GCObject<CGet, Continuation> {
   }
 
   void execute(Runtime &runtime) override {
-     Record *record = static_cast<Record*>(value.get());
-     record->at(index)->await(runtime, cont.get());
+    Record *record = static_cast<Record *>(value.get());
+    record->at(index)->await(runtime, cont.get());
   }
 };
 
-bool RGet::tailCallOk() const {
-  return true;
-}
+bool RGet::tailCallOk() const { return true; }
 
 void RGet::interpret(InterpretContext &context) {
   Promise *arg = context.arg(args[0]);
@@ -241,9 +226,8 @@ void RGet::interpret(InterpretContext &context) {
     context.finish(arg->coerce<Record>()->at(index));
   } else {
     context.runtime.heap.reserve(Tuple::fulfiller_pads + CGet::reserve());
-    arg->await(context.runtime,
-      CGet::claim(context.runtime.heap, context.defer(), index));
-  }    
+    arg->await(context.runtime, CGet::claim(context.runtime.heap, context.defer(), index));
+  }
 }
 
 struct CDes final : public GCObject<CDes, Continuation> {
@@ -251,8 +235,7 @@ struct CDes final : public GCObject<CDes, Continuation> {
   HeapPointer<Continuation> cont;
   RDes *des;
 
-  CDes(Scope *scope_, Continuation *cont_, RDes *des_)
-   : scope(scope_), cont(cont_), des(des_) { }
+  CDes(Scope *scope_, Continuation *cont_, RDes *des_) : scope(scope_), cont(cont_), des(des_) {}
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -263,22 +246,22 @@ struct CDes final : public GCObject<CDes, Continuation> {
   }
 
   void execute(Runtime &runtime) override {
-    Record *record = static_cast<Record*>(value.get());
-    Closure *handler = InterpretContext::arg(scope.get(), des->args[record->cons->index])->coerce<Closure>();
+    Record *record = static_cast<Record *>(value.get());
+    Closure *handler =
+        InterpretContext::arg(scope.get(), des->args[record->cons->index])->coerce<Closure>();
     runtime.heap.reserve(runtime.reserve_apply(handler->fun));
     runtime.claim_apply(handler, record, cont.get(), scope.get());
   }
 };
 
-bool RDes::tailCallOk() const {
-  return true;
-}
+bool RDes::tailCallOk() const { return true; }
 
 void RDes::interpret(InterpretContext &context) {
   Promise *arg = context.arg(args.back());
   if (*arg) {
     Record *record = arg->coerce<Record>();
-    Closure *handler = InterpretContext::arg(context.scope, args[record->cons->index])->coerce<Closure>();
+    Closure *handler =
+        InterpretContext::arg(context.scope, args[record->cons->index])->coerce<Closure>();
     context.runtime.heap.reserve(context.runtime.reserve_apply(handler->fun));
     if (context.interpret) {
       context.runtime.schedule(context.interpret);
@@ -288,7 +271,7 @@ void RDes::interpret(InterpretContext &context) {
   } else {
     context.runtime.heap.reserve(Tuple::fulfiller_pads + CDes::reserve());
     arg->await(context.runtime,
-      CDes::claim(context.runtime.heap, context.scope, context.defer(), this));
+               CDes::claim(context.runtime.heap, context.scope, context.defer(), this));
   }
 }
 
@@ -298,7 +281,7 @@ struct CPrim final : public GCObject<CPrim, Continuation> {
   RPrim *prim;
 
   CPrim(Scope *scope_, size_t output_, RPrim *prim_)
-   : scope(scope_), output(output_), prim(prim_) { }
+      : scope(scope_), output(output_), prim(prim_) {}
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -310,7 +293,7 @@ struct CPrim final : public GCObject<CPrim, Continuation> {
   static Promise *doit(Runtime &runtime, Scope *scope, size_t output, RPrim *prim);
   void execute(Runtime &runtime) override {
     if (Promise *p = doit(runtime, scope.get(), output, prim)) {
-      next = nullptr; // reschedule
+      next = nullptr;  // reschedule
       p->await(runtime, this);
     }
   }
@@ -333,9 +316,7 @@ Promise *CPrim::doit(Runtime &runtime, Scope *scope, size_t output, RPrim *prim)
   }
 }
 
-bool RPrim::tailCallOk() const {
-  return false;
-}
+bool RPrim::tailCallOk() const { return false; }
 
 void RPrim::interpret(InterpretContext &context) {
   context.runtime.heap.reserve(Tuple::fulfiller_pads + CPrim::reserve());
@@ -352,7 +333,7 @@ struct CApp final : public GCObject<CApp, Continuation> {
   RApp *app;
 
   CApp(Continuation *cont_, Scope *caller_, size_t output_, RApp *app_)
-   : cont(cont_), caller(caller_), output(output_), app(app_) { }
+      : cont(cont_), caller(caller_), output(output_), app(app_) {}
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -362,56 +343,59 @@ struct CApp final : public GCObject<CApp, Continuation> {
     return arg;
   }
 
-  static void doit(Runtime &runtime, Closure *closure, Continuation *cont, Scope *caller, size_t output, RApp *app, Interpret *&resume);
+  static void doit(Runtime &runtime, Closure *closure, Continuation *cont, Scope *caller,
+                   size_t output, RApp *app, Interpret *&resume);
   void execute(Runtime &runtime) override {
     Interpret *null = nullptr;
-    doit(runtime, static_cast<Closure*>(value.get()), cont.get(), caller.get(), output, app, null);
+    doit(runtime, static_cast<Closure *>(value.get()), cont.get(), caller.get(), output, app, null);
   }
 };
 
-void CApp::doit(Runtime &runtime, Closure *closure, Continuation *cont, Scope *caller, size_t output, RApp *app, Interpret *&resume) {
+void CApp::doit(Runtime &runtime, Closure *closure, Continuation *cont, Scope *caller,
+                size_t output, RApp *app, Interpret *&resume) {
   RFun *fun = closure->fun;
   size_t applied = closure->applied;
   size_t nargs = app->args.size() - 1;
   size_t fargs = fun->args();
   size_t terms = fun->terms.size();
   Scope *callee = closure->scope.get();
-  
+
   if (applied + nargs == fargs) {
-    runtime.heap.reserve(Scope::reserve(terms) + (1+fargs)*Tuple::fulfiller_pads + Interpret::reserve());
+    runtime.heap.reserve(Scope::reserve(terms) + (1 + fargs) * Tuple::fulfiller_pads +
+                         Interpret::reserve());
     // Skip over partially applied arguments
     Scope *it = callee;
-    for (size_t pop = applied; pop; it = it->next.get())
-      pop -= it->size();
+    for (size_t pop = applied; pop; it = it->next.get()) pop -= it->size();
     // Fully applied function; allocate "stack" frame
     Scope *bind = Scope::claim(runtime.heap, terms, it, caller, fun);
     // Fill in App() args
     for (size_t i = 0; i < nargs; ++i)
-      bind->claim_instant_fulfiller(runtime, applied+i, InterpretContext::arg(caller, app->args[i+1]));
+      bind->claim_instant_fulfiller(runtime, applied + i,
+                                    InterpretContext::arg(caller, app->args[i + 1]));
     // Forward the partially applied arguments
     it = callee;
     size_t pop = applied;
     while (pop) {
       size_t size = it->size();
       pop -= size;
-      for (size_t i = 0; i < size; ++i)
-        bind->claim_instant_fulfiller(runtime, pop+i, it->at(i));
+      for (size_t i = 0; i < size; ++i) bind->claim_instant_fulfiller(runtime, pop + i, it->at(i));
       it = it->next.get();
     }
     // Schedule an Interpreter
     Interpret *interpret = Interpret::claim(runtime.heap, fun, bind,
-      cont ? cont : caller->claim_fulfiller(runtime, output));
+                                            cont ? cont : caller->claim_fulfiller(runtime, output));
     if (resume) {
       runtime.schedule(resume);
       resume = nullptr;
     }
     runtime.schedule(interpret);
   } else {
-    runtime.heap.reserve(Scope::reserve(nargs) + nargs*Tuple::fulfiller_pads + Closure::reserve());
+    runtime.heap.reserve(Scope::reserve(nargs) + nargs * Tuple::fulfiller_pads +
+                         Closure::reserve());
     Scope *bind = Scope::claim(runtime.heap, nargs, callee, caller, fun);
     for (size_t i = 0; i < nargs; ++i)
-      bind->claim_instant_fulfiller(runtime, i, InterpretContext::arg(caller, app->args[i+1]));
-    Closure *closure = Closure::claim(runtime.heap, fun, applied+nargs, bind);
+      bind->claim_instant_fulfiller(runtime, i, InterpretContext::arg(caller, app->args[i + 1]));
+    Closure *closure = Closure::claim(runtime.heap, fun, applied + nargs, bind);
     if (cont) {
       cont->resume(runtime, closure);
     } else {
@@ -420,16 +404,16 @@ void CApp::doit(Runtime &runtime, Closure *closure, Continuation *cont, Scope *c
   }
 }
 
-bool RApp::tailCallOk() const {
-  return true;
-}
+bool RApp::tailCallOk() const { return true; }
 
 void RApp::interpret(InterpretContext &context) {
   Promise *fn = context.arg(args[0]);
   if (*fn) {
-    CApp::doit(context.runtime, fn->coerce<Closure>(), context.cont, context.scope, context.output, this, context.interpret);
+    CApp::doit(context.runtime, fn->coerce<Closure>(), context.cont, context.scope, context.output,
+               this, context.interpret);
   } else {
-    fn->await(context.runtime, CApp::alloc(context.runtime.heap, context.cont, context.scope, context.output, this));
+    fn->await(context.runtime,
+              CApp::alloc(context.runtime.heap, context.cont, context.scope, context.output, this));
   }
 }
 
@@ -447,7 +431,7 @@ void Runtime::claim_apply(Closure *closure, HeapObject *value, Continuation *con
 void Runtime::run() {
   int count = 0;
   bool lprofile = profile;
-  trace_needed = false; // don't count time spent waiting for Jobs
+  trace_needed = false;  // don't count time spent waiting for Jobs
   while (stack && !abort) {
     if (++count >= 10000) {
       if (JobTable::exit_now()) break;
@@ -459,11 +443,10 @@ void Runtime::run() {
     try {
       w->execute(*this);
       if (lprofile && trace_needed) {
-        if (Interpret *i = dynamic_cast<Interpret*>(w)) {
+        if (Interpret *i = dynamic_cast<Interpret *>(w)) {
           auto stack = i->scope->stack_trace(false);
           Profile *node = profile;
-          for (auto it = stack.rbegin(); it != stack.rend(); ++it)
-            node = &node->children[*it];
+          for (auto it = stack.rbegin(); it != stack.rend(); ++it) node = &node->children[*it];
           ++node->count;
           trace_needed = false;
         }
@@ -473,15 +456,13 @@ void Runtime::run() {
       w->next = stack;
       stack = w;
       heap.GC(gc.needed);
-      trace_needed = false; // don't count time spent running GC
+      trace_needed = false;  // don't count time spent running GC
     }
   }
 }
 
 struct CInit final : public GCObject<CInit, Continuation> {
-  void execute(Runtime &runtime) override {
-    runtime.output = value;
-  }
+  void execute(Runtime &runtime) override { runtime.output = value; }
 };
 
 void Runtime::init(RFun *root) {

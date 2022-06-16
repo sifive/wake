@@ -19,45 +19,46 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include "wakefiles.h"
+
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <re2/re2.h>
-#include <sys/stat.h>
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
+#include <sys/stat.h>
 #include <unistd.h>
-#include <dirent.h>
-#include <fcntl.h>
 
+#include <algorithm>
+#include <fstream>
 #include <memory>
 #include <sstream>
-#include <fstream>
-#include <algorithm>
 
 #include "compat/readable.h"
 #include "compat/windows.h"
-#include "util/execpath.h"
 #include "util/diagnostic.h"
+#include "util/execpath.h"
 #include "util/file.h"
-#include "wakefiles.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 
 EM_JS(char *, nodejs_getfiles, (const char *dir, int *ok), {
   const Path = require("path").posix;
-  const FS   = require("fs");
-  let files  = [];
+  const FS = require("fs");
+  let files = [];
 
   function walkTree(dir) {
-      FS.readdirSync(dir, {withFileTypes: true}).forEach(dirent => {
-          const absolute = Path.join(dir, dirent.name);
-          if (dirent.isDirectory()) {
-            if (dirent.name != ".build" && dirent.name != ".fuse" && dirent.name != ".git")
-              walkTree(absolute);
-          } else {
-            files.push(absolute);
-          }
-      });
+    FS.readdirSync(dir, {withFileTypes : true}).forEach(dirent = > {
+      const absolute = Path.join(dir, dirent.name);
+      if (dirent.isDirectory()) {
+        if (dirent.name != ".build" && dirent.name != ".fuse" && dirent.name != ".git")
+          walkTree(absolute);
+      } else {
+        files.push(absolute);
+      }
+    });
   }
 
   try {
@@ -65,13 +66,13 @@ EM_JS(char *, nodejs_getfiles, (const char *dir, int *ok), {
     const sep = String.fromCharCode(0);
     const out = files.join(sep) + sep;
 
-    const lengthBytes = lengthBytesUTF8(out)+1;
+    const lengthBytes = lengthBytesUTF8(out) + 1;
     const stringOnWasmHeap = _malloc(lengthBytes);
     stringToUTF8(out, stringOnWasmHeap, lengthBytes);
     setValue(ok, 1, "i32");
     return stringOnWasmHeap;
   } catch (err) {
-    const lengthBytes = lengthBytesUTF8(err.message)+1;
+    const lengthBytes = lengthBytesUTF8(err.message) + 1;
     const stringOnWasmHeap = _malloc(lengthBytes);
     stringToUTF8(err.message, stringOnWasmHeap, lengthBytes);
     setValue(ok, 0, "i32");
@@ -79,11 +80,12 @@ EM_JS(char *, nodejs_getfiles, (const char *dir, int *ok), {
   }
 });
 
-bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2& re, size_t skip) {
+bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2 &re,
+                size_t skip) {
   int ok;
   char *files = nodejs_getfiles(path.c_str(), &ok);
   if (ok) {
-    for (char *file = files; *file; file += strlen(file)+1) {
+    for (char *file = files; *file; file += strlen(file) + 1) {
       re2::StringPiece p(file + skip, strlen(file) - skip);
       if (RE2::FullMatch(p, re)) {
         out.emplace_back(file);
@@ -101,7 +103,8 @@ bool push_files(std::vector<std::string> &out, const std::string &path, const re
 
 #else
 
-static bool push_files(std::vector<std::string> &out, const std::string &path, int dirfd, const RE2 &re, size_t skip) {
+static bool push_files(std::vector<std::string> &out, const std::string &path, int dirfd,
+                       const RE2 &re, size_t skip) {
   auto dir = fdopendir(dirfd);
   if (!dir) {
     close(dirfd);
@@ -112,7 +115,8 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
   struct dirent *f;
   bool failed = false;
   for (errno = 0; 0 != (f = readdir(dir)); errno = 0) {
-    if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
+    if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0)))
+      continue;
     bool recurse;
     struct stat sbuf;
 #if defined(DT_DIR)
@@ -138,13 +142,11 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
         fprintf(stderr, "Failed to openat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
         failed = true;
       } else {
-        if (push_files(out, name, fd, re, skip))
-          failed = true;
+        if (push_files(out, name, fd, re, skip)) failed = true;
       }
     } else {
       re2::StringPiece p(name.c_str() + skip, name.size() - skip);
-      if (RE2::FullMatch(p, re))
-        out.emplace_back(std::move(name));
+      if (RE2::FullMatch(p, re)) out.emplace_back(std::move(name));
     }
   }
 
@@ -161,10 +163,10 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
   return failed;
 }
 
-bool push_files(std::vector<std::string> &out, const std::string &path, const RE2& re, size_t skip) {
+bool push_files(std::vector<std::string> &out, const std::string &path, const RE2 &re,
+                size_t skip) {
   int flags, dirfd = open(path.c_str(), O_RDONLY);
-  if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1)
-    fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
+  if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1) fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
   return dirfd == -1 || push_files(out, path, dirfd, re, skip);
 }
 #endif
@@ -189,8 +191,8 @@ std::string make_canonical(const std::string &x) {
       scan = x.find_first_of('/', tok);
     }
     repeat = scan != std::string::npos;
-    std::string token(x, tok, repeat?(scan-tok):scan);
-    tok = scan+1;
+    std::string token(x, tok, repeat ? (scan - tok) : scan);
+    tok = scan + 1;
     if (token == "..") {
       if (!tokens.empty()) {
         tokens.pop_back();
@@ -209,7 +211,7 @@ std::string make_canonical(const std::string &x) {
     } else {
       if (pop) {
         std::string out = str.str();
-        out.resize(out.size()-1);
+        out.resize(out.size() - 1);
         return out;
       } else {
         return ".";
@@ -217,18 +219,17 @@ std::string make_canonical(const std::string &x) {
     }
   } else {
     str << tokens.front();
-    for (auto i = tokens.begin() + 1; i != tokens.end(); ++i)
-      str << "/" << *i;
+    for (auto i = tokens.begin() + 1; i != tokens.end(); ++i) str << "/" << *i;
     return str.str();
   }
 }
 
 struct WakeFilter {
-    size_t prefix;
-    bool allow;
-    std::unique_ptr<RE2> exp;
-    WakeFilter(size_t prefix_, bool allow_, const std::string &exp, const RE2::Options &opts)
-    : prefix(prefix_), allow(allow_), exp(new RE2(exp, opts)) { }
+  size_t prefix;
+  bool allow;
+  std::unique_ptr<RE2> exp;
+  WakeFilter(size_t prefix_, bool allow_, const std::string &exp, const RE2::Options &opts)
+      : prefix(prefix_), allow(allow_), exp(new RE2(exp, opts)) {}
 };
 
 std::string glob2regexp(const std::string &glob) {
@@ -240,7 +241,7 @@ std::string glob2regexp(const std::string &glob) {
     if (glob[e] == '\\') {
       // Trailing \ is left as a raw '\'
       // Don't bother escaping a codepoint start
-      if (e+1 == glob.size() || static_cast<unsigned char>(glob[e+1]) >= 0x80) {
+      if (e + 1 == glob.size() || static_cast<unsigned char>(glob[e + 1]) >= 0x80) {
         s = e + 1;
       } else {
         re2::StringPiece piece(glob.c_str() + e + 1, 1);
@@ -250,39 +251,43 @@ std::string glob2regexp(const std::string &glob) {
     } else if (glob[e] == '[') {
       // To include ']' in a clause, use: []abc]
       // If no closing ']' is found, just stop processing the glob
-      size_t c = glob.find_first_of("]", e+2);
-      if (c == std::string::npos) { s = e; break; }
+      size_t c = glob.find_first_of("]", e + 2);
+      if (c == std::string::npos) {
+        s = e;
+        break;
+      }
       exp.push_back('[');
-      size_t is = e+1, ie;
+      size_t is = e + 1, ie;
       while ((ie = glob.find_first_of("\\[", is)) != std::string::npos) {
         exp.append(glob, is, ie - is);
         exp.push_back('\\');
         exp.push_back(glob[ie]);
-        is = ie+1;
+        is = ie + 1;
       }
       exp.append(glob, is, c - is);
       exp.push_back(']');
-      s = c+1;
+      s = c + 1;
     } else if (glob[e] == '?') {
       // ? can match any non-/ character
       exp.append("[^/]");
-      s = e+1;
-    } else if (e > 0 && glob.size() == e+2 && glob[e-1] == '/' && glob[e+1] == '*') {
+      s = e + 1;
+    } else if (e > 0 && glob.size() == e + 2 && glob[e - 1] == '/' && glob[e + 1] == '*') {
       // trailing /** -> match everything inside
       exp.append(".+");
-      s = e+2;
+      s = e + 2;
     } else if (e == 0 && glob.size() > 2 && glob[1] == '*' && glob[2] == '/') {
       // leading **/ -> any subdirectory
       exp.append("([^/]*/)*");
-      s = e+3;
-    } else if (e > 0 && glob.size() > e+2 && glob[e-1] == '/' && glob[e+1] == '*' && glob[e+2] == '/') {
+      s = e + 3;
+    } else if (e > 0 && glob.size() > e + 2 && glob[e - 1] == '/' && glob[e + 1] == '*' &&
+               glob[e + 2] == '/') {
       // /**/ somewhere in the string
       exp.append("([^/]*/)*");
-      s = e+3;
+      s = e + 3;
     } else {
       // just a normal * -> match any number of non-/ characters
       exp.append("[^/]*");
-      s = e+1;
+      s = e + 1;
     }
   }
   exp.append(RE2::QuoteMeta(glob.c_str() + s));
@@ -290,7 +295,7 @@ std::string glob2regexp(const std::string &glob) {
 }
 
 class DiagnosticIgnorer : public DiagnosticReporter {
-  void report(Diagnostic diagnostic) { }
+  void report(Diagnostic diagnostic) {}
 };
 
 static void process_ignorefile(const std::string &path, std::vector<WakeFilter> &filters) {
@@ -299,7 +304,7 @@ static void process_ignorefile(const std::string &path, std::vector<WakeFilter> 
   ExternalFile file(ignorer, wakeignore.c_str());
   StringSegment segment = file.segment();
   std::stringstream in;
-  in.write(reinterpret_cast<const char*>(segment.start), segment.size());
+  in.write(reinterpret_cast<const char *>(segment.start), segment.size());
 
   RE2::Options options;
   options.set_log_errors(false);
@@ -310,9 +315,9 @@ static void process_ignorefile(const std::string &path, std::vector<WakeFilter> 
     // strip trailing whitespace (including windows CR)
     size_t found = line.find_last_not_of(" \t\f\v\n\r");
     if (found != std::string::npos) {
-      line.erase(found+1);
+      line.erase(found + 1);
     } else {
-      line.clear(); // entirely whitespace
+      line.clear();  // entirely whitespace
     }
     // allow empty lines and comments
     if (line == "" || line[0] == '#') continue;
@@ -324,8 +329,9 @@ static void process_ignorefile(const std::string &path, std::vector<WakeFilter> 
   }
 }
 
-static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wakefiles, const std::string &basedir, bool verbose) {
-  std::string curdir = basedir; // Either "" or ".+/"
+static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wakefiles,
+                                                 const std::string &basedir, bool verbose) {
+  std::string curdir = basedir;  // Either "" or ".+/"
   if (curdir == ".") {
     curdir.clear();
   } else if (!curdir.empty() && curdir.back() != '/') {
@@ -341,22 +347,21 @@ static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wake
   for (auto &wakefile : wakefiles) {
     // Unwind curdir
     while (!curdir.empty() && wakefile.compare(0, curdir.size(), curdir) != 0) {
-      size_t slash = curdir.find_last_of('/', curdir.size()-2);
+      size_t slash = curdir.find_last_of('/', curdir.size() - 2);
       if (slash == std::string::npos) {
         curdir.clear();
       } else {
-        curdir.erase(slash+1);
+        curdir.erase(slash + 1);
       }
     }
 
     // Expire any patterns from directories we've left
-    while (!filters.empty() && filters.back().prefix > curdir.size())
-      filters.pop_back();
+    while (!filters.empty() && filters.back().prefix > curdir.size()) filters.pop_back();
 
     // Descend into directory
     size_t slash;
     while ((slash = wakefile.find_first_of('/', curdir.size())) != std::string::npos) {
-      curdir.append(wakefile, curdir.size(), slash+1 - curdir.size());
+      curdir.append(wakefile, curdir.size(), slash + 1 - curdir.size());
       process_ignorefile(curdir, filters);
     }
 
@@ -373,8 +378,8 @@ static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wake
 
     if (skip) {
       if (verbose) {
-        fprintf(stderr, "Skipping %s due to %s.wakeignore\n",
-                wakefile.c_str(), wakefile.substr(0, prefix).c_str());
+        fprintf(stderr, "Skipping %s due to %s.wakeignore\n", wakefile.c_str(),
+                wakefile.substr(0, prefix).c_str());
       }
     } else {
       output.emplace_back(std::move(wakefile));
@@ -384,7 +389,8 @@ static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wake
   return output;
 }
 
-std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose, const std::string &libdir, const std::string &workdir) {
+std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose,
+                                            const std::string &libdir, const std::string &workdir) {
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
@@ -408,12 +414,9 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
   // Combine the two sorted vectors into one sorted vector
   std::vector<std::string> output;
   output.reserve(libfiles.size() + workfiles.size());
-  std::merge(
-    std::make_move_iterator(libfiles.begin()),
-    std::make_move_iterator(libfiles.end()),
-    std::make_move_iterator(workfiles.begin()),
-    std::make_move_iterator(workfiles.end()),
-    std::back_inserter(output));
+  std::merge(std::make_move_iterator(libfiles.begin()), std::make_move_iterator(libfiles.end()),
+             std::make_move_iterator(workfiles.begin()), std::make_move_iterator(workfiles.end()),
+             std::back_inserter(output));
 
   // Eliminate any files present in both vectors
   auto it = std::unique(output.begin(), output.end());

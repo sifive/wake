@@ -19,17 +19,18 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <string.h>
+#include "profile.h"
+
 #include <errno.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
 #include <fstream>
 #include <iostream>
 
-#include "util/execpath.h"
 #include "json/json5.h"
-#include "profile.h"
+#include "util/execpath.h"
 
 static unsigned dump_tree(std::ostream &os, const std::string &name, const Profile *node) {
   unsigned value = node->count;
@@ -45,10 +46,8 @@ static unsigned dump_tree(std::ostream &os, const std::string &name, const Profi
     os << "],";
   }
   size_t colon = name.find(':');
-  os << "\"name\":\"" << json_escape(name.substr(0, colon))
-     << "\",\"file\":\"" << json_escape(name.substr(colon+2))
-     << "\",\"value\":" << value
-     << "}";
+  os << "\"name\":\"" << json_escape(name.substr(0, colon)) << "\",\"file\":\""
+     << json_escape(name.substr(colon + 2)) << "\",\"value\":" << value << "}";
   return value;
 }
 

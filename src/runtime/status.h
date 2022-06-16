@@ -18,9 +18,10 @@
 #ifndef STATUS_H
 #define STATUS_H
 
+#include <sys/time.h>
+
 #include <list>
 #include <string>
-#include <sys/time.h>
 
 struct Status {
   std::string cmdline;
@@ -28,9 +29,12 @@ struct Status {
   bool merged, wait_stdout, wait_stderr;
   struct timespec launch;
   Status(const std::string &cmdline_, double budget_, const struct timespec &launch_)
-   : cmdline(cmdline_), budget(budget_),
-     merged(false), wait_stdout(true), wait_stderr(true),
-     launch(launch_) { }
+      : cmdline(cmdline_),
+        budget(budget_),
+        merged(false),
+        wait_stdout(true),
+        wait_stderr(true),
+        launch(launch_) {}
 };
 
 struct StatusState {
@@ -40,21 +44,23 @@ struct StatusState {
   double total;
   double current;
 
-  StatusState() : jobs(), remain(0), total(0), current(0) { }
+  StatusState() : jobs(), remain(0), total(0), current(0) {}
 };
 
 extern StatusState status_state;
 
-#define STREAM_LOG	"debug"
-#define STREAM_INFO	"info"
-#define STREAM_REPORT	"report"
-#define STREAM_ECHO	"echo"
-#define STREAM_WARNING	"warning"
-#define STREAM_ERROR	"error"
+#define STREAM_LOG "debug"
+#define STREAM_INFO "info"
+#define STREAM_REPORT "report"
+#define STREAM_ECHO "echo"
+#define STREAM_WARNING "warning"
+#define STREAM_ERROR "error"
 
 void status_init();
 void status_write(const char *name, const char *data, int len);
-inline void status_write(const char *name, const std::string &str) { status_write(name, str.data(), str.size()); }
+inline void status_write(const char *name, const std::string &str) {
+  status_write(name, str.data(), str.size());
+}
 void status_refresh(bool idle);
 void status_finish();
 

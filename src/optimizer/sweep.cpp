@@ -23,34 +23,22 @@
 
 struct PassSweep {
   TermStream stream;
-  PassSweep(TargetScope &scope) : stream(scope) { }
+  PassSweep(TargetScope &scope) : stream(scope) {}
 };
 
-void RArg::pass_sweep(PassSweep &p) {
-}
+void RArg::pass_sweep(PassSweep &p) {}
 
-void RLit::pass_sweep(PassSweep &p) {
-}
+void RLit::pass_sweep(PassSweep &p) {}
 
-void RApp::pass_sweep(PassSweep &p) {
-  update(p.stream.map());
-}
+void RApp::pass_sweep(PassSweep &p) { update(p.stream.map()); }
 
-void RPrim::pass_sweep(PassSweep &p) {
-  update(p.stream.map());
-}
+void RPrim::pass_sweep(PassSweep &p) { update(p.stream.map()); }
 
-void RGet::pass_sweep(PassSweep &p) {
-  update(p.stream.map());
-}
+void RGet::pass_sweep(PassSweep &p) { update(p.stream.map()); }
 
-void RDes::pass_sweep(PassSweep &p) {
-  update(p.stream.map());
-}
+void RDes::pass_sweep(PassSweep &p) { update(p.stream.map()); }
 
-void RCon::pass_sweep(PassSweep &p) {
-  update(p.stream.map());
-}
+void RCon::pass_sweep(PassSweep &p) { update(p.stream.map()); }
 
 void RFun::pass_sweep(PassSweep &p) {
   CheckPoint cp = p.stream.begin();

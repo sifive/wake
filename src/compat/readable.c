@@ -26,15 +26,17 @@
 #include <emscripten/emscripten.h>
 
 int is_readable(const char *filename) {
-  int out = EM_ASM_INT({
-    try {
-      const fs = require('fs');
-      fs.accessSync(UTF8ToString($0), fs.constants.R_OK);
-      return 1;
-    } catch (err) {
-      return 0;
-    }
-  }, filename);
+  int out = EM_ASM_INT(
+      {
+        try {
+          const fs = require('fs');
+          fs.accessSync(UTF8ToString($0), fs.constants.R_OK);
+          return 1;
+        } catch (err) {
+          return 0;
+        }
+      },
+      filename);
 
   return out;
 }
@@ -43,8 +45,6 @@ int is_readable(const char *filename) {
 
 #include <unistd.h>
 
-int is_readable(const char *filename) {
-  return access(filename, R_OK) == 0;
-}
+int is_readable(const char *filename) { return access(filename, R_OK) == 0; }
 
 #endif

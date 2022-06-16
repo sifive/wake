@@ -25,8 +25,8 @@ struct Database;
 struct Runtime;
 
 class ResourceBudget {
-public:
-  ResourceBudget(double percentage_ = 0) : percentage(percentage_), fixed(0) { }
+ public:
+  ResourceBudget(double percentage_ = 0) : percentage(percentage_), fixed(0) {}
 
   double get(uint64_t max_available) const {
     if (fixed) {
@@ -44,7 +44,7 @@ public:
   // If the number is >= 10, the output will have at least 2 digits.
   static std::string format(uint64_t x);
 
-private:
+ private:
   // At least one must be 0 (= invalid)
   double percentage;
   uint64_t fixed;
@@ -54,7 +54,8 @@ struct JobTable {
   struct detail;
   std::unique_ptr<detail> imp;
 
-  JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool debug, bool verbose, bool quiet, bool check, bool batch);
+  JobTable(Database *db, ResourceBudget memory, ResourceBudget cpu, bool debug, bool verbose,
+           bool quiet, bool check, bool batch);
   ~JobTable();
 
   // Wait for a job to complete; false -> no more active jobs

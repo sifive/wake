@@ -37,25 +37,15 @@ void RLit::pass_usage(PassUsage &p) {
   // uses nothing
 }
 
-void RApp::pass_usage(PassUsage &p) {
-  redux_usage(p, this);
-}
+void RApp::pass_usage(PassUsage &p) { redux_usage(p, this); }
 
-void RPrim::pass_usage(PassUsage &p) {
-  redux_usage(p, this);
-}
+void RPrim::pass_usage(PassUsage &p) { redux_usage(p, this); }
 
-void RGet::pass_usage(PassUsage &p) {
-  redux_usage(p, this);
-}
+void RGet::pass_usage(PassUsage &p) { redux_usage(p, this); }
 
-void RDes::pass_usage(PassUsage &p) {
-  redux_usage(p, this);
-}
+void RDes::pass_usage(PassUsage &p) { redux_usage(p, this); }
 
-void RCon::pass_usage(PassUsage &p) {
-  redux_usage(p, this);
-}
+void RCon::pass_usage(PassUsage &p) { redux_usage(p, this); }
 
 void RFun::pass_usage(PassUsage &p) {
   for (auto &x : terms) {
@@ -65,7 +55,7 @@ void RFun::pass_usage(PassUsage &p) {
   ++p.scope[output]->meta;
   size_t last = p.scope.last();
   for (unsigned i = 0; i < terms.size(); ++i) {
-    Term *t = p.scope[last-i];
+    Term *t = p.scope[last - i];
     bool used = t->meta > 0 || t->get(SSA_EFFECT);
     t->set(SSA_USED, used);
     t->set(SSA_SINGLETON, t->meta == 1);

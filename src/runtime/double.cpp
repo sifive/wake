@@ -22,61 +22,57 @@
 #include <gmp.h>
 
 #include <cmath>
-#include <ctgmath>
 #include <cstdlib>
+#include <ctgmath>
 
-#include "types/type.h"
+#include "prim.h"
 #include "types/data.h"
 #include "types/internal.h"
-#include "prim.h"
+#include "types/type.h"
 #include "value.h"
 
 static PRIMTYPE(type_unop) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeDouble) &&
-    out->unify(Data::typeDouble);
+  return args.size() == 1 && args[0]->unify(Data::typeDouble) && out->unify(Data::typeDouble);
 }
 
-#define UNOP(name, fn)				\
-static PRIMFN(prim_##name) {			\
-  EXPECT(1);					\
-  DOUBLE(arg0, 0);				\
-  double out = fn(arg0->value);			\
-  RETURN(Double::alloc(runtime.heap, out));	\
-}
+#define UNOP(name, fn)                        \
+  static PRIMFN(prim_##name) {                \
+    EXPECT(1);                                \
+    DOUBLE(arg0, 0);                          \
+    double out = fn(arg0->value);             \
+    RETURN(Double::alloc(runtime.heap, out)); \
+  }
 
 static double neg(double x) { return -x; }
-UNOP(abs,   std::abs)
-UNOP(neg,   neg)
-UNOP(cos,   std::cos)
-UNOP(sin,   std::sin)
-UNOP(tan,   std::tan)
-UNOP(acos,  std::acos)
-UNOP(asin,  std::asin)
-UNOP(exp,   std::exp)
-UNOP(log,   std::log)
+UNOP(abs, std::abs)
+UNOP(neg, neg)
+UNOP(cos, std::cos)
+UNOP(sin, std::sin)
+UNOP(tan, std::tan)
+UNOP(acos, std::acos)
+UNOP(asin, std::asin)
+UNOP(exp, std::exp)
+UNOP(log, std::log)
 UNOP(expm1, std::expm1)
 UNOP(log1p, std::log1p)
-UNOP(erf,   std::erf)
-UNOP(erfc,  std::erfc)
-UNOP(tgamma,std::tgamma)
-UNOP(lgamma,std::lgamma)
+UNOP(erf, std::erf)
+UNOP(erfc, std::erfc)
+UNOP(tgamma, std::tgamma)
+UNOP(lgamma, std::lgamma)
 
 static PRIMTYPE(type_binop) {
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeDouble) &&
-    args[1]->unify(Data::typeDouble) &&
-    out->unify(Data::typeDouble);
+  return args.size() == 2 && args[0]->unify(Data::typeDouble) && args[1]->unify(Data::typeDouble) &&
+         out->unify(Data::typeDouble);
 }
 
-#define BINOP(name, fn)				\
-static PRIMFN(prim_##name) {			\
-  EXPECT(2);					\
-  DOUBLE(arg0, 0);				\
-  DOUBLE(arg1, 1);				\
-  double out = fn(arg0->value, arg1->value);	\
-  RETURN(Double::alloc(runtime.heap, out));	\
-}
+#define BINOP(name, fn)                        \
+  static PRIMFN(prim_##name) {                 \
+    EXPECT(2);                                 \
+    DOUBLE(arg0, 0);                           \
+    DOUBLE(arg1, 1);                           \
+    double out = fn(arg0->value, arg1->value); \
+    RETURN(Double::alloc(runtime.heap, out));  \
+  }
 
 static double add(double x, double y) { return x + y; }
 static double sub(double x, double y) { return x - y; }
@@ -91,11 +87,8 @@ BINOP(pow, pow)
 BINOP(atan, std::atan2)
 
 static PRIMTYPE(type_fma) {
-  return args.size() == 3 &&
-    args[0]->unify(Data::typeDouble) &&
-    args[1]->unify(Data::typeDouble) &&
-    args[2]->unify(Data::typeDouble) &&
-    out->unify(Data::typeDouble);
+  return args.size() == 3 && args[0]->unify(Data::typeDouble) && args[1]->unify(Data::typeDouble) &&
+         args[2]->unify(Data::typeDouble) && out->unify(Data::typeDouble);
 }
 
 static PRIMFN(prim_fma) {
@@ -108,11 +101,9 @@ static PRIMFN(prim_fma) {
 }
 
 static PRIMTYPE(type_str) {
-  return args.size() == 3 &&
-    args[0]->unify(Data::typeInteger) &&
-    args[1]->unify(Data::typeInteger) &&
-    args[2]->unify(Data::typeDouble) &&
-    out->unify(Data::typeString);
+  return args.size() == 3 && args[0]->unify(Data::typeInteger) &&
+         args[1]->unify(Data::typeInteger) && args[2]->unify(Data::typeDouble) &&
+         out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_str) {
@@ -141,9 +132,7 @@ static PRIMTYPE(type_dbl) {
   TypeVar list;
   Data::typeList.clone(list);
   list[0].unify(Data::typeDouble);
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(list);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(list);
 }
 
 static PRIMFN(prim_dbl) {
@@ -165,10 +154,8 @@ static PRIMTYPE(type_cmp) {
   TypeVar list;
   Data::typeList.clone(list);
   list[0].unify(Data::typeOrder);
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeDouble) &&
-    args[1]->unify(Data::typeDouble) &&
-    out->unify(list);
+  return args.size() == 2 && args[0]->unify(Data::typeDouble) && args[1]->unify(Data::typeDouble) &&
+         out->unify(list);
 }
 
 static PRIMFN(prim_cmp) {
@@ -197,11 +184,11 @@ static PRIMFN(prim_cmp_nan_lt) {
     if (n1) {
       x = 0;
     } else {
-      x = -1; // nan < x
+      x = -1;  // nan < x
     }
   } else {
     if (n1) {
-      x = 1; // x > nan
+      x = 1;  // x > nan
     } else {
       x = (arg0->value > arg1->value) - (arg0->value < arg1->value);
     }
@@ -210,9 +197,7 @@ static PRIMFN(prim_cmp_nan_lt) {
 }
 
 static PRIMTYPE(type_class) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeDouble) &&
-    out->unify(Data::typeInteger);
+  return args.size() == 1 && args[0]->unify(Data::typeDouble) && out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_class) {
@@ -220,11 +205,21 @@ static PRIMFN(prim_class) {
   DOUBLE(arg0, 0);
   int code;
   switch (std::fpclassify(arg0->value)) {
-    case FP_INFINITE:  code = 1; break;
-    case FP_NAN:       code = 2; break;
-    case FP_ZERO:      code = 3; break;
-    case FP_SUBNORMAL: code = 4; break;
-    default:           code = 5; break;
+    case FP_INFINITE:
+      code = 1;
+      break;
+    case FP_NAN:
+      code = 2;
+      break;
+    case FP_ZERO:
+      code = 3;
+      break;
+    case FP_SUBNORMAL:
+      code = 4;
+      break;
+    default:
+      code = 5;
+      break;
   }
   RETURN(Integer::alloc(runtime.heap, code));
 }
@@ -234,9 +229,7 @@ static PRIMTYPE(type_frexp) {
   Data::typePair.clone(pair);
   pair[0].unify(Data::typeDouble);
   pair[1].unify(Data::typeInteger);
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeDouble) &&
-    out->unify(pair);
+  return args.size() == 1 && args[0]->unify(Data::typeDouble) && out->unify(pair);
 }
 
 static PRIMFN(prim_frexp) {
@@ -250,18 +243,14 @@ static PRIMFN(prim_frexp) {
   size_t need = reserve_tuple2() + Double::reserve() + Integer::reserve(val);
   runtime.heap.reserve(need);
 
-  auto out = claim_tuple2(
-    runtime.heap,
-    Double::claim(runtime.heap, frac),
-    Integer::claim(runtime.heap, val));
+  auto out = claim_tuple2(runtime.heap, Double::claim(runtime.heap, frac),
+                          Integer::claim(runtime.heap, val));
   RETURN(out);
 }
 
 static PRIMTYPE(type_ldexp) {
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeDouble) &&
-    args[1]->unify(Data::typeInteger) &&
-    out->unify(Data::typeDouble);
+  return args.size() == 2 && args[0]->unify(Data::typeDouble) &&
+         args[1]->unify(Data::typeInteger) && out->unify(Data::typeDouble);
 }
 
 static PRIMFN(prim_ldexp) {
@@ -284,9 +273,7 @@ static PRIMTYPE(type_modf) {
   Data::typePair.clone(pair);
   pair[0].unify(Data::typeInteger);
   pair[1].unify(Data::typeDouble);
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeDouble) &&
-    out->unify(pair);
+  return args.size() == 1 && args[0]->unify(Data::typeDouble) && out->unify(pair);
 }
 
 static PRIMFN(prim_modf) {
@@ -301,26 +288,24 @@ static PRIMFN(prim_modf) {
   size_t need = reserve_tuple2() + Integer::reserve(i) + Double::reserve();
   runtime.heap.reserve(need);
 
-  auto out = claim_tuple2(
-    runtime.heap,
-    Integer::claim(runtime.heap, i),
-    Double::claim(runtime.heap, frac));
+  auto out = claim_tuple2(runtime.heap, Integer::claim(runtime.heap, i),
+                          Double::claim(runtime.heap, frac));
   RETURN(out);
 }
 
 void prim_register_double(PrimMap &pmap) {
   // basic functions
-  prim_register(pmap, "dabs", prim_abs, type_unop,  PRIM_PURE);
-  prim_register(pmap, "dneg", prim_neg, type_unop,  PRIM_PURE);
+  prim_register(pmap, "dabs", prim_abs, type_unop, PRIM_PURE);
+  prim_register(pmap, "dneg", prim_neg, type_unop, PRIM_PURE);
   prim_register(pmap, "dadd", prim_add, type_binop, PRIM_PURE);
   prim_register(pmap, "dsub", prim_sub, type_binop, PRIM_PURE);
   prim_register(pmap, "dmul", prim_mul, type_binop, PRIM_PURE);
   prim_register(pmap, "ddiv", prim_div, type_binop, PRIM_PURE);
   prim_register(pmap, "dpow", prim_pow, type_binop, PRIM_PURE);
-  prim_register(pmap, "dfma", prim_fma, type_fma,   PRIM_PURE);
-  prim_register(pmap, "dcmp", prim_cmp, type_cmp,   PRIM_PURE);
-  prim_register(pmap, "dstr", prim_str, type_str,   PRIM_PURE);
-  prim_register(pmap, "ddbl", prim_dbl, type_dbl,   PRIM_PURE);
+  prim_register(pmap, "dfma", prim_fma, type_fma, PRIM_PURE);
+  prim_register(pmap, "dcmp", prim_cmp, type_cmp, PRIM_PURE);
+  prim_register(pmap, "dstr", prim_str, type_str, PRIM_PURE);
+  prim_register(pmap, "ddbl", prim_dbl, type_dbl, PRIM_PURE);
 
   prim_register(pmap, "dcmp_nan_lt", prim_cmp_nan_lt, type_cmp_nan_lt, PRIM_PURE);
 
@@ -328,21 +313,21 @@ void prim_register_double(PrimMap &pmap) {
   prim_register(pmap, "dclass", prim_class, type_class, PRIM_PURE);
   prim_register(pmap, "dfrexp", prim_frexp, type_frexp, PRIM_PURE);
   prim_register(pmap, "dldexp", prim_ldexp, type_ldexp, PRIM_PURE);
-  prim_register(pmap, "dmodf",  prim_modf,  type_modf,  PRIM_PURE);
+  prim_register(pmap, "dmodf", prim_modf, type_modf, PRIM_PURE);
 
   // handy numeric functions
-  prim_register(pmap, "dcos",   prim_cos,   type_unop, PRIM_PURE);
-  prim_register(pmap, "dsin",   prim_sin,   type_unop, PRIM_PURE);
-  prim_register(pmap, "dtan",   prim_tan,   type_unop, PRIM_PURE);
-  prim_register(pmap, "dacos",  prim_acos,  type_unop, PRIM_PURE);
-  prim_register(pmap, "dasin",  prim_asin,  type_unop, PRIM_PURE);
-  prim_register(pmap, "dexp",   prim_exp,   type_unop, PRIM_PURE);
-  prim_register(pmap, "dlog",   prim_log,   type_unop, PRIM_PURE);
+  prim_register(pmap, "dcos", prim_cos, type_unop, PRIM_PURE);
+  prim_register(pmap, "dsin", prim_sin, type_unop, PRIM_PURE);
+  prim_register(pmap, "dtan", prim_tan, type_unop, PRIM_PURE);
+  prim_register(pmap, "dacos", prim_acos, type_unop, PRIM_PURE);
+  prim_register(pmap, "dasin", prim_asin, type_unop, PRIM_PURE);
+  prim_register(pmap, "dexp", prim_exp, type_unop, PRIM_PURE);
+  prim_register(pmap, "dlog", prim_log, type_unop, PRIM_PURE);
   prim_register(pmap, "dexpm1", prim_expm1, type_unop, PRIM_PURE);
   prim_register(pmap, "dlog1p", prim_log1p, type_unop, PRIM_PURE);
-  prim_register(pmap, "derf",   prim_erf,   type_unop, PRIM_PURE);
-  prim_register(pmap, "derfc",  prim_erfc,  type_unop, PRIM_PURE);
-  prim_register(pmap, "dtgamma",prim_tgamma,type_unop, PRIM_PURE);
-  prim_register(pmap, "dlgamma",prim_lgamma,type_unop, PRIM_PURE);
-  prim_register(pmap, "datan",  prim_atan,  type_binop,PRIM_PURE);
+  prim_register(pmap, "derf", prim_erf, type_unop, PRIM_PURE);
+  prim_register(pmap, "derfc", prim_erfc, type_unop, PRIM_PURE);
+  prim_register(pmap, "dtgamma", prim_tgamma, type_unop, PRIM_PURE);
+  prim_register(pmap, "dlgamma", prim_lgamma, type_unop, PRIM_PURE);
+  prim_register(pmap, "datan", prim_atan, type_binop, PRIM_PURE);
 }

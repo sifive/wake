@@ -22,16 +22,15 @@
 #include <algorithm>
 #include <unordered_map>
 
-#include "ssa.h"
 #include "runtime/runtime.h"
+#include "ssa.h"
 
 namespace std {
-  template <> struct hash<Hash> {
-    size_t operator () (Hash x) const {
-      return x.data[0];
-    }
-  };
-}
+template <>
+struct hash<Hash> {
+  size_t operator()(Hash x) const { return x.data[0]; }
+};
+}  // namespace std
 
 struct PassCSE {
   TermStream stream;
@@ -41,7 +40,7 @@ struct PassCSE {
   Runtime &runtime;
 
   PassCSE(TargetScope &scope, std::vector<Hash> *undo_, Runtime &runtime_)
-   : stream(scope), undo(undo_), runtime(runtime_) { }
+      : stream(scope), undo(undo_), runtime(runtime_) {}
 };
 
 static Hash hash_arg(PassCSE &p, size_t input) {
@@ -58,8 +57,7 @@ static Hash hash_redux(PassCSE &p, Redux *redux, size_t type) {
   codes.reserve(num * 2 + 2);
   codes.push_back(type);
   codes.push_back(num);
-  for (auto x : redux->args)
-    hash_arg(p, x).push(codes);
+  for (auto x : redux->args) hash_arg(p, x).push(codes);
   return Hash(codes);
 }
 
@@ -70,8 +68,7 @@ static Hash hash_redux(PassCSE &p, Redux *redux, size_t type, Hash hash) {
   codes.push_back(type);
   codes.push_back(num);
   hash.push(codes);
-  for (auto x : redux->args)
-    hash_arg(p, x).push(codes);
+  for (auto x : redux->args) hash_arg(p, x).push(codes);
   return Hash(codes);
 }
 
@@ -86,14 +83,12 @@ static void cse_reduce(PassCSE &p, Hash hash, std::unique_ptr<Term> self) {
   }
 }
 
-void RArg::pass_cse(PassCSE &p, std::unique_ptr<Term> self) {
-  p.stream.transfer(std::move(self));
-}
+void RArg::pass_cse(PassCSE &p, std::unique_ptr<Term> self) { p.stream.transfer(std::move(self)); }
 
 void RLit::pass_cse(PassCSE &p, std::unique_ptr<Term> self) {
   HeapObject *obj = value->get();
-  Hash h = Hash(typeid(RLit).hash_code(), typeid(*obj).hash_code())
-         + (*value)->deep_hash(p.runtime.heap);
+  Hash h = Hash(typeid(RLit).hash_code(), typeid(*obj).hash_code()) +
+           (*value)->deep_hash(p.runtime.heap);
   cse_reduce(p, h, std::move(self));
 }
 
@@ -153,7 +148,7 @@ void RFun::pass_cse(PassCSE &p, std::unique_ptr<Term> self) {
   std::vector<uint64_t> codes;
   codes.reserve(undo.size() * 2 + 6);
   codes.push_back(typeid(RFun).hash_code());
-  codes.push_back(p.starts.size()); // See comment [*]
+  codes.push_back(p.starts.size());  // See comment [*]
   codes.push_back(args);
   codes.push_back(terms.size());
   hash_arg(p, output).push(codes);

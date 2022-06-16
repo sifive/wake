@@ -18,134 +18,134 @@
 #ifndef CST_H
 #define CST_H
 
-#include <vector>
-#include <ostream>
-#include <string>
 #include <stdint.h>
 
-#include "util/rank.h"
-#include "util/location.h"
-#include "util/segment.h"
-#include "util/fragment.h"
+#include <ostream>
+#include <string>
+#include <vector>
 
-#define CST_APP		128
-#define CST_ARITY	129
-#define CST_ASCRIBE	130
-#define CST_BINARY	131
-#define CST_BLOCK	132
-#define CST_CASE	133
-#define CST_DATA	134
-#define CST_DEF		135
-#define CST_EXPORT	136
-#define CST_FLAG_EXPORT	137
-#define CST_FLAG_GLOBAL	138
-#define CST_GUARD	139
-#define CST_HOLE	140
-#define CST_ID		141
-#define CST_IDEQ	142
-#define CST_IF		143
-#define CST_IMPORT	144
-#define CST_INTERPOLATE	145
-#define CST_KIND	146
-#define CST_LAMBDA	147
-#define CST_LITERAL	148
-#define CST_MATCH	149
-#define CST_OP		150
-#define CST_PACKAGE	151
-#define CST_PAREN	152
-#define CST_PRIM	153
-#define CST_PUBLISH	154
-#define CST_REQUIRE	155
-#define CST_REQ_ELSE	156
-#define CST_SUBSCRIBE	157
-#define CST_TARGET	158
-#define CST_TARGET_ARGS	159
-#define CST_TOP		160
-#define CST_TOPIC	161
-#define CST_TUPLE	162
-#define CST_TUPLE_ELT	163
-#define CST_UNARY	164
-#define CST_ERROR	255
+#include "util/fragment.h"
+#include "util/location.h"
+#include "util/rank.h"
+#include "util/segment.h"
+
+#define CST_APP 128
+#define CST_ARITY 129
+#define CST_ASCRIBE 130
+#define CST_BINARY 131
+#define CST_BLOCK 132
+#define CST_CASE 133
+#define CST_DATA 134
+#define CST_DEF 135
+#define CST_EXPORT 136
+#define CST_FLAG_EXPORT 137
+#define CST_FLAG_GLOBAL 138
+#define CST_GUARD 139
+#define CST_HOLE 140
+#define CST_ID 141
+#define CST_IDEQ 142
+#define CST_IF 143
+#define CST_IMPORT 144
+#define CST_INTERPOLATE 145
+#define CST_KIND 146
+#define CST_LAMBDA 147
+#define CST_LITERAL 148
+#define CST_MATCH 149
+#define CST_OP 150
+#define CST_PACKAGE 151
+#define CST_PAREN 152
+#define CST_PRIM 153
+#define CST_PUBLISH 154
+#define CST_REQUIRE 155
+#define CST_REQ_ELSE 156
+#define CST_SUBSCRIBE 157
+#define CST_TARGET 158
+#define CST_TARGET_ARGS 159
+#define CST_TOP 160
+#define CST_TOPIC 161
+#define CST_TUPLE 162
+#define CST_TUPLE_ELT 163
+#define CST_UNARY 164
+#define CST_ERROR 255
 
 class FileContent;
 class CSTElement;
 class DiagnosticReporter;
 
 struct CSTNode {
-    // CST_* Identifier
-    unsigned id   : 8;
-    // Number of NonTerminals to skip to reach sibling (always >= 1)
-    unsigned size : 24;
-    // Byte range covered by this node
-    uint32_t begin, end;
+  // CST_* Identifier
+  unsigned id : 8;
+  // Number of NonTerminals to skip to reach sibling (always >= 1)
+  unsigned size : 24;
+  // Byte range covered by this node
+  uint32_t begin, end;
 
-    CSTNode(uint8_t id_, uint32_t size_, uint32_t begin_, uint32_t end_);
+  CSTNode(uint8_t id_, uint32_t size_, uint32_t begin_, uint32_t end_);
 };
 
 class CSTBuilder {
-public:
-    CSTBuilder(const FileContent &fcontent);
+ public:
+  CSTBuilder(const FileContent &fcontent);
 
-    void addToken(uint8_t id, StringSegment token);
+  void addToken(uint8_t id, StringSegment token);
 
-    void addNode(uint8_t id, StringSegment begin);
-    void addNode(uint8_t id, uint32_t children);
-    void addNode(uint8_t id, StringSegment begin, uint32_t children);
-    void addNode(uint8_t id, uint32_t children, StringSegment end);
-    void addNode(uint8_t id, StringSegment begin, uint32_t childen, StringSegment end);
+  void addNode(uint8_t id, StringSegment begin);
+  void addNode(uint8_t id, uint32_t children);
+  void addNode(uint8_t id, StringSegment begin, uint32_t children);
+  void addNode(uint8_t id, uint32_t children, StringSegment end);
+  void addNode(uint8_t id, StringSegment begin, uint32_t childen, StringSegment end);
 
-    void delNodes(size_t num);
+  void delNodes(size_t num);
 
-private:
-    const FileContent *file;
-    std::vector<uint8_t> token_ids;
-    std::vector<CSTNode> nodes;
-    RankBuilder token_starts;
+ private:
+  const FileContent *file;
+  std::vector<uint8_t> token_ids;
+  std::vector<CSTNode> nodes;
+  RankBuilder token_starts;
 
-friend class CST;
+  friend class CST;
 };
 
 class CST {
-public:
-    CST(CSTBuilder &&builder);
-    CST(FileContent &fcontent, DiagnosticReporter &reporter) : CST(build(fcontent, reporter)) { }
+ public:
+  CST(CSTBuilder &&builder);
+  CST(FileContent &fcontent, DiagnosticReporter &reporter) : CST(build(fcontent, reporter)) {}
 
-    CSTElement root() const;
+  CSTElement root() const;
 
-private:
-    static CSTBuilder build(FileContent &fcontent, DiagnosticReporter &reporter);
+ private:
+  static CSTBuilder build(FileContent &fcontent, DiagnosticReporter &reporter);
 
-    RankSelect1Map token_starts;
-    const FileContent *file;
-    std::vector<uint8_t> token_ids;
-    std::vector<CSTNode> nodes;
+  RankSelect1Map token_starts;
+  const FileContent *file;
+  std::vector<uint8_t> token_ids;
+  std::vector<CSTNode> nodes;
 
-friend class CSTElement;
+  friend class CSTElement;
 };
 
 class CSTElement {
-public:
-    bool empty() const;
-    bool isNode() const;
+ public:
+  bool empty() const;
+  bool isNode() const;
 
-    uint8_t id() const;
-    FileFragment fragment() const;
-    StringSegment segment() const { return fragment().segment(); }
-    Location location() const { return fragment().location(); }
+  uint8_t id() const;
+  FileFragment fragment() const;
+  StringSegment segment() const { return fragment().segment(); }
+  Location location() const { return fragment().location(); }
 
-    void nextSiblingElement();
-    void nextSiblingNode();
+  void nextSiblingElement();
+  void nextSiblingNode();
 
-    CSTElement firstChildElement() const;
-    CSTElement firstChildNode() const;
+  CSTElement firstChildElement() const;
+  CSTElement firstChildNode() const;
 
-private:
-    const CST *cst;
-    uint32_t node, limit;
-    uint32_t token, end; // in bytes
+ private:
+  const CST *cst;
+  uint32_t node, limit;
+  uint32_t token, end;  // in bytes
 
-friend class CST;
+  friend class CST;
 };
 
 #endif
-

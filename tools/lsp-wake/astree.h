@@ -19,90 +19,94 @@
 #ifndef ASTREE_H
 #define ASTREE_H
 
+#include <parser/cst.h>
+
+#include <functional>
 #include <iostream>
 #include <map>
 #include <set>
 #include <vector>
-#include <functional>
-#include <parser/cst.h>
 
 #include "dst/expr.h"
-#include "util/diagnostic.h"
 #include "symbol_definition.h"
-
+#include "util/diagnostic.h"
 
 class ASTree {
-public:
-    std::map<std::string, std::unique_ptr<StringFile>> changedFiles;
+ public:
+  std::map<std::string, std::unique_ptr<StringFile>> changedFiles;
 
-    ASTree();
+  ASTree();
 
-    explicit ASTree(std::string _absLibDir);
+  explicit ASTree(std::string _absLibDir);
 
-    typedef std::pair<const std::string, std::vector<Diagnostic>> FileDiagnostics;
+  typedef std::pair<const std::string, std::vector<Diagnostic>> FileDiagnostics;
 
-    void diagnoseProject(const std::function<void(FileDiagnostics &)>& processFileDiagnostics);
+  void diagnoseProject(const std::function<void(FileDiagnostics &)> &processFileDiagnostics);
 
-    Location findDefinitionLocation(const Location& locationToDefine);
+  Location findDefinitionLocation(const Location &locationToDefine);
 
-    void findReferences(Location &definitionLocation, bool &isDefinitionFound, std::vector<Location> &references);
+  void findReferences(Location &definitionLocation, bool &isDefinitionFound,
+                      std::vector<Location> &references);
 
-    std::vector<Location> findOccurrences(Location &symbolLocation);
+  std::vector<Location> findOccurrences(Location &symbolLocation);
 
-    std::vector<SymbolDefinition> findHoverInfo(const Location& symbolLocation);
+  std::vector<SymbolDefinition> findHoverInfo(const Location &symbolLocation);
 
-    std::vector<SymbolDefinition> documentSymbol(const std::string &filePath);
+  std::vector<SymbolDefinition> documentSymbol(const std::string &filePath);
 
-    std::vector<SymbolDefinition> workspaceSymbol(const std::string &query);
+  std::vector<SymbolDefinition> workspaceSymbol(const std::string &query);
 
-    std::string absLibDir;
-    std::string absWorkDir;
+  std::string absLibDir;
+  std::string absWorkDir;
 
-private:
-    struct SymbolUsage {
-        Location usage;
-        Location definition;
-        SymbolUsage(Location _usage, Location _definition);
-    };
+ private:
+  struct SymbolUsage {
+    Location usage;
+    Location definition;
+    SymbolUsage(Location _usage, Location _definition);
+  };
 
-    struct Comment {
-        Comment(std::string _comment_text, Location _location, int level);
+  struct Comment {
+    Comment(std::string _comment_text, Location _location, int level);
 
-        std::string comment_text;
-        Location location;
-        int level; // level of nestedness in the tree
-    };
+    std::string comment_text;
+    Location location;
+    int level;  // level of nestedness in the tree
+  };
 
-    std::set<Location> types;
-    std::vector<SymbolDefinition> definitions;
-    std::vector<SymbolUsage> usages;
-    std::vector<SymbolDefinition> packages;
-    std::vector<Comment> comments;
+  std::set<Location> types;
+  std::vector<SymbolDefinition> definitions;
+  std::vector<SymbolUsage> usages;
+  std::vector<SymbolDefinition> packages;
+  std::vector<Comment> comments;
 
-    class LSPReporter : public DiagnosticReporter {
-    private:
-        std::map<std::string, std::vector<Diagnostic>> &diagnostics;
+  class LSPReporter : public DiagnosticReporter {
+   private:
+    std::map<std::string, std::vector<Diagnostic>> &diagnostics;
 
-        void report(Diagnostic diagnostic) override;
-    public:
-        explicit LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics, const std::vector<std::string> &allFiles);
-    };
+    void report(Diagnostic diagnostic) override;
 
-    void explore(Expr *expr, bool isGlobal);
-    void explore_type(const AST &ast);
+   public:
+    explicit LSPReporter(std::map<std::string, std::vector<Diagnostic>> &_diagnostics,
+                         const std::vector<std::string> &allFiles);
+  };
 
-    static SymbolKind getSymbolKind(const char *name, const std::string& type);
+  void explore(Expr *expr, bool isGlobal);
+  void explore_type(const AST &ast);
 
-    void recordComments(CSTElement def, int level);
+  static SymbolKind getSymbolKind(const char *name, const std::string &type);
 
-    void fillDefinitionDocumentationFields();
+  void recordComments(CSTElement def, int level);
 
-    static std::string sanitizeComment(std::string comment);
+  void fillDefinitionDocumentationFields();
 
-    static std::string composeOuterComment(std::vector<std::pair<std::string, int>> comment);
+  static std::string sanitizeComment(std::string comment);
 
-    static void emplaceComment(std::vector<std::pair<std::string, int>> &comment, const std::string &text, int level);
+  static std::string composeOuterComment(std::vector<std::pair<std::string, int>> comment);
 
-    void recordSameLocationDefinition(std::vector<SymbolDefinition>::iterator &definitions_iterator);
+  static void emplaceComment(std::vector<std::pair<std::string, int>> &comment,
+                             const std::string &text, int level);
+
+  void recordSameLocationDefinition(std::vector<SymbolDefinition>::iterator &definitions_iterator);
 };
 #endif

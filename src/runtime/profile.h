@@ -18,14 +18,14 @@
 #ifndef PROFILE_H
 #define PROFILE_H
 
-#include <string>
 #include <map>
+#include <string>
 
 struct Profile {
   std::map<std::string, Profile> children;
   unsigned count;
 
-  Profile() : count(0) { }
+  Profile() : count(0) {}
   void report(const char *file, const std::string &cmd) const;
 };
 

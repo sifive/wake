@@ -19,56 +19,53 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <string>
-
 #include "utf8.h"
 
-enum
-{
-        Bit1    = 7,
-        Bitx    = 6,
-        Bit2    = 5,
-        Bit3    = 4,
-        Bit4    = 3,
-        Bit5    = 2,
+#include <string>
 
-        T1      = ((1<<(Bit1+1))-1) ^ 0xFF,     /* 0000 0000 */
-        Tx      = ((1<<(Bitx+1))-1) ^ 0xFF,     /* 1000 0000 */
-        T2      = ((1<<(Bit2+1))-1) ^ 0xFF,     /* 1100 0000 */
-        T3      = ((1<<(Bit3+1))-1) ^ 0xFF,     /* 1110 0000 */
-        T4      = ((1<<(Bit4+1))-1) ^ 0xFF,     /* 1111 0000 */
-        T5      = ((1<<(Bit5+1))-1) ^ 0xFF,     /* 1111 1000 */
+enum {
+  Bit1 = 7,
+  Bitx = 6,
+  Bit2 = 5,
+  Bit3 = 4,
+  Bit4 = 3,
+  Bit5 = 2,
 
-        Rune1   = (1<<(Bit1+0*Bitx))-1,         /*                     0111 1111 */
-        Rune2   = (1<<(Bit2+1*Bitx))-1,         /*                0111 1111 1111 */
-        Rune3   = (1<<(Bit3+2*Bitx))-1,         /*           1111 1111 1111 1111 */
-        Rune4   = (1<<(Bit4+3*Bitx))-1,         /* 0001 1111 1111 1111 1111 1111 */
+  T1 = ((1 << (Bit1 + 1)) - 1) ^ 0xFF, /* 0000 0000 */
+  Tx = ((1 << (Bitx + 1)) - 1) ^ 0xFF, /* 1000 0000 */
+  T2 = ((1 << (Bit2 + 1)) - 1) ^ 0xFF, /* 1100 0000 */
+  T3 = ((1 << (Bit3 + 1)) - 1) ^ 0xFF, /* 1110 0000 */
+  T4 = ((1 << (Bit4 + 1)) - 1) ^ 0xFF, /* 1111 0000 */
+  T5 = ((1 << (Bit5 + 1)) - 1) ^ 0xFF, /* 1111 1000 */
 
-        Maskx   = (1<<Bitx)-1,                  /* 0011 1111 */
-        Testx   = Maskx ^ 0xFF                  /* 1100 0000 */
+  Rune1 = (1 << (Bit1 + 0 * Bitx)) - 1, /*                     0111 1111 */
+  Rune2 = (1 << (Bit2 + 1 * Bitx)) - 1, /*                0111 1111 1111 */
+  Rune3 = (1 << (Bit3 + 2 * Bitx)) - 1, /*           1111 1111 1111 1111 */
+  Rune4 = (1 << (Bit4 + 3 * Bitx)) - 1, /* 0001 1111 1111 1111 1111 1111 */
+
+  Maskx = (1 << Bitx) - 1, /* 0011 1111 */
+  Testx = Maskx ^ 0xFF     /* 1100 0000 */
 };
 
-#define LOW_SURROGATE  0xD800
+#define LOW_SURROGATE 0xD800
 #define HIGH_SURROGATE 0xDC00
-#define END_SURROGATE  0xE000
+#define END_SURROGATE 0xE000
 
-bool push_utf8(std::string &result, uint32_t c)
-{
+bool push_utf8(std::string &result, uint32_t c) {
   if (c <= Rune1) {
     result.push_back(static_cast<unsigned char>(c));
   } else if (c <= Rune2) {
-    result.push_back(T2 | static_cast<unsigned char>(c >> 1*Bitx));
+    result.push_back(T2 | static_cast<unsigned char>(c >> 1 * Bitx));
     result.push_back(Tx | (c & Maskx));
   } else if (c <= Rune3) {
-    if (LOW_SURROGATE <= c && c < END_SURROGATE)
-      return false;
-    result.push_back(T3 | static_cast<unsigned char>(c >> 2*Bitx));
-    result.push_back(Tx | ((c >> 1*Bitx) & Maskx));
+    if (LOW_SURROGATE <= c && c < END_SURROGATE) return false;
+    result.push_back(T3 | static_cast<unsigned char>(c >> 2 * Bitx));
+    result.push_back(Tx | ((c >> 1 * Bitx) & Maskx));
     result.push_back(Tx | (c & Maskx));
   } else if (c <= Rune4) {
-    result.push_back(T4 | static_cast<unsigned char>(c >> 3*Bitx));
-    result.push_back(Tx | ((c >> 2*Bitx) & Maskx));
-    result.push_back(Tx | ((c >> 1*Bitx) & Maskx));
+    result.push_back(T4 | static_cast<unsigned char>(c >> 3 * Bitx));
+    result.push_back(Tx | ((c >> 2 * Bitx) & Maskx));
+    result.push_back(Tx | ((c >> 1 * Bitx) & Maskx));
     result.push_back(Tx | (c & Maskx));
   } else {
     return false;
@@ -76,9 +73,8 @@ bool push_utf8(std::string &result, uint32_t c)
   return true;
 }
 
-int pop_utf8(uint32_t *rune, const char *str)
-{
-  const unsigned char *s = reinterpret_cast<const unsigned char*>(str);
+int pop_utf8(uint32_t *rune, const char *str) {
+  const unsigned char *s = reinterpret_cast<const unsigned char *>(str);
   int c, c1, c2, c3;
   long l;
 

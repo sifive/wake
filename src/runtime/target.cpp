@@ -22,22 +22,23 @@
 #include <sstream>
 #include <unordered_map>
 
-#include "types/datatype.h"
-#include "types/type.h"
-#include "types/data.h"
-#include "types/internal.h"
-#include "value.h"
-#include "tuple.h"
-#include "status.h"
 #include "prim.h"
+#include "status.h"
+#include "tuple.h"
+#include "types/data.h"
+#include "types/datatype.h"
+#include "types/internal.h"
+#include "types/type.h"
+#include "value.h"
 
 struct TargetValue {
   Hash subhash;
   std::vector<Hash> subhashes;
   Promise promise;
 
-  TargetValue() { }
-  TargetValue(Hash subhash_, std::vector<Hash> &subhashes_) : subhash(subhash_), subhashes(subhashes_) { }
+  TargetValue() {}
+  TargetValue(Hash subhash_, std::vector<Hash> &subhashes_)
+      : subhash(subhash_), subhashes(subhashes_) {}
 };
 
 struct HashHasher {
@@ -54,7 +55,8 @@ struct Target final : public GCObject<Target, DestroyableObject> {
   std::unordered_map<Hash, TargetValue, HashHasher> table;
   std::vector<HeapPointer<String> > argnames;
 
-  Target(Heap &h, String *location_, long keyargs_) : Parent(h), location(location_), keyargs(keyargs_) { }
+  Target(Heap &h, String *location_, long keyargs_)
+      : Parent(h), location(location_), keyargs(keyargs_) {}
   Target(Target &&target) = default;
   ~Target();
 
@@ -67,18 +69,14 @@ struct Target final : public GCObject<Target, DestroyableObject> {
 
 bool Target::report_future_targets = true;
 
-void dont_report_future_targets() {
-  Target::report_future_targets = false;
-}
+void dont_report_future_targets() { Target::report_future_targets = false; }
 
 template <typename T, T (HeapPointerBase::*memberfn)(T x)>
 T Target::recurse(T arg) {
   arg = Parent::recurse<T, memberfn>(arg);
   arg = (location.*memberfn)(arg);
-  for (HeapPointerBase &x : argnames)
-    arg = (x.*memberfn)(arg);
-  for (auto &x : table)
-    arg = x.second.promise.recurse<T, memberfn>(arg);
+  for (HeapPointerBase &x : argnames) arg = (x.*memberfn)(arg);
+  for (auto &x : table) arg = x.second.promise.recurse<T, memberfn>(arg);
   return arg;
 }
 
@@ -89,30 +87,32 @@ HeapStep Target::recurse<HeapStep, &HeapPointerBase::explore>(HeapStep step) {
 }
 
 Target::~Target() {
-  if (report_future_targets) for (auto &x : table) {
-    if (!x.second.promise) {
-      std::stringstream ss;
-      ss << "Infinite recursion detected across " << location->c_str() << std::endl;
-      status_write(STREAM_ERROR, ss.str());
-      break;
+  if (report_future_targets)
+    for (auto &x : table) {
+      if (!x.second.promise) {
+        std::stringstream ss;
+        ss << "Infinite recursion detected across " << location->c_str() << std::endl;
+        status_write(STREAM_ERROR, ss.str());
+        break;
+      }
     }
-  }
 }
 
-void Target::format(std::ostream &os, FormatState &state) const {
-  os << "Target";
-}
+void Target::format(std::ostream &os, FormatState &state) const { os << "Target"; }
 
 Hash Target::shallow_hash() const {
   // For reproducible execution, pretend a target is always empty
   return Hash() ^ TYPE_TARGET;
 }
 
-#define TARGET(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Target)); } while(0); Target *arg = static_cast<Target*>(args[i]);
+#define TARGET(arg, i)                       \
+  do {                                       \
+    HeapObject *arg = args[i];               \
+    REQUIRE(typeid(*arg) == typeid(Target)); \
+  } while (0);                               \
+  Target *arg = static_cast<Target *>(args[i]);
 
-static PRIMTYPE(type_hash) {
-  return out->unify(Data::typeInteger);
-}
+static PRIMTYPE(type_hash) { return out->unify(Data::typeInteger); }
 
 static PRIMFN(prim_hash) {
   runtime.heap.reserve(Tuple::fulfiller_pads + reserve_list(nargs) + reserve_hash());
@@ -123,12 +123,9 @@ static PRIMFN(prim_hash) {
 
 static PRIMTYPE(type_tnew) {
   bool ok = true;
-  for (size_t i = 2; i < args.size(); ++i)
-    ok = ok && args[i]->unify(Data::typeString);
-  return ok && args.size() >= 2 &&
-    args[0]->unify(Data::typeString) &&
-    args[1]->unify(Data::typeInteger) &&
-    out->unify(Data::typeTarget);
+  for (size_t i = 2; i < args.size(); ++i) ok = ok && args[i]->unify(Data::typeString);
+  return ok && args.size() >= 2 && args[0]->unify(Data::typeString) &&
+         args[1]->unify(Data::typeInteger) && out->unify(Data::typeTarget);
 }
 
 static PRIMFN(prim_tnew) {
@@ -152,8 +149,7 @@ struct CTargetFill final : public GCObject<CTargetFill, Continuation> {
   HeapPointer<Target> target;
   Hash hash;
 
-  CTargetFill(Target *target_, Hash hash_)
-   : target(target_), hash(hash_) { }
+  CTargetFill(Target *target_, Hash hash_) : target(target_), hash(hash_) {}
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -177,7 +173,7 @@ struct CTargetArgs final : public GCObject<CTargetArgs, Continuation> {
   HeapPointer<Continuation> cont;
 
   CTargetArgs(Target *target_, Closure *body_, Value *list_, Scope *caller_, Continuation *cont_)
-   : target(target_), body(body_), list(list_), caller(caller_), cont(cont_) { }
+      : target(target_), body(body_), list(list_), caller(caller_), cont(cont_) {}
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -202,7 +198,8 @@ void CTargetArgs::execute(Runtime &runtime) {
   std::vector<uint64_t> hashes, subhashes;
   std::vector<Hash> subhashesp;
 
-  for (Record *item = static_cast<Record*>(list.get()); item->size() == 2; item = item->at(1)->coerce<Record>()) {
+  for (Record *item = static_cast<Record *>(list.get()); item->size() == 2;
+       item = item->at(1)->coerce<Record>()) {
     Hash h = item->at(0)->coerce<Value>()->deep_hash(runtime.heap);
     if (++i <= target->keyargs) {
       h.push(hashes);
@@ -219,27 +216,31 @@ void CTargetArgs::execute(Runtime &runtime) {
 
   if (!(ref.first->second.subhash == subhash)) {
     std::stringstream ss;
-    ss << "Target " << target->location->c_str() << " was called with inconsistent auxiliary arguments" << std::endl;
-    for (auto &x : caller->stack_trace())
-      ss << "  from " << x << std::endl;
+    ss << "Target " << target->location->c_str()
+       << " was called with inconsistent auxiliary arguments" << std::endl;
+    for (auto &x : caller->stack_trace()) ss << "  from " << x << std::endl;
 
     long arg = 0;
     ss << "  It was passed these identical primary key arguments:" << std::endl;
-    for (Record *item = static_cast<Record*>(list.get()); item->size() == 2; item = item->at(1)->coerce<Record>()) {
-      if (arg >= target->keyargs && !(subhashesp[arg-target->keyargs] == ref.first->second.subhashes[arg-target->keyargs]))
+    for (Record *item = static_cast<Record *>(list.get()); item->size() == 2;
+         item = item->at(1)->coerce<Record>()) {
+      if (arg >= target->keyargs && !(subhashesp[arg - target->keyargs] ==
+                                      ref.first->second.subhashes[arg - target->keyargs]))
         ss << "    (INCONSISTENT) ";
       else
         ss << "    ";
       ss << target->argnames[arg]->c_str() << " = " << item->at(0)->coerce<Value>() << std::endl;
       if (++arg == target->keyargs)
-        ss << "  It was passed these auxiliary arguments (after the '\\') which should also be identical:" << std::endl;
+        ss << "  It was passed these auxiliary arguments (after the '\\') which should also be "
+              "identical:"
+           << std::endl;
     }
     status_write(STREAM_WARNING, ss.str());
   }
 
   if (ref.second)
     runtime.claim_apply(body.get(), target.get(),
-      CTargetFill::claim(runtime.heap, target.get(), hash), caller.get());
+                        CTargetFill::claim(runtime.heap, target.get(), hash), caller.get());
 }
 
 static PRIMFN(prim_tget) {
@@ -248,21 +249,19 @@ static PRIMFN(prim_tget) {
   CLOSURE(body, 1);
   REQUIRE(nargs == target->argnames.size() + 2);
 
-  runtime.heap.reserve(
-    Tuple::fulfiller_pads
-    + reserve_list(target->argnames.size())
-    + reserve_hash()
-    + CTargetArgs::reserve());
+  runtime.heap.reserve(Tuple::fulfiller_pads + reserve_list(target->argnames.size()) +
+                       reserve_hash() + CTargetArgs::reserve());
 
   Continuation *cont = scope->claim_fulfiller(runtime, output);
-  Value *list = claim_list(runtime.heap, target->argnames.size(), args+2);
+  Value *list = claim_list(runtime.heap, target->argnames.size(), args + 2);
 
   runtime.schedule(claim_hash(runtime.heap, list,
-    CTargetArgs::claim(runtime.heap, target, body, list, scope, cont)));
+                              CTargetArgs::claim(runtime.heap, target, body, list, scope, cont)));
 }
 
 void prim_register_target(PrimMap &pmap) {
   prim_register(pmap, "hash", prim_hash, type_hash, PRIM_PURE);
   prim_register(pmap, "tnew", prim_tnew, type_tnew, PRIM_ORDERED);
-  prim_register(pmap, "tget", prim_tget, type_tget, PRIM_FNARG); // kind depends on function argument
+  prim_register(pmap, "tget", prim_tget, type_tget,
+                PRIM_FNARG);  // kind depends on function argument
 }

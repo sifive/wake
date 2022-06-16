@@ -19,68 +19,66 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <cstring>
-#include <sstream>
-#include <cassert>
-
-#include "util/fragment.h"
-#include "util/diagnostic.h"
-#include "util/colour.h"
-#include "parser/lexer.h"
 #include "type.h"
 
-static int globalClock = 0;
-static int globalEpoch = 1; // before a tagging pass, globalEpoch > TypeVar.epoch for all TypeVars
+#include <cassert>
+#include <cstring>
+#include <sstream>
 
-TypeVar::Imp::Imp() : link(nullptr), epoch(0), free_dob(0), nargs(0), cargs(nullptr), name() { }
-TypeVar::TypeVar() : imp(new Imp), var_dob(0) { }
-TypeChild::TypeChild() : var(), tag() { }
+#include "parser/lexer.h"
+#include "util/colour.h"
+#include "util/diagnostic.h"
+#include "util/fragment.h"
+
+static int globalClock = 0;
+static int globalEpoch = 1;  // before a tagging pass, globalEpoch > TypeVar.epoch for all TypeVars
+
+TypeVar::Imp::Imp() : link(nullptr), epoch(0), free_dob(0), nargs(0), cargs(nullptr), name() {}
+TypeVar::TypeVar() : imp(new Imp), var_dob(0) {}
+TypeChild::TypeChild() : var(), tag() {}
 
 TypeVar::Imp::Imp(const char *name_, int nargs_)
- : link(nullptr), epoch(0), free_dob(++globalClock), nargs(nargs_), name(name_) {
+    : link(nullptr), epoch(0), free_dob(++globalClock), nargs(nargs_), name(name_) {
   cargs = nargs > 0 ? new TypeChild[nargs] : nullptr;
   for (int i = 0; i < nargs; ++i) {
     cargs[i].var.imp->free_dob = cargs[i].var.var_dob = ++globalClock;
   }
 }
 
-TypeVar::TypeVar(const char *name_, int nargs_) : imp(new Imp(name_, nargs_)), var_dob(imp->free_dob) { }
+TypeVar::TypeVar(const char *name_, int nargs_)
+    : imp(new Imp(name_, nargs_)), var_dob(imp->free_dob) {}
 
 TypeVar::Imp::~Imp() {
-  if (nargs) delete [] cargs;
+  if (nargs) delete[] cargs;
 }
 
-bool TypeVar::isFree() const {
-  return imp->isFree() && var_dob == imp->free_dob;
-}
+bool TypeVar::isFree() const { return imp->isFree() && var_dob == imp->free_dob; }
 
-bool TypeVar::operator < (const TypeVar &b) const {
+bool TypeVar::operator<(const TypeVar &b) const {
   if (imp->free_dob < b.imp->free_dob) {
     return true;
   } else if (imp->free_dob > b.imp->free_dob) {
     return false;
-  } else if (reinterpret_cast<uintptr_t>(static_cast<const void*>(imp.get()))
-           < reinterpret_cast<uintptr_t>(static_cast<const void*>(b.imp.get()))) {
+  } else if (reinterpret_cast<uintptr_t>(static_cast<const void *>(imp.get())) <
+             reinterpret_cast<uintptr_t>(static_cast<const void *>(b.imp.get()))) {
     return true;
   } else {
     return false;
   }
 }
 
-bool TypeVar::operator == (const TypeVar &b) const {
-  return imp.get() == b.imp.get();
-}
+bool TypeVar::operator==(const TypeVar &b) const { return imp.get() == b.imp.get(); }
 
 void TypeVar::setDOB() {
   if (!var_dob) {
-    assert (imp->isFree());
+    assert(imp->isFree());
     imp->free_dob = var_dob = ++globalClock;
   }
 }
 
 void TypeVar::setDOB(const TypeVar &other) {
   if (!var_dob) {
-    assert (imp->isFree());
+    assert(imp->isFree());
     imp->free_dob = var_dob = other.var_dob;
   }
 }
@@ -90,9 +88,7 @@ void TypeVar::setTag(int i, const char *tag) {
   if (a->cargs[i].tag.empty()) a->cargs[i].tag = tag;
 }
 
-bool TypeVar::Imp::isFree() const {
-  return name.empty();
-}
+bool TypeVar::Imp::isFree() const { return name.empty(); }
 
 bool TypeVar::Imp::contains(const Imp *other) const {
   const Imp *a = this, *b = other;
@@ -101,8 +97,7 @@ bool TypeVar::Imp::contains(const Imp *other) const {
     a->epoch |= 2;
     if (a == b) return true;
     for (int i = 0; i < a->nargs; ++i)
-      if (a->cargs[i].var.imp->contains(other))
-        return true;
+      if (a->cargs[i].var.imp->contains(other)) return true;
   }
   return false;
 }
@@ -110,22 +105,20 @@ bool TypeVar::Imp::contains(const Imp *other) const {
 void TypeVar::Imp::do_sweep() const {
   if ((epoch & 2)) {
     epoch &= ~2;
-    for (int i = 0; i < nargs; ++i)
-      cargs[i].var.imp->do_sweep();
+    for (int i = 0; i < nargs; ++i) cargs[i].var.imp->do_sweep();
   }
 }
 
 void TypeVar::Imp::do_cap(int dob) {
   if (dob < free_dob) free_dob = dob;
-  for (int i = 0; i < nargs; ++i)
-    cargs[i].var.imp->do_cap(dob);
+  for (int i = 0; i < nargs; ++i) cargs[i].var.imp->do_cap(dob);
 }
 
 bool TypeVar::do_unify(TypeVar &other) {
   Imp *a = imp.get();
   Imp *b = other.imp.get();
-  assert (var_dob);
-  assert (other.var_dob);
+  assert(var_dob);
+  assert(other.var_dob);
 
   if (a == b) {
     return true;
@@ -141,9 +134,9 @@ bool TypeVar::do_unify(TypeVar &other) {
     bool infinite = b->contains(a);
     b->do_sweep();
     if (!infinite) {
-      std::swap(a->name,     b->name);
-      std::swap(a->nargs,    b->nargs);
-      std::swap(a->cargs,    b->cargs);
+      std::swap(a->name, b->name);
+      std::swap(a->nargs, b->nargs);
+      std::swap(a->cargs, b->cargs);
       std::swap(a->free_dob, b->free_dob);
       a->do_cap(b->free_dob);
       imp.union_consume(other.imp);
@@ -155,8 +148,7 @@ bool TypeVar::do_unify(TypeVar &other) {
     bool ok = true;
     for (int i = 0; i < a->nargs; ++i) {
       if (a->cargs[i].var.do_unify(b->cargs[i].var)) {
-        if (a->cargs[i].tag.empty())
-          a->cargs[i].tag = b->cargs[i].tag;
+        if (a->cargs[i].tag.empty()) a->cargs[i].tag = b->cargs[i].tag;
       } else {
         ok = false;
       }
@@ -178,12 +170,10 @@ void LegacyErrorMessage::formatA(std::ostream &os) const {
   os << " type";
 }
 
-void LegacyErrorMessage::formatB(std::ostream &os) const {
-  os << "with incompatible type";
-}
+void LegacyErrorMessage::formatB(std::ostream &os) const { os << "with incompatible type"; }
 
 bool TypeVar::tryUnify(TypeVar &other) {
-  globalEpoch += (-globalEpoch) & 3; // round up to a multiple of 4
+  globalEpoch += (-globalEpoch) & 3;  // round up to a multiple of 4
   bool ok = do_unify(other);
   globalEpoch += 4;
   return ok;
@@ -208,10 +198,10 @@ bool TypeVar::unify(TypeVar &other, const TypeErrorMessage *message) {
 void TypeVar::do_clone(TypeVar &out, const TypeVar &x, int dob) {
   out.imp->free_dob = out.var_dob = ++globalClock;
   const Imp *in = x.imp.get();
-  if (in->isFree() && in->free_dob < dob) { // no need to clone
+  if (in->isFree() && in->free_dob < dob) {  // no need to clone
     x.imp.union_consume(out.imp);
   } else {
-    if (in->epoch < globalEpoch) { // not previously cloned
+    if (in->epoch < globalEpoch) {  // not previously cloned
       in->epoch = globalEpoch;
       in->link = &out;
       Imp *imp = out.imp.get();
@@ -222,14 +212,14 @@ void TypeVar::do_clone(TypeVar &out, const TypeVar &x, int dob) {
         do_clone(imp->cargs[i].var, in->cargs[i].var, dob);
         imp->cargs[i].tag = in->cargs[i].tag;
       }
-    } else { // this TypeVar was already cloned; replicate sharing
+    } else {  // this TypeVar was already cloned; replicate sharing
       in->link->imp.union_consume(out.imp);
     }
   }
 }
 
 void TypeVar::clone(TypeVar &into) const {
-  assert (into.imp->isFree());
+  assert(into.imp->isFree());
   do_clone(into, *this, var_dob);
   ++globalEpoch;
 }
@@ -240,9 +230,10 @@ static void tag2str(std::ostream &os, int tag) {
   os << (char)('a' + (tag % radix));
 }
 
-int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag, const TypeVar *other, int tags, int o, bool qualify) {
+int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag,
+                       const TypeVar *other, int tags, int o, bool qualify) {
   const Imp *a = value.imp.get();
-  const Imp *b = other?other->imp.get():nullptr;
+  const Imp *b = other ? other->imp.get() : nullptr;
   int p;
 
   if (tag[0]) {
@@ -284,17 +275,20 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const ch
   } else if (!a->name.compare(0, 7, "binary ", 7)) {
     op_type q = op_precedence(a->name.c_str() + 7);
     if (q.p < p) os << "(";
-    tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag.c_str(), b?&b->cargs[0].var:0, tags, q.p + !q.l);
+    tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag.c_str(), b ? &b->cargs[0].var : 0,
+                     tags, q.p + !q.l);
     if (a->name[7] != ',') os << " ";
-    os.write(a->name.c_str() + 7, at-7);
+    os.write(a->name.c_str() + 7, at - 7);
     os << " ";
-    tags = do_format(os, dob, a->cargs[1].var, a->cargs[1].tag.c_str(), b?&b->cargs[1].var:0, tags, q.p + q.l);
+    tags = do_format(os, dob, a->cargs[1].var, a->cargs[1].tag.c_str(), b ? &b->cargs[1].var : 0,
+                     tags, q.p + q.l);
     if (q.p < p) os << ")";
   } else if (!a->name.compare(0, 6, "unary ")) {
     op_type q = op_precedence(a->name.c_str() + 6);
     if (q.p < p) os << "(";
-    os.write(a->name.c_str() + 6, at-6);
-    tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag.c_str(), b?&b->cargs[0].var:0, tags, q.p);
+    os.write(a->name.c_str() + 6, at - 6);
+    tags = do_format(os, dob, a->cargs[0].var, a->cargs[0].tag.c_str(), b ? &b->cargs[0].var : 0,
+                     tags, q.p);
     if (q.p < p) os << ")";
   } else {
     op_type q = op_precedence("a");
@@ -302,7 +296,8 @@ int TypeVar::do_format(std::ostream &os, int dob, const TypeVar &value, const ch
     os.write(a->name.c_str(), at);
     for (int i = 0; i < a->nargs; ++i) {
       os << " ";
-      tags = do_format(os, dob, a->cargs[i].var, a->cargs[i].tag.c_str(), b?&b->cargs[i].var:0, tags, q.p+q.l);
+      tags = do_format(os, dob, a->cargs[i].var, a->cargs[i].tag.c_str(), b ? &b->cargs[i].var : 0,
+                       tags, q.p + q.l);
     }
     if (q.p < p) os << ")";
   }
@@ -314,7 +309,7 @@ void TypeVar::format(std::ostream &os, const TypeVar &top) const {
   globalEpoch += TypeVar::do_format(os, top.var_dob, *this, "", 0, 0, 0);
 }
 
-std::ostream & operator << (std::ostream &os, const TypeVar &value) {
+std::ostream &operator<<(std::ostream &os, const TypeVar &value) {
   globalEpoch += TypeVar::do_format(os, value.var_dob, value, "", 0, 0, 0);
   return os;
 }

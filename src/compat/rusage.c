@@ -22,35 +22,35 @@
 // OS/X only makes ru.ru_maxrss available as an extension
 #define _DARWIN_C_SOURCE 1
 
-#include <sys/resource.h>
-#include <assert.h>
-
 #include "rusage.h"
+
+#include <assert.h>
+#include <sys/resource.h>
 
 struct RUsage rusage_sub(struct RUsage x, struct RUsage y) {
   struct RUsage out;
-  out.utime    = x.utime    - y.utime;
-  out.stime    = x.stime    - y.stime;
-  out.ibytes   = x.ibytes   - y.ibytes;
-  out.obytes   = x.obytes   - y.obytes;
+  out.utime = x.utime - y.utime;
+  out.stime = x.stime - y.stime;
+  out.ibytes = x.ibytes - y.ibytes;
+  out.obytes = x.obytes - y.obytes;
   out.membytes = x.membytes - y.membytes;
   return out;
 }
 
-#if   defined(__APPLE__)
-#define MEMBYTES(ru)    (ru.ru_maxrss)
+#if defined(__APPLE__)
+#define MEMBYTES(ru) (ru.ru_maxrss)
 #elif defined(__FreeBSD__)
-#define MEMBYTES(ru)    (ru.ru_maxrss*1024)
+#define MEMBYTES(ru) (ru.ru_maxrss * 1024)
 #elif defined(__linux__)
-#define MEMBYTES(ru)    (ru.ru_maxrss*1024)
+#define MEMBYTES(ru) (ru.ru_maxrss * 1024)
 #elif defined(__NetBSD__)
-#define MEMBYTES(ru)    (ru.ru_maxrss*1024)
+#define MEMBYTES(ru) (ru.ru_maxrss * 1024)
 #elif defined(__OpenBSD__)
-#define MEMBYTES(ru)    (ru.ru_maxrss*1024)
+#define MEMBYTES(ru) (ru.ru_maxrss * 1024)
 #elif defined(__sun)
-#define MEMBYTES(ru)    (ru.ru_maxrss*getpagesize())
+#define MEMBYTES(ru) (ru.ru_maxrss * getpagesize())
 #elif defined(__EMSCRIPTEN__)
-#define MEMBYTES(ru)	0
+#define MEMBYTES(ru) 0
 #else
 #error Missing definition to access maxrss on this platform
 #endif
@@ -61,11 +61,11 @@ struct RUsage getRUsageChildren() {
 
   // Can not fail (who and pointer are vaild)
   int ret = getrusage(RUSAGE_CHILDREN, &usage);
-  assert (ret == 0);
+  assert(ret == 0);
 
   // These two are extremely portable:
-  out.utime = usage.ru_utime.tv_sec + usage.ru_utime.tv_usec/1000000.0;
-  out.stime = usage.ru_stime.tv_sec + usage.ru_stime.tv_usec/1000000.0;
+  out.utime = usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1000000.0;
+  out.stime = usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1000000.0;
   // These are non-standard, but relatively well supported:
   out.ibytes = usage.ru_inblock * UINT64_C(512);
   out.obytes = usage.ru_oublock * UINT64_C(512);
