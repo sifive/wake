@@ -18,6 +18,9 @@
 #ifndef WAKEFILES_H
 #define WAKEFILES_H
 
+#include <string>
+#include <vector>
+
 namespace re2 {
 class RE2;
 };

@@ -18,6 +18,8 @@
 #ifndef TODST_H
 #define TODST_H
 
+#include <memory>
+
 #include "parser/cst.h"
 
 struct Expr;

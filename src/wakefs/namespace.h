@@ -19,6 +19,7 @@
 #define NAMESPACE_H
 
 #include <string>
+#include <vector>
 
 struct mount_op {
   std::string type;
