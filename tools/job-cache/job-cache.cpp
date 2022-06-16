@@ -116,6 +116,19 @@ static void close_fd(int fd) {
   }
 }
 
+// This function first attempts to reflink but if that isn't
+// supported by the filesystem it copies instead.
+#ifdef __APPLE__
+
+static void copy_or_reflink(const char *src, const char *dst) {
+  // TODO: Actully make this work. APFS supports reflinking so
+  //       it should be possible to do this correctly
+}
+
+#else
+
+#include <linux/fs.h>
+
 // This function just uses `copy_file_range` to make
 // an efficent copy
 static void copy(int src_fd, int dst_fd) {
@@ -129,22 +142,6 @@ static void copy(int src_fd, int dst_fd) {
         src_fd, dst_fd, buf.st_size, strerror(errno));
   }
 }
-
-// This function first attempts to reflink but if that isn't
-// supported by the filesystem it copies instead.
-#ifdef __APPLE__
-
-static void copy_or_reflink(const char *src, const char *dst) {
-  int src_fd = open_fd(src, O_RDONLY);
-  int dst_fd = open_fd(dst, O_WRONLY | O_CREAT, 0644);
-  copy(src_fd, dst_fd);
-  close_fd(dst_fd);
-  close_fd(src_fd);
-}
-
-#else
-
-#include <linux/fs.h>
 
 static void copy_or_reflink(const char *src, const char *dst) {
   int src_fd = open_fd(src, O_RDONLY);
