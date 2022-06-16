@@ -63,7 +63,7 @@ format:
 # || true is added after each if expression since they resolve with false when false
 # and we don't want make to report that as an error
 	@CHANGED_FILES=$$(git diff --name-only | grep '.h\|.cpp\|.c' | grep -v 'vendor/') && \
-	if [ ! -z $$CHANGED_FILES ]; then \
+	if [ $$CHANGED_FILES ]; then \
 		clang-format -i --style=file $$CHANGED_FILES; \
 	fi || true && \
 	STAGED_FILES=$$(git diff --name-only --cached | grep '.h\|.cpp\|.c' | grep -v 'vendor/') && \
