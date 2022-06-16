@@ -3,7 +3,8 @@
 VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/^[^']*'\([^']*\)'.*/\1/p" manifest.wake; else git describe --tags --dirty; fi)
 
 CC	:= cc -std=c11
-CXX	:= c++ -std=c++11
+CXX	:= c++
+CXX_VERSION := -std=c++14
 CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
 LDFLAGS	:=
 DESTDIR ?= /usr/local
@@ -67,19 +68,19 @@ static:	wake.db
 	$(WAKE_ENV) ./bin/wake static
 
 bin/wake:	$(WAKE_OBJS)
-	$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
+	$(CXX) $(CFLAGS) $(CXX_VERSION) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 
 bin/wakebox:		tools/wakebox/wakebox.cpp src/wakefs/*.cpp vendor/gopt/*.c $(COMMON_OBJS)
-	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(CXX_VERSION) $^ -o $@ $(LDFLAGS)
 
 lib/wake/fuse-waked:	tools/fuse-waked/fuse-waked.cpp $(COMMON_OBJS)
-	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(FUSE_CFLAGS) $^ -o $@ $(LDFLAGS) $(FUSE_LDFLAGS)
+	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(FUSE_CFLAGS) $(CXX_VERSION) $^ -o $@ $(LDFLAGS) $(FUSE_LDFLAGS)
 
 lib/wake/shim-wake:	tools/shim-wake/shim.o vendor/blake2/blake2b-ref.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 %.o:	%.cpp	$(filter-out src/parser/parser.h,$(wildcard */*/*.h)) | src/parser/parser.h
-	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(CORE_CFLAGS) -o $@ -c $<
+	$(CXX) $(CFLAGS) $(LOCAL_CFLAGS) $(CORE_CFLAGS) $(CXX_VERSION) -o $@ -c $<
 
 %.o:	%.c	$(filter-out src/version.h,$(wildcard */*.h))
 	$(CC) $(CFLAGS) $(LOCAL_CFLAGS) -o $@ -c $<

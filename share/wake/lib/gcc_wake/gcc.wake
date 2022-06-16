@@ -16,6 +16,7 @@
 package gcc_wake
 
 export def cpp11Flags    = ("-std=c++11", Nil)
+export def cpp14Flags    = ("-std=c++14", Nil)
 export def c11Flags      = ("-std=c11", Nil)
 export def debugCFlags   = ("-Wall", "-Wextra", "-O0", "-g", "-pg", Nil)
 export def debugLFlags   = ("-g", "-pg", Nil)
@@ -59,6 +60,9 @@ publish compileC = makeCompileC "native-c11-static"    (which "cc")  (c11Flags +
 publish compileC = makeCompileC "native-cpp11-debug"   (which "c++") (cpp11Flags ++ debugCFlags)
 publish compileC = makeCompileC "native-cpp11-release" (which "c++") (cpp11Flags ++ releaseCFlags)
 publish compileC = makeCompileC "native-cpp11-static"  (which "c++") (cpp11Flags ++ staticCFlags)
+publish compileC = makeCompileC "native-cpp14-debug"   (which "c++") (cpp14Flags ++ debugCFlags)
+publish compileC = makeCompileC "native-cpp14-release" (which "c++") (cpp14Flags ++ releaseCFlags)
+publish compileC = makeCompileC "native-cpp14-static"  (which "c++") (cpp14Flags ++ staticCFlags)
 
 export topic linkO: Pair String ((extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error)
 publish linkO = makeLinkO "native-c11-debug"     (which "cc") (c11Flags ++ debugLFlags)
@@ -67,6 +71,9 @@ publish linkO = makeLinkO "native-c11-static"    (which "cc") (c11Flags ++ stati
 publish linkO = makeLinkO "native-cpp11-debug"   (which "c++") (cpp11Flags ++ debugLFlags)
 publish linkO = makeLinkO "native-cpp11-release" (which "c++") (cpp11Flags ++ releaseLFlags)
 publish linkO = makeLinkO "native-cpp11-static"  (which "c++") (cpp11Flags ++ staticLFlags)
+publish linkO = makeLinkO "native-cpp14-debug"   (which "c++") (cpp14Flags ++ debugLFlags)
+publish linkO = makeLinkO "native-cpp14-release" (which "c++") (cpp14Flags ++ releaseLFlags)
+publish linkO = makeLinkO "native-cpp14-static"  (which "c++") (cpp14Flags ++ staticLFlags)
 
 def pickVariant variant variants =
     match (find (variant ==* _.getPairFirst) variants)

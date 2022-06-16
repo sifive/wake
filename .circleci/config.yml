@@ -79,24 +79,6 @@ jobs:
           paths:
             - release/debian_bullseye
 
-  centos_7_6:
-    machine:
-      image: ubuntu-2004:202201-02
-    steps:
-      - attach_workspace:
-          at: /tmp/workspace
-      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/centos-7.6 -t wake-centos-7.6 .
-      - run: |
-          cp /tmp/workspace/wake_*.tar.xz . && \
-          cp -a /tmp/workspace/tests . && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-centos-7.6 rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-centos-7.6 /bin/sh -c "rpm -i x86_64/*.rpm && cd tests && wake runTests" && \
-          install -D -t release/centos_7_6 x86_64/*.rpm
-      - persist_to_workspace:
-          root: .
-          paths:
-            - release/centos_7_6
-
   rocky_8:
     machine:
       image: ubuntu-2004:202201-02
@@ -196,9 +178,6 @@ workflows:
       - debian_bullseye:
           requires:
             - tarball
-      - centos_7_6:
-          requires:
-            - tarball
       - rocky_8:
           requires:
             - tarball
@@ -215,7 +194,6 @@ workflows:
           requires:
             - alpine
             - debian_bullseye
-            - centos_7_6     # RHEL7-compatible, oldest gcc
             - rocky_8        # RHEL8-compatible
             - ubuntu_18_04   # LTS
             - ubuntu_22_04   # LTS
