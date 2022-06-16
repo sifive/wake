@@ -52,7 +52,6 @@ install:	all
 	$(WAKE_ENV) ./bin/wake install $(DESTDIR)
 
 # This assumes clang is available on the PATH
-# try: module load clang/12.0.1.1
 formatAll:
 	clang-format -i --style=file $(shell find . -type f -name "*.h")
 	clang-format -i --style=file $(shell find . -type f -name "*.cpp")
