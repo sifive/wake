@@ -358,7 +358,7 @@ struct AddJobRequest {
       input.hash = input_dir.second.get("hash").value;
       get_hex_data(input.hash, hash_data);
       bloom.add_hash(reinterpret_cast<const uint8_t *>(hash_data), input.hash.size() / 2);
-      inputs.emplace_back(std::move(input));
+      directories.emplace_back(std::move(input));
     }
 
     // Read the output files
@@ -367,7 +367,7 @@ struct AddJobRequest {
       output.source = output_file.second.get("src").value;
       output.path = output_file.second.get("path").value;
       output.hash = output_file.second.get("hash").value;
-      inputs.emplace_back(std::move(output_file));
+      outputs.emplace_back(std::move(output));
     }
   }
 };
@@ -552,8 +552,7 @@ public:
 
   void add(const JAST &job_result_json) {
     // Create a unique name for the job dir (will rename later to correct name)
-    std::string tmp_job_id = rng.unique_name();
-    std::string tmp_job_dir = dir + "/tmp_" + tmp_job_id;
+    std::string tmp_job_dir = dir + "/tmp_" + rng.unique_name();
     mkdir_no_fail(tmp_job_dir.c_str());
 
     // Parse the json
@@ -589,7 +588,6 @@ public:
     uint8_t job_group = job_id & 0xFF;
     std::string job_group_dir = dir + "/" + to_hex<uint8_t>(&job_group);
     mkdir_no_fail(job_group_dir.c_str());
-    tmp_job_dir = job_group_dir + "/" + tmp_job_id;
     std::string job_dir = job_group_dir + "/" + std::to_string(job_id);
     rename_no_fail(tmp_job_dir.c_str(), job_dir.c_str());
 
