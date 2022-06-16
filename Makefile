@@ -60,7 +60,8 @@ formatAll:
 # It assumes clang is available on the PATH and will fail otherwise
 format:
 # Conditionally run clang-format based on the staged and changed files
-# || true is added after each if expression since they resolve 
+# || true is added after each if expression since they resolve with false when false
+# and we don't want make to report that as an error
 	@CHANGED_FILES=$$(git diff --name-only | grep '.cpp\|.h') && \
 	if [ ! -z $$CHANGED_FILES ]; then \
 		clang-format -i --style=file $$CHANGED_FILES; \
