@@ -18,7 +18,8 @@
 #include <cstdint>
 #include <tuple>
 
-template <class T> static std::string to_hex(const T *value) {
+template <class T>
+static std::string to_hex(const T *value) {
   const uint8_t *data = reinterpret_cast<const uint8_t *>(value);
   static const char *hex = "0123456789abcdef";
   char name[2 * sizeof(T) + 1];
@@ -41,7 +42,7 @@ class Xoshiro256 {
 
   static uint64_t rol64(uint64_t x, int k) { return (x << k) | (x >> (64 - k)); }
 
-public:
+ public:
   // Use /dev/urandom to get a good seed
   static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
     int rng_fd = open_fd("/dev/urandom", O_RDONLY, 0644);

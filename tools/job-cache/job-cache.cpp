@@ -19,26 +19,23 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <iostream>
-#include <string>
-#include <vector>
-
-#include <sqlite3.h>
-
+#include <errno.h>
 #include <fcntl.h>
+#include <json/json5.h>
+#include <sqlite3.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <iostream>
+#include <string>
+#include <vector>
 
-#include <json/json5.h>
-
-#include "xoshiro256.h"
 #include "bloom.h"
+#include "xoshiro256.h"
 
 // This header contains useful information that you might want
 // when running a deamon
@@ -46,13 +43,13 @@ static void log_header(FILE *file) {
   int pid = getpid();
   time_t t = time(NULL);
   struct tm tm = *localtime(&t);
-  fprintf(file, "[pid=%d, %d-%02d-%02d %02d:%02d:%02d] ", pid,
-          tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min,
-          tm.tm_sec);
+  fprintf(file, "[pid=%d, %d-%02d-%02d %02d:%02d:%02d] ", pid, tm.tm_year + 1900, tm.tm_mon + 1,
+          tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
 
 // A generic logging function
-template <class... Args> static void log_info(Args &&...args) {
+template <class... Args>
+static void log_info(Args &&...args) {
   log_header(stdout);
   fprintf(stdout, args...);
   fprintf(stdout, "\n");
@@ -61,7 +58,8 @@ template <class... Args> static void log_info(Args &&...args) {
 
 // A logging function for logging and then exiting with
 // a failure code.
-template <class... Args> static void log_fatal(Args &&...args) {
+template <class... Args>
+static void log_fatal(Args &&...args) {
   log_header(stderr);
   fprintf(stderr, args...);
   fprintf(stderr, "\n");
@@ -89,7 +87,7 @@ static int open_fd(const char *str, int flags, mode_t mode) {
   return fd;
 }
 
- // moves the file or directory, crashes on error
+// moves the file or directory, crashes on error
 static void rename_no_fail(const char *old_path, const char *new_path) {
   if (rename(old_path, new_path) < 0) {
     log_fatal("rename(%s, %s): %s", old_path, new_path, strerror(errno));
@@ -131,9 +129,8 @@ static void copy(int src_fd, int dst_fd) {
     log_fatal("fstat(src_fd = %d): %s", src_fd, strerror(errno));
   }
   if (copy_file_range(src_fd, nullptr, dst_fd, nullptr, buf.st_size, 0) < 0) {
-    log_fatal(
-        "copy_file_range(src_fd = %d, NULL, dst_fd = %d, size = %d, 0): %s",
-        src_fd, dst_fd, buf.st_size, strerror(errno));
+    log_fatal("copy_file_range(src_fd = %d, NULL, dst_fd = %d, size = %d, 0): %s", src_fd, dst_fd,
+              buf.st_size, strerror(errno));
   }
 }
 
@@ -159,7 +156,7 @@ static inline uint8_t hex_to_nibble(char c) {
 }
 
 template <size_t size>
-static void get_hex_data(const std::string& s, uint8_t (*data)[size]) {
+static void get_hex_data(const std::string &s, uint8_t (*data)[size]) {
   const uint8_t *start = *data;
   const uint8_t *end = start + size;
   for (size_t i = 0; data < end && i < s.size(); i += 2) {
@@ -174,14 +171,13 @@ static void finish_stmt(const char *why, sqlite3_stmt *stmt) {
 
   ret = sqlite3_reset(stmt);
   if (ret != SQLITE_OK) {
-    log_fatal("error: %s; sqlite3_reset: %s", why,
-             sqlite3_errmsg(sqlite3_db_handle(stmt)));
+    log_fatal("error: %s; sqlite3_reset: %s", why, sqlite3_errmsg(sqlite3_db_handle(stmt)));
   }
 
   ret = sqlite3_clear_bindings(stmt);
   if (ret != SQLITE_OK) {
     log_fatal("error: %s; sqlite3_clear_bindings: %s", why,
-             sqlite3_errmsg(sqlite3_db_handle(stmt)));
+              sqlite3_errmsg(sqlite3_db_handle(stmt)));
   }
 }
 
@@ -190,46 +186,44 @@ static void single_step(const char *why, sqlite3_stmt *stmt) {
 
   ret = sqlite3_step(stmt);
   if (ret != SQLITE_DONE) {
-    log_fatal("error: %s; sqlite3_step: %s", why,
-             sqlite3_errmsg(sqlite3_db_handle(stmt)));
+    log_fatal("error: %s; sqlite3_step: %s", why, sqlite3_errmsg(sqlite3_db_handle(stmt)));
   }
 
   finish_stmt(why, stmt);
 }
 
-static void bind_string(const char *why, sqlite3_stmt *stmt, int index,
-                        const char *str, size_t len) {
+static void bind_string(const char *why, sqlite3_stmt *stmt, int index, const char *str,
+                        size_t len) {
   int ret;
   ret = sqlite3_bind_text(stmt, index, str, len, SQLITE_STATIC);
   if (ret != SQLITE_OK) {
     log_fatal("%s: sqlite3_bind_text(%d, %s): %s", why, index, str,
-             sqlite3_errmsg(sqlite3_db_handle(stmt)));
+              sqlite3_errmsg(sqlite3_db_handle(stmt)));
   }
 }
 
-static void bind_integer(const char *why, sqlite3_stmt *stmt, int index,
-                         long x) {
+static void bind_integer(const char *why, sqlite3_stmt *stmt, int index, long x) {
   int ret;
   ret = sqlite3_bind_int64(stmt, index, x);
   if (ret != SQLITE_OK) {
     log_fatal("%s: sqlite3_bind_int64(%d, %d): %s", why, index, x,
-             sqlite3_errmsg(sqlite3_db_handle(stmt)));
+              sqlite3_errmsg(sqlite3_db_handle(stmt)));
   }
 }
 
-#define FINALIZE(member)                                                       \
-  if (member) {                                                                \
-    int ret = sqlite3_finalize(member);                                        \
-    if (ret != SQLITE_OK) {                                                    \
-      log_fatal("sqlite3_finalize(%s): %s", #member, sqlite3_errmsg(db));       \
-    }                                                                          \
-    member = nullptr;                                                          \
+#define FINALIZE(member)                                                  \
+  if (member) {                                                           \
+    int ret = sqlite3_finalize(member);                                   \
+    if (ret != SQLITE_OK) {                                               \
+      log_fatal("sqlite3_finalize(%s): %s", #member, sqlite3_errmsg(db)); \
+    }                                                                     \
+    member = nullptr;                                                     \
   }
 
-#define PREPARE(sql_str, query_stmt)                                           \
-  if (sqlite3_prepare_v2(db, sql_str.c_str(), sql_str.size(), &query_stmt,     \
-                         nullptr) != SQLITE_OK) {                              \
-    log_fatal("error: failed to prepare statement: %s", sqlite3_errmsg(db));    \
+#define PREPARE(sql_str, query_stmt)                                                   \
+  if (sqlite3_prepare_v2(db, sql_str.c_str(), sql_str.size(), &query_stmt, nullptr) != \
+      SQLITE_OK) {                                                                     \
+    log_fatal("error: failed to prepare statement: %s", sqlite3_errmsg(db));           \
   }
 
 struct InputFile {
@@ -259,10 +253,10 @@ struct AddJobRequest {
   std::vector<OutputFile> outputs;
 
   AddJobRequest() = delete;
-  AddJobRequest(const AddJobRequest&) = default;
-  AddJobRequest(AddJobRequest&&) = default;
+  AddJobRequest(const AddJobRequest &) = default;
+  AddJobRequest(AddJobRequest &&) = default;
 
-  explicit AddJobRequest(const JAST& job_result_json) {
+  explicit AddJobRequest(const JAST &job_result_json) {
     cwd = job_result_json.get("cwd").value;
     command_line = job_result_json.get("command_line").value;
     envrionment = job_result_json.get("envrionment").value;
@@ -332,7 +326,7 @@ class Cache {
         "  commandline  blob    not null,"
         "  environment  blob    not null,"
         "  stdin        text    not null,"
-        "  bloom_filter integer);" // TODO: Use a larger bloom filter
+        "  bloom_filter integer);"  // TODO: Use a larger bloom filter
         "create index if not exists job on jobs(directory, commandline, environment, stdin);"
         // We only record the input hashes, and not all visible files.
         // The input file blobs are not stored on disk. Only their hash
@@ -373,8 +367,7 @@ class Cache {
         "create index if not exists input_dir on input_dirs(path, hash);";
 
     std::string db_path = dir + "/cache.db";
-    if (sqlite3_open_v2(db_path.c_str(), &db,
-                        SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+    if (sqlite3_open_v2(db_path.c_str(), &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
                         nullptr) != SQLITE_OK) {
       log_fatal("error: %s", sqlite3_errmsg(db));
     }
@@ -385,14 +378,16 @@ class Cache {
       log_fatal("error: cache.db is read-only");
     }
 
-    char* fail = nullptr;
+    char *fail = nullptr;
     if (sqlite3_exec(db, cache_schema.c_str(), nullptr, nullptr, &fail) != SQLITE_OK) {
       log_fatal("error: failed init stmt: %s: %s", fail, sqlite3_errmsg(db));
     }
   }
 
   void prepare_stmts() {
-    std::string sql_add_job = "insert into jobs (directory, commandline, environment, stdin, bloom_filter) values (?, ?, ?, ?, ?)";
+    std::string sql_add_job =
+        "insert into jobs (directory, commandline, environment, stdin, bloom_filter) values (?, ?, "
+        "?, ?, ?)";
     std::string sql_add_input_file = "insert into input_files (path, hash, job) values (?, ?, ?)";
     std::string sql_add_input_dir = "insert into input_files (path, hash, job) values (?, ?, ?)";
     std::string sql_add_output_file = "insert into output_files (path, hash, job) values (?, ?, ?)";
@@ -407,15 +402,12 @@ class Cache {
     PREPARE(sql_commit_txn, commit_txn_query)
   }
 
-  void begin_txn() {
-    single_step("Could not begin a transaction", begin_txn_query);
-  }
+  void begin_txn() { single_step("Could not begin a transaction", begin_txn_query); }
 
-  void end_txn() {
-    single_step("Could not commit a transaction", commit_txn_query);
-  }
+  void end_txn() { single_step("Could not commit a transaction", commit_txn_query); }
 
-  int64_t insert_job(const std::string& cwd, const std::string& cmd, const std::string& env, const std::string& stdin_str, BloomFilter bloom) {
+  int64_t insert_job(const std::string &cwd, const std::string &cmd, const std::string &env,
+                     const std::string &stdin_str, BloomFilter bloom) {
     const char *why = "Could not insert job";
     int64_t bloom_integer = *reinterpret_cast<const int64_t *>(bloom.data());
     bind_string(why, add_job, 1, cwd.c_str(), cwd.size());
@@ -429,7 +421,7 @@ class Cache {
     return job_id;
   }
 
-  void insert_input_file(const std::string& path, const std::string& hash, int64_t job_id) {
+  void insert_input_file(const std::string &path, const std::string &hash, int64_t job_id) {
     const char *why = "Could not insert input file";
     bind_string(why, add_input_file, 1, path.c_str(), path.size());
     bind_string(why, add_input_file, 2, hash.c_str(), hash.size());
@@ -438,7 +430,7 @@ class Cache {
     finish_stmt(why, add_input_file);
   }
 
-  void insert_input_dir(const std::string& path, const std::string& hash, int64_t job_id) {
+  void insert_input_dir(const std::string &path, const std::string &hash, int64_t job_id) {
     const char *why = "Could not insert input directory";
     bind_string(why, add_input_dir, 1, path.c_str(), path.size());
     bind_string(why, add_input_dir, 2, hash.c_str(), hash.size());
@@ -447,7 +439,7 @@ class Cache {
     finish_stmt(why, add_input_dir);
   }
 
-  void insert_output_file(const std::string& path, const std::string& hash, int64_t job_id) {
+  void insert_output_file(const std::string &path, const std::string &hash, int64_t job_id) {
     const char *why = "Could not insert output file";
     bind_string(why, add_output_file, 1, path.c_str(), path.size());
     bind_string(why, add_output_file, 2, hash.c_str(), hash.size());
@@ -456,7 +448,7 @@ class Cache {
     finish_stmt(why, add_output_file);
   }
 
-public:
+ public:
   ~Cache() {
     FINALIZE(add_job)
     FINALIZE(add_input_file)
@@ -472,7 +464,7 @@ public:
   }
 
   Cache() = delete;
-  Cache(const Cache&) = delete;
+  Cache(const Cache &) = delete;
   Cache(std::string _dir) : dir(_dir), rng() {
     mkdir_no_fail(_dir.c_str());
     init_sql();
@@ -495,7 +487,8 @@ public:
 
     // Start a transaction so that a job is never without its files.
     begin_txn();
-    uint64_t job_id = insert_job(add_request.cwd, add_request.command_line, add_request.envrionment, add_request.stdin_str, add_request.bloom);
+    uint64_t job_id = insert_job(add_request.cwd, add_request.command_line, add_request.envrionment,
+                                 add_request.stdin_str, add_request.bloom);
 
     // Input Files
     for (const auto &input_file : add_request.inputs) {
@@ -527,17 +520,16 @@ public:
   }
 };
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   // TODO: Add a better CLI
   if (argc < 2) return 1;
   Cache cache(argv[1]);
 
   if (argc >= 4) {
     if (std::string(argv[2]) == "add") {
-       JAST job_result;
-       JAST::parse(argv[3], std::cerr, job_result);
-       cache.add(job_result);
+      JAST job_result;
+      JAST::parse(argv[3], std::cerr, job_result);
+      cache.add(job_result);
     }
   }
-
 }
