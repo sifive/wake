@@ -19,19 +19,19 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include "util/hash.h"
-#include "ssa.h"
 #include "runtime/runtime.h"
+#include "ssa.h"
+#include "util/hash.h"
 
 // typeid hash_code is not stable between invocations
-#define TYPE_RARG	0
-#define TYPE_RLIT	1
-#define TYPE_RAPP	2
-#define TYPE_RPRIM	3
-#define TYPE_RGET	4
-#define TYPE_RDES	5
-#define TYPE_RCON	6
-#define TYPE_RFUN	7
+#define TYPE_RARG 0
+#define TYPE_RLIT 1
+#define TYPE_RAPP 2
+#define TYPE_RPRIM 3
+#define TYPE_RGET 4
+#define TYPE_RDES 5
+#define TYPE_RCON 6
+#define TYPE_RFUN 7
 
 struct PassScope {
   Runtime &runtime;
@@ -41,17 +41,15 @@ struct PassScope {
   std::vector<size_t> escapes;
   std::vector<uint64_t> codes;
   PassScope(Runtime &runtime_, PassScope *next_, size_t start_)
-   : runtime(runtime_), next(next_), start(start_), index(start_) { }
+      : runtime(runtime_), next(next_), start(start_), index(start_) {}
 };
 
 static size_t scope_arg(PassScope &p, size_t input) {
   if (input < p.start) {
     size_t escape;
     for (escape = 0; escape < p.escapes.size(); ++escape)
-      if (p.escapes[escape] == input)
-        break;
-    if (escape == p.escapes.size())
-      p.escapes.push_back(input);
+      if (p.escapes[escape] == input) break;
+    if (escape == p.escapes.size()) p.escapes.push_back(input);
     size_t depth = 0;
     PassScope *top = &p;
     do {
@@ -68,9 +66,7 @@ static size_t scope_arg(PassScope &p, size_t input) {
   }
 }
 
-void RArg::pass_scope(PassScope &p) {
-  p.codes.push_back(TYPE_RARG);
-}
+void RArg::pass_scope(PassScope &p) { p.codes.push_back(TYPE_RARG); }
 
 void RLit::pass_scope(PassScope &p) {
   p.codes.push_back(TYPE_RLIT);
@@ -80,13 +76,10 @@ void RLit::pass_scope(PassScope &p) {
 static void scope_redux(PassScope &p, Redux *redux, size_t type) {
   p.codes.push_back(type);
   p.codes.push_back(redux->args.size());
-  for (auto &x : redux->args)
-    x = scope_arg(p, x);
+  for (auto &x : redux->args) x = scope_arg(p, x);
 }
 
-void RApp::pass_scope(PassScope &p) {
-  scope_redux(p, this, TYPE_RAPP);
-}
+void RApp::pass_scope(PassScope &p) { scope_redux(p, this, TYPE_RAPP); }
 
 void RPrim::pass_scope(PassScope &p) {
   scope_redux(p, this, TYPE_RPRIM);
@@ -98,9 +91,7 @@ void RGet::pass_scope(PassScope &p) {
   p.codes.push_back(index);
 }
 
-void RDes::pass_scope(PassScope &p) {
-  scope_redux(p, this, TYPE_RDES);
-}
+void RDes::pass_scope(PassScope &p) { scope_redux(p, this, TYPE_RDES); }
 
 void RCon::pass_scope(PassScope &p) {
   scope_redux(p, this, TYPE_RCON);

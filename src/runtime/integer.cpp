@@ -21,97 +21,95 @@
 
 #include <gmp.h>
 
-#include "types/type.h"
+#include "prim.h"
 #include "types/data.h"
 #include "types/internal.h"
-#include "prim.h"
+#include "types/type.h"
 #include "value.h"
 
-#define UNOP(name, fn)				\
-static PRIMFN(prim_##name) {			\
-  EXPECT(1);					\
-  INTEGER_MPZ(arg0, 0);				\
-  MPZ out;					\
-  fn(out.value, arg0);				\
-  RETURN(Integer::alloc(runtime.heap, out));	\
-}
+#define UNOP(name, fn)                         \
+  static PRIMFN(prim_##name) {                 \
+    EXPECT(1);                                 \
+    INTEGER_MPZ(arg0, 0);                      \
+    MPZ out;                                   \
+    fn(out.value, arg0);                       \
+    RETURN(Integer::alloc(runtime.heap, out)); \
+  }
 
 UNOP(com, mpz_com)
 UNOP(abs, mpz_abs)
 UNOP(neg, mpz_neg)
 
-#define BINOP(name, fn)				\
-static PRIMFN(prim_##name) {			\
-  EXPECT(2);					\
-  INTEGER_MPZ(arg0, 0);				\
-  INTEGER_MPZ(arg1, 1);				\
-  MPZ out;					\
-  fn(out.value, arg0, arg1);			\
-  RETURN(Integer::alloc(runtime.heap, out));	\
-}
+#define BINOP(name, fn)                        \
+  static PRIMFN(prim_##name) {                 \
+    EXPECT(2);                                 \
+    INTEGER_MPZ(arg0, 0);                      \
+    INTEGER_MPZ(arg1, 1);                      \
+    MPZ out;                                   \
+    fn(out.value, arg0, arg1);                 \
+    RETURN(Integer::alloc(runtime.heap, out)); \
+  }
 
 BINOP(add, mpz_add)
 BINOP(sub, mpz_sub)
 BINOP(mul, mpz_mul)
 BINOP(xor, mpz_xor)
 BINOP(and, mpz_and)
-BINOP(or,  mpz_ior)
+BINOP(or, mpz_ior)
 BINOP(gcd, mpz_gcd)
 BINOP(lcm, mpz_lcm)
 
-#define BINOP_ZERO(name, fn)					\
-static PRIMFN(prim_##name) {					\
-  EXPECT(2);							\
-  INTEGER_MPZ(arg0, 0);						\
-  INTEGER_MPZ(arg1, 1);						\
-  bool division_by_zero = mpz_cmp_si(arg1, 0) == 0;		\
-  REQUIRE(!division_by_zero);					\
-  MPZ out;							\
-  fn(out.value, arg0, arg1);					\
-  RETURN(Integer::alloc(runtime.heap, out));			\
-}
+#define BINOP_ZERO(name, fn)                          \
+  static PRIMFN(prim_##name) {                        \
+    EXPECT(2);                                        \
+    INTEGER_MPZ(arg0, 0);                             \
+    INTEGER_MPZ(arg1, 1);                             \
+    bool division_by_zero = mpz_cmp_si(arg1, 0) == 0; \
+    REQUIRE(!division_by_zero);                       \
+    MPZ out;                                          \
+    fn(out.value, arg0, arg1);                        \
+    RETURN(Integer::alloc(runtime.heap, out));        \
+  }
 
 BINOP_ZERO(div, mpz_tdiv_q)
 BINOP_ZERO(mod, mpz_tdiv_r)
 
-#define BINOP_SI2(name, fn1, fn2)				\
-static PRIMFN(prim_##name) {					\
-  EXPECT(2);							\
-  INTEGER_MPZ(arg0, 0);						\
-  INTEGER_MPZ(arg1, 1);						\
-  MPZ out;							\
-  if (mpz_sgn(arg1) >= 0) {					\
-    fn1(out.value, arg0, mpz_get_si(arg1));			\
-  } else {							\
-    fn2(out.value, arg0, -mpz_get_si(arg1));			\
-  }								\
-  RETURN(Integer::alloc(runtime.heap, out));			\
-}
+#define BINOP_SI2(name, fn1, fn2)              \
+  static PRIMFN(prim_##name) {                 \
+    EXPECT(2);                                 \
+    INTEGER_MPZ(arg0, 0);                      \
+    INTEGER_MPZ(arg1, 1);                      \
+    MPZ out;                                   \
+    if (mpz_sgn(arg1) >= 0) {                  \
+      fn1(out.value, arg0, mpz_get_si(arg1));  \
+    } else {                                   \
+      fn2(out.value, arg0, -mpz_get_si(arg1)); \
+    }                                          \
+    RETURN(Integer::alloc(runtime.heap, out)); \
+  }
 
-BINOP_SI2(shl,  mpz_mul_2exp,    mpz_tdiv_q_2exp)
-BINOP_SI2(shr,  mpz_tdiv_q_2exp, mpz_mul_2exp)
+BINOP_SI2(shl, mpz_mul_2exp, mpz_tdiv_q_2exp)
+BINOP_SI2(shr, mpz_tdiv_q_2exp, mpz_mul_2exp)
 
-#define BINOP_SI0(name, fn)					\
-static PRIMFN(prim_##name) {					\
-  EXPECT(2);							\
-  INTEGER_MPZ(arg0, 0);						\
-  INTEGER_MPZ(arg1, 1);						\
-  MPZ out;							\
-  if (mpz_sgn(arg1) >= 0) {					\
-    fn(out.value, arg0, mpz_get_si(arg1));			\
-  }								\
-  RETURN(Integer::alloc(runtime.heap, out));			\
-}
+#define BINOP_SI0(name, fn)                    \
+  static PRIMFN(prim_##name) {                 \
+    EXPECT(2);                                 \
+    INTEGER_MPZ(arg0, 0);                      \
+    INTEGER_MPZ(arg1, 1);                      \
+    MPZ out;                                   \
+    if (mpz_sgn(arg1) >= 0) {                  \
+      fn(out.value, arg0, mpz_get_si(arg1));   \
+    }                                          \
+    RETURN(Integer::alloc(runtime.heap, out)); \
+  }
 
-BINOP_SI0(exp,  mpz_pow_ui)
+BINOP_SI0(exp, mpz_pow_ui)
 BINOP_SI0(root, mpz_root)
 
 static PRIMTYPE(type_powm) {
-  return args.size() == 3 &&
-    args[0]->unify(Data::typeInteger) &&
-    args[1]->unify(Data::typeInteger) &&
-    args[2]->unify(Data::typeInteger) &&
-    out->unify(Data::typeInteger);
+  return args.size() == 3 && args[0]->unify(Data::typeInteger) &&
+         args[1]->unify(Data::typeInteger) && args[2]->unify(Data::typeInteger) &&
+         out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_powm) {
@@ -127,10 +125,8 @@ static PRIMFN(prim_powm) {
 }
 
 static PRIMTYPE(type_str) {
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeInteger) &&
-    args[1]->unify(Data::typeInteger) &&
-    out->unify(Data::typeString);
+  return args.size() == 2 && args[0]->unify(Data::typeInteger) &&
+         args[1]->unify(Data::typeInteger) && out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_str) {
@@ -156,10 +152,8 @@ static PRIMTYPE(type_int) {
   TypeVar list;
   Data::typeList.clone(list);
   list[0].unify(Data::typeInteger);
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeInteger) &&
-    args[1]->unify(Data::typeString) &&
-    out->unify(list);
+  return args.size() == 2 && args[0]->unify(Data::typeInteger) &&
+         args[1]->unify(Data::typeString) && out->unify(list);
 }
 
 static PRIMFN(prim_int) {
@@ -186,16 +180,12 @@ static PRIMFN(prim_int) {
 // popcount, scan0, scan1 ?
 
 static PRIMTYPE(type_unop) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeInteger) &&
-    out->unify(Data::typeInteger);
+  return args.size() == 1 && args[0]->unify(Data::typeInteger) && out->unify(Data::typeInteger);
 }
 
 static PRIMTYPE(type_binop) {
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeInteger) &&
-    args[1]->unify(Data::typeInteger) &&
-    out->unify(Data::typeInteger);
+  return args.size() == 2 && args[0]->unify(Data::typeInteger) &&
+         args[1]->unify(Data::typeInteger) && out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_icmp) {
@@ -206,9 +196,9 @@ static PRIMFN(prim_icmp) {
 }
 
 void prim_register_integer(PrimMap &pmap) {
-  prim_register(pmap, "com", prim_com, type_unop,  PRIM_PURE);
-  prim_register(pmap, "abs", prim_abs, type_unop,  PRIM_PURE);
-  prim_register(pmap, "neg", prim_neg, type_unop,  PRIM_PURE);
+  prim_register(pmap, "com", prim_com, type_unop, PRIM_PURE);
+  prim_register(pmap, "abs", prim_abs, type_unop, PRIM_PURE);
+  prim_register(pmap, "neg", prim_neg, type_unop, PRIM_PURE);
   prim_register(pmap, "add", prim_add, type_binop, PRIM_PURE);
   prim_register(pmap, "sub", prim_sub, type_binop, PRIM_PURE);
   prim_register(pmap, "mul", prim_mul, type_binop, PRIM_PURE);
@@ -216,15 +206,15 @@ void prim_register_integer(PrimMap &pmap) {
   prim_register(pmap, "mod", prim_mod, type_binop, PRIM_PURE);
   prim_register(pmap, "xor", prim_xor, type_binop, PRIM_PURE);
   prim_register(pmap, "and", prim_and, type_binop, PRIM_PURE);
-  prim_register(pmap, "or",  prim_or,  type_binop, PRIM_PURE);
+  prim_register(pmap, "or", prim_or, type_binop, PRIM_PURE);
   prim_register(pmap, "gcd", prim_gcd, type_binop, PRIM_PURE);
   prim_register(pmap, "lcm", prim_lcm, type_binop, PRIM_PURE);
   prim_register(pmap, "shl", prim_shl, type_binop, PRIM_PURE);
   prim_register(pmap, "shr", prim_shr, type_binop, PRIM_PURE);
   prim_register(pmap, "exp", prim_exp, type_binop, PRIM_PURE);
-  prim_register(pmap, "root",prim_root,type_binop, PRIM_PURE);
-  prim_register(pmap, "powm",prim_powm,type_powm,  PRIM_PURE);
-  prim_register(pmap, "str", prim_str, type_str,   PRIM_PURE);
-  prim_register(pmap, "int", prim_int, type_int,   PRIM_PURE);
-  prim_register(pmap, "icmp",prim_icmp,type_icmp,  PRIM_PURE);
+  prim_register(pmap, "root", prim_root, type_binop, PRIM_PURE);
+  prim_register(pmap, "powm", prim_powm, type_powm, PRIM_PURE);
+  prim_register(pmap, "str", prim_str, type_str, PRIM_PURE);
+  prim_register(pmap, "int", prim_int, type_int, PRIM_PURE);
+  prim_register(pmap, "icmp", prim_icmp, type_icmp, PRIM_PURE);
 }

@@ -27,12 +27,10 @@ struct PassPurity {
   size_t sflag;
   bool first;
   bool fixed;
-  PassPurity(int pflag_, size_t sflag_) : pflag(pflag_), sflag(sflag_), first(true) { }
+  PassPurity(int pflag_, size_t sflag_) : pflag(pflag_), sflag(sflag_), first(true) {}
 };
 
-static uintptr_t filter_lowest(uintptr_t x) {
-  return (x&1) | (~static_cast<uintptr_t>(0) << 1);
-}
+static uintptr_t filter_lowest(uintptr_t x) { return (x & 1) | (~static_cast<uintptr_t>(0) << 1); }
 
 void RArg::pass_purity(PassPurity &p) {
   // An argument has no effects unless it is applied
@@ -50,8 +48,7 @@ void RApp::pass_purity(PassPurity &p) {
   // The unapplied function itself does not cause an effect
   uintptr_t acc = p.scope[args[0]]->meta | 1;
   // Each application accumulates a chance to zero the lowest bit
-  for (size_t i = 1; i < args.size(); ++i)
-    acc = (acc >> 1) & filter_lowest(acc);
+  for (size_t i = 1; i < args.size(); ++i) acc = (acc >> 1) & filter_lowest(acc);
   meta = acc;
   set(p.sflag, !(meta & 1));
 }
@@ -60,8 +57,7 @@ void RPrim::pass_purity(PassPurity &p) {
   // Pure only if the flag is clear
   meta = (pflags & p.pflag) == 0;
   // Special-case for tget (purity depends on purity of fn arg)
-  if ((pflags & PRIM_FNARG))
-    meta = p.scope[args[1]]->meta >> 1;
+  if ((pflags & PRIM_FNARG)) meta = p.scope[args[1]]->meta >> 1;
   set(p.sflag, !(meta & 1));
 }
 
@@ -73,19 +69,15 @@ void RGet::pass_purity(PassPurity &p) {
 void RDes::pass_purity(PassPurity &p) {
   // Result is only pure when all applied handlers are pure
   uintptr_t acc = ~static_cast<uintptr_t>(0);
-  for (size_t i = 0, num = args.size()-1; i < num; ++i)
-    acc &= p.scope[args[i]]->meta;
+  for (size_t i = 0, num = args.size() - 1; i < num; ++i) acc &= p.scope[args[i]]->meta;
   meta = acc >> 1;
   set(p.sflag, !(meta & 1));
 }
 
-void RCon::pass_purity(PassPurity &p) {
-  meta = 1;
-}
+void RCon::pass_purity(PassPurity &p) { meta = 1; }
 
 void RFun::pass_purity(PassPurity &p) {
-  if (p.first)
-    meta = ~static_cast<uintptr_t>(0); // visible in recursive use
+  if (p.first) meta = ~static_cast<uintptr_t>(0);  // visible in recursive use
   uintptr_t save = meta;
   uintptr_t acc = 1;
   int args = 0;

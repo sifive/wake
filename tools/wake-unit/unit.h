@@ -19,11 +19,11 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <iostream>
+#include <csetjmp>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <vector>
-#include <csetjmp>
 
 #include "json/json5.h"
 #include "util/colour.h"
@@ -68,13 +68,14 @@ struct TestLogger {
   std::jmp_buf return_jmp_buffer;
   const char* test_name = nullptr;
 
-private:
+ private:
   TestStream fail(ErrorMessage& err, bool assert) {
     return TestStream(&err.user_error, assert ? &return_jmp_buffer : nullptr);
   }
 
-public:
-  TestStream expect(bool assert, bool expected, bool cond, const char* cond_str, int line, const char* file) {
+ public:
+  TestStream expect(bool assert, bool expected, bool cond, const char* cond_str, int line,
+                    const char* file) {
     if (cond == expected) return TestStream(nullptr, nullptr);
     auto expected_str = expected ? "true" : "false";
     auto actual_str = cond ? "true" : "false";
@@ -92,7 +93,9 @@ public:
     return fail(*err, assert);
   }
 
-  TestStream expect_equal(bool assert, std::string expected, std::string actual, const char* expected_str, const char* actual_str, int line, const char* file) {
+  TestStream expect_equal(bool assert, std::string expected, std::string actual,
+                          const char* expected_str, const char* actual_str, int line,
+                          const char* file) {
     if (expected == actual) return TestStream(nullptr, nullptr);
     errors.emplace_back(new ErrorMessage);
     auto& err = errors.back();
@@ -107,7 +110,8 @@ public:
   }
 
   template <class T>
-  TestStream expect_equal(bool assert, T&& expected, T&& actual, const char* expected_str, const char* actual_str, int line, const char* file) {
+  TestStream expect_equal(bool assert, T&& expected, T&& actual, const char* expected_str,
+                          const char* actual_str, int line, const char* file) {
     if (expected == actual) return TestStream(nullptr, nullptr);
     errors.emplace_back(new ErrorMessage);
     auto& err = errors.back();
@@ -130,7 +134,7 @@ public:
 #define EXPECT_EQUAL(x, y) (logger__.expect_equal(false, (x), (y), #x, #y, __LINE__, __FILE__))
 #define ASSERT_EQUAL(x, y) (logger__.expect_equal(true, (x), (y), #x, #y, __LINE__, __FILE__))
 
-using TestFunc = void(*)(TestLogger&);
+using TestFunc = void (*)(TestLogger&);
 
 struct TestRegister {
   TestRegister(const char* test_name, TestFunc test);
@@ -141,10 +145,11 @@ struct TestRegisterUnique {
   static TestRegister unique_register;
 };
 
-#define TEST(name)\
-static void Test__ ## name (TestLogger&);\
-namespace {\
-struct Test__Unique__ ## name {};\
-template<> TestRegister TestRegisterUnique<Test__Unique__ ## name>::unique_register(#name, Test__ ## name);\
-};\
-static void Test__ ## name (TestLogger& logger__)
+#define TEST(name)                                                                             \
+  static void Test__##name(TestLogger&);                                                       \
+  namespace {                                                                                  \
+  struct Test__Unique__##name {};                                                              \
+  template <>                                                                                  \
+  TestRegister TestRegisterUnique<Test__Unique__##name>::unique_register(#name, Test__##name); \
+  };                                                                                           \
+  static void Test__##name(TestLogger& logger__)

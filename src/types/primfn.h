@@ -18,19 +18,21 @@
 #ifndef PRIMFN_H
 #define PRIMFN_H
 
+#include <map>
 #include <memory>
 #include <vector>
-#include <map>
 
 struct Scope;
 struct Value;
 struct Runtime;
 struct TypeVar;
 
-typedef bool (*PrimType)(const std::vector<TypeVar*> &args, TypeVar *out);
-typedef void (*PrimFn)(void *data, Runtime &runtime, Scope *scope, size_t output, size_t nargs, Value **args);
-#define PRIMTYPE(name) bool name(const std::vector<TypeVar*> &args, TypeVar *out)
-#define PRIMFN(name) void name(void *data, Runtime &runtime, Scope *scope, size_t output, size_t nargs, Value** args)
+typedef bool (*PrimType)(const std::vector<TypeVar *> &args, TypeVar *out);
+typedef void (*PrimFn)(void *data, Runtime &runtime, Scope *scope, size_t output, size_t nargs,
+                       Value **args);
+#define PRIMTYPE(name) bool name(const std::vector<TypeVar *> &args, TypeVar *out)
+#define PRIMFN(name) \
+  void name(void *data, Runtime &runtime, Scope *scope, size_t output, size_t nargs, Value **args)
 
 /* The evaluation order of wake makes two guarantees:
  *   [1] Exactly the effects of straight-line execution are produced.
@@ -59,7 +61,7 @@ typedef void (*PrimFn)(void *data, Runtime &runtime, Scope *scope, size_t output
 /* Function only depends on it's arguments and has no effects.
  * Allow: all optimizations
  */
-#define PRIM_PURE	0
+#define PRIM_PURE 0
 
 /* Observes location in the happens-before stream (beyond it's arguments).
  * May not be moved earlier in the dependency tree (ie: up the AST).
@@ -68,7 +70,7 @@ typedef void (*PrimFn)(void *data, Runtime &runtime, Scope *scope, size_t output
  * Forbid:  loop invariant lifting (LVL), common sub-expression elimination (CSE)
  * Unclear: duplicating
  */
-#define PRIM_ORDERED	1
+#define PRIM_ORDERED 1
 
 /* Produces something visible outside wake.
  * Number of invocations must remain unchanged.
@@ -76,27 +78,28 @@ typedef void (*PrimFn)(void *data, Runtime &runtime, Scope *scope, size_t output
  * Allow:  Inlining
  * Forbid: LVL, CSE, DE, LTU
  */
-#define PRIM_EFFECT	2
+#define PRIM_EFFECT 2
 
-#define PRIM_IMPURE	(PRIM_EFFECT|PRIM_ORDERED)
+#define PRIM_IMPURE (PRIM_EFFECT | PRIM_ORDERED)
 
 /* This primitive has a function argument which it will invoke.
  * The status of the primitive depends on that argument.
  */
-#define PRIM_FNARG	4
+#define PRIM_FNARG 4
 
 /* Register primitive functions */
 struct PrimDesc {
-  PrimFn   fn;
+  PrimFn fn;
   PrimType type;
-  int      flags;
-  void    *data;
+  int flags;
+  void *data;
 
   PrimDesc(PrimFn fn_, PrimType type_, int flags_, void *data_ = 0)
-   : fn(fn_), type(type_), flags(flags_), data(data_) { }
+      : fn(fn_), type(type_), flags(flags_), data(data_) {}
 };
 
 typedef std::map<std::string, PrimDesc> PrimMap;
-void prim_register(PrimMap &pmap, const char *key, PrimFn fn, PrimType type, int flags, void *data = 0);
+void prim_register(PrimMap &pmap, const char *key, PrimFn fn, PrimType type, int flags,
+                   void *data = 0);
 
 #endif

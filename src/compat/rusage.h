@@ -21,11 +21,11 @@
 #include <stdint.h>
 
 struct RUsage {
-  double utime;    // Time spent running userspace in seconds
-  double stime;    // Time spent running kernel calls
-  uint64_t ibytes;   // read from disk
-  uint64_t obytes;   // written to disk
-  uint64_t membytes; // maximum resident set size
+  double utime;       // Time spent running userspace in seconds
+  double stime;       // Time spent running kernel calls
+  uint64_t ibytes;    // read from disk
+  uint64_t obytes;    // written to disk
+  uint64_t membytes;  // maximum resident set size
 };
 
 #ifdef __cplusplus

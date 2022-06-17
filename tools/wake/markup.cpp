@@ -19,19 +19,20 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <assert.h>
-
-#include <set>
-#include <vector>
-#include <fstream>
-
-#include "json/json5.h"
-#include "util/execpath.h"
-#include "dst/expr.h"
 #include "markup.h"
 
+#include <assert.h>
+
+#include <fstream>
+#include <set>
+#include <vector>
+
+#include "dst/expr.h"
+#include "json/json5.h"
+#include "util/execpath.h"
+
 struct ParanOrder {
-  bool operator () (Expr *a, Expr *b) const {
+  bool operator()(Expr *a, Expr *b) const {
     FileFragment fa = a->fragment;
     FileFragment fb = b->fragment;
     int cmp = strcmp(fa.filename(), fb.filename());
@@ -44,14 +45,14 @@ struct ParanOrder {
 };
 
 struct JSONRender {
-  typedef std::set<Expr*, ParanOrder> ESet;
+  typedef std::set<Expr *, ParanOrder> ESet;
   std::string libdir;
   std::vector<std::unique_ptr<Expr> > defs;
   std::ostream &os;
   ESet eset;
   ESet::iterator it;
 
-  JSONRender(const std::string &libdir_, std::ostream &os_) : libdir(libdir_), os(os_) { }
+  JSONRender(const std::string &libdir_, std::ostream &os_) : libdir(libdir_), os(os_) {}
 
   std::string filename(const FileFragment &frag) const;
   void explore(Expr *expr);
@@ -61,7 +62,8 @@ struct JSONRender {
 
 std::string JSONRender::filename(const FileFragment &frag) const {
   const char *filename = frag.filename();
-  if (libdir.compare(0, libdir.size(), filename, libdir.size()) == 0 && filename[libdir.size()] == '/') {
+  if (libdir.compare(0, libdir.size(), filename, libdir.size()) == 0 &&
+      filename[libdir.size()] == '/') {
     return json_escape(std::string("<stdlib>") + (filename + libdir.size()));
   } else {
     return json_escape(frag.filename());
@@ -69,15 +71,14 @@ std::string JSONRender::filename(const FileFragment &frag) const {
 }
 
 void JSONRender::explore(Expr *expr) {
-  if (!expr->fragment.empty() && (expr->flags & FLAG_AST) != 0)
-    eset.insert(expr);
+  if (!expr->fragment.empty() && (expr->flags & FLAG_AST) != 0) eset.insert(expr);
 
   if (expr->type == &App::type) {
-    App *app = static_cast<App*>(expr);
+    App *app = static_cast<App *>(expr);
     explore(app->val.get());
     explore(app->fn.get());
   } else if (expr->type == &Lambda::type) {
-    Lambda *lambda = static_cast<Lambda*>(expr);
+    Lambda *lambda = static_cast<Lambda *>(expr);
     if (!lambda->token.empty()) {
       auto foo = new VarArg(lambda->token);
       foo->typeVar.setDOB(lambda->typeVar[0]);
@@ -87,10 +88,10 @@ void JSONRender::explore(Expr *expr) {
     }
     explore(lambda->body.get());
   } else if (expr->type == &Ascribe::type) {
-    Ascribe *ascribe = static_cast<Ascribe*>(expr);
+    Ascribe *ascribe = static_cast<Ascribe *>(expr);
     explore(ascribe->body.get());
   } else if (expr->type == &DefBinding::type) {
-    DefBinding *defbinding = static_cast<DefBinding*>(expr);
+    DefBinding *defbinding = static_cast<DefBinding *>(expr);
     for (auto &i : defbinding->val) explore(i.get());
     for (auto &i : defbinding->fun) explore(i.get());
     for (auto &i : defbinding->order) {
@@ -101,10 +102,10 @@ void JSONRender::explore(Expr *expr) {
         if (i.first.compare(0, 6, "topic ") == 0) {
           // expr = VarRef(Nil) | App(App(VarRef(++),Ascribe(VarRef(pub))), expr)
           while (expr->type == &App::type) {
-            App *app1 = static_cast<App*>(expr);
-            App *app2 = static_cast<App*>(app1->fn.get());
-            Ascribe *asc = static_cast<Ascribe*>(app2->val.get());
-            VarRef *pub = static_cast<VarRef*>(asc->body.get());
+            App *app1 = static_cast<App *>(expr);
+            App *app2 = static_cast<App *>(app1->fn.get());
+            Ascribe *asc = static_cast<Ascribe *>(app2->val.get());
+            VarRef *pub = static_cast<VarRef *>(asc->body.get());
             auto ref = new VarRef(pub->target, i.first);
             ref->target = i.second.fragment;
             ref->typeVar.setDOB(expr->typeVar);
@@ -129,24 +130,17 @@ void JSONRender::explore(Expr *expr) {
 void JSONRender::dump() {
   FileFragment self = (*it)->fragment;
 
-  os
-    << "{\"type\":\"" << (*it)->type->name
-    << "\",\"range\":[" << self.startByte()
-    << "," << self.endByte()
-    << "],\"sourceType\":\"";
+  os << "{\"type\":\"" << (*it)->type->name << "\",\"range\":[" << self.startByte() << ","
+     << self.endByte() << "],\"sourceType\":\"";
   (*it)->typeVar.format(os, (*it)->typeVar);
   os << "\"";
 
-
   if ((*it)->type == &VarRef::type) {
-    VarRef *ref = static_cast<VarRef*>(*it);
+    VarRef *ref = static_cast<VarRef *>(*it);
     FileFragment target = ref->target;
     if (!target.empty()) {
-      os
-        << ",\"target\":{\"filename\":\"" << filename(target)
-        << "\",\"range\":[" << target.startByte()
-        << "," << target.endByte()
-        << "]}";
+      os << ",\"target\":{\"filename\":\"" << filename(target) << "\",\"range\":["
+         << target.startByte() << "," << target.endByte() << "]}";
     }
   }
 
@@ -157,7 +151,10 @@ void JSONRender::dump() {
     FileFragment child = (*it)->fragment;
     if (child.filename() != self.filename()) break;
     if (child.startByte() >= self.endByte()) break;
-    if (body) os << ","; else os << ",\"body\":[";
+    if (body)
+      os << ",";
+    else
+      os << ",\"body\":[";
     body = true;
     dump();
   }
@@ -177,11 +174,8 @@ void JSONRender::render(Expr *root) {
     StringSegment content = fragment.fcontent()->segment();
     if (comma) os << ",";
     comma = true;
-    os
-      << "{\"type\":\"Program\",\"filename\":\"" << filename(fragment)
-      << "\",\"range\":[0," << content.size()
-      << "],\"source\":\"" << json_escape(content.str())
-      << "\",\"body\":[";
+    os << "{\"type\":\"Program\",\"filename\":\"" << filename(fragment) << "\",\"range\":[0,"
+       << content.size() << "],\"source\":\"" << json_escape(content.str()) << "\",\"body\":[";
     bool comma = false;
     while (it != eset.end() && (*it)->fragment.filename() == fragment.filename()) {
       if (comma) os << ",";
@@ -216,7 +210,8 @@ void markup_html(const std::string &libdir, std::ostream &os, Expr *root) {
   os << "</script>" << std::endl;
 }
 
-void format_reexports(std::ostream &os, const char *package, const char *kind, const std::vector<std::string> &mixed) {
+void format_reexports(std::ostream &os, const char *package, const char *kind,
+                      const std::vector<std::string> &mixed) {
   std::set<std::string> id, binary, unary;
   for (auto &t : mixed) {
     if (t.compare(0, 7, "binary ") == 0) {

@@ -22,8 +22,8 @@
 #include <string>
 #include <vector>
 
-#include "types/primfn.h"
 #include "tuple.h"
+#include "types/primfn.h"
 
 struct String;
 struct Integer;
@@ -34,38 +34,69 @@ struct Record;
 struct Expr;
 
 /* Macros for handling inputs from wake */
-#define RETURN(val) do {						\
-  scope->at(output)->fulfill(runtime, val);				\
-  return;								\
-} while (0)
+#define RETURN(val)                           \
+  do {                                        \
+    scope->at(output)->fulfill(runtime, val); \
+    return;                                   \
+  } while (0)
 
 void require_fail(const char *message, unsigned size, Runtime &runtime, const Scope *scope);
 
 #define STR(x) #x
 #define STR2(x) STR(x)
-#define REQUIRE(b) do {							\
-  if (!(b)) {								\
-    const char message[] =						\
-      "Requirement " STR(b) " failed at " 				\
-      __FILE__ ":" STR2(__LINE__) "\n";					\
-    require_fail(message, sizeof(message), runtime, scope);		\
-    return;								\
-  }									\
-} while (0)
+#define REQUIRE(b)                                                                                 \
+  do {                                                                                             \
+    if (!(b)) {                                                                                    \
+      const char message[] = "Requirement " STR(b) " failed at " __FILE__ ":" STR2(__LINE__) "\n"; \
+      require_fail(message, sizeof(message), runtime, scope);                                      \
+      return;                                                                                      \
+    }                                                                                              \
+  } while (0)
 
-#define EXPECT(num) do {	\
-  (void)data;			\
-  REQUIRE(nargs == num);	\
-} while (0)
+#define EXPECT(num)        \
+  do {                     \
+    (void)data;            \
+    REQUIRE(nargs == num); \
+  } while (0)
 
-#define STRING(arg, i)  do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(String));  } while(0); String  *arg = static_cast<String *>(args[i]);
-#define INTEGER(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Integer)); } while(0); Integer *arg = static_cast<Integer*>(args[i]);
-#define DOUBLE(arg, i)  do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Double));  } while(0); Double  *arg = static_cast<Double *>(args[i]);
-#define REGEXP(arg, i)	do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(RegExp));  } while(0); RegExp  *arg = static_cast<RegExp *>(args[i]);
-#define CLOSURE(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Closure)); } while(0); Closure *arg = static_cast<Closure*>(args[i]);
-#define RECORD(arg, i)   Record *arg = static_cast<Record*>(args[i]);
+#define STRING(arg, i)                       \
+  do {                                       \
+    HeapObject *arg = args[i];               \
+    REQUIRE(typeid(*arg) == typeid(String)); \
+  } while (0);                               \
+  String *arg = static_cast<String *>(args[i]);
+#define INTEGER(arg, i)                       \
+  do {                                        \
+    HeapObject *arg = args[i];                \
+    REQUIRE(typeid(*arg) == typeid(Integer)); \
+  } while (0);                                \
+  Integer *arg = static_cast<Integer *>(args[i]);
+#define DOUBLE(arg, i)                       \
+  do {                                       \
+    HeapObject *arg = args[i];               \
+    REQUIRE(typeid(*arg) == typeid(Double)); \
+  } while (0);                               \
+  Double *arg = static_cast<Double *>(args[i]);
+#define REGEXP(arg, i)                       \
+  do {                                       \
+    HeapObject *arg = args[i];               \
+    REQUIRE(typeid(*arg) == typeid(RegExp)); \
+  } while (0);                               \
+  RegExp *arg = static_cast<RegExp *>(args[i]);
+#define CLOSURE(arg, i)                       \
+  do {                                        \
+    HeapObject *arg = args[i];                \
+    REQUIRE(typeid(*arg) == typeid(Closure)); \
+  } while (0);                                \
+  Closure *arg = static_cast<Closure *>(args[i]);
+#define RECORD(arg, i) Record *arg = static_cast<Record *>(args[i]);
 
-#define INTEGER_MPZ(arg, i) do { HeapObject *arg = args[i]; REQUIRE(typeid(*arg) == typeid(Integer)); } while(0); mpz_t arg = { static_cast<Integer*>(args[i])->wrap() };
+#define INTEGER_MPZ(arg, i)                   \
+  do {                                        \
+    HeapObject *arg = args[i];                \
+    REQUIRE(typeid(*arg) == typeid(Integer)); \
+  } while (0);                                \
+  mpz_t arg = {static_cast<Integer *>(args[i])->wrap()};
 
 /* Useful expressions for primitives */
 Value *alloc_order(Heap &h, int x);
@@ -75,12 +106,14 @@ inline size_t reserve_bool() { return Record::reserve(0); }
 inline size_t reserve_order() { return Record::reserve(0); }
 inline size_t reserve_tuple2() { return Record::reserve(2); }
 inline size_t reserve_result() { return Record::reserve(1); }
-inline size_t reserve_list(size_t elements) { return Record::reserve(2) * elements + Record::reserve(0); }
+inline size_t reserve_list(size_t elements) {
+  return Record::reserve(2) * elements + Record::reserve(0);
+}
 Value *claim_unit(Heap &h);
 Value *claim_bool(Heap &h, bool x);
 Value *claim_tuple2(Heap &h, Value *first, Value *second);
 Value *claim_result(Heap &h, bool ok, Value *value);
-Value *claim_list(Heap &h, size_t elements, Value** values);
+Value *claim_list(Heap &h, size_t elements, Value **values);
 
 size_t reserve_hash();
 Work *claim_hash(Heap &h, Value *value, Continuation *continuation);
@@ -96,8 +129,9 @@ struct StringInfo {
   std::string version;
   std::string wake_cwd;
   char **cmdline;
-  StringInfo(bool v, bool d, bool q, const std::string &version_, const std::string &wake_cwd_, char **cmdline_)
-   : verbose(v), debug(d), quiet(q), version(version_), wake_cwd(wake_cwd_), cmdline(cmdline_) { }
+  StringInfo(bool v, bool d, bool q, const std::string &version_, const std::string &wake_cwd_,
+             char **cmdline_)
+      : verbose(v), debug(d), quiet(q), version(version_), wake_cwd(wake_cwd_), cmdline(cmdline_) {}
 };
 
 void prim_register_string(PrimMap &pmap, StringInfo *info);

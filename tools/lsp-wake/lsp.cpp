@@ -20,32 +20,33 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <poll.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <poll.h>
 
-#include <iostream>
-#include <string>
-#include <map>
-#include <fstream>
-#include <utility>
 #include <algorithm>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <string>
+#include <utility>
 
+#include "astree.h"
 #include "compat/readable.h"
-#include "util/location.h"
-#include "util/execpath.h"
-#include "util/diagnostic.h"
 #include "json/json5.h"
+#include "json_converter.h"
 #include "parser/parser.h"
 #include "parser/wakefiles.h"
 #include "types/internal.h"
-#include "json_converter.h"
-#include "astree.h"
+#include "util/diagnostic.h"
+#include "util/execpath.h"
+#include "util/location.h"
 
 #ifdef __EMSCRIPTEN__
 #define CERR_DEBUG
 #include <emscripten/emscripten.h>
 
+// clang-format off
 EM_ASYNC_JS(char *, nodejs_getstdin, (), {
   var buffer = "";
 
@@ -84,473 +85,478 @@ EM_ASYNC_JS(char *, nodejs_getstdin, (), {
     return stringOnWasmHeap;
   }
 });
+// clang-format on
+
 #endif
 
 // Header used in JSON-RPC
 static const char contentLength[] = "Content-Length: ";
 
 // Defined by JSON RPC
-static const char *ParseError           = "-32700";
-static const char *InvalidRequest       = "-32600";
-static const char *MethodNotFound       = "-32601";
-static const char *InvalidParams        = "-32602";
-//static const char *InternalError        = "-32603";
-//static const char *serverErrorStart     = "-32099";
-//static const char *serverErrorEnd       = "-32000";
+static const char *ParseError = "-32700";
+static const char *InvalidRequest = "-32600";
+static const char *MethodNotFound = "-32601";
+static const char *InvalidParams = "-32602";
+// static const char *InternalError        = "-32603";
+// static const char *serverErrorStart     = "-32099";
+// static const char *serverErrorEnd       = "-32000";
 static const char *ServerNotInitialized = "-32002";
-//static const char *UnknownErrorCode     = "-32001";
+// static const char *UnknownErrorCode     = "-32001";
 
 DiagnosticReporter *reporter;
 
 const char *term_colour(int _) { return ""; }
-const char *term_normal()         { return ""; }
-
+const char *term_normal() { return ""; }
 
 class LSPServer {
-public:
-    LSPServer(): astree() {}
-    explicit LSPServer(std::string _stdLib) : astree(std::move(_stdLib)) {}
-    explicit LSPServer(bool _isSTDLibValid, std::string _stdLib) : isSTDLibValid(_isSTDLibValid), astree(std::move(_stdLib)) {}
+ public:
+  LSPServer() : astree() {}
+  explicit LSPServer(std::string _stdLib) : astree(std::move(_stdLib)) {}
+  explicit LSPServer(bool _isSTDLibValid, std::string _stdLib)
+      : isSTDLibValid(_isSTDLibValid), astree(std::move(_stdLib)) {}
 
-    void processRequests() {
-      std::string buffer;
+  void processRequests() {
+    std::string buffer;
 
+    while (true) {
+      size_t json_size = 0;
+      // Read header lines until an empty line
       while (true) {
-        size_t json_size = 0;
-        // Read header lines until an empty line
-        while (true) {
-          // Grab a line, terminated by a not-included '\n'
-          std::string line = getLine(buffer);
-          // Trim trailing CR, if any
-          if (!line.empty() && line.back() == '\r')
-            line.resize(line.size() - 1);
-          // Empty line? stop
-          if (line.empty())
-            break;
-          // Capture the json_size
-          if (line.compare(0, sizeof(contentLength) - 1, &contentLength[0]) == 0)
-            json_size = std::stoul(line.substr(sizeof(contentLength) - 1));
-        }
+        // Grab a line, terminated by a not-included '\n'
+        std::string line = getLine(buffer);
+        // Trim trailing CR, if any
+        if (!line.empty() && line.back() == '\r') line.resize(line.size() - 1);
+        // Empty line? stop
+        if (line.empty()) break;
+        // Capture the json_size
+        if (line.compare(0, sizeof(contentLength) - 1, &contentLength[0]) == 0)
+          json_size = std::stoul(line.substr(sizeof(contentLength) - 1));
+      }
 
-        // Content-Length was unset?
-        if (json_size == 0)
-          exit(1);
+      // Content-Length was unset?
+      if (json_size == 0) exit(1);
 
-        // Retrieve the content
-        std::string content = getBlob(buffer, json_size);
+      // Retrieve the content
+      std::string content = getBlob(buffer, json_size);
 
-        // Parse that content as JSON
-        JAST request;
-        std::stringstream parseErrors;
-        if (!JAST::parse(content, parseErrors, request)) {
-          JAST errorMessage = JSONConverter::createErrorMessage(ParseError, parseErrors.str());
+      // Parse that content as JSON
+      JAST request;
+      std::stringstream parseErrors;
+      if (!JAST::parse(content, parseErrors, request)) {
+        JAST errorMessage = JSONConverter::createErrorMessage(ParseError, parseErrors.str());
+        sendMessage(errorMessage);
+      } else {
+        const std::string &method = request.get("method").value;
+        if (!isInitialized && (method != "initialize")) {
+          JAST errorMessage = JSONConverter::createErrorMessage(request, ServerNotInitialized,
+                                                                "Must request initialize first");
           sendMessage(errorMessage);
-        } else {
-          const std::string &method = request.get("method").value;
-          if (!isInitialized && (method != "initialize")) {
-            JAST errorMessage = JSONConverter::createErrorMessage(request, ServerNotInitialized, "Must request initialize first");
-            sendMessage(errorMessage);
-          } else if (isShutDown && (method != "exit")) {
-            JAST errorMessage = JSONConverter::createErrorMessage(request, InvalidRequest, "Received a request other than 'exit' after a shutdown request.");
-            sendMessage(errorMessage);
-          } else if (!method.empty()) {
-            callMethod(method, request);
-          }
+        } else if (isShutDown && (method != "exit")) {
+          JAST errorMessage = JSONConverter::createErrorMessage(
+              request, InvalidRequest,
+              "Received a request other than 'exit' after a shutdown request.");
+          sendMessage(errorMessage);
+        } else if (!method.empty()) {
+          callMethod(method, request);
         }
       }
     }
+  }
 
-    void notifyAboutInvalidSTDLib() const {
-      JAST message = JSONConverter::createMessage();
-      message.add("method", "window/showMessage");
-      JAST &showMessageParams = message.add("params", JSON_OBJECT);
-      showMessageParams.add("type", 1); // Error
-      std::string messageText =
+  void notifyAboutInvalidSTDLib() const {
+    JAST message = JSONConverter::createMessage();
+    message.add("method", "window/showMessage");
+    JAST &showMessageParams = message.add("params", JSON_OBJECT);
+    showMessageParams.add("type", 1);  // Error
+    std::string messageText =
         "The path to the wake standard library (" + astree.absLibDir + ") is invalid. " +
         "Wake language features will not be provided. " +
         "Please change the path in the extension settings and reload the window by: " +
         "  1. Opening the command palette (Ctrl + Shift + P); " +
         "  2. Typing \"> Reload Window\" and executing (Enter);";
-      showMessageParams.add("message", messageText.c_str());
-      sendMessage(message);
-    }
+    showMessageParams.add("message", messageText.c_str());
+    sendMessage(message);
+  }
 
-private:
-    typedef void (LSPServer::*LspMethod)(const JAST &);
+ private:
+  typedef void (LSPServer::*LspMethod)(const JAST &);
 
-    bool isSTDLibValid = true;
-    bool isInitialized = false;
-    bool needsUpdate = false;
-    int ignoredCount = 0;
-    bool isShutDown = false;
-    ASTree astree;
-    std::map<std::string, LspMethod> essentialMethods = {
-      {"initialize",                      &LSPServer::initialize},
-      {"initialized",                     &LSPServer::initialized},
-      {"textDocument/didOpen",            &LSPServer::didOpen},
-      {"textDocument/didChange",          &LSPServer::didChange},
-      {"textDocument/didSave",            &LSPServer::didSave},
-      {"textDocument/didClose",           &LSPServer::didClose},
+  bool isSTDLibValid = true;
+  bool isInitialized = false;
+  bool needsUpdate = false;
+  int ignoredCount = 0;
+  bool isShutDown = false;
+  ASTree astree;
+  std::map<std::string, LspMethod> essentialMethods = {
+      {"initialize", &LSPServer::initialize},
+      {"initialized", &LSPServer::initialized},
+      {"textDocument/didOpen", &LSPServer::didOpen},
+      {"textDocument/didChange", &LSPServer::didChange},
+      {"textDocument/didSave", &LSPServer::didSave},
+      {"textDocument/didClose", &LSPServer::didClose},
       {"workspace/didChangeWatchedFiles", &LSPServer::didChangeWatchedFiles},
-      {"shutdown",                        &LSPServer::shutdown},
-      {"exit",                            &LSPServer::serverExit}
-    };
-    std::map<std::string, LspMethod> additionalMethods = {
-      {"textDocument/definition",         &LSPServer::goToDefinition},
-      {"textDocument/references",         &LSPServer::findReportReferences},
-      {"textDocument/documentHighlight",  &LSPServer::highlightOccurrences},
-      {"textDocument/hover",              &LSPServer::hover},
-      {"textDocument/documentSymbol",     &LSPServer::documentSymbol},
-      {"workspace/symbol",                &LSPServer::workspaceSymbol},
-      {"textDocument/rename",             &LSPServer::rename}
-    };
+      {"shutdown", &LSPServer::shutdown},
+      {"exit", &LSPServer::serverExit}};
+  std::map<std::string, LspMethod> additionalMethods = {
+      {"textDocument/definition", &LSPServer::goToDefinition},
+      {"textDocument/references", &LSPServer::findReportReferences},
+      {"textDocument/documentHighlight", &LSPServer::highlightOccurrences},
+      {"textDocument/hover", &LSPServer::hover},
+      {"textDocument/documentSymbol", &LSPServer::documentSymbol},
+      {"workspace/symbol", &LSPServer::workspaceSymbol},
+      {"textDocument/rename", &LSPServer::rename}};
 
-    std::string getLine(std::string &buffer) {
-      size_t len = 0, off = buffer.find('\n');
-      while (off == std::string::npos) {
-        std::string got = getStdin();
-        len = buffer.size();
-        off = got.find('\n');
-        buffer.append(got);
-      }
-
-      off += len;
-      std::string out(buffer, 0, off); // excluding '\n'
-      buffer.erase(0, off+1); // including '\n'
-      return out;
+  std::string getLine(std::string &buffer) {
+    size_t len = 0, off = buffer.find('\n');
+    while (off == std::string::npos) {
+      std::string got = getStdin();
+      len = buffer.size();
+      off = got.find('\n');
+      buffer.append(got);
     }
 
-    std::string getBlob(std::string &buffer, size_t length) {
-      while (buffer.size() < length)
-        buffer.append(getStdin());
+    off += len;
+    std::string out(buffer, 0, off);  // excluding '\n'
+    buffer.erase(0, off + 1);         // including '\n'
+    return out;
+  }
 
-      std::string out(buffer, 0, length);
-      buffer.erase(0, length);
-      return out;
-    }
+  std::string getBlob(std::string &buffer, size_t length) {
+    while (buffer.size() < length) buffer.append(getStdin());
 
-    std::string getStdin() {
-      while (true) {
+    std::string out(buffer, 0, length);
+    buffer.erase(0, length);
+    return out;
+  }
+
+  std::string getStdin() {
+    while (true) {
 #ifdef __EMSCRIPTEN__
-        char *buf = nodejs_getstdin();
-        if (!buf) {
+      char *buf = nodejs_getstdin();
+      if (!buf) {
 #ifdef CERR_DEBUG
-          std::cerr << "Client did not shutdown cleanly" << std::endl;
+        std::cerr << "Client did not shutdown cleanly" << std::endl;
 #endif
-          exit(1);
-        }
+        exit(1);
+      }
 
-        std::string out(buf, strlen(buf));
-        free(buf);
+      std::string out(buf, strlen(buf));
+      free(buf);
 
-        if (out.empty()) {
-          timeout();
-          continue;
-        }
+      if (out.empty()) {
+        timeout();
+        continue;
+      }
 
-        return out;
+      return out;
 #else
-        struct pollfd pfds;
-        pfds.fd = STDIN_FILENO;
-        pfds.events = POLLIN;
+      struct pollfd pfds;
+      pfds.fd = STDIN_FILENO;
+      pfds.events = POLLIN;
 
-        int ret = poll(&pfds, 1, 2000);
-        if (ret == -1) {
-          perror("poll(stdin)");
-          exit(1);
-        }
-
-        // Timeout expired?
-        if (ret == 0) {
-          timeout();
-          continue;
-        }
-
-        char buf[4096];
-        int got = read(STDIN_FILENO, &buf[0], sizeof(buf));
-        if (got == -1) {
-          perror("read(stdin)");
-          exit(1);
-        }
-
-        // End-of-file reached?
-        if (got == 0) {
-#ifdef CERR_DEBUG
-          std::cerr << "Client did not shutdown cleanly" << std::endl;
-#endif
-          exit(1);
-        }
-
-        return std::string(&buf[0], got);
-#endif
+      int ret = poll(&pfds, 1, 2000);
+      if (ret == -1) {
+        perror("poll(stdin)");
+        exit(1);
       }
-    }
 
-    void refresh(const std::string &why) {
-      ignoredCount = 0;
-      if (needsUpdate) {
-#ifdef CERR_DEBUG
-        struct timeval start, stop;
-        gettimeofday(&start, 0);
-#endif
-        diagnoseProject();
-#ifdef CERR_DEBUG
-        gettimeofday(&stop, 0);
-        double delay =
-          (stop.tv_sec  - start.tv_sec) +
-          (stop.tv_usec - start.tv_usec)/1000000.0;
-        std::cerr << "Refreshed project in " << delay << " seconds (due to " << why << ")" << std::endl;
-#endif
+      // Timeout expired?
+      if (ret == 0) {
+        timeout();
+        continue;
       }
-    }
 
-    void timeout() {
-      refresh("timeout");
-    }
+      char buf[4096];
+      int got = read(STDIN_FILENO, &buf[0], sizeof(buf));
+      if (got == -1) {
+        perror("read(stdin)");
+        exit(1);
+      }
 
-    void callMethod(const std::string &method, const JAST &request) {
-      auto functionPointer = essentialMethods.find(method);
-      if (functionPointer != essentialMethods.end()) {
+      // End-of-file reached?
+      if (got == 0) {
+#ifdef CERR_DEBUG
+        std::cerr << "Client did not shutdown cleanly" << std::endl;
+#endif
+        exit(1);
+      }
+
+      return std::string(&buf[0], got);
+#endif
+    }
+  }
+
+  void refresh(const std::string &why) {
+    ignoredCount = 0;
+    if (needsUpdate) {
+#ifdef CERR_DEBUG
+      struct timeval start, stop;
+      gettimeofday(&start, 0);
+#endif
+      diagnoseProject();
+#ifdef CERR_DEBUG
+      gettimeofday(&stop, 0);
+      double delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
+      std::cerr << "Refreshed project in " << delay << " seconds (due to " << why << ")"
+                << std::endl;
+#endif
+    }
+  }
+
+  void timeout() { refresh("timeout"); }
+
+  void callMethod(const std::string &method, const JAST &request) {
+    auto functionPointer = essentialMethods.find(method);
+    if (functionPointer != essentialMethods.end()) {
+      (this->*(functionPointer->second))(request);
+    } else {
+      functionPointer = additionalMethods.find(method);
+      if (functionPointer != additionalMethods.end()) {
         (this->*(functionPointer->second))(request);
       } else {
-        functionPointer = additionalMethods.find(method);
-        if (functionPointer != additionalMethods.end()) {
-          (this->*(functionPointer->second))(request);
-        } else {
-          JAST errorMessage = JSONConverter::createErrorMessage(request, MethodNotFound, "Method '" + method + "' is not implemented.");
-          sendMessage(errorMessage);
-        }
-      }
-    }
-
-    static void sendMessage(const JAST &message) {
-      std::stringstream str;
-      str << message;
-      str.seekg(0, std::ios::end);
-      size_t length = str.tellg();
-      str.seekg(0, std::ios::beg);
-      std::cout << contentLength << (length+2) << "\r\n\r\n";
-      std::cout << str.rdbuf() << "\r\n" << std::flush;
-    }
-
-    void initialize(const JAST &receivedMessage) {
-      JAST message(JSON_OBJECT);
-      if (!isSTDLibValid) {
-        notifyAboutInvalidSTDLib();
-        message = JSONConverter::createInitializeResultInvalidSTDLib(receivedMessage);
-      } else {
-        message = JSONConverter::createInitializeResultDefault(receivedMessage);
-      }
-
-      isInitialized = true;
-      astree.absWorkDir = JSONConverter::decodePath(receivedMessage.get("params").get("rootUri").value);
-      sendMessage(message);
-
-      if (isSTDLibValid) {
-        needsUpdate = true;
-        refresh("initialize");
-      }
-    }
-
-    void initialized(const JAST &_) { }
-
-    void registerCapabilities() {
-      JAST message = JSONConverter::createRequestMessage();
-      message.add("method", "client/registerCapability");
-      JAST &registrationParams = message.add("params", JSON_OBJECT);
-      JAST &registrations = registrationParams.add("registrations", JSON_ARRAY);
-
-      for (const auto &method: additionalMethods) {
-        JAST &registration = registrations.add("", JSON_OBJECT);
-        registration.add("id", method.first.c_str());
-        registration.add("method", method.first.c_str());
-      }
-      sendMessage(message);
-    }
-
-    void diagnoseProject() {
-      astree.diagnoseProject([](ASTree::FileDiagnostics &fileDiagnostics) {
-        JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(fileDiagnostics.first, fileDiagnostics.second);
-        sendMessage(fileDiagnosticsJSON);
-      });
-      needsUpdate = false;
-    }
-
-    void goToDefinition(const JAST &receivedMessage) {
-      refresh("goto-definition");
-      Location locationToDefine = JSONConverter::getLocationFromJSON(receivedMessage);
-      Location definitionLocation = astree.findDefinitionLocation(locationToDefine);
-      JAST definitionLocationJSON = JSONConverter::definitionLocationToJSON(receivedMessage, definitionLocation);
-      sendMessage(definitionLocationJSON);
-    }
-
-    void findReportReferences(const JAST &receivedMessage) {
-      refresh("report-references");
-      Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage);
-      bool isDefinitionFound = false;
-      std::vector<Location> references;
-
-      astree.findReferences(definitionLocation, isDefinitionFound, references);
-      if (isDefinitionFound && receivedMessage.get("params").get("context").get("includeDeclaration").value == "true") {
-        references.push_back(definitionLocation);
-      }
-
-      JAST referencesJSON = JSONConverter::referencesToJSON(receivedMessage, references);
-      sendMessage(referencesJSON);
-    }
-
-    void highlightOccurrences(const JAST &receivedMessage) {
-      if (needsUpdate) {
-        if (++ignoredCount > 2) {
-          refresh("highlight");
-        } else {
-#ifdef CERR_DEBUG
-          std::cerr << "Opting not to refresh code for highlight request" << std::endl;
-#endif
-        }
-      }
-      Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage);
-      std::vector<Location> occurrences = astree.findOccurrences(symbolLocation);
-      JAST highlightsJSON = JSONConverter::highlightsToJSON(receivedMessage, occurrences);
-      sendMessage(highlightsJSON);
-    }
-
-    void hover(const JAST &receivedMessage) {
-      if (needsUpdate) {
-        if (++ignoredCount > 2) {
-          refresh("hover");
-        } else {
-#ifdef CERR_DEBUG
-          std::cerr << "Opting not to refresh code for hover request" << std::endl;
-#endif
-        }
-      }
-      Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage);
-      std::vector<SymbolDefinition> hoverInfoPieces = astree.findHoverInfo(symbolLocation);
-      JAST hoverInfoJSON = JSONConverter::hoverInfoToJSON(receivedMessage, hoverInfoPieces);
-      sendMessage(hoverInfoJSON);
-    }
-
-    void documentSymbol(const JAST &receivedMessage) {
-      if (needsUpdate) {
-        if (++ignoredCount > 2) {
-          refresh("document-symbol");
-        } else {
-#ifdef CERR_DEBUG
-          std::cerr << "Opting not to refresh code for document-symbol request" << std::endl;
-#endif
-        }
-      }
-      JAST message = JSONConverter::createResponseMessage(receivedMessage);
-      JAST &result = message.add("result", JSON_ARRAY);
-
-      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      std::string filePath = JSONConverter::decodePath(fileUri);
-
-      std::vector<SymbolDefinition> symbols = astree.documentSymbol(filePath);
-      for (const SymbolDefinition &symbol: symbols) {
-        JSONConverter::appendSymbolToJSON(symbol, result);
-      }
-      sendMessage(message);
-    }
-
-    void workspaceSymbol(const JAST &receivedMessage) {
-      refresh("workspace-symbol");
-      JAST message = JSONConverter::createResponseMessage(receivedMessage);
-      JAST &result = message.add("result", JSON_ARRAY);
-
-      std::string query = receivedMessage.get("params").get("query").value;
-      std::vector<SymbolDefinition> symbols = astree.workspaceSymbol(query);
-      for (const SymbolDefinition &symbol: symbols) {
-        JSONConverter::appendSymbolToJSON(symbol, result);
-      }
-      sendMessage(message);
-    }
-
-    void rename(const JAST &receivedMessage) {
-      refresh("rename-symbol");
-      std::string newName = receivedMessage.get("params").get("newName").value;
-      if (newName.find(' ') != std::string::npos || (newName[0] >= '0' && newName[0] <= '9')) {
-        JAST errorMessage = JSONConverter::createErrorMessage(receivedMessage, InvalidParams, "The given name is invalid.");
+        JAST errorMessage = JSONConverter::createErrorMessage(
+            request, MethodNotFound, "Method '" + method + "' is not implemented.");
         sendMessage(errorMessage);
-        return;
       }
+    }
+  }
 
-      Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage);
-      bool isDefinitionFound = false;
-      std::vector<Location> references;
-      astree.findReferences(definitionLocation, isDefinitionFound, references);
-      if (isDefinitionFound) {
-        references.push_back(definitionLocation);
-      }
-      JAST workspaceEditsJSON = JSONConverter::workspaceEditsToJSON(receivedMessage, references, newName);
-      sendMessage(workspaceEditsJSON);
+  static void sendMessage(const JAST &message) {
+    std::stringstream str;
+    str << message;
+    str.seekg(0, std::ios::end);
+    size_t length = str.tellg();
+    str.seekg(0, std::ios::beg);
+    std::cout << contentLength << (length + 2) << "\r\n\r\n";
+    std::cout << str.rdbuf() << "\r\n" << std::flush;
+  }
+
+  void initialize(const JAST &receivedMessage) {
+    JAST message(JSON_OBJECT);
+    if (!isSTDLibValid) {
+      notifyAboutInvalidSTDLib();
+      message = JSONConverter::createInitializeResultInvalidSTDLib(receivedMessage);
+    } else {
+      message = JSONConverter::createInitializeResultDefault(receivedMessage);
     }
 
-    void didOpen(const JAST &_) {
-      // no refresh should be needed
-    }
+    isInitialized = true;
+    astree.absWorkDir =
+        JSONConverter::decodePath(receivedMessage.get("params").get("rootUri").value);
+    sendMessage(message);
 
-    void didChange(const JAST &receivedMessage) {
-      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      std::string fileContent = receivedMessage.get("params").get("contentChanges").children.back().second.get("text").value;
-      std::string fileName = JSONConverter::decodePath(fileUri);
-      astree.changedFiles[fileName] = std::unique_ptr<StringFile>(new StringFile(fileName.c_str(), std::move(fileContent)));
+    if (isSTDLibValid) {
       needsUpdate = true;
-      ignoredCount = 0;
+      refresh("initialize");
+    }
+  }
+
+  void initialized(const JAST &_) {}
+
+  void registerCapabilities() {
+    JAST message = JSONConverter::createRequestMessage();
+    message.add("method", "client/registerCapability");
+    JAST &registrationParams = message.add("params", JSON_OBJECT);
+    JAST &registrations = registrationParams.add("registrations", JSON_ARRAY);
+
+    for (const auto &method : additionalMethods) {
+      JAST &registration = registrations.add("", JSON_OBJECT);
+      registration.add("id", method.first.c_str());
+      registration.add("method", method.first.c_str());
+    }
+    sendMessage(message);
+  }
+
+  void diagnoseProject() {
+    astree.diagnoseProject([](ASTree::FileDiagnostics &fileDiagnostics) {
+      JAST fileDiagnosticsJSON =
+          JSONConverter::fileDiagnosticsToJSON(fileDiagnostics.first, fileDiagnostics.second);
+      sendMessage(fileDiagnosticsJSON);
+    });
+    needsUpdate = false;
+  }
+
+  void goToDefinition(const JAST &receivedMessage) {
+    refresh("goto-definition");
+    Location locationToDefine = JSONConverter::getLocationFromJSON(receivedMessage);
+    Location definitionLocation = astree.findDefinitionLocation(locationToDefine);
+    JAST definitionLocationJSON =
+        JSONConverter::definitionLocationToJSON(receivedMessage, definitionLocation);
+    sendMessage(definitionLocationJSON);
+  }
+
+  void findReportReferences(const JAST &receivedMessage) {
+    refresh("report-references");
+    Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage);
+    bool isDefinitionFound = false;
+    std::vector<Location> references;
+
+    astree.findReferences(definitionLocation, isDefinitionFound, references);
+    if (isDefinitionFound &&
+        receivedMessage.get("params").get("context").get("includeDeclaration").value == "true") {
+      references.push_back(definitionLocation);
     }
 
-    void didSave(const JAST &receivedMessage) {
-      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      astree.changedFiles.erase(JSONConverter::decodePath(fileUri));
+    JAST referencesJSON = JSONConverter::referencesToJSON(receivedMessage, references);
+    sendMessage(referencesJSON);
+  }
 
-      // Might have replaced a file modified on disk
+  void highlightOccurrences(const JAST &receivedMessage) {
+    if (needsUpdate) {
+      if (++ignoredCount > 2) {
+        refresh("highlight");
+      } else {
+#ifdef CERR_DEBUG
+        std::cerr << "Opting not to refresh code for highlight request" << std::endl;
+#endif
+      }
+    }
+    Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage);
+    std::vector<Location> occurrences = astree.findOccurrences(symbolLocation);
+    JAST highlightsJSON = JSONConverter::highlightsToJSON(receivedMessage, occurrences);
+    sendMessage(highlightsJSON);
+  }
+
+  void hover(const JAST &receivedMessage) {
+    if (needsUpdate) {
+      if (++ignoredCount > 2) {
+        refresh("hover");
+      } else {
+#ifdef CERR_DEBUG
+        std::cerr << "Opting not to refresh code for hover request" << std::endl;
+#endif
+      }
+    }
+    Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage);
+    std::vector<SymbolDefinition> hoverInfoPieces = astree.findHoverInfo(symbolLocation);
+    JAST hoverInfoJSON = JSONConverter::hoverInfoToJSON(receivedMessage, hoverInfoPieces);
+    sendMessage(hoverInfoJSON);
+  }
+
+  void documentSymbol(const JAST &receivedMessage) {
+    if (needsUpdate) {
+      if (++ignoredCount > 2) {
+        refresh("document-symbol");
+      } else {
+#ifdef CERR_DEBUG
+        std::cerr << "Opting not to refresh code for document-symbol request" << std::endl;
+#endif
+      }
+    }
+    JAST message = JSONConverter::createResponseMessage(receivedMessage);
+    JAST &result = message.add("result", JSON_ARRAY);
+
+    std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+    std::string filePath = JSONConverter::decodePath(fileUri);
+
+    std::vector<SymbolDefinition> symbols = astree.documentSymbol(filePath);
+    for (const SymbolDefinition &symbol : symbols) {
+      JSONConverter::appendSymbolToJSON(symbol, result);
+    }
+    sendMessage(message);
+  }
+
+  void workspaceSymbol(const JAST &receivedMessage) {
+    refresh("workspace-symbol");
+    JAST message = JSONConverter::createResponseMessage(receivedMessage);
+    JAST &result = message.add("result", JSON_ARRAY);
+
+    std::string query = receivedMessage.get("params").get("query").value;
+    std::vector<SymbolDefinition> symbols = astree.workspaceSymbol(query);
+    for (const SymbolDefinition &symbol : symbols) {
+      JSONConverter::appendSymbolToJSON(symbol, result);
+    }
+    sendMessage(message);
+  }
+
+  void rename(const JAST &receivedMessage) {
+    refresh("rename-symbol");
+    std::string newName = receivedMessage.get("params").get("newName").value;
+    if (newName.find(' ') != std::string::npos || (newName[0] >= '0' && newName[0] <= '9')) {
+      JAST errorMessage = JSONConverter::createErrorMessage(receivedMessage, InvalidParams,
+                                                            "The given name is invalid.");
+      sendMessage(errorMessage);
+      return;
+    }
+
+    Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage);
+    bool isDefinitionFound = false;
+    std::vector<Location> references;
+    astree.findReferences(definitionLocation, isDefinitionFound, references);
+    if (isDefinitionFound) {
+      references.push_back(definitionLocation);
+    }
+    JAST workspaceEditsJSON =
+        JSONConverter::workspaceEditsToJSON(receivedMessage, references, newName);
+    sendMessage(workspaceEditsJSON);
+  }
+
+  void didOpen(const JAST &_) {
+    // no refresh should be needed
+  }
+
+  void didChange(const JAST &receivedMessage) {
+    std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+    std::string fileContent = receivedMessage.get("params")
+                                  .get("contentChanges")
+                                  .children.back()
+                                  .second.get("text")
+                                  .value;
+    std::string fileName = JSONConverter::decodePath(fileUri);
+    astree.changedFiles[fileName] =
+        std::unique_ptr<StringFile>(new StringFile(fileName.c_str(), std::move(fileContent)));
+    needsUpdate = true;
+    ignoredCount = 0;
+  }
+
+  void didSave(const JAST &receivedMessage) {
+    std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+    astree.changedFiles.erase(JSONConverter::decodePath(fileUri));
+
+    // Might have replaced a file modified on disk
+    needsUpdate = true;
+    refresh("file-save");
+  }
+
+  void didClose(const JAST &receivedMessage) {
+    std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
+    if (astree.changedFiles.erase(JSONConverter::decodePath(fileUri)) > 0) {
       needsUpdate = true;
-      refresh("file-save");
+      // If a user hits 'undo' on a symbol rename, you can get hundreds of sequential didClose
+      // invocations Calling refresh here would cause the extension to 'hang' for a very long time.
     }
+  }
 
-    void didClose(const JAST &receivedMessage) {
-      std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
-      if (astree.changedFiles.erase(JSONConverter::decodePath(fileUri)) > 0) {
-        needsUpdate = true;
-        // If a user hits 'undo' on a symbol rename, you can get hundreds of sequential didClose invocations
-        // Calling refresh here would cause the extension to 'hang' for a very long time.
+  void didChangeWatchedFiles(const JAST &receivedMessage) {
+    JAST jfiles = receivedMessage.get("params").get("changes");
+    for (auto child : jfiles.children) {
+      std::string filePath = JSONConverter::decodePath(child.second.get("uri").value);
+      // Newly created, modified on disk, or deleted? => File should be re-read from disk.
+      astree.changedFiles.erase(filePath);
+
+      if (stoi(child.second.get("type").value) == 3) {
+        // The file was deleted => clear any stale diagnostics
+        std::vector<Diagnostic> emptyDiagnostics;
+        JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(filePath, emptyDiagnostics);
+        sendMessage(fileDiagnosticsJSON);
       }
     }
 
-    void didChangeWatchedFiles(const JAST &receivedMessage) {
-      JAST jfiles = receivedMessage.get("params").get("changes");
-      for (auto child: jfiles.children) {
-        std::string filePath = JSONConverter::decodePath(child.second.get("uri").value);
-        // Newly created, modified on disk, or deleted? => File should be re-read from disk.
-        astree.changedFiles.erase(filePath);
-
-        if (stoi(child.second.get("type").value) == 3) {
-          // The file was deleted => clear any stale diagnostics
-          std::vector<Diagnostic> emptyDiagnostics;
-          JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(filePath, emptyDiagnostics);
-          sendMessage(fileDiagnosticsJSON);
-        }
-      }
-
-      if (!jfiles.children.empty()) {
-        needsUpdate = true;
-        refresh("files-created-or-deleted");
-      }
+    if (!jfiles.children.empty()) {
+      needsUpdate = true;
+      refresh("files-created-or-deleted");
     }
+  }
 
-    void shutdown(const JAST &receivedMessage) {
-      JAST message = JSONConverter::createResponseMessage(receivedMessage);
-      message.add("result", JSON_NULLVAL);
-      isShutDown = true;
-      sendMessage(message);
-    }
+  void shutdown(const JAST &receivedMessage) {
+    JAST message = JSONConverter::createResponseMessage(receivedMessage);
+    message.add("result", JSON_NULLVAL);
+    isShutDown = true;
+    sendMessage(message);
+  }
 
-    void serverExit(const JAST &_) {
-      exit(isShutDown ? 0 : 1);
-    }
+  void serverExit(const JAST &_) { exit(isShutDown ? 0 : 1); }
 };
-
 
 int main(int argc, const char **argv) {
   std::string stdLib;

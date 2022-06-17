@@ -24,39 +24,39 @@
 #include <unistd.h>
 
 #include <iostream>
-#include <sstream>
 #include <random>
 #include <set>
+#include <sstream>
 
-#include "gopt/gopt.h"
+#include "describe.h"
+#include "dst/bind.h"
+#include "dst/expr.h"
+#include "dst/todst.h"
 #include "gopt/gopt-arg.h"
-#include "util/colour.h"
-#include "util/file.h"
-#include "util/diagnostic.h"
-#include "util/execpath.h"
-#include "util/shell.h"
-#include "parser/wakefiles.h"
-#include "parser/parser.h"
+#include "gopt/gopt.h"
+#include "markup.h"
+#include "optimizer/ssa.h"
 #include "parser/cst.h"
+#include "parser/parser.h"
 #include "parser/syntax.h"
+#include "parser/wakefiles.h"
+#include "runtime/database.h"
+#include "runtime/job.h"
+#include "runtime/prim.h"
+#include "runtime/profile.h"
+#include "runtime/runtime.h"
+#include "runtime/sources.h"
+#include "runtime/status.h"
+#include "runtime/tuple.h"
+#include "runtime/value.h"
+#include "timeline.h"
 #include "types/data.h"
 #include "types/sums.h"
-#include "dst/bind.h"
-#include "dst/todst.h"
-#include "dst/expr.h"
-#include "optimizer/ssa.h"
-#include "runtime/value.h"
-#include "runtime/tuple.h"
-#include "runtime/job.h"
-#include "runtime/sources.h"
-#include "runtime/database.h"
-#include "runtime/status.h"
-#include "runtime/runtime.h"
-#include "runtime/profile.h"
-#include "runtime/prim.h"
-#include "markup.h"
-#include "describe.h"
-#include "timeline.h"
+#include "util/colour.h"
+#include "util/diagnostic.h"
+#include "util/execpath.h"
+#include "util/file.h"
+#include "util/shell.h"
 
 #ifndef VERSION
 #include "version.h"
@@ -68,6 +68,7 @@
 static CPPFile cppFile(__FILE__);
 
 void print_help(const char *argv0) {
+  // clang-format off
   std::cout << std::endl
     << "Usage: " << argv0 << " [OPTIONS] [target] [target options ...]" << std::endl
     << "Usage in script: #! /usr/bin/env wake [OPTIONS] -:target" << std::endl
@@ -110,136 +111,139 @@ void print_help(const char *argv0) {
     << "    --help    -h     Print this help message and exit"                           << std::endl
     << std::endl;
     // debug-db, no-optimize, stop-after-* are secret undocumented options
+  // clang-format on
 }
 
 DiagnosticReporter *reporter;
 class TerminalReporter : public DiagnosticReporter {
-  public:
-    TerminalReporter() : errors(false), warnings(false) { }
-    bool errors;
-    bool warnings;
+ public:
+  TerminalReporter() : errors(false), warnings(false) {}
+  bool errors;
+  bool warnings;
 
-  private:
-    std::string last;
+ private:
+  std::string last;
 
-    void report(Diagnostic diagnostic) {
-      if (diagnostic.getSeverity() == S_ERROR) errors = true;
-      if (diagnostic.getSeverity() == S_WARNING) warnings = true;
+  void report(Diagnostic diagnostic) {
+    if (diagnostic.getSeverity() == S_ERROR) errors = true;
+    if (diagnostic.getSeverity() == S_WARNING) warnings = true;
 
-      if (last != diagnostic.getMessage()) {
-         last = diagnostic.getMessage();
-         std::cerr << diagnostic.getLocation() << ": ";
-         if (diagnostic.getSeverity() == S_WARNING) std::cerr << "(warning) ";
-         std::cerr << diagnostic.getMessage() << std::endl;
-      }
+    if (last != diagnostic.getMessage()) {
+      last = diagnostic.getMessage();
+      std::cerr << diagnostic.getLocation() << ": ";
+      if (diagnostic.getSeverity() == S_WARNING) std::cerr << "(warning) ";
+      std::cerr << diagnostic.getMessage() << std::endl;
     }
+  }
 };
 
 int main(int argc, char **argv) {
   TerminalReporter terminalReporter;
   reporter = &terminalReporter;
 
+  // clang-format off
   struct option options[] {
-    { 'p', "percent",               GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
-    { 'j', "jobs",                  GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
-    { 'm', "memory",                GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
-    { 'c', "check",                 GOPT_ARGUMENT_FORBIDDEN },
-    { 'v', "verbose",               GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
-    { 'd', "debug",                 GOPT_ARGUMENT_FORBIDDEN },
-    { 'q', "quiet",                 GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "no-wait",               GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "no-workspace",          GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "no-tty",                GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "fatal-warnings",        GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "heap-factor",           GOPT_ARGUMENT_REQUIRED  | GOPT_ARGUMENT_NO_HYPHEN },
-    { 0,   "profile-heap",          GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE },
-    { 0,   "profile",               GOPT_ARGUMENT_REQUIRED  },
-    { 'C', "chdir",                 GOPT_ARGUMENT_REQUIRED  },
-    { 0,   "in",                    GOPT_ARGUMENT_REQUIRED  },
-    { 'x', "exec",                  GOPT_ARGUMENT_REQUIRED  },
-    { 0,   "job",                   GOPT_ARGUMENT_REQUIRED  },
-    { 'i', "input",                 GOPT_ARGUMENT_FORBIDDEN },
-    { 'o', "output",                GOPT_ARGUMENT_FORBIDDEN },
-    { 'l', "last",                  GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "lsp",                   GOPT_ARGUMENT_FORBIDDEN },
-    { 'f', "failed",                GOPT_ARGUMENT_FORBIDDEN },
-    { 's', "script",                GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "init",                  GOPT_ARGUMENT_REQUIRED  },
-    { 0,   "version",               GOPT_ARGUMENT_FORBIDDEN },
-    { 'g', "globals",               GOPT_ARGUMENT_FORBIDDEN },
-    { 'e', "exports",               GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "html",                  GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "timeline",              GOPT_ARGUMENT_OPTIONAL  },
-    { 'h', "help",                  GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "debug-db",              GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "stop-after-parse",      GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "stop-after-ssa",        GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "no-optimize",           GOPT_ARGUMENT_FORBIDDEN },
-    { 0,   "tag-dag",               GOPT_ARGUMENT_REQUIRED  },
-    { 0,   "tag",                   GOPT_ARGUMENT_REQUIRED  },
-    { 0,   "export-api",            GOPT_ARGUMENT_REQUIRED  },
-    { 0,   "stdout",                GOPT_ARGUMENT_REQUIRED  },
-    { 0,   "stderr",                GOPT_ARGUMENT_REQUIRED  },
-    { 0,   "fd:3",                  GOPT_ARGUMENT_REQUIRED  },
-    { 0,   "fd:4",                  GOPT_ARGUMENT_REQUIRED  },
-    { 0,   "fd:5",                  GOPT_ARGUMENT_REQUIRED  },
-    { ':', "shebang",               GOPT_ARGUMENT_REQUIRED  },
-    { 0,   0,                       GOPT_LAST}};
+    {'p', "percent", GOPT_ARGUMENT_REQUIRED | GOPT_ARGUMENT_NO_HYPHEN},
+    {'j', "jobs", GOPT_ARGUMENT_REQUIRED | GOPT_ARGUMENT_NO_HYPHEN},
+    {'m', "memory", GOPT_ARGUMENT_REQUIRED | GOPT_ARGUMENT_NO_HYPHEN},
+    {'c', "check", GOPT_ARGUMENT_FORBIDDEN},
+    {'v', "verbose", GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE},
+    {'d', "debug", GOPT_ARGUMENT_FORBIDDEN},
+    {'q', "quiet", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "no-wait", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "no-workspace", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "no-tty", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "fatal-warnings", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "heap-factor", GOPT_ARGUMENT_REQUIRED | GOPT_ARGUMENT_NO_HYPHEN},
+    {0, "profile-heap", GOPT_ARGUMENT_FORBIDDEN | GOPT_REPEATABLE},
+    {0, "profile", GOPT_ARGUMENT_REQUIRED},
+    {'C', "chdir", GOPT_ARGUMENT_REQUIRED},
+    {0, "in", GOPT_ARGUMENT_REQUIRED},
+    {'x', "exec", GOPT_ARGUMENT_REQUIRED},
+    {0, "job", GOPT_ARGUMENT_REQUIRED},
+    {'i', "input", GOPT_ARGUMENT_FORBIDDEN},
+    {'o', "output", GOPT_ARGUMENT_FORBIDDEN},
+    {'l', "last", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "lsp", GOPT_ARGUMENT_FORBIDDEN},
+    {'f', "failed", GOPT_ARGUMENT_FORBIDDEN},
+    {'s', "script", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "init", GOPT_ARGUMENT_REQUIRED},
+    {0, "version", GOPT_ARGUMENT_FORBIDDEN},
+    {'g', "globals", GOPT_ARGUMENT_FORBIDDEN},
+    {'e', "exports", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "html", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "timeline", GOPT_ARGUMENT_OPTIONAL},
+    {'h', "help", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "debug-db", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "stop-after-parse", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "stop-after-type-check", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "stop-after-ssa", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "no-optimize", GOPT_ARGUMENT_FORBIDDEN},
+    {0, "tag-dag", GOPT_ARGUMENT_REQUIRED},
+    {0, "tag", GOPT_ARGUMENT_REQUIRED},
+    {0, "export-api", GOPT_ARGUMENT_REQUIRED},
+    {0, "stdout", GOPT_ARGUMENT_REQUIRED},
+    {0, "stderr", GOPT_ARGUMENT_REQUIRED},
+    {0, "fd:3", GOPT_ARGUMENT_REQUIRED},
+    {0, "fd:4", GOPT_ARGUMENT_REQUIRED},
+    {0, "fd:5", GOPT_ARGUMENT_REQUIRED},
+    {':', "shebang", GOPT_ARGUMENT_REQUIRED},
+    {0, 0, GOPT_LAST}
+  };
+  // clang-format on
 
   std::string original_command_line = shell_escape(argv[0]);
-  for (int i = 1; i < argc; ++i)
-    original_command_line += " " + shell_escape(argv[i]);
+  for (int i = 1; i < argc; ++i) original_command_line += " " + shell_escape(argv[i]);
 
   argc = gopt(argv, options);
   gopt_errors(argv[0], options);
 
-  bool check   = arg(options, "check"   )->count;
-  bool verbose = arg(options, "verbose" )->count;
-  bool debug   = arg(options, "debug"   )->count;
-  bool quiet   = arg(options, "quiet"   )->count;
-  bool wait    =!arg(options, "no-wait" )->count;
-  bool workspace=!arg(options, "no-workspace")->count;
-  bool tty     =!arg(options, "no-tty"  )->count;
-  bool fwarning= arg(options, "fatal-warnings")->count;
-  int  profileh= arg(options, "profile-heap")->count;
-  bool input   = arg(options, "input"   )->count;
-  bool output  = arg(options, "output"  )->count;
-  bool last    = arg(options, "last"    )->count;
-  bool lsp     = arg(options, "lsp"     )->count;
-  bool failed  = arg(options, "failed"  )->count;
-  bool script  = arg(options, "script"  )->count;
-  bool version = arg(options, "version" )->count;
-  bool html    = arg(options, "html"    )->count;
-  bool global  = arg(options, "globals" )->count;
-  bool help    = arg(options, "help"    )->count;
+  bool check = arg(options, "check")->count;
+  bool verbose = arg(options, "verbose")->count;
+  bool debug = arg(options, "debug")->count;
+  bool quiet = arg(options, "quiet")->count;
+  bool wait = !arg(options, "no-wait")->count;
+  bool workspace = !arg(options, "no-workspace")->count;
+  bool tty = !arg(options, "no-tty")->count;
+  bool fwarning = arg(options, "fatal-warnings")->count;
+  int profileh = arg(options, "profile-heap")->count;
+  bool input = arg(options, "input")->count;
+  bool output = arg(options, "output")->count;
+  bool last = arg(options, "last")->count;
+  bool lsp = arg(options, "lsp")->count;
+  bool failed = arg(options, "failed")->count;
+  bool script = arg(options, "script")->count;
+  bool version = arg(options, "version")->count;
+  bool html = arg(options, "html")->count;
+  bool global = arg(options, "globals")->count;
+  bool help = arg(options, "help")->count;
   bool debugdb = arg(options, "debug-db")->count;
-  bool parse   = arg(options, "stop-after-parse")->count;
-  bool tcheck  = arg(options, "stop-after-type-check")->count;
+  bool parse = arg(options, "stop-after-parse")->count;
+  bool tcheck = arg(options, "stop-after-type-check")->count;
   bool dumpssa = arg(options, "stop-after-ssa")->count;
-  bool optim   =!arg(options, "no-optimize")->count;
+  bool optim = !arg(options, "no-optimize")->count;
   bool exports = arg(options, "exports")->count;
-  bool timeline= arg(options, "timeline")->count;
+  bool timeline = arg(options, "timeline")->count;
 
   const char *percent_str = arg(options, "percent")->argument;
-  const char *jobs_str    = arg(options, "jobs")->argument;
-  const char *memory_str  = arg(options, "memory")->argument;
-  const char *heapf   = arg(options, "heap-factor")->argument;
+  const char *jobs_str = arg(options, "jobs")->argument;
+  const char *memory_str = arg(options, "memory")->argument;
+  const char *heapf = arg(options, "heap-factor")->argument;
   const char *profile = arg(options, "profile")->argument;
-  const char *init    = arg(options, "init")->argument;
-  const char *chdir   = arg(options, "chdir")->argument;
-  const char *in      = arg(options, "in")->argument;
-  const char *exec    = arg(options, "exec")->argument;
-  const char *job     = arg(options, "job")->argument;
-  char       *shebang = arg(options, "shebang")->argument;
-  const char *tagdag  = arg(options, "tag-dag")->argument;
-  const char *tag     = arg(options, "tag")->argument;
-  const char *api     = arg(options, "export-api")->argument;
-  const char *fd1     = arg(options, "stdout")->argument;
-  const char *fd2     = arg(options, "stderr")->argument;
-  const char *fd3     = arg(options, "fd:3")->argument;
-  const char *fd4     = arg(options, "fd:4")->argument;
-  const char *fd5     = arg(options, "fd:5")->argument;
+  const char *init = arg(options, "init")->argument;
+  const char *chdir = arg(options, "chdir")->argument;
+  const char *in = arg(options, "in")->argument;
+  const char *exec = arg(options, "exec")->argument;
+  const char *job = arg(options, "job")->argument;
+  char *shebang = arg(options, "shebang")->argument;
+  const char *tagdag = arg(options, "tag-dag")->argument;
+  const char *tag = arg(options, "tag")->argument;
+  const char *api = arg(options, "export-api")->argument;
+  const char *fd1 = arg(options, "stdout")->argument;
+  const char *fd2 = arg(options, "stderr")->argument;
+  const char *fd3 = arg(options, "fd:3")->argument;
+  const char *fd4 = arg(options, "fd:4")->argument;
+  const char *fd5 = arg(options, "fd:5")->argument;
 
   if (help) {
     print_help(argv[0]);
@@ -274,7 +278,8 @@ int main(int argc, char **argv) {
   }
 
   if (shebang && argc < 2) {
-    std::cerr << "Shebang invocation requires a script name as the first non-option argument" << std::endl;
+    std::cerr << "Shebang invocation requires a script name as the first non-option argument"
+              << std::endl;
     return 1;
   }
 
@@ -291,7 +296,8 @@ int main(int argc, char **argv) {
     percent = strtod(percent_str, &tail);
     percent /= 100.0;
     if (*tail || percent < 0.01 || percent > 0.99) {
-      std::cerr << "Cannot run with " << percent_str << "%  (must be >= 0.01 and <= 0.99)!" << std::endl;
+      std::cerr << "Cannot run with " << percent_str << "%  (must be >= 0.01 and <= 0.99)!"
+                << std::endl;
       return 1;
     }
   }
@@ -352,9 +358,10 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // wake_cwd is the path where wake was invoked, relative to the workspace root (may have leading ../)
-  // src_dir is the chdir path (-C) used to select the default package, relative to the workspace root (always a subdir)
-  std::string wake_cwd, src_dir; // form: "" | .+/
+  // wake_cwd is the path where wake was invoked, relative to the workspace root (may have leading
+  // ../) src_dir is the chdir path (-C) used to select the default package, relative to the
+  // workspace root (always a subdir)
+  std::string wake_cwd, src_dir;  // form: "" | .+/
   if (init) {
     if (!make_workspace(init)) {
       std::cerr << "Unable to initialize a workspace in " << init << std::endl;
@@ -411,18 +418,21 @@ int main(int argc, char **argv) {
   if (job) {
     auto hits = db.explain(std::atol(job), verbose || tag);
     describe(hits, script, debug, verbose, tag);
-    if (hits.empty()) std::cerr << "Job '" << job << "' was not found in the database!" << std::endl;
+    if (hits.empty())
+      std::cerr << "Job '" << job << "' was not found in the database!" << std::endl;
   }
 
   if (input) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1, verbose || tag), script, debug, verbose, tag);
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1, verbose || tag), script, debug,
+               verbose, tag);
     }
   }
 
   if (output) {
     for (int i = 1; i < argc; ++i) {
-      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2, verbose || tag), script, debug, verbose, tag);
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2, verbose || tag), script, debug,
+               verbose, tag);
     }
   }
 
@@ -470,8 +480,7 @@ int main(int argc, char **argv) {
   std::vector<ExternalFile> wakefiles;
   wakefiles.reserve(wakefilenames.size());
   for (auto &i : wakefilenames) {
-    if (verbose && debug)
-      std::cerr << "Parsing " << i << std::endl;
+    if (verbose && debug) std::cerr << "Parsing " << i << std::endl;
 
     wakefiles.emplace_back(terminalReporter, i.c_str());
     FileContent &file = wakefiles.back();
@@ -480,8 +489,8 @@ int main(int argc, char **argv) {
 
     // Does this file inform our choice of a default package?
     size_t slash = i.find_last_of('/');
-    std::string dir(i, 0, slash==std::string::npos?0:(slash+1)); // "" | .+/
-    if (src_dir.compare(0, dir.size(), dir) == 0) { // dir = prefix or parent of src_dir?
+    std::string dir(i, 0, slash == std::string::npos ? 0 : (slash + 1));  // "" | .+/
+    if (src_dir.compare(0, dir.size(), dir) == 0) {  // dir = prefix or parent of src_dir?
       int dirlen = dir.size();
       if (dirlen > longest_src_dir) {
         longest_src_dir = dirlen;
@@ -489,11 +498,10 @@ int main(int argc, char **argv) {
         warned_conflict = false;
       } else if (dirlen == longest_src_dir) {
         if (top->def_package != package && !warned_conflict) {
-          std::cerr << "Directory " << (dir.empty()?".":dir.c_str())
-            << " has wakefiles with both package '" << top->def_package
-            << "' and '" << package
-            << "'. This prevents default package selection;"
-            << " defaulting to no package." << std::endl;
+          std::cerr << "Directory " << (dir.empty() ? "." : dir.c_str())
+                    << " has wakefiles with both package '" << top->def_package << "' and '"
+                    << package << "'. This prevents default package selection;"
+                    << " defaulting to no package." << std::endl;
           top->def_package = nullptr;
           warned_conflict = true;
         }
@@ -504,8 +512,7 @@ int main(int argc, char **argv) {
   if (in) {
     auto it = top->packages.find(in);
     if (it == top->packages.end()) {
-      std::cerr << "Package '" << in
-        << "' selected by --in does not exist!" << std::endl;
+      std::cerr << "Package '" << in << "' selected by --in does not exist!" << std::endl;
       ok = false;
     } else {
       top->def_package = in;
@@ -524,39 +531,38 @@ int main(int argc, char **argv) {
   if (targets) {
     auto it = top->packages.find(top->def_package);
     if (it != top->packages.end()) {
-      for (auto &e : it->second->exports.defs)
-        defs.emplace_back(e.first, e.second.qualified);
+      for (auto &e : it->second->exports.defs) defs.emplace_back(e.first, e.second.qualified);
     }
     if (defs.empty()) {
       ok = false;
-      std::cerr
-        << "No targets were found to recommend for use on the command-line."      << std::endl << std::endl
-        << "Potential solutions include:"                                         << std::endl
-        << "  cd project-directory; wake # lists targets for current directory"   << std::endl
-        << "  wake --in project          # lists targets for a specific project"  << std::endl << std::endl
-        << "If you are a developer, you should also consider adding:"             << std::endl
-        << "  export target build string_list = ... # to your wake build scripts" << std::endl << std::endl;
+      std::cerr << "No targets were found to recommend for use on the command-line." << std::endl
+                << std::endl
+                << "Potential solutions include:" << std::endl
+                << "  cd project-directory; wake # lists targets for current directory" << std::endl
+                << "  wake --in project          # lists targets for a specific project"
+                << std::endl
+                << std::endl
+                << "If you are a developer, you should also consider adding:" << std::endl
+                << "  export target build string_list = ... # to your wake build scripts"
+                << std::endl
+                << std::endl;
     }
   }
 
   if (global) {
-    for (auto &g : top->globals.defs)
-      defs.emplace_back(g.first, g.second.qualified);
+    for (auto &g : top->globals.defs) defs.emplace_back(g.first, g.second.qualified);
     for (auto &t : top->globals.topics)
       defs.emplace_back("topic " + t.first, "topic " + t.second.qualified);
-    for (auto &t : top->globals.types)
-      types.insert(t.first);
+    for (auto &t : top->globals.types) types.insert(t.first);
   }
 
   if (exports || api) {
     auto it = top->packages.find(top->def_package);
     if (it != top->packages.end()) {
-      for (auto &e : it->second->exports.defs)
-        defs.emplace_back(e.first, e.second.qualified);
+      for (auto &e : it->second->exports.defs) defs.emplace_back(e.first, e.second.qualified);
       for (auto &t : it->second->exports.topics)
         defs.emplace_back("topic " + t.first, "topic " + t.second.qualified);
-      for (auto &t : it->second->exports.types)
-        types.insert(t.first);
+      for (auto &t : it->second->exports.types) types.insert(t.first);
     }
   }
 
@@ -568,16 +574,16 @@ int main(int argc, char **argv) {
     command = exec;
   } else if (argc > 1) {
     command = argv[1];
-    cmdline = argv+2;
+    cmdline = argv + 2;
   }
 
   ExprParser cmdExpr(command);
   if (exec) {
     top->body = cmdExpr.expr(terminalReporter);
   } else if (argc > 1) {
-    top->body = std::unique_ptr<Expr>(new App(FRAGMENT_CPP_LINE,
-      cmdExpr.expr(terminalReporter).release(),
-      new Prim(FRAGMENT_CPP_LINE, "cmdline")));
+    top->body =
+        std::unique_ptr<Expr>(new App(FRAGMENT_CPP_LINE, cmdExpr.expr(terminalReporter).release(),
+                                      new Prim(FRAGMENT_CPP_LINE, "cmdline")));
   } else {
     top->body = std::unique_ptr<Expr>(new VarRef(FRAGMENT_CPP_LINE, "Nil@wake"));
   }
@@ -585,14 +591,14 @@ int main(int argc, char **argv) {
   TypeVar type = top->body->typeVar;
 
   if (parse) top->format(std::cout, 0);
-  if (notype) return (ok && !terminalReporter.errors)?0:1;
+  if (notype) return (ok && !terminalReporter.errors) ? 0 : 1;
 
   /* Setup logging streams */
   if (noexecute && !fd1) fd1 = "error";
-  if (debug     && !fd1) fd1 = "debug,info,echo,report,warning,error";
-  if (verbose   && !fd1) fd1 = "info,echo,report,warning,error";
-  if (quiet     && !fd1) fd1 = "error";
-  if (!tty      && !fd1) fd1 = "echo,report,warning,error";
+  if (debug && !fd1) fd1 = "debug,info,echo,report,warning,error";
+  if (verbose && !fd1) fd1 = "info,echo,report,warning,error";
+  if (quiet && !fd1) fd1 = "error";
+  if (!tty && !fd1) fd1 = "echo,report,warning,error";
   if (!fd1) fd1 = "report,warning,error";
   if (!fd2) fd2 = "error";
 
@@ -645,7 +651,7 @@ int main(int argc, char **argv) {
 
   if (api) {
     std::vector<std::string> def, topic;
-    for (auto &d: defs) {
+    for (auto &d : defs) {
       if (d.first.compare(0, 6, "topic ") == 0) {
         topic.emplace_back(d.first.substr(6));
       } else {
@@ -658,12 +664,13 @@ int main(int argc, char **argv) {
     for (auto &g : defs) {
       Expr *e = root.get();
       while (e && e->type == &DefBinding::type) {
-        DefBinding *d = static_cast<DefBinding*>(e);
+        DefBinding *d = static_cast<DefBinding *>(e);
         e = d->body.get();
         auto i = d->order.find(g.second);
         if (i != d->order.end()) {
           int idx = i->second.index;
-          Expr *v = idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx-d->val.size()].get();
+          Expr *v =
+              idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx - d->val.size()].get();
           if (targets) {
             TypeVar clone;
             v->typeVar.clone(clone);
@@ -673,8 +680,8 @@ int main(int argc, char **argv) {
             Data::typeList.clone(list);
             fn1[0].unify(list);
             list[0].unify(Data::typeString);
-            if (!clone.tryUnify(fn1)) continue;   // must accept List String
-            if (clone[1].tryUnify(fn2)) continue; // and not return a function
+            if (!clone.tryUnify(fn1)) continue;    // must accept List String
+            if (clone[1].tryUnify(fn2)) continue;  // and not return a function
             std::cout << "  " << g.first << std::endl;
           } else {
             std::cout << g.first << ": ";
@@ -703,7 +710,7 @@ int main(int argc, char **argv) {
   if (noexecute) return 0;
 
   db.prepare(original_command_line);
-  runtime.init(static_cast<RFun*>(ssa.get()));
+  runtime.init(static_cast<RFun *>(ssa.get()));
 
   // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
   std::cout << std::flush;
@@ -714,7 +721,9 @@ int main(int argc, char **argv) {
   runtime.abort = false;
 
   status_init();
-  do { runtime.run(); } while (!runtime.abort && jobtable.wait(runtime));
+  do {
+    runtime.run();
+  } while (!runtime.abort && jobtable.wait(runtime));
   status_finish();
 
   runtime.heap.report();
@@ -732,21 +741,21 @@ int main(int argc, char **argv) {
     HeapObject *v = runtime.output.get();
     if (!v) {
       pass = false;
-    } else if (Record *r = dynamic_cast<Record*>(v)) {
+    } else if (Record *r = dynamic_cast<Record *>(v)) {
       if (r->cons->ast.name == "Fail") pass = false;
     }
-    std::ostream &os = pass?(std::cout):(std::cerr);
+    std::ostream &os = pass ? (std::cout) : (std::cerr);
     if (verbose) {
       os << command << ": ";
       type.format(os, type);
       os << " = ";
     }
     if (!quiet || !pass) {
-      HeapObject::format(os, v, debug, verbose?0:-1);
+      HeapObject::format(os, v, debug, verbose ? 0 : -1);
       os << std::endl;
     }
   }
 
   db.clean();
-  return pass?0:1;
+  return pass ? 0 : 1;
 }

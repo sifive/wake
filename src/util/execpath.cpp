@@ -19,16 +19,17 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <unistd.h>
+#include "execpath.h"
+
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 
+#include <iostream>
 #include <memory>
 #include <vector>
-#include <iostream>
 
 #include "whereami/whereami.h"
-#include "execpath.h"
 
 std::string find_execpath() {
   static std::string exepath;
@@ -49,26 +50,25 @@ static bool check_exec(const char *tok, size_t len, const std::string &exec, std
 }
 
 std::string find_in_path(const std::string &file, const std::string &path) {
-  if (file.find('/') != std::string::npos)
-    return file;
+  if (file.find('/') != std::string::npos) return file;
 
   std::string out;
   const char *tok = path.c_str();
   const char *end = tok + path.size();
   for (const char *scan = tok; scan != end; ++scan) {
     if (*scan == ':') {
-      if (scan != tok && check_exec(tok, scan-tok, file, out)) return out;
-      tok = scan+1;
+      if (scan != tok && check_exec(tok, scan - tok, file, out)) return out;
+      tok = scan + 1;
     }
   }
 
-  if (end != tok && check_exec(tok, end-tok, file, out)) return out;
+  if (end != tok && check_exec(tok, end - tok, file, out)) return out;
 
   // If not found, return input unmodified => runJob fails somewhat gracefully
   return file;
 }
 
-std::string find_path(const char *const * env) {
+std::string find_path(const char *const *env) {
   for (; *env; ++env) {
     if (!strncmp(*env, "PATH=", 5)) {
       return std::string(*env + 5);
@@ -90,8 +90,7 @@ std::string get_cwd() {
   std::vector<char> buf;
   buf.resize(1024, '\0');
   errno = 0;
-  while (getcwd(buf.data(), buf.size()) == 0 && errno == ERANGE)
-    buf.resize(buf.size() * 2);
+  while (getcwd(buf.data(), buf.size()) == 0 && errno == ERANGE) buf.resize(buf.size() * 2);
   if (buf[0] == 0)
     std::cerr << "Unable to read current working directory: " << strerror(errno) << std::endl;
   return buf.data();

@@ -19,10 +19,10 @@
 #define _BSD_SOURCE
 #define _DEFAULT_SOURCE
 
+#include "spawn.h"
+
 #include <sys/types.h>
 #include <unistd.h>
-
-#include "spawn.h"
 
 pid_t wake_spawn(const char *cmd, char **cmdline, char **environ) {
   pid_t pid = vfork();

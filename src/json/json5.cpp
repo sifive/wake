@@ -22,32 +22,26 @@
 #include "json5.h"
 
 const char *jsymbolTable[] = {
-  // appear in JAST and JSymbol
-  "NULLVAL", "TRUE", "FALSE", "NAN",
-  "INTEGER", "DOUBLE", "INFINITY", "STR",
-  // appear only in JAST
-  "OBJECT", "ARRAY",
-  // appear only in JSymbol
-  "ERROR", "END",
-  "SOPEN", "SCLOSE", "BOPEN", "BCLOSE",
-  "COLON", "ID", "COMMA"
-};
+    // appear in JAST and JSymbol
+    "NULLVAL", "TRUE", "FALSE", "NAN", "INTEGER", "DOUBLE", "INFINITY", "STR",
+    // appear only in JAST
+    "OBJECT", "ARRAY",
+    // appear only in JSymbol
+    "ERROR", "END", "SOPEN", "SCLOSE", "BOPEN", "BCLOSE", "COLON", "ID", "COMMA"};
 
 static JAST null(JSON_NULLVAL);
 
 const JAST &JAST::get(const std::string &key) const {
   if (kind == JSON_OBJECT)
     for (auto &x : children)
-      if (x.first == key)
-        return x.second;
+      if (x.first == key) return x.second;
   return null;
 }
 
 JAST &JAST::get(const std::string &key) {
   if (kind == JSON_OBJECT)
     for (auto &x : children)
-      if (x.first == key)
-        return x.second;
+      if (x.first == key) return x.second;
   return null;
 }
 
@@ -68,8 +62,10 @@ std::string json_escape(const char *str, size_t len) {
   for (const char *i = str; i != end; ++i) {
     char z = *i;
     unsigned char c = z;
-    if (z == '"') out.append("\\\"");
-    else if (z == '\\') out.append("\\\\");
+    if (z == '"')
+      out.append("\\\"");
+    else if (z == '\\')
+      out.append("\\\\");
     else if (c >= 0x20) {
       out.push_back(c);
     } else if (z == '\b') {
@@ -110,18 +106,29 @@ static std::ostream &formatArray(std::ostream &os, const JAST &jast) {
   return os << "]";
 }
 
-std::ostream & operator << (std::ostream &os, const JAST &jast) {
+std::ostream &operator<<(std::ostream &os, const JAST &jast) {
   switch (jast.kind) {
-    case JSON_NULLVAL:  return os << "null";
-    case JSON_TRUE:     return os << "true";
-    case JSON_FALSE:    return os << "false";
-    case JSON_NAN:      return os << "NaN";
-    case JSON_INTEGER:  return os << jast.value;
-    case JSON_DOUBLE:   return os << jast.value;
-    case JSON_INFINITY: return os << jast.value << "Infinity";
-    case JSON_STR:      return os << '"' << json_escape(jast.value) << '"';
-    case JSON_OBJECT:   return formatObject(os, jast);
-    case JSON_ARRAY:    return formatArray(os, jast);
-    default:            return os << "corrupt";
+    case JSON_NULLVAL:
+      return os << "null";
+    case JSON_TRUE:
+      return os << "true";
+    case JSON_FALSE:
+      return os << "false";
+    case JSON_NAN:
+      return os << "NaN";
+    case JSON_INTEGER:
+      return os << jast.value;
+    case JSON_DOUBLE:
+      return os << jast.value;
+    case JSON_INFINITY:
+      return os << jast.value << "Infinity";
+    case JSON_STR:
+      return os << '"' << json_escape(jast.value) << '"';
+    case JSON_OBJECT:
+      return formatObject(os, jast);
+    case JSON_ARRAY:
+      return formatArray(os, jast);
+    default:
+      return os << "corrupt";
   }
 }

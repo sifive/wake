@@ -19,29 +19,24 @@
 #define NAMESPACE_H
 
 #include <string>
+#include <vector>
 
 struct mount_op {
-	std::string type;
-	std::string source;
-	std::string destination;
-	bool read_only;
+  std::string type;
+  std::string source;
+  std::string destination;
+  bool read_only;
 };
 
 #ifdef __linux__
 
 struct JAST;
 
-bool setup_user_namespaces(
-	int id_user,
-	int id_group,
-	bool isolate_network,
-	const std::string &hostname,
-	const std::string &domainname);
+bool setup_user_namespaces(int id_user, int id_group, bool isolate_network,
+                           const std::string &hostname, const std::string &domainname);
 
-bool do_mounts(
-	const std::vector<mount_op> &mount_ops,
-	const std::string &fuse_mount_path,
-	std::vector<std::string> &environments);
+bool do_mounts(const std::vector<mount_op> &mount_ops, const std::string &fuse_mount_path,
+               std::vector<std::string> &environments);
 
 #endif
 

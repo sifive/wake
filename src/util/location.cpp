@@ -19,16 +19,20 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <fstream>
-
 #include "location.h"
 
-std::ostream & operator << (std::ostream &os, const Location& location) {
+#include <fstream>
+
+std::ostream& operator<<(std::ostream& os, const Location& location) {
   os << location.filename << ":";
-  if (location.start.row == location.end.row) os << location.start.row;
-  else os << "[" << location.start.row << "-" << location.end.row << "]";
+  if (location.start.row == location.end.row)
+    os << location.start.row;
+  else
+    os << "[" << location.start.row << "-" << location.end.row << "]";
   os << ":";
-  if (location.start.column == location.end.column) os << location.start.column;
-  else os << "[" << location.start.column << "-" << location.end.column << "]";
+  if (location.start.column == location.end.column)
+    os << location.start.column;
+  else
+    os << "[" << location.start.column << "-" << location.end.column << "]";
   return os;
 }

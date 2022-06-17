@@ -18,32 +18,33 @@
 #ifndef VALUE_H
 #define VALUE_H
 
-#include <string>
-#include <memory>
-#include <vector>
-#include <limits>
 #include <gmp.h>
 #include <stdlib.h>
+
+#include <limits>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "gc.h"
 
 namespace re2 {
-  class RE2;
-  class StringPiece;
-}
+class RE2;
+class StringPiece;
+}  // namespace re2
 
 #define APP_PRECEDENCE 14
 
 // typeid().hash_code() changes between runs
-#define TYPE_STRING	1
-#define TYPE_INTEGER	2
-#define TYPE_DOUBLE	3
-#define TYPE_REGEXP	4
-#define TYPE_JOB	5
-#define TYPE_CLOSURE	6
-#define TYPE_RECORD	7
-#define TYPE_SCOPE	8
-#define TYPE_TARGET	9
+#define TYPE_STRING 1
+#define TYPE_INTEGER 2
+#define TYPE_DOUBLE 3
+#define TYPE_REGEXP 4
+#define TYPE_JOB 5
+#define TYPE_CLOSURE 6
+#define TYPE_RECORD 7
+#define TYPE_SCOPE 8
+#define TYPE_TARGET 9
 
 /* Values */
 
@@ -56,14 +57,14 @@ struct FormatEntry {
   int precedence;
   int state;
   FormatEntry(const HeapObject *value_ = nullptr, int precedence_ = 0, int state_ = 0)
-   : value(value_), precedence(precedence_), state(state_) { }
+      : value(value_), precedence(precedence_), state(state_) {}
 };
 
 struct FormatState {
   std::vector<FormatEntry> stack;
   FormatEntry current;
   bool detailed;
-  int indent; // -1 -> single-line
+  int indent;  // -1 -> single-line
   void resume();
   void child(const HeapObject *value, int precedence);
   int get() const { return current.state; }
@@ -78,8 +79,8 @@ struct String final : public GCObject<String, Value> {
   String(size_t length_);
   String(const String &s);
 
-  const char *c_str() const { return static_cast<const char*>(data()); }
-  char *c_str() { return static_cast<char*>(data()); }
+  const char *c_str() const { return static_cast<const char *>(data()); }
+  char *c_str() { return static_cast<char *>(data()); }
   std::string as_str() const { return std::string(c_str(), length); }
   size_t size() { return length; }
   bool empty() { return length == 0; }
@@ -89,19 +90,39 @@ struct String final : public GCObject<String, Value> {
   int compare(const String &other) const { return compare(other.c_str(), other.length); }
   int compare(const std::string &other) const { return compare(other.c_str(), other.size()); }
 
-  template <typename T> bool operator <  (T&& x) const { return compare(std::forward<T>(x)) <  0; }
-  template <typename T> bool operator <= (T&& x) const { return compare(std::forward<T>(x)) <= 0; }
-  template <typename T> bool operator == (T&& x) const { return compare(std::forward<T>(x)) == 0; }
-  template <typename T> bool operator != (T&& x) const { return compare(std::forward<T>(x)) != 0; }
-  template <typename T> bool operator >= (T&& x) const { return compare(std::forward<T>(x)) >= 0; }
-  template <typename T> bool operator >  (T&& x) const { return compare(std::forward<T>(x)) >  0; }
+  template <typename T>
+  bool operator<(T &&x) const {
+    return compare(std::forward<T>(x)) < 0;
+  }
+  template <typename T>
+  bool operator<=(T &&x) const {
+    return compare(std::forward<T>(x)) <= 0;
+  }
+  template <typename T>
+  bool operator==(T &&x) const {
+    return compare(std::forward<T>(x)) == 0;
+  }
+  template <typename T>
+  bool operator!=(T &&x) const {
+    return compare(std::forward<T>(x)) != 0;
+  }
+  template <typename T>
+  bool operator>=(T &&x) const {
+    return compare(std::forward<T>(x)) >= 0;
+  }
+  template <typename T>
+  bool operator>(T &&x) const {
+    return compare(std::forward<T>(x)) > 0;
+  }
 
   Hash shallow_hash() const override;
   void format(std::ostream &os, FormatState &state) const override;
   static void cstr_format(std::ostream &os, const char *s, size_t len);
 
-  PadObject *objend() { return Parent::objend() + 1 + length/sizeof(PadObject); }
-  static size_t reserve(size_t length) { return sizeof(String)/sizeof(PadObject) + 1 + length/sizeof(PadObject); }
+  PadObject *objend() { return Parent::objend() + 1 + length / sizeof(PadObject); }
+  static size_t reserve(size_t length) {
+    return sizeof(String) / sizeof(PadObject) + 1 + length / sizeof(PadObject);
+  }
 
   static String *claim(Heap &h, size_t length);
   static String *claim(Heap &h, const std::string &str);
@@ -122,14 +143,14 @@ struct MPZ {
   MPZ(long v) { mpz_init_set_si(value, v); }
   MPZ(const std::string &v) { mpz_init_set_str(value, v.c_str(), 0); }
   ~MPZ() { mpz_clear(value); }
-  MPZ(const MPZ& x) = delete;
-  MPZ& operator = (const MPZ& x) = delete;
+  MPZ(const MPZ &x) = delete;
+  MPZ &operator=(const MPZ &x) = delete;
 };
 
 struct Integer final : public GCObject<Integer, Value> {
   typedef GCObject<Integer, Value> Parent;
 
-  int length; // abs(length) = number of mp_limb_t in object
+  int length;  // abs(length) = number of mp_limb_t in object
 
   Integer(int length_);
   Integer(const Integer &i);
@@ -138,18 +159,25 @@ struct Integer final : public GCObject<Integer, Value> {
   void format(std::ostream &os, FormatState &state) const override;
   Hash shallow_hash() const override;
 
-  PadObject *objend() { return Parent::objend() + (abs(length)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
-  static size_t reserve(const MPZ &mpz) { return sizeof(Integer)/sizeof(PadObject) + (abs(mpz.value[0]._mp_size)*sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject); }
+  PadObject *objend() {
+    return Parent::objend() +
+           (abs(length) * sizeof(mp_limb_t) + sizeof(PadObject) - 1) / sizeof(PadObject);
+  }
+  static size_t reserve(const MPZ &mpz) {
+    return sizeof(Integer) / sizeof(PadObject) +
+           (abs(mpz.value[0]._mp_size) * sizeof(mp_limb_t) + sizeof(PadObject) - 1) /
+               sizeof(PadObject);
+  }
 
-  static Integer *claim(Heap &h, const MPZ& mpz);
-  static Integer *alloc(Heap &h, const MPZ& mpz);
+  static Integer *claim(Heap &h, const MPZ &mpz);
+  static Integer *alloc(Heap &h, const MPZ &mpz);
 
   // create a fake mpz_t out of the heap object
   const __mpz_struct wrap() const {
     __mpz_struct out;
     out._mp_size = length;
     out._mp_alloc = abs(length);
-    out._mp_d = static_cast<mp_limb_t*>(const_cast<void*>(data()));
+    out._mp_d = static_cast<mp_limb_t *>(const_cast<void *>(data()));
     return out;
   }
 
@@ -162,12 +190,15 @@ struct Integer final : public GCObject<Integer, Value> {
 #define HEXFLOAT 2
 #define DEFAULTFLOAT 3
 struct Double final : public GCObject<Double, Value> {
-  typedef std::numeric_limits< double > limits;
+  typedef std::numeric_limits<double> limits;
 
   double value;
 
-  Double(double value_ = 0) : value(value_) { }
-  Double(const char *str) { char *end; value = strtod(str, &end); }
+  Double(double value_ = 0) : value(value_) {}
+  Double(const char *str) {
+    char *end;
+    value = strtod(str, &end);
+  }
 
   std::string str(int format = DEFAULTFLOAT, int precision = limits::max_digits10) const;
   void format(std::ostream &os, FormatState &state) const override;

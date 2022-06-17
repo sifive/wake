@@ -18,14 +18,18 @@
 #ifndef SFINAE_H
 #define SFINAE_H
 
-#define TEST_MEMBER(member)						\
-  template <typename T>							\
-  struct has_##member {							\
-    typedef char yes;							\
-    struct no { char x[2]; };						\
-    template <typename C> static yes test(decltype(&C::member));	\
-    template <typename C> static no  test(...); 			\
-    static bool const value = sizeof(test<T>(0)) == sizeof(yes);	\
+#define TEST_MEMBER(member)                                      \
+  template <typename T>                                          \
+  struct has_##member {                                          \
+    typedef char yes;                                            \
+    struct no {                                                  \
+      char x[2];                                                 \
+    };                                                           \
+    template <typename C>                                        \
+    static yes test(decltype(&C::member));                       \
+    template <typename C>                                        \
+    static no test(...);                                         \
+    static bool const value = sizeof(test<T>(0)) == sizeof(yes); \
   }
 
 template <bool C, typename T>
@@ -34,6 +38,6 @@ struct enable_if {
 };
 
 template <typename T>
-struct enable_if<false, T> { };
+struct enable_if<false, T> {};
 
 #endif

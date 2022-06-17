@@ -16,13 +16,14 @@
  */
 
 #include "unit.h"
+
+#include <cstring>
+#include <set>
+
 #include "util/colour.h"
 #include "util/diagnostic.h"
 
-#include <set>
-#include <cstring>
-
-DiagnosticReporter *reporter;
+DiagnosticReporter* reporter;
 
 struct Test {
   const char* test_name;
@@ -46,9 +47,11 @@ int main(int argc, char** argv) {
     return 1;
   }
   if (argc == 2) {
-    if (strcmp(argv[1],"--no-color") == 0) no_color = true;
+    if (strcmp(argv[1], "--no-color") == 0)
+      no_color = true;
     else {
-      std::cerr << "`" << argv[1] << "` is not a valid argument, --no-color is the only valid option";
+      std::cerr << "`" << argv[1]
+                << "` is not a valid argument, --no-color is the only valid option";
       return 1;
     }
   }
@@ -60,7 +63,7 @@ int main(int argc, char** argv) {
     // Set this logjump in case this test fails
     size_t num_errors = logger.errors.size();
     logger.test_name = test.test_name;
-    if(setjmp(logger.return_jmp_buffer)) {
+    if (setjmp(logger.return_jmp_buffer)) {
       // Now that we've made it in here we know that a test has assert failed.
       // We still want to keep running all the other tests however so we keep going.
       // The failure will be logged so we can catch it later.
@@ -68,8 +71,7 @@ int main(int argc, char** argv) {
     }
     // If this returns then we won't long jump
     test.test(logger);
-    if (num_errors == logger.errors.size())
-      passing_tests.emplace(test.test_name);
+    if (num_errors == logger.errors.size()) passing_tests.emplace(test.test_name);
   }
 
   for (auto& err : logger.errors) {

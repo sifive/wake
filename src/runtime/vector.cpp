@@ -21,20 +21,18 @@
 
 #include <cassert>
 
+#include "prim.h"
+#include "types/data.h"
 #include "types/datatype.h"
 #include "types/type.h"
-#include "types/data.h"
 #include "value.h"
-#include "prim.h"
 
 static const TypeVar arrayT("Array@builtin", 1);
 
 static PRIMTYPE(type_vnew) {
   TypeVar vec;
   arrayT.clone(vec);
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeInteger) &&
-    out->unify(vec);
+  return args.size() == 1 && args[0]->unify(Data::typeInteger) && out->unify(vec);
 }
 
 static PRIMFN(prim_vnew) {
@@ -47,10 +45,8 @@ static PRIMFN(prim_vnew) {
 static PRIMTYPE(type_vget) {
   TypeVar vec;
   arrayT.clone(vec);
-  return args.size() == 2 &&
-    args[0]->unify(vec) &&
-    args[1]->unify(Data::typeInteger) &&
-    out->unify(vec[0]);
+  return args.size() == 2 && args[0]->unify(vec) && args[1]->unify(Data::typeInteger) &&
+         out->unify(vec[0]);
 }
 
 static PRIMFN(prim_vget) {
@@ -63,7 +59,7 @@ static PRIMFN(prim_vget) {
   Promise *p = vec->at(mpz_get_si(arg1));
   if (*p) {
     scope->at(output)->fulfill(runtime, p->coerce<HeapObject>());
-  } else  {
+  } else {
     runtime.heap.reserve(Tuple::fulfiller_pads);
     p->await(runtime, scope->claim_fulfiller(runtime, output));
   }
@@ -72,11 +68,8 @@ static PRIMFN(prim_vget) {
 static PRIMTYPE(type_vset) {
   TypeVar vec;
   arrayT.clone(vec);
-  return args.size() == 3 &&
-    args[0]->unify(vec) &&
-    args[1]->unify(Data::typeInteger) &&
-    args[2]->unify(vec[0]) &&
-    out->unify(Data::typeUnit);
+  return args.size() == 3 && args[0]->unify(vec) && args[1]->unify(Data::typeInteger) &&
+         args[2]->unify(vec[0]) && out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_vset) {

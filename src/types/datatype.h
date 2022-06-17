@@ -18,23 +18,23 @@
 #ifndef DATA_TYPE_H
 #define DATA_TYPE_H
 
-#include <vector>
-#include <string>
 #include <map>
-#include <ostream>
 #include <memory>
+#include <ostream>
+#include <string>
+#include <vector>
 
 #include "util/fragment.h"
 #include "util/optional.h"
 
 struct TypeVar;
-typedef std::map<std::string, TypeVar*> TypeMap;
+typedef std::map<std::string, TypeVar *> TypeMap;
 
 struct ScopedTypeVar {
   std::string name;
   FileFragment fragment;
   ScopedTypeVar(const std::string &name_, const FileFragment &fragment_)
-   : name(name_), fragment(fragment_) { }
+      : name(name_), fragment(fragment_) {}
 };
 
 struct AST {
@@ -55,16 +55,16 @@ struct AST {
   operator bool() const { return !name.empty(); }
 };
 
-std::ostream & operator << (std::ostream &os, const AST &ast);
+std::ostream &operator<<(std::ostream &os, const AST &ast);
 
 struct Sum;
 struct Expr;
 struct Constructor {
   AST ast;
-  int index; // sum->members[index] = this
+  int index;  // sum->members[index] = this
   bool scoped;
 
-  Constructor(AST &&ast_) : ast(ast_), index(0), scoped(false) { }
+  Constructor(AST &&ast_) : ast(ast_), index(0), scoped(false) {}
   static Constructor array;
 };
 

@@ -19,36 +19,37 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include "sources.h"
+
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <re2/re2.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
-#include <dirent.h>
-#include <fcntl.h>
 
+#include <algorithm>
 #include <cstring>
-#include <sstream>
 #include <fstream>
 #include <iostream>
-#include <algorithm>
+#include <sstream>
 
-#include "util/execpath.h"
+#include "parser/wakefiles.h"
+#include "prim.h"
+#include "types/data.h"
 #include "types/datatype.h"
 #include "types/type.h"
-#include "types/data.h"
-#include "parser/wakefiles.h"
-#include "sources.h"
-#include "prim.h"
+#include "util/execpath.h"
 #include "value.h"
 
 bool make_workspace(const std::string &dir) {
   if (chdir(dir.c_str()) != 0) return false;
-  int perm = S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH;
-  int fd = open("wake.db", O_RDWR|O_CREAT|O_TRUNC, perm);
+  int perm = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+  int fd = open("wake.db", O_RDWR | O_CREAT | O_TRUNC, perm);
   if (fd == -1) {
     std::cerr << "Could not create 'wake.db' in '" << dir << "': " << strerror(errno) << std::endl;
     return false;
@@ -59,34 +60,35 @@ bool make_workspace(const std::string &dir) {
 
 // dir + path must be canonical
 static std::string make_relative(std::string &&dir, std::string &&path) {
-  if ((!path.empty() && path[0] == '/') !=
-  (!dir .empty() && dir [0] == '/')) {
+  if ((!path.empty() && path[0] == '/') != (!dir.empty() && dir[0] == '/')) {
     return std::move(path);
   }
 
-  if (dir == ".") dir = "";
-  else if (dir != "/") dir += '/';
+  if (dir == ".")
+    dir = "";
+  else if (dir != "/")
+    dir += '/';
   path += '/';
 
   size_t skip = 0, end = std::min(path.size(), dir.size());
   for (size_t i = 0; i < end; ++i) {
-    if (dir[i] != path[i])
-      break;
-    if (dir[i] == '/') skip = i+1;
+    if (dir[i] != path[i]) break;
+    if (dir[i] == '/') skip = i + 1;
   }
 
   std::stringstream str;
   for (size_t i = skip; i < dir.size(); ++i)
-    if (dir[i] == '/')
-      str << "../";
+    if (dir[i] == '/') str << "../";
 
   std::string x;
-  std::string last(path, skip, path.size()-skip-1);
+  std::string last(path, skip, path.size() - skip - 1);
   if (last.empty() || last == ".") {
     // remove trailing '/'
     x = str.str();
-    if (x.empty()) x = ".";
-    else x.resize(x.size()-1);
+    if (x.empty())
+      x = ".";
+    else
+      x.resize(x.size() - 1);
   } else {
     str << last;
     x = str.str();
@@ -111,7 +113,8 @@ bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &sr
       }
     }
     if (res == -1) {
-      std::cerr << "Failed to change directory to '" << chdirto << "': " << strerror(errno) << std::endl;
+      std::cerr << "Failed to change directory to '" << chdirto << "': " << strerror(errno)
+                << std::endl;
       return false;
     }
   }
@@ -133,7 +136,7 @@ bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &sr
 
   std::string workspace = get_cwd();
   if (src_dir.compare(0, workspace.size(), workspace) != 0 ||
-       (workspace.size() < src_dir.size() && src_dir[workspace.size()] != '/')) {
+      (workspace.size() < src_dir.size() && src_dir[workspace.size()] != '/')) {
     fprintf(stderr, "Workspace directory is not a parent of current directory (or --chdir)\n");
     return false;
   }
@@ -141,8 +144,7 @@ bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &sr
   // remove prefix
   src_dir.erase(src_dir.begin(), src_dir.begin() + workspace.size());
   // move leading '/' (if any) to end:
-  if (!src_dir.empty())
-    std::rotate(src_dir.begin(), src_dir.begin()+1, src_dir.end());
+  if (!src_dir.empty()) std::rotate(src_dir.begin(), src_dir.begin() + 1, src_dir.end());
 
   wake_cwd = make_relative(std::move(workspace), std::move(wake_cwd));
   // Make wake_cwd suitable for prepend to paths in main.cpp
@@ -158,8 +160,7 @@ bool chdir_workspace(const char *chdirto, std::string &wake_cwd, std::string &sr
 static const char *num(const char *s, int &outref) {
   if (*s >= '0' && *s <= '9') {
     int out;
-    for (out = 0; *s >= '0' && *s <= '9'; ++s)
-      out = (out*10) + (*s - '0');
+    for (out = 0; *s >= '0' && *s <= '9'; ++s) out = (out * 10) + (*s - '0');
     outref = out;
   } else {
     outref = -1;
@@ -175,14 +176,14 @@ static std::string parse_numbers(const char *s, int &major, int &minor, int &pat
   if (*s == 0) return "";
   if (*s != '.') return "major version not followed by a '.'";
 
-  s = num(s+1, minor);
+  s = num(s + 1, minor);
   if (minor < 0) return "minor version is not a number";
   if (*s == 0) return "";
   if (*s != '.') return "minor version not followed by a '.'";
 
-  s = num(s+1, patch);
+  s = num(s + 1, patch);
   if (patch < 0) return "patch version is not a number";
-  if (*s == 0 || *s == '~' || *s =='-') return "";
+  if (*s == 0 || *s == '~' || *s == '-') return "";
   return "excess text after the patch version number";
 }
 
@@ -199,27 +200,24 @@ std::string check_version(bool workspace, const char *wake_version) {
   int wake_major, wake_minor, wake_patch;
   int repo_major, repo_minor, repo_patch;
   auto repo = parse_numbers(repo_version.c_str(), repo_major, repo_minor, repo_patch);
-  auto wake = parse_numbers(wake_version+1,       wake_major, wake_minor, wake_patch);
+  auto wake = parse_numbers(wake_version + 1, wake_major, wake_minor, wake_patch);
 
   if (!repo.empty()) return repo + " (" + repo_version + ")";
   if (!wake.empty()) return wake + " (" + wake_version + ")";
 
   if (repo_major != wake_major)
-    return "repository requires wake v"
-      + std::to_string(repo_major) + ".x.y, but this is wake "
-      + wake_version;
+    return "repository requires wake v" + std::to_string(repo_major) + ".x.y, but this is wake " +
+           wake_version;
 
   if (repo_minor > wake_minor || (repo_minor == wake_minor && repo_patch > wake_patch))
-    return "repository requires wake >= v"
-      + std::to_string(repo_major) + "."
-      + std::to_string(repo_minor) + "."
-      + std::to_string(repo_patch) + ", but this is wake "
-      + wake_version;
+    return "repository requires wake >= v" + std::to_string(repo_major) + "." +
+           std::to_string(repo_minor) + "." + std::to_string(repo_patch) + ", but this is wake " +
+           wake_version;
 
-  return ""; // ok!
+  return "";  // ok!
 }
 
-static std::string slurp(int dirfd, const char * const * argv, bool &fail) {
+static std::string slurp(int dirfd, const char *const *argv, bool &fail) {
   std::stringstream str;
   char buf[4096];
   int got, status, pipefd[2];
@@ -249,7 +247,8 @@ static std::string slurp(int dirfd, const char * const * argv, bool &fail) {
       fail = true;
     }
     close(pipefd[0]);
-    while (waitpid(pid, &status, 0) != pid) { }
+    while (waitpid(pid, &status, 0) != pid) {
+    }
     if (WIFSIGNALED(status)) {
       fprintf(stderr, "Failed to reap git: killed by %d\n", WTERMSIG(status));
       fail = true;
@@ -261,7 +260,8 @@ static std::string slurp(int dirfd, const char * const * argv, bool &fail) {
   return str.str();
 }
 
-static bool scan(std::vector<std::string> &files, std::vector<std::string> &submods, const std::string &path, int dirfd) {
+static bool scan(std::vector<std::string> &files, std::vector<std::string> &submods,
+                 const std::string &path, int dirfd) {
   auto dir = fdopendir(dirfd);
   if (!dir) {
     fprintf(stderr, "Failed to fdopendir %s: %s\n", path.c_str(), strerror(errno));
@@ -272,13 +272,16 @@ static bool scan(std::vector<std::string> &files, std::vector<std::string> &subm
   struct dirent *f;
   bool failed = false;
   for (errno = 0; 0 != (f = readdir(dir)); errno = 0) {
-    if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0))) continue;
+    if (f->d_name[0] == '.' && (f->d_name[1] == 0 || (f->d_name[1] == '.' && f->d_name[2] == 0)))
+      continue;
     if (!strcmp(f->d_name, ".git")) {
-      static const char *fileArgs[] = { "git", "ls-files", "-z", nullptr };
+      static const char *fileArgs[] = {"git", "ls-files", "-z", nullptr};
       std::string fileStr(slurp(dirfd, &fileArgs[0], failed));
       std::string submodStr;
       if (faccessat(dirfd, ".gitmodules", R_OK, 0) == 0) {
-        static const char *submodArgs[] = { "git", "config", "-f", ".gitmodules", "-z", "--get-regexp", "^submodule[.].*[.]path$", nullptr };
+        static const char *submodArgs[] = {
+            "git",  "config", "-f", ".gitmodules", "-z", "--get-regexp", "^submodule[.].*[.]path$",
+            nullptr};
         submodStr = slurp(dirfd, &submodArgs[0], failed);
       }
       std::string prefix(path == "." ? "" : (path + "/"));
@@ -287,17 +290,17 @@ static bool scan(std::vector<std::string> &files, std::vector<std::string> &subm
       for (const char *scan = tok; scan != end; ++scan) {
         if (*scan == 0 && scan != tok) {
           files.emplace_back(prefix + tok);
-          tok = scan+1;
+          tok = scan + 1;
         }
       }
       tok = submodStr.data();
       end = tok + submodStr.size();
       const char *value = nullptr;
       for (const char *scan = tok; scan != end; ++scan) {
-        if (*scan == '\n' && !value) value = scan+1;
+        if (*scan == '\n' && !value) value = scan + 1;
         if (*scan == 0 && scan != tok && value) {
           submods.emplace_back(prefix + value);
-          tok = scan+1;
+          tok = scan + 1;
           value = nullptr;
         }
       }
@@ -308,7 +311,8 @@ static bool scan(std::vector<std::string> &files, std::vector<std::string> &subm
 #endif
         struct stat sbuf;
         if (fstatat(dirfd, f->d_name, &sbuf, AT_SYMLINK_NOFOLLOW) != 0) {
-          fprintf(stderr, "Failed to fstatat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
+          fprintf(stderr, "Failed to fstatat %s/%s: %s\n", path.c_str(), f->d_name,
+                  strerror(errno));
           failed = true;
           recurse = false;
         } else {
@@ -327,8 +331,7 @@ static bool scan(std::vector<std::string> &files, std::vector<std::string> &subm
           fprintf(stderr, "Failed to openat %s/%s: %s\n", path.c_str(), f->d_name, strerror(errno));
           failed = true;
         } else {
-          if (scan(files, submods, name, fd))
-            failed = true;
+          if (scan(files, submods, name, fd)) failed = true;
         }
       }
     }
@@ -349,8 +352,7 @@ static bool scan(std::vector<std::string> &files, std::vector<std::string> &subm
 
 static bool scan(std::vector<std::string> &files, std::vector<std::string> &submods) {
   int flags, dirfd = open(".", O_RDONLY);
-  if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1)
-    fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
+  if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1) fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
   return dirfd == -1 || scan(files, submods, ".", dirfd);
 }
 
@@ -392,10 +394,8 @@ static PRIMTYPE(type_sources) {
   TypeVar list;
   Data::typeList.clone(list);
   list[0].unify(Data::typeString);
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeString) &&
-    args[1]->unify(Data::typeRegExp) &&
-    out->unify(list);
+  return args.size() == 2 && args[0]->unify(Data::typeString) && args[1]->unify(Data::typeRegExp) &&
+         out->unify(list);
 }
 
 static bool promise_lexical(const Promise &a, const std::string &b) {
@@ -408,19 +408,19 @@ static PRIMFN(prim_sources) {
   REGEXP(arg1, 1);
 
   long skip = 0;
-  Promise *low  = runtime.sources->at(0);
+  Promise *low = runtime.sources->at(0);
   Promise *high = low + runtime.sources->size();
 
   std::string root = make_canonical(arg0->as_str());
   if (root != ".") {
     auto prefixL = root + "/";
-    auto prefixH = root + "0"; // '/' + 1 = '0'
+    auto prefixH = root + "0";  // '/' + 1 = '0'
     skip = root.size() + 1;
-    low  = std::lower_bound(low, high, prefixL, promise_lexical);
+    low = std::lower_bound(low, high, prefixL, promise_lexical);
     high = std::lower_bound(low, high, prefixH, promise_lexical);
   }
 
-  std::vector<Value*> found;
+  std::vector<Value *> found;
   for (Promise *i = low; i != high; ++i) {
     String *s = i->coerce<String>();
     re2::StringPiece piece(s->c_str() + skip, s->size() - skip);
@@ -441,24 +441,21 @@ static PRIMFN(prim_files) {
 
   std::vector<std::string> match;
   bool fail = push_files(match, root, *arg1->exp, skip);
-  (void)fail; // !!! There's a hole in the API
+  (void)fail;  // !!! There's a hole in the API
 
   size_t need = reserve_list(match.size());
   for (auto &x : match) need += String::reserve(x.size());
   runtime.heap.reserve(need);
 
-  std::vector<Value*> out;
+  std::vector<Value *> out;
   out.reserve(match.size());
-  for (auto &x : match)
-    out.push_back(String::claim(runtime.heap, x));
+  for (auto &x : match) out.push_back(String::claim(runtime.heap, x));
 
   RETURN(claim_list(runtime.heap, out.size(), out.data()));
 }
 
 static PRIMTYPE(type_add_sources) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(Data::typeBoolean);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeBoolean);
 }
 
 static bool promise_lt(const Promise &a, const Promise &b) {
@@ -482,11 +479,11 @@ static PRIMFN(prim_add_sources) {
     if (*scan == 0 && scan != tok) {
       ++num;
       need += String::reserve(scan - tok);
-      tok = scan+1;
+      tok = scan + 1;
     }
   }
 
-  need += 2*Record::reserve(num);
+  need += 2 * Record::reserve(num);
   runtime.heap.reserve(need);
   Record *tuple = Record::claim(runtime.heap, &Constructor::array, num);
 
@@ -498,8 +495,8 @@ static PRIMFN(prim_add_sources) {
   end = tok + arg0->size();
   for (const char *scan = tok; scan != end; ++scan) {
     if (*scan == 0 && scan != tok) {
-      tuple->at(i++)->instant_fulfill(String::claim(runtime.heap, tok, scan-tok));
-      tok = scan+1;
+      tuple->at(i++)->instant_fulfill(String::claim(runtime.heap, tok, scan - tok));
+      tok = scan + 1;
     }
   }
 
@@ -518,9 +515,7 @@ static PRIMFN(prim_add_sources) {
 }
 
 static PRIMTYPE(type_simplify) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(Data::typeString);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_simplify) {
@@ -531,10 +526,8 @@ static PRIMFN(prim_simplify) {
 }
 
 static PRIMTYPE(type_relative) {
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeString) &&
-    args[1]->unify(Data::typeString) &&
-    out->unify(Data::typeString);
+  return args.size() == 2 && args[0]->unify(Data::typeString) && args[1]->unify(Data::typeString) &&
+         out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_relative) {
@@ -542,35 +535,25 @@ static PRIMFN(prim_relative) {
   STRING(dir, 0);
   STRING(path, 1);
 
-  RETURN(String::alloc(runtime.heap, make_relative(
-    make_canonical(dir->as_str()),
-    make_canonical(path->as_str()))));
+  RETURN(String::alloc(
+      runtime.heap, make_relative(make_canonical(dir->as_str()), make_canonical(path->as_str()))));
 }
 
-static PRIMTYPE(type_execpath) {
-  return args.size() == 0 &&
-    out->unify(Data::typeString);
-}
+static PRIMTYPE(type_execpath) { return args.size() == 0 && out->unify(Data::typeString); }
 
 static PRIMFN(prim_execpath) {
   EXPECT(0);
   RETURN(String::alloc(runtime.heap, find_execpath()));
 }
 
-static PRIMTYPE(type_workspace) {
-  return args.size() == 0 &&
-    out->unify(Data::typeString);
-}
+static PRIMTYPE(type_workspace) { return args.size() == 0 && out->unify(Data::typeString); }
 
 static PRIMFN(prim_workspace) {
   EXPECT(0);
   RETURN(String::alloc(runtime.heap, get_cwd()));
 }
 
-static PRIMTYPE(type_pid) {
-  return args.size() == 0 &&
-    out->unify(Data::typeInteger);
-}
+static PRIMTYPE(type_pid) { return args.size() == 0 && out->unify(Data::typeInteger); }
 
 static PRIMFN(prim_pid) {
   EXPECT(0);
@@ -579,9 +562,7 @@ static PRIMFN(prim_pid) {
 }
 
 static PRIMTYPE(type_glob2regexp) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(Data::typeString);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_glob2regexp) {
@@ -593,15 +574,15 @@ static PRIMFN(prim_glob2regexp) {
 
 void prim_register_sources(PrimMap &pmap) {
   // Observes the filesystem, so must be ordered
-  prim_register(pmap, "files",       prim_files,       type_sources,     PRIM_ORDERED);
+  prim_register(pmap, "files", prim_files, type_sources, PRIM_ORDERED);
   // Sources do not change after wake starts
   prim_register(pmap, "add_sources", prim_add_sources, type_add_sources, PRIM_PURE);
-  prim_register(pmap, "sources",     prim_sources,     type_sources,     PRIM_PURE);
+  prim_register(pmap, "sources", prim_sources, type_sources, PRIM_PURE);
   // Simple functions
-  prim_register(pmap, "simplify",    prim_simplify,    type_simplify,    PRIM_PURE);
-  prim_register(pmap, "relative",    prim_relative,    type_relative,    PRIM_PURE);
+  prim_register(pmap, "simplify", prim_simplify, type_simplify, PRIM_PURE);
+  prim_register(pmap, "relative", prim_relative, type_relative, PRIM_PURE);
   prim_register(pmap, "glob2regexp", prim_glob2regexp, type_glob2regexp, PRIM_PURE);
-  prim_register(pmap, "execpath",    prim_execpath,    type_execpath,    PRIM_PURE);
-  prim_register(pmap, "workspace",   prim_workspace,   type_workspace,   PRIM_PURE);
-  prim_register(pmap, "pid",         prim_pid,         type_pid,         PRIM_PURE);
+  prim_register(pmap, "execpath", prim_execpath, type_execpath, PRIM_PURE);
+  prim_register(pmap, "workspace", prim_workspace, type_workspace, PRIM_PURE);
+  prim_register(pmap, "pid", prim_pid, type_pid, PRIM_PURE);
 }

@@ -19,27 +19,27 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <errno.h>
+#include <fcntl.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
-#include <errno.h>
-#include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
 
-#include <sstream>
 #include <fstream>
+#include <sstream>
 
+#include "gc.h"
+#include "json/utf8.h"
+#include "prim.h"
+#include "status.h"
+#include "types/data.h"
+#include "types/internal.h"
+#include "types/type.h"
 #include "utf8proc/utf8proc.h"
 #include "util/shell.h"
 #include "util/unlink.h"
-#include "json/utf8.h"
-#include "types/type.h"
-#include "types/data.h"
-#include "types/internal.h"
-#include "prim.h"
 #include "value.h"
-#include "status.h"
-#include "gc.h"
 
 static PRIMFN(prim_vcat) {
   (void)data;
@@ -55,7 +55,7 @@ static PRIMFN(prim_vcat) {
 
   size = 0;
   for (size_t i = 0; i < nargs; ++i) {
-    String *s = static_cast<String*>(args[i]);
+    String *s = static_cast<String *>(args[i]);
     memcpy(out->c_str() + size, s->c_str(), s->size());
     size += s->size();
   }
@@ -64,9 +64,7 @@ static PRIMFN(prim_vcat) {
 }
 
 static PRIMTYPE(type_strlen) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(Data::typeInteger);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_strlen) {
@@ -80,9 +78,7 @@ static PRIMTYPE(type_lcat) {
   TypeVar list;
   Data::typeList.clone(list);
   list[0].unify(Data::typeString);
-  return args.size() == 1 &&
-    args[0]->unify(list) &&
-    out->unify(Data::typeString);
+  return args.size() == 1 && args[0]->unify(list) && out->unify(Data::typeString);
 }
 
 struct CCat final : public GCObject<CCat, Continuation> {
@@ -91,7 +87,8 @@ struct CCat final : public GCObject<CCat, Continuation> {
   HeapPointer<Scope> scope;
   size_t output;
 
-  CCat(Record *list_, Scope *scope_, size_t output_) : list(list_), progress(list_), scope(scope_), output(output_) { }
+  CCat(Record *list_, Scope *scope_, size_t output_)
+      : list(list_), progress(list_), scope(scope_), output(output_) {}
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -110,7 +107,7 @@ void CCat::execute(Runtime &runtime) {
     progress = progress->at(1)->coerce<Record>();
 
   if (progress->size() == 2) {
-    next = nullptr; // reschedule
+    next = nullptr;  // reschedule
     if (*progress->at(0)) {
       progress->at(1)->await(runtime, this);
     } else {
@@ -145,9 +142,7 @@ static PRIMTYPE(type_explode) {
   TypeVar list;
   Data::typeList.clone(list);
   list[0].unify(Data::typeString);
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(list);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(list);
 }
 
 static PRIMFN(prim_explode) {
@@ -158,7 +153,7 @@ static PRIMFN(prim_explode) {
   size_t need = reserve_list(arg0->size()) + arg0->size() * String::reserve(4);
   runtime.heap.reserve(need);
 
-  std::vector<Value*> vals;
+  std::vector<Value *> vals;
   uint32_t rune;
 
   int got;
@@ -176,9 +171,7 @@ static PRIMTYPE(type_read) {
   Data::typeResult.clone(result);
   result[0].unify(Data::typeString);
   result[1].unify(Data::typeString);
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(result);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(result);
 }
 
 static PRIMFN(prim_read) {
@@ -219,11 +212,8 @@ static PRIMTYPE(type_write) {
   Data::typeResult.clone(result);
   result[0].unify(Data::typeString);
   result[1].unify(Data::typeString);
-  return args.size() == 3 &&
-    args[0]->unify(Data::typeInteger) &&
-    args[1]->unify(Data::typeString) &&
-    args[2]->unify(Data::typeString) &&
-    out->unify(result);
+  return args.size() == 3 && args[0]->unify(Data::typeInteger) &&
+         args[1]->unify(Data::typeString) && args[2]->unify(Data::typeString) && out->unify(result);
 }
 
 static PRIMFN(prim_write) {
@@ -262,9 +252,7 @@ static PRIMFN(prim_write) {
 }
 
 static PRIMTYPE(type_unlink) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(Data::typeUnit);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_unlink) {
@@ -284,9 +272,7 @@ static PRIMTYPE(type_getenv) {
   TypeVar list;
   Data::typeList.clone(list);
   list[0].unify(Data::typeString);
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(list);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(list);
 }
 
 static PRIMFN(prim_getenv) {
@@ -309,10 +295,8 @@ static PRIMTYPE(type_mkdir) {
   Data::typeResult.clone(result);
   result[0].unify(Data::typeString);
   result[1].unify(Data::typeString);
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeInteger) &&
-    args[1]->unify(Data::typeString) &&
-    out->unify(result);
+  return args.size() == 2 && args[0]->unify(Data::typeInteger) &&
+         args[1]->unify(Data::typeString) && out->unify(result);
 }
 
 static PRIMFN(prim_mkdir) {
@@ -364,15 +348,15 @@ static PRIMFN(prim_mkdir) {
 
 static PRIMTYPE(type_format) {
   return args.size() == 1 &&
-    // don't unify args[0] => allow any
-    out->unify(Data::typeString);
+         // don't unify args[0] => allow any
+         out->unify(Data::typeString);
 }
 
 struct CFormat final : public GCObject<CFormat, Continuation> {
   HeapPointer<HeapObject> obj;
   HeapPointer<Continuation> cont;
 
-  CFormat(HeapObject *obj_, Continuation *cont_) : obj(obj_), cont(cont_) { }
+  CFormat(HeapObject *obj_, Continuation *cont_) : obj(obj_), cont(cont_) {}
 
   template <typename T, T (HeapPointerBase::*memberfn)(T x)>
   T recurse(T arg) {
@@ -394,16 +378,14 @@ void CFormat::execute(Runtime &runtime) {
 static PRIMFN(prim_format) {
   EXPECT(1);
   runtime.heap.reserve(Tuple::fulfiller_pads + reserve_hash() + CFormat::reserve());
-  runtime.schedule(claim_hash(runtime.heap, args[0],
-    CFormat::claim(runtime.heap, args[0],
-      scope->claim_fulfiller(runtime, output))));
+  runtime.schedule(
+      claim_hash(runtime.heap, args[0],
+                 CFormat::claim(runtime.heap, args[0], scope->claim_fulfiller(runtime, output))));
 }
 
 static PRIMTYPE(type_colour) {
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeString) &&
-    args[1]->unify(Data::typeInteger) &&
-    out->unify(Data::typeUnit);
+  return args.size() == 2 && args[0]->unify(Data::typeString) &&
+         args[1]->unify(Data::typeInteger) && out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_colour) {
@@ -416,10 +398,8 @@ static PRIMFN(prim_colour) {
 }
 
 static PRIMTYPE(type_print) {
-  return args.size() == 2 &&
-    args[0]->unify(Data::typeString) &&
-    args[1]->unify(Data::typeString) &&
-    out->unify(Data::typeUnit);
+  return args.size() == 2 && args[0]->unify(Data::typeString) && args[1]->unify(Data::typeString) &&
+         out->unify(Data::typeUnit);
 }
 
 static PRIMFN(prim_print) {
@@ -431,25 +411,19 @@ static PRIMFN(prim_print) {
   RETURN(claim_unit(runtime.heap));
 }
 
-static PRIMTYPE(type_version) {
-  return args.size() == 0 &&
-    out->unify(Data::typeString);
-}
+static PRIMTYPE(type_version) { return args.size() == 0 && out->unify(Data::typeString); }
 
 static PRIMFN(prim_version) {
   EXPECT(0);
-  StringInfo *info = static_cast<StringInfo*>(data);
+  StringInfo *info = static_cast<StringInfo *>(data);
   RETURN(String::alloc(runtime.heap, info->version));
 }
 
-static PRIMTYPE(type_level) {
-  return args.size() == 0 &&
-    out->unify(Data::typeInteger);
-}
+static PRIMTYPE(type_level) { return args.size() == 0 && out->unify(Data::typeInteger); }
 
 static PRIMFN(prim_level) {
   EXPECT(0);
-  StringInfo *info = static_cast<StringInfo*>(data);
+  StringInfo *info = static_cast<StringInfo *>(data);
 
   int x;
   if (info->quiet) {
@@ -476,9 +450,7 @@ static PRIMFN(prim_scmp) {
 }
 
 static PRIMTYPE(type_normalize) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(Data::typeString);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeString);
 }
 
 struct UTF8Out {
@@ -486,20 +458,17 @@ struct UTF8Out {
   utf8proc_uint8_t *dst;
   ssize_t len;
 
-  ~UTF8Out() { if (len >= 0) free(dst); }
+  ~UTF8Out() {
+    if (len >= 0) free(dst);
+  }
   UTF8Out(String *in_, unsigned long opt) : in(in_) {
-    len = utf8proc_map(
-      reinterpret_cast<const utf8proc_uint8_t*>(in->c_str()),
-      in->size(),
-      &dst,
-      static_cast<utf8proc_option_t>(opt));
+    len = utf8proc_map(reinterpret_cast<const utf8proc_uint8_t *>(in->c_str()), in->size(), &dst,
+                       static_cast<utf8proc_option_t>(opt));
   }
 
   String *copy(Heap &heap) const {
     if (len < 0) return in;
-    return String::alloc(heap,
-      reinterpret_cast<const char*>(dst),
-      static_cast<size_t>(len));
+    return String::alloc(heap, reinterpret_cast<const char *>(dst), static_cast<size_t>(len));
   }
 };
 
@@ -507,9 +476,7 @@ static PRIMFN(prim_sNFC) {
   EXPECT(1);
   STRING(arg0, 0);
 
-  UTF8Out out(arg0,
-    UTF8PROC_COMPOSE |
-    UTF8PROC_REJECTNA);
+  UTF8Out out(arg0, UTF8PROC_COMPOSE | UTF8PROC_REJECTNA);
 
   RETURN(out.copy(runtime.heap));
 }
@@ -518,12 +485,8 @@ static PRIMFN(prim_sNFKC) {
   EXPECT(1);
   STRING(arg0, 0);
 
-  UTF8Out out(arg0,
-    UTF8PROC_COMPOSE   |
-    UTF8PROC_COMPAT    |
-    UTF8PROC_IGNORE    |
-    UTF8PROC_LUMP      |
-    UTF8PROC_REJECTNA);
+  UTF8Out out(arg0, UTF8PROC_COMPOSE | UTF8PROC_COMPAT | UTF8PROC_IGNORE | UTF8PROC_LUMP |
+                        UTF8PROC_REJECTNA);
 
   RETURN(out.copy(runtime.heap));
 }
@@ -532,21 +495,14 @@ static PRIMFN(prim_scaseNFKC) {
   EXPECT(1);
   STRING(arg0, 0);
 
-  UTF8Out out(arg0,
-    UTF8PROC_COMPOSE   |
-    UTF8PROC_COMPAT    |
-    UTF8PROC_IGNORE    |
-    UTF8PROC_LUMP      |
-    UTF8PROC_CASEFOLD  |
-    UTF8PROC_REJECTNA);
+  UTF8Out out(arg0, UTF8PROC_COMPOSE | UTF8PROC_COMPAT | UTF8PROC_IGNORE | UTF8PROC_LUMP |
+                        UTF8PROC_CASEFOLD | UTF8PROC_REJECTNA);
 
   RETURN(out.copy(runtime.heap));
 }
 
 static PRIMTYPE(type_code2str) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeInteger) &&
-    out->unify(Data::typeString);
+  return args.size() == 1 && args[0]->unify(Data::typeInteger) && out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_code2str) {
@@ -566,7 +522,7 @@ static PRIMFN(prim_bin2str) {
   bool ok = mpz_fits_slong_p(arg0);
   long x = ok ? mpz_get_si(arg0) : 0;
   ok = ok && x >= 0 && x < 256;
-  char c[2] = { static_cast<char>(x), 0 };
+  char c[2] = {static_cast<char>(x), 0};
   if (ok) {
     RETURN(String::alloc(runtime.heap, c, 1));
   } else {
@@ -575,9 +531,7 @@ static PRIMFN(prim_bin2str) {
 }
 
 static PRIMTYPE(type_str2code) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(Data::typeInteger);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeInteger);
 }
 
 static PRIMFN(prim_str2code) {
@@ -596,14 +550,11 @@ static PRIMFN(prim_str2bin) {
   RETURN(Integer::alloc(runtime.heap, out));
 }
 
-static PRIMTYPE(type_cwd) {
-  return args.size() == 0 &&
-    out->unify(Data::typeString);
-}
+static PRIMTYPE(type_cwd) { return args.size() == 0 && out->unify(Data::typeString); }
 
 static PRIMFN(prim_cwd) {
   EXPECT(0);
-  StringInfo *info = static_cast<StringInfo*>(data);
+  StringInfo *info = static_cast<StringInfo *>(data);
   RETURN(String::alloc(runtime.heap, info->wake_cwd));
 }
 
@@ -611,13 +562,12 @@ static PRIMTYPE(type_cmdline) {
   TypeVar list;
   Data::typeList.clone(list);
   list[0].unify(Data::typeString);
-  return args.size() == 0 &&
-    out->unify(list);
+  return args.size() == 0 && out->unify(list);
 }
 
 static PRIMFN(prim_cmdline) {
   EXPECT(0);
-  StringInfo *info = static_cast<StringInfo*>(data);
+  StringInfo *info = static_cast<StringInfo *>(data);
 
   size_t need = 0, len = 0;
   for (char **arg = info->cmdline; *arg; ++arg) {
@@ -627,9 +577,8 @@ static PRIMFN(prim_cmdline) {
   need += reserve_list(len);
   runtime.heap.reserve(need);
 
-  std::vector<Value*> vals;
-  for (char **arg = info->cmdline; *arg; ++arg)
-    vals.push_back(String::claim(runtime.heap, *arg));
+  std::vector<Value *> vals;
+  for (char **arg = info->cmdline; *arg; ++arg) vals.push_back(String::claim(runtime.heap, *arg));
   RETURN(claim_list(runtime.heap, vals.size(), vals.data()));
 }
 
@@ -638,32 +587,27 @@ static PRIMTYPE(type_uname) {
   Data::typePair.clone(pair);
   pair[0].unify(Data::typeString);
   pair[1].unify(Data::typeString);
-  return args.size() == 0 &&
-    out->unify(pair);
+  return args.size() == 0 && out->unify(pair);
 }
 
 static PRIMFN(prim_uname) {
   EXPECT(0);
   struct utsname uts;
   int ret = uname(&uts);
-  REQUIRE (ret == 0);
+  REQUIRE(ret == 0);
 
   size_t slen = strlen(uts.sysname);
   size_t mlen = strlen(uts.machine);
   size_t need = reserve_tuple2() + String::reserve(slen) + String::reserve(mlen);
   runtime.heap.reserve(need);
 
-  auto out = claim_tuple2(
-    runtime.heap,
-    String::claim(runtime.heap, uts.sysname, slen),
-    String::claim(runtime.heap, uts.machine, mlen));
+  auto out = claim_tuple2(runtime.heap, String::claim(runtime.heap, uts.sysname, slen),
+                          String::claim(runtime.heap, uts.machine, mlen));
   RETURN(out);
 }
 
 static PRIMTYPE(type_shell_str) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(Data::typeString);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_shell_str) {
@@ -673,30 +617,30 @@ static PRIMFN(prim_shell_str) {
 }
 
 void prim_register_string(PrimMap &pmap, StringInfo *info) {
-  prim_register(pmap, "strlen",   prim_strlen,   type_strlen,    PRIM_PURE);
-  prim_register(pmap, "vcat",     prim_vcat,     type_vcat,      PRIM_PURE);
-  prim_register(pmap, "lcat",     prim_lcat,     type_lcat,      PRIM_PURE);
-  prim_register(pmap, "explode",  prim_explode,  type_explode,   PRIM_PURE);
-  prim_register(pmap, "getenv",   prim_getenv,   type_getenv,    PRIM_PURE);
-  prim_register(pmap, "format",   prim_format,   type_format,    PRIM_PURE);
-  prim_register(pmap, "version",  prim_version,  type_version,   PRIM_PURE, (void*)info);
-  prim_register(pmap, "level",    prim_level,    type_level,     PRIM_PURE, (void*)info);
-  prim_register(pmap, "cwd",      prim_cwd,      type_cwd,       PRIM_PURE, (void*)info);
-  prim_register(pmap, "cmdline",  prim_cmdline,  type_cmdline,   PRIM_PURE, (void*)info);
-  prim_register(pmap, "scmp",     prim_scmp,     type_scmp,      PRIM_PURE);
-  prim_register(pmap, "sNFC",     prim_sNFC,     type_normalize, PRIM_PURE);
-  prim_register(pmap, "sNFKC",    prim_sNFKC,    type_normalize, PRIM_PURE);
-  prim_register(pmap, "scaseNFKC",prim_scaseNFKC,type_normalize, PRIM_PURE);
-  prim_register(pmap, "code2str", prim_code2str, type_code2str,  PRIM_PURE);
-  prim_register(pmap, "bin2str",  prim_bin2str,  type_code2str,  PRIM_PURE);
-  prim_register(pmap, "str2code", prim_str2code, type_str2code,  PRIM_PURE);
-  prim_register(pmap, "str2bin",  prim_str2bin,  type_str2code,  PRIM_PURE);
-  prim_register(pmap, "uname",    prim_uname,    type_uname,     PRIM_PURE);
-  prim_register(pmap, "shell_str",prim_shell_str,type_shell_str, PRIM_PURE);
-  prim_register(pmap, "colour",   prim_colour,   type_colour,    PRIM_IMPURE);
-  prim_register(pmap, "print",    prim_print,    type_print,     PRIM_IMPURE);
-  prim_register(pmap, "mkdir",    prim_mkdir,    type_mkdir,     PRIM_IMPURE);
-  prim_register(pmap, "unlink",   prim_unlink,   type_unlink,    PRIM_IMPURE);
-  prim_register(pmap, "write",    prim_write,    type_write,     PRIM_IMPURE);
-  prim_register(pmap, "read",     prim_read,     type_read,      PRIM_ORDERED);
+  prim_register(pmap, "strlen", prim_strlen, type_strlen, PRIM_PURE);
+  prim_register(pmap, "vcat", prim_vcat, type_vcat, PRIM_PURE);
+  prim_register(pmap, "lcat", prim_lcat, type_lcat, PRIM_PURE);
+  prim_register(pmap, "explode", prim_explode, type_explode, PRIM_PURE);
+  prim_register(pmap, "getenv", prim_getenv, type_getenv, PRIM_PURE);
+  prim_register(pmap, "format", prim_format, type_format, PRIM_PURE);
+  prim_register(pmap, "version", prim_version, type_version, PRIM_PURE, (void *)info);
+  prim_register(pmap, "level", prim_level, type_level, PRIM_PURE, (void *)info);
+  prim_register(pmap, "cwd", prim_cwd, type_cwd, PRIM_PURE, (void *)info);
+  prim_register(pmap, "cmdline", prim_cmdline, type_cmdline, PRIM_PURE, (void *)info);
+  prim_register(pmap, "scmp", prim_scmp, type_scmp, PRIM_PURE);
+  prim_register(pmap, "sNFC", prim_sNFC, type_normalize, PRIM_PURE);
+  prim_register(pmap, "sNFKC", prim_sNFKC, type_normalize, PRIM_PURE);
+  prim_register(pmap, "scaseNFKC", prim_scaseNFKC, type_normalize, PRIM_PURE);
+  prim_register(pmap, "code2str", prim_code2str, type_code2str, PRIM_PURE);
+  prim_register(pmap, "bin2str", prim_bin2str, type_code2str, PRIM_PURE);
+  prim_register(pmap, "str2code", prim_str2code, type_str2code, PRIM_PURE);
+  prim_register(pmap, "str2bin", prim_str2bin, type_str2code, PRIM_PURE);
+  prim_register(pmap, "uname", prim_uname, type_uname, PRIM_PURE);
+  prim_register(pmap, "shell_str", prim_shell_str, type_shell_str, PRIM_PURE);
+  prim_register(pmap, "colour", prim_colour, type_colour, PRIM_IMPURE);
+  prim_register(pmap, "print", prim_print, type_print, PRIM_IMPURE);
+  prim_register(pmap, "mkdir", prim_mkdir, type_mkdir, PRIM_IMPURE);
+  prim_register(pmap, "unlink", prim_unlink, type_unlink, PRIM_IMPURE);
+  prim_register(pmap, "write", prim_write, type_write, PRIM_IMPURE);
+  prim_register(pmap, "read", prim_read, type_read, PRIM_ORDERED);
 }

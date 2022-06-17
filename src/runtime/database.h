@@ -25,19 +25,20 @@
 struct FileReflection {
   std::string path;
   std::string hash;
-  FileReflection(std::string &&path_, std::string &&hash_) : path(std::move(path_)), hash(std::move(hash_)) { }
+  FileReflection(std::string &&path_, std::string &&hash_)
+      : path(std::move(path_)), hash(std::move(hash_)) {}
 };
 
 struct Usage {
   bool found;
-  int status; // -signal, +code
+  int status;  // -signal, +code
   double runtime;
   double cputime;
   uint64_t membytes;
   uint64_t ibytes;
   uint64_t obytes;
 
-  Usage() : found(false) { }
+  Usage() : found(false) {}
 };
 
 struct JobTag {
@@ -46,15 +47,15 @@ struct JobTag {
   std::string content;
   JobTag(JobTag &&o) = default;
   JobTag(long job_, std::string &&uri_, std::string &&content_)
-   : job(job_), uri(std::move(uri_)), content(std::move(content_)) { }
+      : job(job_), uri(std::move(uri_)), content(std::move(content_)) {}
 };
 
 struct Time {
-    int64_t t;
-    Time() :t(0) {}
-    explicit Time(int64_t _t) : t(_t) {}
-    int64_t as_int64() const {return t;}
-    std::string as_string() const;
+  int64_t t;
+  Time() : t(0) {}
+  explicit Time(int64_t _t) : t(_t) {}
+  int64_t as_int64() const { return t; }
+  std::string as_string() const;
 };
 
 struct JobReflection {
@@ -82,12 +83,12 @@ struct JobReflection {
 struct JobEdge {
   long user;
   long used;
-  JobEdge(long user_, long used_) : user(user_), used(used_) { }
+  JobEdge(long user_, long used_) : user(user_), used(used_) {}
 };
 
 struct FileAccess {
-    int type; // file access type from wake.db; 0=visible, 1=input, 2=output
-    long job; // id of the job which has the access
+  int type;  // file access type from wake.db; 0=visible, 1=input, 2=output
+  long job;  // id of the job which has the access
 };
 
 struct Database {
@@ -102,90 +103,49 @@ struct Database {
 
   void entropy(uint64_t *key, int words);
 
-  void prepare(const std::string &cmdline); // prepare for job execution
-  void clean(); // finished execution; sweep stale jobs
+  void prepare(const std::string &cmdline);  // prepare for job execution
+  void clean();                              // finished execution; sweep stale jobs
 
   void begin_txn() const;
   void end_txn() const;
 
-  Usage reuse_job(
-    const std::string &directory,
-    const std::string &environment,
-    const std::string &commandline,
-    const std::string &stdin_file, // "" -> /dev/null
-    uint64_t          signature,
-    const std::string &visible,
-    bool check,
-    long &job,
-    std::vector<FileReflection> &out,
-    double *pathtime);
-  Usage predict_job(
-    uint64_t hashcode,
-    double *pathtime);
-  void insert_job( // also wipes out any old runs
-    const std::string &directory,
-    const std::string &environment,
-    const std::string &commandline,
-    const std::string &stdin_file, // "" -> /dev/null
-    // ^^^ only these matter to identify the job
-    uint64_t          signature, // this must match to qualify for reuse
-    const std::string &label,
-    const std::string &stack,
-    const std::string &visible,
-    long   *job); // key used for accesses below
-  void finish_job(
-    long job,
-    const std::string &inputs,  // null separated
-    const std::string &outputs, // null separated
-    int64_t starttime,
-    int64_t endtime,
-    uint64_t hashcode,
-    bool keep,
-    Usage reality);
+  Usage reuse_job(const std::string &directory, const std::string &environment,
+                  const std::string &commandline,
+                  const std::string &stdin_file,  // "" -> /dev/null
+                  uint64_t signature, const std::string &visible, bool check, long &job,
+                  std::vector<FileReflection> &out, double *pathtime);
+  Usage predict_job(uint64_t hashcode, double *pathtime);
+  void insert_job(  // also wipes out any old runs
+      const std::string &directory, const std::string &environment, const std::string &commandline,
+      const std::string &stdin_file,  // "" -> /dev/null
+      // ^^^ only these matter to identify the job
+      uint64_t signature,  // this must match to qualify for reuse
+      const std::string &label, const std::string &stack, const std::string &visible,
+      long *job);  // key used for accesses below
+  void finish_job(long job,
+                  const std::string &inputs,   // null separated
+                  const std::string &outputs,  // null separated
+                  int64_t starttime, int64_t endtime, uint64_t hashcode, bool keep, Usage reality);
   std::vector<FileReflection> get_tree(int kind, long job);
 
-  void tag_job(
-    long job,
-    const std::string &uri,
-    const std::string &content);
+  void tag_job(long job, const std::string &uri, const std::string &content);
 
-  void save_output( // call only if needs_build -> true
-    long job,
-    int descriptor,
-    const char *buffer,
-    int size,
-    double runtime);
-  std::string get_output(
-    long job,
-    int descriptor) const;
-  void replay_output(
-    long job,
-    const char *stdout,
-    const char *stderr);
+  void save_output(  // call only if needs_build -> true
+      long job, int descriptor, const char *buffer, int size, double runtime);
+  std::string get_output(long job, int descriptor) const;
+  void replay_output(long job, const char *stdout, const char *stderr);
 
-  void add_hash(
-    const std::string &file,
-    const std::string &hash,
-    long modified);
+  void add_hash(const std::string &file, const std::string &hash, long modified);
 
-  std::string get_hash(
-    const std::string &file,
-    long modified);
+  std::string get_hash(const std::string &file, long modified);
 
-  std::vector<JobReflection> explain(
-    long job,
-    bool verbose);
+  std::vector<JobReflection> explain(long job, bool verbose);
 
-  std::vector<JobReflection> explain(
-    const std::string &file,
-    int use,
-    bool verbose);
+  std::vector<JobReflection> explain(const std::string &file, int use, bool verbose);
 
-  std::vector<JobReflection> failed(
-    bool verbose);
+  std::vector<JobReflection> failed(bool verbose);
 
-  std::vector<JobReflection> last(
-    bool verbose);
+  std::vector<JobReflection> last(bool verbose);
 
   std::vector<JobEdge> get_edges();
   std::vector<JobTag> get_tags();

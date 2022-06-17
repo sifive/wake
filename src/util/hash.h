@@ -18,10 +18,10 @@
 #ifndef HASH_H
 #define HASH_H
 
-#include <vector>
-#include <string>
 #include <cstdint>
 #include <cstring>
+#include <string>
+#include <vector>
 
 extern uint64_t sip_key[2];
 
@@ -32,12 +32,14 @@ int siphash(const void *in, unsigned long inlen, uint64_t *out);
 struct Hash {
   uint64_t data[2];
 
-  Hash(uint64_t x = 0, uint64_t y = 0) : data{x,y} { }
+  Hash(uint64_t x = 0, uint64_t y = 0) : data{x, y} {}
   Hash(const void *in, unsigned long inlen) { siphash(in, inlen, &data[0]); }
-  Hash(const std::vector<uint64_t> &out) { siphash(out.data(), out.size()*sizeof(uint64_t), &data[0]); }
+  Hash(const std::vector<uint64_t> &out) {
+    siphash(out.data(), out.size() * sizeof(uint64_t), &data[0]);
+  }
   Hash(const std::string &str) { siphash(str.data(), str.size(), &data[0]); }
 
-  Hash operator ^ (uint64_t z) const { return Hash(data[0] ^ z, data[1]); }
+  Hash operator^(uint64_t z) const { return Hash(data[0] ^ z, data[1]); }
   size_t mix() const { return data[0] ^ data[1]; }
 
   void push(std::vector<uint64_t> &out) const {
@@ -46,16 +48,16 @@ struct Hash {
   }
 };
 
-static inline bool operator < (Hash x, Hash y) {
+static inline bool operator<(Hash x, Hash y) {
   if (x.data[0] == y.data[0]) return x.data[1] < y.data[1];
   return x.data[0] < y.data[0];
 }
 
-static inline bool operator == (Hash x, Hash y) {
+static inline bool operator==(Hash x, Hash y) {
   return x.data[0] == y.data[0] && x.data[1] == y.data[1];
 }
 
-static inline Hash operator + (Hash a, Hash b) {
+static inline Hash operator+(Hash a, Hash b) {
   uint64_t stuff[4];
   stuff[0] = a.data[0];
   stuff[1] = a.data[1];
@@ -66,8 +68,8 @@ static inline Hash operator + (Hash a, Hash b) {
 
 struct TypeDescriptor {
   const char *name;
-  Hash hashcode; // NOTE: computed with sip_key = 0 before main()
-  TypeDescriptor(const char *name_) : name(name_), hashcode(name_, std::strlen(name_)) { }
+  Hash hashcode;  // NOTE: computed with sip_key = 0 before main()
+  TypeDescriptor(const char *name_) : name(name_), hashcode(name_, std::strlen(name_)) {}
 };
 
 #endif

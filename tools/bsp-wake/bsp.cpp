@@ -21,22 +21,22 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <fcntl.h>
-#include <unistd.h>
+#include <poll.h>
+#include <string.h>
 #include <sys/select.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <string.h>
-#include <poll.h>
+#include <unistd.h>
 
+#include <fstream>
 #include <iostream>
-#include <string>
 #include <map>
 #include <sstream>
-#include <fstream>
+#include <string>
 
-#include "util/execpath.h"
 #include "json/json5.h"
+#include "util/execpath.h"
 
 #ifndef VERSION
 #include "version.h"
@@ -59,19 +59,19 @@ static const char workspace[] = "workspace://";
 static const char bsp[] = "bsp://";
 
 // Defined by JSON RPC
-static const char *ParseError           = "-32700";
-//static const char *InvalidRequest       = "-32600";
-static const char *MethodNotFound       = "-32601";
-static const char *InvalidParams        = "-32602";
-static const char *InternalError        = "-32603";
-//static const char *serverErrorStart     = "-32099";
-//static const char *serverErrorEnd       = "-32000";
+static const char *ParseError = "-32700";
+// static const char *InvalidRequest       = "-32600";
+static const char *MethodNotFound = "-32601";
+static const char *InvalidParams = "-32602";
+static const char *InternalError = "-32603";
+// static const char *serverErrorStart     = "-32099";
+// static const char *serverErrorEnd       = "-32000";
 static const char *ServerNotInitialized = "-32002";
-//static const char *UnknownErrorCode     = "-32001";
+// static const char *UnknownErrorCode     = "-32001";
 
 // Defined by the BSP.
-//static const char *RequestCancelled = "-32800";
-//static const char *ContentModified  = "-32801";
+// static const char *RequestCancelled = "-32800";
+// static const char *ContentModified  = "-32801";
 
 // We need this when remapping paths
 static std::string rooturi;
@@ -93,7 +93,8 @@ static bool initialize(JAST &response, const JAST &params) {
   bool ok = true;
   if (ok) ok = 0 == uri.compare(0, 7, "file://");
   if (ok) ok = 0 == chdir(uri.c_str() + 7);
-  if (ok) ok = 0 == access("wake.db", W_OK) || (0 == access(".wakeroot", R_OK) && 0 == access(".", W_OK));
+  if (ok)
+    ok = 0 == access("wake.db", W_OK) || (0 == access(".wakeroot", R_OK) && 0 == access(".", W_OK));
 
   if (!ok) {
     JAST &error = response.add("error", JSON_OBJECT);
@@ -107,9 +108,9 @@ static bool initialize(JAST &response, const JAST &params) {
     result.add("bspVersion", "2.0.0-M5");
     JAST &caps = result.add("capabilities", JSON_OBJECT);
     caps.add("compileProvider", JSON_OBJECT).children.emplace_back("languageIds", langs);
-    caps.add("testProvider",    JSON_OBJECT).children.emplace_back("languageIds", langs);
-    caps.add("runProvider",     JSON_OBJECT).children.emplace_back("languageIds", langs);
-    caps.add("dependencySourcesProvider", JSON_TRUE); // can supply sources for external libraries
+    caps.add("testProvider", JSON_OBJECT).children.emplace_back("languageIds", langs);
+    caps.add("runProvider", JSON_OBJECT).children.emplace_back("languageIds", langs);
+    caps.add("dependencySourcesProvider", JSON_TRUE);  // can supply sources for external libraries
   }
 
   return ok;
@@ -174,28 +175,25 @@ void ExecuteWakeProcess::execute() {
   if (child == 0) {
     // Close the reading side of the pipe
     for (int i = 0; i < PIPES; ++i)
-      if (close(pipefds[i][0]) != 0)
-        exit(42);
+      if (close(pipefds[i][0]) != 0) exit(42);
 
     // We need to dup2 pipefds[i][0,PIPES) to [1,PIPES]
     // Unfortunately, some of the these might be in the way
     // dup() any of them that are in the way, out of the way
     for (int i = 0; i < PIPES; ++i)
       while (pipefds[i][1] >= 1 && pipefds[i][1] <= PIPES)
-        if ((pipefds[i][1] = dup(pipefds[i][1])) == -1)
-          exit(43);
+        if ((pipefds[i][1] = dup(pipefds[i][1])) == -1) exit(43);
 
     // Put the pipes in their proper final position
     // This also closes any transient descriptors from dup() above
     for (int i = 0; i < PIPES; ++i) {
-      if (dup2(pipefds[i][1], i+1) == -1) exit(44);
+      if (dup2(pipefds[i][1], i + 1) == -1) exit(44);
       if (close(pipefds[i][1]) != 0) exit(45);
     }
 
     // Launch subprocess with specified arguments
-    std::vector<char*> args;
-    for (auto &arg : cmdline)
-      args.push_back(const_cast<char*>(arg.c_str()));
+    std::vector<char *> args;
+    for (auto &arg : cmdline) args.push_back(const_cast<char *>(arg.c_str()));
     args.push_back(0);
     execv(cmdline[0].c_str(), args.data());
 
@@ -204,8 +202,7 @@ void ExecuteWakeProcess::execute() {
 
   if (child == -1) errorPrefix("fork");
   for (int i = 0; i < PIPES; ++i)
-    if (close(pipefds[i][1]) != 0)
-       errorPrefix("close1");
+    if (close(pipefds[i][1]) != 0) errorPrefix("close1");
 
   // Gather output from wake here
   std::string buffer[PIPES];
@@ -224,13 +221,16 @@ void ExecuteWakeProcess::execute() {
 
     if (nfds == 0) break;
     int ret = poll(&pfds[0], nfds, -1);
-    if (ret <= 0) { errorPrefix("poll"); break; }
+    if (ret <= 0) {
+      errorPrefix("poll");
+      break;
+    }
 
     ssize_t got;
     nfds = 0;
     for (int i = 0; i < PIPES; ++i) {
       if (pipefds[i][0] == -1) continue;
-      bool ready = (pfds[nfds].revents & (POLLHUP|POLLIN)) != 0;
+      bool ready = (pfds[nfds].revents & (POLLHUP | POLLIN)) != 0;
       ++nfds;
       if (!ready) continue;
       got = read(pipefds[i][0], &block[0], sizeof(block));
@@ -239,11 +239,11 @@ void ExecuteWakeProcess::execute() {
         buffer[i].append(&block[0], got);
         size_t start = 0, end;
         while ((end = buffer[i].find_first_of('\n', start)) != std::string::npos) {
-          executeLine(i, buffer[i].substr(start, end-start));
-          start = end+1;
+          executeLine(i, buffer[i].substr(start, end - start));
+          start = end + 1;
         }
         buffer[i].erase(buffer[i].begin(), buffer[i].begin() + start);
-      } else { // got <= 0
+      } else {  // got <= 0
         if (got < 0) errorPrefix("read");
         if (close(pipefds[i][0]) != 0) errorPrefix("close");
         pipefds[i][0] = -1;
@@ -273,10 +273,18 @@ void ExecuteWakeProcess::executeLine(int i, std::string &&line) {
   } else {
     const char *code = "";
     switch (i) {
-    case 1: code = "1"; break; // stderr => error   (1)
-    case 2: code = "2"; break; // fd:3   => warning (2)
-    case 3: code = "3"; break; // fd:4   => info    (3)
-    case 4: code = "4"; break; // fd:5   => log     (4)
+      case 1:
+        code = "1";
+        break;  // stderr => error   (1)
+      case 2:
+        code = "2";
+        break;  // fd:3   => warning (2)
+      case 3:
+        code = "3";
+        break;  // fd:4   => info    (3)
+      case 4:
+        code = "4";
+        break;  // fd:5   => log     (4)
     }
     JAST log(JSON_OBJECT);
     log.add("jsonrpc", "2.0");
@@ -291,11 +299,11 @@ void ExecuteWakeProcess::executeLine(int i, std::string &&line) {
 static void adjustJSON(JAST &node) {
   struct timeval tv;
   for (auto &child : node.children) adjustJSON(child.second);
-  if (node.kind == JSON_STR && node.value.compare(0, sizeof(workspace)-1, &workspace[0]) == 0) {
-    node.value = rooturi + node.value.substr(sizeof(workspace)-1);
+  if (node.kind == JSON_STR && node.value.compare(0, sizeof(workspace) - 1, &workspace[0]) == 0) {
+    node.value = rooturi + node.value.substr(sizeof(workspace) - 1);
   }
   if (node.kind == JSON_STR && node.value == "time://now" && gettimeofday(&tv, 0) == 0) {
-    node.value = std::to_string(tv.tv_sec*1000L + tv.tv_usec/1000);
+    node.value = std::to_string(tv.tv_sec * 1000L + tv.tv_usec / 1000);
   }
 }
 
@@ -330,7 +338,8 @@ void EnumerateTargetsState::gotLine(JAST &row) {
       idmap[jobid] = target.get("id").get("uri").value;
       docs.emplace_back(std::move(target));
     } else {
-      errorMessage("failed to parse tag 'bsp.buildTarget' for job " + jobid + ": " + parseErrors.str());
+      errorMessage("failed to parse tag 'bsp.buildTarget' for job " + jobid + ": " +
+                   parseErrors.str());
     }
   }
   // Second pass: resolve references in documents and output them
@@ -356,8 +365,7 @@ static void enumerateTargets(JAST &response) {
 
 struct CompileState : public ExecuteWakeProcess {
   CompileState(int argc, const char **argv) {
-    for (int i = 1; i < argc; ++i)
-      cmdline.push_back(argv[i]);
+    for (int i = 1; i < argc; ++i) cmdline.push_back(argv[i]);
   }
 
   void gotLine(JAST &row) override;
@@ -374,7 +382,7 @@ static void compile(JAST &response, const JAST &params, int argc, const char **a
   if (state.error.kind == JSON_NULLVAL) {
     JAST &result = response.add("result", JSON_OBJECT);
     bool ok = WIFEXITED(state.status) && WEXITSTATUS(state.status) == 0;
-    result.add("statusCode", JSON_INTEGER, ok?"1":"2");
+    result.add("statusCode", JSON_INTEGER, ok ? "1" : "2");
   } else {
     response.children.emplace_back("error", std::move(state.error));
   }
@@ -403,15 +411,14 @@ struct ExtractBSPDocument : public ExecuteWakeProcess {
 };
 
 ExtractBSPDocument::ExtractBSPDocument(const std::string &method, const JAST &params)
- : items(result.add("items", JSON_ARRAY))
-{
+    : items(result.add("items", JSON_ARRAY)) {
   cmdline.push_back("--tag");
   cmdline.push_back("bsp." + method);
   cmdline.push_back("-o");
   for (auto &x : params.get("targets").children) {
     const std::string &uri = x.second.get("uri").value;
-    if (uri.compare(0, sizeof(bsp)-1, &bsp[0]) != 0) continue;
-    cmdline.emplace_back(uri.substr(sizeof(bsp)-1));
+    if (uri.compare(0, sizeof(bsp) - 1, &bsp[0]) != 0) continue;
+    cmdline.emplace_back(uri.substr(sizeof(bsp) - 1));
   }
 }
 
@@ -443,7 +450,7 @@ int main(int argc, const char **argv) {
       std::string line;
       std::getline(std::cin, line);
       // Trim trailing CR, if any
-      if (!line.empty() && line.back() == '\r') line.resize(line.size()-1);
+      if (!line.empty() && line.back() == '\r') line.resize(line.size() - 1);
       // EOF? exit BSP
       if (std::cin.eof()) return 0;
       // Failure reading? Fail with non-zero exit status
@@ -451,8 +458,8 @@ int main(int argc, const char **argv) {
       // Empty line? stop
       if (line.empty()) break;
       // Capture the json_size
-      if (line.compare(0, sizeof(contentLength)-1, &contentLength[0]) == 0)
-        json_size = std::stoul(line.substr(sizeof(contentLength)-1));
+      if (line.compare(0, sizeof(contentLength) - 1, &contentLength[0]) == 0)
+        json_size = std::stoul(line.substr(sizeof(contentLength) - 1));
     }
 
     // Content-Length was unset?
@@ -484,7 +491,7 @@ int main(int argc, const char **argv) {
       response.children.emplace_back("id", id);
 
       if (method == "build/exit") {
-        return initialized?1:0;
+        return initialized ? 1 : 0;
       } else if (method == "build/initialized") {
         // Trigger initial compile of the workspace
         CompileState state(argc, argv);
@@ -512,9 +519,9 @@ int main(int argc, const char **argv) {
         test(response, params);
       } else if (method == "buildTarget/cleanCache") {
         clean(response, params);
-      } else if (method.compare(0, sizeof(buildTarget)-1, &buildTarget[0]) == 0) {
+      } else if (method.compare(0, sizeof(buildTarget) - 1, &buildTarget[0]) == 0) {
         // Dispatch request to static JSON files
-        staticTarget(method.substr(sizeof(buildTarget)-1), response, params);
+        staticTarget(method.substr(sizeof(buildTarget) - 1), response, params);
       } else {
         JAST &error = response.add("error", JSON_OBJECT);
         error.add("code", JSON_INTEGER, MethodNotFound);

@@ -18,10 +18,10 @@
 #define _DEFAULT_SOURCE
 #define _ISOC11_SOURCE
 
-#include <stdlib.h>
-
 #include "aligned_alloc.h"
 
+#include <stdlib.h>
+
 void *my_aligned_alloc(size_t alignment, size_t size) {
-    return aligned_alloc(alignment, size); // This is a C11 feature
+  return aligned_alloc(alignment, size);  // This is a C11 feature
 }

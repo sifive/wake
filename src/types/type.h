@@ -20,27 +20,27 @@
 
 #include <ostream>
 
-#include "util/fragment.h"
 #include "dsu.h"
+#include "util/fragment.h"
 
 #define FN "binary =>@builtin"
 
 struct TypeErrorMessage {
-  TypeErrorMessage(const FileFragment *f_) : f(f_) { }
+  TypeErrorMessage(const FileFragment *f_) : f(f_) {}
   const FileFragment *f;
   virtual void formatA(std::ostream &os) const = 0;
   virtual void formatB(std::ostream &os) const = 0;
 };
 
 struct LegacyErrorMessage : public TypeErrorMessage {
-  LegacyErrorMessage(const FileFragment *f_) : TypeErrorMessage(f_) { }
+  LegacyErrorMessage(const FileFragment *f_) : TypeErrorMessage(f_) {}
   void formatA(std::ostream &os) const;
   void formatB(std::ostream &os) const;
 };
 
 struct TypeChild;
 struct TypeVar {
-private:
+ private:
   struct Imp {
     // Scratch variables useful for tree traversals
     mutable TypeVar *link;
@@ -62,7 +62,7 @@ private:
     ~Imp();
 
     Imp(const Imp &x) = delete;
-    Imp& operator = (const Imp &x) = delete;
+    Imp &operator=(const Imp &x) = delete;
   };
 
   // Handle to the set leader
@@ -71,20 +71,21 @@ private:
   int var_dob;
 
   static void do_clone(TypeVar &out, const TypeVar &x, int dob);
-  static int do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag, const TypeVar *other, int tags, int p, bool qualify = false);
+  static int do_format(std::ostream &os, int dob, const TypeVar &value, const char *tag,
+                       const TypeVar *other, int tags, int p, bool qualify = false);
   bool do_unify(TypeVar &other);
 
-public:
-  TypeVar(); // free type-var
+ public:
+  TypeVar();  // free type-var
   TypeVar(const char *name_, int nargs_);
 
   TypeVar(const TypeVar &x) = default;
   TypeVar(TypeVar &&x) = default;
-  TypeVar &operator = (const TypeVar &x) = default;
-  TypeVar &operator = (TypeVar &&x) = default;
+  TypeVar &operator=(const TypeVar &x) = default;
+  TypeVar &operator=(TypeVar &&x) = default;
 
-  const TypeVar & operator[](int i) const;
-  TypeVar & operator[](int i);
+  const TypeVar &operator[](int i) const;
+  TypeVar &operator[](int i);
 
   const char *getName() const;
   const char *getTag(int i) const;
@@ -94,21 +95,27 @@ public:
   void setDOB();
   void setDOB(const TypeVar &other);
   void setTag(int i, const char *tag);
-  bool unify(TypeVar &other,  const TypeErrorMessage *message);
+  bool unify(TypeVar &other, const TypeErrorMessage *message);
   bool unify(TypeVar &&other, const TypeErrorMessage *message) { return unify(other, message); }
-  bool tryUnify(TypeVar &other); // no error printed on failed
+  bool tryUnify(TypeVar &other);  // no error printed on failed
   //  Deprecated:
-  bool unify(TypeVar &other,  const FileFragment *l = 0) { LegacyErrorMessage m(l); return unify(other, &m); }
-  bool unify(TypeVar &&other, const FileFragment *l = 0) { LegacyErrorMessage m(l); return unify(other, &m); }
+  bool unify(TypeVar &other, const FileFragment *l = 0) {
+    LegacyErrorMessage m(l);
+    return unify(other, &m);
+  }
+  bool unify(TypeVar &&other, const FileFragment *l = 0) {
+    LegacyErrorMessage m(l);
+    return unify(other, &m);
+  }
 
   // Sort type vars by age and DSU-identity
-  bool operator <  (const TypeVar &b) const;
-  bool operator == (const TypeVar &b) const;
+  bool operator<(const TypeVar &b) const;
+  bool operator==(const TypeVar &b) const;
 
   void clone(TypeVar &into) const;
-  void format(std::ostream &os, const TypeVar &top) const; // use top's dob
+  void format(std::ostream &os, const TypeVar &top) const;  // use top's dob
 
-friend std::ostream & operator << (std::ostream &os, const TypeVar &value);
+  friend std::ostream &operator<<(std::ostream &os, const TypeVar &value);
 };
 
 struct TypeChild {
@@ -117,8 +124,8 @@ struct TypeChild {
   TypeChild();
 };
 
-inline const TypeVar & TypeVar::operator[](int i) const { return imp->cargs[i].var; }
-inline       TypeVar & TypeVar::operator[](int i) { return imp->cargs[i].var; }
+inline const TypeVar &TypeVar::operator[](int i) const { return imp->cargs[i].var; }
+inline TypeVar &TypeVar::operator[](int i) { return imp->cargs[i].var; }
 
 inline const char *TypeVar::getName() const { return imp->name.c_str(); }
 inline const char *TypeVar::getTag(int i) const { return imp->cargs[i].tag.c_str(); }

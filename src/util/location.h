@@ -22,55 +22,50 @@
 
 struct Coordinates {
   int row, column;
-  Coordinates(int r = 1, int c = 1) : row(r), column(c) { }
+  Coordinates(int r = 1, int c = 1) : row(r), column(c) {}
 
-  bool operator == (const Coordinates &c) const {
-    return row == c.row && column == c.column;
-  }
-  bool operator != (const Coordinates &c) const { return !(c == *this); }
+  bool operator==(const Coordinates &c) const { return row == c.row && column == c.column; }
+  bool operator!=(const Coordinates &c) const { return !(c == *this); }
 
-  bool operator < (const Coordinates &c) const {
-    if (row == c.row) { return column < c.column; }
+  bool operator<(const Coordinates &c) const {
+    if (row == c.row) {
+      return column < c.column;
+    }
     return row < c.row;
   }
-  bool operator >  (const Coordinates &c) const { return   c < *this;  }
-  bool operator <= (const Coordinates &c) const { return !(c < *this); }
-  bool operator >= (const Coordinates &c) const { return !(*this < c); }
+  bool operator>(const Coordinates &c) const { return c < *this; }
+  bool operator<=(const Coordinates &c) const { return !(c < *this); }
+  bool operator>=(const Coordinates &c) const { return !(*this < c); }
 
-  Coordinates operator + (int x) const { return Coordinates(row, column+x); }
-  Coordinates operator - (int x) const { return Coordinates(row, column-x); }
+  Coordinates operator+(int x) const { return Coordinates(row, column + x); }
+  Coordinates operator-(int x) const { return Coordinates(row, column - x); }
 };
 
 struct Location {
   std::string filename;
   Coordinates start, end;
 
-  Location(const char *filename_)
-    : filename(filename_) { }
+  Location(const char *filename_) : filename(filename_) {}
   Location(const char *filename_, Coordinates start_, Coordinates end_)
-    : filename(filename_), start(start_), end(end_) { }
+      : filename(filename_), start(start_), end(end_) {}
 
   bool contains(const Location &loc) const {
     return filename == loc.filename && start <= loc.start && loc.end <= end;
   }
 
-  bool operator < (const Location &l) const {
+  bool operator<(const Location &l) const {
     if (filename != l.filename) return filename < l.filename;
     if (start != l.start) return start < l.start;
     return end < l.end;
   }
 
-  bool operator == (const Location &l) const {
-    return this->contains(l) && l.contains(*this);
-  }
+  bool operator==(const Location &l) const { return this->contains(l) && l.contains(*this); }
 
-  bool operator != (const Location &l) const {
-    return !(*this == l);
-  }
+  bool operator!=(const Location &l) const { return !(*this == l); }
 };
 
 #define LOCATION Location(__FILE__, Coordinates(__LINE__), Coordinates(__LINE__))
 
-std::ostream & operator << (std::ostream &os, const Location& location);
+std::ostream &operator<<(std::ostream &os, const Location &location);
 
 #endif

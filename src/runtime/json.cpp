@@ -25,10 +25,10 @@
 #include <sstream>
 
 #include "json/json5.h"
-#include "types/sums.h"
+#include "prim.h"
 #include "types/data.h"
 #include "types/datatype.h"
-#include "prim.h"
+#include "types/sums.h"
 #include "value.h"
 
 typedef std::numeric_limits<double> dlimits;
@@ -37,14 +37,22 @@ static double inf(char c) { return c == '+' ? dlimits::infinity() : -dlimits::in
 
 static size_t measure_jast(const JAST &jast) {
   switch (jast.kind) {
-    case JSON_NULLVAL:  return Record::reserve(0);
-    case JSON_TRUE:     return Record::reserve(1) + reserve_bool();
-    case JSON_FALSE:    return Record::reserve(1) + reserve_bool();
-    case JSON_INTEGER:  return Record::reserve(1) + Integer::reserve(MPZ(jast.value));
-    case JSON_DOUBLE:   return Record::reserve(1) + Double::reserve();
-    case JSON_INFINITY: return Record::reserve(1) + Double::reserve();
-    case JSON_NAN:      return Record::reserve(1) + Double::reserve();
-    case JSON_STR:      return Record::reserve(1) + String::reserve(jast.value.size());
+    case JSON_NULLVAL:
+      return Record::reserve(0);
+    case JSON_TRUE:
+      return Record::reserve(1) + reserve_bool();
+    case JSON_FALSE:
+      return Record::reserve(1) + reserve_bool();
+    case JSON_INTEGER:
+      return Record::reserve(1) + Integer::reserve(MPZ(jast.value));
+    case JSON_DOUBLE:
+      return Record::reserve(1) + Double::reserve();
+    case JSON_INFINITY:
+      return Record::reserve(1) + Double::reserve();
+    case JSON_NAN:
+      return Record::reserve(1) + Double::reserve();
+    case JSON_STR:
+      return Record::reserve(1) + String::reserve(jast.value.size());
     case JSON_OBJECT: {
       size_t out = Record::reserve(1) + reserve_list(jast.children.size());
       for (auto &c : jast.children)
@@ -53,8 +61,7 @@ static size_t measure_jast(const JAST &jast) {
     }
     case JSON_ARRAY: {
       size_t out = Record::reserve(1) + reserve_list(jast.children.size());
-      for (auto &c : jast.children)
-        out += measure_jast(c.second);
+      for (auto &c : jast.children) out += measure_jast(c.second);
       return out;
     }
     default: {
@@ -72,28 +79,33 @@ static Value *getJValue(Heap &h, Value *value, int member) {
 
 static Value *convert_jast(Heap &h, const JAST &jast) {
   switch (jast.kind) {
-    case JSON_NULLVAL:  return Record::claim(h, &JValue->members[4], 0);
-    case JSON_TRUE:     return getJValue(h, claim_bool(h, true),  3);
-    case JSON_FALSE:    return getJValue(h, claim_bool(h, false), 3);
-    case JSON_INTEGER:  return getJValue(h, Integer::claim(h, MPZ(jast.value)), 1);
-    case JSON_DOUBLE:   return getJValue(h, Double::claim(h, jast.value.c_str()), 2);
-    case JSON_INFINITY: return getJValue(h, Double::claim(h, inf(jast.value[0])), 2);
-    case JSON_NAN:      return getJValue(h, Double::claim(h, nan()), 2);
-    case JSON_STR:      return getJValue(h, String::claim(h, jast.value), 0);
+    case JSON_NULLVAL:
+      return Record::claim(h, &JValue->members[4], 0);
+    case JSON_TRUE:
+      return getJValue(h, claim_bool(h, true), 3);
+    case JSON_FALSE:
+      return getJValue(h, claim_bool(h, false), 3);
+    case JSON_INTEGER:
+      return getJValue(h, Integer::claim(h, MPZ(jast.value)), 1);
+    case JSON_DOUBLE:
+      return getJValue(h, Double::claim(h, jast.value.c_str()), 2);
+    case JSON_INFINITY:
+      return getJValue(h, Double::claim(h, inf(jast.value[0])), 2);
+    case JSON_NAN:
+      return getJValue(h, Double::claim(h, nan()), 2);
+    case JSON_STR:
+      return getJValue(h, String::claim(h, jast.value), 0);
     case JSON_OBJECT: {
-      std::vector<Value*> values;
+      std::vector<Value *> values;
       values.reserve(jast.children.size());
       for (auto &c : jast.children)
-        values.emplace_back(claim_tuple2(h, 
-          String::claim(h, c.first),
-          convert_jast(h, c.second)));
+        values.emplace_back(claim_tuple2(h, String::claim(h, c.first), convert_jast(h, c.second)));
       return getJValue(h, claim_list(h, values.size(), values.data()), 5);
     }
     case JSON_ARRAY: {
-      std::vector<Value*> values;
+      std::vector<Value *> values;
       values.reserve(jast.children.size());
-      for (auto &c : jast.children)
-        values.emplace_back(convert_jast(h, c.second));
+      for (auto &c : jast.children) values.emplace_back(convert_jast(h, c.second));
       return getJValue(h, claim_list(h, values.size(), values.data()), 6);
     }
     default: {
@@ -108,9 +120,7 @@ static PRIMTYPE(type_json) {
   Data::typeResult.clone(result);
   result[0].unify(Data::typeJValue);
   result[1].unify(Data::typeString);
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(result);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(result);
 }
 
 static PRIMFN(prim_json_file) {
@@ -148,9 +158,7 @@ static PRIMFN(prim_json_body) {
 }
 
 static PRIMTYPE(type_jstr) {
-  return args.size() == 1 &&
-    args[0]->unify(Data::typeString) &&
-    out->unify(Data::typeString);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(Data::typeString);
 }
 
 static PRIMFN(prim_json_str) {
@@ -163,5 +171,5 @@ void prim_register_json(PrimMap &pmap) {
   // Parsed tree as a persistent constant would be bad.
   prim_register(pmap, "json_file", prim_json_file, type_json, PRIM_ORDERED);
   prim_register(pmap, "json_body", prim_json_body, type_json, PRIM_PURE);
-  prim_register(pmap, "json_str",  prim_json_str,  type_jstr, PRIM_PURE);
+  prim_register(pmap, "json_str", prim_json_str, type_jstr, PRIM_PURE);
 }

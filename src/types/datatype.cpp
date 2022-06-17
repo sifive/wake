@@ -19,19 +19,21 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include "datatype.h"
+
 #include <sstream>
 
+#include "parser/lexer.h"
+#include "type.h"
 #include "util/diagnostic.h"
 #include "util/fragment.h"
-#include "parser/lexer.h"
-#include "datatype.h"
-#include "type.h"
 
 static CPPFile cppFile(__FILE__);
 
 Constructor Constructor::array(AST(FRAGMENT_CPP_LINE, "Array"));
 
-Sum::Sum(AST &&ast) : name(std::move(ast.name)), token(ast.token), region(ast.region), scoped(false) {
+Sum::Sum(AST &&ast)
+    : name(std::move(ast.name)), token(ast.token), region(ast.region), scoped(false) {
   std::map<std::string, FileFragment> dups;
 
   for (auto &x : ast.args) {
@@ -40,9 +42,8 @@ Sum::Sum(AST &&ast) : name(std::move(ast.name)), token(ast.token), region(ast.re
     }
     auto insert = dups.insert(std::make_pair(x.name, x.token));
     if (!insert.second) {
-      ERROR(x.token.location(),
-        "type argument '" << x.name
-        << "' already defined at " << insert.first->second.location());
+      ERROR(x.token.location(), "type argument '" << x.name << "' already defined at "
+                                                  << insert.first->second.location());
     }
     args.push_back(std::move(x.name));
   }
@@ -51,19 +52,20 @@ Sum::Sum(AST &&ast) : name(std::move(ast.name)), token(ast.token), region(ast.re
 void Sum::addConstructor(AST &&ast) {
   members.emplace_back(std::move(ast));
   Constructor &cons = members.back();
-  cons.index = members.size()-1;
+  cons.index = members.size() - 1;
 }
 
 AST::AST(const FileFragment &token_, std::string &&name_, std::vector<AST> &&args_)
-  : token(token_), region(token_), definition(FRAGMENT_CPP_LINE), name(std::move(name_)), args(std::move(args_)) {
-}
+    : token(token_),
+      region(token_),
+      definition(FRAGMENT_CPP_LINE),
+      name(std::move(name_)),
+      args(std::move(args_)) {}
 
 AST::AST(const FileFragment &token_, std::string &&name_)
-  : token(token_), region(token_), definition(FRAGMENT_CPP_LINE), name(std::move(name_)) {
-}
+    : token(token_), region(token_), definition(FRAGMENT_CPP_LINE), name(std::move(name_)) {}
 AST::AST(const FileFragment &token_)
-  : token(token_), region(token_), definition(FRAGMENT_CPP_LINE) {
-}
+    : token(token_), region(token_), definition(FRAGMENT_CPP_LINE) {}
 
 bool AST::unify(TypeVar &out, const TypeMap &ids) {
   if (lex_kind(name) == LOWER) {
@@ -74,7 +76,7 @@ bool AST::unify(TypeVar &out, const TypeMap &ids) {
     } else {
       return out.unify(*it->second, &region);
     }
-  } else { // upper or operator
+  } else {  // upper or operator
     TypeVar cons(name.c_str(), args.size());
     bool ok = out.unify(cons);
     bool childok = true;
@@ -89,19 +91,17 @@ bool AST::unify(TypeVar &out, const TypeMap &ids) {
 }
 
 void AST::lowerVars(std::vector<ScopedTypeVar> &out) const {
-  if (!name.empty() && lex_kind(name) == LOWER)
-    out.emplace_back(name, token);
-  for (auto &arg: args) arg.lowerVars(out);
+  if (!name.empty() && lex_kind(name) == LOWER) out.emplace_back(name, token);
+  for (auto &arg : args) arg.lowerVars(out);
 }
 
 void AST::typeVars(std::vector<ScopedTypeVar> &out) const {
   if (type) type->lowerVars(out);
-  for (auto &arg: args) arg.typeVars(out);
+  for (auto &arg : args) arg.typeVars(out);
 }
 
-std::ostream & operator << (std::ostream &os, const AST &ast) {
+std::ostream &operator<<(std::ostream &os, const AST &ast) {
   os << ast.name;
-  for (auto &x : ast.args)
-    os << " (" << x << ")";
+  for (auto &x : ast.args) os << " (" << x << ")";
   return os;
 }

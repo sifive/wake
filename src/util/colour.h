@@ -18,19 +18,19 @@
 #ifndef COLOUR_H
 #define COLOUR_H
 
-#define TERM_DEFAULT    0
+#define TERM_DEFAULT 0
 
-#define TERM_BLACK      (8+0)
-#define TERM_RED        (8+1)
-#define TERM_GREEN      (8+2)
-#define TERM_YELLOW     (8+3)
-#define TERM_BLUE       (8+4)
-#define TERM_MAGENTA    (8+5)
-#define TERM_CYAN       (8+6)
-#define TERM_WHITE      (8+7)
+#define TERM_BLACK (8 + 0)
+#define TERM_RED (8 + 1)
+#define TERM_GREEN (8 + 2)
+#define TERM_YELLOW (8 + 3)
+#define TERM_BLUE (8 + 4)
+#define TERM_MAGENTA (8 + 5)
+#define TERM_CYAN (8 + 6)
+#define TERM_WHITE (8 + 7)
 
-#define TERM_DIM        (16*1)
-#define TERM_BRIGHT     (16*2)
+#define TERM_DIM (16 * 1)
+#define TERM_BRIGHT (16 * 2)
 
 bool term_init(bool tty_);
 const char *term_colour(int code);
