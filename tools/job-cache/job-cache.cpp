@@ -35,37 +35,8 @@
 #include <vector>
 
 #include "bloom.h"
+#include "logging.h"
 #include "xoshiro256.h"
-
-// This header contains useful information that you might want
-// when running a deamon
-static void log_header(FILE *file) {
-  int pid = getpid();
-  time_t t = time(NULL);
-  struct tm tm = *localtime(&t);
-  fprintf(file, "[pid=%d, %d-%02d-%02d %02d:%02d:%02d] ", pid, tm.tm_year + 1900, tm.tm_mon + 1,
-          tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-}
-
-// A generic logging function
-template <class... Args>
-static void log_info(Args &&...args) {
-  log_header(stdout);
-  fprintf(stdout, args...);
-  fprintf(stdout, "\n");
-  fflush(stdout);
-}
-
-// A logging function for logging and then exiting with
-// a failure code.
-template <class... Args>
-static void log_fatal(Args &&...args) {
-  log_header(stderr);
-  fprintf(stderr, args...);
-  fprintf(stderr, "\n");
-  fflush(stderr);
-  exit(1);
-}
 
 // Helper that only returns successful file opens and exits
 // otherwise.
@@ -295,17 +266,17 @@ struct AddJobRequest {
   }
 };
 
-  // Use /dev/urandom to get a good seed
-  static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
-    int rng_fd = open_fd("/dev/urandom", O_RDONLY, 0644);
-    uint8_t seed_data[32] = {0};
-    if (read(rng_fd, seed_data, sizeof(seed_data)) < 0) {
-      log_fatal("read(/dev/urandom): %s", strerror(errno));
-    }
-    close_fd(rng_fd);
-    uint64_t *data = reinterpret_cast<uint64_t *>(seed_data);
-    return std::make_tuple(data[0], data[1], data[2], data[3]);
+// Use /dev/urandom to get a good seed
+static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
+  int rng_fd = open_fd("/dev/urandom", O_RDONLY, 0644);
+  uint8_t seed_data[32] = {0};
+  if (read(rng_fd, seed_data, sizeof(seed_data)) < 0) {
+    log_fatal("read(/dev/urandom): %s", strerror(errno));
   }
+  close_fd(rng_fd);
+  uint64_t *data = reinterpret_cast<uint64_t *>(seed_data);
+  return std::make_tuple(data[0], data[1], data[2], data[3]);
+}
 
 // TODO: Make this into a library interface.
 class Cache {
