@@ -37,6 +37,9 @@
 
 #include <json/json5.h>
 
+#include "xoshiro256.h"
+#include "bloom.h"
+
 // This header contains useful information that you might want
 // when running a deamon
 static void log_header(FILE *file) {
@@ -58,7 +61,7 @@ template <class... Args> static void log_info(Args &&...args) {
 
 // A logging function for logging and then exiting with
 // a failure code.
-template <class... Args> static void log_fail(Args &&...args) {
+template <class... Args> static void log_fatal(Args &&...args) {
   log_header(stderr);
   fprintf(stderr, args...);
   fprintf(stderr, "\n");
@@ -66,21 +69,12 @@ template <class... Args> static void log_fail(Args &&...args) {
   exit(1);
 }
 
-// A logging function for logging and then exiting successfully.
-template <class... Args> static void log_exit(Args &&...args) {
-  log_header(stdout);
-  fprintf(stdout, args...);
-  fprintf(stdout, "\n");
-  fflush(stdout);
-  exit(0);
-}
-
 // Helper that only returns successful file opens and exits
 // otherwise.
 static int open_fd(const char *str, int flags) {
   int fd = open(str, flags);
   if (fd == -1) {
-    log_fail("open(%s): %s", str, strerror(errno));
+    log_fatal("open(%s): %s", str, strerror(errno));
   }
   return fd;
 }
@@ -90,29 +84,29 @@ static int open_fd(const char *str, int flags) {
 static int open_fd(const char *str, int flags, mode_t mode) {
   int fd = open(str, flags, mode);
   if (fd == -1) {
-    log_fail("open(%s): %s", str, strerror(errno));
+    log_fatal("open(%s): %s", str, strerror(errno));
   }
   return fd;
 }
 
-// Like rename but crashes if an error occurs
+ // moves the file or directory, crashes on error
 static void rename_no_fail(const char *old_path, const char *new_path) {
   if (rename(old_path, new_path) < 0) {
-    log_fail("rename(%s, %s): %s", old_path, new_path, strerror(errno));
+    log_fatal("rename(%s, %s): %s", old_path, new_path, strerror(errno));
   }
 }
 
 // Ensures the the given directory has been created
 static void mkdir_no_fail(const char *dir) {
   if (mkdir(dir, 0777) < 0 && errno != EEXIST) {
-    log_fail("mkdir(%s): %s", dir, strerror(errno));
+    log_fatal("mkdir(%s): %s", dir, strerror(errno));
   }
 }
 
 // Like close but crashes if an error occurs
 static void close_fd(int fd) {
   if (close(fd) == -1) {
-    log_fail("close: %s", strerror(errno));
+    log_fatal("close: %s", strerror(errno));
   }
 }
 
@@ -134,10 +128,10 @@ static void copy_or_reflink(const char *src, const char *dst) {
 static void copy(int src_fd, int dst_fd) {
   struct stat buf;
   if (fstat(src_fd, &buf) < 0) {
-    log_fail("fstat(src_fd = %d): %s", src_fd, strerror(errno));
+    log_fatal("fstat(src_fd = %d): %s", src_fd, strerror(errno));
   }
   if (copy_file_range(src_fd, nullptr, dst_fd, nullptr, buf.st_size, 0) < 0) {
-    log_fail(
+    log_fatal(
         "copy_file_range(src_fd = %d, NULL, dst_fd = %d, size = %d, 0): %s",
         src_fd, dst_fd, buf.st_size, strerror(errno));
   }
@@ -148,7 +142,7 @@ static void copy_or_reflink(const char *src, const char *dst) {
   int dst_fd = open_fd(dst, O_WRONLY | O_CREAT, 0644);
   if (ioctl(dst_fd, FICLONE, src_fd) < 0) {
     if (errno != EINVAL && errno != EOPNOTSUPP) {
-      log_fail("ioctl(%s, FICLONE, %d): %s", dst, src, strerror(errno));
+      log_fatal("ioctl(%s, FICLONE, %d): %s", dst, src, strerror(errno));
     }
     copy(src_fd, dst_fd);
   }
@@ -158,112 +152,35 @@ static void copy_or_reflink(const char *src, const char *dst) {
 
 #endif
 
-// Use /dev/urandom to get a good seed
-static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
-  int rng_fd = open_fd("/dev/urandom", O_RDONLY, 0644);
-  uint8_t seed_data[32] = {0};
-  if (read(rng_fd, seed_data, sizeof(seed_data)) < 0) {
-    log_fail("read(/dev/urandom): %s", strerror(errno));
-  }
-  uint64_t *data = reinterpret_cast<uint64_t *>(seed_data);
-  return std::make_tuple(data[0], data[1], data[2], data[3]);
-}
-
-// Adapted from wikipedia's code, which was adapted from
-// the code included on Sebastiano Vigna's website for
-// Xoshiro256**
-static uint64_t rol64(uint64_t x, int k) { return (x << k) | (x >> (64 - k)); }
-
-static uint8_t hex_to_nibble(char c) {
+static inline uint8_t hex_to_nibble(char c) {
   if (c <= '0' && c >= '9') return (c - '0') & 0xF;
   if (c >= 'a' && c <= 'z') return (c - 'a' + 10) & 0xF;
   return (c - 'A' + 10) & 0xF;
 }
 
-static void get_hex_data(const std::string& s, uint8_t* data) {
-  for (size_t i = 0; i < s.size(); i += 2) {
-    data[0] = hex_to_nibble(s[i]);
-    if (i + 1 < s.size()) data[0] |= hex_to_nibble(s[i + 1]) << 4;
-    ++data;
+template <size_t size>
+static void get_hex_data(const std::string& s, uint8_t (*data)[size]) {
+  const uint8_t *start = *data;
+  const uint8_t *end = start + size;
+  for (size_t i = 0; data < end && i < s.size(); i += 2) {
+    start[0] = hex_to_nibble(s[i]);
+    if (i + 1 < s.size()) start[0] |= hex_to_nibble(s[i + 1]) << 4;
+    ++start;
   }
 }
-
-template <class T> static std::string to_hex(const T *value) {
-  const uint8_t *data = reinterpret_cast<const uint8_t *>(value);
-  static const char *hex = "0123456789abcdef";
-  char name[2 * sizeof(T) + 1];
-  for (size_t i = 0; i < sizeof(T); ++i) {
-    name[2 * i + 1] = hex[data[i] & 0xF];
-    name[2 * i] = hex[(data[i] >> 4) & 0xF];
-  }
-  name[2 * sizeof(T)] = '\0';
-  return name;
-}
-
-class Xoshiro256 {
-  uint64_t state[4];
-
-public:
-  Xoshiro256(std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> seed) {
-    state[0] = std::get<0>(seed);
-    state[1] = std::get<1>(seed);
-    state[2] = std::get<2>(seed);
-    state[3] = std::get<3>(seed);
-  }
-
-  uint64_t step() {
-    uint64_t *s = state;
-    uint64_t const result = rol64(state[1] * 5, 7) * 9;
-    uint64_t const t = s[1] << 17;
-
-    s[2] ^= s[0];
-    s[3] ^= s[1];
-    s[1] ^= s[2];
-    s[0] ^= s[3];
-
-    s[2] ^= t;
-    s[3] = rol64(s[3], 45);
-
-    return result;
-  }
-
-  std::string unique_name() {
-    uint8_t data[16];
-    reinterpret_cast<uint64_t *>(data)[0] = step();
-    reinterpret_cast<uint64_t *>(data)[1] = step();
-    return to_hex<uint8_t[16]>(&data);
-  }
-};
-
-// TODO: Make the bloom filter bigger
-class BloomFilter {
-  uint64_t bits = 0;
-
-public:
-  void add_hash(const uint8_t *data, size_t size) {
-    // We unsafely ignore size for now and only look at the low order 5-bits
-    (void)size;
-    bits |= 1 << (data[0] & 0x1F);
-    std::cerr << "bits = " << bits << std::endl;
-  }
-  size_t size() const { return sizeof(bits); }
-  const uint8_t *data() const {
-    return reinterpret_cast<const uint8_t *>(&bits);
-  }
-};
 
 static void finish_stmt(const char *why, sqlite3_stmt *stmt) {
   int ret;
 
   ret = sqlite3_reset(stmt);
   if (ret != SQLITE_OK) {
-    log_fail("error: %s; sqlite3_reset: %s", why,
+    log_fatal("error: %s; sqlite3_reset: %s", why,
              sqlite3_errmsg(sqlite3_db_handle(stmt)));
   }
 
   ret = sqlite3_clear_bindings(stmt);
   if (ret != SQLITE_OK) {
-    log_fail("error: %s; sqlite3_clear_bindings: %s", why,
+    log_fatal("error: %s; sqlite3_clear_bindings: %s", why,
              sqlite3_errmsg(sqlite3_db_handle(stmt)));
   }
 }
@@ -273,7 +190,7 @@ static void single_step(const char *why, sqlite3_stmt *stmt) {
 
   ret = sqlite3_step(stmt);
   if (ret != SQLITE_DONE) {
-    log_fail("error: %s; sqlite3_step: %s", why,
+    log_fatal("error: %s; sqlite3_step: %s", why,
              sqlite3_errmsg(sqlite3_db_handle(stmt)));
   }
 
@@ -285,7 +202,7 @@ static void bind_string(const char *why, sqlite3_stmt *stmt, int index,
   int ret;
   ret = sqlite3_bind_text(stmt, index, str, len, SQLITE_STATIC);
   if (ret != SQLITE_OK) {
-    log_fail("%s: sqlite3_bind_text(%d, %s): %s", why, index, str,
+    log_fatal("%s: sqlite3_bind_text(%d, %s): %s", why, index, str,
              sqlite3_errmsg(sqlite3_db_handle(stmt)));
   }
 }
@@ -295,7 +212,7 @@ static void bind_integer(const char *why, sqlite3_stmt *stmt, int index,
   int ret;
   ret = sqlite3_bind_int64(stmt, index, x);
   if (ret != SQLITE_OK) {
-    log_fail("%s: sqlite3_bind_int64(%d, %d): %s", why, index, x,
+    log_fatal("%s: sqlite3_bind_int64(%d, %d): %s", why, index, x,
              sqlite3_errmsg(sqlite3_db_handle(stmt)));
   }
 }
@@ -304,7 +221,7 @@ static void bind_integer(const char *why, sqlite3_stmt *stmt, int index,
   if (member) {                                                                \
     int ret = sqlite3_finalize(member);                                        \
     if (ret != SQLITE_OK) {                                                    \
-      log_fail("sqlite3_finalize(%s): %s", #member, sqlite3_errmsg(db));       \
+      log_fatal("sqlite3_finalize(%s): %s", #member, sqlite3_errmsg(db));       \
     }                                                                          \
     member = nullptr;                                                          \
   }
@@ -312,7 +229,7 @@ static void bind_integer(const char *why, sqlite3_stmt *stmt, int index,
 #define PREPARE(sql_str, query_stmt)                                           \
   if (sqlite3_prepare_v2(db, sql_str.c_str(), sql_str.size(), &query_stmt,     \
                          nullptr) != SQLITE_OK) {                              \
-    log_fail("error: failed to prepare statement: %s", sqlite3_errmsg(db));    \
+    log_fatal("error: failed to prepare statement: %s", sqlite3_errmsg(db));    \
   }
 
 struct InputFile {
@@ -358,7 +275,7 @@ struct AddJobRequest {
       InputFile input;
       input.path = input_file.second.get("path").value;
       input.hash = input_file.second.get("hash").value;
-      get_hex_data(input.hash, hash_data);
+      get_hex_data(input.hash, &hash_data);
       bloom.add_hash(reinterpret_cast<const uint8_t *>(hash_data), input.hash.size() / 2);
       inputs.emplace_back(std::move(input));
     }
@@ -368,7 +285,7 @@ struct AddJobRequest {
       InputDir input;
       input.path = input_dir.second.get("path").value;
       input.hash = input_dir.second.get("hash").value;
-      get_hex_data(input.hash, hash_data);
+      get_hex_data(input.hash, &hash_data);
       bloom.add_hash(reinterpret_cast<const uint8_t *>(hash_data), input.hash.size() / 2);
       directories.emplace_back(std::move(input));
     }
@@ -459,18 +376,18 @@ class Cache {
     if (sqlite3_open_v2(db_path.c_str(), &db,
                         SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
                         nullptr) != SQLITE_OK) {
-      log_fail("error: %s", sqlite3_errmsg(db));
+      log_fatal("error: %s", sqlite3_errmsg(db));
     }
 
     // If we happen to open the db as read only we need to fail.
     // TODO: Why would this happen?
     if (sqlite3_db_readonly(db, 0)) {
-      log_fail("error: cache.db is read-only");
+      log_fatal("error: cache.db is read-only");
     }
 
     char* fail = nullptr;
     if (sqlite3_exec(db, cache_schema.c_str(), nullptr, nullptr, &fail) != SQLITE_OK) {
-      log_fail("error: failed init stmt: %s: %s", fail, sqlite3_errmsg(db));
+      log_fatal("error: failed init stmt: %s: %s", fail, sqlite3_errmsg(db));
     }
   }
 
@@ -556,7 +473,7 @@ public:
 
   Cache() = delete;
   Cache(const Cache&) = delete;
-  Cache(std::string _dir) : dir(_dir), rng(get_rng_seed()) {
+  Cache(std::string _dir) : dir(_dir), rng() {
     mkdir_no_fail(_dir.c_str());
     init_sql();
     prepare_stmts();
