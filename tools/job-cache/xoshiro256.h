@@ -43,25 +43,8 @@ class Xoshiro256 {
   static uint64_t rol64(uint64_t x, int k) { return (x << k) | (x >> (64 - k)); }
 
  public:
-  // Use /dev/urandom to get a good seed
-  static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
-    int rng_fd = open_fd("/dev/urandom", O_RDONLY, 0644);
-    uint8_t seed_data[32] = {0};
-    if (read(rng_fd, seed_data, sizeof(seed_data)) < 0) {
-      log_fatal("read(/dev/urandom): %s", strerror(errno));
-    }
-    close_fd(rng_fd);
-    uint64_t *data = reinterpret_cast<uint64_t *>(seed_data);
-    return std::make_tuple(data[0], data[1], data[2], data[3]);
-  }
 
-  Xoshiro256() {
-    auto seed = get_rng_seed();
-    state[0] = std::get<0>(seed);
-    state[1] = std::get<1>(seed);
-    state[2] = std::get<2>(seed);
-    state[3] = std::get<3>(seed);
-  }
+  Xoshiro256() = delete;
 
   Xoshiro256(std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> seed) {
     state[0] = std::get<0>(seed);

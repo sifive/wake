@@ -157,9 +157,9 @@ static inline uint8_t hex_to_nibble(char c) {
 
 template <size_t size>
 static void get_hex_data(const std::string &s, uint8_t (*data)[size]) {
-  const uint8_t *start = *data;
+  uint8_t *start = *data;
   const uint8_t *end = start + size;
-  for (size_t i = 0; data < end && i < s.size(); i += 2) {
+  for (size_t i = 0; start < end && i < s.size(); i += 2) {
     start[0] = hex_to_nibble(s[i]);
     if (i + 1 < s.size()) start[0] |= hex_to_nibble(s[i + 1]) << 4;
     ++start;
@@ -294,6 +294,18 @@ struct AddJobRequest {
     }
   }
 };
+
+  // Use /dev/urandom to get a good seed
+  static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
+    int rng_fd = open_fd("/dev/urandom", O_RDONLY, 0644);
+    uint8_t seed_data[32] = {0};
+    if (read(rng_fd, seed_data, sizeof(seed_data)) < 0) {
+      log_fatal("read(/dev/urandom): %s", strerror(errno));
+    }
+    close_fd(rng_fd);
+    uint64_t *data = reinterpret_cast<uint64_t *>(seed_data);
+    return std::make_tuple(data[0], data[1], data[2], data[3]);
+  }
 
 // TODO: Make this into a library interface.
 class Cache {
@@ -465,7 +477,7 @@ class Cache {
 
   Cache() = delete;
   Cache(const Cache &) = delete;
-  Cache(std::string _dir) : dir(_dir), rng() {
+  Cache(std::string _dir) : dir(_dir), rng(get_rng_seed()) {
     mkdir_no_fail(_dir.c_str());
     init_sql();
     prepare_stmts();
