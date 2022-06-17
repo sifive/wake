@@ -18,6 +18,8 @@
 #include <cstdint>
 #include <tuple>
 
+#pragma once
+
 template <class T>
 static std::string to_hex(const T *value) {
   const uint8_t *data = reinterpret_cast<const uint8_t *>(value);
@@ -43,7 +45,6 @@ class Xoshiro256 {
   static uint64_t rol64(uint64_t x, int k) { return (x << k) | (x >> (64 - k)); }
 
  public:
-
   Xoshiro256() = delete;
 
   Xoshiro256(std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> seed) {

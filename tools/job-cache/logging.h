@@ -19,16 +19,19 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#pragma once
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctime>
 #include <unistd.h>
+
+#include <ctime>
 
 namespace {
 // This header contains useful information that you might want
 // when running a deamon
- inline void log_header(FILE *file) {
+inline void log_header(FILE *file) {
   int pid = getpid();
   time_t t = time(NULL);
   struct tm tm = *localtime(&t);
@@ -56,4 +59,4 @@ void log_fatal(Args &&...args) {
   exit(1);
 }
 
-}
+}  // namespace

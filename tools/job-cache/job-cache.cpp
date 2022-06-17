@@ -278,7 +278,6 @@ static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
   return std::make_tuple(data[0], data[1], data[2], data[3]);
 }
 
-// TODO: Make this into a library interface.
 class Cache {
   sqlite3 *db = nullptr;
   sqlite3_stmt *add_job = nullptr;
@@ -488,18 +487,20 @@ class Cache {
       insert_input_dir(output_file.path, output_file.hash, job_id);
     }
 
-    // TODO: Add clean up on init to `rm -rf` the tmp_ jobs
-    //       in case we fail before we rename
+    // Commit the database without having moved the job directory.
+    // On *read* you have to be aware tha the database can be in
+    // this kind of faulty state where the database is populated but
+    // file system is *not* populated. In such a case we interpret that
+    // as if it wasn't in the database and so it doesn't get used and
+    // will eventully be deleted.
+    end_txn();
+
+    // TODO: Clean up temp directories
     uint8_t job_group = job_id & 0xFF;
     std::string job_group_dir = dir + "/" + to_hex<uint8_t>(&job_group);
     mkdir_no_fail(job_group_dir.c_str());
     std::string job_dir = job_group_dir + "/" + std::to_string(job_id);
     rename_no_fail(tmp_job_dir.c_str(), job_dir.c_str());
-
-    // TODO: Add WAL to handle case where we fail here. We
-    //       can just append the job_id to a file.
-    // Finally now that the disk is settled
-    end_txn();
   }
 };
 
