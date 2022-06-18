@@ -18,6 +18,7 @@ manifest.wake
 /bin/preload-wake.*
 /bin/wakebox
 /bin/wakebox.*
+/bin/job-cache.*
 /src/version.h
 /lib/wake/bsp-wake
 /lib/wake/bsp-wake.*

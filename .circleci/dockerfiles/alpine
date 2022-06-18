@@ -1,6 +1,6 @@
 FROM alpine:3.11.5
 
-RUN apk add m4 g++ make pkgconf git tar xz gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev dash sqlite-static ncurses-static
+RUN apk add m4 g++ make pkgconf git tar xz gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev dash sqlite-static ncurses-static linux-headers
 
 WORKDIR /build
 
