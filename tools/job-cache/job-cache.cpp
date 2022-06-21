@@ -80,8 +80,8 @@ static void copy(int src_fd, int dst_fd) {
 }
 
 static void copy_or_reflink(const char *src, const char *dst) {
-  auto src_fd = UniqueFd::open_fd(src, O_RDONLY);
-  auto dst_fd = UniqueFd::open_fd(dst, O_WRONLY | O_CREAT, 0644);
+  auto src_fd = UniqueFd::open(src, O_RDONLY);
+  auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT, 0644);
   if (ioctl(dst_fd.get(), FICLONE, src_fd.get()) < 0) {
     if (errno != EINVAL && errno != EOPNOTSUPP) {
       log_fatal("ioctl(%s, FICLONE, %d): %s", dst, src, strerror(errno));
@@ -111,7 +111,7 @@ static void get_hex_data(const std::string &s, uint8_t (*data)[size]) {
 
 // Use /dev/urandom to get a good seed
 static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
-  auto rng_fd = UniqueFd::open_fd("/dev/urandom", O_RDONLY, 0644);
+  auto rng_fd = UniqueFd::open("/dev/urandom", O_RDONLY, 0644);
   uint8_t seed_data[32] = {0};
   if (read(rng_fd.get(), seed_data, sizeof(seed_data)) < 0) {
     log_fatal("read(/dev/urandom): %s", strerror(errno));
@@ -121,6 +121,7 @@ static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
 }
 
 class Database {
+ private:
   sqlite3 *db = nullptr;
 
  public:
@@ -144,7 +145,7 @@ class Database {
     // starter but in C++ its decrement. We take advantage of this by
     // adding `--dummy, R("` to the start of the sql file which allows
     // it to be valid and have no effect in both languages. Thus
-    // this dummy variable is needed at the importa site. Additionally
+    // this dummy variable is needed at the import site. Additionally
     // because the comma is lower precedence than the '=' operator we
     // have to put parens around the include to get this trick to work.
     // clang-format off
@@ -179,6 +180,7 @@ class Database {
 };
 
 class PreparedStatement {
+ private:
   std::shared_ptr<Database> db = nullptr;
   sqlite3_stmt *query_stmt = nullptr;
   std::string why = "";
@@ -254,6 +256,7 @@ class PreparedStatement {
 
 // Database and JSON classes
 class InputFiles {
+ private:
   PreparedStatement add_input_file;
 
  public:
@@ -274,6 +277,7 @@ class InputFiles {
 };
 
 class InputDirs {
+ private:
   PreparedStatement add_input_dir;
 
  public:
@@ -294,6 +298,7 @@ class InputDirs {
 };
 
 class OutputFiles {
+ private:
   PreparedStatement add_output_file;
 
  public:
@@ -314,6 +319,7 @@ class OutputFiles {
 };
 
 class JobTable {
+ private:
   std::shared_ptr<Database> db;
   PreparedStatement add_job;
 
@@ -342,6 +348,7 @@ class JobTable {
 };
 
 class Transaction {
+ private:
   PreparedStatement begin_txn_query;
   PreparedStatement commit_txn_query;
 
@@ -381,6 +388,7 @@ struct OutputFile {
 };
 
 struct AddJobRequest {
+ public:
   std::string cwd;
   std::string command_line;
   std::string envrionment;
@@ -433,9 +441,14 @@ struct AddJobRequest {
   }
 };
 
-// Finally the cache provides the generic interface
-// to the cache.
+// the `Cache` class provides the full interface
+// the the underlying complete cache directory.
+// This requires interplay between the file system and
+// the database and must be carefully orchestrated. This
+// class handles all those details and provides a simple
+// interface.
 class Cache {
+ private:
   std::shared_ptr<Database> db;
   JobTable jobs;
   InputFiles input_files;

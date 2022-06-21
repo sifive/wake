@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -57,10 +58,15 @@ class UniqueFd {
     }
   }
 
-  int get() const { return fd; }
+  bool valid() const { return fd > 0; }
 
-  static UniqueFd open_fd(const char* str, int flags) {
-    int fd = open(str, flags);
+  int get() const {
+    assert(valid());
+    return fd;
+  }
+
+  static UniqueFd open(const char* str, int flags) {
+    int fd = ::open(str, flags);
     if (fd == -1) {
       log_fatal("open(%s): %s", str, strerror(errno));
     }
@@ -69,8 +75,8 @@ class UniqueFd {
 
   // Helper that only returns successful file opens and exits
   // otherwise.
-  static UniqueFd open_fd(const char* str, int flags, mode_t mode) {
-    int fd = open(str, flags, mode);
+  static UniqueFd open(const char* str, int flags, mode_t mode) {
+    int fd = ::open(str, flags, mode);
     if (fd == -1) {
       log_fatal("open(%s): %s", str, strerror(errno));
     }
