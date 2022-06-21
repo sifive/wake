@@ -135,6 +135,17 @@ struct Database {
   std::string get_output(long job, int descriptor) const;
   void replay_output(long job, const char *stdout, const char *stderr);
 
+  // Returns all files created by wake jobs
+  std::vector<std::string> get_outputs() const;
+
+  // A single transaction that does the following
+  // 1) finds all files created by wake jobs
+  // 2) clears all jobs
+  // 3) removes all of those files
+  // 4) finishes the transaction and returns the paths
+  //    of the removed files
+  std::vector<std::string> clear_jobs();
+
   void add_hash(const std::string &file, const std::string &hash, long modified);
 
   std::string get_hash(const std::string &file, long modified);
