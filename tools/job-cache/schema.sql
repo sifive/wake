@@ -1,4 +1,4 @@
---dummy, R("
+--dummy, R"(
 pragma auto_vacuum=incremental;
 pragma journal_mode=wal;
 pragma synchronous=0;

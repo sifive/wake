@@ -32,26 +32,24 @@
 
 #include "logging.h"
 
-class unique_fd {
-private:
+class UniqueFd {
+ private:
   int fd = -1;
 
-  explicit unique_fd(int fd) : fd(fd) {}
+  explicit UniqueFd(int fd) : fd(fd) {}
 
-public:
+ public:
+  UniqueFd() = default;
+  UniqueFd(const UniqueFd&) = delete;
 
-  unique_fd() = default;
-  unique_fd(const unique_fd&) = delete;
-
-  unique_fd& operator=(unique_fd&& f) {
+  UniqueFd& operator=(UniqueFd&& f) {
     fd = f.fd;
     f.fd = -1;
+    return *this;
   }
-  unique_fd(unique_fd&& f) : fd(f.fd) {
-    f.fd = -1;
-  }
+  UniqueFd(UniqueFd&& f) : fd(f.fd) { f.fd = -1; }
 
-  ~unique_fd() {
+  ~UniqueFd() {
     if (fd > 0) {
       if (close(fd) == -1) {
         log_fatal("close: %s", strerror(errno));
@@ -59,25 +57,23 @@ public:
     }
   }
 
-  int get() const {
-    return fd;
-  }
+  int get() const { return fd; }
 
-  static unique_fd open_fd(const char *str, int flags) {
+  static UniqueFd open_fd(const char* str, int flags) {
     int fd = open(str, flags);
     if (fd == -1) {
       log_fatal("open(%s): %s", str, strerror(errno));
     }
-    return unique_fd(fd);
+    return UniqueFd(fd);
   }
 
   // Helper that only returns successful file opens and exits
   // otherwise.
-  static unique_fd open_fd(const char *str, int flags, mode_t mode) {
+  static UniqueFd open_fd(const char* str, int flags, mode_t mode) {
     int fd = open(str, flags, mode);
     if (fd == -1) {
       log_fatal("open(%s): %s", str, strerror(errno));
     }
-    return unique_fd(fd);
+    return UniqueFd(fd);
   }
 };

@@ -18,4 +18,4 @@ from wake import _
 from gcc_wake import _
 
 target buildFuseDaemon variant: Result (List Path) Error =
-    tool here variant "lib/wake/fuse-waked" (json, fuse, Nil)
+    tool here Nil variant "lib/wake/fuse-waked" (json, fuse, Nil)
