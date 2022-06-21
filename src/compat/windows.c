@@ -23,6 +23,7 @@ int is_windows() { return 1; }
 #include <emscripten/emscripten.h>
 
 int is_windows() {
+  // clang-format off
   return EM_ASM_INT({
     if (process.platform == 'win32') {
       return 1;
@@ -30,6 +31,7 @@ int is_windows() {
       return 0;
     }
   });
+  // clang-format on
 }
 
 #else
