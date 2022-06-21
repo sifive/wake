@@ -23,11 +23,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <iostream>
 #include <random>
 #include <set>
 #include <sstream>
-#include <algorithm>
 
 #include "describe.h"
 #include "dst/bind.h"
@@ -402,7 +402,7 @@ int main(int argc, char **argv) {
     auto files = db.get_outputs();
 
     // print them all out
-    for (const auto& file : files) {
+    for (const auto &file : files) {
       std::cout << file << std::endl;
     }
 
@@ -411,41 +411,33 @@ int main(int argc, char **argv) {
 
   // If the user asked us to clean the local build, do so.
   if (clean) {
-    // Find all the file we need to delete.
-    auto files = db.get_outputs();
-
     // Clean up the database of unwanted info. Jobs must
     // be cleared before outputs are removed to avoid foreign key
     // constraint issues.
-    db.clear_jobs();
-    db.remove_outputs();
-
-    // Collect directories to be deleted
-    std::vector<std::string> dirs_to_remove;
-
-    // Delete all the files
-    for (const auto& file : files) {
-      if (unlink(file.c_str()) == -1) {
-        if (errno == EISDIR) {
-          dirs_to_remove.push_back(file);
-          continue;
-        }
-        if (errno == ENOENT) continue;
-        std::cerr << "error: unlink(" << file << "): " << strerror(errno) << std::endl;
-        return 1;
-      }
-    }
+    auto paths = db.clear_jobs();
 
     // Sort them so that child directories come before parent directories
-    std::sort(dirs_to_remove.begin(), dirs_to_remove.end(), [&](const std::string& a, const std::string& b) -> bool {
+    std::sort(paths.begin(), paths.end(), [&](const std::string &a, const std::string &b) -> bool {
       return a.size() > b.size();
     });
 
-    // Now delete all empty directories
-    for (const auto& dir : dirs_to_remove) {
-      if (rmdir(dir.c_str()) == -1) {
-        if (errno == ENOTEMPTY) continue;
-        std::cerr << "error: rmdir(" << dir << "): " << strerror(errno) << std::endl;
+    // Delete all the files
+    for (const auto &path : paths) {
+      // First we try to unlink the file
+      if (unlink(path.c_str()) == -1) {
+        // If it was actually a directory we remove it instead
+        if (errno == EISDIR) {
+          if (rmdir(path.c_str()) == -1) {
+            if (errno == ENOTEMPTY) continue;
+            std::cerr << "error: rmdir(" << path << "): " << strerror(errno) << std::endl;
+            return 1;
+          }
+          continue;
+        }
+
+        // If it wasn't a directory then we fail
+        if (errno == ENOENT) continue;
+        std::cerr << "error: unlink(" << path << "): " << strerror(errno) << std::endl;
         return 1;
       }
     }

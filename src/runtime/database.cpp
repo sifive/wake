@@ -437,22 +437,21 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       " where access != 1"
       " order by file_id, access desc, job_id";
   const char *sql_get_output_files =
-    "select f.path"
-    " from filetree ft join files f on f.file_id=ft.file_id join jobs j on ft.job_id=j.job_id"
-    " where ft.access = 2"
-    " and substr(cast(j.commandline as varchar), 1, 8) != '<source>'"
-    " and substr(cast(j.commandline as varchar), 1, 7) != '<claim>'";
+      "select f.path"
+      " from filetree ft join files f on f.file_id=ft.file_id join jobs j on ft.job_id=j.job_id"
+      " where ft.access = 2"
+      " and substr(cast(j.commandline as varchar), 1, 8) != '<source>'"
+      " and substr(cast(j.commandline as varchar), 1, 7) != '<claim>'";
   const char *sql_remove_output_files =
-    "delete from files"
-    " where file_id in ("
-    "   select f.file_id"
-    "   from filetree ft join files f on f.file_id=ft.file_id join jobs j on ft.job_id=j.job_id"
-    "   where ft.access = 2"
-    "   and substr(cast(j.commandline as varchar), 1, 8) != '<source>'"
-    "   and substr(cast(j.commandline as varchar), 1, 7) != '<claim>'"
-    " )";
-  const char *sql_remove_all_jobs =
-    "delete from jobs";
+      "delete from files"
+      " where file_id in ("
+      "   select f.file_id"
+      "   from filetree ft join files f on f.file_id=ft.file_id join jobs j on ft.job_id=j.job_id"
+      "   where ft.access = 2"
+      "   and substr(cast(j.commandline as varchar), 1, 8) != '<source>'"
+      "   and substr(cast(j.commandline as varchar), 1, 7) != '<claim>'"
+      " )";
+  const char *sql_remove_all_jobs = "delete from jobs";
 
 #define PREPARE(sql, member)                                                                     \
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);                                   \
@@ -965,14 +964,24 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   if (fail) exit(1);
 }
 
-void Database::remove_outputs() {
-  const char *why = "Could not remove outputs";
-  single_step (why, imp->remove_output_files, imp->debugdb);
-}
-
-void Database::clear_jobs() {
+std::vector<std::string> Database::clear_jobs() {
   const char *why = "Could not clear jobs";
-  single_step (why, imp->remove_all_jobs, imp->debugdb);
+  std::vector<std::string> out;
+
+  begin_txn();
+
+  while (sqlite3_step(imp->get_output_files) == SQLITE_ROW) {
+    out.emplace_back(rip_column(imp->get_output_files, 0));
+  }
+  finish_stmt(why, imp->get_output_files, imp->debugdb);
+
+  // Now clear everything.
+  single_step(why, imp->remove_all_jobs, imp->debugdb);
+  single_step(why, imp->remove_output_files, imp->debugdb);
+
+  end_txn();
+
+  return out;
 }
 
 void Database::tag_job(long job, const std::string &uri, const std::string &content) {
@@ -1156,17 +1165,17 @@ static std::vector<JobReflection> find_all(const Database *db, sqlite3_stmt *que
 }
 
 std::vector<std::string> Database::get_outputs() const {
-    const char *why = "Could not get outputs";
-    std::vector<std::string> out;
+  const char *why = "Could not get outputs";
+  std::vector<std::string> out;
 
-    begin_txn();
-    while (sqlite3_step(imp->get_output_files) == SQLITE_ROW) {
-        out.emplace_back(rip_column(imp->get_output_files, 0));
-    }
-    finish_stmt(why, imp->get_output_files, imp->debugdb);
-    end_txn();
+  begin_txn();
+  while (sqlite3_step(imp->get_output_files) == SQLITE_ROW) {
+    out.emplace_back(rip_column(imp->get_output_files, 0));
+  }
+  finish_stmt(why, imp->get_output_files, imp->debugdb);
+  end_txn();
 
-    return out;
+  return out;
 }
 
 static std::vector<FileAccess> get_all_file_accesses(const Database *db, sqlite3_stmt *query) {
