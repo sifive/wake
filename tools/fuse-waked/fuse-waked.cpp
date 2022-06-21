@@ -621,6 +621,15 @@ static int wakefuse_unlink_trace(const char *path) {
   return out;
 }
 
+// Check if the directory has children that were written and not yet deleted.
+// Note: we don't check the 'files_visible' list as when the directory itself or
+// a file within that directory is visible then is_writable() would have already failed.
+static bool has_written_children(const std::string &dir, Job &job) {
+  auto i = job.files_wrote.lower_bound(dir + "/");
+  return i != job.files_wrote.end() && i->size() > dir.size() &&
+         0 == i->compare(0, dir.size(), dir);
+}
+
 static int wakefuse_rmdir(const char *path) {
   if (is_special(path)) return -ENOTDIR;
 
@@ -637,7 +646,14 @@ static int wakefuse_rmdir(const char *path) {
   if (!it->second.is_writeable(key.second)) return -EACCES;
 
   int res = unlinkat(context.rootfd, key.second.c_str(), AT_REMOVEDIR);
-  if (res == -1) return -errno;
+  if (res == -1) {
+    if ((errno == ENOTEMPTY) && !has_written_children(key.second, it->second)) {
+      // Let the fuse client process believe that the directory was unlinked,
+      // even though the underlying filesystem still has a populated directory.
+    } else {
+      return -errno;
+    }
+  }
 
   it->second.files_wrote.erase(key.second);
   it->second.files_read.erase(key.second);
