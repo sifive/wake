@@ -36,27 +36,8 @@
 
 #include "bloom.h"
 #include "logging.h"
+#include "unique_fd.h"
 #include "xoshiro256.h"
-
-// Helper that only returns successful file opens and exits
-// otherwise.
-static int open_fd(const char *str, int flags) {
-  int fd = open(str, flags);
-  if (fd == -1) {
-    log_fatal("open(%s): %s", str, strerror(errno));
-  }
-  return fd;
-}
-
-// Helper that only returns successful file opens and exits
-// otherwise.
-static int open_fd(const char *str, int flags, mode_t mode) {
-  int fd = open(str, flags, mode);
-  if (fd == -1) {
-    log_fatal("open(%s): %s", str, strerror(errno));
-  }
-  return fd;
-}
 
 // moves the file or directory, crashes on error
 static void rename_no_fail(const char *old_path, const char *new_path) {
@@ -69,13 +50,6 @@ static void rename_no_fail(const char *old_path, const char *new_path) {
 static void mkdir_no_fail(const char *dir) {
   if (mkdir(dir, 0777) < 0 && errno != EEXIST) {
     log_fatal("mkdir(%s): %s", dir, strerror(errno));
-  }
-}
-
-// Like close but crashes if an error occurs
-static void close_fd(int fd) {
-  if (close(fd) == -1) {
-    log_fatal("close: %s", strerror(errno));
   }
 }
 
@@ -106,16 +80,14 @@ static void copy(int src_fd, int dst_fd) {
 }
 
 static void copy_or_reflink(const char *src, const char *dst) {
-  int src_fd = open_fd(src, O_RDONLY);
-  int dst_fd = open_fd(dst, O_WRONLY | O_CREAT, 0644);
-  if (ioctl(dst_fd, FICLONE, src_fd) < 0) {
+  auto src_fd = UniqueFd::open(src, O_RDONLY);
+  auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT, 0644);
+  if (ioctl(dst_fd.get(), FICLONE, src_fd.get()) < 0) {
     if (errno != EINVAL && errno != EOPNOTSUPP) {
       log_fatal("ioctl(%s, FICLONE, %d): %s", dst, src, strerror(errno));
     }
-    copy(src_fd, dst_fd);
+    copy(src_fd.get(), dst_fd.get());
   }
-  close_fd(dst_fd);
-  close_fd(src_fd);
 }
 
 #endif
@@ -137,66 +109,268 @@ static void get_hex_data(const std::string &s, uint8_t (*data)[size]) {
   }
 }
 
-static void finish_stmt(const char *why, sqlite3_stmt *stmt) {
-  int ret;
-
-  ret = sqlite3_reset(stmt);
-  if (ret != SQLITE_OK) {
-    log_fatal("error: %s; sqlite3_reset: %s", why, sqlite3_errmsg(sqlite3_db_handle(stmt)));
+// Use /dev/urandom to get a good seed
+static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
+  auto rng_fd = UniqueFd::open("/dev/urandom", O_RDONLY, 0644);
+  uint8_t seed_data[32] = {0};
+  if (read(rng_fd.get(), seed_data, sizeof(seed_data)) < 0) {
+    log_fatal("read(/dev/urandom): %s", strerror(errno));
   }
-
-  ret = sqlite3_clear_bindings(stmt);
-  if (ret != SQLITE_OK) {
-    log_fatal("error: %s; sqlite3_clear_bindings: %s", why,
-              sqlite3_errmsg(sqlite3_db_handle(stmt)));
-  }
+  uint64_t *data = reinterpret_cast<uint64_t *>(seed_data);
+  return std::make_tuple(data[0], data[1], data[2], data[3]);
 }
 
-static void single_step(const char *why, sqlite3_stmt *stmt) {
-  int ret;
+class Database {
+ private:
+  sqlite3 *db = nullptr;
 
-  ret = sqlite3_step(stmt);
-  if (ret != SQLITE_DONE) {
-    log_fatal("error: %s; sqlite3_step: %s", why, sqlite3_errmsg(sqlite3_db_handle(stmt)));
+ public:
+  Database(const Database &) = delete;
+  Database(Database &&other) {
+    db = other.db;
+    other.db = nullptr;
+  }
+  Database() = delete;
+  ~Database() {
+    if (sqlite3_close(db) != SQLITE_OK) {
+      log_fatal("Could not close database: %s", sqlite3_errmsg(db));
+    }
+  }
+  Database(const std::string &cache_dir) {
+    // We want to keep a sql file that has proper syntax highlighting
+    // around instead of embeding the schema. In order to acomplish this
+    // we use C++11 raw strings and the preprocessor. Unfortuently
+    // since starting a sql file with `R("` causes it to all highlight
+    // as a string we need to work around that. In sql `--` is a comment
+    // starter but in C++ its decrement. We take advantage of this by
+    // adding `--dummy, R("` to the start of the sql file which allows
+    // it to be valid and have no effect in both languages. Thus
+    // this dummy variable is needed at the import site. Additionally
+    // because the comma is lower precedence than the '=' operator we
+    // have to put parens around the include to get this trick to work.
+    // clang-format off
+    int dummy = 0;
+    const char* cache_schema = (
+        #include "schema.sql"
+    );
+    // clang-format on
+
+    // Make sure the cache directory exists
+    mkdir_no_fail(cache_dir.c_str());
+
+    std::string db_path = cache_dir + "/cache.db";
+    if (sqlite3_open_v2(db_path.c_str(), &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+                        nullptr) != SQLITE_OK) {
+      log_fatal("error: %s", sqlite3_errmsg(db));
+    }
+
+    // If we happen to open the db as read only we need to fail.
+    // TODO: Why would this happen?
+    if (sqlite3_db_readonly(db, 0)) {
+      log_fatal("error: cache.db is read-only");
+    }
+
+    char *fail = nullptr;
+    if (sqlite3_exec(db, cache_schema, nullptr, nullptr, &fail) != SQLITE_OK) {
+      log_fatal("error: failed init stmt: %s: %s", fail, sqlite3_errmsg(db));
+    }
   }
 
-  finish_stmt(why, stmt);
-}
+  sqlite3 *get() const { return db; }
+};
 
-static void bind_string(const char *why, sqlite3_stmt *stmt, int index, const char *str,
-                        size_t len) {
-  int ret;
-  ret = sqlite3_bind_text(stmt, index, str, len, SQLITE_STATIC);
-  if (ret != SQLITE_OK) {
-    log_fatal("%s: sqlite3_bind_text(%d, %s): %s", why, index, str,
-              sqlite3_errmsg(sqlite3_db_handle(stmt)));
+class PreparedStatement {
+ private:
+  std::shared_ptr<Database> db = nullptr;
+  sqlite3_stmt *query_stmt = nullptr;
+  std::string why = "";
+
+ public:
+  PreparedStatement() = delete;
+  PreparedStatement(const PreparedStatement &) = delete;
+  PreparedStatement(PreparedStatement &&pstmt) {
+    db = pstmt.db;
+    query_stmt = pstmt.query_stmt;
+    pstmt.db = nullptr;
+    query_stmt = nullptr;
   }
-}
-
-static void bind_integer(const char *why, sqlite3_stmt *stmt, int index, long x) {
-  int ret;
-  ret = sqlite3_bind_int64(stmt, index, x);
-  if (ret != SQLITE_OK) {
-    log_fatal("%s: sqlite3_bind_int64(%d, %d): %s", why, index, x,
-              sqlite3_errmsg(sqlite3_db_handle(stmt)));
-  }
-}
-
-#define FINALIZE(member)                                                  \
-  if (member) {                                                           \
-    int ret = sqlite3_finalize(member);                                   \
-    if (ret != SQLITE_OK) {                                               \
-      log_fatal("sqlite3_finalize(%s): %s", #member, sqlite3_errmsg(db)); \
-    }                                                                     \
-    member = nullptr;                                                     \
+  PreparedStatement &operator=(PreparedStatement &&pstmt) {
+    db = pstmt.db;
+    query_stmt = pstmt.query_stmt;
+    pstmt.db = nullptr;
+    query_stmt = nullptr;
+    return *this;
   }
 
-#define PREPARE(sql_str, query_stmt)                                                   \
-  if (sqlite3_prepare_v2(db, sql_str.c_str(), sql_str.size(), &query_stmt, nullptr) != \
-      SQLITE_OK) {                                                                     \
-    log_fatal("error: failed to prepare statement: %s", sqlite3_errmsg(db));           \
+  PreparedStatement(std::shared_ptr<Database> db, const std::string &sql_str) : db(db) {
+    if (sqlite3_prepare_v2(db->get(), sql_str.c_str(), sql_str.size(), &query_stmt, nullptr) !=
+        SQLITE_OK) {
+      log_fatal("error: failed to prepare statement: %s", sqlite3_errmsg(db->get()));
+    }
   }
 
+  ~PreparedStatement() {
+    if (query_stmt) {
+      int ret = sqlite3_finalize(query_stmt);
+      if (ret != SQLITE_OK) {
+        log_fatal("sqlite3_finalize: %s", sqlite3_errmsg(db->get()));
+      }
+      query_stmt = nullptr;
+    }
+  }
+
+  void set_why(std::string why) { this->why = std::move(why); }
+
+  void bind_integer(int64_t index, int64_t value) {
+    int ret = sqlite3_bind_int64(query_stmt, index, value);
+    if (ret != SQLITE_OK) {
+      log_fatal("%s: sqlite3_bind_int64(%d, %d): %s", why.c_str(), index, value,
+                sqlite3_errmsg(db->get()));
+    }
+  }
+
+  void bind_string(int64_t index, const std::string &value) {
+    int ret = sqlite3_bind_text(query_stmt, index, value.c_str(), value.size(), SQLITE_STATIC);
+    if (ret != SQLITE_OK) {
+      log_fatal("%s: sqlite3_bind_text(%d, %s): %s", why.c_str(), index, value.c_str(),
+                sqlite3_errmsg(sqlite3_db_handle(query_stmt)));
+    }
+  }
+
+  void reset() {
+    if (sqlite3_reset(query_stmt) != SQLITE_OK) {
+      log_fatal("error: %s; sqlite3_reset: %s", why.c_str(), sqlite3_errmsg(db->get()));
+    }
+
+    if (sqlite3_clear_bindings(query_stmt) != SQLITE_OK) {
+      log_fatal("error: %s; sqlite3_clear_bindings: %s", why.c_str(), sqlite3_errmsg(db->get()));
+    }
+  }
+
+  void step() {
+    if (sqlite3_step(query_stmt) != SQLITE_DONE) {
+      log_fatal("error: %s; sqlite3_step: %s", why.c_str(), sqlite3_errmsg(db->get()));
+    }
+  }
+};
+
+// Database and JSON classes
+class InputFiles {
+ private:
+  PreparedStatement add_input_file;
+
+ public:
+  static constexpr const char *insert_query =
+      "insert into input_files (path, hash, job) values (?, ?, ?)";
+
+  InputFiles(std::shared_ptr<Database> db) : add_input_file(db, insert_query) {
+    add_input_file.set_why("Could not insert input file");
+  }
+
+  void insert(const std::string &path, const std::string &hash, int64_t job_id) {
+    add_input_file.bind_string(1, path);
+    add_input_file.bind_string(2, hash);
+    add_input_file.bind_integer(3, job_id);
+    add_input_file.step();
+    add_input_file.reset();
+  }
+};
+
+class InputDirs {
+ private:
+  PreparedStatement add_input_dir;
+
+ public:
+  static constexpr const char *insert_query =
+      "insert into input_dirs (path, hash, job) values (?, ?, ?)";
+
+  InputDirs(std::shared_ptr<Database> db) : add_input_dir(db, insert_query) {
+    add_input_dir.set_why("Could not insert input directory");
+  }
+
+  void insert(const std::string &path, const std::string &hash, int64_t job_id) {
+    add_input_dir.bind_string(1, path);
+    add_input_dir.bind_string(2, hash);
+    add_input_dir.bind_integer(3, job_id);
+    add_input_dir.step();
+    add_input_dir.reset();
+  }
+};
+
+class OutputFiles {
+ private:
+  PreparedStatement add_output_file;
+
+ public:
+  static constexpr const char *insert_query =
+      "insert into output_files (path, hash, job) values (?, ?, ?)";
+
+  OutputFiles(std::shared_ptr<Database> db) : add_output_file(db, insert_query) {
+    add_output_file.set_why("Could not insert output file");
+  }
+
+  void insert(const std::string &path, const std::string &hash, int64_t job_id) {
+    add_output_file.bind_string(1, path);
+    add_output_file.bind_string(2, hash);
+    add_output_file.bind_integer(3, job_id);
+    add_output_file.step();
+    add_output_file.reset();
+  }
+};
+
+class JobTable {
+ private:
+  std::shared_ptr<Database> db;
+  PreparedStatement add_job;
+
+ public:
+  static constexpr const char *insert_query =
+      "insert into jobs (directory, commandline, environment, stdin, bloom_filter)"
+      "values (?, ?, ?, ?, ?)";
+
+  JobTable(std::shared_ptr<Database> db) : db(db), add_job(db, insert_query) {
+    add_job.set_why("Could not insert job");
+  }
+
+  int64_t insert(const std::string &cwd, const std::string &cmd, const std::string &env,
+                 const std::string &stdin_str, BloomFilter bloom) {
+    int64_t bloom_integer = *reinterpret_cast<const int64_t *>(bloom.data());
+    add_job.bind_string(1, cwd);
+    add_job.bind_string(2, cmd);
+    add_job.bind_string(3, env);
+    add_job.bind_string(4, stdin_str);
+    add_job.bind_integer(5, bloom_integer);
+    add_job.step();
+    int64_t job_id = sqlite3_last_insert_rowid(db->get());
+    add_job.reset();
+    return job_id;
+  }
+};
+
+class Transaction {
+ private:
+  PreparedStatement begin_txn_query;
+  PreparedStatement commit_txn_query;
+
+ public:
+  static constexpr const char *sql_begin_txn = "begin transaction";
+  static constexpr const char *sql_commit_txn = "commit transaction";
+
+  Transaction(std::shared_ptr<Database> db)
+      : begin_txn_query(db, sql_begin_txn), commit_txn_query(db, sql_commit_txn) {
+    begin_txn_query.set_why("Could not begin a transaction");
+    commit_txn_query.set_why("Could not commit a transaction");
+  }
+
+  template <class F>
+  void run(F f) {
+    begin_txn_query.step();
+    f();
+    commit_txn_query.step();
+  }
+};
+
+// JSON parsing stuff
 struct InputFile {
   std::string path;
   std::string hash;
@@ -214,6 +388,7 @@ struct OutputFile {
 };
 
 struct AddJobRequest {
+ public:
   std::string cwd;
   std::string command_line;
   std::string envrionment;
@@ -266,200 +441,43 @@ struct AddJobRequest {
   }
 };
 
-// Use /dev/urandom to get a good seed
-static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
-  int rng_fd = open_fd("/dev/urandom", O_RDONLY, 0644);
-  uint8_t seed_data[32] = {0};
-  if (read(rng_fd, seed_data, sizeof(seed_data)) < 0) {
-    log_fatal("read(/dev/urandom): %s", strerror(errno));
-  }
-  close_fd(rng_fd);
-  uint64_t *data = reinterpret_cast<uint64_t *>(seed_data);
-  return std::make_tuple(data[0], data[1], data[2], data[3]);
-}
-
+// the `Cache` class provides the full interface
+// the the underlying complete cache directory.
+// This requires interplay between the file system and
+// the database and must be carefully orchestrated. This
+// class handles all those details and provides a simple
+// interface.
 class Cache {
-  sqlite3 *db = nullptr;
-  sqlite3_stmt *add_job = nullptr;
-  sqlite3_stmt *add_input_file = nullptr;
-  sqlite3_stmt *add_input_dir = nullptr;
-  sqlite3_stmt *add_output_file = nullptr;
-  sqlite3_stmt *begin_txn_query = nullptr;
-  sqlite3_stmt *commit_txn_query = nullptr;
+ private:
+  std::shared_ptr<Database> db;
+  JobTable jobs;
+  InputFiles input_files;
+  InputDirs input_dirs;
+  OutputFiles output_files;
+  Transaction transact;
   std::string dir;
   Xoshiro256 rng;
 
-  void init_sql() {
-    std::string cache_schema =
-        "pragma auto_vacuum=incremental;"
-        "pragma journal_mode=wal;"
-        "pragma synchronous=0;"
-        "pragma locking_mode=exclusive;"
-        "pragma foreign_keys=on;"
-        // In order to look up compaitable jobs quickly we need
-        // a special table of some kind. We use a bloom filter
-        // table. We have an index on (directory, commandline, environment,
-        // stdin) and from there we do a scan over our bloom_filters. Any
-        // remaining matching jobs can be checked against the the input_files,
-        // and input_dirs tables.
-        "create table if not exists jobs("
-        "  job_id       integer primary key autoincrement,"
-        "  directory    text    not null,"
-        "  commandline  blob    not null,"
-        "  environment  blob    not null,"
-        "  stdin        text    not null,"
-        "  bloom_filter integer);"  // TODO: Use a larger bloom filter
-        "create index if not exists job on jobs(directory, commandline, environment, stdin);"
-        // We only record the input hashes, and not all visible files.
-        // The input file blobs are not stored on disk. Only their hash
-        // is stored
-        "create table if not exists input_files("
-        "  input_file_id integer primary key autoincrement,"
-        "  path          text    not null,"
-        "  hash          text    not null,"
-        "  job           job_id  not null references jobs(job_id) on delete cascade);"
-        "create index if not exists input_file on input_files(path, hash);"
-        // We don't record where a wake job writes an output file
-        // only where the file is placed within the sandbox. Each
-        // seperate sandbox will provide a distinct remapping of
-        // these items. The blobs of these hashes will also
-        // be stored on disk.
-        // TODO(jake): Add mode
-        "create table if not exists output_files("
-        "  output_file_id integer primary key autoincrement,"
-        "  path           text    not null,"
-        "  hash           text    not null,"
-        "  job            job_id  not null references jobs(job_id) on delete "
-        "cascade);"
-        "create index if not exists output_file on output_files(path, hash);"
-        "create index if not exists find_file on output_files(hash);"
-        // We also need to know about directories that have been read
-        // in some way. For instance if a file fails to be read in
-        // a directory or if a readdir is performed. We only
-        // store a hash of a subset of the dirent information for
-        // a directory. Namely the name of each entry and its d_type.
-        // This hash is crptographic so we do not intend on seeing
-        // collisions.
-        "create table if not exists input_dirs("
-        "  input_dir_id integer primary key autoincrement,"
-        "  path         text    not null,"
-        "  hash         text    not null,"
-        "  job          job_id  not null references jobs(job_id) on delete "
-        "cascade);"
-        "create index if not exists input_dir on input_dirs(path, hash);";
-
-    std::string db_path = dir + "/cache.db";
-    if (sqlite3_open_v2(db_path.c_str(), &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
-                        nullptr) != SQLITE_OK) {
-      log_fatal("error: %s", sqlite3_errmsg(db));
-    }
-
-    // If we happen to open the db as read only we need to fail.
-    // TODO: Why would this happen?
-    if (sqlite3_db_readonly(db, 0)) {
-      log_fatal("error: cache.db is read-only");
-    }
-
-    char *fail = nullptr;
-    if (sqlite3_exec(db, cache_schema.c_str(), nullptr, nullptr, &fail) != SQLITE_OK) {
-      log_fatal("error: failed init stmt: %s: %s", fail, sqlite3_errmsg(db));
-    }
-  }
-
-  void prepare_stmts() {
-    std::string sql_add_job =
-        "insert into jobs (directory, commandline, environment, stdin, bloom_filter) values (?, ?, "
-        "?, ?, ?)";
-    std::string sql_add_input_file = "insert into input_files (path, hash, job) values (?, ?, ?)";
-    std::string sql_add_input_dir = "insert into input_files (path, hash, job) values (?, ?, ?)";
-    std::string sql_add_output_file = "insert into output_files (path, hash, job) values (?, ?, ?)";
-    std::string sql_begin_txn = "begin transaction";
-    std::string sql_commit_txn = "commit transaction";
-
-    PREPARE(sql_add_job, add_job)
-    PREPARE(sql_add_input_file, add_input_file)
-    PREPARE(sql_add_input_dir, add_input_dir)
-    PREPARE(sql_add_output_file, add_output_file)
-    PREPARE(sql_begin_txn, begin_txn_query)
-    PREPARE(sql_commit_txn, commit_txn_query)
-  }
-
-  void begin_txn() { single_step("Could not begin a transaction", begin_txn_query); }
-
-  void end_txn() { single_step("Could not commit a transaction", commit_txn_query); }
-
-  int64_t insert_job(const std::string &cwd, const std::string &cmd, const std::string &env,
-                     const std::string &stdin_str, BloomFilter bloom) {
-    const char *why = "Could not insert job";
-    int64_t bloom_integer = *reinterpret_cast<const int64_t *>(bloom.data());
-    bind_string(why, add_job, 1, cwd.c_str(), cwd.size());
-    bind_string(why, add_job, 2, cmd.c_str(), cmd.size());
-    bind_string(why, add_job, 3, env.c_str(), env.size());
-    bind_string(why, add_job, 4, stdin_str.c_str(), stdin_str.size());
-    bind_integer(why, add_job, 5, bloom_integer);
-    single_step(why, add_job);
-    int64_t job_id = sqlite3_last_insert_rowid(db);
-    finish_stmt(why, add_job);
-    return job_id;
-  }
-
-  void insert_input_file(const std::string &path, const std::string &hash, int64_t job_id) {
-    const char *why = "Could not insert input file";
-    bind_string(why, add_input_file, 1, path.c_str(), path.size());
-    bind_string(why, add_input_file, 2, hash.c_str(), hash.size());
-    bind_integer(why, add_input_file, 3, job_id);
-    single_step(why, add_input_file);
-    finish_stmt(why, add_input_file);
-  }
-
-  void insert_input_dir(const std::string &path, const std::string &hash, int64_t job_id) {
-    const char *why = "Could not insert input directory";
-    bind_string(why, add_input_dir, 1, path.c_str(), path.size());
-    bind_string(why, add_input_dir, 2, hash.c_str(), hash.size());
-    bind_integer(why, add_input_dir, 3, job_id);
-    single_step(why, add_input_dir);
-    finish_stmt(why, add_input_dir);
-  }
-
-  void insert_output_file(const std::string &path, const std::string &hash, int64_t job_id) {
-    const char *why = "Could not insert output file";
-    bind_string(why, add_output_file, 1, path.c_str(), path.size());
-    bind_string(why, add_output_file, 2, hash.c_str(), hash.size());
-    bind_integer(why, add_output_file, 3, job_id);
-    single_step(why, add_output_file);
-    finish_stmt(why, add_output_file);
-  }
-
  public:
-  ~Cache() {
-    FINALIZE(add_job)
-    FINALIZE(add_input_file)
-    FINALIZE(add_input_dir)
-    FINALIZE(add_output_file)
-    FINALIZE(begin_txn_query)
-    FINALIZE(commit_txn_query)
-
-    if (sqlite3_close(db) != SQLITE_OK) {
-      std::cerr << "Could not close wake.db: " << sqlite3_errmsg(db) << std::endl;
-      return;
-    }
-  }
+  ~Cache() {}
 
   Cache() = delete;
   Cache(const Cache &) = delete;
-  Cache(std::string _dir) : dir(_dir), rng(get_rng_seed()) {
-    mkdir_no_fail(_dir.c_str());
-    init_sql();
-    prepare_stmts();
-  }
 
-  void add(const JAST &job_result_json) {
+  Cache(std::string _dir)
+      : db(std::make_unique<Database>(_dir)),
+        jobs(db),
+        input_files(db),
+        input_dirs(db),
+        output_files(db),
+        transact(db),
+        dir(std::move(_dir)),
+        rng(get_rng_seed()) {}
+
+  void add(const AddJobRequest &add_request) {
     // Create a unique name for the job dir (will rename later to correct name)
     std::string tmp_job_dir = dir + "/tmp_" + rng.unique_name();
     mkdir_no_fail(tmp_job_dir.c_str());
-
-    // Parse the json
-    AddJobRequest add_request(job_result_json);
 
     // Copy the output files into the temp dir
     for (const auto &output_file : add_request.outputs) {
@@ -468,34 +486,37 @@ class Cache {
     }
 
     // Start a transaction so that a job is never without its files.
-    begin_txn();
-    uint64_t job_id = insert_job(add_request.cwd, add_request.command_line, add_request.envrionment,
-                                 add_request.stdin_str, add_request.bloom);
+    int64_t job_id;
+    transact.run([this, &add_request, &job_id]() {
+      job_id = jobs.insert(add_request.cwd, add_request.command_line, add_request.envrionment,
+                           add_request.stdin_str, add_request.bloom);
 
-    // Input Files
-    for (const auto &input_file : add_request.inputs) {
-      insert_input_file(input_file.path, input_file.hash, job_id);
-    }
+      // Input Files
+      for (const auto &input_file : add_request.inputs) {
+        input_files.insert(input_file.path, input_file.hash, job_id);
+      }
 
-    // Input Dirs
-    for (const auto &input_dir : add_request.directories) {
-      insert_input_dir(input_dir.path, input_dir.hash, job_id);
-    }
+      // Input Dirs
+      for (const auto &input_dir : add_request.directories) {
+        input_dirs.insert(input_dir.path, input_dir.hash, job_id);
+      }
 
-    // Output Files
-    for (const auto &output_file : add_request.outputs) {
-      insert_input_dir(output_file.path, output_file.hash, job_id);
-    }
+      // Output Files
+      for (const auto &output_file : add_request.outputs) {
+        output_files.insert(output_file.path, output_file.hash, job_id);
+      }
 
-    // Commit the database without having moved the job directory.
-    // On *read* you have to be aware tha the database can be in
-    // this kind of faulty state where the database is populated but
-    // file system is *not* populated. In such a case we interpret that
-    // as if it wasn't in the database and so it doesn't get used and
-    // will eventully be deleted.
-    end_txn();
+      // We commit the database without having moved the job directory.
+      // On *read* you have to be aware tha the database can be in
+      // this kind of faulty state where the database is populated but
+      // file system is *not* populated. In such a case we interpret that
+      // as if it wasn't in the database and so it doesn't get used and
+      // will eventully be deleted.
+    });
 
-    // TODO: Clean up temp directories
+    // Finally we make sure the group directory exits and then
+    // atomically rename the temp job into place which completes
+    // the insertion. At that point reads should suceed.
     uint8_t job_group = job_id & 0xFF;
     std::string job_group_dir = dir + "/" + to_hex<uint8_t>(&job_group);
     mkdir_no_fail(job_group_dir.c_str());
@@ -507,13 +528,15 @@ class Cache {
 int main(int argc, char **argv) {
   // TODO: Add a better CLI
   if (argc < 2) return 1;
+
   Cache cache(argv[1]);
 
   if (argc >= 4) {
     if (std::string(argv[2]) == "add") {
       JAST job_result;
       JAST::parse(argv[3], std::cerr, job_result);
-      cache.add(job_result);
+      AddJobRequest add_request(job_result);
+      cache.add(add_request);
     }
   }
 }

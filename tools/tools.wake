@@ -18,7 +18,7 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def tool (dir: String) (variant: Pair String String) (output: String) (deps: List (Pair String String => Result SysLib Error)): Result (List Path) Error =
+def tool (dir: String) (addHeaders: List Path) (variant: Pair String String) (output: String) (deps: List (Pair String String => Result SysLib Error)): Result (List Path) Error =
     def Pair cppVariant cVariant =
         variant
 
@@ -33,7 +33,8 @@ def tool (dir: String) (variant: Pair String String) (output: String) (deps: Lis
         sources here `.*\.h`
     def headers =
         lib.getSysLibHeaders ++
-        headerPaths
+        headerPaths ++
+        addHeaders
 
     def cflags =
         lib.getSysLibCFlags

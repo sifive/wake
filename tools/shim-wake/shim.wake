@@ -18,4 +18,4 @@ from wake import _
 from gcc_wake import _
 
 target buildShim variant: Result (List Path) Error =
-    tool here variant "lib/wake/shim-wake" (blake2, compat, Nil)
+    tool here Nil variant "lib/wake/shim-wake" (blake2, compat, Nil)

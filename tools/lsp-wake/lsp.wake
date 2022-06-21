@@ -17,4 +17,4 @@ package build_wake
 from wake import _
 
 target buildLSP variant: Result (List Path) Error =
-    tool here variant "lib/wake/lsp-wake" (dst, Nil)
+    tool here Nil variant "lib/wake/lsp-wake" (dst, Nil)
