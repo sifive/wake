@@ -51,11 +51,12 @@ export data List a =
 
 # Create a singleton list from a value. This
 # can be used to slightly increase the niceness
-# of lists by avoid the Nil at the end.
+# of lists by avoid the Nil at the end. This is
+# especially nice for vertical lists.
 #
 # Examples:
 # ```
-#   10,                      # Create a singleton list containg just 10
+#   10,                      # Create a singleton list containing just 10
 #   1, 2, 3,                 # Create a list of 3 elements without using Nil
 #   (1, 2, 3,) ++ (4, 5, 6,) # append two lists
 # ```
