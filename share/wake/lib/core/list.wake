@@ -49,6 +49,19 @@ export data List a =
 # ```
     (head: a), (tail: List a)
 
+# Create a singleton list from a value. This
+# can be used to slightly increase the niceness
+# of lists by avoid the Nil at the end. This is
+# especially nice for vertical lists.
+#
+# Examples:
+# ```
+#   10,                      # Create a singleton list containing just 10
+#   1, 2, 3,                 # Create a list of 3 elements without using Nil
+#   (1, 2, 3,) ++ (4, 5, 6,) # append two lists
+# ```
+export def element, = element, Nil
+
 # Report if the list contains no elements.
 # If you find yourself using the function, consider using match instead.
 #
