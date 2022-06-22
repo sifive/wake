@@ -95,24 +95,25 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
   Location l(filename());
 
   int32_t length;
-  uint8_t *base = (uint8_t *)EM_ASM_INT(
-      {
-        try {
-          const fs = require('fs');
-          const fileBuffer = fs.readFileSync(UTF8ToString($1));
-          const wasmPointer = Module._malloc(fileBuffer.length + 1);
-          fileBuffer.copy(Module.HEAPU8, wasmPointer);
-          setValue($0, fileBuffer.length, "i32");
-          return wasmPointer;
-        } catch (err) {
-          const lengthBytes = lengthBytesUTF8(err.message) + 1;
-          const stringOnWasmHeap = _malloc(lengthBytes);
-          stringToUTF8(err.message, stringOnWasmHeap, lengthBytes);
-          setValue($0, -1, "i32");
-          return stringOnWasmHeap;
-        }
-      },
-      &length, filename());
+
+  // clang-format off
+  uint8_t *base = (uint8_t *)EM_ASM_INT({
+    try {
+      const fs = require('fs');
+      const fileBuffer = fs.readFileSync(UTF8ToString($1));
+      const wasmPointer = Module._malloc(fileBuffer.length+1);
+      fileBuffer.copy(Module.HEAPU8, wasmPointer);
+      setValue($0, fileBuffer.length, "i32");
+      return wasmPointer;
+    } catch (err) {
+      const lengthBytes = lengthBytesUTF8(err.message)+1;
+      const stringOnWasmHeap = _malloc(lengthBytes);
+      stringToUTF8(err.message, stringOnWasmHeap, lengthBytes);
+      setValue($0, -1, "i32");
+      return stringOnWasmHeap;
+    }
+  }, &length, filename());
+  // clang-format on
 
   if (length == -1) {
     reporter.reportError(l, std::string("readFileSync failed; ") + reinterpret_cast<char *>(base));

@@ -26,17 +26,17 @@
 #include <emscripten/emscripten.h>
 
 int is_readable(const char *filename) {
-  int out = EM_ASM_INT(
-      {
-        try {
-          const fs = require('fs');
-          fs.accessSync(UTF8ToString($0), fs.constants.R_OK);
-          return 1;
-        } catch (err) {
-          return 0;
-        }
-      },
-      filename);
+  // clang-format off
+  int out = EM_ASM_INT({
+    try {
+      const fs = require('fs');
+      fs.accessSync(UTF8ToString($0), fs.constants.R_OK);
+      return 1;
+    } catch (err) {
+      return 0;
+    }
+  }, filename);
+  // clang-format on
 
   return out;
 }
