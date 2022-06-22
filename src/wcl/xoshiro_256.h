@@ -17,9 +17,6 @@
 
 #pragma once
 
-#include <fcntl.h>
-#include <unistd.h>
-
 #include <cstdint>
 #include <string>
 #include <tuple>
@@ -32,6 +29,11 @@ static std::string to_hex(const T *value) {
   static const char *hex = "0123456789abcdef";
   char name[2 * sizeof(T) + 1];
   for (size_t i = 0; i < sizeof(T); ++i) {
+    // Each byte is converted to two nibbles. The
+    // higher order nibble comes first in output string
+    // this means that the bytes are in a logical order
+    // but each pair of nibbles is swaped around from
+    // little endian order.
     name[2 * i + 1] = hex[data[i] & 0xF];
     name[2 * i] = hex[(data[i] >> 4) & 0xF];
   }

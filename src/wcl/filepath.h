@@ -46,6 +46,12 @@ class filepath_iterator {
     next();
   }
 
+  filepath_iterator operator++(int) {
+    auto out = *this;
+    next();
+    return out;
+  }
+
   filepath_iterator& operator++() {
     next();
     return *this;
