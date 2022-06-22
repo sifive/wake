@@ -1202,11 +1202,8 @@ The GitHub API returns a JSON document, for which wake has built-in handling.
 The full library will be described elsewhere, but for a brief overview of what
 is used in this example, `parseJSONFile` does as the name suggests and reads a
 file (here retrieved by `curl`, but it could also be from `source` or any other
-call) into an internal representation which we then pass to `query`.  The `$`
-are read similarly to the standard `|` pipeline, but are used primarily in the
-context of a `query` such that `jFlatten` accesses a JSON array, passes each
-value to `jField` which looks up a key-value pair in a JSON object, and finally
-`jString` converts JSON strings into wake `Strings`.
+call) into an internal representation which we then search through for all
+`tarball_url` keys.
 
 By passing the resulting URL to a second call of `curl`, we're able to retrieve
 the required files *determined by* the output of a previous job.  This ability
