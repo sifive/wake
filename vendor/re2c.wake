@@ -100,5 +100,8 @@ def re2c (file: Path): Result Path Error =
     match (re2cOk Unit)
         Pass re2c = re2cReal re2c file
         Fail err =
-            def _ = println "[WARN] Requested re2c which is unsatisfiable. Using fake\n  why:   {err.getErrorCause}"
+            def _ = if (getenv "UPGRADE_GENERATED" | getOrElse "0") ==* "1"
+            then println "[WARN] Requested re2c which is unsatisfiable. Using fake\n  why:   {err.getErrorCause}"
+            else Unit
+
             re2cFake file
