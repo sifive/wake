@@ -82,4 +82,5 @@ def re2c (file: Path): Result Path Error =
     if re2cOk Unit then
         re2cReal file
     else
+        def _ = println "[WARN] Requested re2c which is unsatisfiable. Using fake"
         re2cFake file
