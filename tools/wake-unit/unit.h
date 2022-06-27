@@ -93,6 +93,22 @@ struct TestLogger {
     return fail(*err, assert);
   }
 
+  TestStream expect_equal(bool assert, int expected, int actual,
+                          const char* expected_str, const char* actual_str, int line,
+                          const char* file) {
+    if (expected == actual) return TestStream(nullptr, nullptr);
+    errors.emplace_back(new ErrorMessage);
+    auto& err = errors.back();
+    err->test_name = test_name;
+    err->file = file;
+    err->line = line;
+    err->predicate_error << "Expected:\n\t" << term_colour(TERM_MAGENTA) << expected;
+    err->predicate_error << term_normal() << "\nBut got:\n\t";
+    err->predicate_error << term_colour(TERM_MAGENTA) << actual;
+    err->predicate_error << term_normal() << std::endl;
+    return fail(*err, assert);
+  }
+
   TestStream expect_equal(bool assert, std::string expected, std::string actual,
                           const char* expected_str, const char* actual_str, int line,
                           const char* file) {
@@ -109,8 +125,8 @@ struct TestLogger {
     return fail(*err, assert);
   }
 
-  template <class T>
-  TestStream expect_equal(bool assert, T&& expected, T&& actual, const char* expected_str,
+  template <class T1, class T2>
+  TestStream expect_equal(bool assert, T1&& expected, T2&& actual, const char* expected_str,
                           const char* actual_str, int line, const char* file) {
     if (expected == actual) return TestStream(nullptr, nullptr);
     errors.emplace_back(new ErrorMessage);
@@ -140,16 +156,7 @@ struct TestRegister {
   TestRegister(const char* test_name, TestFunc test);
 };
 
-template <class T>
-struct TestRegisterUnique {
-  static TestRegister unique_register;
-};
-
-#define TEST(name)                                                                             \
-  static void Test__##name(TestLogger&);                                                       \
-  namespace {                                                                                  \
-  struct Test__Unique__##name {};                                                              \
-  template <>                                                                                  \
-  TestRegister TestRegisterUnique<Test__Unique__##name>::unique_register(#name, Test__##name); \
-  };                                                                                           \
+#define TEST(name)                                                \
+  static void Test__##name(TestLogger&);                          \
+  static TestRegister Test__Unique__##name(#name, &Test__##name); \
   static void Test__##name(TestLogger& logger__)

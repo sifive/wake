@@ -33,11 +33,16 @@ struct Test {
 
 // A global list of all the tests to run. Its kept static so that
 // nothing can interfear with it except things in this file, which
-// is only TestRegister and main itself.
-static std::vector<Test> tests;
+// is only TestRegister and main itself. We have to make it static
+// local so that it can be initied before anything else no matter
+// what order things are linked in.
+static std::vector<Test>* get_tests() {
+  static std::vector<Test> tests;
+  return &tests;
+}
 
 TestRegister::TestRegister(const char* test_name, TestFunc test) {
-  tests.emplace_back(test_name, test);
+  get_tests()->emplace_back(test_name, test);
 }
 
 int main(int argc, char** argv) {
@@ -59,7 +64,7 @@ int main(int argc, char** argv) {
   TestLogger logger;
   std::set<std::string> failed_tests;
   std::set<std::string> passing_tests;
-  for (auto& test : tests) {
+  for (auto& test : *get_tests()) {
     // Set this logjump in case this test fails
     size_t num_errors = logger.errors.size();
     logger.test_name = test.test_name;
