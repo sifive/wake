@@ -16,10 +16,25 @@
 package build_wake
 from wake import _
 
-# Require re2c >= 1.0 for flag support
-def re2cOk Unit =
-    require Some x, Some y, Some z, _ =
-        makeExecPlan (which "re2c", "--version", Nil) Nil
+def re2cPath =
+    require Some path =
+        getenv "PATH"
+
+    def re2c =
+        whichIn path "re2c"
+
+    if matches `/.*` re2c then
+        Some re2c
+    else
+        None
+
+# Require re2c >= 1.3 for flag support
+def re2cOk Unit: Result String Error =
+    require Some re2c = re2cPath
+    else failWithError "re2c not on Path"
+
+    require Some x, Some y, _ =
+        makeExecPlan (re2c, "--version", Nil) Nil
         | setPlanStdout logNever
         | setPlanStderr logNever
         | runJob
@@ -29,16 +44,19 @@ def re2cOk Unit =
         | map (tokenize `\.` _)
         | flatten
         | map int
-    else
-        False
-    x > 1 || (x == 1 && (y > 2 || (y == 2 && z >= 1)))
+    else failWithError "failed to determine re2c version"
 
-def re2cReal file =
+    require True = (x > 1 || (x == 1 && y > 2))
+    else failWithError "re2c version {str x}.{str y} is not 1.3 or higher"
+
+    Pass re2c
+
+def re2cReal re2c file =
     def cpp =
         replace `\.re$` ".cpp" file.getPathName
 
     def cmdline =
-        which "re2c", "-8", "--no-generation-date", "--input-encoding", "utf8", file.getPathName, "-o", cpp, Nil
+        re2c, "-8", "--no-generation-date", "--input-encoding", "utf8", file.getPathName, "-o", cpp, Nil
 
     require Pass result =
         makeExecPlan cmdline (file, Nil)
@@ -79,7 +97,8 @@ def gunzip zip =
     | getJobOutput
 
 def re2c (file: Path): Result Path Error =
-    if re2cOk Unit then
-        re2cReal file
-    else
-        re2cFake file
+    match (re2cOk Unit)
+        Pass re2c = re2cReal re2c file
+        Fail err =
+            def _ = println "[WARN] Requested re2c which is unsatisfiable. Using fake\n  why:   {err.getErrorCause}"
+            re2cFake file
