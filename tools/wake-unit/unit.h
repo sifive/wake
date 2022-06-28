@@ -109,8 +109,8 @@ struct TestLogger {
     return fail(*err, assert);
   }
 
-  template <class T>
-  TestStream expect_equal(bool assert, T&& expected, T&& actual, const char* expected_str,
+  template <class T1, class T2>
+  TestStream expect_equal(bool assert, T1&& expected, T2&& actual, const char* expected_str,
                           const char* actual_str, int line, const char* file) {
     if (expected == actual) return TestStream(nullptr, nullptr);
     errors.emplace_back(new ErrorMessage);

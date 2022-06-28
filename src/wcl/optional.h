@@ -15,6 +15,9 @@
  * limitations under the License.
  */
 
+#include <utility>
+#include <cstdint>
+
 namespace wcl {
 
 template <class T>
@@ -25,27 +28,27 @@ class alignas(T) optional {
 
  public:
   // Default construct is none
-  Optional() = default;
+  optional() = default;
 
-  Optional(const Optional& other) : none(other.none) {
+  optional(const optional& other) : none(other.none) {
     if (other.none) return;
     new (reinterpret_cast<T*>(data)) T(*other);
   }
 
-  Optional(Optional&& other) : none(other.none) {
+  optional(optional&& other) : none(other.none) {
     if (other.none) return;
     new (reinterpret_cast<T*>(data)) T(std::move(*other));
   }
 
   // Placement new, perfect forwarding construction
   template <class... Args>
-  Optional(Args&&... args) : none(false) {
+  optional(Args&&... args) : none(false) {
     new (reinterpret_cast<T*>(data)) T(std::forward<Args>(args)...);
   }
 
-  ~Optional() { reinterpret_cast<T*>(data)->~T(); }
+  ~optional() { reinterpret_cast<T*>(data)->~T(); }
 
-  Optional& operator=(const Optional& other) {
+  optional& operator=(const optional& other) {
     if (!none) reinterpret_cast<T*>(data)->~T();
     none = other.none;
     if (none) return *this;
@@ -53,7 +56,7 @@ class alignas(T) optional {
     return *this;
   }
 
-  Optional& operator=(Optional&& other) {
+  optional& operator=(optional&& other) {
     if (!none) reinterpret_cast<T*>(data)->~T();
     none = other.none;
     if (none) return *this;
