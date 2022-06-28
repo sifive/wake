@@ -91,28 +91,32 @@ LexerOutput lex_wake(const uint8_t *s, const uint8_t *e) {
         lws+ { return LexerOutput(TOKEN_WS, s); }
 
         // All keywords
-        "def"       { return LexerOutput(TOKEN_KW_DEF,       s); }
-        "tuple"     { return LexerOutput(TOKEN_KW_TUPLE,     s); }
-        "data"      { return LexerOutput(TOKEN_KW_DATA,      s); }
-        "global"    { return LexerOutput(TOKEN_KW_GLOBAL,    s); }
-        "target"    { return LexerOutput(TOKEN_KW_TARGET,    s); }
-        "publish"   { return LexerOutput(TOKEN_KW_PUBLISH,   s); }
-        "subscribe" { return LexerOutput(TOKEN_KW_SUBSCRIBE, s); }
-        "prim"      { return LexerOutput(TOKEN_KW_PRIM,      s); }
-        "if"        { return LexerOutput(TOKEN_KW_IF,        s); }
-        "then"      { return LexerOutput(TOKEN_KW_THEN,      s); }
-        "else"      { return LexerOutput(TOKEN_KW_ELSE,      s); }
-        "here"      { return LexerOutput(TOKEN_KW_HERE,      s); }
-        "match"     { return LexerOutput(TOKEN_KW_MATCH,     s); }
-        "require"   { return LexerOutput(TOKEN_KW_REQUIRE,   s); }
-        "package"   { return LexerOutput(TOKEN_KW_PACKAGE,   s); }
-        "import"    { return LexerOutput(TOKEN_KW_IMPORT,    s); }
-        "export"    { return LexerOutput(TOKEN_KW_EXPORT,    s); }
-        "from"      { return LexerOutput(TOKEN_KW_FROM,      s); }
-        "type"      { return LexerOutput(TOKEN_KW_TYPE,      s); }
-        "topic"     { return LexerOutput(TOKEN_KW_TOPIC,     s); }
-        "unary"     { return LexerOutput(TOKEN_KW_UNARY,     s); }
-        "binary"    { return LexerOutput(TOKEN_KW_BINARY,    s); }
+        "def"       { return LexerOutput(TOKEN_KW_DEF,        s); }
+        "tuple"     { return LexerOutput(TOKEN_KW_TUPLE,      s); }
+        "data"      { return LexerOutput(TOKEN_KW_DATA,       s); }
+        "global"    { return LexerOutput(TOKEN_KW_GLOBAL,     s); }
+        "target"    { return LexerOutput(TOKEN_KW_TARGET,     s); }
+        "publish"   { return LexerOutput(TOKEN_KW_PUBLISH,    s); }
+        "subscribe" { return LexerOutput(TOKEN_KW_SUBSCRIBE,  s); }
+        "prim"      { return LexerOutput(TOKEN_KW_PRIM,       s); }
+        "if"        { return LexerOutput(TOKEN_KW_IF,         s); }
+        "then"      { return LexerOutput(TOKEN_KW_THEN,       s); }
+        "else"      { return LexerOutput(TOKEN_KW_ELSE,       s); }
+        "here"      { return LexerOutput(TOKEN_KW_MACRO_HERE, s); }
+        "@here"     { return LexerOutput(TOKEN_KW_MACRO_HERE, s); }
+        "@line"     { return LexerOutput(TOKEN_KW_MACRO_LINE, s); }
+        "@file"     { return LexerOutput(TOKEN_KW_MACRO_FILE, s); }
+        "@!"        { return LexerOutput(TOKEN_KW_MACRO_BANG, s); }
+        "match"     { return LexerOutput(TOKEN_KW_MATCH,      s); }
+        "require"   { return LexerOutput(TOKEN_KW_REQUIRE,    s); }
+        "package"   { return LexerOutput(TOKEN_KW_PACKAGE,    s); }
+        "import"    { return LexerOutput(TOKEN_KW_IMPORT,     s); }
+        "export"    { return LexerOutput(TOKEN_KW_EXPORT,     s); }
+        "from"      { return LexerOutput(TOKEN_KW_FROM,       s); }
+        "type"      { return LexerOutput(TOKEN_KW_TYPE,       s); }
+        "topic"     { return LexerOutput(TOKEN_KW_TOPIC,      s); }
+        "unary"     { return LexerOutput(TOKEN_KW_UNARY,      s); }
+        "binary"    { return LexerOutput(TOKEN_KW_BINARY,     s); }
 
         // All special punctuation
         "\\" { return LexerOutput(TOKEN_P_BSLASH, s); }

@@ -361,8 +361,14 @@ const char *symbolExample(int symbol) {
       return "3.1415";
     case TOKEN_INTEGER:
       return "42";
-    case TOKEN_KW_HERE:
-      return "here";
+    case TOKEN_KW_MACRO_HERE:
+      return "@here";
+    case TOKEN_KW_MACRO_LINE:
+      return "@line";
+    case TOKEN_KW_MACRO_FILE:
+      return "@file";
+    case TOKEN_KW_MACRO_BANG:
+      return "@!";
     case TOKEN_KW_SUBSCRIBE:
       return "subscribe";
     case TOKEN_KW_PRIM:

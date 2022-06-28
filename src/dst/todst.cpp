@@ -1092,7 +1092,7 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
       x.resize(std::remove(x.begin(), x.end(), '_') - x.begin());
       return new Literal(child.fragment(), std::move(x), &Data::typeInteger);
     }
-    case TOKEN_KW_HERE: {
+    case TOKEN_KW_MACRO_HERE: {
       std::string name(lit.fragment().location().filename);
       std::string::size_type cut = name.find_last_of('/');
       if (cut == std::string::npos)
@@ -1100,6 +1100,20 @@ static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
       else
         name.resize(cut);
       return new Literal(lit.fragment(), std::move(name), &Data::typeString);
+    }
+    case TOKEN_KW_MACRO_LINE: {
+      std::string line = std::to_string(lit.fragment().location().start.row);
+      return new Literal(lit.fragment(), std::move(line), &Data::typeInteger);
+    }
+    case TOKEN_KW_MACRO_FILE: {
+      std::string name(lit.fragment().location().filename);
+      return new Literal(lit.fragment(), std::move(name), &Data::typeString);
+    }
+    case TOKEN_KW_MACRO_BANG: {
+      std::string name(lit.fragment().location().filename);
+      std::string line = std::to_string(lit.fragment().location().start.row);
+      std::string bang = name + ":" + line;
+      return new Literal(lit.fragment(), std::move(bang), &Data::typeString);
     }
     case TOKEN_LSTR_BEGIN:
     case TOKEN_MSTR_BEGIN: {
