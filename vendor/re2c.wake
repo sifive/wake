@@ -23,10 +23,10 @@ def re2cPath =
     def re2c =
         whichIn path "re2c"
 
-    if matches `/.*` re2c then
-        Some re2c
-    else
+    if re2c ==~ "re2c" then
         None
+    else
+        Some re2c
 
 # Require re2c >= 1.3 for flag support
 def re2cOk Unit: Result String Error =
