@@ -93,7 +93,7 @@ class CSTBuilder {
   void addNode(uint8_t id, uint32_t children);
   void addNode(uint8_t id, StringSegment begin, uint32_t children);
   void addNode(uint8_t id, uint32_t children, StringSegment end);
-  void addNode(uint8_t id, StringSegment begin, uint32_t childen, StringSegment end);
+  void addNode(uint8_t id, StringSegment begin, uint32_t children, StringSegment end);
 
   void delNodes(size_t num);
 
