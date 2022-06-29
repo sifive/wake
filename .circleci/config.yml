@@ -90,7 +90,7 @@ jobs:
       - run: |
           cp /tmp/workspace/wake_*.tar.xz . && \
           cp -a /tmp/workspace/tests . && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-centos-7.6 rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-centos-7.6 /bin/sh -c 'source scl_source enable devtoolset-9 && rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz' && \
           docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-centos-7.6 /bin/sh -c "rpm -i x86_64/*.rpm && cd tests && wake runTests" && \
           install -D -t release/centos_7_6 x86_64/*.rpm
       - persist_to_workspace:

@@ -7,6 +7,5 @@ RUN yum --setopt=skip_missing_names_on_install=False install -y tar xz dash git 
 RUN yum --setopt=skip_missing_names_on_install=False install -y centos-release-scl
 RUN yum --setopt=skip_missing_names_on_install=False install -y devtoolset-9-gcc*
 RUN rpmdev-setuptree
-RUN source scl_source enable devtoolset-9
 
 WORKDIR /build
