@@ -116,7 +116,7 @@ global(R) ::= .             { R = 0; }
 global(R) ::= KW_GLOBAL(k). { R = 1; add(CST_FLAG_GLOBAL, k); }
 export(R) ::= .             { R = 0; }
 export(R) ::= KW_EXPORT(k). { R = 1; add(CST_FLAG_EXPORT, k); }
- 
+
 topdef(R) ::= global(G) export(E) KW_TOPIC                             NL(e). { R = 0; pop(G+E); fail("keyword 'topic' must be followed by a topic name", e); }
 topdef(R) ::= global(G) export(E) KW_TOPIC                       error NL.    { R = 0; pop(G+E); }
 topdef(R) ::= global(G) export(E) KW_TOPIC(b) id(I)                    NL(e). { R = 1; add(CST_ERROR, e); add(CST_TOPIC, b, G+E+I+1, e); fail("topics must be followed by an ': type'", e); }
@@ -290,7 +290,10 @@ reg_close(R) ::= REG_CLOSE(r). { R = 1; add(CST_LITERAL, r); }
 
 expression_nodot(R) ::= DOUBLE(d).  { R = 1; add(CST_LITERAL, d); }
 expression_nodot(R) ::= INTEGER(i). { R = 1; add(CST_LITERAL, i); }
-expression_nodot(R) ::= KW_HERE(h). { R = 1; add(CST_LITERAL, h); }
+expression_nodot(R) ::= KW_MACRO_HERE(h). { R = 1; add(CST_LITERAL, h); }
+expression_nodot(R) ::= KW_MACRO_LINE(l). { R = 1; add(CST_LITERAL, l); }
+expression_nodot(R) ::= KW_MACRO_FILE(f). { R = 1; add(CST_LITERAL, f); }
+expression_nodot(R) ::= KW_MACRO_BANG(b). { R = 1; add(CST_LITERAL, b); }
 
 expression_binary_app(R) ::= expression_binary_app(A) expression_term(B). { R = 1; add(CST_APP, A+B); }
 expression_binary_app(R) ::= expression_term(A). { R = A; }
@@ -428,7 +431,7 @@ bool ParseShifts(void *p, int yymajor) {
 }
 }
 
-%syntax_error { 
+%syntax_error {
   const char *example = symbolExample(yymajor);
   int example_len = strlen(example);
   int token_len = yyminor.size();
