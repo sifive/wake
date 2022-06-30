@@ -69,7 +69,7 @@ TEST(option_move) {
   // We want to make sure we can make optional move only things.
   wcl::optional<std::unique_ptr<int>> move_only1(wcl::in_place_t{}, std::make_unique<int>(10));
   wcl::optional<std::unique_ptr<int>> move_only2(std::move(move_only1));
-  //move_only1 = move_only2;
+  // move_only1 = move_only2;
   EXPECT_FALSE((bool)move_only1);
   ASSERT_TRUE((bool)move_only2);
   EXPECT_FALSE(move_only2->get() == nullptr);
@@ -104,25 +104,22 @@ TEST(option_no_construct) {
 }
 
 struct SetOnDestruct {
-  const char* &msg;
+  const char*& msg;
   const char* on_destruct = nullptr;
 
   SetOnDestruct() = delete;
-  SetOnDestruct(const char *&msg, const char* on_destruct) : msg(msg), on_destruct(on_destruct) {}
+  SetOnDestruct(const char*& msg, const char* on_destruct) : msg(msg), on_destruct(on_destruct) {}
 
-  ~SetOnDestruct() {
-    msg = on_destruct;
-  }
+  ~SetOnDestruct() { msg = on_destruct; }
 };
 
 class ConstructDestructCount {
  private:
-  int *count = nullptr;
+  int* count = nullptr;
+
  public:
   ConstructDestructCount() = default;
-  ConstructDestructCount(int &count) : count(&count) {
-    ++*this->count;
-  }
+  ConstructDestructCount(int& count) : count(&count) { ++*this->count; }
   ConstructDestructCount(const ConstructDestructCount& other) : count(other.count) {
     ++*this->count;
   }
@@ -144,9 +141,7 @@ class ConstructDestructCount {
   ~ConstructDestructCount() {
     if (count) --*count;
   }
-  void swap(ConstructDestructCount& other) {
-    std::swap(count, other.count);
-  }
+  void swap(ConstructDestructCount& other) { std::swap(count, other.count); }
 };
 
 TEST(option_destructs) {
@@ -188,8 +183,7 @@ TEST(option_destructs) {
     }
     EXPECT_EQUAL(1000, counter);
     std::mt19937 gen;
-    for (int i = 0; i < 10; ++i)
-      std::shuffle(counters.begin(), counters.end(), gen);
+    for (int i = 0; i < 10; ++i) std::shuffle(counters.begin(), counters.end(), gen);
     EXPECT_EQUAL(1000, counter);
   }
   ASSERT_EQUAL(0, counter);

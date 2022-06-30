@@ -93,9 +93,8 @@ struct TestLogger {
     return fail(*err, assert);
   }
 
-  TestStream expect_equal(bool assert, int expected, int actual,
-                          const char* expected_str, const char* actual_str, int line,
-                          const char* file) {
+  TestStream expect_equal(bool assert, int expected, int actual, const char* expected_str,
+                          const char* actual_str, int line, const char* file) {
     if (expected == actual) return TestStream(nullptr, nullptr);
     errors.emplace_back(new ErrorMessage);
     auto& err = errors.back();

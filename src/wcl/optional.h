@@ -167,15 +167,11 @@ class alignas(T) optional_base<T, false, false> {
 };
 
 template <class T>
-using optional_base_t = optional_base<
-    T,
-    std::is_copy_constructible<T>::value,
-    std::is_move_constructible<T>::value>;
+using optional_base_t =
+    optional_base<T, std::is_copy_constructible<T>::value, std::is_move_constructible<T>::value>;
 
 template <class T>
-class optional
-  : public optional_base_t<T>
-{
+class optional : public optional_base_t<T> {
  public:
   template <class... Args>
   optional(in_place_t x, Args&&... args) : optional_base_t<T>(x, std::forward<Args>(args)...) {}
