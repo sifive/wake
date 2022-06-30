@@ -34,7 +34,7 @@
 #include "status.h"
 
 // Increment every time the database schema changes
-#define SCHEMA_VERSION "6"
+#define SCHEMA_VERSION "5"
 
 #define VISIBLE 0
 #define INPUT 1
