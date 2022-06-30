@@ -897,7 +897,7 @@ void Database::insert_job(const std::string &directory, const std::string &comma
 }
 
 template <class F>
-static void scan_until_sep(char sep, std::string to_scan, F f) {
+static void scan_until_sep(char sep, const std::string& to_scan, F f) {
   auto begin = to_scan.begin();
   auto cur_start = begin;
   auto end = to_scan.end();
@@ -982,7 +982,6 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
 
   // Insert unhashed outputs
   for (const auto& unhashed_output : unhashed_outputs) {
-    std::cerr << "Inserting unhashed file: " << unhashed_output << std::endl;
     bind_integer(why, imp->insert_unhashed_file, 1, job);
     bind_string(why, imp->insert_unhashed_file, 2, unhashed_output);
     single_step(why, imp->insert_unhashed_file, imp->debugdb);
