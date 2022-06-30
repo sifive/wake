@@ -35,9 +35,9 @@ TEST(option_some) {
 }
 
 TEST(option_inplace) {
-  wcl::optional<int> some(wcl::in_place_t{}, 10);
+  wcl::optional<std::pair<int, int>> some(wcl::in_place_t{}, 10, 10);
   ASSERT_TRUE((bool)some);
-  EXPECT_EQUAL(10, *some);
+  EXPECT_EQUAL(std::make_pair(10, 10), *some);
 }
 
 TEST(option_copy) {
