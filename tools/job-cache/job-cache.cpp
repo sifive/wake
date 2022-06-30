@@ -57,12 +57,12 @@ static void mkdir_no_fail(const char *dir) {
 // supported by the filesystem it copies instead.
 #ifdef __APPLE__
 
-static void copy_or_reflink(const char *src, const char *dst) {
+static void copy(int src_fd, int dst_fd) {
   // TODO: Actully make this work. APFS supports reflinking so
   //       it should be possible to do this correctly
 }
 
-#else
+#elif __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 27
 
 #include <linux/fs.h>
 
@@ -79,15 +79,35 @@ static void copy(int src_fd, int dst_fd) {
   }
 }
 
+#else
+static void copy(int src_fd, int dst_fd) {
+  // TODO: Write a fallback. This should only be needed for centos7.6
+}
+#endif
+
+#ifdef FICLONE
+
 static void copy_or_reflink(const char *src, const char *dst) {
   auto src_fd = UniqueFd::open(src, O_RDONLY);
   auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT, 0644);
-  if (ioctl(dst_fd.get(), FICLONE, src_fd.get()) < 0) {
+
+  int status = 0;
+  status = ioctl(dst_fd.get(), FICLONE, src_fd.get());
+  if (status < 0) {
     if (errno != EINVAL && errno != EOPNOTSUPP) {
       log_fatal("ioctl(%s, FICLONE, %d): %s", dst, src, strerror(errno));
     }
     copy(src_fd.get(), dst_fd.get());
   }
+}
+
+#else
+
+static void copy_or_reflink(const char *src, const char *dst) {
+  auto src_fd = UniqueFd::open(src, O_RDONLY);
+  auto dst_fd = UniqueFd::open(dst, O_WRONLY | O_CREAT, 0644);
+
+  copy(src_fd.get(), dst_fd.get());
 }
 
 #endif
