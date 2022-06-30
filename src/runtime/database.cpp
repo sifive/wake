@@ -897,7 +897,7 @@ void Database::insert_job(const std::string &directory, const std::string &comma
 }
 
 template <class F>
-static void scan_until_sep(char sep, const std::string& to_scan, F f) {
+static void scan_until_sep(char sep, const std::string &to_scan, F f) {
   auto begin = to_scan.begin();
   auto cur_start = begin;
   auto end = to_scan.end();
@@ -920,16 +920,12 @@ static void scan_until_sep(char sep, const std::string& to_scan, F f) {
 void Database::finish_job(long job, const std::string &inputs, const std::string &outputs,
                           const std::string &all_outputs, int64_t starttime, int64_t endtime,
                           uint64_t hashcode, bool keep, Usage reality) {
-
   // Compute the unhashed_outputs
   std::set<std::string> output_set;
   std::vector<std::string> unhashed_outputs;
-  scan_until_sep('\0', outputs, [&](std::string&& path) {
-    output_set.emplace(std::move(path));
-  });
-  scan_until_sep('\0', all_outputs, [&](std::string&& path) {
-    if (!output_set.count(path))
-      unhashed_outputs.emplace_back(std::move(path));
+  scan_until_sep('\0', outputs, [&](std::string &&path) { output_set.emplace(std::move(path)); });
+  scan_until_sep('\0', all_outputs, [&](std::string &&path) {
+    if (!output_set.count(path)) unhashed_outputs.emplace_back(std::move(path));
   });
 
   const char *why = "Could not save job inputs and outputs";
@@ -958,7 +954,7 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   finish_stmt(why, imp->get_tree, imp->debugdb);
 
   // Insert inputs, confirming they are visible
-  scan_until_sep('\0', inputs, [&, this](const std::string& input) {
+  scan_until_sep('\0', inputs, [&, this](const std::string &input) {
     if (visible.find(input) == visible.end()) {
       std::stringstream s;
       s << "Job " << job << " erroneously added input '" << input
@@ -973,7 +969,7 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   });
 
   // Insert outputs
-  for (const auto& output : output_set) {
+  for (const auto &output : output_set) {
     bind_integer(why, imp->insert_tree, 1, OUTPUT);
     bind_integer(why, imp->insert_tree, 2, job);
     bind_string(why, imp->insert_tree, 3, output);
@@ -981,7 +977,7 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   }
 
   // Insert unhashed outputs
-  for (const auto& unhashed_output : unhashed_outputs) {
+  for (const auto &unhashed_output : unhashed_outputs) {
     bind_integer(why, imp->insert_unhashed_file, 1, job);
     bind_string(why, imp->insert_unhashed_file, 2, unhashed_output);
     single_step(why, imp->insert_unhashed_file, imp->debugdb);
