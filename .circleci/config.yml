@@ -216,7 +216,7 @@ workflows:
           requires:
             - alpine
             - debian_bullseye
-            - centos_7_6     # RHEL7-compatible, oldest gcc
+            - centos_7_6     # RHEL7-compatible, not using default compiler
             - rocky_8        # RHEL8-compatible
             - ubuntu_18_04   # LTS
             - ubuntu_22_04   # LTS
