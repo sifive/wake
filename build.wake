@@ -24,15 +24,6 @@ def toVariant = match _
     "wasm"    = Pass (Pair "wasm-cpp14-release"   "wasm-c11-release")
     s = Fail "Unknown build target ({s})".makeError
 
-export def bigDumb (_: List String): Result (List Path) Error =
-    def script = "%
-        echo foo > test.txt
-        %"
-    makeShellPlan script Nil
-    | setPlanFnOutputs (\_ Nil)
-    | runJob
-    | getJobOutputs
-
 export def build: List String => Result String Error = match _
     "tarball", Nil = tarball Unit | rmap (\_ "TARBALL")
     kind, Nil =
