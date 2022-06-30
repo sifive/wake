@@ -1,4 +1,14 @@
 PASSED:
+  option_assign1
+  option_assign2
+  option_copy
+  option_destructs
+  option_forward
+  option_inplace
+  option_move
+  option_no_construct
+  option_none_is_none
+  option_some
   sanity_check1
   sanity_check2
 
