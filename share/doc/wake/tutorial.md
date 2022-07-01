@@ -6,6 +6,27 @@ added to a `tutorial.wake` file. If you're reading the raw file, these are
 indicated above the code block; if the Markdown has already been rendered, it
 shouldn't be too difficult to guess.
 
+## Table of Contents
+
+  - [Invoking wake](#invoking-wake)
+  - [Functions](#functions)
+    - [Anonymous functions](#anonymous-functions)
+  - [Data types and pattern matching](#data-types-and-pattern-matching)
+    - [More complex types](#more-complex-types)
+    - [Named accessors](#named-accessors)
+  - [Dealing with failure](#dealing-with-failure)
+    - [Option](#option)
+    - [Result](#result)
+  - [Executing shell jobs](#executing-shell-jobs)
+    - [Customizing job invocation](#customizing-job-invocation)
+  - [Build rules with file inputs](#build-rules-with-file-inputs)
+  - [Building targets from multiple files](#building-targets-from-multiple-files)
+    - [Map and partial function evaluation](#map-and-partial-function-evaluation)
+  - [Supplemental file visibility](#supplemental-file-visibility)
+  - [Publish/Subscribe](#publishsubscribe)
+  - [Downloading and parsing files](#downloading-and-parsing-files)
+  - [Ignore wake source files](#ignore-wake-source-files)
+
 ## Invoking wake
 
 Unlike some other build systems, wake stores data to the filesystem between runs
