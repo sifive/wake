@@ -22,7 +22,10 @@
 #include "rank.h"
 
 #include <assert.h>
-#include <immintrin.h>
+
+#ifndef __arm__
+//#include <immintrin.h>
+#endif
 
 #define W_SIZE 64
 #define L0_COUNT 8   // number of entries in an L0 block

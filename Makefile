@@ -12,12 +12,12 @@ DESTDIR ?= /usr/local
 LOCAL_CFLAGS :=	-Ivendor -Isrc
 FUSE_CFLAGS  :=	$(shell pkg-config --silence-errors --cflags fuse)
 CORE_CFLAGS  := $(shell pkg-config --silence-errors --cflags sqlite3)	\
-		$(shell pkg-config --silence-errors --cflags gmp-6)	\
+		$(shell pkg-config --silence-errors --cflags gmp)	\
 		$(shell pkg-config --silence-errors --cflags re2)	\
 		$(shell pkg-config --silence-errors --cflags-only-I ncurses)
 FUSE_LDFLAGS := $(shell pkg-config --silence-errors --libs fuse    || echo -lfuse)
 CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsqlite3)	\
-		$(shell pkg-config --silence-errors --libs gmp-6   || echo -lgmp)	\
+		$(shell pkg-config --silence-errors --libs gmp   || echo -lmp)	\
 		$(shell pkg-config --silence-errors --libs re2     || echo -lre2)	\
 		$(shell pkg-config --silence-errors --libs ncurses tinfo || pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
