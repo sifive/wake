@@ -19,6 +19,7 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -118,10 +119,9 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  std::vector<ExternalFile> files = {};
   for (int i = 1; i < argc; i++) {
-    files.push_back(ExternalFile(*reporter, argv[i]));
-    CST cst = CST(files.back(), *reporter);
+    ExternalFile file = ExternalFile(*reporter, argv[i]);
+    CST cst = CST(file, *reporter);
     if (terminalReporter.errors) {
       std::cerr << argv[0] << ": failed to parse file: " << argv[i] << std::endl;
       exit(EXIT_FAILURE);
@@ -130,8 +130,10 @@ int main(int argc, char **argv) {
     std::streambuf *buffer;
     std::ofstream stream;
 
+    std::string name(argv[i]);
+    std::string tmp = name + ".tmp";
     if (in_place) {
-      stream.open(argv[i]);
+      stream.open(tmp);
       buffer = stream.rdbuf();
     } else {
       buffer = std::cout.rdbuf();
@@ -140,6 +142,12 @@ int main(int argc, char **argv) {
     std::ostream fout(buffer);
 
     walk_cst(fout, cst.root());
+
+    // It's implementation defined what rename
+    // does if the file already exists so it must
+    // be explictly deleted here
+    std::remove(name.c_str());
+    std::rename(tmp.c_str(), name.c_str());
   }
 
   exit(EXIT_SUCCESS);
