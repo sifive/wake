@@ -17,7 +17,7 @@ CORE_CFLAGS  := $(shell pkg-config --silence-errors --cflags sqlite3)	\
 		$(shell pkg-config --silence-errors --cflags-only-I ncurses)
 FUSE_LDFLAGS := $(shell pkg-config --silence-errors --libs fuse    || echo -lfuse)
 CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsqlite3)	\
-		$(shell pkg-config --silence-errors --libs gmp   || echo -lmp)	\
+		$(shell pkg-config --silence-errors --libs gmp   || echo -lgmp)	\
 		$(shell pkg-config --silence-errors --libs re2     || echo -lre2)	\
 		$(shell pkg-config --silence-errors --libs ncurses tinfo || pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
