@@ -1,8 +1,0 @@
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-brew install gmp
-brew install pkg-config
-brew install re2
-brew install --cask macfuse
-
-
