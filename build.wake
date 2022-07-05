@@ -38,7 +38,7 @@ export def install: List String => Result String Error = match _
 
 # Build all wake targets
 def targets =
-    buildWake, buildWakeBox, buildFuseDaemon, buildShim, buildBSP, buildLSP, buildJobCache, Nil
+    buildWake, buildWakeBox, buildFuseDaemon, buildShim, buildBSP, buildLSP, buildJobCache, buildWakeBox, buildWakeFormat, Nil
 
 def all variant =
     require Pass x =
