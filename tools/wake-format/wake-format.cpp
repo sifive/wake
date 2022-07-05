@@ -71,7 +71,6 @@ void print_version() { std::cout << "wake-format " << VERSION << std::endl; }
 void walk_cst(std::ostream &fout, CSTElement node) {
   while (!node.empty()) {
     fout << node.fragment().segment().str();
-    // walk_cst(fout, node.firstChildElement());
     node.nextSiblingElement();
   }
 }
@@ -140,7 +139,6 @@ int main(int argc, char **argv) {
 
     std::ostream fout(buffer);
 
-    // todo, should this work since CST root is const?
     walk_cst(fout, cst.root());
   }
 
