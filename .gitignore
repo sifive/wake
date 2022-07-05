@@ -3,8 +3,8 @@ manifest.wake
 .build
 .fuse*
 /.vscode/*.log
-/**/wake.db
-/wake.db
+/**/wake.db*
+/wake.db*
 /wake.spec
 /src/parser/lexer.cpp
 /src/parser/parser.y
