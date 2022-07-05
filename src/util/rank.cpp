@@ -23,8 +23,8 @@
 
 #include <assert.h>
 
-#ifndef __arm__
-//#include <immintrin.h>
+#ifndef __aarch64__
+#include <immintrin.h>
 #endif
 
 #define W_SIZE 64
