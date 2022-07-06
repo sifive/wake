@@ -143,11 +143,14 @@ int main(int argc, char **argv) {
 
     walk_cst(fout, cst.root());
 
-    // It's implementation defined what rename
-    // does if the file already exists so it must
-    // be explictly deleted here
-    std::remove(name.c_str());
-    std::rename(tmp.c_str(), name.c_str());
+    // When editing in-place we need to copy the tmp file over the original
+    if (in_place) {
+      // It's implementation defined what rename
+      // does if the file already exists so it must
+      // be explictly deleted here
+      std::remove(name.c_str());
+      std::rename(tmp.c_str(), name.c_str());
+    }
   }
 
   exit(EXIT_SUCCESS);
