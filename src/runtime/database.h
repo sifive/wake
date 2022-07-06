@@ -123,8 +123,9 @@ struct Database {
       const std::string &label, const std::string &stack, const std::string &visible,
       long *job);  // key used for accesses below
   void finish_job(long job,
-                  const std::string &inputs,   // null separated
-                  const std::string &outputs,  // null separated
+                  const std::string &inputs,       // null separated
+                  const std::string &outputs,      // null separated
+                  const std::string &all_outputs,  // null seperated
                   int64_t starttime, int64_t endtime, uint64_t hashcode, bool keep, Usage reality);
   std::vector<FileReflection> get_tree(int kind, long job);
 

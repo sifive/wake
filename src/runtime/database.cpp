@@ -86,6 +86,8 @@ struct Database::detail {
   sqlite3_stmt *get_output_files;
   sqlite3_stmt *remove_output_files;
   sqlite3_stmt *remove_all_jobs;
+  sqlite3_stmt *get_unhashed_file_paths;
+  sqlite3_stmt *insert_unhashed_file;
 
   long run_id;
   detail(bool debugdb_)
@@ -239,7 +241,12 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "  job_id  integer not null references jobs(job_id) on delete cascade,"
       "  uri     text,"
       "  content text,"
-      "  unique(job_id, uri) on conflict replace);";
+      "  unique(job_id, uri) on conflict replace);"
+      "create table if not exists unhashed_files("
+      "  unhashed_file_id integer primary key autoincrement,"
+      "  job_id integer not null references jobs(job_id) on delete cascade,"
+      "  path             text not null);"
+      "create index if not exists unhashed_outputs on unhashed_files(job_id);";
 
   bool waiting = false;
   int ret;
@@ -452,6 +459,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
       "   and substr(cast(j.commandline as varchar), 1, 7) != '<claim>'"
       " )";
   const char *sql_remove_all_jobs = "delete from jobs";
+  const char *sql_get_unhashed_file_paths = "select path from unhashed_files";
+  const char *sql_insert_unhashed_file = "insert into unhashed_files(job_id, path) values(?, ?)";
 
 #define PREPARE(sql, member)                                                                     \
   ret = sqlite3_prepare_v2(imp->db, sql, -1, &imp->member, 0);                                   \
@@ -503,6 +512,8 @@ std::string Database::open(bool wait, bool memory, bool tty) {
   PREPARE(sql_get_output_files, get_output_files);
   PREPARE(sql_remove_output_files, remove_output_files);
   PREPARE(sql_remove_all_jobs, remove_all_jobs);
+  PREPARE(sql_get_unhashed_file_paths, get_unhashed_file_paths);
+  PREPARE(sql_insert_unhashed_file, insert_unhashed_file);
 
   return "";
 }
@@ -563,6 +574,8 @@ void Database::close() {
   FINALIZE(get_output_files);
   FINALIZE(remove_output_files);
   FINALIZE(remove_all_jobs);
+  FINALIZE(get_unhashed_file_paths);
+  FINALIZE(insert_unhashed_file);
 
   close_db(imp.get());
 }
@@ -883,11 +896,41 @@ void Database::insert_job(const std::string &directory, const std::string &comma
   end_txn();
 }
 
+template <class F>
+static void scan_until_sep(char sep, const std::string &to_scan, F f) {
+  auto begin = to_scan.begin();
+  auto cur_start = begin;
+  auto end = to_scan.end();
+  while (begin < end) {
+    if (*begin == sep) {
+      // TODO: This would be better as a string_view. Since the allocation
+      //       would not be forced. To compremise we can use an r-value string
+      //       so that the user doesn't have to pay an *additional* allocation
+      //       if they don't want to. This means its identical for user's that
+      //       want to allocate this string anyway.
+      f(std::string(cur_start, begin));
+      ++begin;
+      cur_start = begin;
+    } else {
+      ++begin;
+    }
+  }
+}
+
 void Database::finish_job(long job, const std::string &inputs, const std::string &outputs,
-                          int64_t starttime, int64_t endtime, uint64_t hashcode, bool keep,
-                          Usage reality) {
+                          const std::string &all_outputs, int64_t starttime, int64_t endtime,
+                          uint64_t hashcode, bool keep, Usage reality) {
+  // Compute the unhashed_outputs
+  std::set<std::string> output_set;
+  std::vector<std::string> unhashed_outputs;
+  scan_until_sep('\0', outputs, [&](std::string &&path) { output_set.emplace(std::move(path)); });
+  scan_until_sep('\0', all_outputs, [&](std::string &&path) {
+    if (!output_set.count(path)) unhashed_outputs.emplace_back(std::move(path));
+  });
+
   const char *why = "Could not save job inputs and outputs";
   begin_txn();
+
   bind_integer(why, imp->add_stats, 1, hashcode);
   bind_integer(why, imp->add_stats, 2, reality.status);
   bind_double(why, imp->add_stats, 3, reality.runtime);
@@ -902,43 +945,42 @@ void Database::finish_job(long job, const std::string &inputs, const std::string
   bind_integer(why, imp->link_stats, 4, keep ? 1 : 0);
   bind_integer(why, imp->link_stats, 5, job);
   single_step(why, imp->link_stats, imp->debugdb);
+
   // Grab the visible set
   std::set<std::string> visible;
   bind_integer(why, imp->get_tree, 1, job);
   bind_integer(why, imp->get_tree, 2, VISIBLE);
   while (sqlite3_step(imp->get_tree) == SQLITE_ROW) visible.insert(rip_column(imp->get_tree, 0));
   finish_stmt(why, imp->get_tree, imp->debugdb);
+
   // Insert inputs, confirming they are visible
-  const char *tok = inputs.c_str();
-  const char *end = tok + inputs.size();
-  for (const char *scan = tok; scan != end; ++scan) {
-    if (*scan == 0 && scan != tok) {
-      std::string input(tok, scan - tok);
-      if (visible.find(input) == visible.end()) {
-        std::stringstream s;
-        s << "Job " << job << " erroneously added input '" << input
-          << "' which was not a visible file." << std::endl;
-        status_write(STREAM_ERROR, s.str());
-      } else {
-        bind_integer(why, imp->insert_tree, 1, INPUT);
-        bind_integer(why, imp->insert_tree, 2, job);
-        bind_string(why, imp->insert_tree, 3, tok, scan - tok);
-        single_step(why, imp->insert_tree, imp->debugdb);
-      }
-      tok = scan + 1;
-    }
-  }
-  // Insert outputs
-  tok = outputs.c_str();
-  end = tok + outputs.size();
-  for (const char *scan = tok; scan != end; ++scan) {
-    if (*scan == 0 && scan != tok) {
-      bind_integer(why, imp->insert_tree, 1, OUTPUT);
+  scan_until_sep('\0', inputs, [&, this](const std::string &input) {
+    if (visible.find(input) == visible.end()) {
+      std::stringstream s;
+      s << "Job " << job << " erroneously added input '" << input
+        << "' which was not a visible file." << std::endl;
+      status_write(STREAM_ERROR, s.str());
+    } else {
+      bind_integer(why, imp->insert_tree, 1, INPUT);
       bind_integer(why, imp->insert_tree, 2, job);
-      bind_string(why, imp->insert_tree, 3, tok, scan - tok);
+      bind_string(why, imp->insert_tree, 3, input);
       single_step(why, imp->insert_tree, imp->debugdb);
-      tok = scan + 1;
     }
+  });
+
+  // Insert outputs
+  for (const auto &output : output_set) {
+    bind_integer(why, imp->insert_tree, 1, OUTPUT);
+    bind_integer(why, imp->insert_tree, 2, job);
+    bind_string(why, imp->insert_tree, 3, output);
+    single_step(why, imp->insert_tree, imp->debugdb);
+  }
+
+  // Insert unhashed outputs
+  for (const auto &unhashed_output : unhashed_outputs) {
+    bind_integer(why, imp->insert_unhashed_file, 1, job);
+    bind_string(why, imp->insert_unhashed_file, 2, unhashed_output);
+    single_step(why, imp->insert_unhashed_file, imp->debugdb);
   }
 
   bind_integer(why, imp->delete_prior, 1, imp->run_id);
@@ -974,6 +1016,11 @@ std::vector<std::string> Database::clear_jobs() {
     out.emplace_back(rip_column(imp->get_output_files, 0));
   }
   finish_stmt(why, imp->get_output_files, imp->debugdb);
+
+  while (sqlite3_step(imp->get_unhashed_file_paths) == SQLITE_ROW) {
+    out.emplace_back(rip_column(imp->get_unhashed_file_paths, 0));
+  }
+  finish_stmt(why, imp->get_unhashed_file_paths, imp->debugdb);
 
   // Now clear everything.
   single_step(why, imp->remove_all_jobs, imp->debugdb);
@@ -1173,6 +1220,10 @@ std::vector<std::string> Database::get_outputs() const {
     out.emplace_back(rip_column(imp->get_output_files, 0));
   }
   finish_stmt(why, imp->get_output_files, imp->debugdb);
+  while (sqlite3_step(imp->get_unhashed_file_paths) == SQLITE_ROW) {
+    out.emplace_back(rip_column(imp->get_unhashed_file_paths, 0));
+  }
+  finish_stmt(why, imp->get_unhashed_file_paths, imp->debugdb);
   end_txn();
 
   return out;

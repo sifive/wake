@@ -1442,11 +1442,12 @@ static PRIMFN(prim_job_desc) {
 }
 
 static PRIMTYPE(type_job_finish) {
-  return args.size() == 9 && args[0]->unify(Data::typeJob) && args[1]->unify(Data::typeString) &&
-         args[2]->unify(Data::typeString) && args[3]->unify(Data::typeInteger) &&
-         args[4]->unify(Data::typeDouble) && args[5]->unify(Data::typeDouble) &&
-         args[6]->unify(Data::typeInteger) && args[7]->unify(Data::typeInteger) &&
-         args[8]->unify(Data::typeInteger) && out->unify(Data::typeUnit);
+  return args.size() == 10 && args[0]->unify(Data::typeJob) && args[1]->unify(Data::typeString) &&
+         args[2]->unify(Data::typeString) && args[3]->unify(Data::typeString) &&
+         args[4]->unify(Data::typeInteger) && args[5]->unify(Data::typeDouble) &&
+         args[6]->unify(Data::typeDouble) && args[7]->unify(Data::typeInteger) &&
+         args[8]->unify(Data::typeInteger) && args[9]->unify(Data::typeInteger) &&
+         out->unify(Data::typeUnit);
 }
 
 static int64_t int64_ns(struct timespec tv) {
@@ -1454,10 +1455,11 @@ static int64_t int64_ns(struct timespec tv) {
 }
 
 static PRIMFN(prim_job_finish) {
-  EXPECT(9);
+  EXPECT(10);
   JOB(job, 0);
   STRING(inputs, 1);
   STRING(outputs, 2);
+  STRING(all_outputs, 3);
 
   REQUIRE(job->state & STATE_MERGED);
   REQUIRE(!(job->state & STATE_FINISHED));
@@ -1465,12 +1467,13 @@ static PRIMFN(prim_job_finish) {
   size_t need = WJob::reserve() + reserve_unit();
   runtime.heap.reserve(need);
 
-  parse_usage(&job->report, args + 3, runtime, scope);
+  parse_usage(&job->report, args + 4, runtime, scope);
   job->report.found = true;
 
   bool keep = !job->bad_launch && !job->bad_finish && job->keep && job->report.status == 0;
-  job->db->finish_job(job->job, inputs->as_str(), outputs->as_str(), int64_ns(job->start),
-                      int64_ns(job->stop), job->code.data[0], keep, job->report);
+  job->db->finish_job(job->job, inputs->as_str(), outputs->as_str(), all_outputs->as_str(),
+                      int64_ns(job->start), int64_ns(job->stop), job->code.data[0], keep,
+                      job->report);
   job->state |= STATE_FINISHED;
 
   runtime.schedule(WJob::claim(runtime.heap, job));

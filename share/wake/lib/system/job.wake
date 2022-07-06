@@ -51,12 +51,12 @@ tuple Runner =
 
 # Create new Runner given pre- and post-hooks around an existing Runner
 # param name: String
-# param score: type Plan → Result Double String 
-#   Called by runJob to produce a score representing the priority of a runner with respect to the given Plan. 
+# param score: type Plan → Result Double String
+#   Called by runJob to produce a score representing the priority of a runner with respect to the given Plan.
 # param pre: type Result RunnerInput Error → Pair (Result RunnerInput Error) a
-#   Called before the job is run, allowing the runner to modify the input to provide the requested resources. 
+#   Called before the job is run, allowing the runner to modify the input to provide the requested resources.
 # param post: type Pair (Result RunnerOutput Error) a → Result RunnerOutput Error
-#   Similar to the pre function but called after the job has run. post is for editing the reported outputs/inputs/usage of the job. 
+#   Similar to the pre function but called after the job has run. post is for editing the reported outputs/inputs/usage of the job.
 # param (Runner _ _ run): base runner that the current runner is built on top of
 #   i.e. localRISCVRunner is built on localRunner.
 
@@ -222,7 +222,7 @@ def pid = prim "pid"
 def implode l = cat (foldr (_, "\0", _) Nil l)
 def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo stdout stderr label: Job =
   def create label dir stdin env cmd signature visible keep echo stdout stderr = prim "job_create"
-  def finish job inputs outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
+  def finish job inputs outputs all_outputs status runtime cputime membytes ibytes obytes = prim "job_finish"
   def badfinish job error = prim "job_fail_finish"
   def cache dir stdin env cmd signature visible = prim "job_cache"
   def signature cmd res fni fno keep = prim "hash"
@@ -240,7 +240,7 @@ def runAlways cmd env dir stdin res uusage finputs foutputs vis keep run echo st
       Pass (RunnerOutput inputs outputs (Usage status runtime cputime mem in out)) =
         def input  = finputs  inputs  | map simplify | implode
         def output = foutputs outputs | map addhash  | implode
-        finish job input output status runtime cputime mem in out
+        finish job input output (implode outputs) status runtime cputime mem in out
     # Make sure we don't hash files before the job has stopped running
     def _ = waitJobMerged final job
     job
