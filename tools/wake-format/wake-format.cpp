@@ -27,6 +27,7 @@
 #include "gopt/gopt-arg.h"
 #include "gopt/gopt.h"
 #include "parser/cst.h"
+#include "parser/parser.h"
 #include "parser/syntax.h"
 #include "util/diagnostic.h"
 #include "util/file.h"
@@ -69,10 +70,30 @@ void print_help(const char *argv0) {
 
 void print_version() { std::cout << "wake-format " << VERSION << std::endl; }
 
-void walk_cst(std::ostream &fout, CSTElement node) {
-  while (!node.empty()) {
-    fout << node.fragment().segment().str();
-    node.nextSiblingElement();
+void walk_cst(std::ostream &fout, CSTElement node, int rec) {
+  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    std::cout << rec << ": ";
+    for (int i = 0; i < rec; i++) {
+      std::cout << "  ";
+    }
+    std::cout << symbolExample(child.id()) << ": " << child.isNode() << std::endl;
+    if (child.isNode()) {
+      walk_cst(fout, child, rec + 1);
+      continue;
+    }
+
+    fout << child.fragment().segment().str();
+    // if (child.id() == TOKEN_KW_MACRO_HERE) {
+    //   fout << "@here";
+    // } else {
+    //   fout << child.fragment().segment().str();
+    // }
+
+    // Workaround for CST on identifiers. Only process the first child then exit
+    // This doesn't actually work since `from id import _` puts `import _` under the id
+    // if (node.id() == CST_ID) {
+    //   return;
+    // }
   }
 }
 
@@ -141,7 +162,7 @@ int main(int argc, char **argv) {
 
     std::ostream fout(buffer);
 
-    walk_cst(fout, cst.root());
+    walk_cst(fout, cst.root(), 0);
 
     // When editing in-place we need to copy the tmp file over the original
     if (in_place) {
