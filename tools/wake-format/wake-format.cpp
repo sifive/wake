@@ -92,7 +92,7 @@ void print_cst(CSTElement node, int depth) {
       case TOKEN_STR_SINGLE:
       case TOKEN_REG_SINGLE:
         std::cout << " -> " << child.fragment().segment().str() << std::endl;
-	break;
+        break;
       default:
         std::cout << std::endl;
         break;
