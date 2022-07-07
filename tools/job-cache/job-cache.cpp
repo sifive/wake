@@ -127,17 +127,6 @@ static void get_hex_data(const std::string &s, uint8_t (*data)[size]) {
   }
 }
 
-// Use /dev/urandom to get a good seed
-static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
-  auto rng_fd = UniqueFd::open("/dev/urandom", O_RDONLY, 0644);
-  uint8_t seed_data[32] = {0};
-  if (read(rng_fd.get(), seed_data, sizeof(seed_data)) < 0) {
-    log_fatal("read(/dev/urandom): %s", strerror(errno));
-  }
-  uint64_t *data = reinterpret_cast<uint64_t *>(seed_data);
-  return std::make_tuple(data[0], data[1], data[2], data[3]);
-}
-
 class Database {
  private:
   sqlite3 *db = nullptr;
@@ -490,7 +479,7 @@ class Cache {
         output_files(db),
         transact(db),
         dir(std::move(_dir)),
-        rng(get_rng_seed()) {}
+        rng(wcl::get_rng_seed()) {}
 
   void add(const AddJobRequest &add_request) {
     // Create a unique name for the job dir (will rename later to correct name)

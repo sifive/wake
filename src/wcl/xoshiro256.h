@@ -35,6 +35,17 @@ static std::string to_hex(const T *value) {
   return name;
 }
 
+// Use /dev/urandom to get a good seed
+static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
+  auto rng_fd = UniqueFd::open("/dev/urandom", O_RDONLY, 0644);
+  uint8_t seed_data[32] = {0};
+  if (read(rng_fd.get(), seed_data, sizeof(seed_data)) < 0) {
+    log_fatal("read(/dev/urandom): %s", strerror(errno));
+  }
+  uint64_t *data = reinterpret_cast<uint64_t *>(seed_data);
+  return std::make_tuple(data[0], data[1], data[2], data[3]);
+}
+
 // Adapted from wikipedia's code, which was adapted from
 // the code included on Sebastiano Vigna's website for
 // Xoshiro256**. Xoshiro256** is a modern, efficent, and
