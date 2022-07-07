@@ -37,7 +37,7 @@
 #include "bloom.h"
 #include "logging.h"
 #include "unique_fd.h"
-#include "xoshiro256.h"
+#include "wcl/xoshiro_256.h"
 
 // moves the file or directory, crashes on error
 static void rename_no_fail(const char *old_path, const char *new_path) {
@@ -125,17 +125,6 @@ static void get_hex_data(const std::string &s, uint8_t (*data)[size]) {
     if (i + 1 < s.size()) start[0] |= hex_to_nibble(s[i + 1]) << 4;
     ++start;
   }
-}
-
-// Use /dev/urandom to get a good seed
-static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
-  auto rng_fd = UniqueFd::open("/dev/urandom", O_RDONLY, 0644);
-  uint8_t seed_data[32] = {0};
-  if (read(rng_fd.get(), seed_data, sizeof(seed_data)) < 0) {
-    log_fatal("read(/dev/urandom): %s", strerror(errno));
-  }
-  uint64_t *data = reinterpret_cast<uint64_t *>(seed_data);
-  return std::make_tuple(data[0], data[1], data[2], data[3]);
 }
 
 class Database {
@@ -474,7 +463,7 @@ class Cache {
   OutputFiles output_files;
   Transaction transact;
   std::string dir;
-  Xoshiro256 rng;
+  wcl::xoshiro_256 rng;
 
  public:
   ~Cache() {}
@@ -490,7 +479,7 @@ class Cache {
         output_files(db),
         transact(db),
         dir(std::move(_dir)),
-        rng(get_rng_seed()) {}
+        rng(wcl::get_rng_seed()) {}
 
   void add(const AddJobRequest &add_request) {
     // Create a unique name for the job dir (will rename later to correct name)
@@ -536,7 +525,7 @@ class Cache {
     // atomically rename the temp job into place which completes
     // the insertion. At that point reads should suceed.
     uint8_t job_group = job_id & 0xFF;
-    std::string job_group_dir = dir + "/" + to_hex<uint8_t>(&job_group);
+    std::string job_group_dir = dir + "/" + wcl::to_hex<uint8_t>(&job_group);
     mkdir_no_fail(job_group_dir.c_str());
     std::string job_dir = job_group_dir + "/" + std::to_string(job_id);
     rename_no_fail(tmp_job_dir.c_str(), job_dir.c_str());
