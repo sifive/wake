@@ -23,6 +23,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <vector>
 
 #include "gopt/gopt-arg.h"
