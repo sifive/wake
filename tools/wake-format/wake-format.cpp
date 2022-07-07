@@ -66,6 +66,7 @@ void print_help(const char *argv0) {
     << "  --help     -h     Print this help message and exit"                    << std::endl
     << "  --in-place -i     Edit files in place. Default emits file to stdout"   << std::endl
     << "  --version  -v     Print the version and exit"                          << std::endl
+    << "  --debug    -d     Print debug info while formatting"                   << std::endl
     << std::endl;
   // clang-format on
 }
@@ -105,18 +106,11 @@ void walk_cst(std::ostream *out, CSTElement node) {
       continue;
     }
 
-    *out << child.fragment().segment().str();
-    // if (child.id() == TOKEN_KW_MACRO_HERE) {
-    //   *out << "@here";
-    // } else {
-    //   *out << child.fragment().segment().str();
-    // }
-
-    // Workaround for CST on identifiers. Only process the first child then exit
-    // This doesn't actually work since `from id import _` puts `import _` under the id
-    // if (node.id() == CST_ID) {
-    //   return;
-    // }
+    if (child.id() == TOKEN_KW_MACRO_HERE) {
+      *out << "@here";
+    } else {
+      *out << child.fragment().segment().str();
+    }
   }
 }
 
@@ -131,6 +125,7 @@ int main(int argc, char **argv) {
     {'h', "help", GOPT_ARGUMENT_FORBIDDEN},
     {'i', "in-place", GOPT_ARGUMENT_FORBIDDEN},
     {'v', "version", GOPT_ARGUMENT_FORBIDDEN},
+    {'d', "debug", GOPT_ARGUMENT_FORBIDDEN},
     {0, 0, GOPT_LAST}
   };
   // clang-format on
@@ -142,6 +137,7 @@ int main(int argc, char **argv) {
   bool help = arg(options, "help")->count;
   bool in_place = arg(options, "in-place")->count;
   bool version = arg(options, "version")->count;
+  bool debug = arg(options, "debug")->count;
 
   if (help) {
     print_help(argv[0]);
@@ -183,7 +179,10 @@ int main(int argc, char **argv) {
       out = &std::cout;
     }
 
-    print_cst(cst.root(), 0);
+    if (debug) {
+      print_cst(cst.root(), 0);
+    }
+
     walk_cst(out, cst.root());
 
     // When editing in-place we need to copy the tmp file over the original
