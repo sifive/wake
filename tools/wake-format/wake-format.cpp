@@ -62,11 +62,11 @@ void print_help(const char *argv0) {
   // clang-format off
   std::cout << std::endl
     << "Usage: " << argv0 << " [OPTIONS] [<file> ...]" << std::endl
+    << "  --debug    -d     Print debug info while formatting"                   << std::endl
     << "  --dry-run  -n     Check if formatting needed, but don't apply it"      << std::endl
     << "  --help     -h     Print this help message and exit"                    << std::endl
     << "  --in-place -i     Edit files in place. Default emits file to stdout"   << std::endl
     << "  --version  -v     Print the version and exit"                          << std::endl
-    << "  --debug    -d     Print debug info while formatting"                   << std::endl
     << std::endl;
   // clang-format on
 }
@@ -79,7 +79,7 @@ void print_cst(CSTElement node, int depth) {
     for (int i = 0; i < depth; i++) {
       std::cout << "  ";
     }
-    std::cout << symbolExample(child.id()) << " " << (child.isNode() ? "[Node]" : "[Leaf]");
+    std::cout << symbolExample(child.id()) << " " << (child.isNode() ? "[Node]" : "[Token]");
     if (child.isNode()) {
       std::cout << std::endl;
       print_cst(child, depth + 1);
@@ -91,7 +91,8 @@ void print_cst(CSTElement node, int depth) {
       case TOKEN_DOUBLE:
       case TOKEN_STR_SINGLE:
       case TOKEN_REG_SINGLE:
-        std::cout << " -> " << child.fragment().segment().str();
+        std::cout << " -> " << child.fragment().segment().str() << std::endl;
+	break;
       default:
         std::cout << std::endl;
         break;
@@ -121,11 +122,11 @@ int main(int argc, char **argv) {
 
   // clang-format off
   struct option options[] {
+    {'d', "debug", GOPT_ARGUMENT_FORBIDDEN},
     {'n', "dry-run", GOPT_ARGUMENT_FORBIDDEN},
     {'h', "help", GOPT_ARGUMENT_FORBIDDEN},
     {'i', "in-place", GOPT_ARGUMENT_FORBIDDEN},
     {'v', "version", GOPT_ARGUMENT_FORBIDDEN},
-    {'d', "debug", GOPT_ARGUMENT_FORBIDDEN},
     {0, 0, GOPT_LAST}
   };
   // clang-format on
