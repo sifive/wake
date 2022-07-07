@@ -37,7 +37,7 @@
 #include "bloom.h"
 #include "logging.h"
 #include "unique_fd.h"
-#include "wcl/xoshiro256.h"
+#include "wcl/xoshiro_256.h"
 
 // moves the file or directory, crashes on error
 static void rename_no_fail(const char *old_path, const char *new_path) {
@@ -463,7 +463,7 @@ class Cache {
   OutputFiles output_files;
   Transaction transact;
   std::string dir;
-  wcl::Xoshiro256 rng;
+  wcl::xoshiro_256 rng;
 
  public:
   ~Cache() {}
