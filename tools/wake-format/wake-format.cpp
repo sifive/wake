@@ -19,7 +19,8 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
-#include <cstdio>
+#include <stdio.h>
+
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -70,23 +71,44 @@ void print_help(const char *argv0) {
 
 void print_version() { std::cout << "wake-format " << VERSION << std::endl; }
 
-void walk_cst(std::ostream &fout, CSTElement node, int rec) {
+void print_cst(CSTElement node, int depth) {
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
-    std::cout << rec << ": ";
-    for (int i = 0; i < rec; i++) {
+    std::cout << depth << ": ";
+    for (int i = 0; i < depth; i++) {
       std::cout << "  ";
     }
-    std::cout << symbolExample(child.id()) << ": " << child.isNode() << std::endl;
+    std::cout << symbolExample(child.id()) << " " << (child.isNode() ? "[Node]" : "[Leaf]");
     if (child.isNode()) {
-      walk_cst(fout, child, rec + 1);
+      std::cout << std::endl;
+      print_cst(child, depth + 1);
+      continue;
+    }
+    switch (child.id()) {
+      case TOKEN_ID:
+      case TOKEN_INTEGER:
+      case TOKEN_DOUBLE:
+      case TOKEN_STR_SINGLE:
+      case TOKEN_REG_SINGLE:
+        std::cout << " -> " << child.fragment().segment().str();
+      default:
+        std::cout << std::endl;
+        break;
+    }
+  }
+}
+
+void walk_cst(std::ostream *out, CSTElement node) {
+  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    if (child.isNode()) {
+      walk_cst(out, child);
       continue;
     }
 
-    fout << child.fragment().segment().str();
+    *out << child.fragment().segment().str();
     // if (child.id() == TOKEN_KW_MACRO_HERE) {
-    //   fout << "@here";
+    //   *out << "@here";
     // } else {
-    //   fout << child.fragment().segment().str();
+    //   *out << child.fragment().segment().str();
     // }
 
     // Workaround for CST on identifiers. Only process the first child then exit
@@ -148,29 +170,25 @@ int main(int argc, char **argv) {
       exit(EXIT_FAILURE);
     }
 
-    std::streambuf *buffer;
-    std::ofstream stream;
+    std::unique_ptr<std::ofstream> output_file;
+    std::ostream *out;
 
     std::string name(argv[i]);
     std::string tmp = name + ".tmp";
     if (in_place) {
-      stream.open(tmp);
-      buffer = stream.rdbuf();
+      output_file = std::make_unique<std::ofstream>(tmp);
+      out = output_file.get();
     } else {
-      buffer = std::cout.rdbuf();
+      out = &std::cout;
     }
 
-    std::ostream fout(buffer);
-
-    walk_cst(fout, cst.root(), 0);
+    print_cst(cst.root(), 0);
+    walk_cst(out, cst.root());
 
     // When editing in-place we need to copy the tmp file over the original
     if (in_place) {
-      // It's implementation defined what rename
-      // does if the file already exists so it must
-      // be explictly deleted here
-      std::remove(name.c_str());
-      std::rename(tmp.c_str(), name.c_str());
+      output_file.reset();
+      rename(tmp.c_str(), name.c_str());
     }
   }
 
