@@ -146,8 +146,8 @@ CST::CST(CSTBuilder &&builder) : token_starts(builder.token_starts) {
   }
 
   // parseWake filters out COMMENT and WS tokens from the stream passed to the lexer
-  // This means that any leading or trailing comments in the file are orphaned by the lexer parse tree.
-  // This expands the range of the top node to include those tokens.
+  // This means that any leading or trailing comments in the file are orphaned by the lexer parse
+  // tree. This expands the range of the top node to include those tokens.
   if (!nodes.empty()) {
     nodes.front().begin = 0;
     nodes.front().end = file->segment().size();
