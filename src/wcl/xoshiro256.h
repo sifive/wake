@@ -20,7 +20,7 @@
 #include <cstdint>
 #include <tuple>
 
-#pragma once
+namespace wcl {
 
 template <class T>
 static std::string to_hex(const T *value) {
@@ -86,3 +86,5 @@ class Xoshiro256 {
     return to_hex<uint8_t[16]>(&data);
   }
 };
+
+}  // namespace wcl
