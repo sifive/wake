@@ -33,6 +33,7 @@
 #include "parser/syntax.h"
 #include "util/diagnostic.h"
 #include "util/file.h"
+#include "wcl/xoshiro_256.h"
 
 #define VERSION "0.0.1"
 
@@ -160,6 +161,8 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
+  wcl::xoshiro_256 rng(wcl::get_rng_seed());
+
   for (int i = 1; i < argc; i++) {
     ExternalFile file = ExternalFile(*reporter, argv[i]);
     CST cst = CST(file, *reporter);
@@ -172,7 +175,7 @@ int main(int argc, char **argv) {
     std::ostream *out;
 
     std::string name(argv[i]);
-    std::string tmp = name + ".tmp";
+    std::string tmp = name + ".tmp." + rng.unique_name();
     if (in_place) {
       output_file = std::make_unique<std::ofstream>(tmp);
       out = output_file.get();
