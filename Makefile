@@ -18,7 +18,7 @@ CORE_CFLAGS  := $(shell pkg-config --silence-errors --cflags sqlite3)	\
 FUSE_LDFLAGS := $(shell pkg-config --silence-errors --libs fuse    || echo -lfuse)
 CORE_LDFLAGS :=	$(shell pkg-config --silence-errors --libs sqlite3 || echo -lsqlite3)	\
 		$(shell pkg-config --silence-errors --libs gmp || echo -lgmp)	\
-		$(shell pkg-config --silence-errors --libs re2     || echo -lre2)	\
+		$(shell pkg-config --silence-errors --libs re2 || echo -lre2)	\
 		$(shell pkg-config --silence-errors --libs ncurses tinfo || pkg-config --silence-errors --libs ncurses || echo -lncurses)
 
 COMMON_DIRS := src/compat src/util src/json
@@ -65,7 +65,7 @@ format:
 	@FILES=$$(./scripts/which_clang_files changed) && \
 	if [ "$$FILES" ]; then \
 		clang-format -i --style=file $$FILES; \
-	fi || true 
+	fi || true
 
 test:		wake.db
 	$(WAKE_ENV) ./bin/wake --in test_wake runTests
