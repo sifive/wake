@@ -51,4 +51,4 @@ std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
   return std::make_tuple(data[0], data[1], data[2], data[3]);
 }
 
-}
+}  // namespace wcl
