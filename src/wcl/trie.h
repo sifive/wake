@@ -16,8 +16,8 @@
  */
 
 #include <cstdint>
-#include <vector>
 #include <iostream>
+#include <vector>
 
 #include "optional.h"
 
@@ -70,9 +70,8 @@ class trie {
  public:
   // NOTE: This insert moves the keys and constructs the Value
   //       emplace.
-  template <class KeyIter, class ...Args>
+  template <class KeyIter, class... Args>
   void move_emplace(KeyIter begin, KeyIter end, Args&&... args) {
-
     // First handle the empty sequence
     if (begin == end) {
       empty_seq = optional<Value>(in_place_t{}, std::forward<Args>(args)...);
@@ -190,4 +189,4 @@ class trie {
   }
 };
 
-}
+}  // namespace wcl

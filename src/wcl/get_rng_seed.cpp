@@ -24,8 +24,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <tuple>
 #include <iostream>
+#include <tuple>
 
 extern std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
   // TODO: This really needs to be using a unique_fd/return a result

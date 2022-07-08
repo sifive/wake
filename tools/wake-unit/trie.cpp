@@ -18,12 +18,12 @@
 #include <wcl/trie.h>
 #include <wcl/xoshiro_256.h>
 
-#include <vector>
-#include <string>
-#include <map>
 #include <algorithm>
+#include <map>
 #include <memory>
 #include <random>
+#include <string>
+#include <vector>
 
 #include "unit.h"
 
@@ -164,27 +164,26 @@ TEST(trie_long_seq) {
   int seq2[] = {7, 4, 2, 9, 0, 5, 9, 6, 3};
   int seq3[] = {6, 0, 4, 2, 6, 9, 5, 3, 3, 8, 0, 4, 3, 7, 9, 6, 4, 2};
 
-  test.move_emplace(seq3, seq3 + sizeof(seq3)/sizeof(*seq3), 30);
-  test.move_emplace(seq2, seq2 + sizeof(seq2)/sizeof(*seq2), 20);
-  test.move_emplace(seq1, seq1 + sizeof(seq1)/sizeof(*seq1), 10);
+  test.move_emplace(seq3, seq3 + sizeof(seq3) / sizeof(*seq3), 30);
+  test.move_emplace(seq2, seq2 + sizeof(seq2) / sizeof(*seq2), 20);
+  test.move_emplace(seq1, seq1 + sizeof(seq1) / sizeof(*seq1), 10);
 
-  auto v1 = test.find(seq1, seq1 + sizeof(seq1)/sizeof(*seq1));
+  auto v1 = test.find(seq1, seq1 + sizeof(seq1) / sizeof(*seq1));
   ASSERT_TRUE(v1 != nullptr);
   EXPECT_EQUAL(10, *v1);
 
-  auto v2 = test.find(seq2, seq2 + sizeof(seq2)/sizeof(*seq2));
+  auto v2 = test.find(seq2, seq2 + sizeof(seq2) / sizeof(*seq2));
   ASSERT_TRUE(v2 != nullptr);
   EXPECT_EQUAL(20, *v2);
 
-  auto v3 = test.find(seq3, seq3 + sizeof(seq3)/sizeof(*seq3));
+  auto v3 = test.find(seq3, seq3 + sizeof(seq3) / sizeof(*seq3));
   ASSERT_TRUE(v3 != nullptr);
   EXPECT_EQUAL(30, *v3);
 }
 
-
 template <class F, class Gen>
-static std::pair<std::vector<int>, int> gen_seq_pair(int min_length, int max_length, Gen& gen, F f) {
-
+static std::pair<std::vector<int>, int> gen_seq_pair(int min_length, int max_length, Gen& gen,
+                                                     F f) {
   std::uniform_int_distribution<int> length_dist(min_length, max_length);
   int size = length_dist(gen);
 

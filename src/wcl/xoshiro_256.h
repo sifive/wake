@@ -54,12 +54,8 @@ class xoshiro_256 {
 
  public:
   using result_type = uint64_t;
-  static constexpr result_type min() {
-    return 0;
-  }
-  static constexpr result_type max() {
-    return ~min();
-  }
+  static constexpr result_type min() { return 0; }
+  static constexpr result_type max() { return ~min(); }
 
   xoshiro_256() = delete;
 
