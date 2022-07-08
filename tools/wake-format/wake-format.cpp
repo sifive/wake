@@ -35,7 +35,12 @@
 #include "util/file.h"
 #include "wcl/xoshiro_256.h"
 
-#define VERSION "0.0.1"
+#ifndef VERSION
+#include "version.h"
+#endif
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define VERSION_STR TOSTRING(VERSION)
 
 class TerminalReporter : public DiagnosticReporter {
  public:
@@ -72,7 +77,7 @@ void print_help(const char *argv0) {
   // clang-format on
 }
 
-void print_version() { std::cout << "wake-format " << VERSION << std::endl; }
+void print_version() { std::cout << "wake-format " << VERSION_STR << std::endl; }
 
 void print_cst(CSTElement node, int depth) {
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
