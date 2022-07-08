@@ -19,12 +19,35 @@
 #include <wcl/xoshiro_256.h>
 
 #include <vector>
+#include <string>
 #include <map>
 #include <algorithm>
 #include <memory>
 #include <random>
 
 #include "unit.h"
+
+TEST(trie_string) {
+  wcl::trie<std::string, int> test;
+  std::vector<std::string> seq = {"this", "is", "a", "test"};
+  std::vector<std::string> to_move = seq;
+
+  EXPECT_EQUAL(nullptr, test.find(seq.begin(), seq.end()));
+  test.move_emplace(to_move.begin(), to_move.end(), 10);
+
+  auto v1 = test.find(seq.begin(), seq.end());
+  ASSERT_TRUE(v1 != nullptr);
+  EXPECT_EQUAL(10, *v1);
+}
+
+TEST(trie_unique) {
+  wcl::trie<int, std::unique_ptr<int>> test;
+  int dummy;
+  test.move_emplace(&dummy, &dummy, std::make_unique<int>(10));
+  auto v1 = test.find(&dummy, &dummy);
+  ASSERT_TRUE(v1 != nullptr);
+  EXPECT_EQUAL(10, **v1);
+}
 
 TEST(trie_basic) {
   wcl::trie<int, int> test;

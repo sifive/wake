@@ -17,6 +17,8 @@ PASSED:
   trie_empty_seq_const
   trie_fuzz
   trie_long_seq
+  trie_string
+  trie_unique
   trie_unit_seqs
   trie_unit_seqs_const
 
