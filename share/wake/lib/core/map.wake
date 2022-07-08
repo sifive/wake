@@ -1,0 +1,561 @@
+# Copyright 2022 SiFive, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You should have received a copy of LICENSE.Apache2 along with
+# this software. If not, you may obtain a copy at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package wake
+
+# A dictionary associating a key-value pair, providing fast lookup by key.
+# This is internally implemented by a balanced tree, so some total ordering must
+# be able to be produced for the key type.
+data Map k v = Map (cmp: k => k => Order) (root: Tree (Pair k v))
+from wake export type Map
+
+def makeCmpPair (cmpKey: k => k => Order) (left: Pair k v) (right: Pair k v): Order =
+    cmpKey left.getPairFirst right.getPairFirst
+
+
+# Initialize an empty `Map` which will use the given total order function.
+#
+# *Parameters:*
+#   * `cmpKey`:
+#       A function providing a total ordering over values of the key type.
+#
+# *Example:*
+#   ```
+#   mnew scmp | msize = 0
+#   ```
+export def mnew (cmpKey: k => k => Order): Map k v =
+    tnew (makeCmpPair cmpKey)
+    | Map cmpKey
+
+# Construct a `Map` from the pre-associated key-value pairs in the `List`.
+# If multiple `Pair`s have the same left value (key), then the resulting `Map`
+# will contain the right value of only the *first* occurrence.
+#
+# *Parameters:*
+#   * `cmpKey`:
+#       A function providing a total ordering over values of the key type.
+#   * `pairs`:
+#       The keys and values which the `Map` should contain.  This does not have
+#       to be sorted, but each left-hand value should be unique.
+#
+# *Examples:*
+#   ```
+#   listToMap scmp ("a" → True, "b" → False, "c" → False, Nil) | msize = 3
+#   listToMap scmp ("a" → 1, "a" → 2, Nil) | mlookup "a" = Some 1
+#   ```
+export def listToMap (cmpKey: k => k => Order) (pairs: List (Pair k v)): Map k v =
+    listToTree (makeCmpPair cmpKey) pairs
+    | Map cmpKey
+
+# Construct a `Map` from the pre-associated key-value pairs in the `Vector`.
+# If multiple `Pair`s have the same left value (key), then the resulting `Map`
+# will contain the right value of only the *first* occurrence.
+#
+# *Parameters:*
+#   * `cmpKey`:
+#       A function providing a total ordering over values of the key type.
+#   * `pairs`:
+#       The keys and values which the `Map` should contain.  This does not have
+#       to be sorted, but each left-hand value should be unique.
+export def vectorToMap (cmpKey: k => k => Order) (pairs: Vector (Pair k v)): Map k v =
+    vectorToTree (makeCmpPair cmpKey) pairs
+    | Map cmpKey
+
+
+# Count how many key-value associations are contained in the `Map`.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | msize = 0
+#   listToMap scmp ("a" → True, "b" → False, "c" → False, Nil) | msize = 3
+#   ```
+export def msize (map: Map k v): Integer =
+    def Map _ tree = map
+    tlen tree
+
+# Test if the `Map` does not contain any elements.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mempty = True
+#   listToMap scmp ("a" → True, "b" → False, "c" → False, Nil) | mempty = False
+#   ```
+export def mempty (map: Map k v): Boolean =
+    def Map _ tree = map
+    tempty tree
+
+
+# Add a given value into the map under the key, if that key does not already exist.
+# Any pair with the same key which already exists in the map *remains unchanged*.
+#
+# For a similar function which uses the new value provided, see `minsertReplace`
+# or `minsertWith`.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | minsert "a" 2 | mlookup "a" = Some 2
+#   listToMap scmp ("a" → 1, Nil) | minsert "a" 2 | mlookup "a" = Some 1
+#   ```
+export def minsert (key: k) (value: v) (map: Map k v): Map k v =
+    def Map cmpKey tree = map
+    tinsert (Pair key value) tree
+    | Map cmpKey
+
+# Add a given value into the map under the key, whether or not it already exists.
+#
+# For a similar function which preserves the original value contained in the
+# map, see `minsert` or `minsertWith`.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | minsertReplace "a" 2 | mlookup "a" = Some 2
+#   listToMap scmp ("a" → 1, Nil) | minsertReplace "a" 2 | mlookup "a" = Some 2
+#   ```
+export def minsertReplace (key: k) (value: v) (map: Map k v): Map k v =
+    def Map cmpKey tree = map
+    tinsertReplace (Pair key value) tree
+    | Map cmpKey
+
+# Add a given value into the map under the key, resolving conflicts as specified.
+#
+# If either the original value or the new will always be used, see `minsert` or
+# `minsertReplace`.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | minsertWith (_+_) "a" 2 | mlookup "a" = Some 2
+#   listToMap scmp ("a" → 1, Nil) | minsertWith (_+_) "a" 2 | mlookup "a" = Some 3
+#   ```
+export def minsertWith (fn: k => v => v => v) (key: k) (value: v) (map: Map k v): Map k v =
+    def Map cmpKey tree = map
+    def pairFn (Pair k l) (Pair _ r) = Pair k (fn k l r)
+    tinsertWith pairFn (Pair key value) tree
+    | Map cmpKey
+
+
+# Remove any value contained in the map under the given key.
+#
+# *Examples:*
+#   ```
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "b" | mlookup "b" = None
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "x" | msize = 2
+#   ```
+export def mdelete (key: k) (map: Map k v): Map k v =
+    def Map cmpKey tree = map
+    def Tree cmpPair root = tree
+    delete (cmpKey _.getPairFirst _) key root
+    | Tree cmpPair
+    | Map cmpKey
+
+
+# Accumulate and combine every value in the map, starting from the "smallest" key.
+#
+# *Parameters:*
+#   * `fn`:
+#       The manner in which each value should be added to the accumulator.
+#   * `base`:
+#       The value used to initialize the accumulator.  If `map` is empty, this
+#       value is returned unchanged.
+#   * `map`:
+#       The key-value pairs which will be combined.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mfoldl (\_\a\v a + v) 0 = 0
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mfoldl (\_\a\v a + v) 0 = 3
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mfoldl (\k\a\v "{a} {k}={str v}") "k=v:" = "k=v: a=1 b=2"
+#   ```
+export def mfoldl (fn: k => a => v => a) (base: a) (map: Map k v): a =
+    def Map _ tree = map
+    def pairFn a (Pair k v) = fn k a v
+    tfoldl pairFn base tree
+
+# Accumulate and combine every value in the map, starting from the "largest" key.
+#
+# *Parameters:*
+#   * `fn`:
+#       The manner in which each value should be added to the accumulator.
+#   * `base`:
+#       The value used to initialize the accumulator.  If `map` is empty, this
+#       value is returned unchanged.
+#   * `map`:
+#       The key-value pairs which will be combined.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mfoldr (\_\v\a v + a) 0 = 0
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mfoldr (\_\v\a v + a) 0 = 3
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mfoldr (\k\v\a "{a} {k}={str v}") "k=v:" = "k=v: b=2 a=1"
+#   ```
+export def mfoldr (fn: k => v => a => a) (base: a) (map: Map k v): a =
+    def Map _ tree = map
+    def pairFn (Pair k v) a = fn k v a
+    tfoldr pairFn base tree
+
+# Transform and combine every value in the map in parallel.
+#
+# *Parameters:*
+#   * `combineFn`:
+#       The manner in which two values of the target type should be joined.
+#   * `base`:
+#       The value used to initialize the accumulator.  If `map` is empty, this
+#       value is returned unchanged.
+#   * `transformFn`:
+#       The function which should be applied to every key-value pair in the map.
+#       This might just be to prepare them to be combined, or it might be some
+#       more complex function which happens to have a more-easily-joined output.
+#   * `map`:
+#       The key-value pairs which will be processed.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mfoldmap (_+_) 0 (\_\v v) = 0
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mfoldmap (_+_) 0 (\_\v v) = 3
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mfoldmap ("{_} {_}") "k=v:" ("{_}={str _}") = "k=v: a=1 b=2"
+#   ```
+export def mfoldmap (combineFn: a => a => a) (base: a) (transformFn: k => v => a) (map: Map k v): a =
+    def Map _ tree = map
+    def pairFn (Pair k v) = transformFn k v
+    tfoldmap combineFn base pairFn tree
+
+# Flatten every key-value pair in the map into a simple list.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mapToList = Nil
+#   listToMap scmp ("a" → 1, Nil) | minsert "b" 2 | mapToList = Pair "a" 1, Pair "b" 2, Nil
+#   ```
+export def mapToList (map: Map k v): List (Pair k v) =
+    def Map _ tree = map
+    treeToList tree
+
+
+# Apply some function to every value contained in the map.
+#
+# *Examples:*
+#   ```
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mmap (\_\v v + 1) | mlookup "b" = 3
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mmap (\k\v "{k}={str v}") | mlookup "b" = "b=2"
+#   ```
+export def mmap (fn: k => v => w) (map: Map k v): Map k w =
+    def Map cmpKey tree = map
+    def Tree _ root = tree
+    def helper = match _
+        Tip                  = Tip
+        Bin i l (Pair x y) r = Bin i (helper l) (Pair x (fn x y)) (helper r)
+    helper root
+    | Tree (makeCmpPair cmpKey)
+    | Map cmpKey
+
+# Apply some failable function to every value, passing only if every computation does.
+#
+# *Example:*
+#   ```
+#   listToMap scmp ("a" → "1", "b" → "2", Nil) | mmapPass (int _ | getOrFail "") = Pass ...
+#   ```
+export def mmapPass (fn: k => v => Result w e) (map: Map k v): Result (Map k w) e =
+    def Map cmpKey tree = map
+    def Tree _ root = tree
+    def helper = match _
+        Tip                  = Pass Tip
+        Bin i l (Pair x y) r =
+            def lResult = helper l
+            def wResult = fn x y
+            def rResult = helper r
+            require Pass l = lResult
+            require Pass w = wResult
+            require Pass r = rResult
+            Pass (Bin i l (Pair x w) r)
+    require Pass newRoot = helper root
+    Tree (makeCmpPair cmpKey) newRoot
+    | Map cmpKey
+    | Pass
+
+
+# Retrieve the "smallest" key from the map and its associated value.
+# This is determined according to the comparison function specified when the map
+# was originally created.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mmin = None
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mmin = Some (Pair "a" 1)
+#   ```
+export def mmin (map: Map k v): Option (Pair k v) =
+    def Map _ tree = map
+    tmin tree
+
+# Retrieve the "largest" key from the map and its associated value.
+# This is determined according to the comparison function specified when the map
+# was originally created.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mmax = None
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mmax = Some (Pair "b" 2)
+#   ```
+export def mmax (map: Map k v): Option (Pair k v) =
+    def Map _ tree = map
+    tmax tree
+
+# Retrieve the "smallest" key from the map that is equal to or "larger than" a known point.
+# This is determined according to the comparison function specified when the map
+# was originally created.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mmax = None
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mlowerGE "a" = Some (Pair "a" 1)
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mlowerGE "aaa" = Some (Pair "b" 2)
+#   ```
+export def mlowerGE (key: k) (map: Map k v): Option (Pair k v) =
+    def Map cmpKey tree = map
+    def Tree _ root = tree
+    def predicate t =
+        isGE (cmpKey t.getPairFirst key)
+    lower predicate root
+    | omap getPairFirst
+
+# Retrieve the "smallest" key from the map that is strictly "larger than" a known point.
+# This is determined according to the comparison function specified when the map
+# was originally created.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mmax = None
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mlowerGT "a" = Some (Pair "b" 2)
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mlowerGT "aaa" = Some (Pair "b" 2)
+#   ```
+export def mlowerGT (key: k) (map: Map k v): Option (Pair k v) =
+    def Map cmpKey tree = map
+    def Tree _ root = tree
+    def predicate t =
+        isGT (cmpKey t.getPairFirst key)
+    lower predicate root
+    | omap getPairFirst
+
+# Retrieve the "largest" key from the map that is strictly "smaller than" a known point.
+# This is determined according to the comparison function specified when the map
+# was originally created.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mmax = None
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mupperLT "b" = Some (Pair "a" 1)
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mupperLT "aaa" = Some (Pair "a" 1)
+#   ```
+export def mupperLT (key: k) (map: Map k v): Option (Pair k v) =
+    def Map cmpKey tree = map
+    def Tree _ root = tree
+    def predicate t =
+        isGE (cmpKey t.getPairFirst key)
+    upper predicate root
+    | omap getPairFirst
+
+# Retrieve the "largest" key from the map that is equal to or "smaller than" a known point.
+# This is determined according to the comparison function specified when the map
+# was originally created.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mmax = None
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mupperLE "b" = Some (Pair "b" 2)
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mupperLE "aaa" = Some (Pair "a" 1)
+#   ```
+export def mupperLE (key: k) (map: Map k v): Option (Pair k v) =
+    def Map cmpKey tree = map
+    def Tree _ root = tree
+    def predicate t =
+        isGT (cmpKey t.getPairFirst key)
+    upper predicate root
+    | omap getPairFirst
+
+
+# Retrieve the value associated with a particular key in the map, if one exists.
+#
+# If only the presence of the value matters, see `mexists`.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mlookup "a" = None
+#   mnew scmp | minsert "a" 1 | mlookup "a" = Some 1
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "b" | mlookup "b" = None
+#   ```
+export def mlookup (key: k) (map: Map k v): Option v =
+    def Map cmpKey _ = map
+    match (mupperLE key map)
+        None              = None
+        (Some (Pair l v)) = match (cmpKey l key)
+            EQ = Some v
+            _  = None
+
+# Check whether some key is associated with any value in the map.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mexists "a" = False
+#   mnew scmp | minsert "a" 1 | mexists "a" = True
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "b" | mexists "b" = False
+#   ```
+export def mexists (key: k) (map: Map k v): Boolean =
+    isSome (mlookup key map)
+
+
+# Divide the key-value pairs comprising one map into two according to some predicate.
+#
+# *Returns:*
+#   `Pair trues falses` where `trues` contains all the values for which `fn`
+#   returned `True` and `falses` where it returned `False`.  Both resulting maps
+#   use the same key-comparison function as the original `map`.
+export def msplitBy (fn: k => v => Boolean) (map: Map k v): Pair (Map k v) (Map k v) =
+    def Map cmpKey tree = map
+    def pairFn (Pair k v) = fn k v
+    def Pair trues falses = tsplitBy pairFn tree
+    Pair (Map cmpKey trues) (Map cmpKey falses)
+
+# Discard any key-value pairs in the map for which the predicate fails.
+#
+# *Examples:*
+#   ```
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mfilter (\k\_ isVowel k) | mlookup "a" = Some 1
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mfilter (\k\_ isVowel k) | mlookup "b" = None
+#   ```
+export def mfilter (fn: k => v => Boolean) (map: Map k v): Map k v =
+    def Map cmpKey tree = map
+    def pairFn (Pair k v) = fn k v
+    tfilter pairFn tree
+    | Map cmpKey
+
+
+# Collect all key-value associations in either of two maps into a single one.
+# If the same key occurs in both, the value from `left` is kept and the one from
+# `right` is discarded.  However, if the key comparison function differs between
+# the two inputs, then the one from the `right` is used.
+#
+# *Examples:*
+#   ```
+#   def left  = listToMap scmp ("a" → 1, "b" → 2, Nil)
+#   def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
+#
+#   munion left right | mlookup "a" = Some 1
+#   munion left right | mlookup "f" = Some 15
+#   munion left right | mlookup "b" = Some 2
+#   ```
+export def munion (left: Map k v) (right: Map k v): Map k v =
+    def Map _ leftTree = left
+    # tunion uses the comparison function of the right tree, so similarly attach
+    # the raw key comparison function of the right map to the output
+    def Map cmpKey rightTree = right
+    tunion leftTree rightTree
+    | Map cmpKey
+
+# Collect all key-value associations in maps with the given conflict resolultion.
+# If the key comparison function differs between the two inputs, then the one
+# from the `right` is used.
+#
+# For a similar function which preserves the original value contained in the
+# map, see `munionWith`.
+#
+# *Examples:*
+#   ```
+#   def left  = listToMap scmp ("a" → 1, "b" → 2, Nil)
+#   def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
+#
+#   munionWith (\_\lv\rv lv + rv) left right | mlookup "a" = Some 1
+#   munionWith (\_\lv\rv lv + rv) left right | mlookup "f" = Some 15
+#   munionWith (\_\lv\rv lv + rv) left right | mlookup "b" = Some 13
+#   ```
+export def munionWith (fn: k => v => v => v) (left: Map k v) (right: Map k v): Map k v =
+    def Map _ leftTree = left
+    # tunionWith uses the comparison function of the right tree, so similarly
+    # attach the raw key comparison function of the right map to the output
+    def Map cmpKey rightTree = right
+    def pairFn l r =
+        def Pair _ lv = l
+        def Pair rk rv = r
+        rk :-> fn rk lv rv
+    tunionWith pairFn leftTree rightTree
+    | Map cmpKey
+
+# Remove all keys from the left map which occur (regardless of value) in the right.
+# If the key comparison function differs between the two inputs, then the one
+# from the `right` is used.
+#
+# *Examples:*
+#   ```
+#   def left  = listToMap scmp ("a" → 1, "b" → 2, Nil)
+#   def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
+#
+#   msubtract left right | mlookup "a" = Some 1
+#   msubtract left right | mlookup "f" = None
+#   msubtract left right | mlookup "b" = None
+#   ```
+export def msubtract (left: Map k v) (right: Map k v): Map k v =
+    def Map _ leftTree = left
+    # tsubtract uses the comparison function of the right tree, so similarly
+    # attach the raw key comparison function of the right map to the output
+    def Map cmpKey rightTree = right
+    tsubtract leftTree rightTree
+    | Map cmpKey
+
+# Remove all keys from the left map which do not occur in the right.
+# For all keys, the value from `left` is kept and the one from `right` is
+# discarded.  However, if the key comparison function differs between the two
+# inputs, then the one from the `right` is used.
+#
+# For a similar function which preserves the original value contained in the
+# map, see `mintersectWith`.
+#
+# *Examples:*
+#   ```
+#   def left  = listToMap scmp ("a" → 1, "b" → 2, Nil)
+#   def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
+#
+#   mintersect left right | mlookup "a" = None
+#   mintersect left right | mlookup "f" = None
+#   mintersect left right | mlookup "b" = Some 2
+#   ```
+export def mintersect (left: Map k v) (right: Map k v): Map k v =
+    def Map _ leftTree = left
+    # tintersect uses the comparison function of the right tree, so similarly
+    # attach the raw key comparison function of the right map to the output
+    def Map cmpKey rightTree = right
+    tintersect leftTree rightTree
+    | Map cmpKey
+
+# Remove all keys from the left map which do not occur in the right, joining values.
+# If the key comparison function differs between the two inputs, then the one
+# from the `right` is used.
+#
+# *Examples:*
+#   ```
+#   def left  = listToMap scmp ("a" → 1, "b" → 2, Nil)
+#   def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
+#
+#   mintersectWith left right | mlookup "a" = None
+#   mintersectWith left right | mlookup "f" = None
+#   mintersectWith left right | mlookup "b" = Some 13
+#   ```
+export def mintersectWith (fn: k => v => v => v) (left: Map k v) (right: Map k v): Map k v =
+    def Map _ leftTree = left
+    # tintersect uses the comparison function of the right tree, so similarly
+    # attach the raw key comparison function of the right map to the output
+    def Map cmpKey rightTree = right
+    def pairFn l r =
+        def Pair _ lv = l
+        def Pair rk rv = r
+        rk :-> fn rk lv rv
+    tintersectWith pairFn leftTree rightTree
+    | Map cmpKey
