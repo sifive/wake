@@ -16,6 +16,7 @@
  */
 
 #include <wcl/trie.h>
+#include <wcl/xoshiro_256.h>
 
 #include <vector>
 #include <map>
@@ -158,26 +159,72 @@ TEST(trie_long_seq) {
 }
 
 
-template <class Gen>
-static std::pair<std::vector<int>, int> gen_seq_pair(int max_length, Gen& gen) {
+template <class F, class Gen>
+static std::pair<std::vector<int>, int> gen_seq_pair(int min_length, int max_length, Gen& gen, F f) {
 
-  std::uniform_int_distribution<int> length_dist(0, max_length);
+  std::uniform_int_distribution<int> length_dist(min_length, max_length);
   int size = length_dist(gen);
 
-  std::uniform_int_distribution<int> value_dist(-1000, 1000);
+  std::uniform_int_distribution<int> value_dist(0, 1000);
   std::vector<int> out(size, 0);
   for (auto& out_value : out) {
-    out_value = value_dist(gen);
+    out_value = f(value_dist(gen));
   }
 
-  return std::make_pair(std::move(out), value_dist);
+  return std::make_pair(std::move(out), value_dist(gen));
 }
 
-TEST(trie_fuzz_recall) {
+TEST(trie_fuzz) {
   std::map<std::vector<int>, int> recall;
   wcl::trie<int, int> test;
 
+  // seed the rng for fuzzing
+  uint64_t seedV = 0xdeadbeefdeadbeef;
+  std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> seed = {seedV, seedV, seedV, seedV};
+  wcl::xoshiro_256 rng(seed);
+
+  // First insert many values
   for (int i = 0; i < 1000; ++i) {
-    //auto pair = gen_seq_pair(20, )
+    // Generate values that are even mod 7. Then we can generate values that are odd
+    // mod 7 later to ensure we have a unique sequence. The benifit of being even mod 7
+    // is that both even and odd numbers, with no trivial pattern to them, are even mod
+    // 7. For instance 7 mod 7 is 0 which is even, 8 mod 7 is 1 which is odd, 14 mod 7 is
+    // 0 which is even and 15 mod 7 is 1 which is odd. So you can so that every multiple
+    // of 7, the even/odd pattenr flips. This ensures better coverage of your code.
+    auto pair = gen_seq_pair(0, 20, rng, [](int x) {
+      if ((x % 7) & 1) return x + 1;
+      return x;
+    });
+    recall[pair.first] = pair.second;
+    test.move_emplace(pair.first.begin(), pair.first.end(), pair.second);
+  }
+
+  // Next recall them all but in a different order than
+  // they were inserted.
+  for (auto pair : recall) {
+    auto recall_value = test.find(pair.first.begin(), pair.first.end());
+    ASSERT_TRUE(recall_value != nullptr);
+    EXPECT_EQUAL(recall[pair.first], *recall_value);
+  }
+
+  auto to_str = [](const std::vector<int>& seq) {
+    std::string out;
+    for (int val : seq) {
+      out += std::to_string(val);
+      out += ", ";
+    }
+    return out;
+  };
+
+  // Now make sure none of these values are in the trie
+  for (int i = 0; i < 1000; ++i) {
+    // We don't allow empty sequences because they are likely to have
+    // been added we can't unique them in anyway.
+    auto pair = gen_seq_pair(1, 20, rng, [](int x) {
+      if ((x % 7) & 1) return x;
+      return x + 1;
+    });
+    auto null_value = test.find(pair.first.begin(), pair.first.end());
+    EXPECT_EQUAL(nullptr, null_value) << "Checking seq: " << to_str(pair.first);
   }
 }
