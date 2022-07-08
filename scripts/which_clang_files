@@ -4,7 +4,7 @@ HERE="$( dirname -- "${0}"; )"
 WAKE_ROOT="${HERE}/../"
 
 if [[ ${1} == "all" ]]; then
-  SOURCE_FILES=$(find ${WAKE_ROOT} -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.c" \) | grep -v 'vendor')
+  SOURCE_FILES=$(find ${WAKE_ROOT} -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.c" \) | grep -v 'vendor/' | grep -v "lexer.cpp" | grep -v "parser\." | grep -v "version.h")
 
   echo $SOURCE_FILES
 
@@ -19,7 +19,7 @@ if [[ ${1} == "changed" ]]; then
   CHANGED_FILES=$(git --git-dir ${WAKE_ROOT}.git diff --name-only | grep '\.h\|\.cpp\|\.c' | grep -v 'vendor/')
   STAGED_FILES=$(git --git-dir ${WAKE_ROOT}.git diff --name-only --cached | grep '\.h\|\.cpp\|\.c' | grep -v 'vendor/')
   MERGED="${CHANGED_FILES} ${STAGED_FILES}"
-  
+
   echo ${MERGED}
 
   # Flag if any files were found
