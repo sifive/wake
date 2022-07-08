@@ -27,7 +27,9 @@
 #include <iostream>
 #include <tuple>
 
-extern std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
+namespace wcl {
+
+std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
   // TODO: This really needs to be using a unique_fd/return a result
   // That is currently blocked by landing wcl. Update this once
   // unique_fd and result land.
@@ -47,4 +49,6 @@ extern std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
 
   uint64_t *data = reinterpret_cast<uint64_t *>(seed_data);
   return std::make_tuple(data[0], data[1], data[2], data[3]);
+}
+
 }
