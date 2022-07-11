@@ -126,6 +126,7 @@ class rope_builder {
 
  public:
   void append(const char* str) { r = r.concat(rope::lit(str)); }
+  void append(std::string str) { r = r.concat(rope::lit(str)); }
   void append(rope other) { r = r.concat(other); }
 
   rope build() && {
