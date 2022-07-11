@@ -1,7 +1,8 @@
 #! /bin/sh
 
 ln ../json-test.wake .
-"${1:-wake}" --quiet --stdout=warning,report 'jsonTest normalizeJSONCompat' \
+WAKE="${1:+$1/wake}"
+"${WAKE:-wake}" --quiet --stdout=warning,report 'jsonTest normalizeJSONCompat' \
     valid.json \
     valid-nesting.json \
     invalid-boolean.json \

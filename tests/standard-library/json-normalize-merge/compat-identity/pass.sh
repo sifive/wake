@@ -1,7 +1,8 @@
 #! /bin/sh
 
 ln ../json-test.wake .
-"${1:-wake}" --quiet --stdout=warning,report 'jsonTest normalizeJSONIdentity' \
+WAKE="${1:+$1/wake}"
+"${WAKE:-wake}" --quiet --stdout=warning,report 'jsonTest normalizeJSONIdentity' \
     infinity.json \
     nan.json \
     unicode.json
