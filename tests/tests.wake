@@ -35,11 +35,12 @@ export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
 # the way we test currently.
 export topic wakeUnitTestBinary: (variant: Pair String String) => Result (List Path) Error
 
-def wakeToTestDir Unit =
-    require buildTestWake, Nil = subscribe wakeTestBinary
-    else failWithError "wake binary to test not found"
-    require Pass (Pair path visible) = buildTestWake Unit
-    Pass (Pair (simplify "{path}/..") visible)
+def wakeToTestDir Unit = match (subscribe wakeTestBinary)
+    buildTestWake, Nil =
+        require Pass (Pair path visible) = buildTestWake Unit
+        Pass (Pair (simplify "{path}/..") visible)
+    Nil = Pass (Pair "{wakePath}" Nil)
+    _ = Fail (makeError "Two wake binaries declared for testing!")
 
 def wakeUnitToTest Unit =
     require buildWakeUnit, Nil = subscribe wakeUnitTestBinary
