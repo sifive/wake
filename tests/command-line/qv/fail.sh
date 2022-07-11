@@ -1,3 +1,3 @@
 #! /bin/sh
-
-"${1:-wake}" -qv -x Unit
+WAKE="${1:+$1/wake}"
+"${WAKE:-wake}" -qv -x Unit

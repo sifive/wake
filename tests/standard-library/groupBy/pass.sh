@@ -1,3 +1,4 @@
 #! /bin/sh
 
-"${1:-wake}" --stdout=warning,report test
+WAKE="${1:+$1/wake}"
+"${WAKE:-wake}" --stdout=warning,report test

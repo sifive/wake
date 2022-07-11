@@ -1,3 +1,4 @@
 #! /bin/sh
 
-"${1:-wake}" --in foo -q test
+WAKE="${1:+$1/wake}"
+"${WAKE:-wake}" --in foo -q test
