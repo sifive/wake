@@ -27,6 +27,19 @@
 
 #include "unit.h"
 
+TEST(trie_char) {
+  wcl::trie<char, int> test;
+  std::string seq = "this is a test";
+  std::string to_move = seq;
+
+  EXPECT_EQUAL(nullptr, test.find(seq.begin(), seq.end()));
+  test.move_emplace(to_move.begin(), to_move.end(), 10);
+
+  auto v1 = test.find(seq.begin(), seq.end());
+  ASSERT_TRUE(v1 != nullptr);
+  EXPECT_EQUAL(10, *v1);
+}
+
 TEST(trie_string) {
   wcl::trie<std::string, int> test;
   std::vector<std::string> seq = {"this", "is", "a", "test"};

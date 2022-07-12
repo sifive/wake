@@ -27,9 +27,11 @@
 #include <iostream>
 #include <tuple>
 
+#include "xoshiro_256.h"
+
 namespace wcl {
 
-std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed() {
+std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> xoshiro_256::get_rng_seed() {
   // TODO: This really needs to be using a unique_fd/return a result
   // That is currently blocked by landing wcl. Update this once
   // unique_fd and result land.

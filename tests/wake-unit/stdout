@@ -13,6 +13,7 @@ PASSED:
   sanity_check2
   trie_basic
   trie_basic_const
+  trie_char
   trie_empty_seq
   trie_empty_seq_const
   trie_fuzz

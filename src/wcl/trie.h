@@ -33,9 +33,9 @@ class trie {
   struct trie_node {
     // TODO: This would be an awesome use case for a small vector but its
     //       extra work to get that working and right now I just need a trie.
-    //       by using a uint32_t and a properlly implemented small_vector, you
+    //       by using a uint32_t and a properly implemented small_vector, you
     //       can get a 4 element small vector for *free* here which would make
-    //       this trie entirelly in place for the vast vast majority of nodes.
+    //       this trie entirely in place for the vast vast majority of nodes.
     std::vector<size_t> child_indexes;
     Key key;
     optional<Value> value;
@@ -56,7 +56,7 @@ class trie {
     for (size_t index : starts) {
       if (key == nodes[index].key) return optional<size_t>(in_place_t{}, index);
     }
-    return optional<size_t>();
+    return {};
   }
 
   optional<size_t> matching_child(size_t pindex, const Key& key) const {
@@ -64,7 +64,7 @@ class trie {
     for (size_t child_index : node->child_indexes) {
       if (key == nodes[child_index].key) return optional<size_t>(in_place_t{}, child_index);
     }
-    return optional<size_t>();
+    return {};
   }
 
  public:

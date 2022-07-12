@@ -38,9 +38,6 @@ static std::string to_hex(const T *value) {
   return name;
 }
 
-// Use /dev/urandom to get a good seed
-std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed();
-
 // Adapted from wikipedia's code, which was adapted from
 // the code included on Sebastiano Vigna's website for
 // Xoshiro256**. Xoshiro256** is a modern, efficent, and
@@ -56,6 +53,9 @@ class xoshiro_256 {
   using result_type = uint64_t;
   static constexpr result_type min() { return 0; }
   static constexpr result_type max() { return ~min(); }
+
+  // Use /dev/urandom to get a good seed
+  static std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> get_rng_seed();
 
   xoshiro_256() = delete;
 
