@@ -20,14 +20,14 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include "xoshiro_256.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 
 #include <iostream>
 #include <tuple>
-
-#include "xoshiro_256.h"
 
 namespace wcl {
 
