@@ -60,6 +60,21 @@ class rope_impl_pair : public rope_impl_base {
   }
 };
 
+// `rope` is a very efficient data structure for editing strings. It is ideal to use when
+// repeatedly editing very long strings. Converting rope->string and string->rope is expensive
+// thus the majority of work should be done within the rope structure.
+//
+// It supports O(1) concatination of two ropes and O(1) size lookup.
+// Rope->string and string->rope are O(n) operations.
+//
+// *Examples*
+// ```
+// rope r1 = rope::lit("first");
+// rope r2 = rope::lit("-second");
+// rope r3 = r1.concat(r2);
+// r3.size() -> 13
+// r3.as_string() -> "first-second"
+// ```
 class rope {
  private:
   std::shared_ptr<rope_impl_base> impl;
@@ -88,6 +103,22 @@ class rope {
   size_t size() const { return impl->size(); }
 };
 
+// `rope_builder` is a convenient wrapper around `rope`. It simplifies the API for building up
+// a rope from several parts.
+//
+// *Examples*
+// ```
+// rope_builder b1;
+// b1.append("Hello");
+// b1.append(" ");
+//
+// rope_builder b2;
+// b2.append("World");
+// b2.append("!");
+//
+// b1.append(std::move(b2).build());
+// rope r = std::move(b1).build();
+// r.as_string() -> "Hello World!"
 class rope_builder {
  private:
   rope r = rope::lit("");
