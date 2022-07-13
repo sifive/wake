@@ -27,6 +27,73 @@
 
 #include "unit.h"
 
+TEST(trie_max) {
+  wcl::trie<int, int> test;
+  int seq[] = {0, 1, 2, 3, 5};
+  test.move_emplace(seq, seq + 1, 10);
+  test.move_emplace(seq, seq + 2, 20);
+  test.move_emplace(seq, seq + 4, 40);
+
+  auto v1 = test.find_max(seq, seq + 1);
+  EXPECT_EQUAL(v1.second, seq + 1);
+  ASSERT_TRUE(v1.first != nullptr);
+  EXPECT_EQUAL(10, *v1.first);
+
+  auto v2 = test.find_max(seq, seq + 2);
+  EXPECT_EQUAL(v2.second, seq + 2);
+  ASSERT_TRUE(v2.first != nullptr);
+  EXPECT_EQUAL(20, *v2.first);
+
+  auto v3 = test.find_max(seq, seq + 3);
+  EXPECT_EQUAL(v3.second, seq + 2);
+  ASSERT_TRUE(v3.first != nullptr);
+  EXPECT_EQUAL(20, *v3.first);
+
+  auto v4 = test.find_max(seq, seq + 4);
+  EXPECT_EQUAL(v4.second, seq + 4);
+  ASSERT_TRUE(v4.first != nullptr);
+  EXPECT_EQUAL(40, *v4.first);
+
+  auto v5 = test.find_max(seq, seq + 5);
+  EXPECT_EQUAL(v5.second, seq + 4);
+  ASSERT_TRUE(v5.first != nullptr);
+  EXPECT_EQUAL(40, *v5.first);
+}
+
+TEST(trie_max_const) {
+  wcl::trie<int, int> testSource;
+  int seq[] = {0, 1, 2, 3, 5};
+  testSource.move_emplace(seq, seq + 1, 10);
+  testSource.move_emplace(seq, seq + 2, 20);
+  testSource.move_emplace(seq, seq + 4, 40);
+
+  const wcl::trie<int, int>& test = testSource;
+  auto v1 = test.find_max(seq, seq + 1);
+  EXPECT_EQUAL(v1.second, seq + 1);
+  ASSERT_TRUE(v1.first != nullptr);
+  EXPECT_EQUAL(10, *v1.first);
+
+  auto v2 = test.find_max(seq, seq + 2);
+  EXPECT_EQUAL(v2.second, seq + 2);
+  ASSERT_TRUE(v2.first != nullptr);
+  EXPECT_EQUAL(20, *v2.first);
+
+  auto v3 = test.find_max(seq, seq + 3);
+  EXPECT_EQUAL(v3.second, seq + 2);
+  ASSERT_TRUE(v3.first != nullptr);
+  EXPECT_EQUAL(20, *v3.first);
+
+  auto v4 = test.find_max(seq, seq + 4);
+  EXPECT_EQUAL(v4.second, seq + 4);
+  ASSERT_TRUE(v4.first != nullptr);
+  EXPECT_EQUAL(40, *v4.first);
+
+  auto v5 = test.find_max(seq, seq + 5);
+  EXPECT_EQUAL(v5.second, seq + 4);
+  ASSERT_TRUE(v5.first != nullptr);
+  EXPECT_EQUAL(40, *v5.first);
+}
+
 TEST(trie_char) {
   wcl::trie<char, int> test;
   std::string seq = "this is a test";
