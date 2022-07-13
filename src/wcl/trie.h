@@ -115,21 +115,29 @@ class trie {
     nodes[root].value = optional<Value>(in_place_t{}, std::forward<Args>(args)...);
   }
 
+  // Find the maximum prefix of a given sequence in the trie.
   template <class KeyIter>
-  Value* find(KeyIter begin, KeyIter end) {
+  std::pair<const Value*, KeyIter> find_max(KeyIter begin, KeyIter end) const {
     // First we handle the empty sequence
     if (begin == end) {
-      if (empty_seq) return &*empty_seq;
-      return nullptr;
+      if (empty_seq) return std::make_pair(&*empty_seq, begin);
+      return std::make_pair(nullptr, begin);
     }
 
     // Now handle the first node differently.
+    KeyIter out_iter = begin;
     optional<size_t> mroot = matching_start(*begin++);
     size_t root;
+    const Value* out = nullptr;
+
     if (!mroot) {
-      return nullptr;
+      return std::make_pair(nullptr, begin);
     } else {
       root = *mroot;
+      if (nodes[root].value) {
+        out = &*nodes[root].value;
+        out_iter = begin;
+      }
     }
 
     while (begin != end) {
@@ -138,55 +146,77 @@ class trie {
       if (child) {
         root = *child;
         ++begin;
+        if (nodes[root].value) {
+          out = &*nodes[root].value;
+          out_iter = begin;
+        }
         continue;
       }
 
-      return nullptr;
+      return std::make_pair(out, out_iter);
     }
 
-    if (root < nodes.size()) {
-      auto& node = nodes[root];
-      if (node.value) return &*node.value;
+    return std::make_pair(out, out_iter);
+  }
+
+  // Find the maximum prefix of a given sequence in the trie.
+  template <class KeyIter>
+  std::pair<Value*, KeyIter> find_max(KeyIter begin, KeyIter end) {
+    // First we handle the empty sequence
+    if (begin == end) {
+      if (empty_seq) return std::make_pair(&*empty_seq, begin);
+      return std::make_pair(nullptr, begin);
     }
 
+    // Now handle the first node differently.
+    KeyIter out_iter = begin;
+    optional<size_t> mroot = matching_start(*begin++);
+    size_t root;
+    Value* out = nullptr;
+
+    if (!mroot) {
+      return std::make_pair(nullptr, begin);
+    } else {
+      root = *mroot;
+      if (nodes[root].value) {
+        out = &*nodes[root].value;
+        out_iter = begin;
+      }
+    }
+
+    while (begin != end) {
+      // Check if there's a matching child already
+      optional<size_t> child = matching_child(root, *begin);
+      if (child) {
+        root = *child;
+        ++begin;
+        if (nodes[root].value) {
+          out = &*nodes[root].value;
+          out_iter = begin;
+        }
+        continue;
+      }
+
+      return std::make_pair(out, out_iter);
+    }
+
+    return std::make_pair(out, out_iter);
+  }
+
+  template <class KeyIter>
+  Value* find(KeyIter begin, KeyIter end) {
+    auto pair = find_max(begin, end);
+    if (pair.second == end) return pair.first;
     return nullptr;
   }
 
   template <class KeyIter>
   const Value* find(KeyIter begin, KeyIter end) const {
-    // First we handle the empty sequence
-    if (begin == end) {
-      if (empty_seq) return &*empty_seq;
-      return nullptr;
-    }
-
-    // Now handle the first node differently.
-    optional<size_t> mroot = matching_start(*begin++);
-    size_t root;
-    if (!mroot) {
-      return nullptr;
-    } else {
-      root = *mroot;
-    }
-
-    while (begin != end) {
-      // Check if there's a matching child already
-      optional<size_t> child = matching_child(root, *begin);
-      if (child) {
-        root = *child;
-        ++begin;
-        continue;
-      }
-
-      return nullptr;
-    }
-
-    if (root < nodes.size()) {
-      auto& node = nodes[root];
-      if (node.value) return &*node.value;
-    }
+    auto pair = find_max(begin, end);
+    if (pair.second == end) return pair.first;
     return nullptr;
   }
+
 };
 
 }  // namespace wcl
