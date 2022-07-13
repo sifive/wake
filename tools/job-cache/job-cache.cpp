@@ -479,7 +479,7 @@ class Cache {
         output_files(db),
         transact(db),
         dir(std::move(_dir)),
-        rng(wcl::get_rng_seed()) {}
+        rng(wcl::xoshiro_256::get_rng_seed()) {}
 
   void add(const AddJobRequest &add_request) {
     // Create a unique name for the job dir (will rename later to correct name)

@@ -11,6 +11,17 @@ PASSED:
   option_some
   sanity_check1
   sanity_check2
+  trie_basic
+  trie_basic_const
+  trie_char
+  trie_empty_seq
+  trie_empty_seq_const
+  trie_fuzz
+  trie_long_seq
+  trie_string
+  trie_unique
+  trie_unit_seqs
+  trie_unit_seqs_const
 
 
 SUCCESS

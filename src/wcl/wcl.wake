@@ -1,4 +1,4 @@
-# Copyright 2019 SiFive, Inc.
+# Copyright 2022 SiFive, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,8 @@
 # limitations under the License.
 
 package build_wake
+
 from wake import _
 
-export target buildWakeUnit variant =
-    tool here Nil variant "bin/wake-unit" (ncurses, runtime, wcl, Nil)
+target wcl variant =
+    src here variant (util, Nil) Nil

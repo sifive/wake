@@ -1,0 +1,192 @@
+/*
+ * Copyright 2022 SiFive, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You should have received a copy of LICENSE.Apache2 along with
+ * this software. If not, you may obtain a copy at
+ *
+ *    https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <cstdint>
+#include <iostream>
+#include <vector>
+
+#include "optional.h"
+
+namespace wcl {
+
+// wcl::trie maps sequences of equality comparable keys to values of any type.
+// It does not efficently handle high fan out of the trie but it handles
+// very small fan out extremely well.
+// Assumes both Key and Value are movable.
+template <class Key, class Value>
+class trie {
+ private:
+  struct trie_node {
+    // TODO: This would be an awesome use case for a small vector but its
+    //       extra work to get that working and right now I just need a trie.
+    //       by using a uint32_t and a properly implemented small_vector, you
+    //       can get a 4 element small vector for *free* here which would make
+    //       this trie entirely in place for the vast vast majority of nodes.
+    std::vector<size_t> child_indexes;
+    Key key;
+    optional<Value> value;
+
+    trie_node(trie_node&&) = default;
+    trie_node(const trie_node&) = delete;
+    explicit trie_node(Key&& k) : child_indexes(), key(std::move(k)), value() {}
+  };
+  std::vector<trie_node> nodes;
+  // Because we chose to stores keys in nodes we have some funky handling
+  // of the "first" node which is essentially the node coresponding to the empty
+  // sequence. The benifit is that with a small_vector our trie will be very compact
+  // and memory efficent.
+  std::vector<size_t> starts;
+  optional<Value> empty_seq;
+
+  optional<size_t> matching_start(const Key& key) const {
+    for (size_t index : starts) {
+      if (key == nodes[index].key) return optional<size_t>(in_place_t{}, index);
+    }
+    return {};
+  }
+
+  optional<size_t> matching_child(size_t pindex, const Key& key) const {
+    const trie_node* node = &nodes[pindex];
+    for (size_t child_index : node->child_indexes) {
+      if (key == nodes[child_index].key) return optional<size_t>(in_place_t{}, child_index);
+    }
+    return {};
+  }
+
+ public:
+  // NOTE: This insert moves the keys and constructs the Value
+  //       emplace.
+  template <class KeyIter, class... Args>
+  void move_emplace(KeyIter begin, KeyIter end, Args&&... args) {
+    // First handle the empty sequence
+    if (begin == end) {
+      empty_seq = optional<Value>(in_place_t{}, std::forward<Args>(args)...);
+      return;
+    }
+
+    // Next we have to handle the first key specially because we chose to put keys
+    // on trie nodes instead of on edges pointing to try nodes.
+    optional<size_t> mroot = matching_start(*begin);
+    size_t root;
+    if (!mroot) {
+      root = nodes.size();
+      starts.push_back(root);
+      nodes.emplace_back(std::move(*begin));
+    } else {
+      root = *mroot;
+    }
+    ++begin;
+
+    // Now handle the common sub cases
+    while (begin != end) {
+      // Check if there's a matching child already
+      optional<size_t> child = matching_child(root, *begin);
+      if (child) {
+        root = *child;
+        ++begin;
+        continue;
+      }
+
+      // If not that just means we have to allocate a node
+      size_t new_node = nodes.size();
+      nodes.emplace_back(std::move(*begin++));
+      if (new_node != root) nodes[root].child_indexes.push_back(new_node);
+      root = new_node;
+    }
+
+    // TODO: We're actully adding a move here and really there's no requierment that
+    //       Value be movable. If wcl::optional had an "emplace" method
+    //       this would be more efficent and cleaner. That requires more unit tests though
+    //       and I'm lazy.
+    nodes[root].value = optional<Value>(in_place_t{}, std::forward<Args>(args)...);
+  }
+
+  template <class KeyIter>
+  Value* find(KeyIter begin, KeyIter end) {
+    // First we handle the empty sequence
+    if (begin == end) {
+      if (empty_seq) return &*empty_seq;
+      return nullptr;
+    }
+
+    // Now handle the first node differently.
+    optional<size_t> mroot = matching_start(*begin++);
+    size_t root;
+    if (!mroot) {
+      return nullptr;
+    } else {
+      root = *mroot;
+    }
+
+    while (begin != end) {
+      // Check if there's a matching child already
+      optional<size_t> child = matching_child(root, *begin);
+      if (child) {
+        root = *child;
+        ++begin;
+        continue;
+      }
+
+      return nullptr;
+    }
+
+    if (root < nodes.size()) {
+      auto& node = nodes[root];
+      if (node.value) return &*node.value;
+    }
+
+    return nullptr;
+  }
+
+  template <class KeyIter>
+  const Value* find(KeyIter begin, KeyIter end) const {
+    // First we handle the empty sequence
+    if (begin == end) {
+      if (empty_seq) return &*empty_seq;
+      return nullptr;
+    }
+
+    // Now handle the first node differently.
+    optional<size_t> mroot = matching_start(*begin++);
+    size_t root;
+    if (!mroot) {
+      return nullptr;
+    } else {
+      root = *mroot;
+    }
+
+    while (begin != end) {
+      // Check if there's a matching child already
+      optional<size_t> child = matching_child(root, *begin);
+      if (child) {
+        root = *child;
+        ++begin;
+        continue;
+      }
+
+      return nullptr;
+    }
+
+    if (root < nodes.size()) {
+      auto& node = nodes[root];
+      if (node.value) return &*node.value;
+    }
+    return nullptr;
+  }
+};
+
+}  // namespace wcl

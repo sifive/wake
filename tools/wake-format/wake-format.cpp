@@ -166,7 +166,7 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  wcl::xoshiro_256 rng(wcl::get_rng_seed());
+  wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
 
   for (int i = 1; i < argc; i++) {
     ExternalFile file = ExternalFile(*reporter, argv[i]);
