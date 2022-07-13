@@ -67,7 +67,7 @@ class rope_impl_pair : public rope_impl_base {
 // It supports O(1) concatination of two ropes and O(1) size lookup.
 // Rope->string and string->rope are O(n) operations.
 //
-// *Examples*
+// Examples:
 // ```
 // rope r1 = rope::lit("first");
 // rope r2 = rope::lit("-second");
@@ -106,7 +106,7 @@ class rope {
 // `rope_builder` is a convenient wrapper around `rope`. It simplifies the API for building up
 // a rope from several parts.
 //
-// *Examples*
+// Examples:
 // ```
 // rope_builder b1;
 // b1.append("Hello");
@@ -119,6 +119,7 @@ class rope {
 // b1.append(std::move(b2).build());
 // rope r = std::move(b1).build();
 // r.as_string() -> "Hello World!"
+// ```
 class rope_builder {
  private:
   rope r = rope::lit("");
