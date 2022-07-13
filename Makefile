@@ -5,7 +5,7 @@ VERSION	:= $(shell if test -f manifest.wake; then sed -n "/publish releaseAs/ s/
 CC	:= cc -std=c11
 CXX	:= c++
 CXX_VERSION := -std=c++14
-CFLAGS	:= -Wall -O2 -DVERSION=$(VERSION)
+CFLAGS	:= -Wall -Wno-format-security -O2 -DVERSION=$(VERSION)
 LDFLAGS	:=
 DESTDIR ?= /usr/local
 
