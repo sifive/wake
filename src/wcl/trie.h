@@ -216,7 +216,6 @@ class trie {
     if (pair.second == end) return pair.first;
     return nullptr;
   }
-
 };
 
 }  // namespace wcl
