@@ -29,16 +29,17 @@ TEST(rope_basic) {
   {
     wcl::rope_builder other;
     other.append("My name is");
-    other.append(" John");
+    other.append(" Ashley");
     wcl::rope r = other.build();
     builder.append(" ");
     builder.append(r);
   }
 
   wcl::rope r = builder.build();
-  std::string expected = "Hello World! My name is John";
-  ASSERT_EQUAL(expected.size(), r.size());
-  ASSERT_EQUAL(expected, r.as_string());
+  std::string expected = "Hello World! My name is Ashley";
+
+  EXPECT_EQUAL(expected.size(), r.size());
+  EXPECT_EQUAL(expected, r.as_string());
 }
 
 TEST(rope_builder_build_once) {
@@ -50,14 +51,14 @@ TEST(rope_builder_build_once) {
   wcl::rope r = builder.build();
 
   std::string expected = "Hello World!";
-  ASSERT_EQUAL(expected.size(), r.size());
-  ASSERT_EQUAL(expected, r.as_string());
+  EXPECT_EQUAL(expected.size(), r.size());
+  EXPECT_EQUAL(expected, r.as_string());
 
   r = builder.build();
 
   expected = "";
-  ASSERT_EQUAL(expected.size(), r.size());
-  ASSERT_EQUAL(expected, r.as_string());
+  EXPECT_EQUAL(expected.size(), r.size());
+  EXPECT_EQUAL(expected, r.as_string());
 }
 
 TEST(rope_large) {

@@ -17,6 +17,7 @@
 
 #include <iostream>
 #include <memory>
+#include <sstream>
 
 namespace wcl {
 
@@ -28,9 +29,10 @@ class rope_impl_base {
   rope_impl_base(size_t len) : length(len) {}
 
  public:
+  virtual ~rope_impl_base() = default;
+
   // methods that all RopeImpl share
   virtual void write(std::ostream&) const = 0;
-  virtual std::string as_string() const = 0;
   size_t size() const { return length; }
 };
 
@@ -41,8 +43,6 @@ class rope_impl_string : public rope_impl_base {
  public:
   explicit rope_impl_string(std::string str) : rope_impl_base(str.size()), str(str) {}
   void write(std::ostream& ostream) const override { ostream << str; }
-
-  std::string as_string() const override { return str; }
 };
 
 class rope_impl_pair : public rope_impl_base {
@@ -58,9 +58,6 @@ class rope_impl_pair : public rope_impl_base {
     pair.first->write(ostream);
     pair.second->write(ostream);
   }
-  std::string as_string() const override {
-    return pair.first->as_string() + pair.second->as_string();
-  }
 };
 
 class rope {
@@ -71,20 +68,24 @@ class rope {
 
  public:
   // O(1) but constructing the string takes O(n)
-  static rope lit(std::string&& str) {
+  static rope lit(std::string str) {
     return rope(std::make_unique<rope_impl_string>(std::move(str)));
   }
   // O(1)
-  rope concat(rope r) { return rope(std::make_unique<rope_impl_pair>(impl, r.impl)); }
+  rope concat(rope r) const { return rope(std::make_unique<rope_impl_pair>(impl, r.impl)); }
 
   // O(n)
-  std::string as_string() { return impl->as_string(); }
+  std::string as_string() const {
+    std::stringstream ss;
+    impl->write(ss);
+    return ss.str();
+  }
 
   // O(n)
   void write(std::ostream& ostream) const { impl->write(ostream); }
 
   // O(1)
-  size_t size() { return impl->size(); }
+  size_t size() const { return impl->size(); }
 };
 
 class rope_builder {
@@ -96,7 +97,7 @@ class rope_builder {
   void append(rope other) { r = r.concat(other); }
 
   rope build() {
-    rope copy = r;
+    rope copy = std::move(r);
     r = rope::lit("");
     return copy;
   }
