@@ -9,6 +9,9 @@ PASSED:
   option_no_construct
   option_none_is_none
   option_some
+  rope_basic
+  rope_builder_build_once
+  rope_large
   sanity_check1
   sanity_check2
   trie_basic
