@@ -22,6 +22,7 @@
 
 #include <cstdint>
 #include <tuple>
+#include <string>
 
 namespace wcl {
 
