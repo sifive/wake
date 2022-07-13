@@ -21,41 +21,39 @@
 namespace wcl {
 
 class rope_impl_base {
-protected:
+ protected:
   // On construction this has to be set
   size_t length;
 
   rope_impl_base(size_t len) : length(len) {}
-public:
+
+ public:
   // methods that all RopeImpl share
   virtual void write(std::ostream&) const = 0;
   virtual std::string as_string() const = 0;
-  size_t size() const {
-    return length;
-  }
+  size_t size() const { return length; }
 };
 
 class rope_impl_string : public rope_impl_base {
-  private:
-   std::string str;
-  public:
-  explicit rope_impl_string(std::string str): rope_impl_base(str.size()), str(str){}
-  void write(std::ostream& ostream) const override {
-    ostream << str;
-  }
+ private:
+  std::string str;
 
-  std::string as_string() const override {
-    return str;
-  }
+ public:
+  explicit rope_impl_string(std::string str) : rope_impl_base(str.size()), str(str) {}
+  void write(std::ostream& ostream) const override { ostream << str; }
+
+  std::string as_string() const override { return str; }
 };
 
-class rope_impl_pair: public rope_impl_base {
- // this concats two ropes togethor
-  private:
-   std::pair<std::shared_ptr<rope_impl_base>,std::shared_ptr<rope_impl_base>> pair;
-  public:
-  rope_impl_pair(std::shared_ptr<rope_impl_base> left, std::shared_ptr<rope_impl_base> right):
-  rope_impl_base(left->size() + right->size()), pair(std::make_pair(std::move(left), std::move(right))) {}
+class rope_impl_pair : public rope_impl_base {
+  // this concats two ropes togethor
+ private:
+  std::pair<std::shared_ptr<rope_impl_base>, std::shared_ptr<rope_impl_base>> pair;
+
+ public:
+  rope_impl_pair(std::shared_ptr<rope_impl_base> left, std::shared_ptr<rope_impl_base> right)
+      : rope_impl_base(left->size() + right->size()),
+        pair(std::make_pair(std::move(left), std::move(right))) {}
   void write(std::ostream& ostream) const override {
     pair.first->write(ostream);
     pair.second->write(ostream);
@@ -66,47 +64,36 @@ class rope_impl_pair: public rope_impl_base {
 };
 
 class rope {
-private:
+ private:
   std::shared_ptr<rope_impl_base> impl;
 
   explicit rope(std::unique_ptr<rope_impl_base> impl) : impl(std::move(impl)) {}
 
-public:
+ public:
   // O(1) but constructing the string takes O(n)
   static rope lit(std::string&& str) {
     return rope(std::make_unique<rope_impl_string>(std::move(str)));
   }
   // O(1)
-  rope concat(rope r) {
-    return rope(std::make_unique<rope_impl_pair>(impl, r.impl));
-  }
+  rope concat(rope r) { return rope(std::make_unique<rope_impl_pair>(impl, r.impl)); }
 
   // O(n)
-  std::string as_string() {
-    return impl->as_string();
-  }
+  std::string as_string() { return impl->as_string(); }
 
   // O(n)
-  void write(std::ostream& ostream) const {
-    impl ->write(ostream);
-  }
+  void write(std::ostream& ostream) const { impl->write(ostream); }
 
   // O(1)
   size_t size() { return impl->size(); }
-
 };
 
 class rope_builder {
-private:
+ private:
   rope r = rope::lit("");
 
-public:
-  void append(const char* str) {
-    r = r.concat(rope::lit(str));
-  }
-  void append(rope other) {
-    r = r.concat(other);
-  }
+ public:
+  void append(const char* str) { r = r.concat(rope::lit(str)); }
+  void append(rope other) { r = r.concat(other); }
 
   rope build() {
     rope copy = r;
