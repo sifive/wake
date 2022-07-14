@@ -183,9 +183,10 @@ int main(int argc, char **argv) {
     }
 
     auto output_file = std::make_unique<std::ofstream>(tmp);
-    Emitter emitter(output_file.get());
-    emitter.layout(cst);
+    Emitter emitter;
+    wcl::rope r = emitter.layout(cst);
 
+    r.write(*output_file);
     output_file.reset();
 
     if (in_place) {

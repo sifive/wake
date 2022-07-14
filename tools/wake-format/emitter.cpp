@@ -62,10 +62,11 @@ wcl::rope Emitter::try_flat(ctx_t ctx, CSTElement node) {
   assert(!node.empty());          \
   assert(node.id() == token);
 
-void Emitter::layout(CST cst) {
+wcl::rope Emitter::layout(CST cst) {
   ctx_t ctx;
   wcl::optional<wcl::rope> r = walk_node(ctx, cst.root());
-  r->write(*ostream);
+  assert(r);
+  return *r;
 }
 
 wcl::optional<wcl::rope> Emitter::walk_block(ctx_t ctx, CSTElement node) {

@@ -45,10 +45,8 @@ class Emitter {
     }
   };
 
-  Emitter(std::ostream* ostream) : ostream(ostream) { assert(ostream != nullptr); }
-
-  // Walks the CST, formats it, and writes it to ostream
-  void layout(CST cst);
+  // Walks the CST, formats it, and returns the representative rope
+  wcl::rope layout(CST cst);
 
  private:
   // Top level tree walk. Dispatches out the calls for various nodes
@@ -72,6 +70,5 @@ class Emitter {
   // Attempts to flatten `node` with flat. On failure returns the full node
   wcl::rope try_flat(ctx_t ctx, CSTElement node);
 
-  std::ostream* ostream;
   const uint8_t space_per_indent = 4;
 };
