@@ -179,8 +179,6 @@ int main(int argc, char **argv) {
     }
 
     if (debug) {
-      ExternalFile external_file = ExternalFile(*reporter, name.c_str());
-      CST cst = CST(external_file, *reporter);
       print_cst(cst.root(), 0);
     }
 

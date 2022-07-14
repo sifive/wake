@@ -54,7 +54,7 @@ wcl::optional<wcl::rope> Emitter::walk_top(ctx_t ctx, CSTElement node) {
     switch (child.id()) {
       case CST_CASE: {
         auto flat_child = flat(ctx, child);
-        if (flat_child && flat_child->size() < 120) {
+        if (flat_child && flat_child->size() < 60) {
           builder.append(*flat_child);
         } else {
           auto full_child = walk_top(ctx, child);

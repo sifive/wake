@@ -49,16 +49,27 @@ class Emitter {
 
   Emitter(std::ostream* ostream) : ostream(ostream) { assert(ostream != nullptr); }
 
-  nest_t nest(ctx_t ctx);
-  wcl::rope newline(ctx_t ctx);
-  wcl::rope space(ctx_t ctx, uint8_t count = 1);
-
-  // takes a CST and flattens it, should be memoized
-  wcl::optional<wcl::rope> flat(ctx_t ctx, CSTElement node);
+  // Walks the CST, formats it, and writes it to ostream
   void layout(CST cst);
 
  private:
+  // Top level tree walk. Dispatches out the calls for various nodes
   wcl::optional<wcl::rope> walk_top(ctx_t ctx, CSTElement node);
+
+  // Returns a nest_t instance that increases the indent level
+  // until the instance goes out of scope
+  nest_t nest(ctx_t ctx);
+
+  // Emits a newline and any indentation needed
+  wcl::rope newline(ctx_t ctx);
+
+  // Emits a space character `count` times
+  wcl::rope space(ctx_t ctx, uint8_t count = 1);
+
+  // TODO: memoize this function
+  // returns the subtree with all newlines and indentation removed
+  // if possible, None otherwise
+  wcl::optional<wcl::rope> flat(ctx_t ctx, CSTElement node);
 
   std::ostream* ostream;
   const uint8_t space_per_indent = 4;
