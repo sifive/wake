@@ -39,7 +39,6 @@ wcl::rope Emitter::newline(ctx_t ctx) {
 }
 
 wcl::rope Emitter::space(ctx_t ctx, uint8_t count) {
-  std::string spaces = "";
   wcl::rope_builder builder;
   for (uint8_t i = 0; i < count; i++) {
     builder.append(" ");
