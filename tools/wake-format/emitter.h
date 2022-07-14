@@ -37,14 +37,12 @@ class Emitter {
       copy.is_flat = true;
       return copy;
     }
-  };
 
-  struct nest_t {
-    ctx_t* ctx;
-
-    nest_t(ctx_t* ctx) : ctx(ctx) { ctx->nest_level++; }
-
-    ~nest_t() { ctx->nest_level--; }
+    ctx_t nest() {
+      ctx_t copy = *this;
+      copy.nest_level++;
+      return copy;
+    }
   };
 
   Emitter(std::ostream* ostream) : ostream(ostream) { assert(ostream != nullptr); }
@@ -54,11 +52,11 @@ class Emitter {
 
  private:
   // Top level tree walk. Dispatches out the calls for various nodes
-  wcl::optional<wcl::rope> walk_top(ctx_t ctx, CSTElement node);
+  wcl::optional<wcl::rope> walk_node(ctx_t ctx, CSTElement node);
+  wcl::rope walk_token(ctx_t ctx, CSTElement node);
 
-  // Returns a nest_t instance that increases the indent level
-  // until the instance goes out of scope
-  nest_t nest(ctx_t ctx);
+  wcl::optional<wcl::rope> walk_block(ctx_t ctx, CSTElement node);
+  wcl::rope walk_def(ctx_t ctx, CSTElement node);
 
   // Emits a newline and any indentation needed
   wcl::rope newline(ctx_t ctx);
@@ -71,8 +69,9 @@ class Emitter {
   // if possible, None otherwise
   wcl::optional<wcl::rope> flat(ctx_t ctx, CSTElement node);
 
+  // Attempts to flatten `node` with flat. On failure returns the full node
+  wcl::rope try_flat(ctx_t ctx, CSTElement node);
+
   std::ostream* ostream;
   const uint8_t space_per_indent = 4;
-
-  friend nest_t;
 };

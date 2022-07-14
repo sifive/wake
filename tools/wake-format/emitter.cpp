@@ -25,8 +25,6 @@
 
 #include "parser/parser.h"
 
-Emitter::nest_t Emitter::nest(ctx_t ctx) { return nest_t(&ctx); }
-
 wcl::rope Emitter::newline(ctx_t ctx) {
   wcl::rope_builder builder;
 
@@ -47,60 +45,132 @@ wcl::rope Emitter::space(ctx_t ctx, uint8_t count) {
 }
 
 wcl::optional<wcl::rope> Emitter::flat(ctx_t ctx, CSTElement node) {
-  return walk_top(ctx.flat(), node);
+  return walk_node(ctx.flat(), node);
 }
+
+wcl::rope Emitter::try_flat(ctx_t ctx, CSTElement node) {
+  auto flat_node = flat(ctx, node);
+  if (flat_node && flat_node->size() < 60) {
+    return *flat_node;
+  }
+  auto full_node = walk_node(ctx, node);
+  assert(full_node);
+  return *full_node;
+}
+
+#define ASSERT_TOKEN(node, token) \
+  assert(!node.empty());          \
+  assert(node.id() == token);
 
 void Emitter::layout(CST cst) {
   ctx_t ctx;
-  wcl::optional<wcl::rope> r = walk_top(ctx, cst.root());
+  wcl::optional<wcl::rope> r = walk_node(ctx, cst.root());
   r->write(*ostream);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_top(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::rope> Emitter::walk_block(ctx_t ctx, CSTElement node) {
+  ASSERT_TOKEN(node, CST_BLOCK);
+  CSTElement child = node.firstChildElement();
+  assert(child.isNode());
+
+  auto rope = walk_node(ctx.nest(), child);
+  if (!rope) {
+    return {};
+  }
+
+  wcl::rope block_rope = rope->concat(wcl::rope::lit("\n"));
+  return wcl::optional<wcl::rope>(wcl::in_place_t{}, std::move(block_rope));
+}
+
+wcl::rope Emitter::walk_def(ctx_t ctx, CSTElement node) {
+  ASSERT_TOKEN(node, CST_DEF);
+
   wcl::rope_builder builder;
-  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
-    switch (child.id()) {
-      case CST_CASE: {
-        auto flat_child = flat(ctx, child);
-        if (flat_child && flat_child->size() < 60) {
-          builder.append(*flat_child);
-        } else {
-          auto full_child = walk_top(ctx, child);
-          assert(full_child);
-          builder.append(*full_child);
-        }
-        break;
-      }
-      case TOKEN_KW_MACRO_HERE:
-        builder.append("@here");
-        break;
-      case TOKEN_NL: {
-        if (ctx.is_flat) {
-          builder.append(" ");
-        } else {
-          builder.append("\n");
-        }
-        break;
-      }
-      case TOKEN_WS: {
-        if (ctx.is_flat) {
-          builder.append(" ");
-        } else {
-          builder.append(child.fragment().segment().str());
-        }
-        break;
-      }
-      default: {
+
+  CSTElement child = node.firstChildElement();
+  ASSERT_TOKEN(child, TOKEN_KW_DEF);
+  builder.append("def");
+
+  child.nextSiblingElement();
+  ASSERT_TOKEN(child, TOKEN_WS);
+  builder.append(" ");
+
+  // This is the id/function name + signature
+  child.nextSiblingElement();
+  assert(child.isNode());
+  builder.append(try_flat(ctx, child));
+
+  child.nextSiblingElement();
+  ASSERT_TOKEN(child, TOKEN_WS);
+  builder.append(" ");
+
+  child.nextSiblingElement();
+  ASSERT_TOKEN(child, TOKEN_P_EQUALS);
+  builder.append("=");
+
+  child.nextSiblingElement();
+  while (!child.empty() && (child.id() == TOKEN_WS || child.id() == TOKEN_NL)) {
+    child.nextSiblingElement();
+  }
+
+  builder.append(newline(ctx.nest()));
+
+  builder.append(try_flat(ctx, child));
+
+  return std::move(builder).build();
+}
+
+wcl::optional<wcl::rope> Emitter::walk_node(ctx_t ctx, CSTElement node) {
+  assert(node.isNode());
+
+  wcl::rope_builder builder;
+
+  switch (node.id()) {
+    case CST_DEF:
+      builder.append(walk_def(ctx, node));
+      break;
+    case CST_BLOCK: {
+      auto full_node = walk_block(ctx, node);
+      assert(full_node);
+      builder.append(*full_node);
+      break;
+    }
+    default: {
+      for (CSTElement child = node.firstChildElement(); !child.empty();
+           child.nextSiblingElement()) {
         if (child.isNode()) {
-          auto full_child = walk_top(ctx, child);
+          auto full_child = walk_node(ctx, child);
           assert(full_child);
           builder.append(*full_child);
         } else {
-          builder.append(child.fragment().segment().str());
+          builder.append(walk_token(ctx, child));
         }
-        break;
       }
+      break;
     }
   }
   return wcl::optional<wcl::rope>(wcl::in_place_t{}, std::move(builder).build());
+}
+
+wcl::rope Emitter::walk_token(ctx_t ctx, CSTElement node) {
+  assert(!node.isNode());
+  switch (node.id()) {
+    case TOKEN_KW_MACRO_HERE:
+      return wcl::rope::lit("@here");
+    case TOKEN_NL: {
+      if (ctx.is_flat) {
+        return wcl::rope::lit(" ");
+      }
+      return wcl::rope::lit("\n");
+    }
+    case TOKEN_WS: {
+      if (ctx.is_flat) {
+        return wcl::rope::lit(" ");
+      }
+      return wcl::rope::lit(node.fragment().segment().str());
+    }
+    default: {
+      return wcl::rope::lit(node.fragment().segment().str());
+    }
+  }
 }
