@@ -27,7 +27,16 @@
 
 Emitter::nest_t Emitter::nest(ctx_t ctx) { return nest_t(&ctx); }
 
-wcl::rope Emitter::newline(ctx_t ctx) { return wcl::rope::lit("\n"); }
+wcl::rope Emitter::newline(ctx_t ctx) {
+  wcl::rope_builder builder;
+
+  builder.append("\n");
+  for (int i = 0; i < ctx.nest_level; i++) {
+    builder.append(space(ctx, space_per_indent));
+  }
+
+  return std::move(builder).build();
+}
 
 wcl::rope Emitter::space(ctx_t ctx, uint8_t count) {
   std::string spaces = "";
