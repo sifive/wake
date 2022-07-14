@@ -93,6 +93,86 @@ struct TestLogger {
     return fail(*err, assert);
   }
 
+  TestStream expect_equal(bool assert, std::vector<std::string> expected,
+                          std::vector<std::string> actual, const char* expected_str,
+                          const char* actual_str, int line, const char* file) {
+    if (expected.size() != actual.size()) {
+      errors.emplace_back(new ErrorMessage);
+      auto& err = errors.back();
+      err->test_name = test_name;
+      err->file = file;
+      err->line = line;
+      err->predicate_error << "Expected vector length:\n\t" << term_colour(TERM_MAGENTA)
+                           << expected.size();
+      err->predicate_error << term_normal() << "\nBut actual vector length was:\n\t";
+      err->predicate_error << term_colour(TERM_MAGENTA) << actual.size();
+      err->predicate_error << term_normal() << std::endl;
+      return fail(*err, assert);
+    }
+
+    for (size_t i = 0; i < expected.size(); ++i) {
+      if (expected[i] != actual[i]) {
+        errors.emplace_back(new ErrorMessage);
+        auto& err = errors.back();
+        err->test_name = test_name;
+        err->file = file;
+        err->line = line;
+        err->predicate_error << "Expected vectors to be equal:\n\t" << term_colour(TERM_MAGENTA)
+                             << expected_str;
+        err->predicate_error << term_normal() << "\nAnd:\n\t";
+        err->predicate_error << term_colour(TERM_MAGENTA) << actual_str;
+        err->predicate_error << term_normal() << "\nBut were found to differ at index " << i;
+        err->predicate_error << term_colour(TERM_MAGENTA) << "\n\t(" << actual_str << ")[" << i
+                             << "] = " << actual[i] << "\n";
+        err->predicate_error << term_normal() << "But:\n\t" << term_colour(TERM_MAGENTA) << "("
+                             << expected_str << ")[" << i << "] = " << expected[i] << "\n";
+        err->predicate_error << term_normal() << std::endl;
+        return fail(*err, assert);
+      }
+    }
+
+    return TestStream(nullptr, nullptr);
+  }
+
+  template <class T>
+  TestStream expect_equal(bool assert, const std::vector<T>& expected, const std::vector<T>& actual,
+                          const char* expected_str, const char* actual_str, int line,
+                          const char* file) {
+    if (expected.size() != actual.size()) {
+      errors.emplace_back(new ErrorMessage);
+      auto& err = errors.back();
+      err->test_name = test_name;
+      err->file = file;
+      err->line = line;
+      err->predicate_error << "Expected vector length:\n\t" << term_colour(TERM_MAGENTA)
+                           << expected;
+      err->predicate_error << term_normal() << "\nBut actual vector length was:\n\t";
+      err->predicate_error << term_colour(TERM_MAGENTA) << actual;
+      err->predicate_error << term_normal() << std::endl;
+      return fail(*err, assert);
+    }
+
+    for (size_t i = 0; i < expected.size(); ++i) {
+      if (expected[i] != actual[i]) {
+        errors.emplace_back(new ErrorMessage);
+        auto& err = errors.back();
+        err->test_name = test_name;
+        err->file = file;
+        err->line = line;
+        err->predicate_error << "Expected vectors to be equal:\n\t" << term_colour(TERM_MAGENTA)
+                             << expected_str;
+        err->predicate_error << term_normal() << "\nAnd:\n\t";
+        err->predicate_error << term_colour(TERM_MAGENTA) << actual_str;
+        err->predicate_error << term_normal() << "\nBut were found to differ at index " << i
+                             << "\n";
+        err->predicate_error << term_normal() << std::endl;
+        return fail(*err, assert);
+      }
+    }
+
+    return TestStream(nullptr, nullptr);
+  }
+
   TestStream expect_equal(bool assert, int expected, int actual, const char* expected_str,
                           const char* actual_str, int line, const char* file) {
     if (expected == actual) return TestStream(nullptr, nullptr);

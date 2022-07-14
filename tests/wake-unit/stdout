@@ -1,4 +1,12 @@
 PASSED:
+  filepath_range_basic
+  filepath_range_empty_node
+  filepath_range_fuzz_garbage
+  filepath_range_fuzz_nice
+  filepath_range_no_node
+  filepath_range_one_node
+  filepath_range_only_slash
+  filepath_range_two_slash
   option_assign1
   option_assign2
   option_copy
