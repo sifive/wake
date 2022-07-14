@@ -1,6 +1,0 @@
-def wakeToTestDir Unit = match (subscribe wakeTestBinary)
-    buildTestWake, Nil =
-        require Pass (Pair path visible) = buildTestWake Unit
-        Pass (Pair (simplify "{path}/..") visible)
-    Nil = Pass (Pair "{wakePath}" Nil)
-    _ = Fail (makeError "Two wake binaries declared for testing!")
