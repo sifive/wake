@@ -62,7 +62,7 @@ class Emitter {
   wcl::rope newline(ctx_t ctx);
 
   // Emits a space character `count` times
-  wcl::rope space(ctx_t ctx, uint8_t count = 1);
+  wcl::rope space(uint8_t count = 1);
 
   // TODO: memoize this function
   // returns the subtree with all newlines and indentation removed

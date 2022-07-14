@@ -189,7 +189,7 @@ int main(int argc, char **argv) {
     output_file.reset();
 
     if (in_place) {
-      // When editing in-place we need to copy the tmp file over the original
+      // When editing in-place we need to rename the tmp file over the original
       rename(tmp.c_str(), name.c_str());
     } else {
       // print out the resulting file and remove

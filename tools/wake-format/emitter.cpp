@@ -30,13 +30,13 @@ wcl::rope Emitter::newline(ctx_t ctx) {
 
   builder.append("\n");
   for (int i = 0; i < ctx.nest_level; i++) {
-    builder.append(space(ctx, space_per_indent));
+    builder.append(space(space_per_indent));
   }
 
   return std::move(builder).build();
 }
 
-wcl::rope Emitter::space(ctx_t ctx, uint8_t count) {
+wcl::rope Emitter::space(uint8_t count) {
   wcl::rope_builder builder;
   for (uint8_t i = 0; i < count; i++) {
     builder.append(" ");
