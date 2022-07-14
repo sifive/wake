@@ -33,6 +33,7 @@ class rope_impl_base {
 
   // methods that all RopeImpl share
   virtual void write(std::ostream&) const = 0;
+  virtual void drop_last() = 0;
   size_t size() const { return length; }
 };
 
@@ -43,6 +44,7 @@ class rope_impl_string : public rope_impl_base {
  public:
   explicit rope_impl_string(std::string str) : rope_impl_base(str.size()), str(str) {}
   void write(std::ostream& ostream) const override { ostream << str; }
+  void drop_last() override { str = ""; }
 };
 
 class rope_impl_pair : public rope_impl_base {
@@ -57,6 +59,9 @@ class rope_impl_pair : public rope_impl_base {
   void write(std::ostream& ostream) const override {
     pair.first->write(ostream);
     pair.second->write(ostream);
+  }
+  void drop_last() override {
+    pair = std::make_pair(std::move(pair.first), std::make_unique<rope_impl_string>(std::move("")));
   }
 };
 
@@ -101,6 +106,9 @@ class rope {
 
   // O(1)
   size_t size() const { return impl->size(); }
+
+  // O(1) mutates the rope by removing the last rope added
+  void drop_last() { impl->drop_last(); }
 };
 
 // `rope_builder` is a convenient wrapper around `rope`. It simplifies the API for building up
@@ -127,6 +135,7 @@ class rope_builder {
  public:
   void append(std::string str) { r = r.concat(rope::lit(std::move(str))); }
   void append(rope other) { r = r.concat(other); }
+  void drop_last() { r.drop_last(); }
 
   rope build() && {
     rope copy = std::move(r);

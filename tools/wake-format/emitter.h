@@ -50,11 +50,14 @@ class Emitter {
 
  private:
   // Top level tree walk. Dispatches out the calls for various nodes
+  wcl::rope walk_top(ctx_t ctx, CSTElement node);
+
   wcl::optional<wcl::rope> walk_node(ctx_t ctx, CSTElement node);
   wcl::rope walk_token(ctx_t ctx, CSTElement node);
 
-  wcl::optional<wcl::rope> walk_block(ctx_t ctx, CSTElement node);
+  wcl::rope walk_block(ctx_t ctx, CSTElement node);
   wcl::rope walk_def(ctx_t ctx, CSTElement node);
+  wcl::rope walk_apply(ctx_t ctx, CSTElement node);
 
   // Emits a newline and any indentation needed
   wcl::rope newline(ctx_t ctx);

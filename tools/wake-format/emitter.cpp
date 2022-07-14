@@ -28,7 +28,7 @@
 wcl::rope Emitter::newline(ctx_t ctx) {
   wcl::rope_builder builder;
 
-  builder.append("\n");
+  builder.append("⏎\n");
   for (int i = 0; i < ctx.nest_level; i++) {
     builder.append(space(space_per_indent));
   }
@@ -39,7 +39,7 @@ wcl::rope Emitter::newline(ctx_t ctx) {
 wcl::rope Emitter::space(uint8_t count) {
   wcl::rope_builder builder;
   for (uint8_t i = 0; i < count; i++) {
-    builder.append(" ");
+    builder.append("·");
   }
   return std::move(builder).build();
 }
@@ -50,7 +50,7 @@ wcl::optional<wcl::rope> Emitter::flat(ctx_t ctx, CSTElement node) {
 
 wcl::rope Emitter::try_flat(ctx_t ctx, CSTElement node) {
   auto flat_node = flat(ctx, node);
-  if (flat_node && flat_node->size() < 60) {
+  if (flat_node && flat_node->size() + ctx.nest_level * space_per_indent < 80) {
     return *flat_node;
   }
   auto full_node = walk_node(ctx, node);
@@ -64,23 +64,58 @@ wcl::rope Emitter::try_flat(ctx_t ctx, CSTElement node) {
 
 wcl::rope Emitter::layout(CST cst) {
   ctx_t ctx;
-  wcl::optional<wcl::rope> r = walk_node(ctx, cst.root());
-  assert(r);
-  return *r;
+  return walk_top(ctx, cst.root()).concat(newline(ctx));
 }
 
-wcl::optional<wcl::rope> Emitter::walk_block(ctx_t ctx, CSTElement node) {
-  ASSERT_TOKEN(node, CST_BLOCK);
-  CSTElement child = node.firstChildElement();
-  assert(child.isNode());
+wcl::rope Emitter::walk_top(ctx_t ctx, CSTElement node) {
+  wcl::rope_builder builder;
 
-  auto rope = walk_node(ctx.nest(), child);
-  if (!rope) {
-    return {};
+  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    if (child.isNode()) {
+      builder.append(try_flat(ctx, child));
+      builder.append(newline(ctx));
+    } else {
+      builder.append(walk_token(ctx, child));
+    }
   }
 
-  wcl::rope block_rope = rope->concat(wcl::rope::lit("\n"));
-  return wcl::optional<wcl::rope>(wcl::in_place_t{}, std::move(block_rope));
+  // probably shouldn't do this unconditionally
+  builder.drop_last();
+
+  return std::move(builder).build();
+}
+
+wcl::rope Emitter::walk_block(ctx_t ctx, CSTElement node) {
+  ASSERT_TOKEN(node, CST_BLOCK);
+  return walk_top(ctx.nest(), node);
+}
+
+wcl::rope Emitter::walk_apply(ctx_t ctx, CSTElement node) {
+  ASSERT_TOKEN(node, CST_APP);
+
+  wcl::rope_builder builder;
+
+  CSTElement child = node.firstChildElement();
+  ASSERT_TOKEN(child, CST_ID);
+  {
+    auto node = walk_node(ctx, child);
+    assert(node);
+    builder.append(*node);
+  }
+
+  child.nextSiblingElement();
+  ASSERT_TOKEN(child, TOKEN_WS);
+  builder.append(space());
+
+  child.nextSiblingElement();
+  ASSERT_TOKEN(child, CST_ID);
+  {
+    auto node = walk_node(ctx, child);
+    assert(node);
+    builder.append(*node);
+  }
+
+  return std::move(builder).build();
 }
 
 wcl::rope Emitter::walk_def(ctx_t ctx, CSTElement node) {
@@ -94,7 +129,7 @@ wcl::rope Emitter::walk_def(ctx_t ctx, CSTElement node) {
 
   child.nextSiblingElement();
   ASSERT_TOKEN(child, TOKEN_WS);
-  builder.append(" ");
+  builder.append(space());
 
   // This is the id/function name + signature
   child.nextSiblingElement();
@@ -103,7 +138,7 @@ wcl::rope Emitter::walk_def(ctx_t ctx, CSTElement node) {
 
   child.nextSiblingElement();
   ASSERT_TOKEN(child, TOKEN_WS);
-  builder.append(" ");
+  builder.append(space());
 
   child.nextSiblingElement();
   ASSERT_TOKEN(child, TOKEN_P_EQUALS);
@@ -114,7 +149,11 @@ wcl::rope Emitter::walk_def(ctx_t ctx, CSTElement node) {
     child.nextSiblingElement();
   }
 
-  builder.append(newline(ctx.nest()));
+  if (ctx.is_flat) {
+    builder.append(space());
+  } else {
+    builder.append(newline(ctx.nest()));
+  }
 
   builder.append(try_flat(ctx, child));
 
@@ -130,12 +169,12 @@ wcl::optional<wcl::rope> Emitter::walk_node(ctx_t ctx, CSTElement node) {
     case CST_DEF:
       builder.append(walk_def(ctx, node));
       break;
-    case CST_BLOCK: {
-      auto full_node = walk_block(ctx, node);
-      assert(full_node);
-      builder.append(*full_node);
+    case CST_BLOCK:
+      builder.append(walk_block(ctx, node));
       break;
-    }
+    case CST_APP:
+      builder.append(walk_apply(ctx, node));
+      break;
     default: {
       for (CSTElement child = node.firstChildElement(); !child.empty();
            child.nextSiblingElement()) {
@@ -160,13 +199,14 @@ wcl::rope Emitter::walk_token(ctx_t ctx, CSTElement node) {
       return wcl::rope::lit("@here");
     case TOKEN_NL: {
       if (ctx.is_flat) {
-        return wcl::rope::lit(" ");
+        return space();
       }
-      return wcl::rope::lit("\n");
+      return newline(ctx);
     }
     case TOKEN_WS: {
+      return wcl::rope::lit("");
       if (ctx.is_flat) {
-        return wcl::rope::lit(" ");
+        return space();
       }
       return wcl::rope::lit(node.fragment().segment().str());
     }
