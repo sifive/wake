@@ -116,6 +116,25 @@ jobs:
           paths:
             - release/rocky_8
 
+  rocky_9:
+    machine:
+      image: ubuntu-2004:202201-02
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/rocky-9 -t wake-rocky-9 .
+      - run: |
+          cp /tmp/workspace/wake_*.tar.xz . && \
+          cp -a /tmp/workspace/tests . && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-rocky-9 rpmbuild -ta --define "_rpmdir /build" wake_*.tar.xz && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-rocky-9 /bin/sh -c "rpm -i x86_64/*.rpm && cd tests && wake runTests" && \
+          install -D -t release/rocky_9 x86_64/*.rpm
+      - persist_to_workspace:
+          root: .
+          paths:
+            - release/rocky_9
+
+
   ubuntu_18_04:
     machine:
       image: ubuntu-2004:202201-02
@@ -203,6 +222,9 @@ workflows:
       - rocky_8:
           requires:
             - tarball
+      - rocky_9:
+          requires:
+            - tarball
       - ubuntu_18_04:
           requires:
             - tarball
@@ -218,6 +240,7 @@ workflows:
             - debian_bullseye
             - centos_7_6     # RHEL7-compatible, not using default compiler
             - rocky_8        # RHEL8-compatible
+            - rocky_9        # RHEL9-compatible
             - ubuntu_18_04   # LTS
             - ubuntu_22_04   # LTS
             - vscode
