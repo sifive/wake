@@ -74,4 +74,5 @@ class Emitter {
   wcl::rope try_flat(ctx_t ctx, CSTElement node);
 
   const uint8_t space_per_indent = 4;
+  const uint8_t max_column_width = 100;
 };

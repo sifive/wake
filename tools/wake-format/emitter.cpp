@@ -50,7 +50,7 @@ wcl::optional<wcl::rope> Emitter::flat(ctx_t ctx, CSTElement node) {
 
 wcl::rope Emitter::try_flat(ctx_t ctx, CSTElement node) {
   auto flat_node = flat(ctx, node);
-  if (flat_node && flat_node->size() + ctx.nest_level * space_per_indent < 80) {
+  if (flat_node && flat_node->column() <= max_column_width) {
     return *flat_node;
   }
   auto full_node = walk_node(ctx, node);

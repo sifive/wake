@@ -1,12 +1,7 @@
-def·name·Unit·=⏎
-····def·other·=·@here⏎
-····def·other·=⏎
-········"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"⏎
+def·name·Unit·=·def·other·=·@here⏎
+····def·other·=·"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"⏎
 ····another⏎
 ⏎
-def·name·Unit·=⏎
-····def·other·=·@here⏎
-····def·other·=⏎
-········"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"⏎
+def·name·Unit·=·def·other·=·@here⏎
+····def·other·=·"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"⏎
 ····another⏎
-⏎

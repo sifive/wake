@@ -10,6 +10,7 @@ PASSED:
   option_none_is_none
   option_some
   rope_basic
+  rope_column
   rope_large
   rope_undo
   sanity_check1

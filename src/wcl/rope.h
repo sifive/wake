@@ -26,6 +26,8 @@ class rope_impl_base {
  protected:
   // On construction this has to be set
   size_t length;
+  size_t col;
+  bool has_newline;
 
   rope_impl_base(size_t len) : length(len) {}
 
@@ -35,6 +37,8 @@ class rope_impl_base {
   // methods that all RopeImpl share
   virtual void write(std::ostream&) const = 0;
   size_t size() const { return length; }
+  size_t column() const { return col; }
+  bool newline() const { return has_newline; }
 };
 
 class rope_impl_string : public rope_impl_base {
@@ -42,7 +46,17 @@ class rope_impl_string : public rope_impl_base {
   std::string str;
 
  public:
-  explicit rope_impl_string(std::string str) : rope_impl_base(str.size()), str(str) {}
+  explicit rope_impl_string(std::string str) : rope_impl_base(str.size()), str(str) {
+    col = 0;
+    for (auto& c : str) {
+      if (c == '\n') {
+        col = 0;
+        has_newline = true;
+        continue;
+      }
+      col++;
+    }
+  }
   void write(std::ostream& ostream) const override { ostream << str; }
 };
 
@@ -54,7 +68,15 @@ class rope_impl_pair : public rope_impl_base {
  public:
   rope_impl_pair(std::shared_ptr<rope_impl_base> left, std::shared_ptr<rope_impl_base> right)
       : rope_impl_base(left->size() + right->size()),
-        pair(std::make_pair(std::move(left), std::move(right))) {}
+        pair(std::make_pair(std::move(left), std::move(right))) {
+    if (pair.second->newline()) {
+      col = pair.second->column();
+    } else {
+      col = pair.first->column() + pair.second->size();
+    }
+    has_newline = pair.first->newline() || pair.second->newline();
+  }
+
   void write(std::ostream& ostream) const override {
     pair.first->write(ostream);
     pair.second->write(ostream);
@@ -102,6 +124,9 @@ class rope {
 
   // O(1)
   size_t size() const { return impl->size(); }
+
+  // O(1)
+  size_t column() const { return impl->column(); }
 };
 
 // `rope_builder` is a convenient wrapper around `rope`. It simplifies the API for building up
