@@ -4,46 +4,36 @@
  * ------------------------------------------------------------------------------------------ */
 
 import * as vscode from 'vscode';
-import { integer, LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient/node';
+import { LanguageClient, ServerOptions, TransportKind } from 'vscode-languageclient/node';
 import { spawn } from 'child_process';
+import { clientOptions, registerFsMethods } from './common';
 
 let client: LanguageClient;
 
 export function activate(context: vscode.ExtensionContext): void {
-	const serverModule = context.asAbsolutePath('/lsp-server/lsp-wake.js');
-
-	let stdLibPath: string = vscode.workspace.getConfiguration("wakeLanguageServer").get("pathToWakeStandardLibrary");
-	if (stdLibPath === "") {
+	let stdLibPath: string | undefined = vscode.workspace.getConfiguration('wakeLanguageServer')
+		.get('pathToWakeStandardLibrary');
+	if (stdLibPath === undefined || stdLibPath === '') {
 		stdLibPath = context.asAbsolutePath('/share/wake/lib');
 	}
 
 	const serverOptions: ServerOptions = {
-		module: serverModule,
-		transport: TransportKind.stdio,
-		args: [stdLibPath]
+		module: context.asAbsolutePath('/lsp-server/out/serverNode.js'),
+		transport: TransportKind.ipc
 	};
 
-	// Options to control the language client
-	const clientOptions: LanguageClientOptions = {
-		// Register the server for .wake files
-		documentSelector: [{ language: 'wake', pattern: '**/*.wake' }],
-		synchronize: {
-			// Notify the server about file changes to .wake files contained in the workspace
-			fileEvents: vscode.workspace.createFileSystemWatcher('**/*.wake')
-		}
-	};
-
-	// Create the language client and start the client.
 	client = new LanguageClient(
 		'wakeLanguageServer',
-		'Wake Language Server',
+		'Wake Node Language Server',
 		serverOptions,
 		clientOptions
 	);
-	client.clientOptions.errorHandler = client.createDefaultErrorHandler(integer.MAX_VALUE);
+	client.clientOptions.errorHandler = client.createDefaultErrorHandler(Number.MAX_SAFE_INTEGER);
 
 	// Start the client. This will also launch the server
 	client.start();
+	registerFsMethods(client, stdLibPath);
+
 
 
 	// timeline setup

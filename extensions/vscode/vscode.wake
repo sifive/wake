@@ -47,10 +47,10 @@ export def vscode _: Result Path Error =
         failWithError "Did not find empscripten javascript output; got: {format files}"
 
     require Pass wasmFile =
-        installAs "{here}/lsp-server/lsp-wake.wasm" wasm
+        installAs "{here}/lsp-server/wasm/lsp-wake.wasm" wasm
 
     require Pass jsFile =
-        installAs "{here}/lsp-server/lsp-wake.js" js
+        installAs "{here}/lsp-server/wasm/lsp-wake.js" js
 
     require Pass packageLockJSON =
         source "{here}/package-lock.json"

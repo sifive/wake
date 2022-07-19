@@ -34,9 +34,10 @@ def emscriptenLFlags =
     "-O3",
     "-s", "ALLOW_MEMORY_GROWTH",
     "-s", "EXIT_RUNTIME",
+    "-s", "ASSERTIONS",
     "-s", "ASYNCIFY",
-    "-s", "ASYNCIFY_IGNORE_INDIRECT",
-    "-s", 'ASYNCIFY_IMPORTS=["nodejs_getstdin"]',
+    "-s", "MODULARIZE=1",
+    "-s", "EXPORT_ES6=1",
     Nil
 
 publish compileC =
