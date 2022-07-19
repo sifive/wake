@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-#include <iostream>
+#include <cassert>
 #include <memory>
 #include <sstream>
+#include <vector>
 
 namespace wcl {
 
@@ -33,7 +34,6 @@ class rope_impl_base {
 
   // methods that all RopeImpl share
   virtual void write(std::ostream&) const = 0;
-  virtual void drop_last() = 0;
   size_t size() const { return length; }
 };
 
@@ -44,7 +44,6 @@ class rope_impl_string : public rope_impl_base {
  public:
   explicit rope_impl_string(std::string str) : rope_impl_base(str.size()), str(str) {}
   void write(std::ostream& ostream) const override { ostream << str; }
-  void drop_last() override { str = ""; }
 };
 
 class rope_impl_pair : public rope_impl_base {
@@ -59,9 +58,6 @@ class rope_impl_pair : public rope_impl_base {
   void write(std::ostream& ostream) const override {
     pair.first->write(ostream);
     pair.second->write(ostream);
-  }
-  void drop_last() override {
-    pair = std::make_pair(std::move(pair.first), std::make_unique<rope_impl_string>(std::move("")));
   }
 };
 
@@ -106,9 +102,6 @@ class rope {
 
   // O(1)
   size_t size() const { return impl->size(); }
-
-  // O(1) mutates the rope by removing the last rope added
-  void drop_last() { impl->drop_last(); }
 };
 
 // `rope_builder` is a convenient wrapper around `rope`. It simplifies the API for building up
@@ -130,16 +123,30 @@ class rope {
 // ```
 class rope_builder {
  private:
-  rope r = rope::lit("");
+  std::vector<rope> ropes;
+
+  rope merge(int start, int end) {
+    if (start >= end) {
+      return ropes[start];
+    }
+
+    int middle = (start + end) / 2;
+
+    rope left = merge(start, middle);
+    rope right = merge(middle + 1, end);
+
+    return left.concat(right);
+  }
 
  public:
-  void append(std::string str) { r = r.concat(rope::lit(std::move(str))); }
-  void append(rope other) { r = r.concat(other); }
-  void drop_last() { r.drop_last(); }
+  void append(std::string str) { ropes.push_back(rope::lit(std::move(str))); }
+  void append(rope other) { ropes.push_back(std::move(other)); }
+  void undo() { ropes.pop_back(); }
 
   rope build() && {
-    rope copy = std::move(r);
-    r = rope::lit("");
+    assert(ropes.size() > 0);
+    rope copy = merge(0, ropes.size() - 1);
+    ropes = {};
     return copy;
   }
 };

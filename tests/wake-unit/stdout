@@ -10,8 +10,8 @@ PASSED:
   option_none_is_none
   option_some
   rope_basic
-  rope_builder_build_once
   rope_large
+  rope_undo
   sanity_check1
   sanity_check2
   trie_basic

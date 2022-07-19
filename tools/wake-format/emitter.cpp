@@ -80,7 +80,7 @@ wcl::rope Emitter::walk_top(ctx_t ctx, CSTElement node) {
   }
 
   // probably shouldn't do this unconditionally
-  builder.drop_last();
+  builder.undo();
 
   return std::move(builder).build();
 }

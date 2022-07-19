@@ -42,25 +42,6 @@ TEST(rope_basic) {
   EXPECT_EQUAL(expected, r.as_string());
 }
 
-TEST(rope_builder_build_once) {
-  wcl::rope_builder builder;
-  builder.append("Hello");
-  builder.append(" ");
-  builder.append("World");
-  builder.append("!");
-  wcl::rope r = std::move(builder).build();
-
-  std::string expected = "Hello World!";
-  EXPECT_EQUAL(expected.size(), r.size());
-  EXPECT_EQUAL(expected, r.as_string());
-
-  r = std::move(builder).build();
-
-  expected = "";
-  EXPECT_EQUAL(expected.size(), r.size());
-  EXPECT_EQUAL(expected, r.as_string());
-}
-
 TEST(rope_large) {
   wcl::rope_builder builder;
   for (int i = 0; i < 1000; i++) {
@@ -86,4 +67,21 @@ TEST(rope_large) {
 
   wcl::rope r = std::move(builder).build();
   ASSERT_EQUAL(3000000u, r.size());
+}
+
+TEST(rope_undo) {
+  wcl::rope_builder builder;
+  builder.append("Hello");
+  builder.append(" ");
+  builder.append("World");
+  builder.append("!");
+
+  builder.undo();
+  builder.undo();
+
+  wcl::rope r = std::move(builder).build();
+  std::string expected = "Hello ";
+
+  EXPECT_EQUAL(expected.size(), r.size());
+  EXPECT_EQUAL(expected, r.as_string());
 }
