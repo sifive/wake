@@ -26,8 +26,8 @@ class rope_impl_base {
  protected:
   // On construction this has to be set
   size_t length;
-  size_t col;
-  bool has_newline;
+  size_t col = 0;
+  bool has_newline = false;
 
   rope_impl_base(size_t len) : length(len) {}
 
