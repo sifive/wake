@@ -132,8 +132,9 @@ export def minsertReplace (key: k) (value: v) (map: Map k v): Map k v =
 
 # Add a given value into the map under the key, resolving conflicts as specified.
 #
-# If either the original value or the new will always be used, see `minsert` or
-# `minsertReplace`.
+# If just replacing or keeping the original, consider using `minsert` or
+# `minsertReplace` instead. Prefer `minsertWith` when accumulating values over
+# multiple inserts.
 #
 # *Examples:*
 #   ```
@@ -431,14 +432,17 @@ export def mfilter (fn: k => v => Boolean) (map: Map k v): Map k v =
 # `right` is discarded.  However, if the key comparison function differs between
 # the two inputs, then the one from the `right` is used.
 #
+# For a similar function which provides control over how to join values of keys
+# occurring in both maps, see `munionWith`.
+#
 # *Examples:*
 #   ```
 #   def left  = listToMap scmp ("a" → 1, "b" → 2, Nil)
 #   def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
 #
 #   munion left right | mlookup "a" = Some 1
-#   munion left right | mlookup "f" = Some 15
 #   munion left right | mlookup "b" = Some 2
+#   munion left right | mlookup "f" = Some 15
 #   ```
 export def munion (left: Map k v) (right: Map k v): Map k v =
     def Map _ leftTree = left
@@ -448,12 +452,11 @@ export def munion (left: Map k v) (right: Map k v): Map k v =
     tunion leftTree rightTree
     | Map cmpKey
 
-# Collect all key-value associations in maps with the given conflict resolultion.
+# Collect all key-value associations in maps, with the given conflict resolultion.
 # If the key comparison function differs between the two inputs, then the one
 # from the `right` is used.
 #
-# For a similar function which preserves the original value contained in the
-# map, see `munionWith`.
+# If simply keeping the original in any conflicts, consider using `munion` instead.
 #
 # *Examples:*
 #   ```
@@ -461,8 +464,8 @@ export def munion (left: Map k v) (right: Map k v): Map k v =
 #   def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
 #
 #   munionWith (\_\lv\rv lv + rv) left right | mlookup "a" = Some 1
-#   munionWith (\_\lv\rv lv + rv) left right | mlookup "f" = Some 15
 #   munionWith (\_\lv\rv lv + rv) left right | mlookup "b" = Some 13
+#   munionWith (\_\lv\rv lv + rv) left right | mlookup "f" = Some 15
 #   ```
 export def munionWith (fn: k => v => v => v) (left: Map k v) (right: Map k v): Map k v =
     def Map _ leftTree = left
@@ -486,8 +489,8 @@ export def munionWith (fn: k => v => v => v) (left: Map k v) (right: Map k v): M
 #   def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
 #
 #   msubtract left right | mlookup "a" = Some 1
-#   msubtract left right | mlookup "f" = None
 #   msubtract left right | mlookup "b" = None
+#   msubtract left right | mlookup "f" = None
 #   ```
 export def msubtract (left: Map k v) (right: Map k v): Map k v =
     def Map _ leftTree = left
@@ -502,8 +505,8 @@ export def msubtract (left: Map k v) (right: Map k v): Map k v =
 # discarded.  However, if the key comparison function differs between the two
 # inputs, then the one from the `right` is used.
 #
-# For a similar function which preserves the original value contained in the
-# map, see `mintersectWith`.
+# For a similar function which provides control over how to join the values
+# contained in the map, see `mintersectWith`.
 #
 # *Examples:*
 #   ```
@@ -511,8 +514,8 @@ export def msubtract (left: Map k v) (right: Map k v): Map k v =
 #   def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
 #
 #   mintersect left right | mlookup "a" = None
-#   mintersect left right | mlookup "f" = None
 #   mintersect left right | mlookup "b" = Some 2
+#   mintersect left right | mlookup "f" = None
 #   ```
 export def mintersect (left: Map k v) (right: Map k v): Map k v =
     def Map _ leftTree = left
@@ -522,18 +525,20 @@ export def mintersect (left: Map k v) (right: Map k v): Map k v =
     tintersect leftTree rightTree
     | Map cmpKey
 
-# Remove all keys from the left map which do not occur in the right, joining values.
+# Remove all keys which do not occur in *both* maps, joining values accordingly.
 # If the key comparison function differs between the two inputs, then the one
 # from the `right` is used.
+#
+# If simply keeping the original, consider using `mintersect` instead.
 #
 # *Examples:*
 #   ```
 #   def left  = listToMap scmp ("a" → 1, "b" → 2, Nil)
 #   def right = listToMap scmp ("b" → 11, "f" → 15, Nil)
 #
-#   mintersectWith left right | mlookup "a" = None
-#   mintersectWith left right | mlookup "f" = None
-#   mintersectWith left right | mlookup "b" = Some 13
+#   mintersectWith (\_\lv\rv lv + rv) left right | mlookup "a" = None
+#   mintersectWith (\_\lv\rv lv + rv) left right | mlookup "b" = Some 13
+#   mintersectWith (\_\lv\rv lv + rv) left right | mlookup "f" = None
 #   ```
 export def mintersectWith (fn: k => v => v => v) (left: Map k v) (right: Map k v): Map k v =
     def Map _ leftTree = left
