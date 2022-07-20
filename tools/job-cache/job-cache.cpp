@@ -387,7 +387,7 @@ wcl::optional<std::pair<std::string, std::string>> parent_and_base(const std::st
     if (*rbegin == '/') {
       // Advance to the character past the slash
       rbegin++;
-      // Now return thw two strings
+      // Now return the two strings
       return {wcl::in_place_t{}, std::string(rend, rbegin), std::string(rbegin, str.end())};
     }
   }
@@ -647,7 +647,11 @@ struct AddJobRequest {
   }
 };
 
-// TODO: Ideally we'd have someting like std::filepath
+// join takes a sequence of strings and concats that
+// sequence with some seperator between it. It's like
+// python's join method on strings. So ", ".join(seq)
+// in python joins a list of strings with a comma. This
+// function is a C++ equivlent.
 template <class Iter>
 static std::string join(char sep, Iter begin, Iter end) {
   std::string out;
@@ -798,7 +802,7 @@ class Cache {
     // If we didn't link all the files over we need to return a failure.
     if (!success) return {};
 
-    // TODO: We should really return a different hting here
+    // TODO: We should really return a different thing here
     //       that mentions the *output* locations but for
     //       now this is good enough and we can assume
     //       workspace relative paths everywhere.
