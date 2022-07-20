@@ -16,7 +16,6 @@
  */
 
 #include <cstdint>
-#include <iostream>
 #include <vector>
 
 #include "optional.h"
@@ -70,6 +69,7 @@ class trie {
  public:
   // NOTE: This insert moves the keys and constructs the Value
   //       emplace.
+
   template <class KeyIter, class... Args>
   void move_emplace(KeyIter begin, KeyIter end, Args&&... args) {
     // First handle the empty sequence
