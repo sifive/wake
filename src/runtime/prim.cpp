@@ -176,7 +176,8 @@ void CHash::execute(Runtime &runtime) {
     hash.broken->await(runtime, this);
   } else {
     Hash &h = hash.code;
-    mpz_import(out.value, sizeof(h.data)/sizeof(h.data[0]), 1, sizeof(h.data[0]), 0, 0, &h.data[0]);
+    mpz_import(out.value, sizeof(h.data) / sizeof(h.data[0]), 1, sizeof(h.data[0]), 0, 0,
+               &h.data[0]);
     cont->resume(runtime, Integer::claim(runtime.heap, out));
   }
 }
