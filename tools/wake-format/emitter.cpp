@@ -29,13 +29,13 @@
   assert(!node.empty());          \
   assert(node.id() == token);
 
-#define APPEND_OR_BUBBLE(func, ctx, node) \
-  {                                       \
-    auto subtree = func(ctx, node);       \
-    if (!subtree) {                       \
-      return {};                          \
-    }                                     \
-    builder.append(*subtree);             \
+#define APPEND_OR_BUBBLE(builder, func, ctx, node) \
+  {                                                \
+    auto subtree = func(ctx, node);                \
+    if (!subtree) {                                \
+      return {};                                   \
+    }                                              \
+    builder.append(*subtree);                      \
   }
 
 #define CONSUME_WS_NL(node)                                                     \
@@ -139,118 +139,118 @@ wcl::optional<wcl::rope> Emitter::walk_node(ctx_t ctx, CSTElement node) {
 
   switch (node.id()) {
     case CST_ARITY:
-      APPEND_OR_BUBBLE(walk_arity, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_arity, ctx, node);
       break;
     case CST_APP:
-      APPEND_OR_BUBBLE(walk_apply, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_apply, ctx, node);
       break;
     case CST_ASCRIBE:
-      APPEND_OR_BUBBLE(walk_ascribe, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_ascribe, ctx, node);
       break;
     case CST_BINARY:
-      APPEND_OR_BUBBLE(walk_binary, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_binary, ctx, node);
       break;
     case CST_BLOCK:
-      APPEND_OR_BUBBLE(walk_block, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_block, ctx, node);
       break;
     case CST_CASE:
-      APPEND_OR_BUBBLE(walk_case, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_case, ctx, node);
       break;
     case CST_DATA:
-      APPEND_OR_BUBBLE(walk_data, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_data, ctx, node);
       break;
     case CST_DEF:
-      APPEND_OR_BUBBLE(walk_def, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_def, ctx, node);
       break;
     case CST_EXPORT:
-      APPEND_OR_BUBBLE(walk_export, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_export, ctx, node);
       break;
     case CST_FLAG_EXPORT:
-      APPEND_OR_BUBBLE(walk_flag_export, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_flag_export, ctx, node);
       break;
     case CST_FLAG_GLOBAL:
-      APPEND_OR_BUBBLE(walk_flag_global, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_flag_global, ctx, node);
       break;
     case CST_GUARD:
-      APPEND_OR_BUBBLE(walk_guard, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_guard, ctx, node);
       break;
     case CST_HOLE:
-      APPEND_OR_BUBBLE(walk_hole, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_hole, ctx, node);
       break;
     case CST_ID:
-      APPEND_OR_BUBBLE(walk_identifier, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_identifier, ctx, node);
       break;
     case CST_IDEQ:
-      APPEND_OR_BUBBLE(walk_ideq, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_ideq, ctx, node);
       break;
     case CST_IF:
-      APPEND_OR_BUBBLE(walk_if, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_if, ctx, node);
       break;
     case CST_IMPORT:
-      APPEND_OR_BUBBLE(walk_import, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_import, ctx, node);
       break;
     case CST_INTERPOLATE:
-      APPEND_OR_BUBBLE(walk_interpolate, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_interpolate, ctx, node);
       break;
     case CST_KIND:
-      APPEND_OR_BUBBLE(walk_kind, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_kind, ctx, node);
       break;
     case CST_LAMBDA:
-      APPEND_OR_BUBBLE(walk_lambda, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_lambda, ctx, node);
       break;
     case CST_LITERAL:
-      APPEND_OR_BUBBLE(walk_literal, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_literal, ctx, node);
       break;
     case CST_MATCH:
-      APPEND_OR_BUBBLE(walk_match, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_match, ctx, node);
       break;
     case CST_OP:
-      APPEND_OR_BUBBLE(walk_op, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_op, ctx, node);
       break;
     case CST_PACKAGE:
-      APPEND_OR_BUBBLE(walk_package, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_package, ctx, node);
       break;
     case CST_PAREN:
-      APPEND_OR_BUBBLE(walk_paren, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_paren, ctx, node);
       break;
     case CST_PRIM:
-      APPEND_OR_BUBBLE(walk_prim, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_prim, ctx, node);
       break;
     case CST_PUBLISH:
-      APPEND_OR_BUBBLE(walk_publish, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_publish, ctx, node);
       break;
     case CST_REQUIRE:
-      APPEND_OR_BUBBLE(walk_require, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_require, ctx, node);
       break;
     case CST_REQ_ELSE:
-      APPEND_OR_BUBBLE(walk_req_else, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_req_else, ctx, node);
       break;
     case CST_SUBSCRIBE:
-      APPEND_OR_BUBBLE(walk_subscribe, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_subscribe, ctx, node);
       break;
     case CST_TARGET:
-      APPEND_OR_BUBBLE(walk_target, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_target, ctx, node);
       break;
     case CST_TARGET_ARGS:
-      APPEND_OR_BUBBLE(walk_target_args, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_target_args, ctx, node);
       break;
     case CST_TOP:
-      APPEND_OR_BUBBLE(walk_top, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_top, ctx, node);
       break;
     case CST_TOPIC:
-      APPEND_OR_BUBBLE(walk_topic, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_topic, ctx, node);
       break;
     case CST_TUPLE:
-      APPEND_OR_BUBBLE(walk_tuple, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_tuple, ctx, node);
       break;
     case CST_TUPLE_ELT:
-      APPEND_OR_BUBBLE(walk_tuple_elt, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_tuple_elt, ctx, node);
       break;
     case CST_UNARY:
-      APPEND_OR_BUBBLE(walk_unary, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_unary, ctx, node);
       break;
     case CST_ERROR:
-      APPEND_OR_BUBBLE(walk_error, ctx, node);
+      APPEND_OR_BUBBLE(builder, walk_error, ctx, node);
       break;
     default:
       assert(false);
