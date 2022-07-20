@@ -800,10 +800,10 @@ bool JobTable::wait(Runtime &runtime) {
     if (exit_now()) timeout = &nowait;
 
 #if !defined(__linux__)
+    struct timespec alarm;
     // In case SIGALRM with SA_RESTART doesn't stop pselect
     if (!timeout) {
       struct itimerval timer;
-      struct timespec alarm;
       getitimer(ITIMER_REAL, &timer);
       if (timer.it_value.tv_sec || timer.it_value.tv_usec) {
         alarm.tv_sec = timer.it_value.tv_sec;
