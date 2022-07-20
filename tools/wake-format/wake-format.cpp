@@ -26,6 +26,7 @@
 #include <memory>
 #include <vector>
 
+#include "emitter.h"
 #include "gopt/gopt-arg.h"
 #include "gopt/gopt.h"
 #include "parser/cst.h"
@@ -80,6 +81,7 @@ void print_help(const char *argv0) {
 void print_version() { std::cout << "wake-format " << VERSION_STR << std::endl; }
 
 void print_cst(CSTElement node, int depth) {
+  static uint32_t indent_level = 0;
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
     std::cout << depth << ": ";
     for (int i = 0; i < depth; i++) {
@@ -91,6 +93,8 @@ void print_cst(CSTElement node, int depth) {
       print_cst(child, depth + 1);
       continue;
     }
+    std::cout << " (r: " << child.location().start.row << ", c: " << child.location().start.column
+              << ", i: " << indent_level << ")";
     switch (child.id()) {
       case TOKEN_ID:
       case TOKEN_INTEGER:
@@ -99,24 +103,19 @@ void print_cst(CSTElement node, int depth) {
       case TOKEN_REG_SINGLE:
         std::cout << " -> " << child.fragment().segment().str() << std::endl;
         break;
+      case TOKEN_WS: {
+        size_t size = child.fragment().segment().size();
+        std::cout << " (" << size << ")" << std::endl;
+
+        if (child.location().start.column == 1) {
+          indent_level = size;
+        }
+
+        break;
+      }
       default:
         std::cout << std::endl;
         break;
-    }
-  }
-}
-
-void walk_cst(std::ostream *out, CSTElement node) {
-  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
-    if (child.isNode()) {
-      walk_cst(out, child);
-      continue;
-    }
-
-    if (child.id() == TOKEN_KW_MACRO_HERE) {
-      *out << "@here";
-    } else {
-      *out << child.fragment().segment().str();
     }
   }
 }
@@ -169,35 +168,35 @@ int main(int argc, char **argv) {
   wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
 
   for (int i = 1; i < argc; i++) {
-    ExternalFile file = ExternalFile(*reporter, argv[i]);
-    CST cst = CST(file, *reporter);
-    if (terminalReporter.errors) {
-      std::cerr << argv[0] << ": failed to parse file: " << argv[i] << std::endl;
-      exit(EXIT_FAILURE);
-    }
-
-    std::unique_ptr<std::ofstream> output_file;
-    std::ostream *out;
-
     std::string name(argv[i]);
     std::string tmp = name + ".tmp." + rng.unique_name();
-    if (in_place) {
-      output_file = std::make_unique<std::ofstream>(tmp);
-      out = output_file.get();
-    } else {
-      out = &std::cout;
+
+    ExternalFile external_file = ExternalFile(*reporter, name.c_str());
+    CST cst = CST(external_file, *reporter);
+    if (terminalReporter.errors) {
+      std::cerr << argv[0] << ": failed to parse file: " << name << std::endl;
+      exit(EXIT_FAILURE);
     }
 
     if (debug) {
       print_cst(cst.root(), 0);
     }
 
-    walk_cst(out, cst.root());
+    auto output_file = std::make_unique<std::ofstream>(tmp);
+    Emitter emitter;
+    wcl::rope r = emitter.layout(cst);
 
-    // When editing in-place we need to copy the tmp file over the original
+    r.write(*output_file);
+    output_file.reset();
+
     if (in_place) {
-      output_file.reset();
+      // When editing in-place we need to rename the tmp file over the original
       rename(tmp.c_str(), name.c_str());
+    } else {
+      // print out the resulting file and remove
+      std::ifstream src(tmp);
+      std::cout << src.rdbuf();
+      remove(tmp.c_str());
     }
   }
 
