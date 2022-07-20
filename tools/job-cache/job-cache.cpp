@@ -289,7 +289,6 @@ class InputFiles {
 
   void insert(const std::string &path, Hash256 hash, int64_t job_id) {
     add_input_file.bind_string(1, path);
-    std::cerr << "Hash at bind site: " << hash.to_hex() << std::endl;
     add_input_file.bind_string(2, hash.to_hex());
     add_input_file.bind_integer(3, job_id);
     add_input_file.step();
@@ -492,8 +491,6 @@ class SelectMatchingJobs {
     while (find.step() == SQLITE_ROW) {
       std::string path = find.read_string(1);
       Hash256 hash = Hash256::from_hex(find.read_string(2));
-      std::cerr << "FromDB: hash = " << find.read_string(2) << std::endl;
-      std::cerr << "Checking: " << path << " = " << hash.to_hex() << std::endl;
       auto iter = find_job_request.visible.find(path);
       if (iter == find_job_request.visible.end() || hash != iter->second) {
         find.reset();
@@ -506,13 +503,10 @@ class SelectMatchingJobs {
   std::vector<CachedOutputFile> read_outputs(int64_t job_id) {
     find_outputs.bind_integer(1, job_id);
     std::vector<CachedOutputFile> out;
-    std::cerr << "Finding outputs: job_id = " << job_id << std::endl;
     while (find_outputs.step() == SQLITE_ROW) {
-      std::cerr << "Finding outputs Step!!" << std::endl;
       CachedOutputFile file;
       file.path = find_outputs.read_string(1);
       file.hash = Hash256::from_hex(find_outputs.read_string(2));
-      std::cerr << "Output: " << file.path << " " << file.hash.to_hex() << std::endl;
       out.emplace_back(std::move(file));
     }
     find_outputs.reset();
@@ -562,17 +556,13 @@ class SelectMatchingJobs {
     find_jobs.bind_integer(5, bloom_integer);
 
     // Loop over all matching jobs
-    std::cerr << "Stepping through find results" << std::endl;
     while (find_jobs.step() == SQLITE_ROW) {
-      std::cerr << "Step!!" << std::endl;
       // Having found a matching job we need to check all the files
       // and directories have matching hashes.
       int64_t job_id = find_jobs.read_integer(0);
-      std::cerr << "Checking: job_id = " << job_id << std::endl;
       if (!all_match(find_files, job_id, find_job_request)) continue;
       if (!all_match(find_dirs, job_id, find_job_request)) continue;
 
-      std::cerr << "Job found: job_id = " << job_id << std::endl;
       // Ok this is the job, it matches *exactly* so we should
       // expect running it to produce exaxtly the same result.
       MatchingJob result;
@@ -681,8 +671,10 @@ static std::vector<std::string> split_path(const std::string &path) {
 // is not created
 template <class Iter>
 static void mkdir_all(Iter begin, Iter end) {
+  std::string acc;
   for (; begin + 1 != end; ++begin) {
-    mkdir_no_fail(begin->c_str());
+    acc += *begin + "/";
+    mkdir_no_fail(acc.c_str());
   }
 }
 
@@ -753,33 +745,24 @@ class Cache {
     // one of the files just before we need it.
     std::vector<std::pair<std::string, std::string>> to_copy;
     bool success = true;
-    std::cerr << "result->output_files.size(): " << result->output_files.size() << std::endl;
     for (const auto &output_file : result->output_files) {
       std::string hash_name = output_file.hash.to_hex();
       std::string cur_file = job_dir + hash_name;
       std::string tmp_file = tmp_job_dir + "/" + hash_name;
-      std::cerr << "cur_file: " << cur_file << " tmp_file: " << tmp_file << std::endl;
       int ret = link(cur_file.c_str(), tmp_file.c_str());
       if (ret < 0) {
-        std::cerr << "link failed: " << strerror(errno) << std::endl;
         success = false;
         break;
       }
-      std::cerr << "tmp_file: " << tmp_file << " output_file: " << output_file.path << std::endl;
       to_copy.emplace_back(std::make_pair(std::move(tmp_file), output_file.path));
     }
 
-    std::cerr << "Success?: " << success << std::endl;
-
     if (success) {
       // Now copy/reflink all files into their final place
-      std::cerr << "Copying now" << std::endl;
       for (const auto &to_copy : to_copy) {
         const auto &tmp_file = to_copy.first;
         const auto &sandbox_destination = to_copy.second;
         std::vector<std::string> path_vec = split_path(sandbox_destination);
-
-        std::cerr << "Preparing to copy: " << tmp_file << " to (sandbox) " << sandbox_destination;
 
         // So the file that the sandbox wrote to `sandbox_destination` currently
         // lives at `tmp_file` and is safe from interference. The sandbox location
@@ -789,21 +772,21 @@ class Cache {
         // If there is no redirect what so ever, just copy and assume the sandbox
         // had an accurate picture of the current system.
         if (pair.first == nullptr) {
+          std::string output_path = "." + sandbox_destination;  // TODO: We need join here
+          std::vector<std::string> output_path_vec = split_path(output_path);
           mkdir_all(path_vec.begin(), path_vec.end());
-          copy_or_reflink(tmp_file.c_str(), sandbox_destination.c_str());
-          std::cout << "Native copy to: " << sandbox_destination << std::endl;
+          copy_or_reflink(tmp_file.c_str(), output_path.c_str());
         } else {
           const auto &output_dir = *pair.first;
           const auto &rel_path = join('/', pair.second, path_vec.end());
-          std::string output_path = output_dir + rel_path;
-          mkdir_with_parents(output_path, 0777);
+          std::string output_path = "./" + output_dir + rel_path;  // TODO: We need join here
+          std::vector<std::string> output_path_vec = split_path(output_path);
+          mkdir_all(output_path_vec.begin(), output_path_vec.end());
           copy_or_reflink(tmp_file.c_str(), output_path.c_str());
-          std::cout << "Redirected copy to: " << output_path << std::endl;
         }
       }
     }
 
-    std::cerr << "Cleaning up" << std::endl;
     // Now clean up those files in the tempdir
     for (const auto &to_copy : to_copy) {
       unlink_no_fail(to_copy.first.c_str());
@@ -842,7 +825,6 @@ class Cache {
 
       // Input Files
       for (const auto &input_file : add_request.inputs) {
-        std::cerr << "Inserting input file: hash = " << input_file.hash.to_hex() << std::endl;
         input_files.insert(input_file.path, input_file.hash, job_id);
       }
 
@@ -853,7 +835,6 @@ class Cache {
 
       // Output Files
       for (const auto &output_file : add_request.outputs) {
-        std::cerr << "Inserting output file: hash = " << output_file.hash.to_hex() << std::endl;
         output_files.insert(output_file.path, output_file.hash, job_id);
       }
 
