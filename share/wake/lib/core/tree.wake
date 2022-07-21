@@ -76,7 +76,8 @@ export def tinsert (y: a) (Tree cmp root: Tree a): Tree a =
   Tree cmp (helper root)
 
 # Insert y into the tree, removing any existing keys == y
-export def tinsertReplace (y: a) (Tree cmp root: Tree a): Tree a =
+export def tinsertReplace (y: a) (tree: Tree a): Tree a =
+  def Tree cmp root = tree
   def helper t = match t
     Tip         = Bin 1 Tip y Tip
     Bin _ l x r = match (cmp x y)
@@ -93,6 +94,28 @@ export def tinsertMulti (y: a) (Tree cmp root: Tree a): Tree a =
       GT = balanceL (helper l) x r
       _  = balanceR l x (helper r)
   Tree cmp (helper root)
+
+# Insert y into the tree, or the value resulting from fn on a collision
+# `y` is passed as the left-hand value of `fn`.
+export def tinsertWith (fn: a => a => a) (y: a) (tree: Tree a): Tree a =
+    def Tree cmp root = tree
+    def helper = match _
+        Tip         = Bin 1 Tip y Tip
+        Bin _ l x r = match (cmp x y)
+            GT = join3 (helper l) x r
+            LT = join3 l x (helper r)
+            EQ =
+                # Get all other values equal to y, while maintaining the order
+                # in which they occur.
+                def Triple lm le lg = split y cmp l
+                def Triple rm re rg = split y cmp l
+                def m = join2 lm rm
+                def g = join2 lg rg
+                # Collapse all equal values into a single result.
+                def e = join3 le x re
+                def z = foldl fn y (Tree cmp e | treeToList)
+                join3 m z g
+    Tree cmp (helper root)
 
 # Test if `a` is a subset of `b` (every element of `a` is also in `b`).
 # Note that the comparison function of `b` is used to determine element
@@ -462,6 +485,29 @@ def union cmp aroot broot =
       Triple bl _ bg = join3 (helper al bl) ax (helper ar bg)
   helper aroot broot
 
+export def tunionWith (fn: a => a => a) (left: Tree a) (right: Tree a): Tree a =
+    def Tree _ leftRoot = left
+    def Tree cmp rightRoot = right
+    def unionWith a b = match a b
+        Tip _ = b
+        _ Tip = a
+        (Bin _ al ax ar) _ =
+            # Get all other values equal to ax (according to the right cmp
+            # function), while maintaining the order in which they occur.
+            def Triple all ale alg = split ax cmp al
+            def Triple arl are arg = split ax cmp ar
+            def Triple bl be bg = split ax cmp b
+            def l = unionWith (join2 all arl) bl
+            def g = unionWith (join2 alg arg) bg
+            # Recombine all values, and get the one which was originally first.
+            def e = join2 (join3 ale ax are) be
+            require c1, cs = treeToList (Tree cmp e)
+            else unreachable "Invariant reached in tunionWith"
+            # Initialize the (potentially non-reflexive) fold with that value.
+            def cx = foldl fn c1 cs
+            join3 l cx g
+    Tree cmp (unionWith leftRoot rightRoot)
+
 # Union of two trees, keeping equal values of a before equal values of b
 export def a ⊎ b = tunionMulti a b
 export def tunionMulti (Tree _ aroot) (Tree cmp broot) =
@@ -505,6 +551,32 @@ export def tintersect (Tree _ aroot) (Tree cmp broot) =
           Bin aes _ aex _ =
             if aes == 1 then join3 l aex r else join2 (join2 l ae) r
   Tree cmp (helper aroot broot)
+
+export def tintersectWith (fn: a => a => a) (left: Tree a) (right: Tree a): Tree a =
+    def Tree _ leftRoot = left
+    def Tree cmp rightRoot = right
+    def intersectWith a b = match a b
+        Tip _ = Tip
+        _ Tip = Tip
+        _ (Bin _ bl bx br) =
+            # Get all other values equal to ax (according to the right cmp
+            # function), while maintaining the order in which they occur.
+            def Triple al ae ag = split bx cmp a
+            def Triple bll ble blg = split bx cmp bl
+            def Triple brl bre brg = split bx cmp br
+            def l = intersectWith al (join2 bll brl)
+            def g = intersectWith ag (join2 blg brg)
+            # Recombine all values, and get the one which was originally first.
+            def e = join2 ae (join3 ble bx bre)
+            require c1, cs = treeToList (Tree cmp e)
+            else unreachable "Invariant reached in tintersectWith"
+            # Initialize the (potentially non-reflexive) fold with that value.
+            def cx = foldl fn c1 cs
+            match ae
+                # If nothing in a == bx, then cx was constructed only from b.
+                Tip         = join2 l g
+                Bin _ _ _ _ = join3 l cx g
+    Tree cmp (intersectWith leftRoot rightRoot)
 
 # Pretty print the tree shape for debug
 #export def tshape (Tree _ root: Tree a): String =
