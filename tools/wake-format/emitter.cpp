@@ -491,7 +491,6 @@ wcl::optional<wcl::doc> Emitter::walk_def(ctx_t ctx, CSTElement node) {
 
   assert(child.empty());
   return wcl::optional<wcl::doc>(wcl::in_place_t{}, std::move(builder).build());
-
 }
 
 wcl::optional<wcl::doc> Emitter::walk_export(ctx_t ctx, CSTElement node) {

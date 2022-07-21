@@ -47,7 +47,7 @@ class Emitter {
 
     ctx_t sub(const wcl::doc_builder& builder) {
       ctx_t copy = *this;
-      if(builder.has_newline()) {
+      if (builder.has_newline()) {
         copy.width = builder.last_width();
       } else {
         copy.width += builder.last_width();
