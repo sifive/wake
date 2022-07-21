@@ -1,4 +1,8 @@
 PASSED:
+  doc_basic
+  doc_geometry
+  doc_large
+  doc_undo
   filepath_range_basic
   filepath_range_empty_node
   filepath_range_fuzz_garbage
@@ -17,10 +21,6 @@ PASSED:
   option_no_construct
   option_none_is_none
   option_some
-  rope_basic
-  rope_column
-  rope_large
-  rope_undo
   sanity_check1
   sanity_check2
   trie_basic

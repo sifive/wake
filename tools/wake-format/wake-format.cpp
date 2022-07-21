@@ -20,6 +20,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <stdio.h>
+#include <wcl/doc.h>
 
 #include <fstream>
 #include <iostream>
@@ -184,9 +185,9 @@ int main(int argc, char **argv) {
 
     auto output_file = std::make_unique<std::ofstream>(tmp);
     Emitter emitter;
-    wcl::rope r = emitter.layout(cst);
+    wcl::doc d = emitter.layout(cst);
 
-    r.write(*output_file);
+    d.write(*output_file);
     output_file.reset();
 
     if (in_place) {
