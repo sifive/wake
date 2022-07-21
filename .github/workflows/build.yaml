@@ -6,7 +6,7 @@ on:
 jobs:
     build:
         name: "MacOS build"
-        runs-on: macos-10.15
+        runs-on: macos-12
 
         steps:
             - name: "Clone wake"
