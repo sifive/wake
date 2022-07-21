@@ -29,7 +29,8 @@
 class Emitter {
  public:
   struct ctx_t {
-    int nest_level = 0;
+    size_t width = 0;
+    size_t nest_level = 0;
     bool is_flat = false;
 
     ctx_t flat() {
@@ -41,6 +42,16 @@ class Emitter {
     ctx_t nest() {
       ctx_t copy = *this;
       copy.nest_level++;
+      return copy;
+    }
+
+    ctx_t sub(const wcl::doc_builder& builder) {
+      ctx_t copy = *this;
+      if(builder.has_newline()) {
+        copy.width = builder.last_width();
+      } else {
+        copy.width += builder.last_width();
+      }
       return copy;
     }
   };

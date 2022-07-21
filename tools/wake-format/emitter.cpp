@@ -49,7 +49,7 @@ wcl::doc Emitter::newline(ctx_t ctx) {
   wcl::doc_builder builder;
 
   builder.append("\n");
-  for (int i = 0; i < ctx.nest_level; i++) {
+  for (size_t i = 0; i < ctx.nest_level; i++) {
     builder.append(space(space_per_indent));
   }
 
@@ -391,7 +391,30 @@ wcl::optional<wcl::doc> Emitter::walk_binary(ctx_t ctx, CSTElement node) {
 }
 
 wcl::optional<wcl::doc> Emitter::walk_block(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
+  ASSERT_TOKEN(node, CST_BLOCK);
+  wcl::doc_builder builder;
+
+  ctx = ctx.nest();
+
+  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    // remove optional whitespace
+    if (child.id() == TOKEN_WS || child.id() == TOKEN_NL) {
+      continue;
+    }
+
+    // No non-whitespace nodes should be in a block
+    assert(child.isNode());
+    {
+      auto new_child = walk_node(ctx.sub(builder), child);
+      assert(new_child);
+      builder.append(*new_child);
+    }
+    builder.append(newline(ctx));
+  }
+
+  builder.undo();
+
+  return wcl::optional<wcl::doc>(wcl::in_place_t{}, std::move(builder).build());
 }
 
 wcl::optional<wcl::doc> Emitter::walk_case(ctx_t ctx, CSTElement node) {
@@ -403,7 +426,72 @@ wcl::optional<wcl::doc> Emitter::walk_data(ctx_t ctx, CSTElement node) {
 }
 
 wcl::optional<wcl::doc> Emitter::walk_def(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
+  ASSERT_TOKEN(node, CST_DEF);
+  wcl::doc_builder builder;
+  CSTElement child = node.firstChildElement();
+
+  // def shouldn't follow anything other than indentation.
+  if (ctx.width > ctx.nest_level * space_per_indent) {
+    builder.append(newline(ctx));
+  }
+
+  // def
+  ASSERT_TOKEN(child, TOKEN_KW_DEF);
+  builder.append("def");
+  child.nextSiblingElement();
+
+  // ws
+  ASSERT_TOKEN(child, TOKEN_WS);
+  builder.append(space());
+  child.nextSiblingElement();
+
+  // CST_ID, CST_APPLY, TODO: others?
+  assert(!child.empty());
+  assert(child.id() == CST_ID || child.id() == CST_APP);
+  {
+    auto new_child = walk_node(ctx.sub(builder), child);
+    assert(new_child);
+    builder.append(*new_child);
+  }
+  child.nextSiblingElement();
+
+  // ws
+  ASSERT_TOKEN(child, TOKEN_WS);
+  builder.append(space());
+  child.nextSiblingElement();
+
+  //  =
+  ASSERT_TOKEN(child, TOKEN_P_EQUALS);
+  builder.append("=");
+  child.nextSiblingElement();
+
+  // optional ws/nl
+  CONSUME_WS_NL(child);
+
+  // rhs
+  {
+    auto new_child = walk_node(ctx.sub(builder), child);
+    assert(new_child);
+    wcl::doc new_doc = *new_child;
+    new_doc = space().concat(new_doc);
+    if (builder.last_width() + new_doc.first_width() + ctx.width <= max_column_width) {
+      builder.append(new_doc);
+    } else {
+      ctx_t n_ctx = ctx.nest();
+      builder.append(newline(n_ctx));
+      auto full_child = walk_node(n_ctx.sub(builder), child);
+      assert(full_child);
+      builder.append(*full_child);
+    }
+  }
+  child.nextSiblingElement();
+
+  // optional ws/nl
+  CONSUME_WS_NL(child);
+
+  assert(child.empty());
+  return wcl::optional<wcl::doc>(wcl::in_place_t{}, std::move(builder).build());
+
 }
 
 wcl::optional<wcl::doc> Emitter::walk_export(ctx_t ctx, CSTElement node) {
