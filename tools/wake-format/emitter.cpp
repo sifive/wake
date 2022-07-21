@@ -45,8 +45,8 @@
     }                                                                           \
   }
 
-wcl::rope Emitter::newline(ctx_t ctx) {
-  wcl::rope_builder builder;
+wcl::doc Emitter::newline(ctx_t ctx) {
+  wcl::doc_builder builder;
 
   builder.append("\n");
   for (int i = 0; i < ctx.nest_level; i++) {
@@ -56,29 +56,29 @@ wcl::rope Emitter::newline(ctx_t ctx) {
   return std::move(builder).build();
 }
 
-wcl::rope Emitter::space(uint8_t count) {
-  wcl::rope_builder builder;
+wcl::doc Emitter::space(uint8_t count) {
+  wcl::doc_builder builder;
   for (uint8_t i = 0; i < count; i++) {
     builder.append(" ");
   }
   return std::move(builder).build();
 }
 
-wcl::optional<wcl::rope> Emitter::flat(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::flat(ctx_t ctx, CSTElement node) {
   // Try to get the flat version of node
   auto flat_node = walk_node(ctx.flat(), node);
   if (!flat_node) {
     return {};
   }
 
-  if (flat_node->column() > max_column_width) {
+  if (flat_node->last_width() > max_column_width) {
     return {};
   }
 
   return flat_node;
 }
 
-wcl::optional<wcl::rope> Emitter::flat_or(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::flat_or(ctx_t ctx, CSTElement node) {
   // Try to get the flat version of node
   auto flat_node = flat(ctx, node);
   if (flat_node) {
@@ -95,13 +95,13 @@ wcl::optional<wcl::rope> Emitter::flat_or(ctx_t ctx, CSTElement node) {
   return walk_node(ctx, node);
 }
 
-wcl::rope Emitter::layout(CST cst) {
+wcl::doc Emitter::layout(CST cst) {
   ctx_t ctx;
   return walk(ctx, cst.root()).concat(newline(ctx));
 }
 
-wcl::rope Emitter::walk(ctx_t ctx, CSTElement node) {
-  wcl::rope_builder builder;
+wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
+  wcl::doc_builder builder;
 
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
     // remove optional whitespace
@@ -132,10 +132,10 @@ wcl::rope Emitter::walk(ctx_t ctx, CSTElement node) {
   return std::move(builder).build();
 }
 
-wcl::optional<wcl::rope> Emitter::walk_node(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_node(ctx_t ctx, CSTElement node) {
   assert(node.isNode());
 
-  wcl::rope_builder builder;
+  wcl::doc_builder builder;
 
   switch (node.id()) {
     case CST_ARITY:
@@ -256,13 +256,13 @@ wcl::optional<wcl::rope> Emitter::walk_node(ctx_t ctx, CSTElement node) {
       assert(false);
   }
 
-  return wcl::optional<wcl::rope>(wcl::in_place_t{}, std::move(builder).build());
+  return wcl::optional<wcl::doc>(wcl::in_place_t{}, std::move(builder).build());
 }
 
-wcl::optional<wcl::rope> Emitter::walk_placeholder(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_placeholder(ctx_t ctx, CSTElement node) {
   assert(node.isNode());
 
-  wcl::rope_builder builder;
+  wcl::doc_builder builder;
 
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
     if (child.isNode()) {
@@ -274,22 +274,22 @@ wcl::optional<wcl::rope> Emitter::walk_placeholder(ctx_t ctx, CSTElement node) {
     }
   }
 
-  return wcl::optional<wcl::rope>(wcl::in_place_t{}, std::move(builder).build());
+  return wcl::optional<wcl::doc>(wcl::in_place_t{}, std::move(builder).build());
 }
 
-wcl::rope Emitter::walk_token(ctx_t ctx, CSTElement node) {
+wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   assert(!node.isNode());
   switch (node.id()) {
     case TOKEN_KW_MACRO_HERE:
-      return wcl::rope::lit("@here");
+      return wcl::doc::lit("@here");
     case TOKEN_NL: {
       if (ctx.is_flat) {
-        return wcl::rope::lit(" ");
+        return wcl::doc::lit(" ");
       }
-      return wcl::rope::lit("\n");
+      return wcl::doc::lit("\n");
     }
     case TOKEN_WS: {
-      return wcl::rope::lit(" ");
+      return wcl::doc::lit(" ");
     }
     case TOKEN_COMMENT:
     case TOKEN_P_BOPEN:
@@ -364,165 +364,165 @@ wcl::rope Emitter::walk_token(ctx_t ctx, CSTElement node) {
     case TOKEN_KW_THEN:
     case TOKEN_KW_ELSE:
     case TOKEN_KW_REQUIRE:
-      return wcl::rope::lit(node.fragment().segment().str());
+      return wcl::doc::lit(node.fragment().segment().str());
     default:
       assert(false);
   }
 }
 
-wcl::optional<wcl::rope> Emitter::walk_rhs(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_rhs(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_apply(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_arity(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_arity(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_binary(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_block(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_block(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_case(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_case(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_data(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_data(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_def(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_def(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_export(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_export(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_flag_export(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_flag_export(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_flag_global(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_flag_global(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_guard(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_guard(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_hole(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_hole(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_identifier(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_identifier(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_ideq(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_ideq(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_if(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_if(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_import(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_import(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_kind(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_kind(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_lambda(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_lambda(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_literal(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_literal(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_match(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_match(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_op(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_op(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_package(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_package(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_paren(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_paren(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_prim(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_prim(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_publish(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_publish(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_require(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_require(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_req_else(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_req_else(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_target(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_target(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_target_args(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_target_args(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_top(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_top(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_topic(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_topic(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_tuple(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_tuple(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_tuple_elt(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_tuple_elt(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_unary(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_unary(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::rope> Emitter::walk_error(ctx_t ctx, CSTElement node) {
+wcl::optional<wcl::doc> Emitter::walk_error(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
