@@ -29,15 +29,6 @@
   assert(!node.empty());          \
   assert(node.id() == token);
 
-#define APPEND_OR_BUBBLE(builder, func, ctx, node) \
-  {                                                \
-    auto subtree = func(ctx, node);                \
-    if (!subtree) {                                \
-      return {};                                   \
-    }                                              \
-    builder.append(*subtree);                      \
-  }
-
 #define CONSUME_WS_NL(node)                                                     \
   {                                                                             \
     while (!node.empty() && (node.id() == TOKEN_WS || node.id() == TOKEN_NL)) { \
@@ -76,37 +67,6 @@ wcl::doc Emitter::space(uint8_t count) {
   return std::move(bdr).build();
 }
 
-wcl::optional<wcl::doc> Emitter::flat(ctx_t ctx, CSTElement node) {
-  // Try to get the flat version of node
-  auto flat_node = walk_node(ctx.flat(), node);
-  if (!flat_node) {
-    return {};
-  }
-
-  if (flat_node->last_width() > max_column_width) {
-    return {};
-  }
-
-  return flat_node;
-}
-
-wcl::optional<wcl::doc> Emitter::flat_or(ctx_t ctx, CSTElement node) {
-  // Try to get the flat version of node
-  auto flat_node = flat(ctx, node);
-  if (flat_node) {
-    return flat_node;
-  }
-
-  // flat_or was called within a flat context, so the flat failure
-  // needs to be bubbled up.
-  if (ctx.is_flat) {
-    return {};
-  }
-
-  // fallback to full node
-  return walk_node(ctx, node);
-}
-
 wcl::doc Emitter::layout(CST cst) {
   ctx_t ctx;
   return walk(ctx, cst.root()).concat(newline(ctx));
@@ -133,9 +93,7 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
 
     assert(child.isNode());
 
-    auto r = flat_or(ctx, child);
-    assert(r);
-    bdr.append(*r);
+    bdr.append(walk_node(ctx, child));
     bdr.append(newline(ctx));
   }
 
@@ -144,149 +102,147 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
   return std::move(bdr).build();
 }
 
-wcl::optional<wcl::doc> Emitter::walk_node(ctx_t ctx, CSTElement node) {
+wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {
   assert(node.isNode());
 
   wcl::doc_builder bdr;
 
   switch (node.id()) {
     case CST_ARITY:
-      APPEND_OR_BUBBLE(bdr, walk_arity, ctx, node);
+      bdr.append(walk_arity(ctx, node));
       break;
     case CST_APP:
-      APPEND_OR_BUBBLE(bdr, walk_apply, ctx, node);
+      bdr.append(walk_apply(ctx, node));
       break;
     case CST_ASCRIBE:
-      APPEND_OR_BUBBLE(bdr, walk_ascribe, ctx, node);
+      bdr.append(walk_ascribe(ctx, node));
       break;
     case CST_BINARY:
-      APPEND_OR_BUBBLE(bdr, walk_binary, ctx, node);
+      bdr.append(walk_binary(ctx, node));
       break;
     case CST_BLOCK:
-      APPEND_OR_BUBBLE(bdr, walk_block, ctx, node);
+      bdr.append(walk_block(ctx, node));
       break;
     case CST_CASE:
-      APPEND_OR_BUBBLE(bdr, walk_case, ctx, node);
+      bdr.append(walk_case(ctx, node));
       break;
     case CST_DATA:
-      APPEND_OR_BUBBLE(bdr, walk_data, ctx, node);
+      bdr.append(walk_data(ctx, node));
       break;
     case CST_DEF:
-      APPEND_OR_BUBBLE(bdr, walk_def, ctx, node);
+      bdr.append(walk_def(ctx, node));
       break;
     case CST_EXPORT:
-      APPEND_OR_BUBBLE(bdr, walk_export, ctx, node);
+      bdr.append(walk_export(ctx, node));
       break;
     case CST_FLAG_EXPORT:
-      APPEND_OR_BUBBLE(bdr, walk_flag_export, ctx, node);
+      bdr.append(walk_flag_export(ctx, node));
       break;
     case CST_FLAG_GLOBAL:
-      APPEND_OR_BUBBLE(bdr, walk_flag_global, ctx, node);
+      bdr.append(walk_flag_global(ctx, node));
       break;
     case CST_GUARD:
-      APPEND_OR_BUBBLE(bdr, walk_guard, ctx, node);
+      bdr.append(walk_guard(ctx, node));
       break;
     case CST_HOLE:
-      APPEND_OR_BUBBLE(bdr, walk_hole, ctx, node);
+      bdr.append(walk_hole(ctx, node));
       break;
     case CST_ID:
-      APPEND_OR_BUBBLE(bdr, walk_identifier, ctx, node);
+      bdr.append(walk_identifier(ctx, node));
       break;
     case CST_IDEQ:
-      APPEND_OR_BUBBLE(bdr, walk_ideq, ctx, node);
+      bdr.append(walk_ideq(ctx, node));
       break;
     case CST_IF:
-      APPEND_OR_BUBBLE(bdr, walk_if, ctx, node);
+      bdr.append(walk_if(ctx, node));
       break;
     case CST_IMPORT:
-      APPEND_OR_BUBBLE(bdr, walk_import, ctx, node);
+      bdr.append(walk_import(ctx, node));
       break;
     case CST_INTERPOLATE:
-      APPEND_OR_BUBBLE(bdr, walk_interpolate, ctx, node);
+      bdr.append(walk_interpolate(ctx, node));
       break;
     case CST_KIND:
-      APPEND_OR_BUBBLE(bdr, walk_kind, ctx, node);
+      bdr.append(walk_kind(ctx, node));
       break;
     case CST_LAMBDA:
-      APPEND_OR_BUBBLE(bdr, walk_lambda, ctx, node);
+      bdr.append(walk_lambda(ctx, node));
       break;
     case CST_LITERAL:
-      APPEND_OR_BUBBLE(bdr, walk_literal, ctx, node);
+      bdr.append(walk_literal(ctx, node));
       break;
     case CST_MATCH:
-      APPEND_OR_BUBBLE(bdr, walk_match, ctx, node);
+      bdr.append(walk_match(ctx, node));
       break;
     case CST_OP:
-      APPEND_OR_BUBBLE(bdr, walk_op, ctx, node);
+      bdr.append(walk_op(ctx, node));
       break;
     case CST_PACKAGE:
-      APPEND_OR_BUBBLE(bdr, walk_package, ctx, node);
+      bdr.append(walk_package(ctx, node));
       break;
     case CST_PAREN:
-      APPEND_OR_BUBBLE(bdr, walk_paren, ctx, node);
+      bdr.append(walk_paren(ctx, node));
       break;
     case CST_PRIM:
-      APPEND_OR_BUBBLE(bdr, walk_prim, ctx, node);
+      bdr.append(walk_prim(ctx, node));
       break;
     case CST_PUBLISH:
-      APPEND_OR_BUBBLE(bdr, walk_publish, ctx, node);
+      bdr.append(walk_publish(ctx, node));
       break;
     case CST_REQUIRE:
-      APPEND_OR_BUBBLE(bdr, walk_require, ctx, node);
+      bdr.append(walk_require(ctx, node));
       break;
     case CST_REQ_ELSE:
-      APPEND_OR_BUBBLE(bdr, walk_req_else, ctx, node);
+      bdr.append(walk_req_else(ctx, node));
       break;
     case CST_SUBSCRIBE:
-      APPEND_OR_BUBBLE(bdr, walk_subscribe, ctx, node);
+      bdr.append(walk_subscribe(ctx, node));
       break;
     case CST_TARGET:
-      APPEND_OR_BUBBLE(bdr, walk_target, ctx, node);
+      bdr.append(walk_target(ctx, node));
       break;
     case CST_TARGET_ARGS:
-      APPEND_OR_BUBBLE(bdr, walk_target_args, ctx, node);
+      bdr.append(walk_target_args(ctx, node));
       break;
     case CST_TOP:
-      APPEND_OR_BUBBLE(bdr, walk_top, ctx, node);
+      bdr.append(walk_top(ctx, node));
       break;
     case CST_TOPIC:
-      APPEND_OR_BUBBLE(bdr, walk_topic, ctx, node);
+      bdr.append(walk_topic(ctx, node));
       break;
     case CST_TUPLE:
-      APPEND_OR_BUBBLE(bdr, walk_tuple, ctx, node);
+      bdr.append(walk_tuple(ctx, node));
       break;
     case CST_TUPLE_ELT:
-      APPEND_OR_BUBBLE(bdr, walk_tuple_elt, ctx, node);
+      bdr.append(walk_tuple_elt(ctx, node));
       break;
     case CST_UNARY:
-      APPEND_OR_BUBBLE(bdr, walk_unary, ctx, node);
+      bdr.append(walk_unary(ctx, node));
       break;
     case CST_ERROR:
-      APPEND_OR_BUBBLE(bdr, walk_error, ctx, node);
+      bdr.append(walk_error(ctx, node));
       break;
     default:
       assert(false);
   }
 
-  return wcl::optional<wcl::doc>(wcl::in_place_t{}, std::move(bdr).build());
+  return std::move(bdr).build();
 }
 
-wcl::optional<wcl::doc> Emitter::walk_placeholder(ctx_t ctx, CSTElement node) {
+wcl::doc Emitter::walk_placeholder(ctx_t ctx, CSTElement node) {
   assert(node.isNode());
 
   wcl::doc_builder bdr;
 
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
     if (child.isNode()) {
-      auto full_child = walk_node(ctx, child);
-      assert(full_child);
-      bdr.append(*full_child);
+      bdr.append(walk_node(ctx, child));
     } else {
       bdr.append(walk_token(ctx, child));
     }
   }
 
-  return wcl::optional<wcl::doc>(wcl::in_place_t{}, std::move(bdr).build());
+  return std::move(bdr).build();
 }
 
 wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
@@ -295,9 +251,6 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
     case TOKEN_KW_MACRO_HERE:
       return wcl::doc::lit("@here");
     case TOKEN_NL: {
-      if (ctx.is_flat) {
-        return wcl::doc::lit(" ");
-      }
       return wcl::doc::lit("\n");
     }
     case TOKEN_WS: {
@@ -382,27 +335,17 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   }
 }
 
-wcl::optional<wcl::doc> Emitter::walk_rhs(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_rhs(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::optional<wcl::doc> Emitter::walk_apply(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::optional<wcl::doc> Emitter::walk_arity(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_arity(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::optional<wcl::doc> Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::optional<wcl::doc> Emitter::walk_binary(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::optional<wcl::doc> Emitter::walk_block(ctx_t ctx, CSTElement node) {
+wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   ASSERT_TOKEN(node, CST_BLOCK);
   wcl::doc_builder bdr;
 
@@ -414,28 +357,20 @@ wcl::optional<wcl::doc> Emitter::walk_block(ctx_t ctx, CSTElement node) {
 
     // No non-whitespace nodes should be in a block
     assert(child.isNode());
-    {
-      auto new_child = walk_node(ctx.sub(bdr), child);
-      assert(new_child);
-      bdr.append(*new_child);
-    }
+    bdr.append(walk_node(ctx.sub(bdr), child));
     bdr.append(newline(ctx));
   }
 
   bdr.undo();
 
-  return wcl::optional<wcl::doc>(wcl::in_place_t{}, std::move(bdr).build());
+  return std::move(bdr).build();
 }
 
-wcl::optional<wcl::doc> Emitter::walk_case(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::optional<wcl::doc> Emitter::walk_data(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::optional<wcl::doc> Emitter::walk_def(ctx_t ctx, CSTElement node) {
+wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
   ASSERT_TOKEN(node, CST_DEF);
   wcl::doc_builder bdr;
   CSTElement child = node.firstChildElement();
@@ -453,11 +388,7 @@ wcl::optional<wcl::doc> Emitter::walk_def(ctx_t ctx, CSTElement node) {
   // CST_ID, CST_APPLY, TODO: others?
   assert(!child.empty());
   assert(child.id() == CST_ID || child.id() == CST_APP);
-  {
-    auto new_child = walk_node(ctx.sub(bdr), child);
-    assert(new_child);
-    bdr.append(*new_child);
-  }
+  bdr.append(walk_node(ctx.sub(bdr), child));
   child.nextSiblingElement();
 
   // ws
@@ -475,18 +406,13 @@ wcl::optional<wcl::doc> Emitter::walk_def(ctx_t ctx, CSTElement node) {
 
   // rhs
   {
-    auto new_child = walk_node(ctx.sub(bdr), child);
-    assert(new_child);
-    wcl::doc new_doc = *new_child;
-    new_doc = space().concat(new_doc);
-    if (fits(bdr, ctx, new_doc) && !requires_nl(ctx, child)) {
-      bdr.append(new_doc);
+    wcl::doc doc = space().concat(walk_node(ctx.sub(bdr), child));
+    if (fits(bdr, ctx, doc) && !requires_nl(ctx, child)) {
+      bdr.append(doc);
     } else {
       ctx_t n_ctx = ctx.nest();
       bdr.append(newline(n_ctx));
-      auto full_child = walk_node(n_ctx.sub(bdr), child);
-      assert(full_child);
-      bdr.append(*full_child);
+      bdr.append(walk_node(n_ctx.sub(bdr), child));
     }
   }
   child.nextSiblingElement();
@@ -495,128 +421,78 @@ wcl::optional<wcl::doc> Emitter::walk_def(ctx_t ctx, CSTElement node) {
   CONSUME_WS_NL(child);
 
   assert(child.empty());
-  return wcl::optional<wcl::doc>(wcl::in_place_t{}, std::move(bdr).build());
+  return std::move(bdr).build();
 }
 
-wcl::optional<wcl::doc> Emitter::walk_export(ctx_t ctx, CSTElement node) {
+wcl::doc Emitter::walk_export(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_flag_export(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::doc> Emitter::walk_flag_export(ctx_t ctx, CSTElement node) {
+wcl::doc Emitter::walk_flag_global(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::doc> Emitter::walk_flag_global(ctx_t ctx, CSTElement node) {
+wcl::doc Emitter::walk_guard(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_hole(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_identifier(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::doc> Emitter::walk_guard(ctx_t ctx, CSTElement node) {
+wcl::doc Emitter::walk_ideq(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::doc> Emitter::walk_hole(ctx_t ctx, CSTElement node) {
+wcl::doc Emitter::walk_kind(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_lambda(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_prim(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_req_else(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+
+wcl::doc Emitter::walk_target_args(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
 }
 
-wcl::optional<wcl::doc> Emitter::walk_identifier(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_top(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::optional<wcl::doc> Emitter::walk_ideq(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_topic(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::optional<wcl::doc> Emitter::walk_if(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_tuple(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::optional<wcl::doc> Emitter::walk_import(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_tuple_elt(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::optional<wcl::doc> Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::optional<wcl::doc> Emitter::walk_kind(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_lambda(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_literal(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_match(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_op(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_package(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_paren(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_prim(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_publish(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_require(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_req_else(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_target(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_target_args(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_top(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_topic(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_tuple(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_tuple_elt(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_unary(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
-
-wcl::optional<wcl::doc> Emitter::walk_error(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
-}
+wcl::doc Emitter::walk_error(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
 #undef CONSUME_WS_NL
 #undef APPEND_OR_BUBBLE
