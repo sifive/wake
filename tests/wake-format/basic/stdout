@@ -8,7 +8,9 @@ def name Unit =
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
 
-def t1 = match _  0=0  n = 2+t(n-1)
+def t1 = match _
+ 0=0
+ n = 2+t(n-1)
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
  buildTestWake, Nil =
@@ -17,13 +19,22 @@ def wakeToTestDir Unit = match (subscribe wakeTestBinary)
  Nil = Pass (Pair "{wakePath}" Nil)
  _ = Fail (makeError "Two wake binaries declared for testing!")
 
-package test_wake 
+package test_wake
 
-from wake import _ 
-from wake import source , Nil 
-from test_wake import topic wakeTestBinary 
-from gcc_wake import compileC linkO 
-from wake import myMap=map foldl myFoldr=foldr 
-from wake import def unary + - 
-from wake import type Pair Result 
-from wake import source,Nil 
+
+from wake import _
+
+from wake import source , Nil
+
+from test_wake import topic wakeTestBinary
+
+from gcc_wake import compileC linkO
+
+from wake import myMap=map foldl myFoldr=foldr
+
+from wake import def unary + -
+
+from wake import type Pair Result
+
+from wake import source,Nil
+
