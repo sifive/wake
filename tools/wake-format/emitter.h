@@ -108,6 +108,12 @@ class Emitter {
 
   wcl::optional<wcl::doc> walk_placeholder(ctx_t ctx, CSTElement node);
 
+  // Detemines if a given doc fits in the current doc
+  bool fits(const wcl::doc_builder& bdr, ctx_t ctx, wcl::doc new_doc);
+
+  // Determines if a given node must be started on a newline
+  bool requires_nl(ctx_t ctx, CSTElement node);
+
   // Emits a newline and any indentation needed
   wcl::doc newline(ctx_t ctx);
 
