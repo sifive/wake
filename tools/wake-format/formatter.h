@@ -20,6 +20,8 @@
 #include <wcl/doc.h>
 
 #include <cassert>
+#include <functional>
+#include <vector>
 
 #include "parser/cst.h"
 #include "parser/parser.h"
@@ -120,28 +122,27 @@ struct WalkAction {
   WalkAction(F walk, uint8_t node_type) : walker(walk), node_type(node_type) {}
 
   void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    // assert(node.id() == node_type);
+    assert(node.id() == node_type);
     auto doc = walker(ctx, const_cast<const CSTElement&>(node));
     builder.append(doc);
     node.nextSiblingElement();
   }
 };
 
-// template <class F, class P>
-// struct WalkPredicateAction {
-//   F walker;
-//   P predicate;
+template <class F, class P>
+struct WalkPredicateAction {
+  F walker;
+  P predicate;
 
-//   WalkPredicateAction(F walk, P p) : walker(walk), predicate(p) {}
+  WalkPredicateAction(F walk, P p) : walker(walk), predicate(p) {}
 
-//   void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-//     auto pass = predicate(node);
-//     std::cout << pass;
-//     auto doc = walker(ctx, const_cast<const CSTElement&>(node));
-//     builder.append(doc);
-//     node.nextSiblingElement();
-//   }
-// };
+  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    assert(predicate(node));
+    auto doc = walker(ctx, const_cast<const CSTElement&>(node));
+    builder.append(doc);
+    node.nextSiblingElement();
+  }
+};
 
 // This is the escape hatch to implement something else.
 // NOTE: You're responsible for advancing the node!!!
@@ -197,13 +198,34 @@ struct Formatter {
         SeqAction<Action, WalkAction<Walker>>(action, WalkAction<Walker>{texas_ranger, node_type})};
   }
 
-  //   template <class Predicate, class Walker>
-  //   Formatter<SeqAction<Action, WalkPredicateAction<Walker, Predicate>>> walk(Predicate
-  //   predicate, Walker texas_ranger) {
-  //     return {
-  //         SeqAction<Action, WalkPredicateAction<Walker, Predicate>>(action,
-  //         WalkPredicateAction<Walker, Predicate>{texas_ranger, predicate})};
-  //   }
+  template <class Walker>
+  Formatter<
+      SeqAction<Action, WalkPredicateAction<Walker, std::function<bool(const CSTElement& node)>>>>
+  walk(std::vector<uint8_t> types, Walker texas_ranger) {
+    std::function<bool(const CSTElement& node)> predicate =
+        [types = std::move(types)](const CSTElement& node) {
+          for (const uint8_t t : types) {
+            if (t == node.id()) {
+              return true;
+            }
+          }
+          return false;
+        };
+    return {
+        SeqAction<Action, WalkPredicateAction<Walker, std::function<bool(const CSTElement& node)>>>(
+            action, WalkPredicateAction<Walker, std::function<bool(const CSTElement& node)>>{
+                        texas_ranger, predicate})};
+  }
+
+  template <
+      class Predicate, class Walker,
+      std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(uint8_t()))>::value,
+                       bool> = true>
+  Formatter<SeqAction<Action, WalkPredicateAction<Walker, Predicate>>> walk(Predicate predicate,
+                                                                            Walker texas_ranger) {
+    return {SeqAction<Action, WalkPredicateAction<Walker, Predicate>>(
+        action, WalkPredicateAction<Walker, Predicate>(texas_ranger, predicate))};
+  }
 
   template <class F>
   Formatter<SeqAction<Action, EscapeAction<F>>> escape(F f) {

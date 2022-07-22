@@ -355,7 +355,7 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
       continue;
     }
 
-    // No non-whitespace nodes should be in a block
+    // No non-whitespace tokens should be in a block
     assert(child.isNode());
     bdr.append(walk_node(ctx.sub(bdr), child));
     bdr.append(newline(ctx));
@@ -376,8 +376,7 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
   return formatter()
       .token(TOKEN_KW_DEF)
       .ws()
-      // CST_ID, CST_APPLY
-      .walk(CST_ID, [this](ctx_t ctx, CSTElement node) { return walk_node(ctx, node); })
+      .walk({CST_ID, CST_APP}, [this](ctx_t ctx, CSTElement node) { return walk_node(ctx, node); })
       .ws()
       .token(TOKEN_P_EQUALS)
       .consume_wsnl()
@@ -418,7 +417,17 @@ wcl::doc Emitter::walk_ideq(ctx_t ctx, CSTElement node) { return walk_placeholde
 
 wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
+  ASSERT_TOKEN(node, CST_IMPORT);
+  // return formatter()
+  //     .token(TOKEN_KW_FROM)
+  //     .ws()
+  //     .walk(CST_ID, [this](ctx_t ctx, CSTElement node) { return walk_identifier(ctx, node); })
+  //     .ws()
+  //     .token(TOKEN_KW_IMPORT)
+  //     .ws()
+  return walk_placeholder(ctx, node);
+}
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
