@@ -372,56 +372,28 @@ wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) { return walk_placeholde
 
 wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
   ASSERT_TOKEN(node, CST_DEF);
-  wcl::doc_builder bdr;
-  CSTElement child = node.firstChildElement();
 
-  // def
-  ASSERT_TOKEN(child, TOKEN_KW_DEF);
-  bdr.append("def");
-  child.nextSiblingElement();
-
-  // ws
-  ASSERT_TOKEN(child, TOKEN_WS);
-  bdr.append(space());
-  child.nextSiblingElement();
-
-  // CST_ID, CST_APPLY, TODO: others?
-  assert(!child.empty());
-  assert(child.id() == CST_ID || child.id() == CST_APP);
-  bdr.append(walk_node(ctx.sub(bdr), child));
-  child.nextSiblingElement();
-
-  // ws
-  ASSERT_TOKEN(child, TOKEN_WS);
-  bdr.append(space());
-  child.nextSiblingElement();
-
-  //  =
-  ASSERT_TOKEN(child, TOKEN_P_EQUALS);
-  bdr.append("=");
-  child.nextSiblingElement();
-
-  // optional ws/nl
-  CONSUME_WS_NL(child);
-
-  // rhs
-  {
-    wcl::doc doc = space().concat(walk_node(ctx.sub(bdr), child));
-    if (fits(bdr, ctx, doc) && !requires_nl(ctx, child)) {
-      bdr.append(doc);
-    } else {
-      ctx_t n_ctx = ctx.nest();
-      bdr.append(newline(n_ctx));
-      bdr.append(walk_node(n_ctx.sub(bdr), child));
-    }
-  }
-  child.nextSiblingElement();
-
-  // optional ws/nl
-  CONSUME_WS_NL(child);
-
-  assert(child.empty());
-  return std::move(bdr).build();
+  return formatter()
+      .token(TOKEN_KW_DEF)
+      .ws()
+      // CST_ID, CST_APPLY
+      .walk(CST_ID, [this](ctx_t ctx, CSTElement node) { return walk_node(ctx, node); })
+      .ws()
+      .token(TOKEN_P_EQUALS)
+      .consume_wsnl()
+      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
+        wcl::doc doc = space().concat(walk_node(ctx.sub(bdr), node));
+        if (fits(bdr, ctx, doc) && !requires_nl(ctx, node)) {
+          bdr.append(doc);
+        } else {
+          ctx_t n_ctx = ctx.nest();
+          bdr.append(newline(n_ctx));
+          bdr.append(walk_node(n_ctx.sub(bdr), node));
+        }
+        node.nextSiblingElement();
+      })
+      .consume_wsnl()
+      .format(ctx, node.firstChildElement());
 }
 
 wcl::doc Emitter::walk_export(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
@@ -462,7 +434,15 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) { return walk_placehold
 
 wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
+  ASSERT_TOKEN(node, CST_PACKAGE);
+  return formatter()
+      .token(TOKEN_KW_PACKAGE)
+      .ws()
+      .walk(CST_ID, [this](ctx_t ctx, CSTElement node) { return walk_identifier(ctx, node); })
+      .consume_wsnl()
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
