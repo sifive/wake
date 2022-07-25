@@ -43,7 +43,7 @@ bool Emitter::fits(const wcl::doc_builder& bdr, ctx_t ctx, wcl::doc doc) {
 }
 
 bool Emitter::requires_nl(ctx_t ctx, CSTElement node) {
-  return node.id() == CST_BLOCK && node.firstChildElement().id() != CST_MATCH;
+  return node.id() == CST_BLOCK || node.id() == CST_REQUIRE;
 }
 
 wcl::doc Emitter::newline(ctx_t ctx) {
@@ -335,13 +335,42 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_rhs(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_APP);
+
+  return formatter()
+      .walk({CST_ID, CST_APP}, WALK(walk_node))
+      .consume_wsnl()
+      .space()
+      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_arity(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
 wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_BINARY);
+
+  return formatter()
+      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .consume_wsnl()
+      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
+        assert(node.id() == CST_OP);
+        // only add a space if the binop is not a comma
+        // a+b -> a + b
+        // a,b -> a, b
+        if (node.firstChildElement().id() != TOKEN_OP_COMMA) {
+          bdr.append(space());
+        }
+      })
+      .walk(CST_OP, WALK(walk_op))
+      .consume_wsnl()
+      .space()
+      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_BLOCK);
@@ -364,7 +393,28 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   return std::move(bdr).build();
 }
 
-wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_CASE);
+
+  return formatter()
+      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .consume_wsnl()
+      .space()
+      .walk(CST_GUARD, WALK(walk_guard))
+      .consume_wsnl()
+      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
+        wcl::doc doc = space().concat(walk_node(ctx.sub(bdr), node));
+        if (fits(bdr, ctx, doc) && !requires_nl(ctx, node)) {
+          bdr.append(doc);
+        } else {
+          ctx_t n_ctx = ctx.nest();
+          bdr.append(newline(n_ctx));
+          bdr.append(walk_node(n_ctx.sub(bdr), node));
+        }
+        node.nextSiblingElement();
+      })
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
@@ -408,7 +458,9 @@ wcl::doc Emitter::walk_guard(ctx_t ctx, CSTElement node) { return walk_placehold
 wcl::doc Emitter::walk_hole(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
 wcl::doc Emitter::walk_identifier(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
+  assert(node.id() == CST_ID);
+
+  return formatter().token(TOKEN_ID).format(ctx, node.firstChildElement());
 }
 
 wcl::doc Emitter::walk_ideq(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
@@ -448,7 +500,24 @@ wcl::doc Emitter::walk_lambda(ctx_t ctx, CSTElement node) { return walk_placehol
 
 wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_MATCH);
+
+  return formatter()
+      .token(TOKEN_KW_MATCH)
+      .ws()
+      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .consume_wsnl()
+      // clang-format off
+      .nest(formatter()
+          .fmt_while(
+              CST_CASE, formatter()
+              .newline()
+              .walk([](uint8_t) { return true; }, WALK(walk_node))
+              .consume_wsnl()))
+      // clang-format on
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
@@ -468,11 +537,45 @@ wcl::doc Emitter::walk_prim(ctx_t ctx, CSTElement node) { return walk_placeholde
 
 wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_REQUIRE);
+
+  return formatter()
+      .token(TOKEN_KW_REQUIRE)
+      .ws()
+      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .consume_wsnl()
+      .space()
+      .token(TOKEN_P_EQUALS)
+      .consume_wsnl()
+      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
+        wcl::doc doc = space().concat(walk_node(ctx.sub(bdr), node));
+        if (fits(bdr, ctx, doc) && !requires_nl(ctx, node)) {
+          bdr.append(doc);
+        } else {
+          ctx_t n_ctx = ctx.nest();
+          bdr.append(newline(n_ctx));
+          bdr.append(walk_node(n_ctx.sub(bdr), node));
+        }
+        node.nextSiblingElement();
+      })
+      .consume_wsnl()
+      .newline()
+      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_req_else(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_SUBSCRIBE);
+
+  return formatter()
+      .token(TOKEN_KW_SUBSCRIBE)
+      .ws()
+      .walk(CST_ID, WALK(walk_identifier))
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 

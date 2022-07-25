@@ -147,6 +147,17 @@ struct WalkPredicateAction {
 };
 
 template <class FMT>
+struct NestAction {
+  FMT formatter;
+
+  NestAction(FMT formatter) : formatter(formatter) {}
+
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    builder.append(formatter.compose(ctx.nest(), node));
+  }
+};
+
+template <class FMT>
 struct IfAction {
   FMT formatter;
   uint8_t node_type;
@@ -239,6 +250,11 @@ struct Formatter {
 
   Formatter<SeqAction<Action, TokenReplaceAction>> token(uint8_t id, const char* str) {
     return {SeqAction<Action, TokenReplaceAction>(action, TokenReplaceAction{id, str})};
+  }
+
+  template <class FMT>
+  Formatter<SeqAction<Action, NestAction<FMT>>> nest(FMT formatter) {
+    return {SeqAction<Action, NestAction<FMT>>(action, NestAction<FMT>{formatter})};
   }
 
   template <class FMT>
