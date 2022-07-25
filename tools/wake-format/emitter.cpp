@@ -342,7 +342,7 @@ wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
       .walk({CST_ID, CST_APP}, WALK(walk_node))
       .consume_wsnl()
       .space()
-      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .walk(WALK(walk_node))
       .format(ctx, node.firstChildElement());
 }
 
@@ -354,7 +354,7 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_BINARY);
 
   return formatter()
-      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .walk(WALK(walk_node))
       .consume_wsnl()
       .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
         assert(node.id() == CST_OP);
@@ -368,7 +368,7 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
       .walk(CST_OP, WALK(walk_op))
       .consume_wsnl()
       .space()
-      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .walk(WALK(walk_node))
       .format(ctx, node.firstChildElement());
 }
 
@@ -397,7 +397,7 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_CASE);
 
   return formatter()
-      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .walk(WALK(walk_node))
       .consume_wsnl()
       .space()
       .walk(CST_GUARD, WALK(walk_guard))
@@ -469,6 +469,9 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) { return walk_placeholder(
 
 wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_IMPORT);
+
+  auto id_list_fmt = formatter().walk(WALK(walk_ideq)).fmt_if(TOKEN_WS, formatter().ws());
+
   return formatter()
       .token(TOKEN_KW_FROM)
       .ws()
@@ -476,15 +479,15 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
       .ws()
       .token(TOKEN_KW_IMPORT)
       .ws()
-      .fmt_if(CST_KIND, formatter().walk(CST_KIND, WALK(walk_kind)).ws())
-      .fmt_if(CST_ARITY, formatter().walk(CST_ARITY, WALK(walk_arity)).ws())
+      .fmt_if(CST_KIND, formatter().walk(WALK(walk_kind)).ws())
+      .fmt_if(CST_ARITY, formatter().walk(WALK(walk_arity)).ws())
       // clang-format off
       .fmt_if_else(
           TOKEN_P_HOLE,
-          formatter().walk(TOKEN_P_HOLE, WALK(walk_token)),
+          formatter().walk(WALK(walk_token)),
           formatter().fmt_while(
               CST_IDEQ,
-              formatter().walk(CST_IDEQ, WALK(walk_ideq)).fmt_if(TOKEN_WS, formatter().ws())))
+              id_list_fmt))
       // clang-format on
       .consume_wsnl()
       .format(ctx, node.firstChildElement());
@@ -506,14 +509,14 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
   return formatter()
       .token(TOKEN_KW_MATCH)
       .ws()
-      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .walk(WALK(walk_node))
       .consume_wsnl()
       // clang-format off
       .nest(formatter()
           .fmt_while(
               CST_CASE, formatter()
               .newline()
-              .walk([](uint8_t) { return true; }, WALK(walk_node))
+              .walk(WALK(walk_node))
               .consume_wsnl()))
       // clang-format on
       .format(ctx, node.firstChildElement());
@@ -543,7 +546,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
   return formatter()
       .token(TOKEN_KW_REQUIRE)
       .ws()
-      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .walk(WALK(walk_node))
       .consume_wsnl()
       .space()
       .token(TOKEN_P_EQUALS)
@@ -561,7 +564,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
       })
       .consume_wsnl()
       .newline()
-      .walk([](uint8_t) { return true; }, WALK(walk_node))
+      .walk(WALK(walk_node))
       .format(ctx, node.firstChildElement());
 }
 

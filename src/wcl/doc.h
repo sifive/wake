@@ -263,7 +263,17 @@ class doc_builder {
   bool has_newline() const { return state.newline_count > 0; }
 
   doc build() && {
-    assert(docs.size() > 0);
+    if (docs.size() == 0) {
+      return doc::lit("");
+    }
+
+    if (docs.size() == 1) {
+      doc copy = std::move(docs[0]);
+      docs = {};
+      state = {};
+      return copy;
+    }
+
     doc copy = merge(0, docs.size() - 1);
     docs = {};
     state = {};

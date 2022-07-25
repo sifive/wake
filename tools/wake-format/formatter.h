@@ -116,21 +116,6 @@ struct SeqAction {
   }
 };
 
-template <class F>
-struct WalkAction {
-  F walker;
-  uint8_t node_type;
-
-  WalkAction(F walk, uint8_t node_type) : walker(walk), node_type(node_type) {}
-
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    assert(node.id() == node_type);
-    auto doc = walker(ctx.sub(builder), const_cast<const CSTElement&>(node));
-    builder.append(doc);
-    node.nextSiblingElement();
-  }
-};
-
 template <class F, class P>
 struct WalkPredicateAction {
   F walker;
@@ -154,20 +139,6 @@ struct NestAction {
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     builder.append(formatter.compose(ctx.nest(), node));
-  }
-};
-
-template <class FMT>
-struct IfAction {
-  FMT formatter;
-  uint8_t node_type;
-
-  IfAction(FMT formatter, uint8_t node_type) : formatter(formatter), node_type(node_type) {}
-
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    if (node.id() == node_type) {
-      builder.append(formatter.compose(ctx, node));
-    }
   }
 };
 
@@ -258,8 +229,11 @@ struct Formatter {
   }
 
   template <class FMT>
-  Formatter<SeqAction<Action, IfAction<FMT>>> fmt_if(uint8_t node_type, FMT formatter) {
-    return {SeqAction<Action, IfAction<FMT>>(action, IfAction<FMT>{formatter, node_type})};
+  Formatter<SeqAction<Action, IfElseAction<FMT, Formatter<EpsilonAction>>>> fmt_if(
+      uint8_t node_type, FMT formatter) {
+    return {SeqAction<Action, IfElseAction<FMT, Formatter<EpsilonAction>>>(
+        action, IfElseAction<FMT, Formatter<EpsilonAction>>{formatter, Formatter<EpsilonAction>({}),
+                                                            node_type})};
   }
 
   template <class IFMT, class EFMT>
@@ -275,10 +249,15 @@ struct Formatter {
     return {SeqAction<Action, WhileAction<FMT>>(action, WhileAction<FMT>{formatter, node_type})};
   }
 
+  class TruePredicate {
+   public:
+    bool operator()(uint8_t t) { return true; }
+  };
+
   template <class Walker>
-  Formatter<SeqAction<Action, WalkAction<Walker>>> walk(uint8_t node_type, Walker texas_ranger) {
-    return {
-        SeqAction<Action, WalkAction<Walker>>(action, WalkAction<Walker>{texas_ranger, node_type})};
+  Formatter<SeqAction<Action, WalkPredicateAction<Walker, TruePredicate>>> walk(
+      Walker texas_ranger) {
+    return walk(TruePredicate(), texas_ranger);
   }
 
   class InitListMembershipPredicate {
@@ -295,6 +274,12 @@ struct Formatter {
 
     bool operator()(uint8_t type) { return type_bits[type]; }
   };
+
+  template <class Walker>
+  Formatter<SeqAction<Action, WalkPredicateAction<Walker, InitListMembershipPredicate>>> walk(
+      uint8_t type, Walker texas_ranger) {
+    return walk(InitListMembershipPredicate({type}), texas_ranger);
+  }
 
   template <class Walker>
   Formatter<SeqAction<Action, WalkPredicateAction<Walker, InitListMembershipPredicate>>> walk(
