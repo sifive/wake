@@ -19,12 +19,14 @@
 
 #include <wcl/doc.h>
 
+#include <bitset>
 #include <cassert>
 #include <functional>
-#include <vector>
 
 #include "parser/cst.h"
 #include "parser/parser.h"
+
+#define ALWAYS_INLINE inline __attribute__((always_inline))
 
 struct ctx_t {
   size_t width = 0;
@@ -53,9 +55,8 @@ inline void space(wcl::doc_builder& builder, uint8_t count) {
   }
 }
 
-// TODO: Mark all runs as "always inline"
 struct ConsumeWhitespaceAction {
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     while (!node.empty() && (node.id() == TOKEN_WS || node.id() == TOKEN_NL)) {
       node.nextSiblingElement();
     }
@@ -65,11 +66,13 @@ struct ConsumeWhitespaceAction {
 struct SpaceAction {
   uint8_t count;
   SpaceAction(uint8_t count) : count(count) {}
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) { space(builder, count); }
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    space(builder, count);
+  }
 };
 
 struct NewlineAction {
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     builder.append("\n");
     space(builder, 4 * ctx.nest_level);
   }
@@ -78,7 +81,7 @@ struct NewlineAction {
 struct TokenAction {
   uint8_t token_id;
   TokenAction(uint8_t token_id) : token_id(token_id) {}
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     assert(node.id() == token_id);
     builder.append(node.fragment().segment().str());
     node.nextSiblingElement();
@@ -91,7 +94,7 @@ struct TokenReplaceAction {
 
   TokenReplaceAction(uint8_t token_id, const char* str) : token_id(token_id), str(str) {}
 
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     assert(node.id() == token_id);
     builder.append(str);
     node.nextSiblingElement();
@@ -108,7 +111,7 @@ struct SeqAction {
   Action2 action2;
   SeqAction(Action1 a1, Action2 a2) : action1(a1), action2(a2) {}
 
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     action1.run(builder, ctx, node);
     action2.run(builder, ctx, node);
   }
@@ -121,7 +124,7 @@ struct WalkAction {
 
   WalkAction(F walk, uint8_t node_type) : walker(walk), node_type(node_type) {}
 
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     assert(node.id() == node_type);
     auto doc = walker(ctx.sub(builder), const_cast<const CSTElement&>(node));
     builder.append(doc);
@@ -136,8 +139,8 @@ struct WalkPredicateAction {
 
   WalkPredicateAction(F walk, P p) : walker(walk), predicate(p) {}
 
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    assert(predicate(node));
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    assert(predicate(node.id()));
     auto doc = walker(ctx.sub(builder), const_cast<const CSTElement&>(node));
     builder.append(doc);
     node.nextSiblingElement();
@@ -151,7 +154,7 @@ struct IfAction {
 
   IfAction(FMT formatter, uint8_t node_type) : formatter(formatter), node_type(node_type) {}
 
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     if (node.id() == node_type) {
       builder.append(formatter.compose(ctx, node));
     }
@@ -167,7 +170,7 @@ struct IfElseAction {
   IfElseAction(IFMT if_formatter, EFMT else_formatter, uint8_t node_type)
       : if_formatter(if_formatter), else_formatter(else_formatter), node_type(node_type) {}
 
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     if (node.id() == node_type) {
       builder.append(if_formatter.compose(ctx, node));
     } else {
@@ -184,7 +187,7 @@ struct WhileAction {
   WhileAction(FMT while_formatter, uint8_t node_type)
       : while_formatter(while_formatter), node_type(node_type) {}
 
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     while (node.id() == node_type) {
       builder.append(while_formatter.compose(ctx.sub(builder), node));
     }
@@ -198,7 +201,7 @@ struct EscapeAction {
   F f;
   EscapeAction(F f) : f(f) {}
 
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     // You have to do everything yourself here, that's the price of an escape hatch
     // we can build up enough of these that it shouldn't be an issue however.
     f(builder, ctx, node);
@@ -207,7 +210,7 @@ struct EscapeAction {
 
 // This does nothing, good for kicking off a chain of formatters
 struct EpsilonAction {
-  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {}
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {}
 };
 
 template <class Action>
@@ -263,23 +266,25 @@ struct Formatter {
         SeqAction<Action, WalkAction<Walker>>(action, WalkAction<Walker>{texas_ranger, node_type})};
   }
 
+  class InitListMembershipPredicate {
+   private:
+    std::bitset<256> type_bits;
+
+   public:
+    InitListMembershipPredicate(std::initializer_list<uint8_t> types) {
+      // TODO: static assert(sizeof(token type) == 1)
+      for (uint8_t t : types) {
+        type_bits[t] = true;
+      }
+    }
+
+    bool operator()(uint8_t type) { return type_bits[type]; }
+  };
+
   template <class Walker>
-  Formatter<
-      SeqAction<Action, WalkPredicateAction<Walker, std::function<bool(const CSTElement& node)>>>>
-  walk(std::vector<uint8_t> types, Walker texas_ranger) {
-    std::function<bool(const CSTElement& node)> predicate =
-        [types = std::move(types)](const CSTElement& node) {
-          for (const uint8_t t : types) {
-            if (t == node.id()) {
-              return true;
-            }
-          }
-          return false;
-        };
-    return {
-        SeqAction<Action, WalkPredicateAction<Walker, std::function<bool(const CSTElement& node)>>>(
-            action, WalkPredicateAction<Walker, std::function<bool(const CSTElement& node)>>{
-                        texas_ranger, predicate})};
+  Formatter<SeqAction<Action, WalkPredicateAction<Walker, InitListMembershipPredicate>>> walk(
+      std::initializer_list<uint8_t> types, Walker texas_ranger) {
+    return walk(InitListMembershipPredicate(types), texas_ranger);
   }
 
   template <
@@ -312,3 +317,5 @@ struct Formatter {
 };
 
 inline Formatter<EpsilonAction> formatter() { return Formatter<EpsilonAction>({}); }
+
+#undef ALWAYS_INLINE
