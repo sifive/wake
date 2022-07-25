@@ -515,7 +515,7 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
       .nest(formatter()
           .fmt_while(
               CST_CASE, formatter()
-              .newline()
+              .newline(space_per_indent)
               .walk(WALK(walk_node))
               .consume_wsnl()))
       // clang-format on
@@ -563,7 +563,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
         node.nextSiblingElement();
       })
       .consume_wsnl()
-      .newline()
+      .newline(space_per_indent)
       .walk(WALK(walk_node))
       .format(ctx, node.firstChildElement());
 }

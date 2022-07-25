@@ -71,9 +71,13 @@ struct SpaceAction {
 };
 
 struct NewlineAction {
+  uint8_t space_per_indent;
+
+  NewlineAction(uint8_t space_per_indent) : space_per_indent(space_per_indent) {}
+
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     builder.append("\n");
-    space(builder, 4 * ctx.nest_level);
+    space(builder, space_per_indent * ctx.nest_level);
   }
 };
 
@@ -211,8 +215,8 @@ struct Formatter {
     return {SeqAction<Action, SpaceAction>(action, SpaceAction{count})};
   }
 
-  Formatter<SeqAction<Action, NewlineAction>> newline() {
-    return {SeqAction<Action, NewlineAction>(action, NewlineAction{})};
+  Formatter<SeqAction<Action, NewlineAction>> newline(uint8_t space_per_indent) {
+    return {SeqAction<Action, NewlineAction>(action, NewlineAction{space_per_indent})};
   }
 
   Formatter<SeqAction<Action, TokenAction>> token(uint8_t id) {
