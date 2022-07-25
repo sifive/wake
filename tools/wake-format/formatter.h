@@ -21,7 +21,6 @@
 
 #include <bitset>
 #include <cassert>
-#include <functional>
 
 #include "parser/cst.h"
 #include "parser/parser.h"
