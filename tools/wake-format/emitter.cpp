@@ -25,16 +25,14 @@
 
 #include "parser/parser.h"
 
-#define ASSERT_TOKEN(node, token) \
-  assert(!node.empty());          \
-  assert(node.id() == token);
-
 #define CONSUME_WS_NL(node)                                                     \
   {                                                                             \
     while (!node.empty() && (node.id() == TOKEN_WS || node.id() == TOKEN_NL)) { \
       node.nextSiblingElement();                                                \
     }                                                                           \
   }
+
+#define WALK(func) [this](ctx_t ctx, CSTElement node) { return func(ctx, node); }
 
 bool Emitter::fits(const wcl::doc_builder& bdr, ctx_t ctx, wcl::doc doc) {
   if (bdr.has_newline()) {
@@ -346,7 +344,7 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) { return walk_placeho
 wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
 wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
-  ASSERT_TOKEN(node, CST_BLOCK);
+  assert(node.id() == CST_BLOCK);
   wcl::doc_builder bdr;
 
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
@@ -371,12 +369,12 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) { return walk_placeholde
 wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
 wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
-  ASSERT_TOKEN(node, CST_DEF);
+  assert(node.id() == CST_DEF);
 
   return formatter()
       .token(TOKEN_KW_DEF)
       .ws()
-      .walk({CST_ID, CST_APP}, [this](ctx_t ctx, CSTElement node) { return walk_node(ctx, node); })
+      .walk({CST_ID, CST_APP}, WALK(walk_node))
       .ws()
       .token(TOKEN_P_EQUALS)
       .consume_wsnl()
@@ -418,15 +416,26 @@ wcl::doc Emitter::walk_ideq(ctx_t ctx, CSTElement node) { return walk_placeholde
 wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
 wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
-  ASSERT_TOKEN(node, CST_IMPORT);
-  // return formatter()
-  //     .token(TOKEN_KW_FROM)
-  //     .ws()
-  //     .walk(CST_ID, [this](ctx_t ctx, CSTElement node) { return walk_identifier(ctx, node); })
-  //     .ws()
-  //     .token(TOKEN_KW_IMPORT)
-  //     .ws()
-  return walk_placeholder(ctx, node);
+  assert(node.id() == CST_IMPORT);
+  return formatter()
+      .token(TOKEN_KW_FROM)
+      .ws()
+      .walk(CST_ID, WALK(walk_identifier))
+      .ws()
+      .token(TOKEN_KW_IMPORT)
+      .ws()
+      .fmt_if(CST_KIND, formatter().walk(CST_KIND, WALK(walk_kind)).ws())
+      .fmt_if(CST_ARITY, formatter().walk(CST_ARITY, WALK(walk_arity)).ws())
+      // clang-format off
+      .fmt_if_else(
+          TOKEN_P_HOLE,
+          formatter().walk(TOKEN_P_HOLE, WALK(walk_token)),
+          formatter().fmt_while(
+              CST_IDEQ,
+              formatter().walk(CST_IDEQ, WALK(walk_ideq)).fmt_if(TOKEN_WS, formatter().ws())))
+      // clang-format on
+      .consume_wsnl()
+      .format(ctx, node.firstChildElement());
 }
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
@@ -444,11 +453,11 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) { return walk_placehold
 wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
 wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
-  ASSERT_TOKEN(node, CST_PACKAGE);
+  assert(node.id() == CST_PACKAGE);
   return formatter()
       .token(TOKEN_KW_PACKAGE)
       .ws()
-      .walk(CST_ID, [this](ctx_t ctx, CSTElement node) { return walk_identifier(ctx, node); })
+      .walk(CST_ID, WALK(walk_identifier))
       .consume_wsnl()
       .format(ctx, node.firstChildElement());
 }
@@ -483,6 +492,5 @@ wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) { return walk_placehold
 
 wcl::doc Emitter::walk_error(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
+#undef WALK
 #undef CONSUME_WS_NL
-#undef APPEND_OR_BUBBLE
-#undef ASSERT_TOKEN

@@ -123,7 +123,7 @@ struct WalkAction {
 
   void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     assert(node.id() == node_type);
-    auto doc = walker(ctx, const_cast<const CSTElement&>(node));
+    auto doc = walker(ctx.sub(builder), const_cast<const CSTElement&>(node));
     builder.append(doc);
     node.nextSiblingElement();
   }
@@ -138,9 +138,56 @@ struct WalkPredicateAction {
 
   void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     assert(predicate(node));
-    auto doc = walker(ctx, const_cast<const CSTElement&>(node));
+    auto doc = walker(ctx.sub(builder), const_cast<const CSTElement&>(node));
     builder.append(doc);
     node.nextSiblingElement();
+  }
+};
+
+template <class FMT>
+struct IfAction {
+  FMT formatter;
+  uint8_t node_type;
+
+  IfAction(FMT formatter, uint8_t node_type) : formatter(formatter), node_type(node_type) {}
+
+  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    if (node.id() == node_type) {
+      builder.append(formatter.compose(ctx, node));
+    }
+  }
+};
+
+template <class IFMT, class EFMT>
+struct IfElseAction {
+  IFMT if_formatter;
+  EFMT else_formatter;
+  uint8_t node_type;
+
+  IfElseAction(IFMT if_formatter, EFMT else_formatter, uint8_t node_type)
+      : if_formatter(if_formatter), else_formatter(else_formatter), node_type(node_type) {}
+
+  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    if (node.id() == node_type) {
+      builder.append(if_formatter.compose(ctx, node));
+    } else {
+      builder.append(else_formatter.compose(ctx, node));
+    }
+  }
+};
+
+template <class FMT>
+struct WhileAction {
+  FMT while_formatter;
+  uint8_t node_type;
+
+  WhileAction(FMT while_formatter, uint8_t node_type)
+      : while_formatter(while_formatter), node_type(node_type) {}
+
+  void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    while (node.id() == node_type) {
+      builder.append(while_formatter.compose(ctx.sub(builder), node));
+    }
   }
 };
 
@@ -192,6 +239,24 @@ struct Formatter {
     return {SeqAction<Action, TokenReplaceAction>(action, TokenReplaceAction{id, str})};
   }
 
+  template <class FMT>
+  Formatter<SeqAction<Action, IfAction<FMT>>> fmt_if(uint8_t node_type, FMT formatter) {
+    return {SeqAction<Action, IfAction<FMT>>(action, IfAction<FMT>{formatter, node_type})};
+  }
+
+  template <class IFMT, class EFMT>
+  Formatter<SeqAction<Action, IfElseAction<IFMT, EFMT>>> fmt_if_else(uint8_t node_type,
+                                                                     IFMT if_formatter,
+                                                                     EFMT else_formatter) {
+    return {SeqAction<Action, IfElseAction<IFMT, EFMT>>(
+        action, IfElseAction<IFMT, EFMT>{if_formatter, else_formatter, node_type})};
+  }
+
+  template <class FMT>
+  Formatter<SeqAction<Action, WhileAction<FMT>>> fmt_while(uint8_t node_type, FMT formatter) {
+    return {SeqAction<Action, WhileAction<FMT>>(action, WhileAction<FMT>{formatter, node_type})};
+  }
+
   template <class Walker>
   Formatter<SeqAction<Action, WalkAction<Walker>>> walk(uint8_t node_type, Walker texas_ranger) {
     return {
@@ -236,6 +301,12 @@ struct Formatter {
     wcl::doc_builder builder;
     action.run(builder, ctx, node);
     assert(node.empty());
+    return std::move(builder).build();
+  }
+
+  wcl::doc compose(ctx_t ctx, CSTElement& node) {
+    wcl::doc_builder builder;
+    action.run(builder, ctx, node);
     return std::move(builder).build();
   }
 };
