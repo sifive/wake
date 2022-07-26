@@ -24,31 +24,11 @@
 #include <iostream>
 #include <vector>
 
+#include "formatter.h"
 #include "parser/cst.h"
 
 class Emitter {
  public:
-  struct ctx_t {
-    size_t width = 0;
-    size_t nest_level = 0;
-
-    ctx_t nest() {
-      ctx_t copy = *this;
-      copy.nest_level++;
-      return copy;
-    }
-
-    ctx_t sub(const wcl::doc_builder& builder) {
-      ctx_t copy = *this;
-      if (builder.has_newline()) {
-        copy.width = builder.last_width();
-      } else {
-        copy.width += builder.last_width();
-      }
-      return copy;
-    }
-  };
-
   // Walks the CST, formats it, and returns the representative doc
   wcl::doc layout(CST cst);
 
@@ -58,7 +38,7 @@ class Emitter {
 
   wcl::doc walk_node(ctx_t ctx, CSTElement node);
   wcl::doc walk_token(ctx_t ctx, CSTElement node);
-  wcl::doc walk_rhs(ctx_t ctx, CSTElement node);
+  void walk_rhs(wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node);
 
   wcl::doc walk_apply(ctx_t ctx, CSTElement node);
   wcl::doc walk_arity(ctx_t ctx, CSTElement node);

@@ -25,16 +25,14 @@
 
 #include "parser/parser.h"
 
-#define ASSERT_TOKEN(node, token) \
-  assert(!node.empty());          \
-  assert(node.id() == token);
-
 #define CONSUME_WS_NL(node)                                                     \
   {                                                                             \
     while (!node.empty() && (node.id() == TOKEN_WS || node.id() == TOKEN_NL)) { \
       node.nextSiblingElement();                                                \
     }                                                                           \
   }
+
+#define WALK(func) [this](ctx_t ctx, CSTElement node) { return func(ctx, node); }
 
 bool Emitter::fits(const wcl::doc_builder& bdr, ctx_t ctx, wcl::doc doc) {
   if (bdr.has_newline()) {
@@ -45,7 +43,23 @@ bool Emitter::fits(const wcl::doc_builder& bdr, ctx_t ctx, wcl::doc doc) {
 }
 
 bool Emitter::requires_nl(ctx_t ctx, CSTElement node) {
-  return node.id() == CST_BLOCK && node.firstChildElement().id() != CST_MATCH;
+  return node.id() == CST_BLOCK || node.id() == CST_REQUIRE;
+}
+
+static bool is_expression(uint8_t type) {
+  return type == CST_ID || type == CST_APP || type == CST_LITERAL;
+}
+
+void Emitter::walk_rhs(wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
+  wcl::doc doc = space().concat(walk_node(ctx.sub(bdr), node));
+  if (fits(bdr, ctx, doc) && !requires_nl(ctx, node)) {
+    bdr.append(doc);
+  } else {
+    ctx_t n_ctx = ctx.nest();
+    bdr.append(newline(n_ctx));
+    bdr.append(walk_node(n_ctx.sub(bdr), node));
+  }
+  node.nextSiblingElement();
 }
 
 wcl::doc Emitter::newline(ctx_t ctx) {
@@ -335,18 +349,37 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   }
 }
 
-wcl::doc Emitter::walk_rhs(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_APP);
 
-wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+  return formatter()
+      .walk(is_expression, WALK(walk_node))
+      .consume_wsnl()
+      .space()
+      .walk(WALK(walk_node))
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_arity(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
 wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_BINARY);
+
+  return formatter()
+      .walk(is_expression, WALK(walk_node))
+      .consume_wsnl()
+      .space()
+      .walk(CST_OP, WALK(walk_op))
+      .consume_wsnl()
+      .space()
+      .walk(is_expression, WALK(walk_node))
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
-  ASSERT_TOKEN(node, CST_BLOCK);
+  assert(node.id() == CST_BLOCK);
   wcl::doc_builder bdr;
 
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
@@ -355,7 +388,7 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
       continue;
     }
 
-    // No non-whitespace nodes should be in a block
+    // No non-whitespace tokens should be in a block
     assert(child.isNode());
     bdr.append(walk_node(ctx.sub(bdr), child));
     bdr.append(newline(ctx));
@@ -366,62 +399,36 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   return std::move(bdr).build();
 }
 
-wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_CASE);
+
+  return formatter()
+      .walk(WALK(walk_node))
+      .consume_wsnl()
+      .space()
+      .walk(CST_GUARD, WALK(walk_guard))
+      .consume_wsnl()
+      .escape(
+          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
 wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
-  ASSERT_TOKEN(node, CST_DEF);
-  wcl::doc_builder bdr;
-  CSTElement child = node.firstChildElement();
+  assert(node.id() == CST_DEF);
 
-  // def
-  ASSERT_TOKEN(child, TOKEN_KW_DEF);
-  bdr.append("def");
-  child.nextSiblingElement();
-
-  // ws
-  ASSERT_TOKEN(child, TOKEN_WS);
-  bdr.append(space());
-  child.nextSiblingElement();
-
-  // CST_ID, CST_APPLY, TODO: others?
-  assert(!child.empty());
-  assert(child.id() == CST_ID || child.id() == CST_APP);
-  bdr.append(walk_node(ctx.sub(bdr), child));
-  child.nextSiblingElement();
-
-  // ws
-  ASSERT_TOKEN(child, TOKEN_WS);
-  bdr.append(space());
-  child.nextSiblingElement();
-
-  //  =
-  ASSERT_TOKEN(child, TOKEN_P_EQUALS);
-  bdr.append("=");
-  child.nextSiblingElement();
-
-  // optional ws/nl
-  CONSUME_WS_NL(child);
-
-  // rhs
-  {
-    wcl::doc doc = space().concat(walk_node(ctx.sub(bdr), child));
-    if (fits(bdr, ctx, doc) && !requires_nl(ctx, child)) {
-      bdr.append(doc);
-    } else {
-      ctx_t n_ctx = ctx.nest();
-      bdr.append(newline(n_ctx));
-      bdr.append(walk_node(n_ctx.sub(bdr), child));
-    }
-  }
-  child.nextSiblingElement();
-
-  // optional ws/nl
-  CONSUME_WS_NL(child);
-
-  assert(child.empty());
-  return std::move(bdr).build();
+  return formatter()
+      .token(TOKEN_KW_DEF)
+      .ws()
+      .walk({CST_ID, CST_APP}, WALK(walk_node))
+      .ws()
+      .token(TOKEN_P_EQUALS)
+      .consume_wsnl()
+      .escape(
+          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
+      .consume_wsnl()
+      .format(ctx, node.firstChildElement());
 }
 
 wcl::doc Emitter::walk_export(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
@@ -439,14 +446,40 @@ wcl::doc Emitter::walk_guard(ctx_t ctx, CSTElement node) { return walk_placehold
 wcl::doc Emitter::walk_hole(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
 wcl::doc Emitter::walk_identifier(ctx_t ctx, CSTElement node) {
-  return walk_placeholder(ctx, node);
+  assert(node.id() == CST_ID);
+
+  return formatter().token(TOKEN_ID).format(ctx, node.firstChildElement());
 }
 
 wcl::doc Emitter::walk_ideq(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
 wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_IMPORT);
+
+  auto id_list_fmt = formatter().walk(WALK(walk_ideq)).fmt_if(TOKEN_WS, formatter().ws());
+
+  return formatter()
+      .token(TOKEN_KW_FROM)
+      .ws()
+      .walk(CST_ID, WALK(walk_identifier))
+      .ws()
+      .token(TOKEN_KW_IMPORT)
+      .ws()
+      .fmt_if(CST_KIND, formatter().walk(WALK(walk_kind)).ws())
+      .fmt_if(CST_ARITY, formatter().walk(WALK(walk_arity)).ws())
+      // clang-format off
+      .fmt_if_else(
+          TOKEN_P_HOLE,
+          formatter().walk(WALK(walk_token)),
+          formatter().fmt_while(
+              CST_IDEQ,
+              id_list_fmt))
+      // clang-format on
+      .consume_wsnl()
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
   return walk_placeholder(ctx, node);
@@ -458,11 +491,36 @@ wcl::doc Emitter::walk_lambda(ctx_t ctx, CSTElement node) { return walk_placehol
 
 wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_MATCH);
+
+  return formatter()
+      .token(TOKEN_KW_MATCH)
+      .ws()
+      .walk(WALK(walk_node))
+      .consume_wsnl()
+      // clang-format off
+      .nest(formatter()
+          .fmt_while(
+              CST_CASE, formatter()
+              .newline(space_per_indent)
+              .walk(WALK(walk_node))
+              .consume_wsnl()))
+      // clang-format on
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_PACKAGE);
+  return formatter()
+      .token(TOKEN_KW_PACKAGE)
+      .ws()
+      .walk(CST_ID, WALK(walk_identifier))
+      .consume_wsnl()
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
@@ -470,11 +528,36 @@ wcl::doc Emitter::walk_prim(ctx_t ctx, CSTElement node) { return walk_placeholde
 
 wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_REQUIRE);
+
+  return formatter()
+      .token(TOKEN_KW_REQUIRE)
+      .ws()
+      .walk(WALK(walk_node))
+      .consume_wsnl()
+      .space()
+      .token(TOKEN_P_EQUALS)
+      .consume_wsnl()
+      .escape(
+          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
+      .consume_wsnl()
+      .newline(space_per_indent)
+      .walk(WALK(walk_node))
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_req_else(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
-wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
+wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
+  assert(node.id() == CST_SUBSCRIBE);
+
+  return formatter()
+      .token(TOKEN_KW_SUBSCRIBE)
+      .ws()
+      .walk(CST_ID, WALK(walk_identifier))
+      .format(ctx, node.firstChildElement());
+}
 
 wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
@@ -494,6 +577,5 @@ wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) { return walk_placehold
 
 wcl::doc Emitter::walk_error(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
+#undef WALK
 #undef CONSUME_WS_NL
-#undef APPEND_OR_BUBBLE
-#undef ASSERT_TOKEN

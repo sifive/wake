@@ -9,32 +9,23 @@ def name Unit =
     another
 
 def t1 = match _
- 0=0
- n = 2+t(n-1)
+    0 = 0
+    n = 2 + t (n - 1)
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
- buildTestWake, Nil =
- require Pass (Pair path visible)=buildTestWake Unit
- Pass (Pair (simplify "{path}/..") visible)
- Nil = Pass (Pair "{wakePath}" Nil)
- _ = Fail (makeError "Two wake binaries declared for testing!")
+    buildTestWake , Nil =
+        require Pass (Pair path visible) = buildTestWake Unit
+        Pass (Pair (simplify "{path}/..") visible)
+    Nil = Pass (Pair "{wakePath}" Nil)
+    _ = Fail (makeError "Two wake binaries declared for testing!")
 
 package test_wake
 
-
 from wake import _
-
 from wake import source , Nil
-
 from test_wake import topic wakeTestBinary
-
 from gcc_wake import compileC linkO
-
 from wake import myMap=map foldl myFoldr=foldr
-
 from wake import def unary + -
-
 from wake import type Pair Result
-
 from wake import source,Nil
-
