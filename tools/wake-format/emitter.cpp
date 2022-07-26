@@ -43,44 +43,41 @@ static bool is_expression(uint8_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL;
 }
 
-template <class FMT>
-void walk_rhs(wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node, FMT format) {
-  auto nested_fmt = formatter().nest(format);
+void Emitter::walk_rhs(wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
+  auto nested_fmt = formatter().nest(formatter().walk(WALK(walk_node)));
   if (requires_nl(ctx, node)) {
     bdr.append(nested_fmt.compose(ctx, node));
     return;
   }
 
-  auto flat_fmt = formatter().space().join(format);
-  if (fits(bdr, ctx, flat_fmt.format(ctx, node))) {
+  auto flat_fmt = formatter().space().walk(WALK(walk_node));
+  auto flat = wcl::doc::lit(" ").concat(walk_node(ctx.sub(bdr), node));
+  if (fits(bdr, ctx, flat)) {
     bdr.append(flat_fmt.compose(ctx, node));
     return;
   }
 
+  // probably needs a newline
   bdr.append(nested_fmt.compose(ctx, node));
 }
 
 wcl::doc Emitter::layout(CST cst) {
   ctx_t ctx;
-  return formatter().walk(WALK(walk)).format(ctx, cst.root());
+  return walk(ctx, cst.root());
 }
 
 wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
-  wcl::doc_builder bdr;
-
   // clang-format off
+  auto extra_fmt = formatter()
+      .fmt_if(TOKEN_WS, formatter().next())
+      .fmt_if(TOKEN_NL, formatter().next().newline(space_per_indent))
+      .fmt_if(TOKEN_COMMENT, formatter().walk(WALK(walk_token)));
+
   auto body_fmt = formatter()
-              .fmt_if_else(
-                TOKEN_WS,
-                formatter(),
-                formatter()
-                  .fmt_if_else(
-                    TOKEN_NL,
-                    formatter().newline(space_per_indent),
-                    formatter().fmt_if_else(
-                      TOKEN_COMMENT,
-                      formatter().walk(WALK(walk_token)),
-                      formatter().walk(WALK(walk_node)).newline(space_per_indent))));
+      .fmt_if_else(
+        {TOKEN_WS, TOKEN_NL, TOKEN_COMMENT},
+        extra_fmt,
+        formatter().walk(WALK(walk_node)).newline(space_per_indent));
   // clang-format on
 
   return formatter().walk_children(body_fmt).format(ctx, node);
@@ -350,18 +347,17 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_BLOCK);
-  wcl::doc_builder bdr;
 
   // clang-format off
+  auto extra_fmt = formatter()
+      .fmt_if(TOKEN_WS, formatter().next())
+      .fmt_if(TOKEN_NL, formatter().next());
+
   auto body_fmt = formatter()
-              .fmt_if_else(
-                TOKEN_WS,
-                formatter(),
-                formatter()
-                  .fmt_if_else(
-                    TOKEN_NL,
-                    formatter(),
-                    formatter().newline(space_per_indent).walk(WALK(walk_node))));
+      .fmt_if_else(
+        {TOKEN_WS, TOKEN_NL},
+        extra_fmt,
+        formatter().newline(space_per_indent).walk(WALK(walk_node)));
   // clang-format on
 
   return formatter().walk_children(body_fmt).consume_wsnl().format(ctx, node);
@@ -376,9 +372,8 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
       .space()
       .walk(CST_GUARD, WALK(walk_guard))
       .consume_wsnl()
-      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
-        walk_rhs(bdr, ctx, node, formatter().walk(WALK(walk_node)));
-      })
+      .escape(
+          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
       .format(ctx, node.firstChildElement());
 }
 
@@ -394,9 +389,8 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
       .ws()
       .token(TOKEN_P_EQUALS)
       .consume_wsnl()
-      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
-        walk_rhs(bdr, ctx, node, formatter().walk(WALK(walk_node)).consume_wsnl());
-      })
+      .escape(
+          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
       .consume_wsnl()
       .format(ctx, node.firstChildElement());
 }
@@ -510,14 +504,12 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
       .space()
       .token(TOKEN_P_EQUALS)
       .consume_wsnl()
-      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
-        walk_rhs(bdr, ctx, node,
-                 formatter()
-                     .walk(WALK(walk_node))  // RHS of =
-                     .consume_wsnl()
-                     .newline(space_per_indent)
-                     .walk(WALK(walk_node)));  // Body in the context of the require
-      })
+      .escape(
+          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
+      .consume_wsnl()
+      .newline(space_per_indent)
+      .walk(WALK(walk_node))
+      .consume_wsnl()
       .format(ctx, node.firstChildElement());
 }
 
