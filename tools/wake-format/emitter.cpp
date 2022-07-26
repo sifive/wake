@@ -27,15 +27,15 @@
 
 #define WALK(func) [this](ctx_t ctx, CSTElement node) { return func(ctx, node); }
 
-bool Emitter::fits(const wcl::doc_builder& bdr, ctx_t ctx, wcl::doc doc) {
+bool fits(const wcl::doc_builder& bdr, ctx_t ctx, wcl::doc doc) {
   if (bdr.has_newline()) {
-    return bdr.last_width() + doc.first_width() <= max_column_width;
+    return bdr.last_width() + doc.first_width() <= Emitter::max_column_width;
   } else {
-    return bdr.last_width() + doc.first_width() + ctx.width <= max_column_width;
+    return bdr.last_width() + doc.first_width() + ctx.width <= Emitter::max_column_width;
   }
 }
 
-bool Emitter::requires_nl(ctx_t ctx, CSTElement node) {
+bool requires_nl(ctx_t ctx, CSTElement node) {
   return node.id() == CST_BLOCK || node.id() == CST_REQUIRE;
 }
 
@@ -43,23 +43,21 @@ static bool is_expression(uint8_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL;
 }
 
-void Emitter::walk_rhs(wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
-  auto nested_fmt = formatter().nest(formatter().walk(WALK(walk_node)));
+template <class FMT>
+void walk_rhs(wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node, FMT format) {
+  auto nested_fmt = formatter().nest(format);
   if (requires_nl(ctx, node)) {
-    bdr.append(nested_fmt.format(ctx, node, false));
-    node.nextSiblingElement();
+    bdr.append(nested_fmt.compose(ctx, node));
     return;
   }
 
-  wcl::doc doc = formatter().space().walk(WALK(walk_node)).format(ctx, node, false);
-  if (fits(bdr, ctx, doc)) {
-    bdr.append(doc);
-    node.nextSiblingElement();
+  auto flat_fmt = formatter().space().join(format);
+  if (fits(bdr, ctx, flat_fmt.format(ctx, node))) {
+    bdr.append(flat_fmt.compose(ctx, node));
     return;
   }
 
-  bdr.append(nested_fmt.format(ctx, node, false));
-  node.nextSiblingElement();
+  bdr.append(nested_fmt.compose(ctx, node));
 }
 
 wcl::doc Emitter::layout(CST cst) {
@@ -378,8 +376,9 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
       .space()
       .walk(CST_GUARD, WALK(walk_guard))
       .consume_wsnl()
-      .escape(
-          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
+      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
+        walk_rhs(bdr, ctx, node, formatter().walk(WALK(walk_node)));
+      })
       .format(ctx, node.firstChildElement());
 }
 
@@ -395,8 +394,9 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
       .ws()
       .token(TOKEN_P_EQUALS)
       .consume_wsnl()
-      .escape(
-          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
+      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
+        walk_rhs(bdr, ctx, node, formatter().walk(WALK(walk_node)).consume_wsnl());
+      })
       .consume_wsnl()
       .format(ctx, node.firstChildElement());
 }
@@ -510,11 +510,14 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
       .space()
       .token(TOKEN_P_EQUALS)
       .consume_wsnl()
-      .escape(
-          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
-      .consume_wsnl()
-      .newline(space_per_indent)
-      .walk(WALK(walk_node))
+      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
+        walk_rhs(bdr, ctx, node,
+                 formatter()
+                     .walk(WALK(walk_node))  // RHS of =
+                     .consume_wsnl()
+                     .newline(space_per_indent)
+                     .walk(WALK(walk_node)));  // Body in the context of the require
+      })
       .format(ctx, node.firstChildElement());
 }
 

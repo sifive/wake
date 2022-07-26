@@ -32,13 +32,15 @@ class Emitter {
   // Walks the CST, formats it, and returns the representative doc
   wcl::doc layout(CST cst);
 
+  static const uint8_t space_per_indent = 4;
+  static const uint8_t max_column_width = 100;
+
  private:
   // Top level tree walk. Dispatches out the calls for various nodes
   wcl::doc walk(ctx_t ctx, CSTElement node);
 
   wcl::doc walk_node(ctx_t ctx, CSTElement node);
   wcl::doc walk_token(ctx_t ctx, CSTElement node);
-  void walk_rhs(wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node);
 
   wcl::doc walk_apply(ctx_t ctx, CSTElement node);
   wcl::doc walk_arity(ctx_t ctx, CSTElement node);
@@ -80,19 +82,4 @@ class Emitter {
   wcl::doc walk_error(ctx_t ctx, CSTElement node);
 
   wcl::doc walk_placeholder(ctx_t ctx, CSTElement node);
-
-  // Detemines if a given doc fits in the current doc
-  bool fits(const wcl::doc_builder& bdr, ctx_t ctx, wcl::doc new_doc);
-
-  // Determines if a given node must be started on a newline
-  bool requires_nl(ctx_t ctx, CSTElement node);
-
-  // Emits a newline and any indentation needed
-  wcl::doc newline(ctx_t ctx);
-
-  // Emits a space character `count` times
-  wcl::doc space(uint8_t count = 1);
-
-  const uint8_t space_per_indent = 4;
-  const uint8_t max_column_width = 100;
 };

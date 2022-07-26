@@ -192,6 +192,8 @@ struct WalkChildrenAction {
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+      // Here we can't assert that child is empty since we are processing
+      // each child element in parts.
       builder.append(formatter.format(ctx.sub(builder), child, false));
     }
     node.nextSiblingElement();
@@ -209,6 +211,17 @@ struct EscapeAction {
     // You have to do everything yourself here, that's the price of an escape hatch
     // we can build up enough of these that it shouldn't be an issue however.
     f(builder, ctx, node);
+  }
+};
+
+template <class FMT>
+struct JoinAction {
+  FMT formatter;
+
+  JoinAction(FMT formatter) : formatter(formatter) {}
+
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    builder.append(formatter.compose(ctx, node));
   }
 };
 
@@ -325,6 +338,11 @@ struct Formatter {
     return {SeqAction<Action, WalkChildrenAction<FMT>>(action, WalkChildrenAction<FMT>{formatter})};
   }
 
+  template <class FMT>
+  Formatter<SeqAction<Action, JoinAction<FMT>>> join(FMT formatter) {
+    return {SeqAction<Action, JoinAction<FMT>>(action, JoinAction<FMT>{formatter})};
+  }
+
   template <class F>
   Formatter<SeqAction<Action, EscapeAction<F>>> escape(F f) {
     return {SeqAction<Action, EscapeAction<F>>(action, EscapeAction<F>{f})};
@@ -333,7 +351,13 @@ struct Formatter {
   wcl::doc format(ctx_t ctx, CSTElement node, bool assert_empty = true) {
     wcl::doc_builder builder;
     action.run(builder, ctx, node);
-    if (assert_empty) assert(node.empty());
+    if (assert_empty) {
+      if (!node.empty()) {
+        std::cerr << "Not empty: " << +node.id() << std::endl;
+        std::cerr << "Failed at: " << std::move(builder).build().as_string() << std::endl;
+      }
+      assert(node.empty());
+    }
     return std::move(builder).build();
   }
 
