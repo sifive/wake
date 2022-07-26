@@ -128,7 +128,12 @@ struct WalkPredicateAction {
   WalkPredicateAction(F walk, P p) : walker(walk), predicate(p) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    assert(predicate(node.id()));
+    bool result = predicate(node.id());
+    if (!result) {
+      // TODO: see about adding a token -> token name function
+      std::cerr << "Unexpected token: " << +node.id() << std::endl;
+    }
+    assert(result);
     auto doc = walker(ctx.sub(builder), const_cast<const CSTElement&>(node));
     builder.append(doc);
     node.nextSiblingElement();

@@ -38,7 +38,7 @@ class Emitter {
 
   wcl::doc walk_node(ctx_t ctx, CSTElement node);
   wcl::doc walk_token(ctx_t ctx, CSTElement node);
-  wcl::doc walk_rhs(ctx_t ctx, CSTElement node);
+  void walk_rhs(wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node);
 
   wcl::doc walk_apply(ctx_t ctx, CSTElement node);
   wcl::doc walk_arity(ctx_t ctx, CSTElement node);

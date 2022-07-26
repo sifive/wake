@@ -46,6 +46,22 @@ bool Emitter::requires_nl(ctx_t ctx, CSTElement node) {
   return node.id() == CST_BLOCK || node.id() == CST_REQUIRE;
 }
 
+static bool is_expression(uint8_t type) {
+  return type == CST_ID || type == CST_APP || type == CST_LITERAL;
+}
+
+void Emitter::walk_rhs(wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
+  wcl::doc doc = space().concat(walk_node(ctx.sub(bdr), node));
+  if (fits(bdr, ctx, doc) && !requires_nl(ctx, node)) {
+    bdr.append(doc);
+  } else {
+    ctx_t n_ctx = ctx.nest();
+    bdr.append(newline(n_ctx));
+    bdr.append(walk_node(n_ctx.sub(bdr), node));
+  }
+  node.nextSiblingElement();
+}
+
 wcl::doc Emitter::newline(ctx_t ctx) {
   wcl::doc_builder bdr;
 
@@ -333,13 +349,11 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   }
 }
 
-wcl::doc Emitter::walk_rhs(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
-
 wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_APP);
 
   return formatter()
-      .walk({CST_ID, CST_APP}, WALK(walk_node))
+      .walk(is_expression, WALK(walk_node))
       .consume_wsnl()
       .space()
       .walk(WALK(walk_node))
@@ -354,21 +368,13 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_BINARY);
 
   return formatter()
-      .walk(WALK(walk_node))
+      .walk(is_expression, WALK(walk_node))
       .consume_wsnl()
-      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
-        assert(node.id() == CST_OP);
-        // only add a space if the binop is not a comma
-        // a+b -> a + b
-        // a,b -> a, b
-        if (node.firstChildElement().id() != TOKEN_OP_COMMA) {
-          bdr.append(space());
-        }
-      })
+      .space()
       .walk(CST_OP, WALK(walk_op))
       .consume_wsnl()
       .space()
-      .walk(WALK(walk_node))
+      .walk(is_expression, WALK(walk_node))
       .format(ctx, node.firstChildElement());
 }
 
@@ -402,17 +408,8 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
       .space()
       .walk(CST_GUARD, WALK(walk_guard))
       .consume_wsnl()
-      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
-        wcl::doc doc = space().concat(walk_node(ctx.sub(bdr), node));
-        if (fits(bdr, ctx, doc) && !requires_nl(ctx, node)) {
-          bdr.append(doc);
-        } else {
-          ctx_t n_ctx = ctx.nest();
-          bdr.append(newline(n_ctx));
-          bdr.append(walk_node(n_ctx.sub(bdr), node));
-        }
-        node.nextSiblingElement();
-      })
+      .escape(
+          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
       .format(ctx, node.firstChildElement());
 }
 
@@ -428,17 +425,8 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
       .ws()
       .token(TOKEN_P_EQUALS)
       .consume_wsnl()
-      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
-        wcl::doc doc = space().concat(walk_node(ctx.sub(bdr), node));
-        if (fits(bdr, ctx, doc) && !requires_nl(ctx, node)) {
-          bdr.append(doc);
-        } else {
-          ctx_t n_ctx = ctx.nest();
-          bdr.append(newline(n_ctx));
-          bdr.append(walk_node(n_ctx.sub(bdr), node));
-        }
-        node.nextSiblingElement();
-      })
+      .escape(
+          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
       .consume_wsnl()
       .format(ctx, node.firstChildElement());
 }
@@ -551,17 +539,8 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
       .space()
       .token(TOKEN_P_EQUALS)
       .consume_wsnl()
-      .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
-        wcl::doc doc = space().concat(walk_node(ctx.sub(bdr), node));
-        if (fits(bdr, ctx, doc) && !requires_nl(ctx, node)) {
-          bdr.append(doc);
-        } else {
-          ctx_t n_ctx = ctx.nest();
-          bdr.append(newline(n_ctx));
-          bdr.append(walk_node(n_ctx.sub(bdr), node));
-        }
-        node.nextSiblingElement();
-      })
+      .escape(
+          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
       .consume_wsnl()
       .newline(space_per_indent)
       .walk(WALK(walk_node))

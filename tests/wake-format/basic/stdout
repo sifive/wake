@@ -13,7 +13,7 @@ def t1 = match _
     n = 2 + t (n - 1)
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
-    buildTestWake, Nil =
+    buildTestWake , Nil =
         require Pass (Pair path visible) = buildTestWake Unit
         Pass (Pair (simplify "{path}/..") visible)
     Nil = Pass (Pair "{wakePath}" Nil)

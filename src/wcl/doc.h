@@ -267,13 +267,6 @@ class doc_builder {
       return doc::lit("");
     }
 
-    if (docs.size() == 1) {
-      doc copy = std::move(docs[0]);
-      docs = {};
-      state = {};
-      return copy;
-    }
-
     doc copy = merge(0, docs.size() - 1);
     docs = {};
     state = {};
