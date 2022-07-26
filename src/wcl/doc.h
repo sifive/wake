@@ -226,7 +226,11 @@ class doc_builder {
   doc_state state;
 
   doc merge(int start, int end) {
-    if (start >= end) {
+    if (start > end) {
+      return doc::lit("");
+    }
+
+    if (start == end) {
       return docs[start];
     }
 
@@ -263,10 +267,6 @@ class doc_builder {
   bool has_newline() const { return state.newline_count > 0; }
 
   doc build() && {
-    if (docs.size() == 0) {
-      return doc::lit("");
-    }
-
     doc copy = merge(0, docs.size() - 1);
     docs = {};
     state = {};
