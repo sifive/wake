@@ -184,6 +184,20 @@ struct WhileAction {
   }
 };
 
+template <class FMT>
+struct WalkChildrenAction {
+  FMT formatter;
+
+  WalkChildrenAction(FMT formatter) : formatter(formatter) {}
+
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+      builder.append(formatter.format(ctx.sub(builder), child, false));
+    }
+    node.nextSiblingElement();
+  }
+};
+
 // This is the escape hatch to implement something else.
 // NOTE: You're responsible for advancing the node!!!
 template <class F>
@@ -306,15 +320,20 @@ struct Formatter {
         action, WalkPredicateAction<Walker, Predicate>(texas_ranger, predicate))};
   }
 
+  template <class FMT>
+  Formatter<SeqAction<Action, WalkChildrenAction<FMT>>> walk_children(FMT formatter) {
+    return {SeqAction<Action, WalkChildrenAction<FMT>>(action, WalkChildrenAction<FMT>{formatter})};
+  }
+
   template <class F>
   Formatter<SeqAction<Action, EscapeAction<F>>> escape(F f) {
     return {SeqAction<Action, EscapeAction<F>>(action, EscapeAction<F>{f})};
   }
 
-  wcl::doc format(ctx_t ctx, CSTElement node) {
+  wcl::doc format(ctx_t ctx, CSTElement node, bool assert_empty = true) {
     wcl::doc_builder builder;
     action.run(builder, ctx, node);
-    assert(node.empty());
+    if (assert_empty) assert(node.empty());
     return std::move(builder).build();
   }
 
