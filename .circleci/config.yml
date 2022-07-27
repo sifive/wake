@@ -31,7 +31,7 @@ jobs:
     steps:
       - checkout
       - run: brew install pkg-config
-      - run: brew install macfuse
+      - run: brew install --cask osxfuse
       - run: brew install re2
       - run: brew install gmp
       - run: make tarball
