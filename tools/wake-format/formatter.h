@@ -50,7 +50,7 @@ struct ctx_t {
 
 inline void space(wcl::doc_builder& builder, uint8_t count) {
   for (uint8_t i = 0; i < count; i++) {
-    builder.append(" ");
+    builder.append("·");
   }
 }
 
@@ -76,7 +76,7 @@ struct NewlineAction {
   NewlineAction(uint8_t space_per_indent) : space_per_indent(space_per_indent) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    builder.append("\n");
+    builder.append("⏎\n");
     space(builder, space_per_indent * ctx.nest_level);
   }
 };
@@ -105,7 +105,7 @@ struct TokenReplaceAction {
 };
 
 struct WhitespaceTokenAction : public TokenReplaceAction {
-  WhitespaceTokenAction() : TokenReplaceAction(TOKEN_WS, " ") {}
+  WhitespaceTokenAction() : TokenReplaceAction(TOKEN_WS, "·") {}
 };
 
 template <class Action1, class Action2>
@@ -128,7 +128,7 @@ struct WalkPredicateAction {
   WalkPredicateAction(F walk, P p) : walker(walk), predicate(p) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    bool result = predicate(node.id());
+    bool result = predicate(builder, ctx, node);
     if (!result) {
       // TODO: see about adding a token -> token name function
       std::cerr << "Unexpected token: " << +node.id() << std::endl;
@@ -161,7 +161,7 @@ struct IfElseAction {
       : predicate(predicate), if_formatter(if_formatter), else_formatter(else_formatter) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    if (predicate(node.id())) {
+    if (predicate(builder, ctx, node)) {
       builder.append(if_formatter.compose(ctx, node));
     } else {
       builder.append(else_formatter.compose(ctx, node));
@@ -178,7 +178,7 @@ struct WhileAction {
       : predicate(predicate), while_formatter(while_formatter) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    while (predicate(node.id())) {
+    while (predicate(builder, ctx, node)) {
       builder.append(while_formatter.compose(ctx.sub(builder), node));
     }
   }
@@ -234,9 +234,32 @@ struct EpsilonAction {
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {}
 };
 
-class TruePredicate {
+class BasicPredicate {
+ private:
+  bool result;
+
  public:
-  bool operator()(uint8_t t) { return true; }
+  BasicPredicate(bool result) : result(result) {}
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) { return result; }
+};
+
+template <class FMT>
+class FitsPredicate {
+ private:
+  FMT formatter;
+
+ public:
+  FitsPredicate(FMT formatter) : formatter(formatter) {}
+
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    CSTElement copy = node;
+    wcl::doc doc = formatter.compose(ctx, copy);
+    if (builder.has_newline()) {
+      return builder.last_width() + doc.first_width() <= 100;
+    } else {
+      return builder.last_width() + doc.first_width() + ctx.width <= 100;
+    }
+  }
 };
 
 class InitListMembershipPredicate {
@@ -251,12 +274,17 @@ class InitListMembershipPredicate {
     }
   }
 
-  bool operator()(uint8_t type) { return type_bits[type]; }
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    return type_bits[node.id()];
+  }
 };
 
 template <class Action>
 struct Formatter {
   Action action;
+  static const uint8_t space_per_indent = 4;
+  static const uint8_t max_column_width = 100;
+
   Formatter(Action a) : action(a) {}
 
   Formatter<SeqAction<Action, ConsumeWhitespaceAction>> consume_wsnl() {
@@ -271,7 +299,7 @@ struct Formatter {
     return {SeqAction<Action, SpaceAction>(action, SpaceAction{count})};
   }
 
-  Formatter<SeqAction<Action, NewlineAction>> newline(uint8_t space_per_indent) {
+  Formatter<SeqAction<Action, NewlineAction>> newline() {
     return {SeqAction<Action, NewlineAction>(action, NewlineAction{space_per_indent})};
   }
 
@@ -292,6 +320,12 @@ struct Formatter {
     return {SeqAction<Action, NextAction>(action, NextAction{})};
   }
 
+  template <class IFMT, class EFMT>
+  Formatter<SeqAction<Action, IfElseAction<FitsPredicate<IFMT>, IFMT, EFMT>>> fmt_if_fits(
+      IFMT fits_formatter, EFMT else_formatter) {
+    return fmt_if_else(FitsPredicate<IFMT>(fits_formatter), fits_formatter, else_formatter);
+  }
+
   template <class FMT>
   Formatter<
       SeqAction<Action, IfElseAction<InitListMembershipPredicate, FMT, Formatter<EpsilonAction>>>>
@@ -307,10 +341,11 @@ struct Formatter {
     return fmt_if_else(InitListMembershipPredicate(types), formatter, Formatter<EpsilonAction>({}));
   }
 
-  template <
-      class Predicate, class FMT,
-      std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(uint8_t()))>::value,
-                       bool> = true>
+  template <class Predicate, class FMT,
+            std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(
+                                                    std::declval<wcl::doc_builder&>(), ctx_t(),
+                                                    std::declval<CSTElement&>()))>::value,
+                             bool> = true>
   Formatter<SeqAction<Action, IfElseAction<Predicate, FMT, Formatter<EpsilonAction>>>> fmt_if(
       Predicate predicate, FMT formatter) {
     return fmt_if_else(predicate, formatter, Formatter<EpsilonAction>({}));
@@ -328,10 +363,11 @@ struct Formatter {
     return fmt_if_else(InitListMembershipPredicate(types), if_formatter, else_formatter);
   }
 
-  template <
-      class Predicate, class IFMT, class EFMT,
-      std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(uint8_t()))>::value,
-                       bool> = true>
+  template <class Predicate, class IFMT, class EFMT,
+            std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(
+                                                    std::declval<wcl::doc_builder&>(), ctx_t(),
+                                                    std::declval<CSTElement&>()))>::value,
+                             bool> = true>
   Formatter<SeqAction<Action, IfElseAction<Predicate, IFMT, EFMT>>> fmt_if_else(
       Predicate predicate, IFMT if_formatter, EFMT else_formatter) {
     return {SeqAction<Action, IfElseAction<Predicate, IFMT, EFMT>>(
@@ -350,10 +386,11 @@ struct Formatter {
     return fmt_while(InitListMembershipPredicate(types), formatter);
   }
 
-  template <
-      class Predicate, class FMT,
-      std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(uint8_t()))>::value,
-                       bool> = true>
+  template <class Predicate, class FMT,
+            std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(
+                                                    std::declval<wcl::doc_builder&>(), ctx_t(),
+                                                    std::declval<CSTElement&>()))>::value,
+                             bool> = true>
   Formatter<SeqAction<Action, WhileAction<Predicate, FMT>>> fmt_while(Predicate predicate,
                                                                       FMT formatter) {
     return {SeqAction<Action, WhileAction<Predicate, FMT>>(
@@ -361,9 +398,9 @@ struct Formatter {
   }
 
   template <class Walker>
-  Formatter<SeqAction<Action, WalkPredicateAction<Walker, TruePredicate>>> walk(
+  Formatter<SeqAction<Action, WalkPredicateAction<Walker, BasicPredicate>>> walk(
       Walker texas_ranger) {
-    return walk(TruePredicate(), texas_ranger);
+    return walk(BasicPredicate(true), texas_ranger);
   }
 
   template <class Walker>
@@ -378,10 +415,11 @@ struct Formatter {
     return walk(InitListMembershipPredicate(types), texas_ranger);
   }
 
-  template <
-      class Predicate, class Walker,
-      std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(uint8_t()))>::value,
-                       bool> = true>
+  template <class Predicate, class Walker,
+            std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(
+                                                    std::declval<wcl::doc_builder&>(), ctx_t(),
+                                                    std::declval<CSTElement&>()))>::value,
+                             bool> = true>
   Formatter<SeqAction<Action, WalkPredicateAction<Walker, Predicate>>> walk(Predicate predicate,
                                                                             Walker texas_ranger) {
     return {SeqAction<Action, WalkPredicateAction<Walker, Predicate>>(

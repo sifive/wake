@@ -32,7 +32,6 @@ class Emitter {
   // Walks the CST, formats it, and returns the representative doc
   wcl::doc layout(CST cst);
 
-  static const uint8_t space_per_indent = 4;
   static const uint8_t max_column_width = 100;
 
  private:
@@ -66,7 +65,7 @@ class Emitter {
   wcl::doc walk_lambda(ctx_t ctx, CSTElement node);
   wcl::doc walk_literal(ctx_t ctx, CSTElement node);
   wcl::doc walk_match(ctx_t ctx, CSTElement node);
-  wcl::doc walk_op(ctx_t ctx, CSTElement node);
+  wcl::doc walk_op(ctx_t ctx, CSTElement node, bool space_eligible = true);
   wcl::doc walk_package(ctx_t ctx, CSTElement node);
   wcl::doc walk_paren(ctx_t ctx, CSTElement node);
   wcl::doc walk_prim(ctx_t ctx, CSTElement node);
