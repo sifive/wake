@@ -30,6 +30,8 @@ jobs:
       xcode: 12.4.0
     steps:
       - checkout
+      - run: brew install --cask osxfuse
+      - run: brew install re2 || brew install re2 --head
       - run: make tarball
       - run: make test
       - run: make unittest
