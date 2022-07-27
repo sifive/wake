@@ -421,6 +421,6 @@ struct Formatter {
   }
 };
 
-inline Formatter<EpsilonAction> formatter() { return Formatter<EpsilonAction>({}); }
+inline Formatter<EpsilonAction> fmt() { return Formatter<EpsilonAction>({}); }
 
 #undef ALWAYS_INLINE

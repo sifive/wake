@@ -44,13 +44,13 @@ static bool is_expression(uint8_t type) {
 }
 
 void Emitter::walk_rhs(wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
-  auto nested_fmt = formatter().nest(formatter().walk(WALK(walk_node)));
+  auto nested_fmt = fmt().nest(fmt().walk(WALK(walk_node)));
   if (requires_nl(ctx, node)) {
     bdr.append(nested_fmt.compose(ctx, node));
     return;
   }
 
-  auto flat_fmt = formatter().space().walk(WALK(walk_node));
+  auto flat_fmt = fmt().space().walk(WALK(walk_node));
   auto flat = wcl::doc::lit(" ").concat(walk_node(ctx.sub(bdr), node));
   if (fits(bdr, ctx, flat)) {
     bdr.append(flat_fmt.compose(ctx, node));
@@ -68,19 +68,19 @@ wcl::doc Emitter::layout(CST cst) {
 
 wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
   // clang-format off
-  auto extra_fmt = formatter()
-      .fmt_if(TOKEN_WS, formatter().next())
-      .fmt_if(TOKEN_NL, formatter().next().newline(space_per_indent))
-      .fmt_if(TOKEN_COMMENT, formatter().walk(WALK(walk_token)));
+  auto extra_fmt = fmt()
+      .fmt_if(TOKEN_WS, fmt().next())
+      .fmt_if(TOKEN_NL, fmt().next().newline(space_per_indent))
+      .fmt_if(TOKEN_COMMENT, fmt().walk(WALK(walk_token)));
 
-  auto body_fmt = formatter()
+  auto body_fmt = fmt()
       .fmt_if_else(
         {TOKEN_WS, TOKEN_NL, TOKEN_COMMENT},
         extra_fmt,
-        formatter().walk(WALK(walk_node)).newline(space_per_indent));
+        fmt().walk(WALK(walk_node)).newline(space_per_indent));
   // clang-format on
 
-  return formatter().walk_children(body_fmt).format(ctx, node);
+  return fmt().walk_children(body_fmt).format(ctx, node);
 }
 
 wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {
@@ -319,7 +319,7 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
 wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_APP);
 
-  return formatter()
+  return fmt()
       .walk(is_expression, WALK(walk_node))
       .consume_wsnl()
       .space()
@@ -334,7 +334,7 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) { return walk_placeho
 wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_BINARY);
 
-  return formatter()
+  return fmt()
       .walk(is_expression, WALK(walk_node))
       .consume_wsnl()
       .space()
@@ -349,24 +349,24 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_BLOCK);
 
   // clang-format off
-  auto extra_fmt = formatter()
-      .fmt_if(TOKEN_WS, formatter().next())
-      .fmt_if(TOKEN_NL, formatter().next());
+  auto extra_fmt = fmt()
+      .fmt_if(TOKEN_WS, fmt().next())
+      .fmt_if(TOKEN_NL, fmt().next());
 
-  auto body_fmt = formatter()
+  auto body_fmt = fmt()
       .fmt_if_else(
         {TOKEN_WS, TOKEN_NL},
         extra_fmt,
-        formatter().newline(space_per_indent).walk(WALK(walk_node)));
+        fmt().newline(space_per_indent).walk(WALK(walk_node)));
   // clang-format on
 
-  return formatter().walk_children(body_fmt).consume_wsnl().format(ctx, node);
+  return fmt().walk_children(body_fmt).consume_wsnl().format(ctx, node);
 }
 
 wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_CASE);
 
-  return formatter()
+  return fmt()
       .walk(WALK(walk_node))
       .consume_wsnl()
       .space()
@@ -382,7 +382,7 @@ wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) { return walk_placeholde
 wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_DEF);
 
-  return formatter()
+  return fmt()
       .token(TOKEN_KW_DEF)
       .ws()
       .walk({CST_ID, CST_APP}, WALK(walk_node))
@@ -412,7 +412,7 @@ wcl::doc Emitter::walk_hole(ctx_t ctx, CSTElement node) { return walk_placeholde
 wcl::doc Emitter::walk_identifier(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_ID);
 
-  return formatter().token(TOKEN_ID).format(ctx, node.firstChildElement());
+  return fmt().token(TOKEN_ID).format(ctx, node.firstChildElement());
 }
 
 wcl::doc Emitter::walk_ideq(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
@@ -422,22 +422,22 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) { return walk_placeholder(
 wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_IMPORT);
 
-  auto id_list_fmt = formatter().walk(WALK(walk_ideq)).fmt_if(TOKEN_WS, formatter().ws());
+  auto id_list_fmt = fmt().walk(WALK(walk_ideq)).fmt_if(TOKEN_WS, fmt().ws());
 
-  return formatter()
+  return fmt()
       .token(TOKEN_KW_FROM)
       .ws()
       .walk(CST_ID, WALK(walk_identifier))
       .ws()
       .token(TOKEN_KW_IMPORT)
       .ws()
-      .fmt_if(CST_KIND, formatter().walk(WALK(walk_kind)).ws())
-      .fmt_if(CST_ARITY, formatter().walk(WALK(walk_arity)).ws())
+      .fmt_if(CST_KIND, fmt().walk(WALK(walk_kind)).ws())
+      .fmt_if(CST_ARITY, fmt().walk(WALK(walk_arity)).ws())
       // clang-format off
       .fmt_if_else(
           TOKEN_P_HOLE,
-          formatter().walk(WALK(walk_token)),
-          formatter().fmt_while(
+          fmt().walk(WALK(walk_token)),
+          fmt().fmt_while(
               CST_IDEQ,
               id_list_fmt))
       // clang-format on
@@ -458,15 +458,15 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) { return walk_placeho
 wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_MATCH);
 
-  return formatter()
+  return fmt()
       .token(TOKEN_KW_MATCH)
       .ws()
       .walk(WALK(walk_node))
       .consume_wsnl()
       // clang-format off
-      .nest(formatter()
+      .nest(fmt()
           .fmt_while(
-              CST_CASE, formatter()
+              CST_CASE, fmt()
               .newline(space_per_indent)
               .walk(WALK(walk_node))
               .consume_wsnl()))
@@ -478,7 +478,7 @@ wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) { return walk_placeholder(
 
 wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_PACKAGE);
-  return formatter()
+  return fmt()
       .token(TOKEN_KW_PACKAGE)
       .ws()
       .walk(CST_ID, WALK(walk_identifier))
@@ -495,7 +495,7 @@ wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) { return walk_placeho
 wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_REQUIRE);
 
-  return formatter()
+  return fmt()
       .newline(space_per_indent)
       .token(TOKEN_KW_REQUIRE)
       .ws()
@@ -518,7 +518,7 @@ wcl::doc Emitter::walk_req_else(ctx_t ctx, CSTElement node) { return walk_placeh
 wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_SUBSCRIBE);
 
-  return formatter()
+  return fmt()
       .token(TOKEN_KW_SUBSCRIBE)
       .ws()
       .walk(CST_ID, WALK(walk_identifier))
