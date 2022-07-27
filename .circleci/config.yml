@@ -25,6 +25,15 @@ jobs:
             - tests
             - scripts/sphinx/build/html
 
+  macos_build:
+    macos:
+      xcode: 12.4.0
+    steps:
+      - checkout
+      - run: make tarball
+      - run: make test
+      - run: make unittest
+
   vscode:
     machine:
       image: ubuntu-2004:202201-02
