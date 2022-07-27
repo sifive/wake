@@ -1453,7 +1453,7 @@ int main(int argc, char *argv[]) {
   rlim.rlim_cur = rlim.rlim_max;
   //#ifdef __APPLE__
   // Work around OS/X's misreporting of rlim_max ulimited
-  if (rlim.rlim_cur > 20480) rlim.rlim_cur = 20480;
+  //if (rlim.rlim_cur > 20480) rlim.rlim_cur = 20480;
   //#endif
 
   if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
