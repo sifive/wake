@@ -200,6 +200,7 @@ workflows:
   build:
     jobs:
       - tarball
+      - macos_build
       - alpine:
           requires:
             - tarball
