@@ -32,6 +32,7 @@ jobs:
       - checkout
       - run: brew install --cask osxfuse
       - run: brew install re2 || brew install re2 --head
+      - run: brew install gmp
       - run: make tarball
       - run: make test
       - run: make unittest
