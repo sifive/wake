@@ -30,8 +30,9 @@ jobs:
       xcode: 12.4.0
     steps:
       - checkout
+      - run: brew install pkg-config
       - run: brew install macfuse
-      - run: brew install re2 || brew install re2 --head
+      - run: brew install re2
       - run: brew install gmp
       - run: make tarball
       - run: make test
