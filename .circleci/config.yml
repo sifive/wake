@@ -30,7 +30,7 @@ jobs:
       xcode: 12.4.0
     steps:
       - checkout
-      - run: brew install --cask osxfuse
+      - run: brew install macfuse
       - run: brew install re2 || brew install re2 --head
       - run: brew install gmp
       - run: make tarball
