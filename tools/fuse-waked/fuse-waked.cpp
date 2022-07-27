@@ -1451,15 +1451,16 @@ int main(int argc, char *argv[]) {
   }
 
   rlim.rlim_cur = rlim.rlim_max;
-  //#ifdef __APPLE__
+  #ifdef __APPLE__
   // Work around OS/X's misreporting of rlim_max ulimited
-  //if (rlim.rlim_cur > 20480) rlim.rlim_cur = 20480;
-  //#endif
+  if (rlim.rlim_cur > 20480) rlim.rlim_cur = 20480;
 
+  #else
   if (setrlimit(RLIMIT_NOFILE, &rlim) != 0) {
     fprintf(stderr, "setrlimit(RLIMIT_NOFILE, cur=max): %s\n", strerror(errno));
     goto rmroot;
   }
+  #endif
 
   // Become a daemon
   pid = fork();
