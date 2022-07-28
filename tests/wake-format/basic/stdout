@@ -14,7 +14,8 @@ def t1 = match _
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     buildTestWake , Nil =
-        require Pass (Pair path visible) = buildTestWake UnitPass (Pair (simplify "{path}/..") visible)
+        require Pass (Pair path visible) = buildTestWake Unit
+        Pass (Pair (simplify "{path}/..") visible)
     Nil = Pass (Pair "{wakePath}" Nil)
     _ = Fail (makeError "Two wake binaries declared for testing!")
 
