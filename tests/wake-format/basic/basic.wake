@@ -87,9 +87,7 @@ export def vscode _: Result Path Error =
     require Pass syntaxSources =
         sources here `syntaxes/.*`
     def vsceFiles =
-        wasmFile,
-        jsFile,
-        packageJSON,
+        wasmFile, jsFile, packageJSON,
         currentDirSources ++
         imagesSources ++
         clientSources ++

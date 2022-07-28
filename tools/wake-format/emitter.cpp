@@ -516,10 +516,10 @@ wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node, bool space_eligible) {
   auto comma_fmt = fmt().fmt_if(TOKEN_OP_COMMA, fmt().token(TOKEN_OP_COMMA));
 
   auto rest_fmt =
-      fmt().fmt_if(BasicPredicate(space_eligible), fmt().space()).walk(WALK(walk_token));
+      fmt().fmt_if(ConstPredicate(space_eligible), fmt().space()).walk(WALK(walk_token));
 
   return fmt()
-      .fmt_if_else({TOKEN_OP_COMMA}, comma_fmt, rest_fmt)
+      .fmt_if_else(TOKEN_OP_COMMA, comma_fmt, rest_fmt)
       .format(ctx, node.firstChildElement());
 }
 
