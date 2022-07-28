@@ -509,6 +509,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
       .escape(
           [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
       .consume_wsnl()
+      .newline()
       .walk(WALK(walk_node))
       .consume_wsnl()
       .format(ctx, node.firstChildElement());
