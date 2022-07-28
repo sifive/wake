@@ -39,8 +39,7 @@ bool requires_nl(ctx_t ctx, CSTElement node) {
   return node.id() == CST_BLOCK || node.id() == CST_REQUIRE;
 }
 
-static bool is_expression(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-  auto type = node.id();
+static bool is_expression(uint8_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
          type == CST_BINARY;
 }
@@ -336,21 +335,15 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) { return walk_placeho
 wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_BINARY);
 
-  auto lhs_fmt = fmt().walk(is_expression, WALK(walk_node)).consume_wsnl();
-
-  auto op_fmt = fmt().walk(CST_OP, WALK(walk_op)).consume_wsnl();
-
-  auto split_op_fmt =
-      fmt()
-          .walk(CST_OP, [this](ctx_t ctx, CSTElement node) { return walk_op(ctx, node, false); })
-          .consume_wsnl();
-
-  auto rhs_fmt = fmt().space().walk(is_expression, WALK(walk_node));
-
-  auto full_fmt = fmt().join(lhs_fmt).join(op_fmt).join(rhs_fmt);
-
-  auto split_fmt = fmt().join(lhs_fmt).newline().join(split_op_fmt).join(rhs_fmt);
-  return fmt().fmt_if_fits(full_fmt, split_fmt).format(ctx, node.firstChildElement());
+  return fmt()
+      .walk(is_expression, WALK(walk_node))
+      .consume_wsnl()
+      .space()
+      .walk(CST_OP, WALK(walk_op))
+      .consume_wsnl()
+      .space()
+      .walk(is_expression, WALK(walk_node))
+      .format(ctx, node.firstChildElement());
 }
 
 wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
@@ -483,18 +476,7 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
       .format(ctx, node.firstChildElement());
 }
 
-wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node, bool space_eligible) {
-  assert(node.id() == CST_OP);
-
-  auto comma_fmt = fmt().fmt_if(TOKEN_OP_COMMA, fmt().token(TOKEN_OP_COMMA));
-
-  auto rest_fmt =
-      fmt().fmt_if(ConstPredicate(space_eligible), fmt().space()).walk(WALK(walk_token));
-
-  return fmt()
-      .fmt_if_else(TOKEN_OP_COMMA, comma_fmt, rest_fmt)
-      .format(ctx, node.firstChildElement());
-}
+wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) { return walk_placeholder(ctx, node); }
 
 wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_PACKAGE);
@@ -515,14 +497,6 @@ wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) { return walk_placeho
 wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_REQUIRE);
 
-  auto req_else_fmt = fmt()
-                          .token(TOKEN_KW_ELSE)
-                          .space()
-                          .consume_wsnl()
-                          .walk(WALK(walk_node))
-                          .newline()
-                          .consume_wsnl();
-
   return fmt()
       .newline()
       .token(TOKEN_KW_REQUIRE)
@@ -535,8 +509,6 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
       .escape(
           [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
       .consume_wsnl()
-      .newline()
-      .fmt_if(TOKEN_KW_ELSE, req_else_fmt)
       .walk(WALK(walk_node))
       .consume_wsnl()
       .format(ctx, node.firstChildElement());
