@@ -27,11 +27,11 @@
 
 #define ALWAYS_INLINE inline __attribute__((always_inline))
 
-// #define SPACE_STR " "
-// #define NL_STR "\n"
+#define SPACE_STR " "
+#define NL_STR "\n"
 
-#define SPACE_STR "·"
-#define NL_STR "⏎\n"
+// #define SPACE_STR "·"
+// #define NL_STR "⏎\n"
 
 struct ctx_t {
   size_t width = 0;

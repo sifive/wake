@@ -351,33 +351,6 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
 
   auto split_fmt = fmt().join(lhs_fmt).newline().join(split_op_fmt).join(rhs_fmt);
   return fmt().fmt_if_fits(full_fmt, split_fmt).format(ctx, node.firstChildElement());
-
-  // return fmt()
-  //     .escape([this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
-  //       auto lhs_fmt = fmt().walk(is_expression, WALK(walk_node)).consume_wsnl();
-
-  //       auto op_fmt = fmt().walk(CST_OP, WALK(walk_op)).consume_wsnl();
-
-  //       auto split_op_fmt =
-  //           fmt()
-  //               .walk(CST_OP,
-  //                     [this](ctx_t ctx, CSTElement node) { return walk_op(ctx, node, false); })
-  //               .consume_wsnl();
-
-  //       auto rhs_fmt = fmt().space().walk(is_expression, WALK(walk_node));
-
-  //       auto full_fmt = fmt().join(lhs_fmt).join(op_fmt).join(rhs_fmt);
-
-  //       auto split_fmt = fmt().join(lhs_fmt).newline().join(split_op_fmt).join(rhs_fmt);
-
-  //       wcl::doc full = full_fmt.format(ctx, node);
-  //       if (fits(bdr, ctx, full)) {
-  //         bdr.append(full_fmt.compose(ctx, node));
-  //         return;
-  //       }
-  //       bdr.append(split_fmt.compose(ctx, node));
-  //     })
-  //     .format(ctx, node.firstChildElement());
 }
 
 wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {

@@ -1,87 +1,82 @@
-def·name·Unit·=⏎
-····def·other·=·@here⏎
-····def·other·=·"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"⏎
-····another⏎
-⏎
-def·name·Unit·=⏎
-····def·other·=·@here⏎
-····def·other·=·"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"⏎
-····another⏎
-⏎
-def·t1·=·match·_⏎
-····0·=·0⏎
-····n·=·2·+·t·(n·-·1)⏎
-⏎
-def·wakeToTestDir·Unit·=·match·(subscribe·wakeTestBinary)⏎
-····buildTestWake,·Nil·=⏎
-········require·Pass·(Pair·path·visible)·=·buildTestWake·Unit⏎
-········Pass·(Pair·(simplify·"{path}/..")·visible)⏎
-····Nil·=·Pass·(Pair·"{wakePath}"·Nil)⏎
-····_·=·Fail·(makeError·"Two wake binaries declared for testing!")⏎
-⏎
-package·test_wake⏎
-⏎
-from·wake·import·_⏎
-from·wake·import·source·,·Nil⏎
-from·test_wake·import·topic·wakeTestBinary⏎
-from·gcc_wake·import·compileC·linkO⏎
-from·wake·import·myMap=map·foldl·myFoldr=foldr⏎
-from·wake·import·def·unary··+··-⏎
-from·wake·import·type·Pair·Result⏎
-from·wake·import·source,Nil⏎
-⏎
-# export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error⏎
-⏎
-export·def·vscode·_: Result·Path·Error·=⏎
-····require·Pass·variant·=·toVariant·"wasm"⏎
-····⏎
-····require·Pass·files·=·buildLSP·variant⏎
-····⏎
-····require·wasm,·Nil·=·filter·(matches·`.*\.wasm`·_·.·getPathName)·files⏎
-····else·failWithError·"Did not find empscripten wasm output file; got: {format·files}"⏎
-····⏎
-····require·js,·Nil·=·filter·(matches·`.*\.wasm-.*`·_·.·getPathName)·files⏎
-····else·failWithError·"Did not find empscripten javascript output; got: {format·files}"⏎
-····⏎
-····require·Pass·wasmFile·=·installAs·"{@here}/lsp-server/lsp-wake.wasm"·wasm⏎
-····⏎
-····require·Pass·jsFile·=·installAs·"{@here}/lsp-server/lsp-wake.js"·js⏎
-····⏎
-····require·Pass·packageLockJSON·=·source·"{@here}/package-lock.json"⏎
-····⏎
-····require·Pass·release·=·buildAs·Unit⏎
-····⏎
-····require·Pass·packageJSON·=⏎
-········setVersion·(replace·`~`·"-"·release)·"{@here}/package.json"⏎
-····⏎
-····require·Pass·nodeModules·=⏎
-········makeExecPlan·(which·"npm",·"install",·Nil)·(packageJSON,·packageLockJSON,·Nil)⏎
-········|·setPlanDirectory·@here⏎
-········|·runJob⏎
-········|·getJobOutputs⏎
-····⏎
-····require·Pass·stdlibSources·=·sources·"share/wake/lib"·`.*`⏎
-····⏎
-····require·Pass·stdlib·=·stdlibSources·|·findFailFn·installRO⏎
-····⏎
-····require·Pass·currentDirSources·=·sources·@here·`[^/]*`⏎
-····⏎
-····require·Pass·imagesSources·=·sources·@here·`images/.*`⏎
-····⏎
-····require·Pass·clientSources·=·sources·@here·`lsp-client/.*`⏎
-····⏎
-····require·Pass·serverSources·=·sources·@here·`lsp-server/.*`⏎
-····⏎
-····require·Pass·syntaxSources·=·sources·@here·`syntaxes/.*`⏎
-····⏎
-····def·vsceFiles·=·wasmFile,·jsFile,·packageJSON⏎
-····,·currentDirSources·++·imagesSources·++·clientSources·++·serverSources⏎
-····++·syntaxSources·++·stdlib·++·nodeModules⏎
-····⏎
-····require·Pass·outputs·=⏎
-········makeExecPlan·(which·"npx",·"vsce@1.103.1",·"package",·Nil)·vsceFiles⏎
-········|·setPlanDirectory·@here·|·runJob·|·getJobOutputs⏎
-····⏎
-····require·vsix,·Nil·=·filter·(matches·`.*\.vsix`·_·.·getPathName)·outputs⏎
-····else·failWithError·"vsce failed to produce vsix output; got: {format·files}"⏎
-····Pass·vsix⏎
+def name Unit =
+    def other = @here
+    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    another
+
+def name Unit =
+    def other = @here
+    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    another
+
+def t1 = match _
+    0 = 0
+    n = 2 + t (n - 1)
+
+def wakeToTestDir Unit = match (subscribe wakeTestBinary)
+    buildTestWake, Nil =
+        require Pass (Pair path visible) = buildTestWake Unit
+        Pass (Pair (simplify "{path}/..") visible)
+    Nil = Pass (Pair "{wakePath}" Nil)
+    _ = Fail (makeError "Two wake binaries declared for testing!")
+
+package test_wake
+
+from wake import _
+from wake import source , Nil
+from test_wake import topic wakeTestBinary
+from gcc_wake import compileC linkO
+from wake import myMap=map foldl myFoldr=foldr
+from wake import def unary  +  -
+from wake import type Pair Result
+from wake import source,Nil
+
+# export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
+
+export def vscode _: Result Path Error =
+    require Pass variant = toVariant "wasm"
+    
+    require Pass files = buildLSP variant
+    
+    require wasm, Nil = filter (matches `.*\.wasm` _ . getPathName) files
+    else failWithError "Did not find empscripten wasm output file; got: {format files}"
+    
+    require js, Nil = filter (matches `.*\.wasm-.*` _ . getPathName) files
+    else failWithError "Did not find empscripten javascript output; got: {format files}"
+    
+    require Pass wasmFile = installAs "{@here}/lsp-server/lsp-wake.wasm" wasm
+    
+    require Pass jsFile = installAs "{@here}/lsp-server/lsp-wake.js" js
+    
+    require Pass packageLockJSON = source "{@here}/package-lock.json"
+    
+    require Pass release = buildAs Unit
+    
+    require Pass packageJSON = setVersion (replace `~` "-" release) "{@here}/package.json"
+    
+    require Pass nodeModules = makeExecPlan (which "npm", "install", Nil) (packageJSON, packageLockJSON, Nil)
+    | setPlanDirectory @here | runJob | getJobOutputs
+    
+    require Pass stdlibSources = sources "share/wake/lib" `.*`
+    
+    require Pass stdlib = stdlibSources | findFailFn installRO
+    
+    require Pass currentDirSources = sources @here `[^/]*`
+    
+    require Pass imagesSources = sources @here `images/.*`
+    
+    require Pass clientSources = sources @here `lsp-client/.*`
+    
+    require Pass serverSources = sources @here `lsp-server/.*`
+    
+    require Pass syntaxSources = sources @here `syntaxes/.*`
+    
+    def vsceFiles = wasmFile, jsFile, packageJSON
+    , currentDirSources ++ imagesSources ++ clientSources ++ serverSources ++ syntaxSources
+    ++ stdlib ++ nodeModules
+    
+    require Pass outputs = makeExecPlan (which "npx", "vsce@1.103.1", "package", Nil) vsceFiles | setPlanDirectory @here
+    | runJob | getJobOutputs
+    
+    require vsix, Nil = filter (matches `.*\.vsix` _ . getPathName) outputs
+    else failWithError "vsce failed to produce vsix output; got: {format files}"
+    Pass vsix
