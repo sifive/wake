@@ -72,12 +72,14 @@ export def cwd: String =
 #
 # ```
 # basename "abc/def"  = "def"
+# basename "abc/def/" = "def"
 # basename "/foo/bar" = "bar"
 # basename "/foo"     = "foo"
 # basename "foo-bar"  = "foo-bar"
 # ```
 export def basename (file: String): String =
-    replace `^.*/` '' file
+    replace `/*$` '' file
+    | replace `^.*/` ''
 
 # Extract the directory name from `file`.
 #
