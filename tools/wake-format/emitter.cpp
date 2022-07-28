@@ -27,39 +27,19 @@
 
 #define WALK(func) [this](ctx_t ctx, CSTElement node) { return func(ctx, node); }
 
-bool fits(const wcl::doc_builder& bdr, ctx_t ctx, wcl::doc doc) {
-  if (bdr.has_newline()) {
-    return bdr.last_width() + doc.first_width() <= Emitter::max_column_width;
-  } else {
-    return bdr.last_width() + doc.first_width() + ctx.width <= Emitter::max_column_width;
-  }
-}
-
-bool requires_nl(ctx_t ctx, CSTElement node) {
-  return node.id() == CST_BLOCK || node.id() == CST_REQUIRE;
-}
+static bool requires_nl(uint8_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
 
 static bool is_expression(uint8_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
          type == CST_BINARY;
 }
 
-void Emitter::walk_rhs(wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) {
-  auto nested_fmt = fmt().nest(fmt().walk(WALK(walk_node)));
-  if (requires_nl(ctx, node)) {
-    bdr.append(nested_fmt.compose(ctx, node));
-    return;
-  }
-
+decltype(auto) Emitter::rhs_fmt() {
+  auto nl_required_fmt = fmt().nest(fmt().walk(WALK(walk_node)));
   auto flat_fmt = fmt().space().walk(WALK(walk_node));
-  auto flat = wcl::doc::lit(" ").concat(walk_node(ctx.sub(bdr), node));
-  if (fits(bdr, ctx, flat)) {
-    bdr.append(flat_fmt.compose(ctx, node));
-    return;
-  }
-
-  auto newline_nested_fmt = fmt().nest(fmt().newline().walk(WALK(walk_node)));
-  bdr.append(newline_nested_fmt.compose(ctx, node));
+  auto full_fmt = fmt().nest(fmt().newline().walk(WALK(walk_node)));
+  auto fits_fmt = fmt().fmt_if_fits(flat_fmt, full_fmt);
+  return fmt().fmt_if_else(requires_nl, nl_required_fmt, fits_fmt);
 }
 
 wcl::doc Emitter::layout(CST cst) {
@@ -373,8 +353,7 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
       .space()
       .walk(CST_GUARD, WALK(walk_guard))
       .consume_wsnl()
-      .escape(
-          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
+      .join(rhs_fmt())
       .format(ctx, node.firstChildElement());
 }
 
@@ -391,8 +370,7 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
       .ws()
       .token(TOKEN_P_EQUALS)
       .consume_wsnl()
-      .escape(
-          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
+      .join(rhs_fmt())
       .consume_wsnl()
       .format(ctx, node.firstChildElement());
 }
@@ -506,8 +484,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
       .space()
       .token(TOKEN_P_EQUALS)
       .consume_wsnl()
-      .escape(
-          [this](wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node) { walk_rhs(bdr, ctx, node); })
+      .join(rhs_fmt())
       .consume_wsnl()
       .newline()
       .walk(WALK(walk_node))

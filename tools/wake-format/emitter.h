@@ -32,8 +32,6 @@ class Emitter {
   // Walks the CST, formats it, and returns the representative doc
   wcl::doc layout(CST cst);
 
-  static const uint8_t max_column_width = 100;
-
  private:
   // Top level tree walk. Dispatches out the calls for various nodes
   wcl::doc walk(ctx_t ctx, CSTElement node);
@@ -41,7 +39,7 @@ class Emitter {
   wcl::doc walk_node(ctx_t ctx, CSTElement node);
   wcl::doc walk_token(ctx_t ctx, CSTElement node);
 
-  void walk_rhs(wcl::doc_builder& bdr, ctx_t ctx, CSTElement& node);
+  decltype(auto) rhs_fmt();
 
   wcl::doc walk_apply(ctx_t ctx, CSTElement node);
   wcl::doc walk_arity(ctx_t ctx, CSTElement node);
