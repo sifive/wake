@@ -34,7 +34,7 @@ static bool is_expression(uint8_t type) {
          type == CST_BINARY;
 }
 
-decltype(auto) Emitter::rhs_fmt() {
+auto Emitter::rhs_fmt() {
   auto nl_required_fmt = fmt().nest(fmt().walk(WALK(walk_node)));
   auto flat_fmt = fmt().space().walk(WALK(walk_node));
   auto full_fmt = fmt().nest(fmt().newline().walk(WALK(walk_node)));

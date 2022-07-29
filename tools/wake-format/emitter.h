@@ -39,7 +39,9 @@ class Emitter {
   wcl::doc walk_node(ctx_t ctx, CSTElement node);
   wcl::doc walk_token(ctx_t ctx, CSTElement node);
 
-  decltype(auto) rhs_fmt();
+  // Returns a formatter that inserts the next node
+  // on the current line if it fits, or on a new nested line
+  auto rhs_fmt();
 
   wcl::doc walk_apply(ctx_t ctx, CSTElement node);
   wcl::doc walk_arity(ctx_t ctx, CSTElement node);
