@@ -27,6 +27,12 @@
 
 #define ALWAYS_INLINE inline __attribute__((always_inline))
 
+#define SPACE_STR " "
+#define NL_STR "\n"
+
+// #define SPACE_STR "·"
+// #define NL_STR "⏎\n"
+
 struct ctx_t {
   size_t width = 0;
   size_t nest_level = 0;
@@ -50,7 +56,7 @@ struct ctx_t {
 
 inline void space(wcl::doc_builder& builder, uint8_t count) {
   for (uint8_t i = 0; i < count; i++) {
-    builder.append(" ");
+    builder.append(SPACE_STR);
   }
 }
 
@@ -76,7 +82,7 @@ struct NewlineAction {
   NewlineAction(uint8_t space_per_indent) : space_per_indent(space_per_indent) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    builder.append("\n");
+    builder.append(NL_STR);
     space(builder, space_per_indent * ctx.nest_level);
   }
 };
@@ -105,7 +111,7 @@ struct TokenReplaceAction {
 };
 
 struct WhitespaceTokenAction : public TokenReplaceAction {
-  WhitespaceTokenAction() : TokenReplaceAction(TOKEN_WS, " ") {}
+  WhitespaceTokenAction() : TokenReplaceAction(TOKEN_WS, SPACE_STR) {}
 };
 
 template <class Action1, class Action2>
@@ -120,15 +126,16 @@ struct SeqAction {
   }
 };
 
-template <class F, class P>
+template <class Predicate, class Function>
 struct WalkPredicateAction {
-  F walker;
-  P predicate;
+  Predicate predicate;
+  Function walker;
 
-  WalkPredicateAction(F walk, P p) : walker(walk), predicate(p) {}
+  WalkPredicateAction(Predicate predicate, Function walker)
+      : predicate(predicate), walker(walker) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    bool result = predicate(node.id());
+    bool result = predicate(builder, ctx, node);
     if (!result) {
       // TODO: see about adding a token -> token name function
       std::cerr << "Unexpected token: " << +node.id() << std::endl;
@@ -161,7 +168,7 @@ struct IfElseAction {
       : predicate(predicate), if_formatter(if_formatter), else_formatter(else_formatter) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    if (predicate(node.id())) {
+    if (predicate(builder, ctx, node)) {
       builder.append(if_formatter.compose(ctx, node));
     } else {
       builder.append(else_formatter.compose(ctx, node));
@@ -178,7 +185,7 @@ struct WhileAction {
       : predicate(predicate), while_formatter(while_formatter) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    while (predicate(node.id())) {
+    while (predicate(builder, ctx, node)) {
       builder.append(while_formatter.compose(ctx.sub(builder), node));
     }
   }
@@ -234,173 +241,205 @@ struct EpsilonAction {
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {}
 };
 
-class TruePredicate {
+class ConstPredicate {
+ private:
+  bool result;
+
  public:
-  bool operator()(uint8_t t) { return true; }
+  ConstPredicate(bool result) : result(result) {}
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) { return result; }
 };
 
-class InitListMembershipPredicate {
+template <class FMT>
+class FitsPredicate {
  private:
-  std::bitset<256> type_bits;
+  FMT formatter;
 
  public:
-  InitListMembershipPredicate(std::initializer_list<uint8_t> types) {
-    // TODO: static assert(sizeof(token type) == 1)
-    for (uint8_t t : types) {
-      type_bits[t] = true;
+  FitsPredicate(FMT formatter) : formatter(formatter) {}
+
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    CSTElement copy = node;
+    wcl::doc doc = formatter.compose(ctx, copy);
+    if (builder.has_newline()) {
+      return builder.last_width() + doc.first_width() <= 100;
+    } else {
+      return builder.last_width() + doc.first_width() + ctx.width <= 100;
+    }
+  }
+};
+
+template <class A, class B>
+struct DepDeclType {
+  using type = A;
+};
+
+template <class B>
+struct DepDeclType<ctx_t, B> {
+  using type = B;
+};
+
+template <class Predicate>
+struct FmtPredicate {
+  Predicate predicate;
+  FmtPredicate(Predicate predicate) : predicate(predicate) {}
+
+  template <
+      class CTX,
+      std::enable_if_t<std::is_same<bool, decltype(std::declval<typename DepDeclType<
+                                                       CTX, Predicate>::type>()(uint8_t()))>::value,
+                       bool> = true>
+  bool operator()(wcl::doc_builder& builder, CTX ctx, CSTElement& node) {
+    return predicate(node.id());
+  }
+
+  template <
+      class CTX,
+      std::enable_if_t<
+          std::is_same<bool, decltype(std::declval<typename DepDeclType<CTX, Predicate>::type>()(
+                                 std::declval<wcl::doc_builder&>(), ctx_t(),
+                                 std::declval<CSTElement&>()))>::value,
+          bool> = true>
+  bool operator()(wcl::doc_builder& builder, CTX ctx, CSTElement& node) {
+    return predicate(builder, ctx, node);
+  }
+};
+
+template <>
+struct FmtPredicate<uint8_t> {
+  uint8_t id;
+  FmtPredicate(uint8_t id) : id(id) {}
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    return node.id() == id;
+  }
+};
+
+template <>
+struct FmtPredicate<int> {
+  int id;
+  FmtPredicate(int id) : id(id) {}
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    return node.id() == id;
+  }
+};
+
+template <class T>
+struct FmtPredicate<std::initializer_list<T>> {
+  std::bitset<256> set;
+  FmtPredicate(std::initializer_list<T> ids) {
+    for (T id : ids) {
+      set[id] = true;
     }
   }
 
-  bool operator()(uint8_t type) { return type_bits[type]; }
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) { return set[node.id()]; }
 };
 
 template <class Action>
 struct Formatter {
   Action action;
+  static const uint8_t space_per_indent = 4;
+  static const uint8_t max_column_width = 100;
+
   Formatter(Action a) : action(a) {}
 
-  Formatter<SeqAction<Action, ConsumeWhitespaceAction>> consume_wsnl() {
-    return {SeqAction<Action, ConsumeWhitespaceAction>(action, ConsumeWhitespaceAction{})};
-  }
+  Formatter<SeqAction<Action, ConsumeWhitespaceAction>> consume_wsnl() { return {{action, {}}}; }
 
-  Formatter<SeqAction<Action, WhitespaceTokenAction>> ws() {
-    return {SeqAction<Action, WhitespaceTokenAction>(action, WhitespaceTokenAction{})};
-  }
+  Formatter<SeqAction<Action, WhitespaceTokenAction>> ws() { return {{action, {}}}; }
 
-  Formatter<SeqAction<Action, SpaceAction>> space(uint8_t count = 1) {
-    return {SeqAction<Action, SpaceAction>(action, SpaceAction{count})};
-  }
+  Formatter<SeqAction<Action, SpaceAction>> space(uint8_t count = 1) { return {{action, {count}}}; }
 
-  Formatter<SeqAction<Action, NewlineAction>> newline(uint8_t space_per_indent) {
-    return {SeqAction<Action, NewlineAction>(action, NewlineAction{space_per_indent})};
-  }
+  Formatter<SeqAction<Action, NewlineAction>> newline() { return {{action, {space_per_indent}}}; }
 
-  Formatter<SeqAction<Action, TokenAction>> token(uint8_t id) {
-    return {SeqAction<Action, TokenAction>(action, TokenAction{id})};
-  }
+  Formatter<SeqAction<Action, TokenAction>> token(uint8_t id) { return {{action, {id}}}; }
 
   Formatter<SeqAction<Action, TokenReplaceAction>> token(uint8_t id, const char* str) {
-    return {SeqAction<Action, TokenReplaceAction>(action, TokenReplaceAction{id, str})};
+    return {{action, {id, str}}};
   }
 
   template <class FMT>
   Formatter<SeqAction<Action, NestAction<FMT>>> nest(FMT formatter) {
-    return {SeqAction<Action, NestAction<FMT>>(action, NestAction<FMT>{formatter})};
+    return {{action, {formatter}}};
   }
 
-  Formatter<SeqAction<Action, NextAction>> next() {
-    return {SeqAction<Action, NextAction>(action, NextAction{})};
-  }
+  Formatter<SeqAction<Action, NextAction>> next() { return {{action, {}}}; }
 
-  template <class FMT>
-  Formatter<
-      SeqAction<Action, IfElseAction<InitListMembershipPredicate, FMT, Formatter<EpsilonAction>>>>
-  fmt_if(uint8_t type, FMT formatter) {
-    return fmt_if_else(InitListMembershipPredicate({type}), formatter,
-                       Formatter<EpsilonAction>({}));
+  template <class IFMT, class EFMT>
+  Formatter<SeqAction<Action, IfElseAction<FmtPredicate<FitsPredicate<IFMT>>, IFMT, EFMT>>>
+  fmt_if_fits(IFMT fits_formatter, EFMT else_formatter) {
+    return fmt_if_else(FitsPredicate<IFMT>(fits_formatter), fits_formatter, else_formatter);
   }
 
   template <class FMT>
-  Formatter<
-      SeqAction<Action, IfElseAction<InitListMembershipPredicate, FMT, Formatter<EpsilonAction>>>>
-  fmt_if(std::initializer_list<uint8_t> types, FMT formatter) {
-    return fmt_if_else(InitListMembershipPredicate(types), formatter, Formatter<EpsilonAction>({}));
+  Formatter<SeqAction<Action, IfElseAction<FmtPredicate<std::initializer_list<uint8_t>>, FMT,
+                                           Formatter<EpsilonAction>>>>
+  fmt_if(std::initializer_list<uint8_t> ids, FMT formatter) {
+    return fmt_if_else(ids, formatter, Formatter<EpsilonAction>({}));
   }
 
-  template <
-      class Predicate, class FMT,
-      std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(uint8_t()))>::value,
-                       bool> = true>
-  Formatter<SeqAction<Action, IfElseAction<Predicate, FMT, Formatter<EpsilonAction>>>> fmt_if(
-      Predicate predicate, FMT formatter) {
+  template <class FMT, class Predicate>
+  Formatter<SeqAction<Action, IfElseAction<FmtPredicate<Predicate>, FMT, Formatter<EpsilonAction>>>>
+  fmt_if(Predicate predicate, FMT formatter) {
     return fmt_if_else(predicate, formatter, Formatter<EpsilonAction>({}));
   }
 
   template <class IFMT, class EFMT>
-  Formatter<SeqAction<Action, IfElseAction<InitListMembershipPredicate, IFMT, EFMT>>> fmt_if_else(
-      uint8_t type, IFMT if_formatter, EFMT else_formatter) {
-    return fmt_if_else(InitListMembershipPredicate({type}), if_formatter, else_formatter);
+  Formatter<
+      SeqAction<Action, IfElseAction<FmtPredicate<std::initializer_list<uint8_t>>, IFMT, EFMT>>>
+  fmt_if_else(std::initializer_list<uint8_t> ids, IFMT if_formatter, EFMT else_formatter) {
+    return {{action, {ids, if_formatter, else_formatter}}};
   }
 
-  template <class IFMT, class EFMT>
-  Formatter<SeqAction<Action, IfElseAction<InitListMembershipPredicate, IFMT, EFMT>>> fmt_if_else(
-      std::initializer_list<uint8_t> types, IFMT if_formatter, EFMT else_formatter) {
-    return fmt_if_else(InitListMembershipPredicate(types), if_formatter, else_formatter);
-  }
-
-  template <
-      class Predicate, class IFMT, class EFMT,
-      std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(uint8_t()))>::value,
-                       bool> = true>
-  Formatter<SeqAction<Action, IfElseAction<Predicate, IFMT, EFMT>>> fmt_if_else(
+  template <class IFMT, class EFMT, class Predicate>
+  Formatter<SeqAction<Action, IfElseAction<FmtPredicate<Predicate>, IFMT, EFMT>>> fmt_if_else(
       Predicate predicate, IFMT if_formatter, EFMT else_formatter) {
-    return {SeqAction<Action, IfElseAction<Predicate, IFMT, EFMT>>(
-        action, IfElseAction<Predicate, IFMT, EFMT>(predicate, if_formatter, else_formatter))};
+    return {{action, {predicate, if_formatter, else_formatter}}};
   }
 
   template <class FMT>
-  Formatter<SeqAction<Action, WhileAction<InitListMembershipPredicate, FMT>>> fmt_while(
-      uint8_t type, FMT formatter) {
-    return fmt_while(InitListMembershipPredicate({type}), formatter);
+  Formatter<SeqAction<Action, WhileAction<FmtPredicate<std::initializer_list<uint8_t>>, FMT>>>
+  fmt_while(std::initializer_list<uint8_t> ids, FMT formatter) {
+    return {{action, {ids, formatter}}};
   }
 
-  template <class FMT>
-  Formatter<SeqAction<Action, WhileAction<InitListMembershipPredicate, FMT>>> fmt_while(
-      std::initializer_list<uint8_t> types, FMT formatter) {
-    return fmt_while(InitListMembershipPredicate(types), formatter);
-  }
-
-  template <
-      class Predicate, class FMT,
-      std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(uint8_t()))>::value,
-                       bool> = true>
-  Formatter<SeqAction<Action, WhileAction<Predicate, FMT>>> fmt_while(Predicate predicate,
-                                                                      FMT formatter) {
-    return {SeqAction<Action, WhileAction<Predicate, FMT>>(
-        action, WhileAction<Predicate, FMT>(predicate, formatter))};
+  template <class FMT, class Predicate>
+  Formatter<SeqAction<Action, WhileAction<FmtPredicate<Predicate>, FMT>>> fmt_while(
+      Predicate predicate, FMT formatter) {
+    return {{action, {predicate, formatter}}};
   }
 
   template <class Walker>
-  Formatter<SeqAction<Action, WalkPredicateAction<Walker, TruePredicate>>> walk(
+  Formatter<SeqAction<Action, WalkPredicateAction<FmtPredicate<ConstPredicate>, Walker>>> walk(
       Walker texas_ranger) {
-    return walk(TruePredicate(), texas_ranger);
+    return walk(ConstPredicate(true), texas_ranger);
   }
 
   template <class Walker>
-  Formatter<SeqAction<Action, WalkPredicateAction<Walker, InitListMembershipPredicate>>> walk(
-      uint8_t type, Walker texas_ranger) {
-    return walk(InitListMembershipPredicate({type}), texas_ranger);
+  Formatter<
+      SeqAction<Action, WalkPredicateAction<FmtPredicate<std::initializer_list<uint8_t>>, Walker>>>
+  walk(std::initializer_list<uint8_t> ids, Walker texas_ranger) {
+    return {{action, {ids, texas_ranger}}};
   }
 
-  template <class Walker>
-  Formatter<SeqAction<Action, WalkPredicateAction<Walker, InitListMembershipPredicate>>> walk(
-      std::initializer_list<uint8_t> types, Walker texas_ranger) {
-    return walk(InitListMembershipPredicate(types), texas_ranger);
-  }
-
-  template <
-      class Predicate, class Walker,
-      std::enable_if_t<std::is_same<bool, decltype(std::declval<Predicate>()(uint8_t()))>::value,
-                       bool> = true>
-  Formatter<SeqAction<Action, WalkPredicateAction<Walker, Predicate>>> walk(Predicate predicate,
-                                                                            Walker texas_ranger) {
-    return {SeqAction<Action, WalkPredicateAction<Walker, Predicate>>(
-        action, WalkPredicateAction<Walker, Predicate>(texas_ranger, predicate))};
+  template <class Predicate, class Walker>
+  Formatter<SeqAction<Action, WalkPredicateAction<FmtPredicate<Predicate>, Walker>>> walk(
+      Predicate predicate, Walker texas_ranger) {
+    return {{action, {predicate, texas_ranger}}};
   }
 
   template <class FMT>
   Formatter<SeqAction<Action, WalkChildrenAction<FMT>>> walk_children(FMT formatter) {
-    return {SeqAction<Action, WalkChildrenAction<FMT>>(action, WalkChildrenAction<FMT>{formatter})};
+    return {{action, {formatter}}};
   }
 
   template <class FMT>
   Formatter<SeqAction<Action, JoinAction<FMT>>> join(FMT formatter) {
-    return {SeqAction<Action, JoinAction<FMT>>(action, JoinAction<FMT>{formatter})};
+    return {{action, {formatter}}};
   }
 
   template <class F>
   Formatter<SeqAction<Action, EscapeAction<F>>> escape(F f) {
-    return {SeqAction<Action, EscapeAction<F>>(action, EscapeAction<F>{f})};
+    return {{action, {f}}};
   }
 
   wcl::doc format(ctx_t ctx, CSTElement node) {
