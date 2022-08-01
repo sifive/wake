@@ -49,6 +49,13 @@ class Emitter {
   wcl::doc walk_node(ctx_t ctx, CSTElement node);
   wcl::doc walk_token(ctx_t ctx, CSTElement node);
 
+  // Walks a node and emits it without any formatting.
+  wcl::doc walk_no_edit(ctx_t ctx, CSTElement node);
+
+  // Prefills the context free memo table with the subtrees
+  // that shouldn't be formatted
+  void prefill_format_skip(CSTElement node);
+
   // Returns a formatter that inserts the next node
   // on the current line if it fits, or on a new nested line
   auto rhs_fmt();

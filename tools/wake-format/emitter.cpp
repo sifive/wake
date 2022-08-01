@@ -64,15 +64,22 @@ static bool is_expression(uint8_t type) {
 }
 
 auto Emitter::rhs_fmt() {
-  auto nl_required_fmt = fmt().nest(fmt().walk(WALK(walk_node)));
-  auto flat_fmt = fmt().space().walk(WALK(walk_node));
-  auto full_fmt = fmt().nest(fmt().newline().walk(WALK(walk_node)));
+  auto comment_fmt = fmt().nest(
+      fmt().newline().token(TOKEN_COMMENT).newline().consume_wsnl().walk(WALK(walk_node)));
+
+  auto rhs_fmt = fmt().walk(WALK(walk_node));
+  auto nl_required_fmt = fmt().nest(rhs_fmt);
+  auto flat_fmt = fmt().space().join(rhs_fmt);
+  auto full_fmt = fmt().nest(fmt().newline().join(rhs_fmt));
   auto fits_fmt = fmt().fmt_if_fits(flat_fmt, full_fmt);
-  return fmt().fmt_if_else(requires_nl, nl_required_fmt, fits_fmt);
+
+  return fmt().fmt_if_else(TOKEN_COMMENT, comment_fmt,
+                           fmt().fmt_if_else(requires_nl, nl_required_fmt, fits_fmt));
 }
 
 wcl::doc Emitter::layout(CST cst) {
   ctx_t ctx;
+  prefill_format_skip(cst.root());
   return walk(ctx, cst.root());
 }
 
@@ -83,7 +90,7 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
   auto extra_fmt = fmt()
       .fmt_if(TOKEN_WS, fmt().next())
       .fmt_if(TOKEN_NL, fmt().next().newline())
-      .fmt_if(TOKEN_COMMENT, fmt().walk(WALK(walk_token)));
+      .fmt_if(TOKEN_COMMENT, fmt().token(TOKEN_COMMENT));
 
   auto body_fmt = fmt()
       .fmt_if_else(
@@ -240,6 +247,43 @@ wcl::doc Emitter::walk_placeholder(ctx_t ctx, CSTElement node) {
   MEMO_RET(std::move(bdr).build());
 }
 
+wcl::doc Emitter::walk_no_edit(ctx_t ctx, CSTElement node) {
+  MEMO(ctx, node);
+
+  if (!node.isNode()) {
+    CTX_FREE_RET(wcl::doc::lit(node.fragment().segment().str()));
+  }
+
+  wcl::doc_builder bdr;
+
+  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    bdr.append(walk_no_edit(ctx, child));
+  }
+
+  CTX_FREE_RET(std::move(bdr).build());
+}
+
+void Emitter::prefill_format_skip(CSTElement node) {
+  assert(node.isNode());
+
+  wcl::doc_builder bdr;
+
+  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    if (child.isNode()) {
+      prefill_format_skip(child);
+      continue;
+    }
+
+    if (child.id() == TOKEN_COMMENT && child.fragment().segment().str() == "# wake-format off") {
+      while (!child.empty() && !child.isNode()) child.nextSiblingElement();
+      if (!child.empty()) {
+        ctx_t ctx;
+        walk_no_edit(ctx, child);
+      }
+    }
+  }
+}
+
 wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(!node.isNode());
@@ -376,11 +420,12 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   // clang-format off
   auto extra_fmt = fmt()
       .fmt_if(TOKEN_WS, fmt().next())
-      .fmt_if(TOKEN_NL, fmt().next());
+      .fmt_if(TOKEN_NL, fmt().next())
+      .fmt_if(TOKEN_COMMENT, fmt().token(TOKEN_COMMENT));
 
   auto body_fmt = fmt()
       .fmt_if_else(
-        {TOKEN_WS, TOKEN_NL},
+        {TOKEN_WS, TOKEN_NL, TOKEN_COMMENT},
         extra_fmt,
         fmt().newline().walk(WALK(walk_node)));
   // clang-format on
@@ -517,21 +562,25 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_MATCH);
 
-  MEMO_RET(
-      fmt()
-          .token(TOKEN_KW_MATCH)
-          .ws()
-          .walk(WALK(walk_node))
-          .consume_wsnl()
-          // clang-format off
-          .nest(fmt()
-              .fmt_while(
-                  CST_CASE, fmt()
-                  .newline()
-                  .walk(WALK(walk_node))
-                  .consume_wsnl()))
-          // clang-format on
-          .format(ctx, node.firstChildElement()));
+  MEMO_RET(fmt()
+               .token(TOKEN_KW_MATCH)
+               .ws()
+               .walk(WALK(walk_node))
+               // clang-format off
+               .nest(fmt()
+                   .consume_wsnl()
+                   .fmt_if(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT))
+                   .consume_wsnl()
+                   .fmt_while(
+                       {CST_CASE, TOKEN_COMMENT}, fmt()
+                       .newline()
+                       .fmt_if_else(
+                         TOKEN_COMMENT,
+                         fmt().token(TOKEN_COMMENT),
+                         fmt().walk(WALK(walk_node)))
+                       .consume_wsnl()))
+               // clang-format on
+               .format(ctx, node.firstChildElement()));
 }
 
 wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) {

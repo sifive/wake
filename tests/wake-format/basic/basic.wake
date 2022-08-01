@@ -8,8 +8,46 @@ def name Unit =
   def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   another
 
+# wake-format off
+def name Unit =
+  def other = here
+  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  another
+
+def name Unit =
+  # wake-format off
+  def other = here
+  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  another
+
+def name Unit = # wake-format off
+  def other = here
+  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  another
+
 def t1 =match _
   0=0
+  n = 2+t(n-1)
+
+# wake-format off
+def t1 =match _
+  0=0
+  n = 2+t(n-1)
+
+def t1 =match _
+  # wake-format off
+  0=0
+  n = 2+t(n-1)
+
+def t1 =match _
+  0=0
+  # wake-format off
+  n = 2+t(n-1)
+
+def t1 =match _
+  # wake-format off
+  0=0
+  # wake-format off
   n = 2+t(n-1)
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
