@@ -29,6 +29,10 @@
 
 #define MEMO(ctx, node)                                              \
   {                                                                  \
+    auto ctx_free = context_free_memo.find(node);                    \
+    if (ctx_free != context_free_memo.end()) {                       \
+      return wcl::doc(ctx_free->second);                             \
+    }                                                                \
     auto value = memo.find(std::pair<CSTElement, ctx_t>(node, ctx)); \
     if (value != memo.end()) {                                       \
       return wcl::doc(value->second);                                \
@@ -41,6 +45,14 @@
     wcl::doc copy = v;                                                    \
     memo.insert({std::pair<CSTElement, ctx_t>(node, ctx), std::move(v)}); \
     return copy;                                                          \
+  }
+
+#define CTX_FREE_RET(node, value)                   \
+  {                                                 \
+    wcl::doc v = value;                             \
+    wcl::doc copy = v;                              \
+    context_free_memo.insert({node, std::move(v)}); \
+    return copy;                                    \
   }
 
 static bool requires_nl(uint8_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
@@ -233,12 +245,12 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
 
   switch (node.id()) {
     case TOKEN_KW_MACRO_HERE:
-      MEMO_RET(ctx, node, wcl::doc::lit("@here"));
+      CTX_FREE_RET(node, wcl::doc::lit("@here"));
     case TOKEN_NL: {
-      MEMO_RET(ctx, node, wcl::doc::lit("\n"));
+      CTX_FREE_RET(node, wcl::doc::lit("\n"));
     }
     case TOKEN_WS: {
-      MEMO_RET(ctx, node, wcl::doc::lit(" "));
+      CTX_FREE_RET(node, wcl::doc::lit(" "));
     }
     case TOKEN_COMMENT:
     case TOKEN_P_BOPEN:
@@ -313,7 +325,7 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
     case TOKEN_KW_THEN:
     case TOKEN_KW_ELSE:
     case TOKEN_KW_REQUIRE:
-      MEMO_RET(ctx, node, wcl::doc::lit(node.fragment().segment().str()));
+      CTX_FREE_RET(node, wcl::doc::lit(node.fragment().segment().str()));
     default:
       assert(false);
   }
