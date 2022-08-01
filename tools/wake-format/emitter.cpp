@@ -651,6 +651,7 @@ wcl::doc Emitter::walk_error(ctx_t ctx, CSTElement node) {
   MEMO_RET(ctx, node, walk_placeholder(ctx, node));
 }
 
+#undef CTX_FREE_RET
 #undef MEMO_RET
 #undef MEMO
 #undef WALK
