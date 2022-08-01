@@ -27,32 +27,32 @@
 
 #define WALK(func) [this](ctx_t ctx, CSTElement node) { return func(ctx, node); }
 
-#define MEMO(ctx, node)                                              \
-  {                                                                  \
-    auto ctx_free = context_free_memo.find(node);                    \
-    if (ctx_free != context_free_memo.end()) {                       \
-      return wcl::doc(ctx_free->second);                             \
-    }                                                                \
-    auto value = memo.find(std::pair<CSTElement, ctx_t>(node, ctx)); \
-    if (value != memo.end()) {                                       \
-      return wcl::doc(value->second);                                \
-    }                                                                \
+#define MEMO(ctx, node)                                                                       \
+  auto __memoize_input__ = [node, ctx]() { return std::pair<CSTElement, ctx_t>(node, ctx); }; \
+  {                                                                                           \
+    auto ctx_free = context_free_memo.find(node);                                             \
+    if (ctx_free != context_free_memo.end()) {                                                \
+      return wcl::doc(ctx_free->second);                                                      \
+    }                                                                                         \
+    auto value = memo.find(__memoize_input__());                                              \
+    if (value != memo.end()) {                                                                \
+      return wcl::doc(value->second);                                                         \
+    }                                                                                         \
   }
 
-#define MEMO_RET(ctx, node, value)                                        \
-  {                                                                       \
-    wcl::doc v = value;                                                   \
-    wcl::doc copy = v;                                                    \
-    memo.insert({std::pair<CSTElement, ctx_t>(node, ctx), std::move(v)}); \
-    return copy;                                                          \
+#define MEMO_RET(value)                    \
+  {                                        \
+    wcl::doc v = (value);                  \
+    memo.insert({__memoize_input__(), v}); \
+    return v;                              \
   }
 
-#define CTX_FREE_RET(node, value)                   \
-  {                                                 \
-    wcl::doc v = value;                             \
-    wcl::doc copy = v;                              \
-    context_free_memo.insert({node, std::move(v)}); \
-    return copy;                                    \
+#define CTX_FREE_RET(value)                      \
+  {                                              \
+    wcl::doc v = (value);                        \
+    CSTElement node = __memoize_input__().first; \
+    context_free_memo.insert({node, v});         \
+    return v;                                    \
   }
 
 static bool requires_nl(uint8_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
@@ -91,7 +91,7 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
         fmt().walk(WALK(walk_node)).newline());
   // clang-format on
 
-  MEMO_RET(ctx, node, fmt().walk_children(body_fmt).format(ctx, node));
+  MEMO_RET(fmt().walk_children(body_fmt).format(ctx, node));
 }
 
 wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {
@@ -219,7 +219,7 @@ wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {
       assert(false);
   }
 
-  MEMO_RET(ctx, node, std::move(bdr).build())
+  MEMO_RET(std::move(bdr).build())
 }
 
 wcl::doc Emitter::walk_placeholder(ctx_t ctx, CSTElement node) {
@@ -236,7 +236,7 @@ wcl::doc Emitter::walk_placeholder(ctx_t ctx, CSTElement node) {
     }
   }
 
-  MEMO_RET(ctx, node, std::move(bdr).build());
+  MEMO_RET(std::move(bdr).build());
 }
 
 wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
@@ -245,12 +245,12 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
 
   switch (node.id()) {
     case TOKEN_KW_MACRO_HERE:
-      CTX_FREE_RET(node, wcl::doc::lit("@here"));
+      CTX_FREE_RET(wcl::doc::lit("@here"));
     case TOKEN_NL: {
-      CTX_FREE_RET(node, wcl::doc::lit("\n"));
+      CTX_FREE_RET(wcl::doc::lit("\n"));
     }
     case TOKEN_WS: {
-      CTX_FREE_RET(node, wcl::doc::lit(" "));
+      CTX_FREE_RET(wcl::doc::lit(" "));
     }
     case TOKEN_COMMENT:
     case TOKEN_P_BOPEN:
@@ -325,7 +325,7 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
     case TOKEN_KW_THEN:
     case TOKEN_KW_ELSE:
     case TOKEN_KW_REQUIRE:
-      CTX_FREE_RET(node, wcl::doc::lit(node.fragment().segment().str()));
+      CTX_FREE_RET(wcl::doc::lit(node.fragment().segment().str()));
     default:
       assert(false);
   }
@@ -335,8 +335,7 @@ wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_APP);
 
-  MEMO_RET(ctx, node,
-           fmt()
+  MEMO_RET(fmt()
                .walk(is_expression, WALK(walk_node))
                .consume_wsnl()
                .space()
@@ -346,20 +345,19 @@ wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_arity(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_BINARY);
 
-  MEMO_RET(ctx, node,
-           fmt()
+  MEMO_RET(fmt()
                .walk(is_expression, WALK(walk_node))
                .consume_wsnl()
                .space()
@@ -386,15 +384,14 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
         fmt().newline().walk(WALK(walk_node)));
   // clang-format on
 
-  MEMO_RET(ctx, node, fmt().walk_children(body_fmt).consume_wsnl().format(ctx, node));
+  MEMO_RET(fmt().walk_children(body_fmt).consume_wsnl().format(ctx, node));
 }
 
 wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_CASE);
 
-  MEMO_RET(ctx, node,
-           fmt()
+  MEMO_RET(fmt()
                .walk(WALK(walk_node))
                .consume_wsnl()
                .space()
@@ -406,15 +403,14 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_DEF);
 
-  MEMO_RET(ctx, node,
-           fmt()
+  MEMO_RET(fmt()
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK(walk_export)).ws())
                .token(TOKEN_KW_DEF)
                .ws()
@@ -429,44 +425,44 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_export(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_flag_export(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_flag_global(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_guard(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_hole(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_identifier(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_ID);
 
-  MEMO_RET(ctx, node, fmt().token(TOKEN_ID).format(ctx, node.firstChildElement()));
+  MEMO_RET(fmt().token(TOKEN_ID).format(ctx, node.firstChildElement()));
 }
 
 wcl::doc Emitter::walk_ideq(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
@@ -475,8 +471,7 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
 
   auto id_list_fmt = fmt().walk(WALK(walk_ideq)).fmt_if(TOKEN_WS, fmt().ws());
 
-  MEMO_RET(ctx, node,
-           fmt()
+  MEMO_RET(fmt()
                .token(TOKEN_KW_FROM)
                .ws()
                .walk(CST_ID, WALK(walk_identifier))
@@ -499,22 +494,22 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_kind(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_lambda(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
@@ -522,7 +517,6 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_MATCH);
 
   MEMO_RET(
-      ctx, node,
       fmt()
           .token(TOKEN_KW_MATCH)
           .ws()
@@ -541,15 +535,14 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_PACKAGE);
 
-  MEMO_RET(ctx, node,
-           fmt()
+  MEMO_RET(fmt()
                .token(TOKEN_KW_PACKAGE)
                .ws()
                .walk(CST_ID, WALK(walk_identifier))
@@ -559,25 +552,24 @@ wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_prim(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_REQUIRE);
 
-  MEMO_RET(ctx, node,
-           fmt()
+  MEMO_RET(fmt()
                .newline()
                .token(TOKEN_KW_REQUIRE)
                .ws()
@@ -596,15 +588,14 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_req_else(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_SUBSCRIBE);
 
-  MEMO_RET(ctx, node,
-           fmt()
+  MEMO_RET(fmt()
                .token(TOKEN_KW_SUBSCRIBE)
                .ws()
                .walk(CST_ID, WALK(walk_identifier))
@@ -613,42 +604,42 @@ wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_target_args(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_top(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_topic(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_tuple(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_tuple_elt(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 wcl::doc Emitter::walk_error(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(ctx, node, walk_placeholder(ctx, node));
+  MEMO_RET(walk_placeholder(ctx, node));
 }
 
 #undef CTX_FREE_RET

@@ -159,6 +159,7 @@ struct std::hash<CSTElement> {
         wcl::hash_combine(std::hash<size_t>{}(element.node), std::hash<size_t>{}(element.limit));
     hash = wcl::hash_combine(hash, std::hash<size_t>{}(element.token));
     hash = wcl::hash_combine(hash, std::hash<size_t>{}(element.end));
+    hash = wcl::hash_combine(hash, std::hash<const CST *>{}(element.cst));
     return hash;
   }
 };
