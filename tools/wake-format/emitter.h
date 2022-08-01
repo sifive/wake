@@ -18,6 +18,7 @@
 #pragma once
 
 #include <wcl/doc.h>
+#include <wcl/hash_combine.h>
 #include <wcl/optional.h>
 
 #include <cassert>
@@ -27,12 +28,21 @@
 #include "formatter.h"
 #include "parser/cst.h"
 
+template <>
+struct std::hash<std::pair<CSTElement, ctx_t>> {
+  size_t operator()(std::pair<CSTElement, ctx_t> const &pair) const noexcept {
+    return hash_combine(std::hash<CSTElement>{}(pair.first), std::hash<ctx_t>{}(pair.second));
+  }
+};
+
 class Emitter {
  public:
   // Walks the CST, formats it, and returns the representative doc
   wcl::doc layout(CST cst);
 
  private:
+  std::unordered_map<std::pair<CSTElement, ctx_t>, wcl::doc> memo = {};
+
   // Top level tree walk. Dispatches out the calls for various nodes
   wcl::doc walk(ctx_t ctx, CSTElement node);
 

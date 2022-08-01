@@ -19,6 +19,7 @@
 #define CST_H
 
 #include <stdint.h>
+#include <wcl/hash_combine.h>
 
 #include <ostream>
 #include <string>
@@ -140,12 +141,26 @@ class CSTElement {
   CSTElement firstChildElement() const;
   CSTElement firstChildNode() const;
 
+  bool operator==(const CSTElement &other) const;
+
  private:
   const CST *cst;
   uint32_t node, limit;
   uint32_t token, end;  // in bytes
 
   friend class CST;
+  friend std::hash<CSTElement>;
+};
+
+template <>
+struct std::hash<CSTElement> {
+  size_t operator()(CSTElement const &element) const noexcept {
+    size_t hash =
+        hash_combine(std::hash<size_t>{}(element.node), std::hash<size_t>{}(element.limit));
+    hash = hash_combine(hash, std::hash<size_t>{}(element.token));
+    hash = hash_combine(hash, std::hash<size_t>{}(element.end));
+    return hash;
+  }
 };
 
 #endif

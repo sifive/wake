@@ -257,6 +257,11 @@ CSTElement CSTElement::firstChildNode() const {
   return out;
 }
 
+bool CSTElement::operator==(const CSTElement &other) const {
+  return cst == other.cst && node == other.node && limit == other.limit && token == other.token &&
+         end == other.end;
+}
+
 #define MAX_SNIPPET 30
 #define MAX_SNIPPET_HALF ((MAX_SNIPPET / 2) - 1)
 
