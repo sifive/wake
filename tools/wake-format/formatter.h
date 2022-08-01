@@ -37,10 +37,17 @@
 struct ctx_t {
   size_t width = 0;
   size_t nest_level = 0;
+  bool fmt_off = false;
 
   ctx_t nest() {
     ctx_t copy = *this;
     copy.nest_level++;
+    return copy;
+  }
+
+  ctx_t off() {
+    ctx_t copy = *this;
+    copy.fmt_off = true;
     return copy;
   }
 
@@ -55,14 +62,17 @@ struct ctx_t {
   }
 
   bool operator==(const ctx_t& other) const {
-    return width == other.width && nest_level == other.nest_level;
+    return width == other.width && nest_level == other.nest_level && fmt_off == other.fmt_off;
   }
 };
 
 template <>
 struct std::hash<ctx_t> {
   size_t operator()(ctx_t const& ctx) const noexcept {
-    return wcl::hash_combine(std::hash<size_t>{}(ctx.width), std::hash<size_t>{}(ctx.nest_level));
+    size_t hash =
+        wcl::hash_combine(std::hash<size_t>{}(ctx.width), std::hash<size_t>{}(ctx.nest_level));
+    hash = wcl::hash_combine(hash, std::hash<bool>{}(ctx.fmt_off));
+    return hash;
   }
 };
 
@@ -75,6 +85,24 @@ inline void space(wcl::doc_builder& builder, uint8_t count) {
 struct ConsumeWhitespaceAction {
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     while (!node.empty() && (node.id() == TOKEN_WS || node.id() == TOKEN_NL)) {
+      node.nextSiblingElement();
+    }
+  }
+};
+
+struct CopyWhitespaceAction {
+  uint8_t space_per_indent;
+
+  CopyWhitespaceAction(uint8_t space_per_indent) : space_per_indent(space_per_indent) {}
+
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    while (!node.empty() && (node.id() == TOKEN_WS || node.id() == TOKEN_NL)) {
+      if (node.id() == TOKEN_WS) {
+        space(builder, node.fragment().segment().str().size());
+      } else {
+        builder.append(NL_STR);
+        space(builder, space_per_indent * ctx.nest_level);
+      }
       node.nextSiblingElement();
     }
   }
@@ -437,6 +465,9 @@ struct Formatter {
   Formatter(Action a) : action(a) {}
 
   Formatter<SeqAction<Action, ConsumeWhitespaceAction>> consume_wsnl() { return {{action, {}}}; }
+  Formatter<SeqAction<Action, CopyWhitespaceAction>> copy_wsnl() {
+    return {{action, {space_per_indent}}};
+  }
 
   Formatter<SeqAction<Action, WhitespaceTokenAction>> ws() { return {{action, {}}}; }
 
