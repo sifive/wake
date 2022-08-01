@@ -28,23 +28,24 @@
 #define WALK(func) [this](ctx_t ctx, CSTElement node) { return func(ctx, node); }
 
 #define MEMO(ctx, node)                                                                       \
+  static std::unordered_map<std::pair<CSTElement, ctx_t>, wcl::doc> __memo_map__ = {};        \
   auto __memoize_input__ = [node, ctx]() { return std::pair<CSTElement, ctx_t>(node, ctx); }; \
   {                                                                                           \
     auto ctx_free = context_free_memo.find(node);                                             \
     if (ctx_free != context_free_memo.end()) {                                                \
       return wcl::doc(ctx_free->second);                                                      \
     }                                                                                         \
-    auto value = memo.find(__memoize_input__());                                              \
-    if (value != memo.end()) {                                                                \
+    auto value = __memo_map__.find(__memoize_input__());                                      \
+    if (value != __memo_map__.end()) {                                                        \
       return wcl::doc(value->second);                                                         \
     }                                                                                         \
   }
 
-#define MEMO_RET(value)                    \
-  {                                        \
-    wcl::doc v = (value);                  \
-    memo.insert({__memoize_input__(), v}); \
-    return v;                              \
+#define MEMO_RET(value)                            \
+  {                                                \
+    wcl::doc v = (value);                          \
+    __memo_map__.insert({__memoize_input__(), v}); \
+    return v;                                      \
   }
 
 #define CTX_FREE_RET(value)                      \

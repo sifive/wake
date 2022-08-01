@@ -42,7 +42,6 @@ class Emitter {
 
  private:
   std::unordered_map<CSTElement, wcl::doc> context_free_memo = {};
-  std::unordered_map<std::pair<CSTElement, ctx_t>, wcl::doc> memo = {};
 
   // Top level tree walk. Dispatches out the calls for various nodes
   wcl::doc walk(ctx_t ctx, CSTElement node);
