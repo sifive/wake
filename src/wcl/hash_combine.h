@@ -24,11 +24,3 @@
 inline uint64_t hash_combine(uint64_t a, uint64_t b) {
   return a ^ (b + 0x9e3779b9 + (a << 6) + (a >> 2));
 }
-
-// struct pair_hash
-// {
-//     template <class T1, class T2>
-//     std::size_t operator() (const std::pair<T1, T2> &pair) const {
-//         return hash_combine(std::hash<T1>{}(pair.first), std::hash<T2>{}(pair.second));
-//     }
-// };
