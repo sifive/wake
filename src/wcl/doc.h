@@ -163,8 +163,7 @@ class doc {
   explicit doc(std::unique_ptr<doc_impl_base> impl) : impl(std::move(impl)) {}
 
  public:
-  // Copy constructed doc just points to the same underlying document, increasing its ref count
-  doc(const doc& other) { impl = other.impl; }
+  doc(const doc& other) = default;
 
   // O(n) (n = character count)
   static doc lit(std::string str) { return doc(std::make_unique<doc_impl_string>(std::move(str))); }
