@@ -21,6 +21,8 @@
 #include <functional>
 #include <utility>
 
+namespace wcl {
 inline uint64_t hash_combine(uint64_t a, uint64_t b) {
   return a ^ (b + 0x9e3779b9 + (a << 6) + (a >> 2));
 }
+}  // namespace wcl

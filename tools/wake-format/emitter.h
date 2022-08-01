@@ -18,7 +18,7 @@
 #pragma once
 
 #include <wcl/doc.h>
-#include <wcl/hash_combine.h>
+#include <wcl/hash.h>
 #include <wcl/optional.h>
 
 #include <cassert>
@@ -31,7 +31,7 @@
 template <>
 struct std::hash<std::pair<CSTElement, ctx_t>> {
   size_t operator()(std::pair<CSTElement, ctx_t> const &pair) const noexcept {
-    return hash_combine(std::hash<CSTElement>{}(pair.first), std::hash<ctx_t>{}(pair.second));
+    return wcl::hash_combine(std::hash<CSTElement>{}(pair.first), std::hash<ctx_t>{}(pair.second));
   }
 };
 

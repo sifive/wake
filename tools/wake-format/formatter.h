@@ -18,7 +18,7 @@
 #pragma once
 
 #include <wcl/doc.h>
-#include <wcl/hash_combine.h>
+#include <wcl/hash.h>
 
 #include <bitset>
 #include <cassert>
@@ -62,7 +62,7 @@ struct ctx_t {
 template <>
 struct std::hash<ctx_t> {
   size_t operator()(ctx_t const& ctx) const noexcept {
-    return hash_combine(std::hash<size_t>{}(ctx.width), std::hash<size_t>{}(ctx.nest_level));
+    return wcl::hash_combine(std::hash<size_t>{}(ctx.width), std::hash<size_t>{}(ctx.nest_level));
   }
 };
 

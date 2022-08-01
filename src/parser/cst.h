@@ -19,7 +19,7 @@
 #define CST_H
 
 #include <stdint.h>
-#include <wcl/hash_combine.h>
+#include <wcl/hash.h>
 
 #include <ostream>
 #include <string>
@@ -156,9 +156,9 @@ template <>
 struct std::hash<CSTElement> {
   size_t operator()(CSTElement const &element) const noexcept {
     size_t hash =
-        hash_combine(std::hash<size_t>{}(element.node), std::hash<size_t>{}(element.limit));
-    hash = hash_combine(hash, std::hash<size_t>{}(element.token));
-    hash = hash_combine(hash, std::hash<size_t>{}(element.end));
+        wcl::hash_combine(std::hash<size_t>{}(element.node), std::hash<size_t>{}(element.limit));
+    hash = wcl::hash_combine(hash, std::hash<size_t>{}(element.token));
+    hash = wcl::hash_combine(hash, std::hash<size_t>{}(element.end));
     return hash;
   }
 };
