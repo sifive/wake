@@ -18,6 +18,7 @@
 #pragma once
 
 #include <wcl/doc.h>
+#include <wcl/hash.h>
 
 #include <bitset>
 #include <cassert>
@@ -51,6 +52,17 @@ struct ctx_t {
       copy.width += builder.last_width();
     }
     return copy;
+  }
+
+  bool operator==(const ctx_t& other) const {
+    return width == other.width && nest_level == other.nest_level;
+  }
+};
+
+template <>
+struct std::hash<ctx_t> {
+  size_t operator()(ctx_t const& ctx) const noexcept {
+    return wcl::hash_combine(std::hash<size_t>{}(ctx.width), std::hash<size_t>{}(ctx.nest_level));
   }
 };
 
