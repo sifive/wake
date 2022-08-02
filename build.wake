@@ -16,6 +16,15 @@
 package build_wake
 from wake import _
 
+export def test (_: List String) =
+  require Pass readme = source "README.md"
+  require Pass outputs =
+    makePlan "test" (readme,) "cat {readme.getPathName} > hello-world.txt"
+    | editPlanPersistence (\_ ReRun)
+    | runJobWith jobCacheRunner
+    | getJobOutputs
+  Pass outputs
+
 # Useful build variants (arguments to all)
 def toVariant = match _
     "default" = Pass (Pair "native-cpp14-release" "native-c11-release")

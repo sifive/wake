@@ -20,6 +20,21 @@ create table if not exists jobs(
   bloom_filter integer);
 create index if not exists job on jobs(directory, commandline, environment, stdin);
 
+-- This table stores all the details about a job that aren't known until
+-- after the job has finished executing. As of right now it has no reason
+-- to exist seperately from the jobs table but eventully jobs might exist
+-- in a half finished state. This is basically the info needed by
+-- prim "job_virtual" and RunnerOutput.
+create table if not exists job_output_info(
+  job     job_id primary key not null references jobs(job_id) on delete cascade,
+  stdout  text               not null,
+  stderr  text               not null,
+  ret     integer            not null,
+  runtime float              not null,
+  cputime float              not null,
+  mem     integer            not null,
+  ibytes  integer            not null,
+  obytes  integer            not null);
 
 -- We only record the input hashes, and not all visible files.
 -- The input file blobs are not stored on disk. Only their hash

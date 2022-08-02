@@ -45,7 +45,7 @@ JAST &JAST::get(const std::string &key) {
   return null;
 }
 
-JAST &JAST::add(std::string &&key, SymbolJSON kind, std::string &&value) {
+JAST &JAST::add(std::string key, SymbolJSON kind, std::string &&value) {
   children.emplace_back(std::move(key), JAST(kind, std::move(value)));
   return children.back().second;
 }
