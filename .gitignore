@@ -2,6 +2,7 @@ manifest.wake
 *.o
 .build
 .fuse*
+.job-cache
 compile_commands.json
 /.compile_commands
 /.vscode/*.log
@@ -19,6 +20,8 @@ compile_commands.json
 /bin/preload-wake
 /bin/preload-wake.*
 /bin/wakebox
+/bin/job-cache
+/bin/job-cache.*
 /bin/wakebox.*
 /bin/job-cache.*
 /bin/wake-format.*

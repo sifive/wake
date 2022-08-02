@@ -117,15 +117,15 @@ export def isPathDir (path: Path): Boolean =
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
 data Path =
-    Path (name: String)
+    Path (name: String) (hash: String)
 from wake export type Path
 
 export def getPathName (path: Path): String =
-    def Path name = path
+    def Path name _ = path
     name
 
 export def getPathParent (path: Path): Path =
-    Path (simplify "{getPathName path}/..")
+    Path (simplify "{getPathName path}/..") path.getPathHash
 
 def addhash (f: String): String =
   def p = simplify f

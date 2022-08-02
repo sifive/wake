@@ -21,7 +21,7 @@ from gcc_wake import _
 def srcDir =
     here
 
-def src (dir: String) (variant: Pair String String) (internal: List (Pair String String => Result SysLib Error)) (external: List (Pair String String => Result SysLib Error)): Result SysLib Error =
+def src (dir: String) (variant: Pair String String) (internal: List (Pair String String => Result SysLib Error)) (external: List (Pair String String => Result SysLib Error)) (extraFiles: List Path): Result SysLib Error =
     def Pair cppVariant cVariant =
         variant
 
@@ -53,7 +53,8 @@ def src (dir: String) (variant: Pair String String) (internal: List (Pair String
         map getPairSecond parsers ++
         externalLib.getSysLibHeaders ++
         sourceHeaders ++
-        vendorHeaders
+        vendorHeaders ++
+        extraFiles
 
     def cflags =
         "-I{srcDir}",
@@ -90,7 +91,7 @@ def src (dir: String) (variant: Pair String String) (internal: List (Pair String
 
     require Pass internalLibs =
         findFail internalLibResults
-    
+
     def internalLib =
         flattenSysLibs internalLibs
 

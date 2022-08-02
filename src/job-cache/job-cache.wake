@@ -16,6 +16,6 @@
 package build_wake
 from wake import _
 
-target buildJobCache variant =
-    require Pass schemaSql = source "tools/job-cache/schema.sql"
-    tool here (schemaSql, Nil) variant "bin/job-cache" (json, gopt, sqlite3, blake2, wcl, util, Nil) Nil Nil
+target jobCacheLib variant =
+    require Pass schemaSql = source "src/job-cache/schema.sql"
+    src here variant (json, gopt, sqlite3, blake2, wcl, util,) Nil (schemaSql,)

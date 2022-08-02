@@ -37,6 +37,7 @@
 #include "dst/todst.h"
 #include "gopt/gopt-arg.h"
 #include "gopt/gopt.h"
+#include "job-cache/job-cache.h"
 #include "markup.h"
 #include "optimizer/ssa.h"
 #include "parser/cst.h"
@@ -425,6 +426,11 @@ int main(int argc, char **argv) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;
     return 1;
   }
+
+  // Open the job-cache if it exists
+  // TODO: Use an env-var to create it it conditionally
+  auto cache = std::make_unique<job_cache::Cache>("./.job-cache");
+  set_job_cache(cache.get());
 
   // If the user asked to list all files we *would* clean.
   // This is the same as asking for all output files.

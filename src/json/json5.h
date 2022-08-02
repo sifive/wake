@@ -74,29 +74,39 @@ struct JAST {
   JAST &get(const std::string &key);
 
   // Add a child to a JObject
-  JAST &add(std::string &&key, SymbolJSON kind, std::string &&value);
-  JAST &add(std::string &&key, int value) {
+  JAST &add(std::string key, SymbolJSON kind, std::string &&value);
+  JAST &add(std::string key, bool value) {
+    if (value)
+      return add(std::move(key), JSON_TRUE, "true");
+    else
+      return add(std::move(key), JSON_FALSE, "false");
+  }
+  JAST &add(std::string key, int value) {
     return add(std::move(key), JSON_INTEGER, std::to_string(value));
   }
-  JAST &add(std::string &&key, long value) {
+  JAST &add(std::string key, long value) {
     return add(std::move(key), JSON_INTEGER, std::to_string(value));
   }
-  JAST &add(std::string &&key, long long value) {
+  JAST &add(std::string key, long long value) {
     return add(std::move(key), JSON_INTEGER, std::to_string(value));
   }
-  JAST &add(std::string &&key, double value) {
+  JAST &add(std::string key, double value) {
     return add(std::move(key), JSON_DOUBLE, std::to_string(value));
   }
-  JAST &add(std::string &&key, std::string &&value) {
+  JAST &add(std::string key, std::string value) {
     return add(std::move(key), JSON_STR, std::move(value));
   }
-  JAST &add(std::string &&key, SymbolJSON kind) { return add(std::move(key), kind, std::string()); }
+  JAST &add(std::string key, SymbolJSON kind) { return add(std::move(key), kind, std::string()); }
+  JAST &add(std::string key, JAST &&child) {
+    children.emplace_back(std::move(key), std::move(child));
+    return children.back().second;
+  }
   // Add a child to a JArray
   JAST &add(SymbolJSON kind, std::string &&value) {
     return add(std::string(), kind, std::move(value));
   }
   JAST &add(SymbolJSON kind) { return add(std::string(), kind, std::string()); }
-  JAST &add(std::string &&value) { return add(std::string(), JSON_STR, std::move(value)); }
+  JAST &add(std::string value) { return add(std::string(), JSON_STR, std::move(value)); }
 };
 
 std::ostream &operator<<(std::ostream &os, const JAST &jast);

@@ -19,11 +19,11 @@ export def cpp11Flags    = ("-std=c++11", Nil)
 export def cpp14Flags    = ("-std=c++14", Nil)
 export def c11Flags      = ("-std=c11", Nil)
 export def debugCFlags   = ("-Wall", "-Wextra", "-Wno-format-security", "-O0", "-g", "-pg", Nil)
-export def debugLFlags   = ("-g", "-pg", Nil)
+export def debugLFlags   = ("-lpthread", "-g", "-pg", Nil)
 export def releaseCFlags = ("-Wall", "-Wno-format-security", "-O2", Nil)
-export def releaseLFlags = (Nil)
+export def releaseLFlags = ("-lpthread",)
 export def staticCFlags =  ("-Wall", "-Wno-format-security", "-O2", "-flto", Nil)
-export def staticLFlags  = ("-flto", "-static", "-s", Nil)
+export def staticLFlags  = ("-lpthread", "-flto", "-static", "-s", Nil)
 
 target pwd _ =
     makeExecPlan ("pwd",) Nil

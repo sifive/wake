@@ -44,7 +44,7 @@ export tuple RunnerOutput =
   export Usage:   Usage
 
 # A Runner describes a way to invoke a Plan to get a Job
-tuple Runner =
+export tuple Runner =
   export Name:  String
   export Score: Plan => Result Double String
   Fn:           Job => Result RunnerInput Error => Result RunnerOutput Error
@@ -202,6 +202,236 @@ export def localRunner: Runner =
     if plan.getPlanLocalOnly then Pass 1.0 else Fail "cannot detect outputs"
   Runner "local" score doit
 
+def jField (jvalue: JValue) (key: String) =
+  require JObject obj = jvalue
+  else failWithError "not an object"
+
+  require Some (Pair (Pair _ value) _) = find (_.getPairFirst ==~ key) obj
+  else failWithError "key '{key}' not found"
+
+  Pass value
+
+def jInteger = match _
+  Pass (JInteger x) = Pass x
+  Fail err          = Fail err
+  _                 = failWithError "not an integer"
+
+def jString = match _
+  Pass (JString x) = Pass x
+  Fail err         = Fail err
+  _                = failWithError "not a string"
+
+def jDouble = match _
+  Pass (JDouble x) = Pass x
+  Fail err         = Fail err
+  _                = failWithError "not a number"
+
+def jArray (fn: Result JValue Error => Result a Error) = match _
+  Pass (JArray arr) = map (fn _.Pass) arr | findFail
+  Fail err          = Fail err
+  _                 = failWithError "not an array"
+
+export def mkJobCacheRunner ((Runner name score baseDoIt): Runner): Runner =
+  # def launch job dir stdin env cmd status runtime cputime membytes ibytes obytes = prim "job_launch"
+  def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
+  def badlaunch job error = prim "job_fail_launch"
+  def job_cache_read str = prim "job_cache_read"
+  def job_cache_add str = prim "job_cache_add"
+
+  def doit job runnerInput = match runnerInput
+    Fail e =
+      def _ = badlaunch job e
+      Fail e
+    Pass (RunnerInput _label cmd vis env dir stdin _ _ _) =
+        def mkVisJson (Path path hash) =
+          JObject ("path" :-> JString path, "hash" :-> JString hash,)
+        def jobCacheVisible = JArray (map mkVisJson vis)
+        def jobCacheJsonIn = prettyJSON $ JObject (
+          "cwd" :-> JString dir,
+          "command_line" :-> JString cmd.implode,
+          "envrionment" :-> JString env.implode,
+          "stdin" :-> JString stdin,
+          "input_files" :-> jobCacheVisible,
+          "dir_redirects" :-> JObject ( "/workspace" :-> JString "./",), # TODO: What's the right redirect here?
+        )
+        #def signature label cmd env dir stdin = prim "hash"
+        #def hash = signature label cmd.implode env.implode dir stdin
+        # TODO: Make a function that turns labels into posix compaitable paths
+        #require Pass jsonIn = write ".job-cache-build/{str hash}.job-cache.json.in" jobCacheJsonIn
+        # We don't bother passing a visible list since everything must be visiable
+        require Pass cacheResult =
+          job_cache_read jobCacheJsonIn
+          | rmapFail failWithError
+
+        require Pass jobCacheJsonOut = parseJSONBody cacheResult
+
+        require Pass (JBoolean cacheHit) = jField jobCacheJsonOut "found"
+        else failWithError "job-cache returned unexpected json schema"
+
+        require False = cacheHit
+        else
+          require Pass match_info = jField jobCacheJsonOut "match"
+          require Pass status = jField match_info "status" | jInteger
+          require Pass runtime = jField match_info "runtime" | jDouble
+          require Pass cputime = jField match_info "cputime" | jDouble
+          require Pass mem = jField match_info "mem" | jInteger
+          require Pass ibytes = jField match_info "ibytes" | jInteger
+          require Pass obytes = jField match_info "obytes" | jInteger
+          require Pass inputs = jField match_info "input_files" | jArray jString
+          require Pass outputs = jField match_info "output_files" | jArray jString
+          require Pass stdout = jField match_info "stdout" | jString
+          require Pass stderr = jField match_info "stderr" | jString
+
+          def predict = Usage status runtime cputime mem ibytes obytes
+          def _ = virtual job stdout stderr status runtime cputime mem ibytes obytes
+          Pass (RunnerOutput inputs outputs predict) # TODO: This is wrong but we need better json output
+
+        # Now we need to run the job
+        require Pass (RunnerOutput inputs outputs useage) = baseDoIt job runnerInput
+        def Usage status runtime cputime mem ibytes obytes = useage
+        def inputsTree = listToTree scmpCanonical inputs
+
+        def mkOutputFileJson src =
+          JObject ("src" :-> JString src, "path" :-> JString "/workspace/{src}",)
+        def jobCacheOutputFiles = JArray (map mkOutputFileJson outputs)
+        def jobCacheReadFiles =
+          def readPaths = filter (tcontains _.getPathName inputsTree) vis
+          JArray (map mkVisJson readPaths)
+        require Pass stdout = getJobStdout job
+        require Pass stderr = getJobStderr job
+
+        def jobCacheAddJson = prettyJSON $ JObject (
+          "cwd" :-> JString dir,
+          "command_line" :-> JString cmd.implode,
+          "envrionment" :-> JString env.implode,
+          "stdin" :-> JString stdin,
+          "input_files" :-> jobCacheReadFiles,
+          "input_dirs" :-> JArray Nil, # TODO: This will need some fuse work to make good on
+          "output_files" :-> jobCacheOutputFiles,
+          "status" :-> JInteger status,
+          "runtime" :-> JDouble runtime,
+          "cputime" :-> JDouble cputime,
+          "mem" :-> JInteger mem,
+          "ibytes" :-> JInteger ibytes,
+          "obytes" :-> JInteger obytes,
+          "stdout" :-> JString stdout, # TODO: Figure out how to get the stdout
+          "stderr" :-> JString stderr, # TODO: Figure out how to get the stderr
+        )
+
+        # We put this in a def so that it does not block the return below.
+        # This ensures that the effect still occurs and blocks wake finishing but the job
+        # itself is not blocked by writing to the cache. This allows us to tolorate a lot
+        # of slow down on cache writing.
+        def _ =
+            job_cache_add jobCacheAddJson
+
+        Pass (RunnerOutput (map getPathName vis) outputs useage)
+
+  Runner "job-cache: {name}" score doit
+
+export def mkJobCacheRunnerOld ((Runner name score baseDoIt): Runner): Runner =
+  # def launch job dir stdin env cmd status runtime cputime membytes ibytes obytes = prim "job_launch"
+  def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
+  def badlaunch job error = prim "job_fail_launch"
+
+  def doit job runnerInput = match runnerInput
+    Fail e =
+      def _ = badlaunch job e
+      Fail e
+    Pass (RunnerInput label cmd vis env dir stdin _ _ _) =
+        def mkVisJson (Path path hash) =
+          JObject ("path" :-> JString path, "hash" :-> JString hash,)
+        def jobCacheVisible = JArray (map mkVisJson vis)
+        def jobCacheJsonIn = prettyJSON $ JObject (
+          "cwd" :-> JString dir,
+          "command_line" :-> JString cmd.implode,
+          "envrionment" :-> JString env.implode,
+          "stdin" :-> JString stdin,
+          "input_files" :-> jobCacheVisible,
+          "dir_redirects" :-> JObject ( "/workspace" :-> JString "./",), # TODO: What's the right redirect here?
+        )
+        def signature label cmd env dir stdin = prim "hash"
+        def hash = signature label cmd.implode env.implode dir stdin
+        # TODO: Make a function that turns labels into posix compaitable paths
+        require Pass jsonIn = write ".job-cache-build/{str hash}.job-cache.json.in" jobCacheJsonIn
+        # We don't bother passing a visible list since everything must be visiable
+        require Pass cacheResult =
+            makePlan "read cache" Nil "{wakePath}/job-cache .cache-dir/ read {jsonIn.getPathName}"
+            | editPlanPersistence (\_ ReRun)
+            | runJobWith localRunner
+            | getJobStdout
+        require Pass jobCacheJsonOut = parseJSONBody cacheResult
+
+        require Pass (JBoolean cacheHit) = jField jobCacheJsonOut "found"
+        else failWithError "job-cache returned unexpected json schema"
+
+        require False = cacheHit
+        else
+          require Pass match_info = jField jobCacheJsonOut "match"
+          require Pass status = jField match_info "status" | jInteger
+          require Pass runtime = jField match_info "runtime" | jDouble
+          require Pass cputime = jField match_info "cputime" | jDouble
+          require Pass mem = jField match_info "mem" | jInteger
+          require Pass ibytes = jField match_info "ibytes" | jInteger
+          require Pass obytes = jField match_info "obytes" | jInteger
+          require Pass inputs = jField match_info "input_files" | jArray jString
+          require Pass outputs = jField match_info "output_files" | jArray jString
+          require Pass stdout = jField match_info "stdout" | jString
+          require Pass stderr = jField match_info "stderr" | jString
+
+          def predict = Usage status runtime cputime mem ibytes obytes
+          def _ = virtual job stdout stderr status runtime cputime mem ibytes obytes
+          Pass (RunnerOutput inputs outputs predict) # TODO: This is wrong but we need better json output
+
+        # Now we need to run the job
+        require Pass (RunnerOutput inputs outputs useage) = baseDoIt job runnerInput
+        def Usage status runtime cputime mem ibytes obytes = useage
+        def inputsTree = listToTree scmpCanonical inputs
+
+        def mkOutputFileJson src =
+          JObject ("src" :-> JString src, "path" :-> JString "/workspace/{src}",)
+        def jobCacheOutputFiles = JArray (map mkOutputFileJson outputs)
+        def jobCacheReadFiles =
+          def readPaths = filter (tcontains _.getPathName inputsTree) vis
+          JArray (map mkVisJson readPaths)
+        require Pass stdout = getJobStdout job
+        require Pass stderr = getJobStderr job
+
+        def jobCacheAddJson = prettyJSON $ JObject (
+          "cwd" :-> JString dir,
+          "command_line" :-> JString cmd.implode,
+          "envrionment" :-> JString env.implode,
+          "stdin" :-> JString stdin,
+          "input_files" :-> jobCacheReadFiles,
+          "input_dirs" :-> JArray Nil, # TODO: This will need some fuse work to make good on
+          "output_files" :-> jobCacheOutputFiles,
+          "status" :-> JInteger status,
+          "runtime" :-> JDouble runtime,
+          "cputime" :-> JDouble cputime,
+          "mem" :-> JInteger mem,
+          "ibytes" :-> JInteger ibytes,
+          "obytes" :-> JInteger obytes,
+          "stdout" :-> JString stdout, # TODO: Figure out how to get the stdout
+          "stderr" :-> JString stderr, # TODO: Figure out how to get the stderr
+        )
+
+        # We put this in a def so that it does not block the return below.
+        # This ensures that the effect still occurs and blocks wake finishing but the job
+        # itself is not blocked by writing to the cache. This allows us to tolorate a lot
+        # of slow down on cache writing.
+        def _ =
+            require Pass jsonOut = write ".job-cache-build/{str hash}.job-cache.json.add" jobCacheAddJson
+            require Pass x =
+                makePlan "write cache" Nil "{wakePath}/job-cache .cache-dir/ add {jsonOut.getPathName}"
+                | editPlanPersistence (\_ ReRun)
+                | runJobWith localRunner
+                | getJobStdout
+            Pass x
+
+        Pass (RunnerOutput (map getPathName vis) outputs useage)
+
+  Runner "job-cache: {name}" score doit
+
 export def virtualRunner: Runner =
   def virtual job stdout stderr status runtime cputime membytes ibytes obytes = prim "job_virtual"
   def badlaunch job error = prim "job_fail_launch"
@@ -348,7 +578,7 @@ def treeOk file =
         file
     match h
         "BadHash" = failWithError "Could not hash {f}"
-        _         = Pass (Path f)
+        _         = Pass (Path f h)
 def guardPath job = match _
     Fail e =
         Fail e
@@ -360,8 +590,6 @@ def mapPath = match _
     Fail e = Fail e
     Pass l = findFailFn treeOk l
 
-export def killJob (job: Job) (signal: Integer): Unit =
-  (\j\s prim "job_kill") job signal # send signal to job
 export def getJobStdout  (job: Job): Result String Error = stdio job 1
 export def getJobStderr  (job: Job): Result String Error = stdio job 2
 export def getJobInputs (job: Job): Result (List Path) Error =
@@ -431,7 +659,10 @@ export def xOK: Integer = 2
 export def access (file: String) (mode: Integer): Boolean =
   (\f\m prim "access") file mode
 
-export def defaultRunner: Runner = fuseRunner
+export def defaultRunner: Runner =
+    require Some _ = getenv "WAKE_JOB_CACHE"
+    else fuseRunner
+    mkJobCacheRunner fuseRunner
 
 # A plan describing how to construct a JSONRunner
 # RawScript: the path to the script to run jobs with
@@ -518,7 +749,7 @@ export def makeJSONRunner (plan: JSONRunnerPlan): Runner =
           Some "1" = Unit
           _        = fn f
       def outFile = replace `\.in\.json$` ".out.json" inFile
-      def json = parseJSONFile (Path outFile)
+      def json = parseJSONFile (Path outFile "badhash") # TODO: Fix this?
       def _ = unlink inFile
       match json
         Fail f = Fail f
@@ -558,3 +789,4 @@ export def job (cmd: List String) (visible: List Path): Job =
 export def shellJob (script: String) (visible: List Path): Job =
   makeShellPlan script visible
   | runJob
+

@@ -15,7 +15,8 @@
  * limitations under the License.
  */
 
-#include <cstddef>
+#pragma once
+
 #include <cstdint>
 #include <vector>
 

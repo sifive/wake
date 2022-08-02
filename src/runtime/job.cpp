@@ -62,6 +62,13 @@
 #include "util/shell.h"
 #include "value.h"
 
+static job_cache::Cache *internal_job_cache = nullptr;
+
+void set_job_cache(job_cache::Cache *cache) {
+  if (internal_job_cache) return;
+  internal_job_cache = cache;
+}
+
 // How many times to SIGTERM a process before SIGKILL
 #define TERM_ATTEMPTS 6
 // How long between first and second SIGTERM attempt (exponentially increasing)
@@ -1362,6 +1369,7 @@ static PRIMFN(prim_job_output) {
   }
 }
 
+/*
 static PRIMTYPE(type_job_kill) {
   return args.size() == 2 && args[0]->unify(Data::typeJob) && args[1]->unify(Data::typeInteger) &&
          out->unify(Data::typeUnit);
@@ -1380,7 +1388,7 @@ static PRIMFN(prim_job_kill) {
   }
 
   RETURN(claim_unit(runtime.heap));
-}
+}*/
 
 static PRIMTYPE(type_job_tree) {
   TypeVar list;
@@ -1654,30 +1662,215 @@ static PRIMFN(prim_access) {
   RETURN(claim_bool(runtime.heap, access(file->c_str(), mode) == 0));
 }
 
+static PRIMTYPE(type_job_cache_read) {
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(Data::typeString);
+  result[1].unify(Data::typeString);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(result);
+}
+
+static PRIMFN(prim_job_cache_read) {
+  EXPECT(1);
+  STRING(request_str, 0);
+
+  // First, the user may have not turned on the job cache
+  if (!internal_job_cache) {
+    std::string s =
+        "A job cache has not been specified. Please use WAKE_JOB_CACHE=<path> to turn on job "
+        "caching";
+    size_t need = String::reserve(s.size()) + reserve_result();
+    runtime.heap.reserve(need);
+    RETURN(claim_result(runtime.heap, false, String::claim(runtime.heap, s)));
+  }
+
+  // Now since we receive the request in the form of a json (because we need
+  // rather complex information) we need to parse the json (because currently
+  // we have pre-made macro to take a JValue directly)
+  std::stringstream errs;
+  JAST jast;
+  if (!JAST::parse(request_str->c_str(), request_str->size(), errs, jast)) {
+    std::string s = errs.str();
+    size_t need = String::reserve(s.size()) + reserve_result();
+    runtime.heap.reserve(need);
+    RETURN(claim_result(runtime.heap, false, String::claim(runtime.heap, s)));
+  }
+
+  // Now we actully perform the request
+  // TODO: It's probably not great that wake hard-fails if this json isn't
+  // valid. I should fix that.
+  job_cache::FindJobRequest request(jast);
+  auto result = internal_job_cache->read(request);
+
+  // If nothing is found return a simple error message
+  if (!result) {
+    JAST out_json(JSON_OBJECT);
+    out_json.add("found", static_cast<bool>(false));
+    std::stringstream result_json_stream;
+    result_json_stream << out_json;
+    std::string s = result_json_stream.str();
+    size_t need = String::reserve(s.size()) + reserve_result();
+    runtime.heap.reserve(need);
+    RETURN(claim_result(runtime.heap, true, String::claim(runtime.heap, s)));
+  }
+
+  // If a job is found however we need to return some information about it
+  JAST jast_result = result->to_json();
+  JAST out_json(JSON_OBJECT);
+  out_json.add("found", static_cast<bool>(result));
+  out_json.add("match", result->to_json());
+
+  // Because I'm very lazy however we also return a string and not a JValue.
+  // This is because the `measure_jast` function is defined in json.cpp and I
+  // don't want to lift it or duplicate it right now.
+  // TODO: lift the measure_jast function
+  std::stringstream result_json_stream;
+  result_json_stream << out_json;
+  std::string result_json_str = result_json_stream.str();
+  size_t need = String::reserve(result_json_str.size()) + reserve_result();
+  runtime.heap.reserve(need);
+
+  RETURN(claim_result(runtime.heap, true, String::claim(runtime.heap, result_json_str)));
+}
+
+static PRIMTYPE(type_job_cache_add) {
+  TypeVar result;
+  Data::typeResult.clone(result);
+  result[0].unify(Data::typeString);
+  result[1].unify(Data::typeString);
+  return args.size() == 1 && args[0]->unify(Data::typeString) && out->unify(result);
+}
+
+static PRIMFN(prim_job_cache_add) {
+  EXPECT(1);
+  STRING(request_str, 0);
+
+  // First, the user may have not turned on the job cache
+  if (!internal_job_cache) {
+    std::string s =
+        "A job cache has not been specified. Please use WAKE_JOB_CACHE=<path> to turn on job "
+        "caching";
+    size_t need = String::reserve(s.size()) + reserve_result();
+    runtime.heap.reserve(need);
+    RETURN(claim_result(runtime.heap, false, String::claim(runtime.heap, s)));
+  }
+
+  // Now since we receive the request in the form of a json (because we need
+  // rather complex information) we need to parse the json (because currently
+  // we have pre-made macro to take a JValue directly)
+  std::stringstream errs;
+  JAST jast;
+  if (!JAST::parse(request_str->c_str(), request_str->size(), errs, jast)) {
+    std::string s = errs.str();
+    size_t need = String::reserve(s.size()) + reserve_result();
+    runtime.heap.reserve(need);
+    RETURN(claim_result(runtime.heap, false, String::claim(runtime.heap, s)));
+  }
+
+  // TODO: This just fails if an issue occurs. Would be nice to fail
+  //       with a bit more information. Right now we just use a simple
+  //       string.
+  job_cache::AddJobRequest request(jast);
+  internal_job_cache->add(request);
+  std::string result_json_str = "successfully added job";
+  size_t need = String::reserve(result_json_str.size()) + reserve_result();
+  runtime.heap.reserve(need);
+  RETURN(claim_result(runtime.heap, true, String::claim(runtime.heap, result_json_str)));
+}
+
 void prim_register_job(JobTable *jobtable, PrimMap &pmap) {
-  // These require a Job argument so won't get const-prop evaluated (they don't return)
+  /*****************************************************************************************
+   * These require a Job argument so won't get const-prop evaluated (they don't return)    *
+   *****************************************************************************************/
+
+  // Get's the stdout/stderr of a job
   prim_register(pmap, "job_output", prim_job_output, type_job_output, PRIM_PURE);
+
+  // Get's the set of file paths of a job: 0=visible, 1=input, 2=output
   prim_register(pmap, "job_tree", prim_job_tree, type_job_tree, PRIM_PURE);
+
+  // The id of the job
   prim_register(pmap, "job_id", prim_job_id, type_job_id, PRIM_PURE);
+
+  // The description of the job
   prim_register(pmap, "job_desc", prim_job_desc, type_job_desc, PRIM_PURE);
+
+  // The usage of a job as observed by getrusage() as a result of job_launch.
+  // Alternativelly if job_virtual is used instead this is what's reported to
+  // job_virtual.
   prim_register(pmap, "job_reality", prim_job_reality, type_job_reality, PRIM_PURE);
+
+  // The useage reported to job_finish. This is useful because a remote machine or a job
+  // that uses caching might appear from observation (e.g. job_reality) to consume far
+  // fewer resources than what we actully care about.
   prim_register(pmap, "job_report", prim_job_report, type_job_report, PRIM_PURE);
+
+  // Previous useage (returns Option Usage if no prior use exists) if previouslly in the database
   prim_register(pmap, "job_record", prim_job_record, type_job_record, PRIM_PURE);
-  // These should not be eliminated (they have effects)
+
+  /*****************************************************************************************
+   * These should not be eliminated (they have effects)                                    *
+   *****************************************************************************************/
+
+  // Checks if a job is cached already or not. If it is cached, it returns a job that you
+  // can already call all the queries on and they'll return immeditly.
   prim_register(pmap, "job_cache", prim_job_cache, type_job_cache, PRIM_IMPURE, jobtable);
+
+  // Creates a job object
   prim_register(pmap, "job_create", prim_job_create, type_job_create, PRIM_IMPURE, jobtable);
+
+  // Launches a job, note that this can have any specified command/env etc.. seperate from
+  // what was passed to job_create. This actully causes a child process to kick off.
   prim_register(pmap, "job_launch", prim_job_launch, type_job_launch, PRIM_IMPURE, jobtable);
+
+  // This is like job_launch but instead you supply what job_launch would return to "complete"
+  // the created job.
   prim_register(pmap, "job_virtual", prim_job_virtual, type_job_virtual, PRIM_IMPURE, jobtable);
+
+  // This is where you "finish" a job by explaining what its inputs, outputs, useage etc...
+  // are. This call unblocks things like `job_output` for instance.
   prim_register(pmap, "job_finish", prim_job_finish, type_job_finish, PRIM_IMPURE);
+
+  // Job's have a secret key-value store on them that maps strings to strings. This lets
+  // you annotate jobs with some extra info which can be helpful for sort of structure
+  // logging like practices.
   prim_register(pmap, "job_tag", prim_job_tag, type_job_tag, PRIM_IMPURE);
+
+  // Explain to the wake runtime that the job has failed to launch. This can happen if
+  // a pre-step of a runner fails in someway for instance.
   prim_register(pmap, "job_fail_launch", prim_job_fail_launch, type_job_fail, PRIM_IMPURE);
+
+  // Explain to the wake runtime that the job failed to finihs. This can happen if a
+  // post-step of a runner fails in someway for instance.
   prim_register(pmap, "job_fail_finish", prim_job_fail_finish, type_job_fail, PRIM_IMPURE);
-  prim_register(pmap, "job_kill", prim_job_kill, type_job_kill, PRIM_IMPURE);
+
+  // Specifies the hash of a given file. In practice wake kicks off a job against `shim-wake`
+  // to do the hashing.
   prim_register(pmap, "add_hash", prim_add_hash, type_add_hash, PRIM_IMPURE, jobtable);
-  // Dead-code elimination ok, but not CSE/const-prop ok (must be ordered wrt. filesystem)
+
+  // Adds a job to the job cache
+  prim_register(pmap, "job_cache_add", prim_job_cache_add, type_job_cache_add, PRIM_IMPURE);
+
+  // Adds a job to the job cache
+  prim_register(pmap, "job_cache_read", prim_job_cache_read, type_job_cache_read, PRIM_IMPURE);
+
+  /*****************************************************************************************
+   * Dead-code elimination ok, but not CSE/const-prop ok (must be ordered wrt. filesystem) *
+   *****************************************************************************************/
+
+  // Get's the hash of a file if it was previouslly hashed in the database by a cached
+  // job this session. Returns the empty string otherwise.
   prim_register(pmap, "get_hash", prim_get_hash, type_get_hash, PRIM_ORDERED, jobtable);
+
+  // Get's the modtime of a file, super simple
   prim_register(pmap, "get_modtime", prim_get_modtime, type_get_modtime, PRIM_ORDERED);
+
+  // Given a $PATH variable like path input, searches the filesystem for a matching
+  // executable.
   prim_register(pmap, "search_path", prim_search_path, type_search_path, PRIM_ORDERED);
+
+  // Returns true if a file has a given permission. For instance if you ask this function
+  // if a file can be executed it will return true/false if wake can execute that file.
   prim_register(pmap, "access", prim_access, type_access, PRIM_ORDERED);
 }
 
