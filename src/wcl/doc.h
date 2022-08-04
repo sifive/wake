@@ -75,16 +75,13 @@ struct doc_state {
 
     state.byte_count = str.size();
 
-    utf8proc_int32_t codepoint;
-    utf8proc_ssize_t pos = 0;
-    while (true) {
-      pos += utf8proc_iterate(reinterpret_cast<const unsigned char*>(str.c_str()) + pos, -1,
-                              &codepoint);
+    const utf8proc_uint8_t* iter = reinterpret_cast<const unsigned char*>(str.c_str());
+    const utf8proc_uint8_t* iter_end = iter + str.size();
+    while (iter < iter_end) {
+      utf8proc_int32_t codepoint;
+      iter += utf8proc_iterate(iter, -1, &codepoint);
 
-      assert(codepoint >= 0);  // < 0 means error parsing utf8
-      assert(pos >= 0);        // < 0 means pos was overflown
-
-      if (codepoint == 0) break;
+      assert(codepoint > 0);  // < 0 means error parsing utf8
 
       int charwidth = utf8proc_charwidth(codepoint);
 
