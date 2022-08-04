@@ -38,7 +38,7 @@ TEST(doc_basic) {
   wcl::doc d = std::move(builder).build();
   std::string expected = "Hello World! My name is Ashley";
 
-  EXPECT_EQUAL(expected.size(), d.character_count());
+  EXPECT_EQUAL(expected.size(), d.byte_count());
   EXPECT_EQUAL(expected, d.as_string());
 }
 
@@ -66,7 +66,7 @@ TEST(doc_large) {
   }
 
   wcl::doc d = std::move(builder).build();
-  ASSERT_EQUAL(3000000u, d.character_count());
+  ASSERT_EQUAL(3000000u, d.byte_count());
 }
 
 TEST(doc_undo) {
@@ -82,8 +82,49 @@ TEST(doc_undo) {
   wcl::doc d = std::move(builder).build();
   std::string expected = "Hello ";
 
-  EXPECT_EQUAL(expected.size(), d.character_count());
+  EXPECT_EQUAL(expected.size(), d.byte_count());
   EXPECT_EQUAL(expected, d.as_string());
+}
+
+TEST(doc_unicode) {
+  {
+    wcl::doc_builder builder;
+    builder.append("····");
+
+    EXPECT_EQUAL(8u, builder.byte_count());
+    EXPECT_EQUAL(4u, builder.first_width());
+    EXPECT_EQUAL(4u, builder.last_width());
+    EXPECT_EQUAL(4u, builder.max_width());
+    EXPECT_EQUAL(0u, builder.newline_count());
+    EXPECT_EQUAL(1u, builder.height());
+
+    builder.append("⏎");
+
+    EXPECT_EQUAL(11u, builder.byte_count());
+    EXPECT_EQUAL(6u, builder.first_width());
+    EXPECT_EQUAL(6u, builder.last_width());
+    EXPECT_EQUAL(6u, builder.max_width());
+    EXPECT_EQUAL(0u, builder.newline_count());
+    EXPECT_EQUAL(1u, builder.height());
+
+    builder.append("\n·");
+
+    EXPECT_EQUAL(14u, builder.byte_count());
+    EXPECT_EQUAL(6u, builder.first_width());
+    EXPECT_EQUAL(1u, builder.last_width());
+    EXPECT_EQUAL(6u, builder.max_width());
+    EXPECT_EQUAL(1u, builder.newline_count());
+    EXPECT_EQUAL(2u, builder.height());
+
+    wcl::doc d = std::move(builder).build();
+
+    EXPECT_EQUAL(14u, d.byte_count());
+    EXPECT_EQUAL(6u, d.first_width());
+    EXPECT_EQUAL(1u, d.last_width());
+    EXPECT_EQUAL(6u, d.max_width());
+    EXPECT_EQUAL(1u, d.newline_count());
+    EXPECT_EQUAL(2u, d.height());
+  }
 }
 
 TEST(doc_geometry) {

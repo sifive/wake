@@ -22,22 +22,33 @@
 #include <sstream>
 #include <vector>
 
+#include "utf8proc/utf8proc.h"
+
 namespace wcl {
 
 // Internal state for a doc object. It is intentionally not exposed in the
 // public API and should not be used directly.
 struct doc_state {
-  size_t character_count = 0;
+  // Total number of bytes in the doc
+  size_t byte_count = 0;
+
+  // Total number of newlines in the doc
   size_t newline_count = 0;
+
+  // Human visible "width" of the first line of the doc
   size_t first_width = 0;
+
+  // Human visible "width" of the last line of the doc
   size_t last_width = 0;
+
+  // Max human visible "width" of the doc
   size_t max_width = 0;
 
   // Returns the merged state of this and other.
   doc_state merged(doc_state other) {
     doc_state merged;
 
-    merged.character_count = character_count + other.character_count;
+    merged.byte_count = byte_count + other.byte_count;
     merged.newline_count = newline_count + other.newline_count;
 
     merged.last_width = other.last_width;
@@ -62,10 +73,22 @@ struct doc_state {
   static doc_state from_string(const std::string& str) {
     doc_state state;
 
-    state.character_count = str.size();
+    state.byte_count = str.size();
 
-    for (auto& c : str) {
-      if (c == '\n') {
+    utf8proc_int32_t codepoint;
+    utf8proc_ssize_t pos = 0;
+    while (true) {
+      pos += utf8proc_iterate(reinterpret_cast<const unsigned char*>(str.c_str()) + pos, -1,
+                              &codepoint);
+
+      assert(codepoint >= 0);  // < 0 means error parsing utf8
+      assert(pos >= 0);        // < 0 means pos was overflown
+
+      if (codepoint == 0) break;
+
+      int charwidth = utf8proc_charwidth(codepoint);
+
+      if (codepoint == '\n') {
         // once we see a newline, check if the line was larger than any seen before
         state.max_width = std::max(state.max_width, state.last_width);
 
@@ -75,10 +98,10 @@ struct doc_state {
       }
 
       if (state.newline_count == 0) {
-        state.first_width++;
+        state.first_width += charwidth;
       }
 
-      state.last_width++;
+      state.last_width += charwidth;
     }
 
     // Account for the case when the last line is the longest w/o a nl.
@@ -100,7 +123,7 @@ class doc_impl_base {
   // methods that all RopeImpl share
   virtual void write(std::ostream&) const = 0;
 
-  size_t character_count() const { return state_.character_count; }
+  size_t byte_count() const { return state_.byte_count; }
   size_t newline_count() const { return state_.newline_count; }
   size_t first_width() const { return state_.first_width; }
   size_t last_width() const { return state_.last_width; }
@@ -151,7 +174,7 @@ class doc_builder;
 // doc d1 = doc::lit("first");
 // doc d2 = doc::lit("-second");
 // doc d3 = d1.concat(d2);
-// d3.character_count() -> 13
+// d3.byte_count() -> 12
 // d3.as_string() -> "first-second"
 // ```
 class doc {
@@ -191,7 +214,7 @@ class doc {
   size_t max_width() const { return impl->max_width(); }
 
   // O(1)
-  size_t character_count() const { return impl->character_count(); }
+  size_t byte_count() const { return impl->byte_count(); }
 
   // O(1)
   size_t newline_count() const { return impl->newline_count(); }
@@ -263,7 +286,7 @@ class doc_builder {
   size_t first_width() const { return state.first_width; }
   size_t last_width() const { return state.last_width; }
   size_t max_width() const { return state.max_width; }
-  size_t character_count() const { return state.character_count; }
+  size_t byte_count() const { return state.byte_count; }
   size_t newline_count() const { return state.newline_count; }
   size_t height() const { return state.newline_count + 1; }
   bool has_newline() const { return state.newline_count > 0; }
