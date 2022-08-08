@@ -23,7 +23,7 @@
 
 #include <cassert>
 #include <iostream>
-#include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 #include "formatter.h"
@@ -36,13 +36,23 @@ struct std::hash<std::pair<CSTElement, ctx_t>> {
   }
 };
 
+struct traits_t {
+  bool format_off = false;
+
+  traits_t turn_format_off() {
+    traits_t copy = *this;
+    copy.format_off = true;
+    return copy;
+  }
+};
+
 class Emitter {
  public:
   // Walks the CST, formats it, and returns the representative doc
   wcl::doc layout(CST cst);
 
  private:
-  std::unordered_set<CSTElement> no_format_nodes = {};
+  std::unordered_map<CSTElement, traits_t> traits = {};
 
   // Top level tree walk. Dispatches out the calls for various nodes
   wcl::doc walk(ctx_t ctx, CSTElement node);

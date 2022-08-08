@@ -37,17 +37,10 @@
 struct ctx_t {
   size_t width = 0;
   size_t nest_level = 0;
-  bool fmt_off = false;
 
   ctx_t nest() {
     ctx_t copy = *this;
     copy.nest_level++;
-    return copy;
-  }
-
-  ctx_t off() {
-    ctx_t copy = *this;
-    copy.fmt_off = true;
     return copy;
   }
 
@@ -62,17 +55,14 @@ struct ctx_t {
   }
 
   bool operator==(const ctx_t& other) const {
-    return width == other.width && nest_level == other.nest_level && fmt_off == other.fmt_off;
+    return width == other.width && nest_level == other.nest_level;
   }
 };
 
 template <>
 struct std::hash<ctx_t> {
   size_t operator()(ctx_t const& ctx) const noexcept {
-    size_t hash =
-        wcl::hash_combine(std::hash<size_t>{}(ctx.width), std::hash<size_t>{}(ctx.nest_level));
-    hash = wcl::hash_combine(hash, std::hash<bool>{}(ctx.fmt_off));
-    return hash;
+    return wcl::hash_combine(std::hash<size_t>{}(ctx.width), std::hash<size_t>{}(ctx.nest_level));
   }
 };
 

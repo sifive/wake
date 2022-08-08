@@ -46,6 +46,20 @@
     return v;                                      \
   }
 
+template <class Func>
+void cascade(CSTElement node, Func func) {
+  // mark self
+  func(node);
+
+  if (!node.isNode()) {
+    return;
+  }
+
+  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    cascade(child, func);
+  }
+}
+
 static bool requires_nl(cst_id_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
 
 static bool is_expression(cst_id_t type) {
@@ -268,7 +282,7 @@ void Emitter::mark_no_format_nodes(CSTElement node) {
     if (child.id() == TOKEN_COMMENT && child.fragment().segment().str() == FORMAT_OFF_COMMENT) {
       while (!child.empty() && !child.isNode()) child.nextSiblingElement();
       if (!child.empty()) {
-        no_format_nodes.insert(child);
+        cascade(child, [this](CSTElement e) { traits[e] = traits[e].turn_format_off(); });
       }
     }
   }
@@ -280,7 +294,7 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
 
   switch (node.id()) {
     case TOKEN_KW_MACRO_HERE: {
-      if (ctx.fmt_off) {
+      if (traits[node].format_off) {
         MEMO_RET(wcl::doc::lit("here"))
       }
       MEMO_RET(wcl::doc::lit("@here"))
@@ -374,7 +388,7 @@ wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_APP);
 
-  if (ctx.fmt_off) {
+  if (traits[node].format_off) {
     MEMO_RET(fmt()
                  .walk(is_expression, WALK(walk_node))
                  .copy_wsnl()
@@ -404,7 +418,7 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_BINARY);
 
-  if (ctx.fmt_off) {
+  if (traits[node].format_off) {
     MEMO_RET(fmt()
                  .walk(is_expression, WALK(walk_node))
                  .copy_wsnl()
@@ -444,7 +458,7 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_CASE);
 
-  if (ctx.fmt_off) {
+  if (traits[node].format_off) {
     MEMO_RET(fmt()
                  .walk(WALK(walk_node))
                  .copy_wsnl()
@@ -473,7 +487,7 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_DEF);
 
-  if (ctx.fmt_off) {
+  if (traits[node].format_off) {
     MEMO_RET(fmt()
                  .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK(walk_export)).ws())
                  .token(TOKEN_KW_DEF)
