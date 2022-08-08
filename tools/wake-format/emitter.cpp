@@ -67,8 +67,13 @@ auto Emitter::rhs_fmt() {
   auto nl_required_fmt = fmt().nest(fmt().walk(WALK(walk_node)));
   auto flat_fmt = fmt().space().walk(WALK(walk_node));
   auto full_fmt = fmt().nest(fmt().newline().walk(WALK(walk_node)));
-  auto fits_fmt = fmt().fmt_if_fits(flat_fmt, full_fmt);
-  return fmt().fmt_if_else(requires_nl, nl_required_fmt, fits_fmt);
+
+  // clang-format off
+  return fmt().match(match()
+      .pred(requires_nl, nl_required_fmt)
+      .fits(flat_fmt)
+      .otherwise(full_fmt));
+  // clang-format on
 }
 
 wcl::doc Emitter::layout(CST cst) {
@@ -79,18 +84,11 @@ wcl::doc Emitter::layout(CST cst) {
 wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
 
-  // clang-format off
-  auto extra_fmt = fmt()
-      .fmt_if(TOKEN_WS, fmt().next())
-      .fmt_if(TOKEN_NL, fmt().next().newline())
-      .fmt_if(TOKEN_COMMENT, fmt().walk(WALK(walk_token)));
-
-  auto body_fmt = fmt()
-      .fmt_if_else(
-        {TOKEN_WS, TOKEN_NL, TOKEN_COMMENT},
-        extra_fmt,
-        fmt().walk(WALK(walk_node)).newline());
-  // clang-format on
+  auto body_fmt = fmt().match(match()
+                                  .pred(TOKEN_WS, fmt().next())
+                                  .pred(TOKEN_NL, fmt().next().newline())
+                                  .pred(TOKEN_COMMENT, fmt().walk(WALK(walk_token)))
+                                  .otherwise(fmt().walk(WALK(walk_node)).newline()));
 
   MEMO_RET(fmt().walk_children(body_fmt).format(ctx, node));
 }
@@ -373,17 +371,10 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_BLOCK);
 
-  // clang-format off
-  auto extra_fmt = fmt()
-      .fmt_if(TOKEN_WS, fmt().next())
-      .fmt_if(TOKEN_NL, fmt().next());
-
-  auto body_fmt = fmt()
-      .fmt_if_else(
-        {TOKEN_WS, TOKEN_NL},
-        extra_fmt,
-        fmt().newline().walk(WALK(walk_node)));
-  // clang-format on
+  auto body_fmt = fmt().match(match()
+                                  .pred(TOKEN_WS, fmt().next())
+                                  .pred(TOKEN_NL, fmt().next())
+                                  .otherwise(fmt().newline().walk(WALK(walk_node))));
 
   MEMO_RET(fmt().walk_children(body_fmt).consume_wsnl().format(ctx, node));
 }
