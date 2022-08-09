@@ -347,10 +347,6 @@ struct FmtPredicate<std::initializer_list<T>> {
   bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) { return set[node.id()]; }
 };
 
-struct EpsilonCase {
-  ALWAYS_INLINE bool run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) { return false; }
-};
-
 template <class Predicate, class FMT>
 struct PredicateCase {
   Predicate predicate;
@@ -558,6 +554,10 @@ struct Formatter {
 
 inline Formatter<EpsilonAction> fmt() { return {{}}; }
 
-inline MatchAction<EpsilonCase> match() { return {{}}; }
+template <class Predicate, class FMT>
+inline MatchAction<PredicateCase<FmtPredicate<Predicate>, FMT>> pred(Predicate predicate,
+                                                                     FMT formatter) {
+  return {{predicate, formatter}};
+}
 
 #undef ALWAYS_INLINE
