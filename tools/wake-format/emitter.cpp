@@ -51,7 +51,7 @@ static bool requires_nl(cst_id_t type) { return type == CST_BLOCK || type == CST
 
 static bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
-         type == CST_BINARY;
+         type == CST_BINARY || CST_PAREN;
 }
 
 auto Emitter::rhs_fmt() {
@@ -474,6 +474,7 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_DEF);
 
   MEMO_RET(fmt()
+               .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_DEF)
                .ws()
@@ -619,7 +620,13 @@ wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(walk_placeholder(ctx, node));
+  assert(node.id() == CST_PAREN);
+
+  MEMO_RET(fmt()
+               .token(TOKEN_P_POPEN)
+               .walk(is_expression, WALK(walk_node))
+               .token(TOKEN_P_PCLOSE)
+               .format(ctx, node.firstChildElement()));
 }
 
 wcl::doc Emitter::walk_prim(ctx_t ctx, CSTElement node) {
@@ -686,7 +693,19 @@ wcl::doc Emitter::walk_top(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_topic(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(walk_placeholder(ctx, node));
+  assert(node.id() == CST_TOPIC);
+
+  MEMO_RET(fmt()
+               .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK(walk_flag_global)).ws())
+               .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK(walk_flag_export)).ws())
+               .token(TOKEN_KW_TOPIC)
+               .ws()
+               .walk({CST_ID}, WALK(walk_node))
+               .token(TOKEN_P_ASCRIBE)
+               .ws()
+               .walk({CST_APP, CST_ID, CST_BINARY}, WALK(walk_node))
+               .consume_wsnl()
+               .format(ctx, node.firstChildElement()));
 }
 
 wcl::doc Emitter::walk_tuple(ctx_t ctx, CSTElement node) {

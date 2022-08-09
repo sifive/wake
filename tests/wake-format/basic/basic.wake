@@ -8,6 +8,8 @@ def name Unit =
   def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   another
 
+global export def glob1 = 34
+
 # wake-format off
 def name Unit =
   def other = here
@@ -98,3 +100,11 @@ from wake import myMap=map foldl myFoldr=foldr
 from wake import def unary + -
 from wake import type Pair Result
 from wake import source,Nil
+
+export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
+export topic compileC: Pair String ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Result (List Path) Error)
+topic linkO: Pair String ((extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error)
+export topic path: String
+export topic wakeUnitTestBinary: (variant: Pair String String) => Result (List Path) Error
+global export topic glob1: String
+global topic glob1: String
