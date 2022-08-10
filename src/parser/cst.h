@@ -69,7 +69,7 @@
 #define CST_UNARY 164
 #define CST_ERROR 255
 
-typedef uint8_t cst_id_t;
+using cst_id_t = uint8_t;
 
 class FileContent;
 class CSTElement;
