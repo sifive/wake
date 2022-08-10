@@ -2,7 +2,7 @@
 
 `wake-format` is a tool for automatically applying the wake style guide to wake source files. It is intentionally opinionated to create a singular correct formatting standard.
 
-# Usage
+## Usage
 
 The standard usage of `wake-format` is to format a set of wake files in place.
 
@@ -60,7 +60,7 @@ std::string s = doc.as_string(); // " \n"
 
 Manipulation of the current state of the formatter relating to CSTElement nodes.
 
-**`token(uint8_t id)`**
+**`token(cst_id_t id)`**
 
 `assert()`s the current node.id() is `id` then emits the string representation of the node.
 
@@ -73,7 +73,7 @@ auto doc = fmt()
 doc.as_string(); // "def "
 ```
 
-**`token(uint8_t id, const char* str)`**
+**`token(cst_id_t id, const char* str)`**
 
 `assert()`s the current node.id() is `id` then emits `str`.
 
@@ -339,7 +339,7 @@ doc.as_string(); // "some string"
 
 There are four forms of allowed predicates with varying levels of power and terseness. The more terse, the less power and vice versa. They are listed below in order of increasing power.
 
-**Single `uint8_t` Token Id**
+**Single `cst_id_t` Token Id**
 
 Accepts one id and returns true if the current node matches the it.
 
@@ -348,7 +348,7 @@ auto f = fmt()
   .fmt_if(TOKEN_COMMENT, fmt());
 ```
 
-**`uint8_t` Token Id List**
+**`cst_id_t` Token Id List**
 
 Accepts an initialzer list of ids and returns true if the current node matches any of the ids
 
@@ -357,18 +357,18 @@ auto f = fmt()
   .fmt_if({TOKEN_ID, TOKEN_COMMENT}, fmt());
 ```
 
-**`uint8_t` Token Id Parameter Function**
+**`cst_id_t` Token Id Parameter Function**
 
-Accepts a function with signature `(uint8_t) -> bool`
+Accepts a function with signature `(cst_id_t) -> bool`
 
 ```c++
-bool is_id(uint8_t type) {
+bool is_id(cst_id_t type) {
   return type == CST_ID;
 }
 
 auto f = fmt()
   .fmt_if(is_id, fmt())
-  .fmt_if([](uint8_t type) {
+  .fmt_if([](cst_id_t type) {
     return type == CST_APP;
   }, fmt());
 ```
