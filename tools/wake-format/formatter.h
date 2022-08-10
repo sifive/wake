@@ -352,6 +352,82 @@ struct FmtPredicate<std::initializer_list<T>> {
   bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) { return set[node.id()]; }
 };
 
+template <class Predicate, class FMT>
+struct PredicateCase {
+  Predicate predicate;
+  FMT formatter;
+
+  PredicateCase(Predicate predicate, FMT formatter) : predicate(predicate), formatter(formatter) {}
+
+  ALWAYS_INLINE bool run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    if (!predicate(builder, ctx, node)) {
+      return false;
+    }
+    builder.append(formatter.compose(ctx.sub(builder), node));
+    return true;
+  }
+};
+
+template <class FMT>
+struct OtherwiseCase {
+  FMT formatter;
+
+  OtherwiseCase(FMT formatter) : formatter(formatter) {}
+
+  ALWAYS_INLINE bool run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    builder.append(formatter.compose(ctx.sub(builder), node));
+    return true;
+  }
+};
+
+template <class Case1, class Case2>
+struct MatchSeq {
+  Case1 case1;
+  Case2 case2;
+  MatchSeq(Case1 c1, Case2 c2) : case1(c1), case2(c2) {}
+
+  ALWAYS_INLINE bool run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    if (case1.run(builder, ctx, node)) {
+      return true;
+    }
+    return case2.run(builder, ctx, node);
+  }
+};
+
+template <class Case>
+struct MatchAction {
+  Case c;
+
+  MatchAction(Case c) : c(c) {}
+
+  // Predicate case that is accepted if FMT passes the FitsPredicate
+  template <class FMT>
+  MatchAction<MatchSeq<Case, PredicateCase<FitsPredicate<FMT>, FMT>>> pred_fits(FMT formatter) {
+    return {{c, {FitsPredicate<FMT>(formatter), formatter}}};
+  }
+
+  template <class FMT>
+  MatchAction<MatchSeq<Case, PredicateCase<FmtPredicate<std::initializer_list<uint8_t>>, FMT>>>
+  pred(std::initializer_list<uint8_t> ids, FMT formatter) {
+    return {{c, {ids, formatter}}};
+  }
+
+  template <class Predicate, class FMT>
+  MatchAction<MatchSeq<Case, PredicateCase<FmtPredicate<Predicate>, FMT>>> pred(Predicate predicate,
+                                                                                FMT formatter) {
+    return {{c, {predicate, formatter}}};
+  }
+
+  template <class FMT>
+  MatchAction<MatchSeq<Case, OtherwiseCase<FMT>>> otherwise(FMT formatter) {
+    return {{c, {formatter}}};
+  }
+
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    assert(c.run(builder, ctx, node));
+  }
+};
+
 template <class Action>
 struct Formatter {
   Action action;
@@ -425,6 +501,11 @@ struct Formatter {
     return {{action, {predicate, formatter}}};
   }
 
+  template <class Case>
+  Formatter<SeqAction<Action, MatchAction<Case>>> match(MatchAction<Case> match_action) {
+    return {{action, match_action}};
+  }
+
   template <class Walker>
   Formatter<SeqAction<Action, WalkPredicateAction<FmtPredicate<ConstPredicate>, Walker>>> walk(
       Walker texas_ranger) {
@@ -477,6 +558,12 @@ struct Formatter {
   }
 };
 
-inline Formatter<EpsilonAction> fmt() { return Formatter<EpsilonAction>({}); }
+inline Formatter<EpsilonAction> fmt() { return {{}}; }
+
+template <class Predicate, class FMT>
+inline MatchAction<PredicateCase<FmtPredicate<Predicate>, FMT>> pred(Predicate predicate,
+                                                                     FMT formatter) {
+  return {{predicate, formatter}};
+}
 
 #undef ALWAYS_INLINE
