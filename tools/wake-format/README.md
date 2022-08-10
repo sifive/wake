@@ -18,17 +18,17 @@ The information below should be helpful to contribute to `wake-format`
 
 ## Building
 
-`wake-format` is built in the same manner as `wake`. Running `make` or `./bin/wake build default` from within the wake dir will produce the `wake-format` binary.
+`wake-format` is built in the same manner as `wake`. Running `make` from within the wake dir will produce the `wake-format` binary. `./bin/wake build default` may also be used after running `make` the first time.
 
-The locally build `wake-format` can be found at `./bin/wake-format.native-cpp14-release`
+The locally build `wake-format` can be found at `./bin/wake-format.native-cpp14-release` or at `$DIR/bin/wake-format` after running `DEST_DIR="$DIR" make install`
 
 ## wake-format Fluent API/DSL
 
-`wake-format` relies heavily on a custom fluent API/DSL to generate the formatting rules. Usage of the API is documented below. See [here](TODO) for design decisions, invariants, and engineering tradeoffs considered.
+`wake-format` relies heavily on a custom fluent API/DSL to generate the formatting rules. Usage of the API is documented below. See [here](#design-invariants-and-tradeoffs) for design decisions, invariants, and engineering tradeoffs considered.
 
 ### Usage
 
-All formatting rules start by creating a basic formatting object using `fmt()`. From there functions are added to describe the expectations of the current [CST node](TODO) and to return the appropiate text.
+All formatting rules start by creating a basic formatting object using `fmt()`. From there functions are added to describe the expectations of the current [CST node](#cstelement) and to return the appropiate text.
 
 ```c++
 auto basic_fmt = fmt()
@@ -38,7 +38,7 @@ auto basic_fmt = fmt()
 
 creates a formatter that returns a space and a newline.
 
-Once a formatter has been defined, the `format()` function is used to run the formatter and return the formated source. The source is returned as a [wcl::doc](TODO) for efficient concatenation and geometry lookup. `format()` takes a `ctx_t` and a `CSTElement`. The `ctx_t` (context) tracks the context (such as nest level) that all subnodes should be formatted in, and the `CSTElement` is the current node being formatted.
+Once a formatter has been defined, the `format()` function is used to run the formatter and return the formated source. The source is returned as a [wcl::doc](#document-wcldoc) for efficient concatenation and geometry lookup. `format()` takes a `ctx_t` and a `CSTElement`. The `ctx_t` (context) tracks the context (such as nest level) that all subnodes should be formatted in, and the `CSTElement` is the current node being formatted.
 
 ```c++
 ctx_t ctx;
@@ -57,12 +57,13 @@ std::string s = doc.as_string(); // " \n"
 ### API Functions & Examples
 
 **CSTElement Manipulation**
+---
 
 Manipulation of the current state of the formatter relating to CSTElement nodes.
 
-**`token(cst_id_t id)`**
+#### **`token(cst_id_t id)`**
 
-`assert()`s the current node.id() is `id` then emits the string representation of the node.
+Asserts the current node.id() is `id` then emits the string representation of the node.
 
 ```c++
 CSTElement node = "def";
@@ -73,9 +74,9 @@ auto doc = fmt()
 doc.as_string(); // "def "
 ```
 
-**`token(cst_id_t id, const char* str)`**
+#### **`token(cst_id_t id, const char* str)`**
 
-`assert()`s the current node.id() is `id` then emits `str`.
+Asserts the current node.id() is `id` then emits `str`.
 
 ```c++
 CSTElement node = "def";
@@ -86,7 +87,7 @@ auto doc = fmt()
 doc.as_string(); // "foo "
 ```
 
-**`next()`**
+#### **`next()`**
 
 Moves the current node forward by one element.
 
@@ -102,10 +103,11 @@ auto doc = fmt() // -> def
 ```
 
 **Control Flow**
+---
 
 Conditional formatting based on the state at a given point in the formatter.
 
-**`fmt_if(Predicate, Formatter)`**
+#### **`fmt_if(Predicate, Formatter)`**
 
 Applies `Formatter` if `Predicate` returns `true`. See [Predicate](#predicate) for more Predicate examples.
 
@@ -118,7 +120,7 @@ auto doc = fmt()
 doc.as_string(); // "foo"
 ```
 
-**`fmt_if_else(Predicate, Formatter if_fmt, Formatter else_fmt)`**
+#### **`fmt_if_else(Predicate, Formatter if_fmt, Formatter else_fmt)`**
 
 Applies `if_fmt` if `Predicate` returns `true`, `else_fmt` otherwise. See [Predicate](#predicate) for more Predicate examples.
 
@@ -133,7 +135,7 @@ auto doc = fmt()
 doc.as_string(); // "bar"
 ```
 
-**`fmt_while(Predicate, Formatter)`**
+#### **`fmt_while(Predicate, Formatter)`**
 
 Applies `Formatter` as long as `Predicate` returns `true`
 
@@ -147,7 +149,7 @@ auto doc = fmt()
 doc.as_string(); // "bar bar bar"
 ```
 
-**match(MatchAction)**
+#### **`match(MatchAction)`**
 
 Applies `MatchAction` as a step in the formatting. Combines with `pred()` to create a match statement. Only the first `true` item in a match statement is evaluated. An assertion is raised if no items in a match are applied.
 
@@ -167,7 +169,7 @@ auto doc = fmt()
 doc.as_string(); // "foo"
 ```
 
-**`fmt_if_fits(Formatter if, Formatter else)`**
+#### **`fmt_if_fits(Formatter if, Formatter else)`**
 
 `fmt_if_else` where `Predicate = FitsPredicate`. See [Fits](#fits) for details.
 
@@ -182,13 +184,14 @@ doc.as_string(); // "bar"
 ```
 
 **Walkers**
+---
 
 Dispatch formatting to something else.
 
 `Walker`s must have the type signature `(ctx_t ctx, CSTElement node) -> wcl::doc` The typical use case is to recursivly call into some other function that _walks_ a specific type of `CSTElement`.
 
 
-**`walk(Walker)`**
+#### **`walk(Walker)`**
 
 Unconditionally applies the `Walker`
 
@@ -202,7 +205,7 @@ auto doc = fmt()
 doc.as_string(); // whatever walk_def() returns
 ```
 
-**`walk(Predicate, Walker)`**
+#### **`walk(Predicate, Walker)`**
 
 Applies `Walker` if `Predicate` returns `true`. See [Predicate](#predicate) for more Predicate examples.
 
@@ -216,7 +219,7 @@ auto doc = fmt()
 doc.as_string(); // whatever walk_def() returns
 ```
 
-**`walk_children(Formatter)`**
+#### **`walk_children(Formatter)`**
 
 Applies `Formatter` to every child of the current node
 
@@ -232,10 +235,11 @@ doc.as_string(); // ""
 ```
 
 **Whitespace**
+---
 
 Manipulating and interacting with whitespace.
 
-**`consume_wsnl()`**
+#### **`consume_wsnl()`**
 
 Moves the current node past all consecutive whitespace and newlines.
 
@@ -250,9 +254,9 @@ auto doc = fmt()  // -> def
   .next();        // -> 5
 ```
 
-**`ws()`**
+#### **`ws()`**
 
-`assert()`s the current node is a TOKEN_WS, consumes it, then emits a _single_ space. TOKEN_WS may represent several consecutive spaces.
+Asserts the current node is a TOKEN_WS, consumes it, then emits a _single_ space. TOKEN_WS may represent several consecutive spaces.
 
 ```c++
 CSTElement node = "     \n";
@@ -265,9 +269,9 @@ auto doc = fmt()
 doc.as_string(); // " \n    "
 ```
 
-**`nl()`**
+#### **`nl()`**
 
-`assert()`s the current node is a TOKEN_NL, consumes it, then emits a `\n` and `ctx.nest_level * space_per_indent` spaces
+Asserts the current node is a TOKEN_NL, consumes it, then emits a `\n` and `ctx.nest_level * space_per_indent` spaces
 
 ```c++
 CSTElement node = "     \n";
@@ -279,7 +283,7 @@ auto doc = fmt()
 doc.as_string(); // " \n    "
 ```
 
-**`space(uint8_t count = 1)`**
+#### **`space(uint8_t count = 1)`**
 
 Emits `count` spaces. `count` defaults to `1`
 
@@ -292,7 +296,7 @@ auto doc = fmt()
 doc.as_string(); // "      "
 ```
 
-**`newline()`**
+#### **`newline()`**
 
 Emits a `\n` and `ctx.nest_level * space_per_indent` spaces
 
@@ -305,7 +309,7 @@ auto doc = fmt()
 doc.as_string(); // "\n    "
 ```
 
-**`nest(Formatter)`**
+#### **`nest(Formatter)`**
 
 Increases `ctx.nest_level` by `1` for `Formatter`
 
@@ -321,8 +325,9 @@ doc.as_string(); // "\n    \n"
 ```
 
 **Misc**
+---
 
-**`join(Formatter)`**
+#### **`join(Formatter)`**
 
 Joins two formatters into one.
 
@@ -337,7 +342,7 @@ auto doc = fmt()
 doc.as_string(); // "    "
 ```
 
-**`escape(Function)`**
+#### **`escape(Function)`**
 
 Escape out of the formatter API and manually manage the interal formatting state. `node` must be manually advanced. _Use with caution_
 
@@ -368,7 +373,7 @@ auto f = fmt()
   .fmt_if(TOKEN_COMMENT, fmt());
 ```
 
-**`cst_id_t` Token Id List**
+#### **`cst_id_t` Token Id List**
 
 Accepts an initialzer list of ids and returns true if the current node matches any of the ids
 
@@ -377,7 +382,7 @@ auto f = fmt()
   .fmt_if({TOKEN_ID, TOKEN_COMMENT}, fmt());
 ```
 
-**`cst_id_t` Token Id Parameter Function**
+#### **`cst_id_t` Token Id Parameter Function**
 
 Accepts a function with signature `(cst_id_t) -> bool`
 
