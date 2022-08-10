@@ -56,9 +56,9 @@
     return v;                                    \
   }
 
-static bool requires_nl(uint8_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
+static bool requires_nl(cst_id_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
 
-static bool is_expression(uint8_t type) {
+static bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
          type == CST_BINARY;
 }
