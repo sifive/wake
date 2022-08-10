@@ -147,6 +147,26 @@ auto doc = fmt()
 doc.as_string(); // "bar bar bar"
 ```
 
+**match(MatchAction)**
+
+Applies `MatchAction` as a step in the formatting. Combines with `pred()` to create a match statement. Only the first `true` item in a match statement is evaluated. An assertion is raised if no items in a match are applied.
+
+- `pred(Predicate, FMT)` applies `FMT` if `Predicate() == true`. See [Predicate](#predicate) for more Predicate examples.
+- `pred_fits(FMT)`: `pred()` where `Predicate = FitsPredicate`. See [Fits](#fits) for details.
+- `otherwise(FMT)` unconditionally applies `FMT` used as the default/else case of a match.
+
+```c++
+CSTElement node = "def id = 5";
+auto doc = fmt()
+  .match(
+     pred(TOKEN_COMMENT, fmt().token(TOKEN_COMMENT, "bar"))
+    .pred(TOKEN_KW_DEF, fmt().token(TOKEN_KW_DEF, "foo"))
+    .fits(fmt().space())
+    .otherwise(fmt().newline()))
+  .format(ctx, node);
+doc.as_string(); // "foo"
+```
+
 **`fmt_if_fits(Formatter if, Formatter else)`**
 
 `fmt_if_else` where `Predicate = FitsPredicate`. See [Fits](#fits) for details.
