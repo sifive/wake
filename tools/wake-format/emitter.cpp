@@ -71,7 +71,7 @@ auto Emitter::rhs_fmt() {
   // clang-format off
   return fmt().match(
     pred(requires_nl, nl_required_fmt)
-   .fits(flat_fmt)
+   .pred_fits(flat_fmt)
    .otherwise(full_fmt));
   // clang-format on
 }

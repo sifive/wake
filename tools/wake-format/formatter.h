@@ -395,8 +395,9 @@ struct MatchAction {
 
   MatchAction(Case c) : c(c) {}
 
+  // Predicate case that is accepted if FMT passes the FitsPredicate
   template <class FMT>
-  MatchAction<MatchSeq<Case, PredicateCase<FitsPredicate<FMT>, FMT>>> fits(FMT formatter) {
+  MatchAction<MatchSeq<Case, PredicateCase<FitsPredicate<FMT>, FMT>>> pred_fits(FMT formatter) {
     return {{c, {FitsPredicate<FMT>(formatter), formatter}}};
   }
 
