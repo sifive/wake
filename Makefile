@@ -82,6 +82,9 @@ vscode:		wake.db
 static:	wake.db
 	$(WAKE_ENV) ./bin/wake static
 
+wake-format: wake.db
+	$(WAKE_ENV) ./bin/wake build wake-format default
+
 bin/wake:	$(WAKE_OBJS)
 	$(CXX) $(CFLAGS) $(CXX_VERSION) -o $@ $^ $(LDFLAGS) $(CORE_LDFLAGS)
 

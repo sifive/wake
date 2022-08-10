@@ -24,12 +24,36 @@ def toVariant = match _
     "wasm"    = Pass (Pair "wasm-cpp14-release"   "wasm-c11-release")
     s = Fail "Unknown build target ({s})".makeError
 
+def buildTarget variant targ =
+    require Pass variant = toVariant variant
+    require Pass paths = targ variant
+    Pass (cat (map getPathName paths))
+
+def buildAllTargets variant =
+    map (buildTarget variant) targets
+    | findFail
+
+# build various target + variant combox
+# Ex:
+#   wake build default
+#   wake build debug
+#   wake build wake-format default
+#   wake build job-cache debug
 export def build: List String => Result String Error = match _
     "tarball", Nil = tarball Unit | rmap (\_ "TARBALL")
     kind, Nil =
-        require Pass variant = toVariant kind
-        all variant | rmap (\_ "BUILD")
-    _ = Fail "no target specified (try: build default/debug/tarball)".makeError
+        buildAllTargets kind | rmap (\_ "BUILD")
+    targ, kind, Nil = match targ
+        "bsp-wake" = buildTarget kind buildBSP
+        "lsp-wake" = buildTarget kind buildLSP 
+        "fuse-waked" = buildTarget kind buildFuseDaemon
+        "job-cache" = buildTarget kind buildJobCache
+        "shim-wake" = buildTarget kind buildShim
+        "wake" = buildTarget kind buildWake
+        "wakebox" = buildTarget kind buildWakeBox
+        "wake-format" = buildTarget kind buildWakeFormat
+        _ = failWithError "no matching target for: {targ}"
+    _ = Fail "no variant specified (try: build default/debug/tarball)".makeError
 
 export def install: List String => Result String Error = match _
     dest, kind, Nil = doInstall (in cwd dest) kind | rmap (\_ "INSTALL")
