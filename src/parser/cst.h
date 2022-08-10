@@ -69,6 +69,8 @@
 #define CST_UNARY 164
 #define CST_ERROR 255
 
+typedef uint8_t cst_id_t;
+
 class FileContent;
 class CSTElement;
 class DiagnosticReporter;
@@ -81,26 +83,26 @@ struct CSTNode {
   // Byte range covered by this node
   uint32_t begin, end;
 
-  CSTNode(uint8_t id_, uint32_t size_, uint32_t begin_, uint32_t end_);
+  CSTNode(cst_id_t id_, uint32_t size_, uint32_t begin_, uint32_t end_);
 };
 
 class CSTBuilder {
  public:
   CSTBuilder(const FileContent &fcontent);
 
-  void addToken(uint8_t id, StringSegment token);
+  void addToken(cst_id_t id, StringSegment token);
 
-  void addNode(uint8_t id, StringSegment begin);
-  void addNode(uint8_t id, uint32_t children);
-  void addNode(uint8_t id, StringSegment begin, uint32_t children);
-  void addNode(uint8_t id, uint32_t children, StringSegment end);
-  void addNode(uint8_t id, StringSegment begin, uint32_t children, StringSegment end);
+  void addNode(cst_id_t id, StringSegment begin);
+  void addNode(cst_id_t id, uint32_t children);
+  void addNode(cst_id_t id, StringSegment begin, uint32_t children);
+  void addNode(cst_id_t id, uint32_t children, StringSegment end);
+  void addNode(cst_id_t id, StringSegment begin, uint32_t children, StringSegment end);
 
   void delNodes(size_t num);
 
  private:
   const FileContent *file;
-  std::vector<uint8_t> token_ids;
+  std::vector<cst_id_t> token_ids;
   std::vector<CSTNode> nodes;
   RankBuilder token_starts;
 
@@ -119,7 +121,7 @@ class CST {
 
   RankSelect1Map token_starts;
   const FileContent *file;
-  std::vector<uint8_t> token_ids;
+  std::vector<cst_id_t> token_ids;
   std::vector<CSTNode> nodes;
 
   friend class CSTElement;
@@ -130,7 +132,7 @@ class CSTElement {
   bool empty() const;
   bool isNode() const;
 
-  uint8_t id() const;
+  cst_id_t id() const;
   FileFragment fragment() const;
   StringSegment segment() const { return fragment().segment(); }
   Location location() const { return fragment().location(); }

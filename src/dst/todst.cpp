@@ -136,7 +136,7 @@ static void dst_import(CSTElement topdef, DefMap &map) {
   for (; !child.empty(); child.nextSiblingNode()) {
     CSTElement ideq = child.firstChildNode();
 
-    uint8_t idop1 = ideq.id(), idop2;
+    cst_id_t idop1 = ideq.id(), idop2;
     std::string name = getIdentifier(ideq);
     ideq.nextSiblingNode();
 
@@ -213,7 +213,7 @@ static void dst_export(CSTElement topdef, Package &package) {
   for (; !child.empty(); child.nextSiblingNode()) {
     CSTElement ideq = child.firstChildNode();
 
-    uint8_t idop1 = ideq.id(), idop2;
+    cst_id_t idop1 = ideq.id(), idop2;
     std::string name = getIdentifier(ideq);
     ideq.nextSiblingNode();
 
@@ -816,7 +816,7 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
   std::string name = std::move(ast.name);
   ast.name.clear();
 
-  uint8_t kind = lex_kind(name);
+  IdKind kind = lex_kind(name);
   bool extract = kind == UPPER || (child.id() == CST_PAREN && kind == OPERATOR);
   if (extract && (target || publish)) {
     ERROR(ast.token.location(),
@@ -954,11 +954,11 @@ static void dst_def(CSTElement def, DefMap &map, Package *package, Symbols *glob
 }
 
 static void mstr_add(std::ostream &os, CSTElement token, std::string::size_type wsCut) {
-  uint8_t nid = token.id();
+  cst_id_t nid = token.id();
   while (!token.empty()) {
     StringSegment ti = token.segment();
     token.nextSiblingElement();
-    uint8_t id = nid;
+    cst_id_t id = nid;
     nid = token.id();
 
     switch (id) {
@@ -1052,7 +1052,7 @@ void MultiLineStringIndentationFSM::accept(CSTElement lit) {
 
 static Literal *dst_literal(CSTElement lit, std::string::size_type wsCut) {
   CSTElement child = lit.firstChildElement();
-  uint8_t id = child.id();
+  cst_id_t id = child.id();
   switch (id) {
     case TOKEN_STR_RAW: {
       StringSegment ti = child.segment();

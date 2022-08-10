@@ -100,8 +100,8 @@ struct NewlineAction {
 };
 
 struct TokenAction {
-  uint8_t token_id;
-  TokenAction(uint8_t token_id) : token_id(token_id) {}
+  cst_id_t token_id;
+  TokenAction(cst_id_t token_id) : token_id(token_id) {}
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     assert(node.id() == token_id);
     builder.append(node.fragment().segment().str());
@@ -110,10 +110,10 @@ struct TokenAction {
 };
 
 struct TokenReplaceAction {
-  uint8_t token_id;
+  cst_id_t token_id;
   const char* str;
 
-  TokenReplaceAction(uint8_t token_id, const char* str) : token_id(token_id), str(str) {}
+  TokenReplaceAction(cst_id_t token_id, const char* str) : token_id(token_id), str(str) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     assert(node.id() == token_id);
@@ -298,9 +298,10 @@ struct FmtPredicate {
 
   template <
       class CTX,
-      std::enable_if_t<std::is_same<bool, decltype(std::declval<typename DepDeclType<
-                                                       CTX, Predicate>::type>()(uint8_t()))>::value,
-                       bool> = true>
+      std::enable_if_t<
+          std::is_same<bool, decltype(std::declval<typename DepDeclType<CTX, Predicate>::type>()(
+                                 cst_id_t()))>::value,
+          bool> = true>
   bool operator()(wcl::doc_builder& builder, CTX ctx, CSTElement& node) {
     return predicate(node.id());
   }
@@ -318,9 +319,9 @@ struct FmtPredicate {
 };
 
 template <>
-struct FmtPredicate<uint8_t> {
-  uint8_t id;
-  FmtPredicate(uint8_t id) : id(id) {}
+struct FmtPredicate<cst_id_t> {
+  cst_id_t id;
+  FmtPredicate(cst_id_t id) : id(id) {}
   bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     return node.id() == id;
   }
@@ -363,9 +364,9 @@ struct Formatter {
 
   Formatter<SeqAction<Action, NewlineAction>> newline() { return {{action, {space_per_indent}}}; }
 
-  Formatter<SeqAction<Action, TokenAction>> token(uint8_t id) { return {{action, {id}}}; }
+  Formatter<SeqAction<Action, TokenAction>> token(cst_id_t id) { return {{action, {id}}}; }
 
-  Formatter<SeqAction<Action, TokenReplaceAction>> token(uint8_t id, const char* str) {
+  Formatter<SeqAction<Action, TokenReplaceAction>> token(cst_id_t id, const char* str) {
     return {{action, {id, str}}};
   }
 
@@ -383,9 +384,9 @@ struct Formatter {
   }
 
   template <class FMT>
-  Formatter<SeqAction<Action, IfElseAction<FmtPredicate<std::initializer_list<uint8_t>>, FMT,
+  Formatter<SeqAction<Action, IfElseAction<FmtPredicate<std::initializer_list<cst_id_t>>, FMT,
                                            Formatter<EpsilonAction>>>>
-  fmt_if(std::initializer_list<uint8_t> ids, FMT formatter) {
+  fmt_if(std::initializer_list<cst_id_t> ids, FMT formatter) {
     return fmt_if_else(ids, formatter, Formatter<EpsilonAction>({}));
   }
 
@@ -397,8 +398,8 @@ struct Formatter {
 
   template <class IFMT, class EFMT>
   Formatter<
-      SeqAction<Action, IfElseAction<FmtPredicate<std::initializer_list<uint8_t>>, IFMT, EFMT>>>
-  fmt_if_else(std::initializer_list<uint8_t> ids, IFMT if_formatter, EFMT else_formatter) {
+      SeqAction<Action, IfElseAction<FmtPredicate<std::initializer_list<cst_id_t>>, IFMT, EFMT>>>
+  fmt_if_else(std::initializer_list<cst_id_t> ids, IFMT if_formatter, EFMT else_formatter) {
     return {{action, {ids, if_formatter, else_formatter}}};
   }
 
@@ -409,8 +410,8 @@ struct Formatter {
   }
 
   template <class FMT>
-  Formatter<SeqAction<Action, WhileAction<FmtPredicate<std::initializer_list<uint8_t>>, FMT>>>
-  fmt_while(std::initializer_list<uint8_t> ids, FMT formatter) {
+  Formatter<SeqAction<Action, WhileAction<FmtPredicate<std::initializer_list<cst_id_t>>, FMT>>>
+  fmt_while(std::initializer_list<cst_id_t> ids, FMT formatter) {
     return {{action, {ids, formatter}}};
   }
 
@@ -428,8 +429,8 @@ struct Formatter {
 
   template <class Walker>
   Formatter<
-      SeqAction<Action, WalkPredicateAction<FmtPredicate<std::initializer_list<uint8_t>>, Walker>>>
-  walk(std::initializer_list<uint8_t> ids, Walker texas_ranger) {
+      SeqAction<Action, WalkPredicateAction<FmtPredicate<std::initializer_list<cst_id_t>>, Walker>>>
+  walk(std::initializer_list<cst_id_t> ids, Walker texas_ranger) {
     return {{action, {ids, texas_ranger}}};
   }
 

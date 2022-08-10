@@ -29,21 +29,21 @@
 
 CSTBuilder::CSTBuilder(const FileContent &fcontent) { file = &fcontent; }
 
-CSTNode::CSTNode(uint8_t id_, uint32_t size_, uint32_t begin_, uint32_t end_)
+CSTNode::CSTNode(cst_id_t id_, uint32_t size_, uint32_t begin_, uint32_t end_)
     : id(id_), size(size_), begin(begin_), end(end_) {}
 
-void CSTBuilder::addToken(uint8_t id, StringSegment token) {
+void CSTBuilder::addToken(cst_id_t id, StringSegment token) {
   token_ids.push_back(id);
   token_starts.set(token.start - file->segment().start);
 }
 
-void CSTBuilder::addNode(uint8_t id, StringSegment begin) {
+void CSTBuilder::addNode(cst_id_t id, StringSegment begin) {
   uint32_t b = begin.start - file->segment().start;
   uint32_t e = begin.end - file->segment().start;
   nodes.emplace_back(id, 1, b, e);
 }
 
-void CSTBuilder::addNode(uint8_t id, uint32_t children) {
+void CSTBuilder::addNode(cst_id_t id, uint32_t children) {
   uint32_t b = 0;
   uint32_t e = nodes.empty() ? 0 : nodes.back().end;
 
@@ -56,7 +56,7 @@ void CSTBuilder::addNode(uint8_t id, uint32_t children) {
   nodes.emplace_back(id, size, b, e);
 }
 
-void CSTBuilder::addNode(uint8_t id, StringSegment begin, uint32_t children) {
+void CSTBuilder::addNode(cst_id_t id, StringSegment begin, uint32_t children) {
   uint32_t b = 0;
   uint32_t e = nodes.empty() ? 0 : nodes.back().end;
 
@@ -72,7 +72,7 @@ void CSTBuilder::addNode(uint8_t id, StringSegment begin, uint32_t children) {
   nodes.emplace_back(id, size, b, e);
 }
 
-void CSTBuilder::addNode(uint8_t id, uint32_t children, StringSegment end) {
+void CSTBuilder::addNode(cst_id_t id, uint32_t children, StringSegment end) {
   uint32_t b = 0;
   uint32_t e = nodes.empty() ? 0 : nodes.back().end;
 
@@ -88,7 +88,7 @@ void CSTBuilder::addNode(uint8_t id, uint32_t children, StringSegment end) {
   nodes.emplace_back(id, size, b, e);
 }
 
-void CSTBuilder::addNode(uint8_t id, StringSegment begin, uint32_t children, StringSegment end) {
+void CSTBuilder::addNode(cst_id_t id, StringSegment begin, uint32_t children, StringSegment end) {
   uint32_t b2 = 0;
 
   int size = 1;
@@ -170,7 +170,7 @@ bool CSTElement::empty() const { return node == limit && token >= end; }
 
 bool CSTElement::isNode() const { return node != limit && token >= cst->nodes[node].begin; }
 
-uint8_t CSTElement::id() const {
+cst_id_t CSTElement::id() const {
   if (isNode()) {
     return cst->nodes[node].id;
   } else {
