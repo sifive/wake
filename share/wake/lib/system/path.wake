@@ -52,6 +52,20 @@ export target whichIn (path: String) (exec: String): String =
 export def which (exec: String): String =
     whichIn path exec
 
+# Locate an executable in the users env PATH
+export target whichInEnvPath (exec: String): Option String =
+    require Some path =
+        getenv "PATH"
+
+    def cmd =
+        whichIn path exec
+
+    if cmd ==~ exec then
+        None
+    else
+        Some cmd
+
+
 # Absolute path to the workspace root.
 # All paths in wake are relative to the workspace root; you probably just want "."
 # The absolute path should rarely be used because it breaks build relocatability
