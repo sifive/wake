@@ -65,7 +65,6 @@ export target whichInEnvPath (exec: String): Option String =
     else
         Some cmd
 
-
 # Absolute path to the workspace root.
 # All paths in wake are relative to the workspace root; you probably just want "."
 # The absolute path should rarely be used because it breaks build relocatability
