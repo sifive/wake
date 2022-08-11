@@ -90,6 +90,17 @@ def t1 = match _
     n = 2+t(n-1)
 
 
+def t1 = match _
+    # many
+    # comments
+    # wake-format off
+    0=0
+    # many
+    # more
+    # comments
+    n = 2 + t (n - 1)
+
+
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     buildTestWake , Nil =
         require Pass (Pair path visible) = buildTestWake Unit

@@ -301,15 +301,12 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   assert(!node.isNode());
 
   switch (node.id()) {
-    case TOKEN_KW_MACRO_HERE: {
+    case TOKEN_KW_MACRO_HERE:
       MEMO_RET(wcl::doc::lit("@here"))
-    }
-    case TOKEN_NL: {
+    case TOKEN_NL:
       MEMO_RET(wcl::doc::lit("\n"));
-    }
-    case TOKEN_WS: {
+    case TOKEN_WS:
       MEMO_RET(wcl::doc::lit(" "));
-    }
     case TOKEN_COMMENT:
     case TOKEN_P_BOPEN:
     case TOKEN_P_BCLOSE:
@@ -570,14 +567,13 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_MATCH);
 
-  MEMO_RET(fmt()
-               .token(TOKEN_KW_MATCH)
-               .ws()
-               .walk(WALK_NODE)
-               // clang-format off
+  MEMO_RET(
+      fmt()
+          .token(TOKEN_KW_MATCH)
+          .ws()
+          .walk(WALK_NODE)
+          // clang-format off
                .nest(fmt()
-                   .consume_wsnl()
-                   .fmt_if(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT))
                    .consume_wsnl()
                    .fmt_while(
                        {CST_CASE, TOKEN_COMMENT}, fmt()
@@ -587,8 +583,8 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
                          fmt().token(TOKEN_COMMENT),
                          fmt().walk(WALK_NODE))
                        .consume_wsnl()))
-               // clang-format on
-               .format(ctx, node.firstChildElement()));
+          // clang-format on
+          .format(ctx, node.firstChildElement()));
 }
 
 wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) {
