@@ -36,6 +36,7 @@
 #include "util/diagnostic.h"
 #include "util/file.h"
 #include "wcl/xoshiro_256.h"
+#include "wcl/diff.h"
 
 #ifndef VERSION
 #include "version.h"
@@ -125,8 +126,26 @@ void print_cst(CSTElement node, int depth) {
   }
 }
 
+void goofy_test() {
+  std::vector<std::string> lines1 = {"A", "B", "C", "E", "F"};
+  std::vector<std::string> lines2 = {"A", "D", "C", "E", "F"};
+  for (auto l : wcl::diff<std::string>(lines1.begin(), lines1.end(), lines2.begin(), lines2.end())) {
+    if (l.type == wcl::diff_type_t::Add) {
+      std::cout << "+ "; // TODO: Add color
+    } else if (l.type == wcl::diff_type_t::Sub) {
+      std::cout << "- "; // TODO: Add color
+    } else {
+      std::cout << "  ";
+    }
+    std::cout << l.value << std::endl;
+  }
+  std::cout << std::endl;
+}
+
 DiagnosticReporter *reporter;
 int main(int argc, char **argv) {
+  goofy_test();
+
   TerminalReporter terminalReporter;
   reporter = &terminalReporter;
 
