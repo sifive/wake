@@ -80,19 +80,6 @@ struct ConsumeWhitespaceAction {
   }
 };
 
-struct CopyWhitespaceAction {
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    while (!node.empty() && (node.id() == TOKEN_WS || node.id() == TOKEN_NL)) {
-      if (node.id() == TOKEN_WS) {
-        space(builder, node.fragment().segment().str().size());
-      } else {
-        builder.append(NL_STR);
-      }
-      node.nextSiblingElement();
-    }
-  }
-};
-
 struct SpaceAction {
   uint8_t count;
   SpaceAction(uint8_t count) : count(count) {}
@@ -450,7 +437,6 @@ struct Formatter {
   Formatter(Action a) : action(a) {}
 
   Formatter<SeqAction<Action, ConsumeWhitespaceAction>> consume_wsnl() { return {{action, {}}}; }
-  Formatter<SeqAction<Action, CopyWhitespaceAction>> copy_wsnl() { return {{action, {}}}; }
 
   Formatter<SeqAction<Action, WhitespaceTokenAction>> ws() { return {{action, {}}}; }
 

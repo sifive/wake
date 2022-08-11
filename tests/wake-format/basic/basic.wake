@@ -20,10 +20,18 @@ def name Unit =
   def other = here
   another
 
-def fexname Unit =
+def name Unit =
   def other = here
   # wake-format off
   def other = here
+  def other = here
+  another
+
+def name Unit =
+  def other = here
+  # wake-format off
+  def other = here
+
   def other = here
   another
 

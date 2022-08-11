@@ -27,7 +27,8 @@
 
 #define FORMAT_OFF_COMMENT "# wake-format off"
 
-#define WALK(func) [this](ctx_t ctx, CSTElement node) { return func(ctx, node); }
+#define WALK_NODE [this](ctx_t ctx, CSTElement node) { return walk_node(ctx, node); }
+#define WALK_TOKEN [this](ctx_t ctx, CSTElement node) { return walk_token(ctx, node); }
 
 #define MEMO(ctx, node)                                                                       \
   static std::unordered_map<std::pair<CSTElement, ctx_t>, wcl::doc> __memo_map__ = {};        \
@@ -46,20 +47,6 @@
     return v;                                      \
   }
 
-template <class Func>
-void cascade(CSTElement node, Func func) {
-  // mark self
-  func(node);
-
-  if (!node.isNode()) {
-    return;
-  }
-
-  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
-    cascade(child, func);
-  }
-}
-
 static bool requires_nl(cst_id_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
 
 static bool is_expression(cst_id_t type) {
@@ -68,7 +55,7 @@ static bool is_expression(cst_id_t type) {
 }
 
 auto Emitter::rhs_fmt() {
-  auto rhs_fmt = fmt().walk(WALK(walk_node));
+  auto rhs_fmt = fmt().walk(WALK_NODE);
 
   auto comment_fmt = fmt().nest(fmt().newline().token(TOKEN_COMMENT).consume_wsnl().join(rhs_fmt));
   auto nl_required_fmt = fmt().nest(rhs_fmt);
@@ -93,18 +80,16 @@ wcl::doc Emitter::layout(CST cst) {
 wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
 
+  auto node_fmt = fmt().walk(WALK_NODE).newline();
+
   // clang-format off
   auto body_fmt = fmt().match(
     pred(TOKEN_WS, fmt().next())
-   .pred(TOKEN_NL, fmt().next().newline())
-   .pred(TOKEN_COMMENT, fmt().walk(WALK(walk_token)))
-   .pred([](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node){
-        return node.id() == TOKEN_COMMENT && node.fragment().segment().str() != FORMAT_OFF_COMMENT;
-   }, fmt().token(TOKEN_COMMENT))
-   .pred([](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node){
-        return node.id() == TOKEN_COMMENT && node.fragment().segment().str() == FORMAT_OFF_COMMENT;
-   }, fmt().token(TOKEN_COMMENT).consume_wsnl().newline().walk(WALK(walk_no_edit)))
-   .otherwise(fmt().walk(WALK(walk_node)).newline()));
+   .pred(TOKEN_NL, fmt().next())
+   .pred(TOKEN_COMMENT, fmt().walk(WALK_TOKEN).newline())
+   .pred(CST_IMPORT, node_fmt)
+   .pred(CST_DEF, node_fmt.join(fmt().newline().newline()))
+   .otherwise(node_fmt.join(fmt().newline())));
   // clang-format on
 
   MEMO_RET(fmt().walk_children(body_fmt).format(ctx, node));
@@ -115,6 +100,11 @@ wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {
   assert(node.isNode());
 
   wcl::doc_builder bdr;
+
+  if (traits[node].format_off) {
+    bdr.append(walk_no_edit(ctx, node));
+    return std::move(bdr).build();
+  }
 
   switch (node.id()) {
     case CST_ARITY:
@@ -281,9 +271,27 @@ void Emitter::mark_no_format_nodes(CSTElement node) {
 
     if (child.id() == TOKEN_COMMENT && child.fragment().segment().str() == FORMAT_OFF_COMMENT) {
       while (!child.empty() && !child.isNode()) child.nextSiblingElement();
-      if (!child.empty()) {
-        cascade(child, [this](CSTElement e) { traits[e] = traits[e].turn_format_off(); });
+      if (child.empty()) {
+        continue;
       }
+
+      // Instead of marking the entire block as format off
+      // only the first non-token child should be marked as format off
+      // this allows turing off formatting for the first block item, otherwise
+      // you can never format *just* the first block item
+      if (child.id() == CST_BLOCK) {
+        CSTElement block_item = child.firstChildElement();
+        for (; !(child.empty() || child.isNode()); child.nextSiblingElement())
+          ;
+
+        // This shouldn't be possible, but assert anyways just in case
+        assert(!child.empty());
+
+        traits[block_item] = traits[block_item].turn_format_off();
+        continue;
+      }
+
+      traits[child] = traits[child].turn_format_off();
     }
   }
 }
@@ -294,9 +302,6 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
 
   switch (node.id()) {
     case TOKEN_KW_MACRO_HERE: {
-      if (traits[node].format_off) {
-        MEMO_RET(wcl::doc::lit("here"))
-      }
       MEMO_RET(wcl::doc::lit("@here"))
     }
     case TOKEN_NL: {
@@ -388,19 +393,11 @@ wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_APP);
 
-  if (traits[node].format_off) {
-    MEMO_RET(fmt()
-                 .walk(is_expression, WALK(walk_node))
-                 .copy_wsnl()
-                 .walk(WALK(walk_node))
-                 .format(ctx, node.firstChildElement()));
-  }
-
   MEMO_RET(fmt()
-               .walk(is_expression, WALK(walk_node))
+               .walk(is_expression, WALK_NODE)
                .consume_wsnl()
                .space()
-               .walk(WALK(walk_node))
+               .walk(WALK_NODE)
                .format(ctx, node.firstChildElement()));
 }
 
@@ -418,24 +415,14 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_BINARY);
 
-  if (traits[node].format_off) {
-    MEMO_RET(fmt()
-                 .walk(is_expression, WALK(walk_node))
-                 .copy_wsnl()
-                 .walk(CST_OP, WALK(walk_op))
-                 .copy_wsnl()
-                 .walk(is_expression, WALK(walk_node))
-                 .format(ctx, node.firstChildElement()));
-  }
-
   MEMO_RET(fmt()
-               .walk(is_expression, WALK(walk_node))
+               .walk(is_expression, WALK_NODE)
                .consume_wsnl()
                .space()
-               .walk(CST_OP, WALK(walk_op))
+               .walk(CST_OP, WALK_NODE)
                .consume_wsnl()
                .space()
-               .walk(is_expression, WALK(walk_node))
+               .walk(is_expression, WALK_NODE)
                .format(ctx, node.firstChildElement()));
 }
 
@@ -448,7 +435,7 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
     pred(TOKEN_WS, fmt().next())
    .pred(TOKEN_NL, fmt().next())
    .pred(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT))
-   .otherwise(fmt().newline().walk(WALK(walk_node))));
+   .otherwise(fmt().newline().walk(WALK_NODE)));
   // clang-format on
 
   MEMO_RET(fmt().walk_children(body_fmt).consume_wsnl().format(ctx, node));
@@ -458,21 +445,11 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_CASE);
 
-  if (traits[node].format_off) {
-    MEMO_RET(fmt()
-                 .walk(WALK(walk_node))
-                 .copy_wsnl()
-                 .walk(CST_GUARD, WALK(walk_guard))
-                 .copy_wsnl()
-                 .walk(WALK(walk_node))
-                 .format(ctx, node.firstChildElement()));
-  }
-
   MEMO_RET(fmt()
-               .walk(WALK(walk_node))
+               .walk(WALK_NODE)
                .consume_wsnl()
                .space()
-               .walk(CST_GUARD, WALK(walk_guard))
+               .walk(CST_GUARD, WALK_NODE)
                .consume_wsnl()
                .join(rhs_fmt())
                .format(ctx, node.firstChildElement()));
@@ -487,25 +464,11 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_DEF);
 
-  if (traits[node].format_off) {
-    MEMO_RET(fmt()
-                 .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK(walk_export)).ws())
-                 .token(TOKEN_KW_DEF)
-                 .ws()
-                 .walk({CST_ID, CST_APP, CST_ASCRIBE}, WALK(walk_node))
-                 .ws()
-                 .token(TOKEN_P_EQUALS)
-                 .fmt_if_else(TOKEN_NL, fmt().nest(fmt().consume_wsnl().walk(WALK(walk_node))),
-                              fmt().copy_wsnl().walk(WALK(walk_node)))
-                 .consume_wsnl()
-                 .format(ctx, node.firstChildElement()));
-  }
-
   MEMO_RET(fmt()
-               .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK(walk_export)).ws())
+               .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_DEF)
                .ws()
-               .walk({CST_ID, CST_APP, CST_ASCRIBE}, WALK(walk_node))
+               .walk({CST_ID, CST_APP, CST_ASCRIBE}, WALK_NODE)
                .ws()
                .token(TOKEN_P_EQUALS)
                .consume_wsnl()
@@ -560,21 +523,21 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_IMPORT);
 
-  auto id_list_fmt = fmt().walk(WALK(walk_ideq)).fmt_if(TOKEN_WS, fmt().ws());
+  auto id_list_fmt = fmt().walk(WALK_NODE).fmt_if(TOKEN_WS, fmt().ws());
 
   MEMO_RET(fmt()
                .token(TOKEN_KW_FROM)
                .ws()
-               .walk(CST_ID, WALK(walk_identifier))
+               .walk(CST_ID, WALK_NODE)
                .ws()
                .token(TOKEN_KW_IMPORT)
                .ws()
-               .fmt_if(CST_KIND, fmt().walk(WALK(walk_kind)).ws())
-               .fmt_if(CST_ARITY, fmt().walk(WALK(walk_arity)).ws())
+               .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
+               .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
                // clang-format off
                .fmt_if_else(
                    TOKEN_P_HOLE,
-                   fmt().walk(WALK(walk_token)),
+                   fmt().walk(WALK_TOKEN),
                    fmt().fmt_while(
                        CST_IDEQ,
                        id_list_fmt))
@@ -610,7 +573,7 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
   MEMO_RET(fmt()
                .token(TOKEN_KW_MATCH)
                .ws()
-               .walk(WALK(walk_node))
+               .walk(WALK_NODE)
                // clang-format off
                .nest(fmt()
                    .consume_wsnl()
@@ -622,7 +585,7 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
                        .fmt_if_else(
                          TOKEN_COMMENT,
                          fmt().token(TOKEN_COMMENT),
-                         fmt().walk(WALK(walk_node)))
+                         fmt().walk(WALK_NODE))
                        .consume_wsnl()))
                // clang-format on
                .format(ctx, node.firstChildElement()));
@@ -640,7 +603,7 @@ wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
   MEMO_RET(fmt()
                .token(TOKEN_KW_PACKAGE)
                .ws()
-               .walk(CST_ID, WALK(walk_identifier))
+               .walk(CST_ID, WALK_NODE)
                .consume_wsnl()
                .format(ctx, node.firstChildElement()));
 }
@@ -668,7 +631,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                .newline()
                .token(TOKEN_KW_REQUIRE)
                .ws()
-               .walk(WALK(walk_node))
+               .walk(WALK_NODE)
                .consume_wsnl()
                .space()
                .token(TOKEN_P_EQUALS)
@@ -676,7 +639,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                .join(rhs_fmt())
                .consume_wsnl()
                .newline()
-               .walk(WALK(walk_node))
+               .walk(WALK_NODE)
                .consume_wsnl()
                .format(ctx, node.firstChildElement()));
 }
@@ -693,7 +656,7 @@ wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
   MEMO_RET(fmt()
                .token(TOKEN_KW_SUBSCRIBE)
                .ws()
-               .walk(CST_ID, WALK(walk_identifier))
+               .walk(CST_ID, WALK_NODE)
                .format(ctx, node.firstChildElement()));
 }
 
@@ -739,4 +702,5 @@ wcl::doc Emitter::walk_error(ctx_t ctx, CSTElement node) {
 
 #undef MEMO_RET
 #undef MEMO
-#undef WALK
+#undef WALK_TOKEN
+#undef WALK_NODE
