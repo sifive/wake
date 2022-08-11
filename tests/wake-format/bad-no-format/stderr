@@ -1,0 +1,11 @@
+wake-format failed to format 'bad-no-format.wake'.
+    This is probably due to bad indentation caused by '# wake-format off'
+    Please complete the following steps:
+        1) Submit a copy of 'bad-no-format.wake' to the wake-format authors so they can improve the tool.
+        2) Review 'bad-no-format.wake.tmp.00000000000000000000000000000000' for the syntax errors mentioned below.
+        3) Edit 'bad-no-format.wake' to have the correct indentation expected by wake-format
+
+bad-no-format.wake.tmp.00000000000000000000000000000000:3:17: syntax error; definitions must be followed by an '= expression'
+bad-no-format.wake.tmp.00000000000000000000000000000000:4:9: syntax error; found '\n', a newline, but was expecting one of:
+    decreased-indentation
+
