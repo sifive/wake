@@ -281,8 +281,9 @@ void Emitter::mark_no_format_nodes(CSTElement node) {
       // you can never format *just* the first block item
       if (child.id() == CST_BLOCK) {
         CSTElement block_item = child.firstChildElement();
-        for (; !(child.empty() || child.isNode()); child.nextSiblingElement())
-          ;
+        while (!(child.empty() || child.isNode())) {
+          child.nextSiblingElement();
+        }
 
         // This shouldn't be possible, but assert anyways just in case
         assert(!child.empty());
@@ -522,25 +523,26 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
 
   auto id_list_fmt = fmt().walk(WALK_NODE).fmt_if(TOKEN_WS, fmt().ws());
 
-  MEMO_RET(fmt()
-               .token(TOKEN_KW_FROM)
-               .ws()
-               .walk(CST_ID, WALK_NODE)
-               .ws()
-               .token(TOKEN_KW_IMPORT)
-               .ws()
-               .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
-               .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
-               // clang-format off
-               .fmt_if_else(
-                   TOKEN_P_HOLE,
-                   fmt().walk(WALK_TOKEN),
-                   fmt().fmt_while(
-                       CST_IDEQ,
-                       id_list_fmt))
-               // clang-format on
-               .consume_wsnl()
-               .format(ctx, node.firstChildElement()));
+  MEMO_RET(
+      fmt()
+          .token(TOKEN_KW_FROM)
+          .ws()
+          .walk(CST_ID, WALK_NODE)
+          .ws()
+          .token(TOKEN_KW_IMPORT)
+          .ws()
+          .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
+          .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
+          // clang-format off
+          .fmt_if_else(
+              TOKEN_P_HOLE,
+              fmt().walk(WALK_TOKEN),
+              fmt().fmt_while(
+                  CST_IDEQ,
+                  id_list_fmt))
+          // clang-format on
+          .consume_wsnl()
+          .format(ctx, node.firstChildElement()));
 }
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
