@@ -535,26 +535,25 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
 
   auto id_list_fmt = fmt().walk(WALK_NODE).fmt_if(TOKEN_WS, fmt().ws());
 
-  MEMO_RET(
-      fmt()
-          .token(TOKEN_KW_FROM)
-          .ws()
-          .walk(CST_ID, WALK_NODE)
-          .ws()
-          .token(TOKEN_KW_IMPORT)
-          .ws()
-          .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
-          .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
-          // clang-format off
+  MEMO_RET(fmt()
+               .token(TOKEN_KW_FROM)
+               .ws()
+               .walk(CST_ID, WALK_NODE)
+               .ws()
+               .token(TOKEN_KW_IMPORT)
+               .ws()
+               .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
+               .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
+               // clang-format off
           .fmt_if_else(
               TOKEN_P_HOLE,
               fmt().walk(WALK_TOKEN),
               fmt().fmt_while(
                   CST_IDEQ,
                   id_list_fmt))
-          // clang-format on
-          .consume_wsnl()
-          .format(ctx, node.firstChildElement()));
+               // clang-format on
+               .consume_wsnl()
+               .format(ctx, node.firstChildElement()));
 }
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
@@ -624,7 +623,7 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
 
   MEMO_RET(fmt()
                .token(TOKEN_P_POPEN)
-               .walk(is_expression, WALK(walk_node))
+               .walk(is_expression, WALK_NODE)
                .token(TOKEN_P_PCLOSE)
                .format(ctx, node.firstChildElement()));
 }
@@ -696,14 +695,14 @@ wcl::doc Emitter::walk_topic(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_TOPIC);
 
   MEMO_RET(fmt()
-               .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK(walk_flag_global)).ws())
-               .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK(walk_flag_export)).ws())
+               .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
+               .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_TOPIC)
                .ws()
-               .walk({CST_ID}, WALK(walk_node))
+               .walk({CST_ID}, WALK_NODE)
                .token(TOKEN_P_ASCRIBE)
                .ws()
-               .walk({CST_APP, CST_ID, CST_BINARY}, WALK(walk_node))
+               .walk({CST_APP, CST_ID, CST_BINARY}, WALK_NODE)
                .consume_wsnl()
                .format(ctx, node.firstChildElement()));
 }
