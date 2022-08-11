@@ -23,6 +23,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <unordered_map>
 #include <vector>
 
 #include "formatter.h"
@@ -35,19 +36,35 @@ struct std::hash<std::pair<CSTElement, ctx_t>> {
   }
 };
 
+struct traits_t {
+  bool format_off = false;
+
+  traits_t turn_format_off() {
+    traits_t copy = *this;
+    copy.format_off = true;
+    return copy;
+  }
+};
+
 class Emitter {
  public:
   // Walks the CST, formats it, and returns the representative doc
   wcl::doc layout(CST cst);
 
  private:
-  std::unordered_map<CSTElement, wcl::doc> context_free_memo = {};
+  std::unordered_map<CSTElement, traits_t> traits = {};
 
   // Top level tree walk. Dispatches out the calls for various nodes
   wcl::doc walk(ctx_t ctx, CSTElement node);
 
   wcl::doc walk_node(ctx_t ctx, CSTElement node);
   wcl::doc walk_token(ctx_t ctx, CSTElement node);
+
+  // Walks a node and emits it without any formatting.
+  wcl::doc walk_no_edit(ctx_t ctx, CSTElement node);
+
+  // Marks all node elements that have had their formatting disabled
+  void mark_no_format_nodes(CSTElement node);
 
   // Returns a formatter that inserts the next node
   // on the current line if it fits, or on a new nested line
