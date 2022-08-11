@@ -16,21 +16,9 @@
 package build_wake
 from wake import _
 
-def re2cPath =
-    require Some path =
-        getenv "PATH"
-
-    def re2c =
-        whichIn path "re2c"
-
-    if re2c ==~ "re2c" then
-        None
-    else
-        Some re2c
-
 # Require re2c >= 1.3 for flag support
 def re2cOk Unit: Result String Error =
-    require Some re2c = re2cPath
+    require Some re2c = whichInEnvPath "re2c" 
     else failWithError "re2c not on Path"
 
     require Some x, Some y, _ =
