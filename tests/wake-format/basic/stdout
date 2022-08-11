@@ -17,11 +17,9 @@ def name Unit =
   another
 
 
-
 def name Unit =
     # wake-format off
     def other = here
-
     def other = @here
     another
 
@@ -30,7 +28,6 @@ def name Unit =
     def other = @here
     # wake-format off
     def other = here
-
     def other = @here
     another
 
@@ -39,7 +36,6 @@ def name Unit =
     def other = @here
     # wake-format off
     def other = here
-
     def other = @here
     another
 
@@ -54,7 +50,6 @@ def name Unit =
 def name Unit =
     # wake-format off
     def other = here
-
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
 
@@ -68,7 +63,6 @@ def t1 = match _
 def t1 =match _
   0=0
   n = 2+t(n-1)
-
 
 
 def t1 = match _

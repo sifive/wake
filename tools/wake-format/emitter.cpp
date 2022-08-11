@@ -254,6 +254,17 @@ wcl::doc Emitter::walk_no_edit(ctx_t ctx, CSTElement node) {
 
   wcl::doc_builder bdr;
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    // The last nl of a *tagged* "no format" CST_DEF node shouldn't be emitted.
+    // The nominal formtting for the larger program structure will ensure the correct NLs are
+    // emitted.
+    if (node.id() == CST_DEF && child.id() == TOKEN_NL && traits[node].format_off) {
+      CSTElement next = child;
+      next.nextSiblingElement();
+      if (next.empty()) {
+        continue;
+      }
+    }
+
     bdr.append(walk_no_edit(ctx, child));
   }
 
@@ -575,16 +586,16 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
           .ws()
           .walk(WALK_NODE)
           // clang-format off
-               .nest(fmt()
-                   .consume_wsnl()
-                   .fmt_while(
-                       {CST_CASE, TOKEN_COMMENT}, fmt()
-                       .newline()
-                       .fmt_if_else(
-                         TOKEN_COMMENT,
-                         fmt().token(TOKEN_COMMENT),
-                         fmt().walk(WALK_NODE))
-                       .consume_wsnl()))
+          .nest(fmt()
+              .consume_wsnl()
+              .fmt_while(
+                  {CST_CASE, TOKEN_COMMENT}, fmt()
+                  .newline()
+                  .fmt_if_else(
+                    TOKEN_COMMENT,
+                    fmt().token(TOKEN_COMMENT),
+                    fmt().walk(WALK_NODE))
+                  .consume_wsnl()))
           // clang-format on
           .format(ctx, node.firstChildElement()));
 }
