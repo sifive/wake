@@ -47,11 +47,30 @@
     return v;                                      \
   }
 
-static bool requires_nl(cst_id_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
+static inline bool requires_nl(cst_id_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
 
-static bool is_expression(cst_id_t type) {
+static inline bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
          type == CST_BINARY || CST_PAREN;
+}
+
+static inline bool has_comment_next(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  CSTElement copy = node;
+  while (!copy.empty() && (copy.id() == TOKEN_WS || copy.id() == TOKEN_NL)) {
+    copy.nextSiblingElement();
+  }
+  return copy.id() == TOKEN_COMMENT;
+}
+
+static inline bool has_comment(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  CSTElement copy = node;
+  while (!copy.empty()) {
+    if (copy.id() == TOKEN_COMMENT) {
+      return true;
+    }
+    copy.nextSiblingElement();
+  }
+  return false;
 }
 
 auto Emitter::rhs_fmt() {
@@ -71,6 +90,18 @@ auto Emitter::rhs_fmt() {
   // clang-format on
 }
 
+auto place_comment() {
+  // ws COMMENT -> ws COMMENT nl
+  // ws nl COMMENT -> nl COMMENT nl
+  return fmt().fmt_if(has_comment_next,
+                      fmt()
+                          .fmt_if(TOKEN_WS, fmt().next())
+                          .fmt_if_else(TOKEN_NL, fmt().next().nest(fmt().newline()), fmt().space())
+                          .consume_wsnl()
+                          .token(TOKEN_COMMENT)
+                          .consume_wsnl());
+}
+
 wcl::doc Emitter::layout(CST cst) {
   ctx_t ctx;
   mark_no_format_nodes(cst.root());
@@ -87,7 +118,7 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
     pred(TOKEN_WS, fmt().next())
    .pred(TOKEN_NL, fmt().next())
    .pred(TOKEN_COMMENT, fmt().walk(WALK_TOKEN).newline())
-   .pred(CST_IMPORT, node_fmt)
+   .pred({CST_IMPORT, CST_TOPIC}, node_fmt)
    .pred(CST_DEF, node_fmt.join(fmt().newline().newline()))
    .otherwise(node_fmt.join(fmt().newline())));
   // clang-format on
@@ -621,10 +652,37 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_PAREN);
 
+  auto comment_fmt =
+      fmt()
+          .token(TOKEN_P_POPEN)
+          .fmt_if(has_comment_next, place_comment())
+          .consume_wsnl()
+          // clang-format off
+          .nest(fmt()
+                    .fmt_while(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT).consume_wsnl())
+                    .newline()
+                    .walk(is_expression, WALK_NODE))
+          // place_comment will nest() when it newlines
+          // so this needs to be places one nest level up 
+          // to align with the surrounding nested items.
+          .fmt_if(has_comment_next, fmt().join(place_comment()))
+          .nest(fmt()
+                    .consume_wsnl()
+                    .fmt_while(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT).consume_wsnl()))
+          // clang-format on
+          .consume_wsnl()
+          .newline()
+          .token(TOKEN_P_PCLOSE);
+
+  auto no_comment_fmt = fmt()
+                            .token(TOKEN_P_POPEN)
+                            .consume_wsnl()
+                            .walk(is_expression, WALK_NODE)
+                            .consume_wsnl()
+                            .token(TOKEN_P_PCLOSE);
+
   MEMO_RET(fmt()
-               .token(TOKEN_P_POPEN)
-               .walk(is_expression, WALK_NODE)
-               .token(TOKEN_P_PCLOSE)
+               .fmt_if_else(has_comment, comment_fmt, no_comment_fmt)
                .format(ctx, node.firstChildElement()));
 }
 

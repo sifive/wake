@@ -103,6 +103,10 @@ struct TokenAction {
   cst_id_t token_id;
   TokenAction(cst_id_t token_id) : token_id(token_id) {}
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    if (node.id() != token_id) {
+      // TODO: see about adding a token -> token name function
+      std::cerr << "Unexpected token: " << +token_id << std::endl;
+    }
     assert(node.id() == token_id);
     builder.append(node.fragment().segment().str());
     node.nextSiblingElement();
@@ -116,6 +120,10 @@ struct TokenReplaceAction {
   TokenReplaceAction(cst_id_t token_id, const char* str) : token_id(token_id), str(str) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+    if (node.id() != token_id) {
+      // TODO: see about adding a token -> token name function
+      std::cerr << "Unexpected token: " << +token_id << std::endl;
+    }
     assert(node.id() == token_id);
     builder.append(str);
     node.nextSiblingElement();
