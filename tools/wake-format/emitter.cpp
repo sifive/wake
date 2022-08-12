@@ -90,15 +90,13 @@ auto Emitter::rhs_fmt() {
   // clang-format on
 }
 
-auto place_comment() {
+auto position_comment() {
   // ws COMMENT -> ws COMMENT nl
   // ws nl COMMENT -> nl COMMENT nl
   return fmt().fmt_if(has_comment_next,
                       fmt()
                           .fmt_if(TOKEN_WS, fmt().next())
-                          .fmt_if_else(TOKEN_NL, fmt().next().nest(fmt().newline()), fmt().space())
-                          .consume_wsnl()
-                          .token(TOKEN_COMMENT)
+                          .fmt_if_else(TOKEN_NL, fmt().next().newline(), fmt().space())
                           .consume_wsnl());
 }
 
@@ -653,27 +651,22 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_PAREN);
 
+  // clang-format off
   auto comment_fmt =
-      fmt()
-          .token(TOKEN_P_POPEN)
-          .fmt_if(has_comment_next, place_comment())
-          .consume_wsnl()
-          // clang-format off
-          .nest(fmt()
-                    .fmt_while(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT).consume_wsnl())
-                    .newline()
-                    .walk(is_expression, WALK_NODE))
-          // place_comment will nest() when it newlines
-          // so this needs to be places one nest level up 
-          // to align with the surrounding nested items.
-          .fmt_if(has_comment_next, fmt().join(place_comment()))
-          .nest(fmt()
-                    .consume_wsnl()
-                    .fmt_while(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT).consume_wsnl()))
-          // clang-format on
-          .consume_wsnl()
-          .newline()
-          .token(TOKEN_P_PCLOSE);
+      fmt().nest(fmt()
+             .token(TOKEN_P_POPEN)
+             .fmt_if(has_comment_next, position_comment().join(fmt().token(TOKEN_COMMENT)))
+             .consume_wsnl()
+             .fmt_while(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT).consume_wsnl())
+             .newline()
+             .walk(is_expression, WALK_NODE)
+             .fmt_if(has_comment_next, position_comment().join(fmt().token(TOKEN_COMMENT)))
+             .consume_wsnl()
+             .fmt_while(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT).consume_wsnl())
+             .consume_wsnl())
+             .newline()
+             .token(TOKEN_P_PCLOSE);
+  // clang-format on
 
   auto no_comment_fmt = fmt()
                             .token(TOKEN_P_POPEN)

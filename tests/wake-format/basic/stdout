@@ -112,6 +112,15 @@ def t4 = (
 )
 
 
+def t4 = (
+    # comment
+    (
+        # comment
+        x + 5
+    )
+)
+
+
 def t5 = (
     # comment
     # comment 
