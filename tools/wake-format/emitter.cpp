@@ -54,7 +54,7 @@ static inline bool is_expression(cst_id_t type) {
          type == CST_BINARY || CST_PAREN;
 }
 
-static inline bool has_comment_next(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+static inline bool has_comment_next(wcl::doc_builder& builder, ctx_t ctx, const CSTElement& node) {
   CSTElement copy = node;
   while (!copy.empty() && (copy.id() == TOKEN_WS || copy.id() == TOKEN_NL)) {
     copy.nextSiblingElement();
@@ -62,7 +62,7 @@ static inline bool has_comment_next(wcl::doc_builder& builder, ctx_t ctx, CSTEle
   return copy.id() == TOKEN_COMMENT;
 }
 
-static inline bool has_comment(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+static inline bool has_comment(wcl::doc_builder& builder, ctx_t ctx, const CSTElement& node) {
   CSTElement copy = node;
   while (!copy.empty()) {
     if (copy.id() == TOKEN_COMMENT) {
@@ -90,9 +90,16 @@ auto Emitter::rhs_fmt() {
   // clang-format on
 }
 
+// position_comment() inserts the appropiate ws/nl required to position a comment.
+// it is used to handle the case when its valid to have a comment right after a TOKEN
+// or on the line following the TOKEN. The decision is made by looking at what the original
+// author chose.
+//
+// if input is 'ws COMMENT' then emit 'ws'
+// if input is 'ws nl COMMENT' then emit 'nl'
+//
+// caller is expected to emit the following 'COMMENT' as appropiate
 auto position_comment() {
-  // ws COMMENT -> ws COMMENT nl
-  // ws nl COMMENT -> nl COMMENT nl
   return fmt().fmt_if(has_comment_next,
                       fmt()
                           .fmt_if(TOKEN_WS, fmt().next())
