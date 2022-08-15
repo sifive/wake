@@ -35,6 +35,12 @@ TEST(shell_escape_spaces) {
   EXPECT_EQUAL(esc, "'a b c'");
   esc = shell_escape("zz ss yy aa bb");
   EXPECT_EQUAL(esc, "'zz ss yy aa bb'");
+
+  esc = shell_escape(" echo");
+  EXPECT_EQUAL(esc, "' echo'");
+
+  esc = shell_escape("echo ");
+  EXPECT_EQUAL(esc, "'echo '");
 }
 
 TEST(shell_escape_empty_string) {
