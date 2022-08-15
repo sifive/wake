@@ -90,21 +90,21 @@ auto Emitter::rhs_fmt() {
   // clang-format on
 }
 
-// position_comment() inserts the appropiate ws/nl required to position a comment.
-// it is used to handle the case when its valid to have a comment right after a TOKEN
-// or on the line following the TOKEN. The decision is made by looking at what the original
-// author chose.
+// place_comment() inserts the appropiate ws/nl required to position a comment. Then
+// inserts the comment after that. It is used to handle the case when its valid to have
+// a comment right after a TOKEN or on the line following the TOKEN. The decision is
+// made by looking at what the original author chose.
 //
-// if input is 'ws COMMENT' then emit 'ws'
-// if input is 'ws nl COMMENT' then emit 'nl'
+// if input is 'ws COMMENT' then emits 'ws COMMENT'
+// if input is 'ws nl COMMENT' then emit 'nl COMMENT'
 //
-// caller is expected to emit the following 'COMMENT' as appropiate
-auto position_comment() {
+auto place_comment() {
   return fmt().fmt_if(has_comment_next,
                       fmt()
                           .fmt_if(TOKEN_WS, fmt().next())
                           .fmt_if_else(TOKEN_NL, fmt().next().newline(), fmt().space())
-                          .consume_wsnl());
+                          .consume_wsnl()
+                          .token(TOKEN_COMMENT));
 }
 
 wcl::doc Emitter::layout(CST cst) {
@@ -662,12 +662,12 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
   auto comment_fmt =
       fmt().nest(fmt()
              .token(TOKEN_P_POPEN)
-             .fmt_if(has_comment_next, position_comment().join(fmt().token(TOKEN_COMMENT)))
+             .join(place_comment())
              .consume_wsnl()
              .fmt_while(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT).consume_wsnl())
              .newline()
              .walk(is_expression, WALK_NODE)
-             .fmt_if(has_comment_next, position_comment().join(fmt().token(TOKEN_COMMENT)))
+             .join(place_comment())
              .consume_wsnl()
              .fmt_while(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT).consume_wsnl())
              .consume_wsnl())
