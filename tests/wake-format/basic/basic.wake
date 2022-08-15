@@ -8,6 +8,8 @@ def name Unit =
   def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   another
 
+global export def glob1 = 34
+
 # wake-format off
 def name Unit =
   def other = here
@@ -81,6 +83,81 @@ def t1 =match _
   # comments
   n = 2+t(n-1)
 
+def t2 = ((x+7)*3)
+
+def t3 = ( # comment
+  x 
+  + 5
+)
+
+def t4 = (
+  # comment
+  x 
+  + 5
+)
+
+def t4 = (
+  # comment
+  ( 
+  # comment
+  x 
+  + 5
+  )
+)
+
+def t5 = ( 
+  # comment
+  # comment 
+  # comment
+  x 
+  + 5
+)
+
+def t6 = ( # comment
+  # comment 
+  # comment
+  x 
+  + 5
+)
+
+
+# TODO: These cases are actually binop not paren
+# def t7 = (
+#   x # comment
+#   + 5
+# )
+
+# def t8 = (
+#   x + # comment
+#   5
+# )
+
+def t9 = (
+  x 
+  + 5 # comment
+)
+
+def t10 = (
+  x 
+  + 5
+  # comment
+)
+
+def t11 = (
+  x 
+  + 5 # comment
+# comment
+# comment
+)
+
+def t12 = (
+  x 
+  + 5 
+  # comment
+  # comment
+  # comment
+)
+
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     buildTestWake, Nil =
         require Pass (Pair path visible)=buildTestWake Unit
@@ -98,3 +175,11 @@ from wake import myMap=map foldl myFoldr=foldr
 from wake import def unary + -
 from wake import type Pair Result
 from wake import source,Nil
+
+export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
+export topic compileC: Pair String ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Result (List Path) Error)
+topic linkO: Pair String ((extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error)
+export topic path: String
+export topic wakeUnitTestBinary: (variant: Pair String String) => Result (List Path) Error
+global export topic glob1: String
+global topic glob1: String
