@@ -24,6 +24,10 @@ PASSED:
   option_some
   sanity_check1
   sanity_check2
+  shell_escape_empty_string
+  shell_escape_nominal
+  shell_escape_spaces
+  shell_escape_special
   trie_basic
   trie_basic_const
   trie_char

@@ -111,6 +111,11 @@ static bool not_special(char c) {
 }
 
 std::string shell_escape(const char *x) {
+  // empty string should always be escaped
+  if (strnlen(x, 1) == 0) {
+    return "''";
+  }
+
   // check if we need escaping at all
   const char *ok;
   for (ok = x; not_special(*ok); ++ok) {
