@@ -25,41 +25,42 @@ the wake.db directory and below.
 ### Syntax
 
 - Variables and functions defined the same way.
-```
-def foo x =
-    x + 2 
 
-def bar = 
-    foo 7
-```
+    ```
+    def foo x =
+        x + 2 
+
+    def bar = 
+        foo 7
+    ```
 
 * Only one statement is allowed per function. Multiple defs are allowed.
 
-```
-def foo x =
-    def two = 2
-    def add2 y =
-        y + two
-    add2 x
-``` 
+    ```
+    def foo x =
+        def two = 2
+        def add2 y =
+            y + two
+        add2 x
+    ``` 
 
 * To make any definition visible in another file, use global
 
-```
-global def foo a b =
-    a + b
-```
+    ```
+    global def foo a b =
+        a + b
+    ```
 
-* |, ., and →
-    * the pipe character feeds an argument to a function, like in shells scripts.
+* `|`, `.`, and `→`
+    * the pipe character feeds an argument to a function, like in shell scripts.
     * `a 0 (b 1 2 (c 3 d))` becomes `d | c 3 | b 1 2 | a 0`
-    * '.' is similar, but is used to calls look like OOP
+    * `.` is similar, but is used to make calls look like OOP
     * `length string` would become `string.length`
-    * wake fully supports unicode. A common use of this is in creating a Pair object
-    * 'a → b' is the same as Pair a b
-    * Be aware that there other supported unicode functions.
+    * wake fully supports Unicode. A common use of this is in creating a Pair object
+    * `a → b` is the same as `Pair a b`
+    * Be aware that there other supported Unicode functions.
 
-### functional programming constructs
+### Functional programming constructs
 
 Wake is generally functional.
 
@@ -106,6 +107,7 @@ Wake is generally functional.
     ```
 
 * anonymous functions (lambda). Both forms work.
+
     ```
     (\x x + 2)
     
