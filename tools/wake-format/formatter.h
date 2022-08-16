@@ -174,7 +174,7 @@ struct NestAction {
   NestAction(FMT formatter) : formatter(formatter) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    builder.append(formatter.compose(ctx.nest(), node));
+    builder.append(formatter.compose(ctx.sub(builder).nest(), node));
   }
 };
 
@@ -189,9 +189,9 @@ struct IfElseAction {
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     if (predicate(builder, ctx, node)) {
-      builder.append(if_formatter.compose(ctx, node));
+      builder.append(if_formatter.compose(ctx.sub(builder), node));
     } else {
-      builder.append(else_formatter.compose(ctx, node));
+      builder.append(else_formatter.compose(ctx.sub(builder), node));
     }
   }
 };
@@ -246,7 +246,7 @@ struct JoinAction {
   JoinAction(FMT formatter) : formatter(formatter) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    builder.append(formatter.compose(ctx, node));
+    builder.append(formatter.compose(ctx.sub(builder), node));
   }
 };
 
@@ -280,7 +280,7 @@ class FitsPredicate {
 
   bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     CSTElement copy = node;
-    wcl::doc doc = formatter.compose(ctx, copy);
+    wcl::doc doc = formatter.compose(ctx.sub(builder), copy);
     if (builder.has_newline()) {
       return builder.last_width() + doc.first_width() <= 100;
     } else {
