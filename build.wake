@@ -166,3 +166,6 @@ def defaultWake Unit =
         doInstall "tmp" "default"
 
     Pass (Pair "tmp/bin/wake" wakeVisible)
+
+export def test = "test CI"
+
