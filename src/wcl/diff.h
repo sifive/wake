@@ -17,15 +17,13 @@
 
 #pragma once
 
-#include <vector>
-#include <queue>
 #include <algorithm>
+#include <queue>
+#include <vector>
 
 namespace wcl {
 
-enum class diff_type_t {
-  Add, Sub, Keep
-};
+enum class diff_type_t { Add, Sub, Keep };
 
 template <class T>
 struct diff_t {
@@ -36,7 +34,7 @@ struct diff_t {
 // This is an implementation detail
 template <class Iter1, class Iter2>
 class edge_t {
-private:
+ private:
   // The type, tells us the cost and direction;
   diff_type_t _type;
 
@@ -66,7 +64,7 @@ private:
     return iter2;
   }
 
-public:
+ public:
   edge_t(diff_type_t type, Iter1 i1, Iter2 i2) : _type(type), iter1(i1), iter2(i2), prev(nullptr) {
     total_cost = type_cost(type);
     std::cerr << total_cost << std::endl;
@@ -79,34 +77,23 @@ public:
     std::cerr << total_cost << std::endl;
   }
 
-  bool operator<(const edge_t& other) const {
-    return total_cost >= other.total_cost;
-  }
+  bool operator<(const edge_t& other) const { return total_cost >= other.total_cost; }
 
-  diff_type_t type() const {
-    return _type;
-  }
+  diff_type_t type() const { return _type; }
 
-  std::pair<Iter1, Iter2> from() const {
-    return {iter1, iter2};
-  }
+  std::pair<Iter1, Iter2> from() const { return {iter1, iter2}; }
 
-  std::pair<Iter1, Iter2> to() const {
-    return {advance1(), advance2()};
-  }
+  std::pair<Iter1, Iter2> to() const { return {advance1(), advance2()}; }
 
-  const edge_t* previous() const {
-    return prev.get();
-  }
+  const edge_t* previous() const { return prev.get(); }
 
-  double cost() const {
-    return total_cost;
-  }
+  double cost() const { return total_cost; }
 };
 
 template <class Iter1, class Iter2>
 struct edge_cmp_t {
-  bool operator()(const std::shared_ptr<edge_t<Iter1, Iter2>>& a, const std::shared_ptr<edge_t<Iter1, Iter2>>& b) {
+  bool operator()(const std::shared_ptr<edge_t<Iter1, Iter2>>& a,
+                  const std::shared_ptr<edge_t<Iter1, Iter2>>& b) {
     return *a < *b;
   }
 };
@@ -119,10 +106,10 @@ std::vector<diff_t<T>> diff(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) 
   // If it subtracts, it advances the first iterator. if it adds, it advances the second iterator.
   // If it keeps it advances both (this is like moving diagonally). The cost of an add/sub is 1.0.
   // The cost of a keep is free but both iterators must be equal for it to be valid.
-  // The shortest paths in this graph defines the edit distance of the two sequences and further more
-  // tells you how to edit the first sequence to get to the second sequence. In order to memoize
-  // the shortest path we store the edge we started from as the previous edge in each. Following
-  // these backwards gives the return path in reverse order.
+  // The shortest paths in this graph defines the edit distance of the two sequences and further
+  // more tells you how to edit the first sequence to get to the second sequence. In order to
+  // memoize the shortest path we store the edge we started from as the previous edge in each.
+  // Following these backwards gives the return path in reverse order.
   using edge_type = std::shared_ptr<edge_t<Iter1, Iter2>>;
   std::priority_queue<edge_type, std::vector<edge_type>, edge_cmp_t<Iter1, Iter2>> edges;
   std::vector<diff_t<T>> out;
@@ -202,4 +189,4 @@ std::vector<diff_t<T>> diff(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) 
   // The above is an infinite loop so we never get here
 }
 
-};
+};  // namespace wcl

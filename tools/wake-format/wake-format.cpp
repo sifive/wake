@@ -35,8 +35,8 @@
 #include "parser/syntax.h"
 #include "util/diagnostic.h"
 #include "util/file.h"
-#include "wcl/xoshiro_256.h"
 #include "wcl/diff.h"
+#include "wcl/xoshiro_256.h"
 
 #ifndef VERSION
 #include "version.h"
@@ -126,26 +126,8 @@ void print_cst(CSTElement node, int depth) {
   }
 }
 
-void goofy_test() {
-  std::vector<std::string> lines1 = {"A", "B", "C", "E", "F"};
-  std::vector<std::string> lines2 = {"A", "D", "C", "E", "F"};
-  for (auto l : wcl::diff<std::string>(lines1.begin(), lines1.end(), lines2.begin(), lines2.end())) {
-    if (l.type == wcl::diff_type_t::Add) {
-      std::cout << "+ "; // TODO: Add color
-    } else if (l.type == wcl::diff_type_t::Sub) {
-      std::cout << "- "; // TODO: Add color
-    } else {
-      std::cout << "  ";
-    }
-    std::cout << l.value << std::endl;
-  }
-  std::cout << std::endl;
-}
-
 DiagnosticReporter *reporter;
 int main(int argc, char **argv) {
-  goofy_test();
-
   TerminalReporter terminalReporter;
   reporter = &terminalReporter;
 
@@ -183,11 +165,6 @@ int main(int argc, char **argv) {
     exit(EXIT_SUCCESS);
   }
 
-  if (dry_run) {
-    std::cout << "wake-format: dry-run not yet supported" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-
   if (argc < 2) {
     std::cerr << argv[0] << ": missing files to format" << std::endl;
     exit(EXIT_FAILURE);
@@ -196,6 +173,8 @@ int main(int argc, char **argv) {
   auto seed = (no_rng) ? std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>({0, 0, 0, 0})
                        : wcl::xoshiro_256::get_rng_seed();
   wcl::xoshiro_256 rng(seed);
+
+  bool dry_run_failed = false;
 
   for (int i = 1; i < argc; i++) {
     std::string name(argv[i]);
@@ -243,18 +222,67 @@ int main(int argc, char **argv) {
 
         exit(EXIT_FAILURE);
       }
+
+      if (dry_run) {
+        std::vector<std::string> src;
+        std::vector<std::string> fmt;
+
+        {
+          std::ifstream src_file(name);
+
+          std::string src_line;
+          while (std::getline(src_file, src_line)) {
+            src.push_back(src_line);
+          }
+        }
+
+        {
+          std::ifstream fmt_file(tmp);
+
+          std::string fmt_line;
+          while (std::getline(fmt_file, fmt_line)) {
+            fmt.push_back(fmt_line);
+          }
+        }
+
+        // cleanup the formatting tmp file
+        remove(tmp.c_str());
+
+        // run silent if there is nothing to format
+        // TODO: check full equality here
+        if (src.size() == fmt.size()) {
+          continue;
+        }
+
+        for (auto line : wcl::diff<std::string>(src.begin(), src.end(), fmt.begin(), fmt.end())) {
+          if (line.type == wcl::diff_type_t::Add) {
+            std::cout << "+ ";  // TODO: Add color
+          } else if (line.type == wcl::diff_type_t::Sub) {
+            std::cout << "- ";  // TODO: Add color
+          } else {
+            std::cout << "  ";
+          }
+          std::cout << line.value << std::endl;
+        }
+        std::cout << std::endl;
+
+        dry_run_failed = true;
+      }
+
+      if (in_place) {
+        // When editing in-place we need to rename the tmp file over the original
+        rename(tmp.c_str(), name.c_str());
+      } else {
+        // print out the resulting file and remove
+        std::ifstream src(tmp);
+        std::cout << src.rdbuf();
+        remove(tmp.c_str());
+      }
     }
 
-    if (in_place) {
-      // When editing in-place we need to rename the tmp file over the original
-      rename(tmp.c_str(), name.c_str());
-    } else {
-      // print out the resulting file and remove
-      std::ifstream src(tmp);
-      std::cout << src.rdbuf();
-      remove(tmp.c_str());
+    if (dry_run && dry_run_failed) {
+      exit(EXIT_FAILURE);
     }
+
+    exit(EXIT_SUCCESS);
   }
-
-  exit(EXIT_SUCCESS);
-}
