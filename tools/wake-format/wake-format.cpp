@@ -248,14 +248,13 @@ int main(int argc, char **argv) {
         // cleanup the formatting tmp file
         remove(tmp.c_str());
 
-      if (src == fmt) {
-        continue;
-      }
+        if (src == fmt) {
+          continue;
+        }
 
         auto diff = wcl::diff<std::string>(src.begin(), src.end(), fmt.begin(), fmt.end());
         display_diff(std::cerr, diff);
         dry_run_failed = true;
-
       }
 
       if (in_place) {
@@ -267,7 +266,6 @@ int main(int argc, char **argv) {
         std::cout << src.rdbuf();
         remove(tmp.c_str());
       }
-
     }
 
     if (dry_run && dry_run_failed) {
