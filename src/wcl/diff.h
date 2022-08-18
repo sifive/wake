@@ -98,9 +98,12 @@ struct edge_cmp_t {
   }
 };
 
+template <class T>
+using seq_diff_t = std::vector<diff_t<T>>;
+
 // TODO: optimize leading string of keeps
 template <class T, class Iter1, class Iter2>
-std::vector<diff_t<T>> diff(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) {
+seq_diff_t<T> diff(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) {
   // Each node in the implicit graph is defined by a pair of iterators. Each edge in the graph
   // starts at a node, and advances one or both of the iterators to get to the next node.
   // If it subtracts, it advances the first iterator. if it adds, it advances the second iterator.
@@ -113,7 +116,7 @@ std::vector<diff_t<T>> diff(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) 
   std::set<std::pair<Iter1, Iter2>> visited;
   using edge_type = std::shared_ptr<edge_t<Iter1, Iter2>>;
   std::priority_queue<edge_type, std::vector<edge_type>, edge_cmp_t<Iter1, Iter2>> edges;
-  std::vector<diff_t<T>> out;
+  seq_diff_t<T> out;
 
   // We want to call this later on just the right node. So
   // its easier to make it a function instead.
@@ -195,6 +198,59 @@ std::vector<diff_t<T>> diff(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) 
   }
 
   // The above is an infinite loop so we never get here
+}
+
+template <class T>
+void display_diff(std::ostream& out, const seq_diff_t<T>& diff, size_t keep_size = 4) {
+  // We need a buffer for keeps so we can display them more sainly. This allows us to
+  // iterate through the diff, including the keeps but to only display the keeps in
+  // a more compact way.
+  std::vector<std::string> keep_buf;
+  int64_t cur_in_line = 0;
+  int64_t cur_out_line = 0;
+
+  auto flush_keeps = [&]() {
+    // The buffer might be empty
+    if (keep_buf.empty()) return;
+
+    // If not check if its better to display it all or skip ahead
+    if (keep_buf.size() <= keep_size) {
+      for (const auto& keep_line : keep_buf) {
+        out << "  " << keep_line << std::endl;
+      }
+    } else {
+      // TODO: Make color work correctly at later date using proper term lib
+      out << "\033[94m@@ -" << cur_in_line << " +" << cur_out_line << " @@\033[0m" << std::endl;
+    }
+
+    keep_buf.clear();
+  };
+
+  for (auto iter = diff.begin(); iter < diff.end(); ++iter) {
+    auto line = *iter;
+    switch (line.type) {
+      case wcl::diff_type_t::Add:
+        cur_out_line++;
+        // TODO: Make color work correctly at later date using proper term lib
+        flush_keeps();
+        out << "\033[32m+ " << line.value << "\033[0m" << std::endl;
+        break;
+      case wcl::diff_type_t::Sub:
+        cur_in_line++;
+        // TODO: Make color work correctly at later date using proper term lib
+        flush_keeps();
+        out << "\033[31m- " << line.value << "\033[0m" << std::endl;
+        break;
+      case wcl::diff_type_t::Keep:
+        keep_buf.push_back(line.value);
+        cur_out_line++;
+        cur_in_line++;
+        break;
+    }
+  }
+
+  // Finally we probably have some things to emit in the keep buffer
+  flush_keeps();
 }
 
 };  // namespace wcl

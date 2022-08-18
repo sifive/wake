@@ -248,25 +248,14 @@ int main(int argc, char **argv) {
         // cleanup the formatting tmp file
         remove(tmp.c_str());
 
-        // run silent if there is nothing to format
-        // TODO: check full equality here
-        if (src.size() == fmt.size()) {
-          continue;
-        }
+      if (src == fmt) {
+        continue;
+      }
 
-        for (auto line : wcl::diff<std::string>(src.begin(), src.end(), fmt.begin(), fmt.end())) {
-          if (line.type == wcl::diff_type_t::Add) {
-            std::cout << "+ ";  // TODO: Add color
-          } else if (line.type == wcl::diff_type_t::Sub) {
-            std::cout << "- ";  // TODO: Add color
-          } else {
-            std::cout << "  ";
-          }
-          std::cout << line.value << std::endl;
-        }
-        std::cout << std::endl;
-
+        auto diff = wcl::diff<std::string>(src.begin(), src.end(), fmt.begin(), fmt.end());
+        display_diff(std::cerr, diff);
         dry_run_failed = true;
+
       }
 
       if (in_place) {
@@ -278,6 +267,7 @@ int main(int argc, char **argv) {
         std::cout << src.rdbuf();
         remove(tmp.c_str());
       }
+
     }
 
     if (dry_run && dry_run_failed) {
