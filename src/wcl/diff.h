@@ -19,10 +19,10 @@
 
 #include <algorithm>
 #include <memory>
+#include <ostream>
 #include <queue>
 #include <set>
 #include <vector>
-#include <ostream>
 
 namespace wcl {
 
