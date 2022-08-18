@@ -222,50 +222,50 @@ int main(int argc, char **argv) {
 
         exit(EXIT_FAILURE);
       }
+    }
 
-      if (dry_run) {
-        std::vector<std::string> src;
-        std::vector<std::string> fmt;
+    if (dry_run) {
+      std::vector<std::string> src;
+      std::vector<std::string> fmt;
 
-        {
-          std::ifstream src_file(name);
+      {
+        std::ifstream src_file(name);
 
-          std::string src_line;
-          while (std::getline(src_file, src_line)) {
-            src.push_back(src_line);
-          }
+        std::string src_line;
+        while (std::getline(src_file, src_line)) {
+          src.push_back(src_line);
         }
-
-        {
-          std::ifstream fmt_file(tmp);
-
-          std::string fmt_line;
-          while (std::getline(fmt_file, fmt_line)) {
-            fmt.push_back(fmt_line);
-          }
-        }
-
-        // cleanup the formatting tmp file
-        remove(tmp.c_str());
-
-        if (src == fmt) {
-          continue;
-        }
-
-        auto diff = wcl::diff<std::string>(src.begin(), src.end(), fmt.begin(), fmt.end());
-        display_diff(std::cerr, diff);
-        dry_run_failed = true;
       }
 
-      if (in_place) {
-        // When editing in-place we need to rename the tmp file over the original
-        rename(tmp.c_str(), name.c_str());
-      } else {
-        // print out the resulting file and remove
-        std::ifstream src(tmp);
-        std::cout << src.rdbuf();
-        remove(tmp.c_str());
+      {
+        std::ifstream fmt_file(tmp);
+
+        std::string fmt_line;
+        while (std::getline(fmt_file, fmt_line)) {
+          fmt.push_back(fmt_line);
+        }
       }
+
+      // cleanup the formatting tmp file
+      remove(tmp.c_str());
+
+      if (src == fmt) {
+        continue;
+      }
+
+      auto diff = wcl::diff<std::string>(src.begin(), src.end(), fmt.begin(), fmt.end());
+      display_diff(std::cerr, diff);
+      dry_run_failed = true;
+    }
+
+    if (in_place) {
+      // When editing in-place we need to rename the tmp file over the original
+      rename(tmp.c_str(), name.c_str());
+    } else {
+      // print out the resulting file and remove
+      std::ifstream src(tmp);
+      std::cout << src.rdbuf();
+      remove(tmp.c_str());
     }
 
     if (dry_run && dry_run_failed) {
