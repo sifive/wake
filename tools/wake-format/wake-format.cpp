@@ -35,6 +35,7 @@
 #include "parser/syntax.h"
 #include "util/diagnostic.h"
 #include "util/file.h"
+#include "wcl/diff.h"
 #include "wcl/xoshiro_256.h"
 
 #ifndef VERSION
@@ -164,11 +165,6 @@ int main(int argc, char **argv) {
     exit(EXIT_SUCCESS);
   }
 
-  if (dry_run) {
-    std::cout << "wake-format: dry-run not yet supported" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-
   if (argc < 2) {
     std::cerr << argv[0] << ": missing files to format" << std::endl;
     exit(EXIT_FAILURE);
@@ -177,6 +173,8 @@ int main(int argc, char **argv) {
   auto seed = (no_rng) ? std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>({0, 0, 0, 0})
                        : wcl::xoshiro_256::get_rng_seed();
   wcl::xoshiro_256 rng(seed);
+
+  bool dry_run_failed = false;
 
   for (int i = 1; i < argc; i++) {
     std::string name(argv[i]);
@@ -226,6 +224,40 @@ int main(int argc, char **argv) {
       }
     }
 
+    if (dry_run) {
+      std::vector<std::string> src;
+      std::vector<std::string> fmt;
+
+      {
+        std::ifstream src_file(name);
+
+        std::string src_line;
+        while (std::getline(src_file, src_line)) {
+          src.push_back(src_line);
+        }
+      }
+
+      {
+        std::ifstream fmt_file(tmp);
+
+        std::string fmt_line;
+        while (std::getline(fmt_file, fmt_line)) {
+          fmt.push_back(fmt_line);
+        }
+      }
+
+      // cleanup the formatting tmp file
+      remove(tmp.c_str());
+
+      if (src == fmt) {
+        continue;
+      }
+
+      auto diff = wcl::diff<std::string>(src.begin(), src.end(), fmt.begin(), fmt.end());
+      display_diff(std::cerr, diff);
+      dry_run_failed = true;
+    }
+
     if (in_place) {
       // When editing in-place we need to rename the tmp file over the original
       rename(tmp.c_str(), name.c_str());
@@ -235,6 +267,10 @@ int main(int argc, char **argv) {
       std::cout << src.rdbuf();
       remove(tmp.c_str());
     }
+  }
+
+  if (dry_run && dry_run_failed) {
+    exit(EXIT_FAILURE);
   }
 
   exit(EXIT_SUCCESS);
