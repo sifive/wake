@@ -189,4 +189,22 @@ std::vector<diff_t<T>> diff(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) 
   // The above is an infinite loop so we never get here
 }
 
+template <class T>
+std::vector<T> apply_diff(std::vector<diff_t<T>> diff) {
+  std::vector<T> out = {};
+  for (auto line : diff) {
+    switch (line.type) {
+      case wcl::diff_type_t::Sub:
+        break;
+      case wcl::diff_type_t::Add:
+      case wcl::diff_type_t::Keep:
+        out.push_back(line.value);
+        break;
+      default:
+        assert(0);
+    }
+  }
+  return out;
+}
+
 };  // namespace wcl
