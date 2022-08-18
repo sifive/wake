@@ -18,7 +18,9 @@
 #pragma once
 
 #include <algorithm>
+#include <memory>
 #include <queue>
+#include <set>
 #include <vector>
 
 namespace wcl {
@@ -67,14 +69,12 @@ class edge_t {
  public:
   edge_t(diff_type_t type, Iter1 i1, Iter2 i2) : _type(type), iter1(i1), iter2(i2), prev(nullptr) {
     total_cost = type_cost(type);
-    std::cerr << total_cost << std::endl;
   }
 
   edge_t(diff_type_t type, std::shared_ptr<edge_t> prev) : _type(type), prev(prev) {
     total_cost = prev->total_cost + type_cost(type);
     iter1 = prev->advance1();
     iter2 = prev->advance2();
-    std::cerr << total_cost << std::endl;
   }
 
   bool operator<(const edge_t& other) const { return total_cost >= other.total_cost; }
@@ -110,6 +110,7 @@ std::vector<diff_t<T>> diff(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) 
   // more tells you how to edit the first sequence to get to the second sequence. In order to
   // memoize the shortest path we store the edge we started from as the previous edge in each.
   // Following these backwards gives the return path in reverse order.
+  std::set<std::pair<Iter1, Iter2>> visited;
   using edge_type = std::shared_ptr<edge_t<Iter1, Iter2>>;
   std::priority_queue<edge_type, std::vector<edge_type>, edge_cmp_t<Iter1, Iter2>> edges;
   std::vector<diff_t<T>> out;
@@ -160,8 +161,14 @@ std::vector<diff_t<T>> diff(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) 
     auto edge = edges.top();
     edges.pop();
     std::tie(iter1, iter2) = edge->to();
-    std::cerr << "exploring node: (" << (iter1 - begin1) << ", " << (iter2 - begin2) << ")";
-    std::cerr << " cost = " << edge->cost() << std::endl;
+
+    // If we already visisted the node we're about to go down
+    // we can just skip it because we already found a shorter path
+    // here
+    if (visited.count({iter1, iter2})) continue;
+
+    // Now that we're about to visit this node mark it as visited so no one else does.
+    visited.emplace(iter1, iter2);
 
     // We should always hit this condition before edges is empty.
     // If this condition is false, one of the following conditions
@@ -173,38 +180,21 @@ std::vector<diff_t<T>> diff(Iter1 begin1, Iter1 end1, Iter2 begin2, Iter2 end2) 
       return out;
     }
 
+    // We assume that keeping is always better than not keeping
     if (iter2 != end2 && iter1 != end1 && *iter1 == *iter2) {
       edges.emplace(std::make_unique<edge_t<Iter1, Iter2>>(diff_type_t::Keep, edge));
-    }
+    } else {
+      if (iter2 != end2) {
+        edges.emplace(std::make_unique<edge_t<Iter1, Iter2>>(diff_type_t::Add, edge));
+      }
 
-    if (iter2 != end2) {
-      edges.emplace(std::make_unique<edge_t<Iter1, Iter2>>(diff_type_t::Add, edge));
-    }
-
-    if (iter1 != end1) {
-      edges.emplace(std::make_unique<edge_t<Iter1, Iter2>>(diff_type_t::Sub, edge));
+      if (iter1 != end1) {
+        edges.emplace(std::make_unique<edge_t<Iter1, Iter2>>(diff_type_t::Sub, edge));
+      }
     }
   }
 
   // The above is an infinite loop so we never get here
-}
-
-template <class T>
-std::vector<T> apply_diff(std::vector<diff_t<T>> diff) {
-  std::vector<T> out = {};
-  for (auto line : diff) {
-    switch (line.type) {
-      case wcl::diff_type_t::Sub:
-        break;
-      case wcl::diff_type_t::Add:
-      case wcl::diff_type_t::Keep:
-        out.push_back(line.value);
-        break;
-      default:
-        assert(0);
-    }
-  }
-  return out;
 }
 
 };  // namespace wcl
