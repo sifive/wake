@@ -346,7 +346,7 @@ struct FmtPredicate<int> {
 
 // if sizeof(cst_id_t) is increased then
 // std::bitset<256> set from FmtPredicate needs to be increased
-static_assert(sizeof(cst_id_t) == 1);
+static_assert(sizeof(cst_id_t) == 1, "bitset size must match type size");
 
 template <class T>
 struct FmtPredicate<std::initializer_list<T>> {
