@@ -22,6 +22,7 @@
 #include <queue>
 #include <set>
 #include <vector>
+#include <ostream>
 
 namespace wcl {
 
