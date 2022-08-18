@@ -403,6 +403,7 @@ void status_write(const char *name, const char *data, int len) {
   // clang-format off
   EM_ASM_INT({
     console.log('[' + UTF8ToString($0) + '] ' + UTF8ToString($1));
+    return 0;
   }, name, data);
   // clang-format on
 }
