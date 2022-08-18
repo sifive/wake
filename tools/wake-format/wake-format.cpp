@@ -267,10 +267,11 @@ int main(int argc, char **argv) {
       std::cout << src.rdbuf();
       remove(tmp.c_str());
     }
-
-    if (dry_run && dry_run_failed) {
-      exit(EXIT_FAILURE);
-    }
-
-    exit(EXIT_SUCCESS);
   }
+
+  if (dry_run && dry_run_failed) {
+    exit(EXIT_FAILURE);
+  }
+
+  exit(EXIT_SUCCESS);
+}
