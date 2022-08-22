@@ -10,9 +10,16 @@ def name Unit =
 
 global export def glob1 = 34
 
+# will it bind?
+def name Unit =
+  def other = here
+  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  another
+
 # wake-format off
 def name Unit =
   def other = here
+  # wake-format off
   def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   another
 
