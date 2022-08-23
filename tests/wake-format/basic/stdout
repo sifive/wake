@@ -126,7 +126,7 @@ def t4 = (
 def t4 = (
     # comment
     (
-        # fexcomment
+        # comment
         x + 5
     )
 )
