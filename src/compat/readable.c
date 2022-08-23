@@ -33,6 +33,7 @@ EM_ASYNC_JS(int, isReadable, (const char *filename), {
 
 int is_readable(const char *filename) {
   int is_node = 0;
+  // clang-format off
   int res = EM_ASM_INT({
     if (ENVIRONMENT_IS_NODE) {
       setValue($1, 1, 'i32');
@@ -47,9 +48,12 @@ int is_readable(const char *filename) {
       return 0;
     }
   }, filename, &is_node);
+  // clang-format on
 
-  if (is_node) return res;
-  else return isReadable(filename);
+  if (is_node)
+    return res;
+  else
+    return isReadable(filename);
 }
 
 #else

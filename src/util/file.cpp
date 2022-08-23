@@ -121,7 +121,7 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
   Location l(filename());
 
   int32_t length;
-  uint8_t *base = (uint8_t *) getBase(&length, filename());
+  uint8_t *base = (uint8_t *)getBase(&length, filename());
 
   if (length == -1) {
     reporter.reportError(l, std::string("readFile failed; ") + reinterpret_cast<char *>(base));

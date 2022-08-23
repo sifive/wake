@@ -77,7 +77,7 @@ class LSPServer {
       diagnostics = JAST(JSON_ARRAY);
       notification = JAST(JSON_OBJECT);
     }
-    explicit MethodResult(JAST _response): response(std::move(_response)) {
+    explicit MethodResult(JAST _response) : response(std::move(_response)) {
       diagnostics = JAST(JSON_ARRAY);
       notification = JAST(JSON_OBJECT);
     }
@@ -104,7 +104,7 @@ class LSPServer {
       } else if (!method.empty()) {
         return callMethod(method, request);
       }
-      return {}; // empty result
+      return {};  // empty result
     }
   }
 
@@ -134,17 +134,17 @@ class LSPServer {
       MethodResult methodResult = processRequest(content);
 
       const std::string errorCode = methodResult.response.get("error").get("code").value;
-      if (errorCode.empty()) { // no error occurred
+      if (errorCode.empty()) {  // no error occurred
         const std::string notifMethod = methodResult.notification.get("method").value;
-        if (!notifMethod.empty()) { // notification was produced => send it
+        if (!notifMethod.empty()) {  // notification was produced => send it
           sendMessage(methodResult.notification);
         }
 
-        for (const auto &fileDiagnostics: methodResult.diagnostics.children) {
-          sendMessage(fileDiagnostics.second); // send diagnostics
+        for (const auto &fileDiagnostics : methodResult.diagnostics.children) {
+          sendMessage(fileDiagnostics.second);  // send diagnostics
         }
       }
-      sendMessage(methodResult.response); // send response
+      sendMessage(methodResult.response);  // send response
     }
   }
 
@@ -166,8 +166,7 @@ class LSPServer {
       {"textDocument/didClose", &LSPServer::didClose},
       {"workspace/didChangeWatchedFiles", &LSPServer::didChangeWatchedFiles},
       {"shutdown", &LSPServer::shutdown},
-      {"exit", &LSPServer::serverExit}
-  };
+      {"exit", &LSPServer::serverExit}};
   std::map<std::string, LspMethod> additionalMethods = {
       {"textDocument/definition", &LSPServer::goToDefinition},
       {"textDocument/references", &LSPServer::findReportReferences},
@@ -175,8 +174,7 @@ class LSPServer {
       {"textDocument/hover", &LSPServer::hover},
       {"textDocument/documentSymbol", &LSPServer::documentSymbol},
       {"workspace/symbol", &LSPServer::workspaceSymbol},
-      {"textDocument/rename", &LSPServer::rename}
-  };
+      {"textDocument/rename", &LSPServer::rename}};
 
   void notifyAboutInvalidSTDLib(MethodResult &methodResult) const {
     JAST message = JSONConverter::createMessage();
@@ -305,7 +303,7 @@ class LSPServer {
   MethodResult initialize(const JAST &receivedMessage) {
     MethodResult methodResult;
     if (!isSTDLibValid) {
-      notifyAboutInvalidSTDLib(methodResult); // set notification
+      notifyAboutInvalidSTDLib(methodResult);  // set notification
       methodResult.response = JSONConverter::createInitializeResultInvalidSTDLib(receivedMessage);
     } else {
       methodResult.response = JSONConverter::createInitializeResultDefault(receivedMessage);
@@ -321,7 +319,7 @@ class LSPServer {
     MethodResult methodResult;
     if (isSTDLibValid) {
       needsUpdate = true;
-      refresh("initialized", methodResult); // set diagnostics
+      refresh("initialized", methodResult);  // set diagnostics
     }
     return methodResult;
   }
@@ -541,7 +539,6 @@ class LSPServer {
   MethodResult serverExit(const JAST &_) { exit(isShutDown ? 0 : 1); }
 };
 
-
 LSPServer *lspServer = nullptr;
 
 #ifdef __EMSCRIPTEN__
@@ -563,7 +560,7 @@ void instantiateServerInternal(const std::string &stdLib) {
     } else {
       lspServer = new LSPServer(false, stdLib);
     }
-  } else { // no need to check stdlib validity in web, since it can't be customized there
+  } else {  // no need to check stdlib validity in web, since it can't be customized there
     lspServer = new LSPServer(true, stdLib);
   }
 }
