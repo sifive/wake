@@ -123,6 +123,7 @@ def t5 = (
 #   5
 # )
 
+# TODO: this needs to emit correctly
 def t9 = (
   x 
   + 5 # comment

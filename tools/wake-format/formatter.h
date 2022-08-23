@@ -121,33 +121,6 @@ struct NewlineAction {
   }
 };
 
-struct FreshlineAction {
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
-                         const token_traits_map_t& traits) {
-    size_t curr = curr_width(builder, ctx);
-    // VERY BAD HACK: check for everything is ws
-    wcl::doc d = std::move(builder).build();
-    std::string s = d.as_string();
-    bool is_fresh = true;
-    for (auto c : s) {
-      if (!(c == '\n' || c == ' ')) {
-        is_fresh = false;
-        break;
-      }
-    }
-
-    builder.append(s);
-
-    if (is_fresh && curr <= (SPACE_PER_INDENT * ctx.nest_level)) {
-      // HACK: this is not really a solution to the problem
-      space(builder, SPACE_PER_INDENT * ctx.nest_level - curr);
-      return;
-    }
-
-    newline(builder, SPACE_PER_INDENT * ctx.nest_level);
-  }
-};
-
 struct TokenAction {
   cst_id_t token_id;
   TokenAction(cst_id_t token_id) : token_id(token_id) {}
@@ -559,7 +532,6 @@ struct Formatter {
   Formatter<SeqAction<Action, SpaceAction>> space(uint8_t count = 1) { return {{action, {count}}}; }
 
   Formatter<SeqAction<Action, NewlineAction>> newline() { return {{action, {}}}; }
-  Formatter<SeqAction<Action, FreshlineAction>> freshline() { return {{action, {}}}; }
 
   Formatter<SeqAction<Action, TokenAction>> token(cst_id_t id) { return {{action, {id}}}; }
 

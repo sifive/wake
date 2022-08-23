@@ -348,7 +348,7 @@ void Emitter::bind_before(CSTElement target, CSTElement bindable) {
 
 // Finds and returns the first non-ws token before items[idx].
 // idx must be at least 1 or the function will assert
-//
+// There must be a before bindable token or program will exit
 CSTElement find_before_bindable(const std::vector<CSTElement>& items, size_t idx) {
   assert(idx >= 1);
   size_t start = idx - 1;

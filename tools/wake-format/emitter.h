@@ -28,7 +28,6 @@
 
 #include "formatter.h"
 #include "parser/cst.h"
-#include "parser/syntax.h"
 
 template <>
 struct std::hash<std::pair<CSTElement, ctx_t>> {
