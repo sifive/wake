@@ -32,7 +32,7 @@
 
 template <>
 struct std::hash<std::pair<CSTElement, ctx_t>> {
-  size_t operator()(std::pair<CSTElement, ctx_t> const &pair) const noexcept {
+  size_t operator()(std::pair<CSTElement, ctx_t> const& pair) const noexcept {
     return wcl::hash_combine(std::hash<CSTElement>{}(pair.first), std::hash<ctx_t>{}(pair.second));
   }
 };
@@ -65,9 +65,28 @@ class Emitter {
   // Marks all node elements that have had their formatting disabled
   void mark_no_format_nodes(CSTElement node);
 
-  // Binds all comments in the tree to their associated token
-  // as a human would consider it
+  // Binds all comments in the tree to their associated token as a human would consider it.
+  //
+  // A comment following a token without a newline is bound to that token
+  // Ex:
+  //   'def x = 5 # a number'
+  //   will bind '# a number' to '5'
+  //
+  // A comment with a newline between it and the previous token gets bound to the first
+  // non-whitespace, non-newline, non-comment following the it.
+  // Ex:
+  //   '''
+  //   def x = 5
+  //   # comment1
+  //   # comment2
+  //   def y = 4
+  //   '''
+  //   will bind '# comment1' and '# comment2' to the second 'def'
   void bind_comments(CSTElement node);
+
+  // Helper functions for bind_comments.
+  size_t bind_after(const std::vector<CSTElement>& items, size_t idx, CSTElement bindable);
+  void bind_before(CSTElement target, CSTElement bindable);
 
   // Returns a formatter that inserts the next node
   // on the current line if it fits, or on a new nested line

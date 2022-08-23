@@ -125,12 +125,25 @@ struct FreshlineAction {
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
     size_t curr = curr_width(builder, ctx);
-    if (curr <= (SPACE_PER_INDENT * ctx.nest_level)) {
+    // VERY BAD HACK: check for everything is ws
+    wcl::doc d = std::move(builder).build();
+    std::string s = d.as_string();
+    bool is_fresh = true;
+    for (auto c : s) {
+      if (!(c == '\n' || c == ' ')) {
+        is_fresh = false;
+        break;
+      }
+    }
+
+    builder.append(s);
+
+    if (is_fresh && curr <= (SPACE_PER_INDENT * ctx.nest_level)) {
       // HACK: this is not really a solution to the problem
       space(builder, SPACE_PER_INDENT * ctx.nest_level - curr);
       return;
     }
-    // assert(builder.has_newline());
+
     newline(builder, SPACE_PER_INDENT * ctx.nest_level);
   }
 };

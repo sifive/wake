@@ -307,68 +307,103 @@ void inorder_collect_tokens(CSTElement node, std::vector<CSTElement>& items) {
   }
 }
 
+// Binds after from the perspective of 'bindable'
+// Binds before from the perspective of the token bound to.
+// Returns the new index into items
+size_t Emitter::bind_after(const std::vector<CSTElement>& items, size_t idx, CSTElement bindable) {
+  std::vector<CSTElement> to_bind = {bindable};
+  idx++;
+
+  // Skip any WS/NL/COMMENT tokens while searching for the token to bind to
+  // collect any COMMENTs seen along the way to also bind to the target
+  // TODO: also collect NLs
+  CSTElement target = items[idx];
+  while (!target.empty() &&
+         (target.id() == TOKEN_WS || target.id() == TOKEN_NL || target.id() == TOKEN_COMMENT)) {
+    if (target.id() == TOKEN_COMMENT) {
+      to_bind.push_back(target);
+    }
+    idx++;
+    target = items[idx];
+  }
+
+  // TODO: pretty sure this can happen with a "trailing" comment.
+  assert(!target.empty());
+
+  assert(!target.isNode());
+  assert(!(target.id() == TOKEN_WS || target.id() == TOKEN_COMMENT || target.id() == TOKEN_NL));
+
+  for (auto bind : to_bind) {
+    token_traits[target].bind_before(bind);
+  }
+
+  return idx;
+}
+
+// Binds before from the perspective of 'bindable'
+// Binds after from the perspective of 'target'.
+void Emitter::bind_before(CSTElement target, CSTElement bindable) {
+  token_traits[target].bind_after(bindable);
+}
+
+// Finds and returns the first non-ws token before items[idx].
+// idx must be at least 1 or the function will assert
+//
+CSTElement find_before_bindable(const std::vector<CSTElement>& items, size_t idx) {
+  assert(idx >= 1);
+  size_t start = idx - 1;
+
+  // walk backwards from start until we find a non-ws node
+  while (start > 0 && items[start].id() == TOKEN_WS) {
+    start--;
+  }
+
+  CSTElement bind = items[start];
+
+  // Edge case: start == 0 and id == WS can only happen if the first line of the file is a nested
+  // comment.
+  //
+  // Ex:
+  // '''
+  //   # comment
+  // def x = 5
+  // '''
+  //
+  // This is disallowed by convention, thus print a helpful message and fall over
+  if (start == 0 && bind.id() == TOKEN_WS) {
+    std::cerr << "Starting line of file may not be a nested comment" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  // shouldn't be possible but assert in case
+  assert(bind.id() != TOKEN_COMMENT);
+
+  return bind;
+}
+
 void Emitter::bind_comments(CSTElement node) {
   std::vector<CSTElement> items;
   inorder_collect_tokens(node, items);
-  std::cout << "f: " << items.size() << std::endl;
 
   for (size_t i = 0; i < items.size(); i++) {
     CSTElement item = items[i];
     if (item.id() == TOKEN_COMMENT) {
-      // look backwards to see what to bind to
-      // bind backwards if we see THING ws COMMENT where THING is any non-nl TOKEN
-      // otherwise bind forward to the very next non-nl, non-comment, non-ws token
-      //   and capture all the COMMENTS/nl along the way
-
-      // walk backwards from i until we find a non-ws node
-      size_t start = i - 1;
-      while (start > 0 && items[start].id() == TOKEN_WS) {
-        start--;
+      // Edge case: If the very first token is a comment, we must bind after the comment
+      if (i == 0) {
+        i = bind_after(items, i, item);
+        continue;
       }
 
-      CSTElement back = items[start];
+      // look backwards to see what to bind to.
+      //   if we see THING ws COMMENT then bind before the COMMENT
+      //   otherwise bind after the comment to the next non-nl, non-comment, non-ws token
+      //   and bind all the COMMENTs/NLs along the way
+      CSTElement maybe_before_bindable = find_before_bindable(items, i);
 
-      // This is an edge case I haven't figured out yet.
-      // we have to stop the loop at 0 since size_t can't go negative
-      // but it might be possible to have ws as the first child of a node
-      assert(!(start == 0 && back.id() == TOKEN_WS));
-
-      // shouldn't be possible but assert in case
-      assert(back.id() != TOKEN_COMMENT);
-
-      if (back.id() == TOKEN_NL) {
-        // Forward bind
-        std::vector<CSTElement> to_bind = {item};
-        i++;
-
-        CSTElement target = items[i];
-        while (!target.empty() && (target.id() == TOKEN_WS || target.id() == TOKEN_NL ||
-                                   target.id() == TOKEN_COMMENT)) {
-          if (target.id() == TOKEN_COMMENT) {
-            to_bind.push_back(target);
-          }
-          i++;
-          target = items[i];
-        }
-
-        // TODO: pretty sure this can happen with a "trailing" comment.
-        assert(!target.empty());
-
-        assert(!target.isNode());
-        assert(
-            !(target.id() == TOKEN_WS || target.id() == TOKEN_COMMENT || target.id() == TOKEN_NL));
-
-        for (auto bind : to_bind) {
-          token_traits[target].bind_before(bind);
-          std::cout << "fex1: bind " << symbolExample(target.id()) << " to "
-                    << bind.fragment().segment().str() << std::endl;
-        }
+      if (maybe_before_bindable.id() == TOKEN_NL) {
+        i = bind_after(items, i, item);
       } else {
-        // backwards bind
-        // starting from the last child, find the first non-nl/ws/comment node
-        token_traits[back].bind_after(item);
-        std::cout << "fex2: bind " << symbolExample(back.id()) << " to "
-                  << item.fragment().segment().str() << std::endl;
+        bind_before(maybe_before_bindable, item);
       }
     }
   }
@@ -657,25 +692,26 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
 
   auto id_list_fmt = fmt().walk(WALK_NODE).fmt_if(TOKEN_WS, fmt().ws());
 
-  MEMO_RET(fmt()
-               .token(TOKEN_KW_FROM)
-               .ws()
-               .walk(CST_ID, WALK_NODE)
-               .ws()
-               .token(TOKEN_KW_IMPORT)
-               .ws()
-               .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
-               .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
-               // clang-format off
+  MEMO_RET(
+      fmt()
+          .token(TOKEN_KW_FROM)
+          .ws()
+          .walk(CST_ID, WALK_NODE)
+          .ws()
+          .token(TOKEN_KW_IMPORT)
+          .ws()
+          .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
+          .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
+          // clang-format off
           .fmt_if_else(
               TOKEN_P_HOLE,
               fmt().walk(WALK_TOKEN),
               fmt().fmt_while(
                   CST_IDEQ,
                   id_list_fmt))
-               // clang-format on
-               .consume_wsnlc()
-               .format(ctx, node.firstChildElement(), token_traits));
+          // clang-format on
+          .consume_wsnlc()
+          .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
@@ -751,13 +787,14 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
     MEMO_RET(no_nl);
   }
 
-  MEMO_RET(
-      fmt()
-          .token(TOKEN_P_POPEN)
-          .nest(fmt().consume_wsnlc().freshline().walk(is_expression, WALK_NODE).consume_wsnlc())
-          .freshline()
-          .token(TOKEN_P_PCLOSE)
-          .format(ctx, node.firstChildElement(), token_traits));
+  wcl::doc body = walk_node(ctx.nest(), node.firstChildNode());
+
+  MEMO_RET(fmt()
+               .token(TOKEN_P_POPEN)
+               .nest(fmt().consume_wsnlc().newline().walk(is_expression, WALK_NODE).consume_wsnlc())
+               .newline()
+               .token(TOKEN_P_PCLOSE)
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_prim(ctx_t ctx, CSTElement node) {
