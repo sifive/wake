@@ -121,7 +121,7 @@ def t4 = (
 
 def t5 = (
     # comment
-    # comment 
+    # comment
     # comment
     x + 5
 )
