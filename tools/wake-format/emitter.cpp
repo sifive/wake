@@ -258,12 +258,7 @@ wcl::doc Emitter::walk_no_edit(ctx_t ctx, CSTElement node) {
 
   wcl::doc_builder bdr;
   for (auto node : token_traits[first].before_bound) {
-    bdr.append(walk_token(ctx, node));
-    bdr.append("\n");
-    // HACK todo fix
-    for (size_t i = 0; i < 4 * ctx.nest_level; i++) {
-      bdr.append(" ");
-    }
+    bdr.append(fmt().walk(WALK_TOKEN).newline().compose(ctx, node, token_traits));
   }
 
   bdr.append(walk_no_edit_acc(ctx.sub(bdr), node));
@@ -453,8 +448,7 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   wcl::doc_builder builder;
 
   for (auto node : token_traits[node].before_bound) {
-    builder.append(walk_token(ctx, node));
-    builder.append("\n");
+    builder.append(fmt().walk(WALK_TOKEN).newline().format(ctx, node, token_traits));
   }
 
   switch (node.id()) {
@@ -547,9 +541,7 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   }
 
   for (auto node : token_traits[node].after_bound) {
-    builder.append(" ");
-    builder.append(walk_token(ctx, node));
-    builder.append("\n");
+    builder.append(fmt().space().walk(WALK_TOKEN).newline().compose(ctx, node, token_traits));
   }
 
   MEMO_RET(std::move(builder).build());
@@ -692,26 +684,25 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
 
   auto id_list_fmt = fmt().walk(WALK_NODE).fmt_if(TOKEN_WS, fmt().ws());
 
-  MEMO_RET(
-      fmt()
-          .token(TOKEN_KW_FROM)
-          .ws()
-          .walk(CST_ID, WALK_NODE)
-          .ws()
-          .token(TOKEN_KW_IMPORT)
-          .ws()
-          .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
-          .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
-          // clang-format off
+  MEMO_RET(fmt()
+               .token(TOKEN_KW_FROM)
+               .ws()
+               .walk(CST_ID, WALK_NODE)
+               .ws()
+               .token(TOKEN_KW_IMPORT)
+               .ws()
+               .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
+               .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
+               // clang-format off
           .fmt_if_else(
               TOKEN_P_HOLE,
               fmt().walk(WALK_TOKEN),
               fmt().fmt_while(
                   CST_IDEQ,
                   id_list_fmt))
-          // clang-format on
-          .consume_wsnlc()
-          .format(ctx, node.firstChildElement(), token_traits));
+               // clang-format on
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
