@@ -35,6 +35,7 @@
 // #define NL_STR "⏎\n"
 
 #define SPACE_PER_INDENT 4
+#define MAX_COLUMN_WIDTH 100
 
 struct ctx_t {
   size_t width = 0;
@@ -355,7 +356,7 @@ class FitsPredicate {
                   const token_traits_map_t& traits) {
     CSTElement copy = node;
     wcl::doc doc = formatter.compose(ctx.sub(builder), copy, traits);
-    return curr_width(builder, ctx) + doc.first_width() <= 100;
+    return curr_width(builder, ctx) + doc.first_width() <= MAX_COLUMN_WIDTH;
   }
 };
 
@@ -521,7 +522,6 @@ struct MatchAction {
 template <class Action>
 struct Formatter {
   Action action;
-  static const uint8_t max_column_width = 100;
 
   Formatter(Action a) : action(a) {}
 

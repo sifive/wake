@@ -322,8 +322,24 @@ size_t Emitter::bind_after(const std::vector<CSTElement>& items, size_t idx, CST
     target = items[idx];
   }
 
-  // TODO: pretty sure this can happen with a "trailing" comment.
-  assert(!target.empty());
+  // Edge case: target reaches the end of the input file without findind a match
+  //
+  // This occurs when a 'bind after' comment is the last thing in a file
+  // Bad Ex:
+  //   '''
+  //   def x = 5
+  //   # comment
+  //   '''
+  // It is not a problem for 'bind before' comments
+  // Okay Ex:
+  //   '''
+  //   def x = 5 # comment
+  //   '''
+  // This is disallowed by convention, thus print a helpful message and fall over
+  if (target.empty()) {
+    std::cerr << "File may not end with a top level comment" << std::endl;
+    exit(EXIT_FAILURE);
+  }
 
   assert(!target.isNode());
   assert(!(target.id() == TOKEN_WS || target.id() == TOKEN_COMMENT || target.id() == TOKEN_NL));
@@ -778,8 +794,6 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
   if (!no_nl.has_newline()) {
     MEMO_RET(no_nl);
   }
-
-  wcl::doc body = walk_node(ctx.nest(), node.firstChildNode());
 
   MEMO_RET(fmt()
                .token(TOKEN_P_POPEN)
