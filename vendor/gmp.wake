@@ -15,5 +15,49 @@
 
 package build_wake
 from wake import _
+from gcc_wake import _
 
-def gmp _ = Pass (pkg "gmp")
+def gmp = match _
+  Pair "wasm-cpp14-release" _ = buildGmpWASM Unit
+  _ = Pass (pkg "gmp")
+
+def buildGmpWASM _ =
+  require Some emmake =
+    emmake
+  else
+    failWithError "emmake is not available"
+
+  def emsdk =
+    replace `/[^/]*$` "" emmake
+
+  def version = "6.2.1"
+
+  # HACK: make 'vendor/'' visible
+  require Pass vendor =
+    source "{here}/gmp.wake"
+
+  def job =
+    """
+      wget https://ftp.gnu.org/gnu/gmp/gmp-%{version}.tar.xz
+      tar xmf gmp-%{version}.tar.xz
+      cd gmp-%{version}
+      emconfigure ./configure --disable-assembly --host none --enable-cxx
+      emmake make -j4 MAKEINFO=true
+    """
+    | makePlan "compiling gmp" (vendor, Nil)
+    | editPlanEnvironment (addEnvironmentPath emsdk)
+    | setPlanDirectory here
+    | runJob
+
+  require Pass outputs = job.getJobOutputs
+
+  def headers = filter (matches `.*\.h` _.getPathName) outputs
+
+  # TODO: what files to collect here
+  def objects = filter (matches `.*\.a` _.getPathName) outputs
+
+  def cflags = "-I{here}/gmp-{version}", Nil
+
+  def lflags = Nil
+
+  Pass (SysLib version headers objects cflags lflags)
