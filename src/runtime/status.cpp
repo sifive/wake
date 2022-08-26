@@ -397,6 +397,8 @@ void status_finish() {
 #else
 #include <emscripten/emscripten.h>
 
+StatusState status_state;
+
 void status_init() {}
 
 void status_write(const char *name, const char *data, int len) {
@@ -414,5 +416,10 @@ void status_finish() {}
 void status_set_colour(const char *name, int colour) {}
 void status_set_fd(const char *name, int fd) {}
 void status_set_bulk_fd(int fd, const char *streams) {}
+
+const char *term_colour(int code) { return ""; }
+const char *term_normal() { return ""; }
+const char *term_normal(int code) { return ""; }
+bool term_init(bool tty) { return true; }
 
 #endif
