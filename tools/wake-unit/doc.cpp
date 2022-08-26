@@ -228,6 +228,51 @@ TEST(doc_geometry) {
 
   {
     wcl::doc_builder builder;
+    builder.append("He\nllo");
+    builder.append("Worl\nd!");
+
+    EXPECT_EQUAL(0u, builder->last_ws_count());
+
+    wcl::doc d = std::move(builder).build();
+    EXPECT_EQUAL(0u, d->last_ws_count());
+  }
+  {
+    wcl::doc_builder builder;
+    builder.append("Hello");
+    builder.append("     ");
+
+    EXPECT_EQUAL(5u, builder->last_ws_count());
+
+    builder.append("     ");
+    EXPECT_EQUAL(10u, builder->last_ws_count());
+
+    builder.append("World");
+    EXPECT_EQUAL(10u, builder->last_ws_count());
+
+    builder.append("\n   Hello");
+    EXPECT_EQUAL(3u, builder->last_ws_count());
+
+    builder.append("   World");
+    EXPECT_EQUAL(6u, builder->last_ws_count());
+
+    builder.append("    ");
+    EXPECT_EQUAL(10u, builder->last_ws_count());
+
+    builder.append("\n");
+    EXPECT_EQUAL(0u, builder->last_ws_count());
+
+    builder.append("    ");
+    EXPECT_EQUAL(4u, builder->last_ws_count());
+
+    builder.append("    \n     ");
+    EXPECT_EQUAL(5u, builder->last_ws_count());
+
+    wcl::doc d = std::move(builder).build();
+    EXPECT_EQUAL(5u, d->last_ws_count());
+  }
+
+  {
+    wcl::doc_builder builder;
     builder.append("Hello");
     builder.append("\nHello");
     builder.append("Hello");

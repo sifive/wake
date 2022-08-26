@@ -156,14 +156,48 @@ class last_width_state {
   friend std::hash<last_width_state>;
 };
 
+class last_ws_count_state {
+ private:
+  last_ws_count_state(bool wrapped, size_t count) : wrapped(wrapped), count(count) {}
+
+  bool wrapped = false;
+
+ public:
+  size_t count = 0;
+
+  last_ws_count_state() = default;
+
+  last_ws_count_state operator+(last_ws_count_state other) const {
+    if (other.wrapped) {
+      return other;
+    }
+    return last_ws_count_state{wrapped, count + other.count};
+  }
+
+  bool operator==(const last_ws_count_state& other) const {
+    return wrapped == other.wrapped && count == other.count;
+  }
+
+  static last_ws_count_state identity() { return last_ws_count_state{}; }
+
+  static last_ws_count_state inject(size_t size, utf8proc_int32_t codepoint) {
+    if (codepoint == '\n') return last_ws_count_state{true, 0};
+    return last_ws_count_state{false, codepoint == ' ' ? 1u : 0u};
+  }
+
+  friend std::hash<last_ws_count_state>;
+};
+
 class doc_state {
  private:
   doc_state(byte_count_state byte_count, newline_count_state newline_count,
-            first_width_state first_width, last_width_state last_width)
+            first_width_state first_width, last_width_state last_width,
+            last_ws_count_state last_ws_count)
       : byte_count_(byte_count),
         newline_count_(newline_count),
         first_width_(first_width),
-        last_width_(last_width) {}
+        last_width_(last_width),
+        last_ws_count_(last_ws_count) {}
 
   // Total number of bytes in the doc
   byte_count_state byte_count_;
@@ -177,36 +211,44 @@ class doc_state {
   // Human visible "width" of the last line of the doc
   last_width_state last_width_;
 
+  // Count of total spaces in the last line of the doc
+  last_ws_count_state last_ws_count_;
+
  public:
   doc_state() = default;
 
   doc_state operator+(doc_state other) const {
     return doc_state{byte_count_ + other.byte_count_, newline_count_ + other.newline_count_,
-                     first_width_ + other.first_width_, last_width_ + other.last_width_};
+                     first_width_ + other.first_width_, last_width_ + other.last_width_,
+                     last_ws_count_ + other.last_ws_count_};
   }
 
   bool operator==(const doc_state& other) const {
     return byte_count_ == other.byte_count_ && newline_count_ == other.newline_count_ &&
-           first_width_ == other.first_width_ && last_width_ == other.last_width_;
+           first_width_ == other.first_width_ && last_width_ == other.last_width_ &&
+           last_ws_count_ == other.last_ws_count_;
   }
 
   const doc_state* operator->() const { return this; }
 
   static doc_state identity() {
     return doc_state{byte_count_state::identity(), newline_count_state::identity(),
-                     first_width_state::identity(), last_width_state::identity()};
+                     first_width_state::identity(), last_width_state::identity(),
+                     last_ws_count_state::identity()};
   }
 
   static doc_state inject(size_t size, utf8proc_int32_t codepoint) {
     return doc_state{
         byte_count_state::inject(size, codepoint), newline_count_state::inject(size, codepoint),
-        first_width_state::inject(size, codepoint), last_width_state::inject(size, codepoint)};
+        first_width_state::inject(size, codepoint), last_width_state::inject(size, codepoint),
+        last_ws_count_state::inject(size, codepoint)};
   }
 
   size_t byte_count() const { return byte_count_.count; }
   size_t newline_count() const { return newline_count_.count; }
   size_t first_width() const { return first_width_.width; }
   size_t last_width() const { return last_width_.width; }
+  size_t last_ws_count() const { return last_ws_count_.count; }
   bool has_newline() const { return newline_count() > 0; }
   size_t height() const { return newline_count() + 1; }
 
@@ -249,12 +291,20 @@ struct std::hash<wcl::last_width_state> {
 };
 
 template <>
+struct std::hash<wcl::last_ws_count_state> {
+  size_t operator()(wcl::last_ws_count_state const& state) const noexcept {
+    return wcl::hash_combine(std::hash<bool>{}(state.wrapped), std::hash<size_t>{}(state.count));
+  }
+};
+
+template <>
 struct std::hash<wcl::doc_state> {
   size_t operator()(wcl::doc_state const& state) const noexcept {
     size_t hash = wcl::hash_combine(std::hash<wcl::byte_count_state>{}(state.byte_count_),
                                     std::hash<wcl::newline_count_state>{}(state.newline_count_));
     hash = wcl::hash_combine(hash, std::hash<wcl::first_width_state>{}(state.first_width_));
     hash = wcl::hash_combine(hash, std::hash<wcl::last_width_state>{}(state.last_width_));
+    hash = wcl::hash_combine(hash, std::hash<wcl::last_ws_count_state>{}(state.last_ws_count_));
     return hash;
   }
 };
