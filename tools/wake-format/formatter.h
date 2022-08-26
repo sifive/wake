@@ -35,34 +35,34 @@
 // #define NL_STR "⏎\n"
 
 struct ctx_t {
-  size_t width = 0;
   size_t nest_level = 0;
+  wcl::doc_state state = wcl::doc_state::identity();
 
-  ctx_t nest() {
+  ctx_t nest() const {
     ctx_t copy = *this;
     copy.nest_level++;
     return copy;
   }
 
-  ctx_t sub(const wcl::doc_builder& builder) {
+  ctx_t operator+(const wcl::doc_builder& builder) const {
     ctx_t copy = *this;
-    if (builder.has_newline()) {
-      copy.width = builder.last_width();
-    } else {
-      copy.width += builder.last_width();
-    }
+    copy.state = state + *builder;
     return copy;
   }
 
+  const wcl::doc_state& operator*() const { return state; }
+  const wcl::doc_state& operator->() const { return state; }
+
   bool operator==(const ctx_t& other) const {
-    return width == other.width && nest_level == other.nest_level;
+    return state == other.state && nest_level == other.nest_level;
   }
 };
 
 template <>
 struct std::hash<ctx_t> {
   size_t operator()(ctx_t const& ctx) const noexcept {
-    return wcl::hash_combine(std::hash<size_t>{}(ctx.width), std::hash<size_t>{}(ctx.nest_level));
+    return wcl::hash_combine(std::hash<wcl::doc_state>{}(ctx.state),
+                             std::hash<size_t>{}(ctx.nest_level));
   }
 };
 
@@ -161,7 +161,7 @@ struct WalkPredicateAction {
       std::cerr << "Unexpected token: " << +node.id() << std::endl;
     }
     assert(result);
-    auto doc = walker(ctx.sub(builder), const_cast<const CSTElement&>(node));
+    auto doc = walker(ctx + builder, const_cast<const CSTElement&>(node));
     builder.append(doc);
     node.nextSiblingElement();
   }
@@ -174,7 +174,7 @@ struct NestAction {
   NestAction(FMT formatter) : formatter(formatter) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    builder.append(formatter.compose(ctx.sub(builder).nest(), node));
+    builder.append(formatter.compose(ctx.nest() + builder, node));
   }
 };
 
@@ -189,9 +189,9 @@ struct IfElseAction {
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     if (predicate(builder, ctx, node)) {
-      builder.append(if_formatter.compose(ctx.sub(builder), node));
+      builder.append(if_formatter.compose(ctx + builder, node));
     } else {
-      builder.append(else_formatter.compose(ctx.sub(builder), node));
+      builder.append(else_formatter.compose(ctx + builder, node));
     }
   }
 };
@@ -206,7 +206,7 @@ struct WhileAction {
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     while (predicate(builder, ctx, node)) {
-      builder.append(while_formatter.compose(ctx.sub(builder), node));
+      builder.append(while_formatter.compose(ctx + builder, node));
     }
   }
 };
@@ -219,7 +219,7 @@ struct WalkChildrenAction {
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     for (CSTElement child = node.firstChildElement(); !child.empty();) {
-      builder.append(formatter.compose(ctx.sub(builder), child));
+      builder.append(formatter.compose(ctx + builder, child));
     }
     node.nextSiblingElement();
   }
@@ -246,7 +246,7 @@ struct JoinAction {
   JoinAction(FMT formatter) : formatter(formatter) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    builder.append(formatter.compose(ctx.sub(builder), node));
+    builder.append(formatter.compose(ctx + builder, node));
   }
 };
 
@@ -280,11 +280,11 @@ class FitsPredicate {
 
   bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
     CSTElement copy = node;
-    wcl::doc doc = formatter.compose(ctx.sub(builder), copy);
-    if (builder.has_newline()) {
-      return builder.last_width() + doc.first_width() <= 100;
+    wcl::doc doc = formatter.compose(ctx + builder, copy);
+    if (builder->has_newline()) {
+      return builder->last_width() + doc->first_width() <= 100;
     } else {
-      return builder.last_width() + doc.first_width() + ctx.width <= 100;
+      return builder->last_width() + doc->first_width() + ctx->last_width() <= 100;
     }
   }
 };
@@ -371,7 +371,7 @@ struct PredicateCase {
     if (!predicate(builder, ctx, node)) {
       return false;
     }
-    builder.append(formatter.compose(ctx.sub(builder), node));
+    builder.append(formatter.compose(ctx + builder, node));
     return true;
   }
 };
@@ -383,7 +383,7 @@ struct OtherwiseCase {
   OtherwiseCase(FMT formatter) : formatter(formatter) {}
 
   ALWAYS_INLINE bool run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    builder.append(formatter.compose(ctx.sub(builder), node));
+    builder.append(formatter.compose(ctx + builder, node));
     return true;
   }
 };
