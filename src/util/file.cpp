@@ -91,7 +91,7 @@ StringFile::StringFile(const char *filename_, std::string &&content_)
 #include <emscripten/emscripten.h>
 
 // clang-format off
-EM_ASYNC_JS(int, getBase, (int *length, const char *filename), {
+EM_ASYNC_JS(uint8_t *, getBase, (int *length, const char *filename), {
   try {
     const content = await wakeLspModule.sendRequest('readFile', UTF8ToString(filename));
     if (content.hasOwnProperty('message')) { // readFile request resulted in an error
@@ -99,6 +99,7 @@ EM_ASYNC_JS(int, getBase, (int *length, const char *filename), {
     }
     const encoder = new TextEncoder();
     const bytes = encoder.encode(content);
+    // ExternalFile takes ownership of the memory and frees it in the destructor
     const wasmPointer = Module._malloc(bytes.length + 1);
     for (let i = 0; i < bytes.length; i++) {
       Module.HEAPU8[wasmPointer + i] = bytes[i];
@@ -107,6 +108,7 @@ EM_ASYNC_JS(int, getBase, (int *length, const char *filename), {
     return wasmPointer;
   } catch (err) {
     const lengthBytes = lengthBytesUTF8(err.message) + 1;
+    // Same memory ownership here
     const stringOnWasmHeap = _malloc(lengthBytes);
     stringToUTF8(err.message, stringOnWasmHeap, lengthBytes);
     setValue(length, -1, 'i32');
@@ -121,7 +123,7 @@ ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
   Location l(filename());
 
   int32_t length;
-  uint8_t *base = (uint8_t *)getBase(&length, filename());
+  uint8_t *base = getBase(&length, filename());
 
   if (length == -1) {
     reporter.reportError(l, std::string("readFile failed; ") + reinterpret_cast<char *>(base));

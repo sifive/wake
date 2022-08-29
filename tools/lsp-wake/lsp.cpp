@@ -90,22 +90,26 @@ class LSPServer {
     if (!JAST::parse(requestString, parseErrors, request)) {
       JAST errorMessage = JSONConverter::createErrorMessage(ParseError, parseErrors.str());
       return MethodResult(errorMessage);
-    } else {
-      const std::string &method = request.get("method").value;
-      if (!isInitialized && (method != "initialize")) {
-        JAST errorMessage = JSONConverter::createErrorMessage(request, ServerNotInitialized,
-                                                              "Must request initialize first");
-        return MethodResult(errorMessage);
-      } else if (isShutDown && (method != "exit")) {
-        JAST errorMessage = JSONConverter::createErrorMessage(
-            request, InvalidRequest,
-            "Received a request other than 'exit' after a shutdown request.");
-        return MethodResult(errorMessage);
-      } else if (!method.empty()) {
-        return callMethod(method, request);
-      }
-      return {};  // empty result
     }
+
+    const std::string &method = request.get("method").value;
+    if (!isInitialized && (method != "initialize")) {
+      JAST errorMessage = JSONConverter::createErrorMessage(request, ServerNotInitialized,
+                                                            "Must request initialize first");
+      return MethodResult(errorMessage);
+    }
+
+    if (isShutDown && (method != "exit")) {
+      JAST errorMessage = JSONConverter::createErrorMessage(
+          request, InvalidRequest,
+          "Received a request other than 'exit' after a shutdown request.");
+      return MethodResult(errorMessage);
+    }
+
+    if (!method.empty()) {
+      return callMethod(method, request);
+    }
+    return {};  // empty result
   }
 
   void processRequests() {
@@ -278,16 +282,16 @@ class LSPServer {
     auto functionPointer = essentialMethods.find(method);
     if (functionPointer != essentialMethods.end()) {
       return (this->*(functionPointer->second))(request);
-    } else {
-      functionPointer = additionalMethods.find(method);
-      if (functionPointer != additionalMethods.end()) {
-        return (this->*(functionPointer->second))(request);
-      } else {
-        JAST errorMessage = JSONConverter::createErrorMessage(
-            request, MethodNotFound, "Method '" + method + "' is not implemented.");
-        return MethodResult(errorMessage);
-      }
     }
+
+    functionPointer = additionalMethods.find(method);
+    if (functionPointer != additionalMethods.end()) {
+      return (this->*(functionPointer->second))(request);
+    }
+
+    JAST errorMessage = JSONConverter::createErrorMessage(
+        request, MethodNotFound, "Method '" + method + "' is not implemented.");
+    return MethodResult(errorMessage);
   }
 
   static void sendMessage(const JAST &message) {
@@ -547,22 +551,16 @@ LSPServer *lspServer = nullptr;
 void instantiateServerInternal(const std::string &stdLib) {
   // clang-format off
   int isNode = EM_ASM_INT({
-    if (ENVIRONMENT_IS_NODE) {
-      return 1;
-    } else {
-      return 0;
-    }
+    return ENVIRONMENT_IS_NODE;
   });
   // clang-format on
+  bool isReadable = false;
   if (isNode) {
-    if (is_readable((stdLib + "/core/boolean.wake").c_str())) {
-      lspServer = new LSPServer(true, stdLib);
-    } else {
-      lspServer = new LSPServer(false, stdLib);
-    }
+    isReadable = is_readable((stdLib + "/core/boolean.wake").c_str());
   } else {  // no need to check stdlib validity in web, since it can't be customized there
-    lspServer = new LSPServer(true, stdLib);
+    isReadable = true;
   }
+  lspServer = new LSPServer(isReadable, stdLib);
 }
 
 extern "C" {
@@ -589,7 +587,8 @@ char *processRequest(const char *request) {
   const char *c = str.c_str();
   size_t length = strlen(c);
 
-  // Malloc the string for typescript to use. Typescript will free it
+  // Malloc the string for typescript to use.
+  // Typescript will free it in lsp-server/src/common.ts/getResponse()
   char *result = static_cast<char *>(malloc(length + 1));
   memcpy(result, c, length);
   result[length] = '\0';
@@ -600,11 +599,8 @@ char *processRequest(const char *request) {
 #else
 
 void instantiateServer(const std::string &stdLib) {
-  if (is_readable((stdLib + "/core/boolean.wake").c_str())) {
-    lspServer = new LSPServer(true, stdLib);
-  } else {
-    lspServer = new LSPServer(false, stdLib);
-  }
+  bool isReadable = is_readable((stdLib + "/core/boolean.wake").c_str());
+  lspServer = new LSPServer(isReadable, stdLib);
 }
 
 int main(int argc, const char **argv) {

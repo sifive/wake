@@ -35,16 +35,16 @@ int is_readable(const char *filename) {
   int is_node = 0;
   // clang-format off
   int res = EM_ASM_INT({
-    if (ENVIRONMENT_IS_NODE) {
-      setValue($1, 1, 'i32');
-      try {
-        const fs = require('fs');
-        fs.accessSync(UTF8ToString($0), fs.constants.R_OK);
-        return 1;
-      } catch (err) {
-        return 0;
-      }
-    } else {
+    if (!ENVIRONMENT_IS_NODE) {
+      return 0;
+    }
+
+    setValue($1, 1, 'i32');
+    try {
+      const fs = require('fs');
+      fs.accessSync(UTF8ToString($0), fs.constants.R_OK);
+      return 1;
+    } catch (err) {
       return 0;
     }
   }, filename, &is_node);

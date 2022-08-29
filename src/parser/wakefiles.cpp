@@ -56,13 +56,14 @@ EM_ASYNC_JS(char *, vscode_getfiles, (const char *dir, int *ok), {
     }
     for (const dirent of dirFiles) {
       const absolute = Path.join(dir, dirent[0]); // dirent.name
-      if (dirent[1]) { // dirent.isDirectory
-        if (dirent[0] !== ".build" && dirent[0] !== ".fuse" && dirent[0] !== ".git") {
-          await walkTree(absolute);
-        }
-      } else {
+      if (!dirent[1]) { // not a directory
         files.push(absolute);
+        continue;
       }
+      if (dirent[0] === ".build" || dirent[0] === ".fuse" || dirent[0] === ".git") { // folders to skip
+        continue;
+      }
+      await walkTree(absolute);
     }
   }
 

@@ -61,6 +61,9 @@ function createLspJsonNoParams(method: string): string {
     });
 }
 
+// Defined by JSON RPC
+const InternalError  = -32603;
+
 export function prepareConnection(connection: Connection, isWeb: Boolean) {
     let initializeRequest = '';
 
@@ -112,7 +115,7 @@ export function prepareConnection(connection: Connection, isWeb: Boolean) {
         });
 
         if (lspModule == null) {
-            return new ResponseError(-32603, 'Failed to load wake lsp module.'); // InternalError
+            return new ResponseError(InternalError, 'Failed to load wake lsp module.');
         }
         let str = lspModule.toString(c_str);
         lspModule._free(c_str); // free the string mallocced by c++
