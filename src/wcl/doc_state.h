@@ -33,13 +33,13 @@ State from_string(const std::string& str) {
   const utf8proc_uint8_t* iter_end = iter + str.size();
   while (iter < iter_end) {
     utf8proc_int32_t codepoint;
-    size_t size = utf8proc_iterate(iter, -1, &codepoint);
-    iter += size;
+    size_t byte_size = utf8proc_iterate(iter, -1, &codepoint);
+    iter += byte_size;
 
-    assert(size > 0);
+    assert(byte_size > 0);
     assert(codepoint > 0);  // < 0 means error parsing utf8
 
-    out = out + State::inject(size, codepoint);
+    out = out + State::inject(byte_size, codepoint);
   }
   return out;
 }
@@ -51,7 +51,7 @@ struct empty_state {
 
   static empty_state identity() { return empty_state{}; }
 
-  static empty_state inject(size_t size, utf8proc_int32_t codepoint) { return empty_state{}; }
+  static empty_state inject(size_t byte_size, utf8proc_int32_t codepoint) { return empty_state{}; }
 };
 
 struct byte_count_state {
@@ -68,8 +68,8 @@ struct byte_count_state {
 
   static byte_count_state identity() { return byte_count_state{}; }
 
-  static byte_count_state inject(size_t size, utf8proc_int32_t codepoint) {
-    return byte_count_state{size};
+  static byte_count_state inject(size_t byte_size, utf8proc_int32_t codepoint) {
+    return byte_count_state{byte_size};
   }
 };
 
@@ -87,7 +87,7 @@ struct newline_count_state {
 
   static newline_count_state identity() { return newline_count_state{}; }
 
-  static newline_count_state inject(size_t size, utf8proc_int32_t codepoint) {
+  static newline_count_state inject(size_t byte_size, utf8proc_int32_t codepoint) {
     return newline_count_state{codepoint == '\n'};
   }
 };
@@ -116,7 +116,7 @@ class first_width_state {
 
   static first_width_state identity() { return first_width_state{}; }
 
-  static first_width_state inject(size_t size, utf8proc_int32_t codepoint) {
+  static first_width_state inject(size_t byte_size, utf8proc_int32_t codepoint) {
     if (codepoint == '\n') return first_width_state{true, 0};
     return first_width_state{false, static_cast<size_t>(utf8proc_charwidth(codepoint))};
   }
@@ -148,7 +148,7 @@ class last_width_state {
 
   static last_width_state identity() { return last_width_state{}; }
 
-  static last_width_state inject(size_t size, utf8proc_int32_t codepoint) {
+  static last_width_state inject(size_t byte_size, utf8proc_int32_t codepoint) {
     if (codepoint == '\n') return last_width_state{true, 0};
     return last_width_state{false, static_cast<size_t>(utf8proc_charwidth(codepoint))};
   }
@@ -180,7 +180,7 @@ class last_ws_count_state {
 
   static last_ws_count_state identity() { return last_ws_count_state{}; }
 
-  static last_ws_count_state inject(size_t size, utf8proc_int32_t codepoint) {
+  static last_ws_count_state inject(size_t byte_size, utf8proc_int32_t codepoint) {
     if (codepoint == '\n') return last_ws_count_state{true, 0};
     return last_ws_count_state{false, codepoint == ' ' ? 1u : 0u};
   }
@@ -237,11 +237,12 @@ class doc_state {
                      last_ws_count_state::identity()};
   }
 
-  static doc_state inject(size_t size, utf8proc_int32_t codepoint) {
-    return doc_state{
-        byte_count_state::inject(size, codepoint), newline_count_state::inject(size, codepoint),
-        first_width_state::inject(size, codepoint), last_width_state::inject(size, codepoint),
-        last_ws_count_state::inject(size, codepoint)};
+  static doc_state inject(size_t byte_size, utf8proc_int32_t codepoint) {
+    return doc_state{byte_count_state::inject(byte_size, codepoint),
+                     newline_count_state::inject(byte_size, codepoint),
+                     first_width_state::inject(byte_size, codepoint),
+                     last_width_state::inject(byte_size, codepoint),
+                     last_ws_count_state::inject(byte_size, codepoint)};
   }
 
   size_t byte_count() const { return byte_count_.count; }
