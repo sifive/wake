@@ -37,7 +37,6 @@ def buildSqlite3WASM _ =
 
   def job =
     """
-      mkdir -p .build
       cd .build
       wget https://sqlite.org/2022/sqlite-amalgamation-3390200.zip
       unzip sqlite-amalgamation-3390200

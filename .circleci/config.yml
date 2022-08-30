@@ -41,6 +41,17 @@ jobs:
           root: .
           paths:
             - release/vscode
+  wasm:
+    machine:
+      image: ubuntu-2004:202201-02
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - run: docker build -f /tmp/workspace/.circleci/dockerfiles/wasm -t wake-wasm .
+      - run: mkdir build
+      - run: chmod ugo+rwx build
+      - run: cp /tmp/workspace/wake_*.tar.xz build
+      - run: docker run -u build --rm --mount type=bind,source=$PWD/build,target=/build --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined wake-wasm /bin/sh -c 'tar xvJf wake_*.tar.xz && make -C wake-* wasm'
 
   alpine:
     machine:

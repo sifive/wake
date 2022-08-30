@@ -44,7 +44,6 @@ def buildRE2WASM Unit =
 
     def job =
         """
-            mkdir -p .build
             cd .build
             wget https://github.com/google/re2/archive/refs/tags/%{version}.tar.gz
             tar xvzf %{version}.tar.gz

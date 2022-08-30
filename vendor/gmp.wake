@@ -36,7 +36,6 @@ def buildGmpWASM _ =
 
   def job =
     """
-      mkdir -p .build
       cd .build
       wget https://ftp.gnu.org/gnu/gmp/gmp-%{version}.tar.xz
       tar xmf gmp-%{version}.tar.xz
