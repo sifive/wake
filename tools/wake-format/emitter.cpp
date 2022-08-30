@@ -302,120 +302,58 @@ void inorder_collect_tokens(CSTElement node, std::vector<CSTElement>& items) {
   }
 }
 
-// Binds after from the perspective of 'bindable'
-// Binds before from the perspective of the token bound to.
-// Returns the new index into items
-size_t Emitter::bind_after(const std::vector<CSTElement>& items, size_t idx, CSTElement bindable) {
-  std::vector<CSTElement> to_bind = {bindable};
-  idx++;
-
-  // Skip any WS/NL/COMMENT tokens while searching for the token to bind to
-  // collect any COMMENTs seen along the way to also bind to the target
-  // TODO: also collect NLs
-  CSTElement target = items[idx];
-  while (!target.empty() &&
-         (target.id() == TOKEN_WS || target.id() == TOKEN_NL || target.id() == TOKEN_COMMENT)) {
-    if (target.id() == TOKEN_COMMENT) {
-      to_bind.push_back(target);
-    }
-    idx++;
-    target = items[idx];
-  }
-
-  // Edge case: target reaches the end of the input file without findind a match
-  //
-  // This occurs when a 'bind after' comment is the last thing in a file
-  // Bad Ex:
-  //   '''
-  //   def x = 5
-  //   # comment
-  //   '''
-  // It is not a problem for 'bind before' comments
-  // Okay Ex:
-  //   '''
-  //   def x = 5 # comment
-  //   '''
-  // This is disallowed by convention, thus print a helpful message and fall over
-  if (target.empty()) {
-    std::cerr << "File may not end with a top level comment" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-
-  assert(!target.isNode());
-  assert(!(target.id() == TOKEN_WS || target.id() == TOKEN_COMMENT || target.id() == TOKEN_NL));
-
-  for (auto bind : to_bind) {
-    token_traits[target].bind_before(bind);
-  }
-
-  return idx;
-}
-
-// Binds before from the perspective of 'bindable'
-// Binds after from the perspective of 'target'.
-void Emitter::bind_before(CSTElement target, CSTElement bindable) {
-  token_traits[target].bind_after(bindable);
-}
-
-// Finds and returns the first non-ws token before items[idx].
-// idx must be at least 1 or the function will assert
-// There must be a before bindable token or program will exit
-CSTElement find_before_bindable(const std::vector<CSTElement>& items, size_t idx) {
-  assert(idx >= 1);
-  size_t start = idx - 1;
-
-  // walk backwards from start until we find a non-ws node
-  while (start > 0 && items[start].id() == TOKEN_WS) {
-    start--;
-  }
-
-  CSTElement bind = items[start];
-
-  // Edge case: start == 0 and id == WS can only happen if the first line of the file is a nested
-  // comment.
-  //
-  // Ex:
-  // '''
-  //   # comment
-  // def x = 5
-  // '''
-  //
-  // This is disallowed by convention, thus print a helpful message and fall over
-  if (start == 0 && bind.id() == TOKEN_WS) {
-    std::cerr << "Starting line of file may not be a nested comment" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-
-  // shouldn't be possible but assert in case
-  assert(bind.id() != TOKEN_COMMENT);
-
-  return bind;
-}
-
 void Emitter::bind_comments(CSTElement node) {
   std::vector<CSTElement> items;
   inorder_collect_tokens(node, items);
 
+  IsWSNLCPredicate is_wsnlc;
+
   for (size_t i = 0; i < items.size(); i++) {
     CSTElement item = items[i];
-    if (item.id() == TOKEN_COMMENT) {
-      // Edge case: If the very first token is a comment, we must bind after the comment
-      if (i == 0) {
-        i = bind_after(items, i, item);
-        continue;
-      }
+    if (is_wsnlc(item)) {
+      continue;
+    }
 
-      // look backwards to see what to bind to.
-      //   if we see THING ws COMMENT then bind before the COMMENT
-      //   otherwise bind after the comment to the next non-nl, non-comment, non-ws token
-      //   and bind all the COMMENTs/NLs along the way
-      CSTElement maybe_before_bindable = find_before_bindable(items, i);
-
-      if (maybe_before_bindable.id() == TOKEN_NL) {
-        i = bind_after(items, i, item);
-      } else {
-        bind_before(maybe_before_bindable, item);
+    // bind after
+    for (size_t j = i + 1; j < items.size(); j++) {
+      CSTElement target = items[j];
+      if (target.id() != TOKEN_WS && target.id() != TOKEN_COMMENT) {
+        break;
       }
+      token_traits[item].bind_after(target);
+      token_traits[target].set_bound_to(item);
+    }
+
+    // bind before
+    for (size_t j = i; j > 0; j--) {
+      CSTElement target = items[j - 1];
+      if (!is_wsnlc(target)) {
+        break;
+      }
+      // Stop binding if we find a target already bound
+      if (!token_traits[target].bound_to.empty()) {
+        break;
+      }
+      token_traits[item].bind_before(target);
+      token_traits[target].set_bound_to(item);
+    }
+  }
+
+  // Handle trailing comment edge case
+  // '''
+  // def x = 5
+  // # comment
+  // '''
+  // # comment doesn't have anything to bind to it so it gets dropped
+  for (size_t i = 0; i < items.size(); i++) {
+    CSTElement item = items[i];
+    if (item.id() != TOKEN_COMMENT) {
+      continue;
+    }
+
+    if (token_traits[item].bound_to.empty()) {
+      std::cerr << "File may not end with a top level comment" << std::endl;
+      exit(EXIT_FAILURE);
     }
   }
 }
@@ -568,7 +506,7 @@ wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_APP);
 
   MEMO_RET(fmt()
-               .walk(is_expression, WALK_NODE)  // TODO: this can emit a NL
+               .walk(is_expression, WALK_NODE)  // TODO: fix the 'grows NL' case
                .consume_wsnlc()
                .space()
                .walk(WALK_NODE)
@@ -592,10 +530,10 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   MEMO_RET(fmt()
                .walk(is_expression, WALK_NODE)
                .consume_wsnlc()
-               .space()  // check for NL
+               .space()  // TODO: fix the 'grows NL' case
                .walk(CST_OP, WALK_NODE)
                .consume_wsnlc()
-               .space()  // check for NL
+               .space()  // TODO: fix the 'grows NL' case
                .walk(is_expression, WALK_NODE)
                .format(ctx, node.firstChildElement(), token_traits));
 }
@@ -622,7 +560,7 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
   MEMO_RET(fmt()
                .walk(WALK_NODE)
                .consume_wsnlc()
-               .space()  // check for NL
+               .space()  // TODO: fix the 'grows NL' case
                .walk(CST_GUARD, WALK_NODE)
                .consume_wsnlc()
                .join(rhs_fmt())
@@ -823,7 +761,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                .ws()
                .walk(WALK_NODE)
                .consume_wsnlc()
-               .space()  // check for NL
+               .space()  // TODO: fix the 'grows NL' case
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
                .join(rhs_fmt())

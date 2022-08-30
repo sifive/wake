@@ -22,6 +22,7 @@
 
 #include <bitset>
 #include <cassert>
+#include <set>
 
 #include "parser/cst.h"
 #include "parser/parser.h"
@@ -63,10 +64,37 @@ struct ctx_t {
 };
 
 struct token_traits_t {
-  std::vector<CSTElement> before_bound = {};
-  std::vector<CSTElement> after_bound = {};
-  void bind_before(CSTElement e) { before_bound.push_back(e); }
-  void bind_after(CSTElement e) { after_bound.push_back(e); }
+  // Tokens bound to this token 'before' this token
+  // in source order
+  std::set<CSTElement, CSTElementCompare> before_bound = {};
+
+  // Tokens bound to this token 'after' this token
+  // in source order
+  std::set<CSTElement, CSTElementCompare> after_bound = {};
+
+  // The token this token is bound to
+  // inverse of before/after_bound
+  CSTElement bound_to;
+
+  void bind_before(CSTElement e) {
+    // TODO: delete this after handling captured
+    // NLs and WSes
+    if (e.id() != TOKEN_COMMENT) {
+      return;
+    }
+    before_bound.insert(e);
+  }
+
+  void bind_after(CSTElement e) {
+    // TODO: delete this after handling captured
+    // NLs and WSes
+    if (e.id() != TOKEN_COMMENT) {
+      return;
+    }
+    after_bound.insert(e);
+  }
+
+  void set_bound_to(CSTElement e) { bound_to = e; }
 };
 
 using token_traits_map_t = std::unordered_map<CSTElement, token_traits_t>;
@@ -96,11 +124,23 @@ inline size_t curr_width(wcl::doc_builder& builder, ctx_t ctx) {
   return builder.last_width() + ctx.width;
 }
 
+class IsWSNLCPredicate {
+ public:
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                  const token_traits_map_t& traits) const {
+    return operator()(node);
+  }
+
+  bool operator()(const CSTElement& node) const {
+    return node.id() == TOKEN_WS || node.id() == TOKEN_NL || node.id() == TOKEN_COMMENT;
+  }
+};
+
 struct ConsumeWhitespaceAction {
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
-    while (!node.empty() &&
-           (node.id() == TOKEN_WS || node.id() == TOKEN_NL || node.id() == TOKEN_COMMENT)) {
+    IsWSNLCPredicate predicate;
+    while (!node.empty() && predicate(builder, ctx, node, traits)) {
       node.nextSiblingElement();
     }
   }

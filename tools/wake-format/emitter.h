@@ -83,10 +83,6 @@ class Emitter {
   //   will bind '# comment1' and '# comment2' to the second 'def'
   void bind_comments(CSTElement node);
 
-  // Helper functions for bind_comments.
-  size_t bind_after(const std::vector<CSTElement>& items, size_t idx, CSTElement bindable);
-  void bind_before(CSTElement target, CSTElement bindable);
-
   // Returns a formatter that inserts the next node
   // on the current line if it fits, or on a new nested line
   auto rhs_fmt();

@@ -73,6 +73,7 @@ using cst_id_t = uint8_t;
 
 class FileContent;
 class CSTElement;
+class CSTElementCompare;
 class DiagnosticReporter;
 
 struct CSTNode {
@@ -152,6 +153,7 @@ class CSTElement {
 
   friend class CST;
   friend std::hash<CSTElement>;
+  friend CSTElementCompare;
 };
 
 template <>
@@ -163,6 +165,15 @@ struct std::hash<CSTElement> {
     hash = wcl::hash_combine(hash, std::hash<size_t>{}(element.end));
     hash = wcl::hash_combine(hash, std::hash<const CST *>{}(element.cst));
     return hash;
+  }
+};
+
+struct CSTElementCompare {
+  bool operator()(const CSTElement &lhs, const CSTElement &rhs) const {
+    if (lhs.node == rhs.node) {
+      return lhs.token < rhs.token;
+    }
+    return lhs.node < rhs.node;
   }
 };
 

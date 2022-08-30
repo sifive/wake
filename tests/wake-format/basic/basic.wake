@@ -1,3 +1,6 @@
+    # comment
+def five = 5
+
 # ordinary comment
 
 def name Unit =
