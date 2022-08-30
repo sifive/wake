@@ -32,19 +32,19 @@ def buildGmpWASM _ =
 
   def version = "6.2.1"
 
-  # HACK: make 'vendor/'' visible
-  require Pass vendor =
-    source "{here}/gmp.wake"
+  require Pass buildDir = vendorBuildDir Unit
 
   def job =
     """
+      mkdir -p .build
+      cd .build
       wget https://ftp.gnu.org/gnu/gmp/gmp-%{version}.tar.xz
       tar xmf gmp-%{version}.tar.xz
       cd gmp-%{version}
       emconfigure ./configure --disable-assembly --host none --enable-cxx
       emmake make -j4 MAKEINFO=true
     """
-    | makePlan "compiling gmp" (vendor, Nil)
+    | makePlan "compiling gmp" (buildDir, Nil)
     | editPlanEnvironment (addEnvironmentPath emsdk)
     | setPlanDirectory here
     | runJob
@@ -53,10 +53,9 @@ def buildGmpWASM _ =
 
   def headers = filter (matches `.*\.h` _.getPathName) outputs
 
-  # TODO: what files to collect here
   def objects = filter (matches `.*\.a` _.getPathName) outputs
 
-  def cflags = "-I{here}/gmp-{version}", Nil
+  def cflags = "-I{here}/.build/gmp-{version}", Nil
 
   def lflags = Nil
 

@@ -1,4 +1,4 @@
-# Copyright 2019 SiFive, Inc.
+# Copyright 2022 SiFive, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,14 +17,9 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-# def sqlite3 _ = Pass (pkg "sqlite3")
-
 def sqlite3 = match _
   Pair "wasm-cpp14-release" _ = buildSqlite3WASM Unit
   _ = Pass (pkg "sqlite3")
-
-# target gopt variant =
-#     vendor here variant "10.0" `.*\.h` `gopt(|-errors|-arg).c`
 
 def buildSqlite3WASM _ =
   require Some emmake =
@@ -37,18 +32,19 @@ def buildSqlite3WASM _ =
 
   def version = "0.0.0"
 
-  # HACK: make 'vendor/'' visible
-  require Pass vendor =
-    source "{here}/gmp.wake"
+  require Pass buildDir = vendorBuildDir Unit
+
 
   def job =
     """
+      mkdir -p .build
+      cd .build
       wget https://sqlite.org/2022/sqlite-amalgamation-3390200.zip
       unzip sqlite-amalgamation-3390200
       cd sqlite-amalgamation-3390200
       emcc -c sqlite3.c
     """
-    | makePlan "compiling sqlite3" (vendor, Nil)
+    | makePlan "compiling sqlite3" (buildDir, Nil)
     | editPlanEnvironment (addEnvironmentPath emsdk)
     | setPlanDirectory here
     | runJob
@@ -57,10 +53,9 @@ def buildSqlite3WASM _ =
 
   def headers = filter (matches `.*\.h` _.getPathName) outputs
 
-  # TODO: what files to collect here
   def objects = filter (matches `.*\.o` _.getPathName) outputs
 
-  def cflags = "-I{here}/sqlite-amalgamation-3390200", Nil
+  def cflags = "-I{here}/.build/sqlite-amalgamation-3390200", Nil
 
   def lflags = Nil
 

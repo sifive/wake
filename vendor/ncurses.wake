@@ -24,7 +24,3 @@ def ncurses = match _
         | getOrElseFn (\Unit pkg "ncurses")
         | editSysLibCFlags (filter (matches `-I.*` _)) # remove feature test manipulation
         | Pass
-
-# def sqlite3 = match _
-#   Pair "wasm-cpp14-release" _ = buildSqlite3WASM Unit
-#   _ = Pass (pkg "sqlite3")
