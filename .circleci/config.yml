@@ -223,6 +223,9 @@ workflows:
       - vscode:
           requires:
             - tarball
+      - wasm:
+          requires:
+            - tarball
       - release:
           requires:
             - alpine
@@ -232,6 +235,7 @@ workflows:
             - ubuntu_18_04   # LTS
             - ubuntu_22_04   # LTS
             - vscode
+            - wasm
       - docs_deploy:
           requires:
             - release
