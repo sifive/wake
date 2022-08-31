@@ -140,89 +140,9 @@ class TerminalReporter : public DiagnosticReporter {
   }
 };
 
-class CommandLineOptions {
- public:
-  // Passed in options
-  bool check;
-  bool verbose;
-  bool debug;
-  bool quiet;
-  bool wait;
-  bool workspace;
-  bool tty;
-  bool fwarning;
-  int profileh;
-  bool input;
-  bool output;
-  bool last;
-  bool lsp;
-  bool failed;
-  bool script;
-  bool version;
-  bool html;
-  bool global;
-  bool help;
-  bool debugdb;
-  bool parse;
-  bool tcheck;
-  bool dumpssa;
-  bool optim;
-  bool exports;
-  bool timeline;
-  bool clean;
-  bool list_outputs;
-  const char *percent_str;
-  const char *jobs_str;
-  const char *memory_str;
-  const char *heapf;
-  const char *profile;
-  const char *init;
-  const char *chdir;
-  const char *in;
-  const char *exec;
-  const char *job;
-  char *shebang;
-  const char *tagdag;
-  const char *tag;
-  const char *api;
-  const char *fd1;
-  const char *fd2;
-  const char *fd3;
-  const char *fd4;
-  const char *fd5;
-
-  // Metadata
-  const char *program_name;
-  std::string original_command_line;
-
-  // Derived values
-  double percent;
-  ResourceBudget memory_budget;
-  ResourceBudget cpu_budget;
-  double heap_factor;
-  bool nodb;
-  bool noparse;
-  bool targets;
-  bool notype;
-  bool noexecute;
-  const char *timeline_arg;
-  std::vector<const char *> input_args;
-  std::vector<const char *> output_args;
-  char *none;
-  char **cmdline;
-  std::string command;
-};
-
-// 1) Parses argc and argv into CommmandLineOptions
-// 2) Validates options are self compatible
-// 3) Sets option defaults from the ENV
-// 4) Parses and validates derived values
-//
-// Prints and appropiate message and returns false if failure occurs
-bool parse_command_line_options(int argc, char **argv, CommandLineOptions &clo) {
-  std::string original_command_line = shell_escape(argv[0]);
-  for (int i = 1; i < argc; ++i) original_command_line += " " + shell_escape(argv[i]);
-  clo.original_command_line = original_command_line;
+int main(int argc, char **argv) {
+  TerminalReporter terminalReporter;
+  reporter = &terminalReporter;
 
   // clang-format off
   struct option options[] {
@@ -277,214 +197,171 @@ bool parse_command_line_options(int argc, char **argv, CommandLineOptions &clo) 
   };
   // clang-format on
 
+  std::string original_command_line = shell_escape(argv[0]);
+  for (int i = 1; i < argc; ++i) original_command_line += " " + shell_escape(argv[i]);
+
   argc = gopt(argv, options);
   gopt_errors(argv[0], options);
 
-  // Set metadata values
-  clo.program_name = argv[0];
+  bool check = arg(options, "check")->count;
+  bool verbose = arg(options, "verbose")->count;
+  bool debug = arg(options, "debug")->count;
+  bool quiet = arg(options, "quiet")->count;
+  bool wait = !arg(options, "no-wait")->count;
+  bool workspace = !arg(options, "no-workspace")->count;
+  bool tty = !arg(options, "no-tty")->count;
+  bool fwarning = arg(options, "fatal-warnings")->count;
+  int profileh = arg(options, "profile-heap")->count;
+  bool input = arg(options, "input")->count;
+  bool output = arg(options, "output")->count;
+  bool last = arg(options, "last")->count;
+  bool lsp = arg(options, "lsp")->count;
+  bool failed = arg(options, "failed")->count;
+  bool script = arg(options, "script")->count;
+  bool version = arg(options, "version")->count;
+  bool html = arg(options, "html")->count;
+  bool global = arg(options, "globals")->count;
+  bool help = arg(options, "help")->count;
+  bool debugdb = arg(options, "debug-db")->count;
+  bool parse = arg(options, "stop-after-parse")->count;
+  bool tcheck = arg(options, "stop-after-type-check")->count;
+  bool dumpssa = arg(options, "stop-after-ssa")->count;
+  bool optim = !arg(options, "no-optimize")->count;
+  bool exports = arg(options, "exports")->count;
+  bool timeline = arg(options, "timeline")->count;
+  bool clean = arg(options, "clean")->count;
+  bool list_outputs = arg(options, "list-outputs")->count;
 
-  // Read CLI values
-  clo.check = arg(options, "check")->count;
-  clo.verbose = arg(options, "verbose")->count;
-  clo.debug = arg(options, "debug")->count;
-  clo.quiet = arg(options, "quiet")->count;
-  clo.wait = !arg(options, "no-wait")->count;
-  clo.workspace = !arg(options, "no-workspace")->count;
-  clo.tty = !arg(options, "no-tty")->count;
-  clo.fwarning = arg(options, "fatal-warnings")->count;
-  clo.profileh = arg(options, "profile-heap")->count;
-  clo.input = arg(options, "input")->count;
-  clo.output = arg(options, "output")->count;
-  clo.last = arg(options, "last")->count;
-  clo.lsp = arg(options, "lsp")->count;
-  clo.failed = arg(options, "failed")->count;
-  clo.script = arg(options, "script")->count;
-  clo.version = arg(options, "version")->count;
-  clo.html = arg(options, "html")->count;
-  clo.global = arg(options, "globals")->count;
-  clo.help = arg(options, "help")->count;
-  clo.debugdb = arg(options, "debug-db")->count;
-  clo.parse = arg(options, "stop-after-parse")->count;
-  clo.tcheck = arg(options, "stop-after-type-check")->count;
-  clo.dumpssa = arg(options, "stop-after-ssa")->count;
-  clo.optim = !arg(options, "no-optimize")->count;
-  clo.exports = arg(options, "exports")->count;
-  clo.timeline = arg(options, "timeline")->count;
-  clo.clean = arg(options, "clean")->count;
-  clo.list_outputs = arg(options, "list-outputs")->count;
+  const char *percent_str = arg(options, "percent")->argument;
+  const char *jobs_str = arg(options, "jobs")->argument;
+  const char *memory_str = arg(options, "memory")->argument;
+  const char *heapf = arg(options, "heap-factor")->argument;
+  const char *profile = arg(options, "profile")->argument;
+  const char *init = arg(options, "init")->argument;
+  const char *chdir = arg(options, "chdir")->argument;
+  const char *in = arg(options, "in")->argument;
+  const char *exec = arg(options, "exec")->argument;
+  const char *job = arg(options, "job")->argument;
+  char *shebang = arg(options, "shebang")->argument;
+  const char *tagdag = arg(options, "tag-dag")->argument;
+  const char *tag = arg(options, "tag")->argument;
+  const char *api = arg(options, "export-api")->argument;
+  const char *fd1 = arg(options, "stdout")->argument;
+  const char *fd2 = arg(options, "stderr")->argument;
+  const char *fd3 = arg(options, "fd:3")->argument;
+  const char *fd4 = arg(options, "fd:4")->argument;
+  const char *fd5 = arg(options, "fd:5")->argument;
 
-  clo.percent_str = arg(options, "percent")->argument;
-  clo.jobs_str = arg(options, "jobs")->argument;
-  clo.memory_str = arg(options, "memory")->argument;
-  clo.heapf = arg(options, "heap-factor")->argument;
-  clo.profile = arg(options, "profile")->argument;
-  clo.init = arg(options, "init")->argument;
-  clo.chdir = arg(options, "chdir")->argument;
-  clo.in = arg(options, "in")->argument;
-  clo.exec = arg(options, "exec")->argument;
-  clo.job = arg(options, "job")->argument;
-  clo.shebang = arg(options, "shebang")->argument;
-  clo.tagdag = arg(options, "tag-dag")->argument;
-  clo.tag = arg(options, "tag")->argument;
-  clo.api = arg(options, "export-api")->argument;
-  clo.fd1 = arg(options, "stdout")->argument;
-  clo.fd2 = arg(options, "stderr")->argument;
-  clo.fd3 = arg(options, "fd:3")->argument;
-  clo.fd4 = arg(options, "fd:4")->argument;
-  clo.fd5 = arg(options, "fd:5")->argument;
+  if (help) {
+    print_help(argv[0]);
+    return 0;
+  }
 
-  // Validate CLI options
-  if (clo.quiet && clo.verbose) {
+  if (version) {
+    std::cout << "wake " << VERSION_STR << std::endl;
+    return 0;
+  }
+
+  if (lsp) {
+    std::string lsp = make_canonical(find_execpath() + "/../lib/wake/lsp-wake");
+    execl(lsp.c_str(), "lsp-wake", nullptr);
+    std::cerr << "exec(" << lsp << "): " << strerror(errno) << std::endl;
+    return 1;
+  }
+
+  if (quiet && verbose) {
     std::cerr << "Cannot specify both -v and -q!" << std::endl;
-    return false;
+    return 1;
   }
 
-  if (clo.profile && !clo.debug) {
+  if (profile && !debug) {
     std::cerr << "Cannot profile without stack trace support (-d)!" << std::endl;
-    return false;
+    return 1;
   }
 
-  if (clo.shebang && clo.chdir) {
+  if (shebang && chdir) {
     std::cerr << "Cannot specify chdir and shebang simultaneously!" << std::endl;
-    return false;
+    return 1;
   }
 
-  if (clo.shebang && argc < 2) {
+  if (shebang && argc < 2) {
     std::cerr << "Shebang invocation requires a script name as the first non-option argument"
               << std::endl;
-    return false;
+    return 1;
   }
 
-  // Arguments are forbidden with these options
-  bool noargs = clo.init || clo.job || clo.last || clo.failed || clo.tagdag || clo.html ||
-                clo.global || clo.exports || clo.api || clo.exec;
-  if (noargs && argc > 1) {
-    std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
-    return false;
+  tty = term_init(tty);
+
+  double percent = 0.9;
+
+  if (!percent_str) {
+    percent_str = getenv("WAKE_PERCENT");
   }
 
-  // Try to init tty
-  clo.tty = term_init(clo.tty);
-
-  // Read ENV values
-  if (!clo.percent_str) {
-    clo.percent_str = getenv("WAKE_PERCENT");
-  }
-
-  if (!clo.memory_str) {
-    clo.memory_str = getenv("WAKE_MEMORY");
-  }
-
-  if (!clo.jobs_str) {
-    clo.jobs_str = getenv("WAKE_JOBS");
-  }
-
-  // Parse and validate derived values
-  clo.nodb = clo.init;
-  clo.noparse =
-      clo.nodb || clo.job || clo.output || clo.input || clo.last || clo.failed || clo.tagdag;
-  clo.targets = argc == 1 && !noargs;
-  clo.notype = clo.noparse || clo.parse;
-  clo.noexecute = clo.notype || clo.html || clo.tcheck || clo.dumpssa || clo.global ||
-                  clo.exports || clo.api || clo.targets;
-
-  clo.percent = 0.9;
-  if (clo.percent_str) {
+  if (percent_str) {
     char *tail;
-    clo.percent = strtod(clo.percent_str, &tail);
-    clo.percent /= 100.0;
-    if (*tail || clo.percent < 0.01 || clo.percent > 0.99) {
-      std::cerr << "Cannot run with " << clo.percent_str << "%  (must be >= 0.01 and <= 0.99)!"
+    percent = strtod(percent_str, &tail);
+    percent /= 100.0;
+    if (*tail || percent < 0.01 || percent > 0.99) {
+      std::cerr << "Cannot run with " << percent_str << "%  (must be >= 0.01 and <= 0.99)!"
                 << std::endl;
-      return false;
+      return 1;
     }
   }
 
-  clo.memory_budget = ResourceBudget(clo.percent);
-  clo.cpu_budget = ResourceBudget(clo.percent);
+  ResourceBudget memory_budget(percent);
+  ResourceBudget cpu_budget(percent);
 
-  if (clo.memory_str) {
-    if (auto error = ResourceBudget::parse(clo.memory_str, clo.memory_budget)) {
-      std::cerr << "Option '-m" << clo.memory_str << "' is illegal; " << error << std::endl;
-      return false;
+  if (!memory_str) {
+    memory_str = getenv("WAKE_MEMORY");
+  }
+
+  if (memory_str) {
+    if (auto error = ResourceBudget::parse(memory_str, memory_budget)) {
+      std::cerr << "Option '-m" << memory_str << "' is illegal; " << error << std::endl;
+      return 1;
     }
   }
 
-  if (clo.jobs_str) {
-    if (auto error = ResourceBudget::parse(clo.jobs_str, clo.cpu_budget)) {
-      std::cerr << "Option '-j" << clo.jobs_str << "' is illegal; " << error << std::endl;
-      return false;
+  if (!jobs_str) {
+    jobs_str = getenv("WAKE_JOBS");
+  }
+
+  if (jobs_str) {
+    if (auto error = ResourceBudget::parse(jobs_str, cpu_budget)) {
+      std::cerr << "Option '-j" << jobs_str << "' is illegal; " << error << std::endl;
+      return 1;
     }
   }
 
-  clo.heap_factor = 4.0;
-  if (clo.heapf) {
+  double heap_factor = 4.0;
+  if (heapf) {
     char *tail;
-    clo.heap_factor = strtod(clo.heapf, &tail);
-    if (*tail || clo.heap_factor < 1.1) {
-      std::cerr << "Cannot run with " << clo.heapf << " heap-factor (must be >= 1.1)!" << std::endl;
-      return false;
+    heap_factor = strtod(heapf, &tail);
+    if (*tail || heap_factor < 1.1) {
+      std::cerr << "Cannot run with " << heapf << " heap-factor (must be >= 1.1)!" << std::endl;
+      return 1;
     }
   }
 
   // Change directory to the location of the invoked script
   // and execute the specified target function
-  if (clo.shebang) {
-    clo.chdir = argv[1];
-    argv[1] = clo.shebang;
+  if (shebang) {
+    chdir = argv[1];
+    argv[1] = shebang;
   }
 
-  if (clo.timeline) {
-    if (argc == 1) {
-      clo.timeline_arg = NULL;
-    } else {
-      clo.timeline_arg = argv[1];
-    }
-  }
+  // Arguments are forbidden with these options
+  bool noargs = init || job || last || failed || tagdag || html || global || exports || api || exec;
+  bool targets = argc == 1 && !noargs;
 
-  clo.input_args = {};
-  clo.output_args = {};
+  bool nodb = init;
+  bool noparse = nodb || job || output || input || last || failed || tagdag;
+  bool notype = noparse || parse;
+  bool noexecute = notype || html || tcheck || dumpssa || global || exports || api || targets;
 
-  if (clo.input) {
-    for (int i = 1; i < argc; ++i) {
-      clo.input_args.push_back(argv[i]);
-    }
-  }
-
-  if (clo.output) {
-    for (int i = 1; i < argc; ++i) {
-      clo.output_args.push_back(argv[i]);
-    }
-  }
-
-  clo.none = nullptr;
-  clo.cmdline = &clo.none;
-
-  if (clo.exec) {
-    clo.command = clo.exec;
-  } else if (argc > 1) {
-    clo.command = argv[1];
-    clo.cmdline = argv + 2;
-  }
-
-  return true;
-}
-
-int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
-  if (clo.help) {
-    print_help(clo.program_name);
-    return 0;
-  }
-
-  if (clo.version) {
-    std::cout << "wake " << VERSION_STR << std::endl;
-    return 0;
-  }
-
-  if (clo.lsp) {
-    std::string lsp = make_canonical(find_execpath() + "/../lib/wake/lsp-wake");
-    execl(lsp.c_str(), "lsp-wake", nullptr);
-    std::cerr << "exec(" << lsp << "): " << strerror(errno) << std::endl;
+  if (noargs && argc > 1) {
+    std::cerr << "Unexpected positional arguments on the command-line!" << std::endl;
     return 1;
   }
 
@@ -492,28 +369,27 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
   // ../) src_dir is the chdir path (-C) used to select the default package, relative to the
   // workspace root (always a subdir)
   std::string wake_cwd, src_dir;  // form: "" | .+/
-  if (clo.init) {
-    if (!make_workspace(clo.init)) {
-      std::cerr << "Unable to initialize a workspace in " << clo.init << std::endl;
+  if (init) {
+    if (!make_workspace(init)) {
+      std::cerr << "Unable to initialize a workspace in " << init << std::endl;
       return 1;
     }
-  } else if (clo.workspace && !chdir_workspace(clo.chdir, wake_cwd, src_dir)) {
+  } else if (workspace && !chdir_workspace(chdir, wake_cwd, src_dir)) {
     std::cerr << "Unable to locate wake.db in any parent directory." << std::endl;
     return 1;
   }
 
-  // TODO: this can be deleted if 'return 0' is added as and else to '!make_workspace' above
-  if (clo.nodb) return 0;
+  if (nodb) return 0;
 
   // check that the .wakeroot is compatible with the wake version
-  std::string version_check = check_version(clo.workspace, VERSION_STR);
+  std::string version_check = check_version(workspace, VERSION_STR);
   if (!version_check.empty()) {
     std::cerr << ".wakeroot: " << version_check << std::endl;
     return 1;
   }
 
-  Database db(clo.debugdb);
-  std::string fail = db.open(clo.wait, !clo.workspace, clo.tty);
+  Database db(debugdb);
+  std::string fail = db.open(wait, !workspace, tty);
   if (!fail.empty()) {
     std::cerr << "Failed to open wake.db: " << fail << std::endl;
     return 1;
@@ -521,7 +397,7 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
 
   // If the user asked to list all files we *would* clean.
   // This is the same as asking for all output files.
-  if (clo.list_outputs) {
+  if (list_outputs) {
     // Find all the file we would need to delete.
     auto files = db.get_outputs();
 
@@ -534,7 +410,7 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
   }
 
   // If the user asked us to clean the local build, do so.
-  if (clo.clean) {
+  if (clean) {
     // Clean up the database of unwanted info. Jobs must
     // be cleared before outputs are removed to avoid foreign key
     // constraint issues.
@@ -578,12 +454,12 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
     db.entropy(&sip_key[0], 2);
   }
 
-  if (clo.timeline) {
-    if (clo.timeline_arg == NULL) {
+  if (timeline) {
+    if (argc == 1) {
       get_and_write_timeline(std::cout, db);
       return 0;
     }
-    const char *timeline_str = clo.timeline_arg;
+    char *timeline_str = argv[1];
     if (strcmp(timeline_str, "job-reflections") == 0) {
       get_and_write_job_reflections(std::cout, db);
       return 0;
@@ -596,56 +472,56 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
     return 1;
   }
 
-  if (clo.job) {
-    auto hits = db.explain(std::atol(clo.job), clo.verbose || clo.tag);
-    describe(hits, clo.script, clo.debug, clo.verbose, clo.tag);
+  if (job) {
+    auto hits = db.explain(std::atol(job), verbose || tag);
+    describe(hits, script, debug, verbose, tag);
     if (hits.empty())
-      std::cerr << "Job '" << clo.job << "' was not found in the database!" << std::endl;
+      std::cerr << "Job '" << job << "' was not found in the database!" << std::endl;
   }
 
-  if (clo.input) {
-    for (const char *arg : clo.input_args) {
-      describe(db.explain(make_canonical(wake_cwd + arg), 1, clo.verbose || clo.tag), clo.script,
-               clo.debug, clo.verbose, clo.tag);
+  if (input) {
+    for (int i = 1; i < argc; ++i) {
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 1, verbose || tag), script, debug,
+               verbose, tag);
     }
   }
 
-  if (clo.output) {
-    for (const char *arg : clo.output_args) {
-      describe(db.explain(make_canonical(wake_cwd + arg), 2, clo.verbose || clo.tag), clo.script,
-               clo.debug, clo.verbose, clo.tag);
+  if (output) {
+    for (int i = 1; i < argc; ++i) {
+      describe(db.explain(make_canonical(wake_cwd + argv[i]), 2, verbose || tag), script, debug,
+               verbose, tag);
     }
   }
 
-  if (clo.last) {
-    describe(db.last(clo.verbose || clo.tag), clo.script, clo.debug, clo.verbose, clo.tag);
+  if (last) {
+    describe(db.last(verbose || tag), script, debug, verbose, tag);
   }
 
-  if (clo.failed) {
-    describe(db.failed(clo.verbose || clo.tag), clo.script, clo.debug, clo.verbose, clo.tag);
+  if (failed) {
+    describe(db.failed(verbose || tag), script, debug, verbose, tag);
   }
 
-  if (clo.tagdag) {
-    JAST json = create_tagdag(db, clo.tagdag);
+  if (tagdag) {
+    JAST json = create_tagdag(db, tagdag);
     std::cout << json << std::endl;
   }
 
-  if (clo.noparse) return 0;
+  if (noparse) return 0;
 
   bool enumok = true;
   std::string libdir = make_canonical(find_execpath() + "/../share/wake/lib");
-  auto wakefilenames = find_all_wakefiles(enumok, clo.workspace, clo.verbose, libdir, ".");
+  auto wakefilenames = find_all_wakefiles(enumok, workspace, verbose, libdir, ".");
   if (!enumok) {
-    if (clo.verbose) std::cerr << "Workspace wake file enumeration failed" << std::endl;
+    if (verbose) std::cerr << "Workspace wake file enumeration failed" << std::endl;
     // Try to run the build anyway; if wake files are missing, it will fail later
     // The unreadable location might be irrelevant to the build
   }
 
   Profile tree;
-  Runtime runtime(clo.profile ? &tree : nullptr, clo.profileh, clo.heap_factor);
-  bool sources = find_all_sources(runtime, clo.workspace);
+  Runtime runtime(profile ? &tree : nullptr, profileh, heap_factor);
+  bool sources = find_all_sources(runtime, workspace);
   if (!sources) {
-    if (clo.verbose) std::cerr << "Source file enumeration failed" << std::endl;
+    if (verbose) std::cerr << "Source file enumeration failed" << std::endl;
     // Try to run the build anyway; if sources are missing, it will fail later
     // The unreadable location might be irrelevant to the build
   }
@@ -656,12 +532,12 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
 
   // Read all wake build files
   bool ok = true;
-  Scope::debug = clo.debug;
+  Scope::debug = debug;
   std::unique_ptr<Top> top(new Top);
   std::vector<ExternalFile> wakefiles;
   wakefiles.reserve(wakefilenames.size());
   for (auto &i : wakefilenames) {
-    if (clo.verbose && clo.debug) std::cerr << "Parsing " << i << std::endl;
+    if (verbose && debug) std::cerr << "Parsing " << i << std::endl;
 
     wakefiles.emplace_back(terminalReporter, i.c_str());
     FileContent &file = wakefiles.back();
@@ -690,13 +566,13 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
     }
   }
 
-  if (clo.in) {
-    auto it = top->packages.find(clo.in);
+  if (in) {
+    auto it = top->packages.find(in);
     if (it == top->packages.end()) {
-      std::cerr << "Package '" << clo.in << "' selected by --in does not exist!" << std::endl;
+      std::cerr << "Package '" << in << "' selected by --in does not exist!" << std::endl;
       ok = false;
     } else {
-      top->def_package = clo.in;
+      top->def_package = in;
     }
   }
 
@@ -709,7 +585,7 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
   std::vector<std::pair<std::string, std::string> > defs;
   std::set<std::string> types;
 
-  if (clo.targets) {
+  if (targets) {
     auto it = top->packages.find(top->def_package);
     if (it != top->packages.end()) {
       for (auto &e : it->second->exports.defs) defs.emplace_back(e.first, e.second.qualified);
@@ -730,14 +606,14 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
     }
   }
 
-  if (clo.global) {
+  if (global) {
     for (auto &g : top->globals.defs) defs.emplace_back(g.first, g.second.qualified);
     for (auto &t : top->globals.topics)
       defs.emplace_back("topic " + t.first, "topic " + t.second.qualified);
     for (auto &t : top->globals.types) types.insert(t.first);
   }
 
-  if (clo.exports || clo.api) {
+  if (exports || api) {
     auto it = top->packages.find(top->def_package);
     if (it != top->packages.end()) {
       for (auto &e : it->second->exports.defs) defs.emplace_back(e.first, e.second.qualified);
@@ -747,10 +623,21 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
     }
   }
 
-  ExprParser cmdExpr(clo.command);
-  if (clo.exec) {
+  char *none = nullptr;
+  char **cmdline = &none;
+  std::string command;
+
+  if (exec) {
+    command = exec;
+  } else if (argc > 1) {
+    command = argv[1];
+    cmdline = argv + 2;
+  }
+
+  ExprParser cmdExpr(command);
+  if (exec) {
     top->body = cmdExpr.expr(terminalReporter);
-  } else if (*clo.cmdline != clo.none) {
+  } else if (argc > 1) {
     top->body =
         std::unique_ptr<Expr>(new App(FRAGMENT_CPP_LINE, cmdExpr.expr(terminalReporter).release(),
                                       new Prim(FRAGMENT_CPP_LINE, "cmdline")));
@@ -760,29 +647,27 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
 
   TypeVar type = top->body->typeVar;
 
-  if (clo.parse) top->format(std::cout, 0);
-  if (clo.notype) return (ok && !terminalReporter.errors) ? 0 : 1;
+  if (parse) top->format(std::cout, 0);
+  if (notype) return (ok && !terminalReporter.errors) ? 0 : 1;
 
   /* Setup logging streams */
-  if (clo.noexecute && !clo.fd1) clo.fd1 = "error";
-  if (clo.debug && !clo.fd1) clo.fd1 = "debug,info,echo,report,warning,error";
-  if (clo.verbose && !clo.fd1) clo.fd1 = "info,echo,report,warning,error";
-  if (clo.quiet && !clo.fd1) clo.fd1 = "error";
-  if (!clo.tty && !clo.fd1) clo.fd1 = "echo,report,warning,error";
-  if (!clo.fd1) clo.fd1 = "report,warning,error";
-  if (!clo.fd2) clo.fd2 = "error";
+  if (noexecute && !fd1) fd1 = "error";
+  if (debug && !fd1) fd1 = "debug,info,echo,report,warning,error";
+  if (verbose && !fd1) fd1 = "info,echo,report,warning,error";
+  if (quiet && !fd1) fd1 = "error";
+  if (!tty && !fd1) fd1 = "echo,report,warning,error";
+  if (!fd1) fd1 = "report,warning,error";
+  if (!fd2) fd2 = "error";
 
-  status_set_bulk_fd(1, clo.fd1);
-  status_set_bulk_fd(2, clo.fd2);
-  status_set_bulk_fd(3, clo.fd3);
-  status_set_bulk_fd(4, clo.fd4);
-  status_set_bulk_fd(5, clo.fd5);
+  status_set_bulk_fd(1, fd1);
+  status_set_bulk_fd(2, fd2);
+  status_set_bulk_fd(3, fd3);
+  status_set_bulk_fd(4, fd4);
+  status_set_bulk_fd(5, fd5);
 
   /* Primitives */
-  JobTable jobtable(&db, clo.memory_budget, clo.cpu_budget, clo.debug, clo.verbose, clo.quiet,
-                    clo.check, !clo.tty);
-  StringInfo info(clo.verbose, clo.debug, clo.quiet, VERSION_STR, make_canonical(wake_cwd),
-                  clo.cmdline);
+  JobTable jobtable(&db, memory_budget, cpu_budget, debug, verbose, quiet, check, !tty);
+  StringInfo info(verbose, debug, quiet, VERSION_STR, make_canonical(wake_cwd), cmdline);
   PrimMap pmap = prim_register_all(&info, &jobtable);
 
   bool isTreeBuilt = true;
@@ -791,18 +676,18 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
 
   sums_ok();
 
-  if (clo.tcheck) std::cout << root.get();
+  if (tcheck) std::cout << root.get();
 
-  if (!ok || terminalReporter.errors || (clo.fwarning && terminalReporter.warnings)) {
+  if (!ok || terminalReporter.errors || (fwarning && terminalReporter.warnings)) {
     std::cerr << ">>> Aborting without execution <<<" << std::endl;
     return 1;
   }
 
-  if (clo.html) markup_html(libdir, std::cout, root.get());
+  if (html) markup_html(libdir, std::cout, root.get());
 
-  if (clo.api) {
+  if (api) {
     std::vector<std::string> mixed(types.begin(), types.end());
-    std::cout << "package " << clo.api << std::endl;
+    std::cout << "package " << api << std::endl;
     format_reexports(std::cout, export_package.c_str(), "type", mixed);
   } else if (!types.empty()) {
     std::cout << "types";
@@ -819,9 +704,9 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
     std::cout << std::endl;
   }
 
-  if (clo.targets) std::cout << "Available wake targets:" << std::endl;
+  if (targets) std::cout << "Available wake targets:" << std::endl;
 
-  if (clo.api) {
+  if (api) {
     std::vector<std::string> def, topic;
     for (auto &d : defs) {
       if (d.first.compare(0, 6, "topic ") == 0) {
@@ -843,7 +728,7 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
           int idx = i->second.index;
           Expr *v =
               idx < (int)d->val.size() ? d->val[idx].get() : d->fun[idx - d->val.size()].get();
-          if (clo.targets) {
+          if (targets) {
             TypeVar clone;
             v->typeVar.clone(clone);
             TypeVar fn1(FN, 2);
@@ -867,10 +752,10 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
 
   // Convert AST to optimized SSA
   std::unique_ptr<Term> ssa = Term::fromExpr(std::move(root), runtime);
-  if (clo.optim) ssa = Term::optimize(std::move(ssa), runtime);
+  if (optim) ssa = Term::optimize(std::move(ssa), runtime);
 
   // Upon request, dump out the SSA
-  if (clo.dumpssa) {
+  if (dumpssa) {
     TermFormat format;
     ssa->format(std::cout, format);
   }
@@ -879,9 +764,9 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
   ssa = Term::scope(std::move(ssa), runtime);
 
   // Exit without execution for these arguments
-  if (clo.noexecute) return 0;
+  if (noexecute) return 0;
 
-  db.prepare(clo.original_command_line);
+  db.prepare(original_command_line);
   runtime.init(static_cast<RFun *>(ssa.get()));
 
   // Flush buffered IO before we enter the main loop (which uses unbuffered IO exclusively)
@@ -899,7 +784,7 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
   status_finish();
 
   runtime.heap.report();
-  tree.report(clo.profile, clo.command);
+  tree.report(profile, command);
 
   bool pass = true;
   if (runtime.abort) {
@@ -917,29 +802,17 @@ int run_wake(CommandLineOptions clo, TerminalReporter &terminalReporter) {
       if (r->cons->ast.name == "Fail") pass = false;
     }
     std::ostream &os = pass ? (std::cout) : (std::cerr);
-    if (clo.verbose) {
-      os << clo.command << ": ";
+    if (verbose) {
+      os << command << ": ";
       type.format(os, type);
       os << " = ";
     }
-    if (!clo.quiet || !pass) {
-      HeapObject::format(os, v, clo.debug, clo.verbose ? 0 : -1);
+    if (!quiet || !pass) {
+      HeapObject::format(os, v, debug, verbose ? 0 : -1);
       os << std::endl;
     }
   }
 
   db.clean();
   return pass ? 0 : 1;
-}
-
-int main(int argc, char **argv) {
-  TerminalReporter terminalReporter;
-  reporter = &terminalReporter;
-
-  CommandLineOptions clo;
-  if (!parse_command_line_options(argc, argv, clo)) {
-    return 1;
-  }
-
-  return run_wake(clo, terminalReporter);
 }
