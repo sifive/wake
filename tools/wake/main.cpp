@@ -340,7 +340,7 @@ bool parse_command_line_options(int *argc, char **argv, CommandLineOptions &clo)
   return true;
 }
 
-int run_wake(int argc, char **argv, CommandLineOptions clo, TerminalReporter terminalReporter) {
+int run_wake(int argc, char **argv, CommandLineOptions clo, TerminalReporter &terminalReporter) {
   if (clo.help) {
     print_help(argv[0]);
     return 0;
