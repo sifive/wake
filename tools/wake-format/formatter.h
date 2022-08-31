@@ -117,13 +117,6 @@ inline void newline(wcl::doc_builder& builder, uint8_t space_count) {
   space(builder, space_count);
 }
 
-inline size_t curr_width(wcl::doc_builder& builder, ctx_t ctx) {
-  if (builder->has_newline()) {
-    return builder->last_width();
-  }
-  return builder->last_width() + ctx->last_width();
-}
-
 class IsWSNLCPredicate {
  public:
   bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
@@ -396,7 +389,8 @@ class FitsPredicate {
                   const token_traits_map_t& traits) {
     CSTElement copy = node;
     wcl::doc doc = formatter.compose(ctx.sub(builder), copy, traits);
-    return curr_width(builder, ctx) + doc->first_width() <= MAX_COLUMN_WIDTH;
+
+    return ctx.sub(builder)->last_width() + doc->first_width() <= MAX_COLUMN_WIDTH;
   }
 };
 
