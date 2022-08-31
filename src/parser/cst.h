@@ -170,10 +170,9 @@ struct std::hash<CSTElement> {
 
 struct CSTElementCompare {
   bool operator()(const CSTElement &lhs, const CSTElement &rhs) const {
-    if (lhs.node == rhs.node) {
-      return lhs.token < rhs.token;
-    }
-    return lhs.node < rhs.node;
+    auto l = std::make_tuple(lhs.node, lhs.token, lhs.limit, lhs.cst);
+    auto r = std::make_tuple(rhs.node, rhs.token, rhs.limit, rhs.cst);
+    return l < r;
   }
 };
 
