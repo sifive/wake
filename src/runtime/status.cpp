@@ -21,6 +21,8 @@
 
 #include "status.h"
 
+#ifndef __EMSCRIPTEN__
+
 #include <assert.h>
 #include <curses.h>
 #include <fcntl.h>
@@ -391,3 +393,33 @@ void status_finish() {
     setitimer(ITIMER_REAL, &timer, 0);
   }
 }
+
+#else
+#include <emscripten/emscripten.h>
+
+StatusState status_state;
+
+void status_init() {}
+
+void status_write(const char *name, const char *data, int len) {
+  // clang-format off
+  EM_ASM_INT({
+    console.log('[' + UTF8ToString($0) + '] ' + UTF8ToString($1));
+    return 0;
+  }, name, data);
+  // clang-format on
+}
+
+void status_refresh(bool idle) {}
+void status_finish() {}
+
+void status_set_colour(const char *name, int colour) {}
+void status_set_fd(const char *name, int fd) {}
+void status_set_bulk_fd(int fd, const char *streams) {}
+
+const char *term_colour(int code) { return ""; }
+const char *term_normal() { return ""; }
+const char *term_normal(int code) { return ""; }
+bool term_init(bool tty) { return true; }
+
+#endif

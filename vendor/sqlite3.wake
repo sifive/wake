@@ -15,5 +15,47 @@
 
 package build_wake
 from wake import _
+from gcc_wake import _
 
-def sqlite3 _ = Pass (pkg "sqlite3")
+def sqlite3 = match _
+  Pair "wasm-cpp14-release" _ = buildSqlite3WASM Unit
+  _ = Pass (pkg "sqlite3")
+
+def buildSqlite3WASM _ =
+  require Some emmake =
+    emmake
+  else
+    failWithError "emmake is not available"
+
+  def emsdk =
+    replace `/[^/]*$` "" emmake
+
+  def version = "0.0.0"
+
+  require Pass buildDir = vendorBuildDir Unit
+
+
+  def job =
+    """
+      cd .build
+      wget https://sqlite.org/2022/sqlite-amalgamation-3390200.zip
+      unzip sqlite-amalgamation-3390200
+      cd sqlite-amalgamation-3390200
+      emcc -c sqlite3.c
+    """
+    | makePlan "compiling sqlite3" (buildDir, Nil)
+    | editPlanEnvironment (addEnvironmentPath emsdk)
+    | setPlanDirectory here
+    | runJob
+
+  require Pass outputs = job.getJobOutputs
+
+  def headers = filter (matches `.*\.h` _.getPathName) outputs
+
+  def objects = filter (matches `.*\.o` _.getPathName) outputs
+
+  def cflags = "-I{here}/.build/sqlite-amalgamation-3390200", Nil
+
+  def lflags = Nil
+
+  Pass (SysLib version headers objects cflags lflags)
