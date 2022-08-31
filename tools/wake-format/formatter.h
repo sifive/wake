@@ -39,27 +39,26 @@
 #define MAX_COLUMN_WIDTH 100
 
 struct ctx_t {
-  size_t width = 0;
   size_t nest_level = 0;
+  wcl::doc_state state = wcl::doc_state::identity();
 
-  ctx_t nest() {
+  ctx_t nest() const {
     ctx_t copy = *this;
     copy.nest_level++;
     return copy;
   }
 
-  ctx_t sub(const wcl::doc_builder& builder) {
+  ctx_t sub(const wcl::doc_builder& builder) const {
     ctx_t copy = *this;
-    if (builder.has_newline()) {
-      copy.width = builder.last_width();
-    } else {
-      copy.width += builder.last_width();
-    }
+    copy.state = state + *builder;
     return copy;
   }
 
+  const wcl::doc_state& operator*() const { return state; }
+  const wcl::doc_state& operator->() const { return state; }
+
   bool operator==(const ctx_t& other) const {
-    return width == other.width && nest_level == other.nest_level;
+    return state == other.state && nest_level == other.nest_level;
   }
 };
 
@@ -102,7 +101,8 @@ using token_traits_map_t = std::unordered_map<CSTElement, token_traits_t>;
 template <>
 struct std::hash<ctx_t> {
   size_t operator()(ctx_t const& ctx) const noexcept {
-    return wcl::hash_combine(std::hash<size_t>{}(ctx.width), std::hash<size_t>{}(ctx.nest_level));
+    return wcl::hash_combine(std::hash<wcl::doc_state>{}(ctx.state),
+                             std::hash<size_t>{}(ctx.nest_level));
   }
 };
 
@@ -115,13 +115,6 @@ inline void space(wcl::doc_builder& builder, uint8_t count) {
 inline void newline(wcl::doc_builder& builder, uint8_t space_count) {
   builder.append(NL_STR);
   space(builder, space_count);
-}
-
-inline size_t curr_width(wcl::doc_builder& builder, ctx_t ctx) {
-  if (builder.has_newline()) {
-    return builder.last_width();
-  }
-  return builder.last_width() + ctx.width;
 }
 
 class IsWSNLCPredicate {
@@ -278,7 +271,7 @@ struct NestAction {
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
-    builder.append(formatter.compose(ctx.sub(builder).nest(), node, traits));
+    builder.append(formatter.compose(ctx.nest().sub(builder), node, traits));
   }
 };
 
@@ -396,7 +389,7 @@ class FitsPredicate {
                   const token_traits_map_t& traits) {
     CSTElement copy = node;
     wcl::doc doc = formatter.compose(ctx.sub(builder), copy, traits);
-    return curr_width(builder, ctx) + doc.first_width() <= MAX_COLUMN_WIDTH;
+    return ctx.sub(builder)->last_width() + doc->first_width() <= MAX_COLUMN_WIDTH;
   }
 };
 
