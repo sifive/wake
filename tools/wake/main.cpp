@@ -340,15 +340,7 @@ bool parse_command_line_options(int *argc, char **argv, CommandLineOptions &clo)
   return true;
 }
 
-int main(int argc, char **argv) {
-  TerminalReporter terminalReporter;
-  reporter = &terminalReporter;
-
-  CommandLineOptions clo;
-  if (!parse_command_line_options(&argc, argv, clo)) {
-    return 1;
-  }
-
+int run_wake(int argc, char **argv, CommandLineOptions clo, TerminalReporter terminalReporter) {
   if (clo.help) {
     print_help(argv[0]);
     return 0;
@@ -895,4 +887,16 @@ int main(int argc, char **argv) {
 
   db.clean();
   return pass ? 0 : 1;
+}
+
+int main(int argc, char **argv) {
+  TerminalReporter terminalReporter;
+  reporter = &terminalReporter;
+
+  CommandLineOptions clo;
+  if (!parse_command_line_options(&argc, argv, clo)) {
+    return 1;
+  }
+
+  return run_wake(argc, argv, clo, terminalReporter);
 }
