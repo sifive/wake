@@ -22,6 +22,7 @@
 
 #include <bitset>
 #include <cassert>
+#include <set>
 
 #include "parser/cst.h"
 #include "parser/parser.h"
@@ -33,6 +34,9 @@
 
 // #define SPACE_STR "·"
 // #define NL_STR "⏎\n"
+
+#define SPACE_PER_INDENT 4
+#define MAX_COLUMN_WIDTH 100
 
 struct ctx_t {
   size_t nest_level = 0;
@@ -58,6 +62,42 @@ struct ctx_t {
   }
 };
 
+struct token_traits_t {
+  // Tokens bound to this token 'before' this token
+  // in source order
+  std::set<CSTElement, CSTElementCompare> before_bound = {};
+
+  // Tokens bound to this token 'after' this token
+  // in source order
+  std::set<CSTElement, CSTElementCompare> after_bound = {};
+
+  // The token this token is bound to
+  // inverse of before/after_bound
+  CSTElement bound_to;
+
+  void bind_before(CSTElement e) {
+    // TODO: delete this after handling captured
+    // NLs and WSes
+    if (e.id() != TOKEN_COMMENT) {
+      return;
+    }
+    before_bound.insert(e);
+  }
+
+  void bind_after(CSTElement e) {
+    // TODO: delete this after handling captured
+    // NLs and WSes
+    if (e.id() != TOKEN_COMMENT) {
+      return;
+    }
+    after_bound.insert(e);
+  }
+
+  void set_bound_to(CSTElement e) { bound_to = e; }
+};
+
+using token_traits_map_t = std::unordered_map<CSTElement, token_traits_t>;
+
 template <>
 struct std::hash<ctx_t> {
   size_t operator()(ctx_t const& ctx) const noexcept {
@@ -72,9 +112,35 @@ inline void space(wcl::doc_builder& builder, uint8_t count) {
   }
 }
 
+inline void newline(wcl::doc_builder& builder, uint8_t space_count) {
+  builder.append(NL_STR);
+  space(builder, space_count);
+}
+
+inline size_t curr_width(wcl::doc_builder& builder, ctx_t ctx) {
+  if (builder->has_newline()) {
+    return builder->last_width();
+  }
+  return builder->last_width() + ctx->last_width();
+}
+
+class IsWSNLCPredicate {
+ public:
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                  const token_traits_map_t& traits) const {
+    return operator()(node);
+  }
+
+  bool operator()(const CSTElement& node) const {
+    return node.id() == TOKEN_WS || node.id() == TOKEN_NL || node.id() == TOKEN_COMMENT;
+  }
+};
+
 struct ConsumeWhitespaceAction {
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    while (!node.empty() && (node.id() == TOKEN_WS || node.id() == TOKEN_NL)) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    IsWSNLCPredicate predicate;
+    while (!node.empty() && predicate(builder, ctx, node, traits)) {
       node.nextSiblingElement();
     }
   }
@@ -83,32 +149,48 @@ struct ConsumeWhitespaceAction {
 struct SpaceAction {
   uint8_t count;
   SpaceAction(uint8_t count) : count(count) {}
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
     space(builder, count);
   }
 };
 
 struct NewlineAction {
-  uint8_t space_per_indent;
-
-  NewlineAction(uint8_t space_per_indent) : space_per_indent(space_per_indent) {}
-
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    builder.append(NL_STR);
-    space(builder, space_per_indent * ctx.nest_level);
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    newline(builder, SPACE_PER_INDENT * ctx.nest_level);
   }
 };
 
 struct TokenAction {
   cst_id_t token_id;
   TokenAction(cst_id_t token_id) : token_id(token_id) {}
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
     if (node.id() != token_id) {
       // TODO: see about adding a token -> token name function
       std::cerr << "Unexpected token: " << +token_id << std::endl;
     }
     assert(node.id() == token_id);
+
+    auto it = traits.find(node);
+    if (it != traits.end()) {
+      for (auto n : it->second.before_bound) {
+        builder.append(n.fragment().segment().str());
+        newline(builder, SPACE_PER_INDENT * ctx.nest_level);
+      }
+    }
+
     builder.append(node.fragment().segment().str());
+
+    if (it != traits.end()) {
+      for (auto n : it->second.after_bound) {
+        space(builder, 1);
+        builder.append(n.fragment().segment().str());
+        newline(builder, SPACE_PER_INDENT * ctx.nest_level);
+      }
+    }
+
     node.nextSiblingElement();
   }
 };
@@ -119,13 +201,32 @@ struct TokenReplaceAction {
 
   TokenReplaceAction(cst_id_t token_id, const char* str) : token_id(token_id), str(str) {}
 
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
     if (node.id() != token_id) {
       // TODO: see about adding a token -> token name function
       std::cerr << "Unexpected token: " << +token_id << std::endl;
     }
     assert(node.id() == token_id);
+
+    auto it = traits.find(node);
+    if (it != traits.end()) {
+      for (auto n : it->second.before_bound) {
+        builder.append(n.fragment().segment().str());
+        newline(builder, SPACE_PER_INDENT * ctx.nest_level);
+      }
+    }
+
     builder.append(str);
+
+    if (it != traits.end()) {
+      for (auto n : it->second.after_bound) {
+        space(builder, 1);
+        builder.append(n.fragment().segment().str());
+        newline(builder, SPACE_PER_INDENT * ctx.nest_level);
+      }
+    }
+
     node.nextSiblingElement();
   }
 };
@@ -140,9 +241,10 @@ struct SeqAction {
   Action2 action2;
   SeqAction(Action1 a1, Action2 a2) : action1(a1), action2(a2) {}
 
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    action1.run(builder, ctx, node);
-    action2.run(builder, ctx, node);
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    action1.run(builder, ctx, node, traits);
+    action2.run(builder, ctx, node, traits);
   }
 };
 
@@ -154,8 +256,9 @@ struct WalkPredicateAction {
   WalkPredicateAction(Predicate predicate, Function walker)
       : predicate(predicate), walker(walker) {}
 
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    bool result = predicate(builder, ctx, node);
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    bool result = predicate(builder, ctx, node, traits);
     if (!result) {
       // TODO: see about adding a token -> token name function
       std::cerr << "Unexpected token: " << +node.id() << std::endl;
@@ -173,8 +276,9 @@ struct NestAction {
 
   NestAction(FMT formatter) : formatter(formatter) {}
 
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    builder.append(formatter.compose(ctx.nest().sub(builder), node));
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    builder.append(formatter.compose(ctx.nest().sub(builder), node, traits));
   }
 };
 
@@ -187,11 +291,12 @@ struct IfElseAction {
   IfElseAction(Predicate predicate, IFMT if_formatter, EFMT else_formatter)
       : predicate(predicate), if_formatter(if_formatter), else_formatter(else_formatter) {}
 
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    if (predicate(builder, ctx, node)) {
-      builder.append(if_formatter.compose(ctx.sub(builder), node));
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    if (predicate(builder, ctx, node, traits)) {
+      builder.append(if_formatter.compose(ctx.sub(builder), node, traits));
     } else {
-      builder.append(else_formatter.compose(ctx.sub(builder), node));
+      builder.append(else_formatter.compose(ctx.sub(builder), node, traits));
     }
   }
 };
@@ -204,9 +309,10 @@ struct WhileAction {
   WhileAction(Predicate predicate, FMT while_formatter)
       : predicate(predicate), while_formatter(while_formatter) {}
 
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    while (predicate(builder, ctx, node)) {
-      builder.append(while_formatter.compose(ctx.sub(builder), node));
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    while (predicate(builder, ctx, node, traits)) {
+      builder.append(while_formatter.compose(ctx.sub(builder), node, traits));
     }
   }
 };
@@ -217,9 +323,10 @@ struct WalkChildrenAction {
 
   WalkChildrenAction(FMT formatter) : formatter(formatter) {}
 
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
     for (CSTElement child = node.firstChildElement(); !child.empty();) {
-      builder.append(formatter.compose(ctx.sub(builder), child));
+      builder.append(formatter.compose(ctx.sub(builder), child, traits));
     }
     node.nextSiblingElement();
   }
@@ -232,7 +339,8 @@ struct EscapeAction {
   F f;
   EscapeAction(F f) : f(f) {}
 
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
     // You have to do everything yourself here, that's the price of an escape hatch
     // we can build up enough of these that it shouldn't be an issue however.
     f(builder, ctx, node);
@@ -245,20 +353,23 @@ struct JoinAction {
 
   JoinAction(FMT formatter) : formatter(formatter) {}
 
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    builder.append(formatter.compose(ctx.sub(builder), node));
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    builder.append(formatter.compose(ctx.sub(builder), node, traits));
   }
 };
 
 struct NextAction {
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
     node.nextSiblingElement();
   }
 };
 
 // This does nothing, good for kicking off a chain of formatters
 struct EpsilonAction {
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {}
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {}
 };
 
 class ConstPredicate {
@@ -267,7 +378,10 @@ class ConstPredicate {
 
  public:
   ConstPredicate(bool result) : result(result) {}
-  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) { return result; }
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                  const token_traits_map_t& traits) {
+    return result;
+  }
 };
 
 template <class FMT>
@@ -278,14 +392,11 @@ class FitsPredicate {
  public:
   FitsPredicate(FMT formatter) : formatter(formatter) {}
 
-  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                  const token_traits_map_t& traits) {
     CSTElement copy = node;
-    wcl::doc doc = formatter.compose(ctx.sub(builder), copy);
-    if (builder->has_newline()) {
-      return builder->last_width() + doc->first_width() <= 100;
-    } else {
-      return builder->last_width() + doc->first_width() + ctx->last_width() <= 100;
-    }
+    wcl::doc doc = formatter.compose(ctx.sub(builder), copy, traits);
+    return curr_width(builder, ctx) + doc->first_width() <= MAX_COLUMN_WIDTH;
   }
 };
 
@@ -310,19 +421,22 @@ struct FmtPredicate {
           std::is_same<bool, decltype(std::declval<typename DepDeclType<CTX, Predicate>::type>()(
                                  cst_id_t()))>::value,
           bool> = true>
-  bool operator()(wcl::doc_builder& builder, CTX ctx, CSTElement& node) {
+  bool operator()(wcl::doc_builder& builder, CTX ctx, CSTElement& node,
+                  const token_traits_map_t& traits) {
     return predicate(node.id());
   }
 
   template <
       class CTX,
       std::enable_if_t<
-          std::is_same<bool, decltype(std::declval<typename DepDeclType<CTX, Predicate>::type>()(
-                                 std::declval<wcl::doc_builder&>(), ctx_t(),
-                                 std::declval<CSTElement&>()))>::value,
+          std::is_same<bool,
+                       decltype(std::declval<typename DepDeclType<CTX, Predicate>::type>()(
+                           std::declval<wcl::doc_builder&>(), ctx_t(), std::declval<CSTElement&>(),
+                           std::declval<const token_traits_map_t&>()))>::value,
           bool> = true>
-  bool operator()(wcl::doc_builder& builder, CTX ctx, CSTElement& node) {
-    return predicate(builder, ctx, node);
+  bool operator()(wcl::doc_builder& builder, CTX ctx, CSTElement& node,
+                  const token_traits_map_t& traits) {
+    return predicate(builder, ctx, node, traits);
   }
 };
 
@@ -330,7 +444,8 @@ template <>
 struct FmtPredicate<cst_id_t> {
   cst_id_t id;
   FmtPredicate(cst_id_t id) : id(id) {}
-  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                  const token_traits_map_t& traits) {
     return node.id() == id;
   }
 };
@@ -339,7 +454,8 @@ template <>
 struct FmtPredicate<int> {
   int id;
   FmtPredicate(int id) : id(id) {}
-  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                  const token_traits_map_t& traits) {
     return node.id() == id;
   }
 };
@@ -357,7 +473,10 @@ struct FmtPredicate<std::initializer_list<T>> {
     }
   }
 
-  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) { return set[node.id()]; }
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                  const token_traits_map_t& traits) {
+    return set[node.id()];
+  }
 };
 
 template <class Predicate, class FMT>
@@ -367,11 +486,12 @@ struct PredicateCase {
 
   PredicateCase(Predicate predicate, FMT formatter) : predicate(predicate), formatter(formatter) {}
 
-  ALWAYS_INLINE bool run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    if (!predicate(builder, ctx, node)) {
+  ALWAYS_INLINE bool run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    if (!predicate(builder, ctx, node, traits)) {
       return false;
     }
-    builder.append(formatter.compose(ctx.sub(builder), node));
+    builder.append(formatter.compose(ctx.sub(builder), node, traits));
     return true;
   }
 };
@@ -382,8 +502,9 @@ struct OtherwiseCase {
 
   OtherwiseCase(FMT formatter) : formatter(formatter) {}
 
-  ALWAYS_INLINE bool run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    builder.append(formatter.compose(ctx.sub(builder), node));
+  ALWAYS_INLINE bool run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    builder.append(formatter.compose(ctx.sub(builder), node, traits));
     return true;
   }
 };
@@ -394,11 +515,12 @@ struct MatchSeq {
   Case2 case2;
   MatchSeq(Case1 c1, Case2 c2) : case1(c1), case2(c2) {}
 
-  ALWAYS_INLINE bool run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    if (case1.run(builder, ctx, node)) {
+  ALWAYS_INLINE bool run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    if (case1.run(builder, ctx, node, traits)) {
       return true;
     }
-    return case2.run(builder, ctx, node);
+    return case2.run(builder, ctx, node, traits);
   }
 };
 
@@ -431,26 +553,25 @@ struct MatchAction {
     return {{c, {formatter}}};
   }
 
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node) {
-    assert(c.run(builder, ctx, node));
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    assert(c.run(builder, ctx, node, traits));
   }
 };
 
 template <class Action>
 struct Formatter {
   Action action;
-  static const uint8_t space_per_indent = 4;
-  static const uint8_t max_column_width = 100;
 
   Formatter(Action a) : action(a) {}
 
-  Formatter<SeqAction<Action, ConsumeWhitespaceAction>> consume_wsnl() { return {{action, {}}}; }
+  Formatter<SeqAction<Action, ConsumeWhitespaceAction>> consume_wsnlc() { return {{action, {}}}; }
 
   Formatter<SeqAction<Action, WhitespaceTokenAction>> ws() { return {{action, {}}}; }
 
   Formatter<SeqAction<Action, SpaceAction>> space(uint8_t count = 1) { return {{action, {count}}}; }
 
-  Formatter<SeqAction<Action, NewlineAction>> newline() { return {{action, {space_per_indent}}}; }
+  Formatter<SeqAction<Action, NewlineAction>> newline() { return {{action, {}}}; }
 
   Formatter<SeqAction<Action, TokenAction>> token(cst_id_t id) { return {{action, {id}}}; }
 
@@ -548,9 +669,9 @@ struct Formatter {
     return {{action, {f}}};
   }
 
-  wcl::doc format(ctx_t ctx, CSTElement node) {
+  wcl::doc format(ctx_t ctx, CSTElement node, const token_traits_map_t& traits) {
     wcl::doc_builder builder;
-    action.run(builder, ctx, node);
+    action.run(builder, ctx, node, traits);
     if (!node.empty()) {
       std::cerr << "Not empty: " << +node.id() << std::endl;
       std::cerr << "Failed at: " << std::move(builder).build().as_string() << std::endl;
@@ -559,9 +680,9 @@ struct Formatter {
     return std::move(builder).build();
   }
 
-  wcl::doc compose(ctx_t ctx, CSTElement& node) {
+  wcl::doc compose(ctx_t ctx, CSTElement& node, const token_traits_map_t& traits) {
     wcl::doc_builder builder;
-    action.run(builder, ctx, node);
+    action.run(builder, ctx, node, traits);
     return std::move(builder).build();
   }
 };

@@ -1,3 +1,8 @@
+# comment
+def five = 5
+
+
+# ordinary comment
 def name Unit =
     def other = @here
     def other =
@@ -14,9 +19,17 @@ def name Unit =
 global export def glob1 = 34
 
 
+# ordinary comment
+def name Unit =
+    def other = @here
+    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    another
+
+
 # wake-format off
 def name Unit =
   def other = here
+  # wake-format off
   def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   another
 
@@ -47,13 +60,6 @@ def name Unit =
 def name Unit =
     # ordinary comment
     def other = @here
-    def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    another
-
-
-def name Unit =
-    # wake-format off
-    def other = here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another
 
@@ -102,11 +108,6 @@ def t1 = match _
 def t2 = ((x + 7) * 3)
 
 
-def t3 = ( # comment
-    x + 5
-)
-
-
 def t4 = (
     # comment
     x + 5
@@ -124,14 +125,7 @@ def t4 = (
 
 def t5 = (
     # comment
-    # comment 
     # comment
-    x + 5
-)
-
-
-def t6 = ( # comment
-    # comment 
     # comment
     x + 5
 )
@@ -146,29 +140,10 @@ def t6 = ( # comment
 #   x + # comment
 #   5
 # )
+# TODO: this needs to emit correctly
 def t9 = (
     x + 5 # comment
-)
-
-
-def t10 = (
-    x + 5
-    # comment
-)
-
-
-def t11 = (
-    x + 5 # comment
-    # comment
-    # comment
-)
-
-
-def t12 = (
-    x + 5
-    # comment
-    # comment
-    # comment
+    
 )
 
 
