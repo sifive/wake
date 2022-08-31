@@ -729,7 +729,7 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
                    .token(TOKEN_P_PCLOSE)
                    .format(ctx, node.firstChildElement(), token_traits);
 
-  if (!no_nl.has_newline()) {
+  if (!no_nl->has_newline()) {
     MEMO_RET(no_nl);
   }
 
