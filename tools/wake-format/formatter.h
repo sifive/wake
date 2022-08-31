@@ -389,7 +389,6 @@ class FitsPredicate {
                   const token_traits_map_t& traits) {
     CSTElement copy = node;
     wcl::doc doc = formatter.compose(ctx.sub(builder), copy, traits);
-
     return ctx.sub(builder)->last_width() + doc->first_width() <= MAX_COLUMN_WIDTH;
   }
 };
