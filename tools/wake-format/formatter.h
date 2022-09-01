@@ -117,6 +117,29 @@ inline void newline(wcl::doc_builder& builder, uint8_t space_count) {
   space(builder, space_count);
 }
 
+inline void freshline(wcl::doc_builder& builder, ctx_t ctx) {
+  auto goal_width = SPACE_PER_INDENT * ctx.nest_level;
+  auto merged = ctx.sub(builder);
+
+  // there are non-ws characters on the line, thus a nl is required
+  if (merged->last_width() > merged->last_ws_count()) {
+    newline(builder, goal_width);
+    return;
+  }
+
+  // This is a fresh line, but without the right amount of spaces
+  if (merged->last_width() < goal_width) {
+    space(builder, goal_width - merged->last_width());
+    return;
+  }
+
+  // If there are too many spaces, then a freshline() was used instead
+  // of newline(). Assert to ensure it is fixed.
+  if (merged->last_width() > goal_width) {
+    assert(false);
+  }
+}
+
 class IsWSNLCPredicate {
  public:
   bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
@@ -151,7 +174,14 @@ struct SpaceAction {
 struct NewlineAction {
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
-    newline(builder, SPACE_PER_INDENT * ctx.nest_level);
+    newline(builder, 0);
+  }
+};
+
+struct FreshlineAction {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    freshline(builder, ctx);
   }
 };
 
@@ -170,7 +200,7 @@ struct TokenAction {
     if (it != traits.end()) {
       for (auto n : it->second.before_bound) {
         builder.append(n.fragment().segment().str());
-        newline(builder, SPACE_PER_INDENT * ctx.nest_level);
+        freshline(builder, ctx);
       }
     }
 
@@ -180,7 +210,7 @@ struct TokenAction {
       for (auto n : it->second.after_bound) {
         space(builder, 1);
         builder.append(n.fragment().segment().str());
-        newline(builder, SPACE_PER_INDENT * ctx.nest_level);
+        newline(builder, 0);
       }
     }
 
@@ -206,7 +236,7 @@ struct TokenReplaceAction {
     if (it != traits.end()) {
       for (auto n : it->second.before_bound) {
         builder.append(n.fragment().segment().str());
-        newline(builder, SPACE_PER_INDENT * ctx.nest_level);
+        freshline(builder, ctx);
       }
     }
 
@@ -216,7 +246,7 @@ struct TokenReplaceAction {
       for (auto n : it->second.after_bound) {
         space(builder, 1);
         builder.append(n.fragment().segment().str());
-        newline(builder, SPACE_PER_INDENT * ctx.nest_level);
+        newline(builder, 0);
       }
     }
 
@@ -565,6 +595,8 @@ struct Formatter {
   Formatter<SeqAction<Action, SpaceAction>> space(uint8_t count = 1) { return {{action, {count}}}; }
 
   Formatter<SeqAction<Action, NewlineAction>> newline() { return {{action, {}}}; }
+
+  Formatter<SeqAction<Action, FreshlineAction>> freshline() { return {{action, {}}}; }
 
   Formatter<SeqAction<Action, TokenAction>> token(cst_id_t id) { return {{action, {id}}}; }
 

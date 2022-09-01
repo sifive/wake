@@ -1,38 +1,21 @@
 # Input that wake-format doesn't attempt to format correctly
 
-def name Unit = # wake-format off
-  def other = here
-  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-  another
-
-def t3 = ( # comment
-  x 
-  + 5
-)
-
-def t6 = ( # comment
-  # comment 
-  # comment
-  x 
-  + 5
-)
-
 def t10 = (
-  x 
+  x
   + 5
   # comment
 )
 
 def t11 = (
-  x 
+  x
   + 5 # comment
 # comment
 # comment
 )
 
 def t12 = (
-  x 
-  + 5 
+  x
+  + 5
   # comment
   # comment
   # comment

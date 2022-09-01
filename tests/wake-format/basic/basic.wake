@@ -126,11 +126,28 @@ def t5 = (
 #   5
 # )
 
-# TODO: this needs to emit correctly
 def t9 = (
   x
   + 5 # comment
 )
+
+def name Unit = # wake-format off
+  def other = here
+  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  another
+
+def t3 = ( # comment
+  x
+  + 5
+)
+
+def t6 = ( # comment
+  # comment
+  # comment
+  x
+  + 5
+)
+
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     buildTestWake, Nil =
