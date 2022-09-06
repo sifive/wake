@@ -83,6 +83,42 @@ class Emitter {
   //   will bind '# comment1' and '# comment2' to the second 'def'
   void bind_comments(CSTElement node);
 
+  // Functions to combine binops using various 'full choice' options
+  //
+  // defs:
+  //   combine flat: combine the LHS and RHS without NLs. Spaces may be added as appropiate per OP
+  //   combine explode: combine the LHS and RHS with at least one NL
+  //   with prefer_explode: ctx.prefer_explode = true
+  //   with !prefer_explode: ctx.prefer_explode = false
+  //
+  // (1) combine_flat: format all elements with !prefer_explode, combine flat
+  // (2) combine_explode_first: first element prefer_explode, rest !prefer_explode, combine explode
+  // (3) combine_explode_last: last element prefer_explode, rest !prefer_explode, combine explode
+  // (4) combine_explode_all: all elements prefer_explode, combine explode
+  // (5) combine_explode_first_compress: first element prefer_explode, rest !prefer_explode, combine
+  //     flat
+  // (6) combine_explode_last_compress: last element prefer_explode, rest !prefer_explode, combine
+  //     flat
+  //
+  // Making the 'full choice'
+  //
+  // - format all 6 options and apply the following rules
+  //   - if 1, 5, or 6 have a NL, remove them from consideration
+  //   - divide the remain options into two groups.
+  //     - GT = options where max_width > MAX_COL_WIDTH
+  //     - LTE = options where max_width <= MAX_COL_WIDTH
+  //     if LTE has any elements choose the element with the smallest height
+  //     otherwise choose the element with the smallest width from GT
+  //
+  wcl::doc combine_flat(CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts);
+  wcl::doc combine_explode_first(CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts);
+  wcl::doc combine_explode_last(CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts);
+  wcl::doc combine_explode_all(CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts);
+  wcl::doc combine_explode_first_compress(CSTElement over, ctx_t ctx,
+                                          const std::vector<CSTElement>& parts);
+  wcl::doc combine_explode_last_compress(CSTElement over, ctx_t ctx,
+                                         const std::vector<CSTElement>& parts);
+
   // Returns a formatter that inserts the next node
   // on the current line if it fits, or on a new nested line
   auto rhs_fmt();

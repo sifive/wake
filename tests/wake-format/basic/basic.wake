@@ -148,6 +148,24 @@ def t6 = ( # comment
   + 5
 )
 
+# def t8 = (
+#   # comment
+#   x # comment
+#   + # comment
+#   5 # comment
+#   - # comment
+#   2 # comment
+# )
+
+
+# TODO: operating is getting changed here which is hecking bad
+def t9 = x + 5 - 2
+
+def ff = a | b | c | d
+
+def ff = a $ b $ c $ d
+
+# def ff = a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     buildTestWake, Nil =
