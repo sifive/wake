@@ -62,7 +62,7 @@ void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &proce
   comments.clear();
 
   bool enumok = true;
-  auto allFiles = find_all_wakefiles(enumok, true, false, absLibDir, absWorkDir);
+  auto allFiles = find_all_wakefiles(enumok, true, false, absLibDir, absWorkDir, uriScheme);
 
   std::map<std::string, std::vector<Diagnostic>> diagnostics;
   LSPReporter lspReporter(diagnostics, allFiles);
@@ -81,7 +81,7 @@ void ASTree::diagnoseProject(const std::function<void(FileDiagnostics &)> &proce
     if (it == changedFiles.end()) {
       // Re-read files that are not modified in the editor, because who knows what someone did in a
       // terminal
-      externalFiles.emplace_back(lspReporter, filename.c_str());
+      externalFiles.emplace_back(lspReporter, filename.c_str(), uriScheme.c_str());
       fcontent = &externalFiles.back();
     } else {
       fcontent = it->second.get();

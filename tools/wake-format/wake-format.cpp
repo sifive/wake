@@ -180,7 +180,7 @@ int main(int argc, char **argv) {
     std::string name(argv[i]);
     std::string tmp = name + ".tmp." + rng.unique_name();
 
-    ExternalFile external_file = ExternalFile(*reporter, name.c_str());
+    ExternalFile external_file = ExternalFile(*reporter, name.c_str(), "");
     CST cst = CST(external_file, *reporter);
     if (terminalReporter.errors) {
       std::cerr << argv[0] << ": failed to parse file: '" << name << "'" << std::endl << std::endl;
@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
 
     {
       // Check for bad formatting
-      ExternalFile external_file = ExternalFile(*reporter, tmp.c_str());
+      ExternalFile external_file = ExternalFile(*reporter, tmp.c_str(), "");
       CST cst = CST(external_file, *reporter);
       if (terminalReporter.errors) {
         std::cerr << "wake-format failed to format '" << name << "'." << std::endl

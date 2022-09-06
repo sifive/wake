@@ -25,7 +25,8 @@
 
 namespace JSONConverter {
 std::string decodePath(const std::string &fileUri);
-std::string encodePath(const std::string &filePath);
+std::string decodeScheme(const std::string &fileUri);
+std::string encodePath(const std::string &filePath, const std::string &uriScheme);
 
 JAST createMessage();
 
@@ -44,20 +45,20 @@ JAST createInitializeResultDefault(const JAST &receivedMessage);
 JAST createInitializeResultInvalidSTDLib(const JAST &receivedMessage);
 
 JAST fileDiagnosticsToJSON(const std::string &filePath,
-                           const std::vector<Diagnostic> &fileDiagnostics);
+                           const std::vector<Diagnostic> &fileDiagnostics, const std::string &uriScheme);
 
-JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation);
+JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation, const std::string &uriScheme);
 
-JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references);
+JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references, const std::string &uriScheme);
 
 JAST highlightsToJSON(JAST receivedMessage, const std::vector<Location> &occurrences);
 
 JAST hoverInfoToJSON(JAST receivedMessage, const std::vector<SymbolDefinition> &hoverInfoPieces);
 
-void appendSymbolToJSON(const SymbolDefinition &def, JAST &json);
+void appendSymbolToJSON(const SymbolDefinition &def, JAST &json, const std::string &uriScheme);
 
 JAST workspaceEditsToJSON(JAST receivedMessage, const std::vector<Location> &references,
-                          const std::string &newName);
+                          const std::string &newName, const std::string &uriScheme);
 }  // namespace JSONConverter
 
 #endif

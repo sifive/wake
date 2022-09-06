@@ -1,6 +1,7 @@
 {
 	"name": "wake",
-	"description": "A language server for the SiFive wake build tool",
+    "displayName": "Wake",
+    "description": "A language server for the SiFive wake build tool",
 	"author": "SiFive",
 	"license": "Apache-2.0",
 	"version": "@VERSION@",

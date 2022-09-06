@@ -45,12 +45,12 @@
 #include <emscripten/emscripten.h>
 
 // clang-format off
-EM_ASYNC_JS(char *, vscode_getfiles, (const char *dir, int *ok), {
+EM_ASYNC_JS(char *, vscode_getfiles, (const char *dir, const char *uriScheme, int *ok), {
   const Path = require('path').posix;
   let files  = [];
 
-  async function walkTree(dir) {
-    const dirFiles = await wakeLspModule.sendRequest('readDir', dir);
+  async function walkTree(dir, uriScheme) {
+    const dirFiles = await wakeLspModule.sendRequest('readDir', uriScheme + dir);
     if (dirFiles.hasOwnProperty('message')) { // readDir request resulted in an error
       throw dirFiles;
     }
@@ -63,12 +63,12 @@ EM_ASYNC_JS(char *, vscode_getfiles, (const char *dir, int *ok), {
       if (dirent[0] === ".build" || dirent[0] === ".fuse" || dirent[0] === ".git") { // folders to skip
         continue;
       }
-      await walkTree(absolute);
+      await walkTree(absolute, uriScheme);
     }
   }
 
   try {
-    await walkTree(UTF8ToString(dir));
+    await walkTree(UTF8ToString(dir), UTF8ToString(uriScheme));
     const sep = String.fromCharCode(0);
     const out = files.join(sep) + sep;
 
@@ -87,10 +87,10 @@ EM_ASYNC_JS(char *, vscode_getfiles, (const char *dir, int *ok), {
 });
 // clang-format on
 
-bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2 &re,
+bool push_files(std::vector<std::string> &out, const std::string &path, const std::string &uriScheme, const re2::RE2 &re,
                 size_t skip) {
   int ok;
-  char *files = vscode_getfiles(path.c_str(), &ok);
+  char *files = vscode_getfiles(path.c_str(), uriScheme.c_str(), &ok);
   if (ok) {
     for (char *file = files; *file; file += strlen(file) + 1) {
       re2::StringPiece p(file + skip, strlen(file) - skip);
@@ -170,7 +170,7 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
   return failed;
 }
 
-bool push_files(std::vector<std::string> &out, const std::string &path, const RE2 &re,
+bool push_files(std::vector<std::string> &out, const std::string &path, const std::string &_, const RE2 &re,
                 size_t skip) {
   int flags, dirfd = open(path.c_str(), O_RDONLY);
   if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1) fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
@@ -305,10 +305,10 @@ class DiagnosticIgnorer : public DiagnosticReporter {
   void report(Diagnostic diagnostic) {}
 };
 
-static void process_ignorefile(const std::string &path, std::vector<WakeFilter> &filters) {
+static void process_ignorefile(const std::string &path, std::vector<WakeFilter> &filters, const std::string &uriScheme) {
   DiagnosticIgnorer ignorer;
   std::string wakeignore = path + ".wakeignore";
-  ExternalFile file(ignorer, wakeignore.c_str());
+  ExternalFile file(ignorer, wakeignore.c_str(), uriScheme.c_str());
   StringSegment segment = file.segment();
   std::stringstream in;
   in.write(reinterpret_cast<const char *>(segment.start), segment.size());
@@ -337,7 +337,7 @@ static void process_ignorefile(const std::string &path, std::vector<WakeFilter> 
 }
 
 static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wakefiles,
-                                                 const std::string &basedir, bool verbose) {
+                                                 const std::string &basedir, bool verbose, const std::string &uriScheme) {
   std::string curdir = basedir;  // Either "" or ".+/"
   if (curdir == ".") {
     curdir.clear();
@@ -349,7 +349,7 @@ static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wake
   std::vector<std::string> output;
   output.reserve(wakefiles.size());
 
-  process_ignorefile(curdir, filters);
+  process_ignorefile(curdir, filters, uriScheme);
 
   for (auto &wakefile : wakefiles) {
     // Unwind curdir
@@ -369,7 +369,7 @@ static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wake
     size_t slash;
     while ((slash = wakefile.find_first_of('/', curdir.size())) != std::string::npos) {
       curdir.append(wakefile, curdir.size(), slash + 1 - curdir.size());
-      process_ignorefile(curdir, filters);
+      process_ignorefile(curdir, filters, uriScheme);
     }
 
     // See if any rules exclude this file
@@ -397,7 +397,7 @@ static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wake
 }
 
 std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose,
-                                            const std::string &libdir, const std::string &workdir) {
+                                            const std::string &libdir, const std::string &workdir, const std::string &uriScheme) {
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
@@ -406,16 +406,16 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
   std::vector<std::string> libfiles, workfiles;
 
   std::string boolean = workdir + "/share/wake/lib/core/boolean.wake";
-  if (!workspace || !is_readable(boolean.c_str())) {
-    if (push_files(libfiles, libdir, exp, 0)) ok = false;
+  if (!workspace || !is_readable(boolean.c_str(), uriScheme.c_str())) {
+    if (push_files(libfiles, libdir, uriScheme, exp, 0)) ok = false;
     std::sort(libfiles.begin(), libfiles.end());
-    libfiles = filter_wakefiles(std::move(libfiles), libdir, verbose);
+    libfiles = filter_wakefiles(std::move(libfiles), libdir, verbose, uriScheme);
   }
 
   if (workspace) {
-    if (push_files(workfiles, workdir, exp, 0)) ok = false;
+    if (push_files(workfiles, workdir, uriScheme, exp, 0)) ok = false;
     std::sort(workfiles.begin(), workfiles.end());
-    workfiles = filter_wakefiles(std::move(workfiles), workdir, verbose);
+    workfiles = filter_wakefiles(std::move(workfiles), workdir, verbose, uriScheme);
   }
 
   // Combine the two sorted vectors into one sorted vector

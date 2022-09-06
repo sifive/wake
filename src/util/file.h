@@ -65,7 +65,7 @@ class StringFile : public FileContent {
 
 class ExternalFile : public FileContent {
  public:
-  ExternalFile(DiagnosticReporter &reporter, const char *filename_);
+  ExternalFile(DiagnosticReporter &reporter, const char *filename_, const char *uriScheme);
   ~ExternalFile();
 
   ExternalFile(ExternalFile &&o) = default;

@@ -91,9 +91,9 @@ StringFile::StringFile(const char *filename_, std::string &&content_)
 #include <emscripten/emscripten.h>
 
 // clang-format off
-EM_ASYNC_JS(uint8_t *, getBase, (int *length, const char *filename), {
+EM_ASYNC_JS(uint8_t *, getBase, (int *length, const char *filename, const char *uriScheme), {
   try {
-    const content = await wakeLspModule.sendRequest('readFile', UTF8ToString(filename));
+    const content = await wakeLspModule.sendRequest('readFile', UTF8ToString(uriScheme) + UTF8ToString(filename));
     if (content.hasOwnProperty('message')) { // readFile request resulted in an error
       throw content;
     }
@@ -118,12 +118,12 @@ EM_ASYNC_JS(uint8_t *, getBase, (int *length, const char *filename), {
 
 // clang-format on
 
-ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
+ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_, const char *uriScheme)
     : FileContent(filename_) {
   Location l(filename());
 
   int32_t length;
-  uint8_t *base = getBase(&length, filename());
+  uint8_t *base = getBase(&length, filename(), uriScheme);
 
   if (length == -1) {
     reporter.reportError(l, std::string("readFile failed; ") + reinterpret_cast<char *>(base));
@@ -143,7 +143,7 @@ ExternalFile::~ExternalFile() {
 
 #else
 
-ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
+ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_, const char *_)
     : FileContent(filename_) {
   Location l(filename());
 

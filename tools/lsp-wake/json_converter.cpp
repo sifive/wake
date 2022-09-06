@@ -36,7 +36,7 @@ static int parse_hex(char c) {
   }
 }
 
-std::string decodePath(const std::string &fileUri) {
+std::string decodePathOrScheme(const std::string &fileUri, bool wantPath) {
   std::string out;
   auto i = fileUri.begin(), e = fileUri.end();
   while (i != e) {
@@ -51,20 +51,37 @@ std::string decodePath(const std::string &fileUri) {
     }
   }
 
-  if (out.compare(0, 7, "file://") == 0) {
-    // skip over optional hostname
-    auto root = out.find_first_of('/', 7);
-    if (root == std::string::npos) {
-      root = 7;
-    } else if (is_windows()) {
-      // strip leading '/' on windows
-      ++root;
-    }
-    out.erase(out.begin(), out.begin() + root);
+  // skip over scheme
+  size_t schemeEnd = out.find("://");
+  if (schemeEnd == std::string::npos) {
+    return wantPath ? out : ""; // want scheme but no "://" was encountered => scheme is empty
   }
 
+  // skip over optional authority
+  size_t root = out.find_first_of('/', schemeEnd + 3);
+  if (root == std::string::npos) {
+    root = schemeEnd + 3;
+  } else if (is_windows()) {
+    // strip leading '/' on windows
+    ++root;
+  }
+
+  if (wantPath) {
+    out.erase(out.begin(), out.begin() + root);  // want path => strip scheme
+  } else {
+    out.erase(root, std::string::npos);  // do the opposite
+  }
   return out;
 }
+
+std::string decodePath(const std::string &fileUri) {
+  return decodePathOrScheme(fileUri, true);
+}
+
+std::string decodeScheme(const std::string &fileUri) {
+  return decodePathOrScheme(fileUri, false);
+}
+
 
 static char encodeTable[256][4];
 
@@ -81,7 +98,7 @@ static void normal(int x) {
   encodeTable[x][1] = 0;
 }
 
-std::string encodePath(const std::string &filePath) {
+std::string encodePath(const std::string &filePath, const std::string &uriScheme) {
   if (!encodeTable[0][0]) {
     for (int i = 0; i < 256; ++i) {
       encodeTable[i][0] = '%';
@@ -100,7 +117,7 @@ std::string encodePath(const std::string &filePath) {
     if (is_windows()) normal(':');  // Do not escape volume names
   }
 
-  std::string out = "file://";
+  std::string out(uriScheme);
   if (is_windows()) out.push_back('/');  // filePath starts with drive letter, not '/'
 
   for (char c : filePath) out.append(encodeTable[static_cast<int>(static_cast<unsigned char>(c))]);
@@ -153,9 +170,9 @@ JAST createDiagnosticMessage() {
   return message;
 }
 
-JAST createLocationJSON(const Location &location) {
+JAST createLocationJSON(const Location &location, const std::string &uriScheme) {
   JAST locationJSON(JSON_OBJECT);
-  std::string fileUri = encodePath(location.filename);
+  std::string fileUri = encodePath(location.filename, uriScheme);
   locationJSON.add("uri", fileUri.c_str());
   locationJSON.children.emplace_back("range", createRangeFromLocation(location));
   return locationJSON;
@@ -235,7 +252,7 @@ JAST createInitializeResultInvalidSTDLib(const JAST &receivedMessage) {
 }
 
 JAST fileDiagnosticsToJSON(const std::string &filePath,
-                           const std::vector<Diagnostic> &fileDiagnostics) {
+                           const std::vector<Diagnostic> &fileDiagnostics, const std::string &uriScheme) {
   JAST diagnosticsArray(JSON_ARRAY);
   for (const Diagnostic &diagnostic : fileDiagnostics) {
     diagnosticsArray.children.emplace_back(
@@ -243,25 +260,25 @@ JAST fileDiagnosticsToJSON(const std::string &filePath,
   }
   JAST message = createDiagnosticMessage();
   JAST &params = message.add("params", JSON_OBJECT);
-  params.add("uri", encodePath(filePath));
+  params.add("uri", encodePath(filePath, uriScheme));
   params.children.emplace_back("diagnostics", diagnosticsArray);
   return message;
 }
 
-JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation) {
+JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation, const std::string &uriScheme) {
   JAST message = createResponseMessage(std::move(receivedMessage));
   JAST &result = message.add("result", JSON_OBJECT);
   if (!definitionLocation.filename.empty()) {
-    result = createLocationJSON(definitionLocation);
+    result = createLocationJSON(definitionLocation, uriScheme);
   }
   return message;
 }
 
-JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references) {
+JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references, const std::string &uriScheme) {
   JAST message = createResponseMessage(std::move(receivedMessage));
   JAST &result = message.add("result", JSON_ARRAY);
   for (const Location &location : references) {
-    result.children.emplace_back("", createLocationJSON(location));
+    result.children.emplace_back("", createLocationJSON(location, uriScheme));
   }
   return message;
 }
@@ -299,15 +316,15 @@ JAST hoverInfoToJSON(JAST receivedMessage, const std::vector<SymbolDefinition> &
   return message;
 }
 
-void appendSymbolToJSON(const SymbolDefinition &def, JAST &json) {
+void appendSymbolToJSON(const SymbolDefinition &def, JAST &json, const std::string &uriScheme) {
   JAST &symbol = json.add("", JSON_OBJECT);
   symbol.add("name", def.name + ": " + def.type);
   symbol.add("kind", def.symbolKind);
-  symbol.children.emplace_back("location", createLocationJSON(def.location));
+  symbol.children.emplace_back("location", createLocationJSON(def.location, uriScheme));
 }
 
 JAST workspaceEditsToJSON(JAST receivedMessage, const std::vector<Location> &references,
-                          const std::string &newName) {
+                          const std::string &newName, const std::string &uriScheme) {
   JAST message = createResponseMessage(std::move(receivedMessage));
   JAST &result = message.add("result", JSON_OBJECT);
 
@@ -317,7 +334,7 @@ JAST workspaceEditsToJSON(JAST receivedMessage, const std::vector<Location> &ref
     edit.children.emplace_back("range", createRangeFromLocation(ref));
     edit.add("newText", newName.c_str());
 
-    std::string fileUri = encodePath(ref.filename);
+    std::string fileUri = encodePath(ref.filename, uriScheme);
     if (filesEdits.find(fileUri) == filesEdits.end()) {
       filesEdits[fileUri] = JAST(JSON_ARRAY);
     }

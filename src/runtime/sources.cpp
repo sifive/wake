@@ -440,7 +440,7 @@ static PRIMFN(prim_files) {
   size_t skip = (root == ".") ? 0 : (root.size() + 1);
 
   std::vector<std::string> match;
-  bool fail = push_files(match, root, *arg1->exp, skip);
+  bool fail = push_files(match, root, "", *arg1->exp, skip);
   (void)fail;  // !!! There's a hole in the API
 
   size_t need = reserve_list(match.size());

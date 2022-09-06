@@ -26,12 +26,12 @@
 #include <emscripten/emscripten.h>
 
 // clang-format off
-EM_ASYNC_JS(int, isReadable, (const char *filename), {
-  return await wakeLspModule.sendRequest('isReadable', UTF8ToString(filename));
+EM_ASYNC_JS(int, isReadable, (const char *filename, const char *uriScheme), {
+  return await wakeLspModule.sendRequest('isReadable', UTF8ToString(uriScheme) + UTF8ToString(filename));
 });
 // clang-format on
 
-int is_readable(const char *filename) {
+int is_readable(const char *filename, const char *uriScheme) {
   int is_node = 0;
   // clang-format off
   int res = EM_ASM_INT({
@@ -53,13 +53,13 @@ int is_readable(const char *filename) {
   if (is_node)
     return res;
   else
-    return isReadable(filename);
+    return isReadable(filename, uriScheme);
 }
 
 #else
 
 #include <unistd.h>
 
-int is_readable(const char *filename) { return access(filename, R_OK) == 0; }
+int is_readable(const char *filename, const char *_) { return access(filename, R_OK) == 0; }
 
 #endif

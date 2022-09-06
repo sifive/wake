@@ -25,7 +25,7 @@ extern "C" {
 #endif
 
 // Return if the file is not readable (1) or not (0).
-int is_readable(const char *filename);
+int is_readable(const char *filename, const char *uriScheme);
 
 #ifdef __cplusplus
 };
