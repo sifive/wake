@@ -38,6 +38,7 @@ def emscriptenLFlags =
     "-s", "ASYNCIFY",
     "-s", "MODULARIZE=1",
     "-s", "EXPORT_ES6=1",
+    "-s", "SINGLE_FILE",
     Nil
 
 publish compileC =

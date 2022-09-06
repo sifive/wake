@@ -36,18 +36,10 @@ export def vscode _: Result Path Error =
     require Pass files =
         buildLSP variant
 
-    require wasm, Nil =
-        filter (matches `.*\.wasm` _.getPathName) files
-    else
-        failWithError "Did not find empscripten wasm output file; got: {format files}"
-
     require js, Nil =
         filter (matches `.*\.wasm-.*` _.getPathName) files
     else
         failWithError "Did not find empscripten javascript output; got: {format files}"
-
-    require Pass wasmFile =
-        installAs "{here}/lsp-server/wasm/lsp-wake.wasm" wasm
 
     require Pass jsFile =
         installAs "{here}/lsp-server/wasm/lsp-wake.js" js
@@ -84,7 +76,6 @@ export def vscode _: Result Path Error =
     require Pass syntaxSources =
         sources here `syntaxes/.*`
     def vsceFiles =
-        wasmFile,
         jsFile,
         packageJSON,
         currentDirSources ++
