@@ -54,61 +54,23 @@ static inline bool is_expression(cst_id_t type) {
          type == CST_BINARY || CST_PAREN;
 }
 
-static inline bool has_comment_next(wcl::doc_builder& builder, ctx_t ctx, const CSTElement& node) {
-  CSTElement copy = node;
-  while (!copy.empty() && (copy.id() == TOKEN_WS || copy.id() == TOKEN_NL)) {
-    copy.nextSiblingElement();
-  }
-  return copy.id() == TOKEN_COMMENT;
-}
-
-static inline bool has_comment(wcl::doc_builder& builder, ctx_t ctx, const CSTElement& node) {
-  CSTElement copy = node;
-  while (!copy.empty()) {
-    if (copy.id() == TOKEN_COMMENT) {
-      return true;
-    }
-    copy.nextSiblingElement();
-  }
-  return false;
-}
-
 auto Emitter::rhs_fmt() {
   auto rhs_fmt = fmt().walk(WALK_NODE);
 
-  auto comment_fmt = fmt().nest(fmt().newline().token(TOKEN_COMMENT).consume_wsnl().join(rhs_fmt));
-  auto nl_required_fmt = fmt().nest(rhs_fmt);
   auto flat_fmt = fmt().space().join(rhs_fmt);
-  auto full_fmt = fmt().nest(fmt().newline().join(rhs_fmt));
+  auto full_fmt = fmt().nest(fmt().freshline().join(rhs_fmt));
 
   // clang-format off
   return fmt().match(
-    pred(TOKEN_COMMENT, comment_fmt)
-   .pred(requires_nl, nl_required_fmt)
+   pred(requires_nl, full_fmt)
    .pred_fits(flat_fmt)
    .otherwise(full_fmt));
   // clang-format on
 }
 
-// place_comment() inserts the appropiate ws/nl required to position a comment. Then
-// inserts the comment after that. It is used to handle the case when its valid to have
-// a comment right after a TOKEN or on the line following the TOKEN. The decision is
-// made by looking at what the original author chose.
-//
-// if input is 'ws COMMENT' then emits 'ws COMMENT'
-// if input is 'ws nl COMMENT' then emit 'nl COMMENT'
-//
-auto place_comment() {
-  return fmt().fmt_if(has_comment_next,
-                      fmt()
-                          .fmt_if(TOKEN_WS, fmt().next())
-                          .fmt_if_else(TOKEN_NL, fmt().next().newline(), fmt().space())
-                          .consume_wsnl()
-                          .token(TOKEN_COMMENT));
-}
-
 wcl::doc Emitter::layout(CST cst) {
   ctx_t ctx;
+  bind_comments(cst.root());
   mark_no_format_nodes(cst.root());
   return walk(ctx, cst.root());
 }
@@ -120,15 +82,15 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
 
   // clang-format off
   auto body_fmt = fmt().match(
-    pred(TOKEN_WS, fmt().next())
-   .pred(TOKEN_NL, fmt().next())
-   .pred(TOKEN_COMMENT, fmt().walk(WALK_TOKEN).newline())
+    // TODO: starting 'pred()' function doesn't allow init lists
+    pred(ConstPredicate(false), fmt())
+   .pred({TOKEN_WS, TOKEN_NL, TOKEN_COMMENT}, fmt().next())
    .pred({CST_IMPORT, CST_TOPIC}, node_fmt)
    .pred(CST_DEF, node_fmt.join(fmt().newline().newline()))
    .otherwise(node_fmt.join(fmt().newline())));
   // clang-format on
 
-  MEMO_RET(fmt().walk_children(body_fmt).format(ctx, node));
+  MEMO_RET(fmt().walk_children(body_fmt).format(ctx, node, token_traits));
 }
 
 wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {
@@ -137,7 +99,7 @@ wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {
 
   wcl::doc_builder bdr;
 
-  if (traits[node].format_off) {
+  if (node_traits[node].format_off) {
     bdr.append(walk_no_edit(ctx, node));
     return std::move(bdr).build();
   }
@@ -284,6 +246,27 @@ wcl::doc Emitter::walk_placeholder(ctx_t ctx, CSTElement node) {
 wcl::doc Emitter::walk_no_edit(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
 
+  // The very first token emitted needs to be checked for 'before bound' comments
+  // These comments are outside of the no_edit walk and need to be emitted.
+  // All other comments are captured by the recursive walk.
+
+  CSTElement first = node;
+  while (first.isNode()) {
+    first = first.firstChildElement();
+  }
+
+  wcl::doc_builder bdr;
+  for (auto node : token_traits[first].before_bound) {
+    bdr.append(fmt().walk(WALK_TOKEN).freshline().compose(ctx, node, token_traits));
+  }
+
+  bdr.append(walk_no_edit_acc(ctx.sub(bdr), node));
+  MEMO_RET(std::move(bdr).build());
+}
+
+wcl::doc Emitter::walk_no_edit_acc(ctx_t ctx, CSTElement node) {
+  MEMO(ctx, node);
+
   if (!node.isNode()) {
     MEMO_RET(wcl::doc::lit(node.fragment().segment().str()));
   }
@@ -293,7 +276,7 @@ wcl::doc Emitter::walk_no_edit(ctx_t ctx, CSTElement node) {
     // The last nl of a *tagged* "no format" CST_DEF node shouldn't be emitted.
     // The nominal formtting for the larger program structure will ensure the correct NLs are
     // emitted.
-    if (node.id() == CST_DEF && child.id() == TOKEN_NL && traits[node].format_off) {
+    if (node.id() == CST_DEF && child.id() == TOKEN_NL && node_traits[node].format_off) {
       CSTElement next = child;
       next.nextSiblingElement();
       if (next.empty()) {
@@ -301,10 +284,77 @@ wcl::doc Emitter::walk_no_edit(ctx_t ctx, CSTElement node) {
       }
     }
 
-    bdr.append(walk_no_edit(ctx, child));
+    bdr.append(walk_no_edit_acc(ctx, child));
   }
 
   MEMO_RET(std::move(bdr).build());
+}
+
+void inorder_collect_tokens(CSTElement node, std::vector<CSTElement>& items) {
+  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    if (child.isNode()) {
+      inorder_collect_tokens(child, items);
+      continue;
+    }
+
+    items.push_back(child);
+  }
+}
+
+void Emitter::bind_comments(CSTElement node) {
+  std::vector<CSTElement> items;
+  inorder_collect_tokens(node, items);
+
+  IsWSNLCPredicate is_wsnlc;
+
+  for (size_t i = 0; i < items.size(); i++) {
+    CSTElement item = items[i];
+    if (is_wsnlc(item)) {
+      continue;
+    }
+
+    // bind after
+    for (size_t j = i + 1; j < items.size(); j++) {
+      CSTElement target = items[j];
+      if (target.id() != TOKEN_WS && target.id() != TOKEN_COMMENT) {
+        break;
+      }
+      token_traits[item].bind_after(target);
+      token_traits[target].set_bound_to(item);
+    }
+
+    // bind before
+    for (size_t j = i; j > 0; j--) {
+      CSTElement target = items[j - 1];
+      if (!is_wsnlc(target)) {
+        break;
+      }
+      // Stop binding if we find a target already bound
+      if (!token_traits[target].bound_to.empty()) {
+        break;
+      }
+      token_traits[item].bind_before(target);
+      token_traits[target].set_bound_to(item);
+    }
+  }
+
+  // Handle trailing comment edge case
+  // '''
+  // def x = 5
+  // # comment
+  // '''
+  // # comment doesn't have anything to bind to it so it gets dropped
+  for (size_t i = 0; i < items.size(); i++) {
+    CSTElement item = items[i];
+    if (item.id() != TOKEN_COMMENT) {
+      continue;
+    }
+
+    if (token_traits[item].bound_to.empty()) {
+      std::cerr << "File may not end with a top level comment" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+  }
 }
 
 void Emitter::mark_no_format_nodes(CSTElement node) {
@@ -335,11 +385,11 @@ void Emitter::mark_no_format_nodes(CSTElement node) {
         // This shouldn't be possible, but assert anyways just in case
         assert(!child.empty());
 
-        traits[block_item] = traits[block_item].turn_format_off();
+        node_traits[block_item].turn_format_off();
         continue;
       }
 
-      traits[child] = traits[child].turn_format_off();
+      node_traits[child].turn_format_off();
     }
   }
 }
@@ -348,13 +398,22 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(!node.isNode());
 
+  wcl::doc_builder builder;
+
+  for (auto node : token_traits[node].before_bound) {
+    builder.append(fmt().walk(WALK_TOKEN).freshline().format(ctx, node, token_traits));
+  }
+
   switch (node.id()) {
     case TOKEN_KW_MACRO_HERE:
-      MEMO_RET(wcl::doc::lit("@here"))
+      builder.append(wcl::doc::lit("@here"));
+      break;
     case TOKEN_NL:
-      MEMO_RET(wcl::doc::lit("\n"));
+      builder.append(wcl::doc::lit("\n"));
+      break;
     case TOKEN_WS:
-      MEMO_RET(wcl::doc::lit(" "));
+      builder.append(wcl::doc::lit(" "));
+      break;
     case TOKEN_COMMENT:
     case TOKEN_P_BOPEN:
     case TOKEN_P_BCLOSE:
@@ -428,10 +487,17 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
     case TOKEN_KW_THEN:
     case TOKEN_KW_ELSE:
     case TOKEN_KW_REQUIRE:
-      MEMO_RET(wcl::doc::lit(node.fragment().segment().str()));
+      builder.append(wcl::doc::lit(node.fragment().segment().str()));
+      break;
     default:
       assert(false);
   }
+
+  for (auto node : token_traits[node].after_bound) {
+    builder.append(fmt().space().walk(WALK_TOKEN).newline().compose(ctx, node, token_traits));
+  }
+
+  MEMO_RET(std::move(builder).build());
 }
 
 wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
@@ -439,11 +505,11 @@ wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_APP);
 
   MEMO_RET(fmt()
-               .walk(is_expression, WALK_NODE)
-               .consume_wsnl()
+               .walk(is_expression, WALK_NODE)  // TODO: fix the 'grows NL' case
+               .consume_wsnlc()
                .space()
                .walk(WALK_NODE)
-               .format(ctx, node.firstChildElement()));
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_arity(ctx_t ctx, CSTElement node) {
@@ -462,13 +528,13 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
 
   MEMO_RET(fmt()
                .walk(is_expression, WALK_NODE)
-               .consume_wsnl()
-               .space()
+               .consume_wsnlc()
+               .space()  // TODO: fix the 'grows NL' case
                .walk(CST_OP, WALK_NODE)
-               .consume_wsnl()
-               .space()
+               .consume_wsnlc()
+               .space()  // TODO: fix the 'grows NL' case
                .walk(is_expression, WALK_NODE)
-               .format(ctx, node.firstChildElement()));
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
@@ -477,13 +543,13 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
 
   // clang-format off
   auto body_fmt = fmt().match(
-    pred(TOKEN_WS, fmt().next())
-   .pred(TOKEN_NL, fmt().next())
-   .pred(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT))
-   .otherwise(fmt().newline().walk(WALK_NODE)));
+    // TODO: starting 'pred()' function doesn't allow init lists
+    pred(ConstPredicate(false), fmt())
+   .pred({TOKEN_WS, TOKEN_NL, TOKEN_COMMENT}, fmt().next())
+   .otherwise(fmt().freshline().walk(WALK_NODE)));
   // clang-format on
 
-  MEMO_RET(fmt().walk_children(body_fmt).consume_wsnl().format(ctx, node));
+  MEMO_RET(fmt().walk_children(body_fmt).consume_wsnlc().format(ctx, node, token_traits));
 }
 
 wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
@@ -492,12 +558,12 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
 
   MEMO_RET(fmt()
                .walk(WALK_NODE)
-               .consume_wsnl()
-               .space()
+               .consume_wsnlc()
+               .space()  // TODO: fix the 'grows NL' case
                .walk(CST_GUARD, WALK_NODE)
-               .consume_wsnl()
+               .consume_wsnlc()
                .join(rhs_fmt())
-               .format(ctx, node.firstChildElement()));
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) {
@@ -517,10 +583,10 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
                .walk({CST_ID, CST_APP, CST_ASCRIBE}, WALK_NODE)
                .ws()
                .token(TOKEN_P_EQUALS)
-               .consume_wsnl()
+               .consume_wsnlc()
                .join(rhs_fmt())
-               .consume_wsnl()
-               .format(ctx, node.firstChildElement()));
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_export(ctx_t ctx, CSTElement node) {
@@ -552,7 +618,7 @@ wcl::doc Emitter::walk_identifier(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_ID);
 
-  MEMO_RET(fmt().token(TOKEN_ID).format(ctx, node.firstChildElement()));
+  MEMO_RET(fmt().token(TOKEN_ID).format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_ideq(ctx_t ctx, CSTElement node) {
@@ -589,8 +655,8 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
                   CST_IDEQ,
                   id_list_fmt))
           // clang-format on
-          .consume_wsnl()
-          .format(ctx, node.firstChildElement()));
+          .consume_wsnlc()
+          .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
@@ -617,24 +683,20 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_MATCH);
 
-  MEMO_RET(
-      fmt()
-          .token(TOKEN_KW_MATCH)
-          .ws()
-          .walk(WALK_NODE)
-          // clang-format off
+  MEMO_RET(fmt()
+               .token(TOKEN_KW_MATCH)
+               .ws()
+               .walk(WALK_NODE)
+               // clang-format off
           .nest(fmt()
-              .consume_wsnl()
+              .consume_wsnlc()
               .fmt_while(
-                  {CST_CASE, TOKEN_COMMENT}, fmt()
-                  .newline()
-                  .fmt_if_else(
-                    TOKEN_COMMENT,
-                    fmt().token(TOKEN_COMMENT),
-                    fmt().walk(WALK_NODE))
-                  .consume_wsnl()))
-          // clang-format on
-          .format(ctx, node.firstChildElement()));
+                  {CST_CASE}, fmt()
+                  .freshline()
+                  .walk(WALK_NODE)
+                  .consume_wsnlc()))
+               // clang-format on
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) {
@@ -650,41 +712,33 @@ wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
                .token(TOKEN_KW_PACKAGE)
                .ws()
                .walk(CST_ID, WALK_NODE)
-               .consume_wsnl()
-               .format(ctx, node.firstChildElement()));
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_PAREN);
 
-  // clang-format off
-  auto comment_fmt =
-      fmt().nest(fmt()
-             .token(TOKEN_P_POPEN)
-             .join(place_comment())
-             .consume_wsnl()
-             .fmt_while(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT).consume_wsnl())
-             .newline()
-             .walk(is_expression, WALK_NODE)
-             .join(place_comment())
-             .consume_wsnl()
-             .fmt_while(TOKEN_COMMENT, fmt().newline().token(TOKEN_COMMENT).consume_wsnl())
-             .consume_wsnl())
-             .newline()
-             .token(TOKEN_P_PCLOSE);
-  // clang-format on
+  auto no_nl = fmt()
+                   .token(TOKEN_P_POPEN)
+                   .consume_wsnlc()
+                   .walk(is_expression, WALK_NODE)
+                   .consume_wsnlc()
+                   .token(TOKEN_P_PCLOSE)
+                   .format(ctx, node.firstChildElement(), token_traits);
 
-  auto no_comment_fmt = fmt()
-                            .token(TOKEN_P_POPEN)
-                            .consume_wsnl()
-                            .walk(is_expression, WALK_NODE)
-                            .consume_wsnl()
-                            .token(TOKEN_P_PCLOSE);
+  if (!no_nl->has_newline()) {
+    MEMO_RET(no_nl);
+  }
 
-  MEMO_RET(fmt()
-               .fmt_if_else(has_comment, comment_fmt, no_comment_fmt)
-               .format(ctx, node.firstChildElement()));
+  MEMO_RET(
+      fmt()
+          .token(TOKEN_P_POPEN)
+          .nest(fmt().consume_wsnlc().freshline().walk(is_expression, WALK_NODE).consume_wsnlc())
+          .freshline()
+          .token(TOKEN_P_PCLOSE)
+          .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_prim(ctx_t ctx, CSTElement node) {
@@ -702,20 +756,20 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_REQUIRE);
 
   MEMO_RET(fmt()
-               .newline()
+               .freshline()
                .token(TOKEN_KW_REQUIRE)
                .ws()
                .walk(WALK_NODE)
-               .consume_wsnl()
-               .space()
+               .consume_wsnlc()
+               .space()  // TODO: fix the 'grows NL' case
                .token(TOKEN_P_EQUALS)
-               .consume_wsnl()
+               .consume_wsnlc()
                .join(rhs_fmt())
-               .consume_wsnl()
-               .newline()
+               .consume_wsnlc()
+               .freshline()
                .walk(WALK_NODE)
-               .consume_wsnl()
-               .format(ctx, node.firstChildElement()));
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_req_else(ctx_t ctx, CSTElement node) {
@@ -731,7 +785,7 @@ wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
                .token(TOKEN_KW_SUBSCRIBE)
                .ws()
                .walk(CST_ID, WALK_NODE)
-               .format(ctx, node.firstChildElement()));
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) {
@@ -762,8 +816,8 @@ wcl::doc Emitter::walk_topic(ctx_t ctx, CSTElement node) {
                .token(TOKEN_P_ASCRIBE)
                .ws()
                .walk({CST_APP, CST_ID, CST_BINARY}, WALK_NODE)
-               .consume_wsnl()
-               .format(ctx, node.firstChildElement()));
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_tuple(ctx_t ctx, CSTElement node) {

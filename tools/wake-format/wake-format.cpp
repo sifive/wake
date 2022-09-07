@@ -199,7 +199,7 @@ int main(int argc, char **argv) {
     d.write(*output_file);
     output_file.reset();
 
-    {
+    if (!debug) {
       // Check for bad formatting
       ExternalFile external_file = ExternalFile(*reporter, tmp.c_str(), "");
       CST cst = CST(external_file, *reporter);

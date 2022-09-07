@@ -40,15 +40,18 @@ def buildRE2WASM Unit =
     require Pass patch =
         source "{here}/re2.patch"
 
+    require Pass buildDir = vendorBuildDir Unit
+
     def job =
         """
+            cd .build
             wget https://github.com/google/re2/archive/refs/tags/%{version}.tar.gz
             tar xvzf %{version}.tar.gz
             cd re2-%{version}
-            patch -p0 < ../%{relative here patch.getPathName}
+            patch -p0 < ../../%{relative here patch.getPathName}
             emmake make -j4 RE2_CXXFLAGS="-std=c++14 -I. -Wall -DNO_THREADS" CXXFLAGS="-O2" obj/libre2.a
         """
-        | makePlan "compiling re2" (patch, Nil)
+        | makePlan "compiling re2" (buildDir, patch, Nil)
         | editPlanEnvironment (addEnvironmentPath emsdk)
         | setPlanDirectory here
         | runJob
@@ -63,7 +66,7 @@ def buildRE2WASM Unit =
         filter (matches `.*\.o` _.getPathName) outputs
 
     def cflags =
-        "-I{here}/re2-{version}",
+        "-I{here}/.build/re2-{version}",
         Nil
 
     def lflags =
