@@ -54,7 +54,7 @@ std::string decodePathOrScheme(const std::string &fileUri, bool wantPath) {
   // skip over scheme
   size_t schemeEnd = out.find("://");
   if (schemeEnd == std::string::npos) {
-    return wantPath ? out : ""; // want scheme but no "://" was encountered => scheme is empty
+    return wantPath ? out : "";  // want scheme but no "://" was encountered => scheme is empty
   }
 
   // skip over optional authority
@@ -74,14 +74,9 @@ std::string decodePathOrScheme(const std::string &fileUri, bool wantPath) {
   return out;
 }
 
-std::string decodePath(const std::string &fileUri) {
-  return decodePathOrScheme(fileUri, true);
-}
+std::string decodePath(const std::string &fileUri) { return decodePathOrScheme(fileUri, true); }
 
-std::string decodeScheme(const std::string &fileUri) {
-  return decodePathOrScheme(fileUri, false);
-}
-
+std::string decodeScheme(const std::string &fileUri) { return decodePathOrScheme(fileUri, false); }
 
 static char encodeTable[256][4];
 
@@ -251,7 +246,8 @@ JAST createInitializeResultInvalidSTDLib(const JAST &receivedMessage) {
 }
 
 JAST fileDiagnosticsToJSON(const std::string &filePath,
-                           const std::vector<Diagnostic> &fileDiagnostics, const std::string &uriScheme) {
+                           const std::vector<Diagnostic> &fileDiagnostics,
+                           const std::string &uriScheme) {
   JAST diagnosticsArray(JSON_ARRAY);
   for (const Diagnostic &diagnostic : fileDiagnostics) {
     diagnosticsArray.children.emplace_back(
@@ -264,7 +260,8 @@ JAST fileDiagnosticsToJSON(const std::string &filePath,
   return message;
 }
 
-JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation, const std::string &uriScheme) {
+JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation,
+                              const std::string &uriScheme) {
   JAST message = createResponseMessage(std::move(receivedMessage));
   JAST &result = message.add("result", JSON_OBJECT);
   if (!definitionLocation.filename.empty()) {
@@ -273,7 +270,8 @@ JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLo
   return message;
 }
 
-JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references, const std::string &uriScheme) {
+JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references,
+                      const std::string &uriScheme) {
   JAST message = createResponseMessage(std::move(receivedMessage));
   JAST &result = message.add("result", JSON_ARRAY);
   for (const Location &location : references) {

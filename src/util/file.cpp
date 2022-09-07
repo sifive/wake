@@ -118,7 +118,8 @@ EM_ASYNC_JS(uint8_t *, getBase, (int *length, const char *filename, const char *
 
 // clang-format on
 
-ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_, const char *uriScheme)
+ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_,
+                           const char *uriScheme)
     : FileContent(filename_) {
   Location l(filename());
 

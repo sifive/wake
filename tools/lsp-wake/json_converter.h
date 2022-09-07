@@ -45,11 +45,14 @@ JAST createInitializeResultDefault(const JAST &receivedMessage);
 JAST createInitializeResultInvalidSTDLib(const JAST &receivedMessage);
 
 JAST fileDiagnosticsToJSON(const std::string &filePath,
-                           const std::vector<Diagnostic> &fileDiagnostics, const std::string &uriScheme);
+                           const std::vector<Diagnostic> &fileDiagnostics,
+                           const std::string &uriScheme);
 
-JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation, const std::string &uriScheme);
+JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation,
+                              const std::string &uriScheme);
 
-JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references, const std::string &uriScheme);
+JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references,
+                      const std::string &uriScheme);
 
 JAST highlightsToJSON(JAST receivedMessage, const std::vector<Location> &occurrences);
 

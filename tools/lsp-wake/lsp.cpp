@@ -314,7 +314,8 @@ class LSPServer {
     }
 
     isInitialized = true;
-    std::string workspaceUri = receivedMessage.get("params").get("workspaceFolders").children[0].second.get("uri").value;
+    std::string workspaceUri =
+        receivedMessage.get("params").get("workspaceFolders").children[0].second.get("uri").value;
     astree.absWorkDir = JSONConverter::decodePath(workspaceUri);
     astree.uriScheme = JSONConverter::decodeScheme(workspaceUri);
     return methodResult;
@@ -331,8 +332,8 @@ class LSPServer {
 
   void diagnoseProject(MethodResult &methodResult) {
     astree.diagnoseProject([&methodResult, this](ASTree::FileDiagnostics &fileDiagnostics) {
-      JAST fileDiagnosticsJSON =
-          JSONConverter::fileDiagnosticsToJSON(fileDiagnostics.first, fileDiagnostics.second, astree.uriScheme);
+      JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(
+          fileDiagnostics.first, fileDiagnostics.second, astree.uriScheme);
       methodResult.diagnostics.children.emplace_back("", fileDiagnosticsJSON);
     });
     needsUpdate = false;
@@ -343,8 +344,8 @@ class LSPServer {
     refresh("goto-definition", methodResult);
     Location locationToDefine = JSONConverter::getLocationFromJSON(receivedMessage);
     Location definitionLocation = astree.findDefinitionLocation(locationToDefine);
-    JAST definitionLocationJSON =
-        JSONConverter::definitionLocationToJSON(receivedMessage, definitionLocation, astree.uriScheme);
+    JAST definitionLocationJSON = JSONConverter::definitionLocationToJSON(
+        receivedMessage, definitionLocation, astree.uriScheme);
     methodResult.response = definitionLocationJSON;
     return methodResult;
   }
@@ -362,7 +363,8 @@ class LSPServer {
       references.push_back(definitionLocation);
     }
 
-    JAST referencesJSON = JSONConverter::referencesToJSON(receivedMessage, references, astree.uriScheme);
+    JAST referencesJSON =
+        JSONConverter::referencesToJSON(receivedMessage, references, astree.uriScheme);
     methodResult.response = referencesJSON;
     return methodResult;
   }
@@ -520,7 +522,8 @@ class LSPServer {
       if (stoi(child.second.get("type").value) == 3) {
         // The file was deleted => clear any stale diagnostics
         std::vector<Diagnostic> emptyDiagnostics;
-        JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(filePath, emptyDiagnostics, astree.uriScheme);
+        JAST fileDiagnosticsJSON =
+            JSONConverter::fileDiagnosticsToJSON(filePath, emptyDiagnostics, astree.uriScheme);
         methodResult.diagnostics.children.emplace_back("", fileDiagnosticsJSON);
       }
     }

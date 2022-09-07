@@ -87,8 +87,8 @@ EM_ASYNC_JS(char *, vscode_getfiles, (const char *dir, const char *uriScheme, in
 });
 // clang-format on
 
-bool push_files(std::vector<std::string> &out, const std::string &path, const std::string &uriScheme, const re2::RE2 &re,
-                size_t skip) {
+bool push_files(std::vector<std::string> &out, const std::string &path,
+                const std::string &uriScheme, const re2::RE2 &re, size_t skip) {
   int ok;
   char *files = vscode_getfiles(path.c_str(), uriScheme.c_str(), &ok);
   if (ok) {
@@ -170,8 +170,8 @@ static bool push_files(std::vector<std::string> &out, const std::string &path, i
   return failed;
 }
 
-bool push_files(std::vector<std::string> &out, const std::string &path, const std::string &_, const RE2 &re,
-                size_t skip) {
+bool push_files(std::vector<std::string> &out, const std::string &path, const std::string &_,
+                const RE2 &re, size_t skip) {
   int flags, dirfd = open(path.c_str(), O_RDONLY);
   if ((flags = fcntl(dirfd, F_GETFD, 0)) != -1) fcntl(dirfd, F_SETFD, flags | FD_CLOEXEC);
   return dirfd == -1 || push_files(out, path, dirfd, re, skip);
@@ -305,7 +305,8 @@ class DiagnosticIgnorer : public DiagnosticReporter {
   void report(Diagnostic diagnostic) {}
 };
 
-static void process_ignorefile(const std::string &path, std::vector<WakeFilter> &filters, const std::string &uriScheme) {
+static void process_ignorefile(const std::string &path, std::vector<WakeFilter> &filters,
+                               const std::string &uriScheme) {
   DiagnosticIgnorer ignorer;
   std::string wakeignore = path + ".wakeignore";
   ExternalFile file(ignorer, wakeignore.c_str(), uriScheme.c_str());
@@ -337,7 +338,8 @@ static void process_ignorefile(const std::string &path, std::vector<WakeFilter> 
 }
 
 static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wakefiles,
-                                                 const std::string &basedir, bool verbose, const std::string &uriScheme) {
+                                                 const std::string &basedir, bool verbose,
+                                                 const std::string &uriScheme) {
   std::string curdir = basedir;  // Either "" or ".+/"
   if (curdir == ".") {
     curdir.clear();
@@ -397,7 +399,8 @@ static std::vector<std::string> filter_wakefiles(std::vector<std::string> &&wake
 }
 
 std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose,
-                                            const std::string &libdir, const std::string &workdir, const std::string &uriScheme) {
+                                            const std::string &libdir, const std::string &workdir,
+                                            const std::string &uriScheme) {
   RE2::Options options;
   options.set_log_errors(false);
   options.set_one_line(true);
