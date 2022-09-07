@@ -1,9 +1,25 @@
 /* eslint-disable no-undef */
 /* eslint-disable @typescript-eslint/no-var-requires */
-/*---------------------------------------------------------------------------------------------
+/*---------------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
+ *  Licensed under the MIT License. See LICENSE.MIT in lsp-client/src/vendor for license information.
+ *--------------------------------------------------------------------------------------------------*/
+
+/* Copyright 2022 SiFive, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You should have received a copy of LICENSE.Apache2 along with
+ * this software. If not, you may obtain a copy at
+ *
+ *    https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 //@ts-check
 'use strict';
@@ -20,7 +36,7 @@ const webClientConfig = {
 	mode: 'none',
 	target: 'webworker', // web extensions run in a webworker context
 	entry: {
-		clientWeb: './src/clientWeb.ts',
+		clientWeb: './src/vendor/clientWeb.ts',
 	},
 	output: {
 		filename: '[name].js',
@@ -111,11 +127,12 @@ const webServerConfig = {
 
 /** @type WebpackConfig */
 const nodeClientConfig = {
+	context: path.join(__dirname, 'lsp-client'),
 	mode: 'none', // this leaves the source code as close as possible to the original
 				  // (when packaging we set this to 'production')
 	target: 'node', // node extensions run in a node context
 	entry: {
-		clientNode: './lsp-client/src/clientNode.ts'
+		clientNode: './src/vendor/clientNode.ts'
 	},
 	output: {
 		filename: '[name].js',
