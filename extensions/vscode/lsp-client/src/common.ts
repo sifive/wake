@@ -35,27 +35,27 @@ export function registerFsMethods(client: CommonLanguageClient, stdLib: string):
 
         const decoder = new TextDecoder();
 
-        client.onRequest('isReadable', async (path: string): Promise<number> => {
+        client.onRequest('accessFile', async (path: string): Promise<void> => {
             try {
                 let uri = Uri.parse(path);
                 await workspace.fs.stat(uri);
-                return 1;
-            } catch {
-                return 0;
+                return;
+            } catch (err) {
+                return Promise.reject(new Error(err.toString()));
             }
         });
 
-        client.onRequest('readFile', async (path: string): Promise<string | any> => {
+        client.onRequest('readFile', async (path: string): Promise<string> => {
             try {
                 let uri = Uri.parse(path);
                 const content = await workspace.fs.readFile(uri);
                 return decoder.decode(content);
             } catch (err) {
-                return { message: err.toString() };
+                return Promise.reject(new Error(err.toString()));
             }
         });
 
-        client.onRequest('readDir', async (path: string): Promise<[string, boolean][] | any> => {
+        client.onRequest('readDir', async (path: string): Promise<[string, boolean][]> => {
             try {
                 let uri = Uri.parse(path);
                 const files = await workspace.fs.readDirectory(uri);
@@ -65,7 +65,7 @@ export function registerFsMethods(client: CommonLanguageClient, stdLib: string):
                 }
                 return strippedFiles;
             } catch (err) {
-                return { message: err.toString() };
+                return Promise.reject(new Error(err.toString()));
             }
         });
     });

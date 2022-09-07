@@ -51,9 +51,6 @@ EM_ASYNC_JS(char *, vscode_getfiles, (const char *dir, const char *uriScheme, in
 
   async function walkTree(dir, uriScheme) {
     const dirFiles = await wakeLspModule.sendRequest('readDir', uriScheme + dir);
-    if (dirFiles.hasOwnProperty('message')) { // readDir request resulted in an error
-      throw dirFiles;
-    }
     for (const dirent of dirFiles) {
       const absolute = Path.join(dir, dirent[0]); // dirent.name
       if (!dirent[1]) { // not a directory

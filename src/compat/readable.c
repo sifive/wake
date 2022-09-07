@@ -27,7 +27,12 @@
 
 // clang-format off
 EM_ASYNC_JS(int, isReadable, (const char *filename, const char *uriScheme), {
-  return await wakeLspModule.sendRequest('isReadable', UTF8ToString(uriScheme) + UTF8ToString(filename));
+  try {
+    await wakeLspModule.sendRequest('accessFile', UTF8ToString(uriScheme) + UTF8ToString(filename));
+    return 1;
+  } catch (err) {
+    return 0;
+  }
 });
 // clang-format on
 

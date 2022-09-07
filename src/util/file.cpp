@@ -94,9 +94,6 @@ StringFile::StringFile(const char *filename_, std::string &&content_)
 EM_ASYNC_JS(uint8_t *, getBase, (int *length, const char *filename, const char *uriScheme), {
   try {
     const content = await wakeLspModule.sendRequest('readFile', UTF8ToString(uriScheme) + UTF8ToString(filename));
-    if (content.hasOwnProperty('message')) { // readFile request resulted in an error
-      throw content;
-    }
     const encoder = new TextEncoder();
     const bytes = encoder.encode(content);
     // ExternalFile takes ownership of the memory and frees it in the destructor
