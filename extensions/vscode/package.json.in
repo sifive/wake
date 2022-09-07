@@ -25,7 +25,7 @@
 		"vscode": "^1.70.0"
 	},
 	"activationEvents": [
-		"onLanguage:plaintext",
+		"onLanguage:wake",
 		"onCommand:timeline.create",
 		"onCommand:timeline.refresh",
 		"onWebviewPanel:timeline"
