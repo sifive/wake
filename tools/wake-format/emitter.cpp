@@ -48,6 +48,7 @@
   }
 
 static inline bool requires_nl(cst_id_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
+static inline bool requires_fits_all(cst_id_t type) { return type == CST_APP; }
 
 static inline bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
@@ -62,8 +63,9 @@ auto Emitter::rhs_fmt() {
 
   // clang-format off
   return fmt().match(
-   pred(requires_nl, full_fmt)
-   .pred_fits(flat_fmt)
+    pred(requires_nl, full_fmt)
+   .pred(requires_fits_all, fmt().fmt_if_fits_all(flat_fmt, full_fmt))
+   .pred_fits_first(flat_fmt)
    .otherwise(full_fmt));
   // clang-format on
 }

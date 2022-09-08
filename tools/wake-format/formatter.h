@@ -408,18 +408,35 @@ class ConstPredicate {
 };
 
 template <class FMT>
-class FitsPredicate {
+class FitsFirstPredicate {
  private:
   FMT formatter;
 
  public:
-  FitsPredicate(FMT formatter) : formatter(formatter) {}
+  FitsFirstPredicate(FMT formatter) : formatter(formatter) {}
 
   bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                   const token_traits_map_t& traits) {
     CSTElement copy = node;
     wcl::doc doc = formatter.compose(ctx.sub(builder), copy, traits);
     return ctx.sub(builder)->last_width() + doc->first_width() <= MAX_COLUMN_WIDTH;
+  }
+};
+
+template <class FMT>
+class FitsAllPredicate {
+ private:
+  FMT formatter;
+
+ public:
+  FitsAllPredicate(FMT formatter) : formatter(formatter) {}
+
+  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                  const token_traits_map_t& traits) {
+    CSTElement copy = node;
+    wcl::doc doc = formatter.compose(ctx.sub(builder), copy, traits);
+    return ctx.sub(builder)->last_width() + doc->first_width() <= MAX_COLUMN_WIDTH &&
+           !doc->has_newline();
   }
 };
 
@@ -553,10 +570,18 @@ struct MatchAction {
 
   MatchAction(Case c) : c(c) {}
 
-  // Predicate case that is accepted if FMT passes the FitsPredicate
+  // Predicate case that is accepted if FMT passes the FitsFirstPredicate
   template <class FMT>
-  MatchAction<MatchSeq<Case, PredicateCase<FitsPredicate<FMT>, FMT>>> pred_fits(FMT formatter) {
-    return {{c, {FitsPredicate<FMT>(formatter), formatter}}};
+  MatchAction<MatchSeq<Case, PredicateCase<FitsFirstPredicate<FMT>, FMT>>> pred_fits_first(
+      FMT formatter) {
+    return {{c, {FitsFirstPredicate<FMT>(formatter), formatter}}};
+  }
+
+  // Predicate case that is accepted if FMT passes the FitsAllPredicate
+  template <class FMT>
+  MatchAction<MatchSeq<Case, PredicateCase<FitsAllPredicate<FMT>, FMT>>> pred_fits_all(
+      FMT formatter) {
+    return {{c, {FitsAllPredicate<FMT>(formatter), formatter}}};
   }
 
   template <class FMT>
@@ -612,9 +637,15 @@ struct Formatter {
   Formatter<SeqAction<Action, NextAction>> next() { return {{action, {}}}; }
 
   template <class IFMT, class EFMT>
-  Formatter<SeqAction<Action, IfElseAction<FmtPredicate<FitsPredicate<IFMT>>, IFMT, EFMT>>>
-  fmt_if_fits(IFMT fits_formatter, EFMT else_formatter) {
-    return fmt_if_else(FitsPredicate<IFMT>(fits_formatter), fits_formatter, else_formatter);
+  Formatter<SeqAction<Action, IfElseAction<FmtPredicate<FitsFirstPredicate<IFMT>>, IFMT, EFMT>>>
+  fmt_if_fits_first(IFMT fits_formatter, EFMT else_formatter) {
+    return fmt_if_else(FitsFirstPredicate<IFMT>(fits_formatter), fits_formatter, else_formatter);
+  }
+
+  template <class IFMT, class EFMT>
+  Formatter<SeqAction<Action, IfElseAction<FmtPredicate<FitsAllPredicate<IFMT>>, IFMT, EFMT>>>
+  fmt_if_fits_all(IFMT fits_formatter, EFMT else_formatter) {
+    return fmt_if_else(FitsAllPredicate<IFMT>(fits_formatter), fits_formatter, else_formatter);
   }
 
   template <class FMT>
