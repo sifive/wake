@@ -110,8 +110,7 @@ def t2 = ((x + 7) * 3)
 
 def t4 = (
     # comment
-    x
-    + 5
+    x + 5
 )
 
 
@@ -119,8 +118,7 @@ def t4 = (
     # comment
     (
         # comment
-        x
-        + 5
+        x + 5
     )
 )
 
@@ -129,8 +127,7 @@ def t5 = (
     # comment
     # comment
     # comment
-    x
-    + 5
+    x + 5
 )
 
 
@@ -144,8 +141,7 @@ def t5 = (
 #   5
 # )
 def t9 = (
-    x
-    + 5 # comment
+    x + 5 # comment
 )
 
 
@@ -163,8 +159,7 @@ def t3 = ( # comment
 def t6 = ( # comment
     # comment
     # comment
-    x
-    + 5
+    x + 5
 )
 
 

@@ -655,8 +655,11 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
 
   // WARNING: I'm using Node() here which is differnt than everywhere else
   // This is probably not right since I'm loosing comments
-  CSTElement op = node.firstChildNode();
+  CSTElement lhs = node.firstChildNode();
+  CSTElement op = lhs;
   op.nextSiblingNode();
+  CSTElement rhs = op;
+  rhs.nextSiblingNode();
 
   assert(op.id() == CST_OP);
   CSTElement op_token = op.firstChildElement();
@@ -667,12 +670,37 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   std::vector<std::pair<int, wcl::doc>> lte_fmt = {};
   std::vector<std::pair<int, wcl::doc>> gt_fmt = {};
 
+  size_t allowed_extra_nl = token_traits[lhs.firstChildElement()].before_bound.size();
+
+  CSTElement last_rhs;
+  {
+    IsWSNLCPredicate is_wsnlc;
+    CSTElement curr_rhs = rhs.firstChildElement();
+    CSTElement next_rhs = curr_rhs;
+    next_rhs.nextSiblingElement();
+
+    while (!next_rhs.empty()) {
+      while (!next_rhs.empty() && is_wsnlc(next_rhs)) {
+        next_rhs.nextSiblingElement();
+      }
+      if (next_rhs.empty()) {
+        last_rhs = curr_rhs;
+      } else {
+        curr_rhs = next_rhs;
+        next_rhs.nextSiblingElement();
+      }
+    }
+    last_rhs = curr_rhs;
+  }
+
+  allowed_extra_nl += token_traits[last_rhs].after_bound.size();
+
   // Maybe nest here
 
   // 1
   wcl::doc flat = combine_flat(op_token, ctx, parts);
   std::cerr << "#1 <<<:" << flat.as_string() << ":>>>" << std::endl;
-  if (!flat->has_newline()) {
+  if (flat->newline_count() == allowed_extra_nl) {
     if (flat->max_width() > MAX_COLUMN_WIDTH) {
       gt_fmt.push_back({1, flat});
     } else {
@@ -710,7 +738,7 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   // 5
   wcl::doc explode_first_compress = combine_explode_first_compress(op_token, ctx, parts);
   std::cerr << "#5 <<<:" << explode_first_compress.as_string() << ":>>>" << std::endl;
-  if (!explode_first_compress->has_newline()) {
+  if (explode_first_compress->newline_count() == allowed_extra_nl) {
     if (explode_first_compress->max_width() > MAX_COLUMN_WIDTH) {
       gt_fmt.push_back({5, explode_first_compress});
     } else {
@@ -721,7 +749,7 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   // 6
   wcl::doc explode_last_compress = combine_explode_last_compress(op_token, ctx, parts);
   std::cerr << "#5 <<<:" << explode_last_compress.as_string() << ":>>>" << std::endl;
-  if (!explode_last_compress->has_newline()) {
+  if (explode_last_compress->newline_count() == allowed_extra_nl) {
     if (explode_last_compress->max_width() > MAX_COLUMN_WIDTH) {
       gt_fmt.push_back({6, explode_last_compress});
     } else {
