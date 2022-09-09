@@ -58,7 +58,6 @@ class ASTree {
 
   std::string absLibDir;
   std::string absWorkDir;
-  std::string uriScheme;
 
  private:
   struct SymbolUsage {

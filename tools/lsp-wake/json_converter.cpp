@@ -51,6 +51,7 @@ std::string decodePathOrScheme(const std::string &fileUri, bool wantPath) {
     }
   }
 
+#ifndef __EMSCRIPTEN__
   // skip over scheme
   size_t schemeEnd = out.find("://");
   if (schemeEnd == std::string::npos) {
@@ -71,6 +72,7 @@ std::string decodePathOrScheme(const std::string &fileUri, bool wantPath) {
   } else {
     out.erase(root, std::string::npos);  // do the opposite
   }
+#endif
   return out;
 }
 
@@ -93,7 +95,16 @@ static void normal(int x) {
   encodeTable[x][1] = 0;
 }
 
-std::string encodePath(const std::string &filePath, const std::string &uriScheme) {
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
+std::string encodePath(const std::string &filePath) {
+#ifdef __EMSCRIPTEN__
+  EM_ASM({
+    console.log('filePath: ', UTF8ToString($0));
+  }, filePath.c_str());
+#endif
   if (!encodeTable[0][0]) {
     for (int i = 0; i < 256; ++i) {
       encodeTable[i][0] = '%';
@@ -109,12 +120,22 @@ std::string encodePath(const std::string &filePath, const std::string &uriScheme
     normal('.');
     normal('~');
     normal('/');                    // This is non-standard, but necessary
-    if (is_windows()) normal(':');  // Do not escape volume names
+    normal(':');  // Do not escape volume names
   }
 
-  std::string out(uriScheme);
+#ifdef __EMSCRIPTEN__
+  std::string out;
+#else
+  std::string out("file://");
+#endif
 
   for (char c : filePath) out.append(encodeTable[static_cast<int>(static_cast<unsigned char>(c))]);
+
+#ifdef __EMSCRIPTEN__
+  EM_ASM({
+    console.log('encoded: ', UTF8ToString($0));
+  }, out.c_str());
+#endif
 
   return out;
 }
@@ -164,9 +185,9 @@ JAST createDiagnosticMessage() {
   return message;
 }
 
-JAST createLocationJSON(const Location &location, const std::string &uriScheme) {
+JAST createLocationJSON(const Location &location) {
   JAST locationJSON(JSON_OBJECT);
-  std::string fileUri = encodePath(location.filename, uriScheme);
+  std::string fileUri = encodePath(location.filename);
   locationJSON.add("uri", fileUri.c_str());
   locationJSON.children.emplace_back("range", createRangeFromLocation(location));
   return locationJSON;
@@ -246,8 +267,7 @@ JAST createInitializeResultInvalidSTDLib(const JAST &receivedMessage) {
 }
 
 JAST fileDiagnosticsToJSON(const std::string &filePath,
-                           const std::vector<Diagnostic> &fileDiagnostics,
-                           const std::string &uriScheme) {
+                           const std::vector<Diagnostic> &fileDiagnostics) {
   JAST diagnosticsArray(JSON_ARRAY);
   for (const Diagnostic &diagnostic : fileDiagnostics) {
     diagnosticsArray.children.emplace_back(
@@ -255,27 +275,25 @@ JAST fileDiagnosticsToJSON(const std::string &filePath,
   }
   JAST message = createDiagnosticMessage();
   JAST &params = message.add("params", JSON_OBJECT);
-  params.add("uri", encodePath(filePath, uriScheme));
+  params.add("uri", encodePath(filePath));
   params.children.emplace_back("diagnostics", diagnosticsArray);
   return message;
 }
 
-JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation,
-                              const std::string &uriScheme) {
+JAST definitionLocationToJSON(JAST receivedMessage, const Location &definitionLocation) {
   JAST message = createResponseMessage(std::move(receivedMessage));
   JAST &result = message.add("result", JSON_OBJECT);
   if (!definitionLocation.filename.empty()) {
-    result = createLocationJSON(definitionLocation, uriScheme);
+    result = createLocationJSON(definitionLocation);
   }
   return message;
 }
 
-JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references,
-                      const std::string &uriScheme) {
+JAST referencesToJSON(JAST receivedMessage, const std::vector<Location> &references) {
   JAST message = createResponseMessage(std::move(receivedMessage));
   JAST &result = message.add("result", JSON_ARRAY);
   for (const Location &location : references) {
-    result.children.emplace_back("", createLocationJSON(location, uriScheme));
+    result.children.emplace_back("", createLocationJSON(location));
   }
   return message;
 }
@@ -313,15 +331,15 @@ JAST hoverInfoToJSON(JAST receivedMessage, const std::vector<SymbolDefinition> &
   return message;
 }
 
-void appendSymbolToJSON(const SymbolDefinition &def, JAST &json, const std::string &uriScheme) {
+void appendSymbolToJSON(const SymbolDefinition &def, JAST &json) {
   JAST &symbol = json.add("", JSON_OBJECT);
   symbol.add("name", def.name + ": " + def.type);
   symbol.add("kind", def.symbolKind);
-  symbol.children.emplace_back("location", createLocationJSON(def.location, uriScheme));
+  symbol.children.emplace_back("location", createLocationJSON(def.location));
 }
 
 JAST workspaceEditsToJSON(JAST receivedMessage, const std::vector<Location> &references,
-                          const std::string &newName, const std::string &uriScheme) {
+                          const std::string &newName) {
   JAST message = createResponseMessage(std::move(receivedMessage));
   JAST &result = message.add("result", JSON_OBJECT);
 
@@ -331,7 +349,7 @@ JAST workspaceEditsToJSON(JAST receivedMessage, const std::vector<Location> &ref
     edit.children.emplace_back("range", createRangeFromLocation(ref));
     edit.add("newText", newName.c_str());
 
-    std::string fileUri = encodePath(ref.filename, uriScheme);
+    std::string fileUri = encodePath(ref.filename);
     if (filesEdits.find(fileUri) == filesEdits.end()) {
       filesEdits[fileUri] = JAST(JSON_ARRAY);
     }

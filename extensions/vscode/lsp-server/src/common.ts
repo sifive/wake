@@ -83,7 +83,7 @@ export function prepareConnection(connection: Connection, isWeb: Boolean) {
                 // and send the initialize response to the client.
                 return await lspModule.processRequest(request);
             }
-            if (!isWeb && initializeRequest !== '') { // No need for this in web, since its stdLib can't be customized.
+            if (initializeRequest !== '') { // No need for this in web, since its stdLib can't be customized.
 
                 // After the initialize request was processed, we reinstantiate the wakeLspModule:
                 // make lsp functions usable, make connection usable in wasm;

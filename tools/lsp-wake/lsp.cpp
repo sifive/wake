@@ -43,6 +43,10 @@
 #include "util/execpath.h"
 #include "util/location.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 // Header used in JSON-RPC
 static const char contentLength[] = "Content-Length: ";
 
@@ -317,7 +321,13 @@ class LSPServer {
     std::string workspaceUri =
         receivedMessage.get("params").get("workspaceFolders").children[0].second.get("uri").value;
     astree.absWorkDir = JSONConverter::decodePath(workspaceUri);
-    astree.uriScheme = JSONConverter::decodeScheme(workspaceUri);
+
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+      console.log('abs work dir: ', UTF8ToString($0));
+    }, astree.absWorkDir.c_str());
+#endif
+
     return methodResult;
   }
 
@@ -331,9 +341,9 @@ class LSPServer {
   }
 
   void diagnoseProject(MethodResult &methodResult) {
-    astree.diagnoseProject([&methodResult, this](ASTree::FileDiagnostics &fileDiagnostics) {
+    astree.diagnoseProject([&methodResult](ASTree::FileDiagnostics &fileDiagnostics) {
       JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(
-          fileDiagnostics.first, fileDiagnostics.second, astree.uriScheme);
+          fileDiagnostics.first, fileDiagnostics.second);
       methodResult.diagnostics.children.emplace_back("", fileDiagnosticsJSON);
     });
     needsUpdate = false;
@@ -345,7 +355,7 @@ class LSPServer {
     Location locationToDefine = JSONConverter::getLocationFromJSON(receivedMessage);
     Location definitionLocation = astree.findDefinitionLocation(locationToDefine);
     JAST definitionLocationJSON = JSONConverter::definitionLocationToJSON(
-        receivedMessage, definitionLocation, astree.uriScheme);
+        receivedMessage, definitionLocation);
     methodResult.response = definitionLocationJSON;
     return methodResult;
   }
@@ -364,7 +374,7 @@ class LSPServer {
     }
 
     JAST referencesJSON =
-        JSONConverter::referencesToJSON(receivedMessage, references, astree.uriScheme);
+        JSONConverter::referencesToJSON(receivedMessage, references);
     methodResult.response = referencesJSON;
     return methodResult;
   }
@@ -424,7 +434,7 @@ class LSPServer {
 
     std::vector<SymbolDefinition> symbols = astree.documentSymbol(filePath);
     for (const SymbolDefinition &symbol : symbols) {
-      JSONConverter::appendSymbolToJSON(symbol, result, astree.uriScheme);
+      JSONConverter::appendSymbolToJSON(symbol, result);
     }
     methodResult.response = message;
     return methodResult;
@@ -439,7 +449,7 @@ class LSPServer {
     std::string query = receivedMessage.get("params").get("query").value;
     std::vector<SymbolDefinition> symbols = astree.workspaceSymbol(query);
     for (const SymbolDefinition &symbol : symbols) {
-      JSONConverter::appendSymbolToJSON(symbol, result, astree.uriScheme);
+      JSONConverter::appendSymbolToJSON(symbol, result);
     }
     methodResult.response = message;
     return methodResult;
@@ -464,7 +474,7 @@ class LSPServer {
       references.push_back(definitionLocation);
     }
     JAST workspaceEditsJSON =
-        JSONConverter::workspaceEditsToJSON(receivedMessage, references, newName, astree.uriScheme);
+        JSONConverter::workspaceEditsToJSON(receivedMessage, references, newName);
     methodResult.response = workspaceEditsJSON;
     return methodResult;
   }
@@ -523,7 +533,7 @@ class LSPServer {
         // The file was deleted => clear any stale diagnostics
         std::vector<Diagnostic> emptyDiagnostics;
         JAST fileDiagnosticsJSON =
-            JSONConverter::fileDiagnosticsToJSON(filePath, emptyDiagnostics, astree.uriScheme);
+            JSONConverter::fileDiagnosticsToJSON(filePath, emptyDiagnostics);
         methodResult.diagnostics.children.emplace_back("", fileDiagnosticsJSON);
       }
     }
@@ -550,7 +560,6 @@ class LSPServer {
 LSPServer *lspServer = nullptr;
 
 #ifdef __EMSCRIPTEN__
-#include <emscripten/emscripten.h>
 
 void instantiateServerInternal(const std::string &stdLib) {
   // clang-format off
@@ -560,7 +569,7 @@ void instantiateServerInternal(const std::string &stdLib) {
   // clang-format on
   bool isReadable = false;
   if (isNode) {
-    isReadable = is_readable((stdLib + "/core/boolean.wake").c_str(), "");
+    isReadable = is_readable((stdLib + "/core/boolean.wake").c_str());
   } else {  // no need to check stdlib validity in web, since it can't be customized there
     isReadable = true;
   }
@@ -569,11 +578,20 @@ void instantiateServerInternal(const std::string &stdLib) {
 
 extern "C" {
 void instantiateServer() {
-  instantiateServerInternal(make_canonical(find_execpath() + "/../../share/wake/lib"));
+  auto execpath = find_execpath();
+  auto stdlib = make_canonical(execpath + "/../../share/wake/lib");
+  EM_ASM({
+    console.log('execpath: ', UTF8ToString($0));
+    console.log('stdlib: ', UTF8ToString($1));
+  }, execpath.c_str(), stdlib.c_str());
+  instantiateServerInternal(stdlib);
 }
 
 void instantiateServerCustomStdLib(const char *stdLib) {
-  instantiateServerInternal(make_canonical(stdLib));
+  EM_ASM({
+    console.log('custom stdlib: ', UTF8ToString($0));
+  }, stdLib);
+  instantiateServerInternal(stdLib);
 }
 
 char *processRequest(const char *request) {
@@ -603,7 +621,7 @@ char *processRequest(const char *request) {
 #else
 
 void instantiateServer(const std::string &stdLib) {
-  bool isReadable = is_readable((stdLib + "/core/boolean.wake").c_str(), "");
+  bool isReadable = is_readable((stdLib + "/core/boolean.wake").c_str());
   lspServer = new LSPServer(isReadable, stdLib);
 }
 
