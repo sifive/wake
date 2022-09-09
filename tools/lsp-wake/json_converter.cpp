@@ -141,6 +141,8 @@ std::string encodePath(const std::string &filePath) {
   }
 #endif
 
+  if (is_windows()) out.push_back('/');  // filePath starts with drive letter, not '/'
+
   for (char c : filePath) out.append(encodeTable[static_cast<int>(static_cast<unsigned char>(c))]);
 
 #ifdef __EMSCRIPTEN__
