@@ -110,14 +110,18 @@ class Emitter {
   //     if LTE has any elements choose the element with the smallest height
   //     otherwise choose the element with the smallest width from GT
   //
-  wcl::doc combine_flat(CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts);
-  wcl::doc combine_explode_first(CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts);
-  wcl::doc combine_explode_last(CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts);
-  wcl::doc combine_explode_all(CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts);
-  wcl::doc combine_explode_first_compress(CSTElement over, ctx_t ctx,
-                                          const std::vector<CSTElement>& parts);
-  wcl::doc combine_explode_last_compress(CSTElement over, ctx_t ctx,
-                                         const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_flat(CSTElement over, ctx_t ctx,
+                                       const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_first(CSTElement over, ctx_t ctx,
+                                                const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_last(CSTElement over, ctx_t ctx,
+                                               const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_all(CSTElement over, ctx_t ctx,
+                                              const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_first_compress(CSTElement over, ctx_t ctx,
+                                                         const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_last_compress(CSTElement over, ctx_t ctx,
+                                                        const std::vector<CSTElement>& parts);
 
   // Returns a formatter that inserts the next node
   // on the current line if it fits, or on a new nested line

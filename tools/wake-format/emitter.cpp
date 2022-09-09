@@ -526,7 +526,7 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
   MEMO_RET(walk_placeholder(ctx, node));
 }
 
-std::vector<CSTElement> collect_binary_parts(cst_id_t target, CSTElement node) {
+std::vector<CSTElement> collect_binary_parts(CSTElement collect_over, CSTElement node) {
   if (node.id() != CST_BINARY) {
     return {node};
   }
@@ -539,12 +539,14 @@ std::vector<CSTElement> collect_binary_parts(cst_id_t target, CSTElement node) {
   CSTElement right = op;
   right.nextSiblingNode();
 
-  if (!(op.id() == CST_OP && op.firstChildElement().id() == target)) {
+  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
+        op.firstChildElement().fragment().segment().str() ==
+            collect_over.fragment().segment().str())) {
     return {node};
   }
 
-  auto left_collect = collect_binary_parts(target, left);
-  auto right_collect = collect_binary_parts(target, right);
+  auto left_collect = collect_binary_parts(collect_over, left);
+  auto right_collect = collect_binary_parts(collect_over, right);
 
   size_t size = left_collect.size();
   left_collect.resize(size + right_collect.size());
@@ -553,7 +555,50 @@ std::vector<CSTElement> collect_binary_parts(cst_id_t target, CSTElement node) {
   return left_collect;
 }
 
-wcl::doc Emitter::combine_flat(CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts) {
+size_t count_allowed_newlines(const token_traits_map_t& traits,
+                              const std::vector<CSTElement>& parts) {
+  assert(parts.size() >= 2);
+
+  CSTElement first_token = parts[0].firstChildElement();
+
+  CSTElement last_token;
+  {
+    IsWSNLCPredicate is_wsnlc;
+    CSTElement curr_rhs = parts.back().firstChildElement();
+    CSTElement next_rhs = curr_rhs;
+    next_rhs.nextSiblingElement();
+
+    while (!next_rhs.empty()) {
+      while (!next_rhs.empty() && is_wsnlc(next_rhs)) {
+        next_rhs.nextSiblingElement();
+      }
+      if (next_rhs.empty()) {
+        last_token = curr_rhs;
+      } else {
+        curr_rhs = next_rhs;
+        next_rhs.nextSiblingElement();
+      }
+    }
+    last_token = curr_rhs;
+  }
+
+  size_t allowed = 0;
+
+  auto first_it = traits.find(first_token);
+  if (first_it != traits.end()) {
+    allowed += first_it->second.before_bound.size();
+  }
+
+  auto last_it = traits.find(last_token);
+  if (last_it != traits.end()) {
+    allowed += last_it->second.after_bound.size();
+  }
+
+  return allowed;
+}
+
+wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
+                                              const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
   for (size_t i = 0; i < parts.size() - 1; i++) {
     builder.append(walk_node(ctx.sub(builder), parts[i]));
@@ -563,61 +608,93 @@ wcl::doc Emitter::combine_flat(CSTElement over, ctx_t ctx, const std::vector<CST
   }
 
   builder.append(walk_node(ctx.sub(builder), parts.back()));
-  return std::move(builder).build();
+
+  wcl::doc doc = std::move(builder).build();
+  if (doc->newline_count() != count_allowed_newlines(token_traits, parts)) {
+    return {};
+  }
+  return {wcl::in_place_t{}, std::move(doc)};
 }
 
-wcl::doc Emitter::combine_explode_first(CSTElement over, ctx_t ctx,
-                                        const std::vector<CSTElement>& parts) {
+wcl::optional<wcl::doc> Emitter::combine_explode_first(CSTElement over, ctx_t ctx,
+                                                       const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
   builder.append(walk_node(ctx.sub(builder).explode(), parts[0]));
   builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
-  builder.append(walk_token(ctx.sub(builder), over));
-  builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+
+  wcl::doc operator_doc = walk_token(ctx.sub(builder), over);
+  bool op_has_nl = operator_doc->has_newline();
+  builder.append(std::move(operator_doc));
+  if (op_has_nl) {
+    builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
+  } else {
+    builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+  }
 
   for (size_t i = 1; i < parts.size() - 1; i++) {
     builder.append(walk_node(ctx.sub(builder), parts[i]));
     builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
-    builder.append(walk_token(ctx.sub(builder), over));
-    builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+
+    operator_doc = walk_token(ctx.sub(builder), over);
+    bool op_has_nl = operator_doc->has_newline();
+    builder.append(std::move(operator_doc));
+    if (op_has_nl) {
+      builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
+    } else {
+      builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+    }
   }
 
   builder.append(walk_node(ctx.sub(builder), parts.back()));
-  return std::move(builder).build();
+  return {wcl::in_place_t{}, std::move(builder).build()};
 }
 
-wcl::doc Emitter::combine_explode_last(CSTElement over, ctx_t ctx,
-                                       const std::vector<CSTElement>& parts) {
+wcl::optional<wcl::doc> Emitter::combine_explode_last(CSTElement over, ctx_t ctx,
+                                                      const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
   for (size_t i = 0; i < parts.size() - 1; i++) {
     builder.append(walk_node(ctx.sub(builder), parts[i]));
     builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
-    builder.append(walk_token(ctx.sub(builder), over));
-    builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+
+    wcl::doc operator_doc = walk_token(ctx.sub(builder), over);
+    bool op_has_nl = operator_doc->has_newline();
+    builder.append(std::move(operator_doc));
+    if (op_has_nl) {
+      builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
+    } else {
+      builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+    }
   }
 
   builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
-  return std::move(builder).build();
+  return {wcl::in_place_t{}, std::move(builder).build()};
 }
 
-wcl::doc Emitter::combine_explode_all(CSTElement over, ctx_t ctx,
-                                      const std::vector<CSTElement>& parts) {
+wcl::optional<wcl::doc> Emitter::combine_explode_all(CSTElement over, ctx_t ctx,
+                                                     const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
   for (size_t i = 0; i < parts.size() - 1; i++) {
     builder.append(walk_node(ctx.sub(builder).explode(), parts[i]));
     builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
-    builder.append(walk_token(ctx.sub(builder), over));
-    builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+    wcl::doc operator_doc = walk_token(ctx.sub(builder), over);
+    bool op_has_nl = operator_doc->has_newline();
+    builder.append(std::move(operator_doc));
+    if (op_has_nl) {
+      builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
+    } else {
+      builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+    }
   }
 
   builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
-  return std::move(builder).build();
+  return {wcl::in_place_t{}, std::move(builder).build()};
 }
 
-wcl::doc Emitter::combine_explode_first_compress(CSTElement over, ctx_t ctx,
-                                                 const std::vector<CSTElement>& parts) {
+wcl::optional<wcl::doc> Emitter::combine_explode_first_compress(
+    CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
   builder.append(walk_node(ctx.sub(builder).explode(), parts[0]));
@@ -633,11 +710,16 @@ wcl::doc Emitter::combine_explode_first_compress(CSTElement over, ctx_t ctx,
   }
 
   builder.append(walk_node(ctx.sub(builder), parts.back()));
-  return std::move(builder).build();
+
+  wcl::doc doc = std::move(builder).build();
+  if (doc->newline_count() != count_allowed_newlines(token_traits, parts)) {
+    return {};
+  }
+  return {wcl::in_place_t{}, std::move(doc)};
 }
 
-wcl::doc Emitter::combine_explode_last_compress(CSTElement over, ctx_t ctx,
-                                                const std::vector<CSTElement>& parts) {
+wcl::optional<wcl::doc> Emitter::combine_explode_last_compress(
+    CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
   for (size_t i = 0; i < parts.size() - 1; i++) {
@@ -648,7 +730,12 @@ wcl::doc Emitter::combine_explode_last_compress(CSTElement over, ctx_t ctx,
   }
 
   builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
-  return std::move(builder).build();
+
+  wcl::doc doc = std::move(builder).build();
+  if (doc->newline_count() != count_allowed_newlines(token_traits, parts)) {
+    return {};
+  }
+  return {wcl::in_place_t{}, std::move(doc)};
 }
 
 wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
@@ -666,96 +753,79 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   assert(op.id() == CST_OP);
   CSTElement op_token = op.firstChildElement();
 
-  auto parts = collect_binary_parts(op_token.id(), node);
+  auto parts = collect_binary_parts(op_token, node);
   std::cerr << "ct: " << parts.size() << std::endl;
 
   std::vector<std::pair<int, wcl::doc>> lte_fmt = {};
   std::vector<std::pair<int, wcl::doc>> gt_fmt = {};
 
-  size_t allowed_extra_nl = token_traits[lhs.firstChildElement()].before_bound.size();
-
-  CSTElement last_rhs;
-  {
-    IsWSNLCPredicate is_wsnlc;
-    CSTElement curr_rhs = rhs.firstChildElement();
-    CSTElement next_rhs = curr_rhs;
-    next_rhs.nextSiblingElement();
-
-    while (!next_rhs.empty()) {
-      while (!next_rhs.empty() && is_wsnlc(next_rhs)) {
-        next_rhs.nextSiblingElement();
-      }
-      if (next_rhs.empty()) {
-        last_rhs = curr_rhs;
-      } else {
-        curr_rhs = next_rhs;
-        next_rhs.nextSiblingElement();
-      }
-    }
-    last_rhs = curr_rhs;
-  }
-
-  allowed_extra_nl += token_traits[last_rhs].after_bound.size();
-
   // Maybe nest here
 
   // 1
-  wcl::doc flat = combine_flat(op_token, ctx, parts);
-  std::cerr << "#1 <<<:" << flat.as_string() << ":>>>" << std::endl;
-  if (flat->newline_count() == allowed_extra_nl) {
-    if (flat->max_width() > MAX_COLUMN_WIDTH) {
-      gt_fmt.push_back({1, flat});
+  wcl::optional<wcl::doc> flat = combine_flat(op_token, ctx, parts);
+  if (flat) {
+    std::cerr << "#1 <<<:" << flat->as_string() << ":>>>" << std::endl;
+    if ((*flat)->max_width() > MAX_COLUMN_WIDTH) {
+      gt_fmt.push_back({1, std::move(*flat)});
     } else {
-      lte_fmt.push_back({1, flat});
+      lte_fmt.push_back({1, std::move(*flat)});
     }
   }
 
   // 2
-  wcl::doc explode_first = combine_explode_first(op_token, ctx, parts);
-  std::cerr << "#2 <<<:" << explode_first.as_string() << ":>>>" << std::endl;
-  if (explode_first->max_width() > MAX_COLUMN_WIDTH) {
-    gt_fmt.push_back({2, explode_first});
-  } else {
-    lte_fmt.push_back({2, explode_first});
+  wcl::optional<wcl::doc> explode_first = combine_explode_first(op_token, ctx, parts);
+  if (explode_first) {
+    std::cerr << "#2 <<<:" << explode_first->as_string() << ":>>>" << std::endl;
+    if ((*explode_first)->max_width() > MAX_COLUMN_WIDTH) {
+      gt_fmt.push_back({2, std::move(*explode_first)});
+    } else {
+      lte_fmt.push_back({2, std::move(*explode_first)});
+    }
   }
 
   // 3
-  wcl::doc explode_last = combine_explode_last(op_token, ctx, parts);
-  std::cerr << "#3 <<<:" << explode_last.as_string() << ":>>>" << std::endl;
-  if (explode_last->max_width() > MAX_COLUMN_WIDTH) {
-    gt_fmt.push_back({3, explode_last});
-  } else {
-    lte_fmt.push_back({3, explode_last});
+  wcl::optional<wcl::doc> explode_last = combine_explode_last(op_token, ctx, parts);
+  if (explode_last) {
+    std::cerr << "#3 <<<:" << explode_last->as_string() << ":>>>" << std::endl;
+    if ((*explode_last)->max_width() > MAX_COLUMN_WIDTH) {
+      gt_fmt.push_back({3, std::move(*explode_last)});
+    } else {
+      lte_fmt.push_back({3, std::move(*explode_last)});
+    }
   }
 
   // 4
-  wcl::doc explode_all = combine_explode_all(op_token, ctx, parts);
-  std::cerr << "#4 <<<:" << explode_all.as_string() << ":>>>" << std::endl;
-  if (explode_all->max_width() > MAX_COLUMN_WIDTH) {
-    gt_fmt.push_back({4, explode_all});
-  } else {
-    lte_fmt.push_back({4, explode_all});
+  wcl::optional<wcl::doc> explode_all = combine_explode_all(op_token, ctx, parts);
+  if (explode_all) {
+    std::cerr << "#4 <<<:" << explode_all->as_string() << ":>>>" << std::endl;
+    if ((*explode_all)->max_width() > MAX_COLUMN_WIDTH) {
+      gt_fmt.push_back({4, std::move(*explode_all)});
+    } else {
+      lte_fmt.push_back({4, std::move(*explode_all)});
+    }
   }
 
   // 5
-  wcl::doc explode_first_compress = combine_explode_first_compress(op_token, ctx, parts);
-  std::cerr << "#5 <<<:" << explode_first_compress.as_string() << ":>>>" << std::endl;
-  if (explode_first_compress->newline_count() == allowed_extra_nl) {
-    if (explode_first_compress->max_width() > MAX_COLUMN_WIDTH) {
-      gt_fmt.push_back({5, explode_first_compress});
+  wcl::optional<wcl::doc> explode_first_compress =
+      combine_explode_first_compress(op_token, ctx, parts);
+  if (explode_first_compress) {
+    std::cerr << "#5 <<<:" << explode_first_compress->as_string() << ":>>>" << std::endl;
+    if ((*explode_first_compress)->max_width() > MAX_COLUMN_WIDTH) {
+      gt_fmt.push_back({5, std::move(*explode_first_compress)});
     } else {
-      lte_fmt.push_back({5, explode_first_compress});
+      lte_fmt.push_back({5, std::move(*explode_first_compress)});
     }
   }
 
   // 6
-  wcl::doc explode_last_compress = combine_explode_last_compress(op_token, ctx, parts);
-  std::cerr << "#5 <<<:" << explode_last_compress.as_string() << ":>>>" << std::endl;
-  if (explode_last_compress->newline_count() == allowed_extra_nl) {
-    if (explode_last_compress->max_width() > MAX_COLUMN_WIDTH) {
-      gt_fmt.push_back({6, explode_last_compress});
+  wcl::optional<wcl::doc> explode_last_compress =
+      combine_explode_last_compress(op_token, ctx, parts);
+  if (explode_last_compress) {
+    std::cerr << "#5 <<<:" << explode_last_compress->as_string() << ":>>>" << std::endl;
+    if ((*explode_last_compress)->max_width() > MAX_COLUMN_WIDTH) {
+      gt_fmt.push_back({6, std::move(*explode_last_compress)});
     } else {
-      lte_fmt.push_back({6, explode_last_compress});
+      lte_fmt.push_back({6, std::move(*explode_last_compress)});
     }
   }
 
