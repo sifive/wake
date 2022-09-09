@@ -93,9 +93,15 @@ StringFile::StringFile(const char *filename_, std::string &&content_)
 // clang-format off
 EM_ASYNC_JS(uint8_t *, getBase, (int *length, const char *filename), {
   try {
-    const content = await wakeLspModule.sendRequest('readFile', UTF8ToString(filename));
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(content);
+    let bytes;
+    if (ENVIRONMENT_IS_NODE) {
+      const fs = require('fs');
+      bytes = fs.readFileSync(UTF8ToString(filename));
+    } else {
+      const content = await wakeLspModule.sendRequest('readFile', UTF8ToString(filename));
+      const encoder = new TextEncoder();
+      bytes = encoder.encode(content);
+    }
     // ExternalFile takes ownership of the memory and frees it in the destructor
     const wasmPointer = Module._malloc(bytes.length + 1);
     for (let i = 0; i < bytes.length; i++) {

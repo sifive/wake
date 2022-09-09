@@ -36,7 +36,33 @@ static int parse_hex(char c) {
   }
 }
 
-std::string decodePathOrScheme(const std::string &fileUri, bool wantPath) {
+std::string stripScheme(const std::string &fileUri) {
+  std::string stripped(fileUri);
+
+  // skip over scheme
+  size_t schemeEnd = stripped.find("://");
+  if (schemeEnd == std::string::npos) {
+    return stripped;
+  }
+
+  // skip over optional authority
+  size_t root = stripped.find_first_of('/', schemeEnd + 3);
+  if (root == std::string::npos) {
+    root = schemeEnd + 3;
+  } else if (is_windows()) {
+    // strip leading '/' on windows
+    ++root;
+  }
+
+  stripped.erase(stripped.begin(), stripped.begin() + root);  // strip scheme
+  return stripped;
+}
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
+std::string decodePath(const std::string &fileUri) {
   std::string out;
   auto i = fileUri.begin(), e = fileUri.end();
   while (i != e) {
@@ -52,33 +78,17 @@ std::string decodePathOrScheme(const std::string &fileUri, bool wantPath) {
   }
 
 #ifndef __EMSCRIPTEN__
-  // skip over scheme
-  size_t schemeEnd = out.find("://");
-  if (schemeEnd == std::string::npos) {
-    return wantPath ? out : "";  // want scheme but no "://" was encountered => scheme is empty
+  return stripScheme(out);
+#else
+  int isNode = EM_ASM_INT({
+    return ENVIRONMENT_IS_NODE;
+  });
+  if (isNode) {
+    return stripScheme(out);
   }
-
-  // skip over optional authority
-  size_t root = out.find_first_of('/', schemeEnd + 3);
-  if (root == std::string::npos) {
-    root = schemeEnd + 3;
-  } else if (is_windows()) {
-    // strip leading '/' on windows
-    ++root;
-  }
-
-  if (wantPath) {
-    out.erase(out.begin(), out.begin() + root);  // want path => strip scheme
-  } else {
-    out.erase(root, std::string::npos);  // do the opposite
-  }
-#endif
   return out;
+#endif
 }
-
-std::string decodePath(const std::string &fileUri) { return decodePathOrScheme(fileUri, true); }
-
-std::string decodeScheme(const std::string &fileUri) { return decodePathOrScheme(fileUri, false); }
 
 static char encodeTable[256][4];
 
@@ -94,10 +104,6 @@ static void normal(int x) {
   encodeTable[x][0] = x;
   encodeTable[x][1] = 0;
 }
-
-#ifdef __EMSCRIPTEN__
-#include <emscripten/emscripten.h>
-#endif
 
 std::string encodePath(const std::string &filePath) {
 #ifdef __EMSCRIPTEN__
@@ -123,10 +129,16 @@ std::string encodePath(const std::string &filePath) {
     normal(':');  // Do not escape volume names
   }
 
-#ifdef __EMSCRIPTEN__
   std::string out;
+#ifndef __EMSCRIPTEN__
+  out = "file://";
 #else
-  std::string out("file://");
+  int isNode = EM_ASM_INT({
+    return ENVIRONMENT_IS_NODE;
+  });
+  if (isNode) {
+    out = "file://";
+  }
 #endif
 
   for (char c : filePath) out.append(encodeTable[static_cast<int>(static_cast<unsigned char>(c))]);

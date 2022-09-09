@@ -25,8 +25,8 @@
 
 namespace JSONConverter {
 std::string decodePath(const std::string &fileUri);
-std::string decodeScheme(const std::string &fileUri);
 std::string encodePath(const std::string &filePath);
+std::string stripScheme(const std::string &fileUri);
 
 JAST createMessage();
 

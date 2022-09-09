@@ -46,10 +46,30 @@
 
 // clang-format off
 EM_ASYNC_JS(char *, vscode_getfiles, (const char *dir, int *ok), {
-  //const Path = require('path').posix;
   let files  = [];
 
-  async function walkTree(dir) {
+  function shouldSkip(dirName) {
+    return dirName === '.build' || dirName === '.fuse' || dirName === '.git';
+  }
+
+  const Path = require('path').posix;
+  const FS   = require('fs');
+
+  function walkTreeNode(dir) {
+   FS.readdirSync(dir, {withFileTypes: true}).forEach(dirent => {
+     const absolute = Path.join(dir, dirent.name);
+     if (!dirent.isDirectory()) {
+       files.push(absolute);
+       return;
+     }
+     if (shouldSkip(dirent.name)) {
+       return;
+     }
+     walkTreeNode(absolute);
+   });
+  }
+
+  async function walkTreeWeb(dir) {
     if (dir.slice(-1) !== '/') {
       dir += '/';
     }
@@ -57,20 +77,24 @@ EM_ASYNC_JS(char *, vscode_getfiles, (const char *dir, int *ok), {
     const dirFiles = await wakeLspModule.sendRequest('readDir', dir);
     console.log("after reading ", dir);
     for (const dirent of dirFiles) {
-      const absolute = new URL(dirent[0], dir).href; //Path.join(dir, dirent[0]); // dirent.name
+      const absolute = new URL(dirent[0], dir).href; // dirent.name
       if (!dirent[1]) { // not a directory
         files.push(absolute);
         continue;
       }
-      if (dirent[0] === ".build" || dirent[0] === ".fuse" || dirent[0] === ".git") { // folders to skip
+      if (shouldSkip(dirent[0])) {
         continue;
       }
-      await walkTree(absolute);
+      await walkTreeWeb(absolute);
     }
   }
 
   try {
-    await walkTree(UTF8ToString(dir));
+    if (ENVIRONMENT_IS_NODE) {
+      walkTreeNode(UTF8ToString(dir));
+    } else {
+      await walkTreeWeb(UTF8ToString(dir));
+    }
     const sep = String.fromCharCode(0);
     const out = files.join(sep) + sep;
 
