@@ -48,7 +48,9 @@
   }
 
 static inline bool requires_nl(cst_id_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
-static inline bool requires_fits_all(cst_id_t type) { return type == CST_APP; }
+static inline bool requires_fits_all(cst_id_t type) {
+  return type == CST_APP || type == CST_BINARY;
+}
 
 static inline bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||

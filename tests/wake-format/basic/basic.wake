@@ -115,12 +115,12 @@ def t5 = (
   + 5
 )
 
-# TODO: These cases are actually binop not paren
-# def t7 = (
-#   x # comment
-#   + 5
-# )
+def t7 = (
+  x # comment
+  + 5
+)
 
+# TODO: These cases are actually binop not paren
 # def t8 = (
 #   x + # comment
 #   5
@@ -165,7 +165,7 @@ def ff = a | b | c | d
 
 def ff = a $ b $ c $ d
 
-# def ff = a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a
+def ff = a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     buildTestWake, Nil =
