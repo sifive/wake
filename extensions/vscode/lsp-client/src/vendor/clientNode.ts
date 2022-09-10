@@ -32,7 +32,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	// Start the client. This will also launch the server
 	client.start();
-	registerFsMethods(client, stdLibPath);
+	registerFsMethods(client, stdLibPath, context);
 	registerTimelineCommands(context);
 }
 

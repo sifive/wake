@@ -25,7 +25,8 @@ namespace re2 {
 class RE2;
 };
 
-bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2 &re, size_t skip);
+bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2 &re,
+                size_t skip);
 std::string make_canonical(const std::string &x);
 std::string glob2regexp(const std::string &glob);
 std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbose,

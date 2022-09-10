@@ -16,7 +16,7 @@
 
 import { LanguageClientOptions } from 'vscode-languageclient/node';
 import { CommonLanguageClient } from 'vscode-languageclient';
-import { workspace, Uri, FileType } from 'vscode';
+import { workspace, Uri, FileType, ExtensionContext } from 'vscode';
 
 export const clientOptions: LanguageClientOptions = {
     // Register the server for .wake files
@@ -27,10 +27,28 @@ export const clientOptions: LanguageClientOptions = {
     }
 };
 
-export function registerFsMethods(client: CommonLanguageClient, stdLib: string): void {
+export function registerFsMethods(client: CommonLanguageClient, stdLibPath: string, context: ExtensionContext): void {
     client.onReady().then(() => {
         client.onRequest('getStdLib', async (): Promise<string> => {
-            return stdLib;
+            return stdLibPath;
+        });
+
+        client.onRequest('getStdLibFiles', async (): Promise<string[]> => {
+            // When running in web, stdlib packaged with the extension is hosted online and not recognized as a folder
+            // by vscode fs api. Thus, it cannot be traversed to find out its contents.
+            // So, we compile a list of all paths to wakefiles in stdlib (stdlib.json) and ship it with the extension.
+            try {
+                let uri = Uri.joinPath(context.extensionUri, '/stdlib.json');
+                const content = await workspace.fs.readFile(uri);
+                const stdLibFiles = JSON.parse(decoder.decode(content)).files;
+                let absStdLibFiles: string[] = [];
+                for (const file of stdLibFiles) {
+                    absStdLibFiles.push(stdLibPath + file);
+                }
+                return absStdLibFiles;
+            } catch (err) {
+                return Promise.reject(new Error(err.toString()));
+            }
         });
 
         const decoder = new TextDecoder();

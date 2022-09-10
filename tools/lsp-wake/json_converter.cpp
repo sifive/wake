@@ -80,9 +80,7 @@ std::string decodePath(const std::string &fileUri) {
 #ifndef __EMSCRIPTEN__
   return stripScheme(out);
 #else
-  int isNode = EM_ASM_INT({
-    return ENVIRONMENT_IS_NODE;
-  });
+  int isNode = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
   if (isNode) {
     return stripScheme(out);
   }
@@ -106,11 +104,6 @@ static void normal(int x) {
 }
 
 std::string encodePath(const std::string &filePath) {
-#ifdef __EMSCRIPTEN__
-  EM_ASM({
-    console.log('filePath: ', UTF8ToString($0));
-  }, filePath.c_str());
-#endif
   if (!encodeTable[0][0]) {
     for (int i = 0; i < 256; ++i) {
       encodeTable[i][0] = '%';
@@ -125,7 +118,7 @@ std::string encodePath(const std::string &filePath) {
     normal('_');
     normal('.');
     normal('~');
-    normal('/');                    // This is non-standard, but necessary
+    normal('/');  // This is non-standard, but necessary
     normal(':');  // Do not escape volume names
   }
 
@@ -133,9 +126,7 @@ std::string encodePath(const std::string &filePath) {
 #ifndef __EMSCRIPTEN__
   out = "file://";
 #else
-  int isNode = EM_ASM_INT({
-    return ENVIRONMENT_IS_NODE;
-  });
+  int isNode = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
   if (isNode) {
     out = "file://";
   }
@@ -144,13 +135,6 @@ std::string encodePath(const std::string &filePath) {
   if (is_windows()) out.push_back('/');  // filePath starts with drive letter, not '/'
 
   for (char c : filePath) out.append(encodeTable[static_cast<int>(static_cast<unsigned char>(c))]);
-
-#ifdef __EMSCRIPTEN__
-  EM_ASM({
-    console.log('encoded: ', UTF8ToString($0));
-  }, out.c_str());
-#endif
-
   return out;
 }
 

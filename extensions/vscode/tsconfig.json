@@ -7,8 +7,7 @@
         "outDir": "out",
         "rootDir": "src",
         "sourceMap": true,
-        "target": "es2019",
-        "esModuleInterop": true
+        "target": "es2019"
     },
     "exclude": [
         "node_modules",

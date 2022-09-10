@@ -322,12 +322,6 @@ class LSPServer {
         receivedMessage.get("params").get("workspaceFolders").children[0].second.get("uri").value;
     astree.absWorkDir = JSONConverter::decodePath(workspaceUri);
 
-#ifdef __EMSCRIPTEN__
-    EM_ASM({
-      console.log('abs work dir: ', UTF8ToString($0));
-    }, astree.absWorkDir.c_str());
-#endif
-
     return methodResult;
   }
 
@@ -342,8 +336,8 @@ class LSPServer {
 
   void diagnoseProject(MethodResult &methodResult) {
     astree.diagnoseProject([&methodResult](ASTree::FileDiagnostics &fileDiagnostics) {
-      JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(
-          fileDiagnostics.first, fileDiagnostics.second);
+      JAST fileDiagnosticsJSON =
+          JSONConverter::fileDiagnosticsToJSON(fileDiagnostics.first, fileDiagnostics.second);
       methodResult.diagnostics.children.emplace_back("", fileDiagnosticsJSON);
     });
     needsUpdate = false;
@@ -354,8 +348,8 @@ class LSPServer {
     refresh("goto-definition", methodResult);
     Location locationToDefine = JSONConverter::getLocationFromJSON(receivedMessage);
     Location definitionLocation = astree.findDefinitionLocation(locationToDefine);
-    JAST definitionLocationJSON = JSONConverter::definitionLocationToJSON(
-        receivedMessage, definitionLocation);
+    JAST definitionLocationJSON =
+        JSONConverter::definitionLocationToJSON(receivedMessage, definitionLocation);
     methodResult.response = definitionLocationJSON;
     return methodResult;
   }
@@ -373,8 +367,7 @@ class LSPServer {
       references.push_back(definitionLocation);
     }
 
-    JAST referencesJSON =
-        JSONConverter::referencesToJSON(receivedMessage, references);
+    JAST referencesJSON = JSONConverter::referencesToJSON(receivedMessage, references);
     methodResult.response = referencesJSON;
     return methodResult;
   }
@@ -532,8 +525,7 @@ class LSPServer {
       if (stoi(child.second.get("type").value) == 3) {
         // The file was deleted => clear any stale diagnostics
         std::vector<Diagnostic> emptyDiagnostics;
-        JAST fileDiagnosticsJSON =
-            JSONConverter::fileDiagnosticsToJSON(filePath, emptyDiagnostics);
+        JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(filePath, emptyDiagnostics);
         methodResult.diagnostics.children.emplace_back("", fileDiagnosticsJSON);
       }
     }
@@ -580,19 +572,10 @@ extern "C" {
 void instantiateServer() {
   auto execpath = find_execpath();
   auto stdlib = make_canonical(execpath + "/../../share/wake/lib");
-  EM_ASM({
-    console.log('execpath: ', UTF8ToString($0));
-    console.log('stdlib: ', UTF8ToString($1));
-  }, execpath.c_str(), stdlib.c_str());
   instantiateServerInternal(stdlib);
 }
 
-void instantiateServerCustomStdLib(const char *stdLib) {
-  EM_ASM({
-    console.log('custom stdlib: ', UTF8ToString($0));
-  }, stdLib);
-  instantiateServerInternal(stdLib);
-}
+void instantiateServerCustomStdLib(const char *stdLib) { instantiateServerInternal(stdLib); }
 
 char *processRequest(const char *request) {
   LSPServer::MethodResult methodResult = lspServer->processRequest(request);

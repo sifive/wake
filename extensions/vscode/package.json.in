@@ -41,7 +41,7 @@
 				"properties": {
 					"wakeLanguageServer.pathToWakeStandardLibrary": {
 						"default": "",
-						"description": "The path to the wake standard library that is used to provide diagnostics. If left blank, the library that comes with the extension is used.",
+						"description": "If there is a valid share/wake/lib/ at the root of your project, that library is used to provide diagnostics. If not, the path that you provide here is used.\nWith no path provided, the library that comes with the extension is used.\n\nThis setting has no effect when running in a browser.",
 						"scope": "window",
 						"type": "string"
 					},

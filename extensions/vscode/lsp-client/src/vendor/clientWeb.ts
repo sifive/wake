@@ -15,7 +15,7 @@ export function activate(context: ExtensionContext): void {
 	// Start the client. This will also launch the server
 	const disposable = client.start();
 	context.subscriptions.push(disposable);
-	registerFsMethods(client, Uri.joinPath(context.extensionUri, '/share/wake/lib').toString());
+	registerFsMethods(client, Uri.joinPath(context.extensionUri, '/share/wake/lib').toString(), context);
 }
 
 function createWorkerLanguageClient(context: ExtensionContext, clientOptions: LanguageClientOptions): LanguageClient {

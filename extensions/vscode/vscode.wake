@@ -29,6 +29,15 @@ def installRO path =
     | runJob
     | getJobOutput
 
+def createStdlibJSON (stdlibSources: List Path): Result Path Error =
+    def formatPath path =
+        cat ("\t\t\"", (getPathName path | replace `share/wake/lib` ""), "\"",)
+    def formattedPaths = 
+        map formatPath stdlibSources
+    def content = 
+        cat ("\{\n\t\"files\": [\n", (catWith ",\n" formattedPaths), "\n\t]\n\}",)
+    write "{here}/stdlib.json" content
+
 export def vscode _: Result Path Error =
     require Pass variant =
         toVariant "wasm"
@@ -64,6 +73,8 @@ export def vscode _: Result Path Error =
     require Pass stdlib =
         stdlibSources
         | findFailFn installRO
+    require Pass stdlibJSON =
+        createStdlibJSON  stdlibSources
 
     require Pass currentDirSources =
         sources here `[^/]*`
@@ -78,6 +89,7 @@ export def vscode _: Result Path Error =
     def vsceFiles =
         jsFile,
         packageJSON,
+        stdlibJSON,
         currentDirSources ++
         imagesSources ++
         clientSources ++
