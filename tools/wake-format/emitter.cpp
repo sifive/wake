@@ -786,8 +786,6 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
     }
   }
 
-  ;
-
   if (lte_fmt.size() > 0) {
     auto min_height = std::min_element(lte_fmt.begin(), lte_fmt.end(), min_doc_height);
     MEMO_RET(*min_height);
