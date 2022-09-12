@@ -570,12 +570,24 @@ void instantiateServerInternal(const std::string &stdLib) {
 
 extern "C" {
 void instantiateServer() {
-  auto execpath = find_execpath();
-  auto stdlib = make_canonical(execpath + "/../../share/wake/lib");
+  // This path doesn't matter in web since we don't check the validity of this stdlib there.
+  // (We don't check it since we can't send an 'accessFile' request to the client at this stage)
+  auto stdlib = make_canonical(find_execpath() + "/../../share/wake/lib");
   instantiateServerInternal(stdlib);
 }
 
-void instantiateServerCustomStdLib(const char *stdLib) { instantiateServerInternal(stdLib); }
+void instantiateServerCustomStdLib(const char *stdLib) {
+  // clang-format off
+  int isNode = EM_ASM_INT({
+    return ENVIRONMENT_IS_NODE;
+  });
+  // clang-format on
+  if (isNode) {
+    instantiateServerInternal(make_canonical(stdLib));
+  } else {
+    instantiateServerInternal(stdLib);  // We want to preserve the uri scheme of stdlib in web
+  }
+}
 
 char *processRequest(const char *request) {
   LSPServer::MethodResult methodResult = lspServer->processRequest(request);
