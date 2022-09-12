@@ -21,6 +21,7 @@
 
 #include "emitter.h"
 
+#include <algorithm>
 #include <cassert>
 
 #include "parser/parser.h"
@@ -531,8 +532,8 @@ std::vector<CSTElement> collect_binary_parts(CSTElement collect_over, CSTElement
     return {node};
   }
 
-  // WARNING: I'm using Node() here which is differnt than everywhere else
-  // This is probably not right since I'm loosing comments
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
   CSTElement left = node.firstChildNode();
   CSTElement op = left;
   op.nextSiblingNode();
@@ -548,9 +549,7 @@ std::vector<CSTElement> collect_binary_parts(CSTElement collect_over, CSTElement
   auto left_collect = collect_binary_parts(collect_over, left);
   auto right_collect = collect_binary_parts(collect_over, right);
 
-  size_t size = left_collect.size();
-  left_collect.resize(size + right_collect.size());
-  std::move(right_collect.begin(), right_collect.end(), left_collect.begin() + size);
+  left_collect.insert(left_collect.end(), right_collect.begin(), right_collect.end());
 
   return left_collect;
 }
@@ -597,6 +596,14 @@ size_t count_allowed_newlines(const token_traits_map_t& traits,
   return allowed;
 }
 
+wcl::doc post_binop_spacing(CSTElement over, const token_traits_map_t& traits,
+                            const wcl::doc& fmt_binop, const wcl::doc_builder& builder, ctx_t ctx) {
+  if (fmt_binop->has_newline()) {
+    return fmt().freshline().compose(ctx.sub(builder), over, traits);
+  }
+  return fmt().space().compose(ctx.sub(builder), over, traits);
+}
+
 wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
                                               const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
@@ -623,27 +630,17 @@ wcl::optional<wcl::doc> Emitter::combine_explode_first(CSTElement over, ctx_t ct
   builder.append(walk_node(ctx.sub(builder).explode(), parts[0]));
   builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
 
-  wcl::doc operator_doc = walk_token(ctx.sub(builder), over);
-  bool op_has_nl = operator_doc->has_newline();
-  builder.append(std::move(operator_doc));
-  if (op_has_nl) {
-    builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
-  } else {
-    builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
-  }
+  wcl::doc binop = walk_token(ctx.sub(builder), over);
+  builder.append(binop);
+  builder.append(post_binop_spacing(over, token_traits, binop, builder, ctx));
 
   for (size_t i = 1; i < parts.size() - 1; i++) {
     builder.append(walk_node(ctx.sub(builder), parts[i]));
     builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
 
-    operator_doc = walk_token(ctx.sub(builder), over);
-    bool op_has_nl = operator_doc->has_newline();
-    builder.append(std::move(operator_doc));
-    if (op_has_nl) {
-      builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
-    } else {
-      builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
-    }
+    binop = walk_token(ctx.sub(builder), over);
+    builder.append(binop);
+    builder.append(post_binop_spacing(over, token_traits, binop, builder, ctx));
   }
 
   builder.append(walk_node(ctx.sub(builder), parts.back()));
@@ -658,14 +655,9 @@ wcl::optional<wcl::doc> Emitter::combine_explode_last(CSTElement over, ctx_t ctx
     builder.append(walk_node(ctx.sub(builder), parts[i]));
     builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
 
-    wcl::doc operator_doc = walk_token(ctx.sub(builder), over);
-    bool op_has_nl = operator_doc->has_newline();
-    builder.append(std::move(operator_doc));
-    if (op_has_nl) {
-      builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
-    } else {
-      builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
-    }
+    wcl::doc binop = walk_token(ctx.sub(builder), over);
+    builder.append(binop);
+    builder.append(post_binop_spacing(over, token_traits, binop, builder, ctx));
   }
 
   builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
@@ -680,13 +672,9 @@ wcl::optional<wcl::doc> Emitter::combine_explode_all(CSTElement over, ctx_t ctx,
     builder.append(walk_node(ctx.sub(builder).explode(), parts[i]));
     builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
     wcl::doc operator_doc = walk_token(ctx.sub(builder), over);
-    bool op_has_nl = operator_doc->has_newline();
-    builder.append(std::move(operator_doc));
-    if (op_has_nl) {
-      builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
-    } else {
-      builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
-    }
+    wcl::doc binop = walk_token(ctx.sub(builder), over);
+    builder.append(binop);
+    builder.append(post_binop_spacing(over, token_traits, binop, builder, ctx));
   }
 
   builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
@@ -738,12 +726,20 @@ wcl::optional<wcl::doc> Emitter::combine_explode_last_compress(
   return {wcl::in_place_t{}, std::move(doc)};
 }
 
+bool min_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
+  return lhs->height() < rhs->height();
+}
+
+bool min_doc_max_width(const wcl::doc& lhs, const wcl::doc& rhs) {
+  return lhs->max_width() < rhs->max_width();
+}
+
 wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_BINARY);
 
-  // WARNING: I'm using Node() here which is differnt than everywhere else
-  // This is probably not right since I'm loosing comments
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
   CSTElement lhs = node.firstChildNode();
   CSTElement op = lhs;
   op.nextSiblingNode();
@@ -756,105 +752,49 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   auto parts = collect_binary_parts(op_token, node);
   std::cerr << "ct: " << parts.size() << std::endl;
 
-  std::vector<std::pair<int, wcl::doc>> lte_fmt = {};
-  std::vector<std::pair<int, wcl::doc>> gt_fmt = {};
+  std::vector<wcl::doc> lte_fmt = {};
+  std::vector<wcl::doc> gt_fmt = {};
 
-  // Maybe nest here
+  std::vector<wcl::optional<wcl::doc>> choices = {
+      // 1
+      combine_flat(op_token, ctx, parts),
+      // 2
+      combine_explode_first(op_token, ctx, parts),
+      // 3
+      combine_explode_last(op_token, ctx, parts),
+      // 4
+      combine_explode_all(op_token, ctx, parts),
+      // 5
+      combine_explode_first_compress(op_token, ctx, parts),
+      // 6
+      combine_explode_last_compress(op_token, ctx, parts),
+  };
 
-  // 1
-  wcl::optional<wcl::doc> flat = combine_flat(op_token, ctx, parts);
-  if (flat) {
-    std::cerr << "#1 <<<:" << flat->as_string() << ":>>>" << std::endl;
-    if ((*flat)->max_width() > MAX_COLUMN_WIDTH) {
-      gt_fmt.push_back({1, std::move(*flat)});
+  int i = 0;
+  for (auto choice_opt : choices) {
+    i++;
+    if (!choice_opt) {
+      continue;
+    }
+    auto choice = *choice_opt;
+
+    std::cerr << "#" << i << "<<<:" << choice.as_string() << ":>>>" << std::endl;
+    if (choice->max_width() > MAX_COLUMN_WIDTH) {
+      gt_fmt.push_back(std::move(choice));
     } else {
-      lte_fmt.push_back({1, std::move(*flat)});
+      lte_fmt.push_back(std::move(choice));
     }
   }
 
-  // 2
-  wcl::optional<wcl::doc> explode_first = combine_explode_first(op_token, ctx, parts);
-  if (explode_first) {
-    std::cerr << "#2 <<<:" << explode_first->as_string() << ":>>>" << std::endl;
-    if ((*explode_first)->max_width() > MAX_COLUMN_WIDTH) {
-      gt_fmt.push_back({2, std::move(*explode_first)});
-    } else {
-      lte_fmt.push_back({2, std::move(*explode_first)});
-    }
-  }
-
-  // 3
-  wcl::optional<wcl::doc> explode_last = combine_explode_last(op_token, ctx, parts);
-  if (explode_last) {
-    std::cerr << "#3 <<<:" << explode_last->as_string() << ":>>>" << std::endl;
-    if ((*explode_last)->max_width() > MAX_COLUMN_WIDTH) {
-      gt_fmt.push_back({3, std::move(*explode_last)});
-    } else {
-      lte_fmt.push_back({3, std::move(*explode_last)});
-    }
-  }
-
-  // 4
-  wcl::optional<wcl::doc> explode_all = combine_explode_all(op_token, ctx, parts);
-  if (explode_all) {
-    std::cerr << "#4 <<<:" << explode_all->as_string() << ":>>>" << std::endl;
-    if ((*explode_all)->max_width() > MAX_COLUMN_WIDTH) {
-      gt_fmt.push_back({4, std::move(*explode_all)});
-    } else {
-      lte_fmt.push_back({4, std::move(*explode_all)});
-    }
-  }
-
-  // 5
-  wcl::optional<wcl::doc> explode_first_compress =
-      combine_explode_first_compress(op_token, ctx, parts);
-  if (explode_first_compress) {
-    std::cerr << "#5 <<<:" << explode_first_compress->as_string() << ":>>>" << std::endl;
-    if ((*explode_first_compress)->max_width() > MAX_COLUMN_WIDTH) {
-      gt_fmt.push_back({5, std::move(*explode_first_compress)});
-    } else {
-      lte_fmt.push_back({5, std::move(*explode_first_compress)});
-    }
-  }
-
-  // 6
-  wcl::optional<wcl::doc> explode_last_compress =
-      combine_explode_last_compress(op_token, ctx, parts);
-  if (explode_last_compress) {
-    std::cerr << "#5 <<<:" << explode_last_compress->as_string() << ":>>>" << std::endl;
-    if ((*explode_last_compress)->max_width() > MAX_COLUMN_WIDTH) {
-      gt_fmt.push_back({6, std::move(*explode_last_compress)});
-    } else {
-      lte_fmt.push_back({6, std::move(*explode_last_compress)});
-    }
-  }
+  ;
 
   if (lte_fmt.size() > 0) {
-    size_t min = lte_fmt.front().second->height();
-    size_t idx = 0;
-    for (size_t i = 1; i < lte_fmt.size(); i++) {
-      size_t height = lte_fmt[i].second->height();
-      if (height < min) {
-        min = height;
-        idx = i;
-      }
-    }
-    std::cerr << "LTE: Choosing #" << lte_fmt[idx].first << std::endl;
-    MEMO_RET(lte_fmt[idx].second);
+    auto min_height = std::min_element(lte_fmt.begin(), lte_fmt.end(), min_doc_height);
+    MEMO_RET(*min_height);
   }
 
-  size_t min = gt_fmt.front().second->max_width();
-  size_t idx = 0;
-  for (size_t i = 1; i < gt_fmt.size(); i++) {
-    size_t width = gt_fmt[i].second->max_width();
-    if (width < min) {
-      min = width;
-      idx = i;
-    }
-  }
-
-  std::cerr << "GT: Choosing #" << gt_fmt[idx].first << std::endl;
-  MEMO_RET(gt_fmt[idx].second);
+  auto min_width = std::min_element(gt_fmt.begin(), gt_fmt.end(), min_doc_max_width);
+  MEMO_RET(*min_width);
 }
 
 wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
