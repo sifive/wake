@@ -31,12 +31,12 @@ def installRO path =
 
 def createStdlibJSON (stdlibSources: List Path): Result Path Error =
     def formatPath path =
-        cat ("\t\t\"", (getPathName path | replace `share/wake/lib` ""), "\"",)
-    def formattedPaths = 
+        getPathName path | replace `share/wake/lib` ""
+    def formattedPaths =
         map formatPath stdlibSources
-    def content = 
-        cat ("\{\n\t\"files\": [\n", (catWith ",\n" formattedPaths), "\n\t]\n\}",)
-    write "{here}/stdlib.json" content
+    def content =
+        JObject ("files" :-> JArray (map JString formattedPaths), Nil)
+    write "{here}/stdlib.json" (prettyJSON content)
 
 export def vscode _: Result Path Error =
     require Pass variant =
