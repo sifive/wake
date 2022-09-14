@@ -36,6 +36,32 @@ static int parse_hex(char c) {
   }
 }
 
+std::string stripScheme(const std::string &fileUri) {
+  std::string stripped(fileUri);
+
+  // skip over scheme
+  size_t schemeEnd = stripped.find("://");
+  if (schemeEnd == std::string::npos) {
+    return stripped;
+  }
+
+  // skip over optional authority
+  size_t root = stripped.find_first_of('/', schemeEnd + 3);
+  if (root == std::string::npos) {
+    root = schemeEnd + 3;
+  } else if (is_windows()) {
+    // strip leading '/' on windows
+    ++root;
+  }
+
+  stripped.erase(stripped.begin(), stripped.begin() + root);  // strip scheme
+  return stripped;
+}
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 std::string decodePath(const std::string &fileUri) {
   std::string out;
   auto i = fileUri.begin(), e = fileUri.end();
@@ -51,19 +77,15 @@ std::string decodePath(const std::string &fileUri) {
     }
   }
 
-  if (out.compare(0, 7, "file://") == 0) {
-    // skip over optional hostname
-    auto root = out.find_first_of('/', 7);
-    if (root == std::string::npos) {
-      root = 7;
-    } else if (is_windows()) {
-      // strip leading '/' on windows
-      ++root;
-    }
-    out.erase(out.begin(), out.begin() + root);
+#ifndef __EMSCRIPTEN__
+  return stripScheme(out);
+#else
+  int isNode = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
+  if (isNode) {
+    return stripScheme(out);
   }
-
   return out;
+#endif
 }
 
 static char encodeTable[256][4];
@@ -96,15 +118,23 @@ std::string encodePath(const std::string &filePath) {
     normal('_');
     normal('.');
     normal('~');
-    normal('/');                    // This is non-standard, but necessary
-    if (is_windows()) normal(':');  // Do not escape volume names
+    normal('/');  // This is non-standard, but necessary
+    normal(':');  // Do not escape volume names
   }
 
-  std::string out = "file://";
+  std::string out;
+#ifndef __EMSCRIPTEN__
+  out = "file://";
+#else
+  int isNode = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
+  if (isNode) {
+    out = "file://";
+  }
+#endif
+
   if (is_windows()) out.push_back('/');  // filePath starts with drive letter, not '/'
 
   for (char c : filePath) out.append(encodeTable[static_cast<int>(static_cast<unsigned char>(c))]);
-
   return out;
 }
 

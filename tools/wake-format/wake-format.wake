@@ -17,4 +17,4 @@ package build_wake
 from wake import _
 
 target buildWakeFormat variant =
-    tool here Nil variant "bin/wake-format" (parser, gopt, wcl, util,)
+    tool here Nil variant "bin/wake-format" (parser, gopt, wcl, util,) Nil Nil

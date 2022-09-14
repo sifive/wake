@@ -45,47 +45,99 @@
 #include <emscripten/emscripten.h>
 
 // clang-format off
-EM_JS(char *, nodejs_getfiles, (const char *dir, int *ok), {
-  const Path = require("path").posix;
-  const FS   = require("fs");
+EM_ASYNC_JS(char *, vscode_getfiles, (const char *dir, int *ok), {
   let files  = [];
 
-  function walkTree(dir) {
-      FS.readdirSync(dir, {withFileTypes: true}).forEach(dirent => {
-          const absolute = Path.join(dir, dirent.name);
-          if (dirent.isDirectory()) {
-            if (dirent.name != ".build" && dirent.name != ".fuse" && dirent.name != ".git")
-              walkTree(absolute);
-          } else {
-            files.push(absolute);
-          }
-      });
+  function shouldSkip(dirName) {
+    return dirName === '.build' || dirName === '.fuse' || dirName === '.git';
+  }
+
+  const Path = require('path').posix;
+  const FS   = require('fs');
+
+  function walkTreeNode(dir) {
+   FS.readdirSync(dir, {withFileTypes: true}).forEach(dirent => {
+     const absolute = Path.join(dir, dirent.name);
+     if (!dirent.isDirectory()) {
+       files.push(absolute);
+       return;
+     }
+     if (shouldSkip(dirent.name)) {
+       return;
+     }
+     walkTreeNode(absolute);
+   });
+  }
+
+  async function walkTreeWeb(dir) {
+    if (dir.slice(-1) !== '/') {
+      dir += '/';
+    }
+    const dirFiles = await wakeLspModule.sendRequest('readDir', dir);
+    for (const dirent of dirFiles) {
+      const absolute = new URL(dirent[0], dir).href; // dirent.name
+      if (!dirent[1]) { // not a directory
+        files.push(absolute);
+        continue;
+      }
+      if (shouldSkip(dirent[0])) {
+        continue;
+      }
+      await walkTreeWeb(absolute);
+    }
   }
 
   try {
-    walkTree(UTF8ToString(dir));
+    if (ENVIRONMENT_IS_NODE) {
+      walkTreeNode(UTF8ToString(dir));
+    } else {
+      await walkTreeWeb(UTF8ToString(dir));
+    }
     const sep = String.fromCharCode(0);
     const out = files.join(sep) + sep;
 
-    const lengthBytes = lengthBytesUTF8(out)+1;
+    const lengthBytes = lengthBytesUTF8(out) + 1;
     const stringOnWasmHeap = _malloc(lengthBytes);
     stringToUTF8(out, stringOnWasmHeap, lengthBytes);
-    setValue(ok, 1, "i32");
+    setValue(ok, 1, 'i32');
     return stringOnWasmHeap;
   } catch (err) {
-    const lengthBytes = lengthBytesUTF8(err.message)+1;
+    const lengthBytes = lengthBytesUTF8(err.message) + 1;
     const stringOnWasmHeap = _malloc(lengthBytes);
     stringToUTF8(err.message, stringOnWasmHeap, lengthBytes);
-    setValue(ok, 0, "i32");
+    setValue(ok, 0, 'i32');
+    return stringOnWasmHeap;
+  }
+});
+
+EM_ASYNC_JS(char *, vscode_get_packaged_stdlib_files, (int *ok), {
+  let files  = [];
+  try {
+    const libFiles = await wakeLspModule.sendRequest('getStdLibFiles');
+    for (const file of libFiles) {
+      files.push(file);
+    }
+
+    const sep = String.fromCharCode(0);
+    const out = files.join(sep) + sep;
+
+    const lengthBytes = lengthBytesUTF8(out) + 1;
+    const stringOnWasmHeap = _malloc(lengthBytes);
+    stringToUTF8(out, stringOnWasmHeap, lengthBytes);
+    setValue(ok, 1, 'i32');
+    return stringOnWasmHeap;
+  } catch (err) {
+    const lengthBytes = lengthBytesUTF8(err.message) + 1;
+    const stringOnWasmHeap = _malloc(lengthBytes);
+    stringToUTF8(err.message, stringOnWasmHeap, lengthBytes);
+    setValue(ok, 0, 'i32');
     return stringOnWasmHeap;
   }
 });
 // clang-format on
 
-bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2 &re,
+bool push_files(int ok, char *files, std::vector<std::string> &out, const re2::RE2 &re,
                 size_t skip) {
-  int ok;
-  char *files = nodejs_getfiles(path.c_str(), &ok);
   if (ok) {
     for (char *file = files; *file; file += strlen(file) + 1) {
       re2::StringPiece p(file + skip, strlen(file) - skip);
@@ -101,6 +153,19 @@ bool push_files(std::vector<std::string> &out, const std::string &path, const re
     free(files);
     return true;
   }
+}
+
+bool push_files(std::vector<std::string> &out, const std::string &path, const re2::RE2 &re,
+                size_t skip) {
+  int ok;
+  char *files = vscode_getfiles(path.c_str(), &ok);
+  return push_files(ok, files, out, re, skip);
+}
+
+bool push_packaged_stdlib_files(std::vector<std::string> &out, const re2::RE2 &re, size_t skip) {
+  int ok;
+  char *files = vscode_get_packaged_stdlib_files(&ok);
+  return push_files(ok, files, out, re, skip);
 }
 
 #else
@@ -402,7 +467,20 @@ std::vector<std::string> find_all_wakefiles(bool &ok, bool workspace, bool verbo
 
   std::string boolean = workdir + "/share/wake/lib/core/boolean.wake";
   if (!workspace || !is_readable(boolean.c_str())) {
+#ifdef __EMSCRIPTEN__
+    // clang-format off
+    int isNode = EM_ASM_INT({
+      return ENVIRONMENT_IS_NODE;
+    });
+    // clang-format on
+    if (isNode) {
+      if (push_files(libfiles, libdir, exp, 0)) ok = false;
+    } else {
+      if (push_packaged_stdlib_files(libfiles, exp, 0)) ok = false;
+    }
+#else
     if (push_files(libfiles, libdir, exp, 0)) ok = false;
+#endif
     std::sort(libfiles.begin(), libfiles.end());
     libfiles = filter_wakefiles(std::move(libfiles), libdir, verbose);
   }

@@ -1,19 +1,11 @@
 {
-    "compilerOptions": {
-        "lib": [
-            "ES2019"
-        ],
-        "module": "commonjs",
-        "outDir": "out",
-        "rootDir": "src",
-        "sourceMap": true,
-        "target": "es2019"
-    },
-    "exclude": [
-        "node_modules",
-        ".vscode-test"
-    ],
-    "include": [
-        "src"
-    ]
+	"compilerOptions": {
+		"module": "commonjs",
+		"target": "es2019",
+		"lib": ["ES2019", "WebWorker"],
+		"rootDir": "src",
+		"sourceMap": true
+	},
+	"include": ["src"],
+	"exclude": ["node_modules", ".vscode-test"]
 }

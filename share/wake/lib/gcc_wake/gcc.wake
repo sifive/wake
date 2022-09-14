@@ -35,14 +35,14 @@ def doCompileC variant gcc flags headers cfile =
     | runJob
     | getJobOutputs
 
-def doLinkO variant linker flags objects targ =
+def doLinkO variant linker flags objects targ extraFiles =
     def cmdline =
         (linker, "-o", "{targ}.{variant}", map getPathName objects) ++
         flags
     require Pass destDir =
         simplify "{targ}/.."
         | mkdir
-    makeExecPlan cmdline (destDir, objects)
+    makeExecPlan cmdline (destDir, objects ++ extraFiles)
     | setPlanLabel "link {replace `^.*/` '' linker} {targ}"
     | runJob
     | getJobOutputs
@@ -64,7 +64,7 @@ publish compileC = makeCompileC "native-cpp14-debug"   (which "c++") (cpp14Flags
 publish compileC = makeCompileC "native-cpp14-release" (which "c++") (cpp14Flags ++ releaseCFlags)
 publish compileC = makeCompileC "native-cpp14-static"  (which "c++") (cpp14Flags ++ staticCFlags)
 
-export topic linkO: Pair String ((extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error)
+export topic linkO: Pair String ((extraFlags: List String) => (objects: List Path) => (targ: String) => (extraFiles: List Path) => Result (List Path) Error)
 publish linkO = makeLinkO "native-c11-debug"     (which "cc") (c11Flags ++ debugLFlags)
 publish linkO = makeLinkO "native-c11-release"   (which "cc") (c11Flags ++ releaseLFlags)
 publish linkO = makeLinkO "native-c11-static"    (which "cc") (c11Flags ++ staticLFlags)
@@ -77,13 +77,15 @@ publish linkO = makeLinkO "native-cpp14-static"  (which "c++") (cpp14Flags ++ st
 
 def pickVariant variant variants =
     match (find (variant ==* _.getPairFirst) variants)
-        Some (Pair x _) = x.getPairSecond
+        Some (Pair x _) = Pass x.getPairSecond
         None =
             def ok = catWith " " (map getPairFirst variants)
-            \_\_\_ failWithError "No variant matches {variant}; options: {ok}"
+            failWithError "No variant matches {variant}; options: {ok}"
 
-export def compileC (variant: String): (extraFlags: List String) => (headers: List Path) => (cfile: Path) => Result (List Path) Error =
-    pickVariant variant (subscribe compileC)
+export def compileC (variant: String) (extraFlags: List String) (headers: List Path) (cfile: Path) : Result (List Path) Error =
+    require Pass compileFn = pickVariant variant (subscribe compileC)
+    compileFn extraFlags headers cfile 
 
-export def linkO    (variant: String): (extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error =
-    pickVariant variant (subscribe linkO)
+export def linkO    (variant: String) (extraFlags: List String) (objects: List Path) (targ: String) (extraFiles: List Path) : Result (List Path) Error =
+    require Pass linkFn = pickVariant variant (subscribe linkO)
+    linkFn extraFlags objects targ extraFiles

@@ -1,7 +1,10 @@
 package.json
+stdlib.json
 .vscode/
+.vscode-test-web/
 node_modules/
 lsp-client/out/
-lsp-server/
+lsp-server/out/
+lsp-server/wasm/lsp-wake.js
 wake-*.vsix
-share/**
+share/
