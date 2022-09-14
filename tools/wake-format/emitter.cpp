@@ -527,7 +527,7 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
   MEMO_RET(walk_placeholder(ctx, node));
 }
 
-std::vector<CSTElement> collect_binary_parts(CSTElement collect_over, CSTElement node) {
+std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTElement node) {
   if (node.id() != CST_BINARY) {
     return {node};
   }
@@ -546,12 +546,37 @@ std::vector<CSTElement> collect_binary_parts(CSTElement collect_over, CSTElement
     return {node};
   }
 
-  auto left_collect = collect_binary_parts(collect_over, left);
-  auto right_collect = collect_binary_parts(collect_over, right);
+  auto collect = collect_left_binary(collect_over, left);
+  collect.push_back(right);
 
-  left_collect.insert(left_collect.end(), right_collect.begin(), right_collect.end());
+  return collect;
+}
 
-  return left_collect;
+std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CSTElement node) {
+  if (node.id() != CST_BINARY) {
+    return {node};
+  }
+
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
+  CSTElement left = node.firstChildNode();
+  CSTElement op = left;
+  op.nextSiblingNode();
+  CSTElement right = op;
+  right.nextSiblingNode();
+
+  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
+        op.firstChildElement().fragment().segment().str() ==
+            collect_over.fragment().segment().str())) {
+    return {node};
+  }
+
+  std::vector<CSTElement> collect = {left};
+  auto right_collect = collect_right_binary(collect_over, right);
+
+  collect.insert(collect.end(), right_collect.begin(), right_collect.end());
+
+  return collect;
 }
 
 size_t count_allowed_newlines(const token_traits_map_t& traits,
@@ -603,6 +628,9 @@ bool min_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
 bool min_doc_max_width(const wcl::doc& lhs, const wcl::doc& rhs) {
   return lhs->max_width() < rhs->max_width();
 }
+
+// TODO: this is far from fully correct
+bool is_op_left_assoc(const CSTElement& op) { return op.id() == TOKEN_OP_OR; }
 
 wcl::doc select_best_choice(std::vector<wcl::optional<wcl::doc>> choices) {
   std::vector<wcl::doc> lte_fmt = {};
@@ -777,7 +805,12 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   assert(op.id() == CST_OP);
   CSTElement op_token = op.firstChildElement();
 
-  auto parts = collect_binary_parts(op_token, node);
+  std::vector<CSTElement> parts = {};
+  if (is_op_left_assoc(op_token)) {
+    parts = collect_left_binary(op_token, node);
+  } else {
+    parts = collect_right_binary(op_token, node);
+  }
 
   std::vector<wcl::optional<wcl::doc>> choices = {
       // 1
@@ -897,26 +930,25 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
 
   auto id_list_fmt = fmt().walk(WALK_NODE).fmt_if(TOKEN_WS, fmt().ws());
 
-  MEMO_RET(
-      fmt()
-          .token(TOKEN_KW_FROM)
-          .ws()
-          .walk(CST_ID, WALK_NODE)
-          .ws()
-          .token(TOKEN_KW_IMPORT)
-          .ws()
-          .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
-          .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
-          // clang-format off
+  MEMO_RET(fmt()
+               .token(TOKEN_KW_FROM)
+               .ws()
+               .walk(CST_ID, WALK_NODE)
+               .ws()
+               .token(TOKEN_KW_IMPORT)
+               .ws()
+               .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
+               .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
+               // clang-format off
           .fmt_if_else(
               TOKEN_P_HOLE,
               fmt().walk(WALK_TOKEN),
               fmt().fmt_while(
                   CST_IDEQ,
                   id_list_fmt))
-          // clang-format on
-          .consume_wsnlc()
-          .format(ctx, node.firstChildElement(), token_traits));
+               // clang-format on
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
