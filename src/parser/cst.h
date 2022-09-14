@@ -19,6 +19,7 @@
 #define CST_H
 
 #include <stdint.h>
+#include <wcl/hash.h>
 
 #include <ostream>
 #include <string>
@@ -68,8 +69,11 @@
 #define CST_UNARY 164
 #define CST_ERROR 255
 
+using cst_id_t = uint8_t;
+
 class FileContent;
 class CSTElement;
+class CSTElementCompare;
 class DiagnosticReporter;
 
 struct CSTNode {
@@ -80,26 +84,26 @@ struct CSTNode {
   // Byte range covered by this node
   uint32_t begin, end;
 
-  CSTNode(uint8_t id_, uint32_t size_, uint32_t begin_, uint32_t end_);
+  CSTNode(cst_id_t id_, uint32_t size_, uint32_t begin_, uint32_t end_);
 };
 
 class CSTBuilder {
  public:
   CSTBuilder(const FileContent &fcontent);
 
-  void addToken(uint8_t id, StringSegment token);
+  void addToken(cst_id_t id, StringSegment token);
 
-  void addNode(uint8_t id, StringSegment begin);
-  void addNode(uint8_t id, uint32_t children);
-  void addNode(uint8_t id, StringSegment begin, uint32_t children);
-  void addNode(uint8_t id, uint32_t children, StringSegment end);
-  void addNode(uint8_t id, StringSegment begin, uint32_t children, StringSegment end);
+  void addNode(cst_id_t id, StringSegment begin);
+  void addNode(cst_id_t id, uint32_t children);
+  void addNode(cst_id_t id, StringSegment begin, uint32_t children);
+  void addNode(cst_id_t id, uint32_t children, StringSegment end);
+  void addNode(cst_id_t id, StringSegment begin, uint32_t children, StringSegment end);
 
   void delNodes(size_t num);
 
  private:
   const FileContent *file;
-  std::vector<uint8_t> token_ids;
+  std::vector<cst_id_t> token_ids;
   std::vector<CSTNode> nodes;
   RankBuilder token_starts;
 
@@ -118,7 +122,7 @@ class CST {
 
   RankSelect1Map token_starts;
   const FileContent *file;
-  std::vector<uint8_t> token_ids;
+  std::vector<cst_id_t> token_ids;
   std::vector<CSTNode> nodes;
 
   friend class CSTElement;
@@ -129,7 +133,7 @@ class CSTElement {
   bool empty() const;
   bool isNode() const;
 
-  uint8_t id() const;
+  cst_id_t id() const;
   FileFragment fragment() const;
   StringSegment segment() const { return fragment().segment(); }
   Location location() const { return fragment().location(); }
@@ -140,12 +144,36 @@ class CSTElement {
   CSTElement firstChildElement() const;
   CSTElement firstChildNode() const;
 
+  bool operator==(const CSTElement &other) const;
+
  private:
   const CST *cst;
   uint32_t node, limit;
   uint32_t token, end;  // in bytes
 
   friend class CST;
+  friend std::hash<CSTElement>;
+  friend CSTElementCompare;
+};
+
+template <>
+struct std::hash<CSTElement> {
+  size_t operator()(CSTElement const &element) const noexcept {
+    size_t hash =
+        wcl::hash_combine(std::hash<size_t>{}(element.node), std::hash<size_t>{}(element.limit));
+    hash = wcl::hash_combine(hash, std::hash<size_t>{}(element.token));
+    hash = wcl::hash_combine(hash, std::hash<size_t>{}(element.end));
+    hash = wcl::hash_combine(hash, std::hash<const CST *>{}(element.cst));
+    return hash;
+  }
+};
+
+struct CSTElementCompare {
+  bool operator()(const CSTElement &lhs, const CSTElement &rhs) const {
+    auto l = std::make_tuple(lhs.node, lhs.token, lhs.limit, lhs.cst);
+    auto r = std::make_tuple(rhs.node, rhs.token, rhs.limit, rhs.cst);
+    return l < r;
+  }
 };
 
 #endif

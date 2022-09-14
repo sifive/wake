@@ -235,6 +235,10 @@ struct TestRegister {
   TestRegister(const char* test_name, TestFunc test);
 };
 
+#define TEST_FUNC(ret_type, name, ...) static ret_type name(TestLogger& logger__, __VA_ARGS__)
+
+#define TEST_FUNC_CALL(func, ...) func(logger__, __VA_ARGS__)
+
 #define TEST(name)                                                \
   static void Test__##name(TestLogger&);                          \
   static TestRegister Test__Unique__##name(#name, &Test__##name); \

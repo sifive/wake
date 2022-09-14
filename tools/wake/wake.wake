@@ -17,4 +17,4 @@ package build_wake
 from wake import _
 
 target buildWake variant =
-    tool here Nil variant "bin/wake" (runtime, gopt, Nil)
+    tool here Nil variant "bin/wake" (runtime, gopt, Nil) Nil Nil

@@ -1,8 +1,20 @@
 PASSED:
+  diff_add
+  diff_empty
+  diff_fuzz1
+  diff_fuzz2
+  diff_fuzz2_large
+  diff_fuzz3
+  diff_id
+  diff_permute
+  diff_sub
+  diff_unit_diff
+  diff_unit_same
   doc_basic
   doc_geometry
   doc_large
   doc_undo
+  doc_unicode
   filepath_range_basic
   filepath_range_empty_node
   filepath_range_fuzz_garbage
@@ -23,6 +35,10 @@ PASSED:
   option_some
   sanity_check1
   sanity_check2
+  shell_escape_empty_string
+  shell_escape_nominal
+  shell_escape_spaces
+  shell_escape_special
   trie_basic
   trie_basic_const
   trie_char

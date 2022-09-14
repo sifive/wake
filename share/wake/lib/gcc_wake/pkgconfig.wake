@@ -33,20 +33,8 @@ export def flattenSysLibs (packages: List SysLib): SysLib =
     def lflags  = mapFlat getSysLibLFlags  packages
     SysLib "" headers objects cflags lflags
 
-def pkgConfigCmd =
-    require Some path =
-        getenv "PATH"
-
-    def pkgConfig =
-        whichIn path "pkg-config"
-
-    if pkgConfig ==~ "pkg-config" then
-        None
-    else
-        Some pkgConfig
-
 target pkgConfigImp args =
-    require Some pkgConfig = pkgConfigCmd
+    require Some pkgConfig = whichInEnvPath "pkg-config" 
     else None
 
     def cmdline = pkgConfig, args

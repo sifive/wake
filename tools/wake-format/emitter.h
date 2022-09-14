@@ -18,14 +18,29 @@
 #pragma once
 
 #include <wcl/doc.h>
+#include <wcl/hash.h>
 #include <wcl/optional.h>
 
 #include <cassert>
 #include <iostream>
+#include <unordered_map>
 #include <vector>
 
 #include "formatter.h"
 #include "parser/cst.h"
+
+template <>
+struct std::hash<std::pair<CSTElement, ctx_t>> {
+  size_t operator()(std::pair<CSTElement, ctx_t> const& pair) const noexcept {
+    return wcl::hash_combine(std::hash<CSTElement>{}(pair.first), std::hash<ctx_t>{}(pair.second));
+  }
+};
+
+struct node_traits_t {
+  bool format_off = false;
+
+  void turn_format_off() { format_off = true; }
+};
 
 class Emitter {
  public:
@@ -33,11 +48,40 @@ class Emitter {
   wcl::doc layout(CST cst);
 
  private:
+  std::unordered_map<CSTElement, node_traits_t> node_traits = {};
+  token_traits_map_t token_traits = {};
+
   // Top level tree walk. Dispatches out the calls for various nodes
   wcl::doc walk(ctx_t ctx, CSTElement node);
 
   wcl::doc walk_node(ctx_t ctx, CSTElement node);
   wcl::doc walk_token(ctx_t ctx, CSTElement node);
+
+  // Walks a node and emits it without any formatting.
+  wcl::doc walk_no_edit(ctx_t ctx, CSTElement node);
+  wcl::doc walk_no_edit_acc(ctx_t ctx, CSTElement node);
+
+  // Marks all node elements that have had their formatting disabled
+  void mark_no_format_nodes(CSTElement node);
+
+  // Binds all comments in the tree to their associated token as a human would consider it.
+  //
+  // A comment following a token without a newline is bound to that token
+  // Ex:
+  //   'def x = 5 # a number'
+  //   will bind '# a number' to '5'
+  //
+  // A comment with a newline between it and the previous token gets bound to the first
+  // non-whitespace, non-newline, non-comment following the it.
+  // Ex:
+  //   '''
+  //   def x = 5
+  //   # comment1
+  //   # comment2
+  //   def y = 4
+  //   '''
+  //   will bind '# comment1' and '# comment2' to the second 'def'
+  void bind_comments(CSTElement node);
 
   // Returns a formatter that inserts the next node
   // on the current line if it fits, or on a new nested line

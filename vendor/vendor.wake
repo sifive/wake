@@ -17,6 +17,8 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
+target vendorBuildDir Unit = mkdir "{@here}/.build"
+
 def vendorDir =
     here
 

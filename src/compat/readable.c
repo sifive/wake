@@ -25,9 +25,26 @@
 
 #include <emscripten/emscripten.h>
 
+// clang-format off
+EM_ASYNC_JS(int, isReadable, (const char *filename), {
+  try {
+    await wakeLspModule.sendRequest('accessFile', UTF8ToString(filename));
+    return 1;
+  } catch (err) {
+    return 0;
+  }
+});
+// clang-format on
+
 int is_readable(const char *filename) {
+  int is_node = 0;
   // clang-format off
-  int out = EM_ASM_INT({
+  int res = EM_ASM_INT({
+    if (!ENVIRONMENT_IS_NODE) {
+      return 0;
+    }
+
+    setValue($1, 1, 'i32');
     try {
       const fs = require('fs');
       fs.accessSync(UTF8ToString($0), fs.constants.R_OK);
@@ -35,10 +52,13 @@ int is_readable(const char *filename) {
     } catch (err) {
       return 0;
     }
-  }, filename);
+  }, filename, &is_node);
   // clang-format on
 
-  return out;
+  if (is_node)
+    return res;
+  else
+    return isReadable(filename);
 }
 
 #else

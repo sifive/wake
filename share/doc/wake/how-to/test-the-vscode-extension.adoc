@@ -1,0 +1,145 @@
+= Testing the VS Code extension
+:toc: preamble
+
+The following describes the steps for testing the vscode Wake extension in different environments.
+
+To build the extension `.vsix`, run the vscode build of wake (you need to have https://emscripten.org/docs/getting_started/downloads.html#sdk-download-and-install[emscripten] installed for the build to succeed):
+[source,shell]
+----
+$ ./bin/wake vscode
+----
+
+
+== Node runtime
+=== Desktop
+1. Open `extensions/vscode/` as a folder in vscode
+2. Open `.vscode/launch.json`
+3. Out of all its configurations, delete all but the one named _"Run Node Extension in VS Code"_
+4. Press `Ctrl+F5` to launch the extension in a new window (`F5` to run in debug mode)
+
+=== .vsix
+If you want to test the extension on another machine (for example, the one running Windows):
+
+1. Run the vscode build
+2. Transfer the resulting .vsix file to another machine
+3. https://code.visualstudio.com/docs/editor/extension-marketplace#_install-from-a-vsix[Install from .vsix]. The extension will start working in the same window
+
+=== Executable binary server
+Neovim uses the binary executable server instead of the wasm one. To test it:
+
+1. Run the default/debug build of wake, if needed
+2. Open `extensions/vscode/` as a folder in vscode
+3. Open `lsp-client/src/vendor/clientNode.ts`
+4. Replace
++
+[source, typescript]
+----
+const serverOptions: ServerOptions = {
+    module: context.asAbsolutePath('/lsp-server/out/serverNode.js'),
+    transport: TransportKind.ipc
+};
+----
++
+with
++
+[source, typescript]
+----
+const serverOptions: ServerOptions = {
+		run: {
+			command: __dirname + "/../../../../lib/wake/lsp-wake.native-cpp14-release"
+		},
+		debug: {
+			command: __dirname + "/../../../../lib/wake/lsp-wake.native-cpp14-debug"
+		}
+	};
+----
+5. Press `Ctrl+F5` to launch the extension in a new window
+
+
+
+== Web runtime
+=== https://code.visualstudio.com/api/extension-guides/web-extensions#test-your-web-extension-in-vs-code-running-on-desktop[Desktop]
+1. Open `extensions/vscode/` as a folder in vscode
+2. Open `.vscode/launch.json`
+3. Out of all its configurations, delete all but the one named _"Run Web Extension in VS Code"_
+4. Press `Ctrl+F5` to launch the extension in a new window
+
+I don't think users can run the extension in this environment, so this is probably not needed.
+
+=== https://code.visualstudio.com/api/extension-guides/web-extensions#test-your-web-extension-in-a-browser-using-vscodetestweb[@vscode/test-web]
+From `extensions/vscode/`, launch the extension:
+
+[source,shell]
+----
+npm run open-in-browser
+----
+This method is faster to start than the next one, but with it you can only access projects on your local machine.
+
+=== https://code.visualstudio.com/api/extension-guides/web-extensions#test-your-web-extension-in-on-vscode.dev[vscode.dev]
+This is the closest you can see the extension to actually running in vscode for the web, without publishing it to the extension marketplace. However, you cannot test it in github.dev this way (installing the extension like this violates github's Content Security Policy).
+
+
+== Common notes
+=== Verbose communication mode
+You can toggle the `wakeLanguageServer.trace.server` setting of the extension in vsocde if you have installed it (from a `.vsix`, from the extension marketplace, or with `Developer: Install Web Extension...`).
+
+Alternatively, you can open `extensions/vscode/package.json.in` and set its `contributes.configuration.properties.wakeLanguageServer.trace.server.default` field to `verbose`.
+
+This will allow you to see the messages between the client and the server in the vscode output window. Choose to see output from `Wake Node Language Server` or `Wake Web Language Server`.
+
+=== Does wake stdlib come from the project you're viewing in vscode?
+* If there is a valid `share/wake/lib/` at the root of the project, that library is used to provide diagnostics
+* If not, the path that you provide in the `wakeLanguageServer.pathToWakeStandardLibrary` extension setting is used
+* With no path provided in the setting, the library that comes with the extension is used
+* The setting has no effect when running in a browser
+
+*Keep this in mind when testing:* depending on which library your extension is using to analyze the current project, you could see different behavior.
+
+=== Saving time on builds
+You may find that the vscode build takes a while. Here's how to find out if you can save time:
+
+* Do you want to build a .vsix?
+
+** _- Yes_
++
+Just run the vscode build.
+
+** _- No, I just want to test locally_
++
+Have you changed the non-typesctipt server implementation (any of the `.cpp` files or files in `extensions/vscode/lsp-server/wasm/`)?
+
+**** _- No_
++
+Go to `extensions/vscode/` and run
++
+[source,shell]
+----
+$ npm run compile
+----
+
+**** _- Yes_
++
+Run the vscode build and then terminate the execution once you see that it moved on to npm or npx operations, such as
++
+[source,shell]
+----
+/usr/bin/npm install
+----
++
+or
++
+[source,shell]
+----
+/usr/bin/npx vsce@1.103.1 package
+----
++
+After this, go to `extensions/vscode/` and run
++
+[source,shell]
+----
+$ npm run compile
+----
+
+After this, your extension is ready for testing!
+
+*Keep in mind, however:* this method of cutting down on time is useful when you're making a lot of small changes and testing the extension after each one. But it's still good to check from time to time that the vscode build succeeds, since it most likely uses `node`, `npm`, and `vsce` versions different from yours.
