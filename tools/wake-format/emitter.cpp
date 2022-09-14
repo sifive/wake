@@ -596,6 +596,42 @@ size_t count_allowed_newlines(const token_traits_map_t& traits,
   return allowed;
 }
 
+bool min_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
+  return lhs->height() < rhs->height();
+}
+
+bool min_doc_max_width(const wcl::doc& lhs, const wcl::doc& rhs) {
+  return lhs->max_width() < rhs->max_width();
+}
+
+wcl::doc select_best_choice(std::vector<wcl::optional<wcl::doc>> choices) {
+  std::vector<wcl::doc> lte_fmt = {};
+  std::vector<wcl::doc> gt_fmt = {};
+  int i = 0;
+
+  for (auto choice_opt : choices) {
+    i++;
+    if (!choice_opt) {
+      continue;
+    }
+    auto choice = *choice_opt;
+
+    if (choice->max_width() > MAX_COLUMN_WIDTH) {
+      gt_fmt.push_back(std::move(choice));
+    } else {
+      lte_fmt.push_back(std::move(choice));
+    }
+  }
+
+  if (lte_fmt.size() > 0) {
+    auto min_height = std::min_element(lte_fmt.begin(), lte_fmt.end(), min_doc_height);
+    return *min_height;
+  }
+
+  auto min_width = std::min_element(gt_fmt.begin(), gt_fmt.end(), min_doc_max_width);
+  return *min_width;
+}
+
 wcl::doc post_binop_spacing(CSTElement over, const token_traits_map_t& traits,
                             const wcl::doc& fmt_binop, const wcl::doc_builder& builder, ctx_t ctx) {
   if (fmt_binop->has_newline()) {
@@ -726,14 +762,6 @@ wcl::optional<wcl::doc> Emitter::combine_explode_last_compress(
   return {wcl::in_place_t{}, std::move(doc)};
 }
 
-bool min_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
-  return lhs->height() < rhs->height();
-}
-
-bool min_doc_max_width(const wcl::doc& lhs, const wcl::doc& rhs) {
-  return lhs->max_width() < rhs->max_width();
-}
-
 wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_BINARY);
@@ -750,10 +778,6 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   CSTElement op_token = op.firstChildElement();
 
   auto parts = collect_binary_parts(op_token, node);
-  std::cerr << "ct: " << parts.size() << std::endl;
-
-  std::vector<wcl::doc> lte_fmt = {};
-  std::vector<wcl::doc> gt_fmt = {};
 
   std::vector<wcl::optional<wcl::doc>> choices = {
       // 1
@@ -770,29 +794,7 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
       combine_explode_last_compress(op_token, ctx, parts),
   };
 
-  int i = 0;
-  for (auto choice_opt : choices) {
-    i++;
-    if (!choice_opt) {
-      continue;
-    }
-    auto choice = *choice_opt;
-
-    std::cerr << "#" << i << "<<<:" << choice.as_string() << ":>>>" << std::endl;
-    if (choice->max_width() > MAX_COLUMN_WIDTH) {
-      gt_fmt.push_back(std::move(choice));
-    } else {
-      lte_fmt.push_back(std::move(choice));
-    }
-  }
-
-  if (lte_fmt.size() > 0) {
-    auto min_height = std::min_element(lte_fmt.begin(), lte_fmt.end(), min_doc_height);
-    MEMO_RET(*min_height);
-  }
-
-  auto min_width = std::min_element(gt_fmt.begin(), gt_fmt.end(), min_doc_max_width);
-  MEMO_RET(*min_width);
+  MEMO_RET(select_best_choice(choices));
 }
 
 wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
