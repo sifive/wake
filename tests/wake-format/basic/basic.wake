@@ -1,9 +1,56 @@
+    # comment
+def five = 5
+
+# ordinary comment
+
+def name Unit =
+  def other = here
+  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  another
+
+def name Unit =
+  def other = here
+  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  another
+
+global export def glob1 = 34
+
+# ordinary comment
 def name Unit =
   def other = here
   def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   another
 
+# wake-format off
 def name Unit =
+  def other = here
+  # wake-format off
+  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  another
+
+def name Unit =
+  # wake-format off
+  def other = here
+  def other = here
+  another
+
+def name Unit =
+  def other = here
+  # wake-format off
+  def other = here
+  def other = here
+  another
+
+def name Unit =
+  def other = here
+  # wake-format off
+  def other = here
+
+  def other = here
+  another
+
+def name Unit =
+  # ordinary comment
   def other = here
   def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   another
@@ -11,6 +58,96 @@ def name Unit =
 def t1 =match _
   0=0
   n = 2+t(n-1)
+
+# wake-format off
+def t1 =match _
+  0=0
+  n = 2+t(n-1)
+
+def t1 =match _
+  # wake-format off
+  0=0
+  n = 2+t(n-1)
+
+def t1 =match _
+  0=0
+  # wake-format off
+  n = 2+t(n-1)
+
+def t1 =match _
+  # wake-format off
+  0=0
+  # wake-format off
+  n = 2+t(n-1)
+
+def t1 =match _
+  # many
+  # comments
+  # wake-format off
+  0=0
+  # many
+  # more
+  # comments
+  n = 2+t(n-1)
+
+def t2 = ((x+7)*3)
+
+def t4 = (
+  # comment
+  x
+  + 5
+)
+
+def t4 = (
+  # comment
+  (
+  # comment
+  x
+  + 5
+  )
+)
+
+def t5 = (
+  # comment
+  # comment
+  # comment
+  x
+  + 5
+)
+
+# TODO: These cases are actually binop not paren
+# def t7 = (
+#   x # comment
+#   + 5
+# )
+
+# def t8 = (
+#   x + # comment
+#   5
+# )
+
+def t9 = (
+  x
+  + 5 # comment
+)
+
+def name Unit = # wake-format off
+  def other = here
+  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  another
+
+def t3 = ( # comment
+  x
+  + 5
+)
+
+def t6 = ( # comment
+  # comment
+  # comment
+  x
+  + 5
+)
+
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     buildTestWake, Nil =
@@ -29,3 +166,11 @@ from wake import myMap=map foldl myFoldr=foldr
 from wake import def unary + -
 from wake import type Pair Result
 from wake import source,Nil
+
+export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
+export topic compileC: Pair String ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Result (List Path) Error)
+topic linkO: Pair String ((extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error)
+export topic path: String
+export topic wakeUnitTestBinary: (variant: Pair String String) => Result (List Path) Error
+global export topic glob1: String
+global topic glob1: String

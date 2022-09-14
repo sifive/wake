@@ -38,7 +38,7 @@ TEST(doc_basic) {
   wcl::doc d = std::move(builder).build();
   std::string expected = "Hello World! My name is Ashley";
 
-  EXPECT_EQUAL(expected.size(), d.character_count());
+  EXPECT_EQUAL(expected.size(), d->byte_count());
   EXPECT_EQUAL(expected, d.as_string());
 }
 
@@ -66,7 +66,7 @@ TEST(doc_large) {
   }
 
   wcl::doc d = std::move(builder).build();
-  ASSERT_EQUAL(3000000u, d.character_count());
+  ASSERT_EQUAL(3000000u, d->byte_count());
 }
 
 TEST(doc_undo) {
@@ -82,8 +82,49 @@ TEST(doc_undo) {
   wcl::doc d = std::move(builder).build();
   std::string expected = "Hello ";
 
-  EXPECT_EQUAL(expected.size(), d.character_count());
+  EXPECT_EQUAL(expected.size(), d->byte_count());
   EXPECT_EQUAL(expected, d.as_string());
+}
+
+TEST(doc_unicode) {
+  {
+    wcl::doc_builder builder;
+    builder.append("····");
+
+    EXPECT_EQUAL(8u, builder->byte_count());
+    EXPECT_EQUAL(4u, builder->first_width());
+    EXPECT_EQUAL(4u, builder->last_width());
+    EXPECT_EQUAL(4u, builder->max_width());
+    EXPECT_EQUAL(0u, builder->newline_count());
+    EXPECT_EQUAL(1u, builder->height());
+
+    builder.append("⏎");
+
+    EXPECT_EQUAL(11u, builder->byte_count());
+    EXPECT_EQUAL(6u, builder->first_width());
+    EXPECT_EQUAL(6u, builder->last_width());
+    EXPECT_EQUAL(6u, builder->max_width());
+    EXPECT_EQUAL(0u, builder->newline_count());
+    EXPECT_EQUAL(1u, builder->height());
+
+    builder.append("\n·");
+
+    EXPECT_EQUAL(14u, builder->byte_count());
+    EXPECT_EQUAL(6u, builder->first_width());
+    EXPECT_EQUAL(1u, builder->last_width());
+    EXPECT_EQUAL(6u, builder->max_width());
+    EXPECT_EQUAL(1u, builder->newline_count());
+    EXPECT_EQUAL(2u, builder->height());
+
+    wcl::doc d = std::move(builder).build();
+
+    EXPECT_EQUAL(14u, d->byte_count());
+    EXPECT_EQUAL(6u, d->first_width());
+    EXPECT_EQUAL(1u, d->last_width());
+    EXPECT_EQUAL(6u, d->max_width());
+    EXPECT_EQUAL(1u, d->newline_count());
+    EXPECT_EQUAL(2u, d->height());
+  }
 }
 
 TEST(doc_geometry) {
@@ -91,38 +132,38 @@ TEST(doc_geometry) {
     wcl::doc_builder builder;
     builder.append("Hello");
 
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(5u, builder.last_width());
-    EXPECT_EQUAL(5u, builder.max_width());
-    EXPECT_EQUAL(0u, builder.newline_count());
-    EXPECT_EQUAL(1u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(5u, builder->last_width());
+    EXPECT_EQUAL(5u, builder->max_width());
+    EXPECT_EQUAL(0u, builder->newline_count());
+    EXPECT_EQUAL(1u, builder->height());
 
     wcl::doc d = std::move(builder).build();
 
-    EXPECT_EQUAL(5u, d.first_width());
-    EXPECT_EQUAL(5u, d.last_width());
-    EXPECT_EQUAL(5u, d.max_width());
-    EXPECT_EQUAL(0u, d.newline_count());
-    EXPECT_EQUAL(1u, d.height());
+    EXPECT_EQUAL(5u, d->first_width());
+    EXPECT_EQUAL(5u, d->last_width());
+    EXPECT_EQUAL(5u, d->max_width());
+    EXPECT_EQUAL(0u, d->newline_count());
+    EXPECT_EQUAL(1u, d->height());
   }
 
   {
     wcl::doc_builder builder;
     builder.append("Hello\n");
 
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(0u, builder.last_width());
-    EXPECT_EQUAL(5u, builder.max_width());
-    EXPECT_EQUAL(1u, builder.newline_count());
-    EXPECT_EQUAL(2u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(0u, builder->last_width());
+    EXPECT_EQUAL(5u, builder->max_width());
+    EXPECT_EQUAL(1u, builder->newline_count());
+    EXPECT_EQUAL(2u, builder->height());
 
     wcl::doc d = std::move(builder).build();
 
-    EXPECT_EQUAL(5u, d.first_width());
-    EXPECT_EQUAL(0u, d.last_width());
-    EXPECT_EQUAL(5u, d.max_width());
-    EXPECT_EQUAL(1u, d.newline_count());
-    EXPECT_EQUAL(2u, d.height());
+    EXPECT_EQUAL(5u, d->first_width());
+    EXPECT_EQUAL(0u, d->last_width());
+    EXPECT_EQUAL(5u, d->max_width());
+    EXPECT_EQUAL(1u, d->newline_count());
+    EXPECT_EQUAL(2u, d->height());
   }
 
   {
@@ -130,19 +171,19 @@ TEST(doc_geometry) {
     builder.append("Hello\n");
     builder.append("World!");
 
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(6u, builder.last_width());
-    EXPECT_EQUAL(6u, builder.max_width());
-    EXPECT_EQUAL(1u, builder.newline_count());
-    EXPECT_EQUAL(2u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(6u, builder->last_width());
+    EXPECT_EQUAL(6u, builder->max_width());
+    EXPECT_EQUAL(1u, builder->newline_count());
+    EXPECT_EQUAL(2u, builder->height());
 
     wcl::doc d = std::move(builder).build();
 
-    EXPECT_EQUAL(5u, d.first_width());
-    EXPECT_EQUAL(6u, d.last_width());
-    EXPECT_EQUAL(6u, d.max_width());
-    EXPECT_EQUAL(1u, d.newline_count());
-    EXPECT_EQUAL(2u, d.height());
+    EXPECT_EQUAL(5u, d->first_width());
+    EXPECT_EQUAL(6u, d->last_width());
+    EXPECT_EQUAL(6u, d->max_width());
+    EXPECT_EQUAL(1u, d->newline_count());
+    EXPECT_EQUAL(2u, d->height());
   }
 
   {
@@ -150,19 +191,19 @@ TEST(doc_geometry) {
     builder.append("Hello");
     builder.append("\nWorld!");
 
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(6u, builder.last_width());
-    EXPECT_EQUAL(6u, builder.max_width());
-    EXPECT_EQUAL(1u, builder.newline_count());
-    EXPECT_EQUAL(2u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(6u, builder->last_width());
+    EXPECT_EQUAL(6u, builder->max_width());
+    EXPECT_EQUAL(1u, builder->newline_count());
+    EXPECT_EQUAL(2u, builder->height());
 
     wcl::doc d = std::move(builder).build();
 
-    EXPECT_EQUAL(5u, d.first_width());
-    EXPECT_EQUAL(6u, d.last_width());
-    EXPECT_EQUAL(6u, d.max_width());
-    EXPECT_EQUAL(1u, d.newline_count());
-    EXPECT_EQUAL(2u, d.height());
+    EXPECT_EQUAL(5u, d->first_width());
+    EXPECT_EQUAL(6u, d->last_width());
+    EXPECT_EQUAL(6u, d->max_width());
+    EXPECT_EQUAL(1u, d->newline_count());
+    EXPECT_EQUAL(2u, d->height());
   }
 
   {
@@ -170,19 +211,64 @@ TEST(doc_geometry) {
     builder.append("He\nllo");
     builder.append("Worl\nd!");
 
-    EXPECT_EQUAL(2u, builder.first_width());
-    EXPECT_EQUAL(2u, builder.last_width());
-    EXPECT_EQUAL(7u, builder.max_width());
-    EXPECT_EQUAL(2u, builder.newline_count());
-    EXPECT_EQUAL(3u, builder.height());
+    EXPECT_EQUAL(2u, builder->first_width());
+    EXPECT_EQUAL(2u, builder->last_width());
+    EXPECT_EQUAL(7u, builder->max_width());
+    EXPECT_EQUAL(2u, builder->newline_count());
+    EXPECT_EQUAL(3u, builder->height());
 
     wcl::doc d = std::move(builder).build();
 
-    EXPECT_EQUAL(2u, d.first_width());
-    EXPECT_EQUAL(2u, d.last_width());
-    EXPECT_EQUAL(7u, d.max_width());
-    EXPECT_EQUAL(2u, d.newline_count());
-    EXPECT_EQUAL(3u, d.height());
+    EXPECT_EQUAL(2u, d->first_width());
+    EXPECT_EQUAL(2u, d->last_width());
+    EXPECT_EQUAL(7u, d->max_width());
+    EXPECT_EQUAL(2u, d->newline_count());
+    EXPECT_EQUAL(3u, d->height());
+  }
+
+  {
+    wcl::doc_builder builder;
+    builder.append("He\nllo");
+    builder.append("Worl\nd!");
+
+    EXPECT_EQUAL(0u, builder->last_ws_count());
+
+    wcl::doc d = std::move(builder).build();
+    EXPECT_EQUAL(0u, d->last_ws_count());
+  }
+  {
+    wcl::doc_builder builder;
+    builder.append("Hello");
+    builder.append("     ");
+
+    EXPECT_EQUAL(5u, builder->last_ws_count());
+
+    builder.append("     ");
+    EXPECT_EQUAL(10u, builder->last_ws_count());
+
+    builder.append("World");
+    EXPECT_EQUAL(10u, builder->last_ws_count());
+
+    builder.append("\n   Hello");
+    EXPECT_EQUAL(3u, builder->last_ws_count());
+
+    builder.append("   World");
+    EXPECT_EQUAL(6u, builder->last_ws_count());
+
+    builder.append("    ");
+    EXPECT_EQUAL(10u, builder->last_ws_count());
+
+    builder.append("\n");
+    EXPECT_EQUAL(0u, builder->last_ws_count());
+
+    builder.append("    ");
+    EXPECT_EQUAL(4u, builder->last_ws_count());
+
+    builder.append("    \n     ");
+    EXPECT_EQUAL(5u, builder->last_ws_count());
+
+    wcl::doc d = std::move(builder).build();
+    EXPECT_EQUAL(5u, d->last_ws_count());
   }
 
   {
@@ -204,175 +290,175 @@ TEST(doc_geometry) {
     builder.append("\n");
     builder.append("123");
 
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(3u, builder.last_width());
-    EXPECT_EQUAL(30u, builder.max_width());
-    EXPECT_EQUAL(7u, builder.newline_count());
-    EXPECT_EQUAL(8u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(3u, builder->last_width());
+    EXPECT_EQUAL(30u, builder->max_width());
+    EXPECT_EQUAL(7u, builder->newline_count());
+    EXPECT_EQUAL(8u, builder->height());
 
     wcl::doc d = std::move(builder).build();
 
-    EXPECT_EQUAL(5u, d.first_width());
-    EXPECT_EQUAL(3u, d.last_width());
-    EXPECT_EQUAL(30u, d.max_width());
-    EXPECT_EQUAL(7u, d.newline_count());
-    EXPECT_EQUAL(8u, d.height());
+    EXPECT_EQUAL(5u, d->first_width());
+    EXPECT_EQUAL(3u, d->last_width());
+    EXPECT_EQUAL(30u, d->max_width());
+    EXPECT_EQUAL(7u, d->newline_count());
+    EXPECT_EQUAL(8u, d->height());
   }
 
   {
     wcl::doc_builder builder;
     builder.append("Hello");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(5u, builder.last_width());
-    EXPECT_EQUAL(5u, builder.max_width());
-    EXPECT_EQUAL(0u, builder.newline_count());
-    EXPECT_EQUAL(1u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(5u, builder->last_width());
+    EXPECT_EQUAL(5u, builder->max_width());
+    EXPECT_EQUAL(0u, builder->newline_count());
+    EXPECT_EQUAL(1u, builder->height());
 
     builder.append("\nHello");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(5u, builder.last_width());
-    EXPECT_EQUAL(5u, builder.max_width());
-    EXPECT_EQUAL(1u, builder.newline_count());
-    EXPECT_EQUAL(2u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(5u, builder->last_width());
+    EXPECT_EQUAL(5u, builder->max_width());
+    EXPECT_EQUAL(1u, builder->newline_count());
+    EXPECT_EQUAL(2u, builder->height());
 
     builder.append("Hello");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(10u, builder.last_width());
-    EXPECT_EQUAL(10u, builder.max_width());
-    EXPECT_EQUAL(1u, builder.newline_count());
-    EXPECT_EQUAL(2u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(10u, builder->last_width());
+    EXPECT_EQUAL(10u, builder->max_width());
+    EXPECT_EQUAL(1u, builder->newline_count());
+    EXPECT_EQUAL(2u, builder->height());
 
     builder.append("Hello\n");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(0u, builder.last_width());
-    EXPECT_EQUAL(15u, builder.max_width());
-    EXPECT_EQUAL(2u, builder.newline_count());
-    EXPECT_EQUAL(3u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(0u, builder->last_width());
+    EXPECT_EQUAL(15u, builder->max_width());
+    EXPECT_EQUAL(2u, builder->newline_count());
+    EXPECT_EQUAL(3u, builder->height());
 
     builder.append("Hello");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(5u, builder.last_width());
-    EXPECT_EQUAL(15u, builder.max_width());
-    EXPECT_EQUAL(2u, builder.newline_count());
-    EXPECT_EQUAL(3u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(5u, builder->last_width());
+    EXPECT_EQUAL(15u, builder->max_width());
+    EXPECT_EQUAL(2u, builder->newline_count());
+    EXPECT_EQUAL(3u, builder->height());
 
     builder.append("\nWorld!");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(6u, builder.last_width());
-    EXPECT_EQUAL(15u, builder.max_width());
-    EXPECT_EQUAL(3u, builder.newline_count());
-    EXPECT_EQUAL(4u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(6u, builder->last_width());
+    EXPECT_EQUAL(15u, builder->max_width());
+    EXPECT_EQUAL(3u, builder->newline_count());
+    EXPECT_EQUAL(4u, builder->height());
 
     builder.append("\nWorld!");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(6u, builder.last_width());
-    EXPECT_EQUAL(15u, builder.max_width());
-    EXPECT_EQUAL(4u, builder.newline_count());
-    EXPECT_EQUAL(5u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(6u, builder->last_width());
+    EXPECT_EQUAL(15u, builder->max_width());
+    EXPECT_EQUAL(4u, builder->newline_count());
+    EXPECT_EQUAL(5u, builder->height());
 
     builder.append("\nWorld!");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(6u, builder.last_width());
-    EXPECT_EQUAL(15u, builder.max_width());
-    EXPECT_EQUAL(5u, builder.newline_count());
-    EXPECT_EQUAL(6u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(6u, builder->last_width());
+    EXPECT_EQUAL(15u, builder->max_width());
+    EXPECT_EQUAL(5u, builder->newline_count());
+    EXPECT_EQUAL(6u, builder->height());
 
     builder.append("World!");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(12u, builder.last_width());
-    EXPECT_EQUAL(15u, builder.max_width());
-    EXPECT_EQUAL(5u, builder.newline_count());
-    EXPECT_EQUAL(6u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(12u, builder->last_width());
+    EXPECT_EQUAL(15u, builder->max_width());
+    EXPECT_EQUAL(5u, builder->newline_count());
+    EXPECT_EQUAL(6u, builder->height());
 
     builder.append("World!");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(18u, builder.last_width());
-    EXPECT_EQUAL(18u, builder.max_width());
-    EXPECT_EQUAL(5u, builder.newline_count());
-    EXPECT_EQUAL(6u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(18u, builder->last_width());
+    EXPECT_EQUAL(18u, builder->max_width());
+    EXPECT_EQUAL(5u, builder->newline_count());
+    EXPECT_EQUAL(6u, builder->height());
 
     builder.append("World!");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(24u, builder.last_width());
-    EXPECT_EQUAL(24u, builder.max_width());
-    EXPECT_EQUAL(5u, builder.newline_count());
-    EXPECT_EQUAL(6u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(24u, builder->last_width());
+    EXPECT_EQUAL(24u, builder->max_width());
+    EXPECT_EQUAL(5u, builder->newline_count());
+    EXPECT_EQUAL(6u, builder->height());
 
     builder.append("World!");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(30u, builder.last_width());
-    EXPECT_EQUAL(30u, builder.max_width());
-    EXPECT_EQUAL(5u, builder.newline_count());
-    EXPECT_EQUAL(6u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(30u, builder->last_width());
+    EXPECT_EQUAL(30u, builder->max_width());
+    EXPECT_EQUAL(5u, builder->newline_count());
+    EXPECT_EQUAL(6u, builder->height());
 
     builder.append("\n");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(0u, builder.last_width());
-    EXPECT_EQUAL(30u, builder.max_width());
-    EXPECT_EQUAL(6u, builder.newline_count());
-    EXPECT_EQUAL(7u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(0u, builder->last_width());
+    EXPECT_EQUAL(30u, builder->max_width());
+    EXPECT_EQUAL(6u, builder->newline_count());
+    EXPECT_EQUAL(7u, builder->height());
 
     builder.append("Hello");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(5u, builder.last_width());
-    EXPECT_EQUAL(30u, builder.max_width());
-    EXPECT_EQUAL(6u, builder.newline_count());
-    EXPECT_EQUAL(7u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(5u, builder->last_width());
+    EXPECT_EQUAL(30u, builder->max_width());
+    EXPECT_EQUAL(6u, builder->newline_count());
+    EXPECT_EQUAL(7u, builder->height());
 
     builder.append("\n");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(0u, builder.last_width());
-    EXPECT_EQUAL(30u, builder.max_width());
-    EXPECT_EQUAL(7u, builder.newline_count());
-    EXPECT_EQUAL(8u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(0u, builder->last_width());
+    EXPECT_EQUAL(30u, builder->max_width());
+    EXPECT_EQUAL(7u, builder->newline_count());
+    EXPECT_EQUAL(8u, builder->height());
 
     builder.append("123");
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(3u, builder.last_width());
-    EXPECT_EQUAL(30u, builder.max_width());
-    EXPECT_EQUAL(7u, builder.newline_count());
-    EXPECT_EQUAL(8u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(3u, builder->last_width());
+    EXPECT_EQUAL(30u, builder->max_width());
+    EXPECT_EQUAL(7u, builder->newline_count());
+    EXPECT_EQUAL(8u, builder->height());
 
     builder.undo();
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(0u, builder.last_width());
-    EXPECT_EQUAL(30u, builder.max_width());
-    EXPECT_EQUAL(7u, builder.newline_count());
-    EXPECT_EQUAL(8u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(0u, builder->last_width());
+    EXPECT_EQUAL(30u, builder->max_width());
+    EXPECT_EQUAL(7u, builder->newline_count());
+    EXPECT_EQUAL(8u, builder->height());
 
     builder.undo();
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(5u, builder.last_width());
-    EXPECT_EQUAL(30u, builder.max_width());
-    EXPECT_EQUAL(6u, builder.newline_count());
-    EXPECT_EQUAL(7u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(5u, builder->last_width());
+    EXPECT_EQUAL(30u, builder->max_width());
+    EXPECT_EQUAL(6u, builder->newline_count());
+    EXPECT_EQUAL(7u, builder->height());
 
     builder.undo();
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(0u, builder.last_width());
-    EXPECT_EQUAL(30u, builder.max_width());
-    EXPECT_EQUAL(6u, builder.newline_count());
-    EXPECT_EQUAL(7u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(0u, builder->last_width());
+    EXPECT_EQUAL(30u, builder->max_width());
+    EXPECT_EQUAL(6u, builder->newline_count());
+    EXPECT_EQUAL(7u, builder->height());
 
     builder.undo();
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(30u, builder.last_width());
-    EXPECT_EQUAL(30u, builder.max_width());
-    EXPECT_EQUAL(5u, builder.newline_count());
-    EXPECT_EQUAL(6u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(30u, builder->last_width());
+    EXPECT_EQUAL(30u, builder->max_width());
+    EXPECT_EQUAL(5u, builder->newline_count());
+    EXPECT_EQUAL(6u, builder->height());
 
     builder.undo();
-    EXPECT_EQUAL(5u, builder.first_width());
-    EXPECT_EQUAL(24u, builder.last_width());
-    EXPECT_EQUAL(24u, builder.max_width());
-    EXPECT_EQUAL(5u, builder.newline_count());
-    EXPECT_EQUAL(6u, builder.height());
+    EXPECT_EQUAL(5u, builder->first_width());
+    EXPECT_EQUAL(24u, builder->last_width());
+    EXPECT_EQUAL(24u, builder->max_width());
+    EXPECT_EQUAL(5u, builder->newline_count());
+    EXPECT_EQUAL(6u, builder->height());
 
     wcl::doc d = std::move(builder).build();
-    EXPECT_EQUAL(5u, d.first_width());
-    EXPECT_EQUAL(24u, d.last_width());
-    EXPECT_EQUAL(24u, d.max_width());
-    EXPECT_EQUAL(5u, d.newline_count());
-    EXPECT_EQUAL(6u, d.height());
+    EXPECT_EQUAL(5u, d->first_width());
+    EXPECT_EQUAL(24u, d->last_width());
+    EXPECT_EQUAL(24u, d->max_width());
+    EXPECT_EQUAL(5u, d->newline_count());
+    EXPECT_EQUAL(6u, d->height());
   }
 }

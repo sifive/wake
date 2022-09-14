@@ -22,72 +22,10 @@
 #include <sstream>
 #include <vector>
 
+#include "doc_state.h"
+#include "utf8proc/utf8proc.h"
+
 namespace wcl {
-
-// Internal state for a doc object. It is intentionally not exposed in the
-// public API and should not be used directly.
-struct doc_state {
-  size_t character_count = 0;
-  size_t newline_count = 0;
-  size_t first_width = 0;
-  size_t last_width = 0;
-  size_t max_width = 0;
-
-  // Returns the merged state of this and other.
-  doc_state merged(doc_state other) {
-    doc_state merged;
-
-    merged.character_count = character_count + other.character_count;
-    merged.newline_count = newline_count + other.newline_count;
-
-    merged.last_width = other.last_width;
-    // If other doesn't have any newlines, then the left side needs to be accounted for
-    if (other.newline_count == 0) {
-      merged.last_width += last_width;
-    }
-
-    merged.first_width = first_width;
-    // If the left side doesn't have any newlines, then other side needs to be accounted for
-    if (newline_count == 0) {
-      merged.first_width += other.first_width;
-    }
-
-    merged.max_width = std::max(max_width, other.max_width);
-    // It is possible that the join point is a longer line than any other in either doc
-    merged.max_width = std::max(merged.max_width, last_width + other.first_width);
-
-    return merged;
-  }
-
-  static doc_state from_string(const std::string& str) {
-    doc_state state;
-
-    state.character_count = str.size();
-
-    for (auto& c : str) {
-      if (c == '\n') {
-        // once we see a newline, check if the line was larger than any seen before
-        state.max_width = std::max(state.max_width, state.last_width);
-
-        state.last_width = 0;
-        state.newline_count++;
-        continue;
-      }
-
-      if (state.newline_count == 0) {
-        state.first_width++;
-      }
-
-      state.last_width++;
-    }
-
-    // Account for the case when the last line is the longest w/o a nl.
-    // ex: "a <newline> b <newline> cdef"
-    state.max_width = std::max(state.max_width, state.last_width);
-    return state;
-  }
-};
-
 class doc_impl_base {
  protected:
   doc_state state_;
@@ -100,14 +38,8 @@ class doc_impl_base {
   // methods that all RopeImpl share
   virtual void write(std::ostream&) const = 0;
 
-  size_t character_count() const { return state_.character_count; }
-  size_t newline_count() const { return state_.newline_count; }
-  size_t first_width() const { return state_.first_width; }
-  size_t last_width() const { return state_.last_width; }
-  size_t max_width() const { return state_.max_width; }
-
-  doc_state state() const { return state_; }
-  bool has_newline() const { return state_.newline_count > 0; }
+  const doc_state& operator->() const { return state_; }
+  const doc_state& operator*() const { return state_; }
 };
 
 class doc_impl_string : public doc_impl_base {
@@ -116,7 +48,7 @@ class doc_impl_string : public doc_impl_base {
 
  public:
   explicit doc_impl_string(std::string str)
-      : doc_impl_base(doc_state::from_string(str)), str(str) {}
+      : doc_impl_base(from_string<doc_state>(str)), str(str) {}
   void write(std::ostream& ostream) const override { ostream << str; }
 };
 
@@ -127,8 +59,7 @@ class doc_impl_pair : public doc_impl_base {
 
  public:
   doc_impl_pair(std::shared_ptr<doc_impl_base> left, std::shared_ptr<doc_impl_base> right)
-      : doc_impl_base(left->state().merged(right->state())),
-        pair(std::make_pair(std::move(left), std::move(right))) {}
+      : doc_impl_base(**left + **right), pair(std::make_pair(std::move(left), std::move(right))) {}
 
   void write(std::ostream& ostream) const override {
     pair.first->write(ostream);
@@ -151,18 +82,18 @@ class doc_builder;
 // doc d1 = doc::lit("first");
 // doc d2 = doc::lit("-second");
 // doc d3 = d1.concat(d2);
-// d3.character_count() -> 13
+// d3.byte_count() -> 12
 // d3.as_string() -> "first-second"
 // ```
 class doc {
  private:
   std::shared_ptr<doc_impl_base> impl;
 
-  doc_state state() const { return impl->state(); }
-
   explicit doc(std::unique_ptr<doc_impl_base> impl) : impl(std::move(impl)) {}
 
  public:
+  doc(const doc& other) = default;
+
   // O(n) (n = character count)
   static doc lit(std::string str) { return doc(std::make_unique<doc_impl_string>(std::move(str))); }
 
@@ -179,26 +110,8 @@ class doc {
   // O(n)
   void write(std::ostream& ostream) const { impl->write(ostream); }
 
-  // O(1)
-  size_t first_width() const { return impl->first_width(); }
-
-  // O(1)
-  size_t last_width() const { return impl->last_width(); }
-
-  // O(1)
-  size_t max_width() const { return impl->max_width(); }
-
-  // O(1)
-  size_t character_count() const { return impl->character_count(); }
-
-  // O(1)
-  size_t newline_count() const { return impl->newline_count(); }
-
-  // O(1)
-  bool has_newline() const { return impl->has_newline(); }
-
-  // O(1)
-  size_t height() const { return newline_count() + 1; }
+  const doc_state& operator->() const { return **impl; }
+  const doc_state& operator*() const { return **impl; }
 
   friend doc_builder;
 };
@@ -223,7 +136,7 @@ class doc {
 class doc_builder {
  private:
   std::vector<doc> docs;
-  doc_state state;
+  doc_state state = doc_state::identity();
 
   doc merge(int start, int end) {
     if (start > end) {
@@ -246,7 +159,7 @@ class doc_builder {
   void append(std::string str) { append(doc::lit(std::move(str))); }
 
   void append(doc other) {
-    state = state.merged(other.state());
+    state = state + *other;
     docs.push_back(std::move(other));
   }
 
@@ -254,22 +167,17 @@ class doc_builder {
     docs.pop_back();
     state = {};
     for (const auto& r : docs) {
-      state = state.merged(r.state());
+      state = state + *r;
     }
   }
 
-  size_t first_width() const { return state.first_width; }
-  size_t last_width() const { return state.last_width; }
-  size_t max_width() const { return state.max_width; }
-  size_t character_count() const { return state.character_count; }
-  size_t newline_count() const { return state.newline_count; }
-  size_t height() const { return state.newline_count + 1; }
-  bool has_newline() const { return state.newline_count > 0; }
+  const doc_state& operator->() const { return state; }
+  const doc_state& operator*() const { return state; }
 
   doc build() && {
     doc copy = merge(0, docs.size() - 1);
     docs = {};
-    state = {};
+    state = doc_state::identity();
     return copy;
   }
 };

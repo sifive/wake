@@ -28,6 +28,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -43,50 +44,7 @@
 #include "util/location.h"
 
 #ifdef __EMSCRIPTEN__
-#define CERR_DEBUG
 #include <emscripten/emscripten.h>
-
-// clang-format off
-EM_ASYNC_JS(char *, nodejs_getstdin, (), {
-  var buffer = "";
-
-  let eof = await new Promise(resolve => {
-    let timeout = setTimeout(() => {
-      complete(false);
-    }, 2000);
-    function gotData(input) {
-      buffer = input;
-      complete(false);
-    }
-    function gotEnd() {
-      complete(true);
-    }
-    function complete(out) {
-      clearTimeout(timeout);
-      process.stdin.pause();
-      process.stdin.removeListener('end',   gotEnd);
-      process.stdin.removeListener('error', gotEnd);
-      process.stdin.removeListener('data',  gotData);
-      resolve(out);
-    }
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('end',   gotEnd);
-    process.stdin.on('error', gotEnd);
-    process.stdin.on('data',  gotData);
-    process.stdin.resume();
-  });
-
-  if (eof) {
-    return 0;
-  } else {
-    let lengthBytes = lengthBytesUTF8(buffer)+1;
-    let stringOnWasmHeap = _malloc(lengthBytes);
-    stringToUTF8(buffer, stringOnWasmHeap, lengthBytes);
-    return stringOnWasmHeap;
-  }
-});
-// clang-format on
-
 #endif
 
 // Header used in JSON-RPC
@@ -111,9 +69,52 @@ const char *term_normal() { return ""; }
 class LSPServer {
  public:
   LSPServer() : astree() {}
-  explicit LSPServer(std::string _stdLib) : astree(std::move(_stdLib)) {}
   explicit LSPServer(bool _isSTDLibValid, std::string _stdLib)
       : isSTDLibValid(_isSTDLibValid), astree(std::move(_stdLib)) {}
+
+  struct MethodResult {
+    JAST response;
+    JAST diagnostics;
+    JAST notification;
+    MethodResult() {
+      response = JAST(JSON_OBJECT);
+      diagnostics = JAST(JSON_ARRAY);
+      notification = JAST(JSON_OBJECT);
+    }
+    explicit MethodResult(JAST _response) : response(std::move(_response)) {
+      diagnostics = JAST(JSON_ARRAY);
+      notification = JAST(JSON_OBJECT);
+    }
+  };
+
+  MethodResult processRequest(const std::string &requestString) {
+    // Parse that requestString as JSON
+    JAST request;
+    std::stringstream parseErrors;
+    if (!JAST::parse(requestString, parseErrors, request)) {
+      JAST errorMessage = JSONConverter::createErrorMessage(ParseError, parseErrors.str());
+      return MethodResult(errorMessage);
+    }
+
+    const std::string &method = request.get("method").value;
+    if (!isInitialized && (method != "initialize")) {
+      JAST errorMessage = JSONConverter::createErrorMessage(request, ServerNotInitialized,
+                                                            "Must request initialize first");
+      return MethodResult(errorMessage);
+    }
+
+    if (isShutDown && (method != "exit")) {
+      JAST errorMessage = JSONConverter::createErrorMessage(
+          request, InvalidRequest,
+          "Received a request other than 'exit' after a shutdown request.");
+      return MethodResult(errorMessage);
+    }
+
+    if (!method.empty()) {
+      return callMethod(method, request);
+    }
+    return {};  // empty result
+  }
 
   void processRequests() {
     std::string buffer;
@@ -138,50 +139,27 @@ class LSPServer {
 
       // Retrieve the content
       std::string content = getBlob(buffer, json_size);
+      MethodResult methodResult = processRequest(content);
 
-      // Parse that content as JSON
-      JAST request;
-      std::stringstream parseErrors;
-      if (!JAST::parse(content, parseErrors, request)) {
-        JAST errorMessage = JSONConverter::createErrorMessage(ParseError, parseErrors.str());
-        sendMessage(errorMessage);
-      } else {
-        const std::string &method = request.get("method").value;
-        if (!isInitialized && (method != "initialize")) {
-          JAST errorMessage = JSONConverter::createErrorMessage(request, ServerNotInitialized,
-                                                                "Must request initialize first");
-          sendMessage(errorMessage);
-        } else if (isShutDown && (method != "exit")) {
-          JAST errorMessage = JSONConverter::createErrorMessage(
-              request, InvalidRequest,
-              "Received a request other than 'exit' after a shutdown request.");
-          sendMessage(errorMessage);
-        } else if (!method.empty()) {
-          callMethod(method, request);
+      const std::string errorCode = methodResult.response.get("error").get("code").value;
+      if (errorCode.empty()) {  // no error occurred
+        const std::string notifMethod = methodResult.notification.get("method").value;
+        if (!notifMethod.empty()) {  // notification was produced => send it
+          sendMessage(methodResult.notification);
+        }
+
+        for (const auto &fileDiagnostics : methodResult.diagnostics.children) {
+          sendMessage(fileDiagnostics.second);  // send diagnostics
         }
       }
+      sendMessage(methodResult.response);  // send response
     }
   }
 
-  void notifyAboutInvalidSTDLib() const {
-    JAST message = JSONConverter::createMessage();
-    message.add("method", "window/showMessage");
-    JAST &showMessageParams = message.add("params", JSON_OBJECT);
-    showMessageParams.add("type", 1);  // Error
-    std::string messageText =
-        "The path to the wake standard library (" + astree.absLibDir + ") is invalid. " +
-        "Wake language features will not be provided. " +
-        "Please change the path in the extension settings and reload the window by: " +
-        "  1. Opening the command palette (Ctrl + Shift + P); " +
-        "  2. Typing \"> Reload Window\" and executing (Enter);";
-    showMessageParams.add("message", messageText.c_str());
-    sendMessage(message);
-  }
-
  private:
-  typedef void (LSPServer::*LspMethod)(const JAST &);
+  typedef MethodResult (LSPServer::*LspMethod)(const JAST &);
 
-  bool isSTDLibValid = true;
+  bool isSTDLibValid = false;
   bool isInitialized = false;
   bool needsUpdate = false;
   int ignoredCount = 0;
@@ -205,6 +183,21 @@ class LSPServer {
       {"textDocument/documentSymbol", &LSPServer::documentSymbol},
       {"workspace/symbol", &LSPServer::workspaceSymbol},
       {"textDocument/rename", &LSPServer::rename}};
+
+  void notifyAboutInvalidSTDLib(MethodResult &methodResult) const {
+    JAST message = JSONConverter::createMessage();
+    message.add("method", "window/showMessage");
+    JAST &showMessageParams = message.add("params", JSON_OBJECT);
+    showMessageParams.add("type", 1);  // Error
+    std::string messageText =
+        "The path to the wake standard library (" + astree.absLibDir + ") is invalid. " +
+        "Wake language features will not be provided. " +
+        "Please change the path in the extension settings and reload the window by: " +
+        "  1. Opening the command palette (Ctrl + Shift + P); " +
+        "  2. Typing \"> Reload Window\" and executing (Enter);";
+    showMessageParams.add("message", messageText.c_str());
+    methodResult.notification = message;
+  }
 
   std::string getLine(std::string &buffer) {
     size_t len = 0, off = buffer.find('\n');
@@ -231,25 +224,6 @@ class LSPServer {
 
   std::string getStdin() {
     while (true) {
-#ifdef __EMSCRIPTEN__
-      char *buf = nodejs_getstdin();
-      if (!buf) {
-#ifdef CERR_DEBUG
-        std::cerr << "Client did not shutdown cleanly" << std::endl;
-#endif
-        exit(1);
-      }
-
-      std::string out(buf, strlen(buf));
-      free(buf);
-
-      if (out.empty()) {
-        timeout();
-        continue;
-      }
-
-      return out;
-#else
       struct pollfd pfds;
       pfds.fd = STDIN_FILENO;
       pfds.events = POLLIN;
@@ -282,18 +256,17 @@ class LSPServer {
       }
 
       return std::string(&buf[0], got);
-#endif
     }
   }
 
-  void refresh(const std::string &why) {
+  void refresh(const std::string &why, MethodResult &methodResult) {
     ignoredCount = 0;
     if (needsUpdate) {
 #ifdef CERR_DEBUG
       struct timeval start, stop;
       gettimeofday(&start, 0);
 #endif
-      diagnoseProject();
+      diagnoseProject(methodResult);
 #ifdef CERR_DEBUG
       gettimeofday(&stop, 0);
       double delay = (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000000.0;
@@ -303,22 +276,26 @@ class LSPServer {
     }
   }
 
-  void timeout() { refresh("timeout"); }
+  void timeout() {
+    MethodResult methodResult;
+    // Send message w/ diagnostics if there are any
+    refresh("timeout", methodResult);
+  }
 
-  void callMethod(const std::string &method, const JAST &request) {
+  MethodResult callMethod(const std::string &method, const JAST &request) {
     auto functionPointer = essentialMethods.find(method);
     if (functionPointer != essentialMethods.end()) {
-      (this->*(functionPointer->second))(request);
-    } else {
-      functionPointer = additionalMethods.find(method);
-      if (functionPointer != additionalMethods.end()) {
-        (this->*(functionPointer->second))(request);
-      } else {
-        JAST errorMessage = JSONConverter::createErrorMessage(
-            request, MethodNotFound, "Method '" + method + "' is not implemented.");
-        sendMessage(errorMessage);
-      }
+      return (this->*(functionPointer->second))(request);
     }
+
+    functionPointer = additionalMethods.find(method);
+    if (functionPointer != additionalMethods.end()) {
+      return (this->*(functionPointer->second))(request);
+    }
+
+    JAST errorMessage = JSONConverter::createErrorMessage(
+        request, MethodNotFound, "Method '" + method + "' is not implemented.");
+    return MethodResult(errorMessage);
   }
 
   static void sendMessage(const JAST &message) {
@@ -331,62 +308,55 @@ class LSPServer {
     std::cout << str.rdbuf() << "\r\n" << std::flush;
   }
 
-  void initialize(const JAST &receivedMessage) {
-    JAST message(JSON_OBJECT);
+  MethodResult initialize(const JAST &receivedMessage) {
+    MethodResult methodResult;
     if (!isSTDLibValid) {
-      notifyAboutInvalidSTDLib();
-      message = JSONConverter::createInitializeResultInvalidSTDLib(receivedMessage);
+      notifyAboutInvalidSTDLib(methodResult);  // set notification
+      methodResult.response = JSONConverter::createInitializeResultInvalidSTDLib(receivedMessage);
     } else {
-      message = JSONConverter::createInitializeResultDefault(receivedMessage);
+      methodResult.response = JSONConverter::createInitializeResultDefault(receivedMessage);
     }
 
     isInitialized = true;
-    astree.absWorkDir =
-        JSONConverter::decodePath(receivedMessage.get("params").get("rootUri").value);
-    sendMessage(message);
+    std::string workspaceUri =
+        receivedMessage.get("params").get("workspaceFolders").children[0].second.get("uri").value;
+    astree.absWorkDir = JSONConverter::decodePath(workspaceUri);
 
+    return methodResult;
+  }
+
+  MethodResult initialized(const JAST &_) {
+    MethodResult methodResult;
     if (isSTDLibValid) {
       needsUpdate = true;
-      refresh("initialize");
+      refresh("initialized", methodResult);  // set diagnostics
     }
+    return methodResult;
   }
 
-  void initialized(const JAST &_) {}
-
-  void registerCapabilities() {
-    JAST message = JSONConverter::createRequestMessage();
-    message.add("method", "client/registerCapability");
-    JAST &registrationParams = message.add("params", JSON_OBJECT);
-    JAST &registrations = registrationParams.add("registrations", JSON_ARRAY);
-
-    for (const auto &method : additionalMethods) {
-      JAST &registration = registrations.add("", JSON_OBJECT);
-      registration.add("id", method.first.c_str());
-      registration.add("method", method.first.c_str());
-    }
-    sendMessage(message);
-  }
-
-  void diagnoseProject() {
-    astree.diagnoseProject([](ASTree::FileDiagnostics &fileDiagnostics) {
+  void diagnoseProject(MethodResult &methodResult) {
+    astree.diagnoseProject([&methodResult](ASTree::FileDiagnostics &fileDiagnostics) {
       JAST fileDiagnosticsJSON =
           JSONConverter::fileDiagnosticsToJSON(fileDiagnostics.first, fileDiagnostics.second);
-      sendMessage(fileDiagnosticsJSON);
+      methodResult.diagnostics.children.emplace_back("", fileDiagnosticsJSON);
     });
     needsUpdate = false;
   }
 
-  void goToDefinition(const JAST &receivedMessage) {
-    refresh("goto-definition");
+  MethodResult goToDefinition(const JAST &receivedMessage) {
+    MethodResult methodResult;
+    refresh("goto-definition", methodResult);
     Location locationToDefine = JSONConverter::getLocationFromJSON(receivedMessage);
     Location definitionLocation = astree.findDefinitionLocation(locationToDefine);
     JAST definitionLocationJSON =
         JSONConverter::definitionLocationToJSON(receivedMessage, definitionLocation);
-    sendMessage(definitionLocationJSON);
+    methodResult.response = definitionLocationJSON;
+    return methodResult;
   }
 
-  void findReportReferences(const JAST &receivedMessage) {
-    refresh("report-references");
+  MethodResult findReportReferences(const JAST &receivedMessage) {
+    MethodResult methodResult;
+    refresh("report-references", methodResult);
     Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage);
     bool isDefinitionFound = false;
     std::vector<Location> references;
@@ -398,13 +368,15 @@ class LSPServer {
     }
 
     JAST referencesJSON = JSONConverter::referencesToJSON(receivedMessage, references);
-    sendMessage(referencesJSON);
+    methodResult.response = referencesJSON;
+    return methodResult;
   }
 
-  void highlightOccurrences(const JAST &receivedMessage) {
+  MethodResult highlightOccurrences(const JAST &receivedMessage) {
+    MethodResult methodResult;
     if (needsUpdate) {
       if (++ignoredCount > 2) {
-        refresh("highlight");
+        refresh("highlight", methodResult);
       } else {
 #ifdef CERR_DEBUG
         std::cerr << "Opting not to refresh code for highlight request" << std::endl;
@@ -414,13 +386,15 @@ class LSPServer {
     Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage);
     std::vector<Location> occurrences = astree.findOccurrences(symbolLocation);
     JAST highlightsJSON = JSONConverter::highlightsToJSON(receivedMessage, occurrences);
-    sendMessage(highlightsJSON);
+    methodResult.response = highlightsJSON;
+    return methodResult;
   }
 
-  void hover(const JAST &receivedMessage) {
+  MethodResult hover(const JAST &receivedMessage) {
+    MethodResult methodResult;
     if (needsUpdate) {
       if (++ignoredCount > 2) {
-        refresh("hover");
+        refresh("hover", methodResult);
       } else {
 #ifdef CERR_DEBUG
         std::cerr << "Opting not to refresh code for hover request" << std::endl;
@@ -430,13 +404,15 @@ class LSPServer {
     Location symbolLocation = JSONConverter::getLocationFromJSON(receivedMessage);
     std::vector<SymbolDefinition> hoverInfoPieces = astree.findHoverInfo(symbolLocation);
     JAST hoverInfoJSON = JSONConverter::hoverInfoToJSON(receivedMessage, hoverInfoPieces);
-    sendMessage(hoverInfoJSON);
+    methodResult.response = hoverInfoJSON;
+    return methodResult;
   }
 
-  void documentSymbol(const JAST &receivedMessage) {
+  MethodResult documentSymbol(const JAST &receivedMessage) {
+    MethodResult methodResult;
     if (needsUpdate) {
       if (++ignoredCount > 2) {
-        refresh("document-symbol");
+        refresh("document-symbol", methodResult);
       } else {
 #ifdef CERR_DEBUG
         std::cerr << "Opting not to refresh code for document-symbol request" << std::endl;
@@ -453,11 +429,13 @@ class LSPServer {
     for (const SymbolDefinition &symbol : symbols) {
       JSONConverter::appendSymbolToJSON(symbol, result);
     }
-    sendMessage(message);
+    methodResult.response = message;
+    return methodResult;
   }
 
-  void workspaceSymbol(const JAST &receivedMessage) {
-    refresh("workspace-symbol");
+  MethodResult workspaceSymbol(const JAST &receivedMessage) {
+    MethodResult methodResult;
+    refresh("workspace-symbol", methodResult);
     JAST message = JSONConverter::createResponseMessage(receivedMessage);
     JAST &result = message.add("result", JSON_ARRAY);
 
@@ -466,17 +444,19 @@ class LSPServer {
     for (const SymbolDefinition &symbol : symbols) {
       JSONConverter::appendSymbolToJSON(symbol, result);
     }
-    sendMessage(message);
+    methodResult.response = message;
+    return methodResult;
   }
 
-  void rename(const JAST &receivedMessage) {
-    refresh("rename-symbol");
+  MethodResult rename(const JAST &receivedMessage) {
+    MethodResult methodResult;
+    refresh("rename-symbol", methodResult);
     std::string newName = receivedMessage.get("params").get("newName").value;
     if (newName.find(' ') != std::string::npos || (newName[0] >= '0' && newName[0] <= '9')) {
       JAST errorMessage = JSONConverter::createErrorMessage(receivedMessage, InvalidParams,
                                                             "The given name is invalid.");
-      sendMessage(errorMessage);
-      return;
+      methodResult.response = errorMessage;
+      return methodResult;
     }
 
     Location definitionLocation = JSONConverter::getLocationFromJSON(receivedMessage);
@@ -488,14 +468,16 @@ class LSPServer {
     }
     JAST workspaceEditsJSON =
         JSONConverter::workspaceEditsToJSON(receivedMessage, references, newName);
-    sendMessage(workspaceEditsJSON);
+    methodResult.response = workspaceEditsJSON;
+    return methodResult;
   }
 
-  void didOpen(const JAST &_) {
+  MethodResult didOpen(const JAST &_) {
     // no refresh should be needed
+    return {};
   }
 
-  void didChange(const JAST &receivedMessage) {
+  MethodResult didChange(const JAST &receivedMessage) {
     std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
     std::string fileContent = receivedMessage.get("params")
                                   .get("contentChanges")
@@ -504,30 +486,36 @@ class LSPServer {
                                   .value;
     std::string fileName = JSONConverter::decodePath(fileUri);
     astree.changedFiles[fileName] =
-        std::unique_ptr<StringFile>(new StringFile(fileName.c_str(), std::move(fileContent)));
+        std::make_unique<StringFile>(fileName.c_str(), std::move(fileContent));
     needsUpdate = true;
     ignoredCount = 0;
+    return {};
   }
 
-  void didSave(const JAST &receivedMessage) {
+  MethodResult didSave(const JAST &receivedMessage) {
     std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
     astree.changedFiles.erase(JSONConverter::decodePath(fileUri));
 
     // Might have replaced a file modified on disk
     needsUpdate = true;
-    refresh("file-save");
+    MethodResult methodResult;
+    refresh("file-save", methodResult);
+    return methodResult;
   }
 
-  void didClose(const JAST &receivedMessage) {
+  MethodResult didClose(const JAST &receivedMessage) {
     std::string fileUri = receivedMessage.get("params").get("textDocument").get("uri").value;
     if (astree.changedFiles.erase(JSONConverter::decodePath(fileUri)) > 0) {
       needsUpdate = true;
       // If a user hits 'undo' on a symbol rename, you can get hundreds of sequential didClose
       // invocations Calling refresh here would cause the extension to 'hang' for a very long time.
     }
+    return {};
   }
 
-  void didChangeWatchedFiles(const JAST &receivedMessage) {
+  MethodResult didChangeWatchedFiles(const JAST &receivedMessage) {
+    MethodResult methodResult;
+
     JAST jfiles = receivedMessage.get("params").get("changes");
     for (auto child : jfiles.children) {
       std::string filePath = JSONConverter::decodePath(child.second.get("uri").value);
@@ -538,40 +526,108 @@ class LSPServer {
         // The file was deleted => clear any stale diagnostics
         std::vector<Diagnostic> emptyDiagnostics;
         JAST fileDiagnosticsJSON = JSONConverter::fileDiagnosticsToJSON(filePath, emptyDiagnostics);
-        sendMessage(fileDiagnosticsJSON);
+        methodResult.diagnostics.children.emplace_back("", fileDiagnosticsJSON);
       }
     }
 
     if (!jfiles.children.empty()) {
       needsUpdate = true;
-      refresh("files-created-or-deleted");
+      refresh("files-created-or-deleted", methodResult);
     }
+    return methodResult;
   }
 
-  void shutdown(const JAST &receivedMessage) {
+  MethodResult shutdown(const JAST &receivedMessage) {
+    MethodResult methodResult;
     JAST message = JSONConverter::createResponseMessage(receivedMessage);
     message.add("result", JSON_NULLVAL);
     isShutDown = true;
-    sendMessage(message);
+    methodResult.response = message;
+    return methodResult;
   }
 
-  void serverExit(const JAST &_) { exit(isShutDown ? 0 : 1); }
+  MethodResult serverExit(const JAST &_) { exit(isShutDown ? 0 : 1); }
 };
 
-int main(int argc, const char **argv) {
-  std::string stdLib;
-  if (argc >= 2) {
-    stdLib = make_canonical(argv[1]);
-  } else {
-    stdLib = make_canonical(find_execpath() + "/../../share/wake/lib");
-  }
+LSPServer *lspServer = nullptr;
 
-  LSPServer lsp;
-  if (is_readable((stdLib + "/core/boolean.wake").c_str())) {
-    lsp = LSPServer(stdLib);
+#ifdef __EMSCRIPTEN__
+
+void instantiateServerInternal(const std::string &stdLib) {
+  // clang-format off
+  int isNode = EM_ASM_INT({
+    return ENVIRONMENT_IS_NODE;
+  });
+  // clang-format on
+  bool isReadable = false;
+  if (isNode) {
+    isReadable = is_readable((stdLib + "/core/boolean.wake").c_str());
+  } else {  // no need to check stdlib validity in web, since it can't be customized there
+    isReadable = true;
+  }
+  lspServer = new LSPServer(isReadable, stdLib);
+}
+
+extern "C" {
+void instantiateServer() {
+  // This path doesn't matter in web since we don't check the validity of this stdlib there.
+  // (We don't check it since we can't send an 'accessFile' request to the client at this stage)
+  auto stdlib = make_canonical(find_execpath() + "/../../share/wake/lib");
+  instantiateServerInternal(stdlib);
+}
+
+void instantiateServerCustomStdLib(const char *stdLib) {
+  // clang-format off
+  int isNode = EM_ASM_INT({
+    return ENVIRONMENT_IS_NODE;
+  });
+  // clang-format on
+  if (isNode) {
+    instantiateServerInternal(make_canonical(stdLib));
   } else {
-    lsp = LSPServer(false, stdLib);
+    instantiateServerInternal(stdLib);  // We want to preserve the uri scheme of stdlib in web
+  }
+}
+
+char *processRequest(const char *request) {
+  LSPServer::MethodResult methodResult = lspServer->processRequest(request);
+
+  JAST jsonResult(JSON_OBJECT);
+  jsonResult.children.emplace_back("response", methodResult.response);
+  jsonResult.children.emplace_back("diagnostics", methodResult.diagnostics);
+  jsonResult.children.emplace_back("notification", methodResult.notification);
+
+  // Turn the json into a string
+  std::stringstream stringstream;
+  stringstream << jsonResult;
+  std::string str = stringstream.str();
+  const char *c = str.c_str();
+  size_t length = strlen(c);
+
+  // Malloc the string for typescript to use.
+  // Typescript will free it in lsp-server/src/common.ts/getResponse()
+  char *result = static_cast<char *>(malloc(length + 1));
+  memcpy(result, c, length);
+  result[length] = '\0';
+  return result;
+}
+}
+
+#else
+
+void instantiateServer(const std::string &stdLib) {
+  bool isReadable = is_readable((stdLib + "/core/boolean.wake").c_str());
+  lspServer = new LSPServer(isReadable, stdLib);
+}
+
+int main(int argc, const char **argv) {
+  if (argc >= 2) {
+    instantiateServer(argv[1]);
+  } else {
+    instantiateServer(make_canonical(find_execpath() + "/../../share/wake/lib"));
   }
   // Process requests until something goes wrong
-  lsp.processRequests();
+  lspServer->processRequests();
 }
+
+#endif

@@ -35,6 +35,7 @@
 #include "parser/syntax.h"
 #include "util/diagnostic.h"
 #include "util/file.h"
+#include "wcl/diff.h"
 #include "wcl/xoshiro_256.h"
 
 #ifndef VERSION
@@ -50,7 +51,10 @@ class TerminalReporter : public DiagnosticReporter {
   bool errors;
   bool warnings;
 
+  void report_to_stderr() { std::cerr << ostream.str(); }
+
  private:
+  std::stringstream ostream;
   std::string last;
 
   void report(Diagnostic diagnostic) {
@@ -59,9 +63,9 @@ class TerminalReporter : public DiagnosticReporter {
 
     if (last != diagnostic.getMessage()) {
       last = diagnostic.getMessage();
-      std::cerr << diagnostic.getLocation() << ": ";
-      if (diagnostic.getSeverity() == S_WARNING) std::cerr << "(warning) ";
-      std::cerr << diagnostic.getMessage() << std::endl;
+      ostream << diagnostic.getLocation() << ": ";
+      if (diagnostic.getSeverity() == S_WARNING) ostream << "(warning) ";
+      ostream << diagnostic.getMessage() << std::endl;
     }
   }
 };
@@ -102,6 +106,7 @@ void print_cst(CSTElement node, int depth) {
       case TOKEN_DOUBLE:
       case TOKEN_STR_SINGLE:
       case TOKEN_REG_SINGLE:
+      case TOKEN_COMMENT:
         std::cout << " -> " << child.fragment().segment().str() << std::endl;
         break;
       case TOKEN_WS: {
@@ -128,12 +133,15 @@ int main(int argc, char **argv) {
 
   // clang-format off
   struct option options[] {
-    {'d', "debug", GOPT_ARGUMENT_FORBIDDEN},
-    {'n', "dry-run", GOPT_ARGUMENT_FORBIDDEN},
-    {'h', "help", GOPT_ARGUMENT_FORBIDDEN},
-    {'i', "in-place", GOPT_ARGUMENT_FORBIDDEN},
-    {'v', "version", GOPT_ARGUMENT_FORBIDDEN},
-    {0, 0, GOPT_LAST}
+    { 'd',    "debug", GOPT_ARGUMENT_FORBIDDEN},
+    { 'n',  "dry-run", GOPT_ARGUMENT_FORBIDDEN},
+    { 'h',     "help", GOPT_ARGUMENT_FORBIDDEN},
+    { 'i', "in-place", GOPT_ARGUMENT_FORBIDDEN},
+    { 'v',  "version", GOPT_ARGUMENT_FORBIDDEN},
+    // Undocumented flag for turning off true RNG
+    // Used to make messages deterministic for testing
+    {   0,   "no-rng", GOPT_ARGUMENT_FORBIDDEN},
+    {   0,          0, GOPT_LAST}
   };
   // clang-format on
 
@@ -145,6 +153,7 @@ int main(int argc, char **argv) {
   bool in_place = arg(options, "in-place")->count;
   bool version = arg(options, "version")->count;
   bool debug = arg(options, "debug")->count;
+  bool no_rng = arg(options, "no-rng")->count;
 
   if (help) {
     print_help(argv[0]);
@@ -156,17 +165,16 @@ int main(int argc, char **argv) {
     exit(EXIT_SUCCESS);
   }
 
-  if (dry_run) {
-    std::cout << "wake-format: dry-run not yet supported" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-
   if (argc < 2) {
     std::cerr << argv[0] << ": missing files to format" << std::endl;
     exit(EXIT_FAILURE);
   }
 
-  wcl::xoshiro_256 rng(wcl::xoshiro_256::get_rng_seed());
+  auto seed = (no_rng) ? std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>({0, 0, 0, 0})
+                       : wcl::xoshiro_256::get_rng_seed();
+  wcl::xoshiro_256 rng(seed);
+
+  bool dry_run_failed = false;
 
   for (int i = 1; i < argc; i++) {
     std::string name(argv[i]);
@@ -175,7 +183,8 @@ int main(int argc, char **argv) {
     ExternalFile external_file = ExternalFile(*reporter, name.c_str());
     CST cst = CST(external_file, *reporter);
     if (terminalReporter.errors) {
-      std::cerr << argv[0] << ": failed to parse file: " << name << std::endl;
+      std::cerr << argv[0] << ": failed to parse file: '" << name << "'" << std::endl << std::endl;
+      terminalReporter.report_to_stderr();
       exit(EXIT_FAILURE);
     }
 
@@ -190,6 +199,65 @@ int main(int argc, char **argv) {
     d.write(*output_file);
     output_file.reset();
 
+    if (!debug) {
+      // Check for bad formatting
+      ExternalFile external_file = ExternalFile(*reporter, tmp.c_str());
+      CST cst = CST(external_file, *reporter);
+      if (terminalReporter.errors) {
+        std::cerr << "wake-format failed to format '" << name << "'." << std::endl
+                  << "    This is probably due to bad indentation caused by '# wake-format off'"
+                  << std::endl
+                  << "    Please complete the following steps:" << std::endl
+                  << "        1) Submit a copy of '" << name
+                  << "' to the wake-format authors so they can improve the tool." << std::endl
+                  << "        2) Review '" << tmp << "' for the syntax errors mentioned below."
+                  << std::endl
+                  << "        3) Edit '" << name
+                  << "' to have the correct indentation expected by wake-format" << std::endl
+                  << std::endl;
+
+        terminalReporter.report_to_stderr();
+
+        std::cerr << std::endl;
+
+        exit(EXIT_FAILURE);
+      }
+    }
+
+    if (dry_run) {
+      std::vector<std::string> src;
+      std::vector<std::string> fmt;
+
+      {
+        std::ifstream src_file(name);
+
+        std::string src_line;
+        while (std::getline(src_file, src_line)) {
+          src.push_back(src_line);
+        }
+      }
+
+      {
+        std::ifstream fmt_file(tmp);
+
+        std::string fmt_line;
+        while (std::getline(fmt_file, fmt_line)) {
+          fmt.push_back(fmt_line);
+        }
+      }
+
+      // cleanup the formatting tmp file
+      remove(tmp.c_str());
+
+      if (src == fmt) {
+        continue;
+      }
+
+      auto diff = wcl::diff<std::string>(src.begin(), src.end(), fmt.begin(), fmt.end());
+      display_diff(std::cerr, diff);
+      dry_run_failed = true;
+    }
+
     if (in_place) {
       // When editing in-place we need to rename the tmp file over the original
       rename(tmp.c_str(), name.c_str());
@@ -199,6 +267,10 @@ int main(int argc, char **argv) {
       std::cout << src.rdbuf();
       remove(tmp.c_str());
     }
+  }
+
+  if (dry_run && dry_run_failed) {
+    exit(EXIT_FAILURE);
   }
 
   exit(EXIT_SUCCESS);

@@ -18,7 +18,7 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def tool (dir: String) (addHeaders: List Path) (variant: Pair String String) (output: String) (deps: List (Pair String String => Result SysLib Error)): Result (List Path) Error =
+def tool (dir: String) (addHeaders: List Path) (variant: Pair String String) (output: String) (deps: List (Pair String String => Result SysLib Error)) (extraFiles: List Path) (extraLFlags: List String): Result (List Path) Error =
     def Pair cppVariant cVariant =
         variant
 
@@ -63,4 +63,4 @@ def tool (dir: String) (addHeaders: List Path) (variant: Pair String String) (ou
         else
             cppVariant
 
-    linkO linkKind lib.getSysLibLFlags allObjects output
+    linkO linkKind (lib.getSysLibLFlags ++ extraLFlags) allObjects output extraFiles

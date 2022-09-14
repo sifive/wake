@@ -90,33 +90,46 @@ StringFile::StringFile(const char *filename_, std::string &&content_)
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 
+// clang-format off
+EM_ASYNC_JS(uint8_t *, getBase, (int *length, const char *filename), {
+  try {
+    let bytes;
+    if (ENVIRONMENT_IS_NODE) {
+      const fs = require('fs');
+      bytes = fs.readFileSync(UTF8ToString(filename));
+    } else {
+      const content = await wakeLspModule.sendRequest('readFile', UTF8ToString(filename));
+      const encoder = new TextEncoder();
+      bytes = encoder.encode(content);
+    }
+    // ExternalFile takes ownership of the memory and frees it in the destructor
+    const wasmPointer = Module._malloc(bytes.length + 1);
+    for (let i = 0; i < bytes.length; i++) {
+      Module.HEAPU8[wasmPointer + i] = bytes[i];
+    }
+    setValue(length, bytes.length, 'i32');
+    return wasmPointer;
+  } catch (err) {
+    const lengthBytes = lengthBytesUTF8(err.message) + 1;
+    // Same memory ownership here
+    const stringOnWasmHeap = _malloc(lengthBytes);
+    stringToUTF8(err.message, stringOnWasmHeap, lengthBytes);
+    setValue(length, -1, 'i32');
+    return stringOnWasmHeap;
+  }
+});
+
+// clang-format on
+
 ExternalFile::ExternalFile(DiagnosticReporter &reporter, const char *filename_)
     : FileContent(filename_) {
   Location l(filename());
 
   int32_t length;
-
-  // clang-format off
-  uint8_t *base = (uint8_t *)EM_ASM_INT({
-    try {
-      const fs = require('fs');
-      const fileBuffer = fs.readFileSync(UTF8ToString($1));
-      const wasmPointer = Module._malloc(fileBuffer.length+1);
-      fileBuffer.copy(Module.HEAPU8, wasmPointer);
-      setValue($0, fileBuffer.length, "i32");
-      return wasmPointer;
-    } catch (err) {
-      const lengthBytes = lengthBytesUTF8(err.message)+1;
-      const stringOnWasmHeap = _malloc(lengthBytes);
-      stringToUTF8(err.message, stringOnWasmHeap, lengthBytes);
-      setValue($0, -1, "i32");
-      return stringOnWasmHeap;
-    }
-  }, &length, filename());
-  // clang-format on
+  uint8_t *base = getBase(&length, filename());
 
   if (length == -1) {
-    reporter.reportError(l, std::string("readFileSync failed; ") + reinterpret_cast<char *>(base));
+    reporter.reportError(l, std::string("readFile failed; ") + reinterpret_cast<char *>(base));
     free(base);
     ss.end = ss.start = &null[0];
     return;

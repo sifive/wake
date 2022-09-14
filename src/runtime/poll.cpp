@@ -30,6 +30,8 @@
 #define USE_EPOLL 1
 #elif defined(__APPLE__)
 #define USE_PSELECT 1
+#elif defined(__EMSCRIPTEN__)
+#define USE_PSELECT
 #else
 #define USE_PPOLL 1
 #endif

@@ -17,49 +17,15 @@ package build_wake
 from wake import _
 from gcc_wake import _
 
-def emccFn fn = match emcc
+def emccFn fn = match (whichInEnvPath "emcc")
     None = Nil
     Some x = fn x
 
-def emcc =
-    require Some path =
-        getenv "PATH"
-
-    def emcc =
-        whichIn path "emcc"
-
-    if matches `/.*` emcc then
-        Some emcc
-    else
-        None
-
-def emppFn fn = match empp
+def emppFn fn = match (whichInEnvPath "em++")
     None = Nil
     Some x = fn x
 
-def empp =
-    require Some path =
-        getenv "PATH"
-
-    def empp =
-        whichIn path "em++"
-
-    if matches `/.*` empp then
-        Some empp
-    else
-        None
-
-def emmake =
-    require Some path =
-        getenv "PATH"
-
-    def emmake =
-        whichIn path "emmake"
-
-    if matches `/.*` emmake then
-        Some emmake
-    else
-        None
+def emmake = whichInEnvPath "emmake"
 
 def emscriptenCFlags =
     "-Wall", "-O3", Nil
@@ -68,9 +34,11 @@ def emscriptenLFlags =
     "-O3",
     "-s", "ALLOW_MEMORY_GROWTH",
     "-s", "EXIT_RUNTIME",
+    "-s", "ASSERTIONS",
     "-s", "ASYNCIFY",
-    "-s", "ASYNCIFY_IGNORE_INDIRECT",
-    "-s", 'ASYNCIFY_IMPORTS=["nodejs_getstdin"]',
+    "-s", "MODULARIZE=1",
+    "-s", "EXPORT_ES6=1",
+    "-s", "SINGLE_FILE",
     Nil
 
 publish compileC =
