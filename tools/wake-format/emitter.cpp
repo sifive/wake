@@ -681,9 +681,9 @@ static wcl::doc select_best_choice(std::vector<wcl::optional<wcl::doc>> choices)
 // + # comment
 // <space> 5
 // '''
-static wcl::doc post_binop_spacing(CSTElement over, const token_traits_map_t& traits,
-                                   const wcl::doc& fmt_binop, const wcl::doc_builder& builder,
-                                   ctx_t ctx) {
+static wcl::doc post_binop_separator(CSTElement over, const token_traits_map_t& traits,
+                                     const wcl::doc& fmt_binop, const wcl::doc_builder& builder,
+                                     ctx_t ctx) {
   if (fmt_binop->has_newline()) {
     return fmt().freshline().compose(ctx.sub(builder), over, traits);
   }
@@ -694,10 +694,10 @@ wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
                                               const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
   for (size_t i = 0; i < parts.size() - 1; i++) {
-    builder.append(walk_node(ctx.sub(builder), parts[i]));
-    builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
-    builder.append(walk_token(ctx.sub(builder), over));
-    builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+    CSTElement part = parts[i];
+    CSTElement op_copy = over;
+    builder.append(fmt().walk(WALK_NODE).space().compose(ctx.sub(builder), part, token_traits));
+    builder.append(fmt().walk(WALK_TOKEN).space().compose(ctx.sub(builder), op_copy, token_traits));
   }
 
   builder.append(walk_node(ctx.sub(builder), parts.back()));
@@ -713,20 +713,22 @@ wcl::optional<wcl::doc> Emitter::combine_explode_first(CSTElement over, ctx_t ct
                                                        const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
 
-  builder.append(walk_node(ctx.sub(builder).explode(), parts[0]));
-  builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
+  auto exp_fmt = fmt().walk(WALK_NODE).freshline();
+
+  CSTElement part = parts[0];
+  builder.append(exp_fmt.compose(ctx.sub(builder).explode(), part, token_traits));
 
   wcl::doc binop = walk_token(ctx.sub(builder), over);
   builder.append(binop);
-  builder.append(post_binop_spacing(over, token_traits, binop, builder, ctx));
+  builder.append(post_binop_separator(over, token_traits, binop, builder, ctx));
 
   for (size_t i = 1; i < parts.size() - 1; i++) {
-    builder.append(walk_node(ctx.sub(builder), parts[i]));
-    builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
+    part = parts[i];
+    builder.append(exp_fmt.compose(ctx.sub(builder), part, token_traits));
 
     binop = walk_token(ctx.sub(builder), over);
     builder.append(binop);
-    builder.append(post_binop_spacing(over, token_traits, binop, builder, ctx));
+    builder.append(post_binop_separator(over, token_traits, binop, builder, ctx));
   }
 
   builder.append(walk_node(ctx.sub(builder), parts.back()));
@@ -738,12 +740,12 @@ wcl::optional<wcl::doc> Emitter::combine_explode_last(CSTElement over, ctx_t ctx
   wcl::doc_builder builder;
 
   for (size_t i = 0; i < parts.size() - 1; i++) {
-    builder.append(walk_node(ctx.sub(builder), parts[i]));
-    builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
+    CSTElement part = parts[i];
+    builder.append(fmt().walk(WALK_NODE).freshline().compose(ctx.sub(builder), part, token_traits));
 
     wcl::doc binop = walk_token(ctx.sub(builder), over);
     builder.append(binop);
-    builder.append(post_binop_spacing(over, token_traits, binop, builder, ctx));
+    builder.append(post_binop_separator(over, token_traits, binop, builder, ctx));
   }
 
   builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
@@ -755,12 +757,13 @@ wcl::optional<wcl::doc> Emitter::combine_explode_all(CSTElement over, ctx_t ctx,
   wcl::doc_builder builder;
 
   for (size_t i = 0; i < parts.size() - 1; i++) {
-    builder.append(walk_node(ctx.sub(builder).explode(), parts[i]));
-    builder.append(fmt().freshline().compose(ctx.sub(builder), over, token_traits));
-    wcl::doc operator_doc = walk_token(ctx.sub(builder), over);
+    CSTElement part = parts[i];
+    builder.append(
+        fmt().walk(WALK_NODE).freshline().compose(ctx.sub(builder).explode(), part, token_traits));
+
     wcl::doc binop = walk_token(ctx.sub(builder), over);
     builder.append(binop);
-    builder.append(post_binop_spacing(over, token_traits, binop, builder, ctx));
+    builder.append(post_binop_separator(over, token_traits, binop, builder, ctx));
   }
 
   builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
@@ -777,10 +780,10 @@ wcl::optional<wcl::doc> Emitter::combine_explode_first_compress(
   builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
 
   for (size_t i = 1; i < parts.size() - 1; i++) {
-    builder.append(walk_node(ctx.sub(builder), parts[i]));
-    builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
-    builder.append(walk_token(ctx.sub(builder), over));
-    builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+    CSTElement part = parts[i];
+    CSTElement op_copy = over;
+    builder.append(fmt().walk(WALK_NODE).space().compose(ctx.sub(builder), part, token_traits));
+    builder.append(fmt().walk(WALK_TOKEN).space().compose(ctx.sub(builder), op_copy, token_traits));
   }
 
   builder.append(walk_node(ctx.sub(builder), parts.back()));
@@ -797,10 +800,10 @@ wcl::optional<wcl::doc> Emitter::combine_explode_last_compress(
   wcl::doc_builder builder;
 
   for (size_t i = 0; i < parts.size() - 1; i++) {
-    builder.append(walk_node(ctx.sub(builder), parts[i]));
-    builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
-    builder.append(walk_token(ctx.sub(builder), over));
-    builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+    CSTElement part = parts[i];
+    CSTElement op_copy = over;
+    builder.append(fmt().walk(WALK_NODE).space().compose(ctx.sub(builder), part, token_traits));
+    builder.append(fmt().walk(WALK_TOKEN).space().compose(ctx.sub(builder), op_copy, token_traits));
   }
 
   builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
