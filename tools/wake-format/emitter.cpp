@@ -21,6 +21,7 @@
 
 #include "emitter.h"
 
+#include <algorithm>
 #include <cassert>
 
 #include "parser/parser.h"
@@ -48,7 +49,9 @@
   }
 
 static inline bool requires_nl(cst_id_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
-static inline bool requires_fits_all(cst_id_t type) { return type == CST_APP; }
+static inline bool requires_fits_all(cst_id_t type) {
+  return type == CST_APP || type == CST_BINARY;
+}
 
 static inline bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
@@ -524,19 +527,332 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
   MEMO_RET(walk_placeholder(ctx, node));
 }
 
+static std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTElement node) {
+  if (node.id() != CST_BINARY) {
+    return {node};
+  }
+
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
+  CSTElement left = node.firstChildNode();
+  CSTElement op = left;
+  op.nextSiblingNode();
+  CSTElement right = op;
+  right.nextSiblingNode();
+
+  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
+        op.firstChildElement().fragment().segment().str() ==
+            collect_over.fragment().segment().str())) {
+    return {node};
+  }
+
+  auto collect = collect_left_binary(collect_over, left);
+  collect.push_back(right);
+
+  return collect;
+}
+
+static std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CSTElement node) {
+  if (node.id() != CST_BINARY) {
+    return {node};
+  }
+
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
+  CSTElement left = node.firstChildNode();
+  CSTElement op = left;
+  op.nextSiblingNode();
+  CSTElement right = op;
+  right.nextSiblingNode();
+
+  if (!(op.id() == CST_OP && op.firstChildElement().id() == collect_over.id() &&
+        op.firstChildElement().fragment().segment().str() ==
+            collect_over.fragment().segment().str())) {
+    return {node};
+  }
+
+  std::vector<CSTElement> collect = {left};
+  auto right_collect = collect_right_binary(collect_over, right);
+
+  collect.insert(collect.end(), right_collect.begin(), right_collect.end());
+
+  return collect;
+}
+
+static size_t count_allowed_newlines(const token_traits_map_t& traits,
+                                     const std::vector<CSTElement>& parts) {
+  assert(parts.size() >= 2);
+
+  CSTElement first_token = parts[0].firstChildElement();
+
+  CSTElement last_token;
+  {
+    IsWSNLCPredicate is_wsnlc;
+    CSTElement curr_rhs = parts.back().firstChildElement();
+    CSTElement next_rhs = curr_rhs;
+    next_rhs.nextSiblingElement();
+
+    while (!next_rhs.empty()) {
+      while (!next_rhs.empty() && is_wsnlc(next_rhs)) {
+        next_rhs.nextSiblingElement();
+      }
+      if (next_rhs.empty()) {
+        last_token = curr_rhs;
+      } else {
+        curr_rhs = next_rhs;
+        next_rhs.nextSiblingElement();
+      }
+    }
+    last_token = curr_rhs;
+  }
+
+  size_t allowed = 0;
+
+  auto first_it = traits.find(first_token);
+  if (first_it != traits.end()) {
+    allowed += first_it->second.before_bound.size();
+  }
+
+  auto last_it = traits.find(last_token);
+  if (last_it != traits.end()) {
+    allowed += last_it->second.after_bound.size();
+  }
+
+  return allowed;
+}
+
+static bool compare_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
+  return lhs->height() < rhs->height();
+}
+
+static bool compare_doc_width(const wcl::doc& lhs, const wcl::doc& rhs) {
+  return lhs->max_width() < rhs->max_width();
+}
+
+// TODO: this is far from fully correct
+static bool is_op_left_assoc(const CSTElement& op) { return op.id() == TOKEN_OP_OR; }
+
+// Assumes that at least one of the choices is viable. Will assert otherwise
+static wcl::doc select_best_choice(std::vector<wcl::optional<wcl::doc>> choices) {
+  std::vector<wcl::doc> lte_fmt = {};
+  std::vector<wcl::doc> gt_fmt = {};
+  int i = 0;
+
+  for (auto choice_opt : choices) {
+    i++;
+    if (!choice_opt) {
+      continue;
+    }
+    auto choice = *choice_opt;
+
+    if (choice->max_width() > MAX_COLUMN_WIDTH) {
+      gt_fmt.push_back(std::move(choice));
+    } else {
+      lte_fmt.push_back(std::move(choice));
+    }
+  }
+
+  if (lte_fmt.size() > 0) {
+    auto min_height = std::min_element(lte_fmt.begin(), lte_fmt.end(), compare_doc_height);
+    return *min_height;
+  }
+
+  // If lte_fmt doesn't have any viable then gt_fmt must have at least one
+  assert(gt_fmt.size() > 0);
+
+  auto min_width = std::min_element(gt_fmt.begin(), gt_fmt.end(), compare_doc_width);
+  return *min_width;
+}
+
+// The separator between the binop and the RHS is usually a space but when the doc has a newline a
+// freshline is required instead. This function returns a doc with the appropiate separator.
+//
+// Ex:
+// space: '3 + <space> 2'
+// freshline:
+//  '''x
+//     + # comment
+// <FR>5
+//  '''
+//
+// Without the freshline case, the syntatically invalid below is emitted
+// '''
+// x
+// + # comment
+// <space> 5
+// '''
+static wcl::doc post_binop_separator(CSTElement over, const token_traits_map_t& traits,
+                                     const wcl::doc& fmt_binop, const wcl::doc_builder& builder,
+                                     ctx_t ctx) {
+  if (fmt_binop->has_newline()) {
+    return fmt().freshline().compose(ctx.sub(builder), over, traits);
+  }
+  return fmt().space().compose(ctx.sub(builder), over, traits);
+}
+
+wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
+                                              const std::vector<CSTElement>& parts) {
+  wcl::doc_builder builder;
+  for (size_t i = 0; i < parts.size() - 1; i++) {
+    CSTElement part = parts[i];
+    CSTElement op_copy = over;
+    builder.append(fmt().walk(WALK_NODE).space().compose(ctx.sub(builder), part, token_traits));
+    builder.append(fmt().walk(WALK_TOKEN).space().compose(ctx.sub(builder), op_copy, token_traits));
+  }
+
+  builder.append(walk_node(ctx.sub(builder), parts.back()));
+
+  wcl::doc doc = std::move(builder).build();
+  if (doc->newline_count() != count_allowed_newlines(token_traits, parts)) {
+    return {};
+  }
+  return {wcl::in_place_t{}, std::move(doc)};
+}
+
+wcl::optional<wcl::doc> Emitter::combine_explode_first(CSTElement over, ctx_t ctx,
+                                                       const std::vector<CSTElement>& parts) {
+  wcl::doc_builder builder;
+
+  auto exp_fmt = fmt().walk(WALK_NODE).freshline();
+
+  CSTElement part = parts[0];
+  builder.append(exp_fmt.compose(ctx.sub(builder).explode(), part, token_traits));
+
+  wcl::doc binop = walk_token(ctx.sub(builder), over);
+  builder.append(binop);
+  builder.append(post_binop_separator(over, token_traits, binop, builder, ctx));
+
+  for (size_t i = 1; i < parts.size() - 1; i++) {
+    part = parts[i];
+    builder.append(exp_fmt.compose(ctx.sub(builder), part, token_traits));
+
+    binop = walk_token(ctx.sub(builder), over);
+    builder.append(binop);
+    builder.append(post_binop_separator(over, token_traits, binop, builder, ctx));
+  }
+
+  builder.append(walk_node(ctx.sub(builder), parts.back()));
+  return {wcl::in_place_t{}, std::move(builder).build()};
+}
+
+wcl::optional<wcl::doc> Emitter::combine_explode_last(CSTElement over, ctx_t ctx,
+                                                      const std::vector<CSTElement>& parts) {
+  wcl::doc_builder builder;
+
+  for (size_t i = 0; i < parts.size() - 1; i++) {
+    CSTElement part = parts[i];
+    builder.append(fmt().walk(WALK_NODE).freshline().compose(ctx.sub(builder), part, token_traits));
+
+    wcl::doc binop = walk_token(ctx.sub(builder), over);
+    builder.append(binop);
+    builder.append(post_binop_separator(over, token_traits, binop, builder, ctx));
+  }
+
+  builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
+  return {wcl::in_place_t{}, std::move(builder).build()};
+}
+
+wcl::optional<wcl::doc> Emitter::combine_explode_all(CSTElement over, ctx_t ctx,
+                                                     const std::vector<CSTElement>& parts) {
+  wcl::doc_builder builder;
+
+  for (size_t i = 0; i < parts.size() - 1; i++) {
+    CSTElement part = parts[i];
+    builder.append(
+        fmt().walk(WALK_NODE).freshline().compose(ctx.sub(builder).explode(), part, token_traits));
+
+    wcl::doc binop = walk_token(ctx.sub(builder), over);
+    builder.append(binop);
+    builder.append(post_binop_separator(over, token_traits, binop, builder, ctx));
+  }
+
+  builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
+  return {wcl::in_place_t{}, std::move(builder).build()};
+}
+
+wcl::optional<wcl::doc> Emitter::combine_explode_first_compress(
+    CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts) {
+  wcl::doc_builder builder;
+
+  builder.append(walk_node(ctx.sub(builder).explode(), parts[0]));
+  builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+  builder.append(walk_token(ctx.sub(builder), over));
+  builder.append(fmt().space().compose(ctx.sub(builder), over, token_traits));
+
+  for (size_t i = 1; i < parts.size() - 1; i++) {
+    CSTElement part = parts[i];
+    CSTElement op_copy = over;
+    builder.append(fmt().walk(WALK_NODE).space().compose(ctx.sub(builder), part, token_traits));
+    builder.append(fmt().walk(WALK_TOKEN).space().compose(ctx.sub(builder), op_copy, token_traits));
+  }
+
+  builder.append(walk_node(ctx.sub(builder), parts.back()));
+
+  wcl::doc doc = std::move(builder).build();
+  if (doc->newline_count() != count_allowed_newlines(token_traits, parts)) {
+    return {};
+  }
+  return {wcl::in_place_t{}, std::move(doc)};
+}
+
+wcl::optional<wcl::doc> Emitter::combine_explode_last_compress(
+    CSTElement over, ctx_t ctx, const std::vector<CSTElement>& parts) {
+  wcl::doc_builder builder;
+
+  for (size_t i = 0; i < parts.size() - 1; i++) {
+    CSTElement part = parts[i];
+    CSTElement op_copy = over;
+    builder.append(fmt().walk(WALK_NODE).space().compose(ctx.sub(builder), part, token_traits));
+    builder.append(fmt().walk(WALK_TOKEN).space().compose(ctx.sub(builder), op_copy, token_traits));
+  }
+
+  builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
+
+  wcl::doc doc = std::move(builder).build();
+  if (doc->newline_count() != count_allowed_newlines(token_traits, parts)) {
+    return {};
+  }
+  return {wcl::in_place_t{}, std::move(doc)};
+}
+
 wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_BINARY);
 
-  MEMO_RET(fmt()
-               .walk(is_expression, WALK_NODE)
-               .consume_wsnlc()
-               .space()  // TODO: fix the 'grows NL' case
-               .walk(CST_OP, WALK_NODE)
-               .consume_wsnlc()
-               .space()  // TODO: fix the 'grows NL' case
-               .walk(is_expression, WALK_NODE)
-               .format(ctx, node.firstChildElement(), token_traits));
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
+  CSTElement lhs = node.firstChildNode();
+  CSTElement op = lhs;
+  op.nextSiblingNode();
+  CSTElement rhs = op;
+  rhs.nextSiblingNode();
+
+  assert(op.id() == CST_OP);
+  CSTElement op_token = op.firstChildElement();
+
+  std::vector<CSTElement> parts = {};
+  if (is_op_left_assoc(op_token)) {
+    parts = collect_left_binary(op_token, node);
+  } else {
+    parts = collect_right_binary(op_token, node);
+  }
+
+  std::vector<wcl::optional<wcl::doc>> choices = {
+      // 1
+      combine_flat(op_token, ctx, parts),
+      // 2
+      combine_explode_first(op_token, ctx, parts),
+      // 3
+      combine_explode_last(op_token, ctx, parts),
+      // 4
+      combine_explode_all(op_token, ctx, parts),
+      // 5
+      combine_explode_first_compress(op_token, ctx, parts),
+      // 6
+      combine_explode_last_compress(op_token, ctx, parts),
+  };
+
+  MEMO_RET(select_best_choice(choices));
 }
 
 wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {

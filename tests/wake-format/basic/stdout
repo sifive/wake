@@ -131,15 +131,19 @@ def t5 = (
 )
 
 
-# TODO: These cases are actually binop not paren
-# def t7 = (
-#   x # comment
-#   + 5
-# )
-# def t8 = (
-#   x + # comment
-#   5
-# )
+def t7 = (
+    x # comment
+    + 5
+)
+
+
+def t8 = (
+    x
+    + # comment
+    5
+)
+
+
 def t9 = (
     x + 5 # comment
 )
@@ -161,6 +165,76 @@ def t6 = ( # comment
     # comment
     x + 5
 )
+
+
+def t8 = (
+    # comment
+    x # comment
+    + # comment
+    5 # comment
+    - # comment
+    2 # comment
+)
+
+
+def t9 = x + 5 - 2
+
+
+def ff = a | b | c | d
+
+
+def ff = a $ b $ c $ d
+
+
+def ff =
+    a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
+    | a
 
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)

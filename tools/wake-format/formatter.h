@@ -42,9 +42,20 @@ struct ctx_t {
   size_t nest_level = 0;
   wcl::doc_state state = wcl::doc_state::identity();
 
+  // Expectation from a subtree
+  // 1: By default, don't explode unless you have to
+  // 2: if prefer_explode, explode if you can
+  bool prefer_explode = false;
+
   ctx_t nest() const {
     ctx_t copy = *this;
     copy.nest_level++;
+    return copy;
+  }
+
+  ctx_t explode() {
+    ctx_t copy = *this;
+    copy.prefer_explode = true;
     return copy;
   }
 
@@ -58,7 +69,8 @@ struct ctx_t {
   const wcl::doc_state& operator->() const { return state; }
 
   bool operator==(const ctx_t& other) const {
-    return state == other.state && nest_level == other.nest_level;
+    return state == other.state && nest_level == other.nest_level &&
+           prefer_explode == other.prefer_explode;
   }
 };
 
@@ -101,8 +113,9 @@ using token_traits_map_t = std::unordered_map<CSTElement, token_traits_t>;
 template <>
 struct std::hash<ctx_t> {
   size_t operator()(ctx_t const& ctx) const noexcept {
-    return wcl::hash_combine(std::hash<wcl::doc_state>{}(ctx.state),
-                             std::hash<size_t>{}(ctx.nest_level));
+    auto hash = wcl::hash_combine(std::hash<wcl::doc_state>{}(ctx.state),
+                                  std::hash<size_t>{}(ctx.nest_level));
+    return wcl::hash_combine(hash, std::hash<bool>{}(ctx.prefer_explode));
   }
 };
 
