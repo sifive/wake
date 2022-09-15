@@ -1,8 +1,8 @@
 {
 	"name": "wake",
-    "displayName": "Wake",
-    "description": "A language server for the SiFive wake build tool",
-    "icon": "images/sifive_icon.png",
+	"displayName": "Wake",
+	"description": "A language server for the SiFive wake build tool",
+	"icon": "images/sifive_icon.png",
 	"author": "SiFive",
 	"license": "Apache-2.0",
 	"version": "@VERSION@",
@@ -34,38 +34,36 @@
 	"main": "./lsp-client/out/clientNode",
 	"browser": "./lsp-client/out/clientWeb",
 	"contributes": {
-		"configuration": [
-			{
-				"id": "wakeLanguageServer",
-				"title": "Wake",
-				"type": "object",
-				"properties": {
-					"wakeLanguageServer.pathToWakeStandardLibrary": {
-						"default": "",
-						"description": "If there is a valid share/wake/lib/ at the root of your project, that library is used to provide diagnostics. If not, the path that you provide here is used.\nWith no path provided, the library that comes with the extension is used.\n\nThis setting has no effect when running in a browser.",
-						"scope": "window",
-						"type": "string"
-					},
-					"wakeLanguageServer.trace.server": {
-						"default": "off",
-						"description": "Traces the communication between VS Code and the language server.",
-						"enum": [
-							"off",
-							"messages",
-							"verbose"
-						],
-						"scope": "window",
-						"type": "string"
-					},
-					"wakeTimeline.pathToWakeBinary": {
-						"default": "",
-						"description": "The path to the wake binary that is used to create the timeline. If invalid, the timeline functionality is not provided.",
-						"scope": "window",
-						"type": "string"
-					}
+		"configuration": {
+			"id": "wakeLanguageServer",
+			"title": "Wake",
+			"type": "object",
+			"properties": {
+				"wakeLanguageServer.pathToWakeStandardLibrary": {
+					"default": "",
+					"description": "If there is a valid share/wake/lib/ at the root of your project, that library is used to provide diagnostics. If not, the path that you provide here is used.\nWith no path provided, the library that comes with the extension is used.\n\nThis setting has no effect when running in a browser.",
+					"scope": "window",
+					"type": "string"
+				},
+				"wakeLanguageServer.trace.server": {
+					"default": "off",
+					"description": "Traces the communication between VS Code and the language server.",
+					"enum": [
+						"off",
+						"messages",
+						"verbose"
+					],
+					"scope": "window",
+					"type": "string"
+				},
+				"wakeTimeline.pathToWakeBinary": {
+					"default": "",
+					"description": "The path to the wake binary that is used to create the timeline. If invalid, the timeline functionality is not provided.",
+					"scope": "window",
+					"type": "string"
 				}
 			}
-		],
+		},
 		"grammars": [
 			{
 				"language": "wake",
