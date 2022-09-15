@@ -527,7 +527,7 @@ wcl::doc Emitter::walk_ascribe(ctx_t ctx, CSTElement node) {
   MEMO_RET(walk_placeholder(ctx, node));
 }
 
-std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTElement node) {
+static std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTElement node) {
   if (node.id() != CST_BINARY) {
     return {node};
   }
@@ -552,7 +552,7 @@ std::vector<CSTElement> collect_left_binary(CSTElement collect_over, CSTElement 
   return collect;
 }
 
-std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CSTElement node) {
+static std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CSTElement node) {
   if (node.id() != CST_BINARY) {
     return {node};
   }
@@ -579,8 +579,8 @@ std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CSTElement
   return collect;
 }
 
-size_t count_allowed_newlines(const token_traits_map_t& traits,
-                              const std::vector<CSTElement>& parts) {
+static size_t count_allowed_newlines(const token_traits_map_t& traits,
+                                     const std::vector<CSTElement>& parts) {
   assert(parts.size() >= 2);
 
   CSTElement first_token = parts[0].firstChildElement();
@@ -621,18 +621,19 @@ size_t count_allowed_newlines(const token_traits_map_t& traits,
   return allowed;
 }
 
-bool min_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
+static bool compare_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
   return lhs->height() < rhs->height();
 }
 
-bool min_doc_max_width(const wcl::doc& lhs, const wcl::doc& rhs) {
+static bool compare_doc_width(const wcl::doc& lhs, const wcl::doc& rhs) {
   return lhs->max_width() < rhs->max_width();
 }
 
 // TODO: this is far from fully correct
-bool is_op_left_assoc(const CSTElement& op) { return op.id() == TOKEN_OP_OR; }
+static bool is_op_left_assoc(const CSTElement& op) { return op.id() == TOKEN_OP_OR; }
 
-wcl::doc select_best_choice(std::vector<wcl::optional<wcl::doc>> choices) {
+// Assumes that at least one of the choices is viable. Will assert otherwise
+static wcl::doc select_best_choice(std::vector<wcl::optional<wcl::doc>> choices) {
   std::vector<wcl::doc> lte_fmt = {};
   std::vector<wcl::doc> gt_fmt = {};
   int i = 0;
@@ -652,16 +653,37 @@ wcl::doc select_best_choice(std::vector<wcl::optional<wcl::doc>> choices) {
   }
 
   if (lte_fmt.size() > 0) {
-    auto min_height = std::min_element(lte_fmt.begin(), lte_fmt.end(), min_doc_height);
+    auto min_height = std::min_element(lte_fmt.begin(), lte_fmt.end(), compare_doc_height);
     return *min_height;
   }
 
-  auto min_width = std::min_element(gt_fmt.begin(), gt_fmt.end(), min_doc_max_width);
+  // If lte_fmt doesn't have any viable then gt_fmt must have at least one
+  assert(gt_fmt.size() > 0);
+
+  auto min_width = std::min_element(gt_fmt.begin(), gt_fmt.end(), compare_doc_width);
   return *min_width;
 }
 
-wcl::doc post_binop_spacing(CSTElement over, const token_traits_map_t& traits,
-                            const wcl::doc& fmt_binop, const wcl::doc_builder& builder, ctx_t ctx) {
+// The separator between the binop and the RHS is usually a space but when the doc has a newline a
+// freshline is required instead. This function returns a doc with the appropiate separator.
+//
+// Ex:
+// space: '3 + <space> 2'
+// freshline:
+//  '''x
+//     + # comment
+// <FR>5
+//  '''
+//
+// Without the freshline case, the syntatically invalid below is emitted
+// '''
+// x
+// + # comment
+// <space> 5
+// '''
+static wcl::doc post_binop_spacing(CSTElement over, const token_traits_map_t& traits,
+                                   const wcl::doc& fmt_binop, const wcl::doc_builder& builder,
+                                   ctx_t ctx) {
   if (fmt_binop->has_newline()) {
     return fmt().freshline().compose(ctx.sub(builder), over, traits);
   }
