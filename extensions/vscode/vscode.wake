@@ -36,7 +36,7 @@ def createStdlibJSON (stdlibSources: List Path): Result Path Error =
         map formatPath stdlibSources
     def content = 
         JObject ("files" :-> JArray (map JString formattedPaths),)
-    write "{here}/stdlib.json" content
+    write "{here}/stdlib.json" (prettyJSON content)
 
 export def vscode _: Result Path Error =
     require Pass variant =
