@@ -2,6 +2,7 @@
 	"name": "wake",
     "displayName": "Wake",
     "description": "A language server for the SiFive wake build tool",
+    "icon": "images/sifive_icon.png",
 	"author": "SiFive",
 	"license": "Apache-2.0",
 	"version": "@VERSION@",
