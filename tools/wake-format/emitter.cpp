@@ -935,8 +935,6 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
 
   size_t leading_count = count_leading_newlines(token_traits, node);
 
-  std::cerr << "leading count: " << leading_count << std::endl;
-
   MEMO_RET(fmt()
                .walk(WALK_NODE)
                .consume_wsnlc()

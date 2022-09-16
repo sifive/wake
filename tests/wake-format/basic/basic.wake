@@ -229,12 +229,12 @@ def t1 =match _
   n # comment
   = 2+t(n-1)
 
-def t1 =match _
-  0=0
-  # comment
-  n = 2+t(n-1)
+# def t1 =match _
+#   # comment
+#   0=0
+#   n = 2+t(n-1)
 
 def t1 =match _
-  # comment
   0=0
+  # comment
   n = 2+t(n-1)
