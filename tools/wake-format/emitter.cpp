@@ -28,7 +28,10 @@
 
 #define FORMAT_OFF_COMMENT "# wake-format off"
 
-#define WALK_NODE [this](ctx_t ctx, CSTElement node) { return walk_node(ctx, node); }
+#define WALK_NODE                                                                          \
+  [this](ctx_t ctx, CSTElement node) {                                                     \
+    return dispatch(ctx, node, [this](ctx_t c, CSTElement n) { return walk_node(c, n); }); \
+  }
 #define WALK_TOKEN [this](ctx_t ctx, CSTElement node) { return walk_token(ctx, node); }
 
 #define MEMO(ctx, node)                                                                       \
@@ -198,6 +201,18 @@ wcl::doc Emitter::layout(CST cst) {
   return walk(ctx, cst.root());
 }
 
+template <class Func>
+wcl::doc Emitter::dispatch(ctx_t ctx, CSTElement node, Func func) {
+  MEMO(ctx, node);
+  assert(node.isNode());
+
+  if (node_traits[node].format_off) {
+    MEMO_RET(walk_no_edit(ctx, node));
+  }
+
+  MEMO_RET(func(ctx, node));
+}
+
 wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
 
@@ -220,133 +235,86 @@ wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.isNode());
 
-  wcl::doc_builder bdr;
-
-  if (node_traits[node].format_off) {
-    bdr.append(walk_no_edit(ctx, node));
-    return std::move(bdr).build();
-  }
-
   switch (node.id()) {
     case CST_ARITY:
-      bdr.append(walk_arity(ctx, node));
-      break;
+      MEMO_RET(walk_arity(ctx, node));
     case CST_APP:
-      bdr.append(walk_apply(ctx, node));
-      break;
+      MEMO_RET(walk_apply(ctx, node));
     case CST_ASCRIBE:
-      bdr.append(walk_ascribe(ctx, node));
-      break;
+      MEMO_RET(walk_ascribe(ctx, node));
     case CST_BINARY:
-      bdr.append(walk_binary(ctx, node));
-      break;
+      MEMO_RET(walk_binary(ctx, node));
     case CST_BLOCK:
-      bdr.append(walk_block(ctx, node));
-      break;
+      MEMO_RET(walk_block(ctx, node));
     case CST_CASE:
-      bdr.append(walk_case(ctx, node));
-      break;
+      MEMO_RET(walk_case(ctx, node));
     case CST_DATA:
-      bdr.append(walk_data(ctx, node));
-      break;
+      MEMO_RET(walk_data(ctx, node));
     case CST_DEF:
-      bdr.append(walk_def(ctx, node));
-      break;
+      MEMO_RET(walk_def(ctx, node));
     case CST_EXPORT:
-      bdr.append(walk_export(ctx, node));
-      break;
+      MEMO_RET(walk_export(ctx, node));
     case CST_FLAG_EXPORT:
-      bdr.append(walk_flag_export(ctx, node));
-      break;
+      MEMO_RET(walk_flag_export(ctx, node));
     case CST_FLAG_GLOBAL:
-      bdr.append(walk_flag_global(ctx, node));
-      break;
+      MEMO_RET(walk_flag_global(ctx, node));
     case CST_GUARD:
-      bdr.append(walk_guard(ctx, node));
-      break;
+      MEMO_RET(walk_guard(ctx, node));
     case CST_HOLE:
-      bdr.append(walk_hole(ctx, node));
-      break;
+      MEMO_RET(walk_hole(ctx, node));
     case CST_ID:
-      bdr.append(walk_identifier(ctx, node));
-      break;
+      MEMO_RET(walk_identifier(ctx, node));
     case CST_IDEQ:
-      bdr.append(walk_ideq(ctx, node));
-      break;
+      MEMO_RET(walk_ideq(ctx, node));
     case CST_IF:
-      bdr.append(walk_if(ctx, node));
-      break;
+      MEMO_RET(walk_if(ctx, node));
     case CST_IMPORT:
-      bdr.append(walk_import(ctx, node));
-      break;
+      MEMO_RET(walk_import(ctx, node));
     case CST_INTERPOLATE:
-      bdr.append(walk_interpolate(ctx, node));
-      break;
+      MEMO_RET(walk_interpolate(ctx, node));
     case CST_KIND:
-      bdr.append(walk_kind(ctx, node));
-      break;
+      MEMO_RET(walk_kind(ctx, node));
     case CST_LAMBDA:
-      bdr.append(walk_lambda(ctx, node));
-      break;
+      MEMO_RET(walk_lambda(ctx, node));
     case CST_LITERAL:
-      bdr.append(walk_literal(ctx, node));
-      break;
+      MEMO_RET(walk_literal(ctx, node));
     case CST_MATCH:
-      bdr.append(walk_match(ctx, node));
-      break;
+      MEMO_RET(walk_match(ctx, node));
     case CST_OP:
-      bdr.append(walk_op(ctx, node));
-      break;
+      MEMO_RET(walk_op(ctx, node));
     case CST_PACKAGE:
-      bdr.append(walk_package(ctx, node));
-      break;
+      MEMO_RET(walk_package(ctx, node));
     case CST_PAREN:
-      bdr.append(walk_paren(ctx, node));
-      break;
+      MEMO_RET(walk_paren(ctx, node));
     case CST_PRIM:
-      bdr.append(walk_prim(ctx, node));
-      break;
+      MEMO_RET(walk_prim(ctx, node));
     case CST_PUBLISH:
-      bdr.append(walk_publish(ctx, node));
-      break;
+      MEMO_RET(walk_publish(ctx, node));
     case CST_REQUIRE:
-      bdr.append(walk_require(ctx, node));
-      break;
+      MEMO_RET(walk_require(ctx, node));
     case CST_REQ_ELSE:
-      bdr.append(walk_req_else(ctx, node));
-      break;
+      MEMO_RET(walk_req_else(ctx, node));
     case CST_SUBSCRIBE:
-      bdr.append(walk_subscribe(ctx, node));
-      break;
+      MEMO_RET(walk_subscribe(ctx, node));
     case CST_TARGET:
-      bdr.append(walk_target(ctx, node));
-      break;
+      MEMO_RET(walk_target(ctx, node));
     case CST_TARGET_ARGS:
-      bdr.append(walk_target_args(ctx, node));
-      break;
+      MEMO_RET(walk_target_args(ctx, node));
     case CST_TOP:
-      bdr.append(walk_top(ctx, node));
-      break;
+      MEMO_RET(walk_top(ctx, node));
     case CST_TOPIC:
-      bdr.append(walk_topic(ctx, node));
-      break;
+      MEMO_RET(walk_topic(ctx, node));
     case CST_TUPLE:
-      bdr.append(walk_tuple(ctx, node));
-      break;
+      MEMO_RET(walk_tuple(ctx, node));
     case CST_TUPLE_ELT:
-      bdr.append(walk_tuple_elt(ctx, node));
-      break;
+      MEMO_RET(walk_tuple_elt(ctx, node));
     case CST_UNARY:
-      bdr.append(walk_unary(ctx, node));
-      break;
+      MEMO_RET(walk_unary(ctx, node));
     case CST_ERROR:
-      bdr.append(walk_error(ctx, node));
-      break;
+      MEMO_RET(walk_error(ctx, node));
     default:
       assert(false);
   }
-
-  MEMO_RET(std::move(bdr).build())
 }
 
 wcl::doc Emitter::walk_placeholder(ctx_t ctx, CSTElement node) {

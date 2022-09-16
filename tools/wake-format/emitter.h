@@ -51,6 +51,10 @@ class Emitter {
   std::unordered_map<CSTElement, node_traits_t> node_traits = {};
   token_traits_map_t token_traits = {};
 
+  // Do upkeep and dispatch to the provided function
+  template <class Func>
+  wcl::doc dispatch(ctx_t ctx, CSTElement node, Func func);
+
   // Top level tree walk. Dispatches out the calls for various nodes
   wcl::doc walk(ctx_t ctx, CSTElement node);
 
