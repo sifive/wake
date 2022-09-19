@@ -493,7 +493,7 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   wcl::doc_builder builder;
 
   for (auto node : token_traits[node].before_bound) {
-    builder.append(fmt().walk(WALK_TOKEN).freshline().format(ctx, node, token_traits));
+    builder.append(fmt().walk(WALK_TOKEN).freshline().compose(ctx, node, token_traits));
   }
 
   switch (node.id()) {
