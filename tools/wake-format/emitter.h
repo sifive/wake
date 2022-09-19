@@ -51,6 +51,10 @@ class Emitter {
   std::unordered_map<CSTElement, node_traits_t> node_traits = {};
   token_traits_map_t token_traits = {};
 
+  // Do upkeep and dispatch to the provided function
+  template <class Func>
+  wcl::doc dispatch(ctx_t ctx, CSTElement node, Func func);
+
   // Top level tree walk. Dispatches out the calls for various nodes
   wcl::doc walk(ctx_t ctx, CSTElement node);
 
@@ -123,6 +127,12 @@ class Emitter {
   wcl::optional<wcl::doc> combine_explode_last_compress(CSTElement over, ctx_t ctx,
                                                         const std::vector<CSTElement>& parts);
 
+  // Functions to combine apply using various 'full choice' options
+  //
+  wcl::optional<wcl::doc> combine_apply_flat(ctx_t ctx, const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_apply_explode_all(ctx_t ctx,
+                                                    const std::vector<CSTElement>& parts);
+
   // Returns a formatter that inserts the next node
   // on the current line if it fits, or on a new nested line
   auto rhs_fmt();
@@ -163,6 +173,7 @@ class Emitter {
   wcl::doc walk_topic(ctx_t ctx, CSTElement node);
   wcl::doc walk_tuple(ctx_t ctx, CSTElement node);
   wcl::doc walk_tuple_elt(ctx_t ctx, CSTElement node);
+  wcl::doc walk_type(ctx_t ctx, CSTElement node);
   wcl::doc walk_unary(ctx_t ctx, CSTElement node);
   wcl::doc walk_error(ctx_t ctx, CSTElement node);
 

@@ -28,7 +28,11 @@
 
 #define FORMAT_OFF_COMMENT "# wake-format off"
 
-#define WALK_NODE [this](ctx_t ctx, CSTElement node) { return walk_node(ctx, node); }
+#define DISPATCH(func)                                                                \
+  [this](ctx_t ctx, CSTElement node) {                                                \
+    return dispatch(ctx, node, [this](ctx_t c, CSTElement n) { return func(c, n); }); \
+  }
+#define WALK_NODE DISPATCH(walk_node)
 #define WALK_TOKEN [this](ctx_t ctx, CSTElement node) { return walk_token(ctx, node); }
 
 #define MEMO(ctx, node)                                                                       \
@@ -58,6 +62,124 @@ static inline bool is_expression(cst_id_t type) {
          type == CST_BINARY || CST_PAREN;
 }
 
+static bool compare_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
+  return lhs->height() < rhs->height();
+}
+
+static bool compare_doc_width(const wcl::doc& lhs, const wcl::doc& rhs) {
+  return lhs->max_width() < rhs->max_width();
+}
+
+// TODO: this is far from fully correct
+static bool is_op_left_assoc(const CSTElement& op) { return op.id() == TOKEN_OP_OR; }
+
+static size_t count_leading_newlines(const token_traits_map_t& traits, const CSTElement& node) {
+  CSTElement token = node;
+  while (token.isNode()) {
+    token = token.firstChildElement();
+  }
+
+  auto it = traits.find(token);
+  if (it == traits.end()) {
+    return 0;
+  }
+  return it->second.before_bound.size();
+}
+
+static size_t count_trailing_newlines(const token_traits_map_t& traits, const CSTElement& node) {
+  CSTElement token;
+  {
+    IsWSNLCPredicate is_wsnlc;
+    CSTElement curr_rhs = node.firstChildElement();
+    CSTElement next_rhs = curr_rhs;
+    next_rhs.nextSiblingElement();
+
+    while (!next_rhs.empty()) {
+      while (!next_rhs.empty() && is_wsnlc(next_rhs)) {
+        next_rhs.nextSiblingElement();
+      }
+      if (next_rhs.empty()) {
+        token = curr_rhs;
+      } else {
+        curr_rhs = next_rhs;
+        next_rhs.nextSiblingElement();
+      }
+    }
+    token = curr_rhs;
+  }
+
+  auto it = traits.find(token);
+  if (it == traits.end()) {
+    return 0;
+  }
+
+  return it->second.after_bound.size();
+}
+
+static size_t count_allowed_newlines(const token_traits_map_t& traits,
+                                     const std::vector<CSTElement>& parts) {
+  assert(parts.size() >= 2);
+  return count_leading_newlines(traits, parts[0]) + count_trailing_newlines(traits, parts.back());
+}
+
+// Assumes that at least one of the choices is viable. Will assert otherwise
+static wcl::doc select_best_choice(std::vector<wcl::optional<wcl::doc>> choices) {
+  std::vector<wcl::doc> lte_fmt = {};
+  std::vector<wcl::doc> gt_fmt = {};
+  int i = 0;
+
+  for (auto choice_opt : choices) {
+    i++;
+    if (!choice_opt) {
+      continue;
+    }
+    auto choice = *choice_opt;
+
+    if (choice->max_width() > MAX_COLUMN_WIDTH) {
+      gt_fmt.push_back(std::move(choice));
+    } else {
+      lte_fmt.push_back(std::move(choice));
+    }
+  }
+
+  if (lte_fmt.size() > 0) {
+    auto min_height = std::min_element(lte_fmt.begin(), lte_fmt.end(), compare_doc_height);
+    return *min_height;
+  }
+
+  // If lte_fmt doesn't have any viable then gt_fmt must have at least one
+  assert(gt_fmt.size() > 0);
+
+  auto min_width = std::min_element(gt_fmt.begin(), gt_fmt.end(), compare_doc_width);
+  return *min_width;
+}
+
+// The separator between the binop and the RHS is usually a space but when the doc has a newline a
+// freshline is required instead. This function returns a doc with the appropiate separator.
+//
+// Ex:
+// space: '3 + <space> 2'
+// freshline:
+//  '''x
+//     + # comment
+// <FR>5
+//  '''
+//
+// Without the freshline case, the syntatically invalid below is emitted
+// '''
+// x
+// + # comment
+// <space> 5
+// '''
+static wcl::doc post_binop_separator(CSTElement over, const token_traits_map_t& traits,
+                                     const wcl::doc& fmt_binop, const wcl::doc_builder& builder,
+                                     ctx_t ctx) {
+  if (fmt_binop->has_newline()) {
+    return fmt().freshline().compose(ctx.sub(builder), over, traits);
+  }
+  return fmt().space().compose(ctx.sub(builder), over, traits);
+}
+
 auto Emitter::rhs_fmt() {
   auto rhs_fmt = fmt().walk(WALK_NODE);
 
@@ -78,6 +200,18 @@ wcl::doc Emitter::layout(CST cst) {
   bind_comments(cst.root());
   mark_no_format_nodes(cst.root());
   return walk(ctx, cst.root());
+}
+
+template <class Func>
+wcl::doc Emitter::dispatch(ctx_t ctx, CSTElement node, Func func) {
+  MEMO(ctx, node);
+  assert(node.isNode());
+
+  if (node_traits[node].format_off) {
+    MEMO_RET(walk_no_edit(ctx, node));
+  }
+
+  MEMO_RET(func(ctx, node));
 }
 
 wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
@@ -102,133 +236,86 @@ wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.isNode());
 
-  wcl::doc_builder bdr;
-
-  if (node_traits[node].format_off) {
-    bdr.append(walk_no_edit(ctx, node));
-    return std::move(bdr).build();
-  }
-
   switch (node.id()) {
     case CST_ARITY:
-      bdr.append(walk_arity(ctx, node));
-      break;
+      MEMO_RET(walk_arity(ctx, node));
     case CST_APP:
-      bdr.append(walk_apply(ctx, node));
-      break;
+      MEMO_RET(walk_apply(ctx, node));
     case CST_ASCRIBE:
-      bdr.append(walk_ascribe(ctx, node));
-      break;
+      MEMO_RET(walk_ascribe(ctx, node));
     case CST_BINARY:
-      bdr.append(walk_binary(ctx, node));
-      break;
+      MEMO_RET(walk_binary(ctx, node));
     case CST_BLOCK:
-      bdr.append(walk_block(ctx, node));
-      break;
+      MEMO_RET(walk_block(ctx, node));
     case CST_CASE:
-      bdr.append(walk_case(ctx, node));
-      break;
+      MEMO_RET(walk_case(ctx, node));
     case CST_DATA:
-      bdr.append(walk_data(ctx, node));
-      break;
+      MEMO_RET(walk_data(ctx, node));
     case CST_DEF:
-      bdr.append(walk_def(ctx, node));
-      break;
+      MEMO_RET(walk_def(ctx, node));
     case CST_EXPORT:
-      bdr.append(walk_export(ctx, node));
-      break;
+      MEMO_RET(walk_export(ctx, node));
     case CST_FLAG_EXPORT:
-      bdr.append(walk_flag_export(ctx, node));
-      break;
+      MEMO_RET(walk_flag_export(ctx, node));
     case CST_FLAG_GLOBAL:
-      bdr.append(walk_flag_global(ctx, node));
-      break;
+      MEMO_RET(walk_flag_global(ctx, node));
     case CST_GUARD:
-      bdr.append(walk_guard(ctx, node));
-      break;
+      MEMO_RET(walk_guard(ctx, node));
     case CST_HOLE:
-      bdr.append(walk_hole(ctx, node));
-      break;
+      MEMO_RET(walk_hole(ctx, node));
     case CST_ID:
-      bdr.append(walk_identifier(ctx, node));
-      break;
+      MEMO_RET(walk_identifier(ctx, node));
     case CST_IDEQ:
-      bdr.append(walk_ideq(ctx, node));
-      break;
+      MEMO_RET(walk_ideq(ctx, node));
     case CST_IF:
-      bdr.append(walk_if(ctx, node));
-      break;
+      MEMO_RET(walk_if(ctx, node));
     case CST_IMPORT:
-      bdr.append(walk_import(ctx, node));
-      break;
+      MEMO_RET(walk_import(ctx, node));
     case CST_INTERPOLATE:
-      bdr.append(walk_interpolate(ctx, node));
-      break;
+      MEMO_RET(walk_interpolate(ctx, node));
     case CST_KIND:
-      bdr.append(walk_kind(ctx, node));
-      break;
+      MEMO_RET(walk_kind(ctx, node));
     case CST_LAMBDA:
-      bdr.append(walk_lambda(ctx, node));
-      break;
+      MEMO_RET(walk_lambda(ctx, node));
     case CST_LITERAL:
-      bdr.append(walk_literal(ctx, node));
-      break;
+      MEMO_RET(walk_literal(ctx, node));
     case CST_MATCH:
-      bdr.append(walk_match(ctx, node));
-      break;
+      MEMO_RET(walk_match(ctx, node));
     case CST_OP:
-      bdr.append(walk_op(ctx, node));
-      break;
+      MEMO_RET(walk_op(ctx, node));
     case CST_PACKAGE:
-      bdr.append(walk_package(ctx, node));
-      break;
+      MEMO_RET(walk_package(ctx, node));
     case CST_PAREN:
-      bdr.append(walk_paren(ctx, node));
-      break;
+      MEMO_RET(walk_paren(ctx, node));
     case CST_PRIM:
-      bdr.append(walk_prim(ctx, node));
-      break;
+      MEMO_RET(walk_prim(ctx, node));
     case CST_PUBLISH:
-      bdr.append(walk_publish(ctx, node));
-      break;
+      MEMO_RET(walk_publish(ctx, node));
     case CST_REQUIRE:
-      bdr.append(walk_require(ctx, node));
-      break;
+      MEMO_RET(walk_require(ctx, node));
     case CST_REQ_ELSE:
-      bdr.append(walk_req_else(ctx, node));
-      break;
+      MEMO_RET(walk_req_else(ctx, node));
     case CST_SUBSCRIBE:
-      bdr.append(walk_subscribe(ctx, node));
-      break;
+      MEMO_RET(walk_subscribe(ctx, node));
     case CST_TARGET:
-      bdr.append(walk_target(ctx, node));
-      break;
+      MEMO_RET(walk_target(ctx, node));
     case CST_TARGET_ARGS:
-      bdr.append(walk_target_args(ctx, node));
-      break;
+      MEMO_RET(walk_target_args(ctx, node));
     case CST_TOP:
-      bdr.append(walk_top(ctx, node));
-      break;
+      MEMO_RET(walk_top(ctx, node));
     case CST_TOPIC:
-      bdr.append(walk_topic(ctx, node));
-      break;
+      MEMO_RET(walk_topic(ctx, node));
     case CST_TUPLE:
-      bdr.append(walk_tuple(ctx, node));
-      break;
+      MEMO_RET(walk_tuple(ctx, node));
     case CST_TUPLE_ELT:
-      bdr.append(walk_tuple_elt(ctx, node));
-      break;
+      MEMO_RET(walk_tuple_elt(ctx, node));
     case CST_UNARY:
-      bdr.append(walk_unary(ctx, node));
-      break;
+      MEMO_RET(walk_unary(ctx, node));
     case CST_ERROR:
-      bdr.append(walk_error(ctx, node));
-      break;
+      MEMO_RET(walk_error(ctx, node));
     default:
       assert(false);
   }
-
-  MEMO_RET(std::move(bdr).build())
 }
 
 wcl::doc Emitter::walk_placeholder(ctx_t ctx, CSTElement node) {
@@ -406,7 +493,7 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   wcl::doc_builder builder;
 
   for (auto node : token_traits[node].before_bound) {
-    builder.append(fmt().walk(WALK_TOKEN).freshline().format(ctx, node, token_traits));
+    builder.append(fmt().walk(WALK_TOKEN).freshline().compose(ctx, node, token_traits));
   }
 
   switch (node.id()) {
@@ -505,16 +592,68 @@ wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   MEMO_RET(std::move(builder).build());
 }
 
+static std::vector<CSTElement> collect_apply_parts(CSTElement node) {
+  if (node.id() != CST_APP) {
+    return {node};
+  }
+
+  // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
+  // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
+  CSTElement lhs = node.firstChildNode();
+  CSTElement rhs = lhs;
+  rhs.nextSiblingNode();
+
+  auto collect = collect_apply_parts(lhs);
+  collect.push_back(rhs);
+
+  return collect;
+}
+
+wcl::optional<wcl::doc> Emitter::combine_apply_flat(ctx_t ctx,
+                                                    const std::vector<CSTElement>& parts) {
+  wcl::doc_builder builder;
+  for (size_t i = 0; i < parts.size() - 1; i++) {
+    CSTElement part = parts[i];
+    builder.append(fmt().walk(WALK_NODE).space().compose(ctx.sub(builder), part, token_traits));
+  }
+
+  builder.append(walk_node(ctx.sub(builder), parts.back()));
+
+  wcl::doc doc = std::move(builder).build();
+  if (doc->newline_count() != count_allowed_newlines(token_traits, parts)) {
+    return {};
+  }
+  return {wcl::in_place_t{}, std::move(doc)};
+}
+
+wcl::optional<wcl::doc> Emitter::combine_apply_explode_all(ctx_t ctx,
+                                                           const std::vector<CSTElement>& parts) {
+  wcl::doc_builder builder;
+  for (size_t i = 0; i < parts.size() - 1; i++) {
+    CSTElement part = parts[i];
+    builder.append(
+        fmt().walk(WALK_NODE).freshline().compose(ctx.sub(builder).explode(), part, token_traits));
+  }
+
+  builder.append(walk_node(ctx.sub(builder).explode(), parts.back()));
+
+  return {wcl::in_place_t{}, std::move(builder).build()};
+}
+
 wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_APP);
 
-  MEMO_RET(fmt()
-               .walk(is_expression, WALK_NODE)  // TODO: fix the 'grows NL' case
-               .consume_wsnlc()
-               .space()
-               .walk(WALK_NODE)
-               .format(ctx, node.firstChildElement(), token_traits));
+  auto parts = collect_apply_parts(node);
+
+  std::vector<wcl::optional<wcl::doc>> choices = {
+      // 1
+      combine_apply_flat(ctx, parts),
+      // 2
+      combine_apply_explode_all(ctx, parts),
+  };
+
+  MEMO_RET(select_best_choice(choices));
 }
 
 wcl::doc Emitter::walk_arity(ctx_t ctx, CSTElement node) {
@@ -577,117 +716,6 @@ static std::vector<CSTElement> collect_right_binary(CSTElement collect_over, CST
   collect.insert(collect.end(), right_collect.begin(), right_collect.end());
 
   return collect;
-}
-
-static size_t count_allowed_newlines(const token_traits_map_t& traits,
-                                     const std::vector<CSTElement>& parts) {
-  assert(parts.size() >= 2);
-
-  CSTElement first_token = parts[0].firstChildElement();
-
-  CSTElement last_token;
-  {
-    IsWSNLCPredicate is_wsnlc;
-    CSTElement curr_rhs = parts.back().firstChildElement();
-    CSTElement next_rhs = curr_rhs;
-    next_rhs.nextSiblingElement();
-
-    while (!next_rhs.empty()) {
-      while (!next_rhs.empty() && is_wsnlc(next_rhs)) {
-        next_rhs.nextSiblingElement();
-      }
-      if (next_rhs.empty()) {
-        last_token = curr_rhs;
-      } else {
-        curr_rhs = next_rhs;
-        next_rhs.nextSiblingElement();
-      }
-    }
-    last_token = curr_rhs;
-  }
-
-  size_t allowed = 0;
-
-  auto first_it = traits.find(first_token);
-  if (first_it != traits.end()) {
-    allowed += first_it->second.before_bound.size();
-  }
-
-  auto last_it = traits.find(last_token);
-  if (last_it != traits.end()) {
-    allowed += last_it->second.after_bound.size();
-  }
-
-  return allowed;
-}
-
-static bool compare_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
-  return lhs->height() < rhs->height();
-}
-
-static bool compare_doc_width(const wcl::doc& lhs, const wcl::doc& rhs) {
-  return lhs->max_width() < rhs->max_width();
-}
-
-// TODO: this is far from fully correct
-static bool is_op_left_assoc(const CSTElement& op) { return op.id() == TOKEN_OP_OR; }
-
-// Assumes that at least one of the choices is viable. Will assert otherwise
-static wcl::doc select_best_choice(std::vector<wcl::optional<wcl::doc>> choices) {
-  std::vector<wcl::doc> lte_fmt = {};
-  std::vector<wcl::doc> gt_fmt = {};
-  int i = 0;
-
-  for (auto choice_opt : choices) {
-    i++;
-    if (!choice_opt) {
-      continue;
-    }
-    auto choice = *choice_opt;
-
-    if (choice->max_width() > MAX_COLUMN_WIDTH) {
-      gt_fmt.push_back(std::move(choice));
-    } else {
-      lte_fmt.push_back(std::move(choice));
-    }
-  }
-
-  if (lte_fmt.size() > 0) {
-    auto min_height = std::min_element(lte_fmt.begin(), lte_fmt.end(), compare_doc_height);
-    return *min_height;
-  }
-
-  // If lte_fmt doesn't have any viable then gt_fmt must have at least one
-  assert(gt_fmt.size() > 0);
-
-  auto min_width = std::min_element(gt_fmt.begin(), gt_fmt.end(), compare_doc_width);
-  return *min_width;
-}
-
-// The separator between the binop and the RHS is usually a space but when the doc has a newline a
-// freshline is required instead. This function returns a doc with the appropiate separator.
-//
-// Ex:
-// space: '3 + <space> 2'
-// freshline:
-//  '''x
-//     + # comment
-// <FR>5
-//  '''
-//
-// Without the freshline case, the syntatically invalid below is emitted
-// '''
-// x
-// + # comment
-// <space> 5
-// '''
-static wcl::doc post_binop_separator(CSTElement over, const token_traits_map_t& traits,
-                                     const wcl::doc& fmt_binop, const wcl::doc_builder& builder,
-                                     ctx_t ctx) {
-  if (fmt_binop->has_newline()) {
-    return fmt().freshline().compose(ctx.sub(builder), over, traits);
-  }
-  return fmt().space().compose(ctx.sub(builder), over, traits);
 }
 
 wcl::optional<wcl::doc> Emitter::combine_flat(CSTElement over, ctx_t ctx,
@@ -874,10 +902,18 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_CASE);
 
+  size_t leading_count = count_leading_newlines(token_traits, node);
+
   MEMO_RET(fmt()
                .walk(WALK_NODE)
                .consume_wsnlc()
-               .space()  // TODO: fix the 'grows NL' case
+               // emit a freshline if the previous walk emitted a NL
+               .fmt_if_else(
+                   [leading_count](wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                                   const token_traits_map_t& traits) {
+                     return builder->newline_count() > leading_count;
+                   },
+                   fmt().freshline(), fmt().space())
                .walk(CST_GUARD, WALK_NODE)
                .consume_wsnlc()
                .join(rhs_fmt())
@@ -1079,7 +1115,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                .ws()
                .walk(WALK_NODE)
                .consume_wsnlc()
-               .space()  // TODO: fix the 'grows NL' case
+               .space()
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
                .join(rhs_fmt())
@@ -1133,7 +1169,7 @@ wcl::doc Emitter::walk_topic(ctx_t ctx, CSTElement node) {
                .walk({CST_ID}, WALK_NODE)
                .token(TOKEN_P_ASCRIBE)
                .ws()
-               .walk({CST_APP, CST_ID, CST_BINARY}, WALK_NODE)
+               .walk(is_expression, DISPATCH(walk_type))
                .consume_wsnlc()
                .format(ctx, node.firstChildElement(), token_traits));
 }
@@ -1146,6 +1182,28 @@ wcl::doc Emitter::walk_tuple(ctx_t ctx, CSTElement node) {
 wcl::doc Emitter::walk_tuple_elt(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   MEMO_RET(walk_placeholder(ctx, node));
+}
+
+wcl::doc Emitter::walk_type(ctx_t ctx, CSTElement node) {
+  MEMO(ctx, node);
+
+  auto no_nl = walk_node(ctx, node);
+
+  if (!no_nl->has_newline() || node.id() == CST_PAREN) {
+    MEMO_RET(no_nl);
+  }
+
+  wcl::doc_builder builder;
+  builder.append("(");
+
+  builder.append(fmt()
+                     .nest(fmt().freshline().walk(WALK_NODE).consume_wsnlc())
+                     .freshline()
+                     .format(ctx.sub(builder), node, token_traits));
+
+  builder.append(")");
+
+  MEMO_RET(std::move(builder).build());
 }
 
 wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) {
