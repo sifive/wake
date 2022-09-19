@@ -1115,7 +1115,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                .ws()
                .walk(WALK_NODE)
                .consume_wsnlc()
-               .space()  // TODO: fix the 'grows NL' case
+               .space()
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
                .join(rhs_fmt())

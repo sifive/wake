@@ -205,6 +205,20 @@ def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     _ = Fail (makeError "Two wake binaries declared for testing!")
 
 
+def wakeToTestDir Unit = match (subscribe wakeTestBinary)
+    buildTestWake , Nil =
+        require (
+            Pass
+            # comment
+            (
+                Pair path visible
+            )
+        ) = buildTestWake Unit
+        Pass (Pair (simplify "{path}/..") visible)
+    Nil = Pass (Pair "{wakePath}" Nil)
+    _ = Fail (makeError "Two wake binaries declared for testing!")
+
+
 package test_wake
 
 from wake import _
