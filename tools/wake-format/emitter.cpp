@@ -28,10 +28,11 @@
 
 #define FORMAT_OFF_COMMENT "# wake-format off"
 
-#define WALK_NODE                                                                          \
-  [this](ctx_t ctx, CSTElement node) {                                                     \
-    return dispatch(ctx, node, [this](ctx_t c, CSTElement n) { return walk_node(c, n); }); \
+#define DISPATCH(func)                                                                \
+  [this](ctx_t ctx, CSTElement node) {                                                \
+    return dispatch(ctx, node, [this](ctx_t c, CSTElement n) { return func(c, n); }); \
   }
+#define WALK_NODE DISPATCH(walk_node)
 #define WALK_TOKEN [this](ctx_t ctx, CSTElement node) { return walk_token(ctx, node); }
 
 #define MEMO(ctx, node)                                                                       \
@@ -1160,18 +1161,17 @@ wcl::doc Emitter::walk_topic(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_TOPIC);
 
-  MEMO_RET(
-      fmt()
-          .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
-          .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
-          .token(TOKEN_KW_TOPIC)
-          .ws()
-          .walk({CST_ID}, WALK_NODE)
-          .token(TOKEN_P_ASCRIBE)
-          .ws()
-          .walk(is_expression, [this](ctx_t ctx, CSTElement node) { return walk_type(ctx, node); })
-          .consume_wsnlc()
-          .format(ctx, node.firstChildElement(), token_traits));
+  MEMO_RET(fmt()
+               .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
+               .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
+               .token(TOKEN_KW_TOPIC)
+               .ws()
+               .walk({CST_ID}, WALK_NODE)
+               .token(TOKEN_P_ASCRIBE)
+               .ws()
+               .walk(is_expression, DISPATCH(walk_type))
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_tuple(ctx_t ctx, CSTElement node) {
