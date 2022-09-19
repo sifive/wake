@@ -88,17 +88,17 @@ void print_version() { std::cout << "wake-format " << VERSION_STR << std::endl; 
 void print_cst(CSTElement node, int depth) {
   static uint32_t indent_level = 0;
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
-    std::cout << depth << ": ";
+    std::cerr << depth << ": ";
     for (int i = 0; i < depth; i++) {
-      std::cout << "  ";
+      std::cerr << "  ";
     }
-    std::cout << symbolExample(child.id()) << " " << (child.isNode() ? "[Node]" : "[Token]");
+    std::cerr << symbolExample(child.id()) << " " << (child.isNode() ? "[Node]" : "[Token]");
     if (child.isNode()) {
-      std::cout << std::endl;
+      std::cerr << std::endl;
       print_cst(child, depth + 1);
       continue;
     }
-    std::cout << " (r: " << child.location().start.row << ", c: " << child.location().start.column
+    std::cerr << " (r: " << child.location().start.row << ", c: " << child.location().start.column
               << ", i: " << indent_level << ")";
     switch (child.id()) {
       case TOKEN_ID:
@@ -107,11 +107,11 @@ void print_cst(CSTElement node, int depth) {
       case TOKEN_STR_SINGLE:
       case TOKEN_REG_SINGLE:
       case TOKEN_COMMENT:
-        std::cout << " -> " << child.fragment().segment().str() << std::endl;
+        std::cerr << " -> " << child.fragment().segment().str() << std::endl;
         break;
       case TOKEN_WS: {
         size_t size = child.fragment().segment().size();
-        std::cout << " (" << size << ")" << std::endl;
+        std::cerr << " (" << size << ")" << std::endl;
 
         if (child.location().start.column == 1) {
           indent_level = size;
@@ -120,7 +120,7 @@ void print_cst(CSTElement node, int depth) {
         break;
       }
       default:
-        std::cout << std::endl;
+        std::cerr << std::endl;
         break;
     }
   }

@@ -1102,12 +1102,32 @@ wcl::doc Emitter::walk_prim(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(walk_placeholder(ctx, node));
+  assert(node.id() == CST_PUBLISH);
+
+  MEMO_RET(fmt()
+               .token(TOKEN_KW_PUBLISH)
+               .ws()
+               .walk(WALK_NODE)  // identifier
+               .consume_wsnlc()
+               .space()
+               .token(TOKEN_P_EQUALS)
+               .consume_wsnlc()
+               .join(rhs_fmt())
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_REQUIRE);
+
+  auto else_fmt =
+      fmt()
+          .token(TOKEN_KW_ELSE)
+          .fmt_if_fits_all(fmt().space().consume_wsnlc().walk(WALK_NODE),
+                           fmt().nest(fmt().freshline().consume_wsnlc().walk(WALK_NODE)))
+          .consume_wsnlc()
+          .freshline();
 
   MEMO_RET(fmt()
                .freshline()
@@ -1121,6 +1141,7 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                .join(rhs_fmt())
                .consume_wsnlc()
                .freshline()
+               .fmt_if(TOKEN_KW_ELSE, else_fmt)
                .walk(WALK_NODE)
                .consume_wsnlc()
                .format(ctx, node.firstChildElement(), token_traits));
@@ -1144,7 +1165,20 @@ wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(walk_placeholder(ctx, node));
+  assert(node.id() == CST_TARGET);
+
+  MEMO_RET(fmt()
+               .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
+               .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
+               .token(TOKEN_KW_TARGET)
+               .ws()
+               .walk(is_expression, WALK_NODE)
+               .ws()
+               .token(TOKEN_P_EQUALS)
+               .consume_wsnlc()
+               .join(rhs_fmt())
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_target_args(ctx_t ctx, CSTElement node) {
