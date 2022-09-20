@@ -70,8 +70,21 @@ static bool compare_doc_width(const wcl::doc& lhs, const wcl::doc& rhs) {
   return lhs->max_width() < rhs->max_width();
 }
 
-// TODO: this is far from fully correct
-static bool is_op_left_assoc(const CSTElement& op) { return op.id() == TOKEN_OP_OR; }
+static bool is_op_left_assoc(const CSTElement& op) {
+  switch (op.id()) {
+    case TOKEN_OP_DOT:
+    case TOKEN_OP_QUANT:
+    case TOKEN_OP_MULDIV:
+    case TOKEN_OP_ADDSUB:
+    case TOKEN_OP_COMPARE:
+    case TOKEN_OP_AND:
+    case TOKEN_OP_OR:
+      return true;
+
+    default:
+      return false;
+  }
+}
 
 static size_t count_leading_newlines(const token_traits_map_t& traits, const CSTElement& node) {
   CSTElement token = node;
