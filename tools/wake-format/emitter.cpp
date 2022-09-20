@@ -70,7 +70,6 @@ static bool compare_doc_width(const wcl::doc& lhs, const wcl::doc& rhs) {
   return lhs->max_width() < rhs->max_width();
 }
 
-// TODO: this is far from fully correct
 static bool is_op_left_assoc(const CSTElement& op) {
   switch (op.id()) {
     case TOKEN_OP_DOT:
