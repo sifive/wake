@@ -326,5 +326,3 @@ def buildRE2WASM Unit =
         Nil
 
     Pass (SysLib "1.0" headers objects cflags lflags)
-
-def a = 1

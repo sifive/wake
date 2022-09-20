@@ -54,7 +54,7 @@
 
 static inline bool requires_nl(cst_id_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
 static inline bool requires_fits_all(cst_id_t type) {
-  return type == CST_APP || type == CST_BINARY;
+  return type == CST_APP || type == CST_BINARY || type == CST_LITERAL || type == CST_INTERPOLATE;
 }
 
 static inline bool is_expression(cst_id_t type) {
@@ -1030,7 +1030,42 @@ wcl::doc Emitter::walk_lambda(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(walk_placeholder(ctx, node));
+  assert(node.id() == CST_LITERAL);
+
+  // clang-format off
+  auto multiline_str_fmt = fmt()
+    .match(
+      pred(TOKEN_MSTR_BEGIN, fmt().token(TOKEN_MSTR_BEGIN))
+     .pred(TOKEN_MSTR_RESUME, fmt().token(TOKEN_MSTR_RESUME))
+     // No otherwise, this should fail if neither are true
+    )
+    .fmt_while(
+      {TOKEN_NL, TOKEN_WS, TOKEN_MSTR_CONTINUE},
+      fmt().match(
+        pred(TOKEN_WS, fmt().token(TOKEN_WS))
+       .pred(TOKEN_NL, fmt().token(TOKEN_NL))
+       .pred(TOKEN_MSTR_CONTINUE, fmt().token(TOKEN_MSTR_CONTINUE))
+      ))
+    .match(
+      pred(TOKEN_MSTR_PAUSE, fmt().token(TOKEN_MSTR_PAUSE))
+     .pred(TOKEN_MSTR_END, fmt().token(TOKEN_MSTR_END))
+     // No otherwise, this should fail if neither are true
+    );
+  // clang-format on
+
+  auto node_fmt = fmt().walk(DISPATCH(walk_placeholder));
+  auto token_fmt = fmt().walk(WALK_TOKEN);
+
+  // clang-format off
+  MEMO_RET(fmt().match(
+    // TODO: starting 'pred()' function doesn't allow init lists
+    pred(ConstPredicate(false), fmt())
+   .pred({TOKEN_MSTR_BEGIN, TOKEN_MSTR_RESUME}, multiline_str_fmt)
+   .pred([](wcl::doc_builder&, ctx_t, CSTElement& node,
+                  const token_traits_map_t&){ return node.isNode(); }, node_fmt)
+   .otherwise(token_fmt))
+   .format(ctx, node.firstChildElement(), token_traits));
+  // clang-format on
 }
 
 wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {

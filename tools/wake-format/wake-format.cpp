@@ -92,7 +92,7 @@ void print_cst(CSTElement node, int depth) {
     for (int i = 0; i < depth; i++) {
       std::cerr << "  ";
     }
-    std::cerr << symbolExample(child.id()) << " " << (child.isNode() ? "[Node]" : "[Token]");
+    std::cerr << symbolName(child.id());
     if (child.isNode()) {
       std::cerr << std::endl;
       print_cst(child, depth + 1);
@@ -107,6 +107,11 @@ void print_cst(CSTElement node, int depth) {
       case TOKEN_STR_SINGLE:
       case TOKEN_REG_SINGLE:
       case TOKEN_COMMENT:
+      case TOKEN_MSTR_BEGIN:
+      case TOKEN_MSTR_CONTINUE:
+      case TOKEN_MSTR_PAUSE:
+      case TOKEN_MSTR_RESUME:
+      case TOKEN_MSTR_END:
         std::cerr << " -> " << child.fragment().segment().str() << std::endl;
         break;
       case TOKEN_WS: {
