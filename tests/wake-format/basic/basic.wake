@@ -249,3 +249,80 @@ def t1 =match _
   0=0
   # comment
   n = 2+t(n-1)
+
+publish wakeTestBinary = defaultWake, Nil
+publish animal =
+    "Cat", Nil
+publish animal =
+    replace `u` "o" "Mouse", Nil
+publish compileC = makeCompileC "native-c11-debug"     (which "cc")  (c11Flags ++ debugCFlags)
+publish path = match (getenv "WAKE_PATH")
+    Some x = tokenize `:` x
+    None = Nil
+publish path = match sysname
+    "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
+    "FreeBSD" = "/usr/local/bin", Nil
+    _        = Nil
+publish compileC =
+    emccFn (makeCompileC "wasm-c11-release"   _ ("-std=gnu11", emscriptenCFlags))
+publish compileC = emccFn (makeCompileC "wasm-c11-release"   _ ("-std=gnu11", emscriptenCFlags) (another) ("thing" "here"))
+publish compileC = # comment
+    emccFn (makeCompileC "wasm-c11-release"   _ ("-std=gnu11", emscriptenCFlags))
+publish compileC =
+  # comment
+  emccFn (makeCompileC "wasm-c11-release"   _ ("-std=gnu11", emscriptenCFlags))
+
+global export target fib n = match n
+  0 = 1
+  1 = 1
+  _ = fib (n-1) + fib (n-2)
+
+def buildRE2WASM Unit =
+    def version =
+        "2021-08-01"
+
+    require Some emmake =
+        emmake
+    else
+        # comment
+        failWithError "emmake is not available"
+
+    def emsdk =
+        replace `/[^/]*$` "" emmake
+
+    require Pass patch =
+        source "{here}/re2.patch"
+
+    require Pass buildDir = vendorBuildDir Unit
+
+    def job =
+        """
+            cd .build
+            wget https://github.com/google/re2/archive/refs/tags/%{version}.tar.gz
+            tar xvzf %{version}.tar.gz
+            cd re2-%{version}
+            patch -p0 < ../../%{relative here patch.getPathName}
+            emmake make -j4 RE2_CXXFLAGS="-std=c++14 -I. -Wall -DNO_THREADS" CXXFLAGS="-O2" obj/libre2.a
+        """
+        | makePlan "compiling re2" (buildDir, patch, Nil)
+        | editPlanEnvironment (addEnvironmentPath emsdk)
+        | setPlanDirectory here
+        | runJob
+
+    require Pass outputs =
+        job.getJobOutputs
+
+    def headers =
+        filter (matches `.*\.h` _.getPathName) outputs
+
+    def objects =
+        filter (matches `.*\.o` _.getPathName) outputs
+
+    def cflags =
+        "-I{here}/.build/re2-{version}",
+        Nil
+
+    def lflags =
+        Nil
+
+    Pass (SysLib "1.0" headers objects cflags lflags)
