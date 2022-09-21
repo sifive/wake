@@ -149,6 +149,12 @@ def t9 = (
 )
 
 
+def t10 = (
+    x, # comment
+    5
+)
+
+
 def name Unit = # wake-format off
     def other = here
     def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -197,8 +203,41 @@ def ff =
     | hhhhhhhhhhh
 
 
+def ff =
+    aaaaaaaaaaaaa
+    $ bbbbbbbbbbbbbbbb
+    $ cccccccccccccccccc
+    $ ddddddddddddddddddd
+    $ eeeeeeeeeeeeeee
+    $ ffffffffff
+    $ ggggggggggg
+    $ hhhhhhhhhhh
+
+
+def ff =
+    aaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbb,
+    cccccccccccccccccc,
+    ddddddddddddddddddd,
+    eeeeeeeeeeeeeee,
+    ffffffffff,
+    ggggggggggg,
+    hhhhhhhhhhh
+
+
+def ff =
+    aaaaaaaaaaaaa
+    .bbbbbbbbbbbbbbbb
+    .cccccccccccccccccc
+    .ddddddddddddddddddd
+    .eeeeeeeeeeeeeee
+    .ffffffffff
+    .ggggggggggg
+    .hhhhhhhhhhh
+
+
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
-    buildTestWake , Nil =
+    buildTestWake, Nil =
         require Pass (Pair path visible) = buildTestWake Unit
         Pass (Pair (simplify "{path}/..") visible)
     Nil = Pass (Pair "{wakePath}" Nil)
@@ -206,7 +245,7 @@ def wakeToTestDir Unit = match (subscribe wakeTestBinary)
 
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
-    buildTestWake , Nil =
+    buildTestWake, Nil =
         require (
             Pass
             # comment
@@ -306,11 +345,11 @@ def t1 = match _
     n = 2 + t (n - 1)
 
 
-publish wakeTestBinary = defaultWake , Nil
+publish wakeTestBinary = defaultWake, Nil
 
-publish animal = "Cat" , Nil
+publish animal = "Cat", Nil
 
-publish animal = replace `u` "o" "Mouse" , Nil
+publish animal = replace `u` "o" "Mouse", Nil
 
 publish compileC = makeCompileC "native-c11-debug" (which "cc") (c11Flags ++ debugCFlags)
 
@@ -319,22 +358,22 @@ publish path = match (getenv "WAKE_PATH")
     None = Nil
 
 publish path = match sysname
-    "Darwin" = "/opt/local/bin" , "/usr/local/bin" , Nil
-    "FreeBSD" = "/usr/local/bin" , Nil
+    "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
+    "FreeBSD" = "/usr/local/bin", Nil
     _ = Nil
 
-publish compileC = emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11" , emscriptenCFlags))
+publish compileC = emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
 
 publish compileC =
     emccFn
-    (makeCompileC "wasm-c11-release" _ ("-std=gnu11" , emscriptenCFlags) (another) ("thing" "here"))
+    (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags) (another) ("thing" "here"))
 
 publish compileC = # comment
- emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11" , emscriptenCFlags))
+ emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
 
 publish compileC =
     # comment
-    emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11" , emscriptenCFlags))
+    emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
 
 global export target fib n = match n
     0 = 1
@@ -356,18 +395,21 @@ def buildRE2WASM Unit =
             wget https://github.com/google/re2/archive/refs/tags/%{version}.tar.gz
             tar xvzf %{version}.tar.gz
             cd re2-%{version}
-            patch -p0 < ../../%{relative @here patch . getPathName}
+            patch -p0 < ../../%{relative @here patch.getPathName}
             emmake make -j4 RE2_CXXFLAGS="-std=c++14 -I. -Wall -DNO_THREADS" CXXFLAGS="-O2" obj/libre2.a
         """
-        | makePlan "compiling re2" (buildDir , patch , Nil)
+        | makePlan "compiling re2" (buildDir, patch, Nil)
         | editPlanEnvironment (addEnvironmentPath emsdk)
         | setPlanDirectory @here
         | runJob
-    require Pass outputs = job . getJobOutputs
-    def headers = filter (matches `.*\.h` _ . getPathName) outputs
-    def objects = filter (matches `.*\.o` _ . getPathName) outputs
-    def cflags = "-I{@here}/.build/re2-{version}" , Nil
+    require Pass outputs = job.getJobOutputs
+    def headers = filter (matches `.*\.h` _.getPathName) outputs
+    def objects = filter (matches `.*\.o` _.getPathName) outputs
+    def cflags = "-I{@here}/.build/re2-{version}", Nil
     def lflags = Nil
     Pass (SysLib "1.0" headers objects cflags lflags)
+
+
+def t5 = a.b.c
 
 

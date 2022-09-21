@@ -198,6 +198,16 @@ struct FreshlineAction {
   }
 };
 
+struct LiteralAction {
+  wcl::doc lit;
+  LiteralAction(wcl::doc lit) : lit(lit) {}
+
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    builder.append(std::move(lit));
+  }
+};
+
 struct TokenAction {
   cst_id_t token_id;
   TokenAction(cst_id_t token_id) : token_id(token_id) {}
@@ -635,6 +645,8 @@ struct Formatter {
   Formatter<SeqAction<Action, NewlineAction>> newline() { return {{action, {}}}; }
 
   Formatter<SeqAction<Action, FreshlineAction>> freshline() { return {{action, {}}}; }
+
+  Formatter<SeqAction<Action, LiteralAction>> lit(wcl::doc lit) { return {{action, {lit}}}; }
 
   Formatter<SeqAction<Action, TokenAction>> token(cst_id_t id) { return {{action, {id}}}; }
 

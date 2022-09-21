@@ -137,6 +137,25 @@ class Emitter {
   // on the current line if it fits, or on a new nested line
   auto rhs_fmt();
 
+  // Returns a doc with a binop surrounded by the appropiate separation. This depends heavily on
+  // the context and which operator is being used.
+  //
+  // Ex:
+  // "flat comma": ', '
+  // "flat or": ' | '
+  // "flat dot": '.'
+  // "explode or": '\n| '
+  // "explode comma": ',\n'
+  //
+  // When an operator grows a NL, the rules are slightly different as the spacing is forced.
+  //
+  // Ex:
+  //  '''x
+  //     + # comment
+  // <FR>5
+  //  '''
+  wcl::doc place_binop(CSTElement op, bool is_flat, ctx_t ctx);
+
   wcl::doc walk_apply(ctx_t ctx, CSTElement node);
   wcl::doc walk_arity(ctx_t ctx, CSTElement node);
   wcl::doc walk_ascribe(ctx_t ctx, CSTElement node);
