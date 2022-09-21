@@ -130,6 +130,11 @@ def t9 = (
   + 5 # comment
 )
 
+def t10 = (
+  x, # comment
+  5
+)
+
 def name Unit = # wake-format off
   def other = here
   def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -163,6 +168,9 @@ def ff = a | b | c | d
 def ff = a $ b $ c $ d
 
 def ff = aaaaaaaaaaaaa | bbbbbbbbbbbbbbbb | cccccccccccccccccc | ddddddddddddddddddd | eeeeeeeeeeeeeee | ffffffffff | ggggggggggg | hhhhhhhhhhh
+def ff = aaaaaaaaaaaaa $ bbbbbbbbbbbbbbbb $ cccccccccccccccccc $ ddddddddddddddddddd $ eeeeeeeeeeeeeee $ ffffffffff $ ggggggggggg $ hhhhhhhhhhh
+def ff = aaaaaaaaaaaaa , bbbbbbbbbbbbbbbb , cccccccccccccccccc , ddddddddddddddddddd , eeeeeeeeeeeeeee , ffffffffff , ggggggggggg , hhhhhhhhhhh
+def ff = aaaaaaaaaaaaa . bbbbbbbbbbbbbbbb . cccccccccccccccccc . ddddddddddddddddddd . eeeeeeeeeeeeeee . ffffffffff . ggggggggggg . hhhhhhhhhhh
 
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
     buildTestWake, Nil =
@@ -326,3 +334,5 @@ def buildRE2WASM Unit =
         Nil
 
     Pass (SysLib "1.0" headers objects cflags lflags)
+
+def t5 = a.b.c
