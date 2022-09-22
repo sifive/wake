@@ -555,7 +555,7 @@ export def infoH _args =
         getWhenFail "" os.getJobStdout
     def body =
         "#define OS {str}\n#define WAKE {version}\n"
-    write "{here}/info.h" body    # created with mode: rw-r--r--
+    write "{@here}/info.h" body    # created with mode: rw-r--r--
 ```
 
 This example creates a header file suitable for inclusion in some C/C++ project.
@@ -586,8 +586,8 @@ in case the job failed. There is other information we can get from a `Job`
 object: `getJobStatus` is an `Integer` equal to the job's exit status,
 `getJobOutputs` returns a `List` of `Paths` created by the job, among others.
 
-`version` is just a `String` with the current wake version, and `here` a
-`String` with the location of the wake file.  We also have an example of a
+`version` is just a `String` with the current wake version, and `@here` is a
+`String` with the directory of the Wake file.  We also have an example of a
 comment, `# ...`, reminding us of the default permissions used by `write`.
 
 ```console
@@ -937,7 +937,7 @@ export def buildAll _ =
         compileC variant ("-I.", Nil) Nil
     def objectsResult =
         require Pass srcFiles =
-            sources here `.*\.cpp`
+            sources @here `.*\.cpp`
         map compile srcFiles
         | findFail
     def allResult =
@@ -1003,12 +1003,12 @@ will fail.
 ```wake
 export def buildHeaders _ =
     require Pass headers =
-        sources here `.*\.h`
+        sources @here `.*\.h`
     def compile =
         compileC variant ("-I.", Nil) headers
     def objectsResult =
         require Pass srcFiles =
-            sources here `.*\.cpp`
+            sources @here `.*\.cpp`
         map compile srcFiles
         | findFail
     def headersResult =
@@ -1053,7 +1053,7 @@ Stderr:
 
 In `buildHeaders`, we've used the `sources` command to find all the header
 files in the same directory and pass them as legal inputs to gcc -- the
-keyword `here` expands to the directory of the `.wake` file.  The second
+keyword `@here` expands to the directory of the `.wake` file.  The second
 argument to `sources` is a regular expression to select which files to
 return. We've used ``` `` ```s here which define regular expression literals
 with the [standard syntax](https://github.com/google/re2/wiki/Syntax).
@@ -1155,7 +1155,7 @@ def curl url extension =
         # This construction is somewhat specific to GitHub's url scheme, which
         # names release tarballs according to the tag version, but doesn't
         # include the `.tar.gz` (or `.json`) extension.
-        "{here}/{basename url}.{extension}"
+        "{@here}/{basename url}.{extension}"
     def cmdline =
         which "curl",
         "-o", outputFile,
