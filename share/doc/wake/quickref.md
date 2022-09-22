@@ -256,13 +256,20 @@ Sources are the set of files in a Git repository. A `Path` in Wake is either a) 
 * `source: (file: String) => Result Path Error`
 * `sources: (dir: String) => (filterRegexp: RegExp) => Result (List Path) Error`
 
-functions. For example, to get all the header files in the current repository:
+functions. For example, to get all the header files in the current repository inside a Wake source file located at the workspace root:
 
 ```wake
-sources here `.*\.h`
+sources @here `.*\.h`
 ```
 
-Note that the directory given to `sources` is always relative to the root directory of the current Git repository and not the current directory. `here: String = "."` is just a helper value.
+
+Note that the directory given to `sources` is always relative to the root directory of the current Git repository and not the current directory. The expression `@here: String` is a built-in macro that expands to the relative path from the workspace root to the folder containing the Wake source file that contains `@here`. For example:
+
+```
+./build.wake @here -> "."
+./src/other.wake @here -> "src"
+./src/test/another.wake @here -> "src/test"
+```
 
 ### Wakisms
 
