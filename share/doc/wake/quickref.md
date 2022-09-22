@@ -249,17 +249,22 @@ Runners are created using `makeRunner`. `makeRunner` is defined as follows:
 
 Environment packages can be added to a workspace to provide tools (using runners) for running the workflow. They are composed of Wake files that define and publish runners. Environment packages should be defined for each unique running environment to decouple Wake rules from how tools are installed in each environment. You can check out [environment-example-sifive](https://github.com/sifive/environment-example-sifive) as an example of an environment package that contains runners for Wake-based workflows. 
 
-#### sources and Path objects
+#### Sources and `Path` objects
 
-Sources are the set of files in git.
+Sources are the set of files in a Git repository. A `Path` in Wake is either a) a file in Git or b) a file produced from a build step.
 
-A Path is either a) a file in git or b) a file produced from a build step
+To get a path, use the
 
-To get a path, use the source function. For example, all the header files in this directory:
+* `source: (file: String) => Result Path Error`
+* `sources: (dir: String) => (filterRegexp: RegExp) => Result (List Path) Error`
 
+functions. For example, to get all the header files in the current repository:
+
+```wake
+sources here `.*\.h`
 ```
-source `.*\.h` here
-```
+
+Note that the directory given to `sources` is always relative to the root directory of the current Git repository and not the current directory. `here: String = "."` is just a helper value.
 
 ### Wakisms
 
