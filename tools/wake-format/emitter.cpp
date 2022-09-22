@@ -1029,7 +1029,7 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
   assert(node.id() == CST_LITERAL);
 
   // clang-format off
-  auto multiline_str_fmt = fmt()
+  auto mstr_fmt = fmt()
     .match(
       pred(TOKEN_MSTR_BEGIN, fmt().token(TOKEN_MSTR_BEGIN))
      .pred(TOKEN_MSTR_RESUME, fmt().token(TOKEN_MSTR_RESUME))
@@ -1047,6 +1047,26 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
      .pred(TOKEN_MSTR_END, fmt().token(TOKEN_MSTR_END))
      // No otherwise, this should fail if neither are true
     );
+
+  auto lstr_fmt = fmt()
+    .match(
+      pred(TOKEN_LSTR_BEGIN, fmt().token(TOKEN_LSTR_BEGIN))
+     .pred(TOKEN_LSTR_RESUME, fmt().token(TOKEN_LSTR_RESUME))
+     // No otherwise, this should fail if neither are true
+    )
+    .fmt_while(
+      {TOKEN_NL, TOKEN_WS, TOKEN_LSTR_CONTINUE, TOKEN_LSTR_MID},
+      fmt().match(
+        pred(TOKEN_WS, fmt().token(TOKEN_WS))
+       .pred(TOKEN_NL, fmt().token(TOKEN_NL))
+       .pred(TOKEN_LSTR_CONTINUE, fmt().token(TOKEN_LSTR_CONTINUE))
+       .pred(TOKEN_LSTR_MID, fmt().token(TOKEN_LSTR_MID))
+      ))
+    .match(
+      pred(TOKEN_LSTR_PAUSE, fmt().token(TOKEN_LSTR_PAUSE))
+     .pred(TOKEN_LSTR_END, fmt().token(TOKEN_LSTR_END))
+     // No otherwise, this should fail if neither are true
+    );
   // clang-format on
 
   auto node_fmt = fmt().walk(DISPATCH(walk_placeholder));
@@ -1056,7 +1076,8 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
   MEMO_RET(fmt().match(
     // TODO: starting 'pred()' function doesn't allow init lists
     pred(ConstPredicate(false), fmt())
-   .pred({TOKEN_MSTR_BEGIN, TOKEN_MSTR_RESUME}, multiline_str_fmt)
+   .pred({TOKEN_MSTR_BEGIN, TOKEN_MSTR_RESUME}, mstr_fmt)
+   .pred({TOKEN_LSTR_BEGIN, TOKEN_LSTR_RESUME}, lstr_fmt)
    .pred([](wcl::doc_builder&, ctx_t, CSTElement& node,
                   const token_traits_map_t&){ return node.isNode(); }, node_fmt)
    .otherwise(token_fmt))

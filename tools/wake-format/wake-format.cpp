@@ -112,6 +112,12 @@ void print_cst(CSTElement node, int depth) {
       case TOKEN_MSTR_PAUSE:
       case TOKEN_MSTR_RESUME:
       case TOKEN_MSTR_END:
+      case TOKEN_LSTR_BEGIN:
+      case TOKEN_LSTR_CONTINUE:
+      case TOKEN_LSTR_END:
+      case TOKEN_LSTR_MID:
+      case TOKEN_LSTR_PAUSE:
+      case TOKEN_LSTR_RESUME:
         std::cerr << " -> " << child.fragment().segment().str() << std::endl;
         break;
       case TOKEN_WS: {
