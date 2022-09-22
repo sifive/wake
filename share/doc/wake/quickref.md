@@ -251,9 +251,7 @@ Environment packages can be added to a workspace to provide tools (using runners
 
 #### Sources and `Path` objects
 
-Sources are the set of files in a Git repository. A `Path` in Wake is either a) a file in Git or b) a file produced from a build step.
-
-To get a path, use the
+Sources are the set of files in a Git repository. A `Path` in Wake is either a) a file in Git or b) a file produced from a build step. The `Path` type has no public constructor to help enforce this. To get a `Path` value, use the
 
 * `source: (file: String) => Result Path Error`
 * `sources: (dir: String) => (filterRegexp: RegExp) => Result (List Path) Error`
