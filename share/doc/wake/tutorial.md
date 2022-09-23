@@ -587,7 +587,7 @@ object: `getJobStatus` is an `Integer` equal to the job's exit status,
 `getJobOutputs` returns a `List` of `Paths` created by the job, among others.
 
 `version` is just a `String` with the current wake version, and `@here` is a
-`String` with the directory of the Wake file.  We also have an example of a
+`String` with the directory of the wake file.  We also have an example of a
 comment, `# ...`, reminding us of the default permissions used by `write`.
 
 ```console
