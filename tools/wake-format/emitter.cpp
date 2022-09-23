@@ -245,7 +245,7 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
    .otherwise(node_fmt.join(fmt().newline())));
   // clang-format on
 
-  MEMO_RET(fmt().walk_children(body_fmt).format(ctx, node, token_traits));
+  MEMO_RET(fmt().walk_all(body_fmt).format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {
@@ -891,7 +891,7 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
    .otherwise(fmt().freshline().walk(WALK_NODE)));
   // clang-format on
 
-  MEMO_RET(fmt().walk_children(body_fmt).consume_wsnlc().format(ctx, node, token_traits));
+  MEMO_RET(fmt().walk_all(body_fmt).format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
