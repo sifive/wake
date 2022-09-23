@@ -364,17 +364,16 @@ struct WhileAction {
 };
 
 template <class FMT>
-struct WalkChildrenAction {
+struct WalkAllAction {
   FMT formatter;
 
-  WalkChildrenAction(FMT formatter) : formatter(formatter) {}
+  WalkAllAction(FMT formatter) : formatter(formatter) {}
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
-    for (CSTElement child = node.firstChildElement(); !child.empty();) {
-      builder.append(formatter.compose(ctx.sub(builder), child, traits));
+    while (!node.empty()) {
+      builder.append(formatter.compose(ctx.sub(builder), node, traits));
     }
-    node.nextSiblingElement();
   }
 };
 
@@ -736,7 +735,7 @@ struct Formatter {
   }
 
   template <class FMT>
-  Formatter<SeqAction<Action, WalkChildrenAction<FMT>>> walk_children(FMT formatter) {
+  Formatter<SeqAction<Action, WalkAllAction<FMT>>> walk_all(FMT formatter) {
     return {{action, {formatter}}};
   }
 
