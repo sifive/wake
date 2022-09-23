@@ -251,25 +251,49 @@ Environment packages can be added to a workspace to provide tools (using runners
 
 #### Sources and `Path` objects
 
-Sources are the set of files in a Git repository. A `Path` in Wake is either a) a file in Git or b) a file produced from a build step. The `Path` type has no public constructor to help enforce this. To get a `Path` value, use the
+Source files are files in a Git repository that are either committed or staged. A `Path` in Wake is either
+
+* a source file or
+* a file produced from a build step.
+
+The `Path` type has no public constructor function to help enforce this. To get a `Path` value for a source file, use the
 
 * `source: (file: String) => Result Path Error`
 * `sources: (dir: String) => (filterRegexp: RegExp) => Result (List Path) Error`
 
-functions. For example, to get all the header files in the current repository inside a Wake source file located at the workspace root:
+functions. For example, to get all the header files under the current Wake root:
 
 ```wake
-sources @here `.*\.h`
+sources "." `.*?\.h`
 ```
 
+Note that the directory given to `sources` is always relative to the Wake root and not the current directory of a source file. So the above expression, when evaluated, has the same effect whether it is run in a `.wake` file in any directory under the root or as `` wake -x 'sources "." `.*?\.h`' ``.
 
-Note that the directory given to `sources` is always relative to the root directory of the current Git repository and not the current directory. The expression `@here: String` is a built-in macro that expands to the relative path from the workspace root to the folder containing the Wake source file that contains `@here`. For example:
+When working inside a file, `@here: String` is a built-in macro that expands to the relative path from the workspace root to the directory containing the source file that contains `@here`. This can be useful when only wanting to source files in the current directory that your source file is in and in any subdirectory.
+
+Examples for what relative directory is returned based upon the source file's location:
 
 ```
 ./build.wake @here -> "."
 ./src/other.wake @here -> "src"
 ./src/test/another.wake @here -> "src/test"
 ```
+
+As a further example, suppose we had a source file `share/wake/lib/gcc_wake/test.wake` in the Wake repository that contained
+
+```wake
+package sourcesExample
+export def sourcesExample = sources @here `.*?\.wake`
+```
+
+Then `sourcesExample` would have a value of
+
+```bash
+$ wake -x 'sourcesExample' --in sourcesExample
+Pass (Path "share/wake/lib/gcc_wake/gcc.wake", Path "share/wake/lib/gcc_wake/pkgconfig.wake", Path "share/wake/lib/gcc_wake/test.wake", Nil)
+```
+
+at the time of writing. Note that if `test.wake` was a new, unstaged or uncommitted file, then it would *not* be returned in the result.
 
 ### Wakisms
 
