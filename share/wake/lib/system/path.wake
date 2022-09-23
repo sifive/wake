@@ -24,11 +24,26 @@ export def sortPaths (paths: List Path): List Path =
   def fn a b = a.getPathName <~ b.getPathName
   sortBy fn paths
 
-# Concatenate two paths
-#  join "foo"  "bar"    => "foo/bar"
-#  join "foo"  "/bar "  => "/bar"
-#  join "/foo" "bar"    => "/foo/bar"
-#  join "foo"  "../bar" => "bar"
+# Concatenate two paths by joining with "/" and simplifying the resultant path.
+# If `path` is a root path, i.e. starts with "/", then `dir` is ignored and
+# `path` is returned unchanged.
+#
+# Parameters:
+#  - `dir`: The base directory
+#  - `path`: The file or directory path to concatenate on top of `dir`
+#
+# Examples:
+# ```
+# in "foo"  "bar"    => "foo/bar"
+# in "foo"  "/bar "  => "/bar"
+# in "/foo" "bar"    => "/foo/bar"
+# in "foo"  "../bar" => "bar"
+# in "/foo" "../bar" => "/bar"
+# in "/foo" "./bar"  => "/foo/bar"
+# 
+# in "/test/lib" "../file.h" => "/test/file.h"
+# "file.cc" | in "tests"     => "tests/file.cc"
+# ```
 export def in (dir: String) (path: String): String =
     if matches `/.*` path then
         path
