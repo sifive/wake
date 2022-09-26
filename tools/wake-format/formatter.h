@@ -26,6 +26,7 @@
 
 #include "parser/cst.h"
 #include "parser/parser.h"
+#include "parser/syntax.h"
 
 #define ALWAYS_INLINE inline __attribute__((always_inline))
 
@@ -214,8 +215,8 @@ struct TokenAction {
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
     if (node.id() != token_id) {
-      // TODO: see about adding a token -> token name function
-      std::cerr << "Unexpected token: " << +token_id << std::endl;
+      std::cerr << "Token mismatch! Expected:  " << symbolName(token_id)
+                << ", Saw: " << symbolName(node.id()) << std::endl;
     }
     assert(node.id() == token_id);
 
@@ -250,8 +251,8 @@ struct TokenReplaceAction {
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
     if (node.id() != token_id) {
-      // TODO: see about adding a token -> token name function
-      std::cerr << "Unexpected token: " << +token_id << std::endl;
+      std::cerr << "Token mismatch! Expected:  " << symbolName(token_id)
+                << ", Saw: " << symbolName(node.id()) << std::endl;
     }
     assert(node.id() == token_id);
 
@@ -306,8 +307,7 @@ struct WalkPredicateAction {
                          const token_traits_map_t& traits) {
     bool result = predicate(builder, ctx, node, traits);
     if (!result) {
-      // TODO: see about adding a token -> token name function
-      std::cerr << "Unexpected token: " << +node.id() << std::endl;
+      std::cerr << "Unexpected token: " << symbolName(node.id()) << std::endl;
     }
     assert(result);
     auto doc = walker(ctx.sub(builder), const_cast<const CSTElement&>(node));
@@ -753,7 +753,7 @@ struct Formatter {
     wcl::doc_builder builder;
     action.run(builder, ctx, node, traits);
     if (!node.empty()) {
-      std::cerr << "Not empty: " << +node.id() << std::endl;
+      std::cerr << "Not empty: " << symbolName(node.id()) << std::endl;
       std::cerr << "Failed at: " << std::move(builder).build().as_string() << std::endl;
     }
     assert(node.empty());
