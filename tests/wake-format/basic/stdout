@@ -585,3 +585,19 @@ def defaultWake Unit =
     Pass (Pair "tmp/bin/wake" wakeVisible)
 
 
+def (
+    tool
+    (dir: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+) = ""
+
+

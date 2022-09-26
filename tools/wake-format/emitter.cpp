@@ -59,7 +59,8 @@ static inline bool requires_fits_all(cst_id_t type) {
 
 static inline bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
-         type == CST_BINARY || CST_PAREN;
+         type == CST_BINARY || type == CST_PAREN || type == CST_ASCRIBE || type == CST_SUBSCRIBE ||
+         type == CST_LAMBDA || type == CST_UNARY;
 }
 
 static bool compare_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
@@ -930,7 +931,7 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_DEF)
                .ws()
-               .walk({CST_ID, CST_APP, CST_ASCRIBE}, WALK_NODE)
+               .walk(is_expression, DISPATCH(walk_type))
                .ws()
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
@@ -1284,7 +1285,7 @@ wcl::doc Emitter::walk_type(ctx_t ctx, CSTElement node) {
                .nest(fmt().freshline().walk(WALK_NODE).consume_wsnlc())
                .freshline()
                .lit(wcl::doc::lit(")"))
-               .format(ctx, node, token_traits));
+               .compose(ctx, node, token_traits));  // TODO: find a way to make this not-compose
 }
 
 wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) {
