@@ -1013,8 +1013,30 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   assert(node.id() == CST_IF);
 
-  // TODO: support flat case?
-  // Ex: def x = if true then 5 else 6
+  auto fits_no_nl =
+      fmt()
+          .fmt_if_fits_all(
+              fmt()
+                  .token(TOKEN_KW_IF)
+                  .ws()
+                  .walk(is_expression, WALK_NODE)  // if cond
+                  .ws()
+                  .token(TOKEN_KW_THEN)
+                  .consume_wsnlc()
+                  .space()
+                  .walk(is_expression, WALK_NODE)  // true body
+                  .consume_wsnlc()
+                  .space()
+                  .token(TOKEN_KW_ELSE)
+                  .consume_wsnlc()
+                  .space()
+                  .walk(is_expression, WALK_NODE),     // false body
+              fmt().walk_all(fmt().next()).newline())  // garbage format to fail NL check
+          .format(ctx, node.firstChildElement(), token_traits);
+
+  if (!fits_no_nl->has_newline()) {
+    MEMO_RET(fits_no_nl);
+  }
 
   MEMO_RET(fmt()
                .token(TOKEN_KW_IF)

@@ -210,6 +210,12 @@ def linkKind =
         # comment
         cppVariant
 
+def linkKind =
+    if verrrrrrrry loooooooooooog naaaaaaaaaaaame then
+        verrrrrrrrrrrrrrrrrrrrrrry
+    else
+        looooooooooooooooong
+
 export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
 export topic compileC: Pair String ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Result (List Path) Error)
 topic linkO: (

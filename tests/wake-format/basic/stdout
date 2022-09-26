@@ -278,6 +278,13 @@ def linkKind =
         cppVariant
 
 
+def linkKind =
+    if verrrrrrrry loooooooooooog naaaaaaaaaaaame then
+        verrrrrrrrrrrrrrrrrrrrrrry
+    else
+        looooooooooooooooong
+
+
 export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
 export topic compileC: (
     Pair
@@ -549,11 +556,7 @@ def tarball Unit =
     require Pass tarball =
         def cmd =
             def gnutar = which "gnutar"
-            def tar =
-                if gnutar ==* "gnutar" then
-                    which "tar"
-                else
-                    gnutar
+            def tar = if gnutar ==* "gnutar" then which "tar" else gnutar
             def files = map getPathName (manifest, testManifest, spec, srcs) | sortBy (_ <* _)
             tar,
             "--mtime={time}",
