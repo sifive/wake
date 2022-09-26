@@ -201,6 +201,15 @@ from wake import def unary + -
 from wake import type Pair Result
 from wake import source,Nil
 
+# comment
+def linkKind =
+    # comment
+    if empty cppSources then
+        cVariant # comment
+    else
+        # comment
+        cppVariant
+
 export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
 export topic compileC: Pair String ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Result (List Path) Error)
 topic linkO: (
