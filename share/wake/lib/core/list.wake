@@ -531,6 +531,9 @@ export def exists (f: a => Boolean): List a => Boolean =
 # Once `f` returns False, `f` is not evaulated on further elements.
 # This means that `f` is applied to the List mostly sequentially.
 # If more parallelism is desired, use 'map f | forall (_)'.
+
+# Guarantees:
+#  - `forall` applied to the empty list, `Nil`, is always `True`
 #
 # Examples:
 # ```
