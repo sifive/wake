@@ -10,13 +10,20 @@
 the wake library (share/wake/lib) and all files *.wake in
 the wake.db directory and below.
 
-1. wake is invoked normally, although arguments are generally quoted.
+1. wake is invoked normally with a command-line target and its arguments.
+   Targets are any wake function in scope with a single `args: List String` parameter.
+    ```wake
+    wake runThing "a string"
     ```
-    wake 'runThing "a string"'
+
+1. Arbitrary wake expressions can be invoked with `-x`,
+   although the entire expression is generally quoted with single quotes to avoid interactions with the shell.
+    ```wake
+    wake -x 'runThing "a string"'
     ```
 
 1. Other useful flags
-    1. `wake -v <varible>` to get type information
+    1. `wake -xv <varible>` to get type information for a variable or function that is in scope
     1. Getting information about jobs. For all these commands, adding `-v` will
        include the jobs' stdout/stderr, and adding `-d` will include the Wake
        stack trace of when the job was run.
