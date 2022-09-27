@@ -325,6 +325,8 @@ struct MatchSeq {
   }
 };
 
+// TODO: move match/cases into separate files and maybe split MatchAction into MatchFormatter, and
+// MatchAction
 template <class Case>
 struct MatchAction {
   Case c;
