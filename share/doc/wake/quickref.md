@@ -264,10 +264,10 @@ The `Path` type has no public constructor function to help enforce this. To get 
 functions. For example, to get all the header files under the current Wake root:
 
 ```wake
-sources "." `.*?\.h`
+sources "." `.*\.h`
 ```
 
-Note that the directory given to `sources` is always relative to the Wake root and not the current directory of a source file. So the above expression, when evaluated, has the same effect whether it is run in a `.wake` file in any directory under the root or as `` wake -x 'sources "." `.*?\.h`' ``.
+Note that the directory given to `sources` is always relative to the Wake root and not the current directory of a source file. So the above expression, when evaluated, has the same effect whether it is run in a `.wake` file in any directory under the root or as `` wake -x 'sources "." `.*\.h`' ``.
 
 When working inside a file, `@here: String` is a built-in macro that expands to the relative path from the workspace root to the directory containing the source file that contains `@here`. This can be useful when only wanting to source files in the current directory that your source file is in and in any subdirectory.
 
@@ -283,7 +283,7 @@ As a further example, suppose we had a source file `share/wake/lib/gcc_wake/test
 
 ```wake
 package sourcesExample
-export def sourcesExample = sources @here `.*?\.wake`
+export def sourcesExample = sources @here `.*\.wake`
 ```
 
 Then `sourcesExample` would have a value of
