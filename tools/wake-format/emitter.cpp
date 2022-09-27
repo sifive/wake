@@ -54,7 +54,8 @@
 
 static inline bool requires_nl(cst_id_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
 static inline bool requires_fits_all(cst_id_t type) {
-  return type == CST_APP || type == CST_BINARY || type == CST_LITERAL || type == CST_INTERPOLATE;
+  return type == CST_APP || type == CST_BINARY || type == CST_LITERAL || type == CST_INTERPOLATE ||
+         type == CST_IF;
 }
 
 static inline bool is_expression(cst_id_t type) {
@@ -1010,7 +1011,51 @@ wcl::doc Emitter::walk_ideq(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(walk_placeholder(ctx, node));
+  assert(node.id() == CST_IF);
+
+  auto fits_no_nl =
+      fmt()
+          .fmt_if_fits_all(
+              fmt()
+                  .token(TOKEN_KW_IF)
+                  .consume_wsnlc()
+                  .space()
+                  .walk(is_expression, WALK_NODE)  // if cond
+                  .consume_wsnlc()
+                  .space()
+                  .token(TOKEN_KW_THEN)
+                  .consume_wsnlc()
+                  .space()
+                  .walk(is_expression, WALK_NODE)  // true body
+                  .consume_wsnlc()
+                  .space()
+                  .token(TOKEN_KW_ELSE)
+                  .consume_wsnlc()
+                  .space()
+                  .walk(is_expression, WALK_NODE),     // false body
+              fmt().walk_all(fmt().next()).newline())  // garbage format to fail NL check
+          .format(ctx, node.firstChildElement(), token_traits);
+
+  if (!fits_no_nl->has_newline()) {
+    MEMO_RET(fits_no_nl);
+  }
+
+  MEMO_RET(fmt()
+               .token(TOKEN_KW_IF)
+               .consume_wsnlc()
+               .space()
+               .walk(is_expression, WALK_NODE)  // if cond
+               .consume_wsnlc()
+               .space()
+               .token(TOKEN_KW_THEN)
+               .consume_wsnlc()
+               .nest(fmt().freshline().walk(is_expression, WALK_NODE))  // true body
+               .consume_wsnlc()
+               .freshline()
+               .token(TOKEN_KW_ELSE)
+               .consume_wsnlc()
+               .nest(fmt().freshline().walk(is_expression, WALK_NODE))  // false body
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
