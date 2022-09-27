@@ -60,7 +60,8 @@ static inline bool requires_fits_all(cst_id_t type) {
 
 static inline bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
-         type == CST_BINARY || CST_PAREN;
+         type == CST_BINARY || type == CST_PAREN || type == CST_ASCRIBE || type == CST_SUBSCRIBE ||
+         type == CST_LAMBDA || type == CST_UNARY;
 }
 
 static bool compare_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
@@ -963,7 +964,7 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_DEF)
                .ws()
-               .walk(is_expression, WALK_NODE)
+               .walk(is_expression, DISPATCH(walk_type))
                .ws()
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
@@ -1064,26 +1065,25 @@ wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
 
   auto id_list_fmt = fmt().walk(WALK_NODE).fmt_if(TOKEN_WS, fmt().ws());
 
-  MEMO_RET(
-      fmt()
-          .token(TOKEN_KW_FROM)
-          .ws()
-          .walk(CST_ID, WALK_NODE)
-          .ws()
-          .token(TOKEN_KW_IMPORT)
-          .ws()
-          .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
-          .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
-          // clang-format off
+  MEMO_RET(fmt()
+               .token(TOKEN_KW_FROM)
+               .ws()
+               .walk(CST_ID, WALK_NODE)
+               .ws()
+               .token(TOKEN_KW_IMPORT)
+               .ws()
+               .fmt_if(CST_KIND, fmt().walk(WALK_NODE).ws())
+               .fmt_if(CST_ARITY, fmt().walk(WALK_NODE).ws())
+               // clang-format off
           .fmt_if_else(
               TOKEN_P_HOLE,
               fmt().walk(WALK_TOKEN),
               fmt().fmt_while(
                   CST_IDEQ,
                   id_list_fmt))
-          // clang-format on
-          .consume_wsnlc()
-          .format(ctx, node.firstChildElement(), token_traits));
+               // clang-format on
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_interpolate(ctx_t ctx, CSTElement node) {
@@ -1356,12 +1356,12 @@ wcl::doc Emitter::walk_type(ctx_t ctx, CSTElement node) {
     MEMO_RET(no_nl);
   }
 
-  MEMO_RET(fmt()
+  MEMO_RET(cat()
                .lit(wcl::doc::lit("("))
-               .nest(fmt().freshline().walk(WALK_NODE).consume_wsnlc())
+               .nest(cat().fmt(node, token_traits, fmt().freshline().walk(WALK_NODE)))
                .freshline()
                .lit(wcl::doc::lit(")"))
-               .format(ctx, node, token_traits));
+               .concat(ctx));
 }
 
 wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) {

@@ -23,10 +23,52 @@
 #include <cassert>
 
 #include "actions.h"
+#include "catters.h"
 #include "parser/cst.h"
 #include "parser/syntax.h"
 #include "predicates.h"
 #include "types.h"
+
+template <class Catter>
+struct ConcatFormatter {
+  Catter catter;
+
+  ConcatFormatter(Catter c) : catter(c) {}
+
+  ConcatFormatter<SeqCatter<Catter, SpaceCatter>> space(uint8_t count = 1) {
+    return {{catter, {count}}};
+  }
+
+  ConcatFormatter<SeqCatter<Catter, NewlineCatter>> newline() { return {{catter, {}}}; }
+  ConcatFormatter<SeqCatter<Catter, FreshlineCatter>> freshline() { return {{catter, {}}}; }
+
+  ConcatFormatter<SeqCatter<Catter, LiteralCatter>> lit(wcl::doc lit) { return {{catter, {lit}}}; }
+
+  template <class CTR>
+  ConcatFormatter<SeqCatter<Catter, NestCatter<CTR>>> nest(CTR ctr) {
+    return {{catter, {ctr}}};
+  }
+
+  template <class CTR>
+  ConcatFormatter<SeqCatter<Catter, JoinCatter<CTR>>> join(CTR ctr) {
+    return {{catter, {ctr}}};
+  }
+
+  template <class FMT>
+  ConcatFormatter<SeqCatter<Catter, FormatCatter<FMT>>> fmt(CSTElement node,
+                                                            const token_traits_map_t& traits,
+                                                            FMT formatter) {
+    return {{catter, {formatter, node, traits}}};
+  }
+
+  wcl::doc concat(ctx_t ctx) {
+    wcl::doc_builder builder;
+    catter.cat(builder, ctx);
+    return std::move(builder).build();
+  }
+};
+
+inline ConcatFormatter<EpsilonCatter> cat() { return {{}}; }
 
 template <class Action>
 struct Formatter {
