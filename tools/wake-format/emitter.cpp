@@ -1018,9 +1018,11 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
           .fmt_if_fits_all(
               fmt()
                   .token(TOKEN_KW_IF)
-                  .ws()
+                  .consume_wsnlc()
+                  .space()
                   .walk(is_expression, WALK_NODE)  // if cond
-                  .ws()
+                  .consume_wsnlc()
+                  .space()
                   .token(TOKEN_KW_THEN)
                   .consume_wsnlc()
                   .space()
@@ -1040,9 +1042,11 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
 
   MEMO_RET(fmt()
                .token(TOKEN_KW_IF)
-               .ws()
+               .consume_wsnlc()
+               .space()
                .walk(is_expression, WALK_NODE)  // if cond
-               .ws()
+               .consume_wsnlc()
+               .space()
                .token(TOKEN_KW_THEN)
                .consume_wsnlc()
                .nest(fmt().freshline().walk(is_expression, WALK_NODE))  // true body

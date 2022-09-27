@@ -285,6 +285,9 @@ def linkKind =
         looooooooooooooooong
 
 
+def linkKind = if true then short else short
+
+
 export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
 export topic compileC: (
     Pair
