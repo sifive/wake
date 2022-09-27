@@ -21,6 +21,7 @@
 
 #include "database.h"
 
+#include <fcntl.h>
 #include <sqlite3.h>
 #include <string.h>
 #include <time.h>
@@ -759,8 +760,6 @@ Usage Database::reuse_job(const std::string &directory, const std::string &envir
   Usage out;
   long stat_id;
 
-  // When implementing indexed directories, beware of non-existent BADPATH files
-
   const char *why = "Could not check for a cached job";
   begin_txn();
   bind_string(why, imp->find_prior, 1, directory);
@@ -818,7 +817,7 @@ Usage Database::reuse_job(const std::string &directory, const std::string &envir
   bind_integer(why, imp->get_tree, 2, OUTPUT);
   while (sqlite3_step(imp->get_tree) == SQLITE_ROW) {
     std::string path = rip_column(imp->get_tree, 0);
-    if (access(path.c_str(), R_OK) != 0) out.found = false;
+    if (faccessat(AT_FDCWD, path.c_str(), R_OK, AT_SYMLINK_NOFOLLOW) != 0) out.found = false;
     files.emplace_back(std::move(path), rip_column(imp->get_tree, 1));
   }
   finish_stmt(why, imp->get_tree, imp->debugdb);

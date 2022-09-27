@@ -334,7 +334,7 @@ static int wakefuse_access(const char *path, int mask) {
 
   if (!it->second.is_readable(key.second)) return -ENOENT;
 
-  int res = faccessat(context.rootfd, key.second.c_str(), mask, 0);
+  int res = faccessat(context.rootfd, key.second.c_str(), mask, AT_SYMLINK_NOFOLLOW);
   if (res == -1) return -errno;
 
   return 0;
