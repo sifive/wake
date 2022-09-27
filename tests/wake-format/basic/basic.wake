@@ -486,3 +486,35 @@ def defaultWake Unit =
         doInstall "tmp" "default"
 
     Pass (Pair "tmp/bin/wake" wakeVisible)
+
+export data JValue =
+  JString  String
+  JInteger Integer
+  JDouble  Double
+  JBoolean Boolean
+  JNull
+  JObject  (List (Pair String JValue))
+  JArray   (List JValue)
+
+export data List a =
+# The empty list. Nil represents a list with no elements.
+    Nil
+
+export data Option a =
+    Some a
+    None
+
+data LogLevel = LogLevel (name: String)
+
+export data Result pass fail =
+    Pass pass
+    Fail fail
+
+export data a; b = a; b
+
+export data Boolean =
+    True
+
+global export data Let =
+    A
+    B
