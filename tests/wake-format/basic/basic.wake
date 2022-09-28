@@ -538,3 +538,5 @@ export data Boolean =
 global export data Let =
     A
     B
+
+def x + y = add x y

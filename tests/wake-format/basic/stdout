@@ -644,3 +644,6 @@ global export data Let =
     B
     
 
+def x + y = add x y
+
+
