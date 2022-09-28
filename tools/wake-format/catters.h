@@ -94,6 +94,7 @@ struct FormatCatter {
       : formatter(formatter), node(node), traits(traits) {}
 
   ALWAYS_INLINE void cat(wcl::doc_builder& builder, ctx_t ctx) {
-    builder.append(formatter.compose(ctx.sub(builder), node, traits));
+    CSTElement copy = node;
+    builder.append(formatter.compose(ctx.sub(builder), copy, traits));
   }
 };
