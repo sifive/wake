@@ -213,6 +213,36 @@ auto Emitter::rhs_fmt() {
   // clang-format on
 }
 
+auto Emitter::pattern_fmt(cst_id_t stop_at) {
+  auto first = fmt().walk(is_expression, WALK_NODE).consume_wsnlc();
+  auto rest_flat = fmt().space().walk(is_expression, WALK_NODE).consume_wsnlc();
+  auto all_flat =
+      fmt().join(first).fmt_while([stop_at](cst_id_t id) { return id != stop_at; }, rest_flat);
+  auto rest_explode = fmt().freshline().walk(is_expression, WALK_NODE).consume_wsnlc();
+  auto all_explode = fmt()
+                         .lit(wcl::doc::lit("("))
+                         .nest(fmt().freshline().join(first).fmt_while(
+                             [stop_at](cst_id_t id) { return id != stop_at; }, rest_explode))
+                         .freshline()
+                         .lit(wcl::doc::lit(")"));
+  // 4 Cases
+  // 1) The "flat format" doesn't have a newline and fits()
+  // 2) The "flat format" doesn't have a newline and doesn't fits()
+  // 3) The "flat format" has a NL and fits()
+  // 4) The "flat format" has a NL and doesn't fits()
+  //
+  // #1 is the ideal and most common use, so flat is returned
+  // #2 is a somewhat rare case where the pattern is very wide without the influence of comments.
+  //    return the explode representation
+  // #3/#4 when flat has a newline, it must have been grown from a comment. At that point there
+  //    isn't a good way to determine if it fits since the NL can be in many places. Instead
+  //    just return flat, accepting in some very rare cases the output will exceed the max width
+
+  return fmt().fmt_try_else(
+      [](const wcl::doc_builder& builder, ctx_t ctx, wcl::doc doc) { return doc->has_newline(); },
+      all_flat, fmt().fmt_if_fits_all(all_flat, all_explode));
+}
+
 wcl::doc Emitter::layout(CST cst) {
   ctx_t ctx;
   bind_comments(cst.root());
@@ -903,7 +933,7 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
   size_t leading_count = count_leading_newlines(token_traits, node);
 
   MEMO_RET(fmt()
-               .walk(WALK_NODE)
+               .join(pattern_fmt(CST_GUARD))
                .consume_wsnlc()
                // emit a freshline if the previous walk emitted a NL
                .fmt_if_else(
@@ -1170,15 +1200,15 @@ wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
   MEMO_RET(fmt()
                .token(TOKEN_KW_MATCH)
                .ws()
-               .walk(WALK_NODE)
+               .join(pattern_fmt(CST_CASE))
                // clang-format off
-          .nest(fmt()
-              .consume_wsnlc()
-              .fmt_while(
-                  {CST_CASE}, fmt()
-                  .freshline()
-                  .walk(WALK_NODE)
-                  .consume_wsnlc()))
+               .nest(fmt()
+                   .consume_wsnlc()
+                   .fmt_while(
+                       {CST_CASE}, fmt()
+                       .freshline()
+                       .walk(WALK_NODE)
+                       .consume_wsnlc()))
                // clang-format on
                .format(ctx, node.firstChildElement(), token_traits));
 }

@@ -543,3 +543,11 @@ def x + y = add x y
 
 def tool (dir: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) (addHeaders: String) =
     ""
+
+def f0 = match _ _
+  (x: Integer) (True:  Boolean) = x+1
+  (x: Integer) (False: Boolean) = x+0
+
+def f0 = match aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = x+1
+  x b = x+0
