@@ -152,7 +152,8 @@ struct Formatter {
     wcl::doc_builder builder;
     action.run(builder, ctx, node, traits);
     if (!node.empty()) {
-      std::cerr << "Not empty: " << symbolName(node.id()) << std::endl;
+      std::cerr << "Not empty <" << symbolName(node.id()) << "> at " << node.location().filename
+                << ":" << node.location().start.row << std::endl;
       std::cerr << "Failed at: " << std::move(builder).build().as_string() << std::endl;
     }
     assert(node.empty());

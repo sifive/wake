@@ -108,8 +108,9 @@ struct TokenAction {
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
     if (node.id() != token_id) {
-      std::cerr << "Token mismatch! Expected:  " << symbolName(token_id)
-                << ", Saw: " << symbolName(node.id()) << std::endl;
+      std::cerr << "Token mismatch! Expected <" << symbolName(token_id) << ">, Saw <"
+                << symbolName(node.id()) << "> at " << node.location().filename << ":"
+                << node.location().start.row << std::endl;
     }
     assert(node.id() == token_id);
 
@@ -144,8 +145,9 @@ struct TokenReplaceAction {
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
     if (node.id() != token_id) {
-      std::cerr << "Token mismatch! Expected:  " << symbolName(token_id)
-                << ", Saw: " << symbolName(node.id()) << std::endl;
+      std::cerr << "Token mismatch! Expected <" << symbolName(token_id) << ">, Saw <"
+                << symbolName(node.id()) << "> at " << node.location().filename << ":"
+                << node.location().start.row << std::endl;
     }
     assert(node.id() == token_id);
 
@@ -200,7 +202,8 @@ struct WalkPredicateAction {
                          const token_traits_map_t& traits) {
     bool result = predicate(builder, ctx, node, traits);
     if (!result) {
-      std::cerr << "Unexpected token: " << symbolName(node.id()) << std::endl;
+      std::cerr << "Unexpected token <" << symbolName(node.id()) << "> at "
+                << node.location().filename << ":" << node.location().start.row << std::endl;
     }
     assert(result);
     auto doc = walker(ctx.sub(builder), const_cast<const CSTElement&>(node));

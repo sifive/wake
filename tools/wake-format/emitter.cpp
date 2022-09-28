@@ -963,7 +963,7 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_DEF)
                .ws()
-               .walk({CST_ID, CST_APP, CST_ASCRIBE}, WALK_NODE)
+               .walk(is_expression, WALK_NODE)
                .ws()
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
