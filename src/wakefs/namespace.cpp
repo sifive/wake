@@ -202,7 +202,6 @@ static bool do_squashfuse_mount(const std::string &source, const std::string &mo
     std::cerr << "execlp squashfuse: " << strerror(errno) << std::endl;
     exit(1);
   }
-
   // Wait for the mount to exist before we continue by checking if the
   // stat() device id or the inode changes.
   struct stat before;
