@@ -223,7 +223,7 @@ wcl::doc Emitter::layout(CST cst) {
 template <class Func>
 wcl::doc Emitter::dispatch(ctx_t ctx, CSTElement node, Func func) {
   MEMO(ctx, node);
-  assert(node.isNode());
+  FMT_ASSERT(node.isNode(), node, "Expected node");
 
   if (node_traits[node].format_off) {
     MEMO_RET(walk_no_edit(ctx, node));
@@ -252,7 +252,7 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.isNode());
+  FMT_ASSERT(node.isNode(), node, "Expected node");
 
   switch (node.id()) {
     case CST_ARITY:
@@ -338,7 +338,7 @@ wcl::doc Emitter::walk_node(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_placeholder(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.isNode());
+  FMT_ASSERT(node.isNode(), node, "Expected node");
 
   wcl::doc_builder bdr;
 
@@ -468,7 +468,7 @@ void Emitter::bind_comments(CSTElement node) {
 }
 
 void Emitter::mark_no_format_nodes(CSTElement node) {
-  assert(node.isNode());
+  FMT_ASSERT(node.isNode(), node, "Expected node");
 
   for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
     if (child.isNode()) {
@@ -493,7 +493,7 @@ void Emitter::mark_no_format_nodes(CSTElement node) {
         }
 
         // This shouldn't be possible, but assert anyways just in case
-        assert(!child.empty());
+        FMT_ASSERT(!child.empty(), child, "Expected non-empty child");
 
         node_traits[block_item].turn_format_off();
         continue;
@@ -506,7 +506,7 @@ void Emitter::mark_no_format_nodes(CSTElement node) {
 
 wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(!node.isNode());
+  FMT_ASSERT(!node.isNode(), node, "Expected node");
 
   wcl::doc_builder builder;
 
@@ -660,7 +660,7 @@ wcl::optional<wcl::doc> Emitter::combine_apply_explode_all(ctx_t ctx,
 
 wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_APP);
+  FMT_ASSERT(node.id() == CST_APP, node, "Expected CST_APP");
 
   auto parts = collect_apply_parts(node);
 
@@ -843,7 +843,7 @@ wcl::optional<wcl::doc> Emitter::combine_explode_last_compress(
 
 wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_BINARY);
+  FMT_ASSERT(node.id() == CST_BINARY, node, "Expected CST_BINARY");
 
   // NOTE: The 'node' variant functions are being used here which is differnt than everywhere else
   // This is fine since COMMENTS are bound to the nodes and this func only needs to process nodes
@@ -853,7 +853,7 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
   CSTElement rhs = op;
   rhs.nextSiblingNode();
 
-  assert(op.id() == CST_OP);
+  FMT_ASSERT(op.id() == CST_OP, op, "Expected CST_OP for operator");
   CSTElement op_token = op.firstChildElement();
 
   std::vector<CSTElement> parts = {};
@@ -883,7 +883,7 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_BLOCK);
+  FMT_ASSERT(node.id() == CST_BLOCK, node, "Expected CST_BLOCK");
 
   // clang-format off
   auto body_fmt = fmt().match(
@@ -898,7 +898,7 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_CASE);
+  FMT_ASSERT(node.id() == CST_CASE, node, "Expected CST_CASE");
 
   size_t leading_count = count_leading_newlines(token_traits, node);
 
@@ -920,7 +920,7 @@ wcl::doc Emitter::walk_case(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_DATA);
+  FMT_ASSERT(node.id() == CST_DATA, node, "Expected CST_DATA");
 
   auto fmt_members = fmt().walk_all(fmt().walk(WALK_NODE).freshline().consume_wsnlc());
 
@@ -957,7 +957,7 @@ wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_DEF);
+  FMT_ASSERT(node.id() == CST_DEF, node, "Expected CST_DEF");
 
   MEMO_RET(fmt()
                .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
@@ -1000,7 +1000,7 @@ wcl::doc Emitter::walk_hole(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_identifier(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_ID);
+  FMT_ASSERT(node.id() == CST_ID, node, "Expected CST_ID");
 
   MEMO_RET(fmt().token(TOKEN_ID).format(ctx, node.firstChildElement(), token_traits));
 }
@@ -1012,7 +1012,7 @@ wcl::doc Emitter::walk_ideq(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_IF);
+  FMT_ASSERT(node.id() == CST_IF, node, "Expected CST_IF");
 
   auto fits_no_nl =
       fmt()
@@ -1061,7 +1061,7 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_import(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_IMPORT);
+  FMT_ASSERT(node.id() == CST_IMPORT, node, "Expected CST_IMPORT");
 
   auto id_list_fmt = fmt().walk(WALK_NODE).fmt_if(TOKEN_WS, fmt().ws());
 
@@ -1104,7 +1104,7 @@ wcl::doc Emitter::walk_lambda(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_LITERAL);
+  FMT_ASSERT(node.id() == CST_LITERAL, node, "Expected CST_LITERAL");
 
   // clang-format off
   auto mstr_fmt = fmt()
@@ -1165,7 +1165,7 @@ wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_match(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_MATCH);
+  FMT_ASSERT(node.id() == CST_MATCH, node, "Expected CST_MATCH");
 
   MEMO_RET(fmt()
                .token(TOKEN_KW_MATCH)
@@ -1190,7 +1190,7 @@ wcl::doc Emitter::walk_op(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_PACKAGE);
+  FMT_ASSERT(node.id() == CST_PACKAGE, node, "Expected CST_PACKAGE");
 
   MEMO_RET(fmt()
                .token(TOKEN_KW_PACKAGE)
@@ -1202,7 +1202,7 @@ wcl::doc Emitter::walk_package(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_PAREN);
+  FMT_ASSERT(node.id() == CST_PAREN, node, "Expected CST_PAREN");
 
   auto no_nl = fmt()
                    .token(TOKEN_P_POPEN)
@@ -1232,7 +1232,7 @@ wcl::doc Emitter::walk_prim(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_PUBLISH);
+  FMT_ASSERT(node.id() == CST_PUBLISH, node, "Expected CST_PUBLISH");
 
   MEMO_RET(fmt()
                .token(TOKEN_KW_PUBLISH)
@@ -1249,7 +1249,7 @@ wcl::doc Emitter::walk_publish(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_REQUIRE);
+  FMT_ASSERT(node.id() == CST_REQUIRE, node, "Expected CST_REQUIRE");
 
   auto else_fmt =
       fmt()
@@ -1284,7 +1284,7 @@ wcl::doc Emitter::walk_req_else(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_SUBSCRIBE);
+  FMT_ASSERT(node.id() == CST_SUBSCRIBE, node, "Expected CST_SUBSCRIBE");
 
   MEMO_RET(fmt()
                .token(TOKEN_KW_SUBSCRIBE)
@@ -1295,7 +1295,7 @@ wcl::doc Emitter::walk_subscribe(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_TARGET);
+  FMT_ASSERT(node.id() == CST_TARGET, node, "Expected CST_TARGET");
 
   MEMO_RET(fmt()
                .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
@@ -1323,7 +1323,7 @@ wcl::doc Emitter::walk_top(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_topic(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  assert(node.id() == CST_TOPIC);
+  FMT_ASSERT(node.id() == CST_TOPIC, node, "Expected CST_TOPIC");
 
   MEMO_RET(fmt()
                .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
@@ -1376,7 +1376,7 @@ wcl::doc Emitter::walk_error(ctx_t ctx, CSTElement node) {
 }
 
 wcl::doc Emitter::place_binop(CSTElement op, bool is_flat, ctx_t ctx) {
-  assert(!op.isNode());
+  FMT_ASSERT(!op.isNode(), op, "Expected operator token");
 
   // lsep = operator defined lhs separator
   // rsep = operator defined rhs separator
