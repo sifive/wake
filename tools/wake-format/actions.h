@@ -21,43 +21,16 @@
 
 #include <iostream>
 
+#include "common.h"
 #include "parser/syntax.h"
 #include "predicates.h"
 #include "types.h"
 
-inline void space(wcl::doc_builder& builder, uint8_t count) {
-  for (uint8_t i = 0; i < count; i++) {
-    builder.append(SPACE_STR);
-  }
-}
-
-inline void newline(wcl::doc_builder& builder, uint8_t space_count) {
-  builder.append(NL_STR);
-  space(builder, space_count);
-}
-
-inline void freshline(wcl::doc_builder& builder, ctx_t ctx) {
-  auto goal_width = SPACE_PER_INDENT * ctx.nest_level;
-  auto merged = ctx.sub(builder);
-
-  // there are non-ws characters on the line, thus a nl is required
-  if (merged->last_width() > merged->last_ws_count()) {
-    newline(builder, goal_width);
-    return;
-  }
-
-  // This is a fresh line, but without the right amount of spaces
-  if (merged->last_width() < goal_width) {
-    space(builder, goal_width - merged->last_width());
-    return;
-  }
-
-  // If there are too many spaces, then a freshline() was used instead
-  // of newline(). Assert to ensure it is fixed.
-  if (merged->last_width() > goal_width) {
-    assert(false);
-  }
-}
+// This does nothing, good for kicking off a chain of formatters
+struct EpsilonAction {
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {}
+};
 
 struct ConsumeWhitespaceAction {
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
@@ -307,12 +280,6 @@ struct NextAction {
   }
 };
 
-// This does nothing, good for kicking off a chain of formatters
-struct EpsilonAction {
-  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
-                         const token_traits_map_t& traits) {}
-};
-
 template <class Predicate, class FMT>
 struct PredicateCase {
   Predicate predicate;
@@ -358,6 +325,8 @@ struct MatchSeq {
   }
 };
 
+// TODO: move match/cases into separate files and maybe split MatchAction into MatchFormatter, and
+// MatchAction
 template <class Case>
 struct MatchAction {
   Case c;
