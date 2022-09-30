@@ -80,12 +80,9 @@ struct TokenAction {
   TokenAction(cst_id_t token_id) : token_id(token_id) {}
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
-    if (node.id() != token_id) {
-      std::cerr << "Token mismatch! Expected <" << symbolName(token_id) << ">, Saw <"
-                << symbolName(node.id()) << "> at " << node.location().filename << ":"
-                << node.location().start.row << std::endl;
-    }
-    assert(node.id() == token_id);
+    FMT_ASSERT(node.id() == token_id, node,
+               "Token mismatch! Expected <" + std::string(symbolName(token_id)) + ">, Saw <" +
+                   std::string(symbolName(node.id())) + ">");
 
     auto it = traits.find(node);
     if (it != traits.end()) {
@@ -117,12 +114,9 @@ struct TokenReplaceAction {
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
-    if (node.id() != token_id) {
-      std::cerr << "Token mismatch! Expected <" << symbolName(token_id) << ">, Saw <"
-                << symbolName(node.id()) << "> at " << node.location().filename << ":"
-                << node.location().start.row << std::endl;
-    }
-    assert(node.id() == token_id);
+    FMT_ASSERT(node.id() == token_id, node,
+               "Token mismatch! Expected <" + std::string(symbolName(token_id)) + ">, Saw <" +
+                   std::string(symbolName(node.id())) + ">");
 
     auto it = traits.find(node);
     if (it != traits.end()) {
@@ -173,12 +167,9 @@ struct WalkPredicateAction {
 
   ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                          const token_traits_map_t& traits) {
-    bool result = predicate(builder, ctx, node, traits);
-    if (!result) {
-      std::cerr << "Unexpected token <" << symbolName(node.id()) << "> at "
-                << node.location().filename << ":" << node.location().start.row << std::endl;
-    }
-    assert(result);
+    FMT_ASSERT(predicate(builder, ctx, node, traits), node,
+               "Unexpected token <" + std::string(symbolName(node.id())) + ">");
+
     auto doc = walker(ctx.sub(builder), const_cast<const CSTElement&>(node));
     builder.append(doc);
     node.nextSiblingElement();

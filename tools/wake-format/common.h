@@ -23,6 +23,18 @@
 
 #include "types.h"
 
+#define FMT_ASSERT(condition, node, msg)                                                           \
+  {                                                                                                \
+    bool __fmt_assert_res = (condition);                                                           \
+    if (!__fmt_assert_res) {                                                                       \
+      std::cerr << std::endl << "Assertion failed: '" << #condition << "'" << std::endl;           \
+      std::cerr << (msg) << " at " << node.location().filename << ":" << node.location().start.row \
+                << std::endl                                                                       \
+                << std::endl;                                                                      \
+      assert(false);                                                                               \
+    }                                                                                              \
+  }
+
 inline void space(wcl::doc_builder& builder, uint8_t count) {
   for (uint8_t i = 0; i < count; i++) {
     builder.append(SPACE_STR);

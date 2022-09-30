@@ -193,12 +193,9 @@ struct Formatter {
   wcl::doc format(ctx_t ctx, CSTElement node, const token_traits_map_t& traits) {
     wcl::doc_builder builder;
     action.run(builder, ctx, node, traits);
-    if (!node.empty()) {
-      std::cerr << "Not empty <" << symbolName(node.id()) << "> at " << node.location().filename
-                << ":" << node.location().start.row << std::endl;
-      std::cerr << "Failed at: " << std::move(builder).build().as_string() << std::endl;
-    }
-    assert(node.empty());
+
+    FMT_ASSERT(node.empty(), node, "Not empty <" + std::string(symbolName(node.id())) + ">");
+
     return std::move(builder).build();
   }
 
