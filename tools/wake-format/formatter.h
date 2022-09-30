@@ -101,18 +101,6 @@ struct Formatter {
 
   Formatter<SeqAction<Action, NextAction>> next() { return {{action, {}}}; }
 
-  template <class IFMT, class EFMT>
-  Formatter<SeqAction<Action, IfElseAction<FmtPredicate<FitsFirstPredicate<IFMT>>, IFMT, EFMT>>>
-  fmt_if_fits_first(IFMT fits_formatter, EFMT else_formatter) {
-    return fmt_if_else(FitsFirstPredicate<IFMT>(fits_formatter), fits_formatter, else_formatter);
-  }
-
-  template <class IFMT, class EFMT>
-  Formatter<SeqAction<Action, IfElseAction<FmtPredicate<FitsAllPredicate<IFMT>>, IFMT, EFMT>>>
-  fmt_if_fits_all(IFMT fits_formatter, EFMT else_formatter) {
-    return fmt_if_else(FitsAllPredicate<IFMT>(fits_formatter), fits_formatter, else_formatter);
-  }
-
   template <class FMT>
   Formatter<SeqAction<Action, IfElseAction<FmtPredicate<std::initializer_list<cst_id_t>>, FMT,
                                            Formatter<EpsilonAction>>>>
@@ -137,6 +125,28 @@ struct Formatter {
   Formatter<SeqAction<Action, IfElseAction<FmtPredicate<Predicate>, IFMT, EFMT>>> fmt_if_else(
       Predicate predicate, IFMT if_formatter, EFMT else_formatter) {
     return {{action, {predicate, if_formatter, else_formatter}}};
+  }
+
+  template <class IFMT, class EFMT, class Predicate>
+  Formatter<
+      SeqAction<Action, IfElseAction<FmtPredicate<TryPredicate<Predicate, IFMT>>, IFMT, EFMT>>>
+  fmt_try_else(Predicate predicate, IFMT try_formatter, EFMT else_formatter) {
+    return fmt_if_else(TryPredicate<Predicate, IFMT>(predicate, try_formatter), try_formatter,
+                       else_formatter);
+  }
+
+  template <class IFMT, class EFMT>
+  Formatter<SeqAction<Action,
+                      IfElseAction<FmtPredicate<TryPredicate<DocFitsFirstPred, IFMT>>, IFMT, EFMT>>>
+  fmt_if_fits_first(IFMT fits_formatter, EFMT else_formatter) {
+    return fmt_try_else(DocFitsFirstPred(), fits_formatter, else_formatter);
+  }
+
+  template <class IFMT, class EFMT>
+  Formatter<
+      SeqAction<Action, IfElseAction<FmtPredicate<TryPredicate<DocFitsAllPred, IFMT>>, IFMT, EFMT>>>
+  fmt_if_fits_all(IFMT fits_formatter, EFMT else_formatter) {
+    return fmt_try_else(DocFitsAllPred(), fits_formatter, else_formatter);
   }
 
   template <class FMT>

@@ -326,16 +326,16 @@ struct MatchAction {
 
   // Predicate case that is accepted if FMT passes the FitsFirstPredicate
   template <class FMT>
-  MatchAction<MatchSeq<Case, PredicateCase<FitsFirstPredicate<FMT>, FMT>>> pred_fits_first(
-      FMT formatter) {
-    return {{c, {FitsFirstPredicate<FMT>(formatter), formatter}}};
+  MatchAction<MatchSeq<Case, PredicateCase<TryPredicate<DocFitsFirstPred, FMT>, FMT>>>
+  pred_fits_first(FMT formatter) {
+    return {{c, {TryPredicate<DocFitsFirstPred, FMT>(DocFitsFirstPred(), formatter), formatter}}};
   }
 
   // Predicate case that is accepted if FMT passes the FitsAllPredicate
   template <class FMT>
-  MatchAction<MatchSeq<Case, PredicateCase<FitsAllPredicate<FMT>, FMT>>> pred_fits_all(
+  MatchAction<MatchSeq<Case, PredicateCase<TryPredicate<DocFitsAllPred, FMT>, FMT>>> pred_fits_all(
       FMT formatter) {
-    return {{c, {FitsAllPredicate<FMT>(formatter), formatter}}};
+    return {{c, {TryPredicate<DocFitsFirstPred, FMT>(DocFitsAllPred(), formatter), formatter}}};
   }
 
   template <class FMT>

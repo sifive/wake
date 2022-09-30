@@ -24,6 +24,23 @@
 #include "parser/cst.h"
 #include "types.h"
 
+// TryPredicate Predicates
+class DocFitsFirstPred {
+ public:
+  bool operator()(const wcl::doc_builder& builder, ctx_t ctx, wcl::doc doc) {
+    return ctx.sub(builder)->last_width() + doc->first_width() <= MAX_COLUMN_WIDTH;
+  }
+};
+
+class DocFitsAllPred {
+ public:
+  bool operator()(const wcl::doc_builder& builder, ctx_t ctx, wcl::doc doc) {
+    return ctx.sub(builder)->last_width() + doc->first_width() <= MAX_COLUMN_WIDTH &&
+           !doc->has_newline();
+  }
+};
+
+// fmt_if() style predicates
 class IsWSNLCPredicate {
  public:
   bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
@@ -48,36 +65,22 @@ class ConstPredicate {
   }
 };
 
-template <class FMT>
-class FitsFirstPredicate {
+template <class Predicate, class FMT>
+class TryPredicate {
  private:
+  Predicate predicate;
   FMT formatter;
 
  public:
-  FitsFirstPredicate(FMT formatter) : formatter(formatter) {}
+  TryPredicate(Predicate predicate, FMT formatter) : predicate(predicate), formatter(formatter) {}
 
   bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                   const token_traits_map_t& traits) {
     CSTElement copy = node;
     wcl::doc doc = formatter.compose(ctx.sub(builder), copy, traits);
-    return ctx.sub(builder)->last_width() + doc->first_width() <= MAX_COLUMN_WIDTH;
-  }
-};
 
-template <class FMT>
-class FitsAllPredicate {
- private:
-  FMT formatter;
-
- public:
-  FitsAllPredicate(FMT formatter) : formatter(formatter) {}
-
-  bool operator()(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
-                  const token_traits_map_t& traits) {
-    CSTElement copy = node;
-    wcl::doc doc = formatter.compose(ctx.sub(builder), copy, traits);
-    return ctx.sub(builder)->last_width() + doc->first_width() <= MAX_COLUMN_WIDTH &&
-           !doc->has_newline();
+    const wcl::doc_builder& safe_builder = builder;
+    return predicate(safe_builder, ctx, std::move(doc));
   }
 };
 
