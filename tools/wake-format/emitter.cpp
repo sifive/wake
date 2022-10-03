@@ -1377,7 +1377,28 @@ wcl::doc Emitter::walk_topic(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_tuple(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(walk_placeholder(ctx, node));
+  FMT_ASSERT(node.id() == CST_TUPLE, node, "Expected CST_TUPLE");
+
+  MEMO_RET(
+      fmt()
+          .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
+          .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
+          .token(TOKEN_KW_TUPLE)
+          .ws()
+          .walk(is_expression, WALK_NODE)
+          .ws()
+          .token(TOKEN_P_EQUALS)
+          .consume_wsnlc()
+          // clang-format off
+               .nest(fmt()
+                   .fmt_while(
+                       {CST_TUPLE_ELT}, fmt()
+                       .freshline()
+                       .walk(WALK_NODE)
+                       .consume_wsnlc()))
+          // clang-format on
+          .consume_wsnlc()
+          .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_tuple_elt(ctx_t ctx, CSTElement node) {
