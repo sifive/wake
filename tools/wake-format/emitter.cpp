@@ -214,17 +214,16 @@ auto Emitter::rhs_fmt() {
 }
 
 auto Emitter::pattern_fmt(cst_id_t stop_at) {
-  auto first = fmt().walk(is_expression, WALK_NODE).consume_wsnlc();
-  auto rest_flat = fmt().space().walk(is_expression, WALK_NODE).consume_wsnlc();
-  auto all_flat =
-      fmt().join(first).fmt_while([stop_at](cst_id_t id) { return id != stop_at; }, rest_flat);
-  auto rest_explode = fmt().freshline().walk(is_expression, WALK_NODE).consume_wsnlc();
-  auto all_explode = fmt()
-                         .lit(wcl::doc::lit("("))
-                         .nest(fmt().freshline().join(first).fmt_while(
-                             [stop_at](cst_id_t id) { return id != stop_at; }, rest_explode))
-                         .freshline()
-                         .lit(wcl::doc::lit(")"));
+  auto part_fmt = fmt().walk(is_expression, WALK_NODE).consume_wsnlc();
+  auto all_flat = fmt().join(part_fmt).fmt_while([stop_at](cst_id_t id) { return id != stop_at; },
+                                                 fmt().space().join(part_fmt));
+  auto all_explode =
+      fmt()
+          .lit(wcl::doc::lit("("))
+          .nest(fmt().freshline().join(part_fmt).fmt_while(
+              [stop_at](cst_id_t id) { return id != stop_at; }, fmt().freshline().join(part_fmt)))
+          .freshline()
+          .lit(wcl::doc::lit(")"));
   // 4 Cases
   // 1) The "flat format" doesn't have a newline and fits()
   // 2) The "flat format" doesn't have a newline and doesn't fits()
