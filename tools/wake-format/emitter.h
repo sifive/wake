@@ -137,6 +137,10 @@ class Emitter {
   // on the current line if it fits, or on a new nested line
   auto rhs_fmt();
 
+  // Returns a formatter that consumes a pattern continuing until *stop_at* is seen. Pattern is
+  // separated by spaces if possible, freshlines otherwise
+  auto pattern_fmt(cst_id_t stop_at);
+
   // Returns a doc with a binop surrounded by the appropiate separation. This depends heavily on
   // the context and which operator is being used.
   //
