@@ -61,7 +61,7 @@ static inline bool requires_fits_all(cst_id_t type) {
 static inline bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
          type == CST_BINARY || type == CST_PAREN || type == CST_ASCRIBE || type == CST_SUBSCRIBE ||
-         type == CST_LAMBDA || type == CST_UNARY || type == CST_BLOCK || type == CST_IF;
+         type == CST_LAMBDA || type == CST_UNARY || type == CST_BLOCK || type == CST_IF || type == CST_TARGET_ARGS;
 }
 
 static bool compare_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
@@ -214,7 +214,15 @@ auto Emitter::rhs_fmt() {
 }
 
 auto Emitter::pattern_fmt(cst_id_t stop_at) {
-  auto part_fmt = fmt().walk(is_expression, WALK_NODE).consume_wsnlc();
+  // clang-format off
+  auto part_fmt = fmt().match(
+   pred([](wcl::doc_builder&, ctx_t, CSTElement& node, const token_traits_map_t&){
+     return node.isNode();
+    }, fmt().walk(is_expression, WALK_NODE))
+   .otherwise(fmt().walk(WALK_TOKEN)))
+   .consume_wsnlc();
+  // clang-format on
+
   auto all_flat = fmt().join(part_fmt).fmt_while([stop_at](cst_id_t id) { return id != stop_at; },
                                                  fmt().space().join(part_fmt));
   auto all_explode =
@@ -1339,8 +1347,8 @@ wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) {
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_TARGET)
                .ws()
-               .walk(is_expression, WALK_NODE)
-               .ws()
+               .join(pattern_fmt(TOKEN_P_EQUALS))
+               .space()
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
                .join(rhs_fmt())
