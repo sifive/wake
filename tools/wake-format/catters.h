@@ -74,6 +74,17 @@ struct NestCatter {
 };
 
 template <class CTR>
+struct ExplodeCatter {
+  CTR catter;
+
+  ExplodeCatter(CTR catter) : catter(catter) {}
+
+  ALWAYS_INLINE void cat(wcl::doc_builder& builder, ctx_t ctx) {
+    builder.append(catter.concat(ctx.explode().sub(builder)));
+  }
+};
+
+template <class CTR>
 struct JoinCatter {
   CTR catter;
 

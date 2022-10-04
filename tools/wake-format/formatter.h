@@ -50,6 +50,11 @@ struct ConcatFormatter {
   }
 
   template <class CTR>
+  ConcatFormatter<SeqCatter<Catter, ExplodeCatter<CTR>>> explode(CTR ctr) {
+    return {{catter, {ctr}}};
+  }
+
+  template <class CTR>
   ConcatFormatter<SeqCatter<Catter, JoinCatter<CTR>>> join(CTR ctr) {
     return {{catter, {ctr}}};
   }
@@ -96,6 +101,11 @@ struct Formatter {
 
   template <class FMT>
   Formatter<SeqAction<Action, NestAction<FMT>>> nest(FMT formatter) {
+    return {{action, {formatter}}};
+  }
+
+  template <class FMT>
+  Formatter<SeqAction<Action, ExplodeAction<FMT>>> explode(FMT formatter) {
     return {{action, {formatter}}};
   }
 

@@ -680,3 +680,26 @@ def f0 = match (
     x b = x + 0
 
 
+export def vfoldl (combiningFn: accum => element => accum): accum => Vector element => accum =
+    def loop accumulator v s e =
+        if s == e then
+            accumulator
+        else
+            def element = vget v s
+            loop (combiningFn accumulator element) v (s + 1) e
+    def top a (Vector v s e) = loop a v s e
+    top
+
+
+def loop a s e = if s == e then e else if stopFn (vget a s) then s else loop a (s + 1) e
+
+
+def loop aaaaa sssss eeeee =
+    if sssss == eeeee then
+        eeeee
+    else if stopFn (vget aaaaa sssss) then
+        sssss
+    else
+        loop aaaaa (sssss + 1) eeeee
+
+
