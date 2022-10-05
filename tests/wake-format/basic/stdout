@@ -613,17 +613,17 @@ export data JValue =
     JNull
     JObject (List (Pair String JValue))
     JArray (List JValue)
-
+    
 
 export data List a =
     # The empty list. Nil represents a list with no elements.
     Nil
-
+    
 
 export data Option a =
     Some a
     None
-
+    
 
 data LogLevel = LogLevel (name: String)
 
@@ -631,7 +631,7 @@ data LogLevel = LogLevel (name: String)
 export data Result pass fail =
     Pass pass
     Fail fail
-
+    
 
 export data a; b = a; b
 
@@ -642,7 +642,7 @@ export data Boolean = True
 global export data Let =
     A
     B
-
+    
 
 def x + y = add x y
 
@@ -702,6 +702,7 @@ def loop aaaaa sssss eeeee =
     else
         loop aaaaa (sssss + 1) eeeee
 
+
 # A dictionary associating a key-value pair, providing fast lookup by key.
 # This is internally implemented by a balanced tree, so some total ordering must
 # be able to be produced for the key type.
@@ -720,3 +721,4 @@ export tuple a +++ b =
 
 export tuple (z: Banger) =
     export X: Integer
+
