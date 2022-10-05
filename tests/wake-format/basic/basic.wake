@@ -300,6 +300,9 @@ publish compileC =
   # comment
   emccFn (makeCompileC "wasm-c11-release"   _ ("-std=gnu11", emscriptenCFlags))
 
+target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run echo stdout stderr label =
+ runAlways cmd env dir stdin res usage finputs foutputs vis keep run echo stdout stderr label
+
 global export target fib n = match n
   0 = 1
   1 = 1

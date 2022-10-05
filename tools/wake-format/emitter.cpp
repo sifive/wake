@@ -252,7 +252,8 @@ wcl::doc Emitter::layout(CST cst) {
 template <class Func>
 wcl::doc Emitter::dispatch(ctx_t ctx, CSTElement node, Func func) {
   MEMO(ctx, node);
-  FMT_ASSERT(node.isNode(), node, "Expected node");
+  FMT_ASSERT(node.isNode(), node,
+             "Expected node, Saw <" + std::string(symbolName(node.id())) + ">");
 
   if (node_traits[node].format_off) {
     MEMO_RET(walk_no_edit(ctx, node));
@@ -1340,7 +1341,10 @@ wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) {
                .token(TOKEN_KW_TARGET)
                .ws()
                .walk(is_expression, WALK_NODE)
-               .ws()
+               .consume_wsnlc()
+               .space()
+               .fmt_if(TOKEN_P_BSLASH,
+                       fmt().token(TOKEN_P_BSLASH).ws().walk(WALK_NODE).space().consume_wsnlc())
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
                .join(rhs_fmt())
