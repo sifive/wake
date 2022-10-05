@@ -578,3 +578,21 @@ def loop aaaaa sssss eeeee =
         sssss
     else
         loop aaaaa (sssss+1) eeeee
+# A dictionary associating a key-value pair, providing fast lookup by key.
+# This is internally implemented by a balanced tree, so some total ordering must
+# be able to be produced for the key type.
+global export tuple Map k v =
+    # The ordering function in use, over the key type only.  The `Tree` also
+    # stores a version of this over the full `Pair` type, but some of the data
+    # manipulations require access to this minimal signature.
+    Comparison: k => k => Order
+    # The existing `Tree` type provides the storage and most of the manipulation
+    # features required, but is not always able to provide optimal retrieval
+    # when only the key is known, without access to non-exported details.
+    Data: Tree (Pair k v)
+
+export tuple a +++ b =
+  Bingo: Pair a b
+
+export tuple (z: Banger) =
+  export X: Integer
