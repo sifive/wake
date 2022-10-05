@@ -61,7 +61,8 @@ static inline bool requires_fits_all(cst_id_t type) {
 static inline bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
          type == CST_BINARY || type == CST_PAREN || type == CST_ASCRIBE || type == CST_SUBSCRIBE ||
-         type == CST_LAMBDA || type == CST_UNARY || type == CST_BLOCK || type == CST_IF || type == CST_TARGET_ARGS;
+         type == CST_LAMBDA || type == CST_UNARY || type == CST_BLOCK || type == CST_IF ||
+         type == CST_TARGET_ARGS;
 }
 
 static bool compare_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
@@ -260,7 +261,8 @@ wcl::doc Emitter::layout(CST cst) {
 template <class Func>
 wcl::doc Emitter::dispatch(ctx_t ctx, CSTElement node, Func func) {
   MEMO(ctx, node);
-  FMT_ASSERT(node.isNode(), node, "Expected node");
+  FMT_ASSERT(node.isNode(), node,
+             "Expected node, Saw <" + std::string(symbolName(node.id())) + ">");
 
   if (node_traits[node].format_off) {
     MEMO_RET(walk_no_edit(ctx, node));
@@ -1347,8 +1349,11 @@ wcl::doc Emitter::walk_target(ctx_t ctx, CSTElement node) {
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_TARGET)
                .ws()
-               .join(pattern_fmt(TOKEN_P_EQUALS))
+               .walk(is_expression, WALK_NODE)
+               .consume_wsnlc()
                .space()
+               .fmt_if(TOKEN_P_BSLASH,
+                       fmt().token(TOKEN_P_BSLASH).ws().walk(WALK_NODE).space().consume_wsnlc())
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
                .join(rhs_fmt())
