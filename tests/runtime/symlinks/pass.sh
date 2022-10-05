@@ -12,17 +12,15 @@ rm -f datFile badLink goodLink wake.db
 rm wake.db
 "${WAKE}" -v test
 
-rm -f datFile badLink goodLink
-ln -s whatever datFile
-ln -s whatever badLink
-ln -s whatever goodLink
+rm -f badLink goodLink
+ln -s badFile badLink
+ln -s datFile goodLink
 "${WAKE}" -v test
 "${WAKE}" -v test
 
 rm -f datFile badLink goodLink wake.db
-ln -s whatever datFile
-ln -s whatever badLink
-ln -s whatever goodLink
+ln -s badFile badLink
+ln -s datFile goodLink
 "${WAKE}" -v test
 "${WAKE}" -v test
 
