@@ -61,7 +61,7 @@ static inline bool requires_fits_all(cst_id_t type) {
 static inline bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
          type == CST_BINARY || type == CST_PAREN || type == CST_ASCRIBE || type == CST_SUBSCRIBE ||
-         type == CST_LAMBDA || type == CST_UNARY;
+         type == CST_LAMBDA || type == CST_UNARY || type == CST_BLOCK || type == CST_IF;
 }
 
 static bool compare_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
@@ -1066,7 +1066,7 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
               fmt().walk_all(fmt().next()).newline())  // garbage format to fail NL check
           .format(ctx, node.firstChildElement(), token_traits);
 
-  if (!fits_no_nl->has_newline()) {
+  if (!fits_no_nl->has_newline() && !ctx.prefer_explode) {
     MEMO_RET(fits_no_nl);
   }
 
@@ -1084,7 +1084,15 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
                .freshline()
                .token(TOKEN_KW_ELSE)
                .consume_wsnlc()
-               .nest(fmt().freshline().walk(is_expression, WALK_NODE))  // false body
+               // clang-format off
+               // False body
+               .match(
+                 // For an 'else if' block, we explode in the explode case to prevent partial flat emission
+                 pred(CST_IF, fmt().space().explode(fmt().walk(DISPATCH(walk_if))))
+                .pred(is_expression, fmt().nest(fmt().freshline().walk(WALK_NODE)))
+                // fallthrough is fail
+               )
+               // clang-format on
                .format(ctx, node.firstChildElement(), token_traits));
 }
 

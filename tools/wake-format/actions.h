@@ -188,6 +188,18 @@ struct NestAction {
   }
 };
 
+template <class FMT>
+struct ExplodeAction {
+  FMT formatter;
+
+  ExplodeAction(FMT formatter) : formatter(formatter) {}
+
+  ALWAYS_INLINE void run(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                         const token_traits_map_t& traits) {
+    builder.append(formatter.compose(ctx.explode().sub(builder), node, traits));
+  }
+};
+
 template <class Predicate, class IFMT, class EFMT>
 struct IfElseAction {
   Predicate predicate;
