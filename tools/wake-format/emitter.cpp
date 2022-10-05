@@ -951,7 +951,8 @@ wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_DATA, node, "Expected CST_DATA");
 
-  auto fmt_members = fmt().walk_all(fmt().walk(WALK_NODE).freshline().consume_wsnlc());
+  auto fmt_members = fmt().walk(WALK_NODE).consume_wsnlc().walk_all(
+      fmt().freshline().walk(WALK_NODE).consume_wsnlc());
 
   auto no_nl = fmt()
                    .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
@@ -966,13 +967,12 @@ wcl::doc Emitter::walk_data(ctx_t ctx, CSTElement node) {
                    .join(fmt_members)
                    .format(ctx, node.firstChildElement(), token_traits);
 
-  // We always add one NL in fmt_members
-  if (no_nl->newline_count() == count_leading_newlines(token_traits, node) + 1) {
+  if (no_nl->newline_count() == count_leading_newlines(token_traits, node)) {
     MEMO_RET(no_nl);
   }
 
   MEMO_RET(fmt()
-               .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())  // maybe not needed
+               .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_DATA)
                .ws()
