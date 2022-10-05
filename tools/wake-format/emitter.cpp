@@ -1390,12 +1390,10 @@ wcl::doc Emitter::walk_tuple(ctx_t ctx, CSTElement node) {
           .token(TOKEN_P_EQUALS)
           .consume_wsnlc()
           // clang-format off
-               .nest(fmt()
-                   .fmt_while(
-                       {CST_TUPLE_ELT}, fmt()
-                       .freshline()
-                       .walk(WALK_NODE)
-                       .consume_wsnlc()))
+          .nest(fmt().fmt_while({CST_TUPLE_ELT}, fmt()
+                  .freshline()
+                  .walk(WALK_NODE)
+                  .consume_wsnlc()))
           // clang-format on
           .consume_wsnlc()
           .format(ctx, node.firstChildElement(), token_traits));
