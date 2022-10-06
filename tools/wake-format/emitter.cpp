@@ -61,7 +61,8 @@ static inline bool requires_fits_all(cst_id_t type) {
 static inline bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
          type == CST_BINARY || type == CST_PAREN || type == CST_ASCRIBE || type == CST_SUBSCRIBE ||
-         type == CST_LAMBDA || type == CST_UNARY || type == CST_BLOCK || type == CST_IF;
+         type == CST_LAMBDA || type == CST_UNARY || type == CST_BLOCK || type == CST_IF ||
+         type == CST_INTERPOLATE || type == CST_MATCH;
 }
 
 static bool compare_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
