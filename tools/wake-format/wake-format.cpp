@@ -51,7 +51,7 @@ class TerminalReporter : public DiagnosticReporter {
   bool errors;
   bool warnings;
 
-  void report_to_stderr() { std::cerr << ostream.str(); }
+  void report_to_stderr() { std::cerr << "Start<" << ostream.str() << ">End"; }
 
  private:
   std::stringstream ostream;
