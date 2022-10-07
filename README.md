@@ -73,9 +73,12 @@ On FreeBSD (12 or later):
     pw groupmod operator -m YOUR-NON-ROOT-USER
     reboot
 
-On Alpine Linux (3.11.5 or later):
+On Alpine Linux (3.14.0 or later):
 
     apk add g++ make pkgconf git gmp-dev re2-dev sqlite-dev fuse-dev ncurses-dev dash
+
+  Alpine releases as old as 3.11.5 may work depending on the use case, but due
+  to a limitation in older musl versions some jobs may be rebuilt unnecessarily.
 
 On Mac OS with Mac Ports installed:
 
