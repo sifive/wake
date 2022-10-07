@@ -192,6 +192,12 @@ int main(int argc, char **argv) {
     std::string tmp = name + ".tmp." + rng.unique_name();
 
     ExternalFile external_file = ExternalFile(*reporter, name.c_str());
+    if (terminalReporter.errors) {
+      std::cerr << argv[0] << ": failed to open file: '" << name << "'" << std::endl << std::endl;
+      terminalReporter.report_to_stderr();
+      exit(EXIT_FAILURE);
+    }
+
     CST cst = CST(external_file, *reporter);
     if (terminalReporter.errors) {
       std::cerr << argv[0] << ": failed to parse file: '" << name << "'" << std::endl << std::endl;
