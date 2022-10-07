@@ -131,17 +131,27 @@ def t5 = (
 )
 
 
-# TODO: These cases are actually binop not paren
-# def t7 = (
-#   x # comment
-#   + 5
-# )
-# def t8 = (
-#   x + # comment
-#   5
-# )
+def t7 = (
+    x # comment
+    + 5
+)
+
+
+def t8 = (
+    x
+    + # comment
+    5
+)
+
+
 def t9 = (
     x + 5 # comment
+)
+
+
+def t10 = (
+    x, # comment
+    5
 )
 
 
@@ -163,9 +173,86 @@ def t6 = ( # comment
 )
 
 
+def t8 = (
+    # comment
+    x # comment
+    + # comment
+    5 # comment
+    - # comment
+    2 # comment
+)
+
+
+def t9 = x + 5 - 2
+
+
+def ff = a | b | c | d
+
+
+def ff = a $ b $ c $ d
+
+
+def ff =
+    aaaaaaaaaaaaa
+    | bbbbbbbbbbbbbbbb
+    | cccccccccccccccccc
+    | ddddddddddddddddddd
+    | eeeeeeeeeeeeeee
+    | ffffffffff
+    | ggggggggggg
+    | hhhhhhhhhhh
+
+
+def ff =
+    aaaaaaaaaaaaa
+    $ bbbbbbbbbbbbbbbb
+    $ cccccccccccccccccc
+    $ ddddddddddddddddddd
+    $ eeeeeeeeeeeeeee
+    $ ffffffffff
+    $ ggggggggggg
+    $ hhhhhhhhhhh
+
+
+def ff =
+    aaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbb,
+    cccccccccccccccccc,
+    ddddddddddddddddddd,
+    eeeeeeeeeeeeeee,
+    ffffffffff,
+    ggggggggggg,
+    hhhhhhhhhhh
+
+
+def ff =
+    aaaaaaaaaaaaa
+    .bbbbbbbbbbbbbbbb
+    .cccccccccccccccccc
+    .ddddddddddddddddddd
+    .eeeeeeeeeeeeeee
+    .ffffffffff
+    .ggggggggggg
+    .hhhhhhhhhhh
+
+
 def wakeToTestDir Unit = match (subscribe wakeTestBinary)
-    buildTestWake , Nil =
+    buildTestWake, Nil =
         require Pass (Pair path visible) = buildTestWake Unit
+        Pass (Pair (simplify "{path}/..") visible)
+    Nil = Pass (Pair "{wakePath}" Nil)
+    _ = Fail (makeError "Two wake binaries declared for testing!")
+
+
+def wakeToTestDir Unit = match (subscribe wakeTestBinary)
+    buildTestWake, Nil =
+        require (
+            Pass
+            # comment
+            (
+                Pair path visible
+            )
+        ) = buildTestWake Unit
         Pass (Pair (simplify "{path}/..") visible)
     Nil = Pass (Pair "{wakePath}" Nil)
     _ = Fail (makeError "Two wake binaries declared for testing!")
@@ -181,10 +268,452 @@ from wake import myMap=map foldl myFoldr=foldr
 from wake import def unary + -
 from wake import type Pair Result
 from wake import source,Nil
+# comment
+def linkKind =
+    # comment
+    if empty cppSources then
+        cVariant # comment
+    else
+        # comment
+        cppVariant
+
+
+def linkKind =
+    if verrrrrrrry loooooooooooog naaaaaaaaaaaame then
+        verrrrrrrrrrrrrrrrrrrrrrry
+    else
+        looooooooooooooooong
+
+
+def linkKind = if true then short else short
+
+
 export topic wakeTestBinary: Unit => Result (Pair String (List Path)) Error
-export topic compileC: Pair String ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Result (List Path) Error)
-topic linkO: Pair String ((extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error)
+export topic compileC: (
+    Pair
+    String
+    ((extraFlags: List String) => (headers: List Path) => (cfile: Path) => Result (List Path) Error)
+)
+topic linkO: (
+    Pair
+    String
+    ((extraFlags: List String) => (objects: List Path) => (targ: String) => Result (List Path) Error)
+)
 export topic path: String
 export topic wakeUnitTestBinary: (variant: Pair String String) => Result (List Path) Error
 global export topic glob1: String
 global topic glob1: String
+def app1 =
+    Pair # comment
+    "a"
+    "b"
+
+
+def app = Pair "a" "b"
+
+
+# TODO: The trailing NL here causes a failure for 'fits all' which is why this is NL'd
+def app =
+    Pair "a" "b" # comment
+
+
+
+def app =
+    Pair "a" "b" # comment
+
+
+
+def app =
+    Pair
+    "a" # comment
+    "b"
+
+
+def app =
+    Pair # comment
+    "a" # comment
+    "b" # comment
+
+
+
+def app =
+    aaaaaaaaaa
+    bbbbbbbbbbbbbbbb
+    cccccccccccccccccc
+    ddddddddddddddddddd
+    eeeeeeeeeeeeeee
+    ffffffffff
+    gggggggggggggggggggg
+    hhhhhhhhhhhhhh
+
+
+def t1 = match _
+    0 = 0
+    n # comment
+    = 2 + t (n - 1)
+
+
+def t1 = match _
+    # comment
+    0 = 0
+    n = 2 + t (n - 1)
+
+
+def t1 = match _
+    0 = 0
+    # comment
+    n = 2 + t (n - 1)
+
+
+publish wakeTestBinary = defaultWake, Nil
+
+publish animal = "Cat", Nil
+
+publish animal = replace `u` "o" "Mouse", Nil
+
+publish compileC = makeCompileC "native-c11-debug" (which "cc") (c11Flags ++ debugCFlags)
+
+publish path = match (getenv "WAKE_PATH")
+    Some x = tokenize `:` x
+    None = Nil
+
+publish path = match sysname
+    "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
+    "FreeBSD" = "/usr/local/bin", Nil
+    _ = Nil
+
+publish compileC = emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
+
+publish compileC =
+    emccFn
+    (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags) (another) ("thing" "here"))
+
+publish compileC = # comment
+ emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
+
+publish compileC =
+    # comment
+    emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
+
+target runOnce cmd env dir stdin \ res usage finputs foutputs vis keep run echo stdout stderr label =
+    runAlways cmd env dir stdin res usage finputs foutputs vis keep run echo stdout stderr label
+
+global export target fib n = match n
+    0 = 1
+    1 = 1
+    _ = fib (n - 1) + fib (n - 2)
+
+def buildRE2WASM Unit =
+    def version = "2021-08-01"
+    require Some emmake = emmake
+    else
+        # comment
+        failWithError "emmake is not available"
+    def emsdk = replace `/[^/]*$` "" emmake
+    require Pass patch = source "{@here}/re2.patch"
+    require Pass buildDir = vendorBuildDir Unit
+    def job =
+        """
+            cd .build
+            wget https://github.com/google/re2/archive/refs/tags/%{version}.tar.gz
+            tar xvzf %{version}.tar.gz
+            cd re2-%{version}
+            patch -p0 < ../../%{relative @here patch.getPathName}
+            emmake make -j4 RE2_CXXFLAGS="-std=c++14 -I. -Wall -DNO_THREADS" CXXFLAGS="-O2" obj/libre2.a
+        """
+        | makePlan "compiling re2" (buildDir, patch, Nil)
+        | editPlanEnvironment (addEnvironmentPath emsdk)
+        | setPlanDirectory @here
+        | runJob
+    require Pass outputs = job.getJobOutputs
+    def headers = filter (matches `.*\.h` _.getPathName) outputs
+    def objects = filter (matches `.*\.o` _.getPathName) outputs
+    def cflags = "-I{@here}/.build/re2-{version}", Nil
+    def lflags = Nil
+    Pass (SysLib "1.0" headers objects cflags lflags)
+
+
+def t5 = a.b.c
+
+
+def toVariant = match _
+    "default" = Pass (Pair "native-cpp14-release" "native-c11-release")
+    "static" = Pass (Pair "native-cpp14-static" "native-c11-static")
+    "debug" = Pass (Pair "native-cpp14-debug" "native-c11-debug")
+    "wasm" = Pass (Pair "wasm-cpp14-release" "wasm-c11-release")
+    s = Fail "Unknown build target ({s})".makeError
+
+
+export def build: List String => Result String Error = match _
+    "tarball", Nil = tarball Unit | rmap (\_ "TARBALL")
+    kind, Nil =
+        require Pass variant = toVariant kind
+        all variant | rmap (\_ "BUILD")
+    _ = Fail "no target specified (try: build default/debug/tarball)".makeError
+
+
+export def install: List String => Result String Error = match _
+    dest, kind, Nil = doInstall (in cwd dest) kind | rmap (\_ "INSTALL")
+    dest, Nil = doInstall (in cwd dest) "default" | rmap (\_ "INSTALL")
+    _ = Fail "no directory specified (try: install /opt/local)".makeError
+
+
+# Build all wake targets
+def targets =
+    buildWake,
+    buildWakeBox,
+    buildFuseDaemon,
+    buildShim,
+    buildBSP,
+    buildLSP,
+    buildJobCache,
+    buildWakeFormat,
+    Nil
+
+
+def all variant =
+    require Pass x = map (_ variant) targets | findFail
+    Pass (flatten x)
+
+
+# Install wake into a target location
+def doInstall dest kind =
+    require Pass variant = toVariant kind
+    require Pass datfiles = sources "{@here}/share" `.*`
+    def binfilesResult = all variant
+    def releaseBin exe = installAs "{dest}/{replace `\.[^.]*$` '' exe.getPathName}" exe
+    require Pass datinstall = findFailFn (installIn dest ".") datfiles
+    require Pass readmeSource = source "README.md"
+    require Pass readme = installIn "{dest}/share/doc/wake" "." readmeSource
+    require Pass binfiles = binfilesResult
+    require Pass bininstall = findFailFn releaseBin binfiles
+    def outputs = readme, bininstall ++ datinstall
+    Pass outputs
+
+
+# Replace @VERSION@ with 'release'
+def setVersion release file =
+    require Pass in = source "{file}.in"
+    def script =
+        "%
+        set -e
+        sed "s/@VERSION@/%{release}/g" "%{in.getPathName}" > "%{file}.tmp"
+        mv "%{file}.tmp" "%{file}"
+        %"
+    shellJob script (in, Nil) | getJobOutput
+
+
+# Create a release tarball
+def tarball Unit =
+    def releaseResult = buildAs Unit
+    def timeResult = buildOn Unit
+    require Pass release = releaseResult
+    require Pass time = timeResult
+    # Create debian + RedHat package files
+    require Pass changelog = setVersion release "debian/changelog"
+    require Pass spec = setVersion release "wake.spec"
+    # Identify those sources files to include in the tarball
+    require Pass allSources = sources "." `.*`
+    def srcs =
+        allSources
+        | filter
+        (
+            ! matches `(debian/|wake.spec).*` _.getPathName
+        ) # omit packaging files
+        | filter
+        (
+            ! matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName
+        ) # omit CI files
+        | filter
+        (
+            ! matches `(.*/)*\.gitignore` _.getPathName
+        ) # omit git files
+    def Pair testPaths wakePaths = splitBy (matches `tests/.*` _.getPathName) srcs
+    def wakeSourcesString = wakePaths | map (_.getPathName.format) | foldr (_, ",\n  ", _) Nil | cat
+    def testSourcesString =
+        testPaths
+        | map (getPathName _ | format | replace `^"tests/` '"{here}/')
+        | foldr (_, ",\n  ", _) Nil
+        | cat
+    def manifestStr =
+        "%
+        # Generated by 'wake tarball Unit':
+        package build_wake
+        from wake import source , Nil
+
+        publish releaseAs = '%{release}', Nil
+        publish releaseOn = '%{time}', Nil
+        publish source =
+          %{wakeSourcesString}Nil
+        %"
+    def testsManifestStr =
+        "%
+        # Generated by 'wake tarball Unit':
+        package test_wake
+        from wake import source , Nil
+
+        publish source =
+          %{testSourcesString}Nil
+        %"
+    # Create a manifest which describes the release and source files
+    require Pass manifest = write "manifest.wake" manifestStr
+    require Pass testManifest = write "tests/manifest.wake" testsManifestStr
+    # Execute tar to create a tarball of manifest + sources
+    require Pass tarball =
+        def cmd =
+            def gnutar = which "gnutar"
+            def tar = if gnutar ==* "gnutar" then which "tar" else gnutar
+            def files = map getPathName (manifest, testManifest, spec, srcs) | sortBy (_ <* _)
+            tar,
+            "--mtime={time}",
+            "--transform=s@^@wake-{release}/@",
+            "--owner=0",
+            "--group=0",
+            "--numeric-owner",
+            "-cJf",
+            "wake_{release}.tar.xz",
+            files
+        job cmd (manifest, testManifest, spec, srcs) | getJobOutput
+    Pass (tarball, changelog, Nil)
+
+
+export def static _: Result Path Error =
+    def filesResult = doInstall "tmp" "static"
+    def releaseResult = buildAs Unit
+    def timeResult = buildOn Unit
+    require Pass release = releaseResult
+    require Pass time = timeResult
+    require Pass files = filesResult
+    def cmd =
+        which "tar",
+        "--mtime={time}",
+        "--transform=s@^tmp/@wake-{release}/@",
+        "--owner=0",
+        "--group=0",
+        "--numeric-owner",
+        "-cJf",
+        "wake-static_{release}.tar.xz",
+        map getPathName files | sortBy (_ <* _)
+    job cmd files | getJobOutput
+
+
+from test_wake import topic wakeTestBinary
+from test_wake import topic wakeUnitTestBinary
+publish wakeTestBinary = defaultWake, Nil
+
+publish wakeUnitTestBinary = buildWakeUnit, Nil
+
+def defaultWake Unit =
+    require Pass wakeVisible = doInstall "tmp" "default"
+    Pass (Pair "tmp/bin/wake" wakeVisible)
+
+
+export data JValue =
+    JString String
+    JInteger Integer
+    JDouble Double
+    JBoolean Boolean
+    JNull
+    JObject (List (Pair String JValue))
+    JArray (List JValue)
+
+export data List a =
+    # The empty list. Nil represents a list with no elements.
+    Nil
+
+export data Option a =
+    Some a
+    None
+
+data LogLevel = LogLevel (name: String)
+
+export data Result pass fail =
+    Pass pass
+    Fail fail
+
+export data a; b = a; b
+
+export data Boolean = True
+
+global export data Let =
+    A
+    B
+
+def x + y = add x y
+
+
+def (
+    tool
+    (dir: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+    (addHeaders: String)
+) = ""
+
+
+def f0 = match _ _
+    (x: Integer) (True: Boolean) = x + 1
+    (x: Integer) (False: Boolean) = x + 0
+
+
+def f0 = match (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+)
+    (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    )
+    = x + 1
+    x b = x + 0
+
+
+export def vfoldl (combiningFn: accum => element => accum): accum => Vector element => accum =
+    def loop accumulator v s e =
+        if s == e then
+            accumulator
+        else
+            def element = vget v s
+            loop (combiningFn accumulator element) v (s + 1) e
+    def top a (Vector v s e) = loop a v s e
+    top
+
+
+def loop a s e = if s == e then e else if stopFn (vget a s) then s else loop a (s + 1) e
+
+
+def loop aaaaa sssss eeeee =
+    if sssss == eeeee then
+        eeeee
+    else if stopFn (vget aaaaa sssss) then
+        sssss
+    else
+        loop aaaaa (sssss + 1) eeeee
+
+
+# A dictionary associating a key-value pair, providing fast lookup by key.
+# This is internally implemented by a balanced tree, so some total ordering must
+# be able to be produced for the key type.
+global export tuple Map k v =
+    # The ordering function in use, over the key type only.  The `Tree` also
+    # stores a version of this over the full `Pair` type, but some of the data
+    # manipulations require access to this minimal signature.
+    Comparison: k => k => Order
+    # The existing `Tree` type provides the storage and most of the manipulation
+    # features required, but is not always able to provide optimal retrieval
+    # when only the key is known, without access to non-exported details.
+    Data: Tree (Pair k v)
+
+export tuple a +++ b =
+    Bingo: Pair a b
+
+export tuple (z: Banger) =
+    export X: Integer
+

@@ -51,6 +51,10 @@ class Emitter {
   std::unordered_map<CSTElement, node_traits_t> node_traits = {};
   token_traits_map_t token_traits = {};
 
+  // Do upkeep and dispatch to the provided function
+  template <class Func>
+  wcl::doc dispatch(ctx_t ctx, CSTElement node, Func func);
+
   // Top level tree walk. Dispatches out the calls for various nodes
   wcl::doc walk(ctx_t ctx, CSTElement node);
 
@@ -83,9 +87,78 @@ class Emitter {
   //   will bind '# comment1' and '# comment2' to the second 'def'
   void bind_comments(CSTElement node);
 
+  // Functions to combine binops using various 'full choice' options
+  //
+  // defs:
+  //   combine flat: combine the LHS and RHS without NLs. Spaces may be added as appropiate per OP
+  //   combine explode: combine the LHS and RHS with at least one NL
+  //   with prefer_explode: ctx.prefer_explode = true
+  //   with !prefer_explode: ctx.prefer_explode = false
+  //
+  // (1) combine_flat: format all elements with !prefer_explode, combine flat
+  // (2) combine_explode_first: first element prefer_explode, rest !prefer_explode, combine explode
+  // (3) combine_explode_last: last element prefer_explode, rest !prefer_explode, combine explode
+  // (4) combine_explode_all: all elements prefer_explode, combine explode
+  // (5) combine_explode_first_compress: first element prefer_explode, rest !prefer_explode, combine
+  //     flat
+  // (6) combine_explode_last_compress: last element prefer_explode, rest !prefer_explode, combine
+  //     flat
+  //
+  // Making the 'full choice'
+  //
+  // - format all 6 options and apply the following rules
+  //   - if 1, 5, or 6 have a NL, remove them from consideration
+  //   - divide the remain options into two groups.
+  //     - GT = options where max_width > MAX_COL_WIDTH
+  //     - LTE = options where max_width <= MAX_COL_WIDTH
+  //     if LTE has any elements choose the element with the smallest height
+  //     otherwise choose the element with the smallest width from GT
+  //
+  wcl::optional<wcl::doc> combine_flat(CSTElement over, ctx_t ctx,
+                                       const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_first(CSTElement over, ctx_t ctx,
+                                                const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_last(CSTElement over, ctx_t ctx,
+                                               const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_all(CSTElement over, ctx_t ctx,
+                                              const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_first_compress(CSTElement over, ctx_t ctx,
+                                                         const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_explode_last_compress(CSTElement over, ctx_t ctx,
+                                                        const std::vector<CSTElement>& parts);
+
+  // Functions to combine apply using various 'full choice' options
+  //
+  wcl::optional<wcl::doc> combine_apply_flat(ctx_t ctx, const std::vector<CSTElement>& parts);
+  wcl::optional<wcl::doc> combine_apply_explode_all(ctx_t ctx,
+                                                    const std::vector<CSTElement>& parts);
+
   // Returns a formatter that inserts the next node
   // on the current line if it fits, or on a new nested line
   auto rhs_fmt();
+
+  // Returns a formatter that consumes a pattern continuing until *stop_at* is seen. Pattern is
+  // separated by spaces if possible, freshlines otherwise
+  auto pattern_fmt(cst_id_t stop_at);
+
+  // Returns a doc with a binop surrounded by the appropiate separation. This depends heavily on
+  // the context and which operator is being used.
+  //
+  // Ex:
+  // "flat comma": ', '
+  // "flat or": ' | '
+  // "flat dot": '.'
+  // "explode or": '\n| '
+  // "explode comma": ',\n'
+  //
+  // When an operator grows a NL, the rules are slightly different as the spacing is forced.
+  //
+  // Ex:
+  //  '''x
+  //     + # comment
+  // <FR>5
+  //  '''
+  wcl::doc place_binop(CSTElement op, bool is_flat, ctx_t ctx);
 
   wcl::doc walk_apply(ctx_t ctx, CSTElement node);
   wcl::doc walk_arity(ctx_t ctx, CSTElement node);
@@ -123,6 +196,7 @@ class Emitter {
   wcl::doc walk_topic(ctx_t ctx, CSTElement node);
   wcl::doc walk_tuple(ctx_t ctx, CSTElement node);
   wcl::doc walk_tuple_elt(ctx_t ctx, CSTElement node);
+  wcl::doc walk_type(ctx_t ctx, CSTElement node);
   wcl::doc walk_unary(ctx_t ctx, CSTElement node);
   wcl::doc walk_error(ctx_t ctx, CSTElement node);
 

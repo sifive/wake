@@ -73,7 +73,7 @@ using cst_id_t = uint8_t;
 
 class FileContent;
 class CSTElement;
-class CSTElementCompare;
+struct CSTElementCompare;
 class DiagnosticReporter;
 
 struct CSTNode {

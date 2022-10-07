@@ -34,6 +34,7 @@ struct ParseInfo {
 };
 
 const char *symbolExample(int symbol);
+const char *symbolName(int symbol);
 
 void *ParseAlloc(void *(*mallocProc)(size_t));
 void ParseFree(void *p, void (*freeProc)(void *));
