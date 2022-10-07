@@ -2,7 +2,8 @@
 
 # "${1}/wake-format" $(cat ./srclist.txt) > /dev/null
 
-BASEDIR=$(dirname $0)
+ABSPATH=$(readlink -f "$0")
+BASEDIR=$(dirname "$ABSPATH")
 WAKE_ROOT="$BASEDIR/../../.."
 
 "${1}/wake-format" "$WAKE_ROOT/extensions/vscode/vscode.wake" > /dev/null
