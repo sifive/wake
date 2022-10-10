@@ -160,7 +160,7 @@ jobs:
           cp -a /tmp/workspace/debian wake-* && \
           cp -a /tmp/workspace/tests . && \
           docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build -w /build/$(ls -d wake-*) wake-ubuntu-22.04 debuild -us -uc && \
-          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-ubuntu-22.04 /bin/sh -c "dpkg -i *.deb && cd tests && wake runTests" && \
+          docker run --rm --device /dev/fuse --cap-add SYS_ADMIN --security-opt apparmor:unconfined --mount type=bind,source=$PWD,target=/build wake-ubuntu-22.04 /bin/sh -c "dpkg -i *.deb && cd tests && ls /build && ls /build/tests && wake runTests" && \
           install -D -t release/ubuntu_22_04 *.deb *.xz *.changes *.dsc
       - persist_to_workspace:
           root: .
