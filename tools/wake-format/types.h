@@ -103,7 +103,8 @@ struct token_traits_t {
   // <nl 6>
   // def a = 5
   //
-  // Captures comment1, nl3, nl4, comment2, nl6, def. Trailing NLs are not possible since the def is always the last captured item
+  // Captures comment1, nl3, nl4, comment2, nl6, def. Trailing NLs are not possible since the def is
+  // always the last captured item
   //
   void bind_before(CSTElement e) {
     if (e.id() == TOKEN_NL) {
