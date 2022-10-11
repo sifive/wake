@@ -3,6 +3,7 @@ def five = 5
 
 
 # ordinary comment
+
 def name Unit =
     def other = @here
     def other =
@@ -708,9 +709,13 @@ def loop aaaaa sssss eeeee =
 # A dictionary associating a key-value pair, providing fast lookup by key.
 # This is internally implemented by a balanced tree, so some total ordering must
 # be able to be produced for the key type.
+
 global export tuple Map k v =
     # The ordering function in use, over the key type only.  The `Tree` also
+    
+    
     # stores a version of this over the full `Pair` type, but some of the data
+    
     # manipulations require access to this minimal signature.
     Comparison: k => k => Order
     # The existing `Tree` type provides the storage and most of the manipulation

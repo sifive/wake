@@ -1,4 +1,5 @@
 # Input that wake-format doesn't attempt to format correctly
+
 def t10 = (
     x + 5
 # comment
