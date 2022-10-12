@@ -1398,7 +1398,7 @@ static Expr *dst_expr(CSTElement expr) {
       CSTElement child = expr.firstChildNode();
       AST ast = dst_pattern(child, nullptr);
       child.nextSiblingNode();
-      Expr *body = dst_expr(child);
+      Expr *body = relabel_anon(dst_expr(child));
       Lambda *out;
       FileFragment l = expr.fragment();
       if (lex_kind(ast.name) != LOWER) {
