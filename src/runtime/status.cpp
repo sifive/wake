@@ -339,15 +339,19 @@ void status_init() {
 
 struct StreamSettings {
   int fd;
+  bool istty;
   int colour;
-  StreamSettings() : fd(-1), colour(TERM_DEFAULT) {}
+  StreamSettings() : fd(-1), istty(false), colour(TERM_DEFAULT) {}
 };
 
 static std::unordered_map<std::string, StreamSettings> settings;
 
 void status_set_colour(const char *name, int colour) { settings[name].colour = colour; }
 
-void status_set_fd(const char *name, int fd) { settings[name].fd = fd; }
+void status_set_fd(const char *name, int fd) {
+  settings[name].fd = fd;
+  settings[name].istty = isatty(fd) == 1;
+}
 
 void status_set_bulk_fd(int fd, const char *streams) {
   if (!streams) return;
@@ -366,14 +370,14 @@ void status_write(const char *name, const char *data, int len) {
   StreamSettings s = settings[name];
   if (s.fd != -1) {
     status_clear();
-    if (s.colour != TERM_DEFAULT) {
+    if (s.istty && s.colour != TERM_DEFAULT) {
       int colour = s.colour % 8;
       int intensity = s.colour / 16;
       if (colour != TERM_DEFAULT) write_all_str(s.fd, term_colour(colour));
       if (intensity != TERM_DEFAULT) write_all_str(s.fd, term_intensity(intensity));
     }
     write_all(s.fd, data, len);
-    if (s.colour != TERM_DEFAULT) write_all_str(s.fd, term_normal());
+    if (s.istty && s.colour != TERM_DEFAULT) write_all_str(s.fd, term_normal());
     refresh_needed = true;
   }
 }
