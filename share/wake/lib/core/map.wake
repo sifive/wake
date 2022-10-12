@@ -138,10 +138,10 @@ export def minsertReplace (key: k) (value: v) (map: Map k v): Map k v =
 #
 # *Examples:*
 #   ```
-#   mnew scmp | minsertWith (_+_) "a" 2 | mlookup "a" = Some 2
-#   listToMap scmp ("a" → 1, Nil) | minsertWith (_+_) "a" 2 | mlookup "a" = Some 3
+#   mnew scmp | minsertWith (\_key \old \new old + new) "a" 2 | mlookup "a" = Some 2
+#   listToMap scmp ("a" → 1, Nil) | minsertWith (\_key \old \new old + new) "a" 2 | mlookup "a" = Some 3
 #   ```
-export def minsertWith (fn: k => v => v => v) (key: k) (value: v) (map: Map k v): Map k v =
+export def minsertWith (fn: k => (old: v) => (new: v) => v) (key: k) (value: v) (map: Map k v): Map k v =
     def pairFn (Pair k l) (Pair _ r) = Pair k (fn k l r)
     editMapData (tinsertWith pairFn (Pair key value)) map
 
