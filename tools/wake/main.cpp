@@ -19,6 +19,7 @@
 #define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 
+#include <sys/stat.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -287,6 +288,33 @@ int main(int argc, char **argv) {
   if (shebang && argc < 2) {
     std::cerr << "Shebang invocation requires a script name as the first non-option argument"
               << std::endl;
+    return 1;
+  }
+
+  struct stat sbuf;
+
+  if (fstat(1, &sbuf) != 0) {
+    std::cerr << "Wake must be run with an open standard output (file descriptor 1)" << std::endl;
+    return 1;
+  }
+
+  if (fstat(2, &sbuf) != 0) {
+    std::cout << "Wake must be run with an open standard error (file descriptor 2)" << std::endl;
+    return 1;
+  }
+
+  if (fd3 && fstat(3, &sbuf) != 0) {
+    std::cerr << "Cannot specify --fd:3 unless file descriptor 3 is already open" << std::endl;
+    return 1;
+  }
+
+  if (fd4 && fstat(4, &sbuf) != 0) {
+    std::cerr << "Cannot specify --fd:4 unless file descriptor 4 is already open" << std::endl;
+    return 1;
+  }
+
+  if (fd5 && fstat(5, &sbuf) != 0) {
+    std::cerr << "Cannot specify --fd:5 unless file descriptor 5 is already open" << std::endl;
     return 1;
   }
 
