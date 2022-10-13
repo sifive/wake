@@ -249,9 +249,7 @@ def wakeToTestDir Unit = match (subscribe wakeTestBinary)
         require (
             Pass
             # comment
-            (
-                Pair path visible
-            )
+            (Pair path visible)
         ) = buildTestWake Unit
         Pass (Pair (simplify "{path}/..") visible)
     Nil = Pass (Pair "{wakePath}" Nil)
@@ -516,18 +514,9 @@ def tarball Unit =
     require Pass allSources = sources "." `.*`
     def srcs =
         allSources
-        | filter
-        (
-            ! matches `(debian/|wake.spec).*` _.getPathName
-        ) # omit packaging files
-        | filter
-        (
-            ! matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName
-        ) # omit CI files
-        | filter
-        (
-            ! matches `(.*/)*\.gitignore` _.getPathName
-        ) # omit git files
+        | filter (! matches `(debian/|wake.spec).*` _.getPathName) # omit packaging files
+        | filter (! matches `(\.circleci/|\.github/).*|\.dockerignore` _.getPathName) # omit CI files
+        | filter (! matches `(.*/)*\.gitignore` _.getPathName) # omit git files
     def Pair testPaths wakePaths = splitBy (matches `tests/.*` _.getPathName) srcs
     def wakeSourcesString = wakePaths | map (_.getPathName.format) | foldr (_, ",\n  ", _) Nil | cat
     def testSourcesString =
@@ -716,4 +705,17 @@ export tuple a +++ b =
 
 export tuple (z: Banger) =
     export X: Integer
+
+export data List a =
+    # The empty list. Nil represents a list with no elements.
+    Nil
+    # The prepend constructor. This is often called "cons".
+    #
+    # Examples:
+    # ```
+    #   10, list       # Add a number to `list`
+    #   1, 2, 3, Nil   # Create a list of 3 elements
+    # ```
+    (head: a), (tail: List a) # comment
+
 
