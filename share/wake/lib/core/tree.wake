@@ -97,7 +97,7 @@ export def tinsertMulti (y: a) (Tree cmp root: Tree a): Tree a =
 
 # Insert y into the tree, or the value resulting from fn on a collision
 # `y` is passed as the left-hand value of `fn`.
-export def tinsertWith (fn: a => a => a) (y: a) (tree: Tree a): Tree a =
+export def tinsertWith (fn: (incoming: a) => (existing: a) => a) (y: a) (tree: Tree a): Tree a =
     def Tree cmp root = tree
     def helper = match _
         Tip         = Bin 1 Tip y Tip
