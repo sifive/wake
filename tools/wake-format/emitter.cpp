@@ -65,6 +65,18 @@ static inline bool is_expression(cst_id_t type) {
          type == CST_INTERPOLATE || type == CST_MATCH;
 }
 
+static inline bool contains_req_else(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                                     const token_traits_map_t& traits) {
+  CSTElement copy = node;
+  while (!copy.empty()) {
+    if (copy.id() == CST_REQ_ELSE) {
+      return true;
+    }
+    copy.nextSiblingElement();
+  }
+  return false;
+}
+
 static bool compare_doc_height(const wcl::doc& lhs, const wcl::doc& rhs) {
   return lhs->height() < rhs->height();
 }
@@ -924,9 +936,12 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
 
   // clang-format off
   auto body_fmt = fmt().match(
-    // TODO: starting 'pred()' function doesn't allow init lists
-    pred(ConstPredicate(false), fmt())
-   .pred({TOKEN_WS, TOKEN_NL, TOKEN_COMMENT}, fmt().next())
+    // Block level newlines should be re-emitted as these are the
+    // user creating 'pseudo-blocks'
+    pred(TOKEN_NL, fmt().newline().newline().next())
+   .pred(TOKEN_WS, fmt().next())
+   // Comments are following by a block level newline that shouldn't be emitted
+   .pred(TOKEN_COMMENT, fmt().next().next())
    .otherwise(fmt().freshline().walk(WALK_NODE)));
   // clang-format on
 
@@ -1301,7 +1316,10 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
           .token(TOKEN_KW_ELSE)
           .fmt_if_fits_all(fmt().space().consume_wsnlc().walk(WALK_NODE),
                            fmt().nest(fmt().freshline().consume_wsnlc().walk(WALK_NODE)))
+          // if the author added extra newlines, re-emit them
+          .fmt_if(TOKEN_NL, fmt().next().fmt_while(TOKEN_NL, fmt().next().newline()))
           .consume_wsnlc()
+          .newline()
           .freshline();
 
   MEMO_RET(fmt()
@@ -1314,7 +1332,12 @@ wcl::doc Emitter::walk_require(ctx_t ctx, CSTElement node) {
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
                .join(rhs_fmt())
+               .fmt_if_else(
+                   contains_req_else,
+                   fmt(),  // Do nothing if true, else re-emit author added newlines
+                   fmt().fmt_if(TOKEN_NL, fmt().next().fmt_while(TOKEN_NL, fmt().next().newline())))
                .consume_wsnlc()
+               .newline()
                .freshline()
                .fmt_if(TOKEN_KW_ELSE, else_fmt)
                .walk(WALK_NODE)
