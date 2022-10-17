@@ -267,6 +267,7 @@ from wake import myMap=map foldl myFoldr=foldr
 from wake import def unary + -
 from wake import type Pair Result
 from wake import source,Nil
+
 # comment
 def linkKind =
     # comment
@@ -302,6 +303,7 @@ export topic path: String
 export topic wakeUnitTestBinary: (variant: Pair String String) => Result (List Path) Error
 global export topic glob1: String
 global topic glob1: String
+
 def app1 =
     Pair # comment
     "a"
@@ -365,31 +367,22 @@ def t1 = match _
 
 
 publish wakeTestBinary = defaultWake, Nil
-
 publish animal = "Cat", Nil
-
 publish animal = replace `u` "o" "Mouse", Nil
-
 publish compileC = makeCompileC "native-c11-debug" (which "cc") (c11Flags ++ debugCFlags)
-
 publish path = match (getenv "WAKE_PATH")
     Some x = tokenize `:` x
     None = Nil
-
 publish path = match sysname
     "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
     "FreeBSD" = "/usr/local/bin", Nil
     _ = Nil
-
 publish compileC = emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
-
 publish compileC =
     emccFn
     (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags) (another) ("thing" "here"))
-
 publish compileC = # comment
     emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
-
 publish compileC =
     # comment
     emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
@@ -618,7 +611,6 @@ export def static _: Result Path Error =
 from test_wake import topic wakeTestBinary
 from test_wake import topic wakeUnitTestBinary
 publish wakeTestBinary = defaultWake, Nil
-
 publish wakeUnitTestBinary = buildWakeUnit, Nil
 
 def defaultWake Unit =

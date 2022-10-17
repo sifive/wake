@@ -295,12 +295,11 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
 
   // clang-format off
   auto body_fmt = fmt().match(
-    // TODO: starting 'pred()' function doesn't allow init lists
-    pred(ConstPredicate(false), fmt())
-   .pred({TOKEN_WS, TOKEN_NL, TOKEN_COMMENT}, fmt().next())
-   .pred({CST_IMPORT, CST_TOPIC}, node_fmt)
-   .pred(CST_DEF, node_fmt.join(fmt().newline().newline()))
-   .otherwise(node_fmt.join(fmt().newline())));
+    pred(TOKEN_WS, fmt().next())
+   .pred(TOKEN_COMMENT, fmt().consume_wsnlc())
+   .pred(TOKEN_NL, fmt().next().newline())
+   .pred(CST_DEF, node_fmt.join(fmt().newline().newline()).consume_wsnlc())
+   .otherwise(node_fmt));
   // clang-format on
 
   MEMO_RET(fmt().walk_all(body_fmt).format(ctx, node.firstChildElement(), token_traits));
