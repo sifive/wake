@@ -695,7 +695,7 @@ export def buildSimple _ =
         source "main.cpp"
     require Pass main =
         compileC variant ("-I.", Nil) Nil mainSrc
-    linkO variant Nil main "simple"
+    linkO variant Nil main "simple" Nil
 ```
 
 Let's ignore the contents of `tutorial.wake` briefly and instead focus on how
@@ -773,7 +773,7 @@ export def buildSimple _args =
         source "main.cpp"
     require Pass main =
         compileC variant ("-I.", Nil) Nil mainSrc
-    linkO variant ("-lm", Nil) main "simple"
+    linkO variant ("-lm", Nil) main "simple" Nil
 ```
 
 The `from ... import ...` lines indicate that we want to use something from an
@@ -857,7 +857,7 @@ export def buildMultiple _ =
     def multipleResult =
         require Pass main = mainResult
         require Pass help = helpResult
-        linkO variant ("-lm", Nil) (main ++ help) "multiple"
+        linkO variant ("-lm", Nil) (main ++ help) "multiple" Nil
     multipleResult
 ```
 
@@ -942,7 +942,7 @@ export def buildAll _ =
         | findFail
     def allResult =
         require Pass objects = objectsResult
-        linkO variant ("-lm", Nil) (flatten objects) "all"
+        linkO variant ("-lm", Nil) (flatten objects) "all" Nil
     allResult
 ```
 
@@ -1013,7 +1013,7 @@ export def buildHeaders _ =
         | findFail
     def headersResult =
         require Pass objects = objectsResult
-        linkO variant ("-lm", Nil) (flatten objects) "headers"
+        linkO variant ("-lm", Nil) (flatten objects) "headers" Nil
     headersResult
 ```
 
@@ -1055,7 +1055,7 @@ In `buildHeaders`, we've used the `sources` command to find all the header
 files in the same directory and pass them as legal inputs to gcc -- the
 keyword `@here` expands to the directory of the `.wake` file.  The second
 argument to `sources` is a regular expression to select which files to
-return. We've used ``` `` ```s here which define regular expression literals
+return. We've used ``` `` ```s (backticks) here which define regular expression literals
 with the [standard syntax](https://github.com/google/re2/wiki/Syntax).
 In addition, the parser verifies that regular expression literals are legal.
 
@@ -1119,7 +1119,7 @@ topic animal: String
 publish animal =
     "Cat", Nil
 publish animal =
-    "Dog", "Wolf, Nil
+    "Dog", "Wolf", Nil
 publish animal =
     replace `u` "o" "Mouse", Nil
 export def animals =
@@ -1165,7 +1165,7 @@ def curl url extension =
         job cmdline Nil
     curl.getJobOutput
 
-export def downloadGithubRelease project =
+export def downloadGithubRelease projectList =
     require (project, Nil) = projectList
     else failWithError "Exactly one project must be downloaded per call"
     def releasesResult =
