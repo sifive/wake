@@ -716,6 +716,18 @@ export data List a =
     #   10, list       # Add a number to `list`
     #   1, 2, 3, Nil   # Create a list of 3 elements
     # ```
+    (head: a), (tail: List a)
+
+export data List a =
+    # comment
+    (head: a), (tail: List a)
+
+export data List a =
+    (head: a), (tail: List a) # comment
+
+
+export data List a =
+    # comment
     (head: a), (tail: List a) # comment
 
 
