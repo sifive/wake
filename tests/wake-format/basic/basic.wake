@@ -599,3 +599,26 @@ export tuple a +++ b =
 
 export tuple (z: Banger) =
   export X: Integer
+
+export data List a =
+    # The empty list. Nil represents a list with no elements.
+    Nil
+    # The prepend constructor. This is often called "cons".
+    #
+    # Examples:
+    # ```
+    #   10, list       # Add a number to `list`
+    #   1, 2, 3, Nil   # Create a list of 3 elements
+    # ```
+    (head: a), (tail: List a)
+
+export data List a =
+    # comment
+    (head: a), (tail: List a)
+
+export data List a =
+    (head: a), (tail: List a) # comment
+
+export data List a =
+    # comment
+    (head: a), (tail: List a) # comment

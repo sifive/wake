@@ -142,6 +142,12 @@ static size_t count_trailing_newlines(const token_traits_map_t& traits, const CS
   return it->second.after_bound.size();
 }
 
+static size_t count_allowed_newlines(const token_traits_map_t& traits, const CSTElement& node) {
+  FMT_ASSERT(node.isNode(), node,
+             "Expected node, Saw <" + std::string(symbolName(node.id())) + ">");
+  return count_leading_newlines(traits, node) + count_trailing_newlines(traits, node);
+}
+
 static size_t count_allowed_newlines(const token_traits_map_t& traits,
                                      const std::vector<CSTElement>& parts) {
   assert(parts.size() >= 2);
@@ -1251,7 +1257,7 @@ wcl::doc Emitter::walk_paren(ctx_t ctx, CSTElement node) {
                    .token(TOKEN_P_PCLOSE)
                    .format(ctx, node.firstChildElement(), token_traits);
 
-  if (!no_nl->has_newline()) {
+  if (no_nl->newline_count() == count_allowed_newlines(token_traits, node)) {
     MEMO_RET(no_nl);
   }
 
