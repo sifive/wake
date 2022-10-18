@@ -388,7 +388,7 @@ publish compileC =
     (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags) (another) ("thing" "here"))
 
 publish compileC = # comment
- emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
+    emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
 
 publish compileC =
     # comment
@@ -774,5 +774,25 @@ def a =
     def d = 5
     # comment
     result
+
+
+publish compileC = # comment
+    emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
+
+publish compileC =
+    emccFn (makeCompileC "a" "b") # comment
+
+
+publish compileC =
+    emccFn
+    (
+        makeCompileC # comment
+        "wasm-c11-release"
+        _
+        ("-std=gnu11", emscriptenCFlags)
+    )
+
+def hello = # comment
+    emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
 
 
