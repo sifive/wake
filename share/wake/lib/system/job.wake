@@ -355,7 +355,7 @@ def guardPath job = match _
     Pass l if job.isJobOk =
         findFailFn treeOk l
     _ =
-        failWithError "Non-zero exit status ({format job.getJobStatus}) for '{job.getJobDescription}'"
+        failWithError "Non-zero exit status ({format job.getJobStatus}) for job {str job.getJobId}: '{job.getJobDescription}'"
 def mapPath = match _
     Fail e = Fail e
     Pass l = findFailFn treeOk l
@@ -385,11 +385,11 @@ export def getJobOutput (job: Job): Result Path Error =
         getJobOutputs job
     match outputs
         Nil =
-            failWithError "No outputs available from '{job.getJobDescription}'"
+            failWithError "No outputs available from job {str job.getJobId}: '{job.getJobDescription}'"
         (singleOutput, Nil) =
             Pass singleOutput
         _ =
-            failWithError "More than one output found from '{job.getJobDescription}'"
+            failWithError "More than one output found from job {str job.getJobId}: '{job.getJobDescription}'"
 
 export def isJobOk (job: Job): Boolean = match (getJobReport job)
   Fail _ = False
