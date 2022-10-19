@@ -940,8 +940,9 @@ wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
     // user creating 'pseudo-blocks'
     pred(TOKEN_NL, fmt().newline().newline().next())
    .pred(TOKEN_WS, fmt().next())
-   // Comments are following by a block level newline that shouldn't be emitted
-   .pred(TOKEN_COMMENT, fmt().next().next())
+   // Comments are following by ws/nl/c that have already been tagged and will be
+   // handled later. Skip them for now.
+   .pred(TOKEN_COMMENT, fmt().consume_wsnlc())
    .otherwise(fmt().freshline().walk(WALK_NODE)));
   // clang-format on
 

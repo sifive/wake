@@ -742,6 +742,8 @@ export data List a =
 export data List a =
     # comment
     (head: a), (tail: List a) # comment
+
+
 def buildRE2WASM Unit =
     require Pass outputs = job.getJobOutputs
 
@@ -760,3 +762,17 @@ def buildRE2WASM Unit =
     else blah
 
     Pass (SysLib "1.0" headers objects cflags lflags)
+
+
+def a =
+    # comment
+    def b = 5
+
+    # comment
+    def c = 5
+
+    def d = 5
+    # comment
+    result
+
+
