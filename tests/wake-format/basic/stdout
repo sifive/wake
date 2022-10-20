@@ -53,6 +53,7 @@ def name Unit =
     def other = @here
     # wake-format off
     def other = here
+
     def other = @here
     another
 
@@ -403,13 +404,18 @@ global export target fib n = match n
 
 def buildRE2WASM Unit =
     def version = "2021-08-01"
+
     require Some emmake = emmake
     else
         # comment
         failWithError "emmake is not available"
+
     def emsdk = replace `/[^/]*$` "" emmake
+
     require Pass patch = source "{@here}/re2.patch"
+
     require Pass buildDir = vendorBuildDir Unit
+
     def job =
         """
             cd .build
@@ -423,11 +429,17 @@ def buildRE2WASM Unit =
         | editPlanEnvironment (addEnvironmentPath emsdk)
         | setPlanDirectory @here
         | runJob
+
     require Pass outputs = job.getJobOutputs
+
     def headers = filter (matches `.*\.h` _.getPathName) outputs
+
     def objects = filter (matches `.*\.o` _.getPathName) outputs
+
     def cflags = "-I{@here}/.build/re2-{version}", Nil
+
     def lflags = Nil
+
     Pass (SysLib "1.0" headers objects cflags lflags)
 
 
@@ -594,6 +606,7 @@ publish wakeUnitTestBinary = buildWakeUnit, Nil
 
 def defaultWake Unit =
     require Pass wakeVisible = doInstall "tmp" "default"
+
     Pass (Pair "tmp/bin/wake" wakeVisible)
 
 
@@ -729,5 +742,37 @@ export data List a =
 export data List a =
     # comment
     (head: a), (tail: List a) # comment
+
+
+def buildRE2WASM Unit =
+    require Pass outputs = job.getJobOutputs
+
+    Pass (SysLib "1.0" headers objects cflags lflags)
+
+
+def buildRE2WASM Unit =
+    require Pass outputs = job.getJobOutputs
+    else blah
+
+    Pass (SysLib "1.0" headers objects cflags lflags)
+
+
+def buildRE2WASM Unit =
+    require Pass outputs = job.getJobOutputs
+    else blah
+
+    Pass (SysLib "1.0" headers objects cflags lflags)
+
+
+def a =
+    # comment
+    def b = 5
+
+    # comment
+    def c = 5
+
+    def d = 5
+    # comment
+    result
 
 
