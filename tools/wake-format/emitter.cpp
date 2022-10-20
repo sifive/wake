@@ -291,7 +291,7 @@ wcl::doc Emitter::dispatch(ctx_t ctx, CSTElement node, Func func) {
 wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
 
-  auto node_fmt = fmt().walk(WALK_NODE).newline();
+  auto node_fmt = fmt().walk(WALK_NODE).freshline();
 
   // clang-format off
   auto body_fmt = fmt().match(

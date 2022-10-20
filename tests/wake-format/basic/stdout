@@ -318,10 +318,8 @@ def app =
     Pair "a" "b" # comment
 
 
-
 def app =
     Pair "a" "b" # comment
-
 
 
 def app =
@@ -334,7 +332,6 @@ def app =
     Pair # comment
     "a" # comment
     "b" # comment
-
 
 
 def app =
@@ -389,7 +386,6 @@ publish compileC =
 
 publish compileC =
     emccFn (makeCompileC "a" "b") # comment
-
 
 publish compileC =
     emccFn
@@ -747,11 +743,9 @@ export data List a =
 export data List a =
     (head: a), (tail: List a) # comment
 
-
 export data List a =
     # comment
     (head: a), (tail: List a) # comment
-
 
 def buildRE2WASM Unit =
     require Pass outputs = job.getJobOutputs
