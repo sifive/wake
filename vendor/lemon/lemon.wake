@@ -43,7 +43,7 @@ def m4 (file: Path): Result Path Error =
     match run.getJobStatus
         Exited 0 = write output stdout
         Aborted e = Fail e
-        z = failWithError "Non-zero exit status ({format z}) for '{run.getJobDescription}'"
+        z = failWithError "Non-zero exit status ({format z}) for job {str run.getJobId}: '{run.getJobDescription}'"
 
 def lemon variant (file: Path): Result (Pair Path Path) Error =
     require Pass lemon =
@@ -93,4 +93,4 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
     match zip.getJobStatus
         Exited 0 = Pass (Pair cppfile hfile)
         Aborted e = Fail e
-        z = failWithError "Non-zero exit status ({format z}) for '{zip.getJobDescription}'"
+        z = failWithError "Non-zero exit status ({format z}) for job {str zip.getJobId}: '{zip.getJobDescription}'"
