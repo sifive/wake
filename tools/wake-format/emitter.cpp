@@ -226,6 +226,13 @@ auto Emitter::rhs_fmt() {
   // clang-format off
   return fmt().match(
     pred(requires_nl, full_fmt)
+    // If for some reason (probably a comment) there is a newline after the '=' then we have to
+    // use the full_fmt
+   .pred([](const wcl::doc_builder& builder, ctx_t ctx, const CSTElement& node,
+            const token_traits_map_t& traits) {
+      ctx_t c = ctx.sub(builder);
+      return c->has_newline() && c->last_width() == 0;
+   }, full_fmt)
    .pred(requires_fits_all, fmt().fmt_if_fits_all(flat_fmt, full_fmt))
    .pred_fits_first(flat_fmt)
    .otherwise(full_fmt));
