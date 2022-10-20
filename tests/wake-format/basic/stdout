@@ -777,10 +777,12 @@ def a =
     def b = 5
 
     # comment
+    
     def c = 5
 
     def d = 5
     # comment
+    
     result
 
 
