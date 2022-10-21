@@ -67,7 +67,7 @@ static inline bool is_expression(cst_id_t type) {
 
 // a floating comment is a comment bound to another comment
 static inline bool is_floating_comment(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
-                                     const token_traits_map_t& traits) {
+                                       const token_traits_map_t& traits) {
   if (node.id() != TOKEN_COMMENT) {
     return false;
   }
@@ -309,7 +309,16 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
   auto node_fmt = fmt().walk(WALK_NODE).freshline();
 
   auto consume_wsnl = fmt().fmt_while({TOKEN_WS, TOKEN_NL}, fmt().next());
-  auto floating_comment_fmt = fmt().fmt_if_else(is_floating_comment, fmt().fmt_while(TOKEN_COMMENT, fmt().token(TOKEN_COMMENT).freshline().fmt_if(TOKEN_NL, fmt().next())).freshline().newline().newline().join(consume_wsnl), fmt().consume_wsnlc());
+  auto floating_comment_fmt = fmt().fmt_if_else(
+      is_floating_comment,
+      fmt()
+          .fmt_while(TOKEN_COMMENT,
+                     fmt().token(TOKEN_COMMENT).freshline().fmt_if(TOKEN_NL, fmt().next()))
+          .freshline()
+          .newline()
+          .newline()
+          .join(consume_wsnl),
+      fmt().consume_wsnlc());
 
   // clang-format off
   auto body_fmt = fmt().match(
@@ -504,10 +513,12 @@ void inorder_collect_tokens(CSTElement node, std::vector<CSTElement>& items) {
 // # floating 3a
 // # floating 3b
 //
-// A good rule of thumb is that a floating comment is one that a human wouldn't consider as "bound" to some other token.
+// A good rule of thumb is that a floating comment is one that a human wouldn't consider as "bound"
+// to some other token.
 //
 // Input: The top level CST node
-// Output: token_traits[t].bound_to == t' forall t where t is a floating block comment and t' is the *first* comment token in that floating block.
+// Output: token_traits[t].bound_to == t' forall t where t is a floating block comment and t' is the
+// *first* comment token in that floating block.
 //
 // Ex:
 //  token_traits[1a].bount_to == 1a
@@ -538,7 +549,9 @@ void Emitter::bind_top_level_comments(CSTElement node) {
       if (top.id() == TOKEN_NL) {
         CSTElement first = stack.front();
         for (CSTElement s : stack) {
-          if (s.id() != TOKEN_COMMENT) { continue; }
+          if (s.id() != TOKEN_COMMENT) {
+            continue;
+          }
           token_traits[s].set_bound_to(first);
         }
 
@@ -564,7 +577,9 @@ void Emitter::bind_top_level_comments(CSTElement node) {
   if (!stack.empty()) {
     CSTElement first = stack.front();
     for (CSTElement s : stack) {
-      if (s.id() != TOKEN_COMMENT) { continue; }
+      if (s.id() != TOKEN_COMMENT) {
+        continue;
+      }
       token_traits[s].set_bound_to(first);
     }
   }
@@ -619,7 +634,9 @@ void Emitter::bind_nested_comments(CSTElement node) {
       continue;
     }
 
-    FMT_ASSERT(!token_traits[item].bound_to.empty(), item, "There is a unbound comment, which is an unexpected error case. Please report this to the wake-format team.");
+    FMT_ASSERT(!token_traits[item].bound_to.empty(), item,
+               "There is a unbound comment, which is an unexpected error case. Please report this "
+               "to the wake-format team.");
   }
 }
 
