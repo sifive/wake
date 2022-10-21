@@ -1,3 +1,8 @@
+# -------------
+# floating header
+# header
+# -------------
+
     # comment
 def five = 5
 
@@ -10,6 +15,28 @@ def name Unit =
 
 def name Unit =
   def other = here
+  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  another
+
+def name Unit =
+  def other = here
+
+  # not floating
+
+  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  another
+
+def name Unit =
+  def other = here
+
+  # not floating
+  def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  another
+
+def name Unit =
+  def other = here
+  # not floating
+
   def other = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   another
 
@@ -681,3 +708,42 @@ def a =
   # comment
 
   result
+
+# floating 1
+
+# floating 2a
+# floating 2b
+# floating 2c
+
+# comment 3
+def name Unit =
+    def other = @here
+    def other =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    another # comment
+
+# floating 3a
+# floating 3b
+
+# floating 4
+
+# floating 5
+
+
+
+
+# comment 3
+def name Unit =
+    def other = @here
+    def other =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    another # comment
+# comment 3
+def name Unit =
+    def other = @here
+    def other =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    another # comment
+# floating 6
+
+# floating 7
