@@ -1160,7 +1160,7 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
                .token(TOKEN_KW_DEF)
                .ws()
-               .walk(is_expression, DISPATCH(walk_type))
+               .walk(is_expression, DISPATCH(walk_no_edit))
                .ws()
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
