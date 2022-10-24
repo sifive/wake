@@ -35,8 +35,12 @@
 #define WALK_NODE DISPATCH(walk_node)
 #define WALK_TOKEN [this](ctx_t ctx, CSTElement node) { return walk_token(ctx, node); }
 
+using memo_map_t = std::unordered_map<std::pair<CSTElement, ctx_t>, wcl::doc>;
+static std::vector<memo_map_t*> __memo_maps__ = {};
+
 #define MEMO(ctx, node)                                                                       \
-  static std::unordered_map<std::pair<CSTElement, ctx_t>, wcl::doc> __memo_map__ = {};        \
+  static memo_map_t __memo_map__ = {};                                                        \
+  __memo_maps__.push_back(&__memo_map__);                                                     \
   auto __memoize_input__ = [node, ctx]() { return std::pair<CSTElement, ctx_t>(node, ctx); }; \
   {                                                                                           \
     auto value = __memo_map__.find(__memoize_input__());                                      \
@@ -50,6 +54,14 @@
     wcl::doc v = (value);                          \
     __memo_map__.insert({__memoize_input__(), v}); \
     return v;                                      \
+  }
+
+#define MEMO_RESET()                         \
+  {                                          \
+    for (memo_map_t * map : __memo_maps__) { \
+      map->clear();                          \
+    }                                        \
+    __memo_maps__.clear();                   \
   }
 
 static inline bool requires_nl(cst_id_t type) { return type == CST_BLOCK || type == CST_REQUIRE; }
@@ -231,6 +243,8 @@ static wcl::doc binop_rhs_separator(const CSTElement& op) {
       return wcl::doc::lit(" ");
   }
 }
+
+Emitter::~Emitter() { MEMO_RESET(); }
 
 auto Emitter::rhs_fmt() {
   auto rhs_fmt = fmt().walk(WALK_NODE);
