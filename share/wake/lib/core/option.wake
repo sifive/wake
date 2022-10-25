@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # The ``Option`` datatype.  Either holds a valid entry with value ``a`` (``Some``), or nothing (``None``).
@@ -28,7 +29,8 @@ export data Option a =
 #   isSome None       = False
 export def isSome: Option a => Boolean = match _
     Some _ = True
-    None   = False
+    None = False
+
 
 # isNone: Report if an Option has no value.
 # If you find yourself using the function, consider using a match instead.
@@ -38,7 +40,8 @@ export def isSome: Option a => Boolean = match _
 #   isNone None       = True
 export def isNone: Option a => Boolean = match _
     Some _ = False
-    None   = True
+    None = True
+
 
 # getOrElse: extract the value from an Option, with a supplied default if None.
 # The default value expression is evaluated whether or not the Option is None.
@@ -49,7 +52,8 @@ export def isNone: Option a => Boolean = match _
 #   5
 export def getOrElse (default: a): Option a => a = match _
     Some x = x
-    None   = default
+    None = default
+
 
 # getOrElse: extract the value from an Option, with a supplied default function if None.
 # The default value function is evaluated only when the Option is None.
@@ -60,7 +64,8 @@ export def getOrElse (default: a): Option a => a = match _
 #   567
 export def getOrElseFn (fn: Unit => a): Option a => a = match _
     Some a = a
-    None   = fn Unit
+    None = fn Unit
+
 
 # orElse: combine two Options, using the first value found, if any.
 #
@@ -71,7 +76,8 @@ export def getOrElseFn (fn: Unit => a): Option a => a = match _
 #   Some 343
 export def orElse (alternate: Option a): Option a => Option a = match _
     Some a = Some a
-    None   = alternate
+    None = alternate
+
 
 # omap: apply function `f` to the optional contents
 # If you find yourself using the function with getOrElse, consider using a match instead.
@@ -80,7 +86,8 @@ export def orElse (alternate: Option a): Option a => Option a = match _
 #   omap (_+1) None     = None
 export def omap (f: a => b): Option a => Option b = match _
     Some a = Some (f a)
-    None   = None
+    None = None
+
 
 # omapPartial: apply partial function 'f' to the optional contents
 # A partial function returns Option; only Some cases result in a value.
@@ -96,7 +103,8 @@ export def omap (f: a => b): Option a => Option b = match _
 #   omapPartial divideEven (Some 7) = None
 export def omapPartial (f: a => Option b): Option a => Option b = match _
     Some a = f a
-    None   = None
+    None = None
+
 
 # ofilter: remove the contents of an option when `f` returns False.
 #
@@ -109,12 +117,13 @@ export def ofilter (f: a => Boolean): Option a => Option a = match _
     Some a if f a = Some a
     _ = None
 
+
 # findSome: return the first Some in a List or else None
 #
 #   findSome (Some 456, None, Some 123, Nil) = Some 456
 #   findSome (None, None, Nil) = None
-export def findSome: List (Option a) => Option a =
-    findSomeFn (_)
+export def findSome: List (Option a) => Option a = findSomeFn (_)
+
 
 # findSomeFn: return the first Some output by 'fn' on a List or else None
 # Once a Some is found, fn is not evaluated on further elements.
@@ -131,12 +140,13 @@ export def findSomeFn (fn: a => Option b): List a => Option b =
             loop t
     loop
 
+
 # findNone: if all List elements are Some return the contents else None
 #
 #   findNone (Some 456, Some 123, Nil) = Some (456, 123, Nil)
 #   findNone (Some 456, None, Some 123, Nil) = None
-export def findNone: List (Option a) => Option (List a) =
-    findNoneFn (_)
+export def findNone: List (Option a) => Option (List a) = findNoneFn (_)
+
 
 # findNoneFn: if fn returns Some for all List elements, return the outputs else None
 # Once a None is found, fn is not evaluated on further elements.
@@ -154,7 +164,9 @@ export def findNoneFn (fn: a => Option b): List a => Option (List b) =
             Some (x, t)
     loop
 
+
 # Promote Option to Result:
+
 
 # getOrFail: Convert Some to Pass and None to a Fail with the supplied value.
 # The fail expression is evaluated even when the Option is None.
@@ -168,8 +180,8 @@ export def findNoneFn (fn: a => Option b): List a => Option (List b) =
 #   | getOrFail "some error"
 #   ---
 #   Pass 81234
-export def getOrFail (failVal: fail): Option pass => Result pass fail =
-    getOrFailFn (\_ failVal)
+export def getOrFail (failVal: fail): Option pass => Result pass fail = getOrFailFn (\_ failVal)
+
 
 # getOrFailFn: Convert Some to Pass and None to a Fail with the function output.
 # The fail function is evaluated only when the Option is None.
@@ -185,7 +197,8 @@ export def getOrFail (failVal: fail): Option pass => Result pass fail =
 #   Pass 81234
 export def getOrFailFn (failFn: Unit => fail): Option pass => Result pass fail = match _
     Some a = Pass a
-    None   = Fail (failFn Unit)
+    None = Fail (failFn Unit)
+
 
 # getOrPass: Convert Some to Fail and None to a Pass with the supplied value.
 # The fail expression is evaluated even when the Option is None.
@@ -199,8 +212,8 @@ export def getOrFailFn (failFn: Unit => fail): Option pass => Result pass fail =
 #   | getOrPass "some error"
 #   ---
 #   Fail 81234
-export def getOrPass (passVal: pass): Option fail => Result pass fail =
-    getOrPassFn (\_ passVal)
+export def getOrPass (passVal: pass): Option fail => Result pass fail = getOrPassFn (\_ passVal)
+
 
 # getOrPassFn: Convert Some to Fail and None to a Pass with the function output.
 # The pass function is evaluated only when the Option is None.
@@ -215,5 +228,7 @@ export def getOrPass (passVal: pass): Option fail => Result pass fail =
 #   ---
 #   Fail 81234
 export def getOrPassFn (passFn: Unit => pass): Option fail => Result pass fail = match _
-    None   = Pass (passFn Unit)
+    None = Pass (passFn Unit)
     Some f = Fail f
+
+

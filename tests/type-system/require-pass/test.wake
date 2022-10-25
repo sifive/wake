@@ -6,6 +6,9 @@ def f0 x =
 
     Pass "unreachable"
 
+
 export def test _ =
     require Fail z = f0 "22"
     Pass z
+
+

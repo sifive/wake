@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # This Boolean type must exist in package wake for if/then/else syntax to work.
+
 
 # The Boolean type has two values: True or False.
 export data Boolean =
@@ -28,11 +30,8 @@ export data Boolean =
 # !True  = False
 # !False = True
 # ```
-export def !(x: Boolean): Boolean =
-    if x then
-        False
-    else
-        True
+export def !(x: Boolean): Boolean = if x then False else True
+
 
 # Binary operator for Boolean AND; `x && y`.
 # Both `x` and `y` must be True to return True.
@@ -45,11 +44,8 @@ export def !(x: Boolean): Boolean =
 # True  && False = False
 # False && False = False
 # ```
-export def (x: Boolean) && (y: Boolean): Boolean =
-    if x then
-        y
-    else
-        False
+export def (x: Boolean) && (y: Boolean): Boolean = if x then y else False
+
 
 # Binary operator for Boolean OR; `x || y`.
 # Either `x` or `y` must be True to return True.
@@ -62,11 +58,8 @@ export def (x: Boolean) && (y: Boolean): Boolean =
 # True  || False = True
 # False || False = False
 # ```
-export def (x: Boolean) || (y: Boolean): Boolean =
-    if x then
-        True
-    else
-        y
+export def (x: Boolean) || (y: Boolean): Boolean = if x then True else y
+
 
 # Binary operator for Boolean XOR/EOR; `eor x y`.
 # When `x` and `y` differ, returns True.
@@ -77,11 +70,8 @@ export def (x: Boolean) || (y: Boolean): Boolean =
 # eor True  False = True
 # eor False False = False
 # ```
-export def eor (x: Boolean) (y: Boolean): Boolean =
-    if x then
-        !y
-    else
-        y
+export def eor (x: Boolean) (y: Boolean): Boolean = if x then !y else y
+
 
 # Binary operator for Boolean XNOR/ENOR; `enor x y`.
 # When `x` and `y` are equal, returns True.
@@ -92,8 +82,6 @@ export def eor (x: Boolean) (y: Boolean): Boolean =
 # enor True  False = False
 # enor False False = True
 # ```
-export def enor (x: Boolean) (y: Boolean): Boolean =
-    if x then
-        y
-    else
-        !y
+export def enor (x: Boolean) (y: Boolean): Boolean = if x then y else !y
+
+

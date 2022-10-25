@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # format: render any type into a printable String
@@ -29,14 +30,15 @@ export def format (anyType: a): String =
     def p x = prim "format"
     p anyType
 
+
 # LogLevel is a user-opaque type.
 # To construct a LogLevel, use makeLogLevel.
 data LogLevel = LogLevel (name: String)
 from wake export type LogLevel
 
 # getLogLevelName: return the name of the LogLevel
-export def getLogLevelName (LogLevel name): String =
-    name
+export def getLogLevelName (LogLevel name): String = name
+
 
 # These colours are available for use with LogLevels
 export data Colour =
@@ -57,56 +59,63 @@ export data Intensity =
 export def makeLogLevel (name: String) (colour: Option Colour): LogLevel =
     makeLogLevel2 name colour None
 
+
 export def makeLogLevel2 (name: String) (colour: Option Colour) (intensity: Option Intensity): LogLevel =
     def set name code = prim "colour"
     def colourCode = match colour
-        None   = 0
-        Some c = 8 + match c
-            Black   = 0
-            Red     = 1
-            Green   = 2
-            Yellow  = 3
-            Blue    = 4
-            Magenta = 5
-            Cyan    = 6
-            White   = 7
+        None = 0
+        Some c =
+            8
+            + match c
+                Black = 0
+                Red = 1
+                Green = 2
+                Yellow = 3
+                Blue = 4
+                Magenta = 5
+                Cyan = 6
+                White = 7
     def intensityCode = match intensity
-        None   = 0
-        Some i = 16 * match i
-            Dim    = 1
-            Bright = 2
-    def _ = set name (colourCode+intensityCode)
+        None = 0
+        Some i =
+            16
+            * match i
+                Dim = 1
+                Bright = 2
+    def _ = set name (colourCode + intensityCode)
     LogLevel name
+
 
 # The standard logging levels used in wake
 
+
 # logError: logged to stderr by default
-export def logError: LogLevel =
-    makeLogLevel "error" (Some Red)
+export def logError: LogLevel = makeLogLevel "error" (Some Red)
+
 
 # logWarning: logged to stdout unless run with -q
-export def logWarning: LogLevel =
-    makeLogLevel "warning" (Some Yellow)
+export def logWarning: LogLevel = makeLogLevel "warning" (Some Yellow)
+
 
 # logReport: logged to stdout unless run with -q
-export def logReport: LogLevel =
-    makeLogLevel "report" (Some Magenta)
+export def logReport: LogLevel = makeLogLevel "report" (Some Magenta)
+
 
 # logEcho: logged to stdout when run with -v
-export def logEcho: LogLevel =
-    makeLogLevel "echo" None
+export def logEcho: LogLevel = makeLogLevel "echo" None
+
 
 # logInfo: logged to stdout when run with -v
-export def logInfo: LogLevel =
-    makeLogLevel2 "info" None (Some Dim)
+export def logInfo: LogLevel = makeLogLevel2 "info" None (Some Dim)
+
 
 # logDebug: logged to stdout on debug
-export def logDebug: LogLevel =
-    makeLogLevel "debug" (Some Blue)
+export def logDebug: LogLevel = makeLogLevel "debug" (Some Blue)
+
 
 # logNever: not logged to any stream
-export def logNever: LogLevel =
-    makeLogLevel "null" None
+export def logNever: LogLevel = makeLogLevel "null" None
+
 
 # tap: inject a diagnostic into a pipeline
 # Oftern used in conjunction with println and/or format.
@@ -120,6 +129,7 @@ export def tap (consumerFn: a => b) (value: a): a =
     def _ = consumerFn value
     value
 
+
 # printLevel: print a String on the given LogLevel.
 #
 #   # Produce a red hello on stderr
@@ -127,6 +137,7 @@ export def tap (consumerFn: a => b) (value: a): a =
 export def printLevel (LogLevel name): String => Unit =
     def p stream outputStr = prim "print"
     p name
+
 
 # printlnLevel: print a String with a newline on the given LogLevel.
 #
@@ -136,16 +147,18 @@ export def printlnLevel (level: LogLevel): String => Unit =
     def f = printLevel level
     (\outputStr f "{outputStr}\n")
 
+
 # print: print a colourless String, visible when run with -v.
 #
 #   # Print a diagnostic visible when run with -v
 #   def Unit = print "hello world\n"
-export def print: String => Unit =
-    printLevel logReport
+export def print: String => Unit = printLevel logReport
+
 
 # println: print a colourless String with a newline, visible when run with -v.
 #
 #   # Print a happy face visible when run with -v
 #   def Unit = println "{integerToUnicode 0x1f600}"
-export def println: String => Unit =
-    printlnLevel logReport
+export def println: String => Unit = printlnLevel logReport
+
+

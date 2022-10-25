@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 from wake import _
 
@@ -21,11 +22,15 @@ target buildLSP variant: Result (List Path) Error = match variant
         require Pass postJS = source "extensions/vscode/lsp-server/wasm/lsp-wake.post.js"
         require Pass preJS = source "extensions/vscode/lsp-server/wasm/lsp-wake.pre.js"
         def extraLFlags =
-            "-s", 'EXPORTED_FUNCTIONS=_instantiateServer,_instantiateServerCustomStdLib,_processRequest',
-            "-s", 'DEFAULT_LIBRARY_FUNCS_TO_INCLUDE=[$cwrap]',
-            "-s", 'EXPORT_NAME="wakeLspModule"',
-            "--post-js", postJS.getPathName,
-            "--pre-js", preJS.getPathName,
-        tool here Nil variant "lib/wake/lsp-wake" (dst,) (postJS, preJS,) extraLFlags
-    _ =
-        tool here Nil variant "lib/wake/lsp-wake" (dst,) Nil Nil
+            "-s",
+            'EXPORTED_FUNCTIONS=_instantiateServer,_instantiateServerCustomStdLib,_processRequest',
+            "-s",
+            'DEFAULT_LIBRARY_FUNCS_TO_INCLUDE=[$cwrap]',
+            "-s",
+            'EXPORT_NAME="wakeLspModule"',
+            "--post-js",
+            postJS.getPathName,
+            "--pre-js",
+            preJS.getPathName,
+        tool @here Nil variant "lib/wake/lsp-wake" (dst,) (postJS, preJS,) extraLFlags
+    _ = tool @here Nil variant "lib/wake/lsp-wake" (dst,) Nil Nil

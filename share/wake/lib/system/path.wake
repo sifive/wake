@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # Simplify away the ..s and .s in a String
@@ -20,9 +21,11 @@ export def simplify (path: String): String =
     def p s = prim "simplify"
     p path
 
+
 export def sortPaths (paths: List Path): List Path =
-  def fn a b = a.getPathName <~ b.getPathName
-  sortBy fn paths
+    def fn a b = a.getPathName <~ b.getPathName
+    sortBy fn paths
+
 
 # Concatenate two paths
 #  join "foo"  "bar"    => "foo/bar"
@@ -30,10 +33,8 @@ export def sortPaths (paths: List Path): List Path =
 #  join "/foo" "bar"    => "/foo/bar"
 #  join "foo"  "../bar" => "bar"
 export def in (dir: String) (path: String): String =
-    if matches `/.*` path then
-        path
-    else
-        simplify "{dir}/{path}"
+    if matches `/.*` path then path else simplify "{dir}/{path}"
+
 
 # Reframe path into a form accesible relative to dir
 # For example:
@@ -44,36 +45,32 @@ export def relative (dir: String) (path: String): String =
     def p d p = prim "relative"
     p dir path
 
+
 # Locate an executable in the search path
 export target whichIn (path: String) (exec: String): String =
     def imp path exec = prim "search_path"
     imp path exec
 
-export def which (exec: String): String =
-    whichIn path exec
+export def which (exec: String): String = whichIn path exec
+
 
 # Locate an executable in the users env PATH
 export target whichInEnvPath (exec: String): Option String =
-    require Some path =
-        getenv "PATH"
+    require Some path = getenv "PATH"
 
-    def cmd =
-        whichIn path exec
+    def cmd = whichIn path exec
 
-    if cmd ==~ exec then
-        None
-    else
-        Some cmd
+    if cmd ==~ exec then None else Some cmd
 
 # Absolute path to the workspace root.
 # All paths in wake are relative to the workspace root; you probably just want "."
 # The absolute path should rarely be used because it breaks build relocatability
-export def workspace: String =
-    prim "workspace"
+export def workspace: String = prim "workspace"
+
 
 # The directory within which wake was invoked (relative to the workspace root)
-export def cwd: String =
-    prim "cwd"
+export def cwd: String = prim "cwd"
+
 
 # Remove any leading directories from `file`.
 #
@@ -90,9 +87,8 @@ export def cwd: String =
 # basename "/foo"     = "foo"
 # basename "foo-bar"  = "foo-bar"
 # ```
-export def basename (file: String): String =
-    replace `/*$` '' file
-    | replace `^.*/` ''
+export def basename (file: String): String = replace `/*$` '' file | replace `^.*/` ''
+
 
 # Extract the directory name from `file`.
 #
@@ -108,46 +104,47 @@ export def basename (file: String): String =
 # dirname "/bar"     = "/"
 # dirname "/foo/bar" = /foo"
 # ```
-export def dirname (file: String): String =
-    simplify "{file}/.."
+export def dirname (file: String): String = simplify "{file}/.."
 
-export def isPathDir (path: Path): Boolean =
-    getPathHash path
-    | matches `0+`
+
+export def isPathDir (path: Path): Boolean = getPathHash path | matches `0+`
+
 
 # Paths differ from Strings in that they have been hashed; their content is frozen
-data Path =
-    Path (name: String)
+data Path = Path (name: String)
 from wake export type Path
 
 export def getPathName (path: Path): String =
     def Path name = path
     name
 
-export def getPathParent (path: Path): Path =
-    Path (simplify "{getPathName path}/..")
+
+export def getPathParent (path: Path): Path = Path (simplify "{getPathName path}/..")
+
 
 def addhash (f: String): String =
-  def p = simplify f
-  def add f h = prim "add_hash"
-  add p (hashcode p)
+    def p = simplify f
+    def add f h = prim "add_hash"
+    add p (hashcode p)
+
 
 def hashUsage = defaultUsage | setUsageCPUtime 0.1
-target hashcode (f: String): String =
-  def get f = prim "get_hash"
-  def reuse = get f
-  if reuse !=* "" then reuse else
-    def hashPlan cmd  =
-      Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun True Nil (\_ True) hashUsage id id
-    def job = hashPlan ("<hash>", f, Nil) | runJobWith localRunner
-    def hash =
-      job.getJobStdout
-      | getWhenFail ""
-      | extract `(.{64}).*`
-    match job.isJobOk hash
-      True (x, Nil) = x
-      _ _ = "BadHash"
 
-export def getPathHash (path: Path): String =
-    getPathName path
-    | hashcode
+
+target hashcode (f: String): String =
+    def get f = prim "get_hash"
+    def reuse = get f
+    if reuse !=* "" then
+        reuse
+    else
+        def hashPlan cmd =
+            Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun True Nil (\_ True) hashUsage id id
+        def job = hashPlan ("<hash>", f, Nil) | runJobWith localRunner
+        def hash = job.getJobStdout | getWhenFail "" | extract `(.{64}).*`
+        match job.isJobOk hash
+            True (x, Nil) = x
+            _ _ = "BadHash"
+
+export def getPathHash (path: Path): String = getPathName path | hashcode
+
+

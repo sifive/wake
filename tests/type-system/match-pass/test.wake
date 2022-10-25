@@ -1,27 +1,30 @@
 # This should be polymorphic
 def f0: a => a = match _
-  x:a = x:a
+    x:a = x:a
+
 
 # Refining type polymorphic
 def f0a: Unit => Unit = f0
+
+
 def f0b: Integer => Integer = f0
+
 
 # The literal should force the type
 def f1: Integer => Boolean = match _
-  0 = True
-  _ = False
+    0 = True
+    _ = False
+
 
 export def test _ =
     def Unit = f0a Unit
 
-    require True =
-        5 == f0b 5
-    else
-        Fail "f0 bad"
+    require True = 5 == f0b 5
+    else Fail "f0 bad"
 
-    require True =
-        f1 0
-    else
-        Fail "f1 bad"
+    require True = f1 0
+    else Fail "f1 bad"
 
     Pass "ok"
+
+

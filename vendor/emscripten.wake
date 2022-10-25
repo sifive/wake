@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 from wake import _
 from gcc_wake import _
@@ -21,40 +22,45 @@ def emccFn fn = match (whichInEnvPath "emcc")
     None = Nil
     Some x = fn x
 
+
 def emppFn fn = match (whichInEnvPath "em++")
     None = Nil
     Some x = fn x
 
+
 def emmake = whichInEnvPath "emmake"
 
-def emscriptenCFlags =
-    "-Wall", "-O3", Nil
+
+def emscriptenCFlags = "-Wall", "-O3", Nil
+
 
 def emscriptenLFlags =
     "-O3",
-    "-s", "ALLOW_MEMORY_GROWTH",
-    "-s", "EXIT_RUNTIME",
-    "-s", "ASSERTIONS",
-    "-s", "ASYNCIFY",
-    "-s", "MODULARIZE=1",
-    "-s", "EXPORT_ES6=1",
-    "-s", "SINGLE_FILE",
+    "-s",
+    "ALLOW_MEMORY_GROWTH",
+    "-s",
+    "EXIT_RUNTIME",
+    "-s",
+    "ASSERTIONS",
+    "-s",
+    "ASYNCIFY",
+    "-s",
+    "MODULARIZE=1",
+    "-s",
+    "EXPORT_ES6=1",
+    "-s",
+    "SINGLE_FILE",
     Nil
 
-publish compileC =
-    emccFn (makeCompileC "wasm-c11-release"   _ ("-std=gnu11", emscriptenCFlags))
 
-publish compileC =
-    emppFn (makeCompileC "wasm-cpp11-release" _ ("-std=c++11", emscriptenCFlags))
+publish compileC = emccFn (makeCompileC "wasm-c11-release" _ ("-std=gnu11", emscriptenCFlags))
 
-publish compileC =
-    emppFn (makeCompileC "wasm-cpp14-release" _ ("-std=c++14", emscriptenCFlags))
+publish compileC = emppFn (makeCompileC "wasm-cpp11-release" _ ("-std=c++11", emscriptenCFlags))
 
-publish linkO =
-    emccFn (makeLinkO "wasm-c11-release"   _ emscriptenLFlags)
+publish compileC = emppFn (makeCompileC "wasm-cpp14-release" _ ("-std=c++14", emscriptenCFlags))
 
-publish linkO =
-    emppFn (makeLinkO "wasm-cpp11-release" _ emscriptenLFlags)
+publish linkO = emccFn (makeLinkO "wasm-c11-release" _ emscriptenLFlags)
 
-publish linkO =
-    emppFn (makeLinkO "wasm-cpp14-release" _ emscriptenLFlags)
+publish linkO = emppFn (makeLinkO "wasm-cpp11-release" _ emscriptenLFlags)
+
+publish linkO = emppFn (makeLinkO "wasm-cpp14-release" _ emscriptenLFlags)

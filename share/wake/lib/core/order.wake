@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # Used for comparing quantities.  
@@ -32,7 +33,8 @@ export data Order =
 # isLT GT = False
 export def isLT: Order => Boolean = match _
     LT = True
-    _  = False
+    _ = False
+
 
 # Is equal: convert Order Boolean
 # def a == b = a <=> b | isEQ
@@ -41,7 +43,8 @@ export def isLT: Order => Boolean = match _
 # isEQ GT = False
 export def isEQ: Order => Boolean = match _
     EQ = True
-    _  = False
+    _ = False
+
 
 # Is greater-than: convert Order to Boolean
 # def a > b = a <=> b | isGT
@@ -50,7 +53,8 @@ export def isEQ: Order => Boolean = match _
 # isGT GT = True
 export def isGT: Order => Boolean = match _
     GT = True
-    _  = False
+    _ = False
+
 
 # Is less-than-or-equal: convert Order to Boolean
 # def a <= b = a <=> b | isLE
@@ -59,7 +63,8 @@ export def isGT: Order => Boolean = match _
 # isLE GT = False
 export def isLE: Order => Boolean = match _
     GT = False
-    _  = True
+    _ = True
+
 
 # Is not-equal: convert Order to Boolean
 # def a != b = a <=> b | isNE
@@ -68,7 +73,8 @@ export def isLE: Order => Boolean = match _
 # isEQ GT = True
 export def isNE: Order => Boolean = match _
     EQ = False
-    _  = True
+    _ = True
+
 
 # Is greater-than-or-equal: convert Order to Boolean
 # def a >= b = a <=> b | isGE
@@ -77,4 +83,6 @@ export def isNE: Order => Boolean = match _
 # isGE GT = True
 export def isGE: Order => Boolean = match _
     LT = False
-    _  = True
+    _ = True
+
+

@@ -10,15 +10,15 @@ export def dint (x: Integer): Option Double =
     from wake import imp=dint
     Some (imp x)
 
-export def getPathResult: Path => Result Path Error =
-    Pass
 
-export def getPathError (_: Path): Option Error =
-    None
+export def getPathResult: Path => Result Path Error = Pass
 
-export def getPathChild (path: Path): String =
-    getPathName path
-    | basename
+
+export def getPathError (_: Path): Option Error = None
+
+
+export def getPathChild (path: Path): String = getPathName path | basename
+
 
 # The preload runner is no longer supported, fallback to the the default runner.
 export def preloadRunner = defaultRunner
@@ -27,3 +27,5 @@ export def preloadRunner = defaultRunner
 export def tfoldmap (combineFn: b => b => b) (base: a) (transformFn: a => b) (tree: Tree a): b =
     from v0_27_wake import new=tfoldmap
     new combineFn (transformFn base) transformFn tree
+
+

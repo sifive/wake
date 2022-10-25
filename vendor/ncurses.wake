@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 from wake import _
 from gcc_wake import _
@@ -24,3 +25,5 @@ def ncurses = match _
         | getOrElseFn (\Unit pkg "ncurses")
         | editSysLibCFlags (filter (matches `-I.*` _)) # remove feature test manipulation
         | Pass
+
+

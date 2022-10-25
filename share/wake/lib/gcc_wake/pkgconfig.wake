@@ -13,34 +13,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package gcc_wake
 
 export tuple SysLib =
     export Verison: String
     export Headers: List Path
     export Objects: List Path
-    export CFlags:  List String
-    export LFlags:  List String
+    export CFlags: List String
+    export LFlags: List String
 
-export def makeSysLib (version: String): SysLib =
-    SysLib version Nil Nil Nil Nil
+export def makeSysLib (version: String): SysLib = SysLib version Nil Nil Nil Nil
+
 
 export def flattenSysLibs (packages: List SysLib): SysLib =
     def onePath = distinctBy (_.getPathName <=>* _.getPathName)
     def headers = mapFlat getSysLibHeaders packages | onePath
     def objects = mapFlat getSysLibObjects packages | onePath
-    def cflags  = mapFlat getSysLibCFlags  packages
-    def lflags  = mapFlat getSysLibLFlags  packages
+    def cflags = mapFlat getSysLibCFlags packages
+    def lflags = mapFlat getSysLibLFlags packages
     SysLib "" headers objects cflags lflags
 
+
 target pkgConfigImp args =
-    require Some pkgConfig = whichInEnvPath "pkg-config" 
+    require Some pkgConfig = whichInEnvPath "pkg-config"
     else None
 
     def cmdline = pkgConfig, args
     def addenv list = match (getenv "PKG_CONFIG_PATH")
         Some p = "PKG_CONFIG_PATH={p}", list
-        None   = list
+        None = list
     def result =
         makeExecPlan cmdline Nil
         | setPlanLocalOnly True
@@ -48,27 +50,17 @@ target pkgConfigImp args =
         | setPlanStderr logDebug
         | editPlanEnvironment addenv
         | runJob
-    require Some output =
-        result.getJobStdout
-        | getWhenFail ""
-        | tokenize `\n`
-        | head
-    if result.isJobOk then
-        output
-        | tokenize ` `
-        | filter (_ !=* "")
-        | Some
-    else
-        None
+    require Some output = result.getJobStdout | getWhenFail "" | tokenize `\n` | head
+    if result.isJobOk then output | tokenize ` ` | filter (_ !=* "") | Some else None
 
 export def pkgConfig (pkg: String): Option SysLib =
     def pkgs = tokenize ` ` pkg
-    require Some (version, _) =
-        pkgConfigImp ("--short-errors", "--modversion", pkgs)
-    else
-        None
+    require Some (version, _) = pkgConfigImp ("--short-errors", "--modversion", pkgs)
+    else None
     def cflags = pkgConfigImp ("--silence-errors", "--cflags", pkgs)
-    def lflags = pkgConfigImp ("--silence-errors", "--libs",   pkgs)
+    def lflags = pkgConfigImp ("--silence-errors", "--libs", pkgs)
     require Some cflags = cflags
     require Some lflags = lflags
     Some (SysLib version Nil Nil cflags lflags)
+
+

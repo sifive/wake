@@ -13,86 +13,57 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 
 from wake import _
 from gcc_wake import _
 
-def srcDir =
-    here
+def srcDir = @here
+
 
 def src (dir: String) (variant: Pair String String) (internal: List (Pair String String => Result SysLib Error)) (external: List (Pair String String => Result SysLib Error)): Result SysLib Error =
-    def Pair cppVariant cVariant =
-        variant
+    def Pair cppVariant cVariant = variant
 
-    def internalLibResults =
-        map (_ variant) internal
+    def internalLibResults = map (_ variant) internal
 
-    require Pass externalLibs =
-        map (_ variant) external
-        | findFail
+    require Pass externalLibs = map (_ variant) external | findFail
 
-    def externalLib =
-        flattenSysLibs externalLibs
+    def externalLib = flattenSysLibs externalLibs
 
-    require Pass ym4s =
-        sources here `.*\.y\.m4`
+    require Pass ym4s = sources @here `.*\.y\.m4`
 
-    require Pass parsers =
-        map (parserGen variant) ym4s
-        | findFail
+    require Pass parsers = map (parserGen variant) ym4s | findFail
 
-    require Pass versionHeader =
-        version_h Unit
-    require Pass sourceHeaders =
-        sources srcDir `.*\.h`
-    require Pass vendorHeaders =
-        sources vendorDir `.*\.h`
+    require Pass versionHeader = version_h Unit
+    require Pass sourceHeaders = sources srcDir `.*\.h`
+    require Pass vendorHeaders = sources vendorDir `.*\.h`
     def headers =
         versionHeader,
-        map getPairSecond parsers ++
-        externalLib.getSysLibHeaders ++
-        sourceHeaders ++
-        vendorHeaders
+        map getPairSecond parsers ++ externalLib.getSysLibHeaders ++ sourceHeaders ++ vendorHeaders
 
-    def cflags =
-        "-I{srcDir}",
-        "-I{vendorDir}",
-        externalLib.getSysLibCFlags
+    def cflags = "-I{srcDir}", "-I{vendorDir}", externalLib.getSysLibCFlags
 
     def re2obj re =
         require Pass cpp = re2c re
         cppCompile cpp
 
-    def cCompile =
-        compileC cVariant cflags headers
+    def cCompile = compileC cVariant cflags headers
 
-    def cppCompile =
-        compileC cppVariant cflags headers
+    def cppCompile = compileC cppVariant cflags headers
 
-    def cppExtra =
-        map getPairFirst parsers
-        | filter (matches `^${dir.quote}/.*` _.getPathName)
+    def cppExtra = map getPairFirst parsers | filter (matches `^${dir.quote}/.*` _.getPathName)
 
-    require Pass reObjects =
-        sources dir `.*\.re`
-    require Pass cObjects =
-        sources dir `.*\.c`
-    require Pass cppObjects =
-        sources dir `.*\.cpp`
+    require Pass reObjects = sources dir `.*\.re`
+    require Pass cObjects = sources dir `.*\.c`
+    require Pass cppObjects = sources dir `.*\.cpp`
     def objectResults =
-        map re2obj     reObjects ++
-        map cCompile   cObjects ++
-        map cppCompile (cppExtra ++ cppObjects)
+        map re2obj reObjects ++ map cCompile cObjects ++ map cppCompile (cppExtra ++ cppObjects)
 
-    require Pass objects =
-        findFail objectResults
+    require Pass objects = findFail objectResults
 
-    require Pass internalLibs =
-        findFail internalLibResults
-    
-    def internalLib =
-        flattenSysLibs internalLibs
+    require Pass internalLibs = findFail internalLibResults
+    def internalLib = flattenSysLibs internalLibs
 
     def allObjects =
         (internalLib.getSysLibObjects ++ externalLib.getSysLibObjects ++ objects.flatten)
@@ -100,32 +71,29 @@ def src (dir: String) (variant: Pair String String) (internal: List (Pair String
 
     Pass (SysLib "0.0" headers allObjects cflags externalLib.getSysLibLFlags)
 
+
 def version_h Unit =
-    require Pass ver =
-        buildAs Unit
-    write "{here}/version.h" "#define VERSION {ver}\n"
+    require Pass ver = buildAs Unit
+    write "{@here}/version.h" "#define VERSION {ver}\n"
+
 
 def parserLemon variant ym4 =
-    require Pass parser_y =
-        m4 ym4
+    require Pass parser_y = m4 ym4
 
     lemon variant parser_y
 
+
 def parserGen variant ym4 =
-    require Fail _ =
-        parserLemon variant ym4
+    require Fail _ = parserLemon variant ym4
 
-    def basename =
-        replace `\.y\.m4$` "" ym4.getPathName
+    def basename = replace `\.y\.m4$` "" ym4.getPathName
 
-    require Pass sourcesGZip =
-        source "{basename}.cpp.gz"
-    require Pass headersGZip =
-        source "{basename}.h.gz"
+    require Pass sourcesGZip = source "{basename}.cpp.gz"
+    require Pass headersGZip = source "{basename}.h.gz"
 
-    require Pass parser_c =
-        gunzip sourcesGZip
-    require Pass parser_h =
-        gunzip headersGZip
+    require Pass parser_c = gunzip sourcesGZip
+    require Pass parser_h = gunzip headersGZip
 
     Pass (Pair parser_c parser_h)
+
+
