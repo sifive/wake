@@ -47,6 +47,8 @@ class Emitter {
   // Walks the CST, formats it, and returns the representative doc
   wcl::doc layout(CST cst);
 
+  ~Emitter();
+
  private:
   std::unordered_map<CSTElement, node_traits_t> node_traits = {};
   token_traits_map_t token_traits = {};
