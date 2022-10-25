@@ -76,6 +76,7 @@ struct token_traits_t {
   // Tokens bound to this token 'before' this token
   // in source order
   std::set<CSTElement, CSTElementCompare> before_bound = {};
+  std::vector<CSTElement> before_nls = {};
 
   // Tokens bound to this token 'after' this token
   // in source order
@@ -85,21 +86,51 @@ struct token_traits_t {
   // inverse of before/after_bound
   CSTElement bound_to;
 
+  // bind_before captures comments and a single newline
+  // for each internal and independent newline.
+  //
+  // internal: a newline that would not be removed by a "trim" call
+  // independent: a newline that isn't strictly there for syntax purposes
+  //   such as the newline that must always follow a comment
+  //
+  // Ex:
+  //
+  // <nl 1>
+  // # comment1 <nl 2>
+  // <nl 3>
+  // <nl 4>
+  // # comment2 <nl 5>
+  // <nl 6>
+  // def a = 5
+  //
+  // Captures comment1, nl3, nl4, comment2, nl6, def. Trailing NLs are not possible since the def is
+  // always the last captured item
+  //
   void bind_before(CSTElement e) {
-    // TODO: delete this after handling captured
-    // NLs and WSes
+    if (e.id() == TOKEN_NL) {
+      before_nls.push_back(e);
+      return;
+    }
+
     if (e.id() != TOKEN_COMMENT) {
       return;
     }
+
+    if (before_nls.size() > 1) {
+      for (size_t i = 1; i < before_nls.size(); i++) {
+        before_bound.insert(before_nls[i]);
+      }
+    }
+
+    before_nls = {};
     before_bound.insert(e);
   }
 
   void bind_after(CSTElement e) {
-    // TODO: delete this after handling captured
-    // NLs and WSes
     if (e.id() != TOKEN_COMMENT) {
       return;
     }
+
     after_bound.insert(e);
   }
 

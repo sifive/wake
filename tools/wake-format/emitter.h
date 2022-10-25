@@ -86,6 +86,8 @@ class Emitter {
   //   '''
   //   will bind '# comment1' and '# comment2' to the second 'def'
   void bind_comments(CSTElement node);
+  void bind_top_level_comments(CSTElement node);
+  void bind_nested_comments(CSTElement node);
 
   // Functions to combine binops using various 'full choice' options
   //

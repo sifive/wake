@@ -65,6 +65,21 @@ static inline bool is_expression(cst_id_t type) {
          type == CST_INTERPOLATE || type == CST_MATCH;
 }
 
+// a floating comment is a comment bound to another comment
+static inline bool is_floating_comment(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                                       const token_traits_map_t& traits) {
+  if (node.id() != TOKEN_COMMENT) {
+    return false;
+  }
+
+  auto it = traits.find(node);
+  if (it == traits.end()) {
+    return false;
+  }
+
+  return it->second.bound_to.id() == TOKEN_COMMENT;
+}
+
 static inline bool contains_req_else(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                                      const token_traits_map_t& traits) {
   CSTElement copy = node;
@@ -293,12 +308,24 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
 
   auto node_fmt = fmt().walk(WALK_NODE).freshline();
 
+  auto consume_wsnl = fmt().fmt_while({TOKEN_WS, TOKEN_NL}, fmt().next());
+  auto floating_comment_fmt = fmt().fmt_if_else(
+      is_floating_comment,
+      fmt()
+          .fmt_while(TOKEN_COMMENT,
+                     fmt().token(TOKEN_COMMENT).freshline().fmt_if(TOKEN_NL, fmt().next()))
+          .freshline()
+          .newline()
+          .newline()
+          .join(consume_wsnl),
+      fmt().consume_wsnlc());
+
   // clang-format off
   auto body_fmt = fmt().match(
     pred(TOKEN_WS, fmt().next())
-   .pred(TOKEN_COMMENT, fmt().consume_wsnlc())
+   .pred(TOKEN_COMMENT, floating_comment_fmt)
    .pred(TOKEN_NL, fmt().next().newline())
-   .pred(CST_DEF, node_fmt.join(fmt().newline().newline()).consume_wsnlc())
+   .pred(CST_DEF, node_fmt.join(fmt().newline().newline()).join(consume_wsnl))
    .otherwise(node_fmt));
   // clang-format on
 
@@ -466,7 +493,99 @@ void inorder_collect_tokens(CSTElement node, std::vector<CSTElement>& items) {
   }
 }
 
-void Emitter::bind_comments(CSTElement node) {
+// This function is responsible for exploring *only* the top level of the source file
+// to identify and tag comments which are "floating block comments". To be a floating block comment
+// the following must hold
+//   - The comment is top level
+//   - The comment has two newlines between it and the next element
+//   - Multiple comments in a row are considered to be in the same block
+//
+// Ex:
+//
+// # floating 1a
+//
+// # floating 2a
+// # floating 2b
+// # floating 2c
+//
+// # not-floating
+// def x = 5
+// # floating 3a
+// # floating 3b
+//
+// A good rule of thumb is that a floating comment is one that a human wouldn't consider as "bound"
+// to some other token.
+//
+// Input: The top level CST node
+// Output: token_traits[t].bound_to == t' forall t where t is a floating block comment and t' is the
+// *first* comment token in that floating block.
+//
+// Ex:
+//  token_traits[1a].bount_to == 1a
+//  token_traits[2a].bount_to == 2a
+//  token_traits[2b].bount_to == 2a
+//  token_traits[2c].bount_to == 2a
+void Emitter::bind_top_level_comments(CSTElement node) {
+  // Stack Invariants
+  //   Comments & the associated newline are stored/built up on the stack
+  //   Two newlines in a row (one current, one on the stack) signals a floating comment block
+  //   Whitespace is ignored
+  //   Anything else signals that the stack isn't a floating comment block and should be cleared
+  std::vector<CSTElement> stack = {};
+
+  for (CSTElement child = node.firstChildElement(); !child.empty(); child.nextSiblingElement()) {
+    if (child.id() == TOKEN_COMMENT) {
+      stack.push_back(child);
+      continue;
+    }
+
+    if (stack.empty()) {
+      continue;
+    }
+
+    if (child.id() == TOKEN_NL) {
+      CSTElement top = stack.back();
+
+      if (top.id() == TOKEN_NL) {
+        CSTElement first = stack.front();
+        for (CSTElement s : stack) {
+          if (s.id() != TOKEN_COMMENT) {
+            continue;
+          }
+          token_traits[s].set_bound_to(first);
+        }
+
+        stack = {};
+        continue;
+      }
+
+      if (top.id() == TOKEN_COMMENT) {
+        stack.push_back(child);
+        continue;
+      }
+
+      FMT_ASSERT(false, top, "Expected comment or newline on stack");
+    }
+
+    if (child.id() == TOKEN_WS) {
+      continue;
+    }
+
+    stack = {};
+  }
+
+  if (!stack.empty()) {
+    CSTElement first = stack.front();
+    for (CSTElement s : stack) {
+      if (s.id() != TOKEN_COMMENT) {
+        continue;
+      }
+      token_traits[s].set_bound_to(first);
+    }
+  }
+}
+
+void Emitter::bind_nested_comments(CSTElement node) {
   std::vector<CSTElement> items;
   inorder_collect_tokens(node, items);
 
@@ -482,6 +601,10 @@ void Emitter::bind_comments(CSTElement node) {
     for (size_t j = i + 1; j < items.size(); j++) {
       CSTElement target = items[j];
       if (target.id() != TOKEN_WS && target.id() != TOKEN_COMMENT) {
+        break;
+      }
+      // Stop binding if we find a target already bound
+      if (!token_traits[target].bound_to.empty()) {
         break;
       }
       token_traits[item].bind_after(target);
@@ -503,23 +626,23 @@ void Emitter::bind_comments(CSTElement node) {
     }
   }
 
-  // Handle trailing comment edge case
-  // '''
-  // def x = 5
-  // # comment
-  // '''
-  // # comment doesn't have anything to bind to it so it gets dropped
+  // At this point, all comments should be bound to something.
+  // Assert that is actually the case or alert the user otherwise
   for (size_t i = 0; i < items.size(); i++) {
     CSTElement item = items[i];
     if (item.id() != TOKEN_COMMENT) {
       continue;
     }
 
-    if (token_traits[item].bound_to.empty()) {
-      std::cerr << "File may not end with a top level comment" << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    FMT_ASSERT(!token_traits[item].bound_to.empty(), item,
+               "There is a unbound comment, which is an unexpected error case. Please report this "
+               "to the wake-format team.");
   }
+}
+
+void Emitter::bind_comments(CSTElement node) {
+  bind_top_level_comments(node);
+  bind_nested_comments(node);
 }
 
 void Emitter::mark_no_format_nodes(CSTElement node) {
