@@ -855,3 +855,42 @@ def name Unit =
 # floating 7
 
 
+def a b c = 5
+
+
+def a =
+    if false then
+        5
+    else
+        require Pass a = b
+        a
+
+
+tuple A B =
+    c
+
+global topic a: b
+global topic a: b
+global topic a: b
+global topic a: b
+
+def a name =
+    # comment
+    # comment
+    match (a thing)
+        x, _ = x, Nil
+        Nil = Nil
+
+
+def x = map (\(Pair a b) c a b)
+
+
+def x = (\_ \_ prim "p") x y
+
+
+def x = (\a \b \x prim "p") x y
+
+
+def x = (\a \b \x prim "p") x y
+
+
