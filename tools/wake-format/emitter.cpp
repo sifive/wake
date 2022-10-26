@@ -1314,9 +1314,7 @@ wcl::doc Emitter::walk_lambda(ctx_t ctx, CSTElement node) {
   MEMO_RET(fmt()
                .token(TOKEN_P_BSLASH)
                .consume_wsnlc()
-               //  .join(pattern_fmt(CST_CASE))
-               .walk(is_expression,
-                     WALK_NODE)  // TODO: should be pattern_fmt that stops at an expression
+               .walk(is_expression, WALK_NODE)
                .consume_wsnlc()
                .space()
                .walk(is_expression, WALK_NODE)
