@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 from wake import _
 from gcc_wake import _
@@ -22,11 +23,12 @@ def buildLemon variant: Result (List Path) Error =
         variant
 
     require Pass lemonSource =
-        source "{here}/lemon.c"
+        source "{@here}/lemon.c"
     require Pass objs =
         compileC cVariant Nil Nil lemonSource
 
-    linkO cVariant Nil objs "{here}/lemon" Nil
+    linkO cVariant Nil objs "{@here}/lemon" Nil
+
 
 def m4 (file: Path): Result Path Error =
     def output =
@@ -41,9 +43,14 @@ def m4 (file: Path): Result Path Error =
         run.getJobStdout
 
     match run.getJobStatus
-        Exited 0 = write output stdout
-        Aborted e = Fail e
-        z = failWithError "Non-zero exit status ({format z}) for job {str run.getJobId}: '{run.getJobDescription}'"
+        Exited 0 =
+            write output stdout
+        Aborted e =
+            Fail e
+        z =
+            failWithError
+            "Non-zero exit status ({format z}) for job {str run.getJobId}: '{run.getJobDescription}'"
+
 
 def lemon variant (file: Path): Result (Pair Path Path) Error =
     require Pass lemon =
@@ -51,11 +58,10 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
 
     require Some tool =
         head lemon
-    else
-        failWithError "lemon compilation produced no output"
+    else failWithError "lemon compilation produced no output"
 
     require Pass template =
-        source "{here}/lempar.c"
+        source "{@here}/lempar.c"
 
     def cmdline =
         tool.getPathName, "-T{template.getPathName}", file.getPathName, Nil
@@ -68,21 +74,18 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
 
     require Some (Pair cfile _) =
         find (matches `.*\.c` _.getPathName) result
-    else
-        failWithError "lemon produced no C file"
+    else failWithError "lemon produced no C file"
 
     require Some (Pair hfile _) =
         find (matches `.*\.h` _.getPathName) result
-    else
-        failWithError "lemon produced no H file"
+    else failWithError "lemon produced no H file"
 
     require Pass cppfile =
         installAs (replace `\.c$` ".cpp" cfile.getPathName) cfile
 
     require Some "1" =
         getenv "UPGRADE_GENERATED"
-    else
-        Pass (Pair cppfile hfile)
+    else Pass (Pair cppfile hfile)
 
     def compress =
         which "gzip", "-nk9", cppfile.getPathName, hfile.getPathName, Nil
@@ -91,6 +94,12 @@ def lemon variant (file: Path): Result (Pair Path Path) Error =
         job compress (cppfile, result)
 
     match zip.getJobStatus
-        Exited 0 = Pass (Pair cppfile hfile)
-        Aborted e = Fail e
-        z = failWithError "Non-zero exit status ({format z}) for job {str zip.getJobId}: '{zip.getJobDescription}'"
+        Exited 0 =
+            Pass (Pair cppfile hfile)
+        Aborted e =
+            Fail e
+        z =
+            failWithError
+            "Non-zero exit status ({format z}) for job {str zip.getJobId}: '{zip.getJobDescription}'"
+
+

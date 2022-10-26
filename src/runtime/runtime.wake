@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 
 from wake import _
 
 target runtime variant =
-    src here variant (optimizer, dst, types, json, util, Nil) (gmp, sqlite3, re2, ncurses, Nil)
+    src @here variant (optimizer, dst, types, json, util, Nil) (gmp, sqlite3, re2, ncurses, Nil)

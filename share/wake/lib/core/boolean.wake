@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # This Boolean type must exist in package wake for if/then/else syntax to work.
+
 
 # The Boolean type has two values: True or False.
 export data Boolean =
@@ -34,6 +36,7 @@ export def !(x: Boolean): Boolean =
     else
         True
 
+
 # Binary operator for Boolean AND; `x && y`.
 # Both `x` and `y` must be True to return True.
 #
@@ -50,6 +53,7 @@ export def (x: Boolean) && (y: Boolean): Boolean =
         y
     else
         False
+
 
 # Binary operator for Boolean OR; `x || y`.
 # Either `x` or `y` must be True to return True.
@@ -68,6 +72,7 @@ export def (x: Boolean) || (y: Boolean): Boolean =
     else
         y
 
+
 # Binary operator for Boolean XOR/EOR; `eor x y`.
 # When `x` and `y` differ, returns True.
 #
@@ -83,6 +88,7 @@ export def eor (x: Boolean) (y: Boolean): Boolean =
     else
         y
 
+
 # Binary operator for Boolean XNOR/ENOR; `enor x y`.
 # When `x` and `y` are equal, returns True.
 #
@@ -97,3 +103,5 @@ export def enor (x: Boolean) (y: Boolean): Boolean =
         y
     else
         !y
+
+

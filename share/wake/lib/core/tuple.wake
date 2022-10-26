@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # unit / void
@@ -20,7 +21,7 @@ export data Unit = Unit
 
 # Creates a ``Pair``, a tuple containing two elements.
 export tuple Pair a b =
-    export First:  a
+    export First: a
     export Second: b
 
 # Defines an arrow operator as an alternate way to initialize a ``Pair``.
@@ -29,9 +30,9 @@ from wake export def binary :-> = Pair
 
 # Creates a ``Triple``, a tuple containing three elements.
 export tuple Triple a b c =
-    export First:  a
+    export First: a
     export Second: b
-    export Third:  c
+    export Third: c
 
 # Variable length Tuples (terminate with Unit if you want ._x accessors)
 # aka: a List with fixed length and heterogeneous element types
@@ -44,13 +45,43 @@ export tuple Triple a b c =
 export data a; b = a; b
 
 # Handy accessor methods
-export def _0 (x; _) = x
-export def _1 (_; x; _) = x
-export def _2 (_; _; x; _) = x
-export def _3 (_; _; _; x; _) = x
-export def _4 (_; _; _; _; x; _) = x
-export def _5 (_; _; _; _; _; x; _) = x
-export def _6 (_; _; _; _; _; _; x; _) = x
-export def _7 (_; _; _; _; _; _; _; x; _) = x
-export def _8 (_; _; _; _; _; _; _; _; x; _) = x
-export def _9 (_; _; _; _; _; _; _; _; _; x; _) = x
+export def _0 (x; _) =
+    x
+
+
+export def _1 (_; x; _) =
+    x
+
+
+export def _2 (_; _; x; _) =
+    x
+
+
+export def _3 (_; _; _; x; _) =
+    x
+
+
+export def _4 (_; _; _; _; x; _) =
+    x
+
+
+export def _5 (_; _; _; _; _; x; _) =
+    x
+
+
+export def _6 (_; _; _; _; _; _; x; _) =
+    x
+
+
+export def _7 (_; _; _; _; _; _; _; x; _) =
+    x
+
+
+export def _8 (_; _; _; _; _; _; _; _; x; _) =
+    x
+
+
+export def _9 (_; _; _; _; _; _; _; _; _; x; _) =
+    x
+
+

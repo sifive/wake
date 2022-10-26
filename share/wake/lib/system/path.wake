@@ -13,16 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # Simplify away the ..s and .s in a String
 export def simplify (path: String): String =
-    def p s = prim "simplify"
+    def p s =
+        prim "simplify"
     p path
 
+
 export def sortPaths (paths: List Path): List Path =
-  def fn a b = a.getPathName <~ b.getPathName
-  sortBy fn paths
+    def fn a b =
+        a.getPathName <~ b.getPathName
+    sortBy fn paths
+
 
 # Concatenate two paths
 #  join "foo"  "bar"    => "foo/bar"
@@ -35,22 +40,27 @@ export def in (dir: String) (path: String): String =
     else
         simplify "{dir}/{path}"
 
+
 # Reframe path into a form accesible relative to dir
 # For example:
 #  relative "bin" "bin/usr" => "usr"
 #  relative "bin" "bin"     => "."
 #  relative "bin" "hax"     => "../hax"
 export def relative (dir: String) (path: String): String =
-    def p d p = prim "relative"
+    def p d p =
+        prim "relative"
     p dir path
+
 
 # Locate an executable in the search path
 export target whichIn (path: String) (exec: String): String =
-    def imp path exec = prim "search_path"
+    def imp path exec =
+        prim "search_path"
     imp path exec
 
 export def which (exec: String): String =
     whichIn path exec
+
 
 # Locate an executable in the users env PATH
 export target whichInEnvPath (exec: String): Option String =
@@ -71,9 +81,11 @@ export target whichInEnvPath (exec: String): Option String =
 export def workspace: String =
     prim "workspace"
 
+
 # The directory within which wake was invoked (relative to the workspace root)
 export def cwd: String =
     prim "cwd"
+
 
 # Remove any leading directories from `file`.
 #
@@ -94,6 +106,7 @@ export def basename (file: String): String =
     replace `/*$` '' file
     | replace `^.*/` ''
 
+
 # Extract the directory name from `file`.
 #
 # Parameters:
@@ -111,43 +124,64 @@ export def basename (file: String): String =
 export def dirname (file: String): String =
     simplify "{file}/.."
 
+
 export def isPathDir (path: Path): Boolean =
     getPathHash path
     | matches `0+`
 
+
 # Paths differ from Strings in that they have been hashed; their content is frozen
-data Path =
-    Path (name: String)
+data Path = Path (name: String)
 from wake export type Path
 
 export def getPathName (path: Path): String =
-    def Path name = path
+    def Path name =
+        path
     name
+
 
 export def getPathParent (path: Path): Path =
     Path (simplify "{getPathName path}/..")
 
-def addhash (f: String): String =
-  def p = simplify f
-  def add f h = prim "add_hash"
-  add p (hashcode p)
 
-def hashUsage = defaultUsage | setUsageCPUtime 0.1
+def addhash (f: String): String =
+    def p =
+        simplify f
+    def add f h =
+        prim "add_hash"
+    add p (hashcode p)
+
+
+def hashUsage =
+    defaultUsage
+    | setUsageCPUtime 0.1
+
+
 target hashcode (f: String): String =
-  def get f = prim "get_hash"
-  def reuse = get f
-  if reuse !=* "" then reuse else
-    def hashPlan cmd  =
-      Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun True Nil (\_ True) hashUsage id id
-    def job = hashPlan ("<hash>", f, Nil) | runJobWith localRunner
-    def hash =
-      job.getJobStdout
-      | getWhenFail ""
-      | extract `(.{64}).*`
-    match job.isJobOk hash
-      True (x, Nil) = x
-      _ _ = "BadHash"
+    def get f =
+        prim "get_hash"
+    def reuse =
+        get f
+    if reuse !=* "" then
+        reuse
+    else
+        def hashPlan cmd =
+            Plan "" cmd Nil Nil "." "" logNever logError logDebug ReRun True Nil (\_ True) hashUsage id id
+        def job =
+            hashPlan ("<hash>", f, Nil)
+            | runJobWith localRunner
+        def hash =
+            job.getJobStdout
+            | getWhenFail ""
+            | extract `(.{64}).*`
+        match job.isJobOk hash
+            True (x, Nil) =
+                x
+            _ _ =
+                "BadHash"
 
 export def getPathHash (path: Path): String =
     getPathName path
     | hashcode
+
+

@@ -1,5 +1,13 @@
-def foo _ x = x
-# wake is not Standard ML; 'id' should still be polymorphic (no value restriction)
-def id = foo Unit
+def foo _ x =
+    x
 
-export def test _ = println "{str (id 4)}-{id "2"}"
+
+# wake is not Standard ML; 'id' should still be polymorphic (no value restriction)
+def id =
+    foo Unit
+
+
+export def test _ =
+    println "{str (id 4)}-{id "2"}"
+
+

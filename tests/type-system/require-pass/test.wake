@@ -1,11 +1,17 @@
 def f0 x =
-    require Some (_: Integer): Option Integer = int x
+    require Some (_: Integer): Option Integer =
+        int x
     else Fail "bad" : Result String String
 
-    require Pass (_: Double) = Fail "ok" : Result Double String
+    require Pass (_: Double) =
+        Fail "ok" : Result Double String
 
     Pass "unreachable"
 
+
 export def test _ =
-    require Fail z = f0 "22"
+    require Fail z =
+        f0 "22"
     Pass z
+
+

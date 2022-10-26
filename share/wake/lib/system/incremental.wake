@@ -13,22 +13,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 target tarExe Unit =
-    def gnutar = which "gnutar"
-    if gnutar ==* "gnutar" then which "tar" else gnutar
+    def gnutar =
+        which "gnutar"
+    if gnutar ==* "gnutar" then
+        which "tar"
+    else
+        gnutar
 
 def targz output paths =
     def cmd =
         # Intentionally record mtime in ns (posix) => needed for incremental builds
-        tarExe Unit, "--numeric-owner", "--owner=0", "--group=0", "--format=posix", "-czf",
-        output, map getPathName paths | sortBy (_<*_)
+        tarExe Unit,
+        "--numeric-owner",
+        "--owner=0",
+        "--group=0",
+        "--format=posix",
+        "-czf",
+        output,
+        map getPathName paths
+        | sortBy (_ <* _)
     makeExecPlan cmd paths
     | setPlanLocalOnly True
     | setPlanFnOutputs (\_ output, Nil)
-    | runJobWith       localRunner
+    | runJobWith localRunner
     | getJobOutput
+
 
 # This API allows a Job to access those outputs from its last invocation
 # which are accepted by reusedOutputFilterFn. To use this method, you must
@@ -37,29 +50,47 @@ def targz output paths =
 # all visible files are considered as inputs, since the job might not read
 # all inputs on each run, based on (for example) timestamps.
 export def runIncrementalJob (stateFileLabel: String) (reusedOutputFilterFn: Path => Boolean) (plan: Plan): Job =
-    def code = plan | getPlanHash | strHex
-    def pre  = "{stateFileLabel}-pre-{code}.tar.gz"
-    def post = "{stateFileLabel}-post-{code}.tar.gz"
-    def escape s = prim "shell_str"
+    def code =
+        plan
+        | getPlanHash
+        | strHex
+    def pre =
+        "{stateFileLabel}-pre-{code}.tar.gz"
+    def post =
+        "{stateFileLabel}-post-{code}.tar.gz"
+    def escape s =
+        prim "shell_str"
     def preTarResult =
         claimFileAsPath post pre
-    def untar = "! test -f {escape pre} || tar -xzf {escape pre}\n"
-    def stateFiles = match preTarResult
-        Pass preTar = preTar, Nil
-        Fail _      = Nil
+    def untar =
+        "! test -f {escape pre} || tar -xzf {escape pre}\n"
+    def stateFiles =
+        match preTarResult
+            Pass preTar =
+                preTar, Nil
+            Fail _ =
+                Nil
     def cd =
         if plan.getPlanDirectory ==* "." then
             ""
         else
             "cd {plan.getPlanDirectory}\n"
-    def orig = plan.getPlanCommand | map escape | catWith " "
-    def script = "{untar}{cd}{orig}"
+    def orig =
+        plan.getPlanCommand
+        | map escape
+        | catWith " "
+    def script =
+        "{untar}{cd}{orig}"
     def job =
         plan
         | setPlanDirectory "."
-        | setPlanCommand   (which "dash", "-ec", script, Nil)
-        | editPlanVisible  (stateFiles ++ _)
-        | setPlanFnInputs  (\_ plan.getPlanVisible | map getPathName)
+        | setPlanCommand (which "dash", "-ec", script, Nil)
+        | editPlanVisible (stateFiles ++ _)
+        | setPlanFnInputs
+        (
+            \_ plan.getPlanVisible
+            | map getPathName
+        )
         | runJob
     def _postTar = # ignored, but executed
         require Pass outputs =
@@ -68,3 +99,5 @@ export def runIncrementalJob (stateFileLabel: String) (reusedOutputFilterFn: Pat
         | filter reusedOutputFilterFn
         | targz post
     job
+
+

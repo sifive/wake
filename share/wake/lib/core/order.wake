@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # Used for comparing quantities.  
@@ -30,51 +31,76 @@ export data Order =
 # isLT LT = True
 # isLT EQ = False
 # isLT GT = False
-export def isLT: Order => Boolean = match _
-    LT = True
-    _  = False
+export def isLT: Order => Boolean =
+    match _
+        LT =
+            True
+        _ =
+            False
+
 
 # Is equal: convert Order Boolean
 # def a == b = a <=> b | isEQ
 # isEQ LT = False
 # isEQ EQ = True
 # isEQ GT = False
-export def isEQ: Order => Boolean = match _
-    EQ = True
-    _  = False
+export def isEQ: Order => Boolean =
+    match _
+        EQ =
+            True
+        _ =
+            False
+
 
 # Is greater-than: convert Order to Boolean
 # def a > b = a <=> b | isGT
 # isGT LT = False
 # isGT EQ = False
 # isGT GT = True
-export def isGT: Order => Boolean = match _
-    GT = True
-    _  = False
+export def isGT: Order => Boolean =
+    match _
+        GT =
+            True
+        _ =
+            False
+
 
 # Is less-than-or-equal: convert Order to Boolean
 # def a <= b = a <=> b | isLE
 # isLE LT = True
 # isLE EQ = True
 # isLE GT = False
-export def isLE: Order => Boolean = match _
-    GT = False
-    _  = True
+export def isLE: Order => Boolean =
+    match _
+        GT =
+            False
+        _ =
+            True
+
 
 # Is not-equal: convert Order to Boolean
 # def a != b = a <=> b | isNE
 # isEQ LT = True
 # isEQ EQ = False
 # isEQ GT = True
-export def isNE: Order => Boolean = match _
-    EQ = False
-    _  = True
+export def isNE: Order => Boolean =
+    match _
+        EQ =
+            False
+        _ =
+            True
+
 
 # Is greater-than-or-equal: convert Order to Boolean
 # def a >= b = a <=> b | isGE
 # isGE LT = False
 # isGE EQ = True
 # isGE GT = True
-export def isGE: Order => Boolean = match _
-    LT = False
-    _  = True
+export def isGE: Order => Boolean =
+    match _
+        LT =
+            False
+        _ =
+            True
+
+

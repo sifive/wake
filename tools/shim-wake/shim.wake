@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 from wake import _
 from gcc_wake import _
 
 target buildShim variant: Result (List Path) Error =
-    tool here Nil variant "lib/wake/shim-wake" (blake2, compat, Nil) Nil Nil
+    tool @here Nil variant "lib/wake/shim-wake" (blake2, compat, Nil) Nil Nil

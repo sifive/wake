@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 
 from wake import _
@@ -30,11 +31,9 @@ def tool (dir: String) (addHeaders: List Path) (variant: Pair String String) (ou
         flattenSysLibs libs
 
     require Pass headerPaths =
-        sources here `.*\.h`
+        sources @here `.*\.h`
     def headers =
-        lib.getSysLibHeaders ++
-        headerPaths ++
-        addHeaders
+        lib.getSysLibHeaders ++ headerPaths ++ addHeaders
 
     def cflags =
         lib.getSysLibCFlags
@@ -44,15 +43,14 @@ def tool (dir: String) (addHeaders: List Path) (variant: Pair String String) (ou
     require Pass cppSources =
         sources dir `.*\.cpp`
     def objectResults =
-        map (compileC cVariant   cflags headers) cSources ++
-        map (compileC cppVariant cflags headers) cppSources
+        map (compileC cVariant cflags headers) cSources
+        ++ map (compileC cppVariant cflags headers) cppSources
 
     require Pass objects =
         findFail objectResults
 
     def allObjects =
-        lib.getSysLibObjects ++
-        objects.flatten
+        lib.getSysLibObjects ++ objects.flatten
 
     require Pass cppSources =
         sources dir `.*\.cpp`
@@ -64,3 +62,5 @@ def tool (dir: String) (addHeaders: List Path) (variant: Pair String String) (ou
             cppVariant
 
     linkO linkKind (lib.getSysLibLFlags ++ extraLFlags) allObjects output extraFiles
+
+

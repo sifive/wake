@@ -1,8 +1,22 @@
-def f0 = \(x: Integer) (x+1): Integer
-def f1 = \(Pair (x: Integer) (y: String): Pair Integer String) "{str x}-{y}"
-def f2: a => a = \(x:a) (x:a)
-def f3 (Pair x y): Integer = x + y
-def f4 (Pair (x: Integer) (y: Integer): Pair Integer Integer): Integer = x + y
+def f0 =
+    \(x: Integer) (x + 1): Integer
+
+
+def f1 =
+    \(Pair (x: Integer) (y: String): Pair Integer String) "{str x}-{y}"
+
+
+def f2: a => a =
+    \(x:a) (x:a)
+
+
+def f3 (Pair x y): Integer =
+    x + y
+
+
+def f4 (Pair (x: Integer) (y: Integer): Pair Integer Integer): Integer =
+    x + y
+
 
 export def test _ =
     def _ =
@@ -10,6 +24,10 @@ export def test _ =
         | (Pair _ "zz")
         | f1
         | f2
-    def _ = f3 (Pair 11 12)
-    def _ = f4 (Pair 11 12)
+    def _ =
+        f3 (Pair 11 12)
+    def _ =
+        f4 (Pair 11 12)
     Pass 0
+
+

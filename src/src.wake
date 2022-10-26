@@ -13,13 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 
 from wake import _
 from gcc_wake import _
 
 def srcDir =
-    here
+    @here
+
 
 def src (dir: String) (variant: Pair String String) (internal: List (Pair String String => Result SysLib Error)) (external: List (Pair String String => Result SysLib Error)): Result SysLib Error =
     def Pair cppVariant cVariant =
@@ -36,7 +38,7 @@ def src (dir: String) (variant: Pair String String) (internal: List (Pair String
         flattenSysLibs externalLibs
 
     require Pass ym4s =
-        sources here `.*\.y\.m4`
+        sources @here `.*\.y\.m4`
 
     require Pass parsers =
         map (parserGen variant) ym4s
@@ -50,18 +52,14 @@ def src (dir: String) (variant: Pair String String) (internal: List (Pair String
         sources vendorDir `.*\.h`
     def headers =
         versionHeader,
-        map getPairSecond parsers ++
-        externalLib.getSysLibHeaders ++
-        sourceHeaders ++
-        vendorHeaders
+        map getPairSecond parsers ++ externalLib.getSysLibHeaders ++ sourceHeaders ++ vendorHeaders
 
     def cflags =
-        "-I{srcDir}",
-        "-I{vendorDir}",
-        externalLib.getSysLibCFlags
+        "-I{srcDir}", "-I{vendorDir}", externalLib.getSysLibCFlags
 
     def re2obj re =
-        require Pass cpp = re2c re
+        require Pass cpp =
+            re2c re
         cppCompile cpp
 
     def cCompile =
@@ -81,16 +79,13 @@ def src (dir: String) (variant: Pair String String) (internal: List (Pair String
     require Pass cppObjects =
         sources dir `.*\.cpp`
     def objectResults =
-        map re2obj     reObjects ++
-        map cCompile   cObjects ++
-        map cppCompile (cppExtra ++ cppObjects)
+        map re2obj reObjects ++ map cCompile cObjects ++ map cppCompile (cppExtra ++ cppObjects)
 
     require Pass objects =
         findFail objectResults
 
     require Pass internalLibs =
         findFail internalLibResults
-    
     def internalLib =
         flattenSysLibs internalLibs
 
@@ -100,16 +95,19 @@ def src (dir: String) (variant: Pair String String) (internal: List (Pair String
 
     Pass (SysLib "0.0" headers allObjects cflags externalLib.getSysLibLFlags)
 
+
 def version_h Unit =
     require Pass ver =
         buildAs Unit
-    write "{here}/version.h" "#define VERSION {ver}\n"
+    write "{@here}/version.h" "#define VERSION {ver}\n"
+
 
 def parserLemon variant ym4 =
     require Pass parser_y =
         m4 ym4
 
     lemon variant parser_y
+
 
 def parserGen variant ym4 =
     require Fail _ =
@@ -129,3 +127,5 @@ def parserGen variant ym4 =
         gunzip headersGZip
 
     Pass (Pair parser_c parser_h)
+
+

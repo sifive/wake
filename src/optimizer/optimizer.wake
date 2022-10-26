@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 
 from wake import _
 
 target optimizer variant =
-    src here variant (dst, types, util, Nil) (gmp, Nil)
+    src @here variant (dst, types, util, Nil) (gmp, Nil)

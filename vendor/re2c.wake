@@ -13,12 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 from wake import _
 
 # Require re2c >= 1.3 for flag support
 def re2cOk Unit: Result String Error =
-    require Some re2c = whichInEnvPath "re2c" 
+    require Some re2c =
+        whichInEnvPath "re2c"
     else failWithError "re2c not on Path"
 
     require Some x, Some y, _ =
@@ -34,10 +36,15 @@ def re2cOk Unit: Result String Error =
         | map int
     else failWithError "failed to determine re2c version"
 
-    require True = (x > 1 || (x == 1 && y > 2))
+    require True =
+        (
+            x > 1
+            || (x == 1 && y > 2)
+        )
     else failWithError "re2c version {str x}.{str y} is not 1.3 or higher"
 
     Pass re2c
+
 
 def re2cReal re2c file =
     def cpp =
@@ -54,8 +61,7 @@ def re2cReal re2c file =
 
     require Some "1" =
         getenv "UPGRADE_GENERATED"
-    else
-        Pass result
+    else Pass result
 
     def compress =
         which "gzip", "-nk9", result.getPathName, Nil
@@ -64,19 +70,27 @@ def re2cReal re2c file =
         job compress (result, Nil)
 
     match zip.getJobStatus
-        Exited 0 = Pass result
-        Aborted e = Fail e
-        z = failWithError "Non-zero exit status ({format z}) for '{zip.getJobDescription}'"
+        Exited 0 =
+            Pass result
+        Aborted e =
+            Fail e
+        z =
+            failWithError "Non-zero exit status ({format z}) for '{zip.getJobDescription}'"
+
 
 def re2cFake file =
-    def cpp = replace `\.re$` ".cpp" file.getPathName
+    def cpp =
+        replace `\.re$` ".cpp" file.getPathName
     require Pass zip =
         source "{cpp}.gz"
     gunzip zip
 
+
 def gunzip zip =
-    def out = replace `\.gz$` "" zip.getPathName
-    def script = "%
+    def out =
+        replace `\.gz$` "" zip.getPathName
+    def script =
+        "%
         set -e
         gzip -dc "%{zip.getPathName}" > "%{out}.tmp"
         mv "%{out}.tmp" "%{out}"
@@ -84,12 +98,22 @@ def gunzip zip =
     shellJob script (zip, Nil)
     | getJobOutput
 
+
 def re2c (file: Path): Result Path Error =
     match (re2cOk Unit)
-        Pass re2c = re2cReal re2c file
+        Pass re2c =
+            re2cReal re2c file
         Fail err =
-            def _ = if (getenv "UPGRADE_GENERATED" | getOrElse "0") ==* "1"
-            then println "[WARN] Requested re2c which is unsatisfiable. Using fake\n  why: {err.getErrorCause}"
-            else Unit
+            def _ =
+                if (
+                    getenv "UPGRADE_GENERATED"
+                    | getOrElse "0"
+                )
+                ==* "1" then
+                    println "[WARN] Requested re2c which is unsatisfiable. Using fake\n  why: {err.getErrorCause}"
+                else
+                    Unit
 
             re2cFake file
+
+

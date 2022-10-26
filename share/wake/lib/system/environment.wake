@@ -13,9 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
-def uname = prim "uname"
+def uname =
+    prim "uname"
+
 
 # sysname: build system's operating system.
 #
@@ -24,6 +27,7 @@ def uname = prim "uname"
 export def sysname: String =
     uname.getPairFirst
 
+
 # machine: Build system's CPU architecture.
 #
 #   machine = "x86_64"  # on 64-bit Intel systems
@@ -31,33 +35,48 @@ export def sysname: String =
 export def machine: String =
     uname.getPairSecond
 
+
 # A topic used to globally add directories to the default PATH of a Plans
 export topic path: String
 
 # Default search path for new Plans
 export def path: String =
-    catWith ":" (subscribe path | distinctBy scmp)
+    catWith
+    ":"
+    (
+        subscribe path
+        | distinctBy scmp
+    )
+
 
 # Add PATH to the default environment
 publish environment =
-    "PATH={path}",
-    Nil
+    "PATH={path}", Nil
 
 # Inject command-line specified path entries
 # Note: changing this value will likely cause a total workspace rebuild
-publish path = match (getenv "WAKE_PATH")
-    Some x = tokenize `:` x
-    None = Nil
+publish path =
+    match (getenv "WAKE_PATH")
+        Some x =
+            tokenize `:` x
+        None =
+            Nil
 
 # Setup a default path
-publish path = "/usr/bin", Nil
-publish path = "/bin", Nil
+publish path =
+    "/usr/bin", Nil
+publish path =
+    "/bin", Nil
 
 # On MacOS and FreeBSD, many important system binaries are not in /usr/bin
-publish path = match sysname
-    "Darwin" = "/opt/local/bin", "/usr/local/bin", Nil
-    "FreeBSD" = "/usr/local/bin", Nil
-    _        = Nil
+publish path =
+    match sysname
+        "Darwin" =
+            "/opt/local/bin", "/usr/local/bin", Nil
+        "FreeBSD" =
+            "/usr/local/bin", Nil
+        _ =
+            Nil
 
 # A topic used to globally add variables to the default environment of Plans
 export topic environment: String
@@ -66,19 +85,30 @@ export topic environment: String
 export def environment: List String =
     subscribe environment
 
+
 # getenv: access environment variables provided to the wake executable
 # Use of this function can lead to unnecessary rebuilds!
 export def getenv (key: String): Option String =
-    def p x = prim "getenv"
+    def p x =
+        prim "getenv"
     head (p key)
 
-def test key = replace `=.*` "" _ ==* key
-def value pair = replace `^[^=]*=` "" pair
+
+def test key =
+    replace `=.*` "" _ ==* key
+
+
+def value pair =
+    replace `^[^=]*=` "" pair
+
 
 # Retrieve the value for 'key' from a KEY=VALUE environment list
 export def getEnvironment (key: String) (environment: List String): Option String =
-    def clean (Pair eq _) = value eq
-    find (test key) environment | omap clean
+    def clean (Pair eq _) =
+        value eq
+    find (test key) environment
+    | omap clean
+
 
 # Remove a key from a KEY=VALUE environment list
 #
@@ -88,6 +118,7 @@ export def getEnvironment (key: String) (environment: List String): Option Strin
 export def unsetEnvironment (key: String) (environment: List String): List String =
     filter (! test key _) environment
 
+
 # Set key=value in an environment list, removing all prior values for that key
 #
 #    makePlan ...
@@ -96,14 +127,23 @@ export def unsetEnvironment (key: String) (environment: List String): List Strin
 export def setEnvironment (key: String) (value: String) (environment: List String): List String =
     "{key}={value}", unsetEnvironment key environment
 
+
 # Update a key's value in a KEY=VALUE environment list
 # All prior values for that key are rmeoved
 # Only the first match (if any) is supplied to fn
 export def editEnvironment (key: String) (fn: Option String => Option String) (environment: List String): List String =
-    def Pair eq rest = splitBy (test key) environment
-    match (head eq | omap value | fn)
-        Some v = "{key}={v}", rest
-        None = rest
+    def Pair eq rest =
+        splitBy (test key) environment
+    match (
+        head eq
+        | omap value
+        | fn
+    )
+        Some v =
+            "{key}={v}", rest
+        None =
+            rest
+
 
 # Add a component to the PATH in a KEY=VALUE environment
 #
@@ -111,13 +151,21 @@ export def editEnvironment (key: String) (fn: Option String => Option String) (e
 #    | editPlanEnvironment (addEnvironmentPath "/usr/local/bin")
 #    | ...
 export def addEnvironmentPath (path: String) (environment: List String): List String =
-    def mod = match _
-        None = Some path
-        Some x = Some "{path}:{x}"
+    def mod =
+        match _
+            None =
+                Some path
+            Some x =
+                Some "{path}:{x}"
     editEnvironment "PATH" mod environment
+
 
 # Optionally add a component to the PATH in a KEY=VALUE environment
 export def addEnvironmentPathOpt (pathopt: Option String) (environment: List String): List String =
     match pathopt
-        None = environment
-        Some x = addEnvironmentPath x environment
+        None =
+            environment
+        Some x =
+            addEnvironmentPath x environment
+
+

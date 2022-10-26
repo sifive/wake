@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package wake
 
 # Functions which may fail should return the `Result a Error` type.
@@ -42,70 +43,106 @@ export data Result pass fail =
 #
 #   isPass (Pass 123) = True
 #   isPass (Fail 123) = False
-export def isPass: Result a b => Boolean = match _
-    Pass _ = True
-    Fail _ = False
+export def isPass: Result a b => Boolean =
+    match _
+        Pass _ =
+            True
+        Fail _ =
+            False
+
 
 # isFail: report if the Result was a Fail
 #
 #   isFail (Pass 123) = False
 #   isFail (Fail 123) = True
-export def isFail: Result a b => Boolean = match _
-    Pass _ = False
-    Fail _ = True
+export def isFail: Result a b => Boolean =
+    match _
+        Pass _ =
+            False
+        Fail _ =
+            True
+
 
 # getPass: retrieve the Pass value else None
 #
 #   getPass (Pass 123) = Some 123
 #   getPass (Fail 123) = None
-export def getPass: Result a b => Option a = match _
-    Pass x = Some x
-    Fail _ = None
+export def getPass: Result a b => Option a =
+    match _
+        Pass x =
+            Some x
+        Fail _ =
+            None
+
 
 # getFail: retrieve the Fail value else None
 #
 #   getFail (Pass 123) = None
 #   getFail (Fail 123) = Some 123
-export def getFail: Result a b => Option b = match _
-    Pass _ = None
-    Fail x = Some x
+export def getFail: Result a b => Option b =
+    match _
+        Pass _ =
+            None
+        Fail x =
+            Some x
+
 
 # getWhenFail: retrieve the Pass value, using a default value for Fail
 #
 #   getWhenFail 42 (Pass 123) = 123
 #   getWhenFail 42 (Pass 123) = 42
-export def getWhenFail (default: pass): Result pass fail => pass = match _
-    Pass a = a
-    Fail _ = default
+export def getWhenFail (default: pass): Result pass fail => pass =
+    match _
+        Pass a =
+            a
+        Fail _ =
+            default
+
 
 # getWhenPass: retrieve the Fail value, using a default value for Pass
 #
 #   getWhenPass 42 (Pass 123) = 42
 #   getWhenPass 42 (Pass 123) = 123
-export def getWhenPass (default: fail): Result pass fail => fail = match _
-    Pass _ = default
-    Fail f = f
+export def getWhenPass (default: fail): Result pass fail => fail =
+    match _
+        Pass _ =
+            default
+        Fail f =
+            f
+
 
 # rmap: apply a function to a Pass-ing result
 # If you find yourself using the function, consider using require instead.
 #
 #   rmap (_+1) (Pass 123) = Pass 124
 #   rmap (_+1) (Fail 123) = Fail 123
-export def rmap (fn: a => b): Result a fail => Result b fail = match _
-    Pass a = Pass (fn a)
-    Fail f = Fail f
+export def rmap (fn: a => b): Result a fail => Result b fail =
+    match _
+        Pass a =
+            Pass (fn a)
+        Fail f =
+            Fail f
+
 
 # rmapPass: apply a fallible function a Pass-ing result
 # If you find yourself using the function, consider using require instead.
-export def rmapPass (fn: a => Result b fail): Result a fail => Result b fail = match _
-    Pass a = fn a
-    Fail f = Fail f
+export def rmapPass (fn: a => Result b fail): Result a fail => Result b fail =
+    match _
+        Pass a =
+            fn a
+        Fail f =
+            Fail f
+
 
 # Applies a fallible function to Fail value or propogates Pass
 # If you find yourself using the function, consider using require instead.
-export def rmapFail (fn: a => Result pass b): Result pass a => Result pass b = match _
-    Pass a = Pass a
-    Fail f = fn f
+export def rmapFail (fn: a => Result pass b): Result pass a => Result pass b =
+    match _
+        Pass a =
+            Pass a
+        Fail f =
+            fn f
+
 
 # Try to combine the elements of a `List` front-to-back, where each step might fail.
 # If any update step fails, the error value of the first such failure is
@@ -117,14 +154,16 @@ export def rmapFail (fn: a => Result pass b): Result pass a => Result pass b = m
 #    returned unchanged as the `Pass` value.
 #  - `list`: The elements which should be combined.
 export def rfoldl (combiningFn: accumulator => element => Result accumulator error): (acc: accumulator) => (list: List element) => Result accumulator error =
-    def loop acc = match _
-        Nil =
-            Pass acc
-        element, rest =
-            require Pass result =
-                combiningFn acc element
-            loop result rest
+    def loop acc =
+        match _
+            Nil =
+                Pass acc
+            element, rest =
+                require Pass result =
+                    combiningFn acc element
+                loop result rest
     loop
+
 
 # Try to combine the elements of a `List` front-to-back, where each step might fail.
 # If any update step fails, the error value of the first such failure is
@@ -136,14 +175,16 @@ export def rfoldl (combiningFn: accumulator => element => Result accumulator err
 #    returned unchanged as the `Pass` value.
 #  - `list`: The elements which should be combined.
 export def rfoldr (combiningFn: element => accumulator => Result accumulator error): (acc: accumulator) => (list: List element) => Result accumulator error =
-    def loop acc = match _
-        Nil =
-            Pass acc
-        element, rest =
-            require Pass result =
-                loop acc rest
-            combiningFn element result
+    def loop acc =
+        match _
+            Nil =
+                Pass acc
+            element, rest =
+                require Pass result =
+                    loop acc rest
+                combiningFn element result
     loop
+
 
 # findFail: if all the List elements are Pass return the contents else the first Fail
 #
@@ -151,6 +192,7 @@ export def rfoldr (combiningFn: element => accumulator => Result accumulator err
 #   findFail (Pass 456, Fail "xyz", Fail "abc", Nil) = Fail "xyz"
 export def findFail: List (Result a b) => Result (List a) b =
     findFailFn (_)
+
 
 # findFailFn: if fn returns Pass for all List elements, return the outputs else Fail
 # Once a Fail is found, fn is not evaluated on further elements.
@@ -161,13 +203,18 @@ export def findFail: List (Result a b) => Result (List a) b =
 #   findFailFn toInt ("456", "123", Nil) = Pass (456, 123, Nil)
 #   findFailFn toInt ("_56", "123", Nil) = Fail "not an Integer (_56)"
 export def findFailFn (fn: a => Result b fail): List a => Result (List b) fail =
-    def helper = match _
-        Nil  = Pass Nil
-        h, t =
-            require Pass x  = fn h
-            require Pass tt = helper t
-            Pass (x, tt)
+    def helper =
+        match _
+            Nil =
+                Pass Nil
+            h, t =
+                require Pass x =
+                    fn h
+                require Pass tt =
+                    helper t
+                Pass (x, tt)
     helper
+
 
 # findPass: if all the List elements are Fail return the contents else the first Pass
 #
@@ -175,6 +222,7 @@ export def findFailFn (fn: a => Result b fail): List a => Result (List b) fail =
 #   findPass (Fail 456, Pass "xyz", Pass "abc", Nil) = Pass "xyz"
 export def findPass: List (Result a b) => Result a (List b) =
     findPassFn (_)
+
 
 # findPassFn: if fn returns Fail for all List elements, return the outputs else Pass
 # Once a Pass is found, fn is not evaluated on further elements.
@@ -185,19 +233,26 @@ export def findPass: List (Result a b) => Result a (List b) =
 #   findPassFn toInt ("_56", "123", "777", Nil) = Pass 123
 #   findPassFn toInt ("_56", "_23", "_77", Nil) = Fail ("bad: _56", "bad: _23", "bad: _77", Nil)
 export def findPassFn (fn: a => Result pass b): List a => Result pass (List b) =
-    def helper = match _
-        Nil = Fail Nil
-        h, t =
-            require Fail x  = fn h
-            require Fail tt = helper t
-            Fail (x, tt)
+    def helper =
+        match _
+            Nil =
+                Fail Nil
+            h, t =
+                require Fail x =
+                    fn h
+                require Fail tt =
+                    helper t
+                Fail (x, tt)
     helper
+
 
 # stack: dump a stack trace from the call site
 # This function currently only works with debug mode enabled.
 export def stack Unit: List String =
-    def f x = prim "stack"
+    def f x =
+        prim "stack"
     f Unit
+
 
 # An Error has a cause and a stack trace
 # Result types should generally use an Error for their Fail case.
@@ -210,6 +265,7 @@ export tuple Error =
 export def makeError (cause: String): Error =
     Error cause (stack Unit)
 
+
 # addErrorContext: add a prefix to the cause string of a Fail-ure
 # This method can be useful to preserve an existing failure cause,
 # where using a require-else must supply a totally new cause.
@@ -217,9 +273,13 @@ export def makeError (cause: String): Error =
 # require Pass contents =
 #     read file
 #     | addErrorContext "opening {file.getPathName}"
-export def addErrorContext (prefix: String): Result a Error => Result a Error = match _
-    Pass x = Pass x
-    Fail (Error cause stack) = Fail (Error "{prefix}: {cause}" stack)
+export def addErrorContext (prefix: String): Result a Error => Result a Error =
+    match _
+        Pass x =
+            Pass x
+        Fail (Error cause stack) =
+            Fail (Error "{prefix}: {cause}" stack)
+
 
 # failWithError: produce a Fail for us in error conditions
 #
@@ -227,3 +287,5 @@ export def addErrorContext (prefix: String): Result a Error => Result a Error = 
 #   else failWithError "Could not parse {str} as an Integer"
 export def failWithError (cause: String): Result a Error =
     Fail (makeError cause)
+
+

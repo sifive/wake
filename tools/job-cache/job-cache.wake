@@ -13,9 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 from wake import _
 
 target buildJobCache variant =
-    require Pass schemaSql = source "tools/job-cache/schema.sql"
-    tool here (schemaSql, Nil) variant "bin/job-cache" (json, gopt, sqlite3, blake2, wcl, util, Nil) Nil Nil
+    require Pass schemaSql =
+        source "tools/job-cache/schema.sql"
+    tool
+    @here
+    (schemaSql, Nil)
+    variant
+    "bin/job-cache"
+    (json, gopt, sqlite3, blake2, wcl, util, Nil)
+    Nil
+    Nil

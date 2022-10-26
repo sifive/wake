@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 package build_wake
 
 from wake import _
 
 target parser variant =
-    src here variant (json, util, Nil) (re2, utf8proc, Nil)
+    src @here variant (json, util, Nil) (re2, utf8proc, Nil)
