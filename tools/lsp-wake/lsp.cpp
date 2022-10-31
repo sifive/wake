@@ -301,6 +301,17 @@ class LSPServer {
   static void sendMessage(const JAST &message) {
     std::stringstream str;
     str << message;
+
+    str.seekg(0, std::ios::end);
+    std::string msg = str.str();
+
+    if (msg == "{}") {
+#ifdef CERR_DEBUG
+      std::cerr << "Throwing away empty response message" << std::endl;
+#endif
+      return;
+    }
+
     str.seekg(0, std::ios::end);
     size_t length = str.tellg();
     str.seekg(0, std::ios::beg);
