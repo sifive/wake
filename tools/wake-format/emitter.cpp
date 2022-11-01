@@ -1601,7 +1601,14 @@ wcl::doc Emitter::walk_type(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(walk_placeholder(ctx, node));
+  FMT_ASSERT(node.id() == CST_UNARY, node, "Expected CST_UNARY");
+
+  MEMO_RET(fmt()
+               .walk(CST_OP, DISPATCH(walk_op))
+               .consume_wsnlc()
+               .walk(WALK_NODE)
+               .consume_wsnlc()
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_error(ctx_t ctx, CSTElement node) {
