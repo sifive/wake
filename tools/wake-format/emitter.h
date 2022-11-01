@@ -38,8 +38,10 @@ struct std::hash<std::pair<CSTElement, ctx_t>> {
 
 struct node_traits_t {
   bool format_off = false;
+  bool last_node = false;
 
   void turn_format_off() { format_off = true; }
+  void set_last_node() { last_node = true; }
 };
 
 class Emitter {
@@ -69,6 +71,9 @@ class Emitter {
 
   // Marks all node elements that have had their formatting disabled
   void mark_no_format_nodes(CSTElement node);
+
+  // Marks the last top level node as "last node"
+  void mark_last_node(CSTElement node);
 
   // Binds all comments in the tree to their associated token as a human would consider it.
   //

@@ -301,6 +301,7 @@ wcl::doc Emitter::layout(CST cst) {
   ctx_t ctx;
   bind_comments(cst.root());
   mark_no_format_nodes(cst.root());
+  mark_last_node(cst.root());
   return walk(ctx, cst.root());
 }
 
@@ -339,6 +340,9 @@ wcl::doc Emitter::walk(ctx_t ctx, CSTElement node) {
     pred(TOKEN_WS, fmt().next())
    .pred(TOKEN_COMMENT, floating_comment_fmt)
    .pred(TOKEN_NL, fmt().next().newline())
+   .pred([this](wcl::doc_builder&, ctx_t, CSTElement& node, const token_traits_map_t&) {
+     return node_traits[node].last_node;
+   }, node_fmt)
    .pred(CST_DEF, node_fmt.join(fmt().newline().newline()).join(consume_wsnl))
    .otherwise(node_fmt));
   // clang-format on
@@ -694,6 +698,19 @@ void Emitter::mark_no_format_nodes(CSTElement node) {
       node_traits[child].turn_format_off();
     }
   }
+}
+
+void Emitter::mark_last_node(CSTElement node) {
+  FMT_ASSERT(node.isNode(), node, "Expected node");
+
+  CSTElement last = node;
+  while (!node.empty())
+  {
+    last = node;
+    node.nextSiblingNode();
+  }
+
+  node_traits[last].set_last_node();
 }
 
 wcl::doc Emitter::walk_token(ctx_t ctx, CSTElement node) {

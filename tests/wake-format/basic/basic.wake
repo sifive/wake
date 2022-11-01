@@ -744,6 +744,3 @@ def name Unit =
     def other =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     another # comment
-# floating 6
-
-# floating 7
