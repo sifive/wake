@@ -1604,7 +1604,7 @@ wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) {
   FMT_ASSERT(node.id() == CST_UNARY, node, "Expected CST_UNARY");
 
   MEMO_RET(fmt()
-               .walk(CST_OP, DISPATCH(walk_op))
+               .walk(WALK_NODE)
                .consume_wsnlc()
                .walk(WALK_NODE)
                .consume_wsnlc()
