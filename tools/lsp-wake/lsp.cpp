@@ -302,7 +302,6 @@ class LSPServer {
     std::stringstream str;
     str << message;
 
-    str.seekg(0, std::ios::end);
     std::string msg = str.str();
 
     if (msg == "{}") {
@@ -312,11 +311,8 @@ class LSPServer {
       return;
     }
 
-    str.seekg(0, std::ios::end);
-    size_t length = str.tellg();
-    str.seekg(0, std::ios::beg);
-    std::cout << contentLength << (length + 2) << "\r\n\r\n";
-    std::cout << str.rdbuf() << "\r\n" << std::flush;
+    std::cout << contentLength << (msg.size() + 2) << "\r\n\r\n";
+    std::cout << msg << "\r\n" << std::flush;
   }
 
   MethodResult initialize(const JAST &receivedMessage) {
