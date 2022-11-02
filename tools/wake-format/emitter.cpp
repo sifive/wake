@@ -36,11 +36,11 @@
 #define WALK_TOKEN [this](ctx_t ctx, CSTElement node) { return walk_token(ctx, node); }
 
 using memo_map_t = std::unordered_map<std::pair<CSTElement, ctx_t>, wcl::doc>;
-static std::vector<memo_map_t*> __memo_maps__ = {};
+static std::set<memo_map_t*> __memo_maps__ = {};
 
 #define MEMO(ctx, node)                                                                       \
   static memo_map_t __memo_map__ = {};                                                        \
-  __memo_maps__.push_back(&__memo_map__);                                                     \
+  __memo_maps__.insert(&__memo_map__);                                                        \
   auto __memoize_input__ = [node, ctx]() { return std::pair<CSTElement, ctx_t>(node, ctx); }; \
   {                                                                                           \
     auto value = __memo_map__.find(__memoize_input__());                                      \
@@ -74,7 +74,7 @@ static inline bool is_expression(cst_id_t type) {
   return type == CST_ID || type == CST_APP || type == CST_LITERAL || type == CST_HOLE ||
          type == CST_BINARY || type == CST_PAREN || type == CST_ASCRIBE || type == CST_SUBSCRIBE ||
          type == CST_LAMBDA || type == CST_UNARY || type == CST_BLOCK || type == CST_IF ||
-         type == CST_INTERPOLATE || type == CST_MATCH;
+         type == CST_INTERPOLATE || type == CST_MATCH || type == CST_REQUIRE || type == CST_PRIM;
 }
 
 // a floating comment is a comment bound to another comment
@@ -261,6 +261,11 @@ auto Emitter::rhs_fmt() {
             const token_traits_map_t& traits) {
       ctx_t c = ctx.sub(builder);
       return c->has_newline() && c->last_width() == 0;
+   }, full_fmt)
+   // If the RHS has a leading comment then we must use the full_fmt
+   .pred([this](const wcl::doc_builder& builder, ctx_t ctx, const CSTElement& node,
+            const token_traits_map_t& traits) {
+      return count_leading_newlines(token_traits, node) > 0;
    }, full_fmt)
    .pred(requires_fits_all, fmt().fmt_if_fits_all(flat_fmt, full_fmt))
    .pred_fits_first(flat_fmt)
@@ -1161,7 +1166,8 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
                .token(TOKEN_KW_DEF)
                .ws()
                .walk(is_expression, DISPATCH(walk_no_edit))
-               .ws()
+               .consume_wsnlc()
+               .space()
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
                .join(rhs_fmt())
@@ -1303,7 +1309,16 @@ wcl::doc Emitter::walk_kind(ctx_t ctx, CSTElement node) {
 
 wcl::doc Emitter::walk_lambda(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
-  MEMO_RET(walk_placeholder(ctx, node));
+  FMT_ASSERT(node.id() == CST_LAMBDA, node, "Expected CST_LAMBDA");
+
+  MEMO_RET(fmt()
+               .token(TOKEN_P_BSLASH)
+               .consume_wsnlc()
+               .walk(is_expression, WALK_NODE)
+               .consume_wsnlc()
+               .space()
+               .walk(is_expression, WALK_NODE)
+               .format(ctx, node.firstChildElement(), token_traits));
 }
 
 wcl::doc Emitter::walk_literal(ctx_t ctx, CSTElement node) {
@@ -1546,8 +1561,10 @@ wcl::doc Emitter::walk_topic(ctx_t ctx, CSTElement node) {
                .token(TOKEN_KW_TOPIC)
                .ws()
                .walk({CST_ID}, WALK_NODE)
+               .consume_wsnlc()
                .token(TOKEN_P_ASCRIBE)
-               .ws()
+               .consume_wsnlc()
+               .space()
                .walk(is_expression, DISPATCH(walk_type))
                .consume_wsnlc()
                .format(ctx, node.firstChildElement(), token_traits));
@@ -1564,7 +1581,8 @@ wcl::doc Emitter::walk_tuple(ctx_t ctx, CSTElement node) {
           .token(TOKEN_KW_TUPLE)
           .ws()
           .walk(is_expression, WALK_NODE)
-          .ws()
+          .consume_wsnlc()
+          .space()
           .token(TOKEN_P_EQUALS)
           .consume_wsnlc()
           // clang-format off
