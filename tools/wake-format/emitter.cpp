@@ -1603,12 +1603,14 @@ wcl::doc Emitter::walk_unary(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_UNARY, node, "Expected CST_UNARY");
 
+  // clang-format off
   MEMO_RET(fmt()
                .walk(WALK_NODE)
                .consume_wsnlc()
                .walk(WALK_NODE)
                .consume_wsnlc()
                .format(ctx, node.firstChildElement(), token_traits));
+  // clang-format on
 }
 
 wcl::doc Emitter::walk_error(ctx_t ctx, CSTElement node) {

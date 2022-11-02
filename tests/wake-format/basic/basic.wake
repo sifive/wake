@@ -696,6 +696,8 @@ def buildRE2WASM Unit =
 
     Pass (SysLib "1.0" headers objects cflags lflags)
 
+def x = (x ,) ++ xs
+
 def a =
   # comment
   def b = 5
