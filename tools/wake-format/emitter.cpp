@@ -92,6 +92,30 @@ static inline bool is_floating_comment(wcl::doc_builder& builder, ctx_t ctx, CST
   return it->second.bound_to.id() == TOKEN_COMMENT;
 }
 
+// determines if the rest of the node
+// - only has one sibling node
+// - and that node is a "single" thing (literal or identifier)
+static inline bool is_single_literal(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
+                                     const token_traits_map_t& traits) {
+  CSTElement copy = node;
+  if (!copy.isNode()) {
+    copy.nextSiblingNode();
+  }
+
+  size_t node_count = 0;
+  while (!copy.empty()) {
+    node_count++;
+
+    if (copy.id() != CST_LITERAL && copy.id() != CST_ID) {
+      return false;
+    }
+
+    copy.nextSiblingNode();
+  }
+
+  return node_count == 1;
+}
+
 static inline bool contains_req_else(wcl::doc_builder& builder, ctx_t ctx, CSTElement& node,
                                      const token_traits_map_t& traits) {
   CSTElement copy = node;
@@ -246,7 +270,7 @@ static wcl::doc binop_rhs_separator(const CSTElement& op) {
 
 Emitter::~Emitter() { MEMO_RESET(); }
 
-auto Emitter::rhs_fmt() {
+auto Emitter::rhs_fmt(bool always_newline) {
   auto rhs_fmt = fmt().walk(WALK_NODE);
 
   auto flat_fmt = fmt().space().join(rhs_fmt);
@@ -254,6 +278,7 @@ auto Emitter::rhs_fmt() {
 
   // clang-format off
   return fmt().match(
+    // if the subtree requires a newline then our hand is forced
     pred(requires_nl, full_fmt)
     // If for some reason (probably a comment) there is a newline after the '=' then we have to
     // use the full_fmt
@@ -262,11 +287,16 @@ auto Emitter::rhs_fmt() {
       ctx_t c = ctx.sub(builder);
       return c->has_newline() && c->last_width() == 0;
    }, full_fmt)
-   // If the RHS has a leading comment then we must use the full_fmt
+    // If the RHS has a leading comment then we must use the full_fmt
    .pred([this](const wcl::doc_builder& builder, ctx_t ctx, const CSTElement& node,
             const token_traits_map_t& traits) {
       return count_leading_newlines(token_traits, node) > 0;
    }, full_fmt)
+    // Always newline when requested unless the thing to be formatted is a "single literal".
+    // Used for top-level defs and top-level "constatn" defs
+   .pred(ConstPredicate(always_newline), fmt().fmt_if_else(is_single_literal, flat_fmt, full_fmt))
+
+    // if our hand hand hasn't yet been forced then decide based on how well RHS fits
    .pred(requires_fits_all, fmt().fmt_if_fits_all(flat_fmt, full_fmt))
    .pred_fits_first(flat_fmt)
    .otherwise(full_fmt));
@@ -306,6 +336,7 @@ wcl::doc Emitter::layout(CST cst) {
   ctx_t ctx;
   bind_comments(cst.root());
   mark_no_format_nodes(cst.root());
+  mark_top_level_notes(cst.root());
   return walk(ctx, cst.root());
 }
 
@@ -662,6 +693,15 @@ void Emitter::bind_nested_comments(CSTElement node) {
 void Emitter::bind_comments(CSTElement node) {
   bind_top_level_comments(node);
   bind_nested_comments(node);
+}
+
+void Emitter::mark_top_level_notes(CSTElement node) {
+  FMT_ASSERT(node.isNode(), node, "Expected node");
+
+  // Note: we are iterating over nodes here rather than the more common element
+  for (CSTElement child = node.firstChildNode(); !child.empty(); child.nextSiblingNode()) {
+    node_traits[child].set_top_level();
+  }
 }
 
 void Emitter::mark_no_format_nodes(CSTElement node) {
@@ -1160,6 +1200,8 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
   MEMO(ctx, node);
   FMT_ASSERT(node.id() == CST_DEF, node, "Expected CST_DEF");
 
+  bool is_top_level = node_traits[node].top_level;
+
   MEMO_RET(fmt()
                .fmt_if(CST_FLAG_GLOBAL, fmt().walk(WALK_NODE).ws())
                .fmt_if(CST_FLAG_EXPORT, fmt().walk(WALK_NODE).ws())
@@ -1170,7 +1212,7 @@ wcl::doc Emitter::walk_def(ctx_t ctx, CSTElement node) {
                .space()
                .token(TOKEN_P_EQUALS)
                .consume_wsnlc()
-               .join(rhs_fmt())
+               .join(rhs_fmt(is_top_level))
                .consume_wsnlc()
                .format(ctx, node.firstChildElement(), token_traits));
 }
