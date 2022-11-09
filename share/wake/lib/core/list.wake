@@ -637,7 +637,7 @@ export def transpose: List (List a) => List (List a) =
 # ```
 #
 # Parameters:
-#  - `lessThanFn`: The less-than comparision operator that defines the ordering
+#  - `cmpFn`: The comparision operator that defines the ordering
 #  - `list`: The list of elements to sort by `lessThanFn`
 #
 # Guarantees:
@@ -651,9 +651,9 @@ export def transpose: List (List a) => List (List a) =
 #   sortBy p (x, Nil) = (x, Nil)
 #   sortBy (\x\y if x == y then False else ! p x y) xs = reverse (sortBy p xs)
 # ```
-export def sortBy (lessThanFn: a => a => Boolean): (list: List a) => List a =
+export def sortBy (cmpFn: a => a => Order): (list: List a) => List a =
     def sort =
-        vsortBy lessThanFn
+        vsortBy cmpFn
     def top l =
         listToVector l
         | sort
@@ -670,7 +670,7 @@ export def sortBy (lessThanFn: a => a => Boolean): (list: List a) => List a =
 #   distinctBy (_<=>_) (1, 2, 1, 3, 4, 3, Nil) = 1, 2, 3, 4, Nil
 #   distinctBy (_<=>_) Nil = Nil
 # ```
-export def distinctBy (cmp: a => a => Order): List a => List a =
+export def distinctBy (cmpFn: a => a => Order): List a => List a =
     def loop tree = match _
         Nil = Nil
         x, tail =
@@ -680,7 +680,7 @@ export def distinctBy (cmp: a => a => Order): List a => List a =
                 sub
             else
                 x, sub
-    loop (tnew cmp)
+    loop (tnew cmpFn)
 
 # Keep only the first occurrence in a run of equal values
 #
@@ -794,7 +794,7 @@ export def unzip (list: List (Pair a b)): Pair (List a) (List b) = match list
 # Group a list by some comparison function.
 # Elements which compare equal are placed into the same bucket.
 # Buckets preserve the order of the original list.
-# The buckets appear in the sort-order specified by cmp.
+# The buckets appear in the sort-order specified by cmpFn.
 #
 # Examples:
 # ```
@@ -808,10 +808,10 @@ export def unzip (list: List (Pair a b)): Pair (List a) (List b) = match list
 #   groupBy cmp list =
 #   (9,Nil), (6,7,8,Nil), (3,4,5,Nil), (0,1,2,Nil), Nil
 # ```
-export def groupBy (cmp: a => a => Boolean) (list: List a): List (List a) =
-    def sorted = sortBy cmp list
+export def groupBy (cmpFn: a => a => Order) (list: List a): List (List a) =
+    def sorted = sortBy cmpFn list
     def combo elem acc = match acc
-        (head, rest), tail if ! cmp elem head =
+        (head, rest), tail if ! (cmpFn elem head | isLT) =
             (elem, head, rest), tail
         _ = (elem, Nil), acc
     foldr combo Nil sorted

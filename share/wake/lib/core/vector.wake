@@ -533,11 +533,11 @@ export def vscan (f: a => a => a): a => Vector a => Vector a =
 #
 #   vtab vseq 10 | vflatten | vsortBy (_<_) =
 #     [0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 3 3 3 3 3 3 4 4 4 4 4 5 5 5 5 6 6 6 7 7 8]
-export def vsortBy (lessThanFn: a => a => Boolean): Vector a => Vector a =
+export def vsortBy (cmpFn: a => a => Order): Vector a => Vector a =
     def runStep v i = # 1 if v(i) > v(i+1)
         def vi = vat_ i v
         def vi1 = vat_ (i+1) v
-        if lessThanFn vi1 vi then 1 else 0
+        if cmpFn vi vi1 | isGT then 1 else 0
     def runLoop =
         vtab2 runStep
     def mergeStep (Pair a b) (Pair ai bi) =
@@ -546,9 +546,9 @@ export def vsortBy (lessThanFn: a => a => Boolean): Vector a => Vector a =
             None     None     = unreachable "merged beyond vector limits"
             (Some x) None     = doit x 1 0
             None     (Some y) = doit y 0 1
-            (Some x) (Some y) = match (lessThanFn y x)
-                True  = doit y 0 1
-                False = doit x 1 0 # x <= y prefers x for stable sort
+            (Some x) (Some y) = match (cmpFn x y)
+                GT = doit y 0 1
+                _  = doit x 1 0 # x <= y prefers x for stable sort
     def mergeLoop =
         vunfoldl2 mergeStep
     def top v =
