@@ -784,3 +784,27 @@ def x =
 def x = (\_\_ prim "p") x y
 def x = (\a\b\x prim "p") x y
 def x = (\a \b \x prim "p") x y
+
+def a = 5
+def b = 6
+def c = "asdf"
+def d = identifier
+
+def longFunc param: Result (List Path) Error =
+    match _
+        Nil = Nil,
+        a, b =
+            def f = funcB b
+            match f
+                Some x = x
+                None = x
+        c, e =
+          match f0
+            Some x = x
+            None = x
+
+export def !(x: Boolean): Boolean =
+    if x then
+        False
+    else
+        True

@@ -38,8 +38,10 @@ struct std::hash<std::pair<CSTElement, ctx_t>> {
 
 struct node_traits_t {
   bool format_off = false;
+  bool top_level = false;
 
   void turn_format_off() { format_off = true; }
+  void set_top_level() { top_level = true; }
 };
 
 class Emitter {
@@ -69,6 +71,9 @@ class Emitter {
 
   // Marks all node elements that have had their formatting disabled
   void mark_no_format_nodes(CSTElement node);
+
+  // Marks top level nodes. Any node on 'top level' will have top level = true
+  void mark_top_level_nodes(CSTElement node);
 
   // Binds all comments in the tree to their associated token as a human would consider it.
   //
@@ -139,7 +144,7 @@ class Emitter {
 
   // Returns a formatter that inserts the next node
   // on the current line if it fits, or on a new nested line
-  auto rhs_fmt();
+  auto rhs_fmt(bool always_newline = false);
 
   // Returns a formatter that consumes a pattern continuing until *stop_at* is seen. Pattern is
   // separated by spaces if possible, freshlines otherwise
