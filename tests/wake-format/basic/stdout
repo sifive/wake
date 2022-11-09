@@ -632,7 +632,11 @@ def tarball Unit =
     require Pass tarball =
         def cmd =
             def gnutar = which "gnutar"
-            def tar = if gnutar ==* "gnutar" then which "tar" else gnutar
+            def tar =
+                if gnutar ==* "gnutar" then
+                    which "tar"
+                else
+                    gnutar
             def files = map getPathName (manifest, testManifest, spec, srcs) | sortBy (_ <* _)
             tar,
             "--mtime={time}",
@@ -747,7 +751,12 @@ export def vfoldl (combiningFn: accum => element => accum): accum => Vector elem
 
 
 def loop a s e =
-    if s == e then e else if stopFn (vget a s) then s else loop a (s + 1) e
+    if s == e then
+        e
+    else if stopFn (vget a s) then
+        s
+    else
+        loop a (s + 1) e
 
 
 def loop aaaaa sssss eeeee =
