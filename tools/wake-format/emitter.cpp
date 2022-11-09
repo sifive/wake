@@ -293,7 +293,7 @@ auto Emitter::rhs_fmt(bool always_newline) {
       return count_leading_newlines(token_traits, node) > 0;
    }, full_fmt)
     // Always newline when requested unless the thing to be formatted is a "single literal".
-    // Used for top-level defs and top-level "constatn" defs
+    // Used for top-level defs and top-level "constant" defs
    .pred(ConstPredicate(always_newline), fmt().fmt_if_else(is_single_literal, flat_fmt, full_fmt))
 
     // if our hand hand hasn't yet been forced then decide based on how well RHS fits
@@ -336,7 +336,7 @@ wcl::doc Emitter::layout(CST cst) {
   ctx_t ctx;
   bind_comments(cst.root());
   mark_no_format_nodes(cst.root());
-  mark_top_level_notes(cst.root());
+  mark_top_level_nodes(cst.root());
   return walk(ctx, cst.root());
 }
 
@@ -695,7 +695,7 @@ void Emitter::bind_comments(CSTElement node) {
   bind_nested_comments(node);
 }
 
-void Emitter::mark_top_level_notes(CSTElement node) {
+void Emitter::mark_top_level_nodes(CSTElement node) {
   FMT_ASSERT(node.isNode(), node, "Expected node");
 
   // Note: we are iterating over nodes here rather than the more common element

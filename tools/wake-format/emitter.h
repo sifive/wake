@@ -73,7 +73,7 @@ class Emitter {
   void mark_no_format_nodes(CSTElement node);
 
   // Marks top level nodes. Any node on 'top level' will have top level = true
-  void mark_top_level_notes(CSTElement node);
+  void mark_top_level_nodes(CSTElement node);
 
   // Binds all comments in the tree to their associated token as a human would consider it.
   //
