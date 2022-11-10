@@ -1336,8 +1336,9 @@ wcl::doc Emitter::walk_if(ctx_t ctx, CSTElement node) {
                // clang-format off
                // False body
                .match(
+                 pred(ConstPredicate(false), fmt())
                  // For an 'else if' block, we explode in the explode case to prevent partial flat emission
-                 pred(CST_IF, fmt().space().explode(fmt().walk(DISPATCH(walk_if))))
+                .pred({CST_IF, CST_MATCH}, fmt().space().explode(fmt().walk(WALK_NODE)))
                 .pred(is_expression, fmt().nest(fmt().freshline().walk(WALK_NODE)))
                 // fallthrough is fail
                )
