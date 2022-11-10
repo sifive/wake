@@ -1131,22 +1131,30 @@ wcl::doc Emitter::walk_binary(ctx_t ctx, CSTElement node) {
     parts = collect_right_binary(op_token, node);
   }
 
-  std::vector<wcl::optional<wcl::doc>> choices = {
-      // 1
-      combine_flat(op_token, ctx, parts),
-      // 2
-      combine_explode_first(op_token, ctx, parts),
-      // 3
-      combine_explode_last(op_token, ctx, parts),
-      // 4
-      combine_explode_all(op_token, ctx, parts),
-      // 5
-      combine_explode_first_compress(op_token, ctx, parts),
-      // 6
-      combine_explode_last_compress(op_token, ctx, parts),
-  };
+  if (!ctx.nested_binop &&
+      (op_token.id() == TOKEN_OP_DOLLAR ||
+       (op_token.id() == TOKEN_OP_OR && op_token.fragment().segment().str() == "|"))) {
+    MEMO_RET(select_best_choice({
+        combine_explode_first(op_token, ctx.binop(), parts),
+        combine_explode_last(op_token, ctx.binop(), parts),
+        combine_explode_all(op_token, ctx.binop(), parts),
+    }));
+  }
 
-  MEMO_RET(select_best_choice(choices));
+  MEMO_RET(select_best_choice({
+      // 1
+      combine_flat(op_token, ctx.binop(), parts),
+      // 2
+      combine_explode_first(op_token, ctx.binop(), parts),
+      // 3
+      combine_explode_last(op_token, ctx.binop(), parts),
+      // 4
+      combine_explode_all(op_token, ctx.binop(), parts),
+      // 5
+      combine_explode_first_compress(op_token, ctx.binop(), parts),
+      // 6
+      combine_explode_last_compress(op_token, ctx.binop(), parts),
+  }));
 }
 
 wcl::doc Emitter::walk_block(ctx_t ctx, CSTElement node) {
