@@ -887,6 +887,32 @@ wcl::optional<wcl::doc> Emitter::combine_apply_flat(ctx_t ctx,
   return {wcl::in_place_t{}, std::move(doc)};
 }
 
+wcl::optional<wcl::doc> Emitter::combine_apply_constructor(ctx_t ctx,
+                                                           const std::vector<CSTElement>& parts) {
+  if (parts.size() != 2) {
+    return {};
+  }
+
+  wcl::doc_builder builder;
+
+  CSTElement lhs = parts[0];
+  CSTElement rhs = parts[1];
+
+  if (count_leading_newlines(token_traits, rhs) != 0) {
+    return {};
+  }
+
+  wcl::doc lhs_fmt = fmt().walk(WALK_NODE).space().compose(ctx.sub(builder), lhs, token_traits);
+  if (lhs_fmt->newline_count() != count_leading_newlines(token_traits, lhs)) {
+    return {};
+  }
+
+  builder.append(lhs_fmt);
+  builder.append(walk_node(ctx.sub(builder).explode(), rhs));
+
+  return {wcl::in_place_t{}, std::move(builder).build()};
+}
+
 wcl::optional<wcl::doc> Emitter::combine_apply_explode_all(ctx_t ctx,
                                                            const std::vector<CSTElement>& parts) {
   wcl::doc_builder builder;
@@ -908,9 +934,8 @@ wcl::doc Emitter::walk_apply(ctx_t ctx, CSTElement node) {
   auto parts = collect_apply_parts(node);
 
   std::vector<wcl::optional<wcl::doc>> choices = {
-      // 1
       combine_apply_flat(ctx, parts),
-      // 2
+      combine_apply_constructor(ctx, parts),
       combine_apply_explode_all(ctx, parts),
   };
 
@@ -1699,7 +1724,7 @@ wcl::doc Emitter::place_binop(CSTElement op, bool is_flat, ctx_t ctx) {
   //   ' + '
   //   '.'
   //   ', '
-  if (is_flat) {
+  if (is_flat || op.id() == TOKEN_OP_ASSIGN) {
     return fmt()
         .lit(binop_lhs_separator(op))
         .walk(WALK_TOKEN)
