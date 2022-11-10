@@ -395,12 +395,24 @@ export def mlookup (key: k) (map: Map k v): Option v =
 #
 # *Examples:*
 #   ```
-#   mnew scmp | mexists "a" = False
+#   mnew scmp | mcontains "a" = False
+#   mnew scmp | minsert "a" 1 | mcontains "a" = True
+#   listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "b" | mcontains "b" = False
+#   ```
+export def mcontains (key: k) (map: Map k v): Boolean =
+    isSome (mlookup key map)
+
+# Check whether the predicate succeeds for any key-value pair in the map.
+#
+# *Examples:*
+#   ```
+#   mnew scmp | mcexists "a" = False
 #   mnew scmp | minsert "a" 1 | mexists "a" = True
 #   listToMap scmp ("a" → 1, "b" → 2, Nil) | mdelete "b" | mexists "b" = False
 #   ```
-export def mexists (key: k) (map: Map k v): Boolean =
-    isSome (mlookup key map)
+export def mexists (fn: k => v => Boolean) (map: Map k v): Boolean =
+    def pairFn (Pair k v) = fn k v
+    texists pairFn map.getMapData
 
 
 # Divide the key-value pairs comprising one map into two according to some predicate.
