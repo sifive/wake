@@ -611,6 +611,14 @@ def loop a s e =
     else
         loop a (s+1) e
 
+def loop a s e =
+    if s == e then
+        e
+    else if shouldStop then
+        s
+    else
+        t
+
 def loop aaaaa sssss eeeee =
     if sssss == eeeee then
         eeeee
